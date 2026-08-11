@@ -15,6 +15,21 @@ function identifier(kind: LibraryMetadataIdentifierKind, raw: string): string {
     if (!/^10\.\d{4,9}\/\S+$/i.test(value)) throw new Error('El DOI no tiene un formato válido.');
     return value;
   }
+  if (kind === 'pmid') {
+    value = value.replace(/^pmid:\s*/i, '').trim();
+    if (!/^\d{1,12}$/.test(value)) throw new Error('El PMID debe contener sólo dígitos.');
+    return value;
+  }
+  if (kind === 'pmcid') {
+    value = value.replace(/^pmcid?:\s*/i, '').toUpperCase().replace(/\s+/g, '');
+    if (!/^PMC\d{1,12}$/.test(value)) throw new Error('El PMCID debe tener el formato PMC seguido de dígitos.');
+    return value;
+  }
+  if (kind === 'arxiv') {
+    value = value.replace(/^https?:\/\/(?:www\.)?arxiv\.org\/(?:abs|pdf)\//i, '').replace(/^arxiv:\s*/i, '').replace(/\.pdf$/i, '').trim();
+    if (!/^(?:\d{4}\.\d{4,5}|[a-z.-]+\/\d{7})(?:v\d+)?$/i.test(value)) throw new Error('El identificador arXiv no tiene un formato válido.');
+    return value;
+  }
   value = value.toUpperCase().replace(/[^0-9X]/g, '');
   if (kind === 'isbn' && !/^(?:\d{9}[\dX]|\d{13})$/.test(value)) throw new Error('El ISBN debe contener 10 o 13 caracteres.');
   if (kind === 'issn' && !/^\d{7}[\dX]$/.test(value)) throw new Error('El ISSN debe contener 8 caracteres.');
@@ -120,6 +135,77 @@ async function jsonRequest(url: URL, fetcher: MetadataFetch, signal?: AbortSigna
   } finally { clearTimeout(timer); signal?.removeEventListener('abort', abort); }
 }
 
+async function textRequest(url: URL, fetcher: MetadataFetch, signal?: AbortSignal): Promise<string> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 15_000);
+  const abort = () => controller.abort();
+  signal?.addEventListener('abort', abort, { once: true });
+  try {
+    const response = await fetcher(url, { signal: controller.signal, headers: { Accept: 'application/atom+xml', 'User-Agent': 'Nodus bibliographic metadata client' } });
+    if (!response.ok) throw new Error(response.status === 404 ? 'No se encontraron metadatos para ese identificador.' : `El servicio bibliográfico respondió con ${response.status}.`);
+    return await response.text();
+  } finally { clearTimeout(timer); signal?.removeEventListener('abort', abort); }
+}
+
+function xmlPlain(value: string): string {
+  return value.replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, '$1').replace(/<[^>]+>/g, ' ')
+    .replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&apos;/g, "'").replace(/&amp;/g, '&')
+    .replace(/\s+/g, ' ').trim();
+}
+
+function xmlValues(xml: string, tag: string): string[] {
+  return [...xml.matchAll(new RegExp(`<${tag}(?:\\s[^>]*)?>([\\s\\S]*?)<\\/${tag}>`, 'gi'))].map((match) => xmlPlain(match[1])).filter(Boolean);
+}
+
+function pubmedCandidate(raw: unknown, requested: { pmid?: string; pmcid?: string }): LibraryMetadataCandidate | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const item = raw as Record<string, unknown>;
+  const title = plain(item.title); if (!title) return null;
+  const authors = (Array.isArray(item.authors) ? item.authors : []).flatMap((author) => {
+    const name = plain((author as { name?: unknown } | null)?.name); return name ? [nameCreator(name)] : [];
+  });
+  const articleIds = Array.isArray(item.articleids) ? item.articleids as Array<Record<string, unknown>> : [];
+  const findId = (idType: string) => plain(articleIds.find((entry) => String(entry.idtype ?? '').toLowerCase() === idType)?.value);
+  const rawDate = plain(item.pubdate) ?? plain(item.epubdate);
+  const parsedYear = Number(/\b(\d{4})\b/.exec(rawDate ?? '')?.[1]) || null;
+  const doi = findId('doi'); const pmid = requested.pmid ?? findId('pubmed'); const pmcid = requested.pmcid ?? findId('pmc');
+  return {
+    id: `pubmed:${pmid ?? pmcid ?? title}`, source: 'pubmed', confidence: 1,
+    sourceUrl: pmid ? `https://pubmed.ncbi.nlm.nih.gov/${pmid}/` : pmcid ? `https://www.ncbi.nlm.nih.gov/pmc/articles/${pmcid}/` : null,
+    metadata: {
+      title, itemType: 'article-journal', creators: authors, date: rawDate, year: parsedYear,
+      publicationTitle: plain(item.fulljournalname) ?? plain(item.source), volume: plain(item.volume), issue: plain(item.issue), pages: plain(item.pages),
+      ...(doi ? { doi } : {}), ...(pmid ? { pmid } : {}), ...(pmcid ? { pmcid } : {}),
+      isbn: [], issn: strings(item.issn), tags: [],
+    },
+  };
+}
+
+function nameCreator(name: string): LibraryItemMetadata['creators'][number] {
+  const clean = name.trim(); const comma = /^([^,]+),\s*(.+)$/.exec(clean);
+  if (comma) return { creatorType: 'author', firstName: comma[2], lastName: comma[1] };
+  const parts = clean.split(/\s+/); return parts.length > 1
+    ? { creatorType: 'author', firstName: parts.slice(0, -1).join(' '), lastName: parts.at(-1) }
+    : { creatorType: 'author', name: clean };
+}
+
+function arxivCandidate(xml: string, arxiv: string): LibraryMetadataCandidate | null {
+  const entry = /<entry(?:\s[^>]*)?>([\s\S]*?)<\/entry>/i.exec(xml)?.[1]; if (!entry) return null;
+  const title = xmlValues(entry, 'title')[0]; if (!title) return null;
+  const published = xmlValues(entry, 'published')[0]; const parsedYear = Number(published?.slice(0, 4)) || null;
+  const authors = [...entry.matchAll(/<author(?:\s[^>]*)?>([\s\S]*?)<\/author>/gi)]
+    .flatMap((match) => xmlValues(match[1], 'name').map(nameCreator));
+  const doi = xmlValues(entry, 'arxiv:doi')[0];
+  return {
+    id: `arxiv:${arxiv}`, source: 'arxiv', confidence: 1, sourceUrl: `https://arxiv.org/abs/${arxiv}`,
+    metadata: {
+      title, itemType: 'manuscript', creators: authors, abstract: xmlValues(entry, 'summary')[0], date: published, year: parsedYear,
+      ...(doi ? { doi } : {}), arxiv, url: `https://arxiv.org/abs/${arxiv}`,
+      isbn: [], issn: [], tags: xmlValues(entry, 'category'),
+    },
+  };
+}
+
 export async function resolveLibraryMetadata(
   kind: LibraryMetadataIdentifierKind,
   rawValue: string,
@@ -139,12 +225,38 @@ export async function resolveLibraryMetadata(
     url.searchParams.set('select', 'DOI,title,author,issued,published-print,published-online,container-title,publisher,type,ISSN,ISBN,URL,abstract,language,volume,issue,page');
     const payload = await jsonRequest(url, fetcher, options.signal) as { message?: { items?: unknown[] } };
     candidates = (payload.message?.items ?? []).map((entry, index) => crossrefCandidate(entry, Math.max(0.55, 0.9 - index * 0.03))).filter((entry): entry is LibraryMetadataCandidate => !!entry);
-  } else {
+  } else if (kind === 'isbn') {
     const url = new URL('https://openlibrary.org/search.json');
     url.searchParams.set('isbn', value); url.searchParams.set('limit', '5');
     url.searchParams.set('fields', 'key,title,author_name,first_publish_year,publish_year,publisher,isbn,language,subject');
     const payload = await jsonRequest(url, fetcher, options.signal) as { docs?: unknown[] };
     candidates = (payload.docs ?? []).map((entry, index) => openLibraryCandidate(entry, value, index)).filter((entry): entry is LibraryMetadataCandidate => !!entry);
+  } else if (kind === 'pmid' || kind === 'pmcid') {
+    let pmid = kind === 'pmid' ? value : '';
+    let pmcid = kind === 'pmcid' ? value : '';
+    if (pmcid) {
+      const idUrl = new URL('https://www.ncbi.nlm.nih.gov/pmc/utils/idconv/v1.0/');
+      idUrl.searchParams.set('format', 'json'); idUrl.searchParams.set('tool', 'nodus'); idUrl.searchParams.set('ids', pmcid);
+      const converted = await jsonRequest(idUrl, fetcher, options.signal) as { records?: Array<{ pmid?: string; pmcid?: string; doi?: string }> };
+      const record = converted.records?.[0]; pmid = plain(record?.pmid) ?? ''; pmcid = plain(record?.pmcid) ?? pmcid;
+      if (!pmid && record?.doi) {
+        const url = new URL(`https://api.crossref.org/works/${encodeURIComponent(record.doi)}`);
+        const payload = await jsonRequest(url, fetcher, options.signal) as { message?: unknown };
+        const candidate = crossrefCandidate(payload.message, 0.96);
+        if (candidate) candidates = [{ ...candidate, metadata: { ...candidate.metadata, pmcid } }];
+      }
+    }
+    if (pmid) {
+      const url = new URL('https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esummary.fcgi');
+      url.searchParams.set('db', 'pubmed'); url.searchParams.set('id', pmid); url.searchParams.set('retmode', 'json');
+      const payload = await jsonRequest(url, fetcher, options.signal) as { result?: Record<string, unknown> };
+      const candidate = pubmedCandidate(payload.result?.[pmid], { pmid, ...(pmcid ? { pmcid } : {}) });
+      if (candidate) candidates = [candidate];
+    }
+  } else {
+    const url = new URL('https://export.arxiv.org/api/query'); url.searchParams.set('search_query', `id:${value}`); url.searchParams.set('max_results', '1');
+    const candidate = arxivCandidate(await textRequest(url, fetcher, options.signal), value);
+    if (candidate) candidates = [candidate];
   }
   if (!candidates.length) throw new Error('No se encontraron metadatos para ese identificador.');
   return { kind, value, candidates, queriedAt: new Date().toISOString() };

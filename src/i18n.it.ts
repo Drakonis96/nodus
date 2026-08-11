@@ -22,10 +22,12 @@ import { NEW_VAULT_COMPLETION_TRANSLATIONS } from './i18n.newVaultCompletion';
 import { NODI_NOTIFICATION_TRANSLATIONS } from './i18n.nodiNotifications';
 import { ANNOUNCEMENT_TRANSLATIONS } from './i18n.announcements';
 import { LIBRARY_READER_TRANSLATIONS } from './i18n.libraryReader';
+import { LIBRARY_BIBLIOGRAPHY_TRANSLATIONS } from './i18n.libraryBibliography';
 
 /** Complete static Italian interface table; coverage prohibits runtime fallbacks. */
 export const IT: Record<string, string> = {
   ...LIBRARY_READER_TRANSLATIONS.it,
+  ...LIBRARY_BIBLIOGRAPHY_TRANSLATIONS.it,
   ...DIARIZATION_TRANSLATIONS.it,
   ...PROSOPOGRAPHY_TRANSLATIONS.it,
   ...PRIMARY_SOURCES_TRANSLATIONS.it,

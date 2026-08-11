@@ -41,7 +41,11 @@ button exists.
 | Zotero | Interrupted and partial sessions persist reports and can resume from the import dialog | Verified | `test-zotero-library-import`, `test-global-library-ui` |
 | Plugin | Status, import, and reader opening reach the desktop | Verified | `test-global-library-ui`, Zotero plugin suite |
 | Plugin | Protocol capabilities let v4 desktop/plugin degrade non-blockingly with their v3 counterpart | Verified | `test-global-library-ui`, Zotero plugin suite |
-| Interoperability | RIS, BibTeX, and CSL JSON are imported | Verified | `test-library-metadata` |
+| Interoperability | RIS, BibTeX/BibLaTeX, CSL-JSON, EndNote XML, Zotero RDF, CSV, and Markdown import and export | Verified | `test-library-metadata`, `test-global-library-ui` |
+| Interoperability | Unknown fields survive same-format import, editing, and export through `metadata.extra` | Verified | `test-library-metadata` |
+| Citations | Citation keys are stable, editable, and collision-free | Verified | `test-library-metadata` |
+| Citations | APA 7, Chicago author-date, MLA 9, IEEE, and Vancouver render deterministically without network access | Verified | `test-library-metadata`, `e2e-global-library` |
+| Citations | Selection, collection, and smart-search exports use the same typed export contract | Verified | `test-global-library-ui`, `e2e-global-library` |
 | Interoperability | Repeated local files are detected by hash | Verified | `test-global-library-operations` |
 | Organization | Collections and subcollections support arbitrary depth | Verified | `test-global-library-operations`, `test-global-library-ui` |
 | Organization | Zotero collections are mirrored and Nodus collections are editable | Verified | `test-global-library-operations` |
@@ -81,8 +85,9 @@ button exists.
 | Chat | The shared engine and model receive document context | Verified | `test-global-library-ui`, `test-global-library-reader` |
 | Chat | History persists beside the document and can be cleared | Verified | `test-global-library-reader` |
 | Metadata | Local edits survive future source refreshes | Verified | `test-library-metadata`, `e2e-global-library` |
-| Metadata | DOI/ISSN use Crossref and ISBN uses Open Library | Verified | `test-library-metadata` |
+| Metadata | DOI/ISSN use Crossref, ISBN uses Open Library, PMID/PMCID use NCBI, and arXiv uses its Atom API | Verified | `test-library-metadata` |
 | Metadata | Candidates require review before being applied | Verified | `test-global-library-ui`, `e2e-global-library` |
+| Metadata | Bulk resolution is rate-limited, cancelable, partial-result safe, and requires a second confirmation | Verified | `test-library-metadata`, `test-global-library-ui`, `e2e-global-library` |
 | Duplicates | Explicit detection and merging preserve derived files | Verified | `test-library-metadata`, `test-global-library-ui` |
 | Vaults | Linking is idempotent and does not duplicate the original | Verified | `test-global-library-vault-integration` |
 | Vaults | Analysis resolves the global clean Markdown | Verified | `test-global-library-vault-integration` |

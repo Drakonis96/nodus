@@ -28,9 +28,11 @@ import { NEW_VAULT_COMPLETION_TRANSLATIONS } from './i18n.newVaultCompletion';
 import { NODI_NOTIFICATION_TRANSLATIONS } from './i18n.nodiNotifications';
 import { ANNOUNCEMENT_TRANSLATIONS } from './i18n.announcements';
 import { LIBRARY_READER_TRANSLATIONS } from './i18n.libraryReader';
+import { LIBRARY_BIBLIOGRAPHY_TRANSLATIONS } from './i18n.libraryBibliography';
 
 export const PT_BR: Record<string, string> = {
   ...LIBRARY_READER_TRANSLATIONS['pt-BR'],
+  ...LIBRARY_BIBLIOGRAPHY_TRANSLATIONS['pt-BR'],
   ...DIARIZATION_TRANSLATIONS['pt-BR'],
   ...PROSOPOGRAPHY_TRANSLATIONS['pt-BR'],
   ...PRIMARY_SOURCES_TRANSLATIONS.ptBR,

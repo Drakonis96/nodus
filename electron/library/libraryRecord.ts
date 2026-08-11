@@ -9,7 +9,10 @@ import type {
   LibrarySourceIdentity,
 } from '@shared/libraryTypes';
 
-const SOURCES = new Set<LibraryItemSource>(['nodus', 'zotero', 'mendeley', 'ris', 'bibtex', 'csl-json', 'legacy']);
+const SOURCES = new Set<LibraryItemSource>([
+  'nodus', 'zotero', 'mendeley', 'ris', 'bibtex', 'biblatex', 'csl-json',
+  'endnote-xml', 'zotero-rdf', 'csv', 'markdown', 'legacy',
+]);
 const ITEM_TYPES = new Set<LibraryItemType>([
   'article-journal', 'journal-article', 'magazine-article', 'newspaper-article', 'book', 'chapter', 'book-section',
   'conference-paper', 'thesis', 'report', 'manuscript', 'presentation', 'interview', 'letter', 'email', 'instant-message',
@@ -47,7 +50,7 @@ export function normalizeLibrarySourceIdentity(value: unknown): LibrarySourceIde
   const libraryType = input.libraryType as LibrarySourceIdentity['libraryType'];
   const libraryId = stringValue(input.libraryId, 1_000);
   const itemKey = stringValue(input.itemKey, 2_000);
-  if (!['zotero', 'mendeley', 'ris', 'bibtex', 'csl-json'].includes(source)) return null;
+  if (!['zotero', 'mendeley', 'ris', 'bibtex', 'biblatex', 'csl-json', 'endnote-xml', 'zotero-rdf', 'csv', 'markdown'].includes(source)) return null;
   if (!['user', 'group', 'personal', 'shared', 'import'].includes(libraryType)) return null;
   return libraryId && itemKey ? { source, libraryType, libraryId, itemKey } : null;
 }
@@ -142,6 +145,9 @@ export function normalizeLibraryMetadata(value: unknown, fallbackTitle = 'Docume
     ...(stringValue(input.rights, 4_000) ? { rights: stringValue(input.rights, 4_000) } : {}),
     ...(stringValue(input.url, 10_000) ? { url: stringValue(input.url, 10_000) } : {}),
     ...(stringValue(input.doi, 1_000) ? { doi: stringValue(input.doi, 1_000) } : {}),
+    ...(stringValue(input.pmid, 100) ? { pmid: stringValue(input.pmid, 100) } : {}),
+    ...(stringValue(input.pmcid, 100) ? { pmcid: stringValue(input.pmcid, 100) } : {}),
+    ...(stringValue(input.arxiv, 100) ? { arxiv: stringValue(input.arxiv, 100) } : {}),
     isbn: stringArray(input.isbn),
     issn: stringArray(input.issn),
     tags: stringArray(input.tags),

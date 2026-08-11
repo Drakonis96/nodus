@@ -171,8 +171,9 @@ specified operation:
   the user's request are sent.The provider, model and account is chosen by the user. Local models do
   not make that submission.
 - **Zotero:** consults libraries and files authorized by the user.
-- **Crossref and Open Library:** when the user requests bibliographic metadata, Nodus sends only the
-  DOI, ISBN or ISSN entered for that lookup. Candidates are shown for review and are not applied
+- **Crossref, Open Library, NCBI and arXiv:** when the user requests bibliographic metadata, Nodus
+  sends only the DOI, ISBN, ISSN, PMID, PMCID or arXiv identifier selected for that lookup. Bulk
+  requests are rate-limited and cancelable. Candidates are shown for review and are not applied
   automatically.
 - **Clean-reader chat and remote OCR:** these actions use the AI model explicitly configured by the
   user. A remote chat provider receives the clean document text, relevant annotations and recent

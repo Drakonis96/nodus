@@ -231,6 +231,23 @@ try {
   assert.equal((await page.evaluate((id) => window.nodus.getGlobalLibraryItem(id), itemId)).metadata.publisher, 'Editorial corregida en Nodus');
   console.log('[global-library-e2e] local metadata correction persisted');
 
+  await page.getByTestId('cite-library-item').click();
+  const citationDialog = page.getByTestId('library-citation-export-dialog');
+  await citationDialog.waitFor({ state: 'visible' });
+  await page.getByTestId('library-citation-style').selectOption('chicago-author-date');
+  await page.getByTestId('copy-library-citation').click();
+  await citationDialog.getByText(/Mujeres solas en la posguerra/).waitFor();
+  const copiedCitation = await page.evaluate(() => navigator.clipboard.readText());
+  assert.match(copiedCitation, /Mujeres solas en la posguerra/);
+  await page.screenshot({ path: path.join(os.tmpdir(), 'nodus-library-citation-export-dark-wide.png'), fullPage: true });
+  await page.evaluate(() => { document.documentElement.classList.add('light'); document.documentElement.classList.remove('dark'); });
+  await page.setViewportSize({ width: 760, height: 900 });
+  await page.screenshot({ path: path.join(os.tmpdir(), 'nodus-library-citation-export-light-narrow.png'), fullPage: true });
+  await page.evaluate(() => { document.documentElement.classList.add('dark'); document.documentElement.classList.remove('light'); });
+  await page.setViewportSize({ width: 1540, height: 940 });
+  await citationDialog.getByRole('button').first().click();
+  await citationDialog.waitFor({ state: 'detached' });
+
   await detail.getByRole('button', { name: 'Adjuntos', exact: true }).click();
   const itemManager = page.getByTestId('library-item-manager');
   await itemManager.waitFor({ state: 'visible' });
@@ -258,6 +275,17 @@ try {
 
   await row.locator('input[type="checkbox"]').check();
   await page.getByTestId('global-library-bulk-actions').waitFor({ state: 'visible' });
+  await page.getByTestId('bulk-resolve-library-metadata').click();
+  const metadataBatch = page.getByTestId('library-metadata-batch-dialog');
+  await metadataBatch.waitFor({ state: 'visible' });
+  await page.screenshot({ path: path.join(os.tmpdir(), 'nodus-library-metadata-batch-dark-wide.png'), fullPage: true });
+  await page.evaluate(() => { document.documentElement.classList.add('light'); document.documentElement.classList.remove('dark'); });
+  await page.setViewportSize({ width: 760, height: 900 });
+  await page.screenshot({ path: path.join(os.tmpdir(), 'nodus-library-metadata-batch-light-narrow.png'), fullPage: true });
+  await page.evaluate(() => { document.documentElement.classList.add('dark'); document.documentElement.classList.remove('light'); });
+  await page.setViewportSize({ width: 1540, height: 940 });
+  await metadataBatch.getByRole('button').first().click();
+  await metadataBatch.waitFor({ state: 'detached' });
   await page.getByTestId('global-library-search').fill('resultado inexistente');
   await page.waitForTimeout(350);
   await row.waitFor({ state: 'detached' });

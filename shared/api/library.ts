@@ -36,6 +36,12 @@ import type {
   LibrarySavedSearchRecord,
   LibrarySmartSearchGroup,
   LibraryViewPreferences,
+  LibraryBibliographyExportRequest,
+  LibraryBibliographyExportReport,
+  LibraryCitationResult,
+  LibraryCitationStyle,
+  LibraryMetadataBatchProgress,
+  LibraryMetadataBatchResult,
 } from '../libraryTypes';
 import type { VaultSummary } from '../types';
 
@@ -93,6 +99,13 @@ export interface LibraryApi {
   listGlobalLibraryTags(): Promise<LibraryTagRecord[]>;
   setGlobalLibraryTagColor(tag: string, color: string | null): Promise<LibraryTagRecord[]>;
   resolveGlobalLibraryMetadata(kind: LibraryMetadataIdentifierKind, value: string): Promise<LibraryMetadataLookupResult>;
+  startGlobalLibraryMetadataBatch(requestId: string, itemIds: string[]): Promise<LibraryMetadataBatchResult>;
+  applyGlobalLibraryMetadataBatch(requestId: string, itemIds: string[]): Promise<LibraryMetadataBatchResult>;
+  cancelGlobalLibraryMetadataBatch(requestId: string): Promise<boolean>;
+  onGlobalLibraryMetadataBatchProgress(cb: (progress: LibraryMetadataBatchProgress) => void): () => void;
+  updateGlobalLibraryCitationKey(itemId: string, citationKey: string): Promise<LibraryItemRecord>;
+  formatGlobalLibraryCitation(itemIds: string[], style: LibraryCitationStyle, kind: 'citation' | 'bibliography'): Promise<LibraryCitationResult>;
+  exportGlobalLibraryBibliography(request: LibraryBibliographyExportRequest): Promise<LibraryBibliographyExportReport>;
   listGlobalLibraryDuplicates(): Promise<LibraryDuplicateGroup[]>;
   mergeGlobalLibraryItems(canonicalId: string, duplicateIds: string[]): Promise<LibraryItemRecord>;
   listGlobalLibraryVaults(): Promise<VaultSummary[]>;

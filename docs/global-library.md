@@ -253,12 +253,14 @@ receives only the text needed for the question when the user asks it.
 
 The Nodus record supports title, type, creators, date, publication, publisher,
 volume, issue, pages, edition, place, language, rights, URL, DOI, ISBN, ISSN,
-abstract, and tags.
+PMID, PMCID, arXiv, abstract, tags, and lossless extra fields.
 
 Identifier lookup uses:
 
 - Crossref for DOI and ISSN;
-- Open Library for ISBN.
+- Open Library for ISBN;
+- NCBI for PMID and PMCID;
+- arXiv for arXiv identifiers.
 
 Nodus shows candidates and a change preview; nothing is applied without review.
 Corrections live in a Nodus-owned layer and survive future source-manager
@@ -329,6 +331,26 @@ to both records with the correct inverse (`cites`/`is-cited-by` and
 `corrects`/`is-corrected-by`). Tags support bulk add/remove operations and a
 library-wide color registry stored in `.nodus/tags.json`.
 
+### Identifiers, citations, and file exchange
+
+The metadata editor resolves DOI and ISSN through Crossref, ISBN through Open
+Library, PMID and PMCID through the public NCBI services, and arXiv identifiers
+through the arXiv Atom API. Every individual lookup produces a field-by-field
+preview. Bulk lookup is sequential and rate-limited, can be canceled, retains a
+partial result report, and still requires explicit confirmation before writing
+any candidate to a manifest.
+
+Every live record has a stable, editable, collision-free citation key. Nodus
+formats in-text citations and bibliography entries locally for APA 7, Chicago
+author-date, MLA 9, IEEE, and Vancouver. The formatter does not use Citation.js,
+citeproc, an online citation service, or arbitrary CSL styles.
+
+RIS, BibTeX, BibLaTeX, CSL-JSON, EndNote XML, Zotero RDF, CSV, and Markdown can
+be imported and exported. Unknown source fields are stored in `metadata.extra`
+and emitted again by the corresponding exporter. Export can target the current
+selection, a collection, or a live smart search; sorting and citation keys make
+the generated file deterministic.
+
 ## Editable collections and live smart searches
 
 Nodus collections can be nested, reordered, and moved with drag and drop. A
@@ -379,7 +401,8 @@ retention policy.
 - Cataloging, reading, annotation, local OCR, and rebuilding run on the device.
 - Zotero is accessed locally or through an API already authorized by the user,
   always in read-only mode.
-- Crossref and Open Library receive only the requested identifier.
+- Crossref, Open Library, NCBI, and arXiv receive only the identifier selected
+  for metadata resolution. Bulk resolution is never started implicitly.
 - Remote OCR and chat contact the selected AI provider only when the user runs
   the corresponding action.
 - Linking a Library item to a vault does not publish originals or derived files
@@ -405,7 +428,8 @@ The main tests are:
   notes, symmetric relations, and colored tags;
 - `test-library-smart-collections.mjs`: cycle-safe movement, reversible item
   memberships, nested live rules, facets, and persisted table preferences;
-- `test-library-metadata.mjs`: identifiers, formats, and duplicates;
+- `test-library-metadata.mjs`: six identifier kinds, cancelable bulk lookup,
+  eight import/export formats, five local citation styles, keys, and duplicates;
 - `test-global-library-reader.mjs`: reader, pages, annotations, and chat;
 - `test-global-library-vault-integration.mjs`: vault linking and analysis;
 - `test-vaults.mjs`: exact component reuse, cancellation, aliases, and private-state isolation;

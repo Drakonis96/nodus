@@ -62,6 +62,17 @@ export const libraryApi: LibraryApi = {
   listGlobalLibraryTags: () => ipcRenderer.invoke('library:tags'),
   setGlobalLibraryTagColor: (tag, color) => ipcRenderer.invoke('library:setTagColor', tag, color),
   resolveGlobalLibraryMetadata: (kind, value) => ipcRenderer.invoke('library:resolveMetadata', kind, value),
+  startGlobalLibraryMetadataBatch: (requestId, itemIds) => ipcRenderer.invoke('library:startMetadataBatch', requestId, itemIds),
+  applyGlobalLibraryMetadataBatch: (requestId, itemIds) => ipcRenderer.invoke('library:applyMetadataBatch', requestId, itemIds),
+  cancelGlobalLibraryMetadataBatch: (requestId) => ipcRenderer.invoke('library:cancelMetadataBatch', requestId),
+  onGlobalLibraryMetadataBatchProgress: (cb) => {
+    const listener = (_event: unknown, progress: Parameters<typeof cb>[0]) => cb(progress);
+    ipcRenderer.on('library:metadataBatchProgress', listener);
+    return () => ipcRenderer.removeListener('library:metadataBatchProgress', listener);
+  },
+  updateGlobalLibraryCitationKey: (itemId, citationKey) => ipcRenderer.invoke('library:updateCitationKey', itemId, citationKey),
+  formatGlobalLibraryCitation: (itemIds, style, kind) => ipcRenderer.invoke('library:formatCitation', itemIds, style, kind),
+  exportGlobalLibraryBibliography: (request) => ipcRenderer.invoke('library:exportBibliography', request),
   listGlobalLibraryDuplicates: () => ipcRenderer.invoke('library:duplicates'),
   mergeGlobalLibraryItems: (canonicalId, duplicateIds) => ipcRenderer.invoke('library:mergeItems', canonicalId, duplicateIds),
   listGlobalLibraryVaults: () => ipcRenderer.invoke('library:vaults'),

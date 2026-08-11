@@ -1,4 +1,5 @@
 import { BrowserWindow } from 'electron';
+import fs from 'node:fs';
 import type {
   LibraryCatalogPage,
   LibraryCatalogQuery,
@@ -37,6 +38,13 @@ import type {
   LibrarySavedSearchRecord,
   LibrarySmartSearchGroup,
   LibraryViewPreferences,
+  LibraryBibliographyExportRequest,
+  LibraryBibliographyExportReport,
+  LibraryCitationResult,
+  LibraryCitationStyle,
+  LibraryMetadataBatchEntry,
+  LibraryMetadataBatchProgress,
+  LibraryMetadataBatchResult,
 } from '@shared/libraryTypes';
 import { LibraryCatalog } from './libraryCatalog';
 import { LibraryDiskStore } from './libraryStorage';
@@ -58,6 +66,8 @@ import { buildOcrTextPrompt, OCR_USER_PROMPT } from '@shared/aiOcrPrompt';
 import { DEFAULT_OCR_OPTIONS } from '@shared/aiOcrTypes';
 import { LibraryOperations } from './libraryOperations';
 import { resolveLibraryMetadata } from './libraryMetadataResolver';
+import { libraryItemIdentifier, runLibraryMetadataBatch } from './libraryMetadataBatch';
+import { mergeLibraryMetadataCandidate } from '@shared/libraryMetadata';
 import { propagateLibraryInvalidations, settleActiveVaultLibraryInvalidations } from './libraryInvalidation';
 import { listLibraryAnalysisProvenance } from '../db/libraryAnalysisProvenance';
 import type { LibraryAnalysisReuseComponent, LibraryAnalysisReuseStatus } from '@shared/libraryTypes';
@@ -75,6 +85,7 @@ let live: {
   migrations: LibraryMigrationSessionManager;
 } | null = null;
 const zoteroImports = new Map<string, AbortController>();
+const metadataBatches = new Map<string, { controller: AbortController; result: LibraryMetadataBatchResult | null }>();
 
 async function libraryRemoteOcr(input: { image: Buffer; mimeType: 'image/png' }): Promise<string> {
   const settings = getSettings();
@@ -120,7 +131,9 @@ function service(): NonNullable<typeof live> | null {
   const catalog = new LibraryCatalog(localLibraryDatabasePath());
   const extraction = new LibraryExtractionQueue({ store, catalog, onProgress: broadcastExtraction, remoteOcr: libraryRemoteOcr });
   const migrations = new LibraryMigrationSessionManager(store, catalog, listVaults, broadcastMigration);
-  live = { root, deviceId, store, catalog, extraction, operations: new LibraryOperations(store, catalog), migrations };
+  const operations = new LibraryOperations(store, catalog);
+  operations.ensureCitationKeys();
+  live = { root, deviceId, store, catalog, extraction, operations, migrations };
   return live;
 }
 
@@ -255,6 +268,7 @@ export function startZoteroLibraryImport(
     requestId, selection, store: current.store, catalog: current.catalog,
     signal: controller.signal, onProgress,
   }).then((report) => {
+    current.operations.ensureCitationKeys();
     const readyToExtract = current.store.scanMaterializedItems().records
       .filter((item) => !item.deletedAt && item.source === 'zotero' && item.extraction?.status === 'pending' && !!item.files?.original)
       .map((item) => item.id);
@@ -504,6 +518,83 @@ export function updateGlobalLibraryItemMetadata(itemId: string, patch: Partial<L
 
 export function resolveGlobalLibraryMetadata(kind: LibraryMetadataIdentifierKind, value: string): Promise<LibraryMetadataLookupResult> {
   return resolveLibraryMetadata(kind, value);
+}
+
+export async function startGlobalLibraryMetadataBatch(
+  requestId: string,
+  itemIds: string[],
+  onProgress: (progress: LibraryMetadataBatchProgress) => void,
+  rateLimitMs = 350,
+): Promise<LibraryMetadataBatchResult> {
+  if (metadataBatches.has(requestId)) throw new Error('Ya existe una resolución masiva con ese identificador.');
+  const current = service(); if (!current) throw new Error('Configura primero la carpeta de copias de seguridad de Nodus.');
+  const controller = new AbortController(); const startedAt = new Date().toISOString();
+  metadataBatches.set(requestId, { controller, result: null });
+  const uniqueIds = [...new Set(itemIds)]; const entries: LibraryMetadataBatchEntry[] = [];
+  const emit = (phase: LibraryMetadataBatchProgress['phase'], currentItemId: string | null, message: string) => onProgress({
+    requestId, phase, completed: entries.length, total: uniqueIds.length, currentItemId,
+    succeeded: entries.filter((entry) => !!entry.candidate).length, failed: entries.filter((entry) => !!entry.error).length, message,
+  });
+  emit('queued', null, 'Preparando la resolución de metadatos.');
+  let status: LibraryMetadataBatchResult['status'] = 'ready';
+  try {
+    const batch = await runLibraryMetadataBatch(uniqueIds.map((itemId) => ({ itemId, item: current.operations.bibliographyRecords({ itemIds: [itemId] })[0] ?? null })), {
+      signal: controller.signal, rateLimitMs,
+      resolve: (kind, value, signal) => resolveLibraryMetadata(kind, value, { signal }),
+      onStep: (entry, itemId) => {
+        if (entry) { entries.push(entry); emit('resolving', itemId, 'Resultado parcial guardado.'); }
+        else {
+          const item = current.operations.bibliographyRecords({ itemIds: [itemId] })[0]; const detected = item ? libraryItemIdentifier(item) : null;
+          emit('resolving', itemId, detected ? `Resolviendo ${detected.kind.toUpperCase()}…` : 'Sin identificador compatible.');
+        }
+      },
+    });
+    status = batch.status; emit(status === 'ready' ? 'ready' : 'canceled', null, status === 'ready' ? 'La vista previa está lista para confirmar.' : 'Resolución cancelada; se conservan los resultados parciales.');
+  } catch (error) {
+    status = controller.signal.aborted ? 'canceled' : 'failed';
+    emit(status === 'canceled' ? 'canceled' : 'failed', null, status === 'canceled' ? 'Resolución cancelada; se conservan los resultados parciales.' : error instanceof Error ? error.message : String(error));
+  }
+  const result: LibraryMetadataBatchResult = { requestId, status, entries, startedAt, completedAt: new Date().toISOString() };
+  metadataBatches.set(requestId, { controller, result }); return result;
+}
+
+export function applyGlobalLibraryMetadataBatch(requestId: string, itemIds: string[]): LibraryMetadataBatchResult {
+  const session = metadataBatches.get(requestId); const current = service();
+  if (!session?.result || !current) throw new Error('La vista previa ya no está disponible.');
+  const selected = new Set(itemIds); const entries = session.result.entries.map((entry) => {
+    if (!selected.has(entry.itemId) || !entry.candidate) return entry;
+    const existing = current.operations.bibliographyRecords({ itemIds: [entry.itemId] })[0]; if (!existing) return { ...entry, error: 'El documento ya no existe.' };
+    const patch = mergeLibraryMetadataCandidate(existing.metadata, entry.candidate.metadata);
+    patch.extra = { ...(patch.extra ?? {}), [`resolved:${entry.kind}`]: entry.value ?? '' };
+    finishItemMutation(current, current.operations.updateItemMetadata(entry.itemId, patch));
+    return { ...entry, applied: true };
+  });
+  const result: LibraryMetadataBatchResult = { ...session.result, status: 'complete', entries, completedAt: new Date().toISOString() };
+  metadataBatches.set(requestId, { ...session, result }); return result;
+}
+
+export function cancelGlobalLibraryMetadataBatch(requestId: string): boolean {
+  const session = metadataBatches.get(requestId); if (!session || session.result?.status === 'complete') return false;
+  session.controller.abort(); return true;
+}
+
+export function updateGlobalLibraryCitationKey(itemId: string, citationKey: string): LibraryItemRecord {
+  const current = service(); if (!current) throw new Error('Configura primero la carpeta de copias de seguridad de Nodus.');
+  const result = current.operations.updateCitationKey(itemId, citationKey); broadcast(current.catalog.status(current.root, current.deviceId)); return result;
+}
+
+export function formatGlobalLibraryCitation(itemIds: string[], style: LibraryCitationStyle, kind: 'citation' | 'bibliography'): LibraryCitationResult {
+  const current = service(); if (!current) throw new Error('Configura primero la carpeta de copias de seguridad de Nodus.');
+  current.operations.ensureCitationKeys();
+  return current.operations.formatCitation(itemIds, style, kind);
+}
+
+export function exportGlobalLibraryBibliography(request: LibraryBibliographyExportRequest, filePath: string): LibraryBibliographyExportReport {
+  const current = service(); if (!current) throw new Error('Configura primero la carpeta de copias de seguridad de Nodus.');
+  current.operations.ensureCitationKeys();
+  const exported = current.operations.exportBibliography(request);
+  fs.writeFileSync(filePath, exported.content, 'utf8');
+  return { format: request.format, exported: exported.exported, filePath, canceled: false, warnings: [] };
 }
 
 export function listGlobalLibraryDuplicates(): LibraryDuplicateGroup[] {

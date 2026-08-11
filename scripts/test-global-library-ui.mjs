@@ -14,7 +14,7 @@ test('the unified Library keeps the global catalogue independent and the vault c
 });
 
 test('the Library UI exposes hierarchy, search, bulk operations, imports and background state', async () => {
-  const view = `${await readSource('src/views/GlobalLibraryView.tsx')}\n${await readSource('src/components/library/LibraryItemManager.tsx')}\n${await readSource('src/components/library/LibrarySmartSearchDialog.tsx')}`;
+  const view = `${await readSource('src/views/GlobalLibraryView.tsx')}\n${await readSource('src/components/library/LibraryItemManager.tsx')}\n${await readSource('src/components/library/LibrarySmartSearchDialog.tsx')}\n${await readSource('src/components/library/LibraryMetadataDialogs.tsx')}`;
   for (const marker of [
     'global-library-view', 'global-library-search', 'global-library-bulk-actions',
     'global-library-detail', 'zotero-global-import-dialog', 'open-zotero-global-import',
@@ -27,6 +27,8 @@ test('the Library UI exposes hierarchy, search, bulk operations, imports and bac
     'library-smart-search-dialog', 'smart-search-preview', 'library-table-settings', 'library-table-preferences',
     'zotero-sync-resume', 'resume-zotero-sync',
     'library-source-missing',
+    'library-metadata-batch-dialog', 'start-library-metadata-batch', 'apply-library-metadata-batch',
+    'library-citation-export-dialog', 'copy-library-citation', 'export-library-bibliography',
   ]) assert.match(view, new RegExp(`data-testid=(?:"|\{\`)[^\n]*${marker}`));
   for (const method of [
     'getGlobalLibraryStatus', 'listGlobalLibraryItems', 'listGlobalLibraryCollections',
@@ -44,6 +46,8 @@ test('the Library UI exposes hierarchy, search, bulk operations, imports and bac
     'cancelLibraryMigration', 'rollbackLibraryMigration', 'listLibraryMigrationSessions',
     'listGlobalLibrarySavedSearches', 'saveGlobalLibrarySavedSearch', 'deleteGlobalLibrarySavedSearch',
     'getGlobalLibraryViewPreferences', 'setGlobalLibraryViewPreferences',
+    'startGlobalLibraryMetadataBatch', 'applyGlobalLibraryMetadataBatch', 'cancelGlobalLibraryMetadataBatch',
+    'updateGlobalLibraryCitationKey', 'formatGlobalLibraryCitation', 'exportGlobalLibraryBibliography',
   ]) assert.match(view, new RegExp(String.raw`window\.nodus\.${method}\b`));
   assert.match(view, /CollectionBranch[\s\S]*<CollectionBranch/, 'collection rendering is recursively unbounded');
   assert.match(view, /La importación se canceló; el catálogo ya recuperado se conserva/);
@@ -98,6 +102,8 @@ test('the typed bridge covers every global management operation', async () => {
     'listGlobalLibrarySavedSearches', 'saveGlobalLibrarySavedSearch', 'deleteGlobalLibrarySavedSearch',
     'getGlobalLibraryViewPreferences', 'setGlobalLibraryViewPreferences',
     'listZoteroSyncSessions', 'resumeZoteroLibraryImport',
+    'startGlobalLibraryMetadataBatch', 'applyGlobalLibraryMetadataBatch', 'cancelGlobalLibraryMetadataBatch',
+    'updateGlobalLibraryCitationKey', 'formatGlobalLibraryCitation', 'exportGlobalLibraryBibliography',
   ];
   assertApiMethods(assert, methods);
   assertChannelsWired(assert, [
@@ -114,6 +120,8 @@ test('the typed bridge covers every global management operation', async () => {
     'library:savedSearches', 'library:saveSavedSearch', 'library:deleteSavedSearch',
     'library:viewPreferences', 'library:setViewPreferences',
     'library:zoteroSyncSessions', 'library:resumeZoteroImport',
+    'library:startMetadataBatch', 'library:applyMetadataBatch', 'library:cancelMetadataBatch',
+    'library:updateCitationKey', 'library:formatCitation', 'library:exportBibliography',
   ]);
 });
 
@@ -149,13 +157,17 @@ test('Zotero bridge exposes import, status and clean-reader navigation', async (
     'plugin v4 hides global-Library actions when a v3 desktop does not advertise them');
 });
 
-test('metadata management previews remote candidates and requires an explicit duplicate merge', async () => {
+test('metadata management previews candidates, supports bulk confirmation and requires an explicit duplicate merge', async () => {
   const dialogs = await readSource('src/components/library/LibraryMetadataDialogs.tsx');
-  for (const marker of ['library-metadata-editor', 'library-duplicates-dialog']) assert.match(dialogs, new RegExp(marker));
+  for (const marker of ['library-metadata-editor', 'library-metadata-batch-dialog', 'library-citation-export-dialog', 'library-duplicates-dialog']) assert.match(dialogs, new RegExp(marker));
   assert.match(dialogs, /Vista previa de cambios/);
   assert.match(dialogs, /Nada se aplica sin tu revisión/);
   assert.match(dialogs, /updateGlobalLibraryItemMetadata/);
   assert.match(dialogs, /resolveGlobalLibraryMetadata/);
+  assert.match(dialogs, /onGlobalLibraryMetadataBatchProgress/);
+  assert.match(dialogs, /formatGlobalLibraryCitation/);
+  assert.match(dialogs, /'apa-7'[^\n]*'chicago-author-date'[^\n]*'mla-9'[^\n]*'ieee'[^\n]*'vancouver'/);
+  assert.match(dialogs, /'endnote-xml'[^\n]*'zotero-rdf'[^\n]*'csv'[^\n]*'markdown'/);
   assert.match(dialogs, /mergeGlobalLibraryItems/);
   assert.match(dialogs, /Los demás pasarán a la papelera/);
 });

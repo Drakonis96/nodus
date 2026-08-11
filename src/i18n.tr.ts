@@ -22,10 +22,12 @@ import { NEW_VAULT_COMPLETION_TRANSLATIONS } from './i18n.newVaultCompletion';
 import { NODI_NOTIFICATION_TRANSLATIONS } from './i18n.nodiNotifications';
 import { ANNOUNCEMENT_TRANSLATIONS } from './i18n.announcements';
 import { LIBRARY_READER_TRANSLATIONS } from './i18n.libraryReader';
+import { LIBRARY_BIBLIOGRAPHY_TRANSLATIONS } from './i18n.libraryBibliography';
 
 /** Complete static Turkish interface table; coverage prohibits runtime fallbacks. */
 export const TR: Record<string, string> = {
   ...LIBRARY_READER_TRANSLATIONS.tr,
+  ...LIBRARY_BIBLIOGRAPHY_TRANSLATIONS.tr,
   ...DIARIZATION_TRANSLATIONS.tr,
   ...PROSOPOGRAPHY_TRANSLATIONS.tr,
   ...PRIMARY_SOURCES_TRANSLATIONS.tr,

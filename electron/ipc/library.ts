@@ -1,5 +1,6 @@
 import type { IpcContext } from './context';
-import { BrowserWindow, shell } from 'electron';
+import { BrowserWindow, clipboard, dialog, shell } from 'electron';
+import fs from 'node:fs';
 import { showImportOpenDialog } from '../privacy';
 import {
   getGlobalLibraryStatus,
@@ -56,6 +57,12 @@ import {
   listGlobalLibraryVaults,
   listGlobalLibraryVaultLinks,
   linkGlobalLibraryItemsToVault,
+  startGlobalLibraryMetadataBatch,
+  applyGlobalLibraryMetadataBatch,
+  cancelGlobalLibraryMetadataBatch,
+  updateGlobalLibraryCitationKey,
+  formatGlobalLibraryCitation,
+  exportGlobalLibraryBibliography,
 } from '../library/libraryService';
 
 export function registerLibraryIpc({ h }: IpcContext): void {
@@ -119,7 +126,7 @@ export function registerLibraryIpc({ h }: IpcContext): void {
     const options = {
       title: 'Importar referencias bibliográficas',
       properties: ['openFile', 'multiSelections'] as Array<'openFile' | 'multiSelections'>,
-      filters: [{ name: 'RIS, BibTeX, CSL JSON o Mendeley', extensions: ['ris', 'bib', 'bibtex', 'json'] }],
+      filters: [{ name: 'RIS, BibTeX, BibLaTeX, CSL JSON, EndNote, Zotero RDF, CSV o Markdown', extensions: ['ris', 'bib', 'bibtex', 'biblatex', 'json', 'xml', 'rdf', 'csv', 'md', 'markdown'] }],
     };
     const selected = owner ? await showImportOpenDialog(owner, options) : await showImportOpenDialog(options);
     return selected.canceled
@@ -156,6 +163,26 @@ export function registerLibraryIpc({ h }: IpcContext): void {
   h('library:setTagColor', async (_event, tag, color) => setGlobalLibraryTagColor(tag, color));
   h('library:updateMetadata', async (_event, itemId, patch) => updateGlobalLibraryItemMetadata(itemId, patch));
   h('library:resolveMetadata', async (_event, kind, value) => resolveGlobalLibraryMetadata(kind, value));
+  h('library:startMetadataBatch', async (event, requestId, itemIds) => startGlobalLibraryMetadataBatch(requestId, itemIds, (progress) => {
+    if (!event.sender.isDestroyed()) event.sender.send('library:metadataBatchProgress', progress);
+  }));
+  h('library:applyMetadataBatch', async (_event, requestId, itemIds) => applyGlobalLibraryMetadataBatch(requestId, itemIds));
+  h('library:cancelMetadataBatch', async (_event, requestId) => cancelGlobalLibraryMetadataBatch(requestId));
+  h('library:updateCitationKey', async (_event, itemId, citationKey) => updateGlobalLibraryCitationKey(itemId, citationKey));
+  h('library:formatCitation', async (_event, itemIds, style, kind) => {
+    const result = formatGlobalLibraryCitation(itemIds, style, kind); clipboard.writeText(result.text); return result;
+  });
+  h('library:exportBibliography', async (event, request) => {
+    const extensions = { ris: 'ris', bibtex: 'bib', biblatex: 'biblatex', 'csl-json': 'json', 'endnote-xml': 'xml', 'zotero-rdf': 'rdf', csv: 'csv', markdown: 'md' } as const;
+    const extension = extensions[request.format as keyof typeof extensions]; if (!extension) throw new Error('Formato de exportación no compatible.');
+    const owner = BrowserWindow.fromWebContents(event.sender) ?? undefined;
+    const options = { title: 'Exportar referencias bibliográficas', defaultPath: `nodus-library.${extension}`, filters: [{ name: request.format, extensions: [extension] }] };
+    const selected = owner ? await dialog.showSaveDialog(owner, options) : await dialog.showSaveDialog(options);
+    if (selected.canceled || !selected.filePath) return { format: request.format, exported: 0, filePath: null, canceled: true, warnings: [] };
+    const report = exportGlobalLibraryBibliography(request, selected.filePath);
+    if (!fs.existsSync(selected.filePath)) throw new Error('No se pudo verificar el archivo exportado.');
+    return report;
+  });
   h('library:duplicates', async () => listGlobalLibraryDuplicates());
   h('library:mergeItems', async (_event, canonicalId, duplicateIds) => mergeGlobalLibraryItems(canonicalId, duplicateIds));
   h('library:vaults', async () => listGlobalLibraryVaults());

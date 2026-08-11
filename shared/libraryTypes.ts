@@ -1,7 +1,9 @@
 /** Canonical, vault-independent bibliography stored in `nodus-library`. */
 export type LibraryScope = 'global' | 'vault';
 
-export type LibraryItemSource = 'nodus' | 'zotero' | 'mendeley' | 'ris' | 'bibtex' | 'csl-json' | 'legacy';
+export type LibraryItemSource =
+  | 'nodus' | 'zotero' | 'mendeley' | 'ris' | 'bibtex' | 'biblatex' | 'csl-json'
+  | 'endnote-xml' | 'zotero-rdf' | 'csv' | 'markdown' | 'legacy';
 
 /** External identity is never the Nodus item ID. All fields participate in equality. */
 export interface LibrarySourceIdentity {
@@ -85,6 +87,9 @@ export interface LibraryItemMetadata {
   rights?: string;
   url?: string;
   doi?: string;
+  pmid?: string;
+  pmcid?: string;
+  arxiv?: string;
   isbn?: string[];
   issn?: string[];
   tags?: string[];
@@ -565,11 +570,11 @@ export interface LibraryLocalImportReport {
   warnings: string[];
 }
 
-export type LibraryMetadataIdentifierKind = 'doi' | 'isbn' | 'issn';
+export type LibraryMetadataIdentifierKind = 'doi' | 'isbn' | 'issn' | 'pmid' | 'pmcid' | 'arxiv';
 
 export interface LibraryMetadataCandidate {
   id: string;
-  source: 'crossref' | 'open-library';
+  source: 'crossref' | 'open-library' | 'pubmed' | 'arxiv';
   confidence: number;
   sourceUrl: string | null;
   metadata: LibraryItemMetadata;
@@ -589,6 +594,62 @@ export interface LibraryBibliographyImportReport {
   skipped: number;
   itemIds: string[];
   warnings: string[];
+}
+
+export type LibraryBibliographyFormat =
+  | 'ris' | 'bibtex' | 'biblatex' | 'csl-json' | 'endnote-xml' | 'zotero-rdf' | 'csv' | 'markdown';
+
+export type LibraryCitationStyle = 'apa-7' | 'chicago-author-date' | 'mla-9' | 'ieee' | 'vancouver';
+
+export interface LibraryBibliographyExportRequest {
+  format: LibraryBibliographyFormat;
+  itemIds?: string[];
+  collectionId?: string | null;
+  savedSearchId?: string | null;
+  smartSearch?: LibrarySmartSearchGroup | null;
+}
+
+export interface LibraryBibliographyExportReport {
+  format: LibraryBibliographyFormat;
+  exported: number;
+  filePath: string | null;
+  canceled: boolean;
+  warnings: string[];
+}
+
+export interface LibraryCitationResult {
+  style: LibraryCitationStyle;
+  kind: 'citation' | 'bibliography';
+  itemIds: string[];
+  text: string;
+}
+
+export interface LibraryMetadataBatchProgress {
+  requestId: string;
+  phase: 'queued' | 'resolving' | 'ready' | 'applying' | 'complete' | 'canceled' | 'failed';
+  completed: number;
+  total: number;
+  currentItemId: string | null;
+  succeeded: number;
+  failed: number;
+  message: string;
+}
+
+export interface LibraryMetadataBatchEntry {
+  itemId: string;
+  kind: LibraryMetadataIdentifierKind | null;
+  value: string | null;
+  candidate: LibraryMetadataCandidate | null;
+  error: string | null;
+  applied: boolean;
+}
+
+export interface LibraryMetadataBatchResult {
+  requestId: string;
+  status: 'ready' | 'complete' | 'canceled' | 'failed';
+  entries: LibraryMetadataBatchEntry[];
+  startedAt: string;
+  completedAt: string;
 }
 
 export interface LibraryDuplicateGroup {

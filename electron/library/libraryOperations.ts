@@ -21,6 +21,9 @@ import type {
   LibrarySavedSearchRecord,
   LibrarySmartSearchGroup,
   LibraryViewPreferences,
+  LibraryBibliographyExportRequest,
+  LibraryCitationResult,
+  LibraryCitationStyle,
 } from '@shared/libraryTypes';
 import { canonicalJson, normalizeLibraryMetadata } from './libraryRecord';
 import { LibraryCatalog } from './libraryCatalog';
@@ -29,6 +32,7 @@ import { LibraryDiskStore } from './libraryStorage';
 import { importBibliographyFiles } from './libraryBibliographyImport';
 import { bibliographicFingerprint } from './libraryRevision';
 import { LibrarySmartCollectionStore } from './librarySmartCollections';
+import { exportLibraryBibliography, formatLibraryCitation, generateCitationKey } from './libraryCitation';
 
 function comparable(value: LibraryItemRecord): string {
   const { clock: _clock, createdAt: _createdAt, ...rest } = value;
@@ -149,6 +153,19 @@ export class LibraryOperations {
 
   constructor(private readonly store: LibraryDiskStore, private readonly catalog: LibraryCatalog) {
     this.smartCollections = new LibrarySmartCollectionStore(store.root);
+  }
+
+  ensureCitationKeys(): number {
+    const records = this.store.scanMaterializedItems().records.filter((record) => !record.deletedAt)
+      .sort((a, b) => a.createdAt.localeCompare(b.createdAt) || a.id.localeCompare(b.id));
+    const used = new Set<string>(); let changed = 0;
+    for (const record of records) {
+      const citationKey = generateCitationKey(record.metadata, used, record.citationKey);
+      used.add(citationKey);
+      if (record.citationKey === citationKey) continue;
+      this.store.upsertItem({ ...record, citationKey }, record.clock.revision); changed += 1;
+    }
+    if (changed) this.catalog.rebuild(this.store); return changed;
   }
 
   listCollections(): LibraryCollectionView[] {
@@ -340,8 +357,9 @@ export class LibraryOperations {
       if (!collection || collection.deletedAt) throw new Error('Una de las colecciones de destino ya no existe.');
     }
     const id = `nodus:${randomUUID()}`;
+    const citationKey = generateCitationKey(metadata, this.store.scanMaterializedItems().records.map((record) => record.citationKey).filter((value): value is string => !!value));
     const result = this.store.upsertItem({
-      id, storageId: id, source: 'nodus', metadata: normalizeLibraryMetadata(metadata),
+      id, storageId: id, source: 'nodus', citationKey, metadata: normalizeLibraryMetadata(metadata),
       collectionIds: [...new Set(collectionIds.map((entry) => this.catalog.resolveCollectionId(entry) ?? entry))],
       attachments: [], notes: [], relations: [], files: { annotations: 'annotations.json' },
       extraction: { status: 'pending' }, deletedAt: null,
@@ -373,8 +391,9 @@ export class LibraryOperations {
     }
     copyDirectoryIfMissing(path.join(sourceFolder, 'assets'), path.join(destinationFolder, 'assets'));
     const now = new Date().toISOString();
+    const citationKey = generateCitationKey(current.metadata, this.store.scanMaterializedItems().records.map((record) => record.citationKey).filter((value): value is string => !!value), current.citationKey);
     const result = this.store.upsertItem({
-      id, storageId: id, source: 'nodus', citationKey: undefined,
+      id, storageId: id, source: 'nodus', citationKey,
       metadata: current.metadata, collectionIds: current.collectionIds,
       attachments: orderedAttachments(current.attachments.map((entry) => ({ ...entry, id: `local:${randomUUID()}`, sourceKey: undefined }))),
       notes: (current.notes ?? []).filter((note) => note.source === 'nodus').map((note) => ({ ...note, id: `note:${randomUUID()}`, createdAt: now, updatedAt: now })),
@@ -563,6 +582,45 @@ export class LibraryOperations {
     return desired;
   }
 
+  updateCitationKey(itemId: string, preferred: string): LibraryItemRecord {
+    const current = this.item(itemId);
+    const used = this.store.scanMaterializedItems().records.filter((entry) => entry.id !== current.id && !entry.deletedAt)
+      .map((entry) => entry.citationKey).filter((value): value is string => !!value);
+    const citationKey = generateCitationKey(current.metadata, used, preferred);
+    if (asciiCitationKey(preferred) !== citationKey) throw new Error('La clave de cita ya existe o no contiene caracteres válidos.');
+    const result = this.store.upsertItem({ ...current, citationKey }, current.clock.revision);
+    this.catalog.rebuild(this.store); return result;
+  }
+
+  bibliographyRecords(request: Omit<LibraryBibliographyExportRequest, 'format'>): LibraryItemRecord[] {
+    const records = this.store.scanMaterializedItems().records;
+    if (request.itemIds?.length) {
+      const ids = new Set(request.itemIds.map((id) => this.catalog.resolveItemId(id) ?? id));
+      return records.filter((record) => ids.has(record.id) && !record.deletedAt);
+    }
+    const smartSearch = request.smartSearch ?? (request.savedSearchId ? this.listSavedSearches().find((entry) => entry.id === request.savedSearchId)?.query ?? null : null);
+    const ids = new Set<string>(); let offset = 0;
+    for (;;) {
+      const page = this.catalog.list({
+        collectionId: request.collectionId, savedSearchId: request.savedSearchId,
+        smartSearch, limit: 500, offset, includeFacets: false,
+      });
+      for (const item of page.items) ids.add(item.id);
+      offset += page.items.length; if (!page.items.length || offset >= page.total) break;
+    }
+    return records.filter((record) => ids.has(record.id) && !record.deletedAt);
+  }
+
+  exportBibliography(request: LibraryBibliographyExportRequest): { content: string; exported: number } {
+    const records = this.bibliographyRecords(request);
+    return { content: exportLibraryBibliography(records, request.format), exported: records.length };
+  }
+
+  formatCitation(itemIds: string[], style: LibraryCitationStyle, kind: 'citation' | 'bibliography'): LibraryCitationResult {
+    const records = this.bibliographyRecords({ itemIds });
+    return formatLibraryCitation(records, style, kind);
+  }
+
   listDuplicateGroups(): LibraryDuplicateGroup[] {
     const records = this.store.scanMaterializedItems().records.filter((item) => !item.deletedAt);
     const emitted = new Set<string>(); const groups: LibraryDuplicateGroup[] = [];
@@ -661,6 +719,10 @@ export class LibraryOperations {
     this.catalog.rebuild(this.store);
     return desired;
   }
+}
+
+function asciiCitationKey(value: string): string {
+  return value.trim().normalize('NFKD').replace(/\p{M}/gu, '').replace(/[^\p{L}\p{N}]+/gu, '');
 }
 
 function readJsonArray(file: string): unknown[] {
