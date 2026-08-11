@@ -16,6 +16,7 @@ const userData = path.join(scratch, 'user-data');
 const root = path.join(scratch, 'backups', 'nodus-library');
 const extractionWorker = path.join(scratch, 'extraction-worker.cjs');
 const operationWorker = path.join(scratch, 'operation-worker.cjs');
+const readerWorker = path.join(scratch, 'reader-worker.cjs');
 installRuntimeHooks(userData);
 const require = createRequire(import.meta.url);
 
@@ -55,14 +56,28 @@ try {
       parentPort.postMessage({ ok: true, result: 42 });
     });
   `);
+  await writeFile(readerWorker, `
+    const { parentPort } = require('node:worker_threads');
+    parentPort.once('message', (request) => {
+      const until = Date.now() + 500;
+      while (Date.now() < until) Math.sqrt(Math.random());
+      parentPort.postMessage({ ok: true, result: request.operation === 'attachment-content'
+        ? { attachmentId: request.task.attachmentId, viewer: 'text', text: 'worker reader', html: null, chapters: [] }
+        : true });
+    });
+  `);
   process.env.NODUS_LIBRARY_EXTRACTION_WORKER_FILE = extractionWorker;
   process.env.NODUS_LIBRARY_OPERATION_WORKER_FILE = operationWorker;
+  process.env.NODUS_LIBRARY_READER_WORKER_FILE = readerWorker;
 
   const { LibraryDiskStore } = require(path.join(repoRoot, 'electron/library/libraryStorage.ts'));
   const { LibraryCatalog } = require(path.join(repoRoot, 'electron/library/libraryCatalog.ts'));
   const { LibraryOperations } = require(path.join(repoRoot, 'electron/library/libraryOperations.ts'));
+  const { writeGlobalPrefsRaw } = require(path.join(repoRoot, 'electron/db/appPrefs.ts'));
   const extractionHost = require(path.join(repoRoot, 'electron/library/libraryExtractionWorkerHost.ts'));
   const operationHost = require(path.join(repoRoot, 'electron/library/libraryOperationWorkerHost.ts'));
+  const readerHost = require(path.join(repoRoot, 'electron/libraryReader/libraryReaderWorkerHost.ts'));
+  writeGlobalPrefsRaw({ autoBackupFolder: path.dirname(root) });
   const store = new LibraryDiskStore(root, 'responsiveness-device');
   store.initialize();
   const catalog = new LibraryCatalog(path.join(userData, 'catalog.sqlite'));
@@ -87,6 +102,24 @@ try {
   ), 'disk-heavy Library operation');
   assert.equal(operationResult, 42);
 
+  const readerFolder = store.itemFolder('reader-responsive');
+  await mkdir(readerFolder, { recursive: true });
+  await writeFile(path.join(readerFolder, 'reader.md'), '# Responsive reader\n');
+  await writeFile(path.join(readerFolder, 'notes.txt'), 'foreground work is forbidden\n');
+  await writeFile(path.join(readerFolder, 'annotations.json'), '[]\n');
+  store.upsertItem({
+    ...item,
+    id: 'nodus:reader-responsive', storageId: 'reader-responsive',
+    metadata: { ...item.metadata, title: 'Responsive reader' },
+    attachments: [{ id: 'local:notes', title: 'Notes', fileName: 'notes.txt', relativePath: 'notes.txt', mimeType: 'text/plain', byteSize: 30, sha256: 'a'.repeat(64), role: 'supplement', position: 0 }],
+    files: { reader: 'reader.md', annotations: 'annotations.json' },
+  });
+  const readerResult = await assertEventLoopResponsive(
+    readerHost.getLibraryReaderAttachmentContentInWorker('nodus:reader-responsive', 'local:notes'),
+    'reader attachment parsing',
+  );
+  assert.equal(readerResult.text, 'worker reader');
+
   const operations = new LibraryOperations(store, catalog);
   const created = operations.createItem({
     title: 'Incremental item', itemType: 'journalArticle', creators: [], isbn: [], issn: [], tags: [],
@@ -107,6 +140,7 @@ try {
   assert.doesNotMatch(serviceSource.match(/export function getGlobalLibraryStatus\(\)[\s\S]*?\n}/)?.[0] ?? '', /scanMaterializedItems|settleActive/);
   assert.match(viteSource, /libraryExtractionWorker: 'electron\/workers\/libraryExtractionWorker\.ts'/);
   assert.match(viteSource, /libraryOperationWorker: 'electron\/workers\/libraryOperationWorker\.ts'/);
+  assert.match(viteSource, /libraryReaderWorker: 'electron\/workers\/libraryReaderWorker\.ts'/);
 
   // When a production build exists, execute its real ESM worker with Electron's
   // native SQLite ABI. This catches missing shared chunks and accidental imports
@@ -126,12 +160,30 @@ try {
     assert.equal(builtResult.ok, true, builtResult.error);
   }
 
+  const builtReaderWorker = path.join(repoRoot, 'dist-electron', 'libraryReaderWorker.js');
+  if (existsSync(builtReaderWorker)) {
+    const builtWorker = new Worker(builtReaderWorker);
+    const builtResult = await new Promise((resolve, reject) => {
+      builtWorker.once('message', resolve);
+      builtWorker.once('error', reject);
+      builtWorker.postMessage({
+        operation: 'attachment-content',
+        task: { attachmentId: 'local:notes', file: path.join(readerFolder, 'notes.txt'), viewer: 'text' },
+      });
+    });
+    await builtWorker.terminate();
+    assert.equal(builtResult.ok, true, builtResult.error);
+    assert.equal(builtResult.result.text, 'foreground work is forbidden\n');
+  }
+
   catalog.close();
   extractionHost.disposeLibraryExtractionWorkers();
   operationHost.disposeLibraryOperationWorkers();
+  readerHost.disposeLibraryReaderWorkers();
   console.log('Library responsiveness worker/incremental-index tests passed.');
 } finally {
   delete process.env.NODUS_LIBRARY_EXTRACTION_WORKER_FILE;
   delete process.env.NODUS_LIBRARY_OPERATION_WORKER_FILE;
+  delete process.env.NODUS_LIBRARY_READER_WORKER_FILE;
   await rm(scratch, { recursive: true, force: true });
 }

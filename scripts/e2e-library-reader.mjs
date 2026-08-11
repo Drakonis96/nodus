@@ -34,6 +34,9 @@ const childEnv = {
   NODUS_DISABLE_AUTO_UPDATE: '1',
   NODUS_E2E_UPDATE_STATUS: 'not-available',
   NODUS_E2E_DISABLE_STUDY_BACKGROUND_AI: '1',
+  // A real backup disk can take hundreds of milliseconds to fsync. The reader
+  // must paint the highlight before durable persistence acknowledges it.
+  NODUS_E2E_LIBRARY_READER_WRITE_DELAY_MS: '750',
   HOME: testRoot,
   USERPROFILE: testRoot,
 };
@@ -95,6 +98,9 @@ try {
   assert.ok(work?.nodus_id && work?.zotero_key, 'the demo provides a work with a stable Zotero id');
 
   const documentFolder = path.join(backupRoot, 'nodus-library', work.zotero_key);
+  const longReaderBody = Array.from({ length: 180 }, (_, index) =>
+    `Párrafo de carga ${index + 1}. La biblioteca debe conservar una interacción inmediata aunque el documento tenga muchas páginas, notas, citas y fragmentos seleccionables.`
+  ).join('\n\n');
   const markdown = `# ${work.title}
 
 Texto introductorio para comprobar una lectura limpia, cómoda y persistente.
@@ -123,6 +129,8 @@ La segunda sección permite comprobar el índice, la página de origen y el marc
 Este párrafo adicional conserva el ritmo de lectura académica y hace visible la separación regular entre párrafos sin introducir controles innecesarios.
 
 Otro párrafo de comprobación confirma que la primera línea se sangra, que el texto se justifica y que la composición sigue siendo legible en ventanas estrechas.
+
+${longReaderBody}
 
 ## Referencias
 
@@ -282,6 +290,25 @@ Otro párrafo de comprobación confirma que la primera línea se sangra, que el 
   await filesToggle.click();
   assert.equal(await page.getByTestId('library-reader-files').getByRole('button').count(), 6, 'the compact file control reveals every preserved source');
   assert.equal(await filesToggle.getAttribute('aria-expanded'), 'true');
+  const filesInteraction = await page.evaluate(async () => {
+    const clean = document.querySelector('[data-testid="library-reader-file-clean"]');
+    if (!(clean instanceof HTMLButtonElement)) throw new Error('clean reader source is unavailable');
+    const started = performance.now();
+    clean.click();
+    await new Promise((resolve) => requestAnimationFrame(() => resolve(undefined)));
+    return { elapsed: performance.now() - started, active: clean.classList.contains('is-active') };
+  });
+  assert.ok(filesInteraction.elapsed < 150, `the file menu remains responsive on a long document (${filesInteraction.elapsed.toFixed(1)}ms)`);
+  assert.equal(filesInteraction.active, true, 'the expanded menu remains interactive');
+  assert.equal(await filesToggle.getAttribute('aria-expanded'), 'false', 'choosing the current source also closes the compact menu');
+  await filesToggle.click();
+  const sourceSwitchStarted = Date.now();
+  await page.getByTestId('library-reader-file-zotero:READERPDF').click();
+  await page.getByTestId('library-reader-pdf-viewer').waitFor({ state: 'visible' });
+  assert.ok(Date.now() - sourceSwitchStarted < 300, 'choosing a preserved file switches the reader without blocking the interface');
+  assert.equal(await filesToggle.getAttribute('aria-expanded'), 'false', 'the compact file menu closes after choosing a source');
+  await page.getByTestId('library-reader-source-picker').locator('select').selectOption('clean');
+  await documentRoot.waitFor({ state: 'visible' });
   assert.equal(await page.getByTestId('library-reader-source-picker').locator('option').count(), 6, 'clean Markdown and five preserved attachments are directly selectable');
   const darkReaderColors = await page.evaluate(() => {
     const surface = document.querySelector('.library-reader-clean-surface');
@@ -395,12 +422,30 @@ Otro párrafo de comprobación confirma que la primera línea se sangra, que el 
     }, index);
   }
 
+  async function waitForSavedAnnotations(predicate, label, timeout = 10_000) {
+    const deadline = Date.now() + timeout;
+    while (Date.now() < deadline) {
+      const saved = await page.evaluate((id) => window.nodus.listLibraryReaderAnnotations(id), globalItemId);
+      if (predicate(saved)) return saved;
+      await page.waitForTimeout(50);
+    }
+    throw new Error(`Timed out waiting for persisted reader annotation: ${label}`);
+  }
+
   await selectCandidate(1);
   const selectionBar = page.locator('.reader-selection-actions');
   await selectionBar.waitFor({ state: 'visible' });
   assert.equal(await selectionBar.locator('.reader-selection-color').count(), 6);
+  const highlightStarted = Date.now();
   await selectionBar.locator('.reader-selection-color').first().click();
-  await page.waitForFunction(async (id) => (await window.nodus.listLibraryReaderAnnotations(id)).some((item) => item.kind === 'highlight'), globalItemId);
+  await page.waitForFunction(() => {
+    const registry = CSS.highlights;
+    const highlight = registry?.get('nodus-reader-yellow');
+    return Boolean(highlight && highlight.size > 0);
+  }, undefined, { timeout: 300 });
+  const highlightPaintLatency = Date.now() - highlightStarted;
+  assert.ok(highlightPaintLatency < 300, `highlight paints optimistically before the delayed disk write (${highlightPaintLatency}ms)`);
+  await waitForSavedAnnotations((items) => items.some((item) => item.kind === 'highlight'), 'clean highlight');
 
   await selectCandidate(2);
   await selectionBar.waitFor({ state: 'visible' });
@@ -408,18 +453,20 @@ Otro párrafo de comprobación confirma que la primera línea se sangra, que el 
   const commentEditor = page.locator('.reader-comment-editor');
   await commentEditor.locator('textarea').fill('Una nota vinculada al fragmento seleccionado.');
   await commentEditor.getByRole('button', { name: 'Guardar', exact: true }).click();
-  await page.waitForFunction(async (id) => (await window.nodus.listLibraryReaderAnnotations(id)).some((item) => item.kind === 'comment'), globalItemId);
+  await waitForSavedAnnotations((items) => items.some((item) => item.kind === 'comment'), 'clean comment');
 
   const bookmarkMenu = page.getByTestId('library-reader-bookmark-menu');
   await bookmarkMenu.click();
   await page.getByRole('menuitem', { name: 'Marcar esta sección' }).click();
-  await page.waitForFunction(async (id) => (await window.nodus.listLibraryReaderAnnotations(id)).some((item) => item.kind === 'bookmark'), globalItemId);
   await bookmarkMenu.click();
   const goToBookmark = page.getByRole('menuitem', { name: 'Ir al marcador de lectura' });
+  await page.waitForFunction(() => Array.from(document.querySelectorAll('[role="menuitem"]')).some((item) => item.textContent?.includes('Ir al marcador de lectura') && !item.disabled), undefined, { timeout: 300 });
   assert.equal(await goToBookmark.isEnabled(), true, 'the bookmark menu exposes navigation once a mark exists');
   await goToBookmark.click();
   assert.match(await page.locator('.library-reader-notes').innerText(), /2 fragmentos guardados/);
 
+  await waitForSavedAnnotations((items) => items.some((item) => item.kind === 'bookmark'), 'reader bookmark');
+  await waitForSavedAnnotations((items) => items.length >= 3, 'complete clean annotation set');
   const diskAnnotations = JSON.parse(await readFile(path.join(documentFolder, 'annotations.json'), 'utf8'));
   assert.equal(diskAnnotations.length, 4);
   assert.ok(diskAnnotations.every((item) => item.documentId === work.zotero_key), 'annotations retain the stable Zotero identifier');
@@ -447,7 +494,7 @@ Otro párrafo de comprobación confirma que la primera línea se sangra, que el 
   });
   await page.locator('.reader-selection-actions').waitFor({ state: 'visible' });
   await page.locator('.reader-selection-actions .reader-selection-color').first().click();
-  await page.waitForFunction(async (id) => (await window.nodus.listLibraryReaderAnnotations(id)).some((item) => item.scope === 'attachment:zotero:READERPDF:page:1'), globalItemId);
+  await waitForSavedAnnotations((items) => items.some((item) => item.scope === 'attachment:zotero:READERPDF:page:1'), 'PDF highlight');
   await page.screenshot({ path: pdfScreenshotPath, fullPage: true });
 
   await sourceChooser.selectOption('local:READEREPUB');
@@ -465,7 +512,7 @@ Otro párrafo de comprobación confirma que la primera línea se sangra, que el 
   });
   await page.locator('.reader-selection-actions').waitFor({ state: 'visible' });
   await page.locator('.reader-selection-actions .reader-selection-color').nth(2).click();
-  await page.waitForFunction(async (id) => (await window.nodus.listLibraryReaderAnnotations(id)).some((item) => item.scope.startsWith('attachment:local:READEREPUB:chapter:')), globalItemId);
+  await waitForSavedAnnotations((items) => items.some((item) => item.scope.startsWith('attachment:local:READEREPUB:chapter:')), 'EPUB highlight');
   await page.screenshot({ path: epubScreenshotPath, fullPage: true });
 
   await sourceChooser.selectOption('local:READERIMAGE');
@@ -476,7 +523,7 @@ Otro párrafo de comprobación confirma que la primera línea se sangra, que el 
   const imageBox = await image.boundingBox(); assert.ok(imageBox);
   await page.mouse.move(imageBox.x + imageBox.width * .18, imageBox.y + imageBox.height * .2);
   await page.mouse.down(); await page.mouse.move(imageBox.x + imageBox.width * .68, imageBox.y + imageBox.height * .7, { steps: 8 }); await page.mouse.up();
-  await page.waitForFunction(async (id) => (await window.nodus.listLibraryReaderAnnotations(id)).some((item) => item.target?.type === 'region' && item.target.attachmentId === 'local:READERIMAGE'), globalItemId);
+  await waitForSavedAnnotations((items) => items.some((item) => item.target?.type === 'region' && item.target.attachmentId === 'local:READERIMAGE'), 'image region');
   await page.screenshot({ path: imageScreenshotPath, fullPage: true });
 
   await sourceChooser.selectOption('local:READERDOCX');
@@ -563,7 +610,7 @@ Otro párrafo de comprobación confirma que la primera línea se sangra, que el 
   await page.setViewportSize({ width: 860, height: 820 });
   await page.screenshot({ path: lightScreenshotPath, fullPage: true });
   assert.deepEqual(pageErrors, [], pageErrors.map((error) => error.stack ?? String(error)).join('\n'));
-  console.log(`library reader UI test passed; screenshots: ${screenshotDirectory}`);
+  console.log(`library reader UI test passed; file menu ${filesInteraction.elapsed.toFixed(1)}ms; optimistic highlight ${highlightPaintLatency}ms; screenshots: ${screenshotDirectory}`);
 } finally {
   if (app) await app.close().catch(() => undefined);
   await rm(testRoot, { recursive: true, force: true });

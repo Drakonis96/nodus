@@ -596,10 +596,25 @@ function rtfText(source: string): string {
 }
 
 export async function getLibraryReaderAttachmentContent(documentId: string, attachmentId: string): Promise<LibraryReaderAttachmentContent | null> {
+  const task = libraryReaderAttachmentTask(documentId, attachmentId);
+  return task ? getLibraryReaderAttachmentContentFromTask(task) : null;
+}
+
+export interface LibraryReaderAttachmentTask {
+  attachmentId: string;
+  file: string;
+  viewer: LibraryReaderAttachment['viewer'];
+}
+
+export function libraryReaderAttachmentTask(documentId: string, attachmentId: string): LibraryReaderAttachmentTask | null {
   const resolved = resolvedDocument(documentId); const file = libraryReaderAttachmentPath(documentId, attachmentId);
   const attachment = resolved?.metadata.attachments?.find((entry) => entry.id === attachmentId);
   if (!resolved || !file || !attachment) return null;
   const viewer = attachmentViewer(attachment.mimeType, attachment.fileName);
+  return { attachmentId, file, viewer };
+}
+
+export async function getLibraryReaderAttachmentContentFromTask({ attachmentId, file, viewer }: LibraryReaderAttachmentTask): Promise<LibraryReaderAttachmentContent | null> {
   if (viewer === 'epub') return epubContent(file, attachmentId);
   if (viewer !== 'html' && viewer !== 'text') return null;
   const stat = fs.statSync(file);
@@ -626,7 +641,14 @@ export async function getLibraryReaderAttachmentContent(documentId: string, atta
   return { attachmentId, viewer, text: source, html: null, chapters: [] };
 }
 
-function annotationsPath(documentId: string): { filePath: string; orphanedFilePath: string; documentId: string; contentFingerprint: string | null } | null {
+export interface LibraryReaderAnnotationContext {
+  filePath: string;
+  orphanedFilePath: string;
+  documentId: string;
+  contentFingerprint: string | null;
+}
+
+export function libraryReaderAnnotationContext(documentId: string): LibraryReaderAnnotationContext | null {
   const resolved = resolvedDocument(documentId);
   if (!resolved) return null;
   const filePath = optionalDocumentFile(resolved.folder, resolved.metadata.files?.annotations, 'annotations.json');
@@ -683,7 +705,7 @@ function publicAnnotation(workId: string, annotation: DiskAnnotation): WritingDr
 }
 
 export function listLibraryReaderAnnotations(workId: string): WritingDraftAnnotation[] {
-  const target = annotationsPath(workId);
+  const target = libraryReaderAnnotationContext(workId);
   if (!target) return [];
   return readDiskAnnotations(target.filePath)
     .filter((annotation) => annotation.anchorStatus !== 'orphaned')
@@ -692,7 +714,7 @@ export function listLibraryReaderAnnotations(workId: string): WritingDraftAnnota
 }
 
 export function listLibraryReaderOrphanedAnnotations(workId: string): WritingDraftAnnotation[] {
-  const target = annotationsPath(workId);
+  const target = libraryReaderAnnotationContext(workId);
   if (!target) return [];
   return readDiskAnnotations(target.filePath)
     .filter((annotation) => annotation.anchorStatus === 'orphaned')
@@ -729,8 +751,12 @@ function normalizedAnnotationInput(input: WritingDraftAnnotationInput) {
 }
 
 export function createLibraryReaderAnnotation(workId: string, input: WritingDraftAnnotationInput): WritingDraftAnnotation {
-  const target = annotationsPath(workId);
+  const target = libraryReaderAnnotationContext(workId);
   if (!target) throw new Error('La versión de lectura ya no existe.');
+  return createLibraryReaderAnnotationFromContext(workId, target, input);
+}
+
+export function createLibraryReaderAnnotationFromContext(workId: string, target: LibraryReaderAnnotationContext, input: WritingDraftAnnotationInput): WritingDraftAnnotation {
   const value = normalizedAnnotationInput(input);
   const now = new Date().toISOString();
   const id = value.kind === 'bookmark' ? `reader-bookmark:${target.documentId}:${value.scope}` : randomUUID();
@@ -749,8 +775,12 @@ export function createLibraryReaderAnnotation(workId: string, input: WritingDraf
 }
 
 export function updateLibraryReaderComment(workId: string, id: string, comment: string): WritingDraftAnnotation | null {
-  const target = annotationsPath(workId);
+  const target = libraryReaderAnnotationContext(workId);
   if (!target) return null;
+  return updateLibraryReaderCommentFromContext(workId, target, id, comment);
+}
+
+export function updateLibraryReaderCommentFromContext(workId: string, target: LibraryReaderAnnotationContext, id: string, comment: string): WritingDraftAnnotation | null {
   const value = comment.trim();
   if (!value) throw new Error('Escribe el comentario antes de guardarlo.');
   const annotations = readDiskAnnotations(target.filePath);
@@ -764,8 +794,12 @@ export function updateLibraryReaderComment(workId: string, id: string, comment: 
 }
 
 export function deleteLibraryReaderAnnotation(workId: string, id: string): boolean {
-  const target = annotationsPath(workId);
+  const target = libraryReaderAnnotationContext(workId);
   if (!target) return false;
+  return deleteLibraryReaderAnnotationFromContext(target, id);
+}
+
+export function deleteLibraryReaderAnnotationFromContext(target: LibraryReaderAnnotationContext, id: string): boolean {
   const annotations = readDiskAnnotations(target.filePath);
   const next = annotations.filter((annotation) => annotation.id !== id);
   if (next.length === annotations.length) return false;

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { GlobalWorkerOptions, getDocument } from 'pdfjs-dist';
 import type { PDFDocumentProxy } from 'pdfjs-dist';
 import pdfWorker from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
@@ -97,6 +97,62 @@ function anchorForElement(root: HTMLElement, element: HTMLElement) {
   };
 }
 
+function sameAnnotationAnchor(left: WritingDraftAnnotation, right: WritingDraftAnnotation): boolean {
+  return left.scope === right.scope
+    && left.kind === right.kind
+    && left.color === right.color
+    && left.startOffset === right.startOffset
+    && left.endOffset === right.endOffset
+    && left.selectedText === right.selectedText;
+}
+
+const ReaderMarkdownDocument = memo(function ReaderMarkdownDocument({ content }: { content: string }) {
+  return <Markdown content={content} verify={false} allowDataImages className="text-[16px] leading-[1.85] text-neutral-300" />;
+});
+
+const ReaderFilesMenu = memo(function ReaderFilesMenu({
+  attachments,
+  cleanAvailable,
+  cleanLabel,
+  filesLabel,
+  selectedSource,
+  selectedTitle,
+  onSelect,
+}: {
+  attachments: LibraryReaderDocument['attachments'];
+  cleanAvailable: boolean;
+  cleanLabel: string;
+  filesLabel: string;
+  selectedSource: string;
+  selectedTitle: string;
+  onSelect: (source: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const choose = (source: string) => {
+    onSelect(source);
+    setOpen(false);
+  };
+  return (
+    <div className="mt-4 border-t border-neutral-800 pt-3">
+      <button
+        data-testid="library-reader-files-toggle"
+        className="flex w-full items-center gap-2 rounded-xl border border-neutral-800 bg-neutral-950/35 px-2.5 py-2 text-left hover:border-neutral-700 hover:bg-neutral-900/70"
+        aria-expanded={open}
+        aria-controls="library-reader-files"
+        onClick={() => setOpen((value) => !value)}
+      >
+        <span className="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-neutral-900 text-neutral-400"><Icon name="folder" size={13} /></span>
+        <span className="min-w-0 flex-1"><b className="block truncate text-[11px] font-medium text-neutral-300">{filesLabel}</b><small className="block truncate text-[9px] text-neutral-600">{selectedTitle} · {attachments.length + 1}</small></span>
+        <Icon name={open ? 'chevronUp' : 'chevronDown'} size={12} className="text-neutral-600" />
+      </button>
+      {open && <div id="library-reader-files" data-testid="library-reader-files" className="mt-2 max-h-56 space-y-0.5 overflow-y-auto overscroll-contain pr-0.5">
+        <button data-testid="library-reader-file-clean" className={`library-reader-file-option flex w-full items-center gap-2 rounded-lg px-2 py-2 text-left text-xs ${selectedSource === 'clean' ? 'is-active' : ''}`} disabled={!cleanAvailable} onClick={() => choose('clean')}><Icon name="book" size={12} /><span className="truncate">{cleanLabel}</span></button>
+        {attachments.map((attachment) => <button key={attachment.id} data-testid={`library-reader-file-${attachment.id}`} className={`library-reader-file-option flex w-full items-center gap-2 rounded-lg px-2 py-2 text-left text-xs ${selectedSource === attachment.id ? 'is-active' : ''} disabled:opacity-40`} disabled={!attachment.available} onClick={() => choose(attachment.id)}><Icon name={attachment.viewer === 'image' ? 'image' : attachment.viewer === 'pdf' || attachment.viewer === 'epub' ? 'book' : 'archive'} size={12} /><span className="min-w-0 flex-1 truncate">{attachment.title}</span><span className="library-reader-file-kind text-[9px] uppercase">{attachment.viewer}</span></button>)}
+      </div>}
+    </div>
+  );
+});
+
 function OriginalPagePreview({
   url, initialPage, title, onClose, onOpenFull,
 }: {
@@ -183,6 +239,7 @@ export function LibraryDocumentReader({
   const markActionsRef = useRef<ReaderSelectionActionsHandle | null>(null);
   const bookmarkMenuRef = useRef<HTMLDivElement | null>(null);
   const chatMessagesRef = useRef<HTMLDivElement | null>(null);
+  const pendingAnnotationsRef = useRef(new Map<string, WritingDraftAnnotation>());
   const [reader, setReader] = useState<LibraryReaderDocument | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -195,7 +252,6 @@ export function LibraryDocumentReader({
   const [progress, setProgress] = useState(0);
   const [outlineOpen, setOutlineOpen] = useState(true);
   const [notesOpen, setNotesOpen] = useState(true);
-  const [filesOpen, setFilesOpen] = useState(false);
   const [bookmarkMenuOpen, setBookmarkMenuOpen] = useState(false);
   const [sidebarTab, setSidebarTab] = useState<'annotations' | 'metadata' | 'chat'>('annotations');
   const [previewPage, setPreviewPage] = useState<number | null>(null);
@@ -228,7 +284,10 @@ export function LibraryDocumentReader({
         window.nodus.listLibraryReaderAnnotations(reference.id),
         window.nodus.listLibraryReaderOrphanedAnnotations(reference.id),
       ]);
-      setAnnotations(current);
+      const pending = [...pendingAnnotationsRef.current.values()].filter((candidate) =>
+        !current.some((persisted) => sameAnnotationAnchor(candidate, persisted))
+      );
+      setAnnotations([...current, ...pending]);
       setOrphanedAnnotations(orphaned);
       setAnnotationError(null);
     } catch (nextError) {
@@ -236,7 +295,10 @@ export function LibraryDocumentReader({
     }
   }, [reference.id]);
 
-  useEffect(() => { void loadReader(); }, [loadReader]);
+  useEffect(() => {
+    pendingAnnotationsRef.current.clear();
+    void loadReader();
+  }, [loadReader]);
   useEffect(() => {
     if (!reader) return;
     const remembered = localStorage.getItem(`nodus.libraryReader.source.${reader.storageId}`);
@@ -297,30 +359,83 @@ export function LibraryDocumentReader({
     });
   }, [reader, refreshAnnotations, reference.id]);
 
-  const createScopedAnnotation = async (scope: string, input: Omit<WritingDraftAnnotationInput, 'draftId' | 'scope'>) => {
-    const created = await window.nodus.createLibraryReaderAnnotation(reference.id, {
-      ...input,
+  const createScopedAnnotation = useCallback(async (scope: string, input: Omit<WritingDraftAnnotationInput, 'draftId' | 'scope'>) => {
+    const pendingId = `reader-pending:${crypto.randomUUID()}`;
+    const now = new Date().toISOString();
+    const optimistic: WritingDraftAnnotation = {
+      id: pendingId,
       draftId: reference.id,
       scope,
-    });
-    setAnnotations((current) => [...current.filter((item) => item.id !== created.id), created]);
+      kind: input.kind,
+      color: input.kind === 'highlight' ? input.color ?? null : null,
+      startOffset: input.startOffset,
+      endOffset: input.endOffset,
+      selectedText: input.selectedText,
+      prefix: input.prefix ?? '',
+      suffix: input.suffix ?? '',
+      comment: input.kind === 'comment' ? input.comment ?? null : null,
+      createdAt: now,
+      updatedAt: now,
+      anchorStatus: 'current',
+      ...(input.target ? { target: input.target } : {}),
+    };
+    pendingAnnotationsRef.current.set(pendingId, optimistic);
+    setAnnotations((current) => [...current, optimistic]);
     setAnnotationError(null);
-  };
-  const createAnnotation = (input: Omit<WritingDraftAnnotationInput, 'draftId' | 'scope'>) => createScopedAnnotation('source', input);
+    try {
+      const created = await window.nodus.createLibraryReaderAnnotation(reference.id, {
+        ...input,
+        draftId: reference.id,
+        scope,
+      });
+      pendingAnnotationsRef.current.delete(pendingId);
+      setAnnotations((current) => [...current.filter((item) => item.id !== pendingId && item.id !== created.id), created]);
+    } catch (nextError) {
+      pendingAnnotationsRef.current.delete(pendingId);
+      setAnnotations((current) => current.filter((item) => item.id !== pendingId));
+      throw nextError;
+    }
+  }, [reference.id]);
+  const createAnnotation = useCallback((input: Omit<WritingDraftAnnotationInput, 'draftId' | 'scope'>) => createScopedAnnotation('source', input), [createScopedAnnotation]);
 
-  const updateComment = async (id: string, comment: string) => {
-    const updated = await window.nodus.updateLibraryReaderComment(reference.id, id, comment);
-    if (!updated) return void refreshAnnotations();
-    setAnnotations((current) => current.map((item) => item.id === updated.id ? updated : item));
+  const updateComment = useCallback(async (id: string, comment: string) => {
+    let previous: WritingDraftAnnotation | null = null;
+    setAnnotations((current) => current.map((item) => {
+      if (item.id !== id) return item;
+      previous = item;
+      return { ...item, comment, updatedAt: new Date().toISOString() };
+    }));
     setAnnotationError(null);
-  };
+    try {
+      const updated = await window.nodus.updateLibraryReaderComment(reference.id, id, comment);
+      if (!updated) return void refreshAnnotations();
+      setAnnotations((current) => current.map((item) => item.id === updated.id ? updated : item));
+    } catch (nextError) {
+      if (previous) setAnnotations((current) => current.map((item) => item.id === id ? previous! : item));
+      throw nextError;
+    }
+  }, [reference.id, refreshAnnotations]);
 
-  const deleteAnnotation = async (id: string) => {
-    await window.nodus.deleteLibraryReaderAnnotation(reference.id, id);
-    setAnnotations((current) => current.filter((item) => item.id !== id));
-    setOrphanedAnnotations((current) => current.filter((item) => item.id !== id));
+  const deleteAnnotation = useCallback(async (id: string) => {
+    let previous: WritingDraftAnnotation | null = null;
+    let previousOrphaned: WritingDraftAnnotation | null = null;
+    setAnnotations((current) => current.filter((item) => {
+      if (item.id === id) previous = item;
+      return item.id !== id;
+    }));
+    setOrphanedAnnotations((current) => current.filter((item) => {
+      if (item.id === id) previousOrphaned = item;
+      return item.id !== id;
+    }));
     setAnnotationError(null);
-  };
+    try {
+      await window.nodus.deleteLibraryReaderAnnotation(reference.id, id);
+    } catch (nextError) {
+      if (previous) setAnnotations((current) => [...current, previous!]);
+      if (previousOrphaned) setOrphanedAnnotations((current) => [...current, previousOrphaned!]);
+      throw nextError;
+    }
+  }, [reference.id]);
 
   useEffect(() => {
     const root = documentRef.current;
@@ -368,11 +483,11 @@ export function LibraryDocumentReader({
     };
   }, [reader, selectedSource]);
 
-  const selectReaderSource = (value: string) => {
+  const selectReaderSource = useCallback((value: string) => {
     setSelectedSource(value);
     if (reader) localStorage.setItem(`nodus.libraryReader.source.${reader.storageId}`, value);
     setPreviewPage(null);
-  };
+  }, [reader]);
 
   const scrollToSection = (index: number) => {
     const id = reader?.sections[index]?.id;
@@ -488,6 +603,13 @@ export function LibraryDocumentReader({
     setChatError(null);
   };
 
+  const selectedAttachment = useMemo(() => reader?.attachments.find((entry) => entry.id === selectedSource) ?? null, [reader, selectedSource]);
+  const visibleAnnotations = useMemo(() => annotations.filter((annotation) => selectedSource === 'clean'
+    ? annotation.scope === 'source'
+    : annotation.scope === `attachment:${selectedSource}` || annotation.scope.startsWith(`attachment:${selectedSource}:`)), [annotations, selectedSource]);
+  const sidebarAnnotations = useMemo(() => visibleAnnotations.filter((annotation) => annotation.kind !== 'bookmark'), [visibleAnnotations]);
+  const contextMarkdown = useMemo(() => reader?.markdown.replace(/data:image\/[^;]+;base64,[^)\s]+/g, '[imagen extraída]') ?? '', [reader]);
+
   if (loading) {
     return <div className="grid h-full place-items-center"><Spinner label={t('Preparando lector…')} /></div>;
   }
@@ -514,12 +636,6 @@ export function LibraryDocumentReader({
   }
 
   const currentPage = reader.sections[activeSection]?.page ?? null;
-  const selectedAttachment = reader.attachments.find((entry) => entry.id === selectedSource) ?? null;
-  const visibleAnnotations = annotations.filter((annotation) => selectedSource === 'clean'
-    ? annotation.scope === 'source'
-    : annotation.scope === `attachment:${selectedSource}` || annotation.scope.startsWith(`attachment:${selectedSource}:`));
-  const sidebarAnnotations = visibleAnnotations.filter((annotation) => annotation.kind !== 'bookmark');
-  const contextMarkdown = reader.markdown.replace(/data:image\/[^;]+;base64,[^)\s]+/g, '[imagen extraída]');
   const sourceKind = selectedAttachment
     ? selectedAttachment.role === 'original' ? 'original' : 'attachment'
     : reader.freshness === 'current' ? 'current' : 'previous';
@@ -626,23 +742,15 @@ export function LibraryDocumentReader({
                 </div>
                 ))}
               </> : <p className="px-2 py-3 text-[10px] leading-4 text-neutral-600">{t('Añade títulos para crear un índice navegable.')}</p>}
-              <div className="mt-4 border-t border-neutral-800 pt-3">
-                <button
-                  data-testid="library-reader-files-toggle"
-                  className="flex w-full items-center gap-2 rounded-xl border border-neutral-800 bg-neutral-950/35 px-2.5 py-2 text-left hover:border-neutral-700 hover:bg-neutral-900/70"
-                  aria-expanded={filesOpen}
-                  aria-controls="library-reader-files"
-                  onClick={() => setFilesOpen((value) => !value)}
-                >
-                  <span className="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-neutral-900 text-neutral-400"><Icon name="folder" size={13} /></span>
-                  <span className="min-w-0 flex-1"><b className="block truncate text-[11px] font-medium text-neutral-300">{t('Versiones y archivos')}</b><small className="block truncate text-[9px] text-neutral-600">{selectedAttachment?.title ?? t('Markdown limpio')} · {reader.attachments.length + 1}</small></span>
-                  <Icon name={filesOpen ? 'chevronUp' : 'chevronDown'} size={12} className="text-neutral-600" />
-                </button>
-                {filesOpen && <div id="library-reader-files" data-testid="library-reader-files" className="mt-2 space-y-0.5">
-                  <button data-testid="library-reader-file-clean" className={`library-reader-file-option flex w-full items-center gap-2 rounded-lg px-2 py-2 text-left text-xs ${selectedSource === 'clean' ? 'is-active' : ''}`} disabled={!reader.cleanAvailable} onClick={() => selectReaderSource('clean')}><Icon name="book" size={12} /><span className="truncate">{t('Markdown limpio')}</span></button>
-                  {reader.attachments.map((attachment) => <button key={attachment.id} data-testid={`library-reader-file-${attachment.id}`} className={`library-reader-file-option flex w-full items-center gap-2 rounded-lg px-2 py-2 text-left text-xs ${selectedSource === attachment.id ? 'is-active' : ''} disabled:opacity-40`} disabled={!attachment.available} onClick={() => selectReaderSource(attachment.id)}><Icon name={attachment.viewer === 'image' ? 'image' : attachment.viewer === 'pdf' || attachment.viewer === 'epub' ? 'book' : 'archive'} size={12} /><span className="min-w-0 flex-1 truncate">{attachment.title}</span><span className="library-reader-file-kind text-[9px] uppercase">{attachment.viewer}</span></button>)}
-                </div>}
-              </div>
+              <ReaderFilesMenu
+                attachments={reader.attachments}
+                cleanAvailable={reader.cleanAvailable}
+                cleanLabel={t('Markdown limpio')}
+                filesLabel={t('Versiones y archivos')}
+                selectedSource={selectedSource}
+                selectedTitle={selectedAttachment?.title ?? t('Markdown limpio')}
+                onSelect={selectReaderSource}
+              />
             </nav>
             <div className="mt-5 border-t border-neutral-800 px-2 pt-4 text-[10px] leading-5 text-neutral-600">
               <div>{t('Identificador')}: <span className="select-all font-mono text-neutral-500">{reader.storageId}</span></div>
@@ -654,7 +762,7 @@ export function LibraryDocumentReader({
         {selectedSource === 'clean' ? <main ref={scrollRef} className="library-reader-clean-surface min-w-0 flex-1 overflow-y-auto px-5 py-8 max-md:px-3">
           <article className="library-reader-paper mx-auto max-w-[52rem] rounded-2xl border border-neutral-800/80 px-12 py-12 shadow-[0_24px_70px_-40px_rgba(0,0,0,.75)] max-md:rounded-none max-md:border-x-0 max-md:px-5">
             <div ref={documentRef} className="library-reader-document relative" data-testid="library-reader-document">
-              <Markdown content={reader.markdown} verify={false} allowDataImages className="text-[16px] leading-[1.85] text-neutral-300" />
+              <ReaderMarkdownDocument content={reader.markdown} />
             </div>
           </article>
           <div className="mx-auto mt-6 flex max-w-[52rem] items-center justify-between px-2 pb-10 text-[11px] text-neutral-600">

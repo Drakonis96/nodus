@@ -131,6 +131,12 @@ import { streamDebateAnalysis } from '../ai/debate';
 import * as rqRepo from '../db/researchMapRepo';
 import * as writingAnnotations from '../db/writingAnnotationsRepo';
 import * as libraryReader from '../libraryReader/libraryReaderStore';
+import {
+  createLibraryReaderAnnotationInWorker,
+  deleteLibraryReaderAnnotationInWorker,
+  getLibraryReaderAttachmentContentInWorker,
+  updateLibraryReaderCommentInWorker,
+} from '../libraryReader/libraryReaderWorkerHost';
 import { streamLibraryReaderChat } from '../ai/libraryReaderChat';
 import { decomposeQuestion, mapCoverage } from '../ai/researchMap';
 import { exportResearchCoverage } from '../export/researchMapExport';
@@ -531,7 +537,7 @@ export function registerAcademicIpc({ h, getWindow, chatAborters }: IpcContext):
   });
   h('libraryReader:get', async (_e, nodusId: string) => libraryReader.getLibraryReaderDocument(nodusId));
   h('libraryReader:attachmentContent', async (_e, nodusId: string, attachmentId: string) =>
-    libraryReader.getLibraryReaderAttachmentContent(nodusId, attachmentId));
+    getLibraryReaderAttachmentContentInWorker(nodusId, attachmentId));
   h('libraryReader:openOriginal', async (_e, nodusId: string) => {
     const originalPath = libraryReader.libraryReaderOriginalPath(nodusId);
     if (!originalPath) return false;
@@ -544,17 +550,17 @@ export function registerAcademicIpc({ h, getWindow, chatAborters }: IpcContext):
     libraryReader.listLibraryReaderOrphanedAnnotations(nodusId)
   );
   h('libraryReader:annotations:create', async (_e, nodusId: string, input: WritingDraftAnnotationInput) => {
-    const annotation = libraryReader.createLibraryReaderAnnotation(nodusId, { ...input, draftId: nodusId });
+    const annotation = await createLibraryReaderAnnotationInWorker(nodusId, { ...input, draftId: nodusId });
     announceLibraryReaderAnnotations(nodusId);
     return annotation;
   });
   h('libraryReader:annotations:updateComment', async (_e, nodusId: string, id: string, comment: string) => {
-    const annotation = libraryReader.updateLibraryReaderComment(nodusId, id, comment);
+    const annotation = await updateLibraryReaderCommentInWorker(nodusId, id, comment);
     if (annotation) announceLibraryReaderAnnotations(nodusId);
     return annotation;
   });
   h('libraryReader:annotations:delete', async (_e, nodusId: string, id: string) => {
-    const deleted = libraryReader.deleteLibraryReaderAnnotation(nodusId, id);
+    const deleted = await deleteLibraryReaderAnnotationInWorker(nodusId, id);
     if (deleted) announceLibraryReaderAnnotations(nodusId);
     return deleted;
   });

@@ -140,6 +140,7 @@ export default defineConfig({
           computeWorker: 'electron/workers/computeWorker.ts',
           libraryExtractionWorker: 'electron/workers/libraryExtractionWorker.ts',
           libraryOperationWorker: 'electron/workers/libraryOperationWorker.ts',
+          libraryReaderWorker: 'electron/workers/libraryReaderWorker.ts',
         },
         vite: {
           // The top-level resolve.alias only applies to the renderer build;
