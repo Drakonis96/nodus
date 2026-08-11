@@ -9,6 +9,7 @@ import type {
   LibrarySortField,
   LibraryViewPreferences,
 } from '@shared/libraryTypes';
+import { LIBRARY_COLUMNS } from '@shared/libraryBibliography';
 import { Icon, Spinner } from '../ui';
 import { t, tx } from '../../i18n';
 import { toast } from '../feedback';
@@ -22,14 +23,8 @@ const OPERATORS: Array<[LibrarySmartSearchOperator, string]> = [
   ['contains', 'contiene'], ['equals', 'es'], ['not-equals', 'no es'], ['before', 'antes de'], ['after', 'después de'],
   ['is-true', 'sí'], ['is-false', 'no'],
 ];
-const COLUMNS: Array<[LibraryColumnId, string]> = [
-  ['title', 'Documento'], ['creator', 'Autoría'], ['year', 'Año'], ['source', 'Origen'], ['status', 'Estado'],
-  ['attachments', 'Adjuntos'], ['updatedAt', 'Modificado'],
-];
-const SORT_FIELDS: Array<[LibrarySortField, string]> = [
-  ['title', 'Documento'], ['creator', 'Autoría'], ['year', 'Año'], ['source', 'Origen'],
-  ['updatedAt', 'Modificado'], ['extraction', 'Estado'], ['attachments', 'Adjuntos'],
-];
+const COLUMNS: Array<[LibraryColumnId, string]> = LIBRARY_COLUMNS.map((column) => [column.id, column.label]);
+const SORT_FIELDS: Array<[LibrarySortField, string]> = LIBRARY_COLUMNS.flatMap((column) => column.sort ? [[column.sort, column.label] as [LibrarySortField, string]] : []);
 
 function newCondition(): LibrarySmartSearchCondition {
   return { id: crypto.randomUUID(), field: 'title', operator: 'contains', value: '' };
@@ -106,10 +101,36 @@ export function LibraryTablePreferencesDialog({ preferences, onClose, onSaved }:
   onSaved: (preferences: LibraryViewPreferences) => void;
 }) {
   const [value, setValue] = useState(preferences);
+  const [dragging, setDragging] = useState<LibraryColumnId | null>(null);
+  const label = (id: LibraryColumnId) => COLUMNS.find(([column]) => column === id)?.[1] ?? id;
+  const moveColumn = (id: LibraryColumnId, target: LibraryColumnId) => setValue((current) => {
+    const from = current.visibleColumns.indexOf(id); const to = current.visibleColumns.indexOf(target);
+    if (from < 0 || to < 0 || from === to) return current;
+    const visibleColumns = [...current.visibleColumns]; visibleColumns.splice(from, 1); visibleColumns.splice(to, 0, id);
+    return { ...current, visibleColumns };
+  });
+  const moveBy = (id: LibraryColumnId, direction: -1 | 1) => setValue((current) => {
+    const from = current.visibleColumns.indexOf(id); const to = from + direction;
+    if (from < 0 || to < 0 || to >= current.visibleColumns.length) return current;
+    const visibleColumns = [...current.visibleColumns]; [visibleColumns[from], visibleColumns[to]] = [visibleColumns[to], visibleColumns[from]];
+    return { ...current, visibleColumns };
+  });
   const save = async () => { const stored = await window.nodus.setGlobalLibraryViewPreferences(value); onSaved(stored); onClose(); };
   return <div className="fixed inset-0 z-[80] grid place-items-center bg-black/65 p-4" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
     <section data-testid="library-table-preferences" className="card w-full max-w-lg overflow-hidden shadow-2xl"><header className="flex items-center gap-3 border-b border-neutral-800 p-5"><Icon name="columns" className="text-indigo-300" /><div className="flex-1"><h2 className="font-semibold">{t('Columnas y orden')}</h2><p className="mt-1 text-xs text-neutral-500">{t('La vista se conserva entre sesiones.')}</p></div><button className="btn btn-ghost" onClick={onClose} aria-label={t('Cerrar')}><Icon name="x" /></button></header>
-      <div className="p-5"><h3 className="text-[10px] font-semibold uppercase tracking-wider text-neutral-500">{t('Columnas visibles')}</h3><div className="mt-3 grid grid-cols-2 gap-2">{COLUMNS.map(([id, label]) => <label key={id} className="flex items-center gap-2 rounded-lg border border-neutral-800 p-2 text-xs"><input type="checkbox" checked={value.visibleColumns.includes(id)} onChange={(event) => setValue((current) => ({ ...current, visibleColumns: event.target.checked ? [...current.visibleColumns, id] : current.visibleColumns.filter((entry) => entry !== id) }))} />{t(label)}</label>)}</div>
+      <div className="max-h-[70vh] overflow-y-auto p-5"><h3 className="text-[10px] font-semibold uppercase tracking-wider text-neutral-500">{t('Columnas visibles')}</h3><p className="mt-1 text-[11px] text-neutral-500">{t('Arrastra las filas, usa las flechas y ajusta el ancho en píxeles.')}</p>
+        <div className="mt-3 space-y-1.5" data-testid="library-visible-column-order">{value.visibleColumns.map((id, index) => <div
+          key={id} draggable data-column-id={id}
+          onDragStart={(event) => { setDragging(id); event.dataTransfer.effectAllowed = 'move'; event.dataTransfer.setData('text/plain', id); }}
+          onDragEnd={() => setDragging(null)} onDragOver={(event) => event.preventDefault()}
+          onDrop={(event) => { event.preventDefault(); const source = dragging ?? event.dataTransfer.getData('text/plain') as LibraryColumnId; if (source) moveColumn(source, id); setDragging(null); }}
+          className={`flex items-center gap-2 rounded-lg border p-2 text-xs ${dragging === id ? 'border-indigo-500 opacity-50' : 'border-neutral-800'}`}
+        ><Icon name="menu" size={13} className="cursor-grab text-neutral-500" /><span className="min-w-0 flex-1 truncate">{t(label(id))}</span><input
+          type="number" min={64} max={640} step={8} className="input h-7 w-[4.7rem] text-[10px]" placeholder={t('Auto')}
+          aria-label={tx('Ancho de columna {name}', { name: t(label(id)) })} value={value.columnWidths?.[id] ?? ''}
+          onChange={(event) => setValue((current) => { const columnWidths = { ...(current.columnWidths ?? {}) }; if (event.target.value) columnWidths[id] = Number(event.target.value); else delete columnWidths[id]; return { ...current, columnWidths }; })}
+        /><button className="grid h-7 w-7 place-items-center rounded hover:bg-neutral-800 disabled:opacity-30" disabled={!index} aria-label={tx('Subir columna {name}', { name: t(label(id)) })} onClick={() => moveBy(id, -1)}><Icon name="chevronUp" size={12} /></button><button className="grid h-7 w-7 place-items-center rounded hover:bg-neutral-800 disabled:opacity-30" disabled={index === value.visibleColumns.length - 1} aria-label={tx('Bajar columna {name}', { name: t(label(id)) })} onClick={() => moveBy(id, 1)}><Icon name="chevronDown" size={12} /></button><button className="grid h-7 w-7 place-items-center rounded text-red-400 hover:bg-red-500/10" aria-label={tx('Ocultar columna {name}', { name: t(label(id)) })} onClick={() => setValue((current) => ({ ...current, visibleColumns: current.visibleColumns.filter((entry) => entry !== id) }))}><Icon name="x" size={12} /></button></div>)}</div>
+        <h3 className="mt-5 text-[10px] font-semibold uppercase tracking-wider text-neutral-500">{t('Columnas ocultas')}</h3><div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3">{COLUMNS.filter(([id]) => !value.visibleColumns.includes(id)).map(([id, columnLabel]) => <button key={id} className="flex items-center gap-2 rounded-lg border border-neutral-800 p-2 text-left text-xs hover:border-indigo-500/50" onClick={() => setValue((current) => ({ ...current, visibleColumns: [...current.visibleColumns, id] }))}><Icon name="plus" size={12} className="text-indigo-400" />{t(columnLabel)}</button>)}</div>
         <h3 className="mt-5 text-[10px] font-semibold uppercase tracking-wider text-neutral-500">{t('Orden multicolumna')}</h3><div className="mt-3 space-y-2">{value.sort.map((rule, index) => <div key={index} className="flex gap-2"><select className="input flex-1 text-xs" value={rule.field} onChange={(event) => setValue((current) => ({ ...current, sort: current.sort.map((entry, ruleIndex) => ruleIndex === index ? { ...entry, field: event.target.value as LibrarySortField } : entry) }))}>{SORT_FIELDS.map(([id, label]) => <option key={id} value={id}>{t(label)}</option>)}</select><select className="input w-32 text-xs" value={rule.direction} onChange={(event) => setValue((current) => ({ ...current, sort: current.sort.map((entry, ruleIndex) => ruleIndex === index ? { ...entry, direction: event.target.value as 'asc' | 'desc' } : entry) }))}><option value="asc">{t('Ascendente')}</option><option value="desc">{t('Descendente')}</option></select><button className="btn btn-ghost text-red-400" onClick={() => setValue((current) => ({ ...current, sort: current.sort.filter((_, ruleIndex) => ruleIndex !== index) }))}><Icon name="x" size={12} /></button></div>)}</div>{value.sort.length < 3 && <button className="btn btn-ghost mt-2 h-8 text-xs" onClick={() => setValue((current) => ({ ...current, sort: [...current.sort, { field: 'title', direction: 'asc' }] }))}><Icon name="plus" size={12} /> {t('Añadir criterio')}</button>}
       </div><footer className="flex justify-end gap-2 border-t border-neutral-800 p-4"><button className="btn btn-ghost" onClick={onClose}>{t('Cancelar')}</button><button className="btn btn-primary" disabled={!value.visibleColumns.length || !value.sort.length} onClick={() => void save()}><Icon name="save" /> {t('Guardar')}</button></footer></section>
   </div>;

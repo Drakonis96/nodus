@@ -24,7 +24,7 @@ import type {
 } from '@shared/libraryTypes';
 import type { AppSettings, VaultSummary, VaultType } from '@shared/types';
 import { Icon, Spinner } from '../components/ui';
-import { LibraryCitationExportDialog, LibraryDuplicatesDialog, LibraryMetadataBatchDialog, LibraryMetadataEditor } from '../components/library/LibraryMetadataDialogs';
+import { LibraryCitationExportDialog, LibraryCreateReferenceDialog, LibraryDuplicatesDialog, LibraryMetadataBatchDialog, LibraryMetadataEditor } from '../components/library/LibraryMetadataDialogs';
 import { LibraryItemManager } from '../components/library/LibraryItemManager';
 import { LibrarySmartSearchDialog, LibraryTablePreferencesDialog } from '../components/library/LibrarySmartSearchDialog';
 import { LibraryRecoveryDialog, LibraryTrashImpactDialog } from '../components/library/LibraryRecoveryDialogs';
@@ -36,6 +36,7 @@ import type { PendingAssistantNavigationTarget } from '../navigation';
 import type { PendingLibraryNavigationTarget } from '../navigation';
 import type { PendingGraphNavigationTarget } from '../navigation';
 import { Library } from './Library';
+import { LIBRARY_COLUMN_BY_ID, libraryItemTypeLabel } from '@shared/libraryBibliography';
 
 const PAGE_SIZE = 250;
 const TRASH_SEARCH = { id: 'library-trash', mode: 'all' as const, rules: [{ id: 'library-trash-only', field: 'trash' as const, operator: 'is-true' as const, value: true }] };
@@ -57,19 +58,12 @@ const REUSE_COMPONENT_LABELS = {
 const EMPTY_FACETS: LibraryCatalogFacets = { sources: [], itemTypes: [], extraction: [], attachments: [], years: [], tags: [], vaults: [] };
 const DEFAULT_VIEW_PREFERENCES: LibraryViewPreferences = {
   visibleColumns: ['title', 'creator', 'year', 'source', 'status'],
+  columnWidths: {},
   sort: [{ field: 'updatedAt', direction: 'desc' }, { field: 'title', direction: 'asc' }],
 };
-const COLUMN_LABEL: Record<LibraryColumnId, string> = {
-  title: 'Documento', creator: 'Autoría', year: 'Año', source: 'Origen', status: 'Estado',
-  attachments: 'Adjuntos', updatedAt: 'Modificado',
-};
-const COLUMN_WIDTH: Record<LibraryColumnId, string> = {
-  title: 'minmax(14rem,2fr)', creator: 'minmax(9rem,1fr)', year: '4.5rem', source: '7rem', status: '7.5rem',
-  attachments: '5.5rem', updatedAt: '8.5rem',
-};
-const COLUMN_SORT: Partial<Record<LibraryColumnId, LibrarySortField>> = {
-  title: 'title', creator: 'creator', year: 'year', source: 'source', status: 'extraction', attachments: 'attachments', updatedAt: 'updatedAt',
-};
+const COLUMN_LABEL = Object.fromEntries(Object.entries(LIBRARY_COLUMN_BY_ID).map(([id, column]) => [id, column.label])) as Record<LibraryColumnId, string>;
+const COLUMN_WIDTH = Object.fromEntries(Object.entries(LIBRARY_COLUMN_BY_ID).map(([id, column]) => [id, column.width])) as Record<LibraryColumnId, string>;
+const COLUMN_SORT = Object.fromEntries(Object.entries(LIBRARY_COLUMN_BY_ID).flatMap(([id, column]) => column.sort ? [[id, column.sort]] : [])) as Partial<Record<LibraryColumnId, LibrarySortField>>;
 
 function VaultReuseBadges({ link }: { link: LibraryVaultLink }) {
   if (!link.analysis.reuse) return null;
@@ -88,6 +82,18 @@ function VaultReuseBadges({ link }: { link: LibraryVaultLink }) {
 
 function creatorText(item: LibraryCatalogItem): string {
   return item.creators.map((creator) => creator.name || [creator.firstName, creator.lastName].filter(Boolean).join(' ')).filter(Boolean).join('; ');
+}
+
+function catalogColumnText(item: LibraryCatalogItem, column: LibraryColumnId): string {
+  if (column === 'creator') return creatorText(item) || '—';
+  if (column === 'itemType') return t(libraryItemTypeLabel(item.itemType));
+  if (column === 'year') return item.year == null ? '—' : String(item.year);
+  if (column === 'citationKey') return item.citationKey ?? '—';
+  if (column === 'attachments') return String(item.attachmentCount);
+  if (column === 'createdAt' || column === 'updatedAt') return new Date(item[column]).toLocaleDateString();
+  if (column === 'isbn' || column === 'issn' || column === 'tags') return (item.metadata[column] ?? []).join('; ') || '—';
+  const metadataValue = (item.metadata as unknown as Record<string, unknown>)[column];
+  return metadataValue == null || metadataValue === '' ? '—' : String(metadataValue);
 }
 
 function collectionChildren(collections: LibraryCollectionView[]): Map<string | null, LibraryCollectionView[]> {
@@ -464,6 +470,7 @@ function GlobalLibraryContent({
   const [collectionTarget, setCollectionTarget] = useState('');
   const [readerItem, setReaderItem] = useState<LibraryItemRecord | null>(null);
   const [metadataItem, setMetadataItem] = useState<LibraryItemRecord | null>(null);
+  const [createReferenceMode, setCreateReferenceMode] = useState<'identifier' | 'manual' | null>(null);
   const [metadataBatchItems, setMetadataBatchItems] = useState<string[] | null>(null);
   const [citationItems, setCitationItems] = useState<string[] | null>(null);
   const [duplicatesOpen, setDuplicatesOpen] = useState(false);
@@ -538,7 +545,7 @@ function GlobalLibraryContent({
   const localCollections = useMemo(() => collections.filter((entry) => entry.source === 'nodus'), [collections]);
   const activeJobs = jobs.filter((job) => ['queued', 'processing'].includes(job.status));
   const visibleColumns = viewPreferences.visibleColumns;
-  const tableGrid = `2.2rem ${visibleColumns.map((column) => COLUMN_WIDTH[column]).join(' ')}`;
+  const tableGrid = `2.2rem ${visibleColumns.map((column) => viewPreferences.columnWidths?.[column] ? `${viewPreferences.columnWidths[column]}px` : COLUMN_WIDTH[column]).join(' ')}`;
   const tableMinWidth = Math.max(560, 160 + visibleColumns.length * 112);
 
   const createCollection = async () => {
@@ -631,13 +638,6 @@ function GlobalLibraryContent({
       else if (report.warnings.length) toast(report.warnings[0], { tone: 'info' });
       await load();
     } catch (nextError) { toast(nextError instanceof Error ? nextError.message : String(nextError), { tone: 'error' }); }
-  };
-
-  const createReference = async () => {
-    const title = await promptText({ title: t('Nueva referencia'), placeholder: t('Título de la referencia'), confirmLabel: t('Crear') });
-    if (!title?.trim()) return;
-    const created = await window.nodus.createGlobalLibraryItem({ title: title.trim(), itemType: 'document', creators: [], year: null, isbn: [], issn: [], tags: [] }, selectedCollection ? [selectedCollection] : []);
-    setDetailId(created.id); setDetail(created); setMetadataItem(created); await load();
   };
 
   const duplicateDetail = async () => {
@@ -739,7 +739,8 @@ function GlobalLibraryContent({
         <div className="flex-1" />
         {activeJobs.length > 0 && <span className="flex items-center gap-2 rounded-full bg-indigo-500/10 px-3 py-1.5 text-xs text-indigo-300"><Spinner /> {tx('{n} tarea(s) en segundo plano', { n: activeJobs.length })}</span>}
         {trashMode ? <><button data-testid="close-library-trash" className="btn btn-ghost border border-neutral-700" onClick={closeTrash}><Icon name="chevronLeft" /> {t('Volver a la Biblioteca')}</button><button data-testid="empty-library-trash" className="btn btn-ghost border border-red-500/30 text-red-400" disabled={!trashCount} onClick={() => setTrashImpactItems([])}><Icon name="trash" /> {t('Vaciar papelera')}</button></> : <>
-        <button data-testid="create-library-reference" className="btn btn-ghost border border-neutral-700" onClick={() => void createReference()}><Icon name="plus" /> {t('Nueva referencia')}</button>
+        <button data-testid="magic-add-library-reference" className="btn btn-primary" onClick={() => setCreateReferenceMode('identifier')} title={t('Añadir por DOI, ISBN, ISSN, PMID, PMCID o arXiv')}><Icon name="wand" /> {t('Añadir por identificador')}</button>
+        <button data-testid="create-library-reference" className="btn btn-ghost border border-neutral-700" onClick={() => setCreateReferenceMode('manual')}><Icon name="plus" /> {t('Entrada manual')}</button>
         <button data-testid="open-library-migration" className="btn btn-ghost border border-neutral-700" onClick={() => setMigrationOpen(true)}><Icon name="vault" /> {t('Migrar vaults')}</button>
         <button data-testid="open-library-duplicates" className="btn btn-ghost border border-neutral-700" onClick={() => setDuplicatesOpen(true)}><Icon name="copy" /> {t('Duplicados')}</button>
         <button data-testid="import-library-bibliography" className="btn btn-ghost border border-neutral-700" onClick={() => void importBibliography()}><Icon name="fileText" /> {t('Importar referencias')}</button>
@@ -771,14 +772,14 @@ function GlobalLibraryContent({
         <section className="flex min-w-0 flex-1 flex-col">
           <div className="border-b border-neutral-800 p-3">
             <div className="flex items-center gap-2">
-              <div className="relative min-w-[220px] flex-1"><Icon name="search" size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-neutral-600" /><input data-testid="global-library-search" className="input w-full pl-9" value={searchDraft} onChange={(event) => setSearchDraft(event.target.value)} placeholder={t('Buscar título, autor, etiqueta, DOI, ISBN o ISSN…')} /></div>
+              <div className="relative min-w-[220px] flex-1"><Icon name="search" size={15} className="pointer-events-none absolute left-3 top-1/2 z-10 -translate-y-1/2 text-neutral-600" /><input data-testid="global-library-search" className="input input-with-leading-icon w-full" value={searchDraft} onChange={(event) => setSearchDraft(event.target.value)} placeholder={t('Buscar título, autor, etiqueta, DOI, ISBN, ISSN, PMID o arXiv…')} /></div>
               <button className={`btn border border-neutral-700 ${filtersOpen || source || extraction || yearFrom || yearTo || itemType || facetTag || facetVault || attachmentFilter ? 'bg-indigo-500/10 text-indigo-300' : 'btn-ghost'}`} onClick={() => setFiltersOpen((value) => !value)}><Icon name="filter" /> {t('Filtros')}</button>
               <button data-testid="library-table-settings" className="btn btn-ghost border border-neutral-700" onClick={() => setTablePreferencesOpen(true)} title={t('Columnas y orden')}><Icon name="columns" /></button>
             </div>
             {filtersOpen && <div className="mt-2 rounded-xl bg-neutral-900/55 p-2"><div className="grid gap-2 sm:grid-cols-3 xl:grid-cols-6">
               <select className="input text-xs" value={source} onChange={(event) => { setSource(event.target.value as LibraryItemSource | ''); setOffset(0); }}><option value="">{t('Todos los orígenes')}</option>{Object.entries(SOURCE_LABEL).map(([id, label]) => <option key={id} value={id}>{label}</option>)}</select>
               <select className="input text-xs" value={extraction} onChange={(event) => { setExtraction(event.target.value as typeof extraction); setOffset(0); }}><option value="">{t('Cualquier estado')}</option>{Object.entries(EXTRACTION_LABEL).map(([id, label]) => <option key={id} value={id}>{t(label)}</option>)}</select>
-              <select className="input text-xs" value={itemType} onChange={(event) => { setItemType(event.target.value as LibraryItemType | ''); setOffset(0); }}><option value="">{t('Todos los tipos')}</option>{facets.itemTypes.map((entry) => <option key={entry.value} value={entry.value}>{entry.value} ({entry.count})</option>)}</select>
+              <select className="input text-xs" value={itemType} onChange={(event) => { setItemType(event.target.value as LibraryItemType | ''); setOffset(0); }}><option value="">{t('Todos los tipos')}</option>{facets.itemTypes.map((entry) => <option key={entry.value} value={entry.value}>{t(libraryItemTypeLabel(entry.value as LibraryItemType))} ({entry.count})</option>)}</select>
               <select className="input text-xs" value={attachmentFilter} onChange={(event) => { setAttachmentFilter(event.target.value as typeof attachmentFilter); setOffset(0); }}><option value="">{t('Cualquier adjunto')}</option><option value="with">{t('Con adjuntos')}</option><option value="without">{t('Sin adjuntos')}</option></select>
               <input className="input text-xs" type="number" value={yearFrom} onChange={(event) => { setYearFrom(event.target.value); setOffset(0); }} placeholder={t('Año desde')} />
               <input className="input text-xs" type="number" value={yearTo} onChange={(event) => { setYearTo(event.target.value); setOffset(0); }} placeholder={t('Año hasta')} />
@@ -788,7 +789,7 @@ function GlobalLibraryContent({
           {selected.size > 0 && <div data-testid="global-library-bulk-actions" className="flex flex-wrap items-center gap-2 border-b border-indigo-500/20 bg-indigo-500/5 px-3 py-2 text-xs"><b>{tx('{n} seleccionados', { n: selected.size })}</b>{trashMode ? <><button data-testid="bulk-restore-library-trash" className="btn btn-secondary h-8" onClick={() => void restoreSelected()}><Icon name="refresh" size={13} /> {t('Restaurar')}</button><button data-testid="bulk-purge-library-trash" className="btn btn-ghost h-8 text-red-400" onClick={() => setTrashImpactItems([...selected])}><Icon name="trash" size={13} /> {t('Revisar y vaciar')}</button></> : <><select aria-label={t('Acción de colección')} className="input ml-2 h-8 text-xs" value={collectionAction} onChange={(event) => setCollectionAction(event.target.value as typeof collectionAction)}><option value="copy">{t('Copiar a')}</option><option value="move">{t('Mover a')}</option><option value="remove">{t('Quitar de esta colección')}</option></select>{collectionAction !== 'remove' && <select className="input h-8 min-w-44 text-xs" value={collectionTarget} onChange={(event) => setCollectionTarget(event.target.value)}><option value="">{t('Elegir colección…')}</option>{localCollections.map((collection) => <option key={collection.id} value={collection.id}>{collection.name}</option>)}</select>}<button className="btn btn-ghost h-8" disabled={collectionAction === 'remove' ? collections.find((entry) => entry.id === selectedCollection)?.source !== 'nodus' : !collectionTarget} onClick={() => void addSelectedToCollection()}>{t('Aplicar')}</button><input className="input h-8 w-32 text-xs" value={bulkTag} onChange={(event) => setBulkTag(event.target.value)} placeholder={t('Etiqueta…')} /><button className="btn btn-ghost h-8" disabled={!bulkTag.trim()} onClick={() => void applyBulkTag()}><Icon name="tag" size={13} /> {t('Etiquetar')}</button><button data-testid="bulk-resolve-library-metadata" className="btn btn-ghost h-8" onClick={() => setMetadataBatchItems([...selected])}><Icon name="search" size={13} /> {t('Completar metadatos')}</button><button data-testid="bulk-library-citations" className="btn btn-ghost h-8" onClick={() => setCitationItems([...selected])}><Icon name="quote" size={13} /> {t('Citar / exportar')}</button><button data-testid="bulk-add-library-to-vault" className="btn btn-ghost h-8" onClick={() => setVaultLinkItems([...selected])}><Icon name="vault" size={13} /> {t('Añadir al vault')}</button><button className="btn btn-ghost h-8" onClick={() => void processSelected()}><Icon name="refresh" size={13} /> {t('Procesar de nuevo')}</button><button className="btn btn-ghost h-8 text-red-400" onClick={() => void deleteSelected()}><Icon name="trash" size={13} /> {t('Papelera')}</button></>}<button className="ml-auto text-neutral-500 hover:text-neutral-200" onClick={() => setSelected(new Set())}>{t('Limpiar selección')}</button></div>}
 
           <div className="min-h-0 flex-1 overflow-x-auto">
-          <div className="grid h-9 items-center border-b border-neutral-800 px-3 text-[10px] font-semibold uppercase tracking-wider text-neutral-600" style={{ gridTemplateColumns: tableGrid, minWidth: tableMinWidth }}>
+          <div data-testid="global-library-table-header" className="grid h-9 items-center border-b border-neutral-800 px-3 text-[10px] font-semibold uppercase tracking-wider text-neutral-600" style={{ gridTemplateColumns: tableGrid, minWidth: tableMinWidth }}>
             <input type="checkbox" checked={items.length > 0 && items.every((item) => selected.has(item.id))} onChange={(event) => setSelected((current) => { const next = new Set(current); for (const item of items) { if (event.target.checked) next.add(item.id); else next.delete(item.id); } return next; })} aria-label={t('Seleccionar página')} />
             {visibleColumns.map((column) => { const sortField = COLUMN_SORT[column]; const sortIndex = sortField ? viewPreferences.sort.findIndex((entry) => entry.field === sortField) : -1; const rule = sortIndex >= 0 ? viewPreferences.sort[sortIndex] : null; return <button key={column} className="flex min-w-0 items-center gap-1 text-left hover:text-neutral-300" disabled={!sortField} onClick={(event) => sortField && void sortByColumn(sortField, event.shiftKey)} title={t('Clic para ordenar; Mayús+Clic añade un criterio')}><span className="truncate">{t(COLUMN_LABEL[column])}</span>{rule && <span className="text-indigo-400">{rule.direction === 'asc' ? '↑' : '↓'}{viewPreferences.sort.length > 1 ? sortIndex + 1 : ''}</span>}</button>; })}
           </div>
@@ -801,12 +802,10 @@ function GlobalLibraryContent({
                 <input type="checkbox" checked={selected.has(item.id)} onChange={(event) => setSelected((current) => { const next = new Set(current); if (event.target.checked) next.add(item.id); else next.delete(item.id); return next; })} />
                 {visibleColumns.map((column) => {
                   if (column === 'title') return <button key={column} className="min-w-0 pr-4 text-left" onClick={() => setDetailId(item.id)}><b className="flex min-w-0 items-center gap-1.5 font-medium text-neutral-200"><span className="truncate">{item.title}</span>{item.sourceState && item.sourceState !== 'current' && <Icon name="alert" size={11} className="shrink-0 text-amber-400" />}</b><span className="mt-1 block truncate text-[10px] text-neutral-600">{item.doi || item.isbn[0] || item.issn[0] || item.sourceKey || item.id}</span></button>;
-                  if (column === 'creator') return <span key={column} className="truncate pr-3 text-neutral-500">{creatorText(item) || '—'}</span>;
-                  if (column === 'year') return <span key={column} className="tabular-nums text-neutral-500">{item.year ?? '—'}</span>;
                   if (column === 'source') return <span key={column} className="w-fit rounded bg-neutral-900 px-2 py-1 text-[10px] text-neutral-400">{SOURCE_LABEL[item.source]}</span>;
-                  if (column === 'attachments') return <span key={column} className="text-neutral-500">{item.attachmentCount}</span>;
-                  if (column === 'updatedAt') return <time key={column} className="text-[10px] text-neutral-500" dateTime={item.updatedAt}>{new Date(item.updatedAt).toLocaleDateString()}</time>;
-                  return <span key={column} className={`flex items-center gap-1.5 text-[10px] ${activeJob ? 'text-indigo-300' : item.extractionStatus === 'ready' ? 'text-emerald-400' : item.extractionStatus === 'failed' ? 'text-red-400' : 'text-neutral-500'}`}>{activeJob && <Spinner />} {activeJob ? `${Math.round(activeJob.progress * 100)}%` : t(EXTRACTION_LABEL[item.extractionStatus])}</span>;
+                  if (column === 'status') return <span key={column} className={`flex items-center gap-1.5 text-[10px] ${activeJob ? 'text-indigo-300' : item.extractionStatus === 'ready' ? 'text-emerald-400' : item.extractionStatus === 'failed' ? 'text-red-400' : 'text-neutral-500'}`}>{activeJob && <Spinner />} {activeJob ? `${Math.round(activeJob.progress * 100)}%` : t(EXTRACTION_LABEL[item.extractionStatus])}</span>;
+                  if (column === 'createdAt' || column === 'updatedAt') return <time key={column} className="truncate pr-3 text-[10px] text-neutral-500" dateTime={item[column]}>{catalogColumnText(item, column)}</time>;
+                  return <span key={column} title={catalogColumnText(item, column)} className={`truncate pr-3 text-neutral-500 ${['year', 'attachments'].includes(column) ? 'tabular-nums' : ''}`}>{catalogColumnText(item, column)}</span>;
                 })}
               </div>;
             }}
@@ -820,7 +819,7 @@ function GlobalLibraryContent({
           <div className="min-h-0 flex-1 overflow-y-auto p-4"><span className="rounded bg-indigo-500/10 px-2 py-1 text-[10px] font-medium text-indigo-300">{SOURCE_LABEL[detail.source]}</span><h2 className="mt-3 text-base font-semibold leading-6">{detail.metadata.title}</h2><p className="mt-2 text-xs leading-5 text-neutral-500">{detail.metadata.creators.map((creator) => creator.name || [creator.firstName, creator.lastName].filter(Boolean).join(' ')).filter(Boolean).join('; ') || t('Sin autoría')}</p>
             {detail.sourceState && detail.sourceState !== 'current' && <div data-testid="library-source-missing" role="status" className="mt-4 rounded-lg border border-amber-500/30 bg-amber-500/10 p-2.5 text-[11px] text-amber-950 dark:text-amber-100"><b>{t(detail.sourceState === 'library-missing' ? 'Biblioteca de origen no disponible' : 'Elemento ausente en el origen')}</b><p className="mt-1 opacity-80">{t('El contenido de Nodus se conserva y volverá a vincularse si reaparece en Zotero.')}</p></div>}
             <dl className="mt-5 space-y-3 text-xs">{[
-              [t('Tipo'), detail.metadata.itemType], [t('Fecha'), detail.metadata.date || detail.metadata.year], [t('Publicación'), detail.metadata.publicationTitle], [t('Editorial'), detail.metadata.publisher], [t('DOI'), detail.metadata.doi], [t('ISBN'), detail.metadata.isbn?.join('; ')], [t('ISSN'), detail.metadata.issn?.join('; ')], [t('PMID'), detail.metadata.pmid], [t('PMCID'), detail.metadata.pmcid], [t('arXiv'), detail.metadata.arxiv], [t('Clave de cita'), detail.citationKey], [t('Idioma'), detail.metadata.language], [t('Identificador'), detail.sourceKey || detail.id],
+              [t('Tipo'), t(libraryItemTypeLabel(detail.metadata.itemType))], [t('Fecha'), detail.metadata.date || detail.metadata.year], [t('Publicación'), detail.metadata.publicationTitle], [t('Editorial'), detail.metadata.publisher], [t('DOI'), detail.metadata.doi], [t('ISBN'), detail.metadata.isbn?.join('; ')], [t('ISSN'), detail.metadata.issn?.join('; ')], [t('PMID'), detail.metadata.pmid], [t('PMCID'), detail.metadata.pmcid], [t('arXiv'), detail.metadata.arxiv], [t('Clave de cita'), detail.citationKey], [t('Idioma'), detail.metadata.language], [t('Identificador'), detail.sourceKey || detail.id],
             ].filter(([, value]) => value != null && value !== '').map(([label, value]) => <div key={String(label)}><dt className="text-[10px] uppercase tracking-wider text-neutral-600">{label}</dt><dd className="mt-1 break-words text-neutral-300">{String(value)}</dd></div>)}</dl>
             {detail.metadata.abstract && <div className="mt-5"><h3 className="text-[10px] font-semibold uppercase tracking-wider text-neutral-600">{t('Resumen')}</h3><p className="mt-2 text-xs leading-5 text-neutral-400">{detail.metadata.abstract}</p></div>}
             {detail.metadata.tags?.length ? <div className="mt-5 flex flex-wrap gap-1">{detail.metadata.tags.map((tag) => <span key={tag} className="rounded-full bg-neutral-900 px-2 py-1 text-[10px] text-neutral-400">{tag}</span>)}</div> : null}
@@ -832,6 +831,7 @@ function GlobalLibraryContent({
       </div>
       {zoteroOpen && <ZoteroImportDialog onClose={() => setZoteroOpen(false)} onFinished={() => void load()} />}
       {migrationOpen && <LibraryMigrationDialog onClose={() => setMigrationOpen(false)} onFinished={() => void load()} />}
+      {createReferenceMode && <LibraryCreateReferenceDialog defaultMode={createReferenceMode} collectionIds={selectedCollection && collections.find((entry) => entry.id === selectedCollection)?.source === 'nodus' ? [selectedCollection] : []} onClose={() => setCreateReferenceMode(null)} onCreated={(created, openEditor) => { setDetailId(created.id); setDetail(created); if (openEditor) setMetadataItem(created); void load(); }} />}
       {metadataItem && <LibraryMetadataEditor item={metadataItem} onClose={() => setMetadataItem(null)} onSaved={(saved) => { setDetail(saved); void load(); }} />}
       {metadataBatchItems && <LibraryMetadataBatchDialog itemIds={metadataBatchItems} onClose={() => setMetadataBatchItems(null)} onApplied={() => { setSelected(new Set()); void load(); }} />}
       {citationItems && <LibraryCitationExportDialog itemIds={citationItems} requestScope={{ collectionId: selectedCollection, savedSearchId: selectedSavedSearch, smartSearch: selectedSavedSearch ? savedSearches.find((entry) => entry.id === selectedSavedSearch)?.query ?? null : null }} onClose={() => setCitationItems(null)} />}

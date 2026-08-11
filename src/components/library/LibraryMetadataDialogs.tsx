@@ -17,14 +17,22 @@ import { confirm, toast } from '../feedback';
 import { Icon, Spinner } from '../ui';
 import { t, tx } from '../../i18n';
 import { mergeLibraryMetadataCandidate } from '@shared/libraryMetadata';
+import {
+  detectLibraryMetadataIdentifier,
+  LIBRARY_CREATOR_ROLES,
+  LIBRARY_ITEM_TYPES,
+} from '@shared/libraryBibliography';
 
 function authorText(metadata: LibraryItemMetadata): string {
   return metadata.creators.map((creator) => creator.name || [creator.lastName, creator.firstName].filter(Boolean).join(', ')).filter(Boolean).join('; ');
 }
 
 function metadataDraft(metadata: LibraryItemMetadata) {
+  const itemType = (metadata.itemType === 'book-section' || metadata.itemType === 'chapter' ? 'book-chapter'
+    : metadata.itemType === 'article-journal' ? 'journal-article' : metadata.itemType) as LibraryItemMetadata['itemType'];
   return {
     ...metadata,
+    itemType,
     authors: authorText(metadata),
     isbnText: (metadata.isbn ?? []).join('; '), issnText: (metadata.issn ?? []).join('; '), tagsText: (metadata.tags ?? []).join(', '),
   };
@@ -42,6 +50,59 @@ function displayValue(metadata: LibraryItemMetadata, key: keyof LibraryItemMetad
   return Array.isArray(value) ? value.join('; ') : value == null ? '' : String(value);
 }
 
+export function LibraryCreateReferenceDialog({ defaultMode = 'identifier', collectionIds, onClose, onCreated }: {
+  defaultMode?: 'identifier' | 'manual';
+  collectionIds: string[];
+  onClose: () => void;
+  onCreated: (item: LibraryItemRecord, openEditor: boolean) => void;
+}) {
+  const [mode, setMode] = useState<'identifier' | 'manual'>(defaultMode);
+  const [rawIdentifier, setRawIdentifier] = useState('');
+  const [title, setTitle] = useState('');
+  const [itemType, setItemType] = useState<LibraryItemMetadata['itemType']>('journal-article');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+
+  const addByIdentifier = async () => {
+    const detected = detectLibraryMetadataIdentifier(rawIdentifier);
+    if (!detected) { setError(t('No se reconoce el identificador. Usa DOI, ISBN, ISSN, PMID, PMCID o arXiv.')); return; }
+    setBusy(true); setError('');
+    try {
+      const result = await window.nodus.resolveGlobalLibraryMetadata(detected.kind, detected.value);
+      const candidate = result.candidates[0];
+      if (!candidate) throw new Error(t('No se encontró ninguna ficha bibliográfica.'));
+      const created = await window.nodus.createGlobalLibraryItem(candidate.metadata, collectionIds);
+      toast(tx('Referencia añadida desde {kind}.', { kind: detected.kind.toUpperCase() }));
+      onCreated(created, false); onClose();
+    } catch (cause) { setError(cause instanceof Error ? cause.message : String(cause)); }
+    finally { setBusy(false); }
+  };
+
+  const addManual = async () => {
+    if (!title.trim()) return;
+    setBusy(true); setError('');
+    try {
+      const created = await window.nodus.createGlobalLibraryItem({
+        title: title.trim(), itemType, creators: [], year: null, isbn: [], issn: [], tags: [],
+      }, collectionIds);
+      onCreated(created, true); onClose();
+    } catch (cause) { setError(cause instanceof Error ? cause.message : String(cause)); }
+    finally { setBusy(false); }
+  };
+
+  return <div className="fixed inset-0 z-[86] grid place-items-center bg-black/70 p-4" role="dialog" aria-modal="true" data-testid="library-create-reference-dialog" onMouseDown={(event) => { if (event.target === event.currentTarget && !busy) onClose(); }}>
+    <section className="card-modal w-full max-w-xl overflow-hidden rounded-2xl border border-neutral-800 shadow-2xl">
+      <header className="flex items-center gap-3 border-b border-neutral-800 px-5 py-4"><span className="grid h-9 w-9 place-items-center rounded-xl bg-indigo-500/15 text-indigo-300"><Icon name={mode === 'identifier' ? 'wand' : 'edit'} /></span><div className="min-w-0 flex-1"><h2 className="font-semibold">{t('Añadir referencia')}</h2><p className="mt-1 text-xs text-neutral-500">{t('Crea una ficha automáticamente por identificador o introdúcela manualmente.')}</p></div><button className="btn btn-ghost" aria-label={t('Cerrar')} onClick={onClose}><Icon name="x" /></button></header>
+      <div className="border-b border-neutral-800 px-5 pt-3"><div className="flex gap-1" role="tablist"><button role="tab" aria-selected={mode === 'identifier'} className={`rounded-t-lg px-3 py-2 text-xs ${mode === 'identifier' ? 'bg-indigo-500/15 text-indigo-300' : 'text-neutral-500 hover:text-neutral-200'}`} onClick={() => { setMode('identifier'); setError(''); }}><Icon name="wand" size={13} /> {t('Identificador')}</button><button role="tab" aria-selected={mode === 'manual'} className={`rounded-t-lg px-3 py-2 text-xs ${mode === 'manual' ? 'bg-indigo-500/15 text-indigo-300' : 'text-neutral-500 hover:text-neutral-200'}`} onClick={() => { setMode('manual'); setError(''); }}><Icon name="edit" size={13} /> {t('Entrada manual')}</button></div></div>
+      <form className="p-5" onSubmit={(event) => { event.preventDefault(); void (mode === 'identifier' ? addByIdentifier() : addManual()); }}>
+        {mode === 'identifier' ? <><label className="block text-xs font-medium">{t('DOI, ISBN, ISSN, PMID, PMCID o arXiv')}<input autoFocus data-testid="library-magic-identifier" className="input mt-2 w-full" value={rawIdentifier} onChange={(event) => setRawIdentifier(event.target.value)} placeholder="10.1234/article · 978… · PMID: …" /></label><p className="mt-2 text-[11px] leading-5 text-neutral-500">{t('Nodus detecta el tipo, recupera la mejor ficha disponible y la añade al pulsar Intro.')}</p></> : <div className="grid gap-3 sm:grid-cols-[12rem_1fr]"><label className="block text-xs font-medium">{t('Tipo')}<select data-testid="library-manual-item-type" className="input mt-2 w-full" value={itemType} onChange={(event) => setItemType(event.target.value as LibraryItemMetadata['itemType'])}>{LIBRARY_ITEM_TYPES.map((entry) => <option key={entry.id} value={entry.id}>{t(entry.label)}</option>)}</select></label><label className="block text-xs font-medium">{t('Título')}<input autoFocus data-testid="library-manual-title" className="input mt-2 w-full" value={title} onChange={(event) => setTitle(event.target.value)} placeholder={t('Título de la referencia')} /></label><p className="text-[11px] leading-5 text-neutral-500 sm:col-span-2">{t('Después podrás completar autores, identificadores, publicación, fechas y campos específicos de Zotero.')}</p></div>}
+        {error && <p role="alert" className="mt-4 rounded-lg border border-red-500/30 bg-red-500/10 p-2.5 text-xs text-red-300">{error}</p>}
+        <div className="mt-5 flex justify-end gap-2"><button type="button" className="btn btn-ghost" disabled={busy} onClick={onClose}>{t('Cancelar')}</button><button type="submit" data-testid="confirm-create-library-reference" className="btn btn-primary" disabled={busy || (mode === 'identifier' ? !rawIdentifier.trim() : !title.trim())}>{busy ? <Spinner /> : <Icon name={mode === 'identifier' ? 'wand' : 'plus'} />} {t(mode === 'identifier' ? 'Buscar y añadir' : 'Crear y completar')}</button></div>
+      </form>
+    </section>
+  </div>;
+}
+
 export function LibraryMetadataEditor({ item, onClose, onSaved }: {
   item: LibraryItemRecord; onClose: () => void; onSaved: (item: LibraryItemRecord) => void;
 }) {
@@ -55,6 +116,7 @@ export function LibraryMetadataEditor({ item, onClose, onSaved }: {
   const [lookingUp, setLookingUp] = useState(false);
   const [saving, setSaving] = useState(false);
   const [citationKey, setCitationKey] = useState(item.citationKey ?? '');
+  const [extraFields, setExtraFields] = useState(() => Object.entries(item.metadata.extra ?? {}).map(([name, value]) => ({ name, value })));
   const [error, setError] = useState('');
 
   const lookup = async () => {
@@ -88,6 +150,7 @@ export function LibraryMetadataEditor({ item, onClose, onSaved }: {
         isbn: draft.isbnText.split(/[;,]\s*/).map((value) => value.trim()).filter(Boolean),
         issn: draft.issnText.split(/[;,]\s*/).map((value) => value.trim()).filter(Boolean),
         tags: draft.tagsText.split(',').map((value) => value.trim()).filter(Boolean),
+        extra: Object.fromEntries(extraFields.map((entry) => [entry.name.trim(), entry.value.trim()]).filter(([name, value]) => name && value)),
       });
       const final = citationKey.trim() !== (saved.citationKey ?? '')
         ? await window.nodus.updateGlobalLibraryCitationKey(saved.id, citationKey.trim()) : saved;
@@ -112,14 +175,15 @@ export function LibraryMetadataEditor({ item, onClose, onSaved }: {
           {input('title', 'Título', { wide: true })}
           <fieldset className="sm:col-span-2" data-testid="library-creator-editor"><div className="flex items-center justify-between"><legend className="text-[10px] uppercase tracking-wider text-neutral-500">{t('Autoría y contribuciones')}</legend><button type="button" className="btn btn-ghost h-7 text-[10px]" onClick={() => setCreators((current) => [...current, { creatorType: 'author', firstName: '', lastName: '', fieldMode: 0 }])}><Icon name="plus" size={12} /> {t('Añadir persona')}</button></div>
             <div className="mt-2 space-y-2">{creators.map((creator, index) => <div key={`${index}:${creator.creatorType}`} className="grid gap-2 rounded-xl border border-neutral-800 p-2 sm:grid-cols-[8rem_7rem_1fr_1fr_auto]">
-              <select aria-label={t('Rol')} className="input text-xs" value={creator.creatorType} onChange={(event) => setCreators((current) => current.map((entry, position) => position === index ? { ...entry, creatorType: event.target.value } : entry))}>{['author', 'editor', 'translator', 'contributor', 'bookAuthor', 'seriesEditor', 'reviewedAuthor', 'inventor', 'director', 'scriptwriter', 'producer', 'performer', 'composer', 'cartographer', 'programmer', 'artist', 'presenter', 'interviewer', 'interviewee', 'recipient', 'sponsor'].map((role) => <option key={role} value={role}>{role}</option>)}</select>
+              <select aria-label={t('Rol')} className="input text-xs" value={creator.creatorType} onChange={(event) => setCreators((current) => current.map((entry, position) => position === index ? { ...entry, creatorType: event.target.value } : entry))}>{LIBRARY_CREATOR_ROLES.map((role) => <option key={role} value={role}>{role}</option>)}</select>
               <select aria-label={t('Tipo de autoría')} className="input text-xs" value={creator.fieldMode === 1 || creator.name ? 'organization' : 'person'} onChange={(event) => setCreators((current) => current.map((entry, position) => position === index ? event.target.value === 'organization' ? { creatorType: entry.creatorType, name: entry.name || [entry.firstName, entry.lastName].filter(Boolean).join(' '), fieldMode: 1 } : { creatorType: entry.creatorType, firstName: '', lastName: entry.name ?? '', fieldMode: 0 } : entry))}><option value="person">{t('Persona')}</option><option value="organization">{t('Institución')}</option></select>
               {creator.fieldMode === 1 || creator.name ? <input aria-label={t('Nombre institucional')} className="input sm:col-span-2" value={creator.name ?? ''} onChange={(event) => setCreators((current) => current.map((entry, position) => position === index ? { ...entry, name: event.target.value, fieldMode: 1 } : entry))} /> : <><input aria-label={t('Nombre')} className="input" value={creator.firstName ?? ''} onChange={(event) => setCreators((current) => current.map((entry, position) => position === index ? { ...entry, firstName: event.target.value } : entry))} /><input aria-label={t('Apellidos')} className="input" value={creator.lastName ?? ''} onChange={(event) => setCreators((current) => current.map((entry, position) => position === index ? { ...entry, lastName: event.target.value } : entry))} /></>}
               <span className="flex items-center"><button type="button" className="grid h-7 w-7 place-items-center" aria-label={t('Subir')} disabled={!index} onClick={() => setCreators((current) => { const next = [...current]; [next[index - 1], next[index]] = [next[index], next[index - 1]]; return next; })}><Icon name="chevronUp" size={12} /></button><button type="button" className="grid h-7 w-7 place-items-center" aria-label={t('Bajar')} disabled={index === creators.length - 1} onClick={() => setCreators((current) => { const next = [...current]; [next[index], next[index + 1]] = [next[index + 1], next[index]]; return next; })}><Icon name="chevronDown" size={12} /></button><button type="button" className="grid h-7 w-7 place-items-center text-red-400" aria-label={t('Eliminar')} onClick={() => setCreators((current) => current.filter((_, position) => position !== index))}><Icon name="trash" size={12} /></button></span>
             </div>)}</div>
           </fieldset>
-          <label className="block text-[10px] uppercase tracking-wider text-neutral-500">{t('Tipo')}<select className="input mt-1 w-full normal-case tracking-normal" value={draft.itemType} onChange={(event) => setDraft((current) => ({ ...current, itemType: event.target.value as LibraryItemMetadata['itemType'] }))}>{['journal-article', 'magazine-article', 'newspaper-article', 'book', 'book-section', 'chapter', 'conference-paper', 'thesis', 'report', 'manuscript', 'presentation', 'interview', 'letter', 'email', 'encyclopedia-article', 'dictionary-entry', 'case', 'hearing', 'bill', 'statute', 'patent', 'artwork', 'map', 'film', 'audio-recording', 'video-recording', 'podcast', 'blog-post', 'forum-post', 'computer-program', 'webpage', 'document', 'dataset', 'other'].map((value) => <option key={value}>{value}</option>)}</select></label>
+          <label className="block text-[10px] uppercase tracking-wider text-neutral-500">{t('Tipo')}<select data-testid="library-metadata-item-type" className="input mt-1 w-full normal-case tracking-normal" value={draft.itemType} onChange={(event) => setDraft((current) => ({ ...current, itemType: event.target.value as LibraryItemMetadata['itemType'] }))}>{LIBRARY_ITEM_TYPES.map((entry) => <option key={entry.id} value={entry.id}>{t(entry.label)}</option>)}</select></label>
           {input('year', 'Año', { type: 'number' })}{input('date', 'Fecha')}{input('language', 'Idioma')}{input('publicationTitle', 'Publicación', { wide: true })}{input('publisher', 'Editorial')}{input('place', 'Lugar')}{input('volume', 'Volumen')}{input('issue', 'Número')}{input('pages', 'Páginas')}{input('edition', 'Edición')}{input('doi', 'DOI', { wide: true })}{input('isbnText', 'ISBN', { wide: true })}{input('issnText', 'ISSN', { wide: true })}{input('pmid', 'PMID')}{input('pmcid', 'PMCID')}{input('arxiv', 'arXiv', { wide: true })}<label className="block text-[10px] uppercase tracking-wider text-neutral-500 sm:col-span-2">{t('Clave de cita')}<input data-testid="library-citation-key" className="input mt-1 w-full normal-case tracking-normal" value={citationKey} onChange={(event) => setCitationKey(event.target.value)} /></label>{input('url', 'URL', { wide: true })}{input('tagsText', 'Etiquetas', { wide: true })}{input('abstract', 'Resumen', { wide: true, textarea: true })}
+          <fieldset className="sm:col-span-2"><div className="flex items-center justify-between"><legend className="text-[10px] uppercase tracking-wider text-neutral-500">{t('Campos adicionales')}</legend><button type="button" className="btn btn-ghost h-7 text-[10px]" onClick={() => setExtraFields((current) => [...current, { name: '', value: '' }])}><Icon name="plus" size={12} /> {t('Añadir campo')}</button></div><p className="mt-1 text-[10px] text-neutral-600">{t('Conserva campos específicos de Zotero y campos personalizados en importaciones y exportaciones.')}</p><div className="mt-2 space-y-2">{extraFields.map((entry, index) => <div key={index} className="grid grid-cols-[minmax(7rem,.8fr)_minmax(10rem,1.4fr)_auto] gap-2"><input aria-label={t('Nombre del campo')} className="input" value={entry.name} onChange={(event) => setExtraFields((current) => current.map((field, position) => position === index ? { ...field, name: event.target.value } : field))} /><input aria-label={t('Valor del campo')} className="input" value={entry.value} onChange={(event) => setExtraFields((current) => current.map((field, position) => position === index ? { ...field, value: event.target.value } : field))} /><button type="button" className="grid h-8 w-8 place-items-center text-red-400" aria-label={t('Eliminar campo')} onClick={() => setExtraFields((current) => current.filter((_, position) => position !== index))}><Icon name="trash" size={12} /></button></div>)}</div></fieldset>
         </div></div>
         <aside className="min-h-0 overflow-y-auto border-l border-neutral-800 bg-neutral-950/35 p-5">
           <h3 className="text-xs font-semibold">{t('Buscar por identificador')}</h3><p className="mt-1 text-[10px] leading-5 text-neutral-600">{t('Consulta fuentes bibliográficas públicas. Nada se aplica sin tu revisión.')}</p>

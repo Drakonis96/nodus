@@ -128,6 +128,7 @@ const ICON_PATHS: Record<string, string> = {
   arrowDown: '<path d="M12 5v14"/><path d="M19 12l-7 7-7-7"/>',
   arrowRight: '<path d="M5 12h14"/><path d="m12 5 7 7-7 7"/>',
   columns: '<rect x="3" y="3" width="18" height="18" rx="2"/><path d="M12 3v18"/>',
+  menu: '<circle cx="9" cy="6" r="1"/><circle cx="15" cy="6" r="1"/><circle cx="9" cy="12" r="1"/><circle cx="15" cy="12" r="1"/><circle cx="9" cy="18" r="1"/><circle cx="15" cy="18" r="1"/>',
   pause: '<rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/>',
   play: '<polygon points="6 4 20 12 6 20 6 4"/>',
   stop: '<rect x="5" y="5" width="14" height="14" rx="2"/>',
