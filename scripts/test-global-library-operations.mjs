@@ -34,11 +34,22 @@ try {
   assert.equal(initialCollections.find((entry) => entry.id === postwar.id)?.parentId, women.id);
   assert.throws(() => operations.updateCollection(history.id, { parentId: postwar.id }), /ciclo/);
   assert.equal(operations.updateCollection(women.id, { name: 'Historia de las mujeres' }).name, 'Historia de las mujeres');
+  const styled = operations.updateCollection(women.id, { icon: 'star', color: '#0f766e' });
+  assert.equal(styled.icon, 'star');
+  assert.equal(styled.color, '#0f766e');
+  assert.equal(store.readMaterializedCollection(women.id).icon, 'star', 'collection icon is stored in the source-of-truth manifest');
+  assert.equal(store.readMaterializedCollection(women.id).color, '#0f766e', 'collection color is stored in the source-of-truth manifest');
+  assert.throws(() => operations.updateCollection(women.id, { icon: 'script' }), /icono/i);
+  assert.throws(() => operations.updateCollection(women.id, { color: 'url(javascript:bad)' }), /color/i);
+  const resetStyle = operations.updateCollection(women.id, { icon: null, color: null });
+  assert.equal(resetStyle.icon, null);
+  assert.equal(resetStyle.color, null);
 
   // Imported collection names remain a read-only mirror; Nodus collections are independent.
   store.upsertCollection({ id: 'zotero:ROOT', name: 'Zotero', parentId: null, position: 0, source: 'zotero', sourceLibraryId: 'users/0', sourceKey: 'ROOT' });
   catalog.rebuild(store);
   assert.throws(() => operations.updateCollection('zotero:ROOT', { name: 'Cambio local' }), /gestor/);
+  assert.throws(() => operations.updateCollection('zotero:ROOT', { icon: 'star', color: '#0f766e' }), /gestor/);
   assert.throws(() => operations.deleteCollection('zotero:ROOT'), /gestor de origen/);
 
   const sourceDir = path.join(scratch, 'imports');

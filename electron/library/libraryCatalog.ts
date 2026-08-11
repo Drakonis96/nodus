@@ -215,6 +215,8 @@ export class LibraryCatalog {
       CREATE TABLE IF NOT EXISTS library_collections (
         id TEXT PRIMARY KEY,
         name TEXT NOT NULL,
+        icon TEXT,
+        color TEXT,
         parent_id TEXT,
         position INTEGER NOT NULL,
         source TEXT NOT NULL,
@@ -311,6 +313,8 @@ export class LibraryCatalog {
     this.ensureColumn('library_items', 'analysis_json', "TEXT NOT NULL DEFAULT '{}'");
     this.ensureColumn('library_items', 'created_at', 'TEXT');
     this.ensureColumn('library_collections', 'source_library_id', 'TEXT');
+    this.ensureColumn('library_collections', 'icon', 'TEXT');
+    this.ensureColumn('library_collections', 'color', 'TEXT');
     this.handle.exec('CREATE INDEX IF NOT EXISTS library_items_source_library ON library_items (source, source_library_id, source_key);');
   }
 
@@ -405,8 +409,8 @@ export class LibraryCatalog {
       VALUES (@identityKey, @itemId, @source, @libraryType, @libraryId, @itemKey)
     `);
     const insertCollection = this.handle.prepare(`
-      INSERT INTO library_collections (id, name, parent_id, position, source, source_library_id, source_key, revision, updated_at, deleted_at)
-      VALUES (@id, @name, @parentId, @position, @source, @sourceLibraryId, @sourceKey, @revision, @updatedAt, @deletedAt)
+      INSERT INTO library_collections (id, name, icon, color, parent_id, position, source, source_library_id, source_key, revision, updated_at, deleted_at)
+      VALUES (@id, @name, @icon, @color, @parentId, @position, @source, @sourceLibraryId, @sourceKey, @revision, @updatedAt, @deletedAt)
     `);
     const insertCollectionAlias = this.handle.prepare(
       'INSERT OR IGNORE INTO library_collection_aliases (alias, collection_id) VALUES (?, ?)'
@@ -481,6 +485,8 @@ export class LibraryCatalog {
         insertCollection.run({
           id: record.id,
           name: record.name,
+          icon: record.icon ?? null,
+          color: record.color ?? null,
           parentId: record.parentId,
           position: record.position,
           source: record.source,
@@ -786,6 +792,8 @@ export class LibraryCatalog {
     `).all() as Record<string, unknown>[];
     return rows.map((row) => ({
       id: String(row.id), name: String(row.name), parentId: row.parent_id == null ? null : String(row.parent_id),
+      icon: row.icon == null ? null : row.icon as LibraryCollectionView['icon'],
+      color: row.color == null ? null : String(row.color),
       position: Number(row.position), source: row.source as LibraryCollectionView['source'],
       sourceLibraryId: row.source_library_id == null ? null : String(row.source_library_id),
       sourceKey: row.source_key == null ? null : String(row.source_key),

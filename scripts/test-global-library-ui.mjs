@@ -33,7 +33,8 @@ test('the Library UI exposes hierarchy, search, bulk operations, imports and bac
     'open-library-trash', 'empty-library-trash', 'library-trash-impact-dialog', 'restore-library-trash', 'purge-library-trash',
     'open-library-recovery', 'library-recovery-dialog', 'rebuild-library-recovery', 'library-merge-impact',
     'library-collection-edit-', 'library-collection-move-', 'library-collection-delete-',
-    'library-collection-move-dialog', 'library-collection-move-root', 'confirm-library-collection-move',
+    'library-collection-move-dialog', 'library-collection-move-search', 'library-collection-move-root', 'confirm-library-collection-move',
+    'library-collection-style-', 'library-collection-style-dialog', 'library-collection-custom-color', 'save-library-collection-style',
   ]) assert.match(view, new RegExp(`data-testid=(?:"|\{\`)[^\n]*${marker}`));
   for (const method of [
     'getGlobalLibraryStatus', 'listGlobalLibraryItems', 'listGlobalLibraryCollections',
@@ -63,6 +64,9 @@ test('the Library UI exposes hierarchy, search, bulk operations, imports and bac
   assert.doesNotMatch(view, /event\.shiftKey \? targetCollection\.id/, 'nesting does not depend on a hidden keyboard modifier');
   assert.match(view, /deleteGlobalLibraryCollection\(current\.id, false\)/, 'deleting a grouping explicitly preserves its items');
   assert.match(view, /collectionSubtreeIds/, 'move and delete actions account for every nested collection');
+  assert.match(view, /collectionSearchIds/, 'move search preserves matching collections and their hierarchical ancestors');
+  assert.match(view, /COLLECTION_COLOR_PRESETS\.map/, 'collection styling exposes the six predefined colors');
+  assert.match(view, /type="color"/, 'collection styling includes a custom native color palette');
   assert.match(view, /data-testid="open-library-trash"[\s\S]*?<Icon name="folder"/, 'trash is rendered as the final collection-tree folder');
   assert.match(view, /library-trash-folder[\s\S]*aria-current=\{trashMode \? 'page'/, 'the trash folder exposes its selected state');
   assert.doesNotMatch(view, /\{!trashMode && <aside/, 'the collection tree remains visible while trash is open');

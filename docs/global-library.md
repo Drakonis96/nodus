@@ -418,11 +418,16 @@ Dropping a collection on another collection nests it directly; dropping it on
 the Library root moves it back to the top level. Every local collection and
 subcollection also exposes compact rename, move, and delete controls. The move
 dialog presents the complete hierarchy, disables the current subtree to prevent
-cycles, and makes the destination explicit. Deleting a collection removes only
-that grouping and its nested groupings: items, attachments, notes, annotations,
-and analyses remain in the Library. Dropping one or more document rows copies
-their memberships without changing their files or analysis. The bulk bar also
-exposes explicit copy, move, and remove operations.
+cycles, and makes the destination explicit. Its accent-insensitive search keeps
+each matching collection beneath its visible ancestor path instead of flattening
+the results. Clicking a Nodus collection icon opens its visual settings: twelve
+icons, six predefined colours, and a native custom-colour picker. The selected
+icon and colour live in the collection manifest and therefore survive catalog
+rebuilds. Deleting a collection removes only that grouping and its nested
+groupings: items, attachments, notes, annotations, and analyses remain in the
+Library. Dropping one or more document rows copies their memberships without
+changing their files or analysis. The bulk bar also exposes explicit copy, move,
+and remove operations.
 Trash is a fixed, red-tinted folder at the end of the complete collection tree.
 It cannot be renamed, moved, nested, or used as a drop target, and remains
 visible while its recoverable contents are being reviewed.

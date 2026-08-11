@@ -17,6 +17,7 @@ import type {
   LibrarySortField,
   LibraryViewPreferences,
   LibraryItemType,
+  LibraryCollectionIcon,
   ZoteroImportProgress,
   ZoteroImportSelection,
   ZoteroLibraryPreview,
@@ -64,6 +65,11 @@ const DEFAULT_VIEW_PREFERENCES: LibraryViewPreferences = {
 const COLUMN_LABEL = Object.fromEntries(Object.entries(LIBRARY_COLUMN_BY_ID).map(([id, column]) => [id, column.label])) as Record<LibraryColumnId, string>;
 const COLUMN_WIDTH = Object.fromEntries(Object.entries(LIBRARY_COLUMN_BY_ID).map(([id, column]) => [id, column.width])) as Record<LibraryColumnId, string>;
 const COLUMN_SORT = Object.fromEntries(Object.entries(LIBRARY_COLUMN_BY_ID).flatMap(([id, column]) => column.sort ? [[id, column.sort]] : [])) as Partial<Record<LibraryColumnId, LibrarySortField>>;
+const COLLECTION_ICONS: LibraryCollectionIcon[] = ['folder', 'book', 'bookmark', 'star', 'archive', 'notebook', 'graduation', 'flask', 'globe', 'map', 'users', 'tag'];
+const COLLECTION_COLOR_PRESETS = [
+  { id: 'indigo', value: '#6366f1' }, { id: 'sky', value: '#0ea5e9' }, { id: 'emerald', value: '#10b981' },
+  { id: 'amber', value: '#f59e0b' }, { id: 'rose', value: '#f43f5e' }, { id: 'violet', value: '#8b5cf6' },
+] as const;
 
 function VaultReuseBadges({ link }: { link: LibraryVaultLink }) {
   if (!link.analysis.reuse) return null;
@@ -126,6 +132,27 @@ function flattenedCollections(children: Map<string | null, LibraryCollectionView
   return entries;
 }
 
+function normalizedCollectionSearch(value: string): string {
+  return value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().toLocaleLowerCase();
+}
+
+/** Matching nodes stay in their original tree: every ancestor is retained as context. */
+function collectionSearchIds(collections: LibraryCollectionView[], search: string): Set<string> | null {
+  const query = normalizedCollectionSearch(search);
+  if (!query) return null;
+  const byId = new Map(collections.map((collection) => [collection.id, collection]));
+  const visible = new Set<string>();
+  for (const collection of collections) {
+    if (!normalizedCollectionSearch(collection.name).includes(query)) continue;
+    let cursor: LibraryCollectionView | undefined = collection;
+    while (cursor && !visible.has(cursor.id)) {
+      visible.add(cursor.id);
+      cursor = cursor.parentId ? byId.get(cursor.parentId) : undefined;
+    }
+  }
+  return visible;
+}
+
 function LibraryCollectionMoveDialog({
   collection,
   collections,
@@ -140,6 +167,9 @@ function LibraryCollectionMoveDialog({
   const children = useMemo(() => collectionChildren(collections), [collections]);
   const excluded = useMemo(() => collectionSubtreeIds(collection.id, children), [children, collection.id]);
   const entries = useMemo(() => flattenedCollections(children), [children]);
+  const [search, setSearch] = useState('');
+  const visibleIds = useMemo(() => collectionSearchIds(collections, search), [collections, search]);
+  const visibleEntries = useMemo(() => entries.filter(({ collection: entry }) => !visibleIds || visibleIds.has(entry.id)), [entries, visibleIds]);
   const [parentId, setParentId] = useState<string | null>(collection.parentId);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -172,6 +202,20 @@ function LibraryCollectionMoveDialog({
           </div>
           <button className="btn btn-ghost" onClick={onClose} disabled={busy} aria-label={t('Cerrar')}><Icon name="x" /></button>
         </header>
+        <div className="shrink-0 border-b border-neutral-800 p-3">
+          <div className="relative">
+            <Icon name="search" size={14} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-neutral-500" />
+            <input
+              data-testid="library-collection-move-search"
+              className="input w-full"
+              style={{ paddingInlineStart: '2.25rem' }}
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              placeholder={t('Buscar colección…')}
+              autoFocus
+            />
+          </div>
+        </div>
         <div className="min-h-0 flex-1 overflow-y-auto p-3">
           <button
             data-testid="library-collection-move-root"
@@ -185,7 +229,7 @@ function LibraryCollectionMoveDialog({
             {collection.parentId === null && <span className="text-[10px] text-neutral-500">{t('Destino actual')}</span>}
           </button>
           <div className="mt-1 space-y-0.5">
-            {entries.map(({ collection: target, depth }) => {
+            {visibleEntries.map(({ collection: target, depth }) => {
               const unavailable = excluded.has(target.id) || target.source !== 'nodus';
               const active = parentId === target.id;
               return <button
@@ -197,14 +241,16 @@ function LibraryCollectionMoveDialog({
                 onClick={() => setParentId(target.id)}
                 title={excluded.has(target.id) ? t('La colección actual y sus subcolecciones no pueden ser destino.') : target.source !== 'nodus' ? t('Las colecciones importadas son de solo lectura en Nodus.') : tx('Mover dentro de {name}', { name: target.name })}
               >
+                <span aria-hidden="true" className="relative h-5 shrink-0" style={{ width: depth ? depth * 10 : 0 }}>{depth > 0 && <span className="absolute inset-y-0 right-0 w-2.5 rounded-bl border-b border-l border-neutral-700 opacity-70" />}</span>
                 <span className={`grid h-5 w-5 shrink-0 place-items-center rounded-full border ${active ? 'border-indigo-400' : 'border-neutral-700'}`}>{active && <span className="h-2.5 w-2.5 rounded-full bg-indigo-400" />}</span>
-                <Icon name="folder" size={15} className="shrink-0" />
+                <span className="shrink-0" style={{ color: target.color ?? undefined }}><Icon name={target.icon ?? 'folder'} size={15} /></span>
                 <span className="min-w-0 flex-1 truncate">{target.name}</span>
                 {target.id === collection.id && <span className="text-[10px] text-neutral-500">{t('Colección actual')}</span>}
                 {target.source !== 'nodus' && <Icon name="lock" size={10} className="shrink-0" />}
                 {target.id === collection.parentId && <span className="text-[10px] text-neutral-500">{t('Destino actual')}</span>}
               </button>;
             })}
+            {visibleEntries.length === 0 && <p className="px-3 py-8 text-center text-sm text-neutral-500">{t('Sin colecciones.')}</p>}
           </div>
           {error && <p role="alert" className="mt-3 rounded-lg bg-red-500/10 p-3 text-xs text-red-300">{error}</p>}
         </div>
@@ -212,6 +258,40 @@ function LibraryCollectionMoveDialog({
           <button className="btn btn-ghost" disabled={busy} onClick={onClose}>{t('Cancelar')}</button>
           <button data-testid="confirm-library-collection-move" className="btn btn-primary" disabled={busy || parentId === collection.parentId} onClick={() => void move()}>{busy ? <Spinner /> : <Icon name="route" />} {t('Mover aquí')}</button>
         </footer>
+      </section>
+    </div>
+  );
+}
+
+function LibraryCollectionStyleDialog({ collection, onClose, onSave }: {
+  collection: LibraryCollectionView;
+  onClose: () => void;
+  onSave: (icon: LibraryCollectionIcon | null, color: string | null) => Promise<void>;
+}) {
+  const [icon, setIcon] = useState<LibraryCollectionIcon | null>(collection.icon);
+  const [color, setColor] = useState<string | null>(collection.color);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const save = async () => {
+    setBusy(true); setError('');
+    try { await onSave(icon, color); onClose(); }
+    catch (cause) { setError(cause instanceof Error ? cause.message : String(cause)); }
+    finally { setBusy(false); }
+  };
+  return (
+    <div className="fixed inset-0 z-[92] grid place-items-center bg-black/65 p-6" onMouseDown={(event) => { if (event.target === event.currentTarget && !busy) onClose(); }}>
+      <section data-testid="library-collection-style-dialog" className="card-modal w-full max-w-md overflow-hidden rounded-2xl border border-neutral-800 shadow-2xl" role="dialog" aria-modal="true" aria-labelledby="library-collection-style-title">
+        <header className="flex items-center gap-3 border-b border-neutral-800 px-5 py-4">
+          <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-indigo-500/10" style={{ color: color ?? undefined }}><Icon name={icon ?? 'folder'} size={20} /></span>
+          <div className="min-w-0 flex-1"><h2 id="library-collection-style-title" className="font-semibold">{t('Icono')} · {t('Color')}</h2><p className="mt-1 truncate text-xs text-neutral-500">{collection.name}</p></div>
+          <button className="btn btn-ghost" onClick={onClose} disabled={busy} aria-label={t('Cerrar')}><Icon name="x" /></button>
+        </header>
+        <div className="space-y-5 p-5">
+          <section><h3 className="text-[10px] font-semibold uppercase tracking-wider text-neutral-500">{t('Icono')}</h3><div className="mt-2 grid grid-cols-6 gap-2">{COLLECTION_ICONS.map((candidate) => <button key={candidate} data-testid={`library-collection-icon-${candidate}`} className={`grid aspect-square place-items-center rounded-xl border ${icon === candidate ? 'border-indigo-500 bg-indigo-500/10 text-indigo-300' : 'border-neutral-800 text-neutral-500 hover:border-neutral-600 hover:text-neutral-200'}`} onClick={() => setIcon(candidate)} aria-label={candidate}><Icon name={candidate} size={18} /></button>)}</div></section>
+          <section><h3 className="text-[10px] font-semibold uppercase tracking-wider text-neutral-500">{t('Color')}</h3><div className="mt-2 flex flex-wrap items-center gap-2">{COLLECTION_COLOR_PRESETS.map((preset) => <button key={preset.id} data-testid={`library-collection-color-preset-${preset.id}`} className={`grid h-9 w-9 place-items-center rounded-full border-2 ${color === preset.value ? 'border-white shadow-[0_0_0_2px_rgba(99,102,241,.65)]' : 'border-transparent'}`} style={{ backgroundColor: preset.value }} onClick={() => setColor(preset.value)} aria-label={preset.id}>{color === preset.value && <Icon name="check" size={15} className="text-white" />}</button>)}<label className={`relative grid h-10 w-10 cursor-pointer place-items-center overflow-hidden rounded-full border-2 ${color && !COLLECTION_COLOR_PRESETS.some((preset) => preset.value === color) ? 'border-white shadow-[0_0_0_2px_rgba(99,102,241,.65)]' : 'border-neutral-700'}`} title={t('Color')}><Icon name="palette" size={17} className="pointer-events-none relative z-10 text-white drop-shadow" /><input data-testid="library-collection-custom-color" type="color" className="absolute inset-[-8px] h-14 w-14 cursor-pointer border-0 p-0" value={color ?? '#64748b'} onChange={(event) => setColor(event.target.value.toLowerCase())} aria-label={t('Color')} /></label></div></section>
+          {error && <p role="alert" className="rounded-lg bg-red-500/10 p-3 text-xs text-red-300">{error}</p>}
+        </div>
+        <footer className="flex justify-between gap-2 border-t border-neutral-800 p-4"><button className="btn btn-ghost" disabled={busy} onClick={() => { setIcon(null); setColor(null); }}><Icon name="rotateCcw" /> {t('Restablecer')}</button><div className="flex gap-2"><button className="btn btn-ghost" disabled={busy} onClick={onClose}>{t('Cancelar')}</button><button data-testid="save-library-collection-style" className="btn btn-primary" disabled={busy} onClick={() => void save()}>{busy ? <Spinner /> : <Icon name="check" />} {t('Guardar')}</button></div></footer>
       </section>
     </div>
   );
@@ -227,6 +307,7 @@ function CollectionBranch({
   onDrop,
   onRename,
   onMove,
+  onStyle,
   onDelete,
   depth,
 }: {
@@ -239,6 +320,7 @@ function CollectionBranch({
   onDrop: (event: DragEvent, collection: LibraryCollectionView) => void;
   onRename: (collection: LibraryCollectionView) => void;
   onMove: (collection: LibraryCollectionView) => void;
+  onStyle: (collection: LibraryCollectionView) => void;
   onDelete: (collection: LibraryCollectionView) => void;
   depth: number;
 }) {
@@ -254,6 +336,14 @@ function CollectionBranch({
         >
           <Icon name="chevronRight" size={12} className={open ? 'rotate-90' : ''} />
         </button>
+        {collection.source === 'nodus' ? <button
+          data-testid={`library-collection-style-${collection.id}`}
+          className="grid h-7 w-7 shrink-0 place-items-center rounded-md text-neutral-500 hover:bg-neutral-900 hover:text-neutral-200"
+          style={{ color: collection.color ?? undefined }}
+          onClick={() => onStyle(collection)}
+          title={`${t('Icono')} · ${t('Color')}`}
+          aria-label={`${t('Icono')} · ${collection.name}`}
+        ><Icon name={collection.icon ?? 'folder'} size={13} /></button> : <span className="grid h-7 w-7 shrink-0 place-items-center text-neutral-500" style={{ color: collection.color ?? undefined }}><Icon name={collection.icon ?? 'folder'} size={13} /></span>}
         <button
           data-testid={`global-library-collection-${collection.id}`}
           className={`flex min-w-0 flex-1 items-center gap-2 rounded-md px-1.5 py-1 text-left text-xs ${selected === collection.id ? 'bg-indigo-600 text-white' : 'text-neutral-400 hover:bg-neutral-900 hover:text-neutral-200'}`}
@@ -262,7 +352,6 @@ function CollectionBranch({
           draggable={collection.source === 'nodus'}
           onDragStart={(event) => { event.dataTransfer.effectAllowed = 'move'; event.dataTransfer.setData('application/x-nodus-library-collection', collection.id); }}
         >
-          <Icon name="folder" size={13} className="shrink-0 opacity-70" />
           <span className="min-w-0 flex-1 truncate">{collection.name}</span>
           {collection.source !== 'nodus' && <Icon name="lock" size={9} className="shrink-0 opacity-45" />}
           <span className="text-[10px] tabular-nums opacity-55">{collection.directItemCount}</span>
@@ -277,7 +366,7 @@ function CollectionBranch({
         <CollectionBranch
           key={child.id} collection={child} children={children} selected={selected} expanded={expanded}
           onSelect={onSelect} onToggle={onToggle} depth={depth + 1}
-          onDrop={onDrop} onRename={onRename} onMove={onMove} onDelete={onDelete}
+          onDrop={onDrop} onRename={onRename} onMove={onMove} onStyle={onStyle} onDelete={onDelete}
         />
       ))}
     </>
@@ -664,6 +753,7 @@ function GlobalLibraryContent({
   const [bulkTag, setBulkTag] = useState('');
   const [collectionAction, setCollectionAction] = useState<'copy' | 'move' | 'remove'>('copy');
   const [movingCollection, setMovingCollection] = useState<LibraryCollectionView | null>(null);
+  const [stylingCollection, setStylingCollection] = useState<LibraryCollectionView | null>(null);
   const [smartSearchEditor, setSmartSearchEditor] = useState<LibrarySavedSearchRecord | 'new' | null>(null);
   const [tablePreferencesOpen, setTablePreferencesOpen] = useState(false);
   const sortKey = JSON.stringify(viewPreferences.sort);
@@ -966,7 +1056,7 @@ function GlobalLibraryContent({
             <button className={`flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs ${!trashMode && selectedCollection === null && selectedSavedSearch === null ? 'bg-indigo-600 text-white' : 'text-neutral-400 hover:bg-neutral-900'}`} onClick={() => { setTrashMode(false); setSelectedCollection(null); setSelectedSavedSearch(null); setSelected(new Set()); setDetailId(null); setOffset(0); }}><Icon name="library" size={14} /><span className="flex-1">{t('Todos los documentos')}</span><span className="text-[10px] opacity-60">{status.items}</span></button>
           </div>
           <div className="flex min-h-0 flex-1 flex-col overflow-y-auto px-2 pb-3">
-            {(children.get(null) ?? []).map((collection) => <CollectionBranch key={collection.id} collection={collection} children={children} selected={trashMode ? null : selectedCollection} expanded={expanded} onSelect={(id) => { setTrashMode(false); setSelectedCollection(id); setSelectedSavedSearch(null); setSelected(new Set()); setDetailId(null); setOffset(0); }} onToggle={(id) => setExpanded((current) => { const next = new Set(current); if (next.has(id)) next.delete(id); else next.add(id); return next; })} onDrop={(event, entry) => void dropOnCollection(event, entry)} onRename={(entry) => void renameCollection(entry.id)} onMove={setMovingCollection} onDelete={(entry) => void deleteCollection(entry.id)} depth={0} />)}
+            {(children.get(null) ?? []).map((collection) => <CollectionBranch key={collection.id} collection={collection} children={children} selected={trashMode ? null : selectedCollection} expanded={expanded} onSelect={(id) => { setTrashMode(false); setSelectedCollection(id); setSelectedSavedSearch(null); setSelected(new Set()); setDetailId(null); setOffset(0); }} onToggle={(id) => setExpanded((current) => { const next = new Set(current); if (next.has(id)) next.delete(id); else next.add(id); return next; })} onDrop={(event, entry) => void dropOnCollection(event, entry)} onRename={(entry) => void renameCollection(entry.id)} onMove={setMovingCollection} onStyle={setStylingCollection} onDelete={(entry) => void deleteCollection(entry.id)} depth={0} />)}
             {collections.length === 0 && <p className="px-3 py-4 text-xs leading-5 text-neutral-600">{t('Crea colecciones propias o importa la jerarquía completa de Zotero.')}</p>}
             <div className="mt-4 flex items-center gap-1 border-t border-neutral-800 px-1 pt-3"><b className="min-w-0 flex-1 text-[10px] uppercase tracking-wider text-neutral-600">{t('Búsquedas inteligentes')}</b><button className="grid h-7 w-7 place-items-center rounded hover:bg-neutral-900" onClick={() => setSmartSearchEditor('new')} title={t('Nueva búsqueda inteligente')}><Icon name="plus" size={13} /></button></div>
             <div className="mt-1 space-y-0.5">{savedSearches.map((record) => <button key={record.id} data-testid={`library-saved-search-${record.id}`} className={`flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-xs ${!trashMode && selectedSavedSearch === record.id ? 'bg-indigo-600 text-white' : 'text-neutral-400 hover:bg-neutral-900'}`} onClick={() => { setTrashMode(false); setSelectedSavedSearch(record.id); setSelectedCollection(null); setSelected(new Set()); setDetailId(null); setOffset(0); }}><Icon name="search" size={12} /><span className="min-w-0 flex-1 truncate">{record.name}</span></button>)}</div>
@@ -1048,6 +1138,7 @@ function GlobalLibraryContent({
       </div>
       {zoteroOpen && <ZoteroImportDialog onClose={() => setZoteroOpen(false)} onFinished={() => void load()} />}
       {movingCollection && <LibraryCollectionMoveDialog collection={movingCollection} collections={collections} onClose={() => setMovingCollection(null)} onMove={(parentId) => moveCollection(movingCollection, parentId)} />}
+      {stylingCollection && <LibraryCollectionStyleDialog collection={stylingCollection} onClose={() => setStylingCollection(null)} onSave={async (icon, color) => { await window.nodus.updateGlobalLibraryCollection(stylingCollection.id, { icon, color }); await load(); }} />}
       {migrationOpen && <LibraryMigrationDialog onClose={() => setMigrationOpen(false)} onFinished={() => void load()} />}
       {createReferenceMode && <LibraryCreateReferenceDialog defaultMode={createReferenceMode} collectionIds={selectedCollection && collections.find((entry) => entry.id === selectedCollection)?.source === 'nodus' ? [selectedCollection] : []} onClose={() => setCreateReferenceMode(null)} onCreated={(created, openEditor) => { setDetailId(created.id); setDetail(created); if (openEditor) setMetadataItem(created); void load(); }} />}
       {metadataItem && <LibraryMetadataEditor item={metadataItem} onClose={() => setMetadataItem(null)} onSaved={(saved) => { setDetail(saved); void load(); }} />}

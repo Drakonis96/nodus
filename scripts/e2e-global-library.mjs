@@ -332,9 +332,47 @@ try {
   await renameDialog.getByRole('button', { name: 'Guardar', exact: true }).click();
   await page.getByText('Mujeres y posguerra revisada', { exact: true }).waitFor();
 
+  await page.getByTestId(`library-collection-style-${collections.child.id}`).click();
+  const styleDialog = page.getByTestId('library-collection-style-dialog');
+  await styleDialog.waitFor({ state: 'visible' });
+  assert.equal(await styleDialog.locator('[data-testid^="library-collection-color-preset-"]').count(), 6, 'the style picker offers exactly six predefined colors');
+  await styleDialog.getByTestId('library-collection-icon-star').click();
+  await styleDialog.getByTestId('library-collection-color-preset-rose').click();
+  await styleDialog.getByTestId('library-collection-custom-color').fill('#0f766e');
+  await page.screenshot({ path: path.join(os.tmpdir(), 'nodus-library-collection-style-dark-wide.png'), fullPage: true });
+  await styleDialog.getByTestId('save-library-collection-style').click();
+  await styleDialog.waitFor({ state: 'detached' });
+  await page.waitForFunction(async (id) => {
+    const entry = (await window.nodus.listGlobalLibraryCollections()).find((collection) => collection.id === id);
+    return entry?.icon === 'star' && entry?.color === '#0f766e';
+  }, collections.child.id);
+  const styledCollectionIcon = page.getByTestId(`library-collection-style-${collections.child.id}`);
+  assert.equal(await styledCollectionIcon.evaluate((element) => getComputedStyle(element).color), 'rgb(15, 118, 110)', 'the chosen custom color is rendered on the collection icon');
+
   await page.getByTestId(`library-collection-move-${collections.root.id}`).click();
   let moveDialog = page.getByTestId('library-collection-move-dialog');
   await moveDialog.waitFor({ state: 'visible' });
+  const rootIndent = Number.parseFloat(await page.getByTestId(`library-collection-move-target-${collections.root.id}`).evaluate((element) => getComputedStyle(element).paddingLeft));
+  const childIndent = Number.parseFloat(await page.getByTestId(`library-collection-move-target-${collections.child.id}`).evaluate((element) => getComputedStyle(element).paddingLeft));
+  assert.ok(childIndent > rootIndent, `nested move targets retain visible hierarchy (${rootIndent}px → ${childIndent}px)`);
+  const moveSearch = moveDialog.getByTestId('library-collection-move-search');
+  const moveSearchLayout = await moveSearch.evaluate((input) => {
+    const inputBox = input.getBoundingClientRect();
+    const iconBox = input.previousElementSibling?.getBoundingClientRect();
+    return { paddingLeft: parseFloat(getComputedStyle(input).paddingLeft), iconRight: iconBox ? iconBox.right - inputBox.left : 0 };
+  });
+  assert.ok(moveSearchLayout.paddingLeft >= moveSearchLayout.iconRight + 4, `move search text starts after its icon (${JSON.stringify(moveSearchLayout)})`);
+  await moveSearch.fill('Mujeres y posguerra');
+  await page.getByTestId(`library-collection-move-target-${collections.child.id}`).waitFor({ state: 'visible' });
+  await page.getByTestId(`library-collection-move-target-${collections.root.id}`).waitFor({ state: 'visible' });
+  assert.equal(await page.getByTestId(`library-collection-move-target-${collections.draggable.id}`).isVisible(), false, 'search hides unrelated branches while retaining the matching collection ancestry');
+  await page.screenshot({ path: path.join(os.tmpdir(), 'nodus-library-collection-move-dark-wide.png'), fullPage: true });
+  await page.evaluate(() => { document.documentElement.classList.add('light'); document.documentElement.classList.remove('dark'); });
+  await page.setViewportSize({ width: 760, height: 900 });
+  await page.screenshot({ path: path.join(os.tmpdir(), 'nodus-library-collection-move-light-narrow.png'), fullPage: true });
+  await page.evaluate(() => { document.documentElement.classList.add('dark'); document.documentElement.classList.remove('light'); });
+  await page.setViewportSize({ width: 1540, height: 940 });
+  await moveSearch.fill('');
   assert.equal(await page.getByTestId(`library-collection-move-target-${collections.child.id}`).isDisabled(), true, 'a collection cannot move inside its descendant');
   await moveDialog.getByLabel('Cerrar', { exact: true }).click();
   await moveDialog.waitFor({ state: 'detached' });
@@ -350,12 +388,6 @@ try {
   await page.getByTestId(`library-collection-move-${collections.child.id}`).click();
   moveDialog = page.getByTestId('library-collection-move-dialog');
   await page.getByTestId(`library-collection-move-target-${collections.root.id}`).click();
-  await page.screenshot({ path: path.join(os.tmpdir(), 'nodus-library-collection-move-dark-wide.png'), fullPage: true });
-  await page.evaluate(() => { document.documentElement.classList.add('light'); document.documentElement.classList.remove('dark'); });
-  await page.setViewportSize({ width: 760, height: 900 });
-  await page.screenshot({ path: path.join(os.tmpdir(), 'nodus-library-collection-move-light-narrow.png'), fullPage: true });
-  await page.evaluate(() => { document.documentElement.classList.add('dark'); document.documentElement.classList.remove('light'); });
-  await page.setViewportSize({ width: 1540, height: 940 });
   await page.getByTestId('confirm-library-collection-move').click();
   await moveDialog.waitFor({ state: 'detached' });
   movedChild = await page.evaluate(async (id) => (await window.nodus.listGlobalLibraryCollections()).find((entry) => entry.id === id), collections.child.id);

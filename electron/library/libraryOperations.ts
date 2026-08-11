@@ -3,6 +3,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import type {
   LibraryCollectionView,
+  LibraryCollectionPatch,
+  LibraryCollectionIcon,
   LibraryBibliographyImportReport,
   LibraryCatalogItem,
   LibraryDuplicateGroup,
@@ -36,6 +38,26 @@ import { assertInside, atomicWriteJson, safeLibraryFolderName } from './libraryP
 import { LibraryDiskStore } from './libraryStorage';
 import { importBibliographyFiles } from './libraryBibliographyImport';
 import { bibliographicFingerprint } from './libraryRevision';
+
+const COLLECTION_ICONS = new Set<LibraryCollectionIcon>([
+  'folder', 'book', 'bookmark', 'star', 'archive', 'notebook',
+  'graduation', 'flask', 'globe', 'map', 'users', 'tag',
+]);
+
+function collectionIcon(value: LibraryCollectionPatch['icon'], fallback?: LibraryCollectionIcon): LibraryCollectionIcon | undefined {
+  if (value === undefined) return fallback;
+  if (value === null) return undefined;
+  if (!COLLECTION_ICONS.has(value)) throw new Error('El icono de la colección no es válido.');
+  return value;
+}
+
+function collectionColor(value: LibraryCollectionPatch['color'], fallback?: string): string | undefined {
+  if (value === undefined) return fallback;
+  if (value === null || value === '') return undefined;
+  const normalized = value.trim().toLowerCase();
+  if (!/^#[0-9a-f]{6}$/.test(normalized)) throw new Error('El color de la colección debe usar el formato hexadecimal #RRGGBB.');
+  return normalized;
+}
 import { LibrarySmartCollectionStore } from './librarySmartCollections';
 import { exportLibraryBibliography, formatLibraryCitation, generateCitationKey } from './libraryCitation';
 
@@ -192,7 +214,7 @@ export class LibraryOperations {
     return this.catalog.listCollections().find((entry) => entry.id === id)!;
   }
 
-  updateCollection(id: string, patch: { name?: string; parentId?: string | null; position?: number }): LibraryCollectionView {
+  updateCollection(id: string, patch: LibraryCollectionPatch): LibraryCollectionView {
     id = this.catalog.resolveCollectionId(id) ?? id;
     if (patch.parentId) patch = { ...patch, parentId: this.catalog.resolveCollectionId(patch.parentId) ?? patch.parentId };
     const current = this.store.readMaterializedCollection(id);
@@ -210,6 +232,8 @@ export class LibraryOperations {
       if (cursor === id) throw new Error('Ese movimiento crearía un ciclo de colecciones.');
       cursor = this.store.readMaterializedCollection(cursor)?.parentId ?? null;
     }
+    const icon = collectionIcon(patch.icon, current.icon);
+    const color = collectionColor(patch.color, current.color);
     const all = this.store.scanMaterializedCollections().records.filter((entry) => !entry.deletedAt);
     const oldSiblings = all.filter((entry) => entry.parentId === current.parentId && entry.id !== id)
       .sort((a, b) => a.position - b.position || a.name.localeCompare(b.name));
@@ -218,15 +242,18 @@ export class LibraryOperations {
     const requestedPosition = patch.position === undefined
       ? (parentId === current.parentId ? current.position : targetSiblings.length)
       : Math.max(0, Math.trunc(patch.position));
-    targetSiblings.splice(Math.min(requestedPosition, targetSiblings.length), 0, { ...current, name, parentId });
+    targetSiblings.splice(Math.min(requestedPosition, targetSiblings.length), 0, { ...current, name, parentId, icon, color });
     const desiredPositions = new Map(targetSiblings.map((entry, position) => [entry.id, position]));
-    const write = (entry: typeof current, desiredParentId: string | null, desiredPosition: number, desiredName = entry.name) => {
-      if (entry.parentId === desiredParentId && entry.position === desiredPosition && entry.name === desiredName) return;
-      this.store.upsertCollection({ ...entry, name: desiredName, parentId: desiredParentId, position: desiredPosition }, entry.clock.revision);
+    const write = (entry: typeof current, desiredParentId: string | null, desiredPosition: number, desiredName: string, desiredIcon: LibraryCollectionIcon | undefined, desiredColor: string | undefined) => {
+      if (entry.parentId === desiredParentId && entry.position === desiredPosition && entry.name === desiredName && entry.icon === desiredIcon && entry.color === desiredColor) return;
+      const next = { ...entry, name: desiredName, parentId: desiredParentId, position: desiredPosition, icon: desiredIcon, color: desiredColor };
+      if (!desiredIcon) delete next.icon;
+      if (!desiredColor) delete next.color;
+      this.store.upsertCollection(next, entry.clock.revision);
     };
-    write(current, parentId, desiredPositions.get(id) ?? requestedPosition, name);
-    for (const sibling of targetSiblings) if (sibling.id !== id) write(sibling, parentId, desiredPositions.get(sibling.id)!);
-    if (parentId !== current.parentId) for (const [position, sibling] of oldSiblings.entries()) write(sibling, current.parentId, position);
+    write(current, parentId, desiredPositions.get(id) ?? requestedPosition, name, icon, color);
+    for (const sibling of targetSiblings) if (sibling.id !== id) write(sibling, parentId, desiredPositions.get(sibling.id)!, sibling.name, sibling.icon, sibling.color);
+    if (parentId !== current.parentId) for (const [position, sibling] of oldSiblings.entries()) write(sibling, current.parentId, position, sibling.name, sibling.icon, sibling.color);
     this.catalog.rebuild(this.store);
     return this.catalog.listCollections().find((entry) => entry.id === id)!;
   }

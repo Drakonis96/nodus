@@ -186,6 +186,8 @@ export function isLibraryCollectionRecord(value: unknown): value is LibraryColle
     && typeof item.id === 'string'
     && Array.isArray(item.aliases)
     && typeof item.name === 'string'
+    && (item.icon === undefined || ['folder', 'book', 'bookmark', 'star', 'archive', 'notebook', 'graduation', 'flask', 'globe', 'map', 'users', 'tag'].includes(item.icon))
+    && (item.color === undefined || (typeof item.color === 'string' && /^#[0-9a-f]{6}$/i.test(item.color)))
     && (item.parentId === null || typeof item.parentId === 'string')
     && Number.isFinite(item.position)
     && SOURCES.has(item.source as LibraryItemSource)
@@ -240,11 +242,15 @@ export function normalizeLibraryCollectionRecord(value: unknown): LibraryCollect
   if (!value || typeof value !== 'object') return null;
   const input = value as Record<string, unknown>;
   if (input.format !== 'nodus.library-collection' || ![1, 2].includes(Number(input.formatVersion))) return null;
-  const { clock: rawClock, ...withoutClock } = input;
+  const { clock: rawClock, icon: rawIcon, color: rawColor, ...withoutClock } = input;
+  const icon = typeof rawIcon === 'string' && ['folder', 'book', 'bookmark', 'star', 'archive', 'notebook', 'graduation', 'flask', 'globe', 'map', 'users', 'tag'].includes(rawIcon) ? rawIcon : undefined;
+  const color = typeof rawColor === 'string' && /^#[0-9a-f]{6}$/i.test(rawColor) ? rawColor.toLowerCase() : undefined;
   const base = {
     ...withoutClock,
     formatVersion: 2 as const,
     aliases: stringArray(input.aliases, 2_000).filter((alias) => alias !== input.id),
+    ...(icon ? { icon } : {}),
+    ...(color ? { color } : {}),
   } as unknown as Omit<LibraryCollectionRecord, 'clock'>;
   const clock = rawClock as LibraryCollectionRecord['clock'] | undefined;
   const normalized = {

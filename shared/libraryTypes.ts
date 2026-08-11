@@ -271,6 +271,9 @@ export interface LibraryCollectionRecord {
   id: string;
   aliases: string[];
   name: string;
+  /** Optional Nodus-owned presentation. Missing values use the standard folder style. */
+  icon?: LibraryCollectionIcon;
+  color?: string;
   parentId: string | null;
   position: number;
   source: LibraryItemSource;
@@ -281,6 +284,18 @@ export interface LibraryCollectionRecord {
   createdAt: string;
   deletedAt: string | null;
   clock: LibraryRecordClock;
+}
+
+export type LibraryCollectionIcon =
+  | 'folder' | 'book' | 'bookmark' | 'star' | 'archive' | 'notebook'
+  | 'graduation' | 'flask' | 'globe' | 'map' | 'users' | 'tag';
+
+export interface LibraryCollectionPatch {
+  name?: string;
+  parentId?: string | null;
+  position?: number;
+  icon?: LibraryCollectionIcon | null;
+  color?: string | null;
 }
 
 export interface LibraryCatalogItem {
@@ -554,6 +569,8 @@ export interface LibraryCatalogPage {
 export interface LibraryCollectionView {
   id: string;
   name: string;
+  icon: LibraryCollectionIcon | null;
+  color: string | null;
   parentId: string | null;
   position: number;
   source: LibraryItemSource;

@@ -20,6 +20,7 @@ import type {
   LibraryExtractionOptions,
   LibraryExtractionProgress,
   LibraryCollectionView,
+  LibraryCollectionPatch,
   LibraryItemCollectionPatch,
   LibraryItemRecord,
   LibraryLocalImportReport,
@@ -394,7 +395,7 @@ export function createGlobalLibraryCollection(name: string, parentId: string | n
 
 export function updateGlobalLibraryCollection(
   id: string,
-  patch: { name?: string; parentId?: string | null; position?: number },
+  patch: LibraryCollectionPatch,
 ): LibraryCollectionView {
   const current = service();
   if (!current) throw new Error('Configura primero la carpeta de copias de seguridad de Nodus.');

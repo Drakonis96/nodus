@@ -18,6 +18,7 @@ import type {
   LibraryExtractionOptions,
   LibraryExtractionProgress,
   LibraryCollectionView,
+  LibraryCollectionPatch,
   LibraryItemCollectionPatch,
   LibraryItemRecord,
   LibraryLocalImportReport,
@@ -82,7 +83,7 @@ export interface LibraryApi {
   setGlobalLibraryViewPreferences(preferences: LibraryViewPreferences): Promise<LibraryViewPreferences>;
   getGlobalLibraryItem(itemId: string): Promise<LibraryItemRecord | null>;
   createGlobalLibraryCollection(name: string, parentId: string | null): Promise<LibraryCollectionView>;
-  updateGlobalLibraryCollection(id: string, patch: { name?: string; parentId?: string | null; position?: number }): Promise<LibraryCollectionView>;
+  updateGlobalLibraryCollection(id: string, patch: LibraryCollectionPatch): Promise<LibraryCollectionView>;
   deleteGlobalLibraryCollection(id: string, deleteItems?: boolean): Promise<number>;
   patchGlobalLibraryItemCollections(itemIds: string[], patch: LibraryItemCollectionPatch): Promise<number>;
   setGlobalLibraryItemsDeleted(itemIds: string[], deleted: boolean): Promise<number>;
