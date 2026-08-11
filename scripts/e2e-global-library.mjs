@@ -135,11 +135,13 @@ try {
       headerHeight: headerRect.height,
       fullWidth: Math.abs(headerRect.left - shellRect.left) < 0.5 && Math.abs(headerRect.right - shellRect.right) < 0.5,
       aligned: switcherRect.top >= headerRect.top && switcherRect.bottom <= headerRect.bottom,
+      centerDelta: Math.abs((switcherRect.left + switcherRect.right) / 2 - (headerRect.left + headerRect.right) / 2),
     };
   });
   assert.equal(vaultScopeLayout.inHeader, true, 'This vault keeps scope controls inside its content header');
   assert.equal(vaultScopeLayout.aligned, true, 'This vault scope controls align with the header actions');
   assert.equal(vaultScopeLayout.fullWidth, true, 'This vault header spans the same full content width as Global');
+  assert.ok(vaultScopeLayout.centerDelta < 1, `This vault scope controls are centered in the complete header (${JSON.stringify(vaultScopeLayout)})`);
   assert.ok(vaultScopeLayout.switcherWidth < Math.min(300, vaultScopeLayout.shellWidth * 0.4), `scope controls remain compact (${JSON.stringify(vaultScopeLayout)})`);
   const vaultScopeTooltip = page.getByTestId('library-scope-vault-tooltip');
   assert.equal(await vaultScopeTooltip.isVisible(), false, 'scope help is not persistent');
@@ -150,6 +152,8 @@ try {
   await page.getByRole('button', { name: 'Colecciones de Zotero', exact: true }).waitFor();
   await page.screenshot({ path: path.join(os.tmpdir(), 'nodus-library-scope-vault-dark-wide.png'), fullPage: true });
   await page.getByTestId('library-scope-global').click();
+  await page.mouse.move(0, 0);
+  await page.waitForTimeout(160);
   const library = page.getByTestId('global-library-view');
   await library.waitFor({ state: 'visible' });
   assert.equal(await page.getByTestId('library-scope-global').getAttribute('aria-pressed'), 'true');
@@ -167,10 +171,12 @@ try {
       shellWidth: shellRect.width,
       headerHeight: headerRect.height,
       fullWidth: Math.abs(headerRect.left - shellRect.left) < 0.5 && Math.abs(headerRect.right - shellRect.right) < 0.5,
+      centerDelta: Math.abs((switcherRect.left + switcherRect.right) / 2 - (headerRect.left + headerRect.right) / 2),
     };
   });
   assert.equal(globalScopeLayout.inHeader, true, 'Global keeps scope controls inside its content header');
   assert.equal(globalScopeLayout.fullWidth, true, 'Global header spans the full content width');
+  assert.ok(globalScopeLayout.centerDelta < 1, `Global scope controls are centered in the complete header (${JSON.stringify(globalScopeLayout)})`);
   assert.ok(Math.abs(globalScopeLayout.headerHeight - vaultScopeLayout.headerHeight) < 0.5, `Global and This-vault headers share a height (${globalScopeLayout.headerHeight}px / ${vaultScopeLayout.headerHeight}px)`);
   assert.ok(globalScopeLayout.switcherWidth < Math.min(300, globalScopeLayout.shellWidth * 0.4), `Global scope controls remain compact (${JSON.stringify(globalScopeLayout)})`);
   const globalScopeTooltip = page.getByTestId('library-scope-global-tooltip');
@@ -217,9 +223,12 @@ try {
     return {
       insideHeader: switcherRect.left >= headerRect.left && switcherRect.right <= headerRect.right && switcherRect.bottom <= headerRect.bottom,
       pageOverflow: document.documentElement.scrollWidth > document.documentElement.clientWidth,
+      centerDelta: Math.abs((switcherRect.left + switcherRect.right) / 2 - (headerRect.left + headerRect.right) / 2),
     };
   });
-  assert.deepEqual(narrowGlobalScopeLayout, { insideHeader: true, pageOverflow: false }, `compact Global scope control must stay within a narrow header (${JSON.stringify(narrowGlobalScopeLayout)})`);
+  assert.equal(narrowGlobalScopeLayout.insideHeader, true, `compact Global scope control must stay within a narrow header (${JSON.stringify(narrowGlobalScopeLayout)})`);
+  assert.equal(narrowGlobalScopeLayout.pageOverflow, false, `compact Global scope control must not overflow the page (${JSON.stringify(narrowGlobalScopeLayout)})`);
+  assert.ok(narrowGlobalScopeLayout.centerDelta < 1, `compact Global scope control remains centered (${JSON.stringify(narrowGlobalScopeLayout)})`);
   await page.screenshot({ path: path.join(os.tmpdir(), 'nodus-library-scope-global-light-narrow.png'), fullPage: true });
   await page.getByTestId('library-scope-vault').click();
   await page.waitForFunction(() => document.querySelector('[data-testid="library-scope-shell"]')?.getAttribute('data-library-scope') === 'vault');
@@ -236,9 +245,12 @@ try {
     return {
       insideHeader: switcherRect.left >= headerRect.left && switcherRect.right <= headerRect.right && switcherRect.bottom <= headerRect.bottom,
       pageOverflow: document.documentElement.scrollWidth > document.documentElement.clientWidth,
+      centerDelta: Math.abs((switcherRect.left + switcherRect.right) / 2 - (headerRect.left + headerRect.right) / 2),
     };
   });
-  assert.deepEqual(narrowVaultScopeLayout, { insideHeader: true, pageOverflow: false }, `compact This-vault scope control must stay within a narrow header (${JSON.stringify(narrowVaultScopeLayout)})`);
+  assert.equal(narrowVaultScopeLayout.insideHeader, true, `compact This-vault scope control must stay within a narrow header (${JSON.stringify(narrowVaultScopeLayout)})`);
+  assert.equal(narrowVaultScopeLayout.pageOverflow, false, `compact This-vault scope control must not overflow the page (${JSON.stringify(narrowVaultScopeLayout)})`);
+  assert.ok(narrowVaultScopeLayout.centerDelta < 1, `compact This-vault scope control remains centered (${JSON.stringify(narrowVaultScopeLayout)})`);
   await page.screenshot({ path: path.join(os.tmpdir(), 'nodus-library-scope-vault-light-narrow.png'), fullPage: true });
   await page.getByTestId('library-scope-global').click();
   await library.waitFor({ state: 'visible' });
@@ -525,7 +537,11 @@ try {
   assert.match(await detail.getByTestId('library-reading-status').innerText(), /Lista para leer/);
   assert.match(await detail.getByTestId('library-detail-primary-action').innerText(), /Leer/);
   assert.equal(await detail.getByTestId('library-extraction-advanced').getAttribute('open'), null, 'technical extraction details start collapsed');
-  for (const dismiss of await page.getByTestId('app-toast-stack').getByRole('button', { name: 'Cerrar' }).all()) await dismiss.click();
+  const toastDismissButtons = page.getByTestId('app-toast-stack').getByRole('button', { name: 'Cerrar' });
+  while (await toastDismissButtons.count()) {
+    await toastDismissButtons.first().evaluate((button) => (button instanceof HTMLButtonElement ? button.click() : undefined)).catch(() => undefined);
+    await page.waitForTimeout(25);
+  }
   await detail.getByTestId('library-reading-status').scrollIntoViewIfNeeded();
   await page.screenshot({ path: path.join(os.tmpdir(), 'nodus-library-progressive-detail-dark-wide.png'), fullPage: true });
   await page.evaluate(() => { document.documentElement.classList.add('light'); document.documentElement.classList.remove('dark'); });

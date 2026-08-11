@@ -1097,10 +1097,10 @@ function GlobalLibraryContent({
     />;
   }
 
-  if (loading && !status) return <div data-testid="global-library-view" className="library-theme-canvas flex h-full min-h-0 flex-col bg-neutral-950"><header data-testid="global-library-header" className="flex min-h-14 shrink-0 flex-wrap items-center gap-3 border-b border-neutral-800 px-5 py-3"><div className="min-w-0"><h1 className="flex items-center gap-2 text-lg font-semibold"><Icon name="book" className="text-indigo-400" /> {t('Biblioteca')}</h1></div>{scopeControls}</header><div className="grid min-h-0 flex-1 place-items-center text-sm text-neutral-500"><span className="flex items-center gap-2"><Spinner /> {t('Cargando Biblioteca…')}</span></div></div>;
+  if (loading && !status) return <div data-testid="global-library-view" className="library-theme-canvas flex h-full min-h-0 flex-col bg-neutral-950"><header data-testid="global-library-header" className="library-header-bar min-h-14 shrink-0 border-b border-neutral-800 px-5 py-3"><div className="library-header-title min-w-0"><h1 className="flex items-center gap-2 text-lg font-semibold"><Icon name="book" className="text-indigo-400" /> {t('Biblioteca')}</h1></div>{scopeControls}<div className="library-header-actions" /></header><div className="grid min-h-0 flex-1 place-items-center text-sm text-neutral-500"><span className="flex items-center gap-2"><Spinner /> {t('Cargando Biblioteca…')}</span></div></div>;
   if (!status?.configured) return (
     <div data-testid="global-library-view" className="library-theme-canvas flex h-full min-h-0 flex-col bg-neutral-950">
-      <header data-testid="global-library-header" className="flex min-h-14 shrink-0 flex-wrap items-center gap-3 border-b border-neutral-800 px-5 py-3"><div className="min-w-0"><h1 className="flex items-center gap-2 text-lg font-semibold"><Icon name="book" className="text-indigo-400" /> {t('Biblioteca')}</h1></div>{scopeControls}</header>
+      <header data-testid="global-library-header" className="library-header-bar min-h-14 shrink-0 border-b border-neutral-800 px-5 py-3"><div className="library-header-title min-w-0"><h1 className="flex items-center gap-2 text-lg font-semibold"><Icon name="book" className="text-indigo-400" /> {t('Biblioteca')}</h1></div>{scopeControls}<div className="library-header-actions" /></header>
       <div className="grid min-h-0 flex-1 place-items-center p-8"><section className="card max-w-lg p-7 text-center">
         <span className="mx-auto grid h-14 w-14 place-items-center rounded-2xl bg-indigo-500/10 text-indigo-300"><Icon name="book" size={28} /></span>
         <h1 className="mt-4 text-xl font-semibold">{t('Activa la Biblioteca transversal')}</h1>
@@ -1112,11 +1112,11 @@ function GlobalLibraryContent({
 
   return (
     <div data-testid="global-library-view" className="library-theme-canvas flex h-full min-h-0 flex-col bg-neutral-950">
-      <header data-testid="global-library-header" className="flex flex-wrap items-center gap-3 border-b border-neutral-800 px-5 py-3">
-        <div className="min-w-0"><h1 className="flex items-center gap-2 text-lg font-semibold"><Icon name={trashMode ? 'trash' : 'book'} className={trashMode ? 'text-red-400' : 'text-indigo-400'} /> {t(trashMode ? 'Papelera' : 'Biblioteca')}</h1><p className="text-[11px] text-neutral-500">{trashMode ? tx('{n} elemento(s) recuperable(s)', { n: trashCount }) : tx('{n} documentos · disponible en todos los vaults', { n: status.items })}</p></div>
+      <header data-testid="global-library-header" className="library-header-bar min-h-14 border-b border-neutral-800 px-5 py-3">
+        <div className="library-header-title min-w-0"><h1 className="flex items-center gap-2 text-lg font-semibold"><Icon name={trashMode ? 'trash' : 'book'} className={trashMode ? 'text-red-400' : 'text-indigo-400'} /> {t(trashMode ? 'Papelera' : 'Biblioteca')}</h1><p className="text-[11px] text-neutral-500">{trashMode ? tx('{n} elemento(s) recuperable(s)', { n: trashCount }) : tx('{n} documentos · disponible en todos los vaults', { n: status.items })}</p></div>
         {scopeControls}
-        <div className="flex-1" />
-        {activeJobs.length > 0 && <span className="flex items-center gap-2 rounded-full bg-indigo-500/10 px-3 py-1.5 text-xs text-indigo-300"><Spinner /> {tx('{n} tarea(s) en segundo plano', { n: activeJobs.length })}</span>}
+        <div className="library-header-actions">
+          {activeJobs.length > 0 && <span className="flex items-center gap-2 rounded-full bg-indigo-500/10 px-3 py-1.5 text-xs text-indigo-300"><Spinner /> {tx('{n} tarea(s) en segundo plano', { n: activeJobs.length })}</span>}
         {trashMode ? <><button data-testid="close-library-trash" className="btn btn-ghost border border-neutral-700" onClick={closeTrash}><Icon name="chevronLeft" /> {t('Volver a la Biblioteca')}</button><button data-testid="empty-library-trash" className="btn btn-ghost border border-red-500/30 text-red-400" disabled={!trashCount} onClick={() => setTrashImpactItems([])}><Icon name="trash" /> {t('Vaciar papelera')}</button></> : <>
           <div className="relative z-40">
             <button
@@ -1145,6 +1145,7 @@ function GlobalLibraryContent({
             </div></>}
           </div>
         </>}
+        </div>
       </header>
 
       {error && <div role="alert" className="border-b border-red-500/30 bg-red-500/10 px-5 py-2 text-xs text-red-300">{error}</div>}
