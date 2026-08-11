@@ -1,8 +1,9 @@
 import type {
-  LibraryReaderChatMessage,
   LibraryReaderChatRequest,
   LibraryReaderChatResponse,
   ModelRef,
+  NodiChatRequest,
+  NodiViewContext,
   WritingDraftAnnotation,
 } from '@shared/types';
 import { getSettings } from '../db/settingsRepo';
@@ -14,7 +15,8 @@ import {
   listLibraryReaderAnnotations,
 } from '../libraryReader/libraryReaderStore';
 import { extractFromPath } from '../extraction/textExtractor';
-import { completeTextStream, localModelContextWindow, resolveModelRef } from './aiClient';
+import { localModelContextWindow, resolveModelRef } from './aiClient';
+import { streamNodiChat } from './nodiChat';
 
 const MAX_HISTORY = 12;
 const CLOUD_DOCUMENT_CHARS = 300_000;
@@ -42,7 +44,8 @@ function boundedDocument(markdown: string, limit: number): { text: string; trunc
   };
 }
 
-export function buildLibraryReaderChatPrompt(input: {
+export function buildLibraryReaderNodiContext(input: {
+  documentId: string;
   title: string;
   authors: string[];
   year: number | null;
@@ -50,40 +53,52 @@ export function buildLibraryReaderChatPrompt(input: {
   sourceLabel?: string;
   sourceId?: string;
   annotations: WritingDraftAnnotation[];
-  messages: LibraryReaderChatMessage[];
+  sections: Array<{ id: string; title: string; page: number | null }>;
   documentCharLimit?: number;
-}): { system: string; user: string } {
-  const cleanMessages = input.messages
-    .filter((message) => (message.role === 'user' || message.role === 'assistant') && message.content.trim())
-    .slice(-MAX_HISTORY)
-    .map(({ role, content }) => ({ role, content: content.slice(0, 24_000) }));
+}): { currentView: NodiViewContext; readerGrounding: NonNullable<NodiChatRequest['readerGrounding']> } {
   const document = boundedDocument(input.markdown, Math.max(2_000, input.documentCharLimit ?? CLOUD_DOCUMENT_CHARS));
+  const citationUri = `nodus://reader/${encodeURIComponent(input.documentId)}`;
+  const outline = input.sections.map((section) => ({
+    id: section.id,
+    title: section.title,
+    ...(section.page ? { page: section.page } : {}),
+    citation: `${citationUri}/section/${encodeURIComponent(section.id)}`,
+  }));
+  const metadata = {
+    id: input.documentId,
+    title: input.title,
+    authors: input.authors,
+    year: input.year,
+    source: input.sourceLabel ?? 'Markdown limpio',
+    truncated: document.truncated,
+  };
   return {
-    system:
-      'Eres el asistente académico del lector de Nodus. Responde en el idioma de la pregunta. ' +
-      'Prioriza el DOCUMENTO y las ANOTACIONES facilitadas. Distingue claramente entre lo que afirma la fuente, ' +
-      'la interpretación del usuario y tus inferencias. Cita encabezados o fragmentos breves cuando ayuden, pero ' +
-      'no inventes números de página, citas, metadatos ni contenido ausente. Si la respuesta no está en el documento, dilo. ' +
-      'Usa Markdown claro y conciso.',
-    user: JSON.stringify({
-      document: {
-        title: input.title,
-        authors: input.authors,
-        year: input.year,
-        source: input.sourceLabel ?? 'Markdown limpio',
-        truncated: document.truncated,
-        markdown: document.text,
-      },
-      annotations: annotationContext(input.annotations, input.sourceId),
-      conversation: cleanMessages,
-      instruction: 'Responde al último mensaje del usuario usando este contexto de lectura.',
-    }),
+    currentView: {
+      viewId: `library-reader:${input.documentId}`,
+      title: input.title,
+      capturedAt: Date.now(),
+      complete: true,
+      text: [
+        '<documento_abierto>',
+        JSON.stringify({ metadata, tracedOutline: outline, annotations: annotationContext(input.annotations, input.sourceId) }, null, 2),
+        '</documento_abierto>',
+        '<contenido_documento>',
+        document.text,
+        '</contenido_documento>',
+      ].join('\n\n'),
+    },
+    readerGrounding: {
+      documentId: input.documentId,
+      title: input.title,
+      citationUri,
+      sections: input.sections,
+    },
   };
 }
 
 function effectiveModel(request: LibraryReaderChatRequest): ModelRef {
   const settings = getSettings();
-  return resolveModelRef(request.model ?? settings.chatModel ?? settings.nodiModel ?? settings.synthesisModel);
+  return resolveModelRef(request.model ?? settings.nodiModel ?? settings.chatModel ?? settings.synthesisModel);
 }
 
 export async function streamLibraryReaderChat(
@@ -129,7 +144,8 @@ export async function streamLibraryReaderChat(
   const documentCharLimit = localWindow
     ? Math.max(2_000, Math.min(CLOUD_DOCUMENT_CHARS, Math.floor((localWindow - 1_800) * CHARS_PER_TOKEN)))
     : CLOUD_DOCUMENT_CHARS;
-  const prompt = buildLibraryReaderChatPrompt({
+  const grounding = buildLibraryReaderNodiContext({
+    documentId: document.workId,
     title: document.title,
     authors: document.authors,
     year: document.year,
@@ -137,15 +153,16 @@ export async function streamLibraryReaderChat(
     sourceLabel,
     sourceId: contextSourceId,
     annotations: listLibraryReaderAnnotations(request.documentId),
-    messages,
+    sections: document.sections.map((section) => ({ id: section.id, title: section.title, page: section.page })),
     documentCharLimit,
   });
-  const maxTokens = localWindow ? Math.max(300, Math.min(2_000, Math.floor(localWindow * 0.22))) : 4_000;
-  const answer = await completeTextStream(
-    { ...prompt, temperature: 0.2, maxTokens },
-    onDelta,
+  const nodiRequest: NodiChatRequest = {
+    messages: messages.map(({ role, content }) => ({ role, content })),
+    contexts: ['current_view', 'vault'],
     model,
-    signal,
-  );
+    currentView: grounding.currentView,
+    readerGrounding: grounding.readerGrounding,
+  };
+  const answer = await streamNodiChat(nodiRequest, (delta) => onDelta(delta, 'content'), signal);
   return { answer: answer.trim(), model };
 }

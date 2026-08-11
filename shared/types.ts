@@ -7239,6 +7239,15 @@ export interface NodiChatRequest {
   /** The in-window companion can attach the latest visible view directly. The
    * overlay falls back to the bounded snapshot published by the main renderer. */
   currentView?: NodiViewContext | null;
+  /** Extra grounding contract used by the Library reader. The document itself is
+   * carried in `currentView`; this metadata makes its traced sections citable and
+   * keeps those citations navigable without weakening Nodi's vault citations. */
+  readerGrounding?: {
+    documentId: string;
+    title: string;
+    citationUri: string;
+    sections: Array<{ id: string; title: string; page: number | null }>;
+  };
 }
 
 export interface NodiConversation {
