@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import type {
   WorkView,
@@ -402,6 +402,7 @@ export function Library({
   onOpenGraph,
   onOpenAssistant,
   onOpenArchive,
+  scopeControls,
 }: {
   vaultId: string | null;
   /** Incoming navigation that pre-applies a filter (e.g. a corpus-health bucket). */
@@ -411,6 +412,7 @@ export function Library({
   onOpenGraph: (target: PendingGraphNavigationTarget) => void;
   onOpenAssistant: (target?: PendingAssistantNavigationTarget) => void;
   onOpenArchive?: () => void;
+  scopeControls?: ReactNode;
 }) {
   // In records vaults the Library holds SECONDARY / published sources (books,
   // published genealogies, transcribed record collections) that can also be mined
@@ -1002,11 +1004,12 @@ export function Library({
 
   return (
     <div className="h-full flex flex-col p-6 min-h-0">
-      <div className="flex flex-wrap items-start gap-3 mb-4">
+      <div data-testid="library-vault-header" className="mb-4 flex flex-wrap items-start gap-3">
         <div>
           <h1 className="text-xl font-semibold">{t('Biblioteca')}</h1>
           <p className="text-sm text-neutral-500 mt-1">{tx('{n} obras visibles', { n: totalWorks })}</p>
         </div>
+        {scopeControls}
         <div className="flex-1" />
         <button
           className={`btn border border-neutral-700 gap-1.5 ${advancedOpen ? 'bg-neutral-800 text-neutral-100' : 'btn-ghost'}`}

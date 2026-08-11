@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, type DragEvent } from 'react';
+import { useCallback, useEffect, useMemo, useState, type DragEvent, type ReactNode } from 'react';
 import type {
   LibraryCatalogItem,
   LibraryCollectionView,
@@ -553,12 +553,69 @@ function VaultLinkDialog({ itemIds, onClose, onLinked }: {
   </div>;
 }
 
+function LibraryScopeControls({
+  scope,
+  switching,
+  globalEnabled,
+  onChoose,
+}: {
+  scope: LibraryScope;
+  switching: boolean;
+  globalEnabled: boolean;
+  onChoose: (scope: LibraryScope) => void;
+}) {
+  return (
+    <div
+      data-testid="library-scope-switcher"
+      data-scope-placement="content-header"
+      className="library-scope-switcher"
+      role="group"
+      aria-label={t('Ámbito de la Biblioteca')}
+    >
+      <span className="library-scope-option">
+        <button
+          data-testid="library-scope-vault"
+          className={`library-scope-button ${scope === 'vault' ? 'is-active' : ''}`}
+          aria-pressed={scope === 'vault'}
+          aria-describedby="library-scope-vault-tooltip"
+          disabled={switching}
+          onClick={() => onChoose('vault')}
+        >
+          <Icon name="vault" size={13} />
+          <span>{t('Este vault')}</span>
+        </button>
+        <span id="library-scope-vault-tooltip" data-testid="library-scope-vault-tooltip" className="library-scope-tooltip" role="tooltip">
+          {t('Este vault conserva colecciones, scans, resúmenes, embeddings y análisis existentes.')}
+        </span>
+      </span>
+      <span className="library-scope-option">
+        <button
+          data-testid="library-scope-global"
+          className={`library-scope-button ${scope === 'global' ? 'is-active' : ''}`}
+          aria-pressed={scope === 'global'}
+          aria-describedby="library-scope-global-tooltip"
+          disabled={switching}
+          onClick={() => onChoose('global')}
+        >
+          <Icon name="library" size={13} />
+          <span>{globalEnabled ? t('Global') : t('Activar Global')}</span>
+        </button>
+        <span id="library-scope-global-tooltip" data-testid="library-scope-global-tooltip" className="library-scope-tooltip" role="tooltip">
+          {t('Global reúne originales y Markdown limpio para todos tus vaults.')}
+          {!globalEnabled && <> {t('Activa la Biblioteca global cuando quieras; este vault no cambiará.')}</>}
+        </span>
+      </span>
+    </div>
+  );
+}
+
 function GlobalLibraryContent({
-  target, onOpenSettings, onOpenAssistant,
+  target, onOpenSettings, onOpenAssistant, scopeControls,
 }: {
   target?: (PendingLibraryNavigationTarget & { nonce: number }) | null;
   onOpenSettings: () => void;
   onOpenAssistant: (target?: PendingAssistantNavigationTarget) => void;
+  scopeControls: ReactNode;
 }) {
   const [status, setStatus] = useState<LibraryStatus | null>(null);
   const [collections, setCollections] = useState<LibraryCollectionView[]>([]);
@@ -867,22 +924,24 @@ function GlobalLibraryContent({
     />;
   }
 
-  if (loading && !status) return <div className="grid h-full place-items-center text-sm text-neutral-500"><span className="flex items-center gap-2"><Spinner /> {t('Cargando Biblioteca…')}</span></div>;
+  if (loading && !status) return <div data-testid="global-library-view" className="library-theme-canvas flex h-full min-h-0 flex-col bg-neutral-950"><header data-testid="global-library-header" className="flex min-h-14 shrink-0 flex-wrap items-center gap-3 border-b border-neutral-800 px-5 py-3"><div className="min-w-0"><h1 className="flex items-center gap-2 text-lg font-semibold"><Icon name="book" className="text-indigo-400" /> {t('Biblioteca')}</h1></div>{scopeControls}</header><div className="grid min-h-0 flex-1 place-items-center text-sm text-neutral-500"><span className="flex items-center gap-2"><Spinner /> {t('Cargando Biblioteca…')}</span></div></div>;
   if (!status?.configured) return (
-    <div className="grid h-full place-items-center p-8">
-      <section className="card max-w-lg p-7 text-center">
+    <div data-testid="global-library-view" className="library-theme-canvas flex h-full min-h-0 flex-col bg-neutral-950">
+      <header data-testid="global-library-header" className="flex min-h-14 shrink-0 flex-wrap items-center gap-3 border-b border-neutral-800 px-5 py-3"><div className="min-w-0"><h1 className="flex items-center gap-2 text-lg font-semibold"><Icon name="book" className="text-indigo-400" /> {t('Biblioteca')}</h1></div>{scopeControls}</header>
+      <div className="grid min-h-0 flex-1 place-items-center p-8"><section className="card max-w-lg p-7 text-center">
         <span className="mx-auto grid h-14 w-14 place-items-center rounded-2xl bg-indigo-500/10 text-indigo-300"><Icon name="book" size={28} /></span>
         <h1 className="mt-4 text-xl font-semibold">{t('Activa la Biblioteca transversal')}</h1>
         <p className="mt-2 text-sm leading-6 text-neutral-500">{t('Elige una carpeta de copias de seguridad. Nodus creará dentro nodus-library para guardar originales, Markdown limpio y recursos.')}</p>
         <button className="btn btn-primary mt-5" onClick={onOpenSettings}><Icon name="settings" /> {t('Configurar copias de seguridad')}</button>
-      </section>
+      </section></div>
     </div>
   );
 
   return (
     <div data-testid="global-library-view" className="library-theme-canvas flex h-full min-h-0 flex-col bg-neutral-950">
-      <header className="flex flex-wrap items-center gap-3 border-b border-neutral-800 px-5 py-3">
+      <header data-testid="global-library-header" className="flex flex-wrap items-center gap-3 border-b border-neutral-800 px-5 py-3">
         <div className="min-w-0"><h1 className="flex items-center gap-2 text-lg font-semibold"><Icon name={trashMode ? 'trash' : 'book'} className={trashMode ? 'text-red-400' : 'text-indigo-400'} /> {t(trashMode ? 'Papelera' : 'Biblioteca')}</h1><p className="text-[11px] text-neutral-500">{trashMode ? tx('{n} elemento(s) recuperable(s)', { n: trashCount }) : tx('{n} documentos · disponible en todos los vaults', { n: status.items })}</p></div>
+        {scopeControls}
         <div className="flex-1" />
         {activeJobs.length > 0 && <span className="flex items-center gap-2 rounded-full bg-indigo-500/10 px-3 py-1.5 text-xs text-indigo-300"><Spinner /> {tx('{n} tarea(s) en segundo plano', { n: activeJobs.length })}</span>}
         {trashMode ? <><button data-testid="close-library-trash" className="btn btn-ghost border border-neutral-700" onClick={closeTrash}><Icon name="chevronLeft" /> {t('Volver a la Biblioteca')}</button><button data-testid="empty-library-trash" className="btn btn-ghost border border-red-500/30 text-red-400" disabled={!trashCount} onClick={() => setTrashImpactItems([])}><Icon name="trash" /> {t('Vaciar papelera')}</button></> : <>
@@ -1062,39 +1121,17 @@ export function GlobalLibraryView({
     }
   };
 
+  const scopeControls = (
+    <LibraryScopeControls
+      scope={scope}
+      switching={switching}
+      globalEnabled={settings.libraryGlobalEnabled}
+      onChoose={(next) => void chooseScope(next)}
+    />
+  );
+
   return (
     <div data-testid="library-scope-shell" data-library-scope={scope} className="library-theme flex h-full min-h-0 flex-col">
-      <div data-testid="library-scope-switcher" className="library-theme-bar flex min-h-12 shrink-0 items-center gap-3 border-b border-neutral-800 bg-neutral-950 px-5 py-2">
-        <span className="hidden text-[10px] font-semibold uppercase tracking-wider text-neutral-600 sm:inline">{t('Ámbito de la Biblioteca')}</span>
-        <div className="flex rounded-lg border border-neutral-800 bg-neutral-900/70 p-0.5" role="group" aria-label={t('Ámbito de la Biblioteca')}>
-          <button
-            data-testid="library-scope-vault"
-            className={`rounded-md px-3 py-1.5 text-xs font-medium ${scope === 'vault' ? 'bg-indigo-600 text-white shadow-sm' : 'text-neutral-400 hover:text-neutral-200'}`}
-            aria-pressed={scope === 'vault'}
-            disabled={switching}
-            onClick={() => void chooseScope('vault')}
-          >
-            <span className="inline-flex items-center gap-1.5"><Icon name="vault" size={13} /> {t('Este vault')}</span>
-          </button>
-          <button
-            data-testid="library-scope-global"
-            className={`rounded-md px-3 py-1.5 text-xs font-medium ${scope === 'global' ? 'bg-indigo-600 text-white shadow-sm' : 'text-neutral-400 hover:text-neutral-200'}`}
-            aria-pressed={scope === 'global'}
-            disabled={switching}
-            onClick={() => void chooseScope('global')}
-          >
-            <span className="inline-flex items-center gap-1.5"><Icon name="library" size={13} /> {settings.libraryGlobalEnabled ? t('Global') : t('Activar Global')}</span>
-          </button>
-        </div>
-        <p className="hidden min-w-0 flex-1 truncate text-[11px] text-neutral-600 lg:block">
-          {scope === 'global'
-            ? t('Global reúne originales y Markdown limpio para todos tus vaults.')
-            : t('Este vault conserva colecciones, scans, resúmenes, embeddings y análisis existentes.')}
-        </p>
-        {!settings.libraryGlobalEnabled && scope === 'vault' && (
-          <span className="ml-auto hidden text-[10px] text-neutral-600 xl:inline">{t('Activa la Biblioteca global cuando quieras; este vault no cambiará.')}</span>
-        )}
-      </div>
       <div className="min-h-0 flex-1 overflow-hidden">
         {scope === 'vault' ? (
           <Library
@@ -1105,9 +1142,10 @@ export function GlobalLibraryView({
             onOpenGraph={onOpenGraph}
             onOpenAssistant={onOpenAssistant}
             onOpenArchive={onOpenArchive}
+            scopeControls={scopeControls}
           />
         ) : (
-          <GlobalLibraryContent target={target} onOpenSettings={onOpenSettings} onOpenAssistant={onOpenAssistant} />
+          <GlobalLibraryContent target={target} onOpenSettings={onOpenSettings} onOpenAssistant={onOpenAssistant} scopeControls={scopeControls} />
         )}
       </div>
     </div>

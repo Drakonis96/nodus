@@ -16,6 +16,9 @@ test('the single Library screen owns explicit global and vault scopes', async ()
   assert.match(view, /data-testid="library-scope-switcher"/);
   assert.match(view, /data-testid="library-scope-vault"/);
   assert.match(view, /data-testid="library-scope-global"/);
+  assert.match(view, /data-scope-placement="content-header"/);
+  assert.match(view, /scopeControls=\{scopeControls\}/, 'both library scopes receive the compact switcher in their own header');
+  assert.doesNotMatch(view, /className="library-theme-bar[^\"]*min-h-12/, 'scope selection must not consume a separate full-width row');
   assert.match(view, /<Library[\s\S]*target=\{target\}/, 'the vault scope renders the complete traditional Library');
   assert.match(registry, /activeVault[\s\S]*setCollectionsOpen[\s\S]*GlobalLibraryView/);
 });

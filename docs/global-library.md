@@ -8,9 +8,12 @@ each document and lets vaults link that copy for analysis without modifying the
 original.
 
 Nodus 3 users start in **This vault** after updating. Global is never enabled by
-the upgrade itself. The scope bar offers it as a non-blocking option; selecting
-it either activates the already configured backup location or opens backup
-settings. After activation Nodus remembers the last scope across vaults.
+the upgrade itself. A compact scope switch lives in the active Library header,
+so changing scope does not consume a separate full-width row. Hovering or
+focusing either scope shows its explanation without requiring another click.
+Selecting Global either activates the already configured backup location or
+opens backup settings. After activation Nodus remembers the last scope across
+vaults.
 Contextual navigation remains deterministic: a corpus-health card opens the
 matching traditional filter, while a Zotero clean-reader link opens Global.
 The Zotero collections manager also remains available from the command palette

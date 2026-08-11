@@ -118,6 +118,30 @@ try {
   await page.locator('[data-tour="nav-library"]').click();
   const scopeSwitcher = page.getByTestId('library-scope-switcher');
   await scopeSwitcher.waitFor({ state: 'visible' });
+  assert.equal(await scopeSwitcher.getAttribute('data-scope-placement'), 'content-header');
+  const vaultScopeLayout = await page.evaluate(() => {
+    const switcher = document.querySelector('[data-testid="library-scope-switcher"]');
+    const header = document.querySelector('[data-testid="library-vault-header"]');
+    const shell = document.querySelector('[data-testid="library-scope-shell"]');
+    if (!(switcher instanceof HTMLElement) || !(header instanceof HTMLElement) || !(shell instanceof HTMLElement)) throw new Error('Vault scope layout not found');
+    const switcherRect = switcher.getBoundingClientRect();
+    const headerRect = header.getBoundingClientRect();
+    const shellRect = shell.getBoundingClientRect();
+    return {
+      inHeader: header.contains(switcher),
+      switcherWidth: switcherRect.width,
+      shellWidth: shellRect.width,
+      aligned: switcherRect.top >= headerRect.top && switcherRect.bottom <= headerRect.bottom,
+    };
+  });
+  assert.equal(vaultScopeLayout.inHeader, true, 'This vault keeps scope controls inside its content header');
+  assert.equal(vaultScopeLayout.aligned, true, 'This vault scope controls align with the header actions');
+  assert.ok(vaultScopeLayout.switcherWidth < Math.min(300, vaultScopeLayout.shellWidth * 0.4), `scope controls remain compact (${JSON.stringify(vaultScopeLayout)})`);
+  const vaultScopeTooltip = page.getByTestId('library-scope-vault-tooltip');
+  assert.equal(await vaultScopeTooltip.isVisible(), false, 'scope help is not persistent');
+  await page.getByTestId('library-scope-vault').hover();
+  await vaultScopeTooltip.waitFor({ state: 'visible' });
+  assert.match(await vaultScopeTooltip.innerText(), /colecciones|collections/i, 'This vault explanation appears on hover');
   assert.equal(await page.getByTestId('library-scope-vault').getAttribute('aria-pressed'), 'true', 'a v3-style profile starts in the unchanged vault corpus');
   await page.getByRole('button', { name: 'Colecciones de Zotero', exact: true }).waitFor();
   await page.screenshot({ path: path.join(os.tmpdir(), 'nodus-library-scope-vault-dark-wide.png'), fullPage: true });
@@ -125,6 +149,25 @@ try {
   const library = page.getByTestId('global-library-view');
   await library.waitFor({ state: 'visible' });
   assert.equal(await page.getByTestId('library-scope-global').getAttribute('aria-pressed'), 'true');
+  const globalScopeLayout = await page.evaluate(() => {
+    const switcher = document.querySelector('[data-testid="library-scope-switcher"]');
+    const header = document.querySelector('[data-testid="global-library-header"]');
+    const shell = document.querySelector('[data-testid="library-scope-shell"]');
+    if (!(switcher instanceof HTMLElement) || !(header instanceof HTMLElement) || !(shell instanceof HTMLElement)) throw new Error('Global scope layout not found');
+    const switcherRect = switcher.getBoundingClientRect();
+    return {
+      inHeader: header.contains(switcher),
+      switcherWidth: switcherRect.width,
+      shellWidth: shell.getBoundingClientRect().width,
+    };
+  });
+  assert.equal(globalScopeLayout.inHeader, true, 'Global keeps scope controls inside its content header');
+  assert.ok(globalScopeLayout.switcherWidth < Math.min(300, globalScopeLayout.shellWidth * 0.4), `Global scope controls remain compact (${JSON.stringify(globalScopeLayout)})`);
+  const globalScopeTooltip = page.getByTestId('library-scope-global-tooltip');
+  assert.equal(await globalScopeTooltip.isVisible(), false, 'Global help is not persistent');
+  await page.getByTestId('library-scope-global').hover();
+  await globalScopeTooltip.waitFor({ state: 'visible' });
+  assert.match(await globalScopeTooltip.innerText(), /Markdown/i, 'Global explanation appears on hover');
   const scopeSettings = await page.evaluate(() => window.nodus.getSettings());
   assert.equal(scopeSettings.libraryGlobalEnabled, true, 'global activation is opt-in');
   assert.equal(scopeSettings.libraryScope, 'global', 'the chosen scope is remembered');
@@ -140,18 +183,33 @@ try {
     const row = document.querySelector(`[data-testid="global-library-item-${id}"]`);
     const canvas = document.querySelector('[data-testid="global-library-view"]');
     const scope = document.querySelector('[data-testid="library-scope-switcher"]');
-    if (!(row instanceof HTMLElement) || !(canvas instanceof HTMLElement) || !(scope instanceof HTMLElement)) throw new Error('Library surfaces not found');
+    const header = document.querySelector('[data-testid="global-library-header"]');
+    if (!(row instanceof HTMLElement) || !(canvas instanceof HTMLElement) || !(scope instanceof HTMLElement) || !(header instanceof HTMLElement)) throw new Error('Library surfaces not found');
     return {
       row: getComputedStyle(row).backgroundColor,
       canvas: getComputedStyle(canvas).backgroundColor,
+      header: getComputedStyle(header).backgroundColor,
       scope: getComputedStyle(scope).backgroundColor,
     };
   }, itemId);
   const rgb = (value) => value.match(/[\d.]+/g)?.slice(0, 3).map(Number) ?? [];
   assert.ok(rgb(lightPalette.row).every((channel) => channel >= 240), `a hovered light row stays pale (${JSON.stringify(lightPalette)})`);
-  assert.deepEqual(rgb(lightPalette.canvas), rgb(lightPalette.scope), `Library and scope bar share one light canvas (${JSON.stringify(lightPalette)})`);
+  assert.ok(lightPalette.header === 'rgba(0, 0, 0, 0)' || rgb(lightPalette.header).every((channel) => channel >= 240), `Library header remains transparent or pale over the light canvas (${JSON.stringify(lightPalette)})`);
+  assert.ok(rgb(lightPalette.scope).every((channel) => channel >= 238), `compact scope control uses a light surface (${JSON.stringify(lightPalette)})`);
   await page.screenshot({ path: path.join(os.tmpdir(), 'nodus-library-scope-global-light-wide.png'), fullPage: true });
   await page.setViewportSize({ width: 760, height: 900 });
+  const narrowGlobalScopeLayout = await page.evaluate(() => {
+    const switcher = document.querySelector('[data-testid="library-scope-switcher"]');
+    const header = document.querySelector('[data-testid="global-library-header"]');
+    if (!(switcher instanceof HTMLElement) || !(header instanceof HTMLElement)) throw new Error('Narrow Global header not found');
+    const switcherRect = switcher.getBoundingClientRect();
+    const headerRect = header.getBoundingClientRect();
+    return {
+      insideHeader: switcherRect.left >= headerRect.left && switcherRect.right <= headerRect.right && switcherRect.bottom <= headerRect.bottom,
+      pageOverflow: document.documentElement.scrollWidth > document.documentElement.clientWidth,
+    };
+  });
+  assert.deepEqual(narrowGlobalScopeLayout, { insideHeader: true, pageOverflow: false }, `compact Global scope control must stay within a narrow header (${JSON.stringify(narrowGlobalScopeLayout)})`);
   await page.screenshot({ path: path.join(os.tmpdir(), 'nodus-library-scope-global-light-narrow.png'), fullPage: true });
   await page.getByTestId('library-scope-vault').click();
   await page.waitForFunction(() => document.querySelector('[data-testid="library-scope-shell"]')?.getAttribute('data-library-scope') === 'vault');
@@ -159,6 +217,18 @@ try {
     document.documentElement.classList.add('light');
     document.documentElement.classList.remove('dark');
   });
+  const narrowVaultScopeLayout = await page.evaluate(() => {
+    const switcher = document.querySelector('[data-testid="library-scope-switcher"]');
+    const header = document.querySelector('[data-testid="library-vault-header"]');
+    if (!(switcher instanceof HTMLElement) || !(header instanceof HTMLElement)) throw new Error('Narrow This-vault header not found');
+    const switcherRect = switcher.getBoundingClientRect();
+    const headerRect = header.getBoundingClientRect();
+    return {
+      insideHeader: switcherRect.left >= headerRect.left && switcherRect.right <= headerRect.right && switcherRect.bottom <= headerRect.bottom,
+      pageOverflow: document.documentElement.scrollWidth > document.documentElement.clientWidth,
+    };
+  });
+  assert.deepEqual(narrowVaultScopeLayout, { insideHeader: true, pageOverflow: false }, `compact This-vault scope control must stay within a narrow header (${JSON.stringify(narrowVaultScopeLayout)})`);
   await page.screenshot({ path: path.join(os.tmpdir(), 'nodus-library-scope-vault-light-narrow.png'), fullPage: true });
   await page.getByTestId('library-scope-global').click();
   await library.waitFor({ state: 'visible' });
