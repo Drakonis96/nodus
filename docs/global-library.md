@@ -408,10 +408,16 @@ the generated file deterministic.
 
 ## Editable collections and live smart searches
 
-Nodus collections can be nested, reordered, and moved with drag and drop. A
-drop reorders beside the target; holding Shift nests under it. Dropping one or
-more document rows copies their memberships without changing their files or
-analysis. The bulk bar also exposes explicit copy, move, and remove operations.
+Nodus collections can be nested, reordered, and moved with drag and drop.
+Dropping a collection on another collection nests it directly; dropping it on
+the Library root moves it back to the top level. Every local collection and
+subcollection also exposes compact rename, move, and delete controls. The move
+dialog presents the complete hierarchy, disables the current subtree to prevent
+cycles, and makes the destination explicit. Deleting a collection removes only
+that grouping and its nested groupings: items, attachments, notes, annotations,
+and analyses remain in the Library. Dropping one or more document rows copies
+their memberships without changing their files or analysis. The bulk bar also
+exposes explicit copy, move, and remove operations.
 Imported Zotero collection nodes and their mirrored memberships are locked;
 local organization belongs in Nodus collections and survives source refreshes.
 

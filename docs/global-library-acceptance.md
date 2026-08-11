@@ -56,7 +56,8 @@ button exists.
 | Organization | Collections and subcollections support arbitrary depth | Verified | `test-global-library-operations`, `test-global-library-ui` |
 | Organization | Zotero collections are mirrored and Nodus collections are editable | Verified | `test-global-library-operations` |
 | Organization | Search, filters, pagination, and bulk actions work | Verified | `test-global-library-ui`, `e2e-global-library` |
-| Organization | Drag-and-drop moves and reorders Nodus collections while rejecting cycles and imported collection edits | Verified | `test-library-smart-collections`, `e2e-global-library` |
+| Organization | Drag-and-drop nests or moves Nodus collections while rejecting cycles and imported collection edits | Verified | `test-library-smart-collections`, `e2e-global-library` |
+| Organization | Every local collection and subcollection exposes rename, hierarchical move, and confirmed grouping-only delete controls | Verified | `test-global-library-operations`, `test-global-library-ui`, `e2e-global-library` |
 | Organization | Individual and bulk membership copy, move, and removal do not invalidate analysis | Verified | `test-library-smart-collections` |
 | Smart searches | Nested all/any/not rules cover metadata, authors, tags, dates, sources, attachments, extraction, trash, vaults, and analysis | Verified | `test-library-smart-collections`, `test-global-library-ui` |
 | Smart searches | Results and counts are live and never materialize duplicate item records | Verified | `test-library-smart-collections` |

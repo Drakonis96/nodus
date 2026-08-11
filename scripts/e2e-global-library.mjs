@@ -57,7 +57,9 @@ try {
     await window.nodus.getGlobalLibraryStatus();
     const root = await window.nodus.createGlobalLibraryCollection('Historia contemporánea', null);
     const child = await window.nodus.createGlobalLibraryCollection('Mujeres y posguerra', root.id);
-    return { root, child };
+    const draggable = await window.nodus.createGlobalLibraryCollection('Por clasificar', null);
+    const disposable = await window.nodus.createGlobalLibraryCollection('Colección temporal', null);
+    return { root, child, draggable, disposable };
   }, { version: require(path.join(repoRoot, 'package.json')).version, backup: backupRoot });
   console.log('[global-library-e2e] profile and nested collections ready');
 
@@ -230,7 +232,69 @@ try {
   await migrationDialog.getByRole('button', { name: 'Cerrar', exact: true }).last().click();
   await migrationDialog.waitFor({ state: 'detached' });
   await page.getByText('Historia contemporánea', { exact: true }).waitFor();
-  await page.getByText('Mujeres y posguerra', { exact: true }).click();
+
+  const childEdit = page.getByTestId(`library-collection-edit-${collections.child.id}`);
+  const childMove = page.getByTestId(`library-collection-move-${collections.child.id}`);
+  const childDelete = page.getByTestId(`library-collection-delete-${collections.child.id}`);
+  await childEdit.waitFor({ state: 'visible' });
+  assert.equal(await childMove.count(), 1, 'every local subcollection exposes a move icon');
+  assert.equal(await childDelete.count(), 1, 'every local subcollection exposes a delete icon');
+  await childEdit.click();
+  const renameDialog = page.getByRole('dialog').filter({ hasText: 'Renombrar colección' });
+  await renameDialog.waitFor({ state: 'visible' });
+  await renameDialog.locator('input').fill('Mujeres y posguerra revisada');
+  await renameDialog.getByRole('button', { name: 'Guardar', exact: true }).click();
+  await page.getByText('Mujeres y posguerra revisada', { exact: true }).waitFor();
+
+  await page.getByTestId(`library-collection-move-${collections.root.id}`).click();
+  let moveDialog = page.getByTestId('library-collection-move-dialog');
+  await moveDialog.waitFor({ state: 'visible' });
+  assert.equal(await page.getByTestId(`library-collection-move-target-${collections.child.id}`).isDisabled(), true, 'a collection cannot move inside its descendant');
+  await moveDialog.getByLabel('Cerrar', { exact: true }).click();
+  await moveDialog.waitFor({ state: 'detached' });
+
+  await page.getByTestId(`library-collection-move-${collections.child.id}`).click();
+  moveDialog = page.getByTestId('library-collection-move-dialog');
+  await page.getByTestId('library-collection-move-root').click();
+  await page.getByTestId('confirm-library-collection-move').click();
+  await moveDialog.waitFor({ state: 'detached' });
+  let movedChild = await page.evaluate(async (id) => (await window.nodus.listGlobalLibraryCollections()).find((entry) => entry.id === id), collections.child.id);
+  assert.equal(movedChild.parentId, null, 'the modal moves a subcollection to the Library top level');
+
+  await page.getByTestId(`library-collection-move-${collections.child.id}`).click();
+  moveDialog = page.getByTestId('library-collection-move-dialog');
+  await page.getByTestId(`library-collection-move-target-${collections.root.id}`).click();
+  await page.screenshot({ path: path.join(os.tmpdir(), 'nodus-library-collection-move-dark-wide.png'), fullPage: true });
+  await page.evaluate(() => { document.documentElement.classList.add('light'); document.documentElement.classList.remove('dark'); });
+  await page.setViewportSize({ width: 760, height: 900 });
+  await page.screenshot({ path: path.join(os.tmpdir(), 'nodus-library-collection-move-light-narrow.png'), fullPage: true });
+  await page.evaluate(() => { document.documentElement.classList.add('dark'); document.documentElement.classList.remove('light'); });
+  await page.setViewportSize({ width: 1540, height: 940 });
+  await page.getByTestId('confirm-library-collection-move').click();
+  await moveDialog.waitFor({ state: 'detached' });
+  movedChild = await page.evaluate(async (id) => (await window.nodus.listGlobalLibraryCollections()).find((entry) => entry.id === id), collections.child.id);
+  assert.equal(movedChild.parentId, collections.root.id, 'the modal nests a collection under the selected destination');
+
+  const dragSource = page.getByTestId(`global-library-collection-${collections.draggable.id}`);
+  const dragTarget = page.getByTestId(`global-library-collection-${collections.child.id}`);
+  await dragSource.dragTo(dragTarget);
+  await page.waitForFunction(async ({ id, parentId }) => (await window.nodus.listGlobalLibraryCollections()).find((entry) => entry.id === id)?.parentId === parentId, { id: collections.draggable.id, parentId: collections.child.id });
+
+  const itemCountBeforeCollectionDelete = (await page.evaluate(() => window.nodus.listGlobalLibraryItems({ limit: 1 }))).total;
+  await page.getByTestId(`library-collection-delete-${collections.disposable.id}`).click();
+  const deleteDialog = page.getByRole('dialog', { name: 'Eliminar colección' });
+  await deleteDialog.waitFor({ state: 'visible' });
+  assert.match(await deleteDialog.innerText(), /No se borrará ningún ítem, archivo, nota, anotación ni análisis/);
+  await deleteDialog.getByRole('button', { name: 'Eliminar', exact: true }).click();
+  await deleteDialog.waitFor({ state: 'detached' });
+  const collectionDeleteState = await page.evaluate(async () => ({
+    collections: await window.nodus.listGlobalLibraryCollections(),
+    items: (await window.nodus.listGlobalLibraryItems({ limit: 1 })).total,
+  }));
+  assert.equal(collectionDeleteState.collections.some((entry) => entry.id === collections.disposable.id), false);
+  assert.equal(collectionDeleteState.items, itemCountBeforeCollectionDelete, 'deleting a collection leaves every Library item intact');
+
+  await page.getByText('Mujeres y posguerra revisada', { exact: true }).click();
   const row = page.getByTestId(`global-library-item-${itemId}`);
   await row.waitFor({ state: 'visible' });
   assert.match(await row.innerText(), /Mujeres solas en la posguerra/);

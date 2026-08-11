@@ -31,6 +31,8 @@ test('the Library UI exposes hierarchy, search, bulk operations, imports and bac
     'library-citation-export-dialog', 'copy-library-citation', 'export-library-bibliography',
     'open-library-trash', 'empty-library-trash', 'library-trash-impact-dialog', 'restore-library-trash', 'purge-library-trash',
     'open-library-recovery', 'library-recovery-dialog', 'rebuild-library-recovery', 'library-merge-impact',
+    'library-collection-edit-', 'library-collection-move-', 'library-collection-delete-',
+    'library-collection-move-dialog', 'library-collection-move-root', 'confirm-library-collection-move',
   ]) assert.match(view, new RegExp(`data-testid=(?:"|\{\`)[^\n]*${marker}`));
   for (const method of [
     'getGlobalLibraryStatus', 'listGlobalLibraryItems', 'listGlobalLibraryCollections',
@@ -56,6 +58,10 @@ test('the Library UI exposes hierarchy, search, bulk operations, imports and bac
     'previewGlobalLibraryMerge',
   ]) assert.match(view, new RegExp(String.raw`window\.nodus\.${method}\b`));
   assert.match(view, /CollectionBranch[\s\S]*<CollectionBranch/, 'collection rendering is recursively unbounded');
+  assert.match(view, /const nextParentId = targetCollection\.id/, 'dropping a collection on another collection nests it directly');
+  assert.doesNotMatch(view, /event\.shiftKey \? targetCollection\.id/, 'nesting does not depend on a hidden keyboard modifier');
+  assert.match(view, /deleteGlobalLibraryCollection\(current\.id, false\)/, 'deleting a grouping explicitly preserves its items');
+  assert.match(view, /collectionSubtreeIds/, 'move and delete actions account for every nested collection');
   assert.match(view, /La importación se canceló; el catálogo ya recuperado se conserva/);
   assert.match(view, /Copia de solo lectura: Nodus nunca modifica Zotero/);
   assert.match(view, /status\.conflicts > 0 \|\| status\.invalidRecords > 0/);

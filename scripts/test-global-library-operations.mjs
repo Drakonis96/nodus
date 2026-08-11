@@ -57,8 +57,12 @@ try {
   assert.equal(catalog.list({ hasAttachments: true }).total, 2);
   assert.equal(catalog.list({ source: 'nodus' }).total, 2);
   const first = store.scanMaterializedItems().records.find((item) => item.metadata.title === 'entre norma y deseo');
+  const second = store.scanMaterializedItems().records.find((item) => item.metadata.title === 'datos');
   assert.ok(first);
+  assert.ok(second);
   assert.ok(existsSync(path.join(store.itemFolder(first.storageId), first.files.original)));
+  const secondOriginal = path.join(store.itemFolder(second.storageId), second.files.original);
+  assert.ok(existsSync(secondOriginal));
   assert.equal(operations.importLocalFiles([firstFile], postwar.id).skipped, 1, 'content hashes reject a duplicate import');
 
   assert.equal(operations.patchItemCollections([first.id], { add: [history.id], remove: [postwar.id] }), 1);
@@ -84,6 +88,8 @@ try {
   assert.equal(catalog.list().total, 3);
   assert.equal(operations.listCollections().some((entry) => entry.id === women.id), false);
   assert.equal(store.scanMaterializedItems().records.find((item) => item.metadata.title === 'datos').collectionIds.length, 0);
+  assert.ok(existsSync(secondOriginal), 'deleting the collection tree preserves the original attachment');
+  assert.equal(store.readMaterializedItem(second.storageId).deletedAt, null, 'deleting a grouping never trashes its items');
   assert.equal(catalog.listCollections().find((entry) => entry.id === history.id).directItemCount, 2);
   catalog.close();
   console.log('Global library collection tree, local import, duplicate safety, memberships and trash tests passed!');

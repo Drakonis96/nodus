@@ -103,6 +103,120 @@ function collectionChildren(collections: LibraryCollectionView[]): Map<string | 
   return map;
 }
 
+function collectionSubtreeIds(collectionId: string, children: Map<string | null, LibraryCollectionView[]>): Set<string> {
+  const ids = new Set<string>();
+  const visit = (id: string) => {
+    if (ids.has(id)) return;
+    ids.add(id);
+    for (const child of children.get(id) ?? []) visit(child.id);
+  };
+  visit(collectionId);
+  return ids;
+}
+
+function flattenedCollections(children: Map<string | null, LibraryCollectionView[]>): Array<{ collection: LibraryCollectionView; depth: number }> {
+  const entries: Array<{ collection: LibraryCollectionView; depth: number }> = [];
+  const visit = (parentId: string | null, depth: number) => {
+    for (const collection of children.get(parentId) ?? []) {
+      entries.push({ collection, depth });
+      visit(collection.id, depth + 1);
+    }
+  };
+  visit(null, 0);
+  return entries;
+}
+
+function LibraryCollectionMoveDialog({
+  collection,
+  collections,
+  onClose,
+  onMove,
+}: {
+  collection: LibraryCollectionView;
+  collections: LibraryCollectionView[];
+  onClose: () => void;
+  onMove: (parentId: string | null) => Promise<void>;
+}) {
+  const children = useMemo(() => collectionChildren(collections), [collections]);
+  const excluded = useMemo(() => collectionSubtreeIds(collection.id, children), [children, collection.id]);
+  const entries = useMemo(() => flattenedCollections(children), [children]);
+  const [parentId, setParentId] = useState<string | null>(collection.parentId);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape' && !busy) onClose();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [busy, onClose]);
+
+  const move = async () => {
+    if (parentId === collection.parentId || busy) return;
+    setBusy(true); setError(null);
+    try { await onMove(parentId); onClose(); }
+    catch (nextError) { setError(nextError instanceof Error ? nextError.message : String(nextError)); }
+    finally { setBusy(false); }
+  };
+
+  return (
+    <div className="fixed inset-0 z-[90] grid place-items-center bg-black/65 p-6" onMouseDown={(event) => { if (event.target === event.currentTarget && !busy) onClose(); }}>
+      <section data-testid="library-collection-move-dialog" className="card-modal flex max-h-[78vh] w-full max-w-lg flex-col overflow-hidden rounded-2xl border border-neutral-800 shadow-2xl" role="dialog" aria-modal="true" aria-labelledby="library-collection-move-title">
+        <header className="flex items-start gap-3 border-b border-neutral-800 px-5 py-4">
+          <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-indigo-500/15 text-indigo-300"><Icon name="route" /></span>
+          <div className="min-w-0 flex-1">
+            <h2 id="library-collection-move-title" className="font-semibold">{t('Mover colección')}</h2>
+            <p className="mt-1 truncate text-sm text-neutral-300">{collection.name}</p>
+            <p className="mt-1 text-xs leading-5 text-neutral-500">{t('Elige dónde debe quedar anidada. También puedes arrastrar la carpeta directamente en el árbol.')}</p>
+          </div>
+          <button className="btn btn-ghost" onClick={onClose} disabled={busy} aria-label={t('Cerrar')}><Icon name="x" /></button>
+        </header>
+        <div className="min-h-0 flex-1 overflow-y-auto p-3">
+          <button
+            data-testid="library-collection-move-root"
+            className={`flex w-full items-center gap-3 rounded-xl border px-3 py-2.5 text-left text-sm ${parentId === null ? 'border-indigo-500/55 bg-indigo-500/10 text-indigo-200' : 'border-transparent text-neutral-400 hover:bg-neutral-900/60 hover:text-neutral-200'}`}
+            onClick={() => setParentId(null)}
+            disabled={busy}
+          >
+            <span className={`grid h-5 w-5 place-items-center rounded-full border ${parentId === null ? 'border-indigo-400' : 'border-neutral-700'}`}>{parentId === null && <span className="h-2.5 w-2.5 rounded-full bg-indigo-400" />}</span>
+            <Icon name="library" size={15} className="shrink-0" />
+            <span className="min-w-0 flex-1">{t('Nivel superior de la Biblioteca')}</span>
+            {collection.parentId === null && <span className="text-[10px] text-neutral-500">{t('Destino actual')}</span>}
+          </button>
+          <div className="mt-1 space-y-0.5">
+            {entries.map(({ collection: target, depth }) => {
+              const unavailable = excluded.has(target.id) || target.source !== 'nodus';
+              const active = parentId === target.id;
+              return <button
+                key={target.id}
+                data-testid={`library-collection-move-target-${target.id}`}
+                className={`flex w-full items-center gap-3 rounded-xl border px-3 py-2.5 text-left text-sm ${active ? 'border-indigo-500/55 bg-indigo-500/10 text-indigo-200' : 'border-transparent text-neutral-400 hover:bg-neutral-900/60 hover:text-neutral-200'} disabled:cursor-not-allowed disabled:opacity-35`}
+                style={{ paddingLeft: 12 + depth * 18 }}
+                disabled={unavailable || busy}
+                onClick={() => setParentId(target.id)}
+                title={excluded.has(target.id) ? t('La colección actual y sus subcolecciones no pueden ser destino.') : target.source !== 'nodus' ? t('Las colecciones importadas son de solo lectura en Nodus.') : tx('Mover dentro de {name}', { name: target.name })}
+              >
+                <span className={`grid h-5 w-5 shrink-0 place-items-center rounded-full border ${active ? 'border-indigo-400' : 'border-neutral-700'}`}>{active && <span className="h-2.5 w-2.5 rounded-full bg-indigo-400" />}</span>
+                <Icon name="folder" size={15} className="shrink-0" />
+                <span className="min-w-0 flex-1 truncate">{target.name}</span>
+                {target.id === collection.id && <span className="text-[10px] text-neutral-500">{t('Colección actual')}</span>}
+                {target.source !== 'nodus' && <Icon name="lock" size={10} className="shrink-0" />}
+                {target.id === collection.parentId && <span className="text-[10px] text-neutral-500">{t('Destino actual')}</span>}
+              </button>;
+            })}
+          </div>
+          {error && <p role="alert" className="mt-3 rounded-lg bg-red-500/10 p-3 text-xs text-red-300">{error}</p>}
+        </div>
+        <footer className="flex justify-end gap-2 border-t border-neutral-800 p-4">
+          <button className="btn btn-ghost" disabled={busy} onClick={onClose}>{t('Cancelar')}</button>
+          <button data-testid="confirm-library-collection-move" className="btn btn-primary" disabled={busy || parentId === collection.parentId} onClick={() => void move()}>{busy ? <Spinner /> : <Icon name="route" />} {t('Mover aquí')}</button>
+        </footer>
+      </section>
+    </div>
+  );
+}
+
 function CollectionBranch({
   collection,
   children,
@@ -111,6 +225,9 @@ function CollectionBranch({
   onSelect,
   onToggle,
   onDrop,
+  onRename,
+  onMove,
+  onDelete,
   depth,
 }: {
   collection: LibraryCollectionView;
@@ -120,13 +237,16 @@ function CollectionBranch({
   onSelect: (id: string) => void;
   onToggle: (id: string) => void;
   onDrop: (event: DragEvent, collection: LibraryCollectionView) => void;
+  onRename: (collection: LibraryCollectionView) => void;
+  onMove: (collection: LibraryCollectionView) => void;
+  onDelete: (collection: LibraryCollectionView) => void;
   depth: number;
 }) {
   const descendants = children.get(collection.id) ?? [];
   const open = expanded.has(collection.id);
   return (
     <>
-      <div className="group flex items-center pr-1" style={{ paddingLeft: depth * 12 }}>
+      <div className="group flex items-center pr-1" style={{ paddingLeft: depth * 12 }} onDragOver={(event) => event.preventDefault()} onDrop={(event) => onDrop(event, collection)}>
         <button
           className={`grid h-7 w-6 shrink-0 place-items-center rounded text-neutral-600 hover:text-neutral-300 ${descendants.length ? '' : 'invisible'}`}
           onClick={() => onToggle(collection.id)}
@@ -141,20 +261,23 @@ function CollectionBranch({
           title={collection.name}
           draggable={collection.source === 'nodus'}
           onDragStart={(event) => { event.dataTransfer.effectAllowed = 'move'; event.dataTransfer.setData('application/x-nodus-library-collection', collection.id); }}
-          onDragOver={(event) => event.preventDefault()}
-          onDrop={(event) => onDrop(event, collection)}
         >
           <Icon name="folder" size={13} className="shrink-0 opacity-70" />
           <span className="min-w-0 flex-1 truncate">{collection.name}</span>
           {collection.source !== 'nodus' && <Icon name="lock" size={9} className="shrink-0 opacity-45" />}
           <span className="text-[10px] tabular-nums opacity-55">{collection.directItemCount}</span>
         </button>
+        {collection.source === 'nodus' && <div className={`ml-0.5 flex shrink-0 items-center gap-0.5 transition-opacity ${selected === collection.id ? 'opacity-100' : 'opacity-60 group-hover:opacity-100 group-focus-within:opacity-100'}`}>
+          <button data-testid={`library-collection-edit-${collection.id}`} className={`grid h-6 w-6 place-items-center rounded ${selected === collection.id ? 'text-neutral-500 hover:bg-indigo-500/15 hover:text-indigo-500' : 'text-neutral-600 hover:bg-neutral-900 hover:text-neutral-200'}`} onClick={() => onRename(collection)} title={t('Renombrar colección')} aria-label={tx('Renombrar {name}', { name: collection.name })}><Icon name="edit" size={11} /></button>
+          <button data-testid={`library-collection-move-${collection.id}`} className={`grid h-6 w-6 place-items-center rounded ${selected === collection.id ? 'text-neutral-500 hover:bg-indigo-500/15 hover:text-indigo-500' : 'text-neutral-600 hover:bg-neutral-900 hover:text-neutral-200'}`} onClick={() => onMove(collection)} title={t('Mover colección')} aria-label={tx('Mover {name}', { name: collection.name })}><Icon name="route" size={11} /></button>
+          <button data-testid={`library-collection-delete-${collection.id}`} className="grid h-6 w-6 place-items-center rounded text-neutral-600 hover:bg-red-500/10 hover:text-red-400" onClick={() => onDelete(collection)} title={t('Eliminar colección')} aria-label={tx('Eliminar {name}', { name: collection.name })}><Icon name="trash" size={11} /></button>
+        </div>}
       </div>
       {open && descendants.map((child) => (
         <CollectionBranch
           key={child.id} collection={child} children={children} selected={selected} expanded={expanded}
           onSelect={onSelect} onToggle={onToggle} depth={depth + 1}
-          onDrop={onDrop}
+          onDrop={onDrop} onRename={onRename} onMove={onMove} onDelete={onDelete}
         />
       ))}
     </>
@@ -483,6 +606,7 @@ function GlobalLibraryContent({
   const [manager, setManager] = useState<{ item: LibraryItemRecord; tab?: 'attachments' | 'notes' | 'relations' | 'tags' } | null>(null);
   const [bulkTag, setBulkTag] = useState('');
   const [collectionAction, setCollectionAction] = useState<'copy' | 'move' | 'remove'>('copy');
+  const [movingCollection, setMovingCollection] = useState<LibraryCollectionView | null>(null);
   const [smartSearchEditor, setSmartSearchEditor] = useState<LibrarySavedSearchRecord | 'new' | null>(null);
   const [tablePreferencesOpen, setTablePreferencesOpen] = useState(false);
   const sortKey = JSON.stringify(viewPreferences.sort);
@@ -559,19 +683,40 @@ function GlobalLibraryContent({
     } catch (nextError) { toast(nextError instanceof Error ? nextError.message : String(nextError), { tone: 'error' }); }
   };
 
-  const renameCollection = async () => {
-    const current = collections.find((entry) => entry.id === selectedCollection);
+  const renameCollection = async (collectionId: string) => {
+    const current = collections.find((entry) => entry.id === collectionId);
     if (!current || current.source !== 'nodus') return;
     const name = await promptText({ title: t('Renombrar colección'), initial: current.name, confirmLabel: t('Guardar') });
     if (!name?.trim()) return;
-    await window.nodus.updateGlobalLibraryCollection(current.id, { name }); await load();
+    try { await window.nodus.updateGlobalLibraryCollection(current.id, { name }); await load(); }
+    catch (nextError) { toast(nextError instanceof Error ? nextError.message : String(nextError), { tone: 'error' }); }
   };
 
-  const deleteCollection = async () => {
-    const current = collections.find((entry) => entry.id === selectedCollection);
+  const moveCollection = async (current: LibraryCollectionView, parentId: string | null) => {
+    const position = children.get(parentId)?.filter((entry) => entry.id !== current.id).length ?? 0;
+    await window.nodus.updateGlobalLibraryCollection(current.id, { parentId, position });
+    if (parentId) setExpanded((value) => new Set([...value, parentId]));
+    await load();
+    toast(t('Colección movida.'));
+  };
+
+  const deleteCollection = async (collectionId: string) => {
+    const current = collections.find((entry) => entry.id === collectionId);
     if (!current || current.source !== 'nodus') return;
-    if (!(await confirm({ title: t('Eliminar colección'), message: t('Se eliminará la colección y sus subcolecciones. Los documentos seguirán en la Biblioteca.'), danger: true, confirmLabel: t('Eliminar') }))) return;
-    await window.nodus.deleteGlobalLibraryCollection(current.id, false); setSelectedCollection(null); await load();
+    const subtree = collectionSubtreeIds(current.id, children);
+    const subcollectionCount = subtree.size - 1;
+    if (!(await confirm({
+      title: t('Eliminar colección'),
+      message: tx('Se eliminará «{name}» y {n} subcolección(es). No se borrará ningún ítem, archivo, nota, anotación ni análisis; sólo desaparecerá esta agrupación.', { name: current.name, n: subcollectionCount }),
+      danger: true,
+      confirmLabel: t('Eliminar'),
+    }))) return;
+    try {
+      await window.nodus.deleteGlobalLibraryCollection(current.id, false);
+      if (selectedCollection && subtree.has(selectedCollection)) setSelectedCollection(null);
+      await load();
+      toast(t('Colección eliminada; sus ítems siguen en la Biblioteca.'));
+    } catch (nextError) { toast(nextError instanceof Error ? nextError.message : String(nextError), { tone: 'error' }); }
   };
 
   const dropOnCollection = async (event: DragEvent, targetCollection: LibraryCollectionView) => {
@@ -581,10 +726,12 @@ function GlobalLibraryContent({
       if (movedCollectionId) {
         if (movedCollectionId === targetCollection.id) return;
         if (targetCollection.source !== 'nodus') throw new Error(t('Las colecciones importadas son de solo lectura en Nodus.'));
-        const nextParentId = event.shiftKey ? targetCollection.id : targetCollection.parentId;
-        const nextPosition = event.shiftKey ? (children.get(targetCollection.id)?.length ?? 0) : targetCollection.position;
+        const nextParentId = targetCollection.id;
+        const nextPosition = children.get(targetCollection.id)?.length ?? 0;
         await window.nodus.updateGlobalLibraryCollection(movedCollectionId, { parentId: nextParentId, position: nextPosition });
-        setExpanded((current) => new Set([...current, ...(nextParentId ? [nextParentId] : [])])); await load(); return;
+        setExpanded((current) => new Set([...current, nextParentId])); await load();
+        toast(t('Colección movida.'));
+        return;
       }
       const rawItems = event.dataTransfer.getData('application/x-nodus-library-items');
       if (rawItems) {
@@ -760,12 +907,11 @@ function GlobalLibraryContent({
             <button className={`flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs ${selectedCollection === null && selectedSavedSearch === null ? 'bg-indigo-600 text-white' : 'text-neutral-400 hover:bg-neutral-900'}`} onClick={() => { setSelectedCollection(null); setSelectedSavedSearch(null); setOffset(0); }}><Icon name="library" size={14} /><span className="flex-1">{t('Todos los documentos')}</span><span className="text-[10px] opacity-60">{status.items}</span></button>
           </div>
           <div className="min-h-0 flex-1 overflow-y-auto px-2 pb-3">
-            {(children.get(null) ?? []).map((collection) => <CollectionBranch key={collection.id} collection={collection} children={children} selected={selectedCollection} expanded={expanded} onSelect={(id) => { setSelectedCollection(id); setSelectedSavedSearch(null); setOffset(0); }} onToggle={(id) => setExpanded((current) => { const next = new Set(current); if (next.has(id)) next.delete(id); else next.add(id); return next; })} onDrop={(event, entry) => void dropOnCollection(event, entry)} depth={0} />)}
+            {(children.get(null) ?? []).map((collection) => <CollectionBranch key={collection.id} collection={collection} children={children} selected={selectedCollection} expanded={expanded} onSelect={(id) => { setSelectedCollection(id); setSelectedSavedSearch(null); setOffset(0); }} onToggle={(id) => setExpanded((current) => { const next = new Set(current); if (next.has(id)) next.delete(id); else next.add(id); return next; })} onDrop={(event, entry) => void dropOnCollection(event, entry)} onRename={(entry) => void renameCollection(entry.id)} onMove={setMovingCollection} onDelete={(entry) => void deleteCollection(entry.id)} depth={0} />)}
             {collections.length === 0 && <p className="px-3 py-4 text-xs leading-5 text-neutral-600">{t('Crea colecciones propias o importa la jerarquía completa de Zotero.')}</p>}
             <div className="mt-4 flex items-center gap-1 border-t border-neutral-800 px-1 pt-3"><b className="min-w-0 flex-1 text-[10px] uppercase tracking-wider text-neutral-600">{t('Búsquedas inteligentes')}</b><button className="grid h-7 w-7 place-items-center rounded hover:bg-neutral-900" onClick={() => setSmartSearchEditor('new')} title={t('Nueva búsqueda inteligente')}><Icon name="plus" size={13} /></button></div>
             <div className="mt-1 space-y-0.5">{savedSearches.map((record) => <button key={record.id} data-testid={`library-saved-search-${record.id}`} className={`flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-xs ${selectedSavedSearch === record.id ? 'bg-indigo-600 text-white' : 'text-neutral-400 hover:bg-neutral-900'}`} onClick={() => { setSelectedSavedSearch(record.id); setSelectedCollection(null); setOffset(0); }}><Icon name="search" size={12} /><span className="min-w-0 flex-1 truncate">{record.name}</span></button>)}</div>
           </div>
-          {collections.find((entry) => entry.id === selectedCollection)?.source === 'nodus' && <div className="flex gap-1 border-t border-neutral-800 p-2"><button className="btn btn-ghost flex-1 text-xs" onClick={() => void renameCollection()}><Icon name="edit" size={13} /> {t('Renombrar')}</button><button className="btn btn-ghost text-red-400" onClick={() => void deleteCollection()} title={t('Eliminar colección')}><Icon name="trash" size={13} /></button></div>}
           {selectedSavedSearch && savedSearches.find((entry) => entry.id === selectedSavedSearch) && <div className="flex gap-1 border-t border-neutral-800 p-2"><button className="btn btn-ghost flex-1 text-xs" onClick={() => setSmartSearchEditor(savedSearches.find((entry) => entry.id === selectedSavedSearch) ?? null)}><Icon name="edit" size={13} /> {t('Editar')}</button><button className="btn btn-ghost text-red-400" onClick={() => { const record = savedSearches.find((entry) => entry.id === selectedSavedSearch); if (record) void removeSavedSearch(record); }} title={t('Eliminar')}><Icon name="trash" size={13} /></button></div>}
         </aside>}
 
@@ -830,6 +976,7 @@ function GlobalLibraryContent({
         </aside>}
       </div>
       {zoteroOpen && <ZoteroImportDialog onClose={() => setZoteroOpen(false)} onFinished={() => void load()} />}
+      {movingCollection && <LibraryCollectionMoveDialog collection={movingCollection} collections={collections} onClose={() => setMovingCollection(null)} onMove={(parentId) => moveCollection(movingCollection, parentId)} />}
       {migrationOpen && <LibraryMigrationDialog onClose={() => setMigrationOpen(false)} onFinished={() => void load()} />}
       {createReferenceMode && <LibraryCreateReferenceDialog defaultMode={createReferenceMode} collectionIds={selectedCollection && collections.find((entry) => entry.id === selectedCollection)?.source === 'nodus' ? [selectedCollection] : []} onClose={() => setCreateReferenceMode(null)} onCreated={(created, openEditor) => { setDetailId(created.id); setDetail(created); if (openEditor) setMetadataItem(created); void load(); }} />}
       {metadataItem && <LibraryMetadataEditor item={metadataItem} onClose={() => setMetadataItem(null)} onSaved={(saved) => { setDetail(saved); void load(); }} />}
