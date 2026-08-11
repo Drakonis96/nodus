@@ -335,10 +335,16 @@ export function LibraryDocumentReader({
   reference,
   onBack,
   onOpenAssistant,
+  initialSource,
+  onSourceChange,
+  showLibraryBackButton = true,
 }: {
   reference: LibraryReaderReference;
   onBack: () => void;
   onOpenAssistant: (target?: PendingAssistantNavigationTarget) => void;
+  initialSource?: string;
+  onSourceChange?: (sourceId: string) => void;
+  showLibraryBackButton?: boolean;
 }) {
   const scrollRef = useRef<HTMLElement | null>(null);
   const documentRef = useRef<HTMLDivElement | null>(null);
@@ -346,6 +352,7 @@ export function LibraryDocumentReader({
   const bookmarkMenuRef = useRef<HTMLDivElement | null>(null);
   const chatMessagesRef = useRef<HTMLDivElement | null>(null);
   const pendingAnnotationsRef = useRef(new Map<string, WritingDraftAnnotation>());
+  const onSourceChangeRef = useRef(onSourceChange);
   const [reader, setReader] = useState<LibraryReaderDocument | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -373,6 +380,8 @@ export function LibraryDocumentReader({
   const [chatSettings, setChatSettings] = useState<AppSettings | null>(null);
   const [chatModel, setChatModel] = useState<ModelRef | null>(null);
   const [citation, setCitation] = useState<CitationTarget>(null);
+
+  useEffect(() => { onSourceChangeRef.current = onSourceChange; }, [onSourceChange]);
 
   const loadReader = useCallback(async () => {
     setLoading(true);
@@ -414,20 +423,30 @@ export function LibraryDocumentReader({
     const preferred = readOpeningFormatPreference();
     setOpeningFormatPreference(preferred);
     setRememberOpeningFormat(false);
-    if (preferred === 'clean' && reader.cleanAvailable) {
+    const initialIsAvailable = initialSource === 'clean'
+      ? reader.cleanAvailable
+      : !!initialSource && !!reader.attachments.find((attachment) => attachment.id === initialSource && attachment.available);
+    if (initialSource && initialIsAvailable) {
+      setSelectedSource(initialSource);
+      setOpeningFormatPrompt(false);
+    } else if (preferred === 'clean' && reader.cleanAvailable) {
       setSelectedSource('clean');
+      onSourceChangeRef.current?.('clean');
       setOpeningFormatPrompt(false);
     } else if (preferred === 'original' && original) {
       setSelectedSource(original.id);
+      onSourceChangeRef.current?.(original.id);
       setOpeningFormatPrompt(false);
     } else if (reader.cleanAvailable && original) {
       setSelectedSource('clean');
       setOpeningFormatPrompt(true);
     } else {
-      setSelectedSource(reader.cleanAvailable ? 'clean' : original?.id ?? reader.attachments.find((entry) => entry.available)?.id ?? 'clean');
+      const fallback = reader.cleanAvailable ? 'clean' : original?.id ?? reader.attachments.find((entry) => entry.available)?.id ?? 'clean';
+      setSelectedSource(fallback);
+      onSourceChangeRef.current?.(fallback);
       setOpeningFormatPrompt(false);
     }
-  }, [reader]);
+  }, [initialSource, reader]);
   useEffect(() => {
     if (!reader) return;
     let alive = true;
@@ -609,15 +628,20 @@ export function LibraryDocumentReader({
   const selectReaderSource = useCallback((value: string) => {
     setSelectedSource(value);
     if (reader) localStorage.setItem(`nodus.libraryReader.source.${reader.storageId}`, value);
+    onSourceChangeRef.current?.(value);
     setPreviewPage(null);
   }, [reader]);
 
   const chooseOpeningFormat = useCallback((format: ReaderOpeningFormat) => {
     if (!reader) return;
     const original = primaryOriginalAttachment(reader);
-    if (format === 'clean' && reader.cleanAvailable) setSelectedSource('clean');
-    else if (format === 'original' && original) setSelectedSource(original.id);
+    let sourceId: string;
+    if (format === 'clean' && reader.cleanAvailable) sourceId = 'clean';
+    else if (format === 'original' && original) sourceId = original.id;
     else return;
+    setSelectedSource(sourceId);
+    localStorage.setItem(`nodus.libraryReader.source.${reader.storageId}`, sourceId);
+    onSourceChangeRef.current?.(sourceId);
     if (rememberOpeningFormat) {
       writeOpeningFormatPreference(format);
       setOpeningFormatPreference(format);
@@ -788,7 +812,7 @@ export function LibraryDocumentReader({
     <div className="library-document-reader relative flex h-full min-h-0 min-w-0 flex-col overflow-hidden">
       <NodiViewContextSource title={reader.title} text={contextMarkdown} />
       <header className="relative z-40 flex flex-wrap items-center gap-2 border-b border-neutral-800 bg-neutral-950/60 px-4 py-2.5 backdrop-blur">
-        <button className="btn btn-ghost gap-1.5" onClick={onBack}><Icon name="chevronLeft" /> {t('Biblioteca')}</button>
+        {showLibraryBackButton && <button className="btn btn-ghost gap-1.5" onClick={onBack}><Icon name="chevronLeft" /> {t('Biblioteca')}</button>}
         <button
           className={`btn btn-ghost h-9 w-9 shrink-0 p-0 ${outlineOpen ? 'text-indigo-300' : ''}`}
           data-testid="library-reader-outline-toggle"

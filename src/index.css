@@ -2935,6 +2935,104 @@ select.input optgroup {
   border-color: #e5e7eb;
   background: #ffffff;
 }
+.library-workspace-tabs {
+  height: 2.25rem;
+  border-bottom: 1px solid #262626;
+  background: rgb(10 10 10 / 0.96);
+  padding: 0.25rem 0.5rem;
+}
+.library-workspace-tabs-scroll {
+  display: flex;
+  height: 1.75rem;
+  min-width: 0;
+  align-items: stretch;
+  gap: 0.25rem;
+  overflow-x: auto;
+  overflow-y: hidden;
+  overscroll-behavior-inline: contain;
+  scrollbar-width: none;
+}
+.library-workspace-tabs-scroll::-webkit-scrollbar {
+  display: none;
+}
+.library-workspace-tab {
+  display: flex;
+  min-width: 7rem;
+  max-width: 13.5rem;
+  flex: 0 1 13.5rem;
+  align-items: center;
+  border: 1px solid transparent;
+  border-radius: 0.45rem;
+  color: #a3a3a3;
+}
+.library-workspace-tab.is-library {
+  min-width: auto;
+  flex-basis: auto;
+}
+.library-workspace-tab:hover {
+  background: #171717;
+  color: #e5e5e5;
+}
+.library-workspace-tab.is-active {
+  border-color: #404040;
+  background: #262626;
+  color: #f5f5f5;
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.24);
+}
+.library-workspace-tab-main {
+  display: flex;
+  min-width: 0;
+  height: 100%;
+  flex: 1;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0 0.55rem;
+  text-align: left;
+  font-size: 0.6875rem;
+}
+.library-workspace-tab-close {
+  display: grid;
+  width: 1.5rem;
+  height: 1.5rem;
+  flex: 0 0 auto;
+  place-items: center;
+  border-radius: 0.35rem;
+  color: #737373;
+  opacity: 0;
+}
+.library-workspace-tab:hover .library-workspace-tab-close,
+.library-workspace-tab.is-active .library-workspace-tab-close,
+.library-workspace-tab-close:focus-visible {
+  opacity: 1;
+}
+.library-workspace-tab-close:hover {
+  background: #404040;
+  color: #f5f5f5;
+}
+.light .library-workspace-tabs {
+  border-color: #d4d4d4;
+  background: rgb(250 250 250 / 0.97);
+}
+.light .library-workspace-tab {
+  color: #737373;
+}
+.light .library-workspace-tab:hover {
+  background: #f5f5f5;
+  color: #262626;
+}
+.light .library-workspace-tab.is-active {
+  border-color: #d4d4d4;
+  background: #ffffff;
+  color: #171717;
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.08);
+}
+.light .library-workspace-tab-close {
+  color: #a3a3a3;
+}
+.light .library-workspace-tab-close:hover {
+  background: #e5e5e5;
+  color: #171717;
+}
 .library-header-bar {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);

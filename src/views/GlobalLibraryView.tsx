@@ -23,10 +23,11 @@ import type {
   ZoteroLibraryPreview,
   ZoteroSyncSession,
 } from '@shared/libraryTypes';
-import type { AppSettings, VaultSummary, VaultType } from '@shared/types';
+import type { AppSettings, LibraryReaderReference, VaultSummary, VaultType } from '@shared/types';
 import { Icon, Spinner } from '../components/ui';
 import { LibraryCitationExportDialog, LibraryCreateReferenceDialog, LibraryDuplicatesDialog, LibraryMetadataBatchDialog, LibraryMetadataEditor } from '../components/library/LibraryMetadataDialogs';
 import { LibraryItemManager } from '../components/library/LibraryItemManager';
+import { LibraryWorkspaceTabs, libraryWorkspaceTabKey, type LibraryWorkspaceTab } from '../components/library/LibraryWorkspaceTabs';
 import { LibrarySmartSearchDialog, LibraryTablePreferencesDialog } from '../components/library/LibrarySmartSearchDialog';
 import { LibraryRecoveryDialog, LibraryTrashImpactDialog } from '../components/library/LibraryRecoveryDialogs';
 import { LibraryDocumentReader } from './LibraryDocumentReader';
@@ -723,12 +724,12 @@ function LibraryScopeControls({
 }
 
 function GlobalLibraryContent({
-  target, onOpenSettings, onOpenAssistant, scopeControls,
+  target, onOpenSettings, scopeControls, onOpenReader,
 }: {
   target?: (PendingLibraryNavigationTarget & { nonce: number }) | null;
   onOpenSettings: () => void;
-  onOpenAssistant: (target?: PendingAssistantNavigationTarget) => void;
   scopeControls: ReactNode;
+  onOpenReader: (reference: LibraryReaderReference) => void;
 }) {
   const [status, setStatus] = useState<LibraryStatus | null>(null);
   const [collections, setCollections] = useState<LibraryCollectionView[]>([]);
@@ -761,7 +762,6 @@ function GlobalLibraryContent({
   const [migrationOpen, setMigrationOpen] = useState(false);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [collectionTarget, setCollectionTarget] = useState('');
-  const [readerItem, setReaderItem] = useState<LibraryItemRecord | null>(null);
   const [metadataItem, setMetadataItem] = useState<LibraryItemRecord | null>(null);
   const [createReferenceMode, setCreateReferenceMode] = useState<'identifier' | 'manual' | null>(null);
   const [metadataBatchItems, setMetadataBatchItems] = useState<string[] | null>(null);
@@ -860,10 +860,16 @@ function GlobalLibraryContent({
     if (!itemId) return;
     void window.nodus.getGlobalLibraryItem(itemId).then((item) => {
       if (!item) return;
-      if (item.files?.reader || item.attachments.length) setReaderItem(item);
+      if (item.files?.reader || item.attachments.length) onOpenReader({
+        id: item.id,
+        zoteroKey: item.source === 'zotero' ? item.sourceKey ?? null : null,
+        title: item.metadata.title,
+        authors: item.metadata.creators.map((creator) => creator.name || [creator.firstName, creator.lastName].filter(Boolean).join(' ')).filter(Boolean),
+        year: item.metadata.year ?? null,
+      });
       else setDetailId(item.id);
     });
-  }, [target?.nonce, target?.readerItemId]);
+  }, [onOpenReader, target?.nonce, target?.readerItemId]);
 
   const children = useMemo(() => collectionChildren(collections), [collections]);
   const localCollections = useMemo(() => collections.filter((entry) => entry.source === 'nodus'), [collections]);
@@ -1080,22 +1086,14 @@ function GlobalLibraryContent({
   const openReader = async (itemId: string) => {
     const item = detail?.id === itemId ? detail : await window.nodus.getGlobalLibraryItem(itemId);
     if (!item || (!item.files?.reader && !item.attachments.length)) return;
-    setReaderItem(item);
+    onOpenReader({
+      id: item.id,
+      zoteroKey: item.source === 'zotero' ? item.sourceKey ?? null : null,
+      title: item.metadata.title,
+      authors: item.metadata.creators.map((creator) => creator.name || [creator.firstName, creator.lastName].filter(Boolean).join(' ')).filter(Boolean),
+      year: item.metadata.year ?? null,
+    });
   };
-
-  if (readerItem) {
-    return <LibraryDocumentReader
-      reference={{
-        id: readerItem.id,
-        zoteroKey: readerItem.source === 'zotero' ? readerItem.sourceKey ?? null : null,
-        title: readerItem.metadata.title,
-        authors: readerItem.metadata.creators.map((creator) => creator.name || [creator.firstName, creator.lastName].filter(Boolean).join(' ')).filter(Boolean),
-        year: readerItem.metadata.year ?? null,
-      }}
-      onBack={() => setReaderItem(null)}
-      onOpenAssistant={onOpenAssistant}
-    />;
-  }
 
   if (loading && !status) return <div data-testid="global-library-view" className="library-theme-canvas flex h-full min-h-0 flex-col bg-neutral-950"><header data-testid="global-library-header" className="library-header-bar min-h-14 shrink-0 border-b border-neutral-800 px-5 py-3"><div className="library-header-title min-w-0"><h1 className="flex items-center gap-2 text-lg font-semibold"><Icon name="book" className="text-indigo-400" /> {t('Biblioteca')}</h1></div>{scopeControls}<div className="library-header-actions" /></header><div className="grid min-h-0 flex-1 place-items-center text-sm text-neutral-500"><span className="flex items-center gap-2"><Spinner /> {t('Cargando Biblioteca…')}</span></div></div>;
   if (!status?.configured) return (
@@ -1367,6 +1365,8 @@ export function GlobalLibraryView({
   const preferredScope = requestedScope ?? (settings.libraryGlobalEnabled ? settings.libraryScope : 'vault');
   const [scope, setScope] = useState<LibraryScope>(preferredScope);
   const [switching, setSwitching] = useState(false);
+  const [workspaceTabs, setWorkspaceTabs] = useState<LibraryWorkspaceTab[]>([]);
+  const [activeReaderKey, setActiveReaderKey] = useState<string | null>(null);
 
   // Contextual entries (Home health buckets and Zotero reader links) choose their
   // scope once. After arrival the user remains free to change the switcher.
@@ -1403,9 +1403,47 @@ export function GlobalLibraryView({
     />
   );
 
+  const openReaderTab = useCallback((tabScope: LibraryScope, reference: LibraryReaderReference) => {
+    const key = libraryWorkspaceTabKey(tabScope, reference);
+    setWorkspaceTabs((current) => current.some((tab) => tab.key === key)
+      ? current.map((tab) => tab.key === key ? { ...tab, reference } : tab)
+      : [...current, { key, scope: tabScope, reference }]);
+    setScope(tabScope);
+    setActiveReaderKey(key);
+  }, []);
+  const openVaultReader = useCallback((reference: LibraryReaderReference) => openReaderTab('vault', reference), [openReaderTab]);
+  const openGlobalReader = useCallback((reference: LibraryReaderReference) => openReaderTab('global', reference), [openReaderTab]);
+
+  const activateReaderTab = (key: string) => {
+    const tab = workspaceTabs.find((entry) => entry.key === key);
+    if (!tab) return;
+    setScope(tab.scope);
+    setActiveReaderKey(key);
+  };
+
+  const closeReaderTab = (key: string) => {
+    const index = workspaceTabs.findIndex((tab) => tab.key === key);
+    if (index < 0) return;
+    const remaining = workspaceTabs.filter((tab) => tab.key !== key);
+    setWorkspaceTabs(remaining);
+    if (activeReaderKey !== key) return;
+    const replacement = remaining[Math.min(index, remaining.length - 1)] ?? null;
+    setActiveReaderKey(replacement?.key ?? null);
+    if (replacement) setScope(replacement.scope);
+  };
+
+  const activeReader = workspaceTabs.find((tab) => tab.key === activeReaderKey) ?? null;
+
   return (
     <div data-testid="library-scope-shell" data-library-scope={scope} className="library-theme flex h-full min-h-0 flex-col">
-      <div className="min-h-0 flex-1 overflow-hidden">
+      <LibraryWorkspaceTabs
+        tabs={workspaceTabs}
+        activeKey={activeReaderKey}
+        onActivateLibrary={() => setActiveReaderKey(null)}
+        onActivateTab={activateReaderTab}
+        onCloseTab={closeReaderTab}
+      />
+      <div className={`min-h-0 flex-1 overflow-hidden ${activeReader ? 'hidden' : ''}`} aria-hidden={activeReader ? true : undefined}>
         {scope === 'vault' ? (
           <Library
             vaultId={vaultId}
@@ -1416,11 +1454,25 @@ export function GlobalLibraryView({
             onOpenAssistant={onOpenAssistant}
             onOpenArchive={onOpenArchive}
             scopeControls={scopeControls}
+            onOpenReader={openVaultReader}
           />
         ) : (
-          <GlobalLibraryContent target={target} onOpenSettings={onOpenSettings} onOpenAssistant={onOpenAssistant} scopeControls={scopeControls} />
+          <GlobalLibraryContent target={target} onOpenSettings={onOpenSettings} scopeControls={scopeControls} onOpenReader={openGlobalReader} />
         )}
       </div>
+      {activeReader && (
+        <div className="min-h-0 flex-1 overflow-hidden">
+          <LibraryDocumentReader
+            key={activeReader.key}
+            reference={activeReader.reference}
+            initialSource={activeReader.sourceId}
+            showLibraryBackButton={false}
+            onSourceChange={(sourceId) => setWorkspaceTabs((current) => current.map((tab) => tab.key === activeReader.key ? { ...tab, sourceId } : tab))}
+            onBack={() => setActiveReaderKey(null)}
+            onOpenAssistant={onOpenAssistant}
+          />
+        </div>
+      )}
     </div>
   );
 }

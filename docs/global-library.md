@@ -280,6 +280,17 @@ gutter, and its status badge, file list, annotation palette, and document surfac
 use explicit light and dark palettes so switching themes never leaves dark
 controls behind.
 
+After the first document opens, the unified Library adds one 36-pixel workspace
+row. **Library** remains the fixed first tab and each open document follows as a
+truncated, independently closable tab. The row scrolls horizontally instead of
+wrapping or increasing the header height; middle-click closes a document and
+the arrow keys move across the tab list. Tabs are shared by Global and This
+vault. The catalogue stays mounted behind the active reader, preserving its
+filters, selection, and scroll position. Only the active reader is rendered, so
+several open PDFs do not consume canvas and parsing work in the background.
+Each tab retains its selected source, while clean-reading position and PDF page,
+zoom, or EPUB chapter are restored per document when the user returns.
+
 Reader navigation and annotation paint never wait for backup-folder I/O. The
 file chooser owns its open state locally, the rendered Markdown tree is
 memoized, and annotation callbacks and filtered collections remain stable while

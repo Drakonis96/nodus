@@ -13,6 +13,7 @@ import type {
   ZoteroTag,
   CollectionFacet,
   WorkSortKey,
+  LibraryReaderReference,
 } from '@shared/types';
 import { Icon } from '../components/ui';
 import { confirm, toast } from '../components/feedback';
@@ -20,7 +21,6 @@ import { WorkGraphModal } from './WorkGraphModal';
 import { WorkIdeasModal } from './WorkIdeasModal';
 import { WorkStatusModal } from './WorkStatusModal';
 import { DuplicatesModal } from './DuplicatesModal';
-import { LibraryDocumentReader } from './LibraryDocumentReader';
 import { VirtualList } from '../components/VirtualList';
 import { anchorStyle, useAnchoredCoords } from '../components/dbGrid';
 import { useDataRefresh, useDismissableLayer, useScanComplete } from '../hooks';
@@ -403,6 +403,7 @@ export function Library({
   onOpenAssistant,
   onOpenArchive,
   scopeControls,
+  onOpenReader,
 }: {
   vaultId: string | null;
   /** Incoming navigation that pre-applies a filter (e.g. a corpus-health bucket). */
@@ -413,6 +414,7 @@ export function Library({
   onOpenAssistant: (target?: PendingAssistantNavigationTarget) => void;
   onOpenArchive?: () => void;
   scopeControls?: ReactNode;
+  onOpenReader: (reference: LibraryReaderReference) => void;
 }) {
   // In records vaults the Library holds SECONDARY / published sources (books,
   // published genealogies, transcribed record collections) that can also be mined
@@ -442,7 +444,6 @@ export function Library({
   const [graphWork, setGraphWork] = useState<{ nodus_id: string; title: string } | null>(null);
   const [ideasWork, setIdeasWork] = useState<{ nodus_id: string; title: string } | null>(null);
   const [statusWork, setStatusWork] = useState<WorkView | null>(null);
-  const [readerWork, setReaderWork] = useState<WorkView | null>(null);
   const [duplicatesOpen, setDuplicatesOpen] = useState(false);
   // Live scan-queue items indexed by work. The persisted *_status fields go
   // 'pending' when a job is enqueued but never say whether it is waiting in line
@@ -986,21 +987,13 @@ export function Library({
     return map;
   }, [works, embeddingStatuses, passageStatuses, queuedByWork]);
 
-  if (readerWork) {
-    return (
-      <LibraryDocumentReader
-        reference={{
-          id: readerWork.nodus_id,
-          zoteroKey: readerWork.zotero_key,
-          title: readerWork.title,
-          authors: readerWork.authors,
-          year: readerWork.year,
-        }}
-        onBack={() => setReaderWork(null)}
-        onOpenAssistant={onOpenAssistant}
-      />
-    );
-  }
+  const openReader = (work: WorkView) => onOpenReader({
+    id: work.nodus_id,
+    zoteroKey: work.zotero_key,
+    title: work.title,
+    authors: work.authors,
+    year: work.year,
+  });
 
   return (
     <div className="h-full flex flex-col p-6 min-h-0">
@@ -1569,7 +1562,7 @@ export function Library({
                 style={{ gridTemplateColumns: LIBRARY_GRID_TEMPLATE }}
                 onDoubleClick={(event) => {
                   if ((event.target as HTMLElement).closest('button, input, select, a')) return;
-                  setReaderWork(w);
+                  openReader(w);
                 }}
               >
                 <div className="p-1">
@@ -1583,7 +1576,7 @@ export function Library({
                   <button
                     className="block w-full truncate text-left hover:text-indigo-300 hover:underline"
                     title={t('Abrir lector limpio')}
-                    onClick={() => setReaderWork(w)}
+                    onClick={() => openReader(w)}
                   >
                     {w.title}
                   </button>
@@ -1623,7 +1616,7 @@ export function Library({
                       title={t('Abrir lector limpio')}
                       icon="book"
                       tone="cyan"
-                      onClick={() => setReaderWork(w)}
+                      onClick={() => openReader(w)}
                     />
                     {/* The column is nullable in SQLite despite the non-null type, and demo
                         vaults carry synthetic keys that open nothing. */}
@@ -1641,7 +1634,7 @@ export function Library({
                         {
                           label: t('Abrir lector limpio'),
                           icon: 'book',
-                          onClick: () => setReaderWork(w),
+                          onClick: () => openReader(w),
                         },
                         ...(isRecordsVault
                           ? [{

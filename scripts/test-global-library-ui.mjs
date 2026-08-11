@@ -14,7 +14,8 @@ test('the unified Library keeps the global catalogue independent and the vault c
 });
 
 test('the Library UI exposes hierarchy, search, bulk operations, imports and background state', async () => {
-  const view = `${await readSource('src/views/GlobalLibraryView.tsx')}\n${await readSource('src/components/library/LibraryItemManager.tsx')}\n${await readSource('src/components/library/LibrarySmartSearchDialog.tsx')}\n${await readSource('src/components/library/LibraryMetadataDialogs.tsx')}\n${await readSource('src/components/library/LibraryRecoveryDialogs.tsx')}`;
+  const workspaceTabs = await readSource('src/components/library/LibraryWorkspaceTabs.tsx');
+  const view = `${await readSource('src/views/GlobalLibraryView.tsx')}\n${workspaceTabs}\n${await readSource('src/components/library/LibraryItemManager.tsx')}\n${await readSource('src/components/library/LibrarySmartSearchDialog.tsx')}\n${await readSource('src/components/library/LibraryMetadataDialogs.tsx')}\n${await readSource('src/components/library/LibraryRecoveryDialogs.tsx')}`;
   const vaultLibrary = await readSource('src/views/Library.tsx');
   const appCss = await readSource('src/index.css');
   for (const marker of [
@@ -102,7 +103,17 @@ test('the Library UI exposes hierarchy, search, bulk operations, imports and bac
   assert.match(view, /LibraryDocumentReader/);
   assert.match(view, /onDoubleClick=\{\(event\) => \{ if \(\(event\.target as HTMLElement\)\.closest\('button, input, select, a'\)\) return; if \(item\.readerAvailable \|\| item\.attachmentCount\) void openReader/, 'global rows open the reader on a non-interactive double-click');
   assert.match(view, /column === 'title'[\s\S]*onDoubleClick=\{\(event\)[\s\S]*void openReader\(item\.id\)/, 'double-clicking the global title follows the same reader path');
-  assert.match(vaultLibrary, /data-testid=\{`vault-library-item-[\s\S]*onDoubleClick=\{\(event\)[\s\S]*setReaderWork\(w\)/, 'traditional vault rows expose the same double-click reader path');
+  assert.match(vaultLibrary, /data-testid=\{`vault-library-item-[\s\S]*onDoubleClick=\{\(event\)[\s\S]*openReader\(w\)/, 'traditional vault rows expose the same double-click reader path');
+  assert.match(view, /data-testid="library-workspace-tabs"/, 'open documents share one compact workspace tab strip');
+  assert.match(view, /data-testid="library-workspace-tab-library"/, 'the Library remains a fixed workspace tab');
+  assert.match(workspaceTabs, /overflow-x: auto|library-workspace-tabs-scroll/, 'document tabs use one horizontally scrollable row');
+  assert.match(workspaceTabs, /onAuxClick[\s\S]*event\.button === 1/, 'a document tab supports conventional middle-click closing');
+  assert.match(view, /workspaceTabs\.find\(\(tab\) => tab\.key === activeReaderKey\)/, 'only the active document is selected for rendering');
+  assert.match(view, /activeReader \? 'hidden' : ''/, 'the catalogue stays mounted behind the active reader');
+  assert.match(view, /initialSource=\{activeReader\.sourceId\}/, 'each open tab retains its selected file or clean version');
+  assert.match(view, /showLibraryBackButton=\{false\}/, 'the fixed Library tab replaces the duplicated reader back label');
+  assert.match(appCss, /\.library-workspace-tabs \{[\s\S]*height: 2\.25rem/, 'the workspace consumes a single low-height row');
+  assert.match(appCss, /\.light \.library-workspace-tab\.is-active[\s\S]*background: #ffffff/, 'workspace tabs have an explicit light appearance');
   assert.match(view, /className="library-theme flex/);
   assert.match(view, /className="library-theme-canvas flex/);
   assert.match(view, /className="library-theme-panel/);
@@ -157,6 +168,9 @@ test('the global reader exposes annotations, metadata, chat and native attachmen
     'every PDF page and scale owns a fresh canvas lifecycle');
   assert.match(attachmentViewer, /renderTask\?\.cancel\(\)/,
     'in-flight PDF renders are cancelled when their canvas unmounts');
+  assert.match(attachmentViewer, /attachmentSessionNumber[\s\S]*writeAttachmentSessionNumber/, 'PDF and EPUB positions survive switching document tabs');
+  assert.match(attachmentViewer, /'page', pageNumber[\s\S]*'scale', scale/, 'PDF page and zoom are restored per document attachment');
+  assert.match(attachmentViewer, /'chapter', chapterIndex/, 'EPUB chapter position is restored per document attachment');
   assert.match(attachmentViewer, /data-library-pdf-page=\{pageNumber\}/,
     'continuous mode exposes stable page targets');
   assert.match(selectionSource, /READER_HIGHLIGHTS_BY_CONTEXT/,

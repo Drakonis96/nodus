@@ -30,6 +30,23 @@ interface ViewerProps {
   onOpenExternal(): void;
 }
 
+function attachmentSessionNumber(documentId: string, attachmentId: string, field: string, fallback: number): number {
+  try {
+    const value = Number(localStorage.getItem(`nodus.libraryReader.attachment.${documentId}.${attachmentId}.${field}`));
+    return Number.isFinite(value) && value > 0 ? value : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+function writeAttachmentSessionNumber(documentId: string, attachmentId: string, field: string, value: number): void {
+  try {
+    localStorage.setItem(`nodus.libraryReader.attachment.${documentId}.${attachmentId}.${field}`, String(value));
+  } catch {
+    // Session restoration is optional and must never interrupt reading.
+  }
+}
+
 function TextSurface({
   scope, contextId, annotations, highlighterColor, onCreate, onUpdateComment, onDelete, onError, children, testId,
   findSegments, activeFindSegmentId, onActivateFindSegment,
@@ -56,16 +73,19 @@ function PdfViewer(props: ViewerProps) {
   const { attachment } = props; const scrollRef = useRef<HTMLElement | null>(null); const activeTextRef = useRef<HTMLDivElement | null>(null); const currentPageRef = useRef(1);
   const textLayersRef = useRef(new Map<number, HTMLDivElement>()); const [pdf, setPdf] = useState<PDFDocumentProxy | null>(null);
   const findSegmentsRef = useRef<{ pdf: PDFDocumentProxy; promise: Promise<FindTextSegment[]> } | null>(null);
-  const [pageNumber, setPageNumber] = useState(1); const [scale, setScale] = useState(1.25);
+  const [pageNumber, setPageNumber] = useState(() => attachmentSessionNumber(props.documentId, attachment.id, 'page', 1));
+  const [scale, setScale] = useState(() => attachmentSessionNumber(props.documentId, attachment.id, 'scale', 1.25));
   const [viewMode, setViewMode] = useState<'single' | 'continuous'>(() => localStorage.getItem('nodus.library.pdfViewMode') === 'continuous' ? 'continuous' : 'single');
   const [renderedScales, setRenderedScales] = useState<Record<number, number>>({}); const [renderRevision, setRenderRevision] = useState(0);
   const [loading, setLoading] = useState(true); const [error, setError] = useState('');
   useEffect(() => {
     if (!attachment.url) return;
     const task = getDocument({ url: attachment.url }); let current: PDFDocumentProxy | null = null; setLoading(true); setError('');
-    void task.promise.then((document) => { current = document; setPdf(document); setPageNumber(1); setRenderedScales({}); setLoading(false); }).catch((cause) => { setError(cause instanceof Error ? cause.message : String(cause)); setLoading(false); });
+    void task.promise.then((document) => { current = document; setPdf(document); setPageNumber((value) => Math.min(document.numPages, Math.max(1, value))); setRenderedScales({}); setLoading(false); }).catch((cause) => { setError(cause instanceof Error ? cause.message : String(cause)); setLoading(false); });
     return () => { void task.destroy(); void current?.destroy(); };
   }, [attachment.url]);
+  useEffect(() => { writeAttachmentSessionNumber(props.documentId, attachment.id, 'page', pageNumber); }, [attachment.id, pageNumber, props.documentId]);
+  useEffect(() => { writeAttachmentSessionNumber(props.documentId, attachment.id, 'scale', scale); }, [attachment.id, props.documentId, scale]);
   const selectTextLayer = useCallback((number: number, layer: HTMLDivElement | null) => {
     if (layer) textLayersRef.current.set(number, layer); else {
       textLayersRef.current.delete(number);
@@ -196,9 +216,12 @@ function LibraryPdfPage({ pdf, pageNumber, scale, continuous, scrollRef, props, 
 }
 
 function RichTextViewer(props: ViewerProps) {
-  const [content, setContent] = useState<LibraryReaderAttachmentContent | null>(null); const [chapterIndex, setChapterIndex] = useState(0); const [error, setError] = useState('');
+  const [content, setContent] = useState<LibraryReaderAttachmentContent | null>(null);
+  const [chapterIndex, setChapterIndex] = useState(() => attachmentSessionNumber(props.documentId, props.attachment.id, 'chapter', 0));
+  const [error, setError] = useState('');
   useEffect(() => { let live = true; setError(''); setContent(null); void window.nodus.getLibraryReaderAttachmentContent(props.documentId, props.attachment.id)
-    .then((value) => { if (live) setContent(value); }).catch((cause) => { if (live) setError(cause instanceof Error ? cause.message : String(cause)); }); return () => { live = false; }; }, [props.attachment.id, props.documentId]);
+    .then((value) => { if (live) { setContent(value); if (value?.viewer === 'epub') setChapterIndex((index) => Math.min(Math.max(0, value.chapters.length - 1), index)); } }).catch((cause) => { if (live) setError(cause instanceof Error ? cause.message : String(cause)); }); return () => { live = false; }; }, [props.attachment.id, props.documentId]);
+  useEffect(() => { writeAttachmentSessionNumber(props.documentId, props.attachment.id, 'chapter', chapterIndex); }, [chapterIndex, props.attachment.id, props.documentId]);
   const findSegments = useMemo<FindTextSegment[]>(() => {
     if (!content) return [];
     return content.viewer === 'epub'
@@ -251,8 +274,8 @@ function ExternalViewer({ props }: { props: ViewerProps }) {
 
 export function LibraryAttachmentViewer(props: ViewerProps) {
   if (!props.attachment.available) return <UnavailableTextViewer message={t('El archivo no está disponible en este dispositivo.')} />;
-  if (props.attachment.viewer === 'pdf') return <PdfViewer {...props} />;
-  if (props.attachment.viewer === 'epub' || props.attachment.viewer === 'html' || props.attachment.viewer === 'text') return <RichTextViewer {...props} />;
+  if (props.attachment.viewer === 'pdf') return <PdfViewer key={`${props.documentId}:${props.attachment.id}`} {...props} />;
+  if (props.attachment.viewer === 'epub' || props.attachment.viewer === 'html' || props.attachment.viewer === 'text') return <RichTextViewer key={`${props.documentId}:${props.attachment.id}`} {...props} />;
   if (props.attachment.viewer === 'image') return <ImageViewer {...props} />;
   return <ExternalViewer props={props} />;
 }

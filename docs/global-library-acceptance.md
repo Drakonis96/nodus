@@ -87,6 +87,8 @@ button exists.
 | Reader | Markdown, images, and tables render | Verified | `e2e-library-reader` |
 | Reader | Read actions and row double-clicks ask between clean Markdown and the preserved original; the user can remember or reset the choice, while the source chooser still reaches every attachment | Verified | `test-global-library-ui`, `e2e-library-reader` |
 | Reader | The file chooser remains immediately interactive on long documents, closes after a source is selected, and does not rebuild the Markdown tree | Verified | `e2e-library-reader` |
+| Reader workspace | Global and This vault share one fixed Library tab plus multiple closable document tabs in a single 36-pixel horizontally scrolling row | Verified | `test-global-library-ui`, `e2e-library-reader` |
+| Reader workspace | Switching documents keeps the catalogue mounted, renders only the active reader, and restores source plus clean/PDF/EPUB reading state | Verified | `test-global-library-ui`, `e2e-library-reader` |
 | Library UI | The toolbar uses progressive Add, Zotero sync, and overflow actions; each selected item exposes one state-derived primary action | Verified | `test-global-library-ui`, `e2e-global-library` |
 | Library UI | Clean-version rebuilding is a collapsed technical action and explicitly excludes vault analysis | Verified | `test-global-library-ui`, `e2e-global-library` |
 | Reader | PDF, EPUB, HTML/text, DOCX/OpenDocument/PowerPoint, spreadsheets, and images have safe internal viewers; legacy binaries expose an explicit external fallback | Verified | `test-global-library-reader`, `e2e-library-reader` |
@@ -100,7 +102,7 @@ button exists.
 | Reader | Paged viewers use balanced icon-only navigation controls | Verified | `test-global-library-ui`, `e2e-library-reader` |
 | Reader | The right rail and chat composer remain reachable after resizing and notifications never cover them | Verified | `e2e-library-reader` |
 | Reader | The bookmark icon exposes marking and return actions | Verified | `test-global-library-ui`, `e2e-library-reader` |
-| Reader | Inactive document tabs are icons and the active tab shows its label | Verified | `test-global-library-ui`, `e2e-library-reader` |
+| Reader | Inactive right-sidebar tabs are icons and the active tab shows its label | Verified | `test-global-library-ui`, `e2e-library-reader` |
 | Reader | Annotations reanchor to the exact content fingerprint or remain in an orphan inbox | Verified | `test-library-revisions`, `e2e-library-reader` |
 | Reader | The Info tab exposes clean-content and extraction provenance | Verified | `test-global-library-reader`, `e2e-library-reader` |
 | Chat | The shared engine and model receive document context | Verified | `test-global-library-ui`, `test-global-library-reader` |

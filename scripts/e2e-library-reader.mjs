@@ -3,7 +3,7 @@
 // a Zotero import without touching a user's documents.
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { cp, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import os from 'node:os';
 import path from 'node:path';
@@ -19,6 +19,7 @@ const backupRoot = path.join(testRoot, 'backups');
 const screenshotDirectory = path.join(repoRoot, 'output', 'library-reader-e2e');
 const formatDialogDarkScreenshotPath = path.join(screenshotDirectory, '00-reader-format-choice-dark.png');
 const formatDialogLightScreenshotPath = path.join(screenshotDirectory, '00b-reader-format-choice-light.png');
+const workspaceTabsScreenshotPath = path.join(screenshotDirectory, '00c-library-document-tabs-dark.png');
 const screenshotPath = path.join(screenshotDirectory, '01-clean-reader-chat-dark.png');
 const originalScreenshotPath = path.join(screenshotDirectory, '02-original-page-preview.png');
 const pdfScreenshotPath = path.join(screenshotDirectory, '03-pdf-reader.png');
@@ -227,6 +228,21 @@ ${longReaderBody}
     ],
   }, null, 2)}\n`, 'utf8');
 
+  const secondStorageId = 'READER02';
+  const secondGlobalItemId = `zotero:${secondStorageId}`;
+  const secondTitle = `${work.title} — Segunda lectura`;
+  const secondDocumentFolder = path.join(backupRoot, 'nodus-library', secondStorageId);
+  await cp(documentFolder, secondDocumentFolder, { recursive: true });
+  const secondMetadata = JSON.parse(await readFile(path.join(secondDocumentFolder, 'metadata.json'), 'utf8'));
+  secondMetadata.id = secondGlobalItemId;
+  secondMetadata.storageId = secondStorageId;
+  secondMetadata.sourceKey = secondStorageId;
+  secondMetadata.citationKey = 'readerFixtureSecond2026';
+  secondMetadata.metadata.title = secondTitle;
+  secondMetadata.clock.revision += 1;
+  secondMetadata.clock.updatedAt = new Date().toISOString();
+  await writeFile(path.join(secondDocumentFolder, 'metadata.json'), `${JSON.stringify(secondMetadata, null, 2)}\n`, 'utf8');
+
   await page.evaluate(() => window.nodus.rebuildGlobalLibrary());
 
   await page.reload();
@@ -239,8 +255,9 @@ ${longReaderBody}
   }
 
   const globalPage = await page.evaluate(() => window.nodus.listGlobalLibraryItems({ limit: 10, offset: 0 }));
-  assert.equal(globalPage.total, 1, `expected the isolated global reader fixture; catalog contained ${JSON.stringify(globalPage.items)}`);
-  assert.equal(globalPage.items[0]?.id, globalItemId);
+  assert.equal(globalPage.total, 2, `expected the two isolated global reader fixtures; catalog contained ${JSON.stringify(globalPage.items)}`);
+  assert.ok(globalPage.items.some((item) => item.id === globalItemId));
+  assert.ok(globalPage.items.some((item) => item.id === secondGlobalItemId));
 
   await page.locator('[data-tour="nav-library"]').click();
   await page.getByTestId('library-scope-global').click();
@@ -261,11 +278,28 @@ ${longReaderBody}
   await documentRoot.waitFor({ state: 'visible' });
   assert.match(await page.getByTestId('library-reader-freshness').innerText(), /Markdown limpio/);
 
-  await page.getByTestId('library-scope-shell').getByRole('button', { name: 'Biblioteca', exact: true }).click();
+  await page.getByTestId(`library-workspace-close-${globalItemId}`).click();
   await globalRow.waitFor({ state: 'visible' });
   await globalRow.getByRole('button').dblclick();
   await documentRoot.waitFor({ state: 'visible' });
   assert.equal(await page.getByTestId('library-reader-format-dialog').count(), 0, 'double-click uses the remembered opening format without asking again');
+
+  await page.getByTestId('library-workspace-tab-library').click();
+  const secondRow = page.getByTestId(`global-library-item-${secondGlobalItemId}`);
+  await secondRow.waitFor({ state: 'visible' });
+  await secondRow.dblclick();
+  await page.getByTestId(`library-workspace-tab-document-${secondGlobalItemId}`).waitFor({ state: 'visible' });
+  assert.equal(await page.locator('[data-testid^="library-workspace-tab-document-"]').count(), 2, 'two documents remain open in the compact Library workspace');
+  const workspaceStripBox = await page.getByTestId('library-workspace-tabs').boundingBox();
+  assert.ok(workspaceStripBox && workspaceStripBox.height <= 38, `document tabs use one low-height row (${workspaceStripBox?.height}px)`);
+  await page.screenshot({ path: workspaceTabsScreenshotPath, fullPage: true });
+  await page.getByTestId(`library-workspace-tab-document-${globalItemId}`).click();
+  await page.locator('.library-document-reader > header h1').filter({ hasText: work.title }).waitFor({ state: 'visible' });
+  await page.getByTestId(`library-workspace-tab-document-${secondGlobalItemId}`).click();
+  await page.locator('.library-document-reader > header h1').filter({ hasText: secondTitle }).waitFor({ state: 'visible' });
+  await page.getByTestId(`library-workspace-close-${secondGlobalItemId}`).click();
+  await page.getByTestId(`library-workspace-tab-document-${globalItemId}`).waitFor({ state: 'visible' });
+  assert.equal(await page.locator('[data-testid^="library-workspace-tab-document-"]').count(), 1, 'closing one document leaves the other reader tab intact');
 
   assert.match(await documentRoot.innerText(), /Texto introductorio/);
   assert.equal(await documentRoot.locator('img').count(), 1, 'local extracted images render inside the clean document');
@@ -405,7 +439,7 @@ ${longReaderBody}
   assert.equal(await sidebarToggle.getAttribute('aria-expanded'), 'false');
   await sidebarToggle.click();
   await page.getByTestId('library-reader-sidebar').waitFor({ state: 'visible' });
-  await page.getByText(work.zotero_key, { exact: true }).waitFor();
+  await page.getByTestId('library-reader-layout').getByText(work.zotero_key, { exact: true }).waitFor();
   await page.getByRole('button', { name: 'Preguntar al chat' }).waitFor();
 
   await page.getByRole('button', { name: 'Ver página 1' }).click();
@@ -720,7 +754,7 @@ ${longReaderBody}
   await page.keyboard.press('Escape');
   await page.screenshot({ path: spreadsheetScreenshotPath, fullPage: true });
 
-  await page.getByTestId('library-scope-shell').getByRole('button', { name: 'Biblioteca', exact: true }).click();
+  await page.getByTestId(`library-workspace-close-${globalItemId}`).click();
   await globalRow.waitFor({ state: 'visible' });
   await globalRow.getByRole('button').click();
   const detail = page.getByTestId('global-library-detail'); await detail.waitFor({ state: 'visible' });
