@@ -182,6 +182,12 @@ specified operation:
   the user's request are sent.The provider, model and account is chosen by the user. Local models do
   not make that submission.
 - **Zotero:** consults libraries and files authorized by the user.
+- **Nodus Connector for Chrome:** after the user clicks its toolbar icon, the extension reads only
+  the active tab's bibliographic metadata and document links. The user reviews the detected item
+  type, collection, tags, snapshot and files before saving them over an authenticated loopback
+  connection to the local desktop app. The pairing secret remains in Chrome local extension
+  storage. Optional per-site permission is requested only when Chrome must use the current browser
+  session to retrieve a selected attachment. The extension contains no telemetry or remote code.
 - **Crossref, Open Library, NCBI and arXiv:** when the user requests bibliographic metadata, Nodus
   sends only the DOI, ISBN, ISSN, PMID, PMCID or arXiv identifier selected for that lookup. Bulk
   requests are rate-limited and cancelable. Candidates are shown for review and are not applied

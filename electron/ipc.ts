@@ -307,7 +307,7 @@ export function registerIpc(
   startReplicaSync();
     if (settings.mcpEnabled) void startMcpServer().then(() => startMcpTunnelIfConfigured());
     if (settings.copilotEnabled) void startCopilotServer();
-    if (settings.zoteroPluginEnabled) void startZoteroPluginServer();
+    if (settings.zoteroPluginEnabled || settings.browserConnectorEnabled) void startZoteroPluginServer();
 
     const activeVault = withVaultKeyProviders(getActiveVault());
     emitVaultChanged();
@@ -385,9 +385,11 @@ export function registerIpc(
     if (
       patch.zoteroPluginEnabled !== undefined ||
       patch.zoteroPluginPort !== undefined ||
-      patch.zoteroPluginToken !== undefined
+      patch.zoteroPluginToken !== undefined ||
+      patch.browserConnectorEnabled !== undefined ||
+      patch.browserConnectorToken !== undefined
     ) {
-      if (next.zoteroPluginEnabled) await restartZoteroPluginServer();
+      if (next.zoteroPluginEnabled || next.browserConnectorEnabled) await restartZoteroPluginServer();
       else await stopZoteroPluginServer();
     }
     if (patch.mascotEnabled !== undefined || patch.mascotAlwaysOnTop !== undefined) {

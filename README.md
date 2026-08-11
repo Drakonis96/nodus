@@ -71,6 +71,11 @@ Download the installer for your computer and open it. There is no server to conf
 
 The standalone Zotero plugin is available from the same release as [nodus-zotero.xpi](https://github.com/Drakonis96/nodus/releases/latest/download/nodus-zotero.xpi). In Zotero, open **Tools → Add-ons**, choose **Install Add-on From File**, and select the downloaded file.
 
+The optional [Nodus Connector for Chrome](browser-extension/README.md) captures the open academic
+page or document into the local Library. It detects embedded bibliographic metadata, DOI/ISBN and
+available files, then lets the user choose a nested Nodus collection and existing or new tags before
+saving. It reads the active tab only after its toolbar icon is clicked.
+
 The [latest release page](https://github.com/Drakonis96/nodus/releases/latest) always contains the newest available installers and release notes.
 
 ## One app, five working vaults

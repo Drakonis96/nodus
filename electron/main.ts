@@ -902,7 +902,7 @@ app.whenReady().then(async () => {
   void startLocalServerIfEnabled();
   if (settings.localServerKeepAwake) holdAwake();
   if (settings.copilotEnabled) void startCopilotServer();
-  if (settings.zoteroPluginEnabled) void startZoteroPluginServer();
+  if (settings.zoteroPluginEnabled || settings.browserConnectorEnabled) void startZoteroPluginServer();
   // Nodi mascot: open the always-on-top desktop window when the user has opted into it.
   seedWelcomeNotification();
   startStudyCalendarReminders();

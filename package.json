@@ -20,6 +20,7 @@
     "test:e2e:deep-research-annotations": "npm run build && node scripts/e2e-deep-research-annotations.mjs",
     "test:e2e:library-reader": "npm run build && node scripts/e2e-library-reader.mjs",
     "test:e2e:global-library": "npm run build && node scripts/e2e-global-library.mjs",
+    "test:e2e:browser-connector": "node scripts/e2e-browser-connector.mjs",
     "test:e2e:local-server": "node scripts/e2e-local-server.mjs",
     "test:e2e:prosopography": "node scripts/test-prosopography-e2e.mjs",
     "test:e2e:testimony": "npm run build && node scripts/e2e-testimony.mjs",
@@ -28,6 +29,7 @@
     "verify:deep-research-queue": "npm run build && node scripts/verify-deep-research-mcp-queue.mjs",
     "verify:vector-scan": "ELECTRON_RUN_AS_NODE=1 ./node_modules/.bin/electron scripts/verify-vector-scan.mjs",
     "verify:library-metadata-live": "node scripts/verify-library-metadata-live.mjs",
+    "verify:browser-connector": "node scripts/verify-browser-connector-server.mjs",
     "verify:study-whisper": "node scripts/verify-study-whisper.mjs",
     "verify:study-improve-local": "node scripts/verify-study-improve-local.mjs",
     "verify:database-records": "node scripts/verify-database-records.mjs",
@@ -45,6 +47,7 @@
     "licenses:verify": "npm run licenses:generate && node scripts/verify-license-compliance.mjs",
     "privacy:verify": "node --test scripts/test-privacy-compliance.mjs",
     "zotero:xpi": "node scripts/build-zotero-xpi.mjs",
+    "browser:zip": "node scripts/build-browser-extension.mjs",
     "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p electron/tsconfig.json",
     "lint": "eslint . --ext .ts,.tsx",
     "icons": "node scripts/generate-icons.mjs",
@@ -182,6 +185,10 @@
         "to": "zotero/nodus-zotero.xpi"
       },
       {
+        "from": "dist-browser/nodus-connector-chrome.zip",
+        "to": "browser/nodus-connector-chrome.zip"
+      },
+      {
         "from": "server",
         "to": "nodus-server",
         "filter": [
@@ -196,6 +203,7 @@
       "dist/**/*",
       "dist-electron/**/*",
       "word-addin/**/*",
+      "browser-extension/**/*",
       "zotero-plugin/**/*",
       "electron/assets/**/*",
       "scripts/nodus_copilot.py"

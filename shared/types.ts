@@ -1669,6 +1669,10 @@ export interface AppSettings {
   zoteroPluginPort: number;
   /** Bearer token for the Zotero-plugin API. Intentionally visible in Settings. */
   zoteroPluginToken: string;
+  /** Opt-in Chrome/Chromium connector that captures the active page into the global library. */
+  browserConnectorEnabled: boolean;
+  /** Separate bearer token issued only after the user approves the browser extension pairing. */
+  browserConnectorToken: string;
   /**
    * User-defined order of the sidebar sections, as stable view/action ids. Excludes
    * 'home' (always pinned first) and 'settings' (always pinned last). Empty means
@@ -4162,6 +4166,14 @@ export interface ZoteroInstallResult {
 
 /** Result of saving the packaged .xpi to disk for manual installation. */
 export interface ZoteroExportResult {
+  ok: boolean;
+  path: string | null;
+  canceled: boolean;
+  message?: string;
+}
+
+/** Result of saving the packaged Chrome connector for manual installation. */
+export interface BrowserConnectorExportResult {
   ok: boolean;
   path: string | null;
   canceled: boolean;

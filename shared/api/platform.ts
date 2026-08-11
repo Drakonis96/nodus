@@ -13,6 +13,7 @@ import type {
   AudioProvider,
   AudioSegment,
   AudioSegmentRequest,
+  BrowserConnectorExportResult,
   ChatGptSubscriptionLogin,
   ChatGptSubscriptionStatus,
   ContentTranslation,
@@ -114,6 +115,10 @@ export interface PlatformApi {
   installZoteroPlugin(): Promise<ZoteroInstallResult>;
   /** Save the packaged .xpi to a chosen location for manual installation. */
   downloadZoteroPluginXpi(): Promise<ZoteroExportResult>;
+  /** Save the Chrome Web Store-ready connector ZIP to a chosen location. */
+  downloadBrowserConnectorZip(): Promise<BrowserConnectorExportResult>;
+  /** Revoke every browser pairing without exposing the replacement secret. */
+  regenerateBrowserConnectorToken(): Promise<void>;
   /** Generate + trust a localhost TLS cert for the copilot server (idempotent). */
   ensureCopilotCert(): Promise<{ ok: boolean; message: string }>;
   /** Copy a port-aware Nodus Copilot manifest into Word's local add-in catalog. */

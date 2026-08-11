@@ -190,6 +190,8 @@ const DEFAULTS: Omit<AppSettings, 'providerKeys' | 'lockedProviderKeys'> = {
   zoteroPluginEnabled: false,
   zoteroPluginPort: 4321,
   zoteroPluginToken: '',
+  browserConnectorEnabled: false,
+  browserConnectorToken: '',
   sidebarOrder: [],
   sidebarHidden: [],
   sidebarCustomized: false,

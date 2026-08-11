@@ -3,6 +3,7 @@ tmp/
 dist/
 dist-electron/
 dist-zotero/
+dist-browser/
 release/
 *.log
 .DS_Store
