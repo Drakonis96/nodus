@@ -5,10 +5,11 @@ import test from 'node:test';
 import { assertChannelsWired, readSource } from './ipc-channel-census.mjs';
 
 test('the single Library screen owns explicit global and vault scopes', async () => {
-  const [types, navigation, view, registry] = await Promise.all([
+  const [types, navigation, view, library, registry] = await Promise.all([
     readSource('shared/libraryTypes.ts'),
     readSource('src/navigation.ts'),
     readSource('src/views/GlobalLibraryView.tsx'),
+    readSource('src/views/Library.tsx'),
     readSource('src/app/views/corpus.tsx'),
   ]);
   assert.match(types, /export type LibraryScope = 'global' \| 'vault'/);
@@ -18,6 +19,8 @@ test('the single Library screen owns explicit global and vault scopes', async ()
   assert.match(view, /data-testid="library-scope-global"/);
   assert.match(view, /data-scope-placement="content-header"/);
   assert.match(view, /scopeControls=\{scopeControls\}/, 'both library scopes receive the compact switcher in their own header');
+  assert.match(library, /library-vault-header[^\n]+min-h-14[^\n]+items-center[^\n]+border-b[^\n]+px-5 py-3/, 'This vault uses the same header geometry as Global');
+  assert.match(library, /<Icon name="book" className="text-indigo-400" \/> \{t\('Biblioteca'\)\}/, 'This vault uses the same Library title treatment as Global');
   assert.doesNotMatch(view, /className="library-theme-bar[^\"]*min-h-12/, 'scope selection must not consume a separate full-width row');
   assert.match(view, /<Library[\s\S]*target=\{target\}/, 'the vault scope renders the complete traditional Library');
   assert.match(registry, /activeVault[\s\S]*setCollectionsOpen[\s\S]*GlobalLibraryView/);

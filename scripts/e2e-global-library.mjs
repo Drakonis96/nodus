@@ -132,11 +132,14 @@ try {
       inHeader: header.contains(switcher),
       switcherWidth: switcherRect.width,
       shellWidth: shellRect.width,
+      headerHeight: headerRect.height,
+      fullWidth: Math.abs(headerRect.left - shellRect.left) < 0.5 && Math.abs(headerRect.right - shellRect.right) < 0.5,
       aligned: switcherRect.top >= headerRect.top && switcherRect.bottom <= headerRect.bottom,
     };
   });
   assert.equal(vaultScopeLayout.inHeader, true, 'This vault keeps scope controls inside its content header');
   assert.equal(vaultScopeLayout.aligned, true, 'This vault scope controls align with the header actions');
+  assert.equal(vaultScopeLayout.fullWidth, true, 'This vault header spans the same full content width as Global');
   assert.ok(vaultScopeLayout.switcherWidth < Math.min(300, vaultScopeLayout.shellWidth * 0.4), `scope controls remain compact (${JSON.stringify(vaultScopeLayout)})`);
   const vaultScopeTooltip = page.getByTestId('library-scope-vault-tooltip');
   assert.equal(await vaultScopeTooltip.isVisible(), false, 'scope help is not persistent');
@@ -156,13 +159,19 @@ try {
     const shell = document.querySelector('[data-testid="library-scope-shell"]');
     if (!(switcher instanceof HTMLElement) || !(header instanceof HTMLElement) || !(shell instanceof HTMLElement)) throw new Error('Global scope layout not found');
     const switcherRect = switcher.getBoundingClientRect();
+    const headerRect = header.getBoundingClientRect();
+    const shellRect = shell.getBoundingClientRect();
     return {
       inHeader: header.contains(switcher),
       switcherWidth: switcherRect.width,
-      shellWidth: shell.getBoundingClientRect().width,
+      shellWidth: shellRect.width,
+      headerHeight: headerRect.height,
+      fullWidth: Math.abs(headerRect.left - shellRect.left) < 0.5 && Math.abs(headerRect.right - shellRect.right) < 0.5,
     };
   });
   assert.equal(globalScopeLayout.inHeader, true, 'Global keeps scope controls inside its content header');
+  assert.equal(globalScopeLayout.fullWidth, true, 'Global header spans the full content width');
+  assert.ok(Math.abs(globalScopeLayout.headerHeight - vaultScopeLayout.headerHeight) < 0.5, `Global and This-vault headers share a height (${globalScopeLayout.headerHeight}px / ${vaultScopeLayout.headerHeight}px)`);
   assert.ok(globalScopeLayout.switcherWidth < Math.min(300, globalScopeLayout.shellWidth * 0.4), `Global scope controls remain compact (${JSON.stringify(globalScopeLayout)})`);
   const globalScopeTooltip = page.getByTestId('library-scope-global-tooltip');
   assert.equal(await globalScopeTooltip.isVisible(), false, 'Global help is not persistent');

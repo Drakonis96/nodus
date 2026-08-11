@@ -1004,10 +1004,10 @@ export function Library({
 
   return (
     <div className="h-full flex flex-col p-6 min-h-0">
-      <div data-testid="library-vault-header" className="mb-4 flex flex-wrap items-start gap-3">
-        <div>
-          <h1 className="text-xl font-semibold">{t('Biblioteca')}</h1>
-          <p className="text-sm text-neutral-500 mt-1">{tx('{n} obras visibles', { n: totalWorks })}</p>
+      <header data-testid="library-vault-header" className="-mx-6 -mt-6 mb-4 flex min-h-14 shrink-0 flex-wrap items-center gap-3 border-b border-neutral-800 px-5 py-3">
+        <div className="min-w-0">
+          <h1 className="flex items-center gap-2 text-lg font-semibold"><Icon name="book" className="text-indigo-400" /> {t('Biblioteca')}</h1>
+          <p className="text-[11px] text-neutral-500">{tx('{n} obras visibles', { n: totalWorks })}</p>
         </div>
         {scopeControls}
         <div className="flex-1" />
@@ -1021,7 +1021,7 @@ export function Library({
         <button className="btn btn-ghost border border-neutral-700" onClick={onOpenCollections}>
           <Icon name="folder" /> {t('Colecciones de Zotero')}
         </button>
-      </div>
+      </header>
 
       <div className="card p-3 mb-3">
         <div className="flex flex-wrap gap-2 items-center">
