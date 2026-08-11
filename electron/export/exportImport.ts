@@ -10,6 +10,8 @@ import { closeDb, getDb, replaceDbFile, SCHEMA_VERSION } from '../db/database';
 import { testimonyBackupInventory } from './testimonyExport';
 import { getSettings } from '../db/settingsRepo';
 import { listVaults, getActiveVault, restoreVaultDatabase, setActiveVault } from '../vaults/vaultRegistry';
+import { closeGlobalLibraryRuntime } from '../library/libraryRuntime';
+import { configuredLibraryRoot } from '../library/libraryPaths';
 import type { VaultType } from '@shared/types';
 import { getApiKey, getAudioKey, getBackupPassword, setApiKey, setAudioKey } from '../secrets/secretStore';
 import {
@@ -71,6 +73,8 @@ interface PayloadManifest {
   vaults?: BackupVaultEntry[];
   /** v5 only: user-selected scope. Omitted means the historical all-data scope. */
   selection?: BackupSelection;
+  /** v4.0 desktop: canonical cross-vault Library files under `global-library/`. */
+  globalLibrary?: { prefix: 'global-library'; fileCount: number };
 }
 
 interface EmbeddingInventory {
@@ -187,6 +191,38 @@ async function addDirectoryIfPresent(files: Record<string, Buffer>, archivePrefi
   }
 }
 
+async function addGlobalLibraryFiles(files: Record<string, Buffer>): Promise<number> {
+  const root = configuredLibraryRoot();
+  if (!root) return 0;
+  const before = Object.keys(files).length;
+  const visit = async (directory: string): Promise<void> => {
+    let entries: fs.Dirent[];
+    try {
+      entries = await fs.promises.readdir(directory, { withFileTypes: true });
+    } catch {
+      return;
+    }
+    for (const entry of entries) {
+      if (entry.isSymbolicLink()) continue;
+      const source = path.join(directory, entry.name);
+      const relative = path.relative(root, source);
+      // A pre-v4 snapshot is already a complete copy of this Library. Including it
+      // inside every scheduled backup would recursively multiply the same originals.
+      if (relative === path.join('.nodus', 'recovery', 'pre-v4')
+        || relative.startsWith(`${path.join('.nodus', 'recovery', 'pre-v4')}${path.sep}`)
+        || relative === path.join('.nodus', 'recovery', 'restores')
+        || relative.startsWith(`${path.join('.nodus', 'recovery', 'restores')}${path.sep}`)) continue;
+      if (entry.isDirectory()) {
+        await visit(source);
+      } else if (entry.isFile() && !entry.name.includes('.tmp-') && !entry.name.includes('.restore-')) {
+        await addFileIfPresent(files, `global-library/${relative.split(path.sep).join('/')}`, source);
+      }
+    }
+  };
+  await visit(root);
+  return Object.keys(files).length - before;
+}
+
 async function addAuxiliaryFiles(
   files: Record<string, Buffer>,
   vaults: ReturnType<typeof listVaults>,
@@ -263,6 +299,7 @@ export async function createBackupArchive(options: {
   }
   files['registry.json'] = Buffer.from(JSON.stringify({ activeVaultId, vaults: vaultEntries }, null, 2));
   await addAuxiliaryFiles(files, vaults, selection);
+  const globalLibraryFileCount = await addGlobalLibraryFiles(files);
   if (includesSecrets) {
     files['api-keys.json'] = Buffer.from(JSON.stringify(apiKeys, null, 2));
     if (Object.keys(audioKeys).length > 0) {
@@ -284,6 +321,9 @@ export async function createBackupArchive(options: {
     activeVaultId,
     vaults: vaultEntries,
     selection,
+    globalLibrary: globalLibraryFileCount > 0
+      ? { prefix: 'global-library', fileCount: globalLibraryFileCount }
+      : undefined,
     files: fileDigests,
   };
   files['payload-manifest.json'] = Buffer.from(JSON.stringify(payloadManifest, null, 2));
@@ -530,6 +570,13 @@ export function verifyBackupArchive(archive: Buffer, password: string): { ok: bo
     const entry = opened.payload.getEntry(vault.dbFile);
     if (!entry) return { ok: false, message: `La copia verificada no contiene la bóveda «${vault.name}».` };
   }
+  if (opened.payloadManifest.globalLibrary) {
+    const prefix = `${opened.payloadManifest.globalLibrary.prefix}/`;
+    const entries = opened.payload.getEntries().filter((entry) => !entry.isDirectory && entry.entryName.startsWith(prefix));
+    if (entries.length !== opened.payloadManifest.globalLibrary.fileCount) {
+      return { ok: false, message: 'La copia verificada no contiene todos los archivos de la Biblioteca global.' };
+    }
+  }
   return { ok: true, message: `Copia verificada: ${opened.payloadManifest.vaults.length} bóveda(s) descifrables.` };
 }
 
@@ -544,9 +591,25 @@ export function restoreBackupArchive(archive: Buffer, password: string): BackupR
 
   // v4 = multi-vault archive: restore every vault (all types), keyed by its id.
   if (manifest.formatVersion >= 4) {
-    const result = restoreAllVaults(payload, payloadManifest);
-    if (!result.ok) return result;
-    if (manifest.formatVersion >= 5) restoreAuxiliaryFiles(payload, payloadManifest);
+    let stagedLibrary: StagedGlobalLibrary | null;
+    try {
+      stagedLibrary = stageGlobalLibraryRestore(payload, payloadManifest);
+    } catch (error) {
+      return { ok: false, message: error instanceof Error ? error.message : String(error) };
+    }
+    let result: { ok: true; restored: number } | { ok: false; message: string };
+    try {
+      result = restoreAllVaults(payload, payloadManifest);
+      if (!result.ok) {
+        cleanupStagedGlobalLibrary(stagedLibrary);
+        return result;
+      }
+      if (manifest.formatVersion >= 5) restoreAuxiliaryFiles(payload, payloadManifest);
+      applyStagedGlobalLibrary(stagedLibrary);
+    } catch (error) {
+      cleanupStagedGlobalLibrary(stagedLibrary);
+      return { ok: false, message: `No se pudo completar la restauración: ${error instanceof Error ? error.message : String(error)}` };
+    }
     if (includesSecrets) {
       restoreApiKeys(importedKeys);
       restoreAudioKeys(importedAudioKeys);
@@ -622,6 +685,71 @@ export function restoreBackupArchive(archive: Buffer, password: string): BackupR
       ? 'Importación completa: biblioteca, texto extraído, embeddings, pasajes, modelos, grafo y claves API restaurados.'
       : 'Importación completa: biblioteca, texto extraído, embeddings, pasajes, modelos y grafo restaurados. Las claves API locales se han conservado (la copia automática no las incluye).',
   };
+}
+
+interface StagedGlobalLibrary {
+  root: string;
+  staging: string;
+}
+
+function stageGlobalLibraryRestore(payload: AdmZip, payloadManifest: PayloadManifest): StagedGlobalLibrary | null {
+  const descriptor = payloadManifest.globalLibrary;
+  if (!descriptor) return null; // v3.x and early multi-vault archives remain compatible.
+  const root = configuredLibraryRoot();
+  if (!root) throw new Error('Configura una carpeta de copias antes de restaurar una copia que contiene la Biblioteca global.');
+  const parent = path.dirname(root);
+  fs.mkdirSync(parent, { recursive: true });
+  const staging = path.join(parent, `.nodus-library-restore-${process.pid}-${Math.random().toString(36).slice(2)}`);
+  fs.mkdirSync(staging, { recursive: false });
+  let written = 0;
+  try {
+    const prefix = `${descriptor.prefix}/`;
+    for (const entry of payload.getEntries()) {
+      if (entry.isDirectory || !entry.entryName.startsWith(prefix)) continue;
+      const relative = safeArchiveRelative(entry.entryName.slice(prefix.length));
+      if (!relative) throw new Error(`La copia contiene una ruta de Biblioteca no válida: ${entry.entryName}`);
+      const target = path.resolve(staging, ...relative.split('/'));
+      if (!target.startsWith(`${path.resolve(staging)}${path.sep}`)) throw new Error('La copia intenta escribir fuera de la Biblioteca.');
+      writeAtomicFile(target, entry.getData());
+      written += 1;
+    }
+    if (written !== descriptor.fileCount) throw new Error('La copia no contiene todos los archivos declarados de la Biblioteca global.');
+    return { root, staging };
+  } catch (error) {
+    fs.rmSync(staging, { recursive: true, force: true });
+    throw error;
+  }
+}
+
+function cleanupStagedGlobalLibrary(staged: StagedGlobalLibrary | null): void {
+  if (staged) fs.rmSync(staged.staging, { recursive: true, force: true });
+}
+
+function applyStagedGlobalLibrary(staged: StagedGlobalLibrary | null): void {
+  if (!staged) return;
+  closeGlobalLibraryRuntime();
+  const displaced = `${staged.root}.before-restore-${process.pid}-${Math.random().toString(36).slice(2)}`;
+  try {
+    if (fs.existsSync(staged.root)) fs.renameSync(staged.root, displaced);
+    fs.renameSync(staged.staging, staged.root);
+    // These local recovery packages are deliberately not embedded in ordinary
+    // archives. Carry them across the atomic swap or a successful restore would erase
+    // the one downgrade/recovery path that the backup intentionally omitted.
+    for (const name of ['pre-v4', 'restores']) {
+      const preserved = path.join(displaced, '.nodus', 'recovery', name);
+      const target = path.join(staged.root, '.nodus', 'recovery', name);
+      if (!fs.existsSync(preserved) || fs.existsSync(target)) continue;
+      fs.mkdirSync(path.dirname(target), { recursive: true });
+      fs.renameSync(preserved, target);
+    }
+    // The caller's encrypted safety archive is the durable rollback. This sibling is
+    // only the atomic-swap guard and is removed after the replacement has landed.
+    fs.rmSync(displaced, { recursive: true, force: true });
+  } catch (error) {
+    if (fs.existsSync(staged.staging)) fs.rmSync(staged.staging, { recursive: true, force: true });
+    if (fs.existsSync(displaced) && !fs.existsSync(staged.root)) fs.renameSync(displaced, staged.root);
+    throw error;
+  }
 }
 
 /**

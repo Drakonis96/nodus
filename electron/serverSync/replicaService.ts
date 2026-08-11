@@ -14,6 +14,11 @@ import { stripUnpublishableColumns, type SnapshotAssetRef } from './serverSnapsh
 import {
   countOutbox, ensureOutboxTriggers, listPendingOutbox, markOutboxRejected, markOutboxSent, MUTABLE_TABLES, pruneSentOutbox,
 } from './outboxTriggers';
+import {
+  LEGACY_SERVER_MUTATION_LIMITS,
+  negotiateRemoteMutationLimits,
+  type RemoteMutationLimits,
+} from './serverCompatibility';
 
 /**
  * A connected vault: a local replica of a Nodus Server space.
@@ -322,13 +327,7 @@ async function refreshRole(vault: VaultSummary, token: string): Promise<void> {
  * too old to publish these answers `null` for them, and every use below falls back to a
  * conservative guess rather than to an assumption — see SAFE_BATCH_BYTES.
  */
-interface RemoteLimits {
-  maxMutationBytes: number | null;
-  maxMutationBatchBytes: number | null;
-  maxMutationBatch: number;
-}
-
-const remoteLimits = new Map<string, { limits: RemoteLimits; at: number }>();
+const remoteLimits = new Map<string, { limits: RemoteMutationLimits; at: number }>();
 /**
  * How long a remembered answer is trusted.
  *
@@ -349,20 +348,14 @@ const LIMITS_TTL_MS = 60 * 60_000;
  */
 const SAFE_BATCH_BYTES = 1_500_000;
 
-async function limitsFor(vault: VaultSummary, token: string): Promise<RemoteLimits> {
+async function limitsFor(vault: VaultSummary, token: string): Promise<RemoteMutationLimits> {
   const cached = remoteLimits.get(vault.id);
   if (cached && Date.now() - cached.at < LIMITS_TTL_MS) return cached.limits;
-  const fallback: RemoteLimits = { maxMutationBytes: null, maxMutationBatchBytes: null, maxMutationBatch: 100 };
+  const fallback = LEGACY_SERVER_MUTATION_LIMITS;
   try {
     const response = await request(`${normalizeUrl(vault.remote!.url)}/api/v1/capabilities`, { headers: { authorization: `Bearer ${token}` } });
     if (!response.ok) return fallback;
-    const value = await response.json() as Partial<Record<keyof RemoteLimits, unknown>>;
-    const positive = (input: unknown): number | null => (typeof input === 'number' && Number.isFinite(input) && input > 0 ? input : null);
-    const limits: RemoteLimits = {
-      maxMutationBytes: positive(value.maxMutationBytes),
-      maxMutationBatchBytes: positive(value.maxMutationBatchBytes),
-      maxMutationBatch: positive(value.maxMutationBatch) ?? 100,
-    };
+    const limits = negotiateRemoteMutationLimits(await response.json());
     remoteLimits.set(vault.id, { limits, at: Date.now() });
     return limits;
   } catch {

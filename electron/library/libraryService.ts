@@ -77,6 +77,7 @@ import { listLibraryAnalysisProvenance } from '../db/libraryAnalysisProvenance';
 import type { LibraryAnalysisReuseComponent, LibraryAnalysisReuseStatus } from '@shared/libraryTypes';
 import { reuseVaultAnalysisForWorks } from '../vaults/vaultAnalysisImport';
 import { libraryRevisionFingerprint } from './libraryVaultProvenance';
+import { registerGlobalLibraryCloser } from './libraryRuntime';
 export { recordLinkedLibraryAnalysis } from './libraryVaultProvenance';
 
 let live: {
@@ -768,3 +769,5 @@ export function closeGlobalLibrary(): void {
   live?.catalog.close();
   live = null;
 }
+
+registerGlobalLibraryCloser(closeGlobalLibrary);

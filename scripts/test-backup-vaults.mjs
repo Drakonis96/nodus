@@ -111,12 +111,28 @@ try {
     path.join(root, 'nodi-notes.json'),
     JSON.stringify({ version: 1, notes: [{ id: 'n1', title: 'Idea suelta', content: 'No perder esto', titleExplicit: false }] })
   );
+  const settingsRepo = require(path.join(repoRoot, 'electron/db/settingsRepo.ts'));
+  const backupFolder = path.join(root, 'backups');
+  const globalLibraryRoot = path.join(backupFolder, 'nodus-library');
+  const globalItem = path.join(globalLibraryRoot, 'canonical-work');
+  settingsRepo.updateSettings({ autoBackupFolder: backupFolder });
+  fs.mkdirSync(globalItem, { recursive: true });
+  fs.writeFileSync(path.join(globalLibraryRoot, 'library.json'), JSON.stringify({ format: 'nodus.library', formatVersion: 2 }));
+  fs.writeFileSync(path.join(globalItem, 'metadata.json'), JSON.stringify({ id: 'canonical-work', title: 'Canonical title' }));
+  fs.writeFileSync(path.join(globalItem, 'reader.md'), '# Canonical clean reader\n\nProtected text.\n');
+  fs.writeFileSync(path.join(globalItem, 'original.pdf'), '%PDF-1.4\nGLOBAL-LIBRARY\n');
+  fs.mkdirSync(path.join(globalLibraryRoot, '.nodus', 'recovery', 'pre-v4'), { recursive: true });
+  fs.writeFileSync(path.join(globalLibraryRoot, '.nodus', 'recovery', 'pre-v4', 'recursive-copy.bin'), 'must be excluded');
   // Restore the genealogy vault as active so the backup's active matches the assertion below.
   switchTo(gene.id);
 
   // Back up the WHOLE app (all vaults) while the genealogy vault is active.
   const archive = await createBackupArchive({ password: 'clave-larga-de-prueba', appVersion: '9.9.9-test' });
   assert.ok(Buffer.isBuffer(archive) && archive.length > 0, 'archive produced');
+  const initialZip = new AdmZip(archive);
+  const initialManifest = JSON.parse(initialZip.readAsText('manifest.json'));
+  const initialPayload = new AdmZip(decryptBackupPayload(initialZip.getEntry('backup.bin').getData(), 'clave-larga-de-prueba', initialManifest.cipher));
+  assert.equal(initialPayload.getEntries().some((entry) => entry.entryName.includes('recursive-copy.bin')), false, 'pre-v4 recovery packages are not recursively embedded');
 
   // ── Wipe both vaults' data ──────────────────────────────────────────────────
   entities.deletePerson(bob.personId); // vault B (active)
@@ -138,6 +154,8 @@ try {
   fs.rmSync(path.join(studyDir, 'study-chat-history.json'), { force: true });
   fs.rmSync(path.join(studyDir, 'audio'), { recursive: true, force: true });
   fs.rmSync(path.join(root, 'nodi-notes.json'), { force: true });
+  fs.writeFileSync(path.join(globalItem, 'reader.md'), '# Mutated after backup\n');
+  fs.rmSync(path.join(globalItem, 'original.pdf'), { force: true });
 
   // ── Restore the whole app from the single archive ───────────────────────────
   const result = restoreBackupArchive(archive, 'clave-larga-de-prueba');
@@ -187,6 +205,9 @@ try {
   assert.match(fs.readFileSync(path.join(studyDir, 'study-chat-history.json'), 'utf8'), /historial estudio/, 'study history restored');
   assert.equal(fs.readFileSync(path.join(studyDir, 'audio', 'lesson.wav'), 'utf8'), 'STUDY-AUDIO', 'study generated audio restored');
   assert.match(fs.readFileSync(path.join(root, 'nodi-notes.json'), 'utf8'), /No perder esto/, 'Nodi quick notes restored');
+  assert.match(fs.readFileSync(path.join(globalItem, 'reader.md'), 'utf8'), /Protected text/, 'the canonical clean reader is restored');
+  assert.match(fs.readFileSync(path.join(globalItem, 'original.pdf'), 'utf8'), /GLOBAL-LIBRARY/, 'the canonical original is restored');
+  assert.equal(fs.existsSync(path.join(globalLibraryRoot, '.nodus', 'recovery', 'pre-v4', 'recursive-copy.bin')), true, 'local pre-v4 recovery survives a normal restore');
 
   // Full-state scope is enforced in the main process. Even a stale/hostile caller
   // passing the removed legacy selection cannot exclude vaults or auxiliary data.
@@ -208,7 +229,6 @@ try {
   // the SOURCE machine's absolute Zotero root. On a different computer (or a different
   // username) that path does not exist and every local PDF lookup fails silently —
   // the corpus text survives but nothing can be re-scanned or opened.
-  const settingsRepo = require(path.join(repoRoot, 'electron/db/settingsRepo.ts'));
   switchTo(legacy.id);
   settingsRepo.updateSettings({ zoteroStoragePath: '/Users/equipo-origen/Zotero/storage' });
   const pathArchive = await createBackupArchive({ password: 'clave-larga-de-prueba', appVersion: '9.9.9-test' });
@@ -318,6 +338,16 @@ try {
   // and a NEWER one must be refused outright rather than applied without the columns
   // this build does not know — a half-applied restore is how a library gets shredded.
   const { SCHEMA_VERSION } = require(path.join(repoRoot, 'electron/db/migrations.ts'));
+  // A released 3.2.7 archive has no global-library descriptor. Nodus 4 restores its
+  // traditional vaults and leaves any current cross-vault Library untouched.
+  const hiddenLibrary = `${globalLibraryRoot}.temporarily-hidden`;
+  fs.renameSync(globalLibraryRoot, hiddenLibrary);
+  const v327Archive = await createBackupArchive({ password: 'clave-v327', appVersion: '3.2.7' });
+  fs.renameSync(hiddenLibrary, globalLibraryRoot);
+  fs.writeFileSync(path.join(globalItem, 'reader.md'), '# Current v4 Library must survive\n');
+  const v327Result = restoreBackupArchive(v327Archive, 'clave-v327');
+  assert.equal(v327Result.ok, true, `a 3.2.7 backup restores: ${v327Result.message}`);
+  assert.match(fs.readFileSync(path.join(globalItem, 'reader.md'), 'utf8'), /must survive/, 'a 3.2.7 archive does not erase the current Global Library');
   const compatArchive = await createBackupArchive({ password: 'clave-larga-de-prueba', appVersion: '9.9.9-test' });
 
   const rewriteSchemaVersion = (archiveBuffer, version) => {

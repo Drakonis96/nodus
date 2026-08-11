@@ -39,7 +39,8 @@ import { restoreAppWindows } from './windowLifecycle';
 import { registerImageProtocol, registerImageSchemePrivileges } from './imageProtocol';
 import { registerArchiveProtocol, registerArchiveSchemePrivileges } from './archiveProtocol';
 import { registerLibraryProtocol, registerLibrarySchemePrivileges } from './libraryProtocol';
-import { closeGlobalLibrary } from './library/libraryService';
+import { closeGlobalLibraryRuntime } from './library/libraryRuntime';
+import { ensurePreV4Recovery } from './recovery/preV4Recovery';
 import {
   upgradeWorldbuildingDemoDynasties,
   upgradeWorldbuildingDemoImageQuality,
@@ -589,7 +590,7 @@ app.on('second-instance', () => {
   win.focus();
 });
 
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
   // Losing the lock queues a quit; do not open the database or a window.
   if (!hasSingleInstanceLock) return;
   restorePersistedDockIcon();
@@ -620,6 +621,14 @@ app.whenReady().then(() => {
   if (!process.env.NODUS_TESSDATA_CACHE) {
     process.env.NODUS_TESSDATA_CACHE = path.join(app.getPath('userData'), 'tessdata');
   }
+  // This must be the final operation before opening SQLite. Nodus 4 can rewrite
+  // schemas and Library manifests that a 3.x binary does not understand, so the first
+  // v4 launch takes and verifies one immutable copy while every database is closed.
+  const preV4 = await ensurePreV4Recovery({
+    userDataDirectory: app.getPath('userData'),
+    targetVersion: app.getVersion(),
+  });
+  if (preV4.snapshotPath) console.log(`[recovery] pre-v4 snapshot: ${preV4.snapshotPath}`);
   getDb(); // open + migrate before anything touches data
   upgradeWorldbuildingDemoDynasties();
   upgradeWorldbuildingDemoImageQuality();
@@ -751,7 +760,7 @@ app.on('window-all-closed', () => {
   stopReplicaSync();
     interruptDecorativeImageGenerations();
     stopAllWhisperCpp();
-    closeGlobalLibrary();
+    closeGlobalLibraryRuntime();
     closeDb();
     app.quit();
   }
@@ -785,7 +794,7 @@ app.on('before-quit', () => {
   // be abandoned mid-drain and leave the vendor runtimes running as orphans.
   killChatGptSubscriptionServer();
   void stopGitHubCopilotSubscription();
-  closeGlobalLibrary();
+  closeGlobalLibraryRuntime();
   closeDb();
 });
 
@@ -814,6 +823,6 @@ updateAwareApp.on('before-quit-for-update', () => {
   // be abandoned mid-drain and leave the vendor runtimes running as orphans.
   killChatGptSubscriptionServer();
   void stopGitHubCopilotSubscription();
-  closeGlobalLibrary();
+  closeGlobalLibraryRuntime();
   closeDb();
 });
