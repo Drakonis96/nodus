@@ -100,7 +100,10 @@ try {
   const policySource = await readFile(path.join(repoRoot, 'electron/ai/studyAiPolicy.ts'), 'utf8');
   assert.match(policySource, /externalConsentKey/);
   assert.match(policySource, /Finalidad:/);
-  assert.match(await readFile(path.join(repoRoot, 'electron/ai/studyKnowledge.ts'), 'utf8'), /mapa conceptual trazable/);
+  const knowledgeSource = await readFile(path.join(repoRoot, 'electron/ai/studyKnowledge.ts'), 'utf8');
+  assert.match(knowledgeSource, /mapa conceptual trazable/);
+  assert.match(knowledgeSource, /kind === 'document' \? '\*'/, 'editor autosave does not open a redundant external-send dialog');
+  assert.match(await readFile(path.join(repoRoot, 'electron/ai/studyImprove.ts'), 'utf8'), /externalConsentModelKey: '\*'/, 'visible editor AI actions do not open a second provider dialog');
   assert.deepEqual(ai.chunkStudyKnowledgeText('A'.repeat(120) + '\n\n' + 'B'.repeat(120), 150, 4).map((part) => part.length), [120, 120]);
 
   const placementB = materials.getStudyMaterial(imported.material.id).placements.find((placement) => placement.subjectId === subjectB.id);

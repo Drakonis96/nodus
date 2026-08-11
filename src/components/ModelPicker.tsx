@@ -222,6 +222,8 @@ export function ModelPicker({
   allowEmpty = true,
   menu = false,
   requireExtraction = false,
+  triggerModelOnly = false,
+  ariaLabel,
   className = '',
 }: {
   settings: AppSettings;
@@ -233,6 +235,10 @@ export function ModelPicker({
   allowEmpty?: boolean;
   menu?: boolean;
   requireExtraction?: boolean;
+  /** Keep compact, in-context pickers readable while the options retain provider names. */
+  triggerModelOnly?: boolean;
+  /** Accessible control name; the current provider and model are appended as its value. */
+  ariaLabel?: string;
   className?: string;
 }) {
   const favorites = sortModelRefs(settings.favorites ?? []);
@@ -242,6 +248,8 @@ export function ModelPicker({
   const valueIsFavorite = value ? favorites.some((model) => sameModel(model, value)) : false;
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement | null>(null);
+  const triggerRef = useRef<HTMLButtonElement | null>(null);
+  const optionsRef = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
     if (!open) return;
     const close = (event: MouseEvent) => { if (!rootRef.current?.contains(event.target as Node)) setOpen(false); };
@@ -251,12 +259,37 @@ export function ModelPicker({
 
   if (menu) {
     const models = value && !valueIsFavorite ? [value, ...favorites] : favorites;
-    const choose = (model: ModelRef | null) => { onChange(model); setOpen(false); };
-    return <div ref={rootRef} className={`model-picker-menu${compact ? ' compact' : ''} ${className}`}>
-      <button type="button" className="model-picker-trigger" disabled={disabled} aria-haspopup="listbox" aria-expanded={open} onClick={() => setOpen((current) => !current)} title={t('Seleccionar modelo')}>
-        <span>{value ? modelLabel(value) : emptyLabel ? t(emptyLabel) : t('Sin modelo seleccionado')}</span><Icon name="chevronDown" size={14} />
+    const choose = (model: ModelRef | null) => {
+      onChange(model);
+      setOpen(false);
+      window.setTimeout(() => triggerRef.current?.focus());
+    };
+    const focusOption = (direction: 1 | -1 | 'first' | 'last') => {
+      const options = [...(optionsRef.current?.querySelectorAll<HTMLButtonElement>('button[role="option"]:not(:disabled)') ?? [])];
+      if (!options.length) return;
+      const current = options.indexOf(document.activeElement as HTMLButtonElement);
+      const next = direction === 'first' ? 0 : direction === 'last' ? options.length - 1
+        : current < 0 ? (direction === 1 ? 0 : options.length - 1) : (current + direction + options.length) % options.length;
+      options[next]?.focus();
+    };
+    const currentLabel = value ? modelLabel(value) : emptyLabel ? t(emptyLabel) : t('Sin modelo seleccionado');
+    const closeAndRestoreFocus = () => { setOpen(false); triggerRef.current?.focus(); };
+    return <div ref={rootRef} className={`model-picker-menu${compact ? ' compact' : ''} ${className}`} onKeyDown={(event) => {
+      if (event.key === 'Escape' && open) { event.preventDefault(); closeAndRestoreFocus(); }
+      if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+        event.preventDefault();
+        if (!open) {
+          setOpen(true);
+          window.setTimeout(() => focusOption(event.key === 'ArrowDown' ? 'first' : 'last'));
+        } else focusOption(event.key === 'ArrowDown' ? 1 : -1);
+      }
+      if (open && event.key === 'Home') { event.preventDefault(); focusOption('first'); }
+      if (open && event.key === 'End') { event.preventDefault(); focusOption('last'); }
+    }}>
+      <button ref={triggerRef} type="button" className="model-picker-trigger" disabled={disabled} aria-haspopup="listbox" aria-expanded={open} aria-label={ariaLabel ? `${ariaLabel}: ${currentLabel}` : undefined} onClick={() => setOpen((current) => !current)} title={currentLabel}>
+        <span>{value ? (triggerModelOnly ? value.model : currentLabel) : currentLabel}</span><Icon name="chevronDown" size={14} />
       </button>
-      {open && <div className="model-picker-options" role="listbox">
+      {open && <div ref={optionsRef} className="model-picker-options" role="listbox" aria-label={ariaLabel}>
         {allowEmpty && <button type="button" role="option" aria-selected={!value} className={!value ? 'selected' : ''} onClick={() => choose(null)}>{emptyLabel ? t(emptyLabel) : t('Sin modelo seleccionado')}</button>}
         {models.map((model) => <button type="button" role="option" aria-selected={sameModel(model, value)} disabled={blocked(model)} title={blocked(model) ? t('Este modelo no puede usarse para extracción de ideas.') : undefined} className={sameModel(model, value) ? 'selected' : ''} key={serialize(model)} onClick={() => { if (!blocked(model)) choose(model); }}><span>{optionText(model)}</span>{sameModel(model, value) && <Icon name="check" size={13} />}</button>)}
         {!models.length && !allowEmpty && <span className="model-picker-empty">{t('No hay modelos favoritos configurados.')}</span>}
@@ -268,6 +301,7 @@ export function ModelPicker({
     <select
       className={`input ${compact ? 'text-xs py-1' : ''} ${className}`}
       disabled={disabled}
+      aria-label={ariaLabel}
       value={value ? serialize(value) : ''}
       onChange={(e) => {
         if (!e.target.value) return onChange(null);

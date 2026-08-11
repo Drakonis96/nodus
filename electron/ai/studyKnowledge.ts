@@ -208,7 +208,12 @@ export function queueStudyKnowledgeSources(kind: StudyKnowledgeSourceKind, ids: 
   if (kind === 'material' && !options.explicit && !options.approved && autoPreference !== 'always') return;
   for (const id of ids) if (id) {
     const key = `${kind}:${id}`; const prior = queue.get(key);
-    const rememberedApproval = kind === 'material' && autoPreference === 'always' ? '*' : null;
+    // Notes are continuously re-indexed behind the editor's autosave in both Study
+    // and Teaching. Showing a native provider warning after ordinary typing makes
+    // autosave look like an explicit AI command; the vault has already established
+    // that this knowledge layer is AI-backed. Imported files keep their separate,
+    // explicit processing decision above.
+    const rememberedApproval = kind === 'document' ? '*' : kind === 'material' && autoPreference === 'always' ? '*' : null;
     queue.set(key, { kind, id, force: force || prior?.force === true,
       externalConsentModelKey: options.externalConsentModelKey ?? rememberedApproval ?? prior?.externalConsentModelKey ?? null });
   }

@@ -1874,6 +1874,7 @@ export const EN: Record<string, string> = {
   'Sigue aquí el progreso. Si falta el modelo de IA o la clave, la cola se pausa y te avisa en vez de fallar en silencio: lo arreglas en Ajustes y pulsas «Reanudar».':
     'Track progress here. If the AI model or key is missing, the queue pauses and warns you instead of failing silently: fix it in Settings and click “Resume”.',
   'Modelo de IA': 'AI model',
+  'Modelo de IA para mejorar texto': 'AI model for text improvement',
   'Comprueba que hay un modelo seleccionado: sin él, Nodus no puede escanear. Puedes cambiarlo aquí o en Ajustes, y marcar tus favoritos.':
     'Make sure a model is selected: without one, Nodus can’t scan. You can change it here or in Settings, and mark your favorites.',
   '¡Listo para empezar!': 'Ready to go!',

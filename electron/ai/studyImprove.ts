@@ -102,7 +102,10 @@ export async function improveStudyText(
   let visibleStreamed = '';
   /** How much of `streamed` has already been restored and emitted. */
   let restoredUpTo = 0;
-  const completed = await runStudyAiTask<string>({ task: 'improve', explicitModel: requestedModel, subjectId: request.subjectId, inputChars: prompt.system.length + prompt.user.length, outputChars: (value) => value.length, allowFallback: () => !streamed }, (model) => {
+  // The editor exposes the active model beside every AI action. Invoking one of
+  // those actions is the send decision, so a second native provider confirmation
+  // adds no information and interrupts the writing flow.
+  const completed = await runStudyAiTask<string>({ task: 'improve', explicitModel: requestedModel, subjectId: request.subjectId, inputChars: prompt.system.length + prompt.user.length, outputChars: (value) => value.length, allowFallback: () => !streamed, externalConsentModelKey: '*' }, (model) => {
     return completeTextStream({
       system: prompt.system,
       user: prompt.user,

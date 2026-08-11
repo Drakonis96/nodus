@@ -2,9 +2,11 @@ import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRe
 import type { CSSProperties, DragEvent } from 'react';
 import { createPortal } from 'react-dom';
 import { Crepe } from '@milkdown/crepe';
-import { commandsCtx, editorViewCtx } from '@milkdown/core';
+import { commandsCtx, editorViewCtx, parserCtx } from '@milkdown/core';
+import { redoCommand, undoCommand } from '@milkdown/plugin-history';
+import { closeHistory, redoDepth, undoDepth } from '@milkdown/prose/history';
 import { toggleInlineCodeCommand, turnIntoTextCommand, wrapInHeadingCommand } from '@milkdown/preset-commonmark';
-import { insert, replaceAll } from '@milkdown/utils';
+import { insert } from '@milkdown/utils';
 import '@milkdown/crepe/theme/common/style.css';
 import '@milkdown/crepe/theme/classic.css';
 import TurndownService from 'turndown';
@@ -22,7 +24,9 @@ import { deleteLastStudySentence } from '@shared/sttModels';
 import type { StudyDocument, StudyDocumentKind, StudyTag } from '@shared/studyOrg';
 import { STUDY_DOCUMENT_KINDS } from '@shared/studyOrg';
 import type { StudyImproveScope, StudyStyle } from '@shared/studyImprove';
+import type { AppSettings } from '@shared/types';
 import { Markdown } from '../Markdown';
+import { ModelPicker } from '../ModelPicker';
 import { Icon, ICON_NAMES, Spinner } from '../ui';
 import { TextInputModal } from '../TextInputModal';
 import { t } from '../../i18n';
@@ -31,8 +35,13 @@ import { StudyDictation } from './StudyDictation';
 import { StudyImproveDialog } from './StudyImproveDialog';
 import { AudioPanel } from '../AudioPanel';
 import { ConfirmModal } from '../ConfirmModal';
+import { useFeatureModel } from '../../hooks/useFeatureModel';
 
 type SaveState = 'saved' | 'dirty' | 'saving' | 'error';
+
+// Match Nodi quick notes: changes feel immediate without writing once per
+// keystroke, and a navigation flush below guarantees the last edit is durable.
+const STUDY_AUTOSAVE_DELAY_MS = 600;
 
 interface ImproveTarget {
   from: number;
@@ -61,7 +70,14 @@ interface MilkdownCanvasHandle {
   runInlineCommand: (command: 'code' | 'formula') => void;
   setHeading: (level: number) => void;
   setTextColor: (color: string) => void;
-  replaceAllMarkdown: (markdown: string) => void;
+  undo: () => void;
+  redo: () => void;
+  replaceAllMarkdown: (markdown: string, options?: { addToHistory?: boolean; closeHistory?: boolean }) => void;
+}
+
+interface EditorHistoryState {
+  canUndo: boolean;
+  canRedo: boolean;
 }
 
 const MilkdownCanvas = forwardRef<MilkdownCanvasHandle, {
@@ -70,14 +86,17 @@ const MilkdownCanvas = forwardRef<MilkdownCanvasHandle, {
   spellcheck: boolean;
   language: string;
   onChange: (markdown: string) => void;
+  onHistoryChange: (state: EditorHistoryState) => void;
   onOpenRecording: (recordingId: string, timestamp?: number | null) => void;
   onToolbarElement: (element: HTMLElement | null) => void;
-}>(({ documentId, value, spellcheck, language, onChange, onOpenRecording, onToolbarElement }, ref) => {
+}>(({ documentId, value, spellcheck, language, onChange, onHistoryChange, onOpenRecording, onToolbarElement }, ref) => {
   const rootRef = useRef<HTMLDivElement>(null);
   const crepeRef = useRef<Crepe | null>(null);
   const initialValueRef = useRef(value);
   const changeRef = useRef(onChange);
   changeRef.current = onChange;
+  const historyChangeRef = useRef(onHistoryChange);
+  historyChangeRef.current = onHistoryChange;
 
   useEffect(() => {
     const root = rootRef.current;
@@ -91,7 +110,11 @@ const MilkdownCanvas = forwardRef<MilkdownCanvasHandle, {
       },
     });
     crepeRef.current = crepe;
-    crepe.on((listener) => listener.markdownUpdated((_ctx, markdown) => changeRef.current(markdown)));
+    crepe.on((listener) => listener.markdownUpdated((ctx, markdown) => {
+      changeRef.current(markdown);
+      const state = ctx.get(editorViewCtx).state;
+      historyChangeRef.current({ canUndo: undoDepth(state) > 0, canRedo: redoDepth(state) > 0 });
+    }));
     let disposed = false;
     let toolbarObserver: MutationObserver | null = null;
     void crepe.create().then(() => {
@@ -169,10 +192,32 @@ const MilkdownCanvas = forwardRef<MilkdownCanvasHandle, {
         ctx.get(editorViewCtx).focus();
       });
     },
-    replaceAllMarkdown(markdown) {
+    undo() {
       crepeRef.current?.editor.action((ctx) => {
-        replaceAll(markdown)(ctx);
-        ctx.get(editorViewCtx).focus();
+        ctx.get(commandsCtx).call(undoCommand.key);
+        const view = ctx.get(editorViewCtx);
+        view.focus();
+        historyChangeRef.current({ canUndo: undoDepth(view.state) > 0, canRedo: redoDepth(view.state) > 0 });
+      });
+    },
+    redo() {
+      crepeRef.current?.editor.action((ctx) => {
+        ctx.get(commandsCtx).call(redoCommand.key);
+        const view = ctx.get(editorViewCtx);
+        view.focus();
+        historyChangeRef.current({ canUndo: undoDepth(view.state) > 0, canRedo: redoDepth(view.state) > 0 });
+      });
+    },
+    replaceAllMarkdown(markdown, options = {}) {
+      crepeRef.current?.editor.action((ctx) => {
+        const view = ctx.get(editorViewCtx);
+        const parsed = ctx.get(parserCtx)(markdown);
+        if (!parsed) return;
+        let transaction = view.state.tr.replaceWith(0, view.state.doc.content.size, parsed.content);
+        if (options.addToHistory === false) transaction = transaction.setMeta('addToHistory', false);
+        if (options.closeHistory) transaction = closeHistory(transaction);
+        view.dispatch(transaction);
+        view.focus();
       });
     },
   }), []);
@@ -203,6 +248,7 @@ function VersionDiff({ version, current }: { version: StudyDocVersion; current: 
 }
 
 export function StudyEditor({
+  settings,
   documents,
   tags,
   activeTagIds,
@@ -219,6 +265,7 @@ export function StudyEditor({
   onOpenLinkedDocument,
   onOpenRecording,
 }: {
+  settings: AppSettings;
   documents: StudyDocument[];
   tags: StudyTag[];
   activeTagIds: string[];
@@ -267,13 +314,15 @@ export function StudyEditor({
   const [selectionToolbar, setSelectionToolbar] = useState<HTMLElement | null>(null);
   const [improveStreamingStyleId, setImproveStreamingStyleId] = useState<string | null>(null);
   const [improveStreamError, setImproveStreamError] = useState('');
-  const [improveUndo, setImproveUndo] = useState<string | null>(null);
+  const [historyState, setHistoryState] = useState<EditorHistoryState>({ canUndo: false, canRedo: false });
   const [selectedVersion, setSelectedVersion] = useState<StudyDocVersion | null>(null);
   const [editorRevision, setEditorRevision] = useState(0);
+  const [aiModel, setAiModel] = useFeatureModel(settings, 'improveModel');
   const baselineRef = useRef('');
   const activeIdRef = useRef(active?.id ?? '');
   const latestSignatureRef = useRef('');
   const saveQueueRef = useRef<Promise<void>>(Promise.resolve());
+  const saveLatestRef = useRef<(reason: 'autosave' | 'manual' | 'command') => Promise<void>>(async () => undefined);
   const rawRef = useRef(raw);
   const milkdownRef = useRef<MilkdownCanvasHandle>(null);
   const rawTextareaRef = useRef<HTMLTextAreaElement>(null);
@@ -302,6 +351,7 @@ export function StudyEditor({
     setSaveState('saved');
     setEditingTitle(false);
     setSelectedVersion(null);
+    setHistoryState({ canUndo: false, canRedo: false });
     setEditorRevision((value) => value + 1);
     void loadData(active.id).then((next) => {
       baselineRef.current = JSON.stringify({ title: active.title, content: active.contentMarkdown, style: next.style, language: next.spellcheckLanguage, dictionary: next.customDictionary });
@@ -345,10 +395,10 @@ export function StudyEditor({
     });
   };
 
-  const replaceImprovedSelection = (base: string, target: ImproveTarget, text: string) => {
+  const replaceImprovedSelection = (base: string, target: ImproveTarget, text: string, commitToHistory = false) => {
     const next = `${base.slice(0, target.from)}${text}${base.slice(target.to)}`;
     setDraft(next);
-    if (!raw) milkdownRef.current?.replaceAllMarkdown(next);
+    if (!raw) milkdownRef.current?.replaceAllMarkdown(next, { addToHistory: commitToHistory, closeHistory: commitToHistory });
     setSaveState('dirty');
   };
 
@@ -358,33 +408,28 @@ export function StudyEditor({
     let streamed = '';
     let frame = 0;
     const flush = () => { frame = 0; replaceImprovedSelection(base, target, streamed); };
-    setImproveUndo(base); setImproveStreamingStyleId(style.id); setImproveStreamError(''); setSelectionImprove(null);
+    setImproveStreamingStyleId(style.id); setImproveStreamError(''); setSelectionImprove(null);
     try {
       const result = await window.nodus.improveStudyText({
         documentId: active.id, subjectId, text: target.text, styleId: style.id, scope: target.scope,
         level: style.level, length: style.length, mode: 'preserve',
         variables: { language: style.language, documentType: active.kind, selectedText: target.text },
-        protectedTerms: [active.title, ...data.customDictionary], model: null,
+        protectedTerms: [active.title, ...data.customDictionary], model: aiModel,
       }, { onDelta: (delta) => {
         streamed += delta;
         if (!frame) frame = window.requestAnimationFrame(flush);
       } });
       if (frame) window.cancelAnimationFrame(frame);
-      replaceImprovedSelection(base, target, result.text);
+      // Streamed previews never enter the undo stack. Restore the pre-request
+      // document invisibly, then commit the complete rewrite as one history step.
+      if (!raw) milkdownRef.current?.replaceAllMarkdown(base, { addToHistory: false });
+      replaceImprovedSelection(base, target, result.text, true);
       await window.nodus.updateStudyImprovementAction(result.logId, 'replace');
     } catch (cause) {
       if (frame) window.cancelAnimationFrame(frame);
-      setDraft(base); if (!raw) milkdownRef.current?.replaceAllMarkdown(base);
-      setImproveUndo(null);
+      setDraft(base); if (!raw) milkdownRef.current?.replaceAllMarkdown(base, { addToHistory: false });
       setImproveStreamError(cause instanceof Error ? cause.message : String(cause));
     } finally { setImproveStreamingStyleId(null); }
-  };
-
-  const undoImprovement = () => {
-    if (improveUndo == null) return;
-    const current = draft;
-    setDraft(improveUndo); if (!raw) milkdownRef.current?.replaceAllMarkdown(improveUndo);
-    setImproveUndo(current); setSaveState('dirty'); setImproveStreamError('');
   };
 
   const currentSignature = JSON.stringify({ title, content: draft, style, language: data?.spellcheckLanguage, dictionary: data?.customDictionary });
@@ -394,12 +439,14 @@ export function StudyEditor({
   useEffect(() => {
     if (!active || !data || improveStreamingStyleId || currentSignature === baselineRef.current) return;
     setSaveState('dirty');
-    const timer = window.setTimeout(() => void save('autosave'), 1400);
+    const timer = window.setTimeout(() => void save('autosave'), STUDY_AUTOSAVE_DELAY_MS);
     return () => window.clearTimeout(timer);
   }, [currentSignature, active?.id, data != null, improveStreamingStyleId]);
 
   const save = async (reason: 'autosave' | 'manual' | 'command') => {
-    if (!active || currentSignature === baselineRef.current) return;
+    // Never persist a partial AI stream. Its complete result marks the editor
+    // dirty and enters this same autosave path when streaming finishes.
+    if (!active || improveStreamingStyleId || currentSignature === baselineRef.current) return;
     const snapshot = {
       id: active.id,
       signature: currentSignature,
@@ -434,13 +481,17 @@ export function StudyEditor({
     saveQueueRef.current = operation;
     await operation;
   };
+  saveLatestRef.current = save;
+
+  // The debounce cleanup cancels its timer when this editor disappears. Flush
+  // the live render snapshot so leaving the vault cannot discard the last edit.
+  useEffect(() => () => { void saveLatestRef.current('autosave'); }, []);
 
   useEffect(() => {
     const keydown = (event: KeyboardEvent) => {
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 's') { event.preventDefault(); void save('manual'); }
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'f') { event.preventDefault(); setShowSearch(true); }
       if ((event.metaKey || event.ctrlKey) && event.shiftKey && event.key.toLowerCase() === 'i') { event.preventDefault(); setShowImprovePrompts(true); }
-      if ((event.metaKey || event.ctrlKey) && !event.shiftKey && event.key.toLowerCase() === 'z' && improveUndo != null && !showImprovePrompts) { event.preventDefault(); undoImprovement(); }
     };
     window.addEventListener('keydown', keydown);
     return () => window.removeEventListener('keydown', keydown);
@@ -479,6 +530,18 @@ export function StudyEditor({
       rawTextareaRef.current?.focus();
     });
   };
+  const runEditorHistory = (direction: 'undo' | 'redo') => {
+    setImproveStreamError('');
+    if (!raw) {
+      milkdownRef.current?.[direction]();
+      return;
+    }
+    const textarea = rawTextareaRef.current;
+    if (!textarea) return;
+    textarea.focus();
+    document.execCommand(direction);
+    setDraft(textarea.value);
+  };
   const insertCommand = (command: StudyEditorCommand) => insertMarkdown(studyCommandMarkdown(command));
   const insertHeading = (level: number) => insertMarkdown(`${'#'.repeat(level)} ${t('Título')}`);
   const insertTable = () => {
@@ -490,11 +553,22 @@ export function StudyEditor({
     insertMarkdown([header, separator, ...body].join('\n'));
     setTableDialogOpen(false);
   };
+  const activateDocument = async (documentId: string) => {
+    if (documentId === active.id) return;
+    await save('autosave');
+    onActivate(documentId);
+  };
+  const openLinkedDocument = async (documentId: string) => {
+    await save('autosave');
+    onOpenLinkedDocument(documentId);
+  };
   const requestClose = (documentId: string) => setPendingCloseId(documentId);
   const confirmClose = async () => {
     const documentId = pendingCloseId;
     if (!documentId) return;
-    if (documentId === active.id && saveState !== 'saved') await save('manual');
+    // `save` is signature-based, so calling it unconditionally also covers the
+    // tiny interval before the dirty-state effect has painted.
+    if (documentId === active.id) await save('autosave');
     setPendingCloseId(null);
     onClose(documentId);
   };
@@ -554,8 +628,8 @@ export function StudyEditor({
     <div style={styleVars} className={`study-editor-shell flex h-full min-h-0 flex-col bg-stone-100 text-stone-900 dark:bg-neutral-950 dark:text-neutral-100 ${fullscreen ? 'fixed inset-0 z-[100]' : ''} study-theme-${style.theme}`}>
       <div className="study-editor-tabs flex min-h-10 items-end gap-1 overflow-x-auto border-b border-stone-200 bg-stone-50 px-2 pt-1 dark:border-neutral-800 dark:bg-neutral-950">
         {documents.map((document) => (
-          <div key={document.id} role="tab" tabIndex={0} aria-selected={document.id === active.id} onClick={() => onActivate(document.id)}
-            onKeyDown={(event) => { if (event.target === event.currentTarget && (event.key === 'Enter' || event.key === ' ')) onActivate(document.id); }}
+          <div key={document.id} role="tab" tabIndex={0} aria-selected={document.id === active.id} onClick={() => void activateDocument(document.id)}
+            onKeyDown={(event) => { if (event.target === event.currentTarget && (event.key === 'Enter' || event.key === ' ')) void activateDocument(document.id); }}
             className={`group flex max-w-64 items-center gap-1.5 rounded-t-lg border border-b-0 px-2.5 py-2 text-xs ${document.id === active.id ? 'border-stone-300 bg-white text-stone-800 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-200' : 'border-transparent text-stone-500 hover:text-stone-800 dark:text-neutral-600 dark:hover:text-neutral-300'}`}>
             <Icon name="notebook" size={12} />
             {document.id === active.id && editingTitle ? (
@@ -576,13 +650,17 @@ export function StudyEditor({
 
       <div className="study-editor-toolbar flex flex-wrap items-center gap-1 border-b border-stone-200 bg-white/80 px-3 py-2 dark:border-neutral-800 dark:bg-neutral-900/50">
         <button className="btn btn-ghost h-8 w-8 p-0" title={t('Cerrar editor')} aria-label={t('Cerrar editor')} onClick={() => requestClose(active.id)}><Icon name="arrowLeft" size={14} /></button>
-        <span className={`mr-2 text-[10px] ${saveState === 'error' ? 'text-red-400' : saveState === 'saved' ? 'text-emerald-500' : 'text-amber-400'}`}>
-          {t(saveState === 'saved' ? 'Guardado' : saveState === 'saving' ? 'Guardando…' : saveState === 'dirty' ? 'Cambios sin guardar' : 'Error al guardar')}
+        <span data-testid="study-editor-save-state" role="status" aria-live="polite" className={`mr-2 text-[10px] ${saveState === 'error' ? 'text-red-400' : saveState === 'saved' ? 'text-emerald-500' : 'text-amber-400'}`}>
+          {t(saveState === 'saved' ? 'Guardado automático' : saveState === 'saving' ? 'Guardando…' : saveState === 'dirty' ? 'Cambios sin guardar' : 'Error al guardar')}
         </span>
         <button data-testid="study-doc-favorite" className="btn btn-ghost h-8 w-8 p-0" title={t('Favorito')} aria-label={t('Favorito')} onClick={() => void onUpdateMetadata({ favorite: !active.favorite })}>
           <Icon name="star" size={13} className={active.favorite ? 'text-amber-400' : ''} />
         </button>
         <button className="btn btn-primary h-8 w-8 p-0" title={t('Guardar')} aria-label={t('Guardar')} onClick={() => void save('manual')}><Icon name="save" size={13} /></button>
+        <span className="mx-0.5 h-5 w-px bg-stone-200 dark:bg-neutral-700" aria-hidden="true" />
+        <button type="button" data-testid="study-editor-undo" className="btn btn-ghost h-8 w-8 p-0" disabled={Boolean(improveStreamingStyleId) || (!raw && !historyState.canUndo)} onClick={() => runEditorHistory('undo')} title={`${t('Deshacer')} (Ctrl/⌘+Z)`} aria-label={t('Deshacer')} aria-keyshortcuts="Control+Z Meta+Z"><Icon name="undo" size={13} /></button>
+        <button type="button" data-testid="study-editor-redo" className="btn btn-ghost h-8 w-8 p-0" disabled={Boolean(improveStreamingStyleId) || (!raw && !historyState.canRedo)} onClick={() => runEditorHistory('redo')} title={`${t('Rehacer')} (Ctrl+Y / Ctrl/⌘+Shift+Z)`} aria-label={t('Rehacer')} aria-keyshortcuts="Control+Y Control+Shift+Z Meta+Shift+Z"><Icon name="redo" size={13} /></button>
+        <span className="mx-0.5 h-5 w-px bg-stone-200 dark:bg-neutral-700" aria-hidden="true" />
         <button className={`btn btn-ghost h-8 w-8 p-0 ${raw ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/50 dark:text-indigo-300' : ''}`} title={t('Markdown crudo')} aria-label={t('Markdown crudo')} onClick={() => {
           if (raw) setEditorRevision((value) => value + 1); setRaw(!raw);
         }}><Icon name="code" size={13} /></button>
@@ -597,9 +675,11 @@ export function StudyEditor({
           setShowAudio((value) => !value);
         }} title={t('Lectura por voz')} aria-label={t('Lectura por voz')}><Icon name="play" size={13} /></button>
         <button data-testid="study-improve-toggle" className={`btn btn-ghost h-8 w-8 p-0 ${showImprovePrompts ? 'bg-teal-100 text-teal-800 dark:bg-teal-950 dark:text-teal-300' : ''}`} onClick={() => setShowImprovePrompts(true)} title={`${t('Prompts de mejora')} (⌘⇧I)`} aria-label={t('Prompts de mejora')}><Icon name="wand" size={13} /></button>
+        <div data-testid="study-editor-model-picker" className="study-editor-model-picker-wrap min-w-32 max-w-52 flex-1 sm:flex-none">
+          <ModelPicker settings={settings} value={aiModel} onChange={setAiModel} compact menu allowEmpty={false} triggerModelOnly ariaLabel={t('Modelo de IA para mejorar texto')} className="study-editor-model-picker" />
+        </div>
         {quickImproveStyles.map((prompt) => <button type="button" key={prompt.id} data-testid={`study-toolbar-quick-improve-${prompt.id.replace(':', '-')}`} className="btn btn-ghost h-8 w-8 p-0 text-teal-700 dark:text-teal-300" title={`${prompt.name} · ${prompt.description}`} aria-label={prompt.name} disabled={Boolean(improveStreamingStyleId)} onClick={() => void runQuickImprovement(prompt)}><ImproveStyleMark style={prompt} size={15} /></button>)}
-        {improveUndo != null && <button data-testid="study-improve-undo" className="btn btn-ghost h-8 w-8 p-0 text-amber-700 dark:text-amber-300" onClick={undoImprovement} title={`${t('Deshacer la última mejora')} (Ctrl/⌘+Z)`} aria-label={t('Deshacer la última mejora')}><Icon name="undo" size={13} /></button>}
-        <button data-testid="study-doc-style" className={`btn btn-ghost h-8 w-8 p-0 ${showStyle ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/50 dark:text-indigo-300' : ''}`} title={t('Apariencia y metadatos')} aria-label={t('Apariencia y metadatos')} onClick={() => setShowStyle(!showStyle)}><Icon name="palette" size={13} /></button>
+        <button data-testid="study-doc-style" className={`study-editor-style-button btn btn-ghost h-8 w-8 p-0 ${showStyle ? 'is-active bg-indigo-100 text-indigo-700 dark:bg-indigo-900/50 dark:text-indigo-300' : ''}`} title={t('Apariencia y metadatos')} aria-label={t('Apariencia y metadatos')} onClick={() => setShowStyle(!showStyle)}><Icon name="palette" size={16} /></button>
         <button className={`btn btn-ghost h-8 w-8 p-0 ${showHistory ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/50 dark:text-indigo-300' : ''}`} title={t('Historial de versiones')} aria-label={t('Historial de versiones')} onClick={() => setShowHistory(!showHistory)}><Icon name="clock" size={13} /></button>
         <button className={`btn btn-ghost h-8 w-8 p-0 ${focusMode ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/50 dark:text-indigo-300' : ''}`} onClick={() => setFocusMode(!focusMode)} title={t('Modo concentración')} aria-label={t('Modo concentración')}><Icon name="eye" size={13} /></button>
         <button className="btn btn-ghost h-8 w-8 p-0" onClick={() => setFullscreen(!fullscreen)} title={t('Pantalla completa')} aria-label={t('Pantalla completa')}><Icon name="fit" size={13} /></button>
@@ -742,10 +822,10 @@ export function StudyEditor({
                 }} />
             ) : (
               <MilkdownCanvas ref={milkdownRef} key={`${active.id}-${editorRevision}`} documentId={`${active.id}-${editorRevision}`} value={draft}
-                spellcheck language={data.spellcheckLanguage} onChange={(value) => { if (!rawRef.current) setDraft(value); }} onOpenRecording={onOpenRecording} onToolbarElement={setSelectionToolbar} />
+                spellcheck language={data.spellcheckLanguage} onChange={(value) => { if (!rawRef.current) setDraft(value); }} onHistoryChange={setHistoryState} onOpenRecording={onOpenRecording} onToolbarElement={setSelectionToolbar} />
             )}
           </div>
-          {split && <div className="min-h-full overflow-y-auto bg-stone-50 p-8 text-stone-900 dark:bg-neutral-900/20 dark:text-neutral-100"><Markdown content={draft} verify={false} onStudyDocument={onOpenLinkedDocument} onStudyRecording={onOpenRecording} /></div>}
+          {split && <div className="min-h-full overflow-y-auto bg-stone-50 p-8 text-stone-900 dark:bg-neutral-900/20 dark:text-neutral-100"><Markdown content={draft} verify={false} onStudyDocument={(documentId) => void openLinkedDocument(documentId)} onStudyRecording={onOpenRecording} /></div>}
         </div>
 
         {!focusMode && (showHistory || data.annotations.length > 0 || data.backlinks.length > 0) && (
@@ -771,7 +851,7 @@ export function StudyEditor({
                 <h3 className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-neutral-600">{t('Backlinks')}</h3>
                 {data.backlinks.map((link) => {
                   const source = documents.find((document) => document.id === link.sourceDocumentId);
-                  return <button key={link.id} className="mb-1 flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-xs text-neutral-500 hover:bg-neutral-900 hover:text-indigo-300" onClick={() => onOpenLinkedDocument(link.sourceDocumentId)}><Icon name="link" size={11} /><span className="truncate">{source?.title ?? link.sourceDocumentId}</span></button>;
+                  return <button key={link.id} className="mb-1 flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-xs text-neutral-500 hover:bg-neutral-900 hover:text-indigo-300" onClick={() => void openLinkedDocument(link.sourceDocumentId)}><Icon name="link" size={11} /><span className="truncate">{source?.title ?? link.sourceDocumentId}</span></button>;
                 })}
               </section>
             )}
