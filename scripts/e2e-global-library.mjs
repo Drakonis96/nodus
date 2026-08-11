@@ -233,6 +233,22 @@ try {
   await migrationDialog.waitFor({ state: 'detached' });
   await page.getByText('Historia contemporánea', { exact: true }).waitFor();
 
+  const trashFolder = page.getByTestId('open-library-trash');
+  await trashFolder.waitFor({ state: 'visible' });
+  const trashTreePlacement = await trashFolder.evaluate((trash) => {
+    const collectionRows = [...document.querySelectorAll('[data-testid^="global-library-collection-"]')];
+    return collectionRows.length > 0 && collectionRows.every((row) => Boolean(row.compareDocumentPosition(trash) & Node.DOCUMENT_POSITION_FOLLOWING));
+  });
+  assert.equal(trashTreePlacement, true, 'trash is the terminal folder after every collection and subcollection');
+  const darkTrashColor = await trashFolder.evaluate((element) => getComputedStyle(element).color);
+  assert.equal(darkTrashColor, 'rgb(252, 165, 165)', 'trash has a restrained red tone in dark mode');
+  await page.screenshot({ path: path.join(os.tmpdir(), 'nodus-library-collection-tree-trash-dark-wide.png'), fullPage: true });
+  await page.evaluate(() => { document.documentElement.classList.add('light'); document.documentElement.classList.remove('dark'); });
+  const lightTrashColor = await trashFolder.evaluate((element) => getComputedStyle(element).color);
+  assert.equal(lightTrashColor, 'rgb(185, 28, 28)', 'trash remains legible and red in light mode');
+  await page.screenshot({ path: path.join(os.tmpdir(), 'nodus-library-collection-tree-trash-light-wide.png'), fullPage: true });
+  await page.evaluate(() => { document.documentElement.classList.add('dark'); document.documentElement.classList.remove('light'); });
+
   const childEdit = page.getByTestId(`library-collection-edit-${collections.child.id}`);
   const childMove = page.getByTestId(`library-collection-move-${collections.child.id}`);
   const childDelete = page.getByTestId(`library-collection-delete-${collections.child.id}`);
@@ -438,7 +454,13 @@ try {
   await page.evaluate(() => { document.documentElement.classList.add('dark'); document.documentElement.classList.remove('light'); });
   await page.setViewportSize({ width: 1540, height: 940 });
   await page.evaluate((id) => window.nodus.setGlobalLibraryItemsDeleted([id], true), itemId);
-  await page.getByTestId('open-library-trash').click();
+  await trashFolder.click();
+  assert.equal(await trashFolder.getAttribute('aria-current'), 'page', 'the trash folder stays selected while reviewing recoverable items');
+  const activeTrashColors = await trashFolder.evaluate((element) => {
+    const style = getComputedStyle(element);
+    return { background: style.backgroundColor, color: style.color };
+  });
+  assert.deepEqual(activeTrashColors, { background: 'rgba(127, 29, 29, 0.32)', color: 'rgb(254, 226, 226)' });
   const trashRow = page.getByTestId(`global-library-item-${itemId}`);
   await trashRow.waitFor({ state: 'visible' });
   await trashRow.locator('input[type="checkbox"]').check();
@@ -449,6 +471,11 @@ try {
   assert.equal(await page.getByTestId('purge-library-trash').isDisabled(), true, 'active vault links block manual emptying');
   await page.screenshot({ path: path.join(os.tmpdir(), 'nodus-library-trash-impact-dark-wide.png'), fullPage: true });
   await page.evaluate(() => { document.documentElement.classList.add('light'); document.documentElement.classList.remove('dark'); });
+  const activeLightTrashColors = await trashFolder.evaluate((element) => {
+    const style = getComputedStyle(element);
+    return { background: style.backgroundColor, color: style.color };
+  });
+  assert.deepEqual(activeLightTrashColors, { background: 'rgb(254, 226, 226)', color: 'rgb(153, 27, 27)' });
   await page.setViewportSize({ width: 760, height: 900 });
   await page.screenshot({ path: path.join(os.tmpdir(), 'nodus-library-trash-impact-light-narrow.png'), fullPage: true });
   await page.getByTestId('restore-library-trash').click();

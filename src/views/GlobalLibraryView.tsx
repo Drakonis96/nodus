@@ -882,7 +882,7 @@ function GlobalLibraryContent({
   return (
     <div data-testid="global-library-view" className="library-theme-canvas flex h-full min-h-0 flex-col bg-neutral-950">
       <header className="flex flex-wrap items-center gap-3 border-b border-neutral-800 px-5 py-3">
-        <div className="min-w-0"><h1 className="flex items-center gap-2 text-lg font-semibold"><Icon name={trashMode ? 'trash' : 'book'} className={trashMode ? 'text-amber-400' : 'text-indigo-400'} /> {t(trashMode ? 'Papelera' : 'Biblioteca')}</h1><p className="text-[11px] text-neutral-500">{trashMode ? tx('{n} elemento(s) recuperable(s)', { n: trashCount }) : tx('{n} documentos · disponible en todos los vaults', { n: status.items })}</p></div>
+        <div className="min-w-0"><h1 className="flex items-center gap-2 text-lg font-semibold"><Icon name={trashMode ? 'trash' : 'book'} className={trashMode ? 'text-red-400' : 'text-indigo-400'} /> {t(trashMode ? 'Papelera' : 'Biblioteca')}</h1><p className="text-[11px] text-neutral-500">{trashMode ? tx('{n} elemento(s) recuperable(s)', { n: trashCount }) : tx('{n} documentos · disponible en todos los vaults', { n: status.items })}</p></div>
         <div className="flex-1" />
         {activeJobs.length > 0 && <span className="flex items-center gap-2 rounded-full bg-indigo-500/10 px-3 py-1.5 text-xs text-indigo-300"><Spinner /> {tx('{n} tarea(s) en segundo plano', { n: activeJobs.length })}</span>}
         {trashMode ? <><button data-testid="close-library-trash" className="btn btn-ghost border border-neutral-700" onClick={closeTrash}><Icon name="chevronLeft" /> {t('Volver a la Biblioteca')}</button><button data-testid="empty-library-trash" className="btn btn-ghost border border-red-500/30 text-red-400" disabled={!trashCount} onClick={() => setTrashImpactItems([])}><Icon name="trash" /> {t('Vaciar papelera')}</button></> : <>
@@ -894,26 +894,38 @@ function GlobalLibraryContent({
         <button data-testid="open-library-export" className="btn btn-ghost border border-neutral-700" onClick={() => setCitationItems([])}><Icon name="download" /> {t('Exportar')}</button>
         <button className="btn btn-ghost border border-neutral-700" onClick={() => void importFiles()}><Icon name="upload" /> {t('Añadir archivos')}</button>
         <button data-testid="open-zotero-global-import" className="btn btn-primary" onClick={() => setZoteroOpen(true)}><Icon name="refresh" /> {t('Zotero')}</button>
-        <button data-testid="open-library-trash" className="btn btn-ghost border border-neutral-700" onClick={openTrash}><Icon name="trash" /> {t('Papelera')} {trashCount ? <span className="rounded-full bg-neutral-800 px-1.5 text-[10px]">{trashCount}</span> : null}</button>
+        <button data-testid="open-library-trash-mobile" className="btn btn-ghost border border-red-500/25 text-red-400 lg:hidden" onClick={openTrash}><Icon name="folder" /> {t('Papelera')} {trashCount ? <span className="rounded-full bg-red-500/10 px-1.5 text-[10px]">{trashCount}</span> : null}</button>
         <button data-testid="open-library-recovery" className="btn btn-ghost border border-neutral-700" onClick={() => setRecoveryOpen(true)} title={t('Revisión y recuperación')}><Icon name="shield" /></button></>}
       </header>
 
       {error && <div role="alert" className="border-b border-red-500/30 bg-red-500/10 px-5 py-2 text-xs text-red-300">{error}</div>}
       {(status.conflicts > 0 || status.invalidRecords > 0) && <div data-testid="global-library-integrity-warning" role="status" className="flex items-start gap-2 border-b border-amber-500/30 bg-amber-500/10 px-5 py-2 text-xs text-amber-200"><Icon name="alert" size={14} className="mt-0.5 shrink-0" /><span><b>{t('La Biblioteca necesita revisión.')}</b> {tx('{conflicts} conflicto(s) conservado(s) · {invalid} registro(s) inválido(s) excluido(s). Los originales no se han modificado.', { conflicts: status.conflicts, invalid: status.invalidRecords })}</span></div>}
       <div className="flex min-h-0 flex-1">
-        {!trashMode && <aside className="library-theme-panel hidden w-[238px] shrink-0 flex-col border-r border-neutral-800 bg-neutral-950/80 lg:flex">
+        <aside className="library-theme-panel hidden w-[238px] shrink-0 flex-col border-r border-neutral-800 bg-neutral-950/80 lg:flex">
           <div className="flex items-center gap-1 px-3 py-3"><b className="min-w-0 flex-1 text-[11px] uppercase tracking-wider text-neutral-500">{t('Colecciones')}</b><button className="grid h-7 w-7 place-items-center rounded hover:bg-neutral-900" title={t('Nueva colección')} onClick={() => void createCollection()}><Icon name="folderPlus" size={14} /></button></div>
           <div className="px-2 pb-2" onDragOver={(event) => event.preventDefault()} onDrop={(event) => void dropCollectionAtRoot(event)}>
-            <button className={`flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs ${selectedCollection === null && selectedSavedSearch === null ? 'bg-indigo-600 text-white' : 'text-neutral-400 hover:bg-neutral-900'}`} onClick={() => { setSelectedCollection(null); setSelectedSavedSearch(null); setOffset(0); }}><Icon name="library" size={14} /><span className="flex-1">{t('Todos los documentos')}</span><span className="text-[10px] opacity-60">{status.items}</span></button>
+            <button className={`flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs ${!trashMode && selectedCollection === null && selectedSavedSearch === null ? 'bg-indigo-600 text-white' : 'text-neutral-400 hover:bg-neutral-900'}`} onClick={() => { setTrashMode(false); setSelectedCollection(null); setSelectedSavedSearch(null); setSelected(new Set()); setDetailId(null); setOffset(0); }}><Icon name="library" size={14} /><span className="flex-1">{t('Todos los documentos')}</span><span className="text-[10px] opacity-60">{status.items}</span></button>
           </div>
-          <div className="min-h-0 flex-1 overflow-y-auto px-2 pb-3">
-            {(children.get(null) ?? []).map((collection) => <CollectionBranch key={collection.id} collection={collection} children={children} selected={selectedCollection} expanded={expanded} onSelect={(id) => { setSelectedCollection(id); setSelectedSavedSearch(null); setOffset(0); }} onToggle={(id) => setExpanded((current) => { const next = new Set(current); if (next.has(id)) next.delete(id); else next.add(id); return next; })} onDrop={(event, entry) => void dropOnCollection(event, entry)} onRename={(entry) => void renameCollection(entry.id)} onMove={setMovingCollection} onDelete={(entry) => void deleteCollection(entry.id)} depth={0} />)}
+          <div className="flex min-h-0 flex-1 flex-col overflow-y-auto px-2 pb-3">
+            {(children.get(null) ?? []).map((collection) => <CollectionBranch key={collection.id} collection={collection} children={children} selected={trashMode ? null : selectedCollection} expanded={expanded} onSelect={(id) => { setTrashMode(false); setSelectedCollection(id); setSelectedSavedSearch(null); setSelected(new Set()); setDetailId(null); setOffset(0); }} onToggle={(id) => setExpanded((current) => { const next = new Set(current); if (next.has(id)) next.delete(id); else next.add(id); return next; })} onDrop={(event, entry) => void dropOnCollection(event, entry)} onRename={(entry) => void renameCollection(entry.id)} onMove={setMovingCollection} onDelete={(entry) => void deleteCollection(entry.id)} depth={0} />)}
             {collections.length === 0 && <p className="px-3 py-4 text-xs leading-5 text-neutral-600">{t('Crea colecciones propias o importa la jerarquía completa de Zotero.')}</p>}
             <div className="mt-4 flex items-center gap-1 border-t border-neutral-800 px-1 pt-3"><b className="min-w-0 flex-1 text-[10px] uppercase tracking-wider text-neutral-600">{t('Búsquedas inteligentes')}</b><button className="grid h-7 w-7 place-items-center rounded hover:bg-neutral-900" onClick={() => setSmartSearchEditor('new')} title={t('Nueva búsqueda inteligente')}><Icon name="plus" size={13} /></button></div>
-            <div className="mt-1 space-y-0.5">{savedSearches.map((record) => <button key={record.id} data-testid={`library-saved-search-${record.id}`} className={`flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-xs ${selectedSavedSearch === record.id ? 'bg-indigo-600 text-white' : 'text-neutral-400 hover:bg-neutral-900'}`} onClick={() => { setSelectedSavedSearch(record.id); setSelectedCollection(null); setOffset(0); }}><Icon name="search" size={12} /><span className="min-w-0 flex-1 truncate">{record.name}</span></button>)}</div>
+            <div className="mt-1 space-y-0.5">{savedSearches.map((record) => <button key={record.id} data-testid={`library-saved-search-${record.id}`} className={`flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-xs ${!trashMode && selectedSavedSearch === record.id ? 'bg-indigo-600 text-white' : 'text-neutral-400 hover:bg-neutral-900'}`} onClick={() => { setTrashMode(false); setSelectedSavedSearch(record.id); setSelectedCollection(null); setSelected(new Set()); setDetailId(null); setOffset(0); }}><Icon name="search" size={12} /><span className="min-w-0 flex-1 truncate">{record.name}</span></button>)}</div>
+            <div className="mt-auto border-t border-red-500/15 px-1 pt-3">
+              <button
+                data-testid="open-library-trash"
+                className={`library-trash-folder flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-xs ${trashMode ? 'is-active' : ''}`}
+                onClick={openTrash}
+                aria-current={trashMode ? 'page' : undefined}
+              >
+                <Icon name="folder" size={14} className="shrink-0" />
+                <span className="min-w-0 flex-1 truncate">{t('Papelera')}</span>
+                {trashCount ? <span className="library-trash-folder-count rounded-full px-1.5 text-[10px] tabular-nums">{trashCount}</span> : null}
+              </button>
+            </div>
           </div>
           {selectedSavedSearch && savedSearches.find((entry) => entry.id === selectedSavedSearch) && <div className="flex gap-1 border-t border-neutral-800 p-2"><button className="btn btn-ghost flex-1 text-xs" onClick={() => setSmartSearchEditor(savedSearches.find((entry) => entry.id === selectedSavedSearch) ?? null)}><Icon name="edit" size={13} /> {t('Editar')}</button><button className="btn btn-ghost text-red-400" onClick={() => { const record = savedSearches.find((entry) => entry.id === selectedSavedSearch); if (record) void removeSavedSearch(record); }} title={t('Eliminar')}><Icon name="trash" size={13} /></button></div>}
-        </aside>}
+        </aside>
 
         <section className="flex min-w-0 flex-1 flex-col">
           <div className="border-b border-neutral-800 p-3">

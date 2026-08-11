@@ -15,6 +15,7 @@ test('the unified Library keeps the global catalogue independent and the vault c
 
 test('the Library UI exposes hierarchy, search, bulk operations, imports and background state', async () => {
   const view = `${await readSource('src/views/GlobalLibraryView.tsx')}\n${await readSource('src/components/library/LibraryItemManager.tsx')}\n${await readSource('src/components/library/LibrarySmartSearchDialog.tsx')}\n${await readSource('src/components/library/LibraryMetadataDialogs.tsx')}\n${await readSource('src/components/library/LibraryRecoveryDialogs.tsx')}`;
+  const appCss = await readSource('src/index.css');
   for (const marker of [
     'global-library-view', 'global-library-search', 'global-library-bulk-actions',
     'global-library-detail', 'zotero-global-import-dialog', 'open-zotero-global-import',
@@ -62,6 +63,11 @@ test('the Library UI exposes hierarchy, search, bulk operations, imports and bac
   assert.doesNotMatch(view, /event\.shiftKey \? targetCollection\.id/, 'nesting does not depend on a hidden keyboard modifier');
   assert.match(view, /deleteGlobalLibraryCollection\(current\.id, false\)/, 'deleting a grouping explicitly preserves its items');
   assert.match(view, /collectionSubtreeIds/, 'move and delete actions account for every nested collection');
+  assert.match(view, /data-testid="open-library-trash"[\s\S]*?<Icon name="folder"/, 'trash is rendered as the final collection-tree folder');
+  assert.match(view, /library-trash-folder[\s\S]*aria-current=\{trashMode \? 'page'/, 'the trash folder exposes its selected state');
+  assert.doesNotMatch(view, /\{!trashMode && <aside/, 'the collection tree remains visible while trash is open');
+  assert.match(appCss, /\.library-trash-folder\.is-active[\s\S]*background: rgb\(127 29 29 \/ 0\.32\)/);
+  assert.match(appCss, /\.light \.library-trash-folder\.is-active[\s\S]*background: #fee2e2/);
   assert.match(view, /La importación se canceló; el catálogo ya recuperado se conserva/);
   assert.match(view, /Copia de solo lectura: Nodus nunca modifica Zotero/);
   assert.match(view, /status\.conflicts > 0 \|\| status\.invalidRecords > 0/);

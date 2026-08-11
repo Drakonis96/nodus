@@ -420,6 +420,9 @@ that grouping and its nested groupings: items, attachments, notes, annotations,
 and analyses remain in the Library. Dropping one or more document rows copies
 their memberships without changing their files or analysis. The bulk bar also
 exposes explicit copy, move, and remove operations.
+Trash is a fixed, red-tinted folder at the end of the complete collection tree.
+It cannot be renamed, moved, nested, or used as a drop target, and remains
+visible while its recoverable contents are being reviewed.
 Imported Zotero collection nodes and their mirrored memberships are locked;
 local organization belongs in Nodus collections and survives source refreshes.
 
