@@ -416,6 +416,7 @@ export const TR: Record<string, string> = {
   "Ej. Simplifica la pantalla inicial y añade un filtro por fecha…": "Örneğin. Başlangıç ​​ekranını basitleştirin ve tarihe göre filtre ekleyin…",
   "Ej. Necesito organizar las fuentes de mi trabajo final y comparar sus conclusiones…": "Mesela son çalışmamın kaynaklarını düzenleyip sonuçlarını karşılaştırmam gerekiyor…",
   "Modelo de IA": "Yapay zeka modeli",
+  "Modelo de IA para mejorar texto": "Metin iyileştirme için yapay zeka modeli",
   "Elige un modelo de IA para construir la app.": "Uygulamayı oluşturmak için bir yapay zeka modeli seçin.",
   "Preparando tu versión…": "Sürümünüz hazırlanıyor…",
   "Aplicar el cambio con IA": "Değişikliği AI ile uygulayın",

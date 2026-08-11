@@ -1682,6 +1682,7 @@ export const IT: Record<string, string> = {
   "La cola de escaneo": "La coda di scansione",
   "Sigue aquí el progreso. Si falta el modelo de IA o la clave, la cola se pausa y te avisa en vez de fallar en silencio: lo arreglas en Ajustes y pulsas «Reanudar».": "Tieni traccia dei progressi qui. Se manca il modello o la chiave AI, la coda si ferma e ti avvisa invece di fallire silenziosamente: correggilo in Impostazioni e fai clic su \"Riprendi\".",
   "Modelo de IA": "Modello di intelligenza artificiale",
+  "Modelo de IA para mejorar texto": "Modello IA per migliorare il testo",
   "Comprueba que hay un modelo seleccionado: sin él, Nodus no puede escanear. Puedes cambiarlo aquí o en Ajustes, y marcar tus favoritos.": "Assicurati che sia selezionato un modello: senza uno, Nodus non può eseguire la scansione. Puoi modificarlo qui o in Impostazioni e contrassegnare i tuoi preferiti.",
   "¡Listo para empezar!": "Pronti a partire!",
   "Explora el grafo, descubre huecos de investigación y sigue la ruta de lectura sugerida. Podrás volver a ver este recorrido desde Ajustes cuando quieras.": "Esplora il grafico, scopri le lacune della ricerca e segui il percorso di lettura suggerito. Puoi riprodurre questo tour dalle Impostazioni quando vuoi.",

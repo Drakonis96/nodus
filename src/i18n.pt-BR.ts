@@ -1844,6 +1844,7 @@ export const PT_BR: Record<string, string> = {
   'Sigue aquí el progreso. Si falta el modelo de IA o la clave, la cola se pausa y te avisa en vez de fallar en silencio: lo arreglas en Ajustes y pulsas «Reanudar».':
     'Acompanhe aqui o progresso. Se faltar o modelo de IA ou a chave, a fila é pausada e avisa você em vez de falhar silenciosamente: você corrige em Configurações e clica em “Retomar”.',
   'Modelo de IA': 'Modelo de IA',
+  'Modelo de IA para mejorar texto': 'Modelo de IA para melhorar o texto',
   'Comprueba que hay un modelo seleccionado: sin él, Nodus no puede escanear. Puedes cambiarlo aquí o en Ajustes, y marcar tus favoritos.':
     'Verifique se há um modelo selecionado: sem ele, o Nodus não consegue escanear. Você pode alterá-lo aqui ou em Configurações, e marcar seus favoritos.',
   '¡Listo para empezar!': 'Pronto para começar!',

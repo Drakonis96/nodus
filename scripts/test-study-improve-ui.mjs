@@ -7,7 +7,7 @@ import { fileURLToPath } from 'node:url';
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const read = (file) => readFile(path.join(root, file), 'utf8');
 
-test('study improvement is selection-first, streamed in place and undoable', async () => {
+test('study improvement is selection-first, streamed in place and committed to the editor history', async () => {
   const [editor, dialog] = await Promise.all([
     read('src/components/editor/StudyEditor.tsx'),
     read('src/components/editor/StudyImproveDialog.tsx'),
@@ -23,11 +23,15 @@ test('study improvement is selection-first, streamed in place and undoable', asy
   assert.match(editor, /data-testid=\{`study-quick-improve-/);
   assert.match(editor, /runQuickImprovement/);
   assert.match(editor, /requestAnimationFrame\(flush\)/);
-  assert.match(editor, /replaceAll\(markdown\)\(ctx\)/);
+  assert.match(editor, /addToHistory: commitToHistory/);
+  assert.match(editor, /replaceAllMarkdown\(base, \{ addToHistory: false \}\)/);
+  assert.match(editor, /closeHistory: commitToHistory/);
   assert.match(editor, /data-testid="study-improve-streaming"/);
   assert.match(editor, /bg-teal-50[^]*dark:bg-teal-950/);
-  assert.match(editor, /data-testid="study-improve-undo"/);
-  assert.match(editor, /event\.key\.toLowerCase\(\) === 'z'/);
+  assert.match(editor, /data-testid="study-editor-undo"/);
+  assert.match(editor, /data-testid="study-editor-redo"/);
+  assert.doesNotMatch(editor, /study-improve-undo|improveUndo|undoImprovement/);
+  assert.doesNotMatch(editor, /event\.key\.toLowerCase\(\) === 'z'/);
   assert.match(editor, /El original permanece intacto/);
   assert.doesNotMatch(dialog, /Transformación libre/);
   assert.doesNotMatch(dialog, /Conservar significado/);

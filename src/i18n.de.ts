@@ -1858,6 +1858,7 @@ export const DE: Record<string, string> = {
   'Sigue aquí el progreso. Si falta el modelo de IA o la clave, la cola se pausa y te avisa en vez de fallar en silencio: lo arreglas en Ajustes y pulsas «Reanudar».':
     'Verfolgen Sie hier den Fortschritt. Fehlt das KI-Modell oder der Schlüssel, pausiert die Warteschlange und warnt Sie, anstatt stillschweigend zu scheitern: Beheben Sie es in den Einstellungen und klicken Sie auf „Fortsetzen“.',
   'Modelo de IA': 'KI-Modell',
+  'Modelo de IA para mejorar texto': 'KI-Modell zur Textverbesserung',
   'Comprueba que hay un modelo seleccionado: sin él, Nodus no puede escanear. Puedes cambiarlo aquí o en Ajustes, y marcar tus favoritos.':
     'Stellen Sie sicher, dass ein Modell ausgewählt ist: Ohne es kann Nodus nicht scannen. Sie können es hier oder in den Einstellungen ändern und Ihre Favoriten markieren.',
   '¡Listo para empezar!': 'Bereit loszulegen!',

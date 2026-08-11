@@ -35,6 +35,7 @@ const openRecording = (ctx: ViewContext) => (id: string, timestamp?: number | nu
 export const studyViews = {
   studyCourses: (ctx) => (
     <StudyOrganizationView
+      settings={ctx.settings}
       target={ctx.studyTarget}
       mode="organization"
       onTargetChange={ctx.setStudyTarget}
