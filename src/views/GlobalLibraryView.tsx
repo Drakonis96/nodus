@@ -733,7 +733,7 @@ function GlobalLibraryContent({
   );
 
   return (
-    <div data-testid="global-library-view" className="flex h-full min-h-0 flex-col bg-neutral-950">
+    <div data-testid="global-library-view" className="library-theme-canvas flex h-full min-h-0 flex-col bg-neutral-950">
       <header className="flex flex-wrap items-center gap-3 border-b border-neutral-800 px-5 py-3">
         <div className="min-w-0"><h1 className="flex items-center gap-2 text-lg font-semibold"><Icon name={trashMode ? 'trash' : 'book'} className={trashMode ? 'text-amber-400' : 'text-indigo-400'} /> {t(trashMode ? 'Papelera' : 'Biblioteca')}</h1><p className="text-[11px] text-neutral-500">{trashMode ? tx('{n} elemento(s) recuperable(s)', { n: trashCount }) : tx('{n} documentos · disponible en todos los vaults', { n: status.items })}</p></div>
         <div className="flex-1" />
@@ -754,7 +754,7 @@ function GlobalLibraryContent({
       {error && <div role="alert" className="border-b border-red-500/30 bg-red-500/10 px-5 py-2 text-xs text-red-300">{error}</div>}
       {(status.conflicts > 0 || status.invalidRecords > 0) && <div data-testid="global-library-integrity-warning" role="status" className="flex items-start gap-2 border-b border-amber-500/30 bg-amber-500/10 px-5 py-2 text-xs text-amber-200"><Icon name="alert" size={14} className="mt-0.5 shrink-0" /><span><b>{t('La Biblioteca necesita revisión.')}</b> {tx('{conflicts} conflicto(s) conservado(s) · {invalid} registro(s) inválido(s) excluido(s). Los originales no se han modificado.', { conflicts: status.conflicts, invalid: status.invalidRecords })}</span></div>}
       <div className="flex min-h-0 flex-1">
-        {!trashMode && <aside className="hidden w-[238px] shrink-0 flex-col border-r border-neutral-800 bg-neutral-950/80 lg:flex">
+        {!trashMode && <aside className="library-theme-panel hidden w-[238px] shrink-0 flex-col border-r border-neutral-800 bg-neutral-950/80 lg:flex">
           <div className="flex items-center gap-1 px-3 py-3"><b className="min-w-0 flex-1 text-[11px] uppercase tracking-wider text-neutral-500">{t('Colecciones')}</b><button className="grid h-7 w-7 place-items-center rounded hover:bg-neutral-900" title={t('Nueva colección')} onClick={() => void createCollection()}><Icon name="folderPlus" size={14} /></button></div>
           <div className="px-2 pb-2" onDragOver={(event) => event.preventDefault()} onDrop={(event) => void dropCollectionAtRoot(event)}>
             <button className={`flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs ${selectedCollection === null && selectedSavedSearch === null ? 'bg-indigo-600 text-white' : 'text-neutral-400 hover:bg-neutral-900'}`} onClick={() => { setSelectedCollection(null); setSelectedSavedSearch(null); setOffset(0); }}><Icon name="library" size={14} /><span className="flex-1">{t('Todos los documentos')}</span><span className="text-[10px] opacity-60">{status.items}</span></button>
@@ -814,7 +814,7 @@ function GlobalLibraryContent({
           <footer className="flex h-10 items-center border-t border-neutral-800 px-3 text-xs text-neutral-500"><span>{tx('{start}–{end} de {total}', { start: total ? offset + 1 : 0, end: Math.min(offset + items.length, total), total })}</span><div className="flex-1" /><button className="btn btn-ghost h-7" disabled={offset === 0} onClick={() => setOffset(Math.max(0, offset - PAGE_SIZE))}><Icon name="chevronLeft" size={13} /></button><button className="btn btn-ghost h-7" disabled={offset + items.length >= total} onClick={() => setOffset(offset + PAGE_SIZE)}><Icon name="chevronRight" size={13} /></button></footer>
         </section>
 
-        {detail && <aside data-testid="global-library-detail" className="flex w-[310px] shrink-0 flex-col border-l border-neutral-800 bg-neutral-950">
+        {detail && <aside data-testid="global-library-detail" className="library-theme-panel flex w-[310px] shrink-0 flex-col border-l border-neutral-800 bg-neutral-950">
           <header className="flex items-center gap-2 border-b border-neutral-800 p-3"><b className="min-w-0 flex-1 truncate text-sm">{t('Detalles')}</b><button className="grid h-7 w-7 place-items-center rounded hover:bg-neutral-900" onClick={() => setDetailId(null)}><Icon name="x" size={14} /></button></header>
           <div className="min-h-0 flex-1 overflow-y-auto p-4"><span className="rounded bg-indigo-500/10 px-2 py-1 text-[10px] font-medium text-indigo-300">{SOURCE_LABEL[detail.source]}</span><h2 className="mt-3 text-base font-semibold leading-6">{detail.metadata.title}</h2><p className="mt-2 text-xs leading-5 text-neutral-500">{detail.metadata.creators.map((creator) => creator.name || [creator.firstName, creator.lastName].filter(Boolean).join(' ')).filter(Boolean).join('; ') || t('Sin autoría')}</p>
             {detail.sourceState && detail.sourceState !== 'current' && <div data-testid="library-source-missing" role="status" className="mt-4 rounded-lg border border-amber-500/30 bg-amber-500/10 p-2.5 text-[11px] text-amber-950 dark:text-amber-100"><b>{t(detail.sourceState === 'library-missing' ? 'Biblioteca de origen no disponible' : 'Elemento ausente en el origen')}</b><p className="mt-1 opacity-80">{t('El contenido de Nodus se conserva y volverá a vincularse si reaparece en Zotero.')}</p></div>}
@@ -904,8 +904,8 @@ export function GlobalLibraryView({
   };
 
   return (
-    <div data-testid="library-scope-shell" data-library-scope={scope} className="flex h-full min-h-0 flex-col">
-      <div data-testid="library-scope-switcher" className="flex min-h-12 shrink-0 items-center gap-3 border-b border-neutral-800 bg-neutral-950 px-5 py-2">
+    <div data-testid="library-scope-shell" data-library-scope={scope} className="library-theme flex h-full min-h-0 flex-col">
+      <div data-testid="library-scope-switcher" className="library-theme-bar flex min-h-12 shrink-0 items-center gap-3 border-b border-neutral-800 bg-neutral-950 px-5 py-2">
         <span className="hidden text-[10px] font-semibold uppercase tracking-wider text-neutral-600 sm:inline">{t('Ámbito de la Biblioteca')}</span>
         <div className="flex rounded-lg border border-neutral-800 bg-neutral-900/70 p-0.5" role="group" aria-label={t('Ámbito de la Biblioteca')}>
           <button

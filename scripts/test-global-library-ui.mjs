@@ -61,6 +61,9 @@ test('the Library UI exposes hierarchy, search, bulk operations, imports and bac
   assert.match(view, /status\.conflicts > 0 \|\| status\.invalidRecords > 0/);
   assert.match(view, /LibraryDocumentReader/);
   assert.match(view, /onDoubleClick=\{\(\) => item\.readerAvailable/);
+  assert.match(view, /className="library-theme flex/);
+  assert.match(view, /className="library-theme-canvas flex/);
+  assert.match(view, /className="library-theme-panel/);
 });
 
 test('the global reader exposes annotations, metadata, chat and native attachment viewers', async () => {
@@ -96,6 +99,8 @@ test('the global reader exposes annotations, metadata, chat and native attachmen
   assert.match(reader, /ModelPicker/);
   assert.match(reader, /onReaderCitation={openReaderCitation}/);
   assert.match(reader, /library-reader-chat-input/);
+  assert.match(reader, /data-testid="library-reader-empty-card"/);
+  assert.match(reader, /library-reader-empty-icon/);
   assert.match(store, /function globalDocument/);
   assert.match(store, /nodus-library:\/\/original/);
   assert.match(store, /nodus-library:\/\/attachment/);

@@ -499,8 +499,8 @@ export function LibraryDocumentReader({
           <button className="btn btn-ghost gap-1.5" onClick={onBack}><Icon name="chevronLeft" /> {t('Volver a la biblioteca')}</button>
         </header>
         <div className="grid min-h-0 flex-1 place-items-center p-8">
-          <div className="max-w-lg rounded-2xl border border-dashed border-neutral-700 bg-neutral-950/30 p-8 text-center">
-            <span className="mx-auto grid h-12 w-12 place-items-center rounded-2xl bg-indigo-950 text-indigo-300"><Icon name="book" size={21} /></span>
+          <div data-testid="library-reader-empty-card" className="library-reader-empty-card max-w-lg rounded-2xl border border-dashed border-neutral-700 bg-neutral-950/30 p-8 text-center">
+            <span className="library-reader-empty-icon mx-auto grid h-12 w-12 place-items-center rounded-2xl bg-indigo-950 text-indigo-300"><Icon name="book" size={21} /></span>
             <h2 className="mt-4 text-base font-semibold text-neutral-100">{t('Todavía no hay una versión limpia de esta obra')}</h2>
             <p className="mt-2 text-sm leading-6 text-neutral-500">{error ?? tx('El lector buscará el documento en nodus-library/{id}, conservando su identificador estable.', { id: reference.zoteroKey || reference.id })}</p>
             <div className="mt-5 flex justify-center gap-2">

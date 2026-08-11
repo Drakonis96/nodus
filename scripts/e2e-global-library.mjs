@@ -131,6 +131,24 @@ try {
     document.documentElement.classList.add('light');
     document.documentElement.classList.remove('dark');
   });
+  await page.setViewportSize({ width: 1540, height: 940 });
+  const lightRow = page.getByTestId(`global-library-item-${itemId}`);
+  await lightRow.hover();
+  const lightPalette = await page.evaluate((id) => {
+    const row = document.querySelector(`[data-testid="global-library-item-${id}"]`);
+    const canvas = document.querySelector('[data-testid="global-library-view"]');
+    const scope = document.querySelector('[data-testid="library-scope-switcher"]');
+    if (!(row instanceof HTMLElement) || !(canvas instanceof HTMLElement) || !(scope instanceof HTMLElement)) throw new Error('Library surfaces not found');
+    return {
+      row: getComputedStyle(row).backgroundColor,
+      canvas: getComputedStyle(canvas).backgroundColor,
+      scope: getComputedStyle(scope).backgroundColor,
+    };
+  }, itemId);
+  const rgb = (value) => value.match(/[\d.]+/g)?.slice(0, 3).map(Number) ?? [];
+  assert.ok(rgb(lightPalette.row).every((channel) => channel >= 240), `a hovered light row stays pale (${JSON.stringify(lightPalette)})`);
+  assert.deepEqual(rgb(lightPalette.canvas), rgb(lightPalette.scope), `Library and scope bar share one light canvas (${JSON.stringify(lightPalette)})`);
+  await page.screenshot({ path: path.join(os.tmpdir(), 'nodus-library-scope-global-light-wide.png'), fullPage: true });
   await page.setViewportSize({ width: 760, height: 900 });
   await page.screenshot({ path: path.join(os.tmpdir(), 'nodus-library-scope-global-light-narrow.png'), fullPage: true });
   await page.getByTestId('library-scope-vault').click();

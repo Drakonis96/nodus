@@ -372,6 +372,9 @@ body {
 .light .border-neutral-900 {
   border-color: #d4d4d4;
 }
+.light .hover\:border-neutral-700:hover {
+  border-color: #a3a3a3;
+}
 .light .border-cyan-900,
 .light .border-cyan-900\/70 {
   border-color: #67e8f9;
@@ -390,9 +393,12 @@ body {
   background-color: #f8fafc;
 }
 .light .bg-neutral-950\/25,
+.light .bg-neutral-950\/30,
 .light .bg-neutral-950\/35,
 .light .bg-neutral-950\/40,
+.light .bg-neutral-950\/45,
 .light .bg-neutral-950\/50,
+.light .bg-neutral-950\/55,
 .light .bg-neutral-950\/60,
 .light .bg-neutral-950\/70,
 .light .bg-neutral-950\/80 {
@@ -479,6 +485,7 @@ body {
 }
 .light .bg-indigo-950\/35,
 .light .bg-indigo-950\/40,
+.light .bg-indigo-950\/45,
 .light .bg-indigo-950\/25,
 .light .bg-indigo-950\/20 {
   background-color: #e0e7ff;
@@ -524,6 +531,7 @@ body {
 .light .border-red-700\/60 {
   border-color: #fca5a5;
 }
+.light .border-amber-700\/50,
 .light .border-amber-700\/60 {
   border-color: #fcd34d;
 }
@@ -540,6 +548,7 @@ body {
 .light .hover\:bg-neutral-900\/30:hover,
 .light .hover\:bg-neutral-900\/40:hover,
 .light .hover\:bg-neutral-900\/50:hover,
+.light .hover\:bg-neutral-900\/55:hover,
 .light .hover\:bg-neutral-900\/60:hover,
 .light .hover\:bg-neutral-900\/70:hover,
 .light .hover\:bg-neutral-900\/80:hover {
@@ -555,6 +564,7 @@ body {
 .light .hover\:bg-neutral-700:hover {
   background-color: #d4d4d4;
 }
+.light .hover\:bg-red-950:hover,
 .light .hover\:bg-red-950\/50:hover {
   background-color: #fee2e2;
 }
@@ -747,8 +757,28 @@ body {
 .light .bg-amber-950\/10 {
   background-color: #fffbeb;
 }
-.light .bg-amber-950\/20 {
+.light .bg-amber-950\/20,
+.light .bg-amber-950\/25,
+.light .bg-amber-950\/35 {
   background-color: #fef3c7;
+}
+.light .bg-emerald-950\/30 {
+  background-color: #ecfdf5;
+}
+.light .bg-indigo-950 {
+  background-color: #eef2ff;
+}
+.light .border-neutral-800\/80 {
+  border-color: #d4d4d4;
+}
+.light .border-amber-800\/35,
+.light .border-amber-800\/40,
+.light .border-amber-800\/50,
+.light .border-amber-800\/70 {
+  border-color: rgba(217, 119, 6, 0.35);
+}
+.light .border-emerald-900\/70 {
+  border-color: rgba(5, 150, 105, 0.35);
 }
 .light .border-amber-900\/50,
 .light .border-amber-900\/60 {
@@ -2865,6 +2895,52 @@ select.input optgroup {
 /* Clean-library reader: the document remains Markdown, but it should feel like a
    quiet reading surface rather than another dashboard card. The outline and note
    rails carry navigation; the paper carries only the source. */
+.library-theme {
+  color-scheme: dark;
+}
+.light .library-theme,
+.light .library-theme-canvas,
+.light .library-theme-bar {
+  background: #fafafa;
+  color: #171717;
+  color-scheme: light;
+}
+.light .library-theme-panel {
+  border-color: #e5e7eb;
+  background: #ffffff;
+}
+.light .library-theme .bg-neutral-950\/25,
+.light .library-theme .bg-neutral-950\/30,
+.light .library-theme .bg-neutral-950\/35,
+.light .library-theme .bg-neutral-950\/40,
+.light .library-theme .bg-neutral-950\/45,
+.light .library-theme .bg-neutral-950\/50,
+.light .library-theme .bg-neutral-950\/55,
+.light .library-theme .bg-neutral-950\/60,
+.light .library-theme .bg-neutral-950\/70,
+.light .library-theme .bg-neutral-950\/80 {
+  background-color: rgba(255, 255, 255, 0.94);
+}
+.light .library-theme .bg-neutral-900,
+.light .library-theme .bg-neutral-900\/40,
+.light .library-theme .bg-neutral-900\/50,
+.light .library-theme .bg-neutral-900\/55,
+.light .library-theme .bg-neutral-900\/60,
+.light .library-theme .bg-neutral-900\/70 {
+  background-color: #ffffff;
+}
+.light .library-theme .text-indigo-100 {
+  color: #3730a3;
+}
+.light .library-reader-empty-card {
+  border-color: #d4d4d4;
+  background: #ffffff;
+  box-shadow: 0 18px 50px -38px rgb(15 23 42 / 0.35);
+}
+.light .library-reader-empty-icon {
+  background: #eef2ff;
+  color: #4f46e5;
+}
 .library-reader-clean-surface {
   background: #09090b;
   color-scheme: dark;
