@@ -644,7 +644,7 @@ export function LibraryDocumentReader({
     : t(reader.freshness === 'current' ? 'Markdown limpio' : 'Última copia legible');
 
   return (
-    <div className="library-document-reader flex h-full min-h-0 min-w-0 flex-col overflow-hidden">
+    <div className="library-document-reader relative flex h-full min-h-0 min-w-0 flex-col overflow-hidden">
       <NodiViewContextSource title={reader.title} text={contextMarkdown} />
       <header className="relative z-40 flex flex-wrap items-center gap-2 border-b border-neutral-800 bg-neutral-950/60 px-4 py-2.5 backdrop-blur">
         <button className="btn btn-ghost gap-1.5" onClick={onBack}><Icon name="chevronLeft" /> {t('Biblioteca')}</button>
@@ -889,7 +889,7 @@ export function LibraryDocumentReader({
           </aside>
         )}
       </div>
-      {selectedSource === 'clean' && <FindInPage targetRef={scrollRef} />}
+      {selectedSource === 'clean' && <FindInPage targetRef={documentRef} sourceRevision={reader.contentFingerprint ?? reader.generatedAt ?? reader.storageId} placement="reader" />}
       {previewPage && reader.originalUrl && <OriginalPagePreview url={reader.originalUrl} initialPage={previewPage} title={reader.title} onClose={() => setPreviewPage(null)} onOpenFull={() => void window.nodus.openLibraryReaderOriginal(reference.id)} />}
       {citation && <SourceCitationModal target={citation} onClose={() => setCitation(null)} />}
     </div>

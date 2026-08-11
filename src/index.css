@@ -3807,6 +3807,14 @@ body:has(.library-document-reader [data-testid="library-reader-sidebar"]) .app-t
   background-color: #facc15;
   color: #111827;
 }
+/* In the Library reader, keep document search over the reading surface rather
+   than covering the persistent notes/chat rail on wide windows. Narrow rails
+   are overlays already, so the search remains right-aligned and above them. */
+@media (min-width: 1280px) {
+  .library-document-reader:has(.library-reader-notes) .find-in-page-panel[data-find-placement="reader"] {
+    right: 21.75rem;
+  }
+}
 
 /* Study editor: Milkdown owns document structure; these variables keep visual
    preferences outside the Markdown so typography never mutates content. */

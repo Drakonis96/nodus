@@ -31,6 +31,11 @@ const lightScreenshotPath = path.join(screenshotDirectory, '09-clean-reader-ligh
 const responsiveChatScreenshotPath = path.join(screenshotDirectory, '10-reader-chat-responsive.png');
 const lightControlsScreenshotPath = path.join(screenshotDirectory, '11-reader-controls-light.png');
 const lightOutlineScreenshotPath = path.join(screenshotDirectory, '12-reader-outline-light-hover.png');
+const cleanFindScreenshotPath = path.join(screenshotDirectory, '13-reader-find-clean.png');
+const pdfFindScreenshotPath = path.join(screenshotDirectory, '14-reader-find-pdf.png');
+const epubFindScreenshotPath = path.join(screenshotDirectory, '15-reader-find-epub.png');
+const imageFindScreenshotPath = path.join(screenshotDirectory, '16-reader-find-image.png');
+const lightFindScreenshotPath = path.join(screenshotDirectory, '17-reader-find-light-narrow.png');
 const childEnv = {
   ...process.env,
   NODUS_USERDATA: userData,
@@ -247,6 +252,42 @@ ${longReaderBody}
   assert.match(await documentRoot.innerText(), /Texto introductorio/);
   assert.equal(await documentRoot.locator('img').count(), 1, 'local extracted images render inside the clean document');
   assert.equal(await documentRoot.locator('table').count(), 1, 'Markdown tables remain structured');
+  await page.keyboard.press('Control+f');
+  const cleanFindPanel = page.getByTestId('find-in-page');
+  await cleanFindPanel.waitFor({ state: 'visible' });
+  const [readerHeaderBox, cleanFindBox, persistentReaderSidebarBox] = await Promise.all([
+    page.locator('.library-document-reader > header').boundingBox(),
+    cleanFindPanel.boundingBox(),
+    page.getByTestId('library-reader-sidebar').boundingBox(),
+  ]);
+  assert.ok(readerHeaderBox && cleanFindBox && persistentReaderSidebarBox);
+  assert.ok(cleanFindBox.y >= readerHeaderBox.y + readerHeaderBox.height - 1, `document search opens below the reader header (${JSON.stringify({ readerHeaderBox, cleanFindBox })})`);
+  assert.ok(cleanFindBox.x + cleanFindBox.width <= persistentReaderSidebarBox.x + 1, `document search does not cover the persistent notes or chat rail (${JSON.stringify({ cleanFindBox, persistentReaderSidebarBox })})`);
+  assert.equal(await cleanFindPanel.locator('input[type="checkbox"]').count(), 3, 'document search exposes three compact search options');
+  const cleanFindInput = page.getByTestId('find-in-page-input');
+  const cleanFindStatus = page.getByTestId('find-in-page-status');
+  await cleanFindInput.fill('párrafo de carga');
+  await cleanFindStatus.filter({ hasText: 'Coincidencia 1 de 180' }).waitFor();
+  await page.waitForFunction(() => CSS.highlights?.get('nodus-find')?.size === 180 && CSS.highlights?.get('nodus-find-current')?.size === 1);
+  await page.getByTestId('find-option-case').check();
+  await cleanFindStatus.filter({ hasText: 'No se encontró ese texto' }).waitFor();
+  await page.getByTestId('find-option-case').uncheck();
+  await cleanFindStatus.filter({ hasText: 'Coincidencia 1 de 180' }).waitFor();
+  await cleanFindInput.fill('carg');
+  await cleanFindStatus.filter({ hasText: 'Coincidencia 1 de 180' }).waitFor();
+  await page.getByTestId('find-option-whole').check();
+  await cleanFindStatus.filter({ hasText: 'No se encontró ese texto' }).waitFor();
+  await page.getByTestId('find-option-whole').uncheck();
+  await cleanFindInput.fill('párrafo de carga');
+  await cleanFindStatus.filter({ hasText: 'Coincidencia 1 de 180' }).waitFor();
+  await cleanFindPanel.getByRole('button', { name: 'Ir a la coincidencia siguiente' }).click();
+  await cleanFindStatus.filter({ hasText: 'Coincidencia 2 de 180' }).waitFor();
+  await page.getByTestId('find-option-mark-all').uncheck();
+  await page.waitForFunction(() => !CSS.highlights?.get('nodus-find') && CSS.highlights?.get('nodus-find-current')?.size === 1);
+  await page.getByTestId('find-option-mark-all').check();
+  await page.screenshot({ path: cleanFindScreenshotPath, fullPage: true });
+  await page.keyboard.press('Escape');
+  await cleanFindPanel.waitFor({ state: 'detached' });
   const academicProseLayout = await documentRoot.evaluate((root) => {
     const paragraph = root.querySelector('.md > p');
     const quotation = root.querySelector('.md blockquote');
@@ -498,6 +539,19 @@ ${longReaderBody}
   await pdfViewer.waitFor({ state: 'visible' });
   await pdfViewer.locator('canvas').waitFor({ state: 'visible' });
   await page.waitForFunction(() => document.querySelectorAll('[data-testid="library-reader-pdf-viewer"] .textLayer span').length > 0);
+  await page.keyboard.press('Control+f');
+  const pdfFindPanel = page.getByTestId('find-in-page');
+  await pdfFindPanel.waitFor({ state: 'visible' });
+  await page.getByTestId('find-in-page-input').fill('hipotesis inicial');
+  await page.getByTestId('find-in-page-status').filter({ hasText: 'Coincidencia 1 de 1' }).waitFor();
+  await page.waitForFunction(() => document.querySelector('[data-testid="library-reader-pdf-viewer"] input[aria-label="Página"]')?.value === '3');
+  await page.waitForFunction(() => CSS.highlights?.get('nodus-find-current')?.size === 1);
+  await page.screenshot({ path: pdfFindScreenshotPath, fullPage: true });
+  await page.keyboard.press('Escape');
+  await pdfFindPanel.waitFor({ state: 'detached' });
+  await pdfViewer.getByRole('spinbutton', { name: 'Página' }).fill('1');
+  await page.waitForFunction(() => !document.querySelector('[data-testid="library-reader-pdf-viewer"]')?.getAttribute('data-rendered-scale'));
+  await page.waitForFunction(() => document.querySelector('[data-testid="library-reader-pdf-viewer"]')?.getAttribute('data-rendered-scale'));
   assert.match(await page.getByTestId('library-reader-freshness').innerText(), /Archivo original/);
   assert.match(await page.locator('.library-reader-outline').innerText(), /Introducción[\s\S]*Resultados/, 'the clean-document outline remains available while the PDF is open');
   assert.equal((await pdfViewer.getByRole('button', { name: 'Anterior' }).innerText()).trim(), '');
@@ -553,6 +607,23 @@ ${longReaderBody}
   const epubViewer = page.getByTestId('library-reader-epub-viewer');
   await epubViewer.waitFor({ state: 'visible' });
   assert.match(await epubViewer.innerText(), /Este texto refluye/);
+  await page.keyboard.press('Control+f');
+  const epubFindPanel = page.getByTestId('find-in-page');
+  await epubFindPanel.waitFor({ state: 'visible' });
+  await page.getByTestId('find-in-page-input').fill('segundo capítulo');
+  await page.getByTestId('find-in-page-status').filter({ hasText: 'Coincidencia 1 de 1' }).waitFor();
+  await page.waitForFunction(() => document.querySelector('[data-testid="library-reader-epub-viewer"] select')?.value === '1');
+  await page.waitForFunction(() => CSS.highlights?.get('nodus-find-current')?.size === 1);
+  const [epubFindBox, epubSurfaceBox] = await Promise.all([
+    epubFindPanel.boundingBox(),
+    page.getByTestId('library-reader-epub-content').boundingBox(),
+  ]);
+  assert.ok(epubFindBox && epubSurfaceBox);
+  assert.ok(epubFindBox.x >= epubSurfaceBox.x && epubFindBox.x + epubFindBox.width <= epubSurfaceBox.x + epubSurfaceBox.width + 1, `EPUB search remains fully visible inside its reading surface (${JSON.stringify({ epubFindBox, epubSurfaceBox })})`);
+  await page.screenshot({ path: epubFindScreenshotPath, fullPage: true });
+  await page.keyboard.press('Escape');
+  await epubFindPanel.waitFor({ state: 'detached' });
+  await epubViewer.locator('select').selectOption('0');
   await assertViewerContained(epubViewer, 'EPUB');
   await page.evaluate(() => {
     const root = document.querySelector('[data-testid="library-reader-epub-content"] .library-attachment-text');
@@ -579,17 +650,34 @@ ${longReaderBody}
   await page.mouse.down(); await page.mouse.move(imageBox.x + imageBox.width * .68, imageBox.y + imageBox.height * .7, { steps: 8 }); await page.mouse.up();
   await waitForSavedAnnotations((items) => items.some((item) => item.target?.type === 'region' && item.target.attachmentId === 'local:READERIMAGE'), 'image region');
   await page.screenshot({ path: imageScreenshotPath, fullPage: true });
+  await page.keyboard.press('Control+f');
+  const imageFindPanel = page.getByTestId('find-in-page');
+  await imageFindPanel.waitFor({ state: 'visible' });
+  assert.equal(await imageFindPanel.locator('input[type="checkbox"]:disabled').count(), 3, 'text-only options are disabled for image files');
+  await page.getByTestId('find-in-page-status').filter({ hasText: 'Las imágenes no contienen una capa textual' }).waitFor();
+  await page.screenshot({ path: imageFindScreenshotPath, fullPage: true });
+  await page.keyboard.press('Escape');
+  await imageFindPanel.waitFor({ state: 'detached' });
 
   await sourceChooser.selectOption('local:READERDOCX');
   const textViewer = page.getByTestId('library-reader-text-viewer');
   await textViewer.waitFor({ state: 'visible' });
   assert.match(await textViewer.innerText(), /Documento Word abierto dentro de Nodus/);
+  await page.keyboard.press('Control+f');
+  await page.getByTestId('find-in-page-input').fill('seleccionar');
+  await page.getByTestId('find-in-page-status').filter({ hasText: 'Coincidencia 1 de 1' }).waitFor();
+  await page.waitForFunction(() => CSS.highlights?.get('nodus-find-current')?.size === 1);
+  await page.keyboard.press('Escape');
   await assertViewerContained(textViewer, 'office document');
   await page.screenshot({ path: docxScreenshotPath, fullPage: true });
 
   await sourceChooser.selectOption('local:READERXLSX');
   await textViewer.waitFor({ state: 'visible' });
   assert.match(await textViewer.innerText(), /Claridad[\s\S]*95/);
+  await page.keyboard.press('Control+f');
+  await page.getByTestId('find-in-page-input').fill('Fidelidad');
+  await page.getByTestId('find-in-page-status').filter({ hasText: 'Coincidencia 1 de 1' }).waitFor();
+  await page.keyboard.press('Escape');
   await page.screenshot({ path: spreadsheetScreenshotPath, fullPage: true });
 
   await page.getByTestId('library-scope-shell').getByRole('button', { name: 'Biblioteca', exact: true }).click();
@@ -675,6 +763,18 @@ ${longReaderBody}
   await page.setViewportSize({ width: 860, height: 820 });
   assert.equal(await page.getByTestId('library-reader-sidebar').evaluate((element) => getComputedStyle(element).backgroundColor), 'rgb(255, 255, 255)', 'the light overlay rail is also opaque');
   await page.screenshot({ path: lightScreenshotPath, fullPage: true });
+  await page.getByTestId('library-reader-sidebar-toggle').click();
+  await page.keyboard.press('Control+f');
+  const lightFindPanel = page.getByTestId('find-in-page');
+  await page.getByTestId('find-in-page-input').fill('Texto introductorio');
+  await page.getByTestId('find-in-page-status').filter({ hasText: 'Coincidencia 1 de 1' }).waitFor();
+  const lightFindGeometry = await lightFindPanel.boundingBox();
+  const lightFindColors = await lightFindPanel.evaluate((element) => ({ background: getComputedStyle(element).backgroundColor, color: getComputedStyle(element).color }));
+  assert.ok(lightFindGeometry && lightFindGeometry.x >= 0 && lightFindGeometry.x + lightFindGeometry.width <= 861, 'the search panel stays inside a narrow reader');
+  assert.match(lightFindColors.background, /rgba?\(255, 255, 255/);
+  assert.equal(lightFindColors.color, 'rgb(23, 23, 23)', 'the light search panel uses readable foreground text');
+  await page.screenshot({ path: lightFindScreenshotPath, fullPage: true });
+  await page.keyboard.press('Escape');
   assert.deepEqual(pageErrors, [], pageErrors.map((error) => error.stack ?? String(error)).join('\n'));
   console.log(`library reader UI test passed; file menu ${filesInteraction.elapsed.toFixed(1)}ms; optimistic highlight ${highlightPaintLatency}ms; screenshots: ${screenshotDirectory}`);
 } finally {

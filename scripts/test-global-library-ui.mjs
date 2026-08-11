@@ -122,21 +122,23 @@ test('Library file mutations automatically prepare the clean reading version', a
 });
 
 test('the global reader exposes annotations, metadata, chat and native attachment viewers', async () => {
-  const [readerSource, attachmentViewer, selectionSource, markdownSource, selectionCss, appCss, store, protocol, main, html] = await Promise.all([
+  const [readerSource, attachmentViewer, findSource, selectionSource, markdownSource, selectionCss, appCss, store, protocol, main, html] = await Promise.all([
     readSource('src/views/LibraryDocumentReader.tsx'), readSource('src/components/library/LibraryAttachmentViewer.tsx'),
+    readSource('src/components/FindInPage.tsx'),
     readSource('src/components/ReaderSelectionActions.tsx'),
     readSource('src/components/Markdown.tsx'),
     readSource('src/components/readerSelectionActions.css'), readSource('src/index.css'),
     readSource('electron/libraryReader/libraryReaderStore.ts'), readSource('electron/libraryProtocol.ts'), readSource('electron/main.ts'), readSource('index.html'),
   ]);
-  const reader = `${readerSource}\n${attachmentViewer}`;
+  const reader = `${readerSource}\n${attachmentViewer}\n${findSource}`;
   for (const marker of [
     'library-reader-document', 'library-reader-outline-toggle', 'library-reader-sidebar-toggle',
     'library-reader-sidebar', 'library-reader-metadata', 'library-reader-chat', 'library-original-preview',
     'library-reader-source-picker', 'library-reader-pdf-viewer', 'library-reader-epub-viewer',
     'library-reader-image-viewer', 'library-reader-text-viewer', 'library-reader-open-external',
     'library-reader-files-toggle', 'library-reader-chat-model',
-    'library-reader-online-source',
+    'library-reader-online-source', 'find-in-page', 'find-in-page-input',
+    'find-option-mark-all', 'find-option-case', 'find-option-whole',
   ]) assert.match(reader, new RegExp(marker));
   assert.match(reader, /aria-expanded=\{outlineOpen\}/);
   assert.match(reader, /aria-expanded=\{notesOpen\}/);
@@ -152,6 +154,17 @@ test('the global reader exposes annotations, metadata, chat and native attachmen
   assert.match(reader, /attachment:/);
   assert.match(reader, /target:\s*\{\s*type:\s*'region'/);
   assert.match(reader, /ReaderSelectionActions/);
+  assert.match(readerSource, /selectedSource === 'clean' && <FindInPage targetRef=\{documentRef\}/, 'clean Markdown owns the document-wide find panel');
+  assert.match(attachmentViewer, /loadFindSegments[\s\S]*pdf\.numPages[\s\S]*getTextContent/, 'PDF search lazily indexes every page');
+  assert.match(attachmentViewer, /pageIndex % 4 === 0[\s\S]*setTimeout/, 'long PDF indexing yields to the renderer');
+  assert.match(attachmentViewer, /content\.chapters\.map\(\(chapter\) => \(\{ id: chapter\.id, text: chapter\.text/ , 'EPUB search indexes every chapter');
+  assert.match(attachmentViewer, /FindInPage targetRef=\{targetRef\} segments=\{findSegments\}/, 'reflowable readers use the segmented document index');
+  assert.match(attachmentViewer, /library-reader-image-viewer[\s\S]*FindInPage[\s\S]*Markdown limpio para buscar el OCR/, 'image files still open the find panel and explain their missing text layer');
+  assert.match(findSource, /event\.metaKey \|\| event\.ctrlKey[\s\S]*key\.toLowerCase\(\) === 'f'/, 'Cmd/Ctrl+F always opens the Nodus document search');
+  assert.match(findSource, /caseSensitive[\s\S]*wholeWord[\s\S]*markAll/, 'document search exposes case, whole-term, and visible-match controls');
+  assert.match(findSource, /activeSegmentId[\s\S]*onActivateSegment/, 'segmented results navigate to their PDF page or EPUB chapter');
+  assert.match(appCss, /\.library-document-reader:has\(\.library-reader-notes\) \.find-in-page-panel\[data-find-placement="reader"\][\s\S]*right: 21\.75rem/, 'wide root-level reader search stays clear of the notes and chat rail');
+  assert.match(attachmentViewer, /placement="surface"/, 'reflowable attachment search is anchored inside its own reading surface');
   assert.match(readerSource, /className="relative flex min-h-0 min-w-0 flex-1 overflow-hidden" data-testid="library-reader-layout"/, 'the reader owns a width-constrained viewport instead of growing with a zoomed attachment');
   assert.match(attachmentViewer, /className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden" data-testid="library-reader-pdf-viewer"/, 'PDF pages scroll inside their viewer and cannot push the right rail away');
   assert.match(attachmentViewer, /className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden" data-testid=\{isEpub \? 'library-reader-epub-viewer' : 'library-reader-text-viewer'\}/, 'reflowable and office viewers share the constrained attachment shell');
