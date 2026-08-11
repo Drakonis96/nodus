@@ -115,6 +115,24 @@ try {
   assert.match(extractedRecord.files.reader, /^\.nodus[/\\]extractions[/\\][a-f0-9]{64}[/\\]reader\.md$/);
   assert.ok(progress.some((value) => value.phase === 'assets'));
 
+  // Legacy safe storage encoded the dot in unsafe Unicode file names. The
+  // extractor must infer the real format without renaming or mutating them.
+  const encodedFolder = store.itemFolder('ENCODED01');
+  await mkdir(encodedFolder, { recursive: true });
+  const encodedName = 'An%C3%A1lisis_cuantitativo%2Epdf';
+  await writeFile(path.join(encodedFolder, encodedName), pdfBytes);
+  const encodedItem = store.upsertItem({
+    id: 'nodus:ENCODED01', storageId: 'ENCODED01', source: 'nodus',
+    metadata: { title: 'Análisis cuantitativo', itemType: 'document', creators: [], year: 2026, isbn: [], issn: [], tags: [] },
+    collectionIds: [], attachments: [{ ...attachment(encodedName, 'application/pdf'), fileName: 'Análisis_cuantitativo.pdf' }],
+    files: { original: encodedName, annotations: 'annotations.json' }, extraction: { status: 'pending' },
+  });
+  catalog.rebuild(store);
+  const encodedExtraction = queue.enqueue([encodedItem.id], { ocrMode: 'off' });
+  await queue.waitForIdle(30_000);
+  assert.equal(catalog.getExtractionJob(encodedExtraction.jobIds[0]).status, 'done', 'an encoded .pdf suffix is still extracted as PDF');
+  assert.ok(store.readMaterializedItem('ENCODED01').files.reader, 'encoded files publish clean Markdown');
+
   // A failed replacement keeps the published readable revision and its files.
   await writeFile(original, Buffer.from('not a pdf'));
   const failedReplacement = queue.enqueue([item.id], { ocrMode: 'off', force: true });

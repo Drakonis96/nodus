@@ -243,6 +243,18 @@ try {
   await page.locator('[data-tour="nav-library"]').click();
   await page.getByTestId('global-library-view').waitFor({ state: 'visible' });
   assert.equal(await page.getByTestId('library-scope-global').getAttribute('aria-pressed'), 'true', 'Global remains selected after a renderer restart');
+  assert.equal(await page.getByTestId('library-add-menu-toggle').isVisible(), true, 'the toolbar has one progressive Add action');
+  assert.equal(await page.getByTestId('open-zotero-global-import').innerText(), 'Sincronizar Zotero', 'Zotero remains a clear top-level action');
+  assert.equal(await page.getByTestId('library-more-menu-toggle').isVisible(), true, 'maintenance is grouped into one overflow menu');
+  await page.getByTestId('library-add-menu-toggle').click();
+  await page.getByTestId('library-add-menu').waitFor({ state: 'visible' });
+  await page.screenshot({ path: path.join(os.tmpdir(), 'nodus-library-progressive-add-dark-wide.png'), fullPage: true });
+  await page.evaluate(() => { document.documentElement.classList.add('light'); document.documentElement.classList.remove('dark'); });
+  const lightAddMenu = await page.getByTestId('library-add-menu').evaluate((element) => ({ background: getComputedStyle(element).backgroundColor, color: getComputedStyle(element).color }));
+  assert.ok((lightAddMenu.background.match(/[\d.]+/g)?.slice(0, 3).map(Number) ?? []).every((channel) => channel >= 245), `Add menu uses a light surface (${JSON.stringify(lightAddMenu)})`);
+  await page.screenshot({ path: path.join(os.tmpdir(), 'nodus-library-progressive-add-light-wide.png'), fullPage: true });
+  await page.evaluate(() => { document.documentElement.classList.add('dark'); document.documentElement.classList.remove('light'); });
+  await page.getByTestId('library-add-menu-toggle').click();
   console.log('[global-library-e2e] global Library visible');
 
   const sidebarNavigation = page.getByTestId('library-sidebar-navigation');
@@ -305,6 +317,7 @@ try {
   await page.setViewportSize({ width: 760, height: 900 });
   await page.screenshot({ path: path.join(os.tmpdir(), 'nodus-library-smart-search-dark-narrow.png'), fullPage: true });
   await page.setViewportSize({ width: 1540, height: 940 });
+  await page.getByTestId('library-more-menu-toggle').click();
   await page.getByTestId('open-library-migration').click();
   const migrationDialog = page.getByTestId('library-migration-dialog');
   await migrationDialog.waitFor({ state: 'visible' });
@@ -440,6 +453,7 @@ try {
   assert.match(await row.innerText(), /Mujeres solas en la posguerra/);
   assert.match(await row.innerText(), /María Aliaga/);
 
+  await page.getByTestId('library-add-menu-toggle').click();
   await page.getByTestId('create-library-reference').click();
   const createReference = page.getByTestId('library-create-reference-dialog');
   await createReference.waitFor({ state: 'visible' });
@@ -456,7 +470,12 @@ try {
   const manualRecord = await page.evaluate(async () => (await window.nodus.listGlobalLibraryItems({ search: 'Capítulo creado manualmente', limit: 5 })).items[0]);
   assert.equal(manualRecord.itemType, 'book-chapter');
   assert.equal(manualRecord.metadata.edition, '2');
+  await page.getByTestId(`global-library-item-${manualRecord.id}`).getByRole('button').click();
+  const noFileDetail = page.getByTestId('global-library-detail');
+  assert.match(await noFileDetail.getByTestId('library-detail-primary-action').innerText(), /Añadir archivo/);
+  assert.match(await noFileDetail.getByTestId('library-reading-status').innerText(), /Sin archivo/);
 
+  await page.getByTestId('library-add-menu-toggle').click();
   await page.getByTestId('magic-add-library-reference').click();
   const magicAdd = page.getByTestId('library-create-reference-dialog');
   await magicAdd.getByTestId('library-magic-identifier').fill('not-an-identifier');
@@ -477,9 +496,18 @@ try {
   console.log('[global-library-e2e] metadata detail visible');
   assert.match(await detail.innerText(), /10\.0000\/nodus\.fixture/);
   assert.match(await detail.innerText(), /1134-6396/);
-  assert.match(await detail.innerText(), /Markdown disponible/);
+  assert.match(await detail.innerText(), /Lista para leer/);
   await detail.getByTestId('library-online-source').waitFor({ state: 'visible' });
   assert.equal(await detail.getByTestId('library-online-source').getAttribute('title'), 'Abrir fuera de Nodus');
+  assert.match(await detail.getByTestId('library-reading-status').innerText(), /Lista para leer/);
+  assert.match(await detail.getByTestId('library-detail-primary-action').innerText(), /Leer/);
+  assert.equal(await detail.getByTestId('library-extraction-advanced').getAttribute('open'), null, 'technical extraction details start collapsed');
+  for (const dismiss of await page.getByTestId('app-toast-stack').getByRole('button', { name: 'Cerrar' }).all()) await dismiss.click();
+  await detail.getByTestId('library-reading-status').scrollIntoViewIfNeeded();
+  await page.screenshot({ path: path.join(os.tmpdir(), 'nodus-library-progressive-detail-dark-wide.png'), fullPage: true });
+  await page.evaluate(() => { document.documentElement.classList.add('light'); document.documentElement.classList.remove('dark'); });
+  await page.screenshot({ path: path.join(os.tmpdir(), 'nodus-library-progressive-detail-light-wide.png'), fullPage: true });
+  await page.evaluate(() => { document.documentElement.classList.add('dark'); document.documentElement.classList.remove('light'); });
 
   await page.getByTestId('add-library-item-to-vault').click();
   const vaultDialog = page.getByTestId('global-library-vault-dialog');
@@ -493,6 +521,7 @@ try {
   await page.waitForTimeout(250);
   await page.screenshot({ path: path.join(os.tmpdir(), 'nodus-library-reuse-status-dark-wide.png'), fullPage: true });
 
+  await page.getByTestId('library-detail-actions-toggle').click();
   await page.getByTestId('edit-library-metadata').click();
   const metadataEditor = page.getByTestId('library-metadata-editor');
   await metadataEditor.waitFor({ state: 'visible' });
@@ -503,6 +532,7 @@ try {
   assert.equal((await page.evaluate((id) => window.nodus.getGlobalLibraryItem(id), itemId)).metadata.publisher, 'Editorial corregida en Nodus');
   console.log('[global-library-e2e] local metadata correction persisted');
 
+  await page.getByTestId('library-detail-actions-toggle').click();
   await page.getByTestId('cite-library-item').click();
   const citationDialog = page.getByTestId('library-citation-export-dialog');
   await citationDialog.waitFor({ state: 'visible' });
@@ -520,7 +550,8 @@ try {
   await citationDialog.getByRole('button').first().click();
   await citationDialog.waitFor({ state: 'detached' });
 
-  await detail.getByRole('button', { name: 'Adjuntos', exact: true }).click();
+  await detail.getByTestId('library-detail-actions-toggle').click();
+  await detail.getByTestId('manage-library-attachments').click();
   const itemManager = page.getByTestId('library-item-manager');
   await itemManager.waitFor({ state: 'visible' });
   await page.getByTestId('library-attachments').waitFor({ state: 'visible' });
@@ -538,6 +569,7 @@ try {
   await itemManager.getByRole('button', { name: 'Cerrar', exact: true }).click();
   await itemManager.waitFor({ state: 'detached' });
 
+  await page.getByTestId('library-more-menu-toggle').click();
   await page.getByTestId('open-library-duplicates').click();
   const duplicatesDialog = page.getByTestId('library-duplicates-dialog');
   await duplicatesDialog.waitFor({ state: 'visible' });
@@ -610,6 +642,7 @@ try {
   await page.getByTestId('close-library-trash').click();
   await page.evaluate(() => { document.documentElement.classList.add('dark'); document.documentElement.classList.remove('light'); });
   await page.setViewportSize({ width: 1540, height: 940 });
+  await page.getByTestId('library-more-menu-toggle').click();
   await page.getByTestId('open-library-recovery').click();
   const recoveryDialog = page.getByTestId('library-recovery-dialog');
   await recoveryDialog.waitFor({ state: 'visible' });

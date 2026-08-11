@@ -194,6 +194,19 @@ each document, it:
    `quality-report.json` with metrics and warnings;
 8. publishes all derived files atomically and updates the item state.
 
+Preparation is automatic when a primary file is added, imported, synchronized
+from Zotero, replaced, or promoted from another attachment. The everyday flow
+is therefore **add → preparing → read**; it is not an analytical scan and never
+runs ideas, summaries, passages, embeddings, or deep analysis. Progress and
+cancellation are available on the selected item. A manual **Rebuild clean
+reading version** command remains under collapsed technical details for recovery
+and extractor-setting changes.
+
+The Library recognizes encoded legacy storage suffixes such as `%2Epdf` without
+renaming the immutable stored file. This closes the compatibility case in which
+a Unicode source name had been safely encoded but subsequently appeared to have
+no extension.
+
 An extraction is built in a private staging directory and is renamed to an
 immutable fingerprinted directory only after its Markdown, map, report, and
 assets have been flushed successfully. The manifest pointer changes last. A
@@ -222,6 +235,21 @@ The quality report counts double spaces, decomposed Unicode, soft hyphens,
 broken words, empty pages, blocks, figures, tables, and OCR pages. A doubtful
 result is marked `needs-review`; it is never silently presented as perfect. An
 interrupted job can resume, and a failed job can be retried.
+
+### Progressive Library interface
+
+The main toolbar exposes only **Add**, **Sync Zotero**, and an overflow menu.
+Add groups identifier lookup, manual references, document files, and
+bibliographic imports. Migration, duplicates, export, and recovery live in the
+overflow menu; Trash remains the final collection-tree folder.
+
+The item panel presents one primary action derived from state: **Add file**,
+preparation progress, **Read**, **Read and review**, **Try again**, or **Continue
+preparation**. Metadata, attachments, notes, citations, duplication, source
+conversion, and deletion remain available in its secondary menu. Linking to a
+vault is described separately because it enables analysis, ideas, connections,
+and cross-document search; it does not prepare or move the global reading copy.
+Technical engine details and clean-version rebuilding start collapsed.
 
 ## Reader
 

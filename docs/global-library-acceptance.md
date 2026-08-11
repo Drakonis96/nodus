@@ -77,6 +77,8 @@ button exists.
 | Extraction | Local OCR covers pages without a text layer | Verified | `test-library-extraction` |
 | Extraction | Remote OCR requires an explicitly selected model | Verified | `test-library-extraction`, service contract |
 | Extraction | The queue resumes, cancels, retries, and publishes progress | Verified | `test-library-extraction`, `test-global-library-ui` |
+| Extraction | Adding, synchronizing, replacing, or promoting a primary file prepares the clean reading version automatically | Verified | `test-global-library-ui`, `test-library-item-management`, `test-library-revisions` |
+| Extraction | Legacy Unicode storage names with encoded `%2Epdf` suffixes remain extractable without renaming the immutable file | Verified | `test-library-extraction` |
 | Quality | The report measures Unicode, whitespace, hyphens, empty pages, and assets | Verified | `test-library-extraction` |
 | Revisions | Independent bibliographic, extraction, content, embedding, and summary fingerprints drive narrow invalidation | Verified | `test-library-revisions` |
 | Revisions | Organizational changes leave analysis current while content changes stale every content derivative | Verified | `test-library-revisions` |
@@ -84,6 +86,8 @@ button exists.
 | Revisions | Active vault invalidation retains prior results and closed vaults receive durable pending work | Verified | `test-library-revisions`, vault integration suite |
 | Reader | Markdown, images, and tables render | Verified | `e2e-library-reader` |
 | Reader | The source chooser switches between clean Markdown and every preserved attachment and remembers the selection per item | Verified | `test-global-library-reader`, `e2e-library-reader` |
+| Library UI | The toolbar uses progressive Add, Zotero sync, and overflow actions; each selected item exposes one state-derived primary action | Verified | `test-global-library-ui`, `e2e-global-library` |
+| Library UI | Clean-version rebuilding is a collapsed technical action and explicitly excludes vault analysis | Verified | `test-global-library-ui`, `e2e-global-library` |
 | Reader | PDF, EPUB, HTML/text, DOCX/OpenDocument/PowerPoint, spreadsheets, and images have safe internal viewers; legacy binaries expose an explicit external fallback | Verified | `test-global-library-reader`, `e2e-library-reader` |
 | Reader | Text-bearing viewers support scoped highlights/comments and images support durable normalized region highlights | Verified | `test-global-library-reader`, `e2e-library-reader` |
 | Reader | A temporary page and the complete original open separately | Verified | `test-global-library-reader`, `e2e-library-reader` |

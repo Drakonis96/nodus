@@ -37,6 +37,9 @@ test('the Library UI exposes hierarchy, search, bulk operations, imports and bac
     'library-collection-move-dialog', 'library-collection-move-search', 'library-collection-move-root', 'confirm-library-collection-move',
     'library-collection-style-', 'library-collection-style-dialog', 'library-collection-custom-color', 'save-library-collection-style',
     'library-sidebar-navigation', 'library-collections-pane', 'library-sidebar-section-resizer', 'library-saved-searches-pane',
+    'library-add-menu-toggle', 'library-add-menu', 'library-more-menu-toggle', 'library-more-menu',
+    'library-detail-primary-action', 'library-detail-actions-toggle', 'library-detail-actions-menu',
+    'library-reading-status', 'library-extraction-advanced', 'cancel-library-preparation',
   ]) assert.match(view, new RegExp(`data-testid=(?:"|\{\`)[^\n]*${marker}`));
   for (const method of [
     'getGlobalLibraryStatus', 'listGlobalLibraryItems', 'listGlobalLibraryCollections',
@@ -77,6 +80,13 @@ test('the Library UI exposes hierarchy, search, bulk operations, imports and bac
   assert.match(view, /data-testid="open-library-trash"[\s\S]*?<Icon name="folder"/, 'trash is rendered as the final collection-tree folder');
   assert.match(view, /library-trash-folder[\s\S]*aria-current=\{trashMode \? 'page'/, 'the trash folder exposes its selected state');
   assert.match(view, /library-trash-section[\s\S]*shrink-0[\s\S]*h-8/, 'trash remains a compact fixed row below both adjustable panes');
+  assert.match(view, /t\('Añadir'\)[\s\S]*t\('Sincronizar Zotero'\)[\s\S]*library-more-menu-toggle/, 'the main toolbar is reduced to Add, Zotero sync, and an overflow menu');
+  assert.match(view, /t\('Reconstruir versión limpia'\)/, 'clean Markdown rebuilding is named explicitly');
+  assert.match(view, /window\.nodus\.cancelLibraryExtraction/, 'visible background preparation can be canceled');
+  assert.match(view, /detail\.attachments\.length === 0[\s\S]*addGlobalLibraryAttachments/, 'a record without a file exposes Add file as its primary action');
+  assert.match(view, /detail\.extraction\?\.status === 'failed'[\s\S]*Intentar de nuevo/, 'a failed preparation exposes a plain-language retry action');
+  assert.match(view, /detail\.extraction\?\.status === 'needs-review'[\s\S]*Leer y revisar/, 'reviewable Markdown remains directly readable');
+  assert.doesNotMatch(view, />\s*\{t\('Procesar'\)\}\s*</, 'the ambiguous Process action is no longer rendered');
   assert.doesNotMatch(view, /\{!trashMode && <aside/, 'the collection tree remains visible while trash is open');
   assert.match(appCss, /\.library-trash-folder\.is-active[\s\S]*background: rgb\(127 29 29 \/ 0\.32\)/);
   assert.match(appCss, /\.light \.library-trash-folder\.is-active[\s\S]*background: #fee2e2/);
@@ -88,6 +98,22 @@ test('the Library UI exposes hierarchy, search, bulk operations, imports and bac
   assert.match(view, /className="library-theme flex/);
   assert.match(view, /className="library-theme-canvas flex/);
   assert.match(view, /className="library-theme-panel/);
+});
+
+test('Library file mutations automatically prepare the clean reading version', async () => {
+  const [service, operations, extraction] = await Promise.all([
+    readSource('electron/library/libraryService.ts'),
+    readSource('electron/library/libraryOperations.ts'),
+    readSource('electron/library/libraryExtractionEngine.ts'),
+  ]);
+  assert.match(service, /importGlobalLibraryFiles[\s\S]*current\.extraction\.enqueue\(report\.itemIds\)/,
+    'newly imported files enter the extraction queue automatically');
+  assert.match(service, /finishItemMutation[\s\S]*freshness === 'queued'[\s\S]*current\.extraction\.enqueue/,
+    'added, replaced, or reprioritized primary attachments enter the queue automatically');
+  assert.match(operations, /extraction:\s*\{ status: 'pending' \}/,
+    'new file-backed records start in a user-visible preparation state');
+  assert.match(extraction, /function sourceExtension[\s\S]*decodeURIComponent/,
+    'legacy filenames with encoded extensions are recognized without renaming stored files');
 });
 
 test('the global reader exposes annotations, metadata, chat and native attachment viewers', async () => {

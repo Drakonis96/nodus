@@ -485,8 +485,20 @@ function copyZipAssets(zip: AdmZip, folder: string, matcher: RegExp): Array<{ so
   return copied;
 }
 
+/**
+ * Older Library versions encoded every dot when a storage filename contained
+ * Unicode or another unsafe character (for example `An%C3%A1lisis%2Epdf`). Keep
+ * those immutable paths in place, but recover the real suffix for extraction.
+ */
+function sourceExtension(source: string): string {
+  const literal = path.extname(source).toLowerCase();
+  if (literal) return literal;
+  try { return path.extname(decodeURIComponent(path.basename(source))).toLowerCase(); }
+  catch { return ''; }
+}
+
 async function nonPdfBlocks(source: string, folder: string): Promise<{ blocks: OutputBlock[]; pages: LibrarySourceMap['pages'] }> {
-  const extension = path.extname(source).toLowerCase();
+  const extension = sourceExtension(source);
   if (['.md', '.markdown'].includes(extension)) return { blocks: markdownBlocks(fs.readFileSync(source, 'utf8')), pages: [{ page: 1, width: 0, height: 0 }] };
   if (['.txt', '.rtf'].includes(extension)) return { blocks: plainTextBlocks(fs.readFileSync(source, 'utf8')), pages: [{ page: 1, width: 0, height: 0 }] };
   if (extension === '.csv' || extension === '.tsv') return { blocks: markdownBlocks(csvFileToText(source)), pages: [{ page: 1, width: 0, height: 0 }] };
@@ -649,7 +661,7 @@ export async function extractLibraryItem(options: {
   try {
     abortIfNeeded(signal);
     onProgress?.({ phase: 'analyze', progress: 0.02, message: `Analizando ${path.basename(source)}…` });
-    const extracted = path.extname(source).toLowerCase() === '.pdf'
+    const extracted = sourceExtension(source) === '.pdf'
       ? await pdfBlocks(source, staging, settings, onProgress, signal, options.remoteOcr)
       : { ...(await nonPdfBlocks(source, staging)), ocrPages: 0, blankPages: 0 };
     abortIfNeeded(signal);
