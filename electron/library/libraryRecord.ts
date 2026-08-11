@@ -14,11 +14,11 @@ const SOURCES = new Set<LibraryItemSource>([
   'endnote-xml', 'zotero-rdf', 'csv', 'markdown', 'legacy',
 ]);
 const ITEM_TYPES = new Set<LibraryItemType>([
-  'article-journal', 'journal-article', 'magazine-article', 'newspaper-article', 'book', 'chapter', 'book-section',
+  'article-journal', 'journal-article', 'magazine-article', 'newspaper-article', 'book', 'book-chapter', 'chapter', 'book-section',
   'conference-paper', 'thesis', 'report', 'manuscript', 'presentation', 'interview', 'letter', 'email', 'instant-message',
   'encyclopedia-article', 'dictionary-entry', 'case', 'hearing', 'bill', 'statute', 'patent', 'artwork', 'map', 'film',
   'audio-recording', 'video-recording', 'radio-broadcast', 'tv-broadcast', 'podcast', 'blog-post', 'forum-post',
-  'computer-program', 'webpage', 'document', 'dataset', 'other',
+  'computer-program', 'webpage', 'document', 'dataset', 'preprint', 'standard', 'other',
 ]);
 
 export function canonicalJson(value: unknown): string {
@@ -118,7 +118,7 @@ function normalizeCreators(value: unknown): LibraryCreator[] {
 
 export function normalizeLibraryMetadata(value: unknown, fallbackTitle = 'Documento sin título'): LibraryItemMetadata {
   const input = value && typeof value === 'object' ? value as Record<string, unknown> : {};
-  const rawYear = Number(input.year);
+  const rawYear = input.year == null || input.year === '' ? Number.NaN : Number(input.year);
   const itemType = ITEM_TYPES.has(input.itemType as LibraryItemType) ? input.itemType as LibraryItemType : 'document';
   const extra = input.extra && typeof input.extra === 'object' && !Array.isArray(input.extra)
     ? Object.fromEntries(Object.entries(input.extra as Record<string, unknown>)

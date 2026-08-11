@@ -92,8 +92,8 @@ function xml(value: unknown): string { return clean(String(value ?? '')).replace
 function bib(value: unknown): string { return clean(String(value ?? '')).replace(/[{}]/g, '').replace(/([&%_$#])/g, '\\$1'); }
 function csv(value: unknown): string { const text = String(value ?? ''); return /[",\r\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text; }
 function yaml(value: unknown): string { return JSON.stringify(clean(String(value ?? ''))); }
-function typeForRis(metadata: LibraryItemMetadata): string { return metadata.itemType === 'book' ? 'BOOK' : ['chapter', 'book-section'].includes(metadata.itemType) ? 'CHAP' : metadata.itemType === 'thesis' ? 'THES' : metadata.itemType === 'report' ? 'RPRT' : 'JOUR'; }
-function typeForBib(metadata: LibraryItemMetadata): string { return metadata.itemType === 'book' ? 'book' : ['chapter', 'book-section'].includes(metadata.itemType) ? 'incollection' : metadata.itemType === 'thesis' ? 'phdthesis' : metadata.itemType === 'conference-paper' ? 'inproceedings' : 'article'; }
+function typeForRis(metadata: LibraryItemMetadata): string { return metadata.itemType === 'book' ? 'BOOK' : ['book-chapter', 'chapter', 'book-section'].includes(metadata.itemType) ? 'CHAP' : metadata.itemType === 'thesis' ? 'THES' : metadata.itemType === 'report' ? 'RPRT' : 'JOUR'; }
+function typeForBib(metadata: LibraryItemMetadata): string { return metadata.itemType === 'book' ? 'book' : ['book-chapter', 'chapter', 'book-section'].includes(metadata.itemType) ? 'incollection' : metadata.itemType === 'thesis' ? 'phdthesis' : metadata.itemType === 'conference-paper' ? 'inproceedings' : metadata.itemType === 'standard' ? 'standard' : 'article'; }
 function authors(metadata: LibraryItemMetadata): string { return metadata.creators.filter((entry) => entry.creatorType === 'author').map((entry) => entry.name || `${entry.lastName ?? ''}, ${entry.firstName ?? ''}`.replace(/,\s*$/, '')).join(' and '); }
 function key(record: LibraryItemRecord): string { return record.citationKey || generateCitationKey(record.metadata); }
 

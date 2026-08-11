@@ -19,6 +19,7 @@ export type LibraryItemType =
   | 'magazine-article'
   | 'newspaper-article'
   | 'book'
+  | 'book-chapter'
   | 'chapter'
   | 'book-section'
   | 'conference-paper'
@@ -51,6 +52,8 @@ export type LibraryItemType =
   | 'webpage'
   | 'document'
   | 'dataset'
+  | 'preprint'
+  | 'standard'
   | 'other';
 
 export type LibraryCreatorRole =
@@ -58,7 +61,8 @@ export type LibraryCreatorRole =
   | 'reviewedAuthor' | 'bookAuthor' | 'inventor' | 'director' | 'scriptwriter'
   | 'producer' | 'performer' | 'composer' | 'wordsBy' | 'cartographer'
   | 'programmer' | 'artist' | 'podcaster' | 'presenter' | 'interviewer'
-  | 'interviewee' | 'recipient' | 'sponsor' | 'counsel' | (string & {});
+  | 'interviewee' | 'recipient' | 'sponsor' | 'counsel' | 'castMember'
+  | 'attorneyAgent' | 'commenter' | 'guest' | (string & {});
 
 export interface LibraryCreator {
   creatorType: LibraryCreatorRole;
@@ -287,6 +291,8 @@ export interface LibraryCatalogItem {
   sourceKey: string | null;
   sourceState: LibraryItemRecord['sourceState'] | null;
   citationKey: string | null;
+  /** Complete normalized bibliography for configurable Zotero-style columns. */
+  metadata: LibraryItemMetadata;
   title: string;
   itemType: LibraryItemType;
   creators: LibraryCreator[];
@@ -300,6 +306,7 @@ export interface LibraryCatalogItem {
   attachmentCount: number;
   readerAvailable: boolean;
   extractionStatus: NonNullable<LibraryItemRecord['extraction']>['status'];
+  createdAt: string;
   updatedAt: string;
   deletedAt: string | null;
 }
@@ -480,7 +487,11 @@ export interface LibraryCatalogQuery {
   includeFacets?: boolean;
 }
 
-export type LibrarySortField = 'title' | 'creator' | 'year' | 'source' | 'updatedAt' | 'extraction' | 'attachments';
+export type LibrarySortField =
+  | 'title' | 'creator' | 'itemType' | 'publicationTitle' | 'publisher' | 'date' | 'year'
+  | 'edition' | 'volume' | 'issue' | 'pages' | 'doi' | 'isbn' | 'issn' | 'language'
+  | 'pmid' | 'pmcid' | 'arxiv' | 'url' | 'tags' | 'citationKey' | 'source' | 'createdAt'
+  | 'updatedAt' | 'extraction' | 'attachments';
 
 export interface LibrarySortRule {
   field: LibrarySortField;
@@ -557,10 +568,16 @@ export interface LibraryItemCollectionPatch {
   remove?: string[];
 }
 
-export type LibraryColumnId = 'title' | 'creator' | 'year' | 'source' | 'status' | 'attachments' | 'updatedAt';
+export type LibraryColumnId =
+  | 'title' | 'creator' | 'itemType' | 'publicationTitle' | 'publisher' | 'date' | 'year'
+  | 'edition' | 'volume' | 'issue' | 'pages' | 'doi' | 'isbn' | 'issn' | 'pmid'
+  | 'pmcid' | 'arxiv' | 'url' | 'language' | 'citationKey' | 'tags' | 'source'
+  | 'status' | 'attachments' | 'createdAt' | 'updatedAt';
 
 export interface LibraryViewPreferences {
   visibleColumns: LibraryColumnId[];
+  /** Optional user-selected widths in CSS pixels; omitted columns use responsive defaults. */
+  columnWidths?: Partial<Record<LibraryColumnId, number>>;
   sort: LibrarySortRule[];
 }
 

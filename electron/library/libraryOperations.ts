@@ -91,13 +91,13 @@ function recordCatalogItem(record: LibraryItemRecord, store: LibraryDiskStore): 
     id: record.id, storageId: record.storageId, source: record.source,
     sourceLibraryId: record.sourceLibraryId ?? null, sourceKey: record.sourceKey ?? null,
     sourceState: record.sourceState ?? null,
-    citationKey: record.citationKey ?? null, title: record.metadata.title,
+    citationKey: record.citationKey ?? null, metadata: record.metadata, title: record.metadata.title,
     itemType: record.metadata.itemType, creators: record.metadata.creators, year: record.metadata.year ?? null,
     date: record.metadata.date ?? null, doi: record.metadata.doi ?? null,
     isbn: record.metadata.isbn ?? [], issn: record.metadata.issn ?? [], tags: record.metadata.tags ?? [],
     collectionIds: record.collectionIds, attachmentCount: record.attachments.length,
     readerAvailable: fs.existsSync(path.join(store.itemFolder(record.storageId), reader)),
-    extractionStatus: record.extraction?.status ?? 'pending', updatedAt: record.clock.updatedAt,
+    extractionStatus: record.extraction?.status ?? 'pending', createdAt: record.createdAt, updatedAt: record.clock.updatedAt,
     deletedAt: record.deletedAt,
   };
 }

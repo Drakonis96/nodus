@@ -6,6 +6,7 @@ import type {
   LibraryCatalogPage,
   LibraryCatalogQuery,
   LibraryCollectionRecord,
+  LibraryItemMetadata,
   LibraryItemRecord,
   LibraryImportSourceState,
   LibraryExtractionJob,
@@ -141,7 +142,17 @@ function orderBySql(sort: LibrarySortRule[] | undefined): string {
   const expressions: Record<LibrarySortRule['field'], string> = {
     title: 'i.title COLLATE NOCASE',
     creator: "LOWER(COALESCE(json_extract(i.creators_json, '$[0].lastName'), json_extract(i.creators_json, '$[0].name'), ''))",
-    year: 'i.year', source: 'i.source', updatedAt: 'i.updated_at', extraction: 'i.extraction_status', attachments: 'i.attachment_count',
+    itemType: 'i.item_type COLLATE NOCASE', publicationTitle: "LOWER(COALESCE(json_extract(i.metadata_json, '$.publicationTitle'), ''))",
+    publisher: "LOWER(COALESCE(json_extract(i.metadata_json, '$.publisher'), ''))", date: 'i.date_value COLLATE NOCASE',
+    year: 'i.year', edition: "LOWER(COALESCE(json_extract(i.metadata_json, '$.edition'), ''))",
+    volume: "LOWER(COALESCE(json_extract(i.metadata_json, '$.volume'), ''))", issue: "LOWER(COALESCE(json_extract(i.metadata_json, '$.issue'), ''))",
+    pages: "LOWER(COALESCE(json_extract(i.metadata_json, '$.pages'), ''))", doi: "LOWER(COALESCE(i.doi, ''))",
+    isbn: "LOWER(COALESCE(json_extract(i.isbn_json, '$[0]'), ''))", issn: "LOWER(COALESCE(json_extract(i.issn_json, '$[0]'), ''))",
+    pmid: "LOWER(COALESCE(json_extract(i.metadata_json, '$.pmid'), ''))", pmcid: "LOWER(COALESCE(json_extract(i.metadata_json, '$.pmcid'), ''))",
+    arxiv: "LOWER(COALESCE(json_extract(i.metadata_json, '$.arxiv'), ''))", url: "LOWER(COALESCE(json_extract(i.metadata_json, '$.url'), ''))",
+    tags: "LOWER(COALESCE(json_extract(i.tags_json, '$[0]'), ''))", language: "LOWER(COALESCE(json_extract(i.metadata_json, '$.language'), ''))",
+    citationKey: "LOWER(COALESCE(i.citation_key, ''))",
+    source: 'i.source', createdAt: 'i.created_at', updatedAt: 'i.updated_at', extraction: 'i.extraction_status', attachments: 'i.attachment_count',
   };
   const unique = new Set<string>();
   const clauses = (sort ?? []).filter((entry) => {
@@ -194,6 +205,7 @@ export class LibraryCatalog {
         extraction_status TEXT NOT NULL,
         analysis_json TEXT NOT NULL DEFAULT '{}',
         revision INTEGER NOT NULL,
+        created_at TEXT,
         updated_at TEXT NOT NULL,
         deleted_at TEXT
       );
@@ -297,6 +309,7 @@ export class LibraryCatalog {
     this.ensureColumn('library_items', 'source_library_id', 'TEXT');
     this.ensureColumn('library_items', 'source_state', 'TEXT');
     this.ensureColumn('library_items', 'analysis_json', "TEXT NOT NULL DEFAULT '{}'");
+    this.ensureColumn('library_items', 'created_at', 'TEXT');
     this.ensureColumn('library_collections', 'source_library_id', 'TEXT');
     this.handle.exec('CREATE INDEX IF NOT EXISTS library_items_source_library ON library_items (source, source_library_id, source_key);');
   }
@@ -364,12 +377,12 @@ export class LibraryCatalog {
         id, storage_id, folder_name, source, source_library_id, source_key, source_state, citation_key, title, item_type,
         creators_json, abstract, date_value, year, doi, isbn_json, issn_json, tags_json,
         metadata_json, collection_ids_json, attachment_count, reader_available,
-        extraction_status, analysis_json, revision, updated_at, deleted_at
+        extraction_status, analysis_json, revision, created_at, updated_at, deleted_at
       ) VALUES (
         @id, @storageId, @folderName, @source, @sourceLibraryId, @sourceKey, @sourceState, @citationKey, @title, @itemType,
         @creatorsJson, @abstract, @date, @year, @doi, @isbnJson, @issnJson, @tagsJson,
         @metadataJson, @collectionIdsJson, @attachmentCount, @readerAvailable,
-        @extractionStatus, @analysisJson, @revision, @updatedAt, @deletedAt
+        @extractionStatus, @analysisJson, @revision, @createdAt, @updatedAt, @deletedAt
       )
     `);
     const insertFts = this.handle.prepare(`
@@ -443,6 +456,7 @@ export class LibraryCatalog {
           extractionStatus: record.extraction?.status ?? 'pending',
           analysisJson: JSON.stringify(record.contentRevision ?? {}),
           revision: record.clock.revision,
+          createdAt: record.createdAt,
           updatedAt: record.clock.updatedAt,
           deletedAt: record.deletedAt,
         });
@@ -452,7 +466,7 @@ export class LibraryCatalog {
           creators: creatorsText(record),
           abstract: record.metadata.abstract ?? '',
           tags: (record.metadata.tags ?? []).join(' '),
-          identifiers: [record.metadata.doi, ...(record.metadata.isbn ?? []), ...(record.metadata.issn ?? [])].filter(Boolean).join(' '),
+          identifiers: [record.metadata.doi, record.metadata.pmid, record.metadata.pmcid, record.metadata.arxiv, ...(record.metadata.isbn ?? []), ...(record.metadata.issn ?? [])].filter(Boolean).join(' '),
         });
         for (const collectionId of record.collectionIds) insertMembership.run(record.id, collectionId);
         for (const attachment of record.attachments) insertAttachment.run({ ...attachment, itemId: record.id });
@@ -723,6 +737,7 @@ export class LibraryCatalog {
       sourceKey: row.source_key == null ? null : String(row.source_key),
       sourceState: row.source_state == null ? null : row.source_state as LibraryCatalogItem['sourceState'],
       citationKey: row.citation_key == null ? null : String(row.citation_key),
+      metadata: json<LibraryItemMetadata>(row.metadata_json, { title: String(row.title), itemType: row.item_type as LibraryItemMetadata['itemType'], creators: [], year: null, isbn: [], issn: [], tags: [] }),
       title: String(row.title),
       itemType: row.item_type as LibraryCatalogItem['itemType'],
       creators: json(row.creators_json, []),
@@ -736,6 +751,7 @@ export class LibraryCatalog {
       attachmentCount: Number(row.attachment_count),
       readerAvailable: Number(row.reader_available) === 1,
       extractionStatus: row.extraction_status as LibraryCatalogItem['extractionStatus'],
+      createdAt: row.created_at == null ? String(row.updated_at) : String(row.created_at),
       updatedAt: String(row.updated_at),
       deletedAt: row.deleted_at == null ? null : String(row.deleted_at),
     }));

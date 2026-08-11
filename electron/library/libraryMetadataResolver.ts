@@ -49,9 +49,10 @@ function strings(value: unknown): string[] {
 
 function crossrefType(value: unknown): LibraryItemType {
   const type = String(value ?? '').toLowerCase();
-  if (['journal-article', 'posted-content'].includes(type)) return 'article-journal';
+  if (type === 'journal-article') return 'journal-article';
+  if (type === 'posted-content') return 'preprint';
   if (['book', 'monograph', 'reference-book'].includes(type)) return 'book';
-  if (['book-chapter', 'book-section', 'reference-entry'].includes(type)) return 'chapter';
+  if (['book-chapter', 'book-section', 'reference-entry'].includes(type)) return 'book-chapter';
   if (['proceedings-article', 'proceedings'].includes(type)) return 'conference-paper';
   if (type === 'dissertation') return 'thesis';
   if (type === 'report') return 'report';
@@ -199,7 +200,7 @@ function arxivCandidate(xml: string, arxiv: string): LibraryMetadataCandidate | 
   return {
     id: `arxiv:${arxiv}`, source: 'arxiv', confidence: 1, sourceUrl: `https://arxiv.org/abs/${arxiv}`,
     metadata: {
-      title, itemType: 'manuscript', creators: authors, abstract: xmlValues(entry, 'summary')[0], date: published, year: parsedYear,
+      title, itemType: 'preprint', creators: authors, abstract: xmlValues(entry, 'summary')[0], date: published, year: parsedYear,
       ...(doi ? { doi } : {}), arxiv, url: `https://arxiv.org/abs/${arxiv}`,
       isbn: [], issn: [], tags: xmlValues(entry, 'category'),
     },

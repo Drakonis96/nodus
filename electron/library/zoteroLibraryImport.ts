@@ -85,20 +85,21 @@ function rawZoteroKey(key: string): string {
   return /^groups:[^:]+:(.+)$/.exec(key)?.[1] ?? key;
 }
 
-function itemType(value: string): LibraryItemType {
+export function mapZoteroLibraryItemType(value: string): LibraryItemType {
   const type = value.toLowerCase().replace(/[^a-z]/g, '');
   if (['journalarticle', 'articlejournal'].includes(type)) return 'journal-article';
   if (type === 'magazinearticle') return 'magazine-article';
   if (type === 'newspaperarticle') return 'newspaper-article';
   if (type === 'book') return 'book';
   const mapped: Record<string, LibraryItemType> = {
-    booksection: 'book-section', chapter: 'chapter', conferencepaper: 'conference-paper', proceedings: 'conference-paper',
+    booksection: 'book-chapter', chapter: 'book-chapter', conferencepaper: 'conference-paper', proceedings: 'conference-paper',
     thesis: 'thesis', report: 'report', manuscript: 'manuscript', presentation: 'presentation', interview: 'interview',
     letter: 'letter', email: 'email', instantmessage: 'instant-message', encyclopediaarticle: 'encyclopedia-article',
     dictionaryentry: 'dictionary-entry', case: 'case', hearing: 'hearing', bill: 'bill', statute: 'statute', patent: 'patent',
     artwork: 'artwork', map: 'map', film: 'film', audiorecording: 'audio-recording', videorecording: 'video-recording',
     radiobroadcast: 'radio-broadcast', tvbroadcast: 'tv-broadcast', podcast: 'podcast', blogpost: 'blog-post',
     forumpost: 'forum-post', computerprogram: 'computer-program', webpage: 'webpage', dataset: 'dataset', document: 'document',
+    preprint: 'preprint', standard: 'standard',
   };
   if (mapped[type]) return mapped[type];
   return type ? 'document' : 'other';
@@ -116,6 +117,7 @@ function parseExtra(value: string | null, item: ZoteroItem): Record<string, stri
   }
   result['Zotero item type'] = item.itemType;
   result['Zotero version'] = String(item.version);
+  for (const [name, entry] of Object.entries(item.fields ?? {})) result[`Zotero field: ${name}`] = entry;
   if (item.dateAdded) result['Zotero date added'] = item.dateAdded;
   if (item.dateModified) result['Zotero date modified'] = item.dateModified;
   return Object.keys(result).length ? result : undefined;
@@ -125,7 +127,7 @@ function metadata(item: ZoteroItem): LibraryItemMetadata {
   const extra = parseExtra(item.extra, item);
   return {
     title: item.title.trim() || 'Documento sin título',
-    itemType: itemType(item.itemType),
+    itemType: mapZoteroLibraryItemType(item.itemType),
     creators: item.creators.map((creator) => ({
       creatorType: creator.creatorType || 'author',
       ...(creator.firstName?.trim() ? { firstName: creator.firstName.trim() } : {}),

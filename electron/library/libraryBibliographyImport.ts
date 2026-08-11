@@ -44,7 +44,9 @@ function itemType(value: unknown): LibraryItemType {
   const type = String(value ?? '').toLowerCase().replace(/[^a-z]/g, '');
   if (['jour', 'journalarticle', 'article', 'articlejournal', 'magazinearticle', 'newspaperarticle'].includes(type)) return 'article-journal';
   if (['book', 'editedbook', 'monograph'].includes(type)) return 'book';
-  if (['chap', 'booksection', 'inbook', 'incollection', 'chapter'].includes(type)) return 'chapter';
+  if (['chap', 'booksection', 'inbook', 'incollection', 'chapter', 'bookchapter'].includes(type)) return 'book-chapter';
+  if (['preprint', 'postedcontent'].includes(type)) return 'preprint';
+  if (['standard', 'std'].includes(type)) return 'standard';
   if (['conf', 'conferencepaper', 'inproceedings', 'proceedings'].includes(type)) return 'conference-paper';
   if (['thes', 'thesis', 'phdthesis', 'mastersthesis'].includes(type)) return 'thesis';
   if (['rprt', 'report', 'techreport'].includes(type)) return 'report';

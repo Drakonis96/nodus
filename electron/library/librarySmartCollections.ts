@@ -9,15 +9,17 @@ import type {
   LibraryViewPreferences,
 } from '@shared/libraryTypes';
 import { atomicWriteJson, readJsonFile } from './libraryPaths';
+import { LIBRARY_COLUMNS } from '@shared/libraryBibliography';
 
-const COLUMNS = new Set<LibraryColumnId>(['title', 'creator', 'year', 'source', 'status', 'attachments', 'updatedAt']);
-const SORT_FIELDS = new Set<LibrarySortField>(['title', 'creator', 'year', 'source', 'updatedAt', 'extraction', 'attachments']);
+const COLUMNS = new Set<LibraryColumnId>(LIBRARY_COLUMNS.map((column) => column.id));
+const SORT_FIELDS = new Set<LibrarySortField>(LIBRARY_COLUMNS.flatMap((column) => column.sort ? [column.sort] : []));
 const GROUP_MODES = new Set(['all', 'any', 'not']);
 const FIELDS = new Set(['title', 'abstract', 'creator', 'tag', 'date', 'year', 'source', 'itemType', 'collection', 'attachment', 'extraction', 'trash', 'vault', 'analysis']);
 const OPERATORS = new Set(['contains', 'equals', 'not-equals', 'before', 'after', 'is-true', 'is-false']);
 
 export const DEFAULT_LIBRARY_VIEW_PREFERENCES: LibraryViewPreferences = {
   visibleColumns: ['title', 'creator', 'year', 'source', 'status'],
+  columnWidths: {},
   sort: [{ field: 'updatedAt', direction: 'desc' }, { field: 'title', direction: 'asc' }],
 };
 
@@ -42,8 +44,13 @@ function normalizePreferences(value: unknown): LibraryViewPreferences {
     : [];
   const sort = Array.isArray(record.sort) ? record.sort.filter((entry) => entry && SORT_FIELDS.has(entry.field)
     && (entry.direction === 'asc' || entry.direction === 'desc')).slice(0, 3) : [];
+  const columnWidths = record.columnWidths && typeof record.columnWidths === 'object'
+    ? Object.fromEntries(Object.entries(record.columnWidths).flatMap(([id, width]) => COLUMNS.has(id as LibraryColumnId)
+      && Number.isFinite(Number(width)) ? [[id, Math.max(64, Math.min(640, Math.round(Number(width))))]] : []))
+    : {};
   return {
     visibleColumns: visibleColumns.length ? visibleColumns : DEFAULT_LIBRARY_VIEW_PREFERENCES.visibleColumns,
+    columnWidths,
     sort: sort.length ? sort : DEFAULT_LIBRARY_VIEW_PREFERENCES.sort,
   };
 }

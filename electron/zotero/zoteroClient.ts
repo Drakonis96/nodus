@@ -173,6 +173,15 @@ function mapItem(raw: any, library: ZoteroLibrary): ZoteroItem {
     creatorType: c.creatorType ?? 'author',
   }));
   const itemKey = d.key ?? raw.key;
+  const represented = new Set([
+    'key', 'version', 'itemType', 'title', 'shortTitle', 'creators', 'date', 'DOI', 'abstractNote', 'tags', 'collections',
+    'publisher', 'publicationTitle', 'bookTitle', 'proceedingsTitle', 'ISBN', 'ISSN', 'url', 'language', 'volume', 'issue',
+    'pages', 'edition', 'place', 'rights', 'extra', 'dateAdded', 'dateModified', 'relations',
+  ]);
+  const fields = Object.fromEntries(Object.entries(d as Record<string, unknown>).flatMap(([name, value]) => {
+    if (represented.has(name) || !['string', 'number', 'boolean'].includes(typeof value)) return [];
+    const clean = String(value).trim(); return clean ? [[name, clean]] : [];
+  }));
   return {
     key: canonicalKey(library, itemKey),
     itemKey,
@@ -200,6 +209,7 @@ function mapItem(raw: any, library: ZoteroLibrary): ZoteroItem {
     place: d.place ?? null,
     rights: d.rights ?? null,
     extra: d.extra ?? null,
+    fields,
     dateAdded: d.dateAdded ?? null,
     dateModified: d.dateModified ?? null,
   };

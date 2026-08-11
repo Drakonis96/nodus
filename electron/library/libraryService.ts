@@ -357,6 +357,7 @@ export function deleteGlobalLibrarySavedSearch(id: string): boolean {
 export function getGlobalLibraryViewPreferences(): LibraryViewPreferences {
   return service()?.operations.getViewPreferences() ?? {
     visibleColumns: ['title', 'creator', 'year', 'source', 'status'],
+    columnWidths: {},
     sort: [{ field: 'updatedAt', direction: 'desc' }, { field: 'title', direction: 'asc' }],
   };
 }

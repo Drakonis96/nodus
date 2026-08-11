@@ -4234,6 +4234,8 @@ export interface ZoteroItem {
   place: string | null;
   rights: string | null;
   extra: string | null;
+  /** Primitive Zotero fields not represented by the common Nodus schema. */
+  fields: Record<string, string>;
   dateAdded: string | null;
   dateModified: string | null;
 }
