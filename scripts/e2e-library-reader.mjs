@@ -20,6 +20,8 @@ const screenshotDirectory = path.join(repoRoot, 'output', 'library-reader-e2e');
 const screenshotPath = path.join(screenshotDirectory, '01-clean-reader-chat-dark.png');
 const originalScreenshotPath = path.join(screenshotDirectory, '02-original-page-preview.png');
 const pdfScreenshotPath = path.join(screenshotDirectory, '03-pdf-reader.png');
+const pdfZoomScreenshotPath = path.join(screenshotDirectory, '03b-pdf-reader-zoom.png');
+const pdfZoomNarrowScreenshotPath = path.join(screenshotDirectory, '03c-pdf-reader-zoom-narrow.png');
 const epubScreenshotPath = path.join(screenshotDirectory, '04-epub-reader-highlight.png');
 const imageScreenshotPath = path.join(screenshotDirectory, '05-image-region-highlight.png');
 const docxScreenshotPath = path.join(screenshotDirectory, '06-docx-reader.png');
@@ -397,7 +399,7 @@ ${longReaderBody}
   await page.getByTestId('library-reader-orphaned-annotations').waitFor({ state: 'visible' });
   assert.match(await page.getByTestId('library-reader-orphaned-annotations').innerText(), /Comentario recuperable/);
 
-  async function selectCandidate(index) {
+  const selectCandidate = async (index) => {
     return page.evaluate((candidateIndex) => {
       const root = document.querySelector('[data-testid="library-reader-document"]');
       if (!(root instanceof HTMLElement)) throw new Error('reader document missing');
@@ -420,9 +422,9 @@ ${longReaderBody}
       root.dispatchEvent(new PointerEvent('pointerup', { bubbles: true }));
       return range.toString();
     }, index);
-  }
+  };
 
-  async function waitForSavedAnnotations(predicate, label, timeout = 10_000) {
+  const waitForSavedAnnotations = async (predicate, label, timeout = 10_000) => {
     const deadline = Date.now() + timeout;
     while (Date.now() < deadline) {
       const saved = await page.evaluate((id) => window.nodus.listLibraryReaderAnnotations(id), globalItemId);
@@ -430,7 +432,20 @@ ${longReaderBody}
       await page.waitForTimeout(50);
     }
     throw new Error(`Timed out waiting for persisted reader annotation: ${label}`);
-  }
+  };
+
+  const assertViewerContained = async (viewer, label) => {
+    const [layoutBox, viewerBox, sidebarBox, geometry] = await Promise.all([
+      page.getByTestId('library-reader-layout').boundingBox(),
+      viewer.boundingBox(),
+      readerSidebar.boundingBox(),
+      page.getByTestId('library-reader-layout').evaluate((element) => ({ clientWidth: element.clientWidth, scrollWidth: element.scrollWidth })),
+    ]);
+    assert.ok(layoutBox && viewerBox && sidebarBox, `${label} exposes measurable reader regions`);
+    assert.ok(sidebarBox.x >= layoutBox.x && sidebarBox.x + sidebarBox.width <= layoutBox.x + layoutBox.width + 1, `${label} keeps the right rail fully inside the reader`);
+    assert.ok(viewerBox.x >= layoutBox.x && viewerBox.x + viewerBox.width <= sidebarBox.x + 1, `${label} cannot render underneath or beyond the right rail`);
+    assert.ok(geometry.scrollWidth <= geometry.clientWidth + 1, `${label} never expands the complete reader viewport`);
+  };
 
   await selectCandidate(1);
   const selectionBar = page.locator('.reader-selection-actions');
@@ -495,12 +510,49 @@ ${longReaderBody}
   await page.locator('.reader-selection-actions').waitFor({ state: 'visible' });
   await page.locator('.reader-selection-actions .reader-selection-color').first().click();
   await waitForSavedAnnotations((items) => items.some((item) => item.scope === 'attachment:zotero:READERPDF:page:1'), 'PDF highlight');
+  await page.waitForFunction(() => {
+    const highlight = CSS.highlights?.get('nodus-reader-yellow');
+    return Boolean(highlight && highlight.size > 0 && Array.from(highlight).every((range) => range.startContainer.isConnected && range.endContainer.isConnected));
+  });
+  const sidebarBeforeZoom = await readerSidebar.boundingBox();
+  assert.ok(sidebarBeforeZoom);
+  for (let index = 0; index < 3; index += 1) await page.getByTestId('library-reader-pdf-zoom-in').click();
+  await page.waitForFunction(() => Number(document.querySelector('[data-testid="library-reader-pdf-viewer"]')?.getAttribute('data-rendered-scale')) >= 1.69);
+  await page.waitForFunction(() => {
+    const highlight = CSS.highlights?.get('nodus-reader-yellow');
+    return Boolean(highlight && highlight.size > 0 && Array.from(highlight).every((range) => range.startContainer.isConnected && range.endContainer.isConnected));
+  });
+  const sidebarAfterZoom = await readerSidebar.boundingBox();
+  assert.ok(sidebarAfterZoom);
+  assert.ok(Math.abs(sidebarAfterZoom.width - sidebarBeforeZoom.width) < 1, 'PDF zoom cannot progressively shrink the right rail');
+  await assertViewerContained(pdfViewer, 'zoomed PDF');
+  const pdfScrollGeometry = await pdfViewer.locator('main').evaluate((element) => ({ clientWidth: element.clientWidth, scrollWidth: element.scrollWidth }));
+  assert.ok(pdfScrollGeometry.scrollWidth > pdfScrollGeometry.clientWidth, 'an enlarged PDF scrolls horizontally inside its own viewport');
+  await page.screenshot({ path: pdfZoomScreenshotPath, fullPage: true });
+  await page.setViewportSize({ width: 1120, height: 760 });
+  const [narrowLayoutBox, narrowSidebarBox, narrowLayoutGeometry, narrowSidebarBackground] = await Promise.all([
+    page.getByTestId('library-reader-layout').boundingBox(),
+    readerSidebar.boundingBox(),
+    page.getByTestId('library-reader-layout').evaluate((element) => ({ clientWidth: element.clientWidth, scrollWidth: element.scrollWidth })),
+    readerSidebar.evaluate((element) => getComputedStyle(element).backgroundColor),
+  ]);
+  assert.ok(narrowLayoutBox && narrowSidebarBox);
+  assert.ok(narrowSidebarBox.x >= narrowLayoutBox.x && narrowSidebarBox.x + narrowSidebarBox.width <= narrowLayoutBox.x + narrowLayoutBox.width + 1, 'the overlay rail remains fully visible beside a zoomed PDF in a narrow window');
+  assert.ok(narrowLayoutGeometry.scrollWidth <= narrowLayoutGeometry.clientWidth + 1, 'PDF width cannot expand the narrow reader shell');
+  assert.equal(narrowSidebarBackground, 'rgb(9, 9, 11)', 'the dark overlay rail is opaque over the enlarged PDF');
+  await page.waitForFunction(() => {
+    const highlight = CSS.highlights?.get('nodus-reader-yellow');
+    return Boolean(highlight && highlight.size > 0 && Array.from(highlight).every((range) => range.startContainer.isConnected && range.endContainer.isConnected));
+  });
+  await page.screenshot({ path: pdfZoomNarrowScreenshotPath, fullPage: true });
+  await page.setViewportSize({ width: 1500, height: 980 });
   await page.screenshot({ path: pdfScreenshotPath, fullPage: true });
 
   await sourceChooser.selectOption('local:READEREPUB');
   const epubViewer = page.getByTestId('library-reader-epub-viewer');
   await epubViewer.waitFor({ state: 'visible' });
   assert.match(await epubViewer.innerText(), /Este texto refluye/);
+  await assertViewerContained(epubViewer, 'EPUB');
   await page.evaluate(() => {
     const root = document.querySelector('[data-testid="library-reader-epub-content"] .library-attachment-text');
     if (!(root instanceof HTMLElement)) throw new Error('EPUB text surface missing');
@@ -518,6 +570,7 @@ ${longReaderBody}
   await sourceChooser.selectOption('local:READERIMAGE');
   const imageViewer = page.getByTestId('library-reader-image-viewer');
   await imageViewer.waitFor({ state: 'visible' });
+  await assertViewerContained(imageViewer, 'image');
   const image = imageViewer.locator('img'); await image.waitFor(); await image.evaluate((element) => element.complete || new Promise((resolve) => element.addEventListener('load', resolve, { once: true })));
   await imageViewer.getByRole('button', { name: 'Marcar región' }).click();
   const imageBox = await image.boundingBox(); assert.ok(imageBox);
@@ -530,6 +583,7 @@ ${longReaderBody}
   const textViewer = page.getByTestId('library-reader-text-viewer');
   await textViewer.waitFor({ state: 'visible' });
   assert.match(await textViewer.innerText(), /Documento Word abierto dentro de Nodus/);
+  await assertViewerContained(textViewer, 'office document');
   await page.screenshot({ path: docxScreenshotPath, fullPage: true });
 
   await sourceChooser.selectOption('local:READERXLSX');
@@ -608,6 +662,7 @@ ${longReaderBody}
 
   await lightSourceSelect.selectOption('clean');
   await page.setViewportSize({ width: 860, height: 820 });
+  assert.equal(await page.getByTestId('library-reader-sidebar').evaluate((element) => getComputedStyle(element).backgroundColor), 'rgb(255, 255, 255)', 'the light overlay rail is also opaque');
   await page.screenshot({ path: lightScreenshotPath, fullPage: true });
   assert.deepEqual(pageErrors, [], pageErrors.map((error) => error.stack ?? String(error)).join('\n'));
   console.log(`library reader UI test passed; file menu ${filesInteraction.elapsed.toFixed(1)}ms; optimistic highlight ${highlightPaintLatency}ms; screenshots: ${screenshotDirectory}`);

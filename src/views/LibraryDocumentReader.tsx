@@ -644,7 +644,7 @@ export function LibraryDocumentReader({
     : t(reader.freshness === 'current' ? 'Markdown limpio' : 'Última copia legible');
 
   return (
-    <div className="library-document-reader flex h-full min-h-0 flex-col">
+    <div className="library-document-reader flex h-full min-h-0 min-w-0 flex-col overflow-hidden">
       <NodiViewContextSource title={reader.title} text={contextMarkdown} />
       <header className="relative z-40 flex flex-wrap items-center gap-2 border-b border-neutral-800 bg-neutral-950/60 px-4 py-2.5 backdrop-blur">
         <button className="btn btn-ghost gap-1.5" onClick={onBack}><Icon name="chevronLeft" /> {t('Biblioteca')}</button>
@@ -722,7 +722,7 @@ export function LibraryDocumentReader({
         {t('La sustitución todavía no está validada. Se muestra la última copia legible y sus resultados no se presentan como actuales.')}
       </div>}
 
-      <div className="relative flex min-h-0 flex-1">
+      <div className="relative flex min-h-0 min-w-0 flex-1 overflow-hidden" data-testid="library-reader-layout">
         {outlineOpen && (
           <aside id="library-reader-outline" className="library-reader-outline w-64 shrink-0 overflow-y-auto border-r border-neutral-800 bg-neutral-950/25 px-3 py-4 max-lg:absolute max-lg:inset-y-0 max-lg:left-0 max-lg:z-30 max-lg:w-[min(18rem,calc(100vw-1rem))] max-lg:shadow-2xl">
             <div className="mb-3 flex items-center justify-between px-2">

@@ -372,6 +372,7 @@ export const ReaderSelectionActions = forwardRef<ReaderSelectionActionsHandle, {
   const [commentError, setCommentError] = useState<string | null>(null);
   const [localMark, setLocalMark] = useState<ReaderMark | null>(() => loadMark(contextId));
   const [marginPositions, setMarginPositions] = useState<MarginPosition[]>([]);
+  const [contentRevision, setContentRevision] = useState(0);
   const migratedBookmark = useRef<string | null>(null);
   const usesSyncedBookmark = !!onCreateAnnotation && !!onDeleteAnnotation;
   const bookmarkAnnotation = annotations.find((item) => item.kind === 'bookmark') ?? null;
@@ -399,9 +400,15 @@ export const ReaderSelectionActions = forwardRef<ReaderSelectionActionsHandle, {
   useEffect(() => {
     const root = targetRef.current;
     if (!root) return;
-    const observer = new MutationObserver(() => READER_TEXT_INDICES.delete(root));
+    let frame = 0;
+    const observer = new MutationObserver(() => {
+      READER_TEXT_INDICES.delete(root);
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(() => setContentRevision((revision) => revision + 1));
+    });
     observer.observe(root, { childList: true, characterData: true, subtree: true });
     return () => {
+      cancelAnimationFrame(frame);
       observer.disconnect();
       READER_TEXT_INDICES.delete(root);
     };
@@ -613,6 +620,10 @@ export const ReaderSelectionActions = forwardRef<ReaderSelectionActionsHandle, {
     const root = targetRef.current;
     const registry = (CSS as unknown as { highlights?: Map<string, unknown> }).highlights;
     const HighlightConstructor = (window as unknown as { Highlight?: new (...ranges: Range[]) => unknown }).Highlight;
+    // PDF.js replaces the complete text layer whenever its scale or page changes.
+    // Rebuild the CSS Highlight ranges against those new nodes instead of leaving
+    // registrations attached to the disconnected previous text layer.
+    void contentRevision;
     for (const name of ALL_HIGHLIGHT_NAMES) registry?.delete(name);
     if (!root || !registry || !HighlightConstructor) return;
     for (const item of READER_ANNOTATION_COLORS) {
@@ -630,7 +641,7 @@ export const ReaderSelectionActions = forwardRef<ReaderSelectionActionsHandle, {
     return () => {
       for (const name of ALL_HIGHLIGHT_NAMES) registry.delete(name);
     };
-  }, [annotations, targetRef]);
+  }, [annotations, contentRevision, targetRef]);
 
   const copy = async () => {
     if (!active) return;

@@ -41,7 +41,7 @@ test('the Library UI exposes hierarchy, search, bulk operations, imports and bac
     'library-detail-primary-action', 'library-detail-actions-toggle', 'library-detail-actions-menu',
     'library-reading-status', 'library-extraction-advanced', 'cancel-library-preparation',
     'library-catalog-scroll',
-  ]) assert.match(view, new RegExp(`data-testid=(?:"|\{\`)[^\n]*${marker}`));
+  ]) assert.match(view, new RegExp(`data-testid=(?:"|{\`)[^\n]*${marker}`));
   for (const method of [
     'getGlobalLibraryStatus', 'listGlobalLibraryItems', 'listGlobalLibraryCollections',
     'importGlobalLibraryFiles', 'listZoteroImportLibraries', 'importZoteroLibrary',
@@ -92,9 +92,9 @@ test('the Library UI exposes hierarchy, search, bulk operations, imports and bac
   assert.doesNotMatch(view, /\{!trashMode && <aside/, 'the collection tree remains visible while trash is open');
   assert.match(appCss, /\.library-trash-folder\.is-active[\s\S]*background: rgb\(127 29 29 \/ 0\.32\)/);
   assert.match(appCss, /\.light \.library-trash-folder\.is-active[\s\S]*background: #fee2e2/);
-  assert.match(appCss, /\.library-catalog-scroll::\-webkit-scrollbar \{ height: 4px; \}/, 'the catalogue horizontal scrollbar stays visually minimal');
-  assert.match(appCss, /\.library-catalog-scroll::\-webkit-scrollbar-track \{ background: transparent; \}/, 'the scrollbar does not render a second opaque rail');
-  assert.match(view, /className="library-catalog-list[^\"]*overflow-x-hidden"/, 'the virtualized rows cannot render a second horizontal scrollbar');
+  assert.match(appCss, /\.library-catalog-scroll::-webkit-scrollbar \{ height: 4px; \}/, 'the catalogue horizontal scrollbar stays visually minimal');
+  assert.match(appCss, /\.library-catalog-scroll::-webkit-scrollbar-track \{ background: transparent; \}/, 'the scrollbar does not render a second opaque rail');
+  assert.match(view, /className="library-catalog-list[^"]*overflow-x-hidden"/, 'the virtualized rows cannot render a second horizontal scrollbar');
   assert.match(view, /La importación se canceló; el catálogo ya recuperado se conserva/);
   assert.match(view, /Copia de solo lectura: Nodus nunca modifica Zotero/);
   assert.match(view, /status\.conflicts > 0 \|\| status\.invalidRecords > 0/);
@@ -122,8 +122,9 @@ test('Library file mutations automatically prepare the clean reading version', a
 });
 
 test('the global reader exposes annotations, metadata, chat and native attachment viewers', async () => {
-  const [readerSource, attachmentViewer, markdownSource, selectionCss, appCss, store, protocol, main, html] = await Promise.all([
+  const [readerSource, attachmentViewer, selectionSource, markdownSource, selectionCss, appCss, store, protocol, main, html] = await Promise.all([
     readSource('src/views/LibraryDocumentReader.tsx'), readSource('src/components/library/LibraryAttachmentViewer.tsx'),
+    readSource('src/components/ReaderSelectionActions.tsx'),
     readSource('src/components/Markdown.tsx'),
     readSource('src/components/readerSelectionActions.css'), readSource('src/index.css'),
     readSource('electron/libraryReader/libraryReaderStore.ts'), readSource('electron/libraryProtocol.ts'), readSource('electron/main.ts'), readSource('index.html'),
@@ -151,6 +152,11 @@ test('the global reader exposes annotations, metadata, chat and native attachmen
   assert.match(reader, /attachment:/);
   assert.match(reader, /target:\s*\{\s*type:\s*'region'/);
   assert.match(reader, /ReaderSelectionActions/);
+  assert.match(readerSource, /className="relative flex min-h-0 min-w-0 flex-1 overflow-hidden" data-testid="library-reader-layout"/, 'the reader owns a width-constrained viewport instead of growing with a zoomed attachment');
+  assert.match(attachmentViewer, /className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden" data-testid="library-reader-pdf-viewer"/, 'PDF pages scroll inside their viewer and cannot push the right rail away');
+  assert.match(attachmentViewer, /className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden" data-testid=\{isEpub \? 'library-reader-epub-viewer' : 'library-reader-text-viewer'\}/, 'reflowable and office viewers share the constrained attachment shell');
+  assert.match(selectionSource, /MutationObserver[\s\S]*setContentRevision[\s\S]*contentRevision/, 'annotations rebuild their live ranges when a viewer replaces its text nodes');
+  assert.match(attachmentViewer, /renderTask\?\.cancel\(\)/, 'superseded PDF zoom renders are cancelled before they can overwrite the current page');
   assert.match(reader, /libraryReaderChatStream/);
   assert.match(reader, /sourceId: selectedSource/);
   assert.match(reader, /model: chatModel/);
@@ -166,6 +172,7 @@ test('the global reader exposes annotations, metadata, chat and native attachmen
   assert.match(selectionCss, /\.light \.reader-highlighter-palette button:hover,[\s\S]*background: #eef2ff; color: #4338ca;/);
   assert.match(appCss, /\.light \.library-reader-source-badge\.is-original[\s\S]*background: #ffffff;[\s\S]*color: #52525b;/);
   assert.match(appCss, /\.light \.library-reader-file-option\.is-active \{ background: #eef2ff; color: #4338ca; \}/);
+  assert.match(appCss, /@media \(max-width: 1279px\)[\s\S]*?\.library-reader-notes \{ background-color: #09090b; \}[\s\S]*?\.light \.library-theme \.library-reader-notes \{ background-color: #ffffff; \}/, 'overlay reader rails are opaque in dark and light themes');
   assert.match(appCss, /\.library-reader-document \.md p \{[\s\S]*text-align: justify;[\s\S]*text-indent: 1\.5em;/, 'clean prose is justified with a first-line indent');
   assert.match(appCss, /\.library-reader-document \.md blockquote \{[\s\S]*margin: 1\.4em 2em;/, 'standalone quotations are visibly inset');
   assert.match(markdownSource, /href\.startsWith\('#'\)/, 'local note and bibliography anchors never leave the reader');
@@ -186,7 +193,7 @@ test('the global reader exposes annotations, metadata, chat and native attachmen
   assert.match(protocol, /Accept-Ranges/);
   assert.match(main, /registerLibrarySchemePrivileges/);
   assert.match(main, /registerLibraryProtocol/);
-  assert.match(html, /connect-src[^\"]*nodus-library:/);
+  assert.match(html, /connect-src[^"]*nodus-library:/);
 });
 
 test('citation UI loads, imports and removes real CSL styles including Zotero styles', async () => {

@@ -3280,6 +3280,14 @@ select.input optgroup {
 .library-reader-document .md > p:last-of-type { margin-bottom: 1.2em; }
 .library-reader-outline,
 .library-reader-notes { scrollbar-width: thin; scrollbar-color: rgb(63 63 70) transparent; }
+@media (max-width: 1279px) {
+  .library-reader-outline,
+  .library-reader-notes { background-color: #09090b; }
+  .light .library-reader-outline,
+  .light .library-reader-notes,
+  .light .library-theme .library-reader-outline,
+  .light .library-theme .library-reader-notes { background-color: #ffffff; }
+}
 
 /* Source status and file selection are semantic reader controls. Keeping their
    palettes here prevents generic dark utility classes from leaking into the
