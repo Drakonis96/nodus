@@ -15,6 +15,7 @@ import type { TeachingApi } from './api/teaching';
 import type { ToolkitApi } from './api/toolkit';
 import type { TestimoniesApi } from './api/testimonies';
 import type { LibraryApi } from './api/library';
+import type { LibraryAttachmentRecord } from './libraryTypes';
 
 export type {
   LibraryAttachmentRecord,
@@ -625,6 +626,38 @@ export interface LibraryReaderReference {
   year: number | null;
 }
 
+export type LibraryReaderAttachmentViewer = 'pdf' | 'epub' | 'image' | 'html' | 'text' | 'external';
+
+/** One preserved attachment that can be selected independently from the clean copy. */
+export interface LibraryReaderAttachment {
+  id: string;
+  title: string;
+  fileName: string;
+  mimeType: string;
+  byteSize: number;
+  role: LibraryAttachmentRecord['role'];
+  viewer: LibraryReaderAttachmentViewer;
+  available: boolean;
+  url: string | null;
+  annotationsSupported: boolean;
+  annotationMode: 'text' | 'region' | 'none';
+}
+
+export interface LibraryReaderEpubChapter {
+  id: string;
+  title: string;
+  html: string;
+  text: string;
+}
+
+export interface LibraryReaderAttachmentContent {
+  attachmentId: string;
+  viewer: 'epub' | 'html' | 'text';
+  text: string;
+  html: string | null;
+  chapters: LibraryReaderEpubChapter[];
+}
+
 /**
  * A durable, clean reading copy stored beside its immutable original.
  *
@@ -641,6 +674,7 @@ export interface LibraryReaderDocument {
   authors: string[];
   year: number | null;
   markdown: string;
+  cleanAvailable: boolean;
   sections: LibraryReaderSection[];
   pageCount: number | null;
   wordCount: number;
@@ -649,6 +683,8 @@ export interface LibraryReaderDocument {
   /** Narrow internal URL served only for this preserved original. */
   originalUrl: string | null;
   originalMimeType: string | null;
+  /** Every preserved file, in the same user-defined order shown by the item manager. */
+  attachments: LibraryReaderAttachment[];
   sourceMapAvailable: boolean;
   /** Exact provenance of the clean copy currently shown. */
   contentFingerprint: string | null;
@@ -669,6 +705,8 @@ export interface LibraryReaderChatMessage {
 
 export interface LibraryReaderChatRequest {
   documentId: string;
+  /** `clean` or the stable attachment id selected in the reader. */
+  sourceId?: string;
   messages: LibraryReaderChatMessage[];
   model?: ModelRef | null;
 }
@@ -6238,7 +6276,13 @@ export interface WritingDraftAnnotation {
   anchorStatus?: 'current' | 'orphaned';
   contentFingerprint?: string | null;
   orphanReason?: string | null;
+  /** Text selections can identify a PDF page or EPUB chapter; images use a normalized rectangle. */
+  target?: WritingDraftAnnotationTarget;
 }
+
+export type WritingDraftAnnotationTarget =
+  | { type: 'text'; attachmentId: string; page?: number; chapterId?: string }
+  | { type: 'region'; attachmentId: string; x: number; y: number; width: number; height: number };
 
 export interface WritingDraftAnnotationInput {
   draftId: string;
@@ -6251,6 +6295,7 @@ export interface WritingDraftAnnotationInput {
   prefix?: string;
   suffix?: string;
   comment?: string | null;
+  target?: WritingDraftAnnotationTarget;
 }
 
 export interface WritingWorkshopSaveDraftRequest {

@@ -5,6 +5,31 @@
 @tailwind components;
 @tailwind utilities;
 
+/* PDF.js keeps the selectable text exactly over the rendered page. The glyphs
+   stay transparent; browser selection and Nodus highlights remain visible. */
+.pdf-annotation-page .textLayer {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  line-height: 1;
+  text-align: initial;
+  text-size-adjust: none;
+  transform-origin: 0 0;
+  forced-color-adjust: none;
+  z-index: 2;
+}
+.pdf-annotation-page .textLayer :is(span, br) {
+  position: absolute;
+  color: transparent;
+  white-space: pre;
+  cursor: text;
+  transform-origin: 0 0;
+}
+.pdf-annotation-page .textLayer ::selection { background: rgb(99 102 241 / .35); }
+.library-attachment-text img { max-width: 100%; height: auto; }
+.library-attachment-text table { width: 100%; border-collapse: collapse; }
+.library-attachment-text :is(th, td) { border: 1px solid rgb(115 115 115 / .35); padding: .45rem .6rem; }
+
 /* The top bar is a window drag region (so the frameless/hiddenInset window can be
    moved by its empty areas), while every interactive child stays clickable. */
 .app-titlebar {

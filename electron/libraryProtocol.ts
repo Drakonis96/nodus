@@ -1,7 +1,7 @@
 import { protocol } from 'electron';
 import fs from 'node:fs';
 import path from 'node:path';
-import { libraryReaderOriginalPath } from './libraryReader/libraryReaderStore';
+import { libraryReaderAttachmentPath, libraryReaderOriginalPath } from './libraryReader/libraryReaderStore';
 
 export const NODUS_LIBRARY_SCHEME = 'nodus-library';
 
@@ -34,16 +34,20 @@ function mimeType(file: string): string {
     '.pdf': 'application/pdf', '.epub': 'application/epub+zip', '.md': 'text/markdown; charset=utf-8',
     '.markdown': 'text/markdown; charset=utf-8', '.txt': 'text/plain; charset=utf-8', '.html': 'text/html; charset=utf-8',
     '.htm': 'text/html; charset=utf-8', '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg',
-    '.gif': 'image/gif', '.webp': 'image/webp',
+    '.gif': 'image/gif', '.webp': 'image/webp', '.bmp': 'image/bmp', '.svg': 'image/svg+xml', '.tif': 'image/tiff', '.tiff': 'image/tiff',
+    '.xml': 'application/xml; charset=utf-8', '.jats': 'application/xml; charset=utf-8', '.csv': 'text/csv; charset=utf-8', '.tsv': 'text/tab-separated-values; charset=utf-8',
   } as Record<string, string>)[path.extname(file).toLowerCase()] ?? 'application/octet-stream';
 }
 
-function documentId(request: Request): string | null {
+function resourceIdentity(request: Request): { kind: 'original'; documentId: string } | { kind: 'attachment'; documentId: string; attachmentId: string } | null {
   try {
     const url = new URL(request.url);
-    if (url.hostname !== 'original') return null;
-    const value = decodeURIComponent(url.pathname.replace(/^\/+/, ''));
-    return value && value.length <= 2_048 ? value : null;
+    const parts = url.pathname.replace(/^\/+/, '').split('/').filter(Boolean).map((entry) => decodeURIComponent(entry));
+    if (url.hostname === 'original' && parts.length === 1 && parts[0].length <= 2_048) return { kind: 'original', documentId: parts[0] };
+    if (url.hostname === 'attachment' && parts.length === 2 && parts.every((entry) => entry.length <= 2_048)) {
+      return { kind: 'attachment', documentId: parts[0], attachmentId: parts[1] };
+    }
+    return null;
   } catch { return null; }
 }
 
@@ -60,9 +64,11 @@ function readSlice(file: string, start: number, end: number): Uint8Array {
 export function registerLibraryProtocol(): void {
   protocol.handle(NODUS_LIBRARY_SCHEME, (request) => {
     try {
-      const id = documentId(request);
-      if (!id) return new Response(null, { status: 400 });
-      const file = libraryReaderOriginalPath(id);
+      const identity = resourceIdentity(request);
+      if (!identity) return new Response(null, { status: 400 });
+      const file = identity.kind === 'original'
+        ? libraryReaderOriginalPath(identity.documentId)
+        : libraryReaderAttachmentPath(identity.documentId, identity.attachmentId);
       if (!file) return new Response(null, { status: 404 });
       const stat = fs.statSync(file);
       const headers = new Headers({

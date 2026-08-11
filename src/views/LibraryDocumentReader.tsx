@@ -14,6 +14,7 @@ import { ASSISTANT_CONTEXTS, type PendingAssistantNavigationTarget } from '../na
 import { FindInPage } from '../components/FindInPage';
 import { Markdown } from '../components/Markdown';
 import { NodiViewContextSource } from '../components/NodiViewContextSource';
+import { LibraryAttachmentViewer } from '../components/library/LibraryAttachmentViewer';
 import {
   READER_ANNOTATION_COLORS,
   ReaderHighlighterControl,
@@ -188,6 +189,7 @@ export function LibraryDocumentReader({
   const [bookmarkMenuOpen, setBookmarkMenuOpen] = useState(false);
   const [sidebarTab, setSidebarTab] = useState<'annotations' | 'metadata' | 'chat'>('annotations');
   const [previewPage, setPreviewPage] = useState<number | null>(null);
+  const [selectedSource, setSelectedSource] = useState('clean');
   const [chatMessages, setChatMessages] = useState<LibraryReaderChatMessage[]>([]);
   const [chatInput, setChatInput] = useState('');
   const [chatSending, setChatSending] = useState(false);
@@ -222,6 +224,12 @@ export function LibraryDocumentReader({
   }, [reference.id]);
 
   useEffect(() => { void loadReader(); }, [loadReader]);
+  useEffect(() => {
+    if (!reader) return;
+    const remembered = localStorage.getItem(`nodus.libraryReader.source.${reader.storageId}`);
+    const valid = remembered === 'clean' ? reader.cleanAvailable : reader.attachments.some((entry) => entry.id === remembered && entry.available);
+    setSelectedSource(valid && remembered ? remembered : reader.cleanAvailable ? 'clean' : reader.attachments.find((entry) => entry.available)?.id ?? 'clean');
+  }, [reader]);
   useEffect(() => {
     if (!reader) return;
     let alive = true;
@@ -265,15 +273,16 @@ export function LibraryDocumentReader({
     });
   }, [reader, refreshAnnotations, reference.id]);
 
-  const createAnnotation = async (input: Omit<WritingDraftAnnotationInput, 'draftId' | 'scope'>) => {
+  const createScopedAnnotation = async (scope: string, input: Omit<WritingDraftAnnotationInput, 'draftId' | 'scope'>) => {
     const created = await window.nodus.createLibraryReaderAnnotation(reference.id, {
       ...input,
       draftId: reference.id,
-      scope: 'source',
+      scope,
     });
     setAnnotations((current) => [...current.filter((item) => item.id !== created.id), created]);
     setAnnotationError(null);
   };
+  const createAnnotation = (input: Omit<WritingDraftAnnotationInput, 'draftId' | 'scope'>) => createScopedAnnotation('source', input);
 
   const updateComment = async (id: string, comment: string) => {
     const updated = await window.nodus.updateLibraryReaderComment(reference.id, id, comment);
@@ -301,7 +310,7 @@ export function LibraryDocumentReader({
     if (!scroller) return;
     const saved = Number(localStorage.getItem(readingPositionKey(reader.storageId)) || 0);
     requestAnimationFrame(() => { scroller.scrollTop = Number.isFinite(saved) ? Math.max(0, saved) : 0; });
-  }, [reader]);
+  }, [reader, selectedSource]);
 
   useEffect(() => {
     const scroller = scrollRef.current;
@@ -333,7 +342,7 @@ export function LibraryDocumentReader({
       scroller.removeEventListener('scroll', schedule);
       window.removeEventListener('resize', schedule);
     };
-  }, [reader]);
+  }, [reader, selectedSource]);
 
   const scrollToSection = (index: number) => {
     const id = reader?.sections[index]?.id;
@@ -395,7 +404,7 @@ export function LibraryDocumentReader({
     setChatSending(true);
     try {
       const response = await window.nodus.libraryReaderChatStream(
-        { documentId: reference.id, messages: requestMessages },
+        { documentId: reference.id, sourceId: selectedSource, messages: requestMessages },
         { onDelta: (delta) => setChatStreaming((current) => current + delta) },
       );
       if (response.answer) setChatMessages((current) => [...current, {
@@ -451,7 +460,10 @@ export function LibraryDocumentReader({
   }
 
   const currentPage = reader.sections[activeSection]?.page ?? null;
-  const visibleAnnotations = annotations.filter((annotation) => annotation.scope === 'source');
+  const selectedAttachment = reader.attachments.find((entry) => entry.id === selectedSource) ?? null;
+  const visibleAnnotations = annotations.filter((annotation) => selectedSource === 'clean'
+    ? annotation.scope === 'source'
+    : annotation.scope === `attachment:${selectedSource}` || annotation.scope.startsWith(`attachment:${selectedSource}:`));
   const sidebarAnnotations = visibleAnnotations.filter((annotation) => annotation.kind !== 'bookmark');
   const contextMarkdown = reader.markdown.replace(/data:image\/[^;]+;base64,[^)\s]+/g, '[imagen extraída]');
 
@@ -476,15 +488,22 @@ export function LibraryDocumentReader({
         <div className="min-w-[12rem] flex-1">
           <h1 className="truncate text-sm font-semibold text-neutral-100" title={reader.title}>{reader.title}</h1>
           <p className="truncate text-[11px] text-neutral-500">
-            {reader.authors.join(', ')}{reader.year ? ` · ${reader.year}` : ''} · {reader.wordCount.toLocaleString()} {t('palabras')}
+            {reader.authors.join(', ')}{reader.year ? ` · ${reader.year}` : ''}{selectedAttachment ? ` · ${selectedAttachment.fileName}` : ` · ${reader.wordCount.toLocaleString()} ${t('palabras')}`}
           </p>
         </div>
+        <label className="relative flex min-w-44 max-w-72 items-center" data-testid="library-reader-source-picker">
+          <Icon name={selectedAttachment ? 'archive' : 'book'} size={13} className="pointer-events-none absolute left-2.5 z-10 text-neutral-500" />
+          <select className="input h-9 w-full truncate pl-8 pr-7 text-xs" value={selectedSource} onChange={(event) => { const value = event.target.value; setSelectedSource(value); localStorage.setItem(`nodus.libraryReader.source.${reader.storageId}`, value); setPreviewPage(null); }} aria-label={t('Versión o archivo')}>
+            <option value="clean" disabled={!reader.cleanAvailable}>{t('Markdown limpio')}</option>
+            {reader.attachments.map((attachment) => <option key={attachment.id} value={attachment.id} disabled={!attachment.available}>{attachment.title} · {attachment.fileName}</option>)}
+          </select>
+        </label>
         <span
           data-testid="library-reader-freshness"
           className={`hidden rounded-full border px-2 py-1 text-[10px] font-medium md:inline-flex ${reader.freshness === 'current' ? 'border-emerald-900/70 bg-emerald-950/30 text-emerald-300' : 'border-amber-800/70 bg-amber-950/35 text-amber-300'}`}
-        >{reader.freshness === 'current' ? t('Markdown limpio') : t('Última copia legible')}</span>
+        >{selectedAttachment ? t(selectedAttachment.role === 'original' ? 'Archivo original' : 'Adjunto conservado') : reader.freshness === 'current' ? t('Markdown limpio') : t('Última copia legible')}</span>
         <ReaderHighlighterControl value={highlighterColor} onChange={setHighlighterColor} />
-        <div ref={bookmarkMenuRef} className="relative">
+        {selectedSource === 'clean' && <div ref={bookmarkMenuRef} className="relative">
           <button
             className={`btn btn-ghost h-9 w-10 gap-0.5 border p-0 ${hasReaderMark ? 'border-amber-700/60 text-amber-300' : 'border-neutral-700'}`}
             data-testid="library-reader-bookmark-menu"
@@ -502,9 +521,8 @@ export function LibraryDocumentReader({
               <Icon name="bookmarkFill" size={13} /><span>{t('Ir al marcador de lectura')}</span>
             </button>
           </div>}
-        </div>
-        <HoverLabelButton icon="file" label={currentPage ? tx('Ver página {n}', { n: currentPage }) : t('Ver página original')} onClick={() => openCurrentPage(currentPage)} disabled={!reader.originalAvailable} showLabel={!!currentPage} className="btn-ghost h-9 min-h-9 border border-neutral-700" />
-        <HoverLabelButton icon="external" label={t('Abrir original completo')} onClick={() => void window.nodus.openLibraryReaderOriginal(reference.id)} disabled={!reader.originalAvailable} className="btn-ghost h-9 min-h-9 border border-neutral-700" />
+        </div>}
+        {selectedSource === 'clean' && <HoverLabelButton icon="file" label={currentPage ? tx('Ver página {n}', { n: currentPage }) : t('Ver página original')} onClick={() => openCurrentPage(currentPage)} disabled={!reader.originalAvailable} showLabel={!!currentPage} className="btn-ghost h-9 min-h-9 border border-neutral-700" />}
         <button className="btn btn-primary h-9 w-9 shrink-0 p-0" data-testid="library-reader-open-chat" onClick={openDocumentChat} aria-label={t('Preguntar al chat')} title={t('Preguntar al chat')}><Icon name="chat" size={14} /></button>
         <button
           className={`btn btn-ghost h-9 w-9 shrink-0 p-0 ${notesOpen ? 'text-indigo-300' : ''}`}
@@ -536,7 +554,11 @@ export function LibraryDocumentReader({
               <button className="ml-1.5 rounded-lg p-1 text-neutral-600 hover:bg-neutral-900 hover:text-neutral-300" onClick={() => setOutlineOpen(false)} aria-label={t('Cerrar')}><Icon name="chevronLeft" size={13} /></button>
             </div>
             <nav className="space-y-0.5">
-              {reader.sections.map((section, index) => (
+              <p className="px-2 pb-1 pt-1 text-[9px] font-semibold uppercase tracking-[.14em] text-neutral-600">{t('Versiones y archivos')}</p>
+              <button className={`flex w-full items-center gap-2 rounded-lg px-2 py-2 text-left text-xs ${selectedSource === 'clean' ? 'bg-indigo-950/45 text-indigo-200' : 'text-neutral-500 hover:bg-neutral-900'}`} disabled={!reader.cleanAvailable} onClick={() => setSelectedSource('clean')}><Icon name="book" size={12} /><span className="truncate">{t('Markdown limpio')}</span></button>
+              {reader.attachments.map((attachment) => <button key={attachment.id} className={`flex w-full items-center gap-2 rounded-lg px-2 py-2 text-left text-xs ${selectedSource === attachment.id ? 'bg-indigo-950/45 text-indigo-200' : 'text-neutral-500 hover:bg-neutral-900'} disabled:opacity-40`} disabled={!attachment.available} onClick={() => setSelectedSource(attachment.id)}><Icon name={attachment.viewer === 'image' ? 'image' : attachment.viewer === 'pdf' || attachment.viewer === 'epub' ? 'book' : 'archive'} size={12} /><span className="min-w-0 flex-1 truncate">{attachment.title}</span><span className="text-[9px] uppercase text-neutral-700">{attachment.viewer}</span></button>)}
+              {selectedSource === 'clean' && <p className="px-2 pb-1 pt-4 text-[9px] font-semibold uppercase tracking-[.14em] text-neutral-600">{t('Índice')}</p>}
+              {selectedSource === 'clean' && reader.sections.map((section, index) => (
                 <div key={section.id} className={`group flex items-center rounded-lg ${index === activeSection ? 'bg-indigo-950/45 text-indigo-200' : 'text-neutral-500 hover:bg-neutral-900 hover:text-neutral-300'}`}>
                   <button className="min-w-0 flex-1 px-2 py-2 text-left text-xs leading-4" style={{ paddingLeft: `${8 + Math.max(0, section.level - 1) * 10}px` }} onClick={() => scrollToSection(index)}>
                     <span className="line-clamp-2">{section.title}</span>
@@ -552,7 +574,7 @@ export function LibraryDocumentReader({
           </aside>
         )}
 
-        <main ref={scrollRef} className="min-w-0 flex-1 overflow-y-auto bg-neutral-950/10 px-5 py-8 max-md:px-3">
+        {selectedSource === 'clean' ? <main ref={scrollRef} className="min-w-0 flex-1 overflow-y-auto bg-neutral-950/10 px-5 py-8 max-md:px-3">
           <article className="library-reader-paper mx-auto max-w-[52rem] rounded-2xl border border-neutral-800/80 bg-neutral-950/35 px-12 py-12 shadow-[0_24px_70px_-40px_rgba(0,0,0,.75)] max-md:rounded-none max-md:border-x-0 max-md:px-5">
             <div ref={documentRef} className="library-reader-document relative" data-testid="library-reader-document">
               <Markdown content={reader.markdown} verify={false} allowDataImages className="text-[16px] leading-[1.85] text-neutral-300" />
@@ -562,9 +584,13 @@ export function LibraryDocumentReader({
             <span>{reader.citationKey ? `[${reader.citationKey}]` : reader.storageId}</span>
             <span>{t('El original permanece separado y sin modificaciones.')}</span>
           </div>
-        </main>
+        </main> : selectedAttachment && <LibraryAttachmentViewer
+          documentId={reference.id} attachment={selectedAttachment} annotations={annotations} highlighterColor={highlighterColor}
+          onCreate={createScopedAnnotation} onUpdateComment={updateComment} onDelete={deleteAnnotation} onError={setAnnotationError}
+          onOpenExternal={() => { void window.nodus.openGlobalLibraryAttachment(reference.id, selectedAttachment.id).catch(() => window.nodus.openLibraryReaderOriginal(reference.id)); }}
+        />}
 
-        <ReaderSelectionActions
+        {selectedSource === 'clean' && <ReaderSelectionActions
           ref={markActionsRef}
           targetRef={documentRef}
           scrollRef={scrollRef}
@@ -576,7 +602,7 @@ export function LibraryDocumentReader({
           onDeleteAnnotation={deleteAnnotation}
           onAnnotationError={setAnnotationError}
           onMarkChange={setHasReaderMark}
-        />
+        />}
 
         {notesOpen && (
           <aside id="library-reader-sidebar" className="library-reader-notes flex w-80 shrink-0 flex-col overflow-hidden border-l border-neutral-800 bg-neutral-950/25 max-xl:absolute max-xl:inset-y-[3.75rem] max-xl:right-0 max-xl:z-30 max-xl:shadow-2xl" data-testid="library-reader-sidebar">
@@ -649,7 +675,7 @@ export function LibraryDocumentReader({
               {sidebarTab === 'chat' && <div data-testid="library-reader-chat" className="flex min-h-full flex-col">
                 <div className="mb-3 flex items-center gap-2">
                   <span className="grid h-8 w-8 place-items-center rounded-xl bg-indigo-500/15 text-indigo-300"><Icon name="chat" size={14} /></span>
-                  <div className="min-w-0 flex-1"><h3 className="text-xs font-semibold">{t('Chat de la lectura')}</h3><p className="truncate text-[9px] text-neutral-600">{t('Texto limpio y anotaciones incluidos')}</p></div>
+                  <div className="min-w-0 flex-1"><h3 className="text-xs font-semibold">{t('Chat de la lectura')}</h3><p className="truncate text-[9px] text-neutral-600">{t(selectedSource === 'clean' ? 'Texto limpio y anotaciones incluidos' : 'Archivo actual y anotaciones incluidos')}</p></div>
                   {chatMessages.length > 0 && <button className="rounded p-1.5 text-neutral-600 hover:bg-red-950 hover:text-red-400" aria-label={t('Vaciar conversación')} onClick={() => void clearChat()}><Icon name="trash" size={12} /></button>}
                 </div>
                 <div className="min-h-0 flex-1 space-y-3" aria-live="polite">
@@ -673,7 +699,7 @@ export function LibraryDocumentReader({
           </aside>
         )}
       </div>
-      <FindInPage targetRef={scrollRef} />
+      {selectedSource === 'clean' && <FindInPage targetRef={scrollRef} />}
       {previewPage && reader.originalUrl && <OriginalPagePreview url={reader.originalUrl} initialPage={previewPage} title={reader.title} onClose={() => setPreviewPage(null)} onOpenFull={() => void window.nodus.openLibraryReaderOriginal(reference.id)} />}
     </div>
   );

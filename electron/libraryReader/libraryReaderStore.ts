@@ -1,7 +1,10 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
+import AdmZip from 'adm-zip';
 import type {
+  LibraryReaderAttachment,
+  LibraryReaderAttachmentContent,
   LibraryReaderDocument,
   LibraryReaderChatMessage,
   LibraryReaderSection,
@@ -12,6 +15,7 @@ import type {
 } from '@shared/types';
 import type { LibraryContentRevision, LibraryItemRecord } from '@shared/libraryTypes';
 import { getWork } from '../db/worksRepo';
+import { xlsxFileToText } from '../extraction/tabular';
 import { atomicWriteJson, configuredLibraryRootOrThrow, safeLibraryFolderName } from '../library/libraryPaths';
 import { legacyMetadataToRecord, normalizeLibraryItemRecord } from '../library/libraryRecord';
 
@@ -25,6 +29,7 @@ interface ReaderMetadata {
   files?: { reader?: string; original?: string; sourceMap?: string; annotations?: string; chat?: string; orphanedAnnotations?: string };
   contentRevision?: LibraryContentRevision;
   extraction?: LibraryItemRecord['extraction'];
+  attachments?: LibraryItemRecord['attachments'];
 }
 
 interface SourceMapBlock {
@@ -71,6 +76,7 @@ interface DiskAnnotation {
   anchorStatus?: 'current' | 'orphaned';
   contentFingerprint?: string | null;
   orphanReason?: string | null;
+  target?: WritingDraftAnnotation['target'];
 }
 
 const COLORS = new Set<WritingDraftAnnotationColor>(['yellow', 'rose', 'blue', 'mint', 'lavender', 'peach']);
@@ -122,6 +128,7 @@ function recordReaderMetadata(record: LibraryItemRecord): ReaderMetadata {
     files: record.files,
     contentRevision: record.contentRevision,
     extraction: record.extraction,
+    attachments: record.attachments,
   };
 }
 
@@ -306,8 +313,6 @@ function globalDocument(documentId: string): ResolvedReaderDocument | null {
       || record.sourceIdentities.some((identity) => identity.itemKey === canonicalId);
     if (!matches) return null;
     const metadata = recordReaderMetadata(record);
-    const reader = optionalDocumentFile(folder, metadata.files?.reader, 'reader.md');
-    if (!reader || !fs.existsSync(reader)) return null;
     return { identity: recordIdentity(record), folder, metadata };
   };
   const directNames = new Set([
@@ -360,14 +365,28 @@ export function getLibraryReaderDocument(documentId: string): LibraryReaderDocum
   const markdownPath = optionalDocumentFile(folder, readerName, 'reader.md');
   const sourceMapPath = optionalDocumentFile(folder, sourceMapName, 'source-map.json');
   const originalPath = optionalDocumentFile(folder, originalName, 'original.pdf');
-  if (!markdownPath || !fs.existsSync(markdownPath)) return null;
-
-  const rawMarkdown = fs.readFileSync(markdownPath, 'utf8');
+  const cleanAvailable = !!markdownPath && fs.existsSync(markdownPath) && fs.statSync(markdownPath).isFile();
+  const rawMarkdown = cleanAvailable && markdownPath ? fs.readFileSync(markdownPath, 'utf8') : '';
   const sourceMap = sourceMapPath ? readJson<ReaderSourceMap>(sourceMapPath) : null;
   const originalAvailable = !!originalPath && fs.existsSync(originalPath) && fs.statSync(originalPath).isFile();
   const extractionRevision = metadata.contentRevision?.components.extraction;
   const freshness = extractionRevision?.freshness ?? (metadata.files?.reader ? 'unavailable' : 'none');
   const sourceContentFingerprint = metadata.contentRevision?.contentFingerprint ?? sourceMap?.reader?.sha256 ?? null;
+  const declaredAttachments = Array.isArray(metadata.attachments) ? metadata.attachments : [];
+  const attachments: LibraryReaderAttachment[] = declaredAttachments
+    .map((attachment) => readerAttachment(identity.workId, folder, attachment))
+    .sort((a, b) => {
+      const left = declaredAttachments.find((entry) => entry.id === a.id)?.position ?? 0;
+      const right = declaredAttachments.find((entry) => entry.id === b.id)?.position ?? 0;
+      return left - right || a.id.localeCompare(b.id);
+    });
+  if (originalAvailable && originalPath && !attachments.some((entry) => path.basename(entry.fileName) === path.basename(originalPath))) {
+    attachments.unshift(readerAttachment(identity.workId, folder, {
+      id: 'original', title: path.basename(originalPath), fileName: path.basename(originalPath),
+      relativePath: path.relative(folder, originalPath), mimeType: mimeForOriginal(originalPath),
+      byteSize: fs.statSync(originalPath).size, sha256: '', role: 'original', position: -1,
+    }));
+  }
   return {
     workId: identity.workId,
     storageId: identity.storageId,
@@ -376,7 +395,8 @@ export function getLibraryReaderDocument(documentId: string): LibraryReaderDocum
     title: metadata.title?.trim() || identity.title,
     authors: Array.isArray(metadata.authors) && metadata.authors.length ? metadata.authors : identity.authors,
     year: typeof metadata.year === 'number' ? metadata.year : identity.year,
-    markdown: inlineDocumentImages(rawMarkdown, folder, path.dirname(markdownPath)),
+    markdown: cleanAvailable && markdownPath ? inlineDocumentImages(rawMarkdown, folder, path.dirname(markdownPath)) : '',
+    cleanAvailable,
     sections: sectionsFromMarkdown(rawMarkdown, sourceMap),
     pageCount: sourceMap?.pages?.length || null,
     wordCount: rawMarkdown.split(/\s+/).filter(Boolean).length,
@@ -384,6 +404,7 @@ export function getLibraryReaderDocument(documentId: string): LibraryReaderDocum
     originalFileName: originalAvailable && originalPath ? path.basename(originalPath) : null,
     originalUrl: originalAvailable && originalPath ? `nodus-library://original/${encodeURIComponent(identity.workId)}?v=${encodeURIComponent(path.basename(originalPath))}` : null,
     originalMimeType: originalAvailable && originalPath ? mimeForOriginal(originalPath) : null,
+    attachments,
     sourceMapAvailable: sourceMap !== null,
     contentFingerprint: sourceContentFingerprint,
     extractionFingerprint: metadata.contentRevision?.extractionFingerprint ?? metadata.extraction?.lastSuccessfulFingerprint ?? null,
@@ -412,9 +433,37 @@ export function getLibraryReaderRawContent(documentId: string): {
 function mimeForOriginal(filePath: string): string {
   return ({
     '.pdf': 'application/pdf', '.epub': 'application/epub+zip', '.md': 'text/markdown', '.markdown': 'text/markdown',
-    '.txt': 'text/plain', '.html': 'text/html', '.htm': 'text/html', '.png': 'image/png', '.jpg': 'image/jpeg',
-    '.jpeg': 'image/jpeg', '.webp': 'image/webp', '.gif': 'image/gif',
+    '.txt': 'text/plain', '.csv': 'text/csv', '.tsv': 'text/tab-separated-values', '.xml': 'application/xml', '.jats': 'application/xml',
+    '.html': 'text/html', '.htm': 'text/html', '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg',
+    '.webp': 'image/webp', '.gif': 'image/gif', '.bmp': 'image/bmp', '.svg': 'image/svg+xml', '.tif': 'image/tiff', '.tiff': 'image/tiff',
   } as Record<string, string>)[path.extname(filePath).toLowerCase()] ?? 'application/octet-stream';
+}
+
+function attachmentViewer(mimeType: string, fileName: string): LibraryReaderAttachment['viewer'] {
+  const mime = mimeType.toLowerCase();
+  const extension = path.extname(fileName).toLowerCase();
+  if (mime === 'application/pdf' || extension === '.pdf') return 'pdf';
+  if (mime === 'application/epub+zip' || extension === '.epub') return 'epub';
+  if (mime.startsWith('image/')) return 'image';
+  if (mime === 'text/html' || ['.html', '.htm'].includes(extension)) return 'html';
+  if (['.docx', '.odt', '.rtf', '.pptx', '.odp'].includes(extension)) return 'html';
+  if (['.xlsx', '.ods'].includes(extension)) return 'text';
+  if (mime.startsWith('text/') || ['.md', '.markdown', '.xml', '.jats'].includes(extension)) return 'text';
+  return 'external';
+}
+
+function readerAttachment(documentId: string, folder: string, attachment: LibraryItemRecord['attachments'][number]): LibraryReaderAttachment {
+  const file = optionalDocumentFile(folder, attachment.relativePath, attachment.fileName);
+  const available = !!file && fs.existsSync(file) && fs.statSync(file).isFile();
+  const viewer = attachmentViewer(attachment.mimeType, attachment.fileName);
+  const annotationMode = viewer === 'image' ? 'region' : ['pdf', 'epub', 'html', 'text'].includes(viewer) ? 'text' : 'none';
+  return {
+    id: attachment.id, title: attachment.title || attachment.fileName, fileName: attachment.fileName,
+    mimeType: attachment.mimeType || mimeForOriginal(attachment.fileName), byteSize: attachment.byteSize,
+    role: attachment.role, viewer, available,
+    url: available ? `nodus-library://attachment/${encodeURIComponent(documentId)}/${encodeURIComponent(attachment.id)}?v=${encodeURIComponent(attachment.sha256 || attachment.fileName)}` : null,
+    annotationsSupported: available && annotationMode !== 'none', annotationMode,
+  };
 }
 
 export function libraryReaderOriginalPath(documentId: string): string | null {
@@ -423,6 +472,155 @@ export function libraryReaderOriginalPath(documentId: string): string | null {
   const name = resolved.metadata.files?.original || 'original.pdf';
   const target = optionalDocumentFile(resolved.folder, name, 'original.pdf');
   return target && fs.existsSync(target) && fs.statSync(target).isFile() ? target : null;
+}
+
+export function libraryReaderAttachmentPath(documentId: string, attachmentId: string): string | null {
+  const resolved = resolvedDocument(documentId);
+  if (!resolved) return null;
+  const attachment = resolved.metadata.attachments?.find((entry) => entry.id === attachmentId);
+  if (!attachment) {
+    if (attachmentId === 'original') return libraryReaderOriginalPath(documentId);
+    return null;
+  }
+  const target = optionalDocumentFile(resolved.folder, attachment.relativePath, attachment.fileName);
+  return target && fs.existsSync(target) && fs.statSync(target).isFile() ? target : null;
+}
+
+function safeZipPath(base: string, target: string): string | null {
+  const normalized = path.posix.normalize(path.posix.join(base, target)).replace(/^\/+/, '');
+  return normalized.startsWith('../') || normalized.includes('/../') ? null : normalized;
+}
+
+function xmlAttribute(source: string, name: string): string | null {
+  const match = new RegExp(`\\b${name}\\s*=\\s*["']([^"']+)["']`, 'i').exec(source);
+  return match?.[1]?.trim() || null;
+}
+
+function plainHtmlText(html: string): string {
+  return html.replace(/<br\s*\/?\s*>/gi, '\n').replace(/<\/(?:p|div|li|h[1-6])>/gi, '\n')
+    .replace(/<[^>]+>/g, ' ').replace(/&nbsp;/gi, ' ').replace(/&amp;/gi, '&').replace(/&lt;/gi, '<').replace(/&gt;/gi, '>')
+    .replace(/[ \t]+/g, ' ').replace(/\n\s+/g, '\n').trim();
+}
+
+function sanitizedPublicationHtml(html: string, zip?: AdmZip, entryName?: string): string {
+  let body = /<body\b[^>]*>([\s\S]*?)<\/body>/i.exec(html)?.[1] ?? html;
+  body = body.replace(/<!--[\s\S]*?-->/g, '').replace(/<(script|style|iframe|object|embed|form|input|button|video|audio|svg)\b[\s\S]*?<\/\1\s*>/gi, '')
+    .replace(/<(script|style|iframe|object|embed|form|input|button|video|audio|svg)\b[^>]*\/?\s*>/gi, '')
+    .replace(/\son\w+\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi, '').replace(/\sstyle\s*=\s*(?:"[^"]*"|'[^']*')/gi, '')
+    .replace(/\s(?:href|src)\s*=\s*(["'])\s*(?:javascript|file):[\s\S]*?\1/gi, '');
+  if (zip && entryName) {
+    const base = path.posix.dirname(entryName);
+    body = body.replace(/(<img\b[^>]*\bsrc\s*=\s*["'])([^"']+)(["'][^>]*>)/gi, (whole, before: string, raw: string, after: string) => {
+      if (/^(?:data:|https?:)/i.test(raw)) return whole;
+      let decoded = raw.split('#')[0];
+      try { decoded = decodeURIComponent(decoded); } catch { /* keep the encoded path */ }
+      const name = safeZipPath(base, decoded);
+      const entry = name ? zip.getEntry(name) : null;
+      if (!entry || entry.isDirectory || entry.header.size > 12 * 1024 * 1024) return '';
+      const mime = mimeForOriginal(name!);
+      if (!mime.startsWith('image/')) return '';
+      return `${before}data:${mime};base64,${entry.getData().toString('base64')}${after}`;
+    });
+  }
+  return body;
+}
+
+function epubContent(file: string, attachmentId: string): LibraryReaderAttachmentContent {
+  const zip = new AdmZip(file);
+  const container = zip.getEntry('META-INF/container.xml')?.getData().toString('utf8') ?? '';
+  const rootfile = xmlAttribute(/<rootfile\b[^>]*>/i.exec(container)?.[0] ?? '', 'full-path');
+  if (!rootfile) throw new Error('El EPUB no contiene un paquete OPF válido.');
+  const opfEntry = zip.getEntry(rootfile);
+  if (!opfEntry || opfEntry.header.size > 8 * 1024 * 1024) throw new Error('El paquete OPF del EPUB no es válido.');
+  const opf = opfEntry.getData().toString('utf8');
+  const manifest = new Map<string, string>();
+  for (const match of opf.matchAll(/<item\b[^>]*>/gi)) {
+    const id = xmlAttribute(match[0], 'id'); const href = xmlAttribute(match[0], 'href');
+    if (id && href) manifest.set(id, href);
+  }
+  const spine = [...opf.matchAll(/<itemref\b[^>]*>/gi)].map((match) => xmlAttribute(match[0], 'idref')).filter((value): value is string => !!value);
+  const opfBase = path.posix.dirname(rootfile);
+  const chapters = spine.slice(0, 2_000).flatMap((idref, index) => {
+    const href = manifest.get(idref); const name = href ? safeZipPath(opfBase, href.split('#')[0]) : null;
+    const entry = name ? zip.getEntry(name) : null;
+    if (!entry || entry.isDirectory || entry.header.size > 16 * 1024 * 1024) return [];
+    const source = entry.getData().toString('utf8');
+    const html = sanitizedPublicationHtml(source, zip, name!); const text = plainHtmlText(html);
+    if (!text) return [];
+    const title = plainHtmlText(/<title\b[^>]*>([\s\S]*?)<\/title>/i.exec(source)?.[1] ?? '')
+      || plainHtmlText(/<h[1-3]\b[^>]*>([\s\S]*?)<\/h[1-3]>/i.exec(html)?.[1] ?? '') || `Capítulo ${index + 1}`;
+    return [{ id: idref, title, html, text }];
+  });
+  if (!chapters.length) throw new Error('El EPUB no contiene capítulos legibles.');
+  return { attachmentId, viewer: 'epub', text: chapters.map((chapter) => chapter.text).join('\n\n'), html: null, chapters };
+}
+
+function escapePublicationText(value: string): string {
+  return value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+function officeXmlParagraphs(xml: string): string[] {
+  const paragraphs = xml.match(/<(?:text:p|text:h|a:p)\b[^>]*>[\s\S]*?<\/(?:text:p|text:h|a:p)>/gi) ?? [];
+  return paragraphs.map((entry) => plainHtmlText(entry.replace(/<text:tab\b[^>]*\/>/gi, '\t').replace(/<text:line-break\b[^>]*\/>/gi, '\n'))).filter(Boolean);
+}
+
+function zippedOfficeContent(file: string, extension: string): { html: string; text: string } {
+  const zip = new AdmZip(file);
+  if (extension === '.pptx') {
+    const slides = zip.getEntries().filter((entry) => /^ppt\/slides\/slide\d+\.xml$/i.test(entry.entryName)).sort((a, b) => {
+      const left = Number(a.entryName.match(/slide(\d+)\.xml/i)?.[1] ?? 0); const right = Number(b.entryName.match(/slide(\d+)\.xml/i)?.[1] ?? 0); return left - right;
+    }).slice(0, 5_000);
+    const sections = slides.flatMap((entry, index) => {
+      if (entry.header.size > 16 * 1024 * 1024) return [];
+      const lines = officeXmlParagraphs(entry.getData().toString('utf8')); if (!lines.length) return [];
+      return [`<section><h2>${escapePublicationText(`Diapositiva ${index + 1}`)}</h2>${lines.map((line) => `<p>${escapePublicationText(line)}</p>`).join('')}</section>`];
+    });
+    const html = sections.join(''); return { html, text: plainHtmlText(html) };
+  }
+  const entryName = extension === '.odt' || extension === '.ods' || extension === '.odp' ? 'content.xml' : '';
+  const entry = entryName ? zip.getEntry(entryName) : null;
+  if (!entry || entry.header.size > 32 * 1024 * 1024) throw new Error('El documento OpenDocument no contiene texto legible.');
+  const lines = officeXmlParagraphs(entry.getData().toString('utf8'));
+  const html = lines.map((line) => `<p>${escapePublicationText(line)}</p>`).join('');
+  return { html, text: lines.join('\n') };
+}
+
+function rtfText(source: string): string {
+  return source.replace(/\\par[d]?\b ?/gi, '\n').replace(/\\line\b ?/gi, '\n')
+    .replace(/\\'([0-9a-f]{2})/gi, (_whole, hex: string) => Buffer.from([Number.parseInt(hex, 16)]).toString('latin1'))
+    .replace(/\\[a-z]+-?\d* ?/gi, '').replace(/\\[{}\\]/g, '').replace(/[{}]/g, '')
+    .replace(/[ \t]+/g, ' ').replace(/\n\s+/g, '\n').trim();
+}
+
+export async function getLibraryReaderAttachmentContent(documentId: string, attachmentId: string): Promise<LibraryReaderAttachmentContent | null> {
+  const resolved = resolvedDocument(documentId); const file = libraryReaderAttachmentPath(documentId, attachmentId);
+  const attachment = resolved?.metadata.attachments?.find((entry) => entry.id === attachmentId);
+  if (!resolved || !file || !attachment) return null;
+  const viewer = attachmentViewer(attachment.mimeType, attachment.fileName);
+  if (viewer === 'epub') return epubContent(file, attachmentId);
+  if (viewer !== 'html' && viewer !== 'text') return null;
+  const stat = fs.statSync(file);
+  if (stat.size > 128 * 1024 * 1024) throw new Error('El adjunto supera el límite de lectura de 128 MB.');
+  const extension = path.extname(file).toLowerCase();
+  if (extension === '.docx') {
+    const mammoth: any = await import('mammoth');
+    const converted = await mammoth.convertToHtml({ path: file }); const html = sanitizedPublicationHtml(String(converted.value ?? ''));
+    return { attachmentId, viewer: 'html', text: plainHtmlText(html), html, chapters: [] };
+  }
+  if (extension === '.xlsx') {
+    const text = xlsxFileToText(file); return { attachmentId, viewer: 'text', text, html: null, chapters: [] };
+  }
+  if (['.odt', '.ods', '.pptx', '.odp'].includes(extension)) {
+    const content = zippedOfficeContent(file, extension); return { attachmentId, viewer, ...content, chapters: [] };
+  }
+  const source = fs.readFileSync(file, 'utf8').replace(/\r\n?/g, '\n');
+  if (extension === '.rtf') {
+    const text = rtfText(source); return { attachmentId, viewer: 'html', text, html: `<p>${escapePublicationText(text).replace(/\n/g, '</p><p>')}</p>`, chapters: [] };
+  }
+  if (viewer === 'html') {
+    const html = sanitizedPublicationHtml(source); return { attachmentId, viewer, text: plainHtmlText(html), html, chapters: [] };
+  }
+  return { attachmentId, viewer, text: source, html: null, chapters: [] };
 }
 
 function annotationsPath(documentId: string): { filePath: string; orphanedFilePath: string; documentId: string; contentFingerprint: string | null } | null {
@@ -456,7 +654,20 @@ function validDiskAnnotation(value: unknown): value is DiskAnnotation {
     && typeof item.suffix === 'string'
     && (item.comment === null || typeof item.comment === 'string')
     && typeof item.createdAt === 'string'
-    && typeof item.updatedAt === 'string';
+    && typeof item.updatedAt === 'string'
+    && validAnnotationTarget(item.target);
+}
+
+function validAnnotationTarget(target: unknown): boolean {
+  if (target == null) return true;
+  if (!target || typeof target !== 'object') return false;
+  const value = target as NonNullable<WritingDraftAnnotation['target']>;
+  if (value.type === 'text') return typeof value.attachmentId === 'string' && value.attachmentId.length <= 512
+    && (value.page == null || Number.isInteger(value.page) && value.page > 0)
+    && (value.chapterId == null || typeof value.chapterId === 'string' && value.chapterId.length <= 512);
+  return value.type === 'region' && typeof value.attachmentId === 'string' && value.attachmentId.length <= 512
+    && [value.x, value.y, value.width, value.height].every((entry) => Number.isFinite(entry) && entry >= 0 && entry <= 1)
+    && value.width > 0 && value.height > 0 && value.x + value.width <= 1.000001 && value.y + value.height <= 1.000001;
 }
 
 function readDiskAnnotations(filePath: string): DiskAnnotation[] {
@@ -499,6 +710,7 @@ function normalizedAnnotationInput(input: WritingDraftAnnotationInput) {
   }
   const comment = input.kind === 'comment' ? input.comment?.trim() || '' : null;
   if (input.kind === 'comment' && !comment) throw new Error('Escribe el comentario antes de guardarlo.');
+  if (!validAnnotationTarget(input.target)) throw new Error('La posición de la anotación no es válida.');
   return {
     scope,
     kind: input.kind,
@@ -509,6 +721,7 @@ function normalizedAnnotationInput(input: WritingDraftAnnotationInput) {
     prefix: (input.prefix ?? '').slice(-64),
     suffix: (input.suffix ?? '').slice(0, 64),
     comment,
+    ...(input.target ? { target: input.target } : {}),
   };
 }
 

@@ -44,6 +44,7 @@ export const academicApi: AcademicApi = {
   openInZotero: (zoteroKey) => ipcRenderer.invoke('works:openInZotero', zoteroKey).then(() => undefined),
   openEvidenceAtPage: (nodusId, location) => ipcRenderer.invoke('works:openAtPage', nodusId, location),
   getLibraryReaderDocument: (nodusId) => ipcRenderer.invoke('libraryReader:get', nodusId),
+  getLibraryReaderAttachmentContent: (nodusId, attachmentId) => ipcRenderer.invoke('libraryReader:attachmentContent', nodusId, attachmentId),
   openLibraryReaderOriginal: (nodusId) => ipcRenderer.invoke('libraryReader:openOriginal', nodusId),
   listLibraryReaderAnnotations: (nodusId) => ipcRenderer.invoke('libraryReader:annotations:list', nodusId),
   listLibraryReaderOrphanedAnnotations: (nodusId) => ipcRenderer.invoke('libraryReader:annotations:listOrphaned', nodusId),

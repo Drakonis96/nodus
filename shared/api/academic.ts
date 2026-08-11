@@ -93,6 +93,7 @@ import type {
   ImmersionStreamHandlers,
   ImportProjectChapterInput,
   LibraryReaderDocument,
+  LibraryReaderAttachmentContent,
   LibraryReaderChatMessage,
   LibraryReaderChatRequest,
   LibraryReaderChatResponse,
@@ -234,6 +235,7 @@ export interface AcademicApi {
   openEvidenceAtPage(nodusId: string, location: string | null): Promise<{ ok: boolean; mode: 'pdf-page' | 'select' | 'none'; page?: number | null }>;
   /** Clean Markdown reader stored under the configured backup root. */
   getLibraryReaderDocument(nodusId: string): Promise<LibraryReaderDocument | null>;
+  getLibraryReaderAttachmentContent(nodusId: string, attachmentId: string): Promise<LibraryReaderAttachmentContent | null>;
   openLibraryReaderOriginal(nodusId: string): Promise<boolean>;
   listLibraryReaderAnnotations(nodusId: string): Promise<WritingDraftAnnotation[]>;
   listLibraryReaderOrphanedAnnotations(nodusId: string): Promise<WritingDraftAnnotation[]>;

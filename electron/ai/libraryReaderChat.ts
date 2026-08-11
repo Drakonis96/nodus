@@ -7,18 +7,23 @@ import type {
 } from '@shared/types';
 import { getSettings } from '../db/settingsRepo';
 import {
+  getLibraryReaderAttachmentContent,
+  getLibraryReaderDocument,
   getLibraryReaderRawContent,
+  libraryReaderAttachmentPath,
   listLibraryReaderAnnotations,
 } from '../libraryReader/libraryReaderStore';
+import { extractFromPath } from '../extraction/textExtractor';
 import { completeTextStream, localModelContextWindow, resolveModelRef } from './aiClient';
 
 const MAX_HISTORY = 12;
 const CLOUD_DOCUMENT_CHARS = 300_000;
 const CHARS_PER_TOKEN = 3.2;
 
-function annotationContext(annotations: WritingDraftAnnotation[]): Array<Record<string, string>> {
+function annotationContext(annotations: WritingDraftAnnotation[], sourceId = 'clean'): Array<Record<string, string>> {
+  const scope = sourceId === 'clean' ? 'source' : `attachment:${sourceId}`;
   return annotations
-    .filter((annotation) => annotation.scope === 'source')
+    .filter((annotation) => annotation.scope === scope || annotation.scope.startsWith(`${scope}:`))
     .slice(-80)
     .map((annotation) => ({
       kind: annotation.kind,
@@ -42,6 +47,8 @@ export function buildLibraryReaderChatPrompt(input: {
   authors: string[];
   year: number | null;
   markdown: string;
+  sourceLabel?: string;
+  sourceId?: string;
   annotations: WritingDraftAnnotation[];
   messages: LibraryReaderChatMessage[];
   documentCharLimit?: number;
@@ -63,10 +70,11 @@ export function buildLibraryReaderChatPrompt(input: {
         title: input.title,
         authors: input.authors,
         year: input.year,
+        source: input.sourceLabel ?? 'Markdown limpio',
         truncated: document.truncated,
         markdown: document.text,
       },
-      annotations: annotationContext(input.annotations),
+      annotations: annotationContext(input.annotations, input.sourceId),
       conversation: cleanMessages,
       instruction: 'Responde al último mensaje del usuario usando este contexto de lectura.',
     }),
@@ -83,8 +91,35 @@ export async function streamLibraryReaderChat(
   onDelta: (delta: string, kind?: 'content' | 'reasoning') => void,
   signal?: AbortSignal,
 ): Promise<LibraryReaderChatResponse> {
-  const content = getLibraryReaderRawContent(request.documentId);
-  if (!content) throw new Error('La versión limpia del documento ya no está disponible.');
+  const document = getLibraryReaderDocument(request.documentId);
+  if (!document) throw new Error('El documento ya no está disponible.');
+  const clean = getLibraryReaderRawContent(request.documentId);
+  const sourceId = request.sourceId && request.sourceId !== 'clean' ? request.sourceId : 'clean';
+  const attachment = sourceId === 'clean' ? null : document.attachments.find((entry) => entry.id === sourceId) ?? null;
+  let contextSourceId = attachment?.id ?? 'clean';
+  let sourceText = clean?.markdown ?? '';
+  let sourceLabel = 'Markdown limpio';
+  if (attachment) {
+    sourceLabel = `${attachment.title} (${attachment.fileName})`;
+    const readable = await getLibraryReaderAttachmentContent(request.documentId, attachment.id).catch(() => null);
+    if (readable?.text.trim()) sourceText = readable.text;
+    else {
+      const file = libraryReaderAttachmentPath(request.documentId, attachment.id);
+      if (file) {
+        const settings = getSettings();
+        try {
+          sourceText = (await extractFromPath(file, {
+            ocr: { enabled: settings.ocrEnabled, languages: settings.ocrLanguages, maxPages: settings.ocrMaxPages },
+          })).text;
+        } catch {
+          if (!sourceText) throw new Error('Este archivo no contiene texto legible para el chat.');
+          sourceLabel = `${sourceLabel}; contexto de la versión limpia`;
+          contextSourceId = 'clean';
+        }
+      }
+    }
+  }
+  if (!sourceText.trim()) throw new Error('La fuente seleccionada no contiene texto legible para el chat.');
   const messages = request.messages.filter((message) => message.content.trim()).slice(-MAX_HISTORY);
   if (!messages.length || messages[messages.length - 1].role !== 'user') {
     throw new Error('Escribe una pregunta antes de enviarla.');
@@ -95,10 +130,12 @@ export async function streamLibraryReaderChat(
     ? Math.max(2_000, Math.min(CLOUD_DOCUMENT_CHARS, Math.floor((localWindow - 1_800) * CHARS_PER_TOKEN)))
     : CLOUD_DOCUMENT_CHARS;
   const prompt = buildLibraryReaderChatPrompt({
-    title: content.document.title,
-    authors: content.document.authors,
-    year: content.document.year,
-    markdown: content.markdown,
+    title: document.title,
+    authors: document.authors,
+    year: document.year,
+    markdown: sourceText,
+    sourceLabel,
+    sourceId: contextSourceId,
     annotations: listLibraryReaderAnnotations(request.documentId),
     messages,
     documentCharLimit,

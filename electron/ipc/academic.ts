@@ -528,6 +528,8 @@ export function registerAcademicIpc({ h, getWindow, chatAborters }: IpcContext):
     return { ok: true, mode: 'select' as const, page };
   });
   h('libraryReader:get', async (_e, nodusId: string) => libraryReader.getLibraryReaderDocument(nodusId));
+  h('libraryReader:attachmentContent', async (_e, nodusId: string, attachmentId: string) =>
+    libraryReader.getLibraryReaderAttachmentContent(nodusId, attachmentId));
   h('libraryReader:openOriginal', async (_e, nodusId: string) => {
     const originalPath = libraryReader.libraryReaderOriginalPath(nodusId);
     if (!originalPath) return false;
