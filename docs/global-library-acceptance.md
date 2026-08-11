@@ -86,12 +86,14 @@ button exists.
 | Revisions | Active vault invalidation retains prior results and closed vaults receive durable pending work | Verified | `test-library-revisions`, vault integration suite |
 | Reader | Markdown, images, and tables render | Verified | `e2e-library-reader` |
 | Reader | The source chooser switches between clean Markdown and every preserved attachment and remembers the selection per item | Verified | `test-global-library-reader`, `e2e-library-reader` |
+| Reader | The file chooser remains immediately interactive on long documents, closes after a source is selected, and does not rebuild the Markdown tree | Verified | `e2e-library-reader` |
 | Library UI | The toolbar uses progressive Add, Zotero sync, and overflow actions; each selected item exposes one state-derived primary action | Verified | `test-global-library-ui`, `e2e-global-library` |
 | Library UI | Clean-version rebuilding is a collapsed technical action and explicitly excludes vault analysis | Verified | `test-global-library-ui`, `e2e-global-library` |
 | Reader | PDF, EPUB, HTML/text, DOCX/OpenDocument/PowerPoint, spreadsheets, and images have safe internal viewers; legacy binaries expose an explicit external fallback | Verified | `test-global-library-reader`, `e2e-library-reader` |
 | Reader | Text-bearing viewers support scoped highlights/comments and images support durable normalized region highlights | Verified | `test-global-library-reader`, `e2e-library-reader` |
 | Reader | A temporary page and the complete original open separately | Verified | `test-global-library-reader`, `e2e-library-reader` |
 | Reader | Highlights, comments, and bookmarks persist | Verified | `test-global-library-reader`, `e2e-library-reader` |
+| Reader | Highlights and bookmarks paint optimistically while delayed backup-folder persistence completes, without flicker from stale notifications | Verified | `test-library-responsiveness`, `e2e-library-reader` |
 | Reader | Both sidebars can be independently shown and hidden | Verified | `test-global-library-ui`, `e2e-library-reader` |
 | Reader | The traced outline stays above a collapsible file chooser for every selected source | Verified | `test-global-library-ui`, `e2e-library-reader` |
 | Reader | Dark and light clean-reading surfaces follow the application theme | Verified | `e2e-library-reader` |
@@ -131,6 +133,7 @@ button exists.
 | Navigation | Library is cross-vault and available in every sidebar | Verified | `test-global-library-ui` |
 | Accessibility | Primary controls have roles, labels, and keyboard navigation | Verified | UI and i18n coverage, Electron E2E |
 | Responsiveness | PDF layout, rendering, figure reconstruction, and OCR run outside Electron's main thread | Verified | `test-library-responsiveness`, `test-library-extraction` |
+| Responsiveness | Reader archive parsing and atomic annotation-sidecar writes run in a dedicated serialized worker whose packaged artifact is executed in tests | Verified | `test-library-responsiveness` |
 | Responsiveness | Rebuilds, bulk mutations, file copies, imports, exports, recovery, duplicate, and trash operations run in a serialized worker | Verified | `test-library-responsiveness`, Library operation suites |
 | Responsiveness | Routine item changes use incremental SQLite/FTS indexing and never rescan or rebuild the complete Library | Verified | `test-library-responsiveness`, `test-global-library-operations` |
 | Responsiveness | Zotero refresh and vault migration expose incremental checkpoints and yield between bounded batches | Verified | `test-zotero-library-import`, `test-library-migration-sessions` |

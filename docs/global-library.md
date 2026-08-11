@@ -277,6 +277,21 @@ over the original. The source selector reserves a fixed icon gutter, and its
 status badge, file list, annotation palette, and document surface use explicit
 light and dark palettes so switching themes never leaves dark controls behind.
 
+Reader navigation and annotation paint never wait for backup-folder I/O. The
+file chooser owns its open state locally, the rendered Markdown tree is
+memoized, and annotation callbacks and filtered collections remain stable while
+the shell changes. A cached text-node index maps selections and saved offsets
+without walking the whole document for every annotation; it is invalidated only
+when the reading surface itself changes. Highlights, comments, and bookmarks
+are applied optimistically and roll back with a visible error only if durable
+persistence fails. Pending annotations are retained across stale filesystem
+notifications so a completed older refresh cannot make a new highlight flicker.
+
+Archive parsing for EPUB and office formats, together with atomic annotation
+sidecar writes, runs in a dedicated reader worker rather than Electron's main
+thread. Annotation mutations are serialized to prevent concurrent writes from
+losing data while the renderer remains immediately interactive.
+
 The internal viewers include:
 
 - PDF rendering with a selectable text layer, page navigation, zoom, comments,
