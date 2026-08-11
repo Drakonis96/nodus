@@ -1082,6 +1082,42 @@ const RELEASE_3_2_4_HIGHLIGHTS: RawReleaseHighlight[] = [
 
 const RELEASE_4_0_0_HIGHLIGHTS: RawReleaseHighlight[] = [
   {
+    scope: 'academic',
+    es: 'Biblioteca reúne Global y Este vault en una sola pantalla. Quien actualiza desde Nodus 3 conserva de entrada su corpus, filtros, análisis y colecciones monitorizadas, y puede activar la biblioteca transversal cuando quiera.',
+    en: 'Library brings Global and This vault into one screen. People updating from Nodus 3 initially keep their corpus, filters, analyses and monitored collections, and can enable the cross-vault library whenever they choose.',
+    fr: 'Bibliothèque réunit Global et Ce coffre sur un seul écran. Après une mise à jour depuis Nodus 3, le corpus, les filtres, les analyses et les collections surveillées restent disponibles, et la bibliothèque transversale peut être activée à tout moment.',
+    de: 'Bibliothek vereint Global und Dieser Tresor in einer Ansicht. Nach einem Update von Nodus 3 bleiben Korpus, Filter, Analysen und überwachte Sammlungen zunächst erhalten, und die tresorübergreifende Bibliothek kann jederzeit aktiviert werden.',
+    pt: 'Biblioteca reúne Global e Este cofre num único ecrã. Quem atualiza a partir do Nodus 3 mantém inicialmente o corpus, os filtros, as análises e as coleções monitorizadas, podendo ativar a biblioteca transversal quando quiser.',
+    'pt-BR': 'Biblioteca reúne Global e Este cofre em uma única tela. Quem atualiza do Nodus 3 mantém inicialmente o corpus, os filtros, as análises e as coleções monitoradas, podendo ativar a biblioteca transversal quando quiser.',
+  },
+  {
+    scope: 'general',
+    es: 'La migración global es opcional, muestra inventario, espacio y progreso, y se puede cancelar, reanudar o revertir sin tocar los vaults fuente. Antes de convertir datos, el primer inicio de Nodus 4 crea y verifica una copia de recuperación pre-v4.',
+    en: 'Global migration is optional, shows inventory, space and progress, and can be cancelled, resumed or rolled back without changing source vaults. Before converting data, the first Nodus 4 launch creates and verifies a pre-v4 recovery copy.',
+    fr: 'La migration globale est facultative, affiche l’inventaire, l’espace et la progression, et peut être annulée, reprise ou inversée sans modifier les coffres sources. Avant toute conversion, le premier lancement de Nodus 4 crée et vérifie une copie de récupération pré-v4.',
+    de: 'Die globale Migration ist optional, zeigt Bestand, Speicherbedarf und Fortschritt und kann abgebrochen, fortgesetzt oder zurückgerollt werden, ohne Quelltresore zu ändern. Vor der Konvertierung erstellt und prüft der erste Start von Nodus 4 eine Vor-v4-Sicherung.',
+    pt: 'A migração global é opcional, mostra inventário, espaço e progresso e pode ser cancelada, retomada ou revertida sem alterar os cofres de origem. Antes de converter dados, o primeiro arranque do Nodus 4 cria e verifica uma cópia de recuperação pré-v4.',
+    'pt-BR': 'A migração global é opcional, mostra inventário, espaço e progresso e pode ser cancelada, retomada ou revertida sem alterar os cofres de origem. Antes de converter dados, a primeira inicialização do Nodus 4 cria e verifica uma cópia de recuperação pré-v4.',
+  },
+  {
+    scope: 'academic',
+    es: 'Nodus ya puede mantener una biblioteca sin Zotero. Crea y edita referencias, autores, etiquetas, relaciones, adjuntos y colecciones, añade búsquedas inteligentes y papelera, resuelve identificadores y produce importaciones, exportaciones y citas sin red.',
+    en: 'Nodus can now maintain a library without Zotero. Create and edit references, authors, tags, relations, attachments and collections, add smart searches and trash, resolve identifiers, and produce offline imports, exports and citations.',
+    fr: 'Nodus peut maintenant gérer une bibliothèque sans Zotero. Créez et modifiez les références, auteurs, étiquettes, relations, pièces jointes et collections, utilisez les recherches intelligentes et la corbeille, résolvez les identifiants et produisez des imports, exports et citations hors ligne.',
+    de: 'Nodus kann jetzt eine Bibliothek ohne Zotero verwalten. Referenzen, Urheber, Tags, Beziehungen, Anhänge und Sammlungen lassen sich erstellen und bearbeiten. Hinzu kommen intelligente Suchen, Papierkorb, Kennungsauflösung sowie Offline-Importe, Exporte und Zitate.',
+    pt: 'O Nodus pode agora manter uma biblioteca sem o Zotero. Crie e edite referências, autores, etiquetas, relações, anexos e coleções, use pesquisas inteligentes e o lixo, resolva identificadores e produza importações, exportações e citações sem rede.',
+    'pt-BR': 'O Nodus agora pode manter uma biblioteca sem o Zotero. Crie e edite referências, autores, etiquetas, relações, anexos e coleções, use pesquisas inteligentes e a lixeira, resolva identificadores e produza importações, exportações e citações sem rede.',
+  },
+  {
+    scope: 'academic',
+    es: 'El lector limpio conserva el original por separado y enlaza texto, páginas, imágenes, tablas y figuras. Permite subrayar, anotar, marcar secciones y preguntar al chat, mientras las huellas exactas impiden mostrar análisis obsoletos como actuales.',
+    en: 'The clean reader keeps the original separate and links text, pages, images, tables and figures. It supports highlights, notes, section bookmarks and chat questions, while exact fingerprints prevent stale analysis from appearing current.',
+    fr: 'Le lecteur propre conserve l’original séparé et relie texte, pages, images, tableaux et figures. Il permet de surligner, annoter, marquer des sections et interroger le chat, tandis que des empreintes exactes empêchent une analyse obsolète de paraître actuelle.',
+    de: 'Der bereinigte Reader hält das Original getrennt und verknüpft Text, Seiten, Bilder, Tabellen und Abbildungen. Markierungen, Notizen, Abschnittslesezeichen und Chatfragen sind möglich, während exakte Fingerabdrücke veraltete Analysen kenntlich machen.',
+    pt: 'O leitor limpo mantém o original separado e liga texto, páginas, imagens, tabelas e figuras. Permite sublinhar, anotar, marcar secções e perguntar ao chat, enquanto impressões digitais exatas impedem que análises obsoletas pareçam atuais.',
+    'pt-BR': 'O leitor limpo mantém o original separado e liga texto, páginas, imagens, tabelas e figuras. Permite destacar, anotar, marcar seções e perguntar ao chat, enquanto impressões digitais exatas impedem que análises obsoletas pareçam atuais.',
+  },
+  {
     scope: 'general',
     es: 'Nodus 4 se publica bajo AGPL-3.0 exclusivamente. Acerca de Nodus muestra la licencia y el código fuente exacto de la versión, y Nodus Server ofrece el mismo enlace a toda persona que lo usa por red.',
     en: 'Nodus 4 is released exclusively under AGPL-3.0. About Nodus shows the license and exact source code for this version, and Nodus Server offers the same link to everyone who uses it over a network.',
@@ -1095,7 +1131,7 @@ const RELEASE_4_0_0_HIGHLIGHTS: RawReleaseHighlight[] = [
 const RAW_RELEASE_NOTES: RawReleaseNote[] = [
   {
     version: '4.0.0',
-    date: '2026-08-10',
+    date: '2026-08-11',
     highlights: RELEASE_4_0_0_HIGHLIGHTS,
   },
   {

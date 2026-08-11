@@ -26,9 +26,13 @@ try {
   const { RELEASE_NOTES, releaseNotesForMajor, compareVersions } = await import(pathToFileURL(bundlePath).href);
   const currentRelease = RELEASE_NOTES[0];
   assert.equal(currentRelease?.version, '4.0.0');
-  assert.equal(currentRelease?.date, '2026-08-10');
-  assert.equal(currentRelease?.highlights.length, 1);
+  assert.equal(currentRelease?.date, '2026-08-11');
+  assert.equal(currentRelease?.highlights.length, 5);
   assert.deepEqual(currentRelease?.highlights.map((highlight) => highlight.scope), [
+    'academic',
+    'general',
+    'academic',
+    'academic',
     'general',
   ]);
 

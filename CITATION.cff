@@ -10,7 +10,7 @@ authors:
   - name: "Nodus contributors"
 type: software
 version: "4.0.0"
-date-released: "2026-08-10"
+date-released: "2026-08-11"
 license: "AGPL-3.0-only"
 repository-code: "https://github.com/Drakonis96/nodus"
 url: "https://drakonis96.github.io/nodus/"

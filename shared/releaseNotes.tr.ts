@@ -95,7 +95,13 @@ const RELEASE_3_2_4_TR: string[] = [
 ];
 
 export const RELEASE_NOTES_TR: Record<string, string[]> = {
-  "4.0.0": ["Nodus 4 yalnızca AGPL-3.0 kapsamında yayımlanır. Nodus Hakkında bölümü bu sürümün lisansını ve tam kaynak kodunu gösterir, Nodus Server da ağ üzerinden kullanan herkese aynı bağlantıyı sunar."],
+  "4.0.0": [
+    "Kitaplık, Global ve Bu kasa kapsamlarını tek ekranda birleştirir. Nodus 3'ten güncelleyenler başlangıçta derlemlerini, filtrelerini, analizlerini ve izlenen koleksiyonlarını korur ve kasalar arası kitaplığı istedikleri zaman etkinleştirebilir.",
+    "Global geçiş isteğe bağlıdır, envanteri, alanı ve ilerlemeyi gösterir ve kaynak kasaları değiştirmeden iptal edilebilir, sürdürülebilir veya geri alınabilir. Veriler dönüştürülmeden önce Nodus 4'ün ilk açılışı v4 öncesi bir kurtarma kopyası oluşturup doğrular.",
+    "Nodus artık Zotero olmadan bir kitaplığı yönetebilir. Kaynakları, yazarları, etiketleri, ilişkileri, ekleri ve koleksiyonları oluşturup düzenleyin, akıllı aramaları ve çöp kutusunu kullanın, tanımlayıcıları çözün ve çevrimdışı içe aktarma, dışa aktarma ve atıf üretin.",
+    "Temiz okuyucu özgün dosyayı ayrı tutar ve metni, sayfaları, görselleri, tabloları ve şekilleri birbirine bağlar. Vurguları, notları, bölüm yer imlerini ve sohbet sorularını desteklerken kesin parmak izleri eski analizlerin güncel görünmesini engeller.",
+    "Nodus 4 yalnızca AGPL-3.0 kapsamında yayımlanır. Nodus Hakkında bölümü bu sürümün lisansını ve tam kaynak kodunu gösterir, Nodus Server da ağ üzerinden kullanan herkese aynı bağlantıyı sunar.",
+  ],
   "3.2.7": RELEASE_3_2_7_TR,
   "3.2.6": RELEASE_3_2_6_TR,
   "3.2.5": RELEASE_3_2_5_TR,
