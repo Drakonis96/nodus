@@ -71,7 +71,12 @@ import type { NodiChatRequest } from '@shared/types';
 import { clearNodiConversations, deleteNodiConversation, getNodiConversation, listNodiConversations, saveNodiConversation } from './nodiConversations';
 import { deleteNodiNote, listNodiNotes, saveNodiNote } from './nodiNotes';
 import { copyApiKeysBetweenVaults, listApiKeyProvidersForVault, setBackupPassword, clearBackupPassword, hasBackupPassword, getBackupPassword, getBackupRecoveryKey } from './secrets/secretStore';
-import { runAutoBackupNow } from './export/autoBackup';
+import {
+  previewBackupCleanup,
+  retentionCutoff,
+  runAutoBackupNow,
+  runBackupCleanupNow,
+} from './export/autoBackup';
 import { MIN_BACKUP_PASSWORD_LENGTH } from './export/backupCrypto';
 import {
   onChatGptSubscriptionStatusChanged,
@@ -186,7 +191,8 @@ function vaultSwitchMessage(base: string, copiedProviders: VaultSwitchResult['co
 export function registerIpc(
   getWindow: () => BrowserWindow | null,
   checkForUpdates: () => Promise<UpdateCheckResponse>,
-  installUpdate: () => Promise<UpdateCheckResponse>
+  installUpdate: () => Promise<UpdateCheckResponse>,
+  updateChannelChanged: (betaUpdates: boolean) => void,
 ): void {
   const context = createIpcContext(getWindow);
   const { h } = context;
@@ -317,6 +323,20 @@ export function registerIpc(
   h('settings:get', async () => getSettings());
   h('settings:update', async (_e, patch: Partial<AppSettings>) => {
     const previous = getSettings();
+    if (patch.backupCleanupEnabled !== undefined && typeof patch.backupCleanupEnabled !== 'boolean') {
+      throw new Error('El estado de la limpieza automática no es válido.');
+    }
+    if (patch.backupRetentionValue !== undefined || patch.backupRetentionUnit !== undefined) {
+      const value = patch.backupRetentionValue ?? previous.backupRetentionValue;
+      const unit = patch.backupRetentionUnit ?? previous.backupRetentionUnit;
+      if (!retentionCutoff(value, unit)) throw new Error('La antigüedad de limpieza no es válida.');
+    }
+    if (patch.backupCleanupEnabled === true) {
+      const folder = patch.autoBackupFolder ?? previous.autoBackupFolder;
+      if (!folder || !hasBackupPassword()) {
+        throw new Error('Configura primero la carpeta de Recuperación y la contraseña maestra.');
+      }
+    }
     const next = updateSettings(patch);
     if (patch.uiLanguage !== undefined && next.uiLanguage !== previous.uiLanguage) {
       relocalizeWorldbuildingDemoData(next.uiLanguage);
@@ -376,6 +396,9 @@ export function registerIpc(
     // Turning announcements back on asks straight away. The alternative is a panel that
     // stays empty for up to four hours after the user opted in, which reads as broken.
     if (patch.announcementsEnabled === true) void refreshAnnouncements('setting enabled');
+    if (patch.betaUpdates !== undefined && next.betaUpdates !== previous.betaUpdates) {
+      updateChannelChanged(next.betaUpdates);
+    }
     // Let other windows (the Nodi overlay) react to setting changes, e.g. costumes.
     for (const win of BrowserWindow.getAllWindows()) {
       if (!win.isDestroyed()) win.webContents.send('settings:changed', next);
@@ -644,6 +667,11 @@ export function registerIpc(
     return canceled || filePaths.length === 0 ? null : filePaths[0];
   });
   h('backup:runNow', async () => runAutoBackupNow(app.getVersion()));
+  h('backup:cleanupPreview', async () => previewBackupCleanup());
+  h('backup:cleanupRunNow', async (_e, scopeToken: string) => {
+    if (!/^[a-f0-9]{64}$/.test(scopeToken)) throw new Error('La confirmación de limpieza no es válida. Revisa de nuevo el alcance.');
+    return runBackupCleanupNow(new Date(), scopeToken);
+  });
   h('backup:saveRecoveryKit', async () => {
     const password = getBackupPassword();
     const recoveryKey = getBackupRecoveryKey();

@@ -6,7 +6,8 @@
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { randomFillSync } from 'node:crypto';
-import { mkdtemp, rm, writeFile, readdir, mkdir } from 'node:fs/promises';
+import { existsSync } from 'node:fs';
+import { copyFile, mkdtemp, rm, writeFile, readdir, mkdir } from 'node:fs/promises';
 import Module, { createRequire } from 'node:module';
 import os from 'node:os';
 import path from 'node:path';
@@ -77,9 +78,42 @@ try {
   // A slot exactly now counts as passed.
   assert.equal(autoBackup.isScheduledBackupDue(at(-1, 9), [], 10, 0, now), true, 'slot at exactly now has passed');
 
+  assert.equal(autoBackup.retentionCutoff(1, 'days', now).getDate(), 9, 'day retention uses calendar subtraction');
+  assert.equal(autoBackup.retentionCutoff(2, 'weeks', now).getDate(), 26, 'week retention uses seven-day units');
+  assert.equal(autoBackup.retentionCutoff(1, 'months', now).getMonth(), 5, 'month retention uses calendar months');
+  assert.equal(autoBackup.retentionCutoff(1, 'years', now).getFullYear(), 2025, 'year retention uses calendar years');
+  assert.equal(
+    autoBackup.retentionCutoff(1, 'months', new Date(2026, 2, 31, 10)).getDate(),
+    28,
+    'month retention clamps to the target month instead of rolling into March',
+  );
+  assert.equal(
+    autoBackup.retentionCutoff(1, 'years', new Date(2024, 1, 29, 10)).getDate(),
+    28,
+    'year retention clamps leap day to February 28',
+  );
+  assert.equal(autoBackup.retentionCutoff(0, 'days', now), null, 'zero retention is rejected');
+  assert.equal(autoBackup.retentionCutoff(-1, 'days', now), null, 'negative retention is rejected');
+  assert.equal(autoBackup.retentionCutoff(11, 'years', now), null, 'unsafe out-of-range retention is rejected');
+
   assert.equal(autoBackup.sanitizeHostname('MacBook-Pro-de-Jorge.local'), 'macbook-pro-de-jorge');
   const name = autoBackup.backupFileName('MacBook-Pro-de-Jorge.local', new Date(2026, 6, 10, 9, 30, 5));
   assert.equal(name, 'nodus-backup-macbook-pro-de-jorge-20260710-093005.nodus');
+  const versionedName = autoBackup.backupFileName('MacBook-Pro-de-Jorge.local', new Date(2026, 6, 10, 9, 30, 5), '3.4.0-beta.2', 122);
+  assert.equal(versionedName, 'nodus-backup-macbook-pro-de-jorge-v3.4.0-beta.2-schema122-20260710-093005.nodus');
+  assert.equal(
+    autoBackup.parseBackupFile('MacBook-Pro-de-Jorge.local', 'nodus-backup-macbook-pro-de-jorge-v3.4.0-schema122-20260231-093005.nodus'),
+    null,
+    'impossible dates are never normalized into cleanup candidates',
+  );
+  const preUpdateName = autoBackup.preUpdateBackupFileName(
+    'MacBook-Pro-de-Jorge.local',
+    new Date(2026, 6, 10, 9, 30, 5),
+    '3.3.0',
+    '3.4.0-beta.2',
+    122,
+  );
+  assert.equal(preUpdateName, 'nodus-pre-update-macbook-pro-de-jorge-from-v3.3.0-to-v3.4.0-beta.2-schema122-20260710-093005.nodus');
 
   // ── GFS retention, scoped to this machine's lineage ────────────────────────
   const mk = (host, y, m, d, hh = 3) => autoBackup.backupFileName(host, new Date(y, m - 1, d, hh, 0, 0));
@@ -96,6 +130,31 @@ try {
   assert.ok(!doomed.includes(mk('mac-a', 2026, 5, 20)), 'monthly grandfather kept (May)');
   assert.ok(doomed.includes(mk('mac-a', 2026, 7, 3)), 'mid-month surplus pruned');
   assert.ok(doomed.length >= 8, `a real chunk of surplus goes (${doomed.length} pruned)`);
+  const versionedLineage = Array.from({ length: 9 }, (_, index) => autoBackup.backupFileName(
+    'mac-versioned',
+    new Date(2026, 6, 1 + index, 3, 0, 0),
+    index < 5 ? '3.3.0' : '3.4.0-beta.2',
+    122,
+  ));
+  assert.ok(
+    autoBackup.selectBackupsToPrune('mac-versioned', versionedLineage).includes(versionedLineage[0]),
+    'GFS retention recognizes newly version-tagged names',
+  );
+
+  const preUpdateFiles = Array.from({ length: 7 }, (_, index) => autoBackup.preUpdateBackupFileName(
+    'mac-a',
+    new Date(2026, 6, 10 + index, 3, 0, 0),
+    '3.3.0',
+    `3.4.0-beta.${index + 1}`,
+    122,
+  ));
+  const preUpdateDoomed = autoBackup.selectPreUpdateBackupsToPrune('mac-a', [
+    ...preUpdateFiles,
+    autoBackup.preUpdateBackupFileName('mac-b', new Date(2026, 6, 1), '3.3.0', '3.4.0-beta.1', 122),
+    ...mine,
+  ]);
+  assert.deepEqual(preUpdateDoomed.sort(), preUpdateFiles.slice(0, 2).sort(), 'pre-update retention keeps five and ignores normal/other-host files');
+  assert.ok(!autoBackup.selectBackupsToPrune('mac-a', [...mine, ...preUpdateFiles]).some((file) => file.startsWith('nodus-pre-update-')), 'scheduled retention never prunes pre-update snapshots');
 
   // ── Real v6 full backup: recovery key, secrets, atomic write ────────────────
   const backupDir = path.join(root, 'backups');
@@ -115,6 +174,7 @@ try {
   assert.equal(result.ok, true, `backup runs: ${result.message}`);
   const written = (await readdir(backupDir)).filter((f) => f.endsWith('.nodus'));
   assert.equal(written.length, 1, 'exactly one archive, no .tmp leftovers');
+  assert.match(written[0], /^nodus-backup-.+-v9\.9\.9-test-schema\d+-\d{8}-\d{6}\.nodus$/, 'new backups expose app/schema versions in the filename');
 
   const zip = new AdmZip(path.join(backupDir, written[0]));
   const manifest = JSON.parse(zip.readAsText('manifest.json'));
@@ -169,6 +229,11 @@ try {
   assert.ok(appSettings.lastAutoBackupAt, 'lastAutoBackupAt recorded');
   assert.ok(String(appSettings.lastAutoBackupStatus).startsWith('ok:'), 'status recorded');
 
+  const preUpdate = await autoBackup.runPreUpdateBackupNow('9.9.9-test', '10.0.0-beta.1');
+  assert.equal(preUpdate.ok, true, `pre-update backup runs: ${preUpdate.message}`);
+  assert.match(path.basename(preUpdate.path), /^nodus-pre-update-.+-from-v9\.9\.9-test-to-v10\.0\.0-beta\.1-schema\d+-\d{8}-\d{6}\.nodus$/);
+  assert.ok(existsSync(preUpdate.path), 'verified pre-update snapshot is retained separately');
+
   // A blob the keychain can no longer decrypt must NOT cost the user their library
   // snapshot. The backup runs, the library is protected, and the unreadable providers
   // are named in the status so the omission is visible rather than silent. Restoring is
@@ -195,6 +260,92 @@ try {
   assert.equal(unreadable?.ok, false, 'unreadable master password reports a failure');
   assert.match(String(settingsRepo.getSettings().lastAutoBackupStatus), /^error:/, 'the failure reaches the UI status');
   globalThis.__backupTestPassword = 'mi-frase-maestra';
+
+  // ── Guarded age cleanup: preview, quarantine, catch-up and delayed purge ────
+  const cleanupNow = new Date();
+  const currentHost = os.hostname();
+  const currentRegularName = (await readdir(backupDir)).find((file) => file.startsWith(`nodus-backup-${autoBackup.sanitizeHostname(currentHost)}-`));
+  assert.ok(currentRegularName, 'a verified regular backup exists before cleanup');
+  const currentRegularPath = path.join(backupDir, currentRegularName);
+  const oldNames = [];
+  for (let index = 0; index < 5; index += 1) {
+    const oldDate = new Date(cleanupNow.getTime() - (40 + index) * 24 * 3600e3);
+    const oldName = autoBackup.backupFileName(currentHost, oldDate, '9.9.9-test', 28);
+    await copyFile(currentRegularPath, path.join(backupDir, oldName));
+    oldNames.push(oldName);
+  }
+  const otherHostName = autoBackup.backupFileName('another-machine', new Date(cleanupNow.getTime() - 400 * 24 * 3600e3), '9.9.9-test', 28);
+  await copyFile(currentRegularPath, path.join(backupDir, otherHostName));
+  await writeFile(path.join(backupDir, 'unrelated-old-file.nodus'), 'not a Nodus backup');
+
+  settingsRepo.updateSettings({
+    backupCleanupEnabled: true,
+    backupRetentionValue: 30,
+    backupRetentionUnit: 'days',
+    lastBackupCleanupAt: null,
+    lastBackupCleanupStatus: null,
+  });
+  const cleanupPreview = autoBackup.previewBackupCleanup(cleanupNow);
+  assert.equal(cleanupPreview.ok, true, cleanupPreview.message);
+  assert.equal(cleanupPreview.protectedCount, 3, 'the three newest regular backups are unconditionally protected');
+  assert.equal(cleanupPreview.candidateCount, 3, 'only old files beyond the protected floor are candidates');
+  assert.ok(cleanupPreview.candidateBytes > 0, 'preview reports bytes before any mutation');
+  assert.equal(cleanupPreview.purgeReadyCount, 0, 'nothing can be permanently deleted on the first pass');
+  assert.match(cleanupPreview.scopeToken, /^[a-f0-9]{64}$/, 'preview seals the exact filesystem scope');
+
+  const appearedAfterPreview = autoBackup.backupFileName(
+    currentHost,
+    new Date(cleanupNow.getTime() - 100 * 24 * 3600e3),
+    '9.9.9-test',
+    28,
+  );
+  await copyFile(currentRegularPath, path.join(backupDir, appearedAfterPreview));
+  const staleScope = await autoBackup.runBackupCleanupNow(cleanupNow, cleanupPreview.scopeToken);
+  assert.equal(staleScope.ok, false, 'a changed folder invalidates the reviewed scope');
+  assert.match(staleScope.message, /cambió desde la vista previa/);
+  assert.equal(existsSync(path.join(backupDir, '.nodus-cleanup-trash')), false, 'a stale confirmation moves and deletes nothing');
+  await rm(path.join(backupDir, appearedAfterPreview));
+
+  const refreshedPreview = autoBackup.previewBackupCleanup(cleanupNow);
+  const cleaned = await autoBackup.runBackupCleanupNow(cleanupNow, refreshedPreview.scopeToken);
+  assert.equal(cleaned.ok, true, cleaned.message);
+  assert.equal(cleaned.quarantinedCount, 3, 'eligible files move to quarantine first');
+  assert.equal(cleaned.purgedCount, 0, 'nothing is permanently deleted on its first cleanup pass');
+  assert.ok(existsSync(cleaned.trashPath), 'the safety trash is a real, inspectable directory');
+  assert.equal((await readdir(cleaned.trashPath)).length, 3, 'all selected files remain recoverable in safety trash');
+  assert.ok(existsSync(path.join(backupDir, otherHostName)), 'another computer’s backup is never touched');
+  assert.ok(existsSync(preUpdate.path), 'pre-update snapshots are never touched by age cleanup');
+  assert.ok(existsSync(path.join(backupDir, 'unrelated-old-file.nodus')), 'unrecognized files are never touched');
+
+  assert.equal(await autoBackup.maybeRunBackupCleanup(cleanupNow), null, 'a completed cleanup is not repeated before the next scheduled slot');
+  settingsRepo.updateSettings({ lastBackupCleanupAt: new Date(cleanupNow.getTime() - 10 * 24 * 3600e3).toISOString() });
+  const caughtUpCleanup = await autoBackup.maybeRunBackupCleanup(cleanupNow);
+  assert.equal(caughtUpCleanup?.ok, true, 'a missed cleanup slot catches up when Nodus next runs');
+
+  const afterGrace = await autoBackup.runBackupCleanupNow(new Date(cleanupNow.getTime() + 8 * 24 * 3600e3));
+  assert.equal(afterGrace.ok, true, afterGrace.message);
+  assert.equal(afterGrace.purgeReadyCount, 3, 'the run discloses the exact permanent-deletion scope before applying it');
+  assert.ok(afterGrace.purgeReadyBytes > 0, 'the permanent-deletion scope includes its byte size');
+  assert.equal(afterGrace.purgedCount, 3, 'quarantined files are purged only after the seven-day grace period');
+  assert.equal((await readdir(cleaned.trashPath)).length, 0, 'purged quarantine is empty');
+
+  // A corrupt newest survivor must stop the whole operation before even one candidate
+  // moves. This is the fail-closed invariant that protects an old but usable lineage.
+  const corruptDir = path.join(root, 'cleanup-corrupt-survivor');
+  await mkdir(corruptDir, { recursive: true });
+  const corruptNewest = autoBackup.backupFileName(currentHost, cleanupNow, '9.9.9-test', 28);
+  await writeFile(path.join(corruptDir, corruptNewest), 'corrupt');
+  for (let index = 0; index < 3; index += 1) {
+    const oldName = autoBackup.backupFileName(currentHost, new Date(cleanupNow.getTime() - (60 + index) * 24 * 3600e3), '9.9.9-test', 28);
+    await copyFile(currentRegularPath, path.join(corruptDir, oldName));
+  }
+  settingsRepo.updateSettings({ autoBackupFolder: corruptDir, lastBackupCleanupAt: null });
+  const refusedCleanup = await autoBackup.runBackupCleanupNow(cleanupNow);
+  assert.equal(refusedCleanup.ok, false, 'cleanup refuses a corrupt newest survivor');
+  assert.match(refusedCleanup.message, /no superó la verificación|No se pudo verificar/);
+  assert.equal((await readdir(corruptDir)).filter((file) => file.startsWith('nodus-backup-')).length, 4, 'verification failure leaves every active backup in place');
+  assert.equal(existsSync(path.join(corruptDir, '.nodus-cleanup-trash')), false, 'verification failure creates no trash and moves nothing');
+  settingsRepo.updateSettings({ autoBackupFolder: backupDir, backupCleanupEnabled: false });
 
   // ── Manual exports also provide a second independent recovery credential ───
   const manualRecoveryKey = 'clave-recuperacion-manual-independiente';

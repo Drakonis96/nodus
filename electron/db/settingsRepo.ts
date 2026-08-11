@@ -123,6 +123,7 @@ const DEFAULTS: Omit<AppSettings, 'providerKeys' | 'lockedProviderKeys'> = {
   reduceMotion: false,
   readingFocusMode: false,
   announcementsEnabled: true,
+  betaUpdates: false,
   mascotEnabled: true,
   mascotAlwaysOnTop: false,
   mascotVaultCostumes: true,
@@ -222,6 +223,11 @@ const DEFAULTS: Omit<AppSettings, 'providerKeys' | 'lockedProviderKeys'> = {
   autoBackupMinute: 0,
   lastAutoBackupAt: null,
   lastAutoBackupStatus: null,
+  backupCleanupEnabled: false,
+  backupRetentionValue: 3,
+  backupRetentionUnit: 'months',
+  lastBackupCleanupAt: null,
+  lastBackupCleanupStatus: null,
 };
 
 /** A shared model key counts as "configured" when it differs from its factory default,
@@ -307,6 +313,36 @@ export function getSettings(): AppSettings {
   if (typeof merged.libraryGlobalEnabled !== 'boolean') merged.libraryGlobalEnabled = false;
   if (!Number.isInteger(merged.libraryScopeOnboardingVersion) || merged.libraryScopeOnboardingVersion < 0) {
     merged.libraryScopeOnboardingVersion = 0;
+  }
+  // Cleanup can delete files, so corrupted or hand-edited global preferences must
+  // never be treated as an enabled policy. Repair them to conservative defaults
+  // before either the renderer or the background scheduler can observe them.
+  if (typeof merged.backupCleanupEnabled !== 'boolean') {
+    merged.backupCleanupEnabled = DEFAULTS.backupCleanupEnabled;
+    seed.backupCleanupEnabled = merged.backupCleanupEnabled;
+  }
+  const retentionLimits: Record<AppSettings['backupRetentionUnit'], number> = {
+    days: 3650,
+    weeks: 520,
+    months: 120,
+    years: 10,
+  };
+  if (!Object.hasOwn(retentionLimits, merged.backupRetentionUnit)) {
+    merged.backupRetentionUnit = DEFAULTS.backupRetentionUnit;
+    seed.backupRetentionUnit = merged.backupRetentionUnit;
+  }
+  const retentionLimit = retentionLimits[merged.backupRetentionUnit];
+  if (!Number.isInteger(merged.backupRetentionValue) || merged.backupRetentionValue < 1 || merged.backupRetentionValue > retentionLimit) {
+    merged.backupRetentionValue = DEFAULTS.backupRetentionValue;
+    seed.backupRetentionValue = merged.backupRetentionValue;
+  }
+  if (typeof merged.lastBackupCleanupAt !== 'string' && merged.lastBackupCleanupAt !== null) {
+    merged.lastBackupCleanupAt = null;
+    seed.lastBackupCleanupAt = null;
+  }
+  if (typeof merged.lastBackupCleanupStatus !== 'string' && merged.lastBackupCleanupStatus !== null) {
+    merged.lastBackupCleanupStatus = null;
+    seed.lastBackupCleanupStatus = null;
   }
   // AI model configuration is shared too (API keys already are). Overlay the shared
   // store when it holds a real value; otherwise seed it — but ONLY from a vault that has

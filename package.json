@@ -77,6 +77,7 @@
     "@milkdown/plugin-slash": "^7.21.3",
     "@milkdown/plugin-tooltip": "^7.21.3",
     "@milkdown/plugin-upload": "^7.21.3",
+    "@milkdown/prose": "^7.21.3",
     "@milkdown/preset-commonmark": "^7.21.3",
     "@milkdown/preset-gfm": "^7.21.3",
     "@milkdown/react": "^7.21.3",
@@ -204,7 +205,8 @@
         "provider": "github",
         "owner": "drakonis96",
         "repo": "nodus",
-        "releaseType": "draft"
+        "releaseType": "draft",
+        "channel": "latest"
       }
     ],
     "beforePack": "build/beforePack.cjs",

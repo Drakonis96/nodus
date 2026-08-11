@@ -102,7 +102,12 @@ export function ToolkitAppPreview({
         if (message.type === 'runtime:error') { setRuntimeError(String(message.message ?? t('Error dentro de la app.')).slice(0, 500)); return; }
         if (message.type === 'session:send') {
           if (!session || !manifest.capabilities.multiplayer || typeof message.channel !== 'string' || !/^[a-zA-Z0-9:_-]{1,64}$/.test(message.channel) || !isToolkitAppJsonValue(message.payload)) return;
-          void session.send(message.channel, message.payload);
+          void Promise.resolve(session.send(message.channel, message.payload)).catch((cause) => {
+            // A shared session can close after the iframe emits its final message but
+            // before the main process handles it. Contain that expected async rejection.
+            if (iframeRef.current?.contentWindow !== target) return;
+            setRuntimeError(String(cause instanceof Error ? cause.message : cause).slice(0, 500));
+          });
           return;
         }
         if (!manifest.capabilities.storage) return respond(false, null, 'El almacenamiento no está activado.');

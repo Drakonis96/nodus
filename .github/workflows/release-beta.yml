@@ -1,0 +1,25 @@
+name: Beta release
+
+# A beta tag can never start the stable workflow. Manual publication likewise
+# requires choosing this workflow and supplying an x.y.z-beta.n tag explicitly.
+on:
+  push:
+    tags:
+      - 'v*-beta.*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Beta tag to publish (vX.Y.Z-beta.N)
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  publish-beta:
+    uses: ./.github/workflows/release-build.yml
+    with:
+      channel: beta
+      tag: ${{ inputs.tag || github.ref_name }}
+    secrets: inherit

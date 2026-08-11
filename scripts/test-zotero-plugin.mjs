@@ -1277,12 +1277,12 @@ test('#9: desktop installer copies the canonical release XPI', () => {
 });
 
 test('#9: stable release blocks publication until the Zotero assets exist', () => {
-  const workflow = readSource('.github/workflows/release.yml');
+  const workflow = readSource('.github/workflows/release-build.yml');
   const pluginJob = workflow.slice(
     workflow.indexOf('  build-zotero-plugin:'),
-    workflow.indexOf('  verify-release-assets:'),
+    workflow.indexOf('  verify-and-publish:'),
   );
-  const verificationJob = workflow.slice(workflow.indexOf('  verify-release-assets:'));
+  const verificationJob = workflow.slice(workflow.indexOf('  verify-and-publish:'));
 
   assert.match(pluginJob, /needs: release/, 'plugin build waits for the draft app release');
   assert.match(pluginJob, /npm run zotero:xpi/, 'release builds the XPI');

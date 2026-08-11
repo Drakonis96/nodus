@@ -1,173 +1,26 @@
-name: Release
+name: Stable release
 
-# Builds the desktop installers and the fixed-name Zotero .xpi, then attaches all
-# of them to the GitHub Release for the pushed tag. Native modules (better-sqlite3,
-# @napi-rs/canvas) are compiled on each OS runner — this is why each installer must
-# be built on its own OS. Linux ships deb + AppImage only: snap/flatpak need extra
-# tooling (snapcraft, flatpak-builder + runtimes) that a bare ubuntu runner lacks.
-
+# Stable keeps the existing vX.Y.Z tag flow. Prerelease tags are explicitly
+# excluded so they can only enter the isolated beta workflow.
 on:
   push:
     tags:
       - 'v*'
+      - '!v*-*'
   workflow_dispatch:
+    inputs:
+      tag:
+        description: Stable tag to publish (vX.Y.Z)
+        required: true
+        type: string
 
 permissions:
   contents: write
 
 jobs:
-  release:
-    env:
-      HAS_MACOS_SIGNING: ${{ secrets.MACOS_CERTIFICATE != '' }}
-    strategy:
-      fail-fast: false
-      # electron-builder creates a shared draft GitHub Release. Running the OS jobs
-      # at once can race on creation for the same tag; the verification job below
-      # promotes the draft only after every installer and updater manifest exists.
-      max-parallel: 1
-      matrix:
-        include:
-          - os: macos-latest
-            platform: '--mac'
-          - os: windows-latest
-            platform: '--win'
-          - os: ubuntu-latest
-            platform: '--linux'
-    runs-on: ${{ matrix.os }}
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v7
-
-      - name: Set up Node
-        uses: actions/setup-node@v7
-        with:
-          node-version: 22
-          cache: npm
-
-      - name: Verify release and citation versions
-        run: npm run citation:check && npm run release:verify-source
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Build renderer + main
-        env:
-          # The main-process bundle is ~1,000 modules and 6.4 MB, and rolling it up
-          # peaks above Node's default heap on the macOS arm64 runner — which is the
-          # smallest of the three and dies at ~2 GB with "Reached heap limit".
-          # ci.yml has carried this same bump since it hit the wall; release.yml
-          # never got it, so the mismatch only ever surfaced at release time.
-          NODE_OPTIONS: --max-old-space-size=4096
-        run: npm run build
-
-      - name: Build and publish Windows installer
-        if: matrix.os == 'windows-latest'
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: npx electron-builder ${{ matrix.platform }} --publish always
-
-      - name: Build and publish signed macOS installer
-        if: matrix.os == 'macos-latest' && env.HAS_MACOS_SIGNING == 'true'
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # Configure these repository secrets to publish a notarized macOS
-          # build. This path is selected only when the certificate exists.
-          CSC_LINK: ${{ secrets.MACOS_CERTIFICATE }}
-          CSC_KEY_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
-          CSC_IDENTITY_AUTO_DISCOVERY: true
-          APPLE_ID: ${{ secrets.APPLE_ID }}
-          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
-          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-        run: npx electron-builder ${{ matrix.platform }} --publish always
-
-      - name: Build and publish ad-hoc macOS installer
-        if: matrix.os == 'macos-latest' && env.HAS_MACOS_SIGNING != 'true'
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # The fallback keeps release production available while signing
-          # credentials are being configured. It deliberately avoids passing an
-          # empty CSC_LINK, which electron-builder treats as an invalid path.
-          CSC_IDENTITY_AUTO_DISCOVERY: false
-        run: npx electron-builder ${{ matrix.platform }} --publish always
-
-      - name: Build and publish Linux installer
-        if: matrix.os == 'ubuntu-latest'
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: npx electron-builder ${{ matrix.platform }} --publish always
-
-  build-zotero-plugin:
-    # The plugin is part of every stable app release. Waiting for the installer
-    # matrix guarantees electron-builder has already created the shared draft
-    # release before this job uploads its two assets.
-    if: startsWith(github.ref, 'refs/tags/v')
-    needs: release
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v7
-
-      - name: Set up Node
-        uses: actions/setup-node@v7
-        with:
-          node-version: 22
-          cache: npm
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Verify plugin
-        run: node --test scripts/test-zotero-plugin.mjs
-
-      - name: Build fixed-name XPI and update manifest
-        env:
-          # Pin the update payload to this immutable tag. Installed plugins find
-          # updates.json through the stable /releases/latest/download URL.
-          ZOTERO_XPI_BASE: https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/
-        run: npm run zotero:xpi
-
-      - name: Upload plugin assets to the draft release
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          gh release upload "$GITHUB_REF_NAME" \
-            dist-zotero/nodus-zotero.xpi \
-            dist-zotero/updates.json \
-            --repo "$GITHUB_REPOSITORY" \
-            --clobber
-
-  verify-release-assets:
-    if: startsWith(github.ref, 'refs/tags/v')
-    needs:
-      - release
-      - build-zotero-plugin
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-    steps:
-      - name: Verify stable release assets
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          assets="$(gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name')"
-          for asset in \
-            Nodus-mac-arm64.dmg \
-            Nodus-win-x64.exe \
-            Nodus-linux-amd64.deb \
-            Nodus-linux-x86_64.AppImage \
-            latest-mac.yml \
-            latest.yml \
-            latest-linux.yml \
-            nodus-zotero.xpi \
-            updates.json
-          do
-            if ! grep -Fxq "$asset" <<< "$assets"; then
-              echo "::error::Missing release asset: $asset"
-              exit 1
-            fi
-          done
-
-      - name: Publish completed release
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: gh release edit "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --draft=false --latest
+  publish-stable:
+    uses: ./.github/workflows/release-build.yml
+    with:
+      channel: latest
+      tag: ${{ inputs.tag || github.ref_name }}
+    secrets: inherit

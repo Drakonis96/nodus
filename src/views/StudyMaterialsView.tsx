@@ -81,7 +81,7 @@ function MaterialAction({ icon, label, testId, disabled = false, tone = '', onCl
   onClick: () => void;
   children?: ReactNode;
 }) {
-  return <span className="group inline-flex" title={label}><button data-testid={testId} className={`btn btn-ghost h-7 min-h-7 justify-center gap-0 px-2 ${tone}`} aria-label={label} disabled={disabled} onClick={onClick}>{children ?? <Icon name={icon ?? 'help'} size={12} className="shrink-0" />}<span className="ml-0 max-w-0 overflow-hidden whitespace-nowrap opacity-0 transition-all duration-200 group-hover:ml-1.5 group-hover:max-w-40 group-hover:opacity-100 group-focus-within:ml-1.5 group-focus-within:max-w-40 group-focus-within:opacity-100">{label}</span></button></span>;
+  return <span className="group inline-flex" title={label}><button data-testid={testId} className={`icon-reveal-button btn btn-ghost h-7 min-h-7 justify-center px-2 ${tone}`} aria-label={label} disabled={disabled} onClick={onClick}>{children ?? <Icon name={icon ?? 'help'} size={12} className="shrink-0" />}<span className="ml-0 max-w-0 overflow-hidden whitespace-nowrap opacity-0 transition-all duration-200 group-hover:ml-1.5 group-hover:max-w-40 group-hover:opacity-100 group-focus-within:ml-1.5 group-focus-within:max-w-40 group-focus-within:opacity-100">{label}</span></button></span>;
 }
 
 export function StudyMaterialsView({ onOpenDocument, initialMaterialId }: { onOpenDocument: (id: string) => void; initialMaterialId?: string | null }) {

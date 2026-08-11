@@ -1,7 +1,7 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import type { StudyDocument, StudyDocumentKind, StudyWorkspace } from '@shared/studyOrg';
-import type { StudyAcademicYear, StudyExportFormat, StudyExportScope, StudyMaterialPreviewKind, StudyMaterialSummary } from '@shared/types';
+import type { AppSettings, StudyAcademicYear, StudyExportFormat, StudyExportScope, StudyMaterialPreviewKind, StudyMaterialSummary } from '@shared/types';
 import { STUDY_DOCUMENT_KINDS } from '@shared/studyOrg';
 import { Icon, Spinner } from '../components/ui';
 import { ConfirmModal } from '../components/ConfirmModal';
@@ -64,7 +64,7 @@ const CREATE_TITLES: Record<StudyCreateKind, string> = {
 };
 
 function StudyHeaderAction({ testId, icon, label, tone = 'ghost', disabled = false, onClick }: { testId: string; icon: string; label: string; tone?: 'primary' | 'secondary' | 'ghost'; disabled?: boolean; onClick?: () => void }) {
-  return <span className="group inline-flex" title={label}><button data-testid={testId} className={`btn ${tone === 'primary' ? 'btn-primary' : tone === 'secondary' ? 'btn-secondary' : 'btn-ghost'} h-9 min-h-9 justify-center gap-0 px-2.5 py-0`} aria-label={label} disabled={disabled} onClick={onClick}><Icon name={icon} className="shrink-0" /><span className="ml-0 max-w-0 overflow-hidden whitespace-nowrap opacity-0 transition-all duration-200 group-hover:ml-1.5 group-hover:max-w-48 group-hover:opacity-100 group-focus-within:ml-1.5 group-focus-within:max-w-48 group-focus-within:opacity-100">{label}</span></button></span>;
+  return <span className="group inline-flex" title={label}><button data-testid={testId} className={`icon-reveal-button btn ${tone === 'primary' ? 'btn-primary' : tone === 'secondary' ? 'btn-secondary' : 'btn-ghost'} h-9 min-h-9 justify-center px-2.5 py-0`} aria-label={label} disabled={disabled} onClick={onClick}><Icon name={icon} className="shrink-0" /><span className="ml-0 max-w-0 overflow-hidden whitespace-nowrap opacity-0 transition-all duration-200 group-hover:ml-1.5 group-hover:max-w-48 group-hover:opacity-100 group-focus-within:ml-1.5 group-focus-within:max-w-48 group-focus-within:opacity-100">{label}</span></button></span>;
 }
 
 async function imageFileToDataUrl(file: File): Promise<string> {
@@ -427,12 +427,14 @@ function StudyMaterialRenameDialog({ material, onSave, onCancel }: { material: S
 }
 
 export function StudyOrganizationView({
+  settings,
   target,
   mode,
   onTargetChange,
   onOpenMaterial,
   onOpenRecording,
 }: {
+  settings: AppSettings;
   target: StudyNavigationTarget | null;
   mode: 'organization' | 'library';
   onTargetChange: (target: StudyNavigationTarget | null) => void;
@@ -888,6 +890,7 @@ export function StudyOrganizationView({
     return (
       <><Suspense fallback={<div className="flex h-full items-center justify-center"><Spinner label={t('Cargando editor…')} /></div>}>
       <StudyEditor
+        settings={settings}
         documents={openDocuments.length ? openDocuments : [editing]}
         tags={workspace.tags}
         activeTagIds={workspace.documentTags.filter((link) => link.documentId === editing.id).map((link) => link.tagId)}

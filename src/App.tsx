@@ -78,6 +78,9 @@ const ResearchAssistantModal = lazy(() => import('./views/ResearchAssistantModal
 // Shortcut label for the command palette: ⌘K on macOS, Ctrl K elsewhere.
 const IS_MAC = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/i.test(navigator.platform || navigator.userAgent || '');
 const PALETTE_HINT = IS_MAC ? '⌘K' : 'Ctrl K';
+// Below this width the centred wordmark would enter macOS's hiddenInset traffic-
+// light area. Keep the mark itself centred and hide only the decorative word.
+const MACOS_FULL_SIDEBAR_BRAND_MIN_WIDTH = 248;
 
 /** Apply the light/dark root classes for a theme mode. 'system' resolves to the
  *  OS preference at call time; the App re-invokes this when that preference
@@ -1160,21 +1163,27 @@ export function App() {
         <button
           ref={setHeaderLogoEl}
           data-testid="sidebar-header-toggle"
-          className="flex h-full shrink-0 items-center justify-center gap-2 px-2 font-semibold text-lg tracking-tight transition-colors hover:bg-neutral-900/70 focus-visible:bg-neutral-900/70"
+          className="relative flex h-full shrink-0 items-center justify-center px-2 font-semibold text-lg tracking-tight transition-colors hover:bg-neutral-900/70 focus-visible:bg-neutral-900/70"
           style={{ width: sidebarWidth }}
           onClick={toggleNav}
           title={navCollapsed ? t('Mostrar el menú lateral') : t('Ocultar el menú lateral (más espacio para el grafo)')}
           aria-label={navCollapsed ? t('Mostrar el menú lateral') : t('Ocultar el menú lateral (más espacio para el grafo)')}
         >
-          <img
-            data-testid="nodus-logo"
-            data-vault-logo={isPrimarySources ? 'primary_sources' : isGenealogy ? 'genealogy' : isDatabases ? 'databases' : isEstudio ? 'estudio' : isDocencia ? 'docencia' : isWorldbuilding ? 'worldbuilding' : isTestimonios ? 'testimonios' : isProsopography ? 'prosopography' : 'academic'}
-            src={isGenealogy ? nodusLogoGold : isDatabases ? nodusLogoCrimson : isEstudio ? nodusLogoTeal : isDocencia ? nodusLogoOrange : isWorldbuilding ? nodusLogoViolet : isTestimonios ? nodusLogoCyan : nodusLogo}
-            alt=""
-            className="h-7 w-7"
+          <span data-testid="sidebar-header-brand" className="flex items-center justify-center gap-2">
+            <img
+              data-testid="nodus-logo"
+              data-vault-logo={isPrimarySources ? 'primary_sources' : isGenealogy ? 'genealogy' : isDatabases ? 'databases' : isEstudio ? 'estudio' : isDocencia ? 'docencia' : isWorldbuilding ? 'worldbuilding' : isTestimonios ? 'testimonios' : isProsopography ? 'prosopography' : 'academic'}
+              src={isGenealogy ? nodusLogoGold : isDatabases ? nodusLogoCrimson : isEstudio ? nodusLogoTeal : isDocencia ? nodusLogoOrange : isWorldbuilding ? nodusLogoViolet : isTestimonios ? nodusLogoCyan : nodusLogo}
+              alt=""
+              className={IS_MAC && sidebarWidth < MACOS_FULL_SIDEBAR_BRAND_MIN_WIDTH ? 'h-6 w-6' : 'h-7 w-7'}
+            />
+            <span className={IS_MAC && sidebarWidth < MACOS_FULL_SIDEBAR_BRAND_MIN_WIDTH ? 'sr-only' : undefined}>Nodus</span>
+          </span>
+          <Icon
+            name={navCollapsed ? 'chevronRight' : 'chevronLeft'}
+            size={14}
+            className="absolute right-2 text-neutral-600"
           />
-          <span>Nodus</span>
-          <Icon name={navCollapsed ? 'chevronRight' : 'chevronLeft'} size={14} className="text-neutral-600" />
         </button>
 
         {/* Vault mode, centred, in the vault's accent colour (gold in genealogy /

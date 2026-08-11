@@ -36,13 +36,6 @@
   -webkit-app-region: drag;
 }
 
-/* hiddenInset puts the macOS traffic lights inside the renderer. Keep the brand
-   centred in the usable part of the sidebar button instead of letting the red,
-   yellow and green controls sit on top of its logo and label. */
-.app-titlebar[data-platform='macos'] [data-testid='sidebar-header-toggle'] {
-  padding-left: 76px;
-}
-
 /* ── Recovery-folder cinematic wizard ─────────────────────────────────────── */
 .recovery-cinema { position: fixed; inset: 0; z-index: 230; display: grid; place-items: center; overflow: auto; padding: 28px; background: #070911; color: #e5e7eb; }
 .recovery-aurora { position: fixed; inset: 0; pointer-events: none; background: radial-gradient(circle at 15% 15%, rgba(45,212,191,.16), transparent 32%), radial-gradient(circle at 85% 75%, rgba(99,102,241,.18), transparent 36%); }
@@ -1606,12 +1599,16 @@ body {
 .btn-primary {
   @apply bg-indigo-600 hover:bg-indigo-500 text-white;
 }
-/* HoverLabelButton always renders an icon plus a zero-width label. The generic .btn
-   gap would still reserve 6px for that hidden label and shift every icon 3px to
-   the left, so labels provide their own margin only when they become visible. The
-   two-class selector is what outranks `.btn`'s own gap. */
-.btn.header-action {
+/* Expandable icon buttons always render an icon plus a zero-width label. The generic
+   .btn gap would still reserve 6px for that hidden label and shift every icon 3px
+   left. Labels provide their own margin only while visible; the two-class selector
+   also outranks `.btn`, so the glyph stays exactly centred in both vaults. */
+.btn.header-action,
+.btn.icon-reveal-button {
   gap: 0;
+}
+.btn.icon-reveal-button > svg:first-child {
+  display: block;
 }
 /* The two ways of supporting the project wear their own brands, so neither is
    mistaken for the other and neither reads as a Nodus feature. */
@@ -3663,6 +3660,50 @@ body:has(.library-document-reader [data-testid="library-reader-sidebar"]) .app-t
 /* Study editor: Milkdown owns document structure; these variables keep visual
    preferences outside the Markdown so typography never mutates content. */
 .study-editor-shell .study-milkdown { min-height: 100%; background: transparent; }
+.study-editor-model-picker .model-picker-trigger {
+  min-height: 2rem;
+  border-color: color-mix(in srgb, var(--vault-accent, #0f766e) 52%, #404040);
+  border-radius: 9999px;
+  background: color-mix(in srgb, var(--vault-accent, #0f766e) 13%, #171717);
+  padding-inline: .75rem;
+  color: #f5f5f5;
+  font-size: .75rem;
+  font-weight: 500;
+}
+.study-editor-model-picker .model-picker-trigger:hover {
+  border-color: color-mix(in srgb, var(--vault-accent, #0f766e) 76%, #525252);
+  background: color-mix(in srgb, var(--vault-accent, #0f766e) 19%, #171717);
+}
+.study-editor-model-picker .model-picker-trigger:focus-visible {
+  border-color: var(--vault-accent, #0f766e);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--vault-accent, #0f766e) 28%, transparent);
+}
+.study-editor-model-picker .model-picker-options { min-width: 15rem; }
+.light .study-editor-model-picker .model-picker-trigger {
+  border-color: color-mix(in srgb, var(--vault-accent, #0f766e) 45%, #d4d4d4);
+  background: color-mix(in srgb, var(--vault-accent, #0f766e) 9%, white);
+  color: color-mix(in srgb, var(--vault-accent, #0f766e) 72%, #171717);
+}
+.light .study-editor-model-picker .model-picker-trigger:hover {
+  border-color: var(--vault-accent, #0f766e);
+  background: color-mix(in srgb, var(--vault-accent, #0f766e) 14%, white);
+}
+.study-editor-style-button:not(.is-active) {
+  color: color-mix(in srgb, var(--vault-accent, #0f766e) 68%, #f5f5f5);
+  background: color-mix(in srgb, var(--vault-accent, #0f766e) 10%, transparent);
+}
+.study-editor-style-button:not(.is-active):hover {
+  color: color-mix(in srgb, var(--vault-accent, #0f766e) 82%, white);
+  background: color-mix(in srgb, var(--vault-accent, #0f766e) 18%, transparent);
+}
+.light .study-editor-style-button:not(.is-active) {
+  color: color-mix(in srgb, var(--vault-accent, #0f766e) 82%, #1c1917);
+  background: color-mix(in srgb, var(--vault-accent, #0f766e) 9%, white);
+}
+.light .study-editor-style-button:not(.is-active):hover {
+  color: color-mix(in srgb, var(--vault-accent, #0f766e) 92%, #0c0a09);
+  background: color-mix(in srgb, var(--vault-accent, #0f766e) 15%, white);
+}
 .study-editor-shell .milkdown {
   position: relative;
   min-height: 100%;

@@ -1,6 +1,6 @@
 import { motion } from 'framer-motion';
 import { useEffect, useMemo, useState } from 'react';
-import type { UpdateCheckResponse, UpdateCheckStatus } from '@shared/types';
+import type { UpdateCheckResponse, UpdateCheckStatus, UpdateErrorCode } from '@shared/types';
 import { t } from '../i18n';
 import { Icon } from './ui';
 import { type NodiState } from './nodi/Nodi';
@@ -16,7 +16,7 @@ type UpdatePresentation = {
   tone: string;
 };
 
-function presentationFor(status: UpdateCheckStatus, version?: string): UpdatePresentation {
+function presentationFor(status: UpdateCheckStatus, version?: string, errorCode?: UpdateErrorCode): UpdatePresentation {
   const resolvedVersion = version || __APP_VERSION__;
   switch (status) {
     case 'not-available':
@@ -51,6 +51,14 @@ function presentationFor(status: UpdateCheckStatus, version?: string): UpdatePre
         nodiState: 'celebrating',
         tone: 'success',
       };
+    case 'backing-up':
+      return {
+        title: t('Protegiendo tus datos'),
+        description: t('Nodus está creando y verificando una copia completa antes de instalar la actualización.'),
+        icon: 'shield',
+        nodiState: 'loading',
+        tone: 'available',
+      };
     case 'installing':
       return {
         title: t('Instalando actualización'),
@@ -60,6 +68,24 @@ function presentationFor(status: UpdateCheckStatus, version?: string): UpdatePre
         tone: 'available',
       };
     case 'error':
+      if (errorCode === 'pre-update-backup-required') {
+        return {
+          title: t('Actualización detenida por seguridad'),
+          description: t('Configura Recuperación antes de instalar una beta. La actualización permanece descargada y tus datos no se han modificado.'),
+          icon: 'shield',
+          nodiState: 'idle',
+          tone: 'error',
+        };
+      }
+      if (errorCode === 'pre-update-backup-failed') {
+        return {
+          title: t('Actualización detenida por seguridad'),
+          description: t('La beta no se instaló porque no pudo crearse y verificarse la copia de seguridad previa. Tus datos no se han modificado.'),
+          icon: 'shield',
+          nodiState: 'idle',
+          tone: 'error',
+        };
+      }
       return {
         title: t('No se pudo comprobar'),
         description: t('Comprueba tu conexión e inténtalo de nuevo.'),
@@ -144,7 +170,10 @@ export function StartupUpdateModal({ onSettled }: { onSettled?: () => void } = {
     };
   }, [attempt, open, shouldShow]);
 
-  const presentation = useMemo(() => presentationFor(update.status, update.version), [update.status, update.version]);
+  const presentation = useMemo(
+    () => presentationFor(update.status, update.version, update.errorCode),
+    [update.status, update.version, update.errorCode],
+  );
   const progress = update.status === 'downloading'
     ? Math.max(0, Math.min(100, update.progress ?? 0))
     : update.status === 'downloaded' || update.status === 'installing' ? 100 : null;
@@ -206,7 +235,7 @@ export function StartupUpdateModal({ onSettled }: { onSettled?: () => void } = {
         <div className="startup-update-content">
           <div className={`startup-update-status startup-update-status-${presentation.tone}`}>
             <span className="startup-update-status-icon">
-              <Icon name={presentation.icon} size={22} className={update.status === 'checking' || update.status === 'installing' ? 'animate-spin' : ''} />
+              <Icon name={presentation.icon} size={22} className={update.status === 'checking' || update.status === 'backing-up' || update.status === 'installing' ? 'animate-spin' : ''} />
             </span>
             <div className="min-w-0 flex-1">
               <h3 id="startup-update-title">{presentation.title}</h3>
@@ -223,7 +252,7 @@ export function StartupUpdateModal({ onSettled }: { onSettled?: () => void } = {
 
           <div className="startup-update-versions">
             <span><small>{t('Versión instalada')}</small><b>v{__APP_VERSION__}</b></span>
-            {(update.status === 'available' || update.status === 'downloading' || update.status === 'downloaded' || update.status === 'installing') && update.version && (
+            {(update.status === 'available' || update.status === 'downloading' || update.status === 'downloaded' || update.status === 'backing-up' || update.status === 'installing') && update.version && (
               <span><small>{t('Nueva versión')}</small><b>v{update.version}</b></span>
             )}
           </div>

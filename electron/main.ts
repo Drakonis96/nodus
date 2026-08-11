@@ -7,7 +7,12 @@ import { spawn, spawnSync } from 'node:child_process';
 import { getDb, closeDb } from './db/database';
 import { reconcileAuthorLayerOnce } from './db/authorsRepo';
 import { pruneDormantIdeas } from './db/ideasRepo';
-import { maybeRunAutoBackup, runAutoBackupNow } from './export/autoBackup';
+import {
+  maybeRunAutoBackup,
+  maybeRunBackupCleanup,
+  runAutoBackupNow,
+  runPreUpdateBackupNow,
+} from './export/autoBackup';
 import { registerIpc } from './ipc';
 import { scanQueue } from './pipeline/scanQueue';
 import { getSettings } from './db/settingsRepo';
@@ -30,6 +35,7 @@ import { startStudyCalendarReminders, stopStudyCalendarReminders } from './study
 import { restorePersistedDockIcon } from './dockIcon';
 import { stopAllWhisperCpp } from './stt/whisperCpp';
 import { recoverLegacyApiKeys } from './secrets/legacySecretRecovery';
+import { hasBackupPassword } from './secrets/secretStore';
 import type { UpdateCheckResponse, UpdateProgressEvent } from '@shared/types';
 import { TUTORIAL_VIDEO_EMBED_ORIGIN } from '@shared/tutorialVideos';
 import { killChatGptSubscriptionServer } from './ai/codexSubscription';
@@ -41,6 +47,7 @@ import { registerArchiveProtocol, registerArchiveSchemePrivileges } from './arch
 import { registerLibraryProtocol, registerLibrarySchemePrivileges } from './libraryProtocol';
 import { closeGlobalLibraryRuntime } from './library/libraryRuntime';
 import { ensurePreV4Recovery } from './recovery/preV4Recovery';
+import { applyUpdateChannel, isPrereleaseVersion } from './updateChannel';
 import {
   upgradeWorldbuildingDemoDynasties,
   upgradeWorldbuildingDemoImageQuality,
@@ -108,11 +115,14 @@ let updateCheckTimer: NodeJS.Timeout | null = null;
 let installingUpdate = false;
 let downloadedUpdateVersion: string | null = null;
 let downloadedUpdateFile: string | null = null;
+let activeUpdateVersion: string | null = null;
+let activeUpdateCancellationToken: { cancel: () => void } | null = null;
 let lastUpdateEvent: UpdateProgressEvent | null = null;
 let lastDownloadProgressEmitAt = 0;
 let lastDownloadProgressPercent = -1;
 let installUpdateTimer: NodeJS.Timeout | null = null;
 let useUnsignedMacUpdaterFallback = false;
+let suppressAutoInstallOnQuitUntilRestart = false;
 let autoBackupTimer: NodeJS.Timeout | null = null;
 let autoBackupFirstTimer: NodeJS.Timeout | null = null;
 let autoBackupRunning = false;
@@ -271,6 +281,52 @@ function emitUpdate(event: UpdateCheckResponse): UpdateCheckResponse {
   return event;
 }
 
+/** Stop a prerelease already in flight when the user leaves the beta channel. */
+function discardPendingPrereleaseUpdate(): boolean {
+  const candidate = downloadedUpdateVersion ?? activeUpdateVersion;
+  if (!isPrereleaseVersion(candidate)) return false;
+
+  activeUpdateCancellationToken?.cancel();
+  activeUpdateCancellationToken = null;
+  if (installUpdateTimer) {
+    clearTimeout(installUpdateTimer);
+    installUpdateTimer = null;
+  }
+  installingUpdate = false;
+  downloadedUpdateVersion = null;
+  downloadedUpdateFile = null;
+  activeUpdateVersion = null;
+  // A native updater may already have staged the package by the time the setting
+  // changes. Do not let an ordinary quit install it behind the stable preference.
+  suppressAutoInstallOnQuitUntilRestart = true;
+  autoUpdater.autoInstallOnAppQuit = false;
+  autoUpdater.autoDownload = false;
+  console.log('[updates] discarded pending prerelease after beta opt-out');
+  return true;
+}
+
+function configureUpdateChannel(betaUpdates: boolean, reason: string): void {
+  const channel = applyUpdateChannel(autoUpdater, betaUpdates);
+  const discardedPrerelease = !betaUpdates && discardPendingPrereleaseUpdate();
+  console.log(`[updates] channel ${channel} (${reason}); downgrades disabled`);
+  if (discardedPrerelease) {
+    emitUpdate({
+      status: 'not-available',
+      message: 'Beta updates está desactivado. La próxima actualización será una versión estable más reciente.',
+      version: app.getVersion(),
+      progress: null,
+    });
+  }
+}
+
+function hasUsableRecoverySetup(): boolean {
+  return Boolean(getSettings().autoBackupFolder && hasBackupPassword());
+}
+
+function hasConfiguredRecoveryFolder(): boolean {
+  return Boolean(getSettings().autoBackupFolder);
+}
+
 function isSafeExternalUrl(url: string): boolean {
   return /^(https?:|mailto:)/i.test(url.trim());
 }
@@ -366,6 +422,8 @@ async function checkForUpdates(reason: string): Promise<UpdateCheckResponse> {
       progress: null,
     });
   }
+  configureUpdateChannel(getSettings().betaUpdates, reason);
+  autoUpdater.autoDownload = true;
   if (installingUpdate) {
     return emitUpdate({
       status: 'installing',
@@ -391,7 +449,30 @@ async function checkForUpdates(reason: string): Promise<UpdateCheckResponse> {
   });
   try {
     const result = await autoUpdater.checkForUpdates();
+    const cancellationToken = result?.cancellationToken ?? null;
+    activeUpdateCancellationToken = cancellationToken;
+    if (result?.downloadPromise) {
+      void result.downloadPromise.then(
+        () => {
+          if (activeUpdateCancellationToken === cancellationToken) activeUpdateCancellationToken = null;
+        },
+        () => {
+          if (activeUpdateCancellationToken === cancellationToken) activeUpdateCancellationToken = null;
+        },
+      );
+    }
     const version = result?.updateInfo?.version;
+    if (isPrereleaseVersion(version) && !getSettings().betaUpdates) {
+      cancellationToken?.cancel();
+      if (activeUpdateCancellationToken === cancellationToken) activeUpdateCancellationToken = null;
+      activeUpdateVersion = null;
+      return emitUpdate({
+        status: 'not-available',
+        message: `Nodus ${app.getVersion()} ya está actualizado.`,
+        version: app.getVersion(),
+        progress: null,
+      });
+    }
     if (version && version !== app.getVersion()) {
       return emitUpdate({
         status: 'available',
@@ -434,6 +515,15 @@ async function installDownloadedUpdate(): Promise<UpdateCheckResponse> {
       progress: null,
     });
   }
+  if (isPrereleaseVersion(downloadedUpdateVersion) && !getSettings().betaUpdates) {
+    discardPendingPrereleaseUpdate();
+    return emitUpdate({
+      status: 'not-available',
+      message: 'Beta updates está desactivado. La próxima actualización será una versión estable más reciente.',
+      version: app.getVersion(),
+      progress: null,
+    });
+  }
   if (installingUpdate) {
     return lastUpdateEvent ?? {
       status: 'installing',
@@ -442,11 +532,69 @@ async function installDownloadedUpdate(): Promise<UpdateCheckResponse> {
       progress: 100,
     };
   }
+
+  const targetVersion = downloadedUpdateVersion;
+  const prerelease = isPrereleaseVersion(targetVersion);
   installingUpdate = true;
+  // A quit while the safety snapshot is being built must never let the native updater
+  // bypass this gate. The explicit quitAndInstall below is the only installation path.
+  autoUpdater.autoInstallOnAppQuit = false;
+
+  const recoveryConfigured = hasConfiguredRecoveryFolder();
+  const recoveryReady = recoveryConfigured && hasUsableRecoverySetup();
+  if (prerelease && !recoveryReady) {
+    installingUpdate = false;
+    return emitUpdate({
+      status: 'error',
+      errorCode: 'pre-update-backup-required',
+      message: 'La beta no se instalará hasta que configures Recuperación con una carpeta y contraseña válidas.',
+      version: targetVersion,
+      progress: null,
+    });
+  }
+
+  // Beta is fail-closed. Stable remains backward-compatible: when Recovery is ready it
+  // gets the same additional protection, but a backup problem never blocks a normal
+  // release or changes the established stable update contract.
+  if (prerelease || recoveryConfigured) {
+    emitUpdate({
+      status: 'backing-up',
+      message: `Creando y verificando una copia de seguridad antes de actualizar a Nodus ${targetVersion}…`,
+      version: targetVersion,
+      progress: null,
+    });
+    const backup = await runPreUpdateBackupNow(app.getVersion(), targetVersion);
+    if (prerelease && !getSettings().betaUpdates) {
+      discardPendingPrereleaseUpdate();
+      return emitUpdate({
+        status: 'not-available',
+        message: 'Beta updates está desactivado. La próxima actualización será una versión estable más reciente.',
+        version: app.getVersion(),
+        progress: null,
+      });
+    }
+    if (!backup.ok) {
+      if (prerelease) {
+        installingUpdate = false;
+        console.error(`[updates] beta install blocked because pre-update backup failed: ${backup.message}`);
+        return emitUpdate({
+          status: 'error',
+          errorCode: 'pre-update-backup-failed',
+          message: `La beta no se instaló porque no pudo crearse una copia de seguridad verificable: ${backup.message}`,
+          version: targetVersion,
+          progress: null,
+        });
+      }
+      console.warn(`[updates] stable pre-update backup failed; continuing without blocking stable: ${backup.message}`);
+    } else {
+      console.log(`[updates] verified pre-update snapshot: ${backup.path}`);
+    }
+  }
+
   const response = emitUpdate({
     status: 'installing',
-    message: `Instalando Nodus ${downloadedUpdateVersion} y reiniciando…`,
-    version: downloadedUpdateVersion,
+    message: `Instalando Nodus ${targetVersion} y reiniciando…`,
+    version: targetVersion,
     progress: 100,
   });
   installUpdateTimer = setTimeout(() => {
@@ -487,7 +635,8 @@ function setupAutoUpdates(): void {
   // a native event that macOS never delivers.
   autoUpdater.autoInstallOnAppQuit = !useUnsignedMacUpdaterFallback;
   autoUpdater.autoRunAppAfterInstall = true;
-  autoUpdater.allowPrerelease = false;
+  configureUpdateChannel(getSettings().betaUpdates, 'startup');
+  autoUpdater.autoInstallOnAppQuit = !useUnsignedMacUpdaterFallback && !suppressAutoInstallOnQuitUntilRestart;
   console.log(
     useUnsignedMacUpdaterFallback
       ? '[updates] using unsigned macOS fallback installer'
@@ -496,7 +645,22 @@ function setupAutoUpdates(): void {
 
   autoUpdater.on('checking-for-update', () => console.log('[updates] checking for update'));
   autoUpdater.on('update-available', (info) => {
+    if (isPrereleaseVersion(info.version) && !getSettings().betaUpdates) {
+      // Defensive race guard: a preference change can land while a network check
+      // is resolving. Prevent autoDownload before checkForUpdates continues.
+      autoUpdater.autoDownload = false;
+      activeUpdateVersion = null;
+      console.warn(`[updates] ignored prerelease ${info.version} on the stable channel`);
+      return;
+    }
+    // Prereleases always require a verified snapshot. Stable releases also use one
+    // when Recovery is configured. Prevent native install-on-quit from racing the
+    // asynchronous snapshot and bypassing its verification.
+    if (isPrereleaseVersion(info.version) || hasConfiguredRecoveryFolder()) {
+      autoUpdater.autoInstallOnAppQuit = false;
+    }
     console.log(`[updates] update available: ${info.version}`);
+    activeUpdateVersion = info.version;
     lastDownloadProgressEmitAt = 0;
     lastDownloadProgressPercent = -1;
     emitUpdate({
@@ -508,6 +672,7 @@ function setupAutoUpdates(): void {
   });
   autoUpdater.on('update-not-available', (info) => {
     console.log(`[updates] up to date: ${info.version}`);
+    if (!downloadedUpdateVersion) activeUpdateVersion = null;
     emitUpdate({
       status: 'not-available',
       message: `Nodus ${app.getVersion()} ya está actualizado.`,
@@ -539,9 +704,20 @@ function setupAutoUpdates(): void {
   });
   autoUpdater.on('update-downloaded', (info) => {
     if (installingUpdate) return;
+    if (isPrereleaseVersion(info.version) && !getSettings().betaUpdates) {
+      activeUpdateVersion = info.version;
+      discardPendingPrereleaseUpdate();
+      emitUpdate({
+        status: 'not-available',
+        message: 'Se ignoró una versión beta porque Beta updates está desactivado.',
+        version: app.getVersion(),
+        progress: null,
+      });
+      return;
+    }
     downloadedUpdateVersion = info.version;
     downloadedUpdateFile = info.downloadedFile;
-    console.log(`[updates] downloaded ${info.version}; installing and restarting`);
+    console.log(`[updates] downloaded ${info.version}; preparing protected installation`);
     emitUpdate({
       status: 'downloaded',
       message: `Actualización ${info.version} descargada. Reiniciando para instalarla…`,
@@ -556,6 +732,7 @@ function setupAutoUpdates(): void {
       installUpdateTimer = null;
     }
     installingUpdate = false;
+    activeUpdateCancellationToken = null;
     console.error(`[updates] error: ${e instanceof Error ? e.message : String(e)}`);
     emitUpdate({
       status: 'error',
@@ -645,7 +822,12 @@ app.whenReady().then(async () => {
   if (prunedIdeas > 0) console.log(`[maintenance] pruned ${prunedIdeas} long-dormant ideas`);
   setCopilotWindowProvider(() => mainWindow);
   setZoteroPluginWindowProvider(() => mainWindow);
-  registerIpc(() => mainWindow, () => checkForUpdates('manual'), installDownloadedUpdate);
+  registerIpc(
+    () => mainWindow,
+    () => checkForUpdates('manual'),
+    installDownloadedUpdate,
+    (betaUpdates) => configureUpdateChannel(betaUpdates, 'setting changed'),
+  );
   createWindow();
 
   // Recover API keys encrypted by the pre-2.3 lowercase Safe Storage identity.
@@ -685,11 +867,15 @@ app.whenReady().then(async () => {
     }
     if (quitting) return;
     autoBackupRunning = true;
-    void maybeRunAutoBackup(app.getVersion())
-      .then((result) => {
-        if (result) console.log(`[backup] ${result.ok ? 'ok' : 'error'}: ${result.message}`);
-      })
-      .catch((error) => {
+    void (async () => {
+      const backup = await maybeRunAutoBackup(app.getVersion());
+      if (backup) console.log(`[backup] ${backup.ok ? 'ok' : 'error'}: ${backup.message}`);
+      // Never age-clean immediately after a due backup failed: preserving every older
+      // recovery point is safer than applying retention without a fresh snapshot.
+      if (backup && !backup.ok) return;
+      const cleanup = await maybeRunBackupCleanup();
+      if (cleanup) console.log(`[backup-cleanup] ${cleanup.ok ? 'ok' : 'error'}: ${cleanup.message}`);
+    })().catch((error) => {
         // Without this the rejection was unhandled, which under Node's default
         // terminates the process — unattended, every 30 minutes.
         console.error(`[backup] failed: ${error instanceof Error ? error.message : String(error)}`);

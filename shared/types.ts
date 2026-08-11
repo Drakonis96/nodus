@@ -1349,6 +1349,8 @@ export type NodiStyle = 'classic' | 'orb';
 /** Whether the orb follows the active vault's accent colour or a colour the user picked. */
 export type NodiOrbColorMode = 'auto' | 'manual';
 
+export type BackupRetentionUnit = 'days' | 'weeks' | 'months' | 'years';
+
 export interface AppSettings {
   /** Whether the user explicitly enabled the cross-vault catalogue. */
   libraryGlobalEnabled: boolean;
@@ -1493,6 +1495,11 @@ export interface AppSettings {
    * promise worth making about a network call.
    */
   announcementsEnabled: boolean;
+  /**
+   * Explicit, app-wide opt-in to prerelease application updates. Stable remains
+   * the default and beta releases are never considered while this is false.
+   */
+  betaUpdates: boolean;
   // Nodi mascot: show the floating companion (visual/animation only for now — no wired
   // behaviour yet). App-wide preference, on by default.
   mascotEnabled: boolean;
@@ -1745,6 +1752,12 @@ export interface AppSettings {
   autoBackupMinute: number;
   lastAutoBackupAt: string | null;
   lastAutoBackupStatus: string | null;
+  /** Explicit opt-in to age-based cleanup of this computer's scheduled backups. */
+  backupCleanupEnabled: boolean;
+  backupRetentionValue: number;
+  backupRetentionUnit: BackupRetentionUnit;
+  lastBackupCleanupAt: string | null;
+  lastBackupCleanupStatus: string | null;
 }
 
 /** Outcome of a manual or scheduled automatic backup run. */
@@ -1753,6 +1766,28 @@ export interface AutoBackupResult {
   message: string;
   path?: string;
   prunedCount?: number;
+}
+
+export interface BackupCleanupPreview {
+  ok: boolean;
+  message: string;
+  /** Opaque fingerprint of the exact files shown to the user; null on preview failure. */
+  scopeToken: string | null;
+  cutoff: string | null;
+  candidateCount: number;
+  candidateBytes: number;
+  protectedCount: number;
+  trashCount: number;
+  purgeReadyCount: number;
+  purgeReadyBytes: number;
+}
+
+export interface BackupCleanupResult extends BackupCleanupPreview {
+  quarantinedCount: number;
+  quarantinedBytes: number;
+  purgedCount: number;
+  purgedBytes: number;
+  trashPath?: string;
 }
 
 /** User-facing scope for a complete encrypted backup. Database-backed content is
@@ -6476,12 +6511,18 @@ export type UpdateCheckStatus =
   | 'available'
   | 'downloading'
   | 'downloaded'
+  | 'backing-up'
   | 'installing'
   | 'error';
+
+export type UpdateErrorCode =
+  | 'pre-update-backup-required'
+  | 'pre-update-backup-failed';
 
 export interface UpdateCheckResponse {
   status: UpdateCheckStatus;
   message: string;
+  errorCode?: UpdateErrorCode;
   version?: string;
   progress?: number | null;
   bytesPerSecond?: number | null;
@@ -7899,8 +7940,12 @@ export interface NodusApi extends ProsopographyApi, TestimoniesApi, ToolkitApi, 
   hasBackupPassword(): Promise<boolean>;
   /** Folder picker for the automatic-backup destination. Returns the chosen path or null. */
   chooseBackupFolder(): Promise<string | null>;
-  /** Run one automatic-style backup immediately (no secrets, master password, prune). */
+  /** Run one complete encrypted automatic-style backup immediately. */
   runBackupNow(): Promise<AutoBackupResult>;
+  /** Read-only cleanup preview; never moves or deletes files. */
+  previewBackupCleanup(): Promise<BackupCleanupPreview>;
+  /** Run the guarded cleanup immediately after explicit user confirmation. */
+  runBackupCleanupNow(scopeToken: string): Promise<BackupCleanupResult>;
   /** Write a plaintext recovery kit (master password + independent recovery key) to a user-chosen file. */
   saveBackupRecoveryKit(): Promise<{ ok: boolean; message: string }>;
   /**

@@ -79,6 +79,46 @@ npm run test:e2e
 The full end-to-end suite launches the real desktop app and is most reliable on
 macOS, which is also the platform used by the main CI job.
 
+## Publishing releases
+
+Stable and Beta are separate GitHub Actions entry points backed by the shared
+`release-build.yml` implementation:
+
+- **Stable release** accepts only a package version and tag in the form `x.y.z`
+  and `vX.Y.Z`. It publishes the existing `latest*.yml` updater manifests,
+  installers, and stable Zotero plugin assets, then marks the release as latest.
+- **Beta release** accepts only `x.y.z-beta.n` and `vX.Y.Z-beta.N`. It publishes
+  `beta*.yml` plus the matching installers, marks the release as a prerelease,
+  and never uploads a stable updater manifest.
+
+Pushing a matching tag starts the corresponding workflow. Both workflows can
+also be run manually by supplying the exact tag. The channel/version validator
+stops a stable tag from entering Beta or a beta tag from entering Stable before
+any native build begins.
+
+Before installing a Beta build, the desktop app requires Recovery to be
+configured and commits a full encrypted, verified `nodus-pre-update-*` snapshot.
+The snapshot records the installed app/schema version and the target version in
+its filename, has an independent five-snapshot retention lineage, and is never
+removed by scheduled-backup pruning. A failed snapshot blocks only Beta. Stable
+updates take the same snapshot when Recovery is already configured, but preserve
+the established non-blocking stable update behavior if that optional snapshot
+cannot be written.
+
+Age-based backup cleanup is a separate, disabled-by-default opt-in in Settings.
+It uses the automatic-backup schedule and catches up after the next launch when
+a scheduled cleanup was missed. Before changing any file, Nodus verifies the
+newest surviving encrypted backup. It considers only strict regular-backup names
+for the current computer, always preserves the three newest regular backups, and
+never includes another computer's lineage or `nodus-pre-update-*` snapshots.
+Candidates first move atomically to `.nodus-cleanup-trash`; permanent deletion is
+allowed only after a seven-day grace period and another successful survivor
+verification. Manual confirmations carry an opaque fingerprint of the exact files
+shown in the preview, so any intervening folder change aborts the operation. A
+partial move is rolled back, and a failed due backup suppresses cleanup for that
+maintenance cycle. When this opt-in is disabled, the established stable GFS
+rotation remains unchanged.
+
 ## Project conventions
 
 - Keep Nodus local-first. New network access must be explicit, documented, and
@@ -106,6 +146,11 @@ Database migrations must be additive, deterministic, and safe for existing
 vaults. Changes that affect stored data, backups, synchronization, telemetry,
 network requests, AI providers, or student information must include appropriate
 privacy documentation and tests.
+
+Once a migration has shipped in a Beta, do not renumber, rewrite, or replace it
+for Stable. Stable must carry that exact forward migration (plus later migrations
+if needed); fixes belong in a new migration. Never rely on an application
+downgrade or automatic data rollback as a migration strategy.
 
 ## Pull requests
 
