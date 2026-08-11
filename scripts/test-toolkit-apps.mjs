@@ -94,6 +94,12 @@ test('shared app sessions preserve the participant browser language', async () =
   }
 });
 
+test('shared session shutdowns cannot create unhandled renderer rejections', async () => {
+  const preview = await readFile(path.join(repoRoot, 'src/toolkitApps/AppPreview.tsx'), 'utf8');
+  assert.match(preview, /Promise\.resolve\(session\.send\(message\.channel, message\.payload\)\)\.catch/);
+  assert.match(preview, /iframeRef\.current\?\.contentWindow !== target/);
+});
+
 test('builds the executable document with a deny-by-default CSP and private bridge', () => {
   const documentText = runtime.buildToolkitAppDocument(minimal, { token: 'a'.repeat(32), language: 'en', storage: true, session: { available: false, role: 'host', participant: null } });
   assert.match(documentText, /default-src 'none'/);
