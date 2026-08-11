@@ -16,14 +16,24 @@ const require = createRequire(import.meta.url);
 const testRoot = await mkdtemp(path.join(os.tmpdir(), 'nodus-library-reader-ui-'));
 const userData = path.join(testRoot, 'profile');
 const backupRoot = path.join(testRoot, 'backups');
-const screenshotPath = path.join(os.tmpdir(), 'nodus-library-reader-e2e.png');
-const lightScreenshotPath = path.join(os.tmpdir(), 'nodus-library-reader-light-narrow-e2e.png');
+const screenshotDirectory = path.join(repoRoot, 'output', 'library-reader-e2e');
+const screenshotPath = path.join(screenshotDirectory, '01-clean-reader-chat-dark.png');
+const originalScreenshotPath = path.join(screenshotDirectory, '02-original-page-preview.png');
+const pdfScreenshotPath = path.join(screenshotDirectory, '03-pdf-reader.png');
+const epubScreenshotPath = path.join(screenshotDirectory, '04-epub-reader-highlight.png');
+const imageScreenshotPath = path.join(screenshotDirectory, '05-image-region-highlight.png');
+const docxScreenshotPath = path.join(screenshotDirectory, '06-docx-reader.png');
+const spreadsheetScreenshotPath = path.join(screenshotDirectory, '07-spreadsheet-reader.png');
+const citationScreenshotPath = path.join(screenshotDirectory, '08-csl-style-manager.png');
+const lightScreenshotPath = path.join(screenshotDirectory, '09-clean-reader-light-narrow.png');
 const childEnv = {
   ...process.env,
   NODUS_USERDATA: userData,
   NODUS_DISABLE_AUTO_UPDATE: '1',
   NODUS_E2E_UPDATE_STATUS: 'not-available',
   NODUS_E2E_DISABLE_STUDY_BACKGROUND_AI: '1',
+  HOME: testRoot,
+  USERPROFILE: testRoot,
 };
 delete childEnv.ELECTRON_RUN_AS_NODE;
 
@@ -32,8 +42,19 @@ const tinyPng = Buffer.from(
   'base64',
 );
 
+function writeZip(file, entries) {
+  const AdmZip = require('adm-zip'); const zip = new AdmZip();
+  for (const [name, value] of Object.entries(entries)) zip.addFile(name, Buffer.from(value));
+  zip.writeZip(file);
+}
+
 let app;
 try {
+  await mkdir(screenshotDirectory, { recursive: true });
+  const zoteroStyles = path.join(testRoot, 'Zotero', 'styles');
+  await mkdir(zoteroStyles, { recursive: true });
+  await writeFile(path.join(zoteroStyles, 'casa-velazquez-e2e.csl'), `<?xml version="1.0" encoding="utf-8"?>
+<style xmlns="http://purl.org/net/xbiblio/csl" version="1.0" class="in-text"><info><title>Casa de Velázquez — E2E</title><id>http://www.zotero.org/styles/casa-velazquez-e2e</id><rights license="https://creativecommons.org/licenses/by-sa/3.0/">CC BY-SA 3.0</rights><updated>2026-08-11T00:00:00+00:00</updated></info><citation><layout prefix="[" suffix="]"><text variable="title"/></layout></citation><bibliography><layout suffix="."><text variable="title"/></layout></bibliography></style>`, 'utf8');
   app = await electron.launch({ executablePath: require('electron'), args: [repoRoot], env: childEnv });
   const page = await app.firstWindow();
   page.setDefaultTimeout(30_000);
@@ -95,6 +116,23 @@ La segunda sección permite comprobar el índice, la página de origen y el marc
   await writeFile(path.join(documentFolder, 'reader.md'), markdown, 'utf8');
   await buildTextPdf(documentFolder, 'original.pdf');
   await writeFile(path.join(documentFolder, 'assets', 'figura.png'), tinyPng);
+  await writeFile(path.join(documentFolder, 'figure.svg'), `<svg xmlns="http://www.w3.org/2000/svg" width="960" height="560" viewBox="0 0 960 560"><rect width="960" height="560" fill="#111827"/><rect x="70" y="70" width="820" height="420" rx="24" fill="#312e81"/><text x="110" y="150" fill="#e0e7ff" font-family="sans-serif" font-size="38">Figura preservada</text><path d="M120 410 L300 250 L455 360 L640 180 L840 410" fill="none" stroke="#a5b4fc" stroke-width="18" stroke-linecap="round" stroke-linejoin="round"/><circle cx="640" cy="180" r="28" fill="#fbbf24"/></svg>`, 'utf8');
+  writeZip(path.join(documentFolder, 'reader.epub'), {
+    mimetype: 'application/epub+zip',
+    'META-INF/container.xml': '<?xml version="1.0"?><container><rootfiles><rootfile full-path="OEBPS/content.opf" media-type="application/oebps-package+xml"/></rootfiles></container>',
+    'OEBPS/content.opf': '<?xml version="1.0"?><package><manifest><item id="intro" href="intro.xhtml" media-type="application/xhtml+xml"/><item id="results" href="results.xhtml" media-type="application/xhtml+xml"/></manifest><spine><itemref idref="intro"/><itemref idref="results"/></spine></package>',
+    'OEBPS/intro.xhtml': '<html><head><title>Introducción EPUB</title></head><body><h1>Introducción EPUB</h1><p>Este texto refluye y admite subrayados independientes del Markdown limpio.</p></body></html>',
+    'OEBPS/results.xhtml': '<html><head><title>Resultados EPUB</title></head><body><h1>Resultados</h1><p>El segundo capítulo conserva su propio contexto de anotación.</p></body></html>',
+  });
+  writeZip(path.join(documentFolder, 'reader.docx'), {
+    '[Content_Types].xml': '<?xml version="1.0"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/></Types>',
+    '_rels/.rels': '<?xml version="1.0"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>',
+    'word/document.xml': '<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:r><w:t>Documento Word abierto dentro de Nodus.</w:t></w:r></w:p><w:p><w:r><w:t>Su texto también se puede seleccionar, subrayar y anotar.</w:t></w:r></w:p></w:body></w:document>',
+  });
+  writeZip(path.join(documentFolder, 'reader.xlsx'), {
+    'xl/sharedStrings.xml': '<?xml version="1.0"?><sst xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><si><t>Dimensión</t></si><si><t>Resultado</t></si><si><t>Claridad</t></si><si><t>95</t></si><si><t>Fidelidad</t></si><si><t>98</t></si></sst>',
+    'xl/worksheets/sheet1.xml': '<?xml version="1.0"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData><row r="1"><c r="A1" t="s"><v>0</v></c><c r="B1" t="s"><v>1</v></c></row><row r="2"><c r="A2" t="s"><v>2</v></c><c r="B2" t="s"><v>3</v></c></row><row r="3"><c r="A3" t="s"><v>4</v></c><c r="B3" t="s"><v>5</v></c></row></sheetData></worksheet>',
+  });
   const now = new Date().toISOString();
   const contentFingerprint = createHash('sha256').update(markdown).digest('hex');
   const components = Object.fromEntries(['extraction', 'light', 'deep', 'passages', 'ideas', 'embeddings', 'summary'].map((component) => [component, {
@@ -118,7 +156,13 @@ La segunda sección permite comprobar el índice, la página de origen y el marc
       title: work.title, itemType: 'article-journal', year: work.year,
       creators: work.authors.map((name) => ({ creatorType: 'author', name })), isbn: [], issn: [], tags: ['lector'],
     },
-    collectionIds: [], attachments: [{ id: 'zotero:READERPDF', title: 'PDF', fileName: 'original.pdf', relativePath: 'original.pdf', mimeType: 'application/pdf', byteSize: 1, sha256: 'a'.repeat(64), role: 'original' }],
+    collectionIds: [], attachments: [
+      { id: 'zotero:READERPDF', title: 'PDF original', fileName: 'original.pdf', relativePath: 'original.pdf', mimeType: 'application/pdf', byteSize: 1, sha256: 'a'.repeat(64), role: 'original', position: 0 },
+      { id: 'local:READEREPUB', title: 'EPUB original', fileName: 'reader.epub', relativePath: 'reader.epub', mimeType: 'application/epub+zip', byteSize: 1, sha256: 'b'.repeat(64), role: 'original', position: 1 },
+      { id: 'local:READERIMAGE', title: 'Figura original', fileName: 'figure.svg', relativePath: 'figure.svg', mimeType: 'image/svg+xml', byteSize: 1, sha256: 'c'.repeat(64), role: 'image', position: 2 },
+      { id: 'local:READERDOCX', title: 'Documento Word', fileName: 'reader.docx', relativePath: 'reader.docx', mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', byteSize: 1, sha256: 'd'.repeat(64), role: 'supplement', position: 3 },
+      { id: 'local:READERXLSX', title: 'Datos XLSX', fileName: 'reader.xlsx', relativePath: 'reader.xlsx', mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', byteSize: 1, sha256: 'e'.repeat(64), role: 'supplement', position: 4 },
+    ],
     files: { reader: 'reader.md', original: 'original.pdf', sourceMap: 'source-map.json', annotations: 'annotations.json', orphanedAnnotations: 'orphaned-annotations.json' },
     extraction: { status: 'ready', lastSuccessfulAt: now, lastSuccessfulFingerprint: 'c'.repeat(64) },
     contentRevision: {
@@ -167,7 +211,8 @@ La segunda sección permite comprobar el índice, la página de origen y el marc
   assert.match(await documentRoot.innerText(), /Texto introductorio/);
   assert.equal(await documentRoot.locator('img').count(), 1, 'local extracted images render inside the clean document');
   assert.equal(await documentRoot.locator('table').count(), 1, 'Markdown tables remain structured');
-  assert.equal(await page.locator('.library-reader-outline nav button').count(), 6, 'three headings expose a title and page action each');
+  assert.equal(await page.locator('.library-reader-outline nav button').count(), 12, 'six source choices and three headings with page actions are visible');
+  assert.equal(await page.getByTestId('library-reader-source-picker').locator('option').count(), 6, 'clean Markdown and five preserved attachments are directly selectable');
   const outlineToggle = page.getByTestId('library-reader-outline-toggle');
   assert.equal(await outlineToggle.getAttribute('aria-expanded'), 'true');
   await outlineToggle.click();
@@ -185,13 +230,13 @@ La segunda sección permite comprobar el índice, la página de origen y el marc
   await page.getByTestId('library-reader-sidebar').waitFor({ state: 'visible' });
   await page.getByText(work.zotero_key, { exact: true }).waitFor();
   await page.getByRole('button', { name: 'Preguntar al chat' }).waitFor();
-  await page.getByRole('button', { name: 'Abrir original completo' }).waitFor();
 
   await page.getByRole('button', { name: 'Ver página 1' }).click();
   const originalPreview = page.getByTestId('library-original-preview');
   await originalPreview.waitFor({ state: 'visible' });
   await originalPreview.locator('canvas').waitFor({ state: 'visible' });
   assert.equal(await originalPreview.locator('canvas').getAttribute('data-page'), '1');
+  await page.screenshot({ path: originalScreenshotPath, fullPage: true });
   await originalPreview.getByRole('button', { name: 'Cerrar' }).click();
 
   const readerSidebar = page.getByTestId('library-reader-sidebar');
@@ -272,12 +317,86 @@ La segunda sección permite comprobar el índice, la página de origen y el marc
   await readerSidebar.getByRole('tab', { name: 'Chat' }).click();
   await page.getByTestId('library-reader-chat-input').waitFor();
   await page.screenshot({ path: screenshotPath, fullPage: true });
-  await readerSidebar.getByRole('tab', { name: 'Notas' }).click();
+
+  const sourceChooser = page.getByTestId('library-reader-source-picker').locator('select');
+  await sourceChooser.selectOption('zotero:READERPDF');
+  const pdfViewer = page.getByTestId('library-reader-pdf-viewer');
+  await pdfViewer.waitFor({ state: 'visible' });
+  await pdfViewer.locator('canvas').waitFor({ state: 'visible' });
+  await page.waitForFunction(() => document.querySelectorAll('[data-testid="library-reader-pdf-viewer"] .textLayer span').length > 0);
+  assert.match(await page.getByTestId('library-reader-freshness').innerText(), /Archivo original/);
+  await page.evaluate(() => {
+    const span = document.querySelector('[data-testid="library-reader-pdf-viewer"] .textLayer span');
+    if (!(span instanceof HTMLElement) || !span.firstChild?.textContent) throw new Error('PDF text layer is empty');
+    const range = document.createRange(); range.selectNodeContents(span.firstChild); const selection = window.getSelection(); selection.removeAllRanges(); selection.addRange(range);
+    span.dispatchEvent(new PointerEvent('pointerup', { bubbles: true }));
+  });
+  await page.locator('.reader-selection-actions').waitFor({ state: 'visible' });
+  await page.locator('.reader-selection-actions .reader-selection-color').first().click();
+  await page.waitForFunction(async (id) => (await window.nodus.listLibraryReaderAnnotations(id)).some((item) => item.scope === 'attachment:zotero:READERPDF:page:1'), globalItemId);
+  await page.screenshot({ path: pdfScreenshotPath, fullPage: true });
+
+  await sourceChooser.selectOption('local:READEREPUB');
+  const epubViewer = page.getByTestId('library-reader-epub-viewer');
+  await epubViewer.waitFor({ state: 'visible' });
+  assert.match(await epubViewer.innerText(), /Este texto refluye/);
+  await page.evaluate(() => {
+    const root = document.querySelector('[data-testid="library-reader-epub-content"] .library-attachment-text');
+    if (!(root instanceof HTMLElement)) throw new Error('EPUB text surface missing');
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT); let node = walker.nextNode();
+    while (node && !node.textContent?.includes('Este texto')) node = walker.nextNode();
+    if (!node?.textContent) throw new Error('EPUB text missing'); const start = node.textContent.indexOf('Este texto');
+    const range = document.createRange(); range.setStart(node, start); range.setEnd(node, start + 28); const selection = window.getSelection(); selection.removeAllRanges(); selection.addRange(range);
+    root.dispatchEvent(new PointerEvent('pointerup', { bubbles: true }));
+  });
+  await page.locator('.reader-selection-actions').waitFor({ state: 'visible' });
+  await page.locator('.reader-selection-actions .reader-selection-color').nth(2).click();
+  await page.waitForFunction(async (id) => (await window.nodus.listLibraryReaderAnnotations(id)).some((item) => item.scope.startsWith('attachment:local:READEREPUB:chapter:')), globalItemId);
+  await page.screenshot({ path: epubScreenshotPath, fullPage: true });
+
+  await sourceChooser.selectOption('local:READERIMAGE');
+  const imageViewer = page.getByTestId('library-reader-image-viewer');
+  await imageViewer.waitFor({ state: 'visible' });
+  const image = imageViewer.locator('img'); await image.waitFor(); await image.evaluate((element) => element.complete || new Promise((resolve) => element.addEventListener('load', resolve, { once: true })));
+  await imageViewer.getByRole('button', { name: 'Marcar región' }).click();
+  const imageBox = await image.boundingBox(); assert.ok(imageBox);
+  await page.mouse.move(imageBox.x + imageBox.width * .18, imageBox.y + imageBox.height * .2);
+  await page.mouse.down(); await page.mouse.move(imageBox.x + imageBox.width * .68, imageBox.y + imageBox.height * .7, { steps: 8 }); await page.mouse.up();
+  await page.waitForFunction(async (id) => (await window.nodus.listLibraryReaderAnnotations(id)).some((item) => item.target?.type === 'region' && item.target.attachmentId === 'local:READERIMAGE'), globalItemId);
+  await page.screenshot({ path: imageScreenshotPath, fullPage: true });
+
+  await sourceChooser.selectOption('local:READERDOCX');
+  const textViewer = page.getByTestId('library-reader-text-viewer');
+  await textViewer.waitFor({ state: 'visible' });
+  assert.match(await textViewer.innerText(), /Documento Word abierto dentro de Nodus/);
+  await page.screenshot({ path: docxScreenshotPath, fullPage: true });
+
+  await sourceChooser.selectOption('local:READERXLSX');
+  await textViewer.waitFor({ state: 'visible' });
+  assert.match(await textViewer.innerText(), /Claridad[\s\S]*95/);
+  await page.screenshot({ path: spreadsheetScreenshotPath, fullPage: true });
+
+  await page.getByTestId('library-scope-shell').getByRole('button', { name: 'Biblioteca', exact: true }).click();
+  const detail = page.getByTestId('global-library-detail'); await detail.waitFor({ state: 'visible' });
+  await detail.getByTestId('cite-library-item').click();
+  const citationDialog = page.getByTestId('library-citation-export-dialog'); await citationDialog.waitFor({ state: 'visible' });
+  await citationDialog.getByRole('button', { name: 'Gestionar estilos' }).click();
+  await citationDialog.getByTestId('import-zotero-csl').click();
+  await citationDialog.locator('b').filter({ hasText: 'Casa de Velázquez — E2E' }).waitFor();
+  await citationDialog.getByTestId('library-citation-style').selectOption('casa-velazquez-e2e');
+  await citationDialog.getByTestId('copy-library-citation').click();
+  await citationDialog.locator('pre').filter({ hasText: work.title }).waitFor();
+  await page.screenshot({ path: citationScreenshotPath, fullPage: true });
+  await citationDialog.locator('header button').click();
+
+  await detail.getByRole('button', { name: 'Leer', exact: true }).click();
+  await page.getByTestId('library-reader-source-picker').locator('select').selectOption('clean');
+  await page.getByTestId('library-reader-sidebar').getByRole('tab', { name: 'Notas' }).click();
   await page.evaluate(() => { document.documentElement.classList.add('light'); document.documentElement.classList.remove('dark'); });
   await page.setViewportSize({ width: 860, height: 820 });
   await page.screenshot({ path: lightScreenshotPath, fullPage: true });
   assert.deepEqual(pageErrors, [], pageErrors.map((error) => error.stack ?? String(error)).join('\n'));
-  console.log(`library reader UI test passed; screenshots: ${screenshotPath}, ${lightScreenshotPath}`);
+  console.log(`library reader UI test passed; screenshots: ${screenshotDirectory}`);
 } finally {
   if (app) await app.close().catch(() => undefined);
   await rm(testRoot, { recursive: true, force: true });

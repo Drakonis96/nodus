@@ -50,6 +50,8 @@ test('the Library UI exposes hierarchy, search, bulk operations, imports and bac
     'getGlobalLibraryViewPreferences', 'setGlobalLibraryViewPreferences',
     'startGlobalLibraryMetadataBatch', 'applyGlobalLibraryMetadataBatch', 'cancelGlobalLibraryMetadataBatch',
     'updateGlobalLibraryCitationKey', 'formatGlobalLibraryCitation', 'exportGlobalLibraryBibliography',
+    'listGlobalLibraryCitationStyles', 'importGlobalLibraryCitationStyles', 'importZoteroCitationStyles',
+    'installGlobalLibraryRepositoryCitationStyle', 'removeGlobalLibraryCitationStyle',
     'previewGlobalLibraryTrash', 'purgeGlobalLibraryTrash', 'auditGlobalLibraryRecovery', 'rebuildGlobalLibrary',
     'previewGlobalLibraryMerge',
   ]) assert.match(view, new RegExp(String.raw`window\.nodus\.${method}\b`));
@@ -61,12 +63,18 @@ test('the Library UI exposes hierarchy, search, bulk operations, imports and bac
   assert.match(view, /onDoubleClick=\{\(\) => item\.readerAvailable/);
 });
 
-test('the global reader exposes annotations, metadata, chat and a temporary original-page viewer', async () => {
-  const [reader, store, protocol, main, html] = await Promise.all([
-    readSource('src/views/LibraryDocumentReader.tsx'), readSource('electron/libraryReader/libraryReaderStore.ts'),
-    readSource('electron/libraryProtocol.ts'), readSource('electron/main.ts'), readSource('index.html'),
+test('the global reader exposes annotations, metadata, chat and native attachment viewers', async () => {
+  const [readerSource, attachmentViewer, store, protocol, main, html] = await Promise.all([
+    readSource('src/views/LibraryDocumentReader.tsx'), readSource('src/components/library/LibraryAttachmentViewer.tsx'),
+    readSource('electron/libraryReader/libraryReaderStore.ts'), readSource('electron/libraryProtocol.ts'), readSource('electron/main.ts'), readSource('index.html'),
   ]);
-  for (const marker of ['library-reader-document', 'library-reader-outline-toggle', 'library-reader-sidebar-toggle', 'library-reader-sidebar', 'library-reader-metadata', 'library-reader-chat', 'library-original-preview']) assert.match(reader, new RegExp(marker));
+  const reader = `${readerSource}\n${attachmentViewer}`;
+  for (const marker of [
+    'library-reader-document', 'library-reader-outline-toggle', 'library-reader-sidebar-toggle',
+    'library-reader-sidebar', 'library-reader-metadata', 'library-reader-chat', 'library-original-preview',
+    'library-reader-source-picker', 'library-reader-pdf-viewer', 'library-reader-epub-viewer',
+    'library-reader-image-viewer', 'library-reader-text-viewer', 'library-reader-open-external',
+  ]) assert.match(reader, new RegExp(marker));
   assert.match(reader, /aria-expanded=\{outlineOpen\}/);
   assert.match(reader, /aria-expanded=\{notesOpen\}/);
   assert.match(reader, /data-testid="library-reader-bookmark-menu"/);
@@ -77,15 +85,44 @@ test('the global reader exposes annotations, metadata, chat and a temporary orig
   assert.match(reader, /selected && <span/);
   assert.match(reader, /t\('Info'\)/);
   assert.match(reader, /OriginalPagePreview/);
+  assert.match(reader, /TextLayer/);
+  assert.match(reader, /attachment:/);
+  assert.match(reader, /target:\s*\{\s*type:\s*'region'/);
   assert.match(reader, /ReaderSelectionActions/);
   assert.match(reader, /libraryReaderChatStream/);
+  assert.match(reader, /sourceId: selectedSource/);
   assert.match(reader, /library-reader-chat-input/);
   assert.match(store, /function globalDocument/);
   assert.match(store, /nodus-library:\/\/original/);
+  assert.match(store, /nodus-library:\/\/attachment/);
+  assert.match(store, /application\/epub\+zip/);
+  assert.match(store, /getLibraryReaderAttachmentContent/);
+  const chat = await readSource('electron/ai/libraryReaderChat.ts');
+  assert.match(chat, /getLibraryReaderAttachmentContent/);
+  assert.match(chat, /extractFromPath/);
+  assert.match(chat, /contextSourceId/);
   assert.match(protocol, /Accept-Ranges/);
   assert.match(main, /registerLibrarySchemePrivileges/);
   assert.match(main, /registerLibraryProtocol/);
   assert.match(html, /connect-src[^\"]*nodus-library:/);
+});
+
+test('citation UI loads, imports and removes real CSL styles including Zotero styles', async () => {
+  const [dialogs, manager, api] = await Promise.all([
+    readSource('src/components/library/LibraryMetadataDialogs.tsx'),
+    readSource('electron/library/libraryCslStyles.ts'),
+    readSource('shared/api/library.ts'),
+  ]);
+  for (const marker of [
+    'library-citation-style-manager', 'library-citation-style-search',
+    'import-library-csl', 'import-zotero-csl', 'install-repository-csl',
+  ]) assert.match(dialogs, new RegExp(marker));
+  assert.match(dialogs, /listGlobalLibraryCitationStyles/);
+  assert.match(manager, /citationstyles\.org/);
+  assert.match(manager, /CC BY-SA 3\.0/);
+  assert.match(manager, /@citation-js\/plugin-csl/);
+  assert.match(api, /importGlobalLibraryCitationStyles/);
+  assert.match(api, /importZoteroCitationStyles/);
 });
 
 test('the typed bridge covers every global management operation', async () => {
@@ -128,6 +165,8 @@ test('the typed bridge covers every global management operation', async () => {
     'library:zoteroSyncSessions', 'library:resumeZoteroImport',
     'library:startMetadataBatch', 'library:applyMetadataBatch', 'library:cancelMetadataBatch',
     'library:updateCitationKey', 'library:formatCitation', 'library:exportBibliography',
+    'library:citationStyles', 'library:importCitationStyles', 'library:importZoteroCitationStyles',
+    'library:installRepositoryCitationStyle', 'library:removeCitationStyle',
     'library:trashImpact', 'library:purgeTrash', 'library:auditRecovery', 'library:mergeImpact',
   ]);
 });
@@ -173,7 +212,7 @@ test('metadata management previews candidates, supports bulk confirmation and re
   assert.match(dialogs, /resolveGlobalLibraryMetadata/);
   assert.match(dialogs, /onGlobalLibraryMetadataBatchProgress/);
   assert.match(dialogs, /formatGlobalLibraryCitation/);
-  assert.match(dialogs, /'apa-7'[^\n]*'chicago-author-date'[^\n]*'mla-9'[^\n]*'ieee'[^\n]*'vancouver'/);
+  assert.match(dialogs, /styles\.map\(\(entry\)/, 'the citation chooser is populated by the installed CSL catalogue');
   assert.match(dialogs, /'endnote-xml'[^\n]*'zotero-rdf'[^\n]*'csv'[^\n]*'markdown'/);
   assert.match(dialogs, /mergeGlobalLibraryItems/);
   assert.match(dialogs, /Las obras de vault permanecen separadas/);
