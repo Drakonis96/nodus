@@ -617,7 +617,31 @@ export interface LibraryBibliographyImportReport {
 export type LibraryBibliographyFormat =
   | 'ris' | 'bibtex' | 'biblatex' | 'csl-json' | 'endnote-xml' | 'zotero-rdf' | 'csv' | 'markdown';
 
-export type LibraryCitationStyle = 'apa-7' | 'chicago-author-date' | 'mla-9' | 'ieee' | 'vancouver';
+/** CSL style identifier. Built-in aliases remain stable, while imported styles keep their CSL id. */
+export type LibraryCitationStyle = string;
+
+export interface LibraryCitationStyleRecord {
+  id: string;
+  title: string;
+  source: 'bundled' | 'zotero' | 'file' | 'repository';
+  fileName: string | null;
+  updatedAt: string | null;
+  citationFormat: 'author' | 'author-date' | 'label' | 'note' | 'numeric' | null;
+  dependentParent: string | null;
+  rights: string | null;
+  license: string | null;
+  availableOffline: boolean;
+  removable: boolean;
+  warning: string | null;
+}
+
+export interface LibraryCitationStyleImportReport {
+  imported: number;
+  updated: number;
+  skipped: number;
+  styles: LibraryCitationStyleRecord[];
+  warnings: string[];
+}
 
 export interface LibraryBibliographyExportRequest {
   format: LibraryBibliographyFormat;
@@ -637,6 +661,8 @@ export interface LibraryBibliographyExportReport {
 
 export interface LibraryCitationResult {
   style: LibraryCitationStyle;
+  styleTitle?: string;
+  locale?: string;
   kind: 'citation' | 'bibliography';
   itemIds: string[];
   text: string;

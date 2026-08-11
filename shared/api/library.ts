@@ -40,6 +40,8 @@ import type {
   LibraryBibliographyExportReport,
   LibraryCitationResult,
   LibraryCitationStyle,
+  LibraryCitationStyleRecord,
+  LibraryCitationStyleImportReport,
   LibraryMetadataBatchProgress,
   LibraryMetadataBatchResult,
   LibraryTrashImpact,
@@ -111,7 +113,12 @@ export interface LibraryApi {
   cancelGlobalLibraryMetadataBatch(requestId: string): Promise<boolean>;
   onGlobalLibraryMetadataBatchProgress(cb: (progress: LibraryMetadataBatchProgress) => void): () => void;
   updateGlobalLibraryCitationKey(itemId: string, citationKey: string): Promise<LibraryItemRecord>;
-  formatGlobalLibraryCitation(itemIds: string[], style: LibraryCitationStyle, kind: 'citation' | 'bibliography'): Promise<LibraryCitationResult>;
+  listGlobalLibraryCitationStyles(): Promise<LibraryCitationStyleRecord[]>;
+  importGlobalLibraryCitationStyles(): Promise<LibraryCitationStyleImportReport>;
+  importZoteroCitationStyles(): Promise<LibraryCitationStyleImportReport>;
+  installGlobalLibraryRepositoryCitationStyle(styleId: string): Promise<LibraryCitationStyleRecord>;
+  removeGlobalLibraryCitationStyle(styleId: string): Promise<boolean>;
+  formatGlobalLibraryCitation(itemIds: string[], style: LibraryCitationStyle, kind: 'citation' | 'bibliography', locale?: string): Promise<LibraryCitationResult>;
   exportGlobalLibraryBibliography(request: LibraryBibliographyExportRequest): Promise<LibraryBibliographyExportReport>;
   listGlobalLibraryDuplicates(): Promise<LibraryDuplicateGroup[]>;
   previewGlobalLibraryMerge(canonicalId: string, duplicateIds: string[]): Promise<LibraryMergeImpact>;

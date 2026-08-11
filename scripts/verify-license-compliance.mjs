@@ -73,7 +73,7 @@ for (const pattern of [
 }
 
 const notices = text('THIRD_PARTY_NOTICES.md');
-for (const marker of ['GeoNames', 'CC BY 4.0', 'ONNX Runtime', 'libheif-js', 'sharp-libvips', 'IDprotector']) {
+for (const marker of ['GeoNames', 'CC BY 4.0', 'ONNX Runtime', 'libheif-js', 'sharp-libvips', 'IDprotector', 'Citation Style Language', 'CC BY-SA 3.0', 'citeproc-js']) {
   assert.match(notices, new RegExp(marker));
 }
 

@@ -32,6 +32,11 @@
       "paths": ["zotero-plugin/content/icons.js"],
       "classification": "third-party-derived-icon-paths",
       "license": "MIT portions preserved in the file notice; Nodus glue remains AGPL-3.0-only"
+    },
+    {
+      "paths": ["electron/library/bundledOfficialCslStyles.ts"],
+      "classification": "first-party-loader-with-compressed-third-party-data",
+      "license": "Loader is AGPL-3.0-only; embedded official CSL style files remain CC BY-SA 3.0 with metadata preserved"
     }
   ]
 }

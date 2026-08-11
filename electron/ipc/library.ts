@@ -66,6 +66,11 @@ import {
   cancelGlobalLibraryMetadataBatch,
   updateGlobalLibraryCitationKey,
   formatGlobalLibraryCitation,
+  listGlobalLibraryCitationStyles,
+  importGlobalLibraryCitationStyleFiles,
+  importGlobalLibraryZoteroCitationStyles,
+  installGlobalLibraryRepositoryCitationStyle,
+  removeGlobalLibraryCitationStyle,
   exportGlobalLibraryBibliography,
 } from '../library/libraryService';
 
@@ -176,8 +181,25 @@ export function registerLibraryIpc({ h }: IpcContext): void {
   h('library:applyMetadataBatch', async (_event, requestId, itemIds) => applyGlobalLibraryMetadataBatch(requestId, itemIds));
   h('library:cancelMetadataBatch', async (_event, requestId) => cancelGlobalLibraryMetadataBatch(requestId));
   h('library:updateCitationKey', async (_event, itemId, citationKey) => updateGlobalLibraryCitationKey(itemId, citationKey));
-  h('library:formatCitation', async (_event, itemIds, style, kind) => {
-    const result = formatGlobalLibraryCitation(itemIds, style, kind); clipboard.writeText(result.text); return result;
+  h('library:citationStyles', async () => listGlobalLibraryCitationStyles());
+  h('library:importCitationStyles', async (event) => {
+    const owner = BrowserWindow.fromWebContents(event.sender) ?? undefined;
+    const options = { title: 'Importar estilos CSL', properties: ['openFile', 'multiSelections'] as Array<'openFile' | 'multiSelections'>, filters: [{ name: 'Citation Style Language', extensions: ['csl'] }] };
+    const selected = owner ? await showImportOpenDialog(owner, options) : await showImportOpenDialog(options);
+    return selected.canceled ? { imported: 0, updated: 0, skipped: 0, styles: listGlobalLibraryCitationStyles(), warnings: [] } : importGlobalLibraryCitationStyleFiles(selected.filePaths);
+  });
+  h('library:importZoteroCitationStyles', async (event) => {
+    const automatic = importGlobalLibraryZoteroCitationStyles();
+    if (automatic.imported || automatic.updated || !automatic.warnings.length) return automatic;
+    const owner = BrowserWindow.fromWebContents(event.sender) ?? undefined;
+    const options = { title: 'Seleccionar la carpeta styles de Zotero', properties: ['openDirectory'] as Array<'openDirectory'> };
+    const selected = owner ? await showImportOpenDialog(owner, options) : await showImportOpenDialog(options);
+    return selected.canceled ? automatic : importGlobalLibraryZoteroCitationStyles(selected.filePaths);
+  });
+  h('library:installRepositoryCitationStyle', async (_event, styleId) => installGlobalLibraryRepositoryCitationStyle(styleId));
+  h('library:removeCitationStyle', async (_event, styleId) => removeGlobalLibraryCitationStyle(styleId));
+  h('library:formatCitation', async (_event, itemIds, style, kind, locale) => {
+    const result = await formatGlobalLibraryCitation(itemIds, style, kind, locale); clipboard.writeText(result.text); return result;
   });
   h('library:exportBibliography', async (event, request) => {
     const extensions = { ris: 'ris', bibtex: 'bib', biblatex: 'biblatex', 'csl-json': 'json', 'endnote-xml': 'xml', 'zotero-rdf': 'rdf', csv: 'csv', markdown: 'md' } as const;

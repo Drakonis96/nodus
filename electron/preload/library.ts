@@ -74,7 +74,12 @@ export const libraryApi: LibraryApi = {
     return () => ipcRenderer.removeListener('library:metadataBatchProgress', listener);
   },
   updateGlobalLibraryCitationKey: (itemId, citationKey) => ipcRenderer.invoke('library:updateCitationKey', itemId, citationKey),
-  formatGlobalLibraryCitation: (itemIds, style, kind) => ipcRenderer.invoke('library:formatCitation', itemIds, style, kind),
+  listGlobalLibraryCitationStyles: () => ipcRenderer.invoke('library:citationStyles'),
+  importGlobalLibraryCitationStyles: () => ipcRenderer.invoke('library:importCitationStyles'),
+  importZoteroCitationStyles: () => ipcRenderer.invoke('library:importZoteroCitationStyles'),
+  installGlobalLibraryRepositoryCitationStyle: (styleId) => ipcRenderer.invoke('library:installRepositoryCitationStyle', styleId),
+  removeGlobalLibraryCitationStyle: (styleId) => ipcRenderer.invoke('library:removeCitationStyle', styleId),
+  formatGlobalLibraryCitation: (itemIds, style, kind, locale) => ipcRenderer.invoke('library:formatCitation', itemIds, style, kind, locale),
   exportGlobalLibraryBibliography: (request) => ipcRenderer.invoke('library:exportBibliography', request),
   listGlobalLibraryDuplicates: () => ipcRenderer.invoke('library:duplicates'),
   previewGlobalLibraryMerge: (canonicalId, duplicateIds) => ipcRenderer.invoke('library:mergeImpact', canonicalId, duplicateIds),

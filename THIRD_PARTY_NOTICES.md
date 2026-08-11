@@ -97,6 +97,43 @@ Zotero is developed by the Corporation for Digital Scholarship. Zotero and its
 logo are trademarks of the Corporation for Digital Scholarship. Nodus is an
 independent project and is not affiliated with or endorsed by Zotero.
 
+## Citation Style Language styles and locales — CC BY-SA 3.0
+
+Nodus can download unmodified citation styles from the Zotero Style Repository
+and bundles a small set of CSL styles and locale files supplied through
+`@citation-js/plugin-csl`. Chicago author-date, MLA, and IEEE are bundled as
+unmodified compressed files from official Style Repository revision
+`d17b5135c5b38f9ffadd0c3ec257f6892ba07f6e`. The style data originates from the
+Citation Style Language project and is licensed under Creative Commons
+Attribution-ShareAlike 3.0 Unported.
+
+- Project and attribution: https://citationstyles.org/
+- Style source: https://github.com/citation-style-language/styles
+- Locale source: https://github.com/citation-style-language/locales
+- License: https://creativecommons.org/licenses/by-sa/3.0/
+
+Nodus preserves the authors, contributors, rights, identifiers, and update
+metadata embedded in every `.csl` file. A style imported from a user's Zotero
+profile or local disk is copied unchanged into that user's `nodus-library` and
+is not redistributed by Nodus. The Citation Style Language project and Zotero
+do not endorse Nodus.
+
+## citeproc-js — AGPL v3 election
+
+Nodus formats CSL citations locally with citeproc-js 1.4.63, distributed in the
+`citeproc` npm package 2.4.63. Upstream offers citeproc-js under CPAL or GNU
+AGPL v3-or-later; Nodus elects the AGPL v3 terms, which are compatible with the
+project's `AGPL-3.0-only` distribution. Copyright Frank G. Bennett, Jr. and
+contributors.
+
+- Source: https://github.com/Juris-M/citeproc-js
+- Upstream license: https://github.com/Juris-M/citeproc-js/blob/master/LICENSE
+
+The complete GNU AGPL v3 text is the root `LICENSE` and is included with every
+Nodus distribution. `@citation-js/plugin-csl`, used only for its bundled style
+and locale data, is MIT licensed and remains identified in the generated
+package-license inventory.
+
 ## Engines downloaded at runtime
 
 The local model installer downloads the unmodified `llama.cpp` release b10002

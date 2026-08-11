@@ -42,6 +42,8 @@ import type {
   LibraryBibliographyExportReport,
   LibraryCitationResult,
   LibraryCitationStyle,
+  LibraryCitationStyleRecord,
+  LibraryCitationStyleImportReport,
   LibraryMetadataBatchEntry,
   LibraryMetadataBatchProgress,
   LibraryMetadataBatchResult,
@@ -78,6 +80,14 @@ import type { LibraryAnalysisReuseComponent, LibraryAnalysisReuseStatus } from '
 import { reuseVaultAnalysisForWorks } from '../vaults/vaultAnalysisImport';
 import { libraryRevisionFingerprint } from './libraryVaultProvenance';
 import { registerGlobalLibraryCloser } from './libraryRuntime';
+import {
+  formatLibraryCitationCsl,
+  importLibraryCitationStyleFiles,
+  importZoteroCitationStyleDirectories,
+  installRepositoryCitationStyle,
+  listLibraryCitationStyles,
+  removeLibraryCitationStyle,
+} from './libraryCslStyles';
 export { recordLinkedLibraryAnalysis } from './libraryVaultProvenance';
 
 let live: {
@@ -604,10 +614,30 @@ export function updateGlobalLibraryCitationKey(itemId: string, citationKey: stri
   const result = current.operations.updateCitationKey(itemId, citationKey); broadcast(current.catalog.status(current.root, current.deviceId)); return result;
 }
 
-export function formatGlobalLibraryCitation(itemIds: string[], style: LibraryCitationStyle, kind: 'citation' | 'bibliography'): LibraryCitationResult {
+export function listGlobalLibraryCitationStyles(): LibraryCitationStyleRecord[] {
+  return listLibraryCitationStyles();
+}
+
+export function importGlobalLibraryCitationStyleFiles(files: string[]): LibraryCitationStyleImportReport {
+  return importLibraryCitationStyleFiles(files, 'file');
+}
+
+export function importGlobalLibraryZoteroCitationStyles(directories?: string[]): LibraryCitationStyleImportReport {
+  return importZoteroCitationStyleDirectories(directories);
+}
+
+export async function installGlobalLibraryRepositoryCitationStyle(styleId: string): Promise<LibraryCitationStyleRecord> {
+  return installRepositoryCitationStyle(styleId);
+}
+
+export function removeGlobalLibraryCitationStyle(styleId: string): boolean {
+  return removeLibraryCitationStyle(styleId);
+}
+
+export async function formatGlobalLibraryCitation(itemIds: string[], style: LibraryCitationStyle, kind: 'citation' | 'bibliography', locale = 'es-ES'): Promise<LibraryCitationResult> {
   const current = service(); if (!current) throw new Error('Configura primero la carpeta de copias de seguridad de Nodus.');
   current.operations.ensureCitationKeys();
-  return current.operations.formatCitation(itemIds, style, kind);
+  return formatLibraryCitationCsl(current.operations.bibliographyRecords({ itemIds }), style, kind, locale);
 }
 
 export function exportGlobalLibraryBibliography(request: LibraryBibliographyExportRequest, filePath: string): LibraryBibliographyExportReport {
