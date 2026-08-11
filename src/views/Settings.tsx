@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import type {
   AppSettings,
+  BackupCleanupPreview,
+  BackupRetentionUnit,
   CopilotServerStatus,
   EmbeddingProvider,
   LocalServerAccess,
@@ -65,7 +67,7 @@ const SETTINGS_TABS: { id: SettingsTabId; label: string; icon: string; keywords:
   { id: 'system', label: 'Tutoriales', icon: 'graduation', keywords: 'sistema ayuda tutorial' },
   { id: 'data', label: 'Backup / copia de seguridad', icon: 'download', keywords: 'datos backup exportar importar demo copia cifrada peligro reinicializar grafo borrar' },
   { id: 'about', label: 'Acerca de Nodus', icon: 'info', keywords: 'acerca proyecto codigo abierto open source gratuito privacidad privacy rgpd gdpr datos alumnado inteligencia artificial licencia terceros legal redes sociales social reddit youtube comunidad' },
-  { id: 'updates', label: 'Actualizaciones y novedades', icon: 'sync', keywords: 'actualizaciones update actualizar version novedades ultimos cambios latest changes changelog buscar instalar reiniciar' },
+  { id: 'updates', label: 'Actualizaciones y novedades', icon: 'sync', keywords: 'actualizaciones update actualizar version novedades ultimos cambios latest changes changelog buscar instalar reiniciar beta testers prerelease canal estable' },
 ];
 
 const ZOTERO_FREE_VAULT_TYPES = new Set<VaultType>(['testimonios', 'prosopography', 'worldbuilding']);
@@ -84,6 +86,17 @@ function normalizeSettingsText(value: string): string {
     .replace(/\p{Diacritic}/gu, '')
     .toLowerCase()
     .trim();
+}
+
+function formatBackupBytes(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KiB`;
+  if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MiB`;
+  return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GiB`;
+}
+
+function backupRetentionLimit(unit: BackupRetentionUnit): number {
+  return unit === 'days' ? 3650 : unit === 'weeks' ? 520 : unit === 'months' ? 120 : 10;
 }
 
 export function Settings({
@@ -123,6 +136,7 @@ export function Settings({
   const [checkingUpdate, setCheckingUpdate] = useState(false);
   const [updateMessage, setUpdateMessage] = useState<string | null>(null);
   const [updateProgress, setUpdateProgress] = useState<UpdateProgressEvent | null>(null);
+  const [confirmBetaUpdates, setConfirmBetaUpdates] = useState(false);
   const [confirmReindex, setConfirmReindex] = useState(false);
   const [pendingModelSettingsMode, setPendingModelSettingsMode] = useState<AppSettings['modelSettingsMode'] | null>(null);
   const [pendingEmbeddingChange, setPendingEmbeddingChange] = useState<{ provider: EmbeddingProvider; model: string } | null>(null);
@@ -161,6 +175,10 @@ export function Settings({
   const [autoBackupPasswordInput, setAutoBackupPasswordInput] = useState('');
   const [showAutoBackupPassword, setShowAutoBackupPassword] = useState(false);
   const [autoBackupRunning, setAutoBackupRunning] = useState(false);
+  const [backupCleanupPreview, setBackupCleanupPreview] = useState<BackupCleanupPreview | null>(null);
+  const [backupCleanupRunning, setBackupCleanupRunning] = useState(false);
+  const [confirmBackupCleanupEnable, setConfirmBackupCleanupEnable] = useState(false);
+  const [confirmBackupCleanupNow, setConfirmBackupCleanupNow] = useState(false);
   const [mcpStatus, setMcpStatus] = useState<McpServerStatus>({ running: false, port: null, url: null, error: null });
   const [mcpTunnelStatus, setMcpTunnelStatus] = useState<McpTunnelStatus | null>(null);
   const [nodusServerOverview, setNodusServerOverview] = useState<NodusServerOverview>({
@@ -223,6 +241,24 @@ export function Settings({
       active = false;
     };
   }, []);
+
+  useEffect(() => {
+    let active = true;
+    setBackupCleanupPreview(null);
+    if (!settings.autoBackupFolder) {
+      return () => { active = false; };
+    }
+    void window.nodus.previewBackupCleanup().then((preview) => {
+      if (active) setBackupCleanupPreview(preview);
+    });
+    return () => { active = false; };
+  }, [
+    settings.autoBackupFolder,
+    settings.backupRetentionUnit,
+    settings.backupRetentionValue,
+    settings.lastAutoBackupAt,
+    settings.lastBackupCleanupAt,
+  ]);
 
   useEffect(() => {
     let active = true;
@@ -433,6 +469,85 @@ export function Settings({
     setUpdateMessage(updateStatusMessage(result));
   };
 
+  const enableBetaUpdates = async () => {
+    setConfirmBetaUpdates(false);
+    await patch({ betaUpdates: true });
+    await checkForUpdates();
+  };
+
+  const refreshBackupCleanupPreview = async () => {
+    const preview = await window.nodus.previewBackupCleanup();
+    setBackupCleanupPreview(preview);
+    return preview;
+  };
+
+  const runBackupCleanup = async () => {
+    setConfirmBackupCleanupNow(false);
+    setBackupCleanupRunning(true);
+    try {
+      if (!backupCleanupPreview?.ok || !backupCleanupPreview.scopeToken) {
+        flash(t('La vista previa ya no está disponible. Revísala de nuevo antes de limpiar.'));
+        return;
+      }
+      const result = await window.nodus.runBackupCleanupNow(backupCleanupPreview.scopeToken);
+      flash(result.ok
+        ? result.quarantinedCount > 0
+          ? tx('{count} copia(s) se movió/movieron a la papelera de seguridad.', { count: result.quarantinedCount })
+          : result.purgedCount > 0
+            ? tx('{count} copia(s) se eliminó/eliminaron definitivamente tras siete días.', { count: result.purgedCount })
+            : t('No hay copias que superen la antigüedad configurada.')
+        : errorText(result.message));
+      await onChange();
+      await refreshBackupCleanupPreview();
+    } catch (error) {
+      flash(errorText(error));
+    } finally {
+      setBackupCleanupRunning(false);
+    }
+  };
+
+  const enableBackupCleanup = async () => {
+    setConfirmBackupCleanupEnable(false);
+    setBackupCleanupRunning(true);
+    let enabled = false;
+    try {
+      if (!backupCleanupPreview?.ok || !backupCleanupPreview.scopeToken) {
+        flash(t('La vista previa ya no está disponible. Revísala de nuevo antes de limpiar.'));
+        return;
+      }
+      await patch({ backupCleanupEnabled: true });
+      enabled = true;
+      // Enabling is also an explicit catch-up: do not wait for the 30-minute
+      // maintenance heartbeat when the user has just confirmed the exact scope.
+      const result = await window.nodus.runBackupCleanupNow(backupCleanupPreview.scopeToken);
+      if (!result.ok) {
+        // A failed first run must not leave a destructive background policy armed.
+        await patch({ backupCleanupEnabled: false });
+        enabled = false;
+      }
+      flash(result.ok
+        ? result.quarantinedCount > 0
+          ? tx('{count} copia(s) se movió/movieron a la papelera de seguridad.', { count: result.quarantinedCount })
+          : result.purgedCount > 0
+            ? tx('{count} copia(s) se eliminó/eliminaron definitivamente tras siete días.', { count: result.purgedCount })
+            : t('No hay copias que superen la antigüedad configurada.')
+        : errorText(result.message));
+      await onChange();
+      await refreshBackupCleanupPreview();
+    } catch (error) {
+      if (enabled) {
+        try {
+          await patch({ backupCleanupEnabled: false });
+        } catch {
+          // The original error is more useful; the backend still fails closed.
+        }
+      }
+      flash(errorText(error));
+    } finally {
+      setBackupCleanupRunning(false);
+    }
+  };
+
   const exportBackup = async () => {
     const result = await window.nodus.exportData();
     if (!result) return;
@@ -600,7 +715,9 @@ export function Settings({
 
   const updatePct =
     updateProgress?.progress != null ? Math.max(0, Math.min(100, updateProgress.progress)) : null;
-  const updateBusy = updateProgress?.status === 'downloading' || updateProgress?.status === 'installing';
+  const updateBusy = updateProgress?.status === 'downloading'
+    || updateProgress?.status === 'backing-up'
+    || updateProgress?.status === 'installing';
   const updateDownloaded = updateProgress?.status === 'downloaded';
   const normalizedSettingsQuery = normalizeSettingsText(settingsQuery);
   const settingsSearchActive = normalizedSettingsQuery.length > 0;
@@ -631,7 +748,7 @@ export function Settings({
     visibleSettingsSection('extraction', 'Extracción de texto PDFs grandes', 'pdf texto zotero ocr tesseract paginas idiomas'),
     visibleSettingsSection('data', 'Zona de peligro', 'reinicializar grafo borrar ideas temas conexiones autores huecos'),
     visibleSettingsSection('about', 'Acerca de Nodus', 'proyecto independiente codigo abierto open source gratuito privacidad privacy rgpd gdpr datos alumnado licencia roadmap hoja de ruta futuro redes sociales social reddit youtube comunidad'),
-    visibleSettingsSection('updates', 'Actualizaciones y novedades', 'actualizaciones update version novedades ultimos cambios latest changes changelog buscar instalar reiniciar avisos anuncios encuestas noticias'),
+    visibleSettingsSection('updates', 'Actualizaciones y novedades', 'actualizaciones update version novedades ultimos cambios latest changes changelog buscar instalar reiniciar avisos anuncios encuestas noticias beta testers prerelease canal estable'),
   ].filter(Boolean).length;
 
   return (
@@ -1443,7 +1560,7 @@ export function Settings({
         </Section>
       )}
 
-      {visibleSettingsSection('updates', 'Actualizaciones y novedades', 'actualizaciones update version novedades ultimos cambios latest changes changelog buscar instalar reiniciar avisos anuncios encuestas noticias') && (
+      {visibleSettingsSection('updates', 'Actualizaciones y novedades', 'actualizaciones update version novedades ultimos cambios latest changes changelog buscar instalar reiniciar avisos anuncios encuestas noticias beta testers prerelease canal estable') && (
         <Section title={t('Actualizaciones y novedades')}>
           <div data-testid="about-latest-changes" className="flex flex-col gap-4 rounded-xl border border-neutral-200 bg-neutral-50 p-5 dark:border-neutral-800 dark:bg-neutral-900/50 sm:flex-row sm:items-center sm:justify-between">
             <div>
@@ -1478,6 +1595,9 @@ export function Settings({
           <div data-testid="about-updates" className="flex flex-col gap-4 rounded-xl border border-neutral-200 bg-neutral-50 p-5 dark:border-neutral-800 dark:bg-neutral-900/50 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <label className="text-sm text-neutral-700 dark:text-neutral-300">{t('Actualizaciones')}</label>
+              <p className="mt-0.5 text-xs font-medium text-indigo-600 dark:text-indigo-300">
+                {settings.betaUpdates ? t('Canal Beta') : t('Canal estable')}
+              </p>
               {updateMessage && <p className="mt-0.5 text-xs text-neutral-500">{updateMessage}</p>}
               {(updatePct != null || updateBusy) && (
                 <div className="mt-2 w-72 max-w-full">
@@ -1506,6 +1626,29 @@ export function Settings({
                 {checkingUpdate ? t('Buscando…') : updateBusy ? t('Actualizando…') : t('Buscar actualización')}
               </button>
             </div>
+          </div>
+          <div data-testid="beta-updates-setting" className="flex flex-col gap-4 rounded-xl border border-neutral-200 bg-neutral-50 p-5 dark:border-neutral-800 dark:bg-neutral-900/50 sm:flex-row sm:items-center sm:justify-between">
+            <div className="max-w-2xl">
+              <label className="text-sm text-neutral-700 dark:text-neutral-300">{t('Beta updates')}</label>
+              <p className="mt-0.5 text-xs text-neutral-500">
+                {t('Recibe versiones de prueba además de las actualizaciones estables. Es una opción voluntaria y está desactivada de forma predeterminada.')}
+              </p>
+              <p className="mt-1 text-xs text-neutral-500">
+                {t('Antes de instalar una beta, Nodus exige una copia completa y verificada en tu carpeta de Recuperación.')}
+              </p>
+            </div>
+            <label className="flex shrink-0 items-center gap-2 text-sm text-neutral-700 dark:text-neutral-300">
+              <input
+                data-testid="toggle-beta-updates"
+                type="checkbox"
+                checked={settings.betaUpdates}
+                onChange={(event) => {
+                  if (event.target.checked) setConfirmBetaUpdates(true);
+                  else void patch({ betaUpdates: false });
+                }}
+              />
+              {settings.betaUpdates ? t('Activadas') : t('Desactivadas')}
+            </label>
           </div>
         </Section>
       )}
@@ -2366,6 +2509,131 @@ export function Settings({
                   )}
                 </div>
               )}
+              <div data-testid="backup-cleanup-setting" className="mt-4 space-y-3 rounded-xl border border-amber-300 bg-amber-50 p-4 dark:border-amber-900/60 dark:bg-amber-950/15">
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <label className="text-sm font-medium text-neutral-900 dark:text-neutral-100">{t('Limpieza automática de copias antiguas')}</label>
+                    <p className="mt-1 text-xs leading-5 text-neutral-600 dark:text-neutral-400">
+                      {t('Usa el mismo día y hora que las copias automáticas. Si Nodus estaba cerrado, la limpieza pendiente se ejecuta al volver a abrirlo.')}
+                    </p>
+                  </div>
+                  <input
+                    data-testid="toggle-backup-cleanup"
+                    type="checkbox"
+                    className="h-4 w-4 shrink-0 accent-amber-600"
+                    checked={settings.backupCleanupEnabled}
+                    disabled={backupCleanupRunning || !settings.autoBackupFolder || !autoBackupHasPassword || !backupCleanupPreview?.ok || !backupCleanupPreview.scopeToken}
+                    onChange={(event) => {
+                      if (event.target.checked) setConfirmBackupCleanupEnable(true);
+                      else void patch({ backupCleanupEnabled: false });
+                    }}
+                  />
+                </div>
+
+                {(!settings.autoBackupFolder || !autoBackupHasPassword) && (
+                  <div className="flex flex-wrap items-center gap-2 rounded-md border border-amber-300/70 bg-white/60 p-2.5 text-xs text-amber-900 dark:border-amber-900/70 dark:bg-neutral-950/30 dark:text-amber-200">
+                    <Icon name="alert" size={14} />
+                    <span>{t('Configura primero la carpeta de Recuperación y la contraseña maestra para poder verificar una copia superviviente.')}</span>
+                    <button className="btn btn-ghost ml-auto text-xs" onClick={() => void patch({ recoverySetupVersion: 0 })}>
+                      <Icon name="folder" /> {t('Configurar Recuperación')}
+                    </button>
+                  </div>
+                )}
+
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-xs text-neutral-600 dark:text-neutral-400">{t('Mover copias con más de')}</span>
+                  <input
+                    data-testid="backup-retention-value"
+                    type="number"
+                    min={1}
+                    max={backupRetentionLimit(settings.backupRetentionUnit)}
+                    className="input w-24 text-sm"
+                    value={settings.backupRetentionValue}
+                    disabled={backupCleanupRunning || settings.backupCleanupEnabled}
+                    onChange={(event) => {
+                      const value = Number(event.target.value);
+                      const limit = backupRetentionLimit(settings.backupRetentionUnit);
+                      if (Number.isInteger(value) && value >= 1 && value <= limit) void patch({ backupRetentionValue: value });
+                    }}
+                  />
+                  <select
+                    data-testid="backup-retention-unit"
+                    className="input w-36 text-sm"
+                    value={settings.backupRetentionUnit}
+                    disabled={backupCleanupRunning || settings.backupCleanupEnabled}
+                    onChange={(event) => {
+                      const unit = event.target.value as BackupRetentionUnit;
+                      void patch({
+                        backupRetentionUnit: unit,
+                        backupRetentionValue: Math.min(settings.backupRetentionValue, backupRetentionLimit(unit)),
+                      });
+                    }}
+                  >
+                    <option value="days">{t('días')}</option>
+                    <option value="weeks">{t('semanas')}</option>
+                    <option value="months">{t('meses')}</option>
+                    <option value="years">{t('años')}</option>
+                  </select>
+                </div>
+
+                {settings.backupCleanupEnabled && (
+                  <p className="text-[11px] text-neutral-500">
+                    {t('Para cambiar la antigüedad, desactiva primero la limpieza y vuelve a activarla para confirmar el nuevo alcance.')}
+                  </p>
+                )}
+
+                {backupCleanupPreview && (
+                  <div data-testid="backup-cleanup-preview" data-ok={backupCleanupPreview.ok ? 'true' : 'false'} className="rounded-md border border-neutral-200 bg-white/70 p-3 text-xs text-neutral-700 dark:border-neutral-800 dark:bg-neutral-950/30 dark:text-neutral-300">
+                    {backupCleanupPreview.ok ? (
+                      <p>{tx('{count} copia(s), {size}, supera(n) ahora la antigüedad configurada.', {
+                        count: backupCleanupPreview.candidateCount,
+                        size: formatBackupBytes(backupCleanupPreview.candidateBytes),
+                      })}</p>
+                    ) : <p>{errorText(backupCleanupPreview.message)}</p>}
+                    <p className="mt-1 text-[11px] text-neutral-500">
+                      {t('Siempre se conservan al menos las tres copias normales más recientes. Las copias de otros equipos y los snapshots pre-update nunca entran en esta limpieza.')}
+                    </p>
+                    {backupCleanupPreview.trashCount > 0 && (
+                      <p className="mt-1 text-[11px] text-neutral-500">
+                        {tx('{count} copia(s) permanece(n) en la papelera de seguridad.', { count: backupCleanupPreview.trashCount })}
+                      </p>
+                    )}
+                    {backupCleanupPreview.purgeReadyCount > 0 && (
+                      <p className="mt-1 text-[11px] text-rose-600 dark:text-rose-300">
+                        {tx('{count} copia(s) ({size}) ya cumplió/cumplieron siete días en la papelera de seguridad y se eliminará(n) definitivamente en esta limpieza.', {
+                          count: backupCleanupPreview.purgeReadyCount,
+                          size: formatBackupBytes(backupCleanupPreview.purgeReadyBytes),
+                        })}
+                      </p>
+                    )}
+                  </div>
+                )}
+
+                <p className="text-[11px] leading-5 text-neutral-500">
+                  {t('Las copias seleccionadas se mueven primero a una papelera privada dentro de la carpeta de Recuperación. Solo se eliminan definitivamente después de siete días y tras verificar otra copia válida.')}
+                </p>
+                <p className="text-[11px] leading-5 text-neutral-500">
+                  {t('Al activar esta opción, el límite de antigüedad sustituye la rotación compacta anterior para las nuevas copias de este equipo.')}
+                </p>
+
+                <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    className="btn btn-ghost border border-amber-400 text-xs dark:border-amber-800"
+                    disabled={backupCleanupRunning || !settings.autoBackupFolder || !autoBackupHasPassword || !backupCleanupPreview?.ok || !backupCleanupPreview.scopeToken}
+                    onClick={() => setConfirmBackupCleanupNow(true)}
+                  >
+                    <Icon name="trash" /> {backupCleanupRunning ? t('Limpiando…') : t('Revisar y limpiar ahora')}
+                  </button>
+                  {settings.lastBackupCleanupAt && (
+                    <span className="text-[11px] text-neutral-500">
+                      {t('Última limpieza')}: {new Date(settings.lastBackupCleanupAt).toLocaleString()}
+                    </span>
+                  )}
+                </div>
+                {settings.lastBackupCleanupStatus?.startsWith('error:') && (
+                  <p className="text-xs text-rose-600 dark:text-rose-300">{errorText(settings.lastBackupCleanupStatus.slice('error:'.length).trim())}</p>
+                )}
+              </div>
             </div>
             {activeVault?.type === 'estudio' && <StudyDataAdministration />}
           </Section>
@@ -2802,6 +3070,77 @@ export function Settings({
             void patch({ embeddingProvider: next.provider, embeddingModel: next.model });
           }}
           onCancel={() => setPendingEmbeddingChange(null)}
+        />
+      )}
+      {confirmBetaUpdates && (
+        <ConfirmModal
+          title={t('¿Activar Beta updates?')}
+          message={(
+            <div data-testid="confirm-beta-updates" className="space-y-2">
+              <p>{t('Este canal está recomendado únicamente para testers.')}</p>
+              <p>{t('Las versiones beta pueden contener errores o ser inestables.')}</p>
+              <p>{t('Si continúas, Nodus comprobará y recibirá versiones beta además de las actualizaciones estables.')}</p>
+              <p>{t('Antes de instalar una beta, Nodus creará y verificará una copia completa. Si Recuperación no está configurada o la copia falla, la beta no se instalará.')}</p>
+            </div>
+          )}
+          confirmLabel={t('Activar Beta updates')}
+          onConfirm={() => void enableBetaUpdates()}
+          onCancel={() => setConfirmBetaUpdates(false)}
+        />
+      )}
+      {confirmBackupCleanupEnable && (
+        <ConfirmModal
+          title={t('¿Activar la limpieza automática?')}
+          message={(
+            <div data-testid="confirm-backup-cleanup-enable" className="space-y-2">
+              <p>{t('Esta opción puede retirar copias antiguas automáticamente. Comprueba con atención la antigüedad seleccionada antes de continuar.')}</p>
+              <p>{backupCleanupPreview?.ok
+                ? tx('Con la configuración actual, {count} copia(s) ({size}) pasaría(n) a la papelera de seguridad.', {
+                  count: backupCleanupPreview.candidateCount,
+                  size: formatBackupBytes(backupCleanupPreview.candidateBytes),
+                })
+                : backupCleanupPreview ? errorText(backupCleanupPreview.message) : null}</p>
+              <p>{t('Las tres copias normales más recientes, las copias de otros equipos y los snapshots pre-update quedan protegidos.')}</p>
+              <p>{t('Ninguna copia que se mueva en esta ejecución se eliminará definitivamente: permanecerá siete días en la papelera de seguridad.')}</p>
+              {backupCleanupPreview?.ok && backupCleanupPreview.purgeReadyCount > 0 && (
+                <p className="text-rose-300">{tx('{count} copia(s) ({size}) ya cumplió/cumplieron siete días en la papelera de seguridad y se eliminará(n) definitivamente en esta limpieza.', {
+                  count: backupCleanupPreview.purgeReadyCount,
+                  size: formatBackupBytes(backupCleanupPreview.purgeReadyBytes),
+                })}</p>
+              )}
+            </div>
+          )}
+          confirmLabel={t('Activar y ejecutar limpieza')}
+          danger
+          onConfirm={() => void enableBackupCleanup()}
+          onCancel={() => setConfirmBackupCleanupEnable(false)}
+        />
+      )}
+      {confirmBackupCleanupNow && (
+        <ConfirmModal
+          title={t('¿Revisar y limpiar copias antiguas?')}
+          message={(
+            <div data-testid="confirm-backup-cleanup-now" className="space-y-2">
+              <p>{backupCleanupPreview?.ok
+                ? tx('{count} copia(s) ({size}) cumple(n) ahora la regla de antigüedad.', {
+                  count: backupCleanupPreview.candidateCount,
+                  size: formatBackupBytes(backupCleanupPreview.candidateBytes),
+                })
+                : backupCleanupPreview ? errorText(backupCleanupPreview.message) : null}</p>
+              <p>{t('Nodus volverá a calcular y verificar todo justo antes de mover archivos. Si algo no coincide, la operación se cancela sin borrar datos.')}</p>
+              <p>{t('Las copias pasarán primero a la papelera de seguridad durante siete días.')}</p>
+              {backupCleanupPreview?.ok && backupCleanupPreview.purgeReadyCount > 0 && (
+                <p className="text-rose-300">{tx('{count} copia(s) ({size}) ya cumplió/cumplieron siete días en la papelera de seguridad y se eliminará(n) definitivamente en esta limpieza.', {
+                  count: backupCleanupPreview.purgeReadyCount,
+                  size: formatBackupBytes(backupCleanupPreview.purgeReadyBytes),
+                })}</p>
+              )}
+            </div>
+          )}
+          confirmLabel={t('Ejecutar limpieza segura')}
+          danger
+          onConfirm={() => void runBackupCleanup()}
+          onCancel={() => setConfirmBackupCleanupNow(false)}
         />
       )}
       {openLegalDoc && (

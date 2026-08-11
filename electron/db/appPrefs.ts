@@ -31,6 +31,7 @@ export const GLOBAL_PREF_KEYS = [
   'reduceMotion',
   'readingFocusMode',
   'announcementsEnabled',
+  'betaUpdates',
   'favorites',
   'mascotEnabled',
   'mascotAlwaysOnTop',
@@ -56,6 +57,11 @@ export const GLOBAL_PREF_KEYS = [
   'autoBackupMinute',
   'lastAutoBackupAt',
   'lastAutoBackupStatus',
+  'backupCleanupEnabled',
+  'backupRetentionValue',
+  'backupRetentionUnit',
+  'lastBackupCleanupAt',
+  'lastBackupCleanupStatus',
 ] as const;
 export type GlobalPrefKey = (typeof GLOBAL_PREF_KEYS)[number];
 

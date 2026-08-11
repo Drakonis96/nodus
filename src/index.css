@@ -11,13 +11,6 @@
   -webkit-app-region: drag;
 }
 
-/* hiddenInset puts the macOS traffic lights inside the renderer. Keep the brand
-   centred in the usable part of the sidebar button instead of letting the red,
-   yellow and green controls sit on top of its logo and label. */
-.app-titlebar[data-platform='macos'] [data-testid='sidebar-header-toggle'] {
-  padding-left: 76px;
-}
-
 /* ── Recovery-folder cinematic wizard ─────────────────────────────────────── */
 .recovery-cinema { position: fixed; inset: 0; z-index: 230; display: grid; place-items: center; overflow: auto; padding: 28px; background: #070911; color: #e5e7eb; }
 .recovery-aurora { position: fixed; inset: 0; pointer-events: none; background: radial-gradient(circle at 15% 15%, rgba(45,212,191,.16), transparent 32%), radial-gradient(circle at 85% 75%, rgba(99,102,241,.18), transparent 36%); }

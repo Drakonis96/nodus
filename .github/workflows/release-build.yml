@@ -1,0 +1,203 @@
+name: Release build
+
+# Shared implementation for Stable and Beta. The two public entry points select
+# a channel explicitly; this workflow owns the common build/upload logic.
+on:
+  workflow_call:
+    inputs:
+      channel:
+        required: true
+        type: string
+      tag:
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  validate-release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout release tag
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.tag }}
+
+      - name: Verify requested channel and version
+        run: node scripts/verify-release-channel.mjs "${{ inputs.channel }}" "${{ inputs.tag }}"
+
+      - name: Verify citation version
+        run: npm run citation:check
+
+  release:
+    needs: validate-release
+    env:
+      HAS_MACOS_SIGNING: ${{ secrets.MACOS_CERTIFICATE != '' }}
+      NODUS_RELEASE_CHANNEL: ${{ inputs.channel }}
+      RELEASE_TAG: ${{ inputs.tag }}
+    strategy:
+      fail-fast: false
+      # electron-builder creates one shared draft. Serialising the native builds
+      # prevents simultaneous attempts to create that draft release.
+      max-parallel: 1
+      matrix:
+        include:
+          - os: macos-latest
+            platform: '--mac'
+          - os: windows-latest
+            platform: '--win'
+          - os: ubuntu-latest
+            platform: '--linux'
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Checkout release tag
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.tag }}
+
+      - name: Set up Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Verify requested channel and version
+        run: node scripts/verify-release-channel.mjs "${{ inputs.channel }}" "${{ inputs.tag }}"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build renderer + main
+        env:
+          NODE_OPTIONS: --max-old-space-size=4096
+        run: npm run build
+
+      - name: Build and publish Windows installer
+        if: matrix.os == 'windows-latest'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: npx electron-builder ${{ matrix.platform }} --publish always --config build/electron-builder.release.cjs
+
+      - name: Build and publish signed macOS installer
+        if: matrix.os == 'macos-latest' && env.HAS_MACOS_SIGNING == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CSC_LINK: ${{ secrets.MACOS_CERTIFICATE }}
+          CSC_KEY_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
+          CSC_IDENTITY_AUTO_DISCOVERY: true
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: npx electron-builder ${{ matrix.platform }} --publish always --config build/electron-builder.release.cjs
+
+      - name: Build and publish ad-hoc macOS installer
+        if: matrix.os == 'macos-latest' && env.HAS_MACOS_SIGNING != 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CSC_IDENTITY_AUTO_DISCOVERY: false
+        run: npx electron-builder ${{ matrix.platform }} --publish always --config build/electron-builder.release.cjs
+
+      - name: Build and publish Linux installer
+        if: matrix.os == 'ubuntu-latest'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: npx electron-builder ${{ matrix.platform }} --publish always --config build/electron-builder.release.cjs
+
+  build-zotero-plugin:
+    # The fixed-name plugin assets remain stable-only: installed plugins resolve
+    # updates through /releases/latest and must never be pointed at a prerelease.
+    if: inputs.channel == 'latest'
+    needs: release
+    runs-on: ubuntu-latest
+    env:
+      RELEASE_TAG: ${{ inputs.tag }}
+    steps:
+      - name: Checkout release tag
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.tag }}
+
+      - name: Set up Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Verify plugin
+        run: node --test scripts/test-zotero-plugin.mjs
+
+      - name: Build fixed-name XPI and update manifest
+        env:
+          ZOTERO_XPI_BASE: https://github.com/${{ github.repository }}/releases/download/${{ inputs.tag }}/
+        run: npm run zotero:xpi
+
+      - name: Upload plugin assets to the draft release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release upload "$RELEASE_TAG" \
+            dist-zotero/nodus-zotero.xpi \
+            dist-zotero/updates.json \
+            --repo "$GITHUB_REPOSITORY" \
+            --clobber
+
+  verify-and-publish:
+    if: >-
+      always() &&
+      needs.release.result == 'success' &&
+      (inputs.channel == 'beta' || needs.build-zotero-plugin.result == 'success')
+    needs:
+      - release
+      - build-zotero-plugin
+    runs-on: ubuntu-latest
+    env:
+      RELEASE_TAG: ${{ inputs.tag }}
+      RELEASE_CHANNEL: ${{ inputs.channel }}
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - name: Verify channel-specific release assets
+        run: |
+          assets="$(gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name')"
+          expected=(
+            Nodus-mac-arm64.dmg
+            Nodus-win-x64.exe
+            Nodus-linux-amd64.deb
+            Nodus-linux-x86_64.AppImage
+          )
+          if [[ "$RELEASE_CHANNEL" == latest ]]; then
+            # GitHub stable releases keep their existing latest manifests. A beta
+            # client selects the stable tag from the feed and electron-updater
+            # falls back from beta*.yml to these latest*.yml manifests.
+            expected+=(
+              latest-mac.yml latest.yml latest-linux.yml
+              nodus-zotero.xpi updates.json
+            )
+          else
+            expected+=(beta-mac.yml beta.yml beta-linux.yml)
+          fi
+          for asset in "${expected[@]}"; do
+            if ! grep -Fxq "$asset" <<< "$assets"; then
+              echo "::error::Missing $RELEASE_CHANNEL release asset: $asset"
+              exit 1
+            fi
+          done
+          if [[ "$RELEASE_CHANNEL" == beta ]]; then
+            for forbidden in latest-mac.yml latest.yml latest-linux.yml; do
+              if grep -Fxq "$forbidden" <<< "$assets"; then
+                echo "::error::Beta release contains stable update manifest: $forbidden"
+                exit 1
+              fi
+            done
+          fi
+
+      - name: Publish stable release
+        if: inputs.channel == 'latest'
+        run: gh release edit "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --draft=false --prerelease=false --latest
+
+      - name: Publish beta prerelease
+        if: inputs.channel == 'beta'
+        run: gh release edit "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --draft=false --prerelease --latest=false

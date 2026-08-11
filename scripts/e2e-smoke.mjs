@@ -812,6 +812,58 @@ try {
   await page.locator('button[title="Cerrar"]').click();
   console.log('[e2e] header has no global model selector');
 
+  // The brand and the collapse chevron used to share one centred flex row. On
+  // macOS an asymmetric 76px padding then shifted the whole row as the sidebar
+  // grew. Exercise the real drag handle and compare centres at the full resize
+  // range; the independently pinned chevron must never affect this geometry.
+  const readSidebarBrandGeometry = () => page.evaluate(() => {
+    const sidebar = document.querySelector('[data-testid="resizable-sidebar"]');
+    const toggle = document.querySelector('[data-testid="sidebar-header-toggle"]');
+    const brand = document.querySelector('[data-testid="sidebar-header-brand"]');
+    if (!sidebar || !toggle || !brand) return null;
+    const box = (element) => {
+      const rect = element.getBoundingClientRect();
+      return { left: rect.left, width: rect.width };
+    };
+    return { sidebar: box(sidebar), toggle: box(toggle), brand: box(brand) };
+  });
+  const assertSidebarBrandCentred = async (expectedWidth) => {
+    await waitForCondition(`sidebar redimensionado a ${expectedWidth}px`, async () => {
+      const geometry = await readSidebarBrandGeometry();
+      return geometry !== null && Math.abs(geometry.sidebar.width - expectedWidth) <= 1;
+    });
+    const geometry = await readSidebarBrandGeometry();
+    assert.ok(geometry, `sidebar geometry is readable at ${expectedWidth}px`);
+    assert.ok(
+      Math.abs(geometry.toggle.width - geometry.sidebar.width) <= 1,
+      `the header follows the ${expectedWidth}px sidebar width`,
+    );
+    const sidebarCentre = geometry.sidebar.left + geometry.sidebar.width / 2;
+    const brandCentre = geometry.brand.left + geometry.brand.width / 2;
+    assert.ok(
+      Math.abs(brandCentre - sidebarCentre) <= 1,
+      `the Nodus brand stays centred at ${expectedWidth}px (offset ${(brandCentre - sidebarCentre).toFixed(2)}px)`,
+    );
+  };
+  const resizeHandle = page.getByTestId('sidebar-resize-handle');
+  await resizeHandle.dblclick({ position: { x: 3, y: 80 } });
+  await assertSidebarBrandCentred(176);
+  for (const targetWidth of [268, 360]) {
+    const handleBox = await resizeHandle.boundingBox();
+    const sidebarGeometry = await readSidebarBrandGeometry();
+    assert.ok(handleBox && sidebarGeometry, `resize controls are visible before dragging to ${targetWidth}px`);
+    const startX = handleBox.x + handleBox.width / 2;
+    const pointerY = handleBox.y + Math.min(80, handleBox.height / 2);
+    await page.mouse.move(startX, pointerY);
+    await page.mouse.down();
+    await page.mouse.move(startX + targetWidth - sidebarGeometry.sidebar.width, pointerY, { steps: 8 });
+    await page.mouse.up();
+    await assertSidebarBrandCentred(targetWidth);
+  }
+  await resizeHandle.dblclick({ position: { x: 3, y: 80 } });
+  await assertSidebarBrandCentred(176);
+  console.log('[e2e] sidebar Nodus brand stays centred throughout real resizing');
+
   // ── Header: the centre badge yields to the rails instead of overlapping ────
   // A hard left:50% badge sat under the action rail as soon as it grew (the AI
   // alert, a hovered label, a dragged-wide sidebar). Measure the real boxes and
