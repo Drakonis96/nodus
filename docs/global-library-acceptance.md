@@ -11,10 +11,15 @@ button exists.
 | Compatibility | Health cards enter the exact traditional filter | Verified | `test-library-scope-compatibility`, `test-search-health` |
 | Compatibility | Legacy corpus and Zotero-collection IPC remains wired | Verified | `test-library-scope-compatibility`, `test-ipc-contract` |
 | Compatibility | Zotero reader links enter Global without changing ordinary defaults | Verified | `test-library-scope-compatibility` |
+| Compatibility | Desktop v4 keeps Server 3.2.7 operation sizes when capability fields are absent | Verified | `test-v4-release-readiness`, server sync suite |
+| Compatibility | Plugin v4 hides Global-only actions with desktop v3, while desktop v4 keeps plugin-v3 chat and warns non-blockingly | Verified | `test-v4-release-readiness`, `test-global-library-ui`, Zotero plugin suite |
 | Storage | `nodus-library` is created inside the backup folder | Verified | `test-library-storage`, `e2e-global-library` |
 | Storage | Originals and derived files share a folder and stable identity | Verified | `test-library-storage`, `test-global-library-reader` |
 | Storage | The SQLite catalog is excluded from backups and can be rebuilt | Verified | `test-library-storage` |
 | Storage | Invalid records are counted and excluded | Verified | `test-library-storage` |
+| Upgrade | The first v4 launch verifies a pre-v4 copy before any database migration or manifest-v2 write | Verified | `test-pre-v4-recovery`, `test-v4-release-readiness` |
+| Upgrade | Disk-full, permission, corruption, and interruption paths never create a trusted checkpoint or modify 3.x data | Verified | `test-pre-v4-recovery`, backup fault injection |
+| Upgrade | Nodus 4 opens released 3.x backup formats and documents that migrated v4 data may not open in 3.x | Verified | `test-backup-vaults`, `test-v4-release-readiness` |
 | Identity | v1 manifests read safely and publish as v2 without folder renames | Verified | `test-library-identity-v2` |
 | Identity | Nodus IDs are independent from exact manager identities | Verified | `test-library-identity-v2`, `test-zotero-library-import` |
 | Identity | Equal Zotero keys in different libraries do not collide | Verified | `test-library-identity-v2` |
@@ -96,6 +101,8 @@ button exists.
 | Duplicates | Aliases and inbound relations remap to the canonical record while vault works remain separate | Verified | `test-library-recovery` |
 | Recovery | Attachment hashes, missing files, invalid records, conflicts, and orphan folders are auditable | Verified | `test-library-recovery`, `test-global-library-ui` |
 | Recovery | Catalogue, aliases, searches, and vault links rebuild from `nodus-library` without SQLite | Verified | `test-library-recovery`, `test-library-storage` |
+| Recovery | Full-state encrypted backups include originals, Markdown, sidecars, records, and the Global Library and restore it through staging | Verified | `test-backup-vaults`, `test-v4-release-readiness` |
+| Performance | Hot queries over 50,000 items and 10,000 collections remain below one second in CI | Verified | `test-library-scale` |
 | Vaults | Linking is idempotent and does not duplicate the original | Verified | `test-global-library-vault-integration` |
 | Vaults | Analysis resolves the global clean Markdown | Verified | `test-global-library-vault-integration` |
 | Vaults | A connected read-only vault rejects writes | Verified | `test-global-library-vault-integration` |
@@ -109,7 +116,7 @@ button exists.
 | Accessibility | Primary controls have roles, labels, and keyboard navigation | Verified | UI and i18n coverage, Electron E2E |
 | Languages | Every UI string is covered in all eight interface languages | Verified | `test-i18n-coverage` |
 | Privacy | Network, AI, backups, and sidecars are documented | Verified | `PRIVACY.md`, `global-library.md` |
-| Licenses | No external extraction engine was added | Verified | lockfile unchanged; architecture documentation |
+| Licenses | Nodus 4 is AGPL-3.0-only, every distribution offers exact source, and no external extraction engine was added | Verified | `test-agpl-release`, `release:verify-source`, license verification |
 
 ## Final gate
 
@@ -121,8 +128,12 @@ npm run lint
 npm run typecheck
 npm test
 npm run build
+npm run licenses:verify
+npm run privacy:verify
 npm run test:e2e:global-library
 npm run test:e2e:library-reader
+npm run test:e2e
+npm run zotero:xpi
 ```
 
 Both E2E tests launch the real Electron application, save screenshots, and fail

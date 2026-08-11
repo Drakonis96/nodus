@@ -381,6 +381,46 @@ immutable record with a clock, revision, device, and hash. Divergent offline
 edits are preserved; Nodus selects one deterministically and leaves the other
 in `.nodus/conflicts/` for review.
 
+Nodus 4 encrypted full-state backups include the canonical Library as well as
+every vault database, preference sidecar, history, attachment, clean Markdown
+file, annotation, note, chat, and immutable record. The disposable
+`library/catalog.sqlite` cache is not included. Pre-v4 and pre-restore recovery
+trees are also excluded from ordinary archives because each is already a full
+copy and embedding one copy inside the next would multiply storage recursively.
+Every included file is authenticated by the encrypted payload manifest before
+restore. The Library is rebuilt in a sibling staging directory and swapped only
+after all paths and hashes validate.
+
+### Updating from Nodus 3.2.7
+
+The first Nodus 4 launch creates a one-time recovery copy before opening SQLite
+or publishing a format-v2 Library manifest. With a backup folder configured it
+lives under `nodus-library/.nodus/recovery/pre-v4/`; otherwise it lives under
+the local Nodus profile at `recovery/pre-v4/`. The copy contains a consistent
+SQLite snapshot of every registered vault, its schema number, profile and vault
+sidecars, and every existing canonical Library file. Symbolic links are recorded
+but never followed. Every file is hashed and each database must pass SQLite
+`quick_check` before the completion marker is written.
+
+An interrupted copy, a full disk, a corrupt database, or a permission failure
+therefore stops before migration and leaves the 3.x profile untouched. The next
+launch retries from the beginning. Once the verified marker exists, later v4
+launches reuse it instead of duplicating the snapshot. Recovery validates every
+hash before replacing any file and restores database files through recoverable
+sibling swaps while the databases are closed.
+
+Nodus 4 accepts all released Nodus 3 encrypted backup formats and migrates an
+older database only after validating its archive and inventory. Restoring a 3.x
+archive that has no Global Library leaves an existing `nodus-library` untouched.
+Data that Nodus 4 has already migrated or newly created may not open in a Nodus
+3 application. Use the retained pre-v4 recovery copy when an actual return to
+3.2.7 is required rather than pointing Nodus 3 at a v4 profile.
+
+The optional Global Library migration is separate from the application upgrade.
+Its assistant can still be cancelled, resumed, verified, or rolled back. That
+rollback removes only the records and links created by its own session and
+preserves anything edited afterward as a conflict.
+
 To recover the Library:
 
 1. preserve an unchanged copy of the affected folder;
@@ -456,6 +496,12 @@ The main tests are:
   eight import/export formats, five local citation styles, keys, and duplicates;
 - `test-library-recovery.mjs`: trash impact, linked-vault purge blocking,
   recoverable emptying, lossless duplicate merges, checksum audits, and rebuilds;
+- `test-pre-v4-recovery.mjs`: first-launch snapshot, disk-full interruption,
+  idempotence, hashes, SQLite verification, and restoration;
+- `test-library-scale.mjs`: hot catalogue queries with 50,000 items and 10,000
+  collections, each held below one second in CI;
+- `test-backup-vaults.mjs`: complete encrypted vault and Global Library backup,
+  staging, recovery rollback, and older-schema compatibility;
 - `test-global-library-reader.mjs`: reader, pages, annotations, and chat;
 - `test-global-library-vault-integration.mjs`: vault linking and analysis;
 - `test-vaults.mjs`: exact component reuse, cancellation, aliases, and private-state isolation;

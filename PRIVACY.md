@@ -29,6 +29,13 @@ Items manually emptied from the Library trash are retained locally in a dated
 `nodus-library/.nodus/recovery/purged` package so the catalogue operation remains
 recoverable. Those packages remain part of the selected backup until the user or
 data controller removes them under the applicable retention policy.
+Before the first Nodus 4 migration, the application also creates one verified pre-v4 recovery copy.
+It contains the existing vault databases, Library originals and derived files, and local profile
+sidecars. With a configured backup folder it is stored under
+`nodus-library/.nodus/recovery/pre-v4`; otherwise it remains in the local Nodus profile. Nodus does
+not upload this copy. A third-party folder synchronization service receives it only when the user
+has selected a folder managed by that service. Ordinary encrypted backups exclude the pre-v4 tree
+to avoid recursively embedding a complete copy, but include the active Global Library itself.
 
 **Nodus Server is optional and self-hosted.** If the user connects it in Settings, the application
 publishes a logical and minimized copy of the vault on the server chosen by the user or his/her

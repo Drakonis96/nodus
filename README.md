@@ -37,6 +37,21 @@ without modifying it. A document can then be linked into any compatible vault
 for search and analysis without duplicating the global copy. See the
 [architecture, recovery and privacy guide](docs/global-library.md).
 
+### Updating to Nodus 4
+
+Updating from 3.2.7 keeps **This vault** as the initial Library scope and does
+not enable or migrate the cross-vault Library automatically. Before Nodus 4
+opens an existing database, it creates and verifies a one-time pre-v4 recovery
+copy. The optional migration assistant then inventories selected academic
+vaults and can be cancelled, resumed, verified, or rolled back without writing
+to the source vaults.
+
+Nodus 4 opens backups created by Nodus 3.x. A profile or Library already
+migrated to v4 is not guaranteed to open in a 3.x application, so keep the
+automatic pre-v4 recovery copy for downgrade recovery. Complete v4 encrypted
+backups include both every vault and `nodus-library`. See the
+[Library recovery contract](docs/global-library.md#updating-from-nodus-327).
+
 ## Install Nodus
 
 Download the installer for your computer and open it. There is no server to configure and no account is required to begin.
