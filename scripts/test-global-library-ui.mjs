@@ -15,6 +15,7 @@ test('the unified Library keeps the global catalogue independent and the vault c
 
 test('the Library UI exposes hierarchy, search, bulk operations, imports and background state', async () => {
   const view = `${await readSource('src/views/GlobalLibraryView.tsx')}\n${await readSource('src/components/library/LibraryItemManager.tsx')}\n${await readSource('src/components/library/LibrarySmartSearchDialog.tsx')}\n${await readSource('src/components/library/LibraryMetadataDialogs.tsx')}\n${await readSource('src/components/library/LibraryRecoveryDialogs.tsx')}`;
+  const vaultLibrary = await readSource('src/views/Library.tsx');
   const appCss = await readSource('src/index.css');
   for (const marker of [
     'global-library-view', 'global-library-search', 'global-library-bulk-actions',
@@ -99,7 +100,9 @@ test('the Library UI exposes hierarchy, search, bulk operations, imports and bac
   assert.match(view, /Copia de solo lectura: Nodus nunca modifica Zotero/);
   assert.match(view, /status\.conflicts > 0 \|\| status\.invalidRecords > 0/);
   assert.match(view, /LibraryDocumentReader/);
-  assert.match(view, /onDoubleClick=\{\(\) => item\.readerAvailable/);
+  assert.match(view, /onDoubleClick=\{\(event\) => \{ if \(\(event\.target as HTMLElement\)\.closest\('button, input, select, a'\)\) return; if \(item\.readerAvailable \|\| item\.attachmentCount\) void openReader/, 'global rows open the reader on a non-interactive double-click');
+  assert.match(view, /column === 'title'[\s\S]*onDoubleClick=\{\(event\)[\s\S]*void openReader\(item\.id\)/, 'double-clicking the global title follows the same reader path');
+  assert.match(vaultLibrary, /data-testid=\{`vault-library-item-[\s\S]*onDoubleClick=\{\(event\)[\s\S]*setReaderWork\(w\)/, 'traditional vault rows expose the same double-click reader path');
   assert.match(view, /className="library-theme flex/);
   assert.match(view, /className="library-theme-canvas flex/);
   assert.match(view, /className="library-theme-panel/);
@@ -138,6 +141,8 @@ test('the global reader exposes annotations, metadata, chat and native attachmen
     'library-reader-pdf-view-single', 'library-reader-pdf-view-continuous',
     'library-reader-image-viewer', 'library-reader-text-viewer', 'library-reader-open-external',
     'library-reader-files-toggle', 'library-reader-chat-model',
+    'library-reader-format-dialog', 'library-reader-format-clean', 'library-reader-format-original',
+    'library-reader-format-remember', 'library-reader-reset-format-preference',
     'library-reader-online-source', 'find-in-page', 'find-in-page-input',
     'find-option-mark-all', 'find-option-case', 'find-option-whole',
   ]) assert.match(reader, new RegExp(marker));
@@ -191,6 +196,10 @@ test('the global reader exposes annotations, metadata, chat and native attachmen
   assert.match(reader, /data-source-kind=\{sourceKind\}/);
   assert.match(reader, /library-reader-source-badge is-/);
   assert.match(reader, /library-reader-file-option/);
+  assert.match(readerSource, /READER_OPENING_FORMAT_KEY = 'nodus\.libraryReader\.openingFormat'/, 'the remembered opening format has one explicit cross-library preference');
+  assert.match(readerSource, /preferred === 'clean'[\s\S]*preferred === 'original'[\s\S]*setOpeningFormatPrompt\(true\)/, 'the reader applies a saved preference or asks when both formats are available');
+  assert.match(readerSource, /primaryOriginalAttachment\(reader\)/, 'the original choice resolves the preserved primary file rather than an arbitrary supplement');
+  assert.match(readerSource, /writeOpeningFormatPreference\(null\)/, 'users can restore the opening question');
   assert.match(selectionCss, /\.light \.reader-highlighter-palette button:hover,[\s\S]*background: #eef2ff; color: #4338ca;/);
   assert.match(appCss, /\.light \.library-reader-source-badge\.is-original[\s\S]*background: #ffffff;[\s\S]*color: #52525b;/);
   assert.match(appCss, /\.light \.library-reader-file-option\.is-active \{ background: #eef2ff; color: #4338ca; \}/);

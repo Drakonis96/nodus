@@ -572,10 +572,77 @@ const LIBRARY_PARITY_TR: Record<string, string> = {
   'Buscar título, autor, etiqueta, DOI, ISBN, ISSN, PMID o arXiv…': 'Başlık, yazar, etiket, DOI, ISBN, ISSN, PMID veya arXiv ara…',
 };
 
+const READER_OPENING_TRANSLATIONS: Record<LibraryTranslationLocale, Record<string, string>> = {
+  en: {
+    '¿Cómo quieres leer este documento?': 'How would you like to read this document?',
+    'Podrás cambiar de formato en cualquier momento desde Versiones y archivos.': 'You can switch formats at any time from Versions and files.',
+    'Lectura adaptable con texto, índice e imágenes extraídas.': 'Reflowable reading with text, an outline, and extracted images.',
+    'Todavía no está disponible': 'Not available yet',
+    'El archivo conservado, con su diseño y sus páginas originales.': 'The preserved file with its original layout and pages.',
+    'La próxima vez Nodus abrirá directamente el formato elegido.': 'Next time, Nodus will open the chosen format directly.',
+    'Preguntar de nuevo al abrir': 'Ask again when opening',
+  },
+  fr: {
+    '¿Cómo quieres leer este documento?': 'Comment souhaitez-vous lire ce document ?',
+    'Podrás cambiar de formato en cualquier momento desde Versiones y archivos.': 'Vous pourrez changer de format à tout moment dans Versions et fichiers.',
+    'Lectura adaptable con texto, índice e imágenes extraídas.': 'Lecture adaptable avec texte, plan et images extraites.',
+    'Todavía no está disponible': 'Pas encore disponible',
+    'El archivo conservado, con su diseño y sus páginas originales.': 'Le fichier conservé, avec sa mise en page et ses pages originales.',
+    'La próxima vez Nodus abrirá directamente el formato elegido.': 'La prochaine fois, Nodus ouvrira directement le format choisi.',
+    'Preguntar de nuevo al abrir': 'Redemander à l’ouverture',
+  },
+  de: {
+    '¿Cómo quieres leer este documento?': 'Wie möchten Sie dieses Dokument lesen?',
+    'Podrás cambiar de formato en cualquier momento desde Versiones y archivos.': 'Unter Versionen und Dateien können Sie das Format jederzeit wechseln.',
+    'Lectura adaptable con texto, índice e imágenes extraídas.': 'Anpassbare Leseansicht mit Text, Gliederung und extrahierten Bildern.',
+    'Todavía no está disponible': 'Noch nicht verfügbar',
+    'El archivo conservado, con su diseño y sus páginas originales.': 'Die erhaltene Datei mit ihrem ursprünglichen Layout und ihren Originalseiten.',
+    'La próxima vez Nodus abrirá directamente el formato elegido.': 'Beim nächsten Mal öffnet Nodus das gewählte Format direkt.',
+    'Preguntar de nuevo al abrir': 'Beim Öffnen erneut fragen',
+  },
+  pt: {
+    '¿Cómo quieres leer este documento?': 'Como pretende ler este documento?',
+    'Podrás cambiar de formato en cualquier momento desde Versiones y archivos.': 'Pode mudar de formato a qualquer momento em Versões e ficheiros.',
+    'Lectura adaptable con texto, índice e imágenes extraídas.': 'Leitura adaptável com texto, índice e imagens extraídas.',
+    'Todavía no está disponible': 'Ainda não está disponível',
+    'El archivo conservado, con su diseño y sus páginas originales.': 'O ficheiro preservado, com o seu desenho e páginas originais.',
+    'La próxima vez Nodus abrirá directamente el formato elegido.': 'Da próxima vez, o Nodus abrirá diretamente o formato escolhido.',
+    'Preguntar de nuevo al abrir': 'Voltar a perguntar ao abrir',
+  },
+  'pt-BR': {
+    '¿Cómo quieres leer este documento?': 'Como você quer ler este documento?',
+    'Podrás cambiar de formato en cualquier momento desde Versiones y archivos.': 'Você pode mudar de formato a qualquer momento em Versões e arquivos.',
+    'Lectura adaptable con texto, índice e imágenes extraídas.': 'Leitura adaptável com texto, sumário e imagens extraídas.',
+    'Todavía no está disponible': 'Ainda não está disponível',
+    'El archivo conservado, con su diseño y sus páginas originales.': 'O arquivo preservado, com o layout e as páginas originais.',
+    'La próxima vez Nodus abrirá directamente el formato elegido.': 'Na próxima vez, o Nodus abrirá diretamente o formato escolhido.',
+    'Preguntar de nuevo al abrir': 'Perguntar novamente ao abrir',
+  },
+  it: {
+    '¿Cómo quieres leer este documento?': 'Come vuoi leggere questo documento?',
+    'Podrás cambiar de formato en cualquier momento desde Versiones y archivos.': 'Puoi cambiare formato in qualsiasi momento da Versioni e file.',
+    'Lectura adaptable con texto, índice e imágenes extraídas.': 'Lettura adattabile con testo, indice e immagini estratte.',
+    'Todavía no está disponible': 'Non ancora disponibile',
+    'El archivo conservado, con su diseño y sus páginas originales.': 'Il file conservato, con il layout e le pagine originali.',
+    'La próxima vez Nodus abrirá directamente el formato elegido.': 'La prossima volta Nodus aprirà direttamente il formato scelto.',
+    'Preguntar de nuevo al abrir': 'Chiedi di nuovo all’apertura',
+  },
+  tr: {
+    '¿Cómo quieres leer este documento?': 'Bu belgeyi nasıl okumak istersiniz?',
+    'Podrás cambiar de formato en cualquier momento desde Versiones y archivos.': 'Sürümler ve dosyalar bölümünden biçimi istediğiniz zaman değiştirebilirsiniz.',
+    'Lectura adaptable con texto, índice e imágenes extraídas.': 'Metin, içindekiler ve çıkarılan görsellerle uyarlanabilir okuma.',
+    'Todavía no está disponible': 'Henüz kullanılamıyor',
+    'El archivo conservado, con su diseño y sus páginas originales.': 'Özgün düzeni ve sayfalarıyla korunan dosya.',
+    'La próxima vez Nodus abrirá directamente el formato elegido.': 'Nodus bir dahaki sefere seçilen biçimi doğrudan açacak.',
+    'Preguntar de nuevo al abrir': 'Açarken yeniden sor',
+  },
+};
+
 /** Copy introduced by the clean Markdown library reader. */
 export const LIBRARY_READER_TRANSLATIONS = {
   en: {
     ...LIBRARY_MANAGEMENT_EN,
+    ...READER_OPENING_TRANSLATIONS.en,
     'Abrir lector limpio': 'Open clean reader',
     'Quiero conversar sobre este documento. Prioriza su texto, sus anotaciones y su relación con el resto del corpus.': 'I want to discuss this document. Prioritize its text, its annotations, and its relationship to the rest of the corpus.',
     'Preparando lector…': 'Preparing reader…',
@@ -611,6 +678,7 @@ export const LIBRARY_READER_TRANSLATIONS = {
   },
   fr: {
     ...LIBRARY_MANAGEMENT_EN,
+    ...READER_OPENING_TRANSLATIONS.fr,
     ...LIBRARY_PARITY_FR,
     'Abrir lector limpio': 'Ouvrir le lecteur épuré',
     'Quiero conversar sobre este documento. Prioriza su texto, sus anotaciones y su relación con el resto del corpus.': 'Je souhaite discuter de ce document. Donnez la priorité à son texte, à ses annotations et à ses liens avec le reste du corpus.',
@@ -648,6 +716,7 @@ export const LIBRARY_READER_TRANSLATIONS = {
   de: {
     ...LIBRARY_MANAGEMENT_EN,
     ...LIBRARY_PARITY_DE,
+    ...READER_OPENING_TRANSLATIONS.de,
     'Abrir lector limpio': 'Bereinigten Reader öffnen',
     'Quiero conversar sobre este documento. Prioriza su texto, sus anotaciones y su relación con el resto del corpus.': 'Ich möchte dieses Dokument besprechen. Priorisiere seinen Text, seine Anmerkungen und seinen Bezug zum übrigen Korpus.',
     'Preparando lector…': 'Reader wird vorbereitet…',
@@ -684,6 +753,7 @@ export const LIBRARY_READER_TRANSLATIONS = {
   pt: {
     ...LIBRARY_MANAGEMENT_EN,
     ...LIBRARY_PARITY_PT,
+    ...READER_OPENING_TRANSLATIONS.pt,
     'Abrir lector limpio': 'Abrir leitor limpo',
     'Quiero conversar sobre este documento. Prioriza su texto, sus anotaciones y su relación con el resto del corpus.': 'Quero conversar sobre este documento. Dá prioridade ao seu texto, às suas anotações e à sua relação com o resto do corpus.',
     'Preparando lector…': 'A preparar o leitor…',
@@ -720,6 +790,7 @@ export const LIBRARY_READER_TRANSLATIONS = {
   'pt-BR': {
     ...LIBRARY_MANAGEMENT_EN,
     ...LIBRARY_PARITY_PT_BR,
+    ...READER_OPENING_TRANSLATIONS['pt-BR'],
     'Abrir lector limpio': 'Abrir leitor limpo',
     'Quiero conversar sobre este documento. Prioriza su texto, sus anotaciones y su relación con el resto del corpus.': 'Quero conversar sobre este documento. Dê prioridade ao texto, às anotações e à relação dele com o restante do corpus.',
     'Preparando lector…': 'Preparando leitor…',
@@ -756,6 +827,7 @@ export const LIBRARY_READER_TRANSLATIONS = {
   it: {
     ...LIBRARY_MANAGEMENT_EN,
     ...LIBRARY_PARITY_IT,
+    ...READER_OPENING_TRANSLATIONS.it,
     'Abrir lector limpio': 'Apri lettore pulito',
     'Quiero conversar sobre este documento. Prioriza su texto, sus anotaciones y su relación con el resto del corpus.': 'Vorrei parlare di questo documento. Dai priorità al testo, alle annotazioni e al suo rapporto con il resto del corpus.',
     'Preparando lector…': 'Preparazione del lettore…',
@@ -792,6 +864,7 @@ export const LIBRARY_READER_TRANSLATIONS = {
   tr: {
     ...LIBRARY_MANAGEMENT_EN,
     ...LIBRARY_PARITY_TR,
+    ...READER_OPENING_TRANSLATIONS.tr,
     'Abrir lector limpio': 'Temiz okuyucuyu aç',
     'Quiero conversar sobre este documento. Prioriza su texto, sus anotaciones y su relación con el resto del corpus.': 'Bu belge hakkında konuşmak istiyorum. Belgenin metnine, notlarına ve külliyatın geri kalanıyla ilişkisine öncelik ver.',
     'Preparando lector…': 'Okuyucu hazırlanıyor…',

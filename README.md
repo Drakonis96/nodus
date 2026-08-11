@@ -32,7 +32,9 @@ Mendeley or other managers, or accept local documents directly.
 
 Each original remains separate from a clean Markdown reading copy, extracted
 figures, structured tables, page mappings, highlights, notes and document chat.
-The reader's file chooser switches between the clean copy and preserved PDF,
+On first open, the reader asks whether to use the clean copy or the preserved
+original and can remember that choice; it can be reset from **Versions and
+files**. The same chooser switches between clean Markdown and preserved PDF,
 EPUB, image, web, text and office attachments. Text can be highlighted in the
 reflowable and PDF viewers, while images accept region highlights. Unsupported
 legacy binaries open in their associated application without modifying them.

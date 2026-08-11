@@ -271,11 +271,14 @@ Technical engine details and clean-version rebuilding start collapsed.
 The reader opens from any Library row that has either clean Markdown or at least
 one available attachment. A persistent source chooser in the top toolbar and a
 matching **Versions and files** group in the left sidebar switch between the
-clean `reader.md` copy and every preserved attachment. The last selection is
-remembered per stable item identifier. The clean copy is not a layer placed
-over the original. The source selector reserves a fixed icon gutter, and its
-status badge, file list, annotation palette, and document surface use explicit
-light and dark palettes so switching themes never leaves dark controls behind.
+clean `reader.md` copy and every preserved attachment. When both a clean copy
+and a preserved original exist, the first **Read** action or row double-click
+asks which one to open. The user may remember that choice across both Library
+scopes and can restore the prompt from **Versions and files**. The clean copy is
+not a layer placed over the original. The source selector reserves a fixed icon
+gutter, and its status badge, file list, annotation palette, and document surface
+use explicit light and dark palettes so switching themes never leaves dark
+controls behind.
 
 Reader navigation and annotation paint never wait for backup-folder I/O. The
 file chooser owns its open state locally, the rendered Markdown tree is

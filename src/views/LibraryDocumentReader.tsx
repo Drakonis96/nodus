@@ -25,7 +25,7 @@ import {
   ReaderSelectionActions,
   type ReaderSelectionActionsHandle,
 } from '../components/ReaderSelectionActions';
-import { HoverLabelButton, Icon, Spinner } from '../components/ui';
+import { HoverLabelButton, Icon, ModalBackdrop, Spinner } from '../components/ui';
 import { confirm } from '../components/feedback';
 import { t, tx } from '../i18n';
 
@@ -33,6 +33,34 @@ GlobalWorkerOptions.workerSrc = pdfWorker;
 
 function readingPositionKey(storageId: string): string {
   return `nodus.libraryReader.position.${storageId}`;
+}
+
+type ReaderOpeningFormat = 'clean' | 'original';
+
+const READER_OPENING_FORMAT_KEY = 'nodus.libraryReader.openingFormat';
+
+function readOpeningFormatPreference(): ReaderOpeningFormat | null {
+  try {
+    const value = localStorage.getItem(READER_OPENING_FORMAT_KEY);
+    return value === 'clean' || value === 'original' ? value : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeOpeningFormatPreference(value: ReaderOpeningFormat | null): void {
+  try {
+    if (value) localStorage.setItem(READER_OPENING_FORMAT_KEY, value);
+    else localStorage.removeItem(READER_OPENING_FORMAT_KEY);
+  } catch {
+    // A blocked localStorage must never prevent the document from opening.
+  }
+}
+
+function primaryOriginalAttachment(reader: LibraryReaderDocument) {
+  return reader.attachments.find((attachment) => attachment.available && attachment.role === 'original')
+    ?? reader.attachments.find((attachment) => attachment.available && attachment.fileName === reader.originalFileName)
+    ?? null;
 }
 
 function findTextRange(root: HTMLElement, annotation: WritingDraftAnnotation): Range | null {
@@ -110,6 +138,79 @@ const ReaderMarkdownDocument = memo(function ReaderMarkdownDocument({ content }:
   return <Markdown content={content} verify={false} allowDataImages className="text-[16px] leading-[1.85] text-neutral-300" />;
 });
 
+function ReaderOpeningFormatDialog({
+  reader,
+  originalAttachment,
+  remember,
+  onRememberChange,
+  onChoose,
+  onCancel,
+}: {
+  reader: LibraryReaderDocument;
+  originalAttachment: LibraryReaderDocument['attachments'][number] | null;
+  remember: boolean;
+  onRememberChange: (remember: boolean) => void;
+  onChoose: (format: ReaderOpeningFormat) => void;
+  onCancel: () => void;
+}) {
+  return (
+    <ModalBackdrop onClose={onCancel} zIndex={150}>
+      <section
+        data-testid="library-reader-format-dialog"
+        className="w-full max-w-xl overflow-hidden rounded-2xl border border-neutral-200 bg-white text-neutral-900 shadow-2xl dark:border-neutral-700 dark:bg-neutral-950 dark:text-neutral-100"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="library-reader-format-title"
+        onMouseDown={(event) => event.stopPropagation()}
+      >
+        <header className="flex items-start gap-3 border-b border-neutral-200 px-5 py-4 dark:border-neutral-800">
+          <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-indigo-50 text-indigo-600 dark:bg-indigo-950/40 dark:text-indigo-300"><Icon name="bookOpen" size={18} /></span>
+          <div className="min-w-0 flex-1">
+            <h2 id="library-reader-format-title" className="text-base font-semibold">{t('¿Cómo quieres leer este documento?')}</h2>
+            <p className="mt-1 text-xs leading-5 text-neutral-500 dark:text-neutral-400">{t('Podrás cambiar de formato en cualquier momento desde Versiones y archivos.')}</p>
+          </div>
+          <button className="btn btn-ghost h-8 w-8 shrink-0 p-0" aria-label={t('Cancelar')} title={t('Cancelar')} onClick={onCancel}><Icon name="x" size={13} /></button>
+        </header>
+
+        <div className="grid gap-3 p-5 sm:grid-cols-2">
+          <button
+            data-testid="library-reader-format-clean"
+            className="group min-h-36 rounded-2xl border border-neutral-200 bg-neutral-50 p-4 text-left transition hover:border-indigo-400 hover:bg-indigo-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-indigo-500 disabled:cursor-not-allowed disabled:opacity-45 dark:border-neutral-800 dark:bg-neutral-900/70 dark:hover:bg-neutral-900/80"
+            disabled={!reader.cleanAvailable}
+            autoFocus={reader.cleanAvailable}
+            onClick={() => onChoose('clean')}
+          >
+            <span className="grid h-9 w-9 place-items-center rounded-xl bg-indigo-100 text-indigo-600 dark:bg-indigo-950 dark:text-indigo-300"><Icon name="book" size={16} /></span>
+            <strong className="mt-3 block text-sm">{t('Markdown limpio')}</strong>
+            <span className="mt-1 block text-xs leading-5 text-neutral-500 dark:text-neutral-400">{t('Lectura adaptable con texto, índice e imágenes extraídas.')}</span>
+            {!reader.cleanAvailable && <span className="mt-2 block text-[10px] font-medium text-amber-600 dark:text-amber-300">{t('Todavía no está disponible')}</span>}
+          </button>
+
+          <button
+            data-testid="library-reader-format-original"
+            className="group min-h-36 rounded-2xl border border-neutral-200 bg-neutral-50 p-4 text-left transition hover:border-indigo-400 hover:bg-indigo-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-indigo-500 disabled:cursor-not-allowed disabled:opacity-45 dark:border-neutral-800 dark:bg-neutral-900/70 dark:hover:bg-neutral-900/80"
+            disabled={!originalAttachment}
+            autoFocus={!reader.cleanAvailable && !!originalAttachment}
+            onClick={() => onChoose('original')}
+          >
+            <span className="grid h-9 w-9 place-items-center rounded-xl bg-amber-100 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300"><Icon name="file" size={16} /></span>
+            <strong className="mt-3 block text-sm">{t('Archivo original')}</strong>
+            <span className="mt-1 block text-xs leading-5 text-neutral-500 dark:text-neutral-400">{t('El archivo conservado, con su diseño y sus páginas originales.')}</span>
+            {originalAttachment ? <span className="mt-2 block truncate text-[10px] text-neutral-400 dark:text-neutral-500" title={originalAttachment.fileName}>{originalAttachment.fileName}</span> : <span className="mt-2 block text-[10px] font-medium text-amber-600 dark:text-amber-300">{t('Todavía no está disponible')}</span>}
+          </button>
+        </div>
+
+        <footer className="border-t border-neutral-200 px-5 py-4 dark:border-neutral-800">
+          <label className="flex cursor-pointer items-start gap-2.5 text-xs text-neutral-700 dark:text-neutral-300">
+            <input data-testid="library-reader-format-remember" className="mt-0.5" type="checkbox" checked={remember} onChange={(event) => onRememberChange(event.target.checked)} />
+            <span><b className="font-medium">{t('No volver a preguntar')}</b><small className="mt-0.5 block text-[10px] leading-4 text-neutral-500">{t('La próxima vez Nodus abrirá directamente el formato elegido.')}</small></span>
+          </label>
+        </footer>
+      </section>
+    </ModalBackdrop>
+  );
+}
+
 const ReaderFilesMenu = memo(function ReaderFilesMenu({
   attachments,
   cleanAvailable,
@@ -118,6 +219,8 @@ const ReaderFilesMenu = memo(function ReaderFilesMenu({
   selectedSource,
   selectedTitle,
   onSelect,
+  hasOpeningPreference,
+  onResetOpeningPreference,
 }: {
   attachments: LibraryReaderDocument['attachments'];
   cleanAvailable: boolean;
@@ -126,6 +229,8 @@ const ReaderFilesMenu = memo(function ReaderFilesMenu({
   selectedSource: string;
   selectedTitle: string;
   onSelect: (source: string) => void;
+  hasOpeningPreference: boolean;
+  onResetOpeningPreference: () => void;
 }) {
   const [open, setOpen] = useState(false);
   const choose = (source: string) => {
@@ -148,6 +253,7 @@ const ReaderFilesMenu = memo(function ReaderFilesMenu({
       {open && <div id="library-reader-files" data-testid="library-reader-files" className="mt-2 max-h-56 space-y-0.5 overflow-y-auto overscroll-contain pr-0.5">
         <button data-testid="library-reader-file-clean" className={`library-reader-file-option flex w-full items-center gap-2 rounded-lg px-2 py-2 text-left text-xs ${selectedSource === 'clean' ? 'is-active' : ''}`} disabled={!cleanAvailable} onClick={() => choose('clean')}><Icon name="book" size={12} /><span className="truncate">{cleanLabel}</span></button>
         {attachments.map((attachment) => <button key={attachment.id} data-testid={`library-reader-file-${attachment.id}`} className={`library-reader-file-option flex w-full items-center gap-2 rounded-lg px-2 py-2 text-left text-xs ${selectedSource === attachment.id ? 'is-active' : ''} disabled:opacity-40`} disabled={!attachment.available} onClick={() => choose(attachment.id)}><Icon name={attachment.viewer === 'image' ? 'image' : attachment.viewer === 'pdf' || attachment.viewer === 'epub' ? 'book' : 'archive'} size={12} /><span className="min-w-0 flex-1 truncate">{attachment.title}</span><span className="library-reader-file-kind text-[9px] uppercase">{attachment.viewer}</span></button>)}
+        {hasOpeningPreference && <button data-testid="library-reader-reset-format-preference" className="mt-1 flex w-full items-center gap-2 border-t border-neutral-800 px-2 py-2.5 text-left text-[10px] text-neutral-500 hover:text-indigo-300" onClick={() => { onResetOpeningPreference(); setOpen(false); }}><Icon name="refresh" size={11} /><span>{t('Preguntar de nuevo al abrir')}</span></button>}
       </div>}
     </div>
   );
@@ -256,6 +362,9 @@ export function LibraryDocumentReader({
   const [sidebarTab, setSidebarTab] = useState<'annotations' | 'metadata' | 'chat'>('annotations');
   const [previewPage, setPreviewPage] = useState<number | null>(null);
   const [selectedSource, setSelectedSource] = useState('clean');
+  const [openingFormatPrompt, setOpeningFormatPrompt] = useState(false);
+  const [rememberOpeningFormat, setRememberOpeningFormat] = useState(false);
+  const [openingFormatPreference, setOpeningFormatPreference] = useState<ReaderOpeningFormat | null>(() => readOpeningFormatPreference());
   const [chatMessages, setChatMessages] = useState<LibraryReaderChatMessage[]>([]);
   const [chatInput, setChatInput] = useState('');
   const [chatSending, setChatSending] = useState(false);
@@ -301,9 +410,23 @@ export function LibraryDocumentReader({
   }, [loadReader]);
   useEffect(() => {
     if (!reader) return;
-    const remembered = localStorage.getItem(`nodus.libraryReader.source.${reader.storageId}`);
-    const valid = remembered === 'clean' ? reader.cleanAvailable : reader.attachments.some((entry) => entry.id === remembered && entry.available);
-    setSelectedSource(valid && remembered ? remembered : reader.cleanAvailable ? 'clean' : reader.attachments.find((entry) => entry.available)?.id ?? 'clean');
+    const original = primaryOriginalAttachment(reader);
+    const preferred = readOpeningFormatPreference();
+    setOpeningFormatPreference(preferred);
+    setRememberOpeningFormat(false);
+    if (preferred === 'clean' && reader.cleanAvailable) {
+      setSelectedSource('clean');
+      setOpeningFormatPrompt(false);
+    } else if (preferred === 'original' && original) {
+      setSelectedSource(original.id);
+      setOpeningFormatPrompt(false);
+    } else if (reader.cleanAvailable && original) {
+      setSelectedSource('clean');
+      setOpeningFormatPrompt(true);
+    } else {
+      setSelectedSource(reader.cleanAvailable ? 'clean' : original?.id ?? reader.attachments.find((entry) => entry.available)?.id ?? 'clean');
+      setOpeningFormatPrompt(false);
+    }
   }, [reader]);
   useEffect(() => {
     if (!reader) return;
@@ -488,6 +611,24 @@ export function LibraryDocumentReader({
     if (reader) localStorage.setItem(`nodus.libraryReader.source.${reader.storageId}`, value);
     setPreviewPage(null);
   }, [reader]);
+
+  const chooseOpeningFormat = useCallback((format: ReaderOpeningFormat) => {
+    if (!reader) return;
+    const original = primaryOriginalAttachment(reader);
+    if (format === 'clean' && reader.cleanAvailable) setSelectedSource('clean');
+    else if (format === 'original' && original) setSelectedSource(original.id);
+    else return;
+    if (rememberOpeningFormat) {
+      writeOpeningFormatPreference(format);
+      setOpeningFormatPreference(format);
+    }
+    setOpeningFormatPrompt(false);
+  }, [reader, rememberOpeningFormat]);
+
+  const resetOpeningFormatPreference = useCallback(() => {
+    writeOpeningFormatPreference(null);
+    setOpeningFormatPreference(null);
+  }, []);
 
   const scrollToSection = (index: number) => {
     const id = reader?.sections[index]?.id;
@@ -750,6 +891,8 @@ export function LibraryDocumentReader({
                 selectedSource={selectedSource}
                 selectedTitle={selectedAttachment?.title ?? t('Markdown limpio')}
                 onSelect={selectReaderSource}
+                hasOpeningPreference={!!openingFormatPreference}
+                onResetOpeningPreference={resetOpeningFormatPreference}
               />
             </nav>
             <div className="mt-5 border-t border-neutral-800 px-2 pt-4 text-[10px] leading-5 text-neutral-600">
@@ -890,6 +1033,14 @@ export function LibraryDocumentReader({
         )}
       </div>
       {selectedSource === 'clean' && <FindInPage targetRef={documentRef} sourceRevision={reader.contentFingerprint ?? reader.generatedAt ?? reader.storageId} placement="reader" />}
+      {openingFormatPrompt && <ReaderOpeningFormatDialog
+        reader={reader}
+        originalAttachment={primaryOriginalAttachment(reader)}
+        remember={rememberOpeningFormat}
+        onRememberChange={setRememberOpeningFormat}
+        onChoose={chooseOpeningFormat}
+        onCancel={onBack}
+      />}
       {previewPage && reader.originalUrl && <OriginalPagePreview url={reader.originalUrl} initialPage={previewPage} title={reader.title} onClose={() => setPreviewPage(null)} onOpenFull={() => void window.nodus.openLibraryReaderOriginal(reference.id)} />}
       {citation && <SourceCitationModal target={citation} onClose={() => setCitation(null)} />}
     </div>

@@ -85,7 +85,7 @@ button exists.
 | Revisions | Replacement extraction is staged atomically and a failure retains the last readable copy | Verified | `test-library-extraction` |
 | Revisions | Active vault invalidation retains prior results and closed vaults receive durable pending work | Verified | `test-library-revisions`, vault integration suite |
 | Reader | Markdown, images, and tables render | Verified | `e2e-library-reader` |
-| Reader | The source chooser switches between clean Markdown and every preserved attachment and remembers the selection per item | Verified | `test-global-library-reader`, `e2e-library-reader` |
+| Reader | Read actions and row double-clicks ask between clean Markdown and the preserved original; the user can remember or reset the choice, while the source chooser still reaches every attachment | Verified | `test-global-library-ui`, `e2e-library-reader` |
 | Reader | The file chooser remains immediately interactive on long documents, closes after a source is selected, and does not rebuild the Markdown tree | Verified | `e2e-library-reader` |
 | Library UI | The toolbar uses progressive Add, Zotero sync, and overflow actions; each selected item exposes one state-derived primary action | Verified | `test-global-library-ui`, `e2e-global-library` |
 | Library UI | Clean-version rebuilding is a collapsed technical action and explicitly excludes vault analysis | Verified | `test-global-library-ui`, `e2e-global-library` |

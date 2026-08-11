@@ -17,6 +17,8 @@ const testRoot = await mkdtemp(path.join(os.tmpdir(), 'nodus-library-reader-ui-'
 const userData = path.join(testRoot, 'profile');
 const backupRoot = path.join(testRoot, 'backups');
 const screenshotDirectory = path.join(repoRoot, 'output', 'library-reader-e2e');
+const formatDialogDarkScreenshotPath = path.join(screenshotDirectory, '00-reader-format-choice-dark.png');
+const formatDialogLightScreenshotPath = path.join(screenshotDirectory, '00b-reader-format-choice-light.png');
 const screenshotPath = path.join(screenshotDirectory, '01-clean-reader-chat-dark.png');
 const originalScreenshotPath = path.join(screenshotDirectory, '02-original-page-preview.png');
 const pdfScreenshotPath = path.join(screenshotDirectory, '03-pdf-reader.png');
@@ -246,9 +248,24 @@ ${longReaderBody}
   await globalRow.waitFor({ state: 'visible' });
   await globalRow.getByRole('button').click();
   await page.getByTestId('global-library-detail').getByRole('button', { name: 'Leer', exact: true }).click();
+  const openingFormatDialog = page.getByTestId('library-reader-format-dialog');
+  await openingFormatDialog.waitFor({ state: 'visible' });
+  assert.equal(await openingFormatDialog.getByTestId('library-reader-format-clean').isEnabled(), true, 'clean Markdown is offered on first open');
+  assert.equal(await openingFormatDialog.getByTestId('library-reader-format-original').isEnabled(), true, 'the preserved original is offered on first open');
+  await page.screenshot({ path: formatDialogDarkScreenshotPath, fullPage: true });
+  await openingFormatDialog.getByTestId('library-reader-format-remember').check();
+  await openingFormatDialog.getByTestId('library-reader-format-clean').click();
+  await openingFormatDialog.waitFor({ state: 'detached' });
+  assert.equal(await page.evaluate(() => localStorage.getItem('nodus.libraryReader.openingFormat')), 'clean', 'the user can remember one opening format across Library items');
   const documentRoot = page.getByTestId('library-reader-document');
   await documentRoot.waitFor({ state: 'visible' });
   assert.match(await page.getByTestId('library-reader-freshness').innerText(), /Markdown limpio/);
+
+  await page.getByTestId('library-scope-shell').getByRole('button', { name: 'Biblioteca', exact: true }).click();
+  await globalRow.waitFor({ state: 'visible' });
+  await globalRow.getByRole('button').dblclick();
+  await documentRoot.waitFor({ state: 'visible' });
+  assert.equal(await page.getByTestId('library-reader-format-dialog').count(), 0, 'double-click uses the remembered opening format without asking again');
 
   assert.match(await documentRoot.innerText(), /Texto introductorio/);
   assert.equal(await documentRoot.locator('img').count(), 1, 'local extracted images render inside the clean document');
@@ -333,7 +350,8 @@ ${longReaderBody}
   assert.equal(await filesToggle.getAttribute('aria-expanded'), 'false', 'preserved files start in one compact control');
   assert.equal(await page.getByTestId('library-reader-files').count(), 0);
   await filesToggle.click();
-  assert.equal(await page.getByTestId('library-reader-files').getByRole('button').count(), 6, 'the compact file control reveals every preserved source');
+  assert.equal(await page.getByTestId('library-reader-files').locator('[data-testid^="library-reader-file-"]').count(), 6, 'the compact file control reveals every preserved source');
+  assert.equal(await page.getByTestId('library-reader-reset-format-preference').isVisible(), true, 'a remembered format can be reset from the file chooser');
   assert.equal(await filesToggle.getAttribute('aria-expanded'), 'true');
   const filesInteraction = await page.evaluate(async () => {
     const clean = document.querySelector('[data-testid="library-reader-file-clean"]');
@@ -346,6 +364,10 @@ ${longReaderBody}
   assert.ok(filesInteraction.elapsed < 150, `the file menu remains responsive on a long document (${filesInteraction.elapsed.toFixed(1)}ms)`);
   assert.equal(filesInteraction.active, true, 'the expanded menu remains interactive');
   assert.equal(await filesToggle.getAttribute('aria-expanded'), 'false', 'choosing the current source also closes the compact menu');
+  await filesToggle.click();
+  await page.getByTestId('library-reader-reset-format-preference').click();
+  assert.equal(await page.evaluate(() => localStorage.getItem('nodus.libraryReader.openingFormat')), null, 'reset restores the choice on the next open');
+  assert.equal(await filesToggle.getAttribute('aria-expanded'), 'false', 'resetting the opening choice closes the compact menu');
   await filesToggle.click();
   const sourceSwitchStarted = Date.now();
   await page.getByTestId('library-reader-file-zotero:READERPDF').click();
@@ -715,12 +737,17 @@ ${longReaderBody}
   await citationDialog.locator('header button').click();
 
   await detail.getByRole('button', { name: 'Leer', exact: true }).click();
+  const reopenedFormatDialog = page.getByTestId('library-reader-format-dialog');
+  await reopenedFormatDialog.waitFor({ state: 'visible' });
+  await page.evaluate(() => { document.documentElement.classList.add('light'); document.documentElement.classList.remove('dark'); });
+  await page.setViewportSize({ width: 1500, height: 820 });
+  await page.screenshot({ path: formatDialogLightScreenshotPath, fullPage: true });
+  await reopenedFormatDialog.getByTestId('library-reader-format-clean').click();
+  await reopenedFormatDialog.waitFor({ state: 'detached' });
   const lightSourcePicker = page.getByTestId('library-reader-source-picker');
   const lightSourceSelect = lightSourcePicker.locator('select');
   await lightSourceSelect.selectOption('clean');
   await page.getByTestId('library-reader-sidebar').getByRole('tab', { name: 'Notas' }).click();
-  await page.evaluate(() => { document.documentElement.classList.add('light'); document.documentElement.classList.remove('dark'); });
-  await page.setViewportSize({ width: 1500, height: 820 });
   const lightOutlineRow = page.locator('.library-reader-outline-section:not(.is-active)').first();
   await lightOutlineRow.hover();
   const lightOutlineHoverColors = await lightOutlineRow.evaluate((element) => {

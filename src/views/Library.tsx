@@ -1564,8 +1564,13 @@ export function Library({
               const status = statusByWork.get(w.nodus_id);
               return (
               <div
+                data-testid={`vault-library-item-${w.nodus_id}`}
                 className="grid h-full items-center border-b border-neutral-800/70 px-2 hover:bg-neutral-900/50"
                 style={{ gridTemplateColumns: LIBRARY_GRID_TEMPLATE }}
+                onDoubleClick={(event) => {
+                  if ((event.target as HTMLElement).closest('button, input, select, a')) return;
+                  setReaderWork(w);
+                }}
               >
                 <div className="p-1">
                   <input
