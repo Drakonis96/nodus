@@ -5,12 +5,13 @@ import test from 'node:test';
 import { assertChannelsWired, readSource } from './ipc-channel-census.mjs';
 
 test('the single Library screen owns explicit global and vault scopes', async () => {
-  const [types, navigation, view, library, registry] = await Promise.all([
+  const [types, navigation, view, library, registry, styles] = await Promise.all([
     readSource('shared/libraryTypes.ts'),
     readSource('src/navigation.ts'),
     readSource('src/views/GlobalLibraryView.tsx'),
     readSource('src/views/Library.tsx'),
     readSource('src/app/views/corpus.tsx'),
+    readSource('src/index.css'),
   ]);
   assert.match(types, /export type LibraryScope = 'global' \| 'vault'/);
   assert.match(navigation, /scope\?: LibraryScope/);
@@ -19,9 +20,13 @@ test('the single Library screen owns explicit global and vault scopes', async ()
   assert.match(view, /data-testid="library-scope-global"/);
   assert.match(view, /data-scope-placement="content-header"/);
   assert.match(view, /scopeControls=\{scopeControls\}/, 'both library scopes receive the compact switcher in their own header');
-  assert.match(library, /library-vault-header[^\n]+min-h-14[^\n]+items-center[^\n]+border-b[^\n]+px-5 py-3/, 'This vault uses the same header geometry as Global');
+  assert.match(library, /library-vault-header[^\n]+library-header-bar[^\n]+min-h-14[^\n]+border-b[^\n]+px-5 py-3/, 'This vault uses the shared Library header geometry');
+  assert.match(view, /global-library-header[^\n]+library-header-bar[^\n]+min-h-14[^\n]+border-b[^\n]+px-5 py-3/, 'Global uses the shared Library header geometry');
+  assert.match(styles, /\.library-header-bar \{[\s\S]*?grid-template-columns: minmax\(0, 1fr\) auto minmax\(0, 1fr\)/, 'equal side columns keep the scope selector at the geometric center');
+  assert.match(styles, /\.library-header-bar > \.library-scope-switcher \{[\s\S]*?grid-column: 2;[\s\S]*?justify-self: center/, 'the scope selector owns the center column');
+  assert.match(styles, /@media \(max-width: 1100px\)[\s\S]*?\.library-header-bar > \.library-scope-switcher \{[\s\S]*?grid-column: 1 \/ -1;[\s\S]*?grid-row: 2;/, 'narrow headers keep the selector centered on its own row');
   assert.match(library, /<Icon name="book" className="text-indigo-400" \/> \{t\('Biblioteca'\)\}/, 'This vault uses the same Library title treatment as Global');
-  assert.doesNotMatch(view, /className="library-theme-bar[^\"]*min-h-12/, 'scope selection must not consume a separate full-width row');
+  assert.doesNotMatch(view, /className="library-theme-bar[^"]*min-h-12/, 'scope selection must not consume a separate full-width row');
   assert.match(view, /<Library[\s\S]*target=\{target\}/, 'the vault scope renders the complete traditional Library');
   assert.match(registry, /activeVault[\s\S]*setCollectionsOpen[\s\S]*GlobalLibraryView/);
 });
