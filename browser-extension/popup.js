@@ -3,7 +3,7 @@
 
 import { detectCapture } from './lib/detector.js';
 import { filterCollectionRows, normalizeTags } from './lib/collections.js';
-import { DEFAULT_NODUS_PORT, discoverNodus, normalizeConnectorPort } from './lib/connection.js';
+import { DEFAULT_NODUS_PORT, discoverNodus, extensionOrigin, normalizeConnectorPort, requestLocalJson } from './lib/connection.js';
 
 const ITEM_TYPES = [
   ['journal-article', 'Journal article'], ['book', 'Book'], ['book-chapter', 'Book chapter'], ['conference-paper', 'Conference paper'],
@@ -106,14 +106,12 @@ async function detectActiveTab() {
 function baseUrl(port = state.port) { return `http://127.0.0.1:${port}`; }
 
 async function api(path, options = {}, token = state.token, port = state.port) {
-  const headers = { ...(options.headers || {}) };
+  const headers = { ...(options.headers || {}), Origin: extensionOrigin(chrome.runtime.getURL) };
   if (token) headers.Authorization = `Bearer ${token}`;
   if (options.body && !(options.body instanceof ArrayBuffer) && !headers['Content-Type']) headers['Content-Type'] = 'application/json';
-  const response = await fetch(`${baseUrl(port)}${path}`, { ...options, headers });
-  const raw = await response.text();
-  let data = {}; try { data = raw ? JSON.parse(raw) : {}; } catch { data = { error: raw }; }
-  if (!response.ok) throw new Error(data.error || `Nodus returned ${response.status}.`);
-  return data;
+  const response = await requestLocalJson(`${baseUrl(port)}${path}`, { ...options, headers });
+  if (!response.ok) throw new Error(response.data.error || `Nodus returned ${response.status}.`);
+  return response.data;
 }
 
 async function findNodus(preferredPort) {
