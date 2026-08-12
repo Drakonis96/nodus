@@ -27,7 +27,7 @@ Nodus formats the complete document in one citeproc state. This preserves CSL so
 
 Word citations and bibliographies are `ADDIN` fields. The user can edit a citation by placing the cursor inside its field. Refresh replaces field results without discarding the embedded source data; Unlink keeps the visible result and removes only the live field.
 
-The installed manifest creates a persistent **Nodus** ribbon tab for every document. It contains shortcuts for the pane, Add/Edit Citation, Add/Edit Bibliography, Refresh, Preferences, and Unlink Citations. The ribbon and pane use the stylized Nodus mark from `word-addin/assets/`, not a generic letter.
+The installed manifest creates a persistent **Nodus** ribbon tab for every document. It contains shortcuts for the pane, Add/Edit Citation, Add/Edit Bibliography, Refresh, Preferences, and Unlink Citations. Each ribbon command has a distinct black-and-red action icon; the stylized Nodus mark remains reserved for product branding in the add-in header and metadata.
 
 ### LibreOffice document model
 

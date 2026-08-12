@@ -49,9 +49,9 @@
                     <Description resid="Nodus.Taskpane.Tooltip" />
                   </Supertip>
                   <Icon>
-                    <bt:Image size="16" resid="Icon.16" />
-                    <bt:Image size="32" resid="Icon.32" />
-                    <bt:Image size="80" resid="Icon.80" />
+                    <bt:Image size="16" resid="Icon.Copilot.16" />
+                    <bt:Image size="32" resid="Icon.Copilot.32" />
+                    <bt:Image size="80" resid="Icon.Copilot.80" />
                   </Icon>
                   <Action xsi:type="ShowTaskpane">
                     <TaskpaneId>NodusTaskpane</TaskpaneId>
@@ -61,31 +61,31 @@
                 <Control xsi:type="Button" id="Nodus.CitationButton">
                   <Label resid="Nodus.Citation.Label" />
                   <Supertip><Title resid="Nodus.Citation.Label" /><Description resid="Nodus.Citation.Tooltip" /></Supertip>
-                  <Icon><bt:Image size="16" resid="Icon.16" /><bt:Image size="32" resid="Icon.32" /><bt:Image size="80" resid="Icon.80" /></Icon>
+                  <Icon><bt:Image size="16" resid="Icon.Citation.16" /><bt:Image size="32" resid="Icon.Citation.32" /><bt:Image size="80" resid="Icon.Citation.80" /></Icon>
                   <Action xsi:type="ShowTaskpane"><TaskpaneId>NodusTaskpane</TaskpaneId><SourceLocation resid="Nodus.Citation.Url" /></Action>
                 </Control>
                 <Control xsi:type="Button" id="Nodus.BibliographyButton">
                   <Label resid="Nodus.Bibliography.Label" />
                   <Supertip><Title resid="Nodus.Bibliography.Label" /><Description resid="Nodus.Bibliography.Tooltip" /></Supertip>
-                  <Icon><bt:Image size="16" resid="Icon.16" /><bt:Image size="32" resid="Icon.32" /><bt:Image size="80" resid="Icon.80" /></Icon>
+                  <Icon><bt:Image size="16" resid="Icon.Bibliography.16" /><bt:Image size="32" resid="Icon.Bibliography.32" /><bt:Image size="80" resid="Icon.Bibliography.80" /></Icon>
                   <Action xsi:type="ShowTaskpane"><TaskpaneId>NodusTaskpane</TaskpaneId><SourceLocation resid="Nodus.Bibliography.Url" /></Action>
                 </Control>
                 <Control xsi:type="Button" id="Nodus.RefreshButton">
                   <Label resid="Nodus.Refresh.Label" />
                   <Supertip><Title resid="Nodus.Refresh.Label" /><Description resid="Nodus.Refresh.Tooltip" /></Supertip>
-                  <Icon><bt:Image size="16" resid="Icon.16" /><bt:Image size="32" resid="Icon.32" /><bt:Image size="80" resid="Icon.80" /></Icon>
+                  <Icon><bt:Image size="16" resid="Icon.Refresh.16" /><bt:Image size="32" resid="Icon.Refresh.32" /><bt:Image size="80" resid="Icon.Refresh.80" /></Icon>
                   <Action xsi:type="ShowTaskpane"><TaskpaneId>NodusTaskpane</TaskpaneId><SourceLocation resid="Nodus.Refresh.Url" /></Action>
                 </Control>
                 <Control xsi:type="Button" id="Nodus.PreferencesButton">
                   <Label resid="Nodus.Preferences.Label" />
                   <Supertip><Title resid="Nodus.Preferences.Label" /><Description resid="Nodus.Preferences.Tooltip" /></Supertip>
-                  <Icon><bt:Image size="16" resid="Icon.16" /><bt:Image size="32" resid="Icon.32" /><bt:Image size="80" resid="Icon.80" /></Icon>
+                  <Icon><bt:Image size="16" resid="Icon.Preferences.16" /><bt:Image size="32" resid="Icon.Preferences.32" /><bt:Image size="80" resid="Icon.Preferences.80" /></Icon>
                   <Action xsi:type="ShowTaskpane"><TaskpaneId>NodusTaskpane</TaskpaneId><SourceLocation resid="Nodus.Preferences.Url" /></Action>
                 </Control>
                 <Control xsi:type="Button" id="Nodus.UnlinkButton">
                   <Label resid="Nodus.Unlink.Label" />
                   <Supertip><Title resid="Nodus.Unlink.Label" /><Description resid="Nodus.Unlink.Tooltip" /></Supertip>
-                  <Icon><bt:Image size="16" resid="Icon.16" /><bt:Image size="32" resid="Icon.32" /><bt:Image size="80" resid="Icon.80" /></Icon>
+                  <Icon><bt:Image size="16" resid="Icon.Unlink.16" /><bt:Image size="32" resid="Icon.Unlink.32" /><bt:Image size="80" resid="Icon.Unlink.80" /></Icon>
                   <Action xsi:type="ShowTaskpane"><TaskpaneId>NodusTaskpane</TaskpaneId><SourceLocation resid="Nodus.Unlink.Url" /></Action>
                 </Control>
               </Group>
@@ -100,6 +100,24 @@
         <bt:Image id="Icon.16" DefaultValue="https://localhost:4320/addin/assets/icon-16.png" />
         <bt:Image id="Icon.32" DefaultValue="https://localhost:4320/addin/assets/icon-32.png" />
         <bt:Image id="Icon.80" DefaultValue="https://localhost:4320/addin/assets/icon-80.png" />
+        <bt:Image id="Icon.Copilot.16" DefaultValue="https://localhost:4320/addin/assets/icon-copilot-16.png" />
+        <bt:Image id="Icon.Copilot.32" DefaultValue="https://localhost:4320/addin/assets/icon-copilot-32.png" />
+        <bt:Image id="Icon.Copilot.80" DefaultValue="https://localhost:4320/addin/assets/icon-copilot-80.png" />
+        <bt:Image id="Icon.Citation.16" DefaultValue="https://localhost:4320/addin/assets/icon-citation-16.png" />
+        <bt:Image id="Icon.Citation.32" DefaultValue="https://localhost:4320/addin/assets/icon-citation-32.png" />
+        <bt:Image id="Icon.Citation.80" DefaultValue="https://localhost:4320/addin/assets/icon-citation-80.png" />
+        <bt:Image id="Icon.Bibliography.16" DefaultValue="https://localhost:4320/addin/assets/icon-bibliography-16.png" />
+        <bt:Image id="Icon.Bibliography.32" DefaultValue="https://localhost:4320/addin/assets/icon-bibliography-32.png" />
+        <bt:Image id="Icon.Bibliography.80" DefaultValue="https://localhost:4320/addin/assets/icon-bibliography-80.png" />
+        <bt:Image id="Icon.Refresh.16" DefaultValue="https://localhost:4320/addin/assets/icon-refresh-16.png" />
+        <bt:Image id="Icon.Refresh.32" DefaultValue="https://localhost:4320/addin/assets/icon-refresh-32.png" />
+        <bt:Image id="Icon.Refresh.80" DefaultValue="https://localhost:4320/addin/assets/icon-refresh-80.png" />
+        <bt:Image id="Icon.Preferences.16" DefaultValue="https://localhost:4320/addin/assets/icon-preferences-16.png" />
+        <bt:Image id="Icon.Preferences.32" DefaultValue="https://localhost:4320/addin/assets/icon-preferences-32.png" />
+        <bt:Image id="Icon.Preferences.80" DefaultValue="https://localhost:4320/addin/assets/icon-preferences-80.png" />
+        <bt:Image id="Icon.Unlink.16" DefaultValue="https://localhost:4320/addin/assets/icon-unlink-16.png" />
+        <bt:Image id="Icon.Unlink.32" DefaultValue="https://localhost:4320/addin/assets/icon-unlink-32.png" />
+        <bt:Image id="Icon.Unlink.80" DefaultValue="https://localhost:4320/addin/assets/icon-unlink-80.png" />
       </bt:Images>
       <bt:Urls>
         <bt:Url id="Nodus.Taskpane.Url" DefaultValue="https://localhost:4320/addin/taskpane.html" />

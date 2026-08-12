@@ -38,6 +38,24 @@ try {
   for (const control of ['Nodus.CitationButton', 'Nodus.BibliographyButton', 'Nodus.RefreshButton', 'Nodus.PreferencesButton', 'Nodus.UnlinkButton']) {
     assert.match(rendered, new RegExp(`<Control xsi:type="Button" id="${control}">`), `${control} must stay on the persistent Nodus tab`);
   }
+  const actionIcons = {
+    Taskpane: 'Copilot', Citation: 'Citation', Bibliography: 'Bibliography',
+    Refresh: 'Refresh', Preferences: 'Preferences', Unlink: 'Unlink',
+  };
+  for (const [control, icon] of Object.entries(actionIcons)) {
+    assert.match(
+      rendered,
+      new RegExp(`id="Nodus\\.${control}Button"[\\s\\S]*?<Icon>[\\s\\S]*?resid="Icon\\.${icon}\\.16"[\\s\\S]*?resid="Icon\\.${icon}\\.32"[\\s\\S]*?resid="Icon\\.${icon}\\.80"[\\s\\S]*?<\\/Icon>`),
+      `${control} must use its own action icon`,
+    );
+    for (const size of [16, 32, 80]) {
+      const iconPath = path.join(repoRoot, `word-addin/assets/icon-${icon.toLowerCase()}-${size}.png`);
+      assert.equal(fs.existsSync(iconPath), true, `${icon} ${size}px icon must exist`);
+      const png = fs.readFileSync(iconPath);
+      assert.equal(png.readUInt32BE(16), size, `${icon} icon width must be ${size}px`);
+      assert.equal(png.readUInt32BE(20), size, `${icon} icon height must be ${size}px`);
+    }
+  }
   assert.match(rendered, /taskpane\.html#references-citation/);
   assert.match(rendered, /taskpane\.html#references-bibliography/);
   assert.match(rendered, /taskpane\.html#references-unlink/);
