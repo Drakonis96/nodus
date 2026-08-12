@@ -81,6 +81,7 @@ export const libraryApi: LibraryApi = {
   importGlobalLibraryCitationStyles: () => ipcRenderer.invoke('library:importCitationStyles'),
   importZoteroCitationStyles: () => ipcRenderer.invoke('library:importZoteroCitationStyles'),
   installGlobalLibraryRepositoryCitationStyle: (styleId) => ipcRenderer.invoke('library:installRepositoryCitationStyle', styleId),
+  searchGlobalLibraryRepositoryCitationStyles: (query, limit) => ipcRenderer.invoke('library:searchRepositoryCitationStyles', query, limit),
   removeGlobalLibraryCitationStyle: (styleId) => ipcRenderer.invoke('library:removeCitationStyle', styleId),
   formatGlobalLibraryCitation: (itemIds, style, kind, locale) => ipcRenderer.invoke('library:formatCitation', itemIds, style, kind, locale),
   exportGlobalLibraryBibliography: (request) => ipcRenderer.invoke('library:exportBibliography', request),

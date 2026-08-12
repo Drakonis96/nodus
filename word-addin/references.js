@@ -15,7 +15,7 @@
   var COPY = {
     es: {
       references: 'Referencias', search: 'Buscar por título, autor, año, DOI, ISBN o clave de cita',
-      style: 'Estilo', language: 'Idioma', placement: 'Ubicación', inText: 'En el texto',
+      style: 'Estilo', styleSearch: 'Buscar estilos de cita', language: 'Idioma', placement: 'Ubicación', inText: 'En el texto',
       footnote: 'Nota al pie', endnote: 'Nota final', auto: 'Actualizar citas automáticamente',
       refresh: 'Actualizar', unlink: 'Desvincular', current: 'Cita actual', choose: 'Añade una o varias fuentes',
       clear: 'Limpiar', insert: 'Insertar cita', update: 'Actualizar cita', bibliography: 'Bibliografía',
@@ -37,7 +37,7 @@
     },
     en: {
       references: 'References', search: 'Search title, author, year, DOI, ISBN, or citation key',
-      style: 'Style', language: 'Language', placement: 'Placement', inText: 'In text',
+      style: 'Style', styleSearch: 'Search citation styles', language: 'Language', placement: 'Placement', inText: 'In text',
       footnote: 'Footnote', endnote: 'Endnote', auto: 'Update citations automatically',
       refresh: 'Refresh', unlink: 'Unlink', current: 'Current citation', choose: 'Add one or more sources',
       clear: 'Clear', insert: 'Insert citation', update: 'Update citation', bibliography: 'Bibliography',
@@ -74,7 +74,7 @@
     var el = {
       results: document.getElementById('results'), empty: document.getElementById('empty'),
       controls: document.getElementById('referenceControls'), analysis: document.getElementById('analysisControls'),
-      search: document.getElementById('searchBox'), style: document.getElementById('referenceStyle'),
+      search: document.getElementById('searchBox'), style: document.getElementById('referenceStyle'), styleSearch: document.getElementById('referenceStyleSearch'),
       locale: document.getElementById('referenceLocale'), placement: document.getElementById('referencePlacement'),
       auto: document.getElementById('referenceAutoUpdate'), selected: document.getElementById('selectedReferences'),
       hint: document.getElementById('composerHint'), insert: document.getElementById('insertCitation'),
@@ -158,14 +158,33 @@
     function loadStyles() {
       return options.api('/api/references/styles').then(function (data) {
         styles = data.styles || [];
-        el.style.innerHTML = '';
-        styles.forEach(function (style) {
-          var option = node('option', '', style.title + (style.availableOffline ? '' : ' · ↓'));
-          option.value = style.id; el.style.appendChild(option);
-        });
+        renderStyleOptions('');
         if (!styles.some(function (style) { return style.id === preferences.style; })) preferences.style = styles[0] ? styles[0].id : 'apa-7';
         el.style.value = preferences.style;
       });
+    }
+
+    function normalizeStyleSearch(value) {
+      return String(value || '').normalize('NFKD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim().replace(/\s+/g, ' ');
+    }
+
+    function renderStyleOptions(query) {
+      var selected = el.style.value || preferences.style;
+      var tokens = normalizeStyleSearch(query).split(' ').filter(Boolean);
+      var filtered = styles.filter(function (style) {
+        var haystack = normalizeStyleSearch(style.title + ' ' + style.id);
+        return tokens.every(function (token) { return haystack.indexOf(token) >= 0; });
+      });
+      if (selected && !filtered.some(function (style) { return style.id === selected; })) {
+        var current = styles.find(function (style) { return style.id === selected; });
+        if (current) filtered.unshift(current);
+      }
+        el.style.innerHTML = '';
+      filtered.forEach(function (style) {
+          var option = node('option', '', style.title + (style.availableOffline ? '' : ' · ↓'));
+          option.value = style.id; el.style.appendChild(option);
+        });
+      if (selected) el.style.value = selected;
     }
 
     function empty(message) {
@@ -501,6 +520,8 @@
       if (!fieldsSupported) options.setStatus(C.wordFieldsUnsupported, 'err');
       loadPreferences();
       loadStyles().then(loadPreferences).catch(function (error) { options.setStatus(error.message, 'err'); });
+      el.styleSearch.placeholder = C.styleSearch; el.styleSearch.setAttribute('aria-label', C.styleSearch);
+      el.styleSearch.oninput = function () { renderStyleOptions(el.styleSearch.value); };
       el.insert.onclick = insertCitation; el.clear.onclick = function () { selected = []; editingCitationId = null; renderComposer(); };
       el.bibliography.onclick = insertBibliography; el.refresh.onclick = refresh; el.unlink.onclick = unlink;
       [el.style, el.locale, el.placement, el.auto].forEach(function (control) { control.onchange = function () {

@@ -58,7 +58,7 @@ try {
   assert.match(taskpaneHtml, /<img class="mark" src="\/addin\/assets\/icon-32\.png"/, 'the pane must use the stylized Nodus mark');
   assert.doesNotMatch(taskpaneHtml, /<div class="mark">N<\/div>/, 'a generic letter N must not be used as the brand');
   assert.match(taskpaneHtml, /data-mode="references"/);
-  for (const id of ['referenceStyle', 'referenceLocale', 'referencePlacement', 'selectedReferences', 'insertCitation', 'insertBibliography', 'refreshReferences', 'unlinkReferences']) {
+  for (const id of ['referenceStyle', 'referenceStyleSearch', 'referenceLocale', 'referencePlacement', 'selectedReferences', 'insertCitation', 'insertBibliography', 'refreshReferences', 'unlinkReferences']) {
     assert.match(taskpaneHtml, new RegExp(`id="${id}"`), `References UI must contain ${id}`);
   }
   assert.match(referencesJs, /Word\.FieldType\.addin/, 'Word citations must be live ADDIN fields');
@@ -68,6 +68,8 @@ try {
   assert.match(referencesJs, /uncitedItems/);
   assert.match(referencesJs, /refresh-references/);
   assert.match(referencesJs, /unlink-references/);
+  assert.match(referencesJs, /normalizeStyleSearch/);
+  assert.match(referencesJs, /tokens\.every/);
 
   // The Word bridge opens the full idea detail in Ideas, not the graph. The
   // nonce makes a second click on the same idea retrigger the selection.

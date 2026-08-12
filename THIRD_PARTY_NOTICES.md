@@ -99,7 +99,7 @@ independent project and is not affiliated with or endorsed by Zotero.
 
 ## Citation Style Language styles and locales — CC BY-SA 3.0
 
-Nodus can download unmodified citation styles from the Zotero Style Repository
+Nodus can download unmodified citation styles from the official CSL styles repository
 and bundles a small set of CSL styles and locale files supplied through
 `@citation-js/plugin-csl`. Chicago author-date, MLA, and IEEE are bundled as
 unmodified compressed files from official Style Repository revision

@@ -13,6 +13,7 @@ import type {
   LibraryCitationStyle,
   LibraryCitationStyleImportReport,
   LibraryCitationStyleRecord,
+  LibraryCitationStyleRepositoryEntry,
   LibraryItemRecord,
 } from '@shared/libraryTypes';
 import type {
@@ -29,6 +30,9 @@ interface StyleManifest { format: 'nodus.citation-styles'; formatVersion: 1; sty
 
 const OFFICIAL_ATTRIBUTION = 'Citation styles from the CSL project (https://citationstyles.org/), CC BY-SA 3.0.';
 const MAX_STYLE_BYTES = 5 * 1024 * 1024;
+const OFFICIAL_STYLES_REVISION = 'v1.0.2';
+const OFFICIAL_STYLES_RAW_URL = `https://raw.githubusercontent.com/citation-style-language/styles/${OFFICIAL_STYLES_REVISION}`;
+const OFFICIAL_STYLES_TREE_URL = `https://api.github.com/repos/citation-style-language/styles/git/trees/${OFFICIAL_STYLES_REVISION}?recursive=1`;
 const BUILTIN_STYLES = [
   { id: 'apa-7', title: 'APA 7', repositoryId: 'apa', pluginId: 'apa' },
   { id: 'chicago-author-date', title: 'Chicago author-date', repositoryId: 'chicago-author-date', pluginId: 'chicago-author-date' },
@@ -59,6 +63,7 @@ type CiteprocConstructor = new (
   language?: string,
 ) => CiteprocEngine;
 const Citeproc = CSL as unknown as { Engine: CiteprocConstructor };
+let repositoryIndexPromise: Promise<LibraryCitationStyleRepositoryEntry[]> | null = null;
 
 function stylesDirectory(): string { return path.join(configuredLibraryRootOrThrow(), 'citation-styles'); }
 function manifestPath(): string { return path.join(stylesDirectory(), 'styles.json'); }
@@ -130,8 +135,52 @@ function storedById(id: string): { record: LibraryCitationStyleRecord; xml: stri
 }
 
 function repositoryIdFromUrl(value: string): string | null {
-  const match = /^https?:\/\/(?:www\.)?(?:zotero\.org|citationstyles\.org)\/styles\/([^/?#]+)(?:\.csl)?(?:[?#].*)?$/i.exec(value.trim());
-  return match?.[1]?.toLowerCase() ?? null;
+  const trimmed = value.trim();
+  const publicMatch = /^https?:\/\/(?:www\.)?(?:zotero\.org|citationstyles\.org)\/styles\/([^/?#]+)(?:\.csl)?(?:[?#].*)?$/i.exec(trimmed);
+  if (publicMatch?.[1]) return publicMatch[1].toLowerCase();
+  const githubMatch = /^https?:\/\/(?:raw\.githubusercontent\.com\/citation-style-language\/styles\/[^/]+|github\.com\/citation-style-language\/styles\/(?:raw|blob)\/[^/]+)\/([^/?#]+)\.csl(?:[?#].*)?$/i.exec(trimmed);
+  return githubMatch?.[1]?.toLowerCase() ?? null;
+}
+
+function normalizeStyleSearch(value: string): string {
+  return value.normalize('NFKD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ').trim().replace(/\s+/g, ' ');
+}
+
+function repositoryStyleTitle(id: string): string {
+  return id.split(/[-_.]+/).filter(Boolean).map((part) => /^(apa|apsa|asa|ama|mla|ieee|iso|mhra)$/i.test(part)
+    ? part.toUpperCase() : part.charAt(0).toUpperCase() + part.slice(1)).join(' ');
+}
+
+async function officialRepositoryIndex(): Promise<LibraryCitationStyleRepositoryEntry[]> {
+  if (!repositoryIndexPromise) {
+    repositoryIndexPromise = fetch(OFFICIAL_STYLES_TREE_URL, {
+      headers: { Accept: 'application/vnd.github+json', 'User-Agent': 'Nodus/4.0.0' },
+    }).then(async (response) => {
+      if (!response.ok) throw new Error(`El repositorio oficial de CSL respondió ${response.status}.`);
+      const payload = await response.json() as { tree?: Array<{ path?: string; type?: string }>; truncated?: boolean };
+      if (!Array.isArray(payload.tree)) throw new Error('El índice del repositorio oficial de CSL no es válido.');
+      return payload.tree.flatMap((entry) => entry.type === 'blob' && typeof entry.path === 'string'
+        && !entry.path.includes('/') && entry.path.toLowerCase().endsWith('.csl')
+        ? [{ id: entry.path.slice(0, -4), title: repositoryStyleTitle(entry.path.slice(0, -4)) }] : [])
+        .sort((a, b) => a.title.localeCompare(b.title));
+    }).catch((cause) => {
+      repositoryIndexPromise = null;
+      throw cause;
+    });
+  }
+  return repositoryIndexPromise;
+}
+
+export async function searchRepositoryCitationStyles(rawQuery: string, rawLimit = 80): Promise<LibraryCitationStyleRepositoryEntry[]> {
+  const query = normalizeStyleSearch(rawQuery);
+  const tokens = query.split(' ').filter(Boolean);
+  const limit = Math.max(1, Math.min(200, Number.isFinite(rawLimit) ? Math.trunc(rawLimit) : 80));
+  const index = await officialRepositoryIndex();
+  return index.filter((entry) => {
+    const haystack = normalizeStyleSearch(`${entry.title} ${entry.id}`);
+    return tokens.every((token) => haystack.includes(token));
+  }).slice(0, limit);
 }
 
 function bundledStyleXml(id: string): string | null {
@@ -151,7 +200,7 @@ export function listLibraryCitationStyles(): LibraryCitationStyleRecord[] {
       citationFormat: cached?.citationFormat
         ?? (bundledXml ? tagAttribute(bundledXml, 'category', 'citation-format') as LibraryCitationStyleRecord['citationFormat'] : null),
       dependentParent: null, rights: cached?.rights ?? OFFICIAL_ATTRIBUTION, license: 'CC-BY-SA-3.0',
-      availableOffline: !!(entry.pluginId && bundledStyleXml(entry.pluginId)) || !!cached, removable: false, warning: cached ? null : entry.pluginId ? null : 'El archivo CSL exacto se guardará desde el repositorio de estilos de Zotero la primera vez que se use.',
+      availableOffline: !!(entry.pluginId && bundledStyleXml(entry.pluginId)) || !!cached, removable: false, warning: cached ? null : entry.pluginId ? null : 'El archivo CSL exacto se guardará desde el repositorio oficial de CSL la primera vez que se use.',
     };
   });
   return [...builtins, ...stored.filter((entry) => !BUILTIN_STYLES.some((builtin) => builtin.id === entry.id || builtin.repositoryId === entry.id))]
@@ -194,10 +243,12 @@ export function importZoteroCitationStyleDirectories(directories = zoteroStyleDi
 }
 
 export async function installRepositoryCitationStyle(rawId: string): Promise<LibraryCitationStyleRecord> {
-  const id = rawId.trim().toLowerCase().replace(/^https?:\/\/(?:www\.)?zotero\.org\/styles\//, '').replace(/\.csl$/i, '');
-  if (!/^[a-z0-9][a-z0-9._-]{1,199}$/.test(id)) throw new Error('Introduce el identificador del estilo del repositorio de Zotero.');
-  const response = await fetch(`https://www.zotero.org/styles/${encodeURIComponent(id)}`, { headers: { Accept: 'application/vnd.citationstyles.style+xml, application/xml;q=0.9' } });
-  if (!response.ok) throw new Error(`El repositorio de Zotero respondió ${response.status}.`);
+  const id = repositoryIdFromUrl(rawId) ?? rawId.trim().toLowerCase().replace(/\.csl$/i, '');
+  if (!/^[a-z0-9][a-z0-9._-]{1,199}$/.test(id)) throw new Error('Introduce el identificador de un estilo del repositorio oficial de CSL.');
+  const response = await fetch(`${OFFICIAL_STYLES_RAW_URL}/${encodeURIComponent(id)}.csl`, {
+    headers: { Accept: 'application/vnd.citationstyles.style+xml, application/xml;q=0.9', 'User-Agent': 'Nodus/4.0.0' },
+  });
+  if (!response.ok) throw new Error(`El repositorio oficial de CSL respondió ${response.status}.`);
   const declaredLength = Number(response.headers.get('content-length') || 0);
   if (declaredLength > MAX_STYLE_BYTES) throw new Error('El estilo CSL supera el límite de 5 MB.');
   const xml = await response.text();

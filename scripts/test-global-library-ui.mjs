@@ -319,22 +319,37 @@ test('the global reader exposes annotations, metadata, chat and native attachmen
   assert.match(html, /connect-src[^"]*nodus-library:/);
 });
 
-test('citation UI loads, imports and removes real CSL styles including Zotero styles', async () => {
-  const [dialogs, manager, api] = await Promise.all([
+test('citation UI searches installed and official CSL styles without punctuation-sensitive matching', async () => {
+  const [dialogs, picker, manager, api, addinHtml, addinReferences] = await Promise.all([
     readSource('src/components/library/LibraryMetadataDialogs.tsx'),
+    readSource('src/components/library/CitationStylePicker.tsx'),
     readSource('electron/library/libraryCslStyles.ts'),
     readSource('shared/api/library.ts'),
+    readSource('word-addin/taskpane.html'),
+    readSource('word-addin/references.js'),
   ]);
   for (const marker of [
     'library-citation-style-manager', 'library-citation-style-search',
-    'import-library-csl', 'import-zotero-csl', 'install-repository-csl',
+    'library-citation-style-list', 'import-library-csl', 'import-zotero-csl',
+    'browse-csl-repository', 'library-csl-repository-search',
   ]) assert.match(dialogs, new RegExp(marker));
+  assert.match(dialogs, /max-h-72 overflow-y-auto/, 'installed styles have an independent scrollable list');
+  assert.match(dialogs, /input input-with-leading-icon w-full/, 'the manager search reserves space for its icon');
+  assert.match(picker, /normalize\('NFKD'\)/);
+  assert.match(picker, /replace\(\/\[\^a-z0-9\]\+\/g, ' '\)/, 'hyphens and punctuation normalize to spaces');
+  assert.match(picker, /tokens\.every/, 'multi-token searches can match non-contiguous words');
   assert.match(dialogs, /listGlobalLibraryCitationStyles/);
-  assert.match(manager, /citationstyles\.org/);
+  assert.match(manager, /citation-style-language\/styles/);
+  assert.match(manager, /raw\.githubusercontent\.com/);
+  assert.match(manager, /searchRepositoryCitationStyles/);
   assert.match(manager, /CC BY-SA 3\.0/);
   assert.match(manager, /@citation-js\/plugin-csl/);
   assert.match(api, /importGlobalLibraryCitationStyles/);
   assert.match(api, /importZoteroCitationStyles/);
+  assert.match(api, /searchGlobalLibraryRepositoryCitationStyles/);
+  assert.match(addinHtml, /id="referenceStyleSearch"/);
+  assert.match(addinReferences, /normalizeStyleSearch/);
+  assert.match(addinReferences, /renderStyleOptions/);
 });
 
 test('the typed bridge covers every global management operation', async () => {
@@ -358,6 +373,7 @@ test('the typed bridge covers every global management operation', async () => {
     'listZoteroSyncSessions', 'resumeZoteroLibraryImport',
     'startGlobalLibraryMetadataBatch', 'applyGlobalLibraryMetadataBatch', 'cancelGlobalLibraryMetadataBatch',
     'updateGlobalLibraryCitationKey', 'formatGlobalLibraryCitation', 'exportGlobalLibraryBibliography',
+    'searchGlobalLibraryRepositoryCitationStyles',
     'previewGlobalLibraryTrash', 'purgeGlobalLibraryTrash', 'auditGlobalLibraryRecovery',
     'previewGlobalLibraryMerge',
   ];
@@ -381,6 +397,7 @@ test('the typed bridge covers every global management operation', async () => {
     'library:updateCitationKey', 'library:formatCitation', 'library:exportBibliography',
     'library:citationStyles', 'library:importCitationStyles', 'library:importZoteroCitationStyles',
     'library:installRepositoryCitationStyle', 'library:removeCitationStyle',
+    'library:searchRepositoryCitationStyles',
     'library:trashImpact', 'library:purgeTrash', 'library:auditRecovery', 'library:mergeImpact',
   ]);
 });
@@ -421,6 +438,7 @@ test('Zotero bridge exposes import, status and clean-reader navigation', async (
 
 test('metadata management previews candidates, supports bulk confirmation and requires an explicit duplicate merge', async () => {
   const dialogs = await readSource('src/components/library/LibraryMetadataDialogs.tsx');
+  const picker = await readSource('src/components/library/CitationStylePicker.tsx');
   for (const marker of ['library-metadata-editor', 'library-metadata-batch-dialog', 'library-citation-export-dialog', 'library-duplicates-dialog']) assert.match(dialogs, new RegExp(marker));
   assert.match(dialogs, /Vista previa de cambios/);
   assert.match(dialogs, /Nada se aplica sin tu revisión/);
@@ -430,7 +448,8 @@ test('metadata management previews candidates, supports bulk confirmation and re
   assert.match(dialogs, /Buscando metadatos y texto completo/);
   assert.match(dialogs, /onGlobalLibraryMetadataBatchProgress/);
   assert.match(dialogs, /formatGlobalLibraryCitation/);
-  assert.match(dialogs, /styles\.map\(\(entry\)/, 'the citation chooser is populated by the installed CSL catalogue');
+  assert.match(dialogs, /<CitationStylePicker styles=\{styles\}/, 'the citation chooser receives the installed CSL catalogue');
+  assert.match(picker, /filtered\.map\(\(entry\)/, 'the searchable citation chooser renders its filtered catalogue');
   assert.match(dialogs, /'endnote-xml'[^\n]*'zotero-rdf'[^\n]*'csv'[^\n]*'markdown'/);
   assert.match(dialogs, /mergeGlobalLibraryItems/);
   assert.match(dialogs, /Las obras de vault permanecen separadas/);

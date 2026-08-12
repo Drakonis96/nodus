@@ -95,6 +95,7 @@ import {
   importLibraryCitationStyleFiles,
   importZoteroCitationStyleDirectories,
   installRepositoryCitationStyle,
+  searchRepositoryCitationStyles,
   listLibraryCitationStyles,
   removeLibraryCitationStyle,
 } from './libraryCslStyles';
@@ -833,6 +834,10 @@ export function importGlobalLibraryZoteroCitationStyles(directories?: string[]):
 
 export async function installGlobalLibraryRepositoryCitationStyle(styleId: string): Promise<LibraryCitationStyleRecord> {
   return installRepositoryCitationStyle(styleId);
+}
+
+export async function searchGlobalLibraryRepositoryCitationStyles(query: string, limit?: number) {
+  return searchRepositoryCitationStyles(query, limit);
 }
 
 export function removeGlobalLibraryCitationStyle(styleId: string): boolean {

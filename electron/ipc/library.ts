@@ -72,6 +72,7 @@ import {
   importGlobalLibraryCitationStyleFiles,
   importGlobalLibraryZoteroCitationStyles,
   installGlobalLibraryRepositoryCitationStyle,
+  searchGlobalLibraryRepositoryCitationStyles,
   removeGlobalLibraryCitationStyle,
   exportGlobalLibraryBibliography,
 } from '../library/libraryService';
@@ -207,6 +208,7 @@ export function registerLibraryIpc({ h }: IpcContext): void {
     return selected.canceled ? automatic : importGlobalLibraryZoteroCitationStyles(selected.filePaths);
   });
   h('library:installRepositoryCitationStyle', async (_event, styleId) => installGlobalLibraryRepositoryCitationStyle(styleId));
+  h('library:searchRepositoryCitationStyles', async (_event, query, limit) => searchGlobalLibraryRepositoryCitationStyles(String(query ?? ''), Number(limit ?? 80)));
   h('library:removeCitationStyle', async (_event, styleId) => removeGlobalLibraryCitationStyle(styleId));
   h('library:formatCitation', async (_event, itemIds, style, kind, locale) => {
     const result = await formatGlobalLibraryCitation(itemIds, style, kind, locale); clipboard.writeText(result.text); return result;

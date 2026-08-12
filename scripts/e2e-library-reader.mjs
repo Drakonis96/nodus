@@ -769,7 +769,9 @@ ${longReaderBody}
   await citationDialog.getByRole('button', { name: 'Gestionar estilos' }).click();
   await citationDialog.getByTestId('import-zotero-csl').click();
   await citationDialog.locator('b').filter({ hasText: 'Casa de Velázquez — E2E' }).waitFor();
-  await citationDialog.getByTestId('library-citation-style').selectOption('casa-velazquez-e2e');
+  await citationDialog.getByTestId('library-citation-style-trigger').click();
+  await citationDialog.getByTestId('library-citation-style-search').fill('casa velazquez');
+  await citationDialog.getByTestId('library-citation-style').getByRole('option', { name: /Casa de Velázquez — E2E/ }).click();
   await citationDialog.getByTestId('copy-library-citation').click();
   await citationDialog.locator('pre').filter({ hasText: work.title }).waitFor();
   await page.screenshot({ path: citationScreenshotPath, fullPage: true });

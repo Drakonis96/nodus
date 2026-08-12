@@ -43,6 +43,7 @@ import type {
   LibraryCitationResult,
   LibraryCitationStyle,
   LibraryCitationStyleRecord,
+  LibraryCitationStyleRepositoryEntry,
   LibraryCitationStyleImportReport,
   LibraryMetadataBatchProgress,
   LibraryMetadataBatchResult,
@@ -123,6 +124,7 @@ export interface LibraryApi {
   importGlobalLibraryCitationStyles(): Promise<LibraryCitationStyleImportReport>;
   importZoteroCitationStyles(): Promise<LibraryCitationStyleImportReport>;
   installGlobalLibraryRepositoryCitationStyle(styleId: string): Promise<LibraryCitationStyleRecord>;
+  searchGlobalLibraryRepositoryCitationStyles(query: string, limit?: number): Promise<LibraryCitationStyleRepositoryEntry[]>;
   removeGlobalLibraryCitationStyle(styleId: string): Promise<boolean>;
   formatGlobalLibraryCitation(itemIds: string[], style: LibraryCitationStyle, kind: 'citation' | 'bibliography', locale?: string): Promise<LibraryCitationResult>;
   exportGlobalLibraryBibliography(request: LibraryBibliographyExportRequest): Promise<LibraryBibliographyExportReport>;

@@ -177,7 +177,8 @@ main {
 .reference-preferences label:last-child { grid-column: 1 / -1; }
 .reference-preferences label { min-width: 0; color: var(--muted); font-size: 10px; }
 .reference-preferences span { display: block; margin: 0 0 3px 2px; }
-.reference-preferences select {
+.reference-preferences select,
+.reference-preferences input[type="search"] {
   width: 100%;
   min-width: 0;
   min-height: 30px;
@@ -189,6 +190,7 @@ main {
   font: inherit;
   font-size: 11px;
 }
+.reference-style-field input[type="search"] { margin-bottom: 4px; }
 
 .reference-auto { padding: 2px 1px; }
 .reference-document-actions { display: flex; gap: 6px; }

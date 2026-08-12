@@ -682,6 +682,11 @@ export interface LibraryCitationStyleRecord {
   warning: string | null;
 }
 
+export interface LibraryCitationStyleRepositoryEntry {
+  id: string;
+  title: string;
+}
+
 export interface LibraryCitationStyleImportReport {
   imported: number;
   updated: number;

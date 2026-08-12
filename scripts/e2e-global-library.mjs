@@ -688,7 +688,9 @@ try {
   await page.getByTestId('cite-library-item').click();
   const citationDialog = page.getByTestId('library-citation-export-dialog');
   await citationDialog.waitFor({ state: 'visible' });
-  await page.getByTestId('library-citation-style').selectOption('chicago-author-date');
+  await page.getByTestId('library-citation-style-trigger').click();
+  await page.getByTestId('library-citation-style-search').fill('chicago author');
+  await page.getByTestId('library-citation-style').getByRole('option', { name: /Chicago author-date/ }).click();
   await page.getByTestId('copy-library-citation').click();
   await citationDialog.getByText(/Mujeres solas en la posguerra/).waitFor();
   const copiedCitation = await page.evaluate(() => navigator.clipboard.readText());

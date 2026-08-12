@@ -239,6 +239,18 @@ try {
   const dependentCitation = await cslStyles.formatLibraryCitationCsl([citationRecord], 'casa-velazquez-fixture', 'citation', 'es-ES');
   assert.equal(dependentCitation.text, '[Mujeres solas en la posguerra]');
   assert.equal(dependentCitation.styleTitle, 'Casa de Velázquez fixture');
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async () => new Response(JSON.stringify({ truncated: false, tree: [
+    { path: 'estilo-casa-compra.csl', type: 'blob' },
+    { path: 'apa.csl', type: 'blob' },
+    { path: 'dependent/ignore.csl', type: 'blob' },
+  ] }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+  try {
+    const repositoryMatches = await cslStyles.searchRepositoryCitationStyles('estilo casa', 20);
+    assert.deepEqual(repositoryMatches.map((entry) => entry.id), ['estilo-casa-compra'], 'repository search ignores separators while preserving every query token');
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
   assert.equal(cslStyles.removeLibraryCitationStyle('casa-velazquez-fixture'), true);
   assert.equal(cslStyles.removeLibraryCitationStyle('centro-estudios-clm'), true);
   console.log('Global reader attachments, annotations, chat and CSL parity tests passed!');
