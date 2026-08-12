@@ -25,11 +25,13 @@ import { ANNOUNCEMENT_TRANSLATIONS } from './i18n.announcements';
 import { LIBRARY_READER_TRANSLATIONS } from './i18n.libraryReader';
 import { LIBRARY_BIBLIOGRAPHY_TRANSLATIONS } from './i18n.libraryBibliography';
 import { LIBRARY_RECOVERY_TRANSLATIONS } from './i18n.libraryRecovery';
+import { LIBRARY_ONBOARDING_TRANSLATIONS } from './i18n.libraryOnboarding';
 
 /** Complete static Italian interface table; coverage prohibits runtime fallbacks. */
 export const IT: Record<string, string> = {
   ...LIBRARY_READER_TRANSLATIONS.it,
   ...LIBRARY_BIBLIOGRAPHY_TRANSLATIONS.it,
+  ...LIBRARY_ONBOARDING_TRANSLATIONS.it,
   ...LIBRARY_RECOVERY_TRANSLATIONS.it,
   ...DIARIZATION_TRANSLATIONS.it,
   ...PROSOPOGRAPHY_TRANSLATIONS.it,

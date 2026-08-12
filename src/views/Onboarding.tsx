@@ -31,6 +31,7 @@ export function Onboarding({
   const [ping, setPing] = useState<{ ok: boolean; userId?: string; message?: string } | null>(null);
   const [collections, setCollections] = useState<ZoteroCollection[]>([]);
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [librarySetup, setLibrarySetup] = useState<'nodus' | 'zotero'>('nodus');
   const [readTag, setReadTag] = useState('leído');
   // The two models the vault needs. Seeded from what this vault already has so a
   // re-run of the wizard shows the current choice instead of resetting it.
@@ -61,6 +62,7 @@ export function Onboarding({
   const vaultType = activeVault?.type ?? 'academic';
   const usesZoteroOnboarding = vaultType === 'academic';
   const simple = !usesZoteroOnboarding;
+  const connectsZotero = usesZoteroOnboarding && librarySetup === 'zotero';
   const aiStep = simple ? 1 : 3; // the "AI provider" step index
   const doneStep = simple ? 2 : 4; // the final step index
 
@@ -86,10 +88,6 @@ export function Onboarding({
       setCollections(groups.flat());
     }
   };
-
-  useEffect(() => {
-    if (!simple) void checkZotero();
-  }, []);
 
   const toggleCollection = (key: string) => {
     setSelected((prev) => {
@@ -175,7 +173,7 @@ export function Onboarding({
         : [...settings.favorites, aiModel];
       const embeddingProvider = normalizeEmbeddingProvider(embeddingModel.provider);
       await window.nodus.updateSettings({
-        ...(simple ? {} : { monitoredCollections: Array.from(selected), readTag, zoteroStoragePath: storagePath }),
+        ...(connectsZotero ? { monitoredCollections: Array.from(selected), readTag, zoteroStoragePath: storagePath } : {}),
         favorites,
         synthesisModel: aiModel,
         embeddingProvider,
@@ -186,7 +184,7 @@ export function Onboarding({
       setStep(doneStep);
       // Only academic vaults ingest Zotero during setup. Study can import files or
       // connect Zotero later from its own Materials section.
-      if (!simple) {
+      if (connectsZotero) {
         const sync = await window.nodus.syncNow();
         const works = await window.nodus.listWorks();
         setSyncSummary(sync.summary);
@@ -214,10 +212,10 @@ export function Onboarding({
     setModelError(null);
     try {
       await window.nodus.updateSettings({
-        ...(simple ? {} : { monitoredCollections: Array.from(selected), readTag, zoteroStoragePath: storagePath }),
+        ...(connectsZotero ? { monitoredCollections: Array.from(selected), readTag, zoteroStoragePath: storagePath } : {}),
         onboardingComplete: true,
       });
-      if (!simple) await window.nodus.syncNow().catch(() => undefined);
+      if (connectsZotero) await window.nodus.syncNow().catch(() => undefined);
       onDone('home');
     } catch (error) {
       setModelError(error instanceof Error ? error.message : String(error));
@@ -228,7 +226,7 @@ export function Onboarding({
 
   const steps = simple
     ? [t('Introducción'), t('Proveedor de IA'), t('Listo')]
-    : [t('Conectar Zotero'), t('Colecciones'), t('Lecturas'), t('Proveedor de IA'), t('Primer resultado')];
+    : [t('Biblioteca'), connectsZotero ? t('Colecciones de Zotero') : t('Añadir contenido'), connectsZotero ? t('Lecturas de Zotero') : t('Cómo funciona'), t('Proveedor de IA'), t('Primer resultado')];
   const intro =
     vaultType === 'primary_sources'
       ? {
@@ -292,7 +290,7 @@ export function Onboarding({
           )}
         </div>
         <p className="text-neutral-400 text-sm mb-6">
-          {simple ? intro.subtitle : t('Teje tu biblioteca de Zotero en un grafo navegable de ideas y autores. Todo es local.')}
+          {simple ? intro.subtitle : t('Construye tu biblioteca dentro de Nodus o conecta Zotero. Las dos opciones terminan en el mismo grafo local.')}
         </p>
 
         {confirmExit && (
@@ -335,20 +333,32 @@ export function Onboarding({
         {step === 0 && !simple && (
           <div className="space-y-4">
             <p className="text-sm">
-              {t('Nodus usa la API local de Zotero en modo solo lectura (requiere Zotero 7 o posterior). Abre Zotero y verifica la conexión.')}
+              {t('Elige cómo quieres empezar. Puedes cambiar de método o combinar ambos más adelante desde Biblioteca.')}
             </p>
-            <button className="btn btn-primary" onClick={checkZotero}>
-              {t('Verificar conexión')}
-            </button>
-            {ping && (
-              <div className={`text-sm ${ping.ok ? 'text-emerald-400' : 'text-red-400'}`}>
-                {ping.ok ? tx('Conectado (userID {id})', { id: ping.userId ?? '' }) : tx('No disponible: {msg}', { msg: ping.message ?? t('sin respuesta') })}
+            <div className="grid gap-3 sm:grid-cols-2">
+              <button type="button" data-testid="onboarding-library-nodus" aria-pressed={librarySetup === 'nodus'} className={`rounded-xl border p-4 text-left ${librarySetup === 'nodus' ? 'border-indigo-500 bg-indigo-500/10' : 'border-neutral-700 hover:border-neutral-500'}`} onClick={() => setLibrarySetup('nodus')}>
+                <span className="flex items-center gap-2 font-semibold"><Icon name="library" /> {t('Biblioteca de Nodus')}</span>
+                <span className="mt-2 block text-xs leading-5 text-neutral-400">{t('Añade archivos, DOI, ISBN o referencias manuales y organiza tus propias colecciones. No necesitas Zotero.')}</span>
+              </button>
+              <button type="button" data-testid="onboarding-library-zotero" aria-pressed={librarySetup === 'zotero'} className={`rounded-xl border p-4 text-left ${librarySetup === 'zotero' ? 'border-indigo-500 bg-indigo-500/10' : 'border-neutral-700 hover:border-neutral-500'}`} onClick={() => { setLibrarySetup('zotero'); void checkZotero(); }}>
+                <span className="flex items-center gap-2 font-semibold"><Icon name="sync" /> Zotero</span>
+                <span className="mt-2 block text-xs leading-5 text-neutral-400">{t('Conecta tu biblioteca existente en modo solo lectura y elige qué colecciones monitorizar.')}</span>
+              </button>
+            </div>
+            {connectsZotero && <div className="rounded-xl border border-neutral-800 p-3">
+              <p className="text-xs text-neutral-400">{t('Nodus usa la API local de Zotero en modo solo lectura (requiere Zotero 7 o posterior). Abre Zotero y verifica la conexión.')}</p>
+              <button className="btn btn-secondary mt-3" onClick={checkZotero}>{t('Verificar conexión')}</button>
+              {ping && <div className={`mt-2 text-sm ${ping.ok ? 'text-emerald-400' : 'text-red-400'}`}>{ping.ok ? tx('Conectado (userID {id})', { id: ping.userId ?? '' }) : tx('No disponible: {msg}', { msg: ping.message ?? t('sin respuesta') })}</div>}
+            </div>}
+            {librarySetup === 'nodus' && (
+              <div className="rounded-xl border border-emerald-700/30 bg-emerald-500/5 p-3 text-xs leading-5 text-emerald-300">
+                {t('Puedes importar Zotero en cualquier momento sin reemplazar tus colecciones ni tus metadatos de Nodus.')}
               </div>
             )}
           </div>
         )}
 
-        {step === 1 && !simple && (
+        {step === 1 && !simple && connectsZotero && (
           <div className="space-y-3">
             <p className="text-sm text-neutral-400">
               {t('Elige las colecciones a monitorizar. Despliega cualquier colección para elegir subcolecciones concretas si una es demasiado grande. Se incorporan metadatos; los análisis se lanzan manualmente salvo que actives automatización en Ajustes.')}
@@ -365,7 +375,15 @@ export function Onboarding({
           </div>
         )}
 
-        {step === 2 && !simple && (
+        {step === 1 && !simple && !connectsZotero && (
+          <div className="space-y-3 rounded-xl border border-neutral-800 p-4">
+            <h3 className="font-semibold">{t('Añade como prefieras')}</h3>
+            <p className="text-sm leading-6 text-neutral-400">{t('Después del asistente podrás arrastrar PDF, EPUB y otros archivos a Biblioteca, añadir una obra por DOI o ISBN, importar referencias o crear una ficha manual.')}</p>
+            <p className="text-xs text-neutral-500">{t('Nodus tratará de completar metadatos y preparar una versión limpia de lectura automáticamente.')}</p>
+          </div>
+        )}
+
+        {step === 2 && !simple && connectsZotero && (
           <div className="space-y-4">
             <label className="block text-sm">
               {t('Tag de lectura')}
@@ -380,6 +398,13 @@ export function Onboarding({
                 onChange={(e) => setStoragePath(e.target.value)}
               />
             </label>
+          </div>
+        )}
+
+        {step === 2 && !simple && !connectsZotero && (
+          <div className="space-y-3 rounded-xl border border-neutral-800 p-4">
+            <h3 className="font-semibold">{t('Biblioteca y análisis son independientes')}</h3>
+            <p className="text-sm leading-6 text-neutral-400">{t('La Biblioteca conserva referencias y archivos. Cuando añades una obra a este vault, habilitas sus análisis, ideas, pasajes, embeddings y conexiones dentro de este espacio.')}</p>
           </div>
         )}
 
@@ -429,20 +454,20 @@ export function Onboarding({
               <p className="text-sm text-neutral-400 mt-1">
                 {simple
                   ? t('Tu bóveda está lista. El panel de Inicio te guiará en los primeros pasos.')
-                  : finishing
+                  : connectsZotero && finishing
                     ? t('Sincronizando Zotero para preparar el panel inicial...')
                     : finishError
                       ? t('No se pudo completar la primera sincronización, pero puedes entrar y corregirlo desde Inicio o Ajustes.')
-                      : t('La biblioteca local ya está preparada. El panel de Inicio te dirá qué conviene hacer después.')}
+                      : connectsZotero ? t('La biblioteca local ya está preparada. El panel de Inicio te dirá qué conviene hacer después.') : t('La Biblioteca de Nodus está lista. Añade tu primera obra desde Biblioteca cuando quieras.')}
               </p>
             </div>
-            {!simple && finishing && <Spinner label={t('Sincronizando metadatos...')} />}
+            {!simple && connectsZotero && finishing && <Spinner label={t('Sincronizando metadatos...')} />}
             {finishError && (
               <div className="rounded-lg border border-red-800 bg-red-950/40 px-3 py-2 text-sm text-red-300">
                 {finishError}
               </div>
             )}
-            {!simple && !finishing && !finishError && (
+            {!simple && connectsZotero && !finishing && !finishError && (
               <div className="grid grid-cols-2 gap-3">
                 <ResultMetric label={t('Obras locales')} value={syncedWorks ?? 0} />
                 <ResultMetric label={t('Colecciones')} value={selected.size} />

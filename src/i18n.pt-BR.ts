@@ -31,10 +31,12 @@ import { ANNOUNCEMENT_TRANSLATIONS } from './i18n.announcements';
 import { LIBRARY_READER_TRANSLATIONS } from './i18n.libraryReader';
 import { LIBRARY_BIBLIOGRAPHY_TRANSLATIONS } from './i18n.libraryBibliography';
 import { LIBRARY_RECOVERY_TRANSLATIONS } from './i18n.libraryRecovery';
+import { LIBRARY_ONBOARDING_TRANSLATIONS } from './i18n.libraryOnboarding';
 
 export const PT_BR: Record<string, string> = {
   ...LIBRARY_READER_TRANSLATIONS['pt-BR'],
   ...LIBRARY_BIBLIOGRAPHY_TRANSLATIONS['pt-BR'],
+  ...LIBRARY_ONBOARDING_TRANSLATIONS['pt-BR'],
   ...LIBRARY_RECOVERY_TRANSLATIONS['pt-BR'],
   ...DIARIZATION_TRANSLATIONS['pt-BR'],
   ...PROSOPOGRAPHY_TRANSLATIONS['pt-BR'],

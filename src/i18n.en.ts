@@ -25,6 +25,7 @@ import { ANNOUNCEMENT_TRANSLATIONS } from './i18n.announcements';
 import { LIBRARY_READER_TRANSLATIONS } from './i18n.libraryReader';
 import { LIBRARY_BIBLIOGRAPHY_TRANSLATIONS } from './i18n.libraryBibliography';
 import { LIBRARY_RECOVERY_TRANSLATIONS } from './i18n.libraryRecovery';
+import { LIBRARY_ONBOARDING_TRANSLATIONS } from './i18n.libraryOnboarding';
 
 /**
  * English translations keyed by the Spanish source string (see {@link ../i18n}).
@@ -34,6 +35,7 @@ import { LIBRARY_RECOVERY_TRANSLATIONS } from './i18n.libraryRecovery';
 export const EN: Record<string, string> = {
   ...LIBRARY_READER_TRANSLATIONS.en,
   ...LIBRARY_BIBLIOGRAPHY_TRANSLATIONS.en,
+  ...LIBRARY_ONBOARDING_TRANSLATIONS.en,
   ...LIBRARY_RECOVERY_TRANSLATIONS.en,
   ...DIARIZATION_TRANSLATIONS.en,
   ...PROSOPOGRAPHY_TRANSLATIONS.en,

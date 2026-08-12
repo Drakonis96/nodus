@@ -26,15 +26,20 @@ try {
   const { RELEASE_NOTES, releaseNotesForMajor, compareVersions } = await import(pathToFileURL(bundlePath).href);
   const currentRelease = RELEASE_NOTES[0];
   assert.equal(currentRelease?.version, '4.0.0');
-  assert.equal(currentRelease?.date, '2026-08-11');
-  assert.equal(currentRelease?.highlights.length, 5);
+  assert.equal(currentRelease?.date, '2026-08-12');
+  assert.equal(currentRelease?.highlights.length, 8);
   assert.deepEqual(currentRelease?.highlights.map((highlight) => highlight.scope), [
     'academic',
     'general',
     'academic',
     'academic',
+    'academic',
+    'academic',
+    'plugin',
     'general',
   ]);
+  assert.ok(currentRelease?.highlights.some((highlight) => /background queue/.test(highlight.en)));
+  assert.ok(currentRelease?.highlights.some((highlight) => /official CSL repository/.test(highlight.en)));
 
   const previousCurrentRelease = RELEASE_NOTES.find((note) => note.version === '3.2.7');
   assert.equal(previousCurrentRelease?.date, '2026-08-10');

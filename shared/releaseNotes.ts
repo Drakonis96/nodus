@@ -1110,12 +1110,39 @@ const RELEASE_4_0_0_HIGHLIGHTS: RawReleaseHighlight[] = [
   },
   {
     scope: 'academic',
+    es: 'La Biblioteca se adapta al trabajo diario. Arrastra archivos a una colección, abre acciones con el botón derecho, configura y mueve columnas y deja que Nodus infiera la ficha. Los documentos breves muestran progreso y los largos pasan a una cola en segundo plano mientras se abre el original.',
+    en: 'Library now fits everyday work. Drop files into a collection, open actions with a right click, configure and move columns, and let Nodus infer the record. Short documents show progress while long ones enter a background queue and open the original.',
+    fr: 'La Bibliothèque s’adapte au travail quotidien. Déposez des fichiers dans une collection, ouvrez les actions par clic droit, configurez et déplacez les colonnes et laissez Nodus déduire la notice. Les documents courts affichent leur progression et les longs rejoignent une file en arrière-plan pendant l’ouverture de l’original.',
+    de: 'Die Bibliothek passt zum Arbeitsalltag. Dateien lassen sich in Sammlungen ziehen, Aktionen per Rechtsklick öffnen und Spalten konfigurieren und verschieben. Nodus leitet den Datensatz ab. Kurze Dokumente zeigen Fortschritt, lange gehen in eine Hintergrundwarteschlange und öffnen das Original.',
+    pt: 'A Biblioteca adapta-se ao trabalho diário. Arraste ficheiros para uma coleção, abra ações com o botão direito, configure e mova colunas e deixe o Nodus inferir o registo. Documentos curtos mostram progresso e os longos entram numa fila em segundo plano enquanto o original abre.',
+    'pt-BR': 'A Biblioteca se adapta ao trabalho diário. Arraste arquivos para uma coleção, abra ações com o botão direito, configure e mova colunas e deixe o Nodus inferir o registro. Documentos curtos mostram progresso e os longos entram numa fila em segundo plano enquanto o original abre.',
+  },
+  {
+    scope: 'academic',
     es: 'El lector limpio conserva el original por separado y enlaza texto, páginas, imágenes, tablas y figuras. Permite subrayar, anotar, marcar secciones y preguntar al chat, mientras las huellas exactas impiden mostrar análisis obsoletos como actuales.',
     en: 'The clean reader keeps the original separate and links text, pages, images, tables and figures. It supports highlights, notes, section bookmarks and chat questions, while exact fingerprints prevent stale analysis from appearing current.',
     fr: 'Le lecteur propre conserve l’original séparé et relie texte, pages, images, tableaux et figures. Il permet de surligner, annoter, marquer des sections et interroger le chat, tandis que des empreintes exactes empêchent une analyse obsolète de paraître actuelle.',
     de: 'Der bereinigte Reader hält das Original getrennt und verknüpft Text, Seiten, Bilder, Tabellen und Abbildungen. Markierungen, Notizen, Abschnittslesezeichen und Chatfragen sind möglich, während exakte Fingerabdrücke veraltete Analysen kenntlich machen.',
     pt: 'O leitor limpo mantém o original separado e liga texto, páginas, imagens, tabelas e figuras. Permite sublinhar, anotar, marcar secções e perguntar ao chat, enquanto impressões digitais exatas impedem que análises obsoletas pareçam atuais.',
     'pt-BR': 'O leitor limpo mantém o original separado e liga texto, páginas, imagens, tabelas e figuras. Permite destacar, anotar, marcar seções e perguntar ao chat, enquanto impressões digitais exatas impedem que análises obsoletas pareçam atuais.',
+  },
+  {
+    scope: 'academic',
+    es: 'El lector abre Markdown limpio, PDF, EPUB, documentos, hojas de cálculo e imágenes en pestañas compactas. La búsqueda funciona en todos los formatos, las vistas continua e individual conservan subrayados al ampliar y el chat comparte las capacidades de Nodi para citar el documento y el vault.',
+    en: 'The reader opens clean Markdown, PDF, EPUB, documents, spreadsheets, and images in compact tabs. Search works across formats, continuous and single-page views preserve highlights while zooming, and chat shares Nodi capabilities for citing the document and vault.',
+    fr: 'Le lecteur ouvre Markdown propre, PDF, EPUB, documents, feuilles de calcul et images dans des onglets compacts. La recherche fonctionne dans tous les formats, les vues continue et page unique conservent les surlignages au zoom et le chat partage les capacités de Nodi pour citer le document et le coffre.',
+    de: 'Der Reader öffnet bereinigtes Markdown, PDF, EPUB, Dokumente, Tabellen und Bilder in kompakten Reitern. Die Suche funktioniert in allen Formaten, fortlaufende und Einzelseitenansicht bewahren Markierungen beim Zoomen und der Chat nutzt Nodi-Fähigkeiten für Belege aus Dokument und Tresor.',
+    pt: 'O leitor abre Markdown limpo, PDF, EPUB, documentos, folhas de cálculo e imagens em separadores compactos. A pesquisa funciona em todos os formatos, as vistas contínua e individual preservam os sublinhados ao ampliar e o chat partilha as capacidades do Nodi para citar o documento e o cofre.',
+    'pt-BR': 'O leitor abre Markdown limpo, PDF, EPUB, documentos, planilhas e imagens em abas compactas. A pesquisa funciona em todos os formatos, as vistas contínua e individual preservam destaques ao ampliar e o chat compartilha os recursos do Nodi para citar o documento e o cofre.',
+  },
+  {
+    scope: 'plugin',
+    es: 'Las citas llegan a Biblioteca, Word y LibreOffice con referencias vivas, notas y bibliografías. Los selectores buscan sin depender de guiones o acentos y el gestor instala estilos del repositorio oficial CSL o de tu Zotero conservando su licencia. El conector del navegador añade páginas y archivos con colección y etiquetas.',
+    en: 'Citations reach Library, Word, and LibreOffice with live references, notes, and bibliographies. Style pickers search without depending on hyphens or accents and the manager installs styles from the official CSL repository or your Zotero while preserving their license. The browser connector adds pages and files with collections and tags.',
+    fr: 'Les citations arrivent dans Bibliothèque, Word et LibreOffice avec références actives, notes et bibliographies. Les sélecteurs recherchent sans dépendre des traits d’union ou accents et le gestionnaire installe les styles du dépôt CSL officiel ou de votre Zotero en préservant leur licence. Le connecteur du navigateur ajoute pages et fichiers avec collection et étiquettes.',
+    de: 'Zitate kommen mit lebenden Referenzen, Fußnoten und Bibliografien in Bibliothek, Word und LibreOffice. Die Stilsuche hängt nicht von Bindestrichen oder Akzenten ab und installiert Stile aus dem offiziellen CSL-Repository oder Zotero unter Erhalt der Lizenz. Der Browser-Connector fügt Seiten und Dateien mit Sammlung und Tags hinzu.',
+    pt: 'As citações chegam à Biblioteca, Word e LibreOffice com referências vivas, notas e bibliografias. Os seletores pesquisam sem depender de hífenes ou acentos e o gestor instala estilos do repositório CSL oficial ou do seu Zotero preservando a licença. O conector do navegador adiciona páginas e ficheiros com coleção e etiquetas.',
+    'pt-BR': 'As citações chegam à Biblioteca, Word e LibreOffice com referências vivas, notas e bibliografias. Os seletores pesquisam sem depender de hífens ou acentos e o gerenciador instala estilos do repositório CSL oficial ou do seu Zotero preservando a licença. O conector do navegador adiciona páginas e arquivos com coleção e etiquetas.',
   },
   {
     scope: 'general',
@@ -1131,7 +1158,7 @@ const RELEASE_4_0_0_HIGHLIGHTS: RawReleaseHighlight[] = [
 const RAW_RELEASE_NOTES: RawReleaseNote[] = [
   {
     version: '4.0.0',
-    date: '2026-08-11',
+    date: '2026-08-12',
     highlights: RELEASE_4_0_0_HIGHLIGHTS,
   },
   {

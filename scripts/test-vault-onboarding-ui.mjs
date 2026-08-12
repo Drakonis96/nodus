@@ -123,11 +123,15 @@ test('preview vaults bypass setup and every automatic tutorial', async () => {
   assert.match(app, /\{!isPreviewVault && settings\.onboardingComplete &&/);
 });
 
-test('only academic onboarding requires Zotero; dedicated vaults stay local-first', async () => {
+test('academic onboarding offers Nodus Library or optional Zotero while dedicated vaults stay local-first', async () => {
   const onboarding = await read('src/views/Onboarding.tsx');
   assert.match(onboarding, /const usesZoteroOnboarding = vaultType === 'academic';/);
   assert.match(onboarding, /const simple = !usesZoteroOnboarding;/);
-  assert.match(onboarding, /if \(!simple\) void checkZotero\(\)/);
+  assert.match(onboarding, /useState<'nodus' \| 'zotero'>\('nodus'\)/);
+  assert.match(onboarding, /data-testid="onboarding-library-nodus"/);
+  assert.match(onboarding, /data-testid="onboarding-library-zotero"/);
+  assert.match(onboarding, /if \(connectsZotero\) \{[\s\S]*syncNow/);
+  assert.match(onboarding, /No necesitas Zotero/);
   assert.match(onboarding, /Organiza cursos, apuntes, materiales y repasos en un espacio de aprendizaje local/);
   assert.match(onboarding, /enlazar materiales de Zotero de forma opcional/);
   assert.match(onboarding, /Conserva entrevistas, participantes y transcripciones en un archivo de historia oral local y privado/);
