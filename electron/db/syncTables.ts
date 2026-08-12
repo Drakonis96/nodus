@@ -28,7 +28,17 @@ const SYNC_GROUPS: { key: SyncGroupKey; prefix?: string; tables?: string[] }[] =
   // que un enlace que llega a una maquina sin la entrevista de destino degrada bien. Lo
   // contrario -- una nota que llega sin sus enlaces -- perderia trabajo del investigador
   // en silencio.
-  { key: 'notes', tables: ['note_folders', 'notes', 'note_links', 'testimony_note_links'] },
+  // El Workspace escribe sobre estas mismas tablas: sus colecciones SON `note_folders` y
+  // sus notas e ideas SON `notes`. Lo que se le añade -- historial, comentarios anclados y
+  // enlaces con la biblioteca -- es trabajo de la persona, no un derivado del corpus, así
+  // que viaja con las notas por la misma razón que ellas.
+  {
+    key: 'notes',
+    tables: [
+      'note_folders', 'notes', 'note_links', 'testimony_note_links',
+      'note_versions', 'note_annotations', 'workspace_library_links',
+    ],
+  },
   {
     key: 'writing',
     tables: [

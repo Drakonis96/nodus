@@ -1,5 +1,6 @@
 import type Database from 'better-sqlite3';
 import { createHash } from 'node:crypto';
+import { migrateWorkspaceContent } from './workspaceMigration';
 
 export interface Migration {
   version: number;
@@ -10,7 +11,7 @@ export interface Migration {
 
 // Versioned, append-only migrations. Never edit an existing migration's SQL once
 // shipped — add a new one. The current schema version is the highest applied.
-export const SCHEMA_VERSION = 129;
+export const SCHEMA_VERSION = 130;
 
 export const migrations: Migration[] = [
   {
@@ -6416,6 +6417,90 @@ export const migrations: Migration[] = [
       CREATE INDEX library_analysis_provenance_library
         ON library_analysis_provenance(library_item_id, library_revision_fingerprint, component);
     `,
+  },
+  {
+    version: 130,
+    up: /* sql */ `
+      -- Workspace: Notas, Escritura y Proyectos pasan a ser UNA sección en la bóveda
+      -- académica. El almacén sigue siendo el árbol de notas que ya existía — las
+      -- colecciones SON note_folders y las notas e ideas SON notes — porque cambiar de
+      -- tabla habría obligado a mover contenido que hoy se lee bien, y a rehacer todo lo
+      -- que ya cuelga de él: búsqueda, embeddings, MCP, copias y sincronización.
+      --
+      -- Lo que se añade es lo que le faltaba a ese árbol para sostener el editor completo
+      -- (el mismo de Estudio y Docencia) y los enlaces con la biblioteca.
+
+      -- Ajustes de página, idioma del corrector y diccionario propio, por nota.
+      ALTER TABLE notes ADD COLUMN style_json TEXT NOT NULL DEFAULT '{}';
+      ALTER TABLE notes ADD COLUMN spellcheck_language TEXT NOT NULL DEFAULT 'es-ES';
+      ALTER TABLE notes ADD COLUMN custom_dictionary_json TEXT NOT NULL DEFAULT '[]';
+
+      -- Procedencia de una colección migrada ('project:<id>' o 'writing'). El índice
+      -- único es lo que hace IMPOSIBLE que una segunda pasada de la migración duplique
+      -- una colección: la garantía la da el motor, no el cuidado del código.
+      ALTER TABLE note_folders ADD COLUMN source_ref TEXT;
+      CREATE UNIQUE INDEX idx_note_folders_source_ref
+        ON note_folders(source_ref) WHERE source_ref IS NOT NULL;
+
+      -- La nota que representa a un documento guardado de Escritura. Misma función que
+      -- project_chapters.note_id, que ya existía: enlazar sin copiar dos veces.
+      ALTER TABLE writing_saved_drafts ADD COLUMN note_id TEXT;
+
+      -- Historial y comentarios anclados de una nota. Son gemelos de study_doc_versions
+      -- y study_annotations, y no reutilizan aquellas tablas porque su clave foránea
+      -- apunta a study_docs con ON DELETE CASCADE: colgar de ellas ids de notas dejaría
+      -- versiones huérfanas que nadie borraría nunca.
+      CREATE TABLE note_versions (
+        id               TEXT PRIMARY KEY,
+        note_id          TEXT NOT NULL REFERENCES notes(id) ON DELETE CASCADE,
+        version_no       INTEGER NOT NULL,
+        title            TEXT NOT NULL,
+        content_markdown TEXT NOT NULL,
+        style_json       TEXT NOT NULL DEFAULT '{}',
+        reason           TEXT NOT NULL DEFAULT 'manual',
+        content_hash     TEXT NOT NULL,
+        created_at       TEXT NOT NULL,
+        UNIQUE(note_id, version_no)
+      );
+      CREATE INDEX idx_note_versions_note ON note_versions(note_id, version_no DESC);
+      CREATE INDEX idx_note_versions_hash ON note_versions(note_id, content_hash);
+
+      CREATE TABLE note_annotations (
+        id            TEXT PRIMARY KEY,
+        note_id       TEXT NOT NULL REFERENCES notes(id) ON DELETE CASCADE,
+        from_pos      INTEGER NOT NULL DEFAULT 0,
+        to_pos        INTEGER NOT NULL DEFAULT 0,
+        selected_text TEXT NOT NULL DEFAULT '',
+        comment       TEXT NOT NULL DEFAULT '',
+        color         TEXT,
+        resolved_at   TEXT,
+        locked        INTEGER NOT NULL DEFAULT 0,
+        pinned        INTEGER NOT NULL DEFAULT 0,
+        position      INTEGER NOT NULL DEFAULT 0,
+        created_at    TEXT NOT NULL,
+        updated_at    TEXT NOT NULL
+      );
+      CREATE INDEX idx_note_annotations_note ON note_annotations(note_id, resolved_at, position);
+
+      -- Enlaces entre lo que se escribe y lo que se lee: una nota, una idea o una
+      -- colección pueden apuntar a varios elementos de la biblioteca.
+      --
+      -- SIN CLAVE FORÁNEA HACIA LA BIBLIOTECA, y es deliberado: los elementos globales
+      -- viven en OTRA base de datos (nodus-library), fuera de esta bóveda. Un enlace roto
+      -- se muestra como roto; nunca se lleva por delante la nota que lo hizo.
+      CREATE TABLE workspace_library_links (
+        owner_kind      TEXT NOT NULL CHECK (owner_kind IN ('note','collection')),
+        owner_id        TEXT NOT NULL,
+        library_item_id TEXT NOT NULL,
+        scope           TEXT NOT NULL DEFAULT 'global' CHECK (scope IN ('global','vault')),
+        label           TEXT,
+        created_at      TEXT NOT NULL,
+        PRIMARY KEY (owner_kind, owner_id, library_item_id, scope)
+      );
+      CREATE INDEX idx_workspace_library_links_item
+        ON workspace_library_links(library_item_id, owner_kind, owner_id);
+    `,
+    after: (db) => { migrateWorkspaceContent(db); },
   },
 ];
 
