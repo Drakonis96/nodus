@@ -5,7 +5,7 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import os from 'node:os';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { EventEmitter } from 'node:events';
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -49,6 +49,11 @@ try {
     const req = mockRequest('POST', '/api/editor/update-text', authHeaders(), {
       paragraphText: 'Este es el texto del parrafo en LibreOffice.',
       selectionText: 'LibreOffice',
+      documentId: 'writer-test-document',
+      references: {
+        documentId: 'writer-test-document', preferences: null, citations: [],
+        bibliographyFieldIds: [], bibliographies: [], selectedFieldId: null,
+      },
     });
     const res = mockResponse();
     await server.handleRequest(req, res, 4320);
@@ -61,6 +66,8 @@ try {
     assert.equal(stateRes.statusCode, 200);
     assert.equal(state.paragraphText, 'Este es el texto del parrafo en LibreOffice.');
     assert.equal(state.selectionText, 'LibreOffice');
+    assert.equal(state.documentId, 'writer-test-document');
+    assert.deepEqual(state.references.citations, []);
   }
 
   // The editor endpoints stay behind the bearer token.
@@ -177,6 +184,49 @@ try {
     assert.deepEqual(body.passages, [], 'no passages without embeddings');
   }
 
+  // Live citation commands travel intact to Writer, including embedded source
+  // metadata and the whole-document updates required for disambiguation.
+  {
+    const pollRes = mockResponse();
+    const pollPromise = server.handleRequest(
+      mockRequest('GET', '/api/editor/poll-insertion', authHeaders()),
+      pollRes,
+      4320
+    );
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    const command = {
+      command: 'insert-citation', text: '(Pérez Burgueño, 2023, p. 401)',
+      html: '(<i>Pérez Burgueño</i>, 2023, p. 401)',
+      field: {
+        format: 'nodus.office-reference', formatVersion: 1, fieldId: 'citation-live-1', kind: 'citation',
+        createdAt: '2026-08-12T00:00:00.000Z',
+        citation: {
+          citationId: 'citation-live-1', noteIndex: 0, placement: 'in-text',
+          citationItems: [{
+            id: 'work:one', locator: '401', label: 'page', prefix: 'véase ', suffix: '; comparación',
+            snapshot: { citationKey: 'perez2023', metadata: {
+              title: 'Análisis cuantitativo', itemType: 'article-journal', year: 2023,
+              creators: [{ creatorType: 'author', firstName: 'Jorge', lastName: 'Pérez Burgueño' }],
+              isbn: [], issn: [], tags: [],
+            } },
+          }],
+        },
+      },
+      citationUpdates: [{ citationId: 'citation-live-1', noteIndex: 0, itemIds: ['work:one'], text: '(Pérez Burgueño, 2023)', html: '(Pérez Burgueño, 2023)' }],
+      bibliography: null,
+      preferences: { formatVersion: 1, style: 'apa-7', locale: 'es-ES', placement: 'in-text', automaticUpdates: true },
+    };
+    const insertRes = mockResponse();
+    await server.handleRequest(mockRequest('POST', '/api/editor/insert', authHeaders(), command), insertRes, 4320);
+    assert.equal(JSON.parse(insertRes.getBody()).delivered, true);
+    await pollPromise;
+    const delivered = JSON.parse(pollRes.getBody());
+    assert.equal(delivered.command, 'insert-citation');
+    assert.deepEqual(delivered.field, command.field, 'the bridge must not flatten a live citation to plain text');
+    assert.deepEqual(delivered.citationUpdates, command.citationUpdates);
+    assert.deepEqual(delivered.preferences, command.preferences);
+  }
+
   // Compose over a selection with no embeddings: graceful available:false, no throw.
   {
     const res = mockResponse();
@@ -225,6 +275,15 @@ try {
       assert.equal(mode, 0o600, 'bridge file must be owner-only');
     }
   }
+
+  const macro = fs.readFileSync(path.join(repoRoot, 'scripts/nodus_copilot.py'), 'utf8');
+  assert.match(macro, /REFERENCE_BOOKMARK_PREFIX = "NODUS_REF_"/);
+  assert.match(macro, /com\.sun\.star\.text\.Footnote/);
+  assert.match(macro, /IsEndnote/);
+  assert.match(macro, /_apply_reference_updates/);
+  assert.match(macro, /_unlink_references/);
+  assert.match(macro, /_CitationHtmlParser/);
+  assert.match(macro, /com\.sun\.star\.awt\.AsyncCallback/, 'all Writer mutations must remain on the UI thread');
 
   console.log('LibreOffice Copilot integration test passed!');
 } finally {
@@ -342,7 +401,8 @@ function installRuntimeHooks(userDataPath) {
   };
 
   require.extensions['.ts'] = function loadTs(module, filename) {
-    const source = fs.readFileSync(filename, 'utf8');
+    const source = fs.readFileSync(filename, 'utf8')
+      .replace(/\bimport\.meta\.url\b/g, JSON.stringify(pathToFileURL(filename).href));
     const output = ts.transpileModule(source, {
       fileName: filename,
       compilerOptions: {

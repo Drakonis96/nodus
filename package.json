@@ -21,6 +21,7 @@
     "test:e2e:library-reader": "npm run build && node scripts/e2e-library-reader.mjs",
     "test:e2e:global-library": "npm run build && node scripts/e2e-global-library.mjs",
     "test:e2e:browser-connector": "node scripts/e2e-browser-connector.mjs",
+    "test:e2e:office-references": "node scripts/e2e-office-references.mjs",
     "test:e2e:local-server": "node scripts/e2e-local-server.mjs",
     "test:e2e:prosopography": "node scripts/test-prosopography-e2e.mjs",
     "test:e2e:testimony": "npm run build && node scripts/e2e-testimony.mjs",

@@ -35,6 +35,12 @@ try {
   assert.match(rendered, /<CustomTab id="Nodus\.Tab">/);
   assert.match(rendered, /<Label resid="Nodus\.Tab\.Label" \/>/);
   assert.doesNotMatch(rendered, /<OfficeTab id="TabHome">/);
+  for (const control of ['Nodus.CitationButton', 'Nodus.BibliographyButton', 'Nodus.RefreshButton', 'Nodus.PreferencesButton', 'Nodus.UnlinkButton']) {
+    assert.match(rendered, new RegExp(`<Control xsi:type="Button" id="${control}">`), `${control} must stay on the persistent Nodus tab`);
+  }
+  assert.match(rendered, /taskpane\.html#references-citation/);
+  assert.match(rendered, /taskpane\.html#references-bibliography/);
+  assert.match(rendered, /taskpane\.html#references-unlink/);
   assert.match(rendered, /<DefaultLocale>en-US<\/DefaultLocale>/);
   assert.match(rendered, /DefaultValue="Open the pane to see how your text relates to your library\."/);
   assert.match(rendered, /<bt:Override Locale="es-ES" Value="Abre el panel/);
@@ -44,10 +50,24 @@ try {
   // pane must never fall back to a Spanish string when a key is missing.
   const taskpaneHtml = fs.readFileSync(path.join(repoRoot, 'word-addin/taskpane.html'), 'utf8');
   const taskpaneJs = fs.readFileSync(path.join(repoRoot, 'word-addin/taskpane.js'), 'utf8');
+  const referencesJs = fs.readFileSync(path.join(repoRoot, 'word-addin/references.js'), 'utf8');
   assert.match(taskpaneHtml, /<html lang="en">/);
   assert.match(taskpaneHtml, />Analyze paragraph</);
   assert.doesNotMatch(taskpaneHtml, /Conectando|Buscar ideas|Analizar párrafo|Selección|Insertar en|Nota al pie|Pasajes/);
   assert.match(taskpaneJs, /table\[key\] !== undefined \? table\[key\] : STR\.en\[key\]/);
+  assert.match(taskpaneHtml, /<img class="mark" src="\/addin\/assets\/icon-32\.png"/, 'the pane must use the stylized Nodus mark');
+  assert.doesNotMatch(taskpaneHtml, /<div class="mark">N<\/div>/, 'a generic letter N must not be used as the brand');
+  assert.match(taskpaneHtml, /data-mode="references"/);
+  for (const id of ['referenceStyle', 'referenceLocale', 'referencePlacement', 'selectedReferences', 'insertCitation', 'insertBibliography', 'refreshReferences', 'unlinkReferences']) {
+    assert.match(taskpaneHtml, new RegExp(`id="${id}"`), `References UI must contain ${id}`);
+  }
+  assert.match(referencesJs, /Word\.FieldType\.addin/, 'Word citations must be live ADDIN fields');
+  assert.match(referencesJs, /insertFootnote/);
+  assert.match(referencesJs, /insertEndnote/);
+  assert.match(referencesJs, /suppressAuthor/);
+  assert.match(referencesJs, /uncitedItems/);
+  assert.match(referencesJs, /refresh-references/);
+  assert.match(referencesJs, /unlink-references/);
 
   // The Word bridge opens the full idea detail in Ideas, not the graph. The
   // nonce makes a second click on the same idea retrigger the selection.
