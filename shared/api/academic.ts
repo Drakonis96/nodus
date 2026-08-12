@@ -178,6 +178,9 @@ import type {
   WorkPassageStatus,
   WorkSummary,
   WorkView,
+  WorkspaceLibraryLink,
+  WorkspaceLibraryLinkInput,
+  WorkspaceLinkOwnerKind,
   WritingWorkshopBrief,
   WritingWorkshopDraft,
   WritingWorkshopDraftRequest,
@@ -712,6 +715,24 @@ export interface AcademicApi {
   updateNoteFolderSummary(id: string, summary: string): Promise<NoteFolder | null>;
   /** Match the folder summary against every idea (semantic + connections + AI) and suggest ideas to integrate. */
   suggestFolderIdeas(folderId: string): Promise<FolderIdeaSuggestionsResult>;
+
+  // Workspace: el mismo editor de Estudio y Docencia, escribiendo sobre una nota, y los
+  // enlaces persistentes entre lo que se escribe y la biblioteca del usuario.
+  getWorkspaceNoteEditorData(noteId: string): Promise<StudyDocEditorData>;
+  updateWorkspaceNote(noteId: string, input: StudyDocUpdateInput): Promise<Note>;
+  restoreWorkspaceNoteVersion(noteId: string, versionId: string): Promise<Note>;
+  createWorkspaceAnnotation(noteId: string, input: StudyAnnotationInput): Promise<StudyAnnotation>;
+  updateWorkspaceAnnotation(id: string, patch: Partial<StudyAnnotationInput> & { resolved?: boolean }): Promise<StudyAnnotation | null>;
+  deleteWorkspaceAnnotation(id: string): Promise<void>;
+  listWorkspaceLibraryLinks(ownerKind: WorkspaceLinkOwnerKind, ownerId: string): Promise<WorkspaceLibraryLink[]>;
+  listAllWorkspaceLibraryLinks(): Promise<WorkspaceLibraryLink[]>;
+  addWorkspaceLibraryLink(input: WorkspaceLibraryLinkInput): Promise<WorkspaceLibraryLink>;
+  removeWorkspaceLibraryLink(
+    ownerKind: WorkspaceLinkOwnerKind,
+    ownerId: string,
+    libraryItemId: string,
+    scope?: 'global' | 'vault'
+  ): Promise<void>;
   /** Check which inline citations resolve to a real source. Key is `${kind}:${id}`. */
   verifyCitations(refs: CitationRef[]): Promise<Record<string, boolean>>;
   /** Lightweight preview (title + snippet) of a cited source for its hover-card. Null if it no longer resolves. */

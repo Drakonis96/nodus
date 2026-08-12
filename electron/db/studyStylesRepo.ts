@@ -265,10 +265,10 @@ export function recordStudyImprovement(input: Omit<StudyImprovementLog, 'id' | '
   const id = crypto.randomUUID();
   const createdAt = now();
   getDb().prepare(`INSERT INTO study_improvement_log
-    (id, document_id, style_id, scope, mode, level, length_mode, model_provider, model_name, original_hash,
+    (id, document_id, note_id, style_id, scope, mode, level, length_mode, model_provider, model_name, original_hash,
      result_hash, original_chars, result_chars, warnings_json, action, created_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
-    .run(id, input.documentId, input.styleId, input.scope, input.mode, input.level, input.length, input.modelProvider,
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+    .run(id, input.documentId ?? null, input.noteId ?? null, input.styleId, input.scope, input.mode, input.level, input.length, input.modelProvider,
       input.modelName, input.originalHash, input.resultHash, input.originalChars, input.resultChars, JSON.stringify(input.warnings),
       input.action, createdAt);
   return { ...input, id, createdAt };
@@ -278,10 +278,16 @@ export function updateStudyImprovementAction(id: string, action: StudyImprovemen
   getDb().prepare('UPDATE study_improvement_log SET action = ? WHERE id = ?').run(action, id);
 }
 
+/** El registro de una procedencia: un documento de estudio o una nota del Workspace. */
 export function listStudyImprovementLog(documentId: string): StudyImprovementLog[] {
-  return (getDb().prepare('SELECT * FROM study_improvement_log WHERE document_id = ? ORDER BY created_at DESC').all(documentId) as Row[])
+  return (getDb().prepare(
+    'SELECT * FROM study_improvement_log WHERE document_id = ? OR note_id = ? ORDER BY created_at DESC'
+  ).all(documentId, documentId) as Row[])
     .map((row) => ({
-      id: String(row.id), documentId: String(row.document_id), styleId: String(row.style_id),
+      id: String(row.id),
+      documentId: row.document_id ? String(row.document_id) : null,
+      noteId: row.note_id ? String(row.note_id) : null,
+      styleId: String(row.style_id),
       scope: String(row.scope) as StudyImprovementLog['scope'], mode: String(row.mode) as StudyImprovementLog['mode'],
       level: String(row.level) as StudyImprovementLog['level'], length: String(row.length_mode) as StudyImprovementLog['length'],
       modelProvider: String(row.model_provider), modelName: String(row.model_name), originalHash: String(row.original_hash),

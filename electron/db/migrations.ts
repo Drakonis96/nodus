@@ -6499,6 +6499,48 @@ export const migrations: Migration[] = [
       );
       CREATE INDEX idx_workspace_library_links_item
         ON workspace_library_links(library_item_id, owner_kind, owner_id);
+
+      -- El registro de mejoras de IA es del EDITOR, no del vault de Estudio, y el editor
+      -- pasa a escribirse también sobre notas. Su 'document_id' era NOT NULL contra
+      -- study_docs, así que una mejora sobre una nota fallaba con un error de clave
+      -- foránea. Se reconstruye con las dos procedencias posibles, cada una con su propio
+      -- borrado en cascada, y con el CHECK que impide una fila sin dueño. Cada fila
+      -- existente se copia columna a columna: no se pierde ni un registro.
+      ALTER TABLE study_improvement_log RENAME TO study_improvement_log_v129;
+      CREATE TABLE study_improvement_log (
+        id               TEXT PRIMARY KEY,
+        document_id      TEXT REFERENCES study_docs(id) ON DELETE CASCADE,
+        note_id          TEXT REFERENCES notes(id) ON DELETE CASCADE,
+        style_id         TEXT NOT NULL,
+        scope            TEXT NOT NULL,
+        mode             TEXT NOT NULL,
+        level            TEXT NOT NULL,
+        length_mode      TEXT NOT NULL,
+        model_provider   TEXT NOT NULL,
+        model_name       TEXT NOT NULL,
+        original_hash    TEXT NOT NULL,
+        result_hash      TEXT NOT NULL,
+        original_chars   INTEGER NOT NULL,
+        result_chars     INTEGER NOT NULL,
+        warnings_json    TEXT NOT NULL DEFAULT '[]',
+        action           TEXT NOT NULL DEFAULT 'generated',
+        created_at       TEXT NOT NULL,
+        CHECK (document_id IS NOT NULL OR note_id IS NOT NULL)
+      );
+      INSERT INTO study_improvement_log (
+        id, document_id, note_id, style_id, scope, mode, level, length_mode, model_provider,
+        model_name, original_hash, result_hash, original_chars, result_chars, warnings_json,
+        action, created_at
+      )
+      SELECT
+        id, document_id, NULL, style_id, scope, mode, level, length_mode, model_provider,
+        model_name, original_hash, result_hash, original_chars, result_chars, warnings_json,
+        action, created_at
+      FROM study_improvement_log_v129;
+      DROP TABLE study_improvement_log_v129;
+      CREATE INDEX idx_study_improvement_log_doc ON study_improvement_log(document_id, created_at DESC);
+      CREATE INDEX idx_study_improvement_log_note ON study_improvement_log(note_id, created_at DESC);
+      CREATE INDEX idx_study_improvement_log_hash ON study_improvement_log(original_hash, result_hash);
     `,
     after: (db) => { migrateWorkspaceContent(db); },
   },

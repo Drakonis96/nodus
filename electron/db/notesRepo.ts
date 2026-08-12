@@ -18,6 +18,7 @@ interface NoteFolderRow {
   name: string;
   summary: string | null;
   order_idx: number;
+  source_ref: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -47,6 +48,7 @@ function toFolder(row: NoteFolderRow): NoteFolder {
     name: row.name,
     summary: row.summary ?? '',
     orderIdx: row.order_idx,
+    sourceRef: row.source_ref ?? null,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
