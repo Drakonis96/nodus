@@ -111,7 +111,11 @@ test('Manifest V3 package minimizes permission and contains no remote executable
   assert.match(manifest.content_security_policy.extension_pages, /script-src 'self'/);
   assert.doesNotMatch(manifest.content_security_policy.extension_pages, /https?:/);
   for (const size of [16, 32, 48, 128]) assert.ok(existsSync(path.join(root, `browser-extension/icons/icon-${size}.png`)));
-  for (const locale of ['en', 'es']) JSON.parse(readFileSync(path.join(root, `browser-extension/_locales/${locale}/messages.json`), 'utf8'));
+  JSON.parse(readFileSync(path.join(root, 'browser-extension/_locales/en/messages.json'), 'utf8'));
+  assert.equal(existsSync(path.join(root, 'browser-extension/_locales/es/messages.json')), false, 'the connector must stay English-only');
   const popup = readFileSync(path.join(root, 'browser-extension/popup.html'), 'utf8');
+  const popupScript = readFileSync(path.join(root, 'browser-extension/popup.js'), 'utf8');
   assert.doesNotMatch(popup, /<script[^>]+src=["']https?:/i);
+  assert.match(popupScript, /document\.documentElement\.lang = 'en'/);
+  assert.doesNotMatch(popupScript, /ITEM_TYPE_LABELS_ES|spanishUi/);
 });
