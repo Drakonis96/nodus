@@ -329,7 +329,7 @@ test('citation UI searches installed and official CSL styles without punctuation
     readSource('word-addin/references.js'),
   ]);
   for (const marker of [
-    'library-citation-style-manager', 'library-citation-style-search',
+    'library-citation-style-manager', 'library-installed-style-search',
     'library-citation-style-list', 'import-library-csl', 'import-zotero-csl',
     'browse-csl-repository', 'library-csl-repository-search',
   ]) assert.match(dialogs, new RegExp(marker));
