@@ -21,6 +21,7 @@ import {
   resolveGlobalLibraryMetadata,
   updateGlobalLibraryAttachment,
 } from '../library/libraryService';
+import { downloadLibraryFullText } from '../library/libraryFullText';
 import {
   MAX_PUBLIC_DOWNLOAD_BYTES,
   fetchPublicAttachment,
@@ -33,6 +34,17 @@ const MAX_SNAPSHOT_CHARS = 6 * 1024 * 1024;
 
 function cleanText(value: unknown, limit = 10_000): string {
   return typeof value === 'string' ? value.replace(/\s+/g, ' ').trim().slice(0, limit) : '';
+}
+
+function expectsPdf(candidate: BrowserConnectorAttachmentCandidate): boolean {
+  return candidate.resolveFullText === true
+    || candidate.mimeType?.split(';')[0].toLowerCase() === 'application/pdf'
+    || /\.pdf(?:$|[?#])/i.test(candidate.url)
+    || /\.pdf$/i.test(candidate.fileName ?? '');
+}
+
+function hasPdfSignature(bytes: Uint8Array): boolean {
+  return Buffer.from(bytes.subarray(0, 1024)).includes(Buffer.from('%PDF-'));
 }
 
 
@@ -126,8 +138,20 @@ export async function saveBrowserCapture(request: BrowserConnectorCaptureRequest
   for (const [index, candidate] of attachments.entries()) {
     let temporary: { dir: string; file: string } | null = null;
     try {
-      const response = await fetchPublicAttachment(candidate.url);
-      temporary = await responseToTemporaryFile(response, candidate);
+      if (expectsPdf(candidate)) {
+        const downloaded = await downloadLibraryFullText({
+          metadata: preview.metadata,
+          sourceUrl: request.pageUrl,
+          fullTextLinks: [{ url: candidate.url, mimeType: candidate.mimeType ?? null, source: 'landing-page' }],
+        });
+        if (downloaded.status !== 'downloaded' || !downloaded.temporaryDirectory || !downloaded.filePath) {
+          throw new Error(downloaded.message || 'The scholarly full-text link did not resolve to a PDF.');
+        }
+        temporary = { dir: downloaded.temporaryDirectory, file: downloaded.filePath };
+      } else {
+        const response = await fetchPublicAttachment(candidate.url);
+        temporary = await responseToTemporaryFile(response, candidate);
+      }
       record = await attachFile(record.id, temporary.file, candidate, index === 0 && candidate.role === 'original');
     } catch (error) {
       const reason = error instanceof Error ? error.message : String(error);
@@ -164,6 +188,9 @@ export async function saveBrowserCapture(request: BrowserConnectorCaptureRequest
 
 export async function uploadBrowserAttachment(itemId: string, bytes: Uint8Array, input: Omit<BrowserConnectorAttachmentCandidate, 'url'> & { url?: string }): Promise<BrowserConnectorSaveResult> {
   if (!bytes.byteLength || bytes.byteLength > MAX_REMOTE_BYTES) throw new Error('The uploaded attachment must be between 1 byte and 64 MB.');
+  if (input.mimeType?.split(';')[0].toLowerCase() === 'application/pdf' && !hasPdfSignature(bytes)) {
+    throw new Error('The uploaded file was labelled as a PDF but did not contain a PDF document.');
+  }
   const current = getGlobalLibraryItem(itemId);
   if (!current || current.deletedAt) throw new Error('The captured library item no longer exists.');
   const fileName = safeRemoteFileName(input.fileName || input.title, input.mimeType, input.url);

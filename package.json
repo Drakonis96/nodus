@@ -1,6 +1,6 @@
 {
   "name": "nodus",
-  "version": "4.0.0",
+  "version": "4.0.1",
   "description": "Local-first desktop app that turns a Zotero library into a navigable graph of ideas and authors.",
   "author": "Nodus",
   "license": "AGPL-3.0-only",
@@ -31,6 +31,7 @@
     "verify:vector-scan": "ELECTRON_RUN_AS_NODE=1 ./node_modules/.bin/electron scripts/verify-vector-scan.mjs",
     "verify:library-metadata-live": "node scripts/verify-library-metadata-live.mjs",
     "verify:browser-connector": "node scripts/verify-browser-connector-server.mjs",
+    "verify:browser-connector-live": "node scripts/verify-browser-connector-live.mjs",
     "verify:study-whisper": "node scripts/verify-study-whisper.mjs",
     "verify:study-improve-local": "node scripts/verify-study-improve-local.mjs",
     "verify:database-records": "node scripts/verify-database-records.mjs",

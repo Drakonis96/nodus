@@ -90,6 +90,36 @@ test('deduplicates attachment candidates and supports a generic readable snapsho
   assert.equal(result.snapshotAvailable, true);
 });
 
+test('treats an extensionless Dialnet full-text link as a resolvable original PDF', () => {
+  const result = detectCapture({
+    ...base,
+    title: 'Dialnet record',
+    url: 'https://dialnet.unirioja.es/servlet/articulo?codigo=9012474',
+    contentType: 'text/html',
+    html: '<html><body>catalogue snapshot, not the paper</body></html>',
+    metas: [
+      { name: 'citation_title', content: 'Análisis cuantitativo de los diarios de pioneros' },
+      { name: 'citation_author', content: 'Jorge Pérez Burgueño' },
+      { name: 'citation_date', content: '2023' },
+      { name: 'citation_journal_title', content: 'Vínculos de Historia' },
+    ],
+    anchors: [{
+      href: 'https://dialnet.unirioja.es/servlet/articulo?codigo=9012474&orden=0&info=link',
+      text: 'Texto completo',
+      title: 'Acceder al texto completo del artículo',
+      type: '',
+    }],
+  });
+  assert.equal(result.metadataSource, 'highwire');
+  assert.equal(result.attachments.length, 1);
+  assert.deepEqual(result.attachments[0], {
+    url: 'https://dialnet.unirioja.es/servlet/articulo?codigo=9012474&orden=0&info=link',
+    title: 'Full text PDF', fileName: 'full-text.pdf', mimeType: 'application/pdf',
+    role: 'original', resolveFullText: true,
+  });
+  assert.equal(result.snapshotAvailable, true, 'the user may still opt into a supplementary snapshot');
+});
+
 test('collection paths remain hierarchical and searchable without losing context', () => {
   const collections = [
     { id: 'history', parentId: null, name: 'History', position: 0 },
@@ -158,4 +188,6 @@ test('Manifest V3 package minimizes permission and contains no remote executable
   assert.doesNotMatch(popup, /<script[^>]+src=["']https?:/i);
   assert.match(popupScript, /document\.documentElement\.lang = 'en'/);
   assert.doesNotMatch(popupScript, /ITEM_TYPE_LABELS_ES|spanishUi/);
+  assert.match(popupScript, /snapshotAvailable && !state\.capture\.attachments\.length/, 'a detected full text keeps the HTML snapshot off by default');
+  assert.match(popupScript, /if \(!state\.token\) await pair\(\)/, 'opening the popup establishes the local token automatically');
 });

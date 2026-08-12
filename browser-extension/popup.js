@@ -74,7 +74,14 @@ async function collectPageSnapshot() {
   const jsonLd = [...document.querySelectorAll('script[type="application/ld+json"]')].slice(0, 80).map((el) => (el.textContent || '').slice(0, 1000000));
   const coins = [...document.querySelectorAll('.Z3988[title], span[title^="ctx_ver="]')].slice(0, 100).map((el) => el.getAttribute('title') || '');
   const filePattern = /\.(?:pdf|epub|docx?|odt|rtf|txt|md|xml|jats|csv|tsv|xlsx?|ods|pptx?|odp|png|jpe?g|webp|gif|tiff?|svg|mp3|m4a|wav|ogg|flac|mp4|webm)(?:$|[?#])/i;
-  const anchors = [...document.querySelectorAll('a[href]')].filter((el) => filePattern.test(el.href || '')).slice(0, 80).map((el) => ({ href: el.href || '', text: (el.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 300), type: el.getAttribute('type') || '' }));
+  const fullTextPattern = /(?:\bpdf\b|full\s*text|texto\s+completo|texte\s+int[ée]gral|volltext|testo\s+completo|texto\s+integral|tam\s+metin|descargar\s+(?:art[ií]culo|pdf)|download\s+(?:article|paper|pdf))/i;
+  const anchors = [...document.querySelectorAll('a[href]')].filter((el) => {
+    const label = `${el.textContent || ''} ${el.getAttribute('title') || ''}`;
+    return filePattern.test(el.href || '') || el.getAttribute('type') === 'application/pdf' || fullTextPattern.test(label);
+  }).slice(0, 80).map((el) => ({
+    href: el.href || '', text: (el.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 300),
+    title: (el.getAttribute('title') || '').slice(0, 500), type: el.getAttribute('type') || '',
+  }));
   let rawHtml = '';
   if (document.contentType === 'text/html' || document.contentType === 'application/xhtml+xml') {
     const clone = document.documentElement.cloneNode(true);
@@ -111,7 +118,11 @@ async function api(path, options = {}, token = state.token, port = state.port) {
   if (token) headers.Authorization = `Bearer ${token}`;
   if (options.body && !(options.body instanceof ArrayBuffer) && !headers['Content-Type']) headers['Content-Type'] = 'application/json';
   const response = await requestLocalJson(`${baseUrl(port)}${path}`, { ...options, headers });
-  if (!response.ok) throw new Error(response.data.error || `Nodus returned ${response.status}.`);
+  if (!response.ok) {
+    const error = new Error(response.data.error || `Nodus returned ${response.status}.`);
+    error.status = response.status;
+    throw error;
+  }
   return response.data;
 }
 
@@ -125,6 +136,12 @@ async function adoptConnection(connection) {
   await chrome.storage.local.set({ port: connection.port });
 }
 
+async function pair() {
+  const paired = await api('/api/browser/pair', { method: 'POST', body: JSON.stringify({ extensionVersion: chrome.runtime.getManifest().version, pageUrl: state.capture?.pageUrl || state.tab?.url || '' }) }, '');
+  state.token = paired.token;
+  await chrome.storage.local.set({ port: state.port, token: state.token });
+}
+
 async function connect() {
   const inputPort = normalizeConnectorPort($('pair-port').value);
   state.port = inputPort; $('pair-button').disabled = true; $('connect-error').textContent = '';
@@ -135,9 +152,7 @@ async function connect() {
     const { health } = connection;
     if (!health.enabled) throw new Error(msg('enableInNodus'));
     if (!health.libraryReady) throw new Error(msg('libraryNotReady'));
-    const paired = await api('/api/browser/pair', { method: 'POST', body: JSON.stringify({ extensionVersion: chrome.runtime.getManifest().version, pageUrl: state.capture?.pageUrl || state.tab?.url || '' }) }, '');
-    state.token = paired.token;
-    await chrome.storage.local.set({ port: state.port, token: state.token });
+    await pair();
     await loadCatalog(); renderCapture();
   } catch (error) { $('connect-error').textContent = error.message || String(error); }
   finally { $('pair-button').disabled = false; }
@@ -263,9 +278,18 @@ async function initConnection() {
     if (!connection) { show('connect-view'); return; }
     await adoptConnection(connection);
     const { health } = connection;
-    if (!health.enabled || !state.token) { show('connect-view'); return; }
+    if (!health.enabled) { show('connect-view'); return; }
     if (!health.libraryReady) { show('connect-view'); $('connect-error').textContent = msg('libraryNotReady'); return; }
-    await loadCatalog();
+    if (!state.token) await pair();
+    try {
+      await loadCatalog();
+    } catch (error) {
+      if (error.status !== 401) throw error;
+      state.token = '';
+      await chrome.storage.local.remove(['token']);
+      await pair();
+      await loadCatalog();
+    }
   } catch { show('connect-view'); }
 }
 

@@ -110,7 +110,7 @@ function contentDispositionFileName(response: Response): string | undefined {
   return /filename\s*=\s*"([^"]+)"/i.exec(raw)?.[1] ?? /filename\s*=\s*([^;\s]+)/i.exec(raw)?.[1];
 }
 
-function suggestedPdfName(candidate: LibraryMetadataCandidate, response: Response, url: string): string {
+function suggestedPdfName(candidate: Pick<LibraryMetadataCandidate, 'metadata'>, response: Response, url: string): string {
   const declared = contentDispositionFileName(response);
   if (declared) return declared.toLowerCase().endsWith('.pdf') ? declared : `${declared}.pdf`;
   const creator = candidate.metadata.creators[0];
@@ -125,7 +125,7 @@ function suggestedPdfName(candidate: LibraryMetadataCandidate, response: Respons
 }
 
 export async function downloadLibraryFullText(
-  candidate: LibraryMetadataCandidate,
+  candidate: Pick<LibraryMetadataCandidate, 'metadata' | 'sourceUrl' | 'fullTextLinks'>,
   options: FullTextFetchOptions = {},
 ): Promise<LibraryFullTextDownload> {
   const queue = [

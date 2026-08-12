@@ -95,6 +95,10 @@ const RELEASE_3_2_4_TR: string[] = [
 ];
 
 export const RELEASE_NOTES_TR: Record<string, string[]> = {
+  "4.0.1": [
+    "Chrome bağlayıcısı Nodus içinde etkinleştirdiğiniz anda artık otomatik olarak eşleşiyor. Gereksiz yerel onay penceresi kaldırıldı ve belirtecini iptal ederseniz bağlayıcıyı yeniden açtığınızda tarayıcı kendiliğinden yenisini alıyor.",
+    "Akademik tam metin bağlantıları adresleri PDF ile bitmese bile artık izleniyor. Nodus, Dialnet ve OJS gibi sayfalardan geçiyor, gerçek PDF imzasını doğruluyor ve temiz Markdown metnini HTML görüntüsünden değil makaleden hazırlıyor.",
+  ],
   "4.0.0": [
     "Kitaplık, Global ve Bu kasa kapsamlarını tek ekranda birleştirir. Nodus 3'ten güncelleyenler başlangıçta derlemlerini, filtrelerini, analizlerini ve izlenen koleksiyonlarını korur ve kasalar arası kitaplığı istedikleri zaman etkinleştirebilir.",
     "Global geçiş isteğe bağlıdır, envanteri, alanı ve ilerlemeyi gösterir ve kaynak kasaları değiştirmeden iptal edilebilir, sürdürülebilir veya geri alınabilir. Veriler dönüştürülmeden önce Nodus 4'ün ilk açılışı v4 öncesi bir kurtarma kopyası oluşturup doğrular.",

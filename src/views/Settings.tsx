@@ -2202,7 +2202,7 @@ export function Settings({
             </div>
             <div className="rounded-lg border border-neutral-200 bg-neutral-50 px-3 py-2 text-xs dark:border-neutral-800 dark:bg-neutral-950/50">
               {settings.browserConnectorEnabled && zoteroStatus.running ? (
-                <span className="text-emerald-700 dark:text-emerald-400">{t('Listo para emparejar')}: {zoteroStatus.url}</span>
+                <span className="text-emerald-700 dark:text-emerald-400">{t('Conector listo')}: {zoteroStatus.url}</span>
               ) : zoteroStatus.error ? (
                 <span className="text-red-700 dark:text-red-400">{t('Error')}: {zoteroStatus.error}</span>
               ) : (
@@ -2231,10 +2231,10 @@ export function Settings({
                 className="btn btn-ghost border border-neutral-300 dark:border-neutral-700"
                 onClick={async () => {
                   await window.nodus.regenerateBrowserConnectorToken();
-                  flash(t('Se ha revocado el acceso de los navegadores emparejados.'));
+                  flash(t('Acceso del conector restablecido.'));
                 }}
               >
-                <Icon name="refresh" /> {t('Revocar navegadores emparejados')}
+                <Icon name="refresh" /> {t('Restablecer acceso del conector')}
               </button>
             </div>
             <p className="text-xs leading-5 text-neutral-600 dark:text-neutral-500">

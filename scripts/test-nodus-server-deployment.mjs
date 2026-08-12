@@ -71,7 +71,7 @@ test('every remote user receives the exact AGPL license and Corresponding Source
       const response = await fetch(`${origin}${endpoint}`);
       assert.equal(response.status, 200);
       const info = await response.json();
-      assert.equal(info.version, '4.0.0');
+      assert.equal(info.version, '4.0.1');
       assert.equal(info.license, 'AGPL-3.0-only');
       assert.equal(info.sourceCodeUrl, sourceCodeUrl);
     }

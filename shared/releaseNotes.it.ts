@@ -155,6 +155,10 @@ const RELEASE_3_2_4_IT: string[] = [
 ];
 
 export const RELEASE_NOTES_IT: Record<string, string[]> = {
+  "4.0.1": [
+    "Il connettore Chrome ora si associa automaticamente dopo che lo attivi in Nodus. La finestra nativa ridondante è stata rimossa e, se revochi il token, il browser ne ottiene uno nuovo quando riapri il connettore.",
+    "I collegamenti accademici al testo completo vengono ora seguiti anche quando l’indirizzo non termina in PDF. Nodus attraversa pagine come Dialnet e OJS, convalida la firma del vero PDF e prepara il Markdown pulito dall’articolo invece che dallo snapshot HTML.",
+  ],
   "4.0.0": [
     "Biblioteca riunisce Globale e Questo vault in un'unica schermata. Chi aggiorna da Nodus 3 conserva inizialmente corpus, filtri, analisi e raccolte monitorate, e può attivare la biblioteca trasversale quando preferisce.",
     "La migrazione globale è facoltativa, mostra inventario, spazio e avanzamento e può essere annullata, ripresa o invertita senza modificare i vault di origine. Prima di convertire i dati, il primo avvio di Nodus 4 crea e verifica una copia di ripristino pre-v4.",

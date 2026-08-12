@@ -50,7 +50,7 @@ async function exercise(colorScheme) {
   const context = await browser.newContext({ viewport: { width: 420, height: 600 }, colorScheme });
   const page = await context.newPage();
   await page.addInitScript(({ messages, detected }) => {
-    const values = { port: 4323, token: 'visual-test-token', lastCollectionId: 'women' };
+    const values = { port: 4323, token: detected.startPaired ? 'visual-test-token' : '', lastCollectionId: 'women' };
     globalThis.chrome = {
       i18n: { getUILanguage: () => 'es-ES', getMessage: (key, substitutions) => {
         const entry = messages[key]; if (!entry) return key;
@@ -66,13 +66,15 @@ async function exercise(colorScheme) {
       scripting: { executeScript: async () => [{ result: detected }] },
       storage: { local: { get: async (defaults) => ({ ...defaults, ...values }), set: async (input) => Object.assign(values, input), remove: async (keys) => { for (const key of keys) delete values[key]; } } },
       permissions: { request: async () => true },
-      runtime: { getManifest: () => ({ version: '4.0.0' }), getURL: (path = '') => `chrome-extension://abcdefghijklmnopabcdefghijklmnop/${path}`, openOptionsPage: async () => undefined },
+      runtime: { getManifest: () => ({ version: '4.0.1' }), getURL: (path = '') => `chrome-extension://abcdefghijklmnopabcdefghijklmnop/${path}`, openOptionsPage: async () => undefined },
     };
-  }, { messages: english, detected: snapshot });
+  }, { messages: english, detected: { ...snapshot, startPaired: colorScheme === 'dark' } });
+  let pairRequests = 0;
   await page.route('http://127.0.0.1:4323/api/browser/**', (route) => route.abort('connectionrefused'));
   await page.route('http://127.0.0.1:4321/api/browser/**', async (route) => {
     const url = route.request().url();
     if (url.endsWith('/health')) return route.fulfill({ json: { ok: true, app: 'nodus', enabled: true, paired: true, libraryReady: true } });
+    if (url.endsWith('/pair')) { pairRequests += 1; return route.fulfill({ json: { ok: true, token: 'visual-test-token', port: 4321 } }); }
     if (url.endsWith('/catalog')) return route.fulfill({ json: { collections, tags: [{ name: 'migración', itemCount: 12 }, { name: 'women', itemCount: 8 }] } });
     if (url.endsWith('/preview')) return route.fulfill({ json: { metadata: { ...snapshotMetadata(), abstract: 'Metadata enriched locally.' }, warnings: [] } });
     if (url.endsWith('/save')) return route.fulfill({ json: { ok: true, itemId: 'nodus:test-item', attachmentCount: 1, warnings: [], pendingUploads: [] } });
@@ -89,6 +91,8 @@ async function exercise(colorScheme) {
   assert.ok((await page.locator('#document-byline').textContent()).includes('Miranda'));
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth), true);
   assert.equal(await page.locator('#collection-label').textContent(), 'Women');
+  assert.equal(pairRequests, colorScheme === 'dark' ? 0 : 1, 'an absent token is restored without user interaction');
+  assert.equal(await page.locator('#snapshot-checkbox').isChecked(), false, 'a detected PDF keeps the HTML snapshot off by default');
 
   await page.locator('#collection-button').click();
   await page.locator('#collection-search').fill('postwar');
