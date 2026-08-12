@@ -648,6 +648,31 @@ try {
   await page.waitForTimeout(250);
   await page.screenshot({ path: path.join(os.tmpdir(), 'nodus-library-reuse-status-dark-wide.png'), fullPage: true });
 
+  await page.getByTestId('library-scope-vault').click();
+  const vaultWorkTitle = page.getByTestId(`vault-library-title-${itemId}`);
+  await vaultWorkTitle.waitFor({ state: 'visible' });
+  assert.equal(await page.locator('[data-testid^="library-workspace-tab-document-"]').count(), 0, 'This vault starts without an open reader tab');
+  await vaultWorkTitle.click();
+  const vaultIdeasModal = page.getByTestId('work-ideas-modal');
+  await vaultIdeasModal.waitFor({ state: 'visible' });
+  assert.equal(await page.locator('[data-testid^="library-workspace-tab-document-"]').count(), 0, 'clicking a This-vault work opens analysis instead of the reader');
+  await page.screenshot({ path: path.join(os.tmpdir(), 'nodus-library-vault-work-analysis-dark-wide.png'), fullPage: true });
+  await page.evaluate(() => { document.documentElement.classList.add('light'); document.documentElement.classList.remove('dark'); });
+  await page.screenshot({ path: path.join(os.tmpdir(), 'nodus-library-vault-work-analysis-light-wide.png'), fullPage: true });
+  await page.evaluate(() => { document.documentElement.classList.add('dark'); document.documentElement.classList.remove('light'); });
+  await vaultIdeasModal.getByRole('button', { name: 'Cerrar' }).click();
+  await vaultIdeasModal.waitFor({ state: 'detached' });
+  const vaultWorkRow = page.getByTestId(`vault-library-item-${itemId}`);
+  await vaultWorkRow.getByRole('button', { name: 'Abrir lector limpio' }).click();
+  await page.locator('[data-testid^="library-workspace-tab-document-"]').first().waitFor({ state: 'visible' });
+  assert.equal(await page.getByTestId('work-ideas-modal').count(), 0, 'the reader action does not reopen the analysis modal');
+  const readerFormatDialog = page.getByTestId('library-reader-format-dialog');
+  if (await readerFormatDialog.count()) await page.getByTestId('library-reader-format-clean').click();
+  await page.getByTestId('library-workspace-tab-library').click();
+  await page.getByTestId('library-scope-global').click();
+  await row.getByRole('button').click();
+  await detail.waitFor({ state: 'visible' });
+
   await page.getByTestId('library-detail-actions-toggle').click();
   await page.getByTestId('edit-library-metadata').click();
   const metadataEditor = page.getByTestId('library-metadata-editor');

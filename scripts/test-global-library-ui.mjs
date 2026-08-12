@@ -106,7 +106,11 @@ test('the Library UI exposes hierarchy, search, bulk operations, imports and bac
   assert.match(view, /LibraryDocumentReader/);
   assert.match(view, /onDoubleClick=\{\(event\) => \{ if \(\(event\.target as HTMLElement\)\.closest\('button, input, select, a'\)\) return; if \(item\.readerAvailable \|\| item\.attachmentCount\) void openReader/, 'global rows open the reader on a non-interactive double-click');
   assert.match(view, /column === 'title'[\s\S]*onDoubleClick=\{\(event\)[\s\S]*void openReader\(item\.id\)/, 'double-clicking the global title follows the same reader path');
-  assert.match(vaultLibrary, /data-testid=\{`vault-library-item-[\s\S]*onDoubleClick=\{\(event\)[\s\S]*openReader\(w\)/, 'traditional vault rows expose the same double-click reader path');
+  assert.match(vaultLibrary, /const openVaultWorkAnalysis = \(work: WorkView\) => setIdeasWork/, 'the vault scope keeps its historical work-analysis entry point');
+  assert.match(vaultLibrary, /data-testid=\{`vault-library-item-[\s\S]*onClick=\{\(event\)[\s\S]*openVaultWorkAnalysis\(w\)/, 'clicking a non-interactive part of a vault row opens its analysis modal');
+  assert.match(vaultLibrary, /data-testid=\{`vault-library-title-[\s\S]*onClick=\{\(\) => openVaultWorkAnalysis\(w\)\}/, 'clicking a vault work title opens its analysis modal');
+  assert.doesNotMatch(vaultLibrary, /data-testid=\{`vault-library-item-[\s\S]*onDoubleClick=\{\(event\)[\s\S]*openReader\(w\)/, 'vault rows never reuse the Global reader gesture');
+  assert.match(vaultLibrary, /<RowIconButton[\s\S]{0,240}title=\{t\('Abrir lector limpio'\)\}[\s\S]{0,240}onClick=\{\(\) => openReader\(w\)\}/, 'the clean reader remains available from the vault action column');
   assert.match(view, /data-testid="library-workspace-tabs"/, 'open documents share one compact workspace tab strip');
   assert.match(view, /data-testid="library-workspace-tab-library"/, 'the Library remains a fixed workspace tab');
   assert.match(workspaceTabs, /overflow-x: auto|library-workspace-tabs-scroll/, 'document tabs use one horizontally scrollable row');

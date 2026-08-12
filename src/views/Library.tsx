@@ -1018,6 +1018,7 @@ export function Library({
     authors: work.authors,
     year: work.year,
   });
+  const openVaultWorkAnalysis = (work: WorkView) => setIdeasWork({ nodus_id: work.nodus_id, title: work.title });
 
   return (
     <div className="h-full flex flex-col p-6 min-h-0">
@@ -1650,11 +1651,11 @@ export function Library({
               return (
               <div
                 data-testid={`vault-library-item-${w.nodus_id}`}
-                className="grid h-full items-center border-b border-neutral-800/70 px-2 hover:bg-neutral-900/50"
+                className="grid h-full cursor-pointer items-center border-b border-neutral-800/70 px-2 hover:bg-neutral-900/50"
                 style={{ gridTemplateColumns: LIBRARY_GRID_TEMPLATE }}
-                onDoubleClick={(event) => {
+                onClick={(event) => {
                   if ((event.target as HTMLElement).closest('button, input, select, a')) return;
-                  openReader(w);
+                  openVaultWorkAnalysis(w);
                 }}
               >
                 <div className="p-1">
@@ -1666,9 +1667,10 @@ export function Library({
                 </div>
                 <div className="min-w-0 p-1">
                   <button
+                    data-testid={`vault-library-title-${w.nodus_id}`}
                     className="block w-full truncate text-left hover:text-indigo-300 hover:underline"
-                    title={t('Abrir lector limpio')}
-                    onClick={() => openReader(w)}
+                    title={t('Ver las ideas de esta obra')}
+                    onClick={() => openVaultWorkAnalysis(w)}
                   >
                     {w.title}
                   </button>
