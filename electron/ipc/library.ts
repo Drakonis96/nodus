@@ -134,6 +134,12 @@ export function registerLibraryIpc({ h }: IpcContext): void {
     const selected = owner ? await showImportOpenDialog(owner, options) : await showImportOpenDialog(options);
     return selected.canceled ? { created: 0, skipped: 0, itemIds: [], warnings: [] } : importGlobalLibraryFiles(selected.filePaths, collectionId);
   });
+  h('library:importDroppedFiles', async (_event, filePaths, collectionId) => {
+    if (!Array.isArray(filePaths) || filePaths.length > 500 || filePaths.some((entry) => typeof entry !== 'string')) {
+      throw new Error('La lista de archivos arrastrados no es válida.');
+    }
+    return importGlobalLibraryFiles(filePaths, collectionId);
+  });
   h('library:importBibliography', async (event, collectionId) => {
     const owner = BrowserWindow.fromWebContents(event.sender) ?? undefined;
     const options = {

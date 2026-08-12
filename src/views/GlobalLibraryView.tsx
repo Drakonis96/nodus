@@ -353,7 +353,7 @@ function CollectionBranch({
   const open = expanded.has(collection.id);
   return (
     <>
-      <div className="group flex items-center pr-1" style={{ paddingLeft: depth * 12 }} onDragOver={(event) => event.preventDefault()} onDrop={(event) => onDrop(event, collection)}>
+      <div className="group flex items-center pr-1" style={{ paddingLeft: depth * 12 }} onDragOver={(event) => { event.preventDefault(); event.dataTransfer.dropEffect = event.dataTransfer.types.includes('Files') ? 'copy' : 'move'; }} onDrop={(event) => onDrop(event, collection)}>
         <button
           className={`grid h-7 w-6 shrink-0 place-items-center rounded text-neutral-600 hover:text-neutral-300 ${descendants.length ? '' : 'invisible'}`}
           onClick={() => onToggle(collection.id)}
@@ -783,6 +783,8 @@ function GlobalLibraryContent({
   const [addMenuOpen, setAddMenuOpen] = useState(false);
   const [moreMenuOpen, setMoreMenuOpen] = useState(false);
   const [detailActionsOpen, setDetailActionsOpen] = useState(false);
+  const [dragImport, setDragImport] = useState<{ collectionId: string | null; label: string } | null>(null);
+  const [itemContextMenu, setItemContextMenu] = useState<{ itemId: string; x: number; y: number } | null>(null);
   const sidebarNavigationRef = useRef<HTMLDivElement>(null);
   const selectedDetailIdRef = useRef<string | null>(null);
   selectedDetailIdRef.current = detailId;
@@ -867,7 +869,7 @@ function GlobalLibraryContent({
   useEffect(() => {
     const closeMenus = (event: KeyboardEvent) => {
       if (event.key !== 'Escape') return;
-      setAddMenuOpen(false); setMoreMenuOpen(false); setDetailActionsOpen(false);
+      setAddMenuOpen(false); setMoreMenuOpen(false); setDetailActionsOpen(false); setItemContextMenu(null);
     };
     window.addEventListener('keydown', closeMenus);
     return () => window.removeEventListener('keydown', closeMenus);
@@ -943,9 +945,29 @@ function GlobalLibraryContent({
     } catch (nextError) { toast(nextError instanceof Error ? nextError.message : String(nextError), { tone: 'error' }); }
   };
 
+  const importDroppedFiles = async (fileList: FileList, collectionId: string | null) => {
+    const filePaths = [...new Set(Array.from(fileList)
+      .map((file) => window.nodus.getPathForDroppedFile(file))
+      .filter((entry): entry is string => !!entry))];
+    setDragImport(null);
+    if (!filePaths.length) return;
+    try {
+      const report = await window.nodus.importDroppedGlobalLibraryFiles(filePaths, collectionId);
+      if (report.created) toast(tx('{n} documento(s) añadido(s). Puedes editar sus metadatos mientras Nodus prepara la lectura.', { n: report.created }));
+      if (report.warnings.length) toast(report.warnings[0], { tone: report.created ? 'info' : 'error' });
+      await load();
+      if (report.itemIds[0]) setDetailId(report.itemIds[0]);
+    } catch (nextError) { toast(nextError instanceof Error ? nextError.message : String(nextError), { tone: 'error' }); }
+  };
+
   const dropOnCollection = async (event: DragEvent, targetCollection: LibraryCollectionView) => {
     event.preventDefault(); event.stopPropagation();
     try {
+      if (event.dataTransfer.files.length) {
+        if (targetCollection.source !== 'nodus') throw new Error(t('Las colecciones importadas son de solo lectura en Nodus.'));
+        await importDroppedFiles(event.dataTransfer.files, targetCollection.id);
+        return;
+      }
       const movedCollectionId = event.dataTransfer.getData('application/x-nodus-library-collection');
       if (movedCollectionId) {
         if (movedCollectionId === targetCollection.id) return;
@@ -967,7 +989,11 @@ function GlobalLibraryContent({
   };
 
   const dropCollectionAtRoot = async (event: DragEvent) => {
-    event.preventDefault();
+    event.preventDefault(); event.stopPropagation();
+    if (event.dataTransfer.files.length) {
+      await importDroppedFiles(event.dataTransfer.files, null);
+      return;
+    }
     const collectionId = event.dataTransfer.getData('application/x-nodus-library-collection');
     if (!collectionId) return;
     try { await window.nodus.updateGlobalLibraryCollection(collectionId, { parentId: null, position: children.get(null)?.length ?? 0 }); await load(); }
@@ -1100,7 +1126,7 @@ function GlobalLibraryContent({
     setTrashMode(false); setSelected(new Set()); setDetailId(null); setOffset(0);
   };
 
-  const openReader = async (itemId: string) => {
+  const openReader = async (itemId: string, preferredSource?: 'clean' | 'original') => {
     const item = detail?.id === itemId ? detail : await window.nodus.getGlobalLibraryItem(itemId);
     if (!item || (!item.files?.reader && !item.attachments.length)) return;
     onOpenReader({
@@ -1109,7 +1135,53 @@ function GlobalLibraryContent({
       title: item.metadata.title,
       authors: item.metadata.creators.map((creator) => creator.name || [creator.firstName, creator.lastName].filter(Boolean).join(' ')).filter(Boolean),
       year: item.metadata.year ?? null,
+      preferredSource,
     });
+  };
+
+  const loadContextItem = async (): Promise<LibraryItemRecord | null> => {
+    const itemId = itemContextMenu?.itemId;
+    setItemContextMenu(null);
+    if (!itemId) return null;
+    const item = detail?.id === itemId ? detail : await window.nodus.getGlobalLibraryItem(itemId);
+    if (item) { setDetailId(item.id); setDetail(item); }
+    return item;
+  };
+
+  const openContextManager = async (tab: 'attachments' | 'notes') => {
+    const item = await loadContextItem();
+    if (item) setManager({ item, tab });
+  };
+
+  const editContextMetadata = async () => {
+    const item = await loadContextItem();
+    if (item) setMetadataItem(item);
+  };
+
+  const revealContextOriginal = async () => {
+    const item = await loadContextItem();
+    const attachment = item?.attachments.find((entry) => entry.role === 'original') ?? item?.attachments[0];
+    if (item && attachment) await window.nodus.revealGlobalLibraryAttachment(item.id, attachment.id);
+  };
+
+  const openContextOnlineSource = async () => {
+    const item = await loadContextItem();
+    if (item?.metadata.url) await window.nodus.openExternal(item.metadata.url);
+  };
+
+  const duplicateContextItem = async () => {
+    const item = await loadContextItem();
+    if (!item) return;
+    const created = await window.nodus.duplicateGlobalLibraryItem(item.id);
+    setDetailId(created.id); setDetail(created); await load();
+    toast(t('Se creó una copia independiente de Nodus.'));
+  };
+
+  const trashContextItem = async () => {
+    const item = await loadContextItem();
+    if (!item || !(await confirm({ title: t('Enviar a la papelera'), message: t('El archivo, las notas y los análisis se conservarán hasta que vacíes la papelera.'), danger: true, confirmLabel: t('Enviar a la papelera') }))) return;
+    await window.nodus.setGlobalLibraryItemsDeleted([item.id], true);
+    setDetailId(null); await load();
   };
 
   if (loading && !status) return <div data-testid="global-library-view" className="library-theme-canvas flex h-full min-h-0 flex-col bg-neutral-950"><header data-testid="global-library-header" className="library-header-bar min-h-14 shrink-0 border-b border-neutral-800 px-5 py-3"><div className="library-header-title min-w-0"><h1 className="flex items-center gap-2 text-lg font-semibold"><Icon name="book" className="text-indigo-400" /> {t('Biblioteca')}</h1></div>{scopeControls}<div className="library-header-actions" /></header><div className="grid min-h-0 flex-1 place-items-center text-sm text-neutral-500"><span className="flex items-center gap-2"><Spinner /> {t('Cargando Biblioteca…')}</span></div></div>;
@@ -1168,7 +1240,7 @@ function GlobalLibraryContent({
       <div className="flex min-h-0 flex-1">
         <aside className="library-theme-panel hidden w-[238px] shrink-0 flex-col border-r border-neutral-800 bg-neutral-950/80 lg:flex">
           <div className="flex items-center gap-1 px-3 py-3"><b className="min-w-0 flex-1 text-[11px] uppercase tracking-wider text-neutral-500">{t('Colecciones')}</b><button className="grid h-7 w-7 place-items-center rounded hover:bg-neutral-900" title={t('Nueva colección')} onClick={() => void createCollection()}><Icon name="folderPlus" size={14} /></button></div>
-          <div className="px-2 pb-2" onDragOver={(event) => event.preventDefault()} onDrop={(event) => void dropCollectionAtRoot(event)}>
+          <div className="px-2 pb-2" onDragOver={(event) => { event.preventDefault(); if (event.dataTransfer.types.includes('Files')) setDragImport({ collectionId: null, label: t('Biblioteca') }); }} onDragLeave={() => setDragImport(null)} onDrop={(event) => void dropCollectionAtRoot(event)}>
             <button className={`flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs ${!trashMode && selectedCollection === null && selectedSavedSearch === null ? 'bg-indigo-600 text-white' : 'text-neutral-400 hover:bg-neutral-900'}`} onClick={() => { setTrashMode(false); setSelectedCollection(null); setSelectedSavedSearch(null); setSelected(new Set()); setDetailId(null); setOffset(0); }}><Icon name="library" size={14} /><span className="flex-1">{t('Todos los documentos')}</span><span className="text-[10px] opacity-60">{status.items}</span></button>
           </div>
           <div ref={sidebarNavigationRef} data-testid="library-sidebar-navigation" className="flex min-h-0 flex-1 flex-col">
@@ -1218,7 +1290,24 @@ function GlobalLibraryContent({
           </div>
         </aside>
 
-        <section className="flex min-w-0 flex-1 flex-col">
+        <section
+          data-testid="library-file-drop-surface"
+          className="relative flex min-w-0 flex-1 flex-col"
+          onDragEnter={(event) => {
+            if (!event.dataTransfer.types.includes('Files')) return;
+            event.preventDefault();
+            const collection = collections.find((entry) => entry.id === selectedCollection && entry.source === 'nodus');
+            setDragImport({ collectionId: collection?.id ?? null, label: collection?.name ?? t('Biblioteca') });
+          }}
+          onDragOver={(event) => { if (event.dataTransfer.types.includes('Files')) { event.preventDefault(); event.dataTransfer.dropEffect = 'copy'; } }}
+          onDragLeave={(event) => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setDragImport(null); }}
+          onDrop={(event) => {
+            if (!event.dataTransfer.files.length) return;
+            event.preventDefault();
+            void importDroppedFiles(event.dataTransfer.files, dragImport?.collectionId ?? null);
+          }}
+        >
+          {dragImport && <div data-testid="library-file-drop-overlay" className="pointer-events-none absolute inset-3 z-50 grid place-items-center rounded-2xl border-2 border-dashed border-indigo-400 bg-indigo-500/10 backdrop-blur-sm"><div className="rounded-2xl border border-indigo-400/35 bg-white/95 px-7 py-5 text-center shadow-2xl dark:bg-neutral-950/95"><span className="mx-auto grid h-11 w-11 place-items-center rounded-xl bg-indigo-500/15 text-indigo-500"><Icon name="upload" size={22} /></span><b className="mt-3 block text-sm">{t('Suelta para añadir')}</b><span className="mt-1 block max-w-xs text-xs text-neutral-500">{dragImport.collectionId ? tx('Se añadirá a «{name}» y Nodus inferirá los metadatos que pueda.', { name: dragImport.label }) : t('Se añadirá a la Biblioteca y Nodus inferirá los metadatos que pueda.')}</span></div></div>}
           <div className="border-b border-neutral-800 p-3">
             <div className="flex items-center gap-2">
               <div className="relative min-w-[220px] flex-1"><Icon name="search" size={15} className="pointer-events-none absolute left-3 top-1/2 z-10 -translate-y-1/2 text-neutral-600" /><input data-testid="global-library-search" className="input input-with-leading-icon w-full" value={searchDraft} onChange={(event) => setSearchDraft(event.target.value)} placeholder={t('Buscar título, autor, etiqueta, DOI, ISBN, ISSN, PMID o arXiv…')} /></div>
@@ -1247,7 +1336,23 @@ function GlobalLibraryContent({
             empty={<div className="grid h-full place-items-center p-8 text-center"><div><Icon name={trashMode ? 'trash' : 'book'} size={28} className="mx-auto text-neutral-700" /><p className="mt-3 text-sm text-neutral-400">{t(trashMode ? 'La papelera está vacía.' : 'No hay documentos que coincidan.')}</p><p className="mt-1 text-xs text-neutral-600">{t(trashMode ? 'Los elementos enviados aquí podrán restaurarse antes del vaciado manual.' : 'Añade archivos o importa una biblioteca de Zotero.')}</p></div></div>}
             renderItem={(item) => {
               const activeJob = jobs.find((job) => job.itemId === item.id && ['queued', 'processing'].includes(job.status));
-              return <div data-testid={`global-library-item-${item.id}`} draggable className={`grid h-[62px] items-center border-b border-neutral-900 px-3 text-xs ${detailId === item.id ? 'bg-indigo-500/10' : 'hover:bg-neutral-900/55'}`} style={{ gridTemplateColumns: tableGrid }} onDragStart={(event) => { const itemIds = selected.has(item.id) ? [...selected] : [item.id]; event.dataTransfer.effectAllowed = 'copyMove'; event.dataTransfer.setData('application/x-nodus-library-items', JSON.stringify(itemIds)); }} onDoubleClick={(event) => { if ((event.target as HTMLElement).closest('button, input, select, a')) return; if (item.readerAvailable || item.attachmentCount) void openReader(item.id); else setDetailId(item.id); }}>
+              return <div
+                data-testid={`global-library-item-${item.id}`}
+                draggable
+                className={`grid h-[62px] items-center border-b border-neutral-900 px-3 text-xs ${detailId === item.id ? 'bg-indigo-500/10' : 'hover:bg-neutral-900/55'}`}
+                style={{ gridTemplateColumns: tableGrid }}
+                onDragStart={(event) => { const itemIds = selected.has(item.id) ? [...selected] : [item.id]; event.dataTransfer.effectAllowed = 'copyMove'; event.dataTransfer.setData('application/x-nodus-library-items', JSON.stringify(itemIds)); }}
+                onContextMenu={(event) => {
+                  event.preventDefault();
+                  setDetailId(item.id);
+                  setItemContextMenu({
+                    itemId: item.id,
+                    x: Math.max(8, Math.min(event.clientX, window.innerWidth - 270)),
+                    y: Math.max(8, Math.min(event.clientY, window.innerHeight - 430)),
+                  });
+                }}
+                onDoubleClick={(event) => { if ((event.target as HTMLElement).closest('button, input, select, a')) return; if (item.readerAvailable || item.attachmentCount) void openReader(item.id); else setDetailId(item.id); }}
+              >
                 <input type="checkbox" checked={selected.has(item.id)} onChange={(event) => setSelected((current) => { const next = new Set(current); if (event.target.checked) next.add(item.id); else next.delete(item.id); return next; })} />
                 {visibleColumns.map((column) => {
                   if (column === 'title') return <button key={column} className="min-w-0 pr-4 text-left" onClick={() => setDetailId(item.id)} onDoubleClick={(event) => { event.stopPropagation(); if (item.readerAvailable || item.attachmentCount) void openReader(item.id); }}><b className="flex min-w-0 items-center gap-1.5 font-medium text-neutral-200"><span className="truncate">{item.title}</span>{item.sourceState && item.sourceState !== 'current' && <Icon name="alert" size={11} className="shrink-0 text-amber-400" />}</b><span className="mt-1 block truncate text-[10px] text-neutral-600">{item.doi || item.isbn[0] || item.issn[0] || item.sourceKey || item.id}</span></button>;
@@ -1333,6 +1438,29 @@ function GlobalLibraryContent({
           </div>}</footer>
         </aside>}
       </div>
+      {itemContextMenu && !trashMode && <>
+        <button className="fixed inset-0 z-[70] cursor-default" aria-label={t('Cerrar menú')} onClick={() => setItemContextMenu(null)} />
+        <div
+          data-testid="library-item-context-menu"
+          role="menu"
+          className="library-action-menu fixed z-[71] w-64 rounded-xl border border-neutral-800 bg-neutral-950 p-1.5 shadow-2xl"
+          style={{ left: itemContextMenu.x, top: itemContextMenu.y }}
+        >
+          <button data-testid="context-read-library-item" role="menuitem" className="library-action-menu-item" onClick={() => { const id = itemContextMenu.itemId; setItemContextMenu(null); void openReader(id); }}><Icon name="bookOpen" /><span><b>{t('Leer')}</b><small>{t('Elegir Markdown limpio u original')}</small></span></button>
+          <button data-testid="context-open-original" role="menuitem" className="library-action-menu-item" onClick={() => { const id = itemContextMenu.itemId; setItemContextMenu(null); void openReader(id, 'original'); }}><Icon name="file" /><span><b>{t('Abrir original')}</b></span></button>
+          <button role="menuitem" className="library-action-menu-item" onClick={() => void openContextOnlineSource()}><Icon name="globe" /><span><b>{t('Ver fuente en línea')}</b></span></button>
+          <button role="menuitem" className="library-action-menu-item" onClick={() => void revealContextOriginal()}><Icon name="folder" /><span><b>{t('Mostrar en carpeta')}</b></span></button>
+          <div className="my-1 border-t border-neutral-800" />
+          <button data-testid="context-edit-library-metadata" role="menuitem" className="library-action-menu-item" onClick={() => void editContextMetadata()}><Icon name="edit" /><span><b>{t('Editar metadatos')}</b></span></button>
+          <button data-testid="context-manage-library-attachments" role="menuitem" className="library-action-menu-item" onClick={() => void openContextManager('attachments')}><Icon name="file" /><span><b>{t('Archivos y adjuntos')}</b></span></button>
+          <button data-testid="context-manage-library-notes" role="menuitem" className="library-action-menu-item" onClick={() => void openContextManager('notes')}><Icon name="notebook" /><span><b>{t('Notas')}</b></span></button>
+          <div className="my-1 border-t border-neutral-800" />
+          <button data-testid="context-cite-library-item" role="menuitem" className="library-action-menu-item" onClick={() => { setCitationItems([itemContextMenu.itemId]); setItemContextMenu(null); }}><Icon name="quote" /><span><b>{t('Citar / exportar')}</b></span></button>
+          <button role="menuitem" className="library-action-menu-item" onClick={() => { setVaultLinkItems([itemContextMenu.itemId]); setItemContextMenu(null); }}><Icon name="vault" /><span><b>{t('Usar en un vault')}</b></span></button>
+          <button data-testid="context-duplicate-library-item" role="menuitem" className="library-action-menu-item" onClick={() => void duplicateContextItem()}><Icon name="copy" /><span><b>{t('Duplicar')}</b></span></button>
+          <button data-testid="context-trash-library-item" role="menuitem" className="library-action-menu-item text-red-400" onClick={() => void trashContextItem()}><Icon name="trash" /><span><b>{t('Enviar a la papelera')}</b></span></button>
+        </div>
+      </>}
       {zoteroOpen && <ZoteroImportDialog onClose={() => setZoteroOpen(false)} onFinished={() => void load()} />}
       {movingCollection && <LibraryCollectionMoveDialog collection={movingCollection} collections={collections} onClose={() => setMovingCollection(null)} onMove={(parentId) => moveCollection(movingCollection, parentId)} />}
       {stylingCollection && <LibraryCollectionStyleDialog collection={stylingCollection} onClose={() => setStylingCollection(null)} onSave={async (icon, color) => { await window.nodus.updateGlobalLibraryCollection(stylingCollection.id, { icon, color }); await load(); }} />}

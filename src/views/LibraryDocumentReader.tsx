@@ -420,7 +420,7 @@ export function LibraryDocumentReader({
   useEffect(() => {
     if (!reader) return;
     const original = primaryOriginalAttachment(reader);
-    const preferred = readOpeningFormatPreference();
+    const preferred = reference.preferredSource ?? readOpeningFormatPreference();
     setOpeningFormatPreference(preferred);
     setRememberOpeningFormat(false);
     const initialIsAvailable = initialSource === 'clean'
@@ -446,7 +446,7 @@ export function LibraryDocumentReader({
       onSourceChangeRef.current?.(fallback);
       setOpeningFormatPrompt(false);
     }
-  }, [initialSource, reader]);
+  }, [initialSource, reader, reference.preferredSource]);
   useEffect(() => {
     if (!reader) return;
     let alive = true;

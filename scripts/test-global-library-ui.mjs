@@ -142,6 +142,50 @@ test('Library file mutations automatically prepare the clean reading version', a
     'legacy filenames with encoded extensions are recognized without renaming stored files');
 });
 
+test('the Library accepts external files at the root or inside an editable collection', async () => {
+  const [view, api, preload, ipc, operations] = await Promise.all([
+    readSource('src/views/GlobalLibraryView.tsx'),
+    readSource('shared/api/library.ts'),
+    readSource('electron/preload/library.ts'),
+    readSource('electron/ipc/library.ts'),
+    readSource('electron/library/libraryOperations.ts'),
+  ]);
+  assert.match(view, /getPathForDroppedFile/,
+    'the renderer resolves Electron File handles without exposing raw browser paths');
+  assert.match(view, /importDroppedGlobalLibraryFiles/,
+    'dropped documents use a dedicated typed import bridge');
+  assert.match(view, /dropOnCollection[\s\S]*dataTransfer\.files[\s\S]*targetCollection\.id/,
+    'dropping files on an editable collection imports them directly into that collection');
+  assert.match(view, /data-testid="library-file-drop-surface"/,
+    'the full catalogue is a visible root/selected-collection drop target');
+  assert.match(view, /data-testid="library-file-drop-overlay"/,
+    'dragging files provides immediate destination feedback');
+  assert.match(api, /importDroppedGlobalLibraryFiles\(filePaths: string\[\], collectionId\?: string \| null\)/);
+  assert.match(preload, /library:importDroppedFiles/);
+  assert.match(ipc, /library:importDroppedFiles/);
+  assert.match(operations, /inferredLocalFileMetadata[\s\S]*yearMatch[\s\S]*isbnMatch[\s\S]*doiMatch/,
+    'filename inference supplies editable title, date, ISBN, and DOI candidates without network blocking');
+});
+
+test('global Library rows expose a compact Nodus context menu', async () => {
+  const view = await readSource('src/views/GlobalLibraryView.tsx');
+  assert.match(view, /onContextMenu=/);
+  for (const marker of [
+    'library-item-context-menu', 'context-read-library-item', 'context-open-original',
+    'context-edit-library-metadata', 'context-manage-library-attachments',
+    'context-manage-library-notes', 'context-cite-library-item',
+    'context-duplicate-library-item', 'context-trash-library-item',
+  ]) assert.match(view, new RegExp(marker));
+});
+
+test('vault Library does not duplicate status operations in its header', async () => {
+  const view = await readSource('src/views/Library.tsx');
+  assert.doesNotMatch(view, /advancedOpen/);
+  assert.doesNotMatch(view, /<OperationCard/);
+  assert.match(view, /<WorkStatusModal/,
+    'per-work processing remains available from the Status column');
+});
+
 test('the global reader exposes annotations, metadata, chat and native attachment viewers', async () => {
   const [readerSource, attachmentViewer, findSource, selectionSource, markdownSource, selectionCss, appCss, store, protocol, main, html] = await Promise.all([
     readSource('src/views/LibraryDocumentReader.tsx'), readSource('src/components/library/LibraryAttachmentViewer.tsx'),
@@ -273,7 +317,7 @@ test('the typed bridge covers every global management operation', async () => {
   const methods = [
     'listGlobalLibraryCollections', 'getGlobalLibraryItem', 'createGlobalLibraryCollection',
     'updateGlobalLibraryCollection', 'deleteGlobalLibraryCollection', 'patchGlobalLibraryItemCollections',
-    'setGlobalLibraryItemsDeleted', 'importGlobalLibraryFiles',
+    'setGlobalLibraryItemsDeleted', 'importGlobalLibraryFiles', 'importDroppedGlobalLibraryFiles',
     'importGlobalBibliographyFiles', 'updateGlobalLibraryItemMetadata', 'resolveGlobalLibraryMetadata',
     'createGlobalLibraryItem', 'importGlobalLibraryIdentifier', 'duplicateGlobalLibraryItem', 'convertGlobalLibraryItemToNodus',
     'addGlobalLibraryAttachments', 'updateGlobalLibraryAttachment', 'replaceGlobalLibraryAttachment',
@@ -295,7 +339,7 @@ test('the typed bridge covers every global management operation', async () => {
   assertApiMethods(assert, methods);
   assertChannelsWired(assert, [
     'library:collections', 'library:item', 'library:createCollection', 'library:updateCollection',
-    'library:deleteCollection', 'library:patchItemCollections', 'library:setItemsDeleted', 'library:importFiles',
+    'library:deleteCollection', 'library:patchItemCollections', 'library:setItemsDeleted', 'library:importFiles', 'library:importDroppedFiles',
     'library:createItem', 'library:duplicateItem', 'library:convertItemToNodus',
     'library:addAttachments', 'library:updateAttachment', 'library:replaceAttachment', 'library:removeAttachment',
     'library:openAttachment', 'library:revealAttachment', 'library:upsertNote', 'library:deleteNote',

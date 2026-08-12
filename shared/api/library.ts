@@ -92,6 +92,7 @@ export interface LibraryApi {
   purgeGlobalLibraryTrash(itemIds: string[]): Promise<LibraryPurgeReport>;
   auditGlobalLibraryRecovery(): Promise<LibraryRecoveryReport>;
   importGlobalLibraryFiles(collectionId?: string | null): Promise<LibraryLocalImportReport>;
+  importDroppedGlobalLibraryFiles(filePaths: string[], collectionId?: string | null): Promise<LibraryLocalImportReport>;
   importGlobalBibliographyFiles(collectionId?: string | null): Promise<LibraryBibliographyImportReport>;
   createGlobalLibraryItem(metadata: LibraryItemMetadata, collectionIds?: string[]): Promise<LibraryItemRecord>;
   importGlobalLibraryIdentifier(kind: LibraryMetadataIdentifierKind, value: string, collectionIds?: string[]): Promise<LibraryIdentifierImportResult>;

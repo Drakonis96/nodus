@@ -630,6 +630,8 @@ export interface LibraryReaderReference {
   title: string;
   authors: string[];
   year: number | null;
+  /** One-shot choice used by explicit “open original/clean” actions. */
+  preferredSource?: 'clean' | 'original';
 }
 
 export type LibraryReaderAttachmentViewer = 'pdf' | 'epub' | 'image' | 'html' | 'text' | 'external';

@@ -20,7 +20,6 @@ import { confirm, toast } from '../components/feedback';
 import { WorkGraphModal } from './WorkGraphModal';
 import { WorkIdeasModal } from './WorkIdeasModal';
 import { WorkStatusModal } from './WorkStatusModal';
-import { DuplicatesModal } from './DuplicatesModal';
 import { VirtualList } from '../components/VirtualList';
 import { anchorStyle, useAnchoredCoords } from '../components/dbGrid';
 import { useDataRefresh, useDismissableLayer, useScanComplete } from '../hooks';
@@ -441,14 +440,12 @@ export function Library({
   const [passageStatuses, setPassageStatuses] = useState<Map<string, WorkPassageStatus>>(new Map());
   const [reuseAnalysisFromVaults, setReuseAnalysisFromVaults] = useState(false);
   const [reuseNotice, setReuseNotice] = useState<string | null>(null);
-  const [advancedOpen, setAdvancedOpen] = useState(false);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [advancedFiltersOpen, setAdvancedFiltersOpen] = useState(false);
   const [collectionsMenuOpen, setCollectionsMenuOpen] = useState(false);
   const [graphWork, setGraphWork] = useState<{ nodus_id: string; title: string } | null>(null);
   const [ideasWork, setIdeasWork] = useState<{ nodus_id: string; title: string } | null>(null);
   const [statusWork, setStatusWork] = useState<WorkView | null>(null);
-  const [duplicatesOpen, setDuplicatesOpen] = useState(false);
   // Live scan-queue items indexed by work. The persisted *_status fields go
   // 'pending' when a job is enqueued but never say whether it is waiting in line
   // or running right now, so this is the only way a row can show "Analizando…".
@@ -757,46 +754,12 @@ export function Library({
     await load();
   };
 
-  const summarizeMissing = async () => {
-    await window.nodus.summarizeAll();
-    await load();
-  };
-
-  const reassignThemes = async () => {
-    const ok = await confirm({
-      title: t('Reasignar temas'),
-      message: t('Reasignar temas vuelve a ejecutar el análisis ligero (título + abstract) sobre TODA la biblioteca para reconstruir los temas padre y agrupar las ideas existentes bajo ellos. Consume tokens del modelo seleccionado. ¿Continuar?'),
-      confirmLabel: t('Continuar'),
-    });
-    if (!ok) return;
-    const n = await window.nodus.reassignThemes();
-    await load();
-    toast(tx('Reasignación de temas en cola para {n} obra(s). Verás el progreso en la cola.', { n }));
-  };
-
-  const rescanAbstractOnly = async () => {
-    const ok = await confirm({
-      title: t('Reanalizar «solo abstract»'),
-      message: t('Reanaliza las obras que solo se analizaron con el abstract (el PDF/EPUB no estaba disponible al analizarlas). Las que ya tengan el texto disponible en Zotero recuperarán el análisis completo; el resto se omiten sin coste. ¿Continuar?'),
-      confirmLabel: t('Continuar'),
-    });
-    if (!ok) return;
-    const n = await window.nodus.rescanDegraded();
-    await load();
-    if (n === 0) toast(t('No hay obras «solo abstract» para reanalizar.'), { tone: 'info' });
-    else toast(tx('Reanálisis en cola para {n} obra(s) «solo abstract». Verás el progreso en la cola.', { n }));
-  };
-
   const embedSelected = async () => {
     const ids = selectedVisibleIds;
     if (ids.length === 0) return;
     const pending = await reuseSelectedAnalysis(ids, ['ideaEmbeddings']);
     if (pending.length > 0) await window.nodus.startEmbedding(pending);
     setSelected(new Set());
-  };
-
-  const embedPending = async () => {
-    await window.nodus.startEmbedding();
   };
 
   const indexSelectedPassages = async () => {
@@ -806,14 +769,6 @@ export function Library({
     if (pending.length > 0) await window.nodus.startPassageEmbedding(pending);
     setSelected(new Set());
     await load();
-  };
-
-  const indexAllPassages = async () => {
-    await window.nodus.startPassageEmbedding();
-  };
-
-  const discoverBridges = async () => {
-    await window.nodus.enqueueBridgeDiscovery();
   };
 
   const toggleSelected = (id: string, checked: boolean) => {
@@ -1029,13 +984,6 @@ export function Library({
         </div>
         {scopeControls}
         <div className="library-header-actions">
-          <button
-            className={`btn border border-neutral-700 gap-1.5 ${advancedOpen ? 'bg-neutral-800 text-neutral-100' : 'btn-ghost'}`}
-            onClick={() => setAdvancedOpen((v) => !v)}
-            aria-expanded={advancedOpen}
-          >
-            <Icon name="wand" /> {t('Operaciones')}
-          </button>
           <div className="relative z-40" ref={collectionsMenuRef}>
             <button
               data-testid="library-collections-menu-toggle"
@@ -1549,68 +1497,6 @@ export function Library({
         </div>
       )}
 
-      {advancedOpen && (
-        <div className="grid grid-cols-1 xl:grid-cols-2 gap-3 mb-4">
-          <OperationCard
-            icon="wand"
-            title={t('Generar resúmenes faltantes')}
-            description={t('Crea resúmenes de orientación independientes a partir de ideas, evidencia, temas y abstract. No son evidencia citable.')}
-            buttonLabel={t('Generar resúmenes faltantes')}
-            tone="violet"
-            onClick={summarizeMissing}
-          />
-          <OperationCard
-            icon="wand"
-            title={t('Reasignar temas')}
-            description={t('Reconstruye los temas padre de toda la biblioteca con análisis ligero. Útil tras cambiar criterios temáticos.')}
-            buttonLabel={t('Reasignar')}
-            onClick={reassignThemes}
-          />
-          <OperationCard
-            icon="bulb"
-            title={t('Reanalizar «solo abstract»')}
-            description={t('Vuelve a analizar las obras cuyo análisis profundo solo usó el abstract porque el PDF/EPUB no estaba disponible. Las que ya tengan el texto recuperan el análisis completo; el resto se omiten sin coste.')}
-            buttonLabel={t('Reanalizar')}
-            onClick={rescanAbstractOnly}
-          />
-          {/* Two indexes, each named for what it gives the reader. There used to be
-              five cards saying "Indexar", two of them called "todo" and meaning
-              opposite things. */}
-          <OperationCard
-            icon="search"
-            title={t('Preparar búsqueda semántica')}
-            description={t('Genera los embeddings que faltan para poder encontrar ideas por significado. No regenera los existentes.')}
-            buttonLabel={t('Preparar las que falten')}
-            tone="cyan"
-            onClick={embedPending}
-          />
-          <OperationCard
-            icon="book"
-            title={t('Indexar texto citable')}
-            description={t('Indexa los fragmentos de texto completo que falten o estén obsoletos, en toda la biblioteca. No requiere análisis de ideas y los ya actuales se omiten.')}
-            buttonLabel={t('Indexar lo que falte')}
-            tone="cyan"
-            onClick={indexAllPassages}
-          />
-          <OperationCard
-            icon="compass"
-            title={t('Descubrir relaciones')}
-            description={t('Usa embeddings e IA para validar puentes semánticos entre ideas que aún no están conectadas. El progreso se muestra en la cola.')}
-            buttonLabel={t('Descubrir')}
-            tone="violet"
-            onClick={discoverBridges}
-          />
-          <OperationCard
-            icon="copy"
-            title={t('Buscar y fusionar duplicados')}
-            description={t('Detecta obras repetidas (mismo DOI, o mismo título, año y autores) y te deja revisarlas y fusionarlas conservando una sola copia. La misma obra en varias colecciones de Zotero no se duplica.')}
-            buttonLabel={t('Revisar duplicados')}
-            tone="violet"
-            onClick={() => setDuplicatesOpen(true)}
-          />
-        </div>
-      )}
-
       <div className="card flex-1 flex flex-col min-h-0 overflow-hidden text-sm">
         <div
           className="grid items-center bg-neutral-900 text-neutral-400 border-b border-neutral-800 px-2 py-2 text-left text-xs"
@@ -1831,49 +1717,7 @@ export function Library({
           onChanged={() => void load()}
         />
       )}
-      {duplicatesOpen && <DuplicatesModal onClose={() => setDuplicatesOpen(false)} />}
     </div>
-  );
-}
-
-function OperationCard({
-  icon,
-  title,
-  description,
-  buttonLabel,
-  tone = 'neutral',
-  disabled,
-  onClick,
-}: {
-  icon: string;
-  title: string;
-  description: string;
-  buttonLabel: string;
-  tone?: 'neutral' | 'cyan' | 'violet';
-  disabled?: boolean;
-  onClick: () => void;
-}) {
-  const toneClass =
-    tone === 'cyan'
-      ? 'border-cyan-900/70 text-cyan-300'
-      : tone === 'violet'
-        ? 'border-violet-900/70 text-violet-300'
-        : 'border-neutral-800 text-neutral-300';
-  return (
-    <section className="rounded-lg border border-neutral-800 bg-neutral-900/40 p-3 flex flex-col gap-3">
-      <div className="flex items-start gap-2">
-        <span className={`mt-0.5 inline-flex h-8 w-8 items-center justify-center rounded-md border ${toneClass}`}>
-          <Icon name={icon} />
-        </span>
-        <div>
-          <h2 className="text-sm font-semibold">{title}</h2>
-          <p className="text-xs text-neutral-500 mt-1 leading-relaxed">{description}</p>
-        </div>
-      </div>
-      <button className="btn btn-ghost border border-neutral-700 mt-auto" disabled={disabled} onClick={onClick}>
-        {buttonLabel}
-      </button>
-    </section>
   );
 }
 

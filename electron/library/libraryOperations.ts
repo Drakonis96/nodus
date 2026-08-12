@@ -136,9 +136,31 @@ function copyDirectoryIfMissing(source: string, destination: string): void {
 }
 
 function itemType(extension: string): LibraryItemType {
+  if (extension === '.epub') return 'book';
   if (['.html', '.htm'].includes(extension)) return 'webpage';
   if (['.csv', '.tsv', '.xlsx', '.xls', '.ods'].includes(extension)) return 'dataset';
   return 'document';
+}
+
+/** Best-effort, offline metadata for a dropped file. Nothing inferred here is
+ * authoritative: the full metadata editor remains available after import. */
+function inferredLocalFileMetadata(source: string, extension: string): LibraryItemMetadata {
+  const decodedStem = (() => {
+    const stem = path.basename(source, extension);
+    try { return decodeURIComponent(stem); } catch { return stem; }
+  })();
+  const readableStem = decodedStem.normalize('NFC').replace(/[_-]+/g, ' ').replace(/\s+/g, ' ').trim();
+  const yearMatch = readableStem.match(/(?:^|\D)((?:18|19|20)\d{2})(?:\D|$)/);
+  const isbnMatch = readableStem.replace(/[^0-9Xx]/g, '').match(/(?:97[89])?\d{9}[\dXx]/)?.[0];
+  const doiMatch = readableStem.match(/10\.\d{4,9}[\s._;/:-]+\S+/i)?.[0]
+    ?.replace(/[\s_]+/g, '/').replace(/[),.;]+$/, '');
+  return {
+    title: readableStem || 'Documento sin título',
+    itemType: doiMatch ? 'journal-article' : itemType(extension),
+    creators: [], year: yearMatch ? Number(yearMatch[1]) : null,
+    doi: doiMatch, isbn: isbnMatch ? [isbnMatch.toUpperCase()] : [], issn: [], tags: [],
+    extra: { 'nodus:metadataOrigin': 'filename-inference' },
+  };
 }
 
 function mimeType(extension: string): string {
@@ -470,10 +492,7 @@ export class LibraryOperations {
       const stat = fs.statSync(destination);
       indexed.push(this.store.upsertItem({
         id, storageId, source: 'nodus',
-        metadata: {
-          title: path.basename(source, extension).replace(/[_-]+/g, ' ').trim() || 'Documento sin título',
-          itemType: itemType(extension), creators: [], year: null, isbn: [], issn: [], tags: [],
-        },
+        metadata: inferredLocalFileMetadata(source, extension),
         collectionIds: collectionId ? [collectionId] : [],
         attachments: [{
           id: `local:${uuid}`, title: path.basename(source), fileName: path.basename(source), relativePath,
