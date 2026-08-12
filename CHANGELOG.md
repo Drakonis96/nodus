@@ -1,5 +1,23 @@
 # Changelog
 
+## 4.0.1 — 2026-08-12
+
+The Chrome connector now completes its local pairing automatically after it is enabled in Nodus.
+It also follows extensionless scholarly full-text links through publisher landing pages, verifies
+the real PDF bytes, and prepares clean Markdown from that paper instead of an HTML snapshot.
+
+### Fixed
+
+- **Chrome pairing asked twice for the same consent.** Enabling the connector in Nodus is now the
+  authorization step. Opening the extension obtains or renews its loopback token without a native
+  dialog, while the extension-origin and bearer-token protections remain in place.
+- **Dialnet and similar catalogue links saved the landing page instead of the paper.** Full-text
+  labels are detected even when their URL has no extension. Nodus follows guarded public redirects,
+  reads publisher PDF declarations such as `citation_pdf_url`, and accepts the result only after
+  checking the PDF signature.
+- **HTML could be prepared as if it were a PDF.** Both desktop downloads and browser-assisted
+  uploads reject HTML or other bytes labelled as PDF before they can become the primary attachment.
+
 ## 3.2.6 — 2026-08-09
 
 Nodi becomes a real report reader, authors gain a persistent shelf, and MCP

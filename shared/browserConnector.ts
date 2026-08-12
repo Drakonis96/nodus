@@ -9,6 +9,8 @@ export interface BrowserConnectorAttachmentCandidate {
   fileName?: string;
   mimeType?: string;
   role?: 'original' | 'supplement' | 'snapshot' | 'image' | 'dataset' | 'other';
+  /** The URL is a scholarly landing link whose publisher-declared PDF must be resolved. */
+  resolveFullText?: boolean;
 }
 
 export interface BrowserConnectorCaptureRequest {

@@ -8,7 +8,7 @@
   "detectingHint": { "message": "Reading only the active tab after your click." },
   "cannotRead": { "message": "This page cannot be read" },
   "connectTitle": { "message": "Connect to Nodus" },
-  "connectHint": { "message": "Open Nodus, enable the Chrome connector in Settings → Integrations, then approve this browser once." },
+  "connectHint": { "message": "Open Nodus and enable the Chrome connector in Settings → Integrations. This browser connects automatically." },
   "port": { "message": "Port" },
   "connect": { "message": "Connect" },
   "cannotReachNodus": { "message": "Nodus could not be reached on port $PORT$. Open Nodus and use the port shown in Settings → Integrations.", "placeholders": { "port": { "content": "$1" } } },
@@ -36,9 +36,9 @@
   "libraryNotReady": { "message": "Choose a backup folder in Nodus first so the local nodus-library folder can be created." },
   "nodusPort": { "message": "Nodus local port" },
   "portHint": { "message": "Use the port shown in Nodus → Settings → Integrations." },
-  "forgetPairing": { "message": "Forget this pairing" },
+  "forgetPairing": { "message": "Reset local connection" },
   "privacy": { "message": "Privacy" },
   "sourceCode": { "message": "Source code" },
   "savedSetting": { "message": "Saved." },
-  "pairingForgotten": { "message": "Pairing removed. Nodus will ask for approval next time." }
+  "pairingForgotten": { "message": "Local connection reset. The connector will reconnect automatically next time." }
 }

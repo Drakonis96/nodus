@@ -214,14 +214,19 @@ function fromOpenGraph(snapshot, map) {
 
 function attachments(snapshot, map, direct) {
   const candidates = [];
-  const add = (raw, title, mimeType, role = 'supplement') => {
+  const add = (raw, title, mimeType, role = 'supplement', resolveFullText = false) => {
     const url = absoluteUrl(raw, snapshot.url);
     if (!url) return;
     const info = fileInfo(url, mimeType);
-    if (!info || info.itemType === 'webpage') return;
+    if ((!info || info.itemType === 'webpage') && !resolveFullText) return;
     let fileName = '';
     try { fileName = decodeURIComponent(new URL(url).pathname.split('/').filter(Boolean).at(-1) || 'document'); } catch { fileName = 'document'; }
-    candidates.push({ url, title: title || (info.mimeType === 'application/pdf' ? 'Full text PDF' : fileName), fileName, mimeType: mimeType || info.mimeType, role });
+    if (resolveFullText && !/\.pdf$/i.test(fileName)) fileName = 'full-text.pdf';
+    const resolvedMime = mimeType || info?.mimeType || (resolveFullText ? 'application/pdf' : 'application/octet-stream');
+    candidates.push({
+      url, title: title || (resolvedMime === 'application/pdf' ? 'Full text PDF' : fileName),
+      fileName, mimeType: resolvedMime, role, ...(resolveFullText ? { resolveFullText: true } : {}),
+    });
   };
   if (direct) add(snapshot.url, snapshot.title || 'Original document', direct.mimeType, 'original');
   for (const url of all(map, 'citation_pdf_url', 'eprints.document_url', 'bepress_citation_pdf_url')) add(url, 'Full text PDF', 'application/pdf', direct ? 'supplement' : 'original');
@@ -230,7 +235,13 @@ function attachments(snapshot, map, direct) {
     const type = clean(link.type, 200).toLowerCase();
     if (type === 'application/pdf' || /(?:alternate|enclosure)/.test(rel) && fileInfo(link.href, type)) add(link.href, clean(link.title) || 'Full text', type, candidates.length ? 'supplement' : 'original');
   }
-  for (const anchor of snapshot.anchors || []) add(anchor.href, clean(anchor.text) || '', clean(anchor.type), candidates.length ? 'supplement' : 'original');
+  const fullTextPattern = /(?:\bpdf\b|full\s*text|texto\s+completo|texte\s+int[ée]gral|volltext|testo\s+completo|texto\s+integral|tam\s+metin|descargar\s+(?:art[ií]culo|pdf)|download\s+(?:article|paper|pdf))/i;
+  for (const anchor of snapshot.anchors || []) {
+    const info = fileInfo(anchor.href, clean(anchor.type));
+    const title = clean(anchor.text) || clean(anchor.title);
+    const resolvesFullText = !info && fullTextPattern.test(`${anchor.text || ''} ${anchor.title || ''}`);
+    add(anchor.href, resolvesFullText ? 'Full text PDF' : title, resolvesFullText ? 'application/pdf' : clean(anchor.type), candidates.length ? 'supplement' : 'original', resolvesFullText);
+  }
   return [...new Map(candidates.map((entry) => [entry.url, entry])).values()].slice(0, 8);
 }
 

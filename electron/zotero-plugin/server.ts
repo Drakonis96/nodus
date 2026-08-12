@@ -14,7 +14,7 @@ import { randomBytes, timingSafeEqual } from 'node:crypto';
 import { mkdir, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import { app, BrowserWindow, dialog, shell } from 'electron';
+import { app, BrowserWindow, shell } from 'electron';
 import type { ModelRef, ReasoningEffort, Work, ZoteroPluginServerStatus } from '@shared/types';
 import { getSettings, updateSettings } from '../db/settingsRepo';
 import { getDb } from '../db/database';
@@ -171,33 +171,6 @@ async function readBinaryBody(req: IncomingMessage, maxBytes = 64 * 1024 * 1024)
     chunks.push(data);
   }
   return Buffer.concat(chunks);
-}
-
-type BrowserPairPrompt = (details: { extensionVersion: string; pageHost: string }) => Promise<boolean>;
-const defaultBrowserPairPrompt: BrowserPairPrompt = async ({ extensionVersion, pageHost }) => {
-  const settings = getSettings();
-  const spanish = settings.uiLanguage === 'es';
-  const owner = getMainWindow?.() ?? BrowserWindow.getFocusedWindow() ?? BrowserWindow.getAllWindows()[0] ?? undefined;
-  const options = {
-    type: 'question' as const,
-    title: spanish ? 'Conectar Nodus Connector' : 'Connect Nodus Connector',
-    message: spanish ? '¿Permitir que la extensión de Chrome guarde documentos en tu Biblioteca de Nodus?' : 'Allow the Chrome extension to save documents to your Nodus Library?',
-    detail: spanish
-      ? `Versión ${extensionVersion || 'desconocida'}${pageHost ? ` · Página actual: ${pageHost}` : ''}. Solo tendrá acceso cuando pulses su icono.`
-      : `Version ${extensionVersion || 'unknown'}${pageHost ? ` · Current page: ${pageHost}` : ''}. It only receives access when you click its icon.`,
-    buttons: spanish ? ['Permitir', 'Cancelar'] : ['Allow', 'Cancel'],
-    defaultId: 0,
-    cancelId: 1,
-    noLink: true,
-  };
-  const result = owner ? await dialog.showMessageBox(owner, options) : await dialog.showMessageBox(options);
-  return result.response === 0;
-};
-let browserPairPrompt: BrowserPairPrompt = defaultBrowserPairPrompt;
-
-/** Test-only seam: production always uses an explicit native confirmation dialog. */
-export function setBrowserConnectorPairPromptForTests(prompt: BrowserPairPrompt | null): void {
-  browserPairPrompt = prompt ?? defaultBrowserPairPrompt;
 }
 
 // -------------------------------------------------------------- domain logic
@@ -454,12 +427,9 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse, _port: n
       sendJson(res, 503, { error: 'Enable Nodus Connector in Settings → Integrations first.' });
       return;
     }
-    const body = await readJsonBody(req);
-    const extensionVersion = typeof body.extensionVersion === 'string' ? body.extensionVersion.slice(0, 40) : '';
-    let pageHost = '';
-    try { pageHost = typeof body.pageUrl === 'string' ? new URL(body.pageUrl).hostname.slice(0, 200) : ''; } catch { pageHost = ''; }
-    const allowed = await browserPairPrompt({ extensionVersion, pageHost });
-    if (!allowed) { sendJson(res, 403, { error: 'Pairing was declined in Nodus.' }); return; }
+    // Enabling the connector in Nodus is the user's consent. The route is already limited to
+    // installed-extension origins on loopback, so a second native confirmation adds no boundary.
+    await readJsonBody(req);
     sendJson(res, 200, { ok: true, token: ensureBrowserConnectorToken(), port: _port, protocolVersion: 1 });
     return;
   }

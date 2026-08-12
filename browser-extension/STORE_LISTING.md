@@ -10,7 +10,7 @@
 
 Use the project logo for the store icon. Provide at least one 1280×800 or 640×400 screenshot that
 shows the detected document type, hierarchical collection selector, searchable tags, file choices,
-and the Nodus pairing confirmation. Do not use screenshots containing private library data.
+and automatic local connection status. Do not use screenshots containing private library data.
 
 ## Permission justifications
 

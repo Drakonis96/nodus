@@ -6,7 +6,7 @@
   xmlns:ov="http://schemas.microsoft.com/office/taskpaneappversionoverrides"
   xsi:type="TaskPaneApp">
   <Id>E4352919-FFEC-4F77-8268-975BB4217FAD</Id>
-  <Version>4.0.0</Version>
+  <Version>4.0.1</Version>
   <ProviderName>Nodus</ProviderName>
   <DefaultLocale>en-US</DefaultLocale>
   <DisplayName DefaultValue="Nodus Copilot" />

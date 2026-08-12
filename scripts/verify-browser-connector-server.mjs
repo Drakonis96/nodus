@@ -18,8 +18,9 @@ const userData = path.join(scratch, 'profile');
 const backups = path.join(scratch, 'backups');
 const port = 4500 + (process.pid % 1000);
 const origin = 'chrome-extension://aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
+let nativePromptCalls = 0;
 const electron = installRuntimeHooks(userData, {
-  dialog: { showMessageBox: async () => ({ response: 1 }) },
+  dialog: { showMessageBox: async () => { nativePromptCalls += 1; return { response: 1 }; } },
   shell: { openExternal: async () => undefined },
 });
 electron.BrowserWindow.getFocusedWindow = () => null;
@@ -39,7 +40,6 @@ try {
   });
   const history = library.createGlobalLibraryCollection('History', null);
   const women = library.createGlobalLibraryCollection('Women', history.id);
-  server.setBrowserConnectorPairPromptForTests(async () => true);
   await server.startZoteroPluginServer();
   const base = `http://127.0.0.1:${port}`;
 
@@ -67,7 +67,7 @@ try {
 
   const markerPair = await (await fetch(`${base}/api/browser/pair`, {
     method: 'POST', headers: { ...markerHeaders, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ extensionVersion: '4.0.0', pageUrl: 'https://journal.example/marker' }),
+    body: JSON.stringify({ extensionVersion: '4.0.1', pageUrl: 'https://journal.example/marker' }),
   })).json();
   assert.equal(markerPair.token, 'browser-test-token');
   const markerCatalog = await (await fetch(`${base}/api/browser/catalog`, {
@@ -77,9 +77,10 @@ try {
 
   const pair = await (await fetch(`${base}/api/browser/pair`, {
     method: 'POST', headers: { ...extensionHeaders, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ extensionVersion: '4.0.0', pageUrl: 'https://journal.example/article' }),
+    body: JSON.stringify({ extensionVersion: '4.0.1', pageUrl: 'https://journal.example/article' }),
   })).json();
   assert.equal(pair.token, 'browser-test-token');
+  assert.equal(nativePromptCalls, 0, 'enabling the connector is sufficient; pairing never opens a native prompt');
 
   const catalog = await (await fetch(`${base}/api/browser/catalog`, { headers: authHeaders })).json();
   assert.deepEqual(catalog.collections.map((entry) => entry.name), ['History', 'Women']);
@@ -120,6 +121,18 @@ try {
   assert.ok(libraryRoot);
   const storageFolder = encodeURIComponent(attached.storageId).replace(/\./g, '%2E');
   assert.ok(existsSync(path.join(libraryRoot, storageFolder, attached.attachments[0].relativePath)));
+
+  const fakePdfUpload = await fetch(`${base}/api/browser/items/${encodeURIComponent(saved.itemId)}/attachments`, {
+    method: 'POST',
+    headers: {
+      Origin: origin, Authorization: 'Bearer browser-test-token', 'Content-Type': 'application/octet-stream',
+      'X-Nodus-File-Name': encodeURIComponent('fake.pdf'), 'X-Nodus-File-Title': encodeURIComponent('Fake PDF'),
+      'X-Nodus-Mime-Type': encodeURIComponent('application/pdf'), 'X-Nodus-Attachment-Role': 'original',
+    },
+    body: '<html>This must never become the clean reader.</html>',
+  });
+  assert.equal(fakePdfUpload.status, 500, 'HTML labelled as PDF is rejected before attachment');
+  assert.equal(library.getGlobalLibraryItem(saved.itemId).attachments.length, 1);
 
   const refreshedCatalog = await (await fetch(`${base}/api/browser/catalog`, { headers: authHeaders })).json();
   assert.ok(refreshedCatalog.tags.some((entry) => entry.name === 'migration'));

@@ -1080,6 +1080,27 @@ const RELEASE_3_2_4_HIGHLIGHTS: RawReleaseHighlight[] = [
   },
 ];
 
+const RELEASE_4_0_1_HIGHLIGHTS: RawReleaseHighlight[] = [
+  {
+    scope: 'plugin',
+    es: 'El conector de Chrome se enlaza solo cuando lo activas en Nodus. Ya no aparece un aviso nativo redundante, y si revocas el token el navegador obtiene uno nuevo al volver a abrir el conector.',
+    en: 'The Chrome connector now pairs automatically after you enable it in Nodus. The redundant native prompt is gone, and if you revoke its token the browser obtains a fresh one when you open the connector again.',
+    fr: 'Le connecteur Chrome s’associe désormais automatiquement après son activation dans Nodus. La boîte de dialogue native redondante disparaît, et si vous révoquez son jeton le navigateur en obtient un nouveau à la prochaine ouverture.',
+    de: 'Der Chrome-Connector verbindet sich nun automatisch, sobald Sie ihn in Nodus aktivieren. Die überflüssige native Nachfrage entfällt, und nach dem Widerruf seines Tokens erhält der Browser beim nächsten Öffnen selbstständig ein neues.',
+    pt: 'O conector do Chrome passa a emparelhar automaticamente depois de o ativar no Nodus. O aviso nativo redundante desaparece e, se revogar o token, o navegador obtém outro quando voltar a abrir o conector.',
+    'pt-BR': 'O conector do Chrome agora emparelha automaticamente depois que você o ativa no Nodus. O aviso nativo redundante desapareceu e, se o token for revogado, o navegador obtém outro ao abrir o conector novamente.',
+  },
+  {
+    scope: 'academic',
+    es: 'Los enlaces académicos de texto completo ya se siguen aunque no terminen en PDF. Nodus atraviesa páginas como Dialnet y OJS, valida la firma del PDF real y prepara el Markdown limpio desde el artículo, no desde el snapshot HTML.',
+    en: 'Academic full-text links are now followed even when their address does not end in PDF. Nodus crosses pages such as Dialnet and OJS, validates the real PDF signature, and prepares clean Markdown from the paper instead of the HTML snapshot.',
+    fr: 'Les liens universitaires en texte intégral sont désormais suivis même si leur adresse ne se termine pas par PDF. Nodus traverse des pages comme Dialnet et OJS, valide la signature du vrai PDF et prépare le Markdown depuis l’article plutôt que depuis l’instantané HTML.',
+    de: 'Akademische Volltextlinks werden jetzt auch verfolgt, wenn ihre Adresse nicht auf PDF endet. Nodus folgt Seiten wie Dialnet und OJS, prüft die Signatur der echten PDF-Datei und erstellt das bereinigte Markdown aus dem Aufsatz statt aus dem HTML-Schnappschuss.',
+    pt: 'As ligações académicas de texto integral passam a ser seguidas mesmo sem terminarem em PDF. O Nodus atravessa páginas como Dialnet e OJS, valida a assinatura do PDF real e prepara o Markdown limpo a partir do artigo, não do snapshot HTML.',
+    'pt-BR': 'Os links acadêmicos de texto completo agora são seguidos mesmo sem terminarem em PDF. O Nodus atravessa páginas como Dialnet e OJS, valida a assinatura do PDF real e prepara o Markdown limpo a partir do artigo, não do snapshot HTML.',
+  },
+];
+
 const RELEASE_4_0_0_HIGHLIGHTS: RawReleaseHighlight[] = [
   {
     scope: 'academic',
@@ -1156,6 +1177,11 @@ const RELEASE_4_0_0_HIGHLIGHTS: RawReleaseHighlight[] = [
 ];
 
 const RAW_RELEASE_NOTES: RawReleaseNote[] = [
+  {
+    version: '4.0.1',
+    date: '2026-08-12',
+    highlights: RELEASE_4_0_1_HIGHLIGHTS,
+  },
   {
     version: '4.0.0',
     date: '2026-08-12',
