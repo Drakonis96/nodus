@@ -665,6 +665,34 @@ export class LibraryCatalog {
     return row?.storage_id ?? null;
   }
 
+  findItemIdByMetadataIdentifiers(metadata: LibraryItemMetadata): string | null {
+    const conditions: string[] = [];
+    const params: Record<string, string> = {};
+    const doi = metadata.doi?.replace(/^https?:\/\/(?:dx\.)?doi\.org\//i, '').replace(/^doi:\s*/i, '').trim().toLowerCase();
+    if (doi) {
+      conditions.push("LOWER(REPLACE(REPLACE(REPLACE(COALESCE(doi, ''), 'https://doi.org/', ''), 'http://doi.org/', ''), 'http://dx.doi.org/', ''))=@doi");
+      params.doi = doi;
+    }
+    for (const key of ['pmid', 'pmcid', 'arxiv'] as const) {
+      const value = metadata[key]?.trim().toLowerCase();
+      if (!value) continue;
+      conditions.push(`LOWER(COALESCE(json_extract(metadata_json, '$.${key}'), ''))=@${key}`);
+      params[key] = value;
+    }
+    const isbn = metadata.isbn?.map((value) => value.toUpperCase().replace(/[^0-9X]/g, '')).find(Boolean);
+    if (isbn) {
+      conditions.push("EXISTS (SELECT 1 FROM json_each(isbn_json) candidate_isbn WHERE UPPER(REPLACE(REPLACE(CAST(candidate_isbn.value AS TEXT), '-', ''), ' ', ''))=@isbn)");
+      params.isbn = isbn;
+    }
+    if (!conditions.length) return null;
+    const row = this.handle.prepare(`
+      SELECT id FROM library_items
+      WHERE deleted_at IS NULL AND (${conditions.join(' OR ')})
+      ORDER BY updated_at DESC LIMIT 1
+    `).get(params) as { id: string } | undefined;
+    return row?.id ?? null;
+  }
+
   citationKeys(exceptItemId?: string): string[] {
     const rows = (exceptItemId
       ? this.handle.prepare('SELECT citation_key FROM library_items WHERE deleted_at IS NULL AND id<>? AND citation_key IS NOT NULL').all(exceptItemId)

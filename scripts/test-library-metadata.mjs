@@ -23,6 +23,7 @@ const jsonResponse = (value) => new Response(JSON.stringify(value), {
 
 try {
   const { resolveLibraryMetadata } = require(path.join(repoRoot, 'electron/library/libraryMetadataResolver.ts'));
+  const { downloadLibraryFullText, extractScholarlyPdfUrls } = require(path.join(repoRoot, 'electron/library/libraryFullText.ts'));
   const { parseRis, parseBibtex, parseCslJson, parseEndNoteXml, parseZoteroRdf, parseBibliographyCsv, parseBibliographyMarkdown } = require(path.join(repoRoot, 'electron/library/libraryBibliographyImport.ts'));
   const { exportLibraryBibliography, formatLibraryCitation, generateCitationKey } = require(path.join(repoRoot, 'electron/library/libraryCitation.ts'));
   const { runLibraryMetadataBatch } = require(path.join(repoRoot, 'electron/library/libraryMetadataBatch.ts'));
@@ -89,6 +90,7 @@ try {
       author: [{ given: 'Mónica', family: 'García Fernández' }], abstract: '<jats:p>Texto   limpio</jats:p>',
       issued: { 'date-parts': [[2020, 5, 2]] }, publisher: 'CSIC', 'container-title': ['Arenal'],
       ISSN: ['1134-6396'], URL: 'https://doi.org/10.5555/norma.1',
+      link: [{ URL: 'https://publisher.example/full-text', 'content-type': 'application/pdf', 'intended-application': 'text-mining' }],
     } });
   };
 
@@ -99,7 +101,48 @@ try {
   assert.equal(doi.candidates[0].metadata.abstract, 'Texto limpio');
   assert.equal(doi.candidates[0].metadata.year, 2020);
   assert.equal(doi.candidates[0].metadata.url, doi.candidates[0].sourceUrl, 'a DOI record keeps its canonical online source');
+  assert.deepEqual(doi.candidates[0].fullTextLinks, [{
+    url: 'https://publisher.example/full-text', mimeType: 'application/pdf', source: 'crossref',
+  }], 'Crossref-declared PDF links remain available to the identifier importer');
   assert.match(requested[0].pathname, /works\/10\.5555%2Fnorma\.1/);
+
+  const scholarlyLinks = extractScholarlyPdfUrls(`<!doctype html><html><head>
+    <meta name="citation_pdf_url" content="/article/download/21/995">
+    <link rel="alternate" type="application/pdf" href="files/accepted.pdf">
+  </head><body><a href="supplement.csv">Data</a></body></html>`, 'https://journal.example/article/view/21');
+  assert.deepEqual(scholarlyLinks, [
+    'https://journal.example/article/download/21/995',
+    'https://journal.example/article/view/files/accepted.pdf',
+  ], 'standard scholarly PDF metadata is resolved against the final landing page');
+
+  const fullTextRequests = [];
+  const fullText = await downloadLibraryFullText({
+    ...doi.candidates[0], fullTextLinks: [], sourceUrl: 'https://doi.example/10.5555/norma.1',
+  }, {
+    assertPublic: async (url) => new URL(url),
+    fetcher: async (input) => {
+      const url = new URL(String(input)); fullTextRequests.push(url.toString());
+      if (url.hostname === 'doi.example') return new Response('<meta name="citation_pdf_url" content="https://journal.example/download/995">', { headers: { 'content-type': 'text/html' } });
+      return new Response('%PDF-1.7\nsynthetic test document', {
+        headers: { 'content-type': 'application/pdf', 'content-disposition': 'attachment; filename="article.pdf"' },
+      });
+    },
+  });
+  assert.equal(fullText.status, 'downloaded');
+  assert.equal(fullText.sourceUrl, 'https://journal.example/download/995');
+  assert.deepEqual(fullTextRequests, ['https://doi.example/10.5555/norma.1', 'https://journal.example/download/995']);
+  assert.ok(fullText.filePath && existsSync(fullText.filePath));
+  assert.match(await readFile(fullText.filePath, 'utf8'), /^%PDF-/);
+  await rm(fullText.temporaryDirectory, { recursive: true, force: true });
+
+  const invalidFullText = await downloadLibraryFullText({
+    ...doi.candidates[0], sourceUrl: null,
+    fullTextLinks: [{ url: 'https://journal.example/not-a-pdf', mimeType: 'application/pdf', source: 'crossref' }],
+  }, {
+    assertPublic: async (url) => new URL(url),
+    fetcher: async () => new Response('<html>Access denied</html>', { headers: { 'content-type': 'application/pdf' } }),
+  });
+  assert.equal(invalidFullText.status, 'failed', 'HTML disguised as a PDF is never attached');
 
   const isbn = await resolveLibraryMetadata('isbn', '978-84-0000-000-0', { fetcher });
   assert.equal(isbn.candidates[0].source, 'open-library');
@@ -214,6 +257,10 @@ ER  -`);
   assert.equal(catalog.list({ collectionId: collection.id }).total, 1);
   assert.equal(operations.importBibliographyFiles([risFile], collection.id).duplicates, 1);
   const importedRecord = store.readMaterializedItem(imported.itemIds[0]);
+  assert.equal(catalog.findItemIdByMetadataIdentifiers({
+    title: 'Same DOI', itemType: 'journal-article', creators: [], year: null,
+    doi: 'https://doi.org/10.7777/import.1', isbn: [], issn: [], tags: [],
+  }), importedRecord.id, 'identifier imports can update an existing record instead of creating a duplicate');
   assert.ok(importedRecord.citationKey, 'imports always receive a stable citation key');
   const generated = generateCitationKey(importedRecord.metadata, [importedRecord.citationKey], importedRecord.citationKey);
   assert.notEqual(generated, importedRecord.citationKey);

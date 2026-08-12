@@ -69,16 +69,23 @@ export function LibraryCreateReferenceDialog({ defaultMode = 'identifier', colle
     if (!detected) { setError(t('No se reconoce el identificador. Usa DOI, ISBN, ISSN, PMID, PMCID o arXiv.')); return; }
     setBusy(true); setError('');
     try {
-      const result = await window.nodus.resolveGlobalLibraryMetadata(detected.kind, detected.value);
-      const candidate = result.candidates[0];
-      if (!candidate) throw new Error(t('No se encontró ninguna ficha bibliográfica.'));
-      const sourceUrl = candidate.metadata.url ?? candidate.sourceUrl ?? undefined;
-      const created = await window.nodus.createGlobalLibraryItem({
-        ...candidate.metadata,
-        ...(sourceUrl ? { url: sourceUrl } : {}),
-      }, collectionIds);
-      toast(tx('Referencia añadida desde {kind}.', { kind: detected.kind.toUpperCase() }));
-      onCreated(created, false); onClose();
+      const result = await window.nodus.importGlobalLibraryIdentifier(detected.kind, detected.value, collectionIds);
+      if (result.fullText.status === 'downloaded') {
+        toast(result.created
+          ? tx('Referencia y PDF añadidos desde {kind}. Preparando la lectura…', { kind: detected.kind.toUpperCase() })
+          : t('La referencia ya existía. Se añadió el PDF que faltaba y se está preparando la lectura.'));
+      } else if (result.fullText.status === 'already-present') {
+        toast(t('La referencia y su PDF ya estaban en la Biblioteca.'), { tone: 'info' });
+      } else if (result.fullText.status === 'failed') {
+        toast(t(result.created
+          ? 'La referencia se añadió, pero el PDF localizado no pudo descargarse.'
+          : 'La referencia ya existía, pero el PDF localizado no pudo descargarse.'), { tone: 'error', duration: 6500 });
+      } else {
+        toast(t(result.created
+          ? 'La referencia se añadió, pero no se encontró un PDF accesible.'
+          : 'La referencia ya existía, pero no se encontró un PDF accesible.'), { tone: 'info', duration: 6500 });
+      }
+      onCreated(result.item, false); onClose();
     } catch (cause) { setError(cause instanceof Error ? cause.message : String(cause)); }
     finally { setBusy(false); }
   };
@@ -100,7 +107,7 @@ export function LibraryCreateReferenceDialog({ defaultMode = 'identifier', colle
       <header className="flex items-center gap-3 border-b border-neutral-800 px-5 py-4"><span className="grid h-9 w-9 place-items-center rounded-xl bg-indigo-500/15 text-indigo-300"><Icon name={mode === 'identifier' ? 'wand' : 'edit'} /></span><div className="min-w-0 flex-1"><h2 className="font-semibold">{t('Añadir referencia')}</h2><p className="mt-1 text-xs text-neutral-500">{t('Crea una ficha automáticamente por identificador o introdúcela manualmente.')}</p></div><button className="btn btn-ghost" aria-label={t('Cerrar')} onClick={onClose}><Icon name="x" /></button></header>
       <div className="border-b border-neutral-800 px-5 pt-3"><div className="flex gap-1" role="tablist"><button role="tab" aria-selected={mode === 'identifier'} className={`rounded-t-lg px-3 py-2 text-xs ${mode === 'identifier' ? 'bg-indigo-500/15 text-indigo-300' : 'text-neutral-500 hover:text-neutral-200'}`} onClick={() => { setMode('identifier'); setError(''); }}><Icon name="wand" size={13} /> {t('Identificador')}</button><button role="tab" aria-selected={mode === 'manual'} className={`rounded-t-lg px-3 py-2 text-xs ${mode === 'manual' ? 'bg-indigo-500/15 text-indigo-300' : 'text-neutral-500 hover:text-neutral-200'}`} onClick={() => { setMode('manual'); setError(''); }}><Icon name="edit" size={13} /> {t('Entrada manual')}</button></div></div>
       <form className="p-5" onSubmit={(event) => { event.preventDefault(); void (mode === 'identifier' ? addByIdentifier() : addManual()); }}>
-        {mode === 'identifier' ? <><label className="block text-xs font-medium">{t('DOI, ISBN, ISSN, PMID, PMCID o arXiv')}<input autoFocus data-testid="library-magic-identifier" className="input mt-2 w-full" value={rawIdentifier} onChange={(event) => setRawIdentifier(event.target.value)} placeholder="10.1234/article · 978… · PMID: …" /></label><p className="mt-2 text-[11px] leading-5 text-neutral-500">{t('Nodus detecta el tipo, recupera la mejor ficha disponible y la añade al pulsar Intro.')}</p></> : <div className="grid gap-3 sm:grid-cols-[12rem_1fr]"><label className="block text-xs font-medium">{t('Tipo')}<select data-testid="library-manual-item-type" className="input mt-2 w-full" value={itemType} onChange={(event) => setItemType(event.target.value as LibraryItemMetadata['itemType'])}>{LIBRARY_ITEM_TYPES.map((entry) => <option key={entry.id} value={entry.id}>{t(entry.label)}</option>)}</select></label><label className="block text-xs font-medium">{t('Título')}<input autoFocus data-testid="library-manual-title" className="input mt-2 w-full" value={title} onChange={(event) => setTitle(event.target.value)} placeholder={t('Título de la referencia')} /></label><p className="text-[11px] leading-5 text-neutral-500 sm:col-span-2">{t('Después podrás completar autores, identificadores, publicación, fechas y campos específicos de Zotero.')}</p></div>}
+        {mode === 'identifier' ? <><label className="block text-xs font-medium">{t('DOI, ISBN, ISSN, PMID, PMCID o arXiv')}<input autoFocus data-testid="library-magic-identifier" className="input mt-2 w-full" value={rawIdentifier} onChange={(event) => setRawIdentifier(event.target.value)} placeholder="10.1234/article · 978… · PMID: …" /></label><p className="mt-2 text-[11px] leading-5 text-neutral-500">{t('Nodus recupera la ficha y añade automáticamente el PDF cuando el editor o repositorio ofrece uno accesible.')}</p>{busy && <p role="status" className="mt-3 flex items-center gap-2 text-[11px] text-indigo-300"><Spinner /> {t('Buscando metadatos y texto completo…')}</p>}</> : <div className="grid gap-3 sm:grid-cols-[12rem_1fr]"><label className="block text-xs font-medium">{t('Tipo')}<select data-testid="library-manual-item-type" className="input mt-2 w-full" value={itemType} onChange={(event) => setItemType(event.target.value as LibraryItemMetadata['itemType'])}>{LIBRARY_ITEM_TYPES.map((entry) => <option key={entry.id} value={entry.id}>{t(entry.label)}</option>)}</select></label><label className="block text-xs font-medium">{t('Título')}<input autoFocus data-testid="library-manual-title" className="input mt-2 w-full" value={title} onChange={(event) => setTitle(event.target.value)} placeholder={t('Título de la referencia')} /></label><p className="text-[11px] leading-5 text-neutral-500 sm:col-span-2">{t('Después podrás completar autores, identificadores, publicación, fechas y campos específicos de Zotero.')}</p></div>}
         {error && <p role="alert" className="mt-4 rounded-lg border border-red-500/30 bg-red-500/10 p-2.5 text-xs text-red-300">{error}</p>}
         <div className="mt-5 flex justify-end gap-2"><button type="button" className="btn btn-ghost" disabled={busy} onClick={onClose}>{t('Cancelar')}</button><button type="submit" data-testid="confirm-create-library-reference" className="btn btn-primary" disabled={busy || (mode === 'identifier' ? !rawIdentifier.trim() : !title.trim())}>{busy ? <Spinner /> : <Icon name={mode === 'identifier' ? 'wand' : 'plus'} />} {t(mode === 'identifier' ? 'Buscar y añadir' : 'Crear y completar')}</button></div>
       </form>

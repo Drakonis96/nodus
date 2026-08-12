@@ -610,11 +610,18 @@ export interface LibraryLocalImportReport {
 
 export type LibraryMetadataIdentifierKind = 'doi' | 'isbn' | 'issn' | 'pmid' | 'pmcid' | 'arxiv';
 
+export interface LibraryFullTextLink {
+  url: string;
+  mimeType: string | null;
+  source: 'crossref' | 'arxiv' | 'pubmed' | 'landing-page';
+}
+
 export interface LibraryMetadataCandidate {
   id: string;
   source: 'crossref' | 'open-library' | 'pubmed' | 'arxiv';
   confidence: number;
   sourceUrl: string | null;
+  fullTextLinks?: LibraryFullTextLink[];
   metadata: LibraryItemMetadata;
 }
 
@@ -623,6 +630,16 @@ export interface LibraryMetadataLookupResult {
   value: string;
   candidates: LibraryMetadataCandidate[];
   queriedAt: string;
+}
+
+export interface LibraryIdentifierImportResult {
+  item: LibraryItemRecord;
+  created: boolean;
+  fullText: {
+    status: 'downloaded' | 'already-present' | 'not-found' | 'failed';
+    sourceUrl: string | null;
+    message: string | null;
+  };
 }
 
 export interface LibraryBibliographyImportReport {

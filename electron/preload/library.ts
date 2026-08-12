@@ -49,6 +49,7 @@ export const libraryApi: LibraryApi = {
   importGlobalLibraryFiles: (collectionId) => ipcRenderer.invoke('library:importFiles', collectionId),
   importGlobalBibliographyFiles: (collectionId) => ipcRenderer.invoke('library:importBibliography', collectionId),
   createGlobalLibraryItem: (metadata, collectionIds) => ipcRenderer.invoke('library:createItem', metadata, collectionIds),
+  importGlobalLibraryIdentifier: (kind, value, collectionIds) => ipcRenderer.invoke('library:importIdentifier', kind, value, collectionIds),
   duplicateGlobalLibraryItem: (itemId) => ipcRenderer.invoke('library:duplicateItem', itemId),
   convertGlobalLibraryItemToNodus: (itemId) => ipcRenderer.invoke('library:convertItemToNodus', itemId),
   updateGlobalLibraryItemMetadata: (itemId, patch) => ipcRenderer.invoke('library:updateMetadata', itemId, patch),

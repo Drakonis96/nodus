@@ -17,6 +17,7 @@ test('the Library UI exposes hierarchy, search, bulk operations, imports and bac
   const workspaceTabs = await readSource('src/components/library/LibraryWorkspaceTabs.tsx');
   const view = `${await readSource('src/views/GlobalLibraryView.tsx')}\n${workspaceTabs}\n${await readSource('src/components/library/LibraryItemManager.tsx')}\n${await readSource('src/components/library/LibrarySmartSearchDialog.tsx')}\n${await readSource('src/components/library/LibraryMetadataDialogs.tsx')}\n${await readSource('src/components/library/LibraryRecoveryDialogs.tsx')}`;
   const vaultLibrary = await readSource('src/views/Library.tsx');
+  const libraryService = await readSource('electron/library/libraryService.ts');
   const appCss = await readSource('src/index.css');
   for (const marker of [
     'global-library-view', 'global-library-search', 'global-library-bulk-actions',
@@ -50,7 +51,7 @@ test('the Library UI exposes hierarchy, search, bulk operations, imports and bac
     'listZoteroSyncSessions', 'resumeZoteroLibraryImport',
     'enqueueLibraryExtraction', 'patchGlobalLibraryItemCollections', 'setGlobalLibraryItemsDeleted',
     'importGlobalBibliographyFiles',
-    'createGlobalLibraryItem', 'duplicateGlobalLibraryItem', 'convertGlobalLibraryItemToNodus',
+    'createGlobalLibraryItem', 'importGlobalLibraryIdentifier', 'duplicateGlobalLibraryItem', 'convertGlobalLibraryItemToNodus',
     'addGlobalLibraryAttachments', 'updateGlobalLibraryAttachment', 'replaceGlobalLibraryAttachment',
     'removeGlobalLibraryAttachment', 'openGlobalLibraryAttachment', 'revealGlobalLibraryAttachment',
     'upsertGlobalLibraryNote', 'deleteGlobalLibraryNote', 'setGlobalLibraryItemRelation',
@@ -79,7 +80,7 @@ test('the Library UI exposes hierarchy, search, bulk operations, imports and bac
   assert.match(view, /setPointerCapture/, 'the Library navigation splitter supports pointer dragging');
   assert.match(view, /ArrowUp[\s\S]*ArrowDown/, 'the Library navigation splitter supports keyboard resizing');
   assert.match(view, /localStorage\.setItem\(LIBRARY_COLLECTION_PANE_RATIO_KEY/, 'the chosen pane ratio persists locally');
-  assert.match(view, /candidate\.metadata\.url \?\? candidate\.sourceUrl/, 'identifier creation retains the canonical source even when the provider metadata omits its URL');
+  assert.match(libraryService, /candidate\.metadata\.url \?\? candidate\.sourceUrl/, 'identifier creation retains the canonical source even when the provider metadata omits its URL');
   assert.match(view, /data-testid="open-library-trash"[\s\S]*?<Icon name="folder"/, 'trash is rendered as the final collection-tree folder');
   assert.match(view, /library-trash-folder[\s\S]*aria-current=\{trashMode \? 'page'/, 'the trash folder exposes its selected state');
   assert.match(view, /library-trash-section[\s\S]*h-10 shrink-0[\s\S]*library-trash-folder[\s\S]*h-8/, 'trash uses the same fixed height as the table footer');
@@ -270,7 +271,7 @@ test('the typed bridge covers every global management operation', async () => {
     'updateGlobalLibraryCollection', 'deleteGlobalLibraryCollection', 'patchGlobalLibraryItemCollections',
     'setGlobalLibraryItemsDeleted', 'importGlobalLibraryFiles',
     'importGlobalBibliographyFiles', 'updateGlobalLibraryItemMetadata', 'resolveGlobalLibraryMetadata',
-    'createGlobalLibraryItem', 'duplicateGlobalLibraryItem', 'convertGlobalLibraryItemToNodus',
+    'createGlobalLibraryItem', 'importGlobalLibraryIdentifier', 'duplicateGlobalLibraryItem', 'convertGlobalLibraryItemToNodus',
     'addGlobalLibraryAttachments', 'updateGlobalLibraryAttachment', 'replaceGlobalLibraryAttachment',
     'removeGlobalLibraryAttachment', 'openGlobalLibraryAttachment', 'revealGlobalLibraryAttachment',
     'upsertGlobalLibraryNote', 'deleteGlobalLibraryNote', 'setGlobalLibraryItemRelation',
@@ -351,6 +352,8 @@ test('metadata management previews candidates, supports bulk confirmation and re
   assert.match(dialogs, /Nada se aplica sin tu revisión/);
   assert.match(dialogs, /updateGlobalLibraryItemMetadata/);
   assert.match(dialogs, /resolveGlobalLibraryMetadata/);
+  assert.match(dialogs, /importGlobalLibraryIdentifier/);
+  assert.match(dialogs, /Buscando metadatos y texto completo/);
   assert.match(dialogs, /onGlobalLibraryMetadataBatchProgress/);
   assert.match(dialogs, /formatGlobalLibraryCitation/);
   assert.match(dialogs, /styles\.map\(\(entry\)/, 'the citation chooser is populated by the installed CSL catalogue');

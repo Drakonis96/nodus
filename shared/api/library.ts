@@ -27,6 +27,7 @@ import type {
   LibraryItemMetadata,
   LibraryMetadataIdentifierKind,
   LibraryMetadataLookupResult,
+  LibraryIdentifierImportResult,
   LibraryVaultLink,
   LibraryVaultLinkReport,
   LibraryAttachmentPatch,
@@ -93,6 +94,7 @@ export interface LibraryApi {
   importGlobalLibraryFiles(collectionId?: string | null): Promise<LibraryLocalImportReport>;
   importGlobalBibliographyFiles(collectionId?: string | null): Promise<LibraryBibliographyImportReport>;
   createGlobalLibraryItem(metadata: LibraryItemMetadata, collectionIds?: string[]): Promise<LibraryItemRecord>;
+  importGlobalLibraryIdentifier(kind: LibraryMetadataIdentifierKind, value: string, collectionIds?: string[]): Promise<LibraryIdentifierImportResult>;
   duplicateGlobalLibraryItem(itemId: string): Promise<LibraryItemRecord>;
   convertGlobalLibraryItemToNodus(itemId: string): Promise<LibraryItemRecord>;
   updateGlobalLibraryItemMetadata(itemId: string, patch: Partial<LibraryItemMetadata>): Promise<LibraryItemRecord>;

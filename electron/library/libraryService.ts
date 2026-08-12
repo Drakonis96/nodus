@@ -29,6 +29,7 @@ import type {
   LibraryItemMetadata,
   LibraryMetadataIdentifierKind,
   LibraryMetadataLookupResult,
+  LibraryIdentifierImportResult,
   LibraryVaultLink,
   LibraryVaultLinkReport,
   LibraryAttachmentPatch,
@@ -73,6 +74,7 @@ import { buildOcrTextPrompt, OCR_USER_PROMPT } from '@shared/aiOcrPrompt';
 import { DEFAULT_OCR_OPTIONS } from '@shared/aiOcrTypes';
 import { LibraryOperations } from './libraryOperations';
 import { resolveLibraryMetadata } from './libraryMetadataResolver';
+import { downloadLibraryFullText } from './libraryFullText';
 import { libraryItemIdentifier, runLibraryMetadataBatch } from './libraryMetadataBatch';
 import { mergeLibraryMetadataCandidate } from '@shared/libraryMetadata';
 import { propagateLibraryInvalidations, settleLibraryInvalidationsForItem } from './libraryInvalidation';
@@ -633,6 +635,70 @@ export function updateGlobalLibraryItemMetadata(itemId: string, patch: Partial<L
 
 export function resolveGlobalLibraryMetadata(kind: LibraryMetadataIdentifierKind, value: string): Promise<LibraryMetadataLookupResult> {
   return resolveLibraryMetadata(kind, value);
+}
+
+export async function importGlobalLibraryIdentifier(
+  kind: LibraryMetadataIdentifierKind,
+  value: string,
+  collectionIds: string[] = [],
+): Promise<LibraryIdentifierImportResult> {
+  const current = service();
+  if (!current) throw new Error('Configura primero la carpeta de copias de seguridad de Nodus.');
+  await ensureCatalogReady(current);
+  const lookup = await resolveLibraryMetadata(kind, value);
+  const candidate = lookup.candidates[0];
+  if (!candidate) throw new Error('No se encontró ninguna ficha bibliográfica.');
+  const sourceUrl = candidate.metadata.url ?? candidate.sourceUrl ?? undefined;
+  const existingId = current.catalog.findItemIdByMetadataIdentifiers(candidate.metadata);
+  let item = existingId
+    ? current.operations.bibliographyRecords({ itemIds: [existingId] })[0]
+    : null;
+  if (item && collectionIds.length) {
+    const editableCollections = new Set(current.catalog.listCollections().filter((entry) => entry.source === 'nodus').map((entry) => entry.id));
+    const add = collectionIds.filter((collectionId) => editableCollections.has(current.catalog.resolveCollectionId(collectionId) ?? collectionId));
+    if (add.length) {
+      current.operations.patchItemCollections([item.id], { add });
+      item = current.operations.bibliographyRecords({ itemIds: [item.id] })[0] ?? item;
+      broadcast(current.catalog.status(current.root, current.deviceId));
+    }
+  }
+  if (item?.attachments.some((attachment) => {
+    if (attachment.mimeType !== 'application/pdf' || ['source-missing', 'corrupt'].includes(attachment.sourceState ?? 'available')) return false;
+    try { return fs.existsSync(current.operations.attachmentPath(item!.id, attachment.id)); } catch { return false; }
+  })) {
+    return { item, created: false, fullText: { status: 'already-present', sourceUrl: null, message: null } };
+  }
+  const downloaded = await downloadLibraryFullText(candidate);
+  const created = !item;
+  item ??= createGlobalLibraryItem({ ...candidate.metadata, ...(sourceUrl ? { url: sourceUrl } : {}) }, collectionIds);
+  try {
+    if (downloaded.status === 'downloaded' && downloaded.filePath) {
+      try {
+        const knownAttachmentIds = new Set(item.attachments.map((attachment) => attachment.id));
+        item = await addGlobalLibraryAttachments(item.id, [downloaded.filePath]);
+        const addedPdf = item.attachments.find((attachment) => !knownAttachmentIds.has(attachment.id) && attachment.mimeType === 'application/pdf');
+        if (addedPdf && addedPdf.role !== 'original') item = await updateGlobalLibraryAttachment(item.id, addedPdf.id, { makePrimary: true });
+      } catch (error) {
+        return {
+          item, created,
+          fullText: {
+            status: 'failed', sourceUrl: downloaded.sourceUrl,
+            message: error instanceof Error ? error.message : String(error),
+          },
+        };
+      }
+    }
+    return {
+      item, created,
+      fullText: {
+        status: downloaded.status,
+        sourceUrl: downloaded.sourceUrl,
+        message: downloaded.message,
+      },
+    };
+  } finally {
+    if (downloaded.temporaryDirectory) fs.rmSync(downloaded.temporaryDirectory, { recursive: true, force: true });
+  }
 }
 
 export async function startGlobalLibraryMetadataBatch(

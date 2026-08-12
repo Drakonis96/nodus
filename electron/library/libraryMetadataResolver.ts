@@ -78,6 +78,14 @@ function crossrefCandidate(raw: unknown, confidence: number): LibraryMetadataCan
   const doi = plain(message.DOI);
   const { date, year } = dateParts(message);
   const pages = plain(message.page);
+  const fullTextLinks = (Array.isArray(message.link) ? message.link : []).flatMap((rawLink) => {
+    if (!rawLink || typeof rawLink !== 'object') return [];
+    const link = rawLink as Record<string, unknown>;
+    const url = plain(link.URL);
+    const mimeType = plain(link['content-type'])?.toLowerCase().split(';')[0] ?? null;
+    if (!url || mimeType !== 'application/pdf') return [];
+    return [{ url, mimeType, source: 'crossref' as const }];
+  });
   const metadata: LibraryItemMetadata = {
     title, itemType: crossrefType(message.type),
     creators: (Array.isArray(message.author) ? message.author : []).flatMap((rawAuthor) => {
@@ -99,7 +107,8 @@ function crossrefCandidate(raw: unknown, confidence: number): LibraryMetadataCan
   };
   return {
     id: doi ?? plain(message.URL) ?? `crossref:${title}:${year ?? ''}`, source: 'crossref', confidence,
-    sourceUrl: plain(message.URL) ?? (doi ? `https://doi.org/${doi}` : null), metadata,
+    sourceUrl: plain(message.URL) ?? (doi ? `https://doi.org/${doi}` : null),
+    ...(fullTextLinks.length ? { fullTextLinks } : {}), metadata,
   };
 }
 
@@ -202,6 +211,7 @@ function arxivCandidate(xml: string, arxiv: string): LibraryMetadataCandidate | 
   const doi = xmlValues(entry, 'arxiv:doi')[0];
   return {
     id: `arxiv:${arxiv}`, source: 'arxiv', confidence: 1, sourceUrl: `https://arxiv.org/abs/${arxiv}`,
+    fullTextLinks: [{ url: `https://arxiv.org/pdf/${arxiv}.pdf`, mimeType: 'application/pdf', source: 'arxiv' }],
     metadata: {
       title, itemType: 'preprint', creators: authors, abstract: xmlValues(entry, 'summary')[0], date: published, year: parsedYear,
       ...(doi ? { doi } : {}), arxiv, url: `https://arxiv.org/abs/${arxiv}`,

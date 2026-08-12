@@ -45,6 +45,7 @@ import {
   previewGlobalLibraryMerge,
   mergeGlobalLibraryItems,
   createGlobalLibraryItem,
+  importGlobalLibraryIdentifier,
   duplicateGlobalLibraryItem,
   convertGlobalLibraryItemToNodus,
   addGlobalLibraryAttachments,
@@ -146,6 +147,7 @@ export function registerLibraryIpc({ h }: IpcContext): void {
       : importGlobalBibliographyFiles(selected.filePaths, collectionId);
   });
   h('library:createItem', async (_event, metadata, collectionIds) => createGlobalLibraryItem(metadata, collectionIds));
+  h('library:importIdentifier', async (_event, kind, value, collectionIds) => importGlobalLibraryIdentifier(kind, value, collectionIds));
   h('library:duplicateItem', async (_event, itemId) => duplicateGlobalLibraryItem(itemId));
   h('library:convertItemToNodus', async (_event, itemId) => convertGlobalLibraryItemToNodus(itemId));
   h('library:addAttachments', async (event, itemId) => {
