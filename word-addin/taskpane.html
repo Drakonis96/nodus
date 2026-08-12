@@ -13,7 +13,7 @@
   </head>
   <body>
     <header class="head">
-      <div class="mark">N</div>
+      <img class="mark" src="/addin/assets/icon-32.png" alt="Nodus" width="28" height="28" />
       <div>
         <div class="title">Nodus Copilot</div>
         <div class="caption">Word + Nodus</div>
@@ -30,22 +30,56 @@
         <div class="segmented" id="searchMode" role="tablist">
           <button class="seg active" data-mode="ideas" type="button" role="tab">Ideas</button>
           <button class="seg" data-mode="passages" type="button" role="tab">Passages</button>
+          <button class="seg" data-mode="references" type="button" role="tab">References</button>
         </div>
-        <div class="toolbar">
-          <label class="auto"><input type="checkbox" id="autoToggle" checked /> Auto</label>
-          <button id="analyzeBtn" class="btn primary" type="button">Analyze paragraph</button>
+        <div id="analysisControls">
+          <div class="toolbar">
+            <label class="auto"><input type="checkbox" id="autoToggle" checked /> Auto</label>
+            <button id="analyzeBtn" class="btn primary" type="button">Analyze paragraph</button>
+          </div>
+          <div class="selection-actions" id="selectionActions">
+            <span class="sa-label">Selection</span>
+            <button class="btn small" data-compose="rewrite" type="button">Rewrite</button>
+            <button class="btn small" data-compose="expand" type="button">Expand</button>
+            <button class="btn small" data-compose="counter" type="button">Counter</button>
+          </div>
+          <div class="insert-target" id="insertTarget">
+            <span class="it-label">Insert into</span>
+            <label><input type="radio" name="insTarget" value="body" checked /> <span data-it="body">Body</span></label>
+            <label id="footnoteOption"><input type="radio" name="insTarget" value="footnote" id="footnoteRadio" /> <span data-it="footnote">Footnote</span></label>
+          </div>
         </div>
-        <div class="selection-actions" id="selectionActions">
-          <span class="sa-label">Selection</span>
-          <button class="btn small" data-compose="rewrite" type="button">Rewrite</button>
-          <button class="btn small" data-compose="expand" type="button">Expand</button>
-          <button class="btn small" data-compose="counter" type="button">Counter</button>
-        </div>
-        <div class="insert-target" id="insertTarget">
-          <span class="it-label">Insert into</span>
-          <label><input type="radio" name="insTarget" value="body" checked /> <span data-it="body">Body</span></label>
-          <label id="footnoteOption"><input type="radio" name="insTarget" value="footnote" id="footnoteRadio" /> <span data-it="footnote">Footnote</span></label>
-        </div>
+
+        <section id="referenceControls" class="reference-controls" hidden aria-label="Reference tools">
+          <div class="reference-preferences">
+            <label><span data-ref-label="style">Style</span><select id="referenceStyle"></select></label>
+            <label><span data-ref-label="locale">Language</span><select id="referenceLocale">
+              <option value="es-ES">Español</option><option value="en-US">English</option>
+              <option value="fr-FR">Français</option><option value="de-DE">Deutsch</option>
+              <option value="it-IT">Italiano</option><option value="pt-PT">Português</option>
+            </select></label>
+            <label><span data-ref-label="placement">Placement</span><select id="referencePlacement">
+              <option value="in-text">In text</option><option value="footnote">Footnote</option><option value="endnote">Endnote</option>
+            </select></label>
+          </div>
+          <label class="auto reference-auto"><input type="checkbox" id="referenceAutoUpdate" checked /> <span>Update citations automatically</span></label>
+          <div class="reference-document-actions">
+            <button id="refreshReferences" class="btn small" type="button" title="Update every live citation and bibliography">↻ <span>Refresh</span></button>
+            <button id="unlinkReferences" class="btn small danger" type="button" title="Convert live references to plain text">⌁ <span>Unlink</span></button>
+          </div>
+          <div id="citationComposer" class="citation-composer">
+            <div class="composer-head"><strong>Current citation</strong><span id="composerHint">Choose one or more sources below</span></div>
+            <div id="selectedReferences" class="selected-references"></div>
+            <div class="composer-actions">
+              <button id="clearCitation" class="btn small" type="button">Clear</button>
+              <button id="insertCitation" class="btn small primary" type="button" disabled>Insert citation</button>
+            </div>
+          </div>
+          <div class="bibliography-actions">
+            <div><strong>Bibliography</strong><small id="bibliographyHint">Uses the sources cited in this document</small></div>
+            <button id="insertBibliography" class="btn small" type="button">Insert / update</button>
+          </div>
+        </section>
       </section>
 
       <div id="paragraph" class="paragraph"></div>
@@ -53,6 +87,7 @@
       <div id="empty" class="empty">Place the cursor in a paragraph to see related ideas.</div>
     </main>
 
+    <script src="/addin/references.js"></script>
     <script src="/addin/taskpane.js"></script>
   </body>
 </html>

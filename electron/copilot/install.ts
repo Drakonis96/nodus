@@ -72,13 +72,23 @@ export async function installCopilotAddin(appRoot: string, appVersion = '0.1.0')
     const manifest = renderManifest(template, getSettings().copilotPort, appVersion);
     await fs.mkdir(targetDir, { recursive: true });
     const targetPath = path.join(targetDir, 'nodus-copilot.manifest.xml');
-    await fs.writeFile(targetPath, manifest, 'utf8');
+    const stagingPath = `${targetPath}.tmp`;
+    await fs.writeFile(stagingPath, manifest, 'utf8');
+    try {
+      await fs.rename(stagingPath, targetPath);
+    } catch {
+      // Windows cannot replace an existing destination with rename(). The
+      // staged manifest is complete, so only the single previous manifest is
+      // removed before the retry; Office's shared cache remains untouched.
+      await fs.rm(targetPath, { force: true });
+      await fs.rename(stagingPath, targetPath);
+    }
     return {
       ok: true,
       manifestPath: targetPath,
       message: installText(
-        'Nodus Copilot instalado/actualizado para Word. Cierra Word del todo (Cmd+Q) y vuelve a abrirlo: el complemento aparece en Inicio → Complementos, y añade su pestaña “Nodus” al abrirlo por primera vez.',
-        'Nodus Copilot was installed/updated for Word. Quit Word completely (Cmd+Q) and reopen it: the add-in appears under Home → Add-ins and adds its “Nodus” tab when you open it for the first time.'
+        'Nodus Copilot instalado/actualizado para Word. Cierra Word del todo (Cmd+Q) y vuelve a abrirlo. La pestaña “Nodus” quedará disponible en la cinta para todos los documentos; no es necesario volver a añadir el complemento.',
+        'Nodus Copilot was installed/updated for Word. Quit Word completely (Cmd+Q) and reopen it. The “Nodus” tab will remain available on the ribbon for every document; you do not need to add the add-in again.'
       ),
     };
   } catch (error) {
