@@ -10,9 +10,7 @@
   <ProviderName>Nodus</ProviderName>
   <DefaultLocale>en-US</DefaultLocale>
   <DisplayName DefaultValue="Nodus Copilot" />
-  <Description DefaultValue="Shows how the paragraph you are writing relates to your Nodus library, lets you explore ideas and connections, and helps you insert cited ideas.">
-    <Override Locale="es-ES" Value="Muestra cómo el párrafo que escribes se relaciona con tu biblioteca de Nodus, permite explorar ideas y conexiones, y te ayuda a insertar ideas citadas." />
-  </Description>
+  <Description DefaultValue="Shows how the paragraph you are writing relates to your Nodus library, lets you explore ideas and connections, and helps you insert cited ideas." />
   <IconUrl DefaultValue="https://localhost:4320/addin/assets/icon-32.png" />
   <HighResolutionIconUrl DefaultValue="https://localhost:4320/addin/assets/icon-80.png" />
   <SupportUrl DefaultValue="https://localhost:4320/addin/taskpane.html" />
@@ -117,24 +115,20 @@
         <bt:String id="Nodus.Tab.Label" DefaultValue="Nodus" />
         <bt:String id="Nodus.Group.Label" DefaultValue="Nodus" />
         <bt:String id="Nodus.Taskpane.Label" DefaultValue="Nodus Copilot" />
-        <bt:String id="Nodus.Citation.Label" DefaultValue="Add/Edit Citation"><bt:Override Locale="es-ES" Value="Añadir/editar cita" /></bt:String>
-        <bt:String id="Nodus.Bibliography.Label" DefaultValue="Add/Edit Bibliography"><bt:Override Locale="es-ES" Value="Añadir/editar bibliografía" /></bt:String>
-        <bt:String id="Nodus.Refresh.Label" DefaultValue="Refresh"><bt:Override Locale="es-ES" Value="Actualizar" /></bt:String>
-        <bt:String id="Nodus.Preferences.Label" DefaultValue="Preferences"><bt:Override Locale="es-ES" Value="Preferencias" /></bt:String>
-        <bt:String id="Nodus.Unlink.Label" DefaultValue="Unlink Citations"><bt:Override Locale="es-ES" Value="Desvincular citas" /></bt:String>
+        <bt:String id="Nodus.Citation.Label" DefaultValue="Add/Edit Citation" />
+        <bt:String id="Nodus.Bibliography.Label" DefaultValue="Add/Edit Bibliography" />
+        <bt:String id="Nodus.Refresh.Label" DefaultValue="Refresh" />
+        <bt:String id="Nodus.Preferences.Label" DefaultValue="Preferences" />
+        <bt:String id="Nodus.Unlink.Label" DefaultValue="Unlink Citations" />
       </bt:ShortStrings>
       <bt:LongStrings>
-        <bt:String id="GetStarted.Description" DefaultValue="Open the pane to see how your text relates to your library.">
-          <bt:Override Locale="es-ES" Value="Abre el panel para ver cómo tu texto se relaciona con tu biblioteca." />
-        </bt:String>
-        <bt:String id="Nodus.Taskpane.Tooltip" DefaultValue="Relate the current paragraph to your Nodus library and insert cited ideas.">
-          <bt:Override Locale="es-ES" Value="Relaciona el párrafo actual con tu biblioteca de Nodus e inserta ideas citadas." />
-        </bt:String>
-        <bt:String id="Nodus.Citation.Tooltip" DefaultValue="Search the Nodus global library and add or edit a live citation."><bt:Override Locale="es-ES" Value="Busca en la biblioteca global de Nodus y añade o edita una cita viva." /></bt:String>
-        <bt:String id="Nodus.Bibliography.Tooltip" DefaultValue="Insert or update the live bibliography for this document."><bt:Override Locale="es-ES" Value="Inserta o actualiza la bibliografía viva de este documento." /></bt:String>
-        <bt:String id="Nodus.Refresh.Tooltip" DefaultValue="Refresh every live Nodus citation and bibliography."><bt:Override Locale="es-ES" Value="Actualiza todas las citas y bibliografías vivas de Nodus." /></bt:String>
-        <bt:String id="Nodus.Preferences.Tooltip" DefaultValue="Choose the citation style, language, placement, and update behavior."><bt:Override Locale="es-ES" Value="Elige el estilo de cita, idioma, ubicación y comportamiento de actualización." /></bt:String>
-        <bt:String id="Nodus.Unlink.Tooltip" DefaultValue="Convert every live Nodus citation and bibliography into plain document text."><bt:Override Locale="es-ES" Value="Convierte todas las citas y bibliografías vivas de Nodus en texto normal del documento." /></bt:String>
+        <bt:String id="GetStarted.Description" DefaultValue="Open the pane to see how your text relates to your library." />
+        <bt:String id="Nodus.Taskpane.Tooltip" DefaultValue="Relate the current paragraph to your Nodus library and insert cited ideas." />
+        <bt:String id="Nodus.Citation.Tooltip" DefaultValue="Search the Nodus global library and add or edit a live citation." />
+        <bt:String id="Nodus.Bibliography.Tooltip" DefaultValue="Insert or update the live bibliography for this document." />
+        <bt:String id="Nodus.Refresh.Tooltip" DefaultValue="Refresh every live Nodus citation and bibliography." />
+        <bt:String id="Nodus.Preferences.Tooltip" DefaultValue="Choose the citation style, language, placement, and update behavior." />
+        <bt:String id="Nodus.Unlink.Tooltip" DefaultValue="Convert every live Nodus citation and bibliography into plain document text." />
       </bt:LongStrings>
     </Resources>
   </VersionOverrides>

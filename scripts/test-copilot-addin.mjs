@@ -43,18 +43,18 @@ try {
   assert.match(rendered, /taskpane\.html#references-unlink/);
   assert.match(rendered, /<DefaultLocale>en-US<\/DefaultLocale>/);
   assert.match(rendered, /DefaultValue="Open the pane to see how your text relates to your library\."/);
-  assert.match(rendered, /<bt:Override Locale="es-ES" Value="Abre el panel/);
+  assert.doesNotMatch(rendered, /<Override Locale=|<bt:Override Locale=/, 'the Word manifest must stay English-only');
 
-  // English is also the safe pre-initialization language in the task pane. The
-  // runtime switches it to Spanish when Nodus injects lang=es, but an English
-  // pane must never fall back to a Spanish string when a key is missing.
+  // The task pane stays in English even when the desktop app uses another language.
   const taskpaneHtml = fs.readFileSync(path.join(repoRoot, 'word-addin/taskpane.html'), 'utf8');
   const taskpaneJs = fs.readFileSync(path.join(repoRoot, 'word-addin/taskpane.js'), 'utf8');
   const referencesJs = fs.readFileSync(path.join(repoRoot, 'word-addin/references.js'), 'utf8');
   assert.match(taskpaneHtml, /<html lang="en">/);
   assert.match(taskpaneHtml, />Analyze paragraph</);
   assert.doesNotMatch(taskpaneHtml, /Conectando|Buscar ideas|Analizar párrafo|Selección|Insertar en|Nota al pie|Pasajes/);
-  assert.match(taskpaneJs, /table\[key\] !== undefined \? table\[key\] : STR\.en\[key\]/);
+  assert.match(taskpaneJs, /var LANG = 'en'/);
+  assert.doesNotMatch(taskpaneJs, /Conectando|Buscar ideas|Analizar párrafo|Selección|Insertar en|Nota al pie|Pasajes/);
+  assert.doesNotMatch(referencesJs, /Referencias|Añadir|Desvincular|Bibliografía|Formateando/);
   assert.match(taskpaneHtml, /<img class="mark" src="\/addin\/assets\/icon-32\.png"/, 'the pane must use the stylized Nodus mark');
   assert.doesNotMatch(taskpaneHtml, /<div class="mark">N<\/div>/, 'a generic letter N must not be used as the brand');
   assert.match(taskpaneHtml, /data-mode="references"/);

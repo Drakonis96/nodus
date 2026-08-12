@@ -41,7 +41,7 @@ const server = createServer(async (req, res) => {
     const file = path.join(addinRoot, relative);
     const ext = path.extname(file);
     let body = await readFile(file);
-    if (ext === '.html') body = Buffer.from(body.toString('utf8').replace(/__COPILOT_TOKEN__/g, 'e2e-token').replace(/__COPILOT_LANG__/g, 'en'));
+    if (ext === '.html') body = Buffer.from(body.toString('utf8').replace(/__COPILOT_TOKEN__/g, 'e2e-token').replace(/__COPILOT_LANG__/g, 'es'));
     const types = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.png': 'image/png' };
     res.writeHead(200, { 'Content-Type': types[ext] || 'application/octet-stream' }); res.end(body); return;
   }
