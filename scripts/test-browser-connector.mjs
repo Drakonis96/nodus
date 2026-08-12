@@ -8,6 +8,7 @@ import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 
 import { filterCollectionRows, hierarchicalCollections, normalizeTags } from '../browser-extension/lib/collections.js';
+import { DEFAULT_NODUS_PORT, connectorPortCandidates, discoverNodus, normalizeConnectorPort } from '../browser-extension/lib/connection.js';
 import { detectCapture } from '../browser-extension/lib/detector.js';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -100,6 +101,21 @@ test('collection paths remain hierarchical and searchable without losing context
   assert.equal(filterCollectionRows(collections, 'women postwar').length, 0);
   assert.equal(filterCollectionRows(collections, 'Women / Postwar')[0].collection.id, 'postwar');
   assert.deepEqual(normalizeTags([' Memory ', 'memory', 'Women', '', 'Women ']), ['Memory', 'Women']);
+});
+
+test('recovers from a stale connector port by probing the Nodus default', async () => {
+  assert.equal(normalizeConnectorPort('4323'), 4323);
+  assert.equal(normalizeConnectorPort('invalid'), DEFAULT_NODUS_PORT);
+  assert.deepEqual(connectorPortCandidates(4323), [4323, DEFAULT_NODUS_PORT]);
+  assert.deepEqual(connectorPortCandidates(DEFAULT_NODUS_PORT), [DEFAULT_NODUS_PORT]);
+  const attempted = [];
+  const connection = await discoverNodus(4323, async (port) => {
+    attempted.push(port);
+    if (port === 4323) throw new TypeError('Failed to fetch');
+    return { ok: true, app: 'nodus', enabled: true };
+  });
+  assert.deepEqual(attempted, [4323, DEFAULT_NODUS_PORT]);
+  assert.deepEqual(connection, { port: DEFAULT_NODUS_PORT, health: { ok: true, app: 'nodus', enabled: true } });
 });
 
 test('Manifest V3 package minimizes permission and contains no remote executable code', () => {

@@ -3,6 +3,7 @@
 
 import { detectCapture } from './lib/detector.js';
 import { filterCollectionRows, normalizeTags } from './lib/collections.js';
+import { DEFAULT_NODUS_PORT, discoverNodus, normalizeConnectorPort } from './lib/connection.js';
 
 const ITEM_TYPES = [
   ['journal-article', 'Journal article'], ['book', 'Book'], ['book-chapter', 'Book chapter'], ['conference-paper', 'Conference paper'],
@@ -16,7 +17,7 @@ const ITEM_TYPES = [
   ['webpage', 'Web page'], ['document', 'Document'], ['standard', 'Standard'], ['other', 'Other'],
 ];
 const $ = (id) => document.getElementById(id);
-const state = { capture: null, tab: null, port: 4321, token: '', collections: [], tags: [], selectedCollection: null, selectedTags: [], savedItemId: null };
+const state = { capture: null, tab: null, port: DEFAULT_NODUS_PORT, token: '', collections: [], tags: [], selectedCollection: null, selectedTags: [], savedItemId: null };
 const msg = (key, substitutions) => chrome.i18n.getMessage(key, substitutions) || key;
 
 function show(id) {
@@ -102,24 +103,37 @@ async function detectActiveTab() {
   renderCapture();
 }
 
-function baseUrl() { return `http://127.0.0.1:${state.port}`; }
+function baseUrl(port = state.port) { return `http://127.0.0.1:${port}`; }
 
-async function api(path, options = {}, token = state.token) {
+async function api(path, options = {}, token = state.token, port = state.port) {
   const headers = { ...(options.headers || {}) };
   if (token) headers.Authorization = `Bearer ${token}`;
   if (options.body && !(options.body instanceof ArrayBuffer) && !headers['Content-Type']) headers['Content-Type'] = 'application/json';
-  const response = await fetch(`${baseUrl()}${path}`, { ...options, headers });
+  const response = await fetch(`${baseUrl(port)}${path}`, { ...options, headers });
   const raw = await response.text();
   let data = {}; try { data = raw ? JSON.parse(raw) : {}; } catch { data = { error: raw }; }
   if (!response.ok) throw new Error(data.error || `Nodus returned ${response.status}.`);
   return data;
 }
 
+async function findNodus(preferredPort) {
+  return discoverNodus(preferredPort, (port) => api('/api/browser/health', {}, '', port));
+}
+
+async function adoptConnection(connection) {
+  state.port = connection.port;
+  $('pair-port').value = String(connection.port);
+  await chrome.storage.local.set({ port: connection.port });
+}
+
 async function connect() {
-  const inputPort = Math.max(1024, Math.min(65535, Number($('pair-port').value) || 4321));
+  const inputPort = normalizeConnectorPort($('pair-port').value);
   state.port = inputPort; $('pair-button').disabled = true; $('connect-error').textContent = '';
   try {
-    const health = await api('/api/browser/health', {}, '');
+    const connection = await findNodus(inputPort);
+    if (!connection) throw new Error(msg('cannotReachNodus', [String(inputPort)]));
+    await adoptConnection(connection);
+    const { health } = connection;
     if (!health.enabled) throw new Error(msg('enableInNodus'));
     if (!health.libraryReady) throw new Error(msg('libraryNotReady'));
     const paired = await api('/api/browser/pair', { method: 'POST', body: JSON.stringify({ extensionVersion: chrome.runtime.getManifest().version, pageUrl: state.capture?.pageUrl || state.tab?.url || '' }) }, '');
@@ -243,10 +257,13 @@ async function save() {
 }
 
 async function initConnection() {
-  const stored = await chrome.storage.local.get({ port: 4321, token: '', lastCollectionId: null });
-  state.port = Number(stored.port) || 4321; state.token = stored.token || ''; state.selectedCollection = stored.lastCollectionId || null; $('pair-port').value = String(state.port);
+  const stored = await chrome.storage.local.get({ port: DEFAULT_NODUS_PORT, token: '', lastCollectionId: null });
+  state.port = normalizeConnectorPort(stored.port); state.token = stored.token || ''; state.selectedCollection = stored.lastCollectionId || null; $('pair-port').value = String(state.port);
   try {
-    const health = await api('/api/browser/health', {}, '');
+    const connection = await findNodus(state.port);
+    if (!connection) { show('connect-view'); return; }
+    await adoptConnection(connection);
+    const { health } = connection;
     if (!health.enabled || !state.token) { show('connect-view'); return; }
     if (!health.libraryReady) { show('connect-view'); $('connect-error').textContent = msg('libraryNotReady'); return; }
     await loadCatalog();

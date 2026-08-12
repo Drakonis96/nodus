@@ -11,6 +11,7 @@
   "connectHint": { "message": "Open Nodus, enable the Chrome connector in Settings → Integrations, then approve this browser once." },
   "port": { "message": "Port" },
   "connect": { "message": "Connect" },
+  "cannotReachNodus": { "message": "Nodus could not be reached on port $PORT$. Open Nodus and use the port shown in Settings → Integrations.", "placeholders": { "port": { "content": "$1" } } },
   "documentType": { "message": "Document type" },
   "enriching": { "message": "Checking bibliographic metadata…" },
   "saveTo": { "message": "Save to" },
