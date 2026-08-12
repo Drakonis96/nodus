@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="site/assets/nodus-logo.svg" width="104" alt="Nodus logo">
+  <img src="site/assets/nodus-logo.png" width="104" alt="Nodus logo">
 </p>
 
 <h1 align="center">Nodus</h1>
@@ -13,8 +13,8 @@
 </p>
 
 <p align="center">
-  <a href="https://paypal.me/Jorgepb96"><img src="https://img.shields.io/badge/PayPal-Support-0070BA?logo=paypal&logoColor=white" alt="Support Nodus with PayPal"></a>
-  <a href="https://ko-fi.com/nodus_app"><img src="https://img.shields.io/badge/Ko--fi-Support-FF5E5B?logo=kofi&logoColor=white" alt="Support Nodus on Ko-fi"></a>
+  <a href="https://paypal.me/Jorgepb96">Support Nodus with PayPal</a> ·
+  <a href="https://ko-fi.com/nodus_app">Support Nodus on Ko-fi</a>
 </p>
 
 Nodus is a desktop centre for university work. It brings sources, notes, data, ideas and learning materials together without forcing every project into the same shape.
