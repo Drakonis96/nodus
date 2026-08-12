@@ -32,38 +32,10 @@ export function extensionOrigin(getUrl) {
   return `${url.protocol}//${url.hostname}`;
 }
 
-export function requestLocalJson(url, options = {}, createRequest = () => new XMLHttpRequest()) {
-  return new Promise((resolve, reject) => {
-    let request;
-    try {
-      request = createRequest();
-      request.open(options.method || 'GET', url, true);
-      for (const [name, value] of Object.entries(options.headers || {})) {
-        try {
-          request.setRequestHeader(name, value);
-        } catch (error) {
-          // Older Chromium builds forbid setting Origin but XHR still supplies the extension origin.
-          if (name.toLowerCase() !== 'origin') throw error;
-        }
-      }
-    } catch (error) {
-      reject(error);
-      return;
-    }
-
-    const fail = () => reject(new TypeError('Nodus local connection failed.'));
-    request.onerror = fail;
-    request.onabort = fail;
-    request.onload = () => {
-      if (!request.status) {
-        fail();
-        return;
-      }
-      const raw = request.responseText || '';
-      let data = {};
-      try { data = raw ? JSON.parse(raw) : {}; } catch { data = { error: raw }; }
-      resolve({ ok: request.status >= 200 && request.status < 300, status: request.status, data });
-    };
-    request.send(options.body ?? null);
-  });
+export async function requestLocalJson(url, options = {}, request = fetch) {
+  const response = await request(url, options);
+  const raw = await response.text();
+  let data = {};
+  try { data = raw ? JSON.parse(raw) : {}; } catch { data = { error: raw }; }
+  return { ok: response.ok, status: response.status, data };
 }

@@ -123,40 +123,23 @@ test('preserves the installed extension origin on local connector requests', asy
 
   const observed = {};
   const response = await requestLocalJson('http://127.0.0.1:4321/api/browser/health', {
-    headers: { Origin: 'chrome-extension://abcdefghijklmnopabcdefghijklmnop' },
-  }, () => ({
-    status: 0,
-    responseText: '',
-    open(method, url, async) { Object.assign(observed, { method, url, async }); },
-    setRequestHeader(name, value) { (observed.headers ||= {})[name] = value; },
-    send(body) {
-      observed.body = body;
-      this.status = 200;
-      this.responseText = JSON.stringify({ ok: true, app: 'nodus' });
-      queueMicrotask(() => this.onload());
+    headers: {
+      Origin: 'chrome-extension://abcdefghijklmnopabcdefghijklmnop',
+      'X-Nodus-Extension-Origin': 'chrome-extension://abcdefghijklmnopabcdefghijklmnop',
     },
-  }));
+  }, async (url, options) => {
+    Object.assign(observed, { url, options });
+    return { ok: true, status: 200, text: async () => JSON.stringify({ ok: true, app: 'nodus' }) };
+  });
 
   assert.deepEqual(observed, {
-    method: 'GET', url: 'http://127.0.0.1:4321/api/browser/health', async: true,
-    headers: { Origin: 'chrome-extension://abcdefghijklmnopabcdefghijklmnop' }, body: null,
+    url: 'http://127.0.0.1:4321/api/browser/health',
+    options: { headers: {
+      Origin: 'chrome-extension://abcdefghijklmnopabcdefghijklmnop',
+      'X-Nodus-Extension-Origin': 'chrome-extension://abcdefghijklmnopabcdefghijklmnop',
+    } },
   });
   assert.deepEqual(response, { ok: true, status: 200, data: { ok: true, app: 'nodus' } });
-
-  const legacyResponse = await requestLocalJson('http://127.0.0.1:4321/api/browser/health', {
-    headers: { Origin: 'chrome-extension://abcdefghijklmnopabcdefghijklmnop' },
-  }, () => ({
-    status: 0,
-    responseText: '',
-    open() {},
-    setRequestHeader(name) { if (name === 'Origin') throw new DOMException('Refused unsafe header'); },
-    send() {
-      this.status = 200;
-      this.responseText = '{"ok":true}';
-      queueMicrotask(() => this.onload());
-    },
-  }));
-  assert.equal(legacyResponse.ok, true, 'older Chromium falls back to the Origin automatically supplied by XHR');
 });
 
 test('Manifest V3 package minimizes permission and contains no remote executable code', () => {
