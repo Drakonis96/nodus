@@ -49,6 +49,7 @@
     "privacy:verify": "node --test scripts/test-privacy-compliance.mjs",
     "zotero:xpi": "node scripts/build-zotero-xpi.mjs",
     "browser:zip": "node scripts/build-browser-extension.mjs",
+    "word:addin-icons": "node scripts/build-word-addin-icons.mjs",
     "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p electron/tsconfig.json",
     "lint": "eslint . --ext .ts,.tsx",
     "icons": "node scripts/generate-icons.mjs",

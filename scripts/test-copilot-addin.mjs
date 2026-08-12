@@ -38,23 +38,41 @@ try {
   for (const control of ['Nodus.CitationButton', 'Nodus.BibliographyButton', 'Nodus.RefreshButton', 'Nodus.PreferencesButton', 'Nodus.UnlinkButton']) {
     assert.match(rendered, new RegExp(`<Control xsi:type="Button" id="${control}">`), `${control} must stay on the persistent Nodus tab`);
   }
+  const actionIcons = {
+    Taskpane: 'Copilot', Citation: 'Citation', Bibliography: 'Bibliography',
+    Refresh: 'Refresh', Preferences: 'Preferences', Unlink: 'Unlink',
+  };
+  for (const [control, icon] of Object.entries(actionIcons)) {
+    assert.match(
+      rendered,
+      new RegExp(`id="Nodus\\.${control}Button"[\\s\\S]*?<Icon>[\\s\\S]*?resid="Icon\\.${icon}\\.16"[\\s\\S]*?resid="Icon\\.${icon}\\.32"[\\s\\S]*?resid="Icon\\.${icon}\\.80"[\\s\\S]*?<\\/Icon>`),
+      `${control} must use its own action icon`,
+    );
+    for (const size of [16, 32, 80]) {
+      const iconPath = path.join(repoRoot, `word-addin/assets/icon-${icon.toLowerCase()}-${size}.png`);
+      assert.equal(fs.existsSync(iconPath), true, `${icon} ${size}px icon must exist`);
+      const png = fs.readFileSync(iconPath);
+      assert.equal(png.readUInt32BE(16), size, `${icon} icon width must be ${size}px`);
+      assert.equal(png.readUInt32BE(20), size, `${icon} icon height must be ${size}px`);
+    }
+  }
   assert.match(rendered, /taskpane\.html#references-citation/);
   assert.match(rendered, /taskpane\.html#references-bibliography/);
   assert.match(rendered, /taskpane\.html#references-unlink/);
   assert.match(rendered, /<DefaultLocale>en-US<\/DefaultLocale>/);
   assert.match(rendered, /DefaultValue="Open the pane to see how your text relates to your library\."/);
-  assert.match(rendered, /<bt:Override Locale="es-ES" Value="Abre el panel/);
+  assert.doesNotMatch(rendered, /<Override Locale=|<bt:Override Locale=/, 'the Word manifest must stay English-only');
 
-  // English is also the safe pre-initialization language in the task pane. The
-  // runtime switches it to Spanish when Nodus injects lang=es, but an English
-  // pane must never fall back to a Spanish string when a key is missing.
+  // The task pane stays in English even when the desktop app uses another language.
   const taskpaneHtml = fs.readFileSync(path.join(repoRoot, 'word-addin/taskpane.html'), 'utf8');
   const taskpaneJs = fs.readFileSync(path.join(repoRoot, 'word-addin/taskpane.js'), 'utf8');
   const referencesJs = fs.readFileSync(path.join(repoRoot, 'word-addin/references.js'), 'utf8');
   assert.match(taskpaneHtml, /<html lang="en">/);
   assert.match(taskpaneHtml, />Analyze paragraph</);
   assert.doesNotMatch(taskpaneHtml, /Conectando|Buscar ideas|Analizar párrafo|Selección|Insertar en|Nota al pie|Pasajes/);
-  assert.match(taskpaneJs, /table\[key\] !== undefined \? table\[key\] : STR\.en\[key\]/);
+  assert.match(taskpaneJs, /var LANG = 'en'/);
+  assert.doesNotMatch(taskpaneJs, /Conectando|Buscar ideas|Analizar párrafo|Selección|Insertar en|Nota al pie|Pasajes/);
+  assert.doesNotMatch(referencesJs, /Referencias|Añadir|Desvincular|Bibliografía|Formateando/);
   assert.match(taskpaneHtml, /<img class="mark" src="\/addin\/assets\/icon-32\.png"/, 'the pane must use the stylized Nodus mark');
   assert.doesNotMatch(taskpaneHtml, /<div class="mark">N<\/div>/, 'a generic letter N must not be used as the brand');
   assert.match(taskpaneHtml, /data-mode="references"/);

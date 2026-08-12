@@ -13,28 +13,6 @@
   ];
 
   var COPY = {
-    es: {
-      references: 'Referencias', search: 'Buscar por título, autor, año, DOI, ISBN o clave de cita',
-      style: 'Estilo', styleSearch: 'Buscar estilos de cita', language: 'Idioma', placement: 'Ubicación', inText: 'En el texto',
-      footnote: 'Nota al pie', endnote: 'Nota final', auto: 'Actualizar citas automáticamente',
-      refresh: 'Actualizar', unlink: 'Desvincular', current: 'Cita actual', choose: 'Añade una o varias fuentes',
-      clear: 'Limpiar', insert: 'Insertar cita', update: 'Actualizar cita', bibliography: 'Bibliografía',
-      bibliographyHint: 'Incluye las fuentes citadas en este documento', insertBibliography: 'Insertar / actualizar',
-      add: 'Añadir', onlyBibliography: 'Solo bibliografía', remove: 'Quitar', edit: 'Editar detalles',
-      up: 'Mover antes', down: 'Mover después', locator: 'Localizador', value: 'Valor', prefix: 'Prefijo',
-      suffix: 'Sufijo / texto posterior', omitAuthor: 'Omitir autor', excludeBibliography: 'Excluir de la bibliografía',
-      noResults: 'No hay referencias que coincidan.', recent: 'Referencias recientes de la biblioteca global',
-      searching: 'Buscando en la biblioteca global…', added: 'Referencia añadida', citationInserted: 'Cita viva insertada',
-      citationUpdated: 'Cita actualizada', bibliographyInserted: 'Bibliografía viva insertada', refreshed: 'Citas y bibliografía actualizadas',
-      unlinkConfirm: 'Las citas y bibliografías se convertirán en texto normal. Esta acción no se puede deshacer desde Nodus. ¿Continuar?',
-      unlinked: 'Referencias desvinculadas', noCitations: 'Este documento aún no contiene citas de Nodus.',
-      noBibliography: 'Añade una cita o una fuente para poder generar la bibliografía.',
-      editorNotListening: 'LibreOffice no está escuchando. Ejecuta la macro start_nodus_copilot en Writer.',
-      wordFieldsUnsupported: 'Esta versión de Word no admite campos de citas editables (requiere WordApi 1.5).',
-      sourceMissing: 'La referencia ya no está en la biblioteca; se usará la copia incrustada en el documento.',
-      automaticOff: 'Cita insertada. Pulsa Actualizar cuando quieras recalcular todo el documento.',
-      bibliographyExtra: 'Añadida a la bibliografía', bibliographyRemoved: 'Quitada de la bibliografía adicional'
-    },
     en: {
       references: 'References', search: 'Search title, author, year, DOI, ISBN, or citation key',
       style: 'Style', styleSearch: 'Search citation styles', language: 'Language', placement: 'Placement', inText: 'In text',
@@ -60,8 +38,7 @@
   };
 
   function create(options) {
-    var lang = options.lang === 'en' ? 'en' : 'es';
-    var C = COPY[lang];
+    var C = COPY.en;
     var refs = [];
     var selected = [];
     var styles = [];
@@ -70,7 +47,7 @@
     var externalState = null;
     var active = false;
     var fieldsSupported = true;
-    var preferences = { formatVersion: 1, style: 'apa-7', locale: lang === 'es' ? 'es-ES' : 'en-US', placement: 'in-text', automaticUpdates: true };
+    var preferences = { formatVersion: 1, style: 'apa-7', locale: 'en-US', placement: 'in-text', automaticUpdates: true };
     var el = {
       results: document.getElementById('results'), empty: document.getElementById('empty'),
       controls: document.getElementById('referenceControls'), analysis: document.getElementById('analysisControls'),
@@ -274,9 +251,9 @@
       el.insert.textContent = editingCitationId ? C.update : C.insert;
       el.placement.disabled = !!editingCitationId;
       el.placement.title = editingCitationId
-        ? (lang === 'es' ? 'La ubicación de una cita existente no cambia al editarla.' : 'An existing citation keeps its current placement while it is edited.')
+        ? 'An existing citation keeps its current placement while it is edited.'
         : '';
-      el.hint.textContent = selected.length ? selected.length + (lang === 'es' ? ' fuente(s)' : ' source(s)') : C.choose;
+      el.hint.textContent = selected.length ? selected.length + ' source(s)' : C.choose;
       el.bibliographyHint.textContent = extras.length
         ? C.bibliographyHint + ' · +' + extras.length
         : C.bibliographyHint;
@@ -386,14 +363,14 @@
           var data = parseFieldData(field.data);
           if (data && data.fieldId === fieldId) { field.data = JSON.stringify(fieldData); replaceFieldResult(field, formatted); matched = true; }
         });
-        if (!matched) throw new Error(lang === 'es' ? 'La cita seleccionada ya no existe.' : 'The selected citation no longer exists.');
+        if (!matched) throw new Error('The selected citation no longer exists.');
         await context.sync();
       });
     }
 
     async function insertCitation() {
       if (!selected.length) return;
-      savePreferences(); el.insert.disabled = true; options.setStatus(lang === 'es' ? 'Formateando…' : 'Formatting…', '');
+      savePreferences(); el.insert.disabled = true; options.setStatus('Formatting…', '');
       try {
         var state = await readDocumentState(); var citations = (state.citations || []).slice();
         var noteIndex = preferences.placement === 'in-text' ? 0 : Math.max(0, citations.reduce(function (max, citation) { return Math.max(max, citation.noteIndex || 0); }, 0)) + 1;
@@ -406,7 +383,7 @@
         if (existing >= 0) { cluster.noteIndex = citations[existing].noteIndex; citations[existing] = cluster; } else citations.push(cluster);
         var result = await formatDocument(citations, state.bibliographies || []);
         var formatted = result.citations.find(function (entry) { return entry.citationId === citationId; });
-        if (!formatted) throw new Error(lang === 'es' ? 'No se pudo formatear la cita.' : 'The citation could not be formatted.');
+        if (!formatted) throw new Error('The citation could not be formatted.');
         var fieldData = { format: FIELD_FORMAT, formatVersion: 1, fieldId: citationId, kind: 'citation', citation: cluster, createdAt: new Date().toISOString() };
         if (options.isWord) {
           if (editingCitationId) await updateWordField(editingCitationId, fieldData, formatted);

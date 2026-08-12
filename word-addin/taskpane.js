@@ -3,7 +3,7 @@
   'use strict';
 
   var TOKEN = (window.NODUS && window.NODUS.token) || '';
-  var LANG = (window.NODUS && window.NODUS.lang) === 'en' ? 'en' : 'es';
+  var LANG = 'en';
   var DEBOUNCE_MS = 700;
   var MIN_CHARS = 12;
 
@@ -22,73 +22,8 @@
   var footnoteSupported = true;
   var referenceController = null;
 
-  // The pane follows the Nodus UI language (injected by the copilot server).
+  // Office add-in surfaces deliberately stay in English regardless of the Nodus UI language.
   var STR = {
-    es: {
-      connecting: 'Conectando…',
-      searchPlaceholder: 'Buscar ideas, autores u obras',
-      searchTitle: 'Buscar',
-      analyze: 'Analizar párrafo',
-      emptyInitial: 'Coloca el cursor en un párrafo para ver ideas relacionadas.',
-      untitled: 'Sin título',
-      oneWork: '1 obra',
-      manyWorks: ' obras',
-      searchCopied: 'búsqueda copiada',
-      openedInNodus: 'Abierto en Nodus',
-      connections: 'Conexiones',
-      noConnections: 'Sin conexiones directas.',
-      open: 'Abrir',
-      loadingIdea: 'Cargando idea…',
-      sources: 'Fuentes',
-      noWorks: 'Sin obras asociadas.',
-      ideaLoadError: 'Error al cargar la idea: ',
-      inserting: 'Insertando…',
-      ideaInserted: 'Idea insertada',
-      details: 'Detalles',
-      openInNodus: 'Abrir en Nodus',
-      insertWithAi: 'Insertar con IA',
-      noRelated: 'Sin ideas relacionadas para este párrafo.',
-      noSearchResults: 'Sin ideas para esa búsqueda.',
-      cursorInParagraph: 'Coloca el cursor en un párrafo con texto.',
-      findingRelated: 'Buscando ideas relacionadas…',
-      needEmbeddings: 'Configura embeddings en Nodus para buscar relaciones.',
-      queryError: 'Error al consultar Nodus: ',
-      searching: 'Buscando ideas…',
-      searchError: 'Error al buscar: ',
-      connectedWorks: 'Conectado · {n} obras',
-      connectedNoEmbeddings: 'Conectado (sin embeddings)',
-      notResponding: 'Nodus no responde · abre Nodus con el copiloto activado',
-      editorNotListening: 'LibreOffice no está escuchando. Ejecuta la macro start_nodus_copilot en Writer.',
-      wordOnly: 'Este complemento solo funciona en Word.',
-      nodusError: 'Error de Nodus',
-      modeIdeas: 'Ideas',
-      modePassages: 'Pasajes',
-      modeReferences: 'Referencias',
-      selectionLabel: 'Selección',
-      composeRewrite: 'Reescribir',
-      composeExpand: 'Ampliar',
-      composeCounter: 'Rebatir',
-      insertInLabel: 'Insertar en',
-      targetBody: 'Texto',
-      targetFootnote: 'Nota al pie',
-      footnoteUnsupported: 'Tu versión de Word no admite notas al pie desde el complemento.',
-      working: 'Trabajando…',
-      needSelection: 'Selecciona el texto que quieres reescribir.',
-      composeEmpty: 'La IA no devolvió texto.',
-      rewriteDone: 'Reescrito',
-      expandDone: 'Ampliado',
-      counterDone: 'Contraargumento insertado',
-      citationsUsed: 'Citas usadas',
-      insertQuote: 'Insertar cita',
-      quoteInserted: 'Cita insertada',
-      searchingPassages: 'Buscando pasajes…',
-      noPassages: 'Sin pasajes para esa búsqueda.',
-      passagesNotIndexed: 'No hay texto completo indexado. Indexa la biblioteca en Nodus.',
-      quoteOpen: '«',
-      quoteClose: '»',
-      relation: { supports: 'apoya', contradicts: 'contradice', refines: 'matiza', extends: 'amplía', related: 'relacionada' },
-      kind: { idea: 'idea', note: 'nota', passage: 'pasaje', work: 'obra' },
-    },
     en: {
       connecting: 'Connecting…',
       searchPlaceholder: 'Search ideas, authors or works',

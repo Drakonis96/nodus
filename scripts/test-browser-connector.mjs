@@ -8,6 +8,7 @@ import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 
 import { filterCollectionRows, hierarchicalCollections, normalizeTags } from '../browser-extension/lib/collections.js';
+import { DEFAULT_NODUS_PORT, connectorPortCandidates, discoverNodus, normalizeConnectorPort } from '../browser-extension/lib/connection.js';
 import { detectCapture } from '../browser-extension/lib/detector.js';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -102,6 +103,21 @@ test('collection paths remain hierarchical and searchable without losing context
   assert.deepEqual(normalizeTags([' Memory ', 'memory', 'Women', '', 'Women ']), ['Memory', 'Women']);
 });
 
+test('recovers from a stale connector port by probing the Nodus default', async () => {
+  assert.equal(normalizeConnectorPort('4323'), 4323);
+  assert.equal(normalizeConnectorPort('invalid'), DEFAULT_NODUS_PORT);
+  assert.deepEqual(connectorPortCandidates(4323), [4323, DEFAULT_NODUS_PORT]);
+  assert.deepEqual(connectorPortCandidates(DEFAULT_NODUS_PORT), [DEFAULT_NODUS_PORT]);
+  const attempted = [];
+  const connection = await discoverNodus(4323, async (port) => {
+    attempted.push(port);
+    if (port === 4323) throw new TypeError('Failed to fetch');
+    return { ok: true, app: 'nodus', enabled: true };
+  });
+  assert.deepEqual(attempted, [4323, DEFAULT_NODUS_PORT]);
+  assert.deepEqual(connection, { port: DEFAULT_NODUS_PORT, health: { ok: true, app: 'nodus', enabled: true } });
+});
+
 test('Manifest V3 package minimizes permission and contains no remote executable code', () => {
   const manifest = JSON.parse(readFileSync(path.join(root, 'browser-extension/manifest.json'), 'utf8'));
   assert.equal(manifest.manifest_version, 3);
@@ -111,7 +127,11 @@ test('Manifest V3 package minimizes permission and contains no remote executable
   assert.match(manifest.content_security_policy.extension_pages, /script-src 'self'/);
   assert.doesNotMatch(manifest.content_security_policy.extension_pages, /https?:/);
   for (const size of [16, 32, 48, 128]) assert.ok(existsSync(path.join(root, `browser-extension/icons/icon-${size}.png`)));
-  for (const locale of ['en', 'es']) JSON.parse(readFileSync(path.join(root, `browser-extension/_locales/${locale}/messages.json`), 'utf8'));
+  JSON.parse(readFileSync(path.join(root, 'browser-extension/_locales/en/messages.json'), 'utf8'));
+  assert.equal(existsSync(path.join(root, 'browser-extension/_locales/es/messages.json')), false, 'the connector must stay English-only');
   const popup = readFileSync(path.join(root, 'browser-extension/popup.html'), 'utf8');
+  const popupScript = readFileSync(path.join(root, 'browser-extension/popup.js'), 'utf8');
   assert.doesNotMatch(popup, /<script[^>]+src=["']https?:/i);
+  assert.match(popupScript, /document\.documentElement\.lang = 'en'/);
+  assert.doesNotMatch(popupScript, /ITEM_TYPE_LABELS_ES|spanishUi/);
 });
