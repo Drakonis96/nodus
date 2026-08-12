@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import os from 'node:os';
@@ -94,6 +95,52 @@ try {
     files: { reader: 'reader.md', original: 'original.pdf', sourceMap: 'source-map.json', annotations: 'annotations.json', chat: 'chat.json' },
     extraction: { status: 'ready' },
   });
+
+  const encodedFolder = store.itemFolder('ENCODEDPDF');
+  const encodedRelativePath = 'attachments/d3844809-Ana%CC%81lisis_cuantitativo_diarios_pioneros%2Epdf';
+  const readableFileName = 'd3844809-Análisis_cuantitativo_diarios_pioneros.pdf';
+  const encodedPdf = Buffer.from('%PDF-1.4 one physical PDF with an encoded storage path\n');
+  await mkdir(path.dirname(path.join(encodedFolder, encodedRelativePath)), { recursive: true });
+  await writeFile(path.join(encodedFolder, 'reader.md'), '# Análisis cuantitativo\n');
+  await writeFile(path.join(encodedFolder, encodedRelativePath), encodedPdf);
+  store.upsertItem({
+    id: 'nodus:encoded-pdf', storageId: 'ENCODEDPDF', source: 'nodus', sourceLibraryId: null, sourceKey: null,
+    metadata: { title: 'Análisis cuantitativo', itemType: 'article-journal', creators: [], isbn: [], issn: [], tags: [] },
+    collectionIds: [], attachments: [{
+      id: 'local:ENCODEDPDF', title: 'Análisis cuantitativo', fileName: readableFileName, relativePath: encodedRelativePath,
+      mimeType: 'application/pdf', byteSize: encodedPdf.byteLength,
+      sha256: createHash('sha256').update(encodedPdf).digest('hex'), role: 'original', position: 0,
+    }],
+    files: { reader: 'reader.md', original: encodedRelativePath }, extraction: { status: 'ready' },
+  });
+
+  const encodedDocument = readerStore.getLibraryReaderDocument('nodus:encoded-pdf');
+  assert.ok(encodedDocument);
+  assert.deepEqual(encodedDocument.attachments.map((entry) => entry.id), ['local:ENCODEDPDF'], 'an encoded legacy original and its declared attachment resolve to one physical file');
+  assert.equal(encodedDocument.attachments[0].fileName, readableFileName, 'the declared human-readable filename wins over the encoded storage path');
+  assert.equal(encodedDocument.attachments[0].viewer, 'pdf', 'an encoded PDF extension keeps the native PDF viewer');
+  assert.equal(encodedDocument.originalMimeType, 'application/pdf', 'legacy original metadata decodes the extension for MIME detection');
+
+  const hashFolder = store.itemFolder('HASHPDF');
+  const duplicatePdf = Buffer.from('%PDF-1.4 two paths preserving the same immutable bytes\n');
+  const duplicateSha = createHash('sha256').update(duplicatePdf).digest('hex');
+  await mkdir(path.join(hashFolder, 'attachments'), { recursive: true });
+  await writeFile(path.join(hashFolder, 'reader.md'), '# Hash duplicate\n');
+  await writeFile(path.join(hashFolder, 'attachments', 'first.pdf'), duplicatePdf);
+  await writeFile(path.join(hashFolder, 'attachments', 'second.pdf'), duplicatePdf);
+  store.upsertItem({
+    id: 'nodus:hash-pdf', storageId: 'HASHPDF', source: 'nodus', sourceLibraryId: null, sourceKey: null,
+    metadata: { title: 'Hash duplicate', itemType: 'document', creators: [], isbn: [], issn: [], tags: [] },
+    collectionIds: [], attachments: [{
+      id: 'local:FIRST', title: 'Original PDF', fileName: 'first.pdf', relativePath: 'attachments/first.pdf',
+      mimeType: 'application/pdf', byteSize: duplicatePdf.byteLength, sha256: duplicateSha, role: 'original', position: 0,
+    }, {
+      id: 'legacy:SECOND', title: 'Legacy copy', fileName: 'second.pdf', relativePath: 'attachments/second.pdf',
+      mimeType: 'application/pdf', byteSize: duplicatePdf.byteLength, sha256: duplicateSha, role: 'supplement', position: 1,
+    }],
+    files: { reader: 'reader.md', original: 'attachments/first.pdf' }, extraction: { status: 'ready' },
+  });
+  assert.deepEqual(readerStore.getLibraryReaderDocument('nodus:hash-pdf').attachments.map((entry) => entry.id), ['local:FIRST'], 'attachment SHA-256 removes duplicate metadata records that point at equivalent copies');
 
   const document = readerStore.getLibraryReaderDocument('zotero:E7FGXJFE');
   assert.ok(document);

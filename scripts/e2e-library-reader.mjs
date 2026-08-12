@@ -110,6 +110,8 @@ try {
   assert.ok(work?.nodus_id && work?.zotero_key, 'the demo provides a work with a stable Zotero id');
 
   const documentFolder = path.join(backupRoot, 'nodus-library', work.zotero_key);
+  const encodedOriginalPath = 'd3844809-Ana%CC%81lisis_cuantitativo_diarios_pioneros%2Epdf';
+  const readableOriginalName = 'Análisis_cuantitativo_diarios_pioneros.pdf';
   const longReaderBody = Array.from({ length: 180 }, (_, index) =>
     `Párrafo de carga ${index + 1}. La biblioteca debe conservar una interacción inmediata aunque el documento tenga muchas páginas, notas, citas y fragmentos seleccionables.`
   ).join('\n\n');
@@ -155,7 +157,7 @@ ${longReaderBody}
   const resultsOffset = markdown.indexOf('## Resultados');
   await mkdir(path.join(documentFolder, 'assets'), { recursive: true });
   await writeFile(path.join(documentFolder, 'reader.md'), markdown, 'utf8');
-  await buildTextPdf(documentFolder, 'original.pdf');
+  await buildTextPdf(documentFolder, encodedOriginalPath);
   await writeFile(path.join(documentFolder, 'assets', 'figura.png'), tinyPng);
   await writeFile(path.join(documentFolder, 'figure.svg'), `<svg xmlns="http://www.w3.org/2000/svg" width="960" height="560" viewBox="0 0 960 560"><rect width="960" height="560" fill="#111827"/><rect x="70" y="70" width="820" height="420" rx="24" fill="#312e81"/><text x="110" y="150" fill="#e0e7ff" font-family="sans-serif" font-size="38">Figura preservada</text><path d="M120 410 L300 250 L455 360 L640 180 L840 410" fill="none" stroke="#a5b4fc" stroke-width="18" stroke-linecap="round" stroke-linejoin="round"/><circle cx="640" cy="180" r="28" fill="#fbbf24"/></svg>`, 'utf8');
   writeZip(path.join(documentFolder, 'reader.epub'), {
@@ -202,13 +204,13 @@ ${longReaderBody}
       creators: work.authors.map((name) => ({ creatorType: 'author', name })), url: 'https://doi.org/10.0000/nodus-reader-fixture', isbn: [], issn: [], tags: ['lector'],
     },
     collectionIds: [], attachments: [
-      { id: 'zotero:READERPDF', title: 'PDF original', fileName: 'original.pdf', relativePath: 'original.pdf', mimeType: 'application/pdf', byteSize: 1, sha256: 'a'.repeat(64), role: 'original', position: 0 },
+      { id: 'zotero:READERPDF', title: 'PDF original', fileName: readableOriginalName, relativePath: encodedOriginalPath, mimeType: 'application/pdf', byteSize: 1, sha256: 'a'.repeat(64), role: 'original', position: 0 },
       { id: 'local:READEREPUB', title: 'EPUB original', fileName: 'reader.epub', relativePath: 'reader.epub', mimeType: 'application/epub+zip', byteSize: 1, sha256: 'b'.repeat(64), role: 'original', position: 1 },
       { id: 'local:READERIMAGE', title: 'Figura original', fileName: 'figure.svg', relativePath: 'figure.svg', mimeType: 'image/svg+xml', byteSize: 1, sha256: 'c'.repeat(64), role: 'image', position: 2 },
       { id: 'local:READERDOCX', title: 'Documento Word', fileName: 'reader.docx', relativePath: 'reader.docx', mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', byteSize: 1, sha256: 'd'.repeat(64), role: 'supplement', position: 3 },
       { id: 'local:READERXLSX', title: 'Datos XLSX', fileName: 'reader.xlsx', relativePath: 'reader.xlsx', mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', byteSize: 1, sha256: 'e'.repeat(64), role: 'supplement', position: 4 },
     ],
-    files: { reader: 'reader.md', original: 'original.pdf', sourceMap: 'source-map.json', annotations: 'annotations.json', orphanedAnnotations: 'orphaned-annotations.json', chat: 'chat.json' },
+    files: { reader: 'reader.md', original: encodedOriginalPath, sourceMap: 'source-map.json', annotations: 'annotations.json', orphanedAnnotations: 'orphaned-annotations.json', chat: 'chat.json' },
     extraction: { status: 'ready', lastSuccessfulAt: now, lastSuccessfulFingerprint: 'c'.repeat(64) },
     contentRevision: {
       format: 'nodus.library-content-revision', formatVersion: 1, revision: 1,
@@ -411,6 +413,9 @@ ${longReaderBody}
   await page.getByTestId('library-reader-source-picker').locator('select').selectOption('clean');
   await documentRoot.waitFor({ state: 'visible' });
   assert.equal(await page.getByTestId('library-reader-source-picker').locator('option').count(), 6, 'clean Markdown and five preserved attachments are directly selectable');
+  const sourcePickerText = await page.getByTestId('library-reader-source-picker').locator('select').innerText();
+  assert.match(sourcePickerText, new RegExp(readableOriginalName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')), 'the source picker keeps the human-readable PDF name');
+  assert.doesNotMatch(sourcePickerText, /%2Epdf/i, 'the encoded storage path never appears as a second reader source');
   const darkReaderColors = await page.evaluate(() => {
     const surface = document.querySelector('.library-reader-clean-surface');
     const paper = document.querySelector('.library-reader-paper');

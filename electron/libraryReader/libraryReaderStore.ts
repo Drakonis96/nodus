@@ -60,6 +60,13 @@ interface ResolvedReaderDocument {
   metadata: ReaderMetadata;
 }
 
+interface ResolvedReaderAttachment {
+  record: LibraryItemRecord['attachments'][number];
+  filePath: string | null;
+  physicalKey: string | null;
+  sha256: string | null;
+}
+
 interface DiskAnnotation {
   id: string;
   documentId: string;
@@ -185,6 +192,58 @@ function documentFile(folder: string, declaredName: string | undefined, fallback
 function optionalDocumentFile(folder: string, declaredName: string | undefined, fallbackName: string): string | null {
   try { return documentFile(folder, declaredName, fallbackName); }
   catch { return null; }
+}
+
+function regularFilePath(filePath: string | null): string | null {
+  if (!filePath) return null;
+  try { return fs.statSync(filePath).isFile() ? filePath : null; }
+  catch { return null; }
+}
+
+/** Reader metadata can preserve a URL-encoded legacy path while the attachment
+ * keeps its human-readable name. Resolve both to the physical file before
+ * deciding whether they are distinct. NFC also collapses the composed and
+ * decomposed Unicode spellings commonly produced on macOS. */
+function physicalFileKey(filePath: string | null): string | null {
+  const file = regularFilePath(filePath);
+  if (!file) return null;
+  try {
+    const resolved = fs.realpathSync.native(file).normalize('NFC');
+    return process.platform === 'win32' ? resolved.toLocaleLowerCase('en-US') : resolved;
+  } catch {
+    return null;
+  }
+}
+
+function normalizedSha256(value: string | undefined): string | null {
+  const normalized = value?.trim().toLowerCase() ?? '';
+  return /^[a-f0-9]{64}$/.test(normalized) ? normalized : null;
+}
+
+function resolvedReaderAttachment(folder: string, record: LibraryItemRecord['attachments'][number]): ResolvedReaderAttachment {
+  const filePath = regularFilePath(optionalDocumentFile(folder, record.relativePath, record.fileName));
+  return { record, filePath, physicalKey: physicalFileKey(filePath), sha256: normalizedSha256(record.sha256) };
+}
+
+function sameReaderFile(left: Pick<ResolvedReaderAttachment, 'physicalKey' | 'sha256'>, right: Pick<ResolvedReaderAttachment, 'physicalKey' | 'sha256'>): boolean {
+  return !!left.physicalKey && left.physicalKey === right.physicalKey
+    || !!left.sha256 && left.sha256 === right.sha256;
+}
+
+function uniqueReaderAttachments(folder: string, records: LibraryItemRecord['attachments']): ResolvedReaderAttachment[] {
+  const sorted = [...records].sort((left, right) => (left.position ?? 0) - (right.position ?? 0) || left.id.localeCompare(right.id));
+  const unique: ResolvedReaderAttachment[] = [];
+  for (const record of sorted) {
+    const candidate = resolvedReaderAttachment(folder, record);
+    if (!unique.some((entry) => sameReaderFile(entry, candidate))) unique.push(candidate);
+  }
+  return unique;
+}
+
+function decodedFileName(filePath: string): string {
+  const baseName = path.basename(filePath);
+  try { return decodeURIComponent(baseName).normalize('NFC'); }
+  catch { return baseName.normalize('NFC'); }
 }
 
 function metadataMatchesWork(metadata: ReaderMetadata, work: WorkView): boolean {
@@ -375,19 +434,22 @@ export function getLibraryReaderDocument(documentId: string): LibraryReaderDocum
   const freshness = extractionRevision?.freshness ?? (metadata.files?.reader ? 'unavailable' : 'none');
   const sourceContentFingerprint = metadata.contentRevision?.contentFingerprint ?? sourceMap?.reader?.sha256 ?? null;
   const declaredAttachments = Array.isArray(metadata.attachments) ? metadata.attachments : [];
-  const attachments: LibraryReaderAttachment[] = declaredAttachments
-    .map((attachment) => readerAttachment(identity.workId, folder, attachment))
-    .sort((a, b) => {
-      const left = declaredAttachments.find((entry) => entry.id === a.id)?.position ?? 0;
-      const right = declaredAttachments.find((entry) => entry.id === b.id)?.position ?? 0;
-      return left - right || a.id.localeCompare(b.id);
-    });
-  if (originalAvailable && originalPath && !attachments.some((entry) => path.basename(entry.fileName) === path.basename(originalPath))) {
+  const resolvedAttachments = uniqueReaderAttachments(folder, declaredAttachments);
+  const attachments: LibraryReaderAttachment[] = resolvedAttachments
+    .map(({ record, filePath }) => readerAttachment(identity.workId, folder, record, filePath));
+  const originalIdentity = originalAvailable && originalPath
+    ? { physicalKey: physicalFileKey(originalPath), sha256: null }
+    : null;
+  const declaredOriginal = originalIdentity
+    ? resolvedAttachments.find((entry) => sameReaderFile(entry, originalIdentity)) ?? null
+    : null;
+  if (originalAvailable && originalPath && !declaredOriginal) {
+    const originalFileName = decodedFileName(originalPath);
     attachments.unshift(readerAttachment(identity.workId, folder, {
-      id: 'original', title: path.basename(originalPath), fileName: path.basename(originalPath),
+      id: 'original', title: originalFileName, fileName: originalFileName,
       relativePath: path.relative(folder, originalPath), mimeType: mimeForOriginal(originalPath),
       byteSize: fs.statSync(originalPath).size, sha256: '', role: 'original', position: -1,
-    }));
+    }, originalPath));
   }
   return {
     workId: identity.workId,
@@ -404,7 +466,7 @@ export function getLibraryReaderDocument(documentId: string): LibraryReaderDocum
     pageCount: sourceMap?.pages?.length || null,
     wordCount: rawMarkdown.split(/\s+/).filter(Boolean).length,
     originalAvailable,
-    originalFileName: originalAvailable && originalPath ? path.basename(originalPath) : null,
+    originalFileName: originalAvailable && originalPath ? declaredOriginal?.record.fileName ?? decodedFileName(originalPath) : null,
     originalUrl: originalAvailable && originalPath ? `nodus-library://original/${encodeURIComponent(identity.workId)}?v=${encodeURIComponent(path.basename(originalPath))}` : null,
     originalMimeType: originalAvailable && originalPath ? mimeForOriginal(originalPath) : null,
     attachments,
@@ -439,7 +501,7 @@ function mimeForOriginal(filePath: string): string {
     '.txt': 'text/plain', '.csv': 'text/csv', '.tsv': 'text/tab-separated-values', '.xml': 'application/xml', '.jats': 'application/xml',
     '.html': 'text/html', '.htm': 'text/html', '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg',
     '.webp': 'image/webp', '.gif': 'image/gif', '.bmp': 'image/bmp', '.svg': 'image/svg+xml', '.tif': 'image/tiff', '.tiff': 'image/tiff',
-  } as Record<string, string>)[path.extname(filePath).toLowerCase()] ?? 'application/octet-stream';
+  } as Record<string, string>)[path.extname(decodedFileName(filePath)).toLowerCase()] ?? 'application/octet-stream';
 }
 
 function attachmentViewer(mimeType: string, fileName: string): LibraryReaderAttachment['viewer'] {
@@ -455,9 +517,11 @@ function attachmentViewer(mimeType: string, fileName: string): LibraryReaderAtta
   return 'external';
 }
 
-function readerAttachment(documentId: string, folder: string, attachment: LibraryItemRecord['attachments'][number]): LibraryReaderAttachment {
-  const file = optionalDocumentFile(folder, attachment.relativePath, attachment.fileName);
-  const available = !!file && fs.existsSync(file) && fs.statSync(file).isFile();
+function readerAttachment(documentId: string, folder: string, attachment: LibraryItemRecord['attachments'][number], resolvedFile?: string | null): LibraryReaderAttachment {
+  const file = resolvedFile === undefined
+    ? regularFilePath(optionalDocumentFile(folder, attachment.relativePath, attachment.fileName))
+    : resolvedFile;
+  const available = !!file;
   const viewer = attachmentViewer(attachment.mimeType, attachment.fileName);
   const annotationMode = viewer === 'image' ? 'region' : ['pdf', 'epub', 'html', 'text'].includes(viewer) ? 'text' : 'none';
   return {
