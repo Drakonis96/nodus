@@ -8,7 +8,7 @@ import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 
 import { filterCollectionRows, hierarchicalCollections, normalizeTags } from '../browser-extension/lib/collections.js';
-import { DEFAULT_NODUS_PORT, connectorPortCandidates, discoverNodus, normalizeConnectorPort } from '../browser-extension/lib/connection.js';
+import { DEFAULT_NODUS_PORT, connectorPortCandidates, discoverNodus, extensionOrigin, normalizeConnectorPort, requestLocalJson } from '../browser-extension/lib/connection.js';
 import { detectCapture } from '../browser-extension/lib/detector.js';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -116,6 +116,47 @@ test('recovers from a stale connector port by probing the Nodus default', async 
   });
   assert.deepEqual(attempted, [4323, DEFAULT_NODUS_PORT]);
   assert.deepEqual(connection, { port: DEFAULT_NODUS_PORT, health: { ok: true, app: 'nodus', enabled: true } });
+});
+
+test('preserves the installed extension origin on local connector requests', async () => {
+  assert.equal(extensionOrigin((path) => `chrome-extension://abcdefghijklmnopabcdefghijklmnop/${path}`), 'chrome-extension://abcdefghijklmnopabcdefghijklmnop');
+
+  const observed = {};
+  const response = await requestLocalJson('http://127.0.0.1:4321/api/browser/health', {
+    headers: { Origin: 'chrome-extension://abcdefghijklmnopabcdefghijklmnop' },
+  }, () => ({
+    status: 0,
+    responseText: '',
+    open(method, url, async) { Object.assign(observed, { method, url, async }); },
+    setRequestHeader(name, value) { (observed.headers ||= {})[name] = value; },
+    send(body) {
+      observed.body = body;
+      this.status = 200;
+      this.responseText = JSON.stringify({ ok: true, app: 'nodus' });
+      queueMicrotask(() => this.onload());
+    },
+  }));
+
+  assert.deepEqual(observed, {
+    method: 'GET', url: 'http://127.0.0.1:4321/api/browser/health', async: true,
+    headers: { Origin: 'chrome-extension://abcdefghijklmnopabcdefghijklmnop' }, body: null,
+  });
+  assert.deepEqual(response, { ok: true, status: 200, data: { ok: true, app: 'nodus' } });
+
+  const legacyResponse = await requestLocalJson('http://127.0.0.1:4321/api/browser/health', {
+    headers: { Origin: 'chrome-extension://abcdefghijklmnopabcdefghijklmnop' },
+  }, () => ({
+    status: 0,
+    responseText: '',
+    open() {},
+    setRequestHeader(name) { if (name === 'Origin') throw new DOMException('Refused unsafe header'); },
+    send() {
+      this.status = 200;
+      this.responseText = '{"ok":true}';
+      queueMicrotask(() => this.onload());
+    },
+  }));
+  assert.equal(legacyResponse.ok, true, 'older Chromium falls back to the Origin automatically supplied by XHR');
 });
 
 test('Manifest V3 package minimizes permission and contains no remote executable code', () => {

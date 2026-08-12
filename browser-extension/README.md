@@ -48,6 +48,11 @@ exposes a token-authenticated, extension-origin-only API. Cross-site attachment 
 and requested at save time for the exact site involved. The package contains no analytics,
 advertising, remotely hosted code, `eval`, or background worker.
 
+Requests to the local Nodus API use the extension page's XHR transport and carry the installed
+`chrome-extension://` origin explicitly when Chromium permits it. This keeps the server-side origin
+check reliable across Chrome versions where extension `fetch()` requests may omit the `Origin`
+header despite having the required loopback host permission.
+
 See [PRIVACY.md](PRIVACY.md) for the Chrome Web Store disclosure and
 [STORE_LISTING.md](STORE_LISTING.md) for release instructions and permission justifications.
 
