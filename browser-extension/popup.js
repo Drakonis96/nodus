@@ -106,7 +106,8 @@ async function detectActiveTab() {
 function baseUrl(port = state.port) { return `http://127.0.0.1:${port}`; }
 
 async function api(path, options = {}, token = state.token, port = state.port) {
-  const headers = { ...(options.headers || {}), Origin: extensionOrigin(chrome.runtime.getURL) };
+  const origin = extensionOrigin(chrome.runtime.getURL);
+  const headers = { ...(options.headers || {}), Origin: origin, 'X-Nodus-Extension-Origin': origin };
   if (token) headers.Authorization = `Bearer ${token}`;
   if (options.body && !(options.body instanceof ArrayBuffer) && !headers['Content-Type']) headers['Content-Type'] = 'application/json';
   const response = await requestLocalJson(`${baseUrl(port)}${path}`, { ...options, headers });

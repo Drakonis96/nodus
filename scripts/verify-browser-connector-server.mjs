@@ -45,6 +45,7 @@ try {
 
   const extensionHeaders = { Origin: origin };
   const authHeaders = { Origin: origin, Authorization: 'Bearer browser-test-token', 'Content-Type': 'application/json' };
+  const markerHeaders = { 'X-Nodus-Extension-Origin': origin };
 
   const healthResponse = await fetch(`${base}/api/browser/health`, { headers: extensionHeaders });
   assert.equal(healthResponse.status, 200);
@@ -53,8 +54,26 @@ try {
   assert.equal(health.libraryReady, true);
   assert.equal(healthResponse.headers.get('access-control-allow-origin'), origin);
 
+  const markerHealthResponse = await fetch(`${base}/api/browser/health`, { headers: markerHeaders });
+  assert.equal(markerHealthResponse.status, 200, 'an extension marker works when Chromium omits Origin');
+  assert.equal(markerHealthResponse.headers.get('access-control-allow-origin'), origin);
+
   assert.equal((await fetch(`${base}/api/browser/health`, { headers: { Origin: 'https://malicious.example' } })).status, 403);
+  assert.equal((await fetch(`${base}/api/browser/health`, {
+    headers: { Origin: 'https://malicious.example', 'X-Nodus-Extension-Origin': origin },
+  })).status, 403, 'a web origin cannot override its identity with the extension marker');
+  assert.equal((await fetch(`${base}/api/browser/health`)).status, 403, 'missing both origin signals remains forbidden');
   assert.equal((await fetch(`${base}/api/browser/catalog`, { headers: extensionHeaders })).status, 401);
+
+  const markerPair = await (await fetch(`${base}/api/browser/pair`, {
+    method: 'POST', headers: { ...markerHeaders, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ extensionVersion: '4.0.0', pageUrl: 'https://journal.example/marker' }),
+  })).json();
+  assert.equal(markerPair.token, 'browser-test-token');
+  const markerCatalog = await (await fetch(`${base}/api/browser/catalog`, {
+    headers: { ...markerHeaders, Authorization: 'Bearer browser-test-token' },
+  })).json();
+  assert.deepEqual(markerCatalog.collections.map((entry) => entry.name), ['History', 'Women']);
 
   const pair = await (await fetch(`${base}/api/browser/pair`, {
     method: 'POST', headers: { ...extensionHeaders, 'Content-Type': 'application/json' },

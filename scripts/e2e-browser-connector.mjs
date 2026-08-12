@@ -68,20 +68,6 @@ async function exercise(colorScheme) {
       permissions: { request: async () => true },
       runtime: { getManifest: () => ({ version: '4.0.0' }), getURL: (path = '') => `chrome-extension://abcdefghijklmnopabcdefghijklmnop/${path}`, openOptionsPage: async () => undefined },
     };
-    globalThis.XMLHttpRequest = class {
-      open(method, url) { this.method = method; this.url = url; }
-      setRequestHeader(name, value) { (this.headers ||= {})[name] = value; }
-      async send(body) {
-        try {
-          const response = await fetch(this.url, { method: this.method, headers: this.headers, body });
-          this.status = response.status;
-          this.responseText = await response.text();
-          this.onload?.();
-        } catch {
-          this.onerror?.();
-        }
-      }
-    };
   }, { messages: english, detected: snapshot });
   await page.route('http://127.0.0.1:4323/api/browser/**', (route) => route.abort('connectionrefused'));
   await page.route('http://127.0.0.1:4321/api/browser/**', async (route) => {

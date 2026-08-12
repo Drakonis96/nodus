@@ -88,7 +88,15 @@ function hasValidToken(req: IncomingMessage, expected: string): boolean {
 
 function extensionOrigin(req: IncomingMessage): string | null {
   const origin = req.headers.origin;
-  return typeof origin === 'string' && /^(?:chrome|moz)-extension:\/\/[a-z0-9-]{16,80}$/i.test(origin) ? origin : null;
+  const validExtensionOrigin = (value: unknown): value is string => (
+    typeof value === 'string' && /^(?:chrome|moz)-extension:\/\/[a-z0-9-]{16,80}$/i.test(value)
+  );
+  if (validExtensionOrigin(origin)) return origin;
+  // A web request always carries its real Origin. Chromium may omit Origin for an extension
+  // with host access, so only allow the explicit extension marker when Origin is absent.
+  if (origin !== undefined) return null;
+  const marker = req.headers['x-nodus-extension-origin'];
+  return validExtensionOrigin(marker) ? marker : null;
 }
 
 function setCors(req: IncomingMessage, res: ServerResponse): void {
@@ -101,6 +109,7 @@ function setCors(req: IncomingMessage, res: ServerResponse): void {
   res.setHeader('Access-Control-Allow-Headers', [
     'Authorization', 'Content-Type', 'X-Nodus-Zotero-Protocol', 'X-Nodus-File-Name',
     'X-Nodus-File-Title', 'X-Nodus-Mime-Type', 'X-Nodus-Attachment-Role', 'X-Nodus-Source-Url',
+    'X-Nodus-Extension-Origin',
   ].join(', '));
   if (browserRoute) res.setHeader('Access-Control-Allow-Private-Network', 'true');
 }
