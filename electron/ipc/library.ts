@@ -22,6 +22,7 @@ import {
   listLibraryExtractionJobs,
   cancelLibraryExtraction,
   retryLibraryExtraction,
+  prepareGlobalLibraryReading,
   listGlobalLibraryCollections,
   listGlobalLibrarySavedSearches,
   saveGlobalLibrarySavedSearch,
@@ -106,6 +107,7 @@ export function registerLibraryIpc({ h }: IpcContext): void {
   h('library:extractionJobs', async () => listLibraryExtractionJobs());
   h('library:cancelExtraction', async (_event, jobId) => cancelLibraryExtraction(jobId));
   h('library:retryExtraction', async (_event, jobId) => retryLibraryExtraction(jobId));
+  h('library:prepareReading', async (_event, itemId) => prepareGlobalLibraryReading(itemId));
   h('library:collections', async () => listGlobalLibraryCollections());
   h('library:savedSearches', async () => listGlobalLibrarySavedSearches());
   h('library:saveSavedSearch', async (_event, input) => saveGlobalLibrarySavedSearch(input));

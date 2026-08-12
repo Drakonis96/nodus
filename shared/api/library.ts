@@ -50,6 +50,7 @@ import type {
   LibraryPurgeReport,
   LibraryMergeImpact,
   LibraryRecoveryReport,
+  LibraryReadingPreparationPlan,
 } from '../libraryTypes';
 import type { VaultSummary } from '../types';
 
@@ -75,6 +76,7 @@ export interface LibraryApi {
   listLibraryExtractionJobs(): Promise<LibraryExtractionJob[]>;
   cancelLibraryExtraction(jobId: string): Promise<boolean>;
   retryLibraryExtraction(jobId: string): Promise<boolean>;
+  prepareGlobalLibraryReading(itemId: string): Promise<LibraryReadingPreparationPlan>;
   onLibraryExtractionProgress(cb: (progress: LibraryExtractionProgress) => void): () => void;
   listGlobalLibraryCollections(): Promise<LibraryCollectionView[]>;
   listGlobalLibrarySavedSearches(): Promise<LibrarySavedSearchRecord[]>;

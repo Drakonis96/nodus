@@ -26,6 +26,7 @@ export const libraryApi: LibraryApi = {
   listLibraryExtractionJobs: () => ipcRenderer.invoke('library:extractionJobs'),
   cancelLibraryExtraction: (jobId) => ipcRenderer.invoke('library:cancelExtraction', jobId),
   retryLibraryExtraction: (jobId) => ipcRenderer.invoke('library:retryExtraction', jobId),
+  prepareGlobalLibraryReading: (itemId) => ipcRenderer.invoke('library:prepareReading', itemId),
   onLibraryExtractionProgress: (cb) => {
     const listener = (_event: unknown, progress: Parameters<typeof cb>[0]) => cb(progress);
     ipcRenderer.on('library:extractionProgress', listener);

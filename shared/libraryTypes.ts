@@ -485,6 +485,16 @@ export interface LibraryExtractionEnqueueResult {
   jobIds: string[];
 }
 
+export interface LibraryReadingPreparationPlan {
+  itemId: string;
+  action: 'open-clean' | 'prepare-before-open' | 'queue-and-open-original' | 'open-original' | 'unavailable';
+  attachmentId: string | null;
+  pageCount: number | null;
+  byteSize: number;
+  jobId: string | null;
+  reason: 'ready' | 'short-document' | 'long-document' | 'original-only' | 'no-file';
+}
+
 export interface LibraryCatalogQuery {
   search?: string;
   collectionId?: string | null;

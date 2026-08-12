@@ -178,6 +178,30 @@ test('global Library rows expose a compact Nodus context menu', async () => {
   ]) assert.match(view, new RegExp(marker));
 });
 
+test('opening an unprepared document routes short and long reading jobs without blocking the renderer', async () => {
+  const [view, service, worker, queue, api] = await Promise.all([
+    readSource('src/views/GlobalLibraryView.tsx'),
+    readSource('electron/library/libraryService.ts'),
+    readSource('electron/workers/libraryOperationWorker.ts'),
+    readSource('electron/library/libraryExtractionQueue.ts'),
+    readSource('shared/api/library.ts'),
+  ]);
+  assert.match(api, /prepareGlobalLibraryReading/);
+  assert.match(service, /SHORT_READING_PAGE_LIMIT\s*=\s*50/);
+  assert.match(service, /runLibraryOperationInWorker[\s\S]*probe-reading/,
+    'page probing runs away from the Electron main thread');
+  assert.match(worker, /PDFDocument[\s\S]*getPageCount/,
+    'PDF length uses the actual page tree rather than file-size guessing');
+  assert.match(queue, /priority > active\.priority[\s\S]*putExtractionJob/,
+    'opening a queued short document promotes it ahead of passive background work');
+  assert.match(view, /data-testid="library-foreground-preparation"/,
+    'short-document preparation has one compact progress strip');
+  assert.match(view, /plan\.action === 'queue-and-open-original'[\s\S]*openReaderReference\(item, 'original'\)/,
+    'long documents immediately open their preserved original while extraction continues');
+  assert.match(view, /progress\.status === 'done'[\s\S]*preferredSource: 'clean'/,
+    'a short document opens its clean version when foreground preparation finishes');
+});
+
 test('vault Library does not duplicate status operations in its header', async () => {
   const view = await readSource('src/views/Library.tsx');
   assert.doesNotMatch(view, /advancedOpen/);
@@ -318,6 +342,7 @@ test('the typed bridge covers every global management operation', async () => {
     'listGlobalLibraryCollections', 'getGlobalLibraryItem', 'createGlobalLibraryCollection',
     'updateGlobalLibraryCollection', 'deleteGlobalLibraryCollection', 'patchGlobalLibraryItemCollections',
     'setGlobalLibraryItemsDeleted', 'importGlobalLibraryFiles', 'importDroppedGlobalLibraryFiles',
+    'prepareGlobalLibraryReading',
     'importGlobalBibliographyFiles', 'updateGlobalLibraryItemMetadata', 'resolveGlobalLibraryMetadata',
     'createGlobalLibraryItem', 'importGlobalLibraryIdentifier', 'duplicateGlobalLibraryItem', 'convertGlobalLibraryItemToNodus',
     'addGlobalLibraryAttachments', 'updateGlobalLibraryAttachment', 'replaceGlobalLibraryAttachment',
@@ -340,6 +365,7 @@ test('the typed bridge covers every global management operation', async () => {
   assertChannelsWired(assert, [
     'library:collections', 'library:item', 'library:createCollection', 'library:updateCollection',
     'library:deleteCollection', 'library:patchItemCollections', 'library:setItemsDeleted', 'library:importFiles', 'library:importDroppedFiles',
+    'library:prepareReading',
     'library:createItem', 'library:duplicateItem', 'library:convertItemToNodus',
     'library:addAttachments', 'library:updateAttachment', 'library:replaceAttachment', 'library:removeAttachment',
     'library:openAttachment', 'library:revealAttachment', 'library:upsertNote', 'library:deleteNote',

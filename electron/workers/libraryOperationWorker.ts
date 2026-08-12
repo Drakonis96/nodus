@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 
 /** Run disk-heavy Library maintenance away from Electron's main thread. */
+import fs from 'node:fs';
 import { parentPort } from 'node:worker_threads';
 import { LibraryCatalog } from '../library/libraryCatalog';
 import { LibraryOperations } from '../library/libraryOperations';
@@ -29,7 +30,8 @@ export type LibraryWorkerOperation =
   | 'merge-impact'
   | 'merge-items'
   | 'bibliography-records'
-  | 'export-bibliography';
+  | 'export-bibliography'
+  | 'probe-reading';
 
 interface OperationRequest {
   operation: LibraryWorkerOperation;
@@ -39,7 +41,7 @@ interface OperationRequest {
   args: unknown[];
 }
 
-function execute(operations: LibraryOperations, catalog: LibraryCatalog, store: LibraryDiskStore, request: OperationRequest): unknown {
+async function execute(operations: LibraryOperations, catalog: LibraryCatalog, store: LibraryDiskStore, request: OperationRequest): Promise<unknown> {
   const args = request.args as any[];
   switch (request.operation) {
     case 'rebuild': return catalog.rebuild(store);
@@ -68,6 +70,14 @@ function execute(operations: LibraryOperations, catalog: LibraryCatalog, store: 
     case 'export-bibliography':
       operations.ensureCitationKeys();
       return operations.exportBibliography(args[0]);
+    case 'probe-reading': {
+      const file = String(args[0] ?? '');
+      const mimeType = String(args[1] ?? '');
+      if (mimeType !== 'application/pdf') return { pageCount: null };
+      const { PDFDocument } = await import('pdf-lib');
+      const pdf = await PDFDocument.load(fs.readFileSync(file), { ignoreEncryption: true, updateMetadata: false });
+      return { pageCount: pdf.getPageCount() };
+    }
   }
 }
 
@@ -76,11 +86,11 @@ parentPort?.once('message', (request: OperationRequest) => {
   try {
     const store = new LibraryDiskStore(request.root, request.deviceId);
     const operations = new LibraryOperations(store, catalog);
-    const result = execute(operations, catalog, store, request);
-    parentPort!.postMessage({ ok: true, result });
+    void execute(operations, catalog, store, request)
+      .then((result) => { catalog.close(); parentPort!.postMessage({ ok: true, result }); })
+      .catch((error) => { catalog.close(); parentPort!.postMessage({ ok: false, error: error instanceof Error ? error.message : String(error) }); });
   } catch (error) {
-    parentPort!.postMessage({ ok: false, error: error instanceof Error ? error.message : String(error) });
-  } finally {
     catalog.close();
+    parentPort!.postMessage({ ok: false, error: error instanceof Error ? error.message : String(error) });
   }
 });

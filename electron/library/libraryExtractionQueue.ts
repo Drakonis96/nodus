@@ -73,7 +73,14 @@ export class LibraryExtractionQueue {
       const active = this.catalog.findActiveExtractionJob(itemId);
       if (!item || active || (!options.force && item.extraction?.status === 'ready')) {
         result.skipped += 1;
-        if (active) result.jobIds.push(active.id);
+        if (active) {
+          if (active.status === 'queued' && priority > active.priority) {
+            const promoted = { ...active, priority: Math.trunc(priority), updatedAt: now };
+            this.catalog.putExtractionJob(promoted);
+            this.emit(promoted, 'Documento priorizado para abrirlo en cuanto esté listo.');
+          }
+          result.jobIds.push(active.id);
+        }
         continue;
       }
       const job: LibraryExtractionJob = {

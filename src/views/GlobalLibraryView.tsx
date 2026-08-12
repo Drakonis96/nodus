@@ -785,6 +785,7 @@ function GlobalLibraryContent({
   const [detailActionsOpen, setDetailActionsOpen] = useState(false);
   const [dragImport, setDragImport] = useState<{ collectionId: string | null; label: string } | null>(null);
   const [itemContextMenu, setItemContextMenu] = useState<{ itemId: string; x: number; y: number } | null>(null);
+  const [foregroundPreparation, setForegroundPreparation] = useState<{ item: LibraryItemRecord; jobId: string; progress: number; message: string } | null>(null);
   const sidebarNavigationRef = useRef<HTMLDivElement>(null);
   const selectedDetailIdRef = useRef<string | null>(null);
   selectedDetailIdRef.current = detailId;
@@ -854,13 +855,46 @@ function GlobalLibraryContent({
     });
     const offExtraction = window.nodus.onLibraryExtractionProgress((progress) => {
       setJobs((current) => [progress, ...current.filter((job) => job.id !== progress.id)]);
+      setForegroundPreparation((current) => current?.jobId === progress.id && ['queued', 'processing'].includes(progress.status)
+        ? { ...current, progress: progress.progress, message: preparationPhaseLabel(progress) }
+        : current);
+      if (progress.status === 'done') {
+        setForegroundPreparation((current) => {
+          if (current?.jobId !== progress.id) return current;
+          onOpenReader({
+            id: current.item.id,
+            zoteroKey: current.item.source === 'zotero' ? current.item.sourceKey ?? null : null,
+            title: current.item.metadata.title,
+            authors: current.item.metadata.creators.map((creator) => creator.name || [creator.firstName, creator.lastName].filter(Boolean).join(' ')).filter(Boolean),
+            year: current.item.metadata.year ?? null,
+            preferredSource: 'clean',
+          });
+          return null;
+        });
+      } else if (progress.status === 'failed' || progress.status === 'canceled') {
+        setForegroundPreparation((current) => {
+          if (current?.jobId !== progress.id) return current;
+          if (progress.status === 'failed') {
+            toast(t('No se pudo preparar ahora; se abrirá el original.'), { tone: 'info' });
+            onOpenReader({
+              id: current.item.id,
+              zoteroKey: current.item.source === 'zotero' ? current.item.sourceKey ?? null : null,
+              title: current.item.metadata.title,
+              authors: current.item.metadata.creators.map((creator) => creator.name || [creator.firstName, creator.lastName].filter(Boolean).join(' ')).filter(Boolean),
+              year: current.item.metadata.year ?? null,
+              preferredSource: 'original',
+            });
+          }
+          return null;
+        });
+      }
       if (progress.status === 'done' || progress.status === 'failed' || progress.status === 'canceled') {
         void load();
         void refreshSelectedLibraryDetail(progress.itemId);
       }
     });
     return () => { offChanged(); offExtraction(); };
-  }, [load, refreshSelectedLibraryDetail]);
+  }, [load, onOpenReader, refreshSelectedLibraryDetail]);
   useEffect(() => {
     if (!detailId) { setDetail(null); setDetailLinks([]); return; }
     void refreshSelectedLibraryDetail();
@@ -1126,17 +1160,33 @@ function GlobalLibraryContent({
     setTrashMode(false); setSelected(new Set()); setDetailId(null); setOffset(0);
   };
 
+  const openReaderReference = (item: LibraryItemRecord, preferredSource?: 'clean' | 'original') => onOpenReader({
+    id: item.id,
+    zoteroKey: item.source === 'zotero' ? item.sourceKey ?? null : null,
+    title: item.metadata.title,
+    authors: item.metadata.creators.map((creator) => creator.name || [creator.firstName, creator.lastName].filter(Boolean).join(' ')).filter(Boolean),
+    year: item.metadata.year ?? null,
+    preferredSource,
+  });
+
   const openReader = async (itemId: string, preferredSource?: 'clean' | 'original') => {
     const item = detail?.id === itemId ? detail : await window.nodus.getGlobalLibraryItem(itemId);
     if (!item || (!item.files?.reader && !item.attachments.length)) return;
-    onOpenReader({
-      id: item.id,
-      zoteroKey: item.source === 'zotero' ? item.sourceKey ?? null : null,
-      title: item.metadata.title,
-      authors: item.metadata.creators.map((creator) => creator.name || [creator.firstName, creator.lastName].filter(Boolean).join(' ')).filter(Boolean),
-      year: item.metadata.year ?? null,
-      preferredSource,
-    });
+    if (preferredSource) { openReaderReference(item, preferredSource); return; }
+    const plan = await window.nodus.prepareGlobalLibraryReading(item.id);
+    if (plan.action === 'open-clean') { openReaderReference(item); return; }
+    if (plan.action === 'queue-and-open-original') {
+      toast(plan.pageCount
+        ? tx('Documento largo ({n} páginas): la versión limpia queda en segundo plano.', { n: plan.pageCount })
+        : t('Documento largo: la versión limpia queda en segundo plano.'), { tone: 'info' });
+      openReaderReference(item, 'original');
+      return;
+    }
+    if (plan.action === 'prepare-before-open' && plan.jobId) {
+      setForegroundPreparation({ item, jobId: plan.jobId, progress: 0, message: t('Preparando lectura…') });
+      return;
+    }
+    openReaderReference(item, 'original');
   };
 
   const loadContextItem = async (): Promise<LibraryItemRecord | null> => {
@@ -1236,6 +1286,7 @@ function GlobalLibraryContent({
       </header>
 
       {error && <div role="alert" className="border-b border-red-500/30 bg-red-500/10 px-5 py-2 text-xs text-red-300">{error}</div>}
+      {foregroundPreparation && <div data-testid="library-foreground-preparation" role="status" className="flex h-9 shrink-0 items-center gap-3 border-b border-indigo-500/20 bg-indigo-500/5 px-5 text-xs"><Spinner /><span className="min-w-0 flex-1 truncate"><b>{foregroundPreparation.item.metadata.title}</b> · {t(foregroundPreparation.message)}</span><div className="h-1.5 w-32 overflow-hidden rounded-full bg-neutral-800"><span className="block h-full rounded-full bg-indigo-500 transition-[width]" style={{ width: `${Math.max(3, foregroundPreparation.progress * 100)}%` }} /></div><span className="w-9 text-right tabular-nums text-indigo-300">{Math.round(foregroundPreparation.progress * 100)}%</span><button className="grid h-7 w-7 place-items-center rounded text-neutral-500 hover:bg-neutral-900 hover:text-red-400" aria-label={t('Cancelar preparación')} title={t('Cancelar preparación')} onClick={() => { void window.nodus.cancelLibraryExtraction(foregroundPreparation.jobId); setForegroundPreparation(null); }}><Icon name="x" size={13} /></button></div>}
       {(status.conflicts > 0 || status.invalidRecords > 0) && <div data-testid="global-library-integrity-warning" role="status" className="flex items-start gap-2 border-b border-amber-500/30 bg-amber-500/10 px-5 py-2 text-xs text-amber-200"><Icon name="alert" size={14} className="mt-0.5 shrink-0" /><span><b>{t('La Biblioteca necesita revisión.')}</b> {tx('{conflicts} conflicto(s) conservado(s) · {invalid} registro(s) inválido(s) excluido(s). Los originales no se han modificado.', { conflicts: status.conflicts, invalid: status.invalidRecords })}</span></div>}
       <div className="flex min-h-0 flex-1">
         <aside className="library-theme-panel hidden w-[238px] shrink-0 flex-col border-r border-neutral-800 bg-neutral-950/80 lg:flex">

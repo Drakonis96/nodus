@@ -53,6 +53,7 @@ import type {
   LibraryPurgeReport,
   LibraryMergeImpact,
   LibraryRecoveryReport,
+  LibraryReadingPreparationPlan,
 } from '@shared/libraryTypes';
 import type {
   OfficeCitationDocumentRequest,
@@ -111,6 +112,15 @@ let live: {
 } | null = null;
 const zoteroImports = new Map<string, AbortController>();
 const metadataBatches = new Map<string, { controller: AbortController; result: LibraryMetadataBatchResult | null }>();
+const SHORT_READING_PAGE_LIMIT = 50;
+const LONG_REFLOWABLE_BYTE_THRESHOLD = 8 * 1024 * 1024;
+
+function bibliographicPageCount(pages?: string): number | null {
+  if (!pages) return null;
+  const values = pages.match(/\d+/g)?.map(Number).filter(Number.isFinite) ?? [];
+  if (values.length >= 2) return Math.max(1, Math.abs(values.at(-1)! - values[0]) + 1);
+  return values[0] && values[0] > 0 ? values[0] : null;
+}
 
 async function libraryRemoteOcr(input: { image: Buffer; mimeType: 'image/png' }): Promise<string> {
   const settings = getSettings();
@@ -392,6 +402,45 @@ export function cancelLibraryExtraction(jobId: string): boolean {
 
 export function retryLibraryExtraction(jobId: string): boolean {
   return service()?.extraction.retry(jobId) ?? false;
+}
+
+export async function prepareGlobalLibraryReading(itemId: string): Promise<LibraryReadingPreparationPlan> {
+  const current = service();
+  if (!current) throw new Error('Configura primero la carpeta de copias de seguridad de Nodus.');
+  const resolvedId = current.catalog.resolveItemId(itemId) ?? itemId;
+  const item = getGlobalLibraryItem(resolvedId);
+  if (!item) return { itemId: resolvedId, action: 'unavailable', attachmentId: null, pageCount: null, byteSize: 0, jobId: null, reason: 'no-file' };
+  const original = item.attachments.find((entry) => entry.role === 'original' && !['source-missing', 'corrupt'].includes(entry.sourceState ?? 'available'))
+    ?? item.attachments.find((entry) => !['source-missing', 'corrupt'].includes(entry.sourceState ?? 'available'))
+    ?? null;
+  if (item.files?.reader && item.extraction?.status !== 'failed') {
+    return { itemId: item.id, action: 'open-clean', attachmentId: original?.id ?? null, pageCount: bibliographicPageCount(item.metadata.pages), byteSize: original?.byteSize ?? 0, jobId: null, reason: 'ready' };
+  }
+  if (!original) return { itemId: item.id, action: 'unavailable', attachmentId: null, pageCount: null, byteSize: 0, jobId: null, reason: 'no-file' };
+
+  let pageCount = bibliographicPageCount(item.metadata.pages);
+  if (pageCount == null && original.mimeType === 'application/pdf') {
+    try {
+      const file = current.operations.attachmentPath(item.id, original.id);
+      const probed = await runLibraryOperationInWorker<{ pageCount: number | null }>(
+        workerContext(current), 'probe-reading', [file, original.mimeType], () => ({ pageCount: null }),
+      );
+      pageCount = probed.pageCount;
+    } catch { pageCount = null; }
+  }
+  const longDocument = pageCount != null
+    ? pageCount >= SHORT_READING_PAGE_LIMIT
+    : original.byteSize >= LONG_REFLOWABLE_BYTE_THRESHOLD;
+  const enqueue = current.extraction.enqueue([item.id], {}, longDocument ? 0 : 100);
+  return {
+    itemId: item.id,
+    action: longDocument ? 'queue-and-open-original' : 'prepare-before-open',
+    attachmentId: original.id,
+    pageCount,
+    byteSize: original.byteSize,
+    jobId: enqueue.jobIds[0] ?? null,
+    reason: longDocument ? 'long-document' : 'short-document',
+  };
 }
 
 export function listGlobalLibraryCollections(): LibraryCollectionView[] {
