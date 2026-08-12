@@ -487,7 +487,7 @@ export class LibraryCatalog {
           creators: creatorsText(record),
           abstract: record.metadata.abstract ?? '',
           tags: (record.metadata.tags ?? []).join(' '),
-          identifiers: [record.metadata.doi, record.metadata.pmid, record.metadata.pmcid, record.metadata.arxiv, ...(record.metadata.isbn ?? []), ...(record.metadata.issn ?? [])].filter(Boolean).join(' '),
+          identifiers: [record.citationKey, record.metadata.doi, record.metadata.pmid, record.metadata.pmcid, record.metadata.arxiv, ...(record.metadata.isbn ?? []), ...(record.metadata.issn ?? [])].filter(Boolean).join(' '),
         });
         for (const collectionId of record.collectionIds) insertMembership.run(record.id, collectionId);
         for (const attachment of record.attachments) insertAttachment.run({ ...attachment, itemId: record.id });
@@ -607,7 +607,7 @@ export class LibraryCatalog {
       insertFts.run({
         id: record.id, title: record.metadata.title, creators: creatorsText(record),
         abstract: record.metadata.abstract ?? '', tags: (record.metadata.tags ?? []).join(' '),
-        identifiers: [record.metadata.doi, record.metadata.pmid, record.metadata.pmcid, record.metadata.arxiv,
+        identifiers: [record.citationKey, record.metadata.doi, record.metadata.pmid, record.metadata.pmcid, record.metadata.arxiv,
           ...(record.metadata.isbn ?? []), ...(record.metadata.issn ?? [])].filter(Boolean).join(' '),
       });
       for (const collectionId of record.collectionIds) insertMembership.run(record.id, collectionId);

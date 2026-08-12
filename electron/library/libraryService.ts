@@ -54,6 +54,11 @@ import type {
   LibraryMergeImpact,
   LibraryRecoveryReport,
 } from '@shared/libraryTypes';
+import type {
+  OfficeCitationDocumentRequest,
+  OfficeCitationDocumentResult,
+  OfficeReferenceSummary,
+} from '@shared/officeCitationTypes';
 import { LibraryCatalog } from './libraryCatalog';
 import { LibraryDiskStore } from './libraryStorage';
 import {
@@ -85,6 +90,7 @@ import { libraryRevisionFingerprint } from './libraryVaultProvenance';
 import { registerGlobalLibraryCloser } from './libraryRuntime';
 import {
   formatLibraryCitationCsl,
+  formatLibraryOfficeDocumentCsl,
   importLibraryCitationStyleFiles,
   importZoteroCitationStyleDirectories,
   installRepositoryCitationStyle,
@@ -793,6 +799,81 @@ export async function formatGlobalLibraryCitation(itemIds: string[], style: Libr
     },
   );
   return formatLibraryCitationCsl(records, style, kind, locale);
+}
+
+function officeReferenceAuthor(item: LibraryCatalogPage['items'][number]): string {
+  const creators = item.creators.filter((entry) => entry.creatorType === 'author' || entry.creatorType === 'bookAuthor');
+  const values = creators.map((entry) => entry.name || [entry.lastName, entry.firstName].filter(Boolean).join(', ')).filter(Boolean);
+  if (!values.length) return '';
+  if (values.length === 1) return values[0];
+  if (values.length === 2) return `${values[0]} & ${values[1]}`;
+  return `${values[0]} et al.`;
+}
+
+export async function searchGlobalLibraryOfficeReferences(query: string, limit = 40): Promise<OfficeReferenceSummary[]> {
+  const page = await listGlobalLibraryItemsResponsive({
+    search: query.trim() || undefined,
+    limit: Math.max(1, Math.min(100, Math.trunc(limit || 40))),
+    includeFacets: false,
+    sort: [{ field: query.trim() ? 'title' : 'updatedAt', direction: query.trim() ? 'asc' : 'desc' }],
+  });
+  return page.items.map((item) => ({
+    id: item.id,
+    citationKey: item.citationKey,
+    title: item.title,
+    itemType: item.itemType,
+    author: officeReferenceAuthor(item),
+    year: item.year,
+    publicationTitle: item.metadata.publicationTitle ?? null,
+    identifiers: [...new Set([
+      item.doi ? `DOI ${item.doi}` : '',
+      ...item.isbn.map((value) => `ISBN ${value}`),
+      ...item.issn.map((value) => `ISSN ${value}`),
+      item.metadata.pmid ? `PMID ${item.metadata.pmid}` : '',
+      item.metadata.arxiv ? `arXiv ${item.metadata.arxiv}` : '',
+    ].filter(Boolean))],
+    tags: item.tags,
+    source: item.source,
+    snapshot: { citationKey: item.citationKey, metadata: item.metadata },
+  }));
+}
+
+function officeSnapshotRecord(itemId: string, request: OfficeCitationDocumentRequest): LibraryItemRecord | null {
+  const snapshot = [...request.citations.flatMap((citation) => citation.citationItems), ...(request.uncitedItems ?? [])]
+    .find((item) => item.id === itemId)?.snapshot;
+  if (!snapshot) return null;
+  const now = new Date().toISOString();
+  return {
+    format: 'nodus.library-item', formatVersion: 2, id: itemId, storageId: itemId,
+    aliases: [], sourceIdentities: [], source: 'legacy', citationKey: snapshot.citationKey ?? undefined,
+    metadata: snapshot.metadata, collectionIds: [], attachments: [], createdAt: now, deletedAt: null,
+    clock: { deviceId: 'office-document', revision: 1, baseRevision: 0, updatedAt: now, contentHash: '' },
+  };
+}
+
+export async function formatGlobalLibraryOfficeDocument(request: OfficeCitationDocumentRequest): Promise<OfficeCitationDocumentResult> {
+  const current = service();
+  if (!current) throw new Error('Configura primero la carpeta de copias de seguridad de Nodus.');
+  const itemIds = [...new Set([
+    ...request.citations.flatMap((citation) => citation.citationItems.map((item) => item.id)),
+    ...(request.uncitedItemIds ?? []),
+    ...(request.uncitedItems ?? []).map((item) => item.id),
+  ])];
+  const records = await runLibraryOperationInWorker<LibraryItemRecord[]>(
+    workerContext(current), 'bibliography-records', [{ itemIds }], () => {
+      current.operations.ensureCitationKeys();
+      return current.operations.bibliographyRecords({ itemIds });
+    },
+  );
+  const existing = new Set(records.map((record) => record.id));
+  for (const itemId of itemIds) {
+    if (existing.has(itemId)) continue;
+    const fallback = officeSnapshotRecord(itemId, request);
+    if (fallback) records.push(fallback);
+  }
+  const unresolved = itemIds.filter((itemId) => !records.some((record) => record.id === itemId));
+  if (unresolved.length) throw new Error(`No se pudieron resolver ${unresolved.length} referencia(s) del documento.`);
+  return formatLibraryOfficeDocumentCsl(records, request);
 }
 
 export async function exportGlobalLibraryBibliography(request: LibraryBibliographyExportRequest, filePath: string): Promise<LibraryBibliographyExportReport> {

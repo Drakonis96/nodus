@@ -15,6 +15,11 @@ import type {
   LibraryCitationStyleRecord,
   LibraryItemRecord,
 } from '@shared/libraryTypes';
+import type {
+  OfficeCitationDocumentRequest,
+  OfficeCitationDocumentResult,
+  OfficeCitationItem,
+} from '@shared/officeCitationTypes';
 import { atomicWriteFile, atomicWriteJson, configuredLibraryRootOrThrow, readJsonFile, safeLibraryFolderName } from './libraryPaths';
 import { bundledOfficialCslStyle } from './bundledOfficialCslStyles';
 
@@ -34,9 +39,18 @@ const BUILTIN_STYLES = [
 
 type CslItem = Record<string, unknown> & { id: string };
 type CiteprocEngine = {
-  setOutputFormat(format: 'text'): void;
+  setOutputFormat(format: 'text' | 'html'): void;
   updateItems(ids: string[]): void;
-  makeCitationCluster(items: Array<{ id: string }>): string;
+  makeCitationCluster(items: Array<Record<string, unknown> & { id: string }>): string;
+  rebuildProcessorState(
+    citations: Array<{
+      citationID: string;
+      citationItems: Array<Record<string, unknown> & { id: string }>;
+      properties: { noteIndex: number };
+    }>,
+    mode: 'text' | 'html',
+    uncitedItemIds?: string[],
+  ): Array<[string, number, string]>;
   makeBibliography(): [{ bibstart?: string; bibend?: string } | null, string[]] | false;
 };
 type CiteprocConstructor = new (
@@ -130,9 +144,12 @@ export function listLibraryCitationStyles(): LibraryCitationStyleRecord[] {
   const stored = storedRecords();
   const builtins = BUILTIN_STYLES.map((entry) => {
     const cached = stored.find((style) => style.id === entry.repositoryId);
+    const bundledXml = entry.pluginId ? bundledStyleXml(entry.pluginId) : null;
     return {
       id: entry.id, title: entry.title, source: 'bundled' as const, fileName: cached?.fileName ?? null,
-      updatedAt: cached?.updatedAt ?? null, citationFormat: cached?.citationFormat ?? null,
+      updatedAt: cached?.updatedAt ?? null,
+      citationFormat: cached?.citationFormat
+        ?? (bundledXml ? tagAttribute(bundledXml, 'category', 'citation-format') as LibraryCitationStyleRecord['citationFormat'] : null),
       dependentParent: null, rights: cached?.rights ?? OFFICIAL_ATTRIBUTION, license: 'CC-BY-SA-3.0',
       availableOffline: !!(entry.pluginId && bundledStyleXml(entry.pluginId)) || !!cached, removable: false, warning: cached ? null : entry.pluginId ? null : 'El archivo CSL exacto se guardará desde el repositorio de estilos de Zotero la primera vez que se use.',
     };
@@ -202,6 +219,13 @@ export function removeLibraryCitationStyle(id: string): boolean {
 function cslData(record: LibraryItemRecord): Record<string, unknown> {
   const metadata = record.metadata;
   const creator = (type: string) => metadata.creators.filter((entry) => entry.creatorType === type).map((entry) => entry.name ? { literal: entry.name } : { given: entry.firstName, family: entry.lastName });
+  const creators = (...types: string[]) => types.flatMap(creator);
+  const primaryCreatorRoles: Partial<Record<LibraryItemRecord['metadata']['itemType'], string[]>> = {
+    artwork: ['artist'], map: ['cartographer'], patent: ['inventor'], interview: ['interviewer'],
+    film: ['director'], 'video-recording': ['director'], 'audio-recording': ['performer', 'composer'],
+    'radio-broadcast': ['director'], 'tv-broadcast': ['director'], podcast: ['podcaster'],
+    presentation: ['presenter'], 'computer-program': ['programmer'],
+  };
   const typeMap: Partial<Record<LibraryItemRecord['metadata']['itemType'], string>> = {
     'article-journal': 'article-journal', 'journal-article': 'article-journal', 'magazine-article': 'article-magazine',
     'newspaper-article': 'article-newspaper', book: 'book', 'book-chapter': 'chapter', chapter: 'chapter',
@@ -216,7 +240,17 @@ function cslData(record: LibraryItemRecord): Record<string, unknown> {
   };
   return {
     id: record.id, type: typeMap[metadata.itemType] ?? 'document', title: metadata.title,
-    author: creator('author'), editor: creator('editor'), translator: creator('translator'),
+    author: creators('author', ...(primaryCreatorRoles[metadata.itemType] ?? [])),
+    editor: creator('editor'),
+    translator: creator('translator'),
+    'container-author': creator('bookAuthor'),
+    'collection-editor': creator('seriesEditor'),
+    'reviewed-author': creator('reviewedAuthor'),
+    recipient: creator('recipient'),
+    interviewer: creator('interviewer'),
+    composer: creator('composer'),
+    director: creator('director'),
+    illustrator: creators('artist', 'illustrator'),
     ...(metadata.year != null ? { issued: { 'date-parts': [[metadata.year]] } } : {}),
     abstract: metadata.abstract, 'container-title': metadata.publicationTitle, publisher: metadata.publisher,
     'publisher-place': metadata.place, volume: metadata.volume, issue: metadata.issue, page: metadata.pages,
@@ -226,13 +260,20 @@ function cslData(record: LibraryItemRecord): Record<string, unknown> {
   };
 }
 
-async function runtimeStyle(style: LibraryCitationStyle, seen = new Set<string>()): Promise<{ xml: string; title: string }> {
+async function runtimeStyle(
+  style: LibraryCitationStyle,
+  seen = new Set<string>(),
+): Promise<{ xml: string; title: string; citationFormat: LibraryCitationStyleRecord['citationFormat'] }> {
   if (seen.has(style)) throw new Error('El estilo CSL contiene un ciclo entre estilos dependientes.');
   seen.add(style);
   const builtin = BUILTIN_STYLES.find((entry) => entry.id === style || entry.repositoryId === style);
   if (builtin?.pluginId) {
     const xml = bundledStyleXml(builtin.pluginId);
-    if (xml) return { xml, title: builtin.title };
+    if (xml) return {
+      xml,
+      title: builtin.title,
+      citationFormat: tagAttribute(xml, 'category', 'citation-format') as LibraryCitationStyleRecord['citationFormat'],
+    };
   }
   let installed = storedById(style);
   if (!installed && builtin) {
@@ -240,14 +281,22 @@ async function runtimeStyle(style: LibraryCitationStyle, seen = new Set<string>(
   }
   if (!installed) throw new Error('El estilo CSL seleccionado no está instalado.');
   const parentUrl = installed.record.dependentParent;
-  if (!parentUrl) return { xml: installed.xml, title: installed.record.title };
+  if (!parentUrl) return {
+    xml: installed.xml,
+    title: installed.record.title,
+    citationFormat: installed.record.citationFormat,
+  };
   const parentId = repositoryIdFromUrl(parentUrl);
   if (!parentId) throw new Error('El estilo CSL dependiente no contiene una referencia válida a su estilo padre.');
   if (!storedById(parentId) && !BUILTIN_STYLES.some((entry) => entry.id === parentId || entry.repositoryId === parentId)) {
     await installRepositoryCitationStyle(parentId);
   }
   const parent = await runtimeStyle(parentId, seen);
-  return { xml: parent.xml, title: installed.record.title };
+  return {
+    xml: parent.xml,
+    title: installed.record.title,
+    citationFormat: installed.record.citationFormat ?? parent.citationFormat,
+  };
 }
 
 export async function formatLibraryCitationCsl(records: LibraryItemRecord[], style: LibraryCitationStyle, kind: 'citation' | 'bibliography', locale = 'es-ES'): Promise<LibraryCitationResult> {
@@ -271,4 +320,93 @@ export async function formatLibraryCitationCsl(records: LibraryItemRecord[], sty
   }
   text = text.replace(/\r\n?/g, '\n').replace(/[ \t]+\n/g, '\n').trim();
   return { style, styleTitle: selected.title, locale, kind, itemIds: records.map((record) => record.id), text };
+}
+
+function citeprocCitationItem(item: OfficeCitationItem): Record<string, unknown> & { id: string } {
+  return {
+    id: item.id,
+    ...(item.locator?.trim() ? { locator: item.locator.trim() } : {}),
+    ...(item.label ? { label: item.label } : {}),
+    ...(item.prefix?.trim() ? { prefix: item.prefix.trim() } : {}),
+    ...(item.suffix?.trim() ? { suffix: item.suffix.trim() } : {}),
+    ...(item.suppressAuthor ? { 'suppress-author': true } : {}),
+  };
+}
+
+function cleanCitationOutput(value: string): string {
+  return value.replace(/\r\n?/g, '\n').replace(/[ \t]+\n/g, '\n').trim();
+}
+
+/**
+ * Formats a whole editor document in one citeproc state. Unlike isolated
+ * makeCitationCluster calls, this preserves CSL sorting, ibid rules and author
+ * disambiguation across every citation in document order.
+ */
+export async function formatLibraryOfficeDocumentCsl(
+  records: LibraryItemRecord[],
+  request: OfficeCitationDocumentRequest,
+): Promise<OfficeCitationDocumentResult> {
+  const selected = await runtimeStyle(request.style);
+  const recordById = new Map(records.map((record) => [record.id, record]));
+  const items = Object.fromEntries(records.map((record) => [record.id, cslData(record) as CslItem]));
+  const localeXml = (language: string) => {
+    const available = bundledLocales as Record<string, string>;
+    const base = language.split('-')[0].toLowerCase();
+    const matched = Object.keys(available).find((key) => key.toLowerCase() === language.toLowerCase())
+      ?? Object.keys(available).find((key) => key.toLowerCase().startsWith(`${base}-`));
+    return matched ? available[matched] : available['en-US'];
+  };
+  const citations = request.citations.map((citation, index) => ({
+    citationID: citation.citationId || `nodus-citation-${index + 1}`,
+    citationItems: citation.citationItems.map(citeprocCitationItem),
+    properties: { noteIndex: Math.max(0, Math.trunc(citation.noteIndex || 0)) },
+  }));
+  const renderCitations = (mode: 'text' | 'html') => {
+    const engine = new Citeproc.Engine({ retrieveLocale: localeXml, retrieveItem: (id) => items[id] }, selected.xml, request.locale);
+    return new Map(engine.rebuildProcessorState(citations, mode).map(([id, , value]) => [id, cleanCitationOutput(value)]));
+  };
+  const textCitations = citations.length ? renderCitations('text') : new Map<string, string>();
+  const htmlCitations = citations.length ? renderCitations('html') : new Map<string, string>();
+
+  const excluded = new Set([
+    ...(request.excludedItemIds ?? []),
+    ...request.citations.flatMap((citation) => citation.citationItems.filter((item) => item.excludeFromBibliography).map((item) => item.id)),
+  ]);
+  const bibliographyIds = [...new Set([
+    ...request.citations.flatMap((citation) => citation.citationItems.map((item) => item.id)),
+    ...(request.uncitedItemIds ?? []),
+    ...(request.uncitedItems ?? []).map((item) => item.id),
+  ])].filter((id) => !excluded.has(id) && recordById.has(id));
+  const renderBibliography = (mode: 'text' | 'html') => {
+    if (!bibliographyIds.length) return '';
+    const engine = new Citeproc.Engine({ retrieveLocale: localeXml, retrieveItem: (id) => items[id] }, selected.xml, request.locale);
+    engine.setOutputFormat(mode);
+    engine.updateItems(bibliographyIds);
+    const bibliography = engine.makeBibliography();
+    if (!bibliography) return '';
+    return cleanCitationOutput(`${bibliography[0]?.bibstart ?? ''}${bibliography[1].join('')}${bibliography[0]?.bibend ?? ''}`);
+  };
+  const bibliographyText = renderBibliography('text');
+  const bibliographyHtml = renderBibliography('html');
+  // A dependent style inherits rendering from its independent parent, but its
+  // own category is the authoritative signal for note/in-text placement.
+  const citationFormat = selected.citationFormat as OfficeCitationDocumentResult['citationFormat'];
+  return {
+    style: request.style,
+    styleTitle: selected.title,
+    locale: request.locale,
+    citationFormat,
+    citations: request.citations.map((citation) => ({
+      citationId: citation.citationId,
+      noteIndex: citation.noteIndex,
+      itemIds: citation.citationItems.map((item) => item.id),
+      text: textCitations.get(citation.citationId) ?? '',
+      html: htmlCitations.get(citation.citationId) ?? '',
+    })),
+    bibliography: bibliographyIds.length ? {
+      itemIds: bibliographyIds,
+      text: bibliographyText,
+      html: bibliographyHtml,
+    } : null,
+  };
 }
