@@ -1,8 +1,8 @@
 # Nodus Privacy Policy
 
-**Version:** 1.2
+**Version:** 1.3
 
-** Date of validity:** 22 July 2026
+**Date of validity:** 10 August 2026
 
 **Scope:** Desktop application Nodus 2.5 and later
 
@@ -18,6 +18,24 @@ optional features can contact third-party services: for example, a user-chosen c
 Zotero, Unpaywall, GitHub to check updates, Hugging Face to download models or OpenAI secure MCP
 tunnel to use Nodus from ChatGPT. These services receive the necessary data for the requested
 operation and apply their own conditions and policies.
+
+**Cross-vault Library.** When a backup folder is configured, Nodus stores the global document
+library in its nested `nodus-library` folder. That folder can contain originals, clean Markdown,
+extracted images, page maps, bibliographic metadata, highlights, comments and saved document-chat
+history. It is local unless the user chooses a backup or synchronization provider for that folder;
+that provider then receives the files under its own terms. Linking a Library item to a vault does
+not upload or duplicate its original.
+Items manually emptied from the Library trash are retained locally in a dated
+`nodus-library/.nodus/recovery/purged` package so the catalogue operation remains
+recoverable. Those packages remain part of the selected backup until the user or
+data controller removes them under the applicable retention policy.
+Before the first Nodus 4 migration, the application also creates one verified pre-v4 recovery copy.
+It contains the existing vault databases, Library originals and derived files, and local profile
+sidecars. With a configured backup folder it is stored under
+`nodus-library/.nodus/recovery/pre-v4`; otherwise it remains in the local Nodus profile. Nodus does
+not upload this copy. A third-party folder synchronization service receives it only when the user
+has selected a folder managed by that service. Ordinary encrypted backups exclude the pre-v4 tree
+to avoid recursively embedding a complete copy, but include the active Global Library itself.
 
 **Nodus Server is optional and self-hosted.** If the user connects it in Settings, the application
 publishes a logical and minimized copy of the vault on the server chosen by the user or his/her
@@ -164,6 +182,20 @@ specified operation:
   the user's request are sent.The provider, model and account is chosen by the user. Local models do
   not make that submission.
 - **Zotero:** consults libraries and files authorized by the user.
+- **Nodus Connector for Chrome:** after the user clicks its toolbar icon, the extension reads only
+  the active tab's bibliographic metadata and document links. The user reviews the detected item
+  type, collection, tags, snapshot and files before saving them over an authenticated loopback
+  connection to the local desktop app. The pairing secret remains in Chrome local extension
+  storage. Optional per-site permission is requested only when Chrome must use the current browser
+  session to retrieve a selected attachment. The extension contains no telemetry or remote code.
+- **Crossref, Open Library, NCBI and arXiv:** when the user requests bibliographic metadata, Nodus
+  sends only the DOI, ISBN, ISSN, PMID, PMCID or arXiv identifier selected for that lookup. Bulk
+  requests are rate-limited and cancelable. Candidates are shown for review and are not applied
+  automatically.
+- **Clean-reader chat and remote OCR:** these actions use the AI model explicitly configured by the
+  user. A remote chat provider receives the clean document text, relevant annotations and recent
+  conversation needed to answer; remote OCR receives the selected page image. A local model keeps
+  that content on the device. Opening, reading, highlighting or annotating alone invokes no model.
 - **Unpaywall and publishing servers:** consult a DOI and you can download the accessible text; the
   mail configured for Unpaywall is included in the request.
 - **GitHub:** Check and download updates, open incidents and downloads of the project. It also hosts
@@ -244,7 +276,7 @@ process and not to use Nodus for unlawful or incompatible purposes. The controll
 his or her own obligations of information, legality, minimization, contracts, security, rights care
 and impact assessment.
 
-The MIT license delivers the software "as is", without technical warranty, to the maximum extent
+The GNU Affero General Public License v3.0 only delivers the software "as is", without technical warranty, to the maximum extent
 permitted by law. **This clause does not eliminate mandatory legal obligations, does not
 automatically make the user solely responsible and does not exclude liability that the law does not
 allow to exclude**.

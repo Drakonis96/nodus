@@ -14,7 +14,7 @@ import { randomBytes, timingSafeEqual } from 'node:crypto';
 import { mkdir, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import { app, BrowserWindow, shell } from 'electron';
+import { app, BrowserWindow, dialog, shell } from 'electron';
 import type { ModelRef, ReasoningEffort, Work, ZoteroPluginServerStatus } from '@shared/types';
 import { getSettings, updateSettings } from '../db/settingsRepo';
 import { getDb } from '../db/database';
@@ -24,11 +24,35 @@ import { searchCopilotIdeas, searchCopilotPassages } from '../ai/liveRelations';
 import { completeTextStream } from '../ai/aiClient';
 import { getActiveVault } from '../vaults/vaultRegistry';
 import type { VisionImagePart } from '@shared/imageAnalysis';
+import {
+  listGlobalLibraryCollections,
+  listGlobalLibraryTags,
+  getGlobalLibraryItem,
+  getGlobalLibraryStatus,
+  startZoteroLibraryImport,
+} from '../library/libraryService';
+import type { BrowserConnectorCaptureRequest } from '@shared/browserConnector';
+import {
+  previewBrowserCapture,
+  saveBrowserCapture,
+  uploadBrowserAttachment,
+} from '../browser-connector/libraryCapture';
 
 const MAX_REQUEST_BYTES = 20 * 1024 * 1024; // full text plus several bounded page images
+export const ZOTERO_PLUGIN_PROTOCOL_VERSION = 4;
+export const ZOTERO_PLUGIN_MINIMUM_PROTOCOL = 3;
+export const ZOTERO_PLUGIN_CAPABILITIES = Object.freeze({
+  chat: true,
+  evidence: true,
+  globalLibrary: true,
+  librarySyncV2: true,
+  cleanReader: true,
+  browserCapture: true,
+});
 
 let httpServer: Server | null = null;
 let status: ZoteroPluginServerStatus = { running: false, port: null, url: null, error: null };
+let lastClientProtocol: number | null = null;
 let lifecycle = Promise.resolve();
 let getMainWindow: (() => BrowserWindow | null) | null = null;
 
@@ -46,6 +70,14 @@ function ensureToken(): string {
   return token;
 }
 
+function ensureBrowserConnectorToken(): string {
+  const settings = getSettings();
+  if (settings.browserConnectorToken) return settings.browserConnectorToken;
+  const token = randomBytes(32).toString('base64url');
+  updateSettings({ browserConnectorToken: token });
+  return token;
+}
+
 function hasValidToken(req: IncomingMessage, expected: string): boolean {
   const header = req.headers.authorization;
   if (!header?.startsWith('Bearer ')) return false;
@@ -54,12 +86,23 @@ function hasValidToken(req: IncomingMessage, expected: string): boolean {
   return actual.length === wanted.length && timingSafeEqual(actual, wanted);
 }
 
+function extensionOrigin(req: IncomingMessage): string | null {
+  const origin = req.headers.origin;
+  return typeof origin === 'string' && /^(?:chrome|moz)-extension:\/\/[a-z0-9-]{16,80}$/i.test(origin) ? origin : null;
+}
+
 function setCors(req: IncomingMessage, res: ServerResponse): void {
   const origin = req.headers.origin;
-  res.setHeader('Access-Control-Allow-Origin', origin ?? '*');
+  const browserRoute = (req.url ?? '').split('?')[0].startsWith('/api/browser/');
+  const allowedOrigin = browserRoute ? extensionOrigin(req) : origin;
+  if (allowedOrigin) res.setHeader('Access-Control-Allow-Origin', allowedOrigin);
   res.setHeader('Vary', 'Origin');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Authorization, Content-Type');
+  res.setHeader('Access-Control-Allow-Headers', [
+    'Authorization', 'Content-Type', 'X-Nodus-Zotero-Protocol', 'X-Nodus-File-Name',
+    'X-Nodus-File-Title', 'X-Nodus-Mime-Type', 'X-Nodus-Attachment-Role', 'X-Nodus-Source-Url',
+  ].join(', '));
+  if (browserRoute) res.setHeader('Access-Control-Allow-Private-Network', 'true');
 }
 
 function describeError(error: unknown): string {
@@ -109,6 +152,45 @@ async function readJsonBody(req: IncomingMessage): Promise<Record<string, unknow
   return parsed && typeof parsed === 'object' ? (parsed as Record<string, unknown>) : {};
 }
 
+async function readBinaryBody(req: IncomingMessage, maxBytes = 64 * 1024 * 1024): Promise<Uint8Array> {
+  let size = 0;
+  const chunks: Buffer[] = [];
+  for await (const chunk of req) {
+    const data = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+    size += data.length;
+    if (size > maxBytes) throw new Error('The uploaded attachment exceeds 64 MB.');
+    chunks.push(data);
+  }
+  return Buffer.concat(chunks);
+}
+
+type BrowserPairPrompt = (details: { extensionVersion: string; pageHost: string }) => Promise<boolean>;
+const defaultBrowserPairPrompt: BrowserPairPrompt = async ({ extensionVersion, pageHost }) => {
+  const settings = getSettings();
+  const spanish = settings.uiLanguage === 'es';
+  const owner = getMainWindow?.() ?? BrowserWindow.getFocusedWindow() ?? BrowserWindow.getAllWindows()[0] ?? undefined;
+  const options = {
+    type: 'question' as const,
+    title: spanish ? 'Conectar Nodus Connector' : 'Connect Nodus Connector',
+    message: spanish ? '¿Permitir que la extensión de Chrome guarde documentos en tu Biblioteca de Nodus?' : 'Allow the Chrome extension to save documents to your Nodus Library?',
+    detail: spanish
+      ? `Versión ${extensionVersion || 'desconocida'}${pageHost ? ` · Página actual: ${pageHost}` : ''}. Solo tendrá acceso cuando pulses su icono.`
+      : `Version ${extensionVersion || 'unknown'}${pageHost ? ` · Current page: ${pageHost}` : ''}. It only receives access when you click its icon.`,
+    buttons: spanish ? ['Permitir', 'Cancelar'] : ['Allow', 'Cancel'],
+    defaultId: 0,
+    cancelId: 1,
+    noLink: true,
+  };
+  const result = owner ? await dialog.showMessageBox(owner, options) : await dialog.showMessageBox(options);
+  return result.response === 0;
+};
+let browserPairPrompt: BrowserPairPrompt = defaultBrowserPairPrompt;
+
+/** Test-only seam: production always uses an explicit native confirmation dialog. */
+export function setBrowserConnectorPairPromptForTests(prompt: BrowserPairPrompt | null): void {
+  browserPairPrompt = prompt ?? defaultBrowserPairPrompt;
+}
+
 // -------------------------------------------------------------- domain logic
 
 /** zotero_key → Work with the same fallback order the MCP tools use. */
@@ -124,6 +206,26 @@ function resolveWork(body: Record<string, unknown>): Work | null {
     if (w) return w;
   }
   return null;
+}
+
+function canonicalLibraryItemKey(body: Record<string, unknown>): string {
+  const key = typeof body.zoteroKey === 'string' ? body.zoteroKey.trim() : '';
+  const libraryId = typeof body.libraryId === 'string' ? body.libraryId.trim() : 'users/0';
+  const group = /^groups\/(.+)$/.exec(libraryId);
+  return group && key && !key.startsWith('groups:') ? `groups:${group[1]}:${key}` : key;
+}
+
+function globalLibraryItemStatus(body: Record<string, unknown>) {
+  const canonicalKey = canonicalLibraryItemKey(body);
+  const item = canonicalKey ? getGlobalLibraryItem(`zotero:${canonicalKey}`) : null;
+  return {
+    imported: Boolean(item),
+    itemId: item?.id ?? null,
+    title: item?.metadata.title ?? null,
+    extractionStatus: item?.extraction?.status ?? null,
+    readerAvailable: Boolean(item?.files?.reader),
+    originalAvailable: Boolean(item?.files?.original),
+  };
 }
 
 function toModelRef(value: unknown): ModelRef | null {
@@ -292,12 +394,19 @@ function parseVisionImages(value: unknown): VisionImagePart[] {
 
 async function handleRequest(req: IncomingMessage, res: ServerResponse, _port: number): Promise<void> {
   setCors(req, res);
+  const urlPath = (req.url ?? '/').split('?')[0];
+  if (urlPath.startsWith('/api/browser/') && !extensionOrigin(req)) {
+    sendJson(res, 403, { error: 'Browser connector requests must come from an installed extension.' });
+    return;
+  }
   if (req.method === 'OPTIONS') {
     res.writeHead(204);
     res.end();
     return;
   }
-  const urlPath = (req.url ?? '/').split('?')[0];
+  const announcedProtocol = Number(req.headers['x-nodus-zotero-protocol']);
+  lastClientProtocol = Number.isInteger(announcedProtocol) && announcedProtocol > 0
+    ? announcedProtocol : ZOTERO_PLUGIN_MINIMUM_PROTOCOL;
 
   // Health is tokenless so the plugin can probe connectivity + report the vault.
   if (urlPath === '/api/z/health') {
@@ -306,6 +415,9 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse, _port: n
       ok: true,
       app: 'nodus',
       version: app.getVersion?.() ?? null,
+      protocolVersion: ZOTERO_PLUGIN_PROTOCOL_VERSION,
+      minimumPluginProtocol: ZOTERO_PLUGIN_MINIMUM_PROTOCOL,
+      capabilities: ZOTERO_PLUGIN_CAPABILITIES,
       vault,
       corpusSize: (getDb().prepare('SELECT COUNT(*) AS n FROM works WHERE archived = 0').get() as { n: number }).n,
       embeddingsConfigured: embeddedIdeaCount() > 0,
@@ -313,14 +425,96 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse, _port: n
     return;
   }
 
-  const token = getSettings().zoteroPluginToken;
+  if (urlPath === '/api/browser/health' && req.method === 'GET') {
+    const settings = getSettings();
+    sendJson(res, 200, {
+      ok: true,
+      app: 'nodus',
+      version: app.getVersion?.() ?? null,
+      protocolVersion: 1,
+      enabled: settings.browserConnectorEnabled,
+      paired: Boolean(settings.browserConnectorToken),
+      libraryReady: getGlobalLibraryStatus().configured,
+      capabilities: { metadata: true, attachments: true, snapshots: true, collections: true, tags: true },
+    });
+    return;
+  }
+
+  if (urlPath === '/api/browser/pair' && req.method === 'POST') {
+    if (!getSettings().browserConnectorEnabled) {
+      sendJson(res, 503, { error: 'Enable Nodus Connector in Settings → Integrations first.' });
+      return;
+    }
+    const body = await readJsonBody(req);
+    const extensionVersion = typeof body.extensionVersion === 'string' ? body.extensionVersion.slice(0, 40) : '';
+    let pageHost = '';
+    try { pageHost = typeof body.pageUrl === 'string' ? new URL(body.pageUrl).hostname.slice(0, 200) : ''; } catch { pageHost = ''; }
+    const allowed = await browserPairPrompt({ extensionVersion, pageHost });
+    if (!allowed) { sendJson(res, 403, { error: 'Pairing was declined in Nodus.' }); return; }
+    sendJson(res, 200, { ok: true, token: ensureBrowserConnectorToken(), port: _port, protocolVersion: 1 });
+    return;
+  }
+
+  const browserRoute = urlPath.startsWith('/api/browser/');
+  if (browserRoute && !getSettings().browserConnectorEnabled) {
+    sendJson(res, 503, { error: 'Nodus Connector is disabled.' });
+    return;
+  }
+  const token = browserRoute ? getSettings().browserConnectorToken : getSettings().zoteroPluginToken;
   if (!token || !hasValidToken(req, token)) {
-    res.setHeader('WWW-Authenticate', 'Bearer realm="Nodus for Zotero"');
+    res.setHeader('WWW-Authenticate', `Bearer realm="${browserRoute ? 'Nodus Connector' : 'Nodus for Zotero'}"`);
     sendJson(res, 401, { error: 'Se requiere un bearer token válido.' });
     return;
   }
 
   try {
+    if (urlPath === '/api/browser/catalog' && req.method === 'GET') {
+      const collections = listGlobalLibraryCollections().filter((entry) => entry.source === 'nodus');
+      sendJson(res, 200, { collections, tags: listGlobalLibraryTags() });
+      return;
+    }
+
+    if (urlPath === '/api/browser/preview' && req.method === 'POST') {
+      const body = await readJsonBody(req) as unknown as BrowserConnectorCaptureRequest;
+      sendJson(res, 200, await previewBrowserCapture(body));
+      return;
+    }
+
+    if (urlPath === '/api/browser/save' && req.method === 'POST') {
+      const body = await readJsonBody(req) as unknown as BrowserConnectorCaptureRequest;
+      sendJson(res, 200, await saveBrowserCapture(body));
+      return;
+    }
+
+    const attachmentMatch = /^\/api\/browser\/items\/([^/]+)\/attachments$/.exec(urlPath);
+    if (attachmentMatch && req.method === 'POST') {
+      const decodeHeader = (name: string): string => {
+        const raw = req.headers[name];
+        const value = Array.isArray(raw) ? raw[0] : raw;
+        if (!value) return '';
+        try { return decodeURIComponent(value); } catch { return value; }
+      };
+      const roleRaw = decodeHeader('x-nodus-attachment-role');
+      const roles = new Set(['original', 'supplement', 'snapshot', 'image', 'dataset', 'other']);
+      const bytes = await readBinaryBody(req);
+      sendJson(res, 200, await uploadBrowserAttachment(decodeURIComponent(attachmentMatch[1]), bytes, {
+        title: decodeHeader('x-nodus-file-title') || decodeHeader('x-nodus-file-name') || 'Captured document',
+        fileName: decodeHeader('x-nodus-file-name') || undefined,
+        mimeType: decodeHeader('x-nodus-mime-type') || undefined,
+        role: roles.has(roleRaw) ? roleRaw as 'original' | 'supplement' | 'snapshot' | 'image' | 'dataset' | 'other' : 'supplement',
+        url: decodeHeader('x-nodus-source-url') || undefined,
+      }));
+      return;
+    }
+
+    if (urlPath === '/api/browser/open' && req.method === 'POST') {
+      const body = await readJsonBody(req);
+      const id = typeof body.itemId === 'string' ? body.itemId : '';
+      if (!id || !getGlobalLibraryItem(id)) { sendJson(res, 404, { ok: false }); return; }
+      sendJson(res, 200, await openInNodus({ kind: 'library-reader', id }));
+      return;
+    }
+
     if (urlPath === '/api/z/models' && req.method === 'GET') {
       sendJson(res, 200, featuredModels());
       return;
@@ -342,6 +536,31 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse, _port: n
         hasAnalysis: work.deep_status === 'done',
         ideaCount,
       });
+      return;
+    }
+
+    if (urlPath === '/api/z/library/status' && req.method === 'POST') {
+      const body = await readJsonBody(req);
+      sendJson(res, 200, globalLibraryItemStatus(body));
+      return;
+    }
+
+    if (urlPath === '/api/z/library/import' && req.method === 'POST') {
+      const body = await readJsonBody(req);
+      const libraryId = typeof body.libraryId === 'string' && body.libraryId.trim() ? body.libraryId.trim() : 'users/0';
+      const requestId = `zotero-plugin-${Date.now()}-${randomBytes(5).toString('hex')}`;
+      const report = await startZoteroLibraryImport(requestId, {
+        libraryIds: [libraryId], includeUnfiled: true, copyAttachments: true,
+      }, () => undefined);
+      sendJson(res, 200, { ...globalLibraryItemStatus(body), report });
+      return;
+    }
+
+    if (urlPath === '/api/z/library/open' && req.method === 'POST') {
+      const body = await readJsonBody(req);
+      const item = globalLibraryItemStatus(body);
+      if (!item.itemId) { sendJson(res, 404, { ok: false, ...item }); return; }
+      sendJson(res, 200, { ...(await openInNodus({ kind: 'library-reader', id: item.itemId })), ...item });
       return;
     }
 
@@ -827,7 +1046,7 @@ function validPort(port: number): boolean {
 async function start(): Promise<void> {
   if (httpServer) return;
   const settings = getSettings();
-  if (!settings.zoteroPluginEnabled) {
+  if (!settings.zoteroPluginEnabled && !settings.browserConnectorEnabled) {
     status = { running: false, port: null, url: null, error: null };
     return;
   }
@@ -837,12 +1056,16 @@ async function start(): Promise<void> {
     return;
   }
   try {
-    ensureToken();
+    if (settings.zoteroPluginEnabled) ensureToken();
+    if (settings.browserConnectorEnabled) ensureBrowserConnectorToken();
     const candidate = createServer((req, res) => {
       handleRequest(req, res, port).catch((error) => {
         console.warn('[zotero-plugin] request failed', error);
         try {
-          if (!res.headersSent) sendJson(res, 500, { error: 'Error interno del servidor de Zotero.' });
+          if (!res.headersSent) {
+            const browserRequest = (req.url ?? '').split('?')[0].startsWith('/api/browser/');
+            sendJson(res, 500, { error: browserRequest ? 'Nodus could not complete the browser capture.' : 'Error interno del servidor de Zotero.' });
+          }
         } catch {
           /* client gone */
         }
@@ -864,10 +1087,12 @@ async function start(): Promise<void> {
     httpServer = candidate;
     status = { running: true, port, url: `http://127.0.0.1:${port}`, error: null };
     console.log(`[zotero-plugin] listening on http://127.0.0.1:${port}`);
-    try {
-      await writeZoteroBridgeFile(port);
-    } catch (error) {
-      console.warn('[zotero-plugin] failed to write bridge file', error);
+    if (settings.zoteroPluginEnabled) {
+      try {
+        await writeZoteroBridgeFile(port);
+      } catch (error) {
+        console.warn('[zotero-plugin] failed to write bridge file', error);
+      }
     }
   } catch (error) {
     status = { running: false, port: null, url: null, error: describeError(error) };
@@ -902,11 +1127,25 @@ export function restartZoteroPluginServer(): Promise<void> {
   return lifecycle;
 }
 export function getZoteroPluginStatus(): ZoteroPluginServerStatus {
-  return { ...status };
+  return {
+    ...status,
+    protocolVersion: ZOTERO_PLUGIN_PROTOCOL_VERSION,
+    clientProtocolVersion: lastClientProtocol,
+    compatibilityWarning: lastClientProtocol !== null && lastClientProtocol < ZOTERO_PLUGIN_PROTOCOL_VERSION
+      ? 'El plugin de Zotero es anterior a Nodus 4. El chat seguirá funcionando, pero la Biblioteca global requiere actualizar el plugin.'
+      : null,
+  };
 }
 export async function regenerateZoteroPluginToken(): Promise<string> {
   const token = randomBytes(24).toString('base64url');
   updateSettings({ zoteroPluginToken: token });
-  if (getSettings().zoteroPluginEnabled) await restartZoteroPluginServer();
+  if (getSettings().zoteroPluginEnabled || getSettings().browserConnectorEnabled) await restartZoteroPluginServer();
+  return token;
+}
+
+export async function regenerateBrowserConnectorToken(): Promise<string> {
+  const token = randomBytes(32).toString('base64url');
+  updateSettings({ browserConnectorToken: token });
+  if (getSettings().zoteroPluginEnabled || getSettings().browserConnectorEnabled) await restartZoteroPluginServer();
   return token;
 }

@@ -30,7 +30,7 @@ assert.ok(latestChangesControl > updatesSection, 'the latest changes control mus
 assert.ok(updatesControl > latestChangesControl, 'latest changes must be presented before the update checker');
 assert.equal(settings.slice(aboutSection, updatesSection).includes('data-testid="about-updates"'), false, 'About Nodus must not render the updates control anymore');
 assert.match(settings, /const ABOUT_ACTION_BUTTON_CLASS = 'btn btn-ghost w-full[^']+sm:w-56'/);
-assert.equal((settings.match(/className=\{ABOUT_ACTION_BUTTON_CLASS\}/g) ?? []).length, 11, 'About actions must use the same responsive button class');
+assert.equal((settings.match(/className=\{ABOUT_ACTION_BUTTON_CLASS\}/g) ?? []).length, 12, 'About actions must use the same responsive button class');
 assert.match(settings, /data-testid="open-latest-changes"[\s\S]*onClick=\{onOpenWhatsNew\}/);
 
 const nodiOverride = settings.match(/<Row label=\{t\('Asistente Nodi'\)\}>(.*?)<\/Row>/s)?.[1] ?? '';

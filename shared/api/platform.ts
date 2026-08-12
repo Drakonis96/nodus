@@ -13,6 +13,7 @@ import type {
   AudioProvider,
   AudioSegment,
   AudioSegmentRequest,
+  BrowserConnectorExportResult,
   ChatGptSubscriptionLogin,
   ChatGptSubscriptionStatus,
   ContentTranslation,
@@ -54,6 +55,7 @@ import type {
   ZoteroItem,
   ZoteroLibrary,
   ZoteroPluginServerStatus,
+  ZoteroPluginOpenTarget,
 } from '../types';
 
 export interface PlatformApi {
@@ -113,6 +115,10 @@ export interface PlatformApi {
   installZoteroPlugin(): Promise<ZoteroInstallResult>;
   /** Save the packaged .xpi to a chosen location for manual installation. */
   downloadZoteroPluginXpi(): Promise<ZoteroExportResult>;
+  /** Save the Chrome Web Store-ready connector ZIP to a chosen location. */
+  downloadBrowserConnectorZip(): Promise<BrowserConnectorExportResult>;
+  /** Revoke every browser pairing without exposing the replacement secret. */
+  regenerateBrowserConnectorToken(): Promise<void>;
   /** Generate + trust a localhost TLS cert for the copilot server (idempotent). */
   ensureCopilotCert(): Promise<{ ok: boolean; message: string }>;
   /** Copy a port-aware Nodus Copilot manifest into Word's local add-in catalog. */
@@ -123,6 +129,8 @@ export interface PlatformApi {
   installLibreOfficeCopilot(): Promise<CopilotInstallResult>;
   /** Fired when the Word add-in asks Nodus to open an idea in the graph. */
   onCopilotOpenIdea(cb: (target: CopilotOpenIdeaTarget) => void): () => void;
+  /** Fired when Zotero asks the desktop app to reveal a clean Library item. */
+  onZoteroPluginOpen(cb: (target: ZoteroPluginOpenTarget) => void): () => void;
   setApiKey(provider: AiProvider, key: string): Promise<void>;
   clearApiKey(provider: AiProvider): Promise<void>;
   recoverApiKeys(): Promise<{ recoveredProviders: AiProvider[]; remainingLockedProviders: AiProvider[] }>;

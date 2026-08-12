@@ -93,6 +93,12 @@ import type {
   ImmersionSessionSummary,
   ImmersionStreamHandlers,
   ImportProjectChapterInput,
+  LibraryReaderDocument,
+  LibraryReaderAttachmentContent,
+  LibraryReaderChatMessage,
+  LibraryReaderChatRequest,
+  LibraryReaderChatResponse,
+  LibraryReaderChatStreamHandlers,
   ManagedTheme,
   ManualIdeaPayload,
   ManuscriptVerificationRequest,
@@ -228,6 +234,20 @@ export interface AcademicApi {
   openInZotero(zoteroKey: string): Promise<void>;
   /** Open a work's PDF in Zotero at the page parsed from an evidence/passage location; falls back to selecting the item. */
   openEvidenceAtPage(nodusId: string, location: string | null): Promise<{ ok: boolean; mode: 'pdf-page' | 'select' | 'none'; page?: number | null }>;
+  /** Clean Markdown reader stored under the configured backup root. */
+  getLibraryReaderDocument(nodusId: string): Promise<LibraryReaderDocument | null>;
+  getLibraryReaderAttachmentContent(nodusId: string, attachmentId: string): Promise<LibraryReaderAttachmentContent | null>;
+  openLibraryReaderOriginal(nodusId: string): Promise<boolean>;
+  listLibraryReaderAnnotations(nodusId: string): Promise<WritingDraftAnnotation[]>;
+  listLibraryReaderOrphanedAnnotations(nodusId: string): Promise<WritingDraftAnnotation[]>;
+  createLibraryReaderAnnotation(nodusId: string, input: WritingDraftAnnotationInput): Promise<WritingDraftAnnotation>;
+  updateLibraryReaderComment(nodusId: string, id: string, comment: string): Promise<WritingDraftAnnotation | null>;
+  deleteLibraryReaderAnnotation(nodusId: string, id: string): Promise<void>;
+  onLibraryReaderAnnotationsChanged(cb: (nodusId: string | null) => void): () => void;
+  listLibraryReaderChatMessages(nodusId: string): Promise<LibraryReaderChatMessage[]>;
+  libraryReaderChatStream(request: LibraryReaderChatRequest, handlers: LibraryReaderChatStreamHandlers): Promise<LibraryReaderChatResponse>;
+  cancelLibraryReaderChat(): Promise<void>;
+  clearLibraryReaderChat(nodusId: string): Promise<void>;
   /** Open an http(s)/mailto link in the user's default browser (used by rendered Markdown). */
   onStudyMaterialAiProcessingRequest(cb: (request: StudyMaterialAiProcessingPrompt) => void): () => void;
   resolveStudyMaterialAiProcessingRequest(requestId: string, decision: StudyMaterialAiProcessingDecision): Promise<void>;

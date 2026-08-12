@@ -27,9 +27,10 @@ test('prosopography has six exclusive domain views and no genealogical UI', asyn
     'prosopAnalysis', 'prosopNetworks', 'notes',
   ]);
   for (const view of views) assert.equal(vaultTypes.isViewAllowedForVaultType(view, 'prosopography'), true);
-  for (const forbidden of ['persons', 'tree', 'relations', 'archive', 'graph', 'library']) {
+  for (const forbidden of ['persons', 'tree', 'relations', 'archive', 'graph']) {
     assert.equal(vaultTypes.isViewAllowedForVaultType(forbidden, 'prosopography'), false, `${forbidden} must not leak`);
   }
+  assert.equal(vaultTypes.isViewAllowedForVaultType('library', 'prosopography'), true, 'the transverse Library is intentionally available in every vault');
   assert.doesNotMatch(sidebar, /Árbol genealógico|Relaciones sociales|Biblioteca/);
 });
 

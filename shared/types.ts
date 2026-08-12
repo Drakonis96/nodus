@@ -14,6 +14,30 @@ import type { DatabasesApi } from './api/databases';
 import type { TeachingApi } from './api/teaching';
 import type { ToolkitApi } from './api/toolkit';
 import type { TestimoniesApi } from './api/testimonies';
+import type { LibraryApi } from './api/library';
+import type { LibraryAttachmentRecord } from './libraryTypes';
+
+export type {
+  LibraryAttachmentRecord,
+  LibraryCatalogItem,
+  LibraryCatalogPage,
+  LibraryCatalogQuery,
+  LibraryCollectionRecord,
+  LibraryCreator,
+  LibraryItemMetadata,
+  LibraryItemRecord,
+  LibraryItemSource,
+  LibraryItemType,
+  LibraryMigrationProgress,
+  LibraryMigrationPreview,
+  LibraryMigrationReport,
+  LibraryMigrationSession,
+  LibraryMigrationStartRequest,
+  LibraryRebuildResult,
+  LibraryRecordClock,
+  LibraryStatus,
+  LibraryVaultLink,
+} from './libraryTypes';
 
 // Testimonios (historia oral). Las REGLAS del dominio — transiciones, normalización de
 // códigos, remapeo de citas, la puerta de acceso — viven en './testimonies' y
@@ -588,6 +612,124 @@ export interface WorkView extends Omit<Work, 'authors_json'> {
   zoteroTags: string[];
   /** How many ideas have been extracted from this work (idea_occurrences count). */
   ideaCount: number;
+}
+
+/** One heading in the clean Markdown reader, linked back to its physical PDF page. */
+export interface LibraryReaderSection {
+  id: string;
+  title: string;
+  level: number;
+  page: number | null;
+}
+
+/** Minimal stable identity accepted by the reader from either the global catalog
+ * or a legacy vault work. It deliberately carries no vault-specific state. */
+export interface LibraryReaderReference {
+  id: string;
+  zoteroKey: string | null;
+  title: string;
+  authors: string[];
+  year: number | null;
+  /** One-shot choice used by explicit “open original/clean” actions. */
+  preferredSource?: 'clean' | 'original';
+}
+
+export type LibraryReaderAttachmentViewer = 'pdf' | 'epub' | 'image' | 'html' | 'text' | 'external';
+
+/** One preserved attachment that can be selected independently from the clean copy. */
+export interface LibraryReaderAttachment {
+  id: string;
+  title: string;
+  fileName: string;
+  mimeType: string;
+  byteSize: number;
+  role: LibraryAttachmentRecord['role'];
+  viewer: LibraryReaderAttachmentViewer;
+  available: boolean;
+  url: string | null;
+  annotationsSupported: boolean;
+  annotationMode: 'text' | 'region' | 'none';
+}
+
+export interface LibraryReaderEpubChapter {
+  id: string;
+  title: string;
+  html: string;
+  text: string;
+}
+
+export interface LibraryReaderAttachmentContent {
+  attachmentId: string;
+  viewer: 'epub' | 'html' | 'text';
+  text: string;
+  html: string | null;
+  chapters: LibraryReaderEpubChapter[];
+}
+
+/**
+ * A durable, clean reading copy stored beside its immutable original.
+ *
+ * Zotero-backed documents keep the Zotero item key as `storageId`; local-only
+ * documents use their Nodus id. The renderer never receives filesystem paths —
+ * opening the original remains a narrowly-scoped main-process operation.
+ */
+export interface LibraryReaderDocument {
+  workId: string;
+  storageId: string;
+  zoteroKey: string | null;
+  citationKey: string | null;
+  title: string;
+  authors: string[];
+  year: number | null;
+  /** Canonical online record discovered from DOI, ISBN, PMID, PMCID, arXiv, or another provider. */
+  sourceUrl: string | null;
+  markdown: string;
+  cleanAvailable: boolean;
+  sections: LibraryReaderSection[];
+  pageCount: number | null;
+  wordCount: number;
+  originalAvailable: boolean;
+  originalFileName: string | null;
+  /** Narrow internal URL served only for this preserved original. */
+  originalUrl: string | null;
+  originalMimeType: string | null;
+  /** Every preserved file, in the same user-defined order shown by the item manager. */
+  attachments: LibraryReaderAttachment[];
+  sourceMapAvailable: boolean;
+  /** Exact provenance of the clean copy currently shown. */
+  contentFingerprint: string | null;
+  extractionFingerprint: string | null;
+  freshness: 'none' | 'queued' | 'running' | 'current' | 'stale' | 'failed' | 'unavailable';
+  generatedAt: string | null;
+  previousReadable: boolean;
+}
+
+/** A document-scoped conversation stored beside the clean Markdown copy. */
+export interface LibraryReaderChatMessage {
+  id: string;
+  role: 'user' | 'assistant';
+  content: string;
+  createdAt: string;
+  error?: boolean;
+}
+
+export interface LibraryReaderChatRequest {
+  documentId: string;
+  /** `clean` or the stable attachment id selected in the reader. */
+  sourceId?: string;
+  messages: LibraryReaderChatMessage[];
+  model?: ModelRef | null;
+}
+
+export interface LibraryReaderChatResponse {
+  answer: string;
+  model: ModelRef;
+}
+
+export interface LibraryReaderChatStreamHandlers {
+  onDelta(delta: string): void;
+  /** Provider reasoning is deliberately transient and is never written to chat.json. */
+  onReasoning?(delta: string): void;
 }
 
 /** One work inside a duplicate group, with enough metadata to choose a canonical. */
@@ -1218,6 +1360,12 @@ export type NodiOrbColorMode = 'auto' | 'manual';
 export type BackupRetentionUnit = 'days' | 'weeks' | 'months' | 'years';
 
 export interface AppSettings {
+  /** Whether the user explicitly enabled the cross-vault catalogue. */
+  libraryGlobalEnabled: boolean;
+  /** Last scope selected after the compatibility-first Library introduction. */
+  libraryScope: import('./libraryTypes').LibraryScope;
+  /** Completed version of the optional global-Library activation contract. */
+  libraryScopeOnboardingVersion: number;
   embeddingProvider: EmbeddingProvider;
   embeddingModel: string;
   // Per-provider key presence (the keys themselves never cross IPC).
@@ -1523,6 +1671,10 @@ export interface AppSettings {
   zoteroPluginPort: number;
   /** Bearer token for the Zotero-plugin API. Intentionally visible in Settings. */
   zoteroPluginToken: string;
+  /** Opt-in Chrome/Chromium connector that captures the active page into the global library. */
+  browserConnectorEnabled: boolean;
+  /** Separate bearer token issued only after the user approves the browser extension pairing. */
+  browserConnectorToken: string;
   /**
    * User-defined order of the sidebar sections, as stable view/action ids. Excludes
    * 'home' (always pinned first) and 'settings' (always pinned last). Empty means
@@ -1852,12 +2004,17 @@ export interface VaultAnalysisReuseWorkResult {
   imported: VaultAnalysisReuseKind[];
   importedRows: number;
   tableRows: Record<string, number>;
+  compatibility: Partial<Record<VaultAnalysisReuseKind, {
+    state: 'reused' | 'pending' | 'incompatible' | 'unavailable' | 'canceled';
+    reason: string;
+  }>>;
 }
 
 export interface VaultAnalysisReuseResult {
   requested: number;
   matched: number;
   imported: number;
+  canceled: boolean;
   works: VaultAnalysisReuseWorkResult[];
 }
 
@@ -3989,6 +4146,9 @@ export interface ZoteroPluginServerStatus {
   port: number | null;
   url: string | null;
   error: string | null;
+  protocolVersion?: number;
+  clientProtocolVersion?: number | null;
+  compatibilityWarning?: string | null;
 }
 
 /** Whether Zotero + its profile are detected, and whether Zotero is running now. */
@@ -4014,6 +4174,14 @@ export interface ZoteroExportResult {
   message?: string;
 }
 
+/** Result of saving the packaged Chrome connector for manual installation. */
+export interface BrowserConnectorExportResult {
+  ok: boolean;
+  path: string | null;
+  canceled: boolean;
+  message?: string;
+}
+
 /** Result of installing/updating the local Word add-in manifest from Settings. */
 export interface CopilotInstallResult {
   ok: boolean;
@@ -4027,6 +4195,12 @@ export interface CopilotOpenIdeaTarget {
   label: string | null;
   /** Word opens full development in Ideas; legacy callers keep the graph destination. */
   destination?: 'ideas' | 'graph';
+}
+
+/** Navigation request emitted by the local Zotero sidebar server. */
+export interface ZoteroPluginOpenTarget {
+  kind: 'library-reader' | 'work' | 'idea' | 'gap' | string;
+  id: string;
 }
 
 /** One typed relation between the edited paragraph and a library entity (Word copilot). */
@@ -4104,6 +4278,9 @@ export interface ZoteroAttachmentInfo {
   linkMode: string | null;
   filename: string | null;
   available: boolean;
+  version?: number;
+  parentItem?: string | null;
+  dateModified?: string | null;
 }
 
 /** Rich bibliographic metadata for one work, read live from Zotero for the detail panel. */
@@ -4141,7 +4318,21 @@ export interface ZoteroItem {
   publisher: string | null;
   publicationTitle: string | null;
   isbn: string | null;
+  issn: string | null;
   url: string | null;
+  date: string | null;
+  language: string | null;
+  volume: string | null;
+  issue: string | null;
+  pages: string | null;
+  edition: string | null;
+  place: string | null;
+  rights: string | null;
+  extra: string | null;
+  /** Primitive Zotero fields not represented by the common Nodus schema. */
+  fields: Record<string, string>;
+  dateAdded: string | null;
+  dateModified: string | null;
 }
 
 /** A raw Zotero creator. `creatorType` distinguishes author/editor/translator/… */
@@ -6138,7 +6329,17 @@ export interface WritingDraftAnnotation {
   comment: string | null;
   createdAt: string;
   updatedAt: string;
+  /** Library-reader annotations are reanchored whenever clean Markdown changes. */
+  anchorStatus?: 'current' | 'orphaned';
+  contentFingerprint?: string | null;
+  orphanReason?: string | null;
+  /** Text selections can identify a PDF page or EPUB chapter; images use a normalized rectangle. */
+  target?: WritingDraftAnnotationTarget;
 }
+
+export type WritingDraftAnnotationTarget =
+  | { type: 'text'; attachmentId: string; page?: number; chapterId?: string }
+  | { type: 'region'; attachmentId: string; x: number; y: number; width: number; height: number };
 
 export interface WritingDraftAnnotationInput {
   draftId: string;
@@ -6151,6 +6352,7 @@ export interface WritingDraftAnnotationInput {
   prefix?: string;
   suffix?: string;
   comment?: string | null;
+  target?: WritingDraftAnnotationTarget;
 }
 
 export interface WritingWorkshopSaveDraftRequest {
@@ -7100,6 +7302,15 @@ export interface NodiChatRequest {
   /** The in-window companion can attach the latest visible view directly. The
    * overlay falls back to the bounded snapshot published by the main renderer. */
   currentView?: NodiViewContext | null;
+  /** Extra grounding contract used by the Library reader. The document itself is
+   * carried in `currentView`; this metadata makes its traced sections citable and
+   * keeps those citations navigable without weakening Nodi's vault citations. */
+  readerGrounding?: {
+    documentId: string;
+    title: string;
+    citationUri: string;
+    sections: Array<{ id: string; title: string; page: number | null }>;
+  };
 }
 
 export interface NodiConversation {
@@ -7657,7 +7868,7 @@ export interface TestimonyExportResult {
 // IPC API surface exposed on window.nodus via the preload bridge.
 // ─────────────────────────────────────────────────────────────────────────────
 
-export interface NodusApi extends ProsopographyApi, TestimoniesApi, ToolkitApi, TeachingApi, DatabasesApi, PrimarySourcesApi, ArchiveApi, WorldbuildingApi, PlatformApi, RecordsApi, AcademicApi {
+export interface NodusApi extends ProsopographyApi, TestimoniesApi, ToolkitApi, TeachingApi, DatabasesApi, PrimarySourcesApi, ArchiveApi, WorldbuildingApi, PlatformApi, RecordsApi, AcademicApi, LibraryApi {
   // settings + secrets
   getSettings(): Promise<AppSettings>;
   updateSettings(patch: Partial<AppSettings>): Promise<AppSettings>;
@@ -7725,7 +7936,8 @@ export interface NodusApi extends ProsopographyApi, TestimoniesApi, ToolkitApi, 
   duplicateVault(id: string, name: string, options?: VaultSwitchOptions): Promise<VaultDuplicateResult>;
   deleteVault(id: string, deleteFiles?: boolean): Promise<void>;
   resetVault(id: string): Promise<VaultSummary>;
-  reuseVaultAnalysis(nodusIds: string[]): Promise<VaultAnalysisReuseResult>;
+  reuseVaultAnalysis(nodusIds: string[], operationId?: string): Promise<VaultAnalysisReuseResult>;
+  cancelVaultAnalysisReuse(operationId: string): Promise<boolean>;
   copyVaultApiKeys(sourceVaultId: string, targetVaultId: string): Promise<{ copiedProviders: AiProvider[] }>;
 
 

@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Jorge Pérez Burgueño and Nodus contributors
+// SPDX-License-Identifier: AGPL-3.0-only
+
 // Package zotero-plugin/ into an installable .xpi and generate the matching
 // Zotero auto-update manifest (updates.json). Single source of truth = the
 // plugin's manifest.json (id, version, strict versions).
@@ -61,6 +64,9 @@ export function buildXpi() {
   const xpiPath = path.join(outDir, xpiName);
   try {
     cpSync(pluginDir, staging, { recursive: true });
+    for (const legalFile of ['LICENSE', 'SOURCE_CODE.md', 'THIRD_PARTY_NOTICES.md']) {
+      cpSync(path.join(repoRoot, legalFile), path.join(staging, legalFile));
+    }
     const runtimeDir = path.join(staging, 'content', 'runtime');
     mkdirSync(runtimeDir, { recursive: true });
     buildSync({
@@ -87,6 +93,9 @@ export function buildXpi() {
       'content/runtime/ort-wasm-simd-threaded.jsep.mjs',
       'content/runtime/ort-wasm-simd-threaded.jsep.wasm',
       'icons/nodus.svg',
+      'LICENSE',
+      'SOURCE_CODE.md',
+      'THIRD_PARTY_NOTICES.md',
     ]) {
       if (!files.some((file) => file.relPath === required)) throw new Error(`missing local embedding runtime: ${required}`);
     }

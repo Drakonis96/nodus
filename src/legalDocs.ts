@@ -465,7 +465,7 @@ const LICENSES: Record<AppLanguage, LegalDocContent> = {
   es: {
     title: 'Licencias y atribuciones',
     intro:
-      'Nodus se publica con licencia MIT. Las licencias, atribuciones y textos exigidos por cada componente, modelo, voz o conjunto de datos de terceros se incluyen con cada versión.',
+      'Nodus se publica exclusivamente con GNU AGPL v3. El código fuente correspondiente y los avisos de terceros se incluyen con cada versión.',
     sections: [
       {
         heading: 'Código abierto',
@@ -476,7 +476,7 @@ const LICENSES: Record<AppLanguage, LegalDocContent> = {
       {
         heading: 'Avisos de terceros',
         bullets: [
-          'Cada aplicación empaquetada incluye un directorio legal con la licencia MIT, el inventario generado completo de las dependencias de producción y los avisos exigidos (ONNX Runtime, sharp/libvips, Electron, Chromium y textos GPL/LGPL y Creative Commons).',
+          'Cada aplicación empaquetada incluye un directorio legal con la licencia AGPL, la oferta de código fuente, el inventario completo de dependencias y los avisos exigidos.',
           'Se incluyen instrucciones para reconstruir o reemplazar los componentes LGPL.',
         ],
       },
@@ -486,7 +486,7 @@ const LICENSES: Record<AppLanguage, LegalDocContent> = {
   en: {
     title: 'Licenses and attributions',
     intro:
-      'Nodus is released under the MIT License. The licenses, attributions and notices required by each third-party component, model, voice or dataset ship with every release.',
+      'Nodus is released exclusively under GNU AGPL v3. The Corresponding Source and third-party notices ship with every release.',
     sections: [
       {
         heading: 'Open source',
@@ -497,7 +497,7 @@ const LICENSES: Record<AppLanguage, LegalDocContent> = {
       {
         heading: 'Third-party notices',
         bullets: [
-          'Each packaged app includes a legal directory with the MIT license, the full generated inventory of production dependencies, and the required upstream notices (ONNX Runtime, sharp/libvips, Electron, Chromium, and GPL/LGPL and Creative Commons texts).',
+          'Each packaged app includes a legal directory with the AGPL license, source-code offer, complete dependency inventory and required upstream notices.',
           'Rebuild or replacement instructions for LGPL components are included.',
         ],
       },
@@ -507,7 +507,7 @@ const LICENSES: Record<AppLanguage, LegalDocContent> = {
   fr: {
     title: 'Licences et attributions',
     intro:
-      "Nodus est publié sous licence MIT. Les licences, attributions et textes exigés par chaque composant, modèle, voix ou jeu de données tiers sont inclus dans chaque version.",
+      "Nodus est publié exclusivement sous GNU AGPL v3. Le code source correspondant et les avis de tiers sont inclus dans chaque version.",
     sections: [
       {
         heading: 'Open source',
@@ -518,7 +518,7 @@ const LICENSES: Record<AppLanguage, LegalDocContent> = {
       {
         heading: 'Avis de tiers',
         bullets: [
-          "Chaque application packagée inclut un répertoire légal avec la licence MIT, l'inventaire généré complet des dépendances de production et les avis requis (ONNX Runtime, sharp/libvips, Electron, Chromium, ainsi que les textes GPL/LGPL et Creative Commons).",
+          "Chaque application packagée inclut un répertoire légal avec la licence AGPL, l'offre de code source, l'inventaire complet des dépendances et les avis requis.",
           'Des instructions pour reconstruire ou remplacer les composants LGPL sont incluses.',
         ],
       },
@@ -528,7 +528,7 @@ const LICENSES: Record<AppLanguage, LegalDocContent> = {
   de: {
     title: 'Lizenzen und Namensnennungen',
     intro:
-      'Nodus wird unter der MIT-Lizenz veröffentlicht. Die Lizenzen, Namensnennungen und geforderten Texte jeder Drittkomponente, jedes Modells, jeder Stimme oder jedes Datensatzes liegen jeder Version bei.',
+      'Nodus wird ausschließlich unter GNU AGPL v3 veröffentlicht. Der entsprechende Quellcode und die Hinweise Dritter liegen jeder Version bei.',
     sections: [
       {
         heading: 'Open Source',
@@ -539,7 +539,7 @@ const LICENSES: Record<AppLanguage, LegalDocContent> = {
       {
         heading: 'Hinweise zu Drittanbietern',
         bullets: [
-          'Jede paketierte App enthält ein Rechtsverzeichnis mit der MIT-Lizenz, dem vollständigen generierten Inventar der Produktionsabhängigkeiten und den erforderlichen Hinweisen (ONNX Runtime, sharp/libvips, Electron, Chromium sowie GPL/LGPL- und Creative-Commons-Texte).',
+          'Jede paketierte App enthält ein Rechtsverzeichnis mit der AGPL-Lizenz, dem Quellcodeangebot, dem vollständigen Abhängigkeitsinventar und den erforderlichen Hinweisen.',
           'Anleitungen zum Neu-Erstellen oder Ersetzen der LGPL-Komponenten sind enthalten.',
         ],
       },
@@ -549,7 +549,7 @@ const LICENSES: Record<AppLanguage, LegalDocContent> = {
   pt: {
     title: 'Licenças e atribuições',
     intro:
-      'O Nodus é publicado sob a licença MIT. As licenças, atribuições e textos exigidos por cada componente, modelo, voz ou conjunto de dados de terceiros são incluídos em cada versão.',
+      'O Nodus é publicado exclusivamente sob GNU AGPL v3. O código-fonte correspondente e os avisos de terceiros são incluídos em cada versão.',
     sections: [
       {
         heading: 'Código aberto',
@@ -560,7 +560,7 @@ const LICENSES: Record<AppLanguage, LegalDocContent> = {
       {
         heading: 'Avisos de terceiros',
         bullets: [
-          'Cada aplicação empacotada inclui um diretório legal com a licença MIT, o inventário gerado completo das dependências de produção e os avisos exigidos (ONNX Runtime, sharp/libvips, Electron, Chromium e textos GPL/LGPL e Creative Commons).',
+          'Cada aplicação empacotada inclui um diretório legal com a licença AGPL, a oferta de código-fonte, o inventário completo de dependências e os avisos exigidos.',
           'São incluídas instruções para reconstruir ou substituir os componentes LGPL.',
         ],
       },
@@ -570,7 +570,7 @@ const LICENSES: Record<AppLanguage, LegalDocContent> = {
   'pt-BR': {
     title: 'Licenças e atribuições',
     intro:
-      'O Nodus é publicado sob a licença MIT. As licenças, atribuições e textos exigidos por cada componente, modelo, voz ou conjunto de dados de terceiros são incluídos em cada versão.',
+      'O Nodus é publicado exclusivamente sob GNU AGPL v3. O código-fonte correspondente e os avisos de terceiros são incluídos em cada versão.',
     sections: [
       {
         heading: 'Código aberto',
@@ -581,7 +581,7 @@ const LICENSES: Record<AppLanguage, LegalDocContent> = {
       {
         heading: 'Avisos de terceiros',
         bullets: [
-          'Cada aplicativo empacotado inclui um diretório legal com a licença MIT, o inventário gerado completo das dependências de produção e os avisos exigidos (ONNX Runtime, sharp/libvips, Electron, Chromium e textos GPL/LGPL e Creative Commons).',
+          'Cada aplicativo empacotado inclui um diretório legal com a licença AGPL, a oferta de código-fonte, o inventário completo de dependências e os avisos exigidos.',
           'São incluídas instruções para reconstruir ou substituir os componentes LGPL.',
         ],
       },
@@ -591,7 +591,7 @@ const LICENSES: Record<AppLanguage, LegalDocContent> = {
   it: {
     title: 'Licenze e attribuzioni',
     intro:
-      'Nodus è pubblicato con licenza MIT. Le licenze, le attribuzioni e i testi richiesti da ogni componente, modello, voce o set di dati di terze parti sono inclusi in ogni versione.',
+      'Nodus è pubblicato esclusivamente con GNU AGPL v3. Il codice sorgente corrispondente e gli avvisi di terze parti sono inclusi in ogni versione.',
     sections: [
       {
         heading: 'Open source',
@@ -602,7 +602,7 @@ const LICENSES: Record<AppLanguage, LegalDocContent> = {
       {
         heading: 'Avvisi di terze parti',
         bullets: [
-          "Ogni app pacchettizzata include una cartella legale con la licenza MIT, l'inventario generato completo delle dipendenze di produzione e gli avvisi richiesti (ONNX Runtime, sharp/libvips, Electron, Chromium e i testi GPL/LGPL e Creative Commons).",
+          "Ogni app pacchettizzata include una cartella legale con la licenza AGPL, l'offerta del codice sorgente, l'inventario completo delle dipendenze e gli avvisi richiesti.",
           'Sono incluse istruzioni per ricostruire o sostituire i componenti LGPL.',
         ],
       },
@@ -612,7 +612,7 @@ const LICENSES: Record<AppLanguage, LegalDocContent> = {
   tr: {
     title: 'Lisanslar ve atıflar',
     intro:
-      'Nodus, MIT Lisansı altında yayınlanmıştır. Her bir üçüncü taraf bileşeni, modeli, sesi veya veri seti için gerekli lisanslar, atıflar ve bildirimler her sürümle birlikte gelir.',
+      'Nodus yalnızca GNU AGPL v3 kapsamında yayımlanır. İlgili kaynak kodu ve üçüncü taraf bildirimleri her sürümle birlikte gelir.',
     sections: [
       {
         heading: 'Açık kaynak',
@@ -623,7 +623,7 @@ const LICENSES: Record<AppLanguage, LegalDocContent> = {
       {
         heading: 'Üçüncü taraf bildirimleri',
         bullets: [
-          'Paketlenen her uygulama; MIT lisansını, üretim bağımlılıklarının tam dökümünü ve gerekli bildirimleri (ONNX Runtime, sharp/libvips, Electron, Chromium, GPL/LGPL ve Creative Commons metinleri) içeren yasal bir dizin barındırır.',
+          'Paketlenen her uygulama AGPL lisansını, kaynak kodu teklifini, eksiksiz bağımlılık dökümünü ve gerekli bildirimleri içeren yasal bir dizin barındırır.',
           'LGPL bileşenlerini yeniden derleme veya değiştirme talimatları dahildir.',
         ],
       },

@@ -1,0 +1,22 @@
+<!-- SPDX-FileCopyrightText: 2026 Jorge Pérez Burgueño and Nodus contributors -->
+<!-- SPDX-License-Identifier: AGPL-3.0-only -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-label="Nodus Connector">
+  <defs>
+    <linearGradient id="bg" x1="18" y1="8" x2="112" y2="122" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#29205f"/>
+      <stop offset="0.55" stop-color="#5b45e8"/>
+      <stop offset="1" stop-color="#8b5cf6"/>
+    </linearGradient>
+    <linearGradient id="mark" x1="34" y1="28" x2="94" y2="100" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#ffffff"/>
+      <stop offset="0.46" stop-color="#ddd6fe"/>
+      <stop offset="1" stop-color="#c4b5fd"/>
+    </linearGradient>
+  </defs>
+  <rect x="5" y="5" width="118" height="118" rx="30" fill="url(#bg)"/>
+  <path d="M36 94V34l56 60V34" fill="none" stroke="url(#mark)" stroke-width="13" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="36" cy="34" r="10" fill="#fff"/>
+  <circle cx="36" cy="94" r="10" fill="#ede9fe"/>
+  <circle cx="92" cy="94" r="10" fill="#ddd6fe"/>
+  <circle cx="92" cy="34" r="10" fill="#c4b5fd"/>
+</svg>

@@ -352,6 +352,37 @@ try {
   await page.reload();
   const whatsNewForExistingUser = page.getByTestId('whats-new-cinematic-modal');
   await whatsNewForExistingUser.waitFor();
+  const releaseOriginalWindow = await app.evaluate(({ BrowserWindow }) => {
+    const win = BrowserWindow.getAllWindows()[0];
+    return win ? { bounds: win.getBounds(), minimumSize: win.getMinimumSize() } : null;
+  });
+  const releaseOriginalClasses = await page.evaluate(() => document.documentElement.className);
+  for (const variant of [
+    { theme: 'dark', name: 'dark-wide', width: 1540, height: 940 },
+    { theme: 'light', name: 'light-narrow', width: 760, height: 900 },
+  ]) {
+    await page.evaluate((theme) => {
+      document.documentElement.classList.toggle('dark', theme === 'dark');
+      document.documentElement.classList.toggle('light', theme === 'light');
+    }, variant.theme);
+    await app.evaluate(({ BrowserWindow }, size) => {
+      const win = BrowserWindow.getAllWindows()[0];
+      if (!win) return;
+      win.setMinimumSize(640, 480);
+      win.setBounds({ width: size.width, height: size.height });
+    }, variant);
+    await page.waitForTimeout(250);
+    await page.screenshot({ path: path.join(os.tmpdir(), `nodus-v4-release-notes-${variant.name}.png`), fullPage: true });
+    const action = await whatsNewForExistingUser.getByRole('button', { name: 'Explorar las novedades', exact: true }).boundingBox();
+    assert.ok(action && action.height >= 32 && action.y + action.height <= (await page.evaluate(() => window.innerHeight)) + 1, `v4 release action remains visible in ${variant.name}`);
+  }
+  await app.evaluate(({ BrowserWindow }, original) => {
+    const win = BrowserWindow.getAllWindows()[0];
+    if (!win || !original) return;
+    win.setMinimumSize(original.minimumSize[0], original.minimumSize[1]);
+    win.setBounds(original.bounds);
+  }, releaseOriginalWindow);
+  await page.evaluate((className) => { document.documentElement.className = className; }, releaseOriginalClasses);
   await whatsNewForExistingUser.getByRole('button', { name: 'Explorar las novedades', exact: true }).click();
 
   // First behind release notes sat the look at the mobile app, and it was a 3.2.4
@@ -706,6 +737,42 @@ try {
   console.log('[e2e] image provider settings rendered');
   await page.getByRole('button', { name: 'Acerca de Nodus', exact: true }).click();
   await page.getByTestId('about-privacy').waitFor();
+  const sourceCodeButton = page.getByTestId('source-code');
+  await sourceCodeButton.waitFor();
+  assert.match(await page.getByTestId('about-third-party-licenses').innerText(), /GNU AGPL v3/);
+  assert.match(await sourceCodeButton.innerText(), /Código fuente de esta versión/);
+  const originalAboutWindow = await app.evaluate(({ BrowserWindow }) => {
+    const win = BrowserWindow.getAllWindows()[0];
+    return win ? { bounds: win.getBounds(), minimumSize: win.getMinimumSize() } : null;
+  });
+  const originalRootClasses = await page.evaluate(() => document.documentElement.className);
+  for (const theme of ['dark', 'light']) {
+    await page.evaluate((selectedTheme) => {
+      document.documentElement.classList.toggle('dark', selectedTheme === 'dark');
+      document.documentElement.classList.toggle('light', selectedTheme === 'light');
+    }, theme);
+    for (const viewport of [{ name: 'wide', width: 1540, height: 940 }, { name: 'narrow', width: 760, height: 900 }]) {
+      await app.evaluate(({ BrowserWindow }, size) => {
+        const win = BrowserWindow.getAllWindows()[0];
+        if (!win) return;
+        win.setMinimumSize(640, 480);
+        win.setBounds({ width: size.width, height: size.height });
+      }, viewport);
+      await page.waitForTimeout(250);
+      await sourceCodeButton.scrollIntoViewIfNeeded();
+      await page.screenshot({ path: path.join(os.tmpdir(), `nodus-about-license-${theme}-${viewport.name}.png`), fullPage: true });
+      const box = await sourceCodeButton.boundingBox();
+      assert.ok(box && box.width >= 180 && box.height >= 32, `source offer remains usable in ${theme} ${viewport.name}`);
+    }
+  }
+  await app.evaluate(({ BrowserWindow }, original) => {
+    const win = BrowserWindow.getAllWindows()[0];
+    if (!win || !original) return;
+    win.setMinimumSize(original.minimumSize[0], original.minimumSize[1]);
+    win.setBounds(original.bounds);
+  }, originalAboutWindow);
+  await page.evaluate((className) => { document.documentElement.className = className; }, originalRootClasses);
+  await page.waitForTimeout(250);
   assert.equal(await page.getByTestId('about-updates').count(), 0, 'Updates moved out of About Nodus into its own section');
   // The privacy card opens a localized in-app modal instead of launching an external markdown file.
   await page.getByTestId('open-privacy-policy').click();

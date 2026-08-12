@@ -10,6 +10,7 @@ import { ocrPdfPages, ocrImageFile } from './ocr';
 import { csvFileToText, xlsxFileToText } from './tabular';
 import { getExtractionCache, upsertExtractionCache } from '../db/extractionCacheRepo';
 import { perfLog, startPerf, type PerfContext } from '../perf';
+import { getLibraryReaderRawContent } from '../libraryReader/libraryReaderStore';
 
 export interface ExtractedDoc {
   text: string;
@@ -226,9 +227,9 @@ export async function extractPdfStreaming(
       const map = await ocrPdfPages(pdf, toOcr, opts.ocr.languages, ({ page, totalPages }) =>
         opts.onProgress?.({ phase: 'ocr', detail: `OCR p. ${page}/${totalPages}`, pct: page / totalPages })
       );
-      for (const [p, t] of map) {
-        if (t && t.length >= MIN_CHARS_TEXT_PAGE) {
-          pageTexts.set(p, t);
+      for (const [p, result] of map) {
+        if (result.text && result.text.length >= MIN_CHARS_TEXT_PAGE) {
+          pageTexts.set(p, result.text);
           ocredPages++;
         }
       }
@@ -656,6 +657,22 @@ export async function resolveWorkText(
   opts: ResolveOptions,
   itemType?: string | null
 ): Promise<ExtractedDoc> {
+  // A work linked from the transverse Library has a curated Markdown copy. It is
+  // the canonical analysis source: deterministic, OCR-clean and independent of
+  // whether Zotero is running or its attachment index has settled yet.
+  try {
+    const clean = getLibraryReaderRawContent(zoteroKey);
+    if (clean?.markdown.trim()) {
+      return {
+        text: clean.markdown,
+        sourceType: 'markdown',
+        notes: 'Versión limpia de la Biblioteca global.',
+        hadTextAttachment: clean.document.originalAvailable,
+      };
+    }
+  } catch {
+    // The backup folder may be unconfigured in headless/first-run contexts.
+  }
   // Fall back to the standard Zotero storage location when the user left it blank,
   // so deep scans can still find local PDFs instead of degrading to abstract-only.
   const effectiveStorage = storagePath || defaultZoteroStorage();

@@ -1,4 +1,5 @@
 import type { CorpusHealthBucketId, ResearchContextSelection } from '@shared/types';
+import type { LibraryScope } from '@shared/libraryTypes';
 import { type VaultType, normalizeVaultType } from '@shared/vaultTypes';
 
 export type View = 'home' | 'search' | 'testimonyInterviews' | 'testimonyParticipants' | 'testimonyContrasts' | 'library' | 'graph' | 'argument' | 'ideas' | 'authors' | 'persons' | 'prosopSearch' | 'prosopPopulation' | 'prosopPersons' | 'prosopSources' | 'prosopAnalysis' | 'prosopNetworks' | 'encyclopedia' | 'continuity' | 'conflicts' | 'arcs' | 'rules' | 'questions' | 'worldChat' | 'manuscript' | 'characters' | 'places' | 'factions' | 'cultures' | 'dynasties' | 'scenes' | 'timeline' | 'tree' | 'relations' | 'map' | 'archive' | 'databases' | 'dbSearch' | 'dbAnalysis' | 'dbChat' | 'studyCourses' | 'studySchedule' | 'studyCalendar' | 'studySearch' | 'studyLibrary' | 'studyRecordings' | 'studyChat' | 'studyIdeas' | 'studyGraph' | 'studyQuestions' | 'studyReview' | 'studyDeepResearch' | 'teachingGroups' | 'teachingGrades' | 'teachingExams' | 'teachingRubrics' | 'teachingUnits' | 'immersion' | 'gaps' | 'debate' | 'research' | 'hypothesis' | 'reading' | 'writing' | 'deepResearch' | 'projects' | 'notes' | 'toolkit' | 'settings';
@@ -350,7 +351,11 @@ export interface AssistantNavigationTarget {
 /** Navigation into the Library that pre-applies a filter (e.g. a corpus-health bucket). */
 export interface LibraryNavigationTarget {
   nonce: number;
+  /** Explicit scope for contextual entry points; ordinary navigation remembers the user's last scope. */
+  scope?: LibraryScope;
   healthBucket?: CorpusHealthBucketId;
+  /** Open a transverse Library item, entering its clean reader when available. */
+  readerItemId?: string;
 }
 
 /** Navigation into Ideas that opens the complete detail panel for one idea. */

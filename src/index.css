@@ -5,6 +5,31 @@
 @tailwind components;
 @tailwind utilities;
 
+/* PDF.js keeps the selectable text exactly over the rendered page. The glyphs
+   stay transparent; browser selection and Nodus highlights remain visible. */
+.pdf-annotation-page .textLayer {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  line-height: 1;
+  text-align: initial;
+  text-size-adjust: none;
+  transform-origin: 0 0;
+  forced-color-adjust: none;
+  z-index: 2;
+}
+.pdf-annotation-page .textLayer :is(span, br) {
+  position: absolute;
+  color: transparent;
+  white-space: pre;
+  cursor: text;
+  transform-origin: 0 0;
+}
+.pdf-annotation-page .textLayer ::selection { background: rgb(99 102 241 / .35); }
+.library-attachment-text img { max-width: 100%; height: auto; }
+.library-attachment-text table { width: 100%; border-collapse: collapse; }
+.library-attachment-text :is(th, td) { border: 1px solid rgb(115 115 115 / .35); padding: .45rem .6rem; }
+
 /* The top bar is a window drag region (so the frameless/hiddenInset window can be
    moved by its empty areas), while every interactive child stays clickable. */
 .app-titlebar {
@@ -340,6 +365,9 @@ body {
 .light .border-neutral-900 {
   border-color: #d4d4d4;
 }
+.light .hover\:border-neutral-700:hover {
+  border-color: #a3a3a3;
+}
 .light .border-cyan-900,
 .light .border-cyan-900\/70 {
   border-color: #67e8f9;
@@ -358,11 +386,15 @@ body {
   background-color: #f8fafc;
 }
 .light .bg-neutral-950\/25,
+.light .bg-neutral-950\/30,
 .light .bg-neutral-950\/35,
 .light .bg-neutral-950\/40,
+.light .bg-neutral-950\/45,
 .light .bg-neutral-950\/50,
+.light .bg-neutral-950\/55,
 .light .bg-neutral-950\/60,
-.light .bg-neutral-950\/70 {
+.light .bg-neutral-950\/70,
+.light .bg-neutral-950\/80 {
   background-color: rgba(248, 250, 252, 0.86);
 }
 .light .bg-neutral-900,
@@ -370,7 +402,8 @@ body {
 .light .bg-neutral-900\/90,
 .light .bg-neutral-900\/80,
 .light .bg-neutral-900\/55,
-.light .bg-neutral-900\/60 {
+.light .bg-neutral-900\/60,
+.light .bg-neutral-900\/70 {
   background-color: rgba(255, 255, 255, 0.96);
 }
 .light .bg-neutral-900\/50,
@@ -445,6 +478,7 @@ body {
 }
 .light .bg-indigo-950\/35,
 .light .bg-indigo-950\/40,
+.light .bg-indigo-950\/45,
 .light .bg-indigo-950\/25,
 .light .bg-indigo-950\/20 {
   background-color: #e0e7ff;
@@ -490,6 +524,7 @@ body {
 .light .border-red-700\/60 {
   border-color: #fca5a5;
 }
+.light .border-amber-700\/50,
 .light .border-amber-700\/60 {
   border-color: #fcd34d;
 }
@@ -506,6 +541,7 @@ body {
 .light .hover\:bg-neutral-900\/30:hover,
 .light .hover\:bg-neutral-900\/40:hover,
 .light .hover\:bg-neutral-900\/50:hover,
+.light .hover\:bg-neutral-900\/55:hover,
 .light .hover\:bg-neutral-900\/60:hover,
 .light .hover\:bg-neutral-900\/70:hover,
 .light .hover\:bg-neutral-900\/80:hover {
@@ -521,6 +557,7 @@ body {
 .light .hover\:bg-neutral-700:hover {
   background-color: #d4d4d4;
 }
+.light .hover\:bg-red-950:hover,
 .light .hover\:bg-red-950\/50:hover {
   background-color: #fee2e2;
 }
@@ -581,6 +618,10 @@ body {
   background-color: #ffffff;
   border-color: #d4d4d4;
   box-shadow: 0 20px 40px rgba(15, 23, 42, 0.14);
+}
+.light .library-vault-filter-panel {
+  background-color: #fafafa;
+  border-color: #e5e5e5;
 }
 .light .zotero-tag-option.is-selected {
   background-color: #eef2ff;
@@ -713,8 +754,28 @@ body {
 .light .bg-amber-950\/10 {
   background-color: #fffbeb;
 }
-.light .bg-amber-950\/20 {
+.light .bg-amber-950\/20,
+.light .bg-amber-950\/25,
+.light .bg-amber-950\/35 {
   background-color: #fef3c7;
+}
+.light .bg-emerald-950\/30 {
+  background-color: #ecfdf5;
+}
+.light .bg-indigo-950 {
+  background-color: #eef2ff;
+}
+.light .border-neutral-800\/80 {
+  border-color: #d4d4d4;
+}
+.light .border-amber-800\/35,
+.light .border-amber-800\/40,
+.light .border-amber-800\/50,
+.light .border-amber-800\/70 {
+  border-color: rgba(217, 119, 6, 0.35);
+}
+.light .border-emerald-900\/70 {
+  border-color: rgba(5, 150, 105, 0.35);
 }
 .light .border-amber-900\/50,
 .light .border-amber-900\/60 {
@@ -2861,6 +2922,604 @@ select.input optgroup {
   margin: 0.9em 0;
 }
 
+/* Clean-library reader: the document remains Markdown, but it should feel like a
+   quiet reading surface rather than another dashboard card. The outline and note
+   rails carry navigation; the paper carries only the source. */
+.library-theme {
+  color-scheme: dark;
+}
+.light .library-theme,
+.light .library-theme-canvas,
+.light .library-theme-bar {
+  background: #fafafa;
+  color: #171717;
+  color-scheme: light;
+}
+.light .library-theme-panel {
+  border-color: #e5e7eb;
+  background: #ffffff;
+}
+.library-workspace-tabs {
+  height: 2.25rem;
+  border-bottom: 1px solid #262626;
+  background: rgb(10 10 10 / 0.96);
+  padding: 0.25rem 0.5rem;
+}
+.library-workspace-tabs-scroll {
+  display: flex;
+  height: 1.75rem;
+  min-width: 0;
+  align-items: stretch;
+  gap: 0.25rem;
+  overflow-x: auto;
+  overflow-y: hidden;
+  overscroll-behavior-inline: contain;
+  scrollbar-width: none;
+}
+.library-workspace-tabs-scroll::-webkit-scrollbar {
+  display: none;
+}
+.library-workspace-tab {
+  display: flex;
+  min-width: 7rem;
+  max-width: 13.5rem;
+  flex: 0 1 13.5rem;
+  align-items: center;
+  border: 1px solid transparent;
+  border-radius: 0.45rem;
+  color: #a3a3a3;
+}
+.library-workspace-tab.is-library {
+  min-width: auto;
+  flex-basis: auto;
+}
+.library-workspace-tab:hover {
+  background: #171717;
+  color: #e5e5e5;
+}
+.library-workspace-tab.is-active {
+  border-color: #404040;
+  background: #262626;
+  color: #f5f5f5;
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.24);
+}
+.library-workspace-tab-main {
+  display: flex;
+  min-width: 0;
+  height: 100%;
+  flex: 1;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0 0.55rem;
+  text-align: left;
+  font-size: 0.6875rem;
+}
+.library-workspace-tab-close {
+  display: grid;
+  width: 1.5rem;
+  height: 1.5rem;
+  flex: 0 0 auto;
+  place-items: center;
+  border-radius: 0.35rem;
+  color: #737373;
+  opacity: 0;
+}
+.library-workspace-tab:hover .library-workspace-tab-close,
+.library-workspace-tab.is-active .library-workspace-tab-close,
+.library-workspace-tab-close:focus-visible {
+  opacity: 1;
+}
+.library-workspace-tab-close:hover {
+  background: #404040;
+  color: #f5f5f5;
+}
+.light .library-workspace-tabs {
+  border-color: #d4d4d4;
+  background: rgb(250 250 250 / 0.97);
+}
+.light .library-workspace-tab {
+  color: #737373;
+}
+.light .library-workspace-tab:hover {
+  background: #f5f5f5;
+  color: #262626;
+}
+.light .library-workspace-tab.is-active {
+  border-color: #d4d4d4;
+  background: #ffffff;
+  color: #171717;
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.08);
+}
+.light .library-workspace-tab-close {
+  color: #a3a3a3;
+}
+.light .library-workspace-tab-close:hover {
+  background: #e5e5e5;
+  color: #171717;
+}
+.library-header-bar {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  column-gap: 0.75rem;
+}
+.library-header-title {
+  grid-column: 1;
+  justify-self: start;
+}
+.library-header-bar > .library-scope-switcher {
+  grid-column: 2;
+  justify-self: center;
+}
+.library-header-actions {
+  grid-column: 3;
+  display: flex;
+  min-width: 0;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  justify-self: end;
+  gap: 0.75rem;
+}
+@media (max-width: 1100px) {
+  .library-header-bar {
+    grid-template-columns: minmax(0, 1fr) auto;
+    row-gap: 0.625rem;
+  }
+  .library-header-bar > .library-scope-switcher {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+  .library-header-actions {
+    grid-column: 2;
+    grid-row: 1;
+  }
+}
+.library-scope-switcher {
+  position: relative;
+  z-index: 40;
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 0.125rem;
+  width: max-content;
+  border: 1px solid #404040;
+  border-radius: 0.625rem;
+  padding: 0.125rem;
+  background: rgb(38 38 38 / 0.72);
+}
+.library-scope-option {
+  position: relative;
+  display: inline-flex;
+}
+.library-scope-button {
+  display: inline-flex;
+  min-height: 1.875rem;
+  align-items: center;
+  justify-content: center;
+  gap: 0.375rem;
+  border-radius: 0.45rem;
+  padding: 0.35rem 0.7rem;
+  color: #a3a3a3;
+  font-size: 0.75rem;
+  font-weight: 500;
+  line-height: 1rem;
+  white-space: nowrap;
+  transition: background-color 140ms ease, color 140ms ease, box-shadow 140ms ease;
+}
+.library-scope-button:hover:not(:disabled),
+.library-scope-button:focus-visible {
+  color: #f5f5f5;
+  background: rgb(64 64 64 / 0.7);
+}
+.library-scope-button:focus-visible {
+  outline: 2px solid #818cf8;
+  outline-offset: 1px;
+}
+.library-scope-button.is-active {
+  color: #ffffff;
+  background: #4f46e5;
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.24);
+}
+.library-scope-button:disabled { cursor: wait; opacity: 0.65; }
+.library-scope-tooltip {
+  pointer-events: none;
+  position: absolute;
+  top: calc(100% + 0.5rem);
+  left: 50%;
+  z-index: 60;
+  visibility: hidden;
+  width: max-content;
+  max-width: min(20rem, calc(100vw - 2rem));
+  transform: translate(-50%, -0.2rem);
+  border: 1px solid #404040;
+  border-radius: 0.5rem;
+  padding: 0.45rem 0.6rem;
+  background: #171717;
+  color: #e5e5e5;
+  box-shadow: 0 10px 28px rgb(0 0 0 / 0.34);
+  font-size: 0.6875rem;
+  font-weight: 400;
+  line-height: 1rem;
+  white-space: normal;
+  opacity: 0;
+  transition: opacity 120ms ease, transform 120ms ease, visibility 120ms;
+}
+.library-scope-option:hover .library-scope-tooltip,
+.library-scope-option:focus-within .library-scope-tooltip {
+  visibility: visible;
+  transform: translate(-50%, 0);
+  opacity: 1;
+}
+.light .library-scope-switcher {
+  border-color: #d4d4d4;
+  background: #ffffff;
+}
+.light .library-scope-button { color: #525252; }
+.light .library-scope-button:hover:not(:disabled),
+.light .library-scope-button:focus-visible {
+  color: #171717;
+  background: #f5f5f5;
+}
+.light .library-scope-button.is-active {
+  color: #ffffff;
+  background: #4f46e5;
+}
+.light .library-scope-tooltip {
+  border-color: #d4d4d4;
+  background: #ffffff;
+  color: #262626;
+  box-shadow: 0 10px 28px rgb(15 23 42 / 0.16);
+}
+.library-trash-folder {
+  border: 1px solid transparent;
+  color: #fca5a5;
+}
+.library-trash-folder:hover {
+  border-color: rgb(248 113 113 / 0.24);
+  background: rgb(127 29 29 / 0.2);
+  color: #fecaca;
+}
+.library-trash-folder.is-active {
+  border-color: rgb(248 113 113 / 0.38);
+  background: rgb(127 29 29 / 0.32);
+  color: #fee2e2;
+}
+.library-trash-folder-count { background: rgb(239 68 68 / 0.16); color: inherit; }
+.light .library-trash-folder { color: #b91c1c; }
+.light .library-trash-folder:hover {
+  border-color: #fecaca;
+  background: #fff1f2;
+  color: #991b1b;
+}
+.light .library-trash-folder.is-active {
+  border-color: #fca5a5;
+  background: #fee2e2;
+  color: #991b1b;
+}
+.light .library-trash-folder-count { background: #fecaca; }
+.library-catalog-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: rgb(82 82 91 / 0.72) transparent;
+  overscroll-behavior-x: contain;
+}
+.library-catalog-scroll::-webkit-scrollbar { height: 4px; }
+.library-catalog-scroll::-webkit-scrollbar-track { background: transparent; }
+.library-catalog-scroll::-webkit-scrollbar-thumb {
+  border-radius: 9999px;
+  background: rgb(82 82 91 / 0.72);
+}
+.library-catalog-scroll:hover::-webkit-scrollbar-thumb { background: rgb(113 113 122 / 0.9); }
+.light .library-catalog-scroll { scrollbar-color: rgb(161 161 170 / 0.72) transparent; }
+.light .library-catalog-scroll::-webkit-scrollbar-thumb { background: rgb(161 161 170 / 0.72); }
+.light .library-catalog-scroll:hover::-webkit-scrollbar-thumb { background: rgb(113 113 122 / 0.78); }
+.library-action-menu-item {
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  align-items: center;
+  gap: 0.625rem;
+  border-radius: 0.625rem;
+  padding: 0.625rem 0.7rem;
+  color: #d4d4d4;
+  text-align: left;
+}
+.library-action-menu-item:hover,
+.library-action-menu-item:focus-visible {
+  background: #262626;
+  color: #ffffff;
+  outline: none;
+}
+.library-action-menu-item > svg { flex: 0 0 auto; width: 0.95rem; height: 0.95rem; }
+.library-action-menu-item > span { display: grid; min-width: 0; flex: 1; gap: 0.15rem; }
+.library-action-menu-item b { overflow: hidden; font-size: 0.75rem; font-weight: 500; text-overflow: ellipsis; white-space: nowrap; }
+.library-action-menu-item small { overflow: hidden; color: #737373; font-size: 0.625rem; line-height: 0.9rem; text-overflow: ellipsis; white-space: nowrap; }
+.light .library-action-menu {
+  border-color: #d4d4d4;
+  background: #ffffff;
+  box-shadow: 0 16px 38px rgb(15 23 42 / 0.16);
+}
+.light .library-action-menu-item { color: #404040; }
+.light .library-action-menu-item:hover,
+.light .library-action-menu-item:focus-visible { background: #f5f5f5; color: #171717; }
+.light .library-action-menu-item small { color: #737373; }
+.library-action-menu-item.text-red-400 { color: #f87171; }
+.light .library-action-menu-item.text-red-400 { color: #b91c1c; }
+.light .library-theme .bg-neutral-950\/25,
+.light .library-theme .bg-neutral-950\/30,
+.light .library-theme .bg-neutral-950\/35,
+.light .library-theme .bg-neutral-950\/40,
+.light .library-theme .bg-neutral-950\/45,
+.light .library-theme .bg-neutral-950\/50,
+.light .library-theme .bg-neutral-950\/55,
+.light .library-theme .bg-neutral-950\/60,
+.light .library-theme .bg-neutral-950\/70,
+.light .library-theme .bg-neutral-950\/80 {
+  background-color: rgba(255, 255, 255, 0.94);
+}
+.light .library-theme .bg-neutral-900,
+.light .library-theme .bg-neutral-900\/40,
+.light .library-theme .bg-neutral-900\/50,
+.light .library-theme .bg-neutral-900\/55,
+.light .library-theme .bg-neutral-900\/60,
+.light .library-theme .bg-neutral-900\/70 {
+  background-color: #ffffff;
+}
+.light .library-theme .text-indigo-100 {
+  color: #3730a3;
+}
+.light .library-reader-empty-card {
+  border-color: #d4d4d4;
+  background: #ffffff;
+  box-shadow: 0 18px 50px -38px rgb(15 23 42 / 0.35);
+}
+.light .library-reader-empty-icon {
+  background: #eef2ff;
+  color: #4f46e5;
+}
+.library-reader-clean-surface {
+  background: #09090b;
+  color-scheme: dark;
+}
+.library-reader-paper {
+  background: #111114;
+  color: rgb(228 228 231);
+  color-scheme: dark;
+}
+.library-reader-document .md {
+  color: rgb(212 212 216);
+  font-family: ui-serif, Georgia, Cambria, "Times New Roman", serif;
+  text-wrap: pretty;
+}
+.library-reader-document .md h1,
+.library-reader-document .md h2,
+.library-reader-document .md h3,
+.library-reader-document .md h4,
+.library-reader-document .md h5,
+.library-reader-document .md h6 {
+  scroll-margin-top: 6rem;
+  color: rgb(244 244 245);
+  font-family: ui-sans-serif, system-ui, sans-serif;
+  letter-spacing: -0.012em;
+}
+.library-reader-document .md h1 {
+  margin-bottom: 0.7em;
+  font-size: clamp(1.75rem, 3vw, 2.35rem);
+  line-height: 1.12;
+  letter-spacing: -0.035em;
+}
+.library-reader-document .md h2 {
+  margin-top: 2.4em;
+  padding-top: 0.9em;
+  border-top: 1px solid rgb(63 63 70 / 0.62);
+  font-size: 1.38em;
+}
+.library-reader-document .md h3 { margin-top: 1.8em; font-size: 1.17em; }
+.library-reader-document .md p {
+  margin: 1.05em 0;
+  overflow-wrap: anywhere;
+  text-align: justify;
+  text-align-last: start;
+  text-indent: 1.5em;
+  hyphens: auto;
+}
+.library-reader-document .md :is(li, td, th, blockquote) p,
+.library-reader-document .md p:has(> img),
+.library-reader-document .md [data-footnotes] p { text-indent: 0; }
+.library-reader-document .md p:has(> img) { text-align: center; }
+.library-reader-document .md blockquote {
+  margin: 1.4em 2em;
+  padding: 0.65em 1.25em;
+  border-left-color: rgb(129 140 248 / 0.75);
+  background: rgb(49 46 129 / 0.12);
+}
+.library-reader-document .md blockquote p { margin: 0; }
+.library-reader-document .md sup a[data-footnote-ref],
+.library-reader-document .md a[href^="#nodus-reference-"] {
+  border-radius: 0.25em;
+  color: rgb(165 180 252);
+  font-family: ui-sans-serif, system-ui, sans-serif;
+  font-weight: 650;
+  text-decoration: none;
+}
+.library-reader-document .md sup a[data-footnote-ref]:hover,
+.library-reader-document .md a[href^="#nodus-reference-"]:hover { background: rgb(79 70 229 / 0.22); color: rgb(199 210 254); }
+.library-reader-document .md [data-footnotes] {
+  margin-top: 3rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid rgb(63 63 70 / 0.62);
+  font-size: 0.86em;
+}
+.library-reader-document .md [data-footnotes] ol { padding-left: 1.5rem; }
+.library-reader-document .md [data-footnote-backref] { margin-left: 0.35em; }
+.library-reader-document .md p[id^="nodus-reference-"] {
+  scroll-margin-top: 6rem;
+  padding-left: 1.7em;
+  text-indent: -1.7em;
+}
+.library-reader-document .md img {
+  display: block;
+  width: auto;
+  max-width: 100%;
+  max-height: 72vh;
+  margin: 1.75rem auto;
+  border-radius: 0.8rem;
+  background: white;
+  box-shadow: 0 18px 50px -30px rgb(0 0 0 / 0.9);
+}
+.library-reader-document .md table {
+  display: block;
+  width: 100%;
+  margin: 1.5em 0;
+  overflow-x: auto;
+  border-collapse: collapse;
+  font-family: ui-sans-serif, system-ui, sans-serif;
+  font-size: 0.82em;
+}
+.library-reader-document .md th { background: rgb(39 39 42 / 0.72); color: rgb(228 228 231); }
+.library-reader-document .md th,
+.library-reader-document .md td { padding: 0.58em 0.72em; }
+.library-reader-document .md > p:last-of-type { margin-bottom: 1.2em; }
+.library-reader-outline,
+.library-reader-notes { scrollbar-width: thin; scrollbar-color: rgb(63 63 70) transparent; }
+.library-reader-outline-close { color: #52525b; }
+.library-reader-outline-close:hover,
+.library-reader-outline-close:focus-visible { background: #18181b; color: #d4d4d8; }
+.library-reader-outline-section { color: #71717a; }
+.library-reader-outline-section:hover,
+.library-reader-outline-section:focus-within { background: #18181b; color: #e4e4e7; }
+.library-reader-outline-section.is-active { background: rgb(49 46 129 / 0.45); color: #c7d2fe; }
+.library-reader-outline-page { color: #52525b; }
+.library-reader-outline-section:hover .library-reader-outline-page,
+.library-reader-outline-section:focus-within .library-reader-outline-page { opacity: 1; color: #a1a1aa; }
+.library-reader-outline-page:hover,
+.library-reader-outline-page:focus-visible { background: #27272a; color: #a5b4fc !important; }
+.light .library-reader-outline-close,
+.light .library-theme .library-reader-outline-close { color: #52525b; }
+.light .library-reader-outline-close:hover,
+.light .library-reader-outline-close:focus-visible,
+.light .library-theme .library-reader-outline-close:hover,
+.light .library-theme .library-reader-outline-close:focus-visible { background: #f4f4f5; color: #27272a; }
+.light .library-reader-outline-section,
+.light .library-theme .library-reader-outline-section { color: #52525b; }
+.light .library-reader-outline-section:hover,
+.light .library-reader-outline-section:focus-within,
+.light .library-theme .library-reader-outline-section:hover,
+.light .library-theme .library-reader-outline-section:focus-within { background: #f4f4f5; color: #27272a; }
+.light .library-reader-outline-section.is-active,
+.light .library-theme .library-reader-outline-section.is-active { background: #e0e7ff; color: #4338ca; }
+.light .library-reader-outline-page,
+.light .library-theme .library-reader-outline-page { color: #64748b; }
+.light .library-reader-outline-section:hover .library-reader-outline-page,
+.light .library-reader-outline-section:focus-within .library-reader-outline-page,
+.light .library-theme .library-reader-outline-section:hover .library-reader-outline-page,
+.light .library-theme .library-reader-outline-section:focus-within .library-reader-outline-page { color: #52525b; }
+.light .library-reader-outline-page:hover,
+.light .library-reader-outline-page:focus-visible,
+.light .library-theme .library-reader-outline-page:hover,
+.light .library-theme .library-reader-outline-page:focus-visible { background: #e5e7eb; color: #4338ca !important; }
+@media (max-width: 1279px) {
+  .library-reader-outline,
+  .library-reader-notes { background-color: #09090b; }
+  .light .library-reader-outline,
+  .light .library-reader-notes,
+  .light .library-theme .library-reader-outline,
+  .light .library-theme .library-reader-notes { background-color: #ffffff; }
+}
+
+/* Source status and file selection are semantic reader controls. Keeping their
+   palettes here prevents generic dark utility classes from leaking into the
+   light reader when an original or preserved attachment is active. */
+.library-reader-source-badge.is-original {
+  border-color: #52525b;
+  background: #18181b;
+  color: #d4d4d8;
+}
+.library-reader-source-badge.is-attachment {
+  border-color: #4338ca;
+  background: rgb(49 46 129 / 0.45);
+  color: #c7d2fe;
+}
+.library-reader-source-badge.is-current {
+  border-color: rgb(6 95 70 / 0.7);
+  background: rgb(2 44 34 / 0.3);
+  color: #6ee7b7;
+}
+.library-reader-source-badge.is-previous {
+  border-color: rgb(146 64 14 / 0.7);
+  background: rgb(69 26 3 / 0.35);
+  color: #fcd34d;
+}
+.library-reader-file-option { color: #71717a; }
+.library-reader-file-option:hover { background: #18181b; color: #e4e4e7; }
+.library-reader-file-option.is-active { background: rgb(49 46 129 / 0.45); color: #c7d2fe; }
+.library-reader-file-kind { color: #52525b; }
+
+.light .library-reader-paper {
+  border-color: rgb(226 232 240);
+  background: rgb(255 255 255 / 0.88);
+  box-shadow: 0 24px 70px -45px rgb(15 23 42 / 0.38);
+  color: #334155;
+  color-scheme: light;
+}
+.light .library-reader-clean-surface { background: #f4f4f5; color-scheme: light; }
+.light .library-reader-document .md { color: #334155; }
+.light .library-reader-document .md h1,
+.light .library-reader-document .md h2,
+.light .library-reader-document .md h3,
+.light .library-reader-document .md h4,
+.light .library-reader-document .md h5,
+.light .library-reader-document .md h6 { color: #0f172a; }
+.light .library-reader-document .md h2 { border-top-color: rgb(226 232 240); }
+.light .library-reader-document .md blockquote { background: rgb(238 242 255 / 0.7); }
+.light .library-reader-document .md sup a[data-footnote-ref],
+.light .library-reader-document .md a[href^="#nodus-reference-"] { color: #4338ca; }
+.light .library-reader-document .md sup a[data-footnote-ref]:hover,
+.light .library-reader-document .md a[href^="#nodus-reference-"]:hover { background: #eef2ff; color: #312e81; }
+.light .library-reader-document .md [data-footnotes] { border-top-color: #e2e8f0; }
+.light .library-reader-document .md th { background: #f1f5f9; color: #1e293b; }
+.light .library-reader-source-badge.is-original {
+  border-color: #d4d4d8;
+  background: #ffffff;
+  color: #52525b;
+}
+.light .library-reader-source-badge.is-attachment {
+  border-color: #c7d2fe;
+  background: #eef2ff;
+  color: #4338ca;
+}
+.light .library-reader-source-badge.is-current {
+  border-color: #a7f3d0;
+  background: #ecfdf5;
+  color: #047857;
+}
+.light .library-reader-source-badge.is-previous {
+  border-color: #fde68a;
+  background: #fffbeb;
+  color: #b45309;
+}
+.light .library-reader-file-option { color: #52525b; }
+.light .library-reader-file-option:hover { background: #f4f4f5; color: #27272a; }
+.light .library-reader-file-option.is-active { background: #eef2ff; color: #4338ca; }
+.light .library-reader-file-kind { color: #737373; }
+.light .library-reader-file-option.is-active .library-reader-file-kind { color: #6366f1; }
+
+/* The reader has its own fully grounded chat. Keeping the floating mascot out of
+   this one surface prevents it from covering the compact sidebar composer. */
+body:has(.library-document-reader) .nodi-companion { display: none; }
+
+/* Reader notifications must not cover the fixed chat composer. The toast host
+   returns to its normal corner as soon as the document sidebar is closed. */
+body:has(.library-document-reader [data-testid="library-reader-sidebar"]) .app-toast-stack {
+  right: 22rem;
+}
+@media (max-width: 640px) {
+  body:has(.library-document-reader [data-testid="library-reader-sidebar"]) .app-toast-stack {
+    inset: 4.5rem 1rem auto;
+    align-items: center;
+  }
+}
+
 /* NotebookLM-style inline source citation. Rendered as a small pill that opens a
    source modal instead of navigating. */
 .md .citation-link {
@@ -3249,6 +3908,14 @@ select.input optgroup {
 ::highlight(nodus-find-current) {
   background-color: #facc15;
   color: #111827;
+}
+/* In the Library reader, keep document search over the reading surface rather
+   than covering the persistent notes/chat rail on wide windows. Narrow rails
+   are overlays already, so the search remains right-aligned and above them. */
+@media (min-width: 1280px) {
+  .library-document-reader:has(.library-reader-notes) .find-in-page-panel[data-find-placement="reader"] {
+    right: 21.75rem;
+  }
 }
 
 /* Study editor: Milkdown owns document structure; these variables keep visual

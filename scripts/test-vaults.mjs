@@ -23,6 +23,7 @@ if (!process.argv.includes('--electron-vaults-test')) {
         `export * as database from ${JSON.stringify(path.join(repoRoot, 'electron/db/database.ts'))};`,
         `export * as secrets from ${JSON.stringify(path.join(repoRoot, 'electron/secrets/secretStore.ts'))};`,
         `export * as settingsRepo from ${JSON.stringify(path.join(repoRoot, 'electron/db/settingsRepo.ts'))};`,
+        `export * as provenance from ${JSON.stringify(path.join(repoRoot, 'electron/db/libraryAnalysisProvenance.ts'))};`,
         `export * as vaultCreationSettings from ${JSON.stringify(path.join(repoRoot, 'electron/vaults/vaultCreationSettings.ts'))};`,
       ].join('\n'),
       'utf8'
@@ -62,7 +63,7 @@ const [, , , bundle, userData] = process.argv;
 process.env.NODE_PATH = [path.join(repoRoot, 'node_modules'), process.env.NODE_PATH].filter(Boolean).join(path.delimiter);
 Module._initPaths();
 const require = createRequire(import.meta.url);
-const { registry, analysisReuse, database, secrets, settingsRepo, vaultCreationSettings } = require(bundle);
+const { registry, analysisReuse, database, secrets, settingsRepo, provenance, vaultCreationSettings } = require(bundle);
 
 assert.equal(registry.getActiveVault().id, 'default');
 assert.equal(registry.getActiveVault().type, 'academic', 'pre-existing/legacy vault defaults to academic type');
@@ -195,14 +196,33 @@ registry.setActiveVault(researchVault.id);
 db = database.getDb();
 assert.equal(settingsRepo.getSettings().chatModel, 'openrouter/anthropic/claude-3', 'the vault keeps its own tool model');
 db.prepare('INSERT INTO works (nodus_id, zotero_key, title) VALUES (?, ?, ?)').run('work-research', 'ZOT-RESEARCH', 'Research work');
-db.prepare('INSERT INTO works (nodus_id, zotero_key, title) VALUES (?, ?, ?)').run(
-  'work-reused',
-  'ZOT-DEFAULT',
-  'Default work reused'
-);
+db.prepare(`INSERT INTO works (
+  nodus_id, zotero_key, title, light_hash, deep_hash, summary_hash, notes, manual_deep, read_tag
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+  .run('work-reused', 'ZOT-DEFAULT', 'Default work reused', 'light-hash', 'deep-hash', 'summary-hash', 'Private target note', 1, 1);
 database.closeDb();
 
-const reused = analysisReuse.reuseVaultAnalysisForWorks(['work-reused']);
+await database.withVaultDatabase('default', () => seedProvenance(database.getDb(), settingsRepo.getSettings(), provenance));
+
+const canceledController = new AbortController();
+canceledController.abort();
+const canceledReuse = await analysisReuse.reuseVaultAnalysisForWorks(['work-reused'], { signal: canceledController.signal });
+assert.equal(canceledReuse.canceled, true, 'reuse can be canceled between atomic per-work transactions');
+assert.equal(canceledReuse.imported, 0);
+
+registry.setActiveVault(researchVault.id);
+db = database.getDb();
+db.prepare('INSERT INTO works (nodus_id, zotero_key, title) VALUES (?, ?, ?)')
+  .run('work-approximate', 'UNRELATED-KEY', 'Default work');
+database.closeDb();
+const approximate = await analysisReuse.reuseVaultAnalysisForWorks(['work-approximate']);
+assert.equal(approximate.matched, 0, 'same-title and DOI-like approximate matches never reuse analysis');
+registry.setActiveVault(researchVault.id);
+db = database.getDb();
+db.prepare('DELETE FROM works WHERE nodus_id=?').run('work-approximate');
+database.closeDb();
+
+const reused = await analysisReuse.reuseVaultAnalysisForWorks(['work-reused']);
 assert.equal(reused.requested, 1);
 assert.equal(reused.matched, 1);
 assert.equal(reused.imported, 1);
@@ -215,6 +235,8 @@ assert.ok(reusedWorkResult.imported.includes('ideas'), 'ideas are reused');
 assert.ok(reusedWorkResult.imported.includes('ideaEmbeddings'), 'idea embeddings are reused');
 assert.ok(reusedWorkResult.imported.includes('summary'), 'summaries are reused');
 assert.ok(reusedWorkResult.imported.includes('passages'), 'passage embeddings are reused');
+assert.equal(reused.canceled, false);
+assert.equal(reusedWorkResult.compatibility.ideas.state, 'reused');
 assert.equal(reusedWorkResult.tableRows.works, undefined, 'analysis reuse does not copy source works');
 registry.setActiveVault(researchVault.id);
 db = database.getDb();
@@ -227,6 +249,11 @@ assert.deepEqual(
   db.prepare('SELECT light_status, deep_status, summary_status FROM works WHERE nodus_id = ?').get('work-reused'),
   { light_status: 'done', deep_status: 'done', summary_status: 'done' },
   'reused analysis updates the target work statuses'
+);
+assert.deepEqual(
+  db.prepare('SELECT notes, manual_deep, read_tag FROM works WHERE nodus_id = ?').get('work-reused'),
+  { notes: 'Private target note', manual_deep: 1, read_tag: 1 },
+  'private notes and manual target decisions never travel with reusable analysis'
 );
 assert.equal(
   db.prepare('SELECT COUNT(*) AS count FROM idea_occurrences WHERE nodus_id = ?').get('work-reused').count,
@@ -260,6 +287,26 @@ db = database.getDb();
 assert.equal(countWorks(db), 1, 'default vault kept its work');
 assert.equal(workTitle(db), 'Default work');
 assert.equal(secrets.getApiKey('openai'), 'sk-default');
+database.closeDb();
+
+const incompatibleVault = registry.createVault('Incompatible embedding model');
+registry.setActiveVault(incompatibleVault.id);
+db = database.getDb();
+settingsRepo.updateSettings({ embeddingProvider: 'openai', embeddingModel: 'different-embedding-model' });
+db.prepare(`INSERT INTO works (
+  nodus_id, zotero_key, title, light_hash, deep_hash, summary_hash
+) VALUES (?, ?, ?, ?, ?, ?)`)
+  .run('work-model-mismatch', 'ZOT-DEFAULT', 'Model mismatch', 'light-hash', 'deep-hash', 'summary-hash');
+database.closeDb();
+const modelMismatch = await analysisReuse.reuseVaultAnalysisForWorks(['work-model-mismatch']);
+assert.ok(modelMismatch.works[0].imported.includes('ideas'), 'a compatible ideas component is independently reused');
+assert.ok(!modelMismatch.works[0].imported.includes('ideaEmbeddings'), 'a different embedding model invalidates embeddings only');
+assert.ok(!modelMismatch.works[0].imported.includes('passages'), 'passage embeddings remain pending for the target model');
+assert.equal(modelMismatch.works[0].compatibility.ideaEmbeddings.state, 'incompatible');
+database.closeDb();
+registry.setActiveVault('default');
+registry.deleteVault(incompatibleVault.id, true);
+db = database.getDb();
 
 registry.renameVault(researchVault.id, 'Archivo 2026');
 assert.equal(registry.getVault(researchVault.id).name, 'Archivo 2026');
@@ -400,12 +447,28 @@ function seedAnalyzedWork(db) {
     'Passage',
     '1',
     7,
-    'passage-hash',
+    'deep-hash',
     Buffer.from([9, 10, 11, 12]),
     'openai',
     'text-embedding-3-small',
     4,
     'passage-embedding-hash',
     now
+  );
+}
+
+function seedProvenance(db, settings, provenance) {
+  const now = '2026-07-07T00:00:00.000Z';
+  const documents = {
+    light: 'light-hash', deep: 'deep-hash', ideas: 'deep-hash', summary: 'summary-hash',
+    passages: 'deep-hash', embeddings: 'deep-hash',
+  };
+  const insert = db.prepare(`INSERT OR REPLACE INTO library_analysis_provenance (
+    work_id, component, document_fingerprint, library_item_id, library_revision_fingerprint,
+    pipeline_version, model_fingerprint, output_fingerprint, source_vault_id, source_work_id, updated_at
+  ) VALUES (?, ?, ?, NULL, NULL, ?, ?, ?, ?, ?, ?)`);
+  for (const component of Object.keys(documents)) insert.run(
+    'work-default', component, documents[component], provenance.ANALYSIS_PIPELINES[component],
+    provenance.analysisModelFingerprint(component, settings), documents[component], 'default', 'work-default', now,
   );
 }

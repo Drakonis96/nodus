@@ -1,10 +1,12 @@
 import Database from 'better-sqlite3';
 import fs from 'node:fs';
-import type { VaultAnalysisReuseKind, VaultAnalysisReuseResult, VaultAnalysisReuseWorkResult, Work } from '@shared/types';
+import type { LibraryAnalysisReuseComponent } from '@shared/libraryTypes';
+import type { AppSettings, VaultAnalysisReuseKind, VaultAnalysisReuseResult, VaultAnalysisReuseWorkResult, Work } from '@shared/types';
 import { getDb } from '../db/database';
-import { purgeDeepData } from '../db/ideasRepo';
 import { runMigrations } from '../db/migrations';
-import { getActiveVault, listVaults } from './vaultRegistry';
+import { getActiveVault, getVault, listVaults } from './vaultRegistry';
+import { getSettings } from '../db/settingsRepo';
+import { ANALYSIS_PIPELINES, analysisModelFingerprint } from '../db/libraryAnalysisProvenance';
 
 type WorkRow = Work & {
   creators_json?: string | null;
@@ -27,17 +29,32 @@ interface SourceMatch {
   path: string;
   work: WorkRow;
   counts: AnalysisCounts;
+  provenance: Map<LibraryAnalysisReuseComponent, SourceProvenance>;
+}
+
+interface SourceProvenance {
+  component: LibraryAnalysisReuseComponent;
+  documentFingerprint: string;
+  libraryItemId: string | null;
+  libraryRevisionFingerprint: string | null;
+  pipelineVersion: string;
+  modelFingerprint: string;
+  outputFingerprint: string;
+  updatedAt: string;
+}
+
+export interface VaultAnalysisReuseContext {
+  libraryItemId: string;
+  revisionFingerprints: Record<LibraryAnalysisReuseComponent, string | null>;
+}
+
+export interface VaultAnalysisReuseOptions {
+  signal?: AbortSignal;
+  context?: VaultAnalysisReuseContext;
+  targetVaultId?: string;
 }
 
 const SOURCE_ALIAS = 'reuse_source';
-
-function normalizeText(value: string | null | undefined): string {
-  return (value ?? '').trim().replace(/\s+/g, ' ').toLocaleLowerCase();
-}
-
-function normalizeDoi(value: string | null | undefined): string {
-  return normalizeText(value).replace(/^https?:\/\/(dx\.)?doi\.org\//, '');
-}
 
 function placeholders(values: unknown[]): string {
   return values.map(() => '?').join(',');
@@ -72,7 +89,7 @@ function sourceCounts(db: Database.Database, nodusId: string): AnalysisCounts {
             SELECT COUNT(*)
               FROM idea_occurrences io JOIN ideas i ON i.global_id = io.global_id
              WHERE io.nodus_id = @id AND i.embedding IS NOT NULL
-          ) AS ideaEmbeddings,
+          ) + (SELECT COUNT(*) FROM passages WHERE nodus_id = @id AND embedding IS NOT NULL) AS ideaEmbeddings,
           (SELECT COUNT(*) FROM work_summaries WHERE nodus_id = @id) AS summary,
           (SELECT COUNT(*) FROM passages WHERE nodus_id = @id) AS passages,
           (SELECT COUNT(*) FROM edges WHERE source_work = @id) AS relations,
@@ -84,36 +101,33 @@ function sourceCounts(db: Database.Database, nodusId: string): AnalysisCounts {
   return row;
 }
 
-function reusableKinds(work: WorkRow, counts: AnalysisCounts): VaultAnalysisReuseKind[] {
+function availableKinds(work: WorkRow, counts: AnalysisCounts): VaultAnalysisReuseKind[] {
   const kinds = new Set<VaultAnalysisReuseKind>();
   if (work.light_status === 'done' || counts.themes > 0) kinds.add('themes');
   if (work.deep_status === 'done' || counts.ideas > 0) kinds.add('ideas');
   if (counts.ideaEmbeddings > 0) kinds.add('ideaEmbeddings');
   if (work.summary_status === 'done' || counts.summary > 0) kinds.add('summary');
   if (counts.passages > 0) kinds.add('passages');
-  if (counts.relations > 0) kinds.add('relations');
-  if (counts.authors > 0) kinds.add('authors');
-  if (counts.synthesis > 0) kinds.add('synthesis');
   return [...kinds];
 }
 
-function findSourceMatch(db: Database.Database, target: WorkRow): WorkRow | null {
+function targetIdentities(target: WorkRow): string[] {
+  const aliases = getDb().prepare('SELECT zotero_key FROM work_aliases WHERE nodus_id=?').all(target.nodus_id) as { zotero_key: string }[];
+  return [...new Set([target.zotero_key, ...aliases.map((entry) => entry.zotero_key)].filter((value): value is string => Boolean(value?.trim())))];
+}
+
+function findSourceMatch(db: Database.Database, identities: string[]): WorkRow | null {
+  if (identities.length === 0) return null;
   const candidates = db
     .prepare(
       /* sql */ `
         SELECT w.*
           FROM works w
-         WHERE w.zotero_key = @zoteroKey
+         WHERE w.zotero_key IN (SELECT value FROM json_each(@identities))
             OR EXISTS (
               SELECT 1 FROM work_aliases a
                WHERE a.nodus_id = w.nodus_id
-                 AND a.zotero_key = @zoteroKey
-            )
-            OR (@doi != '' AND LOWER(COALESCE(w.doi, '')) = @doi)
-            OR (
-              @title != ''
-              AND LOWER(TRIM(w.title)) = @title
-              AND (@year IS NULL OR w.year IS NULL OR w.year = @year)
+                 AND a.zotero_key IN (SELECT value FROM json_each(@identities))
             )
          ORDER BY
          CASE WHEN w.deep_status = 'done' THEN 1 ELSE 0 END DESC,
@@ -124,50 +138,155 @@ function findSourceMatch(db: Database.Database, target: WorkRow): WorkRow | null
       `
     )
     .all({
-      zoteroKey: target.zotero_key || '',
-      doi: normalizeDoi(target.doi),
-      title: normalizeText(target.title),
-      year: target.year,
+      identities: JSON.stringify(identities),
     }) as WorkRow[];
 
   return (
-    candidates.find((candidate) => candidate.zotero_key && candidate.zotero_key === target.zotero_key) ??
-    candidates.find((candidate) => normalizeDoi(candidate.doi) && normalizeDoi(candidate.doi) === normalizeDoi(target.doi)) ??
+    candidates.find((candidate) => candidate.zotero_key && identities.includes(candidate.zotero_key)) ??
     candidates[0] ??
     null
   );
 }
 
-function findBestMatch(target: WorkRow): SourceMatch | null {
+function sourceProvenance(db: Database.Database, workId: string): Map<LibraryAnalysisReuseComponent, SourceProvenance> {
+  const rows = db.prepare(`
+    SELECT component, document_fingerprint, library_item_id, library_revision_fingerprint,
+           pipeline_version, model_fingerprint, output_fingerprint, updated_at
+      FROM library_analysis_provenance WHERE work_id=?
+  `).all(workId) as Record<string, unknown>[];
+  return new Map(rows.map((row) => [row.component as LibraryAnalysisReuseComponent, {
+    component: row.component as LibraryAnalysisReuseComponent,
+    documentFingerprint: String(row.document_fingerprint),
+    libraryItemId: row.library_item_id ? String(row.library_item_id) : null,
+    libraryRevisionFingerprint: row.library_revision_fingerprint ? String(row.library_revision_fingerprint) : null,
+    pipelineVersion: String(row.pipeline_version),
+    modelFingerprint: String(row.model_fingerprint), outputFingerprint: String(row.output_fingerprint),
+    updatedAt: String(row.updated_at),
+  }]));
+}
+
+function findSourceMatches(target: WorkRow, targetVaultId?: string): SourceMatch[] {
   const activeVault = getActiveVault();
-  const candidates = listVaults().filter((vault) => vault.id !== activeVault.id && fs.existsSync(vault.path));
+  const identities = targetIdentities(target);
+  const targetId = targetVaultId ?? activeVault.id;
+  const candidates = listVaults().filter((vault) => vault.id !== targetId && fs.existsSync(vault.path));
+  const matches: SourceMatch[] = [];
   for (const vault of candidates) {
     const db = openSourceDb(vault.path);
     if (!db) continue;
     try {
-      const work = findSourceMatch(db, target);
+      const work = findSourceMatch(db, identities);
       if (!work) continue;
       const counts = sourceCounts(db, work.nodus_id);
-      if (reusableKinds(work, counts).length === 0) continue;
-      return { vaultId: vault.id, vaultName: vault.name, path: vault.path, work, counts };
+      if (availableKinds(work, counts).length === 0) continue;
+      matches.push({ vaultId: vault.id, vaultName: vault.name, path: vault.path, work, counts, provenance: sourceProvenance(db, work.nodus_id) });
     } finally {
       db.close();
     }
   }
-  return null;
+  return matches;
+}
+
+type Compatibility = VaultAnalysisReuseWorkResult['compatibility'];
+
+function kindComponent(kind: VaultAnalysisReuseKind): LibraryAnalysisReuseComponent {
+  if (kind === 'themes') return 'light';
+  if (kind === 'summary') return 'summary';
+  if (kind === 'passages') return 'passages';
+  if (kind === 'ideaEmbeddings') return 'embeddings';
+  return 'ideas';
+}
+
+function targetDocumentFingerprint(
+  targetDb: Database.Database,
+  target: WorkRow,
+  component: LibraryAnalysisReuseComponent,
+): string | null {
+  if (component === 'light') return target.light_hash;
+  if (component === 'summary') return target.summary_hash;
+  if (component === 'deep' || component === 'ideas') return target.deep_hash;
+  const passage = targetDb.prepare('SELECT content_hash FROM passages WHERE nodus_id=? ORDER BY chunk_index LIMIT 1').get(target.nodus_id) as { content_hash: string | null } | undefined;
+  return passage?.content_hash ?? target.deep_hash;
+}
+
+function decideCompatibility(
+  targetDb: Database.Database,
+  target: WorkRow,
+  match: SourceMatch,
+  options: VaultAnalysisReuseOptions,
+  settings: AppSettings,
+): { imported: VaultAnalysisReuseKind[]; compatibility: Compatibility } {
+  const available = new Set(availableKinds(match.work, match.counts));
+  const imported: VaultAnalysisReuseKind[] = [];
+  const compatibility: Compatibility = {};
+  const kinds: VaultAnalysisReuseKind[] = ['themes', 'ideas', 'ideaEmbeddings', 'summary', 'passages'];
+  const targetCount = (table: string, predicate = 'nodus_id=?'): number => Number((targetDb.prepare(`SELECT COUNT(*) AS n FROM ${table} WHERE ${predicate}`).get(target.nodus_id) as { n: number }).n);
+  const targetHasLocalOutput = (kind: VaultAnalysisReuseKind): boolean => {
+    if (kind === 'themes') return target.light_status === 'done' || targetCount('work_themes') > 0;
+    if (kind === 'ideas') return target.deep_status === 'done' || targetCount('idea_occurrences') > 0;
+    if (kind === 'ideaEmbeddings') return targetCount('idea_occurrences io JOIN ideas i ON i.global_id=io.global_id', 'io.nodus_id=? AND i.embedding IS NOT NULL') > 0
+      || targetCount('passages', 'nodus_id=? AND embedding IS NOT NULL') > 0;
+    if (kind === 'summary') return target.summary_status === 'done' || targetCount('work_summaries') > 0;
+    if (kind === 'passages') return targetCount('passages') > 0;
+    return false;
+  };
+  for (const kind of kinds) {
+    const component = kindComponent(kind);
+    if (!available.has(kind)) {
+      compatibility[kind] = { state: 'unavailable', reason: `The source vault has no ${kind} output.` };
+      continue;
+    }
+    if (targetHasLocalOutput(kind)) {
+      compatibility[kind] = { state: 'pending', reason: `The target has local ${kind} data; automatic reuse will not overwrite a manual decision.` };
+      continue;
+    }
+    const provenance = match.provenance.get(component);
+    if (!provenance) {
+      compatibility[kind] = { state: 'pending', reason: `The source ${kind} output predates verifiable provenance.` };
+      continue;
+    }
+    if (provenance.pipelineVersion !== ANALYSIS_PIPELINES[component]) {
+      compatibility[kind] = { state: 'incompatible', reason: `The ${kind} pipeline version differs.` };
+      continue;
+    }
+    if (provenance.modelFingerprint !== analysisModelFingerprint(component, settings)) {
+      compatibility[kind] = { state: 'incompatible', reason: `The ${kind} model configuration differs.` };
+      continue;
+    }
+    if (options.context) {
+      const expected = options.context.revisionFingerprints[component];
+      if (!expected || provenance.libraryItemId !== options.context.libraryItemId || provenance.libraryRevisionFingerprint !== expected) {
+        compatibility[kind] = { state: 'incompatible', reason: `The ${kind} output belongs to another Library revision.` };
+        continue;
+      }
+    } else {
+      const expected = targetDocumentFingerprint(targetDb, target, component);
+      if (!expected) {
+        compatibility[kind] = { state: 'pending', reason: `The target ${kind} input has no verifiable fingerprint.` };
+        continue;
+      }
+      if (provenance.documentFingerprint !== expected) {
+        compatibility[kind] = { state: 'incompatible', reason: `The ${kind} document fingerprint differs.` };
+        continue;
+      }
+    }
+    imported.push(kind);
+    compatibility[kind] = { state: 'reused', reason: `Exact document, pipeline and model fingerprints match.` };
+  }
+  return { imported, compatibility };
 }
 
 function copyThemes(db: Database.Database, sourceId: string, targetId: string, tableRows: Record<string, number>): void {
   const themes = db
     .prepare(
       /* sql */ `
-        SELECT t.theme_id, t.label, t.created_at, COALESCE(t.pinned, 0) AS pinned
+        SELECT t.theme_id, t.label, t.created_at
           FROM ${SOURCE_ALIAS}.work_themes wt
           JOIN ${SOURCE_ALIAS}.themes t ON t.theme_id = wt.theme_id
          WHERE wt.nodus_id = ?
       `
     )
-    .all(sourceId) as { theme_id: string; label: string; created_at: string; pinned: number }[];
+    .all(sourceId) as { theme_id: string; label: string; created_at: string }[];
   if (themes.length === 0) return;
   db.prepare('DELETE FROM work_themes WHERE nodus_id = ?').run(targetId);
   tableChange(db, tableRows, 'work_themes');
@@ -178,7 +297,8 @@ function copyThemes(db: Database.Database, sourceId: string, targetId: string, t
     const existing = findTheme.get(theme.label) as { theme_id: string } | undefined;
     const themeId = existing?.theme_id ?? theme.theme_id;
     if (!existing) {
-      insertTheme.run(theme.theme_id, theme.label, theme.created_at, theme.pinned);
+      // Pinned state is a manual vault decision and never travels with derived themes.
+      insertTheme.run(theme.theme_id, theme.label, theme.created_at, 0);
       tableChange(db, tableRows, 'themes');
     }
     linkTheme.run(targetId, themeId);
@@ -209,21 +329,31 @@ function copyIdeaThemeLinks(db: Database.Database, sourceId: string, targetId: s
   }
 }
 
-function copyDeepAnalysis(db: Database.Database, sourceId: string, targetId: string, tableRows: Record<string, number>): void {
+function copyDeepAnalysis(
+  db: Database.Database,
+  sourceId: string,
+  targetId: string,
+  tableRows: Record<string, number>,
+  includeEmbeddings: boolean,
+): void {
   db.prepare(
     /* sql */ `
       INSERT OR IGNORE INTO ideas (
         global_id, type, label, statement, embedding, created_at,
         embedding_provider, embedding_model, embedding_dim, embedding_text_hash
       )
-      SELECT global_id, type, label, statement, embedding, created_at,
-             embedding_provider, embedding_model, embedding_dim, embedding_text_hash
+      SELECT global_id, type, label, statement,
+             CASE WHEN @includeEmbeddings THEN embedding ELSE NULL END, created_at,
+             CASE WHEN @includeEmbeddings THEN embedding_provider ELSE NULL END,
+             CASE WHEN @includeEmbeddings THEN embedding_model ELSE NULL END,
+             CASE WHEN @includeEmbeddings THEN embedding_dim ELSE NULL END,
+             CASE WHEN @includeEmbeddings THEN embedding_text_hash ELSE NULL END
         FROM ${SOURCE_ALIAS}.ideas
        WHERE global_id IN (
          SELECT global_id FROM ${SOURCE_ALIAS}.idea_occurrences WHERE nodus_id = @sourceId
        )
     `
-  ).run({ sourceId });
+  ).run({ sourceId, includeEmbeddings: includeEmbeddings ? 1 : 0 });
   tableChange(db, tableRows, 'ideas');
 
   db.prepare(
@@ -245,35 +375,6 @@ function copyDeepAnalysis(db: Database.Database, sourceId: string, targetId: str
     `
   ).run({ sourceId, targetId });
   tableChange(db, tableRows, 'evidence');
-
-  db.prepare(
-    /* sql */ `
-      INSERT OR IGNORE INTO edges (id, from_id, to_id, type, basis, confidence, source_work)
-      SELECT id, from_id, to_id, type, basis, confidence,
-             CASE WHEN source_work = @sourceId THEN @targetId ELSE source_work END
-        FROM ${SOURCE_ALIAS}.edges
-       WHERE source_work = @sourceId
-          OR (
-            from_id IN (SELECT global_id FROM ${SOURCE_ALIAS}.idea_occurrences WHERE nodus_id = @sourceId)
-            AND to_id IN (SELECT global_id FROM ${SOURCE_ALIAS}.idea_occurrences WHERE nodus_id = @sourceId)
-          )
-    `
-  ).run({ sourceId, targetId });
-  tableChange(db, tableRows, 'edges');
-
-  db.prepare(
-    /* sql */ `
-      INSERT OR IGNORE INTO edge_traces (
-        edge_id, method, model_json, embedding_provider, embedding_model,
-        similarity, rationale, created_at
-      )
-      SELECT edge_id, method, model_json, embedding_provider, embedding_model,
-             similarity, rationale, created_at
-        FROM ${SOURCE_ALIAS}.edge_traces
-       WHERE EXISTS (SELECT 1 FROM main.edges e WHERE e.id = ${SOURCE_ALIAS}.edge_traces.edge_id)
-    `
-  ).run();
-  tableChange(db, tableRows, 'edge_traces');
 
   copyIdeaThemeLinks(db, sourceId, targetId, tableRows);
 
@@ -297,61 +398,21 @@ function copyDeepAnalysis(db: Database.Database, sourceId: string, targetId: str
   ).run({ sourceId, targetId });
   tableChange(db, tableRows, 'external_refs');
 
-  db.prepare(
-    /* sql */ `
-      DELETE FROM edges
-       WHERE from_id NOT IN (SELECT global_id FROM ideas)
-          OR to_id NOT IN (SELECT global_id FROM ideas)
-    `
-  ).run();
-  db.prepare('DELETE FROM edge_traces WHERE edge_id NOT IN (SELECT id FROM edges)').run();
 }
 
-function copyAuthors(db: Database.Database, sourceId: string, targetId: string, tableRows: Record<string, number>): void {
-  db.prepare(
-    /* sql */ `
-      INSERT OR IGNORE INTO authors (author_id, name, affiliation, canonical_key)
-      SELECT author_id, name, affiliation, canonical_key
-        FROM ${SOURCE_ALIAS}.authors
-       WHERE author_id IN (
-         SELECT author_id FROM ${SOURCE_ALIAS}.work_authors WHERE nodus_id = @sourceId
-       )
-    `
-  ).run({ sourceId });
-  tableChange(db, tableRows, 'authors');
-
-  db.prepare(
-    /* sql */ `
-      INSERT OR REPLACE INTO work_authors (nodus_id, author_id, role)
-      SELECT @targetId, author_id, role
-        FROM ${SOURCE_ALIAS}.work_authors
-       WHERE nodus_id = @sourceId
-    `
-  ).run({ sourceId, targetId });
-  tableChange(db, tableRows, 'work_authors');
-
-  db.prepare(
-    /* sql */ `
-      INSERT OR IGNORE INTO author_relations (from_author, to_author, type, weight)
-      SELECT from_author, to_author, type, weight
-        FROM ${SOURCE_ALIAS}.author_relations
-       WHERE from_author IN (SELECT author_id FROM ${SOURCE_ALIAS}.work_authors WHERE nodus_id = @sourceId)
-         AND to_author IN (SELECT author_id FROM ${SOURCE_ALIAS}.work_authors WHERE nodus_id = @sourceId)
-    `
-  ).run({ sourceId });
-  tableChange(db, tableRows, 'author_relations');
-
-  db.prepare(
-    /* sql */ `
-      INSERT OR REPLACE INTO author_dossier_synthesis (
-        author_id, thesis, remember_json, positioning, model_json, fingerprint, generated_at
-      )
-      SELECT author_id, thesis, remember_json, positioning, model_json, fingerprint, generated_at
-        FROM ${SOURCE_ALIAS}.author_dossier_synthesis
-       WHERE author_id IN (SELECT author_id FROM ${SOURCE_ALIAS}.work_authors WHERE nodus_id = @sourceId)
-    `
-  ).run({ sourceId });
-  tableChange(db, tableRows, 'author_dossier_synthesis');
+function copyIdeaEmbeddings(db: Database.Database, sourceId: string, targetId: string, tableRows: Record<string, number>): void {
+  db.prepare(`
+    UPDATE ideas
+       SET embedding = (SELECT source.embedding FROM ${SOURCE_ALIAS}.ideas source WHERE source.global_id=ideas.global_id),
+           embedding_provider = (SELECT source.embedding_provider FROM ${SOURCE_ALIAS}.ideas source WHERE source.global_id=ideas.global_id),
+           embedding_model = (SELECT source.embedding_model FROM ${SOURCE_ALIAS}.ideas source WHERE source.global_id=ideas.global_id),
+           embedding_dim = (SELECT source.embedding_dim FROM ${SOURCE_ALIAS}.ideas source WHERE source.global_id=ideas.global_id),
+           embedding_text_hash = (SELECT source.embedding_text_hash FROM ${SOURCE_ALIAS}.ideas source WHERE source.global_id=ideas.global_id)
+     WHERE global_id IN (SELECT global_id FROM ${SOURCE_ALIAS}.idea_occurrences WHERE nodus_id=@sourceId)
+       AND global_id IN (SELECT global_id FROM idea_occurrences WHERE nodus_id=@targetId)
+       AND EXISTS (SELECT 1 FROM ${SOURCE_ALIAS}.ideas source WHERE source.global_id=ideas.global_id AND source.embedding IS NOT NULL)
+  `).run({ sourceId, targetId });
+  tableChange(db, tableRows, 'ideas');
 }
 
 function copySummary(db: Database.Database, sourceId: string, targetId: string, tableRows: Record<string, number>): void {
@@ -370,7 +431,13 @@ function copySummary(db: Database.Database, sourceId: string, targetId: string, 
   tableChange(db, tableRows, 'work_summaries');
 }
 
-function copyPassages(db: Database.Database, sourceId: string, targetId: string, tableRows: Record<string, number>): void {
+function copyPassages(
+  db: Database.Database,
+  sourceId: string,
+  targetId: string,
+  tableRows: Record<string, number>,
+  includeEmbeddings: boolean,
+): void {
   db.prepare('DELETE FROM passages WHERE nodus_id = ?').run(targetId);
   tableChange(db, tableRows, 'passages');
   db.prepare(
@@ -380,38 +447,70 @@ function copyPassages(db: Database.Database, sourceId: string, targetId: string,
         embedding, embedding_provider, embedding_model, embedding_dim, embedding_text_hash, created_at
       )
       SELECT @targetId || '#' || chunk_index, @targetId, chunk_index, text, page_label, char_len, content_hash,
-             embedding, embedding_provider, embedding_model, embedding_dim, embedding_text_hash, created_at
+             CASE WHEN @includeEmbeddings THEN embedding ELSE NULL END,
+             CASE WHEN @includeEmbeddings THEN embedding_provider ELSE NULL END,
+             CASE WHEN @includeEmbeddings THEN embedding_model ELSE NULL END,
+             CASE WHEN @includeEmbeddings THEN embedding_dim ELSE NULL END,
+             CASE WHEN @includeEmbeddings THEN embedding_text_hash ELSE NULL END, created_at
         FROM ${SOURCE_ALIAS}.passages
        WHERE nodus_id = @sourceId
     `
-  ).run({ sourceId, targetId });
+  ).run({ sourceId, targetId, includeEmbeddings: includeEmbeddings ? 1 : 0 });
   tableChange(db, tableRows, 'passages');
 }
 
-function copySynthesis(db: Database.Database, sourceId: string, targetId: string, tableRows: Record<string, number>): void {
-  db.prepare(
-    /* sql */ `
-      INSERT OR REPLACE INTO work_idea_synthesis (
-        nodus_id, thesis, remember_json, positioning, model_json, fingerprint, generated_at
-      )
-      SELECT @targetId, thesis, remember_json, positioning, model_json, fingerprint, generated_at
-        FROM ${SOURCE_ALIAS}.work_idea_synthesis
-       WHERE nodus_id = @sourceId
-    `
-  ).run({ sourceId, targetId });
-  tableChange(db, tableRows, 'work_idea_synthesis');
+function copiedComponents(imported: VaultAnalysisReuseKind[]): LibraryAnalysisReuseComponent[] {
+  const components = new Set<LibraryAnalysisReuseComponent>();
+  for (const kind of imported) components.add(kindComponent(kind));
+  if (imported.includes('ideas')) components.add('deep');
+  return [...components];
 }
 
-function copyScanCheckpoints(db: Database.Database, sourceId: string, targetId: string, tableRows: Record<string, number>): void {
-  db.prepare(
-    /* sql */ `
-      INSERT OR REPLACE INTO scan_checkpoints (nodus_id, content_hash, kind, batch_index, data_json, created_at)
-      SELECT @targetId, content_hash, kind, batch_index, data_json, created_at
-        FROM ${SOURCE_ALIAS}.scan_checkpoints
-       WHERE nodus_id = @sourceId
-    `
-  ).run({ sourceId, targetId });
-  tableChange(db, tableRows, 'scan_checkpoints');
+function copyProvenance(
+  db: Database.Database,
+  sourceId: string,
+  targetId: string,
+  sourceVaultId: string,
+  imported: VaultAnalysisReuseKind[],
+  tableRows: Record<string, number>,
+): void {
+  const components = copiedComponents(imported);
+  if (components.length === 0) return;
+  db.prepare(`
+    INSERT OR REPLACE INTO library_analysis_provenance (
+      work_id, component, document_fingerprint, library_item_id, library_revision_fingerprint,
+      pipeline_version, model_fingerprint, output_fingerprint, source_vault_id, source_work_id, updated_at
+    )
+    SELECT @targetId, component, document_fingerprint, library_item_id, library_revision_fingerprint,
+           pipeline_version, model_fingerprint, output_fingerprint, @sourceVaultId, @sourceId, @now
+      FROM ${SOURCE_ALIAS}.library_analysis_provenance
+     WHERE work_id=@sourceId AND component IN (SELECT value FROM json_each(@components))
+  `).run({ targetId, sourceId, sourceVaultId, now: new Date().toISOString(), components: JSON.stringify(components) });
+  tableChange(db, tableRows, 'library_analysis_provenance');
+  const freshness = db.prepare(`
+    INSERT INTO library_analysis_freshness (work_id, component, freshness, fingerprint, reason, updated_at)
+    SELECT @targetId, component, 'current', output_fingerprint, @reason, @now
+      FROM library_analysis_provenance
+     WHERE work_id=@targetId AND component IN (SELECT value FROM json_each(@components))
+    ON CONFLICT(work_id, component) DO UPDATE SET
+      freshness='current', fingerprint=excluded.fingerprint, reason=excluded.reason, updated_at=excluded.updated_at
+  `);
+  freshness.run({
+    targetId,
+    components: JSON.stringify(components),
+    reason: `Reused from ${sourceVaultId} after exact provenance match.`,
+    now: new Date().toISOString(),
+  });
+  tableChange(db, tableRows, 'library_analysis_freshness');
+}
+
+function clearReusableTargetRows(db: Database.Database, targetId: string, imported: VaultAnalysisReuseKind[]): void {
+  if (!imported.includes('ideas')) return;
+  // Clear only the machine-derived idea payload being replaced. Relations,
+  // authors, notes and manual work flags are deliberately outside this set.
+  for (const table of ['idea_occurrences', 'evidence', 'idea_theme_links', 'gaps', 'external_refs']) {
+    db.prepare(`DELETE FROM ${table} WHERE nodus_id=?`).run(targetId);
+  }
 }
 
 function updateWorkStatus(
@@ -458,8 +557,14 @@ function updateWorkStatus(
   });
 }
 
-function importMatch(targetDb: Database.Database, target: WorkRow, match: SourceMatch): VaultAnalysisReuseWorkResult {
-  const imported = reusableKinds(match.work, match.counts);
+function importMatch(
+  targetDb: Database.Database,
+  target: WorkRow,
+  match: SourceMatch,
+  options: VaultAnalysisReuseOptions,
+  settings: AppSettings,
+): VaultAnalysisReuseWorkResult {
+  const { imported, compatibility } = decideCompatibility(targetDb, target, match, options, settings);
   const tableRows: Record<string, number> = {};
   if (imported.length === 0) {
     return {
@@ -470,23 +575,32 @@ function importMatch(targetDb: Database.Database, target: WorkRow, match: Source
       imported,
       importedRows: 0,
       tableRows,
+      compatibility,
     };
   }
 
-  if (imported.includes('ideas')) purgeDeepData(target.nodus_id);
+  if (options.signal?.aborted) {
+    for (const kind of imported) compatibility[kind] = { state: 'canceled', reason: 'Reuse was canceled before the transaction started.' };
+    return {
+      nodusId: target.nodus_id, matchedVaultId: match.vaultId, matchedVaultName: match.vaultName,
+      matchedSourceNodusId: match.work.nodus_id, imported: [], importedRows: 0, tableRows, compatibility,
+    };
+  }
 
   targetDb.prepare(`ATTACH DATABASE ? AS ${SOURCE_ALIAS}`).run(match.path);
   try {
     targetDb.pragma('foreign_keys = OFF');
     const tx = targetDb.transaction(() => {
+      if (options.signal?.aborted) throw new Error('LIBRARY_REUSE_CANCELED');
+      clearReusableTargetRows(targetDb, target.nodus_id, imported);
       if (imported.includes('themes')) copyThemes(targetDb, match.work.nodus_id, target.nodus_id, tableRows);
-      if (imported.includes('ideas')) copyDeepAnalysis(targetDb, match.work.nodus_id, target.nodus_id, tableRows);
-      if (imported.includes('authors')) copyAuthors(targetDb, match.work.nodus_id, target.nodus_id, tableRows);
+      if (imported.includes('ideas')) copyDeepAnalysis(targetDb, match.work.nodus_id, target.nodus_id, tableRows, imported.includes('ideaEmbeddings'));
+      else if (imported.includes('ideaEmbeddings')) copyIdeaEmbeddings(targetDb, match.work.nodus_id, target.nodus_id, tableRows);
       if (imported.includes('summary')) copySummary(targetDb, match.work.nodus_id, target.nodus_id, tableRows);
-      if (imported.includes('passages')) copyPassages(targetDb, match.work.nodus_id, target.nodus_id, tableRows);
-      if (imported.includes('synthesis')) copySynthesis(targetDb, match.work.nodus_id, target.nodus_id, tableRows);
-      copyScanCheckpoints(targetDb, match.work.nodus_id, target.nodus_id, tableRows);
+      if (imported.includes('passages')) copyPassages(targetDb, match.work.nodus_id, target.nodus_id, tableRows, imported.includes('ideaEmbeddings'));
+      // Checkpoints describe an in-flight operation, not a reusable result.
       updateWorkStatus(targetDb, match.work, target.nodus_id, imported);
+      copyProvenance(targetDb, match.work.nodus_id, target.nodus_id, match.vaultId, imported, tableRows);
     });
     tx();
   } finally {
@@ -507,14 +621,20 @@ function importMatch(targetDb: Database.Database, target: WorkRow, match: Source
     imported,
     importedRows,
     tableRows,
+    compatibility,
   };
 }
 
-export function reuseVaultAnalysisForWorks(nodusIds: string[]): VaultAnalysisReuseResult {
+export async function reuseVaultAnalysisForWorks(nodusIds: string[], options: VaultAnalysisReuseOptions = {}): Promise<VaultAnalysisReuseResult> {
+  const targetVault = options.targetVaultId ? getVault(options.targetVaultId) : getActiveVault();
+  if (!targetVault) throw new Error('The target vault no longer exists.');
+  if (targetVault.origin === 'connected' && (targetVault.remote?.role === 'reader' || targetVault.remote?.state !== 'active')) {
+    throw new Error('This connected vault is read-only or inactive.');
+  }
   const ids = [...new Set(nodusIds.map((id) => id.trim()).filter(Boolean))];
   const targetDb = getDb();
   const works: VaultAnalysisReuseWorkResult[] = [];
-  if (ids.length === 0) return { requested: 0, matched: 0, imported: 0, works };
+  if (ids.length === 0) return { requested: 0, matched: 0, imported: 0, canceled: false, works };
 
   const rows = targetDb
     .prepare(`SELECT * FROM works WHERE nodus_id IN (${placeholders(ids)})`)
@@ -522,6 +642,8 @@ export function reuseVaultAnalysisForWorks(nodusIds: string[]): VaultAnalysisReu
   const targetsById = new Map(rows.map((row) => [row.nodus_id, row]));
 
   for (const id of ids) {
+    await new Promise<void>((resolve) => setImmediate(resolve));
+    if (options.signal?.aborted) break;
     const target = targetsById.get(id);
     if (!target) {
       works.push({
@@ -532,11 +654,12 @@ export function reuseVaultAnalysisForWorks(nodusIds: string[]): VaultAnalysisReu
         imported: [],
         importedRows: 0,
         tableRows: {},
+        compatibility: {},
       });
       continue;
     }
-    const match = findBestMatch(target);
-    if (!match) {
+    const matches = findSourceMatches(target, options.targetVaultId);
+    if (matches.length === 0) {
       works.push({
         nodusId: id,
         matchedVaultId: null,
@@ -545,16 +668,22 @@ export function reuseVaultAnalysisForWorks(nodusIds: string[]): VaultAnalysisReu
         imported: [],
         importedRows: 0,
         tableRows: {},
+        compatibility: {},
       });
       continue;
     }
-    works.push(importMatch(targetDb, target, match));
+    const settings = getSettings();
+    const match = matches
+      .map((candidate) => ({ candidate, score: decideCompatibility(targetDb, target, candidate, options, settings).imported.length }))
+      .sort((left, right) => right.score - left.score || left.candidate.vaultName.localeCompare(right.candidate.vaultName))[0].candidate;
+    works.push(importMatch(targetDb, target, match, options, settings));
   }
 
   return {
     requested: ids.length,
     matched: works.filter((work) => work.matchedVaultId !== null).length,
     imported: works.filter((work) => work.imported.length > 0).length,
+    canceled: Boolean(options.signal?.aborted),
     works,
   };
 }

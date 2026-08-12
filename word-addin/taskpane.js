@@ -17,9 +17,10 @@
   var isWord = false;
   var currentParagraphText = '';
   var currentSelectionText = '';
-  var searchMode = 'ideas'; // 'ideas' | 'passages'
+  var searchMode = 'ideas'; // 'ideas' | 'passages' | 'references'
   var insertTarget = 'body'; // 'body' | 'footnote'
   var footnoteSupported = true;
+  var referenceController = null;
 
   // The pane follows the Nodus UI language (injected by the copilot server).
   var STR = {
@@ -62,6 +63,7 @@
       nodusError: 'Error de Nodus',
       modeIdeas: 'Ideas',
       modePassages: 'Pasajes',
+      modeReferences: 'Referencias',
       selectionLabel: 'Selección',
       composeRewrite: 'Reescribir',
       composeExpand: 'Ampliar',
@@ -126,6 +128,7 @@
       nodusError: 'Nodus error',
       modeIdeas: 'Ideas',
       modePassages: 'Passages',
+      modeReferences: 'References',
       selectionLabel: 'Selection',
       composeRewrite: 'Rewrite',
       composeExpand: 'Expand',
@@ -505,6 +508,7 @@
   }
 
   function analyze(force) {
+    if (searchMode === 'references') return;
     if (els.searchBox.value.trim()) return;
     getCurrentParagraph().then(function (text) {
       els.paragraph.textContent = text ? text.slice(0, 360) : '';
@@ -544,6 +548,10 @@
 
   function runSearch() {
     var query = els.searchBox.value.trim();
+    if (searchMode === 'references') {
+      if (referenceController) referenceController.search(query);
+      return;
+    }
     if (query.length < 2) {
       analyze(true);
       return;
@@ -721,10 +729,22 @@
     for (var i = 0; i < buttons.length; i++) {
       buttons[i].classList.toggle('active', buttons[i].getAttribute('data-mode') === mode);
     }
+    if (referenceController) referenceController.setActive(mode === 'references');
+    els.paragraph.hidden = mode === 'references';
+    if (mode === 'references') {
+      runSearch();
+      return;
+    }
+    els.searchBox.placeholder = T('searchPlaceholder');
     if (els.searchBox.value.trim().length >= 2) runSearch();
+    else analyze(true);
   }
 
   function onSelectionChanged() {
+    if (searchMode === 'references') {
+      if (referenceController) referenceController.selectionChanged();
+      return;
+    }
     if (!autoAnalyze || els.searchBox.value.trim()) return;
     if (debounceTimer) clearTimeout(debounceTimer);
     debounceTimer = setTimeout(function () { analyze(false); }, DEBOUNCE_MS);
@@ -751,6 +771,7 @@
           var changed = (state.paragraphText !== currentParagraphText || state.selectionText !== currentSelectionText);
           currentParagraphText = state.paragraphText || '';
           currentSelectionText = state.selectionText || '';
+          if (referenceController) referenceController.setExternalState(state.references || null);
           if (changed) {
             onSelectionChanged();
           }
@@ -790,7 +811,8 @@
     // Localize the segmented search mode, selection actions and insert target.
     var modeButtons = els.searchModeEl.querySelectorAll('.seg');
     for (var mi = 0; mi < modeButtons.length; mi++) {
-      modeButtons[mi].textContent = modeButtons[mi].getAttribute('data-mode') === 'passages' ? T('modePassages') : T('modeIdeas');
+      var mode = modeButtons[mi].getAttribute('data-mode');
+      modeButtons[mi].textContent = mode === 'passages' ? T('modePassages') : mode === 'references' ? T('modeReferences') : T('modeIdeas');
     }
     var saLabel = els.selectionActions.querySelector('.sa-label');
     if (saLabel) saLabel.textContent = T('selectionLabel');
@@ -852,7 +874,8 @@
       if (event.key === 'Enter') runSearch();
       if (event.key === 'Escape') {
         els.searchBox.value = '';
-        analyze(true);
+        if (searchMode === 'references') runSearch();
+        else analyze(true);
       }
     };
     els.autoToggle.onchange = function () { autoAnalyze = els.autoToggle.checked; };
@@ -881,8 +904,22 @@
       checkHealth();
       analyze(true);
     };
+    referenceController = window.NodusReferences && window.NodusReferences.create({
+      api: api,
+      isWord: isWord,
+      lang: LANG,
+      setStatus: setStatus,
+    });
+    if (referenceController) referenceController.init();
+
     checkHealth();
-    analyze(true);
+    var requestedMode = window.location.hash.indexOf('references') >= 0 ? 'references' : 'ideas';
+    if (requestedMode === 'references') {
+      setSearchMode('references');
+      var referenceAction = window.location.hash.replace(/^#references-?/, '') || 'citation';
+      referenceController.performAction(referenceAction);
+    }
+    else analyze(true);
   }
 
   var initialized = false;

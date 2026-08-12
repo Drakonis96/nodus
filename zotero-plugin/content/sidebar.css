@@ -61,6 +61,12 @@ body {
 .nd-badge { display: inline-block; margin-top: 4px; font-size: 10px; padding: 1px 7px; border-radius: 999px; }
 .nd-badge--yes { background: rgba(16,185,129,0.16); color: #059669; }
 .nd-badge--no { background: var(--nd-accent-soft); color: var(--nd-accent); }
+.nd-library-actions { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 7px; }
+.nd-library-btn { appearance: none; border: 1px solid var(--nd-border); border-radius: 6px; background: var(--nd-bg); color: var(--nd-fg); padding: 4px 7px; font: inherit; font-size: 10px; cursor: pointer; }
+.nd-library-btn:hover { border-color: var(--nd-accent); color: var(--nd-accent); }
+.nd-library-btn:disabled { cursor: wait; opacity: .65; }
+.nd-library-btn--primary { border-color: var(--nd-accent); background: var(--nd-accent); color: white; }
+.nd-library-btn--primary:hover { color: white; filter: brightness(1.08); }
 
 #nd-toolrow { display: flex; gap: 6px; }
 #nd-model { flex: 1; min-width: 0; padding: 5px 6px; border-radius: 6px; border: 1px solid var(--nd-border); background: var(--nd-bg); color: var(--nd-fg); }

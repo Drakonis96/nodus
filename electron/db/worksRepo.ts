@@ -558,6 +558,7 @@ export function setLightResult(nodusId: string, status: string, hash: string | n
   db
     .prepare('UPDATE works SET light_status=?, light_at=?, light_hash=?, notes=COALESCE(?, notes) WHERE nodus_id=?')
     .run(status, new Date().toISOString(), hash, notes ?? null, nodusId);
+  markLibraryAnalysisFreshness(db, nodusId, 'light', status === 'done' ? 'current' : status === 'failed' ? 'failed' : 'queued', hash);
 }
 
 export function setDeepResult(
@@ -575,12 +576,30 @@ export function setDeepResult(
       'UPDATE works SET deep_status=?, deep_at=?, deep_hash=?, source_type=COALESCE(?, source_type), notes=COALESCE(?, notes) WHERE nodus_id=?'
     )
     .run(status, new Date().toISOString(), hash, sourceType ?? null, notes ?? null, nodusId);
+  markLibraryAnalysisFreshness(db, nodusId, 'deep', status === 'done' ? 'current' : status === 'failed' ? 'failed' : status === 'skipped_no_text' ? 'unavailable' : 'queued', hash);
 }
 
 export function setSummaryResult(nodusId: string, status: SummaryStatus, hash: string | null): void {
-  getDb()
+  const db = getDb();
+  db
     .prepare('UPDATE works SET summary_status = ?, summary_at = ?, summary_hash = ? WHERE nodus_id = ?')
     .run(status, new Date().toISOString(), hash, nodusId);
+  markLibraryAnalysisFreshness(db, nodusId, 'summary', status === 'done' ? 'current' : status === 'failed' ? 'failed' : status === 'skipped_no_text' ? 'unavailable' : 'queued', hash);
+}
+
+function markLibraryAnalysisFreshness(
+  db: ReturnType<typeof getDb>,
+  nodusId: string,
+  component: 'light' | 'deep' | 'summary',
+  freshness: 'queued' | 'current' | 'failed' | 'unavailable',
+  fingerprint: string | null,
+): void {
+  db.prepare(`
+    INSERT INTO library_analysis_freshness (work_id, component, freshness, fingerprint, reason, updated_at)
+    VALUES (?, ?, ?, ?, NULL, ?)
+    ON CONFLICT(work_id, component) DO UPDATE SET
+      freshness=excluded.freshness, fingerprint=excluded.fingerprint, reason=NULL, updated_at=excluded.updated_at
+  `).run(nodusId, component, freshness, fingerprint, new Date().toISOString());
 }
 
 /** Underlying light/deep material changed, so its orientation summary is no longer current. */

@@ -8,6 +8,7 @@ import { getItem, LOCAL_USER_ID } from '../zotero/zoteroClient';
 import { embedMany } from './aiClient';
 import { addNotification } from '../notifications';
 import { nodiText } from '@shared/nodiNotifications';
+import { recordLinkedLibraryAnalysis } from '../library/libraryVaultProvenance';
 
 type ProgressListener = (progress: PassageEmbeddingProgress) => void;
 
@@ -195,6 +196,11 @@ export async function startPassageEmbedding(nodusIds?: string[]): Promise<void> 
         contentHash,
         chunks.map((chunk, index) => ({ ...chunk, embedding: embeddings[index] ?? null }))
       );
+      recordLinkedLibraryAnalysis({
+        workId: entry.work.nodus_id,
+        components: ['passages', 'embeddings'],
+        documentFingerprint: contentHash,
+      });
       emit();
     }
   } catch (error) {

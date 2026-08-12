@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Jorge Pérez Burgueño and Nodus contributors
+// SPDX-License-Identifier: AGPL-3.0-only
+
 import { useEffect, useRef, useState } from 'react';
 import type {
   AppSettings,
@@ -77,7 +80,8 @@ const ABOUT_CARD_CLASS = 'rounded-xl border border-neutral-200 bg-neutral-50 p-5
 const NODUS_REPOSITORY_URL = 'https://github.com/Drakonis96/nodus';
 const NODUS_SERVER_GUIDE_URL = `${NODUS_REPOSITORY_URL}/blob/main/server/README.md`;
 const NODUS_PRIVACY_URL = `${NODUS_REPOSITORY_URL}/blob/main/PRIVACY.md`;
-const NODUS_LICENSE_URL = `${NODUS_REPOSITORY_URL}/blob/main/LICENSE`;
+const NODUS_VERSION_SOURCE_URL = `${NODUS_REPOSITORY_URL}/tree/v${__APP_VERSION__}`;
+const NODUS_LICENSE_URL = `${NODUS_REPOSITORY_URL}/blob/v${__APP_VERSION__}/LICENSE`;
 const NODUS_SECURITY_REPORT_URL = `${NODUS_REPOSITORY_URL}/security/advisories/new`;
 
 function normalizeSettingsText(value: string): string {
@@ -215,6 +219,7 @@ export function Settings({
   const [copilotStatus, setCopilotStatus] = useState<CopilotServerStatus>({ running: false, port: null, addinUrl: null, certReady: false, error: null });
   const [zoteroStatus, setZoteroStatus] = useState<ZoteroPluginServerStatus>({ running: false, port: null, url: null, error: null });
   const [zoteroInstallBusy, setZoteroInstallBusy] = useState(false);
+  const [browserConnectorBusy, setBrowserConnectorBusy] = useState(false);
   const [copilotBusy, setCopilotBusy] = useState(false);
   const [copilotInstallBusy, setCopilotInstallBusy] = useState(false);
   const [copilotInstallMessage, setCopilotInstallMessage] = useState<string | null>(null);
@@ -387,7 +392,7 @@ export function Settings({
       active = false;
       window.clearInterval(interval);
     };
-  }, [settings.zoteroPluginEnabled, settings.zoteroPluginPort, settings.zoteroPluginToken]);
+  }, [settings.zoteroPluginEnabled, settings.browserConnectorEnabled, settings.zoteroPluginPort, settings.zoteroPluginToken, settings.browserConnectorToken]);
 
   useEffect(() => {
     if (!mcpHelpOpen) return;
@@ -743,6 +748,7 @@ export function Settings({
     visibleSettingsSection('integrations', 'Copiloto de escritura Word', 'word copilot addin certificado token localhost'),
     visibleSettingsSection('integrations', 'Copiloto de escritura LibreOffice', 'libreoffice copilot macro python install instalacion instalando'),
     visibleSettingsSection('integrations', 'Nodus para Zotero', 'zotero plugin sidebar chat servidor puerto token pagina citas conexiones'),
+    visibleSettingsSection('integrations', 'Nodus Connector para Chrome', 'chrome navegador browser extension conector captura metadatos colecciones etiquetas pdf doi isbn'),
     visibleSettingsSection('data', 'Backup / copia de seguridad', 'datos demo exportar importar copia backup cifrada contraseña'),
     visibleSettingsSection('models', 'Modelos de IA', 'basico avanzado modelo general extraccion sintesis tutor resumen fusion embeddings transcripcion voz imagen'),
     visibleSettingsSection('extraction', 'Extracción de texto PDFs grandes', 'pdf texto zotero ocr tesseract paginas idiomas'),
@@ -1479,8 +1485,9 @@ export function Settings({
               <div className="max-w-3xl">
                 <h3 className="text-sm font-medium text-neutral-900 dark:text-neutral-100">{t('Licencias y atribuciones')}</h3>
                 <p className="mt-1 text-xs leading-5 text-neutral-600 dark:text-neutral-400">
-                  {t('Nodus se publica con licencia MIT. Las licencias, atribuciones y textos exigidos por cada componente, modelo, voz o conjunto de datos de terceros se incluyen con cada versión.')}
+                  {t('Nodus se publica exclusivamente con GNU AGPL v3. El código fuente exacto de esta versión y las licencias, atribuciones y textos exigidos por cada componente de terceros se incluyen con cada versión.')}
                 </p>
+                <p className="mt-2 text-xs text-neutral-500">Copyright (C) 2026 Jorge Pérez Burgueño and Nodus contributors</p>
               </div>
             </div>
             <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:flex-wrap">
@@ -1496,7 +1503,14 @@ export function Settings({
                 className={ABOUT_ACTION_BUTTON_CLASS}
                 onClick={() => void window.nodus.openExternal(NODUS_LICENSE_URL)}
               >
-                <Icon name="external" /> {t('Licencia MIT')}
+                <Icon name="external" /> {t('Licencia AGPL-3.0')}
+              </button>
+              <button
+                data-testid="source-code"
+                className={ABOUT_ACTION_BUTTON_CLASS}
+                onClick={() => void window.nodus.openExternal(NODUS_VERSION_SOURCE_URL)}
+              >
+                <Icon name="code" /> {t('Código fuente de esta versión')}
               </button>
             </div>
           </div>
@@ -1535,7 +1549,7 @@ export function Settings({
                   {t('El código, el historial y los documentos legales son públicos y auditables. Las vulnerabilidades pueden comunicarse de forma privada mediante GitHub Security Advisories.')}
                 </p>
                 <p className="mt-2 text-xs leading-5 text-neutral-500">
-                  {t('La exclusión de garantías de la licencia MIT se aplica solo en la medida permitida por la ley y no elimina obligaciones legales imperativas.')}
+                  {t('La exclusión de garantías de GNU AGPL v3 se aplica solo en la medida permitida por la ley y no elimina obligaciones legales imperativas.')}
                 </p>
               </div>
             </div>
@@ -2046,6 +2060,7 @@ export function Settings({
               ) : (
                 <span className="text-neutral-500">{t('Apagado')}</span>
               )}
+              {zoteroStatus.compatibilityWarning && <p role="status" className="mt-2 text-amber-300">{t(zoteroStatus.compatibilityWarning)}</p>}
             </div>
             <div className="flex flex-wrap items-center gap-2">
               <button
@@ -2173,6 +2188,58 @@ export function Settings({
                 <Icon name="refresh" /> {t('Regenerar token')}
               </button>
             </div>
+          </Section>
+      )}
+
+      {visibleSettingsSection('integrations', 'Nodus Connector para Chrome', 'chrome navegador browser extension conector captura metadatos colecciones etiquetas pdf doi isbn') && (
+          <Section title={t('Nodus Connector para Chrome')}>
+            <p className="text-xs leading-5 text-neutral-600 dark:text-neutral-400">
+              {t('Guarda la página o documento abierto en la Biblioteca de Nodus con metadatos, archivos, colección y etiquetas. Solo lee la pestaña cuando pulsas el icono.')}
+            </p>
+            <div className="flex items-center justify-between gap-4">
+              <label className="text-sm text-neutral-700 dark:text-neutral-300">{t('Activar Nodus Connector para Chrome')}</label>
+              <input type="checkbox" checked={settings.browserConnectorEnabled} onChange={(event) => void patch({ browserConnectorEnabled: event.target.checked })} />
+            </div>
+            <div className="rounded-lg border border-neutral-200 bg-neutral-50 px-3 py-2 text-xs dark:border-neutral-800 dark:bg-neutral-950/50">
+              {settings.browserConnectorEnabled && zoteroStatus.running ? (
+                <span className="text-emerald-700 dark:text-emerald-400">{t('Listo para emparejar')}: {zoteroStatus.url}</span>
+              ) : zoteroStatus.error ? (
+                <span className="text-red-700 dark:text-red-400">{t('Error')}: {zoteroStatus.error}</span>
+              ) : (
+                <span className="text-neutral-600 dark:text-neutral-500">{t('Actívalo y deja Nodus abierto mientras guardas desde Chrome.')}</span>
+              )}
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                className="btn btn-primary"
+                disabled={browserConnectorBusy}
+                onClick={async () => {
+                  setBrowserConnectorBusy(true);
+                  try {
+                    const result = await window.nodus.downloadBrowserConnectorZip();
+                    if (result.ok && result.path) flash(`${t('Extensión guardada en:')} ${result.path}`);
+                    else if (result.message) flash(result.message);
+                  } finally {
+                    setBrowserConnectorBusy(false);
+                  }
+                }}
+              >
+                <Icon name={browserConnectorBusy ? 'sync' : 'download'} className={browserConnectorBusy ? 'animate-spin' : ''} />
+                {browserConnectorBusy ? t('Preparando…') : t('Descargar extensión de Chrome')}
+              </button>
+              <button
+                className="btn btn-ghost border border-neutral-300 dark:border-neutral-700"
+                onClick={async () => {
+                  await window.nodus.regenerateBrowserConnectorToken();
+                  flash(t('Se ha revocado el acceso de los navegadores emparejados.'));
+                }}
+              >
+                <Icon name="refresh" /> {t('Revocar navegadores emparejados')}
+              </button>
+            </div>
+            <p className="text-xs leading-5 text-neutral-600 dark:text-neutral-500">
+              {t('Chrome no permite que una app instale extensiones silenciosamente. Descarga el ZIP, descomprímelo y usa Cargar descomprimida en chrome://extensions.')}
+            </p>
           </Section>
       )}
 

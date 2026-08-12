@@ -16,6 +16,12 @@ exports.default = async function beforePack(context) {
   });
   console.log('[beforePack] Built the canonical Zotero XPI');
 
+  execFileSync(process.execPath, [path.join(root, 'scripts', 'build-browser-extension.mjs')], {
+    cwd: root,
+    stdio: 'inherit',
+  });
+  console.log('[beforePack] Built the canonical Chrome connector ZIP');
+
   if (context.electronPlatformName !== 'darwin') return;
   const source = path.join(__dirname, 'docktile');
   const output = path.join(__dirname, 'NodusDockTile.docktileplugin');

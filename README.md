@@ -23,6 +23,41 @@ Each vault is a focused workspace. Researchers can build a connected corpus, his
 
 Nodus is local first. Your vaults and search indexes live on your computer. You decide when a feature may use an online AI provider, and you can also work with compatible local models.
 
+## A library shared by every vault
+
+Nodus keeps one cross-vault Library inside `nodus-library`, nested under the
+backup folder you choose. It can mirror a complete Zotero library with its
+collection hierarchy and stable item keys, import RIS, BibTeX and CSL JSON from
+Mendeley or other managers, or accept local documents directly.
+
+Each original remains separate from a clean Markdown reading copy, extracted
+figures, structured tables, page mappings, highlights, notes and document chat.
+On first open, the reader asks whether to use the clean copy or the preserved
+original and can remember that choice; it can be reset from **Versions and
+files**. The same chooser switches between clean Markdown and preserved PDF,
+EPUB, image, web, text and office attachments. Text can be highlighted in the
+reflowable and PDF viewers, while images accept region highlights. Unsupported
+legacy binaries open in their associated application without modifying them.
+The citation manager uses real CSL styles, including custom `.csl` files copied
+from Zotero, and formats them locally after installation. A document can then be linked into any compatible vault
+for search and analysis without duplicating the global copy. See the
+[architecture, recovery and privacy guide](docs/global-library.md).
+
+### Updating to Nodus 4
+
+Updating from 3.2.7 keeps **This vault** as the initial Library scope and does
+not enable or migrate the cross-vault Library automatically. Before Nodus 4
+opens an existing database, it creates and verifies a one-time pre-v4 recovery
+copy. The optional migration assistant then inventories selected academic
+vaults and can be cancelled, resumed, verified, or rolled back without writing
+to the source vaults.
+
+Nodus 4 opens backups created by Nodus 3.x. A profile or Library already
+migrated to v4 is not guaranteed to open in a 3.x application, so keep the
+automatic pre-v4 recovery copy for downgrade recovery. Complete v4 encrypted
+backups include both every vault and `nodus-library`. See the
+[Library recovery contract](docs/global-library.md#updating-from-nodus-327).
+
 ## Install Nodus
 
 Download the installer for your computer and open it. There is no server to configure and no account is required to begin.
@@ -35,6 +70,11 @@ Download the installer for your computer and open it. There is no server to conf
 | Other Linux distributions | [Download AppImage](https://github.com/Drakonis96/nodus/releases/latest/download/Nodus-linux-x86_64.AppImage) |
 
 The standalone Zotero plugin is available from the same release as [nodus-zotero.xpi](https://github.com/Drakonis96/nodus/releases/latest/download/nodus-zotero.xpi). In Zotero, open **Tools → Add-ons**, choose **Install Add-on From File**, and select the downloaded file.
+
+The optional [Nodus Connector for Chrome](browser-extension/README.md) captures the open academic
+page or document into the local Library. It detects embedded bibliographic metadata, DOI/ISBN and
+available files, then lets the user choose a nested Nodus collection and existing or new tags before
+saving. It reads the active tab only after its toolbar icon is clicked.
 
 The [latest release page](https://github.com/Drakonis96/nodus/releases/latest) always contains the newest available installers and release notes.
 
@@ -135,6 +175,6 @@ You can also visit the [interactive browser tour](https://drakonis96.github.io/n
 
 ## Open and evolving
 
-Nodus is released under the [MIT License](LICENSE). Its [privacy policy](PRIVACY.md), [third-party notices](THIRD_PARTY_NOTICES.md) and [deployment checklist](legal/RGPD_DEPLOYMENT_CHECKLIST.md) document the privacy and licensing boundaries of each installation. Ideas, bug reports and academic use cases are welcome through [GitHub Issues](https://github.com/Drakonis96/nodus/issues).
+Nodus 4.0.0 and later are released exclusively under [GNU AGPL v3](LICENSE), SPDX `AGPL-3.0-only`. Published versions through 3.2.7 remain under MIT. Every build links to its [Corresponding Source](SOURCE_CODE.md). The [privacy policy](PRIVACY.md), [third-party notices](THIRD_PARTY_NOTICES.md) and [deployment checklist](legal/RGPD_DEPLOYMENT_CHECKLIST.md) document the privacy and licensing boundaries of each installation. Ideas, bug reports and academic use cases are welcome through [GitHub Issues](https://github.com/Drakonis96/nodus/issues).
 
 Before participating, read the [contribution guide](CONTRIBUTING.md) and [Code of Conduct](CODE_OF_CONDUCT.md). Report vulnerabilities privately according to the [security policy](SECURITY.md).

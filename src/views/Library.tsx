@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import type {
   WorkView,
@@ -13,13 +13,13 @@ import type {
   ZoteroTag,
   CollectionFacet,
   WorkSortKey,
+  LibraryReaderReference,
 } from '@shared/types';
 import { Icon } from '../components/ui';
 import { confirm, toast } from '../components/feedback';
 import { WorkGraphModal } from './WorkGraphModal';
 import { WorkIdeasModal } from './WorkIdeasModal';
 import { WorkStatusModal } from './WorkStatusModal';
-import { DuplicatesModal } from './DuplicatesModal';
 import { VirtualList } from '../components/VirtualList';
 import { anchorStyle, useAnchoredCoords } from '../components/dbGrid';
 import { useDataRefresh, useDismissableLayer, useScanComplete } from '../hooks';
@@ -398,18 +398,24 @@ export function Library({
   target,
   vaultType,
   onOpenCollections,
+  onOpenNodusCollections,
   onOpenGraph,
   onOpenAssistant,
   onOpenArchive,
+  scopeControls,
+  onOpenReader,
 }: {
   vaultId: string | null;
   /** Incoming navigation that pre-applies a filter (e.g. a corpus-health bucket). */
   target?: LibraryNavigationTarget | null;
   vaultType?: VaultType;
   onOpenCollections: () => void;
+  onOpenNodusCollections: () => void;
   onOpenGraph: (target: PendingGraphNavigationTarget) => void;
   onOpenAssistant: (target?: PendingAssistantNavigationTarget) => void;
   onOpenArchive?: () => void;
+  scopeControls?: ReactNode;
+  onOpenReader: (reference: LibraryReaderReference) => void;
 }) {
   // In records vaults the Library holds SECONDARY / published sources (books,
   // published genealogies, transcribed record collections) that can also be mined
@@ -434,12 +440,12 @@ export function Library({
   const [passageStatuses, setPassageStatuses] = useState<Map<string, WorkPassageStatus>>(new Map());
   const [reuseAnalysisFromVaults, setReuseAnalysisFromVaults] = useState(false);
   const [reuseNotice, setReuseNotice] = useState<string | null>(null);
-  const [advancedOpen, setAdvancedOpen] = useState(false);
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const [advancedFiltersOpen, setAdvancedFiltersOpen] = useState(false);
+  const [collectionsMenuOpen, setCollectionsMenuOpen] = useState(false);
   const [graphWork, setGraphWork] = useState<{ nodus_id: string; title: string } | null>(null);
   const [ideasWork, setIdeasWork] = useState<{ nodus_id: string; title: string } | null>(null);
   const [statusWork, setStatusWork] = useState<WorkView | null>(null);
-  const [duplicatesOpen, setDuplicatesOpen] = useState(false);
   // Live scan-queue items indexed by work. The persisted *_status fields go
   // 'pending' when a job is enqueued but never say whether it is waiting in line
   // or running right now, so this is the only way a row can show "Analizando…".
@@ -457,6 +463,11 @@ export function Library({
     open: collectionFilterOpen,
     onDismiss: () => setCollectionFilterOpen(false),
     group: 'library-filters',
+  });
+  const collectionsMenuRef = useDismissableLayer<HTMLDivElement>({
+    open: collectionsMenuOpen,
+    onDismiss: () => setCollectionsMenuOpen(false),
+    group: 'library-header-menus',
   });
 
   // Only the works list depends on the active filter, so typing in the search
@@ -743,46 +754,12 @@ export function Library({
     await load();
   };
 
-  const summarizeMissing = async () => {
-    await window.nodus.summarizeAll();
-    await load();
-  };
-
-  const reassignThemes = async () => {
-    const ok = await confirm({
-      title: t('Reasignar temas'),
-      message: t('Reasignar temas vuelve a ejecutar el análisis ligero (título + abstract) sobre TODA la biblioteca para reconstruir los temas padre y agrupar las ideas existentes bajo ellos. Consume tokens del modelo seleccionado. ¿Continuar?'),
-      confirmLabel: t('Continuar'),
-    });
-    if (!ok) return;
-    const n = await window.nodus.reassignThemes();
-    await load();
-    toast(tx('Reasignación de temas en cola para {n} obra(s). Verás el progreso en la cola.', { n }));
-  };
-
-  const rescanAbstractOnly = async () => {
-    const ok = await confirm({
-      title: t('Reanalizar «solo abstract»'),
-      message: t('Reanaliza las obras que solo se analizaron con el abstract (el PDF/EPUB no estaba disponible al analizarlas). Las que ya tengan el texto disponible en Zotero recuperarán el análisis completo; el resto se omiten sin coste. ¿Continuar?'),
-      confirmLabel: t('Continuar'),
-    });
-    if (!ok) return;
-    const n = await window.nodus.rescanDegraded();
-    await load();
-    if (n === 0) toast(t('No hay obras «solo abstract» para reanalizar.'), { tone: 'info' });
-    else toast(tx('Reanálisis en cola para {n} obra(s) «solo abstract». Verás el progreso en la cola.', { n }));
-  };
-
   const embedSelected = async () => {
     const ids = selectedVisibleIds;
     if (ids.length === 0) return;
     const pending = await reuseSelectedAnalysis(ids, ['ideaEmbeddings']);
     if (pending.length > 0) await window.nodus.startEmbedding(pending);
     setSelected(new Set());
-  };
-
-  const embedPending = async () => {
-    await window.nodus.startEmbedding();
   };
 
   const indexSelectedPassages = async () => {
@@ -792,14 +769,6 @@ export function Library({
     if (pending.length > 0) await window.nodus.startPassageEmbedding(pending);
     setSelected(new Set());
     await load();
-  };
-
-  const indexAllPassages = async () => {
-    await window.nodus.startPassageEmbedding();
-  };
-
-  const discoverBridges = async () => {
-    await window.nodus.enqueueBridgeDiscovery();
   };
 
   const toggleSelected = (id: string, checked: boolean) => {
@@ -875,6 +844,12 @@ export function Library({
     selectedCollections.length > 0 ||
     selectedReadiness !== null ||
     selectedHealthBucket !== null;
+  const activeFilterCount =
+    selectedStatusFlags.length +
+    selectedZoteroTags.length +
+    selectedCollections.length +
+    (selectedReadiness !== null ? 1 : 0) +
+    (selectedHealthBucket !== null ? 1 : 0);
   const clearHealthBucket = () => setFilter((c) => ({ ...c, healthBucket: undefined }));
   const toggleStatusFlag = (f: StatusFlag) =>
     setFilter((cur) => {
@@ -899,6 +874,15 @@ export function Library({
     setSearchDraft('');
     setTagSearch('');
     setCollectionSearch('');
+  };
+  const toggleFilterPanel = () => {
+    const nextOpen = !filtersOpen;
+    setFiltersOpen(nextOpen);
+    if (!nextOpen) {
+      setTagFilterOpen(false);
+      setCollectionFilterOpen(false);
+      setAdvancedFiltersOpen(false);
+    }
   };
 
   // A batch action must only operate on the current result set.  Otherwise a
@@ -982,34 +966,113 @@ export function Library({
     return map;
   }, [works, embeddingStatuses, passageStatuses, queuedByWork]);
 
+  const openReader = (work: WorkView) => onOpenReader({
+    id: work.nodus_id,
+    zoteroKey: work.zotero_key,
+    title: work.title,
+    authors: work.authors,
+    year: work.year,
+  });
+  const openVaultWorkAnalysis = (work: WorkView) => setIdeasWork({ nodus_id: work.nodus_id, title: work.title });
+
   return (
     <div className="h-full flex flex-col p-6 min-h-0">
-      <div className="flex flex-wrap items-start gap-3 mb-4">
-        <div>
-          <h1 className="text-xl font-semibold">{t('Biblioteca')}</h1>
-          <p className="text-sm text-neutral-500 mt-1">{tx('{n} obras visibles', { n: totalWorks })}</p>
+      <header data-testid="library-vault-header" className="library-header-bar -mx-6 -mt-6 mb-4 min-h-14 shrink-0 border-b border-neutral-800 px-5 py-3">
+        <div className="library-header-title min-w-0">
+          <h1 className="flex items-center gap-2 text-lg font-semibold"><Icon name="book" className="text-indigo-400" /> {t('Biblioteca')}</h1>
+          <p className="text-[11px] text-neutral-500">{tx('{n} obras visibles', { n: totalWorks })}</p>
         </div>
-        <div className="flex-1" />
-        <button
-          className={`btn border border-neutral-700 gap-1.5 ${advancedOpen ? 'bg-neutral-800 text-neutral-100' : 'btn-ghost'}`}
-          onClick={() => setAdvancedOpen((v) => !v)}
-          aria-expanded={advancedOpen}
-        >
-          <Icon name="wand" /> {t('Operaciones')}
-        </button>
-        <button className="btn btn-ghost border border-neutral-700" onClick={onOpenCollections}>
-          <Icon name="folder" /> {t('Colecciones')}
-        </button>
-      </div>
+        {scopeControls}
+        <div className="library-header-actions">
+          <div className="relative z-40" ref={collectionsMenuRef}>
+            <button
+              data-testid="library-collections-menu-toggle"
+              className={`btn border border-neutral-700 gap-1.5 ${collectionsMenuOpen ? 'bg-neutral-800 text-neutral-100' : 'btn-ghost'}`}
+              onClick={() => setCollectionsMenuOpen((open) => !open)}
+              aria-expanded={collectionsMenuOpen}
+              aria-haspopup="menu"
+            >
+              <Icon name="folder" /> {t('Colecciones')}
+              <Icon name="chevronDown" size={12} className={`transition-transform ${collectionsMenuOpen ? 'rotate-180' : ''}`} />
+            </button>
+            {collectionsMenuOpen && (
+              <div
+                data-testid="library-collections-menu"
+                role="menu"
+                className="library-action-menu absolute right-0 z-50 mt-2 w-64 rounded-xl border border-neutral-800 bg-neutral-950 p-1.5 shadow-2xl"
+              >
+                <button
+                  data-testid="open-nodus-collections"
+                  role="menuitem"
+                  className="library-action-menu-item"
+                  onClick={() => {
+                    setCollectionsMenuOpen(false);
+                    onOpenNodusCollections();
+                  }}
+                >
+                  <Icon name="library" />
+                  <span><b>{t('Colecciones de Nodus')}</b><small>{t('Global')}</small></span>
+                </button>
+                <button
+                  data-testid="open-zotero-collections"
+                  role="menuitem"
+                  className="library-action-menu-item"
+                  onClick={() => {
+                    setCollectionsMenuOpen(false);
+                    onOpenCollections();
+                  }}
+                >
+                  <Icon name="folder" />
+                  <span><b>{t('Colecciones de Zotero')}</b><small>{t('Este vault')}</small></span>
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      </header>
 
       <div className="card p-3 mb-3">
-        <div className="flex flex-wrap gap-2 items-center">
-          <input
-            className="input"
-            value={searchDraft}
-            placeholder={t('Buscar título o autor…')}
-            onChange={(e) => setSearchDraft(e.target.value)}
-          />
+        <div className="flex items-center gap-2">
+          <div className="relative min-w-[18rem] flex-1">
+            <Icon name="search" size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-neutral-500" />
+            <input
+              data-testid="library-vault-search"
+              className="input input-with-leading-icon w-full"
+              value={searchDraft}
+              placeholder={t('Buscar título o autor…')}
+              onChange={(e) => setSearchDraft(e.target.value)}
+            />
+          </div>
+          <button
+            data-testid="library-vault-filters-toggle"
+            type="button"
+            className={`library-filter-button tone-indigo btn shrink-0 border gap-1.5 ${filtersOpen || activeFilterCount > 0 ? 'is-active border-indigo-700 bg-indigo-950/40 text-indigo-100' : 'btn-ghost border-neutral-700'}`}
+            onClick={toggleFilterPanel}
+            aria-expanded={filtersOpen}
+            aria-controls="library-vault-filters-panel"
+          >
+            <Icon name="filter" /> {t('Filtros')}
+            {activeFilterCount > 0 && (
+              <span className="library-filter-count tone-indigo rounded bg-indigo-800/80 px-1.5 py-0.5 text-[10px] font-semibold tabular-nums">
+                {activeFilterCount}
+              </span>
+            )}
+          </button>
+          {hasActiveFilters && (
+            <button
+              type="button"
+              className="btn btn-ghost shrink-0 border border-neutral-700 px-2"
+              onClick={clearAllFilters}
+              aria-label={t('Limpiar filtros')}
+              title={t('Limpiar filtros')}
+            >
+              <Icon name="x" />
+            </button>
+          )}
+        </div>
+        {filtersOpen && (
+          <div id="library-vault-filters-panel" data-testid="library-vault-filters-panel" className="library-vault-filter-panel mt-3 rounded-xl border border-neutral-800 bg-neutral-950/35 p-3">
+            <div className="flex flex-wrap items-center gap-2">
           <div className="relative" ref={tagFilterRef}>
             <button
               type="button"
@@ -1187,17 +1250,8 @@ export function Library({
               </div>
             )}
           </div>
-          {hasActiveFilters && (
-            <button
-              type="button"
-              className="btn btn-ghost border border-neutral-700 gap-1.5"
-              onClick={clearAllFilters}
-            >
-              <Icon name="x" /> {t('Limpiar filtros')}
-            </button>
-          )}
           <div className="flex-1" />
-        </div>
+            </div>
         {/* One-click status filters. These replaced a row of counters that showed
             the same information but could not be clicked, sitting next to a
             separate control that filtered by it. */}
@@ -1253,6 +1307,8 @@ export function Library({
             <span className="text-xs text-neutral-500">
               {t('Combina condiciones sueltas de la tubería de análisis. Los presets de arriba cubren los casos habituales.')}
             </span>
+          </div>
+        )}
           </div>
         )}
         {selectedZoteroTags.length > 0 && (
@@ -1441,68 +1497,6 @@ export function Library({
         </div>
       )}
 
-      {advancedOpen && (
-        <div className="grid grid-cols-1 xl:grid-cols-2 gap-3 mb-4">
-          <OperationCard
-            icon="wand"
-            title={t('Generar resúmenes faltantes')}
-            description={t('Crea resúmenes de orientación independientes a partir de ideas, evidencia, temas y abstract. No son evidencia citable.')}
-            buttonLabel={t('Generar resúmenes faltantes')}
-            tone="violet"
-            onClick={summarizeMissing}
-          />
-          <OperationCard
-            icon="wand"
-            title={t('Reasignar temas')}
-            description={t('Reconstruye los temas padre de toda la biblioteca con análisis ligero. Útil tras cambiar criterios temáticos.')}
-            buttonLabel={t('Reasignar')}
-            onClick={reassignThemes}
-          />
-          <OperationCard
-            icon="bulb"
-            title={t('Reanalizar «solo abstract»')}
-            description={t('Vuelve a analizar las obras cuyo análisis profundo solo usó el abstract porque el PDF/EPUB no estaba disponible. Las que ya tengan el texto recuperan el análisis completo; el resto se omiten sin coste.')}
-            buttonLabel={t('Reanalizar')}
-            onClick={rescanAbstractOnly}
-          />
-          {/* Two indexes, each named for what it gives the reader. There used to be
-              five cards saying "Indexar", two of them called "todo" and meaning
-              opposite things. */}
-          <OperationCard
-            icon="search"
-            title={t('Preparar búsqueda semántica')}
-            description={t('Genera los embeddings que faltan para poder encontrar ideas por significado. No regenera los existentes.')}
-            buttonLabel={t('Preparar las que falten')}
-            tone="cyan"
-            onClick={embedPending}
-          />
-          <OperationCard
-            icon="book"
-            title={t('Indexar texto citable')}
-            description={t('Indexa los fragmentos de texto completo que falten o estén obsoletos, en toda la biblioteca. No requiere análisis de ideas y los ya actuales se omiten.')}
-            buttonLabel={t('Indexar lo que falte')}
-            tone="cyan"
-            onClick={indexAllPassages}
-          />
-          <OperationCard
-            icon="compass"
-            title={t('Descubrir relaciones')}
-            description={t('Usa embeddings e IA para validar puentes semánticos entre ideas que aún no están conectadas. El progreso se muestra en la cola.')}
-            buttonLabel={t('Descubrir')}
-            tone="violet"
-            onClick={discoverBridges}
-          />
-          <OperationCard
-            icon="copy"
-            title={t('Buscar y fusionar duplicados')}
-            description={t('Detecta obras repetidas (mismo DOI, o mismo título, año y autores) y te deja revisarlas y fusionarlas conservando una sola copia. La misma obra en varias colecciones de Zotero no se duplica.')}
-            buttonLabel={t('Revisar duplicados')}
-            tone="violet"
-            onClick={() => setDuplicatesOpen(true)}
-          />
-        </div>
-      )}
-
       <div className="card flex-1 flex flex-col min-h-0 overflow-hidden text-sm">
         <div
           className="grid items-center bg-neutral-900 text-neutral-400 border-b border-neutral-800 px-2 py-2 text-left text-xs"
@@ -1542,8 +1536,13 @@ export function Library({
               const status = statusByWork.get(w.nodus_id);
               return (
               <div
-                className="grid h-full items-center border-b border-neutral-800/70 px-2 hover:bg-neutral-900/50"
+                data-testid={`vault-library-item-${w.nodus_id}`}
+                className="grid h-full cursor-pointer items-center border-b border-neutral-800/70 px-2 hover:bg-neutral-900/50"
                 style={{ gridTemplateColumns: LIBRARY_GRID_TEMPLATE }}
+                onClick={(event) => {
+                  if ((event.target as HTMLElement).closest('button, input, select, a')) return;
+                  openVaultWorkAnalysis(w);
+                }}
               >
                 <div className="p-1">
                   <input
@@ -1554,9 +1553,10 @@ export function Library({
                 </div>
                 <div className="min-w-0 p-1">
                   <button
+                    data-testid={`vault-library-title-${w.nodus_id}`}
                     className="block w-full truncate text-left hover:text-indigo-300 hover:underline"
                     title={t('Ver las ideas de esta obra')}
-                    onClick={() => setIdeasWork({ nodus_id: w.nodus_id, title: w.title })}
+                    onClick={() => openVaultWorkAnalysis(w)}
                   >
                     {w.title}
                   </button>
@@ -1592,6 +1592,12 @@ export function Library({
                     >
                       {t('Analizar')}
                     </button>
+                    <RowIconButton
+                      title={t('Abrir lector limpio')}
+                      icon="book"
+                      tone="cyan"
+                      onClick={() => openReader(w)}
+                    />
                     {/* The column is nullable in SQLite despite the non-null type, and demo
                         vaults carry synthetic keys that open nothing. */}
                     {w.zotero_key && (
@@ -1605,6 +1611,11 @@ export function Library({
                     <RowMenu
                       label={t('Más acciones')}
                       items={[
+                        {
+                          label: t('Abrir lector limpio'),
+                          icon: 'book',
+                          onClick: () => openReader(w),
+                        },
                         ...(isRecordsVault
                           ? [{
                               label: t('Extraer personas y eventos'),
@@ -1706,49 +1717,7 @@ export function Library({
           onChanged={() => void load()}
         />
       )}
-      {duplicatesOpen && <DuplicatesModal onClose={() => setDuplicatesOpen(false)} />}
     </div>
-  );
-}
-
-function OperationCard({
-  icon,
-  title,
-  description,
-  buttonLabel,
-  tone = 'neutral',
-  disabled,
-  onClick,
-}: {
-  icon: string;
-  title: string;
-  description: string;
-  buttonLabel: string;
-  tone?: 'neutral' | 'cyan' | 'violet';
-  disabled?: boolean;
-  onClick: () => void;
-}) {
-  const toneClass =
-    tone === 'cyan'
-      ? 'border-cyan-900/70 text-cyan-300'
-      : tone === 'violet'
-        ? 'border-violet-900/70 text-violet-300'
-        : 'border-neutral-800 text-neutral-300';
-  return (
-    <section className="rounded-lg border border-neutral-800 bg-neutral-900/40 p-3 flex flex-col gap-3">
-      <div className="flex items-start gap-2">
-        <span className={`mt-0.5 inline-flex h-8 w-8 items-center justify-center rounded-md border ${toneClass}`}>
-          <Icon name={icon} />
-        </span>
-        <div>
-          <h2 className="text-sm font-semibold">{title}</h2>
-          <p className="text-xs text-neutral-500 mt-1 leading-relaxed">{description}</p>
-        </div>
-      </div>
-      <button className="btn btn-ghost border border-neutral-700 mt-auto" disabled={disabled} onClick={onClick}>
-        {buttonLabel}
-      </button>
-    </section>
   );
 }
 

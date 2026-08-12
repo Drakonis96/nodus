@@ -22,8 +22,57 @@ const HEADERS: Record<string, string> = {
   'Zotero-Allowed-Request': '1',
 };
 
-async function zfetch(url: string): Promise<Response> {
-  return fetch(url, { headers: HEADERS });
+export class ZoteroRequestError extends Error {
+  constructor(
+    message: string,
+    readonly code: 'zotero-closed' | 'credentials-expired' | 'rate-limited' | 'library-missing' | 'permission' | 'network' | 'invalid-response',
+    readonly status: number | null,
+    readonly retryable: boolean,
+  ) { super(message); this.name = 'ZoteroRequestError'; }
+}
+
+function retryDelay(response: Response | null, attempt: number): number {
+  const header = response?.headers.get('Retry-After');
+  const retryAfter = header === null || header === undefined ? Number.NaN : Number(header);
+  return Number.isFinite(retryAfter) && retryAfter >= 0 ? Math.min(2_000, retryAfter * 1_000) : attempt * 150;
+}
+
+async function waitForRetry(milliseconds: number, signal?: AbortSignal): Promise<void> {
+  if (signal?.aborted) throw new DOMException('Solicitud cancelada', 'AbortError');
+  await new Promise<void>((resolve, reject) => {
+    const timer = setTimeout(resolve, milliseconds);
+    signal?.addEventListener('abort', () => { clearTimeout(timer); reject(new DOMException('Solicitud cancelada', 'AbortError')); }, { once: true });
+  });
+}
+
+async function zfetch(url: string, signal?: AbortSignal, init: RequestInit = {}): Promise<Response> {
+  for (let attempt = 1; attempt <= 3; attempt += 1) {
+    try {
+      const response = await fetch(url, { ...init, headers: { ...HEADERS, ...(init.headers ?? {}) }, signal });
+      if ([429, 502, 503, 504].includes(response.status) && attempt < 3) {
+        await waitForRetry(retryDelay(response, attempt), signal);
+        continue;
+      }
+      if (response.status === 401) throw new ZoteroRequestError('Las credenciales de Zotero han caducado.', 'credentials-expired', 401, false);
+      if (response.status === 403) throw new ZoteroRequestError('Zotero rechazó el acceso a esta biblioteca.', 'permission', 403, false);
+      if (response.status === 429) throw new ZoteroRequestError('Zotero mantiene temporalmente limitado el acceso.', 'rate-limited', 429, true);
+      if (response.status >= 500) throw new ZoteroRequestError(`Zotero respondió HTTP ${response.status}.`, 'network', response.status, true);
+      return response;
+    } catch (error) {
+      if (error instanceof ZoteroRequestError || signal?.aborted || (error instanceof Error && error.name === 'AbortError')) throw error;
+      if (attempt < 3) { await waitForRetry(retryDelay(null, attempt), signal); continue; }
+      const message = error instanceof Error ? error.message : String(error);
+      throw new ZoteroRequestError(`No se pudo conectar con Zotero: ${message}`, /ECONNREFUSED|fetch failed|socket/i.test(message) ? 'zotero-closed' : 'network', null, true);
+    }
+  }
+  throw new ZoteroRequestError('No se pudo conectar con Zotero.', 'network', null, true);
+}
+
+function endpointError(context: string, response: Response): ZoteroRequestError {
+  return new ZoteroRequestError(
+    response.status === 404 ? `La biblioteca de Zotero ya no existe: ${context}.` : `${context}: HTTP ${response.status}`,
+    response.status === 404 ? 'library-missing' : 'invalid-response', response.status, false,
+  );
 }
 
 function libraryPrefix(library: ZoteroLibrary): string {
@@ -96,7 +145,7 @@ function mapCollection(raw: any, library: ZoteroLibrary): ZoteroCollection {
 export async function topCollections(userId: string, requestedLibrary?: ZoteroLibrary): Promise<ZoteroCollection[]> {
   const library = requestedLibrary ?? { ...PERSONAL_LIBRARY, id: userId };
   const res = await zfetch(`${BASE}/${libraryPrefix(library)}/collections/top?limit=100`);
-  if (!res.ok) throw new Error(`Zotero collections HTTP ${res.status}`);
+  if (!res.ok) throw endpointError('Colecciones de Zotero', res);
   const data = (await res.json()) as any[];
   return data.map((raw) => mapCollection(raw, library)).sort((a, b) => a.name.localeCompare(b.name));
 }
@@ -104,7 +153,7 @@ export async function topCollections(userId: string, requestedLibrary?: ZoteroLi
 export async function childCollections(userId: string, parentKey: string, requestedLibrary?: ZoteroLibrary): Promise<ZoteroCollection[]> {
   const parsed = parseCanonicalKey(parentKey, requestedLibrary ?? { ...PERSONAL_LIBRARY, id: userId });
   const res = await zfetch(`${BASE}/${libraryPrefix(parsed.library)}/collections/${encodeURIComponent(parsed.rawKey)}/collections?limit=100`);
-  if (!res.ok) throw new Error(`Zotero subcollections HTTP ${res.status}`);
+  if (!res.ok) throw endpointError('Subcolecciones de Zotero', res);
   const data = (await res.json()) as any[];
   return data.map((raw) => mapCollection(raw, parsed.library)).sort((a, b) => a.name.localeCompare(b.name));
 }
@@ -124,6 +173,15 @@ function mapItem(raw: any, library: ZoteroLibrary): ZoteroItem {
     creatorType: c.creatorType ?? 'author',
   }));
   const itemKey = d.key ?? raw.key;
+  const represented = new Set([
+    'key', 'version', 'itemType', 'title', 'shortTitle', 'creators', 'date', 'DOI', 'abstractNote', 'tags', 'collections',
+    'publisher', 'publicationTitle', 'bookTitle', 'proceedingsTitle', 'ISBN', 'ISSN', 'url', 'language', 'volume', 'issue',
+    'pages', 'edition', 'place', 'rights', 'extra', 'dateAdded', 'dateModified', 'relations',
+  ]);
+  const fields = Object.fromEntries(Object.entries(d as Record<string, unknown>).flatMap(([name, value]) => {
+    if (represented.has(name) || !['string', 'number', 'boolean'].includes(typeof value)) return [];
+    const clean = String(value).trim(); return clean ? [[name, clean]] : [];
+  }));
   return {
     key: canonicalKey(library, itemKey),
     itemKey,
@@ -140,8 +198,95 @@ function mapItem(raw: any, library: ZoteroLibrary): ZoteroItem {
     publisher: d.publisher ?? null,
     publicationTitle: d.publicationTitle ?? d.bookTitle ?? d.proceedingsTitle ?? null,
     isbn: d.ISBN ?? null,
+    issn: d.ISSN ?? null,
     url: d.url ?? null,
+    date: d.date ?? null,
+    language: d.language ?? null,
+    volume: d.volume ?? null,
+    issue: d.issue ?? null,
+    pages: d.pages ?? null,
+    edition: d.edition ?? null,
+    place: d.place ?? null,
+    rights: d.rights ?? null,
+    extra: d.extra ?? null,
+    fields,
+    dateAdded: d.dateAdded ?? null,
+    dateModified: d.dateModified ?? null,
   };
+}
+
+export interface ZoteroLibraryItemsPage {
+  items: ZoteroItem[];
+  version: number;
+  total: number;
+}
+
+/** All top-level bibliographic items in a library, or its incremental changes. */
+export async function libraryItems(
+  library: ZoteroLibrary,
+  opts: { since?: number; signal?: AbortSignal; onProgress?: (loaded: number, total: number) => void } = {},
+): Promise<ZoteroLibraryItemsPage> {
+  const items: ZoteroItem[] = [];
+  let start = 0;
+  let version = 0;
+  let total = 0;
+  const limit = 100;
+  for (;;) {
+    const params = new URLSearchParams({ limit: String(limit), start: String(start), sort: 'dateModified', direction: 'asc' });
+    if (opts.since && opts.since > 0) params.set('since', String(opts.since));
+    const res = await zfetch(`${BASE}/${libraryPrefix(library)}/items/top?${params}`, opts.signal);
+    if (!res.ok) throw endpointError('Elementos de Zotero', res);
+    const data = (await res.json()) as any[];
+    version = Number(res.headers.get('Last-Modified-Version')) || version;
+    total = Number(res.headers.get('Total-Results')) || data.length;
+    items.push(...data
+      .filter((raw) => !['attachment', 'note', 'annotation'].includes(raw.data?.itemType))
+      .map((raw) => mapItem(raw, library)));
+    start += data.length;
+    opts.onProgress?.(Math.min(start, total), total);
+    if (data.length < limit || start >= total) break;
+  }
+  return { items, version, total };
+}
+
+export interface ZoteroDeletedObjects {
+  version: number;
+  items: string[];
+  collections: string[];
+}
+
+/** Tombstones since a saved library version. Empty on the first full import. */
+export async function deletedSince(
+  library: ZoteroLibrary,
+  since: number,
+  signal?: AbortSignal,
+): Promise<ZoteroDeletedObjects> {
+  if (since <= 0) return { version: 0, items: [], collections: [] };
+  const res = await zfetch(`${BASE}/${libraryPrefix(library)}/deleted?since=${encodeURIComponent(String(since))}`, signal);
+  if (!res.ok) throw endpointError('Elementos eliminados de Zotero', res);
+  const data = (await res.json().catch(() => ({}))) as { items?: string[]; collections?: string[] };
+  return {
+    version: Number(res.headers.get('Last-Modified-Version')) || since,
+    items: (data.items ?? []).map((key) => canonicalKey(library, key)),
+    collections: (data.collections ?? []).map((key) => canonicalKey(library, key)),
+  };
+}
+
+/** Complete collection tree. Pagination is explicit so libraries over 100 nodes are never truncated. */
+export async function allCollections(library: ZoteroLibrary, signal?: AbortSignal): Promise<ZoteroCollection[]> {
+  const out: ZoteroCollection[] = [];
+  let start = 0;
+  const limit = 100;
+  for (;;) {
+    const res = await zfetch(`${BASE}/${libraryPrefix(library)}/collections?limit=${limit}&start=${start}&sort=title`, signal);
+    if (!res.ok) throw endpointError('Colecciones de Zotero', res);
+    const data = (await res.json()) as any[];
+    out.push(...data.map((raw) => mapCollection(raw, library)));
+    const total = Number(res.headers.get('Total-Results')) || data.length;
+    start += data.length;
+    if (data.length < limit || start >= total) break;
+  }
+  return out.sort((a, b) => a.name.localeCompare(b.name));
 }
 
 /** Page through a collection's items (limit=100), skipping attachments/notes. */
@@ -289,7 +434,31 @@ export async function itemChildren(userId: string, itemKey: string): Promise<Zot
       linkMode: c.data.linkMode ?? null,
       filename: c.data.filename ?? null,
       available: Boolean(c.data.filename),
+      version: c.data.version ?? c.version ?? 0,
+      parentItem: c.data.parentItem ?? null,
+      dateModified: c.data.dateModified ?? null,
     }));
+}
+
+export interface ZoteroChildNote {
+  key: string;
+  title: string;
+  html: string;
+  version: number;
+}
+
+/** Child notes remain a read-only mirror in Nodus. */
+export async function itemNotes(userId: string, itemKey: string, library?: ZoteroLibrary): Promise<ZoteroChildNote[]> {
+  const parsed = parseCanonicalKey(itemKey, library ?? { ...PERSONAL_LIBRARY, id: userId });
+  const res = await zfetch(`${BASE}/${libraryPrefix(parsed.library)}/items/${encodeURIComponent(parsed.rawKey)}/children`);
+  if (!res.ok) return [];
+  const data = (await res.json()) as any[];
+  return data.filter((child) => child.data?.itemType === 'note' && child.data?.parentItem === parsed.rawKey).map((child) => ({
+    key: canonicalKey(parsed.library, child.data.key),
+    title: String(child.data.title || 'Zotero note'),
+    html: String(child.data.note || ''),
+    version: Number(child.data.version ?? child.version ?? 0),
+  }));
 }
 
 export async function itemAttachments(userId: string, itemKey: string, library?: ZoteroLibrary): Promise<ZoteroAttachment[]> {
@@ -303,10 +472,7 @@ export async function itemAttachments(userId: string, itemKey: string, library?:
 
 export async function attachmentFilePath(userId: string, attachmentKey: string): Promise<string | null> {
   const parsed = parseCanonicalKey(attachmentKey, { ...PERSONAL_LIBRARY, id: userId });
-  const res = await fetch(`${BASE}/${libraryPrefix(parsed.library)}/items/${encodeURIComponent(parsed.rawKey)}/file`, {
-    headers: HEADERS,
-    redirect: 'manual',
-  });
+  const res = await zfetch(`${BASE}/${libraryPrefix(parsed.library)}/items/${encodeURIComponent(parsed.rawKey)}/file`, undefined, { redirect: 'manual' });
   const location = res.headers.get('location');
   if (!location?.startsWith('file:')) return null;
   try { return fileURLToPath(location); } catch { return null; }
@@ -362,6 +528,9 @@ export async function itemAsAttachment(userId: string, itemKey: string): Promise
     linkMode: d.linkMode ?? null,
     filename: d.filename ?? null,
     available: Boolean(d.filename),
+    version: d.version ?? raw.version ?? 0,
+    parentItem: d.parentItem ?? null,
+    dateModified: d.dateModified ?? null,
   };
 }
 

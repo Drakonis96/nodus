@@ -28,7 +28,7 @@ jobs:
         run: node scripts/verify-release-channel.mjs "${{ inputs.channel }}" "${{ inputs.tag }}"
 
       - name: Verify citation version
-        run: npm run citation:check
+        run: npm run citation:check && npm run release:verify-source
 
   release:
     needs: validate-release

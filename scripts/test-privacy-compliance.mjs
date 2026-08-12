@@ -41,7 +41,8 @@ test('the distributable contains the privacy policy and controller checklist', a
   assert.match(settings, /setOpenLegalDoc\('licenses'\)/);
   assert.match(settings, /<LegalDocModal/);
   assert.match(settings, /blob\/main\/PRIVACY\.md/);
-  assert.match(settings, /blob\/main\/LICENSE/);
+  assert.match(settings, /blob\/v\$\{__APP_VERSION__\}\/LICENSE/);
+  assert.match(settings, /data-testid="source-code"/);
   assert.match(settings, /security\/advisories\/new/);
   assert.match(settings, /no es una certificación/);
 

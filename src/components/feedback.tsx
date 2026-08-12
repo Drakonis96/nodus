@@ -196,7 +196,7 @@ export function FeedbackHost() {
   return (
     <>
       {createPortal(
-        <div className="fixed bottom-4 right-4 z-[100] flex flex-col items-end gap-2 pointer-events-none">
+        <div data-testid="app-toast-stack" className="app-toast-stack fixed bottom-4 right-4 z-[100] flex flex-col items-end gap-2 pointer-events-none">
           <AnimatePresence initial={false}>
             {toasts.map((item) => (
               <ToastCard key={item.id} item={item} onDismiss={dismissToast} />

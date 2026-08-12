@@ -10,7 +10,7 @@ type ViewId = 'library' | 'graph' | 'gaps' | 'reading' | 'settings' | 'search' |
 const STEPS: TourStep[] = [
   {
     title: '¡Bienvenido a Nodus!',
-    body: '¿Es tu primera vez? En menos de un minuto te enseño cómo convertir tu biblioteca de Zotero en un grafo de ideas. Puedes saltártelo cuando quieras.',
+    body: '¿Es tu primera vez? En menos de un minuto te enseño cómo convertir la Biblioteca de Nodus o tu biblioteca de Zotero en un grafo de ideas. Puedes saltártelo cuando quieras.',
   },
   {
     target: 'vault-badge',
@@ -25,20 +25,20 @@ const STEPS: TourStep[] = [
   },
   {
     target: 'sync',
-    title: 'Actualizar desde Zotero',
-    body: 'Este botón trae las obras de tus colecciones monitorizadas. Por defecto solo incorpora metadatos; puedes activar análisis automático en Ajustes.',
+    title: 'Dos formas de añadir obras',
+    body: 'Biblioteca acepta archivos, DOI, ISBN, referencias manuales e importaciones. Si ya usas Zotero, este botón sincroniza tus colecciones monitorizadas en modo solo lectura.',
   },
   {
     // Sin ancla: Colecciones ya no tiene icono propio en la cabecera. Se abre desde la
     // paleta de comandos, que no es un elemento que se pueda señalar en pantalla.
-    title: 'Elegir colecciones',
-    body: 'Decide qué colecciones o subcolecciones de Zotero vigila Nodus. Ábrelo desde la paleta de comandos (⌘K o Ctrl+K) buscando «Colecciones». Empieza con una pequeña para probar; sus subcolecciones se incluyen solas.',
+    title: 'Organiza a tu manera',
+    body: 'Crea colecciones y subcolecciones propias dentro de Biblioteca. También puedes mantener la estructura de Zotero como fuente de solo lectura y combinar ambos sistemas sin perder tus cambios de Nodus.',
   },
   {
     target: 'nav-library',
     view: 'library',
     title: 'Tu biblioteca',
-    body: 'Aquí tienes todas tus obras con su estado de escaneo: ligero (temas) y profundo (ideas). Desde aquí decides qué llevar al grafo.',
+    body: 'Global reúne referencias, archivos y colecciones de todos tus vaults. Este vault conserva el corpus tradicional y sus estados de análisis. Puedes usar solo Nodus, solo Zotero o combinar ambos.',
   },
   {
     target: 'library-actions',

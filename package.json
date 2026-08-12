@@ -1,9 +1,9 @@
 {
   "name": "nodus",
-  "version": "3.2.7",
+  "version": "4.0.0",
   "description": "Local-first desktop app that turns a Zotero library into a navigable graph of ideas and authors.",
   "author": "Nodus",
-  "license": "MIT",
+  "license": "AGPL-3.0-only",
   "private": true,
   "main": "dist-electron/main.js",
   "type": "module",
@@ -13,10 +13,15 @@
     "test": "node --test scripts/test-*.mjs",
     "citation:sync": "node scripts/sync-citation.mjs",
     "citation:check": "node scripts/sync-citation.mjs --check",
+    "release:verify-source": "node scripts/verify-source-offer.mjs",
     "version": "npm run citation:sync && git add CITATION.cff",
     "test:e2e": "node scripts/e2e-smoke.mjs",
     "test:e2e:saved-authors": "node scripts/e2e-saved-authors.mjs",
     "test:e2e:deep-research-annotations": "npm run build && node scripts/e2e-deep-research-annotations.mjs",
+    "test:e2e:library-reader": "npm run build && node scripts/e2e-library-reader.mjs",
+    "test:e2e:global-library": "npm run build && node scripts/e2e-global-library.mjs",
+    "test:e2e:browser-connector": "node scripts/e2e-browser-connector.mjs",
+    "test:e2e:office-references": "node scripts/e2e-office-references.mjs",
     "test:e2e:local-server": "node scripts/e2e-local-server.mjs",
     "test:e2e:prosopography": "node scripts/test-prosopography-e2e.mjs",
     "test:e2e:testimony": "npm run build && node scripts/e2e-testimony.mjs",
@@ -24,6 +29,8 @@
     "verify:nodi-overlay": "npm run build && node scripts/verify-nodi-overlay.mjs",
     "verify:deep-research-queue": "npm run build && node scripts/verify-deep-research-mcp-queue.mjs",
     "verify:vector-scan": "ELECTRON_RUN_AS_NODE=1 ./node_modules/.bin/electron scripts/verify-vector-scan.mjs",
+    "verify:library-metadata-live": "node scripts/verify-library-metadata-live.mjs",
+    "verify:browser-connector": "node scripts/verify-browser-connector-server.mjs",
     "verify:study-whisper": "node scripts/verify-study-whisper.mjs",
     "verify:study-improve-local": "node scripts/verify-study-improve-local.mjs",
     "verify:database-records": "node scripts/verify-database-records.mjs",
@@ -41,6 +48,7 @@
     "licenses:verify": "npm run licenses:generate && node scripts/verify-license-compliance.mjs",
     "privacy:verify": "node --test scripts/test-privacy-compliance.mjs",
     "zotero:xpi": "node scripts/build-zotero-xpi.mjs",
+    "browser:zip": "node scripts/build-browser-extension.mjs",
     "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p electron/tsconfig.json",
     "lint": "eslint . --ext .ts,.tsx",
     "icons": "node scripts/generate-icons.mjs",
@@ -60,6 +68,7 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.32.1",
+    "@citation-js/plugin-csl": "^0.8.2",
     "@diffusionstudio/piper-wasm": "1.0.0",
     "@diffusionstudio/vits-web": "^1.0.3",
     "@github/copilot-sdk": "1.0.7",
@@ -82,6 +91,7 @@
     "@openai/codex": "0.144.6",
     "adm-zip": "^0.6.0",
     "better-sqlite3": "^11.5.0",
+    "citeproc": "^2.4.63",
     "cytoscape": "^3.30.2",
     "diff": "^9.0.0",
     "docx": "^9.7.1",
@@ -156,6 +166,10 @@
         "to": "legal/NODUS_LICENSE.txt"
       },
       {
+        "from": "SOURCE_CODE.md",
+        "to": "legal/SOURCE_CODE.md"
+      },
+      {
         "from": "THIRD_PARTY_NOTICES.md",
         "to": "legal/THIRD_PARTY_NOTICES.md"
       },
@@ -172,6 +186,10 @@
         "to": "zotero/nodus-zotero.xpi"
       },
       {
+        "from": "dist-browser/nodus-connector-chrome.zip",
+        "to": "browser/nodus-connector-chrome.zip"
+      },
+      {
         "from": "server",
         "to": "nodus-server",
         "filter": [
@@ -186,6 +204,7 @@
       "dist/**/*",
       "dist-electron/**/*",
       "word-addin/**/*",
+      "browser-extension/**/*",
       "zotero-plugin/**/*",
       "electron/assets/**/*",
       "scripts/nodus_copilot.py"

@@ -1,0 +1,37 @@
+version = 1
+SPDX-PackageName = "Nodus"
+SPDX-PackageSupplier = "Jorge Pérez Burgueño and Nodus contributors"
+SPDX-PackageDownloadLocation = "https://github.com/Drakonis96/nodus"
+
+[[annotations]]
+path = [
+  "src/**",
+  "shared/**",
+  "electron/**",
+  "server/**",
+  "zotero-plugin/**",
+  "scripts/**",
+  "site/**",
+  "build/**",
+  "*.ts",
+  "*.js",
+  "*.mjs",
+  "*.cjs",
+  "*.html",
+  "*.css"
+]
+precedence = "aggregate"
+SPDX-FileCopyrightText = "2026 Jorge Pérez Burgueño and Nodus contributors"
+SPDX-License-Identifier = "AGPL-3.0-only"
+
+[[annotations]]
+path = ["legal/generated/**", "legal/templates/**", "scripts/fixtures/**"]
+precedence = "override"
+SPDX-FileCopyrightText = "See the individual file, upstream notice or fixture manifest"
+SPDX-License-Identifier = "NOASSERTION"
+
+[[annotations]]
+path = ["zotero-plugin/content/icons.js"]
+precedence = "override"
+SPDX-FileCopyrightText = "2026 Jorge Pérez Burgueño and Nodus contributors; Lucide contributors"
+SPDX-License-Identifier = "AGPL-3.0-only AND MIT"

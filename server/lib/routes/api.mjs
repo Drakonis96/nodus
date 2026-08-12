@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Jorge Pérez Burgueño and Nodus contributors
+// SPDX-License-Identifier: AGPL-3.0-only
+
 // The /api/v1 control plane: authentication for replicas, capability negotiation, the
 // snapshot channel, assets, vectors and the mutation ledger. Corpus reads live next door in
 // corpus.mjs; this file owns everything that writes or that decides who may.
@@ -17,7 +20,7 @@ import { decodeVectorSet, embeddingMatches } from '../core/vectors.mjs';
 import { searchVectorsOffThread } from '../core/vectorSearchPool.mjs';
 import { lexicalSearch } from '../core/search.mjs';
 import { rows } from '../core/snapshot.mjs';
-import { NODUS_VERSION } from '../version.mjs';
+import { NODUS_LICENSE, NODUS_SOURCE_URL, NODUS_VERSION } from '../version.mjs';
 
 const AUTH_BODY_BYTES = 32 * 1024;
 const TICKET_TTL_MS = 5 * 60_000;
@@ -77,7 +80,9 @@ export function createApiRoutes(ctx) {
       // one version, so a client that shows both side by side turns "it stopped working" into
       // "these two are not the same release".
       version: NODUS_VERSION,
-      server: { name: store.state.settings.name, publicUrl: publicUrl(), language: language(), version: NODUS_VERSION },
+      license: NODUS_LICENSE,
+      sourceCodeUrl: NODUS_SOURCE_URL,
+      server: { name: store.state.settings.name, publicUrl: publicUrl(), language: language(), version: NODUS_VERSION, license: NODUS_LICENSE, sourceCodeUrl: NODUS_SOURCE_URL },
       snapshotVersions: [1, 2],
       assets: true,
       mutations: true,

@@ -41,6 +41,8 @@ export const platformApi: PlatformApi = {
   getZoteroInstallInfo: () => ipcRenderer.invoke('zoteroPlugin:installInfo'),
   installZoteroPlugin: () => ipcRenderer.invoke('zoteroPlugin:install'),
   downloadZoteroPluginXpi: () => ipcRenderer.invoke('zoteroPlugin:downloadXpi'),
+  downloadBrowserConnectorZip: () => ipcRenderer.invoke('browserConnector:downloadZip'),
+  regenerateBrowserConnectorToken: () => ipcRenderer.invoke('browserConnector:regenerateToken'),
   ensureCopilotCert: () => ipcRenderer.invoke('copilot:ensureCert'),
   installCopilotAddin: () => ipcRenderer.invoke('copilot:installAddin'),
   installLibreOfficeCopilot: () => ipcRenderer.invoke('copilot:installLibreOffice'),
@@ -49,6 +51,11 @@ export const platformApi: PlatformApi = {
     const listener = (_e: unknown, target: import('@shared/types').CopilotOpenIdeaTarget) => cb(target);
     ipcRenderer.on('copilot:openIdea', listener);
     return () => ipcRenderer.removeListener('copilot:openIdea', listener);
+  },
+  onZoteroPluginOpen: (cb) => {
+    const listener = (_event: unknown, target: import('@shared/types').ZoteroPluginOpenTarget) => cb(target);
+    ipcRenderer.on('zoteroPlugin:open', listener);
+    return () => ipcRenderer.removeListener('zoteroPlugin:open', listener);
   },
   setApiKey: (provider, key) => ipcRenderer.invoke('settings:setApiKey', provider, key),
   clearApiKey: (provider) => ipcRenderer.invoke('settings:clearApiKey', provider),

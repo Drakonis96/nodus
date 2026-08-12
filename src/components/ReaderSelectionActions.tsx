@@ -86,6 +86,20 @@ const HIGHLIGHT_NAMES: Record<WritingDraftAnnotationColor, string> = {
 };
 const COMMENT_HIGHLIGHT_NAME = 'nodus-reader-comment';
 const ALL_HIGHLIGHT_NAMES = [...Object.values(HIGHLIGHT_NAMES), COMMENT_HIGHLIGHT_NAME];
+const READER_HIGHLIGHTS_BY_CONTEXT = new Map<string, Map<string, Range[]>>();
+
+interface HighlightRegistry {
+  delete(name: string): boolean;
+  set(name: string, value: unknown): unknown;
+}
+
+function repaintReaderHighlights(registry: HighlightRegistry, HighlightConstructor: new (...ranges: Range[]) => unknown): void {
+  for (const name of ALL_HIGHLIGHT_NAMES) {
+    registry.delete(name);
+    const ranges = Array.from(READER_HIGHLIGHTS_BY_CONTEXT.values()).flatMap((context) => context.get(name) ?? []).filter((range) => range.startContainer.isConnected && range.endContainer.isConnected);
+    if (ranges.length) registry.set(name, new HighlightConstructor(...ranges));
+  }
+}
 
 function storageKey(contextId: string): string {
   return `nodus.readerMark.${contextId}`;
@@ -107,33 +121,70 @@ function textNodes(root: HTMLElement): Text[] {
   const nodes: Text[] = [];
   let current = walker.nextNode();
   while (current) {
-    nodes.push(current as Text);
+    if ((current as Text).data.length > 0) nodes.push(current as Text);
     current = walker.nextNode();
   }
   return nodes;
 }
 
-function rangeFromOffsets(root: HTMLElement, start: number, end: number): Range | null {
-  const range = document.createRange();
+interface ReaderTextIndex {
+  content: string;
+  nodes: Text[];
+  starts: number[];
+  offsets: WeakMap<Text, number>;
+}
+
+const READER_TEXT_INDICES = new WeakMap<HTMLElement, ReaderTextIndex>();
+
+function readerTextIndex(root: HTMLElement): ReaderTextIndex {
+  const cached = READER_TEXT_INDICES.get(root);
+  if (cached) return cached;
+  const nodes = textNodes(root);
+  const starts: number[] = [];
+  const offsets = new WeakMap<Text, number>();
   let offset = 0;
-  let started = false;
-  for (const node of textNodes(root)) {
-    const next = offset + node.data.length;
-    if (!started && start >= offset && start <= next) {
-      range.setStart(node, Math.min(node.data.length, start - offset));
-      started = true;
-    }
-    if (started && end >= offset && end <= next) {
-      range.setEnd(node, Math.min(node.data.length, end - offset));
-      return range;
-    }
-    offset = next;
+  for (const node of nodes) {
+    starts.push(offset);
+    offsets.set(node, offset);
+    offset += node.data.length;
   }
-  return null;
+  const index = { content: nodes.map((node) => node.data).join(''), nodes, starts, offsets };
+  READER_TEXT_INDICES.set(root, index);
+  return index;
+}
+
+function nodeIndexAtOffset(index: ReaderTextIndex, value: number): number {
+  let low = 0;
+  let high = index.starts.length - 1;
+  let result = 0;
+  while (low <= high) {
+    const middle = (low + high) >>> 1;
+    if (index.starts[middle] <= value) {
+      result = middle;
+      low = middle + 1;
+    } else {
+      high = middle - 1;
+    }
+  }
+  return result;
+}
+
+function rangeFromOffsets(root: HTMLElement, start: number, end: number): Range | null {
+  const index = readerTextIndex(root);
+  if (!index.nodes.length || start < 0 || end <= start || end > index.content.length) return null;
+  const startIndex = nodeIndexAtOffset(index, start);
+  const endIndex = nodeIndexAtOffset(index, Math.max(start, end - 1));
+  const startNode = index.nodes[startIndex];
+  const endNode = index.nodes[endIndex];
+  if (!startNode || !endNode) return null;
+  const range = document.createRange();
+  range.setStart(startNode, Math.min(startNode.data.length, start - index.starts[startIndex]));
+  range.setEnd(endNode, Math.min(endNode.data.length, end - index.starts[endIndex]));
+  return range;
 }
 
 function findAnchoredText(root: HTMLElement, anchor: ReaderAnchor): Range | null {
-  const content = root.textContent || '';
+  const content = readerTextIndex(root).content;
   let bestIndex = -1;
   let bestScore = -1;
   let from = 0;
@@ -163,7 +214,7 @@ function annotationRange(root: HTMLElement, annotation: WritingDraftAnnotation):
 function markRange(root: HTMLElement, mark: ReaderMark): Range | null {
   const direct = rangeFromOffsets(root, mark.start, mark.end);
   if (direct?.toString() === mark.text) return direct;
-  const index = (root.textContent || '').indexOf(mark.text);
+  const index = readerTextIndex(root).content.indexOf(mark.text);
   return index >= 0 ? rangeFromOffsets(root, index, index + mark.text.length) : null;
 }
 
@@ -177,6 +228,14 @@ function selectionInside(root: HTMLElement): { range: Range; text: string } | nu
 }
 
 function selectionOffsets(root: HTMLElement, range: Range): { start: number; end: number } {
+  const index = readerTextIndex(root);
+  if (range.startContainer.nodeType === Node.TEXT_NODE && range.endContainer.nodeType === Node.TEXT_NODE) {
+    const startBase = index.offsets.get(range.startContainer as Text);
+    const endBase = index.offsets.get(range.endContainer as Text);
+    if (startBase !== undefined && endBase !== undefined) {
+      return { start: startBase + range.startOffset, end: endBase + range.endOffset };
+    }
+  }
   const beforeStart = document.createRange();
   beforeStart.selectNodeContents(root);
   beforeStart.setEnd(range.startContainer, range.startOffset);
@@ -327,6 +386,7 @@ export const ReaderSelectionActions = forwardRef<ReaderSelectionActionsHandle, {
   const [commentError, setCommentError] = useState<string | null>(null);
   const [localMark, setLocalMark] = useState<ReaderMark | null>(() => loadMark(contextId));
   const [marginPositions, setMarginPositions] = useState<MarginPosition[]>([]);
+  const [contentRevision, setContentRevision] = useState(0);
   const migratedBookmark = useRef<string | null>(null);
   const usesSyncedBookmark = !!onCreateAnnotation && !!onDeleteAnnotation;
   const bookmarkAnnotation = annotations.find((item) => item.kind === 'bookmark') ?? null;
@@ -342,12 +402,31 @@ export const ReaderSelectionActions = forwardRef<ReaderSelectionActionsHandle, {
 
   useEffect(() => {
     const next = usesSyncedBookmark ? null : loadMark(contextId);
+    const root = targetRef.current;
+    if (root) READER_TEXT_INDICES.delete(root);
     setActive(null);
     setActiveMarkActions(null);
     setActiveHighlightActions(null);
     setCommentEditor(null);
     setLocalMark(next);
   }, [contextId, usesSyncedBookmark]);
+
+  useEffect(() => {
+    const root = targetRef.current;
+    if (!root) return;
+    let frame = 0;
+    const observer = new MutationObserver(() => {
+      READER_TEXT_INDICES.delete(root);
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(() => setContentRevision((revision) => revision + 1));
+    });
+    observer.observe(root, { childList: true, characterData: true, subtree: true });
+    return () => {
+      cancelAnimationFrame(frame);
+      observer.disconnect();
+      READER_TEXT_INDICES.delete(root);
+    };
+  }, [contextId, targetRef]);
 
   useEffect(() => {
     onMarkChange?.(hasMark);
@@ -553,26 +632,33 @@ export const ReaderSelectionActions = forwardRef<ReaderSelectionActionsHandle, {
 
   useEffect(() => {
     const root = targetRef.current;
-    const registry = (CSS as unknown as { highlights?: Map<string, unknown> }).highlights;
+    const registry = (CSS as unknown as { highlights?: HighlightRegistry }).highlights;
     const HighlightConstructor = (window as unknown as { Highlight?: new (...ranges: Range[]) => unknown }).Highlight;
-    for (const name of ALL_HIGHLIGHT_NAMES) registry?.delete(name);
+    // PDF.js replaces the complete text layer whenever its scale or page changes.
+    // Rebuild the CSS Highlight ranges against those new nodes instead of leaving
+    // registrations attached to the disconnected previous text layer.
+    void contentRevision;
     if (!root || !registry || !HighlightConstructor) return;
+    const contextHighlights = new Map<string, Range[]>();
     for (const item of READER_ANNOTATION_COLORS) {
       const ranges = annotations
         .filter((annotation) => annotation.kind === 'highlight' && annotation.color === item.id)
         .map((annotation) => annotationRange(root, annotation))
         .filter((range): range is Range => range !== null);
-      if (ranges.length > 0) registry.set(HIGHLIGHT_NAMES[item.id], new HighlightConstructor(...ranges));
+      contextHighlights.set(HIGHLIGHT_NAMES[item.id], ranges);
     }
     const commentRanges = annotations
       .filter((annotation) => annotation.kind === 'comment')
       .map((annotation) => annotationRange(root, annotation))
       .filter((range): range is Range => range !== null);
-    if (commentRanges.length > 0) registry.set(COMMENT_HIGHLIGHT_NAME, new HighlightConstructor(...commentRanges));
+    contextHighlights.set(COMMENT_HIGHLIGHT_NAME, commentRanges);
+    READER_HIGHLIGHTS_BY_CONTEXT.set(contextId, contextHighlights);
+    repaintReaderHighlights(registry, HighlightConstructor);
     return () => {
-      for (const name of ALL_HIGHLIGHT_NAMES) registry.delete(name);
+      READER_HIGHLIGHTS_BY_CONTEXT.delete(contextId);
+      repaintReaderHighlights(registry, HighlightConstructor);
     };
-  }, [annotations, targetRef]);
+  }, [annotations, contentRevision, contextId, targetRef]);
 
   const copy = async () => {
     if (!active) return;

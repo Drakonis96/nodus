@@ -1,0 +1,26 @@
+# Nodus Connector privacy policy
+
+Last updated: 11 August 2026
+
+Nodus Connector has one purpose: capture a document or web reference chosen by the user and save it in the user's local Nodus Library.
+
+## Data handled
+
+Only after the user clicks the Nodus toolbar icon, the extension reads the active tab's URL, title, embedded bibliographic metadata, structured data, document links, and—if selected by the user—the page snapshot or document file. It also reads the collection and tag catalogue returned by the locally running Nodus desktop application.
+
+## Processing and storage
+
+Captured data is sent to the Nodus desktop application through the loopback address `127.0.0.1`. The pairing token and last selected collection are stored in Chrome's local extension storage. Nodus stores accepted records and files in the user's configured `nodus-library` folder.
+
+The extension does not send captured content, browsing activity, credentials, or library data to Nodus developers. It contains no analytics, advertising, tracking, or telemetry code. Bibliographic identifier enrichment performed by the desktop application may contact the public metadata providers documented by Nodus (for example Crossref, Open Library, PubMed, or arXiv).
+
+## Permissions
+
+- `activeTab` and `scripting`: inspect only the tab on which the user clicked the extension.
+- `storage`: retain the local pairing token, port, and last collection.
+- `http://127.0.0.1/*` and `http://localhost/*`: communicate with the local Nodus desktop application.
+- Optional per-site HTTP/HTTPS access: retrieve a user-selected attachment when its website requires the browser session. Chrome asks for this access at capture time.
+
+Users can revoke site permissions in Chrome, forget the pairing from the extension settings, disable the connector in Nodus, or delete captured records from the Nodus Library.
+
+Nodus Connector's use of information received from Chrome APIs complies with the Chrome Web Store User Data Policy, including its Limited Use requirements. Data is used only to provide the user-facing save-to-Nodus feature, is not transferred for advertising or profiling, and is not made available for human review except when the user explicitly supplies it for support or law requires it.

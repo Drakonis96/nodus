@@ -44,6 +44,9 @@ import { installProcessSafetyNet } from './util/processSafety';
 import { restoreAppWindows } from './windowLifecycle';
 import { registerImageProtocol, registerImageSchemePrivileges } from './imageProtocol';
 import { registerArchiveProtocol, registerArchiveSchemePrivileges } from './archiveProtocol';
+import { registerLibraryProtocol, registerLibrarySchemePrivileges } from './libraryProtocol';
+import { closeGlobalLibraryRuntime } from './library/libraryRuntime';
+import { ensurePreV4Recovery } from './recovery/preV4Recovery';
 import { applyUpdateChannel, isPrereleaseVersion } from './updateChannel';
 import {
   upgradeWorldbuildingDemoDynasties,
@@ -65,6 +68,7 @@ const { autoUpdater } = require('electron-updater') as typeof import('electron-u
 app.setName('Nodus');
 registerImageSchemePrivileges();
 registerArchiveSchemePrivileges();
+registerLibrarySchemePrivileges();
 
 if (process.platform === 'linux') {
   app.commandLine.appendSwitch('ozone-platform-hint', 'auto');
@@ -763,7 +767,7 @@ app.on('second-instance', () => {
   win.focus();
 });
 
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
   // Losing the lock queues a quit; do not open the database or a window.
   if (!hasSingleInstanceLock) return;
   restorePersistedDockIcon();
@@ -794,6 +798,14 @@ app.whenReady().then(() => {
   if (!process.env.NODUS_TESSDATA_CACHE) {
     process.env.NODUS_TESSDATA_CACHE = path.join(app.getPath('userData'), 'tessdata');
   }
+  // This must be the final operation before opening SQLite. Nodus 4 can rewrite
+  // schemas and Library manifests that a 3.x binary does not understand, so the first
+  // v4 launch takes and verifies one immutable copy while every database is closed.
+  const preV4 = await ensurePreV4Recovery({
+    userDataDirectory: app.getPath('userData'),
+    targetVersion: app.getVersion(),
+  });
+  if (preV4.snapshotPath) console.log(`[recovery] pre-v4 snapshot: ${preV4.snapshotPath}`);
   getDb(); // open + migrate before anything touches data
   upgradeWorldbuildingDemoDynasties();
   upgradeWorldbuildingDemoImageQuality();
@@ -801,6 +813,7 @@ app.whenReady().then(() => {
   relocalizeWorldbuildingDemoData();
   registerImageProtocol();
   registerArchiveProtocol();
+  registerLibraryProtocol();
   reconcileAuthorLayerOnce(); // one-time: collapse duplicate author nodes onto Zotero identity
   // Maintenance: drop ideas that have sat dormant (no occurrences) for >30 days.
   // Recent dormancy is kept — it lets fusion revive an idea with the same
@@ -889,7 +902,7 @@ app.whenReady().then(() => {
   void startLocalServerIfEnabled();
   if (settings.localServerKeepAwake) holdAwake();
   if (settings.copilotEnabled) void startCopilotServer();
-  if (settings.zoteroPluginEnabled) void startZoteroPluginServer();
+  if (settings.zoteroPluginEnabled || settings.browserConnectorEnabled) void startZoteroPluginServer();
   // Nodi mascot: open the always-on-top desktop window when the user has opted into it.
   seedWelcomeNotification();
   startStudyCalendarReminders();
@@ -933,6 +946,7 @@ app.on('window-all-closed', () => {
   stopReplicaSync();
     interruptDecorativeImageGenerations();
     stopAllWhisperCpp();
+    closeGlobalLibraryRuntime();
     closeDb();
     app.quit();
   }
@@ -966,6 +980,7 @@ app.on('before-quit', () => {
   // be abandoned mid-drain and leave the vendor runtimes running as orphans.
   killChatGptSubscriptionServer();
   void stopGitHubCopilotSubscription();
+  closeGlobalLibraryRuntime();
   closeDb();
 });
 
@@ -994,5 +1009,6 @@ updateAwareApp.on('before-quit-for-update', () => {
   // be abandoned mid-drain and leave the vendor runtimes running as orphans.
   killChatGptSubscriptionServer();
   void stopGitHubCopilotSubscription();
+  closeGlobalLibraryRuntime();
   closeDb();
 });

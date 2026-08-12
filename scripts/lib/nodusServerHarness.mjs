@@ -57,6 +57,7 @@ export function serverEnvironment(overrides = {}) {
     // NODUS_MAX_CACHED_SNAPSHOTS is refused by the server now, so a developer who still has
     // it exported would fail every boot here rather than see one clear message once.
     'NODUS_MAX_CACHED_SNAPSHOTS', 'NODUS_MAX_SNAPSHOT_CACHE_BYTES', 'NODUS_VECTOR_WORKERS',
+    'NODUS_SOURCE_URL',
   ]) delete env[name];
   return { ...env, ...overrides };
 }

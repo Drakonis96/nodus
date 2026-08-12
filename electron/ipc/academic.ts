@@ -44,6 +44,8 @@ import type {
   ImmersionRequest,
   ImmersionScopeRequest,
   ImportProjectChapterInput,
+  LibraryReaderChatMessage,
+  LibraryReaderChatRequest,
   ManualIdeaPayload,
   ManuscriptVerificationRequest,
   NotesExportOptions,
@@ -128,6 +130,14 @@ import { buildIdeaGraph, buildIdeaGraphOverview, buildIdeaThemeGraph, buildAutho
 import { streamDebateAnalysis } from '../ai/debate';
 import * as rqRepo from '../db/researchMapRepo';
 import * as writingAnnotations from '../db/writingAnnotationsRepo';
+import * as libraryReader from '../libraryReader/libraryReaderStore';
+import {
+  createLibraryReaderAnnotationInWorker,
+  deleteLibraryReaderAnnotationInWorker,
+  getLibraryReaderAttachmentContentInWorker,
+  updateLibraryReaderCommentInWorker,
+} from '../libraryReader/libraryReaderWorkerHost';
+import { streamLibraryReaderChat } from '../ai/libraryReaderChat';
 import { decomposeQuestion, mapCoverage } from '../ai/researchMap';
 import { exportResearchCoverage } from '../export/researchMapExport';
 import { exportData, importData } from '../export/exportImport';
@@ -316,9 +326,18 @@ function announceWritingDraftAnnotations(draftId: string | null): void {
   }
 }
 
+function announceLibraryReaderAnnotations(nodusId: string | null): void {
+  for (const win of BrowserWindow.getAllWindows()) {
+    if (!win.isDestroyed() && !win.webContents.isDestroyed()) {
+      win.webContents.send('libraryReader:annotations:changed', nodusId);
+    }
+  }
+}
+
 export function registerAcademicIpc({ h, getWindow, chatAborters }: IpcContext): void {
   const studyImproveAborters = new Map<string, AbortController>();
   const studyAssistantAborters = new Map<string, AbortController>();
+  const libraryReaderChatAborters = new Map<string, AbortController>();
 
   const queueImportedStudyKnowledge = async (
     results: Awaited<ReturnType<typeof importStudyMaterialPaths>>,
@@ -515,6 +534,72 @@ export function registerAcademicIpc({ h, getWindow, chatAborters }: IpcContext):
     }
     await shell.openExternal(zoteroSelectUrl(work.zotero_key));
     return { ok: true, mode: 'select' as const, page };
+  });
+  h('libraryReader:get', async (_e, nodusId: string) => libraryReader.getLibraryReaderDocument(nodusId));
+  h('libraryReader:attachmentContent', async (_e, nodusId: string, attachmentId: string) =>
+    getLibraryReaderAttachmentContentInWorker(nodusId, attachmentId));
+  h('libraryReader:openOriginal', async (_e, nodusId: string) => {
+    const originalPath = libraryReader.libraryReaderOriginalPath(nodusId);
+    if (!originalPath) return false;
+    return (await shell.openPath(originalPath)) === '';
+  });
+  h('libraryReader:annotations:list', async (_e, nodusId: string) =>
+    libraryReader.listLibraryReaderAnnotations(nodusId)
+  );
+  h('libraryReader:annotations:listOrphaned', async (_e, nodusId: string) =>
+    libraryReader.listLibraryReaderOrphanedAnnotations(nodusId)
+  );
+  h('libraryReader:annotations:create', async (_e, nodusId: string, input: WritingDraftAnnotationInput) => {
+    const annotation = await createLibraryReaderAnnotationInWorker(nodusId, { ...input, draftId: nodusId });
+    announceLibraryReaderAnnotations(nodusId);
+    return annotation;
+  });
+  h('libraryReader:annotations:updateComment', async (_e, nodusId: string, id: string, comment: string) => {
+    const annotation = await updateLibraryReaderCommentInWorker(nodusId, id, comment);
+    if (annotation) announceLibraryReaderAnnotations(nodusId);
+    return annotation;
+  });
+  h('libraryReader:annotations:delete', async (_e, nodusId: string, id: string) => {
+    const deleted = await deleteLibraryReaderAnnotationInWorker(nodusId, id);
+    if (deleted) announceLibraryReaderAnnotations(nodusId);
+    return deleted;
+  });
+  h('libraryReader:chat:list', async (_e, nodusId: string) =>
+    libraryReader.listLibraryReaderChatMessages(nodusId)
+  );
+  h('libraryReader:chat:clear', async (_e, nodusId: string) => {
+    libraryReader.clearLibraryReaderChat(nodusId);
+  });
+  h('libraryReader:chat:stream', async (event, requestId: string, request: LibraryReaderChatRequest) => {
+    const controller = new AbortController();
+    libraryReaderChatAborters.set(requestId, controller);
+    try {
+      const response = await streamLibraryReaderChat(
+        request,
+        (delta, kind) => event.sender.send(
+          kind === 'reasoning' ? 'libraryReader:chat:reasoning' : 'libraryReader:chat:delta',
+          requestId,
+          delta,
+        ),
+        controller.signal,
+      );
+      const persisted: LibraryReaderChatMessage[] = [
+        ...request.messages,
+        ...(response.answer ? [{
+          id: `assistant:${requestId}`,
+          role: 'assistant' as const,
+          content: response.answer,
+          createdAt: new Date().toISOString(),
+        }] : []),
+      ];
+      libraryReader.saveLibraryReaderChatMessages(request.documentId, persisted);
+      return response;
+    } finally {
+      libraryReaderChatAborters.delete(requestId);
+    }
+  });
+  h('libraryReader:chat:cancel', async (_e, requestId: string) => {
+    libraryReaderChatAborters.get(requestId)?.abort();
   });
   h('study:knowledge:processing:resolve', async (event, requestId: string, decision) => {
     resolveStudyMaterialAiProcessingRequest(event.sender.id, requestId, decision);

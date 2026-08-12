@@ -6,6 +6,7 @@ import { setLightResult } from '../db/worksRepo';
 import { getSettings } from '../db/settingsRepo';
 import type { Work, ModelRef } from '@shared/types';
 import crypto from 'node:crypto';
+import { recordLinkedLibraryAnalysis } from '../library/libraryVaultProvenance';
 
 interface LightResult {
   themes: { label: string; confidence: number }[];
@@ -99,6 +100,7 @@ export async function runLightScan(
     // labels accumulating after prompt/model changes or global reassignments.
     setWorkThemes(work.nodus_id, labels);
     setLightResult(work.nodus_id, 'done', hash, result.notes ?? null);
+    recordLinkedLibraryAnalysis({ workId: work.nodus_id, components: ['light'], documentFingerprint: hash });
   } catch (e) {
     if (e instanceof AiError && e.config) throw e;
     setLightResult(work.nodus_id, 'failed', hash, (e as Error).message);

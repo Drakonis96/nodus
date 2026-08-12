@@ -10,6 +10,7 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { app, BrowserWindow, shell } from 'electron';
 import type { CopilotServerStatus } from '@shared/types';
+import type { OfficeCitationDocumentRequest, OfficeEditorCommand } from '@shared/officeCitationTypes';
 import { localizeRuntimeError } from '@shared/uiLanguage';
 import { getSettings, updateSettings } from '../db/settingsRepo';
 import { loadCopilotCert, loadCopilotCa, certReady, copilotStateDir, renewLeafIfNeeded } from './certs';
@@ -24,8 +25,16 @@ import {
 } from '../ai/liveRelations';
 import { embeddedIdeaCount } from '../db/ideasRepo';
 import { getDb } from '../db/database';
+import {
+  formatGlobalLibraryOfficeDocument,
+  listGlobalLibraryCitationStyles,
+  searchGlobalLibraryOfficeReferences,
+} from '../library/libraryService';
 
-const MAX_REQUEST_BYTES = 1 * 1024 * 1024;
+// A large academic document can legitimately contain thousands of embedded,
+// offline-safe citation snapshots. The bridge is loopback-only and token
+// authenticated, so keep a bounded but realistic document payload ceiling.
+const MAX_REQUEST_BYTES = 16 * 1024 * 1024;
 
 let httpServer: Server | null = null;
 let status: CopilotServerStatus = { running: false, port: null, addinUrl: null, certReady: false, error: null };
@@ -35,15 +44,13 @@ let getMainWindow: (() => BrowserWindow | null) | null = null;
 interface EditorState {
   paragraphText: string;
   selectionText: string;
+  documentId?: string;
+  references?: unknown;
 }
 
 // One text to place in the external editor, with the same placement options the
 // Word pane uses: as a footnote, and/or replacing the current selection.
-interface EditorInsertion {
-  text: string;
-  asFootnote: boolean;
-  replace: boolean;
-}
+type EditorInsertion = OfficeEditorCommand;
 
 // Bridge state for external editors (LibreOffice Writer): the macro pushes the
 // current paragraph/selection here and long-polls for texts to insert, while the
@@ -298,6 +305,37 @@ export async function handleRequest(req: IncomingMessage, res: ServerResponse, p
       sendJson(res, 200, insertion);
       return;
     }
+    if (urlPath === '/api/references/styles' && req.method === 'GET') {
+      sendJson(res, 200, { styles: listGlobalLibraryCitationStyles() });
+      return;
+    }
+    if (urlPath === '/api/references/search' && req.method === 'POST') {
+      const body = (await readJsonBody(req)) as { query?: string; limit?: number };
+      const references = await searchGlobalLibraryOfficeReferences(String(body.query ?? ''), Number(body.limit ?? 40));
+      sendJson(res, 200, { references });
+      return;
+    }
+    if (urlPath === '/api/references/format-document' && req.method === 'POST') {
+      const body = (await readJsonBody(req)) as Partial<OfficeCitationDocumentRequest>;
+      if (!body.style || typeof body.style !== 'string' || !Array.isArray(body.citations)) {
+        sendJson(res, 400, { error: copilotText('La solicitud de citas no es válida.', 'The citation request is invalid.') });
+        return;
+      }
+      if (body.citations.length > 5000 || body.citations.some((citation) => !citation || !Array.isArray(citation.citationItems) || citation.citationItems.length > 100)) {
+        sendJson(res, 400, { error: copilotText('El documento contiene demasiadas referencias en una sola operación.', 'The document contains too many references for one operation.') });
+        return;
+      }
+      const result = await formatGlobalLibraryOfficeDocument({
+        style: body.style,
+        locale: typeof body.locale === 'string' && body.locale.trim() ? body.locale.trim() : 'es-ES',
+        citations: body.citations,
+        uncitedItemIds: Array.isArray(body.uncitedItemIds) ? body.uncitedItemIds.map(String) : [],
+        uncitedItems: Array.isArray(body.uncitedItems) ? body.uncitedItems : [],
+        excludedItemIds: Array.isArray(body.excludedItemIds) ? body.excludedItemIds.map(String) : [],
+      });
+      sendJson(res, 200, result);
+      return;
+    }
     if (urlPath === '/api/nodus/open' && req.method === 'POST') {
       const body = (await readJsonBody(req)) as { ideaId?: string };
       if (!body.ideaId) {
@@ -334,9 +372,11 @@ export async function handleRequest(req: IncomingMessage, res: ServerResponse, p
       return;
     }
     if (urlPath === '/api/editor/update-text' && req.method === 'POST') {
-      const body = (await readJsonBody(req)) as { paragraphText?: string; selectionText?: string };
+      const body = (await readJsonBody(req)) as { paragraphText?: string; selectionText?: string; documentId?: string; references?: unknown };
       editorState.paragraphText = String(body.paragraphText ?? '');
       editorState.selectionText = String(body.selectionText ?? '');
+      if (body.documentId !== undefined) editorState.documentId = String(body.documentId ?? '');
+      if (body.references !== undefined) editorState.references = body.references;
       sendJson(res, 200, { ok: true });
       return;
     }
@@ -345,11 +385,17 @@ export async function handleRequest(req: IncomingMessage, res: ServerResponse, p
       return;
     }
     if (urlPath === '/api/editor/insert' && req.method === 'POST') {
-      const body = (await readJsonBody(req)) as { text?: string; asFootnote?: boolean; replace?: boolean };
+      const body = (await readJsonBody(req)) as Partial<OfficeEditorCommand>;
       const insertion: EditorInsertion = {
+        command: body.command ?? 'insert-text',
         text: String(body.text ?? ''),
+        ...(typeof body.html === 'string' ? { html: body.html } : {}),
         asFootnote: Boolean(body.asFootnote),
         replace: Boolean(body.replace),
+        ...(body.field ? { field: body.field } : {}),
+        ...(Array.isArray(body.citationUpdates) ? { citationUpdates: body.citationUpdates } : {}),
+        ...(body.bibliography !== undefined ? { bibliography: body.bibliography } : {}),
+        ...(body.preferences ? { preferences: body.preferences } : {}),
       };
       const resolver = pendingInsertionResolvers.shift();
       if (resolver) resolver(insertion);

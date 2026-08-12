@@ -15,6 +15,17 @@ const nodusUrlTransform = (value: string) => {
   return defaultUrlTransform(value);
 };
 
+// The reader updates its current section while smooth-scrolling. That can remount
+// the Markdown subtree, so keep the last in-text origin outside the component as
+// well as in its local ref. Stale entries are harmless: a missing source element
+// falls back to the saved scroll offset, and the next citation replaces it.
+interface InternalBackTarget {
+  sourceId: string;
+  scrollTop: number | null;
+}
+
+const INTERNAL_BACK_TARGETS = new Map<string, InternalBackTarget>();
+
 /**
  * Renders AI-authored Markdown (tutor narration, chat answers). Links never navigate
  * the renderer: external links open in the user's browser via the safe `openExternal`
@@ -27,10 +38,17 @@ export interface MarkdownCitation {
   id: string;
 }
 
+export interface MarkdownReaderCitation {
+  documentId: string;
+  sectionId?: string;
+  page?: number;
+}
+
 export function Markdown({
   content,
   className = '',
   onCitation,
+  onReaderCitation,
   onStudyDocument,
   onStudyMaterial,
   onStudyRecording,
@@ -38,10 +56,14 @@ export function Markdown({
   onWorldEntry,
   onTestimonyLink,
   verify = true,
+  allowDataImages = false,
 }: {
   content: string;
   className?: string;
   onCitation?: (citation: MarkdownCitation) => void;
+  /** `nodus://reader/<document>[/section/<id>|/page/<n>]` returns to traced
+   * evidence inside the currently open Library document. */
+  onReaderCitation?: (citation: MarkdownReaderCitation) => void;
   /** `nodus://world/<kind>/<id>`. `kind` is `new` when the entry does not exist yet. */
   onWorldEntry?: (kind: string, id: string) => void;
   /** `nodus://testimonios/...`: abre la entrevista, el participante o el contraste, y
@@ -53,10 +75,42 @@ export function Markdown({
   onStudyEvidence?: (citationId: string) => void;
   /** Resolve each `nodus://` citation against the corpus and flag unresolved ones. */
   verify?: boolean;
+  /** Only for trusted local reader assets already confined by the main process. */
+  allowDataImages?: boolean;
 }) {
   // Validity of each citation, keyed by `${kind}:${id}`. A key absent from the map
   // is still being checked (treated as neutral); `false` means it did not resolve.
   const [validity, setValidity] = useState<Record<string, boolean>>({});
+  const internalBackTargets = useRef<Record<string, InternalBackTarget>>({});
+  const internalAnchorSequence = useRef(0);
+
+  const navigateInternalAnchor = (origin: HTMLAnchorElement): void => {
+    const href = origin.getAttribute('href');
+    if (!href) return;
+    const targetId = decodeURIComponent(href.slice(1));
+    const target = document.getElementById(targetId);
+    const storedReturn = internalBackTargets.current[targetId] ?? INTERNAL_BACK_TARGETS.get(targetId);
+    const returnTarget = storedReturn ?? (target?.dataset.nodusReturnId
+      ? { sourceId: target.dataset.nodusReturnId, scrollTop: null }
+      : undefined);
+    if (target?.contains(origin) && returnTarget) {
+      const source = document.getElementById(returnTarget.sourceId);
+      if (source) {
+        source.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      } else if (returnTarget.scrollTop !== null) {
+        const scrollSurface = origin.closest('.library-reader-clean-surface') as HTMLElement | null;
+        scrollSurface?.scrollTo({ top: returnTarget.scrollTop, behavior: 'smooth' });
+      }
+      return;
+    }
+    if (!origin.id) origin.id = `nodus-internal-source-${++internalAnchorSequence.current}`;
+    const scrollSurface = origin.closest('.library-reader-clean-surface') as HTMLElement | null;
+    const backTarget = { sourceId: origin.id, scrollTop: scrollSurface?.scrollTop ?? null };
+    internalBackTargets.current[targetId] = backTarget;
+    INTERNAL_BACK_TARGETS.set(targetId, backTarget);
+    if (target) target.dataset.nodusReturnId = origin.id;
+    target?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  };
 
   // Verification is deliberately deferred rather than run per render.
   //
@@ -99,9 +153,40 @@ export function Markdown({
       <ReactMarkdown
         remarkPlugins={[remarkGfm, remarkMath]}
         rehypePlugins={[rehypeKatex]}
-        urlTransform={nodusUrlTransform}
+        urlTransform={(value, key) => {
+          if (allowDataImages && key === 'src' && /^data:image\/(?:png|jpeg|gif|webp|svg\+xml);base64,/i.test(value)) return value;
+          return nodusUrlTransform(value);
+        }}
         components={{
-          a: ({ href, children }) => {
+          p: ({ node, children, ...props }) => {
+            const first = (node as any)?.children?.[0];
+            const href = first?.tagName === 'a' ? String(first.properties?.href ?? '') : '';
+            const id = href.startsWith('#nodus-reference-') ? decodeURIComponent(href.slice(1)) : undefined;
+            return <p {...props} id={id}>{children}</p>;
+          },
+          a: ({ node: _node, href, children, ...anchorProps }) => {
+            if (href && href.startsWith('#')) {
+              return <a {...anchorProps} href={href} data-nodus-internal-anchor="true" onClick={(event) => {
+                event.preventDefault();
+                navigateInternalAnchor(event.currentTarget);
+              }}>{children}</a>;
+            }
+            const readerCitation = href?.match(/^nodus:\/\/reader\/([^/?]+)(?:\/(section|page)\/([^?]+))?$/);
+            if (readerCitation && onReaderCitation) {
+              const documentId = decodeURIComponent(readerCitation[1]);
+              const target = readerCitation[2];
+              const value = readerCitation[3] ? decodeURIComponent(readerCitation[3]) : undefined;
+              return <button
+                className="citation-link"
+                data-citation-kind="reader"
+                title={t('Abrir cita en el lector')}
+                onClick={() => onReaderCitation({
+                  documentId,
+                  ...(target === 'section' && value ? { sectionId: value } : {}),
+                  ...(target === 'page' && value && Number.isFinite(Number(value)) ? { page: Number(value) } : {}),
+                })}
+              >{children}</button>;
+            }
             const studyMaterial = href?.match(/^nodus:\/\/study\/material\/([^?]+)(?:\?.*)?$/);
             if (studyMaterial && onStudyMaterial) {
               return <button className="text-teal-400 underline decoration-teal-700 underline-offset-2 hover:text-teal-300" onClick={() => onStudyMaterial(decodeURIComponent(studyMaterial[1]))}>{children}</button>;
@@ -188,6 +273,7 @@ export function Markdown({
             }
             return (
               <a
+                {...anchorProps}
                 href={href}
                 onClick={(e) => {
                   e.preventDefault();

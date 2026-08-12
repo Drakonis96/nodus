@@ -155,6 +155,16 @@ const RELEASE_3_2_4_IT: string[] = [
 ];
 
 export const RELEASE_NOTES_IT: Record<string, string[]> = {
+  "4.0.0": [
+    "Biblioteca riunisce Globale e Questo vault in un'unica schermata. Chi aggiorna da Nodus 3 conserva inizialmente corpus, filtri, analisi e raccolte monitorate, e può attivare la biblioteca trasversale quando preferisce.",
+    "La migrazione globale è facoltativa, mostra inventario, spazio e avanzamento e può essere annullata, ripresa o invertita senza modificare i vault di origine. Prima di convertire i dati, il primo avvio di Nodus 4 crea e verifica una copia di ripristino pre-v4.",
+    "Nodus può ora gestire una biblioteca senza Zotero. Crea e modifica riferimenti, autori, tag, relazioni, allegati e raccolte, usa ricerche intelligenti e cestino, risolve identificatori e produce importazioni, esportazioni e citazioni offline.",
+    "La Biblioteca si adatta al lavoro quotidiano. Trascina file in una raccolta, apri le azioni con il tasto destro, configura e sposta le colonne e lascia che Nodus deduca la scheda. I documenti brevi mostrano l’avanzamento, quelli lunghi entrano in una coda in background mentre si apre l’originale.",
+    "Il lettore pulito mantiene separato l'originale e collega testo, pagine, immagini, tabelle e figure. Permette evidenziazioni, note, segnalibri di sezione e domande in chat, mentre impronte esatte impediscono alle analisi obsolete di apparire attuali.",
+    "Il lettore apre Markdown pulito, PDF, EPUB, documenti, fogli di calcolo e immagini in schede compatte. La ricerca funziona in ogni formato, le viste continua e a pagina singola conservano le evidenziazioni durante lo zoom e la chat condivide le capacità di Nodi per citare documento e vault.",
+    "Le citazioni arrivano in Biblioteca, Word e LibreOffice con riferimenti attivi, note e bibliografie. I selettori cercano senza dipendere da trattini o accenti e il gestore installa stili dal repository CSL ufficiale o da Zotero preservandone la licenza. Il connettore del browser aggiunge pagine e file con raccolta e tag.",
+    "Nodus 4 è pubblicato esclusivamente con licenza AGPL-3.0. Informazioni su Nodus mostra la licenza e il codice sorgente esatto di questa versione, e Nodus Server offre lo stesso collegamento a chiunque lo utilizzi tramite la rete.",
+  ],
   "3.2.7": RELEASE_3_2_7_IT,
   "3.2.6": RELEASE_3_2_6_IT,
   "3.2.5": RELEASE_3_2_5_IT,

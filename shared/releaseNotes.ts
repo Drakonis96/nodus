@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Jorge Pérez Burgueño and Nodus contributors
+// SPDX-License-Identifier: AGPL-3.0-only
+
 // Human-facing "what's new" notes shown once after the app updates to a new
 // version. Newest first. Each highlight covers every supported UI language so
 // the modal follows the interface. Keep these short and user-facing — they are
@@ -1077,7 +1080,87 @@ const RELEASE_3_2_4_HIGHLIGHTS: RawReleaseHighlight[] = [
   },
 ];
 
+const RELEASE_4_0_0_HIGHLIGHTS: RawReleaseHighlight[] = [
+  {
+    scope: 'academic',
+    es: 'Biblioteca reúne Global y Este vault en una sola pantalla. Quien actualiza desde Nodus 3 conserva de entrada su corpus, filtros, análisis y colecciones monitorizadas, y puede activar la biblioteca transversal cuando quiera.',
+    en: 'Library brings Global and This vault into one screen. People updating from Nodus 3 initially keep their corpus, filters, analyses and monitored collections, and can enable the cross-vault library whenever they choose.',
+    fr: 'Bibliothèque réunit Global et Ce coffre sur un seul écran. Après une mise à jour depuis Nodus 3, le corpus, les filtres, les analyses et les collections surveillées restent disponibles, et la bibliothèque transversale peut être activée à tout moment.',
+    de: 'Bibliothek vereint Global und Dieser Tresor in einer Ansicht. Nach einem Update von Nodus 3 bleiben Korpus, Filter, Analysen und überwachte Sammlungen zunächst erhalten, und die tresorübergreifende Bibliothek kann jederzeit aktiviert werden.',
+    pt: 'Biblioteca reúne Global e Este cofre num único ecrã. Quem atualiza a partir do Nodus 3 mantém inicialmente o corpus, os filtros, as análises e as coleções monitorizadas, podendo ativar a biblioteca transversal quando quiser.',
+    'pt-BR': 'Biblioteca reúne Global e Este cofre em uma única tela. Quem atualiza do Nodus 3 mantém inicialmente o corpus, os filtros, as análises e as coleções monitoradas, podendo ativar a biblioteca transversal quando quiser.',
+  },
+  {
+    scope: 'general',
+    es: 'La migración global es opcional, muestra inventario, espacio y progreso, y se puede cancelar, reanudar o revertir sin tocar los vaults fuente. Antes de convertir datos, el primer inicio de Nodus 4 crea y verifica una copia de recuperación pre-v4.',
+    en: 'Global migration is optional, shows inventory, space and progress, and can be cancelled, resumed or rolled back without changing source vaults. Before converting data, the first Nodus 4 launch creates and verifies a pre-v4 recovery copy.',
+    fr: 'La migration globale est facultative, affiche l’inventaire, l’espace et la progression, et peut être annulée, reprise ou inversée sans modifier les coffres sources. Avant toute conversion, le premier lancement de Nodus 4 crée et vérifie une copie de récupération pré-v4.',
+    de: 'Die globale Migration ist optional, zeigt Bestand, Speicherbedarf und Fortschritt und kann abgebrochen, fortgesetzt oder zurückgerollt werden, ohne Quelltresore zu ändern. Vor der Konvertierung erstellt und prüft der erste Start von Nodus 4 eine Vor-v4-Sicherung.',
+    pt: 'A migração global é opcional, mostra inventário, espaço e progresso e pode ser cancelada, retomada ou revertida sem alterar os cofres de origem. Antes de converter dados, o primeiro arranque do Nodus 4 cria e verifica uma cópia de recuperação pré-v4.',
+    'pt-BR': 'A migração global é opcional, mostra inventário, espaço e progresso e pode ser cancelada, retomada ou revertida sem alterar os cofres de origem. Antes de converter dados, a primeira inicialização do Nodus 4 cria e verifica uma cópia de recuperação pré-v4.',
+  },
+  {
+    scope: 'academic',
+    es: 'Nodus ya puede mantener una biblioteca sin Zotero. Crea y edita referencias, autores, etiquetas, relaciones, adjuntos y colecciones, añade búsquedas inteligentes y papelera, resuelve identificadores y produce importaciones, exportaciones y citas sin red.',
+    en: 'Nodus can now maintain a library without Zotero. Create and edit references, authors, tags, relations, attachments and collections, add smart searches and trash, resolve identifiers, and produce offline imports, exports and citations.',
+    fr: 'Nodus peut maintenant gérer une bibliothèque sans Zotero. Créez et modifiez les références, auteurs, étiquettes, relations, pièces jointes et collections, utilisez les recherches intelligentes et la corbeille, résolvez les identifiants et produisez des imports, exports et citations hors ligne.',
+    de: 'Nodus kann jetzt eine Bibliothek ohne Zotero verwalten. Referenzen, Urheber, Tags, Beziehungen, Anhänge und Sammlungen lassen sich erstellen und bearbeiten. Hinzu kommen intelligente Suchen, Papierkorb, Kennungsauflösung sowie Offline-Importe, Exporte und Zitate.',
+    pt: 'O Nodus pode agora manter uma biblioteca sem o Zotero. Crie e edite referências, autores, etiquetas, relações, anexos e coleções, use pesquisas inteligentes e o lixo, resolva identificadores e produza importações, exportações e citações sem rede.',
+    'pt-BR': 'O Nodus agora pode manter uma biblioteca sem o Zotero. Crie e edite referências, autores, etiquetas, relações, anexos e coleções, use pesquisas inteligentes e a lixeira, resolva identificadores e produza importações, exportações e citações sem rede.',
+  },
+  {
+    scope: 'academic',
+    es: 'La Biblioteca se adapta al trabajo diario. Arrastra archivos a una colección, abre acciones con el botón derecho, configura y mueve columnas y deja que Nodus infiera la ficha. Los documentos breves muestran progreso y los largos pasan a una cola en segundo plano mientras se abre el original.',
+    en: 'Library now fits everyday work. Drop files into a collection, open actions with a right click, configure and move columns, and let Nodus infer the record. Short documents show progress while long ones enter a background queue and open the original.',
+    fr: 'La Bibliothèque s’adapte au travail quotidien. Déposez des fichiers dans une collection, ouvrez les actions par clic droit, configurez et déplacez les colonnes et laissez Nodus déduire la notice. Les documents courts affichent leur progression et les longs rejoignent une file en arrière-plan pendant l’ouverture de l’original.',
+    de: 'Die Bibliothek passt zum Arbeitsalltag. Dateien lassen sich in Sammlungen ziehen, Aktionen per Rechtsklick öffnen und Spalten konfigurieren und verschieben. Nodus leitet den Datensatz ab. Kurze Dokumente zeigen Fortschritt, lange gehen in eine Hintergrundwarteschlange und öffnen das Original.',
+    pt: 'A Biblioteca adapta-se ao trabalho diário. Arraste ficheiros para uma coleção, abra ações com o botão direito, configure e mova colunas e deixe o Nodus inferir o registo. Documentos curtos mostram progresso e os longos entram numa fila em segundo plano enquanto o original abre.',
+    'pt-BR': 'A Biblioteca se adapta ao trabalho diário. Arraste arquivos para uma coleção, abra ações com o botão direito, configure e mova colunas e deixe o Nodus inferir o registro. Documentos curtos mostram progresso e os longos entram numa fila em segundo plano enquanto o original abre.',
+  },
+  {
+    scope: 'academic',
+    es: 'El lector limpio conserva el original por separado y enlaza texto, páginas, imágenes, tablas y figuras. Permite subrayar, anotar, marcar secciones y preguntar al chat, mientras las huellas exactas impiden mostrar análisis obsoletos como actuales.',
+    en: 'The clean reader keeps the original separate and links text, pages, images, tables and figures. It supports highlights, notes, section bookmarks and chat questions, while exact fingerprints prevent stale analysis from appearing current.',
+    fr: 'Le lecteur propre conserve l’original séparé et relie texte, pages, images, tableaux et figures. Il permet de surligner, annoter, marquer des sections et interroger le chat, tandis que des empreintes exactes empêchent une analyse obsolète de paraître actuelle.',
+    de: 'Der bereinigte Reader hält das Original getrennt und verknüpft Text, Seiten, Bilder, Tabellen und Abbildungen. Markierungen, Notizen, Abschnittslesezeichen und Chatfragen sind möglich, während exakte Fingerabdrücke veraltete Analysen kenntlich machen.',
+    pt: 'O leitor limpo mantém o original separado e liga texto, páginas, imagens, tabelas e figuras. Permite sublinhar, anotar, marcar secções e perguntar ao chat, enquanto impressões digitais exatas impedem que análises obsoletas pareçam atuais.',
+    'pt-BR': 'O leitor limpo mantém o original separado e liga texto, páginas, imagens, tabelas e figuras. Permite destacar, anotar, marcar seções e perguntar ao chat, enquanto impressões digitais exatas impedem que análises obsoletas pareçam atuais.',
+  },
+  {
+    scope: 'academic',
+    es: 'El lector abre Markdown limpio, PDF, EPUB, documentos, hojas de cálculo e imágenes en pestañas compactas. La búsqueda funciona en todos los formatos, las vistas continua e individual conservan subrayados al ampliar y el chat comparte las capacidades de Nodi para citar el documento y el vault.',
+    en: 'The reader opens clean Markdown, PDF, EPUB, documents, spreadsheets, and images in compact tabs. Search works across formats, continuous and single-page views preserve highlights while zooming, and chat shares Nodi capabilities for citing the document and vault.',
+    fr: 'Le lecteur ouvre Markdown propre, PDF, EPUB, documents, feuilles de calcul et images dans des onglets compacts. La recherche fonctionne dans tous les formats, les vues continue et page unique conservent les surlignages au zoom et le chat partage les capacités de Nodi pour citer le document et le coffre.',
+    de: 'Der Reader öffnet bereinigtes Markdown, PDF, EPUB, Dokumente, Tabellen und Bilder in kompakten Reitern. Die Suche funktioniert in allen Formaten, fortlaufende und Einzelseitenansicht bewahren Markierungen beim Zoomen und der Chat nutzt Nodi-Fähigkeiten für Belege aus Dokument und Tresor.',
+    pt: 'O leitor abre Markdown limpo, PDF, EPUB, documentos, folhas de cálculo e imagens em separadores compactos. A pesquisa funciona em todos os formatos, as vistas contínua e individual preservam os sublinhados ao ampliar e o chat partilha as capacidades do Nodi para citar o documento e o cofre.',
+    'pt-BR': 'O leitor abre Markdown limpo, PDF, EPUB, documentos, planilhas e imagens em abas compactas. A pesquisa funciona em todos os formatos, as vistas contínua e individual preservam destaques ao ampliar e o chat compartilha os recursos do Nodi para citar o documento e o cofre.',
+  },
+  {
+    scope: 'plugin',
+    es: 'Las citas llegan a Biblioteca, Word y LibreOffice con referencias vivas, notas y bibliografías. Los selectores buscan sin depender de guiones o acentos y el gestor instala estilos del repositorio oficial CSL o de tu Zotero conservando su licencia. El conector del navegador añade páginas y archivos con colección y etiquetas.',
+    en: 'Citations reach Library, Word, and LibreOffice with live references, notes, and bibliographies. Style pickers search without depending on hyphens or accents and the manager installs styles from the official CSL repository or your Zotero while preserving their license. The browser connector adds pages and files with collections and tags.',
+    fr: 'Les citations arrivent dans Bibliothèque, Word et LibreOffice avec références actives, notes et bibliographies. Les sélecteurs recherchent sans dépendre des traits d’union ou accents et le gestionnaire installe les styles du dépôt CSL officiel ou de votre Zotero en préservant leur licence. Le connecteur du navigateur ajoute pages et fichiers avec collection et étiquettes.',
+    de: 'Zitate kommen mit lebenden Referenzen, Fußnoten und Bibliografien in Bibliothek, Word und LibreOffice. Die Stilsuche hängt nicht von Bindestrichen oder Akzenten ab und installiert Stile aus dem offiziellen CSL-Repository oder Zotero unter Erhalt der Lizenz. Der Browser-Connector fügt Seiten und Dateien mit Sammlung und Tags hinzu.',
+    pt: 'As citações chegam à Biblioteca, Word e LibreOffice com referências vivas, notas e bibliografias. Os seletores pesquisam sem depender de hífenes ou acentos e o gestor instala estilos do repositório CSL oficial ou do seu Zotero preservando a licença. O conector do navegador adiciona páginas e ficheiros com coleção e etiquetas.',
+    'pt-BR': 'As citações chegam à Biblioteca, Word e LibreOffice com referências vivas, notas e bibliografias. Os seletores pesquisam sem depender de hífens ou acentos e o gerenciador instala estilos do repositório CSL oficial ou do seu Zotero preservando a licença. O conector do navegador adiciona páginas e arquivos com coleção e etiquetas.',
+  },
+  {
+    scope: 'general',
+    es: 'Nodus 4 se publica bajo AGPL-3.0 exclusivamente. Acerca de Nodus muestra la licencia y el código fuente exacto de la versión, y Nodus Server ofrece el mismo enlace a toda persona que lo usa por red.',
+    en: 'Nodus 4 is released exclusively under AGPL-3.0. About Nodus shows the license and exact source code for this version, and Nodus Server offers the same link to everyone who uses it over a network.',
+    fr: 'Nodus 4 est publié exclusivement sous AGPL-3.0. À propos de Nodus affiche la licence et le code source exact de cette version, et Nodus Server propose le même lien à toute personne qui l’utilise par le réseau.',
+    de: 'Nodus 4 wird ausschließlich unter AGPL-3.0 veröffentlicht. Über Nodus zeigt die Lizenz und den genauen Quellcode dieser Version, und Nodus Server bietet denselben Link allen an, die ihn über ein Netzwerk nutzen.',
+    pt: 'O Nodus 4 é publicado exclusivamente sob AGPL-3.0. Acerca do Nodus mostra a licença e o código-fonte exato desta versão, e o Nodus Server oferece a mesma ligação a todas as pessoas que o usam pela rede.',
+    'pt-BR': 'O Nodus 4 é publicado exclusivamente sob AGPL-3.0. Sobre o Nodus mostra a licença e o código-fonte exato desta versão, e o Nodus Server oferece o mesmo link a todas as pessoas que o usam pela rede.',
+  },
+];
+
 const RAW_RELEASE_NOTES: RawReleaseNote[] = [
+  {
+    version: '4.0.0',
+    date: '2026-08-12',
+    highlights: RELEASE_4_0_0_HIGHLIGHTS,
+  },
   {
     version: '3.2.7',
     date: '2026-08-10',

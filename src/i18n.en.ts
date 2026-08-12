@@ -22,6 +22,10 @@ import { TESTIMONY_TRANSLATIONS } from './i18n.testimonies';
 import { NEW_VAULT_COMPLETION_TRANSLATIONS } from './i18n.newVaultCompletion';
 import { NODI_NOTIFICATION_TRANSLATIONS } from './i18n.nodiNotifications';
 import { ANNOUNCEMENT_TRANSLATIONS } from './i18n.announcements';
+import { LIBRARY_READER_TRANSLATIONS } from './i18n.libraryReader';
+import { LIBRARY_BIBLIOGRAPHY_TRANSLATIONS } from './i18n.libraryBibliography';
+import { LIBRARY_RECOVERY_TRANSLATIONS } from './i18n.libraryRecovery';
+import { LIBRARY_ONBOARDING_TRANSLATIONS } from './i18n.libraryOnboarding';
 
 /**
  * English translations keyed by the Spanish source string (see {@link ../i18n}).
@@ -29,6 +33,10 @@ import { ANNOUNCEMENT_TRANSLATIONS } from './i18n.announcements';
  * every non-Spanish interface language.
  */
 export const EN: Record<string, string> = {
+  ...LIBRARY_READER_TRANSLATIONS.en,
+  ...LIBRARY_BIBLIOGRAPHY_TRANSLATIONS.en,
+  ...LIBRARY_ONBOARDING_TRANSLATIONS.en,
+  ...LIBRARY_RECOVERY_TRANSLATIONS.en,
   ...DIARIZATION_TRANSLATIONS.en,
   ...PROSOPOGRAPHY_TRANSLATIONS.en,
   ...PRIMARY_SOURCES_TRANSLATIONS.en,
@@ -1230,6 +1238,7 @@ export const EN: Record<string, string> = {
   'Busca coincidencias en otras bóvedas y, si encuentra ideas, embeddings, resúmenes o pasajes ya generados, los importa antes de usar IA.':
     'Looks for matches in other vaults and, if it finds ideas, embeddings, summaries or passages that were already generated, imports them before using AI.',
   'Análisis reutilizado desde otras bóvedas para {n} obra(s).': 'Analysis reused from other vaults for {n} work(s).',
+  '{n} documento(s) añadidos; {reused} componente(s) reutilizados con huellas exactas.': '{n} document(s) added; {reused} component(s) reused with exact fingerprints.',
   'No se encontró análisis reutilizable en otras bóvedas para la selección.':
     'No reusable analysis was found in other vaults for the selection.',
   'Zona peligrosa': 'Danger zone',
@@ -2598,6 +2607,7 @@ export const EN: Record<string, string> = {
   Monitorizar: 'Monitor',
   'ítems directos · subcolecciones': 'direct items · subcollections',
   'Colecciones de Zotero': 'Zotero collections',
+  'Colecciones de Nodus': 'Nodus collections',
   'Monitorizando:': 'Monitoring:',
   'Ninguna colección': 'No collection',
   'Quitar del monitoreo': 'Remove from monitoring',
@@ -2850,6 +2860,19 @@ export const EN: Record<string, string> = {
   'Buscar entre tus informes…': 'Search your reports…',
   'Buscar en la página…': 'Search the page…',
   '0 resultados': 'No results',
+  'Buscar dentro del documento…': 'Search within this document…',
+  'Buscar dentro del documento': 'Search within this document',
+  'Preparando el índice de búsqueda…': 'Building the search index…',
+  'Este archivo no contiene una capa de texto que Nodus pueda buscar.': 'This file has no text layer Nodus can search.',
+  'Este PDF no contiene texto buscable. Abre el Markdown limpio para consultar el OCR.': 'This PDF has no searchable text. Open the clean Markdown to consult the OCR text.',
+  'Las imágenes no contienen una capa textual. Usa el Markdown limpio para buscar el OCR.': 'Images have no text layer. Use the clean Markdown to search the OCR text.',
+  'Coincidencia {current} de {total}': 'Match {current} of {total}',
+  'No se encontró ese texto': 'No matches found',
+  'Ir a la coincidencia anterior': 'Go to the previous match',
+  'Ir a la coincidencia siguiente': 'Go to the next match',
+  'Marcar coincidencias': 'Mark matches',
+  'Diferenciar mayúsculas': 'Distinguish letter case',
+  'Términos exactos': 'Whole terms only',
   'Más antiguos': 'Oldest',
   'Por título (A–Z)': 'By title (A–Z)',
   'Vista mosaico': 'Grid view',
@@ -5324,6 +5347,8 @@ export const EN: Record<string, string> = {
   '¿Crear también un apunte enlazado desde este fragmento?': 'Also create a linked note from this fragment?',
   'Cargando visor PDF…': 'Loading PDF viewer…',
   'Vista continua': 'Continuous view',
+  'Vista individual': 'Single-page view',
+  'Modo de visualización': 'View mode',
   'Ir a página': 'Go to page',
   'Restablecer zoom': 'Reset zoom',
   Miniaturas: 'Thumbnails',
@@ -7082,11 +7107,12 @@ export const EN: Record<string, string> = {
   "Ver lista RGPD": "View GDPR checklist",
   "RGPD oficial": "Official GDPR",
   "Licencias y atribuciones": "Licenses and attributions",
-  "Nodus se publica con licencia MIT. Las licencias, atribuciones y textos exigidos por cada componente, modelo, voz o conjunto de datos de terceros se incluyen con cada versión.": "Nodus is released under the MIT License. The licenses, attributions and notices required by each third-party component, model, voice or dataset are included with every release.",
-  "Licencia MIT": "MIT License",
+  "Nodus se publica exclusivamente con GNU AGPL v3. El código fuente exacto de esta versión y las licencias, atribuciones y textos exigidos por cada componente de terceros se incluyen con cada versión.": "Nodus is released exclusively under GNU AGPL v3. The exact source code for this version and the licenses, attributions and notices required by every third-party component are included with each release.",
+  "Licencia AGPL-3.0": "AGPL-3.0 license",
+  "Código fuente de esta versión": "Source code for this version",
   "Transparencia y seguridad": "Transparency and security",
   "El código, el historial y los documentos legales son públicos y auditables. Las vulnerabilidades pueden comunicarse de forma privada mediante GitHub Security Advisories.": "The source code, history and legal documents are public and auditable. Vulnerabilities can be reported privately through GitHub Security Advisories.",
-  "La exclusión de garantías de la licencia MIT se aplica solo en la medida permitida por la ley y no elimina obligaciones legales imperativas.": "The MIT License warranty disclaimer applies only to the extent permitted by law and does not remove mandatory legal obligations.",
+  "La exclusión de garantías de GNU AGPL v3 se aplica solo en la medida permitida por la ley y no elimina obligaciones legales imperativas.": "The GNU AGPL v3 warranty disclaimer applies only to the extent permitted by law and does not remove mandatory legal obligations.",
   "Ver repositorio": "View repository",
   "Informar de una vulnerabilidad": "Report a vulnerability",
   "IA y datos del alumnado": "AI and student data",
@@ -8168,6 +8194,17 @@ export const EN: Record<string, string> = {
   "Citar en Nodi": "Quote in Nodi",
   "Quitar cita": "Remove quote",
   "Texto visible de la sección abierta o documento completo en los lectores.": "Visible text from the open section, or the complete document in readers.",
+  "Ámbito de la Biblioteca": "Library scope",
+  "Este vault": "This vault",
+  "Global": "Global",
+  "Activar Global": "Enable Global",
+  "Configura las copias de seguridad para activar Global.": "Configure backups to enable Global.",
+  "Biblioteca global activada.": "Global Library enabled.",
+  "Global reúne originales y Markdown limpio para todos tus vaults.": "Global brings originals and clean Markdown together for all your vaults.",
+  "Este vault conserva colecciones, scans, resúmenes, embeddings y análisis existentes.": "This vault preserves existing collections, scans, summaries, embeddings, and analyses.",
+  "Activa la Biblioteca global cuando quieras; este vault no cambiará.": "Enable the Global Library whenever you want; this vault will not change.",
+  "Light": "Light",
+  "Deep": "Deep",
   "Limpieza automática de copias antiguas": "Automatic cleanup of old backups",
   "Usa el mismo día y hora que las copias automáticas. Si Nodus estaba cerrado, la limpieza pendiente se ejecuta al volver a abrirlo.": "Uses the same day and time as automatic backups. If Nodus was closed, overdue cleanup runs when you reopen it.",
   "Configura primero la carpeta de Recuperación y la contraseña maestra para poder verificar una copia superviviente.": "Set up the Recovery folder and master password first so a surviving backup can be verified.",
@@ -8204,4 +8241,14 @@ export const EN: Record<string, string> = {
   "La vista previa ya no está disponible. Revísala de nuevo antes de limpiar.": "The preview is no longer available. Review it again before cleaning.",
   "La carpeta de copias cambió desde la vista previa. No se ha modificado nada; revisa el alcance y vuelve a confirmar.": "The backup folder changed after the preview. Nothing was modified; review the scope and confirm again.",
   "La confirmación de limpieza no es válida. Revisa de nuevo el alcance.": "The cleanup confirmation is invalid. Review the scope again.",
+  "Nodus Connector para Chrome": "Nodus Connector for Chrome",
+  "Guarda la página o documento abierto en la Biblioteca de Nodus con metadatos, archivos, colección y etiquetas. Solo lee la pestaña cuando pulsas el icono.": "Save the open page or document to the Nodus Library with metadata, files, a collection, and tags. It only reads the tab when you click the icon.",
+  "Activar Nodus Connector para Chrome": "Enable Nodus Connector for Chrome",
+  "Listo para emparejar": "Ready to pair",
+  "Actívalo y deja Nodus abierto mientras guardas desde Chrome.": "Enable it and keep Nodus open while saving from Chrome.",
+  "Extensión guardada en:": "Extension saved to:",
+  "Descargar extensión de Chrome": "Download Chrome extension",
+  "Revocar navegadores emparejados": "Revoke paired browsers",
+  "Se ha revocado el acceso de los navegadores emparejados.": "Access for paired browsers has been revoked.",
+  "Chrome no permite que una app instale extensiones silenciosamente. Descarga el ZIP, descomprímelo y usa Cargar descomprimida en chrome://extensions.": "Chrome does not let an app install extensions silently. Download and extract the ZIP, then use Load unpacked in chrome://extensions.",
 };

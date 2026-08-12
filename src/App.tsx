@@ -377,7 +377,7 @@ export function App() {
     const outsideDedicatedWorkspace = dedicatedIds
       ? NAV_ITEMS.filter((item) => item.id !== 'home' && item.id !== 'settings' && !dedicatedIds.includes(item.id)).map((item) => item.id)
       : [];
-    return groupedNav(settings?.sidebarOrder ?? [], [...activeSidebarHidden, ...disallowed, ...outsideDedicatedWorkspace]);
+    return groupedNav(settings?.sidebarOrder ?? [], ['library', ...activeSidebarHidden, ...disallowed, ...outsideDedicatedWorkspace]);
   }, [settings?.sidebarOrder, activeSidebarHidden, activeVault?.type]);
 
   // If the active vault type doesn't allow the current view (e.g. switching from a
@@ -587,6 +587,7 @@ export function App() {
   }, []);
 
   const homeItem = NAV_ITEMS.find((n) => n.id === 'home')!;
+  const libraryItem = NAV_ITEMS.find((n) => n.id === 'library')!;
   const settingsItem = NAV_ITEMS.find((n) => n.id === 'settings')!;
   const dbSearchItem = NAV_ITEMS.find((n) => n.id === 'dbSearch')!;
   const [paletteOpen, setPaletteOpen] = useState(false);
@@ -925,7 +926,7 @@ export function App() {
   }, []);
 
   const openLibraryBucket = useCallback((healthBucket: CorpusHealthBucketId) => {
-    setLibraryTarget({ healthBucket, nonce: Date.now() });
+    setLibraryTarget({ scope: 'vault', healthBucket, nonce: Date.now() });
     setView('library');
   }, []);
 
@@ -944,6 +945,15 @@ export function App() {
       });
     });
   }, [navigate]);
+
+  useEffect(() => {
+    if (!window.nodus?.onZoteroPluginOpen) return undefined;
+    return window.nodus.onZoteroPluginOpen((target) => {
+      if (target.kind !== 'library-reader' || !target.id) return;
+      setLibraryTarget({ scope: 'global', readerItemId: target.id, nonce: Date.now() });
+      setView('library');
+    });
+  }, []);
 
   const openNoteFromSearch = useCallback((id: string) => {
     setNoteTarget({ id, nonce: Date.now() });
@@ -1029,7 +1039,7 @@ export function App() {
     if (!isPrimarySources && !isGenealogy && !isDatabases && !isEstudio && !isDocencia && !isWorldbuilding && !isProsopography && !isTestimonios) {
       actions.unshift(
         { id: 'act:sync', label: t('Actualizar (sincronizar Zotero)'), section: t('Acciones'), icon: 'sync', keywords: 'sync sincronizar', run: () => void onSync() },
-        { id: 'act:collections', label: t('Colecciones'), section: t('Acciones'), icon: 'folder', keywords: 'collections zotero', run: () => setCollectionsOpen(true) },
+        { id: 'act:collections', label: t('Colecciones de Zotero'), section: t('Acciones'), icon: 'folder', keywords: 'collections zotero', run: () => setCollectionsOpen(true) },
       );
     }
     return [...navCommands, ...actions];
@@ -1478,6 +1488,7 @@ export function App() {
                 return (
                   <>
                     {navButton(homeItem)}
+                    {navButton(libraryItem)}
                     <WorldbuildingSidebar
                       activeView={view}
                       onNavigate={(targetView) => setView(targetView)}
@@ -1495,6 +1506,7 @@ export function App() {
                 return (
                   <>
                     {navButton(homeItem)}
+                    {navButton(libraryItem)}
                     <ProsopographySidebar
                       activeView={view}
                       onNavigate={(targetView) => setView(targetView)}
@@ -1510,6 +1522,7 @@ export function App() {
                 return (
                   <>
                     {navButton(homeItem)}
+                    {navButton(libraryItem)}
                     <TestimonySidebar
                       activeView={view}
                       onNavigate={(targetView) => setView(targetView)}
@@ -1527,6 +1540,7 @@ export function App() {
                 return (
                   <>
                     {navButton(homeItem)}
+                    {navButton(libraryItem)}
                     <PrimarySourcesSidebar
                       activeView={view}
                       onNavigate={(targetView) => setView(targetView)}
@@ -1550,6 +1564,7 @@ export function App() {
                 return (
                   <>
                     {navButton(homeItem)}
+                    {navButton(libraryItem)}
                     <div className="mt-2 flex flex-col gap-1" data-tour="db-list">
                       <div className="flex items-center px-3">
                         {groupHeaderButton('explore', exploreLabel, exploreCollapsed, view === 'databases')}
@@ -1583,6 +1598,7 @@ export function App() {
                 return (
                   <>
                     {navButton(homeItem)}
+                    {navButton(libraryItem)}
                     <StudySidebar
                       activeView={view}
                       onNavigate={(targetView) => { setStudyTarget(null); if (targetView !== 'studyLibrary') setStudyMaterialTarget(null); if (targetView !== 'studyRecordings') setStudyRecordingTarget(null); setStudyGraphTarget(null); setView(targetView); }}
@@ -1598,6 +1614,7 @@ export function App() {
                 return (
                   <>
                     {navButton(homeItem)}
+                    {navButton(libraryItem)}
                     <TeachingSidebar
                       activeView={view}
                       onNavigate={(targetView) => { setStudyTarget(null); if (targetView !== 'studyLibrary') setStudyMaterialTarget(null); if (targetView !== 'studyRecordings') setStudyRecordingTarget(null); setStudyGraphTarget(null); setView(targetView); }}
@@ -1615,6 +1632,7 @@ export function App() {
               return (
                 <>
                   {navButton(homeItem)}
+                  {navButton(libraryItem)}
                   {navGroups.map((group) => renderGroup(group))}
                   <div className="mt-2 flex flex-col gap-1">{navButton(settingsItem)}</div>
                 </>

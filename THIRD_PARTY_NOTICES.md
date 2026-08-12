@@ -1,13 +1,15 @@
 # Nodus third-party notices
 
-Nodus is free and open-source software distributed under the MIT License. It
-includes or interoperates with the components and data described below. Their
+Nodus 4.0.0 is free software distributed exclusively under the GNU Affero
+General Public License v3.0 (`AGPL-3.0-only`). Versions through 3.2.7 remain
+available under MIT. Nodus includes or interoperates with the components and
+data described below. Those components keep their own licenses and their
 authors do not endorse Nodus.
 
 Every packaged application also contains a `legal` directory next to its
 resources with:
 
-- the Nodus MIT license;
+- the complete Nodus AGPL license and Corresponding Source offer;
 - the complete, generated license inventory for the exact production packages;
 - the upstream ONNX Runtime and sharp/libvips third-party notices;
 - the Electron and Chromium license collections;
@@ -95,6 +97,43 @@ Zotero is developed by the Corporation for Digital Scholarship. Zotero and its
 logo are trademarks of the Corporation for Digital Scholarship. Nodus is an
 independent project and is not affiliated with or endorsed by Zotero.
 
+## Citation Style Language styles and locales — CC BY-SA 3.0
+
+Nodus can download unmodified citation styles from the official CSL styles repository
+and bundles a small set of CSL styles and locale files supplied through
+`@citation-js/plugin-csl`. Chicago author-date, MLA, and IEEE are bundled as
+unmodified compressed files from official Style Repository revision
+`d17b5135c5b38f9ffadd0c3ec257f6892ba07f6e`. The style data originates from the
+Citation Style Language project and is licensed under Creative Commons
+Attribution-ShareAlike 3.0 Unported.
+
+- Project and attribution: https://citationstyles.org/
+- Style source: https://github.com/citation-style-language/styles
+- Locale source: https://github.com/citation-style-language/locales
+- License: https://creativecommons.org/licenses/by-sa/3.0/
+
+Nodus preserves the authors, contributors, rights, identifiers, and update
+metadata embedded in every `.csl` file. A style imported from a user's Zotero
+profile or local disk is copied unchanged into that user's `nodus-library` and
+is not redistributed by Nodus. The Citation Style Language project and Zotero
+do not endorse Nodus.
+
+## citeproc-js — AGPL v3 election
+
+Nodus formats CSL citations locally with citeproc-js 1.4.63, distributed in the
+`citeproc` npm package 2.4.63. Upstream offers citeproc-js under CPAL or GNU
+AGPL v3-or-later; Nodus elects the AGPL v3 terms, which are compatible with the
+project's `AGPL-3.0-only` distribution. Copyright Frank G. Bennett, Jr. and
+contributors.
+
+- Source: https://github.com/Juris-M/citeproc-js
+- Upstream license: https://github.com/Juris-M/citeproc-js/blob/master/LICENSE
+
+The complete GNU AGPL v3 text is the root `LICENSE` and is included with every
+Nodus distribution. `@citation-js/plugin-csl`, used only for its bundled style
+and locale data, is MIT licensed and remains identified in the generated
+package-license inventory.
+
 ## Engines downloaded at runtime
 
 The local model installer downloads the unmodified `llama.cpp` release b10002
@@ -109,8 +148,8 @@ https://github.com/leejet/stable-diffusion.cpp/tree/b290693
 
 Piper speech downloads `@diffusionstudio/piper-wasm` 1.0.0 from jsDelivr when
 the user first invokes it. That runtime incorporates eSpeak NG, licensed under
-GPL-3.0-or-later. Nodus is MIT/GPL-compatible open-source software and imposes
-no additional restriction on that component. The GPL text is included in
+GPL-3.0-or-later. Nodus is AGPL/GPL-compatible free software and imposes no
+additional restriction on that component. The GPL text is included in
 `legal/generated/GPL-3.0.txt`; source and build information are available at:
 
 - https://github.com/diffusion-studio/piper-wasm/tree/69522c832bd52d7c16389e9a8aee568065027689
@@ -134,12 +173,12 @@ Nodus. Sources:
 - https://huggingface.co/unsloth/Qwen3-4B-GGUF
 - https://huggingface.co/Qwen/Qwen3-4B
 
-Nodus is a free, non-commercial open-source application. Some optional Piper
+Nodus is free and open-source software. Some optional Piper
 voice datasets, including HFC Female and Ryan, are marked CC BY-NC-SA 4.0 and
 must not be reused for commercial purposes. LFM2.5 is governed by the LFM Open
 License v1.0, which contains a separate condition for legal entities with at
 least USD 10 million in annual revenue. Users remain responsible for uses
-outside Nodus's non-commercial purpose.
+outside the license terms of those optional datasets.
 
 ## IDprotector v0.4.1 — MIT
 

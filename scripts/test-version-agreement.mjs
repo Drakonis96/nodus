@@ -41,12 +41,12 @@ test('the server states its version everywhere a client can read it', async () =
   // No literal may sit beside the constant: a hardcoded number is exactly how the MCP handshake
   // and /healthz came to disagree with the release for three minor versions.
   assert.doesNotMatch(server, /version: '\d+\.\d+\.\d+'/, 'server.mjs hardcodes a version somewhere');
-  assert.match(server, /import \{ NODUS_VERSION \} from '\.\/lib\/version\.mjs'/);
+  assert.match(server, /import \{ NODUS_LICENSE, NODUS_SOURCE_URL, NODUS_VERSION \} from '\.\/lib\/version\.mjs'/);
 
   // The four places a version is visible: the health probe, the MCP handshake, the capabilities
   // document the app reads, and the page footer a person reads.
-  assert.match(server, /\/healthz'\) return json\(res, 200, \{ ok: true, service: 'nodus-server', version: NODUS_VERSION/);
+  assert.match(server, /\/healthz'.*version: NODUS_VERSION, license: NODUS_LICENSE, sourceCodeUrl: NODUS_SOURCE_URL/);
   assert.match(server, /serverInfo: \{ name: 'nodus-server', version: NODUS_VERSION/);
-  assert.match(server, /site-footer">Nodus Server \$\{escapeHtml\(NODUS_VERSION\)\}/);
+  assert.match(server, /site-footer">Nodus Server \$\{escapeHtml\(NODUS_VERSION\)\}.*data-testid="source-code"/);
   assert.match(api, /version: NODUS_VERSION/);
 });

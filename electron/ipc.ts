@@ -30,6 +30,7 @@ import { registerWorldbuildingIpc } from './ipc/worldbuilding';
 import { registerPlatformIpc } from './ipc/platform';
 import { registerRecordsIpc } from './ipc/records';
 import { registerAcademicIpc } from './ipc/academic';
+import { registerLibraryIpc } from './ipc/library';
 import {
   restartMcpServer,
   startMcpServer,
@@ -200,6 +201,7 @@ export function registerIpc(
   // imports. What remains below is everything not yet split out.
   registerProsopographyIpc(context);
   registerAcademicIpc(context);
+  registerLibraryIpc(context);
   registerRecordsIpc(context);
   registerPlatformIpc(context);
   registerWorldbuildingIpc(context);
@@ -305,7 +307,7 @@ export function registerIpc(
   startReplicaSync();
     if (settings.mcpEnabled) void startMcpServer().then(() => startMcpTunnelIfConfigured());
     if (settings.copilotEnabled) void startCopilotServer();
-    if (settings.zoteroPluginEnabled) void startZoteroPluginServer();
+    if (settings.zoteroPluginEnabled || settings.browserConnectorEnabled) void startZoteroPluginServer();
 
     const activeVault = withVaultKeyProviders(getActiveVault());
     emitVaultChanged();
@@ -383,9 +385,11 @@ export function registerIpc(
     if (
       patch.zoteroPluginEnabled !== undefined ||
       patch.zoteroPluginPort !== undefined ||
-      patch.zoteroPluginToken !== undefined
+      patch.zoteroPluginToken !== undefined ||
+      patch.browserConnectorEnabled !== undefined ||
+      patch.browserConnectorToken !== undefined
     ) {
-      if (next.zoteroPluginEnabled) await restartZoteroPluginServer();
+      if (next.zoteroPluginEnabled || next.browserConnectorEnabled) await restartZoteroPluginServer();
       else await stopZoteroPluginServer();
     }
     if (patch.mascotEnabled !== undefined || patch.mascotAlwaysOnTop !== undefined) {
@@ -607,10 +611,24 @@ export function registerIpc(
     }
     return withVaultKeyProviders(resetVaultDatabase(id));
   });
-  h('vaults:reuseAnalysis', async (_e, nodusIds: string[]) => {
+  const analysisReuseControllers = new Map<string, AbortController>();
+  h('vaults:reuseAnalysis', async (_e, nodusIds: string[], operationId?: string) => {
     const busy = vaultBusyMessage();
     if (busy) throw new Error(busy);
-    return reuseVaultAnalysisForWorks(nodusIds);
+    const id = operationId?.trim();
+    const controller = new AbortController();
+    if (id) analysisReuseControllers.set(id, controller);
+    try {
+      return await reuseVaultAnalysisForWorks(nodusIds, { signal: controller.signal });
+    } finally {
+      if (id && analysisReuseControllers.get(id) === controller) analysisReuseControllers.delete(id);
+    }
+  });
+  h('vaults:cancelReuseAnalysis', async (_e, operationId: string) => {
+    const controller = analysisReuseControllers.get(operationId.trim());
+    if (!controller) return false;
+    controller.abort();
+    return true;
   });
   h('vaults:copyApiKeys', async (_e, sourceVaultId: string, targetVaultId: string) => ({
     copiedProviders: copyApiKeysBetweenVaults(sourceVaultId, targetVaultId),

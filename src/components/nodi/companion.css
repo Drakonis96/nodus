@@ -859,6 +859,17 @@
 .nodi-theme-light .nodi-msg .md td { border-color: rgba(15, 23, 42, .12); }
 .nodi-theme-light .nodi-msg .md th { color: #1f2937; background: #f1f5f9; }
 .nodi-theme-light .nodi-msg .md a { color: var(--nodi-vault-accent, #6366f1); }
+/* Quoted reader text is persisted as Markdown inside the user's accent-coloured
+   bubble. The neutral blockquote palette above belongs to assistant messages;
+   applying it here produced grey-on-purple text that was effectively invisible. */
+.nodi-theme-light .nodi-msg.user .md blockquote {
+  border-left-color: rgba(255, 255, 255, .82);
+  border-radius: 0 7px 7px 0;
+  background: rgba(15, 23, 42, .18);
+  color: inherit;
+  opacity: 1;
+}
+.nodi-theme-light .nodi-msg.user .md blockquote + p { color: inherit; }
 .nodi-theme-light .nodi-chat-msgs,
 .nodi-theme-light .nodi-chat-input,
 .nodi-theme-light .nodi-history,

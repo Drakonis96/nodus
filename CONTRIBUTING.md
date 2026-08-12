@@ -169,5 +169,9 @@ evidence standards.
 
 ## Licensing
 
-By submitting a contribution, you agree that it may be distributed under the
-project's [MIT License](LICENSE).
+By submitting a contribution, you agree that it may be distributed exclusively
+under the project's [GNU Affero General Public License v3.0](LICENSE), SPDX
+`AGPL-3.0-only`, without an additional contributor license agreement. You must
+have the right to submit the contribution and must preserve all applicable
+third-party notices. Published Nodus releases through 3.2.7 retain their MIT
+license.

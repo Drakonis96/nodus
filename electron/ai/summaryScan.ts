@@ -8,6 +8,7 @@ import { setSummaryResult } from '../db/worksRepo';
 import { getItem } from '../zotero/zoteroClient';
 import { resolveWorkText } from '../extraction/textExtractor';
 import { updateWorkSummaryEmbedding, upsertWorkSummary } from '../db/workSummariesRepo';
+import { recordLinkedLibraryAnalysis } from '../library/libraryVaultProvenance';
 
 function parseAuthors(authorsJson: string): string[] {
   try {
@@ -161,6 +162,7 @@ export async function runSummaryScan(work: Work, model?: ModelRef | null): Promi
       contentHash: hash,
     });
     setSummaryResult(work.nodus_id, 'done', hash);
+    recordLinkedLibraryAnalysis({ workId: work.nodus_id, components: ['summary'], documentFingerprint: hash });
 
     const embedding = await embed(summary);
     if (embedding) updateWorkSummaryEmbedding(work.nodus_id, summary, embedding);
