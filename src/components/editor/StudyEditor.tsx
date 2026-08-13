@@ -21,8 +21,10 @@ import type {
 } from '@shared/studyEditor';
 import { DEFAULT_STUDY_DOC_STYLE, studyCommandMarkdown, studyDocumentStats } from '@shared/studyEditor';
 import { deleteLastStudySentence } from '@shared/sttModels';
-import type { StudyDocument, StudyDocumentKind, StudyTag } from '@shared/studyOrg';
+import type { StudyDocumentKind, StudyTag } from '@shared/studyOrg';
 import { STUDY_DOCUMENT_KINDS } from '@shared/studyOrg';
+import type { EditorDocument, EditorDocumentPort } from './documentPort';
+import { studyDocumentPort } from './documentPort';
 import type { StudyImproveScope, StudyStyle } from '@shared/studyImprove';
 import type { StudySentenceContext, StudySynonymAlternative } from '@shared/studySynonyms';
 import { studySentenceContext } from '@shared/studySynonyms';
@@ -296,13 +298,25 @@ function SynonymAlternativeList({
   </div>;
 }
 
+/**
+ * El editor de documentos de Nodus. Nació en Estudio y ahora escribe también las notas e
+ * ideas del Workspace: lo que cambia entre un caso y otro es sólo la fila que se guarda,
+ * y eso entra por `port` (ver documentPort.ts). Sin `port` se comporta exactamente como
+ * antes, así que Estudio y Docencia no notan el cambio.
+ *
+ * Las propiedades propias de Estudio —tipo de material, color, etiquetas— son opcionales:
+ * los controles que las editan sólo se pintan si llega su callback.
+ */
 export function StudyEditor({
   settings,
   documents,
-  tags,
-  activeTagIds,
+  tags = [],
+  activeTagIds = [],
   subjectId,
   activeId,
+  port: portProp,
+  showTabs = true,
+  documentIcon = 'notebook',
   onActivate,
   onClose,
   onSaved,
@@ -315,22 +329,28 @@ export function StudyEditor({
   onOpenRecording,
 }: {
   settings: AppSettings;
-  documents: StudyDocument[];
-  tags: StudyTag[];
-  activeTagIds: string[];
+  documents: EditorDocument[];
+  tags?: StudyTag[];
+  activeTagIds?: string[];
   subjectId?: string | null;
   activeId: string;
+  /** Dónde vive lo que se edita. Por defecto, los documentos de estudio. */
+  port?: EditorDocumentPort;
+  /** El Workspace pone sus pestañas arriba del todo, así que apaga las del editor. */
+  showTabs?: boolean;
+  documentIcon?: string;
   onActivate: (id: string) => void;
   onClose: (id: string) => void;
-  onSaved: (document: StudyDocument) => void;
-  onUpdateMetadata: (patch: Partial<Pick<StudyDocument, 'kind' | 'color' | 'favorite'>>) => Promise<void>;
-  onSetTags: (tagIds: string[]) => Promise<void>;
-  onCreateTag: (name: string) => Promise<void>;
+  onSaved: (document: EditorDocument) => void;
+  onUpdateMetadata?: (patch: { kind?: string; color?: string; favorite?: boolean }) => Promise<void>;
+  onSetTags?: (tagIds: string[]) => Promise<void>;
+  onCreateTag?: (name: string) => Promise<void>;
   onDuplicate: () => Promise<void>;
   onTrash: () => Promise<void>;
   onOpenLinkedDocument: (id: string) => void;
   onOpenRecording: (id: string, timestamp?: number | null) => void;
 }) {
+  const port = portProp ?? (studyDocumentPort as EditorDocumentPort);
   const active = documents.find((document) => document.id === activeId) ?? documents[0];
   const [data, setData] = useState<StudyDocEditorData | null>(null);
   const [title, setTitle] = useState(active?.title ?? '');
@@ -381,11 +401,11 @@ export function StudyEditor({
   const turndown = useMemo(() => new TurndownService({ headingStyle: 'atx', bulletListMarker: '-', codeBlockStyle: 'fenced' }), []);
 
   const loadData = useCallback(async (documentId: string) => {
-    const next = await window.nodus.getStudyDocEditorData(documentId);
+    const next = await port.loadEditorData(documentId);
     setData(next);
     setStyle(next.style);
     return next;
-  }, []);
+  }, [port]);
 
   const loadQuickImproveStyles = useCallback(async () => {
     const [settings, styles] = await Promise.all([window.nodus.getSettings(), window.nodus.listStudyStyles()]);
@@ -471,9 +491,9 @@ export function StudyEditor({
     setImproveStreamingStyleId(style.id); setImproveStreamError(''); setSelectionImprove(null);
     try {
       const result = await window.nodus.improveStudyText({
-        documentId: active.id, subjectId, text: target.text, styleId: style.id, scope: target.scope,
+        ...port.improveTarget(active.id), subjectId, text: target.text, styleId: style.id, scope: target.scope,
         level: style.level, length: style.length, mode: 'preserve',
-        variables: { language: style.language, documentType: active.kind, selectedText: target.text },
+        variables: { language: style.language, documentType: active.kind ?? 'nota', selectedText: target.text },
         protectedTerms: [active.title, ...data.customDictionary], model: aiModel,
       }, { onDelta: (delta) => {
         streamed += delta;
@@ -614,7 +634,7 @@ export function StudyEditor({
       if (snapshot.id !== activeIdRef.current || snapshot.signature !== latestSignatureRef.current) return;
       setSaveState('saving');
       try {
-        const updated = await window.nodus.updateStudyDoc(snapshot.id, {
+        const updated = await port.save(snapshot.id, {
           title: snapshot.title,
           contentMarkdown: snapshot.contentMarkdown,
           style: snapshot.style,
@@ -735,27 +755,27 @@ export function StudyEditor({
   };
   const submitTextDialog = async (value: string) => {
     if (textDialog?.kind === 'tag') {
-      await onCreateTag(value);
+      await onCreateTag?.(value);
       setTextDialog(null);
       return;
     }
     const selectedText = textDialog?.selectedText ?? '';
     const from = selectedText ? Math.max(0, draft.indexOf(selectedText)) : 0;
-    await window.nodus.createStudyAnnotation(active.id, { from, to: from + selectedText.length, selectedText, comment: value });
+    await port.createAnnotation(active.id, { from, to: from + selectedText.length, selectedText, comment: value });
     await loadData(active.id);
     setTextDialog(null);
   };
   const restoreVersion = async (version: StudyDocVersion) => {
     if (!window.confirm(t('¿Restaurar esta versión? El estado actual seguirá disponible en el historial.'))) return;
-    const restored = await window.nodus.restoreStudyDocVersion(active.id, version.id);
+    const restored = await port.restoreVersion(active.id, version.id);
     setTitle(restored.title); setDraft(restored.contentMarkdown); onSaved(restored);
     setEditorRevision((value) => value + 1);
     const next = await loadData(active.id);
     baselineRef.current = JSON.stringify({ title: restored.title, content: restored.contentMarkdown, style: next.style, language: next.spellcheckLanguage, dictionary: next.customDictionary });
     setSaveState('saved');
   };
-  const updateAnnotation = async (annotation: StudyAnnotation, patch: Parameters<typeof window.nodus.updateStudyAnnotation>[1]) => {
-    await window.nodus.updateStudyAnnotation(annotation.id, patch); await loadData(active.id);
+  const updateAnnotation = async (annotation: StudyAnnotation, patch: Parameters<EditorDocumentPort['updateAnnotation']>[1]) => {
+    await port.updateAnnotation(annotation.id, patch); await loadData(active.id);
   };
   const searchCount = search ? draft.toLocaleLowerCase().split(search.toLocaleLowerCase()).length - 1 : 0;
   const handleEditorDrop = async (event: DragEvent<HTMLDivElement>) => {
@@ -765,9 +785,9 @@ export function StudyEditor({
     event.preventDefault();
     let snippet = '';
     if (documentId) {
-      const workspace = await window.nodus.getStudyWorkspace();
-      const target = workspace.documents.find((document) => document.id === documentId);
-      if (target && target.id !== active.id) snippet = `[${target.title}](nodus://study/doc/${target.id})`;
+      const targets = await port.listLinkTargets();
+      const target = targets.find((candidate) => candidate.id === documentId);
+      if (target && target.id !== active.id) snippet = `[${target.title}](${port.linkHref(target.id)})`;
     } else if (uri) {
       snippet = /\.(png|jpe?g|gif|webp|svg)(?:\?.*)?$/i.test(uri) ? `![${t('Imagen')}](${uri})` : `[${uri}](${uri})`;
     }
@@ -779,36 +799,56 @@ export function StudyEditor({
 
   return (
     <div style={styleVars} className={`study-editor-shell flex h-full min-h-0 flex-col bg-stone-100 text-stone-900 dark:bg-neutral-950 dark:text-neutral-100 ${fullscreen ? 'fixed inset-0 z-[100]' : ''} study-theme-${style.theme}`}>
-      <div className="study-editor-tabs flex min-h-10 items-end gap-1 overflow-x-auto border-b border-stone-200 bg-stone-50 px-2 pt-1 dark:border-neutral-800 dark:bg-neutral-950">
-        {documents.map((document) => (
-          <div key={document.id} role="tab" tabIndex={0} aria-selected={document.id === active.id} onClick={() => void activateDocument(document.id)}
-            onKeyDown={(event) => { if (event.target === event.currentTarget && (event.key === 'Enter' || event.key === ' ')) void activateDocument(document.id); }}
-            className={`group flex max-w-64 items-center gap-1.5 rounded-t-lg border border-b-0 px-2.5 py-2 text-xs ${document.id === active.id ? 'border-stone-300 bg-white text-stone-800 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-200' : 'border-transparent text-stone-500 hover:text-stone-800 dark:text-neutral-600 dark:hover:text-neutral-300'}`}>
-            <Icon name="notebook" size={12} />
-            {document.id === active.id && editingTitle ? (
-              <input autoFocus aria-label={t('Título del apunte')} className="min-w-24 max-w-44 bg-transparent font-semibold outline-none ring-0" value={title}
-                onClick={(event) => event.stopPropagation()} onChange={(event) => setTitle(event.target.value)}
-                onBlur={() => setEditingTitle(false)} onKeyDown={(event) => {
-                  if (event.key === 'Enter') { event.preventDefault(); setEditingTitle(false); void save('manual'); }
-                  if (event.key === 'Escape') { event.preventDefault(); setTitle(active.title); setEditingTitle(false); }
-                }} />
-            ) : <span className="min-w-0 flex-1 truncate">{document.id === active.id ? title : document.title}</span>}
-            {document.id === active.id && !editingTitle && <button type="button" title={t('Renombrar apunte')} aria-label={t('Renombrar apunte')}
-              onClick={(event) => { event.stopPropagation(); setEditingTitle(true); }} className="rounded p-0.5 text-neutral-600 hover:bg-neutral-800 hover:text-neutral-200"><Icon name="edit" size={11} /></button>}
-            <button type="button" title={t('Cerrar apunte')} aria-label={t('Cerrar apunte')}
-              onClick={(event) => { event.stopPropagation(); requestClose(document.id); }} className="rounded p-0.5 text-neutral-700 group-hover:text-neutral-400 hover:bg-neutral-800 hover:!text-red-300"><Icon name="x" size={11} /></button>
-          </div>
-        ))}
-      </div>
+      {showTabs ? (
+        <div className="study-editor-tabs flex min-h-10 items-end gap-1 overflow-x-auto border-b border-stone-200 bg-stone-50 px-2 pt-1 dark:border-neutral-800 dark:bg-neutral-950">
+          {documents.map((document) => (
+            <div key={document.id} role="tab" tabIndex={0} aria-selected={document.id === active.id} onClick={() => void activateDocument(document.id)}
+              onKeyDown={(event) => { if (event.target === event.currentTarget && (event.key === 'Enter' || event.key === ' ')) void activateDocument(document.id); }}
+              className={`group flex max-w-64 items-center gap-1.5 rounded-t-lg border border-b-0 px-2.5 py-2 text-xs ${document.id === active.id ? 'border-stone-300 bg-white text-stone-800 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-200' : 'border-transparent text-stone-500 hover:text-stone-800 dark:text-neutral-600 dark:hover:text-neutral-300'}`}>
+              <Icon name={documentIcon} size={12} />
+              {document.id === active.id && editingTitle ? (
+                <input autoFocus aria-label={t('Título del apunte')} className="min-w-24 max-w-44 bg-transparent font-semibold outline-none ring-0" value={title}
+                  onClick={(event) => event.stopPropagation()} onChange={(event) => setTitle(event.target.value)}
+                  onBlur={() => setEditingTitle(false)} onKeyDown={(event) => {
+                    if (event.key === 'Enter') { event.preventDefault(); setEditingTitle(false); void save('manual'); }
+                    if (event.key === 'Escape') { event.preventDefault(); setTitle(active.title); setEditingTitle(false); }
+                  }} />
+              ) : <span className="min-w-0 flex-1 truncate">{document.id === active.id ? title : document.title}</span>}
+              {document.id === active.id && !editingTitle && <button type="button" title={t('Renombrar apunte')} aria-label={t('Renombrar apunte')}
+                onClick={(event) => { event.stopPropagation(); setEditingTitle(true); }} className="rounded p-0.5 text-neutral-600 hover:bg-neutral-800 hover:text-neutral-200"><Icon name="edit" size={11} /></button>}
+              <button type="button" title={t('Cerrar apunte')} aria-label={t('Cerrar apunte')}
+                onClick={(event) => { event.stopPropagation(); requestClose(document.id); }} className="rounded p-0.5 text-neutral-700 group-hover:text-neutral-400 hover:bg-neutral-800 hover:!text-red-300"><Icon name="x" size={11} /></button>
+            </div>
+          ))}
+        </div>
+      ) : (
+        // Sin pestañas propias, el título necesita seguir siendo editable: es el único
+        // sitio donde se renombra lo que se está escribiendo.
+        <div className="study-editor-titlebar flex min-h-10 items-center gap-2 border-b border-stone-200 bg-stone-50 px-3 py-1.5 dark:border-neutral-800 dark:bg-neutral-950">
+          <Icon name={documentIcon} size={13} className="shrink-0 text-neutral-500" />
+          <input
+            data-testid="editor-title"
+            aria-label={t('Título del apunte')}
+            className="min-w-0 flex-1 bg-transparent text-sm font-semibold outline-none ring-0"
+            value={title}
+            onChange={(event) => setTitle(event.target.value)}
+            onBlur={() => void save('manual')}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter') { event.preventDefault(); event.currentTarget.blur(); }
+              if (event.key === 'Escape') { event.preventDefault(); setTitle(active.title); }
+            }}
+          />
+        </div>
+      )}
 
       <div className="study-editor-toolbar flex flex-wrap items-center gap-1 border-b border-stone-200 bg-white/80 px-3 py-2 dark:border-neutral-800 dark:bg-neutral-900/50">
         <button className="btn btn-ghost h-8 w-8 p-0" title={t('Cerrar editor')} aria-label={t('Cerrar editor')} onClick={() => requestClose(active.id)}><Icon name="arrowLeft" size={14} /></button>
         <span data-testid="study-editor-save-state" role="status" aria-live="polite" className={`mr-2 text-[10px] ${saveState === 'error' ? 'text-red-400' : saveState === 'saved' ? 'text-emerald-500' : 'text-amber-400'}`}>
           {t(saveState === 'saved' ? 'Guardado automático' : saveState === 'saving' ? 'Guardando…' : saveState === 'dirty' ? 'Cambios sin guardar' : 'Error al guardar')}
         </span>
-        <button data-testid="study-doc-favorite" className="btn btn-ghost h-8 w-8 p-0" title={t('Favorito')} aria-label={t('Favorito')} onClick={() => void onUpdateMetadata({ favorite: !active.favorite })}>
+        {onUpdateMetadata && <button data-testid="study-doc-favorite" className="btn btn-ghost h-8 w-8 p-0" title={t('Favorito')} aria-label={t('Favorito')} onClick={() => void onUpdateMetadata({ favorite: !active.favorite })}>
           <Icon name="star" size={13} className={active.favorite ? 'text-amber-400' : ''} />
-        </button>
+        </button>}
         <button className="btn btn-primary h-8 w-8 p-0" title={t('Guardar')} aria-label={t('Guardar')} onClick={() => void save('manual')}><Icon name="save" size={13} /></button>
         <span className="mx-0.5 h-5 w-px bg-stone-200 dark:bg-neutral-700" aria-hidden="true" />
         <button type="button" data-testid="study-editor-undo" className="btn btn-ghost h-8 w-8 p-0" disabled={Boolean(improveStreamingStyleId) || (!raw && !historyState.canUndo)} onClick={() => runEditorHistory('undo')} title={`${t('Deshacer')} (Ctrl/⌘+Z)`} aria-label={t('Deshacer')} aria-keyshortcuts="Control+Z Meta+Z"><Icon name="undo" size={13} /></button>
@@ -923,8 +963,8 @@ export function StudyEditor({
       /></div>}
       {showStyle && (
         <div className="grid grid-cols-2 gap-2 border-b border-neutral-800 bg-neutral-900/40 px-4 py-3 sm:grid-cols-4 lg:grid-cols-8">
-          <label className="text-[10px] text-neutral-500">{t('Tipo de material')}<select data-testid="study-doc-kind" className="input mt-1 w-full" value={active.kind} onChange={(event) => void onUpdateMetadata({ kind: event.target.value as StudyDocumentKind })}>{STUDY_DOCUMENT_KINDS.map((kind) => <option key={kind} value={kind}>{t(STUDY_KIND_LABEL[kind])}</option>)}</select></label>
-          <label className="text-[10px] text-neutral-500">{t('Color')}<input data-testid="study-doc-color" type="color" className="input mt-1 h-9 w-full p-1" value={active.color || '#0f766e'} onChange={(event) => void onUpdateMetadata({ color: event.target.value })} /></label>
+          {onUpdateMetadata && <label className="text-[10px] text-neutral-500">{t('Tipo de material')}<select data-testid="study-doc-kind" className="input mt-1 w-full" value={active.kind} onChange={(event) => void onUpdateMetadata({ kind: event.target.value as StudyDocumentKind })}>{STUDY_DOCUMENT_KINDS.map((kind) => <option key={kind} value={kind}>{t(STUDY_KIND_LABEL[kind])}</option>)}</select></label>}
+          {onUpdateMetadata && <label className="text-[10px] text-neutral-500">{t('Color')}<input data-testid="study-doc-color" type="color" className="input mt-1 h-9 w-full p-1" value={active.color || '#0f766e'} onChange={(event) => void onUpdateMetadata({ color: event.target.value })} /></label>}
           <label className="text-[10px] text-neutral-500">{t('Tipografía')}<select className="input mt-1 w-full" value={style.fontFamily} onChange={(event) => setStyle({ ...style, fontFamily: event.target.value as StudyDocStyle['fontFamily'] })}><option value="serif">Serif</option><option value="sans">Sans</option><option value="mono">Mono</option></select></label>
           <label className="text-[10px] text-neutral-500">{t('Tamaño')}<input type="number" min="12" max="32" className="input mt-1 w-full" value={style.fontSize} onChange={(event) => setStyle({ ...style, fontSize: Number(event.target.value) })} /></label>
           <label className="text-[10px] text-neutral-500">{t('Interlineado')}<input type="number" step="0.1" min="1.1" max="2.5" className="input mt-1 w-full" value={style.lineHeight} onChange={(event) => setStyle({ ...style, lineHeight: Number(event.target.value) })} /></label>
@@ -942,7 +982,7 @@ export function StudyEditor({
                 setData({ ...data, customDictionary: [...data.customDictionary, word] }); setDictionaryWord('');
               }}><Icon name="plus" size={12} /></button></span>
           </label>
-          <div className="col-span-2 text-[10px] text-neutral-500 sm:col-span-4 lg:col-span-6">
+          {onSetTags && <div className="col-span-2 text-[10px] text-neutral-500 sm:col-span-4 lg:col-span-6">
             <span>{t('Etiquetas')}</span>
             <div className="mt-1 flex min-h-9 flex-wrap items-center gap-1.5">
               {tags.map((tag) => {
@@ -952,7 +992,7 @@ export function StudyEditor({
               })}
               <button type="button" className="rounded-full border border-dashed border-neutral-700 px-2 py-1 text-[10px] text-neutral-500 hover:border-indigo-700 hover:text-indigo-300" onClick={() => setTextDialog({ kind: 'tag' })}>+ {t('Etiqueta')}</button>
             </div>
-          </div>
+          </div>}
         </div>
       )}
 
