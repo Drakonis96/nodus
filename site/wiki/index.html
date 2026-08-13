@@ -9,11 +9,12 @@
   <link rel="preconnect" href="https://fonts.googleapis.com"/>
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Fraunces:opsz,wght@9..144,600;9..144,700&display=swap" rel="stylesheet"/>
-  <link rel="stylesheet" href="wiki.css?v=20260814b"/>
+  <link rel="stylesheet" href="wiki.css?v=20260814c"/>
 </head>
 <body>
   <a class="skip-link" href="#article">Skip to documentation</a>
   <header class="topbar">
+    <button id="nav-toggle" class="mobile-nav-toggle" type="button" aria-label="Open documentation menu" aria-controls="wiki-sidebar" aria-expanded="false"><span></span><span></span><span></span></button>
     <a class="brand" href="../index.html"><img src="../assets/nodus-logo.svg" alt=""/><span>Nodus</span><em>Wiki</em></a>
     <div class="search-wrap">
       <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.4-3.4"/></svg>
@@ -24,16 +25,17 @@
     <nav aria-label="Wiki actions"><a href="../demo/">Live demo</a><a href="https://github.com/Drakonis96/nodus/releases/latest">Download Nodus</a></nav>
   </header>
   <div class="layout">
-    <aside class="sidebar" aria-label="Documentation navigation">
-      <div class="sidebar-head"><span>Documentation</span><button id="nav-toggle" type="button" aria-label="Toggle navigation">☰</button></div>
+    <aside id="wiki-sidebar" class="sidebar" aria-label="Documentation navigation">
+      <div class="sidebar-head"><span>Documentation</span><button id="nav-close" type="button" aria-label="Close documentation menu">×</button></div>
       <nav id="wiki-nav"></nav>
       <div class="sidebar-foot"><span id="version"></span><span>English edition</span></div>
     </aside>
+    <button id="nav-backdrop" class="nav-backdrop" type="button" aria-label="Close documentation menu" hidden></button>
     <main id="article" tabindex="-1">
       <noscript>This documentation requires JavaScript to load its searchable content.</noscript>
     </main>
     <aside class="toc" aria-label="On this page"><b>On this page</b><nav id="page-toc"></nav></aside>
   </div>
-  <script src="wiki.js?v=20260814b" type="module"></script>
+  <script src="wiki.js?v=20260814c" type="module"></script>
 </body>
 </html>

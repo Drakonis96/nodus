@@ -32,11 +32,15 @@ test('the wiki shell exposes global search, navigation and downloadable manuals'
   const script = fs.readFileSync(path.join(wikiRoot, 'wiki.js'), 'utf8');
   assert.match(html, /id="search"[^>]+type="search"/);
   assert.match(html, /id="wiki-nav"/);
+  assert.match(html, /id="nav-toggle"[^>]+aria-controls="wiki-sidebar"[^>]+aria-expanded="false"/);
+  assert.match(html, /id="nav-backdrop"[^>]+hidden/);
   assert.match(script, /Download PDF manual/);
   assert.match(script, /Download PDF ↓/);
   assert.match(script, /href="\$\{vault\.pdf\}" download/);
   assert.match(script, /metaKey \|\| event\.ctrlKey/);
   assert.match(script, /content\.vaults\.flatMap/);
+  assert.match(script, /function setNavigationOpen/);
+  assert.match(script, /event\.key === 'Escape'.*nav-open/);
 });
 
 test('every vault uses its canonical Nodus pictogram instead of a letter badge', () => {
