@@ -2,6 +2,55 @@
   "version": 1,
   "notices": [
     {
+      "id": "2026-08-nodus-4-agpl-license",
+      "date": "2026-08-13",
+      "severity": "warning",
+      "url": "https://github.com/Drakonis96/nodus/blob/main/LICENSE",
+      "minVersion": "4.0.0",
+      "copy": {
+        "es": {
+          "title": "Nodus 4 cambia a la licencia AGPL v3",
+          "body": "Desde la versión 4, Nodus se distribuye bajo la GNU Affero General Public License v3.",
+          "linkLabel": "Ver la licencia AGPL v3"
+        },
+        "en": {
+          "title": "Nodus 4 changes to the AGPL v3 license",
+          "body": "Starting with version 4, Nodus is distributed under the GNU Affero General Public License v3.",
+          "linkLabel": "View the AGPL v3 license"
+        },
+        "fr": {
+          "title": "Nodus 4 passe à la licence AGPL v3",
+          "body": "À partir de la version 4, Nodus est distribué sous la licence GNU Affero General Public License v3.",
+          "linkLabel": "Voir la licence AGPL v3"
+        },
+        "de": {
+          "title": "Nodus 4 wechselt zur AGPL-v3-Lizenz",
+          "body": "Ab Version 4 wird Nodus unter der GNU Affero General Public License v3 vertrieben.",
+          "linkLabel": "AGPL-v3-Lizenz ansehen"
+        },
+        "pt": {
+          "title": "O Nodus 4 muda para a licença AGPL v3",
+          "body": "A partir da versão 4, o Nodus é distribuído sob a GNU Affero General Public License v3.",
+          "linkLabel": "Ver a licença AGPL v3"
+        },
+        "pt-BR": {
+          "title": "O Nodus 4 muda para a licença AGPL v3",
+          "body": "A partir da versão 4, o Nodus é distribuído sob a GNU Affero General Public License v3.",
+          "linkLabel": "Ver a licença AGPL v3"
+        },
+        "it": {
+          "title": "Nodus 4 passa alla licenza AGPL v3",
+          "body": "A partire dalla versione 4, Nodus è distribuito con la GNU Affero General Public License v3.",
+          "linkLabel": "Vedi la licenza AGPL v3"
+        },
+        "tr": {
+          "title": "Nodus 4, AGPL v3 lisansına geçiyor",
+          "body": "Nodus, 4. sürümden itibaren GNU Affero General Public License v3 kapsamında dağıtılmaktadır.",
+          "linkLabel": "AGPL v3 lisansını görüntüle"
+        }
+      }
+    },
+    {
       "id": "2026-08-nodus-mobile-interest-survey",
       "date": "2026-08-07",
       "severity": "info",
