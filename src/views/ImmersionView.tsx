@@ -31,6 +31,7 @@ import type {
 import { DECORATIVE_IMAGE_STYLES } from '@shared/imageStyles';
 import type { PendingGraphNavigationTarget } from '../navigation';
 import { Badge, Icon, TypeDot } from '../components/ui';
+import { SectionHeader } from '../components/SectionHeader';
 import { ModelPicker } from '../components/ModelPicker';
 import { Markdown, type MarkdownCitation } from '../components/Markdown';
 import { SourceCitationModal, type CitationTarget } from '../components/SourceCitationModal';
@@ -526,20 +527,16 @@ function ImmersionHome({
 
   return (
     <div className="h-full flex flex-col min-h-0">
-      <header className="flex flex-wrap items-center gap-3 border-b border-neutral-800 px-4 py-3">
-        <div className="min-w-0">
-          <h1 className="flex items-center gap-2 text-xl font-semibold">
-            <Icon name="target" className="text-indigo-300" /> {t('Inmersión')}
-          </h1>
-          <p className="mt-0.5 text-xs text-neutral-500">
-            {t('Domina un tema de tu corpus: el contenido y el progreso se guardan para retomarlos; tus respuestas se borran al reiniciar.')}
-          </p>
-        </div>
-        <div className="flex-1" />
-        <button className="btn btn-primary gap-1.5" onClick={onNew}>
-          <Icon name="plus" /> {t('Nueva inmersión')}
-        </button>
-      </header>
+      <SectionHeader
+        icon="target"
+        title={t('Inmersión')}
+        subtitle={t('Domina un tema de tu corpus: el contenido y el progreso se guardan para retomarlos; tus respuestas se borran al reiniciar.')}
+        actions={(
+          <button className="btn btn-primary gap-1.5" onClick={onNew}>
+            <Icon name="plus" /> {t('Nueva inmersión')}
+          </button>
+        )}
+      />
 
       {error && <div className="border-b border-red-900/60 bg-red-950/40 px-4 py-2 text-xs text-red-300">{error}</div>}
 

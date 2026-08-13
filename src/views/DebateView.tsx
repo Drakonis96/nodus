@@ -1,6 +1,7 @@
 import { Fragment, useCallback, useEffect, useMemo, useState } from 'react';
 import type { Debate, DebateSide, DebateSideKey, DebateTimelineEntry } from '@shared/types';
 import { Badge, EDGE_LABELS, Icon, Spinner } from '../components/ui';
+import { SectionHeader, SectionToolbar } from '../components/SectionHeader';
 import { Markdown, type MarkdownCitation } from '../components/Markdown';
 import { SourceCitationModal, type CitationTarget } from '../components/SourceCitationModal';
 import { SaveToNotesModal } from '../components/SaveToNotesModal';
@@ -149,20 +150,17 @@ export function DebateView({
   }, []);
 
   return (
-    <div className="h-full flex flex-col min-h-0 p-6">
-      <div className="shrink-0">
-        <div className="flex items-center gap-3 mb-2">
-          <Icon name="scale" size={22} className="text-rose-300" />
-          <h1 className="text-xl font-semibold">{t('Debates')}</h1>
-          <Badge>{tx('{n} sin reconciliar', { n: debates.length })}</Badge>
-        </div>
-        <p className="text-sm text-neutral-400 mb-4">
-          {t(
-            'Cada contradicción o refutación del corpus, enfrentada: las dos posiciones, los autores de cada bando, su evidencia textual y la cronología de la disputa.'
-          )}
-        </p>
+    <div className="h-full flex flex-col min-h-0">
+      <SectionHeader
+        icon="scale"
+        title={t('Debates')}
+        subtitle={t(
+          'Cada contradicción o refutación del corpus, enfrentada: las dos posiciones, los autores de cada bando, su evidencia textual y la cronología de la disputa.'
+        )}
+        badge={<Badge>{tx('{n} sin reconciliar', { n: debates.length })}</Badge>}
+      />
 
-        <div className="flex flex-wrap items-center gap-2 mb-4">
+      <SectionToolbar>
           <div className="relative">
             <Icon name="search" size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-neutral-500 pointer-events-none" />
             <input
@@ -190,10 +188,9 @@ export function DebateView({
               ['leaning', t('Inclinados')],
             ]}
           />
-        </div>
-      </div>
+      </SectionToolbar>
 
-      <div className="flex-1 min-h-0 overflow-auto pr-1 space-y-4">
+      <div className="flex-1 min-h-0 overflow-auto p-6 space-y-4">
         {filtered.length === 0 && (
           <div className="text-neutral-500 text-sm">
             {debates.length === 0

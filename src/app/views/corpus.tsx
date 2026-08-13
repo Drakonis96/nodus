@@ -9,7 +9,6 @@ const ArgumentMapView = lazy(() => import('../../views/ArgumentMapView').then((m
 const IdeasView = lazy(() => import('../../views/IdeasView').then((module) => ({ default: module.IdeasView })));
 const AuthorsView = lazy(() => import('../../views/AuthorsView').then((module) => ({ default: module.AuthorsView })));
 const CoverageWorkspace = lazy(() => import('../../views/CoverageWorkspace').then((module) => ({ default: module.CoverageWorkspace })));
-const DebateView = lazy(() => import('../../views/DebateView').then((module) => ({ default: module.DebateView })));
 const HypothesisLabView = lazy(() => import('../../views/HypothesisLabView').then((module) => ({ default: module.HypothesisLabView })));
 const ReadingPathView = lazy(() => import('../../views/ReadingPathView').then((module) => ({ default: module.ReadingPathView })));
 const WritingWorkshopView = lazy(() => import('../../views/WritingWorkshopView').then((module) => ({ default: module.WritingWorkshopView })));
@@ -59,25 +58,28 @@ export const corpusViews = {
   // Cobertura y Huecos son el mismo espacio con dos pestañas. 'gaps' ya no tiene
   // entrada en la barra lateral, pero sigue siendo una vista enrutable —Inicio,
   // Buscar y el tour avanzado navegan a ella— y entra por la pestaña de huecos.
-  gaps: ({ activeVault, navigate, openAssistant, setView }) => (
+  gaps: ({ activeVault, navigate, openAssistant }) => (
     <CoverageWorkspace
       vaultId={activeVault?.id ?? null}
       initialTab="gaps"
       onOpenGraph={(target) => navigate('graph', target)}
       onOpenAssistant={openAssistant}
-      onOpenDebates={() => setView('debate')}
     />
   ),
-  debate: ({ navigate, openAssistant }) => (
-    <DebateView onOpenGraph={(target) => navigate('graph', target)} onOpenAssistant={openAssistant} />
+  debate: ({ activeVault, navigate, openAssistant }) => (
+    <CoverageWorkspace
+      vaultId={activeVault?.id ?? null}
+      initialTab="debate"
+      onOpenGraph={(target) => navigate('graph', target)}
+      onOpenAssistant={openAssistant}
+    />
   ),
-  research: ({ activeVault, navigate, openAssistant, setView }) => (
+  research: ({ activeVault, navigate, openAssistant }) => (
     <CoverageWorkspace
       vaultId={activeVault?.id ?? null}
       initialTab="map"
       onOpenGraph={(target) => navigate('graph', target)}
       onOpenAssistant={openAssistant}
-      onOpenDebates={() => setView('debate')}
     />
   ),
   hypothesis: ({ navigate, openAssistant, settings }) => (

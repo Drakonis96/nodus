@@ -1,7 +1,17 @@
 // Espacio de trabajo: la sección que unifica Notas, Escritura y Proyectos en la bóveda
-// académica, y los enlaces entre lo que se escribe y la biblioteca.
+// académica, y los enlaces entre lo que se escribe y la biblioteca. Con ella viaja el
+// «Estado de la cuestión», la otra sección unificada de esta bóveda.
+//
+// Ese nombre NO se traduce literalmente: cada lengua tiene su propio término académico
+// para la misma parte de un trabajo de investigación —Forschungsstand, état de la
+// question, stato dell'arte— y usar un calco delataría que la interfaz está traducida
+// en vez de escrita en ese idioma.
 
 const en = {
+  'Cada afirmación, hallazgo, constructo, método y marco que el análisis extrajo de tus obras, con quién los sostiene.': 'Every claim, finding, construct, method and framework the analysis drew from your works, and who holds them.',
+  'Quién sostiene qué en tu corpus: una ficha por autoría, su síntesis y la matriz que las enfrenta.': 'Who holds what in your corpus: a profile per author, their synthesis, and the matrix that sets them against each other.',
+  'El esqueleto argumental de tu corpus: qué idea apoya, refina o contradice a cuál, recorrido paso a paso.': 'The argumentative skeleton of your corpus: which idea supports, refines or contradicts which, walked step by step.',
+  'Estado de la cuestión': 'State of the art',
   'Espacio de trabajo': 'Workspace',
   '{n} nota(s) e idea(s) · {c} colección(es)': '{n} note(s) and idea(s) · {c} collection(s)',
   'Agrupa tus notas e ideas en colecciones para trabajar por temas o capítulos.': 'Group your notes and ideas into collections to work by topic or chapter.',
@@ -25,6 +35,10 @@ const en = {
 export const WORKSPACE_TRANSLATIONS = {
   en,
   fr: {
+    'Cada afirmación, hallazgo, constructo, método y marco que el análisis extrajo de tus obras, con quién los sostiene.': 'Chaque affirmation, résultat, construit, méthode et cadre que l’analyse a tirés de vos œuvres, et qui les soutient.',
+    'Quién sostiene qué en tu corpus: una ficha por autoría, su síntesis y la matriz que las enfrenta.': 'Qui soutient quoi dans votre corpus : une fiche par autrice ou auteur, sa synthèse et la matrice qui les confronte.',
+    'El esqueleto argumental de tu corpus: qué idea apoya, refina o contradice a cuál, recorrido paso a paso.': 'Le squelette argumentatif de votre corpus : quelle idée appuie, affine ou contredit quelle autre, parcouru pas à pas.',
+    'Estado de la cuestión': 'État de la question',
     'Espacio de trabajo': 'Espace de travail',
     '{n} nota(s) e idea(s) · {c} colección(es)': '{n} note(s) et idée(s) · {c} collection(s)',
     'Agrupa tus notas e ideas en colecciones para trabajar por temas o capítulos.': 'Regroupez vos notes et vos idées en collections pour travailler par thème ou par chapitre.',
@@ -45,6 +59,10 @@ export const WORKSPACE_TRANSLATIONS = {
     '{n} elemento(s) de biblioteca enlazado(s)': '{n} élément(s) de bibliothèque lié(s)',
   },
   de: {
+    'Cada afirmación, hallazgo, constructo, método y marco que el análisis extrajo de tus obras, con quién los sostiene.': 'Jede Behauptung, jeder Befund, jedes Konstrukt, jede Methode und jeder Rahmen aus Ihren Werken – und wer sie vertritt.',
+    'Quién sostiene qué en tu corpus: una ficha por autoría, su síntesis y la matriz que las enfrenta.': 'Wer in Ihrem Korpus was vertritt: ein Profil je Autorschaft, ihre Synthese und die Matrix, die sie gegenüberstellt.',
+    'El esqueleto argumental de tu corpus: qué idea apoya, refina o contradice a cuál, recorrido paso a paso.': 'Das Argumentationsgerüst Ihres Korpus: welche Idee welche stützt, verfeinert oder ihr widerspricht – Schritt für Schritt.',
+    'Estado de la cuestión': 'Forschungsstand',
     'Espacio de trabajo': 'Arbeitsbereich',
     '{n} nota(s) e idea(s) · {c} colección(es)': '{n} Notiz(en) und Idee(n) · {c} Sammlung(en)',
     'Agrupa tus notas e ideas en colecciones para trabajar por temas o capítulos.': 'Fassen Sie Notizen und Ideen in Sammlungen zusammen, um nach Thema oder Kapitel zu arbeiten.',
@@ -65,6 +83,10 @@ export const WORKSPACE_TRANSLATIONS = {
     '{n} elemento(s) de biblioteca enlazado(s)': '{n} verknüpfte(r) Bibliothekseintrag/-einträge',
   },
   pt: {
+    'Cada afirmación, hallazgo, constructo, método y marco que el análisis extrajo de tus obras, con quién los sostiene.': 'Cada afirmação, achado, constructo, método e enquadramento que a análise extraiu das suas obras, e quem os sustenta.',
+    'Quién sostiene qué en tu corpus: una ficha por autoría, su síntesis y la matriz que las enfrenta.': 'Quem sustenta o quê no seu corpus: uma ficha por autoria, a sua síntese e a matriz que as confronta.',
+    'El esqueleto argumental de tu corpus: qué idea apoya, refina o contradice a cuál, recorrido paso a paso.': 'O esqueleto argumentativo do seu corpus: que ideia apoia, refina ou contradiz qual, percorrido passo a passo.',
+    'Estado de la cuestión': 'Estado da arte',
     'Espacio de trabajo': 'Espaço de trabalho',
     '{n} nota(s) e idea(s) · {c} colección(es)': '{n} nota(s) e ideia(s) · {c} coleção(ões)',
     'Agrupa tus notas e ideas en colecciones para trabajar por temas o capítulos.': 'Agrupe as suas notas e ideias em coleções para trabalhar por temas ou capítulos.',
@@ -85,6 +107,10 @@ export const WORKSPACE_TRANSLATIONS = {
     '{n} elemento(s) de biblioteca enlazado(s)': '{n} elemento(s) de biblioteca ligado(s)',
   },
   ptBR: {
+    'Cada afirmación, hallazgo, constructo, método y marco que el análisis extrajo de tus obras, con quién los sostiene.': 'Cada afirmação, achado, constructo, método e enquadramento que a análise extraiu das suas obras, e quem os sustenta.',
+    'Quién sostiene qué en tu corpus: una ficha por autoría, su síntesis y la matriz que las enfrenta.': 'Quem sustenta o quê no seu corpus: uma ficha por autoria, sua síntese e a matriz que as confronta.',
+    'El esqueleto argumental de tu corpus: qué idea apoya, refina o contradice a cuál, recorrido paso a paso.': 'O esqueleto argumentativo do seu corpus: que ideia apoia, refina ou contradiz qual, percorrido passo a passo.',
+    'Estado de la cuestión': 'Estado da arte',
     'Espacio de trabajo': 'Espaço de trabalho',
     '{n} nota(s) e idea(s) · {c} colección(es)': '{n} nota(s) e ideia(s) · {c} coleção(ões)',
     'Agrupa tus notas e ideas en colecciones para trabajar por temas o capítulos.': 'Agrupe suas notas e ideias em coleções para trabalhar por tema ou capítulo.',
@@ -105,6 +131,10 @@ export const WORKSPACE_TRANSLATIONS = {
     '{n} elemento(s) de biblioteca enlazado(s)': '{n} item(ns) de biblioteca vinculado(s)',
   },
   it: {
+    'Cada afirmación, hallazgo, constructo, método y marco que el análisis extrajo de tus obras, con quién los sostiene.': 'Ogni affermazione, risultato, costrutto, metodo e quadro che l’analisi ha tratto dalle tue opere, e chi li sostiene.',
+    'Quién sostiene qué en tu corpus: una ficha por autoría, su síntesis y la matriz que las enfrenta.': 'Chi sostiene che cosa nel tuo corpus: una scheda per autore, la sua sintesi e la matrice che le mette a confronto.',
+    'El esqueleto argumental de tu corpus: qué idea apoya, refina o contradice a cuál, recorrido paso a paso.': 'Lo scheletro argomentativo del tuo corpus: quale idea sostiene, affina o contraddice quale, percorso passo dopo passo.',
+    'Estado de la cuestión': 'Stato dell’arte',
     'Espacio de trabajo': 'Spazio di lavoro',
     '{n} nota(s) e idea(s) · {c} colección(es)': '{n} nota/e e idea/e · {c} raccolta/e',
     'Agrupa tus notas e ideas en colecciones para trabajar por temas o capítulos.': 'Raggruppa note e idee in raccolte per lavorare per temi o capitoli.',
@@ -125,6 +155,10 @@ export const WORKSPACE_TRANSLATIONS = {
     '{n} elemento(s) de biblioteca enlazado(s)': '{n} elemento/i di biblioteca collegato/i',
   },
   tr: {
+    'Cada afirmación, hallazgo, constructo, método y marco que el análisis extrajo de tus obras, con quién los sostiene.': 'Çözümlemenin eserlerinizden çıkardığı her sav, bulgu, yapı, yöntem ve çerçeve; ve bunları kimin savunduğu.',
+    'Quién sostiene qué en tu corpus: una ficha por autoría, su síntesis y la matriz que las enfrenta.': 'Derleminizde kim neyi savunuyor: her yazar için bir künye, sentezi ve onları karşılaştıran dizey.',
+    'El esqueleto argumental de tu corpus: qué idea apoya, refina o contradice a cuál, recorrido paso a paso.': 'Derleminizin savlar iskeleti: hangi düşünce hangisini destekliyor, inceltiyor ya da çürütüyor; adım adım.',
+    'Estado de la cuestión': 'Alanyazın',
     'Espacio de trabajo': 'Çalışma alanı',
     '{n} nota(s) e idea(s) · {c} colección(es)': '{n} not ve fikir · {c} koleksiyon',
     'Agrupa tus notas e ideas en colecciones para trabajar por temas o capítulos.': 'Konuya veya bölüme göre çalışmak için notlarınızı ve fikirlerinizi koleksiyonlarda toplayın.',

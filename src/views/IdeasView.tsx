@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import type { GraphEdge, IdeaConnection, IdeaDetail, IdeaListItem, IdeaType, EdgeDetail } from '@shared/types';
 import { Badge, EDGE_LABELS, NODE_LABELS, Icon, TypeDot } from '../components/ui';
+import { SectionHeader, SectionToolbar } from '../components/SectionHeader';
 import {
   OccurrenceCard,
   EvidenceLocationLink,
@@ -201,15 +202,14 @@ export function IdeasView({
     <div className="h-full flex min-h-0 bg-white text-neutral-900 dark:bg-neutral-950 dark:text-neutral-100" data-testid={testId}>
       {/* List */}
       <div className="flex-1 min-w-0 flex flex-col min-h-0">
-        <div className="p-6 pb-4">
-          <div className="flex items-center gap-3 mb-4">
-            <Icon name="bulb" size={22} className="text-indigo-300" />
-            <h1 className="text-xl font-semibold">{t('Ideas')}</h1>
-            <span className="text-sm text-neutral-500">{tx('{n} ideas extraídas', { n: totalIdeas })}</span>
-          </div>
+        <SectionHeader
+          icon="bulb"
+          title={t('Ideas')}
+          subtitle={t('Cada afirmación, hallazgo, constructo, método y marco que el análisis extrajo de tus obras, con quién los sostiene.')}
+          badge={<span className="text-sm font-normal text-neutral-500">{tx('{n} ideas extraídas', { n: totalIdeas })}</span>}
+        />
 
-          {/* Filters */}
-          <div className="flex flex-wrap items-center gap-2">
+        <SectionToolbar>
             {scopeControl}
             <input
               className="input text-sm w-60"
@@ -238,15 +238,14 @@ export function IdeasView({
               <option value="connections">{t('Ordenar: conexiones')}</option>
               <option value="confidence">{t('Ordenar: confianza')}</option>
             </select>
-          </div>
-        </div>
+        </SectionToolbar>
 
         {/* Idea cards */}
         <VirtualList
           items={ideas}
           itemHeight={IDEA_ROW_HEIGHT}
           getKey={(node) => node.id}
-          className="flex-1 min-h-0 px-6 pb-6"
+          className="flex-1 min-h-0 p-6"
           empty={
             <div className="text-neutral-500 text-sm">
               {totalIdeas === 0

@@ -67,11 +67,11 @@ test('the registry adds the render and nothing else: labels and gating stay put'
   assert.match(readSource('shared/vaultTypes.ts'), /VAULT_TYPE_SCOPED_VIEWS/);
 });
 
-// Gaps is the one view deliberately reachable without a sidebar entry of its own:
-// it is a tab inside Coverage. What makes that safe is that it stays a routable
-// view — Home, Search and the advanced tour all navigate to it — so the guard has
+// Gaps and Debates are reachable without a sidebar entry of their own: both are tabs
+// inside "Estado de la cuestión". What makes that safe is that they stay routable
+// views — Home, Search and the advanced tour all navigate to them — so each guard has
 // to hold BOTH halves at once. Losing the renderer would 404 those callers; growing
-// a NAV_ITEM back would put a second, full-screen Huecos beside the tab.
+// a NAV_ITEM back would put a second, full-screen copy beside the tab.
 test('gaps is routable without a sidebar section, and lands on the Coverage tab', () => {
   const navigation = readSource('src/navigation.ts');
   assert.ok(viewUnion().includes('gaps'), 'gaps must stay in the View union');
@@ -89,6 +89,47 @@ test('gaps is routable without a sidebar section, and lands on the Coverage tab'
   // The callers that still navigate to it must keep working.
   assert.match(readSource('src/app/views/corpus.tsx'), /onOpenGaps=\{\(\) => setView\('gaps'\)\}/);
   assert.match(readSource('src/views/AdvancedTour.tsx'), /view: 'gaps'/);
+});
+
+// Debates joined them: a contradiction only means something beside what the corpus
+// covers and what it is missing, so it stopped being a section and became the middle
+// tab. The invariant is the same one gaps has, and it is written out separately
+// because the two can break independently.
+test('debate is routable without a sidebar section, and lands on its own tab', () => {
+  const navigation = readSource('src/navigation.ts');
+  assert.ok(viewUnion().includes('debate'), 'debate must stay in the View union');
+  assert.ok(
+    !/\{ id: 'debate',/.test(navigation),
+    'debate must NOT have a NAV_ITEM: it is a tab inside Estado de la cuestión, not a section'
+  );
+
+  // The section that holds it keeps its own entry, renamed and with the compass.
+  assert.match(
+    navigation,
+    /\{ id: 'research', label: 'Estado de la cuestión', icon: 'compass', group: 'analyze' \}/,
+    'the three tabs live under one renamed section'
+  );
+
+  // All three ids render the same workspace, each entering by its own tab.
+  const corpus = readSource('src/app/views/corpus.tsx');
+  assert.match(corpus, /debate: \([^)]*\) => \(\s*<CoverageWorkspace\s+vaultId=\{[^}]*\}\s+initialTab="debate"/);
+  assert.equal(registeredViews().get('debate'), 'corpus.tsx');
+  assert.ok(!corpus.includes('DebateView'), 'the registry no longer mounts DebateView on its own');
+
+  // The tabs, in the agreed order.
+  const workspace = readSource('src/views/CoverageWorkspace.tsx');
+  assert.match(
+    workspace,
+    /\['map', 'Cobertura', '[a-z]+'\],\s*\['debate', 'Debates', '[a-z]+'\],\s*\['gaps', 'Huecos', '[a-z]+'\]/,
+    'the order is Cobertura → Debates → Huecos'
+  );
+
+  // What used to navigate away to a section is now a tab change that keeps the place.
+  assert.match(workspace, /const openDebates = \(\) => setTab\('debate'\)/);
+  assert.ok(
+    !corpus.includes("onOpenDebates"),
+    'nothing outside the workspace still routes to a Debates section'
+  );
 });
 
 // The two labs that need a deeply analysed corpus are hidden by default, but hiding
