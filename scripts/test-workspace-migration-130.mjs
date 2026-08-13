@@ -116,6 +116,19 @@ try {
     JSON.stringify({ origin: 'idea', ref: 'idea-1', note: 'manual-idea' }), 0, now, now
   );
 
+  // ── Legacy shape 5: the AI improvement log, whose foreign key this migration has to
+  // relax so the same editor can also improve a note. Every row must survive the rebuild.
+  db.prepare(
+    `INSERT INTO study_docs (id, short_id, title, content_markdown, created_at, updated_at)
+     VALUES ('sd_1', 'DOC-AAAA', 'Apunte', '# Apunte', ?, ?)`
+  ).run(now, now);
+  db.prepare(
+    `INSERT INTO study_improvement_log (id, document_id, style_id, scope, mode, level, length_mode,
+       model_provider, model_name, original_hash, result_hash, original_chars, result_chars, created_at)
+     VALUES ('log_1', 'sd_1', 'builtin:academic', 'selection', 'preserve', 'medium', 'same',
+       'openai', 'gpt', 'h1', 'h2', 10, 12, ?)`
+  ).run(now);
+
   const before = snapshot(db);
 
   runMigrations(db);
@@ -148,6 +161,11 @@ try {
   assert.equal(before.projects, db.prepare('SELECT COUNT(*) AS c FROM projects').get().c, 'no project row was removed');
   assert.equal(before.chapters, db.prepare('SELECT COUNT(*) AS c FROM project_chapters').get().c, 'no chapter row was removed');
   assert.equal(before.drafts, db.prepare('SELECT COUNT(*) AS c FROM writing_saved_drafts').get().c, 'no saved draft was removed');
+  assert.deepEqual(
+    db.prepare('SELECT id, document_id, note_id, original_chars FROM study_improvement_log').all(),
+    [{ id: 'log_1', document_id: 'sd_1', note_id: null, original_chars: 10 }],
+    'the rebuilt improvement log keeps every existing row, now able to point at a note instead'
+  );
 
   // ── Each project became a collection ──
   const collectionA = db.prepare('SELECT * FROM note_folders WHERE source_ref = ?').get('project:p_a');
