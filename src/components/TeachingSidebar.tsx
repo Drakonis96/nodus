@@ -65,12 +65,14 @@ export const TEACHING_GROUPS: TeachingGroup[] = [
 ];
 
 export function TeachingSidebar({
+  compact = false,
   activeView,
   onNavigate,
   onOpenRoadmap,
   sidebarOrder = [],
   sidebarHidden = [],
 }: {
+  compact?: boolean;
   activeView: string;
   onNavigate: (view: TeachingView) => void;
   onOpenRoadmap: (topic: RoadmapTopicKey) => void;
@@ -87,9 +89,9 @@ export function TeachingSidebar({
           .filter((item) => !sidebarHidden.includes(item.id));
         if (items.length === 0) return null;
         return (
-          <section key={group.id} className="mt-2 flex flex-col gap-1">
-            <h2 className="px-3 pb-0.5 pt-1 text-[10px] font-semibold uppercase tracking-wider text-neutral-600">{t(group.label)}</h2>
-            {group.hint && (
+          <section key={group.id} className={`${compact ? 'mt-1 border-t border-neutral-800/70 pt-1' : 'mt-2'} flex flex-col gap-1`}>
+            <h2 className={compact ? 'sr-only' : 'px-3 pb-0.5 pt-1 text-[10px] font-semibold uppercase tracking-wider text-neutral-600'}>{t(group.label)}</h2>
+            {!compact && group.hint && (
               <p className="px-3 pb-1 text-[10px] leading-snug text-neutral-500">{t(group.hint)}</p>
             )}
             {items.map((item) => item.view ? (
@@ -97,12 +99,14 @@ export function TeachingSidebar({
                 key={item.id}
                 data-tour={`nav-${item.view}`}
                 onClick={() => onNavigate(item.view!)}
-                className={`flex items-center gap-2 rounded-lg px-3 py-2 text-left text-sm ${
+                aria-label={compact ? t(item.label) : undefined}
+                title={compact ? t(item.label) : undefined}
+                className={`flex items-center rounded-lg py-2 text-left text-sm ${compact ? 'justify-center px-2' : 'gap-2 px-3'} ${
                   activeView === item.view ? 'bg-indigo-600 text-white' : 'text-neutral-600 hover:bg-neutral-100 dark:text-neutral-400 dark:hover:bg-neutral-900'
                 }`}
               >
-                <Icon name={item.icon} />
-                <span>{t(item.label)}</span>
+                <Icon name={item.icon} className="shrink-0" />
+                <span className={compact ? 'sr-only' : undefined}>{t(item.label)}</span>
               </button>
             ) : (
               <button
@@ -110,16 +114,19 @@ export function TeachingSidebar({
                 type="button"
                 data-testid={`teaching-roadmap-${item.topic}`}
                 onClick={() => onOpenRoadmap(item.topic!)}
-                title={`${t('En diseño')} · ${t('Cuéntame qué necesitas en esta sección')}`}
-                className="group flex w-full items-center gap-2 rounded-lg border border-dashed border-indigo-400 px-3 py-2 text-left text-sm text-neutral-500 transition-colors hover:bg-indigo-600/20 hover:text-indigo-700 dark:hover:text-indigo-300"
+                aria-label={compact ? t(item.label) : undefined}
+                title={`${t(item.label)} · ${t('En diseño')} · ${t('Cuéntame qué necesitas en esta sección')}`}
+                className={`group flex w-full items-center rounded-lg border border-dashed border-indigo-400 py-2 text-left text-sm text-neutral-500 transition-colors hover:bg-indigo-600/20 hover:text-indigo-700 dark:hover:text-indigo-300 ${compact ? 'justify-center px-2' : 'gap-2 px-3'}`}
               >
                 <Icon name={item.icon} className="shrink-0 opacity-60 transition-opacity group-hover:opacity-100" />
-                <span className="min-w-0 flex-1 truncate">{t(item.label)}</span>
-                <Icon
-                  name="sparkles"
-                  size={13}
-                  className="shrink-0 text-indigo-500 opacity-70 transition-opacity group-hover:opacity-100"
-                />
+                <span className={compact ? 'sr-only' : 'min-w-0 flex-1 truncate'}>{t(item.label)}</span>
+                {!compact && (
+                  <Icon
+                    name="sparkles"
+                    size={13}
+                    className="shrink-0 text-indigo-500 opacity-70 transition-opacity group-hover:opacity-100"
+                  />
+                )}
               </button>
             ))}
           </section>

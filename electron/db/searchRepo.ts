@@ -153,7 +153,7 @@ export function globalSearch(query: string, limitPerKind = 8): GlobalSearchResul
   const notes = db
     .prepare(
       `SELECT id, title, kind, content FROM notes
-        WHERE title LIKE ? ESCAPE '\\' OR content LIKE ? ESCAPE '\\'
+        WHERE trashed_at IS NULL AND (title LIKE ? ESCAPE '\\' OR content LIKE ? ESCAPE '\\')
         ORDER BY updated_at DESC LIMIT ?`
     )
     .all(like, like, limitPerKind) as NoteRow[];
@@ -498,7 +498,7 @@ export function getSearchResultDetail(kind: SearchResultKind, id: string): Searc
       const row = db
         .prepare(
           `SELECT n.id, n.title, n.kind, n.content, n.created_at, n.updated_at, f.name AS folder
-           FROM notes n LEFT JOIN note_folders f ON f.id = n.folder_id WHERE n.id = ?`
+           FROM notes n LEFT JOIN note_folders f ON f.id = n.folder_id WHERE n.id = ? AND n.trashed_at IS NULL`
         )
         .get(id) as
         | { id: string; title: string; kind: string; content: string; created_at: string; updated_at: string; folder: string | null }

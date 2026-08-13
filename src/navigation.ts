@@ -126,10 +126,8 @@ export const NAV_ITEMS: NavItem[] = [
   { id: 'reading', label: 'Ruta de lectura', icon: 'route', group: 'analyze' },
   { id: 'deepResearch', label: 'Deep Research', icon: 'telescope', group: 'analyze' },
   // Escribir — producir salidas con citas.
-  // El Espacio de trabajo REEMPLAZA a Escritura, Proyectos y Notas en la bóveda
-  // académica: las tres contaban la misma historia por separado. Las tres siguen
-  // existiendo como vistas para los demás tipos de bóveda, donde Notas es lo único
-  // que hay y no tendría sentido sustituirla por un espacio con proyectos dentro.
+  // La bóveda académica llama Espacio de trabajo a su sección unificada. Los demás
+  // vaults conservan la entrada Notas, pero comparten su catálogo, pestañas y editor.
   { id: 'workspace', label: 'Espacio de trabajo', icon: 'notebook', group: 'create' },
   { id: 'writing', label: 'Escritura', icon: 'edit', group: 'create' },
   { id: 'projects', label: 'Proyectos', icon: 'folder', group: 'create' },
@@ -143,35 +141,27 @@ export const NAV_ITEMS: NavItem[] = [
 /** Pages inside the Herramientas section. The toolkit keeps a SINGLE entry in the
  * View union — its tools are addressed by this id instead — so that adding a tool
  * never turns into a new top-level view (and never leaks into sidebarOrder, the
- * per-vault-type allow-lists or the reordering UI). The sidebar nests one button
- * per tool under the section, and 'home' is the catalogue. */
+ * per-vault-type allow-lists or the reordering UI). 'home' is the catalogue. */
 export type ToolkitPage = 'home' | 'apps' | 'convert' | 'translate' | 'protect' | 'presenter' | 'ocr';
 
 export interface ToolkitToolDef {
   page: Exclude<ToolkitPage, 'home'>;
   /** Marca de la herramienta; NO se traduce. */
   name: string;
-  /** Etiqueta del botón anidado del sidebar: la marca sin el prefijo que ya
-   * aporta la sección, porque el nombre completo no cabe en el ancho por
-   * defecto y se cortaba («Nodus Con…»). El nombre completo sigue en el title
-   * y en la tarjeta del catálogo. */
-  shortName: string;
   /** Clave i18n (español) de la descripción de la tarjeta. */
   description: string;
   icon: string;
   /** 'wip' = navegable pero en construcción; 'soon' = todavía no existe. */
   state: 'wip' | 'soon';
-  /** Sufijo de los data-testid (tarjeta del hub y botón del sidebar). */
+  /** Sufijo del data-testid de la tarjeta del hub. */
   testid: string;
 }
 
-/** Single source of truth for the toolkit catalogue: the hub cards and the nested
- * sidebar buttons render from this list, so they can never drift apart. */
+/** Single source of truth for the toolkit catalogue. */
 export const TOOLKIT_TOOLS: ToolkitToolDef[] = [
   {
     page: 'apps',
     name: 'Nodus Apps',
-    shortName: 'Apps',
     description: 'Crea herramientas para investigar, estudiar o enseñar con IA; adáptalas hablando y compártelas por QR.',
     icon: 'grid',
     state: 'wip',
@@ -180,7 +170,6 @@ export const TOOLKIT_TOOLS: ToolkitToolDef[] = [
   {
     page: 'convert',
     name: 'Nodus Convert',
-    shortName: 'Convert',
     description: 'Convierte documentos, PDF e imágenes, con OCR ligero y utilidades de texto, de uno en uno o en lote.',
     icon: 'swap',
     state: 'wip',
@@ -189,7 +178,6 @@ export const TOOLKIT_TOOLS: ToolkitToolDef[] = [
   {
     page: 'protect',
     name: 'Nodus Protect',
-    shortName: 'Protect',
     description: 'Oculta datos, añade marcas de agua y crea o verifica copias trazables, siempre mediante procesamiento local.',
     icon: 'shield',
     state: 'wip',
@@ -198,7 +186,6 @@ export const TOOLKIT_TOOLS: ToolkitToolDef[] = [
   {
     page: 'translate',
     name: 'Nodus Translate',
-    shortName: 'Translate',
     description: 'Traduce texto, documentos y adjuntos de Zotero con el modelo que elijas, incluido un modo PDF facsímil.',
     icon: 'languages',
     state: 'wip',
@@ -207,7 +194,6 @@ export const TOOLKIT_TOOLS: ToolkitToolDef[] = [
   {
     page: 'presenter',
     name: 'PDF Presenter',
-    shortName: 'Presenter',
     description: 'Presenta PDF y presentaciones externas como diapositivas, con vista del presentador, notas del orador y anotaciones en directo.',
     icon: 'presentation',
     state: 'wip',
@@ -216,7 +202,6 @@ export const TOOLKIT_TOOLS: ToolkitToolDef[] = [
   {
     page: 'ocr',
     name: 'OCR Workspace',
-    shortName: 'OCR',
     description: 'OCR asistido por IA para escaneados difíciles, con revisión página a página e integración con tus bóvedas.',
     icon: 'scanText',
     state: 'wip',
@@ -367,6 +352,8 @@ export interface LibraryNavigationTarget {
   healthBucket?: CorpusHealthBucketId;
   /** Open a transverse Library item, entering its clean reader when available. */
   readerItemId?: string;
+  /** Open the installed/downloadable CSL style manager. */
+  citationStyles?: boolean;
 }
 
 /** Navigation into Ideas that opens the complete detail panel for one idea. */

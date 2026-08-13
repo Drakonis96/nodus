@@ -144,8 +144,14 @@ export function NodiCompanion({ context, costumes }: { context: Ctx; costumes?: 
   const [ntfs, setNtfs] = useState<NodiNotification[]>([]);
   // The published announcements, from the same hook the header panel uses, so the two
   // surfaces can never disagree about what is unread.
-  const { announcements, unread: unreadAnnouncements, markRead: markAnnouncementRead } = useAnnouncements();
+  const {
+    announcements,
+    unread: unreadAnnouncements,
+    markRead: markAnnouncementRead,
+    refresh: refreshNotificationSources,
+  } = useAnnouncements();
   const unread = unreadAnnouncements + ntfs.reduce((n, x) => n + (x.read ? 0 : 1), 0);
+  const [refreshingNotifications, setRefreshingNotifications] = useState(false);
   const [clearNotificationsConfirmation, setClearNotificationsConfirmation] = useState(false);
 
   const [messages, setMessages] = useState<NodiChatMessage[]>([]);
@@ -704,6 +710,20 @@ export function NodiCompanion({ context, costumes }: { context: Ctx; costumes?: 
     }
   };
 
+  const refreshNotificationCenter = useCallback(async () => {
+    if (refreshingNotifications) return;
+    setRefreshingNotifications(true);
+    try {
+      const snapshot = await refreshNotificationSources();
+      setNtfs(snapshot.notifications);
+    } catch {
+      // Keep the last good snapshot. A failed optional announcement check must not turn
+      // Nodi's local activity feed into an error panel.
+    } finally {
+      setRefreshingNotifications(false);
+    }
+  }, [refreshNotificationSources, refreshingNotifications]);
+
   const nodiState: NodiState = closing ? 'closing' : streaming ? 'thinking' : greet ? 'waving' : celebrate ? 'discovering' : 'idle';
   const activeConversation = conversations.find((conversation) => conversation.id === activeConversationId) ?? null;
   // The academic idea-graph is the only vault whose retrieval carries citable ids, so its
@@ -909,6 +929,17 @@ export function NodiCompanion({ context, costumes }: { context: Ctx; costumes?: 
             <div className="nodi-panel-head">
               <span>{t('Notificaciones')}</span>
               <span className="grow" />
+              <button
+                type="button"
+                className="nodi-head-icon"
+                data-testid="nodi-notifications-refresh"
+                onClick={() => void refreshNotificationCenter()}
+                disabled={refreshingNotifications}
+                title={t(refreshingNotifications ? 'Actualizando…' : 'Actualizar')}
+                aria-label={t(refreshingNotifications ? 'Actualizando…' : 'Actualizar')}
+              >
+                <Icon name="refresh" size={14} className={refreshingNotifications ? 'animate-spin' : ''} />
+              </button>
               {(announcements.length > 0 || ntfs.length > 0) && (
                 <button onClick={() => setClearNotificationsConfirmation(true)}>{t('Limpiar')}</button>
               )}

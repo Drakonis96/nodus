@@ -18,6 +18,7 @@ import type { NodusApi } from '../types';
 export const NODI_WINDOW_METHODS = [
   // notifications
   'listNotifications',
+  'refreshNotifications',
   'markNotificationsRead',
   'clearNotifications',
   'onNotificationsChanged',

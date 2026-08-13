@@ -96,6 +96,9 @@ const ICON_PATHS: Record<string, string> = {
   // Open thesaurus: paired pages make the lexical-alternatives action distinct
   // from the closed-book icon used for ordinary reading and references.
   thesaurus: '<path d="M3 5.5A2.5 2.5 0 0 1 5.5 3H11a2 2 0 0 1 2 2v16a2 2 0 0 0-2-2H5.5A2.5 2.5 0 0 0 3 21.5Z"/><path d="M21 5.5A2.5 2.5 0 0 0 18.5 3H13a2 2 0 0 0-2 2v16a2 2 0 0 1 2-2h5.5a2.5 2.5 0 0 1 2.5 2.5Z"/><path d="M6 8h3M6 12h3M15 8h3M15 12h3"/>',
+  // An open lexical reference plus a small AI sparkle. Every path explicitly
+  // refuses fill so compact editor themes cannot collapse it into a grey block.
+  aiSynonyms: '<path fill="none" d="M3 7a2 2 0 0 1 2-2h5a2 2 0 0 1 2 2v13a2.5 2.5 0 0 0-2-1H5a2 2 0 0 0-2 2Z"/><path fill="none" d="M12 7a2 2 0 0 1 2-2h3"/><path fill="none" d="M6 9h3M6 13h3M15 12h3"/><path fill="none" d="m19 2 .55 1.45L21 4l-1.45.55L19 6l-.55-1.45L17 4l1.45-.55Z"/><path fill="none" d="M12 20a2.5 2.5 0 0 1 2-1h5a2 2 0 0 1 2 2v-9"/>',
   external: '<path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/>',
   x: '<line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>',
   help: '<circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/>',

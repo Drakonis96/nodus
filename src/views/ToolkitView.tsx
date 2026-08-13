@@ -27,8 +27,8 @@ interface ToolCardProps {
 
 /** Tarjeta del hub. Todas se renderizan con la MISMA estructura y altura
  *  (grid + h-full); el icono va en una loseta cuadrada fija para que quede
- *  perfectamente centrado, y el badge se ancla abajo con mt-auto para que el
- *  texto variable no desalinee las tarjetas entre sí. */
+ *  perfectamente centrado. Solo las herramientas aún no disponibles muestran
+ *  estado: las aplicaciones navegables no necesitan una etiqueta de desarrollo. */
 function ToolCard({ testid, icon, name, description, state, onOpen }: ToolCardProps) {
   const disabled = state === 'soon';
   return (
@@ -49,15 +49,11 @@ function ToolCard({ testid, icon, name, description, state, onOpen }: ToolCardPr
       </span>
       <span className="text-base font-semibold text-neutral-900 dark:text-neutral-100">{name}</span>
       <span className="text-sm leading-relaxed text-neutral-500 dark:text-neutral-400">{description}</span>
-      <span
-        className={`mt-auto inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-xs ${
-          disabled
-            ? 'bg-neutral-200 text-neutral-600 dark:bg-neutral-800 dark:text-neutral-300'
-            : 'bg-amber-100 text-amber-700 dark:bg-amber-900/50 dark:text-amber-300'
-        }`}
-      >
-        {disabled ? t('Próximamente') : t('En desarrollo')}
-      </span>
+      {disabled && (
+        <span className="mt-auto inline-flex items-center gap-1 rounded-md bg-neutral-200 px-2 py-0.5 text-xs text-neutral-600 dark:bg-neutral-800 dark:text-neutral-300">
+          {t('Próximamente')}
+        </span>
+      )}
     </button>
   );
 }

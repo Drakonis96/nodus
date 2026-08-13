@@ -5,8 +5,8 @@
 // progress; opening a document reveals the review: the original page image beside its
 // editable transcription, with per-page reprocess and manual edits saved back.
 //
-// Design follows the Toolkit conventions (amber accent, back-button header, dashed
-// dropzone, NoticeBar) — deliberately NOT the reference app's look.
+// Its first screen uses the shared Apps-style Toolkit hero; the review keeps the
+// compact back-button header, dashed dropzone and NoticeBar conventions.
 import { useCallback, useEffect, useMemo, useState, type DragEvent } from 'react';
 import type {
   AiOcrExportFormat,
@@ -22,6 +22,7 @@ import type {
 import { isLocalProvider } from '@shared/providers';
 import { OCR_CONCURRENCY_OPTIONS } from '@shared/aiOcrTypes';
 import { Icon, Spinner, modelLabel } from '../components/ui';
+import { ToolkitAppHero } from '../components/ToolkitAppHero';
 import { ModelPicker, SubscriptionQuotaNotice } from '../components/ModelPicker';
 import { ConfirmModal } from '../components/ConfirmModal';
 import { errorText, t, tr, tx } from '../i18n';
@@ -507,16 +508,21 @@ export function ToolkitAiOcrView({ onBack, settings }: { onBack: () => void; set
 
   return (
     <div data-testid="aiocr-home" className="mx-auto max-w-4xl space-y-6">
-      <header className="flex items-start gap-3">
-        <BackButton testid="toolkit-aiocr-back" label={t('Volver')} onClick={onBack} />
-        <Loseta />
-        <div className="min-w-0">
-          <h1 className="text-lg font-semibold text-neutral-900 dark:text-neutral-100">OCR Workspace</h1>
-          <p className="text-sm text-neutral-500 dark:text-neutral-400">
-            {t('Transcribe PDFs e imágenes escaneadas con modelos de visión. El resultado se guarda en tu biblioteca de OCR.')}
-          </p>
-        </div>
-      </header>
+      <ToolkitAppHero
+        badge="Nodus Toolkit"
+        title="OCR Workspace"
+        description={t('Transcribe PDFs e imágenes escaneadas con modelos de visión. El resultado se guarda en tu biblioteca de OCR.')}
+        icon="scanText"
+        actionLabel={t('Añadir archivos')}
+        actionIcon="upload"
+        onAction={pick}
+        onBack={onBack}
+        heroTestId="toolkit-aiocr-hero"
+        actionTestId="toolkit-aiocr-primary"
+        backTestId="toolkit-aiocr-back"
+        actionDisabled={busy}
+        actionBusy={busy}
+      />
       <NoticeBar notice={notice} onClose={() => setNotice(null)} />
 
       {/* Tabs: process new documents vs. browse the OCR library */}

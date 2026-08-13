@@ -48,7 +48,7 @@ interface AnnouncementsState {
 }
 
 let notify: (() => void) | null = null;
-let checking = false;
+let checking: Promise<void> | null = null;
 
 /** Register a callback invoked when the list or its read marks change. */
 export function setAnnouncementsNotifier(cb: (() => void) | null): void {
@@ -163,9 +163,7 @@ function pruneMarks(marks: Record<string, number>, announcements: readonly Annou
  * file means the app shows the notices it already had, which is the same thing it shows
  * when there is nothing to announce.
  */
-export async function refreshAnnouncements(reason: string): Promise<void> {
-  if (checking || !announcementsAllowed()) return;
-  checking = true;
+async function performAnnouncementsRefresh(reason: string): Promise<void> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
   try {
@@ -198,6 +196,20 @@ export async function refreshAnnouncements(reason: string): Promise<void> {
     console.log('[announcements] check skipped:', error instanceof Error ? error.message : error);
   } finally {
     clearTimeout(timer);
-    checking = false;
+  }
+}
+
+export async function refreshAnnouncements(reason: string): Promise<void> {
+  if (!announcementsAllowed()) return;
+  // A manual check made while the scheduled one is still in flight must wait for the
+  // same request. Returning early would make the refresh icon stop while still showing
+  // the stale list, which is precisely the uncertainty the manual action is meant to
+  // remove. One shared promise also keeps the channel at one conditional request.
+  if (checking) return checking;
+  checking = performAnnouncementsRefresh(reason);
+  try {
+    await checking;
+  } finally {
+    checking = null;
   }
 }

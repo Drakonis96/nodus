@@ -915,6 +915,12 @@
 }
 .nodi-theme-light .nodi-chat-tool .model-picker-trigger:hover { border-color: var(--nodi-vault-accent, #6366f1); background: #ffffff; }
 .nodi-theme-light .nodi-chat-tool .model-picker-options { border-color: rgba(15, 23, 42, .14); background: #ffffff; }
+.nodi-theme-light .nodi-chat-tool .model-picker-search { border-bottom-color: rgba(15, 23, 42, .1); }
+.nodi-theme-light .nodi-chat-tool .model-picker-search > input {
+  border-color: rgba(15, 23, 42, .14);
+  background: #ffffff;
+  color: #1f2937;
+}
 .nodi-theme-light .nodi-chat-tool .model-picker-options button { color: #475569; }
 .nodi-theme-light .nodi-chat-tool .model-picker-options button:hover { background: #f1f5f9; color: #1f2937; }
 .nodi-theme-light .nodi-chat-tool .model-picker-options button.selected {

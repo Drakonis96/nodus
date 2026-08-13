@@ -80,6 +80,7 @@ export const nodusApi: NodusApi = {
   listVaults: () => ipcRenderer.invoke('vaults:list'),
   // Nodi companion: notifications
   listNotifications: () => ipcRenderer.invoke('nodi:notifications:list'),
+  refreshNotifications: () => ipcRenderer.invoke('nodi:notifications:refresh'),
   markNotificationsRead: () => ipcRenderer.invoke('nodi:notifications:markRead'),
   clearNotifications: () => ipcRenderer.invoke('nodi:notifications:clear'),
   listNodiConversations: () => ipcRenderer.invoke('nodi:conversations:list'),

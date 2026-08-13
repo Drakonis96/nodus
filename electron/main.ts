@@ -131,7 +131,7 @@ let announcementsFirstTimer: NodeJS.Timeout | null = null;
 let quitting = false;
 
 const UPDATE_CHECK_INTERVAL_MS = 4 * 60 * 60 * 1000;
-const UPDATE_PROGRESS_MIN_INTERVAL_MS = 200;
+const UPDATE_PROGRESS_MIN_INTERVAL_MS = 500;
 /** Long enough that the first window has painted and a vault is open. */
 const ANNOUNCEMENTS_STARTUP_DELAY_MS = 45 * 1000;
 
@@ -685,7 +685,7 @@ function setupAutoUpdates(): void {
     const roundedPercent = Math.round(percent);
     const now = Date.now();
     // electron-updater can report several byte-level samples per animation frame on
-    // fast links. The UI only displays whole percentages, so repeated or sub-200 ms
+    // fast links. The UI only displays whole percentages, so repeated or sub-500 ms
     // samples buy no visible fidelity and otherwise cause IPC, React and log churn.
     if (roundedPercent === lastDownloadProgressPercent
       || (roundedPercent < 100 && now - lastDownloadProgressEmitAt < UPDATE_PROGRESS_MIN_INTERVAL_MS)) return;

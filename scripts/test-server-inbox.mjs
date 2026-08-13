@@ -40,6 +40,7 @@ const {
   unreadServerInboxCount,
 } = require(path.join(repoRoot, 'electron/db/serverInboxRepo.ts'));
 const { applyIncomingMutations, titleOf } = require(path.join(repoRoot, 'electron/serverSync/mutationInbox.ts'));
+const { groupServerInboxEntries, unreadServerInboxGroupCount } = require(path.join(repoRoot, 'src/serverInboxGrouping.ts'));
 
 const SPACE = { spaceId: 'space-1' };
 
@@ -68,7 +69,7 @@ function mixedBatch() {
 }
 
 test('the vault is migrated far enough to hold an inbox', () => {
-  assert.ok(SCHEMA_VERSION >= 123, 'server_inbox arrives in v123');
+  assert.ok(SCHEMA_VERSION >= 132, 'group parent metadata arrives in v132');
   assert.equal(getDb().pragma('user_version', { simple: true }), SCHEMA_VERSION);
   assert.deepEqual(listServerInbox(), [], 'a fresh vault has received nothing');
 });
@@ -161,6 +162,10 @@ test('titleOf names what a person would recognise, and nothing else', () => {
   );
   assert.deepEqual(titleOf('notes', { title: 'Una nota' }), { title: 'Una nota', entityKind: 'note' });
   assert.deepEqual(titleOf('note_folders', { name: 'Capítulo 3' }), { title: 'Capítulo 3', entityKind: 'note_folder' });
+  assert.deepEqual(
+    titleOf('writing_draft_annotations', { selected_text: 'Un fragmento' }),
+    { title: 'Un fragmento', entityKind: 'deep_research_annotation' }
+  );
   // Anything else, and a delete, have no name: the panel falls back to table + key.
   assert.deepEqual(titleOf('saved_searches', { id: 's-1' }), { title: null, entityKind: null });
   assert.deepEqual(titleOf('notes', null), { title: null, entityKind: null });
@@ -193,6 +198,65 @@ test('what applyIncomingMutations reports is exactly what the inbox can store', 
   assert.deepEqual(entry.key, ['dr-live']);
   assert.ok(db.prepare("SELECT 1 FROM writing_saved_drafts WHERE id = 'dr-live'").get(), 'and the report really landed');
 
+  const annotationRows = [
+    { id: 'a-live-1', kind: 'highlight', selected: 'Informe', start: 0 },
+    { id: 'a-live-2', kind: 'comment', selected: 'llegado', start: 8, comment: 'Comprobar esta afirmación' },
+  ];
+  const annotationSummary = applyIncomingMutations(db, annotationRows.map((item, index) => ({
+    id: `mut-${item.id}`, seq: 10 + index, clientId: 'iphone-de-jorge', kind: 'upsert', table: 'writing_draft_annotations',
+    key: [item.id],
+    row: {
+      id: item.id, draft_id: 'dr-live', scope: 'source', kind: item.kind,
+      color: item.kind === 'highlight' ? 'yellow' : null,
+      start_offset: item.start, end_offset: item.start + item.selected.length,
+      selected_text: item.selected, prefix: '', suffix: '', comment_text: item.comment ?? null,
+      created_at: now, updated_at: now, target_json: null,
+    },
+    schemaVersion: SCHEMA_VERSION, createdAt: now,
+  })));
+  assert.equal(annotationSummary.entries.length, 2);
+  assert.deepEqual(
+    annotationSummary.entries.map(({ parentEntityKind, parentEntityId, parentTitle }) => ({ parentEntityKind, parentEntityId, parentTitle })),
+    annotationRows.map(() => ({ parentEntityKind: 'deep_research', parentEntityId: 'dr-live', parentTitle: 'Informe llegado del teléfono' }))
+  );
+  recordServerInbox(annotationSummary.entries, SPACE);
+  const grouped = groupServerInboxEntries(listServerInbox());
+  assert.equal(grouped.length, 1, 'the report and both nested changes are one notification');
+  assert.equal(grouped[0].entries.length, 3);
+  assert.equal(grouped[0].title, 'Informe llegado del teléfono');
+  assert.equal(grouped[0].unreadCount, 3);
+  assert.equal(unreadServerInboxGroupCount(listServerInbox()), 1, 'the header badge counts the group, not its children');
+
   clearServerInbox();
   await rm(userData, { recursive: true, force: true });
+});
+
+test('global-library annotations can leave the vault database through the external mutation route', () => {
+  const db = getDb();
+  const now = '2026-08-13T12:00:00.000Z';
+  const mutation = {
+    id: 'mut-library-highlight', seq: 14, clientId: 'iphone-de-jorge', kind: 'upsert', table: 'writing_draft_annotations',
+    key: ['library-annotation:ZG9jdW1lbnQ6d2l0aC1jb2xvbg:highlight-1'],
+    row: { id: 'library-annotation:ZG9jdW1lbnQ6d2l0aC1jb2xvbg:highlight-1', draft_id: 'nodus-library:document:with-colon' },
+    schemaVersion: SCHEMA_VERSION, createdAt: now,
+  };
+  let routed = null;
+  const summary = applyIncomingMutations(db, [mutation], {
+    external(value) {
+      routed = value;
+      return {
+        outcome: 'applied', title: 'Fragmento subrayado', entityKind: 'library_annotation',
+        parentEntityKind: 'library_document', parentEntityId: 'document:with-colon', parentTitle: 'Documento global',
+      };
+    },
+  });
+  assert.equal(routed, mutation);
+  assert.equal(summary.applied, 1);
+  assert.equal(summary.cursor, 14);
+  assert.deepEqual(summary.entries.map(({ outcome, entityKind, parentEntityKind, parentEntityId, parentTitle }) => ({ outcome, entityKind, parentEntityKind, parentEntityId, parentTitle })), [
+    {
+      outcome: 'applied', entityKind: 'library_annotation', parentEntityKind: 'library_document',
+      parentEntityId: 'document:with-colon', parentTitle: 'Documento global',
+    },
+  ]);
 });

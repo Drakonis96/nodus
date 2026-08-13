@@ -17,6 +17,8 @@ test('the public website is isolated from repository documentation', () => {
     'nodi.js',
     'nodi-widget.css',
     'nodi-widget.js',
+    'site-header.css',
+    'site-header.js',
     'tutorials.json',
     'assets/nodus-logo.svg',
     'data/github-release-downloads.json',

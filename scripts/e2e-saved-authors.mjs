@@ -77,15 +77,18 @@ try {
   const cards = page.locator('[data-testid^="author-card-"]');
   await cards.first().waitFor();
   const firstCard = cards.first();
-  const authorName = (await firstCard.locator('span.font-medium').innerText()).trim();
+  const firstName = (await firstCard.getByTestId('author-name').innerText()).trim().split('\n')[0];
+  const surname = (await firstCard.locator('button').nth(1).innerText()).trim();
+  const authorName = `${firstName} ${surname}`.trim();
   const saveButton = firstCard.locator('[data-testid^="author-save-"]');
   assert.equal(await saveButton.getAttribute('aria-pressed'), 'false');
   await saveButton.click();
   assert.equal(await saveButton.getAttribute('aria-pressed'), 'true', 'the author card updates after saving');
 
+  await page.getByRole('button', { name: 'Filtros', exact: true }).click();
   await page.getByTestId('authors-tab-saved').click();
   await cards.first().waitFor();
-  assert.equal((await cards.first().locator('span.font-medium').innerText()).trim(), authorName);
+  assert.equal(`${(await cards.first().getByTestId('author-name').innerText()).trim().split('\n')[0]} ${(await cards.first().locator('button').nth(1).innerText()).trim()}`.trim(), authorName);
   assert.equal(await cards.count(), 1, 'the saved workspace only contains the saved author');
 
   const search = page.getByTestId('authors-search');
@@ -103,14 +106,18 @@ try {
   await page.reload();
   await page.getByTestId('app-shell').waitFor();
   await page.locator('[data-tour="nav-authors"]').click();
+  await page.getByRole('button', { name: 'Filtros', exact: true }).click();
   await page.getByTestId('authors-tab-saved').click();
   await cards.first().waitFor();
   assert.equal(await cards.count(), 1, 'the saved author survives an app reload');
 
+  await cards.first().getByTestId('author-name').click();
   const detailSave = page.getByTestId('author-detail-save');
   await detailSave.waitFor();
   assert.equal(await detailSave.getAttribute('aria-pressed'), 'true', 'the dossier header shares the saved state');
+  await page.screenshot({ path: path.join(os.tmpdir(), 'nodus-author-detail-e2e.png'), fullPage: true });
   await detailSave.click();
+  await page.getByTestId('authors-tab-dossier').click();
   await page.getByText('No has guardado ningún autor todavía.', { exact: true }).waitFor();
   assert.equal(await cards.count(), 0, 'removing the dossier star updates the saved workspace immediately');
   assert.deepEqual(pageErrors, [], `renderer errors: ${pageErrors.map((error) => error.message).join(' | ')}`);

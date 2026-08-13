@@ -21,7 +21,9 @@ import type {
 } from '@shared/types';
 import { normalizeUiLanguage } from '@shared/uiLanguage';
 import { buildServerSnapshot, lightweightVaultRevision, type SnapshotAsset } from './serverSnapshot';
+import { buildServerLibraryPublication, type ServerLibraryPackage } from './serverLibrary';
 import { buildVectorSet, vectorRevision, type VectorKind } from './serverVectors';
+import { onGlobalLibraryChanged } from '../library/libraryRuntime';
 import { nodiNotesPending, syncNodiNotes } from './nodiNotesSync';
 import {
   closeReadOnlyPool,
@@ -68,6 +70,8 @@ interface VaultRuntime {
   lastBytes: number | null;
   /** Images sent on the last publication; zero on a republish whose bytes were unchanged. */
   lastAssetsSent: number;
+  /** Clean-Markdown ZIPs sent on the last publication. */
+  lastLibraryPackagesSent: number;
   /** What the last collection from the mutation ledger did, for the Settings panel. */
   lastInbox: { applied: number; deleted: number; keptLocal: number; refused: number } | null;
   /** Fingerprint of the embeddings last uploaded, so an unchanged index is not resent. */
@@ -90,6 +94,7 @@ function ensureRuntime(vaultId: string): VaultRuntime {
       observed: null, dirtySince: 0, lastUploadStartedAt: 0, pending: false,
       lastRevision: null, phase: 'idle', lastSyncAt: null, lastError: null, lastBytes: null,
       lastAssetsSent: 0, lastInbox: null, lastVectorRevision: {}, lastVectors: {},
+      lastLibraryPackagesSent: 0,
     };
     runtimes.set(vaultId, rt);
   }
@@ -168,6 +173,7 @@ function connectionFrom(config: VaultServerConfig): NodusServerConnection {
     autoSync: config.autoSync,
     includeUserContent: config.includeUserContent,
     includePassages: config.includePassages,
+    includeLibraryDocuments: config.includeLibraryDocuments,
     includeVectors: config.includeVectors,
     phase,
     lastSyncAt: rt?.lastSyncAt ?? null,
@@ -254,6 +260,46 @@ async function uploadAssets(
   rt.lastAssetsSent = sent;
 }
 
+/** Upload only the document ZIPs this space does not already hold. */
+async function uploadLibraryPackages(
+  baseUrl: string,
+  spaceId: string,
+  token: string,
+  packages: ServerLibraryPackage[],
+  rt: VaultRuntime,
+): Promise<void> {
+  rt.lastLibraryPackagesSent = 0;
+  if (packages.length === 0) return;
+  const endpoint = `${baseUrl}/api/v1/spaces/${encodeURIComponent(spaceId)}/library`;
+  const negotiation = await fetchWithTimeout(`${endpoint}/negotiate`, {
+    method: 'POST',
+    headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' },
+    body: JSON.stringify({ packages: packages.map((entry) => ({ hash: entry.hash, bytes: entry.bytes })) }),
+  });
+  if (negotiation.status === 404) throw new Error('Actualiza Nodus Server para poder publicar documentos de la biblioteca.');
+  if (!negotiation.ok) throw new Error(`El servidor rechazó la negociación de documentos (HTTP ${negotiation.status}).`);
+  const { missing = [] } = await negotiation.json().catch(() => ({ missing: [] })) as { missing?: string[] };
+  const byHash = new Map(packages.map((entry) => [entry.hash, entry]));
+  for (const hash of missing) {
+    const item = byHash.get(hash);
+    if (!item) continue;
+    const response = await fetchWithTimeout(`${endpoint}/packages/${hash}`, {
+      method: 'PUT',
+      headers: {
+        authorization: `Bearer ${token}`,
+        'content-type': 'application/zip',
+        'content-length': String(item.data.length),
+      },
+      body: item.data,
+    });
+    if (!response.ok) {
+      const problem = await response.json().catch(() => ({})) as { error_description?: string; error?: string };
+      throw new Error(problem.error_description || problem.error || `El servidor rechazó ${item.documentId} (HTTP ${response.status}).`);
+    }
+    rt.lastLibraryPackagesSent += 1;
+  }
+}
+
 /**
  * Publish the corpus embeddings so the server can answer a semantic query.
  *
@@ -328,10 +374,12 @@ async function publishVault(vaultId: string): Promise<void> {
     // Splitting them also disposes of the concurrency question rather than answering it.
     // better-sqlite3 is synchronous and both would run on the one main-process thread, so
     // "never at the same time" would have to be a flag shared between two modules.
+    const library = config.includeLibraryDocuments ? buildServerLibraryPublication() : null;
     const snapshot = buildServerSnapshot(
       { ...vault },
       { nodusServerIncludeUserContent: config.includeUserContent, nodusServerIncludePassages: config.includePassages },
       db,
+      library?.manifest ?? null,
     );
     // Nothing changed since our last upload this session: keep the server as-is and
     // avoid the round-trip. The very first publish after launch always runs (no cache).
@@ -347,6 +395,9 @@ async function publishVault(vaultId: string): Promise<void> {
     // broken illustration until the next publication.
     if (snapshot.assets.length > 0) {
       await uploadAssets(normalizeUrl(config.url), config.spaceId, token, snapshot.assets, rt);
+    }
+    if (library) {
+      await uploadLibraryPackages(normalizeUrl(config.url), config.spaceId, token, library.packages, rt);
     }
     // Level 1 deliberately trades a little bandwidth for very low desktop CPU usage.
     // Compressing asynchronously puts even that on libuv's threadpool: this runs on
@@ -480,6 +531,16 @@ export function startNodusServerSync(): void {
   timer = setInterval(() => void tick(), CHECK_INTERVAL_MS);
   timer.unref?.();
 }
+
+// A global-library write does not increment any vault database's change counter. Mark every
+// opted-in connection explicitly so the next normal publisher tick includes it.
+onGlobalLibraryChanged(() => {
+  for (const config of listVaultConfigs()) {
+    if (config.configured && config.enabled && config.autoSync && config.includeLibraryDocuments) {
+      ensureRuntime(config.vaultId).pending = true;
+    }
+  }
+});
 
 export function stopNodusServerSync(): void {
   if (timer) clearInterval(timer);

@@ -406,7 +406,7 @@ try {
     CREATE TABLE authors (author_id TEXT PRIMARY KEY, name TEXT, affiliation TEXT, canonical_key TEXT);
     CREATE TABLE work_authors (author_id TEXT, nodus_id TEXT);
     CREATE TABLE note_folders (id TEXT PRIMARY KEY, name TEXT);
-    CREATE TABLE notes (id TEXT PRIMARY KEY, title TEXT, kind TEXT, content TEXT, folder_id TEXT, created_at TEXT, updated_at TEXT);
+    CREATE TABLE notes (id TEXT PRIMARY KEY, title TEXT, kind TEXT, content TEXT, folder_id TEXT, created_at TEXT, updated_at TEXT, trashed_at TEXT);
     INSERT INTO ideas VALUES ('i1','claim','Idea de prueba','Enunciado completo','2026-01-01');
     INSERT INTO works VALUES ('w1','Obra de prueba','["Autora, A."]',2026,'book','10/test','Z1','Notas','pdf');
     INSERT INTO idea_occurrences VALUES ('i1','w1','central','Desarrollo',0.9);
@@ -420,7 +420,7 @@ try {
     INSERT INTO authors VALUES ('a1','Autora de prueba','Universidad','autora-prueba');
     INSERT INTO work_authors VALUES ('a1','w1');
     INSERT INTO note_folders VALUES ('f1','Carpeta');
-    INSERT INTO notes VALUES ('n1','Nota de prueba','markdown','Contenido completo','f1','2026-01-01','2026-01-02');
+    INSERT INTO notes VALUES ('n1','Nota de prueba','markdown','Contenido completo','f1','2026-01-01','2026-01-02',NULL);
   `);
   const { getSearchResultDetail } = await import(pathToFileURL(searchOutfile).href);
   const cases = [['idea', 'i1'], ['work', 'w1'], ['passage', 'p1'], ['gap', 'g1'], ['theme', 't1'], ['author', 'a1'], ['note', 'n1']];

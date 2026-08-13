@@ -923,6 +923,9 @@ function GlobalLibraryContent({
       else setDetailId(item.id);
     });
   }, [onOpenReader, target?.nonce, target?.readerItemId]);
+  useEffect(() => {
+    if (target?.citationStyles) setCitationItems([]);
+  }, [target?.citationStyles, target?.nonce]);
 
   const children = useMemo(() => collectionChildren(collections), [collections]);
   const localCollections = useMemo(() => collections.filter((entry) => entry.source === 'nodus'), [collections]);
@@ -1519,7 +1522,7 @@ function GlobalLibraryContent({
       {createReferenceMode && <LibraryCreateReferenceDialog defaultMode={createReferenceMode} collectionIds={selectedCollection && collections.find((entry) => entry.id === selectedCollection)?.source === 'nodus' ? [selectedCollection] : []} onClose={() => setCreateReferenceMode(null)} onCreated={(created, openEditor) => { setDetailId(created.id); setDetail(created); if (openEditor) setMetadataItem(created); void load(); }} />}
       {metadataItem && <LibraryMetadataEditor item={metadataItem} onClose={() => setMetadataItem(null)} onSaved={(saved) => { setDetail(saved); void load(); }} />}
       {metadataBatchItems && <LibraryMetadataBatchDialog itemIds={metadataBatchItems} onClose={() => setMetadataBatchItems(null)} onApplied={() => { setSelected(new Set()); void load(); }} />}
-      {citationItems && <LibraryCitationExportDialog itemIds={citationItems} requestScope={{ collectionId: selectedCollection, savedSearchId: selectedSavedSearch, smartSearch: selectedSavedSearch ? savedSearches.find((entry) => entry.id === selectedSavedSearch)?.query ?? null : null }} onClose={() => setCitationItems(null)} />}
+      {citationItems && <LibraryCitationExportDialog itemIds={citationItems} requestScope={{ collectionId: selectedCollection, savedSearchId: selectedSavedSearch, smartSearch: selectedSavedSearch ? savedSearches.find((entry) => entry.id === selectedSavedSearch)?.query ?? null : null }} initialStyleManagerOpen={Boolean(target?.citationStyles)} onClose={() => setCitationItems(null)} />}
       {manager && <LibraryItemManager item={manager.item} initialTab={manager.tab} onClose={() => setManager(null)} onChanged={(saved) => { setManager((value) => value ? { ...value, item: saved } : null); setDetail(saved); void load(); }} />}
       {smartSearchEditor && <LibrarySmartSearchDialog initial={smartSearchEditor === 'new' ? null : smartSearchEditor} onClose={() => setSmartSearchEditor(null)} onSaved={(record) => { setSelectedSavedSearch(record.id); setSelectedCollection(null); void load(); }} />}
       {tablePreferencesOpen && <LibraryTablePreferencesDialog preferences={viewPreferences} onClose={() => setTablePreferencesOpen(false)} onSaved={(preferences) => { setViewPreferences(preferences); setOffset(0); }} />}

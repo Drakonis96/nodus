@@ -14,6 +14,7 @@
 import { useEffect, useMemo, useRef, useState, type DragEvent, type RefObject } from 'react';
 import { createPortal } from 'react-dom';
 import { Icon } from '../components/ui';
+import { ToolkitAppHero } from '../components/ToolkitAppHero';
 import { t, tr, tx } from '../i18n';
 import {
   TOOLKIT_CATEGORIES,
@@ -528,27 +529,21 @@ export function ToolkitConvertView({ onBack }: { onBack: () => void }) {
   const hasFiles = files.length > 0;
 
   return (
-    <div data-testid="toolkit-convert-page" className="mx-auto flex max-w-3xl flex-col gap-5">
-      <header className="flex items-center gap-3">
-        <button
-          data-testid="toolkit-back"
-          className="btn btn-ghost h-9 min-h-9 justify-center px-2.5 py-0 leading-none"
-          onClick={onBack}
-          title={t('Volver a Herramientas')}
-          aria-label={t('Volver a Herramientas')}
-        >
-          <Icon name="chevronLeft" className="shrink-0" />
-        </button>
-        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300">
-          <Icon name="swap" size={20} />
-        </span>
-        <div className="min-w-0">
-          <h1 className="text-lg font-semibold text-neutral-900 dark:text-neutral-100">Nodus Convert</h1>
-          <p className="text-sm text-neutral-500">
-            {t('Todo se procesa en tu equipo. Nunca se modifica el archivo original.')}
-          </p>
-        </div>
-      </header>
+    <div data-testid="toolkit-convert-page" className="mx-auto flex max-w-5xl flex-col gap-5">
+      <ToolkitAppHero
+        badge="Nodus Toolkit"
+        title="Nodus Convert"
+        description={t('Todo se procesa en tu equipo. Nunca se modifica el archivo original.')}
+        icon="swap"
+        actionLabel={t('Añadir archivos')}
+        actionIcon="upload"
+        onAction={addFiles}
+        onBack={onBack}
+        heroTestId="toolkit-convert-hero"
+        actionTestId="toolkit-convert-add-files"
+        backTestId="toolkit-back"
+        actionDisabled={running}
+      />
 
       {/* Step 1 — drop the files. Stays a drop target once the list has content,
           just smaller, so more files can always be added the same way. */}

@@ -8,6 +8,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { PDFDocumentProxy } from 'pdfjs-dist';
 import { Icon } from '../components/ui';
+import { ToolkitAppHero } from '../components/ToolkitAppHero';
 import { confirm } from '../components/feedback';
 import { t, tx } from '../i18n';
 import {
@@ -306,36 +307,24 @@ export function ToolkitPresenterView({ onBack }: { onBack: () => void }) {
 
   return (
     <div className="mx-auto flex h-full max-w-6xl flex-col gap-4">
-      {/* Breadcrumb header — Herramientas / PDF Presenter */}
-      <header className="flex items-center gap-2">
-        <button
-          type="button"
-          onClick={onBack}
-          data-testid="presenter-back"
-          className="btn btn-ghost h-9 min-h-9 gap-1 px-2 text-sm text-neutral-500 hover:text-neutral-800 dark:hover:text-neutral-200"
-        >
-          <Icon name="chevronLeft" size={16} className="shrink-0" />
-          {t('Herramientas')}
-        </button>
-        <span className="text-neutral-300 dark:text-neutral-600">/</span>
-        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300">
-          <Icon name="presentation" size={18} />
-        </span>
-        <h1 className="text-base font-semibold text-neutral-900 dark:text-neutral-100">PDF Presenter</h1>
-      </header>
+      <ToolkitAppHero
+        badge="Nodus Toolkit"
+        title="PDF Presenter"
+        description={t('Importa un PDF o una presentación para empezar')}
+        icon="presentation"
+        actionLabel={importing ? t('Importando…') : t('Importar PDF o presentación')}
+        actionIcon="plus"
+        onAction={importPresentation}
+        onBack={onBack}
+        heroTestId="toolkit-presenter-hero"
+        actionTestId="presenter-import"
+        backTestId="presenter-back"
+        actionDisabled={importing}
+        actionBusy={importing}
+      />
 
-      {/* Toolbar: import + search + sort */}
+      {/* Toolbar: search + sort. Import is the primary hero action. */}
       <div className="flex flex-wrap items-center gap-2">
-        <button
-          type="button"
-          onClick={importPresentation}
-          disabled={importing}
-          data-testid="presenter-import"
-          className="btn btn-accent h-9 min-h-9 gap-1.5 px-3 text-sm"
-        >
-          <Icon name={importing ? 'refresh' : 'plus'} size={16} className={`shrink-0 ${importing ? 'animate-spin' : ''}`} />
-          {importing ? t('Importando…') : t('Importar PDF o presentación')}
-        </button>
         <div className="relative min-w-40 flex-1">
           <Icon
             name="search"

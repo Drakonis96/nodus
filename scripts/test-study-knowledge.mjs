@@ -136,7 +136,7 @@ try {
   assert.match(ideasView, /<IdeasView/); assert.match(graphView, /<GraphView/);
   for (const marker of ['study-ideas-view', 'study-ideas-subject']) assert.match(ideasView, new RegExp(marker));
   for (const marker of ['study-graph-view', 'study-graph-subject']) assert.match(graphView, new RegExp(marker));
-  for (const academicPattern of ['VirtualList', 'DETAIL_MIN_WIDTH', 'DETAIL_MAX_WIDTH', 'Ordenar: nombre', 'Todos los tipos', 'Ideas conectadas']) assert.match(ideasEngine, new RegExp(academicPattern));
+  for (const academicPattern of ['IDEAS_PAGE_SIZE', 'ideas-tabs', 'ideas-tab-catalog', 'ideas-tab-idea', "t\\('Ordenar'\\)", 'Todos los tipos', 'Ideas conectadas']) assert.match(ideasEngine, new RegExp(academicPattern));
   for (const graphCapability of ['SigmaGraph', 'GRAPH_PRESETS', 'layoutMode', 'highlightDepth', 'playGraphHistory', 'sigma-graph-engine']) assert.match(graphCapability === 'sigma-graph-engine' ? await readFile(path.join(repoRoot, 'src/views/graph/SigmaGraph.tsx'), 'utf8') : graphEngine, new RegExp(graphCapability));
   assert.match(adapter, /key: `study:\$\{subjectId\}`/);
   assert.match(adapter, /window\.nodus\.getStudyKnowledgeGraph\(subjectId\)/);

@@ -48,6 +48,7 @@ import type {
   LibraryReaderChatRequest,
   ManualIdeaPayload,
   ManuscriptVerificationRequest,
+  NoteTagPatch,
   NotesExportOptions,
   QueueKind,
   ReadingPathRequest,
@@ -1429,17 +1430,28 @@ export function registerAcademicIpc({ h, getWindow, chatAborters }: IpcContext):
   h('chat:delete', async (_e, id: string) => chat.deleteConversation(id));
 
   // notes (user-structured folders/subfolders with markdown + captured AI content)
-  h('notes:tree', async () => notes.getNotesTree());
+  h('notes:tree', async (_e, includeTrashed?: boolean) => notes.getNotesTree(includeTrashed ?? false));
   h('notes:folders:create', async (_e, input: CreateNoteFolderInput) => notes.createNoteFolder(input));
   h('notes:folders:rename', async (_e, id: string, name: string) => notes.renameNoteFolder(id, name));
   h('notes:folders:move', async (_e, id: string, parentId: string | null) => notes.moveNoteFolder(id, parentId ?? null));
   h('notes:folders:delete', async (_e, id: string) => {
     notes.deleteNoteFolder(id);
   });
+  h('notes:folders:trash', async (_e, id: string) => notes.trashNoteFolder(id));
   h('notes:create', async (_e, input: CreateNoteInput) => notes.createNote(input));
   h('notes:get', async (_e, id: string) => notes.getNote(id));
   h('notes:update', async (_e, input: UpdateNoteInput) => notes.updateNote(input));
   h('notes:move', async (_e, id: string, folderId: string | null) => notes.moveNote(id, folderId ?? null));
+  h('notes:tags:patch', async (_e, noteIds: string[], patch: NoteTagPatch) => notes.patchNoteTags(noteIds, patch));
+  h('notes:trash', async (_e, noteIds: string[]) => { notes.trashNotes(noteIds); });
+  h('notes:restore', async (_e, noteIds: string[]) => { notes.restoreNotes(noteIds); });
+  h('notes:deletePermanently', async (_e, noteIds: string[]) => {
+    for (const id of [...new Set(noteIds)]) {
+      const note = notes.getNote(id);
+      if (note?.source?.note === MANUAL_IDEA_MARKER && note.source.ref) manualIdeas.deleteManualIdea(note.source.ref);
+      notes.deleteNote(id);
+    }
+  });
   h('notes:delete', async (_e, id: string) => {
     // A manual idea is owned by its note: deleting the note purges the idea and
     // everything indexed for it (occurrences, evidence, edges, embedding).

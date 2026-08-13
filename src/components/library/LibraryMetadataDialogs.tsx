@@ -243,12 +243,12 @@ export function LibraryMetadataBatchDialog({ itemIds, onClose, onApplied }: {
   </div>;
 }
 
-export function LibraryCitationExportDialog({ itemIds, requestScope, onClose }: {
-  itemIds: string[]; requestScope: Omit<LibraryBibliographyExportRequest, 'format' | 'itemIds'>; onClose: () => void;
+export function LibraryCitationExportDialog({ itemIds, requestScope, initialStyleManagerOpen = false, onClose }: {
+  itemIds: string[]; requestScope: Omit<LibraryBibliographyExportRequest, 'format' | 'itemIds'>; initialStyleManagerOpen?: boolean; onClose: () => void;
 }) {
   const [style, setStyle] = useState<LibraryCitationStyle>('apa-7'); const [kind, setKind] = useState<'citation' | 'bibliography'>('bibliography');
   const [format, setFormat] = useState<LibraryBibliographyFormat>('ris'); const [preview, setPreview] = useState(''); const [busy, setBusy] = useState(false);
-  const [styles, setStyles] = useState<LibraryCitationStyleRecord[]>([]); const [styleSearch, setStyleSearch] = useState(''); const [styleManagerOpen, setStyleManagerOpen] = useState(false); const [locale, setLocale] = useState('es-ES');
+  const [styles, setStyles] = useState<LibraryCitationStyleRecord[]>([]); const [styleSearch, setStyleSearch] = useState(''); const [styleManagerOpen, setStyleManagerOpen] = useState(initialStyleManagerOpen); const [locale, setLocale] = useState('es-ES');
   const [repositoryOpen, setRepositoryOpen] = useState(false); const [repositorySearch, setRepositorySearch] = useState('');
   const [repositoryStyles, setRepositoryStyles] = useState<LibraryCitationStyleRepositoryEntry[]>([]); const [repositoryLoading, setRepositoryLoading] = useState(false);
   const targetIds = itemIds;

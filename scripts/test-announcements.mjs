@@ -193,6 +193,25 @@ test('the app fetches announcements conditionally, on the update timer, and can 
   assert.match(main, /UPDATE_CHECK_INTERVAL_MS = 4 \* 60 \* 60 \* 1000/);
 });
 
+test('the header and Nodi can manually refresh the same notification centre', () => {
+  const ipc = fs.readFileSync(path.join(repoRoot, 'electron/ipc.ts'), 'utf8');
+  const preload = fs.readFileSync(path.join(repoRoot, 'electron/preload/api.ts'), 'utf8');
+  const windows = fs.readFileSync(path.join(repoRoot, 'shared/api/windows.ts'), 'utf8');
+  const header = fs.readFileSync(path.join(repoRoot, 'src/components/NotificationsPanel.tsx'), 'utf8');
+  const nodi = fs.readFileSync(path.join(repoRoot, 'src/components/nodi/NodiCompanion.tsx'), 'utf8');
+
+  assert.match(ipc, /h\('nodi:notifications:refresh'/);
+  assert.match(ipc, /await refreshAnnouncements\('manual'\)/);
+  assert.match(ipc, /'nodi:notifications:changed'/);
+  assert.match(ipc, /'announcements:changed'/);
+  assert.match(preload, /refreshNotifications:\s*\(\)\s*=>\s*ipcRenderer\.invoke\('nodi:notifications:refresh'\)/);
+  assert.match(windows, /'refreshNotifications'/, 'the isolated Nodi window must receive the refresh bridge method');
+  assert.match(header, /data-testid="header-notifications-refresh"/);
+  assert.match(header, /<Icon name="refresh"/);
+  assert.match(nodi, /data-testid="nodi-notifications-refresh"/);
+  assert.match(nodi, /<Icon name="refresh"/);
+});
+
 test('announcement text is rendered as text, never as markup', () => {
   for (const file of ['src/components/NotificationsPanel.tsx', 'src/components/nodi/NodiCompanion.tsx']) {
     const source = fs.readFileSync(path.join(repoRoot, file), 'utf8');

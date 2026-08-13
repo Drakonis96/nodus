@@ -50,6 +50,9 @@ export interface InboxEntry {
   /** Something a person would recognise: a report's objective, a note's title. */
   title?: string | null;
   entityKind?: string | null;
+  parentEntityKind?: 'deep_research' | 'library_document' | null;
+  parentEntityId?: string | null;
+  parentTitle?: string | null;
   schemaVersion?: number;
   createdAt?: string;
 }
@@ -100,7 +103,43 @@ export function titleOf(
   }
   if (table === 'notes') return { title: text(row.title), entityKind: 'note' };
   if (table === 'note_folders') return { title: text(row.name), entityKind: 'note_folder' };
+  if (table === 'writing_draft_annotations') {
+    return {
+      title: text(row.comment_text) ?? text(row.selected_text),
+      entityKind: 'deep_research_annotation',
+    };
+  }
   return { title: null, entityKind: null };
+}
+
+type InboxDescription = Pick<
+  InboxEntry,
+  'title' | 'entityKind' | 'parentEntityKind' | 'parentEntityId' | 'parentTitle'
+>;
+
+/**
+ * Describe both the changed row and the durable root it belongs to. Parent metadata is
+ * resolved while the row still exists: after a deletion there is deliberately nothing
+ * left for the renderer to join against.
+ */
+function descriptionOf(
+  db: Database.Database,
+  table: string,
+  row: Record<string, unknown> | null | undefined,
+): InboxDescription {
+  const own = titleOf(table, row);
+  if (table !== 'writing_draft_annotations' || !row) return own;
+  const draftId = typeof row.draft_id === 'string' ? row.draft_id.trim() : '';
+  // Global-library annotations are handled before this path by the external route. Its
+  // document metadata lives on disk rather than in writing_saved_drafts.
+  if (!draftId || draftId.startsWith('nodus-library:')) return own;
+  const report = db.prepare('SELECT title, brief_json FROM writing_saved_drafts WHERE id = ?').get(draftId) as Record<string, unknown> | undefined;
+  return {
+    ...own,
+    parentEntityKind: 'deep_research',
+    parentEntityId: draftId,
+    parentTitle: titleOf('writing_saved_drafts', report).title,
+  };
 }
 
 function timestampOf(row: Record<string, unknown> | null | undefined, fallback?: string): number {
@@ -128,7 +167,20 @@ function timestampOf(row: Record<string, unknown> | null | undefined, fallback?:
  * would manufacture inbox rows during the suite and, on that replay, either collide or
  * resurrect an entry the user had already dealt with. The caller records what it gets back.
  */
-export function applyIncomingMutations(db: Database.Database, mutations: IncomingMutation[]): InboxSummary {
+export interface ExternalMutationDecision {
+  outcome: Extract<InboxEntry['outcome'], 'applied' | 'deleted' | 'keptLocal'>;
+  title?: string | null;
+  entityKind?: string | null;
+  parentEntityKind?: InboxEntry['parentEntityKind'];
+  parentEntityId?: string | null;
+  parentTitle?: string | null;
+}
+
+export function applyIncomingMutations(
+  db: Database.Database,
+  mutations: IncomingMutation[],
+  options: { external?: (mutation: IncomingMutation) => ExternalMutationDecision | null } = {},
+): InboxSummary {
   const summary: InboxSummary = { applied: 0, deleted: 0, keptLocal: 0, refused: [], cursor: 0, entries: [] };
   const present = new Set(
     (db.prepare("SELECT name FROM sqlite_master WHERE type = 'table'").all() as { name: string }[]).map((row) => row.name)
@@ -138,7 +190,14 @@ export function applyIncomingMutations(db: Database.Database, mutations: Incomin
   const describe = (
     mutation: IncomingMutation,
     outcome: InboxEntry['outcome'],
-    extra: { reason?: string; title?: string | null; entityKind?: string | null } = {},
+    extra: {
+      reason?: string;
+      title?: string | null;
+      entityKind?: string | null;
+      parentEntityKind?: InboxEntry['parentEntityKind'];
+      parentEntityId?: string | null;
+      parentTitle?: string | null;
+    } = {},
   ): InboxEntry => ({
     id: mutation.id,
     seq: Number(mutation.seq),
@@ -154,7 +213,15 @@ export function applyIncomingMutations(db: Database.Database, mutations: Incomin
 
   const refuse = (mutation: IncomingMutation, reason: string): void => {
     summary.refused.push({ id: mutation.id, reason });
-    summary.entries.push(describe(mutation, 'refused', { reason }));
+    summary.entries.push(describe(mutation, 'refused', {
+      reason,
+      // A rejected parent row never existed locally, so preserve the established honest
+      // fallback. Annotation rows are the exception: their parent identity is needed to
+      // keep a repeated refusal inside the document/report notification it belongs to.
+      ...(mutation.table === 'writing_draft_annotations'
+        ? descriptionOf(db, mutation.table, mutation.row)
+        : {}),
+    }));
   };
 
   for (const mutation of mutations.slice().sort((a, b) => Number(a.seq) - Number(b.seq))) {
@@ -164,6 +231,20 @@ export function applyIncomingMutations(db: Database.Database, mutations: Incomin
     // refuse a newer package outright.
     if (Number(mutation.schemaVersion) > SCHEMA_VERSION) {
       refuse(mutation, `Procede de un esquema más reciente (v${mutation.schemaVersion} frente a v${SCHEMA_VERSION}). Actualiza Nodus para recibir estos cambios.`);
+      break;
+    }
+    try {
+      const external = options.external?.(mutation) ?? null;
+      if (external) {
+        if (external.outcome === 'applied') summary.applied += 1;
+        else if (external.outcome === 'deleted') summary.deleted += 1;
+        else summary.keptLocal += 1;
+        summary.entries.push(describe(mutation, external.outcome, external));
+        summary.cursor = Number(mutation.seq);
+        continue;
+      }
+    } catch (error) {
+      refuse(mutation, error instanceof Error ? error.message : String(error));
       break;
     }
     if (!APPLICABLE.has(mutation.table) || !present.has(mutation.table)) {
@@ -183,9 +264,11 @@ export function applyIncomingMutations(db: Database.Database, mutations: Incomin
       // The transaction RETURNS its decision, so it is read only after the commit. Counting
       // inside it would credit a mutation whose commit then failed, and the catch below
       // would report that very same mutation as refused — two answers for one decision.
+      let localForDescription: Record<string, unknown> | undefined;
       const outcome = db.transaction((): InboxEntry['outcome'] => {
         db.pragma('defer_foreign_keys = ON');
         const local = db.prepare(`SELECT * FROM ${quoteIdentifier(mutation.table)} WHERE ${where}`).get(...key) as Record<string, unknown> | undefined;
+        localForDescription = local;
 
         if (mutation.kind === 'delete') {
           // A local edit made after the remote deletion is the more recent fact, so the row
@@ -231,8 +314,10 @@ export function applyIncomingMutations(db: Database.Database, mutations: Incomin
       if (outcome === 'applied') summary.applied += 1;
       else if (outcome === 'deleted') summary.deleted += 1;
       else summary.keptLocal += 1;
-      // A delete carries no row, so it has no name to show. The inbox falls back to the key.
-      summary.entries.push(describe(mutation, outcome, titleOf(mutation.table, mutation.row)));
+      const descriptiveRow = localForDescription
+        ? { ...localForDescription, ...(mutation.row ?? {}) }
+        : mutation.row;
+      summary.entries.push(describe(mutation, outcome, descriptionOf(db, mutation.table, descriptiveRow)));
       summary.cursor = Number(mutation.seq);
     } catch (error) {
       refuse(mutation, error instanceof Error ? error.message : String(error));

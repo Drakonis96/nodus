@@ -4,6 +4,7 @@ import { listServerInbox, recordServerInbox } from '../db/serverInboxRepo';
 import { getNodusServerTokenFor } from '../secrets/secretStore';
 import { getActiveVault } from '../vaults/vaultRegistry';
 import { applyIncomingMutations, type IncomingMutation } from './mutationInbox';
+import { applyPublishedLibraryAnnotationMutation } from '../libraryReader/libraryReaderStore';
 import { isPublishing, markVaultDirty, noteVaultInbox } from './serverSyncService';
 import { fetchWithTimeout, normalizeUrl, readVaultConfig } from './serverSyncShared';
 
@@ -103,7 +104,7 @@ async function tick(): Promise<void> {
 
       // Synchronous, and deliberately so: applyIncomingMutations opens a transaction per
       // mutation, and better-sqlite3 forbids awaiting inside a db.transaction() callback.
-      const summary = applyIncomingMutations(db, mutations);
+      const summary = applyIncomingMutations(db, mutations, { external: applyPublishedLibraryAnnotationMutation });
       recordServerInbox(summary.entries, { spaceId: config.spaceId });
       noteVaultInbox(config.vaultId, {
         applied: summary.applied,

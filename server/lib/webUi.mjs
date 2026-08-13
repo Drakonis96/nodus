@@ -1,15 +1,78 @@
 import { escapeHtml } from './http.mjs';
 
 const LANGUAGE_OPTIONS = [
-  ['en', 'English'],
-  ['es', 'Español'],
-  ['fr', 'Français'],
-  ['de', 'Deutsch'],
-  ['pt', 'Português (Portugal)'],
-  ['pt-BR', 'Português (Brasil)'],
-  ['it', 'Italiano'],
-  ['tr', 'Türkçe'],
+  ['en', '🇬🇧', 'English'],
+  ['es', '🇪🇸', 'Español'],
+  ['fr', '🇫🇷', 'Français'],
+  ['de', '🇩🇪', 'Deutsch'],
+  ['pt', '🇵🇹', 'Português (Portugal)'],
+  ['pt-BR', '🇧🇷', 'Português (Brasil)'],
+  ['it', '🇮🇹', 'Italiano'],
+  ['tr', '🇹🇷', 'Türkçe'],
 ];
+
+export const NODUS_FAVICON_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <defs><linearGradient id="n" x1="14" y1="10" x2="50" y2="54" gradientUnits="userSpaceOnUse"><stop stop-color="#ddd6fe"/><stop offset=".45" stop-color="#a78bfa"/><stop offset="1" stop-color="#7c3aed"/></linearGradient></defs>
+  <rect width="64" height="64" rx="15" fill="#0b0b12"/>
+  <path d="M18 48V16L46 48V16" fill="none" stroke="url(#n)" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="18" cy="16" r="5.5" fill="#ddd6fe"/><circle cx="18" cy="48" r="5.5" fill="#a78bfa"/><circle cx="46" cy="48" r="5.5" fill="#8b5cf6"/><circle cx="46" cy="16" r="5.5" fill="#7c3aed"/>
+</svg>`;
+
+export const WEB_SCRIPT = `(() => {
+  'use strict';
+
+  const picker = document.querySelector('[data-testid="language-picker"]');
+  const language = picker?.querySelector('select[name="language"]');
+  if (picker instanceof HTMLFormElement && language instanceof HTMLSelectElement) {
+    language.addEventListener('change', () => {
+      picker.classList.add('is-submitting');
+      language.setAttribute('aria-busy', 'true');
+      picker.requestSubmit();
+    });
+  }
+
+  async function copyText(value) {
+    if (navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(value);
+      return;
+    }
+    const field = document.createElement('textarea');
+    field.value = value;
+    field.setAttribute('readonly', '');
+    field.style.position = 'fixed';
+    field.style.opacity = '0';
+    document.body.append(field);
+    field.select();
+    const copied = document.execCommand('copy');
+    field.remove();
+    if (!copied) throw new Error('Copy failed');
+  }
+
+  document.querySelectorAll('button[data-copy-value]').forEach((button) => {
+    button.addEventListener('click', async () => {
+      if (!(button instanceof HTMLButtonElement)) return;
+      const value = button.dataset.copyValue || '';
+      const copyLabel = button.dataset.copyLabel || '';
+      const copiedLabel = button.dataset.copiedLabel || copyLabel;
+      const feedback = button.parentElement?.querySelector('[data-copy-feedback]');
+      try {
+        await copyText(value);
+        button.classList.add('is-copied');
+        button.setAttribute('aria-label', copiedLabel);
+        button.setAttribute('title', copiedLabel);
+        if (feedback) feedback.textContent = copiedLabel;
+        window.setTimeout(() => {
+          button.classList.remove('is-copied');
+          button.setAttribute('aria-label', copyLabel);
+          button.setAttribute('title', copyLabel);
+          if (feedback) feedback.textContent = '';
+        }, 1600);
+      } catch {
+        button.classList.add('is-error');
+      }
+    });
+  });
+})();`;
 
 export function nodusMark(id, className = 'brand-mark') {
   const safeId = escapeHtml(id);
@@ -35,13 +98,12 @@ export function nodusMark(id, className = 'brand-mark') {
 }
 
 export function languagePicker(currentLanguage, labels) {
-  const options = LANGUAGE_OPTIONS.map(([value, label]) => (
-    `<option value="${value}"${value === currentLanguage ? ' selected' : ''}>${label}</option>`
+  const options = LANGUAGE_OPTIONS.map(([value, flag, label]) => (
+    `<option value="${value}"${value === currentLanguage ? ' selected' : ''}>${flag} ${label}</option>`
   )).join('');
   return `<form class="language-picker" method="post" action="/language" data-testid="language-picker">
     <label for="language-select">${escapeHtml(labels.language)}</label>
     <select id="language-select" name="language" aria-label="${escapeHtml(labels.language)}">${options}</select>
-    <button class="language-apply" type="submit">${escapeHtml(labels.apply)}</button>
   </form>`;
 }
 
@@ -96,9 +158,8 @@ export const WEB_STYLES = `
   .site-brand small{display:block;margin-top:2px;color:var(--subtle);font-size:10px;font-weight:650;letter-spacing:.16em;text-transform:uppercase}
   .language-picker{display:flex;align-items:center;gap:8px;margin:0}
   .language-picker label{margin:0;color:var(--subtle);font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase}
-  .language-picker select{width:auto;min-width:148px;height:36px;padding:0 32px 0 11px;border:1px solid var(--border);border-radius:9px;background:var(--surface);color:#e7e7ec;font-size:12px}
-  .language-apply{height:36px;margin:0;padding:0 12px;border:1px solid var(--border);border-radius:9px;background:var(--surface-raised);color:#dddde5;font-size:12px;font-weight:650;cursor:pointer}
-  .language-apply:hover{border-color:#5b4b86;background:#211b30;color:#fff}
+  .language-picker select{width:auto;min-width:184px;height:36px;padding:0 32px 0 11px;border:1px solid var(--border);border-radius:9px;background:var(--surface);color:#e7e7ec;font-size:12px}
+  .language-picker.is-submitting select{cursor:progress;opacity:.72}
   .app-main{width:min(1180px,calc(100% - 40px));margin:0 auto;padding:30px 0 70px}
   .auth-main{display:grid;grid-template-columns:minmax(300px,.88fr) minmax(430px,1.12fr);width:min(1040px,calc(100% - 40px));min-height:calc(100vh - 116px);margin:0 auto;padding:32px 0 72px;align-items:center}
   .auth-story{position:relative;z-index:0;padding:52px 58px 52px 12px}
@@ -128,6 +189,7 @@ export const WEB_STYLES = `
   label{display:block;margin:0 0 7px;color:#d8d8e1;font-size:12px;font-weight:650}
   .label-line label{margin:0}
   input,select{box-sizing:border-box;width:100%;height:44px;padding:0 12px;border:1px solid var(--border-strong);border-radius:10px;background:#0b0b11;color:#fff;transition:border-color .16s ease,box-shadow .16s ease,background .16s ease}
+  input[type="checkbox"]{width:17px;height:17px;min-width:17px;margin:0;padding:0;border:1px solid var(--border-strong);border-radius:4px;accent-color:var(--violet);box-shadow:none}
   input::placeholder{color:#5f6070}
   input:hover,select:hover{border-color:#535366}
   input:focus,select:focus{border-color:var(--violet);background:#0f0d16;box-shadow:0 0 0 3px rgba(139,92,246,.12)}
@@ -158,8 +220,18 @@ export const WEB_STYLES = `
   .server-overview{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:20px;align-items:center;padding:20px 22px;border:1px solid rgba(139,92,246,.25);border-radius:16px;background:linear-gradient(115deg,rgba(99,102,241,.12),rgba(18,18,25,.88) 55%)}
   .status-line{display:flex;align-items:center;gap:9px;margin-bottom:7px;color:#d9d8e3;font-size:12px;font-weight:650}
   .status-dot{width:8px;height:8px;border-radius:50%;background:#34d399;box-shadow:0 0 0 4px rgba(52,211,153,.1)}
-  .endpoint{display:flex;align-items:center;gap:8px;margin-top:12px;color:var(--muted);font-size:12px}
-  .endpoint code{font-size:11px}
+  .endpoint-list{display:grid;gap:13px;margin-top:14px}
+  .endpoint-group .section-title h2{color:var(--subtle);font-size:10px;font-weight:760;letter-spacing:.09em;text-transform:uppercase}
+  .endpoint{display:flex;min-width:0;align-items:center;gap:8px;margin-top:7px;color:var(--muted);font-size:12px}
+  .endpoint code{display:block;min-width:0;flex:1;padding:7px 9px;font-size:11px;white-space:nowrap;overflow-x:auto}
+  .copy-endpoint{display:grid;width:32px;min-width:32px;height:32px;min-height:32px;margin:0;padding:0;place-items:center;border:1px solid var(--border);border-radius:9px;background:var(--surface-raised);color:#b8b8c6;box-shadow:none}
+  .copy-endpoint:hover{border-color:#66558f;background:#211b30;color:#fff;transform:none}
+  .copy-endpoint svg{width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+  .copy-endpoint .check-icon{display:none;color:var(--success)}
+  .copy-endpoint.is-copied .copy-icon{display:none}
+  .copy-endpoint.is-copied .check-icon{display:block}
+  .copy-endpoint.is-error{border-color:rgba(239,68,68,.45);color:var(--danger)}
+  .copy-feedback{min-width:42px;color:var(--success);font-size:10px;font-weight:650}
   .metric-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
   .metric{min-width:110px;padding:13px;border:1px solid var(--border);border-radius:12px;background:rgba(9,9,14,.56)}
   .metric strong{display:block;color:#fff;font-size:1.35rem;line-height:1}
@@ -178,16 +250,55 @@ export const WEB_STYLES = `
   td p{margin:8px 0 0}
   td select{height:34px;margin-bottom:7px;font-size:11px}
   .empty{padding:30px 18px!important;text-align:center;color:var(--subtle)}
-  .access-list{display:grid;gap:6px}
-  .access-chip{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:6px 8px;border:1px solid #2d2d39;border-radius:8px;background:#101016}
-  .access-chip form{margin:0}
-  .access-chip button{display:grid;min-width:26px;min-height:26px;padding:0 8px;place-items:center}
-  .access-chip select{min-height:26px;padding:2px 6px;font-size:.85rem}
+  .space-name{display:grid;gap:5px;min-width:180px}
+  .space-heading{display:flex;flex-wrap:wrap;align-items:center;gap:7px}
+  .publication-meta{display:inline-flex;align-items:center;gap:5px;width:max-content;margin-top:4px;padding:4px 8px;border:1px solid rgba(144,126,255,.28);border-radius:999px;background:rgba(111,83,255,.11);color:#c7bcff;font-size:11px;font-weight:700}
+  .publication-meta.muted-library{border-color:var(--border);background:rgba(255,255,255,.025);color:var(--subtle);font-weight:600}
+  .publication-meta svg{width:13px;height:13px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+  .space-id{display:flex;align-items:center;gap:7px;min-width:230px}
+  .space-id code{flex:1}
+  .copy-id{width:30px;min-width:30px;height:30px;min-height:30px}
+  .inline-editor{margin-top:7px}
+  .inline-editor summary{width:max-content;color:#b8a9e5;font-size:11px;font-weight:650;cursor:pointer;list-style:none}
+  .inline-editor summary::-webkit-details-marker{display:none}
+  .inline-editor form{display:flex;align-items:center;gap:7px;margin-top:8px}
+  .inline-editor input{min-width:170px;height:34px}
+  .inline-editor button{min-height:34px;margin:0}
+  .vault-type{display:inline-flex;width:max-content;align-items:center;min-height:21px;padding:0 7px;border:1px solid color-mix(in srgb,var(--vault-accent,#71717a) 52%,transparent);border-radius:999px;background:color-mix(in srgb,var(--vault-accent,#71717a) 16%,transparent);color:color-mix(in srgb,var(--vault-accent,#a1a1aa) 48%,white);font-size:9px;font-weight:760;letter-spacing:.055em;text-transform:uppercase}
+  .user-list{display:grid;gap:12px}
+  .user-card{padding:18px;border:1px solid var(--border);border-radius:14px;background:rgba(14,14,20,.76)}
+  .user-card-header{display:flex;align-items:center;justify-content:space-between;gap:16px;padding-bottom:14px;border-bottom:1px solid #252530}
+  .user-identity{display:flex;align-items:center;gap:11px;min-width:0}
+  .user-avatar{display:grid;width:34px;height:34px;flex:0 0 auto;place-items:center;border:1px solid rgba(139,92,246,.32);border-radius:10px;background:var(--violet-soft);color:#ddd6fe;font-size:13px;font-weight:760;text-transform:uppercase}
+  .user-identity strong{display:block;overflow-wrap:anywhere}
+  .account-tag{display:inline-flex;margin-top:3px;color:var(--subtle);font-size:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase}
+  .email-unlock{display:grid;grid-template-columns:minmax(0,1fr) minmax(180px,280px) auto;align-items:end;gap:12px;margin-bottom:14px}
+  .email-unlock p{margin:4px 0 0}
+  .email-unlock input,.email-unlock button{margin:0}
+  .email-edit-form{display:flex;align-items:center;gap:8px}
+  .email-edit-form input{min-width:min(320px,45vw);height:34px}
+  .email-edit-form button{min-height:34px;margin:0;white-space:nowrap}
+  .email-readonly{display:grid;gap:3px}
+  @media(max-width:720px){.email-unlock{grid-template-columns:1fr}.email-edit-form{align-items:stretch;flex-direction:column}.email-edit-form input{min-width:0;width:100%}}
+  .user-card-header a{font-size:11px;font-weight:650}
+  .user-access-form{margin-top:14px}
+  .user-access-heading{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
+  .user-access-heading p{max-width:620px;margin:3px 0 0;color:var(--muted);font-size:11px}
+  .user-access-form>button{margin-top:12px}
   .role-tag{padding:2px 8px;border:1px solid #3b3b4a;border-radius:999px;font-size:.8rem;color:#a9a9bd}
   .grant-list{display:grid;gap:8px;margin-top:6px}
-  .grant-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:8px 10px;border:1px solid #2d2d39;border-radius:8px;background:#101016}
-  .grant-name{display:flex;align-items:center;gap:8px;margin:0;font-weight:500}
-  .grant-row select{min-height:30px;padding:2px 8px;font-size:.85rem}
+  .grant-row{display:grid;grid-template-columns:minmax(0,1fr) minmax(145px,190px);align-items:center;gap:14px;padding:10px 11px;border:1px solid #2d2d39;border-radius:10px;background:#101016}
+  .grant-choice{display:flex;align-items:center;gap:10px;min-width:0;margin:0;cursor:pointer}
+  .grant-choice input:disabled{cursor:not-allowed;opacity:.72}
+  .grant-vault{display:grid;min-width:0;gap:3px}
+  .grant-vault strong{overflow:hidden;color:#e8e8ee;font-size:12px;text-overflow:ellipsis;white-space:nowrap}
+  .grant-vault small{color:var(--subtle);font-size:9px;font-weight:700;letter-spacing:.055em;text-transform:uppercase}
+  .grant-role{display:grid;grid-template-columns:auto minmax(90px,1fr);align-items:center;gap:8px}
+  .grant-role label{margin:0;color:var(--subtle);font-size:9px;text-transform:uppercase}
+  .grant-row select{height:34px;min-height:34px;padding:2px 8px;font-size:11px}
+  .grant-row:not(:has(input[type="checkbox"]:checked)) .grant-role{opacity:.48}
+  .locked-owner{display:inline-flex;align-items:center;gap:4px;color:#a78bfa;font-size:9px;font-weight:650}
+  .locked-owner svg{width:11px;height:11px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
   .role-legend{margin-top:4px;font-size:.82rem;line-height:1.6}
   .code-panel{text-align:center}
   .code-panel h2{margin:22px 0}
@@ -209,8 +320,7 @@ export const WEB_STYLES = `
   @media(max-width:620px){
     .site-header{align-items:flex-start;width:min(100% - 28px,1180px);padding:15px 0}
     .site-brand small,.language-picker label{display:none}
-    .language-picker select{min-width:122px;max-width:43vw}
-    .language-apply{padding:0 9px}
+    .language-picker select{min-width:142px;max-width:51vw}
     .app-main,.auth-main{width:min(100% - 28px,1180px)}
     .auth-card{padding:26px 20px;border-radius:19px}
     .grid,.metric-grid{grid-template-columns:1fr}
@@ -219,6 +329,9 @@ export const WEB_STYLES = `
     .server-overview{padding:17px}
     .help-popover{right:-12px;left:auto;transform:none}
     .help-popover::before{right:17px;left:auto;transform:rotate(45deg)}
+    .grant-row{grid-template-columns:1fr}
+    .grant-role{grid-template-columns:90px minmax(0,1fr)}
+    .user-card-header,.user-access-heading{align-items:flex-start;flex-direction:column}
     th,td{padding:11px}
   }
   @media(prefers-reduced-motion:reduce){*,*::before,*::after{scroll-behavior:auto!important;transition:none!important}}

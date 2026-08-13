@@ -326,7 +326,7 @@ export function WorldChatView({ settings, onNavigate }: {
             <>
               <div className="relative mt-3">
                 <Icon name="search" size={12} className="pointer-events-none absolute left-2.5 top-2.5 text-neutral-400" />
-                <input className="input w-full pl-8 text-xs" value={entrySearch} placeholder={t('Buscar fichas…')} onChange={(event) => setEntrySearch(event.target.value)} />
+                <input className="input input-with-leading-icon w-full text-xs" value={entrySearch} placeholder={t('Buscar fichas…')} onChange={(event) => setEntrySearch(event.target.value)} />
               </div>
               <p className="mt-2 text-[10px] text-neutral-500">{selection.entryKeys.length} {t('fichas elegidas')}</p>
               <div className="mt-2 max-h-[calc(100vh-270px)] space-y-1 overflow-y-auto">

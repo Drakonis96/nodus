@@ -164,6 +164,27 @@ function clip(text: string, max: number): string {
   return clean.length <= max ? clean : `${clean.slice(0, max - 1).trim()}…`;
 }
 
+/**
+ * Rejects PDF extraction output whose character map has already collapsed into
+ * replacement/box glyphs. Presenting that as a quotation would be misleading;
+ * the clean reader can rebuild the source with OCR before it becomes citable.
+ */
+export function readableCopilotPassageText(value: string): string {
+  const text = [...String(value ?? '')]
+    .filter((character) => {
+      const code = character.codePointAt(0) ?? 0;
+      return code >= 32 && code !== 127;
+    })
+    .join('')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .normalize('NFC');
+  if (!text) return '';
+  const suspicious = text.match(/[\uFFFD\u25A1\u2610\u2612]/g)?.length ?? 0;
+  const meaningful = text.match(/[\p{L}\p{N}]/gu)?.length ?? 0;
+  return suspicious > 2 && suspicious > meaningful * 0.12 ? '' : text;
+}
+
 function normalizeSearchText(value: string | null | undefined): string {
   return String(value ?? '')
     .normalize('NFD')
@@ -865,22 +886,24 @@ export async function searchCopilotPassages(query: string, limit = 20): Promise<
   if (!indexed) return { available: true, indexed: false, passages: [] };
 
   const hits = findSimilarPassages(vector, LIVE_PASSAGE_MIN_SIMILARITY, cleanLimit);
-  const passages = hits.map((hit) => {
+  const passages = hits.flatMap((hit) => {
+    const text = readableCopilotPassageText(hit.text);
+    if (!text) return [];
     const authors = parseAuthorsJson(hit.authors_json);
-    return {
+    return [{
       passageId: hit.passage_id,
       nodusId: hit.nodus_id,
       similarity: hit.similarity,
       pageLabel: hit.page_label,
-      snippet: clip(hit.text, 320),
-      text: hit.text,
+      snippet: clip(text, 320),
+      text,
       workTitle: hit.title,
       authors,
       year: hit.year,
       authorYear: authorYearLabel(authors, hit.year),
       zoteroKey: hit.zotero_key || null,
       searchString: searchString(authors, hit.year, hit.title),
-    };
+    }];
   });
   return { available: true, indexed, passages };
 }

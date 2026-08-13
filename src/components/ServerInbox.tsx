@@ -1,8 +1,9 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import type { ServerInboxEntry } from '@shared/types';
 import { t, tx } from '../i18n';
+import { groupServerInboxEntries, type ServerInboxGroup } from '../serverInboxGrouping';
 import { Icon } from './ui';
 
 /**
@@ -24,7 +25,7 @@ interface ServerInboxProps {
   onClose: () => void;
   entries: ServerInboxEntry[];
   onMarkRead: (id?: string) => void;
-  onClearOne: (id: string) => void;
+  onClearOne: (id: string) => void | Promise<void>;
   onClearAll: () => void;
   onOpenEntry: (entry: ServerInboxEntry) => void;
 }
@@ -85,10 +86,151 @@ function OutcomeChip({ outcome }: { outcome: ServerInboxEntry['outcome'] }) {
   );
 }
 
+function InboxEntryRow({
+  entry,
+  nested = false,
+  onOpenEntry,
+  onClearOne,
+}: {
+  entry: ServerInboxEntry;
+  nested?: boolean;
+  onOpenEntry: (entry: ServerInboxEntry) => void;
+  onClearOne: (id: string) => void | Promise<void>;
+}) {
+  const device = shortDevice(entry.clientId);
+  const openable = entry.entityKind === 'deep_research' && entry.outcome === 'applied';
+  return (
+    <li
+      data-testid="server-inbox-entry"
+      className={`group/entry flex items-start gap-2 border-b border-neutral-900 px-3 py-2 last:border-b-0 hover:bg-neutral-900/60 ${nested ? 'bg-neutral-950/55 pl-7' : ''}`}
+    >
+      <span
+        aria-hidden="true"
+        className={`mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full ${entry.read ? 'bg-transparent' : 'bg-indigo-600 dark:bg-indigo-400'}`}
+      />
+      <button
+        type="button"
+        className="min-w-0 flex-1 text-left"
+        title={openable ? t('Abrir el informe') : undefined}
+        onClick={() => onOpenEntry(entry)}
+      >
+        <div className="flex items-start gap-1.5">
+          <span className={`line-clamp-2 min-w-0 flex-1 text-xs ${entry.read ? 'text-neutral-400' : 'font-semibold text-neutral-100'}`}>
+            {entry.title || `${entry.table} · ${entry.key.map((part) => String(part)).join(', ')}`}
+          </span>
+          <OutcomeChip outcome={entry.outcome} />
+        </div>
+        {entry.entityKind === 'deep_research' && (
+          <p className="mt-0.5 text-[11px] text-indigo-600 dark:text-indigo-300">{t('Informe de Deep Research')}</p>
+        )}
+        <p
+          className="mt-0.5 truncate text-[11px] text-neutral-500"
+          title={tx('Llegó el {when}', { when: new Date(entry.arrivedAt).toLocaleString() })}
+        >
+          {device ? `${tx('Desde {device}', { device })} · ` : ''}
+          {relativeTime(entry.arrivedAt)}
+        </p>
+        {entry.reason && <p className="mt-0.5 text-[11px] text-red-700 dark:text-red-300">{entry.reason}</p>}
+      </button>
+      <button
+        type="button"
+        className="btn btn-ghost shrink-0 px-1.5 py-0.5 opacity-0 transition-opacity group-hover/entry:opacity-100 focus-visible:opacity-100"
+        title={t('Quitar de la bandeja')}
+        aria-label={t('Quitar de la bandeja')}
+        onClick={() => void onClearOne(entry.id)}
+      >
+        <Icon name="x" size={13} />
+      </button>
+    </li>
+  );
+}
+
+function InboxParentGroup({
+  group,
+  expanded,
+  onToggle,
+  onOpenEntry,
+  onClearOne,
+}: {
+  group: ServerInboxGroup;
+  expanded: boolean;
+  onToggle: () => void;
+  onOpenEntry: (entry: ServerInboxEntry) => void;
+  onClearOne: (id: string) => void | Promise<void>;
+}) {
+  const latest = group.entries[0];
+  const device = shortDevice(latest?.clientId ?? null);
+  const fallbackTitle = group.parentKind === 'deep_research' ? t('Informe de Deep Research') : t('Documento');
+  const label = group.entries.length === 1
+    ? t('1 cambio')
+    : tx('{n} cambios', { n: String(group.entries.length) });
+  const clearGroup = async () => {
+    // Sequential IPC keeps every returned list newer than the previous one. Parallel
+    // dismissals can finish out of order and briefly resurrect an already-cleared child.
+    for (const entry of group.entries) await onClearOne(entry.id);
+  };
+  return (
+    <li data-testid="server-inbox-group" className="border-b border-neutral-900 last:border-b-0">
+      <div className="group/header flex items-start gap-2 px-3 py-2.5 hover:bg-neutral-900/60">
+        <span
+          aria-hidden="true"
+          className={`mt-2 h-1.5 w-1.5 shrink-0 rounded-full ${group.unreadCount > 0 ? 'bg-indigo-600 dark:bg-indigo-400' : 'bg-transparent'}`}
+        />
+        <button
+          type="button"
+          className="flex min-w-0 flex-1 items-start gap-2 text-left"
+          aria-expanded={expanded}
+          onClick={onToggle}
+        >
+          <span className="mt-0.5 grid h-6 w-6 shrink-0 place-items-center rounded-md bg-indigo-500/10 text-indigo-300">
+            <Icon name={group.parentKind === 'deep_research' ? 'telescope' : 'book'} size={13} />
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className={`block truncate text-xs ${group.unreadCount > 0 ? 'font-semibold text-neutral-100' : 'text-neutral-300'}`}>
+              {group.title || fallbackTitle}
+            </span>
+            <span className="mt-0.5 block truncate text-[11px] text-neutral-500">
+              {label}{device ? ` · ${tx('Desde {device}', { device })}` : ''} · {relativeTime(group.arrivedAt)}
+            </span>
+          </span>
+          <span className="mt-0.5 inline-flex shrink-0 items-center gap-1 rounded-full bg-neutral-900 px-2 py-0.5 text-[10px] font-medium text-neutral-300">
+            {group.unreadCount > 0 && <span className="text-indigo-300">{group.unreadCount}</span>}
+            <Icon name={expanded ? 'chevronDown' : 'chevronRight'} size={11} />
+          </span>
+        </button>
+        <button
+          type="button"
+          className="btn btn-ghost shrink-0 px-1.5 py-0.5 opacity-0 transition-opacity group-hover/header:opacity-100 focus-visible:opacity-100"
+          title={t('Quitar de la bandeja')}
+          aria-label={t('Quitar de la bandeja')}
+          onClick={() => void clearGroup()}
+        >
+          <Icon name="x" size={13} />
+        </button>
+      </div>
+      {expanded && (
+        <ul data-testid="server-inbox-group-details" className="border-t border-neutral-900/80">
+          {group.entries.map((entry) => (
+            <InboxEntryRow
+              key={entry.id}
+              entry={entry}
+              nested
+              onOpenEntry={onOpenEntry}
+              onClearOne={onClearOne}
+            />
+          ))}
+        </ul>
+      )}
+    </li>
+  );
+}
+
 export function ServerInbox({ anchorEl, onClose, entries, onMarkRead, onClearOne, onClearAll, onOpenEntry }: ServerInboxProps) {
   const open = anchorEl != null;
   const panelRef = useRef<HTMLDivElement>(null);
   const [pos, setPos] = useState<{ left: number; top: number; width: number; originX: number } | null>(null);
+  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(() => new Set());
+  const groups = useMemo(() => groupServerInboxEntries(entries), [entries]);
 
   // Placed from the trigger's rect and clamped to the viewport, then kept pinned on
   // resize/scroll. `originX` points the unfold at the button it came from.
@@ -135,6 +277,10 @@ export function ServerInbox({ anchorEl, onClose, entries, onMarkRead, onClearOne
     };
   }, [open, onClose]);
 
+  useEffect(() => {
+    if (!open) setExpandedGroups(new Set());
+  }, [open]);
+
   const unread = entries.reduce((n, entry) => n + (entry.read ? 0 : 1), 0);
 
   return createPortal(
@@ -171,52 +317,28 @@ export function ServerInbox({ anchorEl, onClose, entries, onMarkRead, onClearOne
           ) : (
             <>
               <ul className="max-h-[min(60vh,26rem)] overflow-y-auto">
-                {entries.map((entry) => {
-                  const device = shortDevice(entry.clientId);
-                  const openable = entry.entityKind === 'deep_research' && entry.outcome === 'applied';
+                {groups.map((group) => {
+                  const hasChildMetadata = group.entries.some((entry) => entry.parentEntityId != null);
+                  const grouped = group.entries.length > 1 || hasChildMetadata;
+                  if (!grouped) {
+                    const entry = group.entries[0];
+                    return entry ? (
+                      <InboxEntryRow key={entry.id} entry={entry} onOpenEntry={onOpenEntry} onClearOne={onClearOne} />
+                    ) : null;
+                  }
                   return (
-                    <li
-                      key={entry.id}
-                      className="group flex items-start gap-2 border-b border-neutral-900 px-3 py-2 last:border-b-0 hover:bg-neutral-900/60"
-                    >
-                      <span
-                        aria-hidden="true"
-                        className={`mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full ${entry.read ? 'bg-transparent' : 'bg-indigo-600 dark:bg-indigo-400'}`}
-                      />
-                      <button
-                        type="button"
-                        className="min-w-0 flex-1 text-left"
-                        title={openable ? t('Abrir el informe') : undefined}
-                        onClick={() => onOpenEntry(entry)}
-                      >
-                        <div className="flex items-center gap-1.5">
-                          <span className={`truncate text-xs ${entry.read ? 'text-neutral-400' : 'font-semibold text-neutral-100'}`}>
-                            {entry.title || `${entry.table} · ${entry.key.map((part) => String(part)).join(', ')}`}
-                          </span>
-                          <OutcomeChip outcome={entry.outcome} />
-                        </div>
-                        {entry.entityKind === 'deep_research' && (
-                          <p className="mt-0.5 text-[11px] text-indigo-600 dark:text-indigo-300">{t('Informe de Deep Research')}</p>
-                        )}
-                        <p
-                          className="mt-0.5 truncate text-[11px] text-neutral-500"
-                          title={tx('Llegó el {when}', { when: new Date(entry.arrivedAt).toLocaleString() })}
-                        >
-                          {device ? `${tx('Desde {device}', { device })} · ` : ''}
-                          {relativeTime(entry.arrivedAt)}
-                        </p>
-                        {entry.reason && <p className="mt-0.5 text-[11px] text-red-700 dark:text-red-300">{entry.reason}</p>}
-                      </button>
-                      <button
-                        type="button"
-                        className="btn btn-ghost shrink-0 px-1.5 py-0.5 opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100"
-                        title={t('Quitar de la bandeja')}
-                        aria-label={t('Quitar de la bandeja')}
-                        onClick={() => onClearOne(entry.id)}
-                      >
-                        <Icon name="x" size={13} />
-                      </button>
-                    </li>
+                    <InboxParentGroup
+                      key={group.id}
+                      group={group}
+                      expanded={expandedGroups.has(group.id)}
+                      onToggle={() => setExpandedGroups((current) => {
+                        const next = new Set(current);
+                        if (next.has(group.id)) next.delete(group.id); else next.add(group.id);
+                        return next;
+                      })}
+                      onOpenEntry={onOpenEntry}
+                      onClearOne={onClearOne}
+                    />
                   );
                 })}
               </ul>

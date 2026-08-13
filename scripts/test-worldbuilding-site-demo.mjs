@@ -108,7 +108,7 @@ test('every desktop section has a captured reference and a web route', async () 
   assert.doesNotMatch(appSource, /id:\s*['"]toolkit['"]/)
 })
 
-test('the Worldbuilding vault is linked from every live demo and the site homepage', async () => {
+test('every live demo returns through the shared header and the homepage links Worldbuilding', async () => {
   const pages = [
     'index.html',
     'teaching.html',
@@ -120,9 +120,12 @@ test('the Worldbuilding vault is linked from every live demo and the site homepa
 
   for (const page of pages) {
     const html = await readFile(path.join(demoDir, page), 'utf8')
-    assert.match(html, /href="worldbuilding\.html"/)
+    assert.match(html, /data-nodus-site-header data-base="\.\.\/" data-context="demo"/)
+    assert.match(html, /src="\.\.\/site-header\.js/)
   }
 
+  const sharedHeader = await readFile(path.join(root, 'site', 'site-header.js'), 'utf8')
+  assert.match(sharedHeader, /section\('#vaults'\)/)
   const homepage = await readFile(path.join(root, 'site', 'index.html'), 'utf8')
   assert.match(homepage, /id="vault-tab-worldbuilding"/)
   assert.match(homepage, /href="demo\/worldbuilding\.html"/)

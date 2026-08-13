@@ -6,6 +6,7 @@ import type {
   NoteFolder,
   NoteKind,
   NoteSource,
+  NoteTagPatch,
   NotesTree,
   UpdateNoteInput,
 } from '@shared/types';
@@ -29,6 +30,8 @@ interface NoteRow {
   title: string;
   kind: string;
   content: string;
+  tags_json: string;
+  trashed_at: string | null;
   source_json: string | null;
   order_idx: number;
   created_at: string;
@@ -64,12 +67,21 @@ function toNote(row: NoteRow): Note {
       source = null;
     }
   }
+  let tags: string[] = [];
+  try {
+    const parsed = JSON.parse(row.tags_json || '[]');
+    if (Array.isArray(parsed)) tags = normalizeTags(parsed);
+  } catch {
+    tags = [];
+  }
   return {
     id: row.id,
     folderId: row.folder_id,
     title: row.title,
     kind: normalizeKind(row.kind),
     content: row.content,
+    tags,
+    trashedAt: row.trashed_at ?? null,
     source,
     orderIdx: row.order_idx,
     createdAt: row.created_at,
@@ -77,12 +89,24 @@ function toNote(row: NoteRow): Note {
   };
 }
 
-export function getNotesTree(): NotesTree {
+function normalizeTags(values: unknown[]): string[] {
+  const unique = new Map<string, string>();
+  for (const value of values) {
+    if (typeof value !== 'string') continue;
+    const label = value.trim().replace(/\s+/g, ' ').slice(0, 80);
+    if (!label) continue;
+    const key = label.toLocaleLowerCase();
+    if (!unique.has(key)) unique.set(key, label);
+  }
+  return [...unique.values()].sort((a, b) => a.localeCompare(b));
+}
+
+export function getNotesTree(includeTrashed = false): NotesTree {
   const folderRows = getDb()
     .prepare('SELECT * FROM note_folders ORDER BY order_idx ASC, name COLLATE NOCASE ASC')
     .all() as NoteFolderRow[];
   const noteRows = getDb()
-    .prepare('SELECT * FROM notes ORDER BY order_idx ASC, updated_at DESC')
+    .prepare(`SELECT * FROM notes${includeTrashed ? '' : ' WHERE trashed_at IS NULL'} ORDER BY order_idx ASC, updated_at DESC`)
     .all() as NoteRow[];
   return {
     folders: folderRows.map(toFolder),
@@ -186,6 +210,26 @@ export function deleteNoteFolder(id: string): boolean {
   return getDb().prepare('DELETE FROM note_folders WHERE id = ?').run(id).changes > 0;
 }
 
+/** Remove a collection while preserving its contents in the recoverable Workspace trash. */
+export function trashNoteFolder(id: string): string[] {
+  const db = getDb();
+  const noteIds = (db.prepare(`
+    WITH RECURSIVE descendants(id) AS (
+      SELECT id FROM note_folders WHERE id = ?
+      UNION ALL
+      SELECT child.id FROM note_folders child JOIN descendants parent ON child.parent_id = parent.id
+    )
+    SELECT notes.id FROM notes JOIN descendants ON notes.folder_id = descendants.id
+  `).all(id) as { id: string }[]).map((row) => row.id);
+  const now = new Date().toISOString();
+  db.transaction(() => {
+    const detach = db.prepare('UPDATE notes SET folder_id = NULL, trashed_at = ?, updated_at = ? WHERE id = ?');
+    for (const noteId of noteIds) detach.run(now, now, noteId);
+    db.prepare('DELETE FROM note_folders WHERE id = ?').run(id);
+  })();
+  return noteIds;
+}
+
 export function getNote(id: string): Note | null {
   const row = getDb().prepare('SELECT * FROM notes WHERE id = ?').get(id) as NoteRow | undefined;
   return row ? toNote(row) : null;
@@ -200,8 +244,8 @@ export function createNote(input: CreateNoteInput): Note {
   const kind = normalizeKind(input.kind);
   getDb()
     .prepare(
-      `INSERT INTO notes (id, folder_id, title, kind, content, source_json, order_idx, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      `INSERT INTO notes (id, folder_id, title, kind, content, tags_json, source_json, order_idx, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     )
     .run(
       id,
@@ -209,6 +253,7 @@ export function createNote(input: CreateNoteInput): Note {
       title,
       kind,
       input.content ?? '',
+      JSON.stringify(normalizeTags(input.tags ?? [])),
       input.source ? JSON.stringify(input.source) : null,
       nextNoteOrder(folderId),
       now,
@@ -226,13 +271,14 @@ export function updateNote(input: UpdateNoteInput): Note | null {
   }
   const title = input.title !== undefined ? input.title.trim() || 'Nota sin título' : existing.title;
   const content = input.content !== undefined ? input.content : existing.content;
+  const tags = input.tags !== undefined ? normalizeTags(input.tags) : existing.tags;
   const folderId = input.folderId !== undefined ? input.folderId : existing.folderId;
   const orderIdx = folderChanged ? nextNoteOrder(folderId) : existing.orderIdx;
   getDb()
     .prepare(
-      'UPDATE notes SET title = ?, content = ?, folder_id = ?, order_idx = ?, updated_at = ? WHERE id = ?'
+      'UPDATE notes SET title = ?, content = ?, tags_json = ?, folder_id = ?, order_idx = ?, updated_at = ? WHERE id = ?'
     )
-    .run(title, content, folderId, orderIdx, new Date().toISOString(), input.id);
+    .run(title, content, JSON.stringify(tags), folderId, orderIdx, new Date().toISOString(), input.id);
   return getNote(input.id);
 }
 
@@ -242,6 +288,52 @@ export function moveNote(id: string, folderId: string | null): Note | null {
 
 export function deleteNote(id: string): boolean {
   return getDb().prepare('DELETE FROM notes WHERE id = ?').run(id).changes > 0;
+}
+
+export function patchNoteTags(ids: string[], patch: NoteTagPatch): Note[] {
+  const uniqueIds = [...new Set(ids)].filter(Boolean);
+  const additions = normalizeTags(patch.add ?? []);
+  const removals = new Set(normalizeTags(patch.remove ?? []).map((tag) => tag.toLocaleLowerCase()));
+  const update = getDb().prepare('UPDATE notes SET tags_json = ?, updated_at = ? WHERE id = ?');
+  const changed: Note[] = [];
+  getDb().transaction(() => {
+    for (const id of uniqueIds) {
+      const note = getNote(id);
+      if (!note) continue;
+      const next = normalizeTags([
+        ...note.tags.filter((tag) => !removals.has(tag.toLocaleLowerCase())),
+        ...additions,
+      ]);
+      update.run(JSON.stringify(next), new Date().toISOString(), id);
+      const saved = getNote(id);
+      if (saved) changed.push(saved);
+    }
+  })();
+  return changed;
+}
+
+export function trashNotes(ids: string[]): number {
+  const uniqueIds = [...new Set(ids)].filter(Boolean);
+  if (!uniqueIds.length) return 0;
+  const now = new Date().toISOString();
+  const statement = getDb().prepare('UPDATE notes SET trashed_at = ?, updated_at = ? WHERE id = ? AND trashed_at IS NULL');
+  let changed = 0;
+  getDb().transaction(() => {
+    for (const id of uniqueIds) changed += statement.run(now, now, id).changes;
+  })();
+  return changed;
+}
+
+export function restoreNotes(ids: string[]): number {
+  const uniqueIds = [...new Set(ids)].filter(Boolean);
+  if (!uniqueIds.length) return 0;
+  const now = new Date().toISOString();
+  const statement = getDb().prepare('UPDATE notes SET trashed_at = NULL, updated_at = ? WHERE id = ? AND trashed_at IS NOT NULL');
+  let changed = 0;
+  getDb().transaction(() => {
+    for (const id of uniqueIds) changed += statement.run(now, id).changes;
+  })();
+  return changed;
 }
 
 /**
@@ -274,7 +366,7 @@ export function notesNeedingEmbedding(): { id: string; title: string; content: s
     .prepare(
       `SELECT id, title, content, embedding, embedding_provider, embedding_model, embedding_text_hash
          FROM notes
-        WHERE content <> '' OR title <> ''`
+        WHERE trashed_at IS NULL AND (content <> '' OR title <> '')`
     )
     .all() as {
     id: string;
@@ -326,6 +418,7 @@ export function findSimilarNotes(queryEmbedding: number[], threshold: number, li
          SELECT id, title, content, vec_cosine(embedding, ?) AS similarity
            FROM notes
           WHERE embedding IS NOT NULL
+            AND trashed_at IS NULL
             AND embedding_provider = ?
             AND embedding_model = ?
             AND embedding_dim = ?

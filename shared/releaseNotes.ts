@@ -1080,6 +1080,90 @@ const RELEASE_3_2_4_HIGHLIGHTS: RawReleaseHighlight[] = [
   },
 ];
 
+const RELEASE_4_1_0_HIGHLIGHTS: RawReleaseHighlight[] = [
+  {
+    scope: 'academic',
+    es: 'Autores, Ideas y Mapa de argumentos adoptan la vista de Biblioteca. La lista reúne metadatos, etiquetas y filtros, y cada elemento abre una pestaña ordenada con su síntesis, relaciones y contenido. Estado de la cuestión reúne Cobertura, Debates y Huecos en ese mismo lenguaje visual.',
+    en: 'Authors, Ideas and Argument Map now use the Library view. Their lists bring metadata, tags and filters together, and each item opens an ordered tab with its synthesis, relations and content. State of the Question combines Coverage, Debates and Gaps in the same visual language.',
+    fr: 'Auteurs, Idées et Carte d’arguments adoptent la vue Bibliothèque. Leurs listes réunissent métadonnées, étiquettes et filtres, et chaque élément ouvre un onglet ordonné avec sa synthèse, ses relations et son contenu. État de la recherche regroupe Couverture, Débats et Lacunes dans le même langage visuel.',
+    de: 'Autoren, Ideen und Argumentationskarte verwenden jetzt die Bibliotheksansicht. Die Listen bündeln Metadaten, Tags und Filter, und jedes Element öffnet einen geordneten Reiter mit Synthese, Beziehungen und Inhalt. Der Forschungsstand vereint Abdeckung, Debatten und Lücken in derselben Gestaltung.',
+    pt: 'Autores, Ideias e Mapa de argumentos adotam a vista da Biblioteca. As listas reúnem metadados, etiquetas e filtros, e cada elemento abre um separador organizado com síntese, relações e conteúdo. O Estado da arte reúne Cobertura, Debates e Lacunas na mesma linguagem visual.',
+    'pt-BR': 'Autores, Ideias e Mapa de argumentos agora usam a visualização da Biblioteca. As listas reúnem metadados, etiquetas e filtros, e cada item abre uma aba organizada com síntese, relações e conteúdo. O Estado da arte reúne Cobertura, Debates e Lacunas na mesma linguagem visual.',
+  },
+  {
+    scope: 'academic',
+    es: 'Espacio de trabajo se comporta como una biblioteca de notas e ideas en todos los vaults. Permite añadir etiquetas, filtrar por ellas, seleccionar varios elementos, abrir acciones con el botón derecho y recuperar lo eliminado desde la Papelera.',
+    en: 'Workspace now behaves like a library of notes and ideas in every vault. You can add tags, filter by them, select several items, open actions with a right click, and recover deleted work from Trash.',
+    fr: 'L’Espace de travail fonctionne désormais comme une bibliothèque de notes et d’idées dans chaque coffre. Vous pouvez ajouter des étiquettes, les filtrer, sélectionner plusieurs éléments, ouvrir les actions par clic droit et récupérer le contenu supprimé depuis la Corbeille.',
+    de: 'Der Arbeitsbereich verhält sich jetzt in jedem Tresor wie eine Bibliothek für Notizen und Ideen. Tags lassen sich hinzufügen und filtern, mehrere Elemente gemeinsam auswählen, Aktionen per Rechtsklick öffnen und gelöschte Inhalte aus dem Papierkorb wiederherstellen.',
+    pt: 'O Espaço de trabalho funciona agora como uma biblioteca de notas e ideias em todos os cofres. Pode adicionar etiquetas, filtrá-las, selecionar vários elementos, abrir ações com o botão direito e recuperar o que foi eliminado a partir do Lixo.',
+    'pt-BR': 'O Espaço de trabalho agora funciona como uma biblioteca de notas e ideias em todos os cofres. Você pode adicionar etiquetas, filtrar por elas, selecionar vários itens, abrir ações com o botão direito e recuperar o que foi excluído na Lixeira.',
+  },
+  {
+    scope: 'academic',
+    es: 'La Biblioteca publicada llega al móvil con sus colecciones jerárquicas, metadatos y referencias. Puedes leer y subrayar el Markdown limpio, ver sus imágenes, conservar documentos sin conexión y borrar una selección o todas las descargas. El original aparece identificado y queda reservado para una versión futura.',
+    en: 'Published Library reaches mobile with hierarchical collections, metadata and references. You can read and highlight clean Markdown, view its images, keep documents offline, and delete selected or all downloads. The original is identified and remains reserved for a future release.',
+    fr: 'La Bibliothèque publiée arrive sur mobile avec ses collections hiérarchiques, ses métadonnées et ses références. Vous pouvez lire et surligner le Markdown propre, voir ses images, conserver des documents hors ligne et supprimer une sélection ou tous les téléchargements. L’original est identifié et reste réservé à une prochaine version.',
+    de: 'Die veröffentlichte Bibliothek kommt mit hierarchischen Sammlungen, Metadaten und Referenzen aufs Mobilgerät. Bereinigtes Markdown lässt sich lesen und markieren, Bilder sind sichtbar, Dokumente bleiben offline verfügbar und ausgewählte oder alle Downloads können gelöscht werden. Das Original ist gekennzeichnet und bleibt einer späteren Version vorbehalten.',
+    pt: 'A Biblioteca publicada chega ao telemóvel com coleções hierárquicas, metadados e referências. Pode ler e sublinhar o Markdown limpo, ver as imagens, guardar documentos sem ligação e apagar uma seleção ou todas as transferências. O original fica identificado e reservado para uma versão futura.',
+    'pt-BR': 'A Biblioteca publicada chega ao celular com coleções hierárquicas, metadados e referências. Você pode ler e destacar o Markdown limpo, ver as imagens, manter documentos offline e apagar uma seleção ou todos os downloads. O original aparece identificado e fica reservado para uma versão futura.',
+  },
+  {
+    scope: 'academic',
+    es: 'El editor comparte herramientas profesionales entre escritorio y móvil. Al seleccionar texto aparecen formato, enlaces, color, encabezados y mejoras de IA con iconos reales. El selector de modelos incorpora búsqueda, evita el desplazamiento horizontal y mantiene legibles las opciones en cualquier ancho.',
+    en: 'The editor shares professional writing tools between desktop and mobile. Selecting text reveals formatting, links, colour, headings and AI improvements with proper icons. The model picker includes search, removes horizontal scrolling, and keeps every option readable at any width.',
+    fr: 'L’éditeur partage des outils d’écriture professionnels entre ordinateur et mobile. La sélection de texte révèle formatage, liens, couleur, titres et améliorations par IA avec de vraies icônes. Le sélecteur de modèles intègre la recherche, supprime le défilement horizontal et garde chaque option lisible à toute largeur.',
+    de: 'Der Editor teilt professionelle Schreibwerkzeuge zwischen Desktop und Mobilgerät. Eine Textauswahl zeigt Formatierung, Links, Farbe, Überschriften und KI-Verbesserungen mit echten Symbolen. Die Modellauswahl bietet Suche, entfernt horizontales Scrollen und hält jede Option bei jeder Breite lesbar.',
+    pt: 'O editor partilha ferramentas de escrita profissionais entre computador e telemóvel. Ao selecionar texto surgem formatação, ligações, cor, títulos e melhorias de IA com ícones reais. O seletor de modelos inclui pesquisa, elimina o deslocamento horizontal e mantém todas as opções legíveis em qualquer largura.',
+    'pt-BR': 'O editor compartilha ferramentas profissionais de escrita entre desktop e celular. Ao selecionar texto aparecem formatação, links, cor, títulos e melhorias de IA com ícones reais. O seletor de modelos inclui busca, elimina a rolagem horizontal e mantém todas as opções legíveis em qualquer largura.',
+  },
+  {
+    scope: 'general',
+    es: 'Nodus Server mejora la administración de personas y espacios. Una cuenta puede acceder a varios vaults con permisos distintos, y esos accesos se editan después. También puedes renombrar espacios, copiar sus identificadores y direcciones, cambiar el correo tras confirmar tu contraseña y distinguir cada tipo de vault por su color real.',
+    en: 'Nodus Server improves account and space administration. One account can access several vaults with different permissions, and those grants remain editable. You can also rename spaces, copy their identifiers and addresses, change an email after confirming your password, and recognise each vault type by its real colour.',
+    fr: 'Nodus Server améliore l’administration des comptes et des espaces. Un compte peut accéder à plusieurs coffres avec des autorisations différentes, qui restent modifiables. Vous pouvez aussi renommer les espaces, copier leurs identifiants et adresses, changer un courriel après confirmation du mot de passe et reconnaître chaque type de coffre à sa vraie couleur.',
+    de: 'Nodus Server verbessert die Verwaltung von Konten und Bereichen. Ein Konto kann mit unterschiedlichen Rechten auf mehrere Tresore zugreifen, und diese Freigaben bleiben bearbeitbar. Bereiche lassen sich umbenennen, Kennungen und Adressen kopieren, E-Mail-Adressen nach Passwortbestätigung ändern und Tresortypen an ihrer echten Farbe erkennen.',
+    pt: 'O Nodus Server melhora a administração de contas e espaços. Uma conta pode aceder a vários cofres com permissões diferentes, e esses acessos continuam editáveis. Também pode mudar o nome dos espaços, copiar identificadores e endereços, alterar o email após confirmar a palavra-passe e reconhecer cada tipo de cofre pela cor real.',
+    'pt-BR': 'O Nodus Server melhora a administração de contas e espaços. Uma conta pode acessar vários cofres com permissões diferentes, e esses acessos continuam editáveis. Você também pode renomear espaços, copiar identificadores e endereços, alterar o e-mail após confirmar a senha e reconhecer cada tipo de cofre pela cor real.',
+  },
+  {
+    scope: 'general',
+    es: 'La navegación responde mejor a ventanas estrechas. El sidebar puede reducirse a iconos sin perder la N centrada, usa el color de acento del vault en su barra de desplazamiento y mantiene visibles los controles importantes. También se corrigen solapamientos, campos de búsqueda y superficies que conservaban colores del modo equivocado.',
+    en: 'Navigation now responds better to narrow windows. The sidebar can shrink to icons without losing the centred N, uses the vault accent on its scrollbar, and keeps important controls visible. Overlaps, search fields and surfaces that retained colours from the wrong theme are corrected too.',
+    fr: 'La navigation répond mieux aux fenêtres étroites. La barre latérale peut se réduire aux icônes sans perdre le N centré, reprend la couleur d’accent du coffre dans sa barre de défilement et garde les commandes importantes visibles. Les chevauchements, champs de recherche et surfaces restées dans le mauvais thème sont aussi corrigés.',
+    de: 'Die Navigation passt sich schmalen Fenstern besser an. Die Seitenleiste kann auf Symbole schrumpfen, ohne das zentrierte N zu verlieren, nutzt die Tresorfarbe für ihre Bildlaufleiste und hält wichtige Bedienelemente sichtbar. Überlagerungen, Suchfelder und Flächen mit Farben aus dem falschen Design sind ebenfalls korrigiert.',
+    pt: 'A navegação responde melhor a janelas estreitas. A barra lateral pode reduzir-se a ícones sem perder o N centrado, usa a cor de destaque do cofre na barra de deslocamento e mantém visíveis os controlos importantes. Também foram corrigidas sobreposições, campos de pesquisa e superfícies que mantinham cores do tema errado.',
+    'pt-BR': 'A navegação responde melhor a janelas estreitas. A barra lateral pode se reduzir a ícones sem perder o N centralizado, usa a cor de destaque do cofre na barra de rolagem e mantém os controles importantes visíveis. Também foram corrigidos sobreposições, campos de busca e superfícies que mantinham cores do tema errado.',
+  },
+  {
+    scope: 'general',
+    es: 'Las notificaciones se pueden actualizar manualmente desde la cabecera y desde Nodi. Los cambios de un mismo documento o informe se agrupan en una tarjeta desplegable, en lugar de llenar la bandeja con cada subrayado. Los modales de actualización y novedades conservan su diseño usando menos trabajo gráfico y memoria.',
+    en: 'Notifications can be refreshed manually from the header and from Nodi. Changes from the same document or report are grouped in one expandable card instead of filling the inbox with every highlight. The update and what’s-new modals keep their design while using less graphical work and memory.',
+    fr: 'Les notifications peuvent être actualisées manuellement depuis l’en-tête et depuis Nodi. Les modifications d’un même document ou rapport sont regroupées dans une carte dépliable au lieu de remplir la boîte avec chaque surlignage. Les fenêtres de mise à jour et de nouveautés gardent leur design en utilisant moins de travail graphique et de mémoire.',
+    de: 'Benachrichtigungen lassen sich über die Kopfzeile und über Nodi manuell aktualisieren. Änderungen desselben Dokuments oder Berichts werden in einer aufklappbaren Karte gebündelt, statt den Posteingang mit jeder Markierung zu füllen. Update- und Neuigkeitenfenster behalten ihr Design bei geringerem Grafik- und Speicheraufwand.',
+    pt: 'As notificações podem ser atualizadas manualmente no cabeçalho e no Nodi. As alterações do mesmo documento ou relatório ficam agrupadas num cartão expansível, em vez de encher a caixa com cada sublinhado. Os modais de atualização e novidades mantêm o desenho com menos trabalho gráfico e memória.',
+    'pt-BR': 'As notificações podem ser atualizadas manualmente no cabeçalho e no Nodi. As alterações do mesmo documento ou relatório ficam agrupadas em um cartão expansível, em vez de encher a caixa com cada destaque. Os modais de atualização e novidades mantêm o visual usando menos trabalho gráfico e memória.',
+  },
+  {
+    scope: 'plugin',
+    es: 'El conector de Chrome recomienda la instalación desde Chrome Web Store y conserva el ZIP manual. Mantiene el emparejamiento automático y resuelve enlaces académicos al PDF real. En Word se corrigen el modo oscuro y los pasajes dañados, y el selector CSL busca entre los estilos instalados en Nodus y se actualiza en tiempo real.',
+    en: 'The Chrome connector recommends installation from Chrome Web Store and keeps the manual ZIP. It preserves automatic pairing and resolves scholarly links to the real PDF. In Word, dark mode and damaged passages are fixed, while the CSL picker searches styles installed in Nodus and refreshes them in real time.',
+    fr: 'Le connecteur Chrome recommande l’installation depuis Chrome Web Store et conserve le ZIP manuel. Il préserve l’association automatique et résout les liens universitaires vers le vrai PDF. Dans Word, le mode sombre et les passages endommagés sont corrigés, tandis que le sélecteur CSL recherche les styles installés dans Nodus et les actualise en temps réel.',
+    de: 'Der Chrome-Connector empfiehlt die Installation aus dem Chrome Web Store und behält das manuelle ZIP. Automatische Verbindung und Auflösung wissenschaftlicher Links zur echten PDF-Datei bleiben erhalten. In Word sind Dunkelmodus und beschädigte Passagen korrigiert, während die CSL-Auswahl installierte Nodus-Stile durchsucht und in Echtzeit aktualisiert.',
+    pt: 'O conector do Chrome recomenda a instalação pela Chrome Web Store e mantém o ZIP manual. Preserva a ligação automática e resolve ligações académicas para o PDF real. No Word são corrigidos o modo escuro e os excertos danificados, enquanto o seletor CSL pesquisa os estilos instalados no Nodus e os atualiza em tempo real.',
+    'pt-BR': 'O conector do Chrome recomenda a instalação pela Chrome Web Store e mantém o ZIP manual. Ele preserva a conexão automática e resolve links acadêmicos para o PDF real. No Word foram corrigidos o modo escuro e os trechos danificados, enquanto o seletor CSL busca os estilos instalados no Nodus e os atualiza em tempo real.',
+  },
+  {
+    scope: 'toolkit',
+    es: 'Nodus Toolkit queda como una sola entrada del sidebar. Sus aplicaciones comparten la misma cabecera y presentación visual, sin etiquetas de desarrollo, y el sitio aplica el mismo encabezado a la portada y a los demos tanto en escritorio como en móvil.',
+    en: 'Nodus Toolkit remains a single sidebar entry. Its applications share the same header and visual presentation without development labels, and the website applies the same header to the home page and demos on both desktop and mobile.',
+    fr: 'Nodus Toolkit reste une seule entrée dans la barre latérale. Ses applications partagent le même en-tête et la même présentation visuelle sans étiquettes de développement, et le site applique le même en-tête à l’accueil et aux démos sur ordinateur comme sur mobile.',
+    de: 'Nodus Toolkit bleibt ein einzelner Eintrag in der Seitenleiste. Seine Anwendungen teilen dieselbe Kopfzeile und visuelle Präsentation ohne Entwicklungshinweise, und die Website verwendet auf Startseite und Demos dieselbe Kopfzeile auf Desktop und Mobilgerät.',
+    pt: 'O Nodus Toolkit fica como uma única entrada na barra lateral. As aplicações partilham o mesmo cabeçalho e apresentação visual sem etiquetas de desenvolvimento, e o site aplica o mesmo cabeçalho à página inicial e às demos no computador e no telemóvel.',
+    'pt-BR': 'O Nodus Toolkit fica como uma única entrada na barra lateral. Os aplicativos compartilham o mesmo cabeçalho e apresentação visual sem etiquetas de desenvolvimento, e o site aplica o mesmo cabeçalho à página inicial e às demos no desktop e no celular.',
+  },
+];
+
 const RELEASE_4_0_1_HIGHLIGHTS: RawReleaseHighlight[] = [
   {
     scope: 'plugin',
@@ -1177,6 +1261,11 @@ const RELEASE_4_0_0_HIGHLIGHTS: RawReleaseHighlight[] = [
 ];
 
 const RAW_RELEASE_NOTES: RawReleaseNote[] = [
+  {
+    version: '4.1.0',
+    date: '2026-08-13',
+    highlights: RELEASE_4_1_0_HIGHLIGHTS,
+  },
   {
     version: '4.0.1',
     date: '2026-08-12',

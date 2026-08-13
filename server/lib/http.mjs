@@ -45,7 +45,7 @@ export async function jsonBody(req, limit) {
 }
 
 export function contentSecurityPolicy(formActionSources = ["'self'"]) {
-  return `default-src 'none'; style-src 'unsafe-inline'; form-action ${formActionSources.join(' ')}; frame-ancestors 'none'; base-uri 'none'`;
+  return `default-src 'none'; style-src 'unsafe-inline'; script-src 'self'; img-src 'self'; form-action ${formActionSources.join(' ')}; frame-ancestors 'none'; base-uri 'none'`;
 }
 
 const SECURITY_HEADERS = {
@@ -64,6 +64,11 @@ export function json(res, status, value, headers = {}) {
 
 export function html(res, status, value, headers = {}) {
   res.writeHead(status, { ...SECURITY_HEADERS, 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store', ...headers });
+  res.end(value);
+}
+
+export function staticAsset(res, status, value, contentType, headers = {}) {
+  res.writeHead(status, { ...SECURITY_HEADERS, 'content-type': contentType, 'cache-control': 'public, max-age=3600', ...headers });
   res.end(value);
 }
 

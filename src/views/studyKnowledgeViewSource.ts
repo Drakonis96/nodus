@@ -183,6 +183,7 @@ export function createStudyKnowledgeViewSource(subjectId: string, openEvidence?:
       duplicates: false,
     },
     async listIdeasPage(request: IdeaPageRequest) {
+      if (!subjectId) return { items: [], total: 0, offset: request.offset, limit: request.limit };
       let items = (await window.nodus.listStudyIdeas(subjectId, request.search)).map(listItem);
       if (request.type) items = items.filter((item) => item.type === request.type);
       items.sort((a, b) => {

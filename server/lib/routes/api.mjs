@@ -12,6 +12,11 @@ import * as ledger from '../ledger.mjs';
 import {
   assetExists, collectAssetGarbage, hashBytes, isValidAssetHash, readAsset, snapshotAssetHashes, sniffImageMime, writeAsset,
 } from '../assets.mjs';
+import {
+  collectLibraryPackageGarbage, hashLibraryPackage, isValidLibraryPackageHash,
+  inspectLibraryPackage, libraryPackageExists, looksLikeZip, readLibraryPackage, snapshotLibraryPackageHashes,
+  spaceLibraryPackageBytes, writeLibraryPackage,
+} from '../libraryPackages.mjs';
 import { MAX_MUTATION_BATCH, validateMutation } from '../core/mutations.mjs';
 import {
   MAX_NODI_NOTES, mergeNodiNotes, notesSince, validateNodiNote,
@@ -85,11 +90,14 @@ export function createApiRoutes(ctx) {
       server: { name: store.state.settings.name, publicUrl: publicUrl(), language: language(), version: NODUS_VERSION, license: NODUS_LICENSE, sourceCodeUrl: NODUS_SOURCE_URL },
       snapshotVersions: [1, 2],
       assets: true,
+      libraryDocuments: true,
       mutations: true,
       vectors: true,
       resources: resourceMap(),
       maxAssetBytes: limits.maxAssetBytes,
       maxSpaceAssetBytes: limits.maxSpaceAssetBytes,
+      maxLibraryPackageBytes: limits.maxLibraryPackageBytes,
+      maxSpaceLibraryBytes: limits.maxSpaceLibraryBytes,
       maxSnapshotBytes: limits.maxSnapshotBytes,
       maxSnapshotJsonBytes: limits.maxSnapshotJsonBytes,
       maxMutationBatch: MAX_MUTATION_BATCH,
@@ -228,6 +236,199 @@ export function createApiRoutes(ctx) {
     space.assetBytes = Number(space.assetBytes || 0) + bytes.length;
     store.save();
     json(res, 200, { ok: true, deduplicated: false, mime, bytes: bytes.length });
+    return true;
+  }
+
+  // ── Published global library ─────────────────────────────────────────────
+
+  function libraryManifest(spaceId) {
+    const value = readSnapshot(spaceId)?.library;
+    return value?.format === 'nodus.server-library' && Number(value?.formatVersion) === 1
+      ? value
+      : null;
+  }
+
+  async function negotiateLibraryPackages(req, res, space) {
+    const input = await jsonBody(req, 1024 * 1024);
+    const wanted = Array.isArray(input.packages) ? input.packages : [];
+    const missing = [];
+    for (const entry of wanted) {
+      const hash = String(entry?.hash ?? '');
+      const bytes = Number(entry?.bytes ?? 0);
+      if (!isValidLibraryPackageHash(hash) || bytes <= 0 || bytes > limits.maxLibraryPackageBytes) continue;
+      if (!libraryPackageExists(store, space.id, hash)) missing.push(hash);
+    }
+    json(res, 200, { missing: [...new Set(missing)] });
+    return true;
+  }
+
+  async function uploadLibraryPackage(req, res, space, hash) {
+    if (!isValidLibraryPackageHash(hash)) {
+      json(res, 400, { error: 'bad_hash', error_description: 'A library package is addressed by the lowercase hex sha256 of its bytes.' });
+      return true;
+    }
+    if (libraryPackageExists(store, space.id, hash)) {
+      json(res, 200, { ok: true, deduplicated: true });
+      return true;
+    }
+    const announced = Number(req.headers['content-length'] || 0);
+    if (announced > limits.maxLibraryPackageBytes) {
+      json(res, 413, { error: 'too_large', error_description: `This server accepts one library reading package of up to ${mib(limits.maxLibraryPackageBytes)} (NODUS_MAX_LIBRARY_PACKAGE_BYTES).`, limitBytes: limits.maxLibraryPackageBytes });
+      return true;
+    }
+    if (Number(space.libraryPackageBytes || 0) + announced > limits.maxSpaceLibraryBytes) {
+      json(res, 507, { error: 'space_full', error_description: `This space has reached its published-library budget of ${mib(limits.maxSpaceLibraryBytes)} (NODUS_MAX_SPACE_LIBRARY_BYTES).`, limitBytes: limits.maxSpaceLibraryBytes });
+      return true;
+    }
+    const bytes = await body(req, limits.maxLibraryPackageBytes);
+    if (Number(space.libraryPackageBytes || 0) + bytes.length > limits.maxSpaceLibraryBytes) {
+      json(res, 507, { error: 'space_full', error_description: `This space has reached its published-library budget of ${mib(limits.maxSpaceLibraryBytes)} (NODUS_MAX_SPACE_LIBRARY_BYTES).`, limitBytes: limits.maxSpaceLibraryBytes });
+      return true;
+    }
+    if (hashLibraryPackage(bytes) !== hash) {
+      json(res, 400, { error: 'hash_mismatch', error_description: 'The uploaded bytes do not hash to the address they were sent to.' });
+      return true;
+    }
+    if (!looksLikeZip(bytes)) {
+      json(res, 415, { error: 'unsupported_media_type', error_description: 'A published library document must be a ZIP containing Clean Markdown and/or one supported original.' });
+      return true;
+    }
+    const inspection = inspectLibraryPackage(bytes);
+    if (!inspection.ok) {
+      json(res, 415, { error: 'invalid_library_package', error_description: inspection.reason });
+      return true;
+    }
+    writeLibraryPackage(store, space.id, hash, bytes);
+    space.libraryPackageBytes = Number(space.libraryPackageBytes || 0) + bytes.length;
+    store.save();
+    json(res, 200, { ok: true, deduplicated: false, bytes: bytes.length });
+    return true;
+  }
+
+  function libraryUnavailable(res) {
+    json(res, 409, { error: 'library_not_published', error_description: 'The owner has not enabled library publication for this space.' });
+    return true;
+  }
+
+  function librarySummary(req, res, space) {
+    const library = libraryManifest(space.id);
+    if (!library) {
+      json(res, 200, {
+        published: false, generatedAt: null, collections: 0, documents: 0,
+        downloadableDocuments: 0, packageBytes: 0,
+      });
+      return true;
+    }
+    const documents = Array.isArray(library.documents) ? library.documents : [];
+    json(res, 200, {
+      published: true,
+      generatedAt: library.generatedAt,
+      collections: Array.isArray(library.collections) ? library.collections.length : 0,
+      documents: documents.length,
+      downloadableDocuments: documents.filter((document) => document?.cleanAvailable || document?.originalAvailable).length,
+      packageBytes: documents.reduce((sum, document) => sum + Math.max(0, Number(document?.packageBytes) || 0), 0),
+    });
+    return true;
+  }
+
+  function validatePublishedLibrary(spaceId, library) {
+    if (library == null) return null;
+    if (library?.format !== 'nodus.server-library' || Number(library?.formatVersion) !== 1
+        || !Array.isArray(library.collections) || !Array.isArray(library.documents)) {
+      return { status: 400, error: 'invalid_library', error_description: 'The published library manifest is malformed.' };
+    }
+    const ids = new Set();
+    for (const document of library.documents) {
+      const id = String(document?.id ?? '');
+      if (!id || ids.has(id)) return { status: 400, error: 'invalid_library', error_description: 'Every published library document needs a unique id.' };
+      ids.add(id);
+      const hash = String(document?.packageHash ?? '');
+      const needsPackage = Boolean(document?.cleanAvailable || document?.originalAvailable);
+      if (needsPackage && (!isValidLibraryPackageHash(hash) || !libraryPackageExists(store, spaceId, hash))) {
+        return { status: 409, error: 'package_unavailable', error_description: `The published reading package for ${id} has not reached the server.` };
+      }
+      if (hash && !isValidLibraryPackageHash(hash)) return { status: 400, error: 'invalid_library', error_description: `The package fingerprint for ${id} is invalid.` };
+      if (needsPackage) {
+        const packageBytes = readLibraryPackage(store, spaceId, hash);
+        const inspection = packageBytes ? inspectLibraryPackage(packageBytes) : null;
+        if (!inspection?.ok || String(inspection.manifest?.documentId ?? '') !== id) {
+          return { status: 409, error: 'package_mismatch', error_description: `The reading package for ${id} is invalid or belongs to a different document.` };
+        }
+        if (Number(inspection.manifest?.formatVersion) >= 2
+            && (Boolean(document?.cleanAvailable) !== Boolean(inspection.hasMarkdown)
+              || Boolean(document?.originalAvailable) !== Boolean(inspection.hasOriginal))) {
+          return { status: 409, error: 'package_mismatch', error_description: `The reading formats declared for ${id} do not match its package.` };
+        }
+      }
+    }
+    return null;
+  }
+
+  function libraryCollections(req, res, space) {
+    const library = libraryManifest(space.id);
+    if (!library) return libraryUnavailable(res);
+    json(res, 200, { collections: Array.isArray(library.collections) ? library.collections : [], generatedAt: library.generatedAt });
+    return true;
+  }
+
+  function libraryDocuments(req, res, space, url) {
+    const library = libraryManifest(space.id);
+    if (!library) return libraryUnavailable(res);
+    const query = String(url.searchParams.get('q') || '').trim().toLocaleLowerCase();
+    const collectionId = String(url.searchParams.get('collectionId') || '');
+    const limit = Math.max(1, Math.min(200, Number(url.searchParams.get('limit')) || 50));
+    const offset = Math.max(0, Number(url.searchParams.get('offset')) || 0);
+    const all = (Array.isArray(library.documents) ? library.documents : []).filter((document) => {
+      if (collectionId && !(Array.isArray(document?.collectionIds) && document.collectionIds.includes(collectionId))) return false;
+      if (!query) return true;
+      return [document?.title, document?.abstract, ...(Array.isArray(document?.creators) ? document.creators : []), ...(Array.isArray(document?.tags) ? document.tags : [])]
+        .filter(Boolean).join('\n').toLocaleLowerCase().includes(query);
+    });
+    json(res, 200, { items: all.slice(offset, offset + limit), total: all.length, limit, offset, hasMore: offset + limit < all.length, generatedAt: library.generatedAt });
+    return true;
+  }
+
+  function libraryDocument(req, res, space, documentId) {
+    const library = libraryManifest(space.id);
+    if (!library) return libraryUnavailable(res);
+    const document = (Array.isArray(library.documents) ? library.documents : []).find((entry) => String(entry?.id) === documentId);
+    if (!document) {
+      json(res, 404, { error: 'document_not_found' });
+      return true;
+    }
+    json(res, 200, { document, generatedAt: library.generatedAt });
+    return true;
+  }
+
+  function downloadLibraryDocument(req, res, space, documentId) {
+    const library = libraryManifest(space.id);
+    if (!library) return libraryUnavailable(res);
+    const document = (Array.isArray(library.documents) ? library.documents : []).find((entry) => String(entry?.id) === documentId);
+    if (!document) {
+      json(res, 404, { error: 'document_not_found' });
+      return true;
+    }
+    const hash = String(document.packageHash ?? '');
+    const bytes = readLibraryPackage(store, space.id, hash);
+    if (!bytes) {
+      json(res, 409, { error: 'package_unavailable', error_description: 'The reading package has not reached the server yet.' });
+      return true;
+    }
+    const title = String(document.title || 'document').replace(/[\\/\r\n";]/g, ' ').trim().slice(0, 120) || 'document';
+    const encodedTitle = encodeURIComponent(`${title}.zip`).replace(/[!'()*]/g, (character) => `%${character.charCodeAt(0).toString(16).toUpperCase()}`);
+    const tag = `"${hash}"`;
+    if (req.headers['if-none-match'] === tag) {
+      res.writeHead(304, { etag: tag }); res.end(); return true;
+    }
+    res.writeHead(200, {
+      'content-type': 'application/zip',
+      'content-length': String(bytes.length),
+      // filename is the conservative ASCII fallback; filename* carries the real Unicode title.
+      'content-disposition': `attachment; filename="document.zip"; filename*=UTF-8''${encodedTitle}`,
+      'cache-control': 'private, max-age=31536000, immutable',
+      etag: tag,
+    });
+    if (req.method === 'HEAD') res.end(); else res.end(bytes);
     return true;
   }
 
@@ -555,11 +756,17 @@ export function createApiRoutes(ctx) {
       json(res, 400, { error: 'Unsupported publication format.' });
       return true;
     }
+    const libraryProblem = validatePublishedLibrary(space.id, snapshot.library);
+    if (libraryProblem) {
+      json(res, libraryProblem.status, { error: libraryProblem.error, error_description: libraryProblem.error_description });
+      return true;
+    }
     store.writeSnapshot(space.id, bytes);
     invalidateSnapshot(space.id);
     space.updatedAt = new Date().toISOString();
     space.revision = revision || snapshot.revision || '';
     space.vault = snapshot.vault;
+    if (snapshot?.vault?.type) space.vaultType = String(snapshot.vault.type);
     space.bytes = bytes.length;
     space.schemaVersion = Number(snapshot.schemaVersion) || 0;
     space.snapshotFormatVersion = formatVersion;
@@ -568,11 +775,18 @@ export function createApiRoutes(ctx) {
     // A republication is the moment an image can stop being referenced. The grace window in
     // collectAssetGarbage is what keeps it from racing an upload that is still in flight.
     const removed = collectAssetGarbage(store, space.id, referencedAssets(space.id), limits.assetGraceMs);
+    const removedLibraryPackages = collectLibraryPackageGarbage(
+      store, space.id, snapshotLibraryPackageHashes(snapshot), limits.assetGraceMs,
+    );
     if (removed.length) {
       space.assetBytes = Math.max(0, Number(space.assetBytes || 0));
       store.save();
     }
-    json(res, 200, { ok: true, unchanged: false, updatedAt: space.updatedAt, bytes: bytes.length, assetsCollected: removed.length });
+    if (removedLibraryPackages.length) {
+      space.libraryPackageBytes = spaceLibraryPackageBytes(store, space.id);
+      store.save();
+    }
+    json(res, 200, { ok: true, unchanged: false, updatedAt: space.updatedAt, bytes: bytes.length, assetsCollected: removed.length, libraryPackagesCollected: removedLibraryPackages.length });
     return true;
   }
 
@@ -739,6 +953,18 @@ export function createApiRoutes(ctx) {
       return true;
     }
 
+    if (head === 'library') {
+      if (rest[1] === 'negotiate' && req.method === 'POST') return negotiateLibraryPackages(req, res, space);
+      if (rest[1] === 'packages' && rest[2] && req.method === 'PUT') return uploadLibraryPackage(req, res, space, decodeURIComponent(rest[2]));
+      if (!rest[1] && req.method === 'GET') return librarySummary(req, res, space);
+      if (rest[1] === 'collections' && req.method === 'GET') return libraryCollections(req, res, space);
+      if (rest[1] === 'documents' && !rest[2] && req.method === 'GET') return libraryDocuments(req, res, space, url);
+      if (rest[1] === 'documents' && rest[2] && rest[3] === 'download.zip' && (req.method === 'GET' || req.method === 'HEAD')) return downloadLibraryDocument(req, res, space, decodeURIComponent(rest[2]));
+      if (rest[1] === 'documents' && rest[2] && req.method === 'GET') return libraryDocument(req, res, space, decodeURIComponent(rest[2]));
+      json(res, 405, { error: 'method_not_allowed' });
+      return true;
+    }
+
     if (head === 'vectors' && req.method === 'PUT') return uploadVectors(req, res, space);
     if (head === 'search' && rest[1] === 'semantic' && req.method === 'POST') return semanticSearch(req, res, space);
     if (head === 'context' && req.method === 'POST') return contextPackage(req, res, space);
@@ -769,6 +995,7 @@ export function createApiRoutes(ctx) {
     if (head === 'mutations') return method === 'POST' && rest[1] !== 'ack' ? 'write' : 'own';
     if (head === 'vectors') return 'own';
     if (head === 'assets') return method === 'POST' || method === 'PUT' ? 'write' : 'read';
+    if (head === 'library') return method === 'POST' || method === 'PUT' ? 'own' : 'read';
     return 'read';
   }
 

@@ -8,6 +8,7 @@ import type {
   ProtectWatermark,
 } from '@shared/types';
 import { Icon, Spinner } from '../components/ui';
+import { ToolkitAppHero } from '../components/ToolkitAppHero';
 import { ConfirmModal } from '../components/ConfirmModal';
 import { getActiveLang, t, tr, tx } from '../i18n';
 import {
@@ -144,7 +145,19 @@ function ProtectHome({ onBack }: { onBack: () => void }) {
   };
   return (
     <div data-testid="protect-home" className="mx-auto max-w-5xl space-y-6">
-      <Header title="Nodus Protect" subtitle={t('Oculta datos, añade marcas de agua y crea copias trazables sin enviar el documento fuera de tu equipo.')} onBack={onBack} />
+      <ToolkitAppHero
+        badge="Nodus Toolkit"
+        title="Nodus Protect"
+        description={t('Oculta datos, añade marcas de agua y crea copias trazables sin enviar el documento fuera de tu equipo.')}
+        icon="shield"
+        actionLabel={t('Proteger documentos')}
+        actionIcon="shield"
+        onAction={() => open('protect')}
+        onBack={onBack}
+        heroTestId="toolkit-protect-hero"
+        actionTestId="toolkit-protect-primary"
+        backTestId="toolkit-protect-back"
+      />
       <div className="grid gap-4 sm:grid-cols-2">
         <button data-testid="protect-start-protect" type="button" onClick={() => open('protect')} className="rounded-xl border border-neutral-200 bg-white p-6 text-left hover:border-amber-400 dark:border-neutral-800 dark:bg-neutral-900/50 dark:hover:border-amber-600">
           <span className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300"><Icon name="shield" size={23} /></span>

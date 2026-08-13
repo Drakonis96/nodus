@@ -181,13 +181,33 @@ test('Manifest V3 package minimizes permission and contains no remote executable
   assert.match(manifest.content_security_policy.extension_pages, /script-src 'self'/);
   assert.doesNotMatch(manifest.content_security_policy.extension_pages, /https?:/);
   for (const size of [16, 32, 48, 128]) assert.ok(existsSync(path.join(root, `browser-extension/icons/icon-${size}.png`)));
-  JSON.parse(readFileSync(path.join(root, 'browser-extension/_locales/en/messages.json'), 'utf8'));
-  assert.equal(existsSync(path.join(root, 'browser-extension/_locales/es/messages.json')), false, 'the connector must stay English-only');
+  for (const locale of ['en', 'es']) JSON.parse(readFileSync(path.join(root, `browser-extension/_locales/${locale}/messages.json`), 'utf8'));
   const popup = readFileSync(path.join(root, 'browser-extension/popup.html'), 'utf8');
   const popupScript = readFileSync(path.join(root, 'browser-extension/popup.js'), 'utf8');
   assert.doesNotMatch(popup, /<script[^>]+src=["']https?:/i);
-  assert.match(popupScript, /document\.documentElement\.lang = 'en'/);
-  assert.doesNotMatch(popupScript, /ITEM_TYPE_LABELS_ES|spanishUi/);
+  assert.match(popupScript, /chrome\.i18n\.getUILanguage\(\)\.split/);
+  assert.match(popupScript, /ITEM_TYPE_LABELS_ES|spanishUi/);
   assert.match(popupScript, /snapshotAvailable && !state\.capture\.attachments\.length/, 'a detected full text keeps the HTML snapshot off by default');
   assert.match(popupScript, /if \(!state\.token\) await pair\(\)/, 'opening the popup establishes the local token automatically');
+});
+
+test('Settings recommends the Chrome Web Store while preserving the manual ZIP download', () => {
+  const settings = readFileSync(path.join(root, 'src/views/Settings.tsx'), 'utf8');
+  const storeLogo = readFileSync(path.join(root, 'src/assets/brands/chrome-web-store.svg'), 'utf8');
+  const storeAction = settings.indexOf('data-testid="browser-connector-install-store"');
+  const zipAction = settings.indexOf('data-testid="browser-connector-download-zip"');
+
+  assert.match(settings, /const CHROME_WEB_STORE_URL = 'https:\/\/chromewebstore\.google\.com\/detail\/ilcclajjhofhieoljdjmikmfopfbamej\?utm_source=item-share-cb'/);
+  assert.match(settings, /import chromeWebStoreLogo from '\.\.\/assets\/brands\/chrome-web-store\.svg'/);
+  assert.ok(storeAction >= 0, 'the recommended Chrome Web Store action must be rendered');
+  assert.ok(zipAction > storeAction, 'the manual ZIP download must remain available after the recommended store action');
+  assert.match(settings.slice(storeAction, zipAction), /openExternal\(CHROME_WEB_STORE_URL\)/);
+  assert.match(settings.slice(zipAction), /downloadBrowserConnectorZip\(\)/);
+  assert.match(storeLogo, /<title>Chrome Web Store<\/title>/);
+
+  for (const locale of ['en', 'fr', 'de', 'pt', 'pt-BR', 'it', 'tr']) {
+    const translations = readFileSync(path.join(root, `src/i18n.${locale}.ts`), 'utf8');
+    assert.match(translations, /"Instalar desde Chrome Web Store":/);
+    assert.match(translations, /"Recomendado":/);
+  }
 });

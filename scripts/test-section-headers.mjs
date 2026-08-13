@@ -13,15 +13,18 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { readSource } from './ipc-channel-census.mjs';
 
-/** Las secciones que comparten encabezado. La Biblioteca tiene el suyo, propio y probado
- *  aparte, porque además lleva el conmutador de ámbito en el centro. */
+/** Las secciones sencillas que comparten encabezado. Los workspaces tipo Biblioteca
+ *  tienen una franja propia porque su encabezado contiene también pestañas persistentes. */
 const SECTIONS = [
-  'src/views/IdeasView.tsx',
-  'src/views/AuthorsView.tsx',
-  'src/views/ArgumentMapView.tsx',
-  'src/views/DebateView.tsx',
   'src/views/ImmersionView.tsx',
   'src/views/DeepResearchView.tsx',
+];
+
+const LIBRARY_WORKSPACES = [
+  ['src/views/IdeasView.tsx', 'ideas-tabs'],
+  ['src/views/AuthorsView.tsx', 'authors-tabs'],
+  ['src/views/ArgumentMapView.tsx', 'argument-map-tabs'],
+  ['src/views/CoverageWorkspace.tsx', 'coverage-tabs'],
 ];
 
 test('the section header lives in one component, and every section uses it', async () => {
@@ -53,6 +56,16 @@ test('every academic section header carries an icon, a title and one line saying
     assert.match(block, /title=\{t\(/, `${file} translates its title`);
     assert.match(block, /subtitle=\{t\(/, `${file} says in one line what the section is for`);
   }
+});
+
+test('library-style sections own a persistent tab header instead of nesting SectionHeader', async () => {
+  for (const [file, tabs] of LIBRARY_WORKSPACES) {
+    const source = await readSource(file);
+    assert.doesNotMatch(source, /components\/SectionHeader/, `${file} keeps the Library workspace header`);
+    assert.match(source, new RegExp(`data-testid="${tabs}"`), `${file} exposes its persistent tab strip`);
+    assert.match(source, /<header className="shrink-0 border-b border-neutral-200/, `${file} owns one Library-style header`);
+  }
+  assert.doesNotMatch(await readSource('src/views/DebateView.tsx'), /<SectionHeader/, 'Debates inherits the unified workspace header');
 });
 
 // Los iconos identifican la sección en la barra lateral plegada, donde no hay texto: dos

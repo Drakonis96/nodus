@@ -97,6 +97,42 @@ test('every collection endpoint answers with the MCP page envelope and honours i
   });
 });
 
+test('Workspace exposes every note and idea and filters a hierarchical collection recursively', { timeout: 60_000 }, async () => {
+  await withServer({ label: 'api-workspace' }, async (server) => {
+    const spaceId = await server.createSpace('Corpus');
+    const owner = await server.deviceToken(server.adminEmail, server.adminPassword, spaceId);
+    const stamp = { created_at: '2026-08-13T10:00:00.000Z', updated_at: '2026-08-13T10:00:00.000Z' };
+    await publish(server.origin, owner.deviceToken, spaceId, academicSnapshot({
+      tables: {
+        note_folders: [
+          { id: 'research', parent_id: null, name: 'Investigación', order_idx: 0, ...stamp },
+          { id: 'chapter', parent_id: 'research', name: 'Capítulo 1', order_idx: 0, ...stamp },
+          { id: 'personal', parent_id: null, name: 'Personal', order_idx: 1, ...stamp },
+        ],
+        notes: [
+          { id: 'n-root', folder_id: 'research', title: 'Nota marco', kind: 'markdown', content: 'Marco general', order_idx: 0, ...stamp },
+          { id: 'i-root', folder_id: 'research', title: 'Idea marco', kind: 'idea', content: 'Una idea central', order_idx: 1, ...stamp },
+          { id: 'i-child', folder_id: 'chapter', title: 'Idea anidada', kind: 'idea', content: 'Una idea del capítulo', order_idx: 0, ...stamp },
+          { id: 'n-other', folder_id: 'personal', title: 'Nota privada', kind: 'markdown', content: 'Fuera de la colección', order_idx: 0, ...stamp },
+        ],
+      },
+    }));
+
+    const all = await readJson(await server.api(owner.deviceToken, 'GET', `/api/v1/spaces/${spaceId}/notes`));
+    assert.equal(all.total, 4);
+    assert.deepEqual(all.counts, { notes: 2, ideas: 2 });
+    assert.deepEqual(all.folders.map((folder) => folder.id), ['research', 'chapter', 'personal']);
+
+    const subtree = await readJson(await server.api(owner.deviceToken, 'GET', `/api/v1/spaces/${spaceId}/notes?folderId=research&recursive=1&kind=idea`));
+    assert.deepEqual(subtree.notes.map((note) => note.id), ['i-root', 'i-child']);
+    assert.ok(subtree.notes.every((note) => !Object.hasOwn(note, 'content')), 'the list carries snippets rather than every full body');
+
+    const detail = await readJson(await server.api(owner.deviceToken, 'GET', `/api/v1/spaces/${spaceId}/notes/i-child`));
+    assert.equal(detail.note.content, 'Una idea del capítulo');
+    assert.equal(detail.note.kind, 'idea');
+  });
+});
+
 test('the styled report document carries its cover image, and says so when it cannot be laid out', { timeout: 60_000 }, async () => {
   await withServer({ label: 'api-report-document' }, async (server) => {
     const spaceId = await server.createSpace('Corpus');

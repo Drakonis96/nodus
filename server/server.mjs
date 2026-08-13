@@ -14,15 +14,16 @@ import { Store, digest, pairingCode, token } from './lib/store.mjs';
 import { DEFAULT_MAX_MUTATION_BYTES } from './lib/core/mutations.mjs';
 import { lexicalSearch } from './lib/core/search.mjs';
 import { SnapshotCache } from './lib/snapshotCache.mjs';
-import { body, contentSecurityPolicy, cookies, escapeHtml, form, html, json, jsonBody, redirect } from './lib/http.mjs';
+import { body, contentSecurityPolicy, cookies, escapeHtml, form, html, json, jsonBody, redirect, staticAsset } from './lib/http.mjs';
 import { normalizeServerLanguage, serverTranslator } from './lib/i18n.mjs';
-import { helpTip, languagePicker, nodusMark, WEB_STYLES } from './lib/webUi.mjs';
+import { helpTip, languagePicker, nodusMark, NODUS_FAVICON_SVG, WEB_SCRIPT, WEB_STYLES } from './lib/webUi.mjs';
 import { can as canRole, isSpaceRole, normalizeSpaceRole, SPACE_ROLES } from './lib/roles.mjs';
 import { createAuthorizer } from './lib/auth.mjs';
 import { createApiRoutes } from './lib/routes/api.mjs';
 import { createCorpusRoutes } from './lib/routes/corpus.mjs';
 import { NODUS_LICENSE, NODUS_SOURCE_URL, NODUS_VERSION } from './lib/version.mjs';
 import { readAsset } from './lib/assets.mjs';
+import { VAULT_TYPE_COLORS } from './lib/core/generated/vaultColors.mjs';
 
 // A zero, a `200m`-style unit or a value past what Node can hold in a single buffer
 // would otherwise reach zlib and turn every publication into an opaque rejection, so
@@ -92,6 +93,10 @@ const MAX_SNAPSHOT_JSON_BYTES = byteLimit('NODUS_MAX_SNAPSHOT_JSON_BYTES', 384 *
 const MAX_ASSET_BYTES = byteLimit('NODUS_MAX_ASSET_BYTES', 8 * 1024 * 1024, bufferLimits.MAX_LENGTH);
 /** Total image budget for one space, so a shared server cannot be filled from one vault. */
 const MAX_SPACE_ASSET_BYTES = byteLimit('NODUS_MAX_SPACE_ASSET_BYTES', 2 * 1024 * 1024 * 1024, bufferLimits.MAX_LENGTH);
+/** One Clean Markdown + figures + supported original ZIP. */
+const MAX_LIBRARY_PACKAGE_BYTES = byteLimit('NODUS_MAX_LIBRARY_PACKAGE_BYTES', 128 * 1024 * 1024, bufferLimits.MAX_LENGTH);
+/** Total offline-readable published library budget for one space. */
+const MAX_SPACE_LIBRARY_BYTES = byteLimit('NODUS_MAX_SPACE_LIBRARY_BYTES', 2 * 1024 * 1024 * 1024, bufferLimits.MAX_LENGTH);
 const MAX_VECTOR_BYTES = byteLimit('NODUS_MAX_VECTOR_BYTES', 512 * 1024 * 1024, bufferLimits.MAX_LENGTH);
 /**
  * One row a collaborator may send. See DEFAULT_MAX_MUTATION_BYTES for why 256 KiB and why it
@@ -265,7 +270,7 @@ const { authorize, challenge: authChallenge } = createAuthorizer({
 });
 
 function page(title, content, options = {}) {
-  const picker = languagePicker(language(), { language: tr('language'), apply: tr('applyLanguage') });
+  const picker = languagePicker(language(), { language: tr('language') });
   const header = `<header class="site-header">
     <a class="site-brand" href="/" data-testid="nodus-brand">
       ${nodusMark('nodus-header-mark')}
@@ -288,7 +293,7 @@ function page(title, content, options = {}) {
         <section class="auth-card">${content}</section>
       </main>`
     : `<main class="app-main">${content}</main>`;
-  return `<!doctype html><html lang="${escapeHtml(language())}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#08080d"><title>${escapeHtml(title)} · Nodus Server</title><style>${WEB_STYLES}</style></head><body>${header}${main}<footer class="site-footer">Nodus Server ${escapeHtml(NODUS_VERSION)} · ${escapeHtml(NODUS_LICENSE)} · <a data-testid="source-code" href="${escapeHtml(NODUS_SOURCE_URL)}" rel="license source">${tr('sourceCode')}</a></footer></body></html>`;
+  return `<!doctype html><html lang="${escapeHtml(language())}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#08080d"><link rel="icon" type="image/svg+xml" href="/favicon.svg"><title>${escapeHtml(title)} · Nodus Server</title><style>${WEB_STYLES}</style><script src="/server-ui.js?v=2" defer></script></head><body>${header}${main}<footer class="site-footer">Nodus Server ${escapeHtml(NODUS_VERSION)} · ${escapeHtml(NODUS_LICENSE)} · <a data-testid="source-code" href="${escapeHtml(NODUS_SOURCE_URL)}" rel="license source">${tr('sourceCode')}</a></footer></body></html>`;
 }
 
 function sessionFor(req) {
@@ -755,7 +760,8 @@ function accountPage(current, notice = '', error = '') {
 }
 
 function resetPasswordPage(current, user, error = '') {
-  return page(tr('resetPassword'), `<div class="page-heading"><div><p class="eyebrow">${tr('usersAccess')}</p><h1>${tr('resetPassword')}</h1><p class="lead">${escapeHtml(user.email)}</p></div><a class="button-link" href="/">${tr('backAdmin')}</a></div>${error ? `<p class="warn">${escapeHtml(error)}</p>` : ''}<form class="card" method="post" action="/admin/users/password">
+  const visibleEmail = store.sensitiveAccessValid(current.session) ? user.email : maskEmail(user.email);
+  return page(tr('resetPassword'), `<div class="page-heading"><div><p class="eyebrow">${tr('usersAccess')}</p><h1>${tr('resetPassword')}</h1><p class="lead">${escapeHtml(visibleEmail)}</p></div><a class="button-link" href="/">${tr('backAdmin')}</a></div>${error ? `<p class="warn">${escapeHtml(error)}</p>` : ''}<form class="card" method="post" action="/admin/users/password">
     <p class="muted">${tr('resetHelp')}</p>
     <input type="hidden" name="csrf" value="${current.session.csrf}"><input type="hidden" name="userId" value="${user.id}">
     <div class="grid">
@@ -767,6 +773,12 @@ function resetPasswordPage(current, user, error = '') {
 }
 
 const ROLE_LABEL_KEYS = { reader: 'roleReader', writer: 'roleWriter', owner: 'roleOwner' };
+const VAULT_TYPES = ['academic', 'primary_sources', 'genealogy', 'databases', 'estudio', 'docencia', 'testimonios', 'prosopography', 'worldbuilding'];
+const VAULT_TYPE_LABEL_KEYS = {
+  academic: 'vaultTypeAcademic', primary_sources: 'vaultTypePrimarySources', genealogy: 'vaultTypeGenealogy',
+  databases: 'vaultTypeDatabases', estudio: 'vaultTypeStudy', docencia: 'vaultTypeTeaching',
+  testimonios: 'vaultTypeTestimonies', prosopography: 'vaultTypeProsopography', worldbuilding: 'vaultTypeWorldbuilding',
+};
 
 function roleLabel(role) {
   return tr(ROLE_LABEL_KEYS[normalizeSpaceRole(role)]);
@@ -774,6 +786,31 @@ function roleLabel(role) {
 
 function roleOptions(selected) {
   return SPACE_ROLES.map((role) => `<option value="${role}"${role === normalizeSpaceRole(selected) ? ' selected' : ''}>${escapeHtml(roleLabel(role))}</option>`).join('');
+}
+
+function normalizeVaultType(value) {
+  const type = String(value || '').trim();
+  return VAULT_TYPES.includes(type) ? type : '';
+}
+
+function spaceVaultType(space) {
+  return normalizeVaultType(space?.vault?.type || space?.vaultType);
+}
+
+function vaultTypeLabel(type) {
+  const normalized = normalizeVaultType(type);
+  return normalized ? tr(VAULT_TYPE_LABEL_KEYS[normalized]) : tr('vaultTypePending');
+}
+
+function vaultTypeOptions(selected = 'academic') {
+  const normalized = normalizeVaultType(selected) || 'academic';
+  return VAULT_TYPES.map((type) => `<option value="${type}"${type === normalized ? ' selected' : ''}>${escapeHtml(vaultTypeLabel(type))}</option>`).join('');
+}
+
+function vaultBadge(space) {
+  const type = spaceVaultType(space);
+  const accent = type ? VAULT_TYPE_COLORS[type] : '#71717a';
+  return `<span class="vault-type" data-vault-type="${escapeHtml(type || 'pending')}" style="--vault-accent:${escapeHtml(accent)}">${escapeHtml(vaultTypeLabel(type))}</span>`;
 }
 
 /**
@@ -784,12 +821,23 @@ function roleOptions(selected) {
  * key would silently collapse to its last value — which is exactly how a multi-space grant
  * would quietly become a single-space one.
  */
-function spaceGrantPicker() {
+function spaceGrantPicker(entries = [], idPrefix = 'new-user') {
   if (store.state.spaces.length === 0) return `<p class="muted">${tr('noSpacesYet')}</p>`;
-  return `<div class="grant-list">${store.state.spaces.map((space) => `<div class="grant-row">
-    <label class="grant-name"><input type="checkbox" name="space:${space.id}" value="on"> <span>${escapeHtml(space.name)}</span></label>
-    <select name="role:${space.id}" aria-label="${escapeHtml(tr('accessLevel'))}">${roleOptions('reader')}</select>
-  </div>`).join('')}</div>`;
+  const assigned = new Map(entries.map((entry) => [entry.spaceId, entry]));
+  return `<div class="grant-list">${store.state.spaces.map((space) => {
+    const entry = assigned.get(space.id);
+    const checked = Boolean(entry);
+    const locked = entry?.role === 'owner' && ownerCount(space.id) <= 1;
+    const inputId = `${idPrefix}-space-${space.id}`;
+    return `<div class="grant-row" data-testid="grant-${escapeHtml(idPrefix)}-${space.id}">
+      <label class="grant-choice" for="${escapeHtml(inputId)}">
+        <input id="${escapeHtml(inputId)}" type="checkbox" name="space:${space.id}" value="on"${checked ? ' checked' : ''}${locked ? ' disabled' : ''}>
+        ${locked ? `<input type="hidden" name="space:${space.id}" value="on">` : ''}
+        <span class="grant-vault">${vaultBadge(space)}<strong>${escapeHtml(space.name)}</strong>${locked ? `<small class="locked-owner"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="10" width="14" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>${escapeHtml(tr('lockedOwner'))}</small>` : ''}</span>
+      </label>
+      <div class="grant-role"><label for="${escapeHtml(inputId)}-role">${escapeHtml(tr('accessLevel'))}</label><select id="${escapeHtml(inputId)}-role" name="role:${space.id}" aria-label="${escapeHtml(`${tr('accessLevel')}: ${space.name}`)}"${locked ? ' disabled' : ''}>${roleOptions(entry?.role || 'reader')}</select>${locked ? `<input type="hidden" name="role:${space.id}" value="owner">` : ''}</div>
+    </div>`;
+  }).join('')}</div>`;
 }
 
 function readSpaceGrants(values) {
@@ -809,23 +857,64 @@ function readSpaceGrants(values) {
   return grants;
 }
 
+function copyButton(value, copyLabel, copiedLabel, testId, className = 'copy-endpoint') {
+  return `<button type="button" class="${escapeHtml(className)}" data-testid="${escapeHtml(testId)}" data-copy-value="${escapeHtml(value)}" data-copy-label="${escapeHtml(copyLabel)}" data-copied-label="${escapeHtml(copiedLabel)}" aria-label="${escapeHtml(copyLabel)}" title="${escapeHtml(copyLabel)}">
+    <svg class="copy-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M15 9V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h3"/></svg>
+    <svg class="check-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 4 4L19 6"/></svg>
+  </button>`;
+}
+
+function endpointRow(label, help, value, testId) {
+  return `<div class="endpoint-group">
+    <div class="section-title"><h2>${escapeHtml(label)}</h2>${helpTip(help, tr('moreInformation'))}</div>
+    <div class="endpoint">
+      <code data-testid="${testId}">${escapeHtml(value)}</code>
+      ${copyButton(value, tr('copyUrl'), tr('urlCopied'), `${testId}-copy`)}
+      <span class="copy-feedback" data-copy-feedback aria-live="polite"></span>
+    </div>
+  </div>`;
+}
+
+function publishedLibraryMeta(space) {
+  if (!space.updatedAt) return '';
+  const library = readSnapshot(space.id)?.library;
+  const valid = library?.format === 'nodus.server-library' && Number(library?.formatVersion) === 1;
+  const icon = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H20v16H6.5A2.5 2.5 0 0 0 4 21.5z"/><path d="M4 5.5v16M8 7h8"/></svg>';
+  if (!valid) return `<span class="publication-meta muted-library">${icon}${escapeHtml(tr('libraryNotShared'))}</span>`;
+  const count = Array.isArray(library.documents) ? library.documents.length : 0;
+  const label = count === 1 ? tr('publishedLibraryOne') : tr('publishedLibraryCount', { count });
+  return `<span class="publication-meta" data-testid="published-library-${escapeHtml(space.id)}">${icon}${escapeHtml(label)}</span>`;
+}
+
 function dashboard(current, notice = '') {
-  const spaces = store.state.spaces.map((space) => `<tr><td><strong>${escapeHtml(space.name)}</strong>${space.description ? `<div class="muted">${escapeHtml(space.description)}</div>` : ''}</td><td><code>${space.id}</code></td><td>${escapeHtml(space.updatedAt || tr('unpublished'))}</td><td><form method="post" action="/admin/pairing"><input type="hidden" name="csrf" value="${current.session.csrf}"><input type="hidden" name="spaceId" value="${space.id}"><button class="secondary" type="submit">${tr('createPairing')}</button></form>${space.updatedAt ? `<form method="post" action="/admin/spaces/clear-request"><input type="hidden" name="csrf" value="${current.session.csrf}"><input type="hidden" name="spaceId" value="${space.id}"><button class="danger" type="submit">${tr('deletePublication')}</button></form>` : ''}</td></tr>`).join('');
-  const spaceOptions = store.state.spaces.map((space) => `<option value="${space.id}">${escapeHtml(space.name)}</option>`).join('');
+  const emailsUnlocked = store.sensitiveAccessValid(current.session);
+  const spaces = store.state.spaces.map((space) => `<tr>
+    <td><div class="space-name"><div class="space-heading">${vaultBadge(space)}<strong>${escapeHtml(space.name)}</strong></div>${space.description ? `<div class="muted">${escapeHtml(space.description)}</div>` : ''}${publishedLibraryMeta(space)}</div>
+      <details class="inline-editor"><summary>${escapeHtml(tr('editSpaceName'))}</summary><form method="post" action="/admin/spaces/name"><input type="hidden" name="csrf" value="${current.session.csrf}"><input type="hidden" name="spaceId" value="${space.id}"><input name="name" value="${escapeHtml(space.name)}" maxlength="120" aria-label="${escapeHtml(tr('name'))}" required><button class="secondary" type="submit">${escapeHtml(tr('saveName'))}</button></form></details>
+    </td>
+    <td><div class="space-id"><code>${space.id}</code>${copyButton(space.id, tr('copySpaceId'), tr('spaceIdCopied'), `space-id-copy-${space.id}`, 'copy-endpoint copy-id')}<span class="copy-feedback" data-copy-feedback aria-live="polite"></span></div></td>
+    <td>${escapeHtml(space.updatedAt || tr('unpublished'))}</td>
+    <td><form method="post" action="/admin/pairing"><input type="hidden" name="csrf" value="${current.session.csrf}"><input type="hidden" name="spaceId" value="${space.id}"><button class="secondary" type="submit">${tr('createPairing')}</button></form>${space.updatedAt ? `<form method="post" action="/admin/spaces/clear-request"><input type="hidden" name="csrf" value="${current.session.csrf}"><input type="hidden" name="spaceId" value="${space.id}"><button class="danger" type="submit">${tr('deletePublication')}</button></form>` : ''}</td>
+  </tr>`).join('');
   const users = store.state.users.map((user) => {
-    const access = store.state.memberships.filter((entry) => entry.userId === user.id).map((entry) => {
-      const space = store.state.spaces.find((candidate) => candidate.id === entry.spaceId);
-      // The last owner of a space is the one membership that cannot be touched: without it
-      // nobody can ever publish there again, and no screen could undo that.
-      const controls = entry.role === 'owner' && ownerCount(entry.spaceId) <= 1
-        ? `<span class="role-tag">${escapeHtml(roleLabel(entry.role))}</span>`
-        : `<form method="post" action="/admin/access/role"><input type="hidden" name="csrf" value="${current.session.csrf}"><input type="hidden" name="userId" value="${user.id}"><input type="hidden" name="spaceId" value="${entry.spaceId}"><select name="role" aria-label="${escapeHtml(tr('accessLevel'))}">${roleOptions(entry.role)}</select><button class="secondary" type="submit">${tr('updateRole')}</button></form>`
-        + `<form method="post" action="/admin/access/revoke"><input type="hidden" name="csrf" value="${current.session.csrf}"><input type="hidden" name="userId" value="${user.id}"><input type="hidden" name="spaceId" value="${entry.spaceId}"><button class="secondary" type="submit" title="${tr('revokeAccess')}" aria-label="${tr('revokeAccess')}">×</button></form>`;
-      return `<div class="access-chip"><span>${escapeHtml(space?.name || entry.spaceId)}</span>${controls}</div>`;
-    }).join('') || '<span class="muted">—</span>';
-    const grant = user.role === 'admin' || !spaceOptions ? '' : `<form method="post" action="/admin/access/grant"><input type="hidden" name="csrf" value="${current.session.csrf}"><input type="hidden" name="userId" value="${user.id}"><select name="spaceId">${spaceOptions}</select><select name="role" aria-label="${escapeHtml(tr('accessLevel'))}">${roleOptions('reader')}</select><button class="secondary">${tr('grantAccess')}</button></form>`;
+    const entries = store.state.memberships.filter((entry) => entry.userId === user.id);
     const reset = user.role === 'member' ? `<a href="/admin/users/password?userId=${encodeURIComponent(user.id)}">${tr('resetPassword')}</a>` : `<a href="/account">${tr('changeMyPassword')}</a>`;
-    return `<tr><td><strong>${escapeHtml(user.email)}</strong></td><td>${escapeHtml(user.role)}</td><td><div class="access-list">${access}</div></td><td>${grant}<p>${reset}</p></td></tr>`;
+    const accountLabel = user.role === 'admin' ? tr('administrator') : tr('memberAccount');
+    const visibleEmail = emailsUnlocked ? user.email : maskEmail(user.email);
+    const emailEditor = emailsUnlocked
+      ? ENVIRONMENT_ADMIN_CONFIGURED && user.role === 'admin'
+        ? `<div class="email-readonly"><strong>${escapeHtml(user.email)}</strong><span class="muted">${escapeHtml(tr('environmentEmailReadonly'))}</span></div>`
+        : `<form class="email-edit-form" method="post" action="/admin/users/email"><input type="hidden" name="csrf" value="${current.session.csrf}"><input type="hidden" name="userId" value="${user.id}"><input name="email" type="email" value="${escapeHtml(user.email)}" maxlength="320" aria-label="${escapeHtml(tr('email'))}" required><button class="secondary" type="submit">${escapeHtml(tr('saveEmail'))}</button></form>`
+      : `<strong data-testid="masked-email-${escapeHtml(user.id)}">${escapeHtml(visibleEmail)}</strong>`;
+    return `<article class="user-card" data-testid="user-${escapeHtml(user.id)}">
+      <div class="user-card-header"><div class="user-identity"><span class="user-avatar" aria-hidden="true">${escapeHtml(user.email.slice(0, 1))}</span><div>${emailEditor}<span class="account-tag">${escapeHtml(accountLabel)}</span></div></div>${reset}</div>
+      <form class="user-access-form" method="post" action="/admin/users/access">
+        <input type="hidden" name="csrf" value="${current.session.csrf}"><input type="hidden" name="userId" value="${user.id}">
+        <div class="user-access-heading"><div><h3>${escapeHtml(tr('assignedVaults'))}</h3><p>${escapeHtml(tr('manageAccessHelp'))}</p></div></div>
+        ${spaceGrantPicker(entries, `user-${user.id}`)}
+        <button class="secondary" type="submit">${escapeHtml(tr('saveAccess'))}</button>
+      </form>
+    </article>`;
   }).join('');
   const devices = store.state.deviceTokens.map((device) => {
     const space = store.state.spaces.find((entry) => entry.id === device.spaceId);
@@ -838,8 +927,10 @@ function dashboard(current, notice = '') {
   <section class="server-overview">
     <div>
       <div class="status-line"><span class="status-dot"></span>${tr('administration')}</div>
-      <div class="section-title"><h2>${tr('mcpUrl')}</h2>${helpTip(tr('mcpHelp'), tr('moreInformation'))}</div>
-      <div class="endpoint"><code>${escapeHtml(mcpResource())}</code></div>
+      <div class="endpoint-list">
+        ${endpointRow(tr('serverUrl'), tr('publicUrlHelp'), publicUrl(), 'server-url')}
+        ${endpointRow(tr('mcpUrl'), tr('mcpHelp'), mcpResource(), 'mcp-url')}
+      </div>
     </div>
     <div class="metric-grid">
       <div class="metric"><strong>${store.state.spaces.length}</strong><span>${tr('spaces')}</span></div>
@@ -853,6 +944,7 @@ function dashboard(current, notice = '') {
       <div class="section-header"><div><div class="section-title"><h2>${tr('newSpace')}</h2>${helpTip(tr('newSpaceHelp'), tr('moreInformation'))}</div></div></div>
       <input type="hidden" name="csrf" value="${current.session.csrf}">
       <div class="field"><label for="space-name">${tr('name')}</label><input id="space-name" name="name" required></div>
+      <div class="field"><label for="space-vault-type">${escapeHtml(tr('vaultType'))}</label><select id="space-vault-type" name="vaultType">${vaultTypeOptions()}</select></div>
       <div class="field"><label for="space-description">${tr('description')}</label><input id="space-description" name="description"></div>
       <button type="submit">${tr('createSpace')}</button>
     </form>
@@ -861,7 +953,7 @@ function dashboard(current, notice = '') {
       <input type="hidden" name="csrf" value="${current.session.csrf}">
       <div class="field"><label for="reader-email">${tr('email')}</label><input id="reader-email" name="email" type="email" autocomplete="off" required></div>
       <div class="field"><label for="reader-password">${tr('temporaryPasswordLabel')}</label><input id="reader-password" name="password" type="password" autocomplete="new-password" minlength="12" required></div>
-      <div class="field"><div class="label-line"><label>${tr('spacesAndRoles')}</label>${helpTip(tr('newUserSpacesHelp'), tr('moreInformation'))}</div>${spaceGrantPicker()}</div>
+      <div class="field"><div class="label-line"><label>${tr('spacesAndRoles')}</label>${helpTip(tr('newUserSpacesHelp'), tr('moreInformation'))}</div>${spaceGrantPicker([], 'new-user')}</div>
       <p class="muted role-legend"><strong>${escapeHtml(tr('roleReader'))}:</strong> ${tr('roleReaderHelp')}<br><strong>${escapeHtml(tr('roleWriter'))}:</strong> ${tr('roleWriterHelp')}<br><strong>${escapeHtml(tr('roleOwner'))}:</strong> ${tr('roleOwnerHelp')}</p>
       <button type="submit">${tr('createUser')}</button>
     </form>
@@ -872,12 +964,24 @@ function dashboard(current, notice = '') {
   </section>
   <section class="section">
     <div class="section-header"><div><div class="section-title"><h2>${tr('usersAccess')}</h2>${helpTip(tr('usersHelp'), tr('moreInformation'))}</div><p>${tr('mcpReadOnly')}</p></div></div>
-    <div class="table-shell"><table><thead><tr><th>${tr('email')}</th><th>${tr('account')}</th><th>${tr('access')}</th><th>${tr('actions')}</th></tr></thead><tbody>${users}</tbody></table></div>
+    ${emailsUnlocked
+      ? `<p class="ok" data-testid="email-access-unlocked">${escapeHtml(tr('emailAccessUnlocked'))}</p>`
+      : `<form class="email-unlock card" method="post" action="/admin/users/email-access" data-testid="email-unlock-form"><div><strong>${escapeHtml(tr('unlockEmails'))}</strong><p class="muted">${escapeHtml(tr('unlockEmailsHelp'))}</p></div><input type="hidden" name="csrf" value="${current.session.csrf}"><input name="password" type="password" autocomplete="current-password" maxlength="1024" aria-label="${escapeHtml(tr('currentPassword'))}" required><button class="secondary" type="submit">${escapeHtml(tr('unlockForFiveMinutes'))}</button></form>`}
+    <div class="user-list">${users}</div>
   </section>
   <section class="section">
     <div class="section-header"><div><div class="section-title"><h2>${tr('publisherDevices')}</h2>${helpTip(tr('devicesHelp'), tr('moreInformation'))}</div></div></div>
     <div class="table-shell"><table><thead><tr><th>${tr('device')}</th><th>${tr('space')}</th><th>${tr('lastUsed')}</th><th>${tr('actions')}</th></tr></thead><tbody>${devices || `<tr><td class="empty" colspan="4">${tr('noDevices')}</td></tr>`}</tbody></table></div>
   </section>`);
+}
+
+function maskEmail(value) {
+  const [local = '', domain = ''] = String(value || '').split('@');
+  const domainParts = domain.split('.');
+  const host = domainParts.shift() || '';
+  const suffix = domainParts.length ? `.${domainParts.join('.')}` : '';
+  const mask = (part) => part ? `${part.slice(0, 1)}${'•'.repeat(Math.max(3, Math.min(8, part.length - 1)))}` : '•••';
+  return `${mask(local)}@${mask(host)}${suffix}`;
 }
 
 function languageReturnPath(req) {
@@ -910,6 +1014,8 @@ const apiRoutes = createApiRoutes({
     maxSnapshotJsonBytes: MAX_SNAPSHOT_JSON_BYTES,
     maxAssetBytes: MAX_ASSET_BYTES,
     maxSpaceAssetBytes: MAX_SPACE_ASSET_BYTES,
+    maxLibraryPackageBytes: MAX_LIBRARY_PACKAGE_BYTES,
+    maxSpaceLibraryBytes: MAX_SPACE_LIBRARY_BYTES,
     maxVectorBytes: MAX_VECTOR_BYTES,
     maxMutationBytes: MAX_MUTATION_BYTES,
     maxMutationBatchBytes: MAX_MUTATION_BATCH_BYTES,
@@ -946,16 +1052,18 @@ async function handleLocalProvision(req, res) {
   const vaultId = String(input.vaultId || '').trim().slice(0, 120);
   if (!vaultId) return json(res, 400, { error: 'invalid_request', error_description: 'A vaultId is required.' });
   const vaultName = String(input.vaultName || '').trim().slice(0, 120) || 'Nodus';
+  const vaultType = normalizeVaultType(input.vaultType);
 
   let space = store.state.spaces.find((entry) => entry.localVaultId === vaultId);
   if (!space) {
-    space = { id: randomUUID(), name: vaultName, description: '', createdAt: new Date().toISOString(), updatedAt: null, revision: '', bytes: 0, localVaultId: vaultId };
+    space = { id: randomUUID(), name: vaultName, description: '', createdAt: new Date().toISOString(), updatedAt: null, revision: '', bytes: 0, localVaultId: vaultId, vaultType };
     store.state.spaces.push(space);
     store.state.memberships.push({ userId: admin.id, spaceId: space.id, role: 'owner' });
-  } else if (space.name !== vaultName) {
+  } else if (!space.nameEdited && space.name !== vaultName) {
     // Renaming the vault in Nodus should rename the space people see, not orphan it.
     space.name = vaultName;
   }
+  if (vaultType) space.vaultType = vaultType;
 
   const code = pairingCode();
   store.state.pairingCodes.push({ hash: digest(code), userId: admin.id, spaceId: space.id, expiresAt: new Date(Date.now() + 15 * 60_000).toISOString(), usedAt: null });
@@ -965,6 +1073,12 @@ async function handleLocalProvision(req, res) {
 
 async function route(req, res) {
   const url = new URL(req.url || '/', publicUrl());
+  if (url.pathname === '/favicon.svg' && req.method === 'GET') {
+    return staticAsset(res, 200, NODUS_FAVICON_SVG, 'image/svg+xml; charset=utf-8', { 'cache-control': 'public, max-age=86400' });
+  }
+  if (url.pathname === '/server-ui.js' && req.method === 'GET') {
+    return staticAsset(res, 200, WEB_SCRIPT, 'text/javascript; charset=utf-8', { 'cache-control': 'no-cache' });
+  }
   if (url.pathname === '/language' && req.method === 'POST') {
     const values = await form(req, 4 * 1024);
     const selected = normalizeServerLanguage(values.language);
@@ -1055,9 +1169,40 @@ async function route(req, res) {
     if (values.newPassword !== values.confirmPassword) return html(res, 400, resetPasswordPage(current, user, 'The new passwords do not match.'));
     try {
       store.resetPassword(user.id, values.newPassword);
-      return redirect(res, '/?notice=' + encodeURIComponent(`Password reset for ${user.email}.`));
+      return redirect(res, '/?notice=' + encodeURIComponent('Password reset.'));
     } catch (error) {
       return html(res, 400, resetPasswordPage(current, user, error instanceof Error ? error.message : String(error)));
+    }
+  }
+  if (url.pathname === '/admin/users/email-access' && req.method === 'POST') {
+    const current = requireSession(req, res, true); if (!current) return;
+    if (!rateLimit(req, res, 'email-unlock', 10, 15 * 60_000)) return;
+    const values = await form(req, AUTH_BODY_BYTES);
+    if (!checkCsrf(current, values.csrf)) return html(res, 403, page(tr('error'), `<h1>${tr('sessionExpired')}</h1>`));
+    try {
+      store.unlockSensitiveAccess(current.session.hash, values.password);
+      return redirect(res, '/?notice=' + encodeURIComponent(tr('emailAccessUnlocked')));
+    } catch {
+      return html(res, 401, dashboard(current, tr('emailUnlockFailed')));
+    }
+  }
+  if (url.pathname === '/admin/users/email' && req.method === 'POST') {
+    const current = requireSession(req, res, true); if (!current) return;
+    if (!rateLimit(req, res, 'email-change', 20, 15 * 60_000)) return;
+    const values = await form(req, AUTH_BODY_BYTES);
+    if (!checkCsrf(current, values.csrf)) return html(res, 403, page(tr('error'), `<h1>${tr('sessionExpired')}</h1>`));
+    if (!store.sensitiveAccessValid(current.session)) return html(res, 403, dashboard(current, tr('emailAccessExpired')));
+    const target = store.state.users.find((entry) => entry.id === values.userId);
+    if (!target) return html(res, 404, dashboard(current, tr('readerNotFound')));
+    if (ENVIRONMENT_ADMIN_CONFIGURED && target.role === 'admin') return html(res, 403, dashboard(current, tr('environmentEmailReadonly')));
+    try {
+      const result = store.changeEmail(target.id, values.email);
+      if (result.changed && target.id === current.user.id) {
+        return redirect(res, '/login?notice=' + encodeURIComponent(tr('emailUpdatedSignIn')), { 'set-cookie': 'nodus_session=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0' });
+      }
+      return redirect(res, '/?notice=' + encodeURIComponent(result.changed ? tr('emailUpdated') : tr('emailUnchanged')));
+    } catch (error) {
+      return html(res, 400, dashboard(current, error instanceof Error ? error.message : String(error)));
     }
   }
 
@@ -1182,10 +1327,23 @@ async function route(req, res) {
   if (url.pathname === '/admin/spaces' && req.method === 'POST') {
     const current = requireSession(req, res, true); if (!current) return;
     const values = await form(req, AUTH_BODY_BYTES); if (!checkCsrf(current, values.csrf)) return html(res, 403, page(tr('error'), `<h1>${tr('sessionExpired')}</h1>`));
-    const space = { id: randomUUID(), name: String(values.name || '').trim(), description: String(values.description || '').trim(), createdAt: new Date().toISOString(), updatedAt: null, revision: '', bytes: 0 };
+    const space = { id: randomUUID(), name: String(values.name || '').trim().slice(0, 120), description: String(values.description || '').trim().slice(0, 500), vaultType: normalizeVaultType(values.vaultType) || 'academic', nameEdited: true, createdAt: new Date().toISOString(), updatedAt: null, revision: '', bytes: 0 };
     if (!space.name) return html(res, 400, dashboard(current, 'The space needs a name.'));
     store.state.spaces.push(space); store.state.memberships.push({ userId: current.user.id, spaceId: space.id, role: 'owner' }); store.save();
     return redirect(res, '/?notice=' + encodeURIComponent('Space created.'));
+  }
+  if (url.pathname === '/admin/spaces/name' && req.method === 'POST') {
+    const current = requireSession(req, res, true); if (!current) return;
+    const values = await form(req, AUTH_BODY_BYTES); if (!checkCsrf(current, values.csrf)) return html(res, 403, page(tr('error'), `<h1>${tr('sessionExpired')}</h1>`));
+    const space = store.state.spaces.find((entry) => entry.id === values.spaceId);
+    if (!space) return html(res, 404, page(tr('error'), `<h1>${tr('spaceNotFound')}</h1>`));
+    const name = String(values.name || '').trim().slice(0, 120);
+    if (!name) return html(res, 400, dashboard(current, 'The space needs a name.'));
+    space.name = name;
+    // A deliberate administration name wins over later local reprovisioning of the vault.
+    space.nameEdited = true;
+    store.save();
+    return redirect(res, '/?notice=' + encodeURIComponent('Space name updated.'));
   }
   if (url.pathname === '/admin/spaces/clear-request' && req.method === 'POST') {
     const current = requireSession(req, res, true); if (!current) return;
@@ -1204,7 +1362,9 @@ async function route(req, res) {
     // cannot silently recreate data the administrator has just removed.
     store.state.deviceTokens = store.state.deviceTokens.filter((entry) => entry.spaceId !== space.id);
     store.state.pairingCodes = store.state.pairingCodes.filter((entry) => entry.spaceId !== space.id);
-    space.updatedAt = null; space.revision = ''; space.vault = null; space.bytes = 0; store.save();
+    space.vaultType = spaceVaultType(space) || space.vaultType || '';
+    space.updatedAt = null; space.revision = ''; space.vault = null;
+    space.bytes = 0; space.assetBytes = 0; space.libraryPackageBytes = 0; store.save();
     return redirect(res, '/?notice=' + encodeURIComponent('Publication deleted from the server.'));
   }
   if (url.pathname === '/admin/users' && req.method === 'POST') {
@@ -1219,6 +1379,37 @@ async function route(req, res) {
       if (grants.length) store.save();
       return redirect(res, '/?notice=' + encodeURIComponent(`User created with access to ${grants.length} space(s).`));
     } catch (error) { return html(res, 400, dashboard(current, error instanceof Error ? error.message : String(error))); }
+  }
+  if (url.pathname === '/admin/users/access' && req.method === 'POST') {
+    const current = requireSession(req, res, true); if (!current) return;
+    const values = await form(req, AUTH_BODY_BYTES); if (!checkCsrf(current, values.csrf)) return html(res, 403, page(tr('error'), `<h1>${tr('sessionExpired')}</h1>`));
+    const user = store.state.users.find((entry) => entry.id === values.userId);
+    if (!user) return html(res, 400, dashboard(current, 'Invalid user.'));
+    const desired = new Map(readSpaceGrants(values).map((grant) => [grant.spaceId, grant.role]));
+    const existing = store.state.memberships.filter((entry) => entry.userId === user.id);
+
+    // Validate the complete edit before changing anything, so one invalid last-owner change
+    // cannot leave the other vault permissions half-applied.
+    for (const entry of existing) {
+      const nextRole = desired.get(entry.spaceId);
+      if (entry.role === 'owner' && nextRole !== 'owner' && ownerCount(entry.spaceId) <= 1) {
+        return html(res, 400, dashboard(current, 'A space needs at least one owner. Grant owner access to another account before changing this one.'));
+      }
+    }
+
+    const removedSpaceIds = new Set(existing.filter((entry) => !desired.has(entry.spaceId)).map((entry) => entry.spaceId));
+    store.state.memberships = store.state.memberships.filter((entry) => entry.userId !== user.id || desired.has(entry.spaceId));
+    for (const [spaceId, role] of desired) {
+      const entry = membership(user.id, spaceId);
+      if (entry) entry.role = role;
+      else store.state.memberships.push({ userId: user.id, spaceId, role });
+    }
+    if (removedSpaceIds.size) {
+      store.state.deviceTokens = store.state.deviceTokens.filter((device) => device.userId !== user.id || !removedSpaceIds.has(device.spaceId));
+      store.state.pairingCodes = store.state.pairingCodes.filter((pairing) => pairing.userId !== user.id || !removedSpaceIds.has(pairing.spaceId));
+    }
+    store.save();
+    return redirect(res, '/?notice=' + encodeURIComponent('User access updated.'));
   }
   if (url.pathname === '/admin/access/role' && req.method === 'POST') {
     const current = requireSession(req, res, true); if (!current) return;

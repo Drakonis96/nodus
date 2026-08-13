@@ -49,43 +49,49 @@ export function CoverageWorkspace({
   const openDebates = () => setTab('debate');
 
   return (
-    <div className="h-full flex flex-col min-h-0">
-      <nav
-        className="shrink-0 flex border-b border-neutral-800 px-3"
-        role="tablist"
-        aria-label={t('Estado de la cuestión')}
-      >
-        {TABS.map(([value, label, icon], index) => (
-          <button
-            key={value}
-            id={`coverage-tab-${value}`}
-            role="tab"
-            data-testid={`coverage-tab-${value}`}
-            aria-selected={tab === value}
-            aria-controls="coverage-tabpanel"
-            tabIndex={tab === value ? 0 : -1}
-            // border-current sigue al color del texto, que sí tiene remap en modo
-            // claro; una tinta indigo fija en el borde se quedaría sin traducir.
-            className={`flex items-center gap-1.5 border-b-2 px-3 py-2 text-xs font-medium ${
-              tab === value
-                ? 'border-current text-indigo-300'
-                : 'border-transparent text-neutral-500 hover:text-neutral-200'
-            }`}
-            onClick={() => setTab(value)}
-            onKeyDown={(event) => {
-              const delta = event.key === 'ArrowRight' ? 1 : event.key === 'ArrowLeft' ? -1 : 0;
-              if (!delta) return;
-              event.preventDefault();
-              const next = (index + delta + TABS.length) % TABS.length;
-              setTab(TABS[next][0]);
-              const buttons = event.currentTarget.parentElement?.querySelectorAll<HTMLButtonElement>('[role="tab"]');
-              buttons?.[next]?.focus();
-            }}
-          >
-            <Icon name={icon} size={13} /> {t(label)}
-          </button>
-        ))}
-      </nav>
+    <div data-testid="coverage-workspace" className="flex h-full min-h-0 flex-col bg-white text-neutral-900 dark:bg-neutral-950 dark:text-neutral-100">
+      <header className="shrink-0 border-b border-neutral-200 px-5 pt-4 dark:border-neutral-800">
+        <div className="mb-3 flex flex-wrap items-center gap-3">
+          <span className="grid h-9 w-9 place-items-center rounded-xl bg-indigo-100 text-indigo-600 dark:bg-indigo-500/15 dark:text-indigo-300">
+            <Icon name="compass" size={18} />
+          </span>
+          <div>
+            <h1 className="text-base font-semibold">{t('Estado de la cuestión')}</h1>
+            <p className="text-[11px] text-neutral-500">{t('Cobertura')} · {t('Debates')} · {t('Huecos')}</p>
+          </div>
+        </div>
+
+        <nav data-testid="coverage-tabs" className="flex min-w-0 items-end gap-1 overflow-x-auto" role="tablist" aria-label={t('Estado de la cuestión')}>
+          {TABS.map(([value, label, icon], index) => (
+            <button
+              key={value}
+              id={`coverage-tab-${value}`}
+              role="tab"
+              data-testid={`coverage-tab-${value}`}
+              aria-selected={tab === value}
+              aria-controls="coverage-tabpanel"
+              tabIndex={tab === value ? 0 : -1}
+              className={`flex h-9 shrink-0 items-center gap-2 rounded-t-lg border border-b-0 px-3 text-xs ${
+                tab === value
+                  ? 'border-neutral-300 bg-white text-neutral-900 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-100'
+                  : 'border-transparent text-neutral-500 hover:bg-neutral-100 hover:text-neutral-800 dark:hover:bg-neutral-900/60 dark:hover:text-neutral-300'
+              }`}
+              onClick={() => setTab(value)}
+              onKeyDown={(event) => {
+                const delta = event.key === 'ArrowRight' ? 1 : event.key === 'ArrowLeft' ? -1 : 0;
+                if (!delta) return;
+                event.preventDefault();
+                const next = (index + delta + TABS.length) % TABS.length;
+                setTab(TABS[next][0]);
+                const buttons = event.currentTarget.parentElement?.querySelectorAll<HTMLButtonElement>('[role="tab"]');
+                buttons?.[next]?.focus();
+              }}
+            >
+              <Icon name={icon} size={13} /> {t(label)}
+            </button>
+          ))}
+        </nav>
+      </header>
 
       <div
         id="coverage-tabpanel"

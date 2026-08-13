@@ -13,6 +13,30 @@
   ];
 
   var COPY = {
+    es: {
+      references: 'Referencias', search: 'Buscar por título, autor, año, DOI, ISBN o clave de cita',
+      style: 'Estilo', styleSearch: 'Buscar estilos de cita', language: 'Idioma', placement: 'Ubicación', inText: 'En el texto',
+      footnote: 'Nota al pie', endnote: 'Nota final', auto: 'Actualizar citas automáticamente',
+      refresh: 'Actualizar', unlink: 'Desvincular', current: 'Cita actual', choose: 'Añade una o varias fuentes',
+      clear: 'Limpiar', insert: 'Insertar cita', update: 'Actualizar cita', bibliography: 'Bibliografía',
+      bibliographyHint: 'Incluye las fuentes citadas en este documento', insertBibliography: 'Insertar / actualizar',
+      add: 'Añadir', onlyBibliography: 'Solo bibliografía', remove: 'Quitar', edit: 'Editar detalles',
+      up: 'Mover antes', down: 'Mover después', locator: 'Localizador', value: 'Valor', prefix: 'Prefijo',
+      suffix: 'Sufijo / texto posterior', omitAuthor: 'Omitir autor', excludeBibliography: 'Excluir de la bibliografía',
+      noResults: 'No hay referencias que coincidan.', recent: 'Referencias recientes de la biblioteca global',
+      searching: 'Buscando en la biblioteca global…', added: 'Referencia añadida', citationInserted: 'Cita viva insertada',
+      citationUpdated: 'Cita actualizada', bibliographyInserted: 'Bibliografía viva insertada', refreshed: 'Citas y bibliografía actualizadas',
+      unlinkConfirm: 'Las citas y bibliografías se convertirán en texto normal. Esta acción no se puede deshacer desde Nodus. ¿Continuar?',
+      unlinked: 'Referencias desvinculadas', noCitations: 'Este documento aún no contiene citas de Nodus.',
+      noBibliography: 'Añade una cita o una fuente para poder generar la bibliografía.',
+      editorNotListening: 'LibreOffice no está escuchando. Ejecuta la macro start_nodus_copilot en Writer.',
+      wordFieldsUnsupported: 'Esta versión de Word no admite campos de citas editables (requiere WordApi 1.5).',
+      sourceMissing: 'La referencia ya no está en la biblioteca; se usará la copia incrustada en el documento.',
+      automaticOff: 'Cita insertada. Pulsa Actualizar cuando quieras recalcular todo el documento.',
+      bibliographyExtra: 'Añadida a la bibliografía', bibliographyRemoved: 'Quitada de la bibliografía adicional',
+      showStyles: 'Mostrar estilos de cita', noStyles: 'Ningún estilo coincide con la búsqueda.',
+      styleManager: 'Gestionar estilos en Nodus', styleManagerOpened: 'Gestor de estilos abierto en Nodus'
+    },
     en: {
       references: 'References', search: 'Search title, author, year, DOI, ISBN, or citation key',
       style: 'Style', styleSearch: 'Search citation styles', language: 'Language', placement: 'Placement', inText: 'In text',
@@ -33,12 +57,15 @@
       wordFieldsUnsupported: 'This Word version cannot create editable citation fields (WordApi 1.5 is required).',
       sourceMissing: 'This reference is no longer in the library; the document snapshot will be used.',
       automaticOff: 'Citation inserted. Choose Refresh when you want to recalculate the whole document.',
-      bibliographyExtra: 'Added to bibliography', bibliographyRemoved: 'Removed from bibliography extras'
+      bibliographyExtra: 'Added to bibliography', bibliographyRemoved: 'Removed from bibliography extras',
+      showStyles: 'Show citation styles', noStyles: 'No citation style matches the search.',
+      styleManager: 'Manage styles in Nodus', styleManagerOpened: 'Style manager opened in Nodus'
     }
   };
 
   function create(options) {
-    var C = COPY.en;
+    var lang = options.lang === 'en' ? 'en' : 'es';
+    var C = COPY[lang];
     var refs = [];
     var selected = [];
     var styles = [];
@@ -47,11 +74,17 @@
     var externalState = null;
     var active = false;
     var fieldsSupported = true;
-    var preferences = { formatVersion: 1, style: 'apa-7', locale: 'en-US', placement: 'in-text', automaticUpdates: true };
+    var stylePickerOpen = false;
+    var activeStyleIndex = 0;
+    var styleRequestSeq = 0;
+    var styleRefreshTimer = null;
+    var preferences = { formatVersion: 1, style: 'apa-7', locale: lang === 'es' ? 'es-ES' : 'en-US', placement: 'in-text', automaticUpdates: true };
     var el = {
       results: document.getElementById('results'), empty: document.getElementById('empty'),
       controls: document.getElementById('referenceControls'), analysis: document.getElementById('analysisControls'),
       search: document.getElementById('searchBox'), style: document.getElementById('referenceStyle'), styleSearch: document.getElementById('referenceStyleSearch'),
+      stylePicker: document.getElementById('referenceStylePicker'), styleOptions: document.getElementById('referenceStyleOptions'),
+      styleToggle: document.getElementById('referenceStyleToggle'), styleManager: document.getElementById('referenceStyleManager'),
       locale: document.getElementById('referenceLocale'), placement: document.getElementById('referencePlacement'),
       auto: document.getElementById('referenceAutoUpdate'), selected: document.getElementById('selectedReferences'),
       hint: document.getElementById('composerHint'), insert: document.getElementById('insertCitation'),
@@ -130,19 +163,33 @@
       el.hint.textContent = C.choose; el.clear.textContent = C.clear; el.insert.textContent = C.insert;
       document.querySelector('.bibliography-actions strong').textContent = C.bibliography;
       el.bibliographyHint.textContent = C.bibliographyHint; el.bibliography.textContent = C.insertBibliography;
+      el.styleToggle.setAttribute('aria-label', C.showStyles);
+      el.styleManager.textContent = C.styleManager;
     }
 
     function loadStyles() {
-      return options.api('/api/references/styles').then(function (data) {
+      var seq = ++styleRequestSeq;
+      return options.api('/api/references/styles?fresh=' + Date.now(), { cache: 'no-store' }).then(function (data) {
+        if (seq !== styleRequestSeq) return;
         styles = data.styles || [];
-        renderStyleOptions('');
         if (!styles.some(function (style) { return style.id === preferences.style; })) preferences.style = styles[0] ? styles[0].id : 'apa-7';
         el.style.value = preferences.style;
+        renderStyleOptions(stylePickerOpen ? el.styleSearch.value : '');
+        if (!stylePickerOpen) syncStyleSearchDisplay();
       });
     }
 
     function normalizeStyleSearch(value) {
       return String(value || '').normalize('NFKD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim().replace(/\s+/g, ' ');
+    }
+
+    function selectedStyle() {
+      return styles.find(function (style) { return style.id === (el.style.value || preferences.style); });
+    }
+
+    function syncStyleSearchDisplay() {
+      var current = selectedStyle();
+      el.styleSearch.value = current ? current.title : (el.style.value || preferences.style || '');
     }
 
     function renderStyleOptions(query) {
@@ -152,16 +199,82 @@
         var haystack = normalizeStyleSearch(style.title + ' ' + style.id);
         return tokens.every(function (token) { return haystack.indexOf(token) >= 0; });
       });
-      if (selected && !filtered.some(function (style) { return style.id === selected; })) {
-        var current = styles.find(function (style) { return style.id === selected; });
-        if (current) filtered.unshift(current);
-      }
-        el.style.innerHTML = '';
-      filtered.forEach(function (style) {
-          var option = node('option', '', style.title + (style.availableOffline ? '' : ' · ↓'));
-          option.value = style.id; el.style.appendChild(option);
-        });
+      el.style.innerHTML = '';
+      styles.forEach(function (style) {
+        var option = node('option', '', style.title);
+        option.value = style.id; el.style.appendChild(option);
+      });
       if (selected) el.style.value = selected;
+
+      el.styleOptions.innerHTML = '';
+      if (!filtered.length) el.styleOptions.appendChild(node('div', 'reference-style-empty', C.noStyles));
+      filtered.forEach(function (style, index) {
+        var option = node('button', 'reference-style-option');
+        option.type = 'button';
+        option.id = 'reference-style-option-' + index;
+        option.setAttribute('role', 'option');
+        option.setAttribute('aria-selected', String(style.id === selected));
+        option.appendChild(node('span', 'reference-style-option-title', style.title));
+        option.appendChild(node('span', 'reference-style-option-meta', style.availableOffline ? (lang === 'es' ? 'Instalado' : 'Installed') : (lang === 'es' ? 'Descarga pendiente' : 'Download pending')));
+        option.onmousedown = function (event) { event.preventDefault(); selectStyle(style.id); };
+        el.styleOptions.appendChild(option);
+      });
+      activeStyleIndex = Math.max(0, Math.min(activeStyleIndex, filtered.length - 1));
+      updateActiveStyleOption();
+    }
+
+    function updateActiveStyleOption() {
+      var optionsList = el.styleOptions.querySelectorAll('.reference-style-option');
+      for (var i = 0; i < optionsList.length; i++) optionsList[i].classList.toggle('active', i === activeStyleIndex);
+      var activeOption = optionsList[activeStyleIndex];
+      if (activeOption) {
+        el.styleSearch.setAttribute('aria-activedescendant', activeOption.id);
+        activeOption.scrollIntoView({ block: 'nearest' });
+      } else el.styleSearch.removeAttribute('aria-activedescendant');
+    }
+
+    function setStylePickerOpen(value) {
+      stylePickerOpen = value;
+      el.stylePicker.classList.toggle('open', value);
+      el.styleOptions.hidden = !value;
+      el.styleSearch.setAttribute('aria-expanded', String(value));
+      el.styleToggle.setAttribute('aria-expanded', String(value));
+      if (value) {
+        el.styleSearch.value = '';
+        activeStyleIndex = 0;
+        renderStyleOptions('');
+        loadStyles().catch(function () {});
+      } else {
+        el.styleSearch.removeAttribute('aria-activedescendant');
+        syncStyleSearchDisplay();
+      }
+    }
+
+    function selectStyle(styleId) {
+      el.style.value = styleId;
+      preferences.style = styleId;
+      setStylePickerOpen(false);
+      preferenceChanged(el.style);
+    }
+
+    function preferenceChanged(control) {
+      savePreferences();
+      if (control === el.style) {
+        var style = styles.find(function (entry) { return entry.id === el.style.value; });
+        if (style && style.citationFormat === 'note' && preferences.placement === 'in-text') {
+          preferences.placement = 'footnote'; el.placement.value = 'footnote'; savePreferences();
+        }
+      }
+      if (preferences.automaticUpdates && active) refresh();
+    }
+
+    function openStyleManager() {
+      options.api('/api/nodus/open', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ destination: 'citation-styles' })
+      }).then(function () {
+        options.setStatus(C.styleManagerOpened, 'ok');
+      }).catch(function (error) { options.setStatus(error.message || String(error), 'err'); });
     }
 
     function empty(message) {
@@ -251,9 +364,9 @@
       el.insert.textContent = editingCitationId ? C.update : C.insert;
       el.placement.disabled = !!editingCitationId;
       el.placement.title = editingCitationId
-        ? 'An existing citation keeps its current placement while it is edited.'
+        ? (lang === 'es' ? 'La ubicación de una cita existente no cambia al editarla.' : 'An existing citation keeps its current placement while it is edited.')
         : '';
-      el.hint.textContent = selected.length ? selected.length + ' source(s)' : C.choose;
+      el.hint.textContent = selected.length ? selected.length + (lang === 'es' ? ' fuente(s)' : ' source(s)') : C.choose;
       el.bibliographyHint.textContent = extras.length
         ? C.bibliographyHint + ' · +' + extras.length
         : C.bibliographyHint;
@@ -363,14 +476,14 @@
           var data = parseFieldData(field.data);
           if (data && data.fieldId === fieldId) { field.data = JSON.stringify(fieldData); replaceFieldResult(field, formatted); matched = true; }
         });
-        if (!matched) throw new Error('The selected citation no longer exists.');
+        if (!matched) throw new Error(lang === 'es' ? 'La cita seleccionada ya no existe.' : 'The selected citation no longer exists.');
         await context.sync();
       });
     }
 
     async function insertCitation() {
       if (!selected.length) return;
-      savePreferences(); el.insert.disabled = true; options.setStatus('Formatting…', '');
+      savePreferences(); el.insert.disabled = true; options.setStatus(lang === 'es' ? 'Formateando…' : 'Formatting…', '');
       try {
         var state = await readDocumentState(); var citations = (state.citations || []).slice();
         var noteIndex = preferences.placement === 'in-text' ? 0 : Math.max(0, citations.reduce(function (max, citation) { return Math.max(max, citation.noteIndex || 0); }, 0)) + 1;
@@ -383,7 +496,7 @@
         if (existing >= 0) { cluster.noteIndex = citations[existing].noteIndex; citations[existing] = cluster; } else citations.push(cluster);
         var result = await formatDocument(citations, state.bibliographies || []);
         var formatted = result.citations.find(function (entry) { return entry.citationId === citationId; });
-        if (!formatted) throw new Error('The citation could not be formatted.');
+        if (!formatted) throw new Error(lang === 'es' ? 'No se pudo formatear la cita.' : 'The citation could not be formatted.');
         var fieldData = { format: FIELD_FORMAT, formatVersion: 1, fieldId: citationId, kind: 'citation', citation: cluster, createdAt: new Date().toISOString() };
         if (options.isWord) {
           if (editingCitationId) await updateWordField(editingCitationId, fieldData, formatted);
@@ -474,8 +587,16 @@
 
     function setActive(value) {
       active = value; el.controls.hidden = !value; el.analysis.hidden = value;
-      if (!value) return;
+      if (!value) {
+        setStylePickerOpen(false);
+        if (styleRefreshTimer) { clearInterval(styleRefreshTimer); styleRefreshTimer = null; }
+        return;
+      }
       el.search.placeholder = C.search; loadPreferences(); renderComposer(); search(el.search.value.trim());
+      loadStyles().catch(function () {});
+      if (!styleRefreshTimer) styleRefreshTimer = setInterval(function () {
+        if (active && !document.hidden) loadStyles().catch(function () {});
+      }, 4000);
       readDocumentState().then(function (state) { hydrateExtras(state.bibliographies || []); }).catch(function () {});
       selectionChanged();
     }
@@ -484,7 +605,7 @@
       if (action === 'bibliography') { insertBibliography(); return; }
       if (action === 'refresh') { refresh(); return; }
       if (action === 'unlink') { unlink(); return; }
-      if (action === 'preferences') { el.style.focus(); return; }
+      if (action === 'preferences') { el.styleSearch.focus(); setStylePickerOpen(true); return; }
       el.search.focus();
     }
 
@@ -496,19 +617,39 @@
       }
       if (!fieldsSupported) options.setStatus(C.wordFieldsUnsupported, 'err');
       loadPreferences();
-      loadStyles().then(loadPreferences).catch(function (error) { options.setStatus(error.message, 'err'); });
+      loadStyles().then(function () { loadPreferences(); renderStyleOptions(''); syncStyleSearchDisplay(); })
+        .catch(function (error) { options.setStatus(error.message, 'err'); });
       el.styleSearch.placeholder = C.styleSearch; el.styleSearch.setAttribute('aria-label', C.styleSearch);
-      el.styleSearch.oninput = function () { renderStyleOptions(el.styleSearch.value); };
+      el.styleSearch.onfocus = function () { if (!stylePickerOpen) setStylePickerOpen(true); };
+      el.styleSearch.onclick = function () { if (!stylePickerOpen) setStylePickerOpen(true); };
+      el.styleSearch.oninput = function () { if (!stylePickerOpen) setStylePickerOpen(true); activeStyleIndex = 0; renderStyleOptions(el.styleSearch.value); };
+      el.styleSearch.onkeydown = function (event) {
+        var optionCount = el.styleOptions.querySelectorAll('.reference-style-option').length;
+        if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+          event.preventDefault();
+          if (!stylePickerOpen) setStylePickerOpen(true);
+          activeStyleIndex = optionCount ? (activeStyleIndex + (event.key === 'ArrowDown' ? 1 : -1) + optionCount) % optionCount : 0;
+          updateActiveStyleOption();
+        } else if (event.key === 'Enter' && stylePickerOpen) {
+          var selectedOption = el.styleOptions.querySelectorAll('.reference-style-option')[activeStyleIndex];
+          if (selectedOption) { event.preventDefault(); selectedOption.dispatchEvent(new MouseEvent('mousedown', { bubbles: true })); }
+        } else if (event.key === 'Escape' && stylePickerOpen) {
+          event.preventDefault(); setStylePickerOpen(false);
+        }
+      };
+      el.styleToggle.onclick = function () {
+        setStylePickerOpen(!stylePickerOpen);
+        if (stylePickerOpen) el.styleSearch.focus();
+      };
+      el.styleManager.onclick = openStyleManager;
+      document.addEventListener('mousedown', function (event) {
+        if (stylePickerOpen && !el.stylePicker.contains(event.target)) setStylePickerOpen(false);
+      });
+      window.addEventListener('focus', function () { if (active) loadStyles().catch(function () {}); });
+      document.addEventListener('visibilitychange', function () { if (active && !document.hidden) loadStyles().catch(function () {}); });
       el.insert.onclick = insertCitation; el.clear.onclick = function () { selected = []; editingCitationId = null; renderComposer(); };
       el.bibliography.onclick = insertBibliography; el.refresh.onclick = refresh; el.unlink.onclick = unlink;
-      [el.style, el.locale, el.placement, el.auto].forEach(function (control) { control.onchange = function () {
-        savePreferences();
-        if (control === el.style) {
-          var style = styles.find(function (entry) { return entry.id === el.style.value; });
-          if (style && style.citationFormat === 'note' && preferences.placement === 'in-text') { preferences.placement = 'footnote'; el.placement.value = 'footnote'; savePreferences(); }
-        }
-        if (preferences.automaticUpdates && active) refresh();
-      }; });
+      [el.locale, el.placement, el.auto].forEach(function (control) { control.onchange = function () { preferenceChanged(control); }; });
       renderComposer();
     }
 

@@ -48,6 +48,13 @@ if (!process.argv.includes('--electron-primary-sources-research-test')) {
   }
   assert.match(files.app, /<PrimarySourcesSearchView/);
   assert.match(files.app, /<PrimarySourcesNotesView/);
+  for (const marker of [
+    'WorkspaceTabStrip', 'library-theme-canvas', 'library-header-bar',
+    'library-theme-panel', 'library-catalog-scroll',
+    'primary-sources-notes-tab-home', 'primary-sources-notes-list',
+  ]) assert.ok(files.notes.includes(marker), `primary-source notes reuse the Workspace surface: ${marker}`);
+  assert.match(files.notes, /tabs=\{openTabs\.map/, 'each primary-source note opens in a persistent tab');
+  assert.match(files.notes, /Fuentes enlazadas/, 'the evidence-aware side panel survives the visual unification');
   assert.match(files.app, /<PrimarySourcesHomeView/);
   assert.doesNotMatch(files.app, /PrimarySourcesSectionView section="search"/);
   assert.doesNotMatch(files.search, /<aside\b/, 'search filters do not use a dedicated sidebar');

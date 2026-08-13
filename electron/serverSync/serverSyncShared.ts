@@ -49,6 +49,7 @@ export interface VaultServerConfig {
   autoSync: boolean;
   includeUserContent: boolean;
   includePassages: boolean;
+  includeLibraryDocuments: boolean;
   includeVectors: boolean;
   hasToken: boolean;
   configured: boolean;
@@ -101,6 +102,7 @@ function toConfig(vault: VaultSummary, blob: Partial<AppSettings>): VaultServerC
     autoSync: blob.nodusServerAutoSync !== false,
     includeUserContent: Boolean(blob.nodusServerIncludeUserContent),
     includePassages: Boolean(blob.nodusServerIncludePassages),
+    includeLibraryDocuments: Boolean(blob.nodusServerIncludeLibraryDocuments),
     includeVectors: blob.nodusServerIncludeVectors !== false,
     hasToken,
     configured: Boolean(url && spaceId && hasToken),
@@ -119,6 +121,7 @@ export function readVaultConfig(vault: VaultSummary): VaultServerConfig {
       nodusServerAutoSync: s.nodusServerAutoSync,
       nodusServerIncludeUserContent: s.nodusServerIncludeUserContent,
       nodusServerIncludePassages: s.nodusServerIncludePassages,
+      nodusServerIncludeLibraryDocuments: s.nodusServerIncludeLibraryDocuments,
       nodusServerIncludeVectors: s.nodusServerIncludeVectors,
     });
   }

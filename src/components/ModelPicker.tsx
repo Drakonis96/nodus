@@ -247,21 +247,33 @@ export function ModelPicker({
   const serialize = (m: ModelRef) => `${m.provider}::${m.model}`;
   const valueIsFavorite = value ? favorites.some((model) => sameModel(model, value)) : false;
   const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState('');
   const rootRef = useRef<HTMLDivElement | null>(null);
   const triggerRef = useRef<HTMLButtonElement | null>(null);
+  const searchRef = useRef<HTMLInputElement | null>(null);
   const optionsRef = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
     if (!open) return;
-    const close = (event: MouseEvent) => { if (!rootRef.current?.contains(event.target as Node)) setOpen(false); };
+    const close = (event: MouseEvent) => {
+      if (!rootRef.current?.contains(event.target as Node)) {
+        setOpen(false);
+        setQuery('');
+      }
+    };
     document.addEventListener('mousedown', close);
     return () => document.removeEventListener('mousedown', close);
   }, [open]);
 
   if (menu) {
     const models = value && !valueIsFavorite ? [value, ...favorites] : favorites;
+    const normalizedQuery = query.trim().toLocaleLowerCase();
+    const filteredModels = models.filter((model) => optionText(model).toLocaleLowerCase().includes(normalizedQuery));
+    const emptyOptionLabel = emptyLabel ? t(emptyLabel) : t('Sin modelo seleccionado');
+    const showEmptyOption = allowEmpty && (!normalizedQuery || emptyOptionLabel.toLocaleLowerCase().includes(normalizedQuery));
     const choose = (model: ModelRef | null) => {
       onChange(model);
       setOpen(false);
+      setQuery('');
       window.setTimeout(() => triggerRef.current?.focus());
     };
     const focusOption = (direction: 1 | -1 | 'first' | 'last') => {
@@ -273,26 +285,54 @@ export function ModelPicker({
       options[next]?.focus();
     };
     const currentLabel = value ? modelLabel(value) : emptyLabel ? t(emptyLabel) : t('Sin modelo seleccionado');
-    const closeAndRestoreFocus = () => { setOpen(false); triggerRef.current?.focus(); };
+    const closeAndRestoreFocus = () => { setOpen(false); setQuery(''); triggerRef.current?.focus(); };
+    const openAndFocusSearch = () => {
+      setOpen(true);
+      window.setTimeout(() => searchRef.current?.focus());
+    };
     return <div ref={rootRef} className={`model-picker-menu${compact ? ' compact' : ''} ${className}`} onKeyDown={(event) => {
       if (event.key === 'Escape' && open) { event.preventDefault(); closeAndRestoreFocus(); }
       if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
         event.preventDefault();
         if (!open) {
-          setOpen(true);
+          openAndFocusSearch();
           window.setTimeout(() => focusOption(event.key === 'ArrowDown' ? 'first' : 'last'));
         } else focusOption(event.key === 'ArrowDown' ? 1 : -1);
       }
-      if (open && event.key === 'Home') { event.preventDefault(); focusOption('first'); }
-      if (open && event.key === 'End') { event.preventDefault(); focusOption('last'); }
+      if (event.target !== searchRef.current && open && event.key === 'Home') { event.preventDefault(); focusOption('first'); }
+      if (event.target !== searchRef.current && open && event.key === 'End') { event.preventDefault(); focusOption('last'); }
     }}>
-      <button ref={triggerRef} type="button" className="model-picker-trigger" disabled={disabled} aria-haspopup="listbox" aria-expanded={open} aria-label={ariaLabel ? `${ariaLabel}: ${currentLabel}` : undefined} onClick={() => setOpen((current) => !current)} title={currentLabel}>
+      <button ref={triggerRef} type="button" className="model-picker-trigger" disabled={disabled} aria-haspopup="listbox" aria-expanded={open} aria-label={ariaLabel ? `${ariaLabel}: ${currentLabel}` : undefined} onClick={() => {
+        if (open) closeAndRestoreFocus();
+        else openAndFocusSearch();
+      }} title={currentLabel}>
         <span>{value ? (triggerModelOnly ? value.model : currentLabel) : currentLabel}</span><Icon name="chevronDown" size={14} />
       </button>
-      {open && <div ref={optionsRef} className="model-picker-options" role="listbox" aria-label={ariaLabel}>
-        {allowEmpty && <button type="button" role="option" aria-selected={!value} className={!value ? 'selected' : ''} onClick={() => choose(null)}>{emptyLabel ? t(emptyLabel) : t('Sin modelo seleccionado')}</button>}
-        {models.map((model) => <button type="button" role="option" aria-selected={sameModel(model, value)} disabled={blocked(model)} title={blocked(model) ? t('Este modelo no puede usarse para extracción de ideas.') : undefined} className={sameModel(model, value) ? 'selected' : ''} key={serialize(model)} onClick={() => { if (!blocked(model)) choose(model); }}><span>{optionText(model)}</span>{sameModel(model, value) && <Icon name="check" size={13} />}</button>)}
-        {!models.length && !allowEmpty && <span className="model-picker-empty">{t('No hay modelos favoritos configurados.')}</span>}
+      {open && <div className="model-picker-options">
+        <label className="model-picker-search">
+          <Icon name="search" size={13} />
+          <input
+            ref={searchRef}
+            type="search"
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter') {
+                const firstAvailable = filteredModels.find((model) => !blocked(model));
+                if (firstAvailable) { event.preventDefault(); choose(firstAvailable); }
+              }
+            }}
+            placeholder={t('Buscar modelo…')}
+            aria-label={t('Buscar modelo…')}
+            data-testid="model-picker-search"
+          />
+        </label>
+        <div ref={optionsRef} className="model-picker-list" role="listbox" aria-label={ariaLabel}>
+          {showEmptyOption && <button type="button" role="option" aria-selected={!value} className={!value ? 'selected' : ''} onClick={() => choose(null)}>{emptyOptionLabel}</button>}
+          {filteredModels.map((model) => <button type="button" role="option" aria-selected={sameModel(model, value)} disabled={blocked(model)} title={blocked(model) ? t('Este modelo no puede usarse para extracción de ideas.') : undefined} className={sameModel(model, value) ? 'selected' : ''} key={serialize(model)} onClick={() => { if (!blocked(model)) choose(model); }}><span>{optionText(model)}</span>{sameModel(model, value) && <Icon name="check" size={13} />}</button>)}
+          {!normalizedQuery && !models.length && !allowEmpty && <span className="model-picker-empty">{t('No hay modelos favoritos configurados.')}</span>}
+          {normalizedQuery && !filteredModels.length && !showEmptyOption && <span className="model-picker-empty">{tx('Ningún modelo coincide con «{query}».', { query: query.trim() })}</span>}
+        </div>
       </div>}
     </div>;
   }

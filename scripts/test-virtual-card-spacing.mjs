@@ -3,7 +3,7 @@
 // `VirtualList` gives every row a slot exactly `itemHeight` tall, so a card whose
 // fixed height equals the pitch touches the card above and below it: the reading
 // path shipped that way (246 / 246) and its blocks had no separation at all. The
-// gaps and ideas lists already reserved 12 px, which is the spacing this locks in.
+// the remaining card lists reserve 12 px, which is the spacing this locks in.
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import fs from 'node:fs';
@@ -16,7 +16,6 @@ const CARD_GAP = 12;
 const LISTS = [
   { view: 'src/views/ReadingPathView.tsx', rowConstant: 'READING_ENTRY_ROW_HEIGHT' },
   { view: 'src/views/GapsView.tsx', rowConstant: 'GAP_ROW_HEIGHT' },
-  { view: 'src/views/IdeasView.tsx', rowConstant: 'IDEA_ROW_HEIGHT' },
 ];
 
 /** Resolve `const NAME = 246;` or `const NAME = A + B;` from the view's own constants. */

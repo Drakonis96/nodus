@@ -11,7 +11,7 @@ export interface Migration {
 
 // Versioned, append-only migrations. Never edit an existing migration's SQL once
 // shipped — add a new one. The current schema version is the highest applied.
-export const SCHEMA_VERSION = 130;
+export const SCHEMA_VERSION = 133;
 
 export const migrations: Migration[] = [
   {
@@ -6543,6 +6543,74 @@ export const migrations: Migration[] = [
       CREATE INDEX idx_study_improvement_log_hash ON study_improvement_log(original_hash, result_hash);
     `,
     after: (db) => { migrateWorkspaceContent(db); },
+  },
+  {
+    version: 131,
+    up: /* sql */ `
+      -- A Clean Markdown anchor is completely described by its UTF-16 offsets. An
+      -- annotation over the original also needs to say which attachment and page (or
+      -- reflowable chapter) those offsets belong to. JSON keeps the already-public
+      -- WritingDraftAnnotationTarget union extensible without rebuilding this table for
+      -- every new original-document renderer.
+      ALTER TABLE writing_draft_annotations ADD COLUMN target_json TEXT;
+    `,
+  },
+  {
+    version: 132,
+    up: /* sql */ `
+      -- A phone may send dozens of highlights and comments for one document. Retaining
+      -- the parent identity makes those durable inbox records one expandable notification
+      -- instead of an unbounded flat list. The title is captured too: a deleted child can
+      -- no longer be joined back to its report after the mutation has been applied.
+      ALTER TABLE server_inbox ADD COLUMN parent_entity_kind TEXT;
+      ALTER TABLE server_inbox ADD COLUMN parent_entity_id TEXT;
+      ALTER TABLE server_inbox ADD COLUMN parent_title TEXT;
+
+      -- Repair the existing flat Deep Research history where the annotation still exists.
+      -- Deleted legacy children cannot be joined after the fact, but every live highlight,
+      -- comment and bookmark becomes grouped immediately on the first v132 launch.
+      UPDATE server_inbox
+      SET parent_entity_kind = 'deep_research',
+          parent_entity_id = (
+            SELECT annotation.draft_id
+            FROM writing_draft_annotations annotation
+            WHERE annotation.id = json_extract(server_inbox.row_key, '$[0]')
+          ),
+          parent_title = (
+            SELECT COALESCE(NULLIF(TRIM(report.title), ''), json_extract(report.brief_json, '$.objective'))
+            FROM writing_draft_annotations annotation
+            JOIN writing_saved_drafts report ON report.id = annotation.draft_id
+            WHERE annotation.id = json_extract(server_inbox.row_key, '$[0]')
+          ),
+          entity_kind = 'deep_research_annotation',
+          title = COALESCE(title, (
+            SELECT CASE
+              WHEN annotation.kind = 'comment' THEN COALESCE(NULLIF(TRIM(annotation.comment_text), ''), annotation.selected_text)
+              ELSE annotation.selected_text
+            END
+            FROM writing_draft_annotations annotation
+            WHERE annotation.id = json_extract(server_inbox.row_key, '$[0]')
+          ))
+      WHERE table_name = 'writing_draft_annotations'
+        AND parent_entity_id IS NULL
+        AND EXISTS (
+          SELECT 1
+          FROM writing_draft_annotations annotation
+          WHERE annotation.id = json_extract(server_inbox.row_key, '$[0]')
+            AND annotation.draft_id NOT LIKE 'nodus-library:%'
+        );
+    `,
+  },
+  {
+    version: 133,
+    up: /* sql */ `
+      -- El Espacio de trabajo adopta las dos invariantes de la Biblioteca global:
+      -- etiquetas de usuario y borrado recuperable. JSON evita otra tabla para una lista
+      -- pequeña y trashed_at conserva el instante que se muestra y sincroniza.
+      ALTER TABLE notes ADD COLUMN tags_json TEXT NOT NULL DEFAULT '[]';
+      ALTER TABLE notes ADD COLUMN trashed_at TEXT;
+      CREATE INDEX idx_notes_trash_updated ON notes(trashed_at, updated_at DESC);
+    `,
   },
 ];
 

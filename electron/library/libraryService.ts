@@ -88,7 +88,7 @@ import { listLibraryAnalysisProvenance } from '../db/libraryAnalysisProvenance';
 import type { LibraryAnalysisReuseComponent, LibraryAnalysisReuseStatus } from '@shared/libraryTypes';
 import { reuseVaultAnalysisForWorks } from '../vaults/vaultAnalysisImport';
 import { libraryRevisionFingerprint } from './libraryVaultProvenance';
-import { registerGlobalLibraryCloser } from './libraryRuntime';
+import { notifyGlobalLibraryChanged, registerGlobalLibraryCloser } from './libraryRuntime';
 import {
   formatLibraryCitationCsl,
   formatLibraryOfficeDocumentCsl,
@@ -193,6 +193,7 @@ async function ensureCatalogReady(current: NonNullable<ReturnType<typeof service
 }
 
 function broadcast(status: LibraryStatus): void {
+  notifyGlobalLibraryChanged();
   for (const window of BrowserWindow.getAllWindows()) {
     if (!window.isDestroyed() && !window.webContents.isDestroyed()) {
       window.webContents.send('library:changed', status);
@@ -210,6 +211,7 @@ function broadcastMigration(progress: LibraryMigrationProgress): void {
 
 function broadcastExtraction(progress: LibraryExtractionProgress): void {
   if (progress.status === 'done' && live) settleLibraryInvalidationsForItem(progress.itemId, live.store, live.catalog);
+  if (progress.status === 'done') notifyGlobalLibraryChanged();
   for (const window of BrowserWindow.getAllWindows()) {
     if (!window.isDestroyed() && !window.webContents.isDestroyed()) window.webContents.send('library:extractionProgress', progress);
   }

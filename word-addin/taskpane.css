@@ -1,5 +1,5 @@
 :root {
-  color-scheme: light dark;
+  color-scheme: light;
   --bg: #ffffff;
   --panel: #ffffff;
   --surface: #f6f6f6;
@@ -33,6 +33,44 @@
     --cyan: #55d6e1;
     --shadow: none;
   }
+}
+
+/* Word's reported Office theme and the webview's media query can disagree.
+   These body-scoped palettes win over inherited values in either direction. */
+body.light {
+  color-scheme: light;
+  --bg: #ffffff;
+  --panel: #ffffff;
+  --surface: #f6f6f6;
+  --border: #d5d5d5;
+  --text: #1f1f1f;
+  --control-text: #1f1f1f;
+  --muted: #646464;
+  --primary: #4f46e5;
+  --primary-text: #ffffff;
+  --green: #168a46;
+  --red: #c4362e;
+  --amber: #a15c00;
+  --cyan: #007c89;
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+}
+
+body.dark {
+  color-scheme: dark;
+  --bg: #1f1f1f;
+  --panel: #2b2b2b;
+  --surface: #242424;
+  --border: #4a4a4a;
+  --text: #f3f3f3;
+  --control-text: #f3f3f3;
+  --muted: #b8b8b8;
+  --primary: #7c83ff;
+  --primary-text: #ffffff;
+  --green: #4bd27b;
+  --red: #ff766d;
+  --amber: #ffbf5b;
+  --cyan: #55d6e1;
+  --shadow: none;
 }
 
 * { box-sizing: border-box; }
@@ -174,9 +212,10 @@ main {
   gap: 6px;
 }
 
-.reference-preferences label:last-child { grid-column: 1 / -1; }
+.reference-preferences > label:last-child { grid-column: 1 / -1; }
 .reference-preferences label { min-width: 0; color: var(--muted); font-size: 10px; }
-.reference-preferences span { display: block; margin: 0 0 3px 2px; }
+.reference-preferences > label > span,
+.reference-style-head > label > span { display: block; margin: 0 0 3px 2px; }
 .reference-preferences select,
 .reference-preferences input[type="search"] {
   width: 100%;
@@ -190,7 +229,91 @@ main {
   font: inherit;
   font-size: 11px;
 }
-.reference-style-field input[type="search"] { margin-bottom: 4px; }
+.reference-preferences select option { background: var(--panel); color: var(--control-text); }
+
+.reference-style-field { position: relative; min-width: 0; }
+.reference-style-head { display: flex; align-items: baseline; gap: 6px; min-width: 0; }
+.reference-style-head label { flex: 0 0 auto; }
+.reference-style-picker { position: relative; }
+.reference-style-picker input[type="search"] {
+  margin: 0;
+  padding-right: 30px;
+}
+.reference-style-toggle {
+  position: absolute;
+  right: 1px;
+  top: 1px;
+  width: 28px;
+  height: 28px;
+  border: 0;
+  border-left: 1px solid var(--border);
+  border-radius: 0 5px 5px 0;
+  background: var(--panel);
+  color: var(--muted);
+  cursor: pointer;
+}
+.reference-style-toggle span {
+  width: 7px;
+  height: 7px;
+  margin: -3px auto 0;
+  border-right: 1.5px solid currentColor;
+  border-bottom: 1.5px solid currentColor;
+  transform: rotate(45deg);
+}
+.reference-style-picker.open .reference-style-toggle span { margin-top: 3px; transform: rotate(225deg); }
+.reference-style-options {
+  position: absolute;
+  z-index: 8;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  max-height: 208px;
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  padding: 3px;
+  background: var(--panel);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, .24);
+}
+.reference-style-options[hidden] { display: none; }
+.reference-style-option {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 7px;
+  width: 100%;
+  border: 0;
+  border-radius: 5px;
+  padding: 7px 8px;
+  background: transparent;
+  color: var(--control-text);
+  font: inherit;
+  font-size: 11px;
+  text-align: left;
+  cursor: pointer;
+}
+.reference-style-option:hover,
+.reference-style-option.active { background: var(--surface); }
+.reference-style-option[aria-selected="true"] { color: var(--primary); font-weight: 650; }
+.reference-style-option-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.reference-style-option-meta { color: var(--muted); font-size: 9px; }
+.reference-style-empty { padding: 12px 8px; color: var(--muted); font-size: 10px; text-align: center; }
+.reference-style-manager {
+  display: inline-flex;
+  min-width: 0;
+  margin: 0 1px 3px auto;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: var(--primary);
+  font: inherit;
+  font-size: 9px;
+  line-height: 1.4;
+  white-space: nowrap;
+  text-align: left;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
 
 .reference-auto { padding: 2px 1px; }
 .reference-document-actions { display: flex; gap: 6px; }

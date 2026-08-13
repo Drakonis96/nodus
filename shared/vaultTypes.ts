@@ -1,5 +1,7 @@
 import type { PromptLanguage } from './types';
 import { localizedNewVaultPromptPack } from './newVaultPromptPacks';
+import { VAULT_TYPE_COLORS } from './vaultColors';
+export { VAULT_TYPE_COLORS } from './vaultColors';
 
 /**
  * Vault types — a vault's "mode". Each type is a bundle of configuration layered
@@ -287,18 +289,6 @@ Este vault es el espacio de trabajo de un DOCENTE: preparación de clases, mater
  * dock icon, and Nodi's orb when its colour follows the active vault. Keep these in
  * step with the app logos; a type added above must be added here too.
  */
-export const VAULT_TYPE_COLORS: Record<VaultType, string> = {
-  academic: '#6366f1',
-  estudio: '#0f766e',
-  primary_sources: '#6366f1',
-  genealogy: '#ca8a04',
-  prosopography: '#2563eb',
-  databases: '#b30333',
-  testimonios: '#0891b2',
-  worldbuilding: '#7c3aed',
-  docencia: '#ea580c',
-};
-
 /** Accent colour for a vault type; unknown/absent types fall back to the academic indigo. */
 export function vaultTypeColor(value: unknown): string {
   return VAULT_TYPE_COLORS[normalizeVaultType(value)];
@@ -329,9 +319,8 @@ export function isPreviewVaultType(value: unknown): boolean {
  * by phase C.
  */
 export const VAULT_TYPE_SCOPED_VIEWS: Record<string, VaultType[]> = {
-  // El Espacio de trabajo unifica Notas, Escritura y Proyectos, y solo existe donde
-  // existían las tres. En las demás bóvedas Notas sigue siendo la sección de siempre:
-  // ni tienen proyectos ni tienen taller de escritura, así que no hay nada que unificar.
+  // La ruta Espacio de trabajo sigue siendo académica. Los demás vaults conservan la
+  // ruta Notas, aunque ambas rutas comparten ahora la misma experiencia de catálogo.
   workspace: ['academic'],
   writing: ['estudio', 'docencia', 'genealogy', 'primary_sources', 'databases', 'testimonios', 'worldbuilding', 'prosopography'],
   projects: ['estudio', 'docencia', 'genealogy', 'primary_sources', 'databases', 'testimonios', 'worldbuilding', 'prosopography'],

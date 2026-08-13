@@ -359,6 +359,7 @@ export function registerIpc(
       patch.nodusServerSpaceId !== undefined ||
       patch.nodusServerIncludeUserContent !== undefined ||
       patch.nodusServerIncludePassages !== undefined ||
+      patch.nodusServerIncludeLibraryDocuments !== undefined ||
       patch.nodusServerIncludeVectors !== undefined
     ) {
       restartNodusServerSync();
@@ -417,6 +418,19 @@ export function registerIpc(
     }
   });
   h('nodi:notifications:list', async () => listNotifications());
+  h('nodi:notifications:refresh', async () => {
+    await refreshAnnouncements('manual');
+    const notifications = listNotifications();
+    const announcements = listAnnouncements();
+    // Refresh every renderer, not only the button that initiated the check. Nodi can
+    // live in its own always-on-top window, and the header must update at the same time.
+    for (const win of BrowserWindow.getAllWindows()) {
+      if (win.isDestroyed()) continue;
+      win.webContents.send('nodi:notifications:changed', notifications);
+      win.webContents.send('announcements:changed', announcements);
+    }
+    return { notifications, announcements };
+  });
   h('nodi:notifications:markRead', async () => {
     markAllNotificationsRead();
     return listNotifications();

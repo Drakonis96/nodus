@@ -14,6 +14,7 @@ import {
 } from '@shared/types';
 import { isLocalProvider } from '@shared/providers';
 import { ModelPicker, SubscriptionQuotaNotice } from '../components/ModelPicker';
+import { ToolkitAppHero } from '../components/ToolkitAppHero';
 import { Icon, Spinner } from '../components/ui';
 import { errorText, t, tr, tx } from '../i18n';
 import {
@@ -219,11 +220,23 @@ export function ToolkitTranslateView({ onBack, settings }: { onBack: () => void;
   const progress = Math.round((job?.progress?.pct ?? (job?.status === 'completed' ? 1 : 0)) * 100);
 
   return <div data-testid="translate-home" className="mx-auto max-w-5xl space-y-5 pb-12">
-    <header className="flex items-start gap-3">
-      <button data-testid="toolkit-translate-back" type="button" aria-label={t('Volver a Herramientas')} onClick={onBack} className="mt-1 grid h-9 w-9 shrink-0 place-items-center rounded-lg border border-neutral-300 bg-white text-neutral-600 hover:border-amber-400 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-300"><Icon name="chevronLeft" size={17} /></button>
-      <span className="grid h-12 w-12 shrink-0 place-items-center rounded-xl bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300"><Icon name="languages" size={23} /></span>
-      <div><h1 className="text-lg font-semibold text-neutral-900 dark:text-neutral-100">Nodus Translate</h1><p className="text-sm text-neutral-500">{t('Traduce texto, documentos o adjuntos de Zotero conservando su estructura y, en PDF, la disposición de cada página.')}</p></div>
-    </header>
+    <ToolkitAppHero
+      badge="Nodus Toolkit"
+      title="Nodus Translate"
+      description={t('Traduce texto, documentos o adjuntos de Zotero conservando su estructura y, en PDF, la disposición de cada página.')}
+      icon="languages"
+      actionLabel={t('Traducir')}
+      actionIcon="languages"
+      onAction={() => {
+        setNotice(null);
+        setTab('text');
+        window.setTimeout(() => document.querySelector<HTMLTextAreaElement>('[data-testid="translate-source-text"]')?.focus(), 0);
+      }}
+      onBack={onBack}
+      heroTestId="toolkit-translate-hero"
+      actionTestId="toolkit-translate-primary"
+      backTestId="toolkit-translate-back"
+    />
 
     <nav className="grid grid-cols-2 gap-1 rounded-xl bg-neutral-100 p-1 sm:grid-cols-4 dark:bg-neutral-900/60" aria-label={t('Secciones de traducción')}>
       {([['text', 'Texto', 'edit'], ['files', 'Documentos', 'file'], ['zotero', 'Zotero', 'book'], ['history', 'Historial', 'clock']] as const).map(([id, label, icon]) => <button key={id} data-testid={`translate-tab-${id}`} type="button" onClick={() => { setNotice(null); setTab(id); }} className={`flex items-center justify-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold ${tab === id ? 'bg-white text-amber-700 shadow-sm dark:bg-neutral-800 dark:text-amber-300' : 'text-neutral-500'}`}><Icon name={icon} size={15} />{t(label)}</button>)}

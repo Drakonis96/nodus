@@ -25,19 +25,31 @@ try {
 
   const { RELEASE_NOTES, releaseNotesForMajor, compareVersions } = await import(pathToFileURL(bundlePath).href);
   const currentRelease = RELEASE_NOTES[0];
-  assert.equal(currentRelease?.version, '4.0.1');
-  assert.equal(currentRelease?.date, '2026-08-12');
-  assert.equal(currentRelease?.highlights.length, 2);
+  assert.equal(currentRelease?.version, '4.1.0');
+  assert.equal(currentRelease?.date, '2026-08-13');
+  assert.equal(currentRelease?.highlights.length, 9);
   assert.deepEqual(currentRelease?.highlights.map((highlight) => highlight.scope), [
-    'plugin',
     'academic',
+    'academic',
+    'academic',
+    'academic',
+    'general',
+    'general',
+    'general',
+    'plugin',
+    'toolkit',
   ]);
-  assert.ok(currentRelease?.highlights.some((highlight) => /pairs automatically/.test(highlight.en)));
-  assert.ok(currentRelease?.highlights.some((highlight) => /validates the real PDF signature/.test(highlight.en)));
+  assert.ok(currentRelease?.highlights.some((highlight) => /hierarchical collections/.test(highlight.en)));
+  assert.ok(currentRelease?.highlights.some((highlight) => /Chrome Web Store/.test(highlight.en)));
 
-  const firstV4Release = RELEASE_NOTES.find((note) => note.version === '4.0.0');
-  assert.equal(firstV4Release?.date, '2026-08-12');
-  assert.equal(firstV4Release?.highlights.length, 8);
+  const connectorRelease = RELEASE_NOTES.find((note) => note.version === '4.0.1');
+  assert.equal(connectorRelease?.date, '2026-08-12');
+  assert.equal(connectorRelease?.highlights.length, 2);
+  assert.ok(connectorRelease?.highlights.some((highlight) => /pairs automatically/.test(highlight.en)));
+
+  const libraryRelease = RELEASE_NOTES.find((note) => note.version === '4.0.0');
+  assert.equal(libraryRelease?.date, '2026-08-12');
+  assert.equal(libraryRelease?.highlights.length, 8);
 
   const previousCurrentRelease = RELEASE_NOTES.find((note) => note.version === '3.2.7');
   assert.equal(previousCurrentRelease?.date, '2026-08-10');

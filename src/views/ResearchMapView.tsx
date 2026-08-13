@@ -163,9 +163,9 @@ export function ResearchMapView({
     });
 
   return (
-    <div className="h-full flex min-h-0">
-      <aside className="w-64 shrink-0 border-r border-neutral-800 flex flex-col min-h-0">
-        <div className="p-3 border-b border-neutral-800">
+    <div data-testid="coverage-catalog" className="flex h-full min-h-0 bg-white dark:bg-neutral-950">
+      <aside className="flex w-64 min-h-0 shrink-0 flex-col border-r border-neutral-200 dark:border-neutral-800">
+        <div className="border-b border-neutral-200 p-3 dark:border-neutral-800">
           <button className="btn btn-primary w-full text-sm gap-1.5" onClick={() => syncDetail(null)}>
             <Icon name="plus" size={14} /> {t('Nueva pregunta')}
           </button>
@@ -175,7 +175,7 @@ export function ResearchMapView({
           {questions.map((q) => (
             <button
               key={q.id}
-              className={`w-full text-left p-2 rounded-md text-sm ${detail?.rq.id === q.id ? 'bg-neutral-800' : 'hover:bg-neutral-900'}`}
+              className={`w-full rounded-md p-2 text-left text-sm ${detail?.rq.id === q.id ? 'bg-indigo-50 text-indigo-700 dark:bg-neutral-800 dark:text-neutral-100' : 'hover:bg-neutral-100 dark:hover:bg-neutral-900'}`}
               onClick={() => openQuestion(q.id)}
             >
               <span className="line-clamp-2">{q.question}</span>
@@ -185,12 +185,7 @@ export function ResearchMapView({
         </div>
       </aside>
 
-      <main className="flex-1 min-h-0 overflow-auto p-6">
-        <div className="flex items-center gap-3 mb-4">
-          <Icon name="compass" size={22} className="text-cyan-300" />
-          <h1 className="text-xl font-semibold">{t('Mapa de cobertura')}</h1>
-        </div>
-
+      <main className="flex-1 min-h-0 overflow-auto p-5">
         {error && <div className="mb-4 text-sm text-red-400 border border-red-900/60 bg-red-950/40 rounded-md p-3">{error}</div>}
 
         {!detail && (

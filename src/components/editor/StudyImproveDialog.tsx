@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { StudyStyle, StudyStyleInput } from '@shared/types';
-import { validateStudyStylePrompt } from '@shared/studyImprove';
+import { studyStyleIcon, validateStudyStylePrompt } from '@shared/studyImprove';
 import { t } from '../../i18n';
 import { Icon, ICON_NAMES, Spinner } from '../ui';
 import { IconEmojiPicker } from '../IconEmojiPicker';
@@ -14,9 +14,8 @@ const newPrompt = (): StudyStyleInput => ({
 });
 
 function PromptMark({ style, size = 17 }: { style: Pick<StudyStyle, 'icon'>; size?: number }) {
-  return (ICON_NAMES as readonly string[]).includes(style.icon)
-    ? <Icon name={style.icon} size={size} />
-    : <span className="leading-none" style={{ fontSize: size }}>{style.icon || '✦'}</span>;
+  const icon = studyStyleIcon(style.icon);
+  return <Icon name={(ICON_NAMES as readonly string[]).includes(icon) ? icon : 'sparkles'} size={size} />;
 }
 
 export function StudyImproveDialog({ onToolbarChanged, onClose }: {
@@ -109,7 +108,7 @@ export function StudyImproveDialog({ onToolbarChanged, onClose }: {
           {creating ? <div data-testid="study-style-editor" className="space-y-3">
             <h3 className="text-sm font-semibold">{t('Añadir prompt')}</h3>
             <label className="block text-xs text-neutral-500">{t('Título')}<input data-testid="study-prompt-title" autoFocus className="input mt-1 w-full" value={draft.name} onChange={(event) => setDraft({ ...draft, name: event.target.value })} /></label>
-            <label className="block text-xs text-neutral-500">{t('Icono o emoji')}<IconEmojiPicker icon={visual.icon} emoji={visual.emoji} onChange={setVisual} /></label>
+            <label className="block text-xs text-neutral-500">{t('Icono')}<IconEmojiPicker icon={visual.icon} emoji="" allowEmoji={false} onChange={(value) => setVisual({ icon: value.icon, emoji: '' })} /></label>
             <label className="block text-xs text-neutral-500">{t('Prompt')}<textarea data-testid="study-prompt-text" className="input mt-1 min-h-32 w-full resize-y py-2" value={draft.prompt} onChange={(event) => setDraft({ ...draft, prompt: event.target.value })} placeholder={t('Indica exactamente cómo debe transformar el texto seleccionado…')} /></label>
             {warnings.length > 0 && <div className="rounded-lg border border-amber-200 bg-amber-50 p-2 text-[11px] text-amber-700 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-300">{warnings.map((warning) => <p key={warning}>⚠ {warning}</p>)}</div>}
             <div className="flex justify-end gap-2"><button className="btn btn-ghost" onClick={() => setCreating(false)}>{t('Cancelar')}</button><button data-testid="study-prompt-save" className="btn btn-primary" disabled={busy} onClick={() => void savePrompt()}>{busy ? <Spinner label={t('Guardando…')} /> : t('Guardar prompt')}</button></div>

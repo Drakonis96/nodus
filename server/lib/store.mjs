@@ -235,6 +235,44 @@ export class Store {
     return user ? { session, user } : null;
   }
 
+  unlockSensitiveAccess(sessionHash, password, ttlMs = 5 * 60_000) {
+    const session = this.state.sessions.find((entry) => entry.hash === sessionHash);
+    const user = session && this.state.users.find((entry) => entry.id === session.userId);
+    if (!session || !user || user.role !== 'admin' || !verifyPassword(String(password).slice(0, 1024), user.salt, user.hash)) {
+      throw new Error('The current administrator password is incorrect.');
+    }
+    session.sensitiveAccessUntil = new Date(Date.now() + ttlMs).toISOString();
+    this.save();
+    return session.sensitiveAccessUntil;
+  }
+
+  sensitiveAccessValid(session, now = Date.now()) {
+    return Boolean(session?.sensitiveAccessUntil && Date.parse(session.sensitiveAccessUntil) > now);
+  }
+
+  changeEmail(targetUserId, email) {
+    const user = this.state.users.find((entry) => entry.id === targetUserId);
+    if (!user) throw new Error('The account does not exist.');
+    const normalized = normalizedEmail(email);
+    if (this.state.users.some((entry) => entry.id !== user.id && entry.email === normalized)) {
+      throw new Error('An account already exists for that email address.');
+    }
+    if (user.email === normalized) return { user, changed: false };
+    user.email = normalized;
+    user.emailChangedAt = new Date().toISOString();
+    // An email is a login identifier. Changing it is therefore a credential-recovery event,
+    // not a cosmetic profile edit: every outstanding way into this account is revoked.
+    this.state.sessions = this.state.sessions.filter((entry) => entry.userId !== user.id);
+    this.state.oauthCodes = this.state.oauthCodes.filter((entry) => entry.userId !== user.id);
+    this.state.accessTokens = this.state.accessTokens.filter((entry) => entry.userId !== user.id);
+    this.state.refreshTokens = this.state.refreshTokens.filter((entry) => entry.userId !== user.id);
+    this.state.authTickets = this.state.authTickets.filter((entry) => entry.userId !== user.id);
+    this.state.pairingCodes = this.state.pairingCodes.filter((entry) => entry.userId !== user.id);
+    this.state.deviceTokens = this.state.deviceTokens.filter((entry) => entry.userId !== user.id);
+    this.save();
+    return { user, changed: true };
+  }
+
   snapshotPath(spaceId) {
     const dir = path.join(this.spacesDir, spaceId);
     fs.mkdirSync(dir, { recursive: true });
@@ -305,6 +343,16 @@ export class Store {
 
   assetsDir(spaceId) {
     return path.join(this.spacesDir, spaceId, 'assets');
+  }
+
+  // Clean-Markdown document packages are deliberately separate from the image channel.
+  // They are ZIPs addressed by the SHA-256 of their bytes; source PDFs never enter here.
+  libraryPackagePath(spaceId, hash) {
+    return path.join(this.spacesDir, spaceId, 'library', hash.slice(0, 2), hash.slice(2, 4), `${hash}.zip`);
+  }
+
+  libraryPackagesDir(spaceId) {
+    return path.join(this.spacesDir, spaceId, 'library');
   }
 
   // The mutation ledger is append-only NDJSON rather than a key in state.json, because

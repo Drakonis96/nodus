@@ -1,7 +1,6 @@
 import { Fragment, useCallback, useEffect, useMemo, useState } from 'react';
 import type { Debate, DebateSide, DebateSideKey, DebateTimelineEntry } from '@shared/types';
 import { Badge, EDGE_LABELS, Icon, Spinner } from '../components/ui';
-import { SectionHeader, SectionToolbar } from '../components/SectionHeader';
 import { Markdown, type MarkdownCitation } from '../components/Markdown';
 import { SourceCitationModal, type CitationTarget } from '../components/SourceCitationModal';
 import { SaveToNotesModal } from '../components/SaveToNotesModal';
@@ -150,20 +149,13 @@ export function DebateView({
   }, []);
 
   return (
-    <div className="h-full flex flex-col min-h-0">
-      <SectionHeader
-        icon="scale"
-        title={t('Debates')}
-        subtitle={t(
-          'Cada contradicción o refutación del corpus, enfrentada: las dos posiciones, los autores de cada bando, su evidencia textual y la cronología de la disputa.'
-        )}
-        badge={<Badge>{tx('{n} sin reconciliar', { n: debates.length })}</Badge>}
-      />
-
-      <SectionToolbar>
+    <div data-testid="debates-catalog" className="flex h-full min-h-0 flex-col bg-white dark:bg-neutral-950">
+      <div className="shrink-0 border-b border-neutral-200 p-3 dark:border-neutral-800">
+        <div className="flex flex-wrap items-center gap-2">
           <div className="relative">
             <Icon name="search" size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-neutral-500 pointer-events-none" />
             <input
+              data-testid="debates-search"
               className="input input-with-leading-icon h-8 text-sm w-64"
               placeholder={t('Buscar por idea, autor o tema…')}
               value={search}
@@ -188,9 +180,11 @@ export function DebateView({
               ['leaning', t('Inclinados')],
             ]}
           />
-      </SectionToolbar>
+          <Badge>{tx('{n} sin reconciliar', { n: debates.length })}</Badge>
+        </div>
+      </div>
 
-      <div className="flex-1 min-h-0 overflow-auto p-6 space-y-4">
+      <div className="flex-1 min-h-0 overflow-auto p-5 space-y-4">
         {filtered.length === 0 && (
           <div className="text-neutral-500 text-sm">
             {debates.length === 0

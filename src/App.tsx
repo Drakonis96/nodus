@@ -9,6 +9,7 @@ import { EmbeddingProgressBar } from './components/EmbeddingProgressBar';
 import { PassageProgressBar } from './components/PassageProgressBar';
 import { VaultSwitcher, vaultTypeIcon, vaultTypeLabel } from './components/VaultSwitcher';
 import { ServerInbox } from './components/ServerInbox';
+import { unreadServerInboxGroupCount } from './serverInboxGrouping';
 import { NotificationsPanel, useAnnouncements } from './components/NotificationsPanel';
 import { DatabasesSidebarExplore } from './components/DatabasesSidebarExplore';
 import { StudySidebar, type StudyNavigationTarget } from './components/StudySidebar';
@@ -57,7 +58,7 @@ import type {
   PendingLibraryNavigationTarget,
   View,
 } from './navigation';
-import { dedicatedVaultNavIds, groupedNav, NAV_ITEMS, NAV_GROUPS, TOOLKIT_TOOLS } from './navigation';
+import { dedicatedVaultNavIds, groupedNav, NAV_ITEMS, NAV_GROUPS } from './navigation';
 import type { ToolkitPage } from './navigation';
 import { placeHeaderBadge, type HeaderBadgePlacement } from './headerLayout';
 import { effectiveSidebarHidden, isPreviewVaultType, isViewAllowedForVaultType, normalizeVaultType, viewsDisallowedForType } from '@shared/vaultTypes';
@@ -78,8 +79,13 @@ const ResearchAssistantModal = lazy(() => import('./views/ResearchAssistantModal
 // Shortcut label for the command palette: ⌘K on macOS, Ctrl K elsewhere.
 const IS_MAC = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/i.test(navigator.platform || navigator.userAgent || '');
 const PALETTE_HINT = IS_MAC ? '⌘K' : 'Ctrl K';
-// Below this width the centred wordmark would enter macOS's hiddenInset traffic-
-// light area. Keep the mark itself centred and hide only the decorative word.
+const SIDEBAR_MIN_WIDTH = 64;
+const SIDEBAR_DEFAULT_WIDTH = 176;
+const SIDEBAR_MAX_WIDTH = 360;
+const SIDEBAR_COMPACT_THRESHOLD = 144;
+// Below this width the full wordmark would enter macOS's hiddenInset traffic-light
+// area. The icon itself remains visible and centred over the compact sidebar; only
+// the decorative word is hidden.
 const MACOS_FULL_SIDEBAR_BRAND_MIN_WIDTH = 248;
 
 /** Apply the light/dark root classes for a theme mode. 'system' resolves to the
@@ -191,8 +197,11 @@ export function App() {
   const [navCollapsed, setNavCollapsed] = useState(() => localStorage.getItem('nodus.navCollapsed') === '1');
   const [sidebarWidth, setSidebarWidth] = useState(() => {
     const stored = Number(localStorage.getItem('nodus.sidebarWidth'));
-    return Number.isFinite(stored) ? Math.max(176, Math.min(360, stored)) : 176;
+    return Number.isFinite(stored)
+      ? Math.max(SIDEBAR_MIN_WIDTH, Math.min(SIDEBAR_MAX_WIDTH, stored))
+      : SIDEBAR_DEFAULT_WIDTH;
   });
+  const sidebarCompact = sidebarWidth <= SIDEBAR_COMPACT_THRESHOLD;
   // Per-group collapse state for the sidebar (Explorar · Analizar · Escribir),
   // persisted so a user's folded groups survive restarts.
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(() => {
@@ -219,7 +228,13 @@ export function App() {
   // The notification centre. Same two lists Nodi shows, reachable without Nodi.
   const [notificationsAnchor, setNotificationsAnchor] = useState<HTMLElement | null>(null);
   const [notifications, setNotifications] = useState<NodiNotification[]>([]);
-  const { announcements, unread: unreadAnnouncements, markRead: markAnnouncementRead } = useAnnouncements();
+  const [refreshingNotifications, setRefreshingNotifications] = useState(false);
+  const {
+    announcements,
+    unread: unreadAnnouncements,
+    markRead: markAnnouncementRead,
+    refresh: refreshNotificationSources,
+  } = useAnnouncements();
   // Live placement of the centred vault badge. Both rails around it change width
   // (the logo tracks the sidebar; the action rail grows when a button pins or
   // reveals its label), so the badge is measured rather than pinned at 50% — see
@@ -255,6 +270,19 @@ export function App() {
       return el;
     });
   }, [notifications]);
+  const refreshNotificationCenter = useCallback(async () => {
+    if (refreshingNotifications) return;
+    setRefreshingNotifications(true);
+    try {
+      const snapshot = await refreshNotificationSources();
+      setNotifications(snapshot.notifications);
+    } catch {
+      // The notification centre deliberately keeps the last good lists when the public
+      // announcements file is unreachable. Manual refresh follows the same quiet rule.
+    } finally {
+      setRefreshingNotifications(false);
+    }
+  }, [refreshNotificationSources, refreshingNotifications]);
   const [graphTarget, setGraphTarget] = useState<PendingGraphNavigationTarget & { nonce: number } | null>(null);
   const [ideaTarget, setIdeaTarget] = useState<PendingIdeaNavigationTarget & { nonce: number } | null>(null);
   const [libraryTarget, setLibraryTarget] = useState<PendingLibraryNavigationTarget & { nonce: number } | null>(null);
@@ -313,13 +341,14 @@ export function App() {
   const [demoBusy, setDemoBusy] = useState(false);
 
   const beginSidebarResize = (event: React.PointerEvent<HTMLButtonElement>) => {
+    event.currentTarget.focus();
     event.preventDefault();
     const startX = event.clientX;
     const startWidth = sidebarWidth;
     document.body.classList.add('is-resizing-sidebar');
-    const move = (pointerEvent: PointerEvent) => setSidebarWidth(Math.max(176, Math.min(360, startWidth + pointerEvent.clientX - startX)));
+    const move = (pointerEvent: PointerEvent) => setSidebarWidth(Math.max(SIDEBAR_MIN_WIDTH, Math.min(SIDEBAR_MAX_WIDTH, startWidth + pointerEvent.clientX - startX)));
     const finish = (pointerEvent: PointerEvent) => {
-      const width = Math.max(176, Math.min(360, startWidth + pointerEvent.clientX - startX));
+      const width = Math.max(SIDEBAR_MIN_WIDTH, Math.min(SIDEBAR_MAX_WIDTH, startWidth + pointerEvent.clientX - startX));
       setSidebarWidth(width);
       localStorage.setItem('nodus.sidebarWidth', String(width));
       document.body.classList.remove('is-resizing-sidebar');
@@ -332,7 +361,24 @@ export function App() {
     window.addEventListener('pointercancel', finish);
   };
 
-  const unreadInbox = useMemo(() => inbox.reduce((n, e) => n + (e.read ? 0 : 1), 0), [inbox]);
+  const resizeSidebarWithKeyboard = (event: React.KeyboardEvent<HTMLButtonElement>) => {
+    const requestedWidth = event.key === 'Home'
+      ? SIDEBAR_MIN_WIDTH
+      : event.key === 'End'
+        ? SIDEBAR_MAX_WIDTH
+        : event.key === 'ArrowLeft'
+          ? sidebarWidth - 8
+          : event.key === 'ArrowRight'
+            ? sidebarWidth + 8
+            : null;
+    if (requestedWidth === null) return;
+    event.preventDefault();
+    const width = Math.max(SIDEBAR_MIN_WIDTH, Math.min(SIDEBAR_MAX_WIDTH, requestedWidth));
+    setSidebarWidth(width);
+    localStorage.setItem('nodus.sidebarWidth', String(width));
+  };
+
+  const unreadInbox = useMemo(() => unreadServerInboxGroupCount(inbox), [inbox]);
   // One count for one button: an unread announcement and an unread activity line both
   // mean "there is something here you have not seen".
   const unreadNotifications = useMemo(
@@ -936,6 +982,11 @@ export function App() {
   useEffect(() => {
     if (!window.nodus?.onCopilotOpenIdea) return undefined;
     return window.nodus.onCopilotOpenIdea((target) => {
+      if (target.destination === 'library-citation-styles') {
+        setLibraryTarget({ scope: 'global', citationStyles: true, nonce: Date.now() });
+        setView('library');
+        return;
+      }
       if (target.destination === 'ideas') {
         setIdeaTarget({ ideaId: target.ideaId, nonce: Date.now() });
         setView('ideas');
@@ -958,8 +1009,8 @@ export function App() {
     });
   }, []);
 
-  // Una nota se abre donde vivan las notas de esta bóveda: en la académica eso es el
-  // Espacio de trabajo, y en las demás sigue siendo Notas.
+  // Una nota se abre con la misma experiencia de catálogo y pestañas, bajo el nombre
+  // Espacio de trabajo en la académica y Notas en las demás bóvedas.
   const openNoteFromSearch = useCallback((id: string) => {
     setNoteTarget({ id, nonce: Date.now() });
     setView(isAcademic ? 'workspace' : 'notes');
@@ -1175,21 +1226,27 @@ export function App() {
           title={navCollapsed ? t('Mostrar el menú lateral') : t('Ocultar el menú lateral (más espacio para el grafo)')}
           aria-label={navCollapsed ? t('Mostrar el menú lateral') : t('Ocultar el menú lateral (más espacio para el grafo)')}
         >
-          <span data-testid="sidebar-header-brand" className="flex items-center justify-center gap-2">
+          <span data-testid="sidebar-header-brand" className="flex items-center justify-center gap-2" style={{ transform: sidebarCompact && IS_MAC ? 'translateY(0.5625rem)' : undefined }}>
             <img
               data-testid="nodus-logo"
               data-vault-logo={isPrimarySources ? 'primary_sources' : isGenealogy ? 'genealogy' : isDatabases ? 'databases' : isEstudio ? 'estudio' : isDocencia ? 'docencia' : isWorldbuilding ? 'worldbuilding' : isTestimonios ? 'testimonios' : isProsopography ? 'prosopography' : 'academic'}
               src={isGenealogy ? nodusLogoGold : isDatabases ? nodusLogoCrimson : isEstudio ? nodusLogoTeal : isDocencia ? nodusLogoOrange : isWorldbuilding ? nodusLogoViolet : isTestimonios ? nodusLogoCyan : nodusLogo}
               alt=""
-              className={IS_MAC && sidebarWidth < MACOS_FULL_SIDEBAR_BRAND_MIN_WIDTH ? 'h-6 w-6' : 'h-7 w-7'}
+              className={sidebarCompact && IS_MAC
+                ? 'h-[18px] w-[18px]'
+                : sidebarCompact || (IS_MAC && sidebarWidth < MACOS_FULL_SIDEBAR_BRAND_MIN_WIDTH)
+                  ? 'h-6 w-6'
+                  : 'h-7 w-7'}
             />
-            <span className={IS_MAC && sidebarWidth < MACOS_FULL_SIDEBAR_BRAND_MIN_WIDTH ? 'sr-only' : undefined}>Nodus</span>
+            <span className={sidebarCompact || (IS_MAC && sidebarWidth < MACOS_FULL_SIDEBAR_BRAND_MIN_WIDTH) ? 'sr-only' : undefined}>Nodus</span>
           </span>
-          <Icon
-            name={navCollapsed ? 'chevronRight' : 'chevronLeft'}
-            size={14}
-            className="absolute right-2 text-neutral-600"
-          />
+          {!sidebarCompact && (
+            <Icon
+              name={navCollapsed ? 'chevronRight' : 'chevronLeft'}
+              size={14}
+              className="absolute right-2 text-neutral-600"
+            />
+          )}
         </button>
 
         {/* Vault mode, centred, in the vault's accent colour (gold in genealogy /
@@ -1230,7 +1287,7 @@ export function App() {
             label on hover/focus so the header reads as a clean row of icons. It
             grows leftwards as labels open, which is why the centre badge measures
             it instead of assuming a fixed clearance. */}
-        <div ref={setHeaderActionsEl} data-testid="header-actions" className="flex items-center gap-0.5 pr-4">
+        <div ref={setHeaderActionsEl} data-testid="header-actions" className="header-action-rail flex min-w-0 items-center justify-end gap-0.5 overflow-hidden pr-4">
           {/* No Bóvedas button: the centred badge is the way in, and it is now shown at
               every width for exactly that reason (see the badge above). */}
           <HeaderAction
@@ -1352,7 +1409,7 @@ export function App() {
           onClose={() => setInboxAnchor(null)}
           entries={inbox}
           onMarkRead={(id) => void window.nodus.markServerInboxRead(id).then(setInbox)}
-          onClearOne={(id) => void window.nodus.clearServerInbox(id).then(setInbox)}
+          onClearOne={async (id) => { setInbox(await window.nodus.clearServerInbox(id)); }}
           onClearAll={() => void window.nodus.clearServerInbox().then(setInbox)}
           onOpenEntry={(entry) => {
             // Reading is per entry, so opening one is what marks that one — never the lot,
@@ -1372,6 +1429,8 @@ export function App() {
           announcements={announcements}
           language={settings.uiLanguage}
           onMarkAnnouncementRead={markAnnouncementRead}
+          onRefresh={() => void refreshNotificationCenter()}
+          refreshing={refreshingNotifications}
           onClearAll={() => void window.nodus.clearNotifications().then(setNotifications).catch(() => {})}
         />
       </header>
@@ -1394,8 +1453,13 @@ export function App() {
         {/* Sidebar (collapsible via the Nodus logo). Home is pinned first,
             Settings last; the rest render grouped (Explorar · Analizar · Escribir). */}
         {!navCollapsed && (
-          <nav data-testid="resizable-sidebar" className="relative shrink-0 overflow-hidden border-r border-neutral-800" style={{ width: sidebarWidth }}>
-            <div data-testid="sidebar-scroll-region" className="mr-[6px] flex h-full min-h-0 flex-col gap-1 overflow-y-auto p-2">
+          <nav
+            data-testid="resizable-sidebar"
+            data-sidebar-compact={sidebarCompact ? 'true' : 'false'}
+            className="relative shrink-0 overflow-hidden border-r border-neutral-800"
+            style={{ width: sidebarWidth }}
+          >
+            <div data-testid="sidebar-scroll-region" className="vault-sidebar-scroll mr-[6px] flex h-full min-h-0 flex-col gap-1 overflow-y-auto p-2">
               {(() => {
               const navButton = (n: { id: View; icon: string; label: string }, disabled = false) => (
                 <button
@@ -1403,15 +1467,15 @@ export function App() {
                   data-tour={`nav-${n.id}`}
                   disabled={disabled}
                   aria-disabled={disabled}
-                  title={disabled ? t('Próximamente') : undefined}
+                  aria-label={sidebarCompact ? t(n.label) : undefined}
+                  title={disabled ? `${t(n.label)} · ${t('Próximamente')}` : sidebarCompact ? t(n.label) : undefined}
                   onClick={() => {
                     if (disabled) return;
-                    // La sección Herramientas siempre entra por el catálogo; sus
-                    // herramientas tienen su propio botón anidado.
+                    // La sección Herramientas siempre entra por el catálogo.
                     if (n.id === 'toolkit') setToolkitPage('home');
                     setView(n.id);
                   }}
-                  className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-left transition-colors ${
+                  className={`flex items-center rounded-lg py-2 text-sm text-left transition-colors ${sidebarCompact ? 'justify-center px-2' : 'gap-2 px-3'} ${
                     disabled
                       ? 'cursor-not-allowed text-neutral-700 opacity-65'
                       : view === n.id && (n.id !== 'toolkit' || toolkitPage === 'home')
@@ -1419,9 +1483,9 @@ export function App() {
                         : 'text-neutral-400 hover:bg-neutral-900'
                   }`}
                 >
-                  <Icon name={n.icon} className="opacity-70" />
-                  {t(n.label)}
-                  {disabled && <span className="ml-auto text-[9px] font-semibold uppercase tracking-wide">{t('Próximamente')}</span>}
+                  <Icon name={n.icon} className="shrink-0 opacity-70" />
+                  <span className={sidebarCompact ? 'sr-only' : undefined}>{t(n.label)}</span>
+                  {disabled && !sidebarCompact && <span className="ml-auto text-[9px] font-semibold uppercase tracking-wide">{t('Próximamente')}</span>}
                 </button>
               );
               // A collapsible group header (chevron + label), optionally with a control
@@ -1443,50 +1507,13 @@ export function App() {
                   {t(label)}
                 </button>
               );
-              // Las herramientas del toolkit se anidan bajo su sección: no son
-              // vistas propias (no entran en NAV_ITEMS ni en sidebarOrder), sólo
-              // atajos a una página del hub. Las que aún no existen se muestran
-              // deshabilitadas, igual que sus tarjetas en el catálogo.
-              const toolkitSubNav = () => (
-                <div className="ml-4 flex flex-col gap-1 border-l border-neutral-800 pl-2">
-                  {TOOLKIT_TOOLS.map((tool) => {
-                    const disabled = tool.state === 'soon';
-                    const active = view === 'toolkit' && toolkitPage === tool.page;
-                    return (
-                      <button
-                        key={tool.page}
-                        data-testid={`nav-toolkit-${tool.testid}`}
-                        disabled={disabled}
-                        aria-disabled={disabled}
-                        title={disabled ? t('Próximamente') : tool.name}
-                        onClick={() => { if (!disabled) { setToolkitPage(tool.page); setView('toolkit'); } }}
-                        className={`flex items-center gap-2 rounded-lg px-2 py-1.5 text-left text-[13px] transition-colors ${
-                          disabled
-                            ? 'cursor-not-allowed text-neutral-700 opacity-65'
-                            : active
-                              ? 'bg-indigo-600 text-white'
-                              : 'text-neutral-400 hover:bg-neutral-900'
-                        }`}
-                      >
-                        <Icon name={tool.icon} size={14} className="shrink-0 opacity-70" />
-                        <span className="flex-1 truncate">{tool.shortName}</span>
-                      </button>
-                    );
-                  })}
-                </div>
-              );
               const renderGroup = (group: (typeof navGroups)[number]) => {
-                const collapsed = collapsedGroups.has(group.id);
+                const collapsed = !sidebarCompact && collapsedGroups.has(group.id);
                 const hasActive = group.items.some((n) => n.id === view);
                 return (
-                  <div key={group.id} className="mt-2 flex flex-col gap-1">
-                    <div className="flex items-center px-3">{groupHeaderButton(group.id, group.label, collapsed, hasActive)}</div>
-                    {!collapsed && group.items.map((n) => (n.id === 'toolkit' ? (
-                      <div key={n.id} className="flex flex-col gap-1">
-                        {navButton(n)}
-                        {toolkitSubNav()}
-                      </div>
-                    ) : navButton(n)))}
+                  <div key={group.id} className={`${sidebarCompact ? 'mt-1 border-t border-neutral-800/70 pt-1' : 'mt-2'} flex flex-col gap-1`}>
+                    {!sidebarCompact && <div className="flex items-center px-3">{groupHeaderButton(group.id, group.label, collapsed, hasActive)}</div>}
+                    {!collapsed && group.items.map((n) => navButton(n))}
                   </div>
                 );
               };
@@ -1496,6 +1523,7 @@ export function App() {
                     {navButton(homeItem)}
                     {navButton(libraryItem)}
                     <WorldbuildingSidebar
+                      compact={sidebarCompact}
                       activeView={view}
                       onNavigate={(targetView) => setView(targetView)}
                       sidebarOrder={settings?.sidebarOrder}
@@ -1514,6 +1542,7 @@ export function App() {
                     {navButton(homeItem)}
                     {navButton(libraryItem)}
                     <ProsopographySidebar
+                      compact={sidebarCompact}
                       activeView={view}
                       onNavigate={(targetView) => setView(targetView)}
                       sidebarOrder={settings?.sidebarOrder}
@@ -1530,6 +1559,7 @@ export function App() {
                     {navButton(homeItem)}
                     {navButton(libraryItem)}
                     <TestimonySidebar
+                      compact={sidebarCompact}
                       activeView={view}
                       onNavigate={(targetView) => setView(targetView)}
                       sidebarOrder={settings?.sidebarOrder}
@@ -1548,13 +1578,14 @@ export function App() {
                     {navButton(homeItem)}
                     {navButton(libraryItem)}
                     <PrimarySourcesSidebar
+                      compact={sidebarCompact}
                       activeView={view}
                       onNavigate={(targetView) => setView(targetView)}
                       sidebarOrder={settings?.sidebarOrder}
                       sidebarHidden={activeSidebarHidden}
                     />
-                    {/* Toolkit is universal. Reuse its canonical group and nested
-                        catalogue instead of maintaining a primary-source fork. */}
+                    {/* Toolkit is universal. Reuse its canonical group instead of
+                        maintaining a primary-source fork. */}
                     {navGroups.filter((group) => group.id === 'tools').map((group) => renderGroup(group))}
                     <div className="mt-2 flex flex-col gap-1">{navButton(settingsItem)}</div>
                   </>
@@ -1565,19 +1596,20 @@ export function App() {
                 // structure as every other vault: the user's databases are the
                 // Explorar content (rendered dynamically), then the Analysis + Chat
                 // (Analizar) and Notes (Escribir) groups come through groupedNav.
-                const exploreCollapsed = collapsedGroups.has('explore');
+                const exploreCollapsed = !sidebarCompact && collapsedGroups.has('explore');
                 const exploreLabel = NAV_GROUPS.find((g) => g.id === 'explore')?.label ?? 'Explorar';
                 return (
                   <>
                     {navButton(homeItem)}
                     {navButton(libraryItem)}
-                    <div className="mt-2 flex flex-col gap-1" data-tour="db-list">
+                    <div className={`${sidebarCompact ? 'mt-1 border-t border-neutral-800/70 pt-1' : 'mt-2'} flex flex-col gap-1`} data-tour="db-list">
                       <div className="flex items-center px-3">
-                        {groupHeaderButton('explore', exploreLabel, exploreCollapsed, view === 'databases')}
+                        {!sidebarCompact && groupHeaderButton('explore', exploreLabel, exploreCollapsed, view === 'databases')}
                         <button
                           onClick={() => void createDatabase()}
                           title={t('Nueva base de datos')}
-                          className="text-neutral-500 hover:text-neutral-300"
+                          aria-label={t('Nueva base de datos')}
+                          className={`${sidebarCompact ? 'flex w-full justify-center py-2' : ''} text-neutral-500 hover:text-neutral-300`}
                         >
                           <Icon name="plus" size={14} />
                         </button>
@@ -1585,6 +1617,7 @@ export function App() {
                       {!exploreCollapsed && navButton(dbSearchItem)}
                       {!exploreCollapsed && (
                         <DatabasesSidebarExplore
+                          compact={sidebarCompact}
                           databases={databases}
                           activeId={activeDatabaseId}
                           isActiveView={view === 'databases'}
@@ -1606,6 +1639,7 @@ export function App() {
                     {navButton(homeItem)}
                     {navButton(libraryItem)}
                     <StudySidebar
+                      compact={sidebarCompact}
                       activeView={view}
                       onNavigate={(targetView) => { setStudyTarget(null); if (targetView !== 'studyLibrary') setStudyMaterialTarget(null); if (targetView !== 'studyRecordings') setStudyRecordingTarget(null); setStudyGraphTarget(null); setView(targetView); }}
                       sidebarOrder={settings?.sidebarOrder}
@@ -1622,6 +1656,7 @@ export function App() {
                     {navButton(homeItem)}
                     {navButton(libraryItem)}
                     <TeachingSidebar
+                      compact={sidebarCompact}
                       activeView={view}
                       onNavigate={(targetView) => { setStudyTarget(null); if (targetView !== 'studyLibrary') setStudyMaterialTarget(null); if (targetView !== 'studyRecordings') setStudyRecordingTarget(null); setStudyGraphTarget(null); setView(targetView); }}
                       onOpenRoadmap={setRoadmapTopic}
@@ -1652,7 +1687,9 @@ export function App() {
               aria-label={t('Cambiar el ancho del menú lateral')}
               title={t('Arrastra para cambiar el ancho. Haz doble clic para restablecerlo.')}
               onPointerDown={beginSidebarResize}
-              onDoubleClick={() => { setSidebarWidth(176); localStorage.setItem('nodus.sidebarWidth', '176'); }}
+              onClick={(event) => event.currentTarget.focus()}
+              onKeyDown={resizeSidebarWithKeyboard}
+              onDoubleClick={() => { setSidebarWidth(SIDEBAR_DEFAULT_WIDTH); localStorage.setItem('nodus.sidebarWidth', String(SIDEBAR_DEFAULT_WIDTH)); }}
             />
           </nav>
         )}
@@ -1927,7 +1964,7 @@ export function App() {
           <NodiStyleModal onChosen={async () => { await reloadSettings(); }} />
         )}
 
-      <NodiMascot settings={settings} />
+      {!manualWhatsNewOpen && updateSettled && <NodiMascot settings={settings} />}
     </div>
   );
 }
