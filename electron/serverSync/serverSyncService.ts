@@ -42,15 +42,20 @@ import {
 
 const gzipAsync = promisify(gzip);
 
-const CHECK_INTERVAL_MS = 30_000;
-const QUIET_PERIOD_MS = 60_000;
-const MIN_UPLOAD_INTERVAL_MS = 2 * 60_000;
-const FIRST_TICK_MS = 5_000;
+// The mobile client watches the published revision, so this is the latency budget for the
+// desktop half of that conversation. Five seconds of quiet coalesces an editor's writes into
+// one snapshot; the fifteen-second floor prevents a sequence of short pauses from uploading a
+// large vault continuously. Together with mobile's cheap five-second HEAD probe, a settled edit
+// is normally visible on the other device in around twenty seconds or less.
+const CHECK_INTERVAL_MS = 5_000;
+const QUIET_PERIOD_MS = 5_000;
+const MIN_UPLOAD_INTERVAL_MS = 15_000;
+const FIRST_TICK_MS = 1_500;
 
 interface VaultRuntime {
   /** Last lightweight revision observed for the active vault (change detection). */
   observed: string | null;
-  /** Timestamp the active vault first looked dirty; 0 when clean. */
+  /** Timestamp of the latest observed write in the active vault; 0 when clean. */
   dirtySince: number;
   lastUploadStartedAt: number;
   /** The vault wants a publish attempt on the next tick. */
@@ -430,7 +435,13 @@ async function tick(): Promise<void> {
     try {
       const revision = lightweightVaultRevision(getDb());
       if (rt.observed === null) rt.observed = revision;
-      else if (revision !== rt.observed) { rt.observed = revision; rt.dirtySince ||= Date.now(); }
+      else if (revision !== rt.observed) {
+        rt.observed = revision;
+        // A quiet period is measured from the latest write, not the first one. Otherwise a
+        // long paragraph is published halfway through merely because typing began five seconds
+        // ago, followed by another almost-identical snapshot as soon as the interval allows.
+        rt.dirtySince = Date.now();
+      }
       if (
         rt.dirtySince &&
         Date.now() - rt.dirtySince >= QUIET_PERIOD_MS &&
