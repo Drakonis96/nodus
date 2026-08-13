@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>Nodus Wiki - Complete vault guides</title>
+  <meta name="description" content="Complete English documentation for Nodus Academic Research, Genealogy, Databases, Study and Teaching vaults."/>
+  <link rel="icon" type="image/svg+xml" href="../assets/nodus-logo.svg"/>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Fraunces:opsz,wght@9..144,600;9..144,700&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="wiki.css?v=20260814b"/>
+</head>
+<body>
+  <a class="skip-link" href="#article">Skip to documentation</a>
+  <header class="topbar">
+    <a class="brand" href="../index.html"><img src="../assets/nodus-logo.svg" alt=""/><span>Nodus</span><em>Wiki</em></a>
+    <div class="search-wrap">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.4-3.4"/></svg>
+      <input id="search" type="search" placeholder="Search every guide, feature and workflow..." autocomplete="off" aria-label="Search the Nodus Wiki"/>
+      <kbd>⌘ K</kbd>
+      <div id="search-results" class="search-results" hidden></div>
+    </div>
+    <nav aria-label="Wiki actions"><a href="../demo/">Live demo</a><a href="https://github.com/Drakonis96/nodus/releases/latest">Download Nodus</a></nav>
+  </header>
+  <div class="layout">
+    <aside class="sidebar" aria-label="Documentation navigation">
+      <div class="sidebar-head"><span>Documentation</span><button id="nav-toggle" type="button" aria-label="Toggle navigation">☰</button></div>
+      <nav id="wiki-nav"></nav>
+      <div class="sidebar-foot"><span id="version"></span><span>English edition</span></div>
+    </aside>
+    <main id="article" tabindex="-1">
+      <noscript>This documentation requires JavaScript to load its searchable content.</noscript>
+    </main>
+    <aside class="toc" aria-label="On this page"><b>On this page</b><nav id="page-toc"></nav></aside>
+  </div>
+  <script src="wiki.js?v=20260814b" type="module"></script>
+</body>
+</html>

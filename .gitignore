@@ -50,6 +50,9 @@ __pycache__/
 # Locally generated analysis reports
 reports/
 
+# Local artifact previews (published website manuals live in site/manuals/)
+output/
+
 # Locally generated legal texts (rebuilt from node_modules on every build).
 legal/generated/*
 # ...except the pinned upstream license texts, which are vendored so packaging

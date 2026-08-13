@@ -4,3 +4,6 @@
 # Windows release build when the upstream host is unreachable). Keep them byte
 # for byte as committed on every platform.
 legal/generated/** -text
+
+# Manuals are generated binary artifacts; never diff or normalise them as text.
+*.pdf -text -diff

@@ -9,18 +9,18 @@
     { c: 'uk', n: 'Українська', f: '🇺🇦' }, { c: 'zh', n: '中文', f: '🇨🇳' },
   ];
   const DEMO_NAV_TRANSLATIONS = {
-    de: ['Tresore', "So funktioniert's", 'Ansichten', 'Tutorials', 'Mitmachen', 'Live-Demo testen'],
-    en: ['Vaults', 'How it works', 'Views', 'Tutorials', 'Contribute', 'Try the live demo'],
-    es: ['Vaults', 'Cómo funciona', 'Vistas', 'Tutoriales', 'Contribuir', 'Probar la demo'],
-    fr: ['Coffres', 'Comment ça marche', 'Vues', 'Tutoriels', 'Contribuer', 'Essayer la démo'],
-    it: ['Vault', 'Come funziona', 'Viste', 'Tutorial', 'Contribuisci', 'Prova la demo'],
-    ja: ['Vault', '仕組み', '画面', 'チュートリアル', '参加する', 'ライブデモを試す'],
-    'pt-PT': ['Cofres', 'Como funciona', 'Vistas', 'Tutoriais', 'Contribuir', 'Testar a demo'],
-    'pt-BR': ['Cofres', 'Como funciona', 'Vistas', 'Tutoriais', 'Contribuir', 'Testar a demo'],
-    ru: ['Хранилища', 'Как это работает', 'Обзоры', 'Видеоуроки', 'Участвовать', 'Открыть демо'],
-    tr: ['Kasalar', 'Nasıl çalışır', 'Görünümler', 'Öğreticiler', 'Katkıda bulun', 'Demoyu dene'],
-    uk: ['Сховища', 'Як це працює', 'Огляди', 'Підручники', 'Долучитися', 'Спробувати демо'],
-    zh: ['保险库', '工作原理', '视图', '教程', '参与贡献', '试用演示'],
+    de: ['Tresore', "So funktioniert's", 'Ansichten', 'Wiki', 'Mitmachen', 'Live-Demo testen'],
+    en: ['Vaults', 'How it works', 'Views', 'Wiki', 'Contribute', 'Try the live demo'],
+    es: ['Vaults', 'Cómo funciona', 'Vistas', 'Wiki', 'Contribuir', 'Probar la demo'],
+    fr: ['Coffres', 'Comment ça marche', 'Vues', 'Wiki', 'Contribuer', 'Essayer la démo'],
+    it: ['Vault', 'Come funziona', 'Viste', 'Wiki', 'Contribuisci', 'Prova la demo'],
+    ja: ['Vault', '仕組み', '画面', 'Wiki', '参加する', 'ライブデモを試す'],
+    'pt-PT': ['Cofres', 'Como funciona', 'Vistas', 'Wiki', 'Contribuir', 'Testar a demo'],
+    'pt-BR': ['Cofres', 'Como funciona', 'Vistas', 'Wiki', 'Contribuir', 'Testar a demo'],
+    ru: ['Хранилища', 'Как это работает', 'Обзоры', 'Wiki', 'Участвовать', 'Открыть демо'],
+    tr: ['Kasalar', 'Nasıl çalışır', 'Görünümler', 'Wiki', 'Katkıda bulun', 'Demoyu dene'],
+    uk: ['Сховища', 'Як це працює', 'Огляди', 'Wiki', 'Долучитися', 'Спробувати демо'],
+    zh: ['保险库', '工作原理', '视图', 'Wiki', '参与贡献', '试用演示'],
   };
   const DEMO_FAQ_TRANSLATIONS = {
     en: 'FAQ', es: 'Preguntas', fr: 'FAQ', it: 'FAQ', de: 'FAQ',
@@ -50,13 +50,14 @@
   function headerMarkup(base, isDemo) {
     const home = isDemo ? `${base}index.html` : '';
     const section = (anchor) => isDemo ? `${home}${anchor}` : anchor;
+    const wiki = `${base}wiki/`;
     return `<nav class="nav" id="site-header">
       <a class="logo" href="${isDemo ? home : '#'}"><img src="${base}assets/nodus-logo.svg" alt=""/> Nodus</a>
       <div class="links">
         <a href="${section('#vaults')}" class="hideS" data-i18n="nav.vaults">Vaults</a>
         <a href="${section('#story')}" class="hideS nav-secondary" data-i18n="nav.how">How it works</a>
         <a href="${section('#views')}" class="hideS nav-secondary" data-i18n="nav.views">Views</a>
-        <a href="${section('#tutorials')}" class="hideS" data-i18n="nav.tutorials">Tutorials</a>
+        <a href="${wiki}" class="hideS" data-i18n="nav.tutorials">Wiki</a>
         <a href="${section('#contrib')}" class="hideS nav-secondary" data-i18n="nav.contrib">Contribute</a>
         <a href="${section('#faq')}" class="hideS" id="faq-nav-link">FAQ</a>
         <div class="lang-picker" id="lang-picker">
