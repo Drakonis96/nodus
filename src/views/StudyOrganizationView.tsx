@@ -908,8 +908,13 @@ export function StudyOrganizationView({
           onTargetChange(next ? { kind: 'document', id: next.id } : null);
         }}
         onSaved={(updated) => {
-          setWorkspace((current) => current ? { ...current, documents: current.documents.map((document) => document.id === updated.id ? updated : document) } : current);
-          setEditing(updated);
+          // El editor solo conoce el título y el texto: el resto del documento de estudio
+          // (tipo, color, etiquetas, incrustación) lo mantiene esta vista, así que se
+          // fusiona en vez de sustituir la fila entera por la vista reducida del editor.
+          const merge = <T extends StudyDocument>(document: T): T =>
+            document.id === updated.id ? { ...document, title: updated.title, contentMarkdown: updated.contentMarkdown } : document;
+          setWorkspace((current) => current ? { ...current, documents: current.documents.map(merge) } : current);
+          setEditing((current) => current ? merge(current) : current);
           announceStudyWorkspaceChanged();
         }}
         onUpdateMetadata={async (patch) => {

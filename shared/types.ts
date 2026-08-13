@@ -5308,6 +5308,12 @@ export interface NoteFolder {
   /** Free-text brief: the ideas this folder is meant to hold. Drives AI idea suggestions. */
   summary: string;
   orderIdx: number;
+  /**
+   * Where a migrated collection came from (`project:<id>`, or `writing` for the saved
+   * Escritura documents). Null for anything the user made. It is what keeps the
+   * Workspace migration idempotent, and it is shown as provenance in the UI.
+   */
+  sourceRef: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -5348,6 +5354,33 @@ export interface UpdateNoteInput {
   title?: string;
   content?: string;
   folderId?: string | null;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Workspace ↔ biblioteca. Una nota, una idea o una colección puede apuntar a
+// varios elementos de la biblioteca del usuario, y un elemento puede estar citado
+// desde muchas. El enlace guarda también el ámbito porque el mismo identificador
+// puede existir en la biblioteca global y en la de la bóveda.
+// ─────────────────────────────────────────────────────────────────────────────
+
+export type WorkspaceLinkOwnerKind = 'note' | 'collection';
+
+export interface WorkspaceLibraryLink {
+  ownerKind: WorkspaceLinkOwnerKind;
+  ownerId: string;
+  libraryItemId: string;
+  scope: 'global' | 'vault';
+  /** Título con el que se guardó, para poder mostrar un enlace roto con su nombre. */
+  label: string | null;
+  createdAt: string;
+}
+
+export interface WorkspaceLibraryLinkInput {
+  ownerKind: WorkspaceLinkOwnerKind;
+  ownerId: string;
+  libraryItemId: string;
+  scope?: 'global' | 'vault';
+  label?: string | null;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

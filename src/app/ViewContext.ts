@@ -40,6 +40,8 @@ export interface PrimarySourceTarget {
  * vault type says which.
  */
 export interface VaultFlags {
+  /** La bóveda académica: la de por defecto, y la única con Espacio de trabajo. */
+  isAcademic: boolean;
   isGenealogy: boolean;
   isPrimarySources: boolean;
   isDatabases: boolean;

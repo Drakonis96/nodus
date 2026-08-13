@@ -5,6 +5,7 @@ import { SERVER_TRANSLATIONS } from './i18n.server';
 import { TRANSLATE_TRANSLATIONS } from './i18n.translate';
 import { WORLD_CHAT_TRANSLATIONS } from './i18n.worldChat';
 import { STUDY_SYNONYM_TRANSLATIONS } from './i18n.studySynonyms';
+import { WORKSPACE_TRANSLATIONS } from './i18n.workspace';
 import { PROSOPOGRAPHY_TRANSLATIONS } from './i18n.prosopography';
 import { DIARIZATION_TRANSLATIONS } from './i18n.diarization';
 import { WORLDBUILDING_TRANSLATIONS } from './i18n.worldbuilding';
@@ -52,6 +53,7 @@ export const IT: Record<string, string> = {
   ...ANNOUNCEMENT_TRANSLATIONS['it'],
   ...WORLD_CHAT_TRANSLATIONS.it,
   ...STUDY_SYNONYM_TRANSLATIONS.it,
+  ...WORKSPACE_TRANSLATIONS.it,
   "Lo que cuenta el mapa": "Cosa racconta la mappa",
   "Ver dónde ocurren las escenas ({n})": "Vedi dove accadono le scene ({n})",
   "Viajes imposibles": "Viaggi impossibili",

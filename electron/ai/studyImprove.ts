@@ -156,7 +156,8 @@ export async function improveStudyText(
   const originalHash = hash(original);
   const resultHash = hash(text);
   const log = recordStudyImprovement({
-    documentId: request.documentId,
+    documentId: request.documentId ?? null,
+    noteId: request.noteId ?? null,
     styleId: style.id,
     scope: request.scope,
     mode: request.mode,

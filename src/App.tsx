@@ -60,7 +60,7 @@ import type {
 import { dedicatedVaultNavIds, groupedNav, NAV_ITEMS, NAV_GROUPS, TOOLKIT_TOOLS } from './navigation';
 import type { ToolkitPage } from './navigation';
 import { placeHeaderBadge, type HeaderBadgePlacement } from './headerLayout';
-import { effectiveSidebarHidden, isPreviewVaultType, isViewAllowedForVaultType, viewsDisallowedForType } from '@shared/vaultTypes';
+import { effectiveSidebarHidden, isPreviewVaultType, isViewAllowedForVaultType, normalizeVaultType, viewsDisallowedForType } from '@shared/vaultTypes';
 import { CommandPalette, type Command } from './components/CommandPalette';
 import nodusLogo from './assets/nodus-logo.svg';
 import nodusLogoGold from './assets/nodus-logo-gold.svg';
@@ -485,6 +485,9 @@ export function App() {
   }, [isWorldbuilding]);
   // Prosopography is an evidence-first blue workspace with a strict dedicated shell.
   const isProsopography = activeVault?.type === 'prosopography';
+  // 'academic' es también el tipo al que resuelve cualquier bóveda anterior a los tipos,
+  // así que se pregunta por lo que NO es en vez de por lo que es.
+  const isAcademic = normalizeVaultType(activeVault?.type) === 'academic' && !isPreviewVault;
   useEffect(() => {
     document.documentElement.classList.toggle('prosopography', isProsopography);
   }, [isProsopography]);
@@ -955,10 +958,12 @@ export function App() {
     });
   }, []);
 
+  // Una nota se abre donde vivan las notas de esta bóveda: en la académica eso es el
+  // Espacio de trabajo, y en las demás sigue siendo Notas.
   const openNoteFromSearch = useCallback((id: string) => {
     setNoteTarget({ id, nonce: Date.now() });
-    setView('notes');
-  }, []);
+    setView(isAcademic ? 'workspace' : 'notes');
+  }, [isAcademic]);
 
   const openAssistant = useCallback(
     (target?: PendingAssistantNavigationTarget) => {
@@ -1075,6 +1080,7 @@ export function App() {
     activeVault,
     vaults,
     recoveryStatus,
+    isAcademic,
     isGenealogy,
     isPrimarySources,
     isDatabases,

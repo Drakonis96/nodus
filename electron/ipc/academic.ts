@@ -110,6 +110,8 @@ import type {
   UpdateProjectSectionInput,
   UpdateStudyAcademicYearInput,
   WorkFilter,
+  WorkspaceLibraryLinkInput,
+  WorkspaceLinkOwnerKind,
   WritingWorkshopBrief,
   WritingWorkshopDraftRequest,
   WritingWorkshopExportRequest,
@@ -247,6 +249,7 @@ import { getPassageSnapshot } from '../ai/passageEmbeddingPipeline';
 import { isSemanticBridgeRunning } from '../ai/semanticBridges';
 import * as chat from '../db/chatRepo';
 import * as notes from '../db/notesRepo';
+import * as workspace from '../db/workspaceRepo';
 import { getDb } from '../db/database';
 import { getActiveVault } from '../vaults/vaultRegistry';
 
@@ -1471,6 +1474,32 @@ export function registerAcademicIpc({ h, getWindow, chatAborters }: IpcContext):
     notes.updateNoteFolderSummary(id, summary ?? '')
   );
   h('notes:folders:suggestIdeas', async (_e, folderId: string) => suggestFolderIdeas(folderId));
+
+  // workspace — el editor completo sobre una nota, y sus enlaces con la biblioteca
+  h('workspace:editor:data', async (_e, noteId: string) => workspace.getWorkspaceNoteEditorData(noteId));
+  h('workspace:editor:update', async (_e, noteId: string, input: StudyDocUpdateInput) =>
+    workspace.updateWorkspaceNote(noteId, input));
+  h('workspace:editor:restore', async (_e, noteId: string, versionId: string) =>
+    workspace.restoreWorkspaceNoteVersion(noteId, versionId));
+  h('workspace:annotation:create', async (_e, noteId: string, input: StudyAnnotationInput) =>
+    workspace.createWorkspaceAnnotation(noteId, input));
+  h('workspace:annotation:update', async (_e, id: string, patch: Partial<StudyAnnotationInput> & { resolved?: boolean }) =>
+    workspace.updateWorkspaceAnnotation(id, patch));
+  h('workspace:annotation:delete', async (_e, id: string) => {
+    workspace.deleteWorkspaceAnnotation(id);
+  });
+  h('workspace:library:list', async (_e, ownerKind: WorkspaceLinkOwnerKind, ownerId: string) =>
+    workspace.listWorkspaceLibraryLinks(ownerKind, ownerId));
+  // Los enlaces de toda la bóveda de una vez: la lista pinta un contador por fila y
+  // pedirlos uno a uno convertiría una lista de doscientas notas en doscientas llamadas.
+  h('workspace:library:all', async () => {
+    workspace.pruneWorkspaceLibraryLinks();
+    return workspace.listAllWorkspaceLibraryLinks();
+  });
+  h('workspace:library:add', async (_e, input: WorkspaceLibraryLinkInput) => workspace.addWorkspaceLibraryLink(input));
+  h('workspace:library:remove', async (_e, ownerKind: WorkspaceLinkOwnerKind, ownerId: string, libraryItemId: string, scope?: 'global' | 'vault') => {
+    workspace.removeWorkspaceLibraryLink(ownerKind, ownerId, libraryItemId, scope ?? 'global');
+  });
   h('citations:verify', async (_e, refs: CitationRef[]) => verifyCitations(refs ?? []));
   h('citations:preview', async (_e, ref: CitationRef) => (ref ? previewCitation(ref) : null));
   h('search:global', async (_e, query: string, limitPerKind?: number) =>

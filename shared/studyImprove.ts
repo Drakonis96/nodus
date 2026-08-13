@@ -114,7 +114,13 @@ export interface StudyProtectedText {
 }
 
 export interface StudyImproveRequest {
-  documentId: string;
+  /**
+   * Qué se está mejorando. El editor es el mismo en Estudio, Docencia y el Workspace,
+   * así que la mejora puede recaer sobre un documento de estudio o sobre una nota; el
+   * registro guarda una procedencia u otra, nunca las dos ni ninguna.
+   */
+  documentId?: string | null;
+  noteId?: string | null;
   subjectId?: string | null;
   text: string;
   styleId: string;
@@ -147,7 +153,8 @@ export interface StudyImproveStreamHandlers {
 
 export interface StudyImprovementLog {
   id: string;
-  documentId: string;
+  documentId: string | null;
+  noteId: string | null;
   styleId: string;
   scope: StudyImproveScope;
   mode: StudyImproveMode;
