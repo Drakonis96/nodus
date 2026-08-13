@@ -1538,6 +1538,54 @@ try {
   await detailDialog.locator('button[title="Cerrar"]').first().click();
   console.log('[e2e] search idea result opens the shared idea detail modal');
 
+  // ── Espacio de trabajo: la unificación de Notas, Escritura y Proyectos ──────
+  //
+  // Se prueba en este orden porque es el orden en que le pasa a alguien que actualiza:
+  // primero hay contenido antiguo, y solo después se abre la sección nueva. El proyecto
+  // se siembra por IPC con la forma EXACTA que tenía antes de la v130 — una carpeta raíz,
+  // una sección y un capítulo — y lo que se comprueba es que la vista nueva lo encuentra
+  // como colección con su nota dentro, sin haberlo tocado a mano.
+  const legacy = await page.evaluate(async () => {
+    const detail = await window.nodus.createProject({ title: 'Tesis heredada', kind: 'thesis', brief: 'Un proyecto anterior al Espacio de trabajo.' });
+    const tree = await window.nodus.getNotesTree();
+    const document = tree.notes.find((note) => note.title === 'Brief - Tesis heredada');
+    return { rootFolderId: detail.project.rootFolderId, noteId: document?.id ?? null };
+  });
+  assert.ok(legacy.rootFolderId, 'the legacy project brought its own folder, exactly as it always did');
+  assert.ok(legacy.noteId, 'and a document inside it');
+
+  await page.locator('[data-tour="nav-workspace"]').click();
+  await page.getByTestId('workspace-view').waitFor({ timeout: 15_000 });
+  await page.getByTestId(`workspace-collection-${legacy.rootFolderId}`).waitFor({ timeout: 10_000 });
+  await page.getByTestId(`workspace-item-${legacy.noteId}`).waitFor({ timeout: 10_000 });
+  console.log('[e2e] workspace: a legacy project reads as a collection with its document inside');
+
+  // Una nota y una idea, cada una con su icono, abiertas a la vez en pestañas.
+  await page.getByTestId('workspace-create-note').click();
+  await page.getByTestId('editor-title').waitFor({ timeout: 20_000 });
+  await page.getByTestId('workspace-tab-home').click();
+  await page.getByTestId('workspace-create-idea').click();
+  await page.getByTestId('editor-title').waitFor({ timeout: 20_000 });
+  assert.equal(
+    await page.locator('[data-testid^="workspace-tab-"]:not([data-testid="workspace-tab-home"]):not([data-testid^="workspace-tab-close-"])').count(),
+    2,
+    'a note and an idea stay open side by side in tabs'
+  );
+  // El editor es el de Estudio: su barra de inserción y su estado de guardado están ahí.
+  await page.getByTestId('study-insert-toolbar').waitFor({ timeout: 10_000 });
+  await page.getByTestId('study-editor-save-state').waitFor({ timeout: 10_000 });
+  console.log('[e2e] workspace: notes and ideas open in tabs with the full Study editor');
+
+  // Y el enlace con la biblioteca sobrevive a una recarga del listado.
+  const linked = await page.evaluate(async (noteId) => {
+    await window.nodus.addWorkspaceLibraryLink({ ownerKind: 'note', ownerId: noteId, libraryItemId: 'e2e-item', scope: 'vault', label: 'Obra enlazada' });
+    const after = await window.nodus.listWorkspaceLibraryLinks('note', noteId);
+    await window.nodus.removeWorkspaceLibraryLink('note', noteId, 'e2e-item', 'vault');
+    return { after: after.length, gone: (await window.nodus.listWorkspaceLibraryLinks('note', noteId)).length };
+  }, legacy.noteId);
+  assert.deepEqual(linked, { after: 1, gone: 0 }, 'a library link persists and can be removed again');
+  console.log('[e2e] workspace: library links persist per note');
+
   // ── Optional-image controls exist and can be toggled without generation ───
   // The immersion image option now lives in the "New immersion" composer modal.
   await page.locator('[data-tour="nav-immersion"]').click();
