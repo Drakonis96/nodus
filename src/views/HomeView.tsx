@@ -470,7 +470,7 @@ function getRecommendation(settings: AppSettings, stats: AcademicHomeStats): Rec
       title: t('Completa el análisis ligero'),
       body: t('El primer resultado visible del mapa depende de los temas extraídos a partir de título y resumen. Analiza temas antes de profundizar.'),
       action: { kind: 'view', target: 'library', icon: 'tag', label: t('Analizar temas') },
-      secondary: { target: 'graph', icon: 'map', label: t('Ver grafo') },
+      secondary: { target: 'graph', icon: 'network', label: t('Ver grafo') },
     };
   }
   if (stats.deepDone === 0 || (stats.deepTarget > 0 && stats.deepDone < stats.deepTarget)) {
@@ -508,7 +508,7 @@ function getRecommendation(settings: AppSettings, stats: AcademicHomeStats): Rec
   return {
     title: t('Explora el grafo con el Tutor'),
     body: t('El corpus está en buen estado para una lectura guiada. Abre el grafo o pregunta al asistente con el contexto completo.'),
-    action: { kind: 'view', target: 'graph', icon: 'map', label: t('Abrir grafo') },
+    action: { kind: 'view', target: 'graph', icon: 'network', label: t('Abrir grafo') },
     secondary: { target: 'ideas', icon: 'bulb', label: t('Ver ideas') },
   };
 }

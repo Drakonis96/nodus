@@ -112,10 +112,13 @@ test('a manual toggle takes over from the automatic unfold', () => {
 });
 
 test('the back button sits to the left of the Automatic / AI toggle', () => {
-  const header = view.slice(view.indexOf('{/* Header / setup */}'), view.indexOf('{/* Body */}'));
+  // La fila de configuración ya no es el encabezado de la sección: ese lo pone ahora
+  // SectionHeader, compartido con el resto de la bóveda. El botón de volver sigue
+  // perteneciendo a la configuración, que es lo que esta prueba fija.
+  const header = view.slice(view.indexOf('{/* Setup */}'), view.indexOf('{/* Body */}'));
   const backButton = header.indexOf("t('Volver al selector')");
   const modeToggle = header.indexOf("t('Automático')");
-  assert.ok(backButton > -1, 'the back button lives in the header');
+  assert.ok(backButton > -1, 'the back button lives in the setup row');
   assert.ok(modeToggle > -1 && backButton < modeToggle, 'and renders before the mode toggle');
   assert.match(header, /className="btn btn-ghost text-xs gap-1\.5 px-2\.5 py-1\.5 mr-1 border/, 'keeping its own margin');
   const body = view.slice(view.indexOf('{/* Body */}'));

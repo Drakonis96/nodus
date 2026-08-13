@@ -41,8 +41,8 @@ export const NAV_ITEMS: NavItem[] = [
   // Explorar — recorrer el corpus, el grafo y sus ideas/autores.
   { id: 'search', label: 'Buscar', icon: 'search', group: 'explore' },
   { id: 'library', label: 'Biblioteca', icon: 'book', group: 'explore' },
-  { id: 'graph', label: 'Grafo', icon: 'layers', group: 'explore' },
-  { id: 'argument', label: 'Mapa de argumentos', icon: 'map', group: 'explore' },
+  { id: 'graph', label: 'Grafo', icon: 'network', group: 'explore' },
+  { id: 'argument', label: 'Mapa de argumentos', icon: 'layers', group: 'explore' },
   { id: 'ideas', label: 'Ideas', icon: 'bulb', group: 'explore' },
   { id: 'authors', label: 'Autores', icon: 'graduation', group: 'explore' },
   // Prosopography uses dedicated views: its persons and sources must never fall
@@ -57,7 +57,10 @@ export const NAV_ITEMS: NavItem[] = [
   { id: 'persons', label: 'Personas', icon: 'users', group: 'explore' },
   { id: 'timeline', label: 'Línea temporal', icon: 'clock', group: 'explore' },
   { id: 'tree', label: 'Árbol genealógico', icon: 'tree', group: 'explore' },
-  { id: 'relations', label: 'Relaciones sociales', icon: 'network', group: 'explore' },
+  // 'link', y no el icono de red, porque el Grafo se quedó con ese: las dos secciones
+  // conviven en una bóveda genealógica y dos iconos iguales en la misma barra no
+  // distinguen nada cuando está plegada a iconos.
+  { id: 'relations', label: 'Relaciones sociales', icon: 'link', group: 'explore' },
   { id: 'map', label: 'Mapa', icon: 'map', group: 'explore' },
   { id: 'archive', label: 'Archivo', icon: 'archive', group: 'explore' },
   // Worldbuilding mode — shown only for the 'worldbuilding' vault type. It shares the
@@ -98,10 +101,10 @@ export const NAV_ITEMS: NavItem[] = [
   { id: 'studyRecordings', label: 'Grabaciones', icon: 'microphone', group: 'explore' },
   { id: 'studyChat', label: 'Chat de estudio', icon: 'chat', group: 'analyze' },
   { id: 'studyIdeas', label: 'Ideas de estudio', icon: 'bulb', group: 'analyze' },
-  { id: 'studyGraph', label: 'Grafo de estudio', icon: 'layers', group: 'analyze' },
+  { id: 'studyGraph', label: 'Grafo de estudio', icon: 'network', group: 'analyze' },
   { id: 'studyQuestions', label: 'Banco de preguntas', icon: 'help', group: 'analyze' },
   { id: 'studyReview', label: 'Revisión', icon: 'flashcards', group: 'analyze' },
-  { id: 'studyDeepResearch', label: 'Investigación de estudio', icon: 'network', group: 'analyze' },
+  { id: 'studyDeepResearch', label: 'Investigación de estudio', icon: 'telescope', group: 'analyze' },
   // Teaching mode — surfaces scoped to the 'docencia' vault type.
   { id: 'teachingGroups', label: 'Grupos', icon: 'users', group: 'explore' },
   { id: 'teachingGrades', label: 'Calificaciones', icon: 'chartBar', group: 'analyze' },
@@ -110,15 +113,18 @@ export const NAV_ITEMS: NavItem[] = [
   { id: 'teachingUnits', label: 'Diseño de unidades', icon: 'compass', group: 'create' },
   // Analizar — superficies derivadas del grafo y síntesis.
   { id: 'immersion', label: 'Inmersión', icon: 'target', group: 'analyze' },
-  // 'gaps' NO tiene entrada propia: los huecos son una pestaña dentro de Cobertura,
-  // porque solo significan algo mirando qué le falta a una pregunta concreta. Sigue
-  // siendo una vista enrutable —Inicio, Buscar y el tour navegan a ella— y aterriza
+  // 'gaps' NO tiene entrada propia: los huecos son una pestaña dentro del Estado de la
+  // cuestión, porque solo significan algo mirando qué le falta a una pregunta concreta.
+  // Sigue siendo una vista enrutable —Inicio, Buscar y el tour navegan a ella— y aterriza
   // en esa pestaña; ver src/app/views/corpus.tsx.
-  { id: 'debate', label: 'Debates', icon: 'scale', group: 'analyze' },
-  { id: 'research', label: 'Cobertura', icon: 'help', group: 'analyze' },
+  // 'debate' NO tiene entrada propia, por la misma razón que 'gaps': un debate solo
+  // significa algo junto a lo que el corpus cubre y a lo que le falta. Sigue siendo una
+  // vista enrutable —Inicio, Buscar y el tour avanzado navegan a ella— y aterriza en su
+  // pestaña; ver src/app/views/corpus.tsx.
+  { id: 'research', label: 'Estado de la cuestión', icon: 'compass', group: 'analyze' },
   { id: 'hypothesis', label: 'Hipótesis', icon: 'flask', group: 'analyze' },
   { id: 'reading', label: 'Ruta de lectura', icon: 'route', group: 'analyze' },
-  { id: 'deepResearch', label: 'Deep Research', icon: 'network', group: 'analyze' },
+  { id: 'deepResearch', label: 'Deep Research', icon: 'telescope', group: 'analyze' },
   // Escribir — producir salidas con citas.
   // El Espacio de trabajo REEMPLAZA a Escritura, Proyectos y Notas en la bóveda
   // académica: las tres contaban la misma historia por separado. Las tres siguen

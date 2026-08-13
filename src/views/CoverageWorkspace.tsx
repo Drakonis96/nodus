@@ -1,12 +1,19 @@
-// Cobertura y Huecos responden la misma pregunta —¿qué le falta a mi corpus?— desde
-// los dos extremos: el mapa de cobertura mide la biblioteca contra la pregunta que
-// escribe el investigador, y los huecos son lo que las propias obras declaran que
-// queda pendiente. Sueltos en el menú parecían alternativas; aquí son dos pestañas
-// del mismo sitio.
+// El estado de la cuestión: qué se ha dicho ya sobre el tema, dónde se contradice y
+// qué queda por decir. Tres lecturas de la misma pregunta, y por eso tres pestañas del
+// mismo sitio en vez de tres secciones del menú:
 //
-// Los dos hijos se montan tal cual, cada uno con su encabezado: la pestaña dice en
-// qué sección estás y el encabezado explica qué hace. Solo vive una a la vez, así
-// que cambiar de pestaña no paga el coste de la otra.
+//   · Cobertura mide la biblioteca contra la pregunta que escribe el investigador;
+//   · Debates enfrenta las contradicciones que el corpus ya contiene;
+//   · Huecos recoge lo que las propias obras declaran que queda pendiente.
+//
+// Sueltas en el menú parecían alternativas entre las que elegir. Juntas son el recorrido
+// que se hace de una sentada: leo qué cubro, veo dónde se pelean mis fuentes, y salgo con
+// la lista de lo que falta. Los saltos que antes llevaban de Cobertura o de Huecos a la
+// sección de Debates son ahora un cambio de pestaña, sin perder el sitio.
+//
+// Los tres hijos se montan tal cual, cada uno con su encabezado: la pestaña dice en qué
+// parte estás y el encabezado explica qué hace. Solo vive una a la vez, así que cambiar
+// de pestaña no paga el coste de las otras.
 import { useState } from 'react';
 import { Icon } from '../components/ui';
 import type {
@@ -14,13 +21,15 @@ import type {
   PendingGraphNavigationTarget,
 } from '../navigation';
 import { t } from '../i18n';
+import { DebateView } from './DebateView';
 import { GapsView } from './GapsView';
 import { ResearchMapView } from './ResearchMapView';
 
-export type CoverageTab = 'map' | 'gaps';
+export type CoverageTab = 'map' | 'debate' | 'gaps';
 
 const TABS: readonly (readonly [CoverageTab, string, string])[] = [
-  ['map', 'Cobertura', 'compass'],
+  ['map', 'Cobertura', 'help'],
+  ['debate', 'Debates', 'scale'],
   ['gaps', 'Huecos', 'gap'],
 ] as const;
 
@@ -29,23 +38,22 @@ export function CoverageWorkspace({
   initialTab,
   onOpenGraph,
   onOpenAssistant,
-  onOpenDebates,
 }: {
   vaultId: string | null;
-  /** Qué pestaña abre. Navegar a 'gaps' entra directamente por los huecos. */
+  /** Qué pestaña abre. Navegar a 'gaps' o a 'debate' entra directamente por la suya. */
   initialTab: CoverageTab;
   onOpenGraph: (target: PendingGraphNavigationTarget) => void;
   onOpenAssistant: (target?: PendingAssistantNavigationTarget) => void;
-  onOpenDebates: () => void;
 }) {
   const [tab, setTab] = useState<CoverageTab>(initialTab);
+  const openDebates = () => setTab('debate');
 
   return (
     <div className="h-full flex flex-col min-h-0">
       <nav
         className="shrink-0 flex border-b border-neutral-800 px-3"
         role="tablist"
-        aria-label={t('Cobertura y huecos')}
+        aria-label={t('Estado de la cuestión')}
       >
         {TABS.map(([value, label, icon], index) => (
           <button
@@ -85,18 +93,22 @@ export function CoverageWorkspace({
         aria-labelledby={`coverage-tab-${tab}`}
         className="flex-1 min-h-0"
       >
-        {tab === 'map' ? (
+        {tab === 'map' && (
           <ResearchMapView
             onOpenGraph={onOpenGraph}
             onOpenAssistant={onOpenAssistant}
-            onOpenDebates={onOpenDebates}
+            onOpenDebates={openDebates}
           />
-        ) : (
+        )}
+        {tab === 'debate' && (
+          <DebateView onOpenGraph={onOpenGraph} onOpenAssistant={onOpenAssistant} />
+        )}
+        {tab === 'gaps' && (
           <GapsView
             vaultId={vaultId}
             onOpenGraph={onOpenGraph}
             onOpenAssistant={onOpenAssistant}
-            onOpenDebates={onOpenDebates}
+            onOpenDebates={openDebates}
           />
         )}
       </div>

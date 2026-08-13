@@ -26,6 +26,7 @@ import { toReadingCopy } from '@shared/readingCopy';
 import { stripLeadingAbstract } from '@shared/writingDocument';
 import type { PendingGraphNavigationTarget } from '../navigation';
 import { HoverLabelButton, Icon, modelLabel } from '../components/ui';
+import { SectionHeader } from '../components/SectionHeader';
 import { ModelPicker } from '../components/ModelPicker';
 import { confirm } from '../components/feedback';
 import { SourceCitationModal, type CitationTarget } from '../components/SourceCitationModal';
@@ -743,15 +744,11 @@ export function DeepResearchView({
 
   return (
     <div className="h-full flex flex-col min-h-0">
-      <header className="flex flex-wrap items-center gap-3 border-b border-neutral-800 px-4 py-3">
-        <div className="min-w-0">
-          <h1 className="flex items-center gap-2 text-xl font-semibold">
-            <Icon name="compass" className="text-indigo-300" /> {t(copy.heading)}
-          </h1>
-          <p className="mt-0.5 text-xs text-neutral-500">{t(copy.subtitle)}</p>
-        </div>
-
-        <div className="flex-1" />
+      <SectionHeader
+        icon="telescope"
+        title={t(copy.heading)}
+        subtitle={t(copy.subtitle)}
+        actions={(<>
         <button className="btn btn-ghost gap-1.5 border border-neutral-700" onClick={() => setShowTutorial((v) => !v)}>
           <Icon name="help" /> {showTutorial ? t('Ocultar tutorial') : t('Tutorial')}
         </button>
@@ -768,7 +765,8 @@ export function DeepResearchView({
         <button className="btn btn-primary gap-1.5" onClick={() => setComposerOpen(true)}>
           <Icon name="plus" /> {t(copy.newAction)}
         </button>
-      </header>
+        </>)}
+      />
 
       {showTutorial && <DeepResearchTutorial steps={copy.tutorial} />}
 

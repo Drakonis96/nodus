@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import type { AppSettings, ArgumentBlock, ArgumentMap, ArgumentRouteSuggestion, EdgeDetail, EdgeType, IdeaDetail, IdeaPickerItem, IdeaType } from '@shared/types';
 import { EDGE_LABELS, NODE_COLORS, NODE_LABELS, Icon, Spinner } from '../components/ui';
+import { SectionHeader } from '../components/SectionHeader';
 import { ModelPicker } from '../components/ModelPicker';
 import {
   NodeDetailPanel,
@@ -274,7 +275,13 @@ export function ArgumentMapView({ settings }: { settings: AppSettings }) {
 
   return (
     <div className="h-full flex flex-col min-h-0">
-      {/* Header / setup */}
+      <SectionHeader
+        icon="layers"
+        title={t('Mapa de argumentos')}
+        subtitle={t('El esqueleto argumental de tu corpus: qué idea apoya, refina o contradice a cuál, recorrido paso a paso.')}
+      />
+
+      {/* Setup */}
       <div className="border-b border-neutral-800 p-3 flex flex-wrap gap-2 items-end text-xs">
         {map && (
           <button

@@ -10,6 +10,7 @@ import type {
   SynthesisMatrixCell,
 } from '@shared/types';
 import { Badge, Icon, Spinner, TypeDot } from '../components/ui';
+import { SectionHeader, SectionToolbar } from '../components/SectionHeader';
 import { IdeaDetailModal } from '../components/IdeaDetailModal';
 import { ModelPicker } from '../components/ModelPicker';
 import { WorkIdeasModal } from './WorkIdeasModal';
@@ -70,12 +71,20 @@ export function AuthorsView({
   const [model, setModel] = useFeatureModel(settings, 'authorModel');
 
   return (
-    <div className="h-full flex flex-col min-h-0 p-6">
-      <div className="flex flex-wrap items-center gap-3 mb-4">
-        <div className="flex items-center gap-2">
-          <Icon name="graduation" size={20} className="text-indigo-400" />
-          <h2 className="text-lg font-semibold">{t('Autores')}</h2>
-        </div>
+    <div className="h-full flex flex-col min-h-0">
+      <SectionHeader
+        icon="graduation"
+        title={t('Autores')}
+        subtitle={t('Quién sostiene qué en tu corpus: una ficha por autoría, su síntesis y la matriz que las enfrenta.')}
+        actions={(
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-neutral-500">{t('Modelo de síntesis')}</span>
+            <ModelPicker settings={settings} value={model} onChange={setModel} compact />
+          </div>
+        )}
+      />
+
+      <SectionToolbar>
         <div className="flex rounded-lg bg-neutral-900 p-0.5 text-sm">
           <button
             data-testid="authors-tab-dossier"
@@ -100,12 +109,7 @@ export function AuthorsView({
             {t('Autores guardados')}
           </button>
         </div>
-        <div className="flex-1" />
-        <div className="flex items-center gap-2">
-          <span className="text-xs text-neutral-500">{t('Modelo de síntesis')}</span>
-          <ModelPicker settings={settings} value={model} onChange={setModel} compact />
-        </div>
-      </div>
+      </SectionToolbar>
 
       {tab === 'dossier' ? (
         <DossierTab key="all-authors" vaultId={vaultId} onOpenGraph={onOpenGraph} model={model} savedOnly={false} />
