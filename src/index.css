@@ -175,7 +175,10 @@
    max-w-0 and transparent until hover. */
 .header-action-badge {
   position: absolute;
-  top: -2px;
+  /* Keep the badge and its 2px contrast ring inside the action rail. The rail is
+     intentionally overflow-hidden at compact widths, so a negative top offset
+     clips the circular cap against the titlebar. */
+  top: 2px;
   right: -2px;
   min-width: 16px;
   height: 16px;
@@ -210,6 +213,7 @@ body,
 #root {
   height: 100%;
   margin: 0;
+  overflow: hidden;
 }
 
 html {
@@ -642,6 +646,14 @@ body {
 }
 .light .library-active-chip.tone-cyan:hover {
   background-color: #cffafe;
+}
+.light .library-active-chip.tone-amber {
+  background-color: #fffbeb;
+  border-color: #fcd34d;
+  color: #b45309;
+}
+.light .library-active-chip.tone-amber:hover {
+  background-color: #fef3c7;
 }
 .light .library-active-chip.tone-red {
   background-color: #fff1f2;
@@ -1285,6 +1297,33 @@ body {
   color: #404040;
 }
 
+/* Crepe fills every toolbar SVG by default because its own glyphs are solid.
+   Nodus icons are stroked; filling them turns the AI thesaurus into a grey
+   smudge and thickens every prompt mark. Keep our appended controls outlined. */
+.study-milkdown .milkdown-toolbar .study-selection-tool svg,
+.study-milkdown .milkdown-toolbar .study-selection-color svg {
+  fill: none !important;
+  stroke: currentColor;
+  color: currentColor;
+}
+
+.study-milkdown .milkdown-toolbar .study-synonyms-trigger {
+  border: 1px solid rgba(13, 148, 136, 0.24);
+  background: rgba(13, 148, 136, 0.08);
+  color: #0f766e;
+}
+
+.study-milkdown .milkdown-toolbar .study-synonyms-trigger:hover {
+  border-color: rgba(13, 148, 136, 0.42);
+  background: rgba(13, 148, 136, 0.15);
+}
+
+.dark .study-milkdown .milkdown-toolbar .study-synonyms-trigger {
+  border-color: rgba(45, 212, 191, 0.3);
+  background: rgba(20, 184, 166, 0.12);
+  color: #5eead4;
+}
+
 .dark .study-milkdown .milkdown-toolbar .study-selection-tool {
   color: #e5e5e5;
 }
@@ -1371,6 +1410,22 @@ body {
   @apply bg-neutral-300;
 }
 ::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* The shared left navigation serves every vault type. Its inherited accent is
+   supplied by the app shell from the canonical VAULT_TYPE_COLORS map. */
+.vault-sidebar-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: var(--vault-accent, #6366f1) transparent;
+}
+.vault-sidebar-scroll::-webkit-scrollbar-thumb,
+.light .vault-sidebar-scroll::-webkit-scrollbar-thumb {
+  background: var(--vault-accent, #6366f1);
+  border-radius: 999px;
+}
+.vault-sidebar-scroll::-webkit-scrollbar-track,
+.light .vault-sidebar-scroll::-webkit-scrollbar-track {
   background: transparent;
 }
 
@@ -1642,6 +1697,22 @@ body {
 }
 .btn.icon-reveal-button > svg:first-child {
   display: block;
+}
+
+/* The desktop shell is a fixed canvas, so the titlebar must never make the document
+   wider than the BrowserWindow. At compact widths the permanent AI warning gives up
+   its text before any action icon is clipped; the tooltip and aria-label still expose
+   the full label. Keeping the rail shrinkable also protects every view below it from
+   inheriting a page-level horizontal offset. */
+.header-action-rail {
+  max-width: 100%;
+}
+@media (max-width: 1100px) {
+  .header-action-rail .header-action > span {
+    margin-left: 0 !important;
+    max-width: 0 !important;
+    opacity: 0 !important;
+  }
 }
 /* The two ways of supporting the project wear their own brands, so neither is
    mistaken for the other and neither reads as a Nodus feature. */
@@ -4050,8 +4121,8 @@ body:has(.library-document-reader [data-testid="library-reader-sidebar"]) .app-t
 .light .study-editor-shell .milkdown .ProseMirror pre { background: #f5f5f4; }
 
 /* Cinematic release modal: a compact premiere scene rather than a full-screen tour. */
-.whats-new-backdrop { position: fixed; inset: 0; z-index: 60; display: grid; place-items: center; padding: 24px; background: rgb(2 6 23 / .78); backdrop-filter: blur(10px); }
-.whats-new-cinema { --wn-surface: #090d16; --wn-card: rgb(255 255 255 / .045); --wn-border: rgb(255 255 255 / .1); --wn-text: #e7e5e4; --wn-muted: #9ca3af; display: flex; width: min(860px, 100%); max-height: min(88vh, 800px); flex-direction: column; overflow: hidden; border: 1px solid rgb(148 163 184 / .25); border-radius: 26px; color: var(--wn-text); background: var(--wn-surface); box-shadow: 0 40px 120px rgb(0 0 0 / .58), 0 0 0 1px rgb(255 255 255 / .04) inset; }
+.whats-new-backdrop { position: fixed; inset: 0; z-index: 60; display: grid; place-items: center; padding: 24px; background: rgb(2 6 23 / .78); backdrop-filter: blur(10px); animation: modal-backdrop-in .24s ease-out both; }
+.whats-new-cinema { --wn-surface: #090d16; --wn-card: rgb(255 255 255 / .045); --wn-border: rgb(255 255 255 / .1); --wn-text: #e7e5e4; --wn-muted: #9ca3af; display: flex; width: min(860px, 100%); max-height: min(88vh, 800px); flex-direction: column; overflow: hidden; border: 1px solid rgb(148 163 184 / .25); border-radius: 26px; color: var(--wn-text); background: var(--wn-surface); box-shadow: 0 40px 120px rgb(0 0 0 / .58), 0 0 0 1px rgb(255 255 255 / .04) inset; animation: whats-new-modal-in .46s cubic-bezier(.2,.8,.2,1) both; contain: layout paint style; }
 .light .whats-new-cinema { --wn-surface: #f8fafc; --wn-card: #fff; --wn-border: #e2e8f0; --wn-text: #172033; --wn-muted: #64748b; border-color: rgb(30 41 59 / .2); box-shadow: 0 35px 100px rgb(15 23 42 / .28); }
 .whats-new-hero { position: relative; display: grid; min-height: 236px; flex: 0 0 auto; grid-template-columns: minmax(0, 1fr) 250px; align-items: center; overflow: hidden; padding: 30px 38px; color: #f8fafc; background: radial-gradient(circle at 78% 40%, rgb(45 212 191 / .18), transparent 28%), radial-gradient(circle at 15% 5%, rgb(129 140 248 / .28), transparent 35%), linear-gradient(125deg, #111b31 0%, #0b1222 48%, #07151a 100%); }
 .whats-new-hero::after { content: ''; position: absolute; right: 0; bottom: 0; left: 0; height: 1px; background: linear-gradient(90deg, transparent, rgb(94 234 212 / .5), transparent); }
@@ -4066,11 +4137,15 @@ body:has(.library-document-reader [data-testid="library-reader-sidebar"]) .app-t
 .whats-new-version b { border-radius: 999px; padding: 3px 8px; color: #0b1222; background: #5eead4; font-size: 10px; letter-spacing: 0; }
 .whats-new-close { position: absolute; z-index: 5; top: 15px; right: 16px; display: grid; width: 30px; height: 30px; place-items: center; border: 1px solid rgb(255 255 255 / .1); border-radius: 50%; color: #94a3b8; background: rgb(2 6 23 / .3); }
 .whats-new-close:hover { color: white; background: rgb(255 255 255 / .1); }
-.whats-new-nodi { position: relative; z-index: 2; display: grid; justify-items: center; align-self: end; margin-bottom: -13px; }
+.whats-new-nodi { position: relative; z-index: 2; display: grid; justify-items: center; align-self: end; margin-bottom: -13px; animation: whats-new-nodi-in .5s .18s cubic-bezier(.2,.8,.2,1) both; }
 .whats-new-nodi-glow { position: absolute; inset: 38% 10% 8%; z-index: -1; border-radius: 50%; background: rgb(45 212 191 / .25); filter: blur(32px); }
 .whats-new-nodi span { z-index: 2; margin-top: -35px; border: 1px solid rgb(255 255 255 / .14); border-radius: 999px; padding: 6px 11px; color: #e2e8f0; background: rgb(7 15 27 / .82); box-shadow: 0 12px 30px rgb(0 0 0 / .28); font-size: 10px; font-weight: 650; }
 .whats-new-confetti { --confetti-left: 10%; --confetti-delay: 0s; --confetti-color: #2dd4bf; position: absolute; z-index: 1; top: -12px; left: var(--confetti-left); width: 5px; height: 10px; border-radius: 2px; background: var(--confetti-color); opacity: 0; animation: whats-new-confetti 2.8s var(--confetti-delay) ease-in both; }
 @keyframes whats-new-confetti { 0% { opacity: 0; transform: translateY(-8px) rotate(0); } 12% { opacity: .9; } 100% { opacity: 0; transform: translateY(245px) rotate(480deg); } }
+@keyframes modal-backdrop-in { from { opacity: 0; } }
+@keyframes whats-new-modal-in { from { opacity: 0; transform: translateY(28px) scale(.96); } }
+@keyframes whats-new-nodi-in { from { opacity: 0; transform: scale(.7) rotate(-8deg); } }
+@keyframes startup-update-modal-in { from { opacity: 0; transform: translateY(24px) scale(.96); } }
 .whats-new-scroll { display: grid; min-height: 0; flex: 1; grid-auto-rows: max-content; align-content: start; gap: 13px; overflow-y: auto; padding: 22px 30px 24px; background: var(--wn-surface); }
 .whats-new-section-header { position: relative; z-index: 5; display: flex; align-items: center; gap: 14px; }
 .whats-new-section-title { display: flex; min-width: 0; flex: 1; align-items: center; gap: 12px; color: var(--wn-muted); font-size: 10px; font-weight: 750; letter-spacing: .14em; text-transform: uppercase; }
@@ -4310,8 +4385,8 @@ body:has(.library-document-reader [data-testid="library-reader-sidebar"]) .app-t
 
 /* Cinematic startup update check. It deliberately has its own surface rather
    than borrowing vault colours: application updates belong to Nodus itself. */
-.startup-update-backdrop { position: fixed; inset: 0; z-index: 72; display: grid; place-items: center; padding: 24px; background: rgb(2 6 23 / .78); backdrop-filter: blur(10px); }
-.startup-update-cinema { --su-surface: #090d16; --su-card: rgb(255 255 255 / .045); --su-border: rgb(255 255 255 / .1); --su-text: #e7e5e4; --su-muted: #9ca3af; display: flex; width: min(680px, 100%); max-height: min(88vh, 720px); flex-direction: column; overflow: hidden; border: 1px solid rgb(148 163 184 / .25); border-radius: 26px; color: var(--su-text); background: var(--su-surface); box-shadow: 0 40px 120px rgb(0 0 0 / .58), 0 0 0 1px rgb(255 255 255 / .04) inset; }
+.startup-update-backdrop { position: fixed; inset: 0; z-index: 72; display: grid; place-items: center; padding: 24px; background: rgb(2 6 23 / .78); backdrop-filter: blur(10px); animation: modal-backdrop-in .22s ease-out both; }
+.startup-update-cinema { --su-surface: #090d16; --su-card: rgb(255 255 255 / .045); --su-border: rgb(255 255 255 / .1); --su-text: #e7e5e4; --su-muted: #9ca3af; display: flex; width: min(680px, 100%); max-height: min(88vh, 720px); flex-direction: column; overflow: hidden; border: 1px solid rgb(148 163 184 / .25); border-radius: 26px; color: var(--su-text); background: var(--su-surface); box-shadow: 0 40px 120px rgb(0 0 0 / .58), 0 0 0 1px rgb(255 255 255 / .04) inset; animation: startup-update-modal-in .42s cubic-bezier(.2,.8,.2,1) both; contain: layout paint style; }
 .light .startup-update-cinema { --su-surface: #f8fafc; --su-card: #fff; --su-border: #e2e8f0; --su-text: #172033; --su-muted: #64748b; border-color: rgb(30 41 59 / .2); box-shadow: 0 35px 100px rgb(15 23 42 / .28); }
 .startup-update-hero { position: relative; display: grid; min-height: 184px; grid-template-columns: minmax(0, 1fr) 190px; align-items: center; overflow: hidden; padding: 28px 34px; color: #f8fafc; background: radial-gradient(circle at 78% 42%, rgb(56 189 248 / .2), transparent 28%), radial-gradient(circle at 12% 0%, rgb(129 140 248 / .3), transparent 38%), linear-gradient(125deg, #111b31 0%, #0b1222 52%, #07151a 100%); }
 .startup-update-hero::after { content: ''; position: absolute; right: 0; bottom: 0; left: 0; height: 1px; background: linear-gradient(90deg, transparent, rgb(94 234 212 / .5), transparent); }
@@ -4350,7 +4425,7 @@ body:has(.library-document-reader [data-testid="library-reader-sidebar"]) .app-t
 .startup-update-secondary { border: 1px solid var(--su-border); color: var(--su-text); background: var(--su-card); }
 .startup-update-secondary:hover { border-color: rgb(129 140 248 / .55); }
 @media (max-width: 600px) { .startup-update-backdrop { padding: 12px; } .startup-update-cinema { border-radius: 20px; } .startup-update-hero { min-height: 170px; grid-template-columns: 1fr 120px; padding: 24px 20px; } .startup-update-nodi svg { height: 130px !important; } .startup-update-content { padding: 18px; } }
-@media (prefers-reduced-motion: reduce) { .startup-update-aurora { animation: none; } }
+@media (prefers-reduced-motion: reduce) { .startup-update-aurora, .startup-update-backdrop, .startup-update-cinema, .whats-new-backdrop, .whats-new-cinema, .whats-new-nodi { animation: none; } }
 
 /* One-off 2.4.0 Toolkit + model guidance. The content blocks are also reused by
    the full-screen essentials tutorial below. */

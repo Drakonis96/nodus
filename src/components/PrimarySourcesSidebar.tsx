@@ -34,11 +34,13 @@ const GROUPS = [
 ] as const;
 
 export function PrimarySourcesSidebar({
+  compact = false,
   activeView,
   onNavigate,
   sidebarOrder = [],
   sidebarHidden = [],
 }: {
+  compact?: boolean;
   activeView: View;
   onNavigate: (view: PrimarySourcesView) => void;
   sidebarOrder?: string[];
@@ -53,8 +55,8 @@ export function PrimarySourcesSidebar({
         const items = ordered.filter((item) => item.group === group.id);
         if (!items.length) return null;
         return (
-          <section key={group.id} className="mt-2 flex flex-col gap-1" aria-labelledby={`primary-sources-group-${group.id}`}>
-            <h2 id={`primary-sources-group-${group.id}`} className="px-3 pb-0.5 pt-1 text-[10px] font-semibold uppercase tracking-wider text-neutral-600">
+          <section key={group.id} className={`${compact ? 'mt-1 border-t border-neutral-800/70 pt-1' : 'mt-2'} flex flex-col gap-1`} aria-labelledby={`primary-sources-group-${group.id}`}>
+            <h2 id={`primary-sources-group-${group.id}`} className={compact ? 'sr-only' : 'px-3 pb-0.5 pt-1 text-[10px] font-semibold uppercase tracking-wider text-neutral-600'}>
               {t(group.label)}
             </h2>
             {items.map((item) => (
@@ -64,14 +66,16 @@ export function PrimarySourcesSidebar({
                 data-testid={`primary-sources-nav-${item.id}`}
                 onClick={() => onNavigate(item.id)}
                 aria-current={activeView === item.id ? 'page' : undefined}
-                className={`flex items-center gap-2 rounded-lg px-3 py-2 text-left text-sm transition-colors ${
+                aria-label={compact ? t(item.label) : undefined}
+                title={compact ? t(item.label) : undefined}
+                className={`flex items-center rounded-lg py-2 text-left text-sm transition-colors ${compact ? 'justify-center px-2' : 'gap-2 px-3'} ${
                   activeView === item.id
                     ? 'bg-indigo-600 text-white'
                     : 'text-neutral-600 hover:bg-neutral-100 dark:text-neutral-400 dark:hover:bg-neutral-900'
                 }`}
               >
-                <Icon name={item.icon} />
-                <span>{t(item.label)}</span>
+                <Icon name={item.icon} className="shrink-0" />
+                <span className={compact ? 'sr-only' : undefined}>{t(item.label)}</span>
               </button>
             ))}
           </section>

@@ -127,7 +127,7 @@ export interface PlatformApi {
   getAppInfo(): Promise<AppInfo>;
   /** Copy the Nodus Copilot macro into LibreOffice's user script directory. */
   installLibreOfficeCopilot(): Promise<CopilotInstallResult>;
-  /** Fired when the Word add-in asks Nodus to open an idea in the graph. */
+  /** Fired when the Word add-in asks Nodus to reveal an idea or its CSL style manager. */
   onCopilotOpenIdea(cb: (target: CopilotOpenIdeaTarget) => void): () => void;
   /** Fired when Zotero asks the desktop app to reveal a clean Library item. */
   onZoteroPluginOpen(cb: (target: ZoteroPluginOpenTarget) => void): () => void;

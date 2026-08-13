@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 import type Database from 'better-sqlite3';
 import type { AppSettings, VaultSummary } from '@shared/types';
 import { getDb } from '../db/database';
+import type { PublishedLibraryManifest } from './serverLibrary';
 
 export const SERVER_SNAPSHOT_FORMAT = 'nodus.server-snapshot';
 export const SERVER_SNAPSHOT_VERSION = 2;
@@ -21,7 +22,8 @@ const CORE_TABLES = [
 // agree. The rows carry no prose beyond an optional note.
 
 const USER_TABLES = [
-  'note_folders', 'notes', 'writing_saved_drafts', 'writing_draft_annotations', 'projects', 'project_sections',
+  'note_folders', 'notes', 'note_versions', 'note_annotations', 'workspace_library_links',
+  'writing_saved_drafts', 'writing_draft_annotations', 'projects', 'project_sections',
   'project_chapters', 'project_chapter_versions', 'project_chapter_chunks',
   'project_chapter_ideas', 'project_chapter_idea_relations', 'project_links',
   'project_insertion_suggestions', 'saved_searches', 'immersion_sessions',
@@ -366,6 +368,7 @@ export function buildServerSnapshot(
   vault: VaultSummary,
   settings: Pick<AppSettings, 'nodusServerIncludeUserContent' | 'nodusServerIncludePassages'>,
   db: Database.Database = getDb(),
+  library: PublishedLibraryManifest | null = null,
 ): BuiltSnapshot {
   const present = tableNames(db);
   const selected = new Set<string>(CORE_TABLES.filter((table) => present.has(table)));
@@ -409,8 +412,10 @@ export function buildServerSnapshot(
       includesUserContent: Boolean(settings.nodusServerIncludeUserContent),
       includesPassages: Boolean(settings.nodusServerIncludePassages),
       hasAssets: assetRefs.length > 0,
+      includesLibraryDocuments: Boolean(library),
     },
     assets: assetRefs,
+    library,
     tables,
   };
   const raw = Buffer.from(JSON.stringify(payload));
@@ -419,7 +424,15 @@ export function buildServerSnapshot(
   // Asset hashes ARE part of it: replacing only a report's illustration has to count
   // as a change, or the republish would be short-circuited as "unchanged".
   const revision = createHash('sha256')
-    .update(JSON.stringify({ vault: payload.vault, schemaVersion, assets: assetRefs, tables }))
+    .update(JSON.stringify({
+      vault: payload.vault,
+      schemaVersion,
+      assets: assetRefs,
+      // Like the snapshot timestamp, the library projection's generatedAt describes the
+      // upload and is not content. Excluding it keeps an unchanged library revision stable.
+      library: library ? { ...library, generatedAt: undefined } : null,
+      tables,
+    }))
     .digest('base64url');
   return {
     buffer: raw,

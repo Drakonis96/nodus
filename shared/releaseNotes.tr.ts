@@ -95,6 +95,17 @@ const RELEASE_3_2_4_TR: string[] = [
 ];
 
 export const RELEASE_NOTES_TR: Record<string, string[]> = {
+  "4.1.0": [
+    "Yazarlar, Fikirler ve Argüman Haritası artık Kitaplık görünümünü kullanıyor. Listeler üst verileri, etiketleri ve filtreleri bir araya getiriyor, her öğe sentezi, ilişkileri ve içeriği düzenli bir sekmede açıyor. Araştırmanın Durumu da Kapsam, Tartışmalar ve Boşlukları aynı görsel dilde birleştiriyor.",
+    "Çalışma alanı artık her kasada not ve fikirlerden oluşan bir kitaplık gibi davranıyor. Etiket ekleyebilir, etiketlere göre filtreleyebilir, birden fazla öğe seçebilir, sağ tıkla işlemleri açabilir ve silinen çalışmaları Çöp Kutusundan geri getirebilirsiniz.",
+    "Yayımlanan Kitaplık hiyerarşik koleksiyonları, üst verileri ve kaynakçalarıyla telefona geliyor. Temiz Markdown metnini okuyup vurgulayabilir, görselleri görebilir, belgeleri çevrimdışı tutabilir ve seçili ya da tüm indirmeleri silebilirsiniz. Özgün dosya tanımlanır ve gelecekteki bir sürüme ayrılmış olarak kalır.",
+    "Düzenleyici, profesyonel yazma araçlarını masaüstü ve telefon arasında paylaşıyor. Metin seçildiğinde biçimlendirme, bağlantılar, renk, başlıklar ve gerçek simgelerle yapay zekâ iyileştirmeleri görünür. Model seçici arama içerir, yatay kaydırmayı kaldırır ve her seçeneği her genişlikte okunabilir tutar.",
+    "Nodus Server hesap ve alan yönetimini geliştiriyor. Bir hesap farklı izinlerle birden fazla kasaya erişebilir ve bu erişimler daha sonra düzenlenebilir. Alanları yeniden adlandırabilir, kimlikleri ve adresleri kopyalayabilir, parolanızı doğruladıktan sonra e-postayı değiştirebilir ve her kasa türünü gerçek renginden tanıyabilirsiniz.",
+    "Gezinme dar pencerelere daha iyi uyum sağlıyor. Kenar çubuğu ortalanmış N harfini kaybetmeden yalnızca simgelere küçülebiliyor, kaydırma çubuğunda kasa vurgu rengini kullanıyor ve önemli denetimleri görünür tutuyor. Üst üste binmeler, arama alanları ve yanlış temanın renklerini koruyan yüzeyler de düzeltildi.",
+    "Bildirimler başlıktan ve Nodi içinden elle yenilenebilir. Aynı belge ya da rapordaki değişiklikler, gelen kutusunu her vurguyla doldurmak yerine tek bir açılabilir kartta gruplanır. Güncelleme ve yenilik pencereleri daha az grafik işi ve bellek kullanırken tasarımlarını korur.",
+    "Chrome bağlayıcısı Chrome Web Store üzerinden kurulumu öneriyor ve elle indirilen ZIP seçeneğini koruyor. Otomatik bağlantıyı sürdürür ve akademik bağlantıları gerçek PDF dosyasına çözer. Word içinde koyu tema ve bozuk pasajlar düzeltilir, CSL seçici ise Nodus’ta kurulu stilleri arar ve gerçek zamanlı yeniler.",
+    "Nodus Toolkit kenar çubuğunda tek bir giriş olarak kalıyor. Uygulamaları geliştirme etiketleri olmadan aynı başlığı ve görsel sunumu paylaşıyor, site de ana sayfa ile demolarında hem masaüstünde hem telefonda aynı başlığı kullanıyor.",
+  ],
   "4.0.1": [
     "Chrome bağlayıcısı Nodus içinde etkinleştirdiğiniz anda artık otomatik olarak eşleşiyor. Gereksiz yerel onay penceresi kaldırıldı ve belirtecini iptal ederseniz bağlayıcıyı yeniden açtığınızda tarayıcı kendiliğinden yenisini alıyor.",
     "Akademik tam metin bağlantıları adresleri PDF ile bitmese bile artık izleniyor. Nodus, Dialnet ve OJS gibi sayfalardan geçiyor, gerçek PDF imzasını doğruluyor ve temiz Markdown metnini HTML görüntüsünden değil makaleden hazırlıyor.",

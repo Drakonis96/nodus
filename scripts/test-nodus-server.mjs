@@ -7,6 +7,7 @@ import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { gzipSync } from 'node:zlib';
 import test from 'node:test';
+import AdmZip from 'adm-zip';
 import { missingServerTranslations } from '../server/lib/i18n.mjs';
 import { Store, pairingCode } from '../server/lib/store.mjs';
 
@@ -66,6 +67,36 @@ test('active browser sessions are bounded per account', async () => {
   }
 });
 
+test('email edits require a temporary unlock and revoke every credential for the account', async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), 'nodus-server-email-test-'));
+  try {
+    const store = new Store(root);
+    const admin = store.createUser('admin@example.test', 'administrator-password-strong', 'admin');
+    const member = store.createUser('member@example.test', 'member-password-strong', 'member');
+    const rawSession = store.createSession(admin.id);
+    const current = store.session(rawSession);
+    assert.ok(current);
+    assert.equal(store.sensitiveAccessValid(current.session), false);
+    assert.throws(() => store.unlockSensitiveAccess(current.session.hash, 'wrong-password'), /incorrect/i);
+    store.unlockSensitiveAccess(current.session.hash, 'administrator-password-strong', 300_000);
+    assert.equal(store.sensitiveAccessValid(current.session), true);
+
+    store.createSession(member.id);
+    for (const key of ['oauthCodes', 'accessTokens', 'refreshTokens', 'authTickets', 'pairingCodes', 'deviceTokens']) {
+      store.state[key].push({ hash: `${key}-member`, userId: member.id, expiresAt: new Date(Date.now() + 60_000).toISOString() });
+    }
+    store.save();
+    assert.equal(store.changeEmail(member.id, 'changed@example.test').changed, true);
+    assert.equal(store.state.users.find((user) => user.id === member.id).email, 'changed@example.test');
+    assert.equal(store.state.sessions.some((entry) => entry.userId === member.id), false);
+    for (const key of ['oauthCodes', 'accessTokens', 'refreshTokens', 'authTickets', 'pairingCodes', 'deviceTokens']) {
+      assert.equal(store.state[key].some((entry) => entry.userId === member.id), false, `${key} revoked`);
+    }
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 async function freePort() {
   const probe = createServer();
   await new Promise((resolve, reject) => probe.listen(0, '127.0.0.1', resolve).once('error', reject));
@@ -96,6 +127,7 @@ function serverEnvironment(overrides = {}) {
     'NODUS_ADMIN_EMAIL', 'NODUS_ADMIN_PASSWORD', 'NODUS_ADMIN_EMAIL_FILE', 'NODUS_ADMIN_PASSWORD_FILE',
     'NODUS_SETUP_TOKEN', 'NODUS_PUBLIC_URL', 'NODUS_DATA_DIR', 'NODUS_HOST', 'NODUS_PORT',
     'NODUS_MAX_SNAPSHOT_BYTES', 'NODUS_MAX_SNAPSHOT_JSON_BYTES', 'NODUS_VECTOR_WORKERS',
+    'NODUS_MAX_LIBRARY_PACKAGE_BYTES', 'NODUS_MAX_SPACE_LIBRARY_BYTES',
     'NODUS_MAX_CACHED_SNAPSHOTS', 'NODUS_MAX_SNAPSHOT_CACHE_BYTES', 'NODUS_SOURCE_URL',
   ]) delete env[name];
   return { ...env, ...overrides };
@@ -468,10 +500,35 @@ test('Nodus Server pairs a desktop publisher and protects read-only MCP with OAu
     assert.match(initialSetupHtml, /data-testid="auth-layout"/);
     assert.match(initialSetupHtml, /data-testid="language-picker"/);
     assert.match(initialSetupHtml, /class="help-tip"/);
-    for (const language of ['en', 'es', 'fr', 'de', 'pt', 'pt-BR', 'it', 'tr']) {
-      assert.match(initialSetupHtml, new RegExp(`<option value="${language}"`));
+    for (const [language, flag] of [['en', '🇬🇧'], ['es', '🇪🇸'], ['fr', '🇫🇷'], ['de', '🇩🇪'], ['pt', '🇵🇹'], ['pt-BR', '🇧🇷'], ['it', '🇮🇹'], ['tr', '🇹🇷']]) {
+      assert.match(initialSetupHtml, new RegExp(`<option value="${language}"[^>]*>${flag} `));
     }
-    assert.doesNotMatch(initialSetupHtml, /<script/i, 'the redesigned server UI stays compatible with the script-free CSP');
+    assert.match(initialSetupHtml, /<link rel="icon" type="image\/svg\+xml" href="\/favicon\.svg">/);
+    assert.match(initialSetupHtml, /<script src="\/server-ui\.js\?v=2" defer><\/script>/);
+    assert.doesNotMatch(initialSetupHtml, /language-apply/, 'changing the language no longer needs an Apply button');
+    assert.ok(
+      [...initialSetupHtml.matchAll(/<script\b([^>]*)>/gi)].every((match) => /\bsrc="\/server-ui\.js\?v=2"/.test(match[1])),
+      'the server UI uses only its external first-party script',
+    );
+    const setupCsp = initialSetupResponse.headers.get('content-security-policy') || '';
+    assert.match(setupCsp, /script-src 'self'/);
+    assert.match(setupCsp, /img-src 'self'/);
+    assert.doesNotMatch(setupCsp, /script-src[^;]*'unsafe-inline'/);
+
+    const faviconResponse = await fetch(`${origin}/favicon.svg`);
+    assert.equal(faviconResponse.status, 200);
+    assert.match(faviconResponse.headers.get('content-type') || '', /^image\/svg\+xml/);
+    assert.match(await faviconResponse.text(), /<svg[^>]+viewBox="0 0 64 64"/);
+
+    const uiScriptResponse = await fetch(`${origin}/server-ui.js`);
+    assert.equal(uiScriptResponse.status, 200);
+    assert.match(uiScriptResponse.headers.get('content-type') || '', /^text\/javascript/);
+    assert.equal(uiScriptResponse.headers.get('cache-control'), 'no-cache');
+    const uiScript = await uiScriptResponse.text();
+    assert.match(uiScript, /language\.addEventListener\('change'/);
+    assert.match(uiScript, /picker\.requestSubmit\(\)/);
+    assert.match(uiScript, /navigator\.clipboard\?\.writeText/);
+    assert.match(uiScript, /button\[data-copy-value\]/, 'the same copy behavior covers URLs and space IDs');
 
     const spanishPreference = await postForm(`${origin}/language`, { language: 'es' }, {
       headers: { referer: `${origin}/setup` },
@@ -500,10 +557,17 @@ test('Nodus Server pairs a desktop publisher and protects read-only MCP with OAu
     assert.match(dashboard, /class="metric-grid"/);
     assert.match(dashboard, /data-testid="language-picker"/);
     assert.match(dashboard, /This is the address ChatGPT, Claude and other compatible MCP clients/);
+    const serverUrlIndex = dashboard.indexOf('data-testid="server-url"');
+    const mcpUrlIndex = dashboard.indexOf('data-testid="mcp-url"');
+    assert.ok(serverUrlIndex >= 0 && mcpUrlIndex > serverUrlIndex, 'Server URL is shown before MCP URL');
+    assert.match(dashboard, new RegExp(`<code data-testid="server-url">${origin.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}<\\/code>`));
+    assert.match(dashboard, new RegExp(`<code data-testid="mcp-url">${origin.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\/mcp<\\/code>`));
+    assert.match(dashboard, /data-testid="server-url-copy"[^>]+data-copy-value/);
+    assert.match(dashboard, /data-testid="mcp-url-copy"[^>]+data-copy-value/);
     const csrf = hidden(dashboard, 'csrf');
 
-    for (const [name, description] of [['Curso de teoría', 'Materiales del curso'], ['Vault privado', 'No asignado']]) {
-      const created = await postForm(`${origin}/admin/spaces`, { csrf, name, description }, { headers: { cookie: adminCookie } });
+    for (const [name, description, vaultType] of [['Curso de teoría', 'Materiales del curso', 'academic'], ['Vault privado', 'No asignado', 'worldbuilding']]) {
+      const created = await postForm(`${origin}/admin/spaces`, { csrf, name, description, vaultType }, { headers: { cookie: adminCookie } });
       assert.equal(created.status, 303);
     }
 
@@ -512,6 +576,92 @@ test('Nodus Server pairs a desktop publisher and protects read-only MCP with OAu
     const spaceIds = [...dashboard.matchAll(/<code>([0-9a-f-]{36})<\/code>/g)].map((match) => match[1]);
     assert.equal(spaceIds.length, 2);
     const [sharedSpaceId, privateSpaceId] = spaceIds;
+    assert.match(dashboard, /data-vault-type="academic"[^>]*>Academic<\/span>/);
+    assert.match(dashboard, /data-vault-type="worldbuilding"[^>]*>Worldbuilding<\/span>/);
+    assert.match(dashboard, /data-vault-type="academic" style="--vault-accent:#6366f1"/);
+    assert.match(dashboard, /data-vault-type="worldbuilding" style="--vault-accent:#7c3aed"/);
+    assert.match(dashboard, new RegExp(`data-testid="space-id-copy-${privateSpaceId}"[^>]+data-copy-value="${privateSpaceId}"`));
+    assert.match(dashboard, /input\[type="checkbox"\]/, 'the stylesheet explicitly sizes permission checkboxes');
+
+    const renamed = await postForm(`${origin}/admin/spaces/name`, {
+      csrf, spaceId: privateSpaceId, name: 'Archivo de Orthea',
+    }, { headers: { cookie: adminCookie } });
+    assert.equal(renamed.status, 303);
+
+    const editorCreated = await postForm(`${origin}/admin/users`, {
+      csrf,
+      email: 'editor@example.test',
+      password: 'editor-password-strong',
+      [`space:${sharedSpaceId}`]: 'on',
+      [`role:${sharedSpaceId}`]: 'reader',
+      [`space:${privateSpaceId}`]: 'on',
+      [`role:${privateSpaceId}`]: 'writer',
+    }, { headers: { cookie: adminCookie } });
+    assert.equal(editorCreated.status, 303);
+
+    let managementState = JSON.parse(await readFile(path.join(root, 'state.json'), 'utf8'));
+    const editor = managementState.users.find((user) => user.email === 'editor@example.test');
+    assert.ok(editor);
+    assert.deepEqual(
+      managementState.memberships.filter((entry) => entry.userId === editor.id).map(({ spaceId, role }) => ({ spaceId, role })).sort((a, b) => a.spaceId.localeCompare(b.spaceId)),
+      [{ spaceId: sharedSpaceId, role: 'reader' }, { spaceId: privateSpaceId, role: 'writer' }].sort((a, b) => a.spaceId.localeCompare(b.spaceId)),
+      'a new account can receive several vaults with independent permissions in one submission',
+    );
+
+    const editedAccess = await postForm(`${origin}/admin/users/access`, {
+      csrf,
+      userId: editor.id,
+      [`space:${sharedSpaceId}`]: 'on',
+      [`role:${sharedSpaceId}`]: 'writer',
+      [`space:${privateSpaceId}`]: 'on',
+      [`role:${privateSpaceId}`]: 'reader',
+    }, { headers: { cookie: adminCookie } });
+    assert.equal(editedAccess.status, 303);
+    managementState = JSON.parse(await readFile(path.join(root, 'state.json'), 'utf8'));
+    assert.deepEqual(
+      managementState.memberships.filter((entry) => entry.userId === editor.id).map(({ spaceId, role }) => ({ spaceId, role })).sort((a, b) => a.spaceId.localeCompare(b.spaceId)),
+      [{ spaceId: sharedSpaceId, role: 'writer' }, { spaceId: privateSpaceId, role: 'reader' }].sort((a, b) => a.spaceId.localeCompare(b.spaceId)),
+      'one save can change a role and add access to another vault',
+    );
+    assert.equal(managementState.spaces.find((space) => space.id === privateSpaceId)?.name, 'Archivo de Orthea');
+    assert.equal(managementState.spaces.find((space) => space.id === privateSpaceId)?.nameEdited, true);
+
+    dashboard = await (await fetch(`${origin}/`, { headers: { cookie: adminCookie } })).text();
+    assert.match(dashboard, /class="user-list"/);
+    assert.doesNotMatch(dashboard, /editor@example\.test/, 'email addresses are masked before reauthentication');
+    assert.match(dashboard, /data-testid="email-unlock-form"/);
+    assert.match(dashboard, /Archivo de Orthea/);
+    assert.match(dashboard, new RegExp(`name="space:${privateSpaceId}" value="on" checked`));
+    assert.match(dashboard, new RegExp(`name="role:${sharedSpaceId}"[^>]*>[\\s\\S]*?<option value="writer" selected>`));
+
+    const lockedPasswordPage = await (await fetch(`${origin}/admin/users/password?userId=${editor.id}`, { headers: { cookie: adminCookie } })).text();
+    assert.doesNotMatch(lockedPasswordPage, /editor@example\.test/, 'secondary administration pages also keep addresses masked');
+
+    const wrongEmailUnlock = await postForm(`${origin}/admin/users/email-access`, {
+      csrf, password: 'wrong-administrator-password',
+    }, { headers: { cookie: adminCookie } });
+    assert.equal(wrongEmailUnlock.status, 401);
+    const emailUnlock = await postForm(`${origin}/admin/users/email-access`, {
+      csrf, password: 'admin-password-strong',
+    }, { headers: { cookie: adminCookie } });
+    assert.equal(emailUnlock.status, 303);
+    dashboard = await (await fetch(`${origin}/`, { headers: { cookie: adminCookie } })).text();
+    assert.match(dashboard, /editor@example\.test/);
+    assert.match(dashboard, /data-testid="email-access-unlocked"/);
+    const unlockedPasswordPage = await (await fetch(`${origin}/admin/users/password?userId=${editor.id}`, { headers: { cookie: adminCookie } })).text();
+    assert.match(unlockedPasswordPage, /editor@example\.test/);
+    const changedEmail = await postForm(`${origin}/admin/users/email`, {
+      csrf, userId: editor.id, email: 'editor-updated@example.test',
+    }, { headers: { cookie: adminCookie } });
+    assert.equal(changedEmail.status, 303);
+    managementState = JSON.parse(await readFile(path.join(root, 'state.json'), 'utf8'));
+    assert.equal(managementState.users.find((user) => user.id === editor.id).email, 'editor-updated@example.test');
+
+    const admin = managementState.users.find((user) => user.role === 'admin');
+    const rejectedOwnerRemoval = await postForm(`${origin}/admin/users/access`, { csrf, userId: admin.id }, { headers: { cookie: adminCookie } });
+    assert.equal(rejectedOwnerRemoval.status, 400, 'batch edits cannot remove the last owner of a vault');
+    managementState = JSON.parse(await readFile(path.join(root, 'state.json'), 'utf8'));
+    assert.equal(managementState.memberships.filter((entry) => entry.userId === admin.id && entry.role === 'owner').length, 2);
 
     const readerCreated = await postForm(`${origin}/admin/users`, {
       csrf,
@@ -537,6 +687,86 @@ test('Nodus Server pairs a desktop publisher and protects read-only MCP with OAu
     assert.equal(paired.space.id, sharedSpaceId);
     assert.ok(paired.accessToken);
     assert.equal(paired.server.language, 'en');
+
+    const packageZip = new AdmZip();
+    packageZip.addFile('document.md', Buffer.from('# El documento\n\nTexto limpio con una figura.'));
+    packageZip.addFile('assets/figure.png', Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 1, 2, 3]));
+    packageZip.addFile('manifest.json', Buffer.from(JSON.stringify({ format: 'nodus.library-document-package', formatVersion: 1, documentId: 'library-doc-1' })));
+    const packageBytes = packageZip.toBuffer();
+    const packageHash = createHash('sha256').update(packageBytes).digest('hex');
+    const libraryEndpoint = `${origin}/api/v1/spaces/${sharedSpaceId}/library`;
+    const unpublishedLibrarySummary = await fetch(libraryEndpoint, {
+      headers: { authorization: `Bearer ${paired.accessToken}` },
+    });
+    assert.deepEqual(await unpublishedLibrarySummary.json(), {
+      published: false, generatedAt: null, collections: 0, documents: 0,
+      downloadableDocuments: 0, packageBytes: 0,
+    });
+    const negotiation = await fetch(`${libraryEndpoint}/negotiate`, {
+      method: 'POST', headers: { authorization: `Bearer ${paired.accessToken}`, 'content-type': 'application/json' },
+      body: JSON.stringify({ packages: [{ hash: packageHash, bytes: packageBytes.length }] }),
+    });
+    assert.deepEqual((await negotiation.json()).missing, [packageHash]);
+    const uploadedPackage = await fetch(`${libraryEndpoint}/packages/${packageHash}`, {
+      method: 'PUT', headers: { authorization: `Bearer ${paired.accessToken}`, 'content-type': 'application/zip' }, body: packageBytes,
+    });
+    assert.equal(uploadedPackage.status, 200);
+    const forbiddenZip = new AdmZip();
+    forbiddenZip.addFile('document.md', Buffer.from('# Clean'));
+    forbiddenZip.addFile('manifest.json', Buffer.from(JSON.stringify({ format: 'nodus.library-document-package', formatVersion: 1, documentId: 'forbidden-doc' })));
+    forbiddenZip.addFile('original.pdf', Buffer.from('%PDF-1.7'));
+    const forbiddenBytes = forbiddenZip.toBuffer();
+    const forbiddenHash = createHash('sha256').update(forbiddenBytes).digest('hex');
+    const forbiddenPackage = await fetch(`${libraryEndpoint}/packages/${forbiddenHash}`, {
+      method: 'PUT', headers: { authorization: `Bearer ${paired.accessToken}`, 'content-type': 'application/zip' }, body: forbiddenBytes,
+    });
+    assert.equal(forbiddenPackage.status, 415, 'original documents and arbitrary ZIP entries never reach server storage');
+    const librarySnapshot = {
+      format: 'nodus.server-snapshot', formatVersion: 2, generatedAt: new Date().toISOString(),
+      vault: { id: 'vault-test', name: 'Curso', type: 'academic' }, tables: {},
+      library: {
+        format: 'nodus.server-library', formatVersion: 1, generatedAt: new Date().toISOString(),
+        collections: [{ id: 'collection-1', name: 'Teoría', icon: null, color: null, parentId: null, position: 0, directItemCount: 1, updatedAt: new Date().toISOString() }],
+        documents: [{ id: 'library-doc-1', title: 'La formación y la teoría', itemType: 'journalArticle', creators: ['Ada Lovelace'], abstract: 'Un texto para buscar.', date: '1843', year: 1843, language: 'es', publisher: null, publicationTitle: null, doi: null, url: null, tags: ['teoría'], collectionIds: ['collection-1'], updatedAt: new Date().toISOString(), cleanAvailable: true, wordCount: 7, figureCount: 1, packageHash, packageBytes: packageBytes.length, originalAvailable: true, originalFileName: 'original.pdf', originalMimeType: 'application/pdf', annotations: [] }],
+      },
+    };
+    const missingPackageSnapshot = structuredClone(librarySnapshot);
+    missingPackageSnapshot.library.documents[0].packageHash = 'f'.repeat(64);
+    const rejectedIncompleteLibrary = await fetch(`${origin}/api/v1/spaces/${sharedSpaceId}/snapshot`, {
+      method: 'PUT', headers: { authorization: `Bearer ${paired.accessToken}`, 'content-type': 'application/vnd.nodus.snapshot+json', 'content-encoding': 'gzip', 'x-nodus-revision': 'revision-library-missing' }, body: gzipSync(JSON.stringify(missingPackageSnapshot)),
+    });
+    assert.equal(rejectedIncompleteLibrary.status, 409, 'a snapshot cannot expose a document before its Clean Markdown package exists');
+    const mismatchedPackageSnapshot = structuredClone(librarySnapshot);
+    mismatchedPackageSnapshot.library.documents[0].id = 'library-doc-forged';
+    const rejectedMismatchedLibrary = await fetch(`${origin}/api/v1/spaces/${sharedSpaceId}/snapshot`, {
+      method: 'PUT', headers: { authorization: `Bearer ${paired.accessToken}`, 'content-type': 'application/vnd.nodus.snapshot+json', 'content-encoding': 'gzip', 'x-nodus-revision': 'revision-library-mismatch' }, body: gzipSync(JSON.stringify(mismatchedPackageSnapshot)),
+    });
+    assert.equal(rejectedMismatchedLibrary.status, 409, 'a manifest cannot relabel another document package');
+    assert.equal((await rejectedMismatchedLibrary.json()).error, 'package_mismatch');
+    const publishedLibrary = await fetch(`${origin}/api/v1/spaces/${sharedSpaceId}/snapshot`, {
+      method: 'PUT', headers: { authorization: `Bearer ${paired.accessToken}`, 'content-type': 'application/vnd.nodus.snapshot+json', 'content-encoding': 'gzip', 'x-nodus-revision': 'revision-library-1' }, body: gzipSync(JSON.stringify(librarySnapshot)),
+    });
+    assert.equal(publishedLibrary.status, 200);
+    const librarySummary = await (await fetch(libraryEndpoint, { headers: { authorization: `Bearer ${paired.accessToken}` } })).json();
+    assert.equal(librarySummary.published, true);
+    assert.equal(librarySummary.collections, 1);
+    assert.equal(librarySummary.documents, 1);
+    assert.equal(librarySummary.downloadableDocuments, 1);
+    assert.equal(librarySummary.packageBytes, packageBytes.length);
+    const libraryDashboard = await (await fetch(`${origin}/`, { headers: { cookie: adminCookie } })).text();
+    assert.match(libraryDashboard, new RegExp(`data-testid="published-library-${sharedSpaceId}"`));
+    assert.match(libraryDashboard, /Published library: 1 document/);
+    const collectionsResponse = await fetch(`${libraryEndpoint}/collections`, { headers: { authorization: `Bearer ${paired.accessToken}` } });
+    assert.equal((await collectionsResponse.json()).collections[0].name, 'Teoría');
+    const documentsResponse = await fetch(`${libraryEndpoint}/documents?q=lovelace&collectionId=collection-1`, { headers: { authorization: `Bearer ${paired.accessToken}` } });
+    const documentPage = await documentsResponse.json();
+    assert.equal(documentPage.total, 1);
+    assert.equal(documentPage.items[0].originalAvailable, true, 'the original is metadata only');
+    const packageDownload = await fetch(`${libraryEndpoint}/documents/library-doc-1/download.zip`, { headers: { authorization: `Bearer ${paired.accessToken}` } });
+    const downloadedPackage = Buffer.from(await packageDownload.arrayBuffer());
+    assert.equal(createHash('sha256').update(downloadedPackage).digest('hex'), packageHash);
+    assert.equal(packageDownload.headers.get('content-type'), 'application/zip');
+    assert.match(packageDownload.headers.get('content-disposition') || '', /filename\*=UTF-8''La%20formaci%C3%B3n%20y%20la%20teor%C3%ADa\.zip/);
 
     const anonymousLanguageChange = await fetch(`${origin}/api/v1/settings/language`, {
       method: 'PUT',
@@ -851,7 +1081,8 @@ test('Nodus Server pairs a desktop publisher and protects read-only MCP with OAu
 
     dashboardResponse = await fetch(`${origin}/`, { headers: { cookie: adminCookie } });
     dashboard = await dashboardResponse.text();
-    const readerId = dashboard.match(/\/admin\/users\/password\?userId=([0-9a-f-]{36})/)?.[1];
+    const passwordState = JSON.parse(await readFile(path.join(root, 'state.json'), 'utf8'));
+    const readerId = passwordState.users.find((user) => user.email === 'student@example.test')?.id;
     assert.ok(readerId, 'the administrator can open a reader password reset');
     const resetPageResponse = await fetch(`${origin}/admin/users/password?userId=${readerId}`, { headers: { cookie: adminCookie } });
     assert.equal(resetPageResponse.status, 200);
@@ -870,6 +1101,20 @@ test('Nodus Server pairs a desktop publisher and protects read-only MCP with OAu
       email: 'student@example.test', password: 'temporary-password-reset', next: '/account',
     });
     assert.equal(resetPasswordAccepted.status, 303);
+
+    const stateBeforeClear = JSON.parse(await readFile(path.join(root, 'state.json'), 'utf8'));
+    assert.ok(Number(stateBeforeClear.spaces.find((space) => space.id === sharedSpaceId).libraryPackageBytes) > 0);
+    const clearedPublication = await postForm(`${origin}/admin/spaces/clear`, {
+      csrf, spaceId: sharedSpaceId,
+    }, { headers: { cookie: adminCookie } });
+    assert.equal(clearedPublication.status, 303);
+    const stateAfterClear = JSON.parse(await readFile(path.join(root, 'state.json'), 'utf8'));
+    const clearedSpace = stateAfterClear.spaces.find((space) => space.id === sharedSpaceId);
+    assert.equal(clearedSpace.bytes, 0);
+    assert.equal(clearedSpace.assetBytes, 0);
+    assert.equal(clearedSpace.libraryPackageBytes, 0);
+    assert.equal(stateAfterClear.deviceTokens.some((entry) => entry.spaceId === sharedSpaceId), false);
+    await assert.rejects(readFile(path.join(root, 'spaces', sharedSpaceId, 'snapshot.json.gz')));
   } finally {
     await stopServer(child);
     await rm(root, { recursive: true, force: true });

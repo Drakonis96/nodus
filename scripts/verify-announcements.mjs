@@ -100,14 +100,10 @@ async function launch() {
   return { app, page };
 }
 
-/** The main process schedules its first check 45s out; ask for one now instead. */
+/** The main process schedules its first check 45s out; use the manual action now. */
 async function refresh(page) {
   const before = requests.length;
-  await page.evaluate(() => window.nodus.listAnnouncements());
-  // The renderer cannot trigger a fetch, so drive it the way the timer does: the
-  // main process exposes refreshAnnouncements only internally, which is exactly why
-  // this runs through the IPC the app itself uses after a settings change.
-  await page.evaluate(() => window.nodus.updateSettings({ announcementsEnabled: true }));
+  await page.evaluate(() => window.nodus.refreshNotifications());
   const deadline = Date.now() + 15_000;
   while (Date.now() < deadline && requests.length === before) {
     await new Promise((resolve) => setTimeout(resolve, 200));
@@ -149,6 +145,15 @@ try {
   await page.evaluate(() => document.querySelector('[data-notifications-trigger]')?.click());
   const panel = page.getByTestId('header-notifications-panel');
   await panel.waitFor({ timeout: 5_000 });
+  const requestsBeforeButton = requests.length;
+  // A one-time guide can own the pointer in this synthetic profile; invoke the real
+  // button underneath because this check targets the notification centre itself.
+  await panel.getByTestId('header-notifications-refresh').evaluate((button) => button.click());
+  const manualDeadline = Date.now() + 15_000;
+  while (Date.now() < manualDeadline && requests.length === requestsBeforeButton) {
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  }
+  assert.ok(requests.length > requestsBeforeButton, 'the header refresh icon must perform a real announcement check');
   await panel.getByRole('button', { name: 'Limpiar' }).evaluate((button) => button.click());
   const confirmation = page.getByRole('dialog', { name: 'Limpiar notificaciones' });
   await confirmation.waitFor({ timeout: 5_000 });
@@ -158,7 +163,6 @@ try {
   console.log('[announcements] header clear action requires confirmation and cancel is non-destructive');
 
   // ── 2. The second check is conditional and answered with 304 ───────────────
-  await refresh(page);
   const second = requests[requests.length - 1];
   assert.equal(second.ifNoneMatch, ETAG, 'the second request must replay the ETag');
   console.log(`[announcements] second request sent If-None-Match: ${second.ifNoneMatch} → 304, no body`);

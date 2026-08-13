@@ -31,7 +31,9 @@ test('study improvement is selection-first, streamed in place and committed to t
   assert.match(editor, /data-testid="study-editor-undo"/);
   assert.match(editor, /data-testid="study-editor-redo"/);
   assert.match(editor, /data-testid="study-synonyms-toggle"/);
-  assert.match(editor, /name="thesaurus"/);
+  assert.match(editor, /name="aiSynonyms"/);
+  assert.match(editor, /studyStyleIcon/);
+  assert.doesNotMatch(editor, /style\.icon\s*\|\|\s*['"]✦|fontSize:\s*size/);
   assert.match(editor, /data-testid="study-synonyms-panel"/);
   assert.match(editor, /study-synonyms-option/);
   assert.match(editor, /data-testid="study-synonyms-regenerate"/);
@@ -58,6 +60,8 @@ test('the compact prompt manager creates prompts and limits the toolbar to four'
   assert.match(dialog, /study-prompt-title/);
   assert.match(dialog, /study-prompt-text/);
   assert.match(dialog, /IconEmojiPicker/);
+  assert.match(dialog, /allowEmoji=\{false\}/);
+  assert.match(dialog, /studyStyleIcon/);
   assert.match(dialog, /selected\.description/);
   assert.match(dialog, /máximo de cuatro prompts/);
   assert.doesNotMatch(dialog, /diffWordsWithSpace/);

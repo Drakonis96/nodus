@@ -11,50 +11,17 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet"/>
   <link rel="stylesheet" href="demo.css?v=20260720-vault-tabs"/>
   <link rel="stylesheet" href="mobile.css?v=20260801-responsive"/>
+  <link rel="stylesheet" href="../site-header.css?v=20260813-shared-header"/>
 </head>
 <body class="demo-page db">
-  <nav class="site-nav">
-    <a class="site-logo" href="../index.html"><img src="../assets/nodus-logo.svg" alt=""/> Nodus</a>
-    <div class="site-links">
-      <a href="../index.html#story" class="hideS">How it works</a>
-      <a href="../index.html#modes" class="hideS">Modes</a>
-      <a href="../index.html#views" class="hideS">Views</a>
-      <a href="../index.html#contrib" class="hideS">Contribute</a>
-      <a href="../index.html#faq" class="hideS">FAQ</a>
-      <a class="site-gh" href="https://github.com/Drakonis96/nodus" target="_blank" rel="noopener" title="Star Nodus on GitHub">
-        <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82a7.42 7.42 0 0 1 2-.27c.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8Z"/></svg>
-        <span class="lbl">Star</span><span class="stars"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 .25a.75.75 0 0 1 .67.42l1.88 3.8 4.2.62c.61.09.86.84.41 1.28l-3.04 2.96.72 4.18a.75.75 0 0 1-1.09.79L8 12.35l-3.76 1.97a.75.75 0 0 1-1.08-.79l.72-4.18L.83 6.37a.75.75 0 0 1 .41-1.28l4.2-.61L7.32.67A.75.75 0 0 1 8 .25Z"/></svg><span id="site-stars" aria-label="Stars on GitHub">·</span></span>
-      </a>
-    </div>
-  </nav>
+  <div data-nodus-site-header data-base="../" data-context="demo"></div>
+  <script src="../site-header.js?v=20260813-shared-header"></script>
   <div class="demo-frame">
     <div class="mac-titlebar">
       <span class="mac-dots"><i></i><i></i><i></i></span>
       <span class="mac-title">Nodus — Databases demo</span>
     </div>
     <div class="shell db">
-    <header class="topbar">
-      <a href="../index.html" class="brand" style="text-decoration:none;color:inherit">
-        <img src="../assets/nodus-logo.svg" alt="Nodus logo"/> Nodus
-      </a>
-      <nav class="vault-tabs" aria-label="Switch demo vault">
-        <a class="vault-tab academic" href="index.html" title="Academic · Learning science library">Academic</a>
-        <a class="vault-tab teach" href="teaching.html" title="Teaching · Year 9 History">Teaching</a>
-        <a class="vault-tab st" href="study.html" title="Study · General Biology">Study</a>
-        <a class="vault-tab gen" href="genealogy.html" title="Genealogy · Serrano family">Genealogy</a>
-        <a class="vault-tab db" href="databases.html" aria-current="page" title="Databases · Field notebook">Databases<span class="vault-active-label">Active</span></a>
-        <a class="vault-tab world" href="worldbuilding.html" title="Worldbuilding · The Ashen Tides">Worldbuilding</a>
-      </nav>
-      <button class="tb-btn" onclick="GUI.chat()">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.5 8.5 0 0 1-12.2 7.7L3 21l1.8-5.3A8.5 8.5 0 1 1 21 11.5Z"/></svg>
-        Data chat</button>
-      <button class="tb-btn" onclick="GUI.toast('In the app: import a CSV or XLSX and Nodus infers the column types.')">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15V3M7 8l5-5 5 5"/><path d="M4 21h16"/></svg>
-        Import CSV</button>
-      <button class="tb-btn primary" onclick="GUI.toast('In the app: create an empty database, then add typed columns.')">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
-        New database</button>
-    </header>
     <div class="demo-banner">
       <span><b>Web demo · Databases mode</b> — a static sample, free to explore. It mirrors the desktop app but is a simplified snapshot: the real views are richer and change between releases. The AI, CSV import and analysis run only in the desktop app (100% free &amp; open source).</span>
       <a href="https://github.com/Drakonis96/nodus/releases/latest" target="_blank" rel="noopener">Get the desktop app →</a>
@@ -69,25 +36,6 @@
   <div id="toast" role="status"></div>
   <script src="databases-data.js?v=db1"></script>
   <script src="databases-app.js?v=db1"></script>
-  <script>
-    (function () {
-      function paintStars(n) {
-        if (!Number.isFinite(n)) return;
-        var el = document.getElementById('site-stars');
-        if (!el) return;
-        el.textContent = n >= 1000 ? (n / 1000).toFixed(1) + 'k' : String(n);
-        el.setAttribute('aria-label', n + ' stars on GitHub');
-      }
-      fetch('https://api.github.com/repos/Drakonis96/nodus', { cache: 'no-store' })
-        .then(function (r) { return r.ok ? r.json() : null; })
-        .then(function (j) { var n = j && Number(j.stargazers_count); if (Number.isFinite(n)) { paintStars(n); return; } throw new Error('x'); })
-        .catch(function () {
-          return fetch('https://img.shields.io/github/stars/Drakonis96/nodus.json?cacheSeconds=300&_=' + Date.now())
-            .then(function (r) { return r.ok ? r.json() : null; })
-            .then(function (j) { if (j) paintStars(Number(j.value)); }).catch(function () {});
-        });
-    })();
-  </script>
   <script src="mobile.js?v=20260801-responsive"></script>
   <script src="../nodi.js?v=20260720-menu1"></script>
 </body>

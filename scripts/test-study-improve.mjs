@@ -43,6 +43,8 @@ try {
 
   assert.equal(shared.STUDY_IMPROVE_PRESETS.length, 13, 'all thirteen planned presets exist');
   assert.deepEqual(new Set(shared.STUDY_IMPROVE_PRESETS.map((style) => style.id)).size, 13);
+  assert.ok(shared.STUDY_IMPROVE_PRESETS.every((style) => /^[a-z][A-Za-z0-9]*$/.test(style.icon)), 'built-in writing styles use renderer icon names, never emoji');
+  assert.equal(shared.studyStyleIcon('🎓'), 'graduation', 'legacy emoji styles are rendered through the professional icon catalogue');
   const original = 'Según “García mantiene 37 casos”, el valor fue 37% en 2024 (García, 2023, p. 8).\n\n`x = 37` y $y^2$; [fuente](https://example.org/37).';
   const protectedValue = shared.protectStudyText(original, ['García']);
   assert.ok(protectedValue.spans.length >= 7, 'quotes, citations, numbers, code, math, links and terms are protected');

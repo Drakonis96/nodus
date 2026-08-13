@@ -147,15 +147,110 @@ const ROLE_KEYS = {
 };
 ROLE_KEYS['pt-BR'] = { ...ROLE_KEYS.pt, createUser: 'Criar conta', newUserSpacesHelp: 'Marque os espaços que esta conta poderá acessar e escolha o que pode fazer em cada um.' };
 
+const SERVER_UI_KEYS = {
+  en: { serverUrl: 'Server URL', copyUrl: 'Copy URL', urlCopied: 'Copied' },
+  es: { serverUrl: 'URL del servidor', copyUrl: 'Copiar URL', urlCopied: 'Copiada' },
+  fr: { serverUrl: 'URL du serveur', copyUrl: 'Copier l’URL', urlCopied: 'Copiée' },
+  de: { serverUrl: 'Server-URL', copyUrl: 'URL kopieren', urlCopied: 'Kopiert' },
+  pt: { serverUrl: 'URL do servidor', copyUrl: 'Copiar URL', urlCopied: 'Copiado' },
+  'pt-BR': { serverUrl: 'URL do servidor', copyUrl: 'Copiar URL', urlCopied: 'Copiado' },
+  it: { serverUrl: 'URL del server', copyUrl: 'Copia URL', urlCopied: 'Copiato' },
+  tr: { serverUrl: 'Sunucu URL’si', copyUrl: 'URL’yi kopyala', urlCopied: 'Kopyalandı' },
+};
+
+const ADMIN_UI_KEYS = {
+  en: {
+    vaultType: 'Vault type', vaultTypePending: 'Type pending', assignedVaults: 'Vault access',
+    manageAccessHelp: 'Select every vault this account can access and set its permission independently.',
+    saveAccess: 'Save access', lockedOwner: 'Required owner', editSpaceName: 'Edit name', saveName: 'Save name',
+    copySpaceId: 'Copy space ID', spaceIdCopied: 'ID copied', administrator: 'Administrator', memberAccount: 'User',
+  },
+  es: {
+    vaultType: 'Tipo de vault', vaultTypePending: 'Tipo pendiente', assignedVaults: 'Acceso a vaults',
+    manageAccessHelp: 'Selecciona todos los vaults a los que puede acceder esta cuenta y define cada permiso por separado.',
+    saveAccess: 'Guardar accesos', lockedOwner: 'Propietario necesario', editSpaceName: 'Editar nombre', saveName: 'Guardar nombre',
+    copySpaceId: 'Copiar ID del espacio', spaceIdCopied: 'ID copiado', administrator: 'Administrador', memberAccount: 'Usuario',
+  },
+  fr: {
+    vaultType: 'Type de coffre', vaultTypePending: 'Type en attente', assignedVaults: 'Accès aux coffres',
+    manageAccessHelp: 'Sélectionnez tous les coffres accessibles à ce compte et définissez chaque autorisation séparément.',
+    saveAccess: 'Enregistrer les accès', lockedOwner: 'Propriétaire requis', editSpaceName: 'Modifier le nom', saveName: 'Enregistrer le nom',
+    copySpaceId: 'Copier l’ID de l’espace', spaceIdCopied: 'ID copié', administrator: 'Administrateur', memberAccount: 'Utilisateur',
+  },
+  de: {
+    vaultType: 'Tresortyp', vaultTypePending: 'Typ ausstehend', assignedVaults: 'Tresorzugriff',
+    manageAccessHelp: 'Wählen Sie alle Tresore für dieses Konto aus und legen Sie jede Berechtigung einzeln fest.',
+    saveAccess: 'Zugriffe speichern', lockedOwner: 'Erforderlicher Eigentümer', editSpaceName: 'Namen bearbeiten', saveName: 'Namen speichern',
+    copySpaceId: 'Bereichs-ID kopieren', spaceIdCopied: 'ID kopiert', administrator: 'Administrator', memberAccount: 'Benutzer',
+  },
+  pt: {
+    vaultType: 'Tipo de cofre', vaultTypePending: 'Tipo pendente', assignedVaults: 'Acesso aos cofres',
+    manageAccessHelp: 'Selecione todos os cofres acessíveis a esta conta e defina cada permissão separadamente.',
+    saveAccess: 'Guardar acessos', lockedOwner: 'Proprietário necessário', editSpaceName: 'Editar nome', saveName: 'Guardar nome',
+    copySpaceId: 'Copiar ID do espaço', spaceIdCopied: 'ID copiado', administrator: 'Administrador', memberAccount: 'Utilizador',
+  },
+  'pt-BR': {
+    vaultType: 'Tipo de cofre', vaultTypePending: 'Tipo pendente', assignedVaults: 'Acesso aos cofres',
+    manageAccessHelp: 'Selecione todos os cofres acessíveis a esta conta e defina cada permissão separadamente.',
+    saveAccess: 'Salvar acessos', lockedOwner: 'Proprietário necessário', editSpaceName: 'Editar nome', saveName: 'Salvar nome',
+    copySpaceId: 'Copiar ID do espaço', spaceIdCopied: 'ID copiado', administrator: 'Administrador', memberAccount: 'Usuário',
+  },
+  it: {
+    vaultType: 'Tipo di vault', vaultTypePending: 'Tipo in attesa', assignedVaults: 'Accesso ai vault',
+    manageAccessHelp: 'Seleziona tutti i vault accessibili a questo account e imposta ogni autorizzazione separatamente.',
+    saveAccess: 'Salva accessi', lockedOwner: 'Proprietario necessario', editSpaceName: 'Modifica nome', saveName: 'Salva nome',
+    copySpaceId: 'Copia ID dello spazio', spaceIdCopied: 'ID copiato', administrator: 'Amministratore', memberAccount: 'Utente',
+  },
+  tr: {
+    vaultType: 'Kasa türü', vaultTypePending: 'Tür bekleniyor', assignedVaults: 'Kasa erişimi',
+    manageAccessHelp: 'Bu hesabın erişebileceği tüm kasaları seçin ve her izni ayrı ayrı ayarlayın.',
+    saveAccess: 'Erişimleri kaydet', lockedOwner: 'Gerekli sahip', editSpaceName: 'Adı düzenle', saveName: 'Adı kaydet',
+    copySpaceId: 'Alan kimliğini kopyala', spaceIdCopied: 'Kimlik kopyalandı', administrator: 'Yönetici', memberAccount: 'Kullanıcı',
+  },
+};
+
+const VAULT_TYPE_KEYS = {
+  en: { vaultTypeAcademic: 'Academic', vaultTypePrimarySources: 'Primary sources', vaultTypeGenealogy: 'Genealogy', vaultTypeDatabases: 'Databases', vaultTypeStudy: 'Study', vaultTypeTeaching: 'Teaching', vaultTypeTestimonies: 'Testimonies', vaultTypeProsopography: 'Prosopography', vaultTypeWorldbuilding: 'Worldbuilding' },
+  es: { vaultTypeAcademic: 'Académico', vaultTypePrimarySources: 'Fuentes primarias', vaultTypeGenealogy: 'Genealogía', vaultTypeDatabases: 'Bases de datos', vaultTypeStudy: 'Estudio', vaultTypeTeaching: 'Docencia', vaultTypeTestimonies: 'Testimonios', vaultTypeProsopography: 'Prosopografía', vaultTypeWorldbuilding: 'Construcción de mundos' },
+  fr: { vaultTypeAcademic: 'Académique', vaultTypePrimarySources: 'Sources primaires', vaultTypeGenealogy: 'Généalogie', vaultTypeDatabases: 'Bases de données', vaultTypeStudy: 'Étude', vaultTypeTeaching: 'Enseignement', vaultTypeTestimonies: 'Témoignages', vaultTypeProsopography: 'Prosopographie', vaultTypeWorldbuilding: 'Création d’univers' },
+  de: { vaultTypeAcademic: 'Akademisch', vaultTypePrimarySources: 'Primärquellen', vaultTypeGenealogy: 'Genealogie', vaultTypeDatabases: 'Datenbanken', vaultTypeStudy: 'Studium', vaultTypeTeaching: 'Lehre', vaultTypeTestimonies: 'Zeitzeugnisse', vaultTypeProsopography: 'Prosopographie', vaultTypeWorldbuilding: 'Weltenbau' },
+  pt: { vaultTypeAcademic: 'Académico', vaultTypePrimarySources: 'Fontes primárias', vaultTypeGenealogy: 'Genealogia', vaultTypeDatabases: 'Bases de dados', vaultTypeStudy: 'Estudo', vaultTypeTeaching: 'Ensino', vaultTypeTestimonies: 'Testemunhos', vaultTypeProsopography: 'Prosopografia', vaultTypeWorldbuilding: 'Construção de mundos' },
+  'pt-BR': { vaultTypeAcademic: 'Acadêmico', vaultTypePrimarySources: 'Fontes primárias', vaultTypeGenealogy: 'Genealogia', vaultTypeDatabases: 'Bancos de dados', vaultTypeStudy: 'Estudo', vaultTypeTeaching: 'Ensino', vaultTypeTestimonies: 'Testemunhos', vaultTypeProsopography: 'Prosopografia', vaultTypeWorldbuilding: 'Construção de mundos' },
+  it: { vaultTypeAcademic: 'Accademico', vaultTypePrimarySources: 'Fonti primarie', vaultTypeGenealogy: 'Genealogia', vaultTypeDatabases: 'Banche dati', vaultTypeStudy: 'Studio', vaultTypeTeaching: 'Didattica', vaultTypeTestimonies: 'Testimonianze', vaultTypeProsopography: 'Prosopografia', vaultTypeWorldbuilding: 'Creazione di mondi' },
+  tr: { vaultTypeAcademic: 'Akademik', vaultTypePrimarySources: 'Birincil kaynaklar', vaultTypeGenealogy: 'Şecere', vaultTypeDatabases: 'Veritabanları', vaultTypeStudy: 'Çalışma', vaultTypeTeaching: 'Öğretim', vaultTypeTestimonies: 'Tanıklıklar', vaultTypeProsopography: 'Prosopografi', vaultTypeWorldbuilding: 'Dünya inşası' },
+};
+
+const EMAIL_ADMIN_KEYS = {
+  en: { unlockEmails: 'Reveal and edit email addresses', unlockEmailsHelp: 'For privacy, addresses are hidden until you confirm your administrator password.', unlockForFiveMinutes: 'Unlock for 5 minutes', emailAccessUnlocked: 'Email addresses are visible in this session for five minutes.', emailUnlockFailed: 'The administrator password is incorrect.', emailAccessExpired: 'Email access has expired. Confirm your password again.', saveEmail: 'Save email', emailUpdated: 'Email updated. Every session and connected device for that account was revoked.', emailUnchanged: 'The email address did not change.', emailUpdatedSignIn: 'Email updated. Sign in again with the new address.', environmentEmailReadonly: 'Managed by NODUS_ADMIN_EMAIL and cannot be edited here.' },
+  es: { unlockEmails: 'Ver y editar correos', unlockEmailsHelp: 'Por privacidad, las direcciones permanecen ocultas hasta confirmar tu contraseña de administrador.', unlockForFiveMinutes: 'Desbloquear 5 minutos', emailAccessUnlocked: 'Los correos serán visibles durante cinco minutos en esta sesión.', emailUnlockFailed: 'La contraseña de administrador es incorrecta.', emailAccessExpired: 'El acceso a los correos ha caducado. Confirma de nuevo tu contraseña.', saveEmail: 'Guardar correo', emailUpdated: 'Correo actualizado. Se han revocado todas las sesiones y dispositivos conectados de esa cuenta.', emailUnchanged: 'El correo no ha cambiado.', emailUpdatedSignIn: 'Correo actualizado. Inicia sesión de nuevo con la nueva dirección.', environmentEmailReadonly: 'Lo gestiona NODUS_ADMIN_EMAIL y no puede editarse aquí.' },
+  fr: { unlockEmails: 'Afficher et modifier les e-mails', unlockEmailsHelp: 'Pour protéger la vie privée, les adresses restent masquées jusqu’à confirmation du mot de passe administrateur.', unlockForFiveMinutes: 'Déverrouiller 5 minutes', emailAccessUnlocked: 'Les e-mails sont visibles pendant cinq minutes dans cette session.', emailUnlockFailed: 'Le mot de passe administrateur est incorrect.', emailAccessExpired: 'L’accès aux e-mails a expiré. Confirmez à nouveau votre mot de passe.', saveEmail: 'Enregistrer l’e-mail', emailUpdated: 'E-mail modifié. Toutes les sessions et tous les appareils de ce compte ont été révoqués.', emailUnchanged: 'L’e-mail n’a pas changé.', emailUpdatedSignIn: 'E-mail modifié. Reconnectez-vous avec la nouvelle adresse.', environmentEmailReadonly: 'Géré par NODUS_ADMIN_EMAIL et non modifiable ici.' },
+  de: { unlockEmails: 'E-Mail-Adressen anzeigen und bearbeiten', unlockEmailsHelp: 'Zum Schutz der Privatsphäre bleiben Adressen verborgen, bis Sie Ihr Administratorpasswort bestätigen.', unlockForFiveMinutes: 'Für 5 Minuten entsperren', emailAccessUnlocked: 'E-Mail-Adressen sind in dieser Sitzung fünf Minuten sichtbar.', emailUnlockFailed: 'Das Administratorpasswort ist falsch.', emailAccessExpired: 'Der E-Mail-Zugriff ist abgelaufen. Bestätigen Sie Ihr Passwort erneut.', saveEmail: 'E-Mail speichern', emailUpdated: 'E-Mail aktualisiert. Alle Sitzungen und verbundenen Geräte dieses Kontos wurden widerrufen.', emailUnchanged: 'Die E-Mail-Adresse wurde nicht geändert.', emailUpdatedSignIn: 'E-Mail aktualisiert. Melden Sie sich mit der neuen Adresse erneut an.', environmentEmailReadonly: 'Wird über NODUS_ADMIN_EMAIL verwaltet und kann hier nicht bearbeitet werden.' },
+  pt: { unlockEmails: 'Ver e editar e-mails', unlockEmailsHelp: 'Por privacidade, os endereços ficam ocultos até confirmar a palavra-passe de administrador.', unlockForFiveMinutes: 'Desbloquear por 5 minutos', emailAccessUnlocked: 'Os e-mails ficam visíveis durante cinco minutos nesta sessão.', emailUnlockFailed: 'A palavra-passe de administrador está incorreta.', emailAccessExpired: 'O acesso aos e-mails expirou. Confirme novamente a palavra-passe.', saveEmail: 'Guardar e-mail', emailUpdated: 'E-mail atualizado. Todas as sessões e dispositivos ligados dessa conta foram revogados.', emailUnchanged: 'O e-mail não foi alterado.', emailUpdatedSignIn: 'E-mail atualizado. Inicie sessão novamente com o novo endereço.', environmentEmailReadonly: 'Gerido por NODUS_ADMIN_EMAIL e não pode ser editado aqui.' },
+  'pt-BR': { unlockEmails: 'Ver e editar e-mails', unlockEmailsHelp: 'Por privacidade, os endereços ficam ocultos até confirmar a senha de administrador.', unlockForFiveMinutes: 'Desbloquear por 5 minutos', emailAccessUnlocked: 'Os e-mails ficam visíveis durante cinco minutos nesta sessão.', emailUnlockFailed: 'A senha de administrador está incorreta.', emailAccessExpired: 'O acesso aos e-mails expirou. Confirme novamente a senha.', saveEmail: 'Salvar e-mail', emailUpdated: 'E-mail atualizado. Todas as sessões e dispositivos conectados dessa conta foram revogados.', emailUnchanged: 'O e-mail não foi alterado.', emailUpdatedSignIn: 'E-mail atualizado. Entre novamente com o novo endereço.', environmentEmailReadonly: 'Gerenciado por NODUS_ADMIN_EMAIL e não pode ser editado aqui.' },
+  it: { unlockEmails: 'Mostra e modifica gli indirizzi e-mail', unlockEmailsHelp: 'Per la privacy, gli indirizzi restano nascosti finché non confermi la password di amministratore.', unlockForFiveMinutes: 'Sblocca per 5 minuti', emailAccessUnlocked: 'Gli indirizzi e-mail sono visibili per cinque minuti in questa sessione.', emailUnlockFailed: 'La password di amministratore non è corretta.', emailAccessExpired: 'L’accesso alle e-mail è scaduto. Conferma di nuovo la password.', saveEmail: 'Salva e-mail', emailUpdated: 'E-mail aggiornata. Tutte le sessioni e i dispositivi connessi dell’account sono stati revocati.', emailUnchanged: 'L’indirizzo e-mail non è cambiato.', emailUpdatedSignIn: 'E-mail aggiornata. Accedi di nuovo con il nuovo indirizzo.', environmentEmailReadonly: 'Gestita da NODUS_ADMIN_EMAIL e non modificabile qui.' },
+  tr: { unlockEmails: 'E-posta adreslerini göster ve düzenle', unlockEmailsHelp: 'Gizlilik için adresler, yönetici parolanızı doğrulayana kadar gizli kalır.', unlockForFiveMinutes: '5 dakikalığına aç', emailAccessUnlocked: 'E-posta adresleri bu oturumda beş dakika görünür.', emailUnlockFailed: 'Yönetici parolası yanlış.', emailAccessExpired: 'E-posta erişiminin süresi doldu. Parolanızı yeniden doğrulayın.', saveEmail: 'E-postayı kaydet', emailUpdated: 'E-posta güncellendi. Bu hesaba ait tüm oturumlar ve bağlı cihazlar iptal edildi.', emailUnchanged: 'E-posta adresi değişmedi.', emailUpdatedSignIn: 'E-posta güncellendi. Yeni adresle yeniden oturum açın.', environmentEmailReadonly: 'NODUS_ADMIN_EMAIL tarafından yönetilir ve burada düzenlenemez.' },
+};
+
+const LIBRARY_ADMIN_KEYS = {
+  en: { publishedLibraryOne: 'Published library: 1 document', publishedLibraryCount: 'Published library: {count} documents', libraryNotShared: 'Library not shared' },
+  es: { publishedLibraryOne: 'Biblioteca publicada: 1 documento', publishedLibraryCount: 'Biblioteca publicada: {count} documentos', libraryNotShared: 'Biblioteca no compartida' },
+  fr: { publishedLibraryOne: 'Bibliothèque publiée : 1 document', publishedLibraryCount: 'Bibliothèque publiée : {count} documents', libraryNotShared: 'Bibliothèque non partagée' },
+  de: { publishedLibraryOne: 'Veröffentlichte Bibliothek: 1 Dokument', publishedLibraryCount: 'Veröffentlichte Bibliothek: {count} Dokumente', libraryNotShared: 'Bibliothek nicht freigegeben' },
+  pt: { publishedLibraryOne: 'Biblioteca publicada: 1 documento', publishedLibraryCount: 'Biblioteca publicada: {count} documentos', libraryNotShared: 'Biblioteca não partilhada' },
+  'pt-BR': { publishedLibraryOne: 'Biblioteca publicada: 1 documento', publishedLibraryCount: 'Biblioteca publicada: {count} documentos', libraryNotShared: 'Biblioteca não compartilhada' },
+  it: { publishedLibraryOne: 'Biblioteca pubblicata: 1 documento', publishedLibraryCount: 'Biblioteca pubblicata: {count} documenti', libraryNotShared: 'Biblioteca non condivisa' },
+  tr: { publishedLibraryOne: 'Yayınlanmış kitaplık: 1 belge', publishedLibraryCount: 'Yayınlanmış kitaplık: {count} belge', libraryNotShared: 'Kitaplık paylaşılmıyor' },
+};
+
 const TABLES = {
-  en: { ...EN, ...ROLE_KEYS.en },
-  es: { ...ES, ...ROLE_KEYS.es },
-  fr: { ...FR, ...ROLE_KEYS.fr },
-  de: { ...DE, ...ROLE_KEYS.de },
-  pt: { ...PT, ...ROLE_KEYS.pt },
-  'pt-BR': { ...PT_BR, ...ROLE_KEYS['pt-BR'] },
-  it: { ...IT, ...ROLE_KEYS.it },
-  tr: { ...TR, ...ROLE_KEYS.tr },
+  en: { ...EN, ...ROLE_KEYS.en, ...SERVER_UI_KEYS.en, ...ADMIN_UI_KEYS.en, ...VAULT_TYPE_KEYS.en, ...EMAIL_ADMIN_KEYS.en, ...LIBRARY_ADMIN_KEYS.en },
+  es: { ...ES, ...ROLE_KEYS.es, ...SERVER_UI_KEYS.es, ...ADMIN_UI_KEYS.es, ...VAULT_TYPE_KEYS.es, ...EMAIL_ADMIN_KEYS.es, ...LIBRARY_ADMIN_KEYS.es },
+  fr: { ...FR, ...ROLE_KEYS.fr, ...SERVER_UI_KEYS.fr, ...ADMIN_UI_KEYS.fr, ...VAULT_TYPE_KEYS.fr, ...EMAIL_ADMIN_KEYS.fr, ...LIBRARY_ADMIN_KEYS.fr },
+  de: { ...DE, ...ROLE_KEYS.de, ...SERVER_UI_KEYS.de, ...ADMIN_UI_KEYS.de, ...VAULT_TYPE_KEYS.de, ...EMAIL_ADMIN_KEYS.de, ...LIBRARY_ADMIN_KEYS.de },
+  pt: { ...PT, ...ROLE_KEYS.pt, ...SERVER_UI_KEYS.pt, ...ADMIN_UI_KEYS.pt, ...VAULT_TYPE_KEYS.pt, ...EMAIL_ADMIN_KEYS.pt, ...LIBRARY_ADMIN_KEYS.pt },
+  'pt-BR': { ...PT_BR, ...ROLE_KEYS['pt-BR'], ...SERVER_UI_KEYS['pt-BR'], ...ADMIN_UI_KEYS['pt-BR'], ...VAULT_TYPE_KEYS['pt-BR'], ...EMAIL_ADMIN_KEYS['pt-BR'], ...LIBRARY_ADMIN_KEYS['pt-BR'] },
+  it: { ...IT, ...ROLE_KEYS.it, ...SERVER_UI_KEYS.it, ...ADMIN_UI_KEYS.it, ...VAULT_TYPE_KEYS.it, ...EMAIL_ADMIN_KEYS.it, ...LIBRARY_ADMIN_KEYS.it },
+  tr: { ...TR, ...ROLE_KEYS.tr, ...SERVER_UI_KEYS.tr, ...ADMIN_UI_KEYS.tr, ...VAULT_TYPE_KEYS.tr, ...EMAIL_ADMIN_KEYS.tr, ...LIBRARY_ADMIN_KEYS.tr },
 };
 
 export function missingServerTranslations() {

@@ -166,7 +166,7 @@ test('the provisioning secret is written 0600, and guards the endpoint', async (
     const call = (headers) => fetch(`${server.base}/api/v1/local/provision`, {
       method: 'POST',
       headers: { 'content-type': 'application/json', ...headers },
-      body: JSON.stringify({ vaultId: 'vault-1', vaultName: 'Tesis' }),
+      body: JSON.stringify({ vaultId: 'vault-1', vaultName: 'Tesis', vaultType: 'academic' }),
     });
 
     assert.equal((await call({})).status, 401, 'no secret must be refused');
@@ -180,6 +180,8 @@ test('the provisioning secret is written 0600, and guards the endpoint', async (
     assert.ok(first.spaceId);
     assert.match(first.code, /^[A-Z0-9]{4}-[A-Z0-9]{4}$/);
     assert.equal(first.spaceName, 'Tesis');
+    let state = JSON.parse(fs.readFileSync(path.join(dir, 'data', 'state.json'), 'utf8'));
+    assert.equal(state.spaces[0].vaultType, 'academic', 'local provisioning records the vault type before its first publication');
 
     // Same vault, second call: the space is reused rather than duplicated.
     const again = await (await call({ authorization: `Bearer ${secret}` })).json();
@@ -203,9 +205,11 @@ test('the provisioning secret is written 0600, and guards the endpoint', async (
     const other = await fetch(`${server.base}/api/v1/local/provision`, {
       method: 'POST',
       headers: { 'content-type': 'application/json', authorization: `Bearer ${secret}` },
-      body: JSON.stringify({ vaultId: 'vault-2', vaultName: 'Docencia' }),
+      body: JSON.stringify({ vaultId: 'vault-2', vaultName: 'Docencia', vaultType: 'docencia' }),
     });
     assert.notEqual((await other.json()).spaceId, first.spaceId);
+    state = JSON.parse(fs.readFileSync(path.join(dir, 'data', 'state.json'), 'utf8'));
+    assert.equal(state.spaces.find((space) => space.localVaultId === 'vault-2')?.vaultType, 'docencia');
   } finally {
     await stop(server);
     await rm(dir, { recursive: true, force: true });

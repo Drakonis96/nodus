@@ -26,10 +26,12 @@ import { STUDY_DOCUMENT_KINDS } from '@shared/studyOrg';
 import type { EditorDocument, EditorDocumentPort } from './documentPort';
 import { studyDocumentPort } from './documentPort';
 import type { StudyImproveScope, StudyStyle } from '@shared/studyImprove';
+import { studyStyleIcon } from '@shared/studyImprove';
 import type { StudySentenceContext, StudySynonymAlternative } from '@shared/studySynonyms';
 import { studySentenceContext } from '@shared/studySynonyms';
 import type { AppSettings } from '@shared/types';
 import { Markdown } from '../Markdown';
+import type { TestimonyDeepLink } from '@shared/testimonyDeepLinks';
 import { ModelPicker } from '../ModelPicker';
 import { Icon, ICON_NAMES, Spinner } from '../ui';
 import { TextInputModal } from '../TextInputModal';
@@ -69,9 +71,8 @@ interface SynonymPanelState {
 }
 
 function ImproveStyleMark({ style, size = 16 }: { style: Pick<StudyStyle, 'icon'>; size?: number }) {
-  return (ICON_NAMES as readonly string[]).includes(style.icon)
-    ? <Icon name={style.icon} size={size} />
-    : <span className="leading-none" style={{ fontSize: size }}>{style.icon || '✦'}</span>;
+  const icon = studyStyleIcon(style.icon);
+  return <Icon name={(ICON_NAMES as readonly string[]).includes(icon) ? icon : 'sparkles'} size={size} />;
 }
 
 const STUDY_KIND_LABEL: Record<StudyDocumentKind, string> = {
@@ -327,6 +328,7 @@ export function StudyEditor({
   onTrash,
   onOpenLinkedDocument,
   onOpenRecording,
+  onTestimonyLink,
 }: {
   settings: AppSettings;
   documents: EditorDocument[];
@@ -349,6 +351,7 @@ export function StudyEditor({
   onTrash: () => Promise<void>;
   onOpenLinkedDocument: (id: string) => void;
   onOpenRecording: (id: string, timestamp?: number | null) => void;
+  onTestimonyLink?: (link: TestimonyDeepLink) => void;
 }) {
   const port = portProp ?? (studyDocumentPort as EditorDocumentPort);
   const active = documents.find((document) => document.id === activeId) ?? documents[0];
@@ -1018,7 +1021,7 @@ export function StudyEditor({
                 spellcheck language={data.spellcheckLanguage} onChange={(value) => { if (!rawRef.current) setDraft(value); }} onHistoryChange={setHistoryState} onOpenRecording={onOpenRecording} onToolbarElement={setSelectionToolbar} />
             )}
           </div>
-          {split && <div className="min-h-full overflow-y-auto bg-stone-50 p-8 text-stone-900 dark:bg-neutral-900/20 dark:text-neutral-100"><Markdown content={draft} verify={false} onStudyDocument={(documentId) => void openLinkedDocument(documentId)} onStudyRecording={onOpenRecording} /></div>}
+          {split && <div className="min-h-full overflow-y-auto bg-stone-50 p-8 text-stone-900 dark:bg-neutral-900/20 dark:text-neutral-100"><Markdown content={draft} verify={false} onStudyDocument={(documentId) => void openLinkedDocument(documentId)} onStudyRecording={onOpenRecording} onTestimonyLink={onTestimonyLink} /></div>}
         </div>
 
         {!focusMode && (showHistory || data.annotations.length > 0 || data.backlinks.length > 0) && (
@@ -1064,12 +1067,12 @@ export function StudyEditor({
             )}
           </aside>
         )}
-        {selectionImprove && selectionToolbar && createPortal(<><div className="divider" data-testid="study-selection-tools-divider" />{quickImproveStyles.map((prompt) => <button type="button" key={prompt.id} data-testid={`study-quick-improve-${prompt.id.replace(':', '-')}`} className="toolbar-item study-selection-tool" title={`${prompt.name} · ${prompt.description}`} aria-label={prompt.name} disabled={Boolean(improveStreamingStyleId)} onPointerDown={(event) => { event.preventDefault(); void runQuickImprovement(prompt, selectionImprove.target); }}><ImproveStyleMark style={prompt} /></button>)}<button type="button" data-testid="study-synonyms-toggle" className="toolbar-item study-selection-tool" title={t('Sinónimos con IA')} aria-label={t('Sinónimos con IA')} disabled={Boolean(improveStreamingStyleId)} onPointerDown={(event) => { event.preventDefault(); event.stopPropagation(); openSynonymPanel(event.currentTarget, selectionImprove.target); }}><Icon name="thesaurus" size={16} /></button><label className="toolbar-item study-selection-color" title={t('Color del texto')} aria-label={t('Color del texto')}><Icon name="palette" size={16} /><input data-testid="study-selection-text-color" type="color" defaultValue="#0f766e" onInput={(event) => milkdownRef.current?.setTextColor((event.target as HTMLInputElement).value)} /></label><select data-testid="study-selection-heading" className="study-selection-heading" defaultValue="" title={t('Nivel de título')} aria-label={t('Nivel de título')} onPointerDown={(event) => event.stopPropagation()} onChange={(event) => { milkdownRef.current?.setHeading(Number(event.target.value)); event.target.value = ''; }}><option value="" disabled>H</option><option value="0">{t('Párrafo')}</option>{[1, 2, 3, 4, 5, 6].map((level) => <option key={level} value={level}>H{level}</option>)}</select></>, selectionToolbar)}
+        {selectionImprove && selectionToolbar && createPortal(<><div className="divider" data-testid="study-selection-tools-divider" />{quickImproveStyles.map((prompt) => <button type="button" key={prompt.id} data-testid={`study-quick-improve-${prompt.id.replace(':', '-')}`} className="toolbar-item study-selection-tool" title={`${prompt.name} · ${prompt.description}`} aria-label={prompt.name} disabled={Boolean(improveStreamingStyleId)} onPointerDown={(event) => { event.preventDefault(); void runQuickImprovement(prompt, selectionImprove.target); }}><ImproveStyleMark style={prompt} /></button>)}<button type="button" data-testid="study-synonyms-toggle" className="toolbar-item study-selection-tool study-synonyms-trigger" title={t('Sinónimos con IA')} aria-label={t('Sinónimos con IA')} disabled={Boolean(improveStreamingStyleId)} onPointerDown={(event) => { event.preventDefault(); event.stopPropagation(); openSynonymPanel(event.currentTarget, selectionImprove.target); }}><Icon name="aiSynonyms" size={16} /></button><label className="toolbar-item study-selection-color" title={t('Color del texto')} aria-label={t('Color del texto')}><Icon name="palette" size={16} /><input data-testid="study-selection-text-color" type="color" defaultValue="#0f766e" onInput={(event) => milkdownRef.current?.setTextColor((event.target as HTMLInputElement).value)} /></label><select data-testid="study-selection-heading" className="study-selection-heading" defaultValue="" title={t('Nivel de título')} aria-label={t('Nivel de título')} onPointerDown={(event) => event.stopPropagation()} onChange={(event) => { milkdownRef.current?.setHeading(Number(event.target.value)); event.target.value = ''; }}><option value="" disabled>H</option><option value="0">{t('Párrafo')}</option>{[1, 2, 3, 4, 5, 6].map((level) => <option key={level} value={level}>H{level}</option>)}</select></>, selectionToolbar)}
       </div>
       {synonymPanel && createPortal(
         <div ref={synonymPanelRef} data-testid="study-synonyms-panel" role="dialog" aria-label={t('Alternativas de sinónimos')} className="study-synonyms-panel" style={{ left: synonymPanel.x, top: synonymPanel.y }}>
           <div className="study-synonyms-header">
-            <span className="flex min-w-0 items-center gap-2"><Icon name="thesaurus" size={16} className="text-teal-600 dark:text-teal-300" /><span className="truncate font-semibold">{t('Sinónimos y reformulaciones')}</span></span>
+            <span className="flex min-w-0 items-center gap-2"><Icon name="aiSynonyms" size={16} className="text-teal-600 dark:text-teal-300" /><span className="truncate font-semibold">{t('Sinónimos y reformulaciones')}</span></span>
             <button type="button" className="rounded-md p-1 text-neutral-500 hover:bg-neutral-100 hover:text-neutral-800 dark:hover:bg-neutral-800 dark:hover:text-neutral-100" onClick={closeSynonymPanel} aria-label={t('Cerrar')}><Icon name="x" size={13} /></button>
           </div>
           <p className="px-3 pb-2 text-[11px] leading-4 text-neutral-500">{t('Cinco alternativas en el idioma original, elegidas con el contexto de la frase.')}</p>

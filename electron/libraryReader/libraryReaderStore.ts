@@ -18,6 +18,8 @@ import { getWork } from '../db/worksRepo';
 import { xlsxFileToText } from '../extraction/tabular';
 import { atomicWriteJson, configuredLibraryRootOrThrow, safeLibraryFolderName } from '../library/libraryPaths';
 import { legacyMetadataToRecord, normalizeLibraryItemRecord } from '../library/libraryRecord';
+import { notifyGlobalLibraryChanged } from '../library/libraryRuntime';
+import type { IncomingMutation, ExternalMutationDecision } from '../serverSync/mutationInbox';
 
 interface ReaderMetadata {
   citationKey?: string;
@@ -709,6 +711,7 @@ export interface LibraryReaderAnnotationContext {
   filePath: string;
   orphanedFilePath: string;
   documentId: string;
+  title: string;
   contentFingerprint: string | null;
 }
 
@@ -722,6 +725,7 @@ export function libraryReaderAnnotationContext(documentId: string): LibraryReade
     orphanedFilePath: optionalDocumentFile(resolved.folder, resolved.metadata.files?.orphanedAnnotations, 'orphaned-annotations.json')
       ?? path.join(resolved.folder, 'orphaned-annotations.json'),
     documentId: resolved.identity.storageId,
+    title: resolved.identity.title,
     contentFingerprint: resolved.metadata.contentRevision?.contentFingerprint ?? null,
   };
 }
@@ -775,6 +779,119 @@ export function listLibraryReaderAnnotations(workId: string): WritingDraftAnnota
     .filter((annotation) => annotation.anchorStatus !== 'orphaned')
     .sort((a, b) => a.scope.localeCompare(b.scope) || a.startOffset - b.startOffset || a.createdAt.localeCompare(b.createdAt))
     .map((annotation) => publicAnnotation(workId, annotation));
+}
+
+/**
+ * Apply a mobile annotation addressed to the global library rather than the active vault.
+ * The server ledger intentionally carries one table vocabulary; the `nodus-library:` draft
+ * id is the routing invariant that keeps these rows out of a vault SQLite database.
+ */
+export function applyPublishedLibraryAnnotationMutation(mutation: IncomingMutation): ExternalMutationDecision | null {
+  if (mutation.table !== 'writing_draft_annotations') return null;
+  const rowDraftId = typeof mutation.row?.draft_id === 'string' ? mutation.row.draft_id : '';
+  const incomingId = String(mutation.kind === 'delete' ? mutation.key?.[0] ?? '' : mutation.row?.id ?? mutation.key?.[0] ?? '');
+  let routedDocumentId = '';
+  let routedAnnotationId = '';
+  if (incomingId.startsWith('library-annotation:')) {
+    const route = incomingId.slice('library-annotation:'.length);
+    const separator = route.indexOf(':');
+    if (separator <= 0 || separator === route.length - 1) throw new Error('La ruta de la anotación de biblioteca no es válida.');
+    const token = route.slice(0, separator);
+    try {
+      routedDocumentId = Buffer.from(token, 'base64url').toString('utf8');
+    } catch {
+      throw new Error('La ruta de la anotación de biblioteca no se puede leer.');
+    }
+    if (!routedDocumentId || Buffer.from(routedDocumentId, 'utf8').toString('base64url') !== token) {
+      throw new Error('La ruta de la anotación de biblioteca no es canónica.');
+    }
+    routedAnnotationId = route.slice(separator + 1);
+  }
+  const draftDocumentId = rowDraftId.startsWith('nodus-library:') ? rowDraftId.slice('nodus-library:'.length) : '';
+  if (draftDocumentId && routedDocumentId && draftDocumentId !== routedDocumentId) {
+    throw new Error('La anotación de biblioteca apunta a dos documentos distintos.');
+  }
+  const prefixMatch = draftDocumentId || routedDocumentId;
+  if (!prefixMatch) return null;
+  const documentId = prefixMatch;
+  if (!documentId) throw new Error('La anotación de biblioteca no identifica un documento.');
+  const target = libraryReaderAnnotationContext(documentId);
+  if (!target) throw new Error('El documento de biblioteca ya no existe en este equipo.');
+  const annotations = readDiskAnnotations(target.filePath);
+  const id = routedAnnotationId || incomingId;
+  if (!id) throw new Error('La anotación de biblioteca no tiene identificador.');
+  const existing = annotations.findIndex((annotation) => annotation.id === id);
+  const existingAnnotation = existing >= 0 ? annotations[existing] : null;
+  const inboxDecision = (
+    outcome: ExternalMutationDecision['outcome'],
+    annotation: Record<string, unknown> | DiskAnnotation | null | undefined,
+  ): ExternalMutationDecision => {
+    const value = annotation as Record<string, unknown> | null | undefined;
+    const readable = (candidate: unknown) => typeof candidate === 'string' && candidate.trim()
+      ? candidate.trim()
+      : null;
+    return {
+      outcome,
+      title: readable(value?.comment_text ?? value?.comment) ?? readable(value?.selected_text ?? value?.selectedText),
+      entityKind: 'library_annotation',
+      parentEntityKind: 'library_document',
+      parentEntityId: target.documentId,
+      parentTitle: target.title,
+    };
+  };
+  const incomingTime = Date.parse(String(mutation.row?.updated_at ?? mutation.createdAt ?? '')) || 0;
+  if (existing >= 0 && Date.parse(annotations[existing].updatedAt) > incomingTime) {
+    return inboxDecision('keptLocal', existingAnnotation);
+  }
+  if (mutation.kind === 'delete') {
+    if (existing >= 0) annotations.splice(existing, 1);
+    atomicWriteJson(target.filePath, annotations);
+    atomicWriteJson(target.orphanedFilePath, annotations.filter((entry) => entry.anchorStatus === 'orphaned'));
+    notifyGlobalLibraryChanged();
+    return inboxDecision('deleted', existingAnnotation);
+  }
+
+  const row = mutation.row ?? {};
+  let annotationTarget: WritingDraftAnnotation['target'] | undefined;
+  if (typeof row.target_json === 'string' && row.target_json.trim()) {
+    try { annotationTarget = JSON.parse(row.target_json) as WritingDraftAnnotation['target']; }
+    catch { throw new Error('La posición del original anotado no se puede leer.'); }
+  }
+  const value = normalizedAnnotationInput({
+    draftId: documentId,
+    scope: String(row.scope || 'library'),
+    kind: String(row.kind) as WritingDraftAnnotation['kind'],
+    color: row.color == null ? null : String(row.color) as WritingDraftAnnotationColor,
+    startOffset: Number(row.start_offset),
+    endOffset: Number(row.end_offset),
+    selectedText: String(row.selected_text ?? ''),
+    prefix: String(row.prefix ?? ''),
+    suffix: String(row.suffix ?? ''),
+    comment: row.comment_text == null ? null : String(row.comment_text),
+    target: annotationTarget,
+  });
+  const createdAt = typeof row.created_at === 'string' ? row.created_at : mutation.createdAt || new Date().toISOString();
+  const updatedAt = typeof row.updated_at === 'string' ? row.updated_at : mutation.createdAt || createdAt;
+  const next: DiskAnnotation = {
+    id,
+    documentId: target.documentId,
+    ...value,
+    // Clean Markdown and the original are two independent renderings. Mobile names them with
+    // a library prefix while the mutation is in the shared ledger; disk annotations keep the
+    // canonical reader scopes used by desktop.
+    scope: value.scope === 'library-original' || value.scope === 'original' ? 'original' : 'source',
+    createdAt: existing >= 0 ? annotations[existing].createdAt : createdAt,
+    updatedAt,
+    anchorStatus: 'current',
+    contentFingerprint: target.contentFingerprint,
+    orphanReason: null,
+  };
+  if (!validDiskAnnotation(next)) throw new Error('La anotación de biblioteca no es válida.');
+  if (existing >= 0) annotations[existing] = next; else annotations.push(next);
+  atomicWriteJson(target.filePath, annotations);
+  atomicWriteJson(target.orphanedFilePath, annotations.filter((entry) => entry.anchorStatus === 'orphaned'));
+  notifyGlobalLibraryChanged();
+  return inboxDecision('applied', next);
 }
 
 export function listLibraryReaderOrphanedAnnotations(workId: string): WritingDraftAnnotation[] {

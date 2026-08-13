@@ -337,7 +337,22 @@ export async function handleRequest(req: IncomingMessage, res: ServerResponse, p
       return;
     }
     if (urlPath === '/api/nodus/open' && req.method === 'POST') {
-      const body = (await readJsonBody(req)) as { ideaId?: string };
+      const body = (await readJsonBody(req)) as { ideaId?: string; destination?: string };
+      if (body.destination === 'citation-styles') {
+        const win = getMainWindow?.() ?? null;
+        if (win) {
+          if (win.isMinimized()) win.restore();
+          win.show();
+          win.focus();
+          win.webContents.send('copilot:openIdea', {
+            ideaId: '',
+            label: null,
+            destination: 'library-citation-styles',
+          });
+        }
+        sendJson(res, 200, { ok: Boolean(win) });
+        return;
+      }
       if (!body.ideaId) {
         sendJson(res, 400, { error: copilotText('Falta ideaId.', 'Missing ideaId.') });
         return;

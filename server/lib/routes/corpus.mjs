@@ -24,6 +24,21 @@ function snippet(value) {
   return clean.length <= SNIPPET_CHARS ? clean : `${clean.slice(0, SNIPPET_CHARS - 1)}…`;
 }
 
+function folderSubtree(folders, rootId) {
+  if (!rootId) return null;
+  const found = new Set([String(rootId)]);
+  let changed = true;
+  while (changed) {
+    changed = false;
+    for (const folder of folders) {
+      const id = String(folder.id ?? '');
+      const parent = String(folder.parent_id ?? '');
+      if (id && found.has(parent) && !found.has(id)) { found.add(id); changed = true; }
+    }
+  }
+  return found;
+}
+
 function isDeepResearchDraft(row) {
   try {
     return JSON.parse(row.brief_json || '{}')?.kind === 'deep_research';
@@ -431,21 +446,32 @@ export function createCorpusRoutes({ readSnapshot, readAssetBytes }) {
       const snapshot = requireSnapshot(res, json, space.id);
       if (!snapshot) return true;
       const all = rows(snapshot, 'notes');
+      const live = all.filter((note) => !note.trashed_at);
       if (rest.length === 0) {
         const query = url.searchParams.get('q');
         const folder = url.searchParams.get('folderId');
-        const filtered = all
-          .filter((note) => !folder || String(note.folder_id ?? '') === folder)
+        const kind = url.searchParams.get('kind');
+        const folders = rows(snapshot, 'note_folders');
+        const folderIds = url.searchParams.get('recursive') === '1' ? folderSubtree(folders, folder) : null;
+        const filtered = live
+          .filter((note) => !folder || (folderIds
+            ? folderIds.has(String(note.folder_id ?? ''))
+            : String(note.folder_id ?? '') === folder))
+          .filter((note) => !kind || String(note.kind ?? 'markdown') === kind)
           .filter((note) => !query || matchesRow(note, query))
-          .map((note) => ({ id: note.id, title: note.title, folder_id: note.folder_id, kind: note.kind, order_idx: note.order_idx, created_at: note.created_at, updated_at: note.updated_at, snippet: snippet(note.content) }));
+          .map((note) => ({ id: note.id, title: note.title, folder_id: note.folder_id, kind: note.kind, tags: (() => { try { const tags = JSON.parse(note.tags_json || '[]'); return Array.isArray(tags) ? tags : []; } catch { return []; } })(), order_idx: note.order_idx, created_at: note.created_at, updated_at: note.updated_at, snippet: snippet(note.content) }));
         if (notModified(req, res, json, space, url, key)) return true;
         return send(res, json, {
           ...page('notes', filtered, readLimit(url.searchParams.get('limit')), readOffset(url.searchParams.get('offset'))),
-          folders: rows(snapshot, 'note_folders'),
+          folders,
+          counts: {
+            notes: live.filter((note) => String(note.kind ?? 'markdown') !== 'idea').length,
+            ideas: live.filter((note) => String(note.kind ?? '') === 'idea').length,
+          },
           revision: space.revision,
         });
       }
-      const note = all.find((candidate) => String(candidate.id) === decodeURIComponent(rest[0]));
+      const note = live.find((candidate) => String(candidate.id) === decodeURIComponent(rest[0]));
       if (!note) return missing(res, json);
       if (notModified(req, res, json, space, url, key)) return true;
       return send(res, json, { note, revision: space.revision });

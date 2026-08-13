@@ -29,6 +29,7 @@ const STATEMENT_CLIP = 220;
 const MAX_IDEAS_IN_PROMPT = 60;
 const MAX_REMEMBER = 6;
 const TOP_THEMES = 4;
+const TOP_TAGS = 5;
 
 const IDEA_TYPE_LABELS: Record<IdeaType, string> = {
   claim: 'afirmación',
@@ -143,6 +144,25 @@ export function listAuthors(): AuthorSummary[] {
     themesByAuthor.set(r.id, list);
   }
 
+  // most frequent real Zotero tags across each author's live works
+  const tagRows = db
+    .prepare(
+      `SELECT wa.author_id AS id, zt.label AS label, COUNT(DISTINCT wzt.nodus_id) AS n
+         FROM work_authors wa
+         JOIN works w ON w.nodus_id = wa.nodus_id AND w.archived = 0
+         JOIN work_zotero_tags wzt ON wzt.nodus_id = wa.nodus_id
+         JOIN zotero_tags zt ON zt.tag_id = wzt.tag_id
+        GROUP BY wa.author_id, zt.tag_id
+        ORDER BY n DESC, zt.label COLLATE NOCASE`
+    )
+    .all() as { id: string; label: string; n: number }[];
+  const tagsByAuthor = new Map<string, string[]>();
+  for (const row of tagRows) {
+    const list = tagsByAuthor.get(row.id) ?? [];
+    if (list.length < TOP_TAGS) list.push(row.label);
+    tagsByAuthor.set(row.id, list);
+  }
+
   const synthRows = db.prepare('SELECT author_id FROM author_dossier_synthesis').all() as { author_id: string }[];
   const hasSynth = new Set(synthRows.map((r) => r.author_id));
   const saved = savedAuthorIds();
@@ -161,6 +181,7 @@ export function listAuthors(): AuthorSummary[] {
         workCount: w.total,
         ideaCount: ideaCount.get(a.author_id) ?? 0,
         relationCount: relationCount.get(a.author_id) ?? 0,
+        topTags: tagsByAuthor.get(a.author_id) ?? [],
         topThemes: themesByAuthor.get(a.author_id) ?? [],
         read: w.total > 0 && w.read === w.total,
         hasSynthesis: hasSynth.has(a.author_id),

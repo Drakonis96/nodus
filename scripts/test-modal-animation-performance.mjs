@@ -21,8 +21,11 @@ test('cinematic modals bound the expensive Nodi SVG animation', () => {
   assert.match(avatar, /restAfterMs\?: number/);
   assert.match(avatar, /QUIESCENT\.has\(state\) \|\| restAfterMs !== undefined/);
   assert.match(avatar, /\[state, settled, reduceMotion, restAfterMs\]/);
-  assert.match(whatsNew, /<NodiAvatar state="celebrating" height=\{205\} restAfterMs=\{2_400\} \/>/);
-  assert.match(startupUpdate, /<NodiAvatar state=\{presentation\.nodiState\} height=\{162\} restAfterMs=\{2_400\} \/>/);
+  assert.match(avatar, /export const NodiAvatar = memo\(NodiAvatarComponent\)/);
+  assert.match(whatsNew, /const WhatsNewNodi = memo/);
+  assert.match(whatsNew, /<NodiAvatar state="celebrating" height=\{205\} restAfterMs=\{1_200\} \/>/);
+  assert.match(startupUpdate, /const StartupUpdateNodi = memo/);
+  assert.match(startupUpdate, /<NodiAvatar state=\{state\} height=\{162\} restAfterMs=\{1_200\} \/>/);
   assert.match(classicCss, /\.nodi-svg\.nodi-at-rest \* \{ animation-play-state: paused !important; \}/);
   assert.match(orbCss, /\.nodi-orb\.nodi-at-rest \* \{ animation-play-state: paused !important; \}/);
 });
@@ -41,7 +44,30 @@ test('closing the update modal removes its listener and progress is throttled', 
   assert.match(startupUpdate, /if \(!shouldShow \|\| !open\) return;/);
   assert.match(startupUpdate, /\[attempt, open, shouldShow\]/);
   assert.match(app, /!manualWhatsNewOpen && !updateSettled && <StartupUpdateModal/);
-  assert.match(main, /const UPDATE_PROGRESS_MIN_INTERVAL_MS = 200;/);
+  assert.match(main, /const UPDATE_PROGRESS_MIN_INTERVAL_MS = 500;/);
   assert.match(main, /roundedPercent === lastDownloadProgressPercent/);
   assert.match(main, /now - lastDownloadProgressEmitAt < UPDATE_PROGRESS_MIN_INTERVAL_MS/);
+  assert.match(startupUpdate, /const RENDER_PROGRESS_MIN_INTERVAL_MS = 500/);
+  assert.match(startupUpdate, /sameVisibleUpdate/);
+  assert.match(startupUpdate, /pendingUpdateRef/);
+  assert.match(startupUpdate, /progressTimerRef/);
+  assert.match(startupUpdate, /window\.clearTimeout\(progressTimerRef\.current\)/);
+});
+
+test('cinematic modals keep their look without a per-frame React animation engine', () => {
+  assert.doesNotMatch(whatsNew, /from 'framer-motion'/);
+  assert.doesNotMatch(startupUpdate, /from 'framer-motion'/);
+  assert.match(styles, /@keyframes whats-new-modal-in/);
+  assert.match(styles, /@keyframes startup-update-modal-in/);
+  assert.match(styles, /\.whats-new-cinema \{[^\n]*animation: whats-new-modal-in/s);
+  assert.match(styles, /\.startup-update-cinema \{[^\n]*animation: startup-update-modal-in/s);
+  assert.match(styles, /\.whats-new-backdrop \{[^\n]*backdrop-filter: blur\(10px\)/s);
+  assert.match(styles, /\.startup-update-backdrop \{[^\n]*backdrop-filter: blur\(10px\)/s);
+});
+
+test('release and update overlays suspend hidden duplicate work', () => {
+  assert.match(whatsNew, /const STARTUP_VERSION_HISTORY_LIMIT = 12/);
+  assert.match(whatsNew, /showSeenReleaseNotes\) return releaseNotesSince\(null, current\)/);
+  assert.match(whatsNew, /releaseNotesSince\(null, current\)\.slice\(0, STARTUP_VERSION_HISTORY_LIMIT\)/);
+  assert.match(app, /\{!manualWhatsNewOpen && updateSettled && <NodiMascot settings=\{settings\} \/>\}/);
 });

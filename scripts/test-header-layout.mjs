@@ -158,3 +158,21 @@ test('the expanded vault badge has a dedicated light-theme surface', () => {
     /background-color: color-mix\(in srgb, var\(--vault-accent, #6366f1\) 11%, white\)/
   );
 });
+
+test('the action rail cannot widen the document in a compact window', () => {
+  assert.match(appSource, /data-testid="header-actions" className="header-action-rail flex min-w-0[^\"]*overflow-hidden/);
+  assert.match(styles, /\.header-action-rail\s*\{[^}]*max-width:\s*100%/s);
+  assert.match(
+    styles,
+    /@media \(max-width: 1100px\)[\s\S]*?\.header-action-rail \.header-action > span\s*\{[\s\S]*?max-width:\s*0 !important/s,
+    'compact titlebars collapse pinned labels before they can push actions outside the window'
+  );
+  assert.match(styles, /html,\s*\nbody,\s*\n#root\s*\{[^}]*overflow:\s*hidden/s);
+});
+
+test('notification badges stay fully inside the clipped action rail', () => {
+  const badgeRules = styles.match(/\.header-action-badge\s*\{([^}]+)\}/s)?.[1] ?? '';
+  assert.match(badgeRules, /top:\s*2px/);
+  assert.doesNotMatch(badgeRules, /top:\s*-/);
+  assert.match(badgeRules, /box-shadow:\s*0 0 0 2px/);
+});

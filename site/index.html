@@ -996,40 +996,12 @@ SPDX-License-Identifier: AGPL-3.0-only
   .contrib-viz-cap { text-align: center; font-size: 12.5px; color: var(--text-2); font-style: italic; padding: 2px 0 8px; }
   @media (max-width: 860px) { .contrib-wrap { grid-template-columns: 1fr; gap: 32px; } }
 </style>
+<link rel="stylesheet" href="site-header.css?v=20260813-shared-header"/>
 </head>
 <body>
 
-<nav class="nav" id="nav">
-  <a class="logo" href="#"><img src="assets/nodus-logo.svg" alt=""/> Nodus</a>
-  <div class="links">
-    <a href="#vaults" class="hideS" data-i18n="nav.vaults">Vaults</a>
-    <a href="#story" class="hideS nav-secondary" data-i18n="nav.how">How it works</a>
-    <a href="#views" class="hideS nav-secondary" data-i18n="nav.views">Views</a>
-    <a href="#tutorials" class="hideS" data-i18n="nav.tutorials">Tutorials</a>
-    <a href="#contrib" class="hideS nav-secondary" data-i18n="nav.contrib">Contribute</a>
-    <a href="#faq" class="hideS" id="faq-nav-link">FAQ</a>
-    <div class="lang-picker" id="lang-picker">
-      <button class="lang-trigger" id="lang-trigger" type="button" aria-haspopup="listbox" aria-expanded="false" aria-controls="lang-menu" aria-label="Choose language">
-        <span class="lang-flag" id="lang-current-flag" aria-hidden="true">🇬🇧</span>
-        <span class="lang-name" id="lang-current-name">English</span>
-        <svg class="lang-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
-      </button>
-      <div class="lang-menu" id="lang-menu" role="listbox" aria-labelledby="lang-trigger" hidden></div>
-    </div>
-    <a class="gh-badge" href="https://github.com/Drakonis96/nodus" target="_blank" rel="noopener" title="Star Nodus on GitHub">
-      <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82a7.42 7.42 0 0 1 2-.27c.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8Z"/></svg>
-      <span class="lbl">Star</span>
-      <span class="stars"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 .25a.75.75 0 0 1 .67.42l1.88 3.8 4.2.62c.61.09.86.84.41 1.28l-3.04 2.96.72 4.18a.75.75 0 0 1-1.09.79L8 12.35l-3.76 1.97a.75.75 0 0 1-1.08-.79l.72-4.18L.83 6.37a.75.75 0 0 1 .41-1.28l4.2-.61L7.32.67A.75.75 0 0 1 8 .25Z"/></svg><span id="star-count" aria-label="Stars on GitHub">·</span></span>
-    </a>
-    <a class="release-downloads" id="release-downloads" data-state="loading" href="https://github.com/Drakonis96/nodus/releases" target="_blank" rel="noopener" aria-describedby="release-downloads-tooltip">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-      <span class="download-value" id="release-download-count">—</span>
-      <span class="download-word" id="release-download-word">downloads</span>
-      <span class="download-tooltip" id="release-downloads-tooltip" role="tooltip">Package downloads from GitHub Releases · updated daily</span>
-    </a>
-    <a class="btn primary" href="demo/index.html" data-i18n="nav.demo">Try the live demo</a>
-  </div>
-</nav>
+<div data-nodus-site-header data-base="" data-context="landing"></div>
+<script src="site-header.js?v=20260813-shared-header"></script>
 
 <header class="hero">
   <canvas id="stars"></canvas>
@@ -1828,7 +1800,7 @@ SPDX-License-Identifier: AGPL-3.0-only
     <a href="https://github.com/Drakonis96/nodus/releases" target="_blank" rel="noopener">Releases</a> ·
     <a href="demo/index.html">Live demo</a> ·
     <a href="https://github.com/Drakonis96/nodus/blob/main/LICENSE" target="_blank" rel="noopener">AGPL-3.0-only License</a> ·
-    <a href="https://github.com/Drakonis96/nodus/tree/v4.0.1" target="_blank" rel="noopener">Source code</a>
+    <a href="https://github.com/Drakonis96/nodus/tree/v4.1.0" target="_blank" rel="noopener">Source code</a>
   </div>
   <p style="margin-top:12px;opacity:0.7" data-i18n="footer.tag">Nodus, a free, open-source, local-first research workspace. Audio samples generated with the app's local Kokoro voices.</p>
 </footer>
@@ -1888,7 +1860,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 <script src="faq.js?v=20260727-full-coverage"></script>
 <script>
 // ---------- nav shadow ----------
-const nav = document.getElementById('nav');
+const nav = document.getElementById('site-header');
 addEventListener('scroll', () => {
   nav.classList.toggle('scrolled', scrollY > 24);
 }, { passive: true });

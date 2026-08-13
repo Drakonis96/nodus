@@ -10,28 +10,30 @@ const read = (relative) => fs.readFileSync(path.join(repoRoot, relative), 'utf8'
 
 test('the Teaching web demo is reachable from every live vault demo', () => {
   const teachingHtml = read('site/demo/teaching.html');
-  assert.match(teachingHtml, /class="vault-tab teach" href="teaching\.html" aria-current="page"/);
+  const sharedHeader = read('site/site-header.js');
+  assert.match(teachingHtml, /data-nodus-site-header data-base="\.\.\/" data-context="demo"/);
+  assert.match(teachingHtml, /src="\.\.\/site-header\.js/);
+  assert.match(sharedHeader, /section\('#vaults'\)/);
   assert.match(teachingHtml, /src="teaching-data\.js/);
   assert.match(teachingHtml, /src="teaching-app\.js/);
   assert.match(teachingHtml, /AI for generating teaching content only; AI never evaluates students/);
 
   for (const page of ['index.html', 'study.html', 'genealogy.html', 'databases.html', 'worldbuilding.html']) {
     const html = read(`site/demo/${page}`);
-    assert.match(html, /class="vault-tab teach" href="teaching\.html"/, `${page} links to Teaching`);
+    assert.match(html, /data-nodus-site-header data-base="\.\.\/" data-context="demo"/, `${page} uses the shared route back to the vault catalogue`);
+    assert.match(html, /src="\.\.\/site-header\.js/, `${page} loads the shared navigation`);
     assert.doesNotMatch(html, /Shell in the app · preview/, `${page} no longer labels Teaching as a preview`);
   }
 });
 
-test('every live demo exposes the same vault tags and marks exactly one active', () => {
+test('every live demo uses the same shared site header without a duplicate vault bar', () => {
   const pages = ['index.html', 'teaching.html', 'study.html', 'genealogy.html', 'databases.html', 'worldbuilding.html'];
-  const expectedHrefs = ['index.html', 'teaching.html', 'study.html', 'genealogy.html', 'databases.html', 'worldbuilding.html'];
 
   for (const page of pages) {
     const html = read(`site/demo/${page}`);
-    const tabs = [...html.matchAll(/<a class="vault-tab [^"]+" href="([^"]+)"([^>]*)>/g)];
-    assert.deepEqual(tabs.map((match) => match[1]), expectedHrefs, `${page} keeps the visible vault order`);
-    assert.equal(tabs.filter((match) => match[2].includes('aria-current="page"')).length, 1, `${page} marks one active vault`);
-    assert.doesNotMatch(html, /vault-menu|toggleVaultMenu/, `${page} has no hidden vault dropdown`);
+    assert.equal((html.match(/data-nodus-site-header/g) || []).length, 1, `${page} mounts one shared header`);
+    assert.equal((html.match(/site-header\.js/g) || []).length, 1, `${page} loads the shared header once`);
+    assert.doesNotMatch(html, /class="vault-tabs|class="vault-menu|toggleVaultMenu/, `${page} has no duplicate vault navigation`);
   }
 });
 

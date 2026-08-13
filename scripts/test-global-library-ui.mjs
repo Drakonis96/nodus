@@ -97,6 +97,9 @@ test('the Library UI exposes hierarchy, search, bulk operations, imports and bac
   assert.doesNotMatch(view, /\{!trashMode && <aside/, 'the collection tree remains visible while trash is open');
   assert.match(appCss, /\.library-trash-folder\.is-active[\s\S]*background: rgb\(127 29 29 \/ 0\.32\)/);
   assert.match(appCss, /\.light \.library-trash-folder\.is-active[\s\S]*background: #fee2e2/);
+  assert.match(vaultLibrary, /library-active-chip tone-amber/, 'the corpus-health selection uses the semantic amber chip');
+  assert.match(appCss, /\.light \.library-active-chip\.tone-amber \{[\s\S]*background-color: #fffbeb;[\s\S]*border-color: #fcd34d;[\s\S]*color: #b45309;/,
+    'active corpus-health filters have an explicit light palette');
   assert.match(appCss, /\.library-catalog-scroll::-webkit-scrollbar \{ height: 4px; \}/, 'the catalogue horizontal scrollbar stays visually minimal');
   assert.match(appCss, /\.library-catalog-scroll::-webkit-scrollbar-track \{ background: transparent; \}/, 'the scrollbar does not render a second opaque rail');
   assert.match(view, /className="library-catalog-list[^"]*overflow-x-hidden"/, 'the virtualized rows cannot render a second horizontal scrollbar');

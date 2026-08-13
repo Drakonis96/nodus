@@ -14,7 +14,7 @@ const json = async (relative) => JSON.parse(await read(relative));
 
 const AGPL_SHA256 = '0d96a4ff68ad6d4b6f1f30f713b18d5184912ba8dd389f86aa7710db079abcb0';
 const LICENSE_ID = 'AGPL-3.0-only';
-const VERSION = '4.0.1';
+const VERSION = '4.1.0';
 
 test('Nodus 4 carries the unmodified GNU AGPL v3 license text', async () => {
   const license = await read('LICENSE');
@@ -23,7 +23,7 @@ test('Nodus 4 carries the unmodified GNU AGPL v3 license text', async () => {
   assert.match(license, /13\. Remote Network Interaction/);
 });
 
-test('all first-party release metadata identifies 4.0.1 as AGPL-3.0-only', async () => {
+test('all first-party release metadata identifies 4.1.0 as AGPL-3.0-only', async () => {
   const [pkg, lock, serverPkg, plugin, citation] = await Promise.all([
     json('package.json'),
     json('package-lock.json'),
@@ -41,7 +41,7 @@ test('all first-party release metadata identifies 4.0.1 as AGPL-3.0-only', async
   assert.equal(serverPkg.license, LICENSE_ID);
   assert.equal(plugin.version, VERSION);
   assert.equal(plugin.license, LICENSE_ID);
-  assert.match(citation, /^version: "4\.0\.1"$/m);
+  assert.match(citation, new RegExp(`^version: "${VERSION.replace(/\./g, '\\.')}"$`, 'm'));
   assert.match(citation, /^license: ["']AGPL-3\.0-only["']$/m);
 });
 
@@ -68,7 +68,7 @@ test('desktop, server, container and Zotero package expose corresponding source'
   assert.match(dockerfile, /COPY LICENSE SOURCE_CODE\.md THIRD_PARTY_NOTICES\.md/);
   assert.match(xpiBuilder, /SOURCE_CODE\.md/);
   assert.match(sourceOffer, /NODUS_SOURCE_URL/);
-  assert.match(sourceOffer, /releases\/tag\/v4\.0\.1/);
+  assert.match(sourceOffer, new RegExp(`releases/tag/v${VERSION.replace(/\./g, '\\.')}`));
 });
 
 test('project licensing scope is machine-readable and historical MIT releases stay documented', async () => {

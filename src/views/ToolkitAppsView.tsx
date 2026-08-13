@@ -12,6 +12,7 @@ import {
 } from '@shared/toolkitApps';
 import { ConfirmModal } from '../components/ConfirmModal';
 import { ModelPicker } from '../components/ModelPicker';
+import { ToolkitAppHero } from '../components/ToolkitAppHero';
 import { Icon } from '../components/ui';
 import { errorText, t, tx } from '../i18n';
 import { clearToolkitAppPersistedState, ToolkitAppPreview } from '../toolkitApps/AppPreview';
@@ -130,7 +131,7 @@ function AppCard({ app, onOpen }: { app: StoredToolkitApp; onOpen: () => void })
   );
 }
 
-function Catalogue({ apps, onCreate, onOpen }: { apps: StoredToolkitApp[]; onCreate: () => void; onOpen: (id: string) => void }) {
+function Catalogue({ apps, onBack, onCreate, onOpen }: { apps: StoredToolkitApp[]; onBack: () => void; onCreate: () => void; onOpen: (id: string) => void }) {
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState<CatalogueFilter>('available');
   const filtered = useMemo(() => {
@@ -148,17 +149,19 @@ function Catalogue({ apps, onCreate, onOpen }: { apps: StoredToolkitApp[]; onCre
   const filters: Array<[CatalogueFilter, string]> = [['available', 'Explorar'], ['mine', 'Mis apps'], ['archived', 'Archivadas']];
   return (
     <div className="mx-auto max-w-6xl space-y-6" data-testid="toolkit-apps-catalog">
-      <header className="relative overflow-hidden rounded-3xl border border-amber-200 bg-gradient-to-br from-amber-50 via-white to-indigo-50 p-6 dark:border-amber-900/50 dark:from-amber-950/30 dark:via-neutral-950 dark:to-indigo-950/20 sm:p-8">
-        <div className="absolute -right-12 -top-24 h-64 w-64 rounded-full bg-indigo-300/20 blur-3xl" />
-        <div className="relative flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between">
-          <div className="max-w-2xl">
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-100 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider text-amber-700 dark:bg-amber-500/15 dark:text-amber-300"><Icon name="sparkles" size={11} />Nodus App Studio</span>
-            <h1 className="mt-3 text-3xl font-semibold tracking-tight text-neutral-950 dark:text-white">{t('Herramientas hechas para tu forma de trabajar.')}</h1>
-            <p className="mt-2 text-sm leading-relaxed text-neutral-600 dark:text-neutral-400">{t('Describe una necesidad de estudio, docencia o investigación. La IA construye la app, tú la pruebas y puedes pedir cambios con tus propias palabras.')}</p>
-          </div>
-          <button data-testid="toolkit-app-create" type="button" className="btn btn-primary h-11 shrink-0 px-5" onClick={onCreate}><Icon name="wand" size={15} />{t('Crear una app con IA')}</button>
-        </div>
-      </header>
+      <ToolkitAppHero
+        badge="Nodus App Studio"
+        title={t('Herramientas hechas para tu forma de trabajar.')}
+        description={t('Describe una necesidad de estudio, docencia o investigación. La IA construye la app, tú la pruebas y puedes pedir cambios con tus propias palabras.')}
+        icon="sparkles"
+        actionLabel={t('Crear una app con IA')}
+        actionIcon="wand"
+        onAction={onCreate}
+        onBack={onBack}
+        heroTestId="toolkit-apps-hero"
+        actionTestId="toolkit-app-create"
+        backTestId="toolkit-apps-back"
+      />
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="relative min-w-0 flex-1 sm:max-w-md">
           <Icon name="search" size={14} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400" />
@@ -410,7 +413,7 @@ export function ToolkitAppsView({ onBack, settings }: { onBack: () => void; sett
 
   return (
     <div className="mx-auto min-h-full max-w-[1480px]" data-testid="toolkit-apps-page">
-      {screen === 'catalog' && <div><div className="mb-4"><BackButton onClick={onBack} label="Nodus Toolkit" /></div><Catalogue apps={apps} onCreate={create} onOpen={open} /></div>}
+      {screen === 'catalog' && <Catalogue apps={apps} onBack={onBack} onCreate={create} onOpen={open} />}
       {screen === 'studio' && <Studio key={`${studioTarget?.id ?? 'new'}-${studioSeed}`} settings={settings} initialApp={studioTarget} initialInstruction={studioSeed} onCancel={() => setScreen(studioTarget ? 'detail' : 'catalog')} onSave={saveStudio} />}
       {screen === 'detail' && selected && <Detail app={selected} onBack={() => setScreen('catalog')} onImprove={(seed) => improve(selected, seed)} onDuplicate={() => duplicate(selected)} onArchive={() => archive(selected)} onDelete={() => setDeleteTarget(selected)} />}
       {deleteTarget && <ConfirmModal title={t('Eliminar app')} message={tx('Se eliminará «{name}» y sus datos guardados en Nodus Apps. Esta acción no se puede deshacer.', { name: displayTitle(deleteTarget) })} confirmLabel={t('Eliminar app')} danger onConfirm={confirmDelete} onCancel={() => setDeleteTarget(null)} />}

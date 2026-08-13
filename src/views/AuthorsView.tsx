@@ -10,7 +10,6 @@ import type {
   SynthesisMatrixCell,
 } from '@shared/types';
 import { Badge, Icon, Spinner, TypeDot } from '../components/ui';
-import { SectionHeader, SectionToolbar } from '../components/SectionHeader';
 import { IdeaDetailModal } from '../components/IdeaDetailModal';
 import { ModelPicker } from '../components/ModelPicker';
 import { WorkIdeasModal } from './WorkIdeasModal';
@@ -20,7 +19,8 @@ import type { PendingGraphNavigationTarget } from '../navigation';
 import { t, tx } from '../i18n';
 import { getVaultQueryCache, invalidateVaultQueryCache, setVaultQueryCache } from '../vaultQueryCache';
 
-type Tab = 'dossier' | 'matrix' | 'saved';
+type AuthorsSurface = 'catalog' | 'author' | 'matrix';
+type OpenAuthor = { id: string; label: string; saved?: boolean };
 
 const RELATION_LABELS: Record<string, string> = {
   contradicts: 'contradice a',
@@ -67,86 +67,106 @@ export function AuthorsView({
   settings: AppSettings;
   onOpenGraph: (target: PendingGraphNavigationTarget) => void;
 }) {
-  const [tab, setTab] = useState<Tab>('dossier');
+  const [surface, setSurface] = useState<AuthorsSurface>('catalog');
+  const [openAuthor, setOpenAuthor] = useState<OpenAuthor | null>(null);
+  const [matrixOpen, setMatrixOpen] = useState(false);
+  const [catalogRevision, setCatalogRevision] = useState(0);
   const [model, setModel] = useFeatureModel(settings, 'authorModel');
 
+  const showAuthor = useCallback((author: OpenAuthor) => {
+    setOpenAuthor(author);
+    setSurface('author');
+  }, []);
+
+  const showMatrix = useCallback(() => {
+    setMatrixOpen(true);
+    setSurface('matrix');
+  }, []);
+
   return (
-    <div className="h-full flex flex-col min-h-0">
-      <SectionHeader
-        icon="graduation"
-        title={t('Autores')}
-        subtitle={t('Quién sostiene qué en tu corpus: una ficha por autoría, su síntesis y la matriz que las enfrenta.')}
-        actions={(
+    <div data-testid="authors-workspace" className="flex h-full min-h-0 flex-col bg-white text-neutral-900 dark:bg-neutral-950 dark:text-neutral-100">
+      <header className="shrink-0 border-b border-neutral-200 px-5 pt-4 dark:border-neutral-800">
+        <div className="mb-3 flex flex-wrap items-center gap-3">
+        <div className="flex items-center gap-2">
+            <span className="grid h-9 w-9 place-items-center rounded-xl bg-indigo-100 text-indigo-600 dark:bg-indigo-500/15 dark:text-indigo-300">
+              <Icon name="graduation" size={18} />
+            </span>
+            <div>
+              <h1 className="text-base font-semibold">{t('Autores')}</h1>
+              <p className="text-[11px] text-neutral-500">{t('Autores, documentos y red autoral.')}</p>
+            </div>
+        </div>
+          <div className="flex-1" />
           <div className="flex items-center gap-2">
             <span className="text-xs text-neutral-500">{t('Modelo de síntesis')}</span>
             <ModelPicker settings={settings} value={model} onChange={setModel} compact />
           </div>
-        )}
-      />
+        </div>
 
-      <SectionToolbar>
-        <div className="flex rounded-lg bg-neutral-900 p-0.5 text-sm">
+        <div data-testid="authors-tabs" className="flex min-w-0 items-end gap-1 overflow-x-auto">
           <button
             data-testid="authors-tab-dossier"
-            className={`px-3 py-1 rounded-md ${tab === 'dossier' ? 'bg-indigo-600 text-white' : 'text-neutral-400 hover:text-neutral-200'}`}
-            onClick={() => setTab('dossier')}
+            className={`flex h-9 shrink-0 items-center gap-2 rounded-t-lg border border-b-0 px-3 text-xs ${surface === 'catalog' ? 'border-neutral-300 bg-white text-neutral-900 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-100' : 'border-transparent text-neutral-500 hover:bg-neutral-100 hover:text-neutral-800 dark:hover:bg-neutral-900/60 dark:hover:text-neutral-300'}`}
+            onClick={() => setSurface('catalog')}
           >
-            {t('Fichas de autor')}
+            <Icon name="list" size={13} /> {t('Autores')}
           </button>
-          <button
-            data-testid="authors-tab-matrix"
-            className={`px-3 py-1 rounded-md ${tab === 'matrix' ? 'bg-indigo-600 text-white' : 'text-neutral-400 hover:text-neutral-200'}`}
-            onClick={() => setTab('matrix')}
-          >
-            {t('Matriz de síntesis')}
-          </button>
-          <button
-            data-testid="authors-tab-saved"
-            className={`px-3 py-1 rounded-md flex items-center gap-1.5 ${tab === 'saved' ? 'bg-indigo-600 text-white' : 'text-neutral-400 hover:text-neutral-200'}`}
-            onClick={() => setTab('saved')}
-          >
-            <Icon name="star" size={12} />
-            {t('Autores guardados')}
-          </button>
+          {openAuthor && (
+            <div className={`flex h-9 shrink-0 items-center rounded-t-lg border border-b-0 ${surface === 'author' ? 'border-neutral-300 bg-white text-neutral-900 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-100' : 'border-transparent text-neutral-500 hover:bg-neutral-100 hover:text-neutral-800 dark:hover:bg-neutral-900/60 dark:hover:text-neutral-300'}`}>
+              <button data-testid="authors-tab-author" className="flex h-full max-w-64 items-center gap-2 px-3 text-xs" onClick={() => setSurface('author')}>
+                <Icon name="user" size={13} /><span className="truncate">{openAuthor.label}</span>
+              </button>
+              <button className="mr-1 grid h-6 w-6 place-items-center rounded hover:bg-neutral-200 dark:hover:bg-neutral-800" aria-label={t('Cerrar')} onClick={() => { setOpenAuthor(null); if (surface === 'author') setSurface('catalog'); }}>
+                <Icon name="x" size={11} />
+              </button>
+            </div>
+          )}
+          {matrixOpen && (
+            <div className={`flex h-9 shrink-0 items-center rounded-t-lg border border-b-0 ${surface === 'matrix' ? 'border-neutral-300 bg-white text-neutral-900 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-100' : 'border-transparent text-neutral-500 hover:bg-neutral-100 hover:text-neutral-800 dark:hover:bg-neutral-900/60 dark:hover:text-neutral-300'}`}>
+              <button data-testid="authors-tab-matrix" className="flex h-full items-center gap-2 px-3 text-xs" onClick={() => setSurface('matrix')}>
+                <Icon name="grid" size={13} /> {t('Matriz de síntesis')}
+              </button>
+              <button className="mr-1 grid h-6 w-6 place-items-center rounded hover:bg-neutral-200 dark:hover:bg-neutral-800" aria-label={t('Cerrar')} onClick={() => { setMatrixOpen(false); if (surface === 'matrix') setSurface('catalog'); }}>
+                <Icon name="x" size={11} />
+              </button>
+            </div>
+          )}
         </div>
-      </SectionToolbar>
+      </header>
 
-      {tab === 'dossier' ? (
-        <DossierTab key="all-authors" vaultId={vaultId} onOpenGraph={onOpenGraph} model={model} savedOnly={false} />
-      ) : tab === 'matrix' ? (
-        <MatrixTab onOpenGraph={onOpenGraph} model={model} />
-      ) : (
-        <DossierTab key="saved-authors" vaultId={vaultId} onOpenGraph={onOpenGraph} model={model} savedOnly />
-      )}
+      <main className="min-h-0 flex-1">
+        <div className={surface === 'catalog' ? 'h-full' : 'hidden'}><AuthorsCatalog vaultId={vaultId} refreshKey={catalogRevision} onOpenAuthor={showAuthor} onOpenMatrix={showMatrix} /></div>
+        {openAuthor && <div className={surface === 'author' ? 'h-full' : 'hidden'}><AuthorDetailTab key={openAuthor.id} author={openAuthor} vaultId={vaultId} model={model} onOpenAuthor={showAuthor} onOpenGraph={onOpenGraph} onSavedChange={() => setCatalogRevision((value) => value + 1)} /></div>}
+        {matrixOpen && <div className={surface === 'matrix' ? 'h-full p-5' : 'hidden'}><MatrixTab onOpenGraph={onOpenGraph} model={model} /></div>}
+      </main>
     </div>
   );
 }
 
-// ─── Tab 1: Author dossiers ───────────────────────────────────────────────────
+// ─── Author catalogue ─────────────────────────────────────────────────────────
 
-function DossierTab({
+function AuthorsCatalog({
   vaultId,
-  onOpenGraph,
-  model,
-  savedOnly,
+  refreshKey,
+  onOpenAuthor,
+  onOpenMatrix,
 }: {
   vaultId: string | null;
-  onOpenGraph: (target: PendingGraphNavigationTarget) => void;
-  model: ModelRef | null;
-  savedOnly: boolean;
+  refreshKey: number;
+  onOpenAuthor: (author: OpenAuthor) => void;
+  onOpenMatrix: () => void;
 }) {
   const [authors, setAuthors] = useState<AuthorSummary[]>([]);
   const [totalAuthors, setTotalAuthors] = useState(0);
   const [pageOffset, setPageOffset] = useState(0);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [dossier, setDossier] = useState<AuthorDossier | null>(null);
-  const [loadingDossier, setLoadingDossier] = useState(false);
-  const [synthesizing, setSynthesizing] = useState(false);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [query, setQuery] = useState('');
   const [queryFilter, setQueryFilter] = useState('');
   const [sortBy, setSortBy] = useState<SortKey>('surname');
   const [synthFilter, setSynthFilter] = useState<SynthFilter>('all');
+  const [savedOnly, setSavedOnly] = useState(false);
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [exportFormat, setExportFormat] = useState<'markdown' | 'pdf'>('markdown');
   const [exporting, setExporting] = useState(false);
@@ -168,29 +188,25 @@ function DossierTab({
       if (cached) {
         setAuthors(cached.items);
         setTotalAuthors(cached.total);
-        setSelectedId((current) =>
-          current && cached.items.some((author) => author.author_id === current)
-            ? current
-            : cached.items[0]?.author_id ?? null
-        );
         return;
       }
     }
-    const page = await window.nodus.listAuthorsPage({
-      ...request,
-    });
-    if (page.total > 0 && page.items.length === 0 && pageOffset > 0) {
-      setPageOffset(Math.max(0, Math.floor((page.total - 1) / AUTHORS_PAGE_SIZE) * AUTHORS_PAGE_SIZE));
-      return;
+    setLoading(true);
+    setError(null);
+    try {
+      const page = await window.nodus.listAuthorsPage(request);
+      if (page.total > 0 && page.items.length === 0 && pageOffset > 0) {
+        setPageOffset(Math.max(0, Math.floor((page.total - 1) / AUTHORS_PAGE_SIZE) * AUTHORS_PAGE_SIZE));
+        return;
+      }
+      setAuthors(page.items);
+      setTotalAuthors(page.total);
+      setVaultQueryCache(vaultId, cacheKey, { items: page.items, total: page.total });
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : String(cause));
+    } finally {
+      setLoading(false);
     }
-    setAuthors(page.items);
-    setTotalAuthors(page.total);
-    setVaultQueryCache(vaultId, cacheKey, { items: page.items, total: page.total });
-    setSelectedId((current) =>
-      current && page.items.some((author) => author.author_id === current)
-        ? current
-        : page.items[0]?.author_id ?? null
-    );
   }, [pageOffset, queryFilter, savedOnly, sortBy, synthFilter, vaultId]);
 
   useEffect(() => {
@@ -200,58 +216,16 @@ function DossierTab({
 
   useEffect(() => {
     setPageOffset(0);
-  }, [queryFilter, sortBy, synthFilter]);
+  }, [queryFilter, savedOnly, sortBy, synthFilter]);
 
   useEffect(() => {
     void reloadAuthors(false);
   }, [reloadAuthors]);
+  useEffect(() => {
+    if (refreshKey > 0) void reloadAuthors(true);
+  }, [refreshKey, reloadAuthors]);
   useDataRefresh(reloadAuthors);
   useScanComplete(reloadAuthors);
-
-  useEffect(() => {
-    if (!selectedId) {
-      setDossier(null);
-      return;
-    }
-    let cancelled = false;
-    setLoadingDossier(true);
-    const cacheKey = `author-dossier:${selectedId}`;
-    const cached = getVaultQueryCache<AuthorDossier | null>(vaultId, cacheKey);
-    if (cached !== undefined) {
-      setDossier(cached);
-      setLoadingDossier(false);
-      return;
-    }
-    void window.nodus
-      .getAuthorDossier(selectedId)
-      .then((d) => {
-        if (!cancelled) {
-          setDossier(d);
-          setVaultQueryCache(vaultId, cacheKey, d);
-        }
-      })
-      .finally(() => {
-        if (!cancelled) setLoadingDossier(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [selectedId, vaultId]);
-
-  const synthesize = useCallback(async () => {
-    if (!selectedId) return;
-    setSynthesizing(true);
-    setError(null);
-    try {
-      const synthesis = await window.nodus.synthesizeAuthor(selectedId, model);
-      setDossier((cur) => (cur ? { ...cur, synthesis } : cur));
-      setAuthors((cur) => cur.map((a) => (a.author_id === selectedId ? { ...a, hasSynthesis: true } : a)));
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
-    } finally {
-      setSynthesizing(false);
-    }
-  }, [selectedId, model]);
 
   const filtered = authors;
 
@@ -262,15 +236,12 @@ function DossierTab({
     setError(null);
     try {
       await window.nodus.setAuthorSaved(authorId, !author.saved);
-      if (savedOnly && author.saved) {
-        setSelected((current) => {
-          const next = new Set(current);
-          next.delete(authorId);
-          return next;
-        });
-      }
+      setAuthors((current) => savedOnly && author.saved
+        ? current.filter((entry) => entry.author_id !== authorId)
+        : current.map((entry) => entry.author_id === authorId ? { ...entry, saved: !author.saved } : entry));
+      if (savedOnly && author.saved) setTotalAuthors((current) => Math.max(0, current - 1));
+      if (savedOnly && author.saved) setSelected((current) => { const next = new Set(current); next.delete(authorId); return next; });
       invalidateVaultQueryCache(vaultId);
-      await reloadAuthors(true);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -280,7 +251,7 @@ function DossierTab({
         return next;
       });
     }
-  }, [authors, reloadAuthors, savedOnly, savingAuthorIds, vaultId]);
+  }, [authors, savedOnly, savingAuthorIds, vaultId]);
 
   const toggleSelect = useCallback((id: string) => {
     setSelected((cur) => {
@@ -320,177 +291,166 @@ function DossierTab({
   }, [exportFormat, savedOnly, selected]);
 
   return (
-    <div className="flex-1 min-h-0 flex gap-4">
-      {/* Author list */}
-      <div className="w-80 shrink-0 flex flex-col min-h-0">
-        <input
-          data-testid="authors-search"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder={t('Buscar autor…')}
-          className="mb-2 w-full bg-neutral-900 border border-neutral-800 rounded-md px-3 py-1.5 text-sm outline-none focus:border-indigo-600"
-        />
-        <div className="flex gap-2 mb-2">
-          <label className="flex-1 min-w-0 flex items-center gap-1.5 text-[11px] text-neutral-500">
-            {t('Ordenar')}
-            <select
-              value={sortBy}
-              onChange={(e) => setSortBy(e.target.value as SortKey)}
-              className="flex-1 min-w-0 bg-neutral-900 border border-neutral-800 rounded-md px-1.5 py-1 text-xs text-neutral-200 outline-none focus:border-indigo-600"
-            >
-              {(Object.keys(SORT_LABELS) as SortKey[]).map((k) => (
-                <option key={k} value={k}>
-                  {t(SORT_LABELS[k])}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="flex-1 min-w-0 flex items-center gap-1.5 text-[11px] text-neutral-500">
-            {t('Síntesis')}
-            <select
-              value={synthFilter}
-              onChange={(e) => setSynthFilter(e.target.value as SynthFilter)}
-              className="flex-1 min-w-0 bg-neutral-900 border border-neutral-800 rounded-md px-1.5 py-1 text-xs text-neutral-200 outline-none focus:border-indigo-600"
-            >
-              {(Object.keys(SYNTH_FILTER_LABELS) as SynthFilter[]).map((k) => (
-                <option key={k} value={k}>
-                  {t(SYNTH_FILTER_LABELS[k])}
-                </option>
-              ))}
-            </select>
-          </label>
-        </div>
-
-        {/* Selection + export */}
-        <div className="flex items-center justify-between mb-2 text-[11px]">
-          <label className="flex items-center gap-1.5 text-neutral-400 cursor-pointer">
-            <input type="checkbox" checked={allFilteredSelected} onChange={toggleSelectAll} className="accent-indigo-600" />
-            {selected.size > 0 ? tx('{n} seleccionados', { n: selected.size }) : t('Seleccionar todos')}
-          </label>
-          {selected.size > 0 && (
-            <button className="text-neutral-500 hover:text-neutral-300" onClick={() => setSelected(new Set())}>
-              {t('Limpiar')}
-            </button>
-          )}
-        </div>
-        <div className="flex gap-2 mb-2">
-          <select
-            value={exportFormat}
-            onChange={(e) => setExportFormat(e.target.value as 'markdown' | 'pdf')}
-            className="bg-neutral-900 border border-neutral-800 rounded-md px-1.5 py-1 text-xs text-neutral-200 outline-none focus:border-indigo-600"
-          >
-            <option value="markdown">Markdown</option>
-            <option value="pdf">PDF</option>
-          </select>
-          <button
-            onClick={doExport}
-            disabled={exporting}
-            className="flex-1 text-xs px-2 py-1 rounded-md bg-neutral-800 hover:bg-neutral-700 disabled:opacity-50 flex items-center justify-center gap-1"
-            title={t('Exporta la síntesis de los autores seleccionados (o de todos los que tengan síntesis)')}
-          >
-            <Icon name="download" size={12} />
-            {selected.size > 0 ? tx('Exportar ({n})', { n: selected.size }) : t('Exportar todas')}
+    <div className="flex h-full min-h-0 flex-col">
+      <div className="shrink-0 border-b border-neutral-800 p-3">
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="relative min-w-[240px] flex-1">
+            <Icon name="search" size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-neutral-600" />
+            <input data-testid="authors-search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder={t('Buscar autor…')} className="input input-with-leading-icon w-full" />
+          </div>
+          <button className={`btn border border-neutral-700 ${filtersOpen || savedOnly || synthFilter !== 'all' ? 'bg-indigo-500/10 text-indigo-300' : 'btn-ghost'}`} onClick={() => setFiltersOpen((value) => !value)}>
+            <Icon name="filter" /> {t('Filtros')}
+          </button>
+          <button data-testid="authors-open-matrix" className="btn btn-secondary" onClick={onOpenMatrix}>
+            <Icon name="grid" /> {t('Matriz de síntesis')}
           </button>
         </div>
-        {exportMsg && <p className="text-[11px] text-neutral-500 mb-2 break-words">{exportMsg}</p>}
-
-        <div className="flex-1 min-h-0 overflow-y-auto space-y-1 pr-1">
-          {filtered.length === 0 && (
-            <p className="text-sm text-neutral-500 px-1">
-              {t(
-                savedOnly
-                  ? queryFilter || synthFilter !== 'all'
-                    ? 'No hay autores guardados que coincidan con los filtros.'
-                    : 'No has guardado ningún autor todavía.'
-                  : 'No hay autores todavía.'
-              )}
-            </p>
-          )}
-          {filtered.map((a) => (
-            <div
-              key={a.author_id}
-              data-testid={`author-card-${a.author_id}`}
-              className={`flex items-start gap-2 px-2 py-2 rounded-lg border transition ${
-                selectedId === a.author_id
-                  ? 'bg-neutral-800 border-indigo-600'
-                  : 'bg-neutral-900 border-neutral-800 hover:border-neutral-700'
-              }`}
+        {filtersOpen && (
+          <div className="mt-2 flex flex-wrap items-center gap-2 rounded-xl bg-neutral-900/55 p-2">
+            <button
+              data-testid="authors-tab-saved"
+              aria-pressed={savedOnly}
+              className={`btn h-8 text-xs ${savedOnly ? 'bg-amber-500/15 text-amber-300' : 'btn-ghost border border-neutral-700'}`}
+              onClick={() => setSavedOnly((value) => !value)}
             >
-              <input
-                type="checkbox"
-                checked={selected.has(a.author_id)}
-                onChange={() => toggleSelect(a.author_id)}
-                className="mt-1 accent-indigo-600 shrink-0"
-                title={t('Seleccionar para exportar')}
-              />
-              <button onClick={() => setSelectedId(a.author_id)} className="flex-1 min-w-0 text-left">
-                <div className="flex items-center gap-2">
-                  <span className="text-sm font-medium truncate">{a.fullName || a.name}</span>
-                  {a.hasSynthesis && <Icon name="wand" size={12} className="text-indigo-400 shrink-0" />}
-                </div>
-                <div className="mt-1 flex flex-wrap gap-1.5 text-[11px] text-neutral-500">
-                  <span>{tx('{n} obras', { n: a.workCount })}</span>
-                  <span>·</span>
-                  <span>{tx('{n} ideas', { n: a.ideaCount })}</span>
-                  {a.relationCount > 0 && (
-                    <>
-                      <span>·</span>
-                      <span>{tx('{n} conexiones', { n: a.relationCount })}</span>
-                    </>
-                  )}
-                </div>
-              </button>
-              <button
-                data-testid={`author-save-${a.author_id}`}
-                type="button"
-                onClick={() => void toggleAuthorSaved(a.author_id)}
-                disabled={savingAuthorIds.has(a.author_id)}
-                aria-pressed={a.saved}
-                aria-label={t(a.saved ? 'Quitar de autores guardados' : 'Guardar autor')}
-                title={t(a.saved ? 'Quitar de autores guardados' : 'Guardar autor')}
-                className={`mt-0.5 shrink-0 rounded p-1 transition disabled:opacity-50 ${a.saved ? 'text-amber-400 hover:text-amber-300' : 'text-neutral-600 hover:text-amber-400'}`}
-              >
-                <Icon name="star" size={15} className={a.saved ? 'fill-current' : ''} />
-              </button>
+              <Icon name="star" size={13} className={savedOnly ? 'fill-current' : ''} /> {t('Autores guardados')}
+            </button>
+            <label className="flex items-center gap-2 text-xs text-neutral-500">
+              {t('Síntesis')}
+              <select className="input h-8 text-xs" value={synthFilter} onChange={(event) => setSynthFilter(event.target.value as SynthFilter)}>
+                {(Object.keys(SYNTH_FILTER_LABELS) as SynthFilter[]).map((key) => <option key={key} value={key}>{t(SYNTH_FILTER_LABELS[key])}</option>)}
+              </select>
+            </label>
+            <label className="flex items-center gap-2 text-xs text-neutral-500">
+              {t('Ordenar')}
+              <select className="input h-8 text-xs" value={sortBy} onChange={(event) => setSortBy(event.target.value as SortKey)}>
+                {(Object.keys(SORT_LABELS) as SortKey[]).map((key) => <option key={key} value={key}>{t(SORT_LABELS[key])}</option>)}
+              </select>
+            </label>
+          </div>
+        )}
+        {selected.size > 0 && (
+          <div className="mt-2 flex flex-wrap items-center gap-2 rounded-lg border border-indigo-500/20 bg-indigo-500/5 px-2 py-1.5 text-xs">
+            <b>{tx('{n} seleccionados', { n: selected.size })}</b>
+            <select value={exportFormat} onChange={(event) => setExportFormat(event.target.value as 'markdown' | 'pdf')} className="input h-8 text-xs"><option value="markdown">Markdown</option><option value="pdf">PDF</option></select>
+            <button className="btn btn-ghost h-8" disabled={exporting} onClick={() => void doExport()}><Icon name="download" size={13} /> {tx('Exportar ({n})', { n: selected.size })}</button>
+            <button className="ml-auto text-neutral-500 hover:text-neutral-200" onClick={() => setSelected(new Set())}>{t('Limpiar')}</button>
+          </div>
+        )}
+        {exportMsg && <p className="mt-2 text-[11px] text-neutral-500">{exportMsg}</p>}
+        {error && <p role="alert" className="mt-2 text-xs text-red-400">{error}</p>}
+      </div>
+
+      <div data-testid="authors-table-scroll" className="min-h-0 flex-1 overflow-auto">
+        <div className="min-w-[1050px]">
+          <div className="grid h-10 items-center border-b border-neutral-800 px-3 text-[10px] font-semibold uppercase tracking-wider text-neutral-600" style={{ gridTemplateColumns: '2.25rem minmax(130px,1fr) minmax(150px,1.15fr) 5.5rem 5.5rem 7rem minmax(220px,1.6fr) 6rem 2.5rem' }}>
+            <input type="checkbox" checked={allFilteredSelected} onChange={toggleSelectAll} aria-label={t('Seleccionar todos')} />
+            <AuthorSortHeader label="Nombre" sort="name" active={sortBy} onSort={setSortBy} />
+            <AuthorSortHeader label="Apellidos" sort="surname" active={sortBy} onSort={setSortBy} />
+            <AuthorSortHeader label="Nº de obras" sort="works" active={sortBy} onSort={setSortBy} />
+            <AuthorSortHeader label="Nº de ideas" sort="ideas" active={sortBy} onSort={setSortBy} />
+            <AuthorSortHeader label="Nº de conexiones" sort="connections" active={sortBy} onSort={setSortBy} />
+            <span>{t('Etiquetas')}</span><span>{t('Síntesis')}</span><span />
+          </div>
+          {loading && authors.length === 0 ? (
+            <div className="grid h-48 place-items-center"><Spinner label={t('Cargando ficha…')} /></div>
+          ) : filtered.length === 0 ? (
+            <div className="grid h-48 place-items-center p-8 text-center"><div><Icon name="user" size={28} className="mx-auto text-neutral-700" /><p className="mt-3 text-sm text-neutral-400">{t(savedOnly ? queryFilter || synthFilter !== 'all' ? 'No hay autores guardados que coincidan con los filtros.' : 'No has guardado ningún autor todavía.' : 'No hay autores todavía.')}</p></div></div>
+          ) : filtered.map((author) => (
+            <div key={author.author_id} data-testid={`author-card-${author.author_id}`} className="grid min-h-[64px] items-center border-b border-neutral-900 px-3 text-xs hover:bg-neutral-900/55" style={{ gridTemplateColumns: '2.25rem minmax(130px,1fr) minmax(150px,1.15fr) 5.5rem 5.5rem 7rem minmax(220px,1.6fr) 6rem 2.5rem' }}>
+              <input type="checkbox" checked={selected.has(author.author_id)} onChange={() => toggleSelect(author.author_id)} aria-label={t('Seleccionar para exportar')} />
+              <button data-testid="author-name" className="min-w-0 pr-3 text-left font-medium text-neutral-200 hover:text-indigo-300" onClick={() => onOpenAuthor({ id: author.author_id, label: author.fullName || author.name, saved: author.saved })}><span className="block truncate">{author.firstName || author.fullName || author.name}</span>{author.affiliation && <span className="mt-1 block truncate text-[10px] font-normal text-neutral-600">{author.affiliation}</span>}</button>
+              <button className="min-w-0 truncate pr-3 text-left text-neutral-400 hover:text-indigo-300" onClick={() => onOpenAuthor({ id: author.author_id, label: author.fullName || author.name, saved: author.saved })}>{author.lastName || author.name}</button>
+              <span className="tabular-nums text-neutral-400">{author.workCount}</span>
+              <span className="tabular-nums text-neutral-400">{author.ideaCount}</span>
+              <span className="tabular-nums text-neutral-400">{author.relationCount}</span>
+              <div className="flex min-w-0 flex-wrap gap-1 pr-3">{(author.topTags.length ? author.topTags : author.topThemes).slice(0, 4).map((tag) => <span key={tag} className="max-w-32 truncate rounded-full bg-neutral-900 px-2 py-1 text-[10px] text-neutral-500" title={tag}>{tag}</span>)}</div>
+              <span className={`flex items-center gap-1 text-[10px] ${author.hasSynthesis ? 'text-indigo-300' : 'text-neutral-600'}`}>{author.hasSynthesis ? <><Icon name="wand" size={11} /> {t('Síntesis')}</> : '—'}</span>
+              <button data-testid={`author-save-${author.author_id}`} type="button" onClick={() => void toggleAuthorSaved(author.author_id)} disabled={savingAuthorIds.has(author.author_id)} aria-pressed={author.saved} aria-label={t(author.saved ? 'Quitar de autores guardados' : 'Guardar autor')} title={t(author.saved ? 'Quitar de autores guardados' : 'Guardar autor')} className={`grid h-8 w-8 place-items-center rounded-lg disabled:opacity-50 ${author.saved ? 'text-amber-400 hover:bg-amber-500/10' : 'text-neutral-600 hover:bg-neutral-900 hover:text-amber-400'}`}><Icon name="star" size={15} className={author.saved ? 'fill-current' : ''} /></button>
             </div>
           ))}
         </div>
-        {totalAuthors > AUTHORS_PAGE_SIZE && (
-          <div className="mt-2 flex items-center justify-between text-[11px] text-neutral-500">
-            <span>{pageOffset + 1}–{Math.min(pageOffset + authors.length, totalAuthors)} / {totalAuthors}</span>
-            <div className="flex gap-1">
-              <button className="btn btn-ghost border border-neutral-700 p-1" title={t('Anterior')} disabled={pageOffset === 0} onClick={() => setPageOffset((offset) => Math.max(0, offset - AUTHORS_PAGE_SIZE))}>
-                <Icon name="arrowLeft" size={12} />
-              </button>
-              <button className="btn btn-ghost border border-neutral-700 p-1" title={t('Siguiente')} disabled={pageOffset + authors.length >= totalAuthors} onClick={() => setPageOffset((offset) => offset + AUTHORS_PAGE_SIZE)}>
-                <Icon name="arrowRight" size={12} />
-              </button>
-            </div>
-          </div>
-        )}
       </div>
+      <footer className="flex h-10 shrink-0 items-center border-t border-neutral-800 px-3 text-xs text-neutral-500">
+        <span>{totalAuthors ? `${pageOffset + 1}–${Math.min(pageOffset + authors.length, totalAuthors)} / ${totalAuthors}` : '0'}</span><div className="flex-1" />
+        <button className="btn btn-ghost h-7" title={t('Anterior')} disabled={pageOffset === 0} onClick={() => setPageOffset((offset) => Math.max(0, offset - AUTHORS_PAGE_SIZE))}><Icon name="chevronLeft" size={13} /></button>
+        <button className="btn btn-ghost h-7" title={t('Siguiente')} disabled={pageOffset + authors.length >= totalAuthors} onClick={() => setPageOffset((offset) => offset + AUTHORS_PAGE_SIZE)}><Icon name="chevronRight" size={13} /></button>
+      </footer>
+    </div>
+  );
+}
 
-      {/* Dossier detail */}
-      <div className="flex-1 min-h-0 overflow-y-auto pr-1">
-        {loadingDossier && !dossier ? (
-          <Spinner label={t('Cargando ficha…')} />
-        ) : !dossier ? (
-          <p className="text-sm text-neutral-500">{t('Selecciona un autor para ver su ficha.')}</p>
-        ) : (
-          <AuthorDossierDetail
-            dossier={dossier}
-            model={model}
-            synthesizing={synthesizing}
-            error={error}
-            onSynthesize={synthesize}
-            onOpenGraph={onOpenGraph}
-            onSelectAuthor={setSelectedId}
-            saved={authors.find((author) => author.author_id === dossier.author.author_id)?.saved ?? false}
-            savingSaved={savingAuthorIds.has(dossier.author.author_id)}
-            onToggleSaved={() => void toggleAuthorSaved(dossier.author.author_id)}
-          />
-        )}
-      </div>
+function AuthorSortHeader({ label, sort, active, onSort }: { label: string; sort: SortKey; active: SortKey; onSort: (sort: SortKey) => void }) {
+  return <button className="flex min-w-0 items-center gap-1 text-left hover:text-neutral-300" onClick={() => onSort(sort)}><span className="truncate">{t(label)}</span>{active === sort && <span className="text-indigo-400">{sort === 'name' || sort === 'surname' ? '↑' : '↓'}</span>}</button>;
+}
+
+function AuthorDetailTab({ author, vaultId, model, onOpenAuthor, onOpenGraph, onSavedChange }: { author: OpenAuthor; vaultId: string | null; model: ModelRef | null; onOpenAuthor: (author: OpenAuthor) => void; onOpenGraph: (target: PendingGraphNavigationTarget) => void; onSavedChange: () => void }) {
+  const [dossier, setDossier] = useState<AuthorDossier | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [synthesizing, setSynthesizing] = useState(false);
+  const [saved, setSaved] = useState(Boolean(author.saved));
+  const [savingSaved, setSavingSaved] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const reload = useCallback(async (force = false) => {
+    setLoading(true);
+    setError(null);
+    try {
+      const cacheKey = `author-dossier:${author.id}`;
+      const cached = force ? undefined : getVaultQueryCache<AuthorDossier | null>(vaultId, cacheKey);
+      const [next, summaries] = await Promise.all([
+        cached !== undefined ? Promise.resolve(cached) : window.nodus.getAuthorDossier(author.id),
+        window.nodus.listAuthors(),
+      ]);
+      setDossier(next);
+      setSaved(summaries.find((entry) => entry.author_id === author.id)?.saved ?? false);
+      if (cached === undefined) setVaultQueryCache(vaultId, cacheKey, next);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : String(cause));
+    } finally {
+      setLoading(false);
+    }
+  }, [author.id, vaultId]);
+
+  useEffect(() => { void reload(); }, [reload]);
+  useDataRefresh(reload);
+  useScanComplete(reload);
+
+  const synthesize = useCallback(async () => {
+    setSynthesizing(true);
+    setError(null);
+    try {
+      const synthesis = await window.nodus.synthesizeAuthor(author.id, model);
+      setDossier((current) => current ? { ...current, synthesis } : current);
+      invalidateVaultQueryCache(vaultId);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : String(cause));
+    } finally {
+      setSynthesizing(false);
+    }
+  }, [author.id, model, vaultId]);
+
+  const toggleSaved = useCallback(async () => {
+    if (savingSaved) return;
+    setSavingSaved(true);
+    setError(null);
+    try {
+      await window.nodus.setAuthorSaved(author.id, !saved);
+      setSaved((value) => !value);
+      invalidateVaultQueryCache(vaultId);
+      onSavedChange();
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : String(cause));
+    } finally {
+      setSavingSaved(false);
+    }
+  }, [author.id, onSavedChange, saved, savingSaved, vaultId]);
+
+  if (loading && !dossier) return <div className="grid h-full place-items-center"><Spinner label={t('Cargando ficha…')} /></div>;
+  if (!dossier) return <div className="p-5 text-sm text-neutral-500">{error ?? t('Selecciona un autor para ver su ficha.')}</div>;
+  return (
+    <div className="h-full overflow-y-auto p-5">
+      <AuthorDossierDetail dossier={dossier} model={model} synthesizing={synthesizing} error={error} onSynthesize={synthesize} onOpenGraph={onOpenGraph} onSelectAuthor={(id) => { const relation = dossier.relations.find((entry) => entry.author_id === id); onOpenAuthor({ id, label: relation?.name ?? t('Autor') }); }} saved={saved} savingSaved={savingSaved} onToggleSaved={() => void toggleSaved()} />
     </div>
   );
 }
@@ -523,6 +483,17 @@ function AuthorDossierDetail({
   const [ideasWork, setIdeasWork] = useState<{ nodus_id: string; title: string } | null>(null);
 
   const { author, synthesis } = dossier;
+  const connectedAuthors = useMemo(() => {
+    const byAuthor = new Map<string, { author_id: string; name: string; weight: number; types: string[]; sharedThemes: string[] }>();
+    for (const relation of dossier.relations) {
+      const current = byAuthor.get(relation.author_id) ?? { author_id: relation.author_id, name: relation.name, weight: 0, types: [], sharedThemes: [] };
+      current.weight += relation.weight;
+      if (!current.types.includes(relation.type)) current.types.push(relation.type);
+      for (const theme of relation.sharedThemes) if (!current.sharedThemes.includes(theme)) current.sharedThemes.push(theme);
+      byAuthor.set(relation.author_id, current);
+    }
+    return [...byAuthor.values()].sort((left, right) => right.weight - left.weight || left.name.localeCompare(right.name));
+  }, [dossier.relations]);
 
   useEffect(() => {
     setWorksOpen(false);
@@ -531,12 +502,15 @@ function AuthorDossierDetail({
   }, [author.author_id]);
 
   return (
-    <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_18rem] max-w-6xl items-start">
-      <div className="space-y-5 min-w-0">
+    <div data-testid="author-detail" className="mx-auto max-w-7xl space-y-6">
       {/* Header */}
-      <div>
+      <div className="rounded-2xl border border-indigo-100 bg-indigo-50/80 p-5 dark:border-neutral-800 dark:bg-neutral-900/35">
         <div className="flex items-start gap-3">
-          <h3 className="text-xl font-semibold">{dossier.fullName || author.name}</h3>
+          <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-indigo-500/15 text-indigo-600 dark:text-indigo-300"><Icon name="user" size={20} /></span>
+          <div className="min-w-0">
+            <h2 className="text-xl font-semibold">{dossier.fullName || author.name}</h2>
+            {author.affiliation && <p className="mt-0.5 text-sm text-neutral-500">{author.affiliation}</p>}
+          </div>
           <button
             data-testid="author-detail-save"
             type="button"
@@ -545,30 +519,30 @@ function AuthorDossierDetail({
             aria-pressed={saved}
             aria-label={t(saved ? 'Quitar de autores guardados' : 'Guardar autor')}
             title={t(saved ? 'Quitar de autores guardados' : 'Guardar autor')}
-            className={`shrink-0 rounded-md p-1 transition disabled:opacity-50 ${saved ? 'text-amber-400 hover:text-amber-300' : 'text-neutral-500 hover:text-amber-400'}`}
+            className={`grid h-9 w-9 shrink-0 place-items-center rounded-lg transition disabled:opacity-50 ${saved ? 'bg-amber-500/10 text-amber-400 hover:text-amber-300' : 'text-neutral-500 hover:bg-neutral-800 hover:text-amber-400'}`}
           >
             <Icon name="star" size={18} className={saved ? 'fill-current' : ''} />
           </button>
           <button
-            className="ml-auto shrink-0 text-xs px-2 py-1 rounded-md bg-neutral-800 hover:bg-neutral-700 flex items-center gap-1"
+            className="btn btn-ghost ml-auto shrink-0 border border-neutral-700 text-xs"
             onClick={() => onOpenGraph({ preset: 'authors', nodeId: author.author_id, label: author.name })}
             title={t('Ver en el grafo de autores')}
           >
             <Icon name="network" size={13} /> {t('Ver en grafo')}
           </button>
         </div>
-        {author.affiliation && <p className="text-sm text-neutral-500">{author.affiliation}</p>}
-        <div className="mt-2 flex flex-wrap gap-2 text-xs text-neutral-400">
+        <div className="mt-4 flex flex-wrap gap-2 text-xs text-neutral-400">
           <button
             type="button"
             onClick={() => setWorksOpen(true)}
-            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs bg-neutral-800 text-neutral-300 hover:bg-neutral-700"
+            className="inline-flex items-center gap-1 rounded-md bg-neutral-800 px-2 py-1 text-xs text-neutral-300 hover:bg-neutral-700"
             title={t('Ver obras de este autor')}
           >
             <Icon name="book" size={11} />
             {tx('{n} obras', { n: dossier.works.length })}
           </button>
           <Badge>{tx('{n} ideas', { n: dossier.ideas.length })}</Badge>
+          <Badge>{tx('{n} conexiones', { n: connectedAuthors.length })}</Badge>
           {dossier.themes.slice(0, 5).map((th) => (
             <Badge key={th} color="indigo">
               {th}
@@ -577,8 +551,8 @@ function AuthorDossierDetail({
         </div>
       </div>
 
-      {/* Synthesis */}
-      <div className="rounded-xl border border-neutral-800 bg-neutral-900/60 p-4">
+      {/* 1. Synthesis */}
+      <section data-testid="author-synthesis" className="rounded-xl border border-neutral-800 bg-neutral-900/60 p-4">
         <div className="flex items-center gap-2 mb-2">
           <Icon name="wand" size={15} className="text-indigo-400" />
           <h4 className="font-medium">{t('Síntesis')}</h4>
@@ -641,37 +615,37 @@ function AuthorDossierDetail({
           </div>
         )}
         {error && <p className="mt-2 text-sm text-red-400">{error}</p>}
-      </div>
+      </section>
 
-      {/* Relations */}
-      {dossier.relations.length > 0 && (
-        <div>
+      {/* 2. Searchable idea list */}
+      <AuthorIdeasSection ideas={dossier.ideas} onOpenIdea={setSelectedIdeaId} />
+
+      {/* 3. Connected authors, strongest connection first */}
+      {connectedAuthors.length > 0 && (
+        <section data-testid="author-connections">
           <h4 className="font-medium mb-2 flex items-center gap-2">
             <Icon name="network" size={15} className="text-neutral-400" /> {t('Conexiones con otros autores')}
           </h4>
-          <div className="space-y-1.5">
-            {dossier.relations.map((r) => (
+          <div className="overflow-hidden rounded-xl border border-neutral-800">
+            {connectedAuthors.map((relation, index) => (
               <button
-                key={`${r.author_id}-${r.type}`}
-                onClick={() => onSelectAuthor(r.author_id)}
-                className="w-full text-left flex items-center gap-2 px-3 py-2 rounded-lg bg-neutral-900 border border-neutral-800 hover:border-neutral-700"
+                key={relation.author_id}
+                onClick={() => onSelectAuthor(relation.author_id)}
+                className={`grid w-full grid-cols-[2rem_minmax(150px,1fr)_minmax(180px,1.4fr)_7rem] items-center gap-3 bg-neutral-900/45 px-3 py-3 text-left hover:bg-neutral-900 ${index > 0 ? 'border-t border-neutral-800' : ''}`}
               >
-                <Badge color={RELATION_COLORS[r.type] ?? 'neutral'}>{t(RELATION_LABELS[r.type] ?? r.type)}</Badge>
-                <span className="text-sm">{r.name}</span>
-                {r.sharedThemes.length > 0 && (
-                  <span className="ml-auto text-[11px] text-neutral-500 truncate max-w-[45%]">
-                    {t('temas comunes')}: {r.sharedThemes.slice(0, 3).join(', ')}
-                  </span>
-                )}
+                <span className="text-center text-xs tabular-nums text-neutral-600">{index + 1}</span>
+                <span className="min-w-0"><b className="block truncate text-sm text-neutral-200">{relation.name}</b><span className="mt-1 flex flex-wrap gap-1">{relation.types.map((type) => <Badge key={type} color={RELATION_COLORS[type] ?? 'neutral'}>{t(RELATION_LABELS[type] ?? type)}</Badge>)}</span></span>
+                <span className="truncate text-[11px] text-neutral-500">{relation.sharedThemes.length > 0 ? `${t('temas comunes')}: ${relation.sharedThemes.slice(0, 4).join(', ')}` : '—'}</span>
+                <span className="justify-self-end rounded-full bg-indigo-500/10 px-2 py-1 text-[11px] tabular-nums text-indigo-300">{tx('{n} conexiones', { n: Number(relation.weight.toFixed(1)) })}</span>
               </button>
             ))}
           </div>
-        </div>
+        </section>
       )}
 
       {/* Works */}
       {dossier.works.length > 0 && (
-        <div>
+        <section>
           <h4 className="font-medium mb-2 flex items-center gap-2">
             <Icon name="book" size={15} className="text-neutral-400" /> {t('Obras')}
           </h4>
@@ -680,10 +654,8 @@ function AuthorDossierDetail({
               <AuthorWorkRow key={w.nodus_id} work={w} onOpenIdeas={(work) => setIdeasWork(work)} />
             ))}
           </div>
-        </div>
+        </section>
       )}
-      </div>
-      <AuthorIdeasSidebar ideas={dossier.ideas} onOpenIdea={setSelectedIdeaId} />
       {worksOpen && (
         <AuthorWorksModal
           authorName={dossier.fullName || author.name}
@@ -719,7 +691,7 @@ function AuthorDossierDetail({
   );
 }
 
-function AuthorIdeasSidebar({ ideas, onOpenIdea }: { ideas: AuthorDossierIdea[]; onOpenIdea: (id: string) => void }) {
+function AuthorIdeasSection({ ideas, onOpenIdea }: { ideas: AuthorDossierIdea[]; onOpenIdea: (id: string) => void }) {
   const [query, setQuery] = useState('');
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -733,46 +705,48 @@ function AuthorIdeasSidebar({ ideas, onOpenIdea }: { ideas: AuthorDossierIdea[];
   }, [ideas, query]);
 
   return (
-    <aside className="xl:sticky xl:top-0 rounded-lg border border-neutral-800 bg-neutral-950/70 p-3 min-w-0">
-      <div className="flex items-center gap-2 mb-2">
+    <section data-testid="author-ideas" className="min-w-0 rounded-xl border border-neutral-800 bg-neutral-950/70 p-4">
+      <div className="mb-3 flex flex-wrap items-center gap-2">
         <Icon name="bulb" size={14} className="text-neutral-400" />
-        <h4 className="text-sm font-medium">{t('Ideas')}</h4>
-        <span className="ml-auto text-xs text-neutral-500">{ideas.length}</span>
-      </div>
-      <div className="relative mb-2">
-        <Icon name="search" size={13} className="absolute left-2 top-2 text-neutral-500" />
+        <h4 className="font-medium">{t('Ideas del autor')}</h4>
+        <span className="text-xs text-neutral-500">{ideas.length}</span>
+        <div className="relative ml-auto w-full sm:w-80">
+          <Icon name="search" size={13} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-neutral-500" />
         <input
+            data-testid="author-ideas-search"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder={t('Buscar ideas…')}
-          className="w-full bg-neutral-900 border border-neutral-800 rounded-md pl-7 pr-2 py-1.5 text-xs outline-none focus:border-indigo-600"
+            className="input input-with-leading-icon h-9 w-full text-xs"
         />
+        </div>
       </div>
-      <div className="max-h-[calc(100vh-14rem)] overflow-y-auto pr-1 space-y-1">
+      <div className="grid gap-2 lg:grid-cols-2">
         {filtered.length === 0 ? (
-          <p className="text-xs text-neutral-500 px-1 py-2">{t('No hay ideas que coincidan.')}</p>
+          <p className="px-1 py-5 text-xs text-neutral-500">{t('No hay ideas que coincidan.')}</p>
         ) : (
           filtered.map((idea) => (
             <button
               key={idea.global_id}
               type="button"
               onClick={() => onOpenIdea(idea.global_id)}
-              className="w-full text-left px-2 py-2 rounded-md border border-neutral-800 bg-neutral-900/80 hover:border-neutral-700"
+              className="w-full rounded-lg border border-neutral-800 bg-neutral-900/70 p-3 text-left hover:border-indigo-500/40 hover:bg-neutral-900"
             >
               <div className="flex items-start gap-2">
                 <TypeDot type={idea.type} />
-                <span className="min-w-0 text-xs font-medium text-neutral-200 line-clamp-2">{idea.label}</span>
+                <span className="min-w-0 text-sm font-medium text-neutral-200 line-clamp-2">{idea.label}</span>
               </div>
-              <p className="mt-1 text-[11px] text-neutral-500 line-clamp-2">{idea.statement}</p>
-              <div className="mt-1 flex items-center gap-1 text-[10px] text-neutral-600">
+              <p className="mt-2 text-xs leading-5 text-neutral-500 line-clamp-3">{idea.statement}</p>
+              <div className="mt-2 flex items-center gap-2 text-[10px] text-neutral-600">
                 <span className="truncate">{idea.workTitle || t('(sin título)')}</span>
                 {idea.year && <span className="shrink-0">{idea.year}</span>}
+                <span className="ml-auto flex shrink-0 gap-1">{idea.themes.slice(0, 2).map((theme) => <span key={theme} className="rounded-full bg-neutral-950 px-1.5 py-0.5">{theme}</span>)}</span>
               </div>
             </button>
           ))
         )}
       </div>
-    </aside>
+    </section>
   );
 }
 

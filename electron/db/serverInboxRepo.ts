@@ -28,6 +28,9 @@ interface ServerInboxRow {
   reason: string | null;
   title: string | null;
   entity_kind: string | null;
+  parent_entity_kind: string | null;
+  parent_entity_id: string | null;
+  parent_title: string | null;
   schema_version: number | null;
   created_at: string | null;
   arrived_at: string;
@@ -49,6 +52,11 @@ function toEntry(row: ServerInboxRow): ServerInboxEntry | null {
       reason: row.reason,
       title: row.title,
       entityKind: row.entity_kind,
+      parentEntityKind: row.parent_entity_kind === 'deep_research' || row.parent_entity_kind === 'library_document'
+        ? row.parent_entity_kind
+        : null,
+      parentEntityId: row.parent_entity_id,
+      parentTitle: row.parent_title,
       schemaVersion: row.schema_version === null ? null : Number(row.schema_version),
       createdAt: row.created_at,
       arrivedAt: row.arrived_at,
@@ -82,8 +90,9 @@ export function recordServerInbox(entries: InboxSummary['entries'], ctx: { space
   const insert = db.prepare(
     `INSERT INTO server_inbox (
        id, seq, space_id, client_id, table_name, row_key, op, outcome, reason,
-       title, entity_kind, schema_version, created_at, arrived_at, read
-     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)
+       title, entity_kind, parent_entity_kind, parent_entity_id, parent_title,
+       schema_version, created_at, arrived_at, read
+     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)
      ON CONFLICT(id) DO NOTHING`
   );
   db.transaction(() => {
@@ -102,6 +111,9 @@ export function recordServerInbox(entries: InboxSummary['entries'], ctx: { space
         entry.reason ?? null,
         entry.title ?? null,
         entry.entityKind ?? null,
+        entry.parentEntityKind ?? null,
+        entry.parentEntityId ?? null,
+        entry.parentTitle ?? null,
         entry.schemaVersion === undefined ? null : Number(entry.schemaVersion),
         entry.createdAt ?? null,
         arrivedAt

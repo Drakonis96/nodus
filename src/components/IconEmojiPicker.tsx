@@ -28,9 +28,10 @@ const EMOJI_SEARCH_GROUPS = [
 
 const normalize = (value: string) => value.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase().trim();
 
-export function IconEmojiPicker({ icon, emoji, onChange }: {
+export function IconEmojiPicker({ icon, emoji, allowEmoji = true, onChange }: {
   icon: string;
   emoji: string;
+  allowEmoji?: boolean;
   onChange: (value: { icon: string; emoji: string }) => void;
 }) {
   const [open, setOpen] = useState(false);
@@ -50,7 +51,7 @@ export function IconEmojiPicker({ icon, emoji, onChange }: {
   const chooseEmoji = (value: string) => { onChange({ icon, emoji: value }); setOpen(false); };
 
   return <>
-    <button data-testid="study-create-icon-emoji" type="button" className="input mt-1 flex w-full items-center justify-between text-left hover:border-teal-500" aria-label={t('Seleccionar icono o emoji')} onClick={() => { setQuery(''); setOpen(true); }}>
+    <button data-testid="study-create-icon-emoji" type="button" className="input mt-1 flex w-full items-center justify-between text-left hover:border-teal-500" aria-label={t(allowEmoji ? 'Seleccionar icono o emoji' : 'Seleccionar icono')} onClick={() => { setQuery(''); setOpen(true); }}>
       <span className="grid h-5 w-5 shrink-0 place-items-center rounded bg-indigo-950/30 text-sm text-indigo-300">
         {emoji || <Icon name={icon} size={14} />}
       </span>
@@ -58,9 +59,9 @@ export function IconEmojiPicker({ icon, emoji, onChange }: {
     </button>
     {open && createPortal(
       <div className="fixed inset-0 z-[150] flex items-center justify-center bg-black/60 p-6" onClick={() => setOpen(false)}>
-        <div className="card-modal flex max-h-[78vh] w-full max-w-2xl flex-col p-5" role="dialog" aria-modal="true" aria-label={t('Seleccionar icono o emoji')} onClick={(event) => event.stopPropagation()}>
+        <div className="card-modal flex max-h-[78vh] w-full max-w-2xl flex-col p-5" role="dialog" aria-modal="true" aria-label={t(allowEmoji ? 'Seleccionar icono o emoji' : 'Seleccionar icono')} onClick={(event) => event.stopPropagation()}>
           <div className="flex items-center gap-3">
-            <div className="min-w-0 flex-1"><h3 className="font-semibold">{t('Seleccionar icono o emoji')}</h3><p className="mt-0.5 text-xs text-neutral-500">{t('Busca y elige un icono de Nodus o un emoji.')}</p></div>
+            <div className="min-w-0 flex-1"><h3 className="font-semibold">{t(allowEmoji ? 'Seleccionar icono o emoji' : 'Seleccionar icono')}</h3><p className="mt-0.5 text-xs text-neutral-500">{t(allowEmoji ? 'Busca y elige un icono de Nodus o un emoji.' : 'Busca y elige un icono de Nodus.')}</p></div>
             <button type="button" className="btn btn-ghost h-8 w-8 p-0" aria-label={t('Cerrar')} onClick={() => setOpen(false)}><Icon name="x" /></button>
           </div>
           <label className="relative mt-4 block">
@@ -72,10 +73,10 @@ export function IconEmojiPicker({ icon, emoji, onChange }: {
               <div className="grid grid-cols-6 gap-2 sm:grid-cols-8 md:grid-cols-10">{icons.map((name) => <button key={name} type="button" title={name} aria-label={name} className={`grid aspect-square place-items-center rounded-lg border transition-colors ${!emoji && icon === name ? 'border-indigo-500 bg-indigo-950/30 text-indigo-300' : 'border-neutral-800 text-neutral-400 hover:border-indigo-700 hover:bg-neutral-800'}`} onClick={() => chooseIcon(name)}><Icon name={name} size={18} /></button>)}</div>
               {!icons.length && <p className="py-3 text-xs text-neutral-500">{t('No se encontraron iconos.')}</p>}
             </section>
-            <section><h4 className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-neutral-500">{t('Emojis')}</h4>
+            {allowEmoji && <section><h4 className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-neutral-500">{t('Emojis')}</h4>
               <div className="grid grid-cols-6 gap-2 sm:grid-cols-8 md:grid-cols-10">{emojis.map((value, index) => <button key={`${value}-${index}`} type="button" aria-label={`${t('Emoji')} ${value}`} className={`grid aspect-square place-items-center rounded-lg border text-lg transition-colors ${emoji === value ? 'border-indigo-500 bg-indigo-950/30' : 'border-neutral-800 hover:border-indigo-700 hover:bg-neutral-800'}`} onClick={() => chooseEmoji(value)}>{value}</button>)}</div>
               {!emojis.length && <p className="py-3 text-xs text-neutral-500">{t('No se encontraron emojis.')}</p>}
-            </section>
+            </section>}
           </div>
         </div>
       </div>, document.body)}

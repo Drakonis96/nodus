@@ -128,6 +128,18 @@ export function validateMutation(mutation, { snapshot, hasAsset, maxBytes = DEFA
       const expected = `reader-bookmark:${row.draft_id}:${row.scope}`;
       if (row.id !== expected || row.color !== null || row.comment_text !== null) return fail('constraint');
     }
+    if (row.target_json != null) {
+      let target;
+      try { target = JSON.parse(String(row.target_json)); } catch { return fail('constraint'); }
+      const attachment = typeof target?.attachmentId === 'string' ? target.attachmentId : '';
+      const textTarget = target?.type === 'text' && attachment && attachment.length <= 512
+        && (target.page == null || Number.isInteger(target.page) && target.page > 0)
+        && (target.chapterId == null || typeof target.chapterId === 'string' && target.chapterId.length <= 512);
+      const regionTarget = target?.type === 'region' && attachment && attachment.length <= 512
+        && [target.x, target.y, target.width, target.height].every((value) => Number.isFinite(value) && value >= 0 && value <= 1)
+        && target.width > 0 && target.height > 0 && target.x + target.width <= 1.000001 && target.y + target.height <= 1.000001;
+      if (!textTarget && !regionTarget) return fail('constraint');
+    }
   }
 
   const known = knownColumns(snapshot, table);

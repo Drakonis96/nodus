@@ -28,7 +28,8 @@ assert.match(modal, /data-testid="whats-new-paypal-support"/);
 assert.match(modal, /data-testid="whats-new-cinematic-modal"/);
 assert.match(modal, /NodiAvatar state="celebrating"/);
 assert.match(modal, /whats-new-confetti/);
-assert.match(modal, /initial=\{\{ opacity: 0, y: 28, scale: \.96 \}\}/);
+assert.doesNotMatch(modal, /from 'framer-motion'/);
+assert.match(styles, /@keyframes whats-new-modal-in/);
 assert.doesNotMatch(modal, /data-testid="whats-new-support-paypal"/);
 assert.match(modal, /data-testid="whats-new-footer-support-paypal"/);
 assert.equal((modal.match(/https:\/\/paypal\.me\/Jorgepb96/g) ?? []).length, 1);
@@ -47,6 +48,7 @@ assert.match(modal, /groupHighlightsByScope\(selectedNote\.highlights\)\.map[\s\
 assert.match(modal, /function groupHighlightsByScope[\s\S]*b\.items\.length - a\.items\.length \|\| a\.index - b\.index/);
 assert.match(modal, /releaseNotesForMajor\(current\)/);
 assert.match(modal, /if \(showSeenReleaseNotes\) return releaseNotesSince\(null, current\);/);
+assert.match(modal, /releaseNotesSince\(null, current\)\.slice\(0, STARTUP_VERSION_HISTORY_LIMIT\)/);
 assert.match(modal, /const \[selectedVersion, setSelectedVersion\] = useState\(\(\) => notes\[0\]\?\.version \?\? ''\);/);
 assert.match(modal, /function buildVersionHierarchy[\s\S]*const \[major = '0', minor = '0'\]/);
 assert.match(modal, /data-testid="whats-new-version-trigger"/);

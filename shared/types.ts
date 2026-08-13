@@ -1630,6 +1630,12 @@ export interface AppSettings {
   /** Include citable extracted passages. Off by default because full text may be licensed. */
   nodusServerIncludePassages: boolean;
   /**
+   * Publish the global library catalogue plus Clean Markdown/figure packages.
+   * Independent from passages and authored vault content, and off by default because it may
+   * publish an entire personal bibliography into every member's mobile library.
+   */
+  nodusServerIncludeLibraryDocuments: boolean;
+  /**
    * Publish the idea embeddings so the space can answer a semantic query.
    *
    * The vectors are derived from ideas that already travel, and without them a phone or a
@@ -4037,6 +4043,7 @@ export interface NodusServerConnection {
   autoSync: boolean;
   includeUserContent: boolean;
   includePassages: boolean;
+  includeLibraryDocuments: boolean;
   includeVectors: boolean;
   phase: NodusServerSyncPhase;
   lastSyncAt: string | null;
@@ -4070,6 +4077,11 @@ export interface ServerInboxEntry {
   /** The row's own name when it has one, so the panel need not show a raw key. */
   title: string | null;
   entityKind: string | null;
+  /** Root item that owns this change. Child annotations from one report/document share it. */
+  parentEntityKind: 'deep_research' | 'library_document' | null;
+  parentEntityId: string | null;
+  /** Human title captured on arrival, so grouping never has to show an opaque id. */
+  parentTitle: string | null;
   schemaVersion: number | null;
   /** When the sending device wrote it. */
   createdAt: string | null;
@@ -4193,8 +4205,8 @@ export interface CopilotInstallResult {
 export interface CopilotOpenIdeaTarget {
   ideaId: string;
   label: string | null;
-  /** Word opens full development in Ideas; legacy callers keep the graph destination. */
-  destination?: 'ideas' | 'graph';
+  /** Word opens ideas, graph nodes, or the Library's installed CSL manager. */
+  destination?: 'ideas' | 'graph' | 'library-citation-styles';
 }
 
 /** Navigation request emitted by the local Zotero sidebar server. */
@@ -5324,6 +5336,10 @@ export interface Note {
   title: string;
   kind: NoteKind;
   content: string;
+  /** User-managed labels shared by notes and ideas in the Workspace catalogue. */
+  tags: string[];
+  /** Soft-deletion marker. Null means the item belongs to the live Workspace. */
+  trashedAt: string | null;
   source: NoteSource | null;
   orderIdx: number;
   createdAt: string;
@@ -5346,6 +5362,7 @@ export interface CreateNoteInput {
   content: string;
   kind?: NoteKind;
   folderId?: string | null;
+  tags?: string[];
   source?: NoteSource | null;
 }
 
@@ -5354,6 +5371,12 @@ export interface UpdateNoteInput {
   title?: string;
   content?: string;
   folderId?: string | null;
+  tags?: string[];
+}
+
+export interface NoteTagPatch {
+  add?: string[];
+  remove?: string[];
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -6607,6 +6630,8 @@ export interface AuthorSummary {
   workCount: number;
   ideaCount: number;
   relationCount: number;
+  /** Most frequent Zotero tags across this author's live works. */
+  topTags: string[];
   topThemes: string[];
   read: boolean;
   hasSynthesis: boolean;
@@ -7908,6 +7933,11 @@ export interface NodusApi extends ProsopographyApi, TestimoniesApi, ToolkitApi, 
   listVaults(): Promise<VaultSummary[]>;
   // Nodi companion
   listNotifications(): Promise<NodiNotification[]>;
+  /** Manually refresh published announcements and reconcile the local activity list. */
+  refreshNotifications(): Promise<{
+    notifications: NodiNotification[];
+    announcements: AnnouncementEntry[];
+  }>;
   markNotificationsRead(): Promise<NodiNotification[]>;
   clearNotifications(): Promise<NodiNotification[]>;
   onNotificationsChanged(cb: (list: NodiNotification[]) => void): () => void;

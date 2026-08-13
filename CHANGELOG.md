@@ -1,5 +1,40 @@
 # Changelog
 
+## 4.1.0 — 2026-08-13
+
+Nodus 4.1 aligns its research views, workspaces, server and mobile reader around the same
+library-oriented workflow. It also tightens responsive navigation, notification handling,
+Word and Chrome integrations, and the visual consistency of Toolkit and the website.
+
+### Added
+
+- Library-style Authors, Ideas and Argument Map views, plus the unified Coverage, Debates and
+  Gaps workspace under State of the Question.
+- Tags, tag filters, multi-selection, context actions and Trash for workspace notes and ideas.
+- Published Library packages with hierarchical collections, metadata, clean Markdown, figures
+  and offline document management in Nodus Mobile.
+- Multi-vault account permissions, editable access, protected email changes, renameable spaces,
+  copyable identifiers and URLs, and canonical vault colours in Nodus Server.
+- Chrome Web Store installation as the recommended connector path while retaining the manual ZIP.
+
+### Changed
+
+- Desktop and mobile editors share professional selection tools and searchable model picking.
+- Compact sidebars keep the Nodus mark centred, use the vault accent for scrolling, and remain
+  usable at narrow window widths.
+- Notifications from one document or report are grouped, and update checks can be requested from
+  the header or Nodi.
+- Update and what’s-new modals retain their presentation with less rendering and memory work.
+- Toolkit applications and website demos share their respective product headers and visual system.
+
+### Fixed
+
+- Dark-mode, passage encoding and live citation-style selection in the Word copilot.
+- Search-field icon overlap, hidden narrow-window controls, clipped notification badges and theme
+  colours that leaked between light and dark surfaces.
+- Chrome connector regressions are prevented while Spanish localization and store installation
+  are added on top of automatic pairing and scholarly full-text resolution.
+
 ## 4.0.1 — 2026-08-12
 
 The Chrome connector now completes its local pairing automatically after it is enabled in Nodus.

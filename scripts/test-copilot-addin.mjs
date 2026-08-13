@@ -61,18 +61,19 @@ try {
   assert.match(rendered, /taskpane\.html#references-unlink/);
   assert.match(rendered, /<DefaultLocale>en-US<\/DefaultLocale>/);
   assert.match(rendered, /DefaultValue="Open the pane to see how your text relates to your library\."/);
-  assert.doesNotMatch(rendered, /<Override Locale=|<bt:Override Locale=/, 'the Word manifest must stay English-only');
+  assert.match(rendered, /<bt:Override Locale="es-ES" Value="Abre el panel/);
 
-  // The task pane stays in English even when the desktop app uses another language.
+  // English is also the safe pre-initialization language in the task pane. The
+  // runtime switches it to Spanish when Nodus injects lang=es, but an English
+  // pane must never fall back to a Spanish string when a key is missing.
   const taskpaneHtml = fs.readFileSync(path.join(repoRoot, 'word-addin/taskpane.html'), 'utf8');
   const taskpaneJs = fs.readFileSync(path.join(repoRoot, 'word-addin/taskpane.js'), 'utf8');
   const referencesJs = fs.readFileSync(path.join(repoRoot, 'word-addin/references.js'), 'utf8');
+  const taskpaneCss = fs.readFileSync(path.join(repoRoot, 'word-addin/taskpane.css'), 'utf8');
   assert.match(taskpaneHtml, /<html lang="en">/);
   assert.match(taskpaneHtml, />Analyze paragraph</);
   assert.doesNotMatch(taskpaneHtml, /Conectando|Buscar ideas|Analizar párrafo|Selección|Insertar en|Nota al pie|Pasajes/);
-  assert.match(taskpaneJs, /var LANG = 'en'/);
-  assert.doesNotMatch(taskpaneJs, /Conectando|Buscar ideas|Analizar párrafo|Selección|Insertar en|Nota al pie|Pasajes/);
-  assert.doesNotMatch(referencesJs, /Referencias|Añadir|Desvincular|Bibliografía|Formateando/);
+  assert.match(taskpaneJs, /table\[key\] !== undefined \? table\[key\] : STR\.en\[key\]/);
   assert.match(taskpaneHtml, /<img class="mark" src="\/addin\/assets\/icon-32\.png"/, 'the pane must use the stylized Nodus mark');
   assert.doesNotMatch(taskpaneHtml, /<div class="mark">N<\/div>/, 'a generic letter N must not be used as the brand');
   assert.match(taskpaneHtml, /data-mode="references"/);
@@ -88,6 +89,17 @@ try {
   assert.match(referencesJs, /unlink-references/);
   assert.match(referencesJs, /normalizeStyleSearch/);
   assert.match(referencesJs, /tokens\.every/);
+  assert.match(taskpaneHtml, /role="combobox"[\s\S]*aria-controls="referenceStyleOptions"/);
+  assert.match(taskpaneHtml, /id="referenceStyleOptions"[\s\S]*role="listbox"/);
+  assert.match(taskpaneHtml, /id="referenceStyleManager"/);
+  assert.match(referencesJs, /\/api\/references\/styles\?fresh=/, 'installed CSL styles must bypass caches');
+  assert.match(referencesJs, /setInterval[\s\S]*loadStyles/, 'the open References pane keeps its installed styles live');
+  assert.match(referencesJs, /destination: 'citation-styles'/, 'the style link opens Nodus at its CSL manager');
+  assert.match(taskpaneCss, /body\.dark[\s\S]*--panel: #2b2b2b/);
+  assert.match(taskpaneCss, /\.reference-style-options[\s\S]*background: var\(--panel\)/);
+  assert.doesNotMatch(taskpaneJs, /style\.setProperty\('--panel', panel\)/, 'Office controlBackgroundColor must not turn dark cards white');
+  assert.match(taskpaneJs, /readablePassageText/);
+  assert.match(taskpaneJs, /\\uFFFD\\u25A1\\u2610\\u2612/);
 
   // The Word bridge opens the full idea detail in Ideas, not the graph. The
   // nonce makes a second click on the same idea retrigger the selection.
@@ -95,11 +107,13 @@ try {
   const ideasSource = fs.readFileSync(path.join(repoRoot, 'src/views/IdeasView.tsx'), 'utf8');
   const serverSource = fs.readFileSync(path.join(repoRoot, 'electron/copilot/server.ts'), 'utf8');
   assert.match(serverSource, /destination: 'ideas'/);
+  assert.match(serverSource, /destination === 'citation-styles'[\s\S]*destination: 'library-citation-styles'/);
+  assert.match(appSource, /target\.destination === 'library-citation-styles'[\s\S]*citationStyles: true[\s\S]*setView\('library'\)/);
   assert.match(
     appSource,
     /if \(target\.destination === 'ideas'\) \{\s*setIdeaTarget\(\{ ideaId: target\.ideaId, nonce: Date\.now\(\) \}\);\s*setView\('ideas'\);/s
   );
-  assert.match(ideasSource, /if \(target\) setSelectedId\(target\.ideaId\)/);
+  assert.match(ideasSource, /if \(target\) showIdea\(\{ id: target\.ideaId, label: t\('Idea'\) \}\)/);
 
   // Office's add-in cache must survive an install untouched. Deleting individual
   // files from it is documented to make ALL add-ins stop loading, and it did:

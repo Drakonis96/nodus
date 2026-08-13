@@ -15,7 +15,6 @@ const WritingWorkshopView = lazy(() => import('../../views/WritingWorkshopView')
 const DeepResearchView = lazy(() => import('../../views/DeepResearchView').then((module) => ({ default: module.DeepResearchView })));
 const ProjectsView = lazy(() => import('../../views/ProjectsView').then((module) => ({ default: module.ProjectsView })));
 const ImmersionView = lazy(() => import('../../views/ImmersionView').then((module) => ({ default: module.ImmersionView })));
-const NotesView = lazy(() => import('../../views/NotesView').then((module) => ({ default: module.NotesView })));
 const WorkspaceView = lazy(() => import('../../views/WorkspaceView').then((module) => ({ default: module.WorkspaceView })));
 const SearchView = lazy(() => import('../../views/SearchView').then((module) => ({ default: module.SearchView })));
 const PrimarySourcesSearchView = lazy(() => import('../../views/PrimarySourcesSearchView').then((module) => ({ default: module.PrimarySourcesSearchView })));
@@ -138,7 +137,8 @@ export const corpusViews = {
     );
   },
 
-  // Notas, ideas y colecciones de la bóveda académica, con el editor de Estudio.
+  // Notas, ideas y colecciones con una única experiencia visual. La ruta académica
+  // conserva el nombre Espacio de trabajo; el resto entra por su sección Notas.
   workspace: ({ navigate, noteTarget, settings }) => (
     <WorkspaceView
       settings={settings}
@@ -147,10 +147,12 @@ export const corpusViews = {
     />
   ),
 
-  notes: ({ isPrimarySources, isTestimonios, navigate, noteTarget, openPrimarySourceTarget, openTestimonyLink }) => (isPrimarySources
+  notes: ({ isPrimarySources, isTestimonios, navigate, noteTarget, openPrimarySourceTarget, openTestimonyLink, settings }) => (isPrimarySources
     ? <PrimarySourcesNotesView focusNote={noteTarget} onOpenSource={openPrimarySourceTarget} />
     : (
-      <NotesView
+      <WorkspaceView
+        settings={settings}
+        title="Notas"
         onOpenGraph={(target) => navigate('graph', target)}
         focusNote={noteTarget}
         onTestimonyLink={isTestimonios ? openTestimonyLink : undefined}

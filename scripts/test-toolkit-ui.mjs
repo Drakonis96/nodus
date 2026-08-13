@@ -12,7 +12,7 @@ import { bridgeSourceText, mainSourceText, readSource } from './ipc-channel-cens
 // cover the wiring that no e2e step can see cheaply: that the view is registered
 // in the canonical nav tables, that it stays universal across vault types, and
 // that the hub's cards keep the structure the design requires (identical
-// shape, centred icons, honest state badges). The real rendering is asserted by
+// shape, centred icons and availability states). The real rendering is asserted by
 // the toolkit steps in scripts/e2e-smoke.mjs.
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -135,6 +135,31 @@ test('the hub renders every built tool including Nodus Translate', async () => {
   assert.match(view, /page === 'ocr'/, 'OCR Workspace has its own routed workspace');
 });
 
+test('every Toolkit app starts with the shared Apps-style hero', async () => {
+  const hero = await read('src/components/ToolkitAppHero.tsx');
+  for (const marker of ['rounded-3xl', 'border-amber-200', 'bg-gradient-to-br', 'from-amber-50', 'via-white', 'to-indigo-50', 'btn btn-primary']) {
+    assert.ok(hero.includes(marker), `the shared hero keeps the Apps visual marker ${marker}`);
+  }
+
+  const views = [
+    ['src/views/ToolkitAppsView.tsx', 'toolkit-apps-hero'],
+    ['src/views/ToolkitConvertView.tsx', 'toolkit-convert-hero'],
+    ['src/views/ToolkitProtectView.tsx', 'toolkit-protect-hero'],
+    ['src/views/ToolkitTranslateView.tsx', 'toolkit-translate-hero'],
+    ['src/views/ToolkitPresenterView.tsx', 'toolkit-presenter-hero'],
+    ['src/views/ToolkitAiOcrView.tsx', 'toolkit-aiocr-hero'],
+  ];
+  for (const [file, testId] of views) {
+    const source = await read(file);
+    assert.match(source, /<ToolkitAppHero\b/, `${file} uses the one shared first-screen header`);
+    assert.ok(source.includes(`heroTestId="${testId}"`), `${file} exposes its hero for visual regression checks`);
+  }
+
+  const presenter = await read('src/views/ToolkitPresenterView.tsx');
+  assert.equal((presenter.match(/data-testid="presenter-import"/g) ?? []).length, 0, 'Presenter does not duplicate the import action below its hero');
+  assert.equal((presenter.match(/actionTestId="presenter-import"/g) ?? []).length, 1, 'Presenter keeps one primary import action in its hero');
+});
+
 test('Translate exposes balanced text panes, resilient Zotero controls and persistent history', async () => {
   const [view, preload, ipc, history, shared] = await Promise.all([
     read('src/views/ToolkitTranslateView.tsx'),
@@ -179,7 +204,7 @@ test('Protect exposes the complete local workflow and the secure preload boundar
   }
 });
 
-test('the toolkit nests one sidebar button per tool under its section', async () => {
+test('the toolkit has one sidebar entry and keeps its tools in the catalogue', async () => {
   const app = await read('@shell');
   // The tools are NOT views: they must never enter NAV_ITEMS, or they would show
   // up in sidebarOrder, the reordering UI and the vault-type allow-lists.
@@ -188,31 +213,10 @@ test('the toolkit nests one sidebar button per tool under its section', async ()
     !navigation.NAV_ITEMS.some((n) => toolPages.has(n.id)),
     'the tools stay out of the canonical nav table'
   );
-  assert.match(app, /const toolkitSubNav = \(\) =>/, 'the sidebar renders the nested tool buttons');
-  assert.match(app, /TOOLKIT_TOOLS\.map\(\(tool\) => \{/, 'the buttons come from the shared catalogue');
-  assert.match(app, /data-testid=\{`nav-toolkit-\$\{tool\.testid\}`\}/, 'each nested button is addressable');
-  assert.match(app, /n\.id === 'toolkit' \? \(/, 'the nested list hangs off the toolkit item');
-  // Clicking a tool jumps straight to it; clicking the section always lands on
-  // the catalogue, which is the whole point of keeping both buttons.
-  assert.match(
-    app,
-    /setToolkitPage\(tool\.page\); setView\('toolkit'\)/,
-    'a nested button opens its tool directly'
-  );
+  assert.doesNotMatch(app, /toolkitSubNav/, 'the sidebar does not render nested tool buttons');
+  assert.doesNotMatch(app, /nav-toolkit-/, 'tools are only addressable from the catalogue');
   assert.match(app, /if \(n\.id === 'toolkit'\) setToolkitPage\('home'\);/, 'the section button opens the catalogue');
-  // A coming-soon tool is inert in the sidebar too, not just on its card.
-  assert.match(app, /const disabled = tool\.state === 'soon';/, 'unbuilt tools are disabled in the sidebar');
-  // The full brand name does not fit the default 176px sidebar and used to
-  // render as "Nodus Con…"; the nested button drops the prefix the section
-  // already supplies and keeps the full name in its title.
-  assert.match(app, /\{tool\.shortName\}/, 'the nested button uses the short label');
-  assert.match(app, /title=\{disabled \? t\('Próximamente'\) : tool\.name\}/, 'hovering still gives the full brand name');
-  for (const tool of navigation.TOOLKIT_TOOLS) {
-    assert.ok(tool.shortName.length <= 10, `${tool.name} has a sidebar-sized label (${tool.shortName})`);
-    assert.ok(tool.name.includes(tool.shortName), `${tool.shortName} is part of the brand name, not a new word`);
-  }
-  // The section is only highlighted when the catalogue itself is on screen —
-  // otherwise both the parent and the open tool would read as active.
+  // The section is highlighted only while its catalogue is on screen.
   assert.match(
     app,
     /view === n\.id && \(n\.id !== 'toolkit' \|\| toolkitPage === 'home'\)/,
@@ -220,30 +224,32 @@ test('the toolkit nests one sidebar button per tool under its section', async ()
   );
 });
 
-test('the hub cards share one shape: equal size, centred icons, pinned badges', async () => {
+test('the hub cards share one shape and omit development labels', async () => {
   const view = await read('src/views/ToolkitView.tsx');
   // One ToolCard component renders every card, so they cannot drift apart.
   assert.equal((view.match(/<ToolCard\b/g) ?? []).length, 1, 'a single ToolCard renders the whole catalogue');
   assert.match(view, /grid gap-4 sm:grid-cols-2/, 'the cards use a two-column grid when space permits');
   assert.match(view, /className=\{`flex h-full flex-col/, 'each card fills its grid cell');
   assert.match(view, /h-12 w-12 shrink-0 items-center justify-center/, 'the card icon sits in a fixed centred tile');
-  assert.match(view, /mt-auto inline-flex items-center/, 'the state badge pins to the bottom');
+  assert.doesNotMatch(view, /t\('En desarrollo'\)/, 'available apps do not show a development label');
+  assert.match(view, /disabled && \(/, 'only unavailable tools render a status label');
   // The spin/transform clash that made a previous spinner bob instead of rotate.
   assert.ok(!/animate-spin[^"'`]*-translate-y/.test(view), 'no spinner shares an element with a transform');
 });
 
-test('a tool page returns to the hub and keeps the header action row uniform', async () => {
-  const [view, convert, protect, app] = await Promise.all([
+test('a tool page returns to the hub and keeps the shared hero action row uniform', async () => {
+  const [view, convert, protect, hero, app] = await Promise.all([
     read('src/views/ToolkitView.tsx'),
     read('src/views/ToolkitConvertView.tsx'),
     read('src/views/ToolkitProtectView.tsx'),
+    read('src/components/ToolkitAppHero.tsx'),
     read('@shell'),
   ]);
-  // The convert workspace owns its own back-to-hub control.
-  assert.ok(convert.includes('data-testid="toolkit-back"'), 'the back control exists');
-  assert.match(convert, /<Icon name="chevronLeft"/, 'back uses the shared chevron icon');
-  assert.match(convert, /aria-label=\{t\('Volver a Herramientas'\)\}/, 'the back control is labelled for screen readers');
-  assert.ok(protect.includes('data-testid="toolkit-protect-back"'), 'Protect owns its back-to-hub control');
+  // Each workspace configures the shared back-to-hub control without restyling it.
+  assert.ok(convert.includes('backTestId="toolkit-back"'), 'the Convert back control exists');
+  assert.ok(protect.includes('backTestId="toolkit-protect-back"'), 'the Protect back control exists');
+  assert.match(hero, /<Icon name="arrowLeft"/, 'back uses the shared arrow icon');
+  assert.match(hero, /Nodus Toolkit/, 'the visible back label names its destination for screen readers');
   assert.match(view, /onBack=\{\(\) => onNavigate\('home'\)\}/, 'the hub passes a back handler to the tool');
   // Header actions are icon-only buttons of one height; the toolkit must not be
   // the odd one out.

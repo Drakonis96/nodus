@@ -16,7 +16,7 @@ import type {
 } from '@shared/types';
 import { DECORATIVE_IMAGE_STYLES } from '@shared/imageStyles';
 import { DEFAULT_LOCAL_BASE_URLS, supportsFreeTierShaping } from '@shared/providers';
-import { AI_PROVIDERS, PROVIDER_LABELS, isLocalAiProvider, modelLabel, sameModel } from '../components/ui';
+import { AI_PROVIDERS, PROVIDER_LABELS, Icon, isLocalAiProvider, modelLabel, sameModel } from '../components/ui';
 import { IMAGE_PROVIDER_LABELS } from '@shared/providers';
 import { SettingsModelDot, SettingsModelList, settingsModelRowClass } from '../components/SettingsModelList';
 import { codexReasoningLabel } from '../components/ModelPicker';
@@ -95,11 +95,12 @@ export function ProvidersSettings({
             {favorites.map((m) => (
               <span
                 key={`${m.provider}::${m.model}`}
-                className="text-xs px-2 py-0.5 rounded flex items-center gap-1 bg-neutral-800 text-neutral-300"
+                className="flex items-center gap-1 rounded bg-neutral-800 px-2 py-0.5 text-xs text-neutral-300"
               >
-                ⭐ {modelLabel(m)}
-                <button className="text-neutral-500 hover:text-red-400" title={t('Quitar de favoritos')} onClick={() => toggleFav(m)}>
-                  ✕
+                <Icon name="star" size={12} className="shrink-0 fill-current text-amber-400" />
+                <span>{modelLabel(m)}</span>
+                <button className="ml-0.5 grid h-4 w-4 shrink-0 place-items-center rounded text-neutral-500 hover:bg-neutral-700 hover:text-red-400" title={t('Quitar de favoritos')} aria-label={t('Quitar de favoritos')} onClick={() => toggleFav(m)}>
+                  <Icon name="x" size={10} />
                 </button>
               </span>
             ))}
@@ -1085,8 +1086,14 @@ function ModelList({
     const meta = modelMetaParts(m);
     rows.push(
       <div key={m.id} className={settingsModelRowClass(false, true, 'flex items-center gap-2 !px-3 !py-2 text-xs')}>
-        <button className={fav ? 'text-amber-400' : 'text-neutral-600 hover:text-amber-300'} title={t('Favorito')} onClick={() => toggleFav(ref)}>
-          {fav ? '⭐' : '☆'}
+        <button
+          className={`grid h-6 w-6 shrink-0 place-items-center rounded hover:bg-neutral-200 dark:hover:bg-neutral-800 ${fav ? 'text-amber-500 dark:text-amber-400' : 'text-neutral-500 hover:text-amber-500 dark:text-neutral-600 dark:hover:text-amber-300'}`}
+          title={t(fav ? 'Quitar de favoritos' : 'Marcar como favorito')}
+          aria-label={t(fav ? 'Quitar de favoritos' : 'Marcar como favorito')}
+          aria-pressed={fav}
+          onClick={() => toggleFav(ref)}
+        >
+          <Icon name="star" size={13} className={fav ? 'fill-current' : ''} />
         </button>
         {m.loaded && (
           <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-400" title={t('Cargado en memoria')} />
@@ -1139,4 +1146,3 @@ function ModelList({
   }
   return <div>{rows}</div>;
 }
-

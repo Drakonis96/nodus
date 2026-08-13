@@ -45,11 +45,13 @@ export const TESTIMONY_GROUPS: TestimonyGroup[] = [
 ];
 
 export function TestimonySidebar({
+  compact = false,
   activeView,
   onNavigate,
   sidebarOrder = [],
   sidebarHidden = [],
 }: {
+  compact?: boolean;
   activeView: string;
   onNavigate: (view: TestimonyView) => void;
   sidebarOrder?: string[];
@@ -64,8 +66,8 @@ export function TestimonySidebar({
         ).filter((item) => !sidebarHidden.includes(item.id));
         if (items.length === 0) return null;
         return (
-          <section key={group.id} className="mt-2 flex flex-col gap-1">
-            <h2 className="px-3 pb-0.5 pt-1 text-[10px] font-semibold uppercase tracking-wider text-neutral-600">
+          <section key={group.id} className={`${compact ? 'mt-1 border-t border-neutral-800/70 pt-1' : 'mt-2'} flex flex-col gap-1`}>
+            <h2 className={compact ? 'sr-only' : 'px-3 pb-0.5 pt-1 text-[10px] font-semibold uppercase tracking-wider text-neutral-600'}>
               {t(group.label)}
             </h2>
             {items.map((item) => (
@@ -73,14 +75,16 @@ export function TestimonySidebar({
                 key={item.id}
                 data-tour={`nav-${item.view}`}
                 onClick={() => onNavigate(item.view)}
-                className={`flex items-center gap-2 rounded-lg px-3 py-2 text-left text-sm ${
+                aria-label={compact ? t(item.label) : undefined}
+                title={compact ? t(item.label) : undefined}
+                className={`flex items-center rounded-lg py-2 text-left text-sm ${compact ? 'justify-center px-2' : 'gap-2 px-3'} ${
                   activeView === item.view
                     ? 'bg-indigo-600 text-white'
                     : 'text-neutral-600 hover:bg-neutral-100 dark:text-neutral-400 dark:hover:bg-neutral-900'
                 }`}
               >
-                <Icon name={item.icon} />
-                <span>{t(item.label)}</span>
+                <Icon name={item.icon} className="shrink-0" />
+                <span className={compact ? 'sr-only' : undefined}>{t(item.label)}</span>
               </button>
             ))}
           </section>

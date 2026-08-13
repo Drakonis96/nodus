@@ -1,5 +1,4 @@
-import { motion } from 'framer-motion';
-import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
+import { memo, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { releaseNotesForMajor, releaseNotesSince, type ReleaseNote, type ReleaseNoteScope } from '@shared/releaseNotes';
 import { NODUS_SOCIAL_LINKS } from '@shared/socialLinks';
 import type { AppLanguage, VaultType } from '@shared/types';
@@ -16,6 +15,7 @@ import { NodiAvatar } from './nodi/NodiAvatar';
 // user dismisses the modal, so it never reappears for the same version.
 
 const LAST_SEEN_KEY = 'nodus.lastSeenVersion';
+const STARTUP_VERSION_HISTORY_LIMIT = 12;
 
 /**
  * A vault scope wears its own vault's glyph and accent, read from the canonical
@@ -142,7 +142,7 @@ function buildVersionHierarchy(notes: ReleaseNote[]): VersionMajor[] {
   }));
 }
 
-function VersionPicker({
+const VersionPicker = memo(function VersionPicker({
   notes,
   value,
   onChange,
@@ -233,7 +233,11 @@ function VersionPicker({
       )}
     </div>
   );
-}
+});
+
+const WhatsNewNodi = memo(function WhatsNewNodi() {
+  return <NodiAvatar state="celebrating" height={205} restAfterMs={1_200} />;
+});
 
 export function hasPendingWhatsNew(): boolean {
   const current = __APP_VERSION__;
@@ -251,13 +255,14 @@ export function WhatsNewModal({
   showSeenReleaseNotes?: boolean;
 }) {
   const current = __APP_VERSION__;
-  // Compute once on mount. The full history feeds the picker, but only its newest
-  // release is selected and rendered initially.
+  // Compute once on mount. Manual browsing retains the full history; the automatic
+  // launch modal keeps only the recent branch context because it initially renders
+  // one release and older versions remain available from Settings.
   const [notes] = useState(() => {
     if (showSeenReleaseNotes) return releaseNotesSince(null, current);
     const lastSeen = readLastSeen();
     if (lastSeen === current) return [];
-    return releaseNotesSince(null, current);
+    return releaseNotesSince(null, current).slice(0, STARTUP_VERSION_HISTORY_LIMIT);
   });
   const [selectedVersion, setSelectedVersion] = useState(() => notes[0]?.version ?? '');
   const [open, setOpen] = useState(notes.length > 0);
@@ -284,16 +289,13 @@ export function WhatsNewModal({
   }));
 
   return (
-    <motion.div className="whats-new-backdrop" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: .24 }} onMouseDown={close}>
-      <motion.section
+    <div className="whats-new-backdrop" onMouseDown={close}>
+      <section
         role="dialog"
         aria-modal="true"
         aria-label={t('Novedades')}
         className="whats-new-cinema"
         data-testid="whats-new-cinematic-modal"
-        initial={{ opacity: 0, y: 28, scale: .96 }}
-        animate={{ opacity: 1, y: 0, scale: 1 }}
-        transition={{ duration: .46, ease: [0.2, 0.8, 0.2, 1] }}
         onMouseDown={(event) => event.stopPropagation()}
       >
         <header className="whats-new-hero">
@@ -310,11 +312,11 @@ export function WhatsNewModal({
               <b>v{selectedNote.version}</b>
             </div>
           </div>
-          <motion.div className="whats-new-nodi" initial={{ opacity: 0, scale: .7, rotate: -8 }} animate={{ opacity: 1, scale: 1, rotate: 0 }} transition={{ delay: .18, duration: .5, type: 'spring', stiffness: 170 }}>
+          <div className="whats-new-nodi">
             <div className="whats-new-nodi-glow" />
-            <NodiAvatar state="celebrating" height={205} restAfterMs={2_400} />
+            <WhatsNewNodi />
             <span>{t('¡Tenemos novedades!')}</span>
-          </motion.div>
+          </div>
         </header>
 
         <div className="whats-new-scroll">
@@ -434,7 +436,7 @@ export function WhatsNewModal({
           </div>
           <button onClick={close}>{t('Explorar las novedades')} <Icon name="chevronRight" size={14} /></button>
         </footer>
-      </motion.section>
-    </motion.div>
+      </section>
+    </div>
   );
 }

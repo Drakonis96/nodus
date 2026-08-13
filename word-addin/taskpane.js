@@ -3,7 +3,7 @@
   'use strict';
 
   var TOKEN = (window.NODUS && window.NODUS.token) || '';
-  var LANG = 'en';
+  var LANG = (window.NODUS && window.NODUS.lang) === 'en' ? 'en' : 'es';
   var DEBOUNCE_MS = 700;
   var MIN_CHARS = 12;
 
@@ -22,8 +22,74 @@
   var footnoteSupported = true;
   var referenceController = null;
 
-  // Office add-in surfaces deliberately stay in English regardless of the Nodus UI language.
+  // The pane follows the Nodus UI language (injected by the copilot server).
   var STR = {
+    es: {
+      connecting: 'Conectando…',
+      searchPlaceholder: 'Buscar ideas, autores u obras',
+      searchTitle: 'Buscar',
+      analyze: 'Analizar párrafo',
+      emptyInitial: 'Coloca el cursor en un párrafo para ver ideas relacionadas.',
+      untitled: 'Sin título',
+      oneWork: '1 obra',
+      manyWorks: ' obras',
+      searchCopied: 'búsqueda copiada',
+      openedInNodus: 'Abierto en Nodus',
+      connections: 'Conexiones',
+      noConnections: 'Sin conexiones directas.',
+      open: 'Abrir',
+      loadingIdea: 'Cargando idea…',
+      sources: 'Fuentes',
+      noWorks: 'Sin obras asociadas.',
+      ideaLoadError: 'Error al cargar la idea: ',
+      inserting: 'Insertando…',
+      ideaInserted: 'Idea insertada',
+      details: 'Detalles',
+      openInNodus: 'Abrir en Nodus',
+      insertWithAi: 'Insertar con IA',
+      noRelated: 'Sin ideas relacionadas para este párrafo.',
+      noSearchResults: 'Sin ideas para esa búsqueda.',
+      cursorInParagraph: 'Coloca el cursor en un párrafo con texto.',
+      findingRelated: 'Buscando ideas relacionadas…',
+      needEmbeddings: 'Configura embeddings en Nodus para buscar relaciones.',
+      queryError: 'Error al consultar Nodus: ',
+      searching: 'Buscando ideas…',
+      searchError: 'Error al buscar: ',
+      connectedWorks: 'Conectado · {n} obras',
+      connectedNoEmbeddings: 'Conectado (sin embeddings)',
+      notResponding: 'Nodus no responde · abre Nodus con el copiloto activado',
+      editorNotListening: 'LibreOffice no está escuchando. Ejecuta la macro start_nodus_copilot en Writer.',
+      wordOnly: 'Este complemento solo funciona en Word.',
+      nodusError: 'Error de Nodus',
+      modeIdeas: 'Ideas',
+      modePassages: 'Pasajes',
+      modeReferences: 'Referencias',
+      selectionLabel: 'Selección',
+      composeRewrite: 'Reescribir',
+      composeExpand: 'Ampliar',
+      composeCounter: 'Rebatir',
+      insertInLabel: 'Insertar en',
+      targetBody: 'Texto',
+      targetFootnote: 'Nota al pie',
+      footnoteUnsupported: 'Tu versión de Word no admite notas al pie desde el complemento.',
+      working: 'Trabajando…',
+      needSelection: 'Selecciona el texto que quieres reescribir.',
+      composeEmpty: 'La IA no devolvió texto.',
+      rewriteDone: 'Reescrito',
+      expandDone: 'Ampliado',
+      counterDone: 'Contraargumento insertado',
+      citationsUsed: 'Citas usadas',
+      insertQuote: 'Insertar cita',
+      quoteInserted: 'Cita insertada',
+      searchingPassages: 'Buscando pasajes…',
+      noPassages: 'Sin pasajes para esa búsqueda.',
+      passagesNotIndexed: 'No hay texto completo indexado. Indexa la biblioteca en Nodus.',
+      passageUnreadable: 'Este pasaje no contiene texto Unicode legible. Reconstruye su texto limpio en Nodus.',
+      quoteOpen: '«',
+      quoteClose: '»',
+      relation: { supports: 'apoya', contradicts: 'contradice', refines: 'matiza', extends: 'amplía', related: 'relacionada' },
+      kind: { idea: 'idea', note: 'nota', passage: 'pasaje', work: 'obra' },
+    },
     en: {
       connecting: 'Connecting…',
       searchPlaceholder: 'Search ideas, authors or works',
@@ -84,6 +150,7 @@
       searchingPassages: 'Searching passages…',
       noPassages: 'No passages match that search.',
       passagesNotIndexed: 'No full text indexed. Index your library in Nodus.',
+      passageUnreadable: 'This passage has no readable Unicode text. Rebuild its clean text in Nodus.',
       quoteOpen: '“',
       quoteClose: '”',
       relation: { supports: 'supports', contradicts: 'contradicts', refines: 'refines', extends: 'extends', related: 'related' },
@@ -155,15 +222,13 @@
     var theme = Office.context && Office.context.officeTheme;
     if (!theme) return;
     var bg = theme.bodyBackgroundColor || theme.controlBackgroundColor;
-    var fg = theme.bodyForegroundColor || theme.controlForegroundColor;
-    var panel = theme.controlBackgroundColor || bg;
-    var controlFg = theme.controlForegroundColor || fg;
-    if (bg) document.documentElement.style.setProperty('--bg', bg);
-    if (fg) document.documentElement.style.setProperty('--text', fg);
-    if (panel) document.documentElement.style.setProperty('--panel', panel);
-    if (controlFg) document.documentElement.style.setProperty('--control-text', controlFg);
-    document.body.classList.toggle('light', !isDarkColor(bg));
-    document.body.classList.toggle('dark', isDarkColor(bg));
+    var dark = isDarkColor(bg);
+    // Office can report a dark body together with a white control background.
+    // Let the semantic body palettes in CSS keep every surface coherent instead
+    // of copying that contradictory control colour into cards and active tabs.
+    document.documentElement.style.colorScheme = dark ? 'dark' : 'light';
+    document.body.classList.toggle('light', !dark);
+    document.body.classList.toggle('dark', dark);
   }
 
   function getCurrentParagraph() {
@@ -565,10 +630,14 @@
 
       var meta = [passage.authorYear, passage.pageLabel].filter(Boolean).join(' · ');
       if (meta) card.appendChild(textEl('div', 'subtitle', meta));
-      if (passage.snippet) card.appendChild(textEl('p', 'rationale', passage.snippet));
+      var readableSnippet = readablePassageText(passage.snippet || passage.text);
+      if (readableSnippet) card.appendChild(textEl('p', 'rationale', readableSnippet));
+      else card.appendChild(textEl('p', 'rationale muted', T('passageUnreadable')));
 
       var actions = textEl('div', 'actions', '');
-      actions.appendChild(button(T('insertQuote'), 'btn small primary', function () { insertPassageQuote(passage, this); }));
+      var insertQuote = button(T('insertQuote'), 'btn small primary', function () { insertPassageQuote(passage, this); });
+      insertQuote.disabled = !readablePassageText(passage.text || passage.snippet);
+      actions.appendChild(insertQuote);
       appendZoteroAction(actions, passage);
       if (actions.childNodes.length) card.appendChild(actions);
 
@@ -580,7 +649,12 @@
     var original = btn.textContent;
     btn.disabled = true;
     btn.textContent = T('inserting');
-    var body = (passage.text || passage.snippet || '').trim();
+    var body = readablePassageText(passage.text || passage.snippet);
+    if (!body) {
+      setStatus(T('passageUnreadable'), 'err');
+      btn.disabled = true;
+      return;
+    }
     var quote = T('quoteOpen') + body + T('quoteClose');
     if (passage.authorYear) quote += ' (' + passage.authorYear + ')';
     insertAtCursor(quote, { asFootnote: insertTarget === 'footnote' })
@@ -590,6 +664,21 @@
         btn.disabled = false;
         btn.textContent = original;
       });
+  }
+
+  function readablePassageText(value) {
+    var text = String(value || '')
+      .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, '')
+      .replace(/\s+/g, ' ')
+      .trim();
+    if (!text) return '';
+    // Broken PDF character maps commonly arrive as one replacement/box glyph
+    // per source character. Once that has happened the original letters cannot
+    // be reconstructed safely, so do not present or insert corrupted quotations.
+    var suspicious = (text.match(/[\uFFFD\u25A1\u2610\u2612]/g) || []).length;
+    var meaningful = (text.match(/[\p{L}\p{N}]/gu) || []).length;
+    if (suspicious > 2 && suspicious > meaningful * 0.12) return '';
+    return text.normalize ? text.normalize('NFC') : text;
   }
 
   var COMPOSE_DONE = { rewrite: 'rewriteDone', expand: 'expandDone', counter: 'counterDone' };

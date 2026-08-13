@@ -1,15 +1,7 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import type { GraphEdge, IdeaConnection, IdeaDetail, IdeaListItem, IdeaType, EdgeDetail } from '@shared/types';
-import { Badge, EDGE_LABELS, NODE_LABELS, Icon, TypeDot } from '../components/ui';
-import { SectionHeader, SectionToolbar } from '../components/SectionHeader';
-import {
-  OccurrenceCard,
-  EvidenceLocationLink,
-  loadNumber,
-  DETAIL_MIN_WIDTH,
-  DETAIL_MAX_WIDTH,
-} from '../components/NodeDetailPanel';
-import { VirtualList } from '../components/VirtualList';
+import { Badge, EDGE_LABELS, NODE_LABELS, Icon, Spinner, TypeDot } from '../components/ui';
+import { OccurrenceCard, EvidenceLocationLink } from '../components/NodeDetailPanel';
 import { SaveToNotesModal } from '../components/SaveToNotesModal';
 import { ConfirmModal } from '../components/ConfirmModal';
 import { buildIdeaNote } from '../notes';
@@ -25,10 +17,9 @@ import { getVaultQueryCache, setVaultQueryCache } from '../vaultQueryCache';
 import { academicKnowledgeViewSource, type KnowledgeViewSource } from './knowledgeViewSource';
 
 type SortKey = 'label' | 'type' | 'works' | 'connections' | 'confidence';
-const IDEA_ROW_HEIGHT = 116;
-const IDEAS_PAGE_SIZE = 150;
-const IDEAS_DETAIL_WIDTH_KEY = 'nodus.ideas.detailWidth';
-const IDEAS_DETAIL_DEFAULT_WIDTH = 420;
+type IdeasSurface = 'catalog' | 'idea';
+type OpenIdea = { id: string; label: string };
+const IDEAS_PAGE_SIZE = 80;
 
 export function IdeasView({
   vaultId,
@@ -37,6 +28,7 @@ export function IdeasView({
   onOpenAssistant,
   dataSource = academicKnowledgeViewSource,
   scopeControl,
+  emptyMessage,
   testId,
 }: {
   vaultId: string | null;
@@ -45,6 +37,7 @@ export function IdeasView({
   onOpenAssistant: (target?: PendingAssistantNavigationTarget) => void;
   dataSource?: KnowledgeViewSource;
   scopeControl?: ReactNode;
+  emptyMessage?: string;
   testId?: string;
 }) {
   const [ideas, setIdeas] = useState<IdeaListItem[]>([]);
@@ -55,6 +48,9 @@ export function IdeasView({
   const [searchQuery, setSearchQuery] = useState('');
   const [typeFilter, setTypeFilter] = useState<IdeaType | ''>('');
   const [sortKey, setSortKey] = useState<SortKey>('label');
+  const [surface, setSurface] = useState<IdeasSurface>('catalog');
+  const [openIdea, setOpenIdea] = useState<OpenIdea | null>(null);
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [detail, setDetail] = useState<IdeaDetail | null>(null);
   const [connections, setConnections] = useState<IdeaConnection[]>([]);
@@ -68,36 +64,16 @@ export function IdeasView({
   // though: deep scans can finish while the view is unmounted, so the queue-idle
   // transition that normally invalidates query caches may never be observed here.
   const initialListLoad = useRef(true);
-  const [detailWidth, setDetailWidth] = useState(() =>
-    loadNumber(IDEAS_DETAIL_WIDTH_KEY, IDEAS_DETAIL_DEFAULT_WIDTH, DETAIL_MIN_WIDTH, DETAIL_MAX_WIDTH)
-  );
+
+  const showIdea = useCallback((idea: OpenIdea) => {
+    setSelectedId(idea.id);
+    setOpenIdea(idea);
+    setSurface('idea');
+  }, []);
 
   useEffect(() => {
-    if (target) setSelectedId(target.ideaId);
-  }, [target]);
-
-  const startResize = useCallback(
-    (e: React.PointerEvent<HTMLDivElement>) => {
-      e.preventDefault();
-      const startX = e.clientX;
-      const startWidth = detailWidth;
-      const onMove = (evt: PointerEvent) => {
-        const next = Math.min(DETAIL_MAX_WIDTH, Math.max(DETAIL_MIN_WIDTH, startWidth + startX - evt.clientX));
-        setDetailWidth(next);
-      };
-      const onUp = () => {
-        window.removeEventListener('pointermove', onMove);
-        window.removeEventListener('pointerup', onUp);
-        setDetailWidth((w) => {
-          localStorage.setItem(IDEAS_DETAIL_WIDTH_KEY, String(w));
-          return w;
-        });
-      };
-      window.addEventListener('pointermove', onMove);
-      window.addEventListener('pointerup', onUp, { once: true });
-    },
-    [detailWidth]
-  );
+    if (target) showIdea({ id: target.ideaId, label: t('Idea') });
+  }, [showIdea, target]);
 
   const reload = useCallback((force = true) => {
     const request = {
@@ -162,6 +138,9 @@ export function IdeasView({
     if (cached) {
       setDetail(cached.detail);
       setConnections(cached.connections);
+      if (cached.detail) {
+        setOpenIdea((current) => current?.id === selectedId ? { id: selectedId, label: cached.detail!.idea.label } : current);
+      }
       setDetailLoading(false);
       return;
     }
@@ -169,6 +148,7 @@ export function IdeasView({
       if (on) {
         setDetail(d);
         setConnections(linked);
+        if (d) setOpenIdea((current) => current?.id === selectedId ? { id: selectedId, label: d.idea.label } : current);
         setVaultQueryCache(vaultId, cacheKey, { detail: d, connections: linked });
         setDetailLoading(false);
       }
@@ -189,6 +169,8 @@ export function IdeasView({
       await dataSource.deleteIdea(selectedId);
       setConfirmDeleteIdea(false);
       setSelectedId(null);
+      setOpenIdea(null);
+      setSurface('catalog');
       setDetail(null);
       setConnections([]);
       notifyDataChanged();
@@ -198,245 +180,196 @@ export function IdeasView({
     }
   };
 
+  const detailWorkCount = detail ? new Set(detail.occurrences.map((occurrence) => occurrence.nodus_id)).size : 0;
+  const detailConfidence = selectedNode?.maxConfidence
+    ?? (detail?.occurrences.length ? Math.max(...detail.occurrences.map((occurrence) => occurrence.confidence)) : 0);
+
   return (
-    <div className="h-full flex min-h-0 bg-white text-neutral-900 dark:bg-neutral-950 dark:text-neutral-100" data-testid={testId}>
-      {/* List */}
-      <div className="flex-1 min-w-0 flex flex-col min-h-0">
-        <SectionHeader
-          icon="bulb"
-          title={t('Ideas')}
-          subtitle={t('Cada afirmación, hallazgo, constructo, método y marco que el análisis extrajo de tus obras, con quién los sostiene.')}
-          badge={<span className="text-sm font-normal text-neutral-500">{tx('{n} ideas extraídas', { n: totalIdeas })}</span>}
-        />
+    <div data-testid={testId ?? 'ideas-workspace'} className="flex h-full min-h-0 flex-col bg-white text-neutral-900 dark:bg-neutral-950 dark:text-neutral-100">
+      <header className="shrink-0 border-b border-neutral-200 px-5 pt-4 dark:border-neutral-800">
+        <div className="mb-3 flex flex-wrap items-center gap-3">
+          <span className="grid h-9 w-9 place-items-center rounded-xl bg-indigo-100 text-indigo-600 dark:bg-indigo-500/15 dark:text-indigo-300">
+            <Icon name="bulb" size={18} />
+          </span>
+          <div>
+            <h1 className="text-base font-semibold">{t('Ideas')}</h1>
+            <p className="text-[11px] text-neutral-500">{tx('{n} ideas extraídas', { n: totalIdeas })}</p>
+          </div>
+        </div>
 
-        <SectionToolbar>
-            {scopeControl}
-            <input
-              className="input text-sm w-60"
-              placeholder={t('Buscar ideas…')}
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
-            <select
-              className="input text-sm"
-              value={typeFilter}
-              onChange={(e) => setTypeFilter(e.target.value as IdeaType | '')}
-            >
-              <option value="">{t('Todos los tipos')}</option>
-              {(['claim', 'finding', 'construct', 'method', 'framework'] as IdeaType[]).map((tp) => (
-                <option key={tp} value={tp}>{t(NODE_LABELS[tp])}</option>
-              ))}
-            </select>
-            <select
-              className="input text-sm"
-              value={sortKey}
-              onChange={(e) => setSortKey(e.target.value as SortKey)}
-            >
-              <option value="label">{t('Ordenar: nombre')}</option>
-              <option value="type">{t('Ordenar: tipo')}</option>
-              <option value="works">{t('Ordenar: obras')}</option>
-              <option value="connections">{t('Ordenar: conexiones')}</option>
-              <option value="confidence">{t('Ordenar: confianza')}</option>
-            </select>
-        </SectionToolbar>
-
-        {/* Idea cards */}
-        <VirtualList
-          items={ideas}
-          itemHeight={IDEA_ROW_HEIGHT}
-          getKey={(node) => node.id}
-          className="flex-1 min-h-0 p-6"
-          empty={
-            <div className="text-neutral-500 text-sm">
-              {totalIdeas === 0
-                ? t('Aún no hay ideas. Ejecuta escaneos profundos para extraer ideas de tus obras.')
-                : t('Sin resultados para los filtros actuales.')}
-            </div>
-          }
-          renderItem={(node) => {
-            const degree = node.connectionCount;
-            const isSelected = node.id === selectedId;
-            return (
+        <div data-testid="ideas-tabs" className="flex min-w-0 items-end gap-1 overflow-x-auto">
+          <button
+            data-testid="ideas-tab-catalog"
+            className={`flex h-9 shrink-0 items-center gap-2 rounded-t-lg border border-b-0 px-3 text-xs ${surface === 'catalog' ? 'border-neutral-300 bg-white text-neutral-900 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-100' : 'border-transparent text-neutral-500 hover:bg-neutral-100 hover:text-neutral-800 dark:hover:bg-neutral-900/60 dark:hover:text-neutral-300'}`}
+            onClick={() => setSurface('catalog')}
+          >
+            <Icon name="list" size={13} /> {t('Ideas')}
+          </button>
+          {openIdea && (
+            <div className={`flex h-9 min-w-0 shrink-0 items-center rounded-t-lg border border-b-0 ${surface === 'idea' ? 'border-neutral-300 bg-white text-neutral-900 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-100' : 'border-transparent text-neutral-500 hover:bg-neutral-100 hover:text-neutral-800 dark:hover:bg-neutral-900/60 dark:hover:text-neutral-300'}`}>
+              <button data-testid="ideas-tab-idea" className="flex h-full max-w-80 min-w-0 items-center gap-2 px-3 text-xs" onClick={() => setSurface('idea')}>
+                <Icon name="bulb" size={13} /><span className="truncate">{openIdea.label}</span>
+              </button>
               <button
-                key={node.id}
-                data-testid={testId ? 'study-idea-card' : undefined}
-                className={`card p-3 w-full h-[104px] text-left transition-colors ${
-                  isSelected ? 'ring-1 ring-indigo-500 bg-neutral-800/80' : 'hover:bg-neutral-800/50'
-                }`}
-                onClick={() => setSelectedId(node.id)}
+                className="mr-1 grid h-6 w-6 shrink-0 place-items-center rounded hover:bg-neutral-200 dark:hover:bg-neutral-800"
+                aria-label={t('Cerrar')}
+                onClick={() => { setOpenIdea(null); setSelectedId(null); setDetail(null); setConnections([]); setSurface('catalog'); }}
               >
-                <div className="flex items-start gap-2">
-                  <TypeDot type={node.type} />
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="font-medium text-sm">{node.label}</span>
-                      <Badge color="indigo">{t(NODE_LABELS[node.type as IdeaType]) ?? node.type}</Badge>
-                    </div>
-                    {node.statement && (
-                      <p className="text-xs text-neutral-400 mt-1 line-clamp-2">{node.statement}</p>
-                    )}
-                    <div className="flex items-center gap-3 mt-1.5 text-[11px] text-neutral-500">
-                      <span>{tx('{n} obra(s)', { n: node.workCount })}</span>
-                      <span>{tx('{n} conexión(es)', { n: degree })}</span>
-                      <span>{t('conf')} {node.maxConfidence.toFixed(2)}</span>
-                      {node.themes.length > 0 && (
-                        <span className="min-w-0 truncate text-neutral-600">{node.themes.join(', ')}</span>
-                      )}
-                    </div>
-                  </div>
-                </div>
+                <Icon name="x" size={11} />
               </button>
-            );
-          }}
-        />
-        {!loading && totalIdeas > IDEAS_PAGE_SIZE && (
-          <div className="mx-6 mb-4 flex items-center justify-between text-xs text-neutral-500">
-            <span>{pageOffset + 1}–{Math.min(pageOffset + ideas.length, totalIdeas)} / {totalIdeas}</span>
-            <div className="flex gap-2">
-              <button className="btn btn-ghost border border-neutral-700 px-2 py-1 text-xs" disabled={pageOffset === 0} onClick={() => setPageOffset((offset) => Math.max(0, offset - IDEAS_PAGE_SIZE))}>
-                <Icon name="arrowLeft" size={13} /> {t('Anterior')}
-              </button>
-              <button className="btn btn-ghost border border-neutral-700 px-2 py-1 text-xs" disabled={pageOffset + ideas.length >= totalIdeas} onClick={() => setPageOffset((offset) => offset + IDEAS_PAGE_SIZE)}>
-                {t('Siguiente')} <Icon name="arrowRight" size={13} />
-              </button>
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* Detail panel */}
-      {selectedId && (
-        <div
-          data-testid={testId ? 'study-idea-detail' : undefined}
-          className="relative shrink-0 border-l border-neutral-800 bg-neutral-900/95 overflow-y-auto p-4"
-          style={{ width: detailWidth }}
-        >
-          <div
-            className="absolute left-0 top-0 h-full w-2 -translate-x-1/2 cursor-col-resize hover:bg-indigo-500/25 z-10"
-            role="separator"
-            aria-orientation="vertical"
-            title={t('Ajustar ancho')}
-            onPointerDown={startResize}
-          />
-          <div className="flex items-center justify-between mb-3">
-            <h2 className="font-semibold text-sm text-neutral-300">{t('Detalle')}</h2>
-            <button className="text-neutral-500 hover:text-white text-sm" onClick={() => setSelectedId(null)}>
-              ✕
-            </button>
-          </div>
-
-          {detailLoading && !detail && (
-            <div className="space-y-3 animate-pulse">
-              <div className="h-3 bg-neutral-800 rounded w-3/4" />
-              <div className="h-3 bg-neutral-800 rounded w-full" />
-              <div className="h-3 bg-neutral-800 rounded w-5/6" />
-            </div>
-          )}
-
-          {detail && (
-            <div className="space-y-4">
-              {/* Idea info */}
-              <div>
-                <Badge color="indigo">{t(NODE_LABELS[detail.idea.type as IdeaType]) ?? detail.idea.type}</Badge>
-                <h3 className="font-semibold mt-2">{detail.idea.label}</h3>
-                <p className="text-neutral-400 text-sm mt-1">{detail.idea.statement}</p>
-                {selectedNode && selectedNode.themes.length > 0 && (
-                  <div className="flex flex-wrap gap-1 mt-2">
-                    {selectedNode.themes.map((theme) => (
-                      <Badge key={theme} color="amber">{theme}</Badge>
-                    ))}
-                  </div>
-                )}
-                <div className="flex flex-wrap gap-2 mt-3">
-                  <button
-                    className="btn btn-ghost border border-neutral-700 text-xs gap-1.5"
-                    onClick={() => onOpenGraph({ preset: 'overview', nodeId: detail.idea.global_id, label: `${t('Idea:')} ${detail.idea.label}` })}
-                  >
-                    <Icon name="layers" size={13} /> {t('Grafo')}
-                  </button>
-                  <button
-                    className="btn btn-ghost border border-neutral-700 text-xs gap-1.5"
-                    onClick={() =>
-                      onOpenAssistant({
-                        title: `${t('Idea:')} ${detail.idea.label}`,
-                        selection: ASSISTANT_CONTEXTS.idea,
-                        prompt:
-                          `${t('Analiza esta idea dentro del corpus y resume sus conexiones, tensiones y lecturas prioritarias.')}\n\n` +
-                          `${t('Idea:')} ${detail.idea.label}\n${detail.idea.statement}`,
-                      })
-                    }
-                  >
-                    <Icon name="chat" size={13} /> {t('Asistente')}
-                  </button>
-                  <button
-                    className="btn btn-ghost border border-neutral-700 text-xs gap-1.5"
-                    disabled={savingIdea}
-                    onClick={() => {
-                      if (!dataSource.saveIdea) { setSavingIdeaToNotes(true); return; }
-                      setSavingIdea(true);
-                      void dataSource.saveIdea(detail).finally(() => setSavingIdea(false));
-                    }}
-                  >
-                    <Icon name="notebook" size={13} /> {t(savingIdea ? 'Guardando…' : 'Guardar en notas')}
-                  </button>
-                  <button
-                    className="btn btn-ghost border border-red-900/70 text-xs text-red-400 gap-1.5"
-                    disabled={deletingIdea}
-                    onClick={() => setConfirmDeleteIdea(true)}
-                  >
-                    <Icon name="trash" size={13} /> {t('Eliminar idea')}
-                  </button>
-                </div>
-              </div>
-
-              {/* Occurrences */}
-              {detail.occurrences.length > 0 && (
-                <div>
-                  <div className="text-xs uppercase text-neutral-500 mb-1">{t('Obras que la desarrollan')}</div>
-                  {detail.occurrences.map((o) => (
-                    <OccurrenceCard key={o.nodus_id} occurrence={o} />
-                  ))}
-                </div>
-              )}
-
-              {/* Evidence */}
-              {detail.evidence.length > 0 && (
-                <div>
-                  <div className="text-xs uppercase text-neutral-500 mb-1">{t('Evidencia anclada')}</div>
-                  {detail.evidence.map((ev) => (
-                    <blockquote key={ev.id} className="border-l-2 border-indigo-700 pl-3 py-2 my-2 text-xs text-neutral-300 italic bg-neutral-950/35 rounded-r-md">
-                      "{ev.quote}" <EvidenceLocationLink nodusId={ev.nodus_id} location={ev.location} suffix={` · ${ev.kind}`} onOpen={dataSource.openEvidence} />
-                    </blockquote>
-                  ))}
-                </div>
-              )}
-
-              {/* Connected ideas — each expands inline below its row */}
-              {connections.length > 0 && (
-                <div>
-                  <div className="text-xs uppercase text-neutral-500 mb-1">
-                    {tx('Ideas conectadas ({n})', { n: connections.length })}
-                  </div>
-                  <div className="space-y-1.5">
-                    {connections.map(({ edge, node }) =>
-                      (
-                        <ConnectedIdeaRow
-                          key={edge.id}
-                          edge={edge}
-                          node={node}
-                          onSelectIdea={setSelectedId}
-                          onOpenGraph={onOpenGraph}
-                          dataSource={dataSource}
-                        />
-                      )
-                    )}
-                  </div>
-                </div>
-              )}
             </div>
           )}
         </div>
-      )}
+      </header>
+
+      <main className="min-h-0 flex-1">
+        <div className={surface === 'catalog' ? 'flex h-full min-h-0 flex-col' : 'hidden'}>
+          <div className="shrink-0 border-b border-neutral-200 p-3 dark:border-neutral-800">
+            <div className="flex flex-wrap items-center gap-2">
+              {scopeControl}
+              <div className="relative min-w-[240px] flex-1">
+                <Icon name="search" size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-neutral-500" />
+                <input
+                  data-testid="ideas-search"
+                  className="input input-with-leading-icon w-full"
+                  placeholder={t('Buscar ideas…')}
+                  value={search}
+                  onChange={(event) => setSearch(event.target.value)}
+                />
+              </div>
+              <button
+                data-testid="ideas-filters-toggle"
+                className={`btn border border-neutral-300 dark:border-neutral-700 ${filtersOpen || typeFilter ? 'bg-indigo-50 text-indigo-700 dark:bg-indigo-500/10 dark:text-indigo-300' : 'btn-ghost'}`}
+                onClick={() => setFiltersOpen((value) => !value)}
+              >
+                <Icon name="filter" /> {t('Filtros')}{typeFilter ? <span className="rounded bg-indigo-100 px-1.5 py-0.5 text-[10px] dark:bg-indigo-500/20">1</span> : null}
+              </button>
+            </div>
+            {filtersOpen && (
+              <div className="mt-2 flex flex-wrap items-center gap-3 rounded-xl bg-neutral-50 p-2 dark:bg-neutral-900/55">
+                <label className="flex items-center gap-2 text-xs text-neutral-500">
+                  {t('Tipo')}
+                  <select data-testid="ideas-type-filter" className="input h-8 text-xs" value={typeFilter} onChange={(event) => setTypeFilter(event.target.value as IdeaType | '')}>
+                    <option value="">{t('Todos los tipos')}</option>
+                    {(['claim', 'finding', 'construct', 'method', 'framework'] as IdeaType[]).map((type) => <option key={type} value={type}>{t(NODE_LABELS[type])}</option>)}
+                  </select>
+                </label>
+                <label className="flex items-center gap-2 text-xs text-neutral-500">
+                  {t('Ordenar')}
+                  <select data-testid="ideas-sort" className="input h-8 text-xs" value={sortKey} onChange={(event) => setSortKey(event.target.value as SortKey)}>
+                    <option value="label">{t('Nombre')}</option>
+                    <option value="type">{t('Tipo')}</option>
+                    <option value="works">{t('Nº de obras')}</option>
+                    <option value="connections">{t('Nº de conexiones')}</option>
+                    <option value="confidence">{t('Confianza')}</option>
+                  </select>
+                </label>
+              </div>
+            )}
+          </div>
+
+          <div data-testid="ideas-table-scroll" className="min-h-0 flex-1 overflow-auto">
+            <div data-testid="ideas-catalog-table" className="min-w-[1080px]">
+              <div className="grid h-11 items-center border-b border-neutral-200 px-4 text-[10px] font-semibold uppercase tracking-wider text-neutral-500 dark:border-neutral-800 dark:text-neutral-600" style={{ gridTemplateColumns: 'minmax(360px,2.4fr) 8rem 6.5rem 7.5rem 7rem minmax(220px,1.35fr) 2rem' }}>
+                <IdeaSortHeader label="Idea" sort="label" active={sortKey} onSort={setSortKey} />
+                <IdeaSortHeader label="Tipo" sort="type" active={sortKey} onSort={setSortKey} />
+                <IdeaSortHeader label="Nº de obras" sort="works" active={sortKey} onSort={setSortKey} />
+                <IdeaSortHeader label="Nº de conexiones" sort="connections" active={sortKey} onSort={setSortKey} />
+                <IdeaSortHeader label="Confianza" sort="confidence" active={sortKey} onSort={setSortKey} />
+                <span>{t('Temas')}</span><span />
+              </div>
+              {loading && ideas.length === 0 ? (
+                <div className="grid h-48 place-items-center"><Spinner label={t('Cargando ideas…')} /></div>
+              ) : ideas.length === 0 ? (
+                <div className="grid h-48 place-items-center p-8 text-center text-sm text-neutral-500">
+                  {totalIdeas === 0 ? (emptyMessage ?? t('Aún no hay ideas. Ejecuta escaneos profundos para extraer ideas de tus obras.')) : t('Sin resultados para los filtros actuales.')}
+                </div>
+              ) : ideas.map((node) => (
+                <button
+                  key={node.id}
+                  data-testid={testId ? 'study-idea-card' : `idea-row-${node.id}`}
+                  className="grid min-h-[76px] w-full items-center border-b border-neutral-100 px-4 text-left text-xs transition-colors hover:bg-neutral-50 dark:border-neutral-900 dark:hover:bg-neutral-900/55"
+                  style={{ gridTemplateColumns: 'minmax(360px,2.4fr) 8rem 6.5rem 7.5rem 7rem minmax(220px,1.35fr) 2rem' }}
+                  onClick={() => showIdea({ id: node.id, label: node.label })}
+                >
+                  <div className="flex min-w-0 items-start gap-2 pr-5">
+                    <TypeDot type={node.type} />
+                    <div className="min-w-0">
+                      <span className="block truncate font-medium text-neutral-900 dark:text-neutral-200">{node.label}</span>
+                      <span className="mt-1 block line-clamp-2 leading-5 text-neutral-500">{node.statement}</span>
+                    </div>
+                  </div>
+                  <span className="text-neutral-600 dark:text-neutral-400">{t(NODE_LABELS[node.type as IdeaType]) ?? node.type}</span>
+                  <span className="tabular-nums text-neutral-600 dark:text-neutral-400">{node.workCount}</span>
+                  <span className="tabular-nums text-neutral-600 dark:text-neutral-400">{node.connectionCount}</span>
+                  <span className="tabular-nums text-neutral-600 dark:text-neutral-400">{node.maxConfidence.toFixed(2)}</span>
+                  <span className="flex min-w-0 flex-wrap gap-1 pr-3">
+                    {node.themes.slice(0, 3).map((theme) => <span key={theme} title={theme} className="max-w-36 truncate rounded-full bg-neutral-100 px-2 py-1 text-[10px] text-neutral-600 dark:bg-neutral-900 dark:text-neutral-500">{theme}</span>)}
+                    {node.themes.length > 3 && <span className="text-[10px] text-neutral-500">+{node.themes.length - 3}</span>}
+                  </span>
+                  <Icon name="chevronRight" size={14} className="text-neutral-400 dark:text-neutral-600" />
+                </button>
+              ))}
+            </div>
+          </div>
+          <footer className="flex h-10 shrink-0 items-center border-t border-neutral-200 px-3 text-xs text-neutral-500 dark:border-neutral-800">
+            <span>{totalIdeas ? `${pageOffset + 1}–${Math.min(pageOffset + ideas.length, totalIdeas)} / ${totalIdeas}` : '0'}</span><div className="flex-1" />
+            <button className="btn btn-ghost h-7" title={t('Anterior')} disabled={pageOffset === 0} onClick={() => setPageOffset((offset) => Math.max(0, offset - IDEAS_PAGE_SIZE))}><Icon name="chevronLeft" size={13} /></button>
+            <button className="btn btn-ghost h-7" title={t('Siguiente')} disabled={pageOffset + ideas.length >= totalIdeas} onClick={() => setPageOffset((offset) => offset + IDEAS_PAGE_SIZE)}><Icon name="chevronRight" size={13} /></button>
+          </footer>
+        </div>
+
+        {selectedId && (
+          <div data-testid={testId ? 'study-idea-detail' : 'idea-detail-tab'} className={surface === 'idea' ? 'h-full overflow-y-auto p-5' : 'hidden'}>
+            {detailLoading && !detail && <div className="grid h-64 place-items-center"><Spinner label={t('Cargando detalle…')} /></div>}
+            {detail && (
+              <div className="mx-auto max-w-[1480px] space-y-4">
+                <section className="rounded-2xl border border-indigo-100 bg-indigo-50/80 p-5 dark:border-neutral-800 dark:bg-neutral-900/35">
+                  <div className="flex flex-wrap items-start gap-4">
+                    <span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-indigo-100 text-indigo-600 dark:bg-indigo-500/15 dark:text-indigo-300"><Icon name="bulb" size={22} /></span>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-2"><Badge color="indigo">{t(NODE_LABELS[detail.idea.type as IdeaType]) ?? detail.idea.type}</Badge></div>
+                      <h2 className="mt-2 text-xl font-semibold">{detail.idea.label}</h2>
+                      <p className="mt-1 max-w-5xl text-sm leading-6 text-neutral-600 dark:text-neutral-400">{detail.idea.statement}</p>
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        <Badge>{tx('{n} obra(s)', { n: detailWorkCount })}</Badge>
+                        <Badge>{tx('{n} conexión(es)', { n: connections.length })}</Badge>
+                        <Badge>{t('Confianza')} {detailConfidence.toFixed(2)}</Badge>
+                        {selectedNode?.themes.map((theme) => <Badge key={theme} color="amber">{theme}</Badge>)}
+                      </div>
+                    </div>
+                    <div className="flex max-w-lg flex-wrap justify-end gap-2">
+                      <button className="btn btn-ghost border border-neutral-300 text-xs gap-1.5 dark:border-neutral-700" onClick={() => onOpenGraph({ preset: 'overview', nodeId: detail.idea.global_id, label: `${t('Idea:')} ${detail.idea.label}` })}><Icon name="layers" size={13} /> {t('Grafo')}</button>
+                      <button className="btn btn-ghost border border-neutral-300 text-xs gap-1.5 dark:border-neutral-700" onClick={() => onOpenAssistant({ title: `${t('Idea:')} ${detail.idea.label}`, selection: ASSISTANT_CONTEXTS.idea, prompt: `${t('Analiza esta idea dentro del corpus y resume sus conexiones, tensiones y lecturas prioritarias.')}\n\n${t('Idea:')} ${detail.idea.label}\n${detail.idea.statement}` })}><Icon name="chat" size={13} /> {t('Asistente')}</button>
+                      <button className="btn btn-ghost border border-neutral-300 text-xs gap-1.5 dark:border-neutral-700" disabled={savingIdea} onClick={() => { if (!dataSource.saveIdea) { setSavingIdeaToNotes(true); return; } setSavingIdea(true); void dataSource.saveIdea(detail).finally(() => setSavingIdea(false)); }}><Icon name="notebook" size={13} /> {t(savingIdea ? 'Guardando…' : 'Guardar en notas')}</button>
+                      <button className="btn btn-ghost border border-red-200 text-xs text-red-600 gap-1.5 dark:border-red-900/70 dark:text-red-400" disabled={deletingIdea} onClick={() => setConfirmDeleteIdea(true)}><Icon name="trash" size={13} /> {t('Eliminar idea')}</button>
+                    </div>
+                  </div>
+                </section>
+
+                <div className="grid items-start gap-4 xl:grid-cols-12">
+                  <div className="space-y-4 xl:col-span-7">
+                    <section className="rounded-xl border border-neutral-200 bg-white p-4 dark:border-neutral-800 dark:bg-neutral-950/70">
+                      <div className="mb-3 flex items-center gap-2"><Icon name="book" size={15} className="text-indigo-500" /><h3 className="font-semibold">{t('Obras que la desarrollan')}</h3><span className="text-xs text-neutral-500">{detail.occurrences.length}</span></div>
+                      {detail.occurrences.length > 0 ? <div className="space-y-2">{detail.occurrences.map((occurrence) => <OccurrenceCard key={occurrence.nodus_id} occurrence={occurrence} />)}</div> : <p className="text-sm text-neutral-500">—</p>}
+                    </section>
+
+                    <section className="rounded-xl border border-neutral-200 bg-white p-4 dark:border-neutral-800 dark:bg-neutral-950/70">
+                      <div className="mb-3 flex items-center gap-2"><Icon name="quote" size={15} className="text-indigo-500" /><h3 className="font-semibold">{t('Evidencia anclada')}</h3><span className="text-xs text-neutral-500">{detail.evidence.length}</span></div>
+                      {detail.evidence.length > 0 ? <div className="space-y-2">{detail.evidence.map((evidence) => <blockquote key={evidence.id} className="rounded-r-lg border-l-2 border-indigo-500 bg-neutral-50 px-3 py-2 text-sm italic leading-6 text-neutral-600 dark:bg-neutral-900/45 dark:text-neutral-300">“{evidence.quote}” <EvidenceLocationLink nodusId={evidence.nodus_id} location={evidence.location} suffix={` · ${evidence.kind}`} onOpen={dataSource.openEvidence} /></blockquote>)}</div> : <p className="text-sm text-neutral-500">—</p>}
+                    </section>
+                  </div>
+
+                  <section data-testid="idea-connections" className="rounded-xl border border-neutral-200 bg-white p-4 dark:border-neutral-800 dark:bg-neutral-950/70 xl:col-span-5">
+                    <div className="mb-3 flex items-center gap-2"><Icon name="share" size={15} className="text-indigo-500" /><h3 className="font-semibold">{tx('Ideas conectadas ({n})', { n: connections.length })}</h3></div>
+                    {connections.length > 0 ? <div className="space-y-2">{connections.map(({ edge, node }) => <ConnectedIdeaRow key={edge.id} edge={edge} node={node} onSelectIdea={(id) => showIdea({ id, label: node.label })} onOpenGraph={onOpenGraph} dataSource={dataSource} />)}</div> : <p className="text-sm text-neutral-500">{t('Esta idea aún no tiene conexiones con otras ideas.')}</p>}
+                  </section>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+      </main>
 
       {savingIdeaToNotes && detail && !dataSource.saveIdea && (
         <SaveToNotesModal
@@ -458,6 +391,16 @@ export function IdeasView({
         />
       )}
     </div>
+  );
+}
+
+function IdeaSortHeader({ label, sort, active, onSort }: { label: string; sort: SortKey; active: SortKey; onSort: (sort: SortKey) => void }) {
+  const ascending = sort === 'label' || sort === 'type';
+  return (
+    <button className="flex min-w-0 items-center gap-1 text-left hover:text-neutral-800 dark:hover:text-neutral-300" onClick={() => onSort(sort)}>
+      <span className="truncate">{t(label)}</span>
+      {active === sort && <span className="text-indigo-500">{ascending ? '↑' : '↓'}</span>}
+    </button>
   );
 }
 

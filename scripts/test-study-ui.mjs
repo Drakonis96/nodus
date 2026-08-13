@@ -5,18 +5,18 @@ import { readSource } from './ipc-channel-census.mjs';
 const read = async (file) => readSource(file);
 
 test('study vault uses its teal header logo and the shared dock accent', async () => {
-  const [app, logo, dock, vaultTypes] = await Promise.all([
+  const [app, logo, dock, vaultColors] = await Promise.all([
     read('@shell'),
     read('src/assets/nodus-logo-teal.svg'),
     read('src/dockIcon.ts'),
-    read('shared/vaultTypes.ts'),
+    read('shared/vaultColors.ts'),
   ]);
   assert.match(app, /import nodusLogoTeal/);
   assert.match(app, /isEstudio \? nodusLogoTeal/);
   assert.match(app, /data-vault-logo=.*isEstudio \? 'estudio'/s);
   assert.match(logo, /#0f766e/i);
-  // The accent lives once in shared/vaultTypes; the dock reads it from there.
-  assert.match(vaultTypes, /estudio: '#0f766e'/);
+  // The accent lives once in shared/vaultColors; the dock reads it through vaultTypes.
+  assert.match(vaultColors, /estudio: '#0f766e'/);
   assert.match(dock, /vaultTypeColor\(type\)/);
 });
 
@@ -42,6 +42,22 @@ test('study and teaching expandable icon buttons remain centred while labels are
   for (const source of [organization, materials, pdf]) assert.match(source, /icon-reveal-button/);
   assert.match(css, /\.btn\.header-action,\s*\.btn\.icon-reveal-button\s*\{\s*gap:\s*0;/s);
   assert.match(css, /\.btn\.icon-reveal-button > svg:first-child\s*\{\s*display:\s*block;/s);
+});
+
+test('the shared editor model menu is searchable and never scrolls horizontally', async () => {
+  const [picker, css, editor] = await Promise.all([
+    read('src/components/ModelPicker.tsx'),
+    read('src/components/modelPicker.css'),
+    read('src/components/editor/StudyEditor.tsx'),
+  ]);
+  assert.match(editor, /<ModelPicker[^>]* menu /, 'every vault editor reaches the shared menu variant');
+  assert.match(picker, /data-testid="model-picker-search"/);
+  assert.match(picker, /placeholder=\{t\('Buscar modelo…'\)\}/);
+  assert.match(picker, /filteredModels = models\.filter/);
+  assert.match(picker, /Ningún modelo coincide con «\{query\}»/);
+  assert.match(css, /\.model-picker-options\s*\{[^}]*overflow:\s*hidden/s);
+  assert.match(css, /\.model-picker-list\s*\{[^}]*overflow-x:\s*hidden/s);
+  assert.match(css, /\.model-picker-list button\s*\{[^}]*box-sizing:\s*border-box[^}]*width:\s*100%[^}]*max-width:\s*100%/s);
 });
 
 test('macOS keeps the last vault and theme dock icon after Nodus exits', async () => {
@@ -81,7 +97,9 @@ test('left sidebar is resizable and remembers the selected width', async () => {
     app.indexOf('data-testid="sidebar-scroll-region"') < app.indexOf('data-testid="sidebar-resize-handle"'),
     'the scroll region should be rendered before the resize handle',
   );
-  assert.match(app, /Math\.max\(176, Math\.min\(360/);
+  assert.match(app, /const SIDEBAR_MIN_WIDTH = 64/);
+  assert.match(app, /const SIDEBAR_MAX_WIDTH = 360/);
+  assert.match(app, /Math\.max\(SIDEBAR_MIN_WIDTH, Math\.min\(SIDEBAR_MAX_WIDTH/);
   assert.match(app, /onDoubleClick/);
   assert.match(css, /\.sidebar-resize-handle/);
   assert.match(css, /cursor: col-resize/);
@@ -107,6 +125,13 @@ test('sidebar header keeps the Nodus brand centered, stable when hidden and full
   assert.match(app, /className="absolute right-2 text-neutral-600"/);
   assert.match(app, /data-platform=\{IS_MAC \? 'macos' : 'other'\}/);
   assert.match(app, /MACOS_FULL_SIDEBAR_BRAND_MIN_WIDTH = 248/);
+  assert.match(
+    app,
+    /data-testid="sidebar-header-brand"[\s\S]*?style=\{\{ transform: sidebarCompact && IS_MAC \? 'translateY\(0\.5625rem\)' : undefined \}\}/,
+    'compact macOS mode should reserve a contained safe area below the window controls',
+  );
+  assert.doesNotMatch(app, /sidebarCompact && IS_MAC \? 'pt-8'/);
+  assert.match(app, /sidebarCompact && IS_MAC[\s\S]*?\? 'h-\[18px\] w-\[18px\]'/);
   assert.doesNotMatch(css, /\[data-testid='sidebar-header-toggle'\]\s*\{[^}]*padding-left/s);
 });
 
@@ -216,7 +241,7 @@ test('study actions use renderer dialogs and the sidebar has no onboarding space
   assert.doesNotMatch(view, /<section className="border-b border-neutral-800 p-5">/);
   assert.match(editor, /TextInputModal/);
   assert.doesNotMatch(sidebar, /Crea tu primer curso para empezar/);
-  assert.match(sidebar, /data-testid="study-sidebar-organization" className="mt-2 flex flex-col gap-1"/);
+  assert.match(sidebar, /data-testid="study-sidebar-organization" className=\{`\$\{compact \? 'mt-1 border-t border-neutral-800\/70 pt-1' : 'mt-2'\} flex flex-col gap-1`\}/);
   assert.match(sidebar, /data-testid="study-sidebar-organization-toggle"/);
   assert.match(sidebar, /nodus\.studyOrganizationCollapsed/);
   assert.match(sidebar, /aria-expanded=\{!collapsed\}/);
@@ -261,7 +286,7 @@ test('study metadata uses one searchable icon and emoji catalogue', async () => 
   assert.match(picker, /data-testid="study-icon-search"/);
   assert.match(picker, /ICON_NAMES\.filter/);
   assert.match(picker, /EMOJI_SEARCH_GROUPS/);
-  assert.match(picker, /aria-label=\{t\('Seleccionar icono o emoji'\)\}/);
+  assert.match(picker, /aria-label=\{t\(allowEmoji \? 'Seleccionar icono o emoji' : 'Seleccionar icono'\)\}/);
   assert.doesNotMatch(picker, /Emoji seleccionado/);
   assert.doesNotMatch(picker, /\{emoji \|\| icon \|\| t\('Seleccionar icono o emoji'\)\}/);
   assert.match(ui, /export const ICON_NAMES/);

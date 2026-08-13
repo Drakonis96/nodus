@@ -16,6 +16,18 @@ const ITEM_TYPES = [
   ['podcast', 'Podcast'], ['blog-post', 'Blog post'], ['forum-post', 'Forum post'], ['computer-program', 'Computer program'],
   ['webpage', 'Web page'], ['document', 'Document'], ['standard', 'Standard'], ['other', 'Other'],
 ];
+const ITEM_TYPE_LABELS_ES = {
+  'journal-article': 'Artículo académico', book: 'Libro', 'book-chapter': 'Capítulo de libro', 'conference-paper': 'Ponencia',
+  thesis: 'Tesis', report: 'Informe', manuscript: 'Manuscrito', preprint: 'Preprint', dataset: 'Conjunto de datos',
+  presentation: 'Presentación', 'newspaper-article': 'Artículo de periódico', 'magazine-article': 'Artículo de revista',
+  'encyclopedia-article': 'Artículo de enciclopedia', 'dictionary-entry': 'Entrada de diccionario', interview: 'Entrevista',
+  letter: 'Carta', email: 'Correo electrónico', 'instant-message': 'Mensaje instantáneo', case: 'Caso', hearing: 'Audiencia',
+  bill: 'Proyecto de ley', statute: 'Estatuto', patent: 'Patente', artwork: 'Obra de arte', map: 'Mapa', film: 'Película',
+  'audio-recording': 'Grabación de audio', 'video-recording': 'Grabación de vídeo', 'radio-broadcast': 'Emisión de radio',
+  'tv-broadcast': 'Emisión de televisión', podcast: 'Podcast', 'blog-post': 'Entrada de blog', 'forum-post': 'Entrada de foro',
+  'computer-program': 'Programa informático', webpage: 'Página web', document: 'Documento', standard: 'Norma', other: 'Otro',
+};
+const spanishUi = chrome.i18n.getUILanguage().toLowerCase().startsWith('es');
 const $ = (id) => document.getElementById(id);
 const state = { capture: null, tab: null, port: DEFAULT_NODUS_PORT, token: '', collections: [], tags: [], selectedCollection: null, selectedTags: [], savedItemId: null };
 const msg = (key, substitutions) => chrome.i18n.getMessage(key, substitutions) || key;
@@ -25,7 +37,7 @@ function show(id) {
 }
 
 function localize() {
-  document.documentElement.lang = 'en';
+  document.documentElement.lang = chrome.i18n.getUILanguage().split('-')[0] || 'en';
   for (const element of document.querySelectorAll('[data-i18n]')) element.textContent = msg(element.dataset.i18n);
   for (const element of document.querySelectorAll('[data-i18n-placeholder]')) element.placeholder = msg(element.dataset.i18nPlaceholder);
   for (const element of document.querySelectorAll('[data-i18n-title]')) { element.title = msg(element.dataset.i18nTitle); element.setAttribute('aria-label', msg(element.dataset.i18nTitle)); }
@@ -37,7 +49,7 @@ function byline(metadata) {
 }
 
 function typeLabel(type) {
-  return ITEM_TYPES.find(([id]) => id === type)?.[1] || type;
+  return (spanishUi ? ITEM_TYPE_LABELS_ES[type] : '') || ITEM_TYPES.find(([id]) => id === type)?.[1] || type;
 }
 
 function renderCapture() {

@@ -9,6 +9,7 @@
 // is loosened — the code is still single-use and still expires — it is simply typed by the
 // program that generated it instead of by a person copying it between two windows.
 import type { NodusServerPairResult } from '@shared/types';
+import type { VaultType } from '@shared/vaultTypes';
 import { getActiveVault } from '../vaults/vaultRegistry';
 import { getSettings } from '../db/settingsRepo';
 import { pairNodusServer } from '../serverSync/serverSyncService';
@@ -26,13 +27,13 @@ interface ProvisionResult {
  * Authenticated by a secret only readable by this operating-system user, over loopback only —
  * the server refuses this route from anywhere else even with the right secret.
  */
-async function provision(loopbackUrl: string, vaultId: string, vaultName: string): Promise<ProvisionResult> {
+async function provision(loopbackUrl: string, vaultId: string, vaultName: string, vaultType: VaultType): Promise<ProvisionResult> {
   const secret = readProvisionSecret();
   if (!secret) throw new Error('El servidor local todavía no ha escrito su secreto de aprovisionamiento.');
   const response = await fetch(`${loopbackUrl}/api/v1/local/provision`, {
     method: 'POST',
     headers: { 'content-type': 'application/json', authorization: `Bearer ${secret}` },
-    body: JSON.stringify({ vaultId, vaultName }),
+    body: JSON.stringify({ vaultId, vaultName, vaultType }),
     signal: AbortSignal.timeout(15_000),
   });
   const result = await response.json().catch(() => ({})) as Partial<ProvisionResult> & { error_description?: string; error?: string };
@@ -52,6 +53,6 @@ export async function connectActiveVaultToLocalServer(): Promise<NodusServerPair
   }
   const loopbackUrl = `http://127.0.0.1:${getSettings().localServerPort}`;
   const vault = getActiveVault();
-  const { code } = await provision(loopbackUrl, vault.id, vault.name);
+  const { code } = await provision(loopbackUrl, vault.id, vault.name, vault.type);
   return pairNodusServer(loopbackUrl, code);
 }

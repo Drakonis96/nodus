@@ -46,7 +46,6 @@ export function GapsView({
   const [totalGaps, setTotalGaps] = useState(0);
   const [pageOffset, setPageOffset] = useState(0);
   const [contradictionCount, setContradictionCount] = useState(0);
-  const [tab, setTab] = useState<'mined' | 'contradictions'>('mined');
   const [savingGap, setSavingGap] = useState<GapAggregate | null>(null);
   const [searchingGap, setSearchingGap] = useState<GapAggregate | null>(null);
 
@@ -83,34 +82,16 @@ export function GapsView({
   useScanComplete(reload);
 
   return (
-    <div className="h-full flex flex-col min-h-0 p-6">
-      <div className="shrink-0">
-        <div className="flex items-center gap-3 mb-4">
-          <Icon name="gap" size={22} className="text-indigo-300" />
-          <h1 className="text-xl font-semibold">{t('Huecos de investigación')}</h1>
-        </div>
-        <p className="text-sm text-neutral-400 mb-4">
-          {t('Agregados del corpus: trabajo futuro y limitaciones minados de las obras, y contradicciones sin reconciliar.')}
-        </p>
-
-        <div className="flex gap-2 mb-4">
-          <button
-            className={`btn ${tab === 'mined' ? 'btn-primary' : 'btn-ghost'}`}
-            onClick={() => setTab('mined')}
-          >
-            {tx('Minados ({n})', { n: totalGaps })}
-          </button>
-          <button
-            className={`btn ${tab === 'contradictions' ? 'btn-primary' : 'btn-ghost'}`}
-            onClick={() => setTab('contradictions')}
-          >
-            {tx('Contradicciones ({n})', { n: contradictionCount })}
-          </button>
-        </div>
+    <div data-testid="gaps-catalog" className="flex h-full min-h-0 flex-col bg-white dark:bg-neutral-950">
+      <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-neutral-200 p-3 dark:border-neutral-800">
+        <Badge>{tx('Minados ({n})', { n: totalGaps })}</Badge>
+        <div className="flex-1" />
+        <button className="btn btn-ghost h-8 gap-1.5 border border-neutral-300 text-xs dark:border-neutral-700" onClick={onOpenDebates}>
+          <Icon name="scale" size={13} /> {tx('Contradicciones ({n})', { n: contradictionCount })}
+        </button>
       </div>
 
-      {tab === 'mined' && (
-        <div className="flex flex-1 min-h-0 flex-col">
+      <div className="flex flex-1 min-h-0 flex-col p-5">
         <VirtualList
           items={gaps}
           itemHeight={GAP_ROW_HEIGHT}
@@ -184,28 +165,7 @@ export function GapsView({
             </div>
           </div>
         )}
-        </div>
-      )}
-
-      {tab === 'contradictions' && (
-        <div className="flex-1 min-h-0 flex items-start">
-          <div className="card p-5 max-w-xl">
-            <div className="flex items-center gap-2 mb-2">
-              <Icon name="scale" size={20} className="text-rose-300" />
-              <h2 className="text-base font-semibold">{t('Las contradicciones ahora viven en Debates')}</h2>
-            </div>
-            <p className="text-sm text-neutral-400 mb-4">
-              {tx(
-                'La vista de Debates enfrenta cada contradicción o refutación ({n}) mostrando las dos posiciones, los autores de cada bando, su evidencia y la cronología de la disputa.',
-                { n: contradictionCount }
-              )}
-            </p>
-            <button className="btn btn-primary text-sm gap-1.5" onClick={onOpenDebates}>
-              <Icon name="scale" size={14} /> {t('Abrir vista de Debates')}
-            </button>
-          </div>
-        </div>
-      )}
+      </div>
 
       {savingGap && (
         <SaveToNotesModal

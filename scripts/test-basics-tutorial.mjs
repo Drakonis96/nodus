@@ -130,9 +130,8 @@ test('study analysis exposes chat, review and the question bank without obsolete
     assert.doesNotMatch(navigation, new RegExp(removed));
   }
   assert.doesNotMatch(app, /LOCKED_STUDY_VIEWS/);
-  // Every grouped section is a plain nav button — no route is filtered out or
-  // locked. (The toolkit is the one item that also renders nested tool buttons
-  // underneath, which is why the map is no longer a bare navButton call.)
-  assert.match(app, /group\.items\.map\(\(n\) => \(n\.id === 'toolkit' \? \(/);
-  assert.match(app, /\) : navButton\(n\)\)\)/);
+  // Every grouped section is a plain nav button — no route is filtered out,
+  // locked or expanded into a second level of navigation.
+  assert.match(app, /group\.items\.map\(\(n\) => navButton\(n\)\)/);
+  assert.doesNotMatch(app, /toolkitSubNav/);
 });

@@ -155,6 +155,17 @@ const RELEASE_3_2_4_IT: string[] = [
 ];
 
 export const RELEASE_NOTES_IT: Record<string, string[]> = {
+  "4.1.0": [
+    "Autori, Idee e Mappa degli argomenti adottano la vista Biblioteca. Gli elenchi riuniscono metadati, etichette e filtri, e ogni elemento apre una scheda ordinata con sintesi, relazioni e contenuto. Stato della ricerca riunisce Copertura, Dibattiti e Lacune nello stesso linguaggio visivo.",
+    "Lo Spazio di lavoro ora si comporta come una biblioteca di note e idee in ogni vault. Puoi aggiungere etichette, filtrarle, selezionare più elementi, aprire le azioni con il tasto destro e recuperare il lavoro eliminato dal Cestino.",
+    "La Biblioteca pubblicata arriva sul telefono con raccolte gerarchiche, metadati e riferimenti. Puoi leggere ed evidenziare il Markdown pulito, vedere le immagini, conservare documenti offline ed eliminare una selezione o tutti i download. L’originale è identificato e resta riservato a una versione futura.",
+    "L’editor condivide strumenti di scrittura professionali tra computer e telefono. Selezionando il testo compaiono formattazione, collegamenti, colore, titoli e miglioramenti IA con icone vere. Il selettore di modelli include la ricerca, elimina lo scorrimento orizzontale e mantiene leggibile ogni opzione a qualsiasi larghezza.",
+    "Nodus Server migliora l’amministrazione di account e spazi. Un account può accedere a più vault con permessi diversi, e tali accessi restano modificabili. Puoi anche rinominare gli spazi, copiare identificatori e indirizzi, cambiare email dopo aver confermato la password e riconoscere ogni tipo di vault dal suo vero colore.",
+    "La navigazione risponde meglio alle finestre strette. La barra laterale può ridursi alle sole icone senza perdere la N centrata, usa il colore del vault nella barra di scorrimento e mantiene visibili i controlli importanti. Sono corretti anche sovrapposizioni, campi di ricerca e superfici rimaste nel tema sbagliato.",
+    "Le notifiche possono essere aggiornate manualmente dall’intestazione e da Nodi. Le modifiche dello stesso documento o rapporto vengono raggruppate in una scheda espandibile invece di riempire la casella con ogni evidenziazione. Le finestre di aggiornamento e novità mantengono il loro design usando meno lavoro grafico e memoria.",
+    "Il connettore Chrome consiglia l’installazione dal Chrome Web Store e conserva il ZIP manuale. Mantiene l’associazione automatica e risolve i collegamenti accademici verso il vero PDF. In Word sono corretti il tema scuro e i passaggi danneggiati, mentre il selettore CSL cerca gli stili installati in Nodus e li aggiorna in tempo reale.",
+    "Nodus Toolkit resta una sola voce nella barra laterale. Le applicazioni condividono la stessa intestazione e presentazione visiva senza etichette di sviluppo, e il sito usa la stessa intestazione nella pagina iniziale e nelle demo sia su computer sia su telefono.",
+  ],
   "4.0.1": [
     "Il connettore Chrome ora si associa automaticamente dopo che lo attivi in Nodus. La finestra nativa ridondante è stata rimossa e, se revochi il token, il browser ne ottiene uno nuovo quando riapri il connettore.",
     "I collegamenti accademici al testo completo vengono ora seguiti anche quando l’indirizzo non termina in PDF. Nodus attraversa pagine come Dialnet e OJS, convalida la firma del vero PDF e prepara il Markdown pulito dall’articolo invece che dallo snapshot HTML.",

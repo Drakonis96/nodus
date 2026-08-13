@@ -106,6 +106,7 @@ import type {
   ModelRef,
   Note,
   NoteFolder,
+  NoteTagPatch,
   NotesExportOptions,
   NotesReorderResult,
   NotesTree,
@@ -681,18 +682,27 @@ export interface AcademicApi {
 
   // notes (user-structured folders/subfolders with markdown + captured AI content)
   /** Load every folder and note in one payload; the renderer builds the tree. */
-  getNotesTree(): Promise<NotesTree>;
+  getNotesTree(includeTrashed?: boolean): Promise<NotesTree>;
   createNoteFolder(input: CreateNoteFolderInput): Promise<NoteFolder>;
   renameNoteFolder(id: string, name: string): Promise<NoteFolder | null>;
   /** Re-parent a folder (null = root). Cycles are rejected and return the folder unchanged. */
   moveNoteFolder(id: string, parentId: string | null): Promise<NoteFolder | null>;
   /** Delete a folder and, recursively, its subfolders and all their notes. */
   deleteNoteFolder(id: string): Promise<void>;
+  /** Delete a folder hierarchy but preserve its notes and ideas in the Workspace trash. */
+  trashNoteFolder(id: string): Promise<string[]>;
   createNote(input: CreateNoteInput): Promise<Note>;
   getNote(id: string): Promise<Note | null>;
   updateNote(input: UpdateNoteInput): Promise<Note | null>;
   /** Move a note to another folder (null = unfiled / root). */
   moveNote(id: string, folderId: string | null): Promise<Note | null>;
+  /** Add or remove user labels from several Workspace items atomically. */
+  patchNoteTags(noteIds: string[], patch: NoteTagPatch): Promise<Note[]>;
+  /** Move Workspace items to the recoverable trash without deleting graph ideas. */
+  trashNotes(noteIds: string[]): Promise<void>;
+  restoreNotes(noteIds: string[]): Promise<void>;
+  /** Permanently delete trashed items and their owned manual graph ideas. */
+  deleteNotesPermanently(noteIds: string[]): Promise<void>;
   deleteNote(id: string): Promise<void>;
 
   // manual ideas (user-authored, note-owned graph ideas)

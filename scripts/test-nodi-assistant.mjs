@@ -208,6 +208,7 @@ test('Nodi chat keeps model selection inside settings and exposes deletable hist
   assert.match(pickerCss, /\.model-picker-trigger/);
   assert.match(pickerCss, /position:\s*absolute/);
   assert.match(pickerCss, /font-family:\s*inherit/);
+  assert.match(css, /\.nodi-theme-light \.nodi-chat-tool \.model-picker-search > input/);
   assert.match(globalCss, /background-repeat: no-repeat/);
 });
 

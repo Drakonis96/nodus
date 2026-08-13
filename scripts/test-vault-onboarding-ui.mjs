@@ -26,10 +26,10 @@ test('worldbuilding and teaching use their own visible vault icons', async () =>
   assert.match(app, /vaultTypeIcon\(activeVault\.type\)/);
   assert.match(ui, /globe:/);
   assert.match(ui, /presentation:/);
-  // Vault accents live once in shared/vaultTypes; the dock reads them from there.
-  const vaultTypes = await read('shared/vaultTypes.ts');
-  assert.match(vaultTypes, /worldbuilding: '#7c3aed'/);
-  assert.match(vaultTypes, /docencia: '#ea580c'/);
+  // Vault accents live once in shared/vaultColors; vaultTypes and the server import them.
+  const vaultColors = await read('shared/vaultColors.ts');
+  assert.match(vaultColors, /worldbuilding: '#7c3aed'/);
+  assert.match(vaultColors, /docencia: '#ea580c'/);
   assert.match(dock, /vaultTypeColor\(type\)/);
 });
 

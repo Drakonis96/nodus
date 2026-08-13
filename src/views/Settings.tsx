@@ -56,6 +56,7 @@ import { updateStatusMessage } from '../updateStatus';
 import { DEFAULT_EMBEDDING_MODELS, EMBEDDING_PROVIDERS } from '@shared/providers';
 import { ORB_COLOR_CHOICES, orbHue } from '@shared/nodiOrb';
 import { effectiveSidebarHidden, isViewAllowedForVaultType } from '@shared/vaultTypes';
+import chromeWebStoreLogo from '../assets/brands/chrome-web-store.svg';
 
 type SettingsTabId = 'providers' | 'models' | 'library' | 'extraction' | 'interface' | 'integrations' | 'server' | 'system' | 'data' | 'about' | 'updates';
 
@@ -75,7 +76,7 @@ const SETTINGS_TABS: { id: SettingsTabId; label: string; icon: string; keywords:
 
 const ZOTERO_FREE_VAULT_TYPES = new Set<VaultType>(['testimonios', 'prosopography', 'worldbuilding']);
 
-const ABOUT_ACTION_BUTTON_CLASS = 'btn btn-ghost w-full shrink-0 justify-center border border-neutral-300 dark:border-neutral-700 sm:w-56';
+const ABOUT_ACTION_BUTTON_CLASS = 'btn btn-ghost w-full min-h-9 shrink-0 justify-center border border-neutral-300 dark:border-neutral-700 sm:h-9 sm:w-auto sm:min-w-56 sm:whitespace-nowrap';
 const ABOUT_CARD_CLASS = 'rounded-xl border border-neutral-200 bg-neutral-50 p-5 dark:border-neutral-800 dark:bg-neutral-900/50';
 const NODUS_REPOSITORY_URL = 'https://github.com/Drakonis96/nodus';
 const NODUS_SERVER_GUIDE_URL = `${NODUS_REPOSITORY_URL}/blob/main/server/README.md`;
@@ -83,6 +84,7 @@ const NODUS_PRIVACY_URL = `${NODUS_REPOSITORY_URL}/blob/main/PRIVACY.md`;
 const NODUS_VERSION_SOURCE_URL = `${NODUS_REPOSITORY_URL}/tree/v${__APP_VERSION__}`;
 const NODUS_LICENSE_URL = `${NODUS_REPOSITORY_URL}/blob/v${__APP_VERSION__}/LICENSE`;
 const NODUS_SECURITY_REPORT_URL = `${NODUS_REPOSITORY_URL}/security/advisories/new`;
+const CHROME_WEB_STORE_URL = 'https://chromewebstore.google.com/detail/ilcclajjhofhieoljdjmikmfopfbamej?utm_source=item-share-cb';
 
 function normalizeSettingsText(value: string): string {
   return value
@@ -1968,6 +1970,13 @@ export function Settings({
                       </div>
                       <div className="flex items-center justify-between gap-4">
                         <div>
+                          <label className="text-sm text-neutral-700 dark:text-neutral-300">{t('Publicar biblioteca y documentos')}</label>
+                          <p className="mt-0.5 text-xs text-amber-700 dark:text-amber-400">{t('Publica el catálogo global completo, el Clean Markdown y sus figuras para leerlos sin conexión en Nodus Mobile. Los documentos originales nunca se envían.')}</p>
+                        </div>
+                        <input type="checkbox" checked={settings.nodusServerIncludeLibraryDocuments} onChange={(event) => void patch({ nodusServerIncludeLibraryDocuments: event.target.checked })} />
+                      </div>
+                      <div className="flex items-center justify-between gap-4">
+                        <div>
                           <label className="text-sm text-neutral-700 dark:text-neutral-300">{t('Incluir vectores semánticos')}</label>
                           <p className="mt-0.5 text-xs text-neutral-500">{t('Permite buscar por significado desde el móvil o una réplica. Sin ellos solo se puede buscar por texto literal. Se derivan de ideas que ya viajan y no se pueden revertir al texto original.')}</p>
                         </div>
@@ -2202,16 +2211,45 @@ export function Settings({
             </div>
             <div className="rounded-lg border border-neutral-200 bg-neutral-50 px-3 py-2 text-xs dark:border-neutral-800 dark:bg-neutral-950/50">
               {settings.browserConnectorEnabled && zoteroStatus.running ? (
-                <span className="text-emerald-700 dark:text-emerald-400">{t('Conector listo')}: {zoteroStatus.url}</span>
+                <span className="text-emerald-700 dark:text-emerald-400">{t('Listo para emparejar')}: {zoteroStatus.url}</span>
               ) : zoteroStatus.error ? (
                 <span className="text-red-700 dark:text-red-400">{t('Error')}: {zoteroStatus.error}</span>
               ) : (
                 <span className="text-neutral-600 dark:text-neutral-500">{t('Actívalo y deja Nodus abierto mientras guardas desde Chrome.')}</span>
               )}
             </div>
+            <div
+              data-testid="browser-connector-store-install"
+              className="rounded-xl border border-blue-200 bg-blue-50/70 p-4 dark:border-blue-900/70 dark:bg-blue-950/20"
+            >
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+                <div className="grid h-11 w-11 shrink-0 place-items-center rounded-xl border border-blue-200 bg-white shadow-sm dark:border-blue-900/70 dark:bg-neutral-950">
+                  <img src={chromeWebStoreLogo} alt="" className="h-6 w-6" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <p className="text-sm font-semibold text-neutral-900 dark:text-neutral-100">Chrome Web Store</p>
+                    <span className="rounded-full bg-blue-100 px-2 py-0.5 text-[11px] font-semibold text-blue-700 dark:bg-blue-900/50 dark:text-blue-300">
+                      {t('Recomendado')}
+                    </span>
+                  </div>
+                  <p className="mt-1 text-xs leading-5 text-neutral-600 dark:text-neutral-400">
+                    {t('Instalación sencilla y actualizaciones automáticas.')}
+                  </p>
+                </div>
+                <button
+                  data-testid="browser-connector-install-store"
+                  className="btn btn-primary shrink-0"
+                  onClick={() => void window.nodus.openExternal(CHROME_WEB_STORE_URL)}
+                >
+                  <Icon name="external" /> {t('Instalar desde Chrome Web Store')}
+                </button>
+              </div>
+            </div>
             <div className="flex flex-wrap items-center gap-2">
               <button
-                className="btn btn-primary"
+                data-testid="browser-connector-download-zip"
+                className="btn btn-ghost border border-neutral-300 dark:border-neutral-700"
                 disabled={browserConnectorBusy}
                 onClick={async () => {
                   setBrowserConnectorBusy(true);
@@ -2225,20 +2263,20 @@ export function Settings({
                 }}
               >
                 <Icon name={browserConnectorBusy ? 'sync' : 'download'} className={browserConnectorBusy ? 'animate-spin' : ''} />
-                {browserConnectorBusy ? t('Preparando…') : t('Descargar extensión de Chrome')}
+                {browserConnectorBusy ? t('Preparando…') : t('Descargar ZIP')}
               </button>
               <button
                 className="btn btn-ghost border border-neutral-300 dark:border-neutral-700"
                 onClick={async () => {
                   await window.nodus.regenerateBrowserConnectorToken();
-                  flash(t('Acceso del conector restablecido.'));
+                  flash(t('Se ha revocado el acceso de los navegadores emparejados.'));
                 }}
               >
-                <Icon name="refresh" /> {t('Restablecer acceso del conector')}
+                <Icon name="refresh" /> {t('Revocar navegadores emparejados')}
               </button>
             </div>
             <p className="text-xs leading-5 text-neutral-600 dark:text-neutral-500">
-              {t('Chrome no permite que una app instale extensiones silenciosamente. Descarga el ZIP, descomprímelo y usa Cargar descomprimida en chrome://extensions.')}
+              {t('Alternativa manual para desarrollo o pruebas. Descomprime el ZIP y cárgalo desde chrome://extensions.')}
             </p>
           </Section>
       )}

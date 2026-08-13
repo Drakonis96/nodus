@@ -17,6 +17,7 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { AppSettings, Note, NoteFolder, NotesTree, WorkspaceLibraryLink } from '@shared/types';
 import { MANUAL_IDEA_MARKER } from '@shared/types';
+import type { TestimonyDeepLink } from '@shared/testimonyDeepLinks';
 import type { LibraryScope } from '@shared/libraryTypes';
 import { Icon, Spinner } from '../components/ui';
 import { ConfirmModal } from '../components/ConfirmModal';
@@ -31,7 +32,13 @@ const StudyEditor = lazy(() => import('../components/editor/StudyEditor').then((
 /** Lo que se puede crear aquí. Una idea es una nota que además vive en el grafo. */
 type WorkspaceItemKind = 'note' | 'idea';
 
-type Scope = { kind: 'all' } | { kind: 'unfiled' } | { kind: 'collection'; id: string };
+type Scope = { kind: 'all' } | { kind: 'unfiled' } | { kind: 'trash' } | { kind: 'collection'; id: string };
+
+interface WorkspaceItemContextMenu {
+  noteId: string;
+  x: number;
+  y: number;
+}
 
 const KIND_ICON: Record<WorkspaceItemKind, string> = { note: 'notebook', idea: 'bulb' };
 
@@ -342,6 +349,48 @@ function CollectionBranch({
   );
 }
 
+function WorkspaceTagsEditor({ note, onChanged }: { note: Note; onChanged: () => Promise<unknown> }) {
+  const [draft, setDraft] = useState('');
+  const add = async () => {
+    if (!draft.trim()) return;
+    await window.nodus.patchNoteTags([note.id], { add: [draft] });
+    setDraft('');
+    await onChanged();
+  };
+  return (
+    <div data-testid="workspace-item-tags" className="border-t border-neutral-200 px-3 py-3 dark:border-neutral-800">
+      <b className="text-[10px] uppercase tracking-wider text-neutral-500">{t('Etiquetas')}</b>
+      <div className="mt-2 flex flex-wrap gap-1">
+        {note.tags.map((tag) => (
+          <span key={tag} className="inline-flex items-center gap-1 rounded-full bg-indigo-500/10 px-2 py-1 text-[10px] text-indigo-300">
+            {tag}
+            <button
+              type="button"
+              className="text-indigo-400/70 hover:text-red-400"
+              aria-label={tx('Quitar etiqueta {tag}', { tag })}
+              onClick={async () => { await window.nodus.patchNoteTags([note.id], { remove: [tag] }); await onChanged(); }}
+            ><Icon name="x" size={9} /></button>
+          </span>
+        ))}
+        {note.tags.length === 0 && <span className="text-[11px] text-neutral-600">{t('Sin etiquetas')}</span>}
+      </div>
+      <div className="mt-2 flex gap-1">
+        <input
+          data-testid="workspace-item-tag-input"
+          className="input h-8 min-w-0 flex-1 text-xs"
+          value={draft}
+          onChange={(event) => setDraft(event.target.value)}
+          onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); void add(); } }}
+          placeholder={t('Añadir etiqueta…')}
+        />
+        <button type="button" className="btn btn-ghost h-8 w-8 p-0" disabled={!draft.trim()} onClick={() => void add()} aria-label={t('Añadir etiqueta')}>
+          <Icon name="tag" size={13} />
+        </button>
+      </div>
+    </div>
+  );
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // La vista
 // ─────────────────────────────────────────────────────────────────────────────
@@ -350,11 +399,17 @@ export function WorkspaceView({
   settings,
   focusNote,
   onOpenGraph,
+  title = 'Espacio de trabajo',
+  onTestimonyLink,
 }: {
   settings: AppSettings;
   /** Una nota que abrir al entrar (búsqueda global, Nodi); el nonce repite el gesto. */
   focusNote?: { id: string; nonce: number } | null;
   onOpenGraph?: (target: PendingGraphNavigationTarget) => void;
+  /** Los demás vaults conservan el nombre de sección «Notas» usando esta misma vista. */
+  title?: 'Espacio de trabajo' | 'Notas';
+  /** Los enlaces temporales de una nota testimonial abren su entrevista y minuto. */
+  onTestimonyLink?: (link: TestimonyDeepLink) => void;
 }) {
   const [tree, setTree] = useState<NotesTree>({ folders: [], notes: [] });
   const [links, setLinks] = useState<WorkspaceLibraryLink[]>([]);
@@ -363,17 +418,27 @@ export function WorkspaceView({
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [search, setSearch] = useState('');
   const [kindFilter, setKindFilter] = useState<'' | WorkspaceItemKind>('');
+  const [selectedTags, setSelectedTags] = useState<string[]>([]);
+  const [tagFilterOpen, setTagFilterOpen] = useState(false);
+  const [tagSearch, setTagSearch] = useState('');
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [bulkTag, setBulkTag] = useState('');
+  const [bulkCollection, setBulkCollection] = useState('');
   const [openIds, setOpenIds] = useState<string[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
+  const [itemContextMenu, setItemContextMenu] = useState<WorkspaceItemContextMenu | null>(null);
   const [renaming, setRenaming] = useState<NoteFolder | null>(null);
   const [creatingCollection, setCreatingCollection] = useState(false);
   const [pendingCollectionDelete, setPendingCollectionDelete] = useState<NoteFolder | null>(null);
   const [pendingNoteDelete, setPendingNoteDelete] = useState<Note | null>(null);
+  const [pendingPermanentDeleteIds, setPendingPermanentDeleteIds] = useState<string[] | null>(null);
   const focusedNonce = useRef<number | null>(null);
+  const tagFilterRef = useRef<HTMLDivElement | null>(null);
+  const bulkTagRef = useRef<HTMLInputElement | null>(null);
 
   const refresh = useCallback(async () => {
     const [nextTree, nextLinks] = await Promise.all([
-      window.nodus.getNotesTree(),
+      window.nodus.getNotesTree(true),
       window.nodus.listAllWorkspaceLibraryLinks(),
     ]);
     setTree(nextTree);
@@ -384,6 +449,22 @@ export function WorkspaceView({
 
   useEffect(() => { void refresh(); }, [refresh]);
 
+  useEffect(() => {
+    if (!tagFilterOpen && !itemContextMenu) return;
+    const dismiss = (event: MouseEvent) => {
+      if (tagFilterRef.current?.contains(event.target as Node)) return;
+      if ((event.target as Element | null)?.closest?.('[data-testid="workspace-context-menu"]')) return;
+      setTagFilterOpen(false);
+      setItemContextMenu(null);
+    };
+    const escape = (event: KeyboardEvent) => { if (event.key === 'Escape') { setTagFilterOpen(false); setItemContextMenu(null); } };
+    const blur = () => setItemContextMenu(null);
+    window.addEventListener('pointerdown', dismiss);
+    window.addEventListener('keydown', escape);
+    window.addEventListener('blur', blur);
+    return () => { window.removeEventListener('pointerdown', dismiss); window.removeEventListener('keydown', escape); window.removeEventListener('blur', blur); };
+  }, [tagFilterOpen, itemContextMenu]);
+
   // Entrar desde fuera (búsqueda global, Nodi) abre la nota en su pestaña.
   useEffect(() => {
     if (!focusNote || focusedNonce.current === focusNote.nonce) return;
@@ -393,11 +474,26 @@ export function WorkspaceView({
   }, [focusNote?.id, focusNote?.nonce]);
 
   const children = useMemo(() => collectionChildren(tree.folders), [tree.folders]);
+  const activeNotes = useMemo(() => tree.notes.filter((note) => !note.trashedAt), [tree.notes]);
+  const trashedNotes = useMemo(() => tree.notes.filter((note) => Boolean(note.trashedAt)), [tree.notes]);
+  const tagFacets = useMemo(() => {
+    const countsByTag = new Map<string, { label: string; count: number }>();
+    for (const note of activeNotes) for (const label of note.tags) {
+      const key = label.toLocaleLowerCase();
+      const current = countsByTag.get(key);
+      countsByTag.set(key, { label: current?.label ?? label, count: (current?.count ?? 0) + 1 });
+    }
+    return [...countsByTag.values()].sort((a, b) => b.count - a.count || a.label.localeCompare(b.label));
+  }, [activeNotes]);
+  const visibleTagFacets = useMemo(() => {
+    const needle = tagSearch.trim().toLocaleLowerCase();
+    return needle ? tagFacets.filter((entry) => entry.label.toLocaleLowerCase().includes(needle)) : tagFacets;
+  }, [tagFacets, tagSearch]);
 
   /** Cuántas notas hay en cada colección, contando sus subcolecciones. */
   const counts = useMemo(() => {
     const direct = new Map<string, number>();
-    for (const note of tree.notes) {
+    for (const note of activeNotes) {
       if (!note.folderId) continue;
       direct.set(note.folderId, (direct.get(note.folderId) ?? 0) + 1);
     }
@@ -408,26 +504,32 @@ export function WorkspaceView({
       total.set(collection.id, sum);
     }
     return total;
-  }, [tree.notes, tree.folders, children]);
+  }, [activeNotes, tree.folders, children]);
 
   const visible = useMemo(() => {
     const needle = search.trim().toLocaleLowerCase();
     const allowed = scope.kind === 'collection' ? subtreeIds(scope.id, children) : null;
     return tree.notes
       .filter((note) => {
+        if (scope.kind === 'trash') {
+          if (!note.trashedAt) return false;
+        } else if (note.trashedAt) return false;
         if (scope.kind === 'unfiled' && note.folderId) return false;
         if (allowed && (!note.folderId || !allowed.has(note.folderId))) return false;
         if (kindFilter && itemKind(note) !== kindFilter) return false;
+        if (selectedTags.length && !selectedTags.some((tag) => note.tags.some((own) => own.toLocaleLowerCase() === tag.toLocaleLowerCase()))) return false;
         if (!needle) return true;
-        return note.title.toLocaleLowerCase().includes(needle) || note.content.toLocaleLowerCase().includes(needle);
+        return note.title.toLocaleLowerCase().includes(needle)
+          || note.content.toLocaleLowerCase().includes(needle)
+          || note.tags.some((tag) => tag.toLocaleLowerCase().includes(needle));
       })
       .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
-  }, [tree.notes, scope, children, kindFilter, search]);
+  }, [tree.notes, scope, children, kindFilter, search, selectedTags]);
 
   const openTabs = useMemo(
     () => openIds
       .map((id) => tree.notes.find((note) => note.id === id))
-      .filter((note): note is Note => Boolean(note)),
+      .filter((note): note is Note => Boolean(note && !note.trashedAt)),
     [openIds, tree.notes]
   );
   const active = openTabs.find((note) => note.id === activeId) ?? null;
@@ -446,6 +548,71 @@ export function WorkspaceView({
     });
   };
 
+  const closeNotes = (ids: Iterable<string>) => {
+    const closing = new Set(ids);
+    setOpenIds((current) => current.filter((id) => !closing.has(id)));
+    setActiveId((current) => current && closing.has(current) ? null : current);
+  };
+
+  const toggleSelected = (id: string, checked?: boolean) => {
+    setSelected((current) => {
+      const next = new Set(current);
+      const shouldSelect = checked ?? !next.has(id);
+      if (shouldSelect) next.add(id); else next.delete(id);
+      return next;
+    });
+  };
+
+  const duplicateNote = async (note: Note) => {
+    const copy = await window.nodus.createNote({
+      title: `${note.title} (${t('copia')})`, content: note.content,
+      kind: note.kind === 'idea' ? 'markdown' : note.kind, folderId: note.folderId, tags: note.tags,
+    });
+    await refresh();
+    openNote(copy.id);
+  };
+
+  const moveToTrash = async (ids: string[]) => {
+    const unique = [...new Set(ids)];
+    await window.nodus.trashNotes(unique);
+    closeNotes(unique);
+    setSelected(new Set());
+    setPendingNoteDelete(null);
+    setItemContextMenu(null);
+    await refresh();
+  };
+
+  const restoreItems = async (ids: string[]) => {
+    await window.nodus.restoreNotes([...new Set(ids)]);
+    setSelected(new Set());
+    setItemContextMenu(null);
+    await refresh();
+  };
+
+  const permanentlyDelete = async (ids: string[]) => {
+    const unique = [...new Set(ids)];
+    await window.nodus.deleteNotesPermanently(unique);
+    closeNotes(unique);
+    setSelected(new Set());
+    setPendingPermanentDeleteIds(null);
+    setItemContextMenu(null);
+    await refresh();
+  };
+
+  const applyBulkTag = async () => {
+    if (!selected.size || !bulkTag.trim()) return;
+    await window.nodus.patchNoteTags([...selected], { add: [bulkTag] });
+    setBulkTag('');
+    await refresh();
+  };
+
+  const moveSelected = async () => {
+    if (!selected.size) return;
+    await Promise.all([...selected].map((id) => window.nodus.moveNote(id, bulkCollection || null)));
+    setSelected(new Set());
+    await refresh();
+  };
+
   /** La colección en la que aterriza lo que se cree ahora mismo. */
   const targetCollectionId = () => (scope.kind === 'collection' ? scope.id : null);
 
@@ -459,6 +626,7 @@ export function WorkspaceView({
   };
 
   const selectedCollection = scope.kind === 'collection' ? tree.folders.find((folder) => folder.id === scope.id) ?? null : null;
+  const contextNote = itemContextMenu ? tree.notes.find((note) => note.id === itemContextMenu.noteId) ?? null : null;
 
   const editorPane = active && (
     <div className="flex min-h-0 flex-1">
@@ -482,19 +650,11 @@ export function WorkspaceView({
                   : note),
               }));
             }}
-            onDuplicate={async () => {
-              const copy = await window.nodus.createNote({
-                title: `${active.title} (${t('copia')})`,
-                content: active.content,
-                kind: active.kind === 'idea' ? 'markdown' : active.kind,
-                folderId: active.folderId,
-              });
-              await refresh();
-              openNote(copy.id);
-            }}
+            onDuplicate={async () => duplicateNote(active)}
             onTrash={async () => setPendingNoteDelete(active)}
             onOpenLinkedDocument={openNote}
             onOpenRecording={() => undefined}
+            onTestimonyLink={onTestimonyLink}
           />
         </Suspense>
       </div>
@@ -523,6 +683,7 @@ export function WorkspaceView({
             {tree.folders.map((folder) => <option key={folder.id} value={folder.id}>{folder.name}</option>)}
           </select>
         </div>
+        <WorkspaceTagsEditor note={active} onChanged={refresh} />
         {itemKind(active) === 'idea' && active.source?.ref && onOpenGraph && (
           <div className="px-3 pb-3">
             <button className="btn btn-ghost w-full text-xs" onClick={() => onOpenGraph({ nodeId: active.source!.ref!, label: active.title })}>
@@ -539,16 +700,20 @@ export function WorkspaceView({
     <div data-testid="workspace-view" className="library-theme-canvas flex h-full min-h-0 flex-col bg-neutral-950">
       <header data-testid="workspace-header" className="library-header-bar min-h-14 shrink-0 border-b border-neutral-800 px-5 py-3">
         <div className="library-header-title min-w-0">
-          <h1 className="flex items-center gap-2 text-lg font-semibold"><Icon name="notebook" className="text-indigo-400" /> {t('Espacio de trabajo')}</h1>
-          <p className="text-[11px] text-neutral-500">{tx('{n} nota(s) e idea(s) · {c} colección(es)', { n: tree.notes.length, c: tree.folders.length })}</p>
+          <h1 className="flex items-center gap-2 text-lg font-semibold"><Icon name={scope.kind === 'trash' ? 'trash' : 'notebook'} className={scope.kind === 'trash' ? 'text-red-400' : 'text-indigo-400'} /> {t(scope.kind === 'trash' ? 'Papelera' : title)}</h1>
+          <p className="text-[11px] text-neutral-500">{scope.kind === 'trash'
+            ? tx('{n} elemento(s) recuperable(s)', { n: trashedNotes.length })
+            : tx('{n} nota(s) e idea(s) · {c} colección(es)', { n: activeNotes.length, c: tree.folders.length })}</p>
         </div>
         <div className="library-header-actions">
-          <button data-testid="workspace-create-idea" className="btn btn-secondary h-8 text-xs" onClick={() => void createItem('idea')}>
+          {scope.kind === 'trash' ? <button data-testid="workspace-empty-trash" className="btn btn-ghost h-8 border border-red-500/30 text-xs text-red-400" disabled={!trashedNotes.length} onClick={() => setPendingPermanentDeleteIds(trashedNotes.map((note) => note.id))}>
+            <Icon name="trash" size={13} /> {t('Vaciar papelera')}
+          </button> : <><button data-testid="workspace-create-idea" className="btn btn-secondary h-8 text-xs" onClick={() => void createItem('idea')}>
             <Icon name="bulb" size={13} /> {t('Idea')}
           </button>
           <button data-testid="workspace-create-note" className="btn btn-primary h-8 text-xs" onClick={() => void createItem('note')}>
             <Icon name="notebook" size={13} /> {t('Nota')}
-          </button>
+          </button></>}
         </div>
       </header>
 
@@ -568,8 +733,8 @@ export function WorkspaceView({
             <button
               data-testid="workspace-scope-all"
               className={`flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs ${scope.kind === 'all' ? 'bg-indigo-600 text-white' : 'text-neutral-400 hover:bg-neutral-900'}`}
-              onClick={() => setScope({ kind: 'all' })}
-            ><Icon name="library" size={14} /><span className="flex-1">{t('Todo')}</span><span className="text-[10px] opacity-60">{tree.notes.length}</span></button>
+              onClick={() => { setScope({ kind: 'all' }); setSelected(new Set()); }}
+            ><Icon name="library" size={14} /><span className="flex-1">{t('Todo')}</span><span className="text-[10px] opacity-60">{activeNotes.length}</span></button>
           </div>
           <div
             data-testid="workspace-collections-pane"
@@ -596,7 +761,7 @@ export function WorkspaceView({
                 selected={scope.kind === 'collection' ? scope.id : null}
                 expanded={expanded}
                 depth={0}
-                onSelect={(id) => setScope({ kind: 'collection', id })}
+                onSelect={(id) => { setScope({ kind: 'collection', id }); setSelected(new Set()); }}
                 onToggle={(id) => setExpanded((current) => {
                   const next = new Set(current);
                   if (next.has(id)) next.delete(id); else next.add(id);
@@ -614,14 +779,22 @@ export function WorkspaceView({
               <p className="px-3 py-4 text-xs leading-5 text-neutral-600">{t('Agrupa tus notas e ideas en colecciones para trabajar por temas o capítulos.')}</p>
             )}
           </div>
-          <div className="shrink-0 border-t border-neutral-800 px-2 py-2">
+          <div className="shrink-0 space-y-1 border-t border-neutral-800 px-2 py-2">
             <button
               data-testid="workspace-scope-unfiled"
               className={`flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs ${scope.kind === 'unfiled' ? 'bg-indigo-600 text-white' : 'text-neutral-400 hover:bg-neutral-900'}`}
-              onClick={() => setScope({ kind: 'unfiled' })}
+              onClick={() => { setScope({ kind: 'unfiled' }); setSelected(new Set()); }}
             >
               <Icon name="folder" size={14} /><span className="flex-1">{t('Sin colección')}</span>
-              <span className="text-[10px] opacity-60">{tree.notes.filter((note) => !note.folderId).length}</span>
+              <span className="text-[10px] opacity-60">{activeNotes.filter((note) => !note.folderId).length}</span>
+            </button>
+            <button
+              data-testid="workspace-scope-trash"
+              className={`flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs ${scope.kind === 'trash' ? 'bg-red-500/15 text-red-300' : 'text-neutral-500 hover:bg-neutral-900 hover:text-red-400'}`}
+              onClick={() => { setScope({ kind: 'trash' }); setSelected(new Set()); setActiveId(null); }}
+            >
+              <Icon name="trash" size={14} /><span className="flex-1">{t('Papelera')}</span>
+              <span className="text-[10px] opacity-60">{trashedNotes.length}</span>
             </button>
           </div>
           {selectedCollection && (
@@ -641,7 +814,7 @@ export function WorkspaceView({
               <Icon name="search" size={14} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-neutral-500" />
               <input
                 data-testid="workspace-search"
-                className="input h-8 w-full pl-8 text-xs"
+                className="input input-with-leading-icon h-8 w-full text-xs"
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
                 placeholder={t('Buscar en notas e ideas…')}
@@ -658,42 +831,121 @@ export function WorkspaceView({
               <option value="note">{t('Notas')}</option>
               <option value="idea">{t('Ideas')}</option>
             </select>
+            <div className="relative" ref={tagFilterRef}>
+              <button
+                data-testid="workspace-tag-filter"
+                type="button"
+                className={`btn h-8 border text-xs ${selectedTags.length ? 'border-indigo-500/40 bg-indigo-500/10 text-indigo-300' : 'btn-ghost border-neutral-700'}`}
+                onClick={() => setTagFilterOpen((open) => !open)}
+                aria-expanded={tagFilterOpen}
+                aria-haspopup="dialog"
+              >
+                <Icon name="tag" size={13} /> {t('Etiquetas')}
+                {selectedTags.length > 0 && <span className="rounded bg-indigo-600 px-1.5 py-0.5 text-[10px] text-white">{selectedTags.length}</span>}
+              </button>
+              {tagFilterOpen && (
+                <div data-testid="workspace-tag-filter-popover" role="dialog" aria-label={t('Filtrar por etiquetas')} className="library-action-menu absolute right-0 z-40 mt-2 w-72 max-w-[calc(100vw-2rem)] rounded-xl border border-neutral-700 bg-neutral-950 p-3 shadow-2xl">
+                  <div className="relative">
+                    <Icon name="search" size={13} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-neutral-500" />
+                    <input autoFocus className="input input-with-leading-icon h-8 w-full text-xs" value={tagSearch} onChange={(event) => setTagSearch(event.target.value)} placeholder={t('Buscar etiqueta…')} />
+                  </div>
+                  <div className="mt-2 max-h-56 space-y-1 overflow-y-auto">
+                    {visibleTagFacets.map((entry) => {
+                      const checked = selectedTags.some((tag) => tag.toLocaleLowerCase() === entry.label.toLocaleLowerCase());
+                      return <label key={entry.label} className={`flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-xs hover:bg-neutral-900 ${checked ? 'bg-indigo-500/10 text-indigo-300' : 'text-neutral-400'}`}>
+                        <input type="checkbox" checked={checked} onChange={() => setSelectedTags((current) => checked ? current.filter((tag) => tag.toLocaleLowerCase() !== entry.label.toLocaleLowerCase()) : [...current, entry.label])} />
+                        <span className="min-w-0 flex-1 truncate">{entry.label}</span><span className="text-[10px] text-neutral-600">{entry.count}</span>
+                      </label>;
+                    })}
+                    {visibleTagFacets.length === 0 && <p className="px-2 py-3 text-xs text-neutral-600">{t('No hay etiquetas que coincidan.')}</p>}
+                  </div>
+                  {selectedTags.length > 0 && <button className="mt-2 w-full text-center text-[11px] text-indigo-300 hover:text-indigo-200" onClick={() => setSelectedTags([])}>{t('Limpiar filtros')}</button>}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {selected.size > 0 && (
+            <div data-testid="workspace-bulk-actions" className="flex flex-wrap items-center gap-2 border-b border-indigo-500/20 bg-indigo-500/5 px-3 py-2 text-xs">
+              <b>{tx('{n} seleccionados', { n: selected.size })}</b>
+              {scope.kind === 'trash' ? <>
+                <button data-testid="workspace-bulk-restore" className="btn btn-secondary h-8 text-xs" onClick={() => void restoreItems([...selected])}><Icon name="refresh" size={13} /> {t('Restaurar')}</button>
+                <button data-testid="workspace-bulk-delete-permanently" className="btn btn-ghost h-8 text-xs text-red-400" onClick={() => setPendingPermanentDeleteIds([...selected])}><Icon name="trash" size={13} /> {t('Eliminar definitivamente')}</button>
+              </> : <>
+                <input ref={bulkTagRef} data-testid="workspace-bulk-tag-input" className="input h-8 w-36 text-xs" value={bulkTag} onChange={(event) => setBulkTag(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') void applyBulkTag(); }} placeholder={t('Etiqueta…')} />
+                <button data-testid="workspace-bulk-tag" className="btn btn-ghost h-8 text-xs" disabled={!bulkTag.trim()} onClick={() => void applyBulkTag()}><Icon name="tag" size={13} /> {t('Etiquetar')}</button>
+                <select data-testid="workspace-bulk-collection" aria-label={t('Mover a colección')} className="input h-8 min-w-40 text-xs" value={bulkCollection} onChange={(event) => setBulkCollection(event.target.value)}>
+                  <option value="">{t('Sin colección')}</option>
+                  {tree.folders.map((folder) => <option key={folder.id} value={folder.id}>{folder.name}</option>)}
+                </select>
+                <button data-testid="workspace-bulk-move" className="btn btn-ghost h-8 text-xs" onClick={() => void moveSelected()}><Icon name="folder" size={13} /> {t('Mover')}</button>
+                <button data-testid="workspace-bulk-trash" className="btn btn-ghost h-8 text-xs text-red-400" onClick={() => void moveToTrash([...selected])}><Icon name="trash" size={13} /> {t('Enviar a la papelera')}</button>
+              </>}
+              <button className="ml-auto text-neutral-500 hover:text-neutral-200" onClick={() => setSelected(new Set())}>{t('Limpiar selección')}</button>
+            </div>
+          )}
+
+          <div data-testid="workspace-table-header" className="grid h-9 shrink-0 grid-cols-[28px_22px_minmax(0,1fr)_minmax(120px,0.45fr)_72px] items-center border-b border-neutral-800 px-4 text-[10px] font-semibold uppercase tracking-wider text-neutral-600">
+            <input
+              data-testid="workspace-select-all"
+              type="checkbox"
+              checked={visible.length > 0 && visible.every((note) => selected.has(note.id))}
+              onChange={(event) => setSelected((current) => {
+                const next = new Set(current);
+                for (const note of visible) { if (event.target.checked) next.add(note.id); else next.delete(note.id); }
+                return next;
+              })}
+              aria-label={t('Seleccionar todos los elementos visibles')}
+            />
+            <span />
+            <span>{t('Título')}</span>
+            <span>{t('Etiquetas')}</span>
+            <span className="text-right">{t('Modificado')}</span>
           </div>
 
           <div data-testid="workspace-item-list" className="library-catalog-scroll min-h-0 flex-1 overflow-y-auto">
             {loading && <p className="px-4 py-6 text-xs text-neutral-500"><Spinner /> {t('Cargando…')}</p>}
             {!loading && visible.length === 0 && (
               <p className="px-4 py-6 text-xs leading-5 text-neutral-500">
-                {search ? t('Ningún elemento coincide.') : t('Todavía no hay nada aquí. Crea una nota o una idea para empezar.')}
+                {scope.kind === 'trash' ? t('La papelera está vacía.') : (search || selectedTags.length ? t('Ningún elemento coincide.') : t('Todavía no hay nada aquí. Crea una nota o una idea para empezar.'))}
               </p>
             )}
             {visible.map((note) => {
               const kind = itemKind(note);
               const linkCount = links.filter((link) => link.ownerKind === 'note' && link.ownerId === note.id).length;
               return (
-                <button
+                <div
                   key={note.id}
                   data-testid={`workspace-item-${note.id}`}
-                  draggable
+                  role="button"
+                  tabIndex={0}
+                  draggable={scope.kind !== 'trash'}
                   onDragStart={(event) => {
+                    if (scope.kind === 'trash') return;
                     event.dataTransfer.effectAllowed = 'move';
                     event.dataTransfer.setData('application/x-nodus-workspace-note', note.id);
                   }}
-                  className={`flex w-full items-start gap-3 border-b border-neutral-900 px-4 py-3 text-left hover:bg-neutral-900/60 ${openIds.includes(note.id) ? 'bg-neutral-900/40' : ''}`}
-                  onClick={() => openNote(note.id)}
+                  className={`grid min-h-[62px] w-full grid-cols-[28px_22px_minmax(0,1fr)_minmax(120px,0.45fr)_72px] items-center border-b border-neutral-900 px-4 text-left text-xs hover:bg-neutral-900/60 ${selected.has(note.id) ? 'bg-indigo-500/10' : openIds.includes(note.id) ? 'bg-neutral-900/40' : ''}`}
+                  onClick={(event) => { if ((event.target as HTMLElement).closest('input,button')) return; if (scope.kind === 'trash') toggleSelected(note.id); else openNote(note.id); }}
+                  onKeyDown={(event) => { if (event.key !== 'Enter' && event.key !== ' ') return; event.preventDefault(); if (scope.kind === 'trash') toggleSelected(note.id); else openNote(note.id); }}
+                  onContextMenu={(event) => {
+                    event.preventDefault();
+                    setItemContextMenu({ noteId: note.id, x: Math.max(8, Math.min(event.clientX, window.innerWidth - 250)), y: Math.max(8, Math.min(event.clientY, window.innerHeight - 340)) });
+                  }}
                 >
+                  <input type="checkbox" checked={selected.has(note.id)} onChange={(event) => toggleSelected(note.id, event.target.checked)} onClick={(event) => event.stopPropagation()} aria-label={tx('Seleccionar {name}', { name: note.title })} />
                   <Icon name={KIND_ICON[kind]} size={14} className={`mt-0.5 shrink-0 ${kind === 'idea' ? 'text-amber-400' : 'text-neutral-500'}`} />
                   <span className="min-w-0 flex-1">
                     <span className="block truncate text-sm">{note.title}</span>
                     <span className="mt-0.5 block truncate text-[11px] text-neutral-500">{plainSnippet(note.content) || t('Sin contenido')}</span>
                   </span>
-                  {linkCount > 0 && (
-                    <span className="mt-0.5 flex shrink-0 items-center gap-1 text-[10px] text-neutral-500" title={tx('{n} elemento(s) de biblioteca enlazado(s)', { n: linkCount })}>
-                      <Icon name="link" size={11} />{linkCount}
-                    </span>
-                  )}
-                  <span className="mt-0.5 shrink-0 text-[10px] tabular-nums text-neutral-600">{formatRelative(note.updatedAt)}</span>
-                </button>
+                  <span className="flex min-w-0 flex-wrap gap-1 pr-2">
+                    {note.tags.slice(0, 3).map((tag) => <span key={tag} className="max-w-28 truncate rounded-full bg-neutral-900 px-2 py-1 text-[10px] text-neutral-400">{tag}</span>)}
+                    {note.tags.length > 3 && <span className="text-[10px] text-neutral-600">+{note.tags.length - 3}</span>}
+                    {linkCount > 0 && <span className="flex items-center gap-1 text-[10px] text-neutral-600" title={tx('{n} elemento(s) de biblioteca enlazado(s)', { n: linkCount })}><Icon name="link" size={10} />{linkCount}</span>}
+                  </span>
+                  <span className="shrink-0 text-right text-[10px] tabular-nums text-neutral-600">{formatRelative(note.trashedAt ?? note.updatedAt)}</span>
+                </div>
               );
             })}
           </div>
@@ -705,7 +957,7 @@ export function WorkspaceView({
   return (
     <div className="library-theme flex h-full min-h-0 flex-col">
       <WorkspaceTabStrip
-        homeLabel={t('Espacio de trabajo')}
+        homeLabel={t(title)}
         homeIcon="notebook"
         homeTestId="workspace-tab-home"
         tabTestId={(tab) => `workspace-tab-${tab.key}`}
@@ -720,6 +972,28 @@ export function WorkspaceView({
         {browser}
       </div>
       {editorPane}
+
+      {itemContextMenu && contextNote && (
+        <div
+          data-testid="workspace-context-menu"
+          role="menu"
+          className="library-action-menu fixed z-50 w-60 rounded-xl border border-neutral-800 bg-neutral-950 p-1.5 shadow-2xl"
+          style={{ left: itemContextMenu.x, top: itemContextMenu.y }}
+        >
+          {contextNote.trashedAt ? <>
+            <button role="menuitem" className="library-action-menu-item" onClick={() => void restoreItems([contextNote.id])}><Icon name="refresh" /><span><b>{t('Restaurar')}</b><small>{t('Devuelve el elemento al espacio de trabajo')}</small></span></button>
+            <button role="menuitem" className="library-action-menu-item text-red-400" onClick={() => { setPendingPermanentDeleteIds([contextNote.id]); setItemContextMenu(null); }}><Icon name="trash" /><span><b>{t('Eliminar definitivamente')}</b><small>{t('Esta acción no se puede deshacer')}</small></span></button>
+          </> : <>
+            <button role="menuitem" className="library-action-menu-item" onClick={() => { openNote(contextNote.id); setItemContextMenu(null); }}><Icon name="external" /><span><b>{t('Abrir en una pestaña')}</b><small>{t(itemKind(contextNote) === 'idea' ? 'Idea' : 'Nota')}</small></span></button>
+            <button role="menuitem" className="library-action-menu-item" onClick={() => { toggleSelected(contextNote.id); setItemContextMenu(null); }}><Icon name="check" /><span><b>{selected.has(contextNote.id) ? t('Quitar de la selección') : t('Seleccionar')}</b></span></button>
+            <button role="menuitem" className="library-action-menu-item" onClick={() => { setSelected((current) => new Set([...current, contextNote.id])); setItemContextMenu(null); window.setTimeout(() => bulkTagRef.current?.focus(), 0); }}><Icon name="tag" /><span><b>{t('Etiquetar…')}</b><small>{t('Añade una etiqueta desde la barra de acciones')}</small></span></button>
+            <button role="menuitem" className="library-action-menu-item" onClick={() => { setSelected(new Set([contextNote.id])); setItemContextMenu(null); }}><Icon name="folder" /><span><b>{t('Mover a colección…')}</b><small>{t('Elige el destino en la barra de acciones')}</small></span></button>
+            <button role="menuitem" className="library-action-menu-item" onClick={() => { setItemContextMenu(null); void duplicateNote(contextNote); }}><Icon name="copy" /><span><b>{t('Duplicar')}</b></span></button>
+            <button role="menuitem" className="library-action-menu-item" onClick={() => { void navigator.clipboard.writeText(contextNote.title); setItemContextMenu(null); }}><Icon name="copy" /><span><b>{t('Copiar título')}</b></span></button>
+            <button role="menuitem" className="library-action-menu-item text-red-400" onClick={() => { setPendingNoteDelete(contextNote); setItemContextMenu(null); }}><Icon name="trash" /><span><b>{t('Enviar a la papelera')}</b></span></button>
+          </>}
+        </div>
+      )}
 
       {creatingCollection && (
         <TextInputModal
@@ -753,39 +1027,43 @@ export function WorkspaceView({
       {pendingCollectionDelete && (
         <ConfirmModal
           title={t('Eliminar colección')}
-          message={tx('Se eliminará «{name}» con sus subcolecciones y las {n} nota(s) que contiene. No se puede deshacer.', {
+          message={tx('Se eliminará «{name}» con sus subcolecciones. Sus {n} nota(s) e idea(s) se moverán a la papelera.', {
             name: pendingCollectionDelete.name,
             n: counts.get(pendingCollectionDelete.id) ?? 0,
           })}
-          confirmLabel={t('Eliminar')}
+          confirmLabel={t('Mover a la papelera')}
           danger
           onCancel={() => setPendingCollectionDelete(null)}
           onConfirm={async () => {
             const removed = subtreeIds(pendingCollectionDelete.id, children);
-            await window.nodus.deleteNoteFolder(pendingCollectionDelete.id);
+            const trashedIds = await window.nodus.trashNoteFolder(pendingCollectionDelete.id);
             setPendingCollectionDelete(null);
-            const nextTree = await refresh();
-            // Cerrar las pestañas de lo que acaba de dejar de existir.
-            setOpenIds((current) => current.filter((id) => nextTree.notes.some((note) => note.id === id)));
-            setActiveId((current) => (current && nextTree.notes.some((note) => note.id === current) ? current : null));
+            await refresh();
+            closeNotes(trashedIds);
             if (scope.kind === 'collection' && removed.has(scope.id)) setScope({ kind: 'all' });
           }}
         />
       )}
       {pendingNoteDelete && (
         <ConfirmModal
-          title={t(itemKind(pendingNoteDelete) === 'idea' ? 'Eliminar idea' : 'Eliminar nota')}
-          message={tx('Se eliminará «{name}» con su historial y sus comentarios. No se puede deshacer.', { name: pendingNoteDelete.title })}
-          confirmLabel={t('Eliminar')}
+          title={t('Enviar a la papelera')}
+          message={tx('«{name}» se moverá a la papelera y podrá restaurarse más adelante.', { name: pendingNoteDelete.title })}
+          confirmLabel={t('Mover a la papelera')}
           danger
           onCancel={() => setPendingNoteDelete(null)}
           onConfirm={async () => {
-            const id = pendingNoteDelete.id;
-            await window.nodus.deleteNote(id);
-            setPendingNoteDelete(null);
-            closeNote(id);
-            await refresh();
+            await moveToTrash([pendingNoteDelete.id]);
           }}
+        />
+      )}
+      {pendingPermanentDeleteIds && (
+        <ConfirmModal
+          title={t('Eliminar definitivamente')}
+          message={tx('Se eliminarán definitivamente {n} elemento(s), junto con su historial y sus comentarios. Esta acción no se puede deshacer.', { n: pendingPermanentDeleteIds.length })}
+          confirmLabel={t('Eliminar definitivamente')}
+          danger
+          onCancel={() => setPendingPermanentDeleteIds(null)}
+          onConfirm={async () => permanentlyDelete(pendingPermanentDeleteIds)}
         />
       )}
     </div>

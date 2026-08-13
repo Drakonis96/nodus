@@ -111,16 +111,18 @@ test('a manual toggle takes over from the automatic unfold', () => {
   );
 });
 
-test('the back button sits to the left of the Automatic / AI toggle', () => {
-  // La fila de configuración ya no es el encabezado de la sección: ese lo pone ahora
-  // SectionHeader, compartido con el resto de la bóveda. El botón de volver sigue
-  // perteneciendo a la configuración, que es lo que esta prueba fija.
-  const header = view.slice(view.indexOf('{/* Setup */}'), view.indexOf('{/* Body */}'));
-  const backButton = header.indexOf("t('Volver al selector')");
-  const modeToggle = header.indexOf("t('Automático')");
-  assert.ok(backButton > -1, 'the back button lives in the setup row');
-  assert.ok(modeToggle > -1 && backButton < modeToggle, 'and renders before the mode toggle');
-  assert.match(header, /className="btn btn-ghost text-xs gap-1\.5 px-2\.5 py-1\.5 mr-1 border/, 'keeping its own margin');
-  const body = view.slice(view.indexOf('{/* Body */}'));
-  assert.doesNotMatch(body, /t\('Volver al selector'\)/, 'and no longer duplicates inside the map card');
+test('the catalogue and current idea are persistent workspace tabs', () => {
+  assert.match(view, /data-testid="argument-map-tabs"/, 'the argument workspace exposes a tab strip');
+  assert.match(view, /data-testid="argument-tab-catalog"/, 'the catalogue is always reachable as the first tab');
+  assert.match(view, /data-testid="argument-tab-map"/, 'the selected idea owns a named map tab');
+  assert.match(
+    view,
+    /className=\{surface === 'catalog' \? 'flex h-full min-h-0 flex-col' : 'hidden'\}/,
+    'the catalogue stays mounted while its idea map is open',
+  );
+  assert.match(
+    view,
+    /className=\{surface === 'map' \? 'flex h-full min-h-0' : 'hidden'\}/,
+    'the nested map stays mounted when the reader returns to the catalogue',
+  );
 });

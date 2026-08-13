@@ -41,6 +41,7 @@ export function useAnnouncements(): {
   announcements: AnnouncementEntry[];
   unread: number;
   markRead: (id: string) => void;
+  refresh: () => Promise<{ notifications: NodiNotification[]; announcements: AnnouncementEntry[] }>;
 } {
   const [announcements, setAnnouncements] = useState<AnnouncementEntry[]>([]);
 
@@ -53,10 +54,17 @@ export function useAnnouncements(): {
     window.nodus.markAnnouncementRead(id).then(setAnnouncements).catch(() => {});
   }, []);
 
+  const refresh = useCallback(async () => {
+    const snapshot = await window.nodus.refreshNotifications();
+    setAnnouncements(snapshot.announcements);
+    return snapshot;
+  }, []);
+
   return {
     announcements,
     unread: announcements.reduce((total, entry) => total + (entry.read ? 0 : 1), 0),
     markRead,
+    refresh,
   };
 }
 
@@ -122,6 +130,8 @@ interface NotificationsPanelProps {
   announcements: AnnouncementEntry[];
   language: string;
   onMarkAnnouncementRead: (id: string) => void;
+  onRefresh: () => void;
+  refreshing: boolean;
   onClearAll: () => void;
 }
 
@@ -132,6 +142,8 @@ export function NotificationsPanel({
   announcements,
   language,
   onMarkAnnouncementRead,
+  onRefresh,
+  refreshing,
   onClearAll,
 }: NotificationsPanelProps) {
   const open = anchorEl != null;
@@ -214,6 +226,17 @@ export function NotificationsPanel({
           <div className="flex items-center justify-between gap-2 border-b border-neutral-800 px-3 py-2">
             <div className="text-sm font-semibold text-neutral-200">{t('Notificaciones')}</div>
             <div className="flex items-center gap-1">
+              <button
+                type="button"
+                data-testid="header-notifications-refresh"
+                className="btn btn-ghost px-2 py-1"
+                onClick={onRefresh}
+                disabled={refreshing}
+                title={t(refreshing ? 'Actualizando…' : 'Actualizar')}
+                aria-label={t(refreshing ? 'Actualizando…' : 'Actualizar')}
+              >
+                <Icon name="refresh" className={refreshing ? 'animate-spin' : ''} />
+              </button>
               {!empty && (
                 <button className="btn btn-ghost px-2 py-1 text-xs" onClick={() => setClearConfirmation(true)}>
                   {t('Limpiar')}

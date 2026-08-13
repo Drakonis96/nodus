@@ -36,7 +36,7 @@ try {
   const { getDb, closeDb } = require(path.join(repoRoot, 'electron/db/database.ts'));
   const { SCHEMA_VERSION } = require(path.join(repoRoot, 'electron/db/migrations.ts'));
 
-  assert.ok(SCHEMA_VERSION >= 130, 'the Workspace needs schema v130 or later');
+  assert.ok(SCHEMA_VERSION >= 133, 'the Workspace catalogue needs schema v133 or later');
   assert.equal(getDb().pragma('user_version', { simple: true }), SCHEMA_VERSION);
 
   // ── Colecciones y notas ────────────────────────────────────────────────────────
@@ -44,6 +44,26 @@ try {
   assert.equal(collection.sourceRef, null, 'a collection the user made has no provenance');
   const note = notes.createNote({ title: 'Nota inicial', content: '# Nota inicial\n\nPrimer cuerpo.', folderId: collection.id });
   const other = notes.createNote({ title: 'Nota vecina', content: 'Cuerpo vecino.' });
+
+  // ── Catálogo: etiquetas y papelera recuperable ────────────────────────────────
+  notes.patchNoteTags([note.id, other.id], { add: ['Método', ' método ', 'Capítulo 1'] });
+  assert.deepEqual(notes.getNote(note.id).tags, ['Capítulo 1', 'Método'], 'tags are trimmed, deduplicated and sorted');
+  notes.patchNoteTags([note.id], { remove: ['MÉTODO'] });
+  assert.deepEqual(notes.getNote(note.id).tags, ['Capítulo 1'], 'tag removal is case-insensitive');
+
+  notes.trashNotes([other.id]);
+  assert.equal(notes.getNotesTree().notes.some((item) => item.id === other.id), false, 'normal callers never see trash');
+  assert.ok(notes.getNotesTree(true).notes.find((item) => item.id === other.id)?.trashedAt, 'the Workspace can load recoverable trash');
+  notes.restoreNotes([other.id]);
+  assert.equal(notes.getNote(other.id).trashedAt, null, 'restoring makes the same item live again');
+
+  const disposableCollection = notes.createNoteFolder({ name: 'Colección desechable' });
+  const disposable = notes.createNote({ title: 'Idea recuperable', content: 'No se pierde.', folderId: disposableCollection.id, tags: ['rescate'] });
+  assert.deepEqual(notes.trashNoteFolder(disposableCollection.id), [disposable.id], 'deleting a collection reports the items sent to trash');
+  assert.equal(notes.getNoteFolder(disposableCollection.id), null, 'the collection itself is removed');
+  assert.equal(notes.getNote(disposable.id).folderId, null, 'its item is detached before the cascade');
+  assert.ok(notes.getNote(disposable.id).trashedAt, 'its item remains recoverable');
+  notes.restoreNotes([disposable.id]);
 
   // ── Historial ──────────────────────────────────────────────────────────────────
   let data = workspace.getWorkspaceNoteEditorData(note.id);

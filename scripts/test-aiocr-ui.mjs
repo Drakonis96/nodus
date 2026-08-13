@@ -49,8 +49,9 @@ test('the OCR Workspace card is activated and routed to its own view', async () 
 test('the library view is addressable and follows Toolkit design conventions', async () => {
   const view = await read('src/views/ToolkitAiOcrView.tsx');
   assert.match(view, /data-testid="aiocr-home"/, 'the workspace is addressable');
-  assert.match(view, /data-testid=\{testid\}/, 'the shared BackButton stamps its testid onto the DOM');
-  assert.match(view, /testid="toolkit-aiocr-back"/, 'it owns a back-to-hub control');
+  assert.match(view, /<ToolkitAppHero\b/, 'the first screen uses the shared Apps-style Toolkit hero');
+  assert.match(view, /backTestId="toolkit-aiocr-back"/, 'the hero owns its back-to-hub control');
+  assert.match(view, /heroTestId="toolkit-aiocr-hero"/, 'the shared hero is addressable for visual checks');
   assert.match(view, /data-testid="aiocr-dropzone"/, 'the dropzone is addressable');
   // Amber accent (the Toolkit workshop tone), not a bespoke palette.
   assert.match(view, /bg-amber-100 text-amber-700/, 'uses the Toolkit amber loseta');

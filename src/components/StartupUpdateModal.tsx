@@ -1,5 +1,4 @@
-import { motion } from 'framer-motion';
-import { useEffect, useMemo, useState } from 'react';
+import { memo, useEffect, useMemo, useRef, useState } from 'react';
 import type { UpdateCheckResponse, UpdateCheckStatus, UpdateErrorCode } from '@shared/types';
 import { t } from '../i18n';
 import { Icon } from './ui';
@@ -7,6 +6,7 @@ import { type NodiState } from './nodi/Nodi';
 import { NodiAvatar } from './nodi/NodiAvatar';
 
 const SESSION_KEY = 'nodus.startupUpdateChecked';
+const RENDER_PROGRESS_MIN_INTERVAL_MS = 500;
 
 type UpdatePresentation = {
   title: string;
@@ -129,6 +129,19 @@ function markShownThisSession(): void {
   }
 }
 
+function sameVisibleUpdate(a: UpdateCheckResponse, b: UpdateCheckResponse): boolean {
+  const progressA = a.status === 'downloading' ? Math.round(a.progress ?? 0) : null;
+  const progressB = b.status === 'downloading' ? Math.round(b.progress ?? 0) : null;
+  return a.status === b.status
+    && a.version === b.version
+    && a.errorCode === b.errorCode
+    && progressA === progressB;
+}
+
+const StartupUpdateNodi = memo(function StartupUpdateNodi({ state }: { state: NodiState }) {
+  return <NodiAvatar state={state} height={162} restAfterMs={1_200} />;
+});
+
 export function StartupUpdateModal({ onSettled }: { onSettled?: () => void } = {}) {
   const [shouldShow] = useState(shouldShowThisSession);
   const [open, setOpen] = useState(false);
@@ -139,6 +152,41 @@ export function StartupUpdateModal({ onSettled }: { onSettled?: () => void } = {
     version: __APP_VERSION__,
     progress: null,
   });
+  const visibleUpdateRef = useRef(update);
+  const pendingUpdateRef = useRef<UpdateCheckResponse | null>(null);
+  const progressTimerRef = useRef<number | null>(null);
+  const lastProgressRenderAtRef = useRef(0);
+
+  const commitVisibleUpdate = (next: UpdateCheckResponse) => {
+    if (sameVisibleUpdate(visibleUpdateRef.current, next)) return;
+    visibleUpdateRef.current = next;
+    setUpdate(next);
+    if (next.status === 'downloading') lastProgressRenderAtRef.current = performance.now();
+  };
+
+  const queueVisibleUpdate = (next: UpdateCheckResponse) => {
+    if (next.status !== 'downloading') {
+      pendingUpdateRef.current = null;
+      if (progressTimerRef.current !== null) window.clearTimeout(progressTimerRef.current);
+      progressTimerRef.current = null;
+      commitVisibleUpdate(next);
+      return;
+    }
+    pendingUpdateRef.current = next;
+    const elapsed = performance.now() - lastProgressRenderAtRef.current;
+    if (elapsed >= RENDER_PROGRESS_MIN_INTERVAL_MS) {
+      pendingUpdateRef.current = null;
+      commitVisibleUpdate(next);
+      return;
+    }
+    if (progressTimerRef.current !== null) return;
+    progressTimerRef.current = window.setTimeout(() => {
+      progressTimerRef.current = null;
+      const pending = pendingUpdateRef.current;
+      pendingUpdateRef.current = null;
+      if (pending) commitVisibleUpdate(pending);
+    }, Math.max(0, RENDER_PROGRESS_MIN_INTERVAL_MS - elapsed));
+  };
 
   useEffect(() => {
     if (!shouldShow) return;
@@ -156,17 +204,20 @@ export function StartupUpdateModal({ onSettled }: { onSettled?: () => void } = {
     if (!shouldShow || !open) return;
     let active = true;
     const unsubscribe = window.nodus.onUpdateProgress((event) => {
-      if (active) setUpdate(event);
+      if (active) queueVisibleUpdate(event);
     });
-    setUpdate({ status: 'checking', message: '', version: __APP_VERSION__, progress: null });
+    commitVisibleUpdate({ status: 'checking', message: '', version: __APP_VERSION__, progress: null });
     void window.nodus.checkForUpdates()
-      .then((result) => { if (active) setUpdate(result); })
+      .then((result) => { if (active) queueVisibleUpdate(result); })
       .catch(() => {
-        if (active) setUpdate({ status: 'error', message: '', version: __APP_VERSION__, progress: null });
+        if (active) queueVisibleUpdate({ status: 'error', message: '', version: __APP_VERSION__, progress: null });
       });
     return () => {
       active = false;
       unsubscribe();
+      if (progressTimerRef.current !== null) window.clearTimeout(progressTimerRef.current);
+      progressTimerRef.current = null;
+      pendingUpdateRef.current = null;
     };
   }, [attempt, open, shouldShow]);
 
@@ -188,33 +239,27 @@ export function StartupUpdateModal({ onSettled }: { onSettled?: () => void } = {
   };
 
   const retry = () => {
-    setUpdate({ status: 'checking', message: '', version: __APP_VERSION__, progress: null });
+    commitVisibleUpdate({ status: 'checking', message: '', version: __APP_VERSION__, progress: null });
     setAttempt((current) => current + 1);
   };
 
   const install = async () => {
     const result = await window.nodus.installUpdate();
-    setUpdate(result);
+    queueVisibleUpdate(result);
   };
 
   return (
-    <motion.div
+    <div
       className="startup-update-backdrop"
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      transition={{ duration: .22 }}
       onMouseDown={close}
     >
-      <motion.section
+      <section
         className="startup-update-cinema"
         data-testid="startup-update-modal"
         data-update-status={update.status}
         role="dialog"
         aria-modal="true"
         aria-labelledby="startup-update-title"
-        initial={{ opacity: 0, y: 24, scale: .96 }}
-        animate={{ opacity: 1, y: 0, scale: 1 }}
-        transition={{ duration: .42, ease: [0.2, 0.8, 0.2, 1] }}
         onMouseDown={(event) => event.stopPropagation()}
       >
         <header className="startup-update-hero">
@@ -228,7 +273,7 @@ export function StartupUpdateModal({ onSettled }: { onSettled?: () => void } = {
             <p>{t('Comprobamos automáticamente que tengas la versión más reciente y segura de Nodus.')}</p>
           </div>
           <div className="startup-update-nodi">
-            <NodiAvatar state={presentation.nodiState} height={162} restAfterMs={2_400} />
+            <StartupUpdateNodi state={presentation.nodiState} />
           </div>
         </header>
 
@@ -263,7 +308,7 @@ export function StartupUpdateModal({ onSettled }: { onSettled?: () => void } = {
           {canInstall && <button className="startup-update-primary" onClick={() => void install()}><Icon name="refresh" size={14} /> {t('Reiniciar')}</button>}
           {!canInstall && <button className="startup-update-primary" onClick={close}>{update.status === 'downloading' || update.status === 'available' ? t('Continuar en segundo plano') : t('¡Entendido!')} <Icon name="chevronRight" size={14} /></button>}
         </footer>
-      </motion.section>
-    </motion.div>
+      </section>
+    </div>
   );
 }

@@ -1,4 +1,4 @@
-import { useEffect, useState, type CSSProperties } from 'react';
+import { memo, useEffect, useState, type CSSProperties } from 'react';
 import type { AppSettings, VaultType } from '@shared/types';
 import { orbHue } from '@shared/nodiOrb';
 import { Nodi, type NodiRole, type NodiState } from './Nodi';
@@ -60,7 +60,7 @@ function useAtRest(
  * Props mirror `Nodi`'s, so this is a drop-in replacement. `role` (the per-vault
  * costume) only reaches the classic Nodi: the orb wears its vault as a colour instead.
  */
-export function NodiAvatar({
+function NodiAvatarComponent({
   settings,
   state = 'idle',
   role = 'none',
@@ -145,3 +145,11 @@ export function NodiAvatar({
     />
   );
 }
+
+/**
+ * Update and release modals may refresh their surrounding copy frequently (download
+ * progress is the obvious case). The mascot is a large filtered SVG, so rebuilding
+ * its hundreds of nodes for an unrelated percentage change causes noticeable main
+ * thread stalls on macOS. Keep it intact unless one of its own props changes.
+ */
+export const NodiAvatar = memo(NodiAvatarComponent);

@@ -176,6 +176,7 @@ const DEFAULTS: Omit<AppSettings, 'providerKeys' | 'lockedProviderKeys'> = {
   nodusServerLanguage: 'en',
   nodusServerIncludeUserContent: false,
   nodusServerIncludePassages: false,
+  nodusServerIncludeLibraryDocuments: false,
   nodusServerIncludeVectors: true,
   nodusServerAutoSync: true,
   localServerEnabled: false,
