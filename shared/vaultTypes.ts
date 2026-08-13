@@ -329,6 +329,13 @@ export function isPreviewVaultType(value: unknown): boolean {
  * by phase C.
  */
 export const VAULT_TYPE_SCOPED_VIEWS: Record<string, VaultType[]> = {
+  // El Espacio de trabajo unifica Notas, Escritura y Proyectos, y solo existe donde
+  // existían las tres. En las demás bóvedas Notas sigue siendo la sección de siempre:
+  // ni tienen proyectos ni tienen taller de escritura, así que no hay nada que unificar.
+  workspace: ['academic'],
+  writing: ['estudio', 'docencia', 'genealogy', 'primary_sources', 'databases', 'testimonios', 'worldbuilding', 'prosopography'],
+  projects: ['estudio', 'docencia', 'genealogy', 'primary_sources', 'databases', 'testimonios', 'worldbuilding', 'prosopography'],
+  notes: ['estudio', 'docencia', 'genealogy', 'primary_sources', 'databases', 'testimonios', 'worldbuilding', 'prosopography'],
   prosopSearch: ['prosopography'],
   prosopPopulation: ['prosopography'],
   prosopPersons: ['prosopography'],

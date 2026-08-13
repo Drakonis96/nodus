@@ -187,7 +187,10 @@ export function parseStudyDocLinks(markdown: string): ParsedStudyDocLink[] {
     seen.add(key);
     links.push({ targetRef, label });
   };
-  for (const match of markdown.matchAll(/\[([^\]]+)\]\(nodus:\/\/study\/doc\/([^)\s]+)\)/g)) add(match[2], match[1]);
+  // Un enlace entre documentos del MISMO espacio. Hay dos esquemas porque hay dos
+  // espacios —los apuntes de Estudio y las notas del Workspace— y el editor es el
+  // mismo para los dos; lo que se hace con el destino ya depende de quién resuelve.
+  for (const match of markdown.matchAll(/\[([^\]]+)\]\(nodus:\/\/(?:study\/doc|note)\/([^)\s]+)\)/g)) add(match[2], match[1]);
   for (const match of markdown.matchAll(/\[\[([^\]|]+)(?:\|([^\]]+))?\]\]/g)) add(match[1].trim(), match[2]?.trim() ?? null);
   return links;
 }

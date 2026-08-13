@@ -2,7 +2,7 @@ import type { CorpusHealthBucketId, ResearchContextSelection } from '@shared/typ
 import type { LibraryScope } from '@shared/libraryTypes';
 import { type VaultType, normalizeVaultType } from '@shared/vaultTypes';
 
-export type View = 'home' | 'search' | 'testimonyInterviews' | 'testimonyParticipants' | 'testimonyContrasts' | 'library' | 'graph' | 'argument' | 'ideas' | 'authors' | 'persons' | 'prosopSearch' | 'prosopPopulation' | 'prosopPersons' | 'prosopSources' | 'prosopAnalysis' | 'prosopNetworks' | 'encyclopedia' | 'continuity' | 'conflicts' | 'arcs' | 'rules' | 'questions' | 'worldChat' | 'manuscript' | 'characters' | 'places' | 'factions' | 'cultures' | 'dynasties' | 'scenes' | 'timeline' | 'tree' | 'relations' | 'map' | 'archive' | 'databases' | 'dbSearch' | 'dbAnalysis' | 'dbChat' | 'studyCourses' | 'studySchedule' | 'studyCalendar' | 'studySearch' | 'studyLibrary' | 'studyRecordings' | 'studyChat' | 'studyIdeas' | 'studyGraph' | 'studyQuestions' | 'studyReview' | 'studyDeepResearch' | 'teachingGroups' | 'teachingGrades' | 'teachingExams' | 'teachingRubrics' | 'teachingUnits' | 'immersion' | 'gaps' | 'debate' | 'research' | 'hypothesis' | 'reading' | 'writing' | 'deepResearch' | 'projects' | 'notes' | 'toolkit' | 'settings';
+export type View = 'home' | 'search' | 'testimonyInterviews' | 'testimonyParticipants' | 'testimonyContrasts' | 'library' | 'graph' | 'argument' | 'ideas' | 'authors' | 'persons' | 'prosopSearch' | 'prosopPopulation' | 'prosopPersons' | 'prosopSources' | 'prosopAnalysis' | 'prosopNetworks' | 'encyclopedia' | 'continuity' | 'conflicts' | 'arcs' | 'rules' | 'questions' | 'worldChat' | 'manuscript' | 'characters' | 'places' | 'factions' | 'cultures' | 'dynasties' | 'scenes' | 'timeline' | 'tree' | 'relations' | 'map' | 'archive' | 'databases' | 'dbSearch' | 'dbAnalysis' | 'dbChat' | 'studyCourses' | 'studySchedule' | 'studyCalendar' | 'studySearch' | 'studyLibrary' | 'studyRecordings' | 'studyChat' | 'studyIdeas' | 'studyGraph' | 'studyQuestions' | 'studyReview' | 'studyDeepResearch' | 'teachingGroups' | 'teachingGrades' | 'teachingExams' | 'teachingRubrics' | 'teachingUnits' | 'immersion' | 'gaps' | 'debate' | 'research' | 'hypothesis' | 'reading' | 'writing' | 'deepResearch' | 'projects' | 'notes' | 'workspace' | 'toolkit' | 'settings';
 
 export type GraphPresetId = 'overview' | 'contradictions' | 'gaps' | 'reading' | 'unread' | 'authors';
 
@@ -120,6 +120,11 @@ export const NAV_ITEMS: NavItem[] = [
   { id: 'reading', label: 'Ruta de lectura', icon: 'route', group: 'analyze' },
   { id: 'deepResearch', label: 'Deep Research', icon: 'network', group: 'analyze' },
   // Escribir — producir salidas con citas.
+  // El Espacio de trabajo REEMPLAZA a Escritura, Proyectos y Notas en la bóveda
+  // académica: las tres contaban la misma historia por separado. Las tres siguen
+  // existiendo como vistas para los demás tipos de bóveda, donde Notas es lo único
+  // que hay y no tendría sentido sustituirla por un espacio con proyectos dentro.
+  { id: 'workspace', label: 'Espacio de trabajo', icon: 'notebook', group: 'create' },
   { id: 'writing', label: 'Escritura', icon: 'edit', group: 'create' },
   { id: 'projects', label: 'Proyectos', icon: 'folder', group: 'create' },
   { id: 'notes', label: 'Notas', icon: 'notebook', group: 'create' },

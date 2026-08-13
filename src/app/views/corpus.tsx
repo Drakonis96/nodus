@@ -17,6 +17,7 @@ const DeepResearchView = lazy(() => import('../../views/DeepResearchView').then(
 const ProjectsView = lazy(() => import('../../views/ProjectsView').then((module) => ({ default: module.ProjectsView })));
 const ImmersionView = lazy(() => import('../../views/ImmersionView').then((module) => ({ default: module.ImmersionView })));
 const NotesView = lazy(() => import('../../views/NotesView').then((module) => ({ default: module.NotesView })));
+const WorkspaceView = lazy(() => import('../../views/WorkspaceView').then((module) => ({ default: module.WorkspaceView })));
 const SearchView = lazy(() => import('../../views/SearchView').then((module) => ({ default: module.SearchView })));
 const PrimarySourcesSearchView = lazy(() => import('../../views/PrimarySourcesSearchView').then((module) => ({ default: module.PrimarySourcesSearchView })));
 const PrimarySourcesNotesView = lazy(() => import('../../views/PrimarySourcesNotesView').then((module) => ({ default: module.PrimarySourcesNotesView })));
@@ -134,6 +135,15 @@ export const corpusViews = {
       />
     );
   },
+
+  // Notas, ideas y colecciones de la bóveda académica, con el editor de Estudio.
+  workspace: ({ navigate, noteTarget, settings }) => (
+    <WorkspaceView
+      settings={settings}
+      focusNote={noteTarget}
+      onOpenGraph={(target) => navigate('graph', target)}
+    />
+  ),
 
   notes: ({ isPrimarySources, isTestimonios, navigate, noteTarget, openPrimarySourceTarget, openTestimonyLink }) => (isPrimarySources
     ? <PrimarySourcesNotesView focusNote={noteTarget} onOpenSource={openPrimarySourceTarget} />

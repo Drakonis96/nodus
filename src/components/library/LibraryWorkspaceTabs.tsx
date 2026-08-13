@@ -15,16 +15,41 @@ export function libraryWorkspaceTabKey(scope: LibraryScope, reference: LibraryRe
   return `${scope}:${reference.id}`;
 }
 
-export function LibraryWorkspaceTabs({
+/** Una pestaña cualquiera de la tira: lo que se abre junto a la vista principal. */
+export interface WorkspaceStripTab {
+  key: string;
+  title: string;
+  icon: string;
+}
+
+/**
+ * La tira de pestañas que estrenó la Biblioteca y que ahora comparte con el Workspace.
+ *
+ * La primera pestaña es siempre la vista principal —la Biblioteca, el Workspace— y no se
+ * cierra: es el sitio al que se vuelve. Las demás son lo que se ha abierto desde ella.
+ * Vive aquí, y no duplicada en cada vista, porque el gesto tiene que ser el mismo en las
+ * dos: mismas teclas, mismo botón de cerrar, mismo desplazamiento a la pestaña activa.
+ */
+export function WorkspaceTabStrip({
+  homeLabel,
+  homeIcon,
+  homeTestId,
+  tabTestId,
+  closeTestId,
   tabs,
   activeKey,
-  onActivateLibrary,
+  onActivateHome,
   onActivateTab,
   onCloseTab,
 }: {
-  tabs: LibraryWorkspaceTab[];
+  homeLabel: string;
+  homeIcon: string;
+  homeTestId: string;
+  tabTestId: (tab: WorkspaceStripTab) => string;
+  closeTestId: (tab: WorkspaceStripTab) => string;
+  tabs: WorkspaceStripTab[];
   activeKey: string | null;
-  onActivateLibrary: () => void;
+  onActivateHome: () => void;
   onActivateTab: (key: string) => void;
   onCloseTab: (key: string) => void;
 }) {
@@ -41,7 +66,7 @@ export function LibraryWorkspaceTabs({
     const keys: Array<string | null> = [null, ...tabs.map((tab) => tab.key)];
     const currentIndex = Math.max(0, keys.indexOf(currentKey));
     const nextKey = keys[(currentIndex + direction + keys.length) % keys.length];
-    if (nextKey === null) onActivateLibrary();
+    if (nextKey === null) onActivateHome();
     else onActivateTab(nextKey);
   };
 
@@ -63,32 +88,32 @@ export function LibraryWorkspaceTabs({
 
   return (
     <div data-testid="library-workspace-tabs" className="library-workspace-tabs shrink-0">
-      <div ref={stripRef} className="library-workspace-tabs-scroll" role="tablist" aria-label={t('Biblioteca')}>
+      <div ref={stripRef} className="library-workspace-tabs-scroll" role="tablist" aria-label={homeLabel}>
         <div className={`library-workspace-tab is-library ${activeKey === null ? 'is-active' : ''}`}>
           <button
             type="button"
             role="tab"
             aria-selected={activeKey === null}
             tabIndex={activeKey === null ? 0 : -1}
-            data-testid="library-workspace-tab-library"
+            data-testid={homeTestId}
             className="library-workspace-tab-main"
-            onClick={onActivateLibrary}
+            onClick={onActivateHome}
             onKeyDown={(event) => tabKeyDown(event, null)}
           >
-            <Icon name="library" size={13} />
-            <span>{t('Biblioteca')}</span>
+            <Icon name={homeIcon} size={13} />
+            <span>{homeLabel}</span>
           </button>
         </div>
         {tabs.map((tab) => {
           const active = activeKey === tab.key;
           return (
-            <div key={tab.key} className={`library-workspace-tab ${active ? 'is-active' : ''}`} title={tab.reference.title}>
+            <div key={tab.key} className={`library-workspace-tab ${active ? 'is-active' : ''}`} title={tab.title}>
               <button
                 type="button"
                 role="tab"
                 aria-selected={active}
                 tabIndex={active ? 0 : -1}
-                data-testid={`library-workspace-tab-document-${tab.reference.id}`}
+                data-testid={tabTestId(tab)}
                 className="library-workspace-tab-main"
                 onClick={() => onActivateTab(tab.key)}
                 onAuxClick={(event) => {
@@ -96,14 +121,14 @@ export function LibraryWorkspaceTabs({
                 }}
                 onKeyDown={(event) => tabKeyDown(event, tab.key)}
               >
-                <Icon name="file" size={12} />
-                <span className="truncate">{tab.reference.title}</span>
+                <Icon name={tab.icon} size={12} />
+                <span className="truncate">{tab.title}</span>
               </button>
               <button
                 type="button"
-                data-testid={`library-workspace-close-${tab.reference.id}`}
+                data-testid={closeTestId(tab)}
                 className="library-workspace-tab-close"
-                aria-label={`${t('Cerrar pestaña')}: ${tab.reference.title}`}
+                aria-label={`${t('Cerrar pestaña')}: ${tab.title}`}
                 title={t('Cerrar pestaña')}
                 onClick={(event) => {
                   event.stopPropagation();
@@ -117,5 +142,34 @@ export function LibraryWorkspaceTabs({
         })}
       </div>
     </div>
+  );
+}
+
+export function LibraryWorkspaceTabs({
+  tabs,
+  activeKey,
+  onActivateLibrary,
+  onActivateTab,
+  onCloseTab,
+}: {
+  tabs: LibraryWorkspaceTab[];
+  activeKey: string | null;
+  onActivateLibrary: () => void;
+  onActivateTab: (key: string) => void;
+  onCloseTab: (key: string) => void;
+}) {
+  return (
+    <WorkspaceTabStrip
+      homeLabel={t('Biblioteca')}
+      homeIcon="library"
+      homeTestId="library-workspace-tab-library"
+      tabTestId={(tab) => `library-workspace-tab-document-${tab.key.split(':').slice(1).join(':')}`}
+      closeTestId={(tab) => `library-workspace-close-${tab.key.split(':').slice(1).join(':')}`}
+      tabs={tabs.map((tab) => ({ key: tab.key, title: tab.reference.title, icon: 'file' }))}
+      activeKey={activeKey}
+      onActivateHome={onActivateLibrary}
+      onActivateTab={onActivateTab}
+      onCloseTab={onCloseTab}
+    />
   );
 }

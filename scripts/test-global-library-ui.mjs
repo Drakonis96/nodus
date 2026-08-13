@@ -112,7 +112,8 @@ test('the Library UI exposes hierarchy, search, bulk operations, imports and bac
   assert.doesNotMatch(vaultLibrary, /data-testid=\{`vault-library-item-[\s\S]*onDoubleClick=\{\(event\)[\s\S]*openReader\(w\)/, 'vault rows never reuse the Global reader gesture');
   assert.match(vaultLibrary, /<RowIconButton[\s\S]{0,240}title=\{t\('Abrir lector limpio'\)\}[\s\S]{0,240}onClick=\{\(\) => openReader\(w\)\}/, 'the clean reader remains available from the vault action column');
   assert.match(view, /data-testid="library-workspace-tabs"/, 'open documents share one compact workspace tab strip');
-  assert.match(view, /data-testid="library-workspace-tab-library"/, 'the Library remains a fixed workspace tab');
+  assert.match(view, /homeTestId="library-workspace-tab-library"/, 'the Library remains a fixed, non-closable workspace tab');
+  assert.match(workspaceTabs, /data-testid=\{homeTestId\}/, 'the shared strip renders that fixed tab, and the Workspace passes its own');
   assert.match(workspaceTabs, /overflow-x: auto|library-workspace-tabs-scroll/, 'document tabs use one horizontally scrollable row');
   assert.match(workspaceTabs, /onAuxClick[\s\S]*event\.button === 1/, 'a document tab supports conventional middle-click closing');
   assert.match(view, /workspaceTabs\.find\(\(tab\) => tab\.key === activeReaderKey\)/, 'only the active document is selected for rendering');

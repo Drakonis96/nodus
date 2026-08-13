@@ -779,7 +779,7 @@ export function StudyEditor({
   };
   const searchCount = search ? draft.toLocaleLowerCase().split(search.toLocaleLowerCase()).length - 1 : 0;
   const handleEditorDrop = async (event: DragEvent<HTMLDivElement>) => {
-    const documentId = event.dataTransfer.getData('application/x-nodus-study-doc');
+    const documentId = event.dataTransfer.getData(port.dragType);
     const uri = event.dataTransfer.getData('text/uri-list');
     if (!documentId && !uri) return;
     event.preventDefault();
@@ -997,7 +997,7 @@ export function StudyEditor({
       )}
 
       <div className="flex min-h-0 flex-1" onMouseUp={(event) => showSelectionImproveShortcuts(event)} onKeyUp={() => showSelectionImproveShortcuts()} onDragOver={(event) => {
-        if (event.dataTransfer.types.includes('application/x-nodus-study-doc') || event.dataTransfer.types.includes('text/uri-list')) event.preventDefault();
+        if (event.dataTransfer.types.includes(port.dragType) || event.dataTransfer.types.includes('text/uri-list')) event.preventDefault();
       }} onDrop={(event) => void handleEditorDrop(event)}>
         {!focusMode && <DocOutline markdown={draft} onJump={jumpToHeading} />}
         <div className={`min-w-0 flex-1 overflow-y-auto ${split ? 'grid grid-cols-2 divide-x divide-neutral-800' : ''}`}>

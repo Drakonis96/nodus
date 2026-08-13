@@ -41,6 +41,8 @@ export interface EditorDocumentPort<TDocument extends EditorDocument = EditorDoc
   improveTarget(documentId: string): { documentId?: string | null; noteId?: string | null };
   /** Los documentos a los que se puede enlazar al soltar uno dentro del texto. */
   listLinkTargets(): Promise<Array<{ id: string; title: string }>>;
+  /** El tipo MIME que arrastra la lista de este espacio. */
+  dragType: string;
   /** El enlace Markdown que abre otro documento del mismo espacio. */
   linkHref(documentId: string): string;
 }
@@ -54,6 +56,7 @@ export const studyDocumentPort: EditorDocumentPort<import('@shared/studyOrg').St
   updateAnnotation: (id, patch) => window.nodus.updateStudyAnnotation(id, patch),
   improveTarget: (documentId) => ({ documentId }),
   listLinkTargets: async () => (await window.nodus.getStudyWorkspace()).documents.map((document) => ({ id: document.id, title: document.title })),
+  dragType: 'application/x-nodus-study-doc',
   linkHref: (documentId) => `nodus://study/doc/${documentId}`,
 };
 
@@ -70,6 +73,7 @@ export const workspaceNotePort: EditorDocumentPort<EditorDocument & { noteId: st
   updateAnnotation: (id, patch) => window.nodus.updateWorkspaceAnnotation(id, patch),
   improveTarget: (noteId) => ({ noteId }),
   listLinkTargets: async () => (await window.nodus.getNotesTree()).notes.map((note) => ({ id: note.id, title: note.title })),
+  dragType: 'application/x-nodus-workspace-note',
   linkHref: (noteId) => `nodus://note/${noteId}`,
 };
 
