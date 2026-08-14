@@ -479,6 +479,8 @@ export function buildThemeConstellation(data: GraphData): GraphModel {
 
 const IDEA_ATLAS_GLOBAL_CAP = 126;
 const GAP_ATLAS_GLOBAL_CAP = 112;
+const CONTRADICTION_ATLAS_NODE_CAP = 120;
+const CONTRADICTION_ATLAS_EDGE_CAP = 180;
 const AUTHOR_ATLAS_CAP = 144;
 const AUTHOR_ATLAS_MAX_TERRITORIES = 8;
 
@@ -598,6 +600,144 @@ function buildIdeaPresetAtlas(
       type: 'contains',
       basis: 'inferred',
       confidence: 0.72,
+      layoutEdge: true,
+    }];
+  });
+
+  return { nodes: [...themeNodes, ...selectedNodes], edges: [...membershipEdges, ...semanticEdges] };
+}
+
+/**
+ * Contradictions are selected edge-first, rather than idea-first like the other
+ * presets. A node cap applied to independently-ranked ideas can leave one side
+ * of a contradiction outside the scene, which turns a debate into an orphaned
+ * claim. Round-robin selection across theme pairs keeps the atlas varied while
+ * guaranteeing that every retained contradiction/refutation has both ends.
+ */
+function buildContradictionPresetAtlas(data: GraphData, base: GraphModel): GraphModel {
+  const candidateById = new Map(
+    base.nodes
+      .filter((node) => node.type !== 'theme')
+      .map((node) => [node.id, node] as const)
+  );
+  const debateEdges = base.edges.filter((edge) =>
+    (edge.type === 'contradicts' || edge.type === 'refutes')
+    && candidateById.has(edge.source)
+    && candidateById.has(edge.target)
+  );
+  if (debateEdges.length === 0) return { nodes: [], edges: [] };
+
+  const groupOf = (id: string) => candidateById.get(id)?.group?.trim() || '∅';
+  const edgeBuckets = new Map<string, EdgeModel[]>();
+  for (const edge of debateEdges) {
+    const groups = [groupOf(edge.source), groupOf(edge.target)].sort((a, b) => a.localeCompare(b));
+    const key = `${groups[0]}\u0000${groups[1]}`;
+    const bucket = edgeBuckets.get(key) ?? [];
+    bucket.push(edge);
+    edgeBuckets.set(key, bucket);
+  }
+
+  const rankEdges = (a: EdgeModel, b: EdgeModel) =>
+    Number(b.basis === 'explicit') - Number(a.basis === 'explicit')
+    || b.confidence - a.confidence
+    || stableUnit(a.id) - stableUnit(b.id)
+    || a.id.localeCompare(b.id);
+  const buckets = [...edgeBuckets.entries()]
+    .map(([key, edges]) => ({ key, edges: edges.sort(rankEdges), cursor: 0 }))
+    .sort((a, b) => b.edges.length - a.edges.length || a.key.localeCompare(b.key));
+
+  const selectedIds = new Set<string>();
+  const seedEdgeIds = new Set<string>();
+  let madeProgress = true;
+  while (madeProgress && seedEdgeIds.size < CONTRADICTION_ATLAS_EDGE_CAP) {
+    madeProgress = false;
+    for (const bucket of buckets) {
+      while (bucket.cursor < bucket.edges.length) {
+        const edge = bucket.edges[bucket.cursor++];
+        const additions = [...new Set([edge.source, edge.target])]
+          .filter((id) => !selectedIds.has(id));
+        if (selectedIds.size + additions.length > CONTRADICTION_ATLAS_NODE_CAP) continue;
+        additions.forEach((id) => selectedIds.add(id));
+        seedEdgeIds.add(edge.id);
+        madeProgress = true;
+        break;
+      }
+      if (seedEdgeIds.size >= CONTRADICTION_ATLAS_EDGE_CAP) break;
+    }
+  }
+
+  const semanticEdges = debateEdges
+    .filter((edge) => selectedIds.has(edge.source) && selectedIds.has(edge.target))
+    .sort((a, b) => Number(seedEdgeIds.has(b.id)) - Number(seedEdgeIds.has(a.id)) || rankEdges(a, b))
+    .slice(0, CONTRADICTION_ATLAS_EDGE_CAP)
+    .map((edge) => ({ ...edge, layoutEdge: true }));
+
+  const degreeById = new Map([...selectedIds].map((id) => [id, 0]));
+  for (const edge of semanticEdges) {
+    degreeById.set(edge.source, (degreeById.get(edge.source) ?? 0) + 1);
+    degreeById.set(edge.target, (degreeById.get(edge.target) ?? 0) + 1);
+  }
+  const rankedSelected = [...selectedIds]
+    .map((id) => candidateById.get(id)!)
+    .sort((a, b) => (degreeById.get(b.id) ?? 0) - (degreeById.get(a.id) ?? 0)
+      || b.labelRank - a.labelRank
+      || a.label.localeCompare(b.label));
+  const selectedNodes: NodeModel[] = rankedSelected.map((node, index) => {
+    const degree = degreeById.get(node.id) ?? 0;
+    return {
+      ...node,
+      degree,
+      size: Math.max(9, Math.min(18, ideaNodeSize(degree))),
+      labelRank: rankedSelected.length <= 1 ? 1 : 1 - index / (rankedSelected.length - 1),
+    };
+  });
+
+  const totalByGroup = new Map<string, number>();
+  for (const node of candidateById.values()) {
+    const group = node.group?.trim() || '∅';
+    totalByGroup.set(group, (totalByGroup.get(group) ?? 0) + 1);
+  }
+  const selectedGroups = new Set(selectedNodes.map((node) => node.group?.trim() || '∅'));
+  const themeByKey = new Map(
+    data.nodes
+      .filter((node) => node.type === 'theme')
+      .map((node) => [normalizeThemeKey(node.label), node] as const)
+  );
+  const colorByTheme = atlasThemeColorMap(data);
+  const themeIdByGroup = new Map<string, string>();
+  const themeNodes: NodeModel[] = [];
+  for (const group of selectedGroups) {
+    const source = group === '∅' ? undefined : themeByKey.get(normalizeThemeKey(group));
+    const id = source?.id ?? syntheticThemeId(group);
+    const total = totalByGroup.get(group) ?? 0;
+    themeIdByGroup.set(group, id);
+    themeNodes.push({
+      id,
+      label: source?.label ?? '∅',
+      type: 'theme',
+      group,
+      createdAt: source?.createdAt,
+      workCount: total,
+      degree: total,
+      labelRank: 1.2,
+      size: themeConstellationSize(total),
+      read: true,
+      color: colorByTheme.get(normalizeThemeKey(group))
+        ?? THEME_CONSTELLATION_PALETTE[themeNodes.length % THEME_CONSTELLATION_PALETTE.length],
+    });
+  }
+
+  const membershipEdges: EdgeModel[] = selectedNodes.flatMap((node) => {
+    const group = node.group?.trim() || '∅';
+    const source = themeIdByGroup.get(group);
+    if (!source) return [];
+    return [{
+      id: `atlas-membership:${source}:${node.id}`,
+      source,
+      target: node.id,
+      type: 'contains',
+      basis: 'inferred',
+      confidence: 0.78,
       layoutEdge: true,
     }];
   });
@@ -736,9 +876,10 @@ export function buildPresetAtlas(
   lens: GraphLens,
   preset: GraphPresetId
 ): GraphModel | null {
-  if (preset !== 'gaps' && preset !== 'reading' && preset !== 'unread' && preset !== 'authors') return null;
+  if (preset !== 'contradictions' && preset !== 'gaps' && preset !== 'reading' && preset !== 'unread' && preset !== 'authors') return null;
   const base = buildGraphModel(data, filters, lens, preset);
   if (preset === 'authors') return buildAuthorPresetAtlas(base);
+  if (preset === 'contradictions') return buildContradictionPresetAtlas(data, base);
   return buildIdeaPresetAtlas(data, base, preset);
 }
 
