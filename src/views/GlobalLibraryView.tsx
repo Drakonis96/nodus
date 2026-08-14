@@ -18,6 +18,7 @@ import type {
   LibraryViewPreferences,
   LibraryItemType,
   LibraryCollectionIcon,
+  GlobalLibrarySettings,
   ZoteroImportProgress,
   ZoteroImportSelection,
   ZoteroLibraryPreview,
@@ -27,6 +28,7 @@ import type { AppSettings, LibraryReaderReference, VaultSummary, VaultType } fro
 import { Icon, Spinner } from '../components/ui';
 import { LibraryCitationExportDialog, LibraryCreateReferenceDialog, LibraryDuplicatesDialog, LibraryMetadataBatchDialog, LibraryMetadataEditor } from '../components/library/LibraryMetadataDialogs';
 import { LibraryItemManager } from '../components/library/LibraryItemManager';
+import { LibrarySettingsDialog } from '../components/library/LibrarySettingsDialog';
 import { LibraryWorkspaceTabs, libraryWorkspaceTabKey, type LibraryWorkspaceTab } from '../components/library/LibraryWorkspaceTabs';
 import { LibrarySmartSearchDialog, LibraryTablePreferencesDialog } from '../components/library/LibrarySmartSearchDialog';
 import { LibraryRecoveryDialog, LibraryTrashImpactDialog } from '../components/library/LibraryRecoveryDialogs';
@@ -39,6 +41,7 @@ import type { PendingLibraryNavigationTarget } from '../navigation';
 import type { PendingGraphNavigationTarget } from '../navigation';
 import { Library } from './Library';
 import { LIBRARY_COLUMN_BY_ID, libraryItemTypeLabel } from '@shared/libraryBibliography';
+import { DEFAULT_GLOBAL_LIBRARY_SETTINGS } from '@shared/libraryAttachmentNaming';
 
 const PAGE_SIZE = 250;
 const LIBRARY_COLLECTION_PANE_RATIO_KEY = 'nodus.library.collectionsPaneRatio';
@@ -737,6 +740,7 @@ function GlobalLibraryContent({
   const [selectedSavedSearch, setSelectedSavedSearch] = useState<string | null>(null);
   const [facets, setFacets] = useState<LibraryCatalogFacets>(EMPTY_FACETS);
   const [viewPreferences, setViewPreferences] = useState<LibraryViewPreferences>(DEFAULT_VIEW_PREFERENCES);
+  const [librarySettings, setLibrarySettings] = useState<GlobalLibrarySettings>(DEFAULT_GLOBAL_LIBRARY_SETTINGS);
   const [items, setItems] = useState<LibraryCatalogItem[]>([]);
   const [total, setTotal] = useState(0);
   const [offset, setOffset] = useState(0);
@@ -780,6 +784,7 @@ function GlobalLibraryContent({
   const [stylingCollection, setStylingCollection] = useState<LibraryCollectionView | null>(null);
   const [smartSearchEditor, setSmartSearchEditor] = useState<LibrarySavedSearchRecord | 'new' | null>(null);
   const [tablePreferencesOpen, setTablePreferencesOpen] = useState(false);
+  const [librarySettingsOpen, setLibrarySettingsOpen] = useState(false);
   const [addMenuOpen, setAddMenuOpen] = useState(false);
   const [moreMenuOpen, setMoreMenuOpen] = useState(false);
   const [detailActionsOpen, setDetailActionsOpen] = useState(false);
@@ -809,7 +814,7 @@ function GlobalLibraryContent({
 
   const load = useCallback(async () => {
     try {
-      const [nextStatus, page, nextCollections, nextJobs, nextSavedSearches, nextViewPreferences, trashPage] = await Promise.all([
+      const [nextStatus, page, nextCollections, nextJobs, nextSavedSearches, nextViewPreferences, nextLibrarySettings, trashPage] = await Promise.all([
         window.nodus.getGlobalLibraryStatus(),
         window.nodus.listGlobalLibraryItems({
           search: search || undefined, collectionId: trashMode ? null : selectedCollection, savedSearchId: trashMode ? null : selectedSavedSearch,
@@ -824,10 +829,11 @@ function GlobalLibraryContent({
         window.nodus.listLibraryExtractionJobs(),
         window.nodus.listGlobalLibrarySavedSearches(),
         window.nodus.getGlobalLibraryViewPreferences(),
+        window.nodus.getGlobalLibrarySettings(),
         window.nodus.listGlobalLibraryItems({ includeDeleted: true, smartSearch: TRASH_SEARCH, limit: 1, includeFacets: false }),
       ]);
       setStatus(nextStatus); setItems(page.items); setTotal(page.total); setCollections(nextCollections); setJobs(nextJobs);
-      setSavedSearches(nextSavedSearches); setFacets(page.facets); setViewPreferences(nextViewPreferences); setError(null);
+      setSavedSearches(nextSavedSearches); setFacets(page.facets); setViewPreferences(nextViewPreferences); setLibrarySettings(nextLibrarySettings); setError(null);
       setTrashCount(trashPage.total);
       if (!expanded.size && nextCollections.length) setExpanded(new Set(nextCollections.filter((entry) => !entry.parentId).map((entry) => entry.id)));
     } catch (nextError) { setError(nextError instanceof Error ? nextError.message : String(nextError)); }
@@ -990,7 +996,9 @@ function GlobalLibraryContent({
     if (!filePaths.length) return;
     try {
       const report = await window.nodus.importDroppedGlobalLibraryFiles(filePaths, collectionId);
-      if (report.created) toast(tx('{n} documento(s) añadido(s). Puedes editar sus metadatos mientras Nodus prepara la lectura.', { n: report.created }));
+      if (report.created) toast(librarySettings.autoPrepareAttachments
+        ? tx('{n} documento(s) añadido(s). Puedes editar sus metadatos mientras Nodus prepara la lectura.', { n: report.created })
+        : tx('{n} documento(s) añadido(s). La preparación automática está desactivada.', { n: report.created }));
       if (report.warnings.length) toast(report.warnings[0], { tone: report.created ? 'info' : 'error' });
       await load();
       if (report.itemIds[0]) setDetailId(report.itemIds[0]);
@@ -1058,7 +1066,9 @@ function GlobalLibraryContent({
   const importFiles = async () => {
     try {
       const report = await window.nodus.importGlobalLibraryFiles(selectedCollection);
-      if (report.created) toast(tx('{n} documento(s) importado(s); la extracción continúa en segundo plano.', { n: report.created }));
+      if (report.created) toast(librarySettings.autoPrepareAttachments
+        ? tx('{n} documento(s) importado(s); la extracción continúa en segundo plano.', { n: report.created })
+        : tx('{n} documento(s) importado(s). La preparación automática está desactivada.', { n: report.created }));
       else if (report.warnings.length) toast(report.warnings[0], { tone: 'info' });
       await load();
     } catch (nextError) { toast(nextError instanceof Error ? nextError.message : String(nextError), { tone: 'error' }); }
@@ -1113,7 +1123,9 @@ function GlobalLibraryContent({
       const saved = await window.nodus.addGlobalLibraryAttachments(detail.id);
       setDetail(saved);
       await load();
-      if (saved.attachments.length > detail.attachments.length) toast(t('Archivo añadido. Nodus está preparando la lectura.'));
+      if (saved.attachments.length > detail.attachments.length) toast(t(librarySettings.autoPrepareAttachments
+        ? 'Archivo añadido. Nodus está preparando la lectura.'
+        : 'Archivo añadido. La preparación automática está desactivada.'));
     } catch (nextError) { toast(nextError instanceof Error ? nextError.message : String(nextError), { tone: 'error' }); }
   };
 
@@ -1269,11 +1281,12 @@ function GlobalLibraryContent({
             {addMenuOpen && <><button className="fixed inset-0 z-30 cursor-default" aria-label={t('Cerrar menú')} onClick={() => setAddMenuOpen(false)} /><div data-testid="library-add-menu" role="menu" className="library-action-menu absolute right-0 top-[calc(100%+.45rem)] z-50 w-64 rounded-xl border border-neutral-800 bg-neutral-950 p-1.5 shadow-2xl">
               <button data-testid="magic-add-library-reference" role="menuitem" className="library-action-menu-item" onClick={() => { setAddMenuOpen(false); setCreateReferenceMode('identifier'); }}><Icon name="wand" /><span><b>{t('Añadir por identificador')}</b><small>{t('DOI, ISBN, ISSN, PMID, PMCID o arXiv')}</small></span></button>
               <button data-testid="create-library-reference" role="menuitem" className="library-action-menu-item" onClick={() => { setAddMenuOpen(false); setCreateReferenceMode('manual'); }}><Icon name="edit" /><span><b>{t('Entrada manual')}</b><small>{t('Crear una referencia sin archivo')}</small></span></button>
-              <button data-testid="add-library-files" role="menuitem" className="library-action-menu-item" onClick={() => { setAddMenuOpen(false); void importFiles(); }}><Icon name="upload" /><span><b>{t('Añadir archivos')}</b><small>{t('La lectura se prepara automáticamente')}</small></span></button>
+              <button data-testid="add-library-files" role="menuitem" className="library-action-menu-item" onClick={() => { setAddMenuOpen(false); void importFiles(); }}><Icon name="upload" /><span><b>{t('Añadir archivos')}</b><small>{t(librarySettings.autoPrepareAttachments ? 'La lectura se prepara automáticamente' : 'La preparación automática está desactivada')}</small></span></button>
               <button data-testid="import-library-bibliography" role="menuitem" className="library-action-menu-item" onClick={() => { setAddMenuOpen(false); void importBibliography(); }}><Icon name="fileText" /><span><b>{t('Importar referencias')}</b><small>{t('RIS, BibTeX, CSL JSON y otros formatos')}</small></span></button>
             </div></>}
           </div>
           <button data-testid="open-zotero-global-import" className="btn btn-secondary" onClick={() => setZoteroOpen(true)}><Icon name="refresh" /> {t('Sincronizar Zotero')}</button>
+          <button data-testid="open-global-library-settings" className="btn btn-ghost border border-neutral-700" aria-label={t('Opciones de la Biblioteca global')} title={t('Opciones de la Biblioteca global')} onClick={() => { setLibrarySettingsOpen(true); setAddMenuOpen(false); setMoreMenuOpen(false); }}><Icon name="tools" /></button>
           <div className="relative z-40">
             <button data-testid="library-more-menu-toggle" className="btn btn-ghost relative z-40 border border-neutral-700" aria-label={t('Más acciones')} title={t('Más acciones')} aria-haspopup="menu" aria-expanded={moreMenuOpen} onClick={() => { setMoreMenuOpen((value) => !value); setAddMenuOpen(false); }}><Icon name="menu" /></button>
             {moreMenuOpen && <><button className="fixed inset-0 z-30 cursor-default" aria-label={t('Cerrar menú')} onClick={() => setMoreMenuOpen(false)} /><div data-testid="library-more-menu" role="menu" className="library-action-menu absolute right-0 top-[calc(100%+.45rem)] z-50 w-60 rounded-xl border border-neutral-800 bg-neutral-950 p-1.5 shadow-2xl">
@@ -1516,6 +1529,7 @@ function GlobalLibraryContent({
         </div>
       </>}
       {zoteroOpen && <ZoteroImportDialog onClose={() => setZoteroOpen(false)} onFinished={() => void load()} />}
+      {librarySettingsOpen && <LibrarySettingsDialog settings={librarySettings} onClose={() => setLibrarySettingsOpen(false)} onSaved={setLibrarySettings} />}
       {movingCollection && <LibraryCollectionMoveDialog collection={movingCollection} collections={collections} onClose={() => setMovingCollection(null)} onMove={(parentId) => moveCollection(movingCollection, parentId)} />}
       {stylingCollection && <LibraryCollectionStyleDialog collection={stylingCollection} onClose={() => setStylingCollection(null)} onSave={async (icon, color) => { await window.nodus.updateGlobalLibraryCollection(stylingCollection.id, { icon, color }); await load(); }} />}
       {migrationOpen && <LibraryMigrationDialog onClose={() => setMigrationOpen(false)} onFinished={() => void load()} />}

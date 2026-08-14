@@ -15,7 +15,9 @@ test('the unified Library keeps the global catalogue independent and the vault c
 
 test('the Library UI exposes hierarchy, search, bulk operations, imports and background state', async () => {
   const workspaceTabs = await readSource('src/components/library/LibraryWorkspaceTabs.tsx');
-  const view = `${await readSource('src/views/GlobalLibraryView.tsx')}\n${workspaceTabs}\n${await readSource('src/components/library/LibraryItemManager.tsx')}\n${await readSource('src/components/library/LibrarySmartSearchDialog.tsx')}\n${await readSource('src/components/library/LibraryMetadataDialogs.tsx')}\n${await readSource('src/components/library/LibraryRecoveryDialogs.tsx')}`;
+  const itemManager = await readSource('src/components/library/LibraryItemManager.tsx');
+  const librarySettings = await readSource('src/components/library/LibrarySettingsDialog.tsx');
+  const view = `${await readSource('src/views/GlobalLibraryView.tsx')}\n${workspaceTabs}\n${itemManager}\n${librarySettings}\n${await readSource('src/components/library/LibrarySmartSearchDialog.tsx')}\n${await readSource('src/components/library/LibraryMetadataDialogs.tsx')}\n${await readSource('src/components/library/LibraryRecoveryDialogs.tsx')}`;
   const vaultLibrary = await readSource('src/views/Library.tsx');
   const libraryService = await readSource('electron/library/libraryService.ts');
   const appCss = await readSource('src/index.css');
@@ -44,6 +46,8 @@ test('the Library UI exposes hierarchy, search, bulk operations, imports and bac
     'library-detail-primary-action', 'library-detail-actions-toggle', 'library-detail-actions-menu',
     'library-reading-status', 'library-extraction-advanced', 'cancel-library-preparation',
     'library-catalog-scroll',
+    'open-global-library-settings', 'global-library-settings-dialog',
+    'save-global-library-settings',
   ]) assert.match(view, new RegExp(`data-testid=(?:"|{\`)[^\n]*${marker}`));
   for (const method of [
     'getGlobalLibraryStatus', 'listGlobalLibraryItems', 'listGlobalLibraryCollections',
@@ -61,6 +65,7 @@ test('the Library UI exposes hierarchy, search, bulk operations, imports and bac
     'cancelLibraryMigration', 'rollbackLibraryMigration', 'listLibraryMigrationSessions',
     'listGlobalLibrarySavedSearches', 'saveGlobalLibrarySavedSearch', 'deleteGlobalLibrarySavedSearch',
     'getGlobalLibraryViewPreferences', 'setGlobalLibraryViewPreferences',
+    'getGlobalLibrarySettings', 'setGlobalLibrarySettings',
     'startGlobalLibraryMetadataBatch', 'applyGlobalLibraryMetadataBatch', 'cancelGlobalLibraryMetadataBatch',
     'updateGlobalLibraryCitationKey', 'formatGlobalLibraryCitation', 'exportGlobalLibraryBibliography',
     'listGlobalLibraryCitationStyles', 'importGlobalLibraryCitationStyles', 'importZoteroCitationStyles',
@@ -85,7 +90,11 @@ test('the Library UI exposes hierarchy, search, bulk operations, imports and bac
   assert.match(view, /library-trash-folder[\s\S]*aria-current=\{trashMode \? 'page'/, 'the trash folder exposes its selected state');
   assert.match(view, /library-trash-section[\s\S]*h-10 shrink-0[\s\S]*library-trash-folder[\s\S]*h-8/, 'trash uses the same fixed height as the table footer');
   assert.match(view, /library-table-footer[\s\S]*h-10/, 'the table footer exposes its shared height to visual tests');
-  assert.match(view, /t\('Añadir'\)[\s\S]*t\('Sincronizar Zotero'\)[\s\S]*library-more-menu-toggle/, 'the main toolbar is reduced to Add, Zotero sync, and an overflow menu');
+  assert.match(view, /t\('Añadir'\)[\s\S]*t\('Sincronizar Zotero'\)[\s\S]*open-global-library-settings[\s\S]*library-more-menu-toggle/, 'the main toolbar keeps Add, Zotero sync, Library settings, and the overflow menu together');
+  assert.match(itemManager, /h-\[min\(44rem,90vh\)\]/, 'every item-manager tab uses one stable modal height');
+  assert.match(itemManager, /const deleteNote = async[\s\S]*await confirm\([\s\S]*danger: true[\s\S]*deleteGlobalLibraryNote/, 'note deletion requires a destructive confirmation before the write');
+  assert.match(librarySettings, /DEFAULT_GLOBAL_LIBRARY_SETTINGS[\s\S]*autoRenameAttachments[\s\S]*attachmentRenameTemplate/, 'the settings dialog exposes Zotero-compatible attachment naming defaults');
+  assert.match(librarySettings, /testId="library-auto-rename-attachments"/, 'automatic attachment renaming has a stable interactive test hook');
   assert.match(view, /t\('Reconstruir versión limpia'\)/, 'clean Markdown rebuilding is named explicitly');
   assert.match(view, /window\.nodus\.cancelLibraryExtraction/, 'visible background preparation can be canceled');
   assert.match(view, /refreshSelectedLibraryDetail/, 'terminal extraction progress refreshes the selected detail in place');
@@ -374,6 +383,7 @@ test('the typed bridge covers every global management operation', async () => {
     'cancelLibraryMigration', 'rollbackLibraryMigration', 'listLibraryMigrationSessions',
     'listGlobalLibrarySavedSearches', 'saveGlobalLibrarySavedSearch', 'deleteGlobalLibrarySavedSearch',
     'getGlobalLibraryViewPreferences', 'setGlobalLibraryViewPreferences',
+    'getGlobalLibrarySettings', 'setGlobalLibrarySettings',
     'listZoteroSyncSessions', 'resumeZoteroLibraryImport',
     'startGlobalLibraryMetadataBatch', 'applyGlobalLibraryMetadataBatch', 'cancelGlobalLibraryMetadataBatch',
     'updateGlobalLibraryCitationKey', 'formatGlobalLibraryCitation', 'exportGlobalLibraryBibliography',
@@ -396,6 +406,7 @@ test('the typed bridge covers every global management operation', async () => {
     'library:cancelMigration', 'library:rollbackMigration', 'library:migrationSessions',
     'library:savedSearches', 'library:saveSavedSearch', 'library:deleteSavedSearch',
     'library:viewPreferences', 'library:setViewPreferences',
+    'library:settings', 'library:setSettings',
     'library:zoteroSyncSessions', 'library:resumeZoteroImport',
     'library:startMetadataBatch', 'library:applyMetadataBatch', 'library:cancelMetadataBatch',
     'library:updateCitationKey', 'library:formatCitation', 'library:exportBibliography',
