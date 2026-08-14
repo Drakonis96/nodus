@@ -34,21 +34,27 @@ function useAtRest(
 ): boolean {
   const mayRest = QUIESCENT.has(state) || restAfterMs !== undefined;
   const settled = mayRest && !raiseArm && !hovered;
-  const [atRest, setAtRest] = useState(false);
+  const delay = reduceMotion ? 0 : restAfterMs ?? REST_DELAY_MS;
+  // A zero allowance is used by startup surfaces: begin paused in the very first
+  // render instead of starting every filtered SVG animation and stopping it from an
+  // effect one frame later. That first animated paint is the expensive one.
+  const [atRest, setAtRest] = useState(() => settled && delay <= 0);
   useEffect(() => {
     if (!settled) {
       setAtRest(false);
+      return;
+    }
+    if (delay <= 0) {
+      setAtRest(true);
       return;
     }
     // A bounded active state starts its allowance again whenever the state changes.
     // This lets an update visibly move from checking to downloading, for example,
     // without leaving a costly SVG repaint running for the lifetime of the modal.
     setAtRest(false);
-    // Someone who asked for less motion gets the still pose immediately.
-    const delay = reduceMotion ? 0 : restAfterMs ?? REST_DELAY_MS;
     const timer = window.setTimeout(() => setAtRest(true), Math.max(0, delay));
     return () => window.clearTimeout(timer);
-  }, [state, settled, reduceMotion, restAfterMs]);
+  }, [state, settled, delay]);
   return atRest;
 }
 
@@ -62,12 +68,14 @@ function useAtRest(
  */
 function NodiAvatarComponent({
   settings,
+  activeVaultType,
   state = 'idle',
   role = 'none',
   height = 200,
   draggable = false,
   raiseArm = false,
   restAfterMs,
+  lightweight = false,
   className,
   style,
 }: {
@@ -77,6 +85,11 @@ function NodiAvatarComponent({
    * always-on-top overlay window must, living outside that tree — to self-subscribe.
    */
   settings?: AppSettings | null;
+  /**
+   * The active vault type when the caller already has it. Pass null when no vault is
+   * active; omit only in a standalone surface that must subscribe for itself.
+   */
+  activeVaultType?: VaultType | null;
   state?: NodiState;
   role?: NodiRole;
   height?: number;
@@ -84,6 +97,8 @@ function NodiAvatarComponent({
   raiseArm?: boolean;
   /** Pause all internal SVG motion after this many milliseconds, even in an active state. */
   restAfterMs?: number;
+  /** Skip the orb's costly procedural clouds and celebration particles. */
+  lightweight?: boolean;
   className?: string;
   style?: CSSProperties;
 }) {
@@ -96,19 +111,25 @@ function NodiAvatarComponent({
   }, [selfFetch]);
   const resolved = selfFetch ? fetched : settings;
 
-  // The orb's colour can follow the active vault, so it has to know which one is open
-  // even on surfaces that otherwise don't care.
-  const [vaultType, setVaultType] = useState<VaultType | null>(null);
+  // The orb's colour can follow the active vault. App-owned surfaces already know
+  // that vault, so only standalone surfaces need another IPC read and subscription.
+  const selfFetchVault = activeVaultType === undefined;
+  const [fetchedVaultType, setFetchedVaultType] = useState<VaultType | null>(null);
   useEffect(() => {
-    window.nodus.getActiveVault().then((vault) => setVaultType(vault?.type ?? null)).catch(() => {});
-    return window.nodus.onVaultChanged((vault) => setVaultType(vault?.type ?? null));
-  }, []);
+    if (!selfFetchVault || resolved?.mascotStyle !== 'orb') return;
+    window.nodus.getActiveVault().then((vault) => setFetchedVaultType(vault?.type ?? null)).catch(() => {});
+    return window.nodus.onVaultChanged((vault) => setFetchedVaultType(vault?.type ?? null));
+  }, [resolved?.mascotStyle, selfFetchVault]);
+  const resolvedVaultType = selfFetchVault ? fetchedVaultType : activeVaultType;
 
   const [hovered, setHovered] = useState(false);
   const atRest = useAtRest(state, raiseArm, hovered, resolved?.reduceMotion ?? false, restAfterMs);
   // Reaching for Nodi wakes it before the pointer arrives, so it is already moving
   // by the time it is grabbed rather than starting with a jolt.
-  const wake = {
+  // A zero animation allowance is a genuinely static rendering contract. Do not let
+  // an incidental pointer position during startup turn the costly repaint loop back
+  // on before the user has interacted with the modal itself.
+  const wake = restAfterMs === 0 ? {} : {
     onPointerEnter: () => setHovered(true),
     onPointerLeave: () => setHovered(false),
   };
@@ -122,10 +143,11 @@ function NodiAvatarComponent({
     return (
       <NodiOrb
         state={state}
-        hue={orbHue(resolved, vaultType)}
+        hue={orbHue(resolved, resolvedVaultType)}
         height={height}
         draggable={draggable}
         raiseArm={raiseArm}
+        lightweight={lightweight}
         className={classes}
         style={style}
         {...wake}

@@ -89,11 +89,22 @@ try {
 
   const whatsNew = page.getByTestId('whats-new-cinematic-modal');
   await whatsNew.waitFor();
+  const firstCommit = await whatsNew.evaluate((modal) => ({
+    avatarPresent: Boolean(modal.querySelector('svg.nodi-svg, svg.nodi-orb')),
+    atRest: Boolean(modal.querySelector('svg.nodi-at-rest')),
+  }));
+  assert.deepEqual(firstCommit, { avatarPresent: true, atRest: true }, "What's New must commit Nodi already rendered and paused");
   await assertAvatarPaused(whatsNew, 'celebrating', "What's New classic Nodi");
 
   // The same pause contract must cover the alternate, filter-heavy orb.
   await page.evaluate(() => window.nodus.updateSettings({ mascotStyle: 'orb' }));
   await whatsNew.locator('svg.nodi-orb.nodi-at-rest').waitFor();
+  const lightweightOrb = await whatsNew.locator('svg.nodi-orb').evaluate((svg) => ({
+    lightweight: svg.classList.contains('nodi-orb-lightweight'),
+    turbulenceFilters: svg.querySelectorAll('feTurbulence').length,
+    celebrationParticles: svg.querySelectorAll('.party').length,
+  }));
+  assert.deepEqual(lightweightOrb, { lightweight: true, turbulenceFilters: 0, celebrationParticles: 0 });
   await assertAvatarPaused(whatsNew, 'celebrating', "What's New orb Nodi");
   await page.screenshot({ path: path.join(shots, 'whats-new-paused.png') });
   await whatsNew.getByRole('button', { name: /Explorar las novedades/ }).click();

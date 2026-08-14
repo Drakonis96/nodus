@@ -6,8 +6,9 @@ import { fileURLToPath } from 'node:url';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const read = (file) => readFile(path.join(root, file), 'utf8');
-const [avatar, classicCss, orbCss, whatsNew, startupUpdate, app, styles, main] = await Promise.all([
+const [avatar, orb, classicCss, orbCss, whatsNew, startupUpdate, app, styles, main] = await Promise.all([
   read('src/components/nodi/NodiAvatar.tsx'),
+  read('src/components/nodi/NodiOrb.tsx'),
   read('src/components/nodi/nodi.css'),
   read('src/components/nodi/nodiOrb.css'),
   read('src/components/WhatsNewModal.tsx'),
@@ -20,12 +21,20 @@ const [avatar, classicCss, orbCss, whatsNew, startupUpdate, app, styles, main] =
 test('cinematic modals bound the expensive Nodi SVG animation', () => {
   assert.match(avatar, /restAfterMs\?: number/);
   assert.match(avatar, /QUIESCENT\.has\(state\) \|\| restAfterMs !== undefined/);
-  assert.match(avatar, /\[state, settled, reduceMotion, restAfterMs\]/);
+  assert.match(avatar, /useState\(\(\) => settled && delay <= 0\)/);
+  assert.match(avatar, /if \(delay <= 0\) \{\s*setAtRest\(true\)/);
+  assert.match(avatar, /\[state, settled, delay\]/);
   assert.match(avatar, /export const NodiAvatar = memo\(NodiAvatarComponent\)/);
   assert.match(whatsNew, /const WhatsNewNodi = memo/);
-  assert.match(whatsNew, /<NodiAvatar state="celebrating" height=\{205\} restAfterMs=\{1_200\} \/>/);
+  assert.match(whatsNew, /<NodiAvatar[\s\S]*settings=\{settings\}[\s\S]*activeVaultType=\{activeVaultType\}[\s\S]*state="celebrating"[\s\S]*restAfterMs=\{0\}/);
   assert.match(startupUpdate, /const StartupUpdateNodi = memo/);
-  assert.match(startupUpdate, /<NodiAvatar state=\{state\} height=\{162\} restAfterMs=\{1_200\} \/>/);
+  assert.match(startupUpdate, /<NodiAvatar[\s\S]*settings=\{settings\}[\s\S]*activeVaultType=\{activeVaultType\}[\s\S]*state=\{state\}[\s\S]*restAfterMs=\{0\}/);
+  assert.match(whatsNew, /restAfterMs=\{0\}[\s\S]*lightweight/);
+  assert.match(startupUpdate, /restAfterMs=\{0\}[\s\S]*lightweight/);
+  assert.match(orb, /!lightweight && \([\s\S]*feTurbulence/);
+  assert.match(orb, /!lightweight && <g className="fx fx-celebrating">/);
+  assert.match(app, /<WhatsNewModal[\s\S]*settings=\{settings\}[\s\S]*activeVaultType=\{activeVault\?\.type \?\? null\}/);
+  assert.match(app, /<StartupUpdateModal[\s\S]*settings=\{settings\}[\s\S]*activeVaultType=\{activeVault\?\.type \?\? null\}/);
   assert.match(classicCss, /\.nodi-svg\.nodi-at-rest \* \{ animation-play-state: paused !important; \}/);
   assert.match(orbCss, /\.nodi-orb\.nodi-at-rest \* \{ animation-play-state: paused !important; \}/);
 });
@@ -43,7 +52,7 @@ test('cinematic decoration finishes instead of repainting forever', () => {
 test('closing the update modal removes its listener and progress is throttled', () => {
   assert.match(startupUpdate, /if \(!shouldShow \|\| !open\) return;/);
   assert.match(startupUpdate, /\[attempt, open, shouldShow\]/);
-  assert.match(app, /!manualWhatsNewOpen && !updateSettled && <StartupUpdateModal/);
+  assert.match(app, /!manualWhatsNewOpen && !updateSettled && \(\s*<StartupUpdateModal/);
   assert.match(main, /const UPDATE_PROGRESS_MIN_INTERVAL_MS = 500;/);
   assert.match(main, /roundedPercent === lastDownloadProgressPercent/);
   assert.match(main, /now - lastDownloadProgressEmitAt < UPDATE_PROGRESS_MIN_INTERVAL_MS/);

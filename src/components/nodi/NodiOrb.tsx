@@ -153,6 +153,7 @@ export function NodiOrb({
   height = 200,
   draggable = false,
   raiseArm = false,
+  lightweight = false,
   className,
   style,
   onPointerEnter,
@@ -165,6 +166,12 @@ export function NodiOrb({
   draggable?: boolean;
   /** Flag an unread notification — the orb's equivalent of the classic Nodi's raised arm. */
   raiseArm?: boolean;
+  /**
+   * Omit the procedural cloud filters and particle burst for small startup cameos.
+   * The sphere, stars, constellation, core and rings remain, so it keeps its identity
+   * without making the first frame wait for Chromium to rasterise feTurbulence.
+   */
+  lightweight?: boolean;
   className?: string;
   style?: CSSProperties;
   onPointerEnter?: PointerEventHandler<SVGSVGElement>;
@@ -186,7 +193,7 @@ export function NodiOrb({
 
   return (
     <svg
-      className={['nodi-orb', draggable ? 'nodi-draggable' : '', raiseArm ? 'arm-up' : '', className].filter(Boolean).join(' ')}
+      className={['nodi-orb', lightweight ? 'nodi-orb-lightweight' : '', draggable ? 'nodi-draggable' : '', raiseArm ? 'arm-up' : '', className].filter(Boolean).join(' ')}
       style={{ height, ['--nodi-hue' as string]: `${resolvedHue}deg`, ...style }}
       viewBox="0 0 320 340"
       role="img"
@@ -200,13 +207,16 @@ export function NodiOrb({
         <filter id={u('b2')} x="-80%" y="-80%" width="260%" height="260%"><feGaussianBlur stdDeviation="2.2" /></filter>
         <filter id={u('b4')} x="-100%" y="-100%" width="300%" height="300%"><feGaussianBlur stdDeviation="4" /></filter>
         <filter id={u('b6')} x="-120%" y="-120%" width="340%" height="340%"><feGaussianBlur stdDeviation="6" /></filter>
-        <filter id={u('b10')} x="-150%" y="-150%" width="400%" height="400%"><feGaussianBlur stdDeviation="10" /></filter>
-        <filter id={u('b14')} x="-160%" y="-160%" width="420%" height="420%"><feGaussianBlur stdDeviation="14" /></filter>
-
-        <filter id={u('clouds')} x="-20%" y="-20%" width="140%" height="140%">
-          <feTurbulence type="fractalNoise" baseFrequency="0.028" numOctaves="4" seed="11" result="n" />
-          <feColorMatrix in="n" type="matrix" values={cloudTintMatrix(resolvedHue)} />
-        </filter>
+        {!lightweight && (
+          <>
+            <filter id={u('b10')} x="-150%" y="-150%" width="400%" height="400%"><feGaussianBlur stdDeviation="10" /></filter>
+            <filter id={u('b14')} x="-160%" y="-160%" width="420%" height="420%"><feGaussianBlur stdDeviation="14" /></filter>
+            <filter id={u('clouds')} x="-20%" y="-20%" width="140%" height="140%">
+              <feTurbulence type="fractalNoise" baseFrequency="0.028" numOctaves="4" seed="11" result="n" />
+              <feColorMatrix in="n" type="matrix" values={cloudTintMatrix(resolvedHue)} />
+            </filter>
+          </>
+        )}
 
         <radialGradient id={u('deepSpace')} cx="42%" cy="36%" r="85%">
           <stop offset="0%" className="st-deep1" />
@@ -336,16 +346,19 @@ export function NodiOrb({
           <circle cx="160" cy="160" r="79" fill={ref('deepSpace')} />
 
           <g clipPath={ref('sphereClip')}>
-            <circle className="add" cx="160" cy="160" r="79" filter={ref('clouds')} opacity=".5" />
-
-            <g className="neb-spin">
-              <ellipse className="neb-arm1 add" cx="160" cy="160" rx="52" ry="20" fill="none" strokeWidth="16" transform="rotate(28 160 160)" filter={ref('b10')} opacity=".6" />
-              <ellipse className="neb-arm1b add" cx="164" cy="156" rx="60" ry="13" fill="none" strokeWidth="9" transform="rotate(6 160 160)" filter={ref('b10')} opacity=".38" />
-            </g>
-            <g className="neb-spin2">
-              <ellipse className="neb-arm2 add" cx="156" cy="164" rx="42" ry="26" fill="none" strokeWidth="13" transform="rotate(-22 160 160)" filter={ref('b14')} opacity=".42" />
-              <circle className="neb-cloud add" cx="150" cy="150" r="30" filter={ref('b14')} opacity=".5" />
-            </g>
+            {!lightweight && (
+              <>
+                <circle className="add" cx="160" cy="160" r="79" filter={ref('clouds')} opacity=".5" />
+                <g className="neb-spin">
+                  <ellipse className="neb-arm1 add" cx="160" cy="160" rx="52" ry="20" fill="none" strokeWidth="16" transform="rotate(28 160 160)" filter={ref('b10')} opacity=".6" />
+                  <ellipse className="neb-arm1b add" cx="164" cy="156" rx="60" ry="13" fill="none" strokeWidth="9" transform="rotate(6 160 160)" filter={ref('b10')} opacity=".38" />
+                </g>
+                <g className="neb-spin2">
+                  <ellipse className="neb-arm2 add" cx="156" cy="164" rx="42" ry="26" fill="none" strokeWidth="13" transform="rotate(-22 160 160)" filter={ref('b14')} opacity=".42" />
+                  <circle className="neb-cloud add" cx="150" cy="150" r="30" filter={ref('b14')} opacity=".5" />
+                </g>
+              </>
+            )}
 
             <g>
               {starfield.map((s, i) => (
@@ -490,7 +503,7 @@ export function NodiOrb({
           <g transform="translate(160,64) scale(.8)"><use href={`#${u('star4')}`} className="noti-star" /></g>
         </g>
 
-        <g className="fx fx-celebrating">
+        {!lightweight && <g className="fx fx-celebrating">
           {party.map((p, i) =>
             p.star ? (
               <g key={i} transform={`translate(160,160) scale(${p.scale.toFixed(2)})`}>
@@ -511,7 +524,7 @@ export function NodiOrb({
               />
             )
           )}
-        </g>
+        </g>}
 
         <g className="fx fx-sleeping">
           <path className="moon" d="M216,84 a13,13 0 1 0 10,21 a10.5,10.5 0 1 1 -10,-21 Z" filter={ref('b1')} />

@@ -1,7 +1,7 @@
 import { memo, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { releaseNotesForMajor, releaseNotesSince, type ReleaseNote, type ReleaseNoteScope } from '@shared/releaseNotes';
 import { NODUS_SOCIAL_LINKS } from '@shared/socialLinks';
-import type { AppLanguage, VaultType } from '@shared/types';
+import type { AppLanguage, AppSettings, VaultType } from '@shared/types';
 import { VAULT_TYPE_COLORS } from '@shared/vaultTypes';
 import { Icon } from './ui';
 import { t } from '../i18n';
@@ -235,8 +235,23 @@ const VersionPicker = memo(function VersionPicker({
   );
 });
 
-const WhatsNewNodi = memo(function WhatsNewNodi() {
-  return <NodiAvatar state="celebrating" height={205} restAfterMs={1_200} />;
+const WhatsNewNodi = memo(function WhatsNewNodi({
+  settings,
+  activeVaultType,
+}: {
+  settings: AppSettings;
+  activeVaultType: VaultType | null;
+}) {
+  return (
+    <NodiAvatar
+      settings={settings}
+      activeVaultType={activeVaultType}
+      state="celebrating"
+      height={205}
+      restAfterMs={0}
+      lightweight
+    />
+  );
 });
 
 export function hasPendingWhatsNew(): boolean {
@@ -246,10 +261,14 @@ export function hasPendingWhatsNew(): boolean {
 }
 
 export function WhatsNewModal({
+  settings,
+  activeVaultType,
   uiLanguage,
   onSettled,
   showSeenReleaseNotes = false,
 }: {
+  settings: AppSettings;
+  activeVaultType: VaultType | null;
   uiLanguage: AppLanguage;
   onSettled?: () => void;
   showSeenReleaseNotes?: boolean;
@@ -314,7 +333,7 @@ export function WhatsNewModal({
           </div>
           <div className="whats-new-nodi">
             <div className="whats-new-nodi-glow" />
-            <WhatsNewNodi />
+            <WhatsNewNodi settings={settings} activeVaultType={activeVaultType} />
             <span>{t('¡Tenemos novedades!')}</span>
           </div>
         </header>

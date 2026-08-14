@@ -90,7 +90,7 @@ test('the one-time modal is gated on the flag and behind the update check', asyn
   const app = await read('src/App.tsx');
   assert.match(app, /updateSettled &&[\s\S]{0,400}?!settings\.mascotStyleChosen &&[\s\S]{0,80}?<NodiStyleModal/);
   // It has to wait for the update modal rather than fight it for the foreground.
-  assert.match(app, /<StartupUpdateModal onSettled=\{\(\) => setUpdateSettled\(true\)\}/);
+  assert.match(app, /<StartupUpdateModal[\s\S]*settings=\{settings\}[\s\S]*onSettled=\{\(\) => setUpdateSettled\(true\)\}/);
   // Users still in the tutorial pick there instead.
   assert.match(app, /settings\.basicsTutorialVersion > 0 &&[\s\S]{0,200}?<NodiStyleModal/);
 });

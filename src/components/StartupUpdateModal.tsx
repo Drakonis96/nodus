@@ -1,5 +1,5 @@
 import { memo, useEffect, useMemo, useRef, useState } from 'react';
-import type { UpdateCheckResponse, UpdateCheckStatus, UpdateErrorCode } from '@shared/types';
+import type { AppSettings, UpdateCheckResponse, UpdateCheckStatus, UpdateErrorCode, VaultType } from '@shared/types';
 import { t } from '../i18n';
 import { Icon } from './ui';
 import { type NodiState } from './nodi/Nodi';
@@ -138,11 +138,36 @@ function sameVisibleUpdate(a: UpdateCheckResponse, b: UpdateCheckResponse): bool
     && progressA === progressB;
 }
 
-const StartupUpdateNodi = memo(function StartupUpdateNodi({ state }: { state: NodiState }) {
-  return <NodiAvatar state={state} height={162} restAfterMs={1_200} />;
+const StartupUpdateNodi = memo(function StartupUpdateNodi({
+  settings,
+  activeVaultType,
+  state,
+}: {
+  settings: AppSettings;
+  activeVaultType: VaultType | null;
+  state: NodiState;
+}) {
+  return (
+    <NodiAvatar
+      settings={settings}
+      activeVaultType={activeVaultType}
+      state={state}
+      height={162}
+      restAfterMs={0}
+      lightweight
+    />
+  );
 });
 
-export function StartupUpdateModal({ onSettled }: { onSettled?: () => void } = {}) {
+export function StartupUpdateModal({
+  settings,
+  activeVaultType,
+  onSettled,
+}: {
+  settings: AppSettings;
+  activeVaultType: VaultType | null;
+  onSettled?: () => void;
+}) {
   const [shouldShow] = useState(shouldShowThisSession);
   const [open, setOpen] = useState(false);
   const [attempt, setAttempt] = useState(0);
@@ -273,7 +298,11 @@ export function StartupUpdateModal({ onSettled }: { onSettled?: () => void } = {
             <p>{t('Comprobamos automáticamente que tengas la versión más reciente y segura de Nodus.')}</p>
           </div>
           <div className="startup-update-nodi">
-            <StartupUpdateNodi state={presentation.nodiState} />
+            <StartupUpdateNodi
+              settings={settings}
+              activeVaultType={activeVaultType}
+              state={presentation.nodiState}
+            />
           </div>
         </header>
 
