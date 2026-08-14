@@ -617,10 +617,24 @@ function AuthorDossierDetail({
         {error && <p className="mt-2 text-sm text-red-400">{error}</p>}
       </section>
 
-      {/* 2. Searchable idea list */}
+      {/* 2. Works */}
+      {dossier.works.length > 0 && (
+        <section>
+          <h4 className="font-medium mb-2 flex items-center gap-2">
+            <Icon name="book" size={15} className="text-neutral-400" /> {t('Obras')}
+          </h4>
+          <div className="space-y-1">
+            {dossier.works.map((w) => (
+              <AuthorWorkRow key={w.nodus_id} work={w} onOpenIdeas={(work) => setIdeasWork(work)} />
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* 3. Searchable idea list */}
       <AuthorIdeasSection ideas={dossier.ideas} onOpenIdea={setSelectedIdeaId} />
 
-      {/* 3. Connected authors, strongest connection first */}
+      {/* 4. Connected authors, strongest connection first */}
       {connectedAuthors.length > 0 && (
         <section data-testid="author-connections">
           <h4 className="font-medium mb-2 flex items-center gap-2">
@@ -643,19 +657,6 @@ function AuthorDossierDetail({
         </section>
       )}
 
-      {/* Works */}
-      {dossier.works.length > 0 && (
-        <section>
-          <h4 className="font-medium mb-2 flex items-center gap-2">
-            <Icon name="book" size={15} className="text-neutral-400" /> {t('Obras')}
-          </h4>
-          <div className="space-y-1">
-            {dossier.works.map((w) => (
-              <AuthorWorkRow key={w.nodus_id} work={w} onOpenIdeas={(work) => setIdeasWork(work)} />
-            ))}
-          </div>
-        </section>
-      )}
       {worksOpen && (
         <AuthorWorksModal
           authorName={dossier.fullName || author.name}
