@@ -8,6 +8,7 @@ import { PROTECT_TRANSLATIONS } from './i18n.protect';
 import { AI_OCR_TRANSLATIONS } from './i18n.aiOcr';
 import { TOOLKIT_APPS_TRANSLATIONS } from './i18n.toolkitApps';
 import { SERVER_TRANSLATIONS } from './i18n.server';
+import { CLOUDFLARE_TRANSLATIONS } from './i18n.cloudflare';
 import { TRANSLATE_TRANSLATIONS } from './i18n.translate';
 import { WORLD_CHAT_TRANSLATIONS } from './i18n.worldChat';
 import { STUDY_SYNONYM_TRANSLATIONS } from './i18n.studySynonyms';
@@ -195,6 +196,7 @@ export const PT: Record<string, string> = {
   ...PROTECT_TRANSLATIONS.pt,
   ...TOOLKIT_APPS_TRANSLATIONS.pt,
   ...SERVER_TRANSLATIONS.pt,
+  ...CLOUDFLARE_TRANSLATIONS.pt,
   ...TRANSLATE_TRANSLATIONS.pt,
   'Traduce texto, documentos y adjuntos de Zotero con el modelo que elijas, incluido un modo PDF facsímil.': 'Traduza texto, documentos e anexos do Zotero com o modelo que escolher, incluindo um modo fac-símile de PDF.',
   'Traducir texto, documentos y adjuntos de Zotero con el modelo elegido, conservando la estructura de DOCX y EPUB y la apariencia de los PDF mediante un modo facsímil.': 'Traduzir texto, documentos e anexos do Zotero com o modelo escolhido, mantendo a estrutura de DOCX e EPUB e a aparência dos PDF através do modo fac-símile.',
