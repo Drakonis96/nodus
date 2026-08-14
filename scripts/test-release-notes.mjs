@@ -25,22 +25,27 @@ try {
 
   const { RELEASE_NOTES, releaseNotesForMajor, compareVersions } = await import(pathToFileURL(bundlePath).href);
   const currentRelease = RELEASE_NOTES[0];
-  assert.equal(currentRelease?.version, '4.1.0');
-  assert.equal(currentRelease?.date, '2026-08-13');
-  assert.equal(currentRelease?.highlights.length, 9);
+  assert.equal(currentRelease?.version, '4.1.1');
+  assert.equal(currentRelease?.date, '2026-08-14');
+  assert.equal(currentRelease?.highlights.length, 6);
   assert.deepEqual(currentRelease?.highlights.map((highlight) => highlight.scope), [
     'academic',
     'academic',
     'academic',
-    'academic',
     'general',
     'general',
     'general',
-    'plugin',
-    'toolkit',
   ]);
-  assert.ok(currentRelease?.highlights.some((highlight) => /hierarchical collections/.test(highlight.en)));
-  assert.ok(currentRelease?.highlights.some((highlight) => /Chrome Web Store/.test(highlight.en)));
+  // The two things a person can go and look at: a deployment they own, and a wiki they can read.
+  assert.ok(currentRelease?.highlights.some((highlight) => /Cloudflare account/.test(highlight.en)));
+  assert.ok(currentRelease?.highlights.some((highlight) => /complete wiki/.test(highlight.en)));
+
+  // 4.1.0 keeps the nine it shipped with. They are published history.
+  const libraryViewsRelease = RELEASE_NOTES.find((note) => note.version === '4.1.0');
+  assert.equal(libraryViewsRelease?.date, '2026-08-13');
+  assert.equal(libraryViewsRelease?.highlights.length, 9);
+  assert.ok(libraryViewsRelease?.highlights.some((highlight) => /hierarchical collections/.test(highlight.en)));
+  assert.ok(libraryViewsRelease?.highlights.some((highlight) => /Chrome Web Store/.test(highlight.en)));
 
   const connectorRelease = RELEASE_NOTES.find((note) => note.version === '4.0.1');
   assert.equal(connectorRelease?.date, '2026-08-12');

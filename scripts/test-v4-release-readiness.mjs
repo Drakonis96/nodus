@@ -38,7 +38,7 @@ try {
   assert.match(backup, /const supportedVersions = \[1, 2, 3, 4, 5, 6\]/, 'Nodus 4 still opens released 3.x backup formats');
   assert.match(backup, /if \(!descriptor\) return null/, 'a 3.x backup without a Global Library preserves the current local one');
 
-  assert.equal(pluginManifest.version, '4.1.0');
+  assert.equal(pluginManifest.version, '4.1.1');
   assert.match(readerPlugin, /X-Nodus-Zotero-Protocol": "4"/);
   assert.match(readerPlugin, /capabilities\.globalLibrary/, 'plugin v4 omits v4-only Library controls with desktop v3');
   assert.match(readerPlugin, /\/api\/z\/chat/, 'ordinary plugin chat remains available across protocol versions');
@@ -54,10 +54,10 @@ try {
     maxMutationBytes: 1024, maxMutationBatchBytes: 4096, maxMutationBatch: 12,
   });
 
-  assert.match(serverVersion, /export const NODUS_VERSION = '4\.1\.0'/);
+  assert.match(serverVersion, /export const NODUS_VERSION = '4\.1\.1'/);
   assert.match(serverVersion, /tree\/v\$\{NODUS_VERSION\}/);
-  assert.match(sourceOffer, /archive\/refs\/tags\/v4\.1\.0\.tar\.gz/);
-  assert.match(citation, /^date-released: "2026-08-13"$/m);
+  assert.match(sourceOffer, /archive\/refs\/tags\/v4\.1\.1\.tar\.gz/);
+  assert.match(citation, /^date-released: "2026-08-14"$/m);
   for (const phrase of ['pre-v4', '3.2.7', 'may not open', '50,000', '10,000']) {
     assert.match(`${guide}\n${acceptance}`, new RegExp(phrase.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i'), `release documentation is missing ${phrase}`);
   }

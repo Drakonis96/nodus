@@ -1,5 +1,38 @@
 # Changelog
 
+## 4.1.1 — 2026-08-14
+
+Nodus 4.1.1 adds a Cloudflare deployment owned entirely by the person who runs it, publishes the
+complete Nodus Wiki and vault manuals, and corrects Global Library file handling, Coverage question
+loading, the Contradictions graph and several editor and modal details.
+
+### Added
+
+- Direct user-owned Cloudflare deployment through the official Deploy to Cloudflare wizard, which
+  creates D1 and R2 in the owner's own account and publishes a free workers.dev address. Nodus
+  receives no Cloudflare credentials or permissions.
+- Global Library settings for attachment naming, with three author, year and title formats, per
+  file-type selection, name synchronisation and an automatic reading-preparation switch.
+- The complete Nodus Wiki and per-vault manuals on the website, with mobile navigation and
+  downloadable PDF manuals.
+
+### Changed
+
+- The Contradictions graph preset is routed through the bounded semantic atlas and preserves both
+  sides of every retained debate.
+- Coverage questions are processed through a serial queue, so several can be launched in a row.
+
+### Fixed
+
+- Saved Coverage questions are reloaded for the active vault, and destructive deletion of a question
+  or a Library note is confirmed first.
+- Internal protected-span markers no longer leak into text-improvement previews or document content,
+  and the synonyms action no longer keeps a persistent outline.
+- Nodi renders immediately in update-related modals, and idea type markers stay circular inside flex
+  layouts.
+- Nodus Server image publication installs workflow dependencies before the server tests and reruns
+  when dependency manifests change.
+
 ## 4.1.0 — 2026-08-13
 
 Nodus 4.1 aligns its research views, workspaces, server and mobile reader around the same
