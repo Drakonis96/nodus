@@ -1901,11 +1901,18 @@ export function App() {
         (!isTestimonios || settings.testimonyTourComplete) &&
         (!isEstudio || settings.studyTourComplete) &&
         (!isDocencia || settings.docenciaTourComplete) && (
-          <WhatsNewModal uiLanguage={settings.uiLanguage} onSettled={() => setWhatsNewSettled(true)} />
+          <WhatsNewModal
+            settings={settings}
+            activeVaultType={activeVault?.type ?? null}
+            uiLanguage={settings.uiLanguage}
+            onSettled={() => setWhatsNewSettled(true)}
+          />
         )}
 
       {!isPreviewVault && recoveryStatus?.needsSetup && recoveryStatus.previousInstallation && !whatsNewSettled && (
         <WhatsNewModal
+          settings={settings}
+          activeVaultType={activeVault?.type ?? null}
           uiLanguage={settings.uiLanguage}
           onSettled={() => setWhatsNewSettled(true)}
         />
@@ -1913,6 +1920,8 @@ export function App() {
 
       {manualWhatsNewOpen && (
         <WhatsNewModal
+          settings={settings}
+          activeVaultType={activeVault?.type ?? null}
           uiLanguage={settings.uiLanguage}
           showSeenReleaseNotes
           onSettled={() => setManualWhatsNewOpen(false)}
@@ -1950,7 +1959,13 @@ export function App() {
         />
       )}
 
-      {whatsNewSettled && mobileTeaserSettled && platformHighlightsSettled && toolkitBetaTourSettled && tutorialVideosSettled && !manualWhatsNewOpen && !updateSettled && <StartupUpdateModal onSettled={() => setUpdateSettled(true)} />}
+      {whatsNewSettled && mobileTeaserSettled && platformHighlightsSettled && toolkitBetaTourSettled && tutorialVideosSettled && !manualWhatsNewOpen && !updateSettled && (
+        <StartupUpdateModal
+          settings={settings}
+          activeVaultType={activeVault?.type ?? null}
+          onSettled={() => setUpdateSettled(true)}
+        />
+      )}
 
       {/* Users who already saw the cinematic tutorial were never offered the choice of
           Nodi, so it is made here instead — once, behind the update check. New users

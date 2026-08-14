@@ -48,7 +48,8 @@ test('the shared component owns every control visible in the main header', () =>
     'id="release-downloads"',
     'data-i18n="nav.demo"',
   ]) assert.ok(headerScript.includes(token), `shared header includes ${token}`);
-  assert.equal((headerScript.match(/return `<nav class="nav" id="site-header">/g) ?? []).length, 1);
+  assert.equal((headerScript.match(/return `<nav class="nav/g) ?? []).length, 1);
+  assert.match(headerScript, /class="nav\$\{isWiki \? ' wiki-nav' : ''\}" id="site-header"/);
 });
 
 test('desktop and mobile use the same fixed header dimensions on every page', () => {

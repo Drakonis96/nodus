@@ -332,7 +332,7 @@ test('the videos are announced once to installs that predate them', async () => 
   // modals never fight for the foreground.
   const order = ['<WhatsNewModal', '<PlatformHighlightsUpdateTour', '<ToolkitBetaUpdateTour', '<TutorialVideosUpdateTour', '<StartupUpdateModal'].map((tag) => app.indexOf(tag));
   assert.deepEqual(order, [...order].sort((a, b) => a - b), 'the videos announcement sits between the toolkit tour and the update check');
-  assert.match(app, /toolkitBetaTourSettled && tutorialVideosSettled && !manualWhatsNewOpen && !updateSettled && <StartupUpdateModal/);
+  assert.match(app, /toolkitBetaTourSettled && tutorialVideosSettled && !manualWhatsNewOpen && !updateSettled && \(\s*<StartupUpdateModal/);
 });
 
 test('the announcement speaks every interface language', async () => {

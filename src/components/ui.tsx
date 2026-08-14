@@ -364,7 +364,7 @@ export function Spinner({ label }: { label?: string }) {
 
 export function TypeDot({ type }: { type: GraphNodeType }) {
   const color = type === 'author' ? '#a3a3a3' : NODE_COLORS[type];
-  return <span className="inline-block w-2.5 h-2.5 rounded-full" style={{ backgroundColor: color }} />;
+  return <span className="inline-block h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: color }} />;
 }
 
 /**

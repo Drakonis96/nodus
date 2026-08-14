@@ -26,7 +26,7 @@ assert.ok(VAULT_TYPES.length >= 9, `expected the VaultType union to parse, got $
 
 assert.match(modal, /data-testid="whats-new-paypal-support"/);
 assert.match(modal, /data-testid="whats-new-cinematic-modal"/);
-assert.match(modal, /NodiAvatar state="celebrating"/);
+assert.match(modal, /<NodiAvatar[\s\S]*state="celebrating"/);
 assert.match(modal, /whats-new-confetti/);
 assert.doesNotMatch(modal, /from 'framer-motion'/);
 assert.match(styles, /@keyframes whats-new-modal-in/);
