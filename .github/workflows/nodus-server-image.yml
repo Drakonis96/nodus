@@ -65,7 +65,7 @@ jobs:
           scripts/test-server-vectors.mjs
 
       - name: Build smoke-test image
-        run: docker build --build-arg NODUS_VERSION=4.1.1 --build-arg NODUS_REVISION="$GITHUB_SHA" --tag nodus-server:ci ./server
+        run: docker build --build-arg NODUS_VERSION=4.1.2 --build-arg NODUS_REVISION="$GITHUB_SHA" --tag nodus-server:ci ./server
 
       - name: Run image health smoke test
         shell: bash
@@ -115,7 +115,7 @@ jobs:
             org.opencontainers.image.description=Experimental self-hosted Nodus MCP server
             org.opencontainers.image.source=https://github.com/Drakonis96/nodus
             org.opencontainers.image.licenses=AGPL-3.0-only
-            org.opencontainers.image.version=4.1.1
+            org.opencontainers.image.version=4.1.2
             org.opencontainers.image.revision=${{ github.sha }}
             app.nodus.stability=experimental
 

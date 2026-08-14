@@ -95,6 +95,12 @@ const RELEASE_3_2_4_TR: string[] = [
 ];
 
 export const RELEASE_NOTES_TR: Record<string, string[]> = {
+  "4.1.2": [
+    "Bir yazar dosyası birçok noktada iyileşiyor. Eserleri artık fikirlerinden önce görünüyor, birini ilk kez tanırken izlenen sırayla aynı. Bağlantılı yazarlar listesi en güçlü beş ilişkiyi gösteriyor ve tam listeyi ayrı bir pencerede açıyor, ayrıca artık açık modda doğru görünüyor. Dosyanın açtığı pencereler de artık başlık çubuğunun üzerinde renkli bir şerit bırakmıyor.",
+    "Her bölüm nerede bıraktığınızı hatırlıyor. Fikirler, Yazarlar, Genel Kitaplık, Argüman Haritası veya Çalışma Alanına döndüğünüzde filtreler, sıralama, etkin sekme ve bulunduğunuz satır geri yüklenir. Kasa değiştirmek başka bir kasanın hafızasını asla taşımaz.",
+    "Okuyucunun seçim şeridi artık açık moda uyum sağlıyor. Düğmeleri artık önceki koyu vurguyu korumuyor ve renk diskleri beyaz zemin üzerinde tekrar görünür bir kenarlığa kavuşuyor.",
+    "Cloudflare dağıtım sihirbazı artık sekiz arayüz dilinin tümünü konuşuyor. Projeyi kabul etmeden önce Nodus, hesabınızda tam olarak neyin oluşturulacağını ve hangi izinlerin verileceğini tamamen çevrilmiş biçimde gösteriyor.",
+  ],
   "4.1.1": [
     "Genel Kitaplık artık kendi seçenekler penceresine sahip. Eklediğiniz dosyaların nasıl adlandırılacağına karar verirsiniz: yazar, yıl ve başlıktan kurulan üç biçim ve bunun hangi dosya türlerine uygulanacağı. Okunabilir kopyanın otomatik hazırlanmasını da kapatabilirsiniz. Bir notu silmek artık onay ister.",
     "Kapsam, etkin kasayı açtığınızda kayıtlı sorularınızı geri getiriyor. Arka arkaya birkaç tane başlatabilirsiniz ve bunlar sırayla, biri bitince diğeri, çakışmadan işlenir. Bir soruyu silmek önce onay ister.",

@@ -155,6 +155,12 @@ const RELEASE_3_2_4_IT: string[] = [
 ];
 
 export const RELEASE_NOTES_IT: Record<string, string[]> = {
+  "4.1.2": [
+    "Il dossier di un autore migliora su più fronti. Le sue opere compaiono ora prima delle sue idee, come conviene quando si conosce qualcuno per la prima volta. L'elenco degli autori collegati mostra le cinque relazioni più forti e apre l'elenco completo in una propria finestra, e ora si vede correttamente in modalità chiara. Anche le finestre aperte dal dossier non lasciano più una fascia colorata sopra la barra del titolo.",
+    "Ogni sezione ricorda dove l'hai lasciata. Tornando a Idee, Autori, Biblioteca globale, Mappa degli argomenti o Spazio di lavoro, vengono ripristinati i filtri, l'ordine, la scheda attiva e la riga in cui ti trovavi. Cambiare vault non porta mai con sé il ricordo di un altro vault.",
+    "Il nastro di selezione del lettore ora si adatta alla modalità chiara. I suoi pulsanti non mantengono più l'evidenziazione scura precedente e i dischi colorati recuperano un bordo visibile su sfondo bianco.",
+    "La procedura guidata di distribuzione su Cloudflare parla ora tutte e otto le lingue dell'interfaccia. Prima di accettare il progetto, Nodus mostra esattamente cosa crea nel tuo account e quali permessi concede, tutto tradotto.",
+  ],
   "4.1.1": [
     "La Biblioteca globale ha ora una propria finestra di opzioni. Decidi come vengono nominati i file che aggiungi, con tre formati costruiti da autore, anno e titolo, e a quali tipi si applica. Puoi anche disattivare la preparazione automatica della copia leggibile. Eliminare una nota ora chiede conferma.",
     "Copertura recupera le tue domande salvate all'apertura del vault attivo. Puoi lanciarne diverse di seguito e vengono elaborate in ordine, una dopo l'altra, senza sovrapporsi. Eliminare una domanda chiede prima conferma.",

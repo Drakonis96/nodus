@@ -1,5 +1,32 @@
 # Changelog
 
+## 4.1.2 — 2026-08-15
+
+Nodus 4.1.2 orders the author dossier by works before ideas, fixes its modals and connections list,
+lets every section remember where you left it, and finishes translating the Cloudflare deployment
+flow into all eight interface languages.
+
+### Added
+
+- Every section that renders through the shared list registry (Ideas, Authors, the Global Library,
+  the Argument Map, the Library, and the Workspace) restores its filters, sort order, active tab and
+  scroll anchor when you return to it, scoped to the active vault.
+
+### Changed
+
+- The author dossier lists an author's works before their ideas.
+- The connected authors list on an author dossier shows the five strongest relations and opens the
+  full list in a separate modal.
+
+### Fixed
+
+- Modals opened from an author dossier render into `document.body` so a parent `space-y-*` stack can
+  no longer give their backdrop a stray top margin.
+- The connected authors list and the reader's text-selection ribbon now use the correct surface and
+  hover colours in light mode.
+- The Cloudflare deployment wizard is now fully translated in all eight interface languages instead
+  of English only.
+
 ## 4.1.1 — 2026-08-14
 
 Nodus 4.1.1 adds a Cloudflare deployment owned entirely by the person who runs it, publishes the

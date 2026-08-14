@@ -155,7 +155,7 @@ function repositoryStyleTitle(id: string): string {
 async function officialRepositoryIndex(): Promise<LibraryCitationStyleRepositoryEntry[]> {
   if (!repositoryIndexPromise) {
     repositoryIndexPromise = fetch(OFFICIAL_STYLES_TREE_URL, {
-      headers: { Accept: 'application/vnd.github+json', 'User-Agent': 'Nodus/4.1.1' },
+      headers: { Accept: 'application/vnd.github+json', 'User-Agent': 'Nodus/4.1.2' },
     }).then(async (response) => {
       if (!response.ok) throw new Error(`El repositorio oficial de CSL respondió ${response.status}.`);
       const payload = await response.json() as { tree?: Array<{ path?: string; type?: string }>; truncated?: boolean };
@@ -246,7 +246,7 @@ export async function installRepositoryCitationStyle(rawId: string): Promise<Lib
   const id = repositoryIdFromUrl(rawId) ?? rawId.trim().toLowerCase().replace(/\.csl$/i, '');
   if (!/^[a-z0-9][a-z0-9._-]{1,199}$/.test(id)) throw new Error('Introduce el identificador de un estilo del repositorio oficial de CSL.');
   const response = await fetch(`${OFFICIAL_STYLES_RAW_URL}/${encodeURIComponent(id)}.csl`, {
-    headers: { Accept: 'application/vnd.citationstyles.style+xml, application/xml;q=0.9', 'User-Agent': 'Nodus/4.1.1' },
+    headers: { Accept: 'application/vnd.citationstyles.style+xml, application/xml;q=0.9', 'User-Agent': 'Nodus/4.1.2' },
   });
   if (!response.ok) throw new Error(`El repositorio oficial de CSL respondió ${response.status}.`);
   const declaredLength = Number(response.headers.get('content-length') || 0);

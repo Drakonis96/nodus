@@ -25,20 +25,26 @@ try {
 
   const { RELEASE_NOTES, releaseNotesForMajor, compareVersions } = await import(pathToFileURL(bundlePath).href);
   const currentRelease = RELEASE_NOTES[0];
-  assert.equal(currentRelease?.version, '4.1.1');
-  assert.equal(currentRelease?.date, '2026-08-14');
-  assert.equal(currentRelease?.highlights.length, 6);
+  assert.equal(currentRelease?.version, '4.1.2');
+  assert.equal(currentRelease?.date, '2026-08-15');
+  assert.equal(currentRelease?.highlights.length, 4);
   assert.deepEqual(currentRelease?.highlights.map((highlight) => highlight.scope), [
-    'academic',
-    'academic',
     'academic',
     'general',
     'general',
     'general',
   ]);
+  // The dossier fix a person notices first, and the deployment wizard catching up in their language.
+  assert.ok(currentRelease?.highlights.some((highlight) => /before their ideas/.test(highlight.en)));
+  assert.ok(currentRelease?.highlights.some((highlight) => /eight interface languages/.test(highlight.en)));
+
+  // 4.1.1 keeps the six it shipped with. They are published history.
+  const cloudflareRelease = RELEASE_NOTES.find((note) => note.version === '4.1.1');
+  assert.equal(cloudflareRelease?.date, '2026-08-14');
+  assert.equal(cloudflareRelease?.highlights.length, 6);
   // The two things a person can go and look at: a deployment they own, and a wiki they can read.
-  assert.ok(currentRelease?.highlights.some((highlight) => /Cloudflare account/.test(highlight.en)));
-  assert.ok(currentRelease?.highlights.some((highlight) => /complete wiki/.test(highlight.en)));
+  assert.ok(cloudflareRelease?.highlights.some((highlight) => /Cloudflare account/.test(highlight.en)));
+  assert.ok(cloudflareRelease?.highlights.some((highlight) => /complete wiki/.test(highlight.en)));
 
   // 4.1.0 keeps the nine it shipped with. They are published history.
   const libraryViewsRelease = RELEASE_NOTES.find((note) => note.version === '4.1.0');

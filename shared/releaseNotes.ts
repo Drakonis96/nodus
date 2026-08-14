@@ -1081,6 +1081,50 @@ const RELEASE_3_2_4_HIGHLIGHTS: RawReleaseHighlight[] = [
 ];
 
 /**
+ * 4.1.2 — the author dossier gets read in a sensible order and stops flashing its own
+ * seams, every section remembers where you left it, and the Cloudflare wizard from 4.1.1
+ * catches up to the other seven interface languages.
+ */
+const RELEASE_4_1_2_HIGHLIGHTS: RawReleaseHighlight[] = [
+  {
+    scope: 'academic',
+    es: 'El dosier de un autor mejora en varios frentes. Sus obras aparecen ahora antes que sus ideas, como conviene al acercarse a alguien por primera vez. La lista de autores conectados muestra las cinco relaciones más fuertes y abre la lista completa en un modal aparte, y ya se ve bien en modo claro. Los modales que abre el dosier tampoco dejan una franja de color por encima de la barra de título.',
+    en: 'The author dossier improves on several fronts. Their works now appear before their ideas, the way you approach someone for the first time. The connected authors list shows the five strongest relations and opens the full list in its own modal, and it now reads correctly in light mode. The modals the dossier opens no longer leave a bright strip above the title bar.',
+    fr: 'Le dossier d’un auteur s’améliore sur plusieurs points. Ses œuvres apparaissent désormais avant ses idées, comme il convient en découvrant quelqu’un pour la première fois. La liste des auteurs connectés affiche les cinq relations les plus fortes et ouvre la liste complète dans une fenêtre à part, et elle s’affiche enfin correctement en mode clair. Les fenêtres ouvertes depuis le dossier ne laissent plus de bande colorée au-dessus de la barre de titre.',
+    de: 'Das Autorendossier verbessert sich an mehreren Stellen. Seine Werke erscheinen jetzt vor seinen Ideen, so wie man jemandem zum ersten Mal begegnet. Die Liste verbundener Autoren zeigt die fünf stärksten Beziehungen und öffnet die vollständige Liste in einem eigenen Fenster, und sie sieht im hellen Modus jetzt richtig aus. Die vom Dossier geöffneten Fenster lassen keinen farbigen Streifen mehr über der Titelleiste.',
+    pt: 'O dossiê de um autor melhora em várias frentes. As suas obras aparecem agora antes das suas ideias, como convém ao conhecer alguém pela primeira vez. A lista de autores ligados mostra as cinco relações mais fortes e abre a lista completa numa janela própria, e já se vê bem em modo claro. As janelas que o dossiê abre também deixam de ter uma faixa colorida acima da barra de título.',
+    'pt-BR': 'O dossiê de um autor melhora em várias frentes. As obras dele agora aparecem antes das ideias, como convém ao conhecer alguém pela primeira vez. A lista de autores conectados mostra as cinco relações mais fortes e abre a lista completa em uma janela própria, e agora aparece corretamente no modo claro. As janelas que o dossiê abre também deixam de ter uma faixa colorida acima da barra de título.',
+  },
+  {
+    scope: 'general',
+    es: 'Cada sección recuerda dónde la dejaste. Al volver a Ideas, Autores, Biblioteca global, Mapa de argumentos o Espacio de trabajo, se restauran los filtros, el orden, la pestaña activa y la fila donde estabas. Cambiar de bóveda no arrastra ese recuerdo de otra distinta.',
+    en: 'Every section remembers where you left it. Returning to Ideas, Authors, the Global Library, the Argument Map, or the Workspace restores your filters, sort order, active tab, and the row you were on. Switching vaults never carries over another vault’s memory.',
+    fr: 'Chaque section se souvient où vous l’avez laissée. En revenant sur Idées, Auteurs, la Bibliothèque globale, la Carte des arguments ou l’Espace de travail, les filtres, l’ordre, l’onglet actif et la ligne où vous étiez sont restaurés. Changer de coffre n’importe jamais le souvenir d’un autre coffre.',
+    de: 'Jeder Bereich merkt sich, wo Sie ihn verlassen haben. Bei der Rückkehr zu Ideen, Autoren, der globalen Bibliothek, der Argumentkarte oder dem Arbeitsbereich werden Filter, Sortierung, aktiver Reiter und die Zeile, bei der Sie waren, wiederhergestellt. Ein Tresorwechsel überträgt nie die Erinnerung eines anderen Tresors.',
+    pt: 'Cada secção recorda onde a deixou. Ao voltar a Ideias, Autores, Biblioteca global, Mapa de argumentos ou Espaço de trabalho, os filtros, a ordem, o separador ativo e a linha onde estava são repostos. Mudar de cofre nunca arrasta a memória de outro cofre.',
+    'pt-BR': 'Cada seção lembra onde você a deixou. Ao voltar para Ideias, Autores, Biblioteca global, Mapa de argumentos ou Espaço de trabalho, os filtros, a ordem, a aba ativa e a linha em que você estava são restaurados. Trocar de cofre nunca traz a memória de outro cofre.',
+  },
+  {
+    scope: 'general',
+    es: 'La cinta de selección del lector se adapta al modo claro. Sus botones ya no conservan el resaltado oscuro de antes y los discos de color recuperan un borde visible sobre fondo blanco.',
+    en: 'The reader’s selection ribbon now adapts to light mode. Its buttons no longer keep the previous dark highlight, and the colour discs regain a visible edge against a white bar.',
+    fr: 'Le ruban de sélection du lecteur s’adapte désormais au mode clair. Ses boutons ne gardent plus le surlignage sombre d’avant, et les disques de couleur retrouvent un contour visible sur fond blanc.',
+    de: 'Das Auswahlband des Readers passt sich jetzt dem hellen Modus an. Seine Schaltflächen behalten nicht mehr die vorherige dunkle Hervorhebung, und die Farbkreise erhalten wieder einen sichtbaren Rand auf weißem Grund.',
+    pt: 'A fita de seleção do leitor adapta-se agora ao modo claro. Os seus botões deixam de manter o realce escuro anterior e os discos de cor recuperam um contorno visível sobre fundo branco.',
+    'pt-BR': 'A faixa de seleção do leitor agora se adapta ao modo claro. Os botões deixam de manter o realce escuro anterior e os discos de cor recuperam um contorno visível sobre fundo branco.',
+  },
+  {
+    scope: 'general',
+    es: 'El asistente de despliegue en Cloudflare habla ahora tus ocho idiomas. Antes de aceptar el proyecto, Nodus muestra qué crea exactamente en tu cuenta y qué permisos concede, todo traducido.',
+    en: 'The Cloudflare deployment wizard now speaks all eight interface languages. Before you accept the project, Nodus shows exactly what it creates in your account and what permissions it grants, fully translated.',
+    fr: 'L’assistant de déploiement Cloudflare parle désormais vos huit langues. Avant d’accepter le projet, Nodus affiche exactement ce qu’il crée dans votre compte et les autorisations accordées, entièrement traduit.',
+    de: 'Der Cloudflare-Bereitstellungsassistent spricht jetzt alle acht Oberflächensprachen. Bevor Sie das Projekt annehmen, zeigt Nodus genau, was in Ihrem Konto erstellt wird und welche Berechtigungen erteilt werden, vollständig übersetzt.',
+    pt: 'O assistente de implementação na Cloudflare fala agora os seus oito idiomas. Antes de aceitar o projeto, o Nodus mostra exatamente o que cria na sua conta e que permissões concede, tudo traduzido.',
+    'pt-BR': 'O assistente de implantação na Cloudflare agora fala seus oito idiomas. Antes de aceitar o projeto, o Nodus mostra exatamente o que cria na sua conta e quais permissões concede, tudo traduzido.',
+  },
+];
+
+/**
  * 4.1.1 — the patch that follows 4.1, written for someone who never saw the pull requests.
  *
  * Three corrections inside a vault, then three things that appear outside it: your own
@@ -1325,6 +1369,11 @@ const RELEASE_4_0_0_HIGHLIGHTS: RawReleaseHighlight[] = [
 ];
 
 const RAW_RELEASE_NOTES: RawReleaseNote[] = [
+  {
+    version: '4.1.2',
+    date: '2026-08-15',
+    highlights: RELEASE_4_1_2_HIGHLIGHTS,
+  },
   {
     version: '4.1.1',
     date: '2026-08-14',
