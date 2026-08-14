@@ -8,9 +8,10 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const read = (file) => readFile(path.join(root, file), 'utf8');
 
 test('study improvement is selection-first, streamed in place and committed to the editor history', async () => {
-  const [editor, dialog] = await Promise.all([
+  const [editor, dialog, stylesheet] = await Promise.all([
     read('src/components/editor/StudyEditor.tsx'),
     read('src/components/editor/StudyImproveDialog.tsx'),
+    read('src/index.css'),
   ]);
   assert.match(editor, /data-testid="study-improve-toggle"/);
   assert.match(editor, /resolveImproveSelection/);
@@ -32,6 +33,7 @@ test('study improvement is selection-first, streamed in place and committed to t
   assert.match(editor, /data-testid="study-editor-redo"/);
   assert.match(editor, /data-testid="study-synonyms-toggle"/);
   assert.match(editor, /name="aiSynonyms"/);
+  assert.doesNotMatch(stylesheet, /\.study-milkdown \.milkdown-toolbar \.study-synonyms-trigger\s*\{[^}]*\b(?:border|background)\s*:/, 'the idle synonyms action must not have persistent framed styling');
   assert.match(editor, /studyStyleIcon/);
   assert.doesNotMatch(editor, /style\.icon\s*\|\|\s*['"]✦|fontSize:\s*size/);
   assert.match(editor, /data-testid="study-synonyms-panel"/);

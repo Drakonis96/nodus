@@ -273,11 +273,21 @@ export function protectStudyText(source: string, terms: string[] = []): StudyPro
 }
 
 export function missingProtectedSpans(text: string, spans: StudyProtectedSpan[]): StudyProtectedSpan[] {
-  return spans.filter((span) => !text.includes(span.placeholder));
+  const tolerantIndexes = new Set<number>();
+  for (const match of text.matchAll(PROTECTED_PLACEHOLDER_RE)) {
+    const index = Number(match[1]);
+    if (Number.isInteger(index) && index > 0) tolerantIndexes.add(index);
+  }
+  return spans.filter((span, index) => !text.includes(span.placeholder) && !tolerantIndexes.has(index + 1));
 }
 
-/** Matches any placeholder minted by `protectStudyText`. */
-const PROTECTED_PLACEHOLDER_RE = /⟦NODUS_PROTECTED_\d+⟧/gu;
+/**
+ * Matches placeholders minted by `protectStudyText` plus the harmless formatting
+ * variants that some models return (ASCII brackets, spaces, hyphens or changed
+ * casing). The optional index also catches a generic `[NODUS PROTECTED]` ghost
+ * so an internal implementation marker can never become document content.
+ */
+const PROTECTED_PLACEHOLDER_RE = /(?:⟦|\[)\s*NODUS[\s_-]+PROTECTED(?:[\s_-]*(\d+))?\s*(?:⟧|\])/giu;
 
 /**
  * Placeholder→value lookups, cached per span list.
@@ -311,7 +321,15 @@ export function restoreProtectedSpans(text: string, spans: StudyProtectedSpan[])
   // placeholder would have been substituted again. Here each match is
   // replaced exactly once and the result is never re-scanned.
   const byPlaceholder = placeholderLookup(spans);
-  return text.replace(PROTECTED_PLACEHOLDER_RE, (match) => byPlaceholder.get(match) ?? match);
+  return text.replace(PROTECTED_PLACEHOLDER_RE, (match, rawIndex: string | undefined) => {
+    const exact = byPlaceholder.get(match);
+    if (exact) return exact;
+    const index = Number(rawIndex);
+    if (Number.isInteger(index) && index > 0) return spans[index - 1]?.value ?? '';
+    // A marker without an index cannot be mapped safely. It is always an
+    // internal model artefact, never user-facing replacement text.
+    return '';
+  });
 }
 
 export function renderStudyStylePrompt(template: string, variables: StudyImproveVariables): string {

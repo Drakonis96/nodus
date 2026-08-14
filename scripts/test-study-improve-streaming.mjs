@@ -36,7 +36,7 @@ execFileSync(
 );
 
 const require = createRequire(import.meta.url);
-const { protectStudyText, restoreProtectedSpans } = require(bundle);
+const { missingProtectedSpans, protectStudyText, restoreProtectedSpans } = require(bundle);
 
 /** The original implementation, kept as the correctness oracle. */
 function restoreTheOldWay(text, spans) {
@@ -45,9 +45,13 @@ function restoreTheOldWay(text, spans) {
 
 /** `completeProtectedStreamPrefix` from electron/ai/studyImprove.ts. */
 function safePrefixLength(value) {
-  const lastOpen = value.lastIndexOf('⟦');
-  const lastClose = value.lastIndexOf('⟧');
-  return lastOpen > lastClose ? lastOpen : value.length;
+  const unicodeOpen = value.lastIndexOf('⟦');
+  const asciiOpen = value.lastIndexOf('[');
+  const incompleteOpen = Math.max(
+    unicodeOpen > value.lastIndexOf('⟧') ? unicodeOpen : -1,
+    asciiOpen > value.lastIndexOf(']') ? asciiOpen : -1,
+  );
+  return incompleteOpen >= 0 ? incompleteOpen : value.length;
 }
 
 /** A document with plenty of protectable material: citations, numbers, quotes, code. */
@@ -93,16 +97,19 @@ try {
     assert.equal(restoreProtectedSpans(text, spans), restoreTheOldWay(text, spans));
   }
 
-  // --- 3. An unknown placeholder is left alone, not deleted ----------------
-  // A model can hallucinate a marker that was never minted; dropping it would
-  // silently swallow text.
+  // --- 3. Model-formatted and ghost markers never leak into the document ---
   {
-    const { spans } = protectStudyText('Cita [Autor, 2001].', []);
-    const withGhost = 'Texto ⟦NODUS_PROTECTED_9999⟧ final.';
+    const source = 'Cita [Autor, 2001] y 42 casos.';
+    const { text, spans } = protectStudyText(source, []);
+    const formatted = text.replace(/⟦NODUS_PROTECTED_(\d+)⟧/g, '[NODUS PROTECTED $1]');
+    assert.equal(missingProtectedSpans(formatted, spans).length, 0, 'formatted indexed markers still count as present');
+    assert.equal(restoreProtectedSpans(formatted, spans), source, 'formatted indexed markers restore their original spans');
+
+    const withGhost = `${text}\n[NODUS PROTECTED] ⟦NODUS_PROTECTED_9999⟧`;
     assert.equal(
       restoreProtectedSpans(withGhost, spans),
-      withGhost,
-      'a placeholder with no matching span must be preserved verbatim'
+      `${source}\n `,
+      'generic and unknown internal markers are removed instead of becoming document content'
     );
   }
 
@@ -156,6 +163,24 @@ try {
     }
     visible += restoreProtectedSpans(text.slice(restoredUpTo), spans);
     assert.equal(visible, source, 'the split marker must still restore correctly');
+  }
+
+  {
+    const source = 'Antes [Autor, 1988] después.';
+    const { text, spans } = protectStudyText(source, []);
+    const formatted = text.replace(/⟦NODUS_PROTECTED_(\d+)⟧/g, '[NODUS PROTECTED $1]');
+    const splitAt = formatted.indexOf('[NODUS PROTECTED') + 8;
+    let restoredUpTo = 0;
+    let visible = '';
+    for (const streamed of [formatted.slice(0, splitAt), formatted]) {
+      const safeEnd = safePrefixLength(streamed);
+      if (safeEnd <= restoredUpTo) continue;
+      visible += restoreProtectedSpans(streamed.slice(restoredUpTo, safeEnd), spans);
+      restoredUpTo = safeEnd;
+    }
+    visible += restoreProtectedSpans(formatted.slice(restoredUpTo), spans);
+    assert.equal(visible, source, 'an ASCII marker split across chunks must restore without leaking internals');
+    assert.ok(!visible.includes('NODUS PROTECTED'));
   }
 
   // --- 6. The work is now linear, not quadratic ----------------------------
