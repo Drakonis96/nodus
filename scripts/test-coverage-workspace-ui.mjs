@@ -29,6 +29,26 @@ test('Debates remains routable but internal links switch the workspace tab', asy
   assert.doesNotMatch(navigation, /\{ id: 'debate',/);
 });
 
+test('Coverage reloads with the active vault and confirms destructive deletion', async () => {
+  const [workspace, map] = await Promise.all([
+    readSource('src/views/CoverageWorkspace.tsx'),
+    readSource('src/views/ResearchMapView.tsx'),
+  ]);
+  assert.match(workspace, /<ResearchMapView[\s\S]*vaultId=\{vaultId\}/);
+  assert.match(map, /const reloadList = useCallback\([\s\S]*\}, \[vaultId\]\)/);
+  assert.match(map, /const approved = await confirm\(/);
+  assert.match(map, /Se eliminará «\{title\}». Esta acción no se puede deshacer\./);
+  assert.match(map, /if \(!approved\) return/);
+});
+
+test('Coverage accepts several questions into a serial queue and reveals ready results', async () => {
+  const map = await readSource('src/views/ResearchMapView.tsx');
+  assert.match(map, /coverageQuestionQueue\.enqueue/);
+  assert.match(map, /data-testid="coverage-question-queue"/);
+  assert.match(map, /event\.type === 'ready'[\s\S]*reloadList\(\)/);
+  assert.match(map, /visibleQuestions = questions\.filter/);
+});
+
 test('the academic section name uses the native term in every supported language', async () => {
   const expected = [
     ['src/i18n.en.ts', 'State of the art'],

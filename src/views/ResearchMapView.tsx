@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type {
   ResearchQuestion,
   ResearchQuestionDetail,
@@ -7,15 +7,21 @@ import type {
   RqMapProgress,
   RqSubQuestion,
 } from '@shared/types';
+import { localizeRuntimeError } from '@shared/uiLanguage';
 import { Badge, Icon, Spinner } from '../components/ui';
+import { confirm } from '../components/feedback';
 import { SourceCitationModal, type CitationTarget } from '../components/SourceCitationModal';
+import {
+  coverageQuestionQueue,
+  type CoverageQuestionJob,
+} from '../coverageQuestionQueue';
 import { useDataRefresh } from '../hooks';
 import {
   ASSISTANT_CONTEXTS,
   type PendingAssistantNavigationTarget,
   type PendingGraphNavigationTarget,
 } from '../navigation';
-import { t, tx } from '../i18n';
+import { getActiveLang, t, tx } from '../i18n';
 
 type BadgeColor = 'green' | 'amber' | 'red' | 'indigo' | 'neutral' | 'cyan';
 const STATUS: Record<RqCoverageStatus, { label: string; color: BadgeColor; icon: string }> = {
@@ -31,18 +37,24 @@ interface SubDraft {
   rationale: string | null;
 }
 
-type Busy = 'create' | 'decompose' | 'map' | 'save' | null;
+type Busy = 'decompose' | 'map' | 'save' | null;
 
 export function ResearchMapView({
+  vaultId,
   onOpenGraph,
   onOpenAssistant,
   onOpenDebates,
 }: {
+  vaultId: string | null;
   onOpenGraph: (target: PendingGraphNavigationTarget) => void;
   onOpenAssistant: (target?: PendingAssistantNavigationTarget) => void;
   onOpenDebates: () => void;
 }) {
   const [questions, setQuestions] = useState<ResearchQuestion[]>([]);
+  const [questionsLoading, setQuestionsLoading] = useState(true);
+  const [queuedQuestions, setQueuedQuestions] = useState<readonly CoverageQuestionJob[]>(() =>
+    coverageQuestionQueue.snapshot()
+  );
   const [detail, setDetail] = useState<ResearchQuestionDetail | null>(null);
   const [newQuestion, setNewQuestion] = useState('');
   const [newNotes, setNewNotes] = useState('');
@@ -51,20 +63,51 @@ export function ResearchMapView({
   const [progress, setProgress] = useState<RqMapProgress | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [citation, setCitation] = useState<CitationTarget>(null);
+  const listRequest = useRef(0);
 
-  const reloadList = useCallback(() => {
-    void window.nodus.listResearchQuestions().then(setQuestions);
-  }, []);
+  const reloadList = useCallback(async () => {
+    const request = ++listRequest.current;
+    if (!vaultId) {
+      setQuestions([]);
+      setQuestionsLoading(false);
+      return;
+    }
+    setQuestionsLoading(true);
+    try {
+      const next = await window.nodus.listResearchQuestions();
+      if (request === listRequest.current) setQuestions(next);
+    } catch (err) {
+      if (request === listRequest.current) setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      if (request === listRequest.current) setQuestionsLoading(false);
+    }
+  }, [vaultId]);
 
   useEffect(() => {
     reloadList();
   }, [reloadList]);
   useDataRefresh(reloadList);
 
+  useEffect(
+    () =>
+      coverageQuestionQueue.subscribe((jobs, event) => {
+        setQueuedQuestions(jobs);
+        if (event.type === 'ready' && event.vaultId === vaultId) void reloadList();
+      }),
+    [reloadList, vaultId]
+  );
+
   const syncDetail = useCallback((d: ResearchQuestionDetail | null) => {
     setDetail(d);
     setSubDraft(d ? d.subQuestions.map((s) => ({ id: s.id, text: s.text, rationale: s.rationale })) : []);
   }, []);
+
+  useEffect(() => {
+    syncDetail(null);
+    setError(null);
+    setNewQuestion('');
+    setNewNotes('');
+  }, [syncDetail, vaultId]);
 
   const openQuestion = useCallback(
     (id: string) => {
@@ -87,16 +130,13 @@ export function ResearchMapView({
     }
   }, []);
 
-  const createAndDecompose = () =>
-    run('create', async () => {
-      const created = await window.nodus.createResearchQuestion({ question: newQuestion.trim(), notes: newNotes.trim() || undefined });
-      setNewQuestion('');
-      setNewNotes('');
-      reloadList();
-      const decomposed = await window.nodus.decomposeResearchQuestion({ rqId: created.rq.id, model: null });
-      syncDetail(decomposed);
-      reloadList();
-    });
+  const enqueueQuestion = () => {
+    const question = newQuestion.trim();
+    if (!vaultId || !question) return;
+    coverageQuestionQueue.enqueue({ vaultId, question, notes: newNotes.trim() || undefined });
+    setNewQuestion('');
+    setNewNotes('');
+  };
 
   const redecompose = () =>
     detail &&
@@ -136,12 +176,20 @@ export function ResearchMapView({
       reloadList();
     });
 
-  const removeQuestion = (id: string) =>
-    run(null, async () => {
+  const removeQuestion = async (id: string, question: string) => {
+    const approved = await confirm({
+      title: t('Eliminar'),
+      message: tx('Se eliminará «{title}». Esta acción no se puede deshacer.', { title: question }),
+      confirmLabel: t('Eliminar'),
+      danger: true,
+    });
+    if (!approved) return;
+    void run(null, async () => {
       await window.nodus.deleteResearchQuestion(id);
       if (detail?.rq.id === id) syncDetail(null);
-      reloadList();
+      await reloadList();
     });
+  };
 
   const exportMap = () =>
     detail &&
@@ -162,6 +210,10 @@ export function ResearchMapView({
       return next;
     });
 
+  const queueForVault = queuedQuestions.filter((job) => job.vaultId === vaultId);
+  const inFlightIds = new Set(queueForVault.map((job) => job.rqId).filter((id): id is string => Boolean(id)));
+  const visibleQuestions = questions.filter((question) => !inFlightIds.has(question.id));
+
   return (
     <div data-testid="coverage-catalog" className="flex h-full min-h-0 bg-white dark:bg-neutral-950">
       <aside className="flex w-64 min-h-0 shrink-0 flex-col border-r border-neutral-200 dark:border-neutral-800">
@@ -171,8 +223,9 @@ export function ResearchMapView({
           </button>
         </div>
         <div className="flex-1 min-h-0 overflow-auto p-2 space-y-1">
-          {questions.length === 0 && <p className="text-xs text-neutral-500 p-2">{t('Aún no hay preguntas.')}</p>}
-          {questions.map((q) => (
+          {questionsLoading && <div className="p-2"><Spinner label={t('Cargando…')} /></div>}
+          {!questionsLoading && visibleQuestions.length === 0 && <p className="text-xs text-neutral-500 p-2">{t('Aún no hay preguntas.')}</p>}
+          {visibleQuestions.map((q) => (
             <button
               key={q.id}
               className={`w-full rounded-md p-2 text-left text-sm ${detail?.rq.id === q.id ? 'bg-indigo-50 text-indigo-700 dark:bg-neutral-800 dark:text-neutral-100' : 'hover:bg-neutral-100 dark:hover:bg-neutral-900'}`}
@@ -211,9 +264,35 @@ export function ResearchMapView({
               value={newNotes}
               onChange={(e) => setNewNotes(e.target.value)}
             />
-            <button className="btn btn-primary text-sm gap-1.5" onClick={createAndDecompose} disabled={!newQuestion.trim() || busy === 'create'}>
-              {busy === 'create' ? <Spinner label={t('Descomponiendo…')} /> : (<><Icon name="wand" size={14} /> {t('Crear y descomponer')}</>)}
+            <button className="btn btn-primary text-sm gap-1.5" onClick={enqueueQuestion} disabled={!vaultId || !newQuestion.trim()}>
+              <Icon name="layers" size={14} /> {t('Añadir a la cola')}
             </button>
+
+            {queueForVault.length > 0 && (
+              <div className="mt-4 space-y-2" data-testid="coverage-question-queue">
+                {queueForVault.map((job) => (
+                  <div key={job.id} className={`rounded-md border px-3 py-2 text-xs ${job.status === 'failed' ? 'border-red-300 bg-red-50 dark:border-red-900/60 dark:bg-red-950/30' : 'border-neutral-200 bg-neutral-50 dark:border-neutral-800 dark:bg-neutral-900/60'}`}>
+                    <div className="flex items-center gap-2">
+                      <Icon
+                        name={job.status === 'running' ? 'sync' : job.status === 'failed' ? 'alert' : 'clock'}
+                        size={12}
+                        className={job.status === 'running' ? 'animate-spin text-indigo-300' : job.status === 'failed' ? 'text-red-400' : 'text-neutral-500'}
+                      />
+                      <span className="min-w-0 flex-1 truncate text-neutral-700 dark:text-neutral-300" title={job.question}>{job.question}</span>
+                      <span className={job.status === 'failed' ? 'text-red-400' : 'text-neutral-500'}>
+                        {job.status === 'running' ? t('Descomponiendo…') : job.status === 'failed' ? t('Falló') : t('En cola')}
+                      </span>
+                      {job.status === 'failed' && (
+                        <button className="text-neutral-500 hover:text-neutral-300" onClick={() => coverageQuestionQueue.dismiss(job.id)} title={t('Quitar')}>
+                          <Icon name="x" size={12} />
+                        </button>
+                      )}
+                    </div>
+                    {job.error && <p className="mt-1 text-red-500/90 dark:text-red-400/80">{localizeRuntimeError(job.error, getActiveLang())}</p>}
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
 
@@ -222,7 +301,7 @@ export function ResearchMapView({
             <div className="card p-4 mb-4">
               <div className="flex items-start gap-3">
                 <p className="text-base font-medium flex-1">{detail.rq.question}</p>
-                <button className="btn btn-ghost text-xs" onClick={() => removeQuestion(detail.rq.id)} title={t('Borrar')}>
+                <button className="btn btn-ghost text-xs" onClick={() => void removeQuestion(detail.rq.id, detail.rq.question)} title={t('Borrar')}>
                   <Icon name="trash" size={14} />
                 </button>
               </div>

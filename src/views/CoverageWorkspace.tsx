@@ -101,6 +101,7 @@ export function CoverageWorkspace({
       >
         {tab === 'map' && (
           <ResearchMapView
+            vaultId={vaultId}
             onOpenGraph={onOpenGraph}
             onOpenAssistant={onOpenAssistant}
             onOpenDebates={openDebates}
