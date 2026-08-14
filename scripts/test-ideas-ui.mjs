@@ -15,6 +15,15 @@ test('Ideas opens as a library-style metadata catalogue', async () => {
   }
 });
 
+test('idea type markers stay circular beside long labels', async () => {
+  const ui = await readSource('src/components/ui.tsx');
+  assert.match(
+    ui,
+    /function TypeDot[\s\S]*className="[^"]*h-2\.5[^"]*w-2\.5[^"]*shrink-0[^"]*rounded-full"/,
+    'the flex row must not squeeze a type dot into an oval',
+  );
+});
+
 test('Ideas catalogue can be searched, filtered and sorted', async () => {
   const view = await readSource('src/views/IdeasView.tsx');
   assert.match(view, /data-testid="ideas-filters-toggle"/);
