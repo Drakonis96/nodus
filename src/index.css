@@ -411,6 +411,7 @@ body {
   background-color: rgba(255, 255, 255, 0.96);
 }
 .light .bg-neutral-900\/50,
+.light .bg-neutral-900\/45,
 .light .bg-neutral-900\/40 {
   background-color: rgba(250, 250, 250, 0.92);
 }
