@@ -4,6 +4,8 @@ on:
   push:
     branches: [main]
     paths:
+      - 'package.json'
+      - 'package-lock.json'
       - 'server/**'
       - 'scripts/test-nodus-server.mjs'
       - 'scripts/test-nodus-server-deployment.mjs'
@@ -43,6 +45,10 @@ jobs:
         uses: actions/setup-node@v7
         with:
           node-version: 22
+          cache: npm
+
+      - name: Install test dependencies
+        run: npm ci
 
       - name: Test server and deployment contract
         # Every suite that exercises the server, not just the two that predate the client

@@ -23,6 +23,9 @@ test('the main workflow tests then publishes amd64 and arm64 images', () => {
   const workflow = read('.github/workflows/nodus-server-image.yml');
   assert.doesNotMatch(read('.gitignore'), /^\.github\/$/m);
   assert.match(workflow, /branches:\s*\[main\]/);
+  assert.match(workflow, /- 'package\.json'/, 'server publishing reruns when its test dependencies change');
+  assert.match(workflow, /- 'package-lock\.json'/, 'server publishing reruns when the dependency lock changes');
+  assert.match(workflow, /Install test dependencies[\s\S]*?run:\s*npm ci[\s\S]*?Test server and deployment contract/, 'dependencies are installed before server tests');
   // Every server suite has to run before an image is published, not just the two that
   // predate the client API: an image that fails a role check or an asset rejection is
   // exactly what this job exists to stop.
