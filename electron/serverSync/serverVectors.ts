@@ -126,6 +126,40 @@ export function buildVectorSet(db: Database.Database, kind: VectorKind): { buffe
   return { buffer, summary: { kind, provider, model, dim, count, bytes: buffer.length } };
 }
 
+export interface VectorizeChunk {
+  provider: string;
+  model: string;
+  dimensions: number;
+  vectors: Array<{ id: string; values: number[] }>;
+}
+
+/**
+ * Stream the coherent float vectors in API-sized groups. Vectorize currently accepts at
+ * most 1,536 dimensions; larger embeddings keep using the exact R2 representation.
+ */
+export function *buildVectorizeChunks(db: Database.Database, kind: VectorKind, chunkSize = 250): Generator<VectorizeChunk> {
+  const source = SOURCES[kind];
+  const embedding = dominantEmbedding(db, source.table);
+  if (!embedding || embedding.count === 0 || embedding.dim <= 0 || embedding.dim > 1536) return;
+  const rows = db.prepare(
+    `SELECT "${source.id}" AS id, embedding FROM "${source.table}"
+      WHERE embedding IS NOT NULL AND embedding_provider = ? AND embedding_model = ? AND embedding_dim = ?
+      ORDER BY "${source.id}"`
+  ).iterate(embedding.provider, embedding.model, embedding.dim) as Iterable<{ id: string; embedding: Buffer }>;
+  let vectors: VectorizeChunk['vectors'] = [];
+  for (const entry of rows) {
+    if (!Buffer.isBuffer(entry.embedding) || entry.embedding.byteLength !== embedding.dim * 4) continue;
+    const values = Array.from(new Float32Array(entry.embedding.buffer, entry.embedding.byteOffset, embedding.dim));
+    if (!values.every(Number.isFinite)) continue;
+    vectors.push({ id: String(entry.id), values });
+    if (vectors.length >= chunkSize) {
+      yield { provider: embedding.provider, model: embedding.model, dimensions: embedding.dim, vectors };
+      vectors = [];
+    }
+  }
+  if (vectors.length) yield { provider: embedding.provider, model: embedding.model, dimensions: embedding.dim, vectors };
+}
+
 /**
  * A cheap fingerprint of what would be published.
  *

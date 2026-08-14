@@ -2,6 +2,7 @@
 // renderer surface stays flat and every call site is unchanged.
 import type { NodusLocalAiStatus } from '../localAiModels';
 import type { NodusLocalImageStatus } from '../localImageModels';
+import type { CloudflareCompleteDirectDeployInput, CloudflareDeployState, CloudflareDirectDeployPreparation, CloudflareVaultInventory } from '../cloudflare';
 // Declared in shared/types.ts itself; the resulting cycle is types-only and erased at build time.
 import type {
   AcademicHomeSnapshot,
@@ -71,6 +72,11 @@ export interface PlatformApi {
   setNodusServerLanguage(language: AppLanguage, vaultId?: string): Promise<NodusServerOverview>;
   syncNodusServerVaultNow(vaultId: string): Promise<NodusServerOverview>;
   disconnectNodusServerVault(vaultId: string): Promise<NodusServerOverview>;
+  previewCloudflareDeployment(activity?: Partial<CloudflareVaultInventory['activity']>): Promise<CloudflareDeployState>;
+  prepareCloudflareDirectDeployment(): Promise<CloudflareDirectDeployPreparation>;
+  completeCloudflareDirectDeployment(input: CloudflareCompleteDirectDeployInput): Promise<CloudflareDeployState>;
+  getCloudflareDeployState(): Promise<CloudflareDeployState>;
+  openCloudflareDeployment(url: string): Promise<void>;
   /**
    * What has arrived from other devices, newest first. PER VAULT: this reads the open
    * vault's own record, unlike the phone's outbox, which is deliberately global.

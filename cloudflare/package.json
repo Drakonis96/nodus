@@ -1,0 +1,29 @@
+{
+  "name": "@nodus/cloudflare-worker",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "license": "AGPL-3.0-only",
+  "scripts": {
+    "deploy": "npm run db:migrate && wrangler deploy",
+    "db:migrate": "wrangler d1 migrations apply DB --remote",
+    "dev": "wrangler dev"
+  },
+  "cloudflare": {
+    "bindings": {
+      "NODUS_BOOTSTRAP_SECRET_HASH": {
+        "description": "Pega el **código de configuración** mostrado por Nodus Desktop. Es un verificador de un solo uso y no permite acceder a tu cuenta de Cloudflare."
+      },
+      "DB": {
+        "description": "Base privada para los datos estructurados de tu vault. Puedes conservar el nombre propuesto."
+      },
+      "OBJECTS": {
+        "description": "Almacenamiento privado para archivos, snapshots y recuperación. Puedes conservar el nombre propuesto."
+      }
+    }
+  },
+  "engines": { "node": ">=20" },
+  "devDependencies": {
+    "wrangler": "^4.123.0"
+  }
+}

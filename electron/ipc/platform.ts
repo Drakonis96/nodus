@@ -47,6 +47,7 @@ import { getSyncLog } from '../db/syncRepo';
 import { scanQueue } from '../pipeline/scanQueue';
 import { getCorpusHealth } from '../db/corpusHealthRepo';
 import * as translationsRepo from '../db/translationsRepo';
+import { completeCloudflareDirectDeployment, getCloudflareDeployState, prepareCloudflareDirectDeployment, previewCloudflareDeployment } from '../cloudflare/deployment';
 
 function extensionForOriginalImage(mime: string): string {
   switch (mime.toLowerCase()) {
@@ -88,6 +89,15 @@ export function registerPlatformIpc({ h, getWindow }: IpcContext): void {
   h('nodusServer:setLanguage', async (_e, language: AppLanguage, vaultId?: string) => setNodusServerLanguage(language, vaultId));
   h('nodusServer:syncVaultNow', async (_e, vaultId: string) => syncNodusServerVaultNow(vaultId));
   h('nodusServer:disconnectVault', async (_e, vaultId: string) => disconnectNodusServerVault(vaultId));
+  h('cloudflare:preview', async (_e, activity) => previewCloudflareDeployment(activity));
+  h('cloudflare:prepare', async () => prepareCloudflareDirectDeployment());
+  h('cloudflare:complete', async (_e, input) => completeCloudflareDirectDeployment(input));
+  h('cloudflare:state', async () => getCloudflareDeployState());
+  h('cloudflare:openDeploy', async (_e, url: string) => {
+    const parsed = new URL(url);
+    if (parsed.protocol !== 'https:' || parsed.hostname !== 'deploy.workers.cloudflare.com') throw new Error('Nodus solo abre el despliegue oficial de Cloudflare.');
+    await shell.openExternal(parsed.toString());
+  });
   // The Inbox is per-vault: it reads the open vault's own server_inbox, so switching vaults
   // shows a different one. The mutators return the fresh list rather than making the caller
   // ask again, the same shape as nodi:notifications:markRead.

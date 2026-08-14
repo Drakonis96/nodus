@@ -530,6 +530,73 @@ export function clearNodusServerToken(): void {
   if (id) clearNodusServerTokenFor(id);
 }
 
+// ── Direct Cloudflare deployment ──────────────────────────────────────────
+// Nodus never receives a Cloudflare API/OAuth credential. During the official
+// Deploy to Cloudflare flow it creates one random bootstrap secret per vault,
+// stores the secret here, and asks the user to paste only its SHA-256 verifier
+// into Cloudflare. The secret is deleted as soon as the Worker is connected.
+const transientCloudflareBootstrapSecrets = new Map<string, string>();
+
+function cloudflareBootstrapSecretFile(vaultId: string): string | null {
+  const dir = vaultDir(vaultId);
+  return dir ? path.join(dir, 'cloudflare_bootstrap_secret.bin') : null;
+}
+
+export function setCloudflareBootstrapSecret(vaultId: string, value: string): void {
+  const clean = value.trim();
+  const file = cloudflareBootstrapSecretFile(vaultId);
+  if (!clean || !file) { clearCloudflareBootstrapSecret(vaultId); return; }
+  if (!safeStorage.isEncryptionAvailable()) {
+    transientCloudflareBootstrapSecrets.set(vaultId, clean);
+    if (fs.existsSync(file)) fs.unlinkSync(file);
+    return;
+  }
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  writeSecretAtomically(file, safeStorage.encryptString(clean));
+  transientCloudflareBootstrapSecrets.delete(vaultId);
+}
+
+export function getCloudflareBootstrapSecret(vaultId: string): string | null {
+  const transient = transientCloudflareBootstrapSecrets.get(vaultId);
+  if (transient !== undefined) return transient;
+  const file = cloudflareBootstrapSecretFile(vaultId);
+  if (!file) return null;
+  try { return readKeyFile(file); } catch { return null; }
+}
+
+export function clearCloudflareBootstrapSecret(vaultId: string): void {
+  transientCloudflareBootstrapSecrets.delete(vaultId);
+  const file = cloudflareBootstrapSecretFile(vaultId);
+  if (file && fs.existsSync(file)) fs.unlinkSync(file);
+}
+
+/** Remove credentials written by unreleased/legacy OAuth builds. */
+export function clearLegacyCloudflareAuthorization(): void {
+  const file = path.join(globalSecretsDir(), 'cloudflare_oauth.bin');
+  if (fs.existsSync(file)) fs.unlinkSync(file);
+}
+
+const transientCloudflareRecoveryKeys = new Map<string, string>();
+
+function cloudflareRecoveryKeyFile(vaultId: string): string | null {
+  const dir = vaultDir(vaultId);
+  return dir ? path.join(dir, 'cloudflare_recovery_key.bin') : null;
+}
+
+export function setCloudflareRecoveryKey(vaultId: string, value: string): void {
+  const clean = value.trim(); const file = cloudflareRecoveryKeyFile(vaultId);
+  if (!clean || !file) return;
+  if (!safeStorage.isEncryptionAvailable()) { transientCloudflareRecoveryKeys.set(vaultId, clean); if (fs.existsSync(file)) fs.unlinkSync(file); return; }
+  fs.mkdirSync(path.dirname(file), { recursive: true }); writeSecretAtomically(file, safeStorage.encryptString(clean));
+  transientCloudflareRecoveryKeys.delete(vaultId);
+}
+
+export function getCloudflareRecoveryKey(vaultId: string): string | null {
+  const transient = transientCloudflareRecoveryKeys.get(vaultId); if (transient) return transient;
+  const file = cloudflareRecoveryKeyFile(vaultId); if (!file) return null;
+  try { return readKeyFile(file); } catch { return null; }
+}
+
 export function setBackupRecoveryKey(recoveryKey: string): void {
   const clean = recoveryKey.trim();
   if (!clean) {

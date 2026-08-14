@@ -22,6 +22,8 @@ test('packaging generates and exposes the legal bundle', () => {
       // Nodus Server itself, so the basic mode can run it as a child process. Outside the asar
       // because it is executed as ESM from disk rather than read as an asset.
       ['server', 'nodus-server'],
+      // Reproducible Worker bundle, migrations, pricing catalogue and deployment metadata.
+      ['cloudflare/dist', 'nodus-cloudflare'],
     ],
   );
   // Whatever else that folder gains, the shipped copy must never carry a live deployment's state:
