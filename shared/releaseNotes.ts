@@ -1080,6 +1080,70 @@ const RELEASE_3_2_4_HIGHLIGHTS: RawReleaseHighlight[] = [
   },
 ];
 
+/**
+ * 4.1.1 — the patch that follows 4.1, written for someone who never saw the pull requests.
+ *
+ * Three corrections inside a vault, then three things that appear outside it: your own
+ * Cloudflare deployment, the website wiki, and the small editor and window details that
+ * 4.1 shipped with. Short sentences, no semicolons, no em dashes.
+ */
+const RELEASE_4_1_1_HIGHLIGHTS: RawReleaseHighlight[] = [
+  {
+    scope: 'academic',
+    es: 'La Biblioteca global estrena su propia ventana de opciones. Decides cómo se nombran los archivos que añades, con tres formatos a partir de autor, año y título, y a qué tipos se aplica. También puedes desactivar la preparación automática de la copia legible. Borrar una nota ahora pide confirmación.',
+    en: 'The Global Library gains its own settings window. You decide how added files are named, with three formats built from author, year and title, and which file types it applies to. You can also turn off the automatic preparation of the readable copy. Deleting a note now asks for confirmation.',
+    fr: 'La Bibliothèque globale reçoit sa propre fenêtre d’options. Vous décidez comment sont nommés les fichiers ajoutés, avec trois formats construits à partir de l’auteur, de l’année et du titre, et à quels types ils s’appliquent. Vous pouvez aussi désactiver la préparation automatique de la copie lisible. La suppression d’une note demande désormais confirmation.',
+    de: 'Die globale Bibliothek erhält ein eigenes Einstellungsfenster. Sie legen fest, wie hinzugefügte Dateien benannt werden, mit drei Formaten aus Autor, Jahr und Titel, und für welche Dateitypen das gilt. Auch die automatische Aufbereitung der lesbaren Kopie lässt sich abschalten. Das Löschen einer Notiz fragt jetzt nach.',
+    pt: 'A Biblioteca global passa a ter a sua própria janela de opções. Decide como são nomeados os ficheiros que adiciona, com três formatos a partir de autor, ano e título, e a que tipos se aplica. Também pode desativar a preparação automática da cópia legível. Apagar uma nota passa a pedir confirmação.',
+    'pt-BR': 'A Biblioteca global ganha sua própria janela de opções. Você decide como são nomeados os arquivos que adiciona, com três formatos a partir de autor, ano e título, e a quais tipos se aplica. Também pode desativar a preparação automática da cópia legível. Excluir uma nota agora pede confirmação.',
+  },
+  {
+    scope: 'academic',
+    es: 'Cobertura recupera tus preguntas guardadas al abrir el vault activo. Puedes lanzar varias seguidas y se procesan en orden, una detrás de otra, sin pisarse. Borrar una pregunta pide confirmación antes de hacerlo.',
+    en: 'Coverage brings back your saved questions when you open the active vault. You can launch several in a row and they are processed in order, one after another, without colliding. Deleting a question asks for confirmation first.',
+    fr: 'Couverture retrouve vos questions enregistrées à l’ouverture du coffre actif. Vous pouvez en lancer plusieurs de suite et elles sont traitées dans l’ordre, l’une après l’autre, sans se gêner. La suppression d’une question demande confirmation au préalable.',
+    de: 'Abdeckung holt Ihre gespeicherten Fragen zurück, wenn Sie den aktiven Tresor öffnen. Sie können mehrere hintereinander starten, und sie werden der Reihe nach abgearbeitet, ohne sich zu stören. Das Löschen einer Frage fragt vorher nach.',
+    pt: 'A Cobertura recupera as suas perguntas guardadas ao abrir o cofre ativo. Pode lançar várias seguidas e são processadas por ordem, uma a seguir à outra, sem se atropelarem. Apagar uma pergunta pede confirmação antes.',
+    'pt-BR': 'A Cobertura recupera suas perguntas salvas ao abrir o cofre ativo. Você pode lançar várias seguidas e elas são processadas em ordem, uma após a outra, sem se atropelar. Excluir uma pergunta pede confirmação antes.',
+  },
+  {
+    scope: 'academic',
+    es: 'Contradicciones se dibuja ahora en el atlas semántico, igual que el resto del grafo. La vista mantiene un tamaño acotado y conserva las dos partes de cada debate que muestra. Antes podía quedarse con un solo lado de la discusión.',
+    en: 'Contradictions is now drawn in the semantic atlas, like the rest of the graph. The view stays within a bounded size and keeps both sides of every debate it shows. Before, it could end up holding only one side of the argument.',
+    fr: 'Contradictions se dessine désormais dans l’atlas sémantique, comme le reste du graphe. La vue conserve une taille bornée et garde les deux côtés de chaque débat affiché. Auparavant, elle pouvait ne retenir qu’un seul côté de la discussion.',
+    de: 'Widersprüche wird jetzt im semantischen Atlas gezeichnet, wie der übrige Graph. Die Ansicht bleibt in ihrer Größe begrenzt und behält beide Seiten jeder gezeigten Debatte. Zuvor konnte nur eine Seite der Auseinandersetzung übrig bleiben.',
+    pt: 'As Contradições passam a desenhar-se no atlas semântico, como o resto do grafo. A vista mantém um tamanho limitado e conserva os dois lados de cada debate que mostra. Antes podia ficar apenas com um lado da discussão.',
+    'pt-BR': 'As Contradições agora são desenhadas no atlas semântico, como o resto do grafo. A visualização mantém um tamanho limitado e conserva os dois lados de cada debate que mostra. Antes podia ficar só com um lado da discussão.',
+  },
+  {
+    scope: 'general',
+    es: 'Se corrigen tres detalles del editor y de las ventanas. El botón de sinónimos ya no se queda con un contorno marcado después de usarlo. Las marcas internas que protegen citas y enlaces dejan de aparecer en las mejoras de texto y en el documento. Nodi se dibuja de inmediato en las ventanas de actualización y novedades, y los marcadores de tipo de idea vuelven a ser redondos.',
+    en: 'Three details of the editor and the windows are corrected. The synonyms button no longer keeps a marked outline after you use it. The internal marks that protect citations and links stop appearing in text improvements and in the document. Nodi is drawn immediately in the update and what’s-new windows, and idea type markers are round again.',
+    fr: 'Trois détails de l’éditeur et des fenêtres sont corrigés. Le bouton des synonymes ne conserve plus un contour marqué après usage. Les marques internes qui protègent citations et liens cessent d’apparaître dans les améliorations de texte et dans le document. Nodi se dessine immédiatement dans les fenêtres de mise à jour et de nouveautés, et les marqueurs de type d’idée redeviennent ronds.',
+    de: 'Drei Details des Editors und der Fenster sind korrigiert. Die Synonym-Schaltfläche behält nach der Nutzung keinen markierten Rahmen mehr. Die internen Marken, die Zitate und Links schützen, erscheinen nicht mehr in Textverbesserungen und im Dokument. Nodi wird in den Update- und Neuigkeitenfenstern sofort gezeichnet, und die Ideentyp-Markierungen sind wieder rund.',
+    pt: 'Corrigem-se três pormenores do editor e das janelas. O botão de sinónimos deixa de ficar com um contorno marcado depois de o usar. As marcas internas que protegem citações e ligações deixam de aparecer nas melhorias de texto e no documento. O Nodi é desenhado de imediato nas janelas de atualização e novidades, e os marcadores de tipo de ideia voltam a ser redondos.',
+    'pt-BR': 'Três detalhes do editor e das janelas foram corrigidos. O botão de sinônimos não fica mais com um contorno marcado depois de usado. As marcas internas que protegem citações e links deixam de aparecer nas melhorias de texto e no documento. O Nodi é desenhado de imediato nas janelas de atualização e novidades, e os marcadores de tipo de ideia voltam a ser redondos.',
+  },
+  {
+    scope: 'general',
+    es: 'Puedes montar tu propio Nodus Cloud en tu cuenta de Cloudflare. Desde Ajustes se abre el asistente oficial de Cloudflare, que crea la base de datos y el almacenamiento y publica una dirección gratuita. Nodus no recibe tus credenciales ni permisos sobre esa cuenta. El código desplegado es tuyo y se actualiza cuando tú quieras.',
+    en: 'You can run your own Nodus Cloud on your Cloudflare account. Settings opens the official Cloudflare wizard, which creates the database and the storage and publishes a free address. Nodus never receives your credentials or any permission over that account. The deployed code is yours and updates when you decide.',
+    fr: 'Vous pouvez héberger votre propre Nodus Cloud sur votre compte Cloudflare. Les Paramètres ouvrent l’assistant officiel de Cloudflare, qui crée la base de données et le stockage puis publie une adresse gratuite. Nodus ne reçoit jamais vos identifiants ni aucune autorisation sur ce compte. Le code déployé vous appartient et se met à jour quand vous le décidez.',
+    de: 'Sie können Ihr eigenes Nodus Cloud in Ihrem Cloudflare-Konto betreiben. Die Einstellungen öffnen den offiziellen Cloudflare-Assistenten, der Datenbank und Speicher anlegt und eine kostenlose Adresse veröffentlicht. Nodus erhält niemals Ihre Zugangsdaten oder Rechte an diesem Konto. Der bereitgestellte Code gehört Ihnen und wird aktualisiert, wenn Sie es möchten.',
+    pt: 'Pode montar o seu próprio Nodus Cloud na sua conta Cloudflare. As Definições abrem o assistente oficial da Cloudflare, que cria a base de dados e o armazenamento e publica um endereço gratuito. O Nodus nunca recebe as suas credenciais nem permissões sobre essa conta. O código publicado é seu e atualiza-se quando quiser.',
+    'pt-BR': 'Você pode montar o seu próprio Nodus Cloud na sua conta Cloudflare. As Configurações abrem o assistente oficial da Cloudflare, que cria o banco de dados e o armazenamento e publica um endereço gratuito. O Nodus nunca recebe suas credenciais nem permissões sobre essa conta. O código publicado é seu e se atualiza quando você quiser.',
+  },
+  {
+    scope: 'general',
+    es: 'La web de Nodus estrena una wiki completa con manuales por tipo de bóveda. Cada sección explica las pantallas con capturas reales y se puede leer desde el móvil. Los manuales también se descargan en PDF.',
+    en: 'The Nodus website gains a complete wiki with manuals for each vault type. Every section explains the screens with real captures and reads well on a phone. The manuals can also be downloaded as PDF.',
+    fr: 'Le site de Nodus inaugure un wiki complet avec des manuels par type de coffre. Chaque section explique les écrans avec de vraies captures et se lit depuis un téléphone. Les manuels se téléchargent aussi en PDF.',
+    de: 'Die Nodus-Website erhält ein vollständiges Wiki mit Handbüchern für jeden Tresortyp. Jeder Abschnitt erklärt die Bildschirme mit echten Aufnahmen und liest sich auch auf dem Telefon gut. Die Handbücher lassen sich zudem als PDF herunterladen.',
+    pt: 'O site do Nodus estreia uma wiki completa com manuais por tipo de cofre. Cada secção explica os ecrãs com capturas reais e lê-se a partir do telemóvel. Os manuais também podem ser descarregados em PDF.',
+    'pt-BR': 'O site do Nodus estreia uma wiki completa com manuais por tipo de cofre. Cada seção explica as telas com capturas reais e pode ser lida no celular. Os manuais também podem ser baixados em PDF.',
+  },
+];
+
 const RELEASE_4_1_0_HIGHLIGHTS: RawReleaseHighlight[] = [
   {
     scope: 'academic',
@@ -1261,6 +1325,11 @@ const RELEASE_4_0_0_HIGHLIGHTS: RawReleaseHighlight[] = [
 ];
 
 const RAW_RELEASE_NOTES: RawReleaseNote[] = [
+  {
+    version: '4.1.1',
+    date: '2026-08-14',
+    highlights: RELEASE_4_1_1_HIGHLIGHTS,
+  },
   {
     version: '4.1.0',
     date: '2026-08-13',

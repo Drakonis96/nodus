@@ -155,6 +155,14 @@ const RELEASE_3_2_4_IT: string[] = [
 ];
 
 export const RELEASE_NOTES_IT: Record<string, string[]> = {
+  "4.1.1": [
+    "La Biblioteca globale ha ora una propria finestra di opzioni. Decidi come vengono nominati i file che aggiungi, con tre formati costruiti da autore, anno e titolo, e a quali tipi si applica. Puoi anche disattivare la preparazione automatica della copia leggibile. Eliminare una nota ora chiede conferma.",
+    "Copertura recupera le tue domande salvate all'apertura del vault attivo. Puoi lanciarne diverse di seguito e vengono elaborate in ordine, una dopo l'altra, senza sovrapporsi. Eliminare una domanda chiede prima conferma.",
+    "Le Contraddizioni ora vengono disegnate nell'atlante semantico, come il resto del grafo. La vista mantiene una dimensione limitata e conserva entrambi i lati di ogni dibattito mostrato. Prima poteva restare con un solo lato della discussione.",
+    "Sono corretti tre dettagli dell'editor e delle finestre. Il pulsante dei sinonimi non resta più con un contorno marcato dopo l'uso. I segni interni che proteggono citazioni e collegamenti smettono di comparire nei miglioramenti del testo e nel documento. Nodi viene disegnato subito nelle finestre di aggiornamento e novità, e i marcatori del tipo di idea tornano rotondi.",
+    "Puoi ospitare il tuo Nodus Cloud sul tuo account Cloudflare. Le Impostazioni aprono l'assistente ufficiale di Cloudflare, che crea il database e l'archiviazione e pubblica un indirizzo gratuito. Nodus non riceve mai le tue credenziali né permessi su quell'account. Il codice pubblicato è tuo e si aggiorna quando lo decidi tu.",
+    "Il sito di Nodus inaugura una wiki completa con manuali per ogni tipo di vault. Ogni sezione spiega le schermate con immagini reali e si legge bene anche dal telefono. I manuali si possono anche scaricare in PDF.",
+  ],
   "4.1.0": [
     "Autori, Idee e Mappa degli argomenti adottano la vista Biblioteca. Gli elenchi riuniscono metadati, etichette e filtri, e ogni elemento apre una scheda ordinata con sintesi, relazioni e contenuto. Stato della ricerca riunisce Copertura, Dibattiti e Lacune nello stesso linguaggio visivo.",
     "Lo Spazio di lavoro ora si comporta come una biblioteca di note e idee in ogni vault. Puoi aggiungere etichette, filtrarle, selezionare più elementi, aprire le azioni con il tasto destro e recuperare il lavoro eliminato dal Cestino.",

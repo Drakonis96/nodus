@@ -95,6 +95,14 @@ const RELEASE_3_2_4_TR: string[] = [
 ];
 
 export const RELEASE_NOTES_TR: Record<string, string[]> = {
+  "4.1.1": [
+    "Genel Kitaplık artık kendi seçenekler penceresine sahip. Eklediğiniz dosyaların nasıl adlandırılacağına karar verirsiniz: yazar, yıl ve başlıktan kurulan üç biçim ve bunun hangi dosya türlerine uygulanacağı. Okunabilir kopyanın otomatik hazırlanmasını da kapatabilirsiniz. Bir notu silmek artık onay ister.",
+    "Kapsam, etkin kasayı açtığınızda kayıtlı sorularınızı geri getiriyor. Arka arkaya birkaç tane başlatabilirsiniz ve bunlar sırayla, biri bitince diğeri, çakışmadan işlenir. Bir soruyu silmek önce onay ister.",
+    "Çelişkiler artık grafiğin geri kalanı gibi anlamsal atlasta çiziliyor. Görünüm sınırlı bir boyutta kalıyor ve gösterdiği her tartışmanın iki tarafını da koruyor. Önceden tartışmanın yalnızca bir tarafı elde kalabiliyordu.",
+    "Düzenleyici ve pencerelerle ilgili üç ayrıntı düzeltildi. Eş anlamlılar düğmesi kullanıldıktan sonra artık belirgin bir çerçeveyle kalmıyor. Alıntıları ve bağlantıları koruyan iç işaretler, metin iyileştirmelerinde ve belgede görünmeyi bırakıyor. Nodi güncelleme ve yenilik pencerelerinde hemen çiziliyor ve fikir türü işaretleri yeniden yuvarlak.",
+    "Kendi Nodus Cloud kurulumunuzu kendi Cloudflare hesabınızda çalıştırabilirsiniz. Ayarlar, veritabanını ve depolamayı oluşturan ve ücretsiz bir adres yayımlayan resmî Cloudflare sihirbazını açar. Nodus kimlik bilgilerinizi ya da o hesap üzerinde herhangi bir yetkiyi asla almaz. Yayımlanan kod sizindir ve siz istediğinizde güncellenir.",
+    "Nodus sitesi, her kasa türü için el kitapları içeren eksiksiz bir wiki kazanıyor. Her bölüm ekranları gerçek görüntülerle anlatıyor ve telefondan da rahatça okunuyor. El kitapları ayrıca PDF olarak indirilebiliyor.",
+  ],
   "4.1.0": [
     "Yazarlar, Fikirler ve Argüman Haritası artık Kitaplık görünümünü kullanıyor. Listeler üst verileri, etiketleri ve filtreleri bir araya getiriyor, her öğe sentezi, ilişkileri ve içeriği düzenli bir sekmede açıyor. Araştırmanın Durumu da Kapsam, Tartışmalar ve Boşlukları aynı görsel dilde birleştiriyor.",
     "Çalışma alanı artık her kasada not ve fikirlerden oluşan bir kitaplık gibi davranıyor. Etiket ekleyebilir, etiketlere göre filtreleyebilir, birden fazla öğe seçebilir, sağ tıkla işlemleri açabilir ve silinen çalışmaları Çöp Kutusundan geri getirebilirsiniz.",
