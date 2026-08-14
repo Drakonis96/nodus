@@ -1763,8 +1763,8 @@ export function Settings({
               onClick={() => setServerMode('cloudflare')}
               className={`rounded-xl border p-3 text-left transition ${serverMode === 'cloudflare' ? 'border-sky-400 bg-sky-50 dark:border-sky-600 dark:bg-sky-950/30' : 'border-neutral-200 hover:border-neutral-300 dark:border-neutral-800 dark:hover:border-neutral-700'}`}
             >
-              <span className="flex items-center gap-2 text-sm font-medium"><Icon name="globe" /> Cloudflare · recomendado</span>
-              <span className="mt-1 block text-xs leading-5 text-neutral-600 dark:text-neutral-400">Disponible siempre, sin servidor, Docker, dominio ni conocimientos técnicos.</span>
+              <span className="flex items-center gap-2 text-sm font-medium"><Icon name="globe" /> {t('Cloudflare · recomendado')}</span>
+              <span className="mt-1 block text-xs leading-5 text-neutral-600 dark:text-neutral-400">{t('Disponible siempre, sin servidor, Docker, dominio ni conocimientos técnicos.')}</span>
             </button>
             <button
               data-testid="nodus-server-mode-basic"
@@ -1798,8 +1798,8 @@ export function Settings({
             <div className="rounded-xl border border-sky-200 bg-gradient-to-br from-sky-50 to-indigo-50 p-5 dark:border-sky-900 dark:from-sky-950/30 dark:to-indigo-950/20">
               <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                 <div className="max-w-2xl">
-                  <h3 className="font-semibold">Tu propio Nodus Cloud, dentro de tu cuenta</h3>
-                  <p className="mt-1 text-sm leading-6 text-neutral-600 dark:text-neutral-300">Nodus calcula el coste real y abre el despliegue oficial. Cloudflare crea los servicios directamente en tu cuenta; Nodus no recibe permisos ni credenciales de Cloudflare.</p>
+                  <h3 className="font-semibold">{t('Tu propio Nodus Cloud, dentro de tu cuenta')}</h3>
+                  <p className="mt-1 text-sm leading-6 text-neutral-600 dark:text-neutral-300">{t('Nodus calcula el coste real y abre el despliegue oficial. Cloudflare crea los servicios directamente en tu cuenta; Nodus no recibe permisos ni credenciales de Cloudflare.')}</p>
                 </div>
                 <button className="btn btn-primary shrink-0 justify-center" onClick={() => setCloudflareDeployOpen(true)}><Icon name="globe" />Deploy to Cloudflare</button>
               </div>
@@ -1863,8 +1863,8 @@ export function Settings({
             <strong className="text-neutral-800 dark:text-neutral-200">{t('Cómo funciona')}:</strong>
             <ul className="mt-1.5 list-disc space-y-1 pl-4">
               <li>{t('Cada vault se conecta por separado y sigue publicándose en segundo plano aunque estés trabajando en otro vault.')}</li>
-              <li>{serverMode === 'cloudflare' ? 'Nodus solo necesita estar abierto para enviar cambios; después Cloudflare los mantiene disponibles aunque apagues el ordenador.' : t('Tu ordenador es quien publica: mantenlo encendido y con Nodus abierto para enviar las novedades.')}</li>
-              <li>{serverMode === 'cloudflare' ? 'D1 guarda los datos, R2 los archivos y Workers atiende a Desktop, Mobile y clientes MCP.' : t('El servidor Docker sirve la última copia a ChatGPT o Claude aunque tu ordenador esté apagado.')}</li>
+              <li>{t(serverMode === 'cloudflare' ? 'Nodus solo necesita estar abierto para enviar cambios; después Cloudflare los mantiene disponibles aunque apagues el ordenador.' : 'Tu ordenador es quien publica: mantenlo encendido y con Nodus abierto para enviar las novedades.')}</li>
+              <li>{t(serverMode === 'cloudflare' ? 'D1 guarda los datos, R2 los archivos y Workers atiende a Desktop, Mobile y clientes MCP.' : 'El servidor Docker sirve la última copia a ChatGPT o Claude aunque tu ordenador esté apagado.')}</li>
             </ul>
           </div>
 
