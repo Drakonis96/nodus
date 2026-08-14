@@ -1618,6 +1618,8 @@ export interface AppSettings {
   mcpToken: string;
   /** Publish this vault to an independent Nodus Server. Never starts a local listener. */
   nodusServerEnabled: boolean;
+  /** Transport selected for this vault. Classic preserves Docker/local compatibility. */
+  nodusServerKind: 'classic' | 'cloudflare';
   /** Canonical HTTPS origin of the remote Nodus Server. */
   nodusServerUrl: string;
   /** Remote space selected during one-time pairing. */
@@ -1897,6 +1899,8 @@ export type VaultOrigin = 'local' | 'connected';
 export type VaultRemoteRole = 'reader' | 'writer' | 'owner';
 
 export interface VaultRemote {
+  /** Absent in older registries and therefore treated as classic. */
+  serverKind?: 'classic' | 'cloudflare';
   url: string;
   spaceId: string;
   spaceName: string;
@@ -1933,6 +1937,8 @@ export interface RemoteSignIn {
   url: string;
   serverName: string;
   userEmail: string;
+  /** Absent on older servers, which are treated as classic. */
+  serverKind?: 'classic' | 'cloudflare';
   spaces: RemoteSpaceChoice[];
 }
 
@@ -7988,6 +7994,7 @@ export interface NodusApi extends ProsopographyApi, TestimoniesApi, ToolkitApi, 
     space: RemoteSpaceChoice;
     userEmail: string;
     serverName: string;
+    serverKind?: 'classic' | 'cloudflare';
   }): Promise<VaultCreateResult>;
   replicaOverview(): Promise<ReplicaConnectionView[]>;
   replicaSyncNow(vaultId: string): Promise<ReplicaConnectionView[]>;

@@ -3,6 +3,7 @@ import { getSettings } from '../db/settingsRepo';
 import { hasNodusServerTokenFor } from '../secrets/secretStore';
 import { listVaults } from '../vaults/vaultRegistry';
 import type { AppLanguage, AppSettings, VaultSummary } from '@shared/types';
+import type { NodusServerKind } from '@shared/cloudflare';
 import { normalizeUiLanguage } from '@shared/uiLanguage';
 
 /**
@@ -41,6 +42,7 @@ export interface VaultServerConfig {
   vaultName: string;
   vaultType: VaultSummary['type'];
   isActiveVault: boolean;
+  kind: NodusServerKind;
   url: string;
   spaceId: string;
   spaceName: string;
@@ -94,6 +96,7 @@ function toConfig(vault: VaultSummary, blob: Partial<AppSettings>): VaultServerC
     vaultName: vault.name,
     vaultType: vault.type,
     isActiveVault: vault.active,
+    kind: blob.nodusServerKind === 'cloudflare' ? 'cloudflare' : 'classic',
     url,
     spaceId,
     spaceName: String(blob.nodusServerSpaceName || ''),
@@ -114,6 +117,7 @@ export function readVaultConfig(vault: VaultSummary): VaultServerConfig {
     const s = getSettings();
     return toConfig(vault, {
       nodusServerUrl: s.nodusServerUrl,
+      nodusServerKind: s.nodusServerKind,
       nodusServerSpaceId: s.nodusServerSpaceId,
       nodusServerSpaceName: s.nodusServerSpaceName,
       nodusServerLanguage: s.nodusServerLanguage,

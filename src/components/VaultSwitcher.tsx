@@ -222,6 +222,7 @@ export function VaultSwitcher({ anchorEl, onClose, vaults, onVaultsChanged, onAc
         space,
         userEmail: remoteSession.userEmail,
         serverName: remoteSession.serverName,
+        serverKind: remoteSession.serverKind,
       });
       const switched = await window.nodus.switchVault(created.vault.id);
       if (!switched.ok) throw new Error(switched.message);

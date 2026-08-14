@@ -45,6 +45,7 @@ import { SttSettings } from '../components/SttSettings';
 import { LocalAiModelsSettings } from '../components/LocalAiModelsSettings';
 import { LocalImageModelSettings } from '../components/LocalImageModelSettings';
 import { McpConnectionModal } from '../components/McpConnectionModal';
+import { CloudflareDeployModal } from '../components/CloudflareDeployModal';
 import { dedicatedVaultNavIds, NAV_GROUPS, navItemLabel, orderSidebarItems, orderedNav } from '../navigation';
 import { teachingItemId, TEACHING_GROUPS } from '../components/TeachingSidebar';
 import { WORLDBUILDING_GROUPS } from '../components/WorldbuildingSidebar';
@@ -197,6 +198,7 @@ export function Settings({
   const [nodusServerBusy, setNodusServerBusy] = useState(false);
   const [nodusServerMessage, setNodusServerMessage] = useState<string | null>(null);
   const [nodusServerGuideOpen, setNodusServerGuideOpen] = useState(false);
+  const [cloudflareDeployOpen, setCloudflareDeployOpen] = useState(false);
   // A connected vault is the mirror image of a published one: this machine PULLS it. Its
   // state had no screen at all, so a revoked replica simply stopped updating in silence.
   const [replicas, setReplicas] = useState<ReplicaConnectionView[]>([]);
@@ -215,8 +217,8 @@ export function Settings({
   const localServerPasswordRef = useRef<string | null>(null);
   // Which of the two server modes this section shows. Somebody already publishing to a Docker
   // deployment opens on that one; everybody else opens on the one that needs no Docker.
-  const [serverMode, setServerMode] = useState<'basic' | 'advanced'>(
-    settings.localServerEnabled || !settings.nodusServerUrl ? 'basic' : 'advanced',
+  const [serverMode, setServerMode] = useState<'cloudflare' | 'basic' | 'advanced'>(
+    settings.nodusServerKind === 'cloudflare' || !settings.nodusServerUrl ? 'cloudflare' : settings.localServerEnabled ? 'basic' : 'advanced',
   );
   const [copilotStatus, setCopilotStatus] = useState<CopilotServerStatus>({ running: false, port: null, addinUrl: null, certReady: false, error: null });
   const [zoteroStatus, setZoteroStatus] = useState<ZoteroPluginServerStatus>({ running: false, port: null, url: null, error: null });
@@ -1749,12 +1751,21 @@ export function Settings({
             {t('Versión experimental recomendada solo para testers. Guarda copias de seguridad y reporta cualquier error desde el botón superior.')}
           </p>
 
-          {/* Two ways to have a server, and the choice is really "how much do you want to
-              administer". Basic runs it here; advanced is the Docker deployment. */}
+          {/* Three transports share the same vault settings. Cloudflare is the guided,
+              no-server path; the two existing modes remain available without migration. */}
           {/* Written out rather than mapped over a table: a key reached through a variable is
               invisible to scripts/test-i18n-coverage.mjs, and an untranslated string that no
               test can see is exactly how the Spanish sidebar labels once shipped. */}
-          <div className="grid gap-2 sm:grid-cols-2" data-testid="nodus-server-mode-switch">
+          <div className="grid gap-2 sm:grid-cols-3" data-testid="nodus-server-mode-switch">
+            <button
+              data-testid="nodus-server-mode-cloudflare"
+              aria-pressed={serverMode === 'cloudflare'}
+              onClick={() => setServerMode('cloudflare')}
+              className={`rounded-xl border p-3 text-left transition ${serverMode === 'cloudflare' ? 'border-sky-400 bg-sky-50 dark:border-sky-600 dark:bg-sky-950/30' : 'border-neutral-200 hover:border-neutral-300 dark:border-neutral-800 dark:hover:border-neutral-700'}`}
+            >
+              <span className="flex items-center gap-2 text-sm font-medium"><Icon name="globe" /> Cloudflare · recomendado</span>
+              <span className="mt-1 block text-xs leading-5 text-neutral-600 dark:text-neutral-400">Disponible siempre, sin servidor, Docker, dominio ni conocimientos técnicos.</span>
+            </button>
             <button
               data-testid="nodus-server-mode-basic"
               aria-pressed={serverMode === 'basic'}
@@ -1783,6 +1794,18 @@ export function Settings({
             </button>
           </div>
 
+          {serverMode === 'cloudflare' && (
+            <div className="rounded-xl border border-sky-200 bg-gradient-to-br from-sky-50 to-indigo-50 p-5 dark:border-sky-900 dark:from-sky-950/30 dark:to-indigo-950/20">
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                <div className="max-w-2xl">
+                  <h3 className="font-semibold">Tu propio Nodus Cloud, dentro de tu cuenta</h3>
+                  <p className="mt-1 text-sm leading-6 text-neutral-600 dark:text-neutral-300">Nodus calcula el coste real y abre el despliegue oficial. Cloudflare crea los servicios directamente en tu cuenta; Nodus no recibe permisos ni credenciales de Cloudflare.</p>
+                </div>
+                <button className="btn btn-primary shrink-0 justify-center" onClick={() => setCloudflareDeployOpen(true)}><Icon name="globe" />Deploy to Cloudflare</button>
+              </div>
+            </div>
+          )}
+
           {serverMode === 'basic' && localServerStatus && localServerPower && (
             <>
               <LocalServerPanel
@@ -1807,14 +1830,16 @@ export function Settings({
             </>
           )}
 
-          {serverMode === 'advanced' && (
+          {(serverMode === 'advanced' || serverMode === 'cloudflare') && (
           <>
+          {serverMode === 'advanced' && (
           <button
             className="btn btn-ghost w-full justify-center border border-indigo-300 text-indigo-700 dark:border-indigo-800 dark:text-indigo-300 sm:w-auto"
             onClick={() => setNodusServerGuideOpen(true)}
           >
             <Icon name="graduation" /> {t('Guía de instalación paso a paso')}
           </button>
+          )}
           <div
             data-testid="nodus-server-settings-card"
             className="rounded-xl border border-indigo-200 bg-indigo-50 p-4 dark:border-indigo-900/70 dark:bg-indigo-950/20"
@@ -1838,8 +1863,8 @@ export function Settings({
             <strong className="text-neutral-800 dark:text-neutral-200">{t('Cómo funciona')}:</strong>
             <ul className="mt-1.5 list-disc space-y-1 pl-4">
               <li>{t('Cada vault se conecta por separado y sigue publicándose en segundo plano aunque estés trabajando en otro vault.')}</li>
-              <li>{t('Tu ordenador es quien publica: mantenlo encendido y con Nodus abierto para enviar las novedades.')}</li>
-              <li>{t('El servidor Docker sirve la última copia a ChatGPT o Claude aunque tu ordenador esté apagado.')}</li>
+              <li>{serverMode === 'cloudflare' ? 'Nodus solo necesita estar abierto para enviar cambios; después Cloudflare los mantiene disponibles aunque apagues el ordenador.' : t('Tu ordenador es quien publica: mantenlo encendido y con Nodus abierto para enviar las novedades.')}</li>
+              <li>{serverMode === 'cloudflare' ? 'D1 guarda los datos, R2 los archivos y Workers atiende a Desktop, Mobile y clientes MCP.' : t('El servidor Docker sirve la última copia a ChatGPT o Claude aunque tu ordenador esté apagado.')}</li>
             </ul>
           </div>
 
@@ -1996,7 +2021,7 @@ export function Settings({
             </div>
           )}
 
-          {!nodusServerOverview.activeVault.connected && (
+          {serverMode === 'advanced' && !nodusServerOverview.activeVault.connected && (
             <div className="space-y-4 rounded-xl border border-neutral-200 p-4 dark:border-neutral-800">
               <div>
                 <h3 className="text-sm font-medium">{nodusServerOverview.connections.length > 0 ? t('Conectar también este vault') : t('Conectar este vault')}</h3>
@@ -2043,10 +2068,10 @@ export function Settings({
             </p>
           )}
 
-          <div className="rounded-lg border border-neutral-200 bg-neutral-50 px-3 py-3 text-xs leading-5 text-neutral-600 dark:border-neutral-800 dark:bg-neutral-950/50 dark:text-neutral-400">
+          {serverMode === 'advanced' && <div className="rounded-lg border border-neutral-200 bg-neutral-50 px-3 py-3 text-xs leading-5 text-neutral-600 dark:border-neutral-800 dark:bg-neutral-950/50 dark:text-neutral-400">
             <strong className="text-neutral-800 dark:text-neutral-200">{t('Instalación del servidor')}:</strong>{' '}
             {t('se ejecuta con Docker en otro equipo o VPS. Puede usar el Caddy incluido o tu Caddy/Nginx existente con un dominio o subdominio y HTTPS. La configuración inicial y la gestión de usuarios se hacen desde el navegador.')}
-          </div>
+          </div>}
           </>
           )}
         </Section>
@@ -3066,6 +3091,12 @@ export function Settings({
         <NodusServerGuideModal
           onOpenGuide={() => void window.nodus.openExternal(NODUS_SERVER_GUIDE_URL)}
           onClose={() => setNodusServerGuideOpen(false)}
+        />
+      )}
+      {cloudflareDeployOpen && (
+        <CloudflareDeployModal
+          onClose={() => setCloudflareDeployOpen(false)}
+          onComplete={() => { void window.nodus.getNodusServerOverview().then(setNodusServerOverview); }}
         />
       )}
       {backupResult && (

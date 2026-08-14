@@ -562,7 +562,7 @@ export function registerIpc(
   // can actually reach, and the app shows a picker before anything is created on disk.
   h('vaults:remoteSignIn', async (_e, url: string, email: string, password: string) => signInToNodusServer(url, email, password));
   h('vaults:createConnected', async (_e, input: {
-    url: string; ticket: string; space: RemoteSpaceOption; userEmail: string; serverName: string;
+    url: string; ticket: string; space: RemoteSpaceOption; userEmail: string; serverName: string; serverKind?: 'classic' | 'cloudflare';
   }) => ({ vault: withVaultKeyProviders(await createConnectedVault(input)) }));
   h('vaults:replicaOverview', async () => getReplicaOverview());
   h('vaults:replicaSyncNow', async (_e, vaultId: string) => syncReplicaNow(vaultId));

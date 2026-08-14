@@ -23,6 +23,7 @@ import { normalizeUiLanguage } from '@shared/uiLanguage';
 import { buildServerSnapshot, lightweightVaultRevision, type SnapshotAsset } from './serverSnapshot';
 import { buildServerLibraryPublication, type ServerLibraryPackage } from './serverLibrary';
 import { buildVectorSet, vectorRevision, type VectorKind } from './serverVectors';
+import { publishVaultToCloudflare } from './cloudflarePublisher';
 import { onGlobalLibraryChanged } from '../library/libraryRuntime';
 import { nodiNotesPending, syncNodiNotes } from './nodiNotesSync';
 import {
@@ -364,6 +365,20 @@ async function publishVault(vaultId: string): Promise<void> {
   rt.lastUploadStartedAt = Date.now();
   rt.phase = 'syncing';
   try {
+    if (config.kind === 'cloudflare') {
+      const result = await publishVaultToCloudflare(config, token, vault, db);
+      rt.lastRevision = result.revision;
+      rt.dirtySince = 0;
+      rt.pending = false;
+      rt.phase = 'ok';
+      rt.lastError = null;
+      rt.lastSyncAt = result.updatedAt;
+      rt.lastBytes = result.bytes;
+      rt.lastAssetsSent = result.assetsSent;
+      rt.lastLibraryPackagesSent = result.libraryPackagesSent;
+      if (vault.active) rt.observed = lightweightVaultRevision(db);
+      return;
+    }
     // Collecting what collaborators sent used to happen here, right before the snapshot, so
     // their work travelled back out in the same publication. It now belongs to inboxPoller,
     // which drains the ledger every thirty seconds whether or not anything is published —
@@ -569,7 +584,7 @@ export async function pairNodusServer(urlValue: string, code: string): Promise<N
       method: 'POST', headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ code: cleanCode, deviceName: `Nodus Desktop · ${os.hostname()}` }),
     });
-    const result = await response.json().catch(() => ({})) as { accessToken?: string; error?: string; space?: { id: string; name: string }; server?: { name: string; publicUrl: string; language?: AppLanguage } };
+    const result = await response.json().catch(() => ({})) as { accessToken?: string; error?: string; space?: { id: string; name: string }; server?: { name: string; service?: string; publicUrl: string; language?: AppLanguage } };
     if (!response.ok || !result.accessToken || !result.space) throw new Error(result.error || `El servidor respondió con HTTP ${response.status}.`);
     // A server states its own public URL, and normally that is the address worth keeping: the
     // domain people type is not necessarily the one used to pair. The exception is a server on
@@ -581,7 +596,7 @@ export async function pairNodusServer(urlValue: string, code: string): Promise<N
     // and updateSettings both write to the right place.
     setNodusServerToken(result.accessToken);
     const language = normalizeUiLanguage(result.server?.language ?? 'en');
-    updateSettings({ nodusServerUrl: pairedUrl, nodusServerSpaceId: result.space.id, nodusServerSpaceName: result.space.name, nodusServerLanguage: language, nodusServerEnabled: true });
+    updateSettings({ nodusServerKind: result.server?.service === 'nodus-cloudflare' ? 'cloudflare' : 'classic', nodusServerUrl: pairedUrl, nodusServerSpaceId: result.space.id, nodusServerSpaceName: result.space.name, nodusServerLanguage: language, nodusServerEnabled: true });
     runtimes.delete(active.id);
     startNodusServerSync();
     // The one explicit full publication happens immediately; later work is debounced.

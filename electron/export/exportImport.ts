@@ -661,6 +661,7 @@ export function restoreBackupArchive(archive: Buffer, password: string): BackupR
       mcpEnabled: false,
       mcpToken: '',
       nodusServerEnabled: false,
+      nodusServerKind: 'classic',
       nodusServerUrl: '',
       nodusServerSpaceId: '',
       nodusServerSpaceName: '',
@@ -945,6 +946,7 @@ function scrubSettings(raw: unknown): BackupSettings {
   delete obj.providerKeys;
   obj.mcpEnabled = false;
   obj.nodusServerEnabled = false;
+  obj.nodusServerKind = 'classic';
   obj.nodusServerUrl = '';
   obj.nodusServerSpaceId = '';
   obj.nodusServerSpaceName = '';
