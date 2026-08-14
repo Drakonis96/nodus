@@ -69,9 +69,13 @@ function stripWrappingFence(value: string): string {
 }
 
 function completeProtectedStreamPrefix(value: string): string {
-  const lastOpen = value.lastIndexOf('⟦');
-  const lastClose = value.lastIndexOf('⟧');
-  return lastOpen > lastClose ? value.slice(0, lastOpen) : value;
+  const unicodeOpen = value.lastIndexOf('⟦');
+  const asciiOpen = value.lastIndexOf('[');
+  const incompleteOpen = Math.max(
+    unicodeOpen > value.lastIndexOf('⟧') ? unicodeOpen : -1,
+    asciiOpen > value.lastIndexOf(']') ? asciiOpen : -1,
+  );
+  return incompleteOpen >= 0 ? value.slice(0, incompleteOpen) : value;
 }
 
 function hash(value: string): string {

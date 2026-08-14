@@ -1307,21 +1307,9 @@ body {
   color: currentColor;
 }
 
-.study-milkdown .milkdown-toolbar .study-synonyms-trigger {
-  border: 1px solid rgba(13, 148, 136, 0.24);
-  background: rgba(13, 148, 136, 0.08);
-  color: #0f766e;
-}
-
 .study-milkdown .milkdown-toolbar .study-synonyms-trigger:hover {
   border-color: rgba(13, 148, 136, 0.42);
   background: rgba(13, 148, 136, 0.15);
-}
-
-.dark .study-milkdown .milkdown-toolbar .study-synonyms-trigger {
-  border-color: rgba(45, 212, 191, 0.3);
-  background: rgba(20, 184, 166, 0.12);
-  color: #5eead4;
 }
 
 .dark .study-milkdown .milkdown-toolbar .study-selection-tool {
