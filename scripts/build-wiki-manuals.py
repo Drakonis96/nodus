@@ -6,6 +6,7 @@ from __future__ import annotations
 import html
 import json
 import shutil
+import zipfile
 from io import BytesIO
 from pathlib import Path
 
@@ -55,7 +56,7 @@ VIOLET = rgb("#7257d7")
 
 
 class ManualDocTemplate(BaseDocTemplate):
-    def __init__(self, filename: str, *, title: str, vault_name: str, accent: colors.Color):
+    def __init__(self, filename: str, *, title: str, vault_name: str, accent: colors.Color, version: str, updated: str):
         super().__init__(
             filename,
             pagesize=A4,
@@ -65,12 +66,14 @@ class ManualDocTemplate(BaseDocTemplate):
             bottomMargin=22 * mm,
             title=title,
             author="Nodus",
-            subject=f"Complete English manual for the Nodus {vault_name} vault",
+            subject=f"Complete manual for the Nodus {vault_name} vault",
             creator="Nodus Wiki manual builder",
         )
         self.manual_title = title
         self.vault_name = vault_name
         self.accent = accent
+        self.version = version
+        self.updated = updated
         self._bookmark_counter = 0
         body_frame = Frame(self.leftMargin, self.bottomMargin, self.width, self.height, id="body")
         self.addPageTemplates(PageTemplate(id="manual", frames=[body_frame], onPage=self._draw_page))
@@ -100,7 +103,7 @@ class ManualDocTemplate(BaseDocTemplate):
             canvas.line(self.leftMargin, 14.5 * mm, PAGE_W - self.rightMargin, 14.5 * mm)
             canvas.setFillColor(MUTED)
             canvas.setFont("Helvetica", 7.5)
-            canvas.drawString(self.leftMargin, 10.2 * mm, "Nodus 4.1 · English edition · August 2026")
+            canvas.drawString(self.leftMargin, 10.2 * mm, f"Nodus {self.version} · User guide · {self.updated}")
             canvas.drawRightString(PAGE_W - self.rightMargin, 10.2 * mm, str(doc.page))
         canvas.restoreState()
 
@@ -182,7 +185,7 @@ def light_document_capture(source: PILImage.Image) -> PILImage.Image:
     return PILImage.fromarray(np.clip(converted, 0, 255).astype("uint8"), "RGB")
 
 
-def screenshot(path: Path, max_width: float, max_height: float = 98 * mm):
+def screenshot(path: Path, max_width: float, max_height: float = 98 * mm, caption: str = "Nodus desktop application"):
     if not path.exists():
         return []
     with PILImage.open(path) as source:
@@ -193,7 +196,22 @@ def screenshot(path: Path, max_width: float, max_height: float = 98 * mm):
         buffer = BytesIO()
         converted.save(buffer, format="JPEG", quality=84, optimize=True, progressive=True)
         buffer.seek(0)
-    return [Image(buffer, width=target_w, height=target_h), Paragraph("English interface shown with the built-in sample vault.", CURRENT_STYLES["caption"])]
+    return [Image(buffer, width=target_w, height=target_h), Paragraph(html.escape(caption), CURRENT_STYLES["caption"])]
+
+
+def location_box(chapter: dict, vault_name: str | None):
+    location = chapter.get("location") or (f"{vault_name} vault → {chapter['title']}" if vault_name else f"Nodus → {chapter['title']}")
+    table = Table([
+        [Paragraph("WHERE TO FIND IT", CURRENT_STYLES["eyebrow"])],
+        [Paragraph(html.escape(location), CURRENT_STYLES["tip"])],
+    ], colWidths=[None], hAlign="LEFT")
+    table.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#f5f3f9")),
+        ("BOX", (0, 0), (-1, -1), 0.5, LINE),
+        ("LEFTPADDING", (0, 0), (-1, -1), 5 * mm), ("RIGHTPADDING", (0, 0), (-1, -1), 5 * mm),
+        ("TOPPADDING", (0, 0), (-1, 0), 3 * mm), ("BOTTOMPADDING", (0, -1), (-1, -1), 3 * mm),
+    ]))
+    return table
 
 
 def step_box(chapter: dict, accent: colors.Color):
@@ -209,12 +227,14 @@ def step_box(chapter: dict, accent: colors.Color):
     return table
 
 
-def add_chapter(story: list, chapter: dict, number: str, accent: colors.Color, include_image: bool):
+def add_chapter(story: list, chapter: dict, number: str, accent: colors.Color, include_image: bool, vault_name: str | None = None):
     story.append(Paragraph(html.escape(chapter["group"].upper()), CURRENT_STYLES["eyebrow"]))
     story.append(heading(f"{number}  {chapter['title']}", CURRENT_STYLES["h2"], 1))
     story.append(Paragraph(html.escape(chapter["summary"]), CURRENT_STYLES["lead"]))
     story.append(Paragraph(html.escape(chapter["details"]), CURRENT_STYLES["body"]))
     story.append(Spacer(1, 2 * mm))
+    story.append(location_box(chapter, vault_name))
+    story.append(Spacer(1, 4 * mm))
     story.append(step_box(chapter, accent))
     story.append(Spacer(1, 4 * mm))
     tips = [Paragraph(f"• {html.escape(tip)}", CURRENT_STYLES["tip"]) for tip in chapter["tips"]]
@@ -228,7 +248,7 @@ def add_chapter(story: list, chapter: dict, number: str, accent: colors.Color, i
     story.append(tip_table)
     if include_image:
         story.append(Spacer(1, 5 * mm))
-        story.extend(screenshot(ASSETS / chapter["image"], 166 * mm))
+        story.extend(screenshot(ASSETS / chapter["image"], 166 * mm, caption=f"{chapter['title']} in the Nodus desktop application"))
     story.append(Spacer(1, 7 * mm))
     story.append(HRFlowable(width="100%", thickness=0.5, color=LINE, spaceBefore=2 * mm, spaceAfter=4 * mm))
 
@@ -241,7 +261,7 @@ def build_manual(content: dict, vault: dict):
     target = OUTPUT / filename
     public_target = PUBLIC / filename
     title = f"Nodus {vault['name']} Vault Manual"
-    doc = ManualDocTemplate(str(target), title=title, vault_name=vault["name"], accent=accent)
+    doc = ManualDocTemplate(str(target), title=title, vault_name=vault["name"], accent=accent, version=content["version"], updated=content["updated"])
     story = []
 
     story.append(Spacer(1, 23 * mm))
@@ -255,7 +275,7 @@ def build_manual(content: dict, vault: dict):
     story.append(Paragraph(html.escape(vault["description"]), CURRENT_STYLES["body"]))
     story.append(Spacer(1, 12 * mm))
     meta = Table([
-        ["EDITION", "English"], ["VERSION", f"Nodus {content['version']}"], ["UPDATED", content["updated"]], ["AUDIENCE", vault["audience"]],
+        ["VERSION", f"Nodus {content['version']}"], ["UPDATED", content["updated"]], ["AUDIENCE", vault["audience"]],
     ], colWidths=[28 * mm, 118 * mm])
     meta.setStyle(TableStyle([
         ("FONT", (0, 0), (0, -1), "Helvetica-Bold", 7.5), ("TEXTCOLOR", (0, 0), (0, -1), accent),
@@ -275,17 +295,17 @@ def build_manual(content: dict, vault: dict):
 
     story.append(Paragraph("PART I · FOUNDATION", CURRENT_STYLES["eyebrow"]))
     story.append(heading("Core Nodus workflow", CURRENT_STYLES["h1"], 0))
-    story.append(Paragraph("These operating principles apply to every vault. They establish the local-first data boundary, source workflow, optional model configuration and recovery discipline used throughout this manual.", CURRENT_STYLES["lead"]))
+    story.append(Paragraph("Start here if Nodus is new to you. These chapters explain what a vault is, how to move through the application, how sources remain traceable, when a model is optional and how to keep a recoverable copy of the work.", CURRENT_STYLES["lead"]))
     for index, chapter in enumerate(content["common"], 1):
-        add_chapter(story, chapter, f"{index}", accent, include_image=index in {1, 4, 6})
+        add_chapter(story, chapter, f"{index}", accent, include_image=index in {1, 2, 3, 4, 7})
 
     story.append(PageBreak())
     story.append(Paragraph("PART II · VAULT GUIDE", CURRENT_STYLES["eyebrow"]))
     story.append(heading(f"Complete {vault['name']} workflow", CURRENT_STYLES["h1"], 0))
     story.append(Paragraph(html.escape(vault["description"]), CURRENT_STYLES["lead"]))
-    story.extend(screenshot(ASSETS / vault["id"] / "home.png", 166 * mm, 92 * mm))
+    story.extend(screenshot(ASSETS / vault["id"] / "home.png", 166 * mm, 92 * mm, caption=f"{vault['name']} vault home in the Nodus desktop application"))
     for index, chapter in enumerate(vault["chapters"], 1):
-        add_chapter(story, chapter, f"{index}", accent, include_image=(index == 1 or index % 2 == 0))
+        add_chapter(story, chapter, f"{index}", accent, include_image=(index == 1 or index % 2 == 0), vault_name=vault["name"])
 
     story.append(PageBreak())
     story.append(Paragraph("REFERENCE", CURRENT_STYLES["eyebrow"]))
@@ -298,7 +318,7 @@ def build_manual(content: dict, vault: dict):
     for item in checklist:
         story.append(Paragraph(f"□  {html.escape(item)}", CURRENT_STYLES["step"]))
     story.append(Spacer(1, 10 * mm))
-    story.append(Paragraph("This manual documents the stable English workflow represented in Nodus 4.1. Interface details may evolve between releases; the in-app privacy notice and release notes govern the exact behaviour of the installed version.", CURRENT_STYLES["body"]))
+    story.append(Paragraph(f"This manual documents the desktop workflow represented in Nodus {content['version']}. Interface details may evolve between releases; the in-app privacy notice and release notes govern the exact behaviour of the installed version.", CURRENT_STYLES["body"]))
 
     doc.multiBuild(story)
     shutil.copy2(target, public_target)
@@ -309,9 +329,16 @@ def main():
     OUTPUT.mkdir(parents=True, exist_ok=True)
     PUBLIC.mkdir(parents=True, exist_ok=True)
     content = json.loads(CONTENT_PATH.read_text(encoding="utf-8"))
+    public_manuals = []
     for vault in content["vaults"]:
         target, public_target = build_manual(content, vault)
+        public_manuals.append(public_target)
         print(f"Built {target.relative_to(ROOT)} and {public_target.relative_to(ROOT)}")
+    bundle = PUBLIC / "nodus-vault-manuals.zip"
+    with zipfile.ZipFile(bundle, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=9) as archive:
+        for manual in public_manuals:
+            archive.write(manual, arcname=manual.name)
+    print(f"Built {bundle.relative_to(ROOT)} with {len(public_manuals)} manuals")
 
 
 if __name__ == "__main__":

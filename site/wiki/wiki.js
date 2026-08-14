@@ -20,6 +20,10 @@ function iconMarkup(icon = 'nodus') {
   return `<svg class="vault-icon-svg" data-icon="${icon}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${paths}</svg>`;
 }
 
+function downloadIconMarkup() {
+  return '<svg class="download-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/></svg>';
+}
+
 const allPages = [
   { type: 'home', id: 'home', title: 'Nodus Wiki', summary: 'Complete guides for every stable Nodus vault.', accent: '#8b5cf6', icon: 'nodus' },
   ...content.common.map((chapter) => ({ ...chapter, type: 'common', accent: '#8b5cf6', icon: 'nodus' })),
@@ -42,15 +46,22 @@ function navLink(id, title, accent) {
 
 function figure(image, caption) {
   if (!image) return '';
-  return `<figure class="doc-figure"><img src="${imagePath(image)}" alt="${escapeHtml(caption)}" loading="lazy"/><figcaption>${escapeHtml(caption)} - English interface, sample vault.</figcaption></figure>`;
+  return `<figure class="doc-figure"><img src="${imagePath(image)}" alt="${escapeHtml(caption)}" loading="lazy"/><figcaption>${escapeHtml(caption)}</figcaption></figure>`;
 }
 
-function sectionMarkup(chapter, accent, showFigure = true) {
+function locationFor(chapter, vault) {
+  if (chapter.location) return chapter.location;
+  if (vault) return `${vault.name} vault → ${chapter.title}`;
+  return `Nodus → ${chapter.title}`;
+}
+
+function sectionMarkup(chapter, accent, showFigure = true, vault = null) {
   return `<section class="doc-section" id="${chapter.id}">
     <p class="section-kicker">${escapeHtml(chapter.group)}</p>
     <h2>${escapeHtml(chapter.title)}</h2>
     <p class="section-summary">${escapeHtml(chapter.summary)}</p>
     <p class="section-details">${escapeHtml(chapter.details)}</p>
+    <div class="start-box"><div><span>Where to find it</span><strong>${escapeHtml(locationFor(chapter, vault))}</strong></div><div><span>What you will do</span><strong>${escapeHtml(chapter.outcome || chapter.summary)}</strong></div></div>
     <div class="section-grid"><div class="howto"><h3>Step by step</h3><ol>${chapter.steps.map((step) => `<li>${escapeHtml(step)}</li>`).join('')}</ol></div>
     <aside class="tipbox"><h3>Good practice</h3><ul>${chapter.tips.map((tip) => `<li>${escapeHtml(tip)}</li>`).join('')}</ul></aside></div>
     ${showFigure ? figure(chapter.image, chapter.title) : ''}
@@ -59,23 +70,23 @@ function sectionMarkup(chapter, accent, showFigure = true) {
 
 function homeMarkup() {
   return `<div style="--accent:#8b5cf6"><p class="eyebrow">Official documentation</p><h1>Learn Nodus from first launch to finished work.</h1>
-    <p class="lead">A complete English guide to the five stable vaults, with real interface captures, evidence-aware workflows, privacy notes and downloadable professional manuals.</p>
+    <p class="lead">A complete guide to the five stable vaults, from the first launch and basic terminology to evidence-aware workflows, privacy controls and finished outputs.</p>
     <div class="meta-row"><span class="pill">Nodus ${escapeHtml(content.version)}</span><span class="pill">Updated ${escapeHtml(content.updated)}</span><span class="pill">${content.vaults.reduce((n,v)=>n+v.chapters.length,0)} feature tutorials</span><span class="pill">Searchable offline documentation</span></div>
-    <div class="hero-actions"><a class="action primary" href="#welcome">Start with the essentials</a><a class="action" href="../demo/">Open the live demo</a></div>
+    <div class="hero-actions"><a class="action primary bundle-download" href="${content.manualBundle}" download>${downloadIconMarkup()}Download all PDF manuals (.zip)</a><a class="action" href="#welcome">Start with the essentials</a><a class="action" href="https://github.com/Drakonis96/nodus/releases/latest">Download Nodus</a></div>
     ${figure('academic/home.png', 'Nodus Academic Research home')}
     <section class="doc-section"><p class="section-kicker">Choose a workspace</p><h2>Five vaults, one local-first engine</h2><p class="section-details">Start with the vault that matches the work, not with a generic empty canvas. Each guide explains the full navigation and the safest path from source material to a finished output.</p>
-    <div class="vault-grid">${content.vaults.map((vault) => `<article class="vault-card" style="--card-accent:${vault.accent}"><span class="vault-mark" style="--vault-accent:${vault.accent}">${iconMarkup(vault.icon)}</span><h2>${escapeHtml(vault.name)}</h2><p>${escapeHtml(vault.tagline)}</p><div class="vault-card-actions"><a href="#${vault.id}">Open the ${escapeHtml(vault.short)} guide →</a><a href="${vault.pdf}" download>Download PDF ↓</a></div></article>`).join('')}</div></section>
+    <div class="vault-grid">${content.vaults.map((vault) => `<article class="vault-card" style="--card-accent:${vault.accent}"><span class="vault-mark" style="--vault-accent:${vault.accent}">${iconMarkup(vault.icon)}</span><h2>${escapeHtml(vault.name)}</h2><p>${escapeHtml(vault.tagline)}</p><div class="vault-card-actions"><a href="#${vault.id}">Open the ${escapeHtml(vault.short)} guide →</a><a class="vault-pdf-download" href="${vault.pdf}" download aria-label="Download the ${escapeHtml(vault.name)} PDF manual">${downloadIconMarkup()}<span>PDF manual</span></a></div></article>`).join('')}</div></section>
     <aside class="callout"><b>Documentation principle</b><p>Every generated summary, relationship or citation remains something to inspect. Nodus helps organise reasoning; it does not turn automated output into evidence.</p></aside>
   </div>`;
 }
 
 function vaultMarkup(vault) {
   return `<div style="--accent:${vault.accent}"><p class="eyebrow">${escapeHtml(vault.name)} vault</p><h1>${escapeHtml(vault.tagline)}</h1><p class="lead">${escapeHtml(vault.description)}</p>
-    <div class="meta-row"><span class="pill">For ${escapeHtml(vault.audience)}</span><span class="pill">${vault.chapters.length} complete tutorials</span><span class="pill">English screenshots</span></div>
-    <div class="hero-actions"><a class="action primary" href="#${vault.chapters[0].id}">Begin the guide</a><a class="action" href="${vault.demo}">Try this vault</a><a class="action" href="${vault.pdf}" download>Download PDF manual</a></div>
+    <div class="meta-row"><span class="pill">For ${escapeHtml(vault.audience)}</span><span class="pill">${vault.chapters.length} complete tutorials</span><span class="pill">Step-by-step workflows</span></div>
+    <div class="hero-actions"><a class="action primary" href="#${vault.chapters[0].id}">Begin the guide</a><a class="action" href="${vault.pdf}" download>${downloadIconMarkup()}Download PDF manual</a><a class="action bundle-download" href="${content.manualBundle}" download>${downloadIconMarkup()}Download all manuals</a></div>
     ${figure(`${vault.id}/home.png`, `${vault.name} vault overview`)}
     <section class="doc-section"><p class="section-kicker">Contents</p><h2>Complete ${escapeHtml(vault.short)} workflow</h2><div class="chapter-list">${vault.chapters.map((chapter,index) => `<a class="chapter-card" href="#${chapter.id}"><small>${String(index+1).padStart(2,'0')} · ${escapeHtml(chapter.group)}</small><b>${escapeHtml(chapter.title)}</b><span>${escapeHtml(chapter.summary)}</span></a>`).join('')}</div></section>
-    ${vault.chapters.map((chapter, index) => sectionMarkup(chapter, vault.accent, index === 0 || index % 2 === 1)).join('')}
+    ${vault.chapters.map((chapter, index) => sectionMarkup(chapter, vault.accent, index === 0 || index % 2 === 1, vault)).join('')}
   </div>`;
 }
 
@@ -138,7 +149,7 @@ addEventListener('keydown', (event) => {
   if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') { event.preventDefault(); $('#search').focus(); }
   else if (event.key === 'Escape' && document.body.classList.contains('nav-open')) setNavigationOpen(false, true);
 });
-document.addEventListener('pointerdown', (event) => { if (!event.target.closest('.search-wrap')) $('#search-results').hidden = true; });
+document.addEventListener('pointerdown', (event) => { if (!event.target.closest('.wiki-search-wrap')) $('#search-results').hidden = true; });
 $('#nav-toggle').addEventListener('click', () => setNavigationOpen(true));
 $('#nav-close').addEventListener('click', () => setNavigationOpen(false, true));
 $('#nav-backdrop').addEventListener('click', () => setNavigationOpen(false, true));

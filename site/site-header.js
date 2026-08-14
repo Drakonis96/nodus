@@ -47,12 +47,21 @@
     return LANGUAGES.some((language) => language.c === base) ? base : 'en';
   }
 
-  function headerMarkup(base, isDemo) {
-    const home = isDemo ? `${base}index.html` : '';
-    const section = (anchor) => isDemo ? `${home}${anchor}` : anchor;
+  function headerMarkup(base, context) {
+    const isLinkedPage = context !== 'landing';
+    const isWiki = context === 'wiki';
+    const home = isLinkedPage ? `${base}index.html` : '';
+    const section = (anchor) => isLinkedPage ? `${home}${anchor}` : anchor;
     const wiki = `${base}wiki/`;
-    return `<nav class="nav" id="site-header">
-      <a class="logo" href="${isDemo ? home : '#'}"><img src="${base}assets/nodus-logo.svg" alt=""/> Nodus</a>
+    return `<nav class="nav${isWiki ? ' wiki-nav' : ''}" id="site-header">
+      ${isWiki ? '<button id="nav-toggle" class="wiki-menu-toggle" type="button" aria-label="Open documentation menu" aria-controls="wiki-sidebar" aria-expanded="false"><span></span><span></span><span></span></button>' : ''}
+      <a class="logo" href="${isLinkedPage ? home : '#'}"><img src="${base}assets/nodus-logo.svg" alt=""/> Nodus</a>
+      ${isWiki ? `<div class="wiki-search-wrap">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.4-3.4"/></svg>
+        <input id="search" type="search" placeholder="Search guides, features and workflows..." autocomplete="off" aria-label="Search the Nodus Wiki"/>
+        <kbd>⌘ K</kbd>
+        <div id="search-results" class="search-results" hidden></div>
+      </div>` : ''}
       <div class="links">
         <a href="${section('#vaults')}" class="hideS" data-i18n="nav.vaults">Vaults</a>
         <a href="${section('#story')}" class="hideS nav-secondary" data-i18n="nav.how">How it works</a>
@@ -167,8 +176,8 @@
 
   document.querySelectorAll('[data-nodus-site-header]').forEach((host) => {
     const base = host.dataset.base || '';
-    const isDemo = host.dataset.context === 'demo';
-    host.innerHTML = headerMarkup(base, isDemo);
-    if (isDemo) initDemoHeader(host, base);
+    const context = host.dataset.context || 'landing';
+    host.innerHTML = headerMarkup(base, context);
+    if (context !== 'landing') initDemoHeader(host, base);
   });
 })();

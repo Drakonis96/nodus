@@ -214,6 +214,58 @@
 .lang-check { width: 15px; height: 15px; opacity: 0; color: #a78bfa; }
 .lang-option[aria-selected='true'] .lang-check { opacity: 1; }
 
+/* Wiki keeps the public navigation and adds documentation controls inside the
+ * same header surface. */
+.wiki-nav .nav-secondary { display: none; }
+.wiki-menu-toggle {
+  display: none;
+  width: 38px;
+  height: 38px;
+  flex: 0 0 auto;
+  padding: 9px;
+  place-content: center;
+  gap: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.04);
+  color: #f4f2fb;
+  cursor: pointer;
+}
+.wiki-menu-toggle span { display: block; width: 18px; height: 2px; border-radius: 2px; background: currentColor; }
+.wiki-search-wrap {
+  position: relative;
+  display: flex;
+  min-width: 220px;
+  max-width: 520px;
+  flex: 1 1 420px;
+  align-items: center;
+}
+.wiki-search-wrap > svg {
+  position: absolute;
+  left: 13px;
+  width: 17px;
+  height: 17px;
+  fill: none;
+  stroke: #a7a2bd;
+  stroke-width: 2;
+  pointer-events: none;
+}
+.wiki-search-wrap input {
+  width: 100%;
+  height: 39px;
+  padding: 0 58px 0 40px;
+  border: 1px solid rgba(255, 255, 255, 0.11);
+  border-radius: 11px;
+  outline: none;
+  background: rgba(255, 255, 255, 0.045);
+  color: #f4f2fb;
+  font: 500 13px/1.4 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+.wiki-search-wrap input:focus { border-color: rgba(167, 139, 250, 0.68); box-shadow: 0 0 0 4px rgba(139, 92, 246, 0.12); }
+.wiki-search-wrap kbd { position: absolute; right: 9px; padding: 2px 6px; border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 6px; background: rgba(255, 255, 255, 0.04); color: #a7a2bd; font: 10.5px/1.4 'Inter', sans-serif; }
+.wiki-search-wrap .search-results { top: calc(100% + 9px); }
+body.wiki-page { padding-top: 65px; }
+
 /* The demo frame starts immediately below the same fixed header used by the
  * landing page. This preserves the full demo canvas without a second header row. */
 body.demo-page { padding-top: 65px; grid-template-rows: 1fr; }
@@ -225,6 +277,9 @@ body.demo-page { padding-top: 65px; grid-template-rows: 1fr; }
 }
 @media (max-width: 1180px) {
   .nav .links a.nav-secondary { display: none; }
+  .wiki-nav .gh-badge .lbl,
+  .wiki-nav .release-downloads .download-word { display: none; }
+  .wiki-nav .release-downloads { min-width: 58px; padding-right: 10px; padding-left: 10px; }
 }
 @media (max-width: 980px) {
   .nav .links a.hideS,
@@ -234,6 +289,11 @@ body.demo-page { padding-top: 65px; grid-template-rows: 1fr; }
 }
 @media (max-width: 760px) {
   .nav .links a.btn.primary { display: none; }
+  .wiki-nav { flex-wrap: wrap; gap: 8px 12px; padding: 10px 16px; }
+  .wiki-nav .wiki-menu-toggle { display: grid; }
+  .wiki-nav .wiki-search-wrap { order: 4; min-width: 100%; max-width: none; flex-basis: 100%; }
+  .wiki-nav .links { margin-left: auto; }
+  body.wiki-page { padding-top: 110px; }
 }
 @media (max-width: 620px) {
   .nav { gap: 12px; padding: 12px 16px; }
@@ -250,4 +310,7 @@ body.demo-page { padding-top: 65px; grid-template-rows: 1fr; }
   .nav #faq-nav-link { display: none; }
   .gh-badge { padding-right: 10px; padding-left: 10px; }
   body.demo-page { padding-top: 58px; }
+  .wiki-nav { height: auto; min-height: 110px; }
+  .wiki-nav .logo { gap: 9px; font-size: 17px; }
+  body.wiki-page { padding-top: 110px; }
 }
