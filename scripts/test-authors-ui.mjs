@@ -32,12 +32,13 @@ test('author and synthesis-matrix clicks open persistent internal tabs', async (
   assert.match(view, /surface === 'matrix' \? 'h-full p-5' : 'hidden'/, 'the synthesis matrix remains mounted as a tab');
 });
 
-test('author detail reads synthesis, searchable ideas and strongest connected authors in that order', async () => {
+test('author detail reads synthesis, works, searchable ideas and strongest connected authors in that order', async () => {
   const view = await readSource('src/views/AuthorsView.tsx');
   const synthesis = view.indexOf('data-testid="author-synthesis"');
+  const works = view.indexOf("{/* 2. Works */}");
   const ideas = view.indexOf('<AuthorIdeasSection');
   const connections = view.indexOf('data-testid="author-connections"');
-  assert.ok(synthesis >= 0 && ideas > synthesis && connections > ideas, 'detail sections follow the requested reading order');
+  assert.ok(synthesis >= 0 && works > synthesis && ideas > works && connections > ideas, 'detail sections follow the requested reading order');
   assert.match(view, /data-testid="author-ideas-search"/);
   assert.match(view, /right\.weight - left\.weight/, 'connected authors are ordered from strongest to weakest');
 });
