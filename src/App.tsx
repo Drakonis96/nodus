@@ -51,6 +51,7 @@ import { VIEW_REGISTRY } from './app/viewRegistry';
 import type { ViewContext } from './app/ViewContext';
 import { notifyDataChanged, useDataRefresh } from './hooks';
 import { setActiveVaultQueryScope } from './vaultQueryCache';
+import { viewSnapshotAccess } from './app/viewSnapshots';
 import type {
   PendingAssistantNavigationTarget,
   PendingGraphNavigationTarget,
@@ -185,6 +186,12 @@ export function App() {
   const newInstallRef = useRef<boolean | null>(null);
   const [newInstall, setNewInstall] = useState(false);
   useEffect(() => setActiveVaultQueryScope(activeVault?.id ?? null), [activeVault?.id]);
+  // Where each section was when it was last left. It lives above the single render
+  // point because that is what survives the unmount, and outside React state
+  // because it is read only when a section mounts: as state, every keystroke in a
+  // search box would re-render the whole shell. The active vault is bound in once,
+  // here, so no section can read another vault's cut.
+  const snapshots = useMemo(() => viewSnapshotAccess(activeVault?.id ?? null), [activeVault?.id]);
   // Resolved light/dark (accounts for 'system'); drives the macOS dock icon.
   const [isDark, setIsDark] = useState<boolean>(() =>
     typeof window !== 'undefined' && window.matchMedia('(prefers-color-scheme: dark)').matches
@@ -1141,6 +1148,7 @@ export function App() {
     isTestimonios,
     isProsopography,
     isPreviewVault,
+    snapshots,
     hasData,
     demoBusy,
     lastSync,

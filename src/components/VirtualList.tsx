@@ -1,5 +1,5 @@
 import type React from 'react';
-import { useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 
 interface VirtualListProps<T> {
   items: T[];
@@ -10,6 +10,14 @@ interface VirtualListProps<T> {
   style?: React.CSSProperties;
   overscan?: number;
   empty?: React.ReactNode;
+  /**
+   * A row to bring back under the top edge, once, when it appears among `items`.
+   * The DOM-based anchoring the plain lists use cannot work here: the row to scroll
+   * to is usually not rendered yet, and only this component knows where it would be.
+   */
+  anchorKey?: React.Key | null;
+  /** The row now at the top of the viewport, reported as the reader scrolls. */
+  onAnchorChange?: (key: React.Key | null) => void;
 }
 
 export function VirtualList<T>({
@@ -21,10 +29,17 @@ export function VirtualList<T>({
   style,
   overscan = 8,
   empty,
+  anchorKey = null,
+  onAnchorChange,
 }: VirtualListProps<T>) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const [scrollTop, setScrollTop] = useState(0);
   const [viewportHeight, setViewportHeight] = useState(0);
+  // Reporting the top row while the restore is still pending would overwrite the
+  // very placement being restored: the list renders at scroll zero first.
+  const anchorSettled = useRef(anchorKey === null);
+  const reportAnchor = useRef(onAnchorChange);
+  reportAnchor.current = onAnchorChange;
 
   useLayoutEffect(() => {
     const el = scrollRef.current;
@@ -46,7 +61,7 @@ export function VirtualList<T>({
     return { heights, offsets };
   }, [itemHeight, items]);
 
-  const { start, end, offset, totalHeight } = useMemo(() => {
+  const { start, end, offset, totalHeight, topIndex } = useMemo(() => {
     const count = items.length;
     if (!variableLayout) {
       const fixedHeight = itemHeight as number;
@@ -54,7 +69,8 @@ export function VirtualList<T>({
       const rawFirst = Math.max(0, Math.floor(scrollTop / fixedHeight) - overscan);
       const first = Math.min(rawFirst, Math.max(0, count - capacity));
       const last = Math.min(count, Math.ceil((scrollTop + viewportHeight) / fixedHeight) + overscan);
-      return { start: first, end: last, offset: first * fixedHeight, totalHeight: count * fixedHeight };
+      const top = count === 0 ? 0 : Math.min(count - 1, Math.floor(scrollTop / fixedHeight));
+      return { start: first, end: last, offset: first * fixedHeight, totalHeight: count * fixedHeight, topIndex: top };
     }
     const { offsets } = variableLayout;
 
@@ -78,10 +94,32 @@ export function VirtualList<T>({
       end: last,
       offset: offsets[first],
       totalHeight: offsets[count],
+      topIndex: count === 0 ? 0 : indexAt(scrollTop),
     };
   }, [itemHeight, items.length, overscan, scrollTop, variableLayout, viewportHeight]);
 
   const visibleItems = items.slice(start, end);
+
+  // Put the anchored row back under the top edge, once, as soon as it exists. A row
+  // that never turns up leaves the list where it is and simply releases the hold on
+  // capture: deciding what to do about a vanished anchor belongs to the caller, which
+  // is the only one that knows how to go back to the first page.
+  useLayoutEffect(() => {
+    if (anchorSettled.current || anchorKey === null || items.length === 0) return;
+    const index = items.findIndex((item, position) => getKey(item, position) === anchorKey);
+    anchorSettled.current = true;
+    if (index < 0) return;
+    const element = scrollRef.current;
+    if (!element) return;
+    const target = variableLayout ? variableLayout.offsets[index] : index * (itemHeight as number);
+    element.scrollTop = target;
+    setScrollTop(target);
+  }, [anchorKey, getKey, itemHeight, items, variableLayout]);
+
+  const topKey = items.length > 0 && topIndex < items.length ? getKey(items[topIndex], topIndex) : null;
+  useEffect(() => {
+    if (anchorSettled.current) reportAnchor.current?.(topKey);
+  }, [topKey]);
 
   return (
     <div

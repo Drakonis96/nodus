@@ -94,7 +94,9 @@ test('the debates view pages by cards, not by cluster', () => {
 
 test('the argument route picker pages its suggestions', () => {
   const source = read('src/views/ArgumentMapView.tsx');
-  assert.match(source, /useIncrementalList<ArgumentRouteSuggestion>\(filteredSuggestions, ROUTES_PAGE_SIZE\)/);
+  // Trailing arguments are open on purpose: the list also opens wide enough to reach
+  // a restored anchor. What matters here is that it still pages at all.
+  assert.match(source, /useIncrementalList<ArgumentRouteSuggestion>\(filteredSuggestions, ROUTES_PAGE_SIZE[,)]/);
   assert.match(source, /\{shownSuggestions\.map/, 'the picker must render the paged slice');
   assert.doesNotMatch(
     source,

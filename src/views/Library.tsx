@@ -32,6 +32,7 @@ import {
 } from '../navigation';
 import { t, tx } from '../i18n';
 import { getVaultQueryCache, setVaultQueryCache } from '../vaultQueryCache';
+import type { LibraryVaultSnapshot, ListPlacement } from '../app/viewSnapshots';
 
 const LIBRARY_ROW_HEIGHT = 64;
 const LIBRARY_PAGE_SIZE = 200;
@@ -50,7 +51,8 @@ type StatusFlag = 'deep' | 'summary' | 'ideas' | 'passages' | '!deep' | '!summar
  * Readiness has no SQL expression, so the Status column is filtered, not sorted.
  */
 type SortKey = Extract<WorkSortKey, 'title' | 'authors' | 'year' | 'themes' | 'ideas'>;
-type SortState = { key: SortKey; dir: 'asc' | 'desc' };
+/** Exported because the Library section's snapshot stores it. */
+export type SortState = { key: SortKey; dir: 'asc' | 'desc' };
 
 // Counts default to descending (most first); text columns to ascending. A third
 // click clears back to the default backend order (year desc, title asc).
@@ -397,6 +399,8 @@ export function Library({
   vaultId,
   target,
   vaultType,
+  snapshot,
+  onSnapshotChange,
   onOpenCollections,
   onOpenNodusCollections,
   onOpenGraph,
@@ -409,6 +413,9 @@ export function Library({
   /** Incoming navigation that pre-applies a filter (e.g. a corpus-health bucket). */
   target?: LibraryNavigationTarget | null;
   vaultType?: VaultType;
+  /** Where this section was last left. Read once, at mount, and never again. */
+  snapshot?: LibraryVaultSnapshot;
+  onSnapshotChange?: (next: LibraryVaultSnapshot) => void;
   onOpenCollections: () => void;
   onOpenNodusCollections: () => void;
   onOpenGraph: (target: PendingGraphNavigationTarget) => void;
@@ -423,11 +430,15 @@ export function Library({
   const isRecordsVault = vaultType === 'genealogy' || vaultType === 'primary_sources';
   const [works, setWorks] = useState<WorkView[]>([]);
   const [totalWorks, setTotalWorks] = useState(0);
-  const [pageOffset, setPageOffset] = useState(0);
-  const [filter, setFilter] = useState<WorkFilter>({});
+  // The page and the row that was at the top are one restored value.
+  const [pageOffset, setPageOffset] = useState(() => snapshot?.placement?.pageOffset ?? 0);
+  // Restored as an initial value only — a reactive `snapshot` prop would fight the
+  // reader for their own filters.
+  const [filter, setFilter] = useState<WorkFilter>(() => snapshot?.filter ?? {});
   // Local, instantly-responsive text for the search box. It is debounced into
-  // `filter.search` so keystrokes stay smooth even on large libraries.
-  const [searchDraft, setSearchDraft] = useState('');
+  // `filter.search` so keystrokes stay smooth even on large libraries; both halves
+  // start from the stored text so the debounce cannot wipe the restored cut.
+  const [searchDraft, setSearchDraft] = useState(() => snapshot?.filter.search ?? '');
   const [availableZoteroTags, setAvailableZoteroTags] = useState<ZoteroTag[]>([]);
   const [tagFilterOpen, setTagFilterOpen] = useState(false);
   const [tagSearch, setTagSearch] = useState('');
@@ -440,8 +451,8 @@ export function Library({
   const [passageStatuses, setPassageStatuses] = useState<Map<string, WorkPassageStatus>>(new Map());
   const [reuseAnalysisFromVaults, setReuseAnalysisFromVaults] = useState(false);
   const [reuseNotice, setReuseNotice] = useState<string | null>(null);
-  const [filtersOpen, setFiltersOpen] = useState(false);
-  const [advancedFiltersOpen, setAdvancedFiltersOpen] = useState(false);
+  const [filtersOpen, setFiltersOpen] = useState(() => snapshot?.filtersOpen ?? false);
+  const [advancedFiltersOpen, setAdvancedFiltersOpen] = useState(() => snapshot?.advancedFiltersOpen ?? false);
   const [collectionsMenuOpen, setCollectionsMenuOpen] = useState(false);
   const [graphWork, setGraphWork] = useState<{ nodus_id: string; title: string } | null>(null);
   const [ideasWork, setIdeasWork] = useState<{ nodus_id: string; title: string } | null>(null);
@@ -452,7 +463,7 @@ export function Library({
   const [queuedByWork, setQueuedByWork] = useState<Map<string, QueueItem[]>>(new Map());
   // Client-side ordering over the already-in-memory filtered set. `null` keeps
   // the backend order (year desc, title asc).
-  const [sort, setSort] = useState<SortState | null>(null);
+  const [sort, setSort] = useState<SortState | null>(() => snapshot?.sort ?? null);
   const loadRequestRef = useRef(0);
   const tagFilterRef = useDismissableLayer<HTMLDivElement>({
     open: tagFilterOpen,
@@ -604,6 +615,35 @@ export function Library({
     }, 250);
     return () => clearTimeout(handle);
   }, [searchDraft]);
+
+  // The cut this section will find again on the way back: the applied filter, not
+  // the draft in the search box. The registry rebuilds the callback on every render
+  // of the shell, so a ref keeps its identity out of the dependencies.
+  const reportSnapshot = useRef(onSnapshotChange);
+  reportSnapshot.current = onSnapshotChange;
+  // The place in the list is a ref, not state: it changes on every scroll frame, and
+  // as state it would re-render this whole view for each one.
+  const placementRef = useRef<ListPlacement | null>(snapshot?.placement ?? null);
+  const currentSnapshot = useCallback((): LibraryVaultSnapshot => ({
+    filter, sort, filtersOpen, advancedFiltersOpen, placement: placementRef.current,
+  }), [advancedFiltersOpen, filter, filtersOpen, sort]);
+  const snapshotOf = useRef(currentSnapshot);
+  snapshotOf.current = currentSnapshot;
+  useEffect(() => { reportSnapshot.current?.(currentSnapshot()); }, [currentSnapshot]);
+
+  // VirtualList restores the anchor, because only it knows where an unrendered row
+  // would be. What to do when the row is gone is this view's call: the first page.
+  const [restoreAnchorId, setRestoreAnchorId] = useState<string | null>(() => snapshot?.placement?.anchorId ?? null);
+  const anchorChecked = useRef(restoreAnchorId === null);
+  useEffect(() => {
+    if (anchorChecked.current || works.length === 0) return;
+    anchorChecked.current = true;
+    if (works.some((work) => work.nodus_id === restoreAnchorId)) return;
+    setRestoreAnchorId(null);
+    setPageOffset(0);
+    placementRef.current = null;
+    reportSnapshot.current?.(snapshotOf.current());
+  }, [restoreAnchorId, works]);
 
   const reuseSelectedAnalysis = async (ids: string[], skipKinds: VaultAnalysisReuseKind[]): Promise<string[]> => {
     if (!reuseAnalysisFromVaults || ids.length === 0) return ids;
@@ -1530,6 +1570,11 @@ export function Library({
             items={sortedWorks}
             itemHeight={LIBRARY_ROW_HEIGHT}
             getKey={(w) => w.nodus_id}
+            anchorKey={restoreAnchorId}
+            onAnchorChange={(key) => {
+              placementRef.current = key === null ? null : { anchorId: String(key), pageOffset };
+              reportSnapshot.current?.(snapshotOf.current());
+            }}
             className="flex-1 min-h-0"
             empty={<div className="p-4 text-neutral-500">{t('No hay obras con los filtros actuales.')}</div>}
             renderItem={(w) => {

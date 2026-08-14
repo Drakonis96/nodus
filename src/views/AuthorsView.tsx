@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type {
   AppSettings,
   AuthorDossier,
@@ -16,6 +16,8 @@ import { WorkIdeasModal } from './WorkIdeasModal';
 import { useDataRefresh, useScanComplete } from '../hooks';
 import { useFeatureModel } from '../hooks/useFeatureModel';
 import type { PendingGraphNavigationTarget } from '../navigation';
+import type { AuthorsSnapshot } from '../app/viewSnapshots';
+import { useListPlacement } from '../listPlacement';
 import { t, tx } from '../i18n';
 import { getVaultQueryCache, invalidateVaultQueryCache, setVaultQueryCache } from '../vaultQueryCache';
 
@@ -40,8 +42,10 @@ const RELATION_COLORS: Record<string, 'red' | 'amber' | 'green' | 'cyan' | 'neut
   coauthor: 'neutral',
 };
 
-type SortKey = 'name' | 'surname' | 'works' | 'ideas' | 'connections';
-type SynthFilter = 'all' | 'with' | 'without';
+// Exported because the section's snapshot stores them; the unions stay declared
+// here, next to the selects that produce them.
+export type SortKey = 'name' | 'surname' | 'works' | 'ideas' | 'connections';
+export type SynthFilter = 'all' | 'with' | 'without';
 const AUTHORS_PAGE_SIZE = 80;
 
 const SORT_LABELS: Record<SortKey, string> = {
@@ -58,20 +62,53 @@ const SYNTH_FILTER_LABELS: Record<SynthFilter, string> = {
   without: 'Sin síntesis',
 };
 
+/**
+ * A tab can only be the active one if it is still open. The pair is written to the
+ * snapshot together, but a closed author with `surface: 'author'` would render an
+ * empty pane, so the surface answers to what actually exists.
+ */
+function restoredSurface(snapshot?: AuthorsSnapshot): AuthorsSurface {
+  const surface = snapshot?.surface ?? 'catalog';
+  if (surface === 'author' && !snapshot?.openAuthor) return 'catalog';
+  if (surface === 'matrix' && !snapshot?.matrixOpen) return 'catalog';
+  return surface;
+}
+
 export function AuthorsView({
   vaultId,
   settings,
+  snapshot,
+  onSnapshotChange,
   onOpenGraph,
 }: {
   vaultId: string | null;
   settings: AppSettings;
+  /** Where this section was last left. Read once, at mount, and never again. */
+  snapshot?: AuthorsSnapshot;
+  onSnapshotChange?: (patch: Partial<AuthorsSnapshot>) => void;
   onOpenGraph: (target: PendingGraphNavigationTarget) => void;
 }) {
-  const [surface, setSurface] = useState<AuthorsSurface>('catalog');
-  const [openAuthor, setOpenAuthor] = useState<OpenAuthor | null>(null);
-  const [matrixOpen, setMatrixOpen] = useState(false);
+  // Restored as initial values only. A reactive `snapshot` prop would fight the
+  // reader for control of their own tabs on every re-render of the shell.
+  const [openAuthor, setOpenAuthor] = useState<OpenAuthor | null>(() => snapshot?.openAuthor ?? null);
+  const [matrixOpen, setMatrixOpen] = useState(() => snapshot?.matrixOpen ?? false);
+  const [surface, setSurface] = useState<AuthorsSurface>(() => restoredSurface(snapshot));
   const [catalogRevision, setCatalogRevision] = useState(0);
   const [model, setModel] = useFeatureModel(settings, 'authorModel');
+
+  // The registry builds `onSnapshotChange` inline, so its identity changes on every
+  // render of the shell; a ref keeps that out of the effect's dependencies.
+  const report = useRef(onSnapshotChange);
+  report.current = onSnapshotChange;
+  useEffect(() => {
+    // Only the id and the label: `saved` is refetched by the tab when it mounts, and
+    // a stale copy of it here would draw the wrong star.
+    report.current?.({
+      surface,
+      matrixOpen,
+      openAuthor: openAuthor ? { id: openAuthor.id, label: openAuthor.label } : null,
+    });
+  }, [matrixOpen, openAuthor, surface]);
 
   const showAuthor = useCallback((author: OpenAuthor) => {
     setOpenAuthor(author);
@@ -135,7 +172,7 @@ export function AuthorsView({
       </header>
 
       <main className="min-h-0 flex-1">
-        <div className={surface === 'catalog' ? 'h-full' : 'hidden'}><AuthorsCatalog vaultId={vaultId} refreshKey={catalogRevision} onOpenAuthor={showAuthor} onOpenMatrix={showMatrix} /></div>
+        <div className={surface === 'catalog' ? 'h-full' : 'hidden'}><AuthorsCatalog vaultId={vaultId} refreshKey={catalogRevision} snapshot={snapshot} onSnapshotChange={onSnapshotChange} onOpenAuthor={showAuthor} onOpenMatrix={showMatrix} /></div>
         {openAuthor && <div className={surface === 'author' ? 'h-full' : 'hidden'}><AuthorDetailTab key={openAuthor.id} author={openAuthor} vaultId={vaultId} model={model} onOpenAuthor={showAuthor} onOpenGraph={onOpenGraph} onSavedChange={() => setCatalogRevision((value) => value + 1)} /></div>}
         {matrixOpen && <div className={surface === 'matrix' ? 'h-full p-5' : 'hidden'}><MatrixTab onOpenGraph={onOpenGraph} model={model} /></div>}
       </main>
@@ -148,25 +185,35 @@ export function AuthorsView({
 function AuthorsCatalog({
   vaultId,
   refreshKey,
+  snapshot,
+  onSnapshotChange,
   onOpenAuthor,
   onOpenMatrix,
 }: {
   vaultId: string | null;
   refreshKey: number;
+  snapshot?: AuthorsSnapshot;
+  onSnapshotChange?: (patch: Partial<AuthorsSnapshot>) => void;
   onOpenAuthor: (author: OpenAuthor) => void;
   onOpenMatrix: () => void;
 }) {
   const [authors, setAuthors] = useState<AuthorSummary[]>([]);
   const [totalAuthors, setTotalAuthors] = useState(0);
-  const [pageOffset, setPageOffset] = useState(0);
+  // The page and the row that was at the top are one restored value. The page alone
+  // would drop the reader in front of row 201 with no context.
+  const [pageOffset, setPageOffset] = useState(() => snapshot?.placement?.pageOffset ?? 0);
+  const [anchorId, setAnchorId] = useState<string | null>(() => snapshot?.placement?.anchorId ?? null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [query, setQuery] = useState('');
-  const [queryFilter, setQueryFilter] = useState('');
-  const [sortBy, setSortBy] = useState<SortKey>('surname');
-  const [synthFilter, setSynthFilter] = useState<SynthFilter>('all');
-  const [savedOnly, setSavedOnly] = useState(false);
-  const [filtersOpen, setFiltersOpen] = useState(false);
+  // The search box has two states, the immediate one and the debounced one that
+  // actually queries. Both start from the stored text, or the debounce would fire
+  // on mount and wipe the restored cut back to the whole corpus.
+  const [query, setQuery] = useState(() => snapshot?.query ?? '');
+  const [queryFilter, setQueryFilter] = useState(() => snapshot?.query ?? '');
+  const [sortBy, setSortBy] = useState<SortKey>(() => snapshot?.sortBy ?? 'surname');
+  const [synthFilter, setSynthFilter] = useState<SynthFilter>(() => snapshot?.synthFilter ?? 'all');
+  const [savedOnly, setSavedOnly] = useState(() => snapshot?.savedOnly ?? false);
+  const [filtersOpen, setFiltersOpen] = useState(() => snapshot?.filtersOpen ?? false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [exportFormat, setExportFormat] = useState<'markdown' | 'pdf'>('markdown');
   const [exporting, setExporting] = useState(false);
@@ -214,9 +261,42 @@ function AuthorsCatalog({
     return () => clearTimeout(handle);
   }, [query]);
 
+  // The catalogue reports its own half of the snapshot; the tab strip above reports
+  // the other. The stored text is the applied one, not the draft: half a word typed
+  // on the way out is not a cut worth returning to.
+  const report = useRef(onSnapshotChange);
+  report.current = onSnapshotChange;
   useEffect(() => {
+    report.current?.({ query: queryFilter, sortBy, synthFilter, savedOnly, filtersOpen });
+  }, [filtersOpen, queryFilter, savedOnly, sortBy, synthFilter]);
+
+  // Changing the cut throws the place away with it: a row that was at the top of one
+  // filter means nothing under another. It must skip its own first run, though, or
+  // arriving with a restored filter would reset the restored page a frame later.
+  const cutChanged = useRef(false);
+  useEffect(() => {
+    if (!cutChanged.current) {
+      cutChanged.current = true;
+      return;
+    }
     setPageOffset(0);
+    setAnchorId(null);
+    report.current?.({ placement: null });
   }, [queryFilter, savedOnly, sortBy, synthFilter]);
+
+  // Scrolling back to the stored row, once the page holding it has arrived. If it is
+  // not there — deleted, or the corpus changed underneath — the list goes back to the
+  // first page and the top rather than sit on a page with nothing to show for it.
+  const scrollerRef = useListPlacement<HTMLDivElement>({
+    restoreAnchorId: anchorId,
+    revision: authors,
+    onRestoreMissed: () => {
+      setAnchorId(null);
+      setPageOffset(0);
+      report.current?.({ placement: null });
+    },
+    onCapture: (topId) => report.current?.({ placement: topId ? { anchorId: topId, pageOffset } : null }),
+  });
 
   useEffect(() => {
     void reloadAuthors(false);
@@ -341,7 +421,7 @@ function AuthorsCatalog({
         {error && <p role="alert" className="mt-2 text-xs text-red-400">{error}</p>}
       </div>
 
-      <div data-testid="authors-table-scroll" className="min-h-0 flex-1 overflow-auto">
+      <div ref={scrollerRef} data-testid="authors-table-scroll" className="min-h-0 flex-1 overflow-auto">
         <div className="min-w-[1050px]">
           <div className="grid h-10 items-center border-b border-neutral-800 px-3 text-[10px] font-semibold uppercase tracking-wider text-neutral-600" style={{ gridTemplateColumns: '2.25rem minmax(130px,1fr) minmax(150px,1.15fr) 5.5rem 5.5rem 7rem minmax(220px,1.6fr) 6rem 2.5rem' }}>
             <input type="checkbox" checked={allFilteredSelected} onChange={toggleSelectAll} aria-label={t('Seleccionar todos')} />
@@ -357,7 +437,7 @@ function AuthorsCatalog({
           ) : filtered.length === 0 ? (
             <div className="grid h-48 place-items-center p-8 text-center"><div><Icon name="user" size={28} className="mx-auto text-neutral-700" /><p className="mt-3 text-sm text-neutral-400">{t(savedOnly ? queryFilter || synthFilter !== 'all' ? 'No hay autores guardados que coincidan con los filtros.' : 'No has guardado ningún autor todavía.' : 'No hay autores todavía.')}</p></div></div>
           ) : filtered.map((author) => (
-            <div key={author.author_id} data-testid={`author-card-${author.author_id}`} className="grid min-h-[64px] items-center border-b border-neutral-900 px-3 text-xs hover:bg-neutral-900/55" style={{ gridTemplateColumns: '2.25rem minmax(130px,1fr) minmax(150px,1.15fr) 5.5rem 5.5rem 7rem minmax(220px,1.6fr) 6rem 2.5rem' }}>
+            <div key={author.author_id} data-testid={`author-card-${author.author_id}`} data-anchor-id={author.author_id} className="grid min-h-[64px] items-center border-b border-neutral-900 px-3 text-xs hover:bg-neutral-900/55" style={{ gridTemplateColumns: '2.25rem minmax(130px,1fr) minmax(150px,1.15fr) 5.5rem 5.5rem 7rem minmax(220px,1.6fr) 6rem 2.5rem' }}>
               <input type="checkbox" checked={selected.has(author.author_id)} onChange={() => toggleSelect(author.author_id)} aria-label={t('Seleccionar para exportar')} />
               <button data-testid="author-name" className="min-w-0 pr-3 text-left font-medium text-neutral-200 hover:text-indigo-300" onClick={() => onOpenAuthor({ id: author.author_id, label: author.fullName || author.name, saved: author.saved })}><span className="block truncate">{author.firstName || author.fullName || author.name}</span>{author.affiliation && <span className="mt-1 block truncate text-[10px] font-normal text-neutral-600">{author.affiliation}</span>}</button>
               <button className="min-w-0 truncate pr-3 text-left text-neutral-400 hover:text-indigo-300" onClick={() => onOpenAuthor({ id: author.author_id, label: author.fullName || author.name, saved: author.saved })}>{author.lastName || author.name}</button>

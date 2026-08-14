@@ -14,9 +14,12 @@ import {
 } from '../navigation';
 import { t, tx } from '../i18n';
 import { getVaultQueryCache, setVaultQueryCache } from '../vaultQueryCache';
+import type { IdeasSnapshot } from '../app/viewSnapshots';
+import { useListPlacement } from '../listPlacement';
 import { academicKnowledgeViewSource, type KnowledgeViewSource } from './knowledgeViewSource';
 
-type SortKey = 'label' | 'type' | 'works' | 'connections' | 'confidence';
+// Exported because the section's snapshot stores it.
+export type SortKey = 'label' | 'type' | 'works' | 'connections' | 'confidence';
 type IdeasSurface = 'catalog' | 'idea';
 type OpenIdea = { id: string; label: string };
 const IDEAS_PAGE_SIZE = 80;
@@ -24,6 +27,8 @@ const IDEAS_PAGE_SIZE = 80;
 export function IdeasView({
   vaultId,
   target,
+  snapshot,
+  onSnapshotChange,
   onOpenGraph,
   onOpenAssistant,
   dataSource = academicKnowledgeViewSource,
@@ -33,6 +38,9 @@ export function IdeasView({
 }: {
   vaultId: string | null;
   target?: IdeaNavigationTarget | null;
+  /** Where this section was last left. Read once, at mount, and never again. */
+  snapshot?: IdeasSnapshot;
+  onSnapshotChange?: (patch: Partial<IdeasSnapshot>) => void;
   onOpenGraph: (target: PendingGraphNavigationTarget) => void;
   onOpenAssistant: (target?: PendingAssistantNavigationTarget) => void;
   dataSource?: KnowledgeViewSource;
@@ -42,16 +50,25 @@ export function IdeasView({
 }) {
   const [ideas, setIdeas] = useState<IdeaListItem[]>([]);
   const [totalIdeas, setTotalIdeas] = useState(0);
-  const [pageOffset, setPageOffset] = useState(0);
+  // The page and the row that was at the top are one restored value. The page alone
+  // would drop the reader in front of row 201 with no context.
+  const [pageOffset, setPageOffset] = useState(() => snapshot?.placement?.pageOffset ?? 0);
+  const [anchorId, setAnchorId] = useState<string | null>(() => snapshot?.placement?.anchorId ?? null);
   const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState('');
-  const [searchQuery, setSearchQuery] = useState('');
-  const [typeFilter, setTypeFilter] = useState<IdeaType | ''>('');
-  const [sortKey, setSortKey] = useState<SortKey>('label');
-  const [surface, setSurface] = useState<IdeasSurface>('catalog');
-  const [openIdea, setOpenIdea] = useState<OpenIdea | null>(null);
-  const [filtersOpen, setFiltersOpen] = useState(false);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  // Restored as initial values only — a reactive `snapshot` prop would fight the
+  // reader for their own filters. The search box keeps its immediate and debounced
+  // halves in step, or the debounce would wipe the restored cut on mount.
+  const [search, setSearch] = useState(() => snapshot?.search ?? '');
+  const [searchQuery, setSearchQuery] = useState(() => snapshot?.search ?? '');
+  const [typeFilter, setTypeFilter] = useState<IdeaType | ''>(() => snapshot?.typeFilter ?? '');
+  const [sortKey, setSortKey] = useState<SortKey>(() => snapshot?.sortKey ?? 'label');
+  const [openIdea, setOpenIdea] = useState<OpenIdea | null>(() => snapshot?.openIdea ?? null);
+  // An idea tab that is no longer open cannot be the active surface.
+  const [surface, setSurface] = useState<IdeasSurface>(() => (snapshot?.surface === 'idea' && snapshot.openIdea ? 'idea' : 'catalog'));
+  const [filtersOpen, setFiltersOpen] = useState(() => snapshot?.filtersOpen ?? false);
+  // Paired with `openIdea` by `showIdea`; restoring one without the other would draw
+  // a tab with an empty pane behind it.
+  const [selectedId, setSelectedId] = useState<string | null>(() => snapshot?.openIdea?.id ?? null);
   const [detail, setDetail] = useState<IdeaDetail | null>(null);
   const [connections, setConnections] = useState<IdeaConnection[]>([]);
   const [detailLoading, setDetailLoading] = useState(false);
@@ -113,9 +130,42 @@ export function IdeasView({
     return () => clearTimeout(handle);
   }, [search]);
 
+  // The registry builds `onSnapshotChange` inline, so its identity changes on every
+  // render of the shell; a ref keeps that out of the effect's dependencies. The
+  // stored text is the applied one, not the draft.
+  const report = useRef(onSnapshotChange);
+  report.current = onSnapshotChange;
   useEffect(() => {
+    report.current?.({ surface, openIdea, search: searchQuery, typeFilter, sortKey, filtersOpen });
+  }, [filtersOpen, openIdea, searchQuery, sortKey, surface, typeFilter]);
+
+  // Changing the cut throws the place away with it: a row that was at the top of one
+  // filter means nothing under another. It must skip its own first run, though, or
+  // arriving with a restored filter would reset the restored page a frame later.
+  const cutChanged = useRef(false);
+  useEffect(() => {
+    if (!cutChanged.current) {
+      cutChanged.current = true;
+      return;
+    }
     setPageOffset(0);
+    setAnchorId(null);
+    report.current?.({ placement: null });
   }, [searchQuery, sortKey, typeFilter]);
+
+  // Scrolling back to the stored row, once the page holding it has arrived. If it is
+  // gone, the list returns to the first page and the top rather than sit on a page
+  // with nothing to show for it.
+  const scrollerRef = useListPlacement<HTMLDivElement>({
+    restoreAnchorId: anchorId,
+    revision: ideas,
+    onRestoreMissed: () => {
+      setAnchorId(null);
+      setPageOffset(0);
+      report.current?.({ placement: null });
+    },
+    onCapture: (topId) => report.current?.({ placement: topId ? { anchorId: topId, pageOffset } : null }),
+  });
 
   useEffect(() => {
     const force = initialListLoad.current;
@@ -268,7 +318,7 @@ export function IdeasView({
             )}
           </div>
 
-          <div data-testid="ideas-table-scroll" className="min-h-0 flex-1 overflow-auto">
+          <div ref={scrollerRef} data-testid="ideas-table-scroll" className="min-h-0 flex-1 overflow-auto">
             <div data-testid="ideas-catalog-table" className="min-w-[1080px]">
               <div className="grid h-11 items-center border-b border-neutral-200 px-4 text-[10px] font-semibold uppercase tracking-wider text-neutral-500 dark:border-neutral-800 dark:text-neutral-600" style={{ gridTemplateColumns: 'minmax(360px,2.4fr) 8rem 6.5rem 7.5rem 7rem minmax(220px,1.35fr) 2rem' }}>
                 <IdeaSortHeader label="Idea" sort="label" active={sortKey} onSort={setSortKey} />
@@ -288,6 +338,7 @@ export function IdeasView({
                 <button
                   key={node.id}
                   data-testid={testId ? 'study-idea-card' : `idea-row-${node.id}`}
+                  data-anchor-id={node.id}
                   className="grid min-h-[76px] w-full items-center border-b border-neutral-100 px-4 text-left text-xs transition-colors hover:bg-neutral-50 dark:border-neutral-900 dark:hover:bg-neutral-900/55"
                   style={{ gridTemplateColumns: 'minmax(360px,2.4fr) 8rem 6.5rem 7.5rem 7rem minmax(220px,1.35fr) 2rem' }}
                   onClick={() => showIdea({ id: node.id, label: node.label })}

@@ -25,12 +25,15 @@ import { TextInputModal } from '../components/TextInputModal';
 import { WorkspaceTabStrip } from '../components/library/LibraryWorkspaceTabs';
 import { noteAsEditorDocument, workspaceNotePort } from '../components/editor/documentPort';
 import type { PendingGraphNavigationTarget } from '../navigation';
+import type { WorkspaceSnapshot } from '../app/viewSnapshots';
+import { useListPlacement } from '../listPlacement';
 import { t, tx } from '../i18n';
 
 const StudyEditor = lazy(() => import('../components/editor/StudyEditor').then((module) => ({ default: module.StudyEditor })));
 
 /** Lo que se puede crear aquí. Una idea es una nota que además vive en el grafo. */
-type WorkspaceItemKind = 'note' | 'idea';
+/** Exported because the section's snapshot stores it. */
+export type WorkspaceItemKind = 'note' | 'idea';
 
 type Scope = { kind: 'all' } | { kind: 'unfiled' } | { kind: 'trash' } | { kind: 'collection'; id: string };
 
@@ -398,6 +401,8 @@ function WorkspaceTagsEditor({ note, onChanged }: { note: Note; onChanged: () =>
 export function WorkspaceView({
   settings,
   focusNote,
+  snapshot,
+  onSnapshotChange,
   onOpenGraph,
   title = 'Espacio de trabajo',
   onTestimonyLink,
@@ -405,6 +410,9 @@ export function WorkspaceView({
   settings: AppSettings;
   /** Una nota que abrir al entrar (búsqueda global, Nodi); el nonce repite el gesto. */
   focusNote?: { id: string; nonce: number } | null;
+  /** Where this section was last left. Read once, at mount, and never again. */
+  snapshot?: WorkspaceSnapshot;
+  onSnapshotChange?: (patch: Partial<WorkspaceSnapshot>) => void;
   onOpenGraph?: (target: PendingGraphNavigationTarget) => void;
   /** Los demás vaults conservan el nombre de sección «Notas» usando esta misma vista. */
   title?: 'Espacio de trabajo' | 'Notas';
@@ -414,18 +422,22 @@ export function WorkspaceView({
   const [tree, setTree] = useState<NotesTree>({ folders: [], notes: [] });
   const [links, setLinks] = useState<WorkspaceLibraryLink[]>([]);
   const [loading, setLoading] = useState(true);
-  const [scope, setScope] = useState<Scope>({ kind: 'all' });
-  const [expanded, setExpanded] = useState<Set<string>>(new Set());
-  const [search, setSearch] = useState('');
-  const [kindFilter, setKindFilter] = useState<'' | WorkspaceItemKind>('');
-  const [selectedTags, setSelectedTags] = useState<string[]>([]);
+  // Restored as initial values only. The expanded folders are part of the cut:
+  // collapsing back to the root loses the reader's route to what they were reading
+  // just as surely as dropping the filter does.
+  const [scope, setScope] = useState<Scope>(() => snapshot?.scope ?? { kind: 'all' });
+  const [expanded, setExpanded] = useState<Set<string>>(() => new Set(snapshot?.expanded ?? []));
+  const [search, setSearch] = useState(() => snapshot?.search ?? '');
+  const [kindFilter, setKindFilter] = useState<'' | WorkspaceItemKind>(() => snapshot?.kindFilter ?? '');
+  const [selectedTags, setSelectedTags] = useState<string[]>(() => snapshot?.selectedTags ?? []);
   const [tagFilterOpen, setTagFilterOpen] = useState(false);
   const [tagSearch, setTagSearch] = useState('');
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [bulkTag, setBulkTag] = useState('');
   const [bulkCollection, setBulkCollection] = useState('');
-  const [openIds, setOpenIds] = useState<string[]>([]);
-  const [activeId, setActiveId] = useState<string | null>(null);
+  const [openIds, setOpenIds] = useState<string[]>(() => snapshot?.openIds ?? []);
+  const [activeId, setActiveId] = useState<string | null>(() => snapshot?.activeId ?? null);
+  const [anchorId, setAnchorId] = useState<string | null>(() => snapshot?.placement?.anchorId ?? null);
   const [itemContextMenu, setItemContextMenu] = useState<WorkspaceItemContextMenu | null>(null);
   const [renaming, setRenaming] = useState<NoteFolder | null>(null);
   const [creatingCollection, setCreatingCollection] = useState(false);
@@ -525,6 +537,27 @@ export function WorkspaceView({
       })
       .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
   }, [tree.notes, scope, children, kindFilter, search, selectedTags]);
+
+  // The registry rebuilds the callback on every render of the shell, so a ref keeps
+  // its identity out of the effect's dependencies.
+  const report = useRef(onSnapshotChange);
+  report.current = onSnapshotChange;
+  useEffect(() => {
+    report.current?.({ scope, expanded: [...expanded], search, kindFilter, selectedTags, openIds, activeId });
+  }, [activeId, expanded, kindFilter, openIds, scope, search, selectedTags]);
+
+  // This list is not paged — the filtered set renders whole — so the placement is
+  // scroll alone. It is still an id: row heights change with the window, and the
+  // notes reorder themselves by modification date under the reader's feet.
+  const listRef = useListPlacement<HTMLDivElement>({
+    restoreAnchorId: anchorId,
+    revision: visible,
+    onRestoreMissed: () => {
+      setAnchorId(null);
+      report.current?.({ placement: null });
+    },
+    onCapture: (topId) => report.current?.({ placement: topId ? { anchorId: topId } : null }),
+  });
 
   const openTabs = useMemo(
     () => openIds
@@ -903,7 +936,7 @@ export function WorkspaceView({
             <span className="text-right">{t('Modificado')}</span>
           </div>
 
-          <div data-testid="workspace-item-list" className="library-catalog-scroll min-h-0 flex-1 overflow-y-auto">
+          <div ref={listRef} data-testid="workspace-item-list" className="library-catalog-scroll min-h-0 flex-1 overflow-y-auto">
             {loading && <p className="px-4 py-6 text-xs text-neutral-500"><Spinner /> {t('Cargando…')}</p>}
             {!loading && visible.length === 0 && (
               <p className="px-4 py-6 text-xs leading-5 text-neutral-500">
@@ -917,6 +950,7 @@ export function WorkspaceView({
                 <div
                   key={note.id}
                   data-testid={`workspace-item-${note.id}`}
+                  data-anchor-id={note.id}
                   role="button"
                   tabIndex={0}
                   draggable={scope.kind !== 'trash'}
