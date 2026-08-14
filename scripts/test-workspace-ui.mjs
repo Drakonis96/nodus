@@ -139,7 +139,7 @@ test('every vault uses the Workspace experience without losing its own section n
     assert.match(vaultTypes, scoped, `${replaced} is no longer offered in the academic vault`);
     assert.match(vaultTypes, new RegExp(`${replaced}: \\[[^\\]]*'genealogy'`), `${replaced} survives untouched elsewhere`);
   }
-  assert.match(registry, /workspace: \(\{ navigate, noteTarget, settings \}\)/, 'the academic Workspace is routable');
+  assert.match(registry, /workspace: \(\{ navigate, noteTarget, settings[,\s}]/, 'the academic Workspace is routable');
   assert.match(registry, /notes:[\s\S]*<WorkspaceView[\s\S]*title="Notas"/,
     'general Notes routes reuse the same Workspace catalogue, tabs and editor');
   assert.match(registry, /isPrimarySources[\s\S]*<PrimarySourcesNotesView/,

@@ -21,6 +21,7 @@ import type {
 } from '../navigation';
 import type { StudyNavigationTarget } from '../components/StudySidebar';
 import type { DossierTab } from '../components/testimonies/InterviewDossier';
+import type { ViewSnapshotAccess } from './viewSnapshots';
 
 /** A pending navigation carries a nonce so repeating the same target re-triggers it. */
 export type Nonced<T> = T & { nonce: number };
@@ -82,6 +83,13 @@ export interface ViewContext extends VaultFlags {
   studyRecordingTarget: { id: string; timestamp?: number | null } | null;
   studyGraphTarget: Nonced<PendingGraphNavigationTarget> | null;
   studyChatTarget: { prompt: string; nonce: number } | null;
+
+  /**
+   * Where each section was when it was last left: its filters, its ordering and its
+   * open tab, kept above the render point so they outlive the unmount. Already bound
+   * to the active vault, so a section cannot read another vault's cut.
+   */
+  snapshots: ViewSnapshotAccess;
 
   // Navigation.
   setView: (view: View) => void;

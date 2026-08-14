@@ -17,6 +17,8 @@ import {
   type DetailLoading,
 } from '../components/NodeDetailPanel';
 import { useDismissableLayer, useIncrementalList } from '../hooks';
+import type { ArgumentSnapshot } from '../app/viewSnapshots';
+import { useListPlacement } from '../listPlacement';
 import { useFeatureModel } from '../hooks/useFeatureModel';
 import { expandableIdsByDepth } from '../argumentMapTree';
 import { t, tx } from '../i18n';
@@ -57,27 +59,49 @@ function typeColor(type: ArgumentBlock['type']): string {
 // what froze the section; one screenful at a time is enough to scroll from.
 const ROUTES_PAGE_SIZE = 40;
 type ArgumentMapSurface = 'catalog' | 'map';
-type RouteSortKey = 'label' | 'type' | 'connections' | 'debates' | 'confidence';
+/** Exported because the section's snapshot stores it. */
+export type RouteSortKey = 'label' | 'type' | 'connections' | 'debates' | 'confidence';
 type OpenArgumentMap = { ideaId: string; label: string; mode: 'auto' | 'ai' };
 
-export function ArgumentMapView({ settings }: { settings: AppSettings }) {
+export function ArgumentMapView({
+  settings,
+  snapshot,
+  onSnapshotChange,
+}: {
+  settings: AppSettings;
+  /** Where this section was last left. Read once, at mount, and never again. */
+  snapshot?: ArgumentSnapshot;
+  onSnapshotChange?: (patch: Partial<ArgumentSnapshot>) => void;
+}) {
+  // The catalogue is where a returning reader lands, always. The open map holds no
+  // data of its own — redrawing it means rebuilding it, and in AI mode that would
+  // spend a model call on the act of walking back into the section.
   const [surface, setSurface] = useState<ArgumentMapSurface>('catalog');
   const [openArgumentMap, setOpenArgumentMap] = useState<OpenArgumentMap | null>(null);
   const [ideaNodes, setIdeaNodes] = useState<IdeaPickerItem[]>([]);
   const [graphLoaded, setGraphLoaded] = useState(false);
-  const [mode, setMode] = useState<'auto' | 'ai'>('auto');
+  const [mode, setMode] = useState<'auto' | 'ai'>(() => snapshot?.mode ?? 'auto');
   const [suggestions, setSuggestions] = useState<ArgumentRouteSuggestion[]>([]);
   const [suggestionsLoading, setSuggestionsLoading] = useState(false);
   // Only a click on «Actualizar» spins that button's icon. The automatic discovery
   // on entering the section has its own indicator, and spinning both at once read
   // as if the app were refreshing on its own.
   const [refreshing, setRefreshing] = useState(false);
-  const [seedId, setSeedId] = useState('');
+  const [seedId, setSeedId] = useState(() => snapshot?.seedId ?? '');
   const [search, setSearch] = useState('');
   const [seedSearchOpen, setSeedSearchOpen] = useState(false);
-  const [suggestionSearch, setSuggestionSearch] = useState('');
-  const [minConnections, setMinConnections] = useState(0);
-  const [routeSort, setRouteSort] = useState<RouteSortKey>('connections');
+  const [suggestionSearch, setSuggestionSearch] = useState(() => snapshot?.suggestionSearch ?? '');
+  const [minConnections, setMinConnections] = useState(() => snapshot?.minConnections ?? 0);
+  const [routeSort, setRouteSort] = useState<RouteSortKey>(() => snapshot?.routeSort ?? 'connections');
+  const [anchorId, setAnchorId] = useState<string | null>(() => snapshot?.placement?.anchorId ?? null);
+
+  // The registry rebuilds the callback on every render of the shell, so a ref keeps
+  // its identity out of the effect's dependencies.
+  const report = useRef(onSnapshotChange);
+  report.current = onSnapshotChange;
+  useEffect(() => {
+    report.current?.({ mode, seedId, suggestionSearch, minConnections, routeSort });
+  }, [minConnections, mode, routeSort, seedId, suggestionSearch]);
   const [model, setModel] = useFeatureModel(settings, 'argumentMapModel');
   const [map, setMap] = useState<ArgumentMap | null>(null);
   const [building, setBuilding] = useState(false);
@@ -180,12 +204,27 @@ export function ArgumentMapView({ settings }: { settings: AppSettings }) {
     });
   }, [suggestions, suggestionSearch, minConnections, routeSort]);
 
+  // "Load until this id appears" is literal here: this list pages inside the renderer,
+  // so reaching the anchor and paging to it are the same act.
+  const anchorIndex = anchorId === null
+    ? -1
+    : filteredSuggestions.findIndex((suggestion) => suggestion.ideaId === anchorId);
   const {
     visible: shownSuggestions,
     hasMore: hasMoreSuggestions,
     sentinelRef: suggestionsSentinelRef,
     showMore: showMoreSuggestions,
-  } = useIncrementalList<ArgumentRouteSuggestion>(filteredSuggestions, ROUTES_PAGE_SIZE);
+  } = useIncrementalList<ArgumentRouteSuggestion>(filteredSuggestions, ROUTES_PAGE_SIZE, undefined, anchorIndex);
+
+  const routesScrollerRef = useListPlacement<HTMLDivElement>({
+    restoreAnchorId: anchorId,
+    revision: shownSuggestions,
+    onRestoreMissed: () => {
+      setAnchorId(null);
+      report.current?.({ placement: null });
+    },
+    onCapture: (topId) => report.current?.({ placement: topId ? { anchorId: topId } : null }),
+  });
 
   const stopReveal = useCallback(() => {
     if (revealTimerRef.current != null) {
@@ -449,7 +488,7 @@ export function ArgumentMapView({ settings }: { settings: AppSettings }) {
               </div>
             </div>
           ) : (
-            <div data-testid="argument-routes-table" className="min-h-0 flex-1 overflow-auto">
+            <div ref={routesScrollerRef} data-testid="argument-routes-table" className="min-h-0 flex-1 overflow-auto">
               {error && <div className="m-4 flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:border-red-900/60 dark:bg-red-950/30 dark:text-red-400"><Icon name="alert" /> <span>{error}</span></div>}
               {suggestionsLoading && suggestions.length === 0 ? (
                 <div className="grid h-48 place-items-center text-neutral-500"><Spinner label={t('Detectando recorridos…')} /></div>
@@ -473,6 +512,7 @@ export function ArgumentMapView({ settings }: { settings: AppSettings }) {
                         <button
                           key={s.ideaId}
                           data-testid={`argument-route-${s.ideaId}`}
+                          data-anchor-id={s.ideaId}
                           className="grid min-h-[76px] w-full items-center border-b border-neutral-100 px-4 text-left text-xs transition-colors hover:bg-neutral-50 dark:border-neutral-900 dark:hover:bg-neutral-900/55"
                           style={{ gridTemplateColumns: 'minmax(260px,2fr) 7rem 7rem 6rem 7rem minmax(190px,1.25fr) minmax(230px,1.5fr) 2.5rem' }}
                           onClick={() => build(s.ideaId)}

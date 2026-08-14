@@ -38,6 +38,7 @@ import { confirm, promptText, toast } from '../components/feedback';
 import { t, tx } from '../i18n';
 import type { PendingAssistantNavigationTarget } from '../navigation';
 import type { PendingLibraryNavigationTarget } from '../navigation';
+import type { LibraryGlobalSnapshot, LibrarySnapshot, ListPlacement } from '../app/viewSnapshots';
 import type { PendingGraphNavigationTarget } from '../navigation';
 import { Library } from './Library';
 import { LIBRARY_COLUMN_BY_ID, libraryItemTypeLabel } from '@shared/libraryBibliography';
@@ -727,9 +728,11 @@ function LibraryScopeControls({
 }
 
 function GlobalLibraryContent({
-  target, onOpenSettings, scopeControls, onOpenReader,
+  target, snapshot, onSnapshotChange, onOpenSettings, scopeControls, onOpenReader,
 }: {
   target?: (PendingLibraryNavigationTarget & { nonce: number }) | null;
+  snapshot?: LibraryGlobalSnapshot;
+  onSnapshotChange?: (next: LibraryGlobalSnapshot) => void;
   onOpenSettings: () => void;
   scopeControls: ReactNode;
   onOpenReader: (reference: LibraryReaderReference) => void;
@@ -737,24 +740,27 @@ function GlobalLibraryContent({
   const [status, setStatus] = useState<LibraryStatus | null>(null);
   const [collections, setCollections] = useState<LibraryCollectionView[]>([]);
   const [savedSearches, setSavedSearches] = useState<LibrarySavedSearchRecord[]>([]);
-  const [selectedSavedSearch, setSelectedSavedSearch] = useState<string | null>(null);
+  const [selectedSavedSearch, setSelectedSavedSearch] = useState<string | null>(() => snapshot?.selectedSavedSearch ?? null);
   const [facets, setFacets] = useState<LibraryCatalogFacets>(EMPTY_FACETS);
   const [viewPreferences, setViewPreferences] = useState<LibraryViewPreferences>(DEFAULT_VIEW_PREFERENCES);
   const [librarySettings, setLibrarySettings] = useState<GlobalLibrarySettings>(DEFAULT_GLOBAL_LIBRARY_SETTINGS);
   const [items, setItems] = useState<LibraryCatalogItem[]>([]);
   const [total, setTotal] = useState(0);
-  const [offset, setOffset] = useState(0);
-  const [searchDraft, setSearchDraft] = useState('');
-  const [search, setSearch] = useState('');
-  const [selectedCollection, setSelectedCollection] = useState<string | null>(null);
-  const [source, setSource] = useState<LibraryItemSource | ''>('');
-  const [extraction, setExtraction] = useState<LibraryCatalogItem['extractionStatus'] | ''>('');
-  const [yearFrom, setYearFrom] = useState('');
-  const [yearTo, setYearTo] = useState('');
-  const [itemType, setItemType] = useState<LibraryItemType | ''>('');
-  const [facetTag, setFacetTag] = useState('');
-  const [facetVault, setFacetVault] = useState('');
-  const [attachmentFilter, setAttachmentFilter] = useState<'' | 'with' | 'without'>('');
+  // The page and the row that was at the top are one restored value.
+  const [offset, setOffset] = useState(() => snapshot?.placement?.pageOffset ?? 0);
+  // Restored as initial values only. The draft and the applied search start from the
+  // same text, or the debounce would wipe the restored cut on mount.
+  const [searchDraft, setSearchDraft] = useState(() => snapshot?.search ?? '');
+  const [search, setSearch] = useState(() => snapshot?.search ?? '');
+  const [selectedCollection, setSelectedCollection] = useState<string | null>(() => snapshot?.selectedCollection ?? null);
+  const [source, setSource] = useState<LibraryItemSource | ''>(() => snapshot?.filters.source ?? '');
+  const [extraction, setExtraction] = useState<LibraryCatalogItem['extractionStatus'] | ''>(() => snapshot?.filters.extraction ?? '');
+  const [yearFrom, setYearFrom] = useState(() => snapshot?.filters.yearFrom ?? '');
+  const [yearTo, setYearTo] = useState(() => snapshot?.filters.yearTo ?? '');
+  const [itemType, setItemType] = useState<LibraryItemType | ''>(() => snapshot?.filters.itemType ?? '');
+  const [facetTag, setFacetTag] = useState(() => snapshot?.filters.facetTag ?? '');
+  const [facetVault, setFacetVault] = useState(() => snapshot?.filters.facetVault ?? '');
+  const [attachmentFilter, setAttachmentFilter] = useState<'' | 'with' | 'without'>(() => snapshot?.filters.attachmentFilter ?? '');
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [detailId, setDetailId] = useState<string | null>(null);
   const [detail, setDetail] = useState<LibraryItemRecord | null>(null);
@@ -764,7 +770,7 @@ function GlobalLibraryContent({
   const [error, setError] = useState<string | null>(null);
   const [zoteroOpen, setZoteroOpen] = useState(false);
   const [migrationOpen, setMigrationOpen] = useState(false);
-  const [filtersOpen, setFiltersOpen] = useState(false);
+  const [filtersOpen, setFiltersOpen] = useState(() => snapshot?.filtersOpen ?? false);
   const [collectionTarget, setCollectionTarget] = useState('');
   const [metadataItem, setMetadataItem] = useState<LibraryItemRecord | null>(null);
   const [createReferenceMode, setCreateReferenceMode] = useState<'identifier' | 'manual' | null>(null);
@@ -852,7 +858,55 @@ function GlobalLibraryContent({
     setDetailLinks(links);
   }, []);
 
-  useEffect(() => { const timer = window.setTimeout(() => { setOffset(0); setSearch(searchDraft.trim()); }, 220); return () => window.clearTimeout(timer); }, [searchDraft]);
+  // The debounce must skip its own first run: on arrival the draft already equals the
+  // restored search, and letting it fire would reset the restored page to zero.
+  const searchSettled = useRef(false);
+  useEffect(() => {
+    if (!searchSettled.current) {
+      searchSettled.current = true;
+      return;
+    }
+    const timer = window.setTimeout(() => { setOffset(0); setSearch(searchDraft.trim()); }, 220);
+    return () => window.clearTimeout(timer);
+  }, [searchDraft]);
+
+  // The cut this section will find again on the way back. `search` and not
+  // `searchDraft`: half a word typed on the way out is not a cut worth returning to.
+  // The registry rebuilds the callback on every render of the shell, so a ref keeps
+  // its identity out of the dependencies.
+  const reportSnapshot = useRef(onSnapshotChange);
+  reportSnapshot.current = onSnapshotChange;
+  // The place in the list is a ref, not state: it changes on every scroll frame, and
+  // as state it would re-render this whole view — sidebar, detail pane and all — for
+  // each one.
+  const placementRef = useRef<ListPlacement | null>(snapshot?.placement ?? null);
+  const currentSnapshot = useCallback((): LibraryGlobalSnapshot => ({
+    search,
+    selectedCollection,
+    selectedSavedSearch,
+    filtersOpen,
+    filters: { source, extraction, itemType, yearFrom, yearTo, facetTag, facetVault, attachmentFilter },
+    placement: placementRef.current,
+  }), [attachmentFilter, extraction, facetTag, facetVault, filtersOpen, itemType, search, selectedCollection, selectedSavedSearch, source, yearFrom, yearTo]);
+  const snapshotOf = useRef(currentSnapshot);
+  snapshotOf.current = currentSnapshot;
+  useEffect(() => { reportSnapshot.current?.(currentSnapshot()); }, [currentSnapshot]);
+
+  // The anchor is restored by VirtualList, which is the only thing that knows where a
+  // row that is not rendered yet would be. What it cannot decide is what to do when
+  // the row is gone: that is this view's call, and the answer is the first page.
+  const [restoreAnchorId, setRestoreAnchorId] = useState<string | null>(() => snapshot?.placement?.anchorId ?? null);
+  const anchorChecked = useRef(restoreAnchorId === null);
+  useEffect(() => {
+    if (anchorChecked.current || items.length === 0) return;
+    anchorChecked.current = true;
+    if (items.some((item) => item.id === restoreAnchorId)) return;
+    setRestoreAnchorId(null);
+    setOffset(0);
+    placementRef.current = null;
+    reportSnapshot.current?.(snapshotOf.current());
+  }, [items, restoreAnchorId]);
+
   useEffect(() => { void load(); }, [load]);
   useEffect(() => {
     const offChanged = window.nodus.onGlobalLibraryChanged(() => {
@@ -1400,6 +1454,11 @@ function GlobalLibraryContent({
           </div>
           <VirtualList
             items={items} itemHeight={62} getKey={(item) => item.id} className="library-catalog-list h-[calc(100%-2.25rem)] min-h-0 overflow-x-hidden" style={{ minWidth: tableMinWidth }}
+            anchorKey={restoreAnchorId}
+            onAnchorChange={(key) => {
+              placementRef.current = key === null ? null : { anchorId: String(key), pageOffset: offset };
+              reportSnapshot.current?.(snapshotOf.current());
+            }}
             empty={<div className="grid h-full place-items-center p-8 text-center"><div><Icon name={trashMode ? 'trash' : 'book'} size={28} className="mx-auto text-neutral-700" /><p className="mt-3 text-sm text-neutral-400">{t(trashMode ? 'La papelera está vacía.' : 'No hay documentos que coincidan.')}</p><p className="mt-1 text-xs text-neutral-600">{t(trashMode ? 'Los elementos enviados aquí podrán restaurarse antes del vaciado manual.' : 'Añade archivos o importa una biblioteca de Zotero.')}</p></div></div>}
             renderItem={(item) => {
               const activeJob = jobs.find((job) => job.itemId === item.id && ['queued', 'processing'].includes(job.status));
@@ -1556,6 +1615,8 @@ export function GlobalLibraryView({
   settings,
   vaultId,
   vaultType,
+  snapshot,
+  onSnapshotChange,
   onSettingsChange,
   onOpenSettings,
   onOpenCollections,
@@ -1565,6 +1626,9 @@ export function GlobalLibraryView({
 }: {
   target?: (PendingLibraryNavigationTarget & { nonce: number }) | null;
   settings: AppSettings;
+  /** Where this section was last left. Read once, at mount, and never again. */
+  snapshot?: LibrarySnapshot;
+  onSnapshotChange?: (patch: Partial<LibrarySnapshot>) => void;
   vaultId: string | null;
   vaultType?: VaultType;
   onSettingsChange: () => Promise<AppSettings | undefined>;
@@ -1662,6 +1726,8 @@ export function GlobalLibraryView({
             vaultId={vaultId}
             target={target}
             vaultType={vaultType}
+            snapshot={snapshot?.vault}
+            onSnapshotChange={(vault) => onSnapshotChange?.({ vault })}
             onOpenCollections={onOpenCollections}
             onOpenNodusCollections={() => void chooseScope('global')}
             onOpenGraph={onOpenGraph}
@@ -1671,7 +1737,14 @@ export function GlobalLibraryView({
             onOpenReader={openVaultReader}
           />
         ) : (
-          <GlobalLibraryContent target={target} onOpenSettings={onOpenSettings} scopeControls={scopeControls} onOpenReader={openGlobalReader} />
+          <GlobalLibraryContent
+            target={target}
+            snapshot={snapshot?.global}
+            onSnapshotChange={(next) => onSnapshotChange?.({ global: next })}
+            onOpenSettings={onOpenSettings}
+            scopeControls={scopeControls}
+            onOpenReader={openGlobalReader}
+          />
         )}
       </div>
       {activeReader && (
