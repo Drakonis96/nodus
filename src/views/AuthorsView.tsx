@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import type {
   AppSettings,
   AuthorDossier,
@@ -47,6 +48,16 @@ const RELATION_COLORS: Record<string, 'red' | 'amber' | 'green' | 'cyan' | 'neut
 export type SortKey = 'name' | 'surname' | 'works' | 'ideas' | 'connections';
 export type SynthFilter = 'all' | 'with' | 'without';
 const AUTHORS_PAGE_SIZE = 80;
+/** Strongest connections shown inline in the dossier; the rest open in a modal. */
+const CONNECTIONS_PREVIEW = 5;
+
+type AuthorConnection = {
+  author_id: string;
+  name: string;
+  weight: number;
+  types: string[];
+  sharedThemes: string[];
+};
 
 const SORT_LABELS: Record<SortKey, string> = {
   name: 'Nombre',
@@ -559,12 +570,13 @@ function AuthorDossierDetail({
   onToggleSaved: () => void;
 }) {
   const [worksOpen, setWorksOpen] = useState(false);
+  const [connectionsOpen, setConnectionsOpen] = useState(false);
   const [selectedIdeaId, setSelectedIdeaId] = useState<string | null>(null);
   const [ideasWork, setIdeasWork] = useState<{ nodus_id: string; title: string } | null>(null);
 
   const { author, synthesis } = dossier;
   const connectedAuthors = useMemo(() => {
-    const byAuthor = new Map<string, { author_id: string; name: string; weight: number; types: string[]; sharedThemes: string[] }>();
+    const byAuthor = new Map<string, AuthorConnection>();
     for (const relation of dossier.relations) {
       const current = byAuthor.get(relation.author_id) ?? { author_id: relation.author_id, name: relation.name, weight: 0, types: [], sharedThemes: [] };
       current.weight += relation.weight;
@@ -577,6 +589,7 @@ function AuthorDossierDetail({
 
   useEffect(() => {
     setWorksOpen(false);
+    setConnectionsOpen(false);
     setSelectedIdeaId(null);
     setIdeasWork(null);
   }, [author.author_id]);
@@ -720,20 +733,22 @@ function AuthorDossierDetail({
           <h4 className="font-medium mb-2 flex items-center gap-2">
             <Icon name="network" size={15} className="text-neutral-400" /> {t('Conexiones con otros autores')}
           </h4>
+          {/* Only the strongest handful: the tail of this list is long enough to
+              bury the sections below it, and it reads better on demand. */}
           <div className="overflow-hidden rounded-xl border border-neutral-800">
-            {connectedAuthors.map((relation, index) => (
-              <button
-                key={relation.author_id}
-                onClick={() => onSelectAuthor(relation.author_id)}
-                className={`grid w-full grid-cols-[2rem_minmax(150px,1fr)_minmax(180px,1.4fr)_7rem] items-center gap-3 bg-neutral-900/45 px-3 py-3 text-left hover:bg-neutral-900 ${index > 0 ? 'border-t border-neutral-800' : ''}`}
-              >
-                <span className="text-center text-xs tabular-nums text-neutral-600">{index + 1}</span>
-                <span className="min-w-0"><b className="block truncate text-sm text-neutral-200">{relation.name}</b><span className="mt-1 flex flex-wrap gap-1">{relation.types.map((type) => <Badge key={type} color={RELATION_COLORS[type] ?? 'neutral'}>{t(RELATION_LABELS[type] ?? type)}</Badge>)}</span></span>
-                <span className="truncate text-[11px] text-neutral-500">{relation.sharedThemes.length > 0 ? `${t('temas comunes')}: ${relation.sharedThemes.slice(0, 4).join(', ')}` : '—'}</span>
-                <span className="justify-self-end rounded-full bg-indigo-500/10 px-2 py-1 text-[11px] tabular-nums text-indigo-300">{tx('{n} conexiones', { n: Number(relation.weight.toFixed(1)) })}</span>
-              </button>
+            {connectedAuthors.slice(0, CONNECTIONS_PREVIEW).map((relation, index) => (
+              <AuthorConnectionRow key={relation.author_id} relation={relation} index={index} onSelect={onSelectAuthor} />
             ))}
           </div>
+          {connectedAuthors.length > CONNECTIONS_PREVIEW && (
+            <button
+              data-testid="author-connections-more"
+              className="btn btn-ghost mt-2 gap-1.5 border border-neutral-700 text-xs"
+              onClick={() => setConnectionsOpen(true)}
+            >
+              <Icon name="network" size={13} /> {tx('Ver las {n} conexiones', { n: connectedAuthors.length })}
+            </button>
+          )}
         </section>
       )}
 
@@ -745,6 +760,17 @@ function AuthorDossierDetail({
           onOpenWorkIdeas={(work) => {
             setWorksOpen(false);
             setIdeasWork(work);
+          }}
+        />
+      )}
+      {connectionsOpen && (
+        <AuthorConnectionsModal
+          authorName={dossier.fullName || author.name}
+          connections={connectedAuthors}
+          onClose={() => setConnectionsOpen(false)}
+          onSelectAuthor={(id) => {
+            setConnectionsOpen(false);
+            onSelectAuthor(id);
           }}
         />
       )}
@@ -856,6 +882,77 @@ function sourceLabel(value: string | null | undefined): string {
   return value ? t(SOURCE_LABELS[value] ?? value) : t('sin texto');
 }
 
+/** One connected author. Shared by the dossier preview and the full-list modal. */
+function AuthorConnectionRow({
+  relation,
+  index,
+  onSelect,
+}: {
+  relation: AuthorConnection;
+  index: number;
+  onSelect: (id: string) => void;
+}) {
+  return (
+    <button
+      onClick={() => onSelect(relation.author_id)}
+      className={`grid w-full grid-cols-[2rem_minmax(150px,1fr)_minmax(180px,1.4fr)_7rem] items-center gap-3 bg-neutral-900/45 px-3 py-3 text-left hover:bg-neutral-900 ${index > 0 ? 'border-t border-neutral-800' : ''}`}
+    >
+      <span className="text-center text-xs tabular-nums text-neutral-600">{index + 1}</span>
+      <span className="min-w-0"><b className="block truncate text-sm text-neutral-200">{relation.name}</b><span className="mt-1 flex flex-wrap gap-1">{relation.types.map((type) => <Badge key={type} color={RELATION_COLORS[type] ?? 'neutral'}>{t(RELATION_LABELS[type] ?? type)}</Badge>)}</span></span>
+      <span className="truncate text-[11px] text-neutral-500">{relation.sharedThemes.length > 0 ? `${t('temas comunes')}: ${relation.sharedThemes.slice(0, 4).join(', ')}` : '—'}</span>
+      <span className="justify-self-end rounded-full bg-indigo-500/10 px-2 py-1 text-[11px] tabular-nums text-indigo-300">{tx('{n} conexiones', { n: Number(relation.weight.toFixed(1)) })}</span>
+    </button>
+  );
+}
+
+function AuthorConnectionsModal({
+  authorName,
+  connections,
+  onClose,
+  onSelectAuthor,
+}: {
+  authorName: string;
+  connections: AuthorConnection[];
+  onClose: () => void;
+  onSelectAuthor: (id: string) => void;
+}) {
+  return createPortal(
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 p-5" onClick={onClose}>
+      <div
+        data-testid="author-connections-modal"
+        className="w-full max-w-4xl max-h-[88vh] overflow-hidden rounded-lg border border-neutral-800 bg-neutral-950 shadow-2xl"
+        onClick={(e) => e.stopPropagation()}
+        role="dialog"
+        aria-modal="true"
+        aria-label={t('Conexiones del autor')}
+      >
+        <div className="flex items-start gap-3 border-b border-neutral-800 px-4 py-3">
+          <div className="min-w-0">
+            <h3 className="text-base font-semibold">{tx('Conexiones de {name}', { name: authorName })}</h3>
+            <p className="text-xs text-neutral-500">{tx('{n} autores conectados', { n: connections.length })}</p>
+          </div>
+          <button
+            type="button"
+            className="ml-auto rounded-md p-1 text-neutral-500 hover:bg-neutral-900 hover:text-neutral-200"
+            onClick={onClose}
+            title={t('Cerrar')}
+          >
+            <Icon name="x" size={16} />
+          </button>
+        </div>
+        <div className="max-h-[calc(88vh-4.5rem)] overflow-y-auto p-4">
+          <div className="overflow-hidden rounded-xl border border-neutral-800">
+            {connections.map((relation, index) => (
+              <AuthorConnectionRow key={relation.author_id} relation={relation} index={index} onSelect={onSelectAuthor} />
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>,
+    document.body
+  );
+}
+
 function AuthorWorksModal({
   authorName,
   works,
@@ -877,8 +974,10 @@ function AuthorWorksModal({
     [works]
   );
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-5" onClick={onClose}>
+  // Into <body>: as a child of the dossier's `space-y-6` stack the overlay would
+  // inherit a top margin and stop covering the title bar (see WorkIdeasModal).
+  return createPortal(
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 p-5" onClick={onClose}>
       <div
         className="w-full max-w-4xl max-h-[88vh] overflow-hidden rounded-lg border border-neutral-800 bg-neutral-950 shadow-2xl"
         onClick={(e) => e.stopPropagation()}
@@ -970,7 +1069,8 @@ function AuthorWorksModal({
           ))}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
 

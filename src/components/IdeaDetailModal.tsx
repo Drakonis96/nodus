@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { createPortal } from 'react-dom';
 import type { EdgeDetail, IdeaDetail, IdeaType } from '@shared/types';
 import { Badge, EDGE_LABELS, Icon, NODE_LABELS } from './ui';
 import { OccurrenceCard } from './NodeDetailPanel';
@@ -88,8 +89,10 @@ export function IdeaDetailModal({
   const canGoBack = pos > 0;
   const canGoForward = pos < history.length - 1;
 
-  return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 p-4 sm:p-8" role="dialog" aria-modal="true" onClick={onClose}>
+  // Into <body>, so a `space-y-*` stack in the caller (the author dossier) can
+  // never hand the overlay a top margin that uncovers the title bar.
+  return createPortal(
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 p-4 sm:p-8" role="dialog" aria-modal="true" onClick={onClose}>
       <div
         className="card flex h-full w-full max-w-4xl flex-col overflow-hidden border border-neutral-700 bg-neutral-950 shadow-2xl"
         onClick={(event) => event.stopPropagation()}
@@ -243,6 +246,7 @@ export function IdeaDetailModal({
           onClose={() => setSavingNote(null)}
         />
       )}
-    </div>
+    </div>,
+    document.body
   );
 }
