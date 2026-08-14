@@ -118,6 +118,8 @@ export interface LibraryAttachmentRecord {
   addedAt?: string;
   sourceKey?: string;
   sourceState?: 'available' | 'not-downloaded' | 'source-missing' | 'corrupt';
+  /** True while Nodus owns the filename and may keep it aligned with item metadata. */
+  autoRenamed?: boolean;
 }
 
 export interface LibraryAttachmentPatch {
@@ -609,6 +611,28 @@ export interface LibraryViewPreferences {
   /** Optional user-selected widths in CSS pixels; omitted columns use responsive defaults. */
   columnWidths?: Partial<Record<LibraryColumnId, number>>;
   sort: LibrarySortRule[];
+}
+
+export type LibraryAttachmentRenameTemplate =
+  | 'creator-year-title'
+  | 'year-creator-title'
+  | 'title-creator-year';
+
+export type LibraryAttachmentRenameType = 'pdf' | 'epub' | 'other';
+
+/** Cross-vault Library behavior stored alongside the global catalogue. */
+export interface GlobalLibrarySettings {
+  /** Rename newly managed files from their parent record metadata. */
+  autoRenameAttachments: boolean;
+  attachmentRenameTemplate: LibraryAttachmentRenameTemplate;
+  /** Zotero-compatible defaults are PDF and EPUB. */
+  autoRenameAttachmentTypes: LibraryAttachmentRenameType[];
+  /** Off by default so supplementary-material filenames keep their meaning. */
+  renameSupplementaryAttachments: boolean;
+  /** Keep filenames owned by Nodus aligned after bibliographic edits. */
+  keepAttachmentNamesInSync: boolean;
+  /** Queue clean Markdown/OCR preparation as soon as a file is attached. */
+  autoPrepareAttachments: boolean;
 }
 
 export interface LibraryLocalImportReport {

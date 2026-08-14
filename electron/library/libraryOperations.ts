@@ -32,6 +32,7 @@ import type {
   LibraryMergeImpact,
   LibraryRecoveryReport,
   LibraryRecoveryIssue,
+  GlobalLibrarySettings,
 } from '@shared/libraryTypes';
 import { canonicalJson, normalizeLibraryMetadata } from './libraryRecord';
 import { LibraryCatalog } from './libraryCatalog';
@@ -61,6 +62,11 @@ function collectionColor(value: LibraryCollectionPatch['color'], fallback?: stri
 }
 import { LibrarySmartCollectionStore } from './librarySmartCollections';
 import { exportLibraryBibliography, formatLibraryCitation, generateCitationKey } from './libraryCitation';
+import {
+  attachmentRenameType,
+  buildAutomaticAttachmentFileName,
+  shouldAutoRenameAttachment,
+} from '@shared/libraryAttachmentNaming';
 
 function comparable(value: LibraryItemRecord): string {
   const { clock: _clock, createdAt: _createdAt, ...rest } = value;
@@ -354,6 +360,14 @@ export class LibraryOperations {
     return this.smartCollections.setPreferences(value);
   }
 
+  getSettings(): GlobalLibrarySettings {
+    return this.smartCollections.settings();
+  }
+
+  setSettings(value: GlobalLibrarySettings): GlobalLibrarySettings {
+    return this.smartCollections.setSettings(value);
+  }
+
   setItemsDeleted(itemIds: string[], deleted: boolean): number {
     const canonicalItemIds = new Set(itemIds.map((id) => this.catalog.resolveItemId(id) ?? id));
     let updated = 0; const indexed: LibraryItemRecord[] = [];
@@ -473,6 +487,7 @@ export class LibraryOperations {
     const report: LibraryLocalImportReport = { created: 0, skipped: 0, itemIds: [], warnings: [] };
     const knownHashes = new Set(this.catalog.attachmentHashes());
     const indexed: LibraryItemRecord[] = [];
+    const librarySettings = this.getSettings();
     for (const raw of files) {
       const source = path.resolve(raw);
       const extension = path.extname(source).toLowerCase();
@@ -485,18 +500,24 @@ export class LibraryOperations {
       const id = `nodus:${uuid}`;
       const storageId = id;
       const folder = this.store.itemFolder(storageId);
-      const fileName = safeLibraryFolderName(path.basename(source));
-      const relativePath = path.join('attachments', fileName);
+      const originalFileName = path.basename(source);
+      const metadata = inferredLocalFileMetadata(source, extension);
+      const autoRenamed = shouldAutoRenameAttachment(librarySettings, originalFileName, 0);
+      const fileName = autoRenamed
+        ? buildAutomaticAttachmentFileName(metadata, originalFileName, librarySettings.attachmentRenameTemplate)
+        : originalFileName;
+      const relativePath = path.join('attachments', safeLibraryFolderName(fileName));
       const destination = assertInside(folder, path.join(folder, relativePath));
       copyImmutable(source, destination);
       const stat = fs.statSync(destination);
       indexed.push(this.store.upsertItem({
         id, storageId, source: 'nodus',
-        metadata: inferredLocalFileMetadata(source, extension),
+        metadata,
         collectionIds: collectionId ? [collectionId] : [],
         attachments: [{
-          id: `local:${uuid}`, title: path.basename(source), fileName: path.basename(source), relativePath,
+          id: `local:${uuid}`, title: originalFileName, fileName, relativePath,
           mimeType: mimeType(extension), byteSize: stat.size, sha256: hash, role: 'original', position: 0, addedAt: new Date().toISOString(),
+          autoRenamed,
         }],
         files: { original: relativePath, annotations: 'annotations.json' }, extraction: { status: 'pending' }, deletedAt: null,
       }));
@@ -577,18 +598,23 @@ export class LibraryOperations {
     const hashes = new Set(current.attachments.map((entry) => entry.sha256));
     const additions: LibraryAttachmentRecord[] = [];
     const now = new Date().toISOString();
+    const librarySettings = this.getSettings();
     for (const raw of files) {
       const source = path.resolve(raw); const extension = path.extname(source).toLowerCase();
       if (!fs.existsSync(source) || !fs.statSync(source).isFile() || !SUPPORTED_ATTACHMENTS.has(extension)) throw new Error(`Formato no compatible: ${path.basename(source)}`);
       const sha256 = sha256File(source); if (hashes.has(sha256)) continue;
-      const id = `local:${randomUUID()}`; const fileName = path.basename(source);
+      const id = `local:${randomUUID()}`; const originalFileName = path.basename(source);
+      const autoRenamed = shouldAutoRenameAttachment(librarySettings, originalFileName, current.attachments.length + additions.length);
+      const fileName = autoRenamed
+        ? buildAutomaticAttachmentFileName(current.metadata, originalFileName, librarySettings.attachmentRenameTemplate)
+        : originalFileName;
       const relativePath = path.join('attachments', `${id.slice(6, 14)}-${safeLibraryFolderName(fileName)}`);
       const destination = assertInside(folder, path.join(folder, relativePath)); copyImmutable(source, destination);
       const detectedMime = mimeType(extension);
-      additions.push({ id, title: fileName, fileName, relativePath, mimeType: detectedMime,
+      additions.push({ id, title: originalFileName, fileName, relativePath, mimeType: detectedMime,
         byteSize: fs.statSync(destination).size, sha256,
         role: current.attachments.length + additions.length === 0 ? 'original' : detectedMime.startsWith('image/') ? 'image' : 'supplement',
-        position: current.attachments.length + additions.length, addedAt: now });
+        position: current.attachments.length + additions.length, addedAt: now, autoRenamed });
       hashes.add(sha256);
     }
     if (!additions.length) return current;
@@ -609,6 +635,7 @@ export class LibraryOperations {
       if (fs.existsSync(source)) copyImmutable(source, assertInside(folder, path.join(folder, relativePath)));
     }
     const desired = { ...target, title: patch.title?.trim() || target.title, fileName, relativePath,
+      autoRenamed: patch.fileName !== undefined ? false : target.autoRenamed,
       role: patch.makePrimary ? 'original' as const : patch.role ?? target.role };
     const remaining = orderedAttachments(current.attachments.filter((entry) => entry.id !== attachmentId)
       .map((entry) => patch.makePrimary && entry.role === 'original' ? { ...entry, role: 'supplement' as const } : entry));
@@ -624,12 +651,18 @@ export class LibraryOperations {
     if (!target) throw new Error('El adjunto ya no existe.');
     const source = path.resolve(file); const extension = path.extname(source).toLowerCase();
     if (!fs.existsSync(source) || !fs.statSync(source).isFile() || !SUPPORTED_ATTACHMENTS.has(extension)) throw new Error(`Formato no compatible: ${path.basename(source)}`);
-    const sha256 = sha256File(source); const fileName = path.basename(source);
+    const sha256 = sha256File(source); const originalFileName = path.basename(source);
+    const librarySettings = this.getSettings();
+    const autoRenamed = Boolean(target.autoRenamed && librarySettings.autoRenameAttachments
+      && librarySettings.autoRenameAttachmentTypes.includes(attachmentRenameType(originalFileName)));
+    const fileName = autoRenamed
+      ? buildAutomaticAttachmentFileName(current.metadata, originalFileName, librarySettings.attachmentRenameTemplate)
+      : originalFileName;
     const relativePath = path.join('attachments', `${attachmentId.replace(/[^a-z0-9]/gi, '').slice(-8)}-${sha256.slice(0, 10)}-${safeLibraryFolderName(fileName)}`);
     const folder = this.store.itemFolder(current.storageId); const destination = assertInside(folder, path.join(folder, relativePath));
     copyImmutable(source, destination);
     const attachments = orderedAttachments(current.attachments.map((entry) => entry.id === attachmentId ? {
-      ...entry, title: fileName, fileName, relativePath, mimeType: mimeType(extension), byteSize: fs.statSync(destination).size, sha256, addedAt: new Date().toISOString(),
+      ...entry, title: originalFileName, fileName, relativePath, mimeType: mimeType(extension), byteSize: fs.statSync(destination).size, sha256, addedAt: new Date().toISOString(), autoRenamed,
     } : entry));
     const primary = attachments.find((entry) => entry.role === 'original') ?? attachments[0];
     const result = this.store.upsertItem({ ...current, attachments, files: { ...(current.files ?? {}), ...(primary ? { original: primary.relativePath } : {}) } }, current.clock.revision);
@@ -733,8 +766,26 @@ export class LibraryOperations {
       return [key, value === undefined ? null : value];
     })) as LibraryMetadataOverrides;
     const imported = current.source !== 'nodus';
+    const settings = this.getSettings();
+    let attachments = current.attachments;
+    let files = current.files;
+    if (settings.autoRenameAttachments && settings.keepAttachmentNamesInSync) {
+      const folder = this.store.itemFolder(current.storageId);
+      attachments = current.attachments.map((attachment) => {
+        if (!attachment.autoRenamed || !settings.autoRenameAttachmentTypes.includes(attachmentRenameType(attachment.fileName))) return attachment;
+        const fileName = buildAutomaticAttachmentFileName(merged, attachment.fileName, settings.attachmentRenameTemplate);
+        if (fileName === attachment.fileName) return attachment;
+        const source = assertInside(folder, path.join(folder, attachment.relativePath));
+        if (!fs.existsSync(source)) return attachment;
+        const relativePath = path.join('attachments', `${attachment.id.replace(/[^a-z0-9]/gi, '').slice(-8)}-${safeLibraryFolderName(fileName)}`);
+        copyImmutable(source, assertInside(folder, path.join(folder, relativePath)));
+        return { ...attachment, fileName, relativePath };
+      });
+      const primary = attachments.find((attachment) => attachment.role === 'original') ?? attachments[0];
+      if (primary) files = { ...(files ?? {}), original: primary.relativePath };
+    }
     const desired = this.store.upsertItem({
-      ...current, metadata: merged,
+      ...current, metadata: merged, attachments, files,
       ...(imported ? { metadataOverrides: { ...(current.metadataOverrides ?? {}), ...overridePatch } } : {}),
     }, current.clock.revision);
     this.catalog.indexItem(desired, this.store);

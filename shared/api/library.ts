@@ -52,6 +52,7 @@ import type {
   LibraryMergeImpact,
   LibraryRecoveryReport,
   LibraryReadingPreparationPlan,
+  GlobalLibrarySettings,
 } from '../libraryTypes';
 import type { VaultSummary } from '../types';
 
@@ -85,6 +86,8 @@ export interface LibraryApi {
   deleteGlobalLibrarySavedSearch(id: string): Promise<boolean>;
   getGlobalLibraryViewPreferences(): Promise<LibraryViewPreferences>;
   setGlobalLibraryViewPreferences(preferences: LibraryViewPreferences): Promise<LibraryViewPreferences>;
+  getGlobalLibrarySettings(): Promise<GlobalLibrarySettings>;
+  setGlobalLibrarySettings(settings: GlobalLibrarySettings): Promise<GlobalLibrarySettings>;
   getGlobalLibraryItem(itemId: string): Promise<LibraryItemRecord | null>;
   createGlobalLibraryCollection(name: string, parentId: string | null): Promise<LibraryCollectionView>;
   updateGlobalLibraryCollection(id: string, patch: LibraryCollectionPatch): Promise<LibraryCollectionView>;
