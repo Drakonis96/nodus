@@ -21,6 +21,7 @@
     "test:e2e:saved-authors": "node scripts/e2e-saved-authors.mjs",
     "test:e2e:deep-research-annotations": "npm run build && node scripts/e2e-deep-research-annotations.mjs",
     "test:e2e:library-reader": "npm run build && node scripts/e2e-library-reader.mjs",
+    "test:e2e:view-snapshots": "npm run build && node scripts/e2e-view-snapshots.mjs",
     "test:e2e:global-library": "npm run build && node scripts/e2e-global-library.mjs",
     "test:e2e:browser-connector": "node scripts/e2e-browser-connector.mjs",
     "test:e2e:office-references": "node scripts/e2e-office-references.mjs",

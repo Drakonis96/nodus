@@ -303,6 +303,26 @@ ${longReaderBody}
   await page.getByTestId(`library-workspace-tab-document-${globalItemId}`).waitFor({ state: 'visible' });
   assert.equal(await page.locator('[data-testid^="library-workspace-tab-document-"]').count(), 1, 'closing one document leaves the other reader tab intact');
 
+  // Leaving the section unmounts it, tabs and all. What was open has to be open again
+  // on the way back — and at the page it was left on, which the reader stores per
+  // document rather than in the section's snapshot.
+  const cleanScroller = page.locator('main.library-reader-clean-surface');
+  await page.mouse.move(760, 520);
+  await page.mouse.wheel(0, 900);
+  await page.waitForTimeout(400);
+  const leftAtOffset = await cleanScroller.evaluate((element) => element.scrollTop);
+  assert.ok(leftAtOffset > 200, `the wheel moved the document (scrollTop ${leftAtOffset})`);
+  await page.locator('[data-tour="nav-ideas"]').click();
+  await documentRoot.waitFor({ state: 'detached' });
+  await page.locator('[data-tour="nav-library"]').click();
+  await documentRoot.waitFor({ state: 'visible' });
+  assert.equal(await page.locator('[data-testid^="library-workspace-tab-document-"]').count(), 1, 'the open document is open again');
+  await page.getByTestId(`library-workspace-tab-document-${globalItemId}`).waitFor({ state: 'visible' });
+  await page.waitForFunction(
+    (expected) => Math.abs((document.querySelector('main.library-reader-clean-surface')?.scrollTop ?? 0) - expected) <= 4,
+    leftAtOffset,
+  );
+
   assert.match(await documentRoot.innerText(), /Texto introductorio/);
   assert.equal(await documentRoot.locator('img').count(), 1, 'local extracted images render inside the clean document');
   assert.equal(await documentRoot.locator('table').count(), 1, 'Markdown tables remain structured');

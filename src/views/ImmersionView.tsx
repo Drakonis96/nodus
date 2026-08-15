@@ -30,6 +30,8 @@ import type {
 } from '@shared/types';
 import { DECORATIVE_IMAGE_STYLES } from '@shared/imageStyles';
 import type { PendingGraphNavigationTarget } from '../navigation';
+import type { ImmersionSnapshot } from '../app/viewSnapshots';
+import { useListPlacement } from '../listPlacement';
 import { Badge, Icon, TypeDot } from '../components/ui';
 import { SectionHeader } from '../components/SectionHeader';
 import { ModelPicker } from '../components/ModelPicker';
@@ -166,9 +168,14 @@ function GraphBox({
 
 export function ImmersionView({
   settings,
+  snapshot,
+  onSnapshotChange,
   onOpenGraph,
 }: {
   settings: AppSettings;
+  /** Where this section was last left. Read once, at mount, and never again. */
+  snapshot?: ImmersionSnapshot;
+  onSnapshotChange?: (patch: Partial<ImmersionSnapshot>) => void;
   onOpenGraph: (target: PendingGraphNavigationTarget) => void;
 }) {
   const [mode, setMode] = useState<'home' | 'scope' | 'player'>('home');
@@ -291,7 +298,7 @@ export function ImmersionView({
     });
   };
 
-  const openSession = async (id: string, restart = false) => {
+  const openSession = async (id: string, restart = false): Promise<ImmersionSession | null> => {
     setError(null);
     setOpeningId(id);
     try {
@@ -302,20 +309,44 @@ export function ImmersionView({
         setSession(loaded);
         setMode('player');
       }
+      return loaded ?? null;
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
+      return null;
     } finally {
       setOpeningId(null);
     }
   };
 
+  // The registry builds `onSnapshotChange` inline, so its identity changes on every
+  // render of the shell; a ref keeps that out of the effects' dependencies.
+  const report = useRef(onSnapshotChange);
+  report.current = onSnapshotChange;
+  /** The session to reopen, read once. Silences the report until it has landed. */
+  const resuming = useRef<string | null>(snapshot?.openSession?.id ?? null);
+  useEffect(() => {
+    if (resuming.current) return;
+    report.current?.({ openSession: session ? { id: session.id, label: session.plan.title } : null });
+  }, [session]);
+
   useEffect(() => {
     const dossier = findLatestBackgroundJob<unknown, unknown, unknown>(IMMERSION_DOSSIER_JOB_PREFIX);
-    if (!dossier) return;
-    const sessionId = dossier.key.slice(IMMERSION_DOSSIER_JOB_PREFIX.length);
-    if (sessionId) void openSession(sessionId);
+    const fromDossier = dossier ? dossier.key.slice(IMMERSION_DOSSIER_JOB_PREFIX.length) : '';
+    // A dossier still being written wins over the session that was merely left open:
+    // it is the more recent thing, and it is the same section either way.
+    const resume = fromDossier || resuming.current;
+    if (!resume) {
+      resuming.current = null;
+      return;
+    }
     // Reconnect only when this view is mounted. The session itself persists its
-    // current player step, so opening it returns directly to the report card.
+    // current player step, so opening it returns directly to the step it was left on.
+    // Reporting here rather than in the effect above, because the report has to say
+    // what actually loaded: a session deleted elsewhere leaves the section at home.
+    void openSession(resume).then((opened) => {
+      resuming.current = null;
+      report.current?.({ openSession: opened ? { id: opened.id, label: opened.plan.title } : null });
+    });
   }, []);
 
   const deleteSession = async (summary: ImmersionSessionSummary) => {
@@ -362,6 +393,8 @@ export function ImmersionView({
             loadingSessions={loadingSessions}
             openingId={openingId}
             error={error}
+            snapshot={snapshot}
+            onSnapshotChange={onSnapshotChange}
             onNew={() => {
               setError(null);
               setComposerOpen(true);
@@ -456,7 +489,9 @@ export function ImmersionView({
 // Home — hero launcher + saved sessions
 // ─────────────────────────────────────────────────────────────────────────────
 
-type ImmersionSortKey = 'recent' | 'oldest' | 'title';
+// Exported because the section's snapshot stores it; the union stays declared here,
+// next to the select that produces it.
+export type ImmersionSortKey = 'recent' | 'oldest' | 'title';
 
 function formatImmersionDate(iso: string): string {
   try {
@@ -472,6 +507,8 @@ function ImmersionHome({
   loadingSessions,
   openingId,
   error,
+  snapshot,
+  onSnapshotChange,
   onNew,
   onOpenSession,
   onDeleteSession,
@@ -482,16 +519,40 @@ function ImmersionHome({
   loadingSessions: boolean;
   openingId: string | null;
   error: string | null;
+  snapshot?: ImmersionSnapshot;
+  onSnapshotChange?: (patch: Partial<ImmersionSnapshot>) => void;
   onNew: () => void;
   onOpenSession: (id: string, restart: boolean) => void;
   onDeleteSession: (s: ImmersionSessionSummary) => void;
   onDeleteSessions: (ids: string[]) => Promise<boolean>;
 }) {
-  const [search, setSearch] = useState('');
-  const [sortKey, setSortKey] = useState<ImmersionSortKey>('recent');
-  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+  // Restored as initial values only, never as a reactive prop.
+  const [search, setSearch] = useState(() => snapshot?.search ?? '');
+  const [sortKey, setSortKey] = useState<ImmersionSortKey>(() => snapshot?.sortKey ?? 'recent');
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>(() => snapshot?.viewMode ?? 'grid');
+  const [anchorId, setAnchorId] = useState<string | null>(() => snapshot?.placement?.anchorId ?? null);
   const [selecting, setSelecting] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
+
+  // The gallery reports its own half of the snapshot; the section above reports the
+  // session that was open.
+  const report = useRef(onSnapshotChange);
+  report.current = onSnapshotChange;
+  useEffect(() => {
+    report.current?.({ search, sortKey, viewMode });
+  }, [search, sortKey, viewMode]);
+
+  // Changing the cut throws the place away with it, skipping its own first run so a
+  // restored filter does not drop the restored place a frame later.
+  const cutChanged = useRef(false);
+  useEffect(() => {
+    if (!cutChanged.current) {
+      cutChanged.current = true;
+      return;
+    }
+    setAnchorId(null);
+    report.current?.({ placement: null });
+  }, [search, sortKey]);
 
   const visible = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -515,6 +576,18 @@ function ImmersionHome({
     setSelecting(false);
     setSelected(new Set());
   };
+
+  // Back to the card that was under the top edge, once the list holding it is on
+  // screen. If that session is gone, the gallery starts from the top instead.
+  const scrollerRef = useListPlacement<HTMLDivElement>({
+    restoreAnchorId: anchorId,
+    revision: visible,
+    onRestoreMissed: () => {
+      setAnchorId(null);
+      report.current?.({ placement: null });
+    },
+    onCapture: (topId) => report.current?.({ placement: topId ? { anchorId: topId } : null }),
+  });
 
   const allVisibleSelected = visible.length > 0 && visible.every((s) => selected.has(s.id));
   const toggleAll = () =>
@@ -598,7 +671,7 @@ function ImmersionHome({
         </div>
       )}
 
-      <div className="min-h-0 flex-1 overflow-y-auto p-4">
+      <div ref={scrollerRef} className="min-h-0 flex-1 overflow-y-auto p-4">
         {visible.length === 0 ? (
           <div className="flex h-full flex-col items-center justify-center gap-3 text-center">
             <Icon name="target" size={28} className="text-neutral-600" />
@@ -688,6 +761,7 @@ function SessionGridCard({
   const primary = selecting ? onToggle : onOpen;
   return (
     <div
+      data-anchor-id={s.id}
       className={`card group relative flex flex-col gap-3 p-3 transition-colors ${
         selected ? 'border-indigo-600/70 ring-1 ring-indigo-600/40' : 'hover:border-indigo-700/60'
       }`}
@@ -751,6 +825,7 @@ function SessionListRow({
   const primary = selecting ? onToggle : onOpen;
   return (
     <div
+      data-anchor-id={s.id}
       className={`card flex items-center gap-3 p-2.5 transition-colors ${
         selected ? 'border-indigo-600/70 ring-1 ring-indigo-600/40' : 'hover:border-indigo-700/60'
       }`}

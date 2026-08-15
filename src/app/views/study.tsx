@@ -103,6 +103,8 @@ export const studyViews = {
       settings={ctx.settings}
       isStudy
       isTeaching={ctx.isDocencia}
+      snapshot={ctx.snapshots.read('studyDeepResearch')}
+      onSnapshotChange={(patch) => ctx.snapshots.patch('studyDeepResearch', patch)}
       onOpenGraph={(target) => ctx.navigate('graph', target)}
       onOpenStudyDocument={openDocument(ctx)}
       onOpenStudyMaterial={openMaterial(ctx)}
