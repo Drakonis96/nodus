@@ -35,6 +35,7 @@ const bundleOf = (source, name) => {
 };
 const store = bundleOf('src/app/viewSnapshots.ts', 'viewSnapshots.cjs');
 const { topAnchorId } = bundleOf('src/listPlacement.ts', 'listPlacement.cjs');
+const { readingBlocks, topBlockIndex } = bundleOf('src/readingPlace.ts', 'readingPlace.cjs');
 
 test.after(async () => { await rm(bundleDir, { recursive: true, force: true }); });
 
@@ -328,7 +329,8 @@ test('Biblioteca keeps a cut per scope, and only what nothing else already persi
   }
   // Sorting and columns are already written to disk, and the scope lives in settings.
   assert.doesNotMatch(types, /visibleColumns|columnWidths/, 'the snapshot does not duplicate what the Library persists itself');
-  assert.doesNotMatch(types, /scope: LibraryScope/, 'the scope is settings, not a snapshot');
+  const librarySnapshot = types.match(/export interface LibrarySnapshot \{[^}]*\}/)?.[0] ?? '';
+  assert.doesNotMatch(librarySnapshot, /scope/, 'the scope switch is settings, not a snapshot');
 });
 
 test('the page and the row are one field, so neither can be restored without the other', async () => {
@@ -340,9 +342,13 @@ test('the page and the row are one field, so neither can be restored without the
   const declarations = types.match(/^\s*(pageOffset|anchorId)[?]?:/gm) ?? [];
   assert.equal(declarations.length, 2, 'the page and the row are declared once each, inside ListPlacement');
 
-  // Six sections, one contract.
+  // Eight sections, one contract.
   const placements = (types.match(/placement: ListPlacement \| null/g) ?? []).length;
-  assert.equal(placements, 6, 'authors, ideas, both libraries, the workspace and the argument routes');
+  assert.equal(
+    placements,
+    8,
+    'authors, ideas, both libraries, the workspace, the argument routes and the two galleries',
+  );
 });
 
 test('ephemeral state dies on the way out', async () => {
@@ -361,4 +367,143 @@ test('ephemeral state dies on the way out', async () => {
   assert.match(authors, /report\.current\?\.\(\{ query: queryFilter,/);
   const global = await readSource('src/views/GlobalLibraryView.tsx');
   assert.match(global, /currentSnapshot = useCallback\(\(\): LibraryGlobalSnapshot => \(\{\s*search,/, 'the global catalogue stores the applied search');
+});
+
+// ── Phase three: the reading sections ─────────────────────────────────────────
+
+/**
+ * A document whose blocks are 100px tall, stacked from the top of the scroller. Only
+ * the two calls the search makes are needed, so it can be tested for real.
+ */
+function fakeDocument({ blockCount, blockHeight = 100, scrollTop = 0 }) {
+  const blocks = Array.from({ length: blockCount }, (_, index) => ({
+    getBoundingClientRect: () => ({
+      top: index * blockHeight - scrollTop,
+      bottom: (index + 1) * blockHeight - scrollTop,
+    }),
+  }));
+  return { scroller: { getBoundingClientRect: () => ({ top: 0, bottom: 600 }) }, blocks };
+}
+
+test('the place in a report is the block under the top edge', () => {
+  const at = (scrollTop) => {
+    const { scroller, blocks } = fakeDocument({ blockCount: 300, scrollTop });
+    return topBlockIndex(scroller, blocks);
+  };
+  assert.equal(at(0), 0, 'a report opened at the top is at its first block');
+  assert.equal(at(1_200), 12);
+  assert.equal(at(1_250), 12, 'a paragraph half off the top is still the one being read');
+  assert.equal(topBlockIndex(fakeDocument({ blockCount: 0 }).scroller, []), null, 'an empty document has no place');
+});
+
+test('a wrapper is not a second block over the same words', () => {
+  // A blockquote around a paragraph, or a list around its items, would otherwise be
+  // counted twice — and its bottom edge does not increase down the page, which is
+  // what the search above relies on.
+  const paragraph = { id: 'p', contains: () => false };
+  const heading = { id: 'h', contains: () => false };
+  const quote = { id: 'quote', contains: (other) => other === paragraph };
+  const all = [heading, quote, paragraph];
+  const root = { querySelectorAll: () => all };
+
+  assert.deepEqual(readingBlocks(root).map((block) => block.id), ['h', 'p']);
+});
+
+test('a place in a report is a block, and it says which rendering it was counted in', async () => {
+  const [types, reader] = await Promise.all([
+    readSource('src/readingPlace.ts'),
+    readSource('src/views/DeepResearchView.tsx'),
+  ]);
+  assert.match(types, /blockIndex: number/);
+  assert.match(types, /rendering: string/);
+  // The pixel a sentence sits at depends on the width of the window, on the font and
+  // on whether the cover image had loaded yet.
+  assert.doesNotMatch(types, /^\s*scrollTop[?]?:/m, 'a scrollTop is not a place');
+  // A translated report is a different document with a different block count.
+  assert.match(reader, /rendering: annotationScope/);
+  assert.match(types, /restore && restore\.rendering === rendering \? restore\.blockIndex : null/);
+  // A report grows after it first paints, and each of those changes pushes the text
+  // down under a scroll position that was already set.
+  assert.match(types, /new ResizeObserver\(place\)/);
+  assert.match(types, /if \(!settled\.current \|\| frame\.current !== null\) return/, 'capture waits for the reader to take over');
+  // React replaces the document's nodes when it re-renders. A list kept between
+  // frames measures elements that are no longer on the page, and the block it
+  // reports is then somewhere else entirely — which is exactly what the running app
+  // did before this was read fresh.
+  assert.match(types, /const blocks = readingBlocks\(root\);\s*const index = topBlockIndex\(scroller, blocks\);/);
+});
+
+test('Deep Research restores its gallery, the report it was left in and the place inside it', async () => {
+  const view = await readSource('src/views/DeepResearchView.tsx');
+  for (const restored of ['search', 'readFilter', 'sortKey', 'viewMode']) {
+    assert.match(view, new RegExp(`useState[^\\n]*\\(\\) => snapshot\\?\\.${restored}`), `${restored} survives leaving the section`);
+  }
+  // A reader with no report in it would render the gallery anyway.
+  assert.match(view, /snapshot\?\.surface === 'reader' && snapshot\.openReport \? 'reader' : 'gallery'/);
+  // The gallery is the only source of a saved report, so the reopen waits for it
+  // instead of fetching the report a second way.
+  assert.match(view, /const id = reopening\.current;\s*if \(!id \|\| !galleryRead\) return;/);
+  assert.match(view, /restoredReading\.current = null;\s*setMode\('gallery'\)/, 'a report that is gone falls back to the gallery');
+  assert.match(view, /useReadingPlace\(\{/);
+  // The composer is a draft, not a place.
+  const types = await readSource('src/app/viewSnapshots.ts');
+  for (const field of ['objective', 'language', 'structureMode', 'unitOutline', 'audience']) {
+    assert.doesNotMatch(types, new RegExp(`^\\s*${field}[?]?:`, 'm'), `${field} belongs to the composer, not to a place`);
+  }
+});
+
+test('the gallery scroller is born and dies with the gallery', async () => {
+  const view = await readSource('src/views/DeepResearchView.tsx');
+  // The gallery is unmounted while a report is open. A hook called in the view would
+  // come back from the reader still listening to the scroller that was thrown away.
+  assert.match(view, /function GalleryScroller\(\{/);
+  assert.match(view, /<GalleryScroller/);
+  assert.match(view, /data-anchor-id=\{saved\.id\}/);
+});
+
+test('Inmersión restores its gallery and reopens the session it was left in', async () => {
+  const view = await readSource('src/views/ImmersionView.tsx');
+  for (const restored of ['search', 'sortKey', 'viewMode']) {
+    assert.match(view, new RegExp(`useState[^\\n]*\\(\\) => snapshot\\?\\.${restored}`), `${restored} survives leaving the section`);
+  }
+  assert.match(view, /data-anchor-id=\{s\.id\}/);
+  // The session carries its own progress, so reopening it lands on the step it was
+  // left on. Reporting waits for the reopen, or the empty state on the way in would
+  // erase the very session being restored.
+  assert.match(view, /resuming = useRef<string \| null>\(snapshot\?\.openSession\?\.id \?\? null\)/);
+  assert.match(view, /if \(resuming\.current\) return;/);
+  assert.match(view, /const resume = fromDossier \|\| resuming\.current;/);
+  // The scope screen is a pass over the corpus; redrawing it means paying for it again.
+  const types = await readSource('src/app/viewSnapshots.ts');
+  assert.doesNotMatch(types, /ImmersionScope|openScope/, 'the scope screen is not restored');
+});
+
+test('Biblioteca reopens the documents that were open, and the reader finds its own page', async () => {
+  const [view, docReader] = await Promise.all([
+    readSource('src/views/GlobalLibraryView.tsx'),
+    readSource('src/views/LibraryDocumentReader.tsx'),
+  ]);
+  assert.match(view, /useState<LibraryWorkspaceTab\[\]>\(\(\) => snapshot\?\.readers\?\.tabs \?\? \[\]\)/);
+  // A tab that is no longer open cannot be the active one.
+  assert.match(view, /snapshot\?\.readers\?\.tabs\.some\(\(tab\) => tab\.key === snapshot\.readers\?\.activeKey\)/);
+  assert.match(view, /reportReaders\.current\?\.\(\{ readers: \{ tabs: workspaceTabs, activeKey: activeReaderKey \} \}\)/);
+  // The place inside a document is not in the snapshot because it is not lost: the
+  // reader writes it per document and restores it whenever it mounts.
+  assert.match(docReader, /localStorage\.setItem\(readingPositionKey\(reader\.storageId\)/);
+  assert.match(docReader, /localStorage\.getItem\(readingPositionKey\(reader\.storageId\)/);
+});
+
+test('the three sections added here receive their snapshot the way the others do', async () => {
+  const [corpus, study, teaching] = await Promise.all([
+    readSource('src/app/views/corpus.tsx'),
+    readSource('src/app/views/study.tsx'),
+    readSource('src/app/views/teaching.tsx'),
+  ]);
+  for (const view of ['deepResearch', 'immersion']) {
+    assert.match(corpus, new RegExp(`snapshots\\.read\\('${view}'\\)`), `${view} is handed its snapshot`);
+    assert.match(corpus, new RegExp(`snapshots\\.patch\\('${view}',`), `${view} reports its snapshot back`);
+  }
+  // The same surface under the three names the app gives it, each with its own cut.
+  assert.match(study, /snapshots\.read\('studyDeepResearch'\)/);
+  assert.match(teaching, /snapshots\.read\('teachingUnits'\)/);
 });

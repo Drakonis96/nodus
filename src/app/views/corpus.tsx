@@ -68,7 +68,14 @@ export const corpusViews = {
       onOpenGraph={(target) => navigate('graph', target)}
     />
   ),
-  immersion: ({ navigate, settings }) => <ImmersionView settings={settings} onOpenGraph={(target) => navigate('graph', target)} />,
+  immersion: ({ navigate, settings, snapshots }) => (
+    <ImmersionView
+      settings={settings}
+      snapshot={snapshots.read('immersion')}
+      onSnapshotChange={(patch) => snapshots.patch('immersion', patch)}
+      onOpenGraph={(target) => navigate('graph', target)}
+    />
+  ),
   // Cobertura y Huecos son el mismo espacio con dos pestañas. 'gaps' ya no tiene
   // entrada en la barra lateral, pero sigue siendo una vista enrutable —Inicio,
   // Buscar y el tour avanzado navegan a ella— y entra por la pestaña de huecos.
@@ -107,8 +114,14 @@ export const corpusViews = {
     <ReadingPathView onOpenGraph={(target) => navigate('graph', target)} onOpenAssistant={openAssistant} />
   ),
   writing: ({ navigate, settings }) => <WritingWorkshopView settings={settings} onOpenGraph={(target) => navigate('graph', target)} />,
-  deepResearch: ({ isGenealogy, navigate, settings }) => (
-    <DeepResearchView settings={settings} isGenealogy={isGenealogy} onOpenGraph={(target) => navigate('graph', target)} />
+  deepResearch: ({ isGenealogy, navigate, settings, snapshots }) => (
+    <DeepResearchView
+      settings={settings}
+      isGenealogy={isGenealogy}
+      snapshot={snapshots.read('deepResearch')}
+      onSnapshotChange={(patch) => snapshots.patch('deepResearch', patch)}
+      onOpenGraph={(target) => navigate('graph', target)}
+    />
   ),
   projects: ({ settings }) => <ProjectsView settings={settings} />,
 

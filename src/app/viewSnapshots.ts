@@ -29,15 +29,18 @@
 // written on every filter change; as state it would re-render the whole shell on
 // every keystroke in a search box, and this repo has paid for that before.
 import type { View } from '../navigation';
-import type { LibraryCatalogItem, LibraryItemSource, LibraryItemType } from '@shared/libraryTypes';
+import type { LibraryCatalogItem, LibraryItemSource, LibraryItemType, LibraryScope } from '@shared/libraryTypes';
 // Type-only, so the lazy view chunks are not pulled in: the unions stay declared
 // once, where the selects that produce them live.
 import type { SortKey as AuthorsSortKey, SynthFilter as AuthorsSynthFilter } from '../views/AuthorsView';
 import type { SortKey as IdeasSortKey } from '../views/IdeasView';
 import type { RouteSortKey as ArgumentRouteSortKey } from '../views/ArgumentMapView';
+import type { ReadFilter as ReportReadFilter, SortKey as ReportSortKey } from '../views/DeepResearchView';
+import type { ImmersionSortKey } from '../views/ImmersionView';
 import type { WorkspaceItemKind } from '../views/WorkspaceView';
-import type { IdeaType, WorkFilter } from '@shared/types';
+import type { IdeaType, LibraryReaderReference, WorkFilter } from '@shared/types';
 import type { SortState } from '../views/Library';
+import type { ReadingPlace } from '../readingPlace';
 
 /** An open inner tab: enough to redraw the tab strip and refetch its contents. */
 export interface OpenEntityTab {
@@ -174,14 +177,78 @@ export interface LibraryVaultSnapshot {
 }
 
 /**
+ * One document left open in the reader strip. The reference is what the tab was
+ * opened with, so reopening it is the same read as opening it the first time; the
+ * page the reader had reached inside it is not here, because the reader already
+ * writes that to disk per document and restores it whenever it mounts.
+ */
+export interface LibraryReaderTabSnapshot {
+  key: string;
+  scope: LibraryScope;
+  reference: LibraryReaderReference;
+  /** Which rendering was on show: the clean text, or one of the attachments. */
+  sourceId?: string;
+}
+
+/** The reader tabs and which one was in front. Null means the catalogue was. */
+export interface LibraryReadersSnapshot {
+  tabs: LibraryReaderTabSnapshot[];
+  activeKey: string | null;
+}
+
+/**
  * One section, two engines: the Biblioteca entry renders the vault library or the
  * global catalogue depending on the scope switch, and each keeps its own cut so
  * that flipping the switch does not blend two unrelated sets of filters. The scope
  * itself is not here — it already lives in settings.
+ *
+ * The open readings sit beside both, not inside either, because that is where they
+ * sit on screen: the tab strip spans the section and a document opened from the vault
+ * library stays open across a switch to the global catalogue.
  */
 export interface LibrarySnapshot {
   vault?: LibraryVaultSnapshot;
   global?: LibraryGlobalSnapshot;
+  readers?: LibraryReadersSnapshot;
+}
+
+/**
+ * Deep Research: the gallery's cut, the report left open, and the place inside it.
+ *
+ * Reopening a report is a read of something already written, so it costs nothing to
+ * restore. What is deliberately absent is the composer: an objective half typed into
+ * the new-report form is a draft, not a place, and restoring the form would also mean
+ * deciding whether the model, the length and the outline in it are still the ones the
+ * reader meant.
+ */
+export interface DeepResearchSnapshot {
+  surface: 'gallery' | 'reader';
+  /** id and title of the open report; the report itself is re-read from the gallery. */
+  openReport: OpenEntityTab | null;
+  search: string;
+  readFilter: ReportReadFilter;
+  sortKey: ReportSortKey;
+  viewMode: 'grid' | 'list';
+  /** The place in the gallery. */
+  placement: ListPlacement | null;
+  /** The place inside the open report. */
+  reading: ReadingPlace | null;
+}
+
+/**
+ * Inmersión: the gallery's cut and the session left open.
+ *
+ * The session's own progress — which step the player was on, the answers given — is
+ * already stored with the session, so reopening it lands exactly where it was left.
+ * The scope screen is not kept: it is the result of a pass over the corpus, and
+ * redrawing it means paying for that pass again just to walk back into the section.
+ */
+export interface ImmersionSnapshot {
+  openSession: OpenEntityTab | null;
+  search: string;
+  sortKey: ImmersionSortKey;
+  viewMode: 'grid' | 'list';
+  placement: ListPlacement | null;
 }
 
 /** One optional entry per section that has opted in. Keys are `View` members. */
@@ -197,6 +264,17 @@ export interface ViewSnapshots {
    */
   notes?: WorkspaceSnapshot;
   argument?: ArgumentSnapshot;
+  immersion?: ImmersionSnapshot;
+  /**
+   * The same surface under the three names the app gives it: Deep Research in an
+   * academic vault, Investigación de estudio in a study one, Diseño de unidades in a
+   * teaching one. Separate entries for the same reason `workspace` and `notes` are
+   * separate: they are different sections, and a key per section is what keeps the
+   * store honest about which one a cut belongs to.
+   */
+  deepResearch?: DeepResearchSnapshot;
+  studyDeepResearch?: DeepResearchSnapshot;
+  teachingUnits?: DeepResearchSnapshot;
 }
 
 export type SnapshotView = keyof ViewSnapshots;

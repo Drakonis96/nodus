@@ -1642,8 +1642,23 @@ export function GlobalLibraryView({
   const preferredScope = requestedScope ?? (settings.libraryGlobalEnabled ? settings.libraryScope : 'vault');
   const [scope, setScope] = useState<LibraryScope>(preferredScope);
   const [switching, setSwitching] = useState(false);
-  const [workspaceTabs, setWorkspaceTabs] = useState<LibraryWorkspaceTab[]>([]);
-  const [activeReaderKey, setActiveReaderKey] = useState<string | null>(null);
+  // The documents left open, restored as initial values. Reopening one is the same
+  // read as opening it was, and the page the reader had reached inside it comes back
+  // with it: the reader writes its own position per document and restores it on mount.
+  const [workspaceTabs, setWorkspaceTabs] = useState<LibraryWorkspaceTab[]>(() => snapshot?.readers?.tabs ?? []);
+  const [activeReaderKey, setActiveReaderKey] = useState<string | null>(() => (
+    snapshot?.readers?.tabs.some((tab) => tab.key === snapshot.readers?.activeKey)
+      ? snapshot.readers.activeKey
+      : null
+  ));
+
+  // The registry builds `onSnapshotChange` inline, so its identity changes on every
+  // render of the shell; a ref keeps that out of the effect's dependencies.
+  const reportReaders = useRef(onSnapshotChange);
+  reportReaders.current = onSnapshotChange;
+  useEffect(() => {
+    reportReaders.current?.({ readers: { tabs: workspaceTabs, activeKey: activeReaderKey } });
+  }, [activeReaderKey, workspaceTabs]);
 
   // Contextual entries (Home health buckets and Zotero reader links) choose their
   // scope once. After arrival the user remains free to change the switcher.
