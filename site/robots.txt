@@ -1,0 +1,7 @@
+# robots.txt for https://drakonis96.github.io/nodus/
+# All site pages may be crawled and indexed.
+
+User-agent: *
+Allow: /
+
+Sitemap: https://drakonis96.github.io/nodus/sitemap.xml

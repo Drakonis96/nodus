@@ -14,6 +14,7 @@
     "test": "node --test scripts/test-*.mjs",
     "test:cloudflare": "node --test scripts/test-cloudflare-contract.mjs",
     "blog:feed": "node scripts/build-blog-feed.mjs",
+    "site:sitemap": "node scripts/build-sitemap.mjs",
     "citation:sync": "node scripts/sync-citation.mjs",
     "citation:check": "node scripts/sync-citation.mjs --check",
     "release:verify-source": "node scripts/verify-source-offer.mjs",
