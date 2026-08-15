@@ -1,0 +1,228 @@
+<!--
+SPDX-FileCopyrightText: 2026 Jorge Pérez Burgueño and Nodus contributors
+SPDX-License-Identifier: AGPL-3.0-only
+-->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Contribute to Nodus</title>
+<meta name="description" content="Nodus grows one contribution at a time. Report a bug, translate the interface, improve the docs, test a beta or send a pull request — here is how, and the rules the project holds itself to."/>
+<meta property="og:title" content="Contribute to Nodus"/>
+<meta property="og:description" content="Every node counts. Ways to help build a free, local-first workspace for research, teaching and study."/>
+<link rel="icon" type="image/svg+xml" href="../assets/nodus-logo.svg"/>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Fraunces:opsz,wght@9..144,600;9..144,700&display=swap" rel="stylesheet"/>
+<link rel="stylesheet" href="../assets/css/nodus.css?v=20260815"/>
+<link rel="stylesheet" href="contribute.css?v=20260815"/>
+</head>
+<body>
+
+<a class="skip-link" href="#main">Skip to content</a>
+<canvas id="organism" aria-hidden="true"></canvas>
+
+<div data-nodus-site-header data-base="../" data-page="contribute"></div>
+<script src="../site-header.js?v=20260815"></script>
+
+<main id="main">
+
+<header class="page-hero" data-accent="#34d399" data-second="#a78bfa" data-energy="0.36">
+  <div class="wrap contrib-hero">
+    <div class="scrim">
+      <span class="kicker">Open source, together</span>
+      <h1 class="display" data-split>Every node counts.</h1>
+      <p class="lead">Nodus grows one contribution at a time, like grains of sand that each add to the whole. One person started it; anyone can add the next grain — and that does not have to mean writing code.</p>
+      <div class="contrib-actions">
+        <a class="btn primary" href="https://github.com/Drakonis96/nodus" target="_blank" rel="noopener" data-magnet="0.14">
+          <svg class="ic" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.44 9.8 8.2 11.39.6.11.82-.26.82-.58v-2.23c-3.34.72-4.04-1.42-4.04-1.42-.55-1.39-1.34-1.76-1.34-1.76-1.09-.75.08-.73.08-.73 1.2.08 1.84 1.24 1.84 1.24 1.07 1.84 2.81 1.3 3.5 1 .1-.78.42-1.31.76-1.61-2.67-.3-5.47-1.33-5.47-5.93 0-1.31.47-2.38 1.24-3.22-.13-.3-.54-1.52.11-3.18 0 0 1.01-.32 3.3 1.23a11.5 11.5 0 0 1 6 0c2.29-1.55 3.3-1.23 3.3-1.23.65 1.66.24 2.88.12 3.18.77.84 1.23 1.91 1.23 3.22 0 4.61-2.8 5.62-5.48 5.92.43.37.81 1.1.81 2.22v3.29c0 .32.22.7.83.58A12 12 0 0 0 24 12c0-6.63-5.37-12-12-12Z"/></svg>
+          Browse the code
+        </a>
+        <a class="btn" href="https://github.com/Drakonis96/nodus/issues/new/choose" target="_blank" rel="noopener">Report something broken</a>
+      </div>
+    </div>
+    <div class="sand-box">
+      <canvas id="sand" aria-hidden="true"></canvas>
+      <p class="sand-cap">Each grain a contribution.</p>
+    </div>
+  </div>
+</header>
+
+<!-- ============================================================ ways in -->
+<section class="section-line" data-accent="#a78bfa" data-second="#818cf8" data-energy="0.28">
+  <div class="wrap">
+    <div class="section-head scrim reveal">
+      <span class="kicker">Ways in</span>
+      <h2 class="title" data-split>Six ways to help, only one of them is code.</h2>
+      <p class="lead">Pick whichever fits the time you have. A precise bug report is worth more to this project than a rushed patch.</p>
+    </div>
+
+    <div class="ways">
+      <article class="card lit way reveal" style="--wc:#f87171">
+        <span class="pic"><svg viewBox="0 0 24 24"><path d="M12 9v4M12 17h.01"/><path d="M10.3 3.9 2.4 17.5A2 2 0 0 0 4.1 20.5h15.8a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z"/></svg></span>
+        <h3>Report a bug</h3>
+        <p>Reproducible steps, what you expected, what happened, your Nodus version and OS. The desktop app can open the report for you with the environment already filled in, under <b>Suggest / Report</b>.</p>
+        <a class="arrow-link" href="https://github.com/Drakonis96/nodus/issues/new/choose" target="_blank" rel="noopener">Open an issue
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
+      </article>
+
+      <article class="card lit way reveal" style="--wc:#fbbf24;--delay:70ms">
+        <span class="pic"><svg viewBox="0 0 24 24"><path d="M12 3a9 9 0 1 0 9 9M12 3v9l6.4 6.4"/><path d="M12 3a9 9 0 0 1 9 9h-9"/></svg></span>
+        <h3>Suggest a feature or a vault</h3>
+        <p>New capabilities and whole new vault modes both start as issues. Describe the work you are trying to do, not only the button you want — the mode usually follows from the workflow.</p>
+        <a class="arrow-link" href="https://github.com/Drakonis96/nodus/issues/new/choose" target="_blank" rel="noopener">Propose it
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
+      </article>
+
+      <article class="card lit way reveal" style="--wc:#22d3ee;--delay:140ms">
+        <span class="pic"><svg viewBox="0 0 24 24"><path d="m5 8 6 6M4 14l6-6 2-3M2 5h12M7 2h1"/><path d="m22 22-5-10-5 10M14 18h6"/></svg></span>
+        <h3>Translate the interface</h3>
+        <p>Spanish is the source language of the desktop app; every static string also lives in the translation tables under <code>src/i18n.*.ts</code>. Adding or correcting a language is a self-contained, very welcome pull request.</p>
+        <a class="arrow-link" href="https://github.com/Drakonis96/nodus/tree/main/src" target="_blank" rel="noopener">See the tables
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
+      </article>
+
+      <article class="card lit way reveal" style="--wc:#34d399;--delay:210ms">
+        <span class="pic"><svg viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20V3H6.5A2.5 2.5 0 0 0 4 5.5v14Z"/><path d="M4 19.5A2.5 2.5 0 0 0 6.5 22H20v-5"/></svg></span>
+        <h3>Improve the documentation</h3>
+        <p>The Wiki lives in this repository, next to the code it documents. If something is unclear or out of date, you can fix it yourself: open a pull request with the correction and it will be reviewed.</p>
+        <a class="arrow-link" href="../wiki/">Read the Wiki
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
+      </article>
+
+      <article class="card lit way reveal" style="--wc:#c084fc;--delay:280ms">
+        <span class="pic"><svg viewBox="0 0 24 24"><path d="M9 3h6v4l4 9a3 3 0 0 1-2.8 4.4H7.8A3 3 0 0 1 5 16l4-9V3Z"/><path d="M8 3h8M7.5 15h9"/></svg></span>
+        <h3>Test a beta</h3>
+        <p>Beta builds are published on the same releases page as stable ones. Before installing one, the app requires Recovery to be configured and takes a full encrypted, verified snapshot — so a beta is recoverable by design.</p>
+        <a class="arrow-link" href="https://github.com/Drakonis96/nodus/releases" target="_blank" rel="noopener">Releases
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
+      </article>
+
+      <article class="card lit way reveal" style="--wc:#818cf8;--delay:350ms">
+        <span class="pic"><svg viewBox="0 0 24 24"><circle cx="6" cy="6" r="2.6"/><circle cx="6" cy="18" r="2.6"/><circle cx="18" cy="18" r="2.6"/><path d="M6 8.6v6.8M18 15.4V12a3 3 0 0 0-3-3h-3l2.4-2.4M11.4 11.4 9 9"/></svg></span>
+        <h3>Send a pull request</h3>
+        <p>Small and focused beats large and sweeping. Add tests for behaviour changes, reuse the patterns already in the codebase, and run the checks that cover what you touched.</p>
+        <a class="arrow-link" href="https://github.com/Drakonis96/nodus/pulls" target="_blank" rel="noopener">See open pull requests
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
+      </article>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================ setup -->
+<section class="section-line" data-accent="#818cf8" data-second="#8b5cf6" data-energy="0.3">
+  <div class="wrap">
+    <div class="setup-grid">
+      <div class="section-head scrim reveal">
+        <span class="kicker">Development setup</span>
+        <h2 class="title" data-split>Running Nodus from source.</h2>
+        <p class="lead">Nodus is an Electron app built with Node.js 22 in CI. Fork the repository, then work through these four commands. Use a throwaway vault or the demo data while developing — never real personal, student or institutional material.</p>
+        <p class="lead">Before opening a pull request, run the checks that cover your change. If you touched Electron startup, IPC, the database, packaging or a major user flow, run the end-to-end suite too.</p>
+      </div>
+      <div class="terminal reveal">
+        <div class="terminal-bar"><i></i><i></i><i></i><span>setup</span></div>
+        <pre><code><span class="c"># install the locked dependencies</span>
+<span class="p">$</span> npm ci
+<span class="c"># rebuild native Electron dependencies</span>
+<span class="p">$</span> npx electron-builder install-app-deps
+<span class="c"># start the development app</span>
+<span class="p">$</span> npm run dev
+
+<span class="c"># before you open a pull request</span>
+<span class="p">$</span> npm run lint
+<span class="p">$</span> npm run typecheck
+<span class="p">$</span> npm test
+<span class="p">$</span> npm run build</code></pre>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================ rules -->
+<section class="section-line" data-accent="#34d399" data-second="#22d3ee" data-energy="0.24">
+  <div class="wrap">
+    <div class="section-head scrim reveal">
+      <span class="kicker">The lines we hold</span>
+      <h2 class="title" data-split>Conventions a contribution has to respect.</h2>
+      <p class="lead">These are not style preferences. They are the promises Nodus makes to the people who trust it with their work, and a change that breaks one will not be merged.</p>
+    </div>
+    <ul class="rules">
+      <li class="reveal"><b>Local-first stays local-first.</b> New network access must be explicit, documented and started by the user.</li>
+      <li class="reveal" style="--delay:60ms"><b>Privacy boundaries hold.</b> Private content, student work, rosters, grades and credentials never go to an AI provider.</li>
+      <li class="reveal" style="--delay:120ms"><b>AI never grades a student.</b> Nodus does not use AI to grade, rank, profile or evaluate the people it holds data about.</li>
+      <li class="reveal" style="--delay:180ms"><b>Claims keep their sources.</b> No fabricated citations, and no silently replacing a user's evidence.</li>
+      <li class="reveal" style="--delay:240ms"><b>Behaviour changes come with tests.</b> Focused tests for new behaviour, regression tests for fixes.</li>
+      <li class="reveal" style="--delay:300ms"><b>Nothing private in a public issue.</b> No API keys, passwords, vault content, student data or unpublished research. Security problems go through <a href="https://github.com/Drakonis96/nodus/blob/main/SECURITY.md" target="_blank" rel="noopener">SECURITY.md</a>, privately.</li>
+    </ul>
+    <div class="rules-links reveal">
+      <a class="btn" href="https://github.com/Drakonis96/nodus/blob/main/CONTRIBUTING.md" target="_blank" rel="noopener">Full contributing guide</a>
+      <a class="btn" href="https://github.com/Drakonis96/nodus/blob/main/CODE_OF_CONDUCT.md" target="_blank" rel="noopener">Code of conduct</a>
+      <a class="btn" href="https://github.com/Drakonis96/nodus/blob/main/LICENSE" target="_blank" rel="noopener">AGPL-3.0-only licence</a>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================ people -->
+<section class="section-line" data-accent="#fbbf24" data-second="#a78bfa" data-energy="0.3">
+  <div class="wrap">
+    <div class="section-head scrim reveal">
+      <span class="kicker">The people building Nodus</span>
+      <h2 class="title" data-split>Names on the commits.</h2>
+    </div>
+    <div class="people" id="people"><span class="people-loading">Loading contributors…</span></div>
+  </div>
+</section>
+
+<!-- ============================================================ final -->
+<section class="section-line contrib-final" data-accent="#a78bfa" data-second="#34d399" data-energy="0.4">
+  <div class="wrap reveal">
+    <h2 class="title" data-split>Add the next grain.</h2>
+    <p class="lead">Start with whatever is smallest. An issue that describes a real problem clearly is a genuine contribution, and it is where almost every pull request here began.</p>
+    <div class="contrib-actions" style="justify-content:center">
+      <a class="btn primary" href="https://github.com/Drakonis96/nodus/issues" target="_blank" rel="noopener" data-magnet="0.14">Find something to work on</a>
+      <a class="btn" href="https://github.com/Drakonis96/nodus/discussions" target="_blank" rel="noopener">Say hello first</a>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<footer class="site-foot">
+  <div class="wrap">
+    <div class="foot-grid">
+      <div class="foot-brand">
+        <span class="logo"><img src="../assets/nodus-logo.svg" alt=""/> Nodus</span>
+        <p>A free, open-source, local-first workspace for research, teaching and study.</p>
+      </div>
+      <div class="foot-col">
+        <h4>Product</h4>
+        <a href="../index.html#vaults">The four vaults</a>
+        <a href="../index.html#tools">Nodus Toolkit</a>
+        <a href="../demo/index.html">Live demos</a>
+      </div>
+      <div class="foot-col">
+        <h4>Learn</h4>
+        <a href="../wiki/">Wiki</a>
+        <a href="../blog/">Blog</a>
+        <a href="../faq/">FAQ</a>
+      </div>
+      <div class="foot-col">
+        <h4>Project</h4>
+        <a href="./">Contribute</a>
+        <a href="https://github.com/Drakonis96/nodus" target="_blank" rel="noopener">GitHub</a>
+        <a href="https://github.com/Drakonis96/nodus/releases" target="_blank" rel="noopener">Releases</a>
+      </div>
+    </div>
+    <div class="foot-base">
+      <span>© 2026 Jorge Pérez Burgueño and Nodus contributors.</span>
+      <a href="https://github.com/Drakonis96/nodus/blob/main/LICENSE" target="_blank" rel="noopener">AGPL-3.0-only</a>
+    </div>
+  </div>
+</footer>
+
+<script src="../assets/js/organism.js?v=20260815"></script>
+<script src="../assets/js/site.js?v=20260815"></script>
+<script src="contribute.js?v=20260817c"></script>
+</body>
+</html>

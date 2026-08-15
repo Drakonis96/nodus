@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>Nodus Blog</title>
+    <link>https://drakonis96.github.io/nodus/blog/</link>
+    <atom:link href="https://drakonis96.github.io/nodus/blog/feed.xml" rel="self" type="application/rss+xml"/>
+    <description>Notes from the Nodus project: comparisons with the tools around it, workflows worth stealing, and what is being built next.</description>
+    <language>en</language>
+    <lastBuildDate>Sat, 15 Aug 2026 09:57:58 GMT</lastBuildDate>
+
+  </channel>
+</rss>

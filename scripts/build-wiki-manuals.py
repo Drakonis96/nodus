@@ -11,7 +11,6 @@ from io import BytesIO
 from pathlib import Path
 
 from PIL import Image as PILImage
-from PIL import ImageStat
 from reportlab.lib import colors
 from reportlab.lib.enums import TA_CENTER, TA_JUSTIFY, TA_LEFT
 from reportlab.lib.pagesizes import A4
@@ -133,6 +132,7 @@ def styles(accent: colors.Color):
         "eyebrow": ParagraphStyle("Eyebrow", parent=base["Normal"], fontName="Helvetica-Bold", fontSize=7.5, leading=10, textColor=accent, tracking=1.2, spaceBefore=4, spaceAfter=4),
         "lead": ParagraphStyle("Lead", parent=base["Normal"], fontName="Helvetica", fontSize=11.2, leading=17, textColor=INK, alignment=TA_JUSTIFY, firstLineIndent=7 * mm, spaceAfter=8),
         "body": ParagraphStyle("BodyJustified", parent=base["BodyText"], fontName="Helvetica", fontSize=9.4, leading=14.2, textColor=INK, alignment=TA_JUSTIFY, firstLineIndent=7 * mm, spaceAfter=8),
+        "where": ParagraphStyle("Where", parent=base["Normal"], fontName="Helvetica", fontSize=7.8, leading=11, textColor=MUTED, tracking=0.5, spaceBefore=1, spaceAfter=7),
         "step": ParagraphStyle("Step", parent=base["BodyText"], fontName="Helvetica", fontSize=9, leading=13, textColor=INK, leftIndent=9 * mm, firstLineIndent=-6 * mm, spaceAfter=5),
         "tip": ParagraphStyle("Tip", parent=base["BodyText"], fontName="Helvetica", fontSize=8.7, leading=13, textColor=INK, leftIndent=5 * mm, bulletIndent=0, spaceAfter=3),
         "caption": ParagraphStyle("Caption", parent=base["Normal"], fontName="Helvetica-Oblique", fontSize=7.4, leading=10, textColor=MUTED, alignment=TA_CENTER, spaceBefore=4, spaceAfter=9),
@@ -148,81 +148,72 @@ def heading(text: str, style: ParagraphStyle, level: int) -> Paragraph:
     return flowable
 
 
-def light_document_capture(source: PILImage.Image) -> PILImage.Image:
-    """Return a light-paper edition of a dark UI capture for the PDF manuals.
+def screenshot(path: Path, max_width: float, max_height: float = 104 * mm, caption: str = "Nodus desktop application"):
+    """Place a capture of the application, in its own colours.
 
-    The website keeps the original dark screenshots. This print-only transform
-    reverses neutral luminance while retaining the hue of Nodus vault accents,
-    so the PDF has white surfaces and dark text without maintaining a second
-    manually captured image set.
+    Earlier revisions inverted the dark interface into a light "paper" edition.
+    Nodus has very little saturation outside its vault accents, so that transform
+    flattened almost every capture to grey and the manuals read as photocopies.
+    The screenshots now go in exactly as they were taken.
     """
-    image = source.convert("RGB")
-    sample = image.resize((64, 64))
-    if sum(ImageStat.Stat(sample).mean) / 3 >= 112:
-        return image
-
-    try:
-        import numpy as np
-    except ImportError:
-        # The current PDF runtime includes NumPy. Keep a safe monochrome-light
-        # fallback for minimal ReportLab environments.
-        luminance = image.convert("L")
-        lightness = luminance.point(lambda value: max(20, min(248, round(248 - value * 0.91))))
-        return PILImage.merge("RGB", (lightness, lightness, lightness))
-
-    pixels = np.asarray(image, dtype=np.float32)
-    luma = pixels[..., 0] * 0.2126 + pixels[..., 1] * 0.7152 + pixels[..., 2] * 0.0722
-    target = np.clip(248.0 - luma * 0.91, 22.0, 248.0)
-    neutral = target[..., None] + (pixels - luma[..., None]) * 0.24
-
-    chroma = pixels.max(axis=2) - pixels.min(axis=2)
-    saturation = chroma / np.maximum(pixels.max(axis=2), 1.0)
-    # Keep saturated UI accents recognisable, but brighten very dark accent
-    # fills slightly so labels remain legible on paper.
-    accent = pixels * 0.88 + 18.0
-    mix = np.clip((saturation - 0.27) / 0.32, 0.0, 0.82)[..., None]
-    converted = neutral * (1.0 - mix) + accent * mix
-    return PILImage.fromarray(np.clip(converted, 0, 255).astype("uint8"), "RGB")
-
-
-def screenshot(path: Path, max_width: float, max_height: float = 98 * mm, caption: str = "Nodus desktop application"):
     if not path.exists():
         return []
     with PILImage.open(path) as source:
-        converted = light_document_capture(source)
-        width, height = converted.size
+        image = source.convert("RGB")
+        width, height = image.size
         scale = min(max_width / width, max_height / height)
         target_w, target_h = width * scale, height * scale
         buffer = BytesIO()
-        converted.save(buffer, format="JPEG", quality=84, optimize=True, progressive=True)
+        image.save(buffer, format="JPEG", quality=88, optimize=True, progressive=True)
         buffer.seek(0)
-    return [Image(buffer, width=target_w, height=target_h), Paragraph(html.escape(caption), CURRENT_STYLES["caption"])]
+    figure = Table([[Image(buffer, width=target_w, height=target_h)]], hAlign="LEFT")
+    figure.setStyle(TableStyle([
+        ("BOX", (0, 0), (-1, -1), 0.6, LINE),
+        ("LEFTPADDING", (0, 0), (-1, -1), 1.6 * mm), ("RIGHTPADDING", (0, 0), (-1, -1), 1.6 * mm),
+        ("TOPPADDING", (0, 0), (-1, -1), 1.6 * mm), ("BOTTOMPADDING", (0, 0), (-1, -1), 1.6 * mm),
+    ]))
+    return [figure, Paragraph(html.escape(caption), CURRENT_STYLES["caption"])]
 
 
-def location_box(chapter: dict, vault_name: str | None):
-    location = chapter.get("location") or (f"{vault_name} vault → {chapter['title']}" if vault_name else f"Nodus → {chapter['title']}")
-    table = Table([
-        [Paragraph("WHERE TO FIND IT", CURRENT_STYLES["eyebrow"])],
-        [Paragraph(html.escape(location), CURRENT_STYLES["tip"])],
-    ], colWidths=[None], hAlign="LEFT")
+def where_line(chapter: dict, vault_name: str | None):
+    """A single quiet line telling the reader where the screen lives.
+
+    This used to be a full boxed panel on every chapter. Eighty of them turned
+    the manual into a stack of forms, so it is now one line of text.
+    """
+    location = chapter.get("location") or (f"{vault_name} vault > {chapter['title']}" if vault_name else f"Nodus > {chapter['title']}")
+    return Paragraph(
+        f'<font color="#6f6a86">WHERE TO FIND IT&nbsp;&nbsp;</font>{html.escape(location)}',
+        CURRENT_STYLES["where"],
+    )
+
+
+def procedure(chapter: dict, accent: colors.Color):
+    """The working sequence, as a plain numbered list.
+
+    Every chapter used to carry an identical "STEP BY STEP" panel, which read as
+    a template rather than as a guide. The steps now simply follow the prose that
+    introduces them, numbered in the accent colour.
+    """
+    flowables = []
+    for index, step in enumerate(chapter["steps"], 1):
+        flowables.append(Paragraph(
+            f'<font color="#{accent.hexval()[2:]}"><b>{index}</b></font>&nbsp;&nbsp;{html.escape(step)}',
+            CURRENT_STYLES["step"],
+        ))
+    return flowables
+
+
+def practice_note(chapter: dict, accent: colors.Color):
+    """A light marginal note, ruled in the vault accent."""
+    rows = [[Paragraph("IN PRACTICE", CURRENT_STYLES["eyebrow"])]]
+    rows += [[Paragraph(html.escape(tip), CURRENT_STYLES["tip"])] for tip in chapter["tips"]]
+    table = Table(rows, colWidths=[None], hAlign="LEFT")
     table.setStyle(TableStyle([
-        ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#f5f3f9")),
-        ("BOX", (0, 0), (-1, -1), 0.5, LINE),
+        ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#f7f6fb")),
+        ("LINEBEFORE", (0, 0), (0, -1), 2.0, accent),
         ("LEFTPADDING", (0, 0), (-1, -1), 5 * mm), ("RIGHTPADDING", (0, 0), (-1, -1), 5 * mm),
         ("TOPPADDING", (0, 0), (-1, 0), 3 * mm), ("BOTTOMPADDING", (0, -1), (-1, -1), 3 * mm),
-    ]))
-    return table
-
-
-def step_box(chapter: dict, accent: colors.Color):
-    items = [Paragraph(f"<b>{index}.</b> {html.escape(step)}", CURRENT_STYLES["step"]) for index, step in enumerate(chapter["steps"], 1)]
-    content = [[Paragraph("STEP BY STEP", CURRENT_STYLES["eyebrow"])], *[[item] for item in items]]
-    table = Table(content, colWidths=[None], hAlign="LEFT")
-    table.setStyle(TableStyle([
-        ("BACKGROUND", (0, 0), (-1, -1), colors.Color(accent.red, accent.green, accent.blue, alpha=0.055)),
-        ("BOX", (0, 0), (-1, -1), 0.6, colors.Color(accent.red, accent.green, accent.blue, alpha=0.32)),
-        ("LEFTPADDING", (0, 0), (-1, -1), 6 * mm), ("RIGHTPADDING", (0, 0), (-1, -1), 6 * mm),
-        ("TOPPADDING", (0, 0), (-1, 0), 4 * mm), ("BOTTOMPADDING", (0, -1), (-1, -1), 4 * mm),
     ]))
     return table
 
@@ -230,22 +221,16 @@ def step_box(chapter: dict, accent: colors.Color):
 def add_chapter(story: list, chapter: dict, number: str, accent: colors.Color, include_image: bool, vault_name: str | None = None):
     story.append(Paragraph(html.escape(chapter["group"].upper()), CURRENT_STYLES["eyebrow"]))
     story.append(heading(f"{number}  {chapter['title']}", CURRENT_STYLES["h2"], 1))
+    story.append(where_line(chapter, vault_name))
     story.append(Paragraph(html.escape(chapter["summary"]), CURRENT_STYLES["lead"]))
-    story.append(Paragraph(html.escape(chapter["details"]), CURRENT_STYLES["body"]))
-    story.append(Spacer(1, 2 * mm))
-    story.append(location_box(chapter, vault_name))
-    story.append(Spacer(1, 4 * mm))
-    story.append(step_box(chapter, accent))
-    story.append(Spacer(1, 4 * mm))
-    tips = [Paragraph(f"• {html.escape(tip)}", CURRENT_STYLES["tip"]) for tip in chapter["tips"]]
-    tip_table = Table([[Paragraph("GOOD PRACTICE", CURRENT_STYLES["eyebrow"])], *[[tip] for tip in tips]], colWidths=[None])
-    tip_table.setStyle(TableStyle([
-        ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#f3f1fb")),
-        ("LINEBEFORE", (0, 0), (0, -1), 2.2, accent),
-        ("LEFTPADDING", (0, 0), (-1, -1), 5 * mm), ("RIGHTPADDING", (0, 0), (-1, -1), 5 * mm),
-        ("TOPPADDING", (0, 0), (-1, 0), 3 * mm), ("BOTTOMPADDING", (0, -1), (-1, -1), 3 * mm),
-    ]))
-    story.append(tip_table)
+    for paragraph in str(chapter["details"]).split("\n\n"):
+        if paragraph.strip():
+            story.append(Paragraph(html.escape(paragraph.strip()), CURRENT_STYLES["body"]))
+    story.append(Spacer(1, 3 * mm))
+    story.extend(procedure(chapter, accent))
+    if chapter.get("tips"):
+        story.append(Spacer(1, 3 * mm))
+        story.append(practice_note(chapter, accent))
     if include_image:
         story.append(Spacer(1, 5 * mm))
         story.extend(screenshot(ASSETS / chapter["image"], 166 * mm, caption=f"{chapter['title']} in the Nodus desktop application"))
