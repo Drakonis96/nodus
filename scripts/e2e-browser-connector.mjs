@@ -66,7 +66,7 @@ async function exercise(colorScheme) {
       scripting: { executeScript: async () => [{ result: detected }] },
       storage: { local: { get: async (defaults) => ({ ...defaults, ...values }), set: async (input) => Object.assign(values, input), remove: async (keys) => { for (const key of keys) delete values[key]; } } },
       permissions: { request: async () => true },
-      runtime: { getManifest: () => ({ version: '4.1.2' }), getURL: (path = '') => `chrome-extension://abcdefghijklmnopabcdefghijklmnop/${path}`, openOptionsPage: async () => undefined },
+      runtime: { getManifest: () => ({ version: '4.1.3' }), getURL: (path = '') => `chrome-extension://abcdefghijklmnopabcdefghijklmnop/${path}`, openOptionsPage: async () => undefined },
     };
   }, { messages: english, detected: { ...snapshot, startPaired: colorScheme === 'dark' } });
   let pairRequests = 0;

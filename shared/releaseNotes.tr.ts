@@ -95,6 +95,10 @@ const RELEASE_3_2_4_TR: string[] = [
 ];
 
 export const RELEASE_NOTES_TR: Record<string, string[]> = {
+  "4.1.3": [
+    "İçinde okuduğunuz bölümler artık içeriden yeniden açılıyor. Deep Research, Daldırma ve Kitaplık sekmeleri açık bıraktığınız raporu, daldırmayı ya da belgeyi listenin aramasıyla ve sıralamasıyla birlikte geri getiriyor. Bir daldırma bıraktığınız adıma dönüyor. Yazmakta olduğunuz şey geri yüklenmiyor, çünkü o bir yer değil iştir.",
+    "Bir rapor kaldığınız yerden yeniden açılıyor. Nodus piksel konumu yerine üst kenarın altında hangi bloğun durduğunu saklıyor, bu yüzden pencere genişliğini ya da yazı tipini değiştirmek onu artık kaydırmıyor. Rapor büyümeyi bitirene kadar yer korunuyor ve tekerleğe ya da klavyeye dokunduğunuz anda bırakılıyor. Bir çeviri uygulamışsanız yer yaklaştırılmak yerine bırakılıyor, çünkü o başka bir dizgidir.",
+  ],
   "4.1.2": [
     "Bir yazar dosyası birçok noktada iyileşiyor. Eserleri artık fikirlerinden önce görünüyor, birini ilk kez tanırken izlenen sırayla aynı. Bağlantılı yazarlar listesi en güçlü beş ilişkiyi gösteriyor ve tam listeyi ayrı bir pencerede açıyor, ayrıca artık açık modda doğru görünüyor. Dosyanın açtığı pencereler de artık başlık çubuğunun üzerinde renkli bir şerit bırakmıyor.",
     "Her bölüm nerede bıraktığınızı hatırlıyor. Fikirler, Yazarlar, Genel Kitaplık, Argüman Haritası veya Çalışma Alanına döndüğünüzde filtreler, sıralama, etkin sekme ve bulunduğunuz satır geri yüklenir. Kasa değiştirmek başka bir kasanın hafızasını asla taşımaz.",

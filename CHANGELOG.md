@@ -1,5 +1,27 @@
 # Changelog
 
+## 4.1.3 — 2026-08-15
+
+Nodus 4.1.3 extends the section snapshots of 4.1.2 to the three places a reader stays inside the
+longest, and remembers how far into a report the reading had got.
+
+### Added
+
+- Deep Research, Immersion and the Library's tab strip restore the item that was open, not only the
+  state of their list. A report is found again in the gallery the section already reads, an
+  immersion is fetched by id and lands on the step its own progress records, and a Library tab
+  reopens with the reference it was opened with.
+- A Deep Research report reopens at the block that was under the top edge, counted over the
+  paragraphs, headings, quotes and tables of the rendering on screen, so window width, font size and
+  a cover image that had not loaded yet no longer move the place. The place is reapplied while the
+  report is still growing and yields as soon as the reader scrolls or types. A place counted in one
+  rendering is dropped rather than approximated when an applied translation changes the block count.
+
+### Changed
+
+- The composer, the scope screen and an applied translation are deliberately not restored: they are
+  work in progress rather than a place in a document.
+
 ## 4.1.2 — 2026-08-15
 
 Nodus 4.1.2 orders the author dossier by works before ideas, fixes its modals and connections list,

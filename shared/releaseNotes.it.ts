@@ -155,6 +155,10 @@ const RELEASE_3_2_4_IT: string[] = [
 ];
 
 export const RELEASE_NOTES_IT: Record<string, string[]> = {
+  "4.1.3": [
+    "Le sezioni in cui si legge si riaprono dall'interno. Deep Research, Immersione e le schede della Biblioteca recuperano il rapporto, l'immersione o il documento che avevi aperto, oltre alla ricerca e all'ordine dell'elenco. Un'immersione torna al passo in cui l'hai lasciata. Quello che stavi scrivendo non viene ripristinato, perché è lavoro e non un luogo.",
+    "Un rapporto si riapre dal punto in cui eri arrivato. Nodus salva quale blocco stava sotto il bordo superiore invece di una posizione in pixel, così cambiare la larghezza della finestra o il carattere non lo sposta più. Il punto viene mantenuto mentre il rapporto finisce di crescere e viene lasciato appena tocchi la rotellina o la tastiera. Se avevi applicato una traduzione, il punto viene scartato invece che approssimato, perché quella è un'altra impaginazione.",
+  ],
   "4.1.2": [
     "Il dossier di un autore migliora su più fronti. Le sue opere compaiono ora prima delle sue idee, come conviene quando si conosce qualcuno per la prima volta. L'elenco degli autori collegati mostra le cinque relazioni più forti e apre l'elenco completo in una propria finestra, e ora si vede correttamente in modalità chiara. Anche le finestre aperte dal dossier non lasciano più una fascia colorata sopra la barra del titolo.",
     "Ogni sezione ricorda dove l'hai lasciata. Tornando a Idee, Autori, Biblioteca globale, Mappa degli argomenti o Spazio di lavoro, vengono ripristinati i filtri, l'ordine, la scheda attiva e la riga in cui ti trovavi. Cambiare vault non porta mai con sé il ricordo di un altro vault.",

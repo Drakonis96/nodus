@@ -67,7 +67,7 @@ try {
 
   const markerPair = await (await fetch(`${base}/api/browser/pair`, {
     method: 'POST', headers: { ...markerHeaders, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ extensionVersion: '4.1.2', pageUrl: 'https://journal.example/marker' }),
+    body: JSON.stringify({ extensionVersion: '4.1.3', pageUrl: 'https://journal.example/marker' }),
   })).json();
   assert.equal(markerPair.token, 'browser-test-token');
   const markerCatalog = await (await fetch(`${base}/api/browser/catalog`, {
@@ -77,7 +77,7 @@ try {
 
   const pair = await (await fetch(`${base}/api/browser/pair`, {
     method: 'POST', headers: { ...extensionHeaders, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ extensionVersion: '4.1.2', pageUrl: 'https://journal.example/article' }),
+    body: JSON.stringify({ extensionVersion: '4.1.3', pageUrl: 'https://journal.example/article' }),
   })).json();
   assert.equal(pair.token, 'browser-test-token');
   assert.equal(nativePromptCalls, 0, 'enabling the connector is sufficient; pairing never opens a native prompt');

@@ -1081,6 +1081,32 @@ const RELEASE_3_2_4_HIGHLIGHTS: RawReleaseHighlight[] = [
 ];
 
 /**
+ * 4.1.3 — 4.1.2 taught the lists to remember where you left them. This one teaches the
+ * three sections you stay inside to reopen the thing you had open, and a report to
+ * reopen at the paragraph you had reached. Short sentences, no semicolons, no em dashes.
+ */
+const RELEASE_4_1_3_HIGHLIGHTS: RawReleaseHighlight[] = [
+  {
+    scope: 'general',
+    es: 'Las secciones donde se lee vuelven a abrirse por dentro. Deep Research, Inmersión y las pestañas de la Biblioteca recuperan el informe, la inmersión o el documento que tenías abierto, además de la búsqueda y el orden de la lista. Una inmersión vuelve al paso en el que la dejaste. Lo que estabas escribiendo no se restaura, porque eso es trabajo y no un sitio.',
+    en: 'The sections you read inside now reopen inside. Deep Research, Immersion and the Library tabs bring back the report, the immersion or the document you had open, along with the search and ordering of the list. An immersion returns to the step you left it on. What you were writing is not restored, because that is work and not a place.',
+    fr: 'Les sections où l’on lit se rouvrent de l’intérieur. Deep Research, Immersion et les onglets de la Bibliothèque retrouvent le rapport, l’immersion ou le document que vous aviez ouvert, ainsi que la recherche et le tri de la liste. Une immersion revient à l’étape où vous l’aviez laissée. Ce que vous étiez en train d’écrire n’est pas restauré, car c’est du travail et non un endroit.',
+    de: 'Die Bereiche, in denen gelesen wird, öffnen sich wieder von innen. Deep Research, Immersion und die Reiter der Bibliothek holen den Bericht, die Immersion oder das Dokument zurück, das Sie offen hatten, dazu die Suche und die Sortierung der Liste. Eine Immersion kehrt zu dem Schritt zurück, an dem Sie sie verlassen haben. Was Sie gerade geschrieben haben, wird nicht wiederhergestellt, denn das ist Arbeit und kein Ort.',
+    pt: 'As secções onde se lê voltam a abrir por dentro. Deep Research, Imersão e os separadores da Biblioteca recuperam o relatório, a imersão ou o documento que tinha aberto, além da pesquisa e da ordem da lista. Uma imersão volta ao passo em que a deixou. O que estava a escrever não é reposto, porque isso é trabalho e não um sítio.',
+    'pt-BR': 'As seções onde se lê voltam a abrir por dentro. Deep Research, Imersão e as abas da Biblioteca recuperam o relatório, a imersão ou o documento que você tinha aberto, além da busca e da ordem da lista. Uma imersão volta ao passo em que você a deixou. O que você estava escrevendo não é restaurado, porque isso é trabalho e não um lugar.',
+  },
+  {
+    scope: 'general',
+    es: 'Un informe se abre por donde ibas leyendo. Nodus guarda qué bloque tenías arriba del todo en lugar de una posición en píxeles, así que cambiar el ancho de la ventana o la tipografía ya no lo mueve. El sitio se conserva mientras el informe termina de crecer y deja de tocarse en cuanto tocas la rueda o el teclado. Si habías aplicado una traducción, el sitio se descarta en vez de aproximarse, porque esa es otra maquetación.',
+    en: 'A report reopens where you had got to. Nodus stores which block was under the top edge instead of a pixel position, so changing the window width or the font no longer moves it. The place is held while the report finishes growing and is let go the moment you touch the wheel or the keyboard. If you had applied a translation, the place is dropped rather than approximated, because that is a different rendering.',
+    fr: 'Un rapport se rouvre là où vous en étiez. Nodus enregistre quel bloc se trouvait tout en haut plutôt qu’une position en pixels, si bien que changer la largeur de la fenêtre ou la police ne le déplace plus. La place est maintenue pendant que le rapport finit de grandir et elle est relâchée dès que vous touchez la molette ou le clavier. Si vous aviez appliqué une traduction, la place est abandonnée au lieu d’être approchée, car c’est une autre mise en page.',
+    de: 'Ein Bericht öffnet wieder dort, wo Sie waren. Nodus speichert, welcher Block unter der oberen Kante stand, statt einer Pixelposition, sodass eine andere Fensterbreite oder Schrift ihn nicht mehr verschiebt. Die Stelle wird gehalten, während der Bericht zu Ende wächst, und losgelassen, sobald Sie Rad oder Tastatur berühren. Hatten Sie eine Übersetzung angewendet, wird die Stelle verworfen statt angenähert, denn das ist ein anderer Satz.',
+    pt: 'Um relatório abre por onde ia a ler. O Nodus guarda que bloco estava no topo em vez de uma posição em píxeis, por isso mudar a largura da janela ou a tipografia já não o move. O lugar mantém-se enquanto o relatório acaba de crescer e é largado assim que toca na roda ou no teclado. Se tinha aplicado uma tradução, o lugar é descartado em vez de aproximado, porque essa é outra composição.',
+    'pt-BR': 'Um relatório abre onde você parou de ler. O Nodus guarda qual bloco estava no topo em vez de uma posição em pixels, então mudar a largura da janela ou a fonte já não o move. O lugar se mantém enquanto o relatório termina de crescer e é solto assim que você toca na roda ou no teclado. Se você tinha aplicado uma tradução, o lugar é descartado em vez de aproximado, porque essa é outra composição.',
+  },
+];
+
+/**
  * 4.1.2 — the author dossier gets read in a sensible order and stops flashing its own
  * seams, every section remembers where you left it, and the Cloudflare wizard from 4.1.1
  * catches up to the other seven interface languages.
@@ -1369,6 +1395,11 @@ const RELEASE_4_0_0_HIGHLIGHTS: RawReleaseHighlight[] = [
 ];
 
 const RAW_RELEASE_NOTES: RawReleaseNote[] = [
+  {
+    version: '4.1.3',
+    date: '2026-08-15',
+    highlights: RELEASE_4_1_3_HIGHLIGHTS,
+  },
   {
     version: '4.1.2',
     date: '2026-08-15',
