@@ -484,7 +484,11 @@ main#article {
   font: 500 13.5px var(--sans);
   transition: border-color 0.25s var(--ease), box-shadow 0.25s var(--ease);
 }
-.wiki-search-wrap input::placeholder { color: var(--ink-3); }
+/* the sidebar is narrow: a placeholder that overflows must fade, not clip mid-word */
+.wiki-search-wrap input::placeholder {
+  color: var(--ink-3);
+  text-overflow: ellipsis;
+}
 .wiki-search-wrap input:focus {
   outline: none; border-color: rgba(167, 139, 250, 0.62);
   box-shadow: 0 0 0 4px rgba(139, 92, 246, 0.13);
