@@ -16,7 +16,9 @@ import {
   strictRateLimit,
 } from './util.mjs';
 
-const PASSWORD_ITERATIONS = 210_000;
+// Cloudflare Workers caps PBKDF2 at 100_000 iterations; anything higher makes
+// crypto.subtle.deriveBits throw NotSupportedError and bootstrap fails with a 500.
+const PASSWORD_ITERATIONS = 100_000;
 const ACCESS_TTL_MS = 15 * 60_000;
 const REFRESH_TTL_MS = 30 * 86400_000;
 const DEVICE_TTL_MS = 3650 * 86400_000;
@@ -38,16 +40,28 @@ function decodeHex(value) {
   return Uint8Array.from(clean.match(/.{2}/g).map((part) => Number.parseInt(part, 16)));
 }
 
-export async function hashPassword(password, saltHex = null) {
+export async function hashPassword(password, saltHex = null, iterations = PASSWORD_ITERATIONS) {
   const salt = saltHex ? decodeHex(saltHex) : crypto.getRandomValues(new Uint8Array(16));
   const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(String(password)), 'PBKDF2', false, ['deriveBits']);
-  const bits = await crypto.subtle.deriveBits({ name: 'PBKDF2', hash: 'SHA-256', salt, iterations: PASSWORD_ITERATIONS }, key, 256);
-  return { scheme: `pbkdf2-sha256:${PASSWORD_ITERATIONS}`, salt: encodeHex(salt), hash: encodeHex(new Uint8Array(bits)) };
+  const bits = await crypto.subtle.deriveBits({ name: 'PBKDF2', hash: 'SHA-256', salt, iterations }, key, 256);
+  return { scheme: `pbkdf2-sha256:${iterations}`, salt: encodeHex(salt), hash: encodeHex(new Uint8Array(bits)) };
+}
+
+// Each record stores the iteration count it was hashed with, so verification must
+// replay that count rather than the current constant. Otherwise tuning
+// PASSWORD_ITERATIONS invalidates every password already on record.
+function schemeIterations(scheme) {
+  const match = /^pbkdf2-sha256:(\d+)$/.exec(String(scheme || ''));
+  if (!match) return null;
+  const iterations = Number(match[1]);
+  return Number.isSafeInteger(iterations) && iterations > 0 ? iterations : null;
 }
 
 export async function verifyPassword(password, user) {
-  if (!user?.password_hash || !user?.password_salt || !String(user.password_scheme || '').startsWith('pbkdf2-sha256:')) return false;
-  const calculated = await hashPassword(password, user.password_salt);
+  if (!user?.password_hash || !user?.password_salt) return false;
+  const iterations = schemeIterations(user.password_scheme);
+  if (!iterations) return false;
+  const calculated = await hashPassword(password, user.password_salt, iterations);
   return constantTimeEqual(calculated.hash, user.password_hash);
 }
 
