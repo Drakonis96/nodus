@@ -1396,3 +1396,7 @@ textarea.search-input { resize: vertical; min-height: 74px; line-height: 1.5; }
   .teach-form .span-2 { grid-column: auto; }
   .teach-rubric-wrap, .teach-grade-wrap, .teach-table-wrap { margin-right: -14px; }
 }
+
+/* The shared header is position:fixed, so its host element collapses; reserve
+   the row it occupies or the framed app slides underneath the navigation. */
+body.demo-page > [data-nodus-site-header] { display: block; height: 62px; }

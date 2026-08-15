@@ -44,12 +44,17 @@ test('the wiki shell exposes global search, navigation and downloadable manuals'
   const html = fs.readFileSync(path.join(wikiRoot, 'index.html'), 'utf8');
   const script = fs.readFileSync(path.join(wikiRoot, 'wiki.js'), 'utf8');
   const header = fs.readFileSync(path.join(root, 'site', 'site-header.js'), 'utf8');
-  assert.match(header, /id="search"[^>]+type="search"/);
-  assert.match(html, /data-nodus-site-header data-base="\.\.\/" data-context="wiki"/);
-  assert.match(html, /\.\.\/site-header\.css/);
+  // the search box sits at the top of the sidebar rail, pinned while the nav scrolls
+  assert.match(html, /wiki-sidebar[\s\S]*?id="search"[^>]+type="search"/);
+  assert.doesNotMatch(header, /id="search"/, 'the header no longer carries the wiki search');
+  assert.match(html, /data-nodus-site-header data-base="\.\.\/"[^>]*data-context="wiki"/);
+  assert.match(html, /\.\.\/assets\/css\/nodus\.css/, 'the wiki shares the site design system');
   assert.match(html, /\.\.\/site-header\.js/);
   assert.match(html, /id="wiki-nav"/);
   assert.match(header, /id="nav-toggle"[^>]+aria-controls="wiki-sidebar"[^>]+aria-expanded="false"/);
+  // a book, not a second hamburger beside the site menu's own
+  assert.doesNotMatch(header, /class="wiki-menu-toggle"[^>]*>\s*<span>/, 'the docs toggle is not a hamburger');
+  assert.match(header, /class="wiki-menu-toggle"[\s\S]{0,220}?<svg/, 'the docs toggle carries an icon');
   assert.match(html, /id="nav-backdrop"[^>]+hidden/);
   assert.match(script, /Download PDF manual/);
   assert.match(script, /<span>PDF manual<\/span>/);

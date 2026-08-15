@@ -1,0 +1,125 @@
+<!--
+SPDX-FileCopyrightText: 2026 Jorge Pérez Burgueño and Nodus contributors
+SPDX-License-Identifier: AGPL-3.0-only
+-->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Nodus Blog</title>
+<meta name="description" content="Notes from the Nodus project: how it compares to the tools around it, workflows worth stealing, and what is being built next."/>
+<meta property="og:title" content="Nodus Blog"/>
+<meta property="og:description" content="Notes from the Nodus project — comparisons, workflows and what is being built next."/>
+<link rel="icon" type="image/svg+xml" href="../assets/nodus-logo.svg"/>
+<link rel="alternate" type="application/rss+xml" title="Nodus Blog" href="feed.xml"/>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Fraunces:opsz,wght@9..144,600;9..144,700&display=swap" rel="stylesheet"/>
+<link rel="stylesheet" href="../assets/css/nodus.css?v=20260815"/>
+<link rel="stylesheet" href="blog.css?v=20260815"/>
+</head>
+<body>
+
+<a class="skip-link" href="#main">Skip to the posts</a>
+<canvas id="organism" aria-hidden="true"></canvas>
+
+<div data-nodus-site-header data-base="../" data-page="blog"></div>
+<script src="../site-header.js?v=20260815"></script>
+
+<main id="main" data-accent="#c084fc" data-second="#22d3ee" data-energy="0.28">
+  <header class="page-hero">
+    <div class="wrap">
+      <div class="scrim" style="max-width:760px">
+        <span class="kicker">The Nodus blog</span>
+        <h1 class="display" data-split>Notes from the workbench.</h1>
+        <p class="lead">How Nodus compares to the tools around it, workflows worth stealing, and what is being built next. Written when there is something worth saying, not on a schedule.</p>
+        <p class="hero-feed">
+          <a class="arrow-link" href="feed.xml">Subscribe by RSS
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 11a9 9 0 0 1 9 9M4 4a16 16 0 0 1 16 16"/><circle cx="5" cy="19" r="1.6" fill="currentColor"/></svg></a>
+        </p>
+      </div>
+    </div>
+  </header>
+
+  <section style="padding-top:0">
+    <div class="wrap">
+      <div class="filter-bar" id="blog-filters" hidden>
+        <div class="search-wrap">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.4-3.4"/></svg>
+          <input id="blog-search" type="search" autocomplete="off" placeholder="Search the posts…" aria-label="Search the posts" aria-controls="blog-list"/>
+          <button class="search-clear" id="blog-clear" type="button" aria-label="Clear search" hidden>×</button>
+        </div>
+        <div class="filter-tabs" id="blog-tags" role="toolbar" aria-label="Post tags"></div>
+      </div>
+
+      <p class="result-meta" id="blog-meta" role="status" aria-live="polite"></p>
+      <div class="post-list" id="blog-list"></div>
+
+      <div class="empty-state" id="blog-empty" hidden>
+        <b>No posts match that search.</b>
+        Try a different word, or clear the filters.
+      </div>
+
+      <!-- shown while the blog has no published posts at all -->
+      <div class="blog-soon" id="blog-soon" hidden>
+        <div class="soon-mark" aria-hidden="true">
+          <svg viewBox="0 0 64 64">
+            <path d="M18 48V16L46 48V16" fill="none" stroke="currentColor" stroke-width="6.5" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </div>
+        <h2>The first posts are being written.</h2>
+        <p>The blog is live and waiting on its first entries. Until then, the Wiki documents the whole app, and the release notes track everything that ships.</p>
+        <ul class="soon-list">
+          <li><b>Nodus compared with NotebookLM</b><span>Both read your sources. Only one keeps the evidence and runs offline.</span></li>
+          <li><b>Using Nodus alongside Zotero</b><span>What each tool is genuinely good at, and where the handover should happen.</span></li>
+          <li><b>Nodus as an alternative to Obsidian</b><span>Linked notes versus a corpus that knows what its sources actually claim.</span></li>
+        </ul>
+        <div class="soon-links">
+          <a class="btn" href="../wiki/">Read the Wiki</a>
+          <a class="btn" href="https://github.com/Drakonis96/nodus/releases" target="_blank" rel="noopener">Release notes</a>
+          <a class="btn" href="feed.xml">RSS feed</a>
+        </div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer class="site-foot">
+  <div class="wrap">
+    <div class="foot-grid">
+      <div class="foot-brand">
+        <span class="logo"><img src="../assets/nodus-logo.svg" alt=""/> Nodus</span>
+        <p>A free, open-source, local-first workspace for research, teaching and study.</p>
+      </div>
+      <div class="foot-col">
+        <h4>Product</h4>
+        <a href="../index.html#vaults">The four vaults</a>
+        <a href="../index.html#tools">Nodus Toolkit</a>
+        <a href="../demo/index.html">Live demos</a>
+      </div>
+      <div class="foot-col">
+        <h4>Learn</h4>
+        <a href="../wiki/">Wiki</a>
+        <a href="./">Blog</a>
+        <a href="../faq/">FAQ</a>
+      </div>
+      <div class="foot-col">
+        <h4>Project</h4>
+        <a href="../contribute/">Contribute</a>
+        <a href="https://github.com/Drakonis96/nodus" target="_blank" rel="noopener">GitHub</a>
+        <a href="https://github.com/Drakonis96/nodus/releases" target="_blank" rel="noopener">Releases</a>
+      </div>
+    </div>
+    <div class="foot-base">
+      <span>© 2026 Jorge Pérez Burgueño and Nodus contributors.</span>
+      <a href="https://github.com/Drakonis96/nodus/blob/main/LICENSE" target="_blank" rel="noopener">AGPL-3.0-only</a>
+    </div>
+  </div>
+</footer>
+
+<script src="../assets/js/organism.js?v=20260815"></script>
+<script src="../assets/js/site.js?v=20260815"></script>
+<script src="blog.js?v=20260815"></script>
+</body>
+</html>

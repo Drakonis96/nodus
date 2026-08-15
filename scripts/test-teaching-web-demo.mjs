@@ -13,7 +13,8 @@ test('the Teaching web demo is reachable from every live vault demo', () => {
   const sharedHeader = read('site/site-header.js');
   assert.match(teachingHtml, /data-nodus-site-header data-base="\.\.\/" data-context="demo"/);
   assert.match(teachingHtml, /src="\.\.\/site-header\.js/);
-  assert.match(sharedHeader, /section\('#vaults'\)/);
+  // the route back to the vault catalogue is now the header's Home link
+  assert.match(sharedHeader, /\{ id: 'home', label: 'Home', href: \(base\) => `\$\{base\}index\.html` \}/);
   assert.match(teachingHtml, /src="teaching-data\.js/);
   assert.match(teachingHtml, /src="teaching-app\.js/);
   assert.match(teachingHtml, /AI for generating teaching content only; AI never evaluates students/);
@@ -58,15 +59,16 @@ test('the browser fixture preserves the important facts from the real app fixtur
 });
 
 test('landing copy describes the current Teaching scope and names Nodus directly', () => {
+  // The site was rebuilt in English only in August 2026, so this no longer checks
+  // translation keys — only that the Teaching claims themselves stay honest.
   const landing = read('site/index.html');
-  assert.match(landing, /href="demo\/teaching\.html"[^>]*data-i18n="vaults\.teaching\.cta"/);
-  assert.match(landing, /Tú traes los datos, Nodus hace los números/);
+  assert.match(landing, /href="demo\/teaching\.html"/, 'the landing opens the Teaching demo');
   assert.doesNotMatch(landing, /Tú traes los datos, él hace los números/);
   assert.doesNotMatch(landing, /You bring the data, it runs the numbers/);
   assert.doesNotMatch(landing, /Teaching guide · linked/);
   assert.doesNotMatch(landing, /Open the four live demos/);
-  assert.match(landing, /From the assessment plan to every final grade/);
-  assert.match(landing, /AI generates teaching content only and never grades, profiles or evaluates students/);
+  assert.match(landing, /published assessment plan in a gradebook that keeps non-numeric states explicit/);
+  assert.match(landing, /AI generates teaching content only, and never grades, profiles or evaluates students/);
 });
 
 test('the FAQ documents Teaching availability in every maintained FAQ translation', () => {
