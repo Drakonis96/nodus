@@ -96,7 +96,6 @@ Home page components. The shared system lives in nodus.css.
   color: transparent; -webkit-text-stroke: 1.2px var(--accent);
   opacity: 0.75;
 }
-.scene-index .tag-status { transform: translateY(-4px); }
 
 .scene h2 {
   font-size: clamp(30px, 4.2vw, 52px);

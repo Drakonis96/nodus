@@ -48,6 +48,35 @@ test('the home page presents the four main vaults, the rest, and the toolkit', (
   }
 });
 
+test('every page of the site carries the Google Tag Manager container', () => {
+  // a page added later without the snippet goes uncounted and nobody notices,
+  // so the container is checked across the whole site rather than page by page
+  const pages = [];
+  const walk = (dir) => {
+    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+      const full = path.join(dir, entry.name);
+      if (entry.isDirectory()) walk(full);
+      else if (entry.name.endsWith('.html')) pages.push(full);
+    }
+  };
+  walk(siteRoot);
+  assert.ok(pages.length >= 12, 'the walk found the pages of the site');
+
+  for (const page of pages) {
+    const html = fs.readFileSync(page, 'utf8');
+    const name = path.relative(siteRoot, page);
+    assert.match(html, /googletagmanager\.com\/gtm\.js/, `${name} loads the GTM container`);
+    assert.match(html, /googletagmanager\.com\/ns\.html\?id=GTM-MP3BX78N/, `${name} carries the noscript fallback`);
+    // the container must be reachable before anything else can delay it
+    const headStart = html.indexOf('<!-- Google Tag Manager -->');
+    assert.ok(headStart > -1 && headStart < html.indexOf('<title'), `${name} puts GTM high in the head`);
+    assert.ok(
+      html.indexOf('<!-- Google Tag Manager (noscript) -->') > html.indexOf('<body'),
+      `${name} puts the noscript iframe right after <body>`,
+    );
+  }
+});
+
 test('the tutorial gallery lives in the wiki and is generated from the file the desktop app also reads', () => {
   const script = read('wiki/wiki.js');
   assert.match(script, /fetch\('\.\.\/tutorials\.json'\)/);

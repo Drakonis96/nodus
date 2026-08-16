@@ -6,7 +6,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const SITE = 'https://drakonis96.github.io/nodus';
+const SITE = 'https://nodusresearch.com';
 
 const PAGES = [
   { file: 'index.html', url: '/' },

@@ -6,6 +6,13 @@ SPDX-License-Identifier: AGPL-3.0-only
 <html lang="en">
 <head>
 <meta charset="utf-8"/>
+<!-- Google Tag Manager -->
+<script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
+new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
+j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
+'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
+})(window,document,'script','dataLayer','GTM-MP3BX78N');</script>
+<!-- End Google Tag Manager -->
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
 <title>Nodus Blog</title>
 <meta name="description" content="Notes from the Nodus project: how it compares to the tools around it, workflows worth stealing, and what is being built next."/>
@@ -19,9 +26,13 @@ SPDX-License-Identifier: AGPL-3.0-only
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Fraunces:opsz,wght@9..144,600;9..144,700&display=swap" rel="stylesheet"/>
 <link rel="stylesheet" href="../assets/css/nodus.css?v=20260817c"/>
-<link rel="stylesheet" href="blog.css?v=20260816"/>
+<link rel="stylesheet" href="blog.css?v=20260817"/>
 </head>
 <body>
+<!-- Google Tag Manager (noscript) -->
+<noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-MP3BX78N"
+height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
+<!-- End Google Tag Manager (noscript) -->
 
 <a class="skip-link" href="#main">Skip to the posts</a>
 <canvas id="organism" aria-hidden="true"></canvas>
@@ -39,6 +50,10 @@ SPDX-License-Identifier: AGPL-3.0-only
         <p class="hero-feed">
           <a class="arrow-link" href="feed.xml">Subscribe by RSS
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 11a9 9 0 0 1 9 9M4 4a16 16 0 0 1 16 16"/><circle cx="5" cy="19" r="1.6" fill="currentColor"/></svg></a>
+          <button class="feed-copy" id="feed-copy" type="button" data-url="https://nodusresearch.com/blog/feed.xml" hidden>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>
+            <span id="feed-copy-label">Copy the feed URL</span>
+          </button>
         </p>
       </div>
     </div>
@@ -122,7 +137,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 
 <script src="../assets/js/organism.js?v=20260815"></script>
 <script src="../assets/js/site.js?v=20260815"></script>
-<script src="blog.js?v=20260816"></script>
+<script src="blog.js?v=20260817"></script>
 <script src="../assets/js/back-to-top.js?v=20260817b"></script>
 </body>
 </html>

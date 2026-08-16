@@ -87,9 +87,36 @@ test('the RSS feed carries the published posts and nothing else', () => {
   }
 });
 
+test('the feed is readable in a browser, not just in a reader', () => {
+  const feed = read('feed.xml');
+  assert.match(
+    feed,
+    /<\?xml-stylesheet type="text\/xsl" href="feed\.xsl"\?>/,
+    'feed.xml points at the stylesheet, so a browser renders a page instead of raw XML',
+  );
+  const stylesheet = read('feed.xsl');
+  assert.match(stylesheet, /<xsl:template match="\/rss\/channel">/, 'the stylesheet transforms the channel');
+  assert.match(stylesheet, /<xsl:template match="item">/, 'the stylesheet renders each post');
+
+  // the address only helps when it can be taken to a reader in one click
+  const html = read('index.html');
+  assert.match(html, /id="feed-copy"[^>]*data-url="https:\/\/nodusresearch\.com\/blog\/feed\.xml"/);
+  assert.match(read('blog.js'), /navigator\.clipboard/, 'the copy button is wired');
+});
+
+test('regenerating the feed keeps what the published feed says', () => {
+  // build-blog-feed.mjs overwrites feed.xml wholesale: if it drifts from the
+  // shipped feed, one `npm run blog:feed` silently undoes the domain move and
+  // changes every guid, which shows old posts again in everyone's reader
+  const generator = fs.readFileSync(path.join(repoRoot, 'scripts', 'build-blog-feed.mjs'), 'utf8');
+  assert.match(generator, /const SITE = 'https:\/\/nodusresearch\.com'/, 'the generator uses the live domain');
+  assert.match(generator, /xml-stylesheet type="text\/xsl" href="feed\.xsl"/, 'the generator keeps the stylesheet');
+  assert.match(generator, /<guid isPermaLink="true">/, 'the generator keeps the guids already published');
+});
+
 test('the site addresses the blog by its own domain', () => {
   // the sitemap is validated against the verified Search Console property
-  for (const file of ['index.html', 'post.html', 'feed.xml']) {
+  for (const file of ['index.html', 'post.html', 'feed.xml', 'feed.xsl']) {
     assert.doesNotMatch(read(file), /drakonis96\.github\.io/, `${file} uses nodusresearch.com`);
   }
   const sitemap = fs.readFileSync(path.join(repoRoot, 'site', 'sitemap.xml'), 'utf8');
