@@ -263,6 +263,18 @@ export async function deletedSince(
 ): Promise<ZoteroDeletedObjects> {
   if (since <= 0) return { version: 0, items: [], collections: [] };
   const res = await zfetch(`${BASE}/${libraryPrefix(library)}/deleted?since=${encodeURIComponent(String(since))}`, signal);
+  // The local API does not implement /deleted: it answers 404 "No endpoint found" for
+  // every library, user id and `since` — unlike the Web API this endpoint only exists in.
+  // Read as a missing library that aborted the entire import on the *second* run, once a
+  // version had been recorded and `since` stopped being zero, which is why it stayed
+  // hidden while first syncs were failing for other reasons. A library that really is
+  // gone also fails on the items and collections endpoints, which are checked on their
+  // own, so answering "no tombstones" here cannot disguise one.
+  //
+  // The cost is that deletions made in Zotero are not mirrored: an item removed there
+  // stays in the local catalogue until a full refresh. That is the honest answer while
+  // the runtime cannot report tombstones, and it is preferable to refusing to sync.
+  if (res.status === 404) return { version: since, items: [], collections: [] };
   if (!res.ok) throw endpointError('Elementos eliminados de Zotero', res);
   const data = (await res.json().catch(() => ({}))) as { items?: string[]; collections?: string[] };
   return {
