@@ -1106,6 +1106,46 @@ const RELEASE_4_1_3_HIGHLIGHTS: RawReleaseHighlight[] = [
   },
 ];
 
+/** 4.1.4 — a new public home and a desktop that stays responsive during upkeep. */
+const RELEASE_4_1_4_HIGHLIGHTS: RawReleaseHighlight[] = [
+  {
+    scope: 'general',
+    es: 'Nodus estrena casa en nodusresearch.com. La nueva web reúne la wiki, los manuales, las demos interactivas, las preguntas frecuentes, el blog y una página para contribuir. Está rediseñada para orientarte desde el primer vistazo y funciona mejor en pantallas pequeñas. La aplicación te avisará una sola vez y el centro de notificaciones abrirá la nueva dirección.',
+    en: 'Nodus has a new home at nodusresearch.com. The new website brings together the wiki, manuals, interactive demos, frequently asked questions, the blog and a page for contributing. It has been redesigned to orient you at first glance and works better on small screens. The app will tell you once, and the notification centre will open the new address.',
+    fr: 'Nodus a une nouvelle adresse, nodusresearch.com. Le nouveau site réunit le wiki, les manuels, les démos interactives, les questions fréquentes, le blog et une page pour contribuer. Il a été repensé pour vous orienter dès le premier regard et fonctionne mieux sur les petits écrans. L’application vous préviendra une seule fois et le centre de notifications ouvrira la nouvelle adresse.',
+    de: 'Nodus hat unter nodusresearch.com ein neues Zuhause. Die neue Website vereint Wiki, Handbücher, interaktive Demos, häufige Fragen, Blog und eine Seite zum Mitmachen. Sie wurde neu gestaltet, damit Sie sich auf den ersten Blick zurechtfinden, und funktioniert besser auf kleinen Bildschirmen. Die App weist Sie einmal darauf hin und die Mitteilungszentrale öffnet die neue Adresse.',
+    pt: 'O Nodus tem uma nova casa em nodusresearch.com. O novo site reúne a wiki, os manuais, as demonstrações interativas, as perguntas frequentes, o blogue e uma página para contribuir. Foi redesenhado para orientar à primeira vista e funciona melhor em ecrãs pequenos. A aplicação avisará uma única vez e o centro de notificações abrirá o novo endereço.',
+    'pt-BR': 'O Nodus tem uma nova casa em nodusresearch.com. O novo site reúne a wiki, os manuais, as demonstrações interativas, as perguntas frequentes, o blog e uma página para contribuir. Ele foi redesenhado para orientar logo de início e funciona melhor em telas pequenas. O aplicativo avisará uma única vez e a central de notificações abrirá o novo endereço.',
+  },
+  {
+    scope: 'general',
+    es: 'Las copias de seguridad automáticas y la publicación de bóvedas conectadas dejan de bloquear la aplicación. El trabajo pesado ocurre ahora fuera de la ventana principal, usa memoria de forma acotada y se detiene si un proceso externo queda colgado. Puedes seguir usando Nodus mientras una bóveda grande se cifra, comprime o envía al servidor. Los fallos de publicación esperan antes de volver a intentarlo y los datos sin cambios no se reconstruyen.',
+    en: 'Automatic backups and publishing connected vaults no longer block the app. Heavy work now runs outside the main window, uses bounded memory and stops if an external process hangs. You can keep using Nodus while a large vault is encrypted, compressed or sent to the server. Failed publications wait before trying again, and unchanged data is not rebuilt.',
+    fr: 'Les sauvegardes automatiques et la publication des coffres connectés ne bloquent plus l’application. Le travail lourd s’effectue désormais hors de la fenêtre principale, utilise une quantité de mémoire limitée et s’arrête si un processus externe se fige. Vous pouvez continuer à utiliser Nodus pendant le chiffrement, la compression ou l’envoi au serveur d’un grand coffre. Les publications échouées attendent avant de réessayer et les données inchangées ne sont pas reconstruites.',
+    de: 'Automatische Sicherungen und die Veröffentlichung verbundener Tresore blockieren die App nicht mehr. Aufwendige Arbeit läuft nun außerhalb des Hauptfensters, nutzt begrenzten Speicher und wird beendet, falls ein externer Prozess hängen bleibt. Sie können Nodus weiterverwenden, während ein großer Tresor verschlüsselt, komprimiert oder an den Server gesendet wird. Fehlgeschlagene Veröffentlichungen warten vor dem nächsten Versuch und unveränderte Daten werden nicht neu aufgebaut.',
+    pt: 'As cópias de segurança automáticas e a publicação de cofres ligados deixam de bloquear a aplicação. O trabalho pesado passa a decorrer fora da janela principal, usa memória de forma limitada e termina se um processo externo ficar bloqueado. Pode continuar a usar o Nodus enquanto um cofre grande é cifrado, comprimido ou enviado para o servidor. As publicações falhadas aguardam antes de tentar novamente e os dados inalterados não são reconstruídos.',
+    'pt-BR': 'Os backups automáticos e a publicação de cofres conectados não bloqueiam mais o aplicativo. O trabalho pesado agora acontece fora da janela principal, usa memória de forma limitada e é interrompido se um processo externo travar. Você pode continuar usando o Nodus enquanto um cofre grande é criptografado, compactado ou enviado ao servidor. As publicações com falha aguardam antes de tentar novamente e os dados inalterados não são reconstruídos.',
+  },
+  {
+    scope: 'general',
+    es: 'El despliegue de Nodus Cloud en Cloudflare ya puede crear su primera cuenta de administración. El servicio real rechazaba la operación de contraseña que aceptaba el entorno de prueba, por lo que el asistente terminaba siempre con un error 500 y no dejaba iniciar el servidor. La configuración respeta ahora el límite de Cloudflare, conserva la compatibilidad con las contraseñas existentes y muestra el motivo que devuelve el servidor cuando algo falla.',
+    en: 'A Nodus Cloud deployment on Cloudflare can now create its first administrator account. The production service rejected a password operation that the test environment accepted, so the wizard always ended with a 500 error and could not initialise the server. The setup now respects Cloudflare’s limit, remains compatible with existing passwords and shows the reason returned by the server when something fails.',
+    fr: 'Un déploiement de Nodus Cloud sur Cloudflare peut désormais créer son premier compte administrateur. Le service de production refusait une opération de mot de passe acceptée par l’environnement de test. L’assistant se terminait donc toujours par une erreur 500 et ne pouvait pas initialiser le serveur. La configuration respecte maintenant la limite de Cloudflare, reste compatible avec les mots de passe existants et affiche la raison renvoyée par le serveur en cas d’échec.',
+    de: 'Eine Nodus-Cloud-Bereitstellung auf Cloudflare kann jetzt ihr erstes Administratorkonto anlegen. Der Produktionsdienst lehnte einen Passwortvorgang ab, den die Testumgebung akzeptierte. Deshalb endete der Assistent immer mit Fehler 500 und konnte den Server nicht initialisieren. Die Einrichtung hält nun das Cloudflare-Limit ein, bleibt mit vorhandenen Passwörtern kompatibel und zeigt bei einem Fehler den vom Server zurückgegebenen Grund an.',
+    pt: 'Uma instalação do Nodus Cloud na Cloudflare já pode criar a primeira conta de administração. O serviço de produção recusava uma operação de palavra-passe que o ambiente de teste aceitava. Por isso, o assistente terminava sempre com um erro 500 e não conseguia iniciar o servidor. A configuração respeita agora o limite da Cloudflare, mantém a compatibilidade com as palavras-passe existentes e mostra o motivo devolvido pelo servidor quando algo falha.',
+    'pt-BR': 'Uma implantação do Nodus Cloud na Cloudflare agora pode criar a primeira conta de administração. O serviço de produção recusava uma operação de senha aceita pelo ambiente de teste. Por isso, o assistente sempre terminava com um erro 500 e não conseguia iniciar o servidor. A configuração agora respeita o limite da Cloudflare, mantém a compatibilidade com as senhas existentes e mostra o motivo devolvido pelo servidor quando algo falha.',
+  },
+  {
+    scope: 'nodi',
+    es: 'Actualizar el centro de notificaciones ya da una respuesta clara. Después de pulsar el botón, Nodus indica si la lista se ha actualizado, si no hay novedades, si los avisos están desactivados o si no ha podido consultar la fuente. La lista sigue conservando la última copia válida cuando la red falla.',
+    en: 'Refreshing the notification centre now gives a clear answer. After you press the button, Nodus says whether the list was updated, there is nothing new, announcements are disabled or the source could not be reached. The list keeps its last valid copy when the network fails.',
+    fr: 'L’actualisation du centre de notifications donne désormais une réponse claire. Après avoir appuyé sur le bouton, Nodus indique si la liste a été mise à jour, s’il n’y a rien de nouveau, si les annonces sont désactivées ou si la source n’a pas pu être consultée. La liste conserve sa dernière copie valide en cas de panne du réseau.',
+    de: 'Das Aktualisieren der Mitteilungszentrale liefert jetzt eine klare Rückmeldung. Nach dem Drücken der Schaltfläche sagt Nodus, ob die Liste aktualisiert wurde, ob es nichts Neues gibt, ob Hinweise deaktiviert sind oder ob die Quelle nicht erreicht werden konnte. Bei einem Netzfehler behält die Liste ihre letzte gültige Kopie.',
+    pt: 'Atualizar o centro de notificações passa a dar uma resposta clara. Depois de premir o botão, o Nodus indica se a lista foi atualizada, se não há novidades, se os avisos estão desativados ou se não foi possível consultar a fonte. A lista conserva a última cópia válida quando a rede falha.',
+    'pt-BR': 'Atualizar a central de notificações agora dá uma resposta clara. Depois de apertar o botão, o Nodus informa se a lista foi atualizada, se não há novidades, se os avisos estão desativados ou se não foi possível consultar a fonte. A lista mantém a última cópia válida quando a rede falha.',
+  },
+];
+
 /**
  * 4.1.2 — the author dossier gets read in a sensible order and stops flashing its own
  * seams, every section remembers where you left it, and the Cloudflare wizard from 4.1.1
@@ -1395,6 +1435,11 @@ const RELEASE_4_0_0_HIGHLIGHTS: RawReleaseHighlight[] = [
 ];
 
 const RAW_RELEASE_NOTES: RawReleaseNote[] = [
+  {
+    version: '4.1.4',
+    date: '2026-08-16',
+    highlights: RELEASE_4_1_4_HIGHLIGHTS,
+  },
   {
     version: '4.1.3',
     date: '2026-08-15',

@@ -1,5 +1,21 @@
 # Changelog
 
+## 4.1.4 — 2026-08-16
+
+Nodus 4.1.4 keeps the desktop responsive during automatic backups and connected-vault
+publication, fixes the first administrator setup in production Cloudflare deployments,
+and introduces the project’s new public home at nodusresearch.com.
+
+- Automatic backups and connected-vault publication now run outside the main process with
+  bounded memory, hard process deadlines, retry backoff and unchanged-data shortcuts.
+- Nodus Cloud can initialise its first administrator on Cloudflare Workers and surfaces the
+  server’s real error when deployment setup fails.
+- The notification centre reports the outcome of a manual refresh and preserves its last
+  valid snapshot when the remote feed is unavailable.
+- The redesigned website brings together the wiki, manuals, interactive demos, FAQ, blog
+  and contribution paths at nodusresearch.com.
+- The What’s New modal presents this release in all eight interface languages.
+
 ## 4.1.3 — 2026-08-15
 
 Nodus 4.1.3 extends the section snapshots of 4.1.2 to the three places a reader stays inside the

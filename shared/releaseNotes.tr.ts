@@ -95,6 +95,12 @@ const RELEASE_3_2_4_TR: string[] = [
 ];
 
 export const RELEASE_NOTES_TR: Record<string, string[]> = {
+  "4.1.4": [
+    "Nodus artık nodusresearch.com adresinde yeni bir eve sahip. Yeni site wiki’yi, kılavuzları, etkileşimli demoları, sık sorulan soruları, blogu ve katkıda bulunma sayfasını bir araya getiriyor. İlk bakışta yönünüzü bulmanız için yeniden tasarlandı ve küçük ekranlarda daha iyi çalışıyor. Uygulama size bunu yalnızca bir kez bildirecek ve bildirim merkezi yeni adresi açacak.",
+    "Otomatik yedeklemeler ve bağlı kasaların yayımlanması artık uygulamayı engellemiyor. Ağır işler ana pencerenin dışında çalışıyor, sınırlı bellek kullanıyor ve harici bir süreç takılırsa durduruluyor. Büyük bir kasa şifrelenirken, sıkıştırılırken veya sunucuya gönderilirken Nodus’u kullanmaya devam edebilirsiniz. Başarısız yayımlar yeniden denemeden önce bekliyor ve değişmeyen veriler yeniden oluşturulmuyor.",
+    "Cloudflare üzerindeki bir Nodus Cloud dağıtımı artık ilk yönetici hesabını oluşturabiliyor. Üretim hizmeti, test ortamının kabul ettiği bir parola işlemini reddediyordu. Bu yüzden sihirbaz her zaman 500 hatasıyla bitiyor ve sunucuyu başlatamıyordu. Kurulum artık Cloudflare sınırına uyuyor, mevcut parolalarla uyumluluğu koruyor ve bir şey başarısız olduğunda sunucunun döndürdüğü nedeni gösteriyor.",
+    "Bildirim merkezini yenilemek artık net bir yanıt veriyor. Düğmeye bastıktan sonra Nodus listenin güncellenip güncellenmediğini, yeni bir şey olmadığını, duyuruların devre dışı olduğunu veya kaynağa ulaşılamadığını bildiriyor. Ağ başarısız olduğunda liste son geçerli kopyasını koruyor.",
+  ],
   "4.1.3": [
     "İçinde okuduğunuz bölümler artık içeriden yeniden açılıyor. Deep Research, Daldırma ve Kitaplık sekmeleri açık bıraktığınız raporu, daldırmayı ya da belgeyi listenin aramasıyla ve sıralamasıyla birlikte geri getiriyor. Bir daldırma bıraktığınız adıma dönüyor. Yazmakta olduğunuz şey geri yüklenmiyor, çünkü o bir yer değil iştir.",
     "Bir rapor kaldığınız yerden yeniden açılıyor. Nodus piksel konumu yerine üst kenarın altında hangi bloğun durduğunu saklıyor, bu yüzden pencere genişliğini ya da yazı tipini değiştirmek onu artık kaydırmıyor. Rapor büyümeyi bitirene kadar yer korunuyor ve tekerleğe ya da klavyeye dokunduğunuz anda bırakılıyor. Bir çeviri uygulamışsanız yer yaklaştırılmak yerine bırakılıyor, çünkü o başka bir dizgidir.",

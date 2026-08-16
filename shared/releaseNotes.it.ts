@@ -155,6 +155,12 @@ const RELEASE_3_2_4_IT: string[] = [
 ];
 
 export const RELEASE_NOTES_IT: Record<string, string[]> = {
+  "4.1.4": [
+    "Nodus ha una nuova casa su nodusresearch.com. Il nuovo sito riunisce wiki, manuali, demo interattive, domande frequenti, blog e una pagina per contribuire. È stato riprogettato per orientarti al primo sguardo e funziona meglio sugli schermi piccoli. L’applicazione ti avviserà una sola volta e il centro notifiche aprirà il nuovo indirizzo.",
+    "I backup automatici e la pubblicazione dei vault connessi non bloccano più l’applicazione. Il lavoro pesante ora avviene fuori dalla finestra principale, usa una quantità di memoria limitata e si interrompe se un processo esterno si blocca. Puoi continuare a usare Nodus mentre un vault grande viene cifrato, compresso o inviato al server. Le pubblicazioni non riuscite attendono prima di riprovare e i dati invariati non vengono ricostruiti.",
+    "Una distribuzione di Nodus Cloud su Cloudflare può ora creare il primo account amministratore. Il servizio di produzione rifiutava un’operazione sulla password accettata dall’ambiente di test. La procedura guidata terminava quindi sempre con un errore 500 e non riusciva a inizializzare il server. La configurazione ora rispetta il limite di Cloudflare, resta compatibile con le password esistenti e mostra il motivo restituito dal server quando qualcosa non funziona.",
+    "L’aggiornamento del centro notifiche ora dà una risposta chiara. Dopo aver premuto il pulsante, Nodus indica se l’elenco è stato aggiornato, se non ci sono novità, se gli avvisi sono disattivati o se non è stato possibile consultare la fonte. L’elenco conserva l’ultima copia valida quando la rete non funziona.",
+  ],
   "4.1.3": [
     "Le sezioni in cui si legge si riaprono dall'interno. Deep Research, Immersione e le schede della Biblioteca recuperano il rapporto, l'immersione o il documento che avevi aperto, oltre alla ricerca e all'ordine dell'elenco. Un'immersione torna al passo in cui l'hai lasciata. Quello che stavi scrivendo non viene ripristinato, perché è lavoro e non un luogo.",
     "Un rapporto si riapre dal punto in cui eri arrivato. Nodus salva quale blocco stava sotto il bordo superiore invece di una posizione in pixel, così cambiare la larghezza della finestra o il carattere non lo sposta più. Il punto viene mantenuto mentre il rapporto finisce di crescere e viene lasciato appena tocchi la rotellina o la tastiera. Se avevi applicato una traduzione, il punto viene scartato invece che approssimato, perché quella è un'altra impaginazione.",
