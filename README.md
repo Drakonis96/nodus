@@ -23,41 +23,6 @@ Each vault is a focused workspace. Researchers can build a connected corpus, his
 
 Nodus is local first. Your vaults and search indexes live on your computer. You decide when a feature may use an online AI provider, and you can also work with compatible local models.
 
-## A library shared by every vault
-
-Nodus keeps one cross-vault Library inside `nodus-library`, nested under the
-backup folder you choose. It can mirror a complete Zotero library with its
-collection hierarchy and stable item keys, import RIS, BibTeX and CSL JSON from
-Mendeley or other managers, or accept local documents directly.
-
-Each original remains separate from a clean Markdown reading copy, extracted
-figures, structured tables, page mappings, highlights, notes and document chat.
-On first open, the reader asks whether to use the clean copy or the preserved
-original and can remember that choice; it can be reset from **Versions and
-files**. The same chooser switches between clean Markdown and preserved PDF,
-EPUB, image, web, text and office attachments. Text can be highlighted in the
-reflowable and PDF viewers, while images accept region highlights. Unsupported
-legacy binaries open in their associated application without modifying them.
-The citation manager uses real CSL styles, including custom `.csl` files copied
-from Zotero, and formats them locally after installation. A document can then be linked into any compatible vault
-for search and analysis without duplicating the global copy. See the
-[architecture, recovery and privacy guide](docs/global-library.md).
-
-### Updating to Nodus 4
-
-Updating from 3.2.7 keeps **This vault** as the initial Library scope and does
-not enable or migrate the cross-vault Library automatically. Before Nodus 4
-opens an existing database, it creates and verifies a one-time pre-v4 recovery
-copy. The optional migration assistant then inventories selected academic
-vaults and can be cancelled, resumed, verified, or rolled back without writing
-to the source vaults.
-
-Nodus 4 opens backups created by Nodus 3.x. A profile or Library already
-migrated to v4 is not guaranteed to open in a 3.x application, so keep the
-automatic pre-v4 recovery copy for downgrade recovery. Complete v4 encrypted
-backups include both every vault and `nodus-library`. See the
-[Library recovery contract](docs/global-library.md#updating-from-nodus-327).
-
 ## Install Nodus
 
 Download the installer for your computer and open it. There is no server to configure and no account is required to begin.
@@ -149,6 +114,41 @@ Nodi is the friendly guide that lives inside Nodus. It helps new users understan
 Nodus Server shares a selected copy of a vault while the original database and documents stay on the owner's computer. Readers can search published spaces from Nodus, ChatGPT or Claude. Owners choose what is included and can give each person reader, writer or owner access.
 
 Nodus can now start a private server from Settings for access on a phone or tablet through Tailscale or the local network. Groups can instead run the Docker version on their own server and manage spaces, people and devices from the web. Both options are experimental. See the [Nodus Server installation guide](server/README.md).
+
+## A library shared by every vault
+
+Nodus keeps one cross-vault Library inside `nodus-library`, nested under the
+backup folder you choose. It can mirror a complete Zotero library with its
+collection hierarchy and stable item keys, import RIS, BibTeX and CSL JSON from
+Mendeley or other managers, or accept local documents directly.
+
+Each original remains separate from a clean Markdown reading copy, extracted
+figures, structured tables, page mappings, highlights, notes and document chat.
+On first open, the reader asks whether to use the clean copy or the preserved
+original and can remember that choice; it can be reset from **Versions and
+files**. The same chooser switches between clean Markdown and preserved PDF,
+EPUB, image, web, text and office attachments. Text can be highlighted in the
+reflowable and PDF viewers, while images accept region highlights. Unsupported
+legacy binaries open in their associated application without modifying them.
+The citation manager uses real CSL styles, including custom `.csl` files copied
+from Zotero, and formats them locally after installation. A document can then be linked into any compatible vault
+for search and analysis without duplicating the global copy. See the
+[architecture, recovery and privacy guide](docs/global-library.md).
+
+### Updating to Nodus 4
+
+Updating from 3.2.7 keeps **This vault** as the initial Library scope and does
+not enable or migrate the cross-vault Library automatically. Before Nodus 4
+opens an existing database, it creates and verifies a one-time pre-v4 recovery
+copy. The optional migration assistant then inventories selected academic
+vaults and can be cancelled, resumed, verified, or rolled back without writing
+to the source vaults.
+
+Nodus 4 opens backups created by Nodus 3.x. A profile or Library already
+migrated to v4 is not guaranteed to open in a 3.x application, so keep the
+automatic pre-v4 recovery copy for downgrade recovery. Complete v4 encrypted
+backups include both every vault and `nodus-library`. See the
+[Library recovery contract](docs/global-library.md#updating-from-nodus-327).
 
 ## Cite Nodus
 
