@@ -79,55 +79,6 @@ Home page components. The shared system lives in nodus.css.
   will-change: transform;
 }
 
-/* ============================================================ basics */
-.pillars {
-  display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
-  gap: 16px; margin-top: 52px;
-}
-.pillar { padding: 24px; }
-.pillar .pic {
-  display: grid; place-items: center;
-  width: 42px; height: 42px; margin-bottom: 16px;
-  border-radius: 12px; border: 1px solid var(--membrane);
-  background: var(--accent-soft); color: var(--accent);
-}
-.pillar .pic svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
-.pillar h3 { font-size: 17px; margin-bottom: 8px; }
-.pillar p { margin: 0; font-size: 14.5px; color: var(--ink-2); line-height: 1.6; }
-
-/* what a vault is */
-.vault-def {
-  display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 0.85fr);
-  gap: clamp(28px, 5vw, 64px); align-items: center;
-  margin-top: 58px; padding: clamp(26px, 3.6vw, 44px);
-  border: 1px solid var(--membrane); border-radius: var(--r-xl);
-  background: linear-gradient(140deg, rgba(32, 22, 58, 0.88), rgba(12, 9, 22, 0.84));
-}
-.vault-def h3 { font-size: clamp(21px, 2.4vw, 28px); margin-bottom: 14px; }
-.vault-def p { margin: 0 0 14px; color: var(--ink-2); font-size: 15.5px; }
-.vault-def p:last-child { margin-bottom: 0; }
-
-/* the little file-with-modes diagram */
-.mode-stack { display: grid; gap: 10px; }
-.mode-row {
-  display: flex; align-items: center; gap: 12px;
-  padding: 12px 15px; border-radius: var(--r-m);
-  border: 1px solid var(--membrane); background: rgba(255, 255, 255, 0.03);
-  font-size: 13.5px; font-weight: 600;
-}
-.mode-row i {
-  width: 9px; height: 9px; border-radius: 50%; flex: 0 0 auto;
-  background: var(--dot, var(--violet-2));
-  box-shadow: 0 0 12px var(--dot, var(--violet-2));
-}
-.mode-row span { margin-left: auto; font-weight: 500; font-size: 12.5px; color: var(--ink-3); }
-.mode-row.engine {
-  border-style: dashed; border-color: rgba(167, 139, 250, 0.4);
-  background: rgba(139, 92, 246, 0.07); color: var(--violet-3);
-}
-
-@media (max-width: 900px) { .vault-def { grid-template-columns: minmax(0, 1fr); } }
-
 /* ============================================================ vault scenes */
 .scene { padding: clamp(56px, 7.5vw, 100px) 0; }
 .scene-inner {
