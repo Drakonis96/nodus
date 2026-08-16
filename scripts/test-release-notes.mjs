@@ -25,13 +25,21 @@ try {
 
   const { RELEASE_NOTES, releaseNotesForMajor, compareVersions } = await import(pathToFileURL(bundlePath).href);
   const currentRelease = RELEASE_NOTES[0];
-  assert.equal(currentRelease?.version, '4.1.3');
-  assert.equal(currentRelease?.date, '2026-08-15');
-  assert.equal(currentRelease?.highlights.length, 2);
-  assert.deepEqual(currentRelease?.highlights.map((highlight) => highlight.scope), ['general', 'general']);
-  // The two halves of the release: the item that was open, and the place inside it.
-  assert.ok(currentRelease?.highlights.some((highlight) => /the immersion or the document you had open/.test(highlight.en)));
-  assert.ok(currentRelease?.highlights.some((highlight) => /instead of a pixel position/.test(highlight.en)));
+  assert.equal(currentRelease?.version, '4.1.4');
+  assert.equal(currentRelease?.date, '2026-08-16');
+  assert.equal(currentRelease?.highlights.length, 4);
+  assert.deepEqual(currentRelease?.highlights.map((highlight) => highlight.scope), ['general', 'general', 'general', 'nodi']);
+  assert.ok(currentRelease?.highlights.some((highlight) => /new home at nodusresearch\.com/.test(highlight.en)));
+  assert.ok(currentRelease?.highlights.some((highlight) => /no longer block the app/.test(highlight.en)));
+  assert.ok(currentRelease?.highlights.some((highlight) => /first administrator account/.test(highlight.en)));
+  assert.ok(currentRelease?.highlights.some((highlight) => /notification centre now gives a clear answer/.test(highlight.en)));
+
+  // 4.1.3 keeps the two it shipped with. They are published history.
+  const readingPositionRelease = RELEASE_NOTES.find((note) => note.version === '4.1.3');
+  assert.equal(readingPositionRelease?.date, '2026-08-15');
+  assert.equal(readingPositionRelease?.highlights.length, 2);
+  assert.ok(readingPositionRelease?.highlights.some((highlight) => /the immersion or the document you had open/.test(highlight.en)));
+  assert.ok(readingPositionRelease?.highlights.some((highlight) => /instead of a pixel position/.test(highlight.en)));
 
   // 4.1.2 keeps the four it shipped with. They are published history.
   const dossierRelease = RELEASE_NOTES.find((note) => note.version === '4.1.2');
