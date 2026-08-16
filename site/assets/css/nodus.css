@@ -139,6 +139,38 @@ html { scrollbar-width: thin; scrollbar-color: rgba(139, 92, 246, 0.45) transpar
 }
 .skip-link:focus { top: 16px; color: #fff; }
 
+/* ============================================================ back to top
+   The only floating control the reading pages carry. It stays out of the
+   accessibility tree until there is something to scroll back from. */
+/* the strip the observer watches: while it is on screen, the reader is still
+   within the first screenful and the button stays away */
+.back-to-top-sentinel {
+  position: absolute; top: 0; left: 0;
+  width: 1px; height: 90vh;
+  pointer-events: none; visibility: hidden;
+}
+.back-to-top {
+  position: fixed; z-index: 120;
+  right: clamp(14px, 3vw, 28px); bottom: clamp(14px, 3vw, 28px);
+  display: grid; place-items: center;
+  width: 44px; height: 44px; padding: 0;
+  border: 1px solid var(--membrane); border-radius: 50%;
+  background: rgba(16, 13, 28, 0.88); color: var(--ink-2);
+  backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+  box-shadow: var(--shadow);
+  cursor: pointer;
+  opacity: 0; visibility: hidden; transform: translateY(8px);
+  transition: opacity 0.25s var(--ease), transform 0.25s var(--ease),
+    visibility 0.25s var(--ease), border-color 0.2s var(--ease), color 0.2s var(--ease);
+}
+.back-to-top.is-visible { opacity: 1; visibility: visible; transform: none; }
+.back-to-top:hover { border-color: rgba(167, 139, 250, 0.55); color: var(--ink); }
+.back-to-top svg { width: 18px; height: 18px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .back-to-top { transition: opacity 0.01s, visibility 0.01s; transform: none; }
+}
+
 /* ============================================================ organism canvas */
 #organism {
   position: fixed;
