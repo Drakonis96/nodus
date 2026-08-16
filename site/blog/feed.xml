@@ -2,11 +2,21 @@
 <rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
   <channel>
     <title>Nodus Blog</title>
-    <link>https://drakonis96.github.io/nodus/blog/</link>
-    <atom:link href="https://drakonis96.github.io/nodus/blog/feed.xml" rel="self" type="application/rss+xml"/>
+    <link>https://nodusresearch.com/blog/</link>
+    <atom:link href="https://nodusresearch.com/blog/feed.xml" rel="self" type="application/rss+xml"/>
     <description>Notes from the Nodus project: comparisons with the tools around it, workflows worth stealing, and what is being built next.</description>
     <language>en</language>
-    <lastBuildDate>Sat, 15 Aug 2026 09:57:58 GMT</lastBuildDate>
+    <lastBuildDate>Sun, 16 Aug 2026 09:00:00 GMT</lastBuildDate>
 
+    <item>
+      <title>Nodus: an open source research workspace for academic work</title>
+      <link>https://nodusresearch.com/blog/post.html?p=nodus-open-source-research-workspace</link>
+      <guid isPermaLink="true">https://nodusresearch.com/blog/post.html?p=nodus-open-source-research-workspace</guid>
+      <pubDate>Sun, 16 Aug 2026 09:00:00 GMT</pubDate>
+      <description>Research is spread across reference managers, PDF folders, note apps and chatbots. Nodus keeps sources, ideas and the evidence behind them in one local-first workspace.</description>
+      <category>Project</category>
+      <category>Research</category>
+      <category>AI</category>
+    </item>
   </channel>
 </rss>

@@ -19,13 +19,20 @@ appears on the blog. Copy it to write a real post.
   "date": "2026-08-20",
   "tags": ["Comparisons", "AI"],
   "summary": "Both read your sources. Only one of them keeps the evidence, runs offline, and is still yours next year.",
-  "reading": 8
+  "reading": 8,
+  "cover": "media/nodus-vs-notebooklm.png",
+  "coverAlt": "Real alt text describing the image."
 }
 ```
 
 `reading` is optional; leave it out and the page estimates it from the file.
 Set `"draft": true` to keep a post out of the index and the RSS feed while you
 are still writing it.
+
+`cover` is optional too. It is a path relative to `site/blog/`, so a file in
+`site/blog/media/` is written `media/<file>.png`. The same image is used as the
+card thumbnail on the index (cropped to 16:9) and, uncropped, above the post.
+Always give it a `coverAlt`.
 
 ## What Markdown is supported
 
