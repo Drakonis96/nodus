@@ -126,6 +126,22 @@ test('Codex App Server is forced to managed ChatGPT auth and receives no ambient
   }
 });
 
+test('Codex App Server is reaped after its explicit idle limit', async () => {
+  const home = path.join(outDir, 'codex-idle-home');
+  fs.mkdirSync(home);
+  const client = new CodexAppServerClient({
+    binaryPath: fakeAppServer(),
+    codexHome: home,
+    appVersion: 'test',
+    idleTimeoutMs: 20,
+    maxLifetimeMs: 200,
+  });
+  await client.request('probe');
+  assert.equal(client.isRunning(), true);
+  await new Promise((resolve) => setTimeout(resolve, 100));
+  assert.equal(client.isRunning(), false, 'an unused @openai/codex process cannot survive indefinitely');
+});
+
 class CompletionTransport {
   handlers = new Set();
   calls = [];
