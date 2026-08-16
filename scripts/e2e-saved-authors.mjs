@@ -52,6 +52,7 @@ try {
     localStorage.setItem('nodus.platformHighlightsSeen.2026-07', '1');
     localStorage.setItem('nodus.toolkitBetaGuideSeen.2.4.0', '1');
     localStorage.setItem('nodus.tutorialVideosAnnouncementSeen.2026-07', '1');
+    localStorage.setItem('nodus.websiteLaunchSeen.2026-08', '1');
     sessionStorage.setItem('nodus.startupUpdateChecked', '1');
     await window.nodus.updateSettings({
       uiLanguage: 'es',

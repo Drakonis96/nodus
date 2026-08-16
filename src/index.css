@@ -4518,6 +4518,14 @@ body:has(.library-document-reader [data-testid="library-reader-sidebar"]) .app-t
 @media (max-width: 660px) { .toolkit-guide-backdrop { padding: 10px; } .toolkit-guide-cinema { max-height: 95vh; border-radius: 20px; } .toolkit-guide-hero { min-height: 170px; grid-template-columns: 1fr 120px; padding: 24px 20px; } .toolkit-guide-nodi svg { height: 130px !important; } .toolkit-guide-stage { padding: 19px; } .toolkit-guide-tools, .toolkit-guide-models, .toolkit-guide-remote-models, .toolkit-guide-subscriptions, .platform-guide-pair, .platform-guide-feature-list, .platform-guide-feature-list.compact, .platform-guide-tool-grid { grid-template-columns: 1fr; } .toolkit-guide-subscription { grid-template-columns: 38px minmax(0, 1fr); } .toolkit-guide-subscription em { display: none; } }
 @media (prefers-reduced-motion: reduce) { .toolkit-guide-aurora { animation: none; } }
 
+/* "Nodus has a new website" — a title, a line and the address. It reuses the update-tour
+   chrome with no stage at all, so the shared 840px width would leave the hero floating in
+   a modal that says four words. Narrower, and the hero IS the modal. */
+.website-launch-guide { width: min(560px, 100%); }
+.website-launch-guide .toolkit-guide-hero { min-height: 172px; grid-template-columns: minmax(0, 1fr) 168px; padding: 22px 30px; }
+.website-launch-guide .toolkit-guide-hero h2 { font-size: clamp(26px, 3.4vw, 34px); }
+.website-launch-footer { justify-content: space-between; }
+
 /* "A tease of what's coming" — the App Store screenshots beside the copy that explains
    them. The shots are portrait (1320 x 2868), so they get their own narrow column and
    the prose takes the rest of the 840px stage; stacking them would push the survey below

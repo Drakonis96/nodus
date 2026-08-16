@@ -40,6 +40,7 @@ import { PlatformHighlightsUpdateTour } from './components/PlatformHighlightsGui
 import { ToolkitBetaUpdateTour } from './components/ToolkitBetaGuide';
 import { StartupUpdateModal } from './components/StartupUpdateModal';
 import { MobileTeaserGuide } from './components/MobileTeaserGuide';
+import { WebsiteLaunchGuide } from './components/WebsiteLaunchGuide';
 import { recoveryHealthAdvice, recoveryHealthHeadline } from './recoveryHealth';
 import { NodiMascot } from './components/nodi/NodiMascot';
 import { NodiStyleModal } from './components/NodiStyleModal';
@@ -175,6 +176,9 @@ export function App() {
   // Users who completed the essential guide before the video tutorials existed were
   // never asked "video or text", so the catalogue is announced to them once, here.
   const [tutorialVideosSettled, setTutorialVideosSettled] = useState(false);
+  // The website is not part of any tutorial chapter, so it is announced once here, to
+  // anyone past the essential guide. Its own sentinel decides: no version to expire on.
+  const [websiteLaunchSettled, setWebsiteLaunchSettled] = useState(false);
   // Set once the startup update check is done with the screen, so the one-time Nodi
   // choice can queue up behind it instead of fighting it for the foreground.
   const [updateSettled, setUpdateSettled] = useState(false);
@@ -1967,7 +1971,15 @@ export function App() {
         />
       )}
 
-      {whatsNewSettled && mobileTeaserSettled && platformHighlightsSettled && toolkitBetaTourSettled && tutorialVideosSettled && !manualWhatsNewOpen && !updateSettled && (
+      {whatsNewSettled && mobileTeaserSettled && platformHighlightsSettled && toolkitBetaTourSettled && tutorialVideosSettled && !websiteLaunchSettled && !manualWhatsNewOpen && (
+        <WebsiteLaunchGuide
+          uiLanguage={settings.uiLanguage}
+          previousTutorialVersion={settings.basicsTutorialVersion}
+          onSettled={() => setWebsiteLaunchSettled(true)}
+        />
+      )}
+
+      {whatsNewSettled && mobileTeaserSettled && platformHighlightsSettled && toolkitBetaTourSettled && tutorialVideosSettled && websiteLaunchSettled && !manualWhatsNewOpen && !updateSettled && (
         <StartupUpdateModal
           settings={settings}
           activeVaultType={activeVault?.type ?? null}
