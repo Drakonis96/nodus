@@ -23,6 +23,14 @@ const PAGES = [
   { file: 'contribute/index.html', url: '/contribute/' },
 ];
 
+// Every published post is a page of its own: the post page reads the slug from
+// the query string, so the sitemap has to list ?p=<slug> or the posts stay unindexed.
+const index = JSON.parse(fs.readFileSync(path.join(repoRoot, 'site', 'blog', 'posts.json'), 'utf8'));
+for (const post of index.posts) {
+  if (post.draft) continue;
+  PAGES.push({ file: `blog/posts/${post.slug}.md`, url: `/blog/post.html?p=${post.slug}` });
+}
+
 const missing = PAGES.filter((page) => !fs.existsSync(path.join(repoRoot, 'site', page.file)));
 if (missing.length) {
   console.error(`Missing pages: ${missing.map((page) => page.file).join(', ')}`);

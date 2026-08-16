@@ -2,50 +2,57 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
     <loc>https://nodusresearch.com/</loc>
-    <lastmod>2026-08-15</lastmod>
+    <lastmod>2026-08-16</lastmod>
   </url>
   <url>
     <loc>https://nodusresearch.com/demo/</loc>
-    <lastmod>2026-08-15</lastmod>
+    <lastmod>2026-08-16</lastmod>
   </url>
   <url>
     <loc>https://nodusresearch.com/demo/study.html</loc>
-    <lastmod>2026-08-15</lastmod>
+    <lastmod>2026-08-16</lastmod>
   </url>
   <url>
     <loc>https://nodusresearch.com/demo/teaching.html</loc>
-    <lastmod>2026-08-15</lastmod>
+    <lastmod>2026-08-16</lastmod>
   </url>
   <url>
     <loc>https://nodusresearch.com/demo/worldbuilding.html</loc>
-    <lastmod>2026-08-15</lastmod>
+    <lastmod>2026-08-16</lastmod>
   </url>
   <url>
     <loc>https://nodusresearch.com/demo/databases.html</loc>
-    <lastmod>2026-08-15</lastmod>
+    <lastmod>2026-08-16</lastmod>
   </url>
   <url>
     <loc>https://nodusresearch.com/demo/genealogy.html</loc>
-    <lastmod>2026-08-15</lastmod>
+    <lastmod>2026-08-16</lastmod>
   </url>
   <url>
     <loc>https://nodusresearch.com/blog/</loc>
     <lastmod>2026-08-16</lastmod>
   </url>
   <url>
-    <loc>https://nodusresearch.com/blog/post.html?p=nodus-open-source-research-workspace</loc>
+    <loc>https://nodusresearch.com/blog/post.html</loc>
     <lastmod>2026-08-16</lastmod>
   </url>
   <url>
     <loc>https://nodusresearch.com/wiki/</loc>
-    <lastmod>2026-08-15</lastmod>
+    <lastmod>2026-08-16</lastmod>
   </url>
   <url>
     <loc>https://nodusresearch.com/faq/</loc>
-    <lastmod>2026-08-15</lastmod>
+    <lastmod>2026-08-16</lastmod>
   </url>
   <url>
     <loc>https://nodusresearch.com/contribute/</loc>
-    <lastmod>2026-08-15</lastmod>
+    <lastmod>2026-08-16</lastmod>
+  </url>
+  <url>
+    <loc>https://nodusresearch.com/blog/post.html?p=how-to-organize-a-large-academic-research-library</loc>
+  </url>
+  <url>
+    <loc>https://nodusresearch.com/blog/post.html?p=nodus-open-source-research-workspace</loc>
+    <lastmod>2026-08-16</lastmod>
   </url>
 </urlset>
