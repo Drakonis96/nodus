@@ -8,6 +8,30 @@ tag and by free text. With no published posts it shows what is coming instead.
 (function () {
   'use strict';
 
+  // The feed address is only useful pasted into a reader, so offer it as a copy
+  // rather than as one more link into raw XML. Shown only where copying works.
+  const copyButton = document.getElementById('feed-copy');
+  if (copyButton && navigator.clipboard && window.isSecureContext) {
+    const label = document.getElementById('feed-copy-label');
+    const idle = label.textContent;
+    let restore;
+    copyButton.hidden = false;
+    copyButton.addEventListener('click', () => {
+      navigator.clipboard.writeText(copyButton.dataset.url).then(() => {
+        label.textContent = 'Copied — paste it into your feed reader';
+        copyButton.classList.add('copied');
+        clearTimeout(restore);
+        restore = setTimeout(() => {
+          label.textContent = idle;
+          copyButton.classList.remove('copied');
+        }, 3200);
+      }).catch(() => {
+        // clipboard refused: show the address so it can be selected by hand
+        label.textContent = copyButton.dataset.url;
+      });
+    });
+  }
+
   const list = document.getElementById('blog-list');
   const filters = document.getElementById('blog-filters');
   const tagsHost = document.getElementById('blog-tags');

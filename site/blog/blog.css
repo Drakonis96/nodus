@@ -3,9 +3,22 @@ SPDX-FileCopyrightText: 2026 Jorge Pérez Burgueño and Nodus contributors
 SPDX-License-Identifier: AGPL-3.0-only
 */
 
-.hero-feed { margin-top: 24px; }
+.hero-feed { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 22px; margin-top: 24px; }
 .hero-feed .arrow-link svg { transform: none; }
 .hero-feed .arrow-link:hover svg { transform: scale(1.12); }
+
+/* the RSS link leads to XML, which is right for a reader and puzzling in a
+   browser, so the address can also be taken straight to the clipboard */
+.feed-copy {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 7px 14px; border-radius: 999px;
+  border: 1px solid var(--membrane); background: rgba(255, 255, 255, 0.045);
+  color: var(--ink-2); font: 600 13.5px var(--sans); cursor: pointer;
+  transition: border-color 0.3s var(--ease), color 0.3s var(--ease), background 0.3s var(--ease);
+}
+.feed-copy svg { width: 15px; height: 15px; }
+.feed-copy:hover { color: var(--ink); border-color: var(--membrane-2); background: rgba(255, 255, 255, 0.07); }
+.feed-copy.copied { color: var(--good); border-color: rgba(52, 211, 153, 0.45); }
 
 /* ============================================================ the list */
 .post-list { display: grid; gap: 16px; }
