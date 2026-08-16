@@ -441,11 +441,9 @@ main#article {
     background: rgba(0, 0, 0, 0.64); backdrop-filter: blur(3px); cursor: default;
   }
   .nav-backdrop:not([hidden]) { display: block; }
-  .section-grid, .start-box { grid-template-columns: 1fr; }
+  .section-grid, .start-box { grid-template-columns: minmax(0, 1fr); }
   .hero-shot { margin-inline: -10px; }
 }
-
-@media (max-width: 760px) { :root { --nav-h: 104px; } }
 
 @media print {
   [data-nodus-site-header], .sidebar, .toc, .hero-actions, .chapter-list, #organism { display: none !important; }
@@ -457,9 +455,11 @@ main#article {
 /* ============================================================ wiki chrome
    The header itself comes from nodus.css; these are the two controls only the
    documentation needs. site-header.css carries its own copy for the demos. */
+/* deliberately the same box as .nav-toggle in nodus.css: on a phone the two sit
+   side by side, and a half-size neighbour would read as a different control */
 .wiki-menu-toggle {
   display: none; place-items: center;
-  width: 38px; height: 34px; flex: 0 0 auto; padding: 0;
+  width: 40px; height: 36px; flex: 0 0 auto; padding: 0;
   border: 1px solid var(--membrane); border-radius: var(--r-s);
   background: var(--skin); color: var(--ink); cursor: pointer;
   transition: border-color 0.2s var(--ease), background 0.2s var(--ease);
@@ -468,16 +468,24 @@ main#article {
 .wiki-menu-toggle svg { width: 18px; height: 18px; }
 .wiki-menu-toggle:hover { border-color: rgba(167, 139, 250, 0.5); background: var(--skin-2); }
 
+/* --search-inset is the distance from this box's padding edge to the field
+   itself. The icon and the shortcut are absolute against the wrapper, so any
+   padding the wrapper takes on has to be added back here or they drift out of
+   the input and leave a hole in front of the placeholder. */
 .wiki-search-wrap {
   position: relative; display: flex; align-items: center;
   flex: 1 1 340px; min-width: 0; max-width: 460px;
+  --search-inset: 0px;
 }
 .wiki-search-wrap > svg {
-  position: absolute; left: 13px; width: 15px; height: 15px;
+  position: absolute; left: calc(var(--search-inset) + 13px); width: 15px; height: 15px;
   fill: none; stroke: var(--ink-3); stroke-width: 2; stroke-linecap: round;
   pointer-events: none;
 }
 .wiki-search-wrap input {
+  /* Safari draws type="search" as a native searchfield: it centres its own text
+     and ignores the padding, leaving the placeholder floating mid-box */
+  -webkit-appearance: none; appearance: none;
   width: 100%; padding: 9px 58px 9px 36px;
   border: 1px solid var(--membrane); border-radius: 11px;
   background: rgba(16, 13, 28, 0.85); color: var(--ink);
@@ -495,7 +503,7 @@ main#article {
 }
 .wiki-search-wrap input::-webkit-search-cancel-button { display: none; }
 .wiki-search-wrap kbd {
-  position: absolute; right: 9px; padding: 2px 6px;
+  position: absolute; right: calc(var(--search-inset) + 9px); padding: 2px 6px;
   border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 6px;
   background: var(--skin); color: var(--ink-2); font: 10.5px/1.4 var(--sans);
 }
@@ -506,6 +514,7 @@ main#article {
   position: sticky; top: -26px; z-index: 3;
   flex: none; width: 100%; max-width: none;
   margin: 0 -16px 18px; padding: 0 16px 14px;
+  --search-inset: 16px;
   background: rgba(13, 11, 21, 0.94);
   backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
   border-bottom: 1px solid var(--membrane);
@@ -516,8 +525,17 @@ main#article {
   .wiki-nav .release-downloads .download-word { display: none; }
   .wiki-nav .release-downloads { min-width: 58px; padding-inline: 10px; }
 }
-@media (max-width: 1080px) { .wiki-nav .wiki-menu-toggle { display: grid; } }
+/* The docs button is written first in the markup so it reads right after the
+   landmark, but on a phone it belongs with the other menu control: reorder it
+   into the pair at the end of the bar rather than stranding it beside the logo. */
+@media (max-width: 1080px) {
+  .wiki-nav .wiki-menu-toggle { display: grid; order: 2; margin-left: auto; }
+  .wiki-nav .nav-toggle { order: 3; margin-left: 0; }
+  .wiki-nav { gap: 10px; }
+}
+/* the phone header holds a logo and two buttons in one row, so it keeps the
+   standard 62px band: the taller wrapping bar dates from when the search box
+   still rode in the header */
 @media (max-width: 760px) {
-  .wiki-nav { height: auto; min-height: 104px; flex-wrap: wrap; gap: 8px 12px; padding: 10px 16px; }
-  .wiki-nav .links { inset-block-start: 104px; }
+  .wiki-nav { padding-inline: 16px; }
 }
