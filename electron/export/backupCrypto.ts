@@ -1,4 +1,7 @@
 import { createCipheriv, createDecipheriv, createHash, randomBytes, scrypt, scryptSync } from 'node:crypto';
+import fs from 'node:fs';
+import { Transform } from 'node:stream';
+import { pipeline } from 'node:stream/promises';
 
 const PASSWORD_BYTES = 24;
 const SALT_BYTES = 16;
@@ -145,6 +148,51 @@ export async function encryptBackupPayloadAsync(
 ): Promise<{ ciphertext: Buffer; metadata: BackupCipherMetadata }> {
   const salt = randomBytes(SALT_BYTES);
   return sealPayload(plaintext, await deriveKeyAsync(password, salt), salt);
+}
+
+/** Encrypt a payload file without materialising either plaintext or ciphertext in RAM. */
+export async function encryptBackupPayloadFile(
+  sourcePath: string,
+  targetPath: string,
+  password: string,
+): Promise<BackupCipherMetadata> {
+  const salt = randomBytes(SALT_BYTES);
+  const iv = randomBytes(IV_BYTES);
+  const key = await deriveKeyAsync(password, salt);
+  const cipher = createCipheriv('aes-256-gcm', key, iv);
+  const plaintextHash = createHash('sha256');
+  const ciphertextHash = createHash('sha256');
+  const hashPlaintext = new Transform({
+    transform(chunk, _encoding, callback) {
+      plaintextHash.update(chunk);
+      callback(null, chunk);
+    },
+  });
+  const hashCiphertext = new Transform({
+    transform(chunk, _encoding, callback) {
+      ciphertextHash.update(chunk);
+      callback(null, chunk);
+    },
+  });
+  await pipeline(
+    fs.createReadStream(sourcePath),
+    hashPlaintext,
+    cipher,
+    hashCiphertext,
+    fs.createWriteStream(targetPath, { flags: 'wx' }),
+  );
+  return {
+    formatVersion: 1,
+    algorithm: 'aes-256-gcm',
+    kdf: {
+      name: 'scrypt', salt: salt.toString('base64'), keyLength: KEY_BYTES,
+      N: SCRYPT_N, r: SCRYPT_R, p: SCRYPT_P,
+    },
+    iv: iv.toString('base64'),
+    authTag: cipher.getAuthTag().toString('base64'),
+    plaintextSha256: plaintextHash.digest('hex'),
+    ciphertextSha256: ciphertextHash.digest('hex'),
+  };
 }
 
 function sealPayload(plaintext: Buffer, key: Buffer, salt: Buffer): { ciphertext: Buffer; metadata: BackupCipherMetadata } {

@@ -70,7 +70,7 @@ test('cleanup implementation is scoped, verified, quarantined and rollback-aware
   assert.match(source, /entry\.isFile\(\)/, 'only direct regular files are considered');
   assert.match(source, /parseBackupFile\(hostname, entry\.name\)/, 'filenames must belong to the current host lineage');
   assert.match(source, /KEEP_ACTIVE_DURING_CLEANUP = 3/);
-  assert.match(source, /verifyBackupArchive\(await fs\.promises\.readFile\(survivor\.path\), password\)/);
+  assert.match(source, /await verifyBackupFileInUtility\(survivor\.path, password\)/, 'verification stays out of the Electron main event loop');
   assert.match(source, /CLEANUP_TRASH_GRACE_MS = 7 \* 24 \* 60 \* 60 \* 1000/);
   assert.match(source, /fs\.renameSync\(candidate\.path, destination\)/, 'first phase is a recoverable move');
   assert.match(source, /for \(const item of \[\.\.\.moved\]\.reverse\(\)\)/, 'partial moves are rolled back');

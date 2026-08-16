@@ -11,7 +11,7 @@ export interface Migration {
 
 // Versioned, append-only migrations. Never edit an existing migration's SQL once
 // shipped — add a new one. The current schema version is the highest applied.
-export const SCHEMA_VERSION = 133;
+export const SCHEMA_VERSION = 134;
 
 export const migrations: Migration[] = [
   {
@@ -6610,6 +6610,19 @@ export const migrations: Migration[] = [
       ALTER TABLE notes ADD COLUMN tags_json TEXT NOT NULL DEFAULT '[]';
       ALTER TABLE notes ADD COLUMN trashed_at TEXT;
       CREATE INDEX idx_notes_trash_updated ON notes(trashed_at, updated_at DESC);
+    `,
+  },
+  {
+    version: 134,
+    up: /* sql */ `
+      -- Durable content token used to reuse a previously verified vault entry. File
+      -- mtimes are not safe with WAL and can change without content; mutations advance
+      -- this counter transactionally through triggers installed when the vault opens.
+      CREATE TABLE backup_revision (
+        singleton INTEGER PRIMARY KEY CHECK (singleton = 1),
+        sequence INTEGER NOT NULL
+      );
+      INSERT INTO backup_revision (singleton, sequence) VALUES (1, 1);
     `,
   },
 ];

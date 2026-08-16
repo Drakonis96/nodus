@@ -76,6 +76,31 @@ const preloadBuild = (name: string, entry: string) => ({
   },
 });
 
+/** Utility entries are isolated self-contained ESM bundles: sharing a Rollup chunk with
+ * the browser main entry can import Electron APIs that do not exist in a utility process. */
+const utilityBuild = (name: string, entry: string) => ({
+  onstart: (args: { reload: () => void }) => args.reload(),
+  vite: {
+    resolve: { alias: { '@shared': path.resolve(__dirname, 'shared') } },
+    build: {
+      outDir: 'dist-electron',
+      emptyOutDir: false,
+      rollupOptions: {
+        input: { [name]: path.join(__dirname, entry) },
+        external: mainExternals,
+        output: {
+          format: 'es' as const,
+          entryFileNames: '[name].js',
+          inlineDynamicImports: true,
+          banner:
+            "import{fileURLToPath as __nodusFU}from'node:url';import{dirname as __nodusDN}from'node:path';" +
+            'const __filename=__nodusFU(import.meta.url);const __dirname=__nodusDN(__filename);',
+        },
+      },
+    },
+  },
+});
+
 export default defineConfig({
   // Expose the app version to the renderer at build time (shown in Settings).
   define: {
@@ -186,6 +211,7 @@ export default defineConfig({
     electronPlugin([
       preloadBuild('preload.nodi', 'electron/preload/nodi.ts'),
       preloadBuild('preload.presenter', 'electron/preload/presenter.ts'),
+      utilityBuild('backupUtilityWorker', 'electron/export/backupUtilityWorker.ts'),
     ]),
     renderer(),
   ],
