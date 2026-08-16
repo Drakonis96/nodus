@@ -12,7 +12,8 @@ import { SCHEMA_VERSION } from '../db/migrations';
 import { getSettings, updateSettings } from '../db/settingsRepo';
 import { getBackupPassword, getBackupRecoveryKey, lockedApiKeyProviders, setBackupRecoveryKey } from '../secrets/secretStore';
 import { generateBackupPassword } from './backupCrypto';
-import { createBackupArchive, verifyBackupArchive } from './exportImport';
+import { createBackupArchiveFile } from './exportImport';
+import { verifyBackupFileInUtility } from './backupUtilityHost';
 import { resolveBackupOutputDir } from '../recovery/recoveryPaths';
 
 /**
@@ -505,7 +506,7 @@ async function executeBackupCleanup(now: Date, expectedScopeToken?: string): Pro
   const survivor = context.active[0];
   if (!survivor) return cleanupResultFailure('No existe ninguna copia activa que pueda verificarse antes de limpiar. No se ha modificado nada.');
   try {
-    const verification = verifyBackupArchive(await fs.promises.readFile(survivor.path), password);
+    const verification = await verifyBackupFileInUtility(survivor.path, password);
     if (!verification.ok) {
       return cleanupResultFailure(`La copia más reciente no superó la verificación (${verification.message}). No se ha modificado nada.`);
     }
@@ -669,12 +670,6 @@ async function writeVerifiedBackup(options: VerifiedBackupOptions): Promise<Auto
       recoveryKey = generateBackupPassword();
       setBackupRecoveryKey(recoveryKey);
     }
-    const archive = await createBackupArchive({
-      password,
-      appVersion: options.appVersion,
-      recoveryKey,
-    });
-    phaseStartedAt = logBackupPerf('archive-built', phaseStartedAt, { bytes: archive.byteLength });
     const hostname = os.hostname();
     const startedAt = new Date();
     // A manual click and an updater timer can land in the same second. Choose another
@@ -691,17 +686,17 @@ async function writeVerifiedBackup(options: VerifiedBackupOptions): Promise<Auto
     if (!target) throw new Error('No se pudo reservar un nombre único para la copia de seguridad.');
     // Write via temp + rename so cloud clients never sync a half-written file.
     tmp = `${target}.tmp`;
-    await fs.promises.writeFile(tmp, archive);
+    const built = await createBackupArchiveFile({ password, appVersion: options.appVersion, recoveryKey }, tmp);
+    phaseStartedAt = logBackupPerf('archive-built', phaseStartedAt, { bytes: built.bytes, reusedVaults: built.reusedVaults });
     await fs.promises.rename(tmp, target);
     committed = true;
-    phaseStartedAt = logBackupPerf('archive-written', phaseStartedAt, { bytes: archive.byteLength });
+    phaseStartedAt = logBackupPerf('archive-written', phaseStartedAt, { bytes: built.bytes });
 
-    // Re-read the committed file and prove it can be authenticated/decrypted before
-    // deleting any older snapshot or letting an updater close the application.
-    const committedArchive = await fs.promises.readFile(target);
-    phaseStartedAt = logBackupPerf('archive-reread', phaseStartedAt, { bytes: committedArchive.byteLength });
-    const verification = verifyBackupArchive(committedArchive, password);
-    logBackupPerf('archive-verified', phaseStartedAt, { bytes: committedArchive.byteLength });
+    // Prove the committed file can be authenticated/decrypted before deleting any
+    // older snapshot or letting an updater close the application. The full read,
+    // decrypt and hash run in a disposable utility process.
+    const verification = await verifyBackupFileInUtility(target, password);
+    logBackupPerf('archive-verified', phaseStartedAt, { bytes: built.bytes });
     if (!verification.ok) {
       fs.rmSync(target, { force: true });
       committed = false;
@@ -712,7 +707,7 @@ async function writeVerifiedBackup(options: VerifiedBackupOptions): Promise<Auto
     }
 
     const prunedCount = options.prune(folder, hostname);
-    logBackupPerf('run:complete', backupStartedAt, { bytes: committedArchive.byteLength });
+    logBackupPerf('run:complete', backupStartedAt, { bytes: built.bytes, reusedVaults: built.reusedVaults });
     const locked = lockedApiKeyProviders();
     const warning = locked.length > 0
       ? ` Aviso: las claves de ${locked.join(', ')} no se pudieron leer del almacén seguro y no viajan en esta copia.`

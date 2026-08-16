@@ -228,6 +228,10 @@ const NOT_SYNCED_TABLES = new Set([
   'library_analysis_freshness',
   'library_analysis_provenance',
   'sync_log', 'settings',
+  // A single machine-local counter used only to decide whether its next automatic
+  // backup can reuse a verified snapshot. Moving it to another machine would neither
+  // carry user data nor describe the receiver's SQLite file.
+  'backup_revision',
   // Explicitly local, opt-in and content-free beta performance observations.
   'primary_source_local_metrics',
   // Deliberately machine-local: it is THIS computer's record of what its own merges

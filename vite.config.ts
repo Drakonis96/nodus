@@ -214,6 +214,7 @@ export default defineConfig({
     electronPlugin([
       preloadBuild('preload.nodi', 'electron/preload/nodi.ts'),
       preloadBuild('preload.presenter', 'electron/preload/presenter.ts'),
+      utilityBuild('backupUtilityWorker', 'electron/export/backupUtilityWorker.ts'),
       utilityBuild('serverPublishWorker', 'electron/serverSync/serverPublishWorker.ts'),
     ]),
     renderer(),
