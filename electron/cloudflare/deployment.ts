@@ -90,8 +90,8 @@ async function capabilityDocument(url: string): Promise<CloudflareCapabilityDocu
   const response = await fetch(`${url}/api/v3/capabilities`, {
     headers: { accept: 'application/json' }, signal: AbortSignal.timeout(30_000),
   });
-  const value = await response.json().catch(() => ({})) as Partial<CloudflareCapabilityDocument> & { detail?: string };
-  if (!response.ok) throw new Error(value.detail || `El Worker respondió con HTTP ${response.status}.`);
+  const value = await response.json().catch(() => ({})) as Partial<CloudflareCapabilityDocument> & { error_description?: string; detail?: string };
+  if (!response.ok) throw new Error(value.error_description || value.detail || `El Worker respondió con HTTP ${response.status}.`);
   if (value.service !== NODUS_CLOUDFLARE_SERVICE || Number(value.protocolVersion) < NODUS_CLOUDFLARE_PROTOCOL) {
     throw new Error('Esta dirección no corresponde a un despliegue compatible de Nodus Cloud.');
   }
@@ -122,10 +122,12 @@ async function bootstrap(url: string, secret: string, input: CloudflareCompleteD
     }),
     signal: AbortSignal.timeout(60_000),
   });
-  const value = await response.json().catch(() => ({})) as Partial<BootstrapResult> & { error?: string; detail?: string };
+  const value = await response.json().catch(() => ({})) as Partial<BootstrapResult> & { error?: string; error_description?: string; detail?: string };
   if (response.status === 409 && value.error === 'already_bootstrapped') throw new AlreadyBootstrappedError();
   if (!response.ok || !value.installationId || !value.space || !value.deviceToken || !value.recoveryKey) {
-    throw new Error(value.detail || `No se pudo inicializar Nodus Cloud (HTTP ${response.status}).`);
+    // The Worker reports failures as error_description (see problem() in cloudflare/src/util.mjs).
+    // Reading only detail collapsed every Worker error into a bare status code on screen.
+    throw new Error(value.error_description || value.detail || `No se pudo inicializar Nodus Cloud (HTTP ${response.status}).`);
   }
   return value as BootstrapResult;
 }

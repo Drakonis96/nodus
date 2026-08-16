@@ -1,18 +1,18 @@
-# Actualizar y revertir Nodus Cloud
+# Updating and rolling back Nodus Cloud
 
-La instalación creada por **Deploy to Cloudflare** vive en una copia del repositorio que pertenece al usuario. Nodus Desktop no tiene acceso a esa copia ni a la cuenta de Cloudflare.
+The installation created by **Deploy to Cloudflare** lives in a copy of the repository that belongs to the user. Nodus Desktop has no access to that copy or to the Cloudflare account.
 
-## Actualizar
+## Updating
 
-1. Comprueba las notas de la nueva versión de Nodus y sus migraciones.
-2. Incorpora a tu copia los cambios publicados en `https://github.com/Drakonis96/nodus/tree/main/cloudflare` mediante la interfaz de GitHub/GitLab o Git.
-3. Confirma los cambios. Workers Builds ejecutará `npm run deploy`, aplicará las migraciones D1 y publicará el Worker.
-4. Abre Nodus Desktop y fuerza una sincronización para verificar la conexión.
+1. Read the release notes for the new version of Nodus and its migrations.
+2. Bring the changes published at `https://github.com/Drakonis96/nodus/tree/main/cloudflare` into your copy, through the GitHub/GitLab interface or with Git.
+3. Commit the changes. Workers Builds runs `npm run deploy`, applies the D1 migrations and publishes the Worker.
+4. Open Nodus Desktop and force a synchronisation to confirm the connection.
 
-Las migraciones deben ser compatibles hacia delante. Haz un export de D1 y conserva la clave de recuperación antes de una actualización importante.
+Migrations must be forward compatible. Export D1 and keep the recovery key before a major update.
 
-## Revertir
+## Rolling back
 
-Cloudflare permite volver a una versión o despliegue anterior del Worker desde su panel. Esto revierte el código, no la base D1. No reviertas una migración destructiva sin un procedimiento de restauración específico.
+Cloudflare can return the Worker to an earlier version or deployment from its dashboard. That rolls back the code, not the D1 database. Do not roll back a destructive migration without a specific restore procedure.
 
-Documentación oficial: [Workers Builds](https://developers.cloudflare.com/workers/ci-cd/builds/), [versiones y despliegues](https://developers.cloudflare.com/workers/configuration/versions-and-deployments/), [exportar e importar D1](https://developers.cloudflare.com/d1/best-practices/import-export-data/).
+Official documentation: [Workers Builds](https://developers.cloudflare.com/workers/ci-cd/builds/), [versions and deployments](https://developers.cloudflare.com/workers/configuration/versions-and-deployments/), [import and export D1](https://developers.cloudflare.com/d1/best-practices/import-export-data/).
