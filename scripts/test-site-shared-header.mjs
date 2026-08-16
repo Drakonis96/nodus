@@ -13,6 +13,9 @@ const systemStyles = read('site/assets/css/nodus.css');
 // Pages that carry the site design system and get the header from nodus.css.
 const systemPages = [
   ['site/index.html', 'home', ''],
+  ['site/research/index.html', 'research', '../'],
+  ['site/zotero/index.html', 'zotero', '../'],
+  ['site/ai-research/index.html', 'ai-research', '../'],
   ['site/faq/index.html', 'faq', '../'],
   ['site/blog/index.html', 'blog', '../'],
   ['site/blog/post.html', 'blog', '../'],
