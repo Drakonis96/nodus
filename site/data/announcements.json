@@ -2,6 +2,54 @@
   "version": 1,
   "notices": [
     {
+      "id": "2026-08-nodusresearch-website",
+      "date": "2026-08-16",
+      "severity": "info",
+      "url": "https://nodusresearch.com/",
+      "copy": {
+        "es": {
+          "title": "Nodus estrena nueva web",
+          "body": "La web de Nodus tiene una nueva dirección: nodusresearch.com. Reúne la wiki, los tutoriales, el blog y las demos interactivas en un mismo sitio.",
+          "linkLabel": "Visitar nodusresearch.com"
+        },
+        "en": {
+          "title": "Nodus has a new website",
+          "body": "The Nodus website has a new address: nodusresearch.com. It brings the wiki, tutorials, blog, and interactive demos together in one place.",
+          "linkLabel": "Visit nodusresearch.com"
+        },
+        "fr": {
+          "title": "Nodus a un nouveau site web",
+          "body": "Le site web de Nodus a une nouvelle adresse : nodusresearch.com. Il réunit le wiki, les tutoriels, le blog et les démos interactives au même endroit.",
+          "linkLabel": "Visiter nodusresearch.com"
+        },
+        "de": {
+          "title": "Nodus hat eine neue Website",
+          "body": "Die Nodus-Website hat eine neue Adresse: nodusresearch.com. Dort sind Wiki, Tutorials, Blog und interaktive Demos an einem Ort vereint.",
+          "linkLabel": "nodusresearch.com besuchen"
+        },
+        "pt": {
+          "title": "O Nodus estreia um novo site",
+          "body": "O site do Nodus tem um novo endereço: nodusresearch.com. Reúne a wiki, os tutoriais, o blogue e as demonstrações interativas num só lugar.",
+          "linkLabel": "Visitar nodusresearch.com"
+        },
+        "pt-BR": {
+          "title": "O Nodus está de site novo",
+          "body": "O site do Nodus tem um novo endereço: nodusresearch.com. Ele reúne a wiki, os tutoriais, o blog e as demonstrações interativas em um só lugar.",
+          "linkLabel": "Visitar nodusresearch.com"
+        },
+        "it": {
+          "title": "Nodus ha un nuovo sito",
+          "body": "Il sito di Nodus ha un nuovo indirizzo: nodusresearch.com. Riunisce wiki, tutorial, blog e demo interattive in un unico posto.",
+          "linkLabel": "Visita nodusresearch.com"
+        },
+        "tr": {
+          "title": "Nodus’un yeni web sitesi yayında",
+          "body": "Nodus web sitesinin yeni adresi nodusresearch.com. Wiki, eğitim içerikleri, blog ve etkileşimli demolar artık tek bir yerde.",
+          "linkLabel": "nodusresearch.com adresini ziyaret et"
+        }
+      }
+    },
+    {
       "id": "2026-08-nodus-connector-for-chrome",
       "date": "2026-08-14",
       "severity": "info",

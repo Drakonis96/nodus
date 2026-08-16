@@ -1,5 +1,6 @@
 import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { AppSettings, CorpusHealthBucketId, DatabaseSummary, NodiNotification, RecoveryStatus, ServerInboxEntry, SyncLogEntry, VaultSummary } from '@shared/types';
+import type { AnnouncementRefreshResult } from '@shared/announcements';
 import type { CsvImportPlanData } from './views/DatabasesView';
 import { FeedbackModal } from './views/FeedbackModal';
 import { RoadmapFeedbackModal, type RoadmapTopicKey } from './views/RoadmapFeedbackModal';
@@ -40,7 +41,6 @@ import { PlatformHighlightsUpdateTour } from './components/PlatformHighlightsGui
 import { ToolkitBetaUpdateTour } from './components/ToolkitBetaGuide';
 import { StartupUpdateModal } from './components/StartupUpdateModal';
 import { MobileTeaserGuide } from './components/MobileTeaserGuide';
-import { WebsiteLaunchGuide } from './components/WebsiteLaunchGuide';
 import { recoveryHealthAdvice, recoveryHealthHeadline } from './recoveryHealth';
 import { NodiMascot } from './components/nodi/NodiMascot';
 import { NodiStyleModal } from './components/NodiStyleModal';
@@ -176,9 +176,6 @@ export function App() {
   // Users who completed the essential guide before the video tutorials existed were
   // never asked "video or text", so the catalogue is announced to them once, here.
   const [tutorialVideosSettled, setTutorialVideosSettled] = useState(false);
-  // The website is not part of any tutorial chapter, so it is announced once here, to
-  // anyone past the essential guide. Its own sentinel decides: no version to expire on.
-  const [websiteLaunchSettled, setWebsiteLaunchSettled] = useState(false);
   // Set once the startup update check is done with the screen, so the one-time Nodi
   // choice can queue up behind it instead of fighting it for the foreground.
   const [updateSettled, setUpdateSettled] = useState(false);
@@ -281,15 +278,17 @@ export function App() {
       return el;
     });
   }, [notifications]);
-  const refreshNotificationCenter = useCallback(async () => {
-    if (refreshingNotifications) return;
+  const refreshNotificationCenter = useCallback(async (): Promise<AnnouncementRefreshResult> => {
+    if (refreshingNotifications) return { status: 'not-modified', checkedAt: Date.now() };
     setRefreshingNotifications(true);
     try {
       const snapshot = await refreshNotificationSources();
       setNotifications(snapshot.notifications);
+      return snapshot.refresh;
     } catch {
       // The notification centre deliberately keeps the last good lists when the public
-      // announcements file is unreachable. Manual refresh follows the same quiet rule.
+      // announcements file is unreachable. The panel renders this status inline.
+      return { status: 'error', checkedAt: Date.now() };
     } finally {
       setRefreshingNotifications(false);
     }
@@ -1441,7 +1440,7 @@ export function App() {
           announcements={announcements}
           language={settings.uiLanguage}
           onMarkAnnouncementRead={markAnnouncementRead}
-          onRefresh={() => void refreshNotificationCenter()}
+          onRefresh={refreshNotificationCenter}
           refreshing={refreshingNotifications}
           onClearAll={() => void window.nodus.clearNotifications().then(setNotifications).catch(() => {})}
         />
@@ -1971,15 +1970,7 @@ export function App() {
         />
       )}
 
-      {whatsNewSettled && mobileTeaserSettled && platformHighlightsSettled && toolkitBetaTourSettled && tutorialVideosSettled && !websiteLaunchSettled && !manualWhatsNewOpen && (
-        <WebsiteLaunchGuide
-          uiLanguage={settings.uiLanguage}
-          previousTutorialVersion={settings.basicsTutorialVersion}
-          onSettled={() => setWebsiteLaunchSettled(true)}
-        />
-      )}
-
-      {whatsNewSettled && mobileTeaserSettled && platformHighlightsSettled && toolkitBetaTourSettled && tutorialVideosSettled && websiteLaunchSettled && !manualWhatsNewOpen && !updateSettled && (
+      {whatsNewSettled && mobileTeaserSettled && platformHighlightsSettled && toolkitBetaTourSettled && tutorialVideosSettled && !manualWhatsNewOpen && !updateSettled && (
         <StartupUpdateModal
           settings={settings}
           activeVaultType={activeVault?.type ?? null}

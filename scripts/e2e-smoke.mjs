@@ -431,18 +431,6 @@ try {
   assert.equal(await page.evaluate(() => localStorage.getItem('nodus.tutorialVideosAnnouncementSeen.2026-07')), '1', 'the announcement is marked seen only when dismissed');
   console.log('[e2e] the video tutorials announcement shows the catalogue in-modal, once');
 
-  // Last in the chain: the website notice. A title, a line and the address, so what is
-  // asserted is that it is exactly that — the visit button opens the browser and must
-  // NOT count as having read the notice, only the dismissal does.
-  const websiteNotice = page.getByTestId('website-launch-guide');
-  await websiteNotice.waitFor();
-  await websiteNotice.getByRole('heading', { name: 'Nodus estrena nueva web', exact: true }).waitFor();
-  assert.equal(await page.evaluate(() => localStorage.getItem('nodus.websiteLaunchSeen.2026-08')), null, 'the notice is not marked seen just by appearing');
-  await websiteNotice.getByTestId('website-launch-complete').click();
-  await websiteNotice.waitFor({ state: 'detached' });
-  assert.equal(await page.evaluate(() => localStorage.getItem('nodus.websiteLaunchSeen.2026-08')), '1', 'the notice is marked seen only when dismissed');
-  console.log('[e2e] the website notice closes the update chain, once');
-
   // Back to Spanish for the rest of the suite, which asserts on Spanish copy. The
   // reload above already consumed the once-per-session startup update check, so reset
   // its gate to leave the next reload looking like a fresh session again.
