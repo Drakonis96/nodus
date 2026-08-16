@@ -7,12 +7,20 @@ SPDX-License-Identifier: AGPL-3.0-only
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
-<title>Nodus: a local-first workspace for research, teaching and study</title>
-<meta name="description" content="Nodus is a free, open-source, local-first desktop app for academic work. Each vault picks a mode — academic research, teaching, study, structured databases and more — over the same private engine. No accounts, no subscriptions, no telemetry."/>
-<meta property="og:title" content="Nodus: a local-first workspace for research, teaching and study"/>
-<meta property="og:description" content="Free and open source, local-first. Vault modes over one engine: an academic research library, a teaching workspace, a study workspace, structured databases, genealogy and worldbuilding."/>
+<title>Nodus | Open Source Research Workspace</title>
+<meta name="description" content="Nodus is a free, open source, local-first research workspace for academic work. Connect your Zotero library or your own documents, turn what you read into ideas anchored to the passage that supports them, and search, question and cite your own corpus."/>
+<meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1"/>
+<meta property="og:title" content="Nodus | Open Source Research Workspace"/>
+<meta property="og:description" content="An open source research workspace for connecting sources, ideas and evidence. Build a corpus from Zotero or your own files, search it semantically and write with citations you can open. Free, local-first, no accounts."/>
 <meta property="og:type" content="website"/>
 <meta property="og:url" content="https://nodusresearch.com/"/>
+<meta property="og:site_name" content="Nodus"/>
+<meta property="og:locale" content="en_GB"/>
+<meta property="og:image" content="https://nodusresearch.com/favicon.png"/>
+<meta name="twitter:card" content="summary"/>
+<meta name="twitter:title" content="Nodus | Open Source Research Workspace"/>
+<meta name="twitter:description" content="An open source research workspace for connecting sources, ideas and evidence. Free, local-first, and built around your own library."/>
+<meta name="twitter:image" content="https://nodusresearch.com/favicon.png"/>
 <link rel="canonical" href="https://nodusresearch.com/"/>
 <link rel="icon" href="favicon.ico" sizes="any"/>
   <link rel="icon" type="image/png" href="favicon.png" sizes="512x512"/>
@@ -21,8 +29,8 @@ SPDX-License-Identifier: AGPL-3.0-only
 <link rel="preconnect" href="https://fonts.googleapis.com"/>
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Fraunces:opsz,wght@9..144,600;9..144,700&display=swap" rel="stylesheet"/>
-<link rel="stylesheet" href="assets/css/nodus.css?v=20260817c"/>
-<link rel="stylesheet" href="assets/css/home.css?v=20260817"/>
+<link rel="stylesheet" href="assets/css/nodus.css?v=20260818"/>
+<link rel="stylesheet" href="assets/css/home.css?v=20260818"/>
 <script>
   /* Arm the opening sequence before the first paint. Anything that goes wrong
      here simply leaves the page in its ordinary, fully visible state. */
@@ -40,6 +48,37 @@ SPDX-License-Identifier: AGPL-3.0-only
       }, 9000);
     }
   } catch (error) {}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "WebSite",
+      "@id": "https://nodusresearch.com/#website",
+      "url": "https://nodusresearch.com/",
+      "name": "Nodus",
+      "description": "An open source research workspace for connecting sources, ideas and evidence.",
+      "inLanguage": "en"
+    },
+    {
+      "@type": "SoftwareApplication",
+      "@id": "https://nodusresearch.com/#app",
+      "name": "Nodus",
+      "url": "https://nodusresearch.com/",
+      "applicationCategory": "EducationalApplication",
+      "applicationSubCategory": "Research workspace",
+      "operatingSystem": "macOS, Windows, Linux",
+      "description": "Nodus is a free, open source, local-first desktop workspace for academic research. It builds a corpus from a Zotero library or your own documents, records ideas with the passage and page that support them, and supports semantic search, research gaps, debates and writing with verifiable citations.",
+      "license": "https://github.com/Drakonis96/nodus/blob/main/LICENSE",
+      "isAccessibleForFree": true,
+      "downloadUrl": "https://github.com/Drakonis96/nodus/releases/latest",
+      "softwareHelp": "https://nodusresearch.com/wiki/",
+      "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+      "author": { "@type": "Person", "name": "Jorge Pérez Burgueño" }
+    }
+  ]
+}
 </script>
 </head>
 <body data-formation="on">
@@ -65,11 +104,11 @@ SPDX-License-Identifier: AGPL-3.0-only
       <circle cx="46" cy="48" r="6.5" fill="#8b5cf6"/><circle cx="46" cy="16" r="6.5" fill="#7c3aed"/>
     </svg>
     <h1 class="hero-title">
-      <span class="line"><i><span class="verb">Research</span> deeper</i></span>
-      <span class="line"><i><span class="verb">Teach</span> smarter</i></span>
-      <span class="line"><i><span class="verb">Study</span> better</i></span>
+      <span class="line"><i>An open source <span class="verb">research</span></i></span>
+      <span class="line"><i>workspace for connecting</i></span>
+      <span class="line"><i>sources, ideas and evidence</i></span>
     </h1>
-    <p class="sub">A local-first workspace for researchers, teachers and students to connect sources, notes, data, ideas and learning materials — on your own machine.</p>
+    <p class="sub">Nodus is a free desktop app for academic research. Connect your Zotero library or your own documents, and turn what you read into ideas, notes and evidence you can search, question and cite — every claim anchored to the passage behind it. For scholars, students and teachers.</p>
     <div class="ctas">
       <a class="btn primary" href="demo/index.html" data-magnet="0.16">
         <svg class="ic" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7-11-7Z"/></svg>
@@ -85,9 +124,45 @@ SPDX-License-Identifier: AGPL-3.0-only
       </button>
     </div>
     <p class="meta"><b>Completely free and open source.</b> No accounts, no subscriptions, no telemetry, and your corpus never leaves your machine.</p>
+    <p class="hero-links">Read on: <a href="research/">Nodus for academic research</a> · <a href="zotero/">the Zotero integration</a> · <a href="ai-research/">AI for academic research</a></p>
   </div>
   <div class="scroll-cue" aria-hidden="true"><span class="rail"></span>Scroll</div>
 </header>
+
+<!-- ============================================================ what nodus is -->
+<section id="what-nodus-is" class="section-line" data-accent="#818cf8" data-second="#22d3ee" data-energy="0.3">
+  <div class="wrap">
+    <div class="section-head scrim reveal">
+      <span class="kicker">What Nodus is</span>
+      <h2 class="title" data-split>A research workspace, not another notes app.</h2>
+      <p class="lead">Nodus is a desktop application for academic research. You bring in the papers, books and documents you already work with — from Zotero, from a bibliographic export or straight from disk — and Nodus records what they claim, with the exact passage and page that support each claim. A bibliography knows what you have read and a notebook knows what you thought; Nodus knows which source stands behind which idea, which is the link scholarly work actually runs on.</p>
+    </div>
+
+    <div class="home-topics">
+      <a class="card lit path-card reveal" href="research/">
+        <span class="pic"><svg viewBox="0 0 24 24"><circle cx="6" cy="6" r="2.4"/><circle cx="18" cy="7" r="2.4"/><circle cx="11" cy="18" r="2.4"/><path d="M8 7l7.6.6M7.2 8.2l3 7.4M16.6 9.2l-4.4 6.6"/></svg></span>
+        <h3>Nodus for academic research</h3>
+        <p>Sources, typed ideas with their evidence, semantic search, debates, research gaps and writing with citations you can open. The full picture for researchers and students.</p>
+        <span class="arrow-link">Read the research guide
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>
+      </a>
+      <a class="card lit path-card reveal" href="zotero/" style="--delay:70ms">
+        <span class="pic"><svg viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20V3H6.5A2.5 2.5 0 0 0 4 5.5v14Z"/><path d="M9 7h6M9 11h6"/></svg></span>
+        <h3>Nodus and Zotero</h3>
+        <p>Nodus does not replace your reference manager. Connect your Zotero library read-only and work around it — plus a standalone plugin that lives inside Zotero itself.</p>
+        <span class="arrow-link">Read about the Zotero integration
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>
+      </a>
+      <a class="card lit path-card reveal" href="ai-research/" style="--delay:140ms">
+        <span class="pic"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M18.4 5.6l-2.1 2.1M7.7 16.3l-2.1 2.1"/></svg></span>
+        <h3>AI for academic research</h3>
+        <p>What the models are actually asked to do over your own documents, how to run them offline with Ollama or LM Studio, and where the output still has to be checked.</p>
+        <span class="arrow-link">Read about AI-assisted research
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>
+      </a>
+    </div>
+  </div>
+</section>
 
 <!-- ============================================================ the four vaults -->
 <section id="vaults" class="section-line" data-accent="#a78bfa" data-second="#818cf8" data-energy="0.3" style="padding-bottom:0">
@@ -494,10 +569,16 @@ SPDX-License-Identifier: AGPL-3.0-only
 
 <footer class="site-foot">
   <div class="wrap">
-    <div class="foot-grid">
+    <div class="foot-grid wide">
       <div class="foot-brand">
         <span class="logo"><img src="assets/nodus-logo.svg" alt=""/> Nodus</span>
-        <p>A free, open-source, local-first workspace for research, teaching and study. Your corpus stays on your machine.</p>
+        <p>A free, open-source, local-first research workspace for connecting sources, ideas and evidence. Your corpus stays on your machine.</p>
+      </div>
+      <div class="foot-col">
+        <h4>Research</h4>
+        <a href="research/">Academic research</a>
+        <a href="zotero/">Nodus and Zotero</a>
+        <a href="ai-research/">AI for research</a>
       </div>
       <div class="foot-col">
         <h4>Product</h4>
