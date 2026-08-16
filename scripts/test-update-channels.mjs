@@ -71,7 +71,7 @@ test('beta installation is fail-closed behind a verified pre-update snapshot', a
   assert.match(main, /if \(prerelease \|\| recoveryConfigured\)/, 'stable attempts the snapshot whenever a Recovery folder is configured');
   assert.match(main, /stable pre-update backup failed; continuing without blocking stable/, 'stable preserves its non-blocking contract');
   assert.match(main, /autoUpdater\.autoInstallOnAppQuit = false/);
-  assert.match(backups, /verifyBackupArchive\(await fs\.promises\.readFile\(target\), password\)/);
+  assert.match(backups, /const committedArchive = await fs\.promises\.readFile\(target\);[\s\S]*verifyBackupArchive\(committedArchive, password\)/);
   assert.match(backups, /selectPreUpdateBackupsToPrune/);
   assert.match(types, /'backing-up'/);
 });
