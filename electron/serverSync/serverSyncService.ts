@@ -1,7 +1,4 @@
 import os from 'node:os';
-import { gzip } from 'node:zlib';
-import { promisify } from 'node:util';
-import type Database from 'better-sqlite3';
 import { getDb, withVaultDatabase } from '../db/database';
 import { getActiveVault, getVault } from '../vaults/vaultRegistry';
 import { updateSettings } from '../db/settingsRepo';
@@ -20,10 +17,9 @@ import type {
   VaultSummary,
 } from '@shared/types';
 import { normalizeUiLanguage } from '@shared/uiLanguage';
-import { buildServerSnapshot, lightweightVaultRevision, type SnapshotAsset } from './serverSnapshot';
+import { lightweightVaultRevision, type SnapshotAsset } from './serverSnapshot';
 import { buildServerLibraryPublication, type ServerLibraryPackage } from './serverLibrary';
-import { buildVectorSet, vectorRevision, type VectorKind } from './serverVectors';
-import { publishVaultToCloudflare } from './cloudflarePublisher';
+import type { VectorKind } from './serverVectors';
 import { onGlobalLibraryChanged } from '../library/libraryRuntime';
 import { nodiNotesPending, syncNodiNotes } from './nodiNotesSync';
 import {
@@ -35,6 +31,14 @@ import {
   readVaultConfig,
   type VaultServerConfig,
 } from './serverSyncShared';
+import {
+  clearPublishRetry,
+  mayAttemptPublish,
+  notePublishFailure,
+  publishRetryIsDue,
+} from './publishRetryPolicy';
+import { buildServerSnapshotInUtility, publishVaultToCloudflareInUtility } from './serverPublishWorkerHost';
+import { publishSourceRevision } from './publishSourceRevision';
 
 // A Nodus Server pairing belongs to ONE vault and one remote space. Unlike the old
 // single-active-vault publisher, every paired vault keeps publishing in the background
@@ -43,8 +47,6 @@ import {
 // together so Settings shows them from any vault instead of pretending the current
 // vault is "unconfigured".
 
-const gzipAsync = promisify(gzip);
-
 // The mobile client watches the published revision, so this is the latency budget for the
 // desktop half of that conversation. Five seconds of quiet coalesces an editor's writes into
 // one snapshot; the fifteen-second floor prevents a sequence of short pauses from uploading a
@@ -52,19 +54,22 @@ const gzipAsync = promisify(gzip);
 // is normally visible on the other device in around twenty seconds or less.
 const CHECK_INTERVAL_MS = 5_000;
 const QUIET_PERIOD_MS = 5_000;
-const MIN_UPLOAD_INTERVAL_MS = 15_000;
 const FIRST_TICK_MS = 1_500;
-
 interface VaultRuntime {
   /** Last lightweight revision observed for the active vault (change detection). */
   observed: string | null;
   /** Timestamp of the latest observed write in the active vault; 0 when clean. */
   dirtySince: number;
   lastUploadStartedAt: number;
+  /** Consecutive failed PUTs and the earliest time their next automatic retry may run. */
+  consecutiveFailures: number;
+  retryNotBefore: number;
   /** The vault wants a publish attempt on the next tick. */
   pending: boolean;
   /** Content hash last actually uploaded this session; skips redundant network. */
   lastRevision: string | null;
+  /** Cheap per-connection DB revision that was last published successfully. */
+  lastPublishedDatabaseRevision: string | null;
   phase: NodusServerSyncPhase;
   lastSyncAt: string | null;
   lastError: string | null;
@@ -93,7 +98,9 @@ function ensureRuntime(vaultId: string): VaultRuntime {
   if (!rt) {
     rt = {
       observed: null, dirtySince: 0, lastUploadStartedAt: 0, pending: false,
-      lastRevision: null, phase: 'idle', lastSyncAt: null, lastError: null, lastBytes: null,
+      consecutiveFailures: 0, retryNotBefore: 0,
+      lastRevision: null, lastPublishedDatabaseRevision: null,
+      phase: 'idle', lastSyncAt: null, lastError: null, lastBytes: null,
       lastAssetsSent: 0, lastInbox: null, lastVectorRevision: {}, lastVectors: {},
       lastLibraryPackagesSent: 0,
     };
@@ -113,6 +120,15 @@ function tooLargeMessage(config: VaultServerConfig, serverError: string, rawByte
       ? 'Desactiva «Incluir contenido creado por mí» para dejar fuera notas, proyectos y borradores.'
       : 'Pide a quien administra el servidor que amplíe NODUS_MAX_SNAPSHOT_JSON_BYTES.';
   return `${serverError || 'El servidor ha rechazado la publicación por su tamaño.'} ${size} ${lever}`;
+}
+
+function logPublishPerf(phase: string, startedAt: bigint, metadata: Record<string, string | number> = {}): bigint {
+  const endedAt = process.hrtime.bigint();
+  const elapsedMs = Number(endedAt - startedAt) / 1_000_000;
+  const rssMiB = process.memoryUsage().rss / (1024 * 1024);
+  const details = Object.entries(metadata).map(([key, value]) => `${key}=${value}`).join(' ');
+  console.log(`[perf][publish] phase=${phase} elapsedMs=${elapsedMs.toFixed(1)} rssMiB=${rssMiB.toFixed(1)}${details ? ` ${details}` : ''}`);
+  return endedAt;
 }
 
 /**
@@ -314,19 +330,15 @@ async function uploadLibraryPackages(
 async function publishVectors(
   config: VaultServerConfig,
   token: string,
-  db: Database.Database,
+  vectors: Awaited<ReturnType<typeof buildServerSnapshotInUtility>>['vectors'],
   rt: VaultRuntime,
 ): Promise<void> {
   if (!config.includeVectors) return;
-  const kinds: VectorKind[] = config.includePassages ? ['ideas', 'passages'] : ['ideas'];
   const endpoint = `${normalizeUrl(config.url)}/api/v1/spaces/${encodeURIComponent(config.spaceId)}/vectors`;
-  for (const kind of kinds) {
-    const revision = vectorRevision(db, kind);
-    if (!revision || rt.lastVectorRevision[kind] === revision) continue;
-    const built = buildVectorSet(db, kind);
-    if (!built) continue;
+  for (const vector of vectors) {
+    const { kind, revision, compressed, summary } = vector;
+    if (rt.lastVectorRevision[kind] === revision) continue;
     try {
-      const compressed = await gzipAsync(built.buffer, { level: 1 });
       const response = await fetchWithTimeout(`${endpoint}?kind=${kind}`, {
         method: 'PUT',
         headers: {
@@ -341,7 +353,7 @@ async function publishVectors(
       if (response.status === 404) return;
       if (!response.ok) return;
       rt.lastVectorRevision[kind] = revision;
-      rt.lastVectors = { ...rt.lastVectors, [kind]: { count: built.summary.count, dim: built.summary.dim, bytes: compressed.length } };
+      rt.lastVectors = { ...rt.lastVectors, [kind]: { count: summary.count, dim: summary.dim, bytes: compressed.length } };
     } catch {
       // Retried on the next publication; nothing was recorded as sent.
     }
@@ -366,7 +378,22 @@ async function publishVault(vaultId: string): Promise<void> {
   rt.phase = 'syncing';
   try {
     if (config.kind === 'cloudflare') {
-      const result = await publishVaultToCloudflare(config, token, vault, db);
+      const databaseRevision = publishSourceRevision(lightweightVaultRevision(db), config);
+      if (databaseRevision && rt.lastPublishedDatabaseRevision === databaseRevision) {
+        rt.phase = 'ok';
+        rt.pending = false;
+        rt.dirtySince = 0;
+        clearPublishRetry(rt);
+        return;
+      }
+      const library = config.includeLibraryDocuments ? buildServerLibraryPublication() : null;
+      const result = await publishVaultToCloudflareInUtility({
+        vaultPath: vault.path,
+        vault,
+        config,
+        token,
+        library,
+      });
       rt.lastRevision = result.revision;
       rt.dirtySince = 0;
       rt.pending = false;
@@ -376,6 +403,8 @@ async function publishVault(vaultId: string): Promise<void> {
       rt.lastBytes = result.bytes;
       rt.lastAssetsSent = result.assetsSent;
       rt.lastLibraryPackagesSent = result.libraryPackagesSent;
+      rt.lastPublishedDatabaseRevision = databaseRevision;
+      clearPublishRetry(rt);
       if (vault.active) rt.observed = lightweightVaultRevision(db);
       return;
     }
@@ -389,19 +418,44 @@ async function publishVault(vaultId: string): Promise<void> {
     // Splitting them also disposes of the concurrency question rather than answering it.
     // better-sqlite3 is synchronous and both would run on the one main-process thread, so
     // "never at the same time" would have to be a flag shared between two modules.
-    const library = config.includeLibraryDocuments ? buildServerLibraryPublication() : null;
-    const snapshot = buildServerSnapshot(
-      { ...vault },
-      { nodusServerIncludeUserContent: config.includeUserContent, nodusServerIncludePassages: config.includePassages },
-      db,
-      library?.manifest ?? null,
-    );
-    // Nothing changed since our last upload this session: keep the server as-is and
-    // avoid the round-trip. The very first publish after launch always runs (no cache).
-    if (rt.lastRevision && rt.lastRevision === snapshot.revision) {
+    // total_changes + data_version is connection-local but stable for the pooled connection.
+    // It cannot miss writes made by this connection or another one. Library packages live
+    // outside SQLite, so that opt-in deliberately bypasses this early shortcut.
+    const databaseRevision = publishSourceRevision(lightweightVaultRevision(db), config);
+    if (databaseRevision && rt.lastPublishedDatabaseRevision === databaseRevision) {
       rt.phase = 'ok';
       rt.pending = false;
       rt.dirtySince = 0;
+      clearPublishRetry(rt);
+      return;
+    }
+    const library = config.includeLibraryDocuments ? buildServerLibraryPublication() : null;
+    let publishPhaseStartedAt = process.hrtime.bigint();
+    const snapshot = await buildServerSnapshotInUtility({
+      vaultPath: vault.path,
+      vault: { ...vault },
+      settings: {
+        nodusServerIncludeUserContent: config.includeUserContent,
+        nodusServerIncludePassages: config.includePassages,
+      },
+      library: library?.manifest ?? null,
+      vectorKinds: config.includeVectors
+        ? (config.includePassages ? ['ideas', 'passages'] : ['ideas']) as VectorKind[]
+        : [],
+    });
+    publishPhaseStartedAt = logPublishPerf('utility-snapshot-gzip:complete', publishPhaseStartedAt, {
+      rawBytes: snapshot.rawBytes,
+      compressedBytes: snapshot.compressed.byteLength,
+    });
+    // Nothing changed since our last upload this session: keep the server as-is and
+    // avoid the round-trip. The very first publish after launch always runs (no cache).
+    if (rt.lastRevision && rt.lastRevision === snapshot.revision) {
+      await publishVectors(config, token, snapshot.vectors, rt);
+      rt.phase = 'ok';
+      rt.pending = false;
+      rt.dirtySince = 0;
+      rt.lastPublishedDatabaseRevision = databaseRevision;
+      clearPublishRetry(rt);
       if (vault.active) rt.observed = lightweightVaultRevision(db);
       return;
     }
@@ -414,11 +468,6 @@ async function publishVault(vaultId: string): Promise<void> {
     if (library) {
       await uploadLibraryPackages(normalizeUrl(config.url), config.spaceId, token, library.packages, rt);
     }
-    // Level 1 deliberately trades a little bandwidth for very low desktop CPU usage.
-    // Compressing asynchronously puts even that on libuv's threadpool: this runs on
-    // a 30 s timer, and the main process is the single thread every window's IPC
-    // goes through — including the Nodi overlay's.
-    const compressed = await gzipAsync(snapshot.buffer, { level: 1 });
     const response = await fetchWithTimeout(
       `${normalizeUrl(config.url)}/api/v1/spaces/${encodeURIComponent(config.spaceId)}/snapshot`,
       {
@@ -429,9 +478,13 @@ async function publishVault(vaultId: string): Promise<void> {
           'content-encoding': 'gzip',
           'x-nodus-revision': snapshot.revision,
         },
-        body: compressed,
+        body: snapshot.compressed,
       },
     );
+    logPublishPerf('snapshot-put:complete', publishPhaseStartedAt, {
+      status: response.status,
+      bytes: snapshot.compressed.byteLength,
+    });
     const result = await response.json().catch(() => ({})) as { updatedAt?: string; error?: string };
     if (response.status === 401 || response.status === 403) {
       // The server revoked this device. Drop only the token so the vault stops trying
@@ -442,12 +495,14 @@ async function publishVault(vaultId: string): Promise<void> {
       rt.pending = false;
       return;
     }
-    if (response.status === 413) throw new Error(tooLargeMessage(config, result.error || '', snapshot.buffer.length));
+    if (response.status === 413) throw new Error(tooLargeMessage(config, result.error || '', snapshot.rawBytes));
     if (!response.ok) throw new Error(result.error || `El servidor respondió con HTTP ${response.status}.`);
     rt.lastRevision = snapshot.revision;
     rt.dirtySince = 0;
     rt.pending = false;
     rt.phase = 'ok';
+    rt.lastPublishedDatabaseRevision = databaseRevision;
+    clearPublishRetry(rt);
     // Cleared here and nowhere else it mattered: this was written on failure and never taken
     // back, so one 502 while the server restarted stayed on the panel for the rest of the
     // session — beside a publication that had just succeeded and an inbox that had just
@@ -455,14 +510,17 @@ async function publishVault(vaultId: string): Promise<void> {
     // because the reader cannot tell it is over.
     rt.lastError = null;
     rt.lastSyncAt = result.updatedAt || new Date().toISOString();
-    rt.lastBytes = compressed.length;
+    rt.lastBytes = snapshot.compressed.length;
     // After the snapshot, so a client that sees the new revision already has rows for
     // whatever the matrix points at.
-    await publishVectors(config, token, db, rt);
+    await publishVectors(config, token, snapshot.vectors, rt);
     if (vault.active) rt.observed = lightweightVaultRevision(db);
   } catch (error) {
     rt.phase = 'error';
     rt.lastError = error instanceof Error ? error.message : String(error);
+    rt.pending = false;
+    rt.dirtySince = 0;
+    notePublishFailure(rt);
   } finally {
     publishing = false;
   }
@@ -511,7 +569,7 @@ async function tick(): Promise<void> {
       if (
         rt.dirtySince &&
         Date.now() - rt.dirtySince >= QUIET_PERIOD_MS &&
-        Date.now() - rt.lastUploadStartedAt >= MIN_UPLOAD_INTERVAL_MS
+        mayAttemptPublish(rt)
       ) {
         rt.pending = true;
       }
@@ -519,8 +577,17 @@ async function tick(): Promise<void> {
   }
 
   // 2) Publish one pending vault per tick (active-first so edits win over refreshes).
+  const selectionNow = Date.now();
+  for (const config of configs) {
+    const rt = ensureRuntime(config.vaultId);
+    if (publishRetryIsDue(rt, selectionNow)) rt.pending = true;
+  }
   const target = [active, ...configs.filter((config) => !config.isActiveVault)]
-    .find((config) => config && config.autoSync && ensureRuntime(config.vaultId).pending);
+    .find((config) => {
+      if (!config || !config.autoSync) return false;
+      const rt = ensureRuntime(config.vaultId);
+      return rt.pending && mayAttemptPublish(rt, selectionNow);
+    });
   if (target) await publishVault(target.vaultId);
 }
 
@@ -533,6 +600,9 @@ export function startNodusServerSync(): void {
   // publishVault keeps unchanged vaults from re-uploading beyond the first launch pass.
   for (const config of configs) {
     const rt = ensureRuntime(config.vaultId);
+    // stop/start closes the read-only pool. A fresh SQLite connection resets
+    // total_changes/data_version, so no pre-build fingerprint may cross that boundary.
+    rt.lastPublishedDatabaseRevision = null;
     if (config.enabled && config.autoSync) rt.pending = true;
     if (config.isActiveVault) rt.observed = null;
   }

@@ -4,11 +4,12 @@ import { promisify } from 'node:util';
 import type Database from 'better-sqlite3';
 import type { VaultSummary } from '@shared/types';
 import type { CloudflareCapabilityDocument, CloudflarePublicationManifest, CloudflarePublicationSession } from '@shared/cloudflare';
-import { identityColumns } from '../db/rowIdentity';
+import { identityColumnsInDatabase } from '../db/rowIdentityCore';
 import { buildServerSnapshot, type SnapshotAsset, type SnapshotAssetRef } from './serverSnapshot';
-import { buildServerLibraryPublication, type ServerLibraryPackage } from './serverLibrary';
+import type { BuiltServerLibraryPublication, ServerLibraryPackage } from './serverLibrary';
 import { buildVectorSet, buildVectorizeChunks, describeVectorSet, type VectorKind } from './serverVectors';
-import { fetchWithTimeout, normalizeUrl, type VaultServerConfig } from './serverSyncShared';
+import type { VaultServerConfig } from './serverSyncShared';
+import { normalizeServerUrl, serverFetchWithTimeout } from './serverNetwork';
 
 const gzipAsync = promisify(gzip);
 const DIRECT_OBJECT_BYTES = 96 * 1024 * 1024;
@@ -29,7 +30,7 @@ async function jsonRequest<T>(url: string, token: string, init: RequestInit): Pr
   const headers = new Headers(init.headers);
   headers.set('authorization', `Bearer ${token}`); headers.set('accept', 'application/json');
   if (init.body && !headers.has('content-type')) headers.set('content-type', 'application/json');
-  const response = await fetchWithTimeout(url, { ...init, headers });
+  const response = await serverFetchWithTimeout(url, { ...init, headers });
   const result = await response.json().catch(() => ({})) as T & { error?: string; detail?: string; title?: string };
   if (!response.ok) throw new Error(result.detail || result.error || result.title || `Nodus Cloud respondió con HTTP ${response.status}.`);
   return result;
@@ -38,7 +39,7 @@ async function jsonRequest<T>(url: string, token: string, init: RequestInit): Pr
 async function putObject(base: string, spaceId: string, publicationId: string, token: string, purpose: string, objectHash: string, mime: string, data: Buffer): Promise<void> {
   const directLimit = purpose === 'row' ? DIRECT_R2_ROW_BYTES : DIRECT_OBJECT_BYTES;
   if (data.length <= directLimit) {
-    const response = await fetchWithTimeout(`${base}/api/v3/spaces/${encodeURIComponent(spaceId)}/objects/${purpose}/${objectHash}?publicationId=${encodeURIComponent(publicationId)}`, {
+    const response = await serverFetchWithTimeout(`${base}/api/v3/spaces/${encodeURIComponent(spaceId)}/objects/${purpose}/${objectHash}?publicationId=${encodeURIComponent(publicationId)}`, {
       method: 'PUT', headers: { authorization: `Bearer ${token}`, 'content-type': mime, 'content-length': String(data.length) }, body: data,
     });
     if (!response.ok) { const value = await response.json().catch(() => ({})) as { detail?: string; error_description?: string }; throw new Error(value.detail || value.error_description || `Nodus Cloud rechazó un archivo (HTTP ${response.status}).`); }
@@ -81,7 +82,7 @@ function stableRows(db: Database.Database, payload: SnapshotPayload): {
   const tables: Record<string, Array<{ key: string; row: Record<string, unknown> }>> = {};
   const rowObjects: R2RowObject[] = [];
   for (const [table, rows] of Object.entries(payload.tables)) {
-    const identity = identityColumns(table, undefined, db);
+    const identity = identityColumnsInDatabase(db, table);
     if (!identity.length) throw new Error(`La tabla ${table} no tiene una identidad estable y no puede publicarse de forma segura.`);
     tables[table] = rows.map((row) => {
       const key = JSON.stringify(identity.map((column) => row[column] ?? null));
@@ -128,7 +129,7 @@ async function uploadLibrary(base: string, spaceId: string, publicationId: strin
 }
 
 async function vectorizeDimensions(base: string): Promise<Set<number>> {
-  const response = await fetchWithTimeout(`${base}/api/v3/capabilities`, { headers: { accept: 'application/json' } });
+  const response = await serverFetchWithTimeout(`${base}/api/v3/capabilities`, { headers: { accept: 'application/json' } });
   if (!response.ok) return new Set();
   const value = await response.json().catch(() => ({})) as Partial<CloudflareCapabilityDocument>;
   return new Set((value.storage?.vectorizeDimensions || []).filter((dimension) => Number.isSafeInteger(dimension) && dimension > 0 && dimension <= 1536));
@@ -147,7 +148,7 @@ async function uploadVectors(base: string, spaceId: string, publicationId: strin
     } else {
       const exact = buildVectorSet(db, kind);
       if (!exact || exact.buffer.length > EXACT_VECTOR_SEARCH_BYTES) throw new Error(`El índice ${kind} (${exact ? exact.buffer.length : 0} bytes) supera el límite seguro de búsqueda exacta. Añade en Cloudflare un índice Vectorize de ${summary.dim} dimensiones o desactiva esta proyección.`);
-      const response = await fetchWithTimeout(`${base}/api/v3/spaces/${encodeURIComponent(spaceId)}/publications/${publicationId}/vectors/${kind}/exact`, {
+      const response = await serverFetchWithTimeout(`${base}/api/v3/spaces/${encodeURIComponent(spaceId)}/publications/${publicationId}/vectors/${kind}/exact`, {
         method: 'PUT', headers: { authorization: `Bearer ${token}`, 'content-type': 'application/vnd.nodus.vectors' }, body: exact.buffer,
       });
       if (!response.ok) throw new Error(`Nodus Cloud rechazó el índice ${kind} (HTTP ${response.status}).`);
@@ -157,10 +158,16 @@ async function uploadVectors(base: string, spaceId: string, publicationId: strin
 
 export interface CloudflarePublishResult { revision: string; updatedAt: string; bytes: number; assetsSent: number; libraryPackagesSent: number; }
 
-export async function publishVaultToCloudflare(config: VaultServerConfig, token: string, vault: VaultSummary, db: Database.Database): Promise<CloudflarePublishResult> {
-  const base = normalizeUrl(config.url); const spaceId = config.spaceId;
+export async function publishVaultToCloudflare(
+  config: VaultServerConfig,
+  token: string,
+  vault: VaultSummary,
+  db: Database.Database,
+  preparedLibrary: BuiltServerLibraryPublication | null,
+): Promise<CloudflarePublishResult> {
+  const base = normalizeServerUrl(config.url); const spaceId = config.spaceId;
   const availableVectorizeDimensions = await vectorizeDimensions(base);
-  const library = config.includeLibraryDocuments ? buildServerLibraryPublication() : null;
+  const library = preparedLibrary;
   const snapshot = buildServerSnapshot(vault, { nodusServerIncludeUserContent: config.includeUserContent, nodusServerIncludePassages: config.includePassages }, db, library?.manifest || null);
   const payload = JSON.parse(snapshot.buffer.toString('utf8')) as SnapshotPayload;
   const preparedRows = stableRows(db, payload);

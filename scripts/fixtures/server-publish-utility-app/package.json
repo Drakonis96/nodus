@@ -1,0 +1,5 @@
+{
+  "name": "nodus-server-publish-utility-verifier",
+  "private": true,
+  "main": "main.cjs"
+}

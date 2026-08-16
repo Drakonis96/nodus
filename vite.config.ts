@@ -76,6 +76,34 @@ const preloadBuild = (name: string, entry: string) => ({
   },
 });
 
+/** A utility process must not share Rollup chunks with Electron's main entry: a shared
+ * chunk may pull `app`/`BrowserWindow` imports into a process where Electron does not
+ * expose them. Build it as one self-contained ESM file instead. */
+const utilityBuild = (name: string, entry: string) => ({
+  onstart: (args: { reload: () => void }) => args.reload(),
+  vite: {
+    resolve: {
+      alias: { '@shared': path.resolve(__dirname, 'shared') },
+    },
+    build: {
+      outDir: 'dist-electron',
+      emptyOutDir: false,
+      rollupOptions: {
+        input: { [name]: path.join(__dirname, entry) },
+        external: mainExternals,
+        output: {
+          format: 'es' as const,
+          entryFileNames: '[name].js',
+          inlineDynamicImports: true,
+          banner:
+            "import{fileURLToPath as __nodusFU}from'node:url';import{dirname as __nodusDN}from'node:path';" +
+            'const __filename=__nodusFU(import.meta.url);const __dirname=__nodusDN(__filename);',
+        },
+      },
+    },
+  },
+});
+
 export default defineConfig({
   // Expose the app version to the renderer at build time (shown in Settings).
   define: {
@@ -186,6 +214,7 @@ export default defineConfig({
     electronPlugin([
       preloadBuild('preload.nodi', 'electron/preload/nodi.ts'),
       preloadBuild('preload.presenter', 'electron/preload/presenter.ts'),
+      utilityBuild('serverPublishWorker', 'electron/serverSync/serverPublishWorker.ts'),
     ]),
     renderer(),
   ],
