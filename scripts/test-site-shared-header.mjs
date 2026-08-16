@@ -16,6 +16,7 @@ const systemPages = [
   ['site/research/index.html', 'research', '../'],
   ['site/zotero/index.html', 'zotero', '../'],
   ['site/ai-research/index.html', 'ai-research', '../'],
+  ['site/open-source/index.html', 'open-source', '../'],
   ['site/faq/index.html', 'faq', '../'],
   ['site/blog/index.html', 'blog', '../'],
   ['site/blog/post.html', 'blog', '../'],

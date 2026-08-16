@@ -171,7 +171,7 @@ test('the organism degrades for visitors who cannot or do not want to run it', (
   assert.match(site, /matchMedia\('\(prefers-reduced-motion: reduce\)'\)/, 'reveals and the cursor respect reduced motion');
 
   // every page that paints the organism has to provide its canvas
-  for (const page of ['index.html', 'faq/index.html', 'blog/index.html', 'blog/post.html', 'contribute/index.html', 'wiki/index.html', 'research/index.html', 'zotero/index.html', 'ai-research/index.html']) {
+  for (const page of ['index.html', 'faq/index.html', 'blog/index.html', 'blog/post.html', 'contribute/index.html', 'wiki/index.html', 'research/index.html', 'zotero/index.html', 'ai-research/index.html', 'open-source/index.html']) {
     assert.ok(read(page).includes('<canvas id="organism" aria-hidden="true"></canvas>'), `${page} carries the organism canvas`);
   }
 });
@@ -210,6 +210,7 @@ const TOPIC_PAGES = [
   ['research/index.html', 'https://nodusresearch.com/research/'],
   ['zotero/index.html', 'https://nodusresearch.com/zotero/'],
   ['ai-research/index.html', 'https://nodusresearch.com/ai-research/'],
+  ['open-source/index.html', 'https://nodusresearch.com/open-source/'],
 ];
 
 test('the topic pages are indexable, canonical and described only once each', () => {
@@ -243,16 +244,17 @@ test('the topic pages are indexable, canonical and described only once each', ()
 
 test('the topic pages are linked from the home page and to each other', () => {
   const home = read('index.html');
-  for (const href of ['research/', 'zotero/', 'ai-research/']) {
+  for (const href of ['research/', 'zotero/', 'ai-research/', 'open-source/']) {
     assert.ok(home.includes(`href="${href}"`), `the home page links to /${href}`);
   }
   // descriptive anchors, not "click here" — the anchor text is the link's whole signal
   assert.match(home, /Nodus for academic research/, 'the home page names the research page');
 
   const links = {
-    'research/index.html': ['../zotero/', '../ai-research/'],
-    'zotero/index.html': ['../research/'],
-    'ai-research/index.html': ['../research/', '../zotero/'],
+    'research/index.html': ['../zotero/', '../ai-research/', '../open-source/'],
+    'zotero/index.html': ['../research/', '../open-source/'],
+    'ai-research/index.html': ['../research/', '../zotero/', '../open-source/'],
+    'open-source/index.html': ['../research/', '../zotero/', '../ai-research/'],
   };
   for (const [page, required] of Object.entries(links)) {
     const html = read(page);
@@ -270,6 +272,7 @@ test('the sitemap lists every static page of the site', () => {
     'https://nodusresearch.com/research/',
     'https://nodusresearch.com/zotero/',
     'https://nodusresearch.com/ai-research/',
+    'https://nodusresearch.com/open-source/',
     'https://nodusresearch.com/wiki/',
     'https://nodusresearch.com/faq/',
     'https://nodusresearch.com/contribute/',
@@ -285,7 +288,7 @@ test('the sitemap lists every static page of the site', () => {
 });
 
 test('every page is reachable by keyboard and readable by a screen reader', () => {
-  for (const page of ['index.html', 'faq/index.html', 'blog/index.html', 'blog/post.html', 'contribute/index.html', 'research/index.html', 'zotero/index.html', 'ai-research/index.html']) {
+  for (const page of ['index.html', 'faq/index.html', 'blog/index.html', 'blog/post.html', 'contribute/index.html', 'research/index.html', 'zotero/index.html', 'ai-research/index.html', 'open-source/index.html']) {
     const html = read(page);
     assert.match(html, /class="skip-link" href="#/, `${page} offers a skip link`);
     assert.match(html, /<html lang="en">/, `${page} declares its language`);
