@@ -2,6 +2,15 @@
   "$comment": "The blog index. Every post listed here must have a matching Markdown file at site/blog/posts/<slug>.md. Fields: slug (kebab-case, becomes the URL ?p=<slug>), title, date (YYYY-MM-DD), tags (array, free-form, drives the filter row), summary (one or two sentences shown on the card and in the RSS feed), the optional reading (minutes, an integer; omitted means it is estimated from the file), and the optional cover (a path relative to site/blog/, shown on the card and above the post) with its coverAlt. Set draft: true to keep a post out of the index and the feed while you write it. Newest first is not required — the index sorts by date. See posts/_template.md.",
   "posts": [
     {
+      "slug": "how-to-organize-a-large-academic-research-library",
+      "title": "How to Organize a Large Academic Research Library",
+      "date": "2026-08-16",
+      "tags": ["Research", "Workflows", "AI"],
+      "summary": "Once a project grows to hundreds of sources, the hard part is no longer storage but context: knowing why a source was collected and how it connects to your ideas.",
+      "cover": "media/organize-large-library.webp",
+      "coverAlt": "A desk seen from above with an open laptop, a notebook, a pen, a plant and a hand holding a cup of coffee."
+    },
+    {
       "slug": "nodus-open-source-research-workspace",
       "title": "Nodus: an open source research workspace for academic work",
       "date": "2026-08-16",
