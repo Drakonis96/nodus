@@ -123,7 +123,6 @@ function vaultMarkup(vault) {
     <div class="meta-row"><span class="pill">For ${escapeHtml(vault.audience)}</span><span class="pill">${vault.chapters.length} complete tutorials</span><span class="pill">Step-by-step workflows</span></div>
     <div class="hero-actions"><a class="action primary" href="#${vault.chapters[0].id}">Begin the guide</a><a class="action" href="${vault.pdf}" download>${downloadIconMarkup()}Download PDF manual</a><a class="action bundle-download" href="${content.manualBundle}" download>${downloadIconMarkup()}Download all manuals</a></div>
     ${figure(`${vault.id}/home.png`, `${vault.name} vault overview`)}
-    <section class="doc-section"><p class="section-kicker">Contents</p><h2>Complete ${escapeHtml(vault.short)} workflow</h2><div class="chapter-list">${vault.chapters.map((chapter,index) => `<a class="chapter-card" href="#${chapter.id}"><small>${String(index+1).padStart(2,'0')} · ${escapeHtml(chapter.group)}</small><b>${escapeHtml(chapter.title)}</b><span>${escapeHtml(chapter.summary)}</span></a>`).join('')}</div></section>
     ${vault.chapters.map((chapter, index) => sectionMarkup(chapter, vault.accent, index === 0 || index % 2 === 1, vault)).join('')}
   </div>`;
 }

@@ -200,25 +200,6 @@ main#article {
   object-fit: cover; object-position: top; border-radius: 10px;
 }
 
-/* ============================================================ chapter index */
-.chapter-list {
-  display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
-  gap: 12px; margin: 28px 0 54px;
-}
-.chapter-card {
-  padding: 18px 20px; border-radius: var(--r-m);
-  border: 1px solid var(--membrane);
-  background: linear-gradient(180deg, rgba(23, 19, 40, 0.7), rgba(11, 9, 21, 0.66));
-  transition: transform 0.2s var(--ease), border-color 0.2s var(--ease);
-}
-.chapter-card:hover {
-  transform: translateY(-2px);
-  border-color: color-mix(in srgb, var(--doc-accent) 45%, var(--membrane));
-}
-.chapter-card small { font: 700 10.5px var(--mono); letter-spacing: 0.08em; color: var(--doc-accent); }
-.chapter-card b { display: block; margin-top: 6px; color: var(--ink); font-size: 14.5px; }
-.chapter-card span { display: block; margin-top: 5px; color: var(--ink-3); font-size: 12.5px; line-height: 1.55; }
-
 /* ============================================================ a chapter */
 .doc-section { scroll-margin-top: calc(var(--nav-h) + 26px); margin-top: 58px; }
 .section-kicker {
@@ -446,7 +427,7 @@ main#article {
 }
 
 @media print {
-  [data-nodus-site-header], .sidebar, .toc, .hero-actions, .chapter-list, #organism { display: none !important; }
+  [data-nodus-site-header], .sidebar, .toc, .hero-actions, #organism { display: none !important; }
   .layout { display: block; padding: 0; }
   main#article { padding: 0; background: none; }
   body { background: #fff; color: #111; }
