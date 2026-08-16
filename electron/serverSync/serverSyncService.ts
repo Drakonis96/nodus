@@ -35,6 +35,12 @@ import {
   readVaultConfig,
   type VaultServerConfig,
 } from './serverSyncShared';
+import {
+  clearPublishRetry,
+  mayAttemptPublish,
+  notePublishFailure,
+  publishRetryIsDue,
+} from './publishRetryPolicy';
 
 // A Nodus Server pairing belongs to ONE vault and one remote space. Unlike the old
 // single-active-vault publisher, every paired vault keeps publishing in the background
@@ -52,7 +58,6 @@ const gzipAsync = promisify(gzip);
 // is normally visible on the other device in around twenty seconds or less.
 const CHECK_INTERVAL_MS = 5_000;
 const QUIET_PERIOD_MS = 5_000;
-const MIN_UPLOAD_INTERVAL_MS = 15_000;
 const FIRST_TICK_MS = 1_500;
 
 interface VaultRuntime {
@@ -61,6 +66,9 @@ interface VaultRuntime {
   /** Timestamp of the latest observed write in the active vault; 0 when clean. */
   dirtySince: number;
   lastUploadStartedAt: number;
+  /** Consecutive failed PUTs and the earliest time their next automatic retry may run. */
+  consecutiveFailures: number;
+  retryNotBefore: number;
   /** The vault wants a publish attempt on the next tick. */
   pending: boolean;
   /** Content hash last actually uploaded this session; skips redundant network. */
@@ -93,6 +101,7 @@ function ensureRuntime(vaultId: string): VaultRuntime {
   if (!rt) {
     rt = {
       observed: null, dirtySince: 0, lastUploadStartedAt: 0, pending: false,
+      consecutiveFailures: 0, retryNotBefore: 0,
       lastRevision: null, phase: 'idle', lastSyncAt: null, lastError: null, lastBytes: null,
       lastAssetsSent: 0, lastInbox: null, lastVectorRevision: {}, lastVectors: {},
       lastLibraryPackagesSent: 0,
@@ -376,6 +385,7 @@ async function publishVault(vaultId: string): Promise<void> {
       rt.lastBytes = result.bytes;
       rt.lastAssetsSent = result.assetsSent;
       rt.lastLibraryPackagesSent = result.libraryPackagesSent;
+      clearPublishRetry(rt);
       if (vault.active) rt.observed = lightweightVaultRevision(db);
       return;
     }
@@ -402,6 +412,7 @@ async function publishVault(vaultId: string): Promise<void> {
       rt.phase = 'ok';
       rt.pending = false;
       rt.dirtySince = 0;
+      clearPublishRetry(rt);
       if (vault.active) rt.observed = lightweightVaultRevision(db);
       return;
     }
@@ -448,6 +459,7 @@ async function publishVault(vaultId: string): Promise<void> {
     rt.dirtySince = 0;
     rt.pending = false;
     rt.phase = 'ok';
+    clearPublishRetry(rt);
     // Cleared here and nowhere else it mattered: this was written on failure and never taken
     // back, so one 502 while the server restarted stayed on the panel for the rest of the
     // session — beside a publication that had just succeeded and an inbox that had just
@@ -463,6 +475,9 @@ async function publishVault(vaultId: string): Promise<void> {
   } catch (error) {
     rt.phase = 'error';
     rt.lastError = error instanceof Error ? error.message : String(error);
+    rt.pending = false;
+    rt.dirtySince = 0;
+    notePublishFailure(rt);
   } finally {
     publishing = false;
   }
@@ -511,7 +526,7 @@ async function tick(): Promise<void> {
       if (
         rt.dirtySince &&
         Date.now() - rt.dirtySince >= QUIET_PERIOD_MS &&
-        Date.now() - rt.lastUploadStartedAt >= MIN_UPLOAD_INTERVAL_MS
+        mayAttemptPublish(rt)
       ) {
         rt.pending = true;
       }
@@ -519,8 +534,17 @@ async function tick(): Promise<void> {
   }
 
   // 2) Publish one pending vault per tick (active-first so edits win over refreshes).
+  const selectionNow = Date.now();
+  for (const config of configs) {
+    const rt = ensureRuntime(config.vaultId);
+    if (publishRetryIsDue(rt, selectionNow)) rt.pending = true;
+  }
   const target = [active, ...configs.filter((config) => !config.isActiveVault)]
-    .find((config) => config && config.autoSync && ensureRuntime(config.vaultId).pending);
+    .find((config) => {
+      if (!config || !config.autoSync) return false;
+      const rt = ensureRuntime(config.vaultId);
+      return rt.pending && mayAttemptPublish(rt, selectionNow);
+    });
   if (target) await publishVault(target.vaultId);
 }
 
