@@ -43,8 +43,6 @@ export interface BackupVaultEntry {
   dbFile: string;
   /** Path of the vault's inventory inside the payload zip. */
   inventoryFile: string;
-  /** v7: a one-entry ZIP cached by durable vault revision and stored without recompression. */
-  databaseEncoding?: 'zip';
 }
 
 interface BackupManifest {
@@ -267,10 +265,8 @@ async function addAuxiliaryFiles(
  * embeddings, full-text passages, extraction cache and chat history.
  */
 /**
- * Build the complete encrypted `.nodus` archive in memory. Shared by the manual
- * export (dialog + generated password + secrets) and the automatic scheduled
- * backup (master password, all data included). Dialog-free so it can run
- * headless and be exercised by tests.
+ * Hash a file without materializing it as a Buffer. The automatic path stays
+ * file-backed from each SQLite snapshot through the encrypted outer archive.
  */
 async function sha256File(file: string): Promise<{ sha256: string; bytes: number }> {
   const hash = createHash('sha256');
@@ -327,90 +323,89 @@ export async function createBackupArchiveFile(options: {
   const tempRoot = await fs.promises.mkdtemp(path.join(app.getPath('temp'), 'nodus-backup-stream-'));
   const payloadPath = path.join(tempRoot, 'payload.zip');
   const ciphertextPath = path.join(tempRoot, 'backup.bin');
-  const cacheDir = path.join(app.getPath('userData'), '.backup-snapshot-cache');
-  const payloadZip = new StreamingZipWriter(payloadPath, 6);
-  let reusedVaults = 0;
-  let processedVaultBytes = 0;
-  for (const vault of vaults) {
-    const vaultStartedAt = process.hrtime.bigint();
-    const dbFile = `vaults/${vault.id}/database.sqlite`;
-    const inventoryFile = `vaults/${vault.id}/inventory.json`;
-    const snapshotPath = path.join(tempRoot, `${vault.id.replace(/[^a-zA-Z0-9._-]/g, '_')}.sqlite`);
-    const snapshot = await snapshotVaultInUtility({
-      sourcePath: vault.path, targetPath: snapshotPath, cacheDir, vaultId: vault.id,
-    });
-    if (snapshot.reused) reusedVaults += 1;
-    const inventory = prepareSnapshotDatabase(snapshotPath, apiKeys);
-    const digest = await sha256File(snapshotPath);
-    fileDigests[dbFile] = digest;
-    processedVaultBytes += digest.bytes;
-    await payloadZip.addFile(dbFile, snapshotPath);
-    await fs.promises.rm(snapshotPath, { force: true });
-    files[inventoryFile] = Buffer.from(JSON.stringify(inventory, null, 2));
-    vaultEntries.push({ id: vault.id, name: vault.name, type: vault.type, legacy: vault.legacy, dbFile, inventoryFile });
-    logBackupPerf('snapshot-vault:complete', vaultStartedAt, {
-      vaultId: vault.id,
-      bytes: digest.bytes,
-      reused: snapshot.reused,
-      processedVaultBytes,
-    });
-  }
-  phaseStartedAt = logBackupPerf('snapshot-all-vaults:complete', phaseStartedAt, { vaults: vaults.length, processedVaultBytes, reusedVaults });
-  files['registry.json'] = Buffer.from(JSON.stringify({ activeVaultId, vaults: vaultEntries }, null, 2));
-  await addAuxiliaryFiles(files, vaults, selection);
-  const globalLibraryFileCount = await addGlobalLibraryFiles(files);
-  if (includesSecrets) {
-    files['api-keys.json'] = Buffer.from(JSON.stringify(apiKeys, null, 2));
-    if (Object.keys(audioKeys).length > 0) {
-      files['audio-keys.json'] = Buffer.from(JSON.stringify(audioKeys, null, 2));
-    }
-  }
-  phaseStartedAt = logBackupPerf('collect-auxiliary:complete', phaseStartedAt, { files: Object.keys(files).length });
-
-  // Hashing and CRC-ing every entry are both full passes over the whole library.
-  // Yield between entries so a backup — which runs unattended every 30 minutes —
-  // never holds the main-process event loop for the length of a full pass.
-  for (const [name, data] of Object.entries(files)) {
-    fileDigests[name] = { sha256: sha256Hex(data), bytes: data.byteLength };
-    await payloadZip.addBuffer(name, data);
-  }
-  phaseStartedAt = logBackupPerf('hash-files:complete', phaseStartedAt, { files: Object.keys(fileDigests).length });
-  const payloadManifest: PayloadManifest = {
-    ...manifest,
-    activeVaultId,
-    vaults: vaultEntries,
-    selection,
-    globalLibrary: globalLibraryFileCount > 0
-      ? { prefix: 'global-library', fileCount: globalLibraryFileCount }
-      : undefined,
-    files: fileDigests,
-  };
-  await payloadZip.addBuffer('payload-manifest.json', Buffer.from(JSON.stringify(payloadManifest, null, 2)));
-  await payloadZip.finalize();
-  phaseStartedAt = logBackupPerf('payload-zip-deflate:complete', phaseStartedAt, { bytes: (await fs.promises.stat(payloadPath)).size });
-
-  const recoveryKey = options.recoveryKey?.trim() || '';
-  const payloadCredential = recoveryKey || options.password;
-  // toBufferPromise() deflates each entry through zlib's asynchronous API, so the
-  // compression runs on libuv's threadpool instead of blocking the event loop.
-  // On a 220 MB library that is ~3.7 s of freeze turned into ~0.3 s.
-  const metadata = await encryptBackupPayloadFile(payloadPath, ciphertextPath, payloadCredential);
-  phaseStartedAt = logBackupPerf('payload-encrypt:complete', phaseStartedAt, { bytes: (await fs.promises.stat(ciphertextPath)).size });
-  const wrappedRecovery = recoveryKey
-    ? await encryptBackupPayloadAsync(Buffer.from(recoveryKey, 'utf8'), options.password)
-    : null;
-  phaseStartedAt = logBackupPerf('recovery-key-wrap:complete', phaseStartedAt, { enabled: Boolean(wrappedRecovery) });
-  const outerManifest: BackupManifest = {
-    format: 'nodus.encrypted-backup',
-    formatVersion: recoveryKey ? 6 : 5,
-    ...manifest,
-    cipher: metadata,
-    includesSecrets,
-    vaultCount: vaultEntries.length,
-    recovery: wrappedRecovery ? { wrappedKeyCipher: wrappedRecovery.metadata } : undefined,
-  };
-
   try {
+    const cacheDir = path.join(app.getPath('userData'), '.backup-snapshot-cache');
+    const payloadZip = new StreamingZipWriter(payloadPath, 6);
+    let reusedVaults = 0;
+    let processedVaultBytes = 0;
+    for (const vault of vaults) {
+      const vaultStartedAt = process.hrtime.bigint();
+      const dbFile = `vaults/${vault.id}/database.sqlite`;
+      const inventoryFile = `vaults/${vault.id}/inventory.json`;
+      const snapshotPath = path.join(tempRoot, `${vault.id.replace(/[^a-zA-Z0-9._-]/g, '_')}.sqlite`);
+      const snapshot = await snapshotVaultInUtility({
+        sourcePath: vault.path, targetPath: snapshotPath, cacheDir, vaultId: vault.id,
+      });
+      if (snapshot.reused) reusedVaults += 1;
+      const inventory = prepareSnapshotDatabase(snapshotPath, apiKeys);
+      const digest = await sha256File(snapshotPath);
+      fileDigests[dbFile] = digest;
+      processedVaultBytes += digest.bytes;
+      await payloadZip.addFile(dbFile, snapshotPath);
+      await fs.promises.rm(snapshotPath, { force: true });
+      files[inventoryFile] = Buffer.from(JSON.stringify(inventory, null, 2));
+      vaultEntries.push({ id: vault.id, name: vault.name, type: vault.type, legacy: vault.legacy, dbFile, inventoryFile });
+      logBackupPerf('snapshot-vault:complete', vaultStartedAt, {
+        vaultId: vault.id,
+        bytes: digest.bytes,
+        reused: snapshot.reused,
+        processedVaultBytes,
+      });
+    }
+    phaseStartedAt = logBackupPerf('snapshot-all-vaults:complete', phaseStartedAt, { vaults: vaults.length, processedVaultBytes, reusedVaults });
+    files['registry.json'] = Buffer.from(JSON.stringify({ activeVaultId, vaults: vaultEntries }, null, 2));
+    await addAuxiliaryFiles(files, vaults, selection);
+    const globalLibraryFileCount = await addGlobalLibraryFiles(files);
+    if (includesSecrets) {
+      files['api-keys.json'] = Buffer.from(JSON.stringify(apiKeys, null, 2));
+      if (Object.keys(audioKeys).length > 0) {
+        files['audio-keys.json'] = Buffer.from(JSON.stringify(audioKeys, null, 2));
+      }
+    }
+    phaseStartedAt = logBackupPerf('collect-auxiliary:complete', phaseStartedAt, { files: Object.keys(files).length });
+
+    // Hashing and CRC-ing every entry are both full passes over the whole library.
+    // Yield between entries so a backup — which runs unattended every 30 minutes —
+    // never holds the main-process event loop for the length of a full pass.
+    for (const [name, data] of Object.entries(files)) {
+      fileDigests[name] = { sha256: sha256Hex(data), bytes: data.byteLength };
+      await payloadZip.addBuffer(name, data);
+    }
+    phaseStartedAt = logBackupPerf('hash-files:complete', phaseStartedAt, { files: Object.keys(fileDigests).length });
+    const payloadManifest: PayloadManifest = {
+      ...manifest,
+      activeVaultId,
+      vaults: vaultEntries,
+      selection,
+      globalLibrary: globalLibraryFileCount > 0
+        ? { prefix: 'global-library', fileCount: globalLibraryFileCount }
+        : undefined,
+      files: fileDigests,
+    };
+    await payloadZip.addBuffer('payload-manifest.json', Buffer.from(JSON.stringify(payloadManifest, null, 2)));
+    await payloadZip.finalize();
+    phaseStartedAt = logBackupPerf('payload-zip-deflate:complete', phaseStartedAt, { bytes: (await fs.promises.stat(payloadPath)).size });
+
+    const recoveryKey = options.recoveryKey?.trim() || '';
+    const payloadCredential = recoveryKey || options.password;
+    // Encryption is a file stream. The payload ZIP uses createDeflateRaw, so both
+    // full passes run outside the Electron main event loop and without a giant Buffer.
+    const metadata = await encryptBackupPayloadFile(payloadPath, ciphertextPath, payloadCredential);
+    phaseStartedAt = logBackupPerf('payload-encrypt:complete', phaseStartedAt, { bytes: (await fs.promises.stat(ciphertextPath)).size });
+    const wrappedRecovery = recoveryKey
+      ? await encryptBackupPayloadAsync(Buffer.from(recoveryKey, 'utf8'), options.password)
+      : null;
+    phaseStartedAt = logBackupPerf('recovery-key-wrap:complete', phaseStartedAt, { enabled: Boolean(wrappedRecovery) });
+    const outerManifest: BackupManifest = {
+      format: 'nodus.encrypted-backup',
+      formatVersion: recoveryKey ? 6 : 5,
+      ...manifest,
+      cipher: metadata,
+      includesSecrets,
+      vaultCount: vaultEntries.length,
+      recovery: wrappedRecovery ? { wrappedKeyCipher: wrappedRecovery.metadata } : undefined,
+    };
+
     await fs.promises.rm(targetPath, { force: true });
     const zip = new StreamingZipWriter(targetPath, 0);
     await zip.addBuffer('manifest.json', Buffer.from(JSON.stringify(outerManifest, null, 2)), true);
