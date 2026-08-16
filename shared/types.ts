@@ -188,7 +188,7 @@ export type {
 import type { VaultType } from './vaultTypes';
 import type { TutorialVideo } from './tutorialVideos';
 import type { NodiNotificationText } from './nodiNotifications';
-import type { AnnouncementEntry } from './announcements';
+import type { AnnouncementEntry, AnnouncementRefreshResult } from './announcements';
 import type {
 } from './toolkitApps';
 import type {
@@ -7943,6 +7943,7 @@ export interface NodusApi extends ProsopographyApi, TestimoniesApi, ToolkitApi, 
   refreshNotifications(): Promise<{
     notifications: NodiNotification[];
     announcements: AnnouncementEntry[];
+    refresh: AnnouncementRefreshResult;
   }>;
   markNotificationsRead(): Promise<NodiNotification[]>;
   clearNotifications(): Promise<NodiNotification[]>;

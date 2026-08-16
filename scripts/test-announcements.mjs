@@ -58,6 +58,14 @@ test('the published file has the shape the app expects', () => {
   assert.ok(published.notices.length <= 50, 'at most 50 notices may be published at once');
 });
 
+test('the new website is published through the remote feed', () => {
+  const notice = published.notices.find((entry) => entry.id === '2026-08-nodusresearch-website');
+  assert.ok(notice, 'the website announcement must be in the remotely deployed feed');
+  assert.equal(notice.url, 'https://nodusresearch.com/');
+  assert.equal(notice.copy.es.title, 'Nodus estrena nueva web');
+  assert.ok(!fs.existsSync(path.join(repoRoot, 'src/components/WebsiteLaunchGuide.tsx')), 'the announcement must not depend on a new app release');
+});
+
 test('every published notice is written in all eight languages', () => {
   for (const notice of published.notices) {
     const missing = ANNOUNCEMENT_LANGUAGES.filter((language) => {
@@ -186,6 +194,11 @@ test('the app fetches announcements conditionally, on the update timer, and can 
   assert.doesNotMatch(fetcher, /\?t=\$\{/);
   assert.match(fetcher, /announcementsEnabled !== false/);
   assert.match(fetcher, /NODUS_ANNOUNCEMENTS_URL/);
+  assert.match(announcements.ANNOUNCEMENTS_URL, /^https:\/\/nodusresearch\.com\/data\/announcements\.json$/);
+  assert.match(fetcher, /status: 'updated'/);
+  assert.match(fetcher, /status: 'not-modified'/);
+  assert.match(fetcher, /status: 'disabled'/);
+  assert.match(fetcher, /status: 'error'/);
   // No timer of its own: it rides the four-hour update check.
   assert.doesNotMatch(fetcher, /setInterval/);
   assert.match(main, /refreshAnnouncements\('scheduled'\)/);
@@ -207,8 +220,10 @@ test('the header and Nodi can manually refresh the same notification centre', ()
   assert.match(preload, /refreshNotifications:\s*\(\)\s*=>\s*ipcRenderer\.invoke\('nodi:notifications:refresh'\)/);
   assert.match(windows, /'refreshNotifications'/, 'the isolated Nodi window must receive the refresh bridge method');
   assert.match(header, /data-testid="header-notifications-refresh"/);
+  assert.match(header, /data-testid="header-notifications-refresh-status"/);
   assert.match(header, /<Icon name="refresh"/);
   assert.match(nodi, /data-testid="nodi-notifications-refresh"/);
+  assert.match(nodi, /data-testid="nodi-notifications-refresh-status"/);
   assert.match(nodi, /<Icon name="refresh"/);
 });
 

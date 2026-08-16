@@ -2,7 +2,7 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react
 import { createPortal } from 'react-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import type { NodiNotification } from '@shared/types';
-import { announcementCopyFor, type AnnouncementEntry } from '@shared/announcements';
+import { announcementCopyFor, type AnnouncementEntry, type AnnouncementRefreshResult } from '@shared/announcements';
 import { notificationLine, t } from '../i18n';
 import { ConfirmModal } from './ConfirmModal';
 import { Icon } from './ui';
@@ -41,7 +41,7 @@ export function useAnnouncements(): {
   announcements: AnnouncementEntry[];
   unread: number;
   markRead: (id: string) => void;
-  refresh: () => Promise<{ notifications: NodiNotification[]; announcements: AnnouncementEntry[] }>;
+  refresh: () => ReturnType<typeof window.nodus.refreshNotifications>;
 } {
   const [announcements, setAnnouncements] = useState<AnnouncementEntry[]>([]);
 
@@ -66,6 +66,15 @@ export function useAnnouncements(): {
     markRead,
     refresh,
   };
+}
+
+export function announcementRefreshMessage(result: AnnouncementRefreshResult): string {
+  switch (result.status) {
+    case 'updated': return t('Notificaciones actualizadas.');
+    case 'not-modified': return t('Sin novedades.');
+    case 'disabled': return t('Los avisos están desactivados.');
+    case 'error': return t('No se pudieron actualizar las notificaciones.');
+  }
 }
 
 /** A published date, in the reader's locale rather than the ISO the file carries. */
@@ -130,7 +139,7 @@ interface NotificationsPanelProps {
   announcements: AnnouncementEntry[];
   language: string;
   onMarkAnnouncementRead: (id: string) => void;
-  onRefresh: () => void;
+  onRefresh: () => Promise<AnnouncementRefreshResult>;
   refreshing: boolean;
   onClearAll: () => void;
 }
@@ -150,6 +159,16 @@ export function NotificationsPanel({
   const panelRef = useRef<HTMLDivElement>(null);
   const [pos, setPos] = useState<{ left: number; top: number; width: number; originX: number } | null>(null);
   const [clearConfirmation, setClearConfirmation] = useState(false);
+  const [refreshFeedback, setRefreshFeedback] = useState<AnnouncementRefreshResult | null>(null);
+
+  const handleRefresh = async () => {
+    setRefreshFeedback(null);
+    try {
+      setRefreshFeedback(await onRefresh());
+    } catch {
+      setRefreshFeedback({ status: 'error', checkedAt: Date.now() });
+    }
+  };
 
   // Placement, Escape and outside-click are ServerInbox's, deliberately: two panels
   // hanging off the same header should behave identically, and that one already solved it.
@@ -230,7 +249,7 @@ export function NotificationsPanel({
                 type="button"
                 data-testid="header-notifications-refresh"
                 className="btn btn-ghost px-2 py-1"
-                onClick={onRefresh}
+                onClick={() => void handleRefresh()}
                 disabled={refreshing}
                 title={t(refreshing ? 'Actualizando…' : 'Actualizar')}
                 aria-label={t(refreshing ? 'Actualizando…' : 'Actualizar')}
@@ -247,6 +266,17 @@ export function NotificationsPanel({
               </button>
             </div>
           </div>
+
+          {refreshFeedback && (
+            <div
+              data-testid="header-notifications-refresh-status"
+              data-status={refreshFeedback.status}
+              role="status"
+              className={`border-b border-neutral-900 px-3 py-1.5 text-[11px] ${refreshFeedback.status === 'error' ? 'text-red-300' : 'text-neutral-400'}`}
+            >
+              {announcementRefreshMessage(refreshFeedback)}
+            </div>
+          )}
 
           {empty ? (
             <p className="px-3 py-6 text-center text-xs text-neutral-500">{t('No hay notificaciones.')}</p>

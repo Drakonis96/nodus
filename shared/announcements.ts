@@ -21,7 +21,7 @@
  */
 
 /** Where the published list lives. Served by GitHub Pages from `site/data/`. */
-export const ANNOUNCEMENTS_URL = 'https://drakonis96.github.io/nodus/data/announcements.json';
+export const ANNOUNCEMENTS_URL = 'https://nodusresearch.com/data/announcements.json';
 
 /** Every language a notice must be written in before it may be published. */
 export const ANNOUNCEMENT_LANGUAGES = ['es', 'en', 'fr', 'de', 'pt', 'pt-BR', 'it', 'tr'] as const;
@@ -64,6 +64,15 @@ export interface Announcement {
 /** An announcement as the renderer needs it: the notice plus this install's read mark. */
 export interface AnnouncementEntry extends Announcement {
   read: boolean;
+}
+
+/** Observable outcome of one announcement-feed check. */
+export interface AnnouncementRefreshResult {
+  status: 'updated' | 'not-modified' | 'disabled' | 'error';
+  /** Time the attempt completed, including disabled and failed checks. */
+  checkedAt: number;
+  /** Safe diagnostic text for logs; the renderer presents localized copy instead. */
+  error?: string;
 }
 
 const MAX_ANNOUNCEMENTS = 50;

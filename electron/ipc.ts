@@ -419,7 +419,7 @@ export function registerIpc(
   });
   h('nodi:notifications:list', async () => listNotifications());
   h('nodi:notifications:refresh', async () => {
-    await refreshAnnouncements('manual');
+    const refresh = await refreshAnnouncements('manual');
     const notifications = listNotifications();
     const announcements = listAnnouncements();
     // Refresh every renderer, not only the button that initiated the check. Nodi can
@@ -429,7 +429,7 @@ export function registerIpc(
       win.webContents.send('nodi:notifications:changed', notifications);
       win.webContents.send('announcements:changed', announcements);
     }
-    return { notifications, announcements };
+    return { notifications, announcements, refresh };
   });
   h('nodi:notifications:markRead', async () => {
     markAllNotificationsRead();

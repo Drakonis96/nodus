@@ -82,7 +82,6 @@ try {
     localStorage.removeItem('nodus.lastSeenVersion');
     localStorage.setItem('nodus.platformHighlightsSeen.2026-07', '1');
     localStorage.setItem('nodus.tutorialVideosAnnouncementSeen.2026-07', '1');
-    localStorage.setItem('nodus.websiteLaunchSeen.2026-08', '1');
     sessionStorage.clear();
   });
   await page.reload();
