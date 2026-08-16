@@ -126,7 +126,7 @@ Home page components. The shared system lives in nodus.css.
   background: rgba(139, 92, 246, 0.07); color: var(--violet-3);
 }
 
-@media (max-width: 900px) { .vault-def { grid-template-columns: 1fr; } }
+@media (max-width: 900px) { .vault-def { grid-template-columns: minmax(0, 1fr); } }
 
 /* ============================================================ vault scenes */
 .scene { padding: clamp(56px, 7.5vw, 100px) 0; }
@@ -428,7 +428,7 @@ Home page components. The shared system lives in nodus.css.
 .step .chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 18px; }
 
 @media (max-width: 700px) {
-  .step { grid-template-columns: 1fr; gap: 10px; }
+  .step { grid-template-columns: minmax(0, 1fr); gap: 10px; }
 }
 
 /* ============================================================ band */
@@ -463,16 +463,21 @@ Home page components. The shared system lives in nodus.css.
 
 /* ============================================================ responsive */
 @media (max-width: 980px) {
-  .scene-inner { grid-template-columns: 1fr; }
+  /* minmax(0, 1fr), never a bare 1fr: a bare fr keeps an automatic minimum, so
+     one wide child (a screenshot frame, a long label) pushes the whole column
+     past the viewport and the page scrolls sideways */
+  .scene-inner { grid-template-columns: minmax(0, 1fr); }
   .scene[data-flip] .scene-copy { order: 0; }
-  .tool-hero { grid-template-columns: 1fr; }
+  .tool-hero { grid-template-columns: minmax(0, 1fr); }
 }
 
 /* The Nodus N is assembled by the field right behind the headline, so the hero
    takes a lighter scrim than the rest of the page: enough to hold the type,
    not enough to swallow the mark. */
 .hero-inner.scrim::before {
-  inset: -80px -90px;
+  /* same rule as the shared scrim: the sideways bleed stops at the gutter so it
+     cannot widen the page (the hero box is already 940px, wider than .wrap) */
+  inset: -80px calc(-1 * min(90px, var(--gut)));
   background: radial-gradient(66% 58% at 50% 50%, rgba(6, 5, 11, 0.62), rgba(6, 5, 11, 0.3) 58%, transparent 80%);
 }
 

@@ -71,24 +71,32 @@ Hosts opt in with a placeholder element:
     const toggle = host.querySelector('#site-nav-toggle');
     const links = host.querySelector('#site-nav-links');
 
-    toggle.addEventListener('click', () => {
-      const open = toggle.getAttribute('aria-expanded') === 'true';
-      toggle.setAttribute('aria-expanded', String(!open));
-      toggle.setAttribute('aria-label', open ? 'Open menu' : 'Close menu');
-      links.classList.toggle('open', !open);
-    });
+    // one place decides what "open" means, so the label, the ARIA state and the
+    // panel can never drift apart no matter which gesture closed the menu
+    const isOpen = () => links.classList.contains('open');
+    const setOpen = (open) => {
+      toggle.setAttribute('aria-expanded', String(open));
+      toggle.setAttribute('aria-label', open ? 'Close menu' : 'Open menu');
+      links.classList.toggle('open', open);
+    };
+
+    toggle.addEventListener('click', () => setOpen(!isOpen()));
     links.addEventListener('click', (event) => {
-      if (event.target.closest('a')) {
-        toggle.setAttribute('aria-expanded', 'false');
-        links.classList.remove('open');
-      }
+      if (event.target.closest('a')) setOpen(false);
     });
     document.addEventListener('keydown', (event) => {
-      if (event.key === 'Escape' && links.classList.contains('open')) {
-        toggle.setAttribute('aria-expanded', 'false');
-        links.classList.remove('open');
+      if (event.key === 'Escape' && isOpen()) {
+        setOpen(false);
         toggle.focus();
       }
+    });
+    // a press anywhere outside the panel dismisses it, the way every other menu
+    // on the web behaves. pointerdown rather than click: the menu is gone before
+    // the press lands, so the first tap outside also reaches what it aimed at.
+    document.addEventListener('pointerdown', (event) => {
+      if (!isOpen()) return;
+      if (links.contains(event.target) || toggle.contains(event.target)) return;
+      setOpen(false);
     });
 
     const syncBorder = () => nav.classList.toggle('scrolled', scrollY > 24);

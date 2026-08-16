@@ -93,8 +93,12 @@ body {
   line-height: 1.62;
   font-synthesis-weight: none;
   -webkit-font-smoothing: antialiased;
-  overflow-x: hidden;
 }
+
+/* No page ever scrolls sideways. `clip` rather than `hidden` on purpose: hidden
+   would turn the viewport into a scroll container and break every sticky
+   element (the wiki rail, its search box), while clip leaves them alone. */
+html { overflow-x: clip; }
 
 /* The organism sits behind everything, and the page landmarks ride on top.
    Name them individually: a blanket `body > *` rule would overwrite the
@@ -134,6 +138,38 @@ html { scrollbar-width: thin; scrollbar-color: rgba(139, 92, 246, 0.45) transpar
   transition: top 0.2s var(--ease);
 }
 .skip-link:focus { top: 16px; color: #fff; }
+
+/* ============================================================ back to top
+   The only floating control the reading pages carry. It stays out of the
+   accessibility tree until there is something to scroll back from. */
+/* the strip the observer watches: while it is on screen, the reader is still
+   within the first screenful and the button stays away */
+.back-to-top-sentinel {
+  position: absolute; top: 0; left: 0;
+  width: 1px; height: 90vh;
+  pointer-events: none; visibility: hidden;
+}
+.back-to-top {
+  position: fixed; z-index: 120;
+  right: clamp(14px, 3vw, 28px); bottom: clamp(14px, 3vw, 28px);
+  display: grid; place-items: center;
+  width: 44px; height: 44px; padding: 0;
+  border: 1px solid var(--membrane); border-radius: 50%;
+  background: rgba(16, 13, 28, 0.88); color: var(--ink-2);
+  backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+  box-shadow: var(--shadow);
+  cursor: pointer;
+  opacity: 0; visibility: hidden; transform: translateY(8px);
+  transition: opacity 0.25s var(--ease), transform 0.25s var(--ease),
+    visibility 0.25s var(--ease), border-color 0.2s var(--ease), color 0.2s var(--ease);
+}
+.back-to-top.is-visible { opacity: 1; visibility: visible; transform: none; }
+.back-to-top:hover { border-color: rgba(167, 139, 250, 0.55); color: var(--ink); }
+.back-to-top svg { width: 18px; height: 18px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .back-to-top { transition: opacity 0.01s, visibility 0.01s; transform: none; }
+}
 
 /* ============================================================ organism canvas */
 #organism {
@@ -401,7 +437,9 @@ h1, h2, h3, h4 { margin: 0; font-weight: 700; letter-spacing: -0.032em; line-hei
 .scrim { position: relative; }
 .scrim::before {
   content: ''; position: absolute; z-index: -1;
-  inset: -56px -64px;
+  /* the sideways bleed is decorative: it must never grow past the gutter, or a
+     narrow screen gains 128px of phantom width and scrolls sideways */
+  inset: -56px calc(-1 * min(64px, var(--gut)));
   background: radial-gradient(72% 62% at 42% 50%, rgba(6, 5, 11, 0.86), rgba(6, 5, 11, 0.55) 55%, transparent 78%);
   pointer-events: none;
 }
@@ -514,7 +552,7 @@ footer.site-foot {
 .foot-base a:hover { color: var(--ink-2); }
 
 @media (max-width: 860px) {
-  .foot-grid { grid-template-columns: 1fr 1fr; }
+  .foot-grid { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
   .foot-brand { grid-column: 1 / -1; }
 }
 

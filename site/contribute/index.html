@@ -17,8 +17,8 @@ SPDX-License-Identifier: AGPL-3.0-only
 <link rel="preconnect" href="https://fonts.googleapis.com"/>
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Fraunces:opsz,wght@9..144,600;9..144,700&display=swap" rel="stylesheet"/>
-<link rel="stylesheet" href="../assets/css/nodus.css?v=20260815"/>
-<link rel="stylesheet" href="contribute.css?v=20260815"/>
+<link rel="stylesheet" href="../assets/css/nodus.css?v=20260817b"/>
+<link rel="stylesheet" href="contribute.css?v=20260816"/>
 </head>
 <body>
 
@@ -26,7 +26,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 <canvas id="organism" aria-hidden="true"></canvas>
 
 <div data-nodus-site-header data-base="../" data-page="contribute"></div>
-<script src="../site-header.js?v=20260815"></script>
+<script src="../site-header.js?v=20260817"></script>
 
 <main id="main">
 
@@ -169,8 +169,9 @@ SPDX-License-Identifier: AGPL-3.0-only
 <section class="section-line" data-accent="#fbbf24" data-second="#a78bfa" data-energy="0.3">
   <div class="wrap">
     <div class="section-head scrim reveal">
-      <span class="kicker">The people building Nodus</span>
-      <h2 class="title" data-split>Names on the commits.</h2>
+      <!-- the kicker carries the heading now that the section has no title of
+           its own: the same small accented line, still a landmark for readers -->
+      <h2 class="kicker">The people building Nodus</h2>
     </div>
     <div class="people" id="people"><span class="people-loading">Loading contributors…</span></div>
   </div>
@@ -225,6 +226,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 
 <script src="../assets/js/organism.js?v=20260815"></script>
 <script src="../assets/js/site.js?v=20260815"></script>
-<script src="contribute.js?v=20260817c"></script>
+<script src="contribute.js?v=20260817f"></script>
+<script src="../assets/js/back-to-top.js?v=20260817b"></script>
 </body>
 </html>
