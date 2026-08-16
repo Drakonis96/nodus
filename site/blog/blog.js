@@ -41,7 +41,9 @@ tag and by free text. With no published posts it shows what is coming instead.
       return `${post.title} ${post.summary} ${(post.tags || []).join(' ')}`.toLowerCase().includes(needle);
     });
 
-    list.innerHTML = matches.map((post, index) => `<a class="post-card lit reveal" href="post.html?p=${encodeURIComponent(post.slug)}" style="--delay:${Math.min(index, 6) * 60}ms">
+    list.innerHTML = matches.map((post, index) => `<a class="post-card lit reveal${post.cover ? ' has-cover' : ''}" href="post.html?p=${encodeURIComponent(post.slug)}" style="--delay:${Math.min(index, 6) * 60}ms">
+      ${post.cover ? `<span class="post-card-cover"><img src="${escapeHtml(post.cover)}" alt="${escapeHtml(post.coverAlt || '')}" loading="lazy" decoding="async"/></span>` : ''}
+      <span class="post-card-body">
       <div class="post-card-meta">
         <time datetime="${escapeHtml(post.date)}">${formatDate(post.date)}</time>
         ${post.reading ? `<span>${post.reading} min read</span>` : ''}
@@ -51,9 +53,18 @@ tag and by free text. With no published posts it shows what is coming instead.
       <div class="post-card-tags">${(post.tags || []).map((item) => `<span>${escapeHtml(item)}</span>`).join('')}</div>
       <span class="post-card-go">Read the post
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>
+      </span>
     </a>`).join('');
 
     list.querySelectorAll('.reveal').forEach((card) => card.classList.add('seen'));
+    // a cover that cannot be loaded leaves the card as if it never had one
+    list.querySelectorAll('.post-card-cover img').forEach((image) => {
+      image.addEventListener('error', () => {
+        const card = image.closest('.post-card');
+        if (card) card.classList.remove('has-cover');
+        image.closest('.post-card-cover')?.remove();
+      }, { once: true });
+    });
     empty.hidden = matches.length > 0;
     meta.textContent = matches.length === posts.length
       ? `${posts.length} post${posts.length === 1 ? '' : 's'}`

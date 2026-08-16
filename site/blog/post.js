@@ -15,6 +15,8 @@ never fetched, so the query string cannot be used to pull an arbitrary file.
   const tagsNode = document.getElementById('post-tags');
   const foot = document.getElementById('post-foot');
   const nextLink = document.getElementById('post-next');
+  const cover = document.getElementById('post-cover');
+  const coverImage = document.getElementById('post-cover-img');
   if (!article) return;
 
   const escapeHtml = (value) => String(value).replace(/[&<>"]/g, (character) => (
@@ -57,6 +59,16 @@ never fetched, so the query string cannot be used to pull an arbitrary file.
       document.title = `${post.title} · Nodus Blog`;
       const description = document.querySelector('meta[name="description"]');
       if (description && post.summary) description.setAttribute('content', post.summary);
+
+      if (post.cover && cover && coverImage) {
+        // a cover that cannot be loaded leaves the post as if it never had one
+        coverImage.addEventListener('error', () => { cover.hidden = true; }, { once: true });
+        coverImage.src = post.cover;
+        coverImage.alt = post.coverAlt || '';
+        cover.hidden = false;
+        const ogImage = document.querySelector('meta[property="og:image"]');
+        if (ogImage) ogImage.setAttribute('content', new URL(post.cover, location.href).href);
+      }
 
       tagsNode.innerHTML = (post.tags || []).map((tag) => `<span>${escapeHtml(tag)}</span>`).join('');
 

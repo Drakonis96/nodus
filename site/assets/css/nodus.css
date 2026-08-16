@@ -21,6 +21,9 @@ One stylesheet shared by the home page, the wiki, the blog, contribute and the F
   --ink: #f6f4fd;
   --ink-2: #a9a3c2;
   --ink-3: #6f6a86;
+  /* long-form reading: --ink-2 is a UI grey and goes dim over several screens
+     of prose, so body copy sits closer to the headline white */
+  --ink-prose: #ddd9ec;
 
   /* signal */
   --violet: #8b5cf6;
@@ -564,7 +567,7 @@ footer.site-foot {
 .page-hero .lead { margin-top: 24px; font-size: clamp(16.5px, 1.4vw, 19px); }
 
 /* ============================================================ prose */
-.prose { font-size: 16.5px; line-height: 1.75; color: var(--ink-2); }
+.prose { font-size: 16.5px; line-height: 1.75; color: var(--ink-prose); }
 .prose > * + * { margin-top: 1.1em; }
 .prose h2 {
   margin-top: 2.2em; font-size: clamp(23px, 2.4vw, 30px);
@@ -584,10 +587,10 @@ footer.site-foot {
   padding: 18px 20px; border-radius: var(--r-m); overflow-x: auto;
   background: var(--deep); border: 1px solid var(--membrane);
 }
-.prose pre code { padding: 0; border: 0; background: none; color: var(--ink-2); }
+.prose pre code { padding: 0; border: 0; background: none; color: var(--ink-prose); }
 .prose blockquote {
   margin-inline: 0; padding: 4px 0 4px 22px;
-  border-left: 2px solid var(--accent); color: var(--ink-2); font-style: italic;
+  border-left: 2px solid var(--accent); color: var(--ink-prose); font-style: italic;
 }
 .prose img { border-radius: var(--r-m); border: 1px solid var(--membrane); }
 .prose hr { border: 0; border-top: 1px solid var(--membrane); margin: 2.4em 0; }

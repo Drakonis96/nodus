@@ -1,4 +1,14 @@
 {
-  "$comment": "The blog index. Every post listed here must have a matching Markdown file at site/blog/posts/<slug>.md. Fields: slug (kebab-case, becomes the URL ?p=<slug>), title, date (YYYY-MM-DD), tags (array, free-form, drives the filter row), summary (one or two sentences shown on the card and in the RSS feed), and the optional reading (minutes, an integer; omitted means it is estimated from the file). Set draft: true to keep a post out of the index and the feed while you write it. Newest first is not required — the index sorts by date. See posts/_template.md.",
-  "posts": []
+  "$comment": "The blog index. Every post listed here must have a matching Markdown file at site/blog/posts/<slug>.md. Fields: slug (kebab-case, becomes the URL ?p=<slug>), title, date (YYYY-MM-DD), tags (array, free-form, drives the filter row), summary (one or two sentences shown on the card and in the RSS feed), the optional reading (minutes, an integer; omitted means it is estimated from the file), and the optional cover (a path relative to site/blog/, shown on the card and above the post) with its coverAlt. Set draft: true to keep a post out of the index and the feed while you write it. Newest first is not required — the index sorts by date. See posts/_template.md.",
+  "posts": [
+    {
+      "slug": "nodus-open-source-research-workspace",
+      "title": "Nodus: an open source research workspace for academic work",
+      "date": "2026-08-16",
+      "tags": ["Project", "Research", "AI"],
+      "summary": "Research is spread across reference managers, PDF folders, note apps and chatbots. Nodus keeps sources, ideas and the evidence behind them in one local-first workspace.",
+      "cover": "media/nodus-promo.webp",
+      "coverAlt": "The five Nodus vaults — Academic, Genealogy, Databases, Study and Teaching — shown side by side under the line One place to research, teach and study."
+    }
+  ]
 }

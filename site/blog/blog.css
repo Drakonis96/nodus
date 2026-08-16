@@ -26,6 +26,19 @@ SPDX-License-Identifier: AGPL-3.0-only
 }
 .post-card.lit:hover::before { opacity: 1; }
 
+/* a card with a cover puts the image beside the text, and above it when narrow */
+.post-card.has-cover { display: grid; grid-template-columns: minmax(0, 260px) minmax(0, 1fr); gap: 26px; align-items: center; }
+.post-card-cover {
+  display: block; overflow: hidden; border-radius: var(--r-m);
+  border: 1px solid var(--membrane); background: rgba(255, 255, 255, 0.03);
+}
+.post-card-cover img {
+  display: block; width: 100%; height: 100%; aspect-ratio: 16 / 9;
+  object-fit: cover; transition: transform 0.5s var(--ease);
+}
+.post-card:hover .post-card-cover img { transform: scale(1.04); }
+.post-card-body { display: block; min-width: 0; }
+
 .post-card-meta {
   display: flex; flex-wrap: wrap; gap: 8px 16px;
   font: 600 12px var(--mono); letter-spacing: 0.04em;
@@ -110,6 +123,13 @@ SPDX-License-Identifier: AGPL-3.0-only
   letter-spacing: 0.04em; text-transform: uppercase; color: var(--ink-3);
 }
 
+.post-cover {
+  margin: 0 0 clamp(24px, 3.5vw, 40px); overflow: hidden;
+  border: 1px solid var(--membrane); border-radius: var(--r-l);
+  background: rgba(255, 255, 255, 0.03);
+}
+.post-cover img { display: block; width: 100%; height: auto; }
+
 #article { padding-top: 14px; }
 #article > h2:first-child, #article > h3:first-child { margin-top: 0; }
 #article h2 { scroll-margin-top: calc(var(--nav-h) + 26px); }
@@ -121,6 +141,10 @@ SPDX-License-Identifier: AGPL-3.0-only
 .post-foot {
   display: flex; flex-wrap: wrap; gap: 12px; justify-content: space-between;
   margin-top: 60px; padding-top: 30px; border-top: 1px solid var(--membrane);
+}
+
+@media (max-width: 860px) {
+  .post-card.has-cover { grid-template-columns: minmax(0, 1fr); gap: 20px; }
 }
 
 @media (max-width: 620px) {
