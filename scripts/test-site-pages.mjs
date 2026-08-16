@@ -48,9 +48,9 @@ test('the home page presents the four main vaults, the rest, and the toolkit', (
   }
 });
 
-test('every page of the site carries the Google Tag Manager container', () => {
-  // a page added later without the snippet goes uncounted and nobody notices,
-  // so the container is checked across the whole site rather than page by page
+test('no page of the site loads a third-party tracker', () => {
+  // the site carries no analytics container, and a page added later must not
+  // quietly bring one back, so the whole tree is checked rather than page by page
   const pages = [];
   const walk = (dir) => {
     for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
@@ -65,15 +65,10 @@ test('every page of the site carries the Google Tag Manager container', () => {
   for (const page of pages) {
     const html = fs.readFileSync(page, 'utf8');
     const name = path.relative(siteRoot, page);
-    assert.match(html, /googletagmanager\.com\/gtm\.js/, `${name} loads the GTM container`);
-    assert.match(html, /googletagmanager\.com\/ns\.html\?id=GTM-MP3BX78N/, `${name} carries the noscript fallback`);
-    // the container must be reachable before anything else can delay it
-    const headStart = html.indexOf('<!-- Google Tag Manager -->');
-    assert.ok(headStart > -1 && headStart < html.indexOf('<title'), `${name} puts GTM high in the head`);
-    assert.ok(
-      html.indexOf('<!-- Google Tag Manager (noscript) -->') > html.indexOf('<body'),
-      `${name} puts the noscript iframe right after <body>`,
-    );
+    assert.doesNotMatch(html, /googletagmanager\.com/, `${name} loads no Tag Manager container`);
+    assert.doesNotMatch(html, /google-analytics\.com|gtag\(/, `${name} loads no Google Analytics`);
+    assert.doesNotMatch(html, /dataLayer/, `${name} declares no analytics dataLayer`);
+    assert.doesNotMatch(html, /Google Tag Manager/, `${name} keeps no leftover GTM markers`);
   }
 });
 
