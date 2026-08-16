@@ -18,16 +18,13 @@ Home page components. The shared system lives in nodus.css.
 
 @keyframes float-in { from { opacity: 0; transform: translateY(14px); } }
 
-/* The headline is a sentence rather than a three-word motto, so it is set a
-   good deal smaller than a display word would be: the longest line has to fit
-   its row without wrapping, or the masked reveal below plays against two rows. */
 .hero h1 {
   margin: 30px 0 0;
   font-family: var(--serif);
   font-weight: 600;
-  font-size: clamp(31px, 5vw, 62px);
-  line-height: 1.06;
-  letter-spacing: -0.032em;
+  font-size: clamp(40px, 7.6vw, 96px);
+  line-height: 0.99;
+  letter-spacing: -0.038em;
   text-wrap: balance;
 }
 /* one masked row per line, so each can rise on its own beat */
