@@ -7,15 +7,6 @@ import type { PublishedLibraryManifest } from './serverLibrary';
 export const SERVER_SNAPSHOT_FORMAT = 'nodus.server-snapshot';
 export const SERVER_SNAPSHOT_VERSION = 2;
 
-function logPublishPerf(phase: string, startedAt: bigint, metadata: Record<string, string | number> = {}): bigint {
-  const endedAt = process.hrtime.bigint();
-  const elapsedMs = Number(endedAt - startedAt) / 1_000_000;
-  const rssMiB = process.memoryUsage().rss / (1024 * 1024);
-  const details = Object.entries(metadata).map(([key, value]) => `${key}=${value}`).join(' ');
-  console.log(`[perf][publish] phase=${phase} elapsedMs=${elapsedMs.toFixed(1)} rssMiB=${rssMiB.toFixed(1)}${details ? ` ${details}` : ''}`);
-  return endedAt;
-}
-
 const CORE_TABLES = [
   'works', 'work_aliases', 'authors', 'work_authors', 'collections', 'work_collections',
   'zotero_tags', 'work_zotero_tags', 'themes', 'work_themes', 'ideas', 'idea_occurrences',
@@ -379,8 +370,6 @@ export function buildServerSnapshot(
   db: Database.Database = getDb(),
   library: PublishedLibraryManifest | null = null,
 ): BuiltSnapshot {
-  const snapshotStartedAt = process.hrtime.bigint();
-  let phaseStartedAt = snapshotStartedAt;
   const present = tableNames(db);
   const selected = new Set<string>(CORE_TABLES.filter((table) => present.has(table)));
   // Each vault type contributes its own corpus. Academic has none listed here because
@@ -403,10 +392,6 @@ export function buildServerSnapshot(
 
   const tables: Record<string, Record<string, unknown>[]> = {};
   for (const table of [...selected].sort()) tables[table] = readTable(db, table);
-  phaseStartedAt = logPublishPerf('select-tables:complete', phaseStartedAt, {
-    tables: Object.keys(tables).length,
-    rows: Object.values(tables).reduce((total, rows) => total + rows.length, 0),
-  });
 
   // Images ride their own channel, addressed by content hash, so the JSON keeps its
   // invariant of holding no binary at all. A portrait is only published for a vault that
@@ -414,7 +399,6 @@ export function buildServerSnapshot(
   const wantsAssets = settings.nodusServerIncludeUserContent || vault.type !== 'academic';
   const assets = wantsAssets ? collectSnapshotAssets(db, present) : [];
   const assetRefs = assets.map(assetRef);
-  phaseStartedAt = logPublishPerf('collect-assets:complete', phaseStartedAt, { assets: assets.length });
   const schemaVersion = db.pragma('user_version', { simple: true }) as number;
 
   const generatedAt = new Date().toISOString();
@@ -435,7 +419,6 @@ export function buildServerSnapshot(
     tables,
   };
   const raw = Buffer.from(JSON.stringify(payload));
-  phaseStartedAt = logPublishPerf('payload-stringify:complete', phaseStartedAt, { bytes: raw.byteLength });
   // generatedAt describes this upload, not its contents. Keeping it outside the
   // digest lets the server recognize an unchanged projection after app restarts.
   // Asset hashes ARE part of it: replacing only a report's illustration has to count
@@ -451,8 +434,6 @@ export function buildServerSnapshot(
       tables,
     }))
     .digest('base64url');
-  logPublishPerf('revision-stringify-hash:complete', phaseStartedAt, { bytes: raw.byteLength });
-  logPublishPerf('snapshot:complete', snapshotStartedAt, { bytes: raw.byteLength });
   return {
     buffer: raw,
     revision,
