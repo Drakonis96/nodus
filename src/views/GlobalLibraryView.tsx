@@ -455,7 +455,19 @@ function ZoteroImportDialog({ onClose, onFinished }: { onClose: () => void; onFi
     }
   };
   const start = () => run(crypto.randomUUID(), { libraryIds: [...selected], copyAttachments, includeUnfiled });
-  const resumable = sessions.find((session) => session.status === 'canceled' || session.status === 'failed');
+  // Only the newest session can be resumed. Searching the whole history instead meant
+  // that one old failure kept the "interrupted sync" banner up forever: a later run
+  // that completed cleanly still found the stale entry and reported itself as
+  // interrupted, which makes a healthy import look broken. A newer run supersedes an
+  // older failure, so the banner follows the latest attempt and nothing else. Picked by
+  // `updatedAt` rather than list order, so it does not depend on how the store sorts.
+  const latestSession = sessions.reduce<ZoteroSyncSession | null>(
+    (newest, session) => (!newest || session.updatedAt > newest.updatedAt ? session : newest),
+    null,
+  );
+  const resumable = latestSession && (latestSession.status === 'canceled' || latestSession.status === 'failed')
+    ? latestSession
+    : null;
 
   return (
     <div className="fixed inset-0 z-[80] grid place-items-center bg-black/65 p-6" onMouseDown={(event) => { if (event.target === event.currentTarget && !requestId) onClose(); }}>
