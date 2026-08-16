@@ -1,7 +1,6 @@
-import { createHash } from 'node:crypto';
+import { createHash, type Hash } from 'node:crypto';
 import type Database from 'better-sqlite3';
 import type { AppSettings, VaultSummary } from '@shared/types';
-import { getDb } from '../db/database';
 import type { PublishedLibraryManifest } from './serverLibrary';
 
 export const SERVER_SNAPSHOT_FORMAT = 'nodus.server-snapshot';
@@ -14,6 +13,44 @@ function logPublishPerf(phase: string, startedAt: bigint, metadata: Record<strin
   const details = Object.entries(metadata).map(([key, value]) => `${key}=${value}`).join(' ');
   console.log(`[perf][publish] phase=${phase} elapsedMs=${elapsedMs.toFixed(1)} rssMiB=${rssMiB.toFixed(1)}${details ? ` ${details}` : ''}`);
   return endedAt;
+}
+
+/** Feed JSON's canonical object/array representation to a digest without ever
+ * materialising a second copy of the complete snapshot string. */
+function updateJsonHash(hash: Hash, value: unknown, inArray = false): void {
+  if (value === undefined || typeof value === 'function' || typeof value === 'symbol') {
+    if (inArray) hash.update('null');
+    return;
+  }
+  if (value === null || typeof value !== 'object') {
+    const encoded = JSON.stringify(value);
+    if (encoded === undefined) {
+      if (inArray) hash.update('null');
+      return;
+    }
+    hash.update(encoded);
+    return;
+  }
+  if (Array.isArray(value)) {
+    hash.update('[');
+    value.forEach((item, index) => {
+      if (index > 0) hash.update(',');
+      updateJsonHash(hash, item, true);
+    });
+    hash.update(']');
+    return;
+  }
+  hash.update('{');
+  let written = 0;
+  for (const key of Object.keys(value as Record<string, unknown>)) {
+    const item = (value as Record<string, unknown>)[key];
+    if (item === undefined || typeof item === 'function' || typeof item === 'symbol') continue;
+    if (written++ > 0) hash.update(',');
+    hash.update(JSON.stringify(key));
+    hash.update(':');
+    updateJsonHash(hash, item);
+  }
+  hash.update('}');
 }
 
 const CORE_TABLES = [
@@ -358,7 +395,7 @@ function assetRef(asset: SnapshotAsset): SnapshotAssetRef {
   return ref;
 }
 
-export function lightweightVaultRevision(db: Database.Database = getDb()): string {
+export function lightweightVaultRevision(db: Database.Database): string {
   const changes = db.prepare('SELECT total_changes() AS value').get() as { value: number };
   const dataVersion = db.pragma('data_version', { simple: true }) as number;
   const schemaVersion = db.pragma('user_version', { simple: true }) as number;
@@ -376,7 +413,7 @@ export interface BuiltSnapshot {
 export function buildServerSnapshot(
   vault: VaultSummary,
   settings: Pick<AppSettings, 'nodusServerIncludeUserContent' | 'nodusServerIncludePassages'>,
-  db: Database.Database = getDb(),
+  db: Database.Database,
   library: PublishedLibraryManifest | null = null,
 ): BuiltSnapshot {
   const snapshotStartedAt = process.hrtime.bigint();
@@ -440,18 +477,18 @@ export function buildServerSnapshot(
   // digest lets the server recognize an unchanged projection after app restarts.
   // Asset hashes ARE part of it: replacing only a report's illustration has to count
   // as a change, or the republish would be short-circuited as "unchanged".
-  const revision = createHash('sha256')
-    .update(JSON.stringify({
-      vault: payload.vault,
-      schemaVersion,
-      assets: assetRefs,
-      // Like the snapshot timestamp, the library projection's generatedAt describes the
-      // upload and is not content. Excluding it keeps an unchanged library revision stable.
-      library: library ? { ...library, generatedAt: undefined } : null,
-      tables,
-    }))
-    .digest('base64url');
-  logPublishPerf('revision-stringify-hash:complete', phaseStartedAt, { bytes: raw.byteLength });
+  const revisionHash = createHash('sha256');
+  updateJsonHash(revisionHash, {
+    vault: payload.vault,
+    schemaVersion,
+    assets: assetRefs,
+    // Like the snapshot timestamp, the library projection's generatedAt describes the
+    // upload and is not content. Excluding it keeps an unchanged library revision stable.
+    library: library ? { ...library, generatedAt: undefined } : null,
+    tables,
+  });
+  const revision = revisionHash.digest('base64url');
+  logPublishPerf('revision-stream-hash:complete', phaseStartedAt, { bytes: raw.byteLength });
   logPublishPerf('snapshot:complete', snapshotStartedAt, { bytes: raw.byteLength });
   return {
     buffer: raw,
