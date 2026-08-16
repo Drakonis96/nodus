@@ -669,8 +669,15 @@ export async function importZoteroLibraries(options: {
     await new Promise<void>((resolve) => setImmediate(resolve));
     report.partial = report.partial || report.failures.length > 0 || report.librariesMissing.length > 0;
     const failed = report.failures.length > 0 && completedLibraries === 0;
+    // `failed` only means that no library reached the end; it says nothing about why.
+    // Reporting it as "Zotero no está disponible" made every cause look like a closed
+    // Zotero, so a failure with Zotero plainly running sent the reader hunting through
+    // connectivity, paths and permissions instead of reading the actual error. Lead
+    // with the first failure's own message and keep the reassurance after it.
+    const failureDetail = report.failures[0]?.message?.trim();
     emit(progress(requestId, failed ? 'failed' : 'complete', null, processedItems, totalItems, processedAttachments, totalAttachments,
-      failed ? 'Zotero no está disponible; los datos locales se conservan.'
+      failed
+        ? `${failureDetail || 'No se pudo completar la importación de Zotero.'} Los datos locales se conservan.`
         : report.partial ? 'Sincronización parcial completada; revisa el informe.' : 'Importación de Zotero completada.'));
     report.durationMs = Date.now() - started;
     sessions.finish(requestId, failed ? 'failed' : 'completed', report, failed ? report.failures[0]?.message ?? 'Sincronización fallida.' : null);
