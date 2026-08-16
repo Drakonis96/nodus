@@ -8,7 +8,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
 <title>AI for Academic Research | Nodus</title>
-<meta name="description" content="What AI-assisted academic research looks like when the model works on your own sources: extracting ideas with their evidence, relating and contrasting them, semantic search, research gaps and cited drafts — with local models or the provider you choose."/>
+<meta name="description" content="What AI-assisted academic research looks like when the model works on your own sources. Extract ideas with their evidence, relate and contrast them, search semantically, find research gaps and produce cited drafts, using local models or the provider you choose."/>
 <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1"/>
 <meta property="og:title" content="AI for Academic Research | Nodus"/>
 <meta property="og:description" content="Nodus is not a chatbot with a search box. Its AI works on the documents, sources and notes you brought in, and every interpretation it stores keeps the passage behind it."/>
@@ -62,7 +62,7 @@ SPDX-License-Identifier: AGPL-3.0-only
       </nav>
       <span class="kicker">AI-assisted research</span>
       <h1 class="display" data-split>AI for Academic Research</h1>
-      <p class="lead">A general chatbot answers from whatever it absorbed during training. Nodus asks a model to work on something much narrower and far more useful: the documents, sources and notes <em>you</em> brought in. Every interpretation it produces is stored with the passage behind it, so the output is something you can check against the page rather than something you have to take on faith.</p>
+      <p class="lead">A general chatbot answers from whatever it absorbed during training. Nodus asks a model to work on something much narrower and far more useful, namely the documents, sources and notes <em>you</em> brought in. Every interpretation it produces is stored with the passage behind it, so you can check the output against the page instead of taking it on faith.</p>
       <div class="guide-actions">
         <a class="btn primary" href="../demo/index.html">
           <svg class="ic" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7-11-7Z"/></svg>
@@ -89,15 +89,15 @@ SPDX-License-Identifier: AGPL-3.0-only
       <h2 class="title" data-split>Grounded in your corpus, not in the internet.</h2>
     </div>
     <div class="guide-body prose reveal" style="margin-top:26px">
-      <p>The failure mode researchers know best is a fluent answer with a citation that does not exist. It happens because a general assistant is asked to produce a scholarly-sounding paragraph without having any particular scholarship in front of it.</p>
-      <p>Nodus inverts the arrangement. You assemble the corpus first — from <a href="../zotero/">your Zotero library</a>, from bibliographic exports, or from your own files — and the model is then asked to work inside it. When Nodus records a claim, it records which work it came from and which excerpt supports it, with the page where the source provides one. A citation cannot be invented, because the thing being cited is an item already sitting in your Library.</p>
-      <p>That is the whole design principle: <b>the AI proposes, and the evidence stays attached so you can dispose.</b> Nothing in Nodus asks you to trust a paragraph on its own merits.</p>
+      <p>The failure researchers know best is a fluent answer with a citation that turns out not to exist. It happens because a general assistant is asked to produce a scholarly sounding paragraph without having any particular scholarship in front of it.</p>
+      <p>Nodus turns that around. You assemble the corpus first, from <a href="../zotero/">your Zotero library</a>, from bibliographic exports, or from your own files, and only then is the model asked to work inside it. When Nodus records a claim, it records which work it came from and which excerpt supports it, along with the page where the source provides one. A citation cannot be invented, because the thing being cited is an item already sitting in your Library.</p>
+      <p>That is the whole idea. <b>The AI proposes, the evidence stays attached, and you decide.</b> Nothing in Nodus asks you to trust a paragraph on its own merits.</p>
     </div>
 
     <div class="guide-grid reveal">
       <article class="card lit guide-card">
         <h3>A general assistant</h3>
-        <p>Answers from training data and whatever it can fetch. Sources are recalled or searched for at answer time. You verify afterwards, if you can work out what to verify.</p>
+        <p>Answers from training data and whatever it can fetch. Sources are recalled or searched for at the moment of answering. You verify afterwards, if you can work out what to verify.</p>
       </article>
       <article class="card lit guide-card">
         <h3>Nodus</h3>
@@ -105,7 +105,7 @@ SPDX-License-Identifier: AGPL-3.0-only
       </article>
       <article class="card lit guide-card">
         <h3>What neither can do</h3>
-        <p>Judge whether an argument is sound, or whether a literature is worth building on. Both are your job, and Nodus is built to make that job possible rather than to take it over.</p>
+        <p>Judge whether an argument is sound, or whether a literature is worth building on. Both of those are your job, and Nodus is built to make that job easier rather than to take it over.</p>
       </article>
     </div>
   </div>
@@ -117,7 +117,7 @@ SPDX-License-Identifier: AGPL-3.0-only
     <div class="section-head scrim reveal">
       <span class="kicker">02 · What the AI actually does</span>
       <h2 class="title" data-split>Specific jobs, not a single magic button.</h2>
-      <p class="lead">AI in Nodus is split into distinct tasks. Each one has a narrow brief, its own output shape and, if you want, its own model.</p>
+      <p class="lead">AI in Nodus is split into separate tasks. Each one has a narrow brief, its own output shape and, if you want, its own model.</p>
     </div>
 
     <div class="guide-steps reveal">
@@ -125,49 +125,49 @@ SPDX-License-Identifier: AGPL-3.0-only
         <em>01</em>
         <div>
           <h3>Extracting ideas from a work</h3>
-          <p>Analysis reads a source and proposes typed units — <b>claims, findings, constructs, methods and frameworks</b> — each one recorded with the excerpt that supports it and whether that excerpt is quoted or paraphrased. A source with only an abstract available yields correspondingly little; Nodus records that rather than padding the result.</p>
+          <p>Analysis reads a source and proposes units of five kinds, <b>claims, findings, constructs, methods and frameworks</b>. Each one is recorded with the excerpt that supports it, and with a note of whether that excerpt is quoted or paraphrased. If only an abstract was available, you get correspondingly little back, and Nodus says so rather than padding the result.</p>
         </div>
       </div>
       <div class="guide-step">
         <em>02</em>
         <div>
           <h3>Relating and contrasting them</h3>
-          <p>Ideas are connected with relations that carry a meaning — one supports, contradicts, refines, extends or applies to another, shares its method or is a precondition for it. Each edge records whether the relation was stated in the source or inferred during analysis, so an inference never passes itself off as a quotation.</p>
+          <p>Ideas are connected with relations that carry a meaning, such as supports, contradicts, refines, extends or applies to. A relation can also record a shared method or a precondition. Each connection notes whether the source stated the relation or the analysis inferred it, so an inference never passes itself off as a quotation.</p>
         </div>
       </div>
       <div class="guide-step">
         <em>03</em>
         <div>
           <h3>Surfacing debates and research gaps</h3>
-          <p>Disagreements between sources become debate views grouped by stance; unanswered questions, acknowledged limitations, flagged future work and unresolved contradictions become gaps with their evidence and what is still missing. Coverage analysis measures how well the corpus actually supports a theme, which is what tells you whether a gap is real or simply an area you have not read yet.</p>
+          <p>Disagreements between sources become debate views grouped by stance. Unanswered questions, acknowledged limitations, flagged future work and unresolved contradictions become gaps, each with the evidence that exists and a note of what is still missing. Coverage analysis then measures how well the corpus supports a theme, which is what tells you whether a gap is real or simply an area you have not read yet.</p>
         </div>
       </div>
       <div class="guide-step">
         <em>04</em>
         <div>
           <h3>Semantic search</h3>
-          <p>Embeddings let you find the passage that means what you asked, even when it uses none of your words and is written in another language. This is the one AI task that runs over everything, and it can be computed entirely on your own machine.</p>
+          <p>Embeddings let you find the passage that means what you asked, even when it uses none of your words and is written in another language. This is the one AI task that runs across everything, and it can be computed entirely on your own machine.</p>
         </div>
       </div>
       <div class="guide-step">
         <em>05</em>
         <div>
           <h3>Long-form synthesis</h3>
-          <p>Deep Research runs as a queued job over the scoped corpus and returns a structured, citation-rich report whose citations open the source they point at. Immersion builds a guided route through a research question. Both are drafts for a reader who will check them, and Nodus presents them that way.</p>
+          <p>Deep Research runs as a queued job over the scoped corpus and returns a structured report full of citations that open the source they point at. Immersion builds a guided route through a research question. Both are drafts written for a reader who will check them, and Nodus presents them that way.</p>
         </div>
       </div>
       <div class="guide-step">
         <em>06</em>
         <div>
           <h3>Hypotheses and writing</h3>
-          <p>A hypothesis pairs a statement with the ideas that support it, the risks against it and a proposed test — separate fields, so speculation cannot masquerade as a result. In the writing workspace, drafts are composed beside the corpus with citations that resolve to real items in your Library.</p>
+          <p>A hypothesis pairs a statement with the ideas that support it, the risks against it and a proposed test. Those are separate fields on purpose, so speculation cannot pass for a result. In the writing workspace, drafts are composed beside the corpus with citations that resolve to real items in your Library.</p>
         </div>
       </div>
       <div class="guide-step">
         <em>07</em>
         <div>
           <h3>Reading what a scan hides</h3>
-          <p>Vision-capable models can read pages as images for scanned documents, figures, tables and formulas that a plain text layer misses. The OCR Workspace puts that behind a page-by-page review, so nothing enters your corpus before you have looked at it.</p>
+          <p>Vision-capable models can read pages as images, which is how scanned documents, figures, tables and formulas get in when a plain text layer misses them. The OCR Workspace puts that behind a page by page review, so nothing enters your corpus before you have looked at it.</p>
         </div>
       </div>
     </div>
@@ -184,10 +184,10 @@ SPDX-License-Identifier: AGPL-3.0-only
     </div>
     <div class="guide-body prose reveal" style="margin-top:26px">
       <p>For text, Nodus supports <b>Anthropic</b>, <b>OpenAI</b>, <b>ChatGPT · Codex</b>, <b>GitHub Copilot</b>, <b>OpenCode Go</b>, <b>OpenRouter</b>, <b>Groq</b>, <b>Cerebras</b>, <b>DeepSeek</b>, <b>Google Gemini</b>, <b>Xiaomi MiMo</b>, and the local runtimes <b>Ollama</b> and <b>LM Studio</b>. For embeddings it supports OpenAI, Google Gemini, OpenRouter, Ollama, LM Studio and a small multilingual model that Nodus manages and runs itself.</p>
-      <p>Model settings come in two modes. In the simplified mode you make one choice and everything follows it. In the advanced mode the tasks are separate selectors, because they genuinely want different things: extraction runs many times over long documents and rewards a cheap, reliable model; long-form synthesis rewards a strong one; the small deduplication and relation calls during a deep scan reward a fast one. Vision, chat, Deep Research, Immersion, writing, the argument map, author synthesis and hypotheses each keep their own choice, so retuning one never silently retargets another.</p>
+      <p>Model settings come in two modes. In the simplified mode you make one choice and everything follows it. In the advanced mode each task gets its own selector, because they want different things. Extraction runs many times over long documents, so a cheap and reliable model pays off. Long-form synthesis rewards a strong model. The small deduplication and relation calls during a deep scan reward a fast one. Vision, chat, Deep Research, Immersion, writing, the argument map, author synthesis and hypotheses each keep their own choice, so changing one never quietly retargets another.</p>
     </div>
     <div class="guide-note reveal">
-      <p><b>Nothing runs until you say so.</b> Model-assisted features stay inactive until a provider or a local model has been configured, and the application is fully usable without one — a corpus, its documents, exact search, notes and writing all work with no AI at all.</p>
+      <p><b>Nothing runs until you say so.</b> Model-assisted features stay inactive until a provider or a local model has been configured, and the application is perfectly usable without one. A corpus, its documents, exact search, notes and writing all work with no AI at all.</p>
     </div>
   </div>
 </section>
@@ -198,25 +198,25 @@ SPDX-License-Identifier: AGPL-3.0-only
     <div class="section-head scrim reveal">
       <span class="kicker">04 · Local models</span>
       <h2 class="title" data-split>Research material that never leaves the machine.</h2>
-      <p class="lead">Unpublished work, confidential interviews and material you are not licensed to send anywhere are ordinary facts of academic life. Nodus can run its AI features entirely offline.</p>
+      <p class="lead">Unpublished work, confidential interviews and material you are not licensed to send anywhere are ordinary facts of academic life. Nodus can run its AI features completely offline.</p>
     </div>
 
     <div class="guide-grid two reveal">
       <article class="card lit guide-card">
         <h3>Ollama and LM Studio</h3>
-        <p>Point Nodus at a local runtime and the same tasks — extraction, synthesis, chat, embeddings — run against a model on your own hardware. No key, no request leaving the machine, no provider terms to read.</p>
+        <p>Point Nodus at a local runtime and the same tasks run against a model on your own hardware, whether that is extraction, synthesis, chat or embeddings. No key, no request leaving the machine, no provider terms to read.</p>
       </article>
       <article class="card lit guide-card">
         <h3>Embeddings on device</h3>
-        <p>Semantic search does not need an external provider at all: Nodus can manage a small multilingual embedding model itself, and the resulting index lives on your disk with the rest of the vault.</p>
+        <p>Semantic search does not need an external provider at all. Nodus can manage a small multilingual embedding model itself, and the resulting index lives on your disk with the rest of the vault.</p>
       </article>
       <article class="card lit guide-card">
         <h3>The honest trade-off</h3>
-        <p>Local analysis is slower — often substantially — and smaller models are less reliable at returning the structured output the analysis pipeline expects. That is a real cost, not a footnote, and it is worth testing a model on a handful of sources before committing a whole corpus to it.</p>
+        <p>Local analysis is slower, often a great deal slower, and smaller models are less reliable at returning the structured output the analysis pipeline expects. That is a real cost rather than a footnote, so it is worth trying a model on a handful of sources before you commit a whole corpus to it.</p>
       </article>
       <article class="card lit guide-card">
         <h3>Mixing is allowed</h3>
-        <p>Because the tasks are separate, a common arrangement is local embeddings and local extraction with a stronger hosted model reserved for long-form synthesis — or the reverse, depending on what your material permits.</p>
+        <p>Because the tasks are separate, a common arrangement is local embeddings and local extraction, with a stronger hosted model kept for long-form synthesis. Some people do the reverse, depending on what their material allows.</p>
       </article>
     </div>
   </div>
@@ -228,15 +228,15 @@ SPDX-License-Identifier: AGPL-3.0-only
     <div class="section-head scrim reveal">
       <span class="kicker">05 · Limits</span>
       <h2 class="title" data-split>What this does not promise.</h2>
-      <p class="lead">A research tool that oversells its AI is worse than one that has none, because it costs you the habit of checking.</p>
+      <p class="lead">A research tool that oversells its AI is worse than one with no AI at all, because it teaches you to stop checking.</p>
     </div>
     <div class="guide-body prose reveal" style="margin-top:26px">
       <p>Nodus does not automate research and does not replace the researcher. It cannot guarantee that an extracted idea faithfully represents its source, that a proposed relation holds, or that a generated report reaches a correct conclusion. Extraction is a first pass over your material, and it can be wrong.</p>
-      <p>What Nodus does instead is make the checking cheap. Every idea carries its excerpt; every excerpt points at a preserved original you already have on disk; report citations open the work they refer to; and an audit ledger records what happened in the vault. The evidence audit in the <a href="../zotero/#plugin">Zotero plugin</a> works the same way — it flags claims whose support looks thin, and then sends you back to the sources.</p>
+      <p>What Nodus does instead is make checking cheap. Every idea carries its excerpt. Every excerpt points at a preserved original you already have on disk. Report citations open the work they refer to, and an audit ledger records what happened in the vault. The evidence audit in the <a href="../zotero/#plugin">Zotero plugin</a> works the same way, flagging claims whose support looks thin and sending you back to the sources.</p>
       <h3>Where AI deliberately does not go</h3>
       <p>The teaching vault generates teaching material only. Nodus does not send student rosters, grades or answers to a model, and does not use AI to grade, profile or evaluate students. Nodus Protect processes documents entirely on your computer and never sends them to a provider. In the databases vault, AI columns work with the fields and values actually present in your rows.</p>
       <h3>A note on academic use</h3>
-      <p>Whether AI assistance is acceptable in a given piece of work is a decision for you, your supervisor, your journal and your institution — not for a piece of software. Nodus keeps the provenance you would need in order to answer that question honestly.</p>
+      <p>Whether AI assistance is acceptable in a given piece of work is for you, your supervisor, your journal and your institution to decide, not for a piece of software. What Nodus does is keep the provenance you would need in order to answer that question honestly.</p>
     </div>
   </div>
 </section>

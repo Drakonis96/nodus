@@ -8,7 +8,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
 <title>Open Source Research Software | Nodus</title>
-<meta name="description" content="Nodus is open source under the AGPL-3.0-only licence and local-first by design: your corpus, Library and search indexes stay on your own computer. What the licence gives you, where your work lives, and exactly what leaves the machine and when."/>
+<meta name="description" content="Nodus is open source under the AGPL-3.0-only licence and local-first by design, so your corpus, Library and search indexes stay on your own computer. What the licence gives you, where your work lives, and exactly what leaves the machine and when."/>
 <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1"/>
 <meta property="og:title" content="Open Source Research Software | Nodus"/>
 <meta property="og:description" content="Free and open source under AGPL-3.0-only, with no accounts, no subscriptions and no telemetry. Your research corpus stays on your own machine."/>
@@ -61,8 +61,8 @@ SPDX-License-Identifier: AGPL-3.0-only
         <span aria-current="page">Open source</span>
       </nav>
       <span class="kicker">Open source and local-first</span>
-      <h1 class="display" data-split>Open source, and local-first</h1>
-      <p class="lead">Research software asks for a great deal of trust. It holds unpublished work, material you may not be licensed to share, and years of reading. Nodus answers that in the only two ways that can actually be checked: the source is published under a licence that keeps it published, and the corpus never leaves your computer unless you ask it to.</p>
+      <h1 class="display" data-split>Open source and local-first</h1>
+      <p class="lead">Research software asks for a great deal of trust. It holds unpublished work, material you may not be licensed to share, and years of reading. Nodus answers that in the only two ways you can check for yourself. The source is published under a licence that keeps it published, and the corpus never leaves your computer unless you ask it to.</p>
       <div class="guide-actions">
         <a class="btn primary" href="https://github.com/Drakonis96/nodus" target="_blank" rel="noopener">
           <svg class="ic" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.44 9.8 8.2 11.39.6.11.82-.26.82-.58v-2.23c-3.34.72-4.04-1.42-4.04-1.42-.55-1.39-1.34-1.76-1.34-1.76-1.09-.75.08-.73.08-.73 1.2.08 1.84 1.24 1.84 1.24 1.07 1.84 2.81 1.3 3.5 1 .1-.78.42-1.31.76-1.61-2.67-.3-5.47-1.33-5.47-5.93 0-1.31.47-2.38 1.24-3.22-.13-.3-.54-1.52.11-3.18 0 0 1.01-.32 3.3 1.23a11.5 11.5 0 0 1 6 0c2.29-1.55 3.3-1.23 3.3-1.23.65 1.66.24 2.88.12 3.18.77.84 1.23 1.91 1.23 3.22 0 4.61-2.8 5.62-5.48 5.92.43.37.81 1.1.81 2.22v3.29c0 .32.22.7.83.58A12 12 0 0 0 24 12c0-6.63-5.37-12-12-12Z"/></svg>
@@ -90,14 +90,14 @@ SPDX-License-Identifier: AGPL-3.0-only
     </div>
 
     <div class="guide-body prose reveal" style="margin-top:26px">
-      <p>The practical effect for a researcher is simple. You may read the code, run it for any purpose, modify it, and pass it on. If you distribute a modified version — or run one as a network service that other people use — you have to publish your source under the same terms. That last clause is what the <em>Affero</em> in AGPL adds, and it is the reason the licence was chosen: it means a future hosted version of Nodus cannot become a closed product built on this work.</p>
-      <p>Every published build links to its <b>Corresponding Source</b>: the exact immutable tag and source archives the release was made from, so a binary you downloaded can be traced back to code you can read. The third-party notices list every dependency and its licence, and the repository follows the REUSE convention, with an SPDX header on its files.</p>
+      <p>What that means for you in practice is short. You may read the code, run it for any purpose, modify it and pass it on. If you distribute a modified version, or run one as a network service that other people use, you have to publish your source under the same terms. That last part is what the <em>Affero</em> in AGPL adds, and it is why the licence was chosen. It means a future hosted version of Nodus cannot quietly become a closed product built on this work.</p>
+      <p>Every published build links to its <b>Corresponding Source</b>, which is the exact immutable tag and the source archives the release was made from. A binary you downloaded can therefore be traced back to code you can read. The third-party notices list every dependency and its licence, and the repository follows the REUSE convention, with an SPDX header on its files.</p>
     </div>
 
     <div class="guide-grid reveal">
       <article class="card lit guide-card">
         <h3>Read the code</h3>
-        <p>The whole application — desktop app, server, Zotero plugin, browser connector and this website — lives in one public repository.</p>
+        <p>One public repository holds the whole thing. The desktop app, the server, the Zotero plugin, the browser connector and this website are all in there.</p>
         <a class="arrow-link" href="https://github.com/Drakonis96/nodus" target="_blank" rel="noopener">Open the repository
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
       </article>
@@ -151,20 +151,20 @@ SPDX-License-Identifier: AGPL-3.0-only
         <em>03</em>
         <div>
           <h3>Backups you can verify</h3>
-          <p>Nodus makes encrypted automatic backups, and a complete Nodus 4 backup contains every vault together with the shared Library. Before Nodus 4 opens an existing database it creates and verifies a one-time pre-v4 recovery copy, and Nodus 4 can still open backups made by Nodus 3.x.</p>
+          <p>Nodus makes encrypted automatic backups, and a complete Nodus 4 backup holds every vault together with the shared Library. Before Nodus 4 opens an existing database it creates and verifies a one-time pre-v4 recovery copy, and Nodus 4 can still open backups made by Nodus 3.x.</p>
         </div>
       </div>
       <div class="guide-step">
         <em>04</em>
         <div>
           <h3>A record of what happened</h3>
-          <p>An audit ledger records the operations performed in a vault, which matters when the question months later is not <em>what does my corpus say</em> but <em>when did this change, and why</em>.</p>
+          <p>An audit ledger records the operations performed in a vault. That matters when the question months later is not <em>what does my corpus say</em> but <em>when did this change, and why</em>.</p>
         </div>
       </div>
     </div>
 
     <div class="guide-note reveal">
-      <p><b>No advertising, telemetry or remote analytics.</b> The application does not send your content to a cloud operated by the project, because the project operates none. This website carries no analytics container either — no Tag Manager, no Google Analytics, no tracking pixel — and a test in the repository fails the build if one is ever added.</p>
+      <p><b>No advertising, telemetry or remote analytics.</b> The application does not send your content to a cloud run by the project, because the project runs none. This website carries no analytics container either, so no Tag Manager, no Google Analytics and no tracking pixel, and a test in the repository fails the build if anyone ever adds one.</p>
     </div>
   </div>
 </section>
@@ -175,42 +175,42 @@ SPDX-License-Identifier: AGPL-3.0-only
     <div class="section-head scrim reveal">
       <span class="kicker">03 · What leaves the machine</span>
       <h2 class="title" data-split>Every outgoing request, and what triggers it.</h2>
-      <p class="lead">"Local-first" does not mean a program that never touches the network. It means nothing goes out unless you asked for something that requires it. Here is the complete shape of that.</p>
+      <p class="lead">Local-first does not mean a program that never touches the network. It means nothing goes out unless you asked for something that needs it. Here is the whole list.</p>
     </div>
 
     <div class="guide-grid two reveal">
       <article class="card lit guide-card">
-        <h3>AI providers — only once you configure one</h3>
-        <p>Model-assisted features stay inactive until you set up a provider or a local model. When you use one, that provider receives the text or page image the task needs. Run <b>Ollama</b> or <b>LM Studio</b> instead and the content never leaves the device at all.</p>
+        <h3>AI providers, only once you configure one</h3>
+        <p>Model-assisted features stay inactive until you set up a provider or a local model. When you use one, that provider receives the text or page image the task needs. Run <b>Ollama</b> or <b>LM Studio</b> instead and the content never leaves your device at all.</p>
         <a class="arrow-link" href="../ai-research/">How Nodus uses AI
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
       </article>
       <article class="card lit guide-card">
-        <h3>Bibliographic lookups — only the identifier</h3>
-        <p>Ask Nodus to resolve metadata and it sends Crossref, Open Library, NCBI or arXiv the single DOI, ISBN, ISSN, PMID or arXiv id you selected — nothing else. Bulk requests are rate-limited and cancelable, and candidates are shown for review rather than applied for you.</p>
+        <h3>Bibliographic lookups, only the identifier</h3>
+        <p>Ask Nodus to resolve metadata and it sends Crossref, Open Library, NCBI or arXiv the single DOI, ISBN, ISSN, PMID or arXiv id you selected, and nothing else. Bulk requests are rate limited and can be cancelled, and candidates are shown for review rather than applied for you.</p>
       </article>
       <article class="card lit guide-card">
-        <h3>Updates — checked, not installed behind your back</h3>
-        <p>Nodus checks GitHub for new releases and can download one, but downloading is not automatic and an update is never installed without you. GitHub sees what any web request exposes, such as an IP address.</p>
+        <h3>Updates, checked but never installed for you</h3>
+        <p>Nodus checks GitHub for new releases and can download one, but the download is not automatic and an update is never installed behind your back. GitHub sees what any web request exposes, such as an IP address.</p>
       </article>
       <article class="card lit guide-card">
-        <h3>Announcements — a static file, and switchable off</h3>
-        <p>Nodus fetches a public static file from this website so it can warn about known issues between releases. It is a plain conditional GET, at most once every four hours, carrying no identifier, no account, no vault name and nothing about your corpus. Turn it off in <b>Settings → Updates and news</b> and no request is made at all.</p>
+        <h3>Announcements, a static file you can switch off</h3>
+        <p>Nodus fetches a public static file from this website so it can warn you about known issues between releases. It is a plain conditional GET, at most once every four hours, carrying no identifier, no account, no vault name and nothing about your corpus. Turn it off in <b>Settings → Updates and news</b> and no request is made at all.</p>
       </article>
       <article class="card lit guide-card">
-        <h3>Zotero — a connection that never leaves the computer</h3>
-        <p>The Zotero integration talks to the Zotero application on the same machine over a local connection. There is no API key and no round-trip through zotero.org.</p>
+        <h3>Zotero, a connection that never leaves the computer</h3>
+        <p>The Zotero integration talks to the Zotero application on the same machine over a local connection. There is no API key and no round trip through zotero.org.</p>
         <a class="arrow-link" href="../zotero/">How the Zotero link works
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
       </article>
       <article class="card lit guide-card">
-        <h3>Sharing — opt-in, and a copy rather than the original</h3>
-        <p>Nodus Server publishes a filtered projection of a vault you explicitly choose to share, while the original database and documents stay on your computer. Nothing is published until you set it up.</p>
+        <h3>Sharing, opt-in and always a copy</h3>
+        <p>Nodus Server publishes a filtered copy of a vault you explicitly choose to share, while the original database and documents stay on your computer. Nothing is published until you set it up.</p>
       </article>
     </div>
 
     <div class="guide-note reveal">
-      <p>This page is a summary written for readers deciding whether to try Nodus. The <a href="https://github.com/Drakonis96/nodus/blob/main/PRIVACY.md" target="_blank" rel="noopener">privacy policy</a> is the authoritative document and goes considerably further, service by service — read it before putting confidential or personal research material into any application, including this one.</p>
+      <p>This page is a summary written for people deciding whether to try Nodus. The <a href="https://github.com/Drakonis96/nodus/blob/main/PRIVACY.md" target="_blank" rel="noopener">privacy policy</a> is the authoritative document and goes a good deal further, service by service. Please read it before you put confidential or personal research material into any application, this one included.</p>
     </div>
   </div>
 </section>
@@ -224,10 +224,10 @@ SPDX-License-Identifier: AGPL-3.0-only
     </div>
     <div class="guide-body prose reveal" style="margin-top:26px">
       <p>If Nodus contributes substantially to research that leads to a publication, cite the version you used. The repository ships machine-readable citation metadata in <code>CITATION.cff</code>, including an ORCID for the author and the released version and date, which GitHub renders directly in APA and BibTeX.</p>
-      <p>Citing the version matters more here than it does for a general-purpose editor: analysis pipelines change between releases, and a reviewer asking how a corpus was processed deserves an answer that points at a specific, archived tag.</p>
+      <p>Citing the version matters more here than it does for a general purpose editor. Analysis pipelines change between releases, and a reviewer asking how a corpus was processed deserves an answer that points at a specific archived tag.</p>
     </div>
     <div class="guide-note reveal">
-      <p><b>Nodus is one person's project, plus everyone who has added to it since.</b> Bug reports, translations, documentation and a precise account of what broke are all worth as much as code — the <a href="../contribute/">contribute page</a> sets out the ways in.</p>
+      <p><b>Nodus started as one person's project, and it now includes everyone who has added to it since.</b> Bug reports, translations, documentation and a precise account of what broke are worth as much as code. The <a href="../contribute/">contribute page</a> sets out the ways in.</p>
     </div>
   </div>
 </section>
@@ -243,7 +243,7 @@ SPDX-License-Identifier: AGPL-3.0-only
       <a class="card lit next-card reveal" href="../research/">
         <span class="pic"><svg viewBox="0 0 24 24"><circle cx="6" cy="6" r="2.4"/><circle cx="18" cy="7" r="2.4"/><circle cx="11" cy="18" r="2.4"/><path d="M8 7l7.6.6M7.2 8.2l3 7.4M16.6 9.2l-4.4 6.6"/></svg></span>
         <h3>Nodus for academic research</h3>
-        <p>What all of this is in service of: sources, typed ideas with their evidence, semantic search, research gaps and cited writing.</p>
+        <p>What all of this is in service of. Sources, ideas with the evidence behind them, semantic search, research gaps and cited writing.</p>
         <span class="arrow-link">Read the research guide
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>
       </a>
@@ -257,7 +257,7 @@ SPDX-License-Identifier: AGPL-3.0-only
       <a class="card lit next-card reveal" href="../ai-research/" style="--delay:140ms">
         <span class="pic"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M18.4 5.6l-2.1 2.1M7.7 16.3l-2.1 2.1"/></svg></span>
         <h3>AI for academic research</h3>
-        <p>Which models Nodus can use, how to keep every one of them on your own hardware, and where the output still has to be checked.</p>
+        <p>Which models Nodus can use, how to keep every one of them on your own hardware, and where you still have to check the result yourself.</p>
         <span class="arrow-link">Read about AI-assisted research
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>
       </a>
