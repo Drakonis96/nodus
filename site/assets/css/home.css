@@ -52,6 +52,12 @@ Home page components. The shared system lives in nodus.css.
   font-size: 13.5px; color: var(--ink-3);
 }
 .hero .meta b { color: var(--ink-2); font-weight: 620; }
+.hero .hero-links {
+  margin: 16px auto 0; max-width: 62ch;
+  font-size: 13.5px; color: var(--ink-3);
+}
+.hero .hero-links a { color: var(--ink-2); text-decoration: underline; text-decoration-color: var(--membrane-2); text-underline-offset: 3px; }
+.hero .hero-links a:hover { color: var(--ink); text-decoration-color: var(--accent); }
 
 .scroll-cue {
   position: absolute; left: 50%; bottom: 30px; transform: translateX(-50%);
@@ -381,20 +387,16 @@ Home page components. The shared system lives in nodus.css.
   .step { grid-template-columns: minmax(0, 1fr); gap: 10px; }
 }
 
-/* ============================================================ band */
-.band { text-align: center; }
-.band .lead { margin-inline: auto; }
-.band .pills {
-  display: flex; flex-wrap: wrap; gap: 10px; justify-content: center;
-  margin-top: 38px;
+/* The centred `band` section moved to nodus.css when the research pages
+   started using it too. */
+
+/* ============================================================ topic pages */
+/* The three long-form pages under the hero. Same card as `paths`, so the two
+   rows of destinations on the page read as one family. */
+.home-topics {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(272px, 1fr));
+  gap: 16px; margin-top: 46px;
 }
-.band .pill {
-  display: inline-flex; align-items: center; gap: 8px;
-  padding: 10px 17px; border-radius: 999px;
-  border: 1px solid rgba(52, 211, 153, 0.22); background: rgba(52, 211, 153, 0.07);
-  font-size: 13.5px; font-weight: 600; color: var(--ink);
-}
-.band .pill svg { width: 14px; height: 14px; fill: none; stroke: var(--good); stroke-width: 2.6; stroke-linecap: round; stroke-linejoin: round; }
 
 /* ============================================================ paths (learn more) */
 .paths { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; margin-top: 46px; }
@@ -467,6 +469,7 @@ html.intro-armed { overflow: hidden; }
 .intro-armed .hero .sub,
 .intro-armed .hero .ctas,
 .intro-armed .hero .meta,
+.intro-armed .hero .hero-links,
 .intro-armed .scroll-cue,
 .intro-armed main > section,
 .intro-armed .site-foot { opacity: 0; }
@@ -489,6 +492,7 @@ html.intro-armed { overflow: hidden; }
 .intro-run .hero .sub   { animation: intro-rise 0.9s var(--ease) 1.20s both; }
 .intro-run .hero .ctas  { animation: intro-rise 0.9s var(--ease) 1.36s both; }
 .intro-run .hero .meta  { animation: intro-rise 0.9s var(--ease) 1.52s both; }
+.intro-run .hero .hero-links { animation: intro-rise 0.9s var(--ease) 1.62s both; }
 .intro-run .nav         { animation: intro-drop 0.8s var(--ease) 1.52s both; }
 .intro-run .scroll-cue  { animation: intro-rise 0.9s var(--ease) 1.78s both; }
 .intro-run #scroll-progress,

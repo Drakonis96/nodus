@@ -1,0 +1,349 @@
+<!--
+SPDX-FileCopyrightText: 2026 Jorge Pérez Burgueño and Nodus contributors
+SPDX-License-Identifier: AGPL-3.0-only
+-->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Nodus + Zotero | Open Source Research Workspace</title>
+<meta name="description" content="How Nodus connects to Zotero. A read-only link to your local Zotero library turns your references into a research workspace, and a standalone Nodus plugin adds semantic search and cited answers inside Zotero itself."/>
+<meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1"/>
+<meta property="og:title" content="Nodus + Zotero | Open Source Research Workspace"/>
+<meta property="og:description" content="Nodus does not replace Zotero. Connect your Zotero library, keep collecting and citing where you already do, and use Nodus as the research workspace around your sources."/>
+<meta property="og:type" content="article"/>
+<meta property="og:url" content="https://nodusresearch.com/zotero/"/>
+<meta property="og:site_name" content="Nodus"/>
+<meta property="og:locale" content="en_GB"/>
+<meta property="og:image" content="https://nodusresearch.com/favicon.png"/>
+<meta name="twitter:card" content="summary"/>
+<meta name="twitter:title" content="Nodus and Zotero"/>
+<meta name="twitter:description" content="A read-only connection to your local Zotero library, and a research workspace built around it."/>
+<meta name="twitter:image" content="https://nodusresearch.com/favicon.png"/>
+<link rel="canonical" href="https://nodusresearch.com/zotero/"/>
+<link rel="icon" href="../favicon.ico" sizes="any"/>
+  <link rel="icon" type="image/png" href="../favicon.png" sizes="512x512"/>
+  <link rel="icon" type="image/svg+xml" href="../assets/nodus-logo.svg"/>
+  <link rel="apple-touch-icon" href="../apple-touch-icon.png"/>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Fraunces:opsz,wght@9..144,600;9..144,700&display=swap" rel="stylesheet"/>
+<link rel="stylesheet" href="../assets/css/nodus.css?v=20260818"/>
+<link rel="stylesheet" href="../assets/css/guide.css?v=20260818"/>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  "itemListElement": [
+    { "@type": "ListItem", "position": 1, "name": "Nodus", "item": "https://nodusresearch.com/" },
+    { "@type": "ListItem", "position": 2, "name": "Zotero integration", "item": "https://nodusresearch.com/zotero/" }
+  ]
+}
+</script>
+</head>
+<body>
+
+<a class="skip-link" href="#main">Skip to content</a>
+<canvas id="organism" aria-hidden="true"></canvas>
+
+<div data-nodus-site-header data-base="../" data-page="zotero"></div>
+<script src="../site-header.js?v=20260817"></script>
+
+<main id="main">
+
+<header class="page-hero guide-hero" data-accent="#f87171" data-second="#a78bfa" data-energy="0.32">
+  <div class="wrap">
+    <div class="scrim" style="max-width:820px">
+      <nav class="breadcrumb" aria-label="Breadcrumb">
+        <a href="../index.html">Nodus</a>
+        <span class="sep" aria-hidden="true">/</span>
+        <span aria-current="page">Zotero</span>
+      </nav>
+      <span class="kicker">Zotero integration</span>
+      <h1 class="display" data-split>Nodus and Zotero</h1>
+      <p class="lead">Zotero is where a great many researchers keep their library, and Nodus is not trying to take that job away from it. Nodus connects to the library you already maintain and becomes the workspace around it, a place where the sources you have collected turn into ideas, relations and evidence you can search, question and cite.</p>
+      <div class="guide-actions">
+        <a class="btn primary" href="https://github.com/Drakonis96/nodus/releases/latest" target="_blank" rel="noopener">
+          <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M7 10l5 5 5-5"/><path d="M4 19h16"/></svg>
+          Download Nodus
+        </a>
+        <a class="btn" href="../research/">Nodus for academic research</a>
+      </div>
+      <nav class="guide-jump" aria-label="On this page">
+        <a href="#not-a-replacement"><em>01</em> Not a replacement</a>
+        <a href="#connect"><em>02</em> Connecting a library</a>
+        <a href="#workspace"><em>03</em> The workspace around it</a>
+        <a href="#plugin"><em>04</em> The Zotero plugin</a>
+        <a href="#which"><em>05</em> Which one to use</a>
+      </nav>
+    </div>
+  </div>
+</header>
+
+<!-- ============================================================ not a replacement -->
+<section id="not-a-replacement" class="section-line" data-accent="#a78bfa" data-second="#f87171" data-energy="0.28">
+  <div class="wrap">
+    <div class="section-head scrim reveal">
+      <span class="kicker">01 · The relationship</span>
+      <h2 class="title" data-split>Nodus does not replace Zotero.</h2>
+    </div>
+    <div class="guide-body prose reveal" style="margin-top:26px">
+      <p>A reference manager and a research workspace answer different questions. Zotero answers <em>what do I have, and how do I cite it</em>. It collects items from the web, holds attachments, syncs across your machines, manages groups and drives citations in your word processor. Nodus does not do any of that better, and it does not try to.</p>
+      <p>What Nodus answers is <em>what does this material say, and how do the pieces relate to each other</em>. It reads the works in your library, records ideas with the passage and page that support them, connects those ideas with relations that mean something, and gives you a corpus you can search semantically, argue with and write from.</p>
+      <p>In practice this means <b>you keep your Zotero workflow exactly as it is</b>. Keep saving with the Zotero Connector, keep organising in collections, keep syncing to zotero.org. Nodus reads what is already there, and because it is <a href="../open-source/">open source and local-first</a>, it reads it on your own machine.</p>
+    </div>
+
+    <div class="guide-note reveal">
+      <p><b>The connection is read-only, by design.</b> Nodus talks to Zotero through the local API that the Zotero desktop application exposes, and never writes to it. It does not modify your items, does not create collections in Zotero, and never opens <code>zotero.sqlite</code> directly. Attachments are copied into the Nodus Library, and the files in your Zotero storage are only ever read.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================ connecting -->
+<section id="connect" class="section-line" data-accent="#818cf8" data-second="#22d3ee" data-energy="0.32">
+  <div class="wrap">
+    <div class="section-head scrim reveal">
+      <span class="kicker">02 · Connecting a library</span>
+      <h2 class="title" data-split>Mirroring your research library into Nodus.</h2>
+      <p class="lead">Nodus keeps one cross-vault Library, and a Zotero library can be mirrored into it with its structure intact. Both applications run on the same computer, and nothing is routed through an external service.</p>
+    </div>
+
+    <div class="guide-steps reveal">
+      <div class="guide-step">
+        <em>01</em>
+        <div>
+          <h3>Have Zotero open</h3>
+          <p>Nodus reads from the local API served by the Zotero desktop application, which means <b>Zotero 7 or newer running on the same machine</b>. There is no API key to paste and no round trip through zotero.org, because the connection is a local one between two applications on your own computer.</p>
+        </div>
+      </div>
+      <div class="guide-step">
+        <em>02</em>
+        <div>
+          <h3>Choose the library and what to bring</h3>
+          <p>Your personal library and any <b>group libraries</b> you belong to are both available, and Nodus previews a library before importing it so you can see what a sync would bring in. Collections keep their hierarchy, and items keep their stable Zotero keys, which is what lets a later sync recognise the same item rather than duplicating it.</p>
+        </div>
+      </div>
+      <div class="guide-step">
+        <em>03</em>
+        <div>
+          <h3>Metadata, attachments and notes</h3>
+          <p>An import carries bibliographic metadata, attachments and the child notes attached to your items. Nodus preserves each original attachment and builds a clean reading copy beside it, along with extracted figures, tables and page mappings, so a claim can always be checked against the page it came from.</p>
+        </div>
+      </div>
+      <div class="guide-step">
+        <em>04</em>
+        <div>
+          <h3>Keep it up to date</h3>
+          <p>Later syncs are incremental: Nodus asks Zotero what has changed since the version it last saw, and picks up new and edited items along with the ones you deleted, rather than re-reading the whole library each time.</p>
+        </div>
+      </div>
+      <div class="guide-step">
+        <em>05</em>
+        <div>
+          <h3>Decide what belongs to which project</h3>
+          <p>A mirrored Zotero library sits in the shared Library, not inside one project. Linking an item into a vault is what places it in that project's corpus, so the same paper can support a thesis and a course without being stored twice. Unlinking it leaves the global source untouched.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="guide-note reveal">
+      <p>Zotero is not the only route in. The same Library accepts <b>RIS, BibTeX and CSL JSON</b> exported from Mendeley or another manager, plain local documents, and pages captured by the Nodus Connector for Chrome. If you do not use Zotero, nothing on <a href="../research/">the research page</a> becomes unavailable to you.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================ workspace -->
+<section id="workspace" class="section-line" data-accent="#34d399" data-second="#818cf8" data-energy="0.3">
+  <div class="wrap">
+    <div class="section-head scrim reveal">
+      <span class="kicker">03 · The workspace around your sources</span>
+      <h2 class="title" data-split>What happens to a Zotero library once it is in Nodus.</h2>
+      <p class="lead">This is the part Zotero was never meant to do, and the reason the two tools sit well together.</p>
+    </div>
+
+    <div class="guide-grid reveal">
+      <article class="card lit guide-card">
+        <h3>Ideas with their evidence</h3>
+        <p>Works are analysed into five kinds of unit, a claim, a finding, a construct, a method or a framework. Each one keeps the excerpt that supports it, plus the page when the source provides one.</p>
+        <a class="arrow-link" href="../research/#ideas">How ideas and evidence work
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
+      </article>
+      <article class="card lit guide-card">
+        <h3>A graph of your reading</h3>
+        <p>Ideas are joined by relations that mean something, such as supports, contradicts, refines, extends or applies to. They gather into themes you can browse as an interactive research map.</p>
+      </article>
+      <article class="card lit guide-card">
+        <h3>Semantic search over the library</h3>
+        <p>Exact and semantic retrieval across works, ideas, passages and authors, including across languages, with the embeddings computed by a provider you choose or entirely on your own machine.</p>
+        <a class="arrow-link" href="../research/#search">More on searching a corpus
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
+      </article>
+      <article class="card lit guide-card">
+        <h3>Debates, gaps and coverage</h3>
+        <p>Where your sources disagree, which questions they leave open, and how well the collection you have actually covers the themes your work depends on.</p>
+      </article>
+      <article class="card lit guide-card">
+        <h3>Deep Research reports</h3>
+        <p>A queued job that pulls the scoped corpus into a long-form report whose citations open the source behind them. Treat it as a draft you can audit rather than a finished text.</p>
+      </article>
+      <article class="card lit guide-card">
+        <h3>Citations in your own style</h3>
+        <p>The citation manager uses real CSL styles and will format with custom <code>.csl</code> files copied over from Zotero, locally on your machine.</p>
+      </article>
+      <article class="card lit guide-card">
+        <h3>Writing beside the sources</h3>
+        <p>Projects, drafts and source-linked notes live in the same workspace, with companions for Microsoft Word and LibreOffice for the manuscript itself.</p>
+      </article>
+      <article class="card lit guide-card">
+        <h3>Translating attachments</h3>
+        <p>Nodus Translate works with text, files and Zotero attachments using the model you choose, preserving DOCX and EPUB structure and offering a facsimile PDF mode that keeps the original layout.</p>
+      </article>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================ plugin -->
+<section id="plugin" class="section-line" data-accent="#fbbf24" data-second="#f87171" data-energy="0.34">
+  <div class="wrap">
+    <div class="section-head scrim reveal">
+      <span class="kicker">04 · The plugin</span>
+      <h2 class="title" data-split>Nodus for Zotero, inside Zotero.</h2>
+      <p class="lead">Some work never leaves the reference manager. For that, Nodus ships a separate Zotero plugin. It is a standalone add-on that runs entirely inside Zotero and does not need the Nodus desktop application at all.</p>
+    </div>
+
+    <div class="guide-body prose reveal" style="margin-top:26px">
+      <p>The plugin indexes the <b>PDF, EPUB and HTML attachments</b> in your library and adds a research sidebar that answers questions across them. Answers come back with the exact passages they rest on and the pages those passages sit on, so you can check a reply instead of having to take it on trust.</p>
+      <p>Retrieval combines keyword and semantic search and works across languages. The embeddings can be produced by a managed local model that runs on your own machine inside the Zotero profile, or by a provider you configure yourself. Anthropic, OpenAI, OpenRouter, Groq, Cerebras, DeepSeek and Google Gemini are all supported, among others, alongside local <b>Ollama</b> and <b>LM Studio</b> endpoints.</p>
+      <h3>Reading what a scan does not say in text</h3>
+      <p>Vision-capable models can read document pages as images, transcribing scanned text and describing figures, tables and formulas so that material a plain text layer misses still enters the index.</p>
+      <h3>Auditing your own claims</h3>
+      <p>An evidence audit takes claims and checks them against the indexed library, highlighting the ones whose support looks thin. Read it as a nudge to go back to the sources, not as a verdict on whether a claim is true.</p>
+      <h3>Installing it</h3>
+      <p>Download <code>nodus-zotero.xpi</code> from the <a href="https://github.com/Drakonis96/nodus/releases/latest" target="_blank" rel="noopener">latest Nodus release</a>. In Zotero, open <b>Tools → Add-ons</b>, choose <b>Install Add-on From File</b> and select the downloaded file. The index it builds stays in your Zotero profile.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================ which -->
+<section id="which" class="section-line" data-accent="#a78bfa" data-second="#34d399" data-energy="0.28">
+  <div class="wrap">
+    <div class="section-head scrim reveal">
+      <span class="kicker">05 · Choosing</span>
+      <h2 class="title" data-split>Which one do you actually need?</h2>
+      <p class="lead">The three pieces do different jobs, and most people end up using more than one.</p>
+    </div>
+
+    <div class="guide-table-scroll reveal">
+      <table class="guide-table">
+        <thead>
+          <tr><th scope="col">You want to…</th><th scope="col">Use</th><th scope="col">Why</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <th scope="row">Collect references, store PDFs, sync and cite in a word processor</th>
+            <td>Zotero</td>
+            <td>That is what a reference manager is for, and Nodus is built on the assumption that you keep doing it there.</td>
+          </tr>
+          <tr>
+            <th scope="row">Search your library's full text and get answers with page citations, without leaving Zotero</th>
+            <td>The Nodus plugin for Zotero</td>
+            <td>It runs inside Zotero, indexes your attachments in your own profile and needs no separate application.</td>
+          </tr>
+          <tr>
+            <th scope="row">Turn a body of literature into ideas, relations, debates, gaps and a cited draft</th>
+            <td>The Nodus desktop app</td>
+            <td>That analysis needs a corpus with its own structure, which is what the academic vault is.</td>
+          </tr>
+          <tr>
+            <th scope="row">Do all of it</th>
+            <td>All three</td>
+            <td>Collect in Zotero, mirror into Nodus for the analysis and writing, and keep the plugin for quick retrieval while you are reading.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================ next -->
+<section class="section-line" data-accent="#a78bfa" data-second="#818cf8" data-energy="0.26">
+  <div class="wrap">
+    <div class="section-head scrim reveal">
+      <span class="kicker">Keep going</span>
+      <h2 class="title" data-split>Where to go from here.</h2>
+    </div>
+    <div class="next-grid">
+      <a class="card lit next-card reveal" href="../research/">
+        <span class="pic"><svg viewBox="0 0 24 24"><circle cx="6" cy="6" r="2.4"/><circle cx="18" cy="7" r="2.4"/><circle cx="11" cy="18" r="2.4"/><path d="M8 7l7.6.6M7.2 8.2l3 7.4M16.6 9.2l-4.4 6.6"/></svg></span>
+        <h3>Nodus for academic research</h3>
+        <p>The whole picture. Sources, ideas with the evidence behind them, semantic search, research gaps and writing with citations you can open.</p>
+        <span class="arrow-link">Read the research guide
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>
+      </a>
+      <a class="card lit next-card reveal" href="../ai-research/" style="--delay:70ms">
+        <span class="pic"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M18.4 5.6l-2.1 2.1M7.7 16.3l-2.1 2.1"/></svg></span>
+        <h3>AI for academic research</h3>
+        <p>Which models Nodus and the Zotero plugin can use, how to keep everything local, and where the output still has to be checked.</p>
+        <span class="arrow-link">Read about AI-assisted research
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>
+      </a>
+      <a class="card lit next-card reveal" href="../demo/index.html" style="--delay:140ms">
+        <span class="pic"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7-11-7Z"/></svg></span>
+        <h3>The live demo</h3>
+        <p>A sample academic corpus you can explore in this browser, with no installation and nothing to import.</p>
+        <span class="arrow-link">Try the demo
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>
+      </a>
+      <a class="card lit next-card reveal" href="../faq/" style="--delay:210ms">
+        <span class="pic"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M9.5 9a2.5 2.5 0 1 1 3.7 2.2c-.7.4-1.2 1-1.2 1.8v.5M12 17h.01"/></svg></span>
+        <h3>Questions before you begin</h3>
+        <p>Setup, providers, citations and the honest limits of what an application like this can do for your research.</p>
+        <span class="arrow-link">Read the FAQ
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>
+      </a>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<footer class="site-foot">
+  <div class="wrap">
+    <div class="foot-grid">
+      <div class="foot-brand">
+        <span class="logo"><img src="../assets/nodus-logo.svg" alt=""/> Nodus</span>
+        <p>A free, open-source, local-first research workspace for connecting sources, ideas and evidence. Your corpus stays on your machine.</p>
+      </div>
+      <div class="foot-col">
+        <h4>Research</h4>
+        <a href="../research/">Academic research</a>
+        <a href="./">Nodus and Zotero</a>
+        <a href="../ai-research/">AI for research</a>
+        <a href="../open-source/">Open source</a>
+      </div>
+      <div class="foot-col">
+        <h4>Learn</h4>
+        <a href="../wiki/">Wiki</a>
+        <a href="../blog/">Blog</a>
+        <a href="../faq/">FAQ</a>
+      </div>
+      <div class="foot-col">
+        <h4>Project</h4>
+        <a href="../contribute/">Contribute</a>
+        <a href="https://github.com/Drakonis96/nodus" target="_blank" rel="noopener">GitHub</a>
+        <a href="https://github.com/Drakonis96/nodus/releases" target="_blank" rel="noopener">Releases</a>
+      </div>
+    </div>
+    <div class="foot-base">
+      <span>© 2026 Jorge Pérez Burgueño and Nodus contributors.</span>
+      <a href="https://github.com/Drakonis96/nodus/blob/main/LICENSE" target="_blank" rel="noopener">AGPL-3.0-only</a>
+    </div>
+  </div>
+</footer>
+
+<script src="../assets/js/organism.js?v=20260815"></script>
+<script src="../assets/js/site.js?v=20260815"></script>
+<script src="../assets/js/back-to-top.js?v=20260817b"></script>
+</body>
+</html>

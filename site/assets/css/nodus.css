@@ -519,6 +519,24 @@ h1, h2, h3, h4 { margin: 0; font-weight: 700; letter-spacing: -0.032em; line-hei
 }
 
 /* ============================================================ footer */
+/* ============================================================ band */
+/* A centred, full-width statement with a row of reassurance pills under it.
+   Shared by the home page and the long-form research pages. */
+.band { text-align: center; }
+.band .lead { margin-inline: auto; }
+.band .pills {
+  display: flex; flex-wrap: wrap; gap: 10px; justify-content: center;
+  margin-top: 38px;
+}
+.band .pill {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 10px 17px; border-radius: 999px;
+  border: 1px solid rgba(52, 211, 153, 0.22); background: rgba(52, 211, 153, 0.07);
+  font-size: 13.5px; font-weight: 600; color: var(--ink);
+}
+.band .pill svg { width: 14px; height: 14px; fill: none; stroke: var(--good); stroke-width: 2.6; stroke-linecap: round; stroke-linejoin: round; }
+
+/* ============================================================ footer */
 footer.site-foot {
   position: relative;
   padding: clamp(56px, 7vw, 90px) 0 46px;
@@ -530,6 +548,8 @@ footer.site-foot {
   grid-template-columns: minmax(0, 1.5fr) repeat(3, minmax(0, 1fr));
   gap: 40px 32px;
 }
+/* the home page carries one column more than the inner pages */
+.foot-grid.wide { grid-template-columns: minmax(0, 1.4fr) repeat(4, minmax(0, 1fr)); }
 .foot-brand { display: flex; flex-direction: column; gap: 14px; }
 .foot-brand .logo {
   display: inline-flex; align-items: center; gap: 10px;

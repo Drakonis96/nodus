@@ -10,6 +10,10 @@ const SITE = 'https://nodusresearch.com';
 
 const PAGES = [
   { file: 'index.html', url: '/' },
+  { file: 'research/index.html', url: '/research/' },
+  { file: 'zotero/index.html', url: '/zotero/' },
+  { file: 'ai-research/index.html', url: '/ai-research/' },
+  { file: 'open-source/index.html', url: '/open-source/' },
   { file: 'demo/index.html', url: '/demo/' },
   { file: 'demo/study.html', url: '/demo/study.html' },
   { file: 'demo/teaching.html', url: '/demo/teaching.html' },
