@@ -12,13 +12,13 @@
   "cloudflare": {
     "bindings": {
       "NODUS_BOOTSTRAP_SECRET_HASH": {
-        "description": "Pega el **código de configuración** mostrado por Nodus Desktop. Es un verificador de un solo uso y no permite acceder a tu cuenta de Cloudflare."
+        "description": "Paste the **setup code** shown by Nodus Desktop. It is a one-time verifier and grants no access to your Cloudflare account."
       },
       "DB": {
-        "description": "Base privada para los datos estructurados de tu vault. Puedes conservar el nombre propuesto."
+        "description": "Private database for your vault's structured data. You can keep the proposed name."
       },
       "OBJECTS": {
-        "description": "Almacenamiento privado para archivos, snapshots y recuperación. Puedes conservar el nombre propuesto."
+        "description": "Private storage for files, snapshots and recovery. You can keep the proposed name."
       }
     }
   },

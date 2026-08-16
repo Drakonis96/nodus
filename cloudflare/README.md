@@ -1,33 +1,33 @@
-# Nodus Cloud para Cloudflare
+# Nodus Cloud for Cloudflare
 
-Servidor de sincronización y publicación de Nodus que se instala directamente en la cuenta de Cloudflare de cada usuario. Cloudflare ejecuta el Worker, guarda los datos estructurados en D1 y los archivos privados en R2. Nodus no recibe credenciales ni permisos sobre esa cuenta.
+Nodus synchronisation and publication server, installed directly into each user's own Cloudflare account. Cloudflare runs the Worker, keeps structured data in D1 and private files in R2. Nodus receives no credentials and no permissions over that account.
 
-## Despliegue recomendado
+## Recommended deployment
 
-Nodus Desktop abre el asistente oficial **Deploy to Cloudflare** con esta carpeta como plantilla. Cloudflare:
+Nodus Desktop opens the official **Deploy to Cloudflare** wizard with this folder as the template. Cloudflare then:
 
-1. crea una copia del código en la cuenta de GitHub o GitLab elegida por el usuario;
-2. crea D1 y R2 y conecta ambos recursos al Worker;
-3. solicita el valor secreto `NODUS_BOOTSTRAP_SECRET_HASH` que muestra Desktop;
-4. aplica las migraciones y publica una URL gratuita `workers.dev`.
+1. creates a copy of the code in the GitHub or GitLab account the user chooses;
+2. creates D1 and R2 and connects both resources to the Worker;
+3. asks for the `NODUS_BOOTSTRAP_SECRET_HASH` secret that Desktop displays;
+4. applies the migrations and publishes a free `workers.dev` URL.
 
-No hace falta comprar un dominio, contratar hosting tradicional ni entregar a Nodus un token de Cloudflare. La ubicación de D1 y R2 es la selección automática de Cloudflare en este flujo. El botón oficial no documenta un parámetro para fijar jurisdicción; quien necesite fijación estricta debe crear esos recursos manualmente y revisar las opciones vigentes de Cloudflare.
+There is no domain to buy, no traditional hosting to arrange and no Cloudflare token to hand over to Nodus. The location of D1 and R2 is whatever Cloudflare selects automatically in this flow. The official button documents no parameter for pinning jurisdiction; anyone who needs strict pinning should create those resources manually and review Cloudflare's current options.
 
-Documentación oficial: [Deploy to Cloudflare](https://developers.cloudflare.com/workers/platform/deploy-buttons/), [D1](https://developers.cloudflare.com/d1/), [R2](https://developers.cloudflare.com/r2/).
+Official documentation: [Deploy to Cloudflare](https://developers.cloudflare.com/workers/platform/deploy-buttons/), [D1](https://developers.cloudflare.com/d1/), [R2](https://developers.cloudflare.com/r2/).
 
-## Qué contiene la plantilla
+## What the template contains
 
-- `src/`: Worker y API de Nodus Cloud.
-- `migrations/`: esquema versionado de D1.
-- `wrangler.jsonc`: bindings D1/R2 y tarea de mantenimiento.
-- `.dev.vars.example`: variable secreta que Cloudflare solicita durante el despliegue.
-- `package.json`: aplica migraciones antes de publicar el Worker.
+- `src/`: the Nodus Cloud Worker and API.
+- `migrations/`: the versioned D1 schema.
+- `wrangler.jsonc`: the D1/R2 bindings and the maintenance task.
+- `.dev.vars.example`: the secret variable Cloudflare asks for during deployment.
+- `package.json`: applies the migrations before publishing the Worker.
 
-Vectorize es opcional. Sus índices requieren una dimensión concreta que depende del modelo de embeddings de cada vault, algo que una plantilla pública estática no conoce. El despliegue directo usa matrices portables en R2 y búsqueda exacta; si el propietario añade bindings `VECTORS_<dim>`, el Worker los anuncia y Desktop los utiliza automáticamente.
+Vectorize is optional. Its indexes require a specific dimension that depends on each vault's embedding model, which a static public template cannot know. Direct deployment uses portable matrices in R2 and exact search; if the owner adds `VECTORS_<dim>` bindings, the Worker announces them and Desktop uses them automatically.
 
-## Desarrollo local
+## Local development
 
-Se necesita Node 20 o posterior. Calcula primero el SHA-256 de un secreto de prueba y pásalo al Worker; el verificador usa el secreto original.
+Wrangler 4.123 or later requires Node 22 or later. Compute the SHA-256 of a test secret first and pass it to the Worker; the verifier uses the original secret.
 
 ```sh
 cd cloudflare
@@ -37,14 +37,20 @@ NODUS_TEST_BOOTSTRAP_HASH="$(printf %s final-local-secret | shasum -a 256 | awk 
 npx wrangler dev --local --port 8799 --var "NODUS_BOOTSTRAP_SECRET_HASH:$NODUS_TEST_BOOTSTRAP_HASH"
 ```
 
-En otra terminal, desde la raíz del repositorio:
+In another terminal, from the repository root:
 
 ```sh
 node scripts/verify-cloudflare-local.mjs
 ```
 
-Para comprobar el mantenimiento programado, inicia Wrangler con `--test-scheduled` y abre `http://localhost:8799/__scheduled?cron=17+3+*+*+*`.
+To exercise scheduled maintenance, start Wrangler with `--test-scheduled` and open `http://localhost:8799/__scheduled?cron=17+3+*+*+*`.
 
-## Licencia y actualizaciones
+### Limits that only appear on a real deployment
 
-El código se distribuye bajo AGPL-3.0-only. La respuesta de capacidades enlaza al código fuente correspondiente. La copia creada por el asistente pertenece al usuario; los commits de esa copia activan Workers Builds. Consulta `UPDATING.md` antes de incorporar una nueva versión de Nodus Cloud.
+The open-source workerd behind `wrangler dev` does not enforce every limit of Cloudflare's production runtime. The known case is PBKDF2: Workers rejects more than **100,000 iterations** with `NotSupportedError`, while local development accepts any count, so an invalid constant passes local verification and breaks the real deployment with an HTTP 500. `scripts/test-cloudflare-bootstrap.mjs` reproduces that ceiling against the real `auth.mjs` and runs as part of `npm test`.
+
+That ceiling is the platform's, not a choice: it sits below the 600,000 iterations OWASP recommends for PBKDF2-SHA256, and Workers offers no alternative. Raising it the day Cloudflare lifts the cap means changing `PASSWORD_ITERATIONS` in `src/auth.mjs` and nothing else: every password records in `password_scheme` the count it was computed with, and `verifyPassword` replays it, so passwords already on record keep verifying.
+
+## Licence and updates
+
+The code is distributed under AGPL-3.0-only. The capabilities response links to the corresponding source code. The copy created by the wizard belongs to the user; commits to that copy trigger Workers Builds. Read `UPDATING.md` before taking in a new version of Nodus Cloud.
