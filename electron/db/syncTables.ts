@@ -228,6 +228,10 @@ const NOT_SYNCED_TABLES = new Set([
   'library_analysis_freshness',
   'library_analysis_provenance',
   'sync_log', 'settings',
+  // A single machine-local counter used only to decide whether its next automatic
+  // backup can reuse a verified snapshot. Moving it to another machine would neither
+  // carry user data nor describe the receiver's SQLite file.
+  'backup_revision',
   // Explicitly local, opt-in and content-free beta performance observations.
   'primary_source_local_metrics',
   // Deliberately machine-local: it is THIS computer's record of what its own merges
@@ -243,6 +247,9 @@ const NOT_SYNCED_TABLES = new Set([
   // applied it — carrying it would tell a second machine it had received work it never
   // received, and its read/unread state is one person's, on one screen.
   'server_inbox',
+  // Machine-independent backup invalidation metadata. It is derived transactionally
+  // from every content write and must never win a content merge or create sync churn.
+  'backup_revision',
   // TESTIMONIOS NO SE SINCRONIZA, y es una decision, no una omision (decision 18 del
   // plan). Antes de activarlo hay que demostrar que TODAS estas tablas viajan, que los
   // blobs de los maestros tienen una politica explicita, y sobre todo que las
