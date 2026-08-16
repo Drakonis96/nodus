@@ -1,0 +1,383 @@
+<!--
+SPDX-FileCopyrightText: 2026 Jorge Pérez Burgueño and Nodus contributors
+SPDX-License-Identifier: AGPL-3.0-only
+-->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Nodus for Academic Research | Open Source Research Workspace</title>
+<meta name="description" content="How researchers use Nodus, a free and open source research workspace: build a corpus from Zotero or your own documents, turn papers into ideas anchored to their exact passage and page, search it semantically, and write with citations you can verify."/>
+<meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1"/>
+<meta property="og:title" content="Nodus for Academic Research | Open Source Research Workspace"/>
+<meta property="og:description" content="A local-first research workspace for academic work: sources from Zotero or your own files, ideas linked to the passage that supports them, semantic search, research gaps, and writing with verifiable citations."/>
+<meta property="og:type" content="article"/>
+<meta property="og:url" content="https://nodusresearch.com/research/"/>
+<meta property="og:site_name" content="Nodus"/>
+<meta property="og:locale" content="en_GB"/>
+<meta property="og:image" content="https://nodusresearch.com/favicon.png"/>
+<meta name="twitter:card" content="summary"/>
+<meta name="twitter:title" content="Nodus for Academic Research"/>
+<meta name="twitter:description" content="An open source, local-first research workspace for connecting sources, ideas and evidence."/>
+<meta name="twitter:image" content="https://nodusresearch.com/favicon.png"/>
+<link rel="canonical" href="https://nodusresearch.com/research/"/>
+<link rel="icon" href="../favicon.ico" sizes="any"/>
+  <link rel="icon" type="image/png" href="../favicon.png" sizes="512x512"/>
+  <link rel="icon" type="image/svg+xml" href="../assets/nodus-logo.svg"/>
+  <link rel="apple-touch-icon" href="../apple-touch-icon.png"/>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Fraunces:opsz,wght@9..144,600;9..144,700&display=swap" rel="stylesheet"/>
+<link rel="stylesheet" href="../assets/css/nodus.css?v=20260818"/>
+<link rel="stylesheet" href="../assets/css/guide.css?v=20260818"/>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  "itemListElement": [
+    { "@type": "ListItem", "position": 1, "name": "Nodus", "item": "https://nodusresearch.com/" },
+    { "@type": "ListItem", "position": 2, "name": "Academic research", "item": "https://nodusresearch.com/research/" }
+  ]
+}
+</script>
+</head>
+<body>
+
+<a class="skip-link" href="#main">Skip to content</a>
+<canvas id="organism" aria-hidden="true"></canvas>
+
+<div data-nodus-site-header data-base="../" data-page="research"></div>
+<script src="../site-header.js?v=20260817"></script>
+
+<main id="main">
+
+<header class="page-hero guide-hero" data-accent="#818cf8" data-second="#a78bfa" data-energy="0.34">
+  <div class="wrap">
+    <div class="scrim" style="max-width:820px">
+      <nav class="breadcrumb" aria-label="Breadcrumb">
+        <a href="../index.html">Nodus</a>
+        <span class="sep" aria-hidden="true">/</span>
+        <span aria-current="page">Academic research</span>
+      </nav>
+      <span class="kicker">Academic research</span>
+      <h1 class="display" data-split>Nodus for Academic Research</h1>
+      <p class="lead">Nodus is a free, open source, local-first workspace for academic research. It sits between your reference manager and your manuscript: you bring in the papers, books and documents you already work with, and Nodus turns them into a corpus of ideas, relations and evidence that you can search, question and cite — without any of it leaving your computer.</p>
+      <div class="guide-actions">
+        <a class="btn primary" href="../demo/index.html">
+          <svg class="ic" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7-11-7Z"/></svg>
+          Open the academic demo
+        </a>
+        <a class="btn" href="../wiki/">Read the manual</a>
+      </div>
+      <nav class="guide-jump" aria-label="On this page">
+        <a href="#sources"><em>01</em> Sources</a>
+        <a href="#ideas"><em>02</em> Ideas and evidence</a>
+        <a href="#search"><em>03</em> Search</a>
+        <a href="#questions"><em>04</em> Gaps and debates</a>
+        <a href="#writing"><em>05</em> Writing</a>
+        <a href="#private"><em>06</em> What stays local</a>
+      </nav>
+    </div>
+  </div>
+</header>
+
+<!-- ============================================================ what it is -->
+<section class="section-line" data-accent="#a78bfa" data-second="#818cf8" data-energy="0.28">
+  <div class="wrap">
+    <div class="section-head scrim reveal">
+      <span class="kicker">The shape of the tool</span>
+      <h2 class="title" data-split>A research application, not a general note app.</h2>
+    </div>
+    <div class="guide-body prose reveal" style="margin-top:26px">
+      <p>Most tools that hold research material are either bibliographies or notebooks. A bibliography knows what you have read; a notebook knows what you thought. Neither of them knows <b>which passage of which work supports which claim</b>, and that link is the one scholarly work actually runs on.</p>
+      <p>Nodus is built around that link. Every interpretation it stores — a claim, a finding, a construct, a method, a framework — carries the work it came from and the excerpt that supports it, with its page where the source provides one. Everything else in the application is a way of moving through those anchored units: a graph of how they relate, a map of an argument, a list of the questions your corpus cannot yet answer, a report whose citations you can open and check.</p>
+      <p>Nodus organises work into <b>vaults</b>, and the academic vault is the one described on this page. Other vaults reuse the same engine for <a href="../index.html#more-vaults">teaching, study, structured databases, genealogy and more</a>, but the research vault is the one designed for literature reviews, theses and research projects.</p>
+    </div>
+
+    <div class="guide-grid reveal">
+      <article class="card lit guide-card">
+        <h3>Who it is for</h3>
+        <p>Doctoral candidates, postdocs and academics working through a literature review or a thesis chapter; students building a serious reading base; and anyone whose writing has to stand on sources rather than recollection.</p>
+      </article>
+      <article class="card lit guide-card">
+        <h3>What it costs</h3>
+        <p>Nothing. Nodus is released under the <b>AGPL-3.0-only</b> licence, with no accounts, no subscriptions and no telemetry. The desktop app runs on macOS, Windows and Linux.</p>
+      </article>
+      <article class="card lit guide-card">
+        <h3>What it does not do</h3>
+        <p>It does not replace your reference manager, it does not read for you, and it does not decide whether an argument is sound. It records interpretations with their evidence so that <em>you</em> can judge them.</p>
+      </article>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================ sources -->
+<section id="sources" class="section-line" data-accent="#a78bfa" data-second="#22d3ee" data-energy="0.3">
+  <div class="wrap">
+    <div class="section-head scrim reveal">
+      <span class="kicker">01 · Sources</span>
+      <h2 class="title" data-split>Academic papers, books and documents, wherever you keep them.</h2>
+      <p class="lead">Nodus keeps one cross-vault Library that holds bibliographic metadata, files and searchable text. A source lives there once and can be linked into any compatible vault without being copied.</p>
+    </div>
+
+    <div class="guide-steps reveal">
+      <div class="guide-step">
+        <em>01</em>
+        <div>
+          <h3>Connect the research library you already have</h3>
+          <p>Nodus can mirror a complete <a href="../zotero/">Zotero library</a> — its collection hierarchy, stable item keys, attachments and child notes — from the Zotero application running on the same computer. It can also import <b>RIS, BibTeX and CSL JSON</b> exported from Mendeley or another manager, or take local documents directly.</p>
+          <p>The optional Nodus Connector for Chrome captures the academic page or document you are looking at into the Library, detecting embedded bibliographic metadata, DOI or ISBN and any available file.</p>
+        </div>
+      </div>
+      <div class="guide-step">
+        <em>02</em>
+        <div>
+          <h3>Keep the original and get a readable copy</h3>
+          <p>For each item, Nodus preserves the original attachment untouched and builds a clean Markdown reading copy beside it, along with extracted figures, structured tables and page mappings. PDF, EPUB, image, web, text and office attachments all stay openable in their preserved form.</p>
+          <p>The reader asks once whether you prefer the clean copy or the preserved original, and that choice can be reset at any time. Page-accurate verification always goes back to the original.</p>
+        </div>
+      </div>
+      <div class="guide-step">
+        <em>03</em>
+        <div>
+          <h3>Decide what belongs in this project</h3>
+          <p>Linking an item into a vault is what places it in that project's corpus. Removing the link does not destroy the global source, so a paper can inform a thesis vault and a teaching vault at once without being duplicated or falling out of either.</p>
+          <p>Collections, tags and filtered views keep a large corpus navigable, and duplicate records are worth resolving before analysis so a single source is not counted twice.</p>
+        </div>
+      </div>
+      <div class="guide-step">
+        <em>04</em>
+        <div>
+          <h3>Read, highlight and annotate in place</h3>
+          <p>Text can be highlighted in both the reflowable and the PDF viewers, and images accept region highlights. Highlights, notes and document chat stay attached to the source, which is what later lets an idea point back at an exact excerpt.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================ ideas -->
+<section id="ideas" class="section-line" data-accent="#818cf8" data-second="#34d399" data-energy="0.34">
+  <div class="wrap">
+    <div class="section-head scrim reveal">
+      <span class="kicker">02 · Ideas and evidence</span>
+      <h2 class="title" data-split>From what you read to what it claims.</h2>
+      <p class="lead">Analysis turns the text of a work into structured interpretations. They are not detached summaries: each one records its type, its source and the excerpt that supports it.</p>
+    </div>
+
+    <div class="guide-grid reveal">
+      <article class="card lit guide-card">
+        <h3>Typed ideas</h3>
+        <p>Every extracted unit is stored as a <b>claim, finding, construct, method or framework</b>. Keeping those apart matters — a method borrowed from one field is a different kind of object from a contested empirical finding, and a corpus that flattens them loses the distinction you most need.</p>
+      </article>
+      <article class="card lit guide-card">
+        <h3>Evidence that stays attached</h3>
+        <p>An idea keeps the passage behind it and, where the source supplies one, the page. Nodus records whether the evidence is quoted explicitly or paraphrased, so you always know how far the wording in front of you is the author's.</p>
+      </article>
+      <article class="card lit guide-card">
+        <h3>Typed relations</h3>
+        <p>Ideas are joined by relations with a meaning: one <b>supports</b>, <b>contradicts</b>, <b>refines</b>, <b>extends</b> or <b>applies to</b> another, shares its method, or is a precondition for it. Each edge records whether it was stated in the source or inferred during analysis.</p>
+      </article>
+      <article class="card lit guide-card">
+        <h3>Themes</h3>
+        <p>Related ideas gather into themes, which is what turns a few hundred extracted units into a readable map of a literature rather than a longer list.</p>
+      </article>
+      <article class="card lit guide-card">
+        <h3>The knowledge graph</h3>
+        <p>Themes, ideas and authors appear as an interactive research map with presets and filters, so you can move from an overview of the whole corpus down to one contested question.</p>
+      </article>
+      <article class="card lit guide-card">
+        <h3>The argument map</h3>
+        <p>A separate view arranges claims and evidence into an explicit structure for a paper or chapter — thesis, support, objection, reply, evidence — and lets you reorganise it as the argument develops.</p>
+      </article>
+      <article class="card lit guide-card">
+        <h3>Author profiles</h3>
+        <p>An author view aggregates only what the active corpus actually supports. It is deliberately narrower than a reputation: it shows the documented position of an author in <em>your</em> material.</p>
+      </article>
+      <article class="card lit guide-card">
+        <h3>Immersion</h3>
+        <p>A guided, audio-capable route through a central research question, sequencing evidence stations and commentary. It is built for orientation in unfamiliar material, not as a substitute for reading the sources.</p>
+      </article>
+    </div>
+
+    <div class="guide-note reveal">
+      <p><b>Extraction is a first pass, not a verdict.</b> Automatically extracted text, metadata and ideas can be wrong, and Nodus is designed on that assumption: the excerpt and the preserved original are always one click away so a claim can be checked against the page it came from. How the AI side of this works, and where its limits are, is covered on <a href="../ai-research/">AI for academic research</a>.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================ search -->
+<section id="search" class="section-line" data-accent="#22d3ee" data-second="#a78bfa" data-energy="0.3">
+  <div class="wrap">
+    <div class="section-head scrim reveal">
+      <span class="kicker">03 · Search</span>
+      <h2 class="title" data-split>Semantic search across your own corpus.</h2>
+      <p class="lead">Nodus searches works, ideas, passages and authors with both exact and semantic retrieval, and results keep the entity type and the source context they came from.</p>
+    </div>
+    <div class="guide-body prose reveal" style="margin-top:26px">
+      <p>Exact search is the right tool when you remember the wording. Semantic search matters in the common case where you do not: when the corpus says <em>desirable difficulty</em> and you are asking about effortful practice, or when half your sources are in another language. Nodus builds embeddings for that, and you decide which model computes them.</p>
+      <p>Embeddings can be produced by an external provider — OpenAI, Google Gemini or OpenRouter — or entirely on your machine through <b>Ollama</b>, <b>LM Studio</b> or a small multilingual model that Nodus manages itself. The indexes live on your computer either way.</p>
+      <p>Searching is also how the rest of the workspace is wired together: a search result opens the idea, the idea opens its passage, and the passage opens the preserved original at the page it came from.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================ questions -->
+<section id="questions" class="section-line" data-accent="#fbbf24" data-second="#f87171" data-energy="0.32">
+  <div class="wrap">
+    <div class="section-head scrim reveal">
+      <span class="kicker">04 · Gaps and debates</span>
+      <h2 class="title" data-split>Questions a corpus can be asked about itself.</h2>
+      <p class="lead">Once a body of literature is stored as anchored ideas and typed relations, some genuinely useful questions become answerable inside the corpus.</p>
+    </div>
+
+    <div class="guide-grid two reveal">
+      <article class="card lit guide-card">
+        <h3>Research gaps</h3>
+        <p>A gap records the evidence that exists, what is missing, and candidate directions. Nodus distinguishes the kinds that matter: <b>future work</b> flagged by authors, acknowledged <b>limitations</b>, <b>open questions</b>, and <b>unresolved contradictions</b> between sources.</p>
+        <p>The strength of a gap depends entirely on how well the corpus covers its area, which is why coverage sits next to it rather than in a different menu.</p>
+      </article>
+      <article class="card lit guide-card">
+        <h3>Debates</h3>
+        <p>Debate views group opposed or qualified positions by stance and show the works standing behind each one. The point is not a pro-and-con tally: boundary conditions, sample differences and methodological disagreements usually carry more information than the headline split.</p>
+      </article>
+      <article class="card lit guide-card">
+        <h3>Coverage analysis</h3>
+        <p>Coverage measures how well the corpus supports the themes and questions you care about, highlighting both overrepresented areas and thin ones. It is the honest way to state the boundary of a literature review — and a reading list for what to add next.</p>
+      </article>
+      <article class="card lit guide-card">
+        <h3>Hypotheses</h3>
+        <p>A hypothesis in Nodus combines a statement, the ideas that support it, the risks against it and a proposed test. Those fields are kept separate on purpose, so that a plausible speculation cannot quietly present itself as an established result.</p>
+      </article>
+      <article class="card lit guide-card">
+        <h3>Reading paths</h3>
+        <p>A reading path orders sources and ideas into a route with a purpose: foundations first, then a debate, then the open questions. Every stop carries a reason for being there rather than a rank.</p>
+      </article>
+      <article class="card lit guide-card">
+        <h3>Deep Research</h3>
+        <p>Deep Research runs as a queued job over the scoped corpus and produces a long-form, citation-rich report whose citations open the source they refer to. It is best treated as an auditable draft: useful because you can check it, not because it is finished.</p>
+      </article>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================ writing -->
+<section id="writing" class="section-line" data-accent="#34d399" data-second="#a78bfa" data-energy="0.3">
+  <div class="wrap">
+    <div class="section-head scrim reveal">
+      <span class="kicker">05 · Writing</span>
+      <h2 class="title" data-split>Writing with citations you can open.</h2>
+      <p class="lead">Research notes are worth little if the manuscript loses their provenance. Nodus keeps projects, notes and drafts in the same workspace as the corpus they draw on.</p>
+    </div>
+    <div class="guide-body prose reveal" style="margin-top:26px">
+      <p>The Workspace holds projects, drafts and source-linked notes. Early observations start close to the passage that prompted them, and mature material moves into a structured manuscript without losing where it came from.</p>
+      <h3>Citations</h3>
+      <p>The citation manager uses real CSL styles, including custom <code>.csl</code> files copied over from Zotero, and formats them locally on your machine after installation.</p>
+      <h3>Word and LibreOffice</h3>
+      <p>Companions for Microsoft Word and LibreOffice bring selected Nodus context into a manuscript you are already writing, so the corpus is reachable from the document rather than only from the app.</p>
+      <h3>Other applications, through MCP</h3>
+      <p>Nodus ships an MCP server, which lets an MCP-capable assistant read approved parts of the active vault — works, ideas, notes, reports — and work with them under your control.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================ private -->
+<section id="private" class="section-line band" data-accent="#34d399" data-second="#22d3ee" data-energy="0.24">
+  <div class="wrap">
+    <div class="reveal">
+      <span class="kicker" style="justify-content:center">06 · What stays on your machine</span>
+      <h2 class="title" data-split>Local-first, and open about it.</h2>
+      <p class="lead">Your vaults, the cross-vault Library and every search index live on your own computer and in the backup folder you choose. There are no accounts, no subscriptions and no telemetry, and model-assisted features stay switched off until you configure a provider or a local model. Nodus is open source under the AGPL-3.0-only licence, and every build links to its corresponding source.</p>
+      <div class="pills">
+        <span class="pill"><svg viewBox="0 0 24 24"><path d="m4 12.5 5 5L20 6.5"/></svg>100% local storage</span>
+        <span class="pill"><svg viewBox="0 0 24 24"><path d="m4 12.5 5 5L20 6.5"/></svg>Offline AI (Ollama · LM Studio)</span>
+        <span class="pill"><svg viewBox="0 0 24 24"><path d="m4 12.5 5 5L20 6.5"/></svg>Encrypted auto-backups</span>
+        <span class="pill"><svg viewBox="0 0 24 24"><path d="m4 12.5 5 5L20 6.5"/></svg>Audit ledger</span>
+        <span class="pill"><svg viewBox="0 0 24 24"><path d="m4 12.5 5 5L20 6.5"/></svg>Free forever (AGPL-3.0-only)</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================ next -->
+<section class="section-line" data-accent="#a78bfa" data-second="#818cf8" data-energy="0.26">
+  <div class="wrap">
+    <div class="section-head scrim reveal">
+      <span class="kicker">Keep going</span>
+      <h2 class="title" data-split>Where to go from here.</h2>
+    </div>
+    <div class="next-grid">
+      <a class="card lit next-card reveal" href="../zotero/">
+        <span class="pic"><svg viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20V3H6.5A2.5 2.5 0 0 0 4 5.5v14Z"/><path d="M9 7h6M9 11h6"/></svg></span>
+        <h3>Nodus and Zotero</h3>
+        <p>How the Zotero connection works, what it does and does not touch, and the standalone Nodus plugin that lives inside Zotero itself.</p>
+        <span class="arrow-link">Read about the Zotero integration
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>
+      </a>
+      <a class="card lit next-card reveal" href="../ai-research/" style="--delay:70ms">
+        <span class="pic"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M18.4 5.6l-2.1 2.1M7.7 16.3l-2.1 2.1"/></svg></span>
+        <h3>AI for academic research</h3>
+        <p>What the models are actually asked to do inside Nodus, how to run them locally, and where their output has to be checked.</p>
+        <span class="arrow-link">Read about AI-assisted research
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>
+      </a>
+      <a class="card lit next-card reveal" href="../wiki/" style="--delay:140ms">
+        <span class="pic"><svg viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20V3H6.5A2.5 2.5 0 0 0 4 5.5v14Z"/><path d="M4 19.5A2.5 2.5 0 0 0 6.5 22H20v-5"/></svg></span>
+        <h3>The manual</h3>
+        <p>Every view and setting of the academic vault documented in full, with a downloadable PDF manual for the research workflow.</p>
+        <span class="arrow-link">Open the wiki
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>
+      </a>
+      <a class="card lit next-card reveal" href="../faq/" style="--delay:210ms">
+        <span class="pic"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M9.5 9a2.5 2.5 0 1 1 3.7 2.2c-.7.4-1.2 1-1.2 1.8v.5M12 17h.01"/></svg></span>
+        <h3>Questions before you begin</h3>
+        <p>What to expect and what not to, how the AI setup works, and what Nodus does about academic rigour.</p>
+        <span class="arrow-link">Read the FAQ
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>
+      </a>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<footer class="site-foot">
+  <div class="wrap">
+    <div class="foot-grid">
+      <div class="foot-brand">
+        <span class="logo"><img src="../assets/nodus-logo.svg" alt=""/> Nodus</span>
+        <p>A free, open-source, local-first research workspace for connecting sources, ideas and evidence. Your corpus stays on your machine.</p>
+      </div>
+      <div class="foot-col">
+        <h4>Research</h4>
+        <a href="./">Academic research</a>
+        <a href="../zotero/">Nodus and Zotero</a>
+        <a href="../ai-research/">AI for research</a>
+        <a href="../demo/index.html">Live demos</a>
+      </div>
+      <div class="foot-col">
+        <h4>Learn</h4>
+        <a href="../wiki/">Wiki</a>
+        <a href="../blog/">Blog</a>
+        <a href="../faq/">FAQ</a>
+      </div>
+      <div class="foot-col">
+        <h4>Project</h4>
+        <a href="../contribute/">Contribute</a>
+        <a href="https://github.com/Drakonis96/nodus" target="_blank" rel="noopener">GitHub</a>
+        <a href="https://github.com/Drakonis96/nodus/releases" target="_blank" rel="noopener">Releases</a>
+      </div>
+    </div>
+    <div class="foot-base">
+      <span>© 2026 Jorge Pérez Burgueño and Nodus contributors.</span>
+      <a href="https://github.com/Drakonis96/nodus/blob/main/LICENSE" target="_blank" rel="noopener">AGPL-3.0-only</a>
+    </div>
+  </div>
+</footer>
+
+<script src="../assets/js/organism.js?v=20260815"></script>
+<script src="../assets/js/site.js?v=20260815"></script>
+<script src="../assets/js/back-to-top.js?v=20260817b"></script>
+</body>
+</html>
