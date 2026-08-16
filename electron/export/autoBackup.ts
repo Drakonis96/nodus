@@ -39,6 +39,15 @@ const TRASHED_BACKUP_RE = /^(.*\.nodus)\.trashed-(\d+)-(\d+)$/;
 
 let activeBackupOperation: string | null = null;
 
+function logBackupPerf(phase: string, startedAt: bigint, metadata: Record<string, string | number> = {}): bigint {
+  const endedAt = process.hrtime.bigint();
+  const elapsedMs = Number(endedAt - startedAt) / 1_000_000;
+  const rssMiB = process.memoryUsage().rss / (1024 * 1024);
+  const details = Object.entries(metadata).map(([key, value]) => `${key}=${value}`).join(' ');
+  console.log(`[perf][backup] phase=${phase} elapsedMs=${elapsedMs.toFixed(1)} rssMiB=${rssMiB.toFixed(1)}${details ? ` ${details}` : ''}`);
+  return endedAt;
+}
+
 async function withBackupOperation<T extends { ok: boolean; message: string }>(
   label: string,
   busyResult: (active: string) => T,
@@ -641,6 +650,8 @@ interface VerifiedBackupOptions {
 }
 
 async function writeVerifiedBackup(options: VerifiedBackupOptions): Promise<AutoBackupResult> {
+  const backupStartedAt = process.hrtime.bigint();
+  let phaseStartedAt = backupStartedAt;
   const settings = getSettings();
   const configuredFolder = settings.autoBackupFolder;
   if (!configuredFolder) return { ok: false, message: 'No hay carpeta de destino configurada.' };
@@ -663,6 +674,7 @@ async function writeVerifiedBackup(options: VerifiedBackupOptions): Promise<Auto
       appVersion: options.appVersion,
       recoveryKey,
     });
+    phaseStartedAt = logBackupPerf('archive-built', phaseStartedAt, { bytes: archive.byteLength });
     const hostname = os.hostname();
     const startedAt = new Date();
     // A manual click and an updater timer can land in the same second. Choose another
@@ -682,10 +694,14 @@ async function writeVerifiedBackup(options: VerifiedBackupOptions): Promise<Auto
     await fs.promises.writeFile(tmp, archive);
     await fs.promises.rename(tmp, target);
     committed = true;
+    phaseStartedAt = logBackupPerf('archive-written', phaseStartedAt, { bytes: archive.byteLength });
 
     // Re-read the committed file and prove it can be authenticated/decrypted before
     // deleting any older snapshot or letting an updater close the application.
-    const verification = verifyBackupArchive(await fs.promises.readFile(target), password);
+    const committedArchive = await fs.promises.readFile(target);
+    phaseStartedAt = logBackupPerf('archive-reread', phaseStartedAt, { bytes: committedArchive.byteLength });
+    const verification = verifyBackupArchive(committedArchive, password);
+    logBackupPerf('archive-verified', phaseStartedAt, { bytes: committedArchive.byteLength });
     if (!verification.ok) {
       fs.rmSync(target, { force: true });
       committed = false;
@@ -696,6 +712,7 @@ async function writeVerifiedBackup(options: VerifiedBackupOptions): Promise<Auto
     }
 
     const prunedCount = options.prune(folder, hostname);
+    logBackupPerf('run:complete', backupStartedAt, { bytes: committedArchive.byteLength });
     const locked = lockedApiKeyProviders();
     const warning = locked.length > 0
       ? ` Aviso: las claves de ${locked.join(', ')} no se pudieron leer del almacén seguro y no viajan en esta copia.`
