@@ -15,11 +15,14 @@
 //
 // Runs under Electron-as-Node so better-sqlite3 matches the app ABI.
 import assert from 'node:assert/strict';
+import { EventEmitter } from 'node:events';
+import fs from 'node:fs';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
+import { gzipSync } from 'node:zlib';
 import { fileURLToPath } from 'node:url';
 import { installRuntimeHooks, requireElectronRuntime } from './lib/tsRuntimeHooks.mjs';
 import { withServer } from './lib/nodusServerHarness.mjs';
@@ -32,7 +35,44 @@ if (!requireElectronRuntime(path.join(repoRoot, 'scripts/test-inbox-poller.mjs')
 }
 
 const userData = await mkdtemp(path.join(os.tmpdir(), 'nodus-poller-userdata-'));
-installRuntimeHooks(userData);
+const workerFixture = path.join(userData, 'serverPublishWorker.js');
+fs.writeFileSync(workerFixture, '// Existence check for the utility-process host.');
+process.env.NODUS_SERVER_PUBLISH_WORKER_FILE = workerFixture;
+
+// This suite exercises inbox and status behaviour, not snapshot construction. Preserve the
+// production boundary by answering through the utilityProcess contract instead of enabling
+// a main-process fallback in serverSyncService.
+class FakePublishUtility extends EventEmitter {
+  postMessage(request) {
+    const raw = Buffer.from(JSON.stringify({
+      format: 'nodus.server-snapshot',
+      formatVersion: 2,
+      revision: 'inbox-test-revision',
+      generatedAt: new Date().toISOString(),
+      vault: request.vault,
+      schemaVersion: 0,
+      assets: [],
+      library: null,
+      tables: {},
+    }));
+    queueMicrotask(() => this.emit('message', {
+      kind: 'done',
+      id: request.id,
+      compressed: gzipSync(raw),
+      rawBytes: raw.length,
+      revision: 'inbox-test-revision',
+      counts: {},
+      assets: [],
+      schemaVersion: 0,
+      vectors: [],
+    }));
+  }
+  kill() { return true; }
+}
+
+installRuntimeHooks(userData, {
+  utilityProcess: { fork: () => new FakePublishUtility() },
+});
 
 const { getDb } = require(path.join(repoRoot, 'electron/db/database.ts'));
 const { SCHEMA_VERSION } = require(path.join(repoRoot, 'electron/db/migrations.ts'));
@@ -205,7 +245,6 @@ test('a refused mutation is recorded once, however often it comes back', { timeo
     const remaining = await (await server.api(desktop.accessToken, 'GET', `/api/v1/spaces/${spaceId}/mutations`)).json();
     assert.equal(remaining.mutations.length, 1, 'a refusal must never be acknowledged away');
   });
-  await rm(userData, { recursive: true, force: true });
 });
 
 test('a sync error goes away when the sync works again', { timeout: 120_000 }, async () => {
@@ -234,8 +273,12 @@ test('a sync error goes away when the sync works again', { timeout: 120_000 }, a
     // next to a publication that had since succeeded and an inbox that had applied a change.
     updateSettings({ nodusServerUrl: server.origin });
     await syncNodusServerVaultNow(vaultId);
-    assert.equal(connection()?.phase, 'ok');
+    assert.equal(connection()?.phase, 'ok', connection()?.lastError ?? undefined);
     assert.equal(connection()?.lastError, null, 'an error that outlives its cause cannot be told apart from a live one');
   });
+});
+
+test.after(async () => {
+  delete process.env.NODUS_SERVER_PUBLISH_WORKER_FILE;
   await rm(userData, { recursive: true, force: true });
 });

@@ -76,12 +76,15 @@ const preloadBuild = (name: string, entry: string) => ({
   },
 });
 
-/** Utility entries are isolated self-contained ESM bundles: sharing a Rollup chunk with
- * the browser main entry can import Electron APIs that do not exist in a utility process. */
+/** A utility process must not share Rollup chunks with Electron's main entry: a shared
+ * chunk may pull `app`/`BrowserWindow` imports into a process where Electron does not
+ * expose them. Build it as one self-contained ESM file instead. */
 const utilityBuild = (name: string, entry: string) => ({
   onstart: (args: { reload: () => void }) => args.reload(),
   vite: {
-    resolve: { alias: { '@shared': path.resolve(__dirname, 'shared') } },
+    resolve: {
+      alias: { '@shared': path.resolve(__dirname, 'shared') },
+    },
     build: {
       outDir: 'dist-electron',
       emptyOutDir: false,
@@ -212,6 +215,7 @@ export default defineConfig({
       preloadBuild('preload.nodi', 'electron/preload/nodi.ts'),
       preloadBuild('preload.presenter', 'electron/preload/presenter.ts'),
       utilityBuild('backupUtilityWorker', 'electron/export/backupUtilityWorker.ts'),
+      utilityBuild('serverPublishWorker', 'electron/serverSync/serverPublishWorker.ts'),
     ]),
     renderer(),
   ],
