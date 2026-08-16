@@ -142,6 +142,21 @@ test('Codex App Server is reaped after its explicit idle limit', async () => {
   assert.equal(client.isRunning(), false, 'an unused @openai/codex process cannot survive indefinitely');
 });
 
+test('Codex App Server hard lifetime also reaps a wedged request', async () => {
+  const home = path.join(outDir, 'codex-lifetime-home');
+  fs.mkdirSync(home);
+  const client = new CodexAppServerClient({
+    binaryPath: fakeAppServer(),
+    codexHome: home,
+    appVersion: 'test',
+    requestTimeoutMs: 5_000,
+    idleTimeoutMs: 5_000,
+    maxLifetimeMs: 30,
+  });
+  await assert.rejects(client.request('never-replies'), /se ha cerrado/);
+  assert.equal(client.isRunning(), false, 'a stuck request cannot extend the child lifetime ceiling');
+});
+
 class CompletionTransport {
   handlers = new Set();
   calls = [];
