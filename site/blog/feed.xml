@@ -7,7 +7,19 @@
     <atom:link href="https://nodusresearch.com/blog/feed.xml" rel="self" type="application/rss+xml"/>
     <description>Notes from the Nodus project: comparisons with the tools around it, workflows worth stealing, and what is being built next.</description>
     <language>en</language>
-    <lastBuildDate>Sun, 16 Aug 2026 12:00:00 GMT</lastBuildDate>
+    <lastBuildDate>Mon, 17 Aug 2026 12:00:00 GMT</lastBuildDate>
+    <item>
+      <title>How Nodus can support research in the humanities</title>
+      <link>https://nodusresearch.com/blog/post.html?p=how-nodus-can-support-research-in-the-humanities</link>
+      <guid isPermaLink="true">https://nodusresearch.com/blog/post.html?p=how-nodus-can-support-research-in-the-humanities</guid>
+      <pubDate>Mon, 17 Aug 2026 12:00:00 GMT</pubDate>
+      <description>Humanities projects rarely fit one tool: books, archival documents, photographs, interviews and datasets all belong to the same argument. Nodus keeps them in one local-first workspace, with every finding still attached to its source.</description>
+      <category>Humanities</category>
+      <category>Digital Humanities</category>
+      <category>Archives</category>
+      <category>Research</category>
+      <category>AI</category>
+    </item>
     <item>
       <title>How to Organize a Large Academic Research Library</title>
       <link>https://nodusresearch.com/blog/post.html?p=how-to-organize-a-large-academic-research-library</link>
