@@ -39,6 +39,10 @@
 
 .reader-selection-colors { display: flex; gap: 1px; }
 .reader-selection-actions .reader-selection-color { width: 25px; }
+/* On a highlight the reader clicked, the colour it already has stays marked so
+   the palette reads as a choice among six rather than six new highlights. */
+.reader-selection-actions .reader-selection-color.is-active { background: #3730a3; }
+.reader-selection-actions .reader-selection-color.is-active span { border-color: #fff; }
 .reader-selection-color span,
 .reader-highlighter-palette button span {
   width: 16px;
@@ -132,6 +136,8 @@
    on white that ring vanishes and the pale swatches lose their edge. */
 .light .reader-selection-color span,
 .light .reader-highlighter-palette button span { border-color: rgb(24 24 27 / 0.22); }
+.light .reader-selection-actions .reader-selection-color.is-active { background: #eef2ff; }
+.light .reader-selection-actions .reader-selection-color.is-active span { border-color: #4338ca; }
 .light .reader-active-color { box-shadow: 0 0 0 1px rgb(24 24 27 / 0.3); }
 .light .reader-selection-actions button[data-tone='danger'] { color: #dc2626; }
 .light .reader-selection-actions button[data-tone='danger']:hover,

@@ -543,8 +543,11 @@ ${longReaderBody}
       const selection = window.getSelection();
       selection.removeAllRanges();
       selection.addRange(range);
-      root.dispatchEvent(new PointerEvent('pointerup', { bubbles: true }));
-      return range.toString();
+      const releaseRect = range.getBoundingClientRect();
+      // A real selection ends under the pointer, and the ribbon is placed there.
+      const release = { x: releaseRect.right, y: releaseRect.top + releaseRect.height / 2 };
+      root.dispatchEvent(new PointerEvent('pointerup', { bubbles: true, clientX: release.x, clientY: release.y }));
+      return { text: range.toString(), release };
     }, index);
   };
 
@@ -571,10 +574,14 @@ ${longReaderBody}
     assert.ok(geometry.scrollWidth <= geometry.clientWidth + 1, `${label} never expands the complete reader viewport`);
   };
 
-  await selectCandidate(1);
+  const cleanSelection = await selectCandidate(1);
   const selectionBar = page.locator('.reader-selection-actions');
   await selectionBar.waitFor({ state: 'visible' });
   assert.equal(await selectionBar.locator('.reader-selection-color').count(), 6);
+  // Highlighting from the library follows the pointer that ended the selection.
+  const cleanRibbonBox = await selectionBar.boundingBox();
+  assert.ok(Math.abs(cleanRibbonBox.x + cleanRibbonBox.width / 2 - cleanSelection.release.x) <= 2, `ribbon centred on the pointer (${cleanRibbonBox.x + cleanRibbonBox.width / 2} vs ${cleanSelection.release.x})`);
+  assert.ok(cleanRibbonBox.y + cleanRibbonBox.height <= cleanSelection.release.y, 'ribbon sits above the pointer');
   const highlightStarted = Date.now();
   await selectionBar.locator('.reader-selection-color').first().click();
   await page.waitForFunction(() => {
@@ -659,7 +666,8 @@ ${longReaderBody}
     const span = document.querySelector('[data-testid="library-reader-pdf-viewer"] .textLayer span');
     if (!(span instanceof HTMLElement) || !span.firstChild?.textContent) throw new Error('PDF text layer is empty');
     const range = document.createRange(); range.selectNodeContents(span.firstChild); const selection = window.getSelection(); selection.removeAllRanges(); selection.addRange(range);
-    span.dispatchEvent(new PointerEvent('pointerup', { bubbles: true }));
+    const spanRect = range.getBoundingClientRect();
+    span.dispatchEvent(new PointerEvent('pointerup', { bubbles: true, clientX: spanRect.right, clientY: spanRect.top + spanRect.height / 2 }));
   });
   await page.locator('.reader-selection-actions').waitFor({ state: 'visible' });
   await page.locator('.reader-selection-actions .reader-selection-color').first().click();
@@ -731,7 +739,8 @@ ${longReaderBody}
     while (node && !node.textContent?.includes('Este texto')) node = walker.nextNode();
     if (!node?.textContent) throw new Error('EPUB text missing'); const start = node.textContent.indexOf('Este texto');
     const range = document.createRange(); range.setStart(node, start); range.setEnd(node, start + 28); const selection = window.getSelection(); selection.removeAllRanges(); selection.addRange(range);
-    root.dispatchEvent(new PointerEvent('pointerup', { bubbles: true }));
+    const rect = range.getBoundingClientRect();
+    root.dispatchEvent(new PointerEvent('pointerup', { bubbles: true, clientX: rect.right, clientY: rect.top + rect.height / 2 }));
   });
   await page.locator('.reader-selection-actions').waitFor({ state: 'visible' });
   await page.locator('.reader-selection-actions .reader-selection-color').nth(2).click();

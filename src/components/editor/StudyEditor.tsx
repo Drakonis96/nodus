@@ -37,6 +37,7 @@ import { Icon, ICON_NAMES, Spinner } from '../ui';
 import { TextInputModal } from '../TextInputModal';
 import { t } from '../../i18n';
 import { DocOutline } from './DocOutline';
+import { anchorToolbarToPointer } from './pointerAnchoredToolbar';
 import { StudyDictation } from './StudyDictation';
 import { StudyImproveDialog } from './StudyImproveDialog';
 import { AudioPanel } from '../AudioPanel';
@@ -134,6 +135,8 @@ const MilkdownCanvas = forwardRef<MilkdownCanvasHandle, {
     }));
     let disposed = false;
     let toolbarObserver: MutationObserver | null = null;
+    let anchoredToolbar: HTMLElement | null = null;
+    let detachAnchor: (() => void) | null = null;
     void crepe.create().then(() => {
       if (disposed) return;
       const editable = root.querySelector('[contenteditable="true"]');
@@ -149,6 +152,11 @@ const MilkdownCanvas = forwardRef<MilkdownCanvasHandle, {
           host.className = 'study-selection-tools-host';
           toolbar.append(host);
         }
+        if (anchoredToolbar !== toolbar) {
+          detachAnchor?.();
+          anchoredToolbar = toolbar;
+          detachAnchor = anchorToolbarToPointer(root.parentElement ?? root, toolbar);
+        }
         onToolbarElement(host);
         return host;
       };
@@ -156,7 +164,7 @@ const MilkdownCanvas = forwardRef<MilkdownCanvasHandle, {
       toolbarObserver = new MutationObserver(() => { findToolbar(); });
       toolbarObserver.observe(root.parentElement ?? root, { childList: true, subtree: true });
     });
-    return () => { disposed = true; toolbarObserver?.disconnect(); onToolbarElement(null); crepeRef.current = null; void crepe.destroy(); };
+    return () => { disposed = true; toolbarObserver?.disconnect(); detachAnchor?.(); onToolbarElement(null); crepeRef.current = null; void crepe.destroy(); };
   }, [documentId, spellcheck, language]);
 
   useImperativeHandle(ref, () => ({
