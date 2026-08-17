@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { deriveNodiNoteTitle } from '@shared/nodiNotes';
 import { announcementCopyFor, type AnnouncementRefreshResult } from '@shared/announcements';
+import { NODI_DEFAULT_CONTEXTS } from '@shared/types';
 import type { AppSettings, ModelRef, NodiChatMessage, NodiContextKind, NodiConversation, NodiNote, NodiNotification, NodiOverlayPlacement, NodiQuoteSelection, VaultType } from '@shared/types';
 import { vaultTypeColor } from '@shared/vaultTypes';
 import { type NodiRole, type NodiState } from './Nodi';
@@ -159,7 +160,10 @@ export function NodiCompanion({ context, costumes }: { context: Ctx; costumes?: 
   const [input, setInput] = useState('');
   const [quotedSelection, setQuotedSelection] = useState<string | null>(null);
   const [streaming, setStreaming] = useState(false);
-  const [contexts, setContexts] = useState<NodiContextKind[]>(['documentation', 'current_view']);
+  // The current vault is on by default (see NODI_DEFAULT_CONTEXTS). Its retrieval
+  // is a bounded, paged semantic scan — never the whole corpus, and never a scan
+  // that holds the window (see electron/db/vectorScan.ts).
+  const [contexts, setContexts] = useState<NodiContextKind[]>([...NODI_DEFAULT_CONTEXTS]);
   const [conversations, setConversations] = useState<NodiConversation[]>([]);
   const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
   const [chatTool, setChatTool] = useState<'none' | 'history' | 'contexts' | 'settings'>('none');

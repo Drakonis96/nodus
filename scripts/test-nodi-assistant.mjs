@@ -454,3 +454,46 @@ test('Nodi receives aggregated, rate-limited lifecycle notifications', async () 
   assert.match(component, /latestNotificationId/);
   assert.match(component, /setCelebrate\(true\)/);
 });
+
+test('a new Nodi chat starts on documentation, the current view and the current vault', async () => {
+  const [types, companion, store] = await Promise.all([
+    read('@api'),
+    read('src/components/nodi/NodiCompanion.tsx'),
+    read('electron/nodiConversations.ts'),
+  ]);
+  assert.match(
+    types,
+    /export const NODI_DEFAULT_CONTEXTS: NodiContextKind\[\] = \['documentation', 'current_view', 'vault'\];/,
+    'the current vault is selected by default, next to the documentation and the visible view'
+  );
+  // One definition: the panel and the stored history must open on the same set.
+  assert.match(companion, /useState<NodiContextKind\[\]>\(\[\.\.\.NODI_DEFAULT_CONTEXTS\]\)/);
+  assert.match(store, /return \[\.\.\.NODI_DEFAULT_CONTEXTS\]/);
+  // Reaching into every other vault stays a per-question decision.
+  assert.doesNotMatch(types, /NODI_DEFAULT_CONTEXTS[^\n]*all_vaults/);
+});
+
+test('the chat retrieval never holds the main process for a whole similarity scan', async () => {
+  const assistant = await read('electron/ai/researchAssistant.ts');
+  // researchAssistant builds the context for the research chat AND for Nodi's
+  // active-vault context, both while the user is looking at the window. The
+  // blocking queries scan every embedded row inside one statement: measured on a
+  // real corpus (13,799 ideas, 44,138 passages) that is 95 ms per idea scan and
+  // 366 ms per passage scan of frozen UI — the beachball. The paged scans
+  // (db/vectorScan.ts) return the same rows and yield between rowid windows.
+  for (const blocking of ['findSimilarIdeas', 'findSimilarWorks', 'findSimilarPassages']) {
+    assert.doesNotMatch(
+      assistant,
+      new RegExp(`${blocking}\\(`),
+      `${blocking}() blocks the event loop for the whole scan — use ${blocking}Paged()`
+    );
+  }
+  for (const paged of ['findSimilarIdeasPaged', 'findSimilarWorksPaged', 'findSimilarPassagesPaged']) {
+    assert.match(assistant, new RegExp(`await ${paged}\\(`), `${paged} is awaited`);
+  }
+  // The passage section is the largest scan of all and runs twice per question.
+  assert.match(assistant, /async function listRelevantPassages/);
+  assert.match(assistant, /await listRelevantPassages\(/);
+  assert.match(assistant, /async function selectDocumentWorks/);
+  assert.match(assistant, /await selectDocumentWorks\(/);
+});

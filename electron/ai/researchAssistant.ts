@@ -23,9 +23,9 @@ import { resolveWorkText } from '../extraction/textExtractor';
 import { completeText, completeTextStream, resolveModelRef, localModelContextWindow } from './aiClient';
 import { embed } from './aiClient';
 import { enforceContextBudget, humanizeCitationLabels } from './researchContextFit';
-import { findSimilarWorks } from '../db/workSummariesRepo';
-import { findSimilarPassages } from '../db/passagesRepo';
-import { findSimilarIdeas } from '../db/ideasRepo';
+import { findSimilarWorksPaged } from '../db/workSummariesRepo';
+import { findSimilarPassagesPaged } from '../db/passagesRepo';
+import { findSimilarIdeasPaged } from '../db/ideasRepo';
 
 const MAX_HISTORY_MESSAGES = 12;
 const MAX_DOCUMENTS = 30;
@@ -42,10 +42,19 @@ const MAX_PASSAGE_CONTEXT_CHARS = 24_000;
 // ── Query-relevant retrieval ────────────────────────────────────────────────
 // The graph sections used to dump the whole corpus regardless of the question,
 // which overflowed the model's context window on large libraries. Instead we
-// retrieve a top-K slice ranked by the question's embedding (via findSimilarIdeas
-// / findSimilarWorks) and scope every derived section to that slice. When no
-// embedding provider is configured we fall back to a bounded, most-supported
-// slice so the payload is always capped.
+// retrieve a top-K slice ranked by the question's embedding (via the paged
+// findSimilarIdeasPaged / findSimilarWorksPaged scans) and scope every derived
+// section to that slice. When no embedding provider is configured we fall back
+// to a bounded, most-supported slice so the payload is always capped.
+//
+// Every similarity search here is the paged variant on purpose (see
+// db/vectorScan.ts). This module builds the context for the research chat AND
+// for Nodi's active-vault context, both of which run while the user is looking
+// at the window: on the reference corpus (13,799 ideas, 44,138 passages) the
+// blocking queries held the main process for 95 ms per idea scan and 366 ms per
+// passage scan — with two passage scans per question that is most of a second of
+// frozen UI, per message. The paged scans return the same rows in the same order
+// and never hold the loop for more than ~10 ms at a time.
 const IDEA_SIM_THRESHOLD = 0.28;
 const TOP_K_IDEAS = 60;
 const MAX_OCCURRENCES_PER_IDEA = 6;
@@ -499,7 +508,7 @@ async function buildRelevanceScope(selection: ResearchContextSelection, question
   // active provider) must fall back to the bounded default rather than filter
   // every section down to nothing — so an empty result becomes a null scope,
   // not an empty one. queryEmbedding is kept for documents/passages retrieval.
-  const similarIdeas = findSimilarIdeas(queryEmbedding, IDEA_SIM_THRESHOLD, TOP_K_IDEAS).map((row) => row.global_id);
+  const similarIdeas = (await findSimilarIdeasPaged(queryEmbedding, IDEA_SIM_THRESHOLD, TOP_K_IDEAS)).map((row) => row.global_id);
   const ideaIds = similarIdeas.length ? similarIdeas : null;
   const ideaIdSet = ideaIds ? new Set(ideaIds) : null;
 
@@ -511,7 +520,7 @@ async function buildRelevanceScope(selection: ResearchContextSelection, question
       .all(...ideaIds) as { nodus_id: string }[];
     for (const row of rows) workIds.add(row.nodus_id);
   }
-  for (const row of findSimilarWorks(queryEmbedding, WORK_SIM_THRESHOLD, TOP_K_SCOPE_WORKS)) {
+  for (const row of await findSimilarWorksPaged(queryEmbedding, WORK_SIM_THRESHOLD, TOP_K_SCOPE_WORKS)) {
     workIds.add(row.nodus_id);
   }
   const workIdSet = workIds.size ? workIds : null;
@@ -613,7 +622,7 @@ async function buildResearchContext(
   // Default to enabled for historic saved selections created before the passage
   // toggle existed. Explicit false still gives the reader full control.
   if (selection.passages !== false) {
-    const passages = listRelevantPassages(scope.queryEmbedding, passageScopeWorkIds, heavyCap);
+    const passages = await listRelevantPassages(scope.queryEmbedding, passageScopeWorkIds, heavyCap);
     context.pasajes_relevantes = passages;
     sections.push('Pasajes de texto completo');
   }
@@ -1066,7 +1075,7 @@ async function listDocuments(
   // (file reads, OCR) for documents that would just be pruned to fit the window.
   const docTotal = Math.min(MAX_DOCUMENT_TOTAL_CHARS, Math.max(0, budget));
   const perDoc = Math.min(MAX_DOCUMENT_CHARS, docTotal || MAX_DOCUMENT_CHARS);
-  const candidateWorks = selectDocumentWorks(linkedWorkIds, queryEmbedding);
+  const candidateWorks = await selectDocumentWorks(linkedWorkIds, queryEmbedding);
   const works = candidateWorks.slice(0, MAX_DOCUMENTS);
   const omitted = Math.max(0, candidateWorks.length - works.length);
   const settings = getSettings();
@@ -1113,7 +1122,7 @@ async function listDocuments(
   return { documents, summaries, omitted, truncated };
 }
 
-function selectDocumentWorks(linkedWorkIds: Set<string>, queryEmbedding: number[] | null): WorkRow[] {
+async function selectDocumentWorks(linkedWorkIds: Set<string>, queryEmbedding: number[] | null): Promise<WorkRow[]> {
   const db = getDb();
   let works: WorkRow[];
   if (linkedWorkIds.size > 0) {
@@ -1131,7 +1140,9 @@ function selectDocumentWorks(linkedWorkIds: Set<string>, queryEmbedding: number[
     (b.year ?? 0) - (a.year ?? 0) ||
     a.title.localeCompare(b.title);
   if (!queryEmbedding) return works.sort(fallback);
-  const similarities = new Map(findSimilarWorks(queryEmbedding, -1, Math.max(works.length, MAX_SUMMARIES)).map((row) => [row.nodus_id, row.similarity]));
+  const similarities = new Map(
+    (await findSimilarWorksPaged(queryEmbedding, -1, Math.max(works.length, MAX_SUMMARIES))).map((row) => [row.nodus_id, row.similarity])
+  );
   return works.sort((a, b) => {
     const aSimilarity = similarities.get(a.nodus_id);
     const bSimilarity = similarities.get(b.nodus_id);
@@ -1140,19 +1151,19 @@ function selectDocumentWorks(linkedWorkIds: Set<string>, queryEmbedding: number[
   });
 }
 
-function listRelevantPassages(
+async function listRelevantPassages(
   queryEmbedding: number[] | null,
   linkedWorkIds: Set<string>,
   budget = MAX_TOTAL_CONTEXT_CHARS
-): unknown[] {
+): Promise<unknown[]> {
   if (!queryEmbedding) return [];
   const passageTotal = Math.min(MAX_PASSAGE_CONTEXT_CHARS, Math.max(0, budget));
   const scoped = linkedWorkIds.size
-    ? findSimilarPassages(queryEmbedding, PASSAGE_SIM_THRESHOLD, TOP_K_SCOPED_PASSAGES, {
+    ? await findSimilarPassagesPaged(queryEmbedding, PASSAGE_SIM_THRESHOLD, TOP_K_SCOPED_PASSAGES, {
         nodusIds: [...linkedWorkIds],
       })
     : [];
-  const global = findSimilarPassages(queryEmbedding, PASSAGE_SIM_THRESHOLD, TOP_K_GLOBAL_PASSAGES);
+  const global = await findSimilarPassagesPaged(queryEmbedding, PASSAGE_SIM_THRESHOLD, TOP_K_GLOBAL_PASSAGES);
   const unique = new Map<string, (typeof global)[number]>();
   for (const passage of [...scoped, ...global]) {
     if (!unique.has(passage.passage_id)) unique.set(passage.passage_id, passage);
