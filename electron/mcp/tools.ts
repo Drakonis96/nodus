@@ -1231,7 +1231,7 @@ export function registerTools(server: McpServer): void {
           );
         }
         return {
-          ideas: ideas.findSimilarIdeas(vector, -1, limit),
+          ideas: await ideas.findSimilarIdeasPaged(vector, -1, limit),
           ...searchCoverage(ideas.embeddedIdeaCount(), count('ideas'), 'ideas'),
         };
       })()
@@ -1689,7 +1689,12 @@ export function registerTools(server: McpServer): void {
             'No embeddings available. Configure the embedding provider and key in Nodus Settings.'
           );
         }
-        const hits = passages.findSimilarPassages(vector, minSimilarity, limit, nodusId ? { nodusIds: [nodusId] } : {});
+        const hits = await passages.findSimilarPassagesPaged(
+          vector,
+          minSimilarity,
+          limit,
+          nodusId ? { nodusIds: [nodusId] } : {}
+        );
         return {
           ...searchCoverage(passages.embeddedPassageCount(), count('passages'), 'full-text passages'),
           passages: hits.map((hit) => ({
