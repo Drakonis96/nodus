@@ -95,6 +95,12 @@ const RELEASE_3_2_4_TR: string[] = [
 ];
 
 export const RELEASE_NOTES_TR: Record<string, string[]> = {
+  "4.1.5": [
+    "Seçenekler şeridi artık işaretçiyi bıraktığınız yerde beliriyor. Önceden seçimin ilk satırının üzerinde duruyordu, bu yüzden bir paragrafı yukarıdan aşağıya sürüklemek onu baktığınız yerden uzağa bırakıyordu. Ayrıca seçim büyürken onu izlemek yerine bırakmanızı bekliyor. Klavyeyle yapılan bir seçimde şerit metin imlecini izliyor. Bu hem okuyucu için hem de çalışma alanı, çalışma ve öğretim not düzenleyicileri için geçerli.",
+    "Kayıtlı bir vurguya bastığınızda artık şeridin tamamı yeniden açılıyor. Önceden yalnızca silmeyi sunuyordu. Artık renkler, yorum, kopyalama, yer imi ve Nodi'de alıntılama elinizin altında, hâlihazırdaki rengi işaretli ve çöp kutusu en sonda. Bir vurgunun rengini değiştirmek artık oradan yapılıyor.",
+    "Nodi'ye ya da araştırma sohbetine soru sormak artık pencereyi dondurmuyor. Benzerlik araması bütün külliyatı tek seferde tarıyor ve yanıt gelmeye başlayana kadar uygulamayı kıpırdatmıyordu. Artık külliyatı bölümler hâlinde tarıyor ve tam olarak aynı sonuçları veriyor. Ayrıca yeni bir sohbet etkin kasa zaten seçili olarak başlıyor, çünkü sorduğunuz şey neredeyse her zaman odur. Tüm kasalar bir tık uzağınızda kalmayı sürdürüyor.",
+    "Bir MCP istemcisinin yaptığı aramalar artık Nodus penceresini engellemiyor. Başka bir uygulamadan fikir ya da pasaj aramak, ekranda bunu açıklayan hiçbir şey olmadan Nodus'u arkada donduruyordu, üstelik turdaki her arama için yeniden. Bu iki arama artık külliyatı bölümler hâlinde tarıyor ve aynı sıralamayı veriyor.",
+  ],
   "4.1.4": [
     "Nodus artık nodusresearch.com adresinde yeni bir eve sahip. Yeni site wiki’yi, kılavuzları, etkileşimli demoları, sık sorulan soruları, blogu ve katkıda bulunma sayfasını bir araya getiriyor. İlk bakışta yönünüzü bulmanız için yeniden tasarlandı ve küçük ekranlarda daha iyi çalışıyor. Uygulama size bunu yalnızca bir kez bildirecek ve bildirim merkezi yeni adresi açacak.",
     "Otomatik yedeklemeler ve bağlı kasaların yayımlanması artık uygulamayı engellemiyor. Ağır işler ana pencerenin dışında çalışıyor, sınırlı bellek kullanıyor ve harici bir süreç takılırsa durduruluyor. Büyük bir kasa şifrelenirken, sıkıştırılırken veya sunucuya gönderilirken Nodus’u kullanmaya devam edebilirsiniz. Başarısız yayımlar yeniden denemeden önce bekliyor ve değişmeyen veriler yeniden oluşturulmuyor.",

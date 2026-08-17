@@ -155,6 +155,12 @@ const RELEASE_3_2_4_IT: string[] = [
 ];
 
 export const RELEASE_NOTES_IT: Record<string, string[]> = {
+  "4.1.5": [
+    "Il nastro delle opzioni compare ora dove hai rilasciato il puntatore. Prima si posizionava sopra la prima riga della selezione, così trascinare un paragrafo dall'alto verso il basso lo lasciava lontano da dove stavi guardando. Aspetta inoltre che tu rilasci, invece di seguire la selezione mentre cresce. Una selezione fatta con la tastiera segue il cursore di testo. Vale sia per il lettore sia per gli editor di note dello spazio di lavoro, dello studio e dell'insegnamento.",
+    "Premendo un'evidenziazione salvata si riapre l'intero nastro. Prima offriva soltanto di cancellarla. Ora hai i colori, il commento, copia, il segnalibro e cita in Nodi, con il colore che ha già selezionato e il cestino alla fine. Cambiare colore a un'evidenziazione si fa ora da lì.",
+    "Chiedere a Nodi o alla chat di ricerca non blocca più la finestra. La ricerca per somiglianza percorreva tutto il corpus in una sola volta e lasciava l'applicazione ferma finché la risposta non iniziava ad arrivare. Ora lo percorre a tratti e restituisce esattamente gli stessi risultati. Inoltre una chat nuova parte con il vault attivo già selezionato, perché quasi sempre è quello di cui stai chiedendo. Tutti i vault resta a un clic di distanza.",
+    "Le ricerche fatte da un client MCP non bloccano più la finestra di Nodus. Cercare idee o passaggi da un'altra applicazione congelava Nodus sullo sfondo, senza nulla sullo schermo che lo spiegasse, e di nuovo a ogni ricerca del turno. Quelle due ricerche ora percorrono il corpus a tratti e restituiscono lo stesso ordine dei risultati.",
+  ],
   "4.1.4": [
     "Nodus ha una nuova casa su nodusresearch.com. Il nuovo sito riunisce wiki, manuali, demo interattive, domande frequenti, blog e una pagina per contribuire. È stato riprogettato per orientarti al primo sguardo e funziona meglio sugli schermi piccoli. L’applicazione ti avviserà una sola volta e il centro notifiche aprirà il nuovo indirizzo.",
     "I backup automatici e la pubblicazione dei vault connessi non bloccano più l’applicazione. Il lavoro pesante ora avviene fuori dalla finestra principale, usa una quantità di memoria limitata e si interrompe se un processo esterno si blocca. Puoi continuare a usare Nodus mentre un vault grande viene cifrato, compresso o inviato al server. Le pubblicazioni non riuscite attendono prima di riprovare e i dati invariati non vengono ricostruiti.",

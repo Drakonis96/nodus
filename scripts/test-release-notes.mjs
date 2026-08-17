@@ -25,14 +25,23 @@ try {
 
   const { RELEASE_NOTES, releaseNotesForMajor, compareVersions } = await import(pathToFileURL(bundlePath).href);
   const currentRelease = RELEASE_NOTES[0];
-  assert.equal(currentRelease?.version, '4.1.4');
-  assert.equal(currentRelease?.date, '2026-08-16');
+  assert.equal(currentRelease?.version, '4.1.5');
+  assert.equal(currentRelease?.date, '2026-08-17');
   assert.equal(currentRelease?.highlights.length, 4);
-  assert.deepEqual(currentRelease?.highlights.map((highlight) => highlight.scope), ['general', 'general', 'general', 'nodi']);
-  assert.ok(currentRelease?.highlights.some((highlight) => /new home at nodusresearch\.com/.test(highlight.en)));
-  assert.ok(currentRelease?.highlights.some((highlight) => /no longer block the app/.test(highlight.en)));
-  assert.ok(currentRelease?.highlights.some((highlight) => /first administrator account/.test(highlight.en)));
-  assert.ok(currentRelease?.highlights.some((highlight) => /notification centre now gives a clear answer/.test(highlight.en)));
+  assert.deepEqual(currentRelease?.highlights.map((highlight) => highlight.scope), ['general', 'academic', 'nodi', 'mcp']);
+  assert.ok(currentRelease?.highlights.some((highlight) => /where you released the pointer/.test(highlight.en)));
+  assert.ok(currentRelease?.highlights.some((highlight) => /reopens the whole ribbon/.test(highlight.en)));
+  assert.ok(currentRelease?.highlights.some((highlight) => /no longer freezes the window/.test(highlight.en)));
+  assert.ok(currentRelease?.highlights.some((highlight) => /MCP client no longer block the Nodus window/.test(highlight.en)));
+
+  // 4.1.4 keeps the four it shipped with. They are published history.
+  const newHomeRelease = RELEASE_NOTES.find((note) => note.version === '4.1.4');
+  assert.equal(newHomeRelease?.date, '2026-08-16');
+  assert.equal(newHomeRelease?.highlights.length, 4);
+  assert.ok(newHomeRelease?.highlights.some((highlight) => /new home at nodusresearch\.com/.test(highlight.en)));
+  assert.ok(newHomeRelease?.highlights.some((highlight) => /no longer block the app/.test(highlight.en)));
+  assert.ok(newHomeRelease?.highlights.some((highlight) => /first administrator account/.test(highlight.en)));
+  assert.ok(newHomeRelease?.highlights.some((highlight) => /notification centre now gives a clear answer/.test(highlight.en)));
 
   // 4.1.3 keeps the two it shipped with. They are published history.
   const readingPositionRelease = RELEASE_NOTES.find((note) => note.version === '4.1.3');

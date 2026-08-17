@@ -1106,6 +1106,49 @@ const RELEASE_4_1_3_HIGHLIGHTS: RawReleaseHighlight[] = [
   },
 ];
 
+/**
+ * 4.1.5 — the selection ribbon lands where the hand left it, and the two remaining
+ * places that stopped the window while it thought stop doing it.
+ */
+const RELEASE_4_1_5_HIGHLIGHTS: RawReleaseHighlight[] = [
+  {
+    scope: 'general',
+    es: 'La cinta de opciones aparece ahora donde soltaste el ratón. Antes se colocaba sobre la primera línea de la selección, así que arrastrar un párrafo de arriba abajo la dejaba lejos de donde estabas mirando. También espera a que sueltes en lugar de seguir a la selección mientras crece. Si seleccionas con el teclado, la cinta sigue al cursor. Vale igual para el lector y para los editores de notas del espacio de trabajo, de estudio y de docencia.',
+    en: 'The options ribbon now appears where you released the pointer. It used to sit above the first line of the selection, so dragging a paragraph downwards left it far from where you were looking. It also waits for you to let go instead of following the selection as it grows. A selection made with the keyboard follows the caret instead. This applies to the reader and to the note editors in the workspace, study and teaching.',
+    fr: 'Le ruban d’options apparaît désormais là où vous avez relâché le pointeur. Il se plaçait avant au-dessus de la première ligne de la sélection, si bien que faire glisser un paragraphe vers le bas le laissait loin de votre regard. Il attend aussi que vous relâchiez au lieu de suivre la sélection pendant qu’elle grandit. Une sélection faite au clavier suit le curseur de texte. Cela vaut pour le lecteur comme pour les éditeurs de notes de l’espace de travail, des études et de l’enseignement.',
+    de: 'Das Optionsband erscheint jetzt dort, wo Sie den Zeiger losgelassen haben. Früher saß es über der ersten Zeile der Auswahl, sodass es beim Ziehen eines Absatzes nach unten weit weg von Ihrem Blick lag. Es wartet außerdem auf das Loslassen, statt der wachsenden Auswahl zu folgen. Eine mit der Tastatur getroffene Auswahl folgt stattdessen der Schreibmarke. Das gilt für den Reader ebenso wie für die Notizeditoren in Arbeitsbereich, Studium und Unterricht.',
+    pt: 'A fita de opções aparece agora onde largou o rato. Antes ficava sobre a primeira linha da seleção, por isso arrastar um parágrafo de cima para baixo deixava-a longe de onde estava a olhar. Também espera que largue, em vez de seguir a seleção enquanto ela cresce. Se selecionar com o teclado, a fita segue o cursor de texto. Vale tanto para o leitor como para os editores de notas do espaço de trabalho, do estudo e do ensino.',
+    'pt-BR': 'A faixa de opções aparece agora onde você soltou o mouse. Antes ela ficava sobre a primeira linha da seleção, então arrastar um parágrafo de cima para baixo a deixava longe de onde você estava olhando. Ela também espera você soltar, em vez de seguir a seleção enquanto cresce. Se você selecionar com o teclado, a faixa segue o cursor de texto. Vale tanto para o leitor quanto para os editores de notas do espaço de trabalho, do estudo e do ensino.',
+  },
+  {
+    scope: 'academic',
+    es: 'Al pulsar un subrayado guardado vuelve a abrirse la cinta completa. Antes solo ofrecía borrarlo. Ahora tienes los colores, el comentario, copiar, el marcador y citar en Nodi, con el color que ya tiene marcado y la papelera al final. Cambiar de color un subrayado ya funciona desde ahí.',
+    en: 'Clicking a stored highlight now reopens the whole ribbon. It used to offer deletion alone. You get the colours, the comment, copy, the bookmark and quoting in Nodi, with the colour it already has marked and the bin at the end. Recolouring a highlight now works from there.',
+    fr: 'Cliquer sur un surlignage enregistré rouvre désormais le ruban entier. Il ne proposait avant que la suppression. Vous retrouvez les couleurs, le commentaire, la copie, le signet et la citation dans Nodi, avec la couleur qu’il a déjà cochée et la corbeille à la fin. Changer la couleur d’un surlignage se fait maintenant de là.',
+    de: 'Ein Klick auf eine gespeicherte Markierung öffnet jetzt das ganze Band. Zuvor bot es nur das Löschen an. Sie erhalten die Farben, den Kommentar, Kopieren, das Lesezeichen und das Zitieren in Nodi, mit der bereits vorhandenen Farbe markiert und dem Papierkorb am Ende. Die Farbe einer Markierung lässt sich nun von dort ändern.',
+    pt: 'Ao carregar num sublinhado guardado, a fita completa volta a abrir. Antes só oferecia apagá-lo. Agora tem as cores, o comentário, copiar, o marcador e citar no Nodi, com a cor que já tem assinalada e o caixote no fim. Mudar a cor de um sublinhado passa a fazer-se a partir daí.',
+    'pt-BR': 'Ao clicar em um destaque salvo, a faixa completa volta a abrir. Antes ela só oferecia excluí-lo. Agora você tem as cores, o comentário, copiar, o marcador e citar no Nodi, com a cor que ele já tem assinalada e a lixeira no fim. Mudar a cor de um destaque passa a ser feito ali mesmo.',
+  },
+  {
+    scope: 'nodi',
+    es: 'Preguntar a Nodi o al chat de investigación ya no congela la ventana. La búsqueda por similitud recorría todo el corpus de una sola vez y dejaba la aplicación quieta hasta que empezaba a llegar la respuesta. Ahora lo recorre por tramos y devuelve exactamente los mismos resultados. Además, un chat nuevo empieza con la bóveda activa ya seleccionada, porque casi siempre preguntas por ella. Todas las bóvedas sigue estando a un clic.',
+    en: 'Asking Nodi or the research chat no longer freezes the window. The similarity search walked the whole corpus in one go and left the app still until the answer started arriving. It now walks it in stages and returns exactly the same results. A new chat also starts with the current vault already selected, because that is nearly always what you are asking about. All vaults stays one click away.',
+    fr: 'Poser une question à Nodi ou au chat de recherche ne fige plus la fenêtre. La recherche par similarité parcourait tout le corpus d’un seul coup et laissait l’application immobile jusqu’à l’arrivée de la réponse. Elle le parcourt désormais par tranches et renvoie exactement les mêmes résultats. Un nouveau chat démarre aussi avec le coffre actif déjà sélectionné, car c’est presque toujours celui dont vous parlez. Tous les coffres reste à un clic.',
+    de: 'Eine Frage an Nodi oder den Recherche-Chat friert das Fenster nicht mehr ein. Die Ähnlichkeitssuche durchlief das gesamte Korpus in einem Zug und ließ die App stillstehen, bis die Antwort einzutreffen begann. Jetzt durchläuft sie es in Abschnitten und liefert genau dieselben Ergebnisse. Ein neuer Chat startet außerdem mit dem aktiven Tresor bereits ausgewählt, denn fast immer geht es um diesen. Alle Tresore bleibt einen Klick entfernt.',
+    pt: 'Perguntar ao Nodi ou ao chat de investigação já não congela a janela. A pesquisa por semelhança percorria todo o corpus de uma só vez e deixava a aplicação parada até a resposta começar a chegar. Agora percorre-o por troços e devolve exatamente os mesmos resultados. Além disso, um chat novo começa com o cofre ativo já selecionado, porque é quase sempre sobre ele que pergunta. Todos os cofres continua a um clique.',
+    'pt-BR': 'Perguntar ao Nodi ou ao chat de pesquisa já não congela a janela. A busca por semelhança percorria todo o corpus de uma só vez e deixava o aplicativo parado até a resposta começar a chegar. Agora ele o percorre por trechos e devolve exatamente os mesmos resultados. Além disso, um chat novo começa com o cofre ativo já selecionado, porque é quase sempre sobre ele que você pergunta. Todos os cofres continua a um clique.',
+  },
+  {
+    scope: 'mcp',
+    es: 'Las búsquedas que hace un cliente MCP dejan de bloquear la ventana de Nodus. Buscar ideas o pasajes desde otra aplicación congelaba Nodus por detrás, sin nada en pantalla que lo explicara, y otra vez por cada búsqueda del turno. Ahora esas dos búsquedas recorren el corpus por tramos y devuelven el mismo orden de resultados.',
+    en: 'Searches made by an MCP client no longer block the Nodus window. Searching ideas or passages from another application froze Nodus behind it, with nothing on screen to explain it, and again for every search in a turn. Those two searches now walk the corpus in stages and return the same ranking.',
+    fr: 'Les recherches lancées par un client MCP ne bloquent plus la fenêtre de Nodus. Chercher des idées ou des passages depuis une autre application figeait Nodus à l’arrière-plan, sans rien à l’écran pour l’expliquer, et de nouveau à chaque recherche du tour. Ces deux recherches parcourent maintenant le corpus par tranches et renvoient le même classement.',
+    de: 'Suchen eines MCP-Clients blockieren das Nodus-Fenster nicht mehr. Das Suchen von Ideen oder Passagen aus einer anderen Anwendung ließ Nodus im Hintergrund einfrieren, ohne dass etwas auf dem Bildschirm es erklärte, und erneut bei jeder Suche im selben Zug. Diese beiden Suchen durchlaufen das Korpus nun in Abschnitten und liefern dieselbe Reihenfolge.',
+    pt: 'As pesquisas feitas por um cliente MCP deixam de bloquear a janela do Nodus. Procurar ideias ou passagens a partir de outra aplicação congelava o Nodus por trás, sem nada no ecrã que o explicasse, e outra vez a cada pesquisa do turno. Essas duas pesquisas percorrem agora o corpus por troços e devolvem a mesma ordem de resultados.',
+    'pt-BR': 'As buscas feitas por um cliente MCP deixam de bloquear a janela do Nodus. Procurar ideias ou passagens a partir de outro aplicativo congelava o Nodus por trás, sem nada na tela que explicasse, e de novo a cada busca do turno. Essas duas buscas percorrem agora o corpus por trechos e devolvem a mesma ordem de resultados.',
+  },
+];
+
 /** 4.1.4 — a new public home and a desktop that stays responsive during upkeep. */
 const RELEASE_4_1_4_HIGHLIGHTS: RawReleaseHighlight[] = [
   {
@@ -1435,6 +1478,11 @@ const RELEASE_4_0_0_HIGHLIGHTS: RawReleaseHighlight[] = [
 ];
 
 const RAW_RELEASE_NOTES: RawReleaseNote[] = [
+  {
+    version: '4.1.5',
+    date: '2026-08-17',
+    highlights: RELEASE_4_1_5_HIGHLIGHTS,
+  },
   {
     version: '4.1.4',
     date: '2026-08-16',
