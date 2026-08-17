@@ -25,5 +25,5 @@ export const NODUS_SOCIAL_LINKS: readonly SocialLink[] = [
   { id: 'youtube', label: 'YouTube', url: 'https://www.youtube.com/@nodus_app', icon: 'youtube' },
   // The close button already owns the name `x` in ICON_PATHS, so the brand mark
   // is `brandX` — an icon name collision would silently render the wrong glyph.
-  { id: 'x', label: 'X', url: 'https://x.com/try_Nodus', icon: 'brandX', glyphIsWordmark: true },
+  { id: 'x', label: 'X', url: 'https://x.com/nodusresearch', icon: 'brandX', glyphIsWordmark: true },
 ];
