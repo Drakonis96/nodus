@@ -2078,8 +2078,9 @@ try {
   // The floating selection ribbon: out of sight while the pointer is still down,
   // and placed over the point where the selection was released rather than over
   // the box of the whole selection, which starts wherever the drag began.
-  await page.locator('.study-milkdown .ProseMirror p').first().scrollIntoViewIfNeeded().catch(() => {});
-  const editorDrag = await page.locator('.study-milkdown .ProseMirror').evaluate((root) => {
+  const floatingRibbon = page.locator('.milkdown-toolbar');
+  await floatingRibbon.waitFor({ state: 'attached', timeout: 10_000 });
+  const measureEditorLine = () => page.locator('.study-milkdown .ProseMirror').evaluate((root) => {
     const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
     const candidates = [];
     let node;
@@ -2089,36 +2090,32 @@ try {
       const range = document.createRange();
       range.setStart(node, 0); range.setEnd(node, Math.min(length, 12));
       const rect = range.getBoundingClientRect();
-      // The drag is driven with the real mouse, so the line has to be on screen.
-      if (rect.width > 20 && rect.top > 0 && rect.bottom < window.innerHeight) candidates.push(rect);
+      // The drag is driven with the real mouse, so the line has to be on screen,
+      // and nothing may be sitting on top of the point the drag starts from.
+      if (rect.width <= 20 || rect.top <= 0 || rect.bottom >= window.innerHeight) continue;
+      const y = rect.top + rect.height / 2;
+      if (!root.contains(document.elementFromPoint(rect.left + 1, y))) continue;
+      candidates.push({ width: rect.width, from: { x: rect.left + 1, y }, to: { x: rect.right - 1, y } });
     }
-    const widest = candidates.sort((a, b) => b.width - a.width)[0];
-    if (!widest) return null;
-    const y = widest.top + widest.height / 2;
-    return { from: { x: widest.left + 1, y }, to: { x: widest.right - 1, y } };
+    return candidates.sort((a, b) => b.width - a.width)[0] ?? null;
   });
-  // A CI runner pinned to a small screen may leave no editor line on screen. The
-  // arithmetic itself is covered by scripts/test-selection-ribbon-position.mjs.
-  if (!editorDrag) console.log('[e2e] editor selection ribbon geometry skipped: no editor line on screen');
-  else {
-    const floatingRibbon = page.locator('.milkdown-toolbar');
-    await floatingRibbon.waitFor({ state: 'attached', timeout: 10_000 });
-    await page.mouse.move(editorDrag.from.x, editorDrag.from.y);
+  let editorDrag = null;
+  for (let attempt = 0; attempt < 3 && !editorDrag; attempt += 1) {
+    const drag = await measureEditorLine();
+    if (!drag) { await page.waitForTimeout(400); continue; }
+    await page.mouse.move(drag.from.x, drag.from.y);
     await page.mouse.down();
-    await page.mouse.move(editorDrag.to.x, editorDrag.to.y, { steps: 8 });
-    try {
-      await page.waitForFunction(() => document.querySelector('.milkdown-toolbar')?.style.visibility === 'hidden', undefined, { timeout: 10_000 });
-    } catch (cause) {
-      console.log('[diag]', JSON.stringify(await page.evaluate((drag) => ({
-        drag,
-        viewport: { w: window.innerWidth, h: window.innerHeight },
-        bars: Array.from(document.querySelectorAll('.milkdown-toolbar')).map((bar) => ({ visibility: bar.style.visibility, show: bar.dataset.show, transform: bar.style.transform, rect: bar.getBoundingClientRect().toJSON() })),
-        editors: document.querySelectorAll('.study-milkdown').length,
-        selection: window.getSelection()?.toString().slice(0, 40),
-        elementAtStart: document.elementFromPoint(drag.from.x, drag.from.y)?.className,
-      }), editorDrag)));
-      throw cause;
-    }
+    await page.mouse.move(drag.to.x, drag.to.y, { steps: 8 });
+    // A layout that shifted between measuring and dragging selects nothing; the
+    // release then has no ribbon to place and the attempt is simply repeated.
+    if (await page.evaluate(() => (window.getSelection()?.toString() ?? '').trim().length > 0)) editorDrag = drag;
+    else await page.mouse.up();
+  }
+  // A CI runner pinned to a small screen may leave no editor line to drag over.
+  // The arithmetic itself is covered by scripts/test-selection-ribbon-position.mjs.
+  if (!editorDrag) console.log('[e2e] editor selection ribbon geometry skipped: no editor line to drag over');
+  else {
+    await page.waitForFunction(() => document.querySelector('.milkdown-toolbar')?.style.visibility === 'hidden', undefined, { timeout: 10_000 });
     await page.mouse.up();
     await floatingRibbon.waitFor({ state: 'visible', timeout: 10_000 });
     const ribbonBox = await floatingRibbon.boundingBox();
