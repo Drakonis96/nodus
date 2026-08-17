@@ -27,6 +27,7 @@ export function anchorToolbarToPointer(root: HTMLElement, toolbar: HTMLElement):
   let pointer: { x: number; y: number } | null = null;
   let offset = { x: 0, y: 0 };
   let frame = 0;
+  let timer = 0;
   let dragging = false;
 
   const write = (property: 'visibility' | 'transform', value: string) => {
@@ -53,9 +54,20 @@ export function anchorToolbarToPointer(root: HTMLElement, toolbar: HTMLElement):
     write('transform', `translate(${next.x}px, ${next.y}px)`);
   };
 
-  const schedule = () => {
+  const run = () => {
     cancelAnimationFrame(frame);
-    frame = requestAnimationFrame(place);
+    window.clearTimeout(timer);
+    frame = 0;
+    timer = 0;
+    place();
+  };
+
+  const schedule = () => {
+    if (frame || timer) return;
+    frame = requestAnimationFrame(run);
+    // A window that is not painting — occluded, or a test runner's — starves
+    // requestAnimationFrame, and the toolbar would stay where it was.
+    timer = window.setTimeout(run, 30);
   };
 
   const insideToolbar = (event: Event) => event.target instanceof Node && toolbar.contains(event.target);
@@ -94,6 +106,7 @@ export function anchorToolbarToPointer(root: HTMLElement, toolbar: HTMLElement):
   root.addEventListener('keydown', onKeyDown);
   return () => {
     cancelAnimationFrame(frame);
+    window.clearTimeout(timer);
     observer.disconnect();
     document.removeEventListener('pointerdown', onPointerDown, true);
     document.removeEventListener('pointerup', onPointerUp, true);
