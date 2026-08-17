@@ -2,6 +2,7 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { app } from 'electron';
+import { NODI_DEFAULT_CONTEXTS } from '@shared/types';
 import type { NodiContextKind, NodiConversation, NodiConversationInput } from '@shared/types';
 import { getActiveVault } from './vaults/vaultRegistry';
 
@@ -19,7 +20,7 @@ function storePath(): string {
 }
 
 function normalizeContexts(value: unknown): NodiContextKind[] {
-  if (!Array.isArray(value)) return ['documentation', 'current_view'];
+  if (!Array.isArray(value)) return [...NODI_DEFAULT_CONTEXTS];
   return [...new Set(value.filter((item): item is NodiContextKind => ALLOWED_CONTEXTS.has(item as NodiContextKind)))];
 }
 

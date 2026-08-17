@@ -7293,6 +7293,14 @@ export interface NodiChatMessage {
 
 export type NodiContextKind = 'documentation' | 'current_view' | 'vault' | 'all_vaults';
 
+/**
+ * Contexts a Nodi chat starts with. A question asked from inside a vault is
+ * almost always a question about that vault, so its retrieval is on next to the
+ * product documentation and the visible view. `all_vaults` stays opt-in: it
+ * reaches into every other vault, which is a decision per question.
+ */
+export const NODI_DEFAULT_CONTEXTS: NodiContextKind[] = ['documentation', 'current_view', 'vault'];
+
 export interface NodiViewContext {
   viewId: string;
   title: string;
