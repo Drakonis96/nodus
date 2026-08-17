@@ -2106,7 +2106,19 @@ try {
     await page.mouse.move(editorDrag.from.x, editorDrag.from.y);
     await page.mouse.down();
     await page.mouse.move(editorDrag.to.x, editorDrag.to.y, { steps: 8 });
-    await page.waitForFunction(() => document.querySelector('.milkdown-toolbar')?.style.visibility === 'hidden', undefined, { timeout: 10_000 });
+    try {
+      await page.waitForFunction(() => document.querySelector('.milkdown-toolbar')?.style.visibility === 'hidden', undefined, { timeout: 10_000 });
+    } catch (cause) {
+      console.log('[diag]', JSON.stringify(await page.evaluate((drag) => ({
+        drag,
+        viewport: { w: window.innerWidth, h: window.innerHeight },
+        bars: Array.from(document.querySelectorAll('.milkdown-toolbar')).map((bar) => ({ visibility: bar.style.visibility, show: bar.dataset.show, transform: bar.style.transform, rect: bar.getBoundingClientRect().toJSON() })),
+        editors: document.querySelectorAll('.study-milkdown').length,
+        selection: window.getSelection()?.toString().slice(0, 40),
+        elementAtStart: document.elementFromPoint(drag.from.x, drag.from.y)?.className,
+      }), editorDrag)));
+      throw cause;
+    }
     await page.mouse.up();
     await floatingRibbon.waitFor({ state: 'visible', timeout: 10_000 });
     const ribbonBox = await floatingRibbon.boundingBox();
