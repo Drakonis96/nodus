@@ -1,5 +1,25 @@
 # Changelog
 
+## 4.1.5 — 2026-08-17
+
+Nodus 4.1.5 puts the floating selection ribbon where the hand that made the selection
+left it, and removes the last two places where a search stopped the whole window while
+it thought.
+
+- The reader's selection ribbon and the workspace, study and teaching note toolbars wait
+  for the pointer to be released and are placed above it, or above the caret when the
+  selection was made with the keyboard.
+- Clicking a stored highlight reopens the full ribbon with colours, comment, copy,
+  bookmark and Nodi quote, with its current colour marked and deletion at the end, so a
+  highlight can be recoloured instead of only deleted.
+- The research chat and Nodi's active-vault context use the paged vector scans, so asking
+  a question no longer blocks the main process, and a new Nodi chat starts with the
+  current vault selected.
+- `nodus_search_ideas` and `nodus_search_passages` use the paged vector scans too, so an
+  MCP client searching from another application no longer freezes the Nodus window behind
+  it. `test-mcp.mjs` now refuses the blocking call sites outright.
+- The What's New modal presents this release in all eight interface languages.
+
 ## 4.1.4 — 2026-08-16
 
 Nodus 4.1.4 keeps the desktop responsive during automatic backups and connected-vault
