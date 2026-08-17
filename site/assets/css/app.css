@@ -1,0 +1,120 @@
+/*
+SPDX-FileCopyrightText: 2026 Jorge Pérez Burgueño and Nodus contributors
+SPDX-License-Identifier: AGPL-3.0-only
+
+Small additions for /app/. The page otherwise uses the same guide components as
+the research, Zotero, AI research and open-source pages.
+*/
+
+.guide-hero .lead b { color: var(--ink); font-weight: 650; }
+
+/* The naming block is deliberately plain: it clarifies the relationship between
+   project, site and application without turning it into four marketing cards. */
+.app-identity {
+  max-width: 900px; margin: 40px 0 0;
+  border-top: 1px solid var(--membrane);
+}
+.app-identity > div {
+  display: grid; grid-template-columns: minmax(180px, 0.38fr) minmax(0, 1fr);
+  gap: 28px; padding: 19px 0; border-bottom: 1px solid var(--membrane);
+}
+.app-identity dt { color: var(--ink); font-size: 14px; font-weight: 700; }
+.app-identity dd { margin: 0; color: var(--ink-2); font-size: 14.5px; line-height: 1.62; }
+
+/* Capabilities use an open list rather than a field of cards. */
+.capability-list {
+  display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0 34px; margin-top: 42px; border-top: 1px solid var(--membrane);
+}
+.capability-list article {
+  display: grid; grid-template-columns: 34px minmax(0, 1fr);
+  gap: 14px; padding: 23px 0; border-bottom: 1px solid var(--membrane);
+}
+.capability-list em, .vault-index {
+  padding-top: 3px; color: var(--accent); font-family: var(--mono);
+  font-size: 11px; font-style: normal;
+}
+.capability-list h3, .vault-list h3 { margin: 0 0 7px; font-size: 17px; }
+.capability-list p, .vault-list p {
+  margin: 0; color: var(--ink-2); font-size: 14px; line-height: 1.62;
+}
+
+.vault-list {
+  display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px 36px; max-width: 940px; margin-top: 42px;
+}
+.vault-list article {
+  display: grid; grid-template-columns: 44px minmax(0, 1fr);
+  gap: 12px; padding: 22px 0; border-top: 1px solid var(--membrane);
+}
+
+/* Platform choices deserve stronger weight than the surrounding explanations:
+   downloading is the page's main task. */
+.app-download { background: linear-gradient(180deg, transparent, rgba(52, 211, 153, 0.025), transparent); }
+.platform-grid {
+  display: grid; grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px; margin-top: 42px;
+}
+.platform-option {
+  display: flex; min-width: 0; min-height: 235px; flex-direction: column;
+  justify-content: space-between; gap: 28px; padding: 26px;
+  border: 1px solid var(--membrane); border-radius: var(--r-l);
+  background: var(--skin); box-shadow: var(--shadow);
+}
+.platform-head { display: flex; align-items: center; gap: 16px; }
+.platform-head > svg {
+  width: 38px; height: 38px; flex: 0 0 auto; padding: 8px;
+  border: 1px solid color-mix(in srgb, var(--accent) 40%, transparent);
+  border-radius: 11px; color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, transparent);
+  fill: currentColor; stroke: currentColor; stroke-width: 0.5;
+}
+.platform-head h3 { margin: 0 0 4px; font-size: 18px; }
+.platform-head p { margin: 0; color: var(--ink-3); font-size: 12.5px; line-height: 1.4; }
+.platform-option > .btn { width: 100%; justify-content: center; }
+.platform-actions { display: flex; flex-wrap: wrap; gap: 9px; }
+.platform-actions .btn { flex: 1 1 120px; justify-content: center; padding-inline: 14px; }
+.release-route, .faq-route {
+  max-width: 820px; margin: 28px 0 0; color: var(--ink-3);
+  font-size: 13.5px; line-height: 1.6;
+}
+
+.audience-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+
+.app-faq { max-width: 860px; margin-top: 40px; border-top: 1px solid var(--membrane); }
+.app-faq details { border-bottom: 1px solid var(--membrane); }
+.app-faq summary {
+  position: relative; padding: 21px 42px 21px 0; color: var(--ink);
+  cursor: pointer; list-style: none; font-size: 16px; font-weight: 650;
+}
+.app-faq summary::-webkit-details-marker { display: none; }
+.app-faq summary::after {
+  content: '+'; position: absolute; top: 18px; right: 8px;
+  color: var(--accent); font-family: var(--mono); font-size: 20px; font-weight: 400;
+}
+.app-faq details[open] summary::after { content: '−'; }
+.app-faq p {
+  max-width: 720px; margin: -4px 0 21px; color: var(--ink-2);
+  font-size: 14.5px; line-height: 1.65;
+}
+
+.app-final { text-align: center; }
+.app-final .title { max-width: 760px; margin-inline: auto; }
+.app-final .lead { max-width: 650px; margin-inline: auto; }
+.app-final .guide-actions { justify-content: center; }
+
+@media (max-width: 900px) {
+  .platform-grid { grid-template-columns: 1fr; }
+  .platform-option { min-height: 0; }
+  .audience-grid { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 720px) {
+  .app-identity > div { grid-template-columns: 1fr; gap: 7px; }
+  .capability-list, .vault-list { grid-template-columns: 1fr; }
+  .capability-list { gap: 0; }
+  .platform-option { padding: 22px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .app-faq summary { scroll-behavior: auto; }
+}
