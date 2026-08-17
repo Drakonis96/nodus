@@ -93,7 +93,8 @@ test('report selection offers icon-only copy, margin bookmark and Nodi quote act
   assert.match(actions, /name="quote"/);
   assert.match(actions, /role="toolbar"/);
   assert.match(actions, /contextmenu/);
-  assert.match(actions, /navigator\.clipboard\.writeText\(active\.selectedText\)/);
+  // Copy reads the ribbon's target, which is a loose selection or a stored highlight.
+  assert.match(actions, /navigator\.clipboard\.writeText\(target\.anchor\.selectedText\)/);
   assert.match(actions, /localStorage\.setItem\(storageKey\(contextId\)/);
   assert.match(actions, /localStorage\.removeItem\(storageKey\(contextId\)/);
   assert.match(actions, /range\.getClientRects\(\)/, 'the margin markers stay aligned with their text ranges');

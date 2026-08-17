@@ -2075,6 +2075,47 @@ try {
   });
   await page.getByTestId('study-inline-formula').click();
   assert.ok(await page.locator('.study-milkdown .ProseMirror [data-type="math_inline"]').count() > 0, 'formula button converts selected visual text into inline math');
+  // The floating selection ribbon: out of sight while the pointer is still down,
+  // and placed over the point where the selection was released rather than over
+  // the box of the whole selection, which starts wherever the drag began.
+  const editorDrag = await page.locator('.study-milkdown .ProseMirror').evaluate((root) => {
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+    const candidates = [];
+    let node;
+    while ((node = walker.nextNode())) {
+      const length = (node.textContent ?? '').length;
+      if (length < 5) continue;
+      const range = document.createRange();
+      range.setStart(node, 0); range.setEnd(node, Math.min(length, 12));
+      const rect = range.getBoundingClientRect();
+      if (rect.width > 20 && rect.top > 0) candidates.push(rect);
+    }
+    const widest = candidates.sort((a, b) => b.width - a.width)[0];
+    if (!widest) throw new Error('no selectable editor text for the ribbon drag');
+    const y = widest.top + widest.height / 2;
+    return { from: { x: widest.left + 1, y }, to: { x: widest.right - 1, y } };
+  });
+  const floatingRibbon = page.locator('.milkdown-toolbar');
+  await page.mouse.move(editorDrag.from.x, editorDrag.from.y);
+  await page.mouse.down();
+  await page.mouse.move(editorDrag.to.x, editorDrag.to.y, { steps: 8 });
+  await page.waitForFunction(() => document.querySelector('.milkdown-toolbar')?.style.visibility === 'hidden', undefined, { timeout: 5_000 });
+  await page.mouse.up();
+  await floatingRibbon.waitFor({ state: 'visible', timeout: 10_000 });
+  const ribbonBox = await floatingRibbon.boundingBox();
+  // This toolbar can be nearly as wide as the editor column it is positioned in,
+  // so it is centred on the pointer only where that column leaves room.
+  const column = await page.locator('.milkdown-toolbar').evaluate((node) => {
+    const parent = node.offsetParent instanceof HTMLElement ? node.offsetParent.getBoundingClientRect() : null;
+    return { left: Math.max(8, parent?.left ?? 8), right: Math.min(window.innerWidth - 8, parent?.right ?? window.innerWidth - 8) };
+  });
+  const wanted = Math.min(Math.max(editorDrag.to.x - ribbonBox.width / 2, column.left), column.right - ribbonBox.width);
+  assert.ok(Math.abs(ribbonBox.x - wanted) <= 2, `the editor ribbon follows the pointer inside its column (${ribbonBox.x} vs ${wanted})`);
+  assert.ok(ribbonBox.y + ribbonBox.height <= editorDrag.to.y, 'the editor ribbon sits above the pointer');
+  assert.ok(ribbonBox.y + ribbonBox.height >= editorDrag.to.y - 90, 'the editor ribbon hugs the released line rather than the first one');
+  await page.keyboard.press('ArrowRight');
+  await floatingRibbon.waitFor({ state: 'hidden', timeout: 10_000 });
+
   const splitButton = page.getByRole('button', { name: 'Dividir vista', exact: true });
   await splitButton.click();
   assert.match(await splitButton.getAttribute('class'), /bg-indigo-100/, 'active split-view control uses its light-theme state');

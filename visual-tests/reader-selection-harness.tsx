@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import ReactDOM from 'react-dom/client';
-import type { AppSettings, NodiQuoteSelection, NodusApi } from '../shared/types';
+import type { AppSettings, NodiQuoteSelection, NodusApi, WritingDraftAnnotation } from '../shared/types';
 import { ReaderSelectionActions } from '../src/components/ReaderSelectionActions';
 import '../src/index.css';
 
@@ -9,6 +9,9 @@ const settings = { mascotEnabled: false } as AppSettings;
 function Harness() {
   const readerRef = useRef<HTMLElement | null>(null);
   const [status, setStatus] = useState('Sin acción');
+  // Annotations live in memory: the reader is the same component the saved
+  // reports and the library use, and clicking a highlight needs stored rows.
+  const [annotations, setAnnotations] = useState<WritingDraftAnnotation[]>([]);
   useEffect(() => {
     Object.defineProperty(navigator, 'clipboard', {
       configurable: true,
@@ -47,7 +50,36 @@ function Harness() {
             El marcador devuelve al lector al pasaje decisivo, mientras que la cita permite formular una pregunta precisa sin volver a describir el fragmento.
           </p>
         </article>
-        <ReaderSelectionActions targetRef={readerRef} contextId="visual-deep-research" />
+        <ReaderSelectionActions
+          targetRef={readerRef}
+          contextId="visual-deep-research"
+          annotations={annotations}
+          onCreateAnnotation={async (input) => {
+            const now = new Date().toISOString();
+            setAnnotations((current) => [...current, {
+              id: `visual-${current.length + 1}`,
+              draftId: 'visual',
+              scope: 'source',
+              comment: input.comment ?? null,
+              createdAt: now,
+              updatedAt: now,
+              ...input,
+              color: input.color ?? null,
+              prefix: input.prefix ?? '',
+              suffix: input.suffix ?? '',
+            }]);
+            setStatus(`Anotación ${input.kind} ${input.color ?? ''}`.trim());
+          }}
+          onUpdateComment={async (id, comment) => {
+            setAnnotations((current) => current.map((item) => item.id === id ? { ...item, comment } : item));
+            setStatus(`Comentario: ${comment}`);
+          }}
+          onDeleteAnnotation={async (id) => {
+            setAnnotations((current) => current.filter((item) => item.id !== id));
+            setStatus(`Eliminada ${id}`);
+          }}
+          onAnnotationError={(message) => setStatus(`Error: ${message}`)}
+        />
         <output data-testid="selection-status" className="mt-5 block rounded-xl border border-indigo-800/60 bg-indigo-950/40 px-4 py-3 text-sm text-indigo-200">{status}</output>
       </section>
     </main>

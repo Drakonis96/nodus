@@ -11,6 +11,8 @@ import { _electron as electron } from 'playwright-core';
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const require = createRequire(import.meta.url);
+/** The six ribbon colours, in the order READER_ANNOTATION_COLORS renders them. */
+const READER_COLORS = ['yellow', 'rose', 'blue', 'mint', 'lavender', 'peach'];
 const userData = await mkdtemp(path.join(os.tmpdir(), 'nodus-dr-annotations-ui-'));
 const childEnv = {
   ...process.env,
@@ -95,8 +97,11 @@ try {
       const selection = window.getSelection();
       selection.removeAllRanges();
       selection.addRange(range);
-      root.dispatchEvent(new PointerEvent('pointerup', { bubbles: true }));
-      return range.toString();
+      const releaseRect = range.getBoundingClientRect();
+      // A real selection ends under the pointer, and the ribbon is placed there.
+      const release = { x: releaseRect.right, y: releaseRect.top + releaseRect.height / 2 };
+      root.dispatchEvent(new PointerEvent('pointerup', { bubbles: true, clientX: release.x, clientY: release.y }));
+      return { text: range.toString(), release };
     }, index);
   }
 
@@ -105,10 +110,15 @@ try {
   }
 
   // Contextual selection: exactly six pastel choices and one click persists a highlight.
-  await selectCandidate(0);
+  const firstSelection = await selectCandidate(0);
   const selectionBar = page.locator('.reader-selection-actions');
   await selectionBar.waitFor({ state: 'visible' });
   assert.equal(await selectionBar.locator('.reader-selection-color').count(), 6);
+  // The ribbon belongs over the pointer that finished the selection, not over the
+  // box of the whole selection, which starts wherever the drag began.
+  const ribbonBox = await selectionBar.boundingBox();
+  assert.ok(Math.abs(ribbonBox.x + ribbonBox.width / 2 - firstSelection.release.x) <= 2, `ribbon centred on the pointer (${ribbonBox.x + ribbonBox.width / 2} vs ${firstSelection.release.x})`);
+  assert.ok(ribbonBox.y + ribbonBox.height <= firstSelection.release.y, 'ribbon sits above the pointer');
   await selectionBar.locator('.reader-selection-color').first().click();
   await page.waitForFunction(async (id) => (await window.nodus.listWritingDraftAnnotations(id)).filter((item) => item.kind === 'highlight').length === 1, draftId);
 
@@ -123,7 +133,8 @@ try {
   await fixedHighlighter.click();
   await page.locator('.reader-highlighter-off').click();
 
-  // Clicking painted text exposes only the trash action; deletion is immediate and
+  // Clicking painted text reopens the whole ribbon over that passage — the colour it
+  // already has is marked, and the trash is added. Deletion is immediate and
   // deliberately does not open the confirmation dialog reserved for comments.
   const firstHighlight = (await annotations()).find((item) => item.kind === 'highlight');
   const highlightPoint = await page.evaluate((annotation) => {
@@ -153,7 +164,19 @@ try {
   }, firstHighlight);
   await page.mouse.click(highlightPoint.x, highlightPoint.y);
   await selectionBar.waitFor({ state: 'visible' });
-  assert.equal(await selectionBar.locator('.reader-selection-color').count(), 0);
+  assert.equal(await selectionBar.locator('.reader-selection-color').count(), 6);
+  assert.equal(await selectionBar.locator('.reader-selection-color.is-active').count(), 1, 'the stored colour is marked');
+  await selectionBar.getByRole('button', { name: 'Copiar' }).waitFor({ state: 'visible' });
+  // A colour on a stored highlight recolours it instead of stacking a second one.
+  const recoloured = READER_COLORS.findIndex((color) => color !== firstHighlight.color);
+  await selectionBar.locator('.reader-selection-color').nth(recoloured).click();
+  await page.waitForFunction(async ({ id, color }) => {
+    const highlights = (await window.nodus.listWritingDraftAnnotations(id)).filter((item) => item.kind === 'highlight');
+    return highlights.length === 2 && highlights.some((item) => item.color === color);
+  }, { id: draftId, color: READER_COLORS[recoloured] });
+
+  await page.mouse.click(highlightPoint.x, highlightPoint.y);
+  await selectionBar.waitFor({ state: 'visible' });
   await selectionBar.locator('button[data-tone="danger"]').click();
   await page.waitForFunction(async (id) => (await window.nodus.listWritingDraftAnnotations(id)).filter((item) => item.kind === 'highlight').length === 1, draftId);
   assert.equal(await page.getByRole('dialog').count(), 0, 'highlight deletion never asks for confirmation');
