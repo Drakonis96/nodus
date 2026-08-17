@@ -8,8 +8,8 @@
 
 <p align="center">
   <a href="https://github.com/Drakonis96/nodus/releases/latest">Download Nodus</a> ·
-  <a href="https://drakonis96.github.io/nodus/">Visit the website</a> ·
-  <a href="https://drakonis96.github.io/nodus/demo/">Try the interactive tour</a>
+  <a href="https://nodusresearch.com/">Visit the website</a> ·
+  <a href="https://nodusresearch.com/demo/">Try the interactive tour</a>
 </p>
 
 <p align="center">
@@ -171,7 +171,7 @@ The three vaults are in alpha and may change as they develop. They are clearly m
 
 Every working vault includes a demo mode with sample content. It is the quickest way to understand how Nodus feels and what each workspace can do.
 
-You can also visit the [interactive browser tour](https://drakonis96.github.io/nodus/demo/) without installing the app.
+You can also visit the [interactive browser tour](https://nodusresearch.com/demo/) without installing the app.
 
 ## Open and evolving
 

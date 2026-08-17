@@ -790,7 +790,7 @@ app.whenReady().then(async () => {
   session.defaultSession.webRequest.onBeforeSendHeaders(
     { urls: [`${TUTORIAL_VIDEO_EMBED_ORIGIN}/*`] },
     (details, callback) => {
-      callback({ requestHeaders: { ...details.requestHeaders, Referer: 'https://drakonis96.github.io/nodus/' } });
+      callback({ requestHeaders: { ...details.requestHeaders, Referer: 'https://nodusresearch.com/' } });
     },
   );
   // Nodus Toolkit OCR caches its Tesseract language traineddata here (the one

@@ -13,7 +13,7 @@ version: "4.1.4"
 date-released: "2026-08-16"
 license: "AGPL-3.0-only"
 repository-code: "https://github.com/Drakonis96/nodus"
-url: "https://drakonis96.github.io/nodus/"
+url: "https://nodusresearch.com/"
 keywords:
   - "research software"
   - "knowledge management"

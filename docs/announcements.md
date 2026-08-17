@@ -12,7 +12,7 @@ Adding a notice is a pull request. Merging it is the deployment.
 | | |
 | --- | --- |
 | Source of truth | [`site/data/announcements.json`](../site/data/announcements.json) |
-| Published at | `https://drakonis96.github.io/nodus/data/announcements.json` |
+| Published at | `https://nodusresearch.com/data/announcements.json` |
 | Deployed by | [`.github/workflows/pages.yml`](../.github/workflows/pages.yml), on push to `main` touching `site/**` |
 | Validated by | `scripts/test-announcements.mjs` (part of `npm test`) |
 | Read by | [`electron/announcements.ts`](../electron/announcements.ts) |

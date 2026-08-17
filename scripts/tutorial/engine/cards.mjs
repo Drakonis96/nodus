@@ -145,7 +145,7 @@ const endHtml = `<!doctype html><html><head><meta charset="utf-8"><style>${BASE}
       <div><span class="accent">Teach</span> smarter</div>
       <div><span class="accent">Study</span> better</div>
     </div>
-    <div class="url">https://drakonis96.github.io/nodus</div>
+    <div class="url">https://nodusresearch.com</div>
     <div class="avail">AVAILABLE ON</div>
     <div class="badges">
       <div class="badge">
