@@ -8283,4 +8283,15 @@ export const EN: Record<string, string> = {
   "Nodus Browser no abre este tipo de dirección": "Nodus Browser does not open this kind of address",
   "Esta página dejó de responder": "This page stopped responding",
   "No se pudo cargar la página": "The page could not be loaded",
+  // Nodus Browser: permisos
+  "Denegar": "Deny",
+  "Denegar siempre": "Always deny",
+  "Permitir": "Allow",
+  "Permitir siempre": "Always allow",
+  "quiere usar la cámara y el micrófono.": "wants to use the camera and microphone.",
+  "quiere usar la cámara.": "wants to use the camera.",
+  "quiere usar el micrófono.": "wants to use the microphone.",
+  "quiere usar la cámara o el micrófono.": "wants to use the camera or microphone.",
+  "quiere conocer tu ubicación.": "wants to know your location.",
+  "pide un permiso adicional.": "is requesting an additional permission.",
 };

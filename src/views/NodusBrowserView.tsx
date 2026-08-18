@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Icon } from '../components/ui';
 import { t } from '../i18n';
-import type { BrowserState, BrowserTabState } from '@shared/browser';
+import type { BrowserState, BrowserTabState, PendingBrowserPermission } from '@shared/browser';
 
 /**
  * Nodus Browser.
@@ -23,6 +23,7 @@ export function NodusBrowserView() {
   const [omnibox, setOmnibox] = useState('');
   const [omniboxFocused, setOmniboxFocused] = useState(false);
   const [refusal, setRefusal] = useState<string | null>(null);
+  const [permission, setPermission] = useState<PendingBrowserPermission | null>(null);
 
   const active: BrowserTabState | null =
     state.tabs.find((tab) => tab.id === state.activeTabId) ?? null;
@@ -33,6 +34,17 @@ export function NodusBrowserView() {
     const stop = window.nodus.onBrowserStateChanged(setState);
     void window.nodus.getBrowserState().then(setState);
     return stop;
+  }, []);
+
+  useEffect(() => {
+    const stop = window.nodus.onBrowserPermissionRequest(setPermission);
+    void window.nodus.getPendingBrowserPermission().then(setPermission);
+    // Leaving the section must not strand a page waiting on a prompt it can no
+    // longer see: every pending request is denied on the way out.
+    return () => {
+      stop();
+      void window.nodus.cancelBrowserPermissions();
+    };
   }, []);
 
   // Follow the URL of whatever tab is active, unless the user is editing.
@@ -163,6 +175,14 @@ export function NodusBrowserView() {
         </div>
       )}
 
+      {permission && (
+        <PermissionBar
+          request={permission}
+          onDecide={(granted, remember) =>
+            void window.nodus.resolveBrowserPermission(permission.id, granted, remember)}
+        />
+      )}
+
       {/* The page goes here. This div is deliberately empty and never painted
           into: the main process positions the native view over its rectangle. */}
       <div ref={viewportRef} data-browser-viewport className="relative min-h-0 flex-1">
@@ -170,6 +190,59 @@ export function NodusBrowserView() {
       </div>
     </div>
   );
+}
+
+/**
+ * The permission prompt.
+ *
+ * Rendered as a BAR in the browser chrome, not as an overlay, and deliberately
+ * so: it takes its own vertical space, which shrinks the rectangle reported to
+ * the main process, so the page is moved down rather than covered. A page can
+ * therefore neither hide this bar nor draw a convincing copy of it in the space
+ * where it would appear.
+ */
+function PermissionBar({
+  request, onDecide,
+}: { request: PendingBrowserPermission; onDecide: (granted: boolean, remember: boolean) => void }) {
+  const what = permissionLabel(request);
+  return (
+    <div
+      data-testid="browser-permission-bar"
+      className="flex flex-wrap items-center gap-2 border-b border-indigo-500/30 bg-indigo-950/40 px-3 py-2 text-xs text-indigo-100"
+    >
+      <Icon name="alert" size={14} className="shrink-0 opacity-70" />
+      <span className="min-w-0 flex-1">
+        <span className="font-semibold">{request.origin}</span>{' '}{what}
+      </span>
+      {/* Deny comes first, and is the button that reads as the safe default. */}
+      <button type="button" className="btn btn-ghost border border-neutral-700 py-0.5" onClick={() => onDecide(false, false)}>
+        {t('Denegar')}
+      </button>
+      <button type="button" className="btn btn-ghost border border-neutral-700 py-0.5" onClick={() => onDecide(false, true)}>
+        {t('Denegar siempre')}
+      </button>
+      <button type="button" className="btn btn-ghost border border-indigo-500/60 py-0.5" onClick={() => onDecide(true, false)}>
+        {t('Permitir')}
+      </button>
+      <button type="button" className="btn btn-ghost border border-indigo-500/60 py-0.5" onClick={() => onDecide(true, true)}>
+        {t('Permitir siempre')}
+      </button>
+    </div>
+  );
+}
+
+/** Plain language for what the site is asking for. */
+function permissionLabel(request: PendingBrowserPermission): string {
+  if (request.permission === 'media') {
+    const wantsVideo = request.mediaTypes.includes('video');
+    const wantsAudio = request.mediaTypes.includes('audio');
+    if (wantsVideo && wantsAudio) return t('quiere usar la cámara y el micrófono.');
+    if (wantsVideo) return t('quiere usar la cámara.');
+    if (wantsAudio) return t('quiere usar el micrófono.');
+    return t('quiere usar la cámara o el micrófono.');
+  }
+  if (request.permission === 'geolocation') return t('quiere conocer tu ubicación.');
+  return t('pide un permiso adicional.');
 }
 
 function ToolbarButton({

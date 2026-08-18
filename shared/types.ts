@@ -1508,6 +1508,8 @@ export interface AppSettings {
    * the default and beta releases are never considered while this is false.
    */
   betaUpdates: boolean;
+  /** Nodus Browser: per-origin permission decisions. Absence means «ask». */
+  browserSitePermissions: BrowserSitePermissionMap;
   // Nodi mascot: show the floating companion (visual/animation only for now — no wired
   // behaviour yet). App-wide preference, on by default.
   mascotEnabled: boolean;
@@ -7944,6 +7946,12 @@ export interface TestimonyExportResult {
  * Nodus Browser. The renderer draws the chrome and issues commands; it never
  * holds a WebContents. State arrives whole through `onBrowserStateChanged`.
  */
+/**
+ * Per-origin permission decisions the user chose ("Always allow for this site").
+ * Absence means "ask"; only explicit allow/deny are stored.
+ */
+export type BrowserSitePermissionMap = Record<string, Record<string, 'allow' | 'deny'>>;
+
 export interface BrowserApi {
   getBrowserState(): Promise<import('./browser').BrowserState>;
   openBrowserTab(url: string): Promise<string | null>;
@@ -7958,6 +7966,12 @@ export interface BrowserApi {
   /** Hide the native page view while a React overlay is open. */
   setBrowserOverlayVisible(visible: boolean): Promise<void>;
   onBrowserStateChanged(cb: (state: import('./browser').BrowserState) => void): () => void;
+  getPendingBrowserPermission(): Promise<import('./browser').PendingBrowserPermission | null>;
+  resolveBrowserPermission(id: string, granted: boolean, remember: boolean): Promise<void>;
+  cancelBrowserPermissions(): Promise<void>;
+  onBrowserPermissionRequest(
+    cb: (request: import('./browser').PendingBrowserPermission | null) => void,
+  ): () => void;
 }
 
 export interface NodusApi extends ProsopographyApi, TestimoniesApi, ToolkitApi, TeachingApi, DatabasesApi, PrimarySourcesApi, ArchiveApi, WorldbuildingApi, PlatformApi, RecordsApi, AcademicApi, LibraryApi, BrowserApi {

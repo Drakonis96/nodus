@@ -21,6 +21,12 @@ import type { IpcContext } from './context';
 import type { BrowserViewport } from '@shared/browser';
 import { parseOmniboxInput } from '@shared/browserOmnibox';
 import {
+  cancelPermissionRequests,
+  pendingPermissionRequest,
+  resolvePermissionRequest,
+  setPermissionPromptNotifier,
+} from '../browser/permissionPrompt';
+import {
   activateTab,
   browserState,
   closeTab,
@@ -67,12 +73,19 @@ export function registerBrowserIpc({ h, getWindow }: IpcContext): void {
     window.webContents.send('browser:state', browserState());
   };
 
+  const broadcastPermission = () => {
+    const window = getWindow();
+    if (!window || window.isDestroyed()) return;
+    window.webContents.send('browser:permissionRequest', pendingPermissionRequest());
+  };
+
   let wired = false;
   const ensureWired = () => {
     if (wired) return;
     const window = getWindow();
     if (!window) return;
     initBrowserTabs(window, broadcast);
+    setPermissionPromptNotifier(broadcastPermission);
     wired = true;
   };
 
@@ -138,5 +151,27 @@ export function registerBrowserIpc({ h, getWindow }: IpcContext): void {
   h('browser:setOverlayVisible', async (event, visible: boolean) => {
     assertUiSender(event, getWindow);
     setOverlayVisible(Boolean(visible));
+  });
+
+  h('browser:pendingPermission', async (event) => {
+    assertUiSender(event, getWindow);
+    return pendingPermissionRequest();
+  });
+
+  /**
+   * Answer a permission prompt.
+   *
+   * `remember` is what "Always allow for this site" writes, and it goes to
+   * app-prefs.json rather than to the vault: a site is the same site whichever
+   * corpus happens to be open.
+   */
+  h('browser:resolvePermission', async (event, id: string, granted: boolean, remember: boolean) => {
+    assertUiSender(event, getWindow);
+    resolvePermissionRequest(String(id), granted === true, remember === true);
+  });
+
+  h('browser:cancelPermissions', async (event) => {
+    assertUiSender(event, getWindow);
+    cancelPermissionRequests();
   });
 }

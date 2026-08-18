@@ -65,6 +65,11 @@ export const GLOBAL_PREF_KEYS = [
   'backupRetentionUnit',
   'lastBackupCleanupAt',
   'lastBackupCleanupStatus',
+  // Nodus Browser. These live here rather than per vault because the browser
+  // is one browser: a site you allowed the camera for, or signed into, must not
+  // change identity when you switch vault. It also means the feature needs no
+  // schema migration, and rides the existing backup of app-prefs.json.
+  'browserSitePermissions',
 ] as const;
 export type GlobalPrefKey = (typeof GLOBAL_PREF_KEYS)[number];
 

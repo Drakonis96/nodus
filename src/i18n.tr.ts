@@ -7808,4 +7808,15 @@ export const TR: Record<string, string> = {
   "Nodus Browser no abre este tipo de dirección": "Nodus Browser bu tür bir adresi açmaz",
   "Esta página dejó de responder": "Bu sayfa yanıt vermeyi durdurdu",
   "No se pudo cargar la página": "Sayfa yüklenemedi",
+  // Nodus Browser: permisos
+  "Denegar": "Reddet",
+  "Denegar siempre": "Her zaman reddet",
+  "Permitir": "İzin ver",
+  "Permitir siempre": "Her zaman izin ver",
+  "quiere usar la cámara y el micrófono.": "kamerayı ve mikrofonu kullanmak istiyor.",
+  "quiere usar la cámara.": "kamerayı kullanmak istiyor.",
+  "quiere usar el micrófono.": "mikrofonu kullanmak istiyor.",
+  "quiere usar la cámara o el micrófono.": "kamerayı veya mikrofonu kullanmak istiyor.",
+  "quiere conocer tu ubicación.": "konumunu öğrenmek istiyor.",
+  "pide un permiso adicional.": "ek bir izin istiyor.",
 };

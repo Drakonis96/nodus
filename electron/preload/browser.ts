@@ -15,6 +15,7 @@
 import { ipcRenderer } from 'electron';
 import type { BrowserState, BrowserViewport } from '@shared/browser';
 import type { OmniboxResolution } from '@shared/browserOmnibox';
+import type { PendingBrowserPermission } from '@shared/browser';
 
 /** What `browser:submitOmnibox` answers: the resolution, plus whether it landed. */
 export type BrowserOmniboxResult =
@@ -37,6 +38,17 @@ export const browserApi = {
     ipcRenderer.invoke('browser:setViewport', viewport).then(() => undefined),
   setBrowserOverlayVisible: (visible: boolean): Promise<void> =>
     ipcRenderer.invoke('browser:setOverlayVisible', visible).then(() => undefined),
+  getPendingBrowserPermission: (): Promise<PendingBrowserPermission | null> =>
+    ipcRenderer.invoke('browser:pendingPermission'),
+  resolveBrowserPermission: (id: string, granted: boolean, remember: boolean): Promise<void> =>
+    ipcRenderer.invoke('browser:resolvePermission', id, granted, remember).then(() => undefined),
+  cancelBrowserPermissions: (): Promise<void> =>
+    ipcRenderer.invoke('browser:cancelPermissions').then(() => undefined),
+  onBrowserPermissionRequest: (callback: (request: PendingBrowserPermission | null) => void): (() => void) => {
+    const listener = (_event: unknown, request: PendingBrowserPermission | null) => callback(request);
+    ipcRenderer.on('browser:permissionRequest', listener);
+    return () => ipcRenderer.removeListener('browser:permissionRequest', listener);
+  },
   onBrowserStateChanged: (callback: (state: BrowserState) => void): (() => void) => {
     const listener = (_event: unknown, state: BrowserState) => callback(state);
     ipcRenderer.on('browser:state', listener);

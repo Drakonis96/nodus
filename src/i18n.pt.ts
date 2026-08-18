@@ -7998,4 +7998,15 @@ export const PT: Record<string, string> = {
   "Nodus Browser no abre este tipo de dirección": "O Nodus Browser não abre este tipo de endereço",
   "Esta página dejó de responder": "Esta página deixou de responder",
   "No se pudo cargar la página": "Não foi possível carregar a página",
+  // Nodus Browser: permisos
+  "Denegar": "Recusar",
+  "Denegar siempre": "Recusar sempre",
+  "Permitir": "Permitir",
+  "Permitir siempre": "Permitir sempre",
+  "quiere usar la cámara y el micrófono.": "quer usar a câmara e o microfone.",
+  "quiere usar la cámara.": "quer usar a câmara.",
+  "quiere usar el micrófono.": "quer usar o microfone.",
+  "quiere usar la cámara o el micrófono.": "quer usar a câmara ou o microfone.",
+  "quiere conocer tu ubicación.": "quer saber a sua localização.",
+  "pide un permiso adicional.": "pede uma permissão adicional.",
 };

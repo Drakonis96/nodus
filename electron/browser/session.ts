@@ -20,7 +20,8 @@
 
 import { session, type Session } from 'electron';
 import { decideNavigation } from '@shared/browserNavigation';
-import { installBrowserPermissions } from './permissions';
+import { installBrowserPermissions, setPermissionPrompter } from './permissions';
+import { createPermissionPrompter } from './permissionPrompt';
 
 export const NODUS_BROWSER_PARTITION = 'persist:nodus-browser';
 
@@ -66,7 +67,11 @@ function browserUserAgent(ses: Session): string {
 function configureBrowserSession(ses: Session): void {
   ses.setUserAgent(browserUserAgent(ses));
 
-  // Deny-by-default permissions, both handlers plus the device ones.
+  // Deny-by-default permissions, both handlers plus the device ones. The
+  // prompter is registered first: installing the handlers without it would
+  // leave `ask` permissions resolving through the fail-closed DENY_ALL stub,
+  // which is safe but silently refuses the camera instead of asking.
+  setPermissionPrompter(createPermissionPrompter());
   installBrowserPermissions(ses);
 
   // Belt to the navigation guard's braces. `will-navigate` stops a tab from

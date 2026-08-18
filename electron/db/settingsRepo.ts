@@ -124,6 +124,7 @@ const DEFAULTS: Omit<AppSettings, 'providerKeys' | 'lockedProviderKeys'> = {
   readingFocusMode: false,
   announcementsEnabled: true,
   betaUpdates: false,
+  browserSitePermissions: {},
   mascotEnabled: true,
   mascotAlwaysOnTop: false,
   mascotVaultCostumes: true,

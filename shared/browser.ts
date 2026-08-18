@@ -127,3 +127,19 @@ export interface BrowserViewport {
   width: number;
   height: number;
 }
+
+/**
+ * A permission a page is waiting on.
+ *
+ * Presented by Nodus, never by the page: the prompt is drawn in Nodus chrome and
+ * the browser view is shrunk to make room, so a site can neither cover it nor
+ * imitate it in its own content area.
+ */
+export interface PendingBrowserPermission {
+  id: string;
+  /** Electron's own permission name. `media` covers camera and microphone. */
+  permission: string;
+  origin: string;
+  /** For `media`: which of 'video' (camera) / 'audio' (microphone) was asked for. */
+  mediaTypes: string[];
+}
