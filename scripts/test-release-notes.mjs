@@ -25,14 +25,24 @@ try {
 
   const { RELEASE_NOTES, releaseNotesForMajor, compareVersions } = await import(pathToFileURL(bundlePath).href);
   const currentRelease = RELEASE_NOTES[0];
-  assert.equal(currentRelease?.version, '4.1.5');
-  assert.equal(currentRelease?.date, '2026-08-17');
-  assert.equal(currentRelease?.highlights.length, 4);
-  assert.deepEqual(currentRelease?.highlights.map((highlight) => highlight.scope), ['general', 'academic', 'nodi', 'mcp']);
-  assert.ok(currentRelease?.highlights.some((highlight) => /where you released the pointer/.test(highlight.en)));
-  assert.ok(currentRelease?.highlights.some((highlight) => /reopens the whole ribbon/.test(highlight.en)));
-  assert.ok(currentRelease?.highlights.some((highlight) => /no longer freezes the window/.test(highlight.en)));
-  assert.ok(currentRelease?.highlights.some((highlight) => /MCP client no longer block the Nodus window/.test(highlight.en)));
+  assert.equal(currentRelease?.version, '4.1.6');
+  assert.equal(currentRelease?.date, '2026-08-18');
+  assert.equal(currentRelease?.highlights.length, 5);
+  assert.deepEqual(currentRelease?.highlights.map((highlight) => highlight.scope), ['academic', 'academic', 'general', 'general', 'estudio']);
+  assert.ok(currentRelease?.highlights.some((highlight) => /copies attachments again/.test(highlight.en)));
+  assert.ok(currentRelease?.highlights.some((highlight) => /second Zotero sync no longer aborts/.test(highlight.en)));
+  assert.ok(currentRelease?.highlights.some((highlight) => /galleries remember how you left them/.test(highlight.en)));
+  assert.ok(currentRelease?.highlights.some((highlight) => /no longer goes through the gallery/.test(highlight.en)));
+  assert.ok(currentRelease?.highlights.some((highlight) => /organisation view is now translated/.test(highlight.en)));
+
+  // 4.1.5 keeps the four it shipped with. They are published history.
+  const selectionRibbonRelease = RELEASE_NOTES.find((note) => note.version === '4.1.5');
+  assert.equal(selectionRibbonRelease?.date, '2026-08-17');
+  assert.equal(selectionRibbonRelease?.highlights.length, 4);
+  assert.ok(selectionRibbonRelease?.highlights.some((highlight) => /where you released the pointer/.test(highlight.en)));
+  assert.ok(selectionRibbonRelease?.highlights.some((highlight) => /reopens the whole ribbon/.test(highlight.en)));
+  assert.ok(selectionRibbonRelease?.highlights.some((highlight) => /no longer freezes the window/.test(highlight.en)));
+  assert.ok(selectionRibbonRelease?.highlights.some((highlight) => /MCP client no longer block the Nodus window/.test(highlight.en)));
 
   // 4.1.4 keeps the four it shipped with. They are published history.
   const newHomeRelease = RELEASE_NOTES.find((note) => note.version === '4.1.4');
