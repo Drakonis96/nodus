@@ -27,6 +27,8 @@ import {
   setPermissionPromptNotifier,
 } from '../browser/permissionPrompt';
 import { browserMediaStates, setMediaNotifier } from '../browser/media';
+import { activePageIsPdf, captureActivePage, importPdfIntoItem, saveCapture } from '../browser/capture';
+import { setNodiQuoteSelection, setNodiViewContext } from '../ai/nodiChat';
 import {
   activateTab,
   browserState,
@@ -38,6 +40,8 @@ import {
   navigate,
   reload,
   setOverlayVisible,
+  activeTabSummary,
+  collectFromTab,
   sendMediaCommand,
   setTabMuted,
   setViewport,
@@ -200,5 +204,70 @@ export function registerBrowserIpc({ h, getWindow }: IpcContext): void {
   h('browser:setTabMuted', async (event, tabId: string, muted: boolean) => {
     assertUiSender(event, getWindow);
     setTabMuted(String(tabId), muted === true);
+  });
+
+  /**
+   * Add to Library.
+   *
+   * Returns what WOULD be stored, enriched, for the user to review. Nothing is
+   * written until browser:saveCapture, because a capture creates a real Library
+   * item and silently guessed metadata is worse than none.
+   */
+  h('browser:capturePage', async (event) => {
+    assertUiSender(event, getWindow);
+    return captureActivePage();
+  });
+
+  h('browser:saveCapture', async (event, request: unknown, includeSnapshot: boolean) => {
+    assertUiSender(event, getWindow);
+    if (!request || typeof request !== 'object') throw new Error('There is nothing to save from this page.');
+    return saveCapture(request as never, { includeSnapshot: includeSnapshot === true });
+  });
+
+  h('browser:isPdf', async (event) => {
+    assertUiSender(event, getWindow);
+    return activePageIsPdf();
+  });
+
+  h('browser:importPdf', async (event, itemId: string, url: string, title: string) => {
+    assertUiSender(event, getWindow);
+    return importPdfIntoItem(String(itemId), String(url), String(title ?? ''));
+  });
+
+  /**
+   * Ask Nodi about this page.
+   *
+   * Reuses the existing Nodi context slot rather than inventing a browser-
+   * specific channel. Nothing is sent to any AI provider by this call: it only
+   * puts the page where Nodi will look IF the user then asks something.
+   */
+  h('browser:askNodiAboutPage', async (event) => {
+    assertUiSender(event, getWindow);
+    const collected = await collectFromTab('text');
+    const payload = (collected ?? {}) as { title?: unknown; text?: unknown };
+    const tab = activeTabSummary();
+    const text = String(payload.text ?? '');
+    if (!text.trim()) return false;
+    setNodiViewContext({
+      viewId: 'browser',
+      title: String(payload.title ?? tab?.title ?? 'Nodus Browser'),
+      text: `${tab?.url ?? ''}\n\n${text}`,
+      capturedAt: Date.now(),
+      complete: true,
+    });
+    return true;
+  });
+
+  h('browser:askNodiAboutSelection', async (event) => {
+    assertUiSender(event, getWindow);
+    const collected = await collectFromTab('selection');
+    const text = String(((collected ?? {}) as { text?: unknown }).text ?? '');
+    if (!text.trim()) return false;
+    const selection = setNodiQuoteSelection(text);
+    const window = getWindow();
+    if (selection && window && !window.isDestroyed()) {
+      window.webContents.send('nodi:quoteSelection', selection);
+    }
+    return Boolean(selection);
   });
 }

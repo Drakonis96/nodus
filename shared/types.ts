@@ -7976,6 +7976,19 @@ export interface BrowserApi {
   browserMediaCommand(tabId: string, command: 'play' | 'pause' | 'stop'): Promise<void>;
   setBrowserTabMuted(tabId: string, muted: boolean): Promise<void>;
   onBrowserMediaChanged(cb: (states: import('./browser').BrowserMediaState[]) => void): () => void;
+  captureBrowserPage(): Promise<{
+    request: import('./browserConnector').BrowserConnectorCaptureRequest & { snapshotAvailable?: boolean };
+    warnings: string[];
+  } | null>;
+  saveBrowserCapture(
+    request: import('./browserConnector').BrowserConnectorCaptureRequest,
+    includeSnapshot: boolean,
+  ): Promise<import('./browserConnector').BrowserConnectorSaveResult>;
+  browserPageIsPdf(): Promise<{ isPdf: boolean; url: string }>;
+  importBrowserPdf(itemId: string, url: string, title: string):
+    Promise<import('./browserConnector').BrowserConnectorSaveResult>;
+  askNodiAboutBrowserPage(): Promise<boolean>;
+  askNodiAboutBrowserSelection(): Promise<boolean>;
 }
 
 export interface NodusApi extends ProsopographyApi, TestimoniesApi, ToolkitApi, TeachingApi, DatabasesApi, PrimarySourcesApi, ArchiveApi, WorldbuildingApi, PlatformApi, RecordsApi, AcademicApi, LibraryApi, BrowserApi {

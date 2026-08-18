@@ -3,6 +3,8 @@ import { Icon } from '../components/ui';
 import { t } from '../i18n';
 import { MAX_BROWSER_TABS } from '@shared/browser';
 import type { BrowserState, BrowserTabState, PendingBrowserPermission } from '@shared/browser';
+import type { BrowserConnectorCaptureRequest } from '@shared/browserConnector';
+import { BrowserCaptureModal } from '../components/browser/BrowserCaptureModal';
 
 /**
  * Nodus Browser.
@@ -25,6 +27,11 @@ export function NodusBrowserView() {
   const [omniboxFocused, setOmniboxFocused] = useState(false);
   const [refusal, setRefusal] = useState<string | null>(null);
   const [permission, setPermission] = useState<PendingBrowserPermission | null>(null);
+  const [capture, setCapture] = useState<
+    { request: BrowserConnectorCaptureRequest & { snapshotAvailable?: boolean }; warnings: string[] } | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [busy, setBusy] = useState(false);
 
   const active: BrowserTabState | null =
     state.tabs.find((tab) => tab.id === state.activeTabId) ?? null;
@@ -116,7 +123,32 @@ export function NodusBrowserView() {
     (document.activeElement as HTMLElement | null)?.blur();
   };
 
-  const busy = Boolean(active?.loading);
+  const loading = Boolean(active?.loading);
+
+  const addToLibrary = async () => {
+    setMenuOpen(false);
+    setBusy(true);
+    setNotice(null);
+    try {
+      const preview = await window.nodus.captureBrowserPage();
+      if (!preview) { setNotice(t('Esta página no ofrece nada que se pueda guardar.')); return; }
+      setCapture(preview);
+    } catch (cause) {
+      setNotice(cause instanceof Error ? cause.message : String(cause));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const askNodi = async (about: 'page' | 'selection') => {
+    setMenuOpen(false);
+    const ok = about === 'page'
+      ? await window.nodus.askNodiAboutBrowserPage()
+      : await window.nodus.askNodiAboutBrowserSelection();
+    setNotice(ok
+      ? (about === 'page' ? t('Nodi ya tiene esta página como contexto.') : t('Nodi ya tiene la selección.'))
+      : t('No había nada que enviar.'));
+  };
 
   return (
     <div className="flex h-full min-h-0 flex-col" data-testid="nodus-browser">
@@ -142,9 +174,9 @@ export function NodusBrowserView() {
           onClick={() => void window.nodus.browserGoForward()}
         />
         <ToolbarButton
-          icon={busy ? 'stop' : 'refresh'}
-          label={busy ? t('Detener') : t('Recargar')}
-          onClick={() => void (busy ? window.nodus.browserStop() : window.nodus.browserReload())}
+          icon={loading ? 'stop' : 'refresh'}
+          label={loading ? t('Detener') : t('Recargar')}
+          onClick={() => void (loading ? window.nodus.browserStop() : window.nodus.browserReload())}
         />
         <ToolbarButton
           icon="home"
@@ -173,6 +205,38 @@ export function NodusBrowserView() {
             />
           </div>
         </form>
+
+        <div className="relative">
+          <ToolbarButton
+            icon="menu"
+            label={t('Acciones de Nodus')}
+            disabled={busy}
+            onClick={() => setMenuOpen((open) => !open)}
+          />
+          {menuOpen && (
+            <>
+              <div className="fixed inset-0 z-[120]" onClick={() => setMenuOpen(false)} />
+              <div
+                data-testid="browser-actions-menu"
+                className="absolute right-0 z-[121] mt-1 w-60 rounded-xl border border-neutral-700 bg-neutral-900 p-1 shadow-xl"
+              >
+                <MenuItem icon="book" label={t('Añadir a la Biblioteca')} onClick={() => void addToLibrary()} />
+                <MenuItem icon="chat" label={t('Preguntar a Nodi sobre esta página')} onClick={() => void askNodi('page')} />
+                <MenuItem icon="quote" label={t('Preguntar a Nodi sobre la selección')} onClick={() => void askNodi('selection')} />
+                <MenuItem
+                  icon="copy"
+                  label={t('Copiar dirección')}
+                  onClick={() => { setMenuOpen(false); void navigator.clipboard.writeText(active?.url ?? ''); }}
+                />
+                <MenuItem
+                  icon="external"
+                  label={t('Abrir en el navegador del sistema')}
+                  onClick={() => { setMenuOpen(false); if (active?.url) void window.nodus.openExternal(active.url); }}
+                />
+              </div>
+            </>
+          )}
+        </div>
       </div>
 
       {refusal && (
@@ -181,6 +245,18 @@ export function NodusBrowserView() {
           className="border-b border-amber-500/30 bg-amber-500/10 px-3 py-1.5 text-xs text-amber-300"
         >
           {refusal}
+        </div>
+      )}
+
+      {notice && (
+        <div
+          data-testid="browser-notice"
+          className="flex items-center gap-2 border-b border-neutral-800 bg-neutral-900/60 px-3 py-1.5 text-xs text-neutral-300"
+        >
+          <span className="min-w-0 flex-1">{notice}</span>
+          <button type="button" aria-label={t('Descartar')} onClick={() => setNotice(null)}>
+            <Icon name="x" size={12} />
+          </button>
         </div>
       )}
 
@@ -199,6 +275,18 @@ export function NodusBrowserView() {
           ? <CertificateInterstitial tab={active} />
           : <BrowserErrorPane tab={active} />)}
       </div>
+
+      {capture && (
+        <BrowserCaptureModal
+          preview={capture.request}
+          warnings={capture.warnings}
+          onClose={() => setCapture(null)}
+          onSaved={(result) => {
+            setCapture(null);
+            setNotice(t('Guardado en la Biblioteca: {title}').replace('{title}', result.title));
+          }}
+        />
+      )}
     </div>
   );
 }
@@ -450,5 +538,18 @@ function BrowserErrorPane({ tab }: { tab: BrowserTabState }) {
         {t('Reintentar')}
       </button>
     </div>
+  );
+}
+
+function MenuItem({ icon, label, onClick }: { icon: string; label: string; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-xs text-neutral-300 hover:bg-neutral-800"
+    >
+      <Icon name={icon} size={13} className="shrink-0 opacity-70" />
+      <span className="min-w-0 truncate">{label}</span>
+    </button>
   );
 }

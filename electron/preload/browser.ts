@@ -16,6 +16,12 @@ import { ipcRenderer } from 'electron';
 import type { BrowserState, BrowserViewport } from '@shared/browser';
 import type { OmniboxResolution } from '@shared/browserOmnibox';
 import type { BrowserMediaState, PendingBrowserPermission } from '@shared/browser';
+import type { BrowserConnectorCaptureRequest, BrowserConnectorSaveResult } from '@shared/browserConnector';
+
+export interface BrowserCapturePreview {
+  request: BrowserConnectorCaptureRequest & { snapshotAvailable?: boolean };
+  warnings: string[];
+}
 
 /** What `browser:submitOmnibox` answers: the resolution, plus whether it landed. */
 export type BrowserOmniboxResult =
@@ -59,6 +65,14 @@ export const browserApi = {
     ipcRenderer.on('browser:media', listener);
     return () => ipcRenderer.removeListener('browser:media', listener);
   },
+  captureBrowserPage: (): Promise<BrowserCapturePreview | null> => ipcRenderer.invoke('browser:capturePage'),
+  saveBrowserCapture: (request: BrowserConnectorCaptureRequest, includeSnapshot: boolean): Promise<BrowserConnectorSaveResult> =>
+    ipcRenderer.invoke('browser:saveCapture', request, includeSnapshot),
+  browserPageIsPdf: (): Promise<{ isPdf: boolean; url: string }> => ipcRenderer.invoke('browser:isPdf'),
+  importBrowserPdf: (itemId: string, url: string, title: string): Promise<BrowserConnectorSaveResult> =>
+    ipcRenderer.invoke('browser:importPdf', itemId, url, title),
+  askNodiAboutBrowserPage: (): Promise<boolean> => ipcRenderer.invoke('browser:askNodiAboutPage'),
+  askNodiAboutBrowserSelection: (): Promise<boolean> => ipcRenderer.invoke('browser:askNodiAboutSelection'),
   onBrowserStateChanged: (callback: (state: BrowserState) => void): (() => void) => {
     const listener = (_event: unknown, state: BrowserState) => callback(state);
     ipcRenderer.on('browser:state', listener);

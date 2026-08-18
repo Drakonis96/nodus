@@ -400,6 +400,48 @@ export function navigate(url: string): boolean {
   return true;
 }
 
+/**
+ * Ask the active tab's preload for something and wait for its reply.
+ *
+ * Times out rather than hanging: a page that is busy, crashed or simply
+ * uncooperative must not leave an Add-to-Library click waiting forever. A null
+ * result is reported to the user as "nothing available", which is honest.
+ */
+const COLLECT_TIMEOUT_MS = 5_000;
+
+export function collectFromTab(what: 'text' | 'selection' | 'capture' | 'pdf'): Promise<unknown> {
+  const tab = activeTabId ? tabs.get(activeTabId) : null;
+  if (!tab || tab.view.webContents.isDestroyed()) return Promise.resolve(null);
+
+  const requestId = `collect-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  return new Promise((resolve) => {
+    let settled = false;
+    const finish = (value: unknown) => {
+      if (settled) return;
+      settled = true;
+      ipcMain.removeListener('nodus-browser:page:collected', listener);
+      clearTimeout(timer);
+      resolve(value);
+    };
+    const listener = (event: Electron.IpcMainEvent, id: string, payload: unknown) => {
+      // Match BOTH the request id and the sender: another tab replying to an id
+      // it happened to see must not answer this question.
+      if (id !== requestId || event.sender.id !== tab.view.webContents.id) return;
+      finish(payload);
+    };
+    const timer = setTimeout(() => finish(null), COLLECT_TIMEOUT_MS);
+    timer.unref?.();
+    ipcMain.on('nodus-browser:page:collected', listener);
+    tab.view.webContents.send('nodus-browser:page:collect', requestId, what);
+  });
+}
+
+/** The active tab's identity, for attributing a capture. */
+export function activeTabSummary(): { id: string; url: string; title: string } | null {
+  const tab = activeTabId ? tabs.get(activeTabId) : null;
+  return tab ? { id: tab.id, url: tab.state.url, title: tab.state.title } : null;
+}
+
 /** Mute or unmute one tab, whether or not it is the active one. */
 export function setTabMuted(id: string, muted: boolean): void {
   const tab = tabs.get(id);

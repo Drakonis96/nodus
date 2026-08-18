@@ -26,6 +26,12 @@
  */
 
 import { ipcRenderer } from 'electron';
+// One source of truth for page metadata: the SAME module the Chrome extension
+// loads. It is pure ESM with no Chrome API and no DOM access, so both consumers
+// share the Highwire / JSON-LD / COinS / Dublin Core / OpenGraph parsing rather
+// than maintaining two implementations that must agree.
+import { detectCapture } from '../../browser-extension/lib/detector.js';
+import { collectPageSnapshot } from './browserPageSnapshot';
 
 interface MediaEl {
   tagName?: unknown;
@@ -90,4 +96,57 @@ ipcRenderer.on('nodus-browser:page:mediaCommand', (_event, command: string) => {
       // One uncooperative element must not stop us from reaching the others.
     }
   }
+});
+
+/** Everything main can ask this page for. The command set is closed. */
+const MAX_TEXT_CHARS = 120_000;
+const MAX_SELECTION_CHARS = 20_000;
+
+interface TextDoc {
+  title?: unknown;
+  contentType?: unknown;
+  body?: { innerText?: unknown } | null;
+  querySelector(selector: string): { innerText?: unknown } | null;
+}
+const textPage = globalThis as unknown as {
+  document?: TextDoc;
+  location?: { href?: unknown };
+  getSelection?: () => { toString(): string } | null;
+};
+
+/** Strip NUL bytes (which truncate downstream) and cap the length. */
+function clip(value: unknown, limit: number): string {
+  return String(value ?? '')
+    .split('\u0000')
+    .join('')
+    .slice(0, limit);
+}
+
+function readableText(): string {
+  const doc = textPage.document;
+  if (!doc) return '';
+  const main = doc.querySelector('main, article, [role="main"]') ?? doc.body ?? null;
+  return clip(main?.innerText, MAX_TEXT_CHARS);
+}
+
+ipcRenderer.on('nodus-browser:page:collect', (_event, requestId: string, what: string) => {
+  let payload: unknown = null;
+  try {
+    if (what === 'text') {
+      payload = { title: clip(textPage.document?.title, 300), text: readableText() };
+    } else if (what === 'selection') {
+      payload = { text: clip(textPage.getSelection?.()?.toString() ?? '', MAX_SELECTION_CHARS) };
+    } else if (what === 'capture') {
+      const snapshot = collectPageSnapshot();
+      // detectCapture throws on a page with no usable URL; a null payload is the
+      // honest answer, and main reports it rather than inventing metadata.
+      payload = snapshot ? detectCapture(snapshot as never) : null;
+    } else if (what === 'pdf') {
+      const contentType = String(textPage.document?.contentType ?? '');
+      payload = { isPdf: contentType === 'application/pdf', url: clip(textPage.location?.href, 2048) };
+    }
+  } catch {
+    payload = null;
+  }
+  ipcRenderer.send('nodus-browser:page:collected', requestId, payload);
 });
