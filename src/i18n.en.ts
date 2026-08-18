@@ -8302,4 +8302,11 @@ export const EN: Record<string, string> = {
   // Nodus Browser: pestañas
   "Pestaña nueva": "New tab",
   "Nodus Browser admite hasta {n} pestañas.": "Nodus Browser holds up to {n} tabs.",
+  // Nodus Browser: media
+  "Medios": "Media",
+  "Reproduciéndose en Nodus Browser": "Playing in Nodus Browser",
+  "Medios en pausa en Nodus Browser": "Media paused in Nodus Browser",
+  "Pausar todo": "Pause all",
+  "Activar sonido": "Unmute",
+  "Silenciar": "Mute",
 };

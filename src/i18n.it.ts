@@ -7480,4 +7480,11 @@ export const IT: Record<string, string> = {
   // Nodus Browser: pestañas
   "Pestaña nueva": "Nuova scheda",
   "Nodus Browser admite hasta {n} pestañas.": "Nodus Browser consente fino a {n} schede.",
+  // Nodus Browser: media
+  "Medios": "Contenuti multimediali",
+  "Reproduciéndose en Nodus Browser": "In riproduzione in Nodus Browser",
+  "Medios en pausa en Nodus Browser": "Contenuti in pausa in Nodus Browser",
+  "Pausar todo": "Metti tutto in pausa",
+  "Activar sonido": "Riattiva audio",
+  "Silenciar": "Disattiva audio",
 };

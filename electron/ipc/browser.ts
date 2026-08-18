@@ -26,6 +26,7 @@ import {
   resolvePermissionRequest,
   setPermissionPromptNotifier,
 } from '../browser/permissionPrompt';
+import { browserMediaStates, setMediaNotifier } from '../browser/media';
 import {
   activateTab,
   browserState,
@@ -37,6 +38,8 @@ import {
   navigate,
   reload,
   setOverlayVisible,
+  sendMediaCommand,
+  setTabMuted,
   setViewport,
   stopLoading,
 } from '../browser/tabs';
@@ -79,6 +82,12 @@ export function registerBrowserIpc({ h, getWindow }: IpcContext): void {
     window.webContents.send('browser:permissionRequest', pendingPermissionRequest());
   };
 
+  const broadcastMedia = () => {
+    const window = getWindow();
+    if (!window || window.isDestroyed()) return;
+    window.webContents.send('browser:media', browserMediaStates());
+  };
+
   let wired = false;
   const ensureWired = () => {
     if (wired) return;
@@ -86,6 +95,7 @@ export function registerBrowserIpc({ h, getWindow }: IpcContext): void {
     if (!window) return;
     initBrowserTabs(window, broadcast);
     setPermissionPromptNotifier(broadcastPermission);
+    setMediaNotifier(broadcastMedia);
     wired = true;
   };
 
@@ -173,5 +183,22 @@ export function registerBrowserIpc({ h, getWindow }: IpcContext): void {
   h('browser:cancelPermissions', async (event) => {
     assertUiSender(event, getWindow);
     cancelPermissionRequests();
+  });
+
+  h('browser:media', async (event) => {
+    assertUiSender(event, getWindow);
+    ensureWired();
+    return browserMediaStates();
+  });
+
+  h('browser:mediaCommand', async (event, tabId: string, command: string) => {
+    assertUiSender(event, getWindow);
+    if (command !== 'play' && command !== 'pause' && command !== 'stop') return;
+    sendMediaCommand(String(tabId), command);
+  });
+
+  h('browser:setTabMuted', async (event, tabId: string, muted: boolean) => {
+    assertUiSender(event, getWindow);
+    setTabMuted(String(tabId), muted === true);
   });
 }

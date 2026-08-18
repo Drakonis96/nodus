@@ -15,7 +15,7 @@
 import { ipcRenderer } from 'electron';
 import type { BrowserState, BrowserViewport } from '@shared/browser';
 import type { OmniboxResolution } from '@shared/browserOmnibox';
-import type { PendingBrowserPermission } from '@shared/browser';
+import type { BrowserMediaState, PendingBrowserPermission } from '@shared/browser';
 
 /** What `browser:submitOmnibox` answers: the resolution, plus whether it landed. */
 export type BrowserOmniboxResult =
@@ -48,6 +48,16 @@ export const browserApi = {
     const listener = (_event: unknown, request: PendingBrowserPermission | null) => callback(request);
     ipcRenderer.on('browser:permissionRequest', listener);
     return () => ipcRenderer.removeListener('browser:permissionRequest', listener);
+  },
+  getBrowserMedia: (): Promise<BrowserMediaState[]> => ipcRenderer.invoke('browser:media'),
+  browserMediaCommand: (tabId: string, command: 'play' | 'pause' | 'stop'): Promise<void> =>
+    ipcRenderer.invoke('browser:mediaCommand', tabId, command).then(() => undefined),
+  setBrowserTabMuted: (tabId: string, muted: boolean): Promise<void> =>
+    ipcRenderer.invoke('browser:setTabMuted', tabId, muted).then(() => undefined),
+  onBrowserMediaChanged: (callback: (states: BrowserMediaState[]) => void): (() => void) => {
+    const listener = (_event: unknown, states: BrowserMediaState[]) => callback(states);
+    ipcRenderer.on('browser:media', listener);
+    return () => ipcRenderer.removeListener('browser:media', listener);
   },
   onBrowserStateChanged: (callback: (state: BrowserState) => void): (() => void) => {
     const listener = (_event: unknown, state: BrowserState) => callback(state);

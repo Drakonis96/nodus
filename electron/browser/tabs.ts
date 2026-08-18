@@ -19,13 +19,23 @@
  *     them. That is what makes a tab cheap enough to have twelve of.
  */
 
-import { WebContentsView, type BaseWindow, type WebContents } from 'electron';
+import { ipcMain, WebContentsView, type BaseWindow, type WebContents } from 'electron';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import type { BrowserState, BrowserTabError, BrowserTabState, BrowserViewport } from '@shared/browser';
 import { MAX_BROWSER_TABS } from '@shared/browser';
 import { decideNavigation } from '@shared/browserNavigation';
 import { NODUS_BROWSER_PARTITION, browserSession } from './session';
+import {
+  describeMediaSession,
+  dropMediaSession,
+  hasMediaSession,
+  noteAudioState,
+  noteMediaPaused,
+  noteMediaPlaying,
+  noteMuted,
+  clearAllMediaSessions,
+} from './media';
 
 interface Tab {
   id: string;
@@ -53,6 +63,10 @@ function classifyError(code: number): BrowserTabError['kind'] {
   return 'unknown';
 }
 
+function originOf(url: string): string {
+  try { return new URL(url).origin; } catch { return ''; }
+}
+
 function emptyState(id: string, url: string): BrowserTabState {
   return {
     id,
@@ -74,6 +88,34 @@ function emptyState(id: string, url: string): BrowserTabState {
 export function initBrowserTabs(window: BaseWindow, onChange: () => void): void {
   hostWindow = window;
   notify = onChange;
+
+  /**
+   * The page preload's only outbound channel: whether the element that started
+   * is audio or video, which Electron's own media events do not say.
+   *
+   * The sender is matched against the live tab registry. A message from anything
+   * that is not one of our tabs is dropped rather than trusted — this is the one
+   * channel in the browser that a page's preload can reach, so it is the one
+   * place where a sender check earns its keep.
+   */
+  ipcMain.on('nodus-browser:page:media', (event, payload: { playing?: unknown; kind?: unknown }) => {
+    const tab = [...tabs.values()].find((candidate) =>
+      !candidate.view.webContents.isDestroyed() && candidate.view.webContents.id === event.sender.id);
+    if (!tab) return;
+    const kind = payload?.kind === 'audio' || payload?.kind === 'video' ? payload.kind : 'unknown';
+    if (payload?.playing === true) {
+      noteMediaPlaying(tab.id, () => ({
+        title: tab.state.title || tab.state.url,
+        url: tab.state.url,
+        origin: originOf(tab.state.url),
+        faviconDataUrl: tab.state.faviconDataUrl,
+      }), kind);
+      patch(tab, { hasMedia: true, mediaPlaying: true });
+    } else {
+      noteMediaPaused(tab.id);
+      patch(tab, { mediaPlaying: false });
+    }
+  });
 }
 
 export function browserState(): BrowserState {
@@ -158,7 +200,50 @@ function wire(tab: Tab): void {
     canGoForward: contents.navigationHistory.canGoForward(),
   })) as never);
 
-  on(tab, contents, 'page-title-updated', ((_e: unknown, title: string) => patch(tab, { title })) as never);
+  on(tab, contents, 'page-title-updated', ((_e: unknown, title: string) => {
+    patch(tab, { title });
+    describeMediaSession(tab.id, { title });
+  }) as never);
+
+  /**
+   * Media.
+   *
+   * Electron's own events are the primary signal and need no injection into the
+   * page at all. `media-started-playing` fires for the first <video>/<audio> to
+   * play; `media-paused` when they stop. Neither says whether it was audio or
+   * video, which is the one thing the page preload adds.
+   */
+  on(tab, contents, 'media-started-playing', (() => {
+    noteMediaPlaying(tab.id, () => ({
+      title: tab.state.title || tab.state.url,
+      url: tab.state.url,
+      origin: originOf(tab.state.url),
+      faviconDataUrl: tab.state.faviconDataUrl,
+    }));
+    patch(tab, { hasMedia: true, mediaPlaying: true });
+  }) as never);
+
+  on(tab, contents, 'media-paused', (() => {
+    noteMediaPaused(tab.id);
+    patch(tab, { mediaPlaying: false });
+  }) as never);
+
+  // Audibility is about sound, not about existence: it goes false on pause, and
+  // a header that keyed on it would lose its own Play button.
+  on(tab, contents, 'audio-state-changed', ((event: { audible: boolean }) => {
+    noteAudioState(tab.id, event.audible);
+    patch(tab, { audible: event.audible });
+  }) as never);
+
+  // A main-frame navigation replaces the document, so whatever was playing is
+  // gone. Subframe navigations must not count: an ad frame reloading underneath
+  // a video would otherwise drop the controls for the video.
+  on(tab, contents, 'did-start-navigation', ((details: { isMainFrame: boolean; isSameDocument: boolean }) => {
+    if (!details.isMainFrame || details.isSameDocument) return;
+    if (!hasMediaSession(tab.id)) return;
+    dropMediaSession(tab.id);
+    patch(tab, { hasMedia: false, mediaPlaying: false, audible: false });
+  }) as never);
 
   on(tab, contents, 'did-fail-load', ((
     _e: unknown, errorCode: number, errorDescription: string, validatedURL: string, isMainFrame: boolean,
@@ -264,6 +349,7 @@ export function closeTab(id: string): void {
   for (const dispose of tab.disposers) dispose();
   tab.disposers.length = 0;
   tabs.delete(id);
+  dropMediaSession(id);
 
   if (!tab.view.webContents.isDestroyed()) tab.view.webContents.close();
 
@@ -314,11 +400,29 @@ export function navigate(url: string): boolean {
   return true;
 }
 
+/** Mute or unmute one tab, whether or not it is the active one. */
+export function setTabMuted(id: string, muted: boolean): void {
+  const tab = tabs.get(id);
+  if (!tab || tab.view.webContents.isDestroyed()) return;
+  tab.view.webContents.setAudioMuted(muted);
+  noteMuted(id, muted);
+  patch(tab, { muted });
+}
+
+/** Drive one tab's media from the header. */
+export function sendMediaCommand(id: string, command: 'play' | 'pause' | 'stop'): void {
+  const tab = tabs.get(id);
+  if (!tab || tab.view.webContents.isDestroyed()) return;
+  tab.view.webContents.send('nodus-browser:page:mediaCommand', command);
+}
+
 /** Destroy every tab. Called from all three of main.ts's shutdown paths. */
 export function closeAllBrowserTabs(): void {
   for (const id of [...tabs.keys()]) closeTab(id);
   activeTabId = null;
   viewport = null;
+  // Also cancels the ended-grace timers, so none outlives the window.
+  clearAllMediaSessions();
 }
 
 /** Test seam: how many WebContents this module still owns. */

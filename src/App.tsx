@@ -12,6 +12,7 @@ import { VaultSwitcher, vaultTypeIcon, vaultTypeLabel } from './components/Vault
 import { ServerInbox } from './components/ServerInbox';
 import { unreadServerInboxGroupCount } from './serverInboxGrouping';
 import { NotificationsPanel, useAnnouncements } from './components/NotificationsPanel';
+import { BrowserMediaPopover, useBrowserMedia } from './components/browser/BrowserMedia';
 import { DatabasesSidebarExplore } from './components/DatabasesSidebarExplore';
 import { StudySidebar, type StudyNavigationTarget } from './components/StudySidebar';
 import { TeachingSidebar } from './components/TeachingSidebar';
@@ -1357,6 +1358,10 @@ export function App() {
               )}
             </span>
           )}
+          <BrowserMediaHeaderAction onOpenTab={(tabId) => {
+            setView('browser');
+            void window.nodus.activateBrowserTab(tabId);
+          }} />
           <HeaderAction
             icon="gitPr"
             label={t('Sugerir / Reportar')}
@@ -1992,5 +1997,36 @@ export function App() {
 
       {!manualWhatsNewOpen && updateSettled && <NodiMascot settings={settings} />}
     </div>
+  );
+}
+
+/**
+ * The header's media button.
+ *
+ * Rendered only when a browser tab holds a media session — and "holds a session"
+ * is not "is making noise". A paused lecture keeps its controls, because taking
+ * them away at the exact moment someone pauses is how a user loses the Play
+ * button they were reaching for.
+ */
+function BrowserMediaHeaderAction({ onOpenTab }: { onOpenTab: (tabId: string) => void }) {
+  const states = useBrowserMedia();
+  const [anchor, setAnchor] = useState<HTMLElement | null>(null);
+  if (states.length === 0) return null;
+  const anyPlaying = states.some((state) => state.playing);
+  return (
+    <span className="relative inline-flex">
+      <HeaderAction
+        icon="volume"
+        label={t('Medios')}
+        title={anyPlaying ? t('Reproduciéndose en Nodus Browser') : t('Medios en pausa en Nodus Browser')}
+        onClick={(event) => setAnchor((current) => (current ? null : event.currentTarget))}
+      />
+      {states.length > 1 && <span className="header-action-badge">{states.length}</span>}
+      <BrowserMediaPopover
+        anchorEl={anchor}
+        onClose={() => setAnchor(null)}
+        onOpenTab={(tabId) => { setAnchor(null); onOpenTab(tabId); }}
+      />
+    </span>
   );
 }

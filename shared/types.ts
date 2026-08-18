@@ -7972,6 +7972,10 @@ export interface BrowserApi {
   onBrowserPermissionRequest(
     cb: (request: import('./browser').PendingBrowserPermission | null) => void,
   ): () => void;
+  getBrowserMedia(): Promise<import('./browser').BrowserMediaState[]>;
+  browserMediaCommand(tabId: string, command: 'play' | 'pause' | 'stop'): Promise<void>;
+  setBrowserTabMuted(tabId: string, muted: boolean): Promise<void>;
+  onBrowserMediaChanged(cb: (states: import('./browser').BrowserMediaState[]) => void): () => void;
 }
 
 export interface NodusApi extends ProsopographyApi, TestimoniesApi, ToolkitApi, TeachingApi, DatabasesApi, PrimarySourcesApi, ArchiveApi, WorldbuildingApi, PlatformApi, RecordsApi, AcademicApi, LibraryApi, BrowserApi {

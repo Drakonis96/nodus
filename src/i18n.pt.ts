@@ -8017,4 +8017,11 @@ export const PT: Record<string, string> = {
   // Nodus Browser: pestañas
   "Pestaña nueva": "Novo separador",
   "Nodus Browser admite hasta {n} pestañas.": "O Nodus Browser admite até {n} separadores.",
+  // Nodus Browser: media
+  "Medios": "Multimédia",
+  "Reproduciéndose en Nodus Browser": "A reproduzir no Nodus Browser",
+  "Medios en pausa en Nodus Browser": "Multimédia em pausa no Nodus Browser",
+  "Pausar todo": "Pausar tudo",
+  "Activar sonido": "Reativar som",
+  "Silenciar": "Silenciar",
 };

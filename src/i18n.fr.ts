@@ -8066,4 +8066,11 @@ export const FR: Record<string, string> = {
   // Nodus Browser: pestañas
   "Pestaña nueva": "Nouvel onglet",
   "Nodus Browser admite hasta {n} pestañas.": "Nodus Browser accepte jusqu'à {n} onglets.",
+  // Nodus Browser: media
+  "Medios": "Médias",
+  "Reproduciéndose en Nodus Browser": "Lecture en cours dans Nodus Browser",
+  "Medios en pausa en Nodus Browser": "Médias en pause dans Nodus Browser",
+  "Pausar todo": "Tout mettre en pause",
+  "Activar sonido": "Réactiver le son",
+  "Silenciar": "Couper le son",
 };
