@@ -41,12 +41,23 @@ export const browserApi = {
   browserGoForward: (): Promise<void> => ipcRenderer.invoke('browser:goForward').then(() => undefined),
   browserReload: (): Promise<void> => ipcRenderer.invoke('browser:reload').then(() => undefined),
   browserStop: (): Promise<void> => ipcRenderer.invoke('browser:stop').then(() => undefined),
+  browserGoHome: (): Promise<{ url: string }> => ipcRenderer.invoke('browser:goHome'),
+  revealBrowserDownload: (id: string): Promise<void> =>
+    ipcRenderer.invoke('browser:revealDownload', id).then(() => undefined),
+  clearBrowserDownloads: (): Promise<BrowserDownloadView[]> => ipcRenderer.invoke('browser:clearDownloads'),
+  onBrowserActionRequested: (callback: (action: string) => void): (() => void) => {
+    const listener = (_event: unknown, action: string) => callback(action);
+    ipcRenderer.on('browser:requestAction', listener);
+    return () => ipcRenderer.removeListener('browser:requestAction', listener);
+  },
   submitBrowserOmnibox: (input: string): Promise<BrowserOmniboxResult> =>
     ipcRenderer.invoke('browser:submitOmnibox', input),
   setBrowserViewport: (viewport: BrowserViewport): Promise<void> =>
     ipcRenderer.invoke('browser:setViewport', viewport).then(() => undefined),
-  setBrowserOverlayVisible: (visible: boolean): Promise<void> =>
-    ipcRenderer.invoke('browser:setOverlayVisible', visible).then(() => undefined),
+  setBrowserOverlayVisible: (open: boolean): Promise<void> =>
+    ipcRenderer.invoke('browser:setOverlayVisible', open).then(() => undefined),
+  setBrowserSectionVisible: (visible: boolean): Promise<void> =>
+    ipcRenderer.invoke('browser:setSectionVisible', visible).then(() => undefined),
   getPendingBrowserPermission: (): Promise<PendingBrowserPermission | null> =>
     ipcRenderer.invoke('browser:pendingPermission'),
   resolveBrowserPermission: (id: string, granted: boolean, remember: boolean): Promise<void> =>

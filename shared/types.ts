@@ -1512,6 +1512,13 @@ export interface AppSettings {
   browserSitePermissions: BrowserSitePermissionMap;
   /** Where Nodus Browser saves downloads. Null asks each time. */
   browserDownloadFolder: string | null;
+  /** What Home and a new tab open. */
+  browserHomeMode: 'start' | 'blank' | 'custom';
+  browserHomeUrl: string;
+  browserNewTabMode: 'home' | 'blank';
+  browserSearchEngine: 'google' | 'scholar' | 'bing' | 'duckduckgo' | 'custom';
+  /** Only used when the engine is 'custom'; must contain %s. */
+  browserSearchTemplate: string;
   // Nodi mascot: show the floating companion (visual/animation only for now — no wired
   // behaviour yet). App-wide preference, on by default.
   mascotEnabled: boolean;
@@ -7963,10 +7970,17 @@ export interface BrowserApi {
   browserGoForward(): Promise<void>;
   browserReload(): Promise<void>;
   browserStop(): Promise<void>;
+  browserGoHome(): Promise<{ url: string }>;
+  revealBrowserDownload(id: string): Promise<void>;
+  clearBrowserDownloads(): Promise<import('./browser').BrowserDownloadView[]>;
+  /** The native context menu asking the renderer to open one of its dialogs. */
+  onBrowserActionRequested(cb: (action: string) => void): () => void;
   submitBrowserOmnibox(input: string): Promise<import('./browserOmnibox').OmniboxResolution & { ok?: boolean }>;
   setBrowserViewport(viewport: import('./browser').BrowserViewport): Promise<void>;
   /** Hide the native page view while a React overlay is open. */
-  setBrowserOverlayVisible(visible: boolean): Promise<void>;
+  setBrowserOverlayVisible(open: boolean): Promise<void>;
+  /** Whether the browser section is the one currently on screen. */
+  setBrowserSectionVisible(visible: boolean): Promise<void>;
   onBrowserStateChanged(cb: (state: import('./browser').BrowserState) => void): () => void;
   getPendingBrowserPermission(): Promise<import('./browser').PendingBrowserPermission | null>;
   resolveBrowserPermission(id: string, granted: boolean, remember: boolean): Promise<void>;

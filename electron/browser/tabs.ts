@@ -26,6 +26,7 @@ import type { BrowserState, BrowserTabError, BrowserTabState, BrowserViewport } 
 import { MAX_BROWSER_TABS } from '@shared/browser';
 import { decideNavigation } from '@shared/browserNavigation';
 import { NODUS_BROWSER_PARTITION, browserSession } from './session';
+import { installContextMenu, type ContextMenuActions } from './contextMenu';
 import {
   describeMediaSession,
   dropMediaSession,
@@ -50,8 +51,19 @@ const tabs = new Map<string, Tab>();
 let activeTabId: string | null = null;
 let hostWindow: BaseWindow | null = null;
 let viewport: BrowserViewport | null = null;
-let overlayVisible = true;
+/**
+ * Two INDEPENDENT reasons the page may be hidden, deliberately not one flag.
+ *
+ * `sectionVisible` is whether the user is looking at the browser section at all;
+ * `overlayOpen` is whether a React overlay is on top of it. Collapsing them into
+ * one boolean is what shipped a page that stayed painted over the rest of the
+ * app after switching sections, and a menu whose clicks went to the website
+ * underneath it instead of to the menu.
+ */
+let sectionVisible = false;
+let overlayOpen = false;
 let notify: (() => void) | null = null;
+let contextMenuActions: ContextMenuActions | null = null;
 
 /** Chromium error codes worth telling the user apart. */
 function classifyError(code: number): BrowserTabError['kind'] {
@@ -85,9 +97,10 @@ function emptyState(id: string, url: string): BrowserTabState {
 }
 
 /** Wire the host window and the change notifier. Called once, from the IPC layer. */
-export function initBrowserTabs(window: BaseWindow, onChange: () => void): void {
+export function initBrowserTabs(window: BaseWindow, onChange: () => void, menu?: ContextMenuActions): void {
   hostWindow = window;
   notify = onChange;
+  if (menu) contextMenuActions = menu;
 
   /**
    * The page preload's only outbound channel: whether the element that started
@@ -152,7 +165,7 @@ function attach(tab: Tab): void {
   if (!hostWindow) return;
   hostWindow.contentView.addChildView(tab.view);
   applyBounds(tab);
-  tab.view.setVisible(overlayVisible);
+  tab.view.setVisible(sectionVisible && !overlayOpen);
 }
 
 function detach(tab: Tab): void {
@@ -170,6 +183,7 @@ function on(tab: Tab, contents: WebContents, event: string, handler: (...args: n
 
 function wire(tab: Tab): void {
   const contents = tab.view.webContents;
+  if (contextMenuActions) installContextMenu(contents, contextMenuActions);
 
   // Never let a page dictate the options of a window it opens. `allow` would
   // hand the site control of webPreferences; instead every popup becomes an
@@ -367,16 +381,35 @@ export function setViewport(next: BrowserViewport): void {
   if (tab) applyBounds(tab);
 }
 
+function applyVisibility(): void {
+  const tab = activeTabId ? tabs.get(activeTabId) : null;
+  tab?.view.setVisible(sectionVisible && !overlayOpen);
+}
+
+/**
+ * Whether the browser section is the one on screen.
+ *
+ * A WebContentsView is a native child view: it keeps painting over the window's
+ * HTML until something says otherwise, so leaving the section without this left
+ * the page floating above every other part of Nodus.
+ */
+export function setSectionVisible(visible: boolean): void {
+  sectionVisible = visible;
+  applyVisibility();
+}
+
 /**
  * Hide the page while a React overlay is open.
  *
- * The WebContents is untouched, so media keeps playing and no state is lost —
- * this only stops the native view from painting over a modal.
+ * Not just a paint problem: a native view on top also takes the MOUSE, so an
+ * HTML menu drawn over the page looks fine and silently sends every click to the
+ * website underneath. Anything that renders over the page must call this.
+ *
+ * The WebContents is untouched either way, so media keeps playing.
  */
-export function setOverlayVisible(visible: boolean): void {
-  overlayVisible = visible;
-  const tab = activeTabId ? tabs.get(activeTabId) : null;
-  tab?.view.setVisible(visible);
+export function setOverlayVisible(open: boolean): void {
+  overlayOpen = open;
+  applyVisibility();
 }
 
 function withActive<T>(fn: (contents: WebContents) => T): T | undefined {

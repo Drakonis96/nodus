@@ -16,7 +16,7 @@
  * preload with `ipcRenderer` on it. Defence in depth, deliberately redundant.
  */
 
-import { BrowserWindow } from 'electron';
+import { BrowserWindow, shell } from 'electron';
 import type { IpcContext } from './context';
 import type { BrowserViewport } from '@shared/browser';
 import { parseOmniboxInput } from '@shared/browserOmnibox';
@@ -34,6 +34,8 @@ import {
 import { addGlobalLibraryAttachments, createGlobalLibraryItem } from '../library/libraryService';
 import { clearAllBrowserData, clearBrowserData, measureBrowserStorage } from '../browser/storage';
 import { setNodiQuoteSelection, setNodiViewContext } from '../ai/nodiChat';
+import { localizeIpcPayload } from '@shared/uiLanguage';
+import { getSettings } from '../db/settingsRepo';
 import {
   activateTab,
   browserState,
@@ -46,6 +48,7 @@ import {
   navigate,
   reload,
   setOverlayVisible,
+  setSectionVisible,
   activeTabSummary,
   collectFromTab,
   sendMediaCommand,
@@ -109,7 +112,30 @@ export function registerBrowserIpc({ h, getWindow }: IpcContext): void {
     if (wired) return;
     const window = getWindow();
     if (!window) return;
-    initBrowserTabs(window, broadcast);
+    initBrowserTabs(window, broadcast, {
+      openInNewTab: (url) => { void createTab(url); },
+      quoteToNodi: (text) => {
+        const selection = setNodiQuoteSelection(text);
+        const target = getWindow();
+        if (selection && target && !target.isDestroyed()) {
+          target.webContents.send('nodi:quoteSelection', selection);
+        }
+      },
+      // Both of these are the same work the toolbar menu does; the renderer owns
+      // the modal, so the context menu asks it to open rather than duplicating it.
+      askNodiAboutPage: () => {
+        const target = getWindow();
+        if (target && !target.isDestroyed()) target.webContents.send('browser:requestAction', 'askNodiPage');
+      },
+      addToLibrary: () => {
+        const target = getWindow();
+        if (target && !target.isDestroyed()) target.webContents.send('browser:requestAction', 'addToLibrary');
+      },
+      searchEngine: () => getSettings().browserSearchEngine ?? 'google',
+      customSearchTemplate: () => getSettings().browserSearchTemplate ?? '',
+      // The native menu speaks the app's language through the same table the UI uses.
+      t: (key: string) => String(localizeIpcPayload({ v: key }, getSettings().uiLanguage).v),
+    });
     setPermissionPromptNotifier(broadcastPermission);
     setMediaNotifier(broadcastMedia);
     setDownloadNotifier(broadcastDownloads);
@@ -122,10 +148,60 @@ export function registerBrowserIpc({ h, getWindow }: IpcContext): void {
     return browserState();
   });
 
+  /**
+   * Where Home and a new tab go.
+   *
+   * Resolved in main so the preference is applied in one place — the renderer
+   * asking for "home" cannot drift from what the setting says.
+   */
+  const homeUrl = (): string => {
+    const settings = getSettings();
+    if (settings.browserHomeMode === 'custom') {
+      const configured = String(settings.browserHomeUrl ?? '').trim();
+      if (configured) {
+        const resolved = parseOmniboxInput(configured);
+        if (resolved.kind === 'navigate' || resolved.kind === 'search') return resolved.url;
+      }
+    }
+    // 'start' has no start page yet, so it behaves as blank rather than
+    // pretending to open something that does not exist.
+    return 'about:blank';
+  };
+
   h('browser:openTab', async (event, url: string) => {
     assertUiSender(event, getWindow);
     ensureWired();
-    return createTab(String(url ?? ''));
+    const requested = String(url ?? '');
+    if (requested === '') {
+      return createTab(getSettings().browserNewTabMode === 'blank' ? 'about:blank' : homeUrl());
+    }
+    return createTab(requested);
+  });
+
+  h('browser:goHome', async (event) => {
+    assertUiSender(event, getWindow);
+    ensureWired();
+    const target = homeUrl();
+    if (target === 'about:blank') { navigate('about:blank'); return { url: target }; }
+    navigate(target);
+    return { url: target };
+  });
+
+  /** Show a completed download in the file manager. Never opens the file itself. */
+  h('browser:revealDownload', async (event, id: string) => {
+    assertUiSender(event, getWindow);
+    const file = completedDownloadPath(String(id));
+    if (!file) throw new Error('That download is no longer available.');
+    shell.showItemInFolder(file);
+  });
+
+  /** Forget every finished download. Files on disk are untouched. */
+  h('browser:clearDownloads', async (event) => {
+    assertUiSender(event, getWindow);
+    for (const download of browserDownloads()) {
+      if (download.state !== 'progressing' && download.state !== 'paused') dismissDownload(download.id);
+    }
+    return browserDownloads();
   });
 
   h('browser:activateTab', async (event, id: string) => {
@@ -175,9 +251,16 @@ export function registerBrowserIpc({ h, getWindow }: IpcContext): void {
    * be drawn underneath a web page. The WebContents is untouched: media keeps
    * playing and no navigation state is lost.
    */
-  h('browser:setOverlayVisible', async (event, visible: boolean) => {
+  h('browser:setOverlayVisible', async (event, open: boolean) => {
     assertUiSender(event, getWindow);
-    setOverlayVisible(Boolean(visible));
+    setOverlayVisible(Boolean(open));
+  });
+
+  /** Whether the browser section is the one currently on screen. */
+  h('browser:setSectionVisible', async (event, visible: boolean) => {
+    assertUiSender(event, getWindow);
+    ensureWired();
+    setSectionVisible(Boolean(visible));
   });
 
   h('browser:pendingPermission', async (event) => {

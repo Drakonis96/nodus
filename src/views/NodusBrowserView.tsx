@@ -4,6 +4,7 @@ import { t } from '../i18n';
 import { MAX_BROWSER_TABS } from '@shared/browser';
 import type { BrowserDownloadView, BrowserState, BrowserTabState, PendingBrowserPermission } from '@shared/browser';
 import type { BrowserConnectorCaptureRequest } from '@shared/browserConnector';
+import type { AppSettings } from '@shared/types';
 import { BrowserCaptureModal } from '../components/browser/BrowserCaptureModal';
 
 /**
@@ -33,6 +34,7 @@ export function NodusBrowserView() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [downloads, setDownloads] = useState<BrowserDownloadView[]>([]);
+  const [panel, setPanel] = useState<null | 'downloads' | 'settings'>(null);
 
   const active: BrowserTabState | null =
     state.tabs.find((tab) => tab.id === state.activeTabId) ?? null;
@@ -43,6 +45,16 @@ export function NodusBrowserView() {
     const stop = window.nodus.onBrowserStateChanged(setState);
     void window.nodus.getBrowserState().then(setState);
     return stop;
+  }, []);
+
+  /**
+   * The page is a native view: it keeps painting over the window until told not
+   * to, so leaving this section without the cleanup below left a website
+   * floating above the rest of Nodus.
+   */
+  useEffect(() => {
+    void window.nodus.setBrowserSectionVisible(true);
+    return () => { void window.nodus.setBrowserSectionVisible(false); };
   }, []);
 
   useEffect(() => {
@@ -113,7 +125,7 @@ export function NodusBrowserView() {
 
   // Open the first tab once, when the section is first shown.
   useEffect(() => {
-    if (state.tabs.length === 0) void window.nodus.openBrowserTab('about:blank');
+    if (state.tabs.length === 0) void window.nodus.openBrowserTab('');
     // Deliberately runs on mount only: re-running on every state change would
     // reopen a tab the moment the user closed the last one.
   }, []);
@@ -129,6 +141,19 @@ export function NodusBrowserView() {
     }
     (document.activeElement as HTMLElement | null)?.blur();
   };
+
+  // Anything drawn over the page has to hide the native view first: a view on
+  // top does not merely paint over HTML, it also swallows the pointer, so an
+  // HTML menu above a page looks right and sends its clicks to the website.
+  useEffect(() => {
+    void window.nodus.setBrowserOverlayVisible(menuOpen || panel !== null);
+  }, [menuOpen, panel]);
+
+  // The native context menu cannot open a React dialog itself, so it asks.
+  useEffect(() => window.nodus.onBrowserActionRequested((action) => {
+    if (action === 'addToLibrary') void addToLibrary();
+    else if (action === 'askNodiPage') void askNodi('page');
+  }));
 
   const loading = Boolean(active?.loading);
 
@@ -188,7 +213,7 @@ export function NodusBrowserView() {
         <ToolbarButton
           icon="home"
           label={t('Inicio')}
-          onClick={() => void window.nodus.submitBrowserOmnibox('about:blank')}
+          onClick={() => void window.nodus.browserGoHome()}
         />
 
         <form className="flex min-w-0 flex-1 items-center" onSubmit={submit}>
@@ -212,6 +237,32 @@ export function NodusBrowserView() {
             />
           </div>
         </form>
+
+        <div className="relative">
+          <ToolbarButton
+            icon="download"
+            label={t('Descargas')}
+            onClick={() => setPanel((current) => (current === 'downloads' ? null : 'downloads'))}
+          />
+          {downloads.length > 0 && <span className="header-action-badge">{downloads.length}</span>}
+          {panel === 'downloads' && (
+            <DownloadsPanel
+              downloads={downloads}
+              onClose={() => setPanel(null)}
+              onImported={(title: string) => { setPanel(null); setNotice(t('Guardado en la Biblioteca: {title}').replace('{title}', title)); }}
+              onError={(message: string) => { setPanel(null); setNotice(message); }}
+            />
+          )}
+        </div>
+
+        <div className="relative">
+          <ToolbarButton
+            icon="settings"
+            label={t('Configuración del navegador')}
+            onClick={() => setPanel((current) => (current === 'settings' ? null : 'settings'))}
+          />
+          {panel === 'settings' && <BrowserQuickSettings onClose={() => setPanel(null)} />}
+        </div>
 
         <div className="relative">
           <ToolbarButton
@@ -641,4 +692,155 @@ function describeDownload(download: BrowserDownloadView): string {
     return `${Math.round((download.receivedBytes / download.totalBytes) * 100)}%`;
   }
   return t('Descargando…');
+}
+
+/**
+ * Recent downloads.
+ *
+ * "Show in folder" reveals the file; it never opens it. That distinction is the
+ * whole of Nodus's download safety posture — revealing hands the decision to the
+ * user's file manager, opening executes whatever a website just sent.
+ */
+function DownloadsPanel({
+  downloads, onClose, onImported, onError,
+}: {
+  downloads: BrowserDownloadView[];
+  onClose: () => void;
+  onImported: (title: string) => void;
+  onError: (message: string) => void;
+}) {
+  const finished = downloads.some((entry) => entry.state !== 'progressing' && entry.state !== 'paused');
+  return (
+    <>
+      <div className="fixed inset-0 z-[120]" onClick={onClose} />
+      <div
+        data-testid="browser-downloads-panel"
+        className="absolute right-0 z-[121] mt-1 w-80 rounded-xl border border-neutral-300 bg-white p-1 shadow-xl dark:border-neutral-700 dark:bg-neutral-900"
+      >
+        {downloads.length === 0 && (
+          <p className="px-3 py-4 text-center text-xs text-neutral-500">{t('Todavía no hay descargas.')}</p>
+        )}
+        <div className="max-h-72 overflow-y-auto">
+          {downloads.map((download) => (
+            <div key={download.id} className="flex items-center gap-2 rounded-lg px-2 py-1.5 hover:bg-neutral-100 dark:hover:bg-neutral-800">
+              <Icon name="file" size={13} className="shrink-0 opacity-60" />
+              <button
+                type="button"
+                className="min-w-0 flex-1 text-left"
+                disabled={download.state !== 'completed'}
+                title={download.state === 'completed' ? t('Mostrar en la carpeta') : undefined}
+                onClick={() => void window.nodus.revealBrowserDownload(download.id).catch(() => undefined)}
+              >
+                <div className="truncate text-xs text-neutral-800 dark:text-neutral-200">{download.filename}</div>
+                <div className="truncate text-[11px] text-neutral-500">{describeDownload(download)}</div>
+              </button>
+              {download.state === 'completed' && download.importable && (
+                <button
+                  type="button"
+                  className="btn btn-ghost shrink-0 border border-indigo-500/50 px-1.5 py-0.5 text-[11px]"
+                  onClick={() => void window.nodus
+                    .importBrowserDownload(download.id, download.filename.replace(/\.[^.]+$/, ''))
+                    .then((result) => onImported(result.title))
+                    .catch((cause) => onError(cause instanceof Error ? cause.message : String(cause)))}
+                >
+                  {t('A la Biblioteca')}
+                </button>
+              )}
+            </div>
+          ))}
+        </div>
+        {finished && (
+          <button
+            type="button"
+            className="btn btn-ghost mt-1 w-full justify-center border border-neutral-300 py-1 text-xs dark:border-neutral-700"
+            onClick={() => void window.nodus.clearBrowserDownloads()}
+          >
+            {t('Limpiar la lista')}
+          </button>
+        )}
+      </div>
+    </>
+  );
+}
+
+/**
+ * The settings a person changes while browsing, rather than in Settings.
+ *
+ * Only the two that come up in the moment — what Home opens and what a new tab
+ * opens. Everything heavier (storage, per-site data, permissions) stays in
+ * Settings → Nodus Browser, where there is room to explain it.
+ */
+function BrowserQuickSettings({ onClose }: { onClose: () => void }) {
+  const [settings, setSettings] = useState<AppSettings | null>(null);
+  useEffect(() => { void window.nodus.getSettings().then(setSettings); }, []);
+
+  const patch = async (next: Partial<AppSettings>) => {
+    await window.nodus.updateSettings(next);
+    setSettings(await window.nodus.getSettings());
+  };
+
+  return (
+    <>
+      <div className="fixed inset-0 z-[120]" onClick={onClose} />
+      <div
+        data-testid="browser-quick-settings"
+        className="absolute right-0 z-[121] mt-1 w-72 rounded-xl border border-neutral-300 bg-white p-3 shadow-xl dark:border-neutral-700 dark:bg-neutral-900"
+      >
+        <p className="mb-1.5 text-xs font-semibold text-neutral-700 dark:text-neutral-200">{t('Página de inicio')}</p>
+        {(['start', 'blank', 'custom'] as const).map((mode) => (
+          <label key={mode} className="mb-1 flex items-center gap-2 text-xs text-neutral-700 dark:text-neutral-300">
+            <input
+              type="radio"
+              name="browser-home-mode"
+              checked={settings?.browserHomeMode === mode}
+              onChange={() => void patch({ browserHomeMode: mode })}
+            />
+            {mode === 'start' ? t('Página en blanco de Nodus') : mode === 'blank' ? t('Página en blanco') : t('Dirección personalizada')}
+          </label>
+        ))}
+        {settings?.browserHomeMode === 'custom' && (
+          <input
+            className="input mt-1 w-full text-xs"
+            placeholder="https://…"
+            defaultValue={settings.browserHomeUrl}
+            onBlur={(event) => void patch({ browserHomeUrl: event.target.value })}
+          />
+        )}
+
+        <p className="mb-1.5 mt-3 text-xs font-semibold text-neutral-700 dark:text-neutral-200">{t('Al abrir una pestaña nueva')}</p>
+        {(['home', 'blank'] as const).map((mode) => (
+          <label key={mode} className="mb-1 flex items-center gap-2 text-xs text-neutral-700 dark:text-neutral-300">
+            <input
+              type="radio"
+              name="browser-newtab-mode"
+              checked={settings?.browserNewTabMode === mode}
+              onChange={() => void patch({ browserNewTabMode: mode })}
+            />
+            {mode === 'home' ? t('La página de inicio') : t('Página en blanco')}
+          </label>
+        ))}
+
+        <p className="mb-1.5 mt-3 text-xs font-semibold text-neutral-700 dark:text-neutral-200">{t('Buscador')}</p>
+        <select
+          className="input w-full text-xs"
+          value={settings?.browserSearchEngine ?? 'google'}
+          onChange={(event) => void patch({ browserSearchEngine: event.target.value as AppSettings['browserSearchEngine'] })}
+        >
+          <option value="google">Google</option>
+          <option value="scholar">Google Scholar</option>
+          <option value="bing">Bing</option>
+          <option value="duckduckgo">DuckDuckGo</option>
+          <option value="custom">{t('Personalizado')}</option>
+        </select>
+        {settings?.browserSearchEngine === 'custom' && (
+          <input
+            className="input mt-1 w-full text-xs"
+            placeholder="https://ejemplo.org/buscar?q=%s"
+            defaultValue={settings.browserSearchTemplate}
+            onBlur={(event) => void patch({ browserSearchTemplate: event.target.value })}
+          />
+        )}
+      </div>
+    </>
+  );
 }

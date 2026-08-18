@@ -71,6 +71,11 @@ export const GLOBAL_PREF_KEYS = [
   // schema migration, and rides the existing backup of app-prefs.json.
   'browserSitePermissions',
   'browserDownloadFolder',
+  'browserHomeMode',
+  'browserHomeUrl',
+  'browserNewTabMode',
+  'browserSearchEngine',
+  'browserSearchTemplate',
 ] as const;
 export type GlobalPrefKey = (typeof GLOBAL_PREF_KEYS)[number];
 
