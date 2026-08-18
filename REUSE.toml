@@ -31,6 +31,12 @@ SPDX-FileCopyrightText = "See the individual file, upstream notice or fixture ma
 SPDX-License-Identifier = "NOASSERTION"
 
 [[annotations]]
+path = ["site/assets/fonts/**"]
+precedence = "override"
+SPDX-FileCopyrightText = "2016 The Inter Project Authors; 2018 The Fraunces Project Authors"
+SPDX-License-Identifier = "OFL-1.1"
+
+[[annotations]]
 path = ["zotero-plugin/content/icons.js"]
 precedence = "override"
 SPDX-FileCopyrightText = "2026 Jorge Pérez Burgueño and Nodus contributors; Lucide contributors"

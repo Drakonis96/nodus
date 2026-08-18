@@ -101,7 +101,9 @@ Hosts opt in with a placeholder element:
 
     const syncBorder = () => nav.classList.toggle('scrolled', scrollY > 24);
     addEventListener('scroll', syncBorder, { passive: true });
-    syncBorder();
+    // Reading the scroll offset immediately after writing the header into the
+    // page forces a synchronous layout; let the frame settle and read it then.
+    requestAnimationFrame(syncBorder);
 
     // live counters, both best-effort: the header reads fine without them
     const starTarget = host.querySelector('#star-count');
