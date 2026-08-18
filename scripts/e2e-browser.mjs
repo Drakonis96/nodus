@@ -119,7 +119,22 @@ const profile = await mkdtemp(path.join(os.tmpdir(), 'nodus-e2e-browser-'));
 await mkdir(profile, { recursive: true });
 // Skip the "we detected a previous installation" recovery wall, which otherwise
 // covers the app before any test can reach the browser section.
-await writeFile(path.join(profile, 'app-prefs.json'), JSON.stringify({ recoverySetupVersion: 1 }), 'utf8');
+// recoverySetupVersion skips the "previous installation detected" wall;
+// firstVaultVersion skips the first-vault wizard, which otherwise replaces the
+// whole shell and makes the sidebar — and therefore the browser entry —
+// unreachable.
+await writeFile(
+  path.join(profile, 'app-prefs.json'),
+  JSON.stringify({
+    recoverySetupVersion: 1,
+    firstVaultVersion: 1,
+    // The basics tutorial opens on a language picker that covers the shell.
+    basicsTutorialVersion: 999,
+    tutorialVideosWatched: true,
+    uiLanguage: 'es',
+  }),
+  'utf8',
+);
 
 await startFixtures();
 
@@ -311,6 +326,14 @@ try {
     const current = await state();
     assert.ok(current.tabs.length <= 12, `the cap must hold, got ${current.tabs.length} tabs`);
   });
+
+  // NOT COVERED, and it should be: entering the section through the UI and
+  // asserting the page view gets a non-zero rectangle. Every check above drives
+  // the browser over IPC, so the viewport is never published and the view stays
+  // sized 0x0 — invisible rather than broken, and green at every level above it.
+  // That blind spot is exactly where the open rendering bug lives. Reaching the
+  // shell from this harness needs the first-run tutorial and vault wizard seeded
+  // past, which is unsolved here.
 
   await check('the main window is still responsive after all of that', async () => {
     const settings = await page.evaluate(() => window.nodus.getSettings());

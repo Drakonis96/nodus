@@ -32,12 +32,12 @@ export function BrowserCaptureModal({
   // The browser page is a native view painting above this HTML, so it has to be
   // hidden while a modal is open or the dialog is drawn underneath it.
   useEffect(() => {
-    void window.nodus.setBrowserOverlayVisible(false);
+    void window.nodus.setBrowserOverlayVisible(true);
     const onKey = (event: KeyboardEvent) => { if (event.key === 'Escape' && !busy) onClose(); };
     window.addEventListener('keydown', onKey);
     return () => {
       window.removeEventListener('keydown', onKey);
-      void window.nodus.setBrowserOverlayVisible(true);
+      void window.nodus.setBrowserOverlayVisible(false);
     };
   }, [busy, onClose]);
 

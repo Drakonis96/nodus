@@ -41,7 +41,7 @@ export function BrowserMediaProvider({ children }: { children: ReactNode }) {
  * The popover, anchored to the header button.
  *
  * Same anchoring pattern as the notifications panel. It calls
- * `setBrowserOverlayVisible(false)` while open, because the browser page is a
+ * `setBrowserOverlayVisible(true)` while open, because the browser page is a
  * native view that paints above this HTML — without that, opening this popover
  * while the browser section is on screen would draw it underneath the page.
  */
@@ -52,12 +52,12 @@ export function BrowserMediaPopover({
 
   useEffect(() => {
     if (!anchorEl) return;
-    void window.nodus.setBrowserOverlayVisible(false);
+    void window.nodus.setBrowserOverlayVisible(true);
     const onKey = (event: KeyboardEvent) => { if (event.key === 'Escape') onClose(); };
     window.addEventListener('keydown', onKey);
     return () => {
       window.removeEventListener('keydown', onKey);
-      void window.nodus.setBrowserOverlayVisible(true);
+      void window.nodus.setBrowserOverlayVisible(false);
     };
   }, [anchorEl, onClose]);
 
