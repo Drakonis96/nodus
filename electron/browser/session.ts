@@ -20,6 +20,7 @@
 
 import { session, type Session } from 'electron';
 import { decideNavigation } from '@shared/browserNavigation';
+import { installBrowserPermissions } from './permissions';
 
 export const NODUS_BROWSER_PARTITION = 'persist:nodus-browser';
 
@@ -64,6 +65,9 @@ function browserUserAgent(ses: Session): string {
 
 function configureBrowserSession(ses: Session): void {
   ses.setUserAgent(browserUserAgent(ses));
+
+  // Deny-by-default permissions, both handlers plus the device ones.
+  installBrowserPermissions(ses);
 
   // Belt to the navigation guard's braces. `will-navigate` stops a tab from
   // MOVING to a blocked scheme; this stops a page from FETCHING one as a
