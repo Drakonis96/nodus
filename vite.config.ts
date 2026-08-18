@@ -40,6 +40,14 @@ const mainExternals = [
   '@github/copilot-sdk',
   'openai',
   'electron-updater',
+  // Turndown picks its HTML parser at module-evaluation time: with no `window` — i.e.
+  // in the main process — it takes the Node branch, which is a bare
+  // `require('@mixmark-io/domino')`. Bundled into an ESM chunk that call throws
+  // "require is not defined in ES module scope" the moment the chunk is imported,
+  // which took down the whole Zotero note-mirroring step. Kept external so it loads
+  // as the real CommonJS package, where the require resolves normally.
+  'turndown',
+  '@mixmark-io/domino',
 ];
 
 /**
