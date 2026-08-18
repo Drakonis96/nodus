@@ -1,5 +1,32 @@
 # Changelog
 
+## 4.1.6 — 2026-08-18
+
+Nodus 4.1.6 repairs the Zotero import of the Global Library, which catalogued documents
+without ever copying an attachment and then refused to run a second time, and keeps the
+two reading galleries from forgetting how they were set or flashing on the way back in.
+
+- The Zotero import bundles turndown and its HTML parser as external CommonJS, so loading
+  it in the main process no longer throws before the attachment loop and both notes and
+  attachments are copied again. A failed import reports the first failure's own message
+  instead of always claiming that Zotero is unavailable.
+- A 404 from Zotero's `/deleted` endpoint, which the local API does not implement, is read
+  as "no tombstones reported" rather than as a missing library, so the second and later
+  syncs no longer abort before reading an item. Deletions made in Zotero are not mirrored
+  incrementally until a full refresh, which the release notes state.
+- The resumable-session banner follows the newest session by `updatedAt` alone, so an old
+  failure no longer presents a later clean import as interrupted.
+- Ordering, the read filter and grid-versus-list are written to a small per-vault store on
+  disk and seed the snapshot Deep Research, the study and teaching unit galleries and
+  Inmersión mount with. The search box, the open report and the place in a list stay in
+  memory. Deleting a vault takes its stored preferences with it.
+- Deep Research and Inmersión hold a quiet pane while the report or session they are
+  returning to is read back, showing a spinner only after 250ms, so neither section paints
+  its gallery on the way in. A session that no longer exists lands on the gallery.
+- The study and teaching organization heading goes through `t()` for its three interface
+  fallbacks, which were bare Spanish literals rendered raw, with a regression test.
+- The What's New modal presents this release in all eight interface languages.
+
 ## 4.1.5 — 2026-08-17
 
 Nodus 4.1.5 puts the floating selection ribbon where the hand that made the selection
