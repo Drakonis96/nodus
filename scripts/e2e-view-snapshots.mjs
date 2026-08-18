@@ -37,6 +37,27 @@ const TOP_BLOCK = `(() => {
   return found ? (found.textContent ?? '').trim().slice(0, 80) : null;
 })()`;
 
+/**
+ * Samples what is painted on every frame until told to stop. A section walking back
+ * into a report or a session must never show its gallery on the way: the read of the
+ * thing to reopen takes a few frames, and painting the list in the meantime looks
+ * like the app opening the list and clicking the item by itself.
+ */
+const WATCH_SURFACES = (gallery) => `(() => {
+  window.__gen = (window.__gen ?? 0) + 1;
+  const mine = window.__gen;
+  window.__surfaces = [];
+  const started = performance.now();
+  const tick = () => {
+    if (window.__gen !== mine) return;
+    if (document.querySelector('${gallery}')) window.__surfaces.push(Math.round(performance.now() - started));
+    if (performance.now() - started < 3000) requestAnimationFrame(tick);
+  };
+  requestAnimationFrame(tick);
+})()`;
+const DEEP_GALLERY = 'input[placeholder^="Buscar entre tus informes"]';
+const IMMERSION_GALLERY = 'input[placeholder^="Buscar entre tus inmersiones"]';
+
 let app;
 try {
   app = await electron.launch({ executablePath: require('electron'), args: [repoRoot], env: childEnv });
@@ -67,12 +88,14 @@ try {
   }, require(path.join(repoRoot, 'package.json')).version);
   await page.reload();
   await page.waitForFunction(() => Boolean(document.getElementById('root')?.children.length));
-  const updateModal = page.getByTestId('startup-update-modal');
-  if (await updateModal.count()) {
+  const dismissUpdateModal = async () => {
+    const updateModal = page.getByTestId('startup-update-modal');
+    if (!(await updateModal.count())) return;
     await page.waitForFunction(() => document.querySelector('[data-testid="startup-update-modal"]')?.getAttribute('data-update-status') === 'not-available');
     await updateModal.getByRole('button', { name: 'Entendido', exact: false }).click();
     await updateModal.waitFor({ state: 'detached' });
-  }
+  };
+  await dismissUpdateModal();
 
   // The demo's report is one screen long, and a place only means something in a
   // document that does not fit on one. This is the demo report with a long body: same
@@ -117,8 +140,14 @@ try {
   // ── Out of the section, and back in ─────────────────────────────────────────
   await page.locator('[data-tour="nav-ideas"]').click();
   await page.waitForSelector('[data-testid="deep-research-reader-document"]', { state: 'detached' });
+  await page.evaluate(WATCH_SURFACES(DEEP_GALLERY));
   await openDeepResearch();
   await readerDocument.waitFor({ state: 'visible' });
+  assert.deepEqual(
+    await page.evaluate(() => window.__surfaces),
+    [],
+    'the gallery is never painted on the way back to an open report',
+  );
 
   const backAt = await page.evaluate(TOP_BLOCK);
   assert.equal(backAt, leftAt, 'the report reopens at the paragraph it was left on');
@@ -157,8 +186,14 @@ try {
   const step = await page.locator('header .text-\\[11px\\]').first().innerText();
   await page.locator('[data-tour="nav-ideas"]').click();
   await immersionExit.waitFor({ state: 'detached' });
+  await page.evaluate(WATCH_SURFACES(IMMERSION_GALLERY));
   await page.locator('[data-tour="nav-immersion"]').click();
   await immersionExit.waitFor({ state: 'visible' });
+  assert.deepEqual(
+    await page.evaluate(() => window.__surfaces),
+    [],
+    'nor on the way back to an open session',
+  );
   assert.equal(await page.locator('header .text-\\[11px\\]').first().innerText(), step, 'the immersion reopens on the step it was left on');
 
   // And leaving the player is leaving it: the gallery does not reopen it by itself.
@@ -166,6 +201,48 @@ try {
   await page.locator('[data-tour="nav-ideas"]').click();
   await page.locator('[data-tour="nav-immersion"]').click();
   await immersionExit.waitFor({ state: 'detached' });
+
+  // ── A restart: what was a preference, and what was only a place ─────────────
+  //
+  // Reloading the window throws the entire renderer away, module-level snapshot store
+  // included, which is what the reader gets on the next launch. Everything above this
+  // line is remembered by that store; only the ordering, the read filter and the
+  // grid/list choice are expected to come back from disk.
+  const immersionSort = page.locator('select').filter({ hasText: 'Más recientes' });
+  await immersionSort.selectOption('title');
+  await page.getByTitle('Vista lista').click();
+
+  // A search and an open report, which are a question and a place: neither is a
+  // preference, and neither may come back a launch later to hide the gallery.
+  await openDeepResearch();
+  await page.locator('input[placeholder^="Buscar entre tus informes"]').fill('AAA informe largo');
+  await page.getByRole('button', { name: 'Leer', exact: true }).first().click();
+  await readerDocument.waitFor({ state: 'visible' });
+
+  await page.reload();
+  await page.waitForFunction(() => Boolean(document.getElementById('root')?.children.length));
+  await dismissUpdateModal();
+
+  await openDeepResearch();
+  await readerDocument.waitFor({ state: 'detached' });
+  assert.equal(await sortSelect.inputValue(), 'title', 'the ordering survives the restart');
+  assert.ok(
+    await page.evaluate(() => Boolean(document.querySelector('.space-y-2 [data-anchor-id]'))),
+    'and so does the list/grid choice',
+  );
+  assert.equal(
+    await page.locator('input[placeholder^="Buscar entre tus informes"]').inputValue(),
+    '',
+    'the search box does not come back with them',
+  );
+
+  await page.locator('[data-tour="nav-immersion"]').click();
+  await page.locator('[data-anchor-id]').first().waitFor({ state: 'visible' });
+  assert.equal(await immersionSort.inputValue(), 'title', 'Inmersión reopens on its own stored ordering');
+  assert.ok(
+    await page.evaluate(() => Boolean(document.querySelector('.space-y-2 [data-anchor-id]'))),
+    'and on its own stored layout',
+  );
 
   assert.deepEqual(pageErrors.map((error) => error.message), [], 'no renderer errors');
   console.log('View snapshots e2e passed.');

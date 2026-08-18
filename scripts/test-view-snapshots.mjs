@@ -491,12 +491,35 @@ test('Inmersión restores its gallery and reopens the session it was left in', a
   // The session carries its own progress, so reopening it lands on the step it was
   // left on. Reporting waits for the reopen, or the empty state on the way in would
   // erase the very session being restored.
-  assert.match(view, /resuming = useRef<string \| null>\(snapshot\?\.openSession\?\.id \?\? null\)/);
+  // The target is chosen at mount, before the first paint: a dossier still being
+  // written wins over the session that was merely left open.
+  assert.match(view, /return fromDossier \|\| snapshot\?\.openSession\?\.id \|\| null;/);
+  assert.match(view, /const resuming = useRef<string \| null>\(resumeTarget\);/);
   assert.match(view, /if \(resuming\.current\) return;/);
-  assert.match(view, /const resume = fromDossier \|\| resuming\.current;/);
   // The scope screen is a pass over the corpus; redrawing it means paying for it again.
   const types = await readSource('src/app/viewSnapshots.ts');
   assert.doesNotMatch(types, /ImmersionScope|openScope/, 'the scope screen is not restored');
+});
+
+test('a section walking back into what it had open never paints its gallery on the way', async () => {
+  const [deep, immersion, ui] = await Promise.all([
+    readSource('src/views/DeepResearchView.tsx'),
+    readSource('src/views/ImmersionView.tsx'),
+    readSource('src/components/ui.tsx'),
+  ]);
+  // Reopening means reading the report or the session back, which takes frames. What
+  // is painted in those frames used to be the gallery, and a gallery that appears and
+  // is replaced by the item it lists looks like the app clicking that item itself.
+  assert.match(deep, /if \(mode === 'reader' && !openDraft\) return <RestoringPane \/>;/);
+  // Inmersión decides at mount, not in an effect: an effect runs after the first
+  // paint, and the first paint is the one that must not be the gallery.
+  assert.match(immersion, /useState<'home' \| 'scope' \| 'player'>\(\(\) => \(resumeTarget \? 'player' : 'home'\)\)/);
+  assert.match(immersion, /mode === 'player' && !session && <RestoringPane \/>/);
+  // The waiting pane has exactly one way out when the thing is gone.
+  assert.match(immersion, /if \(!opened\) setMode\('home'\)/);
+  assert.match(deep, /restoredReading\.current = null;\s*setMode\('gallery'\)/);
+  // A spinner that appears and vanishes inside 60ms is its own flicker.
+  assert.match(ui, /setTimeout\(\(\) => setSlow\(true\), delayMs\)/);
 });
 
 test('Biblioteca reopens the documents that were open, and the reader finds its own page', async () => {

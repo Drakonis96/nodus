@@ -32,7 +32,7 @@ import { DECORATIVE_IMAGE_STYLES } from '@shared/imageStyles';
 import type { PendingGraphNavigationTarget } from '../navigation';
 import type { ImmersionSnapshot } from '../app/viewSnapshots';
 import { useListPlacement } from '../listPlacement';
-import { Badge, Icon, TypeDot } from '../components/ui';
+import { Badge, Icon, RestoringPane, TypeDot } from '../components/ui';
 import { SectionHeader } from '../components/SectionHeader';
 import { ModelPicker } from '../components/ModelPicker';
 import { Markdown, type MarkdownCitation } from '../components/Markdown';
@@ -178,7 +178,21 @@ export function ImmersionView({
   onSnapshotChange?: (patch: Partial<ImmersionSnapshot>) => void;
   onOpenGraph: (target: PendingGraphNavigationTarget) => void;
 }) {
-  const [mode, setMode] = useState<'home' | 'scope' | 'player'>('home');
+  /**
+   * The session this mount is walking back into, decided here rather than in an
+   * effect: the section has to know on its very first frame that it is going to the
+   * player, or it paints the gallery on the way there and the return looks like the
+   * app opening the list and clicking the session by itself.
+   *
+   * A dossier still being written wins over the session that was merely left open:
+   * it is the more recent thing, and it is the same section either way.
+   */
+  const [resumeTarget] = useState<string | null>(() => {
+    const dossier = findLatestBackgroundJob<unknown, unknown, unknown>(IMMERSION_DOSSIER_JOB_PREFIX);
+    const fromDossier = dossier ? dossier.key.slice(IMMERSION_DOSSIER_JOB_PREFIX.length) : '';
+    return fromDossier || snapshot?.openSession?.id || null;
+  });
+  const [mode, setMode] = useState<'home' | 'scope' | 'player'>(() => (resumeTarget ? 'player' : 'home'));
   const [sessions, setSessions] = useState<ImmersionSessionSummary[]>([]);
   const [loadingSessions, setLoadingSessions] = useState(false);
   const [composerOpen, setComposerOpen] = useState(false);
@@ -322,29 +336,24 @@ export function ImmersionView({
   // render of the shell; a ref keeps that out of the effects' dependencies.
   const report = useRef(onSnapshotChange);
   report.current = onSnapshotChange;
-  /** The session to reopen, read once. Silences the report until it has landed. */
-  const resuming = useRef<string | null>(snapshot?.openSession?.id ?? null);
+  /** The session being reopened. Silences the report until it has landed. */
+  const resuming = useRef<string | null>(resumeTarget);
   useEffect(() => {
     if (resuming.current) return;
     report.current?.({ openSession: session ? { id: session.id, label: session.plan.title } : null });
   }, [session]);
 
   useEffect(() => {
-    const dossier = findLatestBackgroundJob<unknown, unknown, unknown>(IMMERSION_DOSSIER_JOB_PREFIX);
-    const fromDossier = dossier ? dossier.key.slice(IMMERSION_DOSSIER_JOB_PREFIX.length) : '';
-    // A dossier still being written wins over the session that was merely left open:
-    // it is the more recent thing, and it is the same section either way.
-    const resume = fromDossier || resuming.current;
-    if (!resume) {
-      resuming.current = null;
-      return;
-    }
+    const resume = resuming.current;
+    if (!resume) return;
     // Reconnect only when this view is mounted. The session itself persists its
     // current player step, so opening it returns directly to the step it was left on.
     // Reporting here rather than in the effect above, because the report has to say
-    // what actually loaded: a session deleted elsewhere leaves the section at home.
+    // what actually loaded: a session deleted elsewhere leaves the section at home —
+    // which is also the only way out of the waiting pane the mount opened on.
     void openSession(resume).then((opened) => {
       resuming.current = null;
+      if (!opened) setMode('home');
       report.current?.({ openSession: opened ? { id: opened.id, label: opened.plan.title } : null });
     });
   }, []);
@@ -448,6 +457,9 @@ export function ImmersionView({
           onCitation={setCitation}
         />
       )}
+
+      {/* The session is on its way back; the gallery is not what was asked for. */}
+      {mode === 'player' && !session && <RestoringPane />}
 
       {mode === 'player' && session && (
         <ImmersionPlayer
