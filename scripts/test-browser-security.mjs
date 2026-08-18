@@ -166,3 +166,24 @@ test('the browser never opens a URL externally without scheme validation', () =>
     assert.doesNotMatch(code(file), /shell\.openExternal/, `${file} must not call openExternal directly`);
   }
 });
+
+test('every icon the browser view names actually exists', () => {
+  // Icon renders `null` for a name it does not know, silently. A typo therefore
+  // produces an invisible control rather than an error: a close button that is
+  // an empty clickable area, or a Stop button that vanishes exactly while a page
+  // is loading. Both of those shipped in a draft of this view.
+  const view = read('src/views/NodusBrowserView.tsx');
+  const ui = read('src/components/ui.tsx');
+  const known = new Set([...ui.matchAll(/^ {2}([a-zA-Z]+): '/gm)].map((m) => m[1]));
+  assert.ok(known.size > 50, `the icon catalogue looked wrong (${known.size} entries)`);
+
+  const used = new Set([
+    ...[...view.matchAll(/<Icon\s+name="([a-zA-Z]+)"/g)].map((m) => m[1]),
+    ...[...view.matchAll(/icon=\{[^}]*?'([a-zA-Z]+)'/g)].map((m) => m[1]),
+    ...[...view.matchAll(/icon="([a-zA-Z]+)"/g)].map((m) => m[1]),
+  ]);
+  assert.ok(used.size > 5, `expected the view to use icons, found ${used.size}`);
+
+  const missing = [...used].filter((name) => !known.has(name));
+  assert.deepEqual(missing, [], `icons named but absent from ICON_PATHS: ${missing.join(', ')}`);
+});

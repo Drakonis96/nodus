@@ -7824,4 +7824,7 @@ export const TR: Record<string, string> = {
   "Chromium no pudo verificar que «{host}» sea quien dice ser. Puede tratarse de un certificado caducado o mal configurado, o de que alguien esté interceptando la conexión.": "Chromium \u00ab{host}\u00bb adresinin iddia ettiği kişi olduğunu doğrulayamadı. Sertifika süresi dolmuş veya yanlış yapılandırılmış olabilir ya da biri bağlantıyı araya girerek dinliyor olabilir.",
   "Nodus Browser no ofrece continuar de todos modos: no valida certificados por su cuenta, así que no puede contradecir ese veredicto.": "Nodus Browser yine de devam etme seçeneği sunmaz: sertifikaları kendisi doğrulamadığı için bu karara itiraz edemez.",
   "Volver atrás": "Geri dön",
+  // Nodus Browser: pestañas
+  "Pestaña nueva": "Yeni sekme",
+  "Nodus Browser admite hasta {n} pestañas.": "Nodus Browser en fazla {n} sekme tutar.",
 };

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Icon } from '../components/ui';
 import { t } from '../i18n';
+import { MAX_BROWSER_TABS } from '@shared/browser';
 import type { BrowserState, BrowserTabState, PendingBrowserPermission } from '@shared/browser';
 
 /**
@@ -119,6 +120,14 @@ export function NodusBrowserView() {
 
   return (
     <div className="flex h-full min-h-0 flex-col" data-testid="nodus-browser">
+      <BrowserTabStrip
+        tabs={state.tabs}
+        activeTabId={state.activeTabId}
+        onSelect={(id) => void window.nodus.activateBrowserTab(id)}
+        onClose={(id) => void window.nodus.closeBrowserTab(id)}
+        onNew={() => void window.nodus.openBrowserTab('about:blank')}
+      />
+
       <div className="flex items-center gap-1 border-b border-neutral-800 px-2 py-1.5">
         <ToolbarButton
           icon="chevronLeft"
@@ -133,7 +142,7 @@ export function NodusBrowserView() {
           onClick={() => void window.nodus.browserGoForward()}
         />
         <ToolbarButton
-          icon={busy ? 'close' : 'refresh'}
+          icon={busy ? 'stop' : 'refresh'}
           label={busy ? t('Detener') : t('Recargar')}
           onClick={() => void (busy ? window.nodus.browserStop() : window.nodus.browserReload())}
         />
@@ -283,6 +292,86 @@ function SecurityIndicator({ url, error }: { url: string; error: boolean }) {
     <span title={`${label} · ${t('Nodus no valida certificados por su cuenta.')}`} className={`shrink-0 ${tone}`}>
       <Icon name={secure && !error ? 'lock' : 'alert'} size={13} />
     </span>
+  );
+}
+
+/**
+ * The tab strip.
+ *
+ * Tabs are cheap because only the ACTIVE one is attached to the window's content
+ * view: the rest keep their WebContents — so a login, a scroll position and
+ * playing audio all survive — but are detached, so Chromium neither composites
+ * nor paints them. Closing one destroys its WebContents outright.
+ *
+ * The cap is deliberate and visible. Each tab is a renderer process, and this is
+ * a research browser rather than a replacement for one.
+ */
+function BrowserTabStrip({
+  tabs, activeTabId, onSelect, onClose, onNew,
+}: {
+  tabs: BrowserTabState[];
+  activeTabId: string | null;
+  onSelect: (id: string) => void;
+  onClose: (id: string) => void;
+  onNew: () => void;
+}) {
+  if (tabs.length === 0) return null;
+  const full = tabs.length >= MAX_BROWSER_TABS;
+  return (
+    <div
+      role="tablist"
+      data-testid="browser-tab-strip"
+      className="flex items-center gap-1 overflow-x-auto border-b border-neutral-800 px-2 py-1"
+    >
+      {tabs.map((tab) => {
+        const selected = tab.id === activeTabId;
+        return (
+          <div
+            key={tab.id}
+            role="tab"
+            aria-selected={selected}
+            data-testid="browser-tab"
+            className={`group flex min-w-0 max-w-52 shrink-0 items-center gap-1.5 rounded-lg px-2 py-1 text-xs transition-colors ${
+              selected ? 'bg-neutral-800 text-neutral-100' : 'text-neutral-400 hover:bg-neutral-900'
+            }`}
+          >
+            <button
+              type="button"
+              className="flex min-w-0 flex-1 items-center gap-1.5 text-left"
+              onClick={() => onSelect(tab.id)}
+              title={tab.url || tab.title}
+            >
+              {tab.faviconDataUrl
+                ? <img src={tab.faviconDataUrl} alt="" className="h-3.5 w-3.5 shrink-0" />
+                : <Icon name="globe" size={13} className="shrink-0 opacity-50" />}
+              <span className="truncate">{tab.title || tab.url || t('Pestaña nueva')}</span>
+              {/* A muted-but-playing tab is otherwise invisible in the strip. */}
+              {tab.audible && <Icon name="volume" size={11} className="shrink-0 opacity-60" />}
+            </button>
+            <button
+              type="button"
+              aria-label={t('Cerrar pestaña')}
+              title={t('Cerrar pestaña')}
+              className="shrink-0 rounded p-0.5 opacity-0 transition-opacity hover:bg-neutral-700 group-hover:opacity-70 focus:opacity-100"
+              onClick={() => onClose(tab.id)}
+            >
+              <Icon name="x" size={11} />
+            </button>
+          </div>
+        );
+      })}
+      <button
+        type="button"
+        aria-label={t('Pestaña nueva')}
+        title={full ? t('Nodus Browser admite hasta {n} pestañas.').replace('{n}', String(MAX_BROWSER_TABS)) : t('Pestaña nueva')}
+        disabled={full}
+        onClick={onNew}
+        data-testid="browser-new-tab"
+        className="shrink-0 rounded-lg p-1.5 text-neutral-400 hover:bg-neutral-900 disabled:cursor-not-allowed disabled:opacity-30"
+      >
+        <Icon name="plus" size={13} />
+      </button>
+    </div>
   );
 }
 

@@ -46,6 +46,7 @@ import { registerImageProtocol, registerImageSchemePrivileges } from './imagePro
 import { registerArchiveProtocol, registerArchiveSchemePrivileges } from './archiveProtocol';
 import { registerLibraryProtocol, registerLibrarySchemePrivileges } from './libraryProtocol';
 import { closeGlobalLibraryRuntime } from './library/libraryRuntime';
+import { closeAllBrowserTabs } from './browser/tabs';
 import { ensurePreV4Recovery } from './recovery/preV4Recovery';
 import { applyUpdateChannel, isPrereleaseVersion } from './updateChannel';
 import {
@@ -946,6 +947,7 @@ app.on('window-all-closed', () => {
   stopReplicaSync();
     interruptDecorativeImageGenerations();
     stopAllWhisperCpp();
+    closeAllBrowserTabs();
     closeGlobalLibraryRuntime();
     closeDb();
     app.quit();
@@ -980,6 +982,7 @@ app.on('before-quit', () => {
   // be abandoned mid-drain and leave the vendor runtimes running as orphans.
   killChatGptSubscriptionServer();
   killGitHubCopilotSubscriptionServer();
+  closeAllBrowserTabs();
   closeGlobalLibraryRuntime();
   closeDb();
 });
@@ -1009,6 +1012,7 @@ updateAwareApp.on('before-quit-for-update', () => {
   // be abandoned mid-drain and leave the vendor runtimes running as orphans.
   killChatGptSubscriptionServer();
   killGitHubCopilotSubscriptionServer();
+  closeAllBrowserTabs();
   closeGlobalLibraryRuntime();
   closeDb();
 });

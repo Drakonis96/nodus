@@ -7477,4 +7477,7 @@ export const IT: Record<string, string> = {
   "Chromium no pudo verificar que «{host}» sea quien dice ser. Puede tratarse de un certificado caducado o mal configurado, o de que alguien esté interceptando la conexión.": "Chromium non ha potuto verificare che \u00ab{host}\u00bb sia chi dichiara di essere. Il certificato può essere scaduto o configurato male, oppure qualcuno sta intercettando la connessione.",
   "Nodus Browser no ofrece continuar de todos modos: no valida certificados por su cuenta, así que no puede contradecir ese veredicto.": "Nodus Browser non offre di continuare comunque: non convalida i certificati per conto proprio, quindi non può contraddire quel verdetto.",
   "Volver atrás": "Torna indietro",
+  // Nodus Browser: pestañas
+  "Pestaña nueva": "Nuova scheda",
+  "Nodus Browser admite hasta {n} pestañas.": "Nodus Browser consente fino a {n} schede.",
 };
