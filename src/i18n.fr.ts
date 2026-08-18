@@ -8088,4 +8088,7 @@ export const FR: Record<string, string> = {
   "Guardar también una copia del HTML de la página": "Enregistrer aussi une copie du HTML de la page",
   "Se intentarán adjuntar {n} archivos detectados en la página.": "Nodus tentera de joindre {n} fichiers détectés sur la page.",
   "Consultado": "Consulté",
+  // Nodus Browser: descargas
+  "Importar a la Biblioteca": "Importer dans la bibliothèque",
+  "Interrumpido": "Interrompu",
 };

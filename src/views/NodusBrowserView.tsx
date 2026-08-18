@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Icon } from '../components/ui';
 import { t } from '../i18n';
 import { MAX_BROWSER_TABS } from '@shared/browser';
-import type { BrowserState, BrowserTabState, PendingBrowserPermission } from '@shared/browser';
+import type { BrowserDownloadView, BrowserState, BrowserTabState, PendingBrowserPermission } from '@shared/browser';
 import type { BrowserConnectorCaptureRequest } from '@shared/browserConnector';
 import { BrowserCaptureModal } from '../components/browser/BrowserCaptureModal';
 
@@ -32,6 +32,7 @@ export function NodusBrowserView() {
   const [notice, setNotice] = useState<string | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [downloads, setDownloads] = useState<BrowserDownloadView[]>([]);
 
   const active: BrowserTabState | null =
     state.tabs.find((tab) => tab.id === state.activeTabId) ?? null;
@@ -41,6 +42,12 @@ export function NodusBrowserView() {
   useEffect(() => {
     const stop = window.nodus.onBrowserStateChanged(setState);
     void window.nodus.getBrowserState().then(setState);
+    return stop;
+  }, []);
+
+  useEffect(() => {
+    const stop = window.nodus.onBrowserDownloadsChanged(setDownloads);
+    void window.nodus.getBrowserDownloads().then(setDownloads).catch(() => undefined);
     return stop;
   }, []);
 
@@ -258,6 +265,14 @@ export function NodusBrowserView() {
             <Icon name="x" size={12} />
           </button>
         </div>
+      )}
+
+      {downloads.length > 0 && (
+        <DownloadsBar
+          downloads={downloads}
+          onImported={(title) => setNotice(t('Guardado en la Biblioteca: {title}').replace('{title}', title))}
+          onError={(message) => setNotice(message)}
+        />
       )}
 
       {permission && (
@@ -552,4 +567,78 @@ function MenuItem({ icon, label, onClick }: { icon: string; label: string; onCli
       <span className="min-w-0 truncate">{label}</span>
     </button>
   );
+}
+
+/**
+ * Downloads.
+ *
+ * A strip rather than an overlay, for the same reason as the permission bar: it
+ * takes its own space and pushes the page down, so nothing a site draws can be
+ * confused with it.
+ *
+ * Importing is always a click. Nodus never files a download on its own, and
+ * never opens one — a browser that launches what it just fetched is one step
+ * from being the delivery mechanism.
+ */
+function DownloadsBar({
+  downloads, onImported, onError,
+}: {
+  downloads: BrowserDownloadView[];
+  onImported: (title: string) => void;
+  onError: (message: string) => void;
+}) {
+  return (
+    <div data-testid="browser-downloads" className="flex flex-col gap-1 border-b border-neutral-800 bg-neutral-900/50 px-3 py-1.5">
+      {downloads.map((download) => (
+        <div key={download.id} className="flex items-center gap-2 text-xs">
+          <Icon name="download" size={13} className="shrink-0 opacity-60" />
+          <span className="min-w-0 flex-1 truncate text-neutral-300">{download.filename}</span>
+          <span className="shrink-0 text-neutral-500">{describeDownload(download)}</span>
+
+          {download.state === 'completed' && download.importable && (
+            <button
+              type="button"
+              className="btn btn-ghost shrink-0 border border-indigo-500/50 px-2 py-0.5"
+              onClick={() => void window.nodus
+                .importBrowserDownload(download.id, download.filename.replace(/\.[^.]+$/, ''))
+                .then((result) => onImported(result.title))
+                .catch((cause) => onError(cause instanceof Error ? cause.message : String(cause)))}
+            >
+              {t('Importar a la Biblioteca')}
+            </button>
+          )}
+
+          {download.state === 'progressing' || download.state === 'paused' ? (
+            <button
+              type="button"
+              className="shrink-0 rounded p-0.5 text-neutral-400 hover:bg-neutral-800"
+              aria-label={t('Cancelar')}
+              onClick={() => void window.nodus.cancelBrowserDownload(download.id)}
+            >
+              <Icon name="x" size={12} />
+            </button>
+          ) : (
+            <button
+              type="button"
+              className="shrink-0 rounded p-0.5 text-neutral-400 hover:bg-neutral-800"
+              aria-label={t('Descartar')}
+              onClick={() => void window.nodus.dismissBrowserDownload(download.id)}
+            >
+              <Icon name="x" size={12} />
+            </button>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function describeDownload(download: BrowserDownloadView): string {
+  if (download.state === 'completed') return t('Descargado');
+  if (download.state === 'cancelled') return t('Cancelado');
+  if (download.state === 'interrupted') return t('Interrumpido');
+  if (download.totalBytes > 0) {
+    return `${Math.round((download.receivedBytes / download.totalBytes) * 100)}%`;
+  }
+  return t('Descargando…');
 }

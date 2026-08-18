@@ -70,6 +70,7 @@ export const GLOBAL_PREF_KEYS = [
   // change identity when you switch vault. It also means the feature needs no
   // schema migration, and rides the existing backup of app-prefs.json.
   'browserSitePermissions',
+  'browserDownloadFolder',
 ] as const;
 export type GlobalPrefKey = (typeof GLOBAL_PREF_KEYS)[number];
 

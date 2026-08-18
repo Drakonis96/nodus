@@ -1510,6 +1510,8 @@ export interface AppSettings {
   betaUpdates: boolean;
   /** Nodus Browser: per-origin permission decisions. Absence means «ask». */
   browserSitePermissions: BrowserSitePermissionMap;
+  /** Where Nodus Browser saves downloads. Null asks each time. */
+  browserDownloadFolder: string | null;
   // Nodi mascot: show the floating companion (visual/animation only for now — no wired
   // behaviour yet). App-wide preference, on by default.
   mascotEnabled: boolean;
@@ -7989,6 +7991,11 @@ export interface BrowserApi {
     Promise<import('./browserConnector').BrowserConnectorSaveResult>;
   askNodiAboutBrowserPage(): Promise<boolean>;
   askNodiAboutBrowserSelection(): Promise<boolean>;
+  getBrowserDownloads(): Promise<import('./browser').BrowserDownloadView[]>;
+  cancelBrowserDownload(id: string): Promise<void>;
+  dismissBrowserDownload(id: string): Promise<void>;
+  importBrowserDownload(id: string, title: string): Promise<{ itemId: string; title: string }>;
+  onBrowserDownloadsChanged(cb: (downloads: import('./browser').BrowserDownloadView[]) => void): () => void;
 }
 
 export interface NodusApi extends ProsopographyApi, TestimoniesApi, ToolkitApi, TeachingApi, DatabasesApi, PrimarySourcesApi, ArchiveApi, WorldbuildingApi, PlatformApi, RecordsApi, AcademicApi, LibraryApi, BrowserApi {

@@ -7502,4 +7502,7 @@ export const IT: Record<string, string> = {
   "Guardar también una copia del HTML de la página": "Salva anche una copia dell'HTML della pagina",
   "Se intentarán adjuntar {n} archivos detectados en la página.": "Nodus proverà ad allegare {n} file rilevati nella pagina.",
   "Consultado": "Consultato",
+  // Nodus Browser: descargas
+  "Importar a la Biblioteca": "Importa nella Biblioteca",
+  "Interrumpido": "Interrotto",
 };

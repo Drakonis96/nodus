@@ -22,6 +22,8 @@ import { session, type Session } from 'electron';
 import { decideNavigation } from '@shared/browserNavigation';
 import { installBrowserPermissions, setPermissionPrompter } from './permissions';
 import { createPermissionPrompter } from './permissionPrompt';
+import { installDownloadHandling } from './downloads';
+import { getSettings } from '../db/settingsRepo';
 
 export const NODUS_BROWSER_PARTITION = 'persist:nodus-browser';
 
@@ -73,6 +75,9 @@ function configureBrowserSession(ses: Session): void {
   // which is safe but silently refuses the camera instead of asking.
   setPermissionPrompter(createPermissionPrompter());
   installBrowserPermissions(ses);
+
+  // Downloads: classified, size-capped, and never opened afterwards.
+  installDownloadHandling(ses, () => getSettings().browserDownloadFolder ?? null);
 
   // Belt to the navigation guard's braces. `will-navigate` stops a tab from
   // MOVING to a blocked scheme; this stops a page from FETCHING one as a

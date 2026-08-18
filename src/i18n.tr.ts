@@ -7849,4 +7849,7 @@ export const TR: Record<string, string> = {
   "Guardar también una copia del HTML de la página": "Sayfanın HTML kopyasını da kaydet",
   "Se intentarán adjuntar {n} archivos detectados en la página.": "Nodus sayfada bulunan {n} dosyayı eklemeyi deneyecek.",
   "Consultado": "Erişildi",
+  // Nodus Browser: descargas
+  "Importar a la Biblioteca": "Kitaplığa aktar",
+  "Interrumpido": "Kesildi",
 };

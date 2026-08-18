@@ -143,3 +143,17 @@ export interface PendingBrowserPermission {
   /** For `media`: which of 'video' (camera) / 'audio' (microphone) was asked for. */
   mediaTypes: string[];
 }
+
+/** A download in progress or finished, as the renderer sees it. */
+export interface BrowserDownloadView {
+  id: string;
+  filename: string;
+  url: string;
+  kind: 'pdf' | 'document' | 'dataset' | 'media' | 'other';
+  totalBytes: number;
+  receivedBytes: number;
+  state: 'progressing' | 'paused' | 'completed' | 'cancelled' | 'interrupted';
+  /** Whether Nodus can offer to file this into the Library. */
+  importable: boolean;
+  savePath: string | null;
+}

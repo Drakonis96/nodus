@@ -15,7 +15,7 @@
 import { ipcRenderer } from 'electron';
 import type { BrowserState, BrowserViewport } from '@shared/browser';
 import type { OmniboxResolution } from '@shared/browserOmnibox';
-import type { BrowserMediaState, PendingBrowserPermission } from '@shared/browser';
+import type { BrowserDownloadView, BrowserMediaState, PendingBrowserPermission } from '@shared/browser';
 import type { BrowserConnectorCaptureRequest, BrowserConnectorSaveResult } from '@shared/browserConnector';
 
 export interface BrowserCapturePreview {
@@ -73,6 +73,18 @@ export const browserApi = {
     ipcRenderer.invoke('browser:importPdf', itemId, url, title),
   askNodiAboutBrowserPage: (): Promise<boolean> => ipcRenderer.invoke('browser:askNodiAboutPage'),
   askNodiAboutBrowserSelection: (): Promise<boolean> => ipcRenderer.invoke('browser:askNodiAboutSelection'),
+  getBrowserDownloads: (): Promise<BrowserDownloadView[]> => ipcRenderer.invoke('browser:downloads'),
+  cancelBrowserDownload: (id: string): Promise<void> =>
+    ipcRenderer.invoke('browser:cancelDownload', id).then(() => undefined),
+  dismissBrowserDownload: (id: string): Promise<void> =>
+    ipcRenderer.invoke('browser:dismissDownload', id).then(() => undefined),
+  importBrowserDownload: (id: string, title: string): Promise<{ itemId: string; title: string }> =>
+    ipcRenderer.invoke('browser:importDownload', id, title),
+  onBrowserDownloadsChanged: (callback: (downloads: BrowserDownloadView[]) => void): (() => void) => {
+    const listener = (_event: unknown, downloads: BrowserDownloadView[]) => callback(downloads);
+    ipcRenderer.on('browser:downloads', listener);
+    return () => ipcRenderer.removeListener('browser:downloads', listener);
+  },
   onBrowserStateChanged: (callback: (state: BrowserState) => void): (() => void) => {
     const listener = (_event: unknown, state: BrowserState) => callback(state);
     ipcRenderer.on('browser:state', listener);

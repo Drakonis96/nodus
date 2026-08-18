@@ -28,6 +28,10 @@ import {
 } from '../browser/permissionPrompt';
 import { browserMediaStates, setMediaNotifier } from '../browser/media';
 import { activePageIsPdf, captureActivePage, importPdfIntoItem, saveCapture } from '../browser/capture';
+import {
+  browserDownloads, cancelDownload, completedDownloadPath, dismissDownload, setDownloadNotifier,
+} from '../browser/downloads';
+import { addGlobalLibraryAttachments, createGlobalLibraryItem } from '../library/libraryService';
 import { setNodiQuoteSelection, setNodiViewContext } from '../ai/nodiChat';
 import {
   activateTab,
@@ -92,6 +96,12 @@ export function registerBrowserIpc({ h, getWindow }: IpcContext): void {
     window.webContents.send('browser:media', browserMediaStates());
   };
 
+  const broadcastDownloads = () => {
+    const window = getWindow();
+    if (!window || window.isDestroyed()) return;
+    window.webContents.send('browser:downloads', browserDownloads());
+  };
+
   let wired = false;
   const ensureWired = () => {
     if (wired) return;
@@ -100,6 +110,7 @@ export function registerBrowserIpc({ h, getWindow }: IpcContext): void {
     initBrowserTabs(window, broadcast);
     setPermissionPromptNotifier(broadcastPermission);
     setMediaNotifier(broadcastMedia);
+    setDownloadNotifier(broadcastDownloads);
     wired = true;
   };
 
@@ -256,6 +267,45 @@ export function registerBrowserIpc({ h, getWindow }: IpcContext): void {
       complete: true,
     });
     return true;
+  });
+
+  h('browser:downloads', async (event) => {
+    assertUiSender(event, getWindow);
+    ensureWired();
+    return browserDownloads();
+  });
+
+  h('browser:cancelDownload', async (event, id: string) => {
+    assertUiSender(event, getWindow);
+    cancelDownload(String(id));
+  });
+
+  h('browser:dismissDownload', async (event, id: string) => {
+    assertUiSender(event, getWindow);
+    dismissDownload(String(id));
+  });
+
+  /**
+   * Import a completed download into the Library.
+   *
+   * Only ever from an explicit click. The file is already on disk where the user
+   * put it; this attaches a COPY through the normal Library path, which is what
+   * runs extraction, OCR, indexing and embeddings.
+   */
+  h('browser:importDownload', async (event, id: string, title: string) => {
+    assertUiSender(event, getWindow);
+    const file = completedDownloadPath(String(id));
+    if (!file) throw new Error('That download is no longer available.');
+    const item = createGlobalLibraryItem({
+      title: String(title ?? '').trim() || 'Downloaded document',
+      itemType: 'document',
+      creators: [],
+      url: '',
+      tags: [],
+    } as never);
+    const saved = await addGlobalLibraryAttachments(item.id, [file]);
+    dismissDownload(String(id));
+    return { itemId: saved.id, title: saved.metadata.title };
   });
 
   h('browser:askNodiAboutSelection', async (event) => {
