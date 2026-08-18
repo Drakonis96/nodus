@@ -1,0 +1,247 @@
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { Icon } from '../components/ui';
+import { t } from '../i18n';
+import type { BrowserState, BrowserTabState } from '@shared/browser';
+
+/**
+ * Nodus Browser.
+ *
+ * This component renders CHROME ONLY. The page itself is a native
+ * WebContentsView owned by the main process, positioned over the empty
+ * `data-browser-viewport` div below. That division is the whole architecture:
+ * the renderer never holds a WebContents, so a website cannot reach Nodus
+ * through it.
+ *
+ * The consequence to keep in mind while editing: a native view paints ABOVE this
+ * HTML. Anything that must appear over the page — modals, the command palette,
+ * Nodi — has to hide the view first (window.nodus.setBrowserOverlayVisible), and
+ * the error panes below are drawn while the view is hidden for that reason.
+ */
+export function NodusBrowserView() {
+  const viewportRef = useRef<HTMLDivElement | null>(null);
+  const [state, setState] = useState<BrowserState>({ tabs: [], activeTabId: null });
+  const [omnibox, setOmnibox] = useState('');
+  const [omniboxFocused, setOmniboxFocused] = useState(false);
+  const [refusal, setRefusal] = useState<string | null>(null);
+
+  const active: BrowserTabState | null =
+    state.tabs.find((tab) => tab.id === state.activeTabId) ?? null;
+
+  // Subscribe first, then read: doing it the other way round drops any change
+  // that lands between the read and the subscription.
+  useEffect(() => {
+    const stop = window.nodus.onBrowserStateChanged(setState);
+    void window.nodus.getBrowserState().then(setState);
+    return stop;
+  }, []);
+
+  // Follow the URL of whatever tab is active, unless the user is editing.
+  useEffect(() => {
+    if (omniboxFocused) return;
+    setOmnibox(active?.url ?? '');
+  }, [active?.url, omniboxFocused]);
+
+  /**
+   * Report the rectangle the page should occupy.
+   *
+   * getBoundingClientRect() is already in CSS pixels, which is what setBounds
+   * expects, so no scaling is needed — but the values are rounded in the main
+   * process, because a fractional rectangle leaves a sub-pixel seam.
+   */
+  const publishViewport = useCallback(() => {
+    const element = viewportRef.current;
+    if (!element) return;
+    const rect = element.getBoundingClientRect();
+    void window.nodus.setBrowserViewport({
+      x: rect.left,
+      y: rect.top,
+      width: rect.width,
+      height: rect.height,
+    });
+  }, []);
+
+  useEffect(() => {
+    publishViewport();
+    const element = viewportRef.current;
+    if (!element) return;
+    // rAF-coalesced: a drag-resize fires these dozens of times per second, and
+    // forwarding each one is how a browser section starts dropping frames.
+    let frame = 0;
+    const schedule = () => {
+      if (frame) return;
+      frame = requestAnimationFrame(() => {
+        frame = 0;
+        publishViewport();
+      });
+    };
+    const observer = new ResizeObserver(schedule);
+    observer.observe(element);
+    window.addEventListener('resize', schedule);
+    return () => {
+      if (frame) cancelAnimationFrame(frame);
+      observer.disconnect();
+      window.removeEventListener('resize', schedule);
+    };
+  }, [publishViewport]);
+
+  // Open the first tab once, when the section is first shown.
+  useEffect(() => {
+    if (state.tabs.length === 0) void window.nodus.openBrowserTab('about:blank');
+    // Deliberately runs on mount only: re-running on every state change would
+    // reopen a tab the moment the user closed the last one.
+  }, []);
+
+  const submit = async (event: React.FormEvent) => {
+    event.preventDefault();
+    setRefusal(null);
+    const result = await window.nodus.submitBrowserOmnibox(omnibox);
+    if (result.kind === 'blocked') {
+      setRefusal(t('Nodus Browser no abre direcciones de tipo «{scheme}».').replace('{scheme}', result.scheme));
+    } else if (result.kind === 'external') {
+      setRefusal(t('Esa dirección se abre fuera de Nodus.'));
+    }
+    (document.activeElement as HTMLElement | null)?.blur();
+  };
+
+  const busy = Boolean(active?.loading);
+
+  return (
+    <div className="flex h-full min-h-0 flex-col" data-testid="nodus-browser">
+      <div className="flex items-center gap-1 border-b border-neutral-800 px-2 py-1.5">
+        <ToolbarButton
+          icon="chevronLeft"
+          label={t('Atrás')}
+          disabled={!active?.canGoBack}
+          onClick={() => void window.nodus.browserGoBack()}
+        />
+        <ToolbarButton
+          icon="chevronRight"
+          label={t('Adelante')}
+          disabled={!active?.canGoForward}
+          onClick={() => void window.nodus.browserGoForward()}
+        />
+        <ToolbarButton
+          icon={busy ? 'close' : 'refresh'}
+          label={busy ? t('Detener') : t('Recargar')}
+          onClick={() => void (busy ? window.nodus.browserStop() : window.nodus.browserReload())}
+        />
+        <ToolbarButton
+          icon="home"
+          label={t('Inicio')}
+          onClick={() => void window.nodus.submitBrowserOmnibox('about:blank')}
+        />
+
+        <form className="flex min-w-0 flex-1 items-center" onSubmit={submit}>
+          <div className="flex min-w-0 flex-1 items-center gap-2 rounded-lg border border-neutral-700 bg-neutral-900 px-2.5 py-1">
+            <SecurityIndicator url={active?.url ?? ''} error={Boolean(active?.error)} />
+            <input
+              data-testid="browser-omnibox"
+              className="min-w-0 flex-1 bg-transparent text-sm text-neutral-200 outline-none"
+              value={omnibox}
+              spellCheck={false}
+              placeholder={t('Busca o escribe una dirección')}
+              onChange={(event) => setOmnibox(event.target.value)}
+              onFocus={(event) => { setOmniboxFocused(true); event.target.select(); }}
+              onBlur={() => setOmniboxFocused(false)}
+              onKeyDown={(event) => {
+                if (event.key === 'Escape') {
+                  setOmnibox(active?.url ?? '');
+                  event.currentTarget.blur();
+                }
+              }}
+            />
+          </div>
+        </form>
+      </div>
+
+      {refusal && (
+        <div
+          data-testid="browser-refusal"
+          className="border-b border-amber-500/30 bg-amber-500/10 px-3 py-1.5 text-xs text-amber-300"
+        >
+          {refusal}
+        </div>
+      )}
+
+      {/* The page goes here. This div is deliberately empty and never painted
+          into: the main process positions the native view over its rectangle. */}
+      <div ref={viewportRef} data-browser-viewport className="relative min-h-0 flex-1">
+        {active?.error && <BrowserErrorPane tab={active} />}
+      </div>
+    </div>
+  );
+}
+
+function ToolbarButton({
+  icon, label, onClick, disabled,
+}: { icon: string; label: string; onClick: () => void; disabled?: boolean }) {
+  return (
+    <button
+      type="button"
+      title={label}
+      aria-label={label}
+      disabled={disabled}
+      onClick={onClick}
+      className="rounded-lg p-1.5 text-neutral-400 transition-colors hover:bg-neutral-900 disabled:cursor-not-allowed disabled:opacity-40"
+    >
+      <Icon name={icon} size={16} />
+    </button>
+  );
+}
+
+/**
+ * The padlock.
+ *
+ * Chromium validates certificates; Nodus only reflects the verdict. The tooltip
+ * says exactly that, because a padlock drawn by the application implies the
+ * application checked something, and this one did not.
+ */
+function SecurityIndicator({ url, error }: { url: string; error: boolean }) {
+  const secure = url.startsWith('https://');
+  const tone = error ? 'text-red-400' : secure ? 'text-emerald-500' : 'text-neutral-500';
+  const label = error
+    ? t('La conexión no es segura')
+    : secure
+      ? t('Conexión cifrada, verificada por Chromium')
+      : t('Sin cifrar');
+  return (
+    <span title={`${label} · ${t('Nodus no valida certificados por su cuenta.')}`} className={`shrink-0 ${tone}`}>
+      <Icon name={secure && !error ? 'lock' : 'alert'} size={13} />
+    </span>
+  );
+}
+
+/** Rendered by React, over the hidden native view, when a navigation failed. */
+function BrowserErrorPane({ tab }: { tab: BrowserTabState }) {
+  const error = tab.error;
+  if (!error) return null;
+  const heading: Record<string, string> = {
+    dns: t('No se encontró el sitio'),
+    offline: t('Sin conexión a internet'),
+    refused: t('El sitio rechazó la conexión'),
+    timeout: t('El sitio tardó demasiado en responder'),
+    certificate: t('El certificado del sitio no es válido'),
+    'blocked-scheme': t('Nodus Browser no abre este tipo de dirección'),
+    crashed: t('Esta página dejó de responder'),
+    unknown: t('No se pudo cargar la página'),
+    none: '',
+  };
+  return (
+    <div
+      data-testid="browser-error"
+      className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-neutral-950 px-8 text-center"
+    >
+      <Icon name="alert" size={28} className="text-neutral-600" />
+      <h2 className="text-base font-semibold text-neutral-200">{heading[error.kind] ?? heading.unknown}</h2>
+      <p className="max-w-md break-all text-xs text-neutral-500">{error.url}</p>
+      {error.description && <p className="max-w-md text-xs text-neutral-600">{error.description}</p>}
+      <button
+        type="button"
+        className="btn btn-ghost border border-neutral-700"
+        onClick={() => void window.nodus.browserReload()}
+      >
+        {t('Reintentar')}
+      </button>
+    </div>
+  );
+}

@@ -25,6 +25,7 @@ import { platformApi } from './platform';
 import { recordsApi } from './records';
 import { academicApi } from './academic';
 import { libraryApi } from './library';
+import { browserApi } from './browser';
 
 // Tracks the Nodi chat stream currently in flight so `cancelNodiChat` can abort
 // it without the renderer having to juggle request ids. Only one chat stream
@@ -64,6 +65,7 @@ function readInitialOverlayPlacement(): NodiOverlayPlacement {
 
 export const nodusApi: NodusApi = {
   ...libraryApi,
+  ...browserApi,
   ...prosopographyApi,
   ...academicApi,
   ...recordsApi,

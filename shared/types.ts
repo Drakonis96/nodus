@@ -7940,7 +7940,27 @@ export interface TestimonyExportResult {
 // IPC API surface exposed on window.nodus via the preload bridge.
 // ─────────────────────────────────────────────────────────────────────────────
 
-export interface NodusApi extends ProsopographyApi, TestimoniesApi, ToolkitApi, TeachingApi, DatabasesApi, PrimarySourcesApi, ArchiveApi, WorldbuildingApi, PlatformApi, RecordsApi, AcademicApi, LibraryApi {
+/**
+ * Nodus Browser. The renderer draws the chrome and issues commands; it never
+ * holds a WebContents. State arrives whole through `onBrowserStateChanged`.
+ */
+export interface BrowserApi {
+  getBrowserState(): Promise<import('./browser').BrowserState>;
+  openBrowserTab(url: string): Promise<string | null>;
+  activateBrowserTab(id: string): Promise<void>;
+  closeBrowserTab(id: string): Promise<void>;
+  browserGoBack(): Promise<void>;
+  browserGoForward(): Promise<void>;
+  browserReload(): Promise<void>;
+  browserStop(): Promise<void>;
+  submitBrowserOmnibox(input: string): Promise<import('./browserOmnibox').OmniboxResolution & { ok?: boolean }>;
+  setBrowserViewport(viewport: import('./browser').BrowserViewport): Promise<void>;
+  /** Hide the native page view while a React overlay is open. */
+  setBrowserOverlayVisible(visible: boolean): Promise<void>;
+  onBrowserStateChanged(cb: (state: import('./browser').BrowserState) => void): () => void;
+}
+
+export interface NodusApi extends ProsopographyApi, TestimoniesApi, ToolkitApi, TeachingApi, DatabasesApi, PrimarySourcesApi, ArchiveApi, WorldbuildingApi, PlatformApi, RecordsApi, AcademicApi, LibraryApi, BrowserApi {
   // settings + secrets
   getSettings(): Promise<AppSettings>;
   updateSettings(patch: Partial<AppSettings>): Promise<AppSettings>;

@@ -1,0 +1,142 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+// Copyright (C) 2026 Jorge Pérez Burgueño and Nodus contributors
+
+/**
+ * The Nodus Browser IPC surface.
+ *
+ * Every channel here carries a sender check, which is a NEW invariant in this
+ * codebase and the reason this file does not simply use `h()` and stop there.
+ *
+ * Until now Nodus had exactly one renderer — its own `file://` window — so
+ * `ipcMain.handle` needed no sender validation: anything that could call a
+ * channel was already trusted. Nodus Browser breaks that assumption by adding
+ * WebContents that load arbitrary websites. Those pages get no bridge (see
+ * electron/preload/browserPage.ts), so they cannot invoke these channels today;
+ * `assertUiSender` is what keeps that true if a future edit ever gives a page a
+ * preload with `ipcRenderer` on it. Defence in depth, deliberately redundant.
+ */
+
+import { BrowserWindow } from 'electron';
+import type { IpcContext } from './context';
+import type { BrowserViewport } from '@shared/browser';
+import { parseOmniboxInput } from '@shared/browserOmnibox';
+import {
+  activateTab,
+  browserState,
+  closeTab,
+  createTab,
+  goBack,
+  goForward,
+  initBrowserTabs,
+  navigate,
+  reload,
+  setOverlayVisible,
+  setViewport,
+  stopLoading,
+} from '../browser/tabs';
+
+/**
+ * Refuse anything that is not the main Nodus window.
+ *
+ * `event.sender` is the WebContents that made the call. Comparing it against the
+ * main window's own WebContents means a browser tab — which lives in a different
+ * WebContents entirely — can never drive the browser it is displayed in.
+ */
+function assertUiSender(event: { sender: Electron.WebContents }, getWindow: () => BrowserWindow | null): void {
+  const window = getWindow();
+  if (!window || window.isDestroyed()) throw new Error('The Nodus window is not available.');
+  if (event.sender !== window.webContents) {
+    throw new Error('This channel is only available to the Nodus window.');
+  }
+}
+
+function sanitizeViewport(raw: unknown): BrowserViewport | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const candidate = raw as Partial<Record<keyof BrowserViewport, unknown>>;
+  const numbers = (['x', 'y', 'width', 'height'] as const).map((key) => Number(candidate[key]));
+  if (numbers.some((value) => !Number.isFinite(value))) return null;
+  const [x, y, width, height] = numbers;
+  return { x, y, width: Math.max(0, width), height: Math.max(0, height) };
+}
+
+export function registerBrowserIpc({ h, getWindow }: IpcContext): void {
+  /** Push the whole browser state; the renderer re-renders from it wholesale. */
+  const broadcast = () => {
+    const window = getWindow();
+    if (!window || window.isDestroyed()) return;
+    window.webContents.send('browser:state', browserState());
+  };
+
+  let wired = false;
+  const ensureWired = () => {
+    if (wired) return;
+    const window = getWindow();
+    if (!window) return;
+    initBrowserTabs(window, broadcast);
+    wired = true;
+  };
+
+  h('browser:state', async (event) => {
+    assertUiSender(event, getWindow);
+    ensureWired();
+    return browserState();
+  });
+
+  h('browser:openTab', async (event, url: string) => {
+    assertUiSender(event, getWindow);
+    ensureWired();
+    return createTab(String(url ?? ''));
+  });
+
+  h('browser:activateTab', async (event, id: string) => {
+    assertUiSender(event, getWindow);
+    await activateTab(String(id));
+  });
+
+  h('browser:closeTab', async (event, id: string) => {
+    assertUiSender(event, getWindow);
+    closeTab(String(id));
+  });
+
+  h('browser:goBack', async (event) => { assertUiSender(event, getWindow); goBack(); });
+  h('browser:goForward', async (event) => { assertUiSender(event, getWindow); goForward(); });
+  h('browser:reload', async (event) => { assertUiSender(event, getWindow); reload(); });
+  h('browser:stop', async (event) => { assertUiSender(event, getWindow); stopLoading(); });
+
+  /**
+   * What the user typed in the address bar.
+   *
+   * Resolution happens HERE rather than in the renderer so the scheme blocklist
+   * is enforced on the main-process side of the boundary, where it cannot be
+   * skipped by whatever the renderer happens to send.
+   */
+  h('browser:submitOmnibox', async (event, input: string) => {
+    assertUiSender(event, getWindow);
+    ensureWired();
+    const resolved = parseOmniboxInput(String(input ?? ''));
+    if (resolved.kind === 'navigate' || resolved.kind === 'search') {
+      const ok = navigate(resolved.url);
+      return { kind: resolved.kind, url: resolved.url, ok };
+    }
+    return resolved;
+  });
+
+  h('browser:setViewport', async (event, raw: unknown) => {
+    assertUiSender(event, getWindow);
+    const viewport = sanitizeViewport(raw);
+    if (viewport) setViewport(viewport);
+  });
+
+  /**
+   * Hide the page while a React overlay is open.
+   *
+   * A WebContentsView is a native child view and paints above the window's HTML,
+   * so without this every modal, the command palette and Nodi's companion would
+   * be drawn underneath a web page. The WebContents is untouched: media keeps
+   * playing and no navigation state is lost.
+   */
+  h('browser:setOverlayVisible', async (event, visible: boolean) => {
+    assertUiSender(event, getWindow);
+    setOverlayVisible(Boolean(visible));
+  });
+}

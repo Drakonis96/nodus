@@ -1,0 +1,317 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+// Copyright (C) 2026 Jorge Pérez Burgueño and Nodus contributors
+
+/**
+ * Nodus Browser tabs: one WebContentsView each, owned entirely by the main process.
+ *
+ * BrowserView is deprecated and <webview> is officially discouraged, so
+ * WebContentsView is the supported primitive. It is a NATIVE child view, which
+ * has two consequences the rest of the feature is built around:
+ *
+ *  1. It paints ABOVE the window's HTML, so every React modal, the command
+ *     palette and the Nodi companion would be hidden behind a page. The renderer
+ *     therefore tells us when an overlay opens and we hide the view (see
+ *     `setOverlayVisible`) rather than trying to stack around it.
+ *
+ *  2. Only the ACTIVE tab is attached to `contentView`. Background tabs keep
+ *     their WebContents alive — so a login, a scroll position and playing audio
+ *     all survive — but are detached, so Chromium neither composites nor paints
+ *     them. That is what makes a tab cheap enough to have twelve of.
+ */
+
+import { WebContentsView, type BaseWindow, type WebContents } from 'electron';
+import path from 'node:path';
+import { randomUUID } from 'node:crypto';
+import type { BrowserState, BrowserTabError, BrowserTabState, BrowserViewport } from '@shared/browser';
+import { MAX_BROWSER_TABS } from '@shared/browser';
+import { decideNavigation } from '@shared/browserNavigation';
+import { NODUS_BROWSER_PARTITION, browserSession } from './session';
+
+interface Tab {
+  id: string;
+  view: WebContentsView;
+  /** What we last told the renderer, so a no-op change does not cause a send. */
+  state: BrowserTabState;
+  /** Every listener this tab registered, so closing it can undo all of them. */
+  disposers: (() => void)[];
+}
+
+const tabs = new Map<string, Tab>();
+let activeTabId: string | null = null;
+let hostWindow: BaseWindow | null = null;
+let viewport: BrowserViewport | null = null;
+let overlayVisible = true;
+let notify: (() => void) | null = null;
+
+/** Chromium error codes worth telling the user apart. */
+function classifyError(code: number): BrowserTabError['kind'] {
+  if (code === -105 || code === -137) return 'dns';        // NAME_NOT_RESOLVED / NAME_RESOLUTION_FAILED
+  if (code === -106) return 'offline';                      // INTERNET_DISCONNECTED
+  if (code === -102) return 'refused';                      // CONNECTION_REFUSED
+  if (code === -7 || code === -118) return 'timeout';       // TIMED_OUT / CONNECTION_TIMED_OUT
+  if (code <= -200 && code >= -299) return 'certificate';   // the whole CERT_ block
+  return 'unknown';
+}
+
+function emptyState(id: string, url: string): BrowserTabState {
+  return {
+    id,
+    url,
+    title: '',
+    faviconDataUrl: null,
+    loading: false,
+    canGoBack: false,
+    canGoForward: false,
+    audible: false,
+    muted: false,
+    hasMedia: false,
+    mediaPlaying: false,
+    error: null,
+  };
+}
+
+/** Wire the host window and the change notifier. Called once, from the IPC layer. */
+export function initBrowserTabs(window: BaseWindow, onChange: () => void): void {
+  hostWindow = window;
+  notify = onChange;
+}
+
+export function browserState(): BrowserState {
+  return {
+    tabs: [...tabs.values()].map((tab) => ({ ...tab.state })),
+    activeTabId,
+  };
+}
+
+function patch(tab: Tab, next: Partial<BrowserTabState>): void {
+  let changed = false;
+  const current = tab.state as unknown as Record<string, unknown>;
+  for (const [key, value] of Object.entries(next)) {
+    if (current[key] !== value) changed = true;
+  }
+  if (!changed) return;
+  Object.assign(tab.state, next);
+  notify?.();
+}
+
+function applyBounds(tab: Tab): void {
+  if (!viewport) return;
+  // Integers only: a fractional rectangle leaves a sub-pixel seam between the
+  // native view and the React chrome around it.
+  tab.view.setBounds({
+    x: Math.round(viewport.x),
+    y: Math.round(viewport.y),
+    width: Math.max(0, Math.round(viewport.width)),
+    height: Math.max(0, Math.round(viewport.height)),
+  });
+}
+
+function attach(tab: Tab): void {
+  if (!hostWindow) return;
+  hostWindow.contentView.addChildView(tab.view);
+  applyBounds(tab);
+  tab.view.setVisible(overlayVisible);
+}
+
+function detach(tab: Tab): void {
+  if (!hostWindow) return;
+  hostWindow.contentView.removeChildView(tab.view);
+}
+
+/** Register a listener and remember how to remove it. */
+function on(tab: Tab, contents: WebContents, event: string, handler: (...args: never[]) => void): void {
+  (contents as unknown as { on(e: string, h: unknown): void }).on(event, handler);
+  tab.disposers.push(() => {
+    (contents as unknown as { removeListener(e: string, h: unknown): void }).removeListener(event, handler);
+  });
+}
+
+function wire(tab: Tab): void {
+  const contents = tab.view.webContents;
+
+  // Never let a page dictate the options of a window it opens. `allow` would
+  // hand the site control of webPreferences; instead every popup becomes an
+  // ordinary Nodus tab, created by us with our own configuration.
+  contents.setWindowOpenHandler(({ url }) => {
+    if (decideNavigation(url, { isMainFrame: true }).allowed) void createTab(url);
+    return { action: 'deny' };
+  });
+
+  on(tab, contents, 'will-navigate', ((event: Electron.Event, url: string) => {
+    if (decideNavigation(url, { isMainFrame: true }).allowed) return;
+    event.preventDefault();
+    patch(tab, {
+      error: { kind: 'blocked-scheme', code: null, description: url, url },
+    });
+  }) as never);
+
+  on(tab, contents, 'will-frame-navigate', ((details: { url: string; isMainFrame: boolean; preventDefault(): void }) => {
+    if (decideNavigation(details.url, { isMainFrame: details.isMainFrame }).allowed) return;
+    details.preventDefault();
+  }) as never);
+
+  on(tab, contents, 'did-start-loading', (() => patch(tab, { loading: true, error: null })) as never);
+  on(tab, contents, 'did-stop-loading', (() => patch(tab, {
+    loading: false,
+    url: contents.getURL(),
+    canGoBack: contents.navigationHistory.canGoBack(),
+    canGoForward: contents.navigationHistory.canGoForward(),
+  })) as never);
+
+  on(tab, contents, 'page-title-updated', ((_e: unknown, title: string) => patch(tab, { title })) as never);
+
+  on(tab, contents, 'did-fail-load', ((
+    _e: unknown, errorCode: number, errorDescription: string, validatedURL: string, isMainFrame: boolean,
+  ) => {
+    // Subframe failures are ordinary noise (blocked trackers, dead embeds) and
+    // must never replace a page that loaded fine.
+    if (!isMainFrame) return;
+    // -3 is ABORTED, which is what a user pressing Stop or navigating away looks
+    // like. Showing an error pane for it would be wrong.
+    if (errorCode === -3) return;
+    patch(tab, {
+      loading: false,
+      error: { kind: classifyError(errorCode), code: errorCode, description: errorDescription, url: validatedURL },
+    });
+  }) as never);
+
+  // Chromium validates certificates; Nodus only reflects the verdict. Never
+  // calling preventDefault() here is what keeps that true — there is no
+  // "proceed anyway" path in v1.
+  on(tab, contents, 'certificate-error', ((
+    _e: unknown, url: string, error: string,
+  ) => {
+    patch(tab, { loading: false, error: { kind: 'certificate', code: null, description: error, url } });
+  }) as never);
+
+  on(tab, contents, 'render-process-gone', ((_e: unknown, details: { reason: string }) => {
+    patch(tab, {
+      loading: false,
+      error: { kind: 'crashed', code: null, description: details.reason, url: tab.state.url },
+    });
+  }) as never);
+}
+
+export async function createTab(url: string): Promise<string | null> {
+  if (tabs.size >= MAX_BROWSER_TABS) return null;
+
+  const view = new WebContentsView({
+    webPreferences: {
+      partition: NODUS_BROWSER_PARTITION,
+      preload: path.join(__dirname, 'preload.browserPage.cjs'),
+      sandbox: true,
+      contextIsolation: true,
+      nodeIntegration: false,
+      nodeIntegrationInSubFrames: false,
+      webSecurity: true,
+      allowRunningInsecureContent: false,
+      experimentalFeatures: false,
+      webviewTag: false,
+      // The single relaxation, and it buys Chromium's own PDF viewer. The
+      // alternative — decoding untrusted PDF bytes with pdfjs inside the TRUSTED
+      // renderer — is strictly worse.
+      plugins: true,
+      safeDialogs: true,
+      spellcheck: true,
+      backgroundThrottling: true,
+    },
+  });
+
+  browserSession();
+
+  const id = randomUUID();
+  const tab: Tab = { id, view, state: emptyState(id, url), disposers: [] };
+  tabs.set(id, tab);
+  wire(tab);
+  await activateTab(id);
+
+  if (url && url !== 'about:blank') {
+    // A load failure is reported through did-fail-load, which the UI already
+    // renders; letting the rejection escape here would be a duplicate report.
+    void view.webContents.loadURL(url).catch(() => undefined);
+  }
+  notify?.();
+  return id;
+}
+
+export async function activateTab(id: string): Promise<void> {
+  const tab = tabs.get(id);
+  if (!tab) return;
+  const previous = activeTabId ? tabs.get(activeTabId) : null;
+  if (previous && previous.id !== id) detach(previous);
+  activeTabId = id;
+  attach(tab);
+  notify?.();
+}
+
+export function closeTab(id: string): void {
+  const tab = tabs.get(id);
+  if (!tab) return;
+
+  detach(tab);
+  // Undo every listener before destroying the contents: a handler firing during
+  // teardown would patch state for a tab that no longer exists.
+  for (const dispose of tab.disposers) dispose();
+  tab.disposers.length = 0;
+  tabs.delete(id);
+
+  if (!tab.view.webContents.isDestroyed()) tab.view.webContents.close();
+
+  if (activeTabId === id) {
+    activeTabId = null;
+    const next = [...tabs.keys()].at(-1) ?? null;
+    if (next) void activateTab(next);
+  }
+  notify?.();
+}
+
+export function setViewport(next: BrowserViewport): void {
+  viewport = next;
+  const tab = activeTabId ? tabs.get(activeTabId) : null;
+  if (tab) applyBounds(tab);
+}
+
+/**
+ * Hide the page while a React overlay is open.
+ *
+ * The WebContents is untouched, so media keeps playing and no state is lost —
+ * this only stops the native view from painting over a modal.
+ */
+export function setOverlayVisible(visible: boolean): void {
+  overlayVisible = visible;
+  const tab = activeTabId ? tabs.get(activeTabId) : null;
+  tab?.view.setVisible(visible);
+}
+
+function withActive<T>(fn: (contents: WebContents) => T): T | undefined {
+  const tab = activeTabId ? tabs.get(activeTabId) : null;
+  if (!tab || tab.view.webContents.isDestroyed()) return undefined;
+  return fn(tab.view.webContents);
+}
+
+export function goBack(): void {
+  withActive((c) => { if (c.navigationHistory.canGoBack()) c.navigationHistory.goBack(); });
+}
+export function goForward(): void {
+  withActive((c) => { if (c.navigationHistory.canGoForward()) c.navigationHistory.goForward(); });
+}
+export function reload(): void { withActive((c) => c.reload()); }
+export function stopLoading(): void { withActive((c) => c.stop()); }
+
+export function navigate(url: string): boolean {
+  if (!decideNavigation(url, { isMainFrame: true }).allowed) return false;
+  withActive((c) => void c.loadURL(url).catch(() => undefined));
+  return true;
+}
+
+/** Destroy every tab. Called from all three of main.ts's shutdown paths. */
+export function closeAllBrowserTabs(): void {
+  for (const id of [...tabs.keys()]) closeTab(id);
+  activeTabId = null;
+  viewport = null;
+}
+
+/** Test seam: how many WebContents this module still owns. */
+export function openTabCount(): number {
+  return tabs.size;
+}

@@ -2,10 +2,12 @@
 import { lazy } from 'react';
 import type { ViewRenderer } from '../ViewContext';
 
+const NodusBrowserView = lazy(() => import('../../views/NodusBrowserView').then((module) => ({ default: module.NodusBrowserView })));
 const ToolkitView = lazy(() => import('../../views/ToolkitView').then((module) => ({ default: module.ToolkitView })));
 const Settings = lazy(() => import('../../views/Settings').then((module) => ({ default: module.Settings })));
 
 export const shellViews = {
+  browser: () => <NodusBrowserView />,
   toolkit: ({ setToolkitPage, settings, toolkitPage }) => <ToolkitView page={toolkitPage} onNavigate={setToolkitPage} settings={settings} />,
   settings: ({ activeVault, recoveryStatus, reloadSettings, reloadVaults, setManualWhatsNewOpen, setRoadmapOpen, settings, vaults }) => (
     <Settings

@@ -222,6 +222,10 @@ export default defineConfig({
     electronPlugin([
       preloadBuild('preload.nodi', 'electron/preload/nodi.ts'),
       preloadBuild('preload.presenter', 'electron/preload/presenter.ts'),
+      // The Nodus Browser page preload. Unlike every other entry here it exposes
+      // NOTHING on window: it is a sensor the main process drives, and the whole
+      // point is that a remote website finds no bridge to reach for.
+      preloadBuild('preload.browserPage', 'electron/preload/browserPage.ts'),
       utilityBuild('backupUtilityWorker', 'electron/export/backupUtilityWorker.ts'),
       utilityBuild('serverPublishWorker', 'electron/serverSync/serverPublishWorker.ts'),
     ]),

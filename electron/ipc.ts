@@ -31,6 +31,7 @@ import { registerPlatformIpc } from './ipc/platform';
 import { registerRecordsIpc } from './ipc/records';
 import { registerAcademicIpc } from './ipc/academic';
 import { registerLibraryIpc } from './ipc/library';
+import { registerBrowserIpc } from './ipc/browser';
 import {
   restartMcpServer,
   startMcpServer,
@@ -202,6 +203,7 @@ export function registerIpc(
   registerProsopographyIpc(context);
   registerAcademicIpc(context);
   registerLibraryIpc(context);
+  registerBrowserIpc(context);
   registerRecordsIpc(context);
   registerPlatformIpc(context);
   registerWorldbuildingIpc(context);
