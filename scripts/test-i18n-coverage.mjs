@@ -769,6 +769,23 @@ test('seeded Spanish data labels are translated on screen, not left raw', () => 
   }
 });
 
+test('the study/teaching organization header title is translated', () => {
+  // The <h1> of the organization browser (study AND docencia, which reuse the same view)
+  // is not a t() literal: it comes back from targetTitle(), which returns either the name
+  // the user typed or one of three interface fallbacks. Those fallbacks shipped bare, so
+  // an English interface showed "Cursos y asignaturas" under an "ORGANISATION" eyebrow.
+  const view = fs.readFileSync(path.join(repoRoot, 'src/views/StudyOrganizationView.tsx'), 'utf8');
+  const body = view.slice(view.indexOf('function targetTitle'));
+  const fn = body.slice(0, body.indexOf('\n}') + 2);
+  assert.ok(fn.includes('function targetTitle'), 'targetTitle must exist');
+  for (const key of ['Cursos y asignaturas', 'Documento', 'Selección actual']) {
+    assert.match(fn, new RegExp(`t\\('${key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}'\\)`), `targetTitle must return t('${key}'), not the bare literal`);
+    for (const { name, table } of TRANSLATIONS) {
+      assert.ok(table[key], `"${key}" must be translated into ${name}`);
+    }
+  }
+});
+
 test('genealogy vault-type + section labels are translated', () => {
   // Spot-check the surfaces the user reported: header vault label, tree, relations,
   // archive, tour welcome.
