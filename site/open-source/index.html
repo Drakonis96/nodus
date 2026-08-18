@@ -26,10 +26,9 @@ SPDX-License-Identifier: AGPL-3.0-only
   <link rel="icon" type="image/png" href="../favicon.png" sizes="512x512"/>
   <link rel="icon" type="image/svg+xml" href="../assets/nodus-logo.svg"/>
   <link rel="apple-touch-icon" href="../apple-touch-icon.png"/>
-<link rel="preconnect" href="https://fonts.googleapis.com"/>
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Fraunces:opsz,wght@9..144,600;9..144,700&display=swap" rel="stylesheet"/>
-<link rel="stylesheet" href="../assets/css/nodus.css?v=20260818"/>
+<link rel="preload" as="font" type="font/woff2" href="../assets/fonts/inter-latin.woff2" crossorigin/>
+<link rel="preload" as="font" type="font/woff2" href="../assets/fonts/fraunces-latin.woff2" crossorigin/>
+<link rel="stylesheet" href="../assets/css/nodus.css?v=20260818c"/>
 <link rel="stylesheet" href="../assets/css/guide.css?v=20260818b"/>
 <script type="application/ld+json">
 {
@@ -48,7 +47,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 <canvas id="organism" aria-hidden="true"></canvas>
 
 <div data-nodus-site-header data-base="../" data-page="open-source"></div>
-<script src="../site-header.js?v=20260817"></script>
+<script defer src="../site-header.js?v=20260818c"></script>
 
 <main id="main">
 
@@ -282,20 +281,20 @@ SPDX-License-Identifier: AGPL-3.0-only
         <p>A free, open-source, local-first research workspace for connecting sources, ideas and evidence. Your corpus stays on your machine.</p>
       </div>
       <div class="foot-col">
-        <h4>Research</h4>
+        <h3>Research</h3>
         <a href="../research/">Academic research</a>
         <a href="../zotero/">Nodus and Zotero</a>
         <a href="../ai-research/">AI for research</a>
         <a href="./">Open source</a>
       </div>
       <div class="foot-col">
-        <h4>Learn</h4>
+        <h3>Learn</h3>
         <a href="../wiki/">Wiki</a>
         <a href="../blog/">Blog</a>
         <a href="../faq/">FAQ</a>
       </div>
       <div class="foot-col">
-        <h4>Project</h4>
+        <h3>Project</h3>
         <a href="../contribute/">Contribute</a>
         <a href="https://github.com/Drakonis96/nodus" target="_blank" rel="noopener">GitHub</a>
         <a href="https://github.com/Drakonis96/nodus/releases" target="_blank" rel="noopener">Releases</a>
@@ -308,7 +307,7 @@ SPDX-License-Identifier: AGPL-3.0-only
   </div>
 </footer>
 
-<script src="../assets/js/organism.js?v=20260815"></script>
+<script src="../assets/js/organism.js?v=20260818c"></script>
 <script src="../assets/js/site.js?v=20260815"></script>
 <script src="../assets/js/back-to-top.js?v=20260817b"></script>
 </body>

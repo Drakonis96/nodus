@@ -26,16 +26,19 @@ SPDX-License-Identifier: AGPL-3.0-only
   <link rel="icon" type="image/png" href="favicon.png" sizes="512x512"/>
   <link rel="icon" type="image/svg+xml" href="assets/nodus-logo.svg"/>
   <link rel="apple-touch-icon" href="apple-touch-icon.png"/>
-<link rel="preconnect" href="https://fonts.googleapis.com"/>
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Fraunces:opsz,wght@9..144,600;9..144,700&display=swap" rel="stylesheet"/>
-<link rel="stylesheet" href="assets/css/nodus.css?v=20260818"/>
-<link rel="stylesheet" href="assets/css/home.css?v=20260818b"/>
+<link rel="preload" as="font" type="font/woff2" href="assets/fonts/inter-latin.woff2" crossorigin/>
+<link rel="preload" as="font" type="font/woff2" href="assets/fonts/fraunces-latin.woff2" crossorigin/>
+<link rel="stylesheet" href="assets/css/nodus.css?v=20260818c"/>
+<link rel="stylesheet" href="assets/css/home.css?v=20260818c"/>
 <script>
   /* Arm the opening sequence before the first paint. Anything that goes wrong
      here simply leaves the page in its ordinary, fully visible state. */
   try {
-    if (!matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    /* Only on a pointer that hovers. On a phone the title sequence holds the
+       whole page back for five seconds on the smallest screen and the slowest
+       connection, which costs a visitor far more than the shot is worth. */
+    if (matchMedia('(pointer: fine)').matches
+        && !matchMedia('(prefers-reduced-motion: reduce)').matches) {
       var root = document.documentElement;
       root.classList.add('intro-armed');
       /* The sequence in home.js normally finishes in about five seconds. This
@@ -88,7 +91,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 <div id="scroll-progress" aria-hidden="true"></div>
 
 <div data-nodus-site-header data-base="" data-page="home"></div>
-<script src="site-header.js?v=20260817"></script>
+<script defer src="site-header.js?v=20260818c"></script>
 
 <main id="main">
 
@@ -370,7 +373,7 @@ SPDX-License-Identifier: AGPL-3.0-only
           <h3>Genealogy</h3>
         </div>
         <p>Reconstruct family histories and individual lives from primary sources, across a tree, a timeline and a map, with GEDCOM in and out and every event tied to its evidence.</p>
-        <a class="arrow-link" href="demo/genealogy.html">Open the demo
+        <a class="arrow-link" href="demo/genealogy.html">Open the genealogy demo
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
       </article>
 
@@ -380,7 +383,7 @@ SPDX-License-Identifier: AGPL-3.0-only
           <h3>Worldbuilding</h3>
         </div>
         <p>Build a fictional world from connected characters, places, factions, cultures, maps and histories, and plan narrative threads while the rules and continuity of the setting stay visible.</p>
-        <a class="arrow-link" href="demo/worldbuilding.html">Open the demo
+        <a class="arrow-link" href="demo/worldbuilding.html">Open the worldbuilding demo
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
       </article>
 
@@ -582,7 +585,7 @@ SPDX-License-Identifier: AGPL-3.0-only
         <p>A free, open-source, local-first research workspace for connecting sources, ideas and evidence. Your corpus stays on your machine.</p>
       </div>
       <div class="foot-col">
-        <h4>Research</h4>
+        <h3>Research</h3>
         <a href="app/">The Nodus App</a>
         <a href="research/">Academic research</a>
         <a href="zotero/">Nodus and Zotero</a>
@@ -590,21 +593,21 @@ SPDX-License-Identifier: AGPL-3.0-only
         <a href="open-source/">Open source</a>
       </div>
       <div class="foot-col">
-        <h4>Product</h4>
+        <h3>Product</h3>
         <a href="#vaults">The four vaults</a>
         <a href="#more-vaults">Other vaults</a>
         <a href="#tools">Nodus Toolkit</a>
         <a href="demo/index.html">Live demos</a>
       </div>
       <div class="foot-col">
-        <h4>Learn</h4>
+        <h3>Learn</h3>
         <a href="wiki/">Wiki</a>
         <a href="blog/">Blog</a>
         <a href="faq/">FAQ</a>
         <a href="wiki/#videos">Video tutorials</a>
       </div>
       <div class="foot-col">
-        <h4>Project</h4>
+        <h3>Project</h3>
         <a href="contribute/">Contribute</a>
         <a href="https://github.com/Drakonis96/nodus" target="_blank" rel="noopener">GitHub</a>
         <a href="https://github.com/Drakonis96/nodus/releases" target="_blank" rel="noopener">Releases</a>
@@ -644,7 +647,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 </div>
 
 
-<script src="assets/js/organism.js?v=20260815"></script>
+<script src="assets/js/organism.js?v=20260818c"></script>
 <script src="assets/js/site.js?v=20260815"></script>
 <script src="assets/js/home.js?v=20260815"></script>
 <script src="assets/js/back-to-top.js?v=20260817b"></script>

@@ -284,6 +284,24 @@ for reduced motion.
 
   /* ------------------------------------------------------------ the organism */
 
+  /* A machine with no usable GPU still answers "yes" to WebGL: Chrome quietly
+     falls back to a software rasteriser (SwiftShader here, llvmpipe on a Linux
+     box with no drivers, Microsoft's basic renderer on Windows). Every frame
+     then costs tens of milliseconds on the main thread instead of two or three,
+     which is far worse than showing no field at all. The renderer name is only
+     advisory and some browsers mask it, so anything we cannot read is trusted
+     to be real hardware and left to the frame governor below. */
+  function isSoftwareRenderer(gl) {
+    try {
+      const info = gl.getExtension('WEBGL_debug_renderer_info');
+      const unmasked = info ? gl.getParameter(info.UNMASKED_RENDERER_WEBGL) : '';
+      const name = String(unmasked || '') + ' ' + String(gl.getParameter(gl.RENDERER) || '');
+      return /swiftshader|llvmpipe|softpipe|software|basic render/i.test(name);
+    } catch (error) {
+      return false;
+    }
+  }
+
   function create(canvas) {
     let gl = null;
     try {
@@ -291,6 +309,7 @@ for reduced motion.
       gl = canvas.getContext('webgl2', options) || canvas.getContext('webgl', options);
     } catch (error) { gl = null; }
     if (!gl) return null;
+    if (isSoftwareRenderer(gl)) return null;
 
     const nebula = program(gl, NEBULA_VS, NEBULA_FS, ['aPos']);
     const blit = program(gl, BLIT_VS, BLIT_FS, ['aPos']);
@@ -686,13 +705,21 @@ for reduced motion.
     }
 
     /* --- the loop, with a governor that gives up gracefully --- */
+    const FRAME_MS = 1000 / 60;
     let previous = 0;
     let slowFrames = 0;
+    let frames = 0;
+    let costly = 0;
     let frame = 0;
 
     function tick(now) {
       if (!state.running) return;
       frame = requestAnimationFrame(tick);
+
+      // Hold to 60 fps. A 120 Hz display gains nothing visible from a drifting
+      // field and pays twice the CPU and battery for it.
+      if (previous && now - previous < FRAME_MS - 1) return;
+
       const elapsed = previous ? Math.min(0.05, (now - previous) / 1000) : 0.016;
       previous = now;
       state.time += elapsed;
@@ -700,15 +727,32 @@ for reduced motion.
       const started = performance.now();
       step(elapsed);
       draw(pack());
+      const cost = performance.now() - started;
+      frames++;
+
+      /* Warm-up aside, real hardware draws this field in two or three
+         milliseconds. If the first second says otherwise we are on a renderer
+         that did not admit to being software, and the field is not worth the
+         main thread it is eating: stand down and let the page have it back. */
+      if (frames > 10 && cost > 16) costly++;
+      if (frames === 40 && costly >= 15) {
+        stop();
+        canvas.dispatchEvent(new CustomEvent('organism-standdown'));
+        return;
+      }
 
       // if we are consistently over budget, shed load rather than stutter
-      if (performance.now() - started > 12) {
+      if (cost > 12) {
         slowFrames++;
         if (slowFrames === 45) {
           count = Math.max(60, Math.round(count * 0.65));
           layoutFormation(); // fewer nodes means a different sampling of the glyph
         } else if (slowFrames === 120 && state.quality > 0) {
           state.quality = 0;
+        } else if (slowFrames === 240) {
+          // shedding load was not enough either; give the machine its thread back
+          stop();
+          canvas.dispatchEvent(new CustomEvent('organism-standdown'));
         }
       } else if (slowFrames > 0) {
         slowFrames--;
@@ -764,20 +808,39 @@ for reduced motion.
 
   /* ------------------------------------------------------------ boot */
 
+  /* The opening sequence on the home page is a title shot for the field: the
+     nodes gather into the Nodus N, hold, and burst as the page arrives. With no
+     field there is no N, and holding a blank page for five seconds shows the
+     visitor nothing at all. So every path that stands the field down also hands
+     the page straight back, and home.js finds the sequence already over. */
+  function releaseOpening() {
+    const root = document.documentElement;
+    if (!root.classList.contains('intro-armed') && !root.classList.contains('intro-run')) return;
+    root.classList.remove('intro-armed', 'intro-run');
+    root.classList.add('intro-done');
+  }
+
+  function standDown(canvas) {
+    canvas.replaceWith(Object.assign(document.createElement('div'), { className: 'organism-fallback' }));
+    window.NodusOrganism = null;
+    releaseOpening();
+  }
+
   function boot() {
     const canvas = document.getElementById('organism');
     if (!canvas) return;
 
     if (reduceMotion.matches) {
-      canvas.replaceWith(Object.assign(document.createElement('div'), { className: 'organism-fallback' }));
-      window.NodusOrganism = null;
+      standDown(canvas);
       return;
     }
 
+    // the governor can decide mid-flight that this machine cannot afford us
+    canvas.addEventListener('organism-standdown', () => standDown(canvas), { once: true });
+
     const organism = create(canvas);
     if (!organism) {
-      canvas.replaceWith(Object.assign(document.createElement('div'), { className: 'organism-fallback' }));
-      window.NodusOrganism = null;
+      standDown(canvas);
       return;
     }
 
@@ -827,8 +890,7 @@ for reduced motion.
     const onPreference = () => {
       if (reduceMotion.matches) {
         organism.stop();
-        canvas.replaceWith(Object.assign(document.createElement('div'), { className: 'organism-fallback' }));
-        window.NodusOrganism = null;
+        standDown(canvas);
       }
     };
     if (reduceMotion.addEventListener) reduceMotion.addEventListener('change', onPreference);
