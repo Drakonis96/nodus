@@ -33,7 +33,28 @@ const bundleOf = (source, name) => {
   );
   return require(outfile);
 };
+/**
+ * The renderer's `localStorage`, which `node --test` does not have. Defined before
+ * the store is bundled so the durable half of a cut can be exercised for real
+ * instead of described, and counting its writes because a gallery patches its
+ * snapshot on every keystroke in the search box.
+ */
+class FakeStorage {
+  #values = new Map();
+  writes = 0;
+  get length() { return this.#values.size; }
+  key(index) { return [...this.#values.keys()][index] ?? null; }
+  getItem(key) { return this.#values.has(key) ? this.#values.get(key) : null; }
+  setItem(key, value) { this.writes += 1; this.#values.set(key, String(value)); }
+  removeItem(key) { this.#values.delete(key); }
+  clear() { this.#values.clear(); }
+}
+globalThis.localStorage = new FakeStorage();
+
 const store = bundleOf('src/app/viewSnapshots.ts', 'viewSnapshots.cjs');
+// Bundled apart from the store on purpose: a second instance of the module shares
+// no memory with the first, so anything the two agree on came through the disk.
+const preferences = bundleOf('src/app/filterPreferences.ts', 'filterPreferences.cjs');
 const { topAnchorId } = bundleOf('src/listPlacement.ts', 'listPlacement.cjs');
 const { readingBlocks, topBlockIndex } = bundleOf('src/readingPlace.ts', 'readingPlace.cjs');
 
@@ -506,4 +527,185 @@ test('the three sections added here receive their snapshot the way the others do
   // The same surface under the three names the app gives it, each with its own cut.
   assert.match(study, /snapshots\.read\('studyDeepResearch'\)/);
   assert.match(teaching, /snapshots\.read\('teachingUnits'\)/);
+});
+
+// ── Phase four: the half of the cut that outlives the run ─────────────────────
+
+/** A fresh app start: the in-memory store is gone, the disk is not. */
+const restart = () => store.clearViewSnapshots();
+
+const forgetPreferences = () => {
+  preferences.clearFilterPreferences();
+  globalThis.localStorage.writes = 0;
+  store.clearViewSnapshots();
+};
+
+test('the galleries reopen on the ordering and the layout the reader chose, run after run', () => {
+  forgetPreferences();
+  store.patchViewSnapshot('vault-a', 'deepResearch', {
+    surface: 'gallery', openReport: null, search: 'mímesis', readFilter: 'unread', sortKey: 'title', viewMode: 'list',
+  });
+  store.patchViewSnapshot('vault-a', 'immersion', { search: 'ricoeur', sortKey: 'oldest', viewMode: 'list' });
+
+  restart();
+
+  const reports = store.readViewSnapshot('vault-a', 'deepResearch');
+  assert.equal(reports.readFilter, 'unread', 'the read filter is a preference, not a place');
+  assert.equal(reports.sortKey, 'title');
+  assert.equal(reports.viewMode, 'list');
+  const immersion = store.readViewSnapshot('vault-a', 'immersion');
+  assert.equal(immersion.sortKey, 'oldest');
+  assert.equal(immersion.viewMode, 'list');
+});
+
+test('a query and a place are not preferences, and do not come back with them', () => {
+  forgetPreferences();
+  store.patchViewSnapshot('vault-a', 'deepResearch', {
+    surface: 'reader',
+    openReport: { id: 'R1', label: 'La metáfora viva' },
+    search: 'mímesis',
+    sortKey: 'title',
+    viewMode: 'list',
+    placement: { anchorId: 'R7' },
+    reading: { blockIndex: 42, rendering: 'original' },
+  });
+  store.patchViewSnapshot('vault-a', 'immersion', {
+    openSession: { id: 'S1', label: 'Sesión' }, search: 'ricoeur', sortKey: 'oldest', placement: { anchorId: 'S9' },
+  });
+
+  restart();
+
+  const reports = store.readViewSnapshot('vault-a', 'deepResearch');
+  // A search restored a week later hides the gallery with no visible cause; a place
+  // and an open report point at rows that may not exist any more.
+  assert.equal(reports.search, '', 'the search box starts empty on a new run');
+  assert.equal(reports.surface, 'gallery', 'a new run opens on the gallery');
+  assert.equal(reports.openReport, null);
+  assert.equal(reports.placement, null);
+  assert.equal(reports.reading, null);
+  const immersion = store.readViewSnapshot('vault-a', 'immersion');
+  assert.equal(immersion.search, '');
+  assert.equal(immersion.openSession, null);
+  assert.equal(immersion.placement, null);
+});
+
+test('within a run the whole cut still wins over the stored preferences', () => {
+  forgetPreferences();
+  store.patchViewSnapshot('vault-a', 'deepResearch', { sortKey: 'title', viewMode: 'list' });
+  store.patchViewSnapshot('vault-a', 'deepResearch', { search: 'mímesis', placement: { anchorId: 'R7' } });
+
+  // Leaving the section and coming back is not a restart: the snapshot in memory is
+  // the whole answer, and the seed must not overwrite it with its emptier one.
+  const live = store.readViewSnapshot('vault-a', 'deepResearch');
+  assert.equal(live.search, 'mímesis');
+  assert.deepEqual(live.placement, { anchorId: 'R7' });
+  assert.equal(live.sortKey, 'title');
+});
+
+test('a gallery never visited has no preferences to restore', () => {
+  forgetPreferences();
+  assert.equal(store.readViewSnapshot('vault-a', 'deepResearch'), undefined);
+  assert.equal(store.readViewSnapshot('vault-a', 'immersion'), undefined);
+});
+
+test('wiping one vault leaves the others their preferences', () => {
+  forgetPreferences();
+  store.patchViewSnapshot('vault-a', 'deepResearch', { sortKey: 'title' });
+  store.patchViewSnapshot('vault-b', 'deepResearch', { sortKey: 'oldest' });
+
+  // Deleting a vault takes its preferences with it, and nobody else's.
+  preferences.clearFilterPreferences('vault-a');
+  store.clearViewSnapshots();
+  assert.equal(store.readViewSnapshot('vault-a', 'deepResearch'), undefined);
+  assert.equal(store.readViewSnapshot('vault-b', 'deepResearch').sortKey, 'oldest');
+});
+
+test('the three names of Deep Research keep three sets of preferences', () => {
+  forgetPreferences();
+  store.patchViewSnapshot('vault-a', 'deepResearch', { sortKey: 'title' });
+  store.patchViewSnapshot('vault-a', 'studyDeepResearch', { sortKey: 'oldest' });
+  store.patchViewSnapshot('vault-a', 'teachingUnits', { viewMode: 'list' });
+
+  restart();
+
+  assert.equal(store.readViewSnapshot('vault-a', 'deepResearch').sortKey, 'title');
+  assert.equal(store.readViewSnapshot('vault-a', 'studyDeepResearch').sortKey, 'oldest');
+  assert.equal(store.readViewSnapshot('vault-a', 'teachingUnits').viewMode, 'list');
+  assert.equal(store.readViewSnapshot('vault-a', 'teachingUnits').sortKey, 'recent', 'what was never chosen keeps its default');
+});
+
+test('a preference belongs to the vault it was chosen in', () => {
+  forgetPreferences();
+  store.patchViewSnapshot('vault-a', 'deepResearch', { sortKey: 'title', viewMode: 'list' });
+  restart();
+
+  // Two corpora are two different sets of reports; ordering one says nothing about
+  // the other, and the seed is read under the id being asked for, never carried over.
+  assert.equal(store.readViewSnapshot('vault-b', 'deepResearch'), undefined);
+  assert.equal(store.readViewSnapshot('vault-a', 'deepResearch').sortKey, 'title');
+});
+
+test('with no vault nothing is stored and nothing is seeded', () => {
+  forgetPreferences();
+  store.patchViewSnapshot(null, 'deepResearch', { sortKey: 'title' });
+  assert.equal(store.readViewSnapshot(null, 'deepResearch'), undefined);
+  assert.equal(store.readViewSnapshot('vault-a', 'deepResearch'), undefined, 'a vault-less write is not a write to whoever comes next');
+});
+
+test('a value that is not an option of its select is ignored, not restored', () => {
+  forgetPreferences();
+  store.patchViewSnapshot('vault-a', 'deepResearch', { sortKey: 'conexiones', viewMode: 'list', readFilter: 42 });
+  restart();
+
+  const reports = store.readViewSnapshot('vault-a', 'deepResearch');
+  // A select holding a value it has no option for renders visibly empty and cannot
+  // be put right except by choosing something else.
+  assert.equal(reports.sortKey, 'recent', 'an unknown ordering falls back to the default');
+  assert.equal(reports.readFilter, 'all');
+  assert.equal(reports.viewMode, 'list', 'the fields that were valid still survive');
+
+  // The same for a store written by hand or left behind by an older version.
+  globalThis.localStorage.setItem('nodus.galleryFilters.immersion.vault-a', '{ not json');
+  store.clearViewSnapshots();
+  assert.equal(store.readViewSnapshot('vault-a', 'immersion'), undefined, 'an unreadable entry is a missing entry');
+});
+
+test('typing in the search box does not write to disk once per keystroke', () => {
+  forgetPreferences();
+  store.patchViewSnapshot('vault-a', 'deepResearch', { sortKey: 'title', viewMode: 'list' });
+  const afterChoice = globalThis.localStorage.writes;
+  assert.ok(afterChoice > 0, 'choosing an ordering is written');
+
+  // The gallery reports its filters together with the search on every keystroke, and
+  // `setItem` is synchronous on the thread painting the list being typed into.
+  for (const search of ['m', 'mí', 'mím', 'míme', 'mímes', 'mímesi', 'mímesis']) {
+    store.patchViewSnapshot('vault-a', 'deepResearch', { search, sortKey: 'title', viewMode: 'list' });
+  }
+  assert.equal(globalThis.localStorage.writes, afterChoice, 'repeating the same preferences costs nothing');
+
+  store.patchViewSnapshot('vault-a', 'deepResearch', { search: 'mímesis', sortKey: 'oldest', viewMode: 'list' });
+  assert.equal(globalThis.localStorage.writes, afterChoice + 1, 'a changed preference is written once');
+});
+
+test('only the galleries opt in, and only for the three durable fields', async () => {
+  const [preferences, types] = await Promise.all([
+    readSource('src/app/filterPreferences.ts'),
+    readSource('src/app/viewSnapshots.ts'),
+  ]);
+  const opted = preferences.match(/export const PREFERENCE_VIEWS[^;]*;/s)?.[0] ?? '';
+  for (const view of ['deepResearch', 'studyDeepResearch', 'teachingUnits', 'immersion']) {
+    assert.match(opted, new RegExp(`'${view}'`), `${view} keeps its preferences between runs`);
+  }
+  for (const view of ['authors', 'ideas', 'library', 'workspace', 'notes', 'argument']) {
+    assert.doesNotMatch(opted, new RegExp(`'${view}'`), `${view} was not asked for and does not opt in`);
+  }
+  // The durable set is closed: anything else in a patch stops at the in-memory store.
+  const fields = preferences.match(/export interface GalleryFilterPreferences \{[^}]*\}/s)?.[0] ?? '';
+  assert.match(fields, /readFilter\?:/);
+  assert.match(fields, /sortKey\?:/);
+  assert.match(fields, /viewMode\?:/);
+  for (const ephemeral of ['search', 'placement', 'openReport', 'openSession', 'reading', 'surface']) {
+    assert.doesNotMatch(fields, new RegExp(`\\b${ephemeral}\\??:`), `${ephemeral} is a place, not a preference`);
+  }
+  assert.match(types, /if \(isPreferenceView\(view\)\) writeFilterPreferences\(vaultId, view, patch/, 'the write-through sits in the one place a cut is recorded');
 });
