@@ -72,7 +72,8 @@
     "capture:wiki": "npm run build && electron-rebuild -f -w better-sqlite3 && node scripts/capture-wiki-desktop-screenshots.mjs",
     "verify:testimony-diarization": "npm run build && node scripts/verify-testimony-diarization.mjs",
     "audit:ai": "npm run build && node scripts/ai-audit/run.mjs",
-    "build:server-shared": "node scripts/build-server-shared.mjs"
+    "build:server-shared": "node scripts/build-server-shared.mjs",
+    "test:e2e:browser": "node scripts/e2e-browser.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.32.1",
@@ -250,8 +251,8 @@
         }
       ],
       "extendInfo": {
-        "NSMicrophoneUsageDescription": "Nodus usa el micrófono únicamente cuando inicias un dictado o una grabación de estudio.",
-        "NSAppleEventsUsageDescription": "Nodus puede usar una aplicación de presentaciones instalada únicamente para convertir a PDF el archivo que elijas importar.",
+        "NSMicrophoneUsageDescription": "Nodus usa el micr\u00f3fono \u00fanicamente cuando inicias un dictado o una grabaci\u00f3n de estudio.",
+        "NSAppleEventsUsageDescription": "Nodus puede usar una aplicaci\u00f3n de presentaciones instalada \u00fanicamente para convertir a PDF el archivo que elijas importar.",
         "NSDockTilePlugIn": "NodusDockTile.docktileplugin"
       },
       "target": [
