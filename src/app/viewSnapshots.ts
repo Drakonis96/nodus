@@ -28,7 +28,20 @@
 // The store is deliberately NOT React state. It is read once when a view mounts and
 // written on every filter change; as state it would re-render the whole shell on
 // every keystroke in a search box, and this repo has paid for that before.
+//
+// All of this dies with the window, which is right for a place: on the next launch
+// there is no "where was I". Three fields are not a place but a preference — the
+// ordering, the read filter and grid-vs-list of the two galleries, set once and
+// expected to hold — and those are written through to `filterPreferences` and read
+// back as the seed a section mounts with. That file says why only those three.
 import type { View } from '../navigation';
+import {
+  PREFERENCE_VIEWS,
+  readFilterPreferences,
+  writeFilterPreferences,
+  type GalleryFilterPreferences,
+  type PreferenceView,
+} from './filterPreferences';
 import type { LibraryCatalogItem, LibraryItemSource, LibraryItemType, LibraryScope } from '@shared/libraryTypes';
 // Type-only, so the lazy view chunks are not pulled in: the unions stay declared
 // once, where the selects that produce them live.
@@ -295,13 +308,59 @@ let slot: { vaultId: string; values: ViewSnapshots } | null = null;
  * Undefined for a different vault, and for no vault at all — same contract as
  * `getVaultQueryCache`. The vault check lives in the read, not in an effect, so a
  * view that mounts in the same commit as a vault change cannot see the old cut.
+ *
+ * The two galleries are the exception, and only for the three fields `filterPreferences`
+ * keeps: with nothing in memory they are seeded from that vault's stored preferences,
+ * so the ordering and the layout the reader chose survive a restart. The seed is still
+ * closed to its own vault — it is read under the id being asked for, never carried over
+ * from the one that was active a moment ago.
  */
 export function readViewSnapshot<K extends SnapshotView>(
   vaultId: string | null | undefined,
   view: K,
 ): ViewSnapshots[K] | undefined {
-  if (!vaultId || slot?.vaultId !== vaultId) return undefined;
-  return slot.values[view];
+  const live = !vaultId || slot?.vaultId !== vaultId ? undefined : slot?.values[view];
+  if (live || !vaultId || !isPreferenceView(view)) return live;
+  // Nothing in memory: either the first visit of the run, or the first after a
+  // vault change. Both are exactly when the preferences kept on disk are the only
+  // record of how the reader wants this gallery, so they become the seed.
+  return gallerySeed(vaultId, view) as ViewSnapshots[K] | undefined;
+}
+
+function isPreferenceView(view: SnapshotView): view is PreferenceView {
+  return (PREFERENCE_VIEWS as readonly SnapshotView[]).includes(view);
+}
+
+/**
+ * A snapshot holding nothing but the stored preferences: no open report, no search,
+ * no place. Every other field is its default, so the seed says only what the reader
+ * actually chose and never claims a place they were never at.
+ *
+ * Undefined when nothing was ever stored, so that "never visited" stays
+ * distinguishable from "visited and left on the defaults".
+ */
+function gallerySeed(vaultId: string, view: PreferenceView): DeepResearchSnapshot | ImmersionSnapshot | undefined {
+  const stored = readFilterPreferences(vaultId, view);
+  if (!stored.readFilter && !stored.sortKey && !stored.viewMode) return undefined;
+  if (view === 'immersion') {
+    return {
+      openSession: null,
+      search: '',
+      sortKey: stored.sortKey ?? 'recent',
+      viewMode: stored.viewMode ?? 'grid',
+      placement: null,
+    };
+  }
+  return {
+    surface: 'gallery',
+    openReport: null,
+    search: '',
+    readFilter: stored.readFilter ?? 'all',
+    sortKey: stored.sortKey ?? 'recent',
+    viewMode: stored.viewMode ?? 'grid',
+    placement: null,
+    reading: null,
+  };
 }
 
 /**
@@ -318,6 +377,10 @@ export function patchViewSnapshot<K extends SnapshotView>(
   if (slot?.vaultId !== vaultId) slot = { vaultId, values: {} };
   const current = slot.values[view];
   slot.values[view] = { ...(current ?? {}), ...patch } as ViewSnapshots[K];
+  // The galleries' ordering, read filter and grid-vs-list are preferences rather
+  // than places, so they go on through to disk. Everything else in the patch stops
+  // here, and a patch mentioning none of the three costs nothing.
+  if (isPreferenceView(view)) writeFilterPreferences(vaultId, view, patch as GalleryFilterPreferences);
 }
 
 /** Drop everything. For vault deletion, imports and tests. */

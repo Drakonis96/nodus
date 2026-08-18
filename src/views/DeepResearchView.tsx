@@ -28,7 +28,7 @@ import type { PendingGraphNavigationTarget } from '../navigation';
 import type { DeepResearchSnapshot } from '../app/viewSnapshots';
 import { useListPlacement } from '../listPlacement';
 import { useReadingPlace, type ReadingPlace } from '../readingPlace';
-import { HoverLabelButton, Icon, modelLabel } from '../components/ui';
+import { HoverLabelButton, Icon, RestoringPane, modelLabel } from '../components/ui';
 import { SectionHeader } from '../components/SectionHeader';
 import { ModelPicker } from '../components/ModelPicker';
 import { confirm } from '../components/feedback';
@@ -761,6 +761,13 @@ export function DeepResearchView({
     clearFinishedDeepResearch();
     void window.nodus.clearFinishedDeepResearchJobs();
   };
+
+  // A report that was left open is the section's first frame, never its second. The
+  // gallery below is a screen full of cards; painting it for the frames the read of
+  // the report takes is what makes returning to the section look like the app opening
+  // the list and clicking the report by itself. `mode` already says the reader was in
+  // a report — so wait here, quietly, until the report it names has landed.
+  if (mode === 'reader' && !openDraft) return <RestoringPane />;
 
   if (mode === 'reader' && openDraft) {
     return (

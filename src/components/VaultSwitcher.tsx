@@ -4,6 +4,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import type { RemoteSignIn, VaultSummary, VaultType } from '@shared/types';
 import { isPreviewVaultType } from '@shared/vaultTypes';
 import { errorText, t, tr, tx } from '../i18n';
+import { clearFilterPreferences } from '../app/filterPreferences';
 import { ConfirmModal } from './ConfirmModal';
 import { Icon } from './ui';
 import {
@@ -342,6 +343,9 @@ export function VaultSwitcher({ anchorEl, onClose, vaults, onVaultsChanged, onAc
     void run(async () => {
       if (action.kind === 'delete') {
         await window.nodus.deleteVault(action.vault.id, true);
+        // The gallery preferences of a vault that no longer exists are not a cut of
+        // anything; they would only sit in the store until a new vault reused the id.
+        clearFilterPreferences(action.vault.id);
         await onVaultsChanged();
         setMessage(t('Bóveda eliminada.'));
         return;
