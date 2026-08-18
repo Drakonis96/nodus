@@ -33,6 +33,7 @@ import { AudioGenerationSettings } from './AudioGenerationSettings';
 import { ConnectedVaultsPanel } from '../components/ConnectedVaultsPanel';
 import { LocalServerPanel } from '../components/LocalServerPanel';
 import { ConfirmModal } from '../components/ConfirmModal';
+import { BrowserSettings } from './settings/BrowserSettings';
 import { LegalDocModal } from '../components/LegalDocModal';
 import { LEGAL_DOCS, type LegalDocId } from '../legalDocs';
 import { confirm } from '../components/feedback';
@@ -59,7 +60,7 @@ import { ORB_COLOR_CHOICES, orbHue } from '@shared/nodiOrb';
 import { effectiveSidebarHidden, isViewAllowedForVaultType } from '@shared/vaultTypes';
 import chromeWebStoreLogo from '../assets/brands/chrome-web-store.svg';
 
-type SettingsTabId = 'providers' | 'models' | 'library' | 'extraction' | 'interface' | 'integrations' | 'server' | 'system' | 'data' | 'about' | 'updates';
+type SettingsTabId = 'providers' | 'models' | 'library' | 'extraction' | 'interface' | 'integrations' | 'browser' | 'server' | 'system' | 'data' | 'about' | 'updates';
 
 const SETTINGS_TABS: { id: SettingsTabId; label: string; icon: string; keywords: string }[] = [
   { id: 'providers', label: 'Proveedores', icon: 'key', keywords: 'api key keys claves proveedores provider providers modelos favoritos default openai anthropic deepseek gemini google openrouter xiaomi lm studio ollama vault boveda' },
@@ -68,6 +69,7 @@ const SETTINGS_TABS: { id: SettingsTabId; label: string; icon: string; keywords:
   { id: 'extraction', label: 'Texto y OCR', icon: 'search', keywords: 'pdf texto fulltext zotero ocr tesseract paginas idiomas' },
   { id: 'interface', label: 'Interfaz', icon: 'palette', keywords: 'idioma tema claro oscuro animaciones barra lateral menu navegacion accesibilidad contraste escala fuente lectura enfoque' },
   { id: 'integrations', label: 'Integraciones', icon: 'link', keywords: 'mcp servidor token puerto chatgpt openai tunnel tunel word copilot certificado addin' },
+  { id: 'browser', label: 'Nodus Browser', icon: 'compass', keywords: 'navegador browser web cookies cache almacenamiento datos permisos sitios descargas privacidad' },
   { id: 'server', label: 'Servidor', icon: 'globe', keywords: 'servidor docker compartir vault boveda estudiantes investigadores dominio subdominio oauth claude chatgpt reverse proxy caddy nginx publicar sincronizar' },
   { id: 'system', label: 'Tutoriales', icon: 'graduation', keywords: 'sistema ayuda tutorial' },
   { id: 'data', label: 'Backup / copia de seguridad', icon: 'download', keywords: 'datos backup exportar importar demo copia cifrada peligro reinicializar grafo borrar' },
@@ -748,6 +750,7 @@ export function Settings({
     visibleSettingsSection('interface', 'Barra lateral', 'menu lateral ordenar ocultar mostrar navegacion'),
     visibleSettingsSection('system', 'Ayuda', 'tutorial uso avanzado actualizaciones version update reiniciar'),
     visibleSettingsSection('integrations', 'Servidor MCP', 'mcp servidor puerto token cliente conexion chatgpt openai tunnel tunel'),
+    visibleSettingsSection('browser', 'Nodus Browser', 'navegador browser web cookies cache almacenamiento datos permisos sitios descargas privacidad'),
     visibleSettingsSection('server', 'Nodus Server', 'docker compartir vault boveda estudiantes investigadores dominio oauth reverse proxy caddy nginx sincronizacion remota'),
     visibleSettingsSection('integrations', 'Copiloto de escritura Word', 'word copilot addin certificado token localhost'),
     visibleSettingsSection('integrations', 'Copiloto de escritura LibreOffice', 'libreoffice copilot macro python install instalacion instalando'),
@@ -1743,6 +1746,12 @@ export function Settings({
               {t('Solo escucha en este ordenador. Las herramientas de escritura están activas mientras el servidor esté encendido.')}
             </p>
           </Section>
+      )}
+
+      {visibleSettingsSection('browser', 'Nodus Browser', 'navegador browser web cookies cache almacenamiento datos permisos sitios descargas privacidad') && (
+        <Section title={t('Nodus Browser')}>
+          <BrowserSettings settings={settings} onChange={onChange} />
+        </Section>
       )}
 
       {visibleSettingsSection('server', 'Nodus Server', 'docker compartir vault boveda estudiantes investigadores dominio oauth reverse proxy caddy nginx sincronizacion remota') && (

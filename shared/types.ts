@@ -7996,6 +7996,12 @@ export interface BrowserApi {
   dismissBrowserDownload(id: string): Promise<void>;
   importBrowserDownload(id: string, title: string): Promise<{ itemId: string; title: string }>;
   onBrowserDownloadsChanged(cb: (downloads: import('./browser').BrowserDownloadView[]) => void): () => void;
+  getBrowserStorage(force?: boolean): Promise<import('./browser').BrowserStorageReport>;
+  clearBrowserData(
+    categories: import('./browser').BrowserDataCategory[],
+    origins?: string[],
+  ): Promise<import('./browser').BrowserStorageReport>;
+  clearAllBrowserData(): Promise<import('./browser').BrowserStorageReport>;
 }
 
 export interface NodusApi extends ProsopographyApi, TestimoniesApi, ToolkitApi, TeachingApi, DatabasesApi, PrimarySourcesApi, ArchiveApi, WorldbuildingApi, PlatformApi, RecordsApi, AcademicApi, LibraryApi, BrowserApi {

@@ -32,10 +32,12 @@ import {
   browserDownloads, cancelDownload, completedDownloadPath, dismissDownload, setDownloadNotifier,
 } from '../browser/downloads';
 import { addGlobalLibraryAttachments, createGlobalLibraryItem } from '../library/libraryService';
+import { clearAllBrowserData, clearBrowserData, measureBrowserStorage } from '../browser/storage';
 import { setNodiQuoteSelection, setNodiViewContext } from '../ai/nodiChat';
 import {
   activateTab,
   browserState,
+  closeAllBrowserTabs,
   closeTab,
   createTab,
   goBack,
@@ -306,6 +308,35 @@ export function registerBrowserIpc({ h, getWindow }: IpcContext): void {
     const saved = await addGlobalLibraryAttachments(item.id, [file]);
     dismissDownload(String(id));
     return { itemId: saved.id, title: saved.metadata.title };
+  });
+
+  h('browser:storage', async (event, force: boolean) => {
+    assertUiSender(event, getWindow);
+    return measureBrowserStorage(force === true);
+  });
+
+  h('browser:clearData', async (event, categories: unknown, origins: unknown) => {
+    assertUiSender(event, getWindow);
+    const list = Array.isArray(categories) ? categories.map(String) : [];
+    if (list.length === 0) return measureBrowserStorage(true);
+    const scoped = Array.isArray(origins) ? origins.map(String).filter(Boolean) : undefined;
+    await clearBrowserData(list as never, scoped);
+    return measureBrowserStorage(true);
+  });
+
+  /**
+   * Clear everything.
+   *
+   * Tabs are closed FIRST. A live page holding a service worker or an open
+   * IndexedDB connection re-seeds its storage the moment it is wiped, so
+   * clearing under a loaded page produces a panel that reports success and a
+   * profile that is not actually empty.
+   */
+  h('browser:clearAllData', async (event) => {
+    assertUiSender(event, getWindow);
+    closeAllBrowserTabs();
+    await clearAllBrowserData();
+    return measureBrowserStorage(true);
   });
 
   h('browser:askNodiAboutSelection', async (event) => {

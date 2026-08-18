@@ -157,3 +157,23 @@ export interface BrowserDownloadView {
   importable: boolean;
   savePath: string | null;
 }
+
+/**
+ * What the browser keeps on disk.
+ *
+ * Only `profileBytes` and `cacheBytes` are byte figures, and that is a hard
+ * limit rather than a simplification: Chromium exposes no per-category size API
+ * through Electron. Everything else is reported as counts, and the UI says so.
+ */
+export interface BrowserStorageReport {
+  profileBytes: number | null;
+  cacheBytes: number;
+  cookieCount: number;
+  cookieSites: number;
+  sites: { origin: string; cookies: number }[];
+  measuredAt: number;
+}
+
+export type BrowserDataCategory =
+  | 'cache' | 'cookies' | 'localStorage' | 'indexedDB'
+  | 'serviceWorkers' | 'cacheStorage' | 'fileSystems';

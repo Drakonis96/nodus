@@ -15,7 +15,10 @@
 import { ipcRenderer } from 'electron';
 import type { BrowserState, BrowserViewport } from '@shared/browser';
 import type { OmniboxResolution } from '@shared/browserOmnibox';
-import type { BrowserDownloadView, BrowserMediaState, PendingBrowserPermission } from '@shared/browser';
+import type {
+  BrowserDataCategory, BrowserDownloadView, BrowserMediaState,
+  BrowserStorageReport, PendingBrowserPermission,
+} from '@shared/browser';
 import type { BrowserConnectorCaptureRequest, BrowserConnectorSaveResult } from '@shared/browserConnector';
 
 export interface BrowserCapturePreview {
@@ -85,6 +88,11 @@ export const browserApi = {
     ipcRenderer.on('browser:downloads', listener);
     return () => ipcRenderer.removeListener('browser:downloads', listener);
   },
+  getBrowserStorage: (force?: boolean): Promise<BrowserStorageReport> =>
+    ipcRenderer.invoke('browser:storage', force === true),
+  clearBrowserData: (categories: BrowserDataCategory[], origins?: string[]): Promise<BrowserStorageReport> =>
+    ipcRenderer.invoke('browser:clearData', categories, origins ?? null),
+  clearAllBrowserData: (): Promise<BrowserStorageReport> => ipcRenderer.invoke('browser:clearAllData'),
   onBrowserStateChanged: (callback: (state: BrowserState) => void): (() => void) => {
     const listener = (_event: unknown, state: BrowserState) => callback(state);
     ipcRenderer.on('browser:state', listener);
