@@ -8009,4 +8009,9 @@ export const PT: Record<string, string> = {
   "quiere usar la cámara o el micrófono.": "quer usar a câmara ou o microfone.",
   "quiere conocer tu ubicación.": "quer saber a sua localização.",
   "pide un permiso adicional.": "pede uma permissão adicional.",
+  // Nodus Browser: certificado
+  "La conexión con este sitio no es privada": "A sua ligação a este site não é privada",
+  "Chromium no pudo verificar que «{host}» sea quien dice ser. Puede tratarse de un certificado caducado o mal configurado, o de que alguien esté interceptando la conexión.": "O Chromium não conseguiu verificar que \u00ab{host}\u00bb é quem diz ser. O certificado pode estar expirado ou mal configurado, ou alguém pode estar a intercetar a ligação.",
+  "Nodus Browser no ofrece continuar de todos modos: no valida certificados por su cuenta, así que no puede contradecir ese veredicto.": "O Nodus Browser não oferece continuar mesmo assim: não valida certificados por si próprio, por isso não pode contradizer esse veredicto.",
+  "Volver atrás": "Voltar atrás",
 };

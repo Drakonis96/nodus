@@ -175,9 +175,19 @@ function wire(tab: Tab): void {
     });
   }) as never);
 
-  // Chromium validates certificates; Nodus only reflects the verdict. Never
-  // calling preventDefault() here is what keeps that true — there is no
-  // "proceed anyway" path in v1.
+  /**
+   * Chromium validates certificates; Nodus only reflects the verdict.
+   *
+   * The listener signature is (event, url, error, certificate, callback), and
+   * BOTH escape hatches are deliberately left alone: `event.preventDefault()`
+   * plus `callback(true)` is how an app says "trust this anyway", and together
+   * they are exactly the "proceed anyway" button v1 does not have. Touching
+   * neither leaves Chromium's default, which is to reject.
+   *
+   * This is worth being explicit about because the two are easy to add later by
+   * accident — a `callback(true)` looks like an acknowledgement rather than a
+   * decision to trust an invalid certificate.
+   */
   on(tab, contents, 'certificate-error', ((
     _e: unknown, url: string, error: string,
   ) => {

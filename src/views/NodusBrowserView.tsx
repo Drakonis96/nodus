@@ -186,7 +186,9 @@ export function NodusBrowserView() {
       {/* The page goes here. This div is deliberately empty and never painted
           into: the main process positions the native view over its rectangle. */}
       <div ref={viewportRef} data-browser-viewport className="relative min-h-0 flex-1">
-        {active?.error && <BrowserErrorPane tab={active} />}
+        {active?.error && (active.error.kind === 'certificate'
+          ? <CertificateInterstitial tab={active} />
+          : <BrowserErrorPane tab={active} />)}
       </div>
     </div>
   );
@@ -284,6 +286,50 @@ function SecurityIndicator({ url, error }: { url: string; error: boolean }) {
   );
 }
 
+/**
+ * A certificate failure, told apart from every other kind.
+ *
+ * This is a separate component rather than another row in the heading map
+ * because it means something categorically different. "Site not found" is an
+ * accident; an invalid certificate can mean the connection is being intercepted,
+ * and a user who reads the two in the same grey pane will treat them the same.
+ *
+ * There is no "proceed anyway", by design. Nodus performs no certificate
+ * validation of its own — Chromium does — and offering a bypass here would be
+ * offering to overrule a verdict Nodus is in no position to second-guess.
+ */
+function CertificateInterstitial({ tab }: { tab: BrowserTabState }) {
+  const error = tab.error;
+  if (!error) return null;
+  let host = error.url;
+  try { host = new URL(error.url).host || error.url; } catch { /* show the raw target */ }
+  return (
+    <div
+      data-testid="browser-certificate-interstitial"
+      className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-red-950/25 px-8 text-center"
+    >
+      <Icon name="lock" size={28} className="text-red-400" />
+      <h2 className="text-base font-semibold text-red-200">{t('La conexión con este sitio no es privada')}</h2>
+      <p className="max-w-md text-sm text-neutral-300">
+        {t('Chromium no pudo verificar que «{host}» sea quien dice ser. Puede tratarse de un certificado caducado o mal configurado, o de que alguien esté interceptando la conexión.').replace('{host}', host)}
+      </p>
+      {error.description && (
+        <p className="max-w-md font-mono text-[11px] text-neutral-500">{error.description}</p>
+      )}
+      <p className="max-w-md text-xs text-neutral-500">
+        {t('Nodus Browser no ofrece continuar de todos modos: no valida certificados por su cuenta, así que no puede contradecir ese veredicto.')}
+      </p>
+      <button
+        type="button"
+        className="btn btn-ghost border border-neutral-700"
+        onClick={() => void window.nodus.browserGoBack()}
+      >
+        {t('Volver atrás')}
+      </button>
+    </div>
+  );
+}
+
 /** Rendered by React, over the hidden native view, when a navigation failed. */
 function BrowserErrorPane({ tab }: { tab: BrowserTabState }) {
   const error = tab.error;
@@ -293,7 +339,6 @@ function BrowserErrorPane({ tab }: { tab: BrowserTabState }) {
     offline: t('Sin conexión a internet'),
     refused: t('El sitio rechazó la conexión'),
     timeout: t('El sitio tardó demasiado en responder'),
-    certificate: t('El certificado del sitio no es válido'),
     'blocked-scheme': t('Nodus Browser no abre este tipo de dirección'),
     crashed: t('Esta página dejó de responder'),
     unknown: t('No se pudo cargar la página'),

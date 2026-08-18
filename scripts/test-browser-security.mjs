@@ -85,6 +85,25 @@ test('certificate errors are never overridden', () => {
   assert.doesNotMatch(body, /preventDefault/, 'a certificate error must never be bypassed');
 });
 
+test('nothing in the browser offers a way past a certificate verdict', () => {
+  // preventDefault() plus callback(true) is exactly how an Electron app says
+  // "trust this certificate anyway". Both are absent on purpose, and both are
+  // easy to add back by accident — a callback(true) reads like an
+  // acknowledgement rather than like a decision to trust an invalid cert.
+  const tabs = code('electron/browser/tabs.ts');
+  const handler = tabs.slice(tabs.indexOf("'certificate-error'"));
+  const body = handler.slice(0, handler.indexOf('as never);'));
+  assert.doesNotMatch(body, /preventDefault/, 'a certificate error must never be bypassed');
+  assert.doesNotMatch(body, /callback\s*\(\s*true\s*\)/, 'a certificate must never be trusted manually');
+
+  // And the UI must not grow one either.
+  const view = code('src/views/NodusBrowserView.tsx');
+  const interstitial = view.slice(view.indexOf('function CertificateInterstitial'));
+  const uiBody = interstitial.slice(0, interstitial.indexOf('\n}'));
+  assert.doesNotMatch(uiBody, /browserReload|continuar de todos modos["']|proceed/i,
+    'the interstitial must not offer a way through');
+});
+
 test('every browser IPC channel validates its sender', () => {
   // With one trusted renderer, ipcMain.handle needed no sender check. Adding
   // WebContents that load arbitrary websites ends that assumption, so each
