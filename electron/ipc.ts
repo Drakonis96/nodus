@@ -1,6 +1,6 @@
 import path from 'node:path';
 import fs from 'node:fs';
-import { ipcMain, BrowserWindow, dialog, app } from 'electron';
+import { ipcMain, BrowserWindow, dialog, app, nativeTheme } from 'electron';
 
 import {
   showImportOpenDialog,
@@ -32,6 +32,7 @@ import { registerRecordsIpc } from './ipc/records';
 import { registerAcademicIpc } from './ipc/academic';
 import { registerLibraryIpc } from './ipc/library';
 import { registerBrowserIpc } from './ipc/browser';
+import { setBrowserTheme } from './browser/tabs';
 import {
   restartMcpServer,
   startMcpServer,
@@ -340,6 +341,10 @@ export function registerIpc(
       }
     }
     const next = updateSettings(patch);
+    if (patch.theme !== undefined && next.theme !== previous.theme) {
+      setBrowserTheme(next.theme);
+      getWindow()?.setBackgroundColor(nativeTheme.shouldUseDarkColors ? '#0a0a0a' : '#ffffff');
+    }
     if (patch.uiLanguage !== undefined && next.uiLanguage !== previous.uiLanguage) {
       relocalizeWorldbuildingDemoData(next.uiLanguage);
     }

@@ -19,10 +19,11 @@
  *     them. That is what makes a tab cheap enough to have twelve of.
  */
 
-import { ipcMain, WebContentsView, type BaseWindow, type WebContents } from 'electron';
+import { ipcMain, nativeTheme, WebContentsView, type BaseWindow, type WebContents } from 'electron';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import type { BrowserMediaCommand, BrowserState, BrowserTabError, BrowserTabState, BrowserViewport } from '@shared/browser';
+import type { ThemeMode } from '@shared/types';
 import { MAX_BROWSER_TABS } from '@shared/browser';
 import { decideNavigation } from '@shared/browserNavigation';
 import { NODUS_BROWSER_PARTITION, browserSession } from './session';
@@ -64,6 +65,55 @@ let sectionVisible = false;
 let overlayOpen = false;
 let notify: (() => void) | null = null;
 let contextMenuActions: ContextMenuActions | null = null;
+
+function browserSurfaceColor(): string {
+  return nativeTheme.shouldUseDarkColors ? '#0a0a0a' : '#ffffff';
+}
+
+function applyBrowserSurfaceColor(): void {
+  const color = browserSurfaceColor();
+  for (const tab of tabs.values()) {
+    tab.view.setBackgroundColor(color);
+    void applyPageColorScheme(tab.view.webContents);
+  }
+}
+
+/**
+ * Electron's nativeTheme reaches the default renderer immediately, but a
+ * persistent partition can leave an already-open WebContentsView on its former
+ * media-query value. Chromium's own Emulation domain makes that preference
+ * deterministic without reloading the page or injecting site CSS.
+ */
+async function applyPageColorScheme(contents: WebContents): Promise<void> {
+  if (contents.isDestroyed()) return;
+  const attachedHere = !contents.debugger.isAttached();
+  try {
+    if (attachedHere) contents.debugger.attach('1.3');
+    await contents.debugger.sendCommand('Emulation.setEmulatedMedia', {
+      features: [{
+        name: 'prefers-color-scheme',
+        value: nativeTheme.shouldUseDarkColors ? 'dark' : 'light',
+      }],
+    });
+  } catch {
+    // A user-opened DevTools session can own the debugger transport. The native
+    // theme still supplies the normal fallback; never break browsing for style.
+  } finally {
+    if (attachedHere && contents.debugger.isAttached()) contents.debugger.detach();
+  }
+}
+
+/**
+ * Keep Chromium's color preference and every native browser surface aligned
+ * with Nodus's light / dark / system setting. Pages that support
+ * `prefers-color-scheme` react live, just like the React application does.
+ */
+export function setBrowserTheme(theme: ThemeMode): void {
+  nativeTheme.themeSource = theme;
+  applyBrowserSurfaceColor();
+}
+
+nativeTheme.on('updated', applyBrowserSurfaceColor);
 
 /** Chromium error codes worth telling the user apart. */
 function classifyError(code: number): BrowserTabError['kind'] {
@@ -184,6 +234,7 @@ function on(tab: Tab, contents: WebContents, event: string, handler: (...args: n
 function wire(tab: Tab): void {
   const contents = tab.view.webContents;
   if (contextMenuActions) installContextMenu(contents, contextMenuActions);
+  void applyPageColorScheme(contents);
 
   // Never let a page dictate the options of a window it opens. `allow` would
   // hand the site control of webPreferences; instead every popup becomes an
@@ -207,6 +258,7 @@ function wire(tab: Tab): void {
   }) as never);
 
   on(tab, contents, 'did-start-loading', (() => patch(tab, { loading: true, error: null })) as never);
+  on(tab, contents, 'dom-ready', (() => { void applyPageColorScheme(contents); }) as never);
   on(tab, contents, 'did-stop-loading', (() => patch(tab, {
     loading: false,
     url: contents.getURL(),
@@ -325,6 +377,7 @@ export async function createTab(url: string): Promise<string | null> {
       backgroundThrottling: true,
     },
   });
+  view.setBackgroundColor(browserSurfaceColor());
 
   browserSession();
 

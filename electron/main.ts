@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog, session, shell } from 'electron';
+import { app, BrowserWindow, dialog, nativeTheme, session, shell } from 'electron';
 import path from 'node:path';
 import { createRequire } from 'node:module';
 import { constants as fsConstants, promises as fs } from 'node:fs';
@@ -46,7 +46,7 @@ import { registerImageProtocol, registerImageSchemePrivileges } from './imagePro
 import { registerArchiveProtocol, registerArchiveSchemePrivileges } from './archiveProtocol';
 import { registerLibraryProtocol, registerLibrarySchemePrivileges } from './libraryProtocol';
 import { closeGlobalLibraryRuntime } from './library/libraryRuntime';
-import { closeAllBrowserTabs } from './browser/tabs';
+import { closeAllBrowserTabs, setBrowserTheme } from './browser/tabs';
 import { ensurePreV4Recovery } from './recovery/preV4Recovery';
 import { applyUpdateChannel, isPrereleaseVersion } from './updateChannel';
 import {
@@ -367,7 +367,7 @@ function createWindow(): void {
     height: 900,
     minWidth: 1024,
     minHeight: 700,
-    backgroundColor: '#0a0a0a',
+    backgroundColor: nativeTheme.shouldUseDarkColors ? '#0a0a0a' : '#ffffff',
     titleBarStyle: process.platform === 'darwin' ? 'hiddenInset' : 'default',
     webPreferences: {
       preload: path.join(__dirname, 'preload.cjs'),
@@ -808,6 +808,9 @@ app.whenReady().then(async () => {
   });
   if (preV4.snapshotPath) console.log(`[recovery] pre-v4 snapshot: ${preV4.snapshotPath}`);
   getDb(); // open + migrate before anything touches data
+  // Do this before creating either the main window or a browser tab: Chromium
+  // then exposes the same effective preference to pages from their first frame.
+  setBrowserTheme(getSettings().theme);
   upgradeWorldbuildingDemoDynasties();
   upgradeWorldbuildingDemoImageQuality();
   upgradeWorldbuildingDemoNarrativeDepth();

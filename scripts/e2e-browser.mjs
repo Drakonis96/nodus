@@ -260,6 +260,50 @@ try {
     assert.equal(tab.error, null, 'a good page must report no error');
   });
 
+  await check('browser chrome and pages inherit light, dark and system themes', async () => {
+    const originalTheme = (await call('getSettings')).theme;
+    const pagePrefersDark = () => app.evaluate(async ({ webContents }) => {
+      const target = webContents.getAllWebContents().find((wc) => wc.getURL().startsWith('http://127.0.0.1'));
+      if (!target) throw new Error('the browser page is missing');
+      return target.executeJavaScript("matchMedia('(prefers-color-scheme: dark)').matches");
+    });
+    const waitForPageTheme = async (dark) => {
+      const deadline = Date.now() + 5_000;
+      while (Date.now() < deadline) {
+        if (await pagePrefersDark() === dark) return;
+        await new Promise((resolve) => setTimeout(resolve, 50));
+      }
+      assert.equal(await pagePrefersDark(), dark, 'the page did not receive the effective theme');
+    };
+    const omniboxColor = () => page.getByTestId('browser-omnibox-shell')
+      .evaluate((element) => getComputedStyle(element).backgroundColor);
+
+    await call('updateSettings', { theme: 'light' });
+    await page.waitForFunction(() => document.documentElement.classList.contains('light'));
+    await waitForPageTheme(false);
+    const lightColor = await omniboxColor();
+    assert.equal(await app.evaluate(({ nativeTheme }) => nativeTheme.themeSource), 'light');
+
+    await call('updateSettings', { theme: 'dark' });
+    await page.waitForFunction(() => document.documentElement.classList.contains('dark'));
+    await waitForPageTheme(true);
+    const darkColor = await omniboxColor();
+    assert.equal(await app.evaluate(({ nativeTheme }) => nativeTheme.themeSource), 'dark');
+    assert.notEqual(lightColor, darkColor, 'the browser chrome did not change theme');
+
+    await call('updateSettings', { theme: 'system' });
+    const systemDark = await app.evaluate(({ nativeTheme }) => ({
+      source: nativeTheme.themeSource,
+      dark: nativeTheme.shouldUseDarkColors,
+    }));
+    assert.equal(systemDark.source, 'system');
+    await waitForPageTheme(systemDark.dark);
+
+    await call('updateSettings', { theme: originalTheme });
+    const restoredDark = await app.evaluate(({ nativeTheme }) => nativeTheme.shouldUseDarkColors);
+    await waitForPageTheme(restoredDark);
+  });
+
   await check('a page gets no bridge, no ipcRenderer and no require', async () => {
     // The single most important property of the whole feature.
     const [browserView] = app.windows().length > 1 ? app.windows().slice(1) : [];
@@ -375,7 +419,12 @@ try {
     const snapshot = page.getByTestId('header-notifications-browser-snapshot');
     await snapshot.waitFor({ state: 'visible' });
     assert.match(await snapshot.getAttribute('src'), /^data:image\/png;base64,/, 'Notifications must preserve the page underneath');
-    const hidden = await app.evaluate(() => globalThis.__nodusBrowserVisibilityCalls?.includes(false));
+    let hidden = false;
+    const hiddenDeadline = Date.now() + 5_000;
+    while (!hidden && Date.now() < hiddenDeadline) {
+      hidden = await app.evaluate(() => globalThis.__nodusBrowserVisibilityCalls?.includes(false));
+      if (!hidden) await new Promise((resolve) => setTimeout(resolve, 25));
+    }
     assert.equal(hidden, true, 'opening Notifications must hide the native page behind it');
 
     const backdrop = page.getByTestId('header-notifications-backdrop');

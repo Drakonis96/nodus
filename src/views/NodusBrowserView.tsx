@@ -207,7 +207,7 @@ export function NodusBrowserView() {
         onNew={() => void window.nodus.openBrowserTab('')}
       />
 
-      <div className="flex items-center gap-1 border-b border-neutral-800 px-2 py-1.5">
+      <div data-testid="browser-toolbar" className="flex items-center gap-1 border-b border-neutral-300 px-2 py-1.5 dark:border-neutral-800">
         <ToolbarButton
           icon="chevronLeft"
           label={t('Atrás')}
@@ -232,11 +232,11 @@ export function NodusBrowserView() {
         />
 
         <form className="flex min-w-0 flex-1 items-center" onSubmit={submit}>
-          <div className="flex min-w-0 flex-1 items-center gap-2 rounded-lg border border-neutral-700 bg-neutral-900 px-2.5 py-1">
+          <div data-testid="browser-omnibox-shell" className="flex min-w-0 flex-1 items-center gap-2 rounded-lg border border-neutral-300 bg-white px-2.5 py-1 dark:border-neutral-700 dark:bg-neutral-900">
             <SecurityIndicator url={active?.url ?? ''} error={Boolean(active?.error)} />
             <input
               data-testid="browser-omnibox"
-              className="min-w-0 flex-1 bg-transparent text-sm text-neutral-200 outline-none"
+              className="min-w-0 flex-1 bg-transparent text-sm text-neutral-900 outline-none dark:text-neutral-200"
               value={omnibox}
               spellCheck={false}
               placeholder={t('Busca o escribe una dirección')}
@@ -290,13 +290,13 @@ export function NodusBrowserView() {
       )}
       {panel === 'settings' && <BrowserQuickSettings onClose={() => setPanel(null)} />}
       {panel === 'actions' && (
-        <div data-testid="browser-actions-menu" className="flex shrink-0 flex-wrap items-center gap-1 border-b border-neutral-800 bg-neutral-900/60 px-3 py-2">
+        <div data-testid="browser-actions-menu" className="flex shrink-0 flex-wrap items-center gap-1 border-b border-neutral-300 bg-neutral-50 px-3 py-2 dark:border-neutral-800 dark:bg-neutral-900/60">
           <MenuItem icon="book" label={t('Añadir a la Biblioteca')} onClick={() => void addToLibrary()} />
           <MenuItem icon="chat" label={t('Preguntar a Nodi sobre esta página')} onClick={() => void askNodi('page')} />
           <MenuItem icon="quote" label={t('Preguntar a Nodi sobre la selección')} onClick={() => void askNodi('selection')} />
           <MenuItem icon="copy" label={t('Copiar dirección')} onClick={() => { setPanel(null); void navigator.clipboard.writeText(active?.url ?? ''); }} />
           <MenuItem icon="external" label={t('Abrir en el navegador del sistema')} onClick={() => { setPanel(null); if (active?.url) void window.nodus.openExternal(active.url); }} />
-          <button type="button" className="ml-auto rounded p-1 text-neutral-500 hover:bg-neutral-800" aria-label={t('Cerrar')} onClick={() => setPanel(null)}>
+          <button type="button" className="ml-auto rounded p-1 text-neutral-500 hover:bg-neutral-200 dark:hover:bg-neutral-800" aria-label={t('Cerrar')} onClick={() => setPanel(null)}>
             <Icon name="x" size={13} />
           </button>
         </div>
@@ -314,7 +314,7 @@ export function NodusBrowserView() {
       {notice && (
         <div
           data-testid="browser-notice"
-          className="flex items-center gap-2 border-b border-neutral-800 bg-neutral-900/60 px-3 py-1.5 text-xs text-neutral-300"
+          className="flex items-center gap-2 border-b border-neutral-300 bg-neutral-50 px-3 py-1.5 text-xs text-neutral-700 dark:border-neutral-800 dark:bg-neutral-900/60 dark:text-neutral-300"
         >
           <span className="min-w-0 flex-1">{notice}</span>
           <button type="button" aria-label={t('Descartar')} onClick={() => setNotice(null)}>
@@ -378,17 +378,17 @@ function PermissionBar({
   return (
     <div
       data-testid="browser-permission-bar"
-      className="flex flex-wrap items-center gap-2 border-b border-indigo-500/30 bg-indigo-950/40 px-3 py-2 text-xs text-indigo-100"
+      className="flex flex-wrap items-center gap-2 border-b border-indigo-300 bg-indigo-50 px-3 py-2 text-xs text-indigo-950 dark:border-indigo-500/30 dark:bg-indigo-950/40 dark:text-indigo-100"
     >
       <Icon name="alert" size={14} className="shrink-0 opacity-70" />
       <span className="min-w-0 flex-1">
         <span className="font-semibold">{request.origin}</span>{' '}{what}
       </span>
       {/* Deny comes first, and is the button that reads as the safe default. */}
-      <button type="button" className="btn btn-ghost border border-neutral-700 py-0.5" onClick={() => onDecide(false, false)}>
+      <button type="button" className="btn btn-ghost border border-neutral-300 py-0.5 dark:border-neutral-700" onClick={() => onDecide(false, false)}>
         {t('Denegar')}
       </button>
-      <button type="button" className="btn btn-ghost border border-neutral-700 py-0.5" onClick={() => onDecide(false, true)}>
+      <button type="button" className="btn btn-ghost border border-neutral-300 py-0.5 dark:border-neutral-700" onClick={() => onDecide(false, true)}>
         {t('Denegar siempre')}
       </button>
       <button type="button" className="btn btn-ghost border border-indigo-500/60 py-0.5" onClick={() => onDecide(true, false)}>
@@ -425,7 +425,7 @@ function ToolbarButton({
       aria-label={label}
       disabled={disabled}
       onClick={onClick}
-      className="rounded-lg p-1.5 text-neutral-400 transition-colors hover:bg-neutral-900 disabled:cursor-not-allowed disabled:opacity-40"
+      className="rounded-lg p-1.5 text-neutral-600 transition-colors hover:bg-neutral-100 disabled:cursor-not-allowed disabled:opacity-40 dark:text-neutral-400 dark:hover:bg-neutral-900"
     >
       <Icon name={icon} size={16} />
     </button>
@@ -480,7 +480,7 @@ function BrowserTabStrip({
     <div
       role="tablist"
       data-testid="browser-tab-strip"
-      className="flex items-center gap-1 overflow-x-auto border-b border-neutral-800 px-2 py-1"
+      className="flex items-center gap-1 overflow-x-auto border-b border-neutral-300 px-2 py-1 dark:border-neutral-800"
     >
       {tabs.map((tab) => {
         const selected = tab.id === activeTabId;
@@ -491,7 +491,7 @@ function BrowserTabStrip({
             aria-selected={selected}
             data-testid="browser-tab"
             className={`group flex min-w-0 max-w-52 shrink-0 items-center gap-1.5 rounded-lg px-2 py-1 text-xs transition-colors ${
-              selected ? 'bg-neutral-800 text-neutral-100' : 'text-neutral-400 hover:bg-neutral-900'
+              selected ? 'bg-neutral-200 text-neutral-900 dark:bg-neutral-800 dark:text-neutral-100' : 'text-neutral-600 hover:bg-neutral-100 dark:text-neutral-400 dark:hover:bg-neutral-900'
             }`}
           >
             <button
@@ -511,7 +511,7 @@ function BrowserTabStrip({
               type="button"
               aria-label={t('Cerrar pestaña')}
               title={t('Cerrar pestaña')}
-              className="shrink-0 rounded p-0.5 opacity-0 transition-opacity hover:bg-neutral-700 group-hover:opacity-70 focus:opacity-100"
+              className="shrink-0 rounded p-0.5 opacity-0 transition-opacity hover:bg-neutral-300 group-hover:opacity-70 focus:opacity-100 dark:hover:bg-neutral-700"
               onClick={() => onClose(tab.id)}
             >
               <Icon name="x" size={11} />
@@ -526,7 +526,7 @@ function BrowserTabStrip({
         disabled={full}
         onClick={onNew}
         data-testid="browser-new-tab"
-        className="shrink-0 rounded-lg p-1.5 text-neutral-400 hover:bg-neutral-900 disabled:cursor-not-allowed disabled:opacity-30"
+        className="shrink-0 rounded-lg p-1.5 text-neutral-600 hover:bg-neutral-100 disabled:cursor-not-allowed disabled:opacity-30 dark:text-neutral-400 dark:hover:bg-neutral-900"
       >
         <Icon name="plus" size={13} />
       </button>
@@ -554,11 +554,11 @@ function CertificateInterstitial({ tab }: { tab: BrowserTabState }) {
   return (
     <div
       data-testid="browser-certificate-interstitial"
-      className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-red-950/25 px-8 text-center"
+      className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-red-50 px-8 text-center dark:bg-red-950/25"
     >
       <Icon name="lock" size={28} className="text-red-400" />
-      <h2 className="text-base font-semibold text-red-200">{t('La conexión con este sitio no es privada')}</h2>
-      <p className="max-w-md text-sm text-neutral-300">
+      <h2 className="text-base font-semibold text-red-800 dark:text-red-200">{t('La conexión con este sitio no es privada')}</h2>
+      <p className="max-w-md text-sm text-neutral-700 dark:text-neutral-300">
         {t('Chromium no pudo verificar que «{host}» sea quien dice ser. Puede tratarse de un certificado caducado o mal configurado, o de que alguien esté interceptando la conexión.').replace('{host}', host)}
       </p>
       {error.description && (
@@ -569,7 +569,7 @@ function CertificateInterstitial({ tab }: { tab: BrowserTabState }) {
       </p>
       <button
         type="button"
-        className="btn btn-ghost border border-neutral-700"
+        className="btn btn-ghost border border-neutral-300 dark:border-neutral-700"
         onClick={() => void window.nodus.browserGoBack()}
       >
         {t('Volver atrás')}
@@ -595,15 +595,15 @@ function BrowserErrorPane({ tab }: { tab: BrowserTabState }) {
   return (
     <div
       data-testid="browser-error"
-      className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-neutral-950 px-8 text-center"
+      className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-white px-8 text-center dark:bg-neutral-950"
     >
       <Icon name="alert" size={28} className="text-neutral-600" />
-      <h2 className="text-base font-semibold text-neutral-200">{heading[error.kind] ?? heading.unknown}</h2>
+      <h2 className="text-base font-semibold text-neutral-800 dark:text-neutral-200">{heading[error.kind] ?? heading.unknown}</h2>
       <p className="max-w-md break-all text-xs text-neutral-500">{error.url}</p>
       {error.description && <p className="max-w-md text-xs text-neutral-600">{error.description}</p>}
       <button
         type="button"
-        className="btn btn-ghost border border-neutral-700"
+        className="btn btn-ghost border border-neutral-300 dark:border-neutral-700"
         onClick={() => void window.nodus.browserReload()}
       >
         {t('Reintentar')}
@@ -617,7 +617,7 @@ function MenuItem({ icon, label, onClick }: { icon: string; label: string; onCli
     <button
       type="button"
       onClick={onClick}
-      className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-left text-xs text-neutral-300 hover:bg-neutral-800"
+      className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-left text-xs text-neutral-700 hover:bg-neutral-200 dark:text-neutral-300 dark:hover:bg-neutral-800"
     >
       <Icon name={icon} size={13} className="shrink-0 opacity-70" />
       <span className="min-w-0 truncate">{label}</span>
@@ -644,11 +644,11 @@ function DownloadsBar({
   onError: (message: string) => void;
 }) {
   return (
-    <div data-testid="browser-downloads" className="flex flex-col gap-1 border-b border-neutral-800 bg-neutral-900/50 px-3 py-1.5">
+    <div data-testid="browser-downloads" className="flex flex-col gap-1 border-b border-neutral-300 bg-neutral-50 px-3 py-1.5 dark:border-neutral-800 dark:bg-neutral-900/50">
       {downloads.map((download) => (
         <div key={download.id} className="flex items-center gap-2 text-xs">
           <Icon name="download" size={13} className="shrink-0 opacity-60" />
-          <span className="min-w-0 flex-1 truncate text-neutral-300">{download.filename}</span>
+          <span className="min-w-0 flex-1 truncate text-neutral-700 dark:text-neutral-300">{download.filename}</span>
           <span className="shrink-0 text-neutral-500">{describeDownload(download)}</span>
 
           {download.state === 'completed' && download.importable && (
@@ -667,7 +667,7 @@ function DownloadsBar({
           {download.state === 'progressing' || download.state === 'paused' ? (
             <button
               type="button"
-              className="shrink-0 rounded p-0.5 text-neutral-400 hover:bg-neutral-800"
+              className="shrink-0 rounded p-0.5 text-neutral-600 hover:bg-neutral-200 dark:text-neutral-400 dark:hover:bg-neutral-800"
               aria-label={t('Cancelar')}
               onClick={() => void window.nodus.cancelBrowserDownload(download.id)}
             >
@@ -676,7 +676,7 @@ function DownloadsBar({
           ) : (
             <button
               type="button"
-              className="shrink-0 rounded p-0.5 text-neutral-400 hover:bg-neutral-800"
+              className="shrink-0 rounded p-0.5 text-neutral-600 hover:bg-neutral-200 dark:text-neutral-400 dark:hover:bg-neutral-800"
               aria-label={t('Descartar')}
               onClick={() => void window.nodus.dismissBrowserDownload(download.id)}
             >
@@ -719,7 +719,7 @@ function DownloadsPanel({
       <div data-testid="browser-downloads-panel" className="shrink-0 border-b border-neutral-300 bg-white px-3 py-2 dark:border-neutral-800 dark:bg-neutral-900/60">
         <div className="mb-1 flex items-center justify-between">
           <p className="text-xs font-semibold text-neutral-700 dark:text-neutral-200">{t('Descargas')}</p>
-          <button type="button" className="rounded p-1 text-neutral-500 hover:bg-neutral-800" aria-label={t('Cerrar')} onClick={onClose}><Icon name="x" size={13} /></button>
+          <button type="button" className="rounded p-1 text-neutral-500 hover:bg-neutral-200 dark:hover:bg-neutral-800" aria-label={t('Cerrar')} onClick={onClose}><Icon name="x" size={13} /></button>
         </div>
         {downloads.length === 0 && (
           <p className="px-3 py-4 text-center text-xs text-neutral-500">{t('Todavía no hay descargas.')}</p>
@@ -786,7 +786,7 @@ function BrowserQuickSettings({ onClose }: { onClose: () => void }) {
       <div data-testid="browser-quick-settings" className="shrink-0 border-b border-neutral-300 bg-white px-3 py-2 dark:border-neutral-800 dark:bg-neutral-900/60">
         <div className="mb-1 flex items-center justify-between">
           <p className="text-xs font-semibold text-neutral-700 dark:text-neutral-200">{t('Configuración del navegador')}</p>
-          <button type="button" className="rounded p-1 text-neutral-500 hover:bg-neutral-800" aria-label={t('Cerrar')} onClick={onClose}><Icon name="x" size={13} /></button>
+          <button type="button" className="rounded p-1 text-neutral-500 hover:bg-neutral-200 dark:hover:bg-neutral-800" aria-label={t('Cerrar')} onClick={onClose}><Icon name="x" size={13} /></button>
         </div>
         <div className="grid gap-x-6 md:grid-cols-3">
         <div>
