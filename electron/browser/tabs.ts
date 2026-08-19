@@ -412,6 +412,25 @@ export function setOverlayVisible(open: boolean): void {
   applyVisibility();
 }
 
+/**
+ * Freeze the active page before an HTML overlay hides its native view.
+ *
+ * WebContentsView always paints above React, so the real view still has to be
+ * hidden while a modal or header panel is open. A transient PNG lets React keep
+ * showing exactly what was underneath instead of exposing the window's bare
+ * background (which looked like the whole browser had turned black).
+ */
+export async function captureOverlaySnapshot(): Promise<string | null> {
+  const tab = activeTabId ? tabs.get(activeTabId) : null;
+  if (!tab || tab.view.webContents.isDestroyed() || !sectionVisible || !viewport) return null;
+  try {
+    const image = await tab.view.webContents.capturePage();
+    return image.isEmpty() ? null : image.toDataURL();
+  } catch {
+    return null;
+  }
+}
+
 function withActive<T>(fn: (contents: WebContents) => T): T | undefined {
   const tab = activeTabId ? tabs.get(activeTabId) : null;
   if (!tab || tab.view.webContents.isDestroyed()) return undefined;

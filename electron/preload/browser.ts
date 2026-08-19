@@ -56,6 +56,8 @@ export const browserApi = {
     ipcRenderer.invoke('browser:setViewport', viewport).then(() => undefined),
   setBrowserOverlayVisible: (open: boolean): Promise<void> =>
     ipcRenderer.invoke('browser:setOverlayVisible', open).then(() => undefined),
+  captureBrowserOverlaySnapshot: (): Promise<string | null> =>
+    ipcRenderer.invoke('browser:overlaySnapshot'),
   setBrowserSectionVisible: (visible: boolean): Promise<void> =>
     ipcRenderer.invoke('browser:setSectionVisible', visible).then(() => undefined),
   getPendingBrowserPermission: (): Promise<PendingBrowserPermission | null> =>

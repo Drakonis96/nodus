@@ -372,6 +372,9 @@ try {
 
     await page.getByRole('button', { name: 'Notificaciones', exact: true }).click();
     await page.getByTestId('header-notifications-panel').waitFor({ state: 'visible' });
+    const snapshot = page.getByTestId('header-notifications-browser-snapshot');
+    await snapshot.waitFor({ state: 'visible' });
+    assert.match(await snapshot.getAttribute('src'), /^data:image\/png;base64,/, 'Notifications must preserve the page underneath');
     const hidden = await app.evaluate(() => globalThis.__nodusBrowserVisibilityCalls?.includes(false));
     assert.equal(hidden, true, 'opening Notifications must hide the native page behind it');
 

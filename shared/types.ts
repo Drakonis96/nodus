@@ -7979,6 +7979,8 @@ export interface BrowserApi {
   setBrowserViewport(viewport: import('./browser').BrowserViewport): Promise<void>;
   /** Hide the native page view while a React overlay is open. */
   setBrowserOverlayVisible(open: boolean): Promise<void>;
+  /** A transient image of the page, used beneath HTML overlays. */
+  captureBrowserOverlaySnapshot(): Promise<string | null>;
   /** Whether the browser section is the one currently on screen. */
   setBrowserSectionVisible(visible: boolean): Promise<void>;
   onBrowserStateChanged(cb: (state: import('./browser').BrowserState) => void): () => void;

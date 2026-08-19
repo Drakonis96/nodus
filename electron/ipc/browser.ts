@@ -40,6 +40,7 @@ import { getSettings } from '../db/settingsRepo';
 import {
   activateTab,
   browserState,
+  captureOverlaySnapshot,
   closeAllBrowserTabs,
   closeTab,
   createTab,
@@ -282,6 +283,11 @@ export function registerBrowserIpc({ h, getWindow }: IpcContext): void {
   h('browser:setOverlayVisible', async (event, open: boolean) => {
     assertUiSender(event, getWindow);
     setOverlayVisible(Boolean(open));
+  });
+
+  h('browser:overlaySnapshot', async (event) => {
+    assertUiSender(event, getWindow);
+    return captureOverlaySnapshot();
   });
 
   /** Whether the browser section is the one currently on screen. */
