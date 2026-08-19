@@ -1,6 +1,9 @@
 import type { IpcContext } from './context';
 import { BrowserWindow, clipboard, dialog, shell } from 'electron';
+import { execFile } from 'node:child_process';
 import fs from 'node:fs';
+import path from 'node:path';
+import { promisify } from 'node:util';
 import { showImportOpenDialog } from '../privacy';
 import {
   getGlobalLibraryStatus,
@@ -78,6 +81,26 @@ import {
   removeGlobalLibraryCitationStyle,
   exportGlobalLibraryBibliography,
 } from '../library/libraryService';
+
+const execFileAsync = promisify(execFile);
+
+async function revealAttachmentInFolder(filePath: string): Promise<boolean> {
+  if (process.platform === 'darwin') {
+    try {
+      // Electron's showItemInFolder can fail silently on macOS. Finder's native
+      // reveal command both opens the containing folder and selects the file.
+      await execFileAsync('/usr/bin/open', ['-R', filePath], { timeout: 10_000 });
+      return true;
+    } catch {
+      const error = await shell.openPath(path.dirname(filePath));
+      if (error) throw new Error(`No se pudo abrir la carpeta del adjunto: ${error}`);
+      return true;
+    }
+  }
+
+  shell.showItemInFolder(filePath);
+  return true;
+}
 
 export function registerLibraryIpc({ h }: IpcContext): void {
   const existingItem = async (itemId: string) => {
@@ -181,7 +204,7 @@ export function registerLibraryIpc({ h }: IpcContext): void {
   });
   h('library:removeAttachment', async (_event, itemId, attachmentId) => removeGlobalLibraryAttachment(itemId, attachmentId));
   h('library:openAttachment', async (_event, itemId, attachmentId) => (await shell.openPath(globalLibraryAttachmentPath(itemId, attachmentId))) === '');
-  h('library:revealAttachment', async (_event, itemId, attachmentId) => { shell.showItemInFolder(globalLibraryAttachmentPath(itemId, attachmentId)); return true; });
+  h('library:revealAttachment', async (_event, itemId, attachmentId) => revealAttachmentInFolder(globalLibraryAttachmentPath(itemId, attachmentId)));
   h('library:upsertNote', async (_event, itemId, note) => upsertGlobalLibraryNote(itemId, note));
   h('library:deleteNote', async (_event, itemId, noteId) => deleteGlobalLibraryNote(itemId, noteId));
   h('library:setRelation', async (_event, itemId, targetItemId, relationType, enabled) => setGlobalLibraryItemRelation(itemId, targetItemId, relationType, enabled));

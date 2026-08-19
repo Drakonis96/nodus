@@ -28,7 +28,7 @@ test('the Library UI exposes hierarchy, search, bulk operations, imports and bac
     'import-library-bibliography', 'open-library-duplicates', 'edit-library-metadata',
     'add-library-item-to-vault', 'global-library-vault-dialog',
     'global-library-integrity-warning',
-    'create-library-reference', 'library-item-manager', 'library-attachments',
+    'create-library-reference', 'library-item-manager', 'library-attachments', 'reveal-library-attachment-',
     'library-notes', 'library-relations', 'library-tag-manager',
     'open-library-migration', 'library-migration-dialog', 'start-library-migration',
     'library-smart-search-dialog', 'smart-search-preview', 'library-table-settings', 'library-table-preferences',
@@ -102,6 +102,12 @@ test('the Library UI exposes hierarchy, search, bulk operations, imports and bac
   assert.match(view, /detail\.attachments\.length === 0[\s\S]*addGlobalLibraryAttachments/, 'a record without a file exposes Add file as its primary action');
   assert.match(view, /detail\.extraction\?\.status === 'failed'[\s\S]*Intentar de nuevo/, 'a failed preparation exposes a plain-language retry action');
   assert.match(view, /detail\.extraction\?\.status === 'needs-review'[\s\S]*Leer y revisar/, 'reviewable Markdown remains directly readable');
+  assert.match(view, /data-testid="library-reading-status"[\s\S]*data-testid="edit-library-metadata"[\s\S]*data-testid="add-library-item-to-vault"[\s\S]*data-testid="library-extraction-advanced"[\s\S]*data-testid="library-online-source"/,
+    'the detail header keeps reading state, metadata, vault, technical details, and external source together');
+  assert.match(view, /<span\s+data-testid="library-reading-status"[\s\S]*?<span className="sr-only">\{detailReadingLabel\}<\/span>/,
+    'the compact reading state remains accessible without becoming a button');
+  assert.doesNotMatch(view, /data-testid="edit-library-metadata"[^>]*role="menuitem"/,
+    'metadata editing no longer requires the detail overflow menu');
   assert.doesNotMatch(view, />\s*\{t\('Procesar'\)\}\s*</, 'the ambiguous Process action is no longer rendered');
   assert.doesNotMatch(view, /\{!trashMode && <aside/, 'the collection tree remains visible while trash is open');
   assert.match(appCss, /\.library-trash-folder\.is-active[\s\S]*background: rgb\(127 29 29 \/ 0\.32\)/);
@@ -184,11 +190,29 @@ test('global Library rows expose a compact Nodus context menu', async () => {
   const view = await readSource('src/views/GlobalLibraryView.tsx');
   assert.match(view, /onContextMenu=/);
   for (const marker of [
-    'library-item-context-menu', 'context-read-library-item', 'context-open-original',
+    'library-item-context-menu', 'context-read-library-item', 'context-open-original', 'context-reveal-library-attachment',
     'context-edit-library-metadata', 'context-manage-library-attachments',
     'context-manage-library-notes', 'context-cite-library-item',
     'context-duplicate-library-item', 'context-trash-library-item',
   ]) assert.match(view, new RegExp(marker));
+});
+
+test('both Library reveal actions use Finder native reveal on macOS', async () => {
+  const [view, itemManager, ipc] = await Promise.all([
+    readSource('src/views/GlobalLibraryView.tsx'),
+    readSource('src/components/library/LibraryItemManager.tsx'),
+    readSource('electron/ipc/library.ts'),
+  ]);
+  assert.match(view, /context-reveal-library-attachment[\s\S]*revealContextOriginal/,
+    'the row context menu keeps its reveal action wired');
+  assert.match(view, /revealContextOriginal[\s\S]*revealGlobalLibraryAttachment/,
+    'the context action resolves the original attachment through the shared bridge');
+  assert.match(itemManager, /reveal-library-attachment-[\s\S]*revealGlobalLibraryAttachment/,
+    'the attachment manager uses the same shared bridge');
+  assert.match(ipc, /process\.platform === 'darwin'[\s\S]*\/usr\/bin\/open[\s\S]*\['-R', filePath\]/,
+    'macOS delegates selection to Finder instead of relying on Electron\'s silent API');
+  assert.match(ipc, /shell\.openPath\(path\.dirname\(filePath\)\)/,
+    'a failed native selection still opens the containing folder');
 });
 
 test('opening an unprepared document routes short and long reading jobs without blocking the renderer', async () => {
@@ -451,14 +475,15 @@ test('Zotero bridge exposes import, status and clean-reader navigation', async (
     'plugin v4 hides global-Library actions when a v3 desktop does not advertise them');
 });
 
-test('metadata management previews candidates, supports bulk confirmation and requires an explicit duplicate merge', async () => {
+test('metadata management keeps editing focused, supports bulk confirmation and requires an explicit duplicate merge', async () => {
   const dialogs = await readSource('src/components/library/LibraryMetadataDialogs.tsx');
   const picker = await readSource('src/components/library/CitationStylePicker.tsx');
   for (const marker of ['library-metadata-editor', 'library-metadata-batch-dialog', 'library-citation-export-dialog', 'library-duplicates-dialog']) assert.match(dialogs, new RegExp(marker));
-  assert.match(dialogs, /Vista previa de cambios/);
-  assert.match(dialogs, /Nada se aplica sin tu revisión/);
   assert.match(dialogs, /updateGlobalLibraryItemMetadata/);
-  assert.match(dialogs, /resolveGlobalLibraryMetadata/);
+  assert.doesNotMatch(dialogs, /Buscar por identificador/, 'the metadata editor no longer wastes space on an identifier lookup sidebar');
+  assert.match(dialogs, /md:grid-cols-\[7rem_7rem_minmax\(0,1fr\)_minmax\(0,1fr\)_5\.5rem\]/,
+    'creator rows use compact fluid name columns without forcing horizontal overflow');
+  assert.match(dialogs, /overflow-x-hidden overflow-y-auto/, 'the editor constrains horizontal overflow while keeping the form scrollable');
   assert.match(dialogs, /importGlobalLibraryIdentifier/);
   assert.match(dialogs, /Buscando metadatos y texto completo/);
   assert.match(dialogs, /onGlobalLibraryMetadataBatchProgress/);

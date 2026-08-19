@@ -4,8 +4,6 @@ import type {
   LibraryItemMetadata,
   LibraryItemRecord,
   LibraryCreator,
-  LibraryMetadataCandidate,
-  LibraryMetadataIdentifierKind,
   LibraryMetadataBatchProgress,
   LibraryMetadataBatchResult,
   LibraryBibliographyExportRequest,
@@ -18,7 +16,6 @@ import type {
 import { confirm, toast } from '../feedback';
 import { Icon, Spinner } from '../ui';
 import { t, tx } from '../../i18n';
-import { mergeLibraryMetadataCandidate } from '@shared/libraryMetadata';
 import { CitationStylePicker, matchesCitationStyleQuery } from './CitationStylePicker';
 import {
   detectLibraryMetadataIdentifier,
@@ -39,18 +36,6 @@ function metadataDraft(metadata: LibraryItemMetadata) {
     authors: authorText(metadata),
     isbnText: (metadata.isbn ?? []).join('; '), issnText: (metadata.issn ?? []).join('; '), tagsText: (metadata.tags ?? []).join(', '),
   };
-}
-
-const FIELD_LABELS: Array<[keyof LibraryItemMetadata, string]> = [
-  ['title', 'Título'], ['creators', 'Autoría'], ['date', 'Fecha'], ['year', 'Año'], ['publicationTitle', 'Publicación'],
-  ['publisher', 'Editorial'], ['volume', 'Volumen'], ['issue', 'Número'], ['pages', 'Páginas'], ['doi', 'DOI'],
-  ['isbn', 'ISBN'], ['issn', 'ISSN'], ['language', 'Idioma'], ['abstract', 'Resumen'], ['tags', 'Etiquetas'],
-  ['pmid', 'PMID'], ['pmcid', 'PMCID'], ['arxiv', 'arXiv'],
-];
-
-function displayValue(metadata: LibraryItemMetadata, key: keyof LibraryItemMetadata): string {
-  const value = key === 'creators' ? authorText(metadata) : metadata[key];
-  return Array.isArray(value) ? value.join('; ') : value == null ? '' : String(value);
 }
 
 export function LibraryCreateReferenceDialog({ defaultMode = 'identifier', collectionIds, onClose, onCreated }: {
@@ -122,31 +107,10 @@ export function LibraryMetadataEditor({ item, onClose, onSaved }: {
 }) {
   const [draft, setDraft] = useState(() => metadataDraft(item.metadata));
   const [creators, setCreators] = useState<LibraryCreator[]>(item.metadata.creators);
-  const initialKind: LibraryMetadataIdentifierKind = item.metadata.doi ? 'doi' : item.metadata.pmid ? 'pmid' : item.metadata.pmcid ? 'pmcid' : item.metadata.arxiv ? 'arxiv' : item.metadata.isbn?.[0] ? 'isbn' : 'issn';
-  const [kind, setKind] = useState<LibraryMetadataIdentifierKind>(initialKind);
-  const [lookupValue, setLookupValue] = useState(item.metadata[initialKind] instanceof Array ? item.metadata[initialKind]?.[0] ?? '' : String(item.metadata[initialKind] ?? ''));
-  const [candidates, setCandidates] = useState<LibraryMetadataCandidate[]>([]);
-  const [selectedCandidate, setSelectedCandidate] = useState<LibraryMetadataCandidate | null>(null);
-  const [lookingUp, setLookingUp] = useState(false);
   const [saving, setSaving] = useState(false);
   const [citationKey, setCitationKey] = useState(item.citationKey ?? '');
   const [extraFields, setExtraFields] = useState(() => Object.entries(item.metadata.extra ?? {}).map(([name, value]) => ({ name, value })));
   const [error, setError] = useState('');
-
-  const lookup = async () => {
-    if (!lookupValue.trim()) return;
-    setLookingUp(true); setError(''); setCandidates([]); setSelectedCandidate(null);
-    try {
-      const result = await window.nodus.resolveGlobalLibraryMetadata(kind, lookupValue);
-      setCandidates(result.candidates); setSelectedCandidate(result.candidates[0] ?? null);
-    } catch (cause) { setError(cause instanceof Error ? cause.message : String(cause)); }
-    finally { setLookingUp(false); }
-  };
-
-  const applyCandidate = (candidate: LibraryMetadataCandidate) => {
-    const merged = mergeLibraryMetadataCandidate(draft, candidate.metadata);
-    setDraft(metadataDraft(merged)); setCreators(merged.creators); setSelectedCandidate(candidate);
-  };
 
   const save = async () => {
     if (!draft.title.trim()) return;
@@ -173,41 +137,36 @@ export function LibraryMetadataEditor({ item, onClose, onSaved }: {
     finally { setSaving(false); }
   };
 
-  const input = (key: keyof typeof draft, label: string, options: { wide?: boolean; textarea?: boolean; type?: string } = {}) => (
-    <label className={`block text-[10px] uppercase tracking-wider text-neutral-500 ${options.wide ? 'sm:col-span-2' : ''}`}>{t(label)}
+  const inputSpan = (span: 1 | 2 | 3 | 4 = 1) => span === 4 ? 'md:col-span-4' : span === 3 ? 'md:col-span-3' : span === 2 ? 'md:col-span-2' : '';
+  const input = (key: keyof typeof draft, label: string, options: { span?: 1 | 2 | 3 | 4; textarea?: boolean; type?: string } = {}) => (
+    <label className={`block min-w-0 text-[10px] uppercase tracking-wider text-neutral-500 ${inputSpan(options.span)}`}>{t(label)}
       {options.textarea
-        ? <textarea className="input mt-1 min-h-24 w-full normal-case tracking-normal" value={String(draft[key] ?? '')} onChange={(event) => setDraft((current) => ({ ...current, [key]: event.target.value }))} />
-        : <input className="input mt-1 w-full normal-case tracking-normal" type={options.type ?? 'text'} value={String(draft[key] ?? '')} onChange={(event) => setDraft((current) => ({ ...current, [key]: options.type === 'number' ? (event.target.value ? Number(event.target.value) : null) : event.target.value }))} />}
+        ? <textarea className="input mt-1 min-h-20 w-full resize-y normal-case tracking-normal" value={String(draft[key] ?? '')} onChange={(event) => setDraft((current) => ({ ...current, [key]: event.target.value }))} />
+        : <input className="input mt-1 h-9 w-full min-w-0 normal-case tracking-normal" type={options.type ?? 'text'} value={String(draft[key] ?? '')} onChange={(event) => setDraft((current) => ({ ...current, [key]: options.type === 'number' ? (event.target.value ? Number(event.target.value) : null) : event.target.value }))} />}
     </label>
   );
 
-  return <div className="fixed inset-0 z-[85] grid place-items-center bg-black/70 p-5" role="dialog" aria-modal="true" data-testid="library-metadata-editor" onMouseDown={(event) => { if (event.target === event.currentTarget && !saving) onClose(); }}>
-    <section className="card flex max-h-[90vh] w-full max-w-5xl flex-col overflow-hidden shadow-2xl">
-      <header className="flex items-center gap-3 border-b border-neutral-800 px-5 py-4"><span className="grid h-9 w-9 place-items-center rounded-xl bg-indigo-500/15 text-indigo-300"><Icon name="edit" /></span><div className="min-w-0 flex-1"><h2 className="font-semibold">{t('Editar y completar metadatos')}</h2><p className="mt-1 text-xs text-neutral-500">{item.source === 'nodus' ? t('Ficha propia de Nodus.') : t('Tus cambios se conservan aunque vuelvas a sincronizar el gestor de origen.')}</p></div><button className="btn btn-ghost" onClick={onClose}><Icon name="x" /></button></header>
-      <div className="grid min-h-0 flex-1 lg:grid-cols-[1.25fr_.9fr]">
-        <div className="min-h-0 overflow-y-auto p-5"><div className="grid gap-3 sm:grid-cols-2">
-          {input('title', 'Título', { wide: true })}
-          <fieldset className="sm:col-span-2" data-testid="library-creator-editor"><div className="flex items-center justify-between"><legend className="text-[10px] uppercase tracking-wider text-neutral-500">{t('Autoría y contribuciones')}</legend><button type="button" className="btn btn-ghost h-7 text-[10px]" onClick={() => setCreators((current) => [...current, { creatorType: 'author', firstName: '', lastName: '', fieldMode: 0 }])}><Icon name="plus" size={12} /> {t('Añadir persona')}</button></div>
-            <div className="mt-2 space-y-2">{creators.map((creator, index) => <div key={`${index}:${creator.creatorType}`} className="grid gap-2 rounded-xl border border-neutral-800 p-2 sm:grid-cols-[8rem_7rem_1fr_1fr_auto]">
-              <select aria-label={t('Rol')} className="input text-xs" value={creator.creatorType} onChange={(event) => setCreators((current) => current.map((entry, position) => position === index ? { ...entry, creatorType: event.target.value } : entry))}>{LIBRARY_CREATOR_ROLES.map((role) => <option key={role} value={role}>{role}</option>)}</select>
-              <select aria-label={t('Tipo de autoría')} className="input text-xs" value={creator.fieldMode === 1 || creator.name ? 'organization' : 'person'} onChange={(event) => setCreators((current) => current.map((entry, position) => position === index ? event.target.value === 'organization' ? { creatorType: entry.creatorType, name: entry.name || [entry.firstName, entry.lastName].filter(Boolean).join(' '), fieldMode: 1 } : { creatorType: entry.creatorType, firstName: '', lastName: entry.name ?? '', fieldMode: 0 } : entry))}><option value="person">{t('Persona')}</option><option value="organization">{t('Institución')}</option></select>
-              {creator.fieldMode === 1 || creator.name ? <input aria-label={t('Nombre institucional')} className="input sm:col-span-2" value={creator.name ?? ''} onChange={(event) => setCreators((current) => current.map((entry, position) => position === index ? { ...entry, name: event.target.value, fieldMode: 1 } : entry))} /> : <><input aria-label={t('Nombre')} className="input" value={creator.firstName ?? ''} onChange={(event) => setCreators((current) => current.map((entry, position) => position === index ? { ...entry, firstName: event.target.value } : entry))} /><input aria-label={t('Apellidos')} className="input" value={creator.lastName ?? ''} onChange={(event) => setCreators((current) => current.map((entry, position) => position === index ? { ...entry, lastName: event.target.value } : entry))} /></>}
-              <span className="flex items-center"><button type="button" className="grid h-7 w-7 place-items-center" aria-label={t('Subir')} disabled={!index} onClick={() => setCreators((current) => { const next = [...current]; [next[index - 1], next[index]] = [next[index], next[index - 1]]; return next; })}><Icon name="chevronUp" size={12} /></button><button type="button" className="grid h-7 w-7 place-items-center" aria-label={t('Bajar')} disabled={index === creators.length - 1} onClick={() => setCreators((current) => { const next = [...current]; [next[index], next[index + 1]] = [next[index + 1], next[index]]; return next; })}><Icon name="chevronDown" size={12} /></button><button type="button" className="grid h-7 w-7 place-items-center text-red-400" aria-label={t('Eliminar')} onClick={() => setCreators((current) => current.filter((_, position) => position !== index))}><Icon name="trash" size={12} /></button></span>
+  return <div className="fixed inset-0 z-[85] grid place-items-center bg-black/70 p-3 sm:p-5" role="dialog" aria-modal="true" data-testid="library-metadata-editor" onMouseDown={(event) => { if (event.target === event.currentTarget && !saving) onClose(); }}>
+    <section className="card flex max-h-[92vh] w-full max-w-4xl flex-col overflow-hidden rounded-2xl border border-neutral-800 bg-neutral-950 shadow-2xl">
+      <header className="flex shrink-0 items-center gap-3 border-b border-neutral-800 px-5 py-4 sm:px-6"><span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-indigo-500/15 text-indigo-300"><Icon name="edit" /></span><div className="min-w-0 flex-1"><h2 className="font-semibold">{t('Editar y completar metadatos')}</h2><p className="mt-1 truncate text-xs text-neutral-500">{item.source === 'nodus' ? t('Ficha propia de Nodus.') : t('Tus cambios se conservan aunque vuelvas a sincronizar el gestor de origen.')}</p></div><button className="btn btn-ghost h-8 w-8 shrink-0 p-0" aria-label={t('Cerrar')} onClick={onClose}><Icon name="x" size={14} /></button></header>
+      <div className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto px-5 py-5 sm:px-6">
+        <div className="grid grid-cols-1 gap-x-3 gap-y-4 md:grid-cols-4">
+          {input('title', 'Título', { span: 4 })}
+          <fieldset className="min-w-0 rounded-xl border border-neutral-800 bg-neutral-950/25 p-3 md:col-span-4" data-testid="library-creator-editor"><div className="flex items-center justify-between gap-3"><legend className="text-[10px] uppercase tracking-wider text-neutral-500">{t('Autoría y contribuciones')}</legend><button type="button" className="btn btn-ghost h-7 shrink-0 text-[10px]" onClick={() => setCreators((current) => [...current, { creatorType: 'author', firstName: '', lastName: '', fieldMode: 0 }])}><Icon name="plus" size={12} /> {t('Añadir persona')}</button></div>
+            {creators.length > 0 && <div className="mt-3 hidden grid-cols-[7rem_7rem_minmax(0,1fr)_minmax(0,1fr)_5.5rem] gap-2 px-2 text-[9px] uppercase tracking-wider text-neutral-600 md:grid"><span>{t('Rol')}</span><span>{t('Tipo de autoría')}</span><span>{t('Nombre')}</span><span>{t('Apellidos')}</span><span className="text-center">{t('Acciones')}</span></div>}
+            <div className="mt-1.5 space-y-1.5">{creators.map((creator, index) => <div key={`${index}:${creator.creatorType}`} className="grid min-w-0 grid-cols-2 gap-2 rounded-lg border border-neutral-800 bg-neutral-950/25 p-2 md:grid-cols-[7rem_7rem_minmax(0,1fr)_minmax(0,1fr)_5.5rem]">
+              <select aria-label={t('Rol')} className="input h-9 min-w-0 text-xs" value={creator.creatorType} onChange={(event) => setCreators((current) => current.map((entry, position) => position === index ? { ...entry, creatorType: event.target.value } : entry))}>{LIBRARY_CREATOR_ROLES.map((role) => <option key={role} value={role}>{role}</option>)}</select>
+              <select aria-label={t('Tipo de autoría')} className="input h-9 min-w-0 text-xs" value={creator.fieldMode === 1 || creator.name ? 'organization' : 'person'} onChange={(event) => setCreators((current) => current.map((entry, position) => position === index ? event.target.value === 'organization' ? { creatorType: entry.creatorType, name: entry.name || [entry.firstName, entry.lastName].filter(Boolean).join(' '), fieldMode: 1 } : { creatorType: entry.creatorType, firstName: '', lastName: entry.name ?? '', fieldMode: 0 } : entry))}><option value="person">{t('Persona')}</option><option value="organization">{t('Institución')}</option></select>
+              {creator.fieldMode === 1 || creator.name ? <input aria-label={t('Nombre institucional')} className="input col-span-2 h-9 min-w-0 md:col-span-2" value={creator.name ?? ''} onChange={(event) => setCreators((current) => current.map((entry, position) => position === index ? { ...entry, name: event.target.value, fieldMode: 1 } : entry))} /> : <><input aria-label={t('Nombre')} className="input h-9 min-w-0" value={creator.firstName ?? ''} onChange={(event) => setCreators((current) => current.map((entry, position) => position === index ? { ...entry, firstName: event.target.value } : entry))} /><input aria-label={t('Apellidos')} className="input h-9 min-w-0" value={creator.lastName ?? ''} onChange={(event) => setCreators((current) => current.map((entry, position) => position === index ? { ...entry, lastName: event.target.value } : entry))} /></>}
+              <span className="col-span-2 flex h-9 items-center justify-end rounded-lg border border-neutral-800 md:col-span-1 md:justify-center"><button type="button" className="grid h-8 w-7 place-items-center rounded text-neutral-500 hover:bg-neutral-800 hover:text-neutral-200 disabled:opacity-25" aria-label={t('Subir')} disabled={!index} onClick={() => setCreators((current) => { const next = [...current]; [next[index - 1], next[index]] = [next[index], next[index - 1]]; return next; })}><Icon name="chevronUp" size={12} /></button><button type="button" className="grid h-8 w-7 place-items-center rounded text-neutral-500 hover:bg-neutral-800 hover:text-neutral-200 disabled:opacity-25" aria-label={t('Bajar')} disabled={index === creators.length - 1} onClick={() => setCreators((current) => { const next = [...current]; [next[index], next[index + 1]] = [next[index + 1], next[index]]; return next; })}><Icon name="chevronDown" size={12} /></button><button type="button" className="grid h-8 w-7 place-items-center rounded text-red-400 hover:bg-red-500/10" aria-label={t('Eliminar')} onClick={() => setCreators((current) => current.filter((_, position) => position !== index))}><Icon name="trash" size={12} /></button></span>
             </div>)}</div>
           </fieldset>
-          <label className="block text-[10px] uppercase tracking-wider text-neutral-500">{t('Tipo')}<select data-testid="library-metadata-item-type" className="input mt-1 w-full normal-case tracking-normal" value={draft.itemType} onChange={(event) => setDraft((current) => ({ ...current, itemType: event.target.value as LibraryItemMetadata['itemType'] }))}>{LIBRARY_ITEM_TYPES.map((entry) => <option key={entry.id} value={entry.id}>{t(entry.label)}</option>)}</select></label>
-          {input('year', 'Año', { type: 'number' })}{input('date', 'Fecha')}{input('language', 'Idioma')}{input('publicationTitle', 'Publicación', { wide: true })}{input('publisher', 'Editorial')}{input('place', 'Lugar')}{input('volume', 'Volumen')}{input('issue', 'Número')}{input('pages', 'Páginas')}{input('edition', 'Edición')}{input('doi', 'DOI', { wide: true })}{input('isbnText', 'ISBN', { wide: true })}{input('issnText', 'ISSN', { wide: true })}{input('pmid', 'PMID')}{input('pmcid', 'PMCID')}{input('arxiv', 'arXiv', { wide: true })}<label className="block text-[10px] uppercase tracking-wider text-neutral-500 sm:col-span-2">{t('Clave de cita')}<input data-testid="library-citation-key" className="input mt-1 w-full normal-case tracking-normal" value={citationKey} onChange={(event) => setCitationKey(event.target.value)} /></label>{input('url', 'URL', { wide: true })}{input('tagsText', 'Etiquetas', { wide: true })}{input('abstract', 'Resumen', { wide: true, textarea: true })}
-          <fieldset className="sm:col-span-2"><div className="flex items-center justify-between"><legend className="text-[10px] uppercase tracking-wider text-neutral-500">{t('Campos adicionales')}</legend><button type="button" className="btn btn-ghost h-7 text-[10px]" onClick={() => setExtraFields((current) => [...current, { name: '', value: '' }])}><Icon name="plus" size={12} /> {t('Añadir campo')}</button></div><p className="mt-1 text-[10px] text-neutral-600">{t('Conserva campos específicos de Zotero y campos personalizados en importaciones y exportaciones.')}</p><div className="mt-2 space-y-2">{extraFields.map((entry, index) => <div key={index} className="grid grid-cols-[minmax(7rem,.8fr)_minmax(10rem,1.4fr)_auto] gap-2"><input aria-label={t('Nombre del campo')} className="input" value={entry.name} onChange={(event) => setExtraFields((current) => current.map((field, position) => position === index ? { ...field, name: event.target.value } : field))} /><input aria-label={t('Valor del campo')} className="input" value={entry.value} onChange={(event) => setExtraFields((current) => current.map((field, position) => position === index ? { ...field, value: event.target.value } : field))} /><button type="button" className="grid h-8 w-8 place-items-center text-red-400" aria-label={t('Eliminar campo')} onClick={() => setExtraFields((current) => current.filter((_, position) => position !== index))}><Icon name="trash" size={12} /></button></div>)}</div></fieldset>
-        </div></div>
-        <aside className="min-h-0 overflow-y-auto border-l border-neutral-800 bg-neutral-950/35 p-5">
-          <h3 className="text-xs font-semibold">{t('Buscar por identificador')}</h3><p className="mt-1 text-[10px] leading-5 text-neutral-600">{t('Consulta fuentes bibliográficas públicas. Nada se aplica sin tu revisión.')}</p>
-          <div className="mt-3 flex gap-2"><select className="input w-24 text-xs uppercase" value={kind} onChange={(event) => { const next = event.target.value as LibraryMetadataIdentifierKind; setKind(next); const value = next === 'isbn' ? draft.isbnText.split(';')[0] : next === 'issn' ? draft.issnText.split(';')[0] : String(draft[next] ?? ''); setLookupValue(value); }}>{['doi', 'isbn', 'issn', 'pmid', 'pmcid', 'arxiv'].map((value) => <option key={value}>{value}</option>)}</select><input className="input min-w-0 flex-1" value={lookupValue} onChange={(event) => setLookupValue(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') void lookup(); }} /><button className="btn btn-primary" disabled={lookingUp || !lookupValue.trim()} onClick={() => void lookup()}>{lookingUp ? <Spinner /> : <Icon name="search" />}</button></div>
-          {error && <p role="alert" className="mt-3 rounded-lg border border-red-500/30 bg-red-500/10 p-2 text-xs text-red-300">{error}</p>}
-          <div className="mt-4 space-y-2">{candidates.map((candidate) => <button key={candidate.id} className={`block w-full rounded-xl border p-3 text-left ${selectedCandidate?.id === candidate.id ? 'border-indigo-500 bg-indigo-500/10' : 'border-neutral-800 hover:border-neutral-700'}`} onClick={() => setSelectedCandidate(candidate)}><b className="line-clamp-2 text-xs">{candidate.metadata.title}</b><span className="mt-1 block text-[10px] text-neutral-500">{authorText(candidate.metadata) || '—'} · {candidate.metadata.year ?? '—'} · {candidate.source}</span><span className="mt-2 block text-[10px] text-indigo-300">{Math.round(candidate.confidence * 100)}% {t('coincidencia')}</span></button>)}</div>
-          {selectedCandidate && <div className="mt-4"><div className="flex items-center justify-between"><h4 className="text-[10px] font-semibold uppercase tracking-wider text-neutral-500">{t('Vista previa de cambios')}</h4><button className="btn btn-secondary h-8 text-xs" onClick={() => applyCandidate(selectedCandidate)}>{t('Usar esta ficha')}</button></div><div className="mt-2 max-h-56 overflow-y-auto rounded-xl border border-neutral-800">{FIELD_LABELS.flatMap(([key, label]) => { const before = displayValue(item.metadata, key); const after = displayValue(selectedCandidate.metadata, key); return before === after || !after ? [] : [<div key={key} className="border-b border-neutral-800 p-2 last:border-0"><b className="text-[9px] uppercase tracking-wider text-neutral-600">{t(label)}</b><p className="mt-1 line-clamp-2 text-[10px] text-red-300/70">− {before || '—'}</p><p className="mt-1 line-clamp-2 text-[10px] text-emerald-300">+ {after}</p></div>]; })}</div></div>}
-        </aside>
+          <label className="block min-w-0 text-[10px] uppercase tracking-wider text-neutral-500 md:col-span-2">{t('Tipo')}<select data-testid="library-metadata-item-type" className="input mt-1 h-9 w-full min-w-0 normal-case tracking-normal" value={draft.itemType} onChange={(event) => setDraft((current) => ({ ...current, itemType: event.target.value as LibraryItemMetadata['itemType'] }))}>{LIBRARY_ITEM_TYPES.map((entry) => <option key={entry.id} value={entry.id}>{t(entry.label)}</option>)}</select></label>
+          {input('year', 'Año', { type: 'number' })}{input('language', 'Idioma')}{input('date', 'Fecha')}{input('publicationTitle', 'Publicación', { span: 3 })}{input('publisher', 'Editorial', { span: 2 })}{input('place', 'Lugar', { span: 2 })}{input('volume', 'Volumen')}{input('issue', 'Número')}{input('pages', 'Páginas')}{input('edition', 'Edición')}{input('doi', 'DOI', { span: 2 })}{input('isbnText', 'ISBN', { span: 2 })}{input('issnText', 'ISSN', { span: 2 })}{input('arxiv', 'arXiv', { span: 2 })}{input('pmid', 'PMID')}{input('pmcid', 'PMCID')}<label className="block min-w-0 text-[10px] uppercase tracking-wider text-neutral-500 md:col-span-2">{t('Clave de cita')}<input data-testid="library-citation-key" className="input mt-1 h-9 w-full min-w-0 normal-case tracking-normal" value={citationKey} onChange={(event) => setCitationKey(event.target.value)} /></label>{input('url', 'URL', { span: 4 })}{input('tagsText', 'Etiquetas', { span: 4 })}{input('abstract', 'Resumen', { span: 4, textarea: true })}
+          <fieldset className="min-w-0 rounded-xl border border-neutral-800 bg-neutral-950/25 p-3 md:col-span-4"><div className="flex items-center justify-between gap-3"><legend className="text-[10px] uppercase tracking-wider text-neutral-500">{t('Campos adicionales')}</legend><button type="button" className="btn btn-ghost h-7 shrink-0 text-[10px]" onClick={() => setExtraFields((current) => [...current, { name: '', value: '' }])}><Icon name="plus" size={12} /> {t('Añadir campo')}</button></div><p className="mt-1 text-[10px] text-neutral-600">{t('Conserva campos específicos de Zotero y campos personalizados en importaciones y exportaciones.')}</p><div className="mt-2 space-y-2">{extraFields.map((entry, index) => <div key={index} className="grid min-w-0 grid-cols-[minmax(0,1fr)_2rem] gap-2 sm:grid-cols-[minmax(0,.8fr)_minmax(0,1.4fr)_2rem]"><input aria-label={t('Nombre del campo')} className="input h-9 min-w-0" value={entry.name} onChange={(event) => setExtraFields((current) => current.map((field, position) => position === index ? { ...field, name: event.target.value } : field))} /><input aria-label={t('Valor del campo')} className="input col-start-1 h-9 min-w-0 sm:col-start-2 sm:row-start-1" value={entry.value} onChange={(event) => setExtraFields((current) => current.map((field, position) => position === index ? { ...field, value: event.target.value } : field))} /><button type="button" className="col-start-2 row-span-2 row-start-1 grid h-8 w-8 place-items-center self-center rounded text-red-400 hover:bg-red-500/10 sm:col-start-3 sm:row-span-1" aria-label={t('Eliminar campo')} onClick={() => setExtraFields((current) => current.filter((_, position) => position !== index))}><Icon name="trash" size={12} /></button></div>)}</div></fieldset>
+        </div>
       </div>
-      <footer className="flex items-center justify-end gap-2 border-t border-neutral-800 px-5 py-4"><button className="btn btn-ghost" onClick={onClose}>{t('Cancelar')}</button><button className="btn btn-primary" disabled={saving || !draft.title.trim()} onClick={() => void save()}>{saving ? <Spinner /> : <Icon name="save" />} {t('Guardar metadatos')}</button></footer>
+      <footer className="flex shrink-0 items-center justify-between gap-3 border-t border-neutral-800 px-5 py-3.5 sm:px-6">{error ? <p role="alert" className="min-w-0 flex-1 truncate text-xs text-red-400" title={error}>{error}</p> : <span />}<div className="flex shrink-0 items-center gap-2"><button className="btn btn-ghost" onClick={onClose}>{t('Cancelar')}</button><button className="btn btn-primary" disabled={saving || !draft.title.trim()} onClick={() => void save()}>{saving ? <Spinner /> : <Icon name="save" />} {t('Guardar metadatos')}</button></div></footer>
     </section>
   </div>;
 }

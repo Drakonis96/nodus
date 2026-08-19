@@ -684,10 +684,21 @@ try {
   await row.getByRole('button').click();
   await detail.waitFor({ state: 'visible' });
 
-  await page.getByTestId('library-detail-actions-toggle').click();
+  const editorToastDismissButtons = page.getByTestId('app-toast-stack').getByRole('button', { name: 'Cerrar' });
+  while (await editorToastDismissButtons.count()) {
+    await editorToastDismissButtons.first().evaluate((button) => (button instanceof HTMLButtonElement ? button.click() : undefined)).catch(() => undefined);
+    await page.waitForTimeout(25);
+  }
   await page.getByTestId('edit-library-metadata').click();
   const metadataEditor = page.getByTestId('library-metadata-editor');
   await metadataEditor.waitFor({ state: 'visible' });
+  if (process.env.NODUS_METADATA_SCREENSHOT) {
+    await page.setViewportSize({ width: 1200, height: 900 });
+    await page.evaluate(() => { document.documentElement.classList.add('light'); document.documentElement.classList.remove('dark'); });
+    await page.screenshot({ path: process.env.NODUS_METADATA_SCREENSHOT });
+    await page.evaluate(() => { document.documentElement.classList.add('dark'); document.documentElement.classList.remove('light'); });
+    await page.setViewportSize({ width: 1540, height: 940 });
+  }
   await metadataEditor.getByLabel('Editorial', { exact: true }).fill('Editorial corregida en Nodus');
   await metadataEditor.getByRole('button', { name: 'Guardar metadatos' }).click();
   await metadataEditor.waitFor({ state: 'detached' });
