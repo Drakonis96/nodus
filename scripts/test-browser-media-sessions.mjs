@@ -143,13 +143,13 @@ test('replaying within the grace period cancels the removal', async () => {
   assert.equal(media.browserMediaStates()[0].playing, true);
 });
 
-test('previous/next are absent from the state, not present and false', () => {
+test('previous/next are commands, not guessed capability flags in the state', () => {
   reset();
   media.noteMediaPlaying('tab-1', describe());
   const [state] = media.browserMediaStates();
-  // No web or Electron API can discover whether a page registered those
-  // handlers, so a field would invite a UI to render dead controls. Adding them
-  // later has to be a deliberate, typed change rather than flipping a boolean.
+  // Chromium routes the standard media commands, but does not reveal whether a
+  // page registered handlers for them. The UI therefore sends commands without
+  // inventing capability flags.
   assert.equal('canPrevious' in state, false);
   assert.equal('canNext' in state, false);
 });
@@ -168,8 +168,13 @@ test('every change notifies exactly once, so the header does not thrash', () => 
   media.setMediaNotifier(() => { calls += 1; });
   media.noteMediaPlaying('tab-1', describe());
   assert.equal(calls, 1);
+  media.noteMediaPlaying('tab-1', describe());
+  media.noteMediaPlaying('tab-1', describe());
+  assert.equal(calls, 1, 'duplicate native and preload play reports must collapse into one state');
   media.noteMediaPaused('tab-1');
   assert.equal(calls, 2);
+  media.noteMediaPaused('tab-1');
+  assert.equal(calls, 2, 'a duplicate pause report must not repaint the header');
   // A no-op must not notify: repeated identical reports are common from
   // Chromium and each one would re-render the header.
   media.noteAudioState('tab-1', true);

@@ -12,13 +12,21 @@ import type { BrowserMediaState } from '@shared/browser';
  * changing on pause, so an audibility-driven icon would disappear the moment the
  * user pressed Pause — removing the Play button they need to resume.
  *
- * There is no Previous/Next, and that is not an omission. Nothing in the Media
- * Session API or in Electron can tell us whether a page registered those
- * handlers (`setActionHandler` has no getter), so the buttons would be dead on
- * most pages and there is no way to know which.
+ * Previous/Next route Chromium's standard media keys and also switch between
+ * concrete audio/video elements on ordinary multi-track pages.
  */
 
 const MediaContext = createContext<BrowserMediaState[]>([]);
+
+const MEDIA_STATE_KEYS: (keyof BrowserMediaState)[] = [
+  'tabId', 'title', 'url', 'origin', 'faviconDataUrl', 'hasMedia',
+  'playing', 'audible', 'muted', 'canPlayPause', 'kind',
+];
+
+function sameMediaStates(current: BrowserMediaState[], next: BrowserMediaState[]): boolean {
+  return current.length === next.length && current.every((state, index) =>
+    MEDIA_STATE_KEYS.every((key) => state[key] === next[index]?.[key]));
+}
 
 export function useBrowserMedia(): BrowserMediaState[] {
   return useContext(MediaContext);
@@ -28,9 +36,12 @@ export function BrowserMediaProvider({ children }: { children: ReactNode }) {
   const [states, setStates] = useState<BrowserMediaState[]>([]);
 
   useEffect(() => {
+    const update = (next: BrowserMediaState[]) => {
+      setStates((current) => sameMediaStates(current, next) ? current : next);
+    };
     // Subscribe before reading: a change landing between the two would be lost.
-    const stop = window.nodus.onBrowserMediaChanged(setStates);
-    void window.nodus.getBrowserMedia().then(setStates).catch(() => undefined);
+    const stop = window.nodus.onBrowserMediaChanged(update);
+    void window.nodus.getBrowserMedia().then(update).catch(() => undefined);
     return stop;
   }, []);
 

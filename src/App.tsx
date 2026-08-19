@@ -2018,12 +2018,15 @@ function BrowserMediaHeaderAction({ onOpenTab }: { onOpenTab: (tabId: string) =>
   if (states.length === 0) return null;
   const anyPlaying = states.some((state) => state.playing);
   return (
-    <span className="relative inline-flex">
+    <span data-testid="browser-media-header-action" className="relative inline-flex">
       <HeaderAction
         icon="volume"
         label={t('Medios')}
         title={anyPlaying ? t('Reproduciéndose en Nodus Browser') : t('Medios en pausa en Nodus Browser')}
-        onClick={(event) => setAnchor((current) => (current ? null : event.currentTarget))}
+        onClick={(event) => {
+          const button = event.currentTarget;
+          setAnchor((current) => (current ? null : button));
+        }}
       />
       {states.length > 1 && <span className="header-action-badge">{states.length}</span>}
       <BrowserMediaPopover

@@ -13,11 +13,9 @@
  * media does: the tab navigates away, the tab closes, or playback finished and
  * stayed finished.
  *
- * What is deliberately NOT here: previous/next. Neither the Media Session API
- * nor Electron exposes any way to discover whether a page registered
- * `previoustrack`/`nexttrack` handlers — `setActionHandler` has no getter — so
- * offering those controls would mean guessing, and a control that does nothing
- * half the time is worse than no control.
+ * Previous/next are commands rather than state: Chromium can route its standard
+ * media keys to a page's Media Session handlers, but does not expose whether a
+ * page registered those handlers.
  */
 
 import type { BrowserMediaState } from '@shared/browser';
@@ -73,17 +71,26 @@ export function noteMediaPlaying(
   describe: () => Pick<BrowserMediaState, 'title' | 'url' | 'origin' | 'faviconDataUrl'>,
   kind: BrowserMediaState['kind'] = 'unknown',
 ): void {
+  const description = describe();
   const existing = sessions.get(tabId);
   if (existing) {
     clearGrace(existing);
-    Object.assign(existing, describe(), { playing: true, hasMedia: true });
-    if (kind !== 'unknown') existing.kind = kind;
+    const nextKind = kind === 'unknown' ? existing.kind : kind;
+    const changed = !existing.playing
+      || !existing.hasMedia
+      || existing.title !== description.title
+      || existing.url !== description.url
+      || existing.origin !== description.origin
+      || existing.faviconDataUrl !== description.faviconDataUrl
+      || existing.kind !== nextKind;
+    if (!changed) return;
+    Object.assign(existing, description, { playing: true, hasMedia: true, kind: nextKind });
     publish();
     return;
   }
   sessions.set(tabId, {
     tabId,
-    ...describe(),
+    ...description,
     hasMedia: true,
     playing: true,
     audible: true,
@@ -99,6 +106,7 @@ export function noteMediaPlaying(
 export function noteMediaPaused(tabId: string): void {
   const session = sessions.get(tabId);
   if (!session) return;
+  if (!session.playing) return;
   clearGrace(session);
   session.playing = false;
   publish();
