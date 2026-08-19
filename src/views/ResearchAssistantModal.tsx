@@ -15,7 +15,7 @@ import { ChatTypingIndicator } from '../components/ChatTypingIndicator';
 import { SaveToNotesModal } from '../components/SaveToNotesModal';
 import { SourceCitationModal, type CitationTarget } from '../components/SourceCitationModal';
 import { VirtualList } from '../components/VirtualList';
-import { ASSISTANT_CONTEXTS, type AssistantNavigationTarget, type PendingGraphNavigationTarget } from '../navigation';
+import { ASSISTANT_CONTEXTS, type AssistantNavigationTarget } from '../navigation';
 import { t, tx } from '../i18n';
 import { useFeatureModel } from '../hooks/useFeatureModel';
 
@@ -201,7 +201,6 @@ export function ResearchAssistantModal({
   settings,
   initialTarget,
   isGenealogy = false,
-  onOpenGraph,
   onClose,
 }: {
   settings: AppSettings;
@@ -209,7 +208,6 @@ export function ResearchAssistantModal({
   /** Genealogy vault: the assistant answers over the family (people, kinship, events,
    *  documents, evidence), so the academic context selector is not shown. */
   isGenealogy?: boolean;
-  onOpenGraph?: (target: PendingGraphNavigationTarget) => void;
   onClose: () => void;
 }) {
   const [selection, setSelection] = useState<ResearchContextSelection>(() => cloneSelection(SYNTHESIS_SELECTION));
@@ -541,18 +539,10 @@ export function ResearchAssistantModal({
   const archivedCount = conversations.filter((c) => c.archived).length;
   const activeMode = ASSISTANT_MODES.find((mode) => mode.id === activeModeId);
   const lastMessageId = messages.length ? messages[messages.length - 1].id : null;
-  // Citations always open their evidence first. Navigation to the graph remains
-  // available from that detail modal, rather than unexpectedly closing the chat.
+  // Citations open their evidence workspace without replacing the conversation.
   const handleCitation = useCallback((c: MarkdownCitation) => {
     setCitation({ kind: c.kind, id: c.id });
   }, []);
-  const openGraphFromCitation = useCallback(
-    (target: PendingGraphNavigationTarget) => {
-      setCitation(null);
-      onOpenGraph?.(target);
-    },
-    [onOpenGraph]
-  );
 
   return (
     <div className="fixed inset-0 z-50 bg-black/70 p-4 flex items-center justify-center">
@@ -977,7 +967,6 @@ export function ResearchAssistantModal({
         <SourceCitationModal
           target={citation}
           onClose={() => setCitation(null)}
-          onOpenGraph={onOpenGraph ? openGraphFromCitation : undefined}
         />
       )}
 

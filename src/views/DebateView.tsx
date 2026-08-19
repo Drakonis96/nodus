@@ -238,7 +238,7 @@ export function DebateView({
       </div>
 
       {citation && (
-        <SourceCitationModal target={citation} onClose={() => setCitation(null)} onOpenGraph={onOpenGraph} />
+        <SourceCitationModal target={citation} onClose={() => setCitation(null)} />
       )}
 
       {noteTarget && (

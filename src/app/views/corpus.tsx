@@ -68,12 +68,12 @@ export const corpusViews = {
       onOpenGraph={(target) => navigate('graph', target)}
     />
   ),
-  immersion: ({ navigate, settings, snapshots }) => (
+  immersion: ({ openLibraryItem, settings, snapshots }) => (
     <ImmersionView
       settings={settings}
       snapshot={snapshots.read('immersion')}
       onSnapshotChange={(patch) => snapshots.patch('immersion', patch)}
-      onOpenGraph={(target) => navigate('graph', target)}
+      onOpenLibraryWork={openLibraryItem}
     />
   ),
   // Cobertura y Huecos son el mismo espacio con dos pestañas. 'gaps' ya no tiene
@@ -113,14 +113,14 @@ export const corpusViews = {
   reading: ({ navigate, openAssistant }) => (
     <ReadingPathView onOpenGraph={(target) => navigate('graph', target)} onOpenAssistant={openAssistant} />
   ),
-  writing: ({ navigate, settings }) => <WritingWorkshopView settings={settings} onOpenGraph={(target) => navigate('graph', target)} />,
-  deepResearch: ({ isGenealogy, navigate, settings, snapshots }) => (
+  writing: ({ settings }) => <WritingWorkshopView settings={settings} />,
+  deepResearch: ({ isGenealogy, openLibraryItem, settings, snapshots }) => (
     <DeepResearchView
       settings={settings}
       isGenealogy={isGenealogy}
       snapshot={snapshots.read('deepResearch')}
       onSnapshotChange={(patch) => snapshots.patch('deepResearch', patch)}
-      onOpenGraph={(target) => navigate('graph', target)}
+      onOpenLibraryWork={openLibraryItem}
     />
   ),
   projects: ({ settings }) => <ProjectsView settings={settings} />,

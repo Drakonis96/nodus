@@ -116,7 +116,13 @@ test('report selection offers icon-only copy, margin bookmark and Nodi quote act
   assert.match(deepResearch, /ReaderSelectionActions[^>]*scrollRef=\{mainRef\}/);
   assert.match(deepResearch, /label=\{t\('Ir al marcador de lectura'\)\}/);
   assert.match(deepResearch, /markActionsRef\.current\?\.goToMark\(\)/);
-  assert.match(immersion, /ReaderSelectionActions[^>]*contextId=\{`immersion:/);
+  assert.match(immersion, /immersionAnnotationDocumentId\(session\.id\)/);
+  assert.match(immersion, /ReaderSelectionActions[\s\S]*?annotations=\{visibleAnnotations\}/);
+  assert.match(immersion, /ReaderSelectionActions[\s\S]*?onCreateAnnotation=\{createAnnotation\}/);
+  assert.match(immersion, /ReaderSelectionActions[\s\S]*?onUpdateComment=\{updateComment\}/);
+  assert.match(immersion, /ReaderSelectionActions[\s\S]*?onDeleteAnnotation=\{deleteAnnotation\}/);
+  assert.match(immersion, /ReaderHighlighterControl value=\{highlighterColor\}/);
+  assert.match(immersion, /markActionsRef\.current\?\.goToMark\(\)/);
 });
 
 test('Nodi cites corpus sources like the research assistant, adapted to its own light/dark UI', async () => {

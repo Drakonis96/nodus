@@ -160,7 +160,11 @@ function InboxParentGroup({
 }) {
   const latest = group.entries[0];
   const device = shortDevice(latest?.clientId ?? null);
-  const fallbackTitle = group.parentKind === 'deep_research' ? t('Informe de Deep Research') : t('Documento');
+  const fallbackTitle = group.parentKind === 'deep_research'
+    ? t('Informe de Deep Research')
+    : group.parentKind === 'immersion'
+      ? t('Inmersión')
+      : t('Documento');
   const label = group.entries.length === 1
     ? t('1 cambio')
     : tx('{n} cambios', { n: String(group.entries.length) });
@@ -183,7 +187,7 @@ function InboxParentGroup({
           onClick={onToggle}
         >
           <span className="mt-0.5 grid h-6 w-6 shrink-0 place-items-center rounded-md bg-indigo-500/10 text-indigo-300">
-            <Icon name={group.parentKind === 'deep_research' ? 'telescope' : 'book'} size={13} />
+            <Icon name={group.parentKind === 'deep_research' ? 'telescope' : group.parentKind === 'immersion' ? 'target' : 'book'} size={13} />
           </span>
           <span className="min-w-0 flex-1">
             <span className={`block truncate text-xs ${group.unreadCount > 0 ? 'font-semibold text-neutral-100' : 'text-neutral-300'}`}>

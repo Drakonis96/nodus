@@ -63,6 +63,7 @@ import type {
 } from './navigation';
 import { dedicatedVaultNavIds, groupedNav, NAV_ITEMS, NAV_GROUPS } from './navigation';
 import type { ToolkitPage } from './navigation';
+import type { LibraryScope } from '@shared/libraryTypes';
 import { placeHeaderBadge, type HeaderBadgePlacement } from './headerLayout';
 import { effectiveSidebarHidden, isPreviewVaultType, isViewAllowedForVaultType, normalizeVaultType, viewsDisallowedForType } from '@shared/vaultTypes';
 import { CommandPalette, type Command } from './components/CommandPalette';
@@ -1001,6 +1002,11 @@ export function App() {
     setView('library');
   }, []);
 
+  const openLibraryItem = useCallback((itemId: string, scope: LibraryScope) => {
+    setLibraryTarget({ scope, readerItemId: itemId, nonce: Date.now() });
+    setView('library');
+  }, []);
+
   useEffect(() => {
     if (!window.nodus?.onCopilotOpenIdea) return undefined;
     return window.nodus.onCopilotOpenIdea((target) => {
@@ -1053,14 +1059,6 @@ export function App() {
       setResearchOpen(true);
     },
     [isWorldbuilding, settings?.chatModel, settings?.synthesisModel]
-  );
-
-  const openGraphFromAssistant = useCallback(
-    (target: PendingGraphNavigationTarget) => {
-      setResearchOpen(false);
-      navigate('graph', target);
-    },
-    [navigate]
   );
 
   const handleActiveVaultChanged = useCallback(async () => {
@@ -1192,6 +1190,7 @@ export function App() {
     reloadDatabases,
     openAssistant,
     openLibraryBucket,
+    openLibraryItem,
     openNoteFromSearch,
     openPrimarySourceTarget,
     openTestimonyInterview,
@@ -1790,7 +1789,6 @@ export function App() {
           initialTarget={assistantTarget}
           isGenealogy={isGenealogy}
           onClose={() => setResearchOpen(false)}
-          onOpenGraph={openGraphFromAssistant}
         />
       )}
       {feedbackOpen && <FeedbackModal onClose={() => setFeedbackOpen(false)} />}

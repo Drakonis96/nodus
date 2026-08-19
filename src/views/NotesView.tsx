@@ -858,14 +858,6 @@ export function NotesView({
         <SourceCitationModal
           target={citation}
           onClose={() => setCitation(null)}
-          onOpenGraph={
-            onOpenGraph
-              ? (target) => {
-                  setCitation(null);
-                  onOpenGraph(target);
-                }
-              : undefined
-          }
         />
       )}
 

@@ -1,6 +1,6 @@
 import type { ServerInboxEntry } from '@shared/types';
 
-export type ServerInboxParentKind = 'deep_research' | 'library_document';
+export type ServerInboxParentKind = 'deep_research' | 'immersion' | 'library_document';
 
 export interface ServerInboxGroup {
   id: string;
@@ -25,6 +25,10 @@ function parentOf(entry: ServerInboxEntry): {
   if (entry.entityKind === 'deep_research') {
     const id = entry.key[0] == null ? '' : String(entry.key[0]);
     if (id) return { kind: 'deep_research', id, title: entry.title };
+  }
+  if (entry.entityKind === 'immersion') {
+    const id = entry.key[0] == null ? '' : String(entry.key[0]);
+    if (id) return { kind: 'immersion', id, title: entry.title };
   }
   // Entries recorded before parent metadata existed still carried the library document id
   // in `title`. Group those too, so upgrading immediately shortens an existing inbox.

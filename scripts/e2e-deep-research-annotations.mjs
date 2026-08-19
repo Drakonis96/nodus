@@ -70,9 +70,9 @@ try {
   ));
   assert.ok(draftId, 'the demo supplies a saved Deep Research report');
 
-  async function selectCandidate(index) {
-    return page.evaluate((candidateIndex) => {
-      const root = document.querySelector('[data-testid="deep-research-reader-document"]');
+  async function selectCandidate(index, releaseInGutter = false, readerTestId = 'deep-research-reader-document') {
+    return page.evaluate(({ candidateIndex, releaseInGutter, readerTestId }) => {
+      const root = document.querySelector(`[data-testid="${readerTestId}"]`);
       if (!(root instanceof HTMLElement)) throw new Error('reader document missing');
       const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
       const candidates = [];
@@ -99,10 +99,14 @@ try {
       selection.addRange(range);
       const releaseRect = range.getBoundingClientRect();
       // A real selection ends under the pointer, and the ribbon is placed there.
-      const release = { x: releaseRect.right, y: releaseRect.top + releaseRect.height / 2 };
-      root.dispatchEvent(new PointerEvent('pointerup', { bubbles: true, clientX: release.x, clientY: release.y }));
+      const rootRect = root.getBoundingClientRect();
+      const release = releaseInGutter
+        ? { x: Math.max(1, rootRect.left - 24), y: releaseRect.top + releaseRect.height / 2 }
+        : { x: releaseRect.right, y: releaseRect.top + releaseRect.height / 2 };
+      const releaseTarget = releaseInGutter ? document.elementFromPoint(release.x, release.y) ?? document.body : root;
+      releaseTarget.dispatchEvent(new PointerEvent('pointerup', { bubbles: true, clientX: release.x, clientY: release.y }));
       return { text: range.toString(), release };
-    }, index);
+    }, { candidateIndex: index, releaseInGutter, readerTestId });
   }
 
   async function annotations() {
@@ -121,6 +125,15 @@ try {
   assert.ok(ribbonBox.y + ribbonBox.height <= firstSelection.release.y, 'ribbon sits above the pointer');
   await selectionBar.locator('.reader-selection-color').first().click();
   await page.waitForFunction(async (id) => (await window.nodus.listWritingDraftAnnotations(id)).filter((item) => item.kind === 'highlight').length === 1, draftId);
+
+  // Releasing in the blank gutter still completes a selection made in the
+  // report and opens the ribbon at the edge of the viewport.
+  const gutterSelection = await selectCandidate(4, true);
+  await selectionBar.waitFor({ state: 'visible' });
+  const gutterRibbonBox = await selectionBar.boundingBox();
+  assert.ok(gutterRibbonBox.x >= 0, 'gutter selection ribbon stays inside the viewport');
+  assert.ok(gutterRibbonBox.x <= gutterSelection.release.x + 1, 'gutter selection ribbon follows the release side');
+  await page.keyboard.press('Escape');
 
   // Fixed mode remains active while two separate selections are made.
   const fixedHighlighter = page.locator('[data-testid="deep-research-fixed-highlighter"]');
@@ -211,6 +224,35 @@ try {
   const confirmation = page.getByRole('dialog').filter({ hasText: '¿Eliminar esta anotación? No se puede deshacer.' });
   await confirmation.getByRole('button', { name: 'Eliminar', exact: true }).click();
   await page.waitForFunction(async (id) => !(await window.nodus.listWritingDraftAnnotations(id)).some((item) => item.kind === 'comment'), draftId);
+
+  // Inmersión uses the same complete annotation contract, persisted under the
+  // session and isolated by player step.
+  await page.locator('[data-tour="nav-immersion"]').click();
+  await page.getByRole('button', { name: 'Continuar', exact: true }).first().click();
+  const immersionRoot = page.getByTestId('immersion-reader-document');
+  await immersionRoot.waitFor({ state: 'visible' });
+  const immersionDocumentId = 'immersion:demo-immersion-session';
+
+  await selectCandidate(0, false, 'immersion-reader-document');
+  await selectionBar.waitFor({ state: 'visible' });
+  await selectionBar.locator('.reader-selection-color').first().click();
+  await page.waitForFunction(async (id) => (await window.nodus.listWritingDraftAnnotations(id)).some((item) => item.kind === 'highlight'), immersionDocumentId);
+
+  await selectCandidate(1, false, 'immersion-reader-document');
+  await selectionBar.waitFor({ state: 'visible' });
+  await selectionBar.getByRole('button', { name: 'Añadir comentario' }).click();
+  await commentEditor.locator('textarea').fill('Comentario persistente de Inmersión');
+  await commentEditor.getByRole('button', { name: 'Guardar', exact: true }).click();
+  await page.waitForFunction(async (id) => (await window.nodus.listWritingDraftAnnotations(id)).some((item) => item.comment === 'Comentario persistente de Inmersión'), immersionDocumentId);
+  await commentMarker.waitFor({ state: 'visible' });
+
+  await page.getByRole('button', { name: 'Salir', exact: true }).click();
+  await page.getByRole('button', { name: 'Continuar', exact: true }).first().click();
+  await immersionRoot.waitFor({ state: 'visible' });
+  await commentMarker.waitFor({ state: 'visible' });
+  assert.equal(await page.evaluate(() => Boolean(CSS.highlights?.get('nodus-reader-yellow'))), true, 'the immersion highlight is painted after reopening');
+  await commentMarker.click();
+  assert.equal(await commentEditor.locator('textarea').inputValue(), 'Comentario persistente de Inmersión');
 
   assert.deepEqual(pageErrors, [], pageErrors.map((error) => error.stack ?? String(error)).join('\n'));
   const final = await annotations();

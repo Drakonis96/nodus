@@ -387,7 +387,7 @@ export function ResearchMapView({
         )}
       </main>
 
-      {citation && <SourceCitationModal target={citation} onClose={() => setCitation(null)} onOpenGraph={onOpenGraph} />}
+      {citation && <SourceCitationModal target={citation} onClose={() => setCitation(null)} />}
     </div>
   );
 }

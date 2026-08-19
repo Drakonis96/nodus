@@ -902,6 +902,7 @@ export function clearDemoData(): void {
       DELETE FROM project_chapters WHERE id LIKE 'demo-%';
       DELETE FROM project_sections WHERE id LIKE 'demo-%';
       DELETE FROM projects WHERE id LIKE 'demo-%';
+      DELETE FROM writing_draft_annotations WHERE draft_id LIKE 'immersion:demo-%';
       DELETE FROM immersion_sessions WHERE id LIKE 'demo-%';
       DELETE FROM writing_saved_drafts WHERE id LIKE 'demo-%';
       DELETE FROM research_coverage_links WHERE id LIKE 'demo-%';
