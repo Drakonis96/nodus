@@ -5,6 +5,22 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Native overlay scrollbars can paint above a portalled dialog even when its source
+   surface is inert. Suppress only that background surface; the dialog keeps its own
+   vertical scrollbar and remains fully keyboard-scrollable. */
+.modal-background-inert,
+.modal-background-inert * {
+  scrollbar-width: none;
+}
+.modal-background-inert::-webkit-scrollbar,
+.modal-background-inert *::-webkit-scrollbar {
+  display: none;
+}
+
+/* Option accents stay in the border/background; labels remain AA-readable. */
+.db-option-chip { color: #262626; }
+.dark .db-option-chip { color: #fafafa; }
+
 /* PDF.js keeps the selectable text exactly over the rendered page. The glyphs
    stay transparent; browser selection and Nodus highlights remain visible. */
 .pdf-annotation-page .textLayer {
@@ -138,6 +154,13 @@
 .light .backup-health-banner { border-bottom-color: #fca5a5; background: #fef2f2; color: #991b1b; }
 .light .backup-health-banner .backup-health-dismiss { color: #b91c1c; }
 .light .backup-health-banner .backup-health-dismiss:hover { color: #7f1d1d; }
+@media (max-width: 600px) {
+  .backup-health-banner { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: start; gap: 6px 8px; padding: 9px 10px; font-size: 13px; }
+  .backup-health-banner > span { grid-column: 2; min-width: 0; overflow-wrap: anywhere; }
+  .backup-health-banner > span > span { display: block; margin-top: 2px; margin-left: 0; }
+  .backup-health-banner > .btn { grid-column: 2; grid-row: 2; justify-self: start; min-height: 32px; padding: 4px 8px; }
+  .backup-health-banner .backup-health-dismiss { grid-column: 3; grid-row: 1; padding: 4px; }
+}
 @media (max-width: 820px) { .recovery-card { grid-template-columns: 1fr; max-height: none; } .recovery-hero { border-right: 0; border-bottom: 1px solid rgba(99,102,241,.2); } .recovery-success { grid-template-columns: 1fr; text-align: center; } }
 .app-titlebar button,
 .app-titlebar a,
@@ -1011,8 +1034,8 @@ body {
   position: absolute;
   z-index: 20;
   top: 0;
-  right: 0;
-  width: 6px;
+  right: -9px;
+  width: 24px;
   height: 100%;
   cursor: col-resize;
   touch-action: none;
@@ -1023,7 +1046,7 @@ body {
   content: '';
   position: absolute;
   top: 0;
-  right: 0;
+  right: 11px;
   width: 2px;
   height: 100%;
   background: transparent;
@@ -2317,13 +2340,18 @@ body {
 .databases .hover\:text-indigo-700:hover { color: #8a0227; }
 .databases .hover\:bg-indigo-600\/20:hover { background-color: rgba(179, 3, 51, 0.2); }
 .databases .text-indigo-900 { color: #4d0116; }
+.databases .text-indigo-950 { color: #2b0010; }
+.databases .hover\:text-indigo-600:hover { color: #b30333; }
 .databases .hover\:text-indigo-300:hover { color: #f27a97; }
 .databases .hover\:text-indigo-400:hover { color: #e23a63; }
 .databases .bg-indigo-400 { background-color: #e23a63; }
 .databases .bg-indigo-500 { background-color: #cc0a3a; }
+.databases .bg-indigo-500\/20 { background-color: rgba(204, 10, 58, 0.2); }
 .databases .bg-indigo-600 { background-color: #b30333; }
 .databases .hover\:bg-indigo-500:hover { background-color: #d40a3f; }
+.databases .hover\:bg-indigo-50:hover { background-color: #fff1f4; }
 .databases .bg-indigo-50 { background-color: #fff1f4; }
+.databases .bg-indigo-50\/70 { background-color: rgba(255, 241, 244, 0.7); }
 .databases .bg-indigo-100 { background-color: #ffe4ec; }
 .databases .bg-indigo-900 { background-color: #4d0116; }
 .databases .bg-indigo-950 { background-color: #2b0010; }
@@ -2348,11 +2376,13 @@ body {
 .databases .border-indigo-900\/70 { border-color: rgba(77, 1, 22, 0.7); }
 .databases .hover\:border-indigo-700\/60:hover { border-color: rgba(138, 2, 39, 0.6); }
 .databases .ring-indigo-500 { --tw-ring-color: #cc0a3a; }
+.databases .ring-indigo-500\/30 { --tw-ring-color: rgba(204, 10, 58, 0.3); }
 .databases .ring-indigo-500\/40 { --tw-ring-color: rgba(204, 10, 58, 0.4); }
 .databases .ring-indigo-600\/40 { --tw-ring-color: rgba(179, 3, 51, 0.4); }
 /* Hover states the grid uses: the column resize handle and the database card's border. Without
    these two the databases vault flashes indigo on hover in an otherwise crimson surface. */
 .databases .hover\:bg-indigo-500\/40:hover { background-color: rgba(204, 10, 58, 0.4); }
+.databases .hover\:bg-indigo-600\/15:hover { background-color: rgba(179, 3, 51, 0.15); }
 .databases .hover\:border-indigo-600\/70:hover { border-color: rgba(179, 3, 51, 0.7); }
 /* Hovering an attachment thumbnail to open its preview. */
 .databases .hover\:border-indigo-500:hover { border-color: #cc0a3a; }
@@ -2477,6 +2507,7 @@ body {
 
 /* databases */
 .databases.dark .dark\:bg-indigo-400 { background-color: #e23a63; }
+.databases.dark .dark\:bg-indigo-500\/20 { background-color: rgba(204, 10, 58, 0.2); }
 .databases.dark .dark\:bg-indigo-600\/15 { background-color: rgba(179, 3, 51, 0.15); }
 .databases.dark .dark\:bg-indigo-900\/40 { background-color: rgba(77, 1, 22, 0.4); }
 .databases.dark .dark\:bg-indigo-900\/50 { background-color: rgba(77, 1, 22, 0.5); }
@@ -2494,6 +2525,7 @@ body {
 .databases.dark .dark\:border-indigo-800\/60 { border-color: rgba(107, 1, 30, 0.6); }
 .databases.dark .dark\:border-indigo-800\/70 { border-color: rgba(107, 1, 30, 0.7); }
 .databases.dark .dark\:border-indigo-900\/70 { border-color: rgba(77, 1, 22, 0.7); }
+.databases.dark .dark\:hover\:border-indigo-500:hover { border-color: #cc0a3a; }
 .databases.dark .dark\:hover\:text-indigo-300:hover { color: #f27a97; }
 .databases.dark .dark\:text-indigo-100 { color: #ffe4ec; }
 .databases.dark .dark\:text-indigo-200 { color: #f9b4c4; }

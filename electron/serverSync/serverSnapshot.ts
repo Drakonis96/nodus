@@ -23,6 +23,9 @@ const CORE_TABLES = [
 
 const USER_TABLES = [
   'note_folders', 'notes', 'note_versions', 'note_annotations', 'workspace_library_links',
+  'pages', 'page_blocks', 'page_favorites', 'page_links',
+  'page_revisions', 'page_comments', 'page_comment_reactions', 'page_comment_mentions',
+  'workspace_actors', 'workspace_groups', 'workspace_group_members', 'acl_entries',
   'writing_saved_drafts', 'writing_draft_annotations', 'projects', 'project_sections',
   'project_chapters', 'project_chapter_versions', 'project_chapter_chunks',
   'project_chapter_ideas', 'project_chapter_idea_relations', 'project_links',
@@ -103,8 +106,13 @@ export const STUDY_SERVER_TABLES = [
  * and nothing anywhere else.
  */
 export const DATABASES_SERVER_TABLES = [
-  'db_databases', 'db_columns', 'db_rows', 'db_cells', 'db_views', 'db_select_options', 'db_relations',
-  'db_attachments',
+  'db_databases', 'db_data_sources', 'db_columns', 'db_rows', 'db_cells', 'db_views', 'db_view_sources', 'db_view_revisions', 'db_select_options', 'db_relations',
+  'db_attachments', 'db_row_templates', 'db_template_runs', 'db_row_hierarchy', 'db_row_dependencies', 'db_task_configs',
+  'db_sprints', 'db_sprint_rows', 'pages', 'page_blocks', 'page_favorites', 'page_links',
+  'page_revisions', 'page_comments', 'page_comment_reactions', 'page_comment_mentions',
+  'workspace_actors', 'workspace_groups', 'workspace_group_members', 'acl_entries',
+  'automation_rules', 'automation_runs', 'automation_notifications',
+  'database_forms', 'database_form_fields', 'database_form_submissions',
 ] as const;
 
 const OMIT_COLUMNS = new Set([
@@ -112,6 +120,7 @@ const OMIT_COLUMNS = new Set([
   'blob', 'thumb', 'audio_blob',
   'file_path', 'source_path', 'storage_path', 'local_path', 'absolute_path',
   'api_key', 'access_token', 'refresh_token', 'password', 'secret', 'credentials',
+  'auth_token_hash',
 ]);
 
 // `embedding_dim` and `embedding_text_hash` used to survive while `embedding` itself was

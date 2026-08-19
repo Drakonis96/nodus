@@ -19,7 +19,7 @@ export const renderHome: ViewRenderer = (ctx) => {
     settings, activeVault, hasData, demoBusy, lastSync, syncing,
     databases, setView, navigate, openAssistant, onSync, openLibraryBucket,
     openPrimarySourceTarget, openTestimonyInterview, setNoteTarget,
-    setActiveDatabaseId, createDatabase, importCsv,
+    setActiveDatabaseId, createDatabase, importCsv, importNotion,
   } = ctx;
   const showDemoOffer = hasData === false && !settings.demoMode;
 
@@ -63,6 +63,7 @@ export const renderHome: ViewRenderer = (ctx) => {
         }}
         onNewDatabase={() => void createDatabase()}
         onImportCsv={() => void importCsv()}
+        onImportNotion={() => void importNotion()}
         onOpenAnalysis={() => setView('dbAnalysis')}
         onOpenChat={() => setView('dbChat')}
         demoBusy={demoBusy}

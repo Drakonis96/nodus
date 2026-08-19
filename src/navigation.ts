@@ -2,7 +2,7 @@ import type { CorpusHealthBucketId, ResearchContextSelection } from '@shared/typ
 import type { LibraryScope } from '@shared/libraryTypes';
 import { type VaultType, normalizeVaultType } from '@shared/vaultTypes';
 
-export type View = 'home' | 'search' | 'testimonyInterviews' | 'testimonyParticipants' | 'testimonyContrasts' | 'library' | 'graph' | 'argument' | 'ideas' | 'authors' | 'persons' | 'prosopSearch' | 'prosopPopulation' | 'prosopPersons' | 'prosopSources' | 'prosopAnalysis' | 'prosopNetworks' | 'encyclopedia' | 'continuity' | 'conflicts' | 'arcs' | 'rules' | 'questions' | 'worldChat' | 'manuscript' | 'characters' | 'places' | 'factions' | 'cultures' | 'dynasties' | 'scenes' | 'timeline' | 'tree' | 'relations' | 'map' | 'archive' | 'databases' | 'dbSearch' | 'dbAnalysis' | 'dbChat' | 'studyCourses' | 'studySchedule' | 'studyCalendar' | 'studySearch' | 'studyLibrary' | 'studyRecordings' | 'studyChat' | 'studyIdeas' | 'studyGraph' | 'studyQuestions' | 'studyReview' | 'studyDeepResearch' | 'teachingGroups' | 'teachingGrades' | 'teachingExams' | 'teachingRubrics' | 'teachingUnits' | 'immersion' | 'gaps' | 'debate' | 'research' | 'hypothesis' | 'reading' | 'writing' | 'deepResearch' | 'projects' | 'notes' | 'workspace' | 'toolkit' | 'settings';
+export type View = 'home' | 'search' | 'testimonyInterviews' | 'testimonyParticipants' | 'testimonyContrasts' | 'library' | 'graph' | 'argument' | 'ideas' | 'authors' | 'persons' | 'prosopSearch' | 'prosopPopulation' | 'prosopPersons' | 'prosopSources' | 'prosopAnalysis' | 'prosopNetworks' | 'encyclopedia' | 'continuity' | 'conflicts' | 'arcs' | 'rules' | 'questions' | 'worldChat' | 'manuscript' | 'characters' | 'places' | 'factions' | 'cultures' | 'dynasties' | 'scenes' | 'timeline' | 'tree' | 'relations' | 'map' | 'archive' | 'pages' | 'databases' | 'dbSearch' | 'dbAnalysis' | 'dbChat' | 'studyCourses' | 'studySchedule' | 'studyCalendar' | 'studySearch' | 'studyLibrary' | 'studyRecordings' | 'studyChat' | 'studyIdeas' | 'studyGraph' | 'studyQuestions' | 'studyReview' | 'studyDeepResearch' | 'teachingGroups' | 'teachingGrades' | 'teachingExams' | 'teachingRubrics' | 'teachingUnits' | 'immersion' | 'gaps' | 'debate' | 'research' | 'hypothesis' | 'reading' | 'writing' | 'deepResearch' | 'projects' | 'notes' | 'workspace' | 'toolkit' | 'settings';
 
 export type GraphPresetId = 'overview' | 'contradictions' | 'gaps' | 'reading' | 'unread' | 'authors';
 
@@ -83,6 +83,7 @@ export const NAV_ITEMS: NavItem[] = [
   // The database list itself is rendered dynamically in the sidebar; these two are the
   // fixed Analysis and Chat sections. The table workspace ('databases' view) is reached
   // by clicking a database in the list, so it is not a nav button.
+  { id: 'pages', label: 'Páginas', icon: 'notebook', group: 'explore' },
   { id: 'dbSearch', label: 'Buscar', icon: 'search', group: 'explore' },
   { id: 'dbAnalysis', label: 'Análisis', icon: 'chartBar', group: 'analyze' },
   { id: 'dbChat', label: 'Chat de datos', icon: 'chat', group: 'analyze' },
@@ -274,7 +275,7 @@ const DEDICATED_VAULT_NAV_IDS: Partial<Record<ReturnType<typeof normalizeVaultTy
     'studyRecordings', 'studyChat', 'studyIdeas', 'studyGraph', 'studyQuestions',
     'teachingRubrics', 'teachingExams', 'teachingGrades', 'teachingUnits', 'toolkit',
   ],
-  databases: ['dbSearch', 'dbAnalysis', 'dbChat', 'notes', 'toolkit'],
+  databases: ['pages', 'dbSearch', 'dbAnalysis', 'dbChat', 'notes', 'toolkit'],
   // Las ocho entradas acordadas del vault de Testimonios, menos Inicio y Ajustes, que
   // van fijas fuera de los grupos. Es una lista CERRADA a propósito: la regla de diseño
   // del vault es que solo sale al menú lo que atraviesa varias entrevistas.

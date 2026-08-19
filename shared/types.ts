@@ -11,6 +11,7 @@ import type { WorldbuildingApi } from './api/worldbuilding';
 import type { ArchiveApi } from './api/archive';
 import type { PrimarySourcesApi } from './api/primarySources';
 import type { DatabasesApi } from './api/databases';
+import type { PagesApi } from './api/pages';
 import type { TeachingApi } from './api/teaching';
 import type { ToolkitApi } from './api/toolkit';
 import type { TestimoniesApi } from './api/testimonies';
@@ -496,11 +497,74 @@ export type {
 export type {
   DatabaseFilterState,
   DatabaseSavedView,
+  DatabaseViewRevision,
   FilterCondition,
   FilterGroup,
   SavedViewInput,
+  SavedViewPatch,
   SortRule,
 } from './databaseFilters';
+export type {
+  DatabaseViewConfig,
+  DatabaseViewDensity,
+  DatabaseViewEditPermission,
+  DatabaseViewLayout,
+  DatabaseViewOpenMode,
+  DatabaseViewPropertyConfig,
+  DatabaseViewScope,
+} from './databaseViewConfig';
+export type {
+  DatabaseRowPage,
+  DatabaseRowQuery,
+  FilterConditionNode,
+  FilterGroupNode,
+  FilterNode,
+  GroupRule,
+} from './databaseQuery';
+export type {
+  AttachDatabaseViewSourceInput,
+  DatabaseContainerDefinition,
+  DatabaseContainerProperty,
+  DatabaseContainerRow,
+  DatabaseContainerRowPage,
+  DatabaseContainerRowQuery,
+  DatabaseDataSource,
+  DatabaseViewDataSource,
+} from './databaseSources';
+export type {
+  CreateDatabaseRowTemplateInput,
+  DatabaseDuplicateRowInput,
+  DatabaseRowDependency,
+  DatabaseRowHierarchyItem,
+  DatabaseRowTemplate,
+  DatabaseSprint,
+  DatabaseSprintState,
+  DatabaseTaskConfig,
+  DatabaseTaskDateChange,
+  DatabaseTemplateInstantiation,
+  DatabaseTemplateRecurrence,
+  DatabaseTemplateRelationDefault,
+  DatabaseSubitemView,
+} from './databaseTasks';
+export type {
+  AutomationAction,
+  AutomationEvent,
+  AutomationRule,
+  AutomationRuleMutationResult,
+  AutomationRun,
+  AutomationRunStatus,
+  AutomationTrigger,
+  AutomationTriggerType,
+  AutomationValue,
+  CreateAutomationRuleInput,
+  CreateFormDefinitionInput,
+  DatabaseFormAccess,
+  DatabaseFormField,
+  DatabaseFormServerStatus,
+  DatabaseFormSubmission,
+  FormDefinition,
+  FormDefinitionMutationResult,
+} from './databaseAutomations';
 export type { ColumnProfile, DatabaseProfile, DistributionSlice, NumberStats } from './dataProfile';
 import type { DbChatTurn } from './databaseChat';
 export type { DbChatTurn } from './databaseChat';
@@ -1960,6 +2024,24 @@ export interface ReplicaConnectionView {
   lastImages: { downloaded: number; bytes: number; skipped: number } | null;
 }
 
+export interface ReplicaPresenceParticipant {
+  id: string;
+  userId: string;
+  name: string;
+  pageId: string | null;
+  blockId: string | null;
+  cursor: { anchor: number; head: number } | null;
+  color: string | null;
+  updatedAt: string;
+}
+
+export interface ReplicaPresenceInput {
+  pageId?: string | null;
+  blockId?: string | null;
+  cursor?: { anchor: number; head: number } | null;
+  color?: string | null;
+}
+
 export interface VaultSummary {
   id: string;
   name: string;
@@ -2038,6 +2120,22 @@ export interface VaultCreateResult {
 export interface VaultDuplicateResult {
   vault: VaultSummary;
   copiedProviders: AiProvider[];
+}
+
+/** Immutable, verified copy made immediately before a schema migration. */
+export interface MigrationRecoverySnapshot {
+  id: string;
+  databasePath: string;
+  manifestPath: string;
+  sourceDatabasePath: string;
+  fromVersion: number;
+  targetVersion: number;
+  createdAt: string;
+  bytes: number;
+  sha256: string;
+  quickCheck: string;
+  immutable: boolean;
+  major: boolean;
 }
 
 // ── Primary-source / genealogy records ontology (phase B) ────────────────────
@@ -7926,7 +8024,7 @@ export interface TestimonyExportResult {
 // IPC API surface exposed on window.nodus via the preload bridge.
 // ─────────────────────────────────────────────────────────────────────────────
 
-export interface NodusApi extends ProsopographyApi, TestimoniesApi, ToolkitApi, TeachingApi, DatabasesApi, PrimarySourcesApi, ArchiveApi, WorldbuildingApi, PlatformApi, RecordsApi, AcademicApi, LibraryApi {
+export interface NodusApi extends ProsopographyApi, TestimoniesApi, ToolkitApi, TeachingApi, DatabasesApi, PagesApi, PrimarySourcesApi, ArchiveApi, WorldbuildingApi, PlatformApi, RecordsApi, AcademicApi, LibraryApi {
   // settings + secrets
   getSettings(): Promise<AppSettings>;
   updateSettings(patch: Partial<AppSettings>): Promise<AppSettings>;
@@ -7991,6 +8089,8 @@ export interface NodusApi extends ProsopographyApi, TestimoniesApi, ToolkitApi, 
   }): Promise<VaultCreateResult>;
   replicaOverview(): Promise<ReplicaConnectionView[]>;
   replicaSyncNow(vaultId: string): Promise<ReplicaConnectionView[]>;
+  replicaPresence(vaultId: string): Promise<ReplicaPresenceParticipant[]>;
+  replicaUpdatePresence(vaultId: string, input: ReplicaPresenceInput | null): Promise<ReplicaPresenceParticipant[]>;
   /** Keep the data, stop syncing: what a revoked or unwanted replica becomes. */
   replicaDetach(vaultId: string): Promise<ReplicaConnectionView[]>;
   renameVault(id: string, name: string): Promise<VaultSummary>;
@@ -8002,6 +8102,8 @@ export interface NodusApi extends ProsopographyApi, TestimoniesApi, ToolkitApi, 
   reuseVaultAnalysis(nodusIds: string[], operationId?: string): Promise<VaultAnalysisReuseResult>;
   cancelVaultAnalysisReuse(operationId: string): Promise<boolean>;
   copyVaultApiKeys(sourceVaultId: string, targetVaultId: string): Promise<{ copiedProviders: AiProvider[] }>;
+  listMigrationRecoverySnapshots(): Promise<MigrationRecoverySnapshot[]>;
+  openMigrationRecoverySnapshot(id: string): Promise<VaultCreateResult>;
 
 
   // core: sync, backups, recovery. Regrouped here so the academic and study

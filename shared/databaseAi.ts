@@ -6,6 +6,7 @@
 
 import { decodeCheckbox, decodeMultiSelect } from './databases';
 import type { DatabaseColumn, DatabaseRow } from './databases';
+import { databasePropertyPlainText } from './databaseProperties';
 
 /** A preset the user can drop into an AI column's prompt. */
 export interface AiColumnPreset {
@@ -44,6 +45,7 @@ export function buildAiRowContext(
     let value = '';
     switch (col.type) {
       case 'select':
+      case 'status':
         value = col.options.find((o) => o.id === raw)?.label ?? '';
         break;
       case 'multi_select':
@@ -55,7 +57,8 @@ export function buildAiRowContext(
       case 'checkbox':
         value = decodeCheckbox(raw) ? 'sí' : 'no';
         break;
-      case 'attachment': {
+      case 'attachment':
+      case 'files': {
         const atts = row.attachments?.[col.id] ?? [];
         const names = atts.map((a) => a.fileName ?? '').filter(Boolean).join(', ');
         const texts = atts.map((a) => a.extractedText).filter((x): x is string => Boolean(x && x.trim()));
@@ -63,7 +66,7 @@ export function buildAiRowContext(
         break;
       }
       default:
-        value = raw ?? '';
+        value = databasePropertyPlainText(col.type, raw);
     }
     if (value && value.trim()) lines.push(`${col.name}: ${value.trim()}`);
   }

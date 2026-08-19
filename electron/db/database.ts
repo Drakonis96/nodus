@@ -1,16 +1,25 @@
 import Database from 'better-sqlite3';
+import { randomUUID } from 'node:crypto';
 import path from 'node:path';
 import fs from 'node:fs';
+import os from 'node:os';
 import { AsyncLocalStorage } from 'node:async_hooks';
+import { isMainThread, workerData } from 'node:worker_threads';
 import { runMigrations, SCHEMA_VERSION } from './migrations';
 import { ensureTombstoneTriggers, pruneTombstones } from './tombstones';
 import { ensureOutboxTriggers } from '../serverSync/outboxTriggers';
 import { activeVaultDbPath, getVault, getVaultByPath } from '../vaults/vaultRegistry';
+import { auditQaDatabaseOpen } from '../qa/databaseAudit';
+import { migrateDatabaseSafely } from './migrationSafety';
 
 let db: Database.Database | null = null;
 const jobDatabase = new AsyncLocalStorage<Database.Database>();
 
 export function dbPath(): string {
+  const workerPath = !isMainThread && workerData && typeof workerData === 'object'
+    ? (workerData as { nodusDatabasePath?: unknown }).nodusDatabasePath
+    : null;
+  if (typeof workerPath === 'string' && path.isAbsolute(workerPath)) return workerPath;
   return activeVaultDbPath();
 }
 
@@ -85,9 +94,33 @@ function mayQueueMutations(file: string): boolean {
   }
 }
 
+/** Replace the migration's deterministic bootstrap id before any outbox trigger can use it. */
+export function ensureWorkspaceDevice(database: Database.Database): void {
+  const present = database.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'workspace_devices'").get();
+  if (!present) return;
+  const row = database.prepare('SELECT id FROM workspace_devices ORDER BY created_at, id LIMIT 1').get() as { id: string } | undefined;
+  if (row && row.id !== 'local-device') return;
+  const id = `device-${randomUUID()}`;
+  const timestamp = new Date().toISOString();
+  database.prepare(
+    `UPDATE workspace_devices SET id = ?, name = ?, last_hlc = ?, updated_at = ? WHERE id = 'local-device'`,
+  ).run(id, `Nodus · ${os.hostname()}`, `0000000000000-000000-${id}`, timestamp);
+  database.prepare(
+    `UPDATE server_outbox SET device_id = ?, hlc = printf('%013d-%06d-%s', 0, 0, ?)
+     WHERE device_id = 'local-device' AND state = 'pending'`,
+  ).run(id, id);
+}
+
 function openDatabase(file: string): Database.Database {
-  const next = new Database(file);
-  runMigrations(next);
+  let next = new Database(file);
+  try {
+    auditQaDatabaseOpen(file, 'read-write');
+  } catch (error) {
+    next.close();
+    throw error;
+  }
+  next = migrateDatabaseSafely(next, file, SCHEMA_VERSION, runMigrations);
+  ensureWorkspaceDevice(next);
   // Deletion tombstones are written by triggers, which are regenerated here rather than
   // created by a migration: the set of synced tables is decided in code, so a migration
   // could only ever capture the shape it had on the day it was written.
@@ -106,10 +139,25 @@ function openDatabase(file: string): Database.Database {
   next.function('vec_cosine', vecCosine);
   next.function('vec_scan', vecScan);
   const optimizeTimer = setTimeout(() => {
+    let previousBusyTimeout: number | null = null;
     try {
-      if (next.open) next.pragma('optimize');
+      if (next.open) {
+        // This is opportunistic maintenance, never part of the user's operation. A
+        // scale import/calculation can own the writer lock for seconds; inheriting the
+        // normal 5s busy timeout here froze the main Electron thread while an unrelated
+        // worker was doing exactly what it should. Fail immediately and try next open.
+        previousBusyTimeout = next.pragma('busy_timeout', { simple: true }) as number;
+        next.pragma('busy_timeout = 0');
+        next.pragma('optimize');
+      }
     } catch {
       // The vault may have been switched/closed before the idle maintenance ran.
+    } finally {
+      try {
+        if (next.open && previousBusyTimeout != null) next.pragma(`busy_timeout = ${previousBusyTimeout}`);
+      } catch {
+        // The connection closed between optimize and restoring its normal timeout.
+      }
     }
   }, 2_000);
   optimizeTimer.unref();
@@ -126,6 +174,13 @@ export function getDb(): Database.Database {
     db = openDatabase(target);
   }
   return db;
+}
+
+/** Run synchronous repository code against an already-open replica connection. */
+export function withDatabaseContext<T>(database: Database.Database, work: () => T): T {
+  const existing = jobDatabase.getStore();
+  if (existing === database) return work();
+  return jobDatabase.run(database, work);
 }
 
 /**

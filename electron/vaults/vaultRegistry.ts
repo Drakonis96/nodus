@@ -5,7 +5,9 @@ import fs from 'node:fs';
 import path from 'node:path';
 import type { VaultOrigin, VaultRemote, VaultSummary, VaultType } from '@shared/types';
 import { normalizeVaultType } from '@shared/vaultTypes';
-import { runMigrations } from '../db/migrations';
+import { runMigrations, SCHEMA_VERSION } from '../db/migrations';
+import { auditQaDatabaseOpen } from '../qa/databaseAudit';
+import { migrateDatabaseSafely } from '../db/migrationSafety';
 
 interface VaultRecord {
   id: string;
@@ -227,9 +229,10 @@ export function readVaultRemoteFile(vaultPath: string): VaultRemote | null {
 
 function initializeDatabase(file: string): void {
   fs.mkdirSync(path.dirname(file), { recursive: true });
-  const db = new Database(file);
+  let db = new Database(file);
   try {
-    runMigrations(db);
+    auditQaDatabaseOpen(file, 'initialize');
+    db = migrateDatabaseSafely(db, file, SCHEMA_VERSION, runMigrations);
   } finally {
     db.close();
   }
@@ -408,6 +411,9 @@ export function createVaultFromDatabaseFile(
   };
   fs.mkdirSync(dir, { recursive: true });
   fs.copyFileSync(sourceFile, vault.path);
+  // A migration recovery snapshot is intentionally read-only. Its new vault copy must be
+  // writable before migrations can bring it to the current schema.
+  fs.chmodSync(vault.path, 0o600);
   initializeDatabase(vault.path);
   writeVaultManifest(vault);
   registry.vaults.push(vault);

@@ -8,7 +8,10 @@
 import type { DatabaseColumnType } from './databases';
 
 const NUMBER_RE = /^-?\d{1,3}(?:[.,]?\d{3})*(?:[.,]\d+)?$|^-?\d+(?:\.\d+)?$/;
-const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+// Date properties may include a local wall time or an explicit UTC/offset suffix.
+// Keep the imported spelling lossless; the date decoder already understands both
+// compact historical values and the structured range representation.
+const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}(?:T\d{2}:\d{2}(?::\d{2}(?:\.\d{1,9})?)?(?:Z|[+-]\d{2}:\d{2})?)?$/;
 const TIME_RE = /^\d{1,2}:\d{2}$/;
 const BOOL_TRUE = new Set(['sí', 'si', 'true', 'yes', 'verdadero', 'x', '✓']);
 const BOOL_FALSE = new Set(['no', 'false', 'falso', '']);
@@ -26,7 +29,10 @@ export function isNullMarker(raw: string): boolean {
 }
 
 /** Column types that can receive text from a CSV cell. */
-const TEXT_BACKED_TYPES = new Set<DatabaseColumnType>(['title', 'text', 'number', 'date', 'time', 'select', 'multi_select', 'checkbox', 'ai']);
+const TEXT_BACKED_TYPES = new Set<DatabaseColumnType>([
+  'title', 'rich_text', 'text', 'number', 'date', 'time', 'select', 'status', 'multi_select', 'checkbox',
+  'person', 'url', 'email', 'phone', 'location', 'ai',
+]);
 
 /**
  * Whether an imported CSV value can be stored in this column type. attachment/ai_image hold

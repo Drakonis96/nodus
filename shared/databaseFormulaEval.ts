@@ -11,6 +11,7 @@
 
 import { decodeCheckbox, decodeMultiSelect, decodeNumber, encodeNumber } from './databases';
 import type { DatabaseColumn, DatabaseRow } from './databases';
+import { databasePropertyPlainText } from './databaseProperties';
 import { matchesCondition, opLabel } from './databaseFilters';
 import {
   ARITHMETIC_OPS,
@@ -24,6 +25,13 @@ import {
   type FormulaOutput,
   type FormulaSpec,
 } from './databaseFormula';
+import {
+  evaluateFormulaExpression,
+  explainFormulaExpression,
+  formulaExpressionGlobalStatDependencies,
+  formulaRuntimeToRaw,
+  type FormulaRuntimeValue,
+} from './databaseFormulaExpression';
 
 /** What a formula puts in a cell: a raw value (as stored/compared) plus how to paint it. */
 export interface FormulaResult {
@@ -60,7 +68,7 @@ export function cellDisplayValue(column: DatabaseColumn, row: DatabaseRow): stri
     case 'checkbox':
       return decodeCheckbox(raw) ? 'Sí' : 'No';
     default:
-      return raw;
+      return databasePropertyPlainText(column.type, raw);
   }
 }
 
@@ -222,6 +230,9 @@ export interface EvalContext {
   columns: Map<string, DatabaseColumn>;
   /** columnId → stats over the whole table, for columnStat recipes. */
   stats: Map<string, ColumnStats>;
+  /** Values reached through a db-row relation. Supplied by the SQLite repository; pure
+   * callers can inject a deterministic resolver. */
+  relatedValues?: (rowId: string, relationColumnId: string, targetColumnId: string) => FormulaRuntimeValue[];
 }
 
 /** Run one formula for one row. */
@@ -256,6 +267,20 @@ export function evaluateFormula(spec: FormulaSpec, row: DatabaseRow, ctx: EvalCo
         .join('');
       return { value: text.trim() === '' ? null : text };
     }
+    case 'expression':
+      try {
+        return {
+          value: formulaRuntimeToRaw(evaluateFormulaExpression(spec.ast, {
+            columns: ctx.columns,
+            row,
+          relatedValues: (relationColumnId, targetColumnId) =>
+              ctx.relatedValues?.(row.id, relationColumnId, targetColumnId) ?? [],
+            columnStats: ctx.stats,
+          })),
+        };
+      } catch (error) {
+        return { value: null, error: error instanceof Error ? error.message : String(error) };
+      }
   }
 }
 
@@ -359,9 +384,11 @@ export function computeFormulas(rows: DatabaseRow[], columns: DatabaseColumn[], 
     const kind = formulaResultKind(spec);
 
     const stats = new Map<string, ColumnStats>();
-    if (spec.kind === 'columnStat') {
-      const src = byId.get(spec.columnId);
-      if (src) stats.set(spec.columnId, computeColumnStats(src, evalRows));
+    const statisticIds = spec.kind === 'columnStat' ? [spec.columnId]
+      : spec.kind === 'expression' ? formulaExpressionGlobalStatDependencies(spec.ast) : [];
+    for (const statisticId of statisticIds) {
+      const src = byId.get(statisticId);
+      if (src) stats.set(statisticId, computeColumnStats(src, evalRows));
     }
     const ctx: EvalContext = { columns: byId, stats };
 
@@ -452,5 +479,7 @@ export function describeFormula(
     }
     case 'concat':
       return spec.parts.map((p) => (p.kind === 'column' ? name(p.columnId) : `«${p.value}»`)).join(' + ');
+    case 'expression':
+      return explainFormulaExpression(spec.ast, columns);
   }
 }

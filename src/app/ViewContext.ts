@@ -120,6 +120,7 @@ export interface ViewContext extends VaultFlags {
   setRoadmapOpen: (open: boolean) => void;
   createDatabase: () => Promise<void>;
   importCsv: () => Promise<void>;
+  importNotion: () => Promise<void>;
 
   // Demo seeding, one per vault type that offers it.
   loadDemo: () => Promise<void>;

@@ -1,19 +1,23 @@
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import os from 'node:os';
 import { gunzipSync } from 'node:zlib';
 import Database from 'better-sqlite3';
-import { getDb } from '../db/database';
+import { ensureWorkspaceDevice, getDb, withDatabaseContext } from '../db/database';
+import * as pages from '../db/pagesRepo';
 import { SCHEMA_VERSION } from '../db/migrations';
 import { quoteIdentifier, identityColumns } from '../db/rowIdentity';
 import { createVault, deleteVault, getVault, listVaults, updateVaultRemote } from '../vaults/vaultRegistry';
 import { clearNodusServerTokenFor, getNodusServerTokenFor, setNodusServerTokenFor } from '../secrets/secretStore';
-import type { VaultRemote, VaultRemoteRole, VaultSummary, VaultType } from '@shared/types';
+import type { ReplicaPresenceInput, ReplicaPresenceParticipant, VaultRemote, VaultRemoteRole, VaultSummary, VaultType } from '@shared/types';
 import { normalizeVaultType } from '@shared/vaultTypes';
 import { applySnapshotToReplica, downloadReplicaAssets } from './replicaApply';
 import { stripUnpublishableColumns, type SnapshotAssetRef } from './serverSnapshot';
 import {
   countOutbox, ensureOutboxTriggers, listPendingOutbox, markOutboxRejected, markOutboxSent, MUTABLE_TABLES, pruneSentOutbox,
+  withOutboxSuppressed,
 } from './outboxTriggers';
+import { applyIncomingMutations, type IncomingMutation } from './mutationInbox';
+import { recordServerInbox } from '../db/serverInboxRepo';
 import {
   LEGACY_SERVER_MUTATION_LIMITS,
   negotiateRemoteMutationLimits,
@@ -37,10 +41,19 @@ const CHECK_INTERVAL_MS = 30_000;
 const FIRST_TICK_MS = 7_000;
 const REQUEST_TIMEOUT_MS = 60_000;
 const OUTBOX_BATCH = 100;
+const SHARED_BLOB_CHUNK_BYTES = 1024 * 1024;
 
 let timer: ReturnType<typeof setInterval> | null = null;
 let firstTimer: ReturnType<typeof setTimeout> | null = null;
 let working = false;
+let eventWatchersStopped = true;
+
+// SSE is only a wake-up signal. The durable source of truth remains the mutation relay,
+// which means a disconnected stream loses no work: the thirty-second poll below asks for
+// the same cursor and catches everything the next time either transport is available.
+const eventControllers = new Map<string, AbortController>();
+const eventReconnectTimers = new Map<string, ReturnType<typeof setTimeout>>();
+const eventWakeTimers = new Map<string, ReturnType<typeof setTimeout>>();
 
 export type ReplicaPhase = 'idle' | 'syncing' | 'ok' | 'error' | 'revoked' | 'paused';
 
@@ -203,6 +216,7 @@ function openReplicaDb(vault: VaultSummary): Database.Database | null {
   try {
     // Writable, unlike the publisher's read-only siblings: applying a publication is a write.
     const db = new Database(vault.path, { fileMustExist: true });
+    ensureWorkspaceDevice(db);
     // A non-active replica never goes through openDatabase(), which is where the gate
     // normally lives — without this, a writer's queue would silently never be populated.
     ensureOutboxTriggers(db, mayWrite(vault));
@@ -230,6 +244,185 @@ function handleRevocation(vaultId: string, runtime: ReplicaRuntime): void {
   runtime.lastError = 'El servidor ha revocado tu acceso a este espacio. La réplica sigue en este equipo y puedes seguir consultándola o convertirla en un vault local.';
 }
 
+async function pullRelayOperations(vault: VaultSummary, token: string, db: Database.Database, snapshotRevision: string | null): Promise<void> {
+  const endpoint = `${normalizeUrl(vault.remote!.url)}/api/v1/spaces/${encodeURIComponent(vault.remote!.spaceId)}/mutations`;
+  for (let batch = 0; batch < 8; batch += 1) {
+    const response = await request(`${endpoint}?limit=50`, { headers: { authorization: `Bearer ${token}` } });
+    if (response.status === 401 || response.status === 403 || response.status === 404 || !response.ok) return;
+    const value = await response.json() as { mutations?: IncomingMutation[]; hasMore?: boolean };
+    const mutations = value.mutations ?? []; if (!mutations.length) return;
+    for (const mutation of mutations) {
+      if (mutation.table !== 'page_document_updates' || mutation.kind !== 'upsert') continue;
+      const hash = String(mutation.documentHash ?? mutation.row?.update_hash ?? '');
+      if (!/^[0-9a-f]{64}$/.test(hash)) throw new Error('El servidor entregó una actualización Yjs sin hash válido.');
+      const binary = await request(
+        `${normalizeUrl(vault.remote!.url)}/api/v1/spaces/${encodeURIComponent(vault.remote!.spaceId)}/document-updates/${hash}`,
+        { headers: { authorization: `Bearer ${token}` } },
+      );
+      if (!binary.ok) throw new Error(`No se pudo descargar la actualización Yjs ${hash.slice(0, 12)} (HTTP ${binary.status}).`);
+      const bytes = Buffer.from(await binary.arrayBuffer());
+      if (createHash('sha256').update(bytes).digest('hex') !== hash) throw new Error('Una actualización Yjs no coincide con su hash.');
+      mutation.row = { ...(mutation.row ?? {}), update_blob: bytes, update_hash: hash };
+    }
+    for (const mutation of mutations) {
+      if (mutation.table !== 'db_attachments' || mutation.kind !== 'upsert') continue;
+      const hash = String(mutation.blobHash ?? mutation.row?.blob_hash ?? '');
+      if (!hash) continue;
+      if (!/^[0-9a-f]{64}$/.test(hash)) throw new Error('El servidor entregó un adjunto sin hash válido.');
+      if (db.prepare('SELECT 1 FROM db_blobs WHERE hash = ?').get(hash)) continue;
+      const expected = Number(mutation.row?.bytes ?? 0);
+      const chunks: Buffer[] = [];
+      for (let start = 0; start < expected; start += SHARED_BLOB_CHUNK_BYTES) {
+        const end = Math.min(expected - 1, start + SHARED_BLOB_CHUNK_BYTES - 1);
+        const part = await request(
+          `${normalizeUrl(vault.remote!.url)}/api/v1/spaces/${encodeURIComponent(vault.remote!.spaceId)}/blobs/${hash}`,
+          { headers: { authorization: `Bearer ${token}`, range: `bytes=${start}-${end}` } },
+        );
+        if (part.status !== 206 && !(start === 0 && part.status === 200)) throw new Error(`No se pudo reanudar el adjunto ${hash.slice(0, 12)}.`);
+        chunks.push(Buffer.from(await part.arrayBuffer()));
+      }
+      const bytes = Buffer.concat(chunks);
+      if (bytes.length !== expected || createHash('sha256').update(bytes).digest('hex') !== hash) throw new Error('Un adjunto descargado no coincide con su checksum.');
+      const timestamp = new Date().toISOString();
+      db.prepare(
+        `INSERT OR IGNORE INTO db_blobs
+          (hash, bytes, mime_type, data, revision, created_by, updated_by, created_at, updated_at)
+         VALUES (?, ?, ?, ?, 1, ?, ?, ?, ?)`,
+      ).run(hash, bytes.length, mutation.row?.mime_type ?? null, bytes, mutation.actorId || 'remote', mutation.actorId || 'remote', timestamp, timestamp);
+    }
+    const summary = withOutboxSuppressed(db, () => withDatabaseContext(db, () => applyIncomingMutations(db, mutations, {
+      external: (mutation) => {
+        if (mutation.table === 'page_revisions' && mutation.kind === 'upsert') {
+          const pageId = String(mutation.row?.page_id ?? '');
+          const revision = Number(mutation.row?.revision ?? 0);
+          if (pageId && revision > 0 && db.prepare('SELECT 1 FROM page_revisions WHERE page_id = ? AND revision = ?').get(pageId, revision)) {
+            return { outcome: 'keptLocal', entityKind: 'page_revision' };
+          }
+        }
+        if (mutation.table !== 'page_document_updates' || mutation.kind !== 'upsert') return null;
+        const hash = String(mutation.documentHash ?? mutation.row?.update_hash ?? '');
+        const pageId = String(mutation.row?.page_id ?? '');
+        const bytes = mutation.row?.update_blob;
+        if (!pageId || !Buffer.isBuffer(bytes)) throw new Error('La actualización Yjs está incompleta.');
+        if (db.prepare('SELECT 1 FROM page_document_update_receipts WHERE update_hash = ?').get(hash)
+          || db.prepare('SELECT 1 FROM page_document_updates WHERE page_id = ? AND update_hash = ?').get(pageId, hash)) {
+          db.prepare(
+            'INSERT OR IGNORE INTO page_document_update_receipts (update_hash, page_id, operation_id, applied_at) VALUES (?, ?, ?, ?)',
+          ).run(hash, pageId, mutation.id, new Date().toISOString());
+          return { outcome: 'keptLocal' };
+        }
+        const current = pages.getPageDocument(pageId);
+        if (!current) throw new Error('La página de la actualización Yjs no existe todavía.');
+        const applied = pages.applyPageDocumentUpdate(pageId, new Uint8Array(bytes), current.revision, mutation.actorId || 'remote');
+        if (!applied.ok) throw new Error('La página cambió mientras se aplicaba su actualización Yjs.');
+        db.prepare(
+          'INSERT OR IGNORE INTO page_document_update_receipts (update_hash, page_id, operation_id, applied_at) VALUES (?, ?, ?, ?)',
+        ).run(hash, pageId, mutation.id, new Date().toISOString());
+        return { outcome: 'applied', entityKind: 'page_update', title: applied.document.page.title };
+      },
+    })));
+    if (summary.refused.length) {
+      throw new Error(`No se pudo aplicar ${summary.refused[0].id}: ${summary.refused[0].reason}`);
+    }
+    if (vault.active && summary.entries.length) recordServerInbox(summary.entries, { spaceId: vault.remote!.spaceId });
+    if (summary.cursor > 0) {
+      const ack = await request(`${endpoint}/ack`, { method: 'POST', headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' }, body: JSON.stringify({ cursor: summary.cursor }) });
+      if (!ack.ok) return;
+      db.prepare(`INSERT INTO sync_snapshot_cursors (stream_id, cursor, snapshot_revision, hydrated_at, updated_at)
+        VALUES (?, ?, ?, ?, ?) ON CONFLICT(stream_id) DO UPDATE SET cursor = MAX(cursor, excluded.cursor),
+          snapshot_revision = excluded.snapshot_revision, hydrated_at = COALESCE(sync_snapshot_cursors.hydrated_at, excluded.hydrated_at),
+          updated_at = excluded.updated_at`)
+        .run(`server:${vault.remote!.spaceId}`, summary.cursor, snapshotRevision, new Date().toISOString(), new Date().toISOString());
+    }
+    if (summary.refused.length || !value.hasMore) return;
+    await new Promise((resolve) => { setImmediate(resolve); });
+  }
+}
+
+function scheduleReplicaWake(vaultId: string): void {
+  if (eventWatchersStopped || eventWakeTimers.has(vaultId)) return;
+  const wake = setTimeout(() => {
+    eventWakeTimers.delete(vaultId);
+    void pullReplica(vaultId);
+  }, 25);
+  wake.unref?.();
+  eventWakeTimers.set(vaultId, wake);
+}
+
+function scheduleEventReconnect(vaultId: string): void {
+  if (eventWatchersStopped || eventReconnectTimers.has(vaultId)) return;
+  const reconnect = setTimeout(() => {
+    eventReconnectTimers.delete(vaultId);
+    const vault = getVault(vaultId);
+    if (vault?.origin === 'connected' && vault.remote?.state === 'active') watchReplicaEvents(vault);
+  }, 5_000);
+  reconnect.unref?.();
+  eventReconnectTimers.set(vaultId, reconnect);
+}
+
+/**
+ * Listen for tiny, ephemeral wake-ups while mutations themselves stay in the durable relay.
+ * Parsing is intentionally limited to SSE frame boundaries: no payload is applied from this
+ * connection, so a truncated frame, reconnect or proxy retry can never create partial data.
+ */
+async function watchReplicaEvents(vault: VaultSummary): Promise<void> {
+  if (eventWatchersStopped || eventControllers.has(vault.id) || !vault.remote) return;
+  const token = getNodusServerTokenFor(vault.id);
+  if (!token) return;
+  const controller = new AbortController();
+  eventControllers.set(vault.id, controller);
+  try {
+    const endpoint = `${normalizeUrl(vault.remote.url)}/api/v1/spaces/${encodeURIComponent(vault.remote.spaceId)}/mutations/events`;
+    const response = await fetch(endpoint, {
+      headers: { authorization: `Bearer ${token}`, accept: 'text/event-stream' },
+      signal: controller.signal,
+    });
+    if (response.status === 401 || response.status === 403) {
+      handleRevocation(vault.id, runtimeFor(vault.id));
+      return;
+    }
+    if (!response.ok || !response.body) throw new Error(`Mutation events returned HTTP ${response.status}.`);
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let pending = '';
+    while (!controller.signal.aborted) {
+      const chunk = await reader.read();
+      if (chunk.done) break;
+      pending += decoder.decode(chunk.value, { stream: true }).replace(/\r\n/g, '\n');
+      let boundary = pending.indexOf('\n\n');
+      while (boundary >= 0) {
+        const frame = pending.slice(0, boundary);
+        pending = pending.slice(boundary + 2);
+        if (frame.split('\n').some((line) => line.trim() === 'event: mutation')) scheduleReplicaWake(vault.id);
+        boundary = pending.indexOf('\n\n');
+      }
+    }
+  } catch (error) {
+    if (!controller.signal.aborted) runtimeFor(vault.id).lastError = error instanceof Error ? error.message : String(error);
+  } finally {
+    if (eventControllers.get(vault.id) === controller) eventControllers.delete(vault.id);
+    if (!controller.signal.aborted) scheduleEventReconnect(vault.id);
+  }
+}
+
+function startReplicaEventWatchers(): void {
+  eventWatchersStopped = false;
+  for (const vault of connectedVaults()) {
+    if (vault.remote?.state === 'active') void watchReplicaEvents(vault);
+  }
+}
+
+function stopReplicaEventWatchers(): void {
+  eventWatchersStopped = true;
+  for (const controller of eventControllers.values()) controller.abort();
+  eventControllers.clear();
+  for (const reconnect of eventReconnectTimers.values()) clearTimeout(reconnect);
+  eventReconnectTimers.clear();
+  for (const wake of eventWakeTimers.values()) clearTimeout(wake);
+  eventWakeTimers.clear();
+}
+
 export async function pullReplica(vaultId: string, options: { force?: boolean } = {}): Promise<void> {
   const vault = getVault(vaultId);
   if (!vault || vault.origin !== 'connected' || !vault.remote) return;
@@ -252,6 +445,8 @@ export async function pullReplica(vaultId: string, options: { force?: boolean } 
 
     if (response.status === 401 || response.status === 403) { handleRevocation(vaultId, runtime); return; }
     if (response.status === 304) {
+      const db = openReplicaDb(vault);
+      if (db) await pullRelayOperations(vault, token, db, vault.remote.lastPulledRevision);
       runtime.phase = 'ok';
       runtime.lastError = null;
       await drainOutbox(vaultId);
@@ -276,6 +471,7 @@ export async function pullReplica(vaultId: string, options: { force?: boolean } 
     const db = openReplicaDb(vault);
     if (!db) throw new Error('No se ha podido abrir la base de datos de la réplica.');
     applySnapshotToReplica(db, snapshot);
+    await pullRelayOperations(vault, token, db, snapshot.revision ?? vault.remote.lastPulledRevision);
 
     // The JSON carries no binary by design, so the illustration of every Deep Research
     // report arrives as a row saying "ready" with nothing behind it. Fetch the bytes and
@@ -410,6 +606,78 @@ export async function drainOutbox(vaultId: string): Promise<void> {
     // An upsert whose row is gone was deleted after being queued; the delete entry that
     // replaced it carries the truth, so this one is simply dropped.
     if (entry.op === 'upsert' && !row) { markOutboxSent(db, [entry.id]); continue; }
+    let documentHash: string | null = null;
+    let blobHash: string | null = null;
+    if (entry.op === 'upsert' && entry.table_name === 'page_document_updates') {
+      const stored = db.prepare('SELECT update_blob, update_hash FROM page_document_updates WHERE id = ?').get(String(key[0] ?? '')) as {
+        update_blob: Buffer; update_hash: string | null;
+      } | undefined;
+      if (!stored || !Buffer.isBuffer(stored.update_blob)) {
+        markOutboxRejected(db, [entry.id], 'No se encuentran los bytes de esta actualización Yjs.');
+        continue;
+      }
+      documentHash = stored.update_hash || createHash('sha256').update(stored.update_blob).digest('hex');
+      if (row) row.update_hash = documentHash;
+      try {
+        const upload = await request(
+          `${normalizeUrl(vault.remote.url)}/api/v1/spaces/${encodeURIComponent(vault.remote.spaceId)}/document-updates/${documentHash}`,
+          {
+            method: 'PUT',
+            headers: {
+              authorization: `Bearer ${token}`,
+              'content-type': 'application/octet-stream',
+              'content-length': String(stored.update_blob.length),
+            },
+            body: stored.update_blob,
+          },
+        );
+        if (!upload.ok) {
+          runtime.lastError = `El servidor rechazó una actualización Yjs (HTTP ${upload.status}).`;
+          return;
+        }
+      } catch (error) {
+        runtime.lastError = error instanceof Error ? error.message : String(error);
+        return;
+      }
+    }
+    if (entry.op === 'upsert' && entry.table_name === 'db_attachments' && row?.blob_hash) {
+      blobHash = String(row.blob_hash);
+      const stored = db.prepare('SELECT data FROM db_blobs WHERE hash = ?').get(blobHash) as { data: Buffer } | undefined;
+      if (!stored || !Buffer.isBuffer(stored.data) || createHash('sha256').update(stored.data).digest('hex') !== blobHash) {
+        markOutboxRejected(db, [entry.id], 'El archivo adjunto local no coincide con su hash.');
+        continue;
+      }
+      const blobEndpoint = `${normalizeUrl(vault.remote.url)}/api/v1/spaces/${encodeURIComponent(vault.remote.spaceId)}/blobs/${blobHash}`;
+      try {
+        const status = await request(`${blobEndpoint}/status`, { headers: { authorization: `Bearer ${token}` } });
+        if (!status.ok) throw new Error(`HTTP ${status.status}`);
+        const state = await status.json() as { complete?: boolean; received?: number[] };
+        if (!state.complete) {
+          const received = new Set(state.received ?? []);
+          const totalChunks = Math.max(1, Math.ceil(stored.data.length / SHARED_BLOB_CHUNK_BYTES));
+          for (let index = 0; index < totalChunks; index += 1) {
+            if (received.has(index)) continue;
+            const chunk = stored.data.subarray(index * SHARED_BLOB_CHUNK_BYTES, Math.min(stored.data.length, (index + 1) * SHARED_BLOB_CHUNK_BYTES));
+            const chunkHash = createHash('sha256').update(chunk).digest('hex');
+            const uploaded = await request(`${blobEndpoint}/chunks/${index}`, {
+              method: 'PUT',
+              headers: {
+                authorization: `Bearer ${token}`, 'content-type': 'application/octet-stream',
+                'content-length': String(chunk.length), 'x-nodus-total-chunks': String(totalChunks),
+                'x-nodus-total-bytes': String(stored.data.length), 'x-nodus-chunk-sha256': chunkHash,
+              },
+              body: chunk,
+            });
+            if (!uploaded.ok) throw new Error(`chunk ${index}: HTTP ${uploaded.status}`);
+          }
+          const completed = await request(`${blobEndpoint}/complete`, { method: 'POST', headers: { authorization: `Bearer ${token}` } });
+          if (!completed.ok) throw new Error(`complete: HTTP ${completed.status}`);
+        }
+      } catch (error) {
+        runtime.lastError = `No se pudo reanudar el adjunto ${blobHash.slice(0, 12)}: ${error instanceof Error ? error.message : String(error)}`;
+        return;
+      }
+    }
     const mutation = {
       id: entry.id,
       clientId: clientIdFor(vaultId),
@@ -419,6 +687,11 @@ export async function drainOutbox(vaultId: string): Promise<void> {
       ...(entry.op === 'upsert' ? { row } : {}),
       schemaVersion: entry.schema_version,
       createdAt: entry.created_at,
+      actorId: entry.actor_id,
+      deviceId: entry.device_id,
+      hlc: entry.hlc,
+      ...(documentHash ? { documentHash } : {}),
+      ...(blobHash ? { blobHash } : {}),
     };
 
     // Measured here, where the row is in hand. A Deep Research report is one row carrying its
@@ -534,6 +807,7 @@ async function tick(): Promise<void> {
 export function startReplicaSync(): void {
   stopReplicaSync();
   if (connectedVaults().length === 0) return;
+  startReplicaEventWatchers();
   firstTimer = setTimeout(() => void tick(), FIRST_TICK_MS);
   firstTimer.unref?.();
   timer = setInterval(() => void tick(), CHECK_INTERVAL_MS);
@@ -545,6 +819,7 @@ export function stopReplicaSync(): void {
   if (firstTimer) clearTimeout(firstTimer);
   timer = null;
   firstTimer = null;
+  stopReplicaEventWatchers();
   closeReplicaPool();
 }
 
@@ -599,6 +874,32 @@ export function getReplicaOverview(): ReplicaConnection[] {
 export async function syncReplicaNow(vaultId: string): Promise<ReplicaConnection[]> {
   await pullReplica(vaultId, { force: true });
   return getReplicaOverview();
+}
+
+export async function listReplicaPresence(vaultId: string): Promise<ReplicaPresenceParticipant[]> {
+  const vault = getVault(vaultId);
+  const token = vault?.remote ? getNodusServerTokenFor(vaultId) : null;
+  if (!vault?.remote || !token || vault.remote.state !== 'active') return [];
+  const response = await request(
+    `${normalizeUrl(vault.remote.url)}/api/v1/spaces/${encodeURIComponent(vault.remote.spaceId)}/presence`,
+    { headers: { authorization: `Bearer ${token}` } },
+  );
+  if (!response.ok) return [];
+  return ((await response.json()) as { participants?: ReplicaPresenceParticipant[] }).participants ?? [];
+}
+
+export async function updateReplicaPresence(vaultId: string, input: ReplicaPresenceInput | null): Promise<ReplicaPresenceParticipant[]> {
+  const vault = getVault(vaultId);
+  const token = vault?.remote ? getNodusServerTokenFor(vaultId) : null;
+  if (!vault?.remote || !token || vault.remote.state !== 'active') return [];
+  const endpoint = `${normalizeUrl(vault.remote.url)}/api/v1/spaces/${encodeURIComponent(vault.remote.spaceId)}/presence`;
+  const response = await request(endpoint, input == null ? {
+    method: 'DELETE', headers: { authorization: `Bearer ${token}` },
+  } : {
+    method: 'POST', headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' }, body: JSON.stringify(input),
+  });
+  if (!response.ok) return [];
+  return listReplicaPresence(vaultId);
 }
 
 /**

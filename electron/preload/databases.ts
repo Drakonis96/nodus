@@ -10,11 +10,25 @@ import type { DatabasesApi } from '@shared/api/databases';
 // belongs with the bindings that are its only users.
 let activeDbChatRequestId: string | null = null;
 
+// A deterministic latency hook for the isolated notion-parity runner. It is
+// deliberately unavailable unless the process also carries the QA-root guard,
+// so normal profiles can never enable it through application data or settings.
+const qaDatabaseQueryDelayMs = process.env.NODUS_QA_ROOT
+  ? Math.min(2_000, Math.max(0, Number.parseInt(process.env.NODUS_QA_DATABASE_QUERY_DELAY_MS ?? '0', 10) || 0))
+  : 0;
+const qaDatabaseTaskDelayMs = process.env.NODUS_QA_ROOT
+  ? Math.min(2_000, Math.max(0, Number.parseInt(process.env.NODUS_QA_DATABASE_TASK_DELAY_MS ?? '0', 10) || 0))
+  : 0;
+const qaDatabaseAutomationDelayMs = process.env.NODUS_QA_ROOT
+  ? Math.min(2_000, Math.max(0, Number.parseInt(process.env.NODUS_QA_DATABASE_AUTOMATION_DELAY_MS ?? '0', 10) || 0))
+  : 0;
+
 export const databasesApi: DatabasesApi = {
   // databases mode
   listDatabases: () => ipcRenderer.invoke('db:list'),
   searchDatabases: (query, includeContent) => ipcRenderer.invoke('db:search', query, includeContent),
   searchDatabaseRows: (query, limit) => ipcRenderer.invoke('db:searchRows', query, limit),
+  searchDatabaseRowsPage: (input) => ipcRenderer.invoke('db:searchRowsPage', input),
   getDatabase: (id) => ipcRenderer.invoke('db:get', id),
   getDatabaseDetail: (id) => ipcRenderer.invoke('db:detail', id),
   databaseStats: (id) => ipcRenderer.invoke('db:stats', id),
@@ -28,15 +42,99 @@ export const databasesApi: DatabasesApi = {
   updateDatabaseColumn: (id, patch) => ipcRenderer.invoke('db:updateColumn', id, patch),
   deleteDatabaseColumn: (id) => ipcRenderer.invoke('db:deleteColumn', id).then(() => undefined),
   reorderDatabaseColumns: (databaseId, ids) => ipcRenderer.invoke('db:reorderColumns', databaseId, ids).then(() => undefined),
-  addDatabaseOption: (columnId, label, color) => ipcRenderer.invoke('db:addOption', columnId, label, color),
+  addDatabaseOption: (columnId, label, color, group) => ipcRenderer.invoke('db:addOption', columnId, label, color, group),
   updateDatabaseOption: (id, patch) => ipcRenderer.invoke('db:updateOption', id, patch).then(() => undefined),
   deleteDatabaseOption: (id) => ipcRenderer.invoke('db:deleteOption', id).then(() => undefined),
   reorderDatabaseOptions: (columnId, ids) => ipcRenderer.invoke('db:reorderOptions', columnId, ids).then(() => undefined),
   listDatabaseRows: (databaseId, opts) => ipcRenderer.invoke('db:listRows', databaseId, opts),
+  queryDatabaseRows: async (input) => {
+    if (qaDatabaseQueryDelayMs > 0) await new Promise((resolve) => setTimeout(resolve, qaDatabaseQueryDelayMs));
+    return ipcRenderer.invoke('db:queryRows', input);
+  },
+  startQaDatabaseScaleFixture: (input) => ipcRenderer.invoke('qa:db:startScaleFixture', input),
+  getQaDatabaseScaleFixtureStatus: (jobId) => ipcRenderer.invoke('qa:db:scaleFixtureStatus', jobId),
+  listDatabaseDataSources: () => ipcRenderer.invoke('db:listDataSources'),
+  getDatabaseContainer: (viewId) => ipcRenderer.invoke('db:getContainer', viewId),
+  listDatabaseViewSources: (viewId) => ipcRenderer.invoke('db:listViewSources', viewId),
+  attachDatabaseViewSource: (viewId, databaseId, input) => ipcRenderer.invoke('db:attachViewSource', viewId, databaseId, input ?? {}),
+  detachDatabaseViewSource: (viewId, sourceId) => ipcRenderer.invoke('db:detachViewSource', viewId, sourceId).then(() => undefined),
+  queryDatabaseContainerRows: async (input) => {
+    if (qaDatabaseQueryDelayMs > 0) await new Promise((resolve) => setTimeout(resolve, qaDatabaseQueryDelayMs));
+    return ipcRenderer.invoke('db:queryContainerRows', input);
+  },
+  recalculateDatabase: (databaseId) => ipcRenderer.invoke('db:recalculate', databaseId),
+  getDatabaseCalculationStatus: (databaseId) => ipcRenderer.invoke('db:calculationStatus', databaseId),
+  cancelDatabaseCalculation: (jobId) => ipcRenderer.invoke('db:cancelCalculation', jobId),
+  onDatabaseCalculationProgress: (cb) => {
+    const listener = (_event: unknown, progress: Parameters<typeof cb>[0]) => cb(progress);
+    ipcRenderer.on('db:calculationProgress', listener);
+    return () => ipcRenderer.removeListener('db:calculationProgress', listener);
+  },
   getDatabaseRow: (id) => ipcRenderer.invoke('db:getRow', id),
   createDatabaseRow: (databaseId) => ipcRenderer.invoke('db:createRow', databaseId),
   deleteDatabaseRow: (id) => ipcRenderer.invoke('db:deleteRow', id).then(() => undefined),
+  listDatabaseRowTemplates: async (databaseId) => {
+    if (qaDatabaseTaskDelayMs > 0) await new Promise((resolve) => setTimeout(resolve, qaDatabaseTaskDelayMs));
+    return ipcRenderer.invoke('db:listRowTemplates', databaseId);
+  },
+  createDatabaseRowTemplate: (databaseId, input) => ipcRenderer.invoke('db:createRowTemplate', databaseId, input),
+  deleteDatabaseRowTemplate: (templateId) => ipcRenderer.invoke('db:deleteRowTemplate', templateId).then(() => undefined),
+  instantiateDatabaseRowTemplate: (templateId, occurrenceKey) => ipcRenderer.invoke('db:instantiateRowTemplate', templateId, occurrenceKey ?? null),
+  runDueDatabaseRowTemplates: (at, limit) => ipcRenderer.invoke('db:runDueRowTemplates', at, limit),
+  duplicateDatabaseRow: (input) => ipcRenderer.invoke('db:duplicateRow', input),
+  listDatabaseRowHierarchy: (databaseId, limit) => ipcRenderer.invoke('db:listRowHierarchy', databaseId, limit),
+  setDatabaseSubitemParent: (rowId, parentRowId) => ipcRenderer.invoke('db:setSubitemParent', rowId, parentRowId).then(() => undefined),
+  setDatabaseSubitemCollapsed: (rowId, collapsed) => ipcRenderer.invoke('db:setSubitemCollapsed', rowId, collapsed).then(() => undefined),
+  listDatabaseRowDependencies: (databaseId) => ipcRenderer.invoke('db:listRowDependencies', databaseId),
+  addDatabaseRowDependency: (predecessorRowId, successorRowId, lagDays) => ipcRenderer.invoke('db:addRowDependency', predecessorRowId, successorRowId, lagDays),
+  removeDatabaseRowDependency: (id) => ipcRenderer.invoke('db:removeRowDependency', id).then(() => undefined),
+  getDatabaseTaskConfig: (databaseId) => ipcRenderer.invoke('db:getTaskConfig', databaseId),
+  updateDatabaseTaskConfig: (databaseId, patch) => ipcRenderer.invoke('db:updateTaskConfig', databaseId, patch),
+  shiftDatabaseTaskDates: (rowId, deltaDays) => ipcRenderer.invoke('db:shiftTaskDates', rowId, deltaDays),
+  listDatabaseSprints: (databaseId) => ipcRenderer.invoke('db:listSprints', databaseId),
+  createDatabaseSprint: (databaseId, input) => ipcRenderer.invoke('db:createSprint', databaseId, input),
+  updateDatabaseSprintState: (sprintId, state) => ipcRenderer.invoke('db:updateSprintState', sprintId, state),
+  assignDatabaseRowToSprint: (sprintId, rowId) => ipcRenderer.invoke('db:assignRowToSprint', sprintId, rowId).then(() => undefined),
+  listDatabaseAutomationRules: async (databaseId) => {
+    if (qaDatabaseAutomationDelayMs > 0) await new Promise((resolve) => setTimeout(resolve, qaDatabaseAutomationDelayMs));
+    return ipcRenderer.invoke('db:listAutomationRules', databaseId);
+  },
+  createDatabaseAutomationRule: (databaseId, input) => ipcRenderer.invoke('db:createAutomationRule', databaseId, input),
+  updateDatabaseAutomationRule: (ruleId, patch, expectedRevision) => ipcRenderer.invoke('db:updateAutomationRule', ruleId, patch, expectedRevision),
+  deleteDatabaseAutomationRule: (ruleId, expectedRevision) => ipcRenderer.invoke('db:deleteAutomationRule', ruleId, expectedRevision),
+  runDatabaseAutomationRule: (ruleId, rowId, eventKey) => ipcRenderer.invoke('db:runAutomationRule', ruleId, rowId ?? null, eventKey),
+  runDatabaseButtonAutomation: (columnId, rowId) => ipcRenderer.invoke('db:runButtonAutomation', columnId, rowId),
+  runDueDatabaseAutomations: (at, limit) => ipcRenderer.invoke('db:runDueAutomations', at, limit),
+  listDatabaseAutomationRuns: (databaseId, limit) => ipcRenderer.invoke('db:listAutomationRuns', databaseId, limit),
+  listDatabaseAutomationNotifications: (databaseId, limit) => ipcRenderer.invoke('db:listAutomationNotifications', databaseId, limit),
+  listDatabaseForms: (databaseId) => ipcRenderer.invoke('db:listForms', databaseId),
+  createDatabaseForm: (databaseId, input) => ipcRenderer.invoke('db:createForm', databaseId, input),
+  updateDatabaseForm: (formId, input, expectedRevision) => ipcRenderer.invoke('db:updateForm', formId, input, expectedRevision),
+  deleteDatabaseForm: (formId, expectedRevision) => ipcRenderer.invoke('db:deleteForm', formId, expectedRevision),
+  listDatabaseFormSubmissions: (formId, limit) => ipcRenderer.invoke('db:listFormSubmissions', formId, limit),
+  getDatabaseFormServerStatus: () => ipcRenderer.invoke('db:formServerStatus'),
+  getDatabaseFormPublicUrl: (slug) => ipcRenderer.invoke('db:formPublicUrl', slug),
   setDatabaseCell: (rowId, columnId, raw) => ipcRenderer.invoke('db:setCell', rowId, columnId, raw),
+  setDatabaseCellsBulk: (input) => ipcRenderer.invoke('db:setCellsBulk', input),
+  aggregateDatabaseRows: (input) => ipcRenderer.invoke('db:aggregateRows', input),
+  queryDatabaseTemporalEvents: async (input) => {
+    if (qaDatabaseQueryDelayMs > 0) await new Promise((resolve) => setTimeout(resolve, qaDatabaseQueryDelayMs));
+    return ipcRenderer.invoke('db:queryTemporalEvents', input);
+  },
+  updateDatabaseTemporalRange: (input) => ipcRenderer.invoke('db:updateTemporalRange', input),
+  queryDatabaseChart: async (input) => {
+    if (qaDatabaseQueryDelayMs > 0) await new Promise((resolve) => setTimeout(resolve, qaDatabaseQueryDelayMs));
+    return ipcRenderer.invoke('db:queryChart', input);
+  },
+  queryDatabaseMap: async (input) => {
+    if (qaDatabaseQueryDelayMs > 0) await new Promise((resolve) => setTimeout(resolve, qaDatabaseQueryDelayMs));
+    return ipcRenderer.invoke('db:queryMap', input);
+  },
+  queryDatabaseFeed: async (input) => {
+    if (qaDatabaseQueryDelayMs > 0) await new Promise((resolve) => setTimeout(resolve, qaDatabaseQueryDelayMs));
+    return ipcRenderer.invoke('db:queryFeed', input);
+  },
+  exportDatabaseChart: (input) => ipcRenderer.invoke('db:exportChart', input),
   runDatabaseComparisonCell: (rowId, columnId) => ipcRenderer.invoke('db:runComparisonCell', rowId, columnId),
   runDatabaseComparisonColumn: (databaseId, columnId) => ipcRenderer.invoke('db:runComparisonColumn', databaseId, columnId),
   onDatabaseComparisonProgress: (cb) => {
@@ -69,11 +167,14 @@ export const databasesApi: DatabasesApi = {
   addDatabaseRelation: (rowId, columnId, targetKind, targetId, targetVaultId) =>
     ipcRenderer.invoke('db:addRelation', rowId, columnId, targetKind, targetId, targetVaultId),
   removeDatabaseRelation: (id) => ipcRenderer.invoke('db:removeRelation', id).then(() => undefined),
+  repairDatabaseRelation: (id, targetId, targetVaultId) => ipcRenderer.invoke('db:repairRelation', id, targetId, targetVaultId),
+  cleanupBrokenDatabaseRelations: (databaseId) => ipcRenderer.invoke('db:cleanupBrokenRelations', databaseId),
   searchDatabaseRelationTargets: (kind, query, databaseId) => ipcRenderer.invoke('db:searchRelationTargets', kind, query, databaseId),
   parseCsvForImport: () => ipcRenderer.invoke('db:parseCsvForImport'),
   createDatabaseFromCsv: (name, headers, rows, types) => ipcRenderer.invoke('db:createFromCsv', name, headers, rows, types),
   createDatabaseFromCsvToken: (token, name, types) => ipcRenderer.invoke('db:createFromCsvToken', token, name, types),
   releaseCsvImport: (token) => ipcRenderer.invoke('db:releaseCsvImport', token).then(() => undefined),
+  importNotionZip: () => ipcRenderer.invoke('db:importNotionZip'),
   onCsvImportProgress: (cb) => {
     const listener = (_e: unknown, payload: { done: number; total: number; finished: boolean }) => cb(payload);
     ipcRenderer.on('db:csvImportProgress', listener);
@@ -110,6 +211,12 @@ export const databasesApi: DatabasesApi = {
   listDatabaseViews: (databaseId) => ipcRenderer.invoke('db:listViews', databaseId),
   createDatabaseView: (databaseId, input) => ipcRenderer.invoke('db:createView', databaseId, input),
   updateDatabaseView: (id, patch) => ipcRenderer.invoke('db:updateView', id, patch),
+  duplicateDatabaseView: (id, name) => ipcRenderer.invoke('db:duplicateView', id, name),
+  linkDatabaseView: (id, name, scope) => ipcRenderer.invoke('db:linkView', id, name, scope),
+  reorderDatabaseViews: (databaseId, ids) => ipcRenderer.invoke('db:reorderViews', databaseId, ids),
+  listDatabaseViewRevisions: (id) => ipcRenderer.invoke('db:listViewRevisions', id),
+  restoreDatabaseViewRevision: (id, revision, expectedRevision) =>
+    ipcRenderer.invoke('db:restoreViewRevision', id, revision, expectedRevision),
   deleteDatabaseView: (id) => ipcRenderer.invoke('db:deleteView', id).then(() => undefined),
   pickBulkDatabaseFiles: (mode) => ipcRenderer.invoke('db:pickBulkFiles', mode ?? 'files'),
   bulkAttachDatabaseFiles: (databaseId, refColumnId, attachmentColumnId, files, options) =>

@@ -6,8 +6,10 @@ const DatabasesView = lazy(() => import('../../views/DatabasesView').then((modul
 const DatabasesSearchView = lazy(() => import('../../views/DatabasesSearchView').then((module) => ({ default: module.DatabasesSearchView })));
 const DatabasesAnalysisView = lazy(() => import('../../views/DatabasesAnalysisView').then((module) => ({ default: module.DatabasesAnalysisView })));
 const DatabasesChatView = lazy(() => import('../../views/DatabasesChatView').then((module) => ({ default: module.DatabasesChatView })));
+const PageWikiView = lazy(() => import('../../views/PageWikiView').then((module) => ({ default: module.PageWikiView })));
 
 export const databasesViews = {
+  pages: () => <PageWikiView />,
   databases: ({ activeDatabaseId, createDatabase, pendingRecordId, reloadDatabases, setPendingRecordId }) => (
     <DatabasesView
       databaseId={activeDatabaseId}

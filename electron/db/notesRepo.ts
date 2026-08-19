@@ -12,6 +12,7 @@ import type {
 } from '@shared/types';
 import { getDb } from './database';
 import { currentEmbeddingConfig, encodeEmbedding, embeddingTextHash } from './ideasRepo';
+import { synchronizeNotePage } from './pagesRepo';
 
 interface NoteFolderRow {
   id: string;
@@ -259,6 +260,7 @@ export function createNote(input: CreateNoteInput): Note {
       now,
       now
     );
+  synchronizeNotePage(id, title, input.content ?? '');
   return getNote(id)!;
 }
 
@@ -279,6 +281,7 @@ export function updateNote(input: UpdateNoteInput): Note | null {
       'UPDATE notes SET title = ?, content = ?, tags_json = ?, folder_id = ?, order_idx = ?, updated_at = ? WHERE id = ?'
     )
     .run(title, content, JSON.stringify(tags), folderId, orderIdx, new Date().toISOString(), input.id);
+  if (input.title !== undefined || input.content !== undefined) synchronizeNotePage(input.id, title, content);
   return getNote(input.id);
 }
 

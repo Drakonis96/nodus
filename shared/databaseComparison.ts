@@ -11,7 +11,7 @@ import type { DatabaseColumn, DatabaseRow } from './databases';
 
 /** Types whose value is meaningful as one comparable term. */
 export function isComparisonSource(column: DatabaseColumn): boolean {
-  return !['attachment', 'ai_image', 'relation', 'comparison'].includes(column.type);
+  return !['attachment', 'files', 'ai_image', 'relation', 'comparison', 'button'].includes(column.type);
 }
 
 /** Valid, de-duplicated source columns from a comparison column's current configuration. */

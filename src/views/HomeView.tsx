@@ -1193,6 +1193,7 @@ export function DatabasesHome({
   onOpenDatabase,
   onNewDatabase,
   onImportCsv,
+  onImportNotion,
   onOpenAnalysis,
   onOpenChat,
   demoBusy = false,
@@ -1202,6 +1203,7 @@ export function DatabasesHome({
   onOpenDatabase: (id: string) => void;
   onNewDatabase: () => void;
   onImportCsv?: () => void;
+  onImportNotion?: () => void;
   onOpenAnalysis: () => void;
   onOpenChat: () => void;
   demoBusy?: boolean;
@@ -1231,6 +1233,11 @@ export function DatabasesHome({
           {onImportCsv && (
             <button className="btn btn-ghost border border-neutral-700 gap-1.5" onClick={onImportCsv}>
               <Icon name="upload" /> {t('Importar CSV')}
+            </button>
+          )}
+          {onImportNotion && (
+            <button data-testid="import-notion-zip" className="btn btn-ghost border border-neutral-300 gap-1.5 dark:border-neutral-700" onClick={onImportNotion}>
+              <Icon name="archive" /> {t('Importar desde Notion')}
             </button>
           )}
           <button className="btn btn-primary gap-1.5" onClick={onNewDatabase}>

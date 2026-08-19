@@ -18,6 +18,7 @@ import { testimoniesApi } from './testimonies';
 import { toolkitApi } from './toolkit';
 import { teachingApi } from './teaching';
 import { databasesApi } from './databases';
+import { pagesApi } from './pages';
 import { primarySourcesApi } from './primarySources';
 import { archiveApi } from './archive';
 import { worldbuildingApi } from './worldbuilding';
@@ -72,6 +73,7 @@ export const nodusApi: NodusApi = {
   ...archiveApi,
   ...primarySourcesApi,
   ...databasesApi,
+  ...pagesApi,
   ...teachingApi,
   ...toolkitApi,
   ...testimoniesApi,
@@ -179,6 +181,8 @@ export const nodusApi: NodusApi = {
   createConnectedVault: (input) => ipcRenderer.invoke('vaults:createConnected', input),
   replicaOverview: () => ipcRenderer.invoke('vaults:replicaOverview'),
   replicaSyncNow: (vaultId) => ipcRenderer.invoke('vaults:replicaSyncNow', vaultId),
+  replicaPresence: (vaultId) => ipcRenderer.invoke('vaults:replicaPresence', vaultId),
+  replicaUpdatePresence: (vaultId, input) => ipcRenderer.invoke('vaults:replicaUpdatePresence', vaultId, input),
   replicaDetach: (vaultId) => ipcRenderer.invoke('vaults:replicaDetach', vaultId),
   renameVault: (id, name) => ipcRenderer.invoke('vaults:rename', id, name),
   setVaultType: (id, type) => ipcRenderer.invoke('vaults:setType', id, type),
@@ -190,6 +194,8 @@ export const nodusApi: NodusApi = {
   cancelVaultAnalysisReuse: (operationId) => ipcRenderer.invoke('vaults:cancelReuseAnalysis', operationId),
   copyVaultApiKeys: (sourceVaultId, targetVaultId) =>
     ipcRenderer.invoke('vaults:copyApiKeys', sourceVaultId, targetVaultId),
+  listMigrationRecoverySnapshots: () => ipcRenderer.invoke('migrationRecovery:list'),
+  openMigrationRecoverySnapshot: (id) => ipcRenderer.invoke('migrationRecovery:open', id),
 
 
   // Core: sync, backups, recovery. Regrouped here so the academic and study

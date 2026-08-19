@@ -83,7 +83,7 @@ test('migrateState leaves an already-current state untouched', () => {
   assert.equal(state.deviceTokens[0].grandfathered, undefined, 'a current file is not rewritten');
 });
 
-test('a reader cannot publish, a writer cannot drain, and the role is read live', { timeout: 60_000 }, async () => {
+test('a reader cannot publish, authorized replicas share the stream, and the role is read live', { timeout: 60_000 }, async () => {
   await withServer({ label: 'roles' }, async (server) => {
     const spaceId = await server.createSpace('Corpus compartido');
     const owner = await server.deviceToken(server.adminEmail, server.adminPassword, spaceId, 'Owner desktop');
@@ -118,11 +118,14 @@ test('a reader cannot publish, a writer cannot drain, and the role is read live'
       assert.equal(response.status, 200);
     }
 
-    // Sending a mutation is the writer's and the owner's; draining the ledger is the owner's.
+    // Sending a mutation is the writer's and the owner's. Every authorized replica reads
+    // the same ordered stream with its own cursor, which is what lets writers converge while
+    // the owner is offline without draining another device's queue.
     const mutation = { mutations: [{ id: 'mut-role-1', kind: 'upsert', table: 'notes', key: ['n-role'], row: { id: 'n-role', title: 'Nota', content: 'x', kind: 'markdown', order_idx: 0, folder_id: null, source_json: null, created_at: '2026-02-02T00:00:00.000Z', updated_at: '2026-02-02T00:00:00.000Z' }, schemaVersion: 121, createdAt: '2026-02-02T00:00:00.000Z' }] };
     assert.equal((await server.api(reader.deviceToken, 'POST', `/api/v1/spaces/${spaceId}/mutations`, { json: mutation })).status, 403);
     assert.equal((await server.api(writer.deviceToken, 'POST', `/api/v1/spaces/${spaceId}/mutations`, { json: mutation })).status, 200);
-    assert.equal((await server.api(writer.deviceToken, 'GET', `/api/v1/spaces/${spaceId}/mutations`)).status, 403, 'a writer must not drain the queue that feeds the owner');
+    assert.equal((await server.api(writer.deviceToken, 'GET', `/api/v1/spaces/${spaceId}/mutations`)).status, 200);
+    assert.equal((await server.api(reader.deviceToken, 'GET', `/api/v1/spaces/${spaceId}/mutations`)).status, 200);
     assert.equal((await server.api(owner.deviceToken, 'GET', `/api/v1/spaces/${spaceId}/mutations`)).status, 200);
 
     // Downgrade the writer with a token it already holds in hand.

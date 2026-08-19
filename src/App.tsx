@@ -1,6 +1,7 @@
 import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { AppSettings, CorpusHealthBucketId, DatabaseSummary, NodiNotification, RecoveryStatus, ServerInboxEntry, SyncLogEntry, VaultSummary } from '@shared/types';
 import type { CsvImportPlanData } from './views/DatabasesView';
+import type { NotionImportReport } from '@shared/notionImport';
 import { FeedbackModal } from './views/FeedbackModal';
 import { RoadmapFeedbackModal, type RoadmapTopicKey } from './views/RoadmapFeedbackModal';
 import { RoadmapModal } from './views/RoadmapModal';
@@ -73,6 +74,7 @@ import nodusLogoCyan from './assets/nodus-logo-cyan.svg';
 import { buildDockIconDataUrl, dockColorForVaultType } from './dockIcon';
 
 const CsvImportModal = lazy(() => import('./views/DatabasesView').then((module) => ({ default: module.CsvImportModal })));
+const NotionImportReportModal = lazy(() => import('./views/DatabasesView').then((module) => ({ default: module.NotionImportReportModal })));
 const CollectionsModal = lazy(() => import('./views/CollectionsModal').then((module) => ({ default: module.CollectionsModal })));
 const ResearchAssistantModal = lazy(() => import('./views/ResearchAssistantModal').then((module) => ({ default: module.ResearchAssistantModal })));
 
@@ -148,7 +150,7 @@ function HeaderAction({
       disabled={disabled}
       spinning={spinning}
       showLabel={showLabel}
-      className={`btn-ghost h-9 min-h-9 ${tone}`}
+      className={`btn-ghost h-9 min-h-9 min-w-9 ${tone}`}
       trailing={kbd ? <kbd className="composer-kbd ml-1.5">{kbd}</kbd> : undefined}
     />
   );
@@ -629,15 +631,25 @@ export function App() {
     setView('databases');
   }, [reloadDatabases]);
   const [csvPlan, setCsvPlan] = useState<CsvImportPlanData | null>(null);
+  const [notionImportReport, setNotionImportReport] = useState<NotionImportReport | null>(null);
   const importCsv = useCallback(async () => {
     if (!window.nodus) return;
     const plan = await window.nodus.parseCsvForImport();
     if (plan) setCsvPlan(plan);
   }, []);
+  const importNotion = useCallback(async () => {
+    if (!window.nodus) return;
+    const report = await window.nodus.importNotionZip();
+    if (!report) return;
+    setNotionImportReport(report);
+    await reloadDatabases();
+    if (report.createdDatabaseIds[0]) setActiveDatabaseId(report.createdDatabaseIds[0]);
+  }, [reloadDatabases]);
 
   const homeItem = NAV_ITEMS.find((n) => n.id === 'home')!;
   const libraryItem = NAV_ITEMS.find((n) => n.id === 'library')!;
   const settingsItem = NAV_ITEMS.find((n) => n.id === 'settings')!;
+  const pagesItem = NAV_ITEMS.find((n) => n.id === 'pages')!;
   const dbSearchItem = NAV_ITEMS.find((n) => n.id === 'dbSearch')!;
   const [paletteOpen, setPaletteOpen] = useState(false);
 
@@ -1189,6 +1201,7 @@ export function App() {
     setRoadmapOpen,
     createDatabase,
     importCsv,
+    importNotion,
     loadDemo,
     loadGenealogyDemo,
     loadDatabasesDemo,
@@ -1604,7 +1617,7 @@ export function App() {
                     {navButton(libraryItem)}
                     <div className={`${sidebarCompact ? 'mt-1 border-t border-neutral-800/70 pt-1' : 'mt-2'} flex flex-col gap-1`} data-tour="db-list">
                       <div className="flex items-center px-3">
-                        {!sidebarCompact && groupHeaderButton('explore', exploreLabel, exploreCollapsed, view === 'databases')}
+                        {!sidebarCompact && groupHeaderButton('explore', exploreLabel, exploreCollapsed, view === 'databases' || view === 'pages' || view === 'dbSearch')}
                         <button
                           onClick={() => void createDatabase()}
                           title={t('Nueva base de datos')}
@@ -1614,6 +1627,7 @@ export function App() {
                           <Icon name="plus" size={14} />
                         </button>
                       </div>
+                      {!exploreCollapsed && navButton(pagesItem)}
                       {!exploreCollapsed && navButton(dbSearchItem)}
                       {!exploreCollapsed && (
                         <DatabasesSidebarExplore
@@ -1877,6 +1891,9 @@ export function App() {
             setView('databases');
           }}
         />
+      )}
+      {notionImportReport && (
+        <NotionImportReportModal report={notionImportReport} onClose={() => setNotionImportReport(null)} />
       )}
       </Suspense>
 
