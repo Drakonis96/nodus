@@ -137,7 +137,7 @@ export function parseFormulaExpression(source: string): FormulaExpression {
   };
   const expression = (min: number): FormulaExpression => {
     let left = primary();
-    while (true) {
+    for (;;) {
       const def = BINARY[peek().value];
       if (!def || def.precedence < min) break;
       take();
@@ -251,7 +251,7 @@ export function evaluateFormulaExpression(expression: FormulaExpression, context
     if (node.type === 'property') return rawProperty(context.columns.get(node.columnId), context.row);
     if (node.type === 'unary') {
       const value = evaluate(node.value);
-      return node.op === 'not' ? !Boolean(value) : -(numberOf(value) ?? 0);
+      return node.op === 'not' ? !value : -(numberOf(value) ?? 0);
     }
     if (node.type === 'binary') {
       if (node.op === 'and') return Boolean(evaluate(node.left)) && Boolean(evaluate(node.right));
@@ -287,7 +287,7 @@ export function evaluateFormulaExpression(expression: FormulaExpression, context
       return (stats.sorted.filter((value) => value < self).length / stats.sorted.length) * 100;
     }
     const args = node.args.map(evaluate);
-    if (node.name === 'if') return Boolean(args[0]) ? (args[1] ?? null) : (args[2] ?? null);
+    if (node.name === 'if') return args[0] ? (args[1] ?? null) : (args[2] ?? null);
     if (node.name === 'coalesce') return args.find((value) => value != null && textOf(value) !== '') ?? null;
     if (node.name === 'concat') return args.map(textOf).join('');
     if (node.name === 'lower') return textOf(args[0]).toLocaleLowerCase();

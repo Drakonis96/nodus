@@ -79,7 +79,7 @@ export function listAclEntries(resourceType: AclResourceType, resourceId: string
 function resourceChain(resourceType: AclResourceType, resourceId: string): Array<[AclResourceType, string]> {
   const db = getDb(); const chain: Array<[AclResourceType, string]> = []; const seen = new Set<string>();
   let type = resourceType; let id = resourceId;
-  while (true) {
+  for (;;) {
     const key = `${type}:${id}`; if (seen.has(key)) break; seen.add(key); chain.push([type, id]);
     if (type === 'vault') break;
     if (type === 'page') {

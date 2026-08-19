@@ -17,7 +17,7 @@ const pkg = require('./package.json') as { version: string };
 const databaseComputeWorkerAliases = () => ({
   name: 'database-compute-worker-aliases',
   enforce: 'pre' as const,
-  resolveId(source: string, importer?: string) {
+  resolveId(source: string, _importer?: string) {
     // This plugin is installed only in the standalone calculation-worker build, so
     // every database accessor in that graph must resolve to the authorized worker
     // connection (query suffixes may be normalized before resolveId runs).

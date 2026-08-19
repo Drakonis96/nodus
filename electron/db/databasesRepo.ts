@@ -1226,7 +1226,7 @@ function scanDatabaseRows(databaseId: string, visit: (meta: RowMeta[]) => void |
   let position = -1;
   let rowId = '';
   let total = 0;
-  while (true) {
+  for (;;) {
     const page = db.prepare(
       `SELECT id, database_id, position, created_at, updated_at, revision,
               created_by, updated_by, unique_sequence
@@ -1544,7 +1544,7 @@ export function recomputeDatabaseDerived(
     if (cancelled()) return abort();
     const spec = column.config.formula as FormulaSpec | undefined;
     const problem = validateFormula(spec, columns);
-    let stats = new Map<string, ColumnStats>();
+    const stats = new Map<string, ColumnStats>();
     const statisticIds = spec?.kind === 'columnStat' ? [spec.columnId]
       : spec?.kind === 'expression' ? formulaExpressionGlobalStatDependencies(spec.ast) : [];
     for (const statisticId of statisticIds) {

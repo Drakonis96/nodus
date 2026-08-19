@@ -3,7 +3,6 @@ import { getDb } from './database';
 import {
   addRelation,
   createRow,
-  getColumn,
   getColumns,
   getRow,
   setCell,

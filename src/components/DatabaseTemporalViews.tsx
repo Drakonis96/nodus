@@ -38,7 +38,6 @@ function dayLabel(day: string, detail: 'short' | 'long' = 'short'): string {
     : { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' }).format(dayDate(day));
 }
 function timeLabel(value: string): string { return value.includes('T') ? value.slice(11, 16) : ''; }
-function localDateTime(day: string, source: string): string { return source.includes('T') ? `${day}T${source.slice(11)}` : day; }
 function durationDays(start: string, end: string): number { return Math.round((dayDate(end).getTime() - dayDate(start).getTime()) / DAY); }
 function defaultZone(column: DatabaseColumn | undefined): string {
   const configured = typeof column?.config.dateTimeZone === 'string' ? column.config.dateTimeZone : '';

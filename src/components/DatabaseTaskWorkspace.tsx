@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import type { DatabaseColumn } from '@shared/databases';
 import type { DatabaseRowDependency, DatabaseRowHierarchyItem, DatabaseRowTemplate, DatabaseSprint, DatabaseTaskConfig, DatabaseTemplateRecurrence } from '@shared/databaseTasks';
