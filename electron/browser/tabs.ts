@@ -282,9 +282,35 @@ function wire(tab: Tab): void {
 
   on(tab, contents, 'did-start-loading', (() => patch(tab, { loading: true, error: null })) as never);
   on(tab, contents, 'dom-ready', (() => { void applyPageColorScheme(contents); }) as never);
+
+  // The address bar must follow navigation, not page load completion. A modern
+  // page can keep the load event open for seconds (or indefinitely), so waiting
+  // for did-stop-loading left the previous URL visible while the user was
+  // already looking at the next document.
+  on(tab, contents, 'did-redirect-navigation', ((details: { url: string; isMainFrame: boolean }) => {
+    if (!details.isMainFrame) return;
+    patch(tab, { url: details.url });
+  }) as never);
+
+  on(tab, contents, 'did-navigate', ((_event: unknown, url: string) => patch(tab, {
+    url,
+    canGoBack: contents.navigationHistory.canGoBack(),
+    canGoForward: contents.navigationHistory.canGoForward(),
+  })) as never);
+
+  on(tab, contents, 'did-navigate-in-page', ((
+    _event: unknown, url: string, isMainFrame: boolean,
+  ) => {
+    if (!isMainFrame) return;
+    patch(tab, {
+      url,
+      canGoBack: contents.navigationHistory.canGoBack(),
+      canGoForward: contents.navigationHistory.canGoForward(),
+    });
+  }) as never);
+
   on(tab, contents, 'did-stop-loading', (() => patch(tab, {
     loading: false,
-    url: contents.getURL(),
     canGoBack: contents.navigationHistory.canGoBack(),
     canGoForward: contents.navigationHistory.canGoForward(),
   })) as never);
@@ -327,8 +353,15 @@ function wire(tab: Tab): void {
   // A main-frame navigation replaces the document, so whatever was playing is
   // gone. Subframe navigations must not count: an ad frame reloading underneath
   // a video would otherwise drop the controls for the video.
-  on(tab, contents, 'did-start-navigation', ((details: { isMainFrame: boolean; isSameDocument: boolean }) => {
-    if (!details.isMainFrame || details.isSameDocument) return;
+  on(tab, contents, 'did-start-navigation', ((details: {
+    url: string; isMainFrame: boolean; isSameDocument: boolean;
+  }) => {
+    if (!details.isMainFrame) return;
+    patch(tab, {
+      url: details.url,
+      ...(details.isSameDocument ? {} : { loading: true, error: null }),
+    });
+    if (details.isSameDocument) return;
     if (!hasMediaSession(tab.id)) return;
     dropMediaSession(tab.id);
     patch(tab, { hasMedia: false, mediaPlaying: false, audible: false });
@@ -345,6 +378,7 @@ function wire(tab: Tab): void {
     if (errorCode === -3) return;
     patch(tab, {
       loading: false,
+      url: validatedURL || tab.state.url,
       error: { kind: classifyError(errorCode), code: errorCode, description: errorDescription, url: validatedURL },
     });
   }) as never);
@@ -365,7 +399,7 @@ function wire(tab: Tab): void {
   on(tab, contents, 'certificate-error', ((
     _e: unknown, url: string, error: string,
   ) => {
-    patch(tab, { loading: false, error: { kind: 'certificate', code: null, description: error, url } });
+    patch(tab, { loading: false, url, error: { kind: 'certificate', code: null, description: error, url } });
   }) as never);
 
   on(tab, contents, 'render-process-gone', ((_event: unknown, details: { reason?: string; exitCode?: number }) => {

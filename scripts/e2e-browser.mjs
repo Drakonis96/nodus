@@ -46,7 +46,7 @@ const PAGES = {
         <a id="blank" href="/second" target="_blank">new tab</a></main></body></html>`,
 
   '/second': `<!doctype html><html><head><title>Second page</title></head>
-        <body><main><h1>Second</h1></main></body></html>`,
+        <body><main><h1>Second</h1><a id="slow" href="/slow-page">slow page</a></main></body></html>`,
 
   // A publisher-shaped page: Highwire tags are the highest-precedence source.
   '/paper': `<!doctype html><html><head><title>Publisher page</title>
@@ -161,6 +161,16 @@ async function startFixtures() {
         response.write(Buffer.alloc(size, 0x5a));
       }, 50);
       response.once('close', () => clearInterval(timer));
+      return;
+    }
+    if (url.pathname === '/slow-page') {
+      // Keep the document loading long enough to prove that the trusted
+      // address bar changes at navigation time, rather than at load completion.
+      setTimeout(() => {
+        if (response.destroyed) return;
+        response.setHeader('Content-Type', 'text/html; charset=utf-8');
+        response.end('<!doctype html><html><head><title>Slow page</title></head><body><h1>Slow page</h1></body></html>');
+      }, 1_500);
       return;
     }
     if (url.pathname === '/redirect-internal') {
@@ -334,6 +344,37 @@ try {
     const tab = loaded.tabs.find((entry) => entry.url.startsWith(origin));
     assert.equal(tab.title, 'Fixture home', 'the page title must reach the tab state');
     assert.equal(tab.error, null, 'a good page must report no error');
+  });
+
+  await check('the address bar changes before a slow page finishes loading', async () => {
+    await call('submitBrowserOmnibox', `${origin}/second`);
+    await waitFor(
+      (s) => s.tabs.find((tab) => tab.id === s.activeTabId)?.url === `${origin}/second`
+        && !s.tabs.find((tab) => tab.id === s.activeTabId)?.loading,
+      'the active fixture page before slow navigation',
+    );
+
+    await app.evaluate(async ({ webContents }, sourceUrl) => {
+      const target = webContents.getAllWebContents().find((contents) => contents.getURL() === sourceUrl);
+      if (!target) throw new Error(`the active browser fixture is missing at ${sourceUrl}`);
+      await target.executeJavaScript("document.querySelector('#slow').click()", true);
+    }, `${origin}/second`);
+
+    const navigating = await waitFor((s) => {
+      const active = s.tabs.find((tab) => tab.id === s.activeTabId);
+      return active?.url === `${origin}/slow-page` && active.loading;
+    }, 'the slow destination to reach state while still loading', 1_000);
+    assert.equal(navigating.tabs.find((tab) => tab.id === navigating.activeTabId)?.url, `${origin}/slow-page`);
+    await page.waitForFunction((url) => {
+      const input = document.querySelector('[data-testid="browser-omnibox"]');
+      return input instanceof HTMLInputElement && input.value === url;
+    }, `${origin}/slow-page`);
+
+    await waitFor(
+      (s) => s.tabs.find((tab) => tab.id === s.activeTabId)?.url === `${origin}/slow-page`
+        && !s.tabs.find((tab) => tab.id === s.activeTabId)?.loading,
+      'the slow page to finish loading',
+    );
   });
 
   await check('browser chrome and pages inherit light, dark and system themes', async () => {
