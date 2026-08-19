@@ -24,6 +24,19 @@ const childEnv = {
 };
 delete childEnv.ELECTRON_RUN_AS_NODE;
 
+async function closeElectronApp(instance) {
+  if (!instance) return;
+  const child = instance.process();
+  let timer;
+  const closed = instance.close().then(() => true, () => false);
+  const closedCleanly = await Promise.race([
+    closed,
+    new Promise((resolve) => { timer = setTimeout(() => resolve(false), 5_000); }),
+  ]);
+  clearTimeout(timer);
+  if (!closedCleanly && child.exitCode === null && !child.killed) child.kill('SIGKILL');
+}
+
 let app;
 try {
   app = await electron.launch({
@@ -122,6 +135,6 @@ try {
   assert.deepEqual(pageErrors, [], `renderer errors: ${pageErrors.map((error) => error.message).join(' | ')}`);
   console.log(`prosopography Electron smoke passed\nlight=${lightPath}\ndark=${darkPath}`);
 } finally {
-  if (app) await app.close().catch(() => {});
+  await closeElectronApp(app);
   await rm(userData, { recursive: true, force: true });
 }

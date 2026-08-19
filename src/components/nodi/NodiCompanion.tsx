@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { deriveNodiNoteTitle } from '@shared/nodiNotes';
-import { announcementCopyFor } from '@shared/announcements';
+import { announcementCopyFor, type AnnouncementRefreshResult } from '@shared/announcements';
+import { NODI_DEFAULT_CONTEXTS } from '@shared/types';
 import type { AppSettings, ModelRef, NodiChatMessage, NodiContextKind, NodiConversation, NodiNote, NodiNotification, NodiOverlayPlacement, NodiQuoteSelection, VaultType } from '@shared/types';
 import { vaultTypeColor } from '@shared/vaultTypes';
 import { type NodiRole, type NodiState } from './Nodi';
@@ -9,7 +10,7 @@ import { NodiCitationCard } from './NodiCitationCard';
 import { ChatTypingIndicator } from '../ChatTypingIndicator';
 import { Markdown, type MarkdownCitation } from '../Markdown';
 import { ModelPicker } from '../ModelPicker';
-import { useAnnouncements } from '../NotificationsPanel';
+import { announcementRefreshMessage, useAnnouncements } from '../NotificationsPanel';
 import { Icon } from '../ui';
 import { errorText, notificationLine, setActiveLang, t, tx } from '../../i18n';
 import './companion.css';
@@ -152,13 +153,17 @@ export function NodiCompanion({ context, costumes }: { context: Ctx; costumes?: 
   } = useAnnouncements();
   const unread = unreadAnnouncements + ntfs.reduce((n, x) => n + (x.read ? 0 : 1), 0);
   const [refreshingNotifications, setRefreshingNotifications] = useState(false);
+  const [notificationRefreshFeedback, setNotificationRefreshFeedback] = useState<AnnouncementRefreshResult | null>(null);
   const [clearNotificationsConfirmation, setClearNotificationsConfirmation] = useState(false);
 
   const [messages, setMessages] = useState<NodiChatMessage[]>([]);
   const [input, setInput] = useState('');
   const [quotedSelection, setQuotedSelection] = useState<string | null>(null);
   const [streaming, setStreaming] = useState(false);
-  const [contexts, setContexts] = useState<NodiContextKind[]>(['documentation', 'current_view']);
+  // The current vault is on by default (see NODI_DEFAULT_CONTEXTS). Its retrieval
+  // is a bounded, paged semantic scan — never the whole corpus, and never a scan
+  // that holds the window (see electron/db/vectorScan.ts).
+  const [contexts, setContexts] = useState<NodiContextKind[]>([...NODI_DEFAULT_CONTEXTS]);
   const [conversations, setConversations] = useState<NodiConversation[]>([]);
   const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
   const [chatTool, setChatTool] = useState<'none' | 'history' | 'contexts' | 'settings'>('none');
@@ -712,13 +717,15 @@ export function NodiCompanion({ context, costumes }: { context: Ctx; costumes?: 
 
   const refreshNotificationCenter = useCallback(async () => {
     if (refreshingNotifications) return;
+    setNotificationRefreshFeedback(null);
     setRefreshingNotifications(true);
     try {
       const snapshot = await refreshNotificationSources();
       setNtfs(snapshot.notifications);
+      setNotificationRefreshFeedback(snapshot.refresh);
     } catch {
-      // Keep the last good snapshot. A failed optional announcement check must not turn
-      // Nodi's local activity feed into an error panel.
+      // Keep the last good snapshot and report the optional check inline.
+      setNotificationRefreshFeedback({ status: 'error', checkedAt: Date.now() });
     } finally {
       setRefreshingNotifications(false);
     }
@@ -946,6 +953,16 @@ export function NodiCompanion({ context, costumes }: { context: Ctx; costumes?: 
               <button onClick={() => setPanel('none')} aria-label={t('Cerrar')}>✕</button>
             </div>
             <div className="nodi-panel-body">
+              {notificationRefreshFeedback && (
+                <div
+                  className={`nodi-refresh-status ${notificationRefreshFeedback.status === 'error' ? 'error' : ''}`}
+                  data-testid="nodi-notifications-refresh-status"
+                  data-status={notificationRefreshFeedback.status}
+                  role="status"
+                >
+                  {announcementRefreshMessage(notificationRefreshFeedback)}
+                </div>
+              )}
               {announcements.length > 0 && (
                 <>
                   <div className="nodi-ntf-section">{t('Avisos de Nodus')}</div>

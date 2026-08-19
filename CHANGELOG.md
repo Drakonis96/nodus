@@ -1,5 +1,150 @@
 # Changelog
 
+## 4.1.6 — 2026-08-18
+
+Nodus 4.1.6 repairs the Zotero import of the Global Library, which catalogued documents
+without ever copying an attachment and then refused to run a second time, and keeps the
+two reading galleries from forgetting how they were set or flashing on the way back in.
+
+- The Zotero import bundles turndown and its HTML parser as external CommonJS, so loading
+  it in the main process no longer throws before the attachment loop and both notes and
+  attachments are copied again. A failed import reports the first failure's own message
+  instead of always claiming that Zotero is unavailable.
+- A 404 from Zotero's `/deleted` endpoint, which the local API does not implement, is read
+  as "no tombstones reported" rather than as a missing library, so the second and later
+  syncs no longer abort before reading an item. Deletions made in Zotero are not mirrored
+  incrementally until a full refresh, which the release notes state.
+- The resumable-session banner follows the newest session by `updatedAt` alone, so an old
+  failure no longer presents a later clean import as interrupted.
+- Ordering, the read filter and grid-versus-list are written to a small per-vault store on
+  disk and seed the snapshot Deep Research, the study and teaching unit galleries and
+  Inmersión mount with. The search box, the open report and the place in a list stay in
+  memory. Deleting a vault takes its stored preferences with it.
+- Deep Research and Inmersión hold a quiet pane while the report or session they are
+  returning to is read back, showing a spinner only after 250ms, so neither section paints
+  its gallery on the way in. A session that no longer exists lands on the gallery.
+- The study and teaching organization heading goes through `t()` for its three interface
+  fallbacks, which were bare Spanish literals rendered raw, with a regression test.
+- The What's New modal presents this release in all eight interface languages.
+
+## 4.1.5 — 2026-08-17
+
+Nodus 4.1.5 puts the floating selection ribbon where the hand that made the selection
+left it, and removes the last two places where a search stopped the whole window while
+it thought.
+
+- The reader's selection ribbon and the workspace, study and teaching note toolbars wait
+  for the pointer to be released and are placed above it, or above the caret when the
+  selection was made with the keyboard.
+- Clicking a stored highlight reopens the full ribbon with colours, comment, copy,
+  bookmark and Nodi quote, with its current colour marked and deletion at the end, so a
+  highlight can be recoloured instead of only deleted.
+- The research chat and Nodi's active-vault context use the paged vector scans, so asking
+  a question no longer blocks the main process, and a new Nodi chat starts with the
+  current vault selected.
+- `nodus_search_ideas` and `nodus_search_passages` use the paged vector scans too, so an
+  MCP client searching from another application no longer freezes the Nodus window behind
+  it. `test-mcp.mjs` now refuses the blocking call sites outright.
+- The What's New modal presents this release in all eight interface languages.
+
+## 4.1.4 — 2026-08-16
+
+Nodus 4.1.4 keeps the desktop responsive during automatic backups and connected-vault
+publication, fixes the first administrator setup in production Cloudflare deployments,
+and introduces the project’s new public home at nodusresearch.com.
+
+- Automatic backups and connected-vault publication now run outside the main process with
+  bounded memory, hard process deadlines, retry backoff and unchanged-data shortcuts.
+- Nodus Cloud can initialise its first administrator on Cloudflare Workers and surfaces the
+  server’s real error when deployment setup fails.
+- The notification centre reports the outcome of a manual refresh and preserves its last
+  valid snapshot when the remote feed is unavailable.
+- The redesigned website brings together the wiki, manuals, interactive demos, FAQ, blog
+  and contribution paths at nodusresearch.com.
+- The What’s New modal presents this release in all eight interface languages.
+
+## 4.1.3 — 2026-08-15
+
+Nodus 4.1.3 extends the section snapshots of 4.1.2 to the three places a reader stays inside the
+longest, and remembers how far into a report the reading had got.
+
+### Added
+
+- Deep Research, Immersion and the Library's tab strip restore the item that was open, not only the
+  state of their list. A report is found again in the gallery the section already reads, an
+  immersion is fetched by id and lands on the step its own progress records, and a Library tab
+  reopens with the reference it was opened with.
+- A Deep Research report reopens at the block that was under the top edge, counted over the
+  paragraphs, headings, quotes and tables of the rendering on screen, so window width, font size and
+  a cover image that had not loaded yet no longer move the place. The place is reapplied while the
+  report is still growing and yields as soon as the reader scrolls or types. A place counted in one
+  rendering is dropped rather than approximated when an applied translation changes the block count.
+
+### Changed
+
+- The composer, the scope screen and an applied translation are deliberately not restored: they are
+  work in progress rather than a place in a document.
+
+## 4.1.2 — 2026-08-15
+
+Nodus 4.1.2 orders the author dossier by works before ideas, fixes its modals and connections list,
+lets every section remember where you left it, and finishes translating the Cloudflare deployment
+flow into all eight interface languages.
+
+### Added
+
+- Every section that renders through the shared list registry (Ideas, Authors, the Global Library,
+  the Argument Map, the Library, and the Workspace) restores its filters, sort order, active tab and
+  scroll anchor when you return to it, scoped to the active vault.
+
+### Changed
+
+- The author dossier lists an author's works before their ideas.
+- The connected authors list on an author dossier shows the five strongest relations and opens the
+  full list in a separate modal.
+
+### Fixed
+
+- Modals opened from an author dossier render into `document.body` so a parent `space-y-*` stack can
+  no longer give their backdrop a stray top margin.
+- The connected authors list and the reader's text-selection ribbon now use the correct surface and
+  hover colours in light mode.
+- The Cloudflare deployment wizard is now fully translated in all eight interface languages instead
+  of English only.
+
+## 4.1.1 — 2026-08-14
+
+Nodus 4.1.1 adds a Cloudflare deployment owned entirely by the person who runs it, publishes the
+complete Nodus Wiki and vault manuals, and corrects Global Library file handling, Coverage question
+loading, the Contradictions graph and several editor and modal details.
+
+### Added
+
+- Direct user-owned Cloudflare deployment through the official Deploy to Cloudflare wizard, which
+  creates D1 and R2 in the owner's own account and publishes a free workers.dev address. Nodus
+  receives no Cloudflare credentials or permissions.
+- Global Library settings for attachment naming, with three author, year and title formats, per
+  file-type selection, name synchronisation and an automatic reading-preparation switch.
+- The complete Nodus Wiki and per-vault manuals on the website, with mobile navigation and
+  downloadable PDF manuals.
+
+### Changed
+
+- The Contradictions graph preset is routed through the bounded semantic atlas and preserves both
+  sides of every retained debate.
+- Coverage questions are processed through a serial queue, so several can be launched in a row.
+
+### Fixed
+
+- Saved Coverage questions are reloaded for the active vault, and destructive deletion of a question
+  or a Library note is confirmed first.
+- Internal protected-span markers no longer leak into text-improvement previews or document content,
+  and the synonyms action no longer keeps a persistent outline.
+- Nodi renders immediately in update-related modals, and idea type markers stay circular inside flex
+  layouts.
+- Nodus Server image publication installs workflow dependencies before the server tests and reruns
+  when dependency manifests change.
+
 ## 4.1.0 — 2026-08-13
 
 Nodus 4.1 aligns its research views, workspaces, server and mobile reader around the same

@@ -219,7 +219,7 @@ test('the grid never reaches Google until a video is opened', async () => {
   // process — the renderer's CSP knows nothing about that host.
   assert.match(grid, /window\.nodus\.getTutorialCatalogue\(\)/);
   const html = await read('index.html');
-  assert.doesNotMatch(html, /connect-src[^;]*drakonis96/);
+  assert.doesNotMatch(html, /connect-src[^;]*nodusresearch/);
   // The iframe only exists inside the player, which is mounted on click.
   assert.match(grid, /\{playing && <TutorialVideoPlayer/);
   assert.match(grid, /allowFullScreen/, 'the player can go fullscreen');
@@ -527,7 +527,7 @@ test('the published file matches what this build ships', async () => {
     catalogue.TUTORIAL_VIDEOS.map((video) => [video.id, video.youtubeId, video.order, video.category, video.vaultType ?? null]),
     'site/tutorials.json and the built-in list agree'
   );
-  assert.equal(catalogue.TUTORIAL_CATALOGUE_URL, 'https://drakonis96.github.io/nodus/tutorials.json');
+  assert.equal(catalogue.TUTORIAL_CATALOGUE_URL, 'https://nodusresearch.com/tutorials.json');
 });
 
 test('the catalogue is fetched in the main process, cached, and never fatal', async () => {
@@ -557,6 +557,6 @@ test('a packaged renderer still gets the real player, not YouTube error 153', as
   // its "video player configuration error" card. Naming the Nodus site fixes it, and
   // the rewrite must stay scoped to the single host Nodus frames.
   assert.match(main, /onBeforeSendHeaders\(\s*\{ urls: \[`\$\{TUTORIAL_VIDEO_EMBED_ORIGIN\}\/\*`\] \}/);
-  assert.match(main, /Referer: 'https:\/\/drakonis96\.github\.io\/nodus\/'/);
+  assert.match(main, /Referer: 'https:\/\/nodusresearch\.com\/'/);
   assert.match(main, /import \{ TUTORIAL_VIDEO_EMBED_ORIGIN \} from '@shared\/tutorialVideos'/);
 });

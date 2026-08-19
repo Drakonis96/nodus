@@ -1,0 +1,527 @@
+/*
+SPDX-FileCopyrightText: 2026 Jorge Pérez Burgueño and Nodus contributors
+SPDX-License-Identifier: AGPL-3.0-only
+
+Home page components. The shared system lives in nodus.css.
+*/
+
+/* ============================================================ hero */
+.hero {
+  position: relative;
+  min-height: 100svh;
+  display: grid;
+  place-items: center;
+  padding: calc(var(--nav-h) + 40px) 0 90px;
+  text-align: center;
+}
+.hero-inner { width: min(100% - calc(var(--gut) * 2), 940px); margin-inline: auto; }
+
+@keyframes float-in { from { opacity: 0; transform: translateY(14px); } }
+
+.hero h1 {
+  margin: 30px 0 0;
+  font-family: var(--serif);
+  font-weight: 600;
+  font-size: clamp(40px, 7.6vw, 96px);
+  line-height: 0.99;
+  letter-spacing: -0.038em;
+  text-wrap: balance;
+}
+/* one masked row per line, so each can rise on its own beat */
+.hero-title .line { display: block; overflow: hidden; padding-bottom: 0.06em; }
+.hero-title .line > i { display: block; font-style: inherit; will-change: transform; }
+.hero h1 .verb {
+  background: linear-gradient(115deg, var(--violet-3), var(--violet-2) 45%, var(--violet));
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+}
+.hero h1 em { font-style: normal; color: var(--ink-2); font-size: 0.62em; }
+
+.hero .sub {
+  max-width: 60ch; margin: 26px auto 0;
+  font-size: clamp(16.5px, 1.5vw, 20px);
+  color: var(--ink-2);
+  text-wrap: pretty;
+}
+
+.hero .ctas {
+  display: flex; flex-wrap: wrap; gap: 14px; justify-content: center;
+  margin-top: 38px;
+}
+.hero .meta {
+  margin: 26px auto 0; max-width: 56ch;
+  font-size: 13.5px; color: var(--ink-3);
+}
+.hero .meta b { color: var(--ink-2); font-weight: 620; }
+.hero .hero-links {
+  margin: 16px auto 0; max-width: 62ch;
+  font-size: 13.5px; color: var(--ink-3);
+}
+.hero .hero-links a { color: var(--ink-2); text-decoration: underline; text-decoration-color: var(--membrane-2); text-underline-offset: 3px; }
+.hero .hero-links a:hover { color: var(--ink); text-decoration-color: var(--accent); }
+
+.scroll-cue {
+  position: absolute; left: 50%; bottom: 30px; transform: translateX(-50%);
+  display: flex; flex-direction: column; align-items: center; gap: 9px;
+  font-size: 10.5px; font-weight: 700; letter-spacing: 0.22em; text-transform: uppercase;
+  color: var(--ink-2);
+}
+.scroll-cue .rail {
+  width: 1px; height: 44px;
+  background: linear-gradient(var(--ink-3), transparent);
+  position: relative; overflow: hidden;
+}
+.scroll-cue .rail::after {
+  content: ''; position: absolute; inset: 0 auto auto 0;
+  width: 1px; height: 14px; background: var(--violet-2);
+  animation: cue 2.2s var(--ease-in-out) infinite;
+}
+@keyframes cue { 0% { transform: translateY(-16px); opacity: 0; } 40% { opacity: 1; } 100% { transform: translateY(46px); opacity: 0; } }
+
+/* ============================================================ scroll progress */
+#scroll-progress {
+  position: fixed; top: var(--nav-h); left: 0; z-index: 99;
+  width: 100%; height: 2px; transform-origin: 0 50%; transform: scaleX(0);
+  background: linear-gradient(90deg, var(--violet), var(--accent));
+  will-change: transform;
+}
+
+/* ============================================================ vault scenes */
+.scene { padding: clamp(56px, 7.5vw, 100px) 0; }
+.scene-inner {
+  display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.08fr);
+  gap: clamp(32px, 5vw, 72px); align-items: center;
+}
+/* every other scene puts the visual first, so the eye zig-zags down the page */
+.scene[data-flip] .scene-copy { order: 2; }
+
+.scene-index {
+  display: flex; align-items: baseline; gap: 14px; margin-bottom: 18px;
+}
+.scene-index b {
+  font-family: var(--serif); font-size: 54px; line-height: 1;
+  color: transparent; -webkit-text-stroke: 1.2px var(--accent);
+  opacity: 0.75;
+}
+
+.scene h2 {
+  font-size: clamp(30px, 4.2vw, 52px);
+  letter-spacing: -0.035em;
+}
+.scene h2 .glow { color: var(--accent); }
+.scene .lead { margin-top: 18px; }
+
+.caps { margin: 30px 0 28px; display: grid; gap: 2px; }
+.cap {
+  display: grid; grid-template-columns: 30px minmax(0, 1fr);
+  gap: 14px; align-items: start;
+  padding: 15px 14px 15px 4px;
+  border-top: 1px solid var(--membrane);
+  transition: background 0.3s var(--ease), padding-left 0.3s var(--ease);
+}
+.cap:last-child { border-bottom: 1px solid var(--membrane); }
+.cap:hover { background: rgba(255, 255, 255, 0.022); padding-left: 12px; }
+.cap em {
+  font-style: normal; font-family: var(--mono); font-size: 11.5px;
+  font-weight: 600; color: var(--accent); padding-top: 3px;
+}
+.cap p { margin: 0; font-size: 14.5px; color: var(--ink-2); line-height: 1.58; }
+.cap p b { color: var(--ink); font-weight: 620; }
+
+/* the framed device that holds each vault's visual */
+.frame {
+  position: relative;
+  border: 1px solid var(--membrane); border-radius: var(--r-l);
+  background: linear-gradient(180deg, rgba(16, 13, 28, 0.92), rgba(9, 7, 17, 0.92));
+  box-shadow: var(--shadow), 0 0 0 1px rgba(255, 255, 255, 0.02) inset;
+  overflow: hidden;
+  transition: transform 0.6s var(--ease), border-color 0.6s var(--ease);
+}
+.scene:hover .frame { border-color: color-mix(in srgb, var(--accent) 45%, transparent); }
+.frame::after {
+  content: ''; position: absolute; inset: 0; pointer-events: none;
+  background: radial-gradient(120% 90% at 50% -10%, color-mix(in srgb, var(--accent) 16%, transparent), transparent 62%);
+}
+.frame-bar {
+  display: flex; align-items: center; gap: 7px;
+  padding: 11px 15px; border-bottom: 1px solid var(--membrane);
+  background: rgba(255, 255, 255, 0.022);
+}
+.frame-bar i { width: 8px; height: 8px; border-radius: 50%; background: var(--membrane-2); }
+.frame-bar span {
+  margin-left: 8px; font: 600 10.5px/1 var(--mono);
+  letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-3);
+}
+.frame-body { padding: 20px; }
+
+/* --- academic: a graph --- */
+.graph-svg { width: 100%; height: auto; display: block; }
+.graph-svg text { font: 600 8.5px var(--sans); fill: var(--ink-2); }
+.graph-svg text.theme { font-size: 7.5px; letter-spacing: 0.1em; fill: var(--teaching); }
+.graph-svg .edge { stroke-dasharray: 120; stroke-dashoffset: 120; }
+.seen .graph-svg .edge { animation: draw-edge 1.1s var(--ease) forwards; }
+.seen .graph-svg .edge:nth-of-type(2) { animation-delay: 0.12s; }
+.seen .graph-svg .edge:nth-of-type(3) { animation-delay: 0.24s; }
+.seen .graph-svg .edge:nth-of-type(4) { animation-delay: 0.36s; }
+.seen .graph-svg .edge:nth-of-type(5) { animation-delay: 0.48s; }
+.seen .graph-svg .edge:nth-of-type(6) { animation-delay: 0.6s; }
+@keyframes draw-edge { to { stroke-dashoffset: 0; } }
+.graph-svg .node { opacity: 0; transform-box: fill-box; transform-origin: center; }
+.seen .graph-svg .node { animation: pop 0.5s var(--ease) forwards; }
+.seen .graph-svg .node:nth-of-type(2) { animation-delay: 0.1s; }
+.seen .graph-svg .node:nth-of-type(3) { animation-delay: 0.2s; }
+.seen .graph-svg .node:nth-of-type(4) { animation-delay: 0.3s; }
+.seen .graph-svg .node:nth-of-type(5) { animation-delay: 0.4s; }
+.seen .graph-svg .node:nth-of-type(6) { animation-delay: 0.5s; }
+.seen .graph-svg .node:nth-of-type(7) { animation-delay: 0.6s; }
+@keyframes pop { from { opacity: 0; transform: scale(0.4); } to { opacity: 1; transform: scale(1); } }
+
+.evidence {
+  margin-top: 14px; padding: 12px 14px;
+  border-left: 2px solid var(--accent); border-radius: 0 var(--r-s) var(--r-s) 0;
+  background: rgba(255, 255, 255, 0.028);
+  font-size: 12.5px; color: var(--ink-2); font-style: italic;
+}
+.evidence b { display: block; margin-top: 6px; font-style: normal; font-size: 11px; color: var(--ink-3); }
+
+/* --- teaching: gradebook --- */
+.grid-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.grid-table th {
+  padding: 8px 6px; text-align: left; font-weight: 600; font-size: 10px;
+  letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-3);
+  border-bottom: 1px solid var(--membrane);
+}
+.grid-table td { padding: 9px 6px; border-bottom: 1px solid rgba(255, 255, 255, 0.05); color: var(--ink-2); }
+.grid-table tr:last-child td { border-bottom: 0; }
+.grid-table td b { color: var(--ink); font-weight: 620; }
+.mark-pill {
+  display: inline-block; min-width: 34px; padding: 3px 8px; border-radius: 6px;
+  text-align: center; font-weight: 700; font-size: 11.5px;
+}
+.mark-pill.ok { background: rgba(52, 211, 153, 0.14); color: var(--good); }
+.mark-pill.mid { background: rgba(251, 191, 36, 0.14); color: var(--warn); }
+.mark-pill.na { background: rgba(255, 255, 255, 0.06); color: var(--ink-3); font-size: 10.5px; }
+.rubric { margin-top: 16px; display: grid; gap: 8px; }
+.rubric-row { display: flex; align-items: center; gap: 10px; font-size: 11.5px; color: var(--ink-2); }
+.rubric-row .bar { flex: 1; height: 5px; border-radius: 3px; background: rgba(255, 255, 255, 0.07); overflow: hidden; }
+.rubric-row .bar i {
+  display: block; height: 100%; border-radius: 3px;
+  background: linear-gradient(90deg, var(--accent), color-mix(in srgb, var(--accent) 45%, white));
+  width: 0; transition: width 1.1s var(--ease);
+}
+.seen .rubric-row .bar i { width: var(--w, 60%); }
+.rubric-row em { font-style: normal; width: 34px; text-align: right; color: var(--ink-3); font-family: var(--mono); font-size: 10.5px; }
+
+/* --- study: schedule + card --- */
+.week { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; }
+.week .day { text-align: center; font: 700 9.5px var(--sans); letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-3); padding-bottom: 6px; }
+.week .slot {
+  padding: 9px 7px; border-radius: 9px; font-size: 10.5px; font-weight: 600;
+  background: rgba(255, 255, 255, 0.04); border: 1px solid var(--membrane); color: var(--ink-2);
+  min-height: 44px;
+}
+.week .slot.on {
+  background: color-mix(in srgb, var(--accent) 18%, transparent);
+  border-color: color-mix(in srgb, var(--accent) 50%, transparent);
+  color: var(--ink);
+}
+.week .slot small { display: block; margin-top: 3px; font-weight: 500; font-size: 9.5px; color: var(--ink-3); }
+.flash {
+  margin-top: 16px; padding: 16px; border-radius: var(--r-m);
+  border: 1px solid var(--membrane); background: rgba(255, 255, 255, 0.03);
+}
+.flash b { display: block; font-size: 13.5px; margin-bottom: 8px; }
+.flash p { margin: 0 0 12px; font-size: 12px; color: var(--ink-3); }
+.flash .row { display: flex; gap: 7px; }
+.flash .row span {
+  flex: 1; padding: 7px; border-radius: 8px; text-align: center;
+  font-size: 10.5px; font-weight: 600; border: 1px solid var(--membrane); color: var(--ink-3);
+}
+.flash .row span.pick { border-color: color-mix(in srgb, var(--accent) 55%, transparent); color: var(--ink); background: color-mix(in srgb, var(--accent) 14%, transparent); }
+
+/* --- databases: table + chart --- */
+.db-cols { display: flex; gap: 6px; margin-bottom: 12px; }
+.db-cols span {
+  padding: 4px 9px; border-radius: 6px; font: 600 10px var(--mono);
+  background: rgba(255, 255, 255, 0.05); border: 1px solid var(--membrane); color: var(--ink-3);
+}
+.bars { display: flex; align-items: flex-end; gap: 8px; height: 96px; margin-top: 16px; }
+.bars i {
+  flex: 1; border-radius: 5px 5px 2px 2px;
+  background: linear-gradient(180deg, var(--accent), color-mix(in srgb, var(--accent) 22%, transparent));
+  height: 0; transition: height 0.9s var(--ease);
+  transition-delay: var(--d, 0ms);
+}
+.seen .bars i { height: var(--h, 50%); }
+.bars-axis { display: flex; gap: 8px; margin-top: 7px; }
+.bars-axis span { flex: 1; text-align: center; font: 600 9.5px var(--mono); color: var(--ink-3); }
+
+/* ============================================================ more vaults */
+.more-grid {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(272px, 1fr));
+  gap: 16px; margin-top: 48px;
+}
+.more-card { padding: 24px; }
+.more-card .head { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
+.more-card .pic {
+  display: grid; place-items: center; width: 38px; height: 38px; flex: 0 0 auto;
+  border-radius: 11px; border: 1px solid color-mix(in srgb, var(--vc) 40%, transparent);
+  background: color-mix(in srgb, var(--vc) 14%, transparent); color: var(--vc);
+}
+.more-card .pic svg { width: 19px; height: 19px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+.more-card h3 { font-size: 17px; }
+.more-card p { margin: 0 0 16px; font-size: 14px; color: var(--ink-2); line-height: 1.58; }
+.more-card .arrow-link { color: var(--vc); font-size: 13.5px; }
+.more-card:hover { border-color: color-mix(in srgb, var(--vc) 45%, transparent); }
+.more-card .tag-status { margin-left: auto; }
+
+.roadmap-note {
+  margin-top: 26px; padding: 16px 20px; border-radius: var(--r-m);
+  border: 1px dashed var(--membrane); background: rgba(255, 255, 255, 0.02);
+  font-size: 14px; color: var(--ink-3);
+}
+.roadmap-note b { color: var(--ink-2); }
+
+/* ============================================================ toolkit */
+.tool-hero {
+  display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr);
+  gap: clamp(28px, 5vw, 64px); align-items: center;
+  margin-top: 52px; padding: clamp(24px, 3.4vw, 40px);
+  border: 1px solid var(--membrane); border-radius: var(--r-xl);
+  background: linear-gradient(140deg, rgba(32, 22, 58, 0.88), rgba(12, 9, 22, 0.84));
+}
+.tool-hero h3 { font-size: clamp(22px, 2.6vw, 30px); margin-bottom: 14px; }
+.tool-hero p { margin: 0 0 20px; color: var(--ink-2); font-size: 15px; }
+.tool-pills { display: flex; flex-wrap: wrap; gap: 8px; }
+
+/* the presenter stage, with tools you can actually try */
+.stage { position: relative; }
+.stage-slide {
+  position: relative; aspect-ratio: 16 / 10; overflow: hidden;
+  border: 1px solid var(--membrane); border-radius: var(--r-m);
+  background: linear-gradient(160deg, #16122a, #0b0913);
+  display: grid; align-content: center; gap: 12px; padding: 26px;
+  cursor: crosshair;
+}
+.stage-slide small { font: 700 9.5px var(--mono); letter-spacing: 0.16em; text-transform: uppercase; color: var(--ink-3); }
+.stage-slide strong { font-family: var(--serif); font-size: clamp(19px, 2.3vw, 27px); font-weight: 600; letter-spacing: -0.03em; }
+.stage-slide i { display: block; height: 7px; border-radius: 4px; background: rgba(255, 255, 255, 0.08); }
+.stage-slide i:nth-of-type(1) { width: 82%; }
+.stage-slide i:nth-of-type(2) { width: 64%; }
+.stage-page {
+  position: absolute; right: 16px; bottom: 14px;
+  font: 600 10.5px var(--mono); color: var(--ink-3);
+}
+.stage-canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+.stage-spot {
+  position: absolute; inset: 0; opacity: 0; transition: opacity 0.3s var(--ease);
+  background: radial-gradient(circle 110px at var(--sx, 50%) var(--sy, 50%), transparent 0 100px, rgba(3, 2, 8, 0.86) 150px);
+}
+.stage[data-tool="spotlight"] .stage-spot { opacity: 1; }
+.stage-laser {
+  position: absolute; width: 15px; height: 15px; border-radius: 50%;
+  left: var(--sx, 50%); top: var(--sy, 50%); transform: translate(-50%, -50%);
+  background: radial-gradient(circle, #fff, #f43f5e 40%, transparent 70%);
+  box-shadow: 0 0 18px 5px rgba(244, 63, 94, 0.55);
+  opacity: 0; transition: opacity 0.2s;
+}
+.stage[data-tool="laser"] .stage-laser { opacity: 1; }
+.stage[data-tool="zoom"] .stage-slide > *:not(.stage-canvas):not(.stage-spot):not(.stage-laser) {
+  transform: scale(1.35); transform-origin: var(--sx, 50%) var(--sy, 50%);
+  transition: transform 0.35s var(--ease);
+}
+.stage-tools {
+  display: flex; flex-wrap: wrap; gap: 7px; margin-top: 14px;
+}
+.stage-tools button {
+  display: inline-flex; align-items: center; gap: 7px;
+  padding: 8px 13px; border-radius: var(--r-s);
+  border: 1px solid var(--membrane); background: var(--skin);
+  color: var(--ink-2); font: 600 12.5px var(--sans); cursor: pointer;
+  transition: all 0.22s var(--ease);
+}
+.stage-tools button svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.stage-tools button:hover { color: var(--ink); border-color: rgba(167, 139, 250, 0.5); }
+.stage-tools button[aria-pressed="true"] {
+  color: var(--ink); border-color: var(--accent); background: var(--accent-soft);
+}
+.stage-hint { margin-top: 10px; font-size: 12px; color: var(--ink-3); }
+
+.tool-cards {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 16px; margin-top: 20px;
+}
+.tool-card { padding: 24px; }
+.tool-card .pic {
+  display: grid; place-items: center; width: 40px; height: 40px; margin-bottom: 15px;
+  border-radius: 11px; border: 1px solid color-mix(in srgb, var(--tc) 40%, transparent);
+  background: color-mix(in srgb, var(--tc) 13%, transparent); color: var(--tc);
+}
+.tool-card .pic svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+.tool-card h3 { font-size: 16.5px; margin-bottom: 9px; }
+.tool-card p { margin: 0 0 14px; font-size: 14px; color: var(--ink-2); line-height: 1.55; }
+.tool-card .tags { display: flex; flex-wrap: wrap; gap: 6px; }
+.tool-card .tags span {
+  padding: 4px 10px; border-radius: 999px; font-size: 11.5px; font-weight: 600;
+  background: rgba(255, 255, 255, 0.05); border: 1px solid var(--membrane); color: var(--ink-3);
+}
+
+/* ============================================================ how it works */
+.steps { counter-reset: step; margin-top: 56px; display: grid; gap: 0; }
+.step {
+  position: relative; display: grid;
+  grid-template-columns: 78px minmax(0, 1fr);
+  gap: clamp(18px, 3vw, 40px);
+  padding: clamp(26px, 3.6vw, 44px) 0;
+  border-top: 1px solid var(--membrane);
+}
+.step:last-child { border-bottom: 1px solid var(--membrane); }
+.step .n {
+  font-family: var(--serif); font-size: clamp(38px, 4.4vw, 58px); line-height: 0.9;
+  color: transparent; -webkit-text-stroke: 1.2px var(--accent); opacity: 0.6;
+}
+.step h3 { font-size: clamp(20px, 2.2vw, 27px); margin-bottom: 12px; }
+.step p { margin: 0; max-width: 62ch; color: var(--ink-2); font-size: 15.5px; }
+.step .chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 18px; }
+
+@media (max-width: 700px) {
+  .step { grid-template-columns: minmax(0, 1fr); gap: 10px; }
+}
+
+/* The centred `band` section moved to nodus.css when the research pages
+   started using it too. */
+
+/* ============================================================ topic pages */
+/* The three long-form pages under the hero. Same card as `paths`, so the two
+   rows of destinations on the page read as one family. */
+.home-topics {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(272px, 1fr));
+  gap: 16px; margin-top: 46px;
+}
+
+/* ============================================================ paths (learn more) */
+.paths { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; margin-top: 46px; }
+.path-card { display: block; padding: 26px; color: inherit; }
+.path-card:hover { color: inherit; }
+.path-card .pic { color: var(--accent); margin-bottom: 16px; }
+.path-card .pic svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+.path-card h3 { font-size: 18px; margin-bottom: 9px; }
+.path-card p { margin: 0 0 16px; font-size: 14px; color: var(--ink-2); line-height: 1.55; }
+
+/* ============================================================ final */
+.final { text-align: center; padding-bottom: clamp(90px, 12vw, 150px); }
+.final .n-mark { width: 62px; height: 62px; margin-bottom: 26px; }
+.final .lead { margin-inline: auto; }
+.final .ctas { display: flex; flex-wrap: wrap; gap: 14px; justify-content: center; margin-top: 36px; }
+
+/* ============================================================ responsive */
+@media (max-width: 980px) {
+  /* minmax(0, 1fr), never a bare 1fr: a bare fr keeps an automatic minimum, so
+     one wide child (a screenshot frame, a long label) pushes the whole column
+     past the viewport and the page scrolls sideways */
+  .scene-inner { grid-template-columns: minmax(0, 1fr); }
+  .scene[data-flip] .scene-copy { order: 0; }
+  .tool-hero { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* The Nodus N is assembled by the field right behind the headline, so the hero
+   takes a lighter scrim than the rest of the page: enough to hold the type,
+   not enough to swallow the mark. */
+.hero-inner.scrim::before {
+  /* same rule as the shared scrim: the sideways bleed stops at the gutter so it
+     cannot widen the page (the hero box is already 940px, wider than .wrap) */
+  inset: -80px calc(-1 * min(90px, var(--gut)));
+  background: radial-gradient(66% 58% at 50% 50%, rgba(6, 5, 11, 0.62), rgba(6, 5, 11, 0.3) 58%, transparent 80%);
+}
+
+/* The Nodus mark, held in the middle of the home page above the headline. */
+.hero .n-mark {
+  width: clamp(58px, 6vw, 78px); height: auto;
+  margin: 0 auto 30px; display: block;
+  filter: drop-shadow(0 0 26px rgba(139, 92, 246, 0.5));
+  animation: n-breathe 6s var(--ease-in-out) 1s infinite;
+}
+@keyframes n-breathe {
+  0%, 100% { transform: translateY(0) scale(1); }
+  50% { transform: translateY(-6px) scale(1.03); }
+}
+
+/* ============================================================ the opening
+   The visitor arrives to an empty field. The nodes gather into the Nodus N,
+   hold, then burst apart as the mark lands and the three lines of the motto
+   rise one after another. Everything else follows.
+
+   `intro-armed` is set on <html> before the first paint by a tiny inline
+   script, so nothing ever flashes. `intro-run` starts the choreography;
+   `intro-done` hands the page back to its ordinary rules. With JavaScript off,
+   or motion reduced, none of these classes exist and the hero is simply there.
+   ------------------------------------------------------------------------- */
+
+/* keep the scrollbar gutter reserved so locking scroll never shifts the layout */
+html { scrollbar-gutter: stable; }
+html.intro-armed { overflow: hidden; }
+
+/* stage one: only the field. */
+.intro-armed .nav,
+.intro-armed #scroll-progress,
+.intro-armed #nodi,
+.intro-armed .hero .n-mark,
+.intro-armed .hero-title .line > i,
+.intro-armed .hero .sub,
+.intro-armed .hero .ctas,
+.intro-armed .hero .meta,
+.intro-armed .hero .hero-links,
+.intro-armed .scroll-cue,
+.intro-armed main > section,
+.intro-armed .site-foot { opacity: 0; }
+
+/* the scrim would darken the field the N is drawn in */
+.intro-armed .hero-inner.scrim::before { opacity: 0; }
+.intro-armed .hero-title .line > i { transform: translateY(112%) rotate(2.5deg); }
+
+/* stage two: the mark lands, then the motto, then the rest. */
+.intro-run .hero .n-mark {
+  animation: intro-mark 1.1s var(--ease) both, n-breathe 6s var(--ease-in-out) 2s infinite;
+}
+.intro-run .hero-inner.scrim::before { animation: intro-fade 1.2s var(--ease) 0.5s both; }
+
+.intro-run .hero-title .line > i { animation: intro-line 1.05s var(--ease) both; }
+.intro-run .hero-title .line:nth-child(1) > i { animation-delay: 0.52s; }
+.intro-run .hero-title .line:nth-child(2) > i { animation-delay: 0.70s; }
+.intro-run .hero-title .line:nth-child(3) > i { animation-delay: 0.88s; }
+
+.intro-run .hero .sub   { animation: intro-rise 0.9s var(--ease) 1.20s both; }
+.intro-run .hero .ctas  { animation: intro-rise 0.9s var(--ease) 1.36s both; }
+.intro-run .hero .meta  { animation: intro-rise 0.9s var(--ease) 1.52s both; }
+.intro-run .hero .hero-links { animation: intro-rise 0.9s var(--ease) 1.62s both; }
+.intro-run .nav         { animation: intro-drop 0.8s var(--ease) 1.52s both; }
+.intro-run .scroll-cue  { animation: intro-rise 0.9s var(--ease) 1.78s both; }
+.intro-run #scroll-progress,
+.intro-run #nodi        { animation: intro-fade 0.9s var(--ease) 1.78s both; }
+.intro-run main > section,
+.intro-run .site-foot   { animation: intro-fade 0.9s var(--ease) 1.60s both; }
+
+@keyframes intro-mark {
+  from { opacity: 0; transform: scale(2.6); filter: blur(6px) drop-shadow(0 0 46px rgba(139, 92, 246, 0.9)); }
+  60%  { opacity: 1; }
+  to   { opacity: 1; transform: scale(1); filter: blur(0) drop-shadow(0 0 26px rgba(139, 92, 246, 0.5)); }
+}
+@keyframes intro-line {
+  from { transform: translateY(112%) rotate(2.5deg); }
+  to   { transform: translateY(0) rotate(0); }
+}
+@keyframes intro-rise { from { opacity: 0; transform: translateY(18px); } to { opacity: 1; transform: none; } }
+@keyframes intro-drop { from { opacity: 0; transform: translateY(-100%); } to { opacity: 1; transform: none; } }
+@keyframes intro-fade { from { opacity: 0; } to { opacity: 1; } }
+
+/* a skip affordance, for anyone who has seen it already */
+.intro-skip {
+  position: fixed; z-index: 120; right: 22px; bottom: 22px;
+  padding: 9px 16px; border-radius: 999px;
+  border: 1px solid var(--membrane); background: rgba(10, 8, 19, 0.7);
+  backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+  color: var(--ink-2); font: 600 12px var(--sans); cursor: pointer;
+  opacity: 0; animation: intro-fade 0.6s var(--ease) 1.2s forwards;
+  transition: color 0.2s var(--ease), border-color 0.2s var(--ease);
+}
+.intro-skip:hover { color: var(--ink); border-color: rgba(167, 139, 250, 0.5); }
+.intro-done .intro-skip { display: none; }

@@ -46,7 +46,7 @@ test('the table holds exactly the three accounts, with their real addresses', ()
     [
       ['reddit', 'https://www.reddit.com/r/NodusApp/'],
       ['youtube', 'https://www.youtube.com/@nodus_app'],
-      ['x', 'https://x.com/try_Nodus'],
+      ['x', 'https://x.com/nodusresearch'],
     ]
   );
   // Brand names are not translated, and shell:openExternal only follows http(s).

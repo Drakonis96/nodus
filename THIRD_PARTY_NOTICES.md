@@ -1,6 +1,6 @@
 # Nodus third-party notices
 
-Nodus 4.1.0 is free software distributed exclusively under the GNU Affero
+Nodus 4.1.6 is free software distributed exclusively under the GNU Affero
 General Public License v3.0 (`AGPL-3.0-only`). Versions through 3.2.7 remain
 available under MIT. Nodus includes or interoperates with the components and
 data described below. Those components keep their own licenses and their
@@ -32,6 +32,20 @@ The offline gazetteer in Nodus is derived from the GeoNames `cities15000`,
 
 GeoNames data is provided "as is" and without endorsement. A complete copy of
 CC BY 4.0 is included in `legal/generated/CC-BY-4.0.txt`.
+
+## Inter and Fraunces typefaces — OFL 1.1
+
+The promotional website at `site/` serves its two typefaces from its own origin
+instead of Google Fonts, so that no third-party request stands between a visitor
+and the first drawn word.
+
+- Creators: the Inter Project Authors (https://github.com/rsms/inter) and the
+  Fraunces Project Authors (https://github.com/undercasetype/Fraunces)
+- Source: the Google Fonts CSS API, `latin` variable subsets
+- License: SIL Open Font License 1.1, vendored beside the fonts as
+  `site/assets/fonts/Inter-OFL.txt` and `site/assets/fonts/Fraunces-OFL.txt`
+- Changes made by Nodus: none. The `woff2` files are served byte for byte as
+  they are published upstream.
 
 ## Multilingual E5 small model — MIT
 

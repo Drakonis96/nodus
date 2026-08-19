@@ -170,6 +170,7 @@ const DEFAULTS: Omit<AppSettings, 'providerKeys' | 'lockedProviderKeys'> = {
   mcpPort: 4319,
   mcpToken: '',
   nodusServerEnabled: false,
+  nodusServerKind: 'classic',
   nodusServerUrl: '',
   nodusServerSpaceId: '',
   nodusServerSpaceName: '',

@@ -28,12 +28,32 @@ if (!process.argv.includes('--electron-auto-backup-test')) {
 process.env.NODE_PATH = [path.join(repoRoot, 'node_modules'), process.env.NODE_PATH].filter(Boolean).join(path.delimiter);
 Module._initPaths();
 const require = createRequire(import.meta.url);
+const zlib = require('node:zlib');
+const nodeCrypto = require('node:crypto');
+const meter = { deflateSync: 0, deflateStream: 0, scryptSync: 0, scryptAsync: 0 };
+const originalPrimitives = {
+  deflateRawSync: zlib.deflateRawSync,
+  createDeflateRaw: zlib.createDeflateRaw,
+  DeflateRaw: zlib.DeflateRaw,
+  scryptSync: nodeCrypto.scryptSync,
+  scrypt: nodeCrypto.scrypt,
+};
+// Install before bundling production modules: ZIP/crypto libraries capture these
+// references at module evaluation time. node:zlib exports require defineProperty.
+const swapPrimitive = (host, name, value) => Object.defineProperty(host, name, { value, configurable: true, writable: true });
+swapPrimitive(zlib, 'deflateRawSync', (...a) => { meter.deflateSync += 1; return originalPrimitives.deflateRawSync(...a); });
+swapPrimitive(zlib, 'createDeflateRaw', (...a) => { meter.deflateStream += 1; return originalPrimitives.createDeflateRaw(...a); });
+swapPrimitive(zlib, 'DeflateRaw', class MeteredDeflateRaw extends originalPrimitives.DeflateRaw {
+  constructor(...args) { super(...args); meter.deflateStream += 1; }
+});
+swapPrimitive(nodeCrypto, 'scryptSync', (...a) => { meter.scryptSync += 1; return originalPrimitives.scryptSync(...a); });
+swapPrimitive(nodeCrypto, 'scrypt', (...a) => { meter.scryptAsync += 1; return originalPrimitives.scrypt(...a); });
 
 const root = await mkdtemp(path.join(os.tmpdir(), 'nodus-auto-backup-'));
 process.env.NODUS_TEST_USERDATA = root; // stub-electron app.getPath → temp files land here
 try {
   const Database = require('better-sqlite3');
-  const db = new Database(path.join(root, 'live.sqlite'));
+  const db = new Database(path.join(root, 'nodus.sqlite'));
   db.exec(`
     CREATE TABLE settings (key TEXT PRIMARY KEY, value TEXT);
     CREATE TABLE works (nodus_id TEXT PRIMARY KEY, title TEXT);
@@ -175,6 +195,14 @@ try {
   const written = (await readdir(backupDir)).filter((f) => f.endsWith('.nodus'));
   assert.equal(written.length, 1, 'exactly one archive, no .tmp leftovers');
   assert.match(written[0], /^nodus-backup-.+-v9\.9\.9-test-schema\d+-\d{8}-\d{6}\.nodus$/, 'new backups expose app/schema versions in the filename');
+
+  const unchangedPath = path.join(root, 'unchanged.nodus');
+  const unchanged = await exportImport.createBackupArchiveFile({ password: 'mi-frase-maestra', appVersion: 'x' }, unchangedPath);
+  assert.equal(unchanged.reusedVaults, 1, 'an unchanged vault reuses its verified cached snapshot instead of running VACUUM INTO');
+  db.prepare("INSERT INTO works VALUES ('w2', 'Cambio posterior')").run();
+  const changedPath = path.join(root, 'changed.nodus');
+  const changed = await exportImport.createBackupArchiveFile({ password: 'mi-frase-maestra', appVersion: 'x' }, changedPath);
+  assert.equal(changed.reusedVaults, 0, 'a content write invalidates the cached vault snapshot');
 
   const zip = new AdmZip(path.join(backupDir, written[0]));
   const manifest = JSON.parse(zip.readAsText('manifest.json'));
@@ -374,28 +402,15 @@ try {
   for (let offset = 0; offset < filler.length; offset += 65536) randomFillSync(filler, offset, 65536);
   await writeFile(path.join(root, 'nodi-notes.json'), filler);
 
-  const zlib = require('node:zlib');
-  const nodeCrypto = require('node:crypto');
-  const meter = { deflateSync: 0, deflateStream: 0, scryptSync: 0, scryptAsync: 0 };
-  const original = {
-    deflateRawSync: zlib.deflateRawSync,
-    createDeflateRaw: zlib.createDeflateRaw,
-    scryptSync: nodeCrypto.scryptSync,
-    scrypt: nodeCrypto.scrypt,
-  };
-  // node:zlib exports are non-writable, so swap them through defineProperty.
-  const swap = (host, name, value) => Object.defineProperty(host, name, { value, configurable: true, writable: true });
-  swap(zlib, 'deflateRawSync', (...a) => { meter.deflateSync += 1; return original.deflateRawSync(...a); });
-  swap(zlib, 'createDeflateRaw', (...a) => { meter.deflateStream += 1; return original.createDeflateRaw(...a); });
-  swap(nodeCrypto, 'scryptSync', (...a) => { meter.scryptSync += 1; return original.scryptSync(...a); });
-  swap(nodeCrypto, 'scrypt', (...a) => { meter.scryptAsync += 1; return original.scrypt(...a); });
-  let archive;
-  try {
-    archive = await exportImport.createBackupArchive({ password: 'clave-manual-larga', appVersion: 'x' });
-  } finally {
-    for (const [name, value] of Object.entries(original)) swap(name.startsWith('scrypt') ? nodeCrypto : zlib, name, value);
-  }
+  meter.deflateSync = 0; meter.deflateStream = 0; meter.scryptSync = 0; meter.scryptAsync = 0;
+  const archive = await exportImport.createBackupArchive({ password: 'clave-manual-larga', appVersion: 'x' });
   assert.ok(archive.length > 32 * 1024 * 1024, 'the probe payload really made it into the archive');
+  const probeOuterZip = new AdmZip(archive);
+  assert.equal(
+    probeOuterZip.getEntry('backup.bin').header.method,
+    0,
+    'already-encrypted backup.bin must use ZIP STORE instead of a second deflate pass',
+  );
   assert.ok(meter.deflateStream > 0, 'the archive is deflated through zlib’s asynchronous API');
   assert.equal(meter.deflateSync, 0, 'no entry may be deflated with deflateRawSync on the main thread');
   assert.ok(meter.scryptAsync > 0, 'the backup key is derived on libuv’s threadpool');
@@ -454,6 +469,9 @@ try {
   db.close();
   console.log('auto backup (master password + GFS retention) test passed');
 } finally {
+  for (const [name, value] of Object.entries(originalPrimitives)) {
+    swapPrimitive(name.startsWith('scrypt') ? nodeCrypto : zlib, name, value);
+  }
   await rm(root, { recursive: true, force: true });
 }
 

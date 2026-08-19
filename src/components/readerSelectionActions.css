@@ -39,6 +39,10 @@
 
 .reader-selection-colors { display: flex; gap: 1px; }
 .reader-selection-actions .reader-selection-color { width: 25px; }
+/* On a highlight the reader clicked, the colour it already has stays marked so
+   the palette reads as a choice among six rather than six new highlights. */
+.reader-selection-actions .reader-selection-color.is-active { background: #3730a3; }
+.reader-selection-actions .reader-selection-color.is-active span { border-color: #fff; }
 .reader-selection-color span,
 .reader-highlighter-palette button span {
   width: 16px;
@@ -123,6 +127,18 @@
   box-shadow: 0 12px 30px rgb(24 24 27 / 0.16);
   color: #27272a;
 }
+/* The ribbon's own buttons kept the dark-theme hover (a deep indigo block that
+   reads as a hole punched in a white bar). On light they take the same soft
+   indigo the highlighter palette already uses. */
+.light .reader-selection-actions button:hover,
+.light .reader-selection-actions button:focus-visible { background: #eef2ff; color: #4338ca; }
+/* The colour discs ring themselves in white so they separate from a dark bar;
+   on white that ring vanishes and the pale swatches lose their edge. */
+.light .reader-selection-color span,
+.light .reader-highlighter-palette button span { border-color: rgb(24 24 27 / 0.22); }
+.light .reader-selection-actions .reader-selection-color.is-active { background: #eef2ff; }
+.light .reader-selection-actions .reader-selection-color.is-active span { border-color: #4338ca; }
+.light .reader-active-color { box-shadow: 0 0 0 1px rgb(24 24 27 / 0.3); }
 .light .reader-selection-actions button[data-tone='danger'] { color: #dc2626; }
 .light .reader-selection-actions button[data-tone='danger']:hover,
 .light .reader-selection-actions button[data-tone='danger']:focus-visible { background: #fee2e2; color: #991b1b; }

@@ -8,13 +8,13 @@
 
 <p align="center">
   <a href="https://github.com/Drakonis96/nodus/releases/latest">Download Nodus</a> ·
-  <a href="https://drakonis96.github.io/nodus/">Visit the website</a> ·
-  <a href="https://drakonis96.github.io/nodus/demo/">Try the interactive tour</a>
+  <a href="https://nodusresearch.com/">Visit the website</a> ·
+  <a href="https://nodusresearch.com/demo/">Try the interactive tour</a>
 </p>
 
 <p align="center">
-  <a href="https://paypal.me/Jorgepb96">Support Nodus with PayPal</a> ·
-  <a href="https://ko-fi.com/nodus_app">Support Nodus on Ko-fi</a>
+  <a href="https://paypal.me/Jorgepb96"><img src="https://img.shields.io/badge/PayPal-Support-0070BA?logo=paypal&logoColor=white" alt="Support Nodus with PayPal"></a>
+  <a href="https://ko-fi.com/nodus_app"><img src="https://img.shields.io/badge/Ko--fi-Support-FF5E5B?logo=kofi&logoColor=white" alt="Support Nodus on Ko-fi"></a>
 </p>
 
 Nodus is a desktop centre for university work. It brings sources, notes, data, ideas and learning materials together without forcing every project into the same shape.
@@ -22,41 +22,6 @@ Nodus is a desktop centre for university work. It brings sources, notes, data, i
 Each vault is a focused workspace. Researchers can build a connected corpus, historians can document a family tree, teams can explore structured data, teachers can plan and assess their courses, and students can organise an entire degree. You can move between them from one calm, consistent app.
 
 Nodus is local first. Your vaults and search indexes live on your computer. You decide when a feature may use an online AI provider, and you can also work with compatible local models.
-
-## A library shared by every vault
-
-Nodus keeps one cross-vault Library inside `nodus-library`, nested under the
-backup folder you choose. It can mirror a complete Zotero library with its
-collection hierarchy and stable item keys, import RIS, BibTeX and CSL JSON from
-Mendeley or other managers, or accept local documents directly.
-
-Each original remains separate from a clean Markdown reading copy, extracted
-figures, structured tables, page mappings, highlights, notes and document chat.
-On first open, the reader asks whether to use the clean copy or the preserved
-original and can remember that choice; it can be reset from **Versions and
-files**. The same chooser switches between clean Markdown and preserved PDF,
-EPUB, image, web, text and office attachments. Text can be highlighted in the
-reflowable and PDF viewers, while images accept region highlights. Unsupported
-legacy binaries open in their associated application without modifying them.
-The citation manager uses real CSL styles, including custom `.csl` files copied
-from Zotero, and formats them locally after installation. A document can then be linked into any compatible vault
-for search and analysis without duplicating the global copy. See the
-[architecture, recovery and privacy guide](docs/global-library.md).
-
-### Updating to Nodus 4
-
-Updating from 3.2.7 keeps **This vault** as the initial Library scope and does
-not enable or migrate the cross-vault Library automatically. Before Nodus 4
-opens an existing database, it creates and verifies a one-time pre-v4 recovery
-copy. The optional migration assistant then inventories selected academic
-vaults and can be cancelled, resumed, verified, or rolled back without writing
-to the source vaults.
-
-Nodus 4 opens backups created by Nodus 3.x. A profile or Library already
-migrated to v4 is not guaranteed to open in a 3.x application, so keep the
-automatic pre-v4 recovery copy for downgrade recovery. Complete v4 encrypted
-backups include both every vault and `nodus-library`. See the
-[Library recovery contract](docs/global-library.md#updating-from-nodus-327).
 
 ## Install Nodus
 
@@ -150,6 +115,41 @@ Nodus Server shares a selected copy of a vault while the original database and d
 
 Nodus can now start a private server from Settings for access on a phone or tablet through Tailscale or the local network. Groups can instead run the Docker version on their own server and manage spaces, people and devices from the web. Both options are experimental. See the [Nodus Server installation guide](server/README.md).
 
+## A library shared by every vault
+
+Nodus keeps one cross-vault Library inside `nodus-library`, nested under the
+backup folder you choose. It can mirror a complete Zotero library with its
+collection hierarchy and stable item keys, import RIS, BibTeX and CSL JSON from
+Mendeley or other managers, or accept local documents directly.
+
+Each original remains separate from a clean Markdown reading copy, extracted
+figures, structured tables, page mappings, highlights, notes and document chat.
+On first open, the reader asks whether to use the clean copy or the preserved
+original and can remember that choice; it can be reset from **Versions and
+files**. The same chooser switches between clean Markdown and preserved PDF,
+EPUB, image, web, text and office attachments. Text can be highlighted in the
+reflowable and PDF viewers, while images accept region highlights. Unsupported
+legacy binaries open in their associated application without modifying them.
+The citation manager uses real CSL styles, including custom `.csl` files copied
+from Zotero, and formats them locally after installation. A document can then be linked into any compatible vault
+for search and analysis without duplicating the global copy. See the
+[architecture, recovery and privacy guide](docs/global-library.md).
+
+### Updating to Nodus 4
+
+Updating from 3.2.7 keeps **This vault** as the initial Library scope and does
+not enable or migrate the cross-vault Library automatically. Before Nodus 4
+opens an existing database, it creates and verifies a one-time pre-v4 recovery
+copy. The optional migration assistant then inventories selected academic
+vaults and can be cancelled, resumed, verified, or rolled back without writing
+to the source vaults.
+
+Nodus 4 opens backups created by Nodus 3.x. A profile or Library already
+migrated to v4 is not guaranteed to open in a 3.x application, so keep the
+automatic pre-v4 recovery copy for downgrade recovery. Complete v4 encrypted
+backups include both every vault and `nodus-library`. See the
+[Library recovery contract](docs/global-library.md#updating-from-nodus-327).
+
 ## Cite Nodus
 
 If Nodus contributes substantially to research that leads to a publication, please cite the version you used. The repository provides machine-readable citation metadata in [`CITATION.cff`](CITATION.cff), which GitHub can render in APA and BibTeX formats.
@@ -171,7 +171,7 @@ The three vaults are in alpha and may change as they develop. They are clearly m
 
 Every working vault includes a demo mode with sample content. It is the quickest way to understand how Nodus feels and what each workspace can do.
 
-You can also visit the [interactive browser tour](https://drakonis96.github.io/nodus/demo/) without installing the app.
+You can also visit the [interactive browser tour](https://nodusresearch.com/demo/) without installing the app.
 
 ## Open and evolving
 

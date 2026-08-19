@@ -91,12 +91,34 @@ export function useScanComplete(onComplete: () => void): void {
 export function useIncrementalList<T, E extends HTMLElement = HTMLDivElement>(
   items: T[],
   pageSize: number,
-  weight?: (item: T) => number
+  weight?: (item: T) => number,
+  /**
+   * A row that must be on screen for the list to be usable — the anchor a returning
+   * reader is being scrolled back to. Here "load until this id appears" is literal:
+   * the list opens with enough pages to include it instead of one. Consumed once, so
+   * the reader's own paging is never fought.
+   *
+   * Only meaningful without `weight`: with one, `count` is a budget rather than a row
+   * count, and a row index says nothing about how much budget reaching it costs.
+   */
+  ensureIndex?: number
 ): { visible: T[]; hasMore: boolean; sentinelRef: RefObject<E>; showMore: () => void } {
-  const [count, setCount] = useState(pageSize);
+  const anchored = ensureIndex !== undefined && ensureIndex >= 0 && !weight;
+  const initialCount = () => (anchored
+    ? Math.max(pageSize, Math.ceil((ensureIndex! + 1) / pageSize) * pageSize)
+    : pageSize);
+  const [count, setCount] = useState(initialCount);
   const sentinelRef = useRef<E>(null);
+  const ensured = useRef(false);
 
   useEffect(() => {
+    // The first page of real rows must not collapse the pages opened for the anchor:
+    // `items` starts empty and its arrival would otherwise reset the count.
+    if (!ensured.current && anchored && items.length > 0) {
+      ensured.current = true;
+      setCount(initialCount());
+      return;
+    }
     setCount(pageSize);
   }, [items, pageSize]);
 

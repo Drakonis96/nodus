@@ -5,6 +5,7 @@
 // connections to other ideas. From the detail you can jump into the graph
 // — either the focused node in the global graph, or the work's idea graph.
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { createPortal } from 'react-dom';
 import type { EdgeDetail, IdeaByWork, IdeaDetail, IdeaType, ModelRef, WorkIdeaSynthesis } from '@shared/types';
 import { Badge, EDGE_LABELS, Icon, NODE_LABELS, TypeDot } from '../components/ui';
 import { OccurrenceCard } from '../components/NodeDetailPanel';
@@ -187,10 +188,13 @@ export function WorkIdeasModal({
 
   const ideaHeader = detail?.idea ?? null;
 
-  return (
+  // Rendered into <body>: the dossier that opens this modal stacks its sections
+  // with `space-y-*`, which would otherwise hand the overlay a top margin and
+  // push the backdrop below the window's title bar, leaving it half uncovered.
+  return createPortal(
     <div
       data-testid="work-ideas-modal"
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 sm:p-8"
+      className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 p-4 sm:p-8"
       role="dialog"
       aria-modal="true"
       aria-label={t('Ideas de la obra')}
@@ -511,6 +515,7 @@ export function WorkIdeasModal({
           onClose={() => setSavingNote(null)}
         />
       )}
-    </div>
+    </div>,
+    document.body
   );
 }

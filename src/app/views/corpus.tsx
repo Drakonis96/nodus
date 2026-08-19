@@ -22,9 +22,14 @@ const PrimarySourcesNotesView = lazy(() => import('../../views/PrimarySourcesNot
 const TestimonySearchView = lazy(() => import('../../views/TestimonySearchView').then((module) => ({ default: module.TestimonySearchView })));
 
 export const corpusViews = {
-  library: ({ activeVault, isPrimarySources, libraryTarget, navigate, openAssistant, reloadSettings, setCollectionsOpen, settings, setView }) => (
+  // `snapshot` is the same shape as `target` and `initialTab`: a starting value the
+  // shell hands down, read once at mount. `onSnapshotChange` is the return path, so
+  // the cut survives the unmount that leaving the section causes.
+  library: ({ activeVault, isPrimarySources, libraryTarget, navigate, openAssistant, reloadSettings, setCollectionsOpen, settings, setView, snapshots }) => (
     <GlobalLibraryView
       target={libraryTarget}
+      snapshot={snapshots.read('library')}
+      onSnapshotChange={(patch) => snapshots.patch('library', patch)}
       settings={settings}
       vaultId={activeVault?.id ?? null}
       vaultType={activeVault?.type}
@@ -37,23 +42,40 @@ export const corpusViews = {
     />
   ),
   graph: ({ graphTarget, reloadSettings, settings }) => <GraphView settings={settings} onSettingsChange={reloadSettings} target={graphTarget} />,
-  argument: ({ settings }) => <ArgumentMapView settings={settings} />,
-  ideas: ({ activeVault, ideaTarget, navigate, openAssistant }) => (
+  argument: ({ settings, snapshots }) => (
+    <ArgumentMapView
+      settings={settings}
+      snapshot={snapshots.read('argument')}
+      onSnapshotChange={(patch) => snapshots.patch('argument', patch)}
+    />
+  ),
+  ideas: ({ activeVault, ideaTarget, navigate, openAssistant, snapshots }) => (
     <IdeasView
       vaultId={activeVault?.id ?? null}
       target={ideaTarget}
+      snapshot={snapshots.read('ideas')}
+      onSnapshotChange={(patch) => snapshots.patch('ideas', patch)}
       onOpenGraph={(target) => navigate('graph', target)}
       onOpenAssistant={openAssistant}
     />
   ),
-  authors: ({ activeVault, navigate, settings }) => (
+  authors: ({ activeVault, navigate, settings, snapshots }) => (
     <AuthorsView
       vaultId={activeVault?.id ?? null}
       settings={settings}
+      snapshot={snapshots.read('authors')}
+      onSnapshotChange={(patch) => snapshots.patch('authors', patch)}
       onOpenGraph={(target) => navigate('graph', target)}
     />
   ),
-  immersion: ({ navigate, settings }) => <ImmersionView settings={settings} onOpenGraph={(target) => navigate('graph', target)} />,
+  immersion: ({ navigate, settings, snapshots }) => (
+    <ImmersionView
+      settings={settings}
+      snapshot={snapshots.read('immersion')}
+      onSnapshotChange={(patch) => snapshots.patch('immersion', patch)}
+      onOpenGraph={(target) => navigate('graph', target)}
+    />
+  ),
   // Cobertura y Huecos son el mismo espacio con dos pestañas. 'gaps' ya no tiene
   // entrada en la barra lateral, pero sigue siendo una vista enrutable —Inicio,
   // Buscar y el tour avanzado navegan a ella— y entra por la pestaña de huecos.
@@ -92,8 +114,14 @@ export const corpusViews = {
     <ReadingPathView onOpenGraph={(target) => navigate('graph', target)} onOpenAssistant={openAssistant} />
   ),
   writing: ({ navigate, settings }) => <WritingWorkshopView settings={settings} onOpenGraph={(target) => navigate('graph', target)} />,
-  deepResearch: ({ isGenealogy, navigate, settings }) => (
-    <DeepResearchView settings={settings} isGenealogy={isGenealogy} onOpenGraph={(target) => navigate('graph', target)} />
+  deepResearch: ({ isGenealogy, navigate, settings, snapshots }) => (
+    <DeepResearchView
+      settings={settings}
+      isGenealogy={isGenealogy}
+      snapshot={snapshots.read('deepResearch')}
+      onSnapshotChange={(patch) => snapshots.patch('deepResearch', patch)}
+      onOpenGraph={(target) => navigate('graph', target)}
+    />
   ),
   projects: ({ settings }) => <ProjectsView settings={settings} />,
 
@@ -139,20 +167,24 @@ export const corpusViews = {
 
   // Notas, ideas y colecciones con una única experiencia visual. La ruta académica
   // conserva el nombre Espacio de trabajo; el resto entra por su sección Notas.
-  workspace: ({ navigate, noteTarget, settings }) => (
+  workspace: ({ navigate, noteTarget, settings, snapshots }) => (
     <WorkspaceView
       settings={settings}
       focusNote={noteTarget}
+      snapshot={snapshots.read('workspace')}
+      onSnapshotChange={(patch) => snapshots.patch('workspace', patch)}
       onOpenGraph={(target) => navigate('graph', target)}
     />
   ),
 
-  notes: ({ isPrimarySources, isTestimonios, navigate, noteTarget, openPrimarySourceTarget, openTestimonyLink, settings }) => (isPrimarySources
+  notes: ({ isPrimarySources, isTestimonios, navigate, noteTarget, openPrimarySourceTarget, openTestimonyLink, settings, snapshots }) => (isPrimarySources
     ? <PrimarySourcesNotesView focusNote={noteTarget} onOpenSource={openPrimarySourceTarget} />
     : (
       <WorkspaceView
         settings={settings}
         title="Notas"
+        snapshot={snapshots.read('notes')}
+        onSnapshotChange={(patch) => snapshots.patch('notes', patch)}
         onOpenGraph={(target) => navigate('graph', target)}
         focusNote={noteTarget}
         onTestimonyLink={isTestimonios ? openTestimonyLink : undefined}

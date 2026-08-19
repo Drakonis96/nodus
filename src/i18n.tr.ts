@@ -2,6 +2,7 @@ import { PROTECT_TRANSLATIONS } from './i18n.protect';
 import { AI_OCR_TRANSLATIONS } from './i18n.aiOcr';
 import { TOOLKIT_APPS_TRANSLATIONS } from './i18n.toolkitApps';
 import { SERVER_TRANSLATIONS } from './i18n.server';
+import { CLOUDFLARE_TRANSLATIONS } from './i18n.cloudflare';
 import { TRANSLATE_TRANSLATIONS } from './i18n.translate';
 import { WORLD_CHAT_TRANSLATIONS } from './i18n.worldChat';
 import { STUDY_SYNONYM_TRANSLATIONS } from './i18n.studySynonyms';
@@ -206,6 +207,7 @@ export const TR: Record<string, string> = {
   ...PROTECT_TRANSLATIONS.tr,
   ...TOOLKIT_APPS_TRANSLATIONS.tr,
   ...SERVER_TRANSLATIONS.tr,
+  ...CLOUDFLARE_TRANSLATIONS.tr,
   ...TRANSLATE_TRANSLATIONS.tr,
   "Nuevo OCR": "Yeni OCR",
   "Biblioteca": "Kütüphane",
@@ -2666,6 +2668,10 @@ export const TR: Record<string, string> = {
   "Trazar el esquema desde esta idea": "Bu fikirden şemayı çizin",
   "{n} debate(s)": "{n} tartışma(lar)",
   "{n} conexiones": "{n} bağlantı",
+  "Ver las {n} conexiones": "{n} bağlantının tamamını gör",
+  "Conexiones de {name}": "{name} bağlantıları",
+  "{n} autores conectados": "{n} bağlantılı yazar",
+  "Conexiones del autor": "Yazarın bağlantıları",
   "+{n} conexiones no dibujadas": "+{n} çizilmemiş bağlantı",
   "conf media": "yapılandırma ortamı",
   "Selecciona una idea y traza su": "Bir fikir seçin ve onun izini sürün",

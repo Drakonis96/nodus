@@ -98,6 +98,37 @@ const ISSUE_12_RUNTIME_KEYS = [
   'Pasajes incompletos',
 ];
 
+// The Cloudflare deployment prose the main process writes and the modal renders through
+// tr(): step details, catalogue warnings and every failure. None of them appears inside a
+// t() call anywhere, so without this list the whole "Deploy to Cloudflare" flow can ship
+// Spanish to the other six languages — which is exactly how it was first published.
+const CLOUDFLARE_RUNTIME_KEYS = [
+  // Step details.
+  'El secreto permanece cifrado en este dispositivo',
+  'Recursos creados directamente por Cloudflare',
+  'Cloudflare no compartió credenciales de cuenta con Nodus',
+  '{name} · protocolo {version}',
+  // Pricing-catalogue warnings, shown as the detail of the first step.
+  'Se usa el catálogo incluido en esta versión de Nodus. Comprueba los enlaces oficiales antes de contratar un plan.',
+  'No se pudo verificar el catálogo actualizado; la estimación usa la copia incluida y muestra siempre la documentación oficial.',
+  // Failures raised while estimating, preparing or connecting.
+  'El catálogo de precios de Cloudflare no tiene un formato compatible.',
+  'La configuración del catálogo de Cloudflare no es compatible.',
+  'La plantilla de Nodus Cloud debe ser un repositorio público HTTPS de GitHub o GitLab.',
+  'La dirección de Nodus Cloud debe usar HTTPS.',
+  'La dirección no puede contener credenciales.',
+  'Esta dirección no corresponde a un despliegue compatible de Nodus Cloud.',
+  'El Worker respondió con HTTP {status}.',
+  'No se pudo inicializar Nodus Cloud (HTTP {status}).',
+  'El Worker ya estaba configurado, pero no contiene un espacio para este vault. Usa la conexión avanzada para elegir el espacio correcto.',
+  'El Worker ya estaba configurado, pero no publicó su identificador de recuperación. Actualiza la plantilla de Nodus Cloud.',
+  'No se pudo preparar la estimación de Cloudflare.',
+  'Escribe un correo de administración válido.',
+  'La contraseña de Nodus Cloud debe tener al menos 12 caracteres.',
+  'Prepara primero el despliegue para crear el código de configuración.',
+  'El Worker devolvió una clave de recuperación inesperada; Nodus no guardará esta conexión.',
+];
+
 test.after(() => rm(outDir, { recursive: true, force: true }));
 
 function walk(dir) {
@@ -117,6 +148,13 @@ const INDIRECT_KEY_SOURCES = [
   // ever appears literally inside a t() call. Leaving one untranslated is what made
   // the centre answer "this message could not be translated".
   { file: 'shared/nodiNotifications.ts', pattern: /^\s{2}\w+:\s*(["'])((?:\\.|(?!\1).)*?)\1,$/gm },
+  // The six "Deploy to Cloudflare" step labels. They are written in Electron and the modal
+  // renders them as t(step.label), so nothing else can see them.
+  { file: 'electron/cloudflare/deployment.ts', pattern: /^ {2}(?:'[\w-]+'|\w+):\s*(["'])((?:\\.|(?!\1).)*?)\1,$/gm },
+  // The cost table's metric names and units, positional arguments of line() and rendered
+  // as t(line.metric) / t(line.unit). The service name (first argument) is a brand.
+  { file: 'electron/cloudflare/pricing.ts', pattern: /\bline\('[^']*',\s*(')((?:\\.|(?!\1).)*?)\1/g },
+  { file: 'electron/cloudflare/pricing.ts', pattern: /\bline\('[^']*',\s*'[^']*',\s*[^,]+,\s*(')((?:\\.|(?!\1).)*?)\1/g },
   // Sidebar + command palette labels, rendered as t(n.label) / t(g.label) in App.tsx.
   { file: 'src/navigation.ts', pattern: /\blabel:\s*(["'])((?:\\.|(?!\1).)*?)\1/g },
   // Settings tab labels, rendered as t(tab.label).
@@ -532,6 +570,13 @@ test('stored image-generation failures are translated, not flattened or leaked',
   }
 });
 
+test('Cloudflare deployment prose has a translation in every language', () => {
+  for (const { name, table } of TRANSLATIONS) {
+    const missing = CLOUDFLARE_RUNTIME_KEYS.filter((key) => !table[key]?.trim());
+    assert.deepEqual(missing, [], `${name} is missing Cloudflare deployment translations`);
+  }
+});
+
 test('issue #12 runtime UI payloads have a translation in every language', () => {
   for (const { name, table } of TRANSLATIONS) {
     const missing = ISSUE_12_RUNTIME_KEYS.filter((key) => !table[key]?.trim());
@@ -721,6 +766,23 @@ test('seeded Spanish data labels are translated on screen, not left raw', () => 
   assert.match(schedule, /value=\{periodLabel\(period\)\}/, 'the slot name box must render the translated label');
   for (const key of ['Mañana', 'Tarde', 'Lunes', 'Viernes']) {
     assert.ok(enKeys.has(key), `"${key}" must have an English translation`);
+  }
+});
+
+test('the study/teaching organization header title is translated', () => {
+  // The <h1> of the organization browser (study AND docencia, which reuse the same view)
+  // is not a t() literal: it comes back from targetTitle(), which returns either the name
+  // the user typed or one of three interface fallbacks. Those fallbacks shipped bare, so
+  // an English interface showed "Cursos y asignaturas" under an "ORGANISATION" eyebrow.
+  const view = fs.readFileSync(path.join(repoRoot, 'src/views/StudyOrganizationView.tsx'), 'utf8');
+  const body = view.slice(view.indexOf('function targetTitle'));
+  const fn = body.slice(0, body.indexOf('\n}') + 2);
+  assert.ok(fn.includes('function targetTitle'), 'targetTitle must exist');
+  for (const key of ['Cursos y asignaturas', 'Documento', 'Selección actual']) {
+    assert.match(fn, new RegExp(`t\\('${key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}'\\)`), `targetTitle must return t('${key}'), not the bare literal`);
+    for (const { name, table } of TRANSLATIONS) {
+      assert.ok(table[key], `"${key}" must be translated into ${name}`);
+    }
   }
 });
 

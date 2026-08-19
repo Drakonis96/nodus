@@ -1,0 +1,30 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "nodus-cloud",
+  "main": "src/worker.mjs",
+  "compatibility_date": "2026-08-14",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": true,
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "nodus-cloud-db",
+      "database_id": "provisioned-by-cloudflare",
+      "migrations_dir": "migrations"
+    }
+  ],
+  "r2_buckets": [
+    {
+      "binding": "OBJECTS",
+      "bucket_name": "nodus-cloud-objects"
+    }
+  ],
+  "vars": {
+    "NODUS_SOURCE_URL": "https://github.com/drakonis96/nodus",
+    "NODUS_VERSION": "1.0.0",
+    "NODUS_ENVIRONMENT": "production"
+  },
+  "triggers": {
+    "crons": ["17 3 * * *"]
+  }
+}

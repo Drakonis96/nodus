@@ -1,3 +1,9 @@
+/* RETAINED, CURRENTLY UNUSED.
+ * The website was rebuilt in English only (August 2026). The FAQ now lives at
+ * site/faq/ and reads its English questions from site/faq/faq-data.js.
+ * This file keeps the twelve-language question set so the site can be
+ * translated again without re-doing the work. No page loads it.
+ */
 /* Searchable, localized FAQ for the Nodus landing page. */
 (function () {
   const LINKS = {

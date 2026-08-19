@@ -54,7 +54,9 @@ import type {
   LibraryMergeImpact,
   LibraryRecoveryReport,
   LibraryReadingPreparationPlan,
+  GlobalLibrarySettings,
 } from '@shared/libraryTypes';
+import { DEFAULT_GLOBAL_LIBRARY_SETTINGS } from '@shared/libraryAttachmentNaming';
 import type {
   OfficeCitationDocumentRequest,
   OfficeCitationDocumentResult,
@@ -484,6 +486,18 @@ export function setGlobalLibraryViewPreferences(preferences: LibraryViewPreferen
   return current.operations.setViewPreferences(preferences);
 }
 
+export function getGlobalLibrarySettings(): GlobalLibrarySettings {
+  return service()?.operations.getSettings() ?? { ...DEFAULT_GLOBAL_LIBRARY_SETTINGS };
+}
+
+export function setGlobalLibrarySettings(settings: GlobalLibrarySettings): GlobalLibrarySettings {
+  const current = service();
+  if (!current) throw new Error('Configura primero la carpeta de copias de seguridad de Nodus.');
+  const saved = current.operations.setSettings(settings);
+  broadcast(current.catalog.status(current.root, current.deviceId));
+  return saved;
+}
+
 export function getGlobalLibraryItem(itemId: string): LibraryItemRecord | null {
   const current = service();
   if (!current) return null;
@@ -564,7 +578,7 @@ export async function importGlobalLibraryFiles(files: string[], collectionId?: s
   const report = await runLibraryOperationInWorker(
     workerContext(current), 'import-files', [files, collectionId], () => current.operations.importLocalFiles(files, collectionId),
   );
-  if (report.itemIds.length) current.extraction.enqueue(report.itemIds);
+  if (report.itemIds.length && current.operations.getSettings().autoPrepareAttachments) current.extraction.enqueue(report.itemIds);
   broadcast(current.catalog.status(current.root, current.deviceId));
   return report;
 }
@@ -582,7 +596,8 @@ export async function importGlobalBibliographyFiles(files: string[], collectionI
 function finishItemMutation(current: NonNullable<ReturnType<typeof service>>, result: LibraryItemRecord): LibraryItemRecord {
   const final = propagateLibraryInvalidations(result, current.store, current.catalog);
   if (final.clock.revision !== result.clock.revision) current.catalog.indexItem(final, current.store);
-  if (final.contentRevision?.components.extraction.freshness === 'queued' && final.attachments.length) current.extraction.enqueue([final.id]);
+  if (final.contentRevision?.components.extraction.freshness === 'queued' && final.attachments.length
+    && current.operations.getSettings().autoPrepareAttachments) current.extraction.enqueue([final.id]);
   broadcast(current.catalog.status(current.root, current.deviceId));
   return final;
 }

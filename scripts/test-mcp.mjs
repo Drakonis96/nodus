@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { mkdir, mkdtemp, rm } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, rm } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import os from 'node:os';
 import path from 'node:path';
@@ -1220,6 +1220,22 @@ try {
   const missing = await callTool(server, 'nodus_get_deep_research_job', { jobId: 'drj-does-not-exist' });
   assert.equal(missing.job, null);
   assert.match(missing.error, /nodus_list_deep_research_reports/, 'a dropped job points the client at the persistent gallery');
+
+  // The two semantic searches must never hold the main process for a whole scan.
+  // MCP calls arrive while the user is working in another application with Nodus
+  // open behind it, so a blocking scan freezes a window nobody is even looking at:
+  // one statement running vec_cosine() over every embedded row is, on a real corpus
+  // (13,799 ideas, 44,138 passages), 95 ms per idea scan and 366 ms per passage
+  // scan of dead UI. The paged scans (electron/db/vectorScan.ts) return the same
+  // rows in the same order and yield between rowid windows.
+  const toolsSource = await readFile(path.join(repoRoot, 'electron/mcp/tools.ts'), 'utf8');
+  for (const blocking of ['findSimilarIdeas', 'findSimilarPassages']) {
+    assert.doesNotMatch(
+      toolsSource,
+      new RegExp(`\\.${blocking}\\(`),
+      `${blocking}() blocks the event loop for the whole scan — use ${blocking}Paged()`
+    );
+  }
 
   // Semantic passage search: unconfigured provider must fail cleanly…
   const passageAiError = await callToolRaw(server, 'nodus_search_passages', {

@@ -2,7 +2,7 @@
 // chained generation queue, and an immersive reader that expands one report to
 // full width with a back button to the gallery. The heavy lifting (generation,
 // saving, citations) is shared with the Writing workshop via writingShared.
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import type {
   AppSettings,
   DeepResearchArchiveFormat,
@@ -25,7 +25,10 @@ import { DECORATIVE_IMAGE_STYLES } from '@shared/imageStyles';
 import { toReadingCopy } from '@shared/readingCopy';
 import { stripLeadingAbstract } from '@shared/writingDocument';
 import type { PendingGraphNavigationTarget } from '../navigation';
-import { HoverLabelButton, Icon, modelLabel } from '../components/ui';
+import type { DeepResearchSnapshot } from '../app/viewSnapshots';
+import { useListPlacement } from '../listPlacement';
+import { useReadingPlace, type ReadingPlace } from '../readingPlace';
+import { HoverLabelButton, Icon, RestoringPane, modelLabel } from '../components/ui';
 import { SectionHeader } from '../components/SectionHeader';
 import { ModelPicker } from '../components/ModelPicker';
 import { confirm } from '../components/feedback';
@@ -75,8 +78,10 @@ const DEEP_SECTION_OPTIONS: { value: DeepResearchSectionLimit; label: string }[]
   { value: 10, label: 'Máx. 10 secciones' },
 ];
 
-type SortKey = 'recent' | 'oldest' | 'title';
-type ReadFilter = 'all' | 'read' | 'unread';
+// Exported because the section's snapshot stores them; the unions stay declared here,
+// next to the selects that produce them.
+export type SortKey = 'recent' | 'oldest' | 'title';
+export type ReadFilter = 'all' | 'read' | 'unread';
 
 /**
  * One surface, four readers. The machinery is identical — queue, gallery, reader,
@@ -236,6 +241,8 @@ export function DeepResearchView({
   isGenealogy = false,
   isStudy = false,
   isTeaching = false,
+  snapshot,
+  onSnapshotChange,
   onOpenGraph,
   onOpenStudyDocument,
   onOpenStudyMaterial,
@@ -246,6 +253,9 @@ export function DeepResearchView({
   isStudy?: boolean;
   /** Teaching vaults: Unit design — same surface, plus the teacher-defined structure. */
   isTeaching?: boolean;
+  /** Where this section was last left. Read once, at mount, and never again. */
+  snapshot?: DeepResearchSnapshot;
+  onSnapshotChange?: (patch: Partial<DeepResearchSnapshot>) => void;
   onOpenGraph: (target: PendingGraphNavigationTarget) => void;
   onOpenStudyDocument?: (id: string) => void;
   onOpenStudyMaterial?: (id: string) => void;
@@ -253,7 +263,11 @@ export function DeepResearchView({
 }) {
   const variant: DeepResearchVariant = isTeaching ? 'unit' : isGenealogy ? 'genealogy' : isStudy ? 'study' : 'academic';
   const copy = DEEP_RESEARCH_COPY[variant];
-  const [mode, setMode] = useState<'gallery' | 'reader'>('gallery');
+  // A report can only be the surface if there was one open; the pair is stored
+  // together, and a reader with nothing in it would render the gallery anyway.
+  const [mode, setMode] = useState<'gallery' | 'reader'>(
+    () => (snapshot?.surface === 'reader' && snapshot.openReport ? 'reader' : 'gallery')
+  );
 
   // Composer (new report) state.
   const [composerOpen, setComposerOpen] = useState(false);
@@ -278,6 +292,8 @@ export function DeepResearchView({
   // Data.
   const [savedDrafts, setSavedDrafts] = useState<WritingWorkshopSavedDraft[]>([]);
   const [loadingSavedDrafts, setLoadingSavedDrafts] = useState(false);
+  /** True once the gallery has been read at least once, empty or not. */
+  const [galleryRead, setGalleryRead] = useState(false);
   const [queue, setQueue] = useState<DeepResearchQueueItem[]>(() => getDeepResearchQueue());
   // The main-process lane, which also holds reports queued by MCP clients.
   const [laneJobs, setLaneJobs] = useState<DeepResearchJobRecord[]>([]);
@@ -285,11 +301,13 @@ export function DeepResearchView({
     getBackgroundJob(DEEP_RESEARCH_MAIN_JOB_KEY)
   );
 
-  // Gallery controls.
-  const [search, setSearch] = useState('');
-  const [readFilter, setReadFilter] = useState<ReadFilter>('all');
-  const [sortKey, setSortKey] = useState<SortKey>('recent');
-  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+  // Gallery controls. Restored as initial values only: a reactive `snapshot` prop
+  // would fight the reader for their own filters on every render of the shell.
+  const [search, setSearch] = useState(() => snapshot?.search ?? '');
+  const [readFilter, setReadFilter] = useState<ReadFilter>(() => snapshot?.readFilter ?? 'all');
+  const [sortKey, setSortKey] = useState<SortKey>(() => snapshot?.sortKey ?? 'recent');
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>(() => snapshot?.viewMode ?? 'grid');
+  const [galleryAnchorId, setGalleryAnchorId] = useState<string | null>(() => snapshot?.placement?.anchorId ?? null);
   const [showTutorial, setShowTutorial] = useState(false);
   const [selecting, setSelecting] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -312,6 +330,64 @@ export function DeepResearchView({
   const hasModel = !!selectedModel;
   const deepRunning = deepJob?.status === 'running';
   const deepProgress = deepJob?.progress ?? null;
+
+  /**
+   * The report that was open, found again once the gallery has been read.
+   *
+   * The gallery is the only source of a saved report, so this waits for it rather
+   * than fetching the report a second way. If it is no longer there — deleted, or
+   * written in a vault this is not — the section falls back to the gallery instead
+   * of showing an empty reader.
+   */
+  const reopening = useRef(snapshot?.surface === 'reader' ? snapshot.openReport?.id ?? null : null);
+
+  // The registry builds `onSnapshotChange` inline, so its identity changes on every
+  // render of the shell; a ref keeps that out of the effects' dependencies.
+  const report = useRef(onSnapshotChange);
+  report.current = onSnapshotChange;
+  useEffect(() => {
+    // Silent until the report being reopened has landed: on the way in the reader is
+    // empty, and saying so would erase the very report that is on its way back.
+    if (reopening.current) return;
+    report.current?.({
+      surface: mode,
+      openReport: openDraft ? { id: openDraft.id, label: openDraft.title } : null,
+      search,
+      readFilter,
+      sortKey,
+      viewMode,
+    });
+  }, [mode, openDraft, readFilter, search, sortKey, viewMode]);
+
+  // The place inside the open report. Kept in a ref rather than in state because it
+  // is written on every scroll frame and read only when the reader mounts.
+  const restoredReading = useRef<ReadingPlace | null>(snapshot?.reading ?? null);
+
+  useEffect(() => {
+    const id = reopening.current;
+    if (!id || !galleryRead) return;
+    reopening.current = null;
+    const found = savedDrafts.find((item) => item.id === id);
+    if (found) {
+      setOpenDraft(found);
+      return;
+    }
+    restoredReading.current = null;
+    setMode('gallery');
+  }, [galleryRead, savedDrafts]);
+
+  // Changing the cut throws the place in the gallery away with it: a card at the top
+  // of one filter means nothing under another. It skips its own first run, or
+  // arriving with a restored filter would drop the restored place a frame later.
+  const cutChanged = useRef(false);
+  useEffect(() => {
+    if (!cutChanged.current) {
+      cutChanged.current = true;
+      return;
+    }
+    setGalleryAnchorId(null);
+    report.current?.({ placement: null });
+  }, [readFilter, search, sortKey]);
 
   useEffect(() => subscribeBackgroundJob(DEEP_RESEARCH_MAIN_JOB_KEY, setDeepJob), []);
   useEffect(() => subscribeDeepResearchQueue(setQueue), []);
@@ -340,6 +416,7 @@ export function DeepResearchView({
       setError(e instanceof Error ? e.message : String(e));
     } finally {
       setLoadingSavedDrafts(false);
+      setGalleryRead(true);
     }
   }, []);
 
@@ -416,6 +493,8 @@ export function DeepResearchView({
   };
 
   const openReader = (saved: WritingWorkshopSavedDraft) => {
+    // A place taken in another report is not a place in this one.
+    restoredReading.current = null;
     setOpenDraft(saved);
     setMode('reader');
     setShowMatrix(false);
@@ -428,6 +507,8 @@ export function DeepResearchView({
   const backToGallery = () => {
     setMode('gallery');
     setOpenDraft(null);
+    restoredReading.current = null;
+    report.current?.({ reading: null });
     setTranslationOpen(false);
     setAppliedTranslation(null);
     void refreshSavedDrafts();
@@ -681,12 +762,21 @@ export function DeepResearchView({
     void window.nodus.clearFinishedDeepResearchJobs();
   };
 
+  // A report that was left open is the section's first frame, never its second. The
+  // gallery below is a screen full of cards; painting it for the frames the read of
+  // the report takes is what makes returning to the section look like the app opening
+  // the list and clicking the report by itself. `mode` already says the reader was in
+  // a report — so wait here, quietly, until the report it names has landed.
+  if (mode === 'reader' && !openDraft) return <RestoringPane />;
+
   if (mode === 'reader' && openDraft) {
     return (
       <>
         <ReaderView
           saved={openDraft}
           settings={settings}
+          initialReading={restoredReading.current}
+          onReadingChange={(place) => report.current?.({ reading: place })}
           showMatrix={showMatrix}
           exporting={exporting}
           message={message}
@@ -871,7 +961,15 @@ export function DeepResearchView({
         </div>
       )}
 
-      <div className="min-h-0 flex-1 overflow-y-auto p-4">
+      <GalleryScroller
+        anchorId={galleryAnchorId}
+        revision={visibleDrafts}
+        onMissed={() => {
+          setGalleryAnchorId(null);
+          report.current?.({ placement: null });
+        }}
+        onCapture={(anchorId) => report.current?.({ placement: anchorId ? { anchorId } : null })}
+      >
         {visibleDrafts.length === 0 ? (
           <div className="flex h-full flex-col items-center justify-center gap-3 text-center">
             <Icon name="compass" size={28} className="text-neutral-600" />
@@ -929,7 +1027,7 @@ export function DeepResearchView({
             ))}
           </div>
         )}
-      </div>
+      </GalleryScroller>
 
       {archiveIds && (
         <ArchiveModal
@@ -983,6 +1081,37 @@ export function DeepResearchView({
 // ─────────────────────────────────────────────────────────────────────────────
 // Gallery cards
 // ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * The gallery's scroller, and the reader's place in it.
+ *
+ * A component rather than a hook call in the view, because the gallery is unmounted
+ * while a report is open: the hook has to be born and die with the element it listens
+ * to, or it would come back from the reader still holding the scroller that was
+ * thrown away. It also means the trip into a report and back out lands on the same
+ * card, not at the top.
+ */
+function GalleryScroller({
+  anchorId,
+  revision,
+  onMissed,
+  onCapture,
+  children,
+}: {
+  anchorId: string | null;
+  revision: unknown;
+  onMissed: () => void;
+  onCapture: (anchorId: string | null) => void;
+  children: ReactNode;
+}) {
+  const scrollerRef = useListPlacement<HTMLDivElement>({
+    restoreAnchorId: anchorId,
+    revision,
+    onRestoreMissed: onMissed,
+    onCapture,
+  });
+  return <div ref={scrollerRef} className="min-h-0 flex-1 overflow-y-auto p-4">{children}</div>;
+}
 
 function SelectCheck({ checked }: { checked: boolean }) {
   return (
@@ -1058,6 +1187,7 @@ function DraftGridCard({
   const primary = selecting ? onToggle : onOpen;
   return (
     <div
+      data-anchor-id={saved.id}
       className={`card group flex flex-col overflow-hidden p-0 transition-colors ${
         selected ? 'border-indigo-600/70 ring-1 ring-indigo-600/40' : 'hover:border-indigo-700/60'
       }`}
@@ -1156,6 +1286,7 @@ function DraftListRow({
   const primary = selecting ? onToggle : onOpen;
   return (
     <div
+      data-anchor-id={saved.id}
       className={`card flex items-center gap-3 p-2.5 transition-colors ${
         selected ? 'border-indigo-600/70 ring-1 ring-indigo-600/40' : 'hover:border-indigo-700/60'
       }`}
@@ -1335,6 +1466,8 @@ function ArchiveModal({
 function ReaderView({
   saved,
   settings,
+  initialReading,
+  onReadingChange,
   showMatrix,
   exporting,
   message,
@@ -1356,6 +1489,9 @@ function ReaderView({
 }: {
   saved: WritingWorkshopSavedDraft;
   settings: AppSettings;
+  /** How far into the report the reader had got last time. */
+  initialReading: ReadingPlace | null;
+  onReadingChange: (place: ReadingPlace | null) => void;
   showMatrix: boolean;
   exporting: boolean;
   message: string | null;
@@ -1424,6 +1560,18 @@ function ReaderView({
     setAnnotations((current) => current.filter((item) => item.id !== id));
     setAnnotationError(null);
   };
+  // Where the reader was in the report, restored once the prose is on screen. The
+  // rendering travels with the place: a translation is a different document, and a
+  // block counted in one of them is not the same block in the other.
+  useReadingPlace({
+    scrollerRef: mainRef,
+    documentRef,
+    restore: initialReading,
+    rendering: annotationScope,
+    revision: appliedTranslation?.id ?? saved.id,
+    onCapture: onReadingChange,
+  });
+
   const contextTitle = appliedTranslation?.title ?? saved.draft.title;
   const contextMarkdown = appliedTranslation?.markdown
     ?? `# ${saved.draft.title}\n\n${saved.draft.abstract ? `${saved.draft.abstract}\n\n` : ''}${stripLeadingAbstract(saved.draft.draftMarkdown, saved.draft.abstract)}`;

@@ -117,6 +117,7 @@ export interface RemoteSignInResult {
   url: string;
   serverName: string;
   userEmail: string;
+  serverKind: 'classic' | 'cloudflare';
   spaces: RemoteSpaceOption[];
 }
 
@@ -130,12 +131,13 @@ export async function signInToNodusServer(urlValue: string, email: string, passw
   if (response.status === 401) throw new Error('El correo o la contraseña no son correctos.');
   if (response.status === 404) throw new Error('Ese servidor es anterior a los vaults conectados. Pide que lo actualicen.');
   if (!response.ok) throw new Error(`El servidor respondió con HTTP ${response.status}.`);
-  const value = await response.json() as { ticket: string; spaces: RemoteSpaceOption[]; server?: { name?: string } };
+  const value = await response.json() as { ticket: string; spaces: RemoteSpaceOption[]; service?: string; serverName?: string; server?: { name?: string; service?: string } };
   return {
     ticket: value.ticket,
     url,
-    serverName: value.server?.name ?? 'Nodus Server',
+    serverName: value.serverName ?? value.server?.name ?? 'Nodus Server',
     userEmail: String(email).trim().toLowerCase(),
+    serverKind: value.service === 'nodus-cloudflare' || value.server?.service === 'nodus-cloudflare' ? 'cloudflare' : 'classic',
     spaces: value.spaces ?? [],
   };
 }
@@ -153,6 +155,7 @@ export async function createConnectedVault(input: {
   space: RemoteSpaceOption;
   userEmail: string;
   serverName: string;
+  serverKind?: 'classic' | 'cloudflare';
 }): Promise<VaultSummary> {
   const url = normalizeUrl(input.url);
   const response = await request(`${url}/api/v1/auth/device`, {
@@ -167,6 +170,7 @@ export async function createConnectedVault(input: {
   const session = await response.json() as { deviceToken: string; role: VaultRemoteRole; space: { id: string; name: string; vault?: { type?: string } | null } };
 
   const remote: VaultRemote = {
+    serverKind: input.serverKind === 'cloudflare' ? 'cloudflare' : 'classic',
     url,
     spaceId: input.space.id,
     spaceName: input.space.name,

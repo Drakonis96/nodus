@@ -12,7 +12,8 @@ import { SCHEMA_VERSION } from '../db/migrations';
 import { getSettings, updateSettings } from '../db/settingsRepo';
 import { getBackupPassword, getBackupRecoveryKey, lockedApiKeyProviders, setBackupRecoveryKey } from '../secrets/secretStore';
 import { generateBackupPassword } from './backupCrypto';
-import { createBackupArchive, verifyBackupArchive } from './exportImport';
+import { createBackupArchiveFile } from './exportImport';
+import { verifyBackupFileInUtility } from './backupUtilityHost';
 import { resolveBackupOutputDir } from '../recovery/recoveryPaths';
 
 /**
@@ -38,6 +39,15 @@ const PRE_UPDATE_DATE_RE = /^from-v[a-zA-Z0-9.+-]+-to-v[a-zA-Z0-9.+-]+-schema\d+
 const TRASHED_BACKUP_RE = /^(.*\.nodus)\.trashed-(\d+)-(\d+)$/;
 
 let activeBackupOperation: string | null = null;
+
+function logBackupPerf(phase: string, startedAt: bigint, metadata: Record<string, string | number> = {}): bigint {
+  const endedAt = process.hrtime.bigint();
+  const elapsedMs = Number(endedAt - startedAt) / 1_000_000;
+  const rssMiB = process.memoryUsage().rss / (1024 * 1024);
+  const details = Object.entries(metadata).map(([key, value]) => `${key}=${value}`).join(' ');
+  console.log(`[perf][backup] phase=${phase} elapsedMs=${elapsedMs.toFixed(1)} rssMiB=${rssMiB.toFixed(1)}${details ? ` ${details}` : ''}`);
+  return endedAt;
+}
 
 async function withBackupOperation<T extends { ok: boolean; message: string }>(
   label: string,
@@ -496,7 +506,7 @@ async function executeBackupCleanup(now: Date, expectedScopeToken?: string): Pro
   const survivor = context.active[0];
   if (!survivor) return cleanupResultFailure('No existe ninguna copia activa que pueda verificarse antes de limpiar. No se ha modificado nada.');
   try {
-    const verification = verifyBackupArchive(await fs.promises.readFile(survivor.path), password);
+    const verification = await verifyBackupFileInUtility(survivor.path, password);
     if (!verification.ok) {
       return cleanupResultFailure(`La copia más reciente no superó la verificación (${verification.message}). No se ha modificado nada.`);
     }
@@ -641,6 +651,8 @@ interface VerifiedBackupOptions {
 }
 
 async function writeVerifiedBackup(options: VerifiedBackupOptions): Promise<AutoBackupResult> {
+  const backupStartedAt = process.hrtime.bigint();
+  let phaseStartedAt = backupStartedAt;
   const settings = getSettings();
   const configuredFolder = settings.autoBackupFolder;
   if (!configuredFolder) return { ok: false, message: 'No hay carpeta de destino configurada.' };
@@ -658,11 +670,6 @@ async function writeVerifiedBackup(options: VerifiedBackupOptions): Promise<Auto
       recoveryKey = generateBackupPassword();
       setBackupRecoveryKey(recoveryKey);
     }
-    const archive = await createBackupArchive({
-      password,
-      appVersion: options.appVersion,
-      recoveryKey,
-    });
     const hostname = os.hostname();
     const startedAt = new Date();
     // A manual click and an updater timer can land in the same second. Choose another
@@ -679,13 +686,17 @@ async function writeVerifiedBackup(options: VerifiedBackupOptions): Promise<Auto
     if (!target) throw new Error('No se pudo reservar un nombre único para la copia de seguridad.');
     // Write via temp + rename so cloud clients never sync a half-written file.
     tmp = `${target}.tmp`;
-    await fs.promises.writeFile(tmp, archive);
+    const built = await createBackupArchiveFile({ password, appVersion: options.appVersion, recoveryKey }, tmp);
+    phaseStartedAt = logBackupPerf('archive-built', phaseStartedAt, { bytes: built.bytes, reusedVaults: built.reusedVaults });
     await fs.promises.rename(tmp, target);
     committed = true;
+    phaseStartedAt = logBackupPerf('archive-written', phaseStartedAt, { bytes: built.bytes });
 
-    // Re-read the committed file and prove it can be authenticated/decrypted before
-    // deleting any older snapshot or letting an updater close the application.
-    const verification = verifyBackupArchive(await fs.promises.readFile(target), password);
+    // Prove the committed file can be authenticated/decrypted before deleting any
+    // older snapshot or letting an updater close the application. The full read,
+    // decrypt and hash run in a disposable utility process.
+    const verification = await verifyBackupFileInUtility(target, password);
+    logBackupPerf('archive-verified', phaseStartedAt, { bytes: built.bytes });
     if (!verification.ok) {
       fs.rmSync(target, { force: true });
       committed = false;
@@ -696,6 +707,7 @@ async function writeVerifiedBackup(options: VerifiedBackupOptions): Promise<Auto
     }
 
     const prunedCount = options.prune(folder, hostname);
+    logBackupPerf('run:complete', backupStartedAt, { bytes: built.bytes, reusedVaults: built.reusedVaults });
     const locked = lockedApiKeyProviders();
     const warning = locked.length > 0
       ? ` Aviso: las claves de ${locked.join(', ')} no se pudieron leer del almacén seguro y no viajan en esta copia.`

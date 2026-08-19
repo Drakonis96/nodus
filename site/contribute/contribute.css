@@ -1,0 +1,132 @@
+/*
+SPDX-FileCopyrightText: 2026 Jorge Pérez Burgueño and Nodus contributors
+SPDX-License-Identifier: AGPL-3.0-only
+*/
+
+.contrib-hero {
+  display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 0.8fr);
+  gap: clamp(30px, 5vw, 70px); align-items: center;
+}
+.contrib-actions { display: flex; flex-wrap: wrap; gap: 13px; margin-top: 32px; }
+
+/* the grain field: one dot per contribution, drifting down */
+.sand-box {
+  position: relative;
+  border: 1px solid var(--membrane); border-radius: var(--r-xl);
+  background: linear-gradient(180deg, rgba(23, 19, 40, 0.86), rgba(11, 9, 21, 0.82));
+  overflow: hidden;
+}
+#sand { display: block; width: 100%; height: 340px; }
+.sand-cap {
+  position: absolute; left: 0; right: 0; bottom: 0; margin: 0;
+  padding: 14px; text-align: center;
+  font-size: 12px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase;
+  color: var(--ink-3);
+  background: linear-gradient(transparent, rgba(6, 5, 11, 0.85));
+}
+
+@media (max-width: 900px) {
+  .contrib-hero { grid-template-columns: minmax(0, 1fr); }
+  #sand { height: 240px; }
+}
+
+/* ============================================================ ways */
+.ways {
+  display: grid; grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px; margin-top: 48px;
+}
+@media (max-width: 980px) { .ways { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 640px) { .ways { grid-template-columns: minmax(0, 1fr); } }
+.way { padding: 26px; display: flex; flex-direction: column; }
+.way .pic {
+  display: grid; place-items: center; width: 42px; height: 42px; margin-bottom: 16px;
+  border-radius: 12px;
+  border: 1px solid color-mix(in srgb, var(--wc) 40%, transparent);
+  background: color-mix(in srgb, var(--wc) 13%, transparent);
+  color: var(--wc);
+}
+.way .pic svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.way h3 { font-size: 17.5px; margin-bottom: 10px; }
+.way p { margin: 0 0 18px; font-size: 14.5px; color: var(--ink-2); line-height: 1.6; }
+.way p b { color: var(--ink); font-weight: 620; }
+.way p code {
+  padding: 1px 6px; border-radius: 5px;
+  background: rgba(255, 255, 255, 0.07); border: 1px solid var(--membrane);
+  font: 0.86em var(--mono); color: var(--violet-3);
+}
+.way .arrow-link { margin-top: auto; color: var(--wc); font-size: 13.5px; }
+.way:hover { border-color: color-mix(in srgb, var(--wc) 45%, transparent); }
+
+/* ============================================================ setup */
+.setup-grid {
+  display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: clamp(30px, 5vw, 64px); align-items: center;
+}
+.terminal {
+  border: 1px solid var(--membrane); border-radius: var(--r-l);
+  background: linear-gradient(180deg, rgba(14, 11, 24, 0.96), rgba(8, 6, 14, 0.96));
+  box-shadow: var(--shadow); overflow: hidden;
+}
+.terminal-bar {
+  display: flex; align-items: center; gap: 7px;
+  padding: 11px 15px; border-bottom: 1px solid var(--membrane);
+  background: rgba(255, 255, 255, 0.022);
+}
+.terminal-bar i { width: 8px; height: 8px; border-radius: 50%; background: var(--membrane-2); }
+.terminal-bar span {
+  margin-left: 8px; font: 600 10.5px var(--mono);
+  letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-3);
+}
+.terminal pre { margin: 0; padding: 20px 22px; overflow-x: auto; }
+.terminal code { font: 13px/1.85 var(--mono); color: var(--ink); }
+.terminal .c { color: var(--ink-3); }
+.terminal .p { color: var(--good); user-select: none; }
+
+@media (max-width: 900px) { .setup-grid { grid-template-columns: minmax(0, 1fr); } }
+
+/* ============================================================ rules */
+.rules { list-style: none; margin: 48px 0 0; padding: 0; display: grid; gap: 0; }
+.rules li {
+  position: relative;
+  padding: 20px 20px 20px 46px;
+  border-top: 1px solid var(--membrane);
+  font-size: 15.5px; color: var(--ink-2); line-height: 1.62;
+  transition: background 0.3s var(--ease);
+}
+.rules li:last-child { border-bottom: 1px solid var(--membrane); }
+.rules li:hover { background: rgba(255, 255, 255, 0.022); }
+.rules li::before {
+  content: ''; position: absolute; left: 18px; top: 28px;
+  width: 8px; height: 8px; border-radius: 50%;
+  background: var(--accent); box-shadow: 0 0 14px var(--accent);
+}
+.rules li b { color: var(--ink); font-weight: 650; }
+.rules-links { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 32px; }
+
+/* ============================================================ people */
+.people {
+  display: flex; flex-wrap: wrap; gap: 10px;
+  margin-top: 44px;
+}
+.people-loading { font-size: 14px; color: var(--ink-3); }
+.person {
+  display: inline-flex; align-items: center; gap: 10px;
+  padding: 7px 15px 7px 7px; border-radius: 999px;
+  border: 1px solid var(--membrane); background: rgba(255, 255, 255, 0.035);
+  color: var(--ink); font-size: 13.5px; font-weight: 600;
+  transition: border-color 0.25s var(--ease), transform 0.25s var(--ease), background 0.25s var(--ease);
+}
+.person:hover {
+  color: var(--ink); border-color: rgba(167, 139, 250, 0.55);
+  background: rgba(139, 92, 246, 0.1); transform: translateY(-2px);
+}
+.person img { width: 26px; height: 26px; border-radius: 50%; background: var(--skin-2); }
+.person em {
+  font-style: normal; padding-left: 9px; margin-left: 2px;
+  border-left: 1px solid var(--membrane);
+  font: 600 11.5px var(--mono); color: var(--ink-3);
+}
+
+/* ============================================================ final */
+.contrib-final { text-align: center; }
+.contrib-final .lead { margin-inline: auto; }

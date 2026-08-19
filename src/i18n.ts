@@ -157,6 +157,20 @@ const RUNTIME_PATTERNS: RuntimePattern[] = [
     pattern: /^Revisa las páginas (.+): el texto necesitó un ajuste tipográfico intenso\.$/,
     render: (m) => tx('Revisa las páginas {pages}: el texto necesitó un ajuste tipográfico intenso.', { pages: m[1] }),
   },
+  // Cloudflare deployment progress and failures. The main process builds these with the
+  // Worker's own name and status code, so they are prose by the time they reach the modal.
+  {
+    pattern: /^(.+) · protocolo (\d+)$/,
+    render: (m) => tx('{name} · protocolo {version}', { name: m[1], version: m[2] }),
+  },
+  {
+    pattern: /^El Worker respondió con HTTP (\d+)\.$/,
+    render: (m) => tx('El Worker respondió con HTTP {status}.', { status: m[1] }),
+  },
+  {
+    pattern: /^No se pudo inicializar Nodus Cloud \(HTTP (\d+)\)\.$/,
+    render: (m) => tx('No se pudo inicializar Nodus Cloud (HTTP {status}).', { status: m[1] }),
+  },
   {
     pattern: /^(.+?): (.+)$/,
     render: (m) => tx('{name}: {warning}', { name: m[1], warning: tr(m[2]) }),

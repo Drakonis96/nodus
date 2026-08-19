@@ -1,0 +1,146 @@
+/*
+SPDX-FileCopyrightText: 2026 Jorge Pérez Burgueño and Nodus contributors
+SPDX-License-Identifier: AGPL-3.0-only
+
+Long-form topic pages (/research/, /zotero/, /ai-research/).
+The shared system lives in nodus.css; this file only adds the few components
+those pages need that the home page does not already define.
+*/
+
+/* ============================================================ breadcrumb */
+.breadcrumb {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
+  margin-bottom: 22px;
+  font-size: 13px; color: var(--ink-3);
+}
+.breadcrumb a { color: var(--ink-3); }
+.breadcrumb a:hover { color: var(--ink-2); }
+.breadcrumb .sep { opacity: 0.55; }
+.breadcrumb [aria-current="page"] { color: var(--ink-2); }
+
+/* ============================================================ hero extras */
+.guide-hero .display { max-width: 18ch; }
+.guide-actions { display: flex; flex-wrap: wrap; gap: 13px; margin-top: 34px; }
+
+/* the anchor row under the hero: a plain, wrapping list of the page's sections */
+.guide-jump {
+  display: flex; flex-wrap: wrap; gap: 9px;
+  margin-top: 34px; padding-top: 26px;
+  border-top: 1px solid var(--membrane);
+}
+.guide-jump a {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 8px 15px; border-radius: 999px;
+  border: 1px solid var(--membrane); background: var(--skin);
+  font-size: 13px; font-weight: 600; color: var(--ink-2);
+  transition: color 0.25s var(--ease), border-color 0.25s var(--ease), background 0.25s var(--ease);
+}
+.guide-jump a:hover { color: var(--ink); border-color: rgba(167, 139, 250, 0.5); background: var(--skin-2); }
+.guide-jump a em {
+  font-style: normal; font-family: var(--mono); font-size: 11px; color: var(--ink-3);
+}
+
+/* ============================================================ body copy */
+/* Long-form sections keep a comfortable measure while the cards below them are
+   free to use the full width of the wrap. */
+.guide-body { max-width: 760px; }
+.guide-body.prose > h2:first-child,
+.guide-body.prose > h3:first-child { margin-top: 0; }
+
+.guide-note {
+  max-width: 820px;
+  margin-top: 34px; padding: 20px 24px;
+  border-radius: var(--r-m); border: 1px solid var(--membrane);
+  border-left: 2px solid var(--accent);
+  background: rgba(255, 255, 255, 0.022);
+  font-size: 14.5px; line-height: 1.65; color: var(--ink-2);
+}
+.guide-note b, .guide-note strong { color: var(--ink); font-weight: 620; }
+.guide-note p { margin: 0; }
+.guide-note p + p { margin-top: 0.8em; }
+
+/* ============================================================ card grids */
+.guide-grid {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(268px, 1fr));
+  gap: 16px; margin-top: 42px;
+}
+.guide-grid.two { grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); }
+.guide-card { padding: 26px; }
+.guide-card h3 { font-size: 17px; margin-bottom: 10px; }
+.guide-card p { margin: 0; font-size: 14px; line-height: 1.62; color: var(--ink-2); }
+.guide-card p + p { margin-top: 0.85em; }
+.guide-card p b, .guide-card p strong { color: var(--ink); font-weight: 620; }
+.guide-card .arrow-link { margin-top: 15px; font-size: 13.5px; }
+.guide-card .pic {
+  display: grid; place-items: center; width: 38px; height: 38px;
+  margin-bottom: 16px; border-radius: 11px;
+  border: 1px solid color-mix(in srgb, var(--accent) 40%, transparent);
+  background: color-mix(in srgb, var(--accent) 13%, transparent);
+  color: var(--accent);
+}
+.guide-card .pic svg {
+  width: 19px; height: 19px; fill: none; stroke: currentColor;
+  stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round;
+}
+.guide-card .tags { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 15px; }
+.guide-card .tags span {
+  padding: 5px 11px; border-radius: 999px;
+  border: 1px solid var(--membrane); background: var(--skin);
+  font-size: 11.5px; font-weight: 600; color: var(--ink-3);
+}
+
+/* ============================================================ numbered flow */
+/* the step text keeps a readable measure rather than running the full wrap */
+.guide-steps { max-width: 820px; margin-top: 42px; display: grid; gap: 2px; }
+.guide-step {
+  display: grid; grid-template-columns: 42px minmax(0, 1fr);
+  gap: 18px; align-items: start;
+  padding: 22px 0; border-top: 1px solid var(--membrane);
+  transition: padding-left 0.3s var(--ease), background 0.3s var(--ease);
+}
+.guide-step:last-child { border-bottom: 1px solid var(--membrane); }
+.guide-step:hover { background: rgba(255, 255, 255, 0.022); padding-left: 12px; }
+.guide-step em {
+  font-style: normal; font-family: var(--mono); font-size: 12px;
+  color: var(--accent); padding-top: 3px;
+}
+.guide-step h3 { font-size: 17px; margin-bottom: 8px; }
+.guide-step p { margin: 0; font-size: 14.5px; line-height: 1.62; color: var(--ink-2); }
+.guide-step p + p { margin-top: 0.8em; }
+.guide-step p b, .guide-step p strong { color: var(--ink); font-weight: 620; }
+
+/* ============================================================ compare table */
+.guide-table-scroll { max-width: 1000px; margin-top: 40px; overflow-x: auto; }
+.guide-table { width: 100%; min-width: 560px; border-collapse: collapse; font-size: 14.5px; }
+.guide-table th, .guide-table td {
+  padding: 15px 16px; border-bottom: 1px solid var(--membrane);
+  text-align: left; vertical-align: top; color: var(--ink-2); line-height: 1.6;
+}
+.guide-table thead th {
+  font-size: 11px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase;
+  color: var(--ink-3);
+}
+.guide-table tbody th { color: var(--ink); font-weight: 620; width: 30%; }
+
+/* ============================================================ next steps */
+.next-grid {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 16px; margin-top: 44px;
+}
+.next-card { display: block; padding: 26px; color: inherit; }
+.next-card:hover { color: inherit; }
+.next-card .pic { color: var(--accent); margin-bottom: 15px; }
+.next-card .pic svg {
+  width: 22px; height: 22px; fill: none; stroke: currentColor;
+  stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round;
+}
+.next-card h3 { font-size: 17px; margin-bottom: 9px; }
+.next-card p { margin: 0 0 16px; font-size: 14px; line-height: 1.55; color: var(--ink-2); }
+
+/* ============================================================ responsive */
+@media (max-width: 720px) {
+  .guide-hero .display { max-width: none; }
+  .guide-step { grid-template-columns: minmax(0, 1fr); gap: 8px; }
+  .guide-step em { padding-top: 0; }
+  .guide-step:hover { padding-left: 0; }
+}

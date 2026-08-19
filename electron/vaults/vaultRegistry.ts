@@ -72,6 +72,7 @@ function cleanName(name: string): string {
  */
 function normalizeRemote(input: VaultRemote): VaultRemote {
   return {
+    serverKind: input.serverKind === 'cloudflare' ? 'cloudflare' : 'classic',
     url: String(input.url ?? ''),
     spaceId: String(input.spaceId ?? ''),
     spaceName: String(input.spaceName ?? ''),

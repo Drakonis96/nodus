@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import type { EdgeType, ModelRef, GraphNodeType } from '@shared/types';
 import { t } from '../i18n';
 
@@ -363,6 +363,32 @@ export function Spinner({ label }: { label?: string }) {
     <div className="flex items-center gap-2 text-neutral-400 text-sm">
       <span className="inline-block w-4 h-4 border-2 border-neutral-600 border-t-indigo-400 rounded-full animate-spin" />
       {label}
+    </div>
+  );
+}
+
+/**
+ * The pane of a section on its way back to what it had open.
+ *
+ * A section is unmounted when you leave it, so walking back into one that was left
+ * on a report or a session means reading that report back before it can be drawn.
+ * What must NOT be drawn in the meantime is the section's gallery: it is a screen
+ * full of content, and painting it for the two or three frames the read takes reads
+ * as the app opening the list and then clicking the item by itself.
+ *
+ * So the pane stays quiet instead. It is empty at first — a spinner that appears and
+ * vanishes inside 60ms is its own flicker — and only starts spinning if the read is
+ * slow enough that the reader would otherwise wonder whether anything is happening.
+ */
+export function RestoringPane({ delayMs = 250 }: { delayMs?: number }) {
+  const [slow, setSlow] = useState(false);
+  useEffect(() => {
+    const timer = setTimeout(() => setSlow(true), delayMs);
+    return () => clearTimeout(timer);
+  }, [delayMs]);
+  return (
+    <div className="flex h-full items-center justify-center" data-testid="section-restoring">
+      {slow && <Spinner />}
     </div>
   );
 }

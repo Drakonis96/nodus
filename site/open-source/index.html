@@ -1,0 +1,314 @@
+<!--
+SPDX-FileCopyrightText: 2026 Jorge Pérez Burgueño and Nodus contributors
+SPDX-License-Identifier: AGPL-3.0-only
+-->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Open Source Research Software | Nodus</title>
+<meta name="description" content="Nodus is open source under the AGPL-3.0-only licence and local-first by design, so your corpus, Library and search indexes stay on your own computer. What the licence gives you, where your work lives, and exactly what leaves the machine and when."/>
+<meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1"/>
+<meta property="og:title" content="Open Source Research Software | Nodus"/>
+<meta property="og:description" content="Free and open source under AGPL-3.0-only, with no accounts, no subscriptions and no telemetry. Your research corpus stays on your own machine."/>
+<meta property="og:type" content="article"/>
+<meta property="og:url" content="https://nodusresearch.com/open-source/"/>
+<meta property="og:site_name" content="Nodus"/>
+<meta property="og:locale" content="en_GB"/>
+<meta property="og:image" content="https://nodusresearch.com/favicon.png"/>
+<meta name="twitter:card" content="summary"/>
+<meta name="twitter:title" content="Open source and local-first"/>
+<meta name="twitter:description" content="What the AGPL gives you, where your research lives, and exactly what leaves your computer."/>
+<meta name="twitter:image" content="https://nodusresearch.com/favicon.png"/>
+<link rel="canonical" href="https://nodusresearch.com/open-source/"/>
+<link rel="icon" href="../favicon.ico" sizes="any"/>
+  <link rel="icon" type="image/png" href="../favicon.png" sizes="512x512"/>
+  <link rel="icon" type="image/svg+xml" href="../assets/nodus-logo.svg"/>
+  <link rel="apple-touch-icon" href="../apple-touch-icon.png"/>
+<link rel="preload" as="font" type="font/woff2" href="../assets/fonts/inter-latin.woff2" crossorigin/>
+<link rel="preload" as="font" type="font/woff2" href="../assets/fonts/fraunces-latin.woff2" crossorigin/>
+<link rel="stylesheet" href="../assets/css/nodus.css?v=20260818c"/>
+<link rel="stylesheet" href="../assets/css/guide.css?v=20260818b"/>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  "itemListElement": [
+    { "@type": "ListItem", "position": 1, "name": "Nodus", "item": "https://nodusresearch.com/" },
+    { "@type": "ListItem", "position": 2, "name": "Open source and local-first", "item": "https://nodusresearch.com/open-source/" }
+  ]
+}
+</script>
+</head>
+<body>
+
+<a class="skip-link" href="#main">Skip to content</a>
+<canvas id="organism" aria-hidden="true"></canvas>
+
+<div data-nodus-site-header data-base="../" data-page="open-source"></div>
+<script defer src="../site-header.js?v=20260818c"></script>
+
+<main id="main">
+
+<header class="page-hero guide-hero" data-accent="#34d399" data-second="#22d3ee" data-energy="0.32">
+  <div class="wrap">
+    <div class="scrim" style="max-width:820px">
+      <nav class="breadcrumb" aria-label="Breadcrumb">
+        <a href="../index.html">Nodus</a>
+        <span class="sep" aria-hidden="true">/</span>
+        <span aria-current="page">Open source</span>
+      </nav>
+      <span class="kicker">Open source and local-first</span>
+      <h1 class="display" data-split>Open source and local-first</h1>
+      <p class="lead">Research software asks for a great deal of trust. It holds unpublished work, material you may not be licensed to share, and years of reading. Nodus answers that in the only two ways you can check for yourself. The source is published under a licence that keeps it published, and the corpus never leaves your computer unless you ask it to.</p>
+      <div class="guide-actions">
+        <a class="btn primary" href="https://github.com/Drakonis96/nodus" target="_blank" rel="noopener">
+          <svg class="ic" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.44 9.8 8.2 11.39.6.11.82-.26.82-.58v-2.23c-3.34.72-4.04-1.42-4.04-1.42-.55-1.39-1.34-1.76-1.34-1.76-1.09-.75.08-.73.08-.73 1.2.08 1.84 1.24 1.84 1.24 1.07 1.84 2.81 1.3 3.5 1 .1-.78.42-1.31.76-1.61-2.67-.3-5.47-1.33-5.47-5.93 0-1.31.47-2.38 1.24-3.22-.13-.3-.54-1.52.11-3.18 0 0 1.01-.32 3.3 1.23a11.5 11.5 0 0 1 6 0c2.29-1.55 3.3-1.23 3.3-1.23.65 1.66.24 2.88.12 3.18.77.84 1.23 1.91 1.23 3.22 0 4.61-2.8 5.62-5.48 5.92.43.37.81 1.1.81 2.22v3.29c0 .32.22.7.83.58A12 12 0 0 0 24 12c0-6.63-5.37-12-12-12Z"/></svg>
+          Browse the source
+        </a>
+        <a class="btn" href="../contribute/">Contribute</a>
+      </div>
+      <nav class="guide-jump" aria-label="On this page">
+        <a href="#licence"><em>01</em> The licence</a>
+        <a href="#where"><em>02</em> Where your work lives</a>
+        <a href="#leaves"><em>03</em> What leaves the machine</a>
+        <a href="#cite"><em>04</em> Citing Nodus</a>
+      </nav>
+    </div>
+  </div>
+</header>
+
+<!-- ============================================================ licence -->
+<section id="licence" class="section-line" data-accent="#34d399" data-second="#a78bfa" data-energy="0.28">
+  <div class="wrap">
+    <div class="section-head scrim reveal">
+      <span class="kicker">01 · The licence</span>
+      <h2 class="title" data-split>Published under a licence that keeps it published.</h2>
+      <p class="lead">Nodus 4.0.0 and later are released exclusively under the GNU Affero General Public License v3.0, SPDX <code>AGPL-3.0-only</code>. Versions through 3.2.7 remain available under the MIT licence that accompanied them.</p>
+    </div>
+
+    <div class="guide-body prose reveal" style="margin-top:26px">
+      <p>What that means for you in practice is short. You may read the code, run it for any purpose, modify it and pass it on. If you distribute a modified version, or run one as a network service that other people use, you have to publish your source under the same terms. That last part is what the <em>Affero</em> in AGPL adds, and it is why the licence was chosen. It means a future hosted version of Nodus cannot quietly become a closed product built on this work.</p>
+      <p>Every published build links to its <b>Corresponding Source</b>, which is the exact immutable tag and the source archives the release was made from. A binary you downloaded can therefore be traced back to code you can read. The third-party notices list every dependency and its licence, and the repository follows the REUSE convention, with an SPDX header on its files.</p>
+    </div>
+
+    <div class="guide-grid reveal">
+      <article class="card lit guide-card">
+        <h3>Read the code</h3>
+        <p>One public repository holds the whole thing. The desktop app, the server, the Zotero plugin, the browser connector and this website are all in there.</p>
+        <a class="arrow-link" href="https://github.com/Drakonis96/nodus" target="_blank" rel="noopener">Open the repository
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
+      </article>
+      <article class="card lit guide-card">
+        <h3>Read the licence</h3>
+        <p>The complete, unmodified AGPL-3.0 text ships with the source, and the corresponding-source document names the tag every release was built from.</p>
+        <a class="arrow-link" href="https://github.com/Drakonis96/nodus/blob/main/LICENSE" target="_blank" rel="noopener">AGPL-3.0-only
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
+      </article>
+      <article class="card lit guide-card">
+        <h3>Read the dependencies</h3>
+        <p>Third-party notices list what Nodus is built on and under which terms, so an institution can review the whole stack rather than one name.</p>
+        <a class="arrow-link" href="https://github.com/Drakonis96/nodus/blob/main/THIRD_PARTY_NOTICES.md" target="_blank" rel="noopener">Third-party notices
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
+      </article>
+      <article class="card lit guide-card">
+        <h3>Report a vulnerability</h3>
+        <p>Security issues have their own private disclosure route rather than a public issue, so a fix can ship before the details do.</p>
+        <a class="arrow-link" href="https://github.com/Drakonis96/nodus/blob/main/SECURITY.md" target="_blank" rel="noopener">Security policy
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
+      </article>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================ where -->
+<section id="where" class="section-line" data-accent="#a78bfa" data-second="#818cf8" data-energy="0.3">
+  <div class="wrap">
+    <div class="section-head scrim reveal">
+      <span class="kicker">02 · Where your work lives</span>
+      <h2 class="title" data-split>On your disk, in a folder you chose.</h2>
+      <p class="lead">Local-first is a claim about storage, not a slogan. In Nodus it means every vault, the cross-vault Library and every search index are files on your own computer.</p>
+    </div>
+
+    <div class="guide-steps reveal">
+      <div class="guide-step">
+        <em>01</em>
+        <div>
+          <h3>No account, ever</h3>
+          <p>There is no sign-up, no licence key and no subscription. You download an installer, open it, and create a vault. Nothing about the application depends on a server run by the project, because there is no such server.</p>
+        </div>
+      </div>
+      <div class="guide-step">
+        <em>02</em>
+        <div>
+          <h3>You choose the folder</h3>
+          <p>Vaults and the shared Library sit under a backup folder you pick, which means they can live on an encrypted disk, a departmental drive or wherever your institution requires. Moving them is moving files.</p>
+        </div>
+      </div>
+      <div class="guide-step">
+        <em>03</em>
+        <div>
+          <h3>Backups you can verify</h3>
+          <p>Nodus makes encrypted automatic backups, and a complete Nodus 4 backup holds every vault together with the shared Library. Before Nodus 4 opens an existing database it creates and verifies a one-time pre-v4 recovery copy, and Nodus 4 can still open backups made by Nodus 3.x.</p>
+        </div>
+      </div>
+      <div class="guide-step">
+        <em>04</em>
+        <div>
+          <h3>A record of what happened</h3>
+          <p>An audit ledger records the operations performed in a vault. That matters when the question months later is not <em>what does my corpus say</em> but <em>when did this change, and why</em>.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="guide-note reveal">
+      <p><b>No advertising, telemetry or remote analytics.</b> The application does not send your content to a cloud run by the project, because the project runs none. This website carries no analytics container either, so no Tag Manager, no Google Analytics and no tracking pixel, and a test in the repository fails the build if anyone ever adds one.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================ leaves -->
+<section id="leaves" class="section-line" data-accent="#22d3ee" data-second="#fbbf24" data-energy="0.32">
+  <div class="wrap">
+    <div class="section-head scrim reveal">
+      <span class="kicker">03 · What leaves the machine</span>
+      <h2 class="title" data-split>Every outgoing request, and what triggers it.</h2>
+      <p class="lead">Local-first does not mean a program that never touches the network. It means nothing goes out unless you asked for something that needs it. Here is the whole list.</p>
+    </div>
+
+    <div class="guide-grid two reveal">
+      <article class="card lit guide-card">
+        <h3>AI providers, only once you configure one</h3>
+        <p>Model-assisted features stay inactive until you set up a provider or a local model. When you use one, that provider receives the text or page image the task needs. Run <b>Ollama</b> or <b>LM Studio</b> instead and the content never leaves your device at all.</p>
+        <a class="arrow-link" href="../ai-research/">How Nodus uses AI
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
+      </article>
+      <article class="card lit guide-card">
+        <h3>Bibliographic lookups, only the identifier</h3>
+        <p>Ask Nodus to resolve metadata and it sends Crossref, Open Library, NCBI or arXiv the single DOI, ISBN, ISSN, PMID or arXiv id you selected, and nothing else. Bulk requests are rate limited and can be cancelled, and candidates are shown for review rather than applied for you.</p>
+      </article>
+      <article class="card lit guide-card">
+        <h3>Updates, checked but never installed for you</h3>
+        <p>Nodus checks GitHub for new releases and can download one, but the download is not automatic and an update is never installed behind your back. GitHub sees what any web request exposes, such as an IP address.</p>
+      </article>
+      <article class="card lit guide-card">
+        <h3>Announcements, a static file you can switch off</h3>
+        <p>Nodus fetches a public static file from this website so it can warn you about known issues between releases. It is a plain conditional GET, at most once every four hours, carrying no identifier, no account, no vault name and nothing about your corpus. Turn it off in <b>Settings → Updates and news</b> and no request is made at all.</p>
+      </article>
+      <article class="card lit guide-card">
+        <h3>Zotero, a connection that never leaves the computer</h3>
+        <p>The Zotero integration talks to the Zotero application on the same machine over a local connection. There is no API key and no round trip through zotero.org.</p>
+        <a class="arrow-link" href="../zotero/">How the Zotero link works
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
+      </article>
+      <article class="card lit guide-card">
+        <h3>Sharing, opt-in and always a copy</h3>
+        <p>Nodus Server publishes a filtered copy of a vault you explicitly choose to share, while the original database and documents stay on your computer. Nothing is published until you set it up.</p>
+      </article>
+    </div>
+
+    <div class="guide-note reveal">
+      <p>This page is a summary written for people deciding whether to try Nodus. The <a href="https://github.com/Drakonis96/nodus/blob/main/PRIVACY.md" target="_blank" rel="noopener">privacy policy</a> is the authoritative document and goes a good deal further, service by service. Please read it before you put confidential or personal research material into any application, this one included.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================ cite -->
+<section id="cite" class="section-line" data-accent="#fbbf24" data-second="#34d399" data-energy="0.28">
+  <div class="wrap">
+    <div class="section-head scrim reveal">
+      <span class="kicker">04 · Citing Nodus</span>
+      <h2 class="title" data-split>Software you can cite like any other instrument.</h2>
+    </div>
+    <div class="guide-body prose reveal" style="margin-top:26px">
+      <p>If Nodus contributes substantially to research that leads to a publication, cite the version you used. The repository ships machine-readable citation metadata in <code>CITATION.cff</code>, including an ORCID for the author and the released version and date, which GitHub renders directly in APA and BibTeX.</p>
+      <p>Citing the version matters more here than it does for a general purpose editor. Analysis pipelines change between releases, and a reviewer asking how a corpus was processed deserves an answer that points at a specific archived tag.</p>
+    </div>
+    <div class="guide-note reveal">
+      <p><b>Nodus started as one person's project, and it now includes everyone who has added to it since.</b> Bug reports, translations, documentation and a precise account of what broke are worth as much as code. The <a href="../contribute/">contribute page</a> sets out the ways in.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================ next -->
+<section class="section-line" data-accent="#a78bfa" data-second="#818cf8" data-energy="0.26">
+  <div class="wrap">
+    <div class="section-head scrim reveal">
+      <span class="kicker">Keep going</span>
+      <h2 class="title" data-split>Where to go from here.</h2>
+    </div>
+    <div class="next-grid">
+      <a class="card lit next-card reveal" href="../research/">
+        <span class="pic"><svg viewBox="0 0 24 24"><circle cx="6" cy="6" r="2.4"/><circle cx="18" cy="7" r="2.4"/><circle cx="11" cy="18" r="2.4"/><path d="M8 7l7.6.6M7.2 8.2l3 7.4M16.6 9.2l-4.4 6.6"/></svg></span>
+        <h3>Nodus for academic research</h3>
+        <p>What all of this is in service of. Sources, ideas with the evidence behind them, semantic search, research gaps and cited writing.</p>
+        <span class="arrow-link">Read the research guide
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>
+      </a>
+      <a class="card lit next-card reveal" href="../zotero/" style="--delay:70ms">
+        <span class="pic"><svg viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20V3H6.5A2.5 2.5 0 0 0 4 5.5v14Z"/><path d="M9 7h6M9 11h6"/></svg></span>
+        <h3>Nodus and Zotero</h3>
+        <p>A read-only link to the library you already keep, and a standalone plugin that runs inside Zotero itself.</p>
+        <span class="arrow-link">Read about the Zotero integration
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>
+      </a>
+      <a class="card lit next-card reveal" href="../ai-research/" style="--delay:140ms">
+        <span class="pic"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M18.4 5.6l-2.1 2.1M7.7 16.3l-2.1 2.1"/></svg></span>
+        <h3>AI for academic research</h3>
+        <p>Which models Nodus can use, how to keep every one of them on your own hardware, and where you still have to check the result yourself.</p>
+        <span class="arrow-link">Read about AI-assisted research
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>
+      </a>
+      <a class="card lit next-card reveal" href="../contribute/" style="--delay:210ms">
+        <span class="pic"><svg viewBox="0 0 24 24"><circle cx="6" cy="6" r="2.6"/><circle cx="6" cy="18" r="2.6"/><circle cx="18" cy="18" r="2.6"/><path d="M6 8.6v6.8M18 15.4V12a3 3 0 0 0-3-3h-3"/></svg></span>
+        <h3>Contribute</h3>
+        <p>Code, translations, documentation, bug reports or simply telling us what broke. Every grain counts.</p>
+        <span class="arrow-link">Join in
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>
+      </a>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<footer class="site-foot">
+  <div class="wrap">
+    <div class="foot-grid">
+      <div class="foot-brand">
+        <span class="logo"><img src="../assets/nodus-logo.svg" alt=""/> Nodus</span>
+        <p>A free, open-source, local-first research workspace for connecting sources, ideas and evidence. Your corpus stays on your machine.</p>
+      </div>
+      <div class="foot-col">
+        <h3>Research</h3>
+        <a href="../research/">Academic research</a>
+        <a href="../zotero/">Nodus and Zotero</a>
+        <a href="../ai-research/">AI for research</a>
+        <a href="./">Open source</a>
+      </div>
+      <div class="foot-col">
+        <h3>Learn</h3>
+        <a href="../wiki/">Wiki</a>
+        <a href="../blog/">Blog</a>
+        <a href="../faq/">FAQ</a>
+      </div>
+      <div class="foot-col">
+        <h3>Project</h3>
+        <a href="../contribute/">Contribute</a>
+        <a href="https://github.com/Drakonis96/nodus" target="_blank" rel="noopener">GitHub</a>
+        <a href="https://github.com/Drakonis96/nodus/releases" target="_blank" rel="noopener">Releases</a>
+      </div>
+    </div>
+    <div class="foot-base">
+      <span>© 2026 Jorge Pérez Burgueño and Nodus contributors.</span>
+      <a href="https://github.com/Drakonis96/nodus/blob/main/LICENSE" target="_blank" rel="noopener">AGPL-3.0-only</a>
+    </div>
+  </div>
+</footer>
+
+<script src="../assets/js/organism.js?v=20260818c"></script>
+<script src="../assets/js/site.js?v=20260815"></script>
+<script src="../assets/js/back-to-top.js?v=20260817b"></script>
+</body>
+</html>

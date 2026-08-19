@@ -8,6 +8,7 @@ import {
   sortAnnouncements,
   type Announcement,
   type AnnouncementEntry,
+  type AnnouncementRefreshResult,
 } from '@shared/announcements';
 import { getSettings } from './db/settingsRepo';
 
@@ -48,7 +49,7 @@ interface AnnouncementsState {
 }
 
 let notify: (() => void) | null = null;
-let checking: Promise<void> | null = null;
+let checking: Promise<AnnouncementRefreshResult> | null = null;
 
 /** Register a callback invoked when the list or its read marks change. */
 export function setAnnouncementsNotifier(cb: (() => void) | null): void {
@@ -159,11 +160,11 @@ function pruneMarks(marks: Record<string, number>, announcements: readonly Annou
 }
 
 /**
- * Ask for the list. Never throws and never reports failure to the user: an unreachable
- * file means the app shows the notices it already had, which is the same thing it shows
- * when there is nothing to announce.
+ * Ask for the list. Never throws and never discards the last good payload. Callers get
+ * a small status value so a manual check can acknowledge success or failure without
+ * turning an optional network channel into a blocking error.
  */
-async function performAnnouncementsRefresh(reason: string): Promise<void> {
+async function performAnnouncementsRefresh(reason: string): Promise<AnnouncementRefreshResult> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
   try {
@@ -176,31 +177,36 @@ async function performAnnouncementsRefresh(reason: string): Promise<void> {
       headers: state.etag ? { 'If-None-Match': state.etag } : {},
     });
     if (response.status === 304) {
-      writeState({ ...state, checkedAt: Date.now() });
-      return;
+      const checkedAt = Date.now();
+      writeState({ ...state, checkedAt });
+      return { status: 'not-modified', checkedAt };
     }
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     const payload = await response.json();
     const { announcements, rejected } = parseAnnouncements(payload);
     if (rejected > 0) console.warn(`[announcements] ignored ${rejected} malformed entr${rejected === 1 ? 'y' : 'ies'}`);
+    const checkedAt = Date.now();
     writeState({
       etag: response.headers.get('etag') ?? undefined,
-      checkedAt: Date.now(),
+      checkedAt,
       payload,
       read: pruneMarks(state.read ?? {}, announcements),
       dismissed: pruneMarks(state.dismissed ?? {}, announcements),
     });
     console.log(`[announcements] ${announcements.length} notice(s) after check (${reason})`);
     notify?.();
+    return { status: 'updated', checkedAt };
   } catch (error) {
-    console.log('[announcements] check skipped:', error instanceof Error ? error.message : error);
+    const message = error instanceof Error ? error.message : String(error);
+    console.log('[announcements] check skipped:', message);
+    return { status: 'error', checkedAt: Date.now(), error: message };
   } finally {
     clearTimeout(timer);
   }
 }
 
-export async function refreshAnnouncements(reason: string): Promise<void> {
-  if (!announcementsAllowed()) return;
+export async function refreshAnnouncements(reason: string): Promise<AnnouncementRefreshResult> {
+  if (!announcementsAllowed()) return { status: 'disabled', checkedAt: Date.now() };
   // A manual check made while the scheduled one is still in flight must wait for the
   // same request. Returning early would make the refresh icon stop while still showing
   // the stale list, which is precisely the uncertainty the manual action is meant to
@@ -208,7 +214,7 @@ export async function refreshAnnouncements(reason: string): Promise<void> {
   if (checking) return checking;
   checking = performAnnouncementsRefresh(reason);
   try {
-    await checking;
+    return await checking;
   } finally {
     checking = null;
   }

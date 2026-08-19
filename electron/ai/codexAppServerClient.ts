@@ -16,6 +16,10 @@ export interface CodexAppServerClientOptions {
   codexHome: string;
   appVersion: string;
   requestTimeoutMs?: number;
+  /** Keep OAuth/model state warm briefly, then reap the native runtime. */
+  idleTimeoutMs?: number;
+  /** Hard ceiling for one child generation, including a wedged request. */
+  maxLifetimeMs?: number;
   env?: NodeJS.ProcessEnv;
 }
 
@@ -62,6 +66,8 @@ export class CodexAppServerClient {
   private pending = new Map<JsonRpcId, PendingRequest>();
   private notificationHandlers = new Set<CodexNotificationHandler>();
   private stderrTail = '';
+  private idleTimer: NodeJS.Timeout | null = null;
+  private lifetimeTimer: NodeJS.Timeout | null = null;
 
   constructor(private readonly options: CodexAppServerClientOptions) {}
 
@@ -71,8 +77,13 @@ export class CodexAppServerClient {
   }
 
   async request<T>(method: string, params?: unknown, timeoutMs?: number): Promise<T> {
+    this.clearIdleTimer();
     await this.ensureStarted();
-    return this.sendRequest<T>(method, params, timeoutMs);
+    try {
+      return await this.sendRequest<T>(method, params, timeoutMs);
+    } finally {
+      this.armIdleTimer();
+    }
   }
 
   /** Live child, without starting one. Lets callers skip best-effort teardown
@@ -82,6 +93,7 @@ export class CodexAppServerClient {
   }
 
   async stop(): Promise<void> {
+    this.clearLifecycleTimers();
     this.stopping = true;
     const child = this.child;
     this.child = null;
@@ -119,6 +131,7 @@ export class CodexAppServerClient {
    * synchronous handler.
    */
   killNow(): void {
+    this.clearLifecycleTimers();
     this.stopping = true;
     const child = this.child;
     this.child = null;
@@ -163,6 +176,7 @@ export class CodexAppServerClient {
       }
     );
     this.child = child;
+    this.armLifetimeTimer(child);
 
     // A dying child races every write: the `exitCode === null` guards below can pass
     // and the pipe still be gone by the time the data lands, and an unhandled stream
@@ -229,6 +243,37 @@ export class CodexAppServerClient {
     delete env.NODE_OPTIONS;
     env.CODEX_HOME = this.options.codexHome;
     return env;
+  }
+
+  private clearIdleTimer(): void {
+    if (this.idleTimer) clearTimeout(this.idleTimer);
+    this.idleTimer = null;
+  }
+
+  private clearLifecycleTimers(): void {
+    this.clearIdleTimer();
+    if (this.lifetimeTimer) clearTimeout(this.lifetimeTimer);
+    this.lifetimeTimer = null;
+  }
+
+  private armIdleTimer(): void {
+    this.clearIdleTimer();
+    const delay = this.options.idleTimeoutMs ?? 5 * 60_000;
+    this.idleTimer = setTimeout(() => {
+      this.idleTimer = null;
+      if (this.pending.size === 0) void this.stop();
+    }, Math.max(1, delay));
+    this.idleTimer.unref?.();
+  }
+
+  private armLifetimeTimer(child: ChildProcessWithoutNullStreams): void {
+    if (this.lifetimeTimer) clearTimeout(this.lifetimeTimer);
+    this.lifetimeTimer = setTimeout(() => {
+      this.lifetimeTimer = null;
+      if (this.child !== child || child.exitCode !== null) return;
+      this.killNow();
+    }, Math.max(1, this.options.maxLifetimeMs ?? 30 * 60_000));
+    this.lifetimeTimer.unref?.();
   }
 
   private sendRequest<T>(method: string, params?: unknown, timeoutMs?: number): Promise<T> {

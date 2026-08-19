@@ -3,6 +3,11 @@ const content = await fetch('./content.json?v=20260814b').then((response) => {
   return response.json();
 });
 
+const videos = await fetch('../tutorials.json')
+  .then((response) => (response.ok ? response.json() : null))
+  .then((data) => (Array.isArray(data?.videos) ? data.videos : []))
+  .catch(() => []);
+
 const $ = (selector, root = document) => root.querySelector(selector);
 const escapeHtml = (value) => String(value).replace(/[&<>'"]/g, (char) => ({ '&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;' }[char]));
 const imagePath = (image) => `./assets/${image}`;
@@ -24,8 +29,26 @@ function downloadIconMarkup() {
   return '<svg class="download-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/></svg>';
 }
 
+const VIDEO_TITLES = {
+  essentials: ['Introduction', 'Nodus | Introduction and first steps'],
+  academic: ['Vault manuals', 'Academic research vault'],
+  genealogy: ['Vault manuals', 'Genealogy vault'],
+  databases: ['Vault manuals', 'Databases vault'],
+  teaching: ['Vault manuals', 'Teaching vault'],
+  nodi: ['Features', 'Meet Nodi, the companion'],
+  toolkit: ['Features', 'Nodus Toolkit'],
+  word: ['Integrations', 'Word and LibreOffice copilot'],
+  zotero: ['Integrations', 'Zotero integration'],
+  mcp: ['Integrations', 'MCP and Nodus Server'],
+};
+
+const publishedVideos = videos
+  .filter((video) => VIDEO_TITLES[video.id] && /^[\w-]{11}$/.test(video.youtubeId))
+  .sort((a, b) => (a.order || 0) - (b.order || 0));
+
 const allPages = [
   { type: 'home', id: 'home', title: 'Nodus Wiki', summary: 'Complete guides for every stable Nodus vault.', accent: '#8b5cf6', icon: 'nodus' },
+  { type: 'videos', id: 'videos', title: 'Video tutorials', summary: 'Watch every vault, feature and integration explained on screen.', group: 'Video tutorials', accent: '#f87171', icon: 'nodus' },
   ...content.common.map((chapter) => ({ ...chapter, type: 'common', accent: '#8b5cf6', icon: 'nodus' })),
   ...content.vaults.flatMap((vault) => [
     { ...vault, type: 'vault', title: vault.name, summary: vault.tagline, accent: vault.accent },
@@ -34,10 +57,25 @@ const allPages = [
 ];
 
 function buildNavigation() {
-  const commonGroups = Object.groupBy ? Object.groupBy(content.common, (item) => item.group) : content.common.reduce((groups, item) => ((groups[item.group] ||= []).push(item), groups), {});
-  const common = Object.entries(commonGroups).map(([group, chapters]) => `<div class="nav-group"><b>${escapeHtml(group)}</b>${chapters.map((chapter) => navLink(chapter.id, chapter.title, '#8b5cf6')).join('')}</div>`).join('');
+  // One flat list for the core guide: its three sub-headings only added depth to
+  // a rail that already nests five vaults inside it.
+  const common = content.common.map((chapter) => navLink(chapter.id, chapter.title, '#8b5cf6')).join('');
   const vaults = content.vaults.map((vault) => `<details class="nav-vault" data-vault="${vault.id}"><summary style="--vault-accent:${vault.accent}"><span class="vault-mark">${iconMarkup(vault.icon)}</span>${escapeHtml(vault.name)}</summary>${navLink(vault.id, 'Overview', vault.accent)}${vault.chapters.map((chapter) => navLink(chapter.id, chapter.title, vault.accent)).join('')}</details>`).join('');
-  $('#wiki-nav').innerHTML = `${navLink('home', 'Wiki home', '#8b5cf6')}<div class="nav-group"><b>Core guide</b></div>${common}<div class="nav-group"><b>Vault manuals</b></div>${vaults}`;
+  $('#wiki-nav').innerHTML = `${navLink('home', 'Wiki home', '#8b5cf6')}${publishedVideos.length ? navLink('videos', 'Video tutorials', '#f87171') : ''}`
+    + `<div class="nav-group"><b>Core guide</b>${common}</div>`
+    + `<div class="nav-group"><b>Vault manuals</b>${vaults}</div>`;
+
+  // an accordion: opening one vault closes the others, so the rail stays short
+  $('#wiki-nav').addEventListener('click', (event) => {
+    const summary = event.target.closest('.nav-vault > summary');
+    if (!summary) return;
+    const vault = summary.parentElement;
+    if (!vault.open) {
+      $('#wiki-nav').querySelectorAll('.nav-vault[open]').forEach((other) => {
+        if (other !== vault) other.open = false;
+      });
+    }
+  });
 }
 
 function navLink(id, title, accent) {
@@ -85,9 +123,64 @@ function vaultMarkup(vault) {
     <div class="meta-row"><span class="pill">For ${escapeHtml(vault.audience)}</span><span class="pill">${vault.chapters.length} complete tutorials</span><span class="pill">Step-by-step workflows</span></div>
     <div class="hero-actions"><a class="action primary" href="#${vault.chapters[0].id}">Begin the guide</a><a class="action" href="${vault.pdf}" download>${downloadIconMarkup()}Download PDF manual</a><a class="action bundle-download" href="${content.manualBundle}" download>${downloadIconMarkup()}Download all manuals</a></div>
     ${figure(`${vault.id}/home.png`, `${vault.name} vault overview`)}
-    <section class="doc-section"><p class="section-kicker">Contents</p><h2>Complete ${escapeHtml(vault.short)} workflow</h2><div class="chapter-list">${vault.chapters.map((chapter,index) => `<a class="chapter-card" href="#${chapter.id}"><small>${String(index+1).padStart(2,'0')} · ${escapeHtml(chapter.group)}</small><b>${escapeHtml(chapter.title)}</b><span>${escapeHtml(chapter.summary)}</span></a>`).join('')}</div></section>
     ${vault.chapters.map((chapter, index) => sectionMarkup(chapter, vault.accent, index === 0 || index % 2 === 1, vault)).join('')}
   </div>`;
+}
+
+function videosMarkup() {
+  const shelves = publishedVideos.reduce((groups, video) => {
+    const [shelf] = VIDEO_TITLES[video.id];
+    (groups[shelf] ||= []).push(video);
+    return groups;
+  }, {});
+  const sections = Object.entries(shelves).map(([shelf, items]) => `<section class="doc-section" id="videos-${shelf.toLowerCase().replace(/\s+/g, '-')}">
+    <p class="section-kicker">Video tutorials</p><h2>${escapeHtml(shelf)}</h2>
+    <div class="video-grid">${items.map((video) => {
+      const [, title] = VIDEO_TITLES[video.id];
+      return `<button class="video-card" type="button" data-video="${video.youtubeId}" data-title="${escapeHtml(title)}">
+        <span class="video-thumb"><img src="https://i.ytimg.com/vi/${video.youtubeId}/hqdefault.jpg" alt="" loading="lazy" width="480" height="360"/>
+          <span class="video-play"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7-11-7Z"/></svg></span></span>
+        <span class="video-copy"><b>${escapeHtml(title)}</b></span>
+      </button>`;
+    }).join('')}</div></section>`).join('');
+
+  return `<div style="--accent:#f87171"><p class="eyebrow">Video tutorials</p><h1>Watch it work, step by step.</h1>
+    <p class="lead">Short guided videos for setting up each vault, discovering key features and connecting Nodus to the tools you already use. They play here, and the whole catalogue is also inside the app under Settings → Help.</p>
+    <div class="meta-row"><span class="pill">${publishedVideos.length} videos</span><span class="pill">Watch without leaving the wiki</span></div>
+    ${sections || '<p class="lead">The video catalogue could not be loaded. <a href="https://www.youtube.com/@nodusapp">Open the channel</a>.</p>'}
+  </div>`;
+}
+
+function openVideo(id, title) {
+  let modal = $('#video-modal');
+  if (!modal) {
+    modal = document.createElement('div');
+    modal.id = 'video-modal';
+    modal.className = 'video-modal';
+    modal.innerHTML = `<div class="video-dialog" role="dialog" aria-modal="true" aria-labelledby="video-modal-title">
+      <div class="video-head"><h3 id="video-modal-title"></h3>
+        <button class="video-close" type="button" aria-label="Close video">×</button></div>
+      <div class="video-frame"><iframe title="Nodus tutorial" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe></div>
+    </div>`;
+    document.body.append(modal);
+    modal.addEventListener('click', (event) => {
+      if (event.target === modal || event.target.closest('.video-close')) closeVideo();
+    });
+    addEventListener('keydown', (event) => { if (event.key === 'Escape') closeVideo(); });
+  }
+  $('#video-modal-title', modal).textContent = title;
+  $('iframe', modal).src = `https://www.youtube-nocookie.com/embed/${id}?autoplay=1&rel=0&modestbranding=1`;
+  modal.classList.add('open');
+  document.body.style.overflow = 'hidden';
+  $('.video-close', modal).focus();
+}
+
+function closeVideo() {
+  const modal = $('#video-modal');
+  if (!modal || !modal.classList.contains('open')) return;
+  modal.classList.remove('open');
+  $('iframe', modal).src = '';
+  document.body.style.overflow = '';
 }
 
 function commonMarkup(chapter) {
@@ -97,6 +190,7 @@ function commonMarkup(chapter) {
 function render(id) {
   const page = allPages.find((entry) => entry.id === id) || allPages[0];
   if (page.type === 'home') $('#article').innerHTML = homeMarkup();
+  else if (page.type === 'videos') $('#article').innerHTML = videosMarkup();
   else if (page.type === 'vault') $('#article').innerHTML = vaultMarkup(page);
   else if (page.type === 'common') $('#article').innerHTML = commonMarkup(page);
   else $('#article').innerHTML = vaultMarkup(page.vault);
@@ -104,13 +198,70 @@ function render(id) {
   document.title = page.type === 'home' ? 'Nodus Wiki - Complete vault guides' : `${page.title} - Nodus Wiki`;
   document.querySelectorAll('.nav-link').forEach((link) => link.classList.toggle('active', link.dataset.page === page.id));
   const parent = page.vault || (page.type === 'vault' ? page : null);
-  if (parent) $(`.nav-vault[data-vault="${parent.id}"]`)?.setAttribute('open','');
+  if (parent) {
+    // opening the current vault also closes the others: the rail is an accordion
+    document.querySelectorAll('.nav-vault[open]').forEach((vault) => {
+      if (vault.dataset.vault !== parent.id) vault.open = false;
+    });
+    $(`.nav-vault[data-vault="${parent.id}"]`)?.setAttribute('open', '');
+  }
+  $('#article').querySelectorAll('.video-card').forEach((card) => {
+    card.addEventListener('click', () => openVideo(card.dataset.video, card.dataset.title));
+  });
   const sections = [...$('#article').querySelectorAll('.doc-section[id]')];
   $('#page-toc').innerHTML = sections.map((section) => `<a href="#${section.id}">${escapeHtml($('h2', section)?.textContent || '')}</a>`).join('');
+  watchSections(sections, page);
   requestAnimationFrame(() => {
     if (page.type === 'chapter') $(`#${CSS.escape(page.id)}`)?.scrollIntoView();
     else window.scrollTo({ top: 0 });
   });
+}
+
+/* Follow the reader down the page: whichever chapter is currently being read
+   lights up in the left rail and in "On this page". A vault manual is one long
+   document, so without this the rail would sit on the vault name for the whole
+   scroll and give no sense of place. */
+let sectionSpy = null;
+
+function watchSections(sections, page) {
+  if (sectionSpy) { sectionSpy.disconnect(); sectionSpy = null; }
+  if (!sections.length || !('IntersectionObserver' in window)) return;
+
+  const ratios = new Map();
+  const fallback = page.type === 'chapter' ? page.id : page.id;
+
+  const paint = () => {
+    let best = null;
+    let bestRatio = 0;
+    for (const section of sections) {
+      const ratio = ratios.get(section.id) || 0;
+      if (ratio > bestRatio) { bestRatio = ratio; best = section.id; }
+    }
+    // above the first chapter (the page head), keep the page itself marked
+    const current = best || fallback;
+
+    document.querySelectorAll('.nav-link').forEach((link) => {
+      link.classList.toggle('active', link.dataset.page === current);
+    });
+    // the vault entry stays marked while any of its chapters is the current one
+    const parent = page.vault || (page.type === 'vault' ? page : null);
+    if (parent && !document.querySelector(`.nav-link.active[data-page="${parent.id}"]`)) {
+      $(`.nav-vault[data-vault="${parent.id}"]`)?.setAttribute('open', '');
+    }
+    document.querySelectorAll('#page-toc a').forEach((link) => {
+      link.classList.toggle('active', link.getAttribute('href') === `#${current}`);
+    });
+  };
+
+  sectionSpy = new IntersectionObserver((entries) => {
+    for (const entry of entries) ratios.set(entry.target.id, entry.isIntersecting ? entry.intersectionRatio : 0);
+    paint();
+  }, {
+    // bias towards the upper half, so the marker moves as a heading reaches the top
+    rootMargin: `-${Math.round(innerHeight * 0.12)}px 0px -55% 0px`,
+    threshold: [0, 0.15, 0.4, 0.75, 1],
+  });
+  sections.forEach((section) => sectionSpy.observe(section));
 }
 
 function search(query) {

@@ -8,6 +8,7 @@ import { PROTECT_TRANSLATIONS } from './i18n.protect';
 import { AI_OCR_TRANSLATIONS } from './i18n.aiOcr';
 import { TOOLKIT_APPS_TRANSLATIONS } from './i18n.toolkitApps';
 import { SERVER_TRANSLATIONS } from './i18n.server';
+import { CLOUDFLARE_TRANSLATIONS } from './i18n.cloudflare';
 import { TRANSLATE_TRANSLATIONS } from './i18n.translate';
 import { WORLD_CHAT_TRANSLATIONS } from './i18n.worldChat';
 import { STUDY_SYNONYM_TRANSLATIONS } from './i18n.studySynonyms';
@@ -209,6 +210,7 @@ export const DE: Record<string, string> = {
   ...PROTECT_TRANSLATIONS.de,
   ...TOOLKIT_APPS_TRANSLATIONS.de,
   ...SERVER_TRANSLATIONS.de,
+  ...CLOUDFLARE_TRANSLATIONS.de,
   ...TRANSLATE_TRANSLATIONS.de,
   'Traduce texto, documentos y adjuntos de Zotero con el modelo que elijas, incluido un modo PDF facsímil.': 'Übersetze Text, Dokumente und Zotero-Anhänge mit dem Modell deiner Wahl, einschließlich eines PDF-Faksimilemodus.',
   'Traducir texto, documentos y adjuntos de Zotero con el modelo elegido, conservando la estructura de DOCX y EPUB y la apariencia de los PDF mediante un modo facsímil.': 'Text, Dokumente und Zotero-Anhänge mit dem gewählten Modell übersetzen und dabei die DOCX- und EPUB-Struktur sowie das Erscheinungsbild von PDFs im Faksimilemodus bewahren.',
@@ -2547,6 +2549,10 @@ export const DE: Record<string, string> = {
   'Trazar el esquema desde esta idea': 'Das Schema von dieser Idee aus zeichnen',
   '{n} debate(s)': '{n} Debatte(n)',
   '{n} conexiones': '{n} Verbindungen',
+  'Ver las {n} conexiones': 'Alle {n} Verbindungen ansehen',
+  'Conexiones de {name}': 'Verbindungen von {name}',
+  '{n} autores conectados': '{n} verbundene Autoren',
+  'Conexiones del autor': 'Verbindungen des Autors',
   '+{n} conexiones no dibujadas': '+{n} nicht gezeichnete Verbindungen',
   'conf media': 'Ø Konf.',
   'Selecciona una idea y traza su': 'Wählen Sie eine Idee aus und zeichnen Sie ihre',

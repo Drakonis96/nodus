@@ -3,6 +3,7 @@ import {
   useCallback,
   useEffect,
   useImperativeHandle,
+  useLayoutEffect,
   useRef,
   useState,
   type RefObject,
@@ -14,9 +15,13 @@ import type {
   WritingDraftAnnotationInput,
 } from '@shared/types';
 import { t } from '../i18n';
+import { pointerAnchor, selectionRibbonPosition, viewportRibbonBounds, type RibbonAnchor } from '../selectionRibbonPosition';
 import { confirm } from './feedback';
 import { Icon } from './ui';
 import './readerSelectionActions.css';
+
+/** Rough size of the ribbon, for the first paint before it can be measured. */
+const SELECTION_RIBBON = { width: 350, height: 41 };
 
 interface ReaderMark {
   start: number;
@@ -35,12 +40,14 @@ interface ReaderAnchor {
 interface ActiveSelection extends ReaderAnchor {
   left: number;
   top: number;
+  band: RibbonAnchor;
 }
 
 interface FloatingAction<T = undefined> {
   value: T;
   left: number;
   top: number;
+  band?: RibbonAnchor;
 }
 
 interface MarginPosition {
@@ -205,6 +212,17 @@ function findAnchoredText(root: HTMLElement, anchor: ReaderAnchor): Range | null
   return bestIndex >= 0 ? rangeFromOffsets(root, bestIndex, bestIndex + anchor.selectedText.length) : null;
 }
 
+/** The anchor of a stored annotation, so its range can be acted on like a selection. */
+function annotationAnchor(annotation: WritingDraftAnnotation): ReaderAnchor {
+  return {
+    startOffset: annotation.startOffset,
+    endOffset: annotation.endOffset,
+    selectedText: annotation.selectedText,
+    prefix: annotation.prefix,
+    suffix: annotation.suffix,
+  };
+}
+
 function annotationRange(root: HTMLElement, annotation: WritingDraftAnnotation): Range | null {
   const direct = rangeFromOffsets(root, annotation.startOffset, annotation.endOffset);
   if (direct?.toString() === annotation.selectedText) return direct;
@@ -273,6 +291,21 @@ function wordAtPoint(event: MouseEvent, root: HTMLElement): Range | null {
   selection?.removeAllRanges();
   selection?.addRange(range);
   return range;
+}
+
+/**
+ * The moving end of a selection made without a pointer. With the keyboard the
+ * caret is where the reader is working, so the ribbon follows it instead of
+ * sitting over the first line of the selection.
+ */
+function focusAnchor(range: Range): RibbonAnchor {
+  const selection = window.getSelection();
+  const backwards = !!selection?.focusNode
+    && selection.focusNode === range.startContainer
+    && selection.focusOffset === range.startOffset;
+  const rects = Array.from(range.getClientRects()).filter((item) => item.width > 0 || item.height > 0);
+  const rect = rects.length ? (backwards ? rects[0] : rects[rects.length - 1]) : range.getBoundingClientRect();
+  return { x: backwards ? rect.left : rect.right, top: rect.top, bottom: rect.bottom };
 }
 
 function rectAtPoint(range: Range, x: number, y: number): DOMRect | null {
@@ -386,6 +419,7 @@ export const ReaderSelectionActions = forwardRef<ReaderSelectionActionsHandle, {
   const [commentError, setCommentError] = useState<string | null>(null);
   const [localMark, setLocalMark] = useState<ReaderMark | null>(() => loadMark(contextId));
   const [marginPositions, setMarginPositions] = useState<MarginPosition[]>([]);
+  const ribbonRef = useRef<HTMLDivElement | null>(null);
   const [contentRevision, setContentRevision] = useState(0);
   const migratedBookmark = useRef<string | null>(null);
   const usesSyncedBookmark = !!onCreateAnnotation && !!onDeleteAnnotation;
@@ -467,7 +501,7 @@ export const ReaderSelectionActions = forwardRef<ReaderSelectionActionsHandle, {
     }
   }, [activeHighlightActions, annotations, commentEditor]);
 
-  const captureSelection = useCallback((event?: MouseEvent): ActiveSelection | null => {
+  const captureSelection = useCallback((event?: MouseEvent, pointer?: { x: number; y: number }): ActiveSelection | null => {
     const root = targetRef.current;
     if (!root) return null;
     let selected = selectionInside(root);
@@ -476,13 +510,14 @@ export const ReaderSelectionActions = forwardRef<ReaderSelectionActionsHandle, {
       if (range) selected = { range, text: range.toString() };
     }
     if (!selected) return null;
-    const rect = selected.range.getBoundingClientRect();
     const anchor = anchorFromRange(root, selected.range, selected.text);
-    const width = 350;
+    // The pointer wins over the selection box: a selection dragged over several
+    // lines ends where the pointer is, and that is where the reader is looking.
+    const band = pointer ? pointerAnchor(pointer.x, pointer.y) : focusAnchor(selected.range);
     return {
       ...anchor,
-      left: Math.max(8, Math.min(window.innerWidth - Math.min(width, window.innerWidth - 16) - 8, rect.left + rect.width / 2 - width / 2)),
-      top: Math.max(8, rect.top - 48),
+      band,
+      ...selectionRibbonPosition(band, SELECTION_RIBBON, viewportRibbonBounds()),
     };
   }, [targetRef]);
 
@@ -507,8 +542,8 @@ export const ReaderSelectionActions = forwardRef<ReaderSelectionActionsHandle, {
     });
   }, [annotations, clearSelection, onAnnotationError, onCreateAnnotation]);
 
-  const showSelection = useCallback((event?: MouseEvent) => {
-    const selection = captureSelection(event);
+  const showSelection = useCallback((event?: MouseEvent, pointer?: { x: number; y: number }) => {
+    const selection = captureSelection(event, pointer);
     if (!selection) {
       setActive(null);
       return false;
@@ -579,12 +614,15 @@ export const ReaderSelectionActions = forwardRef<ReaderSelectionActionsHandle, {
   useEffect(() => {
     const root = targetRef.current;
     if (!root) return;
-    const onPointerUp = () => window.setTimeout(() => showSelection(), 0);
+    const onPointerUp = (event: PointerEvent) => {
+      const pointer = { x: event.clientX, y: event.clientY };
+      window.setTimeout(() => showSelection(undefined, pointer), 0);
+    };
     const onKeyUp = (event: KeyboardEvent) => {
       if (event.key.startsWith('Arrow') || event.key === 'Shift') showSelection();
     };
     const onContextMenu = (event: MouseEvent) => {
-      if (showSelection(event)) event.preventDefault();
+      if (showSelection(event, { x: event.clientX, y: event.clientY })) event.preventDefault();
     };
     const onClick = (event: MouseEvent) => {
       // A drag ending over an existing highlight is still a new selection. Its
@@ -603,10 +641,11 @@ export const ReaderSelectionActions = forwardRef<ReaderSelectionActionsHandle, {
       event.stopPropagation();
       clearSelection();
       setActiveMarkActions(null);
+      const band = { x: event.clientX, top: match.rect.top, bottom: match.rect.bottom };
       setActiveHighlightActions({
         value: match.annotation,
-        left: Math.max(8, Math.min(window.innerWidth - 51, match.rect.left + match.rect.width / 2 - 22)),
-        top: Math.max(8, match.rect.top - 48),
+        band,
+        ...selectionRibbonPosition(band, SELECTION_RIBBON, viewportRibbonBounds()),
       });
     };
     const hide = (event: Event) => {
@@ -660,18 +699,52 @@ export const ReaderSelectionActions = forwardRef<ReaderSelectionActionsHandle, {
     };
   }, [annotations, contentRevision, contextId, targetRef]);
 
-  const copy = async () => {
-    if (!active) return;
-    await navigator.clipboard.writeText(active.selectedText);
+  // A fresh selection and a highlight the reader clicked on offer the same actions:
+  // both are a passage of the document, one still loose and one already saved.
+  const target: { anchor: ReaderAnchor; highlight: WritingDraftAnnotation | null; left: number; top: number } | null = active
+    ? { anchor: active, highlight: null, left: active.left, top: active.top }
+    : activeHighlightActions
+      ? {
+        anchor: annotationAnchor(activeHighlightActions.value),
+        highlight: activeHighlightActions.value,
+        left: activeHighlightActions.left,
+        top: activeHighlightActions.top,
+      }
+      : null;
+
+  const closeActions = () => {
     clearSelection();
+    setActiveHighlightActions(null);
+  };
+
+  const copy = async () => {
+    if (!target) return;
+    await navigator.clipboard.writeText(target.anchor.selectedText);
+    closeActions();
+  };
+
+  const recolorHighlight = (annotation: WritingDraftAnnotation, color: WritingDraftAnnotationColor) => {
+    setActiveHighlightActions(null);
+    if (annotation.color === color || !onCreateAnnotation || !onDeleteAnnotation) return;
+    // No call changes the colour of a stored highlight, so the new one is written
+    // before the old one goes: a failure leaves the reader's mark where it was.
+    void onCreateAnnotation({ ...annotationAnchor(annotation), kind: 'highlight', color })
+      .then(() => onDeleteAnnotation(annotation.id))
+      .catch((error) => onAnnotationError?.(errorMessage(error)));
+  };
+
+  const deleteHighlight = (annotation: WritingDraftAnnotation) => {
+    setActiveHighlightActions(null);
+    void onDeleteAnnotation?.(annotation.id).catch((error) => onAnnotationError?.(errorMessage(error)));
   };
 
   const saveMark = () => {
-    if (!active) return;
-    const next: ReaderMark = { start: active.startOffset, end: active.endOffset, text: active.selectedText };
-    clearSelection();
+    if (!target) return;
+    const anchor = target.anchor;
+    const next: ReaderMark = { start: anchor.startOffset, end: anchor.endOffset, text: anchor.selectedText };
+    closeActions();
     if (usesSyncedBookmark && onCreateAnnotation) {
-      void onCreateAnnotation({ ...active, kind: 'bookmark', color: null }).catch((error) => {
+      void onCreateAnnotation({ ...anchor, kind: 'bookmark', color: null }).catch((error) => {
         onAnnotationError?.(errorMessage(error));
       });
       return;
@@ -711,25 +784,25 @@ export const ReaderSelectionActions = forwardRef<ReaderSelectionActionsHandle, {
   useImperativeHandle(ref, () => ({ goToMark }), [goToMark]);
 
   const quoteInNodi = async () => {
-    if (!active) return;
-    const text = active.selectedText.replace(/\s+/g, ' ').trim();
+    if (!target) return;
+    const text = target.anchor.selectedText.replace(/\s+/g, ' ').trim();
     const settings = await window.nodus.getSettings();
     if (!settings.mascotEnabled) await window.nodus.updateSettings({ mascotEnabled: true });
     await window.nodus.quoteNodiSelection(text);
-    clearSelection();
+    closeActions();
   };
 
   const openNewComment = () => {
-    if (!active) return;
+    if (!target) return;
     setCommentError(null);
     setCommentEditor({
       annotation: null,
-      anchor: active,
+      anchor: target.anchor,
       body: '',
-      left: active.left,
-      top: Math.max(8, Math.min(window.innerHeight - 270, active.top)),
+      left: target.left,
+      top: Math.max(8, Math.min(window.innerHeight - 270, target.top)),
     });
-    clearSelection();
+    closeActions();
   };
 
   const openComment = (annotation: WritingDraftAnnotation, position: MarginPosition) => {
@@ -790,6 +863,17 @@ export const ReaderSelectionActions = forwardRef<ReaderSelectionActionsHandle, {
 
   const action = active ?? activeMarkActions ?? activeHighlightActions;
 
+  // The estimated width above keeps the first paint from flashing in the wrong
+  // place; the ribbon is only truly centred on the pointer once measured.
+  useLayoutEffect(() => {
+    const node = ribbonRef.current;
+    if (!node || !action?.band) return;
+    const rect = node.getBoundingClientRect();
+    const { left, top } = selectionRibbonPosition(action.band, rect, viewportRibbonBounds());
+    node.style.left = `${left}px`;
+    node.style.top = `${top}px`;
+  }, [action]);
+
   return (
     <>
       {marginPositions.length > 0 && createPortal(
@@ -820,22 +904,25 @@ export const ReaderSelectionActions = forwardRef<ReaderSelectionActionsHandle, {
 
       {action && createPortal(
         <div
+          ref={ribbonRef}
           className="reader-selection-actions"
           data-reader-selection-actions
           role="toolbar"
-          aria-label={active ? t('Acciones de selección') : t('Editar o eliminar')}
+          aria-label={target ? t('Acciones de selección') : t('Editar o eliminar')}
           style={{ left: action.left, top: action.top }}
           onPointerDown={(event) => event.preventDefault()}
         >
-          {active ? (
+          {target ? (
             <>
               <div className="reader-selection-colors" aria-label={t('Color')}>
                 {READER_ANNOTATION_COLORS.map((item, index) => (
                   <button
                     key={item.id}
                     type="button"
-                    className="reader-selection-color"
-                    onClick={() => createHighlight(active, item.id)}
+                    className={`reader-selection-color${target.highlight?.color === item.id ? ' is-active' : ''}`}
+                    onClick={() => target.highlight
+                      ? recolorHighlight(target.highlight, item.id)
+                      : createHighlight(target.anchor, item.id)}
                     title={`${t('Subrayar')} ${index + 1}`}
                     aria-label={`${t('Subrayar')} ${index + 1}`}
                   >
@@ -857,22 +944,28 @@ export const ReaderSelectionActions = forwardRef<ReaderSelectionActionsHandle, {
               <button type="button" onClick={() => void quoteInNodi()} title={t('Citar en Nodi')} aria-label={t('Citar en Nodi')}>
                 <Icon name="quote" size={17} />
               </button>
+              {target.highlight && (
+                <>
+                  <span className="reader-selection-divider" />
+                  <button
+                    type="button"
+                    data-tone="danger"
+                    onClick={() => target.highlight && deleteHighlight(target.highlight)}
+                    title={t('Eliminar')}
+                    aria-label={t('Eliminar')}
+                  >
+                    <Icon name="trash" size={17} />
+                  </button>
+                </>
+              )}
             </>
           ) : (
             <button
               type="button"
               data-tone="danger"
-              onClick={() => {
-                if (activeHighlightActions) {
-                  const id = activeHighlightActions.value.id;
-                  setActiveHighlightActions(null);
-                  void onDeleteAnnotation?.(id).catch((error) => onAnnotationError?.(errorMessage(error)));
-                } else {
-                  deleteMark();
-                }
-              }}
-              title={activeHighlightActions ? t('Eliminar') : t('Eliminar marcador de lectura')}
-              aria-label={activeHighlightActions ? t('Eliminar') : t('Eliminar marcador de lectura')}
+              onClick={deleteMark}
+              title={t('Eliminar marcador de lectura')}
+              aria-label={t('Eliminar marcador de lectura')}
             >
               <Icon name="trash" size={17} />
             </button>

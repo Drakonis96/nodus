@@ -42,7 +42,7 @@ import { hasBackupPassword } from './secrets/secretStore';
 import type { UpdateCheckResponse, UpdateProgressEvent } from '@shared/types';
 import { TUTORIAL_VIDEO_EMBED_ORIGIN } from '@shared/tutorialVideos';
 import { killChatGptSubscriptionServer } from './ai/codexSubscription';
-import { stopGitHubCopilotSubscription } from './ai/githubCopilotSubscription';
+import { killGitHubCopilotSubscriptionServer } from './ai/githubCopilotSubscription';
 import { installProcessSafetyNet } from './util/processSafety';
 import { restoreAppWindows } from './windowLifecycle';
 import { registerImageProtocol, registerImageSchemePrivileges } from './imageProtocol';
@@ -797,7 +797,7 @@ app.whenReady().then(async () => {
   session.defaultSession.webRequest.onBeforeSendHeaders(
     { urls: [`${TUTORIAL_VIDEO_EMBED_ORIGIN}/*`] },
     (details, callback) => {
-      callback({ requestHeaders: { ...details.requestHeaders, Referer: 'https://drakonis96.github.io/nodus/' } });
+      callback({ requestHeaders: { ...details.requestHeaders, Referer: 'https://nodusresearch.com/' } });
     },
   );
   // Nodus Toolkit OCR caches its Tesseract language traineddata here (the one
@@ -1028,7 +1028,7 @@ app.on('before-quit', () => {
   // Kill synchronously: this handler cannot await, so the graceful stops below would
   // be abandoned mid-drain and leave the vendor runtimes running as orphans.
   killChatGptSubscriptionServer();
-  void stopGitHubCopilotSubscription();
+  killGitHubCopilotSubscriptionServer();
   closeGlobalLibraryRuntime();
   closeDb();
 });
@@ -1062,7 +1062,7 @@ updateAwareApp.on('before-quit-for-update', () => {
   // Kill synchronously: this handler cannot await, so the graceful stops below would
   // be abandoned mid-drain and leave the vendor runtimes running as orphans.
   killChatGptSubscriptionServer();
-  void stopGitHubCopilotSubscription();
+  killGitHubCopilotSubscriptionServer();
   closeGlobalLibraryRuntime();
   closeDb();
 });

@@ -1,0 +1,53 @@
+{
+  "schemaVersion": 1,
+  "currency": "USD",
+  "effectiveAt": "2026-08-14T00:00:00.000Z",
+  "checkedAt": "2026-08-14T00:00:00.000Z",
+  "sources": {
+    "workers": { "url": "https://developers.cloudflare.com/workers/platform/pricing/", "checkedAt": "2026-08-14T00:00:00.000Z", "label": "Cloudflare Workers pricing" },
+    "workersLimits": { "url": "https://developers.cloudflare.com/workers/platform/limits/", "checkedAt": "2026-08-14T00:00:00.000Z", "label": "Cloudflare Workers limits" },
+    "d1": { "url": "https://developers.cloudflare.com/d1/platform/pricing/", "checkedAt": "2026-08-14T00:00:00.000Z", "label": "Cloudflare D1 pricing" },
+    "d1Limits": { "url": "https://developers.cloudflare.com/d1/platform/limits/", "checkedAt": "2026-08-14T00:00:00.000Z", "label": "Cloudflare D1 limits" },
+    "r2": { "url": "https://developers.cloudflare.com/r2/pricing/", "checkedAt": "2026-08-14T00:00:00.000Z", "label": "Cloudflare R2 pricing" },
+    "vectorize": { "url": "https://developers.cloudflare.com/vectorize/platform/pricing/", "checkedAt": "2026-08-14T00:00:00.000Z", "label": "Cloudflare Vectorize pricing" }
+  },
+  "workers": {
+    "freeRequestsPerDay": 100000,
+    "freeCpuMsPerInvocation": 10,
+    "paidMinimumPerMonth": 5,
+    "paidIncludedRequestsPerMonth": 10000000,
+    "paidRequestPerMillion": 0.3,
+    "paidIncludedCpuMsPerMonth": 30000000,
+    "paidCpuPerMillionMs": 0.02
+  },
+  "d1": {
+    "freeRowsReadPerDay": 5000000,
+    "freeRowsWrittenPerDay": 100000,
+    "freeStorageBytes": 5368709120,
+    "freeDatabaseBytes": 524288000,
+    "paidIncludedRowsReadPerMonth": 25000000000,
+    "paidRowsReadPerMillion": 0.001,
+    "paidIncludedRowsWrittenPerMonth": 50000000,
+    "paidRowsWrittenPerMillion": 1,
+    "paidIncludedStorageBytes": 5368709120,
+    "paidStoragePerGbMonth": 0.75
+  },
+  "r2": {
+    "freeStandardStorageBytesMonth": 10737418240,
+    "freeClassAOpsPerMonth": 1000000,
+    "freeClassBOpsPerMonth": 10000000,
+    "standardStoragePerGbMonth": 0.015,
+    "classAPerMillion": 4.5,
+    "classBPerMillion": 0.36,
+    "egressPerGb": 0
+  },
+  "vectorize": {
+    "freeStoredDimensions": 5000000,
+    "freeQueriedDimensionsPerMonth": 30000000,
+    "paidIncludedStoredDimensions": 10000000,
+    "paidIncludedQueriedDimensionsPerMonth": 50000000,
+    "storedPerHundredMillion": 0.05,
+    "queriedPerMillion": 0.01,
+    "maxDimensions": 1536
+  }
+}

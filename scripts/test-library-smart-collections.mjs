@@ -103,6 +103,14 @@ try {
   assert.deepEqual(new LibraryOperations(store, catalog).getViewPreferences(), preferences, 'column and multi-sort preferences survive restart');
   assert.deepEqual(preferences.visibleColumns.slice(0, 3), ['doi', 'title', 'edition'], 'the user-defined column order is preserved');
   assert.deepEqual(preferences.columnWidths, { title: 320, doi: 180 }, 'column widths survive restart');
+  assert.deepEqual(operations.getSettings().autoRenameAttachmentTypes, ['pdf', 'epub'], 'PDF and EPUB match Zotero defaults');
+  const librarySettings = operations.setSettings({
+    ...operations.getSettings(),
+    attachmentRenameTemplate: 'year-creator-title',
+    renameSupplementaryAttachments: true,
+    autoPrepareAttachments: false,
+  });
+  assert.deepEqual(new LibraryOperations(store, catalog).getSettings(), librarySettings, 'Global Library behavior settings survive restart');
   const theoryCatalog = catalog.list({ includeDeleted: true, sort: [{ field: 'doi', direction: 'asc' }] }).items.find((entry) => entry.id === theory.id);
   assert.equal(theoryCatalog.metadata.edition, '2');
   assert.equal(theoryCatalog.createdAt, theory.createdAt);

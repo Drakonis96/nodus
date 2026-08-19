@@ -1,0 +1,3 @@
+# Nodus Desktop generates this verifier locally. Cloudflare stores it as a
+# secret; it is not an API key and grants no access to the user's account.
+NODUS_BOOTSTRAP_SECRET_HASH=PASTE_THE_CODE_SHOWN_BY_NODUS_HERE

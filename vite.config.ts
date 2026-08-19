@@ -54,6 +54,14 @@ const mainExternals = [
   '@github/copilot-sdk',
   'openai',
   'electron-updater',
+  // Turndown picks its HTML parser at module-evaluation time: with no `window` — i.e.
+  // in the main process — it takes the Node branch, which is a bare
+  // `require('@mixmark-io/domino')`. Bundled into an ESM chunk that call throws
+  // "require is not defined in ES module scope" the moment the chunk is imported,
+  // which took down the whole Zotero note-mirroring step. Kept external so it loads
+  // as the real CommonJS package, where the require resolves normally.
+  'turndown',
+  '@mixmark-io/domino',
 ];
 
 /**
@@ -143,6 +151,34 @@ const databaseAggregateWorkerBuild = {
     },
   },
 };
+
+/** A utility process must not share Rollup chunks with Electron's main entry: a shared
+ * chunk may pull `app`/`BrowserWindow` imports into a process where Electron does not
+ * expose them. Build it as one self-contained ESM file instead. */
+const utilityBuild = (name: string, entry: string) => ({
+  onstart: (args: { reload: () => void }) => args.reload(),
+  vite: {
+    resolve: {
+      alias: { '@shared': path.resolve(__dirname, 'shared') },
+    },
+    build: {
+      outDir: 'dist-electron',
+      emptyOutDir: false,
+      rollupOptions: {
+        input: { [name]: path.join(__dirname, entry) },
+        external: mainExternals,
+        output: {
+          format: 'es' as const,
+          entryFileNames: '[name].js',
+          inlineDynamicImports: true,
+          banner:
+            "import{fileURLToPath as __nodusFU}from'node:url';import{dirname as __nodusDN}from'node:path';" +
+            'const __filename=__nodusFU(import.meta.url);const __dirname=__nodusDN(__filename);',
+        },
+      },
+    },
+  },
+});
 
 export default defineConfig({
   // Expose the app version to the renderer at build time (shown in Settings).
@@ -257,6 +293,8 @@ export default defineConfig({
       databaseComputeWorkerBuild,
       databaseScaleFixtureWorkerBuild,
       databaseAggregateWorkerBuild,
+      utilityBuild('backupUtilityWorker', 'electron/export/backupUtilityWorker.ts'),
+      utilityBuild('serverPublishWorker', 'electron/serverSync/serverPublishWorker.ts'),
     ]),
     renderer(),
   ],

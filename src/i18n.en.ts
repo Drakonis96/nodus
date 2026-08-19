@@ -2,6 +2,7 @@ import { PROTECT_TRANSLATIONS } from './i18n.protect';
 import { AI_OCR_TRANSLATIONS } from './i18n.aiOcr';
 import { TOOLKIT_APPS_TRANSLATIONS } from './i18n.toolkitApps';
 import { SERVER_TRANSLATIONS } from './i18n.server';
+import { CLOUDFLARE_TRANSLATIONS } from './i18n.cloudflare';
 import { TRANSLATE_TRANSLATIONS } from './i18n.translate';
 import { WORLD_CHAT_TRANSLATIONS } from './i18n.worldChat';
 import { STUDY_SYNONYM_TRANSLATIONS } from './i18n.studySynonyms';
@@ -209,6 +210,7 @@ export const EN: Record<string, string> = {
   ...PROTECT_TRANSLATIONS.en,
   ...TOOLKIT_APPS_TRANSLATIONS.en,
   ...SERVER_TRANSLATIONS.en,
+  ...CLOUDFLARE_TRANSLATIONS.en,
   ...TRANSLATE_TRANSLATIONS.en,
   'Traduce texto, documentos y adjuntos de Zotero con el modelo que elijas, incluido un modo PDF facsímil.': 'Translate text, documents and Zotero attachments with the model you choose, including a PDF facsimile mode.',
   'Traducir texto, documentos y adjuntos de Zotero con el modelo elegido, conservando la estructura de DOCX y EPUB y la apariencia de los PDF mediante un modo facsímil.': 'Translate text, documents and Zotero attachments with the chosen model, retaining DOCX and EPUB structure and the appearance of PDFs through facsimile mode.',
@@ -2605,6 +2607,10 @@ export const EN: Record<string, string> = {
   'Trazar el esquema desde esta idea': 'Trace the scheme from this idea',
   '{n} debate(s)': '{n} debate(s)',
   '{n} conexiones': '{n} connections',
+  'Ver las {n} conexiones': 'See all {n} connections',
+  'Conexiones de {name}': 'Connections of {name}',
+  '{n} autores conectados': '{n} connected authors',
+  'Conexiones del autor': 'Author\'s connections',
   '+{n} conexiones no dibujadas': '+{n} connections not drawn',
   'conf media': 'avg conf',
   'Selecciona una idea y traza su': 'Select an idea and trace its',

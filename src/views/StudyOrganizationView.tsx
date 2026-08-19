@@ -256,11 +256,20 @@ function placementMatches(workspace: StudyWorkspace, documentId: string, target:
   ));
 }
 
+/**
+ * The header title. A course, subject, folder or topic carries the name the user typed,
+ * so it travels as-is; the three fallbacks are interface wording and must be translated
+ * HERE — this string is rendered raw into the <h1>, so a bare literal left the section
+ * heading in Spanish in every other language while the eyebrow and breadcrumb beside it
+ * were translated.
+ */
 function targetTitle(workspace: StudyWorkspace, target: StudyNavigationTarget | null): string {
-  if (!target) return 'Cursos y asignaturas';
-  if (target.kind === 'document') return workspace.documents.find((item) => item.id === target.id)?.title ?? 'Documento';
+  if (!target) return t('Cursos y asignaturas');
+  if (target.kind === 'document') return workspace.documents.find((item) => item.id === target.id)?.title ?? t('Documento');
   const list = target.kind === 'course' ? workspace.courses : target.kind === 'subject' ? workspace.subjects : target.kind === 'topic' ? workspace.topics : workspace.folders;
-  return list.find((item) => item.id === target.id)?.name ?? 'Selección';
+  // Not 'Selección': that key is the databases column type, translated as the verb
+  // ("Select" / "Seleziona"), which reads as an instruction rather than a heading.
+  return list.find((item) => item.id === target.id)?.name ?? t('Selección actual');
 }
 
 interface StudyBrowserItem {

@@ -15,7 +15,7 @@ export interface Migration {
 
 // Versioned, append-only migrations. Never edit an existing migration's SQL once
 // shipped — add a new one. The current schema version is the highest applied.
-export const SCHEMA_VERSION = 152;
+export const SCHEMA_VERSION = 153;
 
 export const migrations: Migration[] = [
   {
@@ -6619,6 +6619,19 @@ export const migrations: Migration[] = [
   {
     version: 134,
     up: /* sql */ `
+      -- Durable content token used to reuse a previously verified vault entry. File
+      -- mtimes are not safe with WAL and can change without content; mutations advance
+      -- this counter transactionally through triggers installed when the vault opens.
+      CREATE TABLE backup_revision (
+        singleton INTEGER PRIMARY KEY CHECK (singleton = 1),
+        sequence INTEGER NOT NULL
+      );
+      INSERT INTO backup_revision (singleton, sequence) VALUES (1, 1);
+    `,
+  },
+  {
+    version: 135,
+    up: /* sql */ `
       -- Boundary for the Notion-parity storage programme. The detailed reports and
       -- immutable pre-migration copies live beside the vault so they also survive a
       -- database-level rollback; this table is the durable in-vault index for future UI.
@@ -6634,7 +6647,7 @@ export const migrations: Migration[] = [
     `,
   },
   {
-    version: 135,
+    version: 136,
     up: /* sql */ `
       -- Notion parity, loop 2: database identity becomes part of every EAV edge.
       -- The legacy value_text stays during the compatibility window, while canonical
@@ -6919,7 +6932,7 @@ export const migrations: Migration[] = [
     },
   },
   {
-    version: 136,
+    version: 137,
     up: /* sql */ `
       -- Notion parity, loop 4: covering indexes for the canonical typed EAV
       -- projections. Partial indexes remain compact when a property uses another type.
@@ -7080,7 +7093,7 @@ export const migrations: Migration[] = [
     `,
   },
   {
-    version: 137,
+    version: 138,
     up: /* sql */ `
       -- Notion parity, loop 5: every database row and legacy note has one universal
       -- page. Independent pages use the same table and therefore the same editor,
@@ -7282,7 +7295,7 @@ export const migrations: Migration[] = [
     },
   },
   {
-    version: 138,
+    version: 139,
     up: /* sql */ `
       -- Notion parity, loop 5: SQL-created row/note pages must receive their Yjs
       -- document and initial snapshot in the same transaction as the owning record.
@@ -7326,7 +7339,7 @@ export const migrations: Migration[] = [
     after: (db) => backfillUniversalPageDocuments(db),
   },
   {
-    version: 139,
+    version: 140,
     up: /* sql */ `
       -- Notion parity, loop 6: wiki navigation, favourites and materialized links.
       CREATE TABLE page_favorites (
@@ -7373,7 +7386,7 @@ export const migrations: Migration[] = [
     `,
   },
   {
-    version: 140,
+    version: 141,
     up: /* sql */ `
       -- Notion parity, loop 7: status lanes and immutable per-database row sequences.
       -- All structured property payloads continue travelling through typed db_cells, so
@@ -7392,7 +7405,7 @@ export const migrations: Migration[] = [
     `,
   },
   {
-    version: 141,
+    version: 142,
     up: /* sql */ `
       -- Notion parity, loop 8: durable bidirectional links and assisted repair.
       ALTER TABLE db_relations ADD COLUMN inverse_relation_id TEXT;
@@ -7431,7 +7444,7 @@ export const migrations: Migration[] = [
     `,
   },
   {
-    version: 142,
+    version: 143,
     up: /* sql */ `
       -- Notion parity, loop 9: one complete, versioned configuration per saved view.
       -- The legacy layout/filter/sort columns remain as round-trip adapters for old
@@ -7495,7 +7508,7 @@ export const migrations: Migration[] = [
     },
   },
   {
-    version: 143,
+    version: 144,
     up: /* sql */ `
       -- Notion parity, loop 13: views are visual containers; databases remain fully
       -- compatible local data sources and may be combined without copying their rows.
@@ -7544,7 +7557,7 @@ export const migrations: Migration[] = [
     `,
   },
   {
-    version: 144,
+    version: 145,
     up: /* sql */ `
       -- Notion parity, loop 14: reusable row/page templates, idempotent schedules,
       -- nested subitems, acyclic task dependencies, and first-class sprints.
@@ -7655,7 +7668,7 @@ export const migrations: Migration[] = [
     `,
   },
   {
-    version: 145,
+    version: 146,
     up: /* sql */ `
       -- Notion parity, loop 15: versioned automations, idempotent execution logs,
       -- durable notifications, and transactional public/authenticated forms.
@@ -7778,7 +7791,7 @@ export const migrations: Migration[] = [
     `,
   },
   {
-    version: 146,
+    version: 147,
     up: /* sql */ `
       -- Notion parity, loop 16A: append-only page history. Every mutation stores a
       -- compact delta and every twentieth revision stores a complete reconstruction
@@ -7805,7 +7818,7 @@ export const migrations: Migration[] = [
     `,
   },
   {
-    version: 147,
+    version: 148,
     up: /* sql */ `
       -- Notion parity, loop 16B. Extend v146 append-only, then add actors,
       -- threaded comments, reactions, explicit mentions and a durable inbox.
@@ -7881,7 +7894,7 @@ export const migrations: Migration[] = [
     `,
   },
   {
-    version: 148,
+    version: 149,
     up: /* sql */ `
       -- Notion parity, loop 16C: generic hierarchical ACLs, groups and
       -- revocable public links. Generic resource ids are validated in the
@@ -7961,7 +7974,7 @@ export const migrations: Migration[] = [
     `,
   },
   {
-    version: 149,
+    version: 150,
     up: /* sql */ `
       -- Notion parity, loop 17A: stable device identity, HLC-stamped operations,
       -- per-row convergence clocks and an inspectable conflict log.
@@ -8020,7 +8033,7 @@ export const migrations: Migration[] = [
     `,
   },
   {
-    version: 150,
+    version: 151,
     up: /* sql */ `
       -- Notion parity, loop 17B: content-address every Yjs delta so its binary bytes
       -- travel outside the JSON operation relay and can be replayed idempotently.
@@ -8044,7 +8057,7 @@ export const migrations: Migration[] = [
     },
   },
   {
-    version: 151,
+    version: 152,
     up: /* sql */ `
       -- Notion parity, loop 19: FTS is a lexical index. Typed numbers, booleans and
       -- numeric materializations are served by their covering indexes and only made
@@ -8117,7 +8130,7 @@ export const migrations: Migration[] = [
     `,
   },
   {
-    version: 152,
+    version: 153,
     up: /* sql */ `
       -- Notion parity, loop 19: FTS5 UNINDEXED metadata cannot locate an entity for
       -- UPDATE/DELETE without scanning the whole virtual table. Give every projection a

@@ -1080,6 +1080,275 @@ const RELEASE_3_2_4_HIGHLIGHTS: RawReleaseHighlight[] = [
   },
 ];
 
+/**
+ * 4.1.3 — 4.1.2 taught the lists to remember where you left them. This one teaches the
+ * three sections you stay inside to reopen the thing you had open, and a report to
+ * reopen at the paragraph you had reached. Short sentences, no semicolons, no em dashes.
+ */
+const RELEASE_4_1_3_HIGHLIGHTS: RawReleaseHighlight[] = [
+  {
+    scope: 'general',
+    es: 'Las secciones donde se lee vuelven a abrirse por dentro. Deep Research, Inmersión y las pestañas de la Biblioteca recuperan el informe, la inmersión o el documento que tenías abierto, además de la búsqueda y el orden de la lista. Una inmersión vuelve al paso en el que la dejaste. Lo que estabas escribiendo no se restaura, porque eso es trabajo y no un sitio.',
+    en: 'The sections you read inside now reopen inside. Deep Research, Immersion and the Library tabs bring back the report, the immersion or the document you had open, along with the search and ordering of the list. An immersion returns to the step you left it on. What you were writing is not restored, because that is work and not a place.',
+    fr: 'Les sections où l’on lit se rouvrent de l’intérieur. Deep Research, Immersion et les onglets de la Bibliothèque retrouvent le rapport, l’immersion ou le document que vous aviez ouvert, ainsi que la recherche et le tri de la liste. Une immersion revient à l’étape où vous l’aviez laissée. Ce que vous étiez en train d’écrire n’est pas restauré, car c’est du travail et non un endroit.',
+    de: 'Die Bereiche, in denen gelesen wird, öffnen sich wieder von innen. Deep Research, Immersion und die Reiter der Bibliothek holen den Bericht, die Immersion oder das Dokument zurück, das Sie offen hatten, dazu die Suche und die Sortierung der Liste. Eine Immersion kehrt zu dem Schritt zurück, an dem Sie sie verlassen haben. Was Sie gerade geschrieben haben, wird nicht wiederhergestellt, denn das ist Arbeit und kein Ort.',
+    pt: 'As secções onde se lê voltam a abrir por dentro. Deep Research, Imersão e os separadores da Biblioteca recuperam o relatório, a imersão ou o documento que tinha aberto, além da pesquisa e da ordem da lista. Uma imersão volta ao passo em que a deixou. O que estava a escrever não é reposto, porque isso é trabalho e não um sítio.',
+    'pt-BR': 'As seções onde se lê voltam a abrir por dentro. Deep Research, Imersão e as abas da Biblioteca recuperam o relatório, a imersão ou o documento que você tinha aberto, além da busca e da ordem da lista. Uma imersão volta ao passo em que você a deixou. O que você estava escrevendo não é restaurado, porque isso é trabalho e não um lugar.',
+  },
+  {
+    scope: 'general',
+    es: 'Un informe se abre por donde ibas leyendo. Nodus guarda qué bloque tenías arriba del todo en lugar de una posición en píxeles, así que cambiar el ancho de la ventana o la tipografía ya no lo mueve. El sitio se conserva mientras el informe termina de crecer y deja de tocarse en cuanto tocas la rueda o el teclado. Si habías aplicado una traducción, el sitio se descarta en vez de aproximarse, porque esa es otra maquetación.',
+    en: 'A report reopens where you had got to. Nodus stores which block was under the top edge instead of a pixel position, so changing the window width or the font no longer moves it. The place is held while the report finishes growing and is let go the moment you touch the wheel or the keyboard. If you had applied a translation, the place is dropped rather than approximated, because that is a different rendering.',
+    fr: 'Un rapport se rouvre là où vous en étiez. Nodus enregistre quel bloc se trouvait tout en haut plutôt qu’une position en pixels, si bien que changer la largeur de la fenêtre ou la police ne le déplace plus. La place est maintenue pendant que le rapport finit de grandir et elle est relâchée dès que vous touchez la molette ou le clavier. Si vous aviez appliqué une traduction, la place est abandonnée au lieu d’être approchée, car c’est une autre mise en page.',
+    de: 'Ein Bericht öffnet wieder dort, wo Sie waren. Nodus speichert, welcher Block unter der oberen Kante stand, statt einer Pixelposition, sodass eine andere Fensterbreite oder Schrift ihn nicht mehr verschiebt. Die Stelle wird gehalten, während der Bericht zu Ende wächst, und losgelassen, sobald Sie Rad oder Tastatur berühren. Hatten Sie eine Übersetzung angewendet, wird die Stelle verworfen statt angenähert, denn das ist ein anderer Satz.',
+    pt: 'Um relatório abre por onde ia a ler. O Nodus guarda que bloco estava no topo em vez de uma posição em píxeis, por isso mudar a largura da janela ou a tipografia já não o move. O lugar mantém-se enquanto o relatório acaba de crescer e é largado assim que toca na roda ou no teclado. Se tinha aplicado uma tradução, o lugar é descartado em vez de aproximado, porque essa é outra composição.',
+    'pt-BR': 'Um relatório abre onde você parou de ler. O Nodus guarda qual bloco estava no topo em vez de uma posição em pixels, então mudar a largura da janela ou a fonte já não o move. O lugar se mantém enquanto o relatório termina de crescer e é solto assim que você toca na roda ou no teclado. Se você tinha aplicado uma tradução, o lugar é descartado em vez de aproximado, porque essa é outra composição.',
+  },
+];
+
+/**
+ * 4.1.6 — the Zotero import finishes what it started, and the two reading galleries
+ * stop forgetting how they were set and stop flashing on the way back in.
+ */
+const RELEASE_4_1_6_HIGHLIGHTS: RawReleaseHighlight[] = [
+  {
+    scope: 'academic',
+    es: 'La importación de Zotero vuelve a copiar los adjuntos. Catalogaba todos los documentos y se paraba justo antes de copiar el primero, así que terminaba con cero adjuntos y un fallo por biblioteca en todos los intentos, también al reanudar. Ahora recorre la biblioteca entera y trae las notas y los archivos. Cuando algo falla, el aviso da el motivo real en lugar de decir siempre que Zotero no está disponible.',
+    en: 'The Zotero import copies attachments again. It catalogued every document and then stopped just before copying the first one, so it ended with zero attachments and one failure per library on every attempt, Resume included. It now walks the whole library and brings the notes and the files across. When something does fail, the message gives the real reason instead of always saying that Zotero is unavailable.',
+    fr: 'L’importation Zotero copie de nouveau les pièces jointes. Elle cataloguait tous les documents puis s’arrêtait juste avant de copier la première, terminant donc avec zéro pièce jointe et un échec par bibliothèque à chaque tentative, reprises comprises. Elle parcourt désormais toute la bibliothèque et rapporte les notes et les fichiers. En cas d’échec, le message donne la vraie raison au lieu de toujours dire que Zotero n’est pas disponible.',
+    de: 'Der Zotero-Import kopiert wieder die Anhänge. Er katalogisierte jedes Dokument und hielt dann kurz vor dem ersten Kopiervorgang an, endete also bei jedem Versuch mit null Anhängen und einem Fehler pro Bibliothek, auch beim Fortsetzen. Jetzt durchläuft er die gesamte Bibliothek und holt Notizen und Dateien herüber. Schlägt doch etwas fehl, nennt die Meldung den wirklichen Grund, statt immer zu sagen, Zotero sei nicht verfügbar.',
+    pt: 'A importação do Zotero volta a copiar os anexos. Catalogava todos os documentos e parava mesmo antes de copiar o primeiro, por isso terminava com zero anexos e uma falha por biblioteca em todas as tentativas, incluindo ao retomar. Agora percorre a biblioteca inteira e traz as notas e os ficheiros. Quando algo falha, o aviso dá o motivo real em vez de dizer sempre que o Zotero não está disponível.',
+    'pt-BR': 'A importação do Zotero volta a copiar os anexos. Ela catalogava todos os documentos e parava logo antes de copiar o primeiro, então terminava com zero anexos e uma falha por biblioteca em todas as tentativas, inclusive ao retomar. Agora ela percorre a biblioteca inteira e traz as notas e os arquivos. Quando algo falha, o aviso dá o motivo real em vez de dizer sempre que o Zotero não está disponível.',
+  },
+  {
+    scope: 'academic',
+    es: 'La segunda sincronización con Zotero ya no aborta. En cuanto una importación terminaba bien, la siguiente se detenía antes de leer un solo elemento diciendo que la biblioteca ya no existe, porque Nodus preguntaba por los elementos eliminados a un servicio que la aplicación de Zotero no ofrece. A cambio, lo que borres en Zotero no desaparece del catálogo local hasta que rehagas la importación completa. Y el aviso de sincronización interrumpida deja de quedarse fijo: antes bastaba un fallo antiguo para que una importación posterior, aunque terminara limpia, se presentara como interrumpida.',
+    en: 'The second Zotero sync no longer aborts. As soon as one import finished cleanly, the next one stopped before reading a single item and said the library no longer exists, because Nodus asked for deleted items from a service the Zotero application does not offer. The cost is that whatever you delete in Zotero stays in the local catalogue until you run a full import again. The interrupted sync banner also stops sticking around: one old failure used to be enough for a later import to present itself as interrupted even when it finished cleanly.',
+    fr: 'La deuxième synchronisation Zotero ne s’interrompt plus. Dès qu’une importation se terminait correctement, la suivante s’arrêtait avant de lire le moindre élément en annonçant que la bibliothèque n’existe plus, car Nodus demandait les éléments supprimés à un service que l’application Zotero ne propose pas. En contrepartie, ce que vous supprimez dans Zotero reste dans le catalogue local jusqu’à une nouvelle importation complète. Le bandeau de synchronisation interrompue cesse aussi de rester affiché : un seul échec ancien suffisait pour qu’une importation ultérieure se présente comme interrompue, même terminée proprement.',
+    de: 'Die zweite Zotero-Synchronisierung bricht nicht mehr ab. Sobald ein Import sauber durchgelaufen war, hielt der nächste an, bevor er ein einziges Element gelesen hatte, und meldete, die Bibliothek existiere nicht mehr, weil Nodus die gelöschten Einträge bei einem Dienst abfragte, den die Zotero-Anwendung nicht anbietet. Der Preis dafür ist, dass in Zotero Gelöschtes im lokalen Katalog bleibt, bis Sie einen vollständigen Import wiederholen. Auch der Hinweis auf eine unterbrochene Synchronisierung bleibt nicht mehr hängen: Ein einziger alter Fehler genügte, damit ein späterer Import sich als unterbrochen ausgab, obwohl er sauber endete.',
+    pt: 'A segunda sincronização com o Zotero já não aborta. Assim que uma importação terminava bem, a seguinte parava antes de ler um único elemento e dizia que a biblioteca já não existe, porque o Nodus pedia os elementos eliminados a um serviço que a aplicação do Zotero não oferece. Em troca, o que apagar no Zotero fica no catálogo local até refazer a importação completa. O aviso de sincronização interrompida também deixa de ficar fixo: bastava uma falha antiga para que uma importação posterior se apresentasse como interrompida, mesmo terminando limpa.',
+    'pt-BR': 'A segunda sincronização com o Zotero já não aborta. Assim que uma importação terminava bem, a seguinte parava antes de ler um único item e dizia que a biblioteca não existe mais, porque o Nodus pedia os itens excluídos a um serviço que o aplicativo do Zotero não oferece. Em troca, o que você excluir no Zotero fica no catálogo local até refazer a importação completa. O aviso de sincronização interrompida também deixa de ficar fixo: bastava uma falha antiga para que uma importação posterior se apresentasse como interrompida, mesmo terminando limpa.',
+  },
+  {
+    scope: 'general',
+    es: 'Las galerías recuerdan cómo las dejaste. El orden, el filtro de leídos y la elección entre cuadrícula y lista se guardan por bóveda y siguen ahí en el siguiente arranque, tanto en Deep Research como en las unidades de docencia y en Inmersión. La búsqueda escrita y el informe abierto siguen sin conservarse entre sesiones, porque son un momento y no una preferencia.',
+    en: 'The galleries remember how you left them. The ordering, the read filter and the choice between grid and list are stored per vault and are still there on the next launch, in Deep Research as well as in the teaching units and in Immersion. The typed search and the open report are still not kept between runs, because they are a moment rather than a preference.',
+    fr: 'Les galeries se souviennent de la manière dont vous les avez laissées. Le tri, le filtre de lecture et le choix entre grille et liste sont enregistrés par coffre et sont encore là au lancement suivant, aussi bien dans Deep Research que dans les unités d’enseignement et dans Immersion. La recherche saisie et le rapport ouvert ne sont toujours pas conservés d’une session à l’autre, car ils relèvent de l’instant et non de la préférence.',
+    de: 'Die Galerien merken sich, wie Sie sie verlassen haben. Die Sortierung, der Gelesen-Filter und die Wahl zwischen Raster und Liste werden pro Tresor gespeichert und sind beim nächsten Start noch da, in Deep Research ebenso wie in den Unterrichtseinheiten und in der Immersion. Die eingegebene Suche und der geöffnete Bericht werden weiterhin nicht über Sitzungen hinweg bewahrt, denn sie sind ein Moment und keine Vorliebe.',
+    pt: 'As galerias lembram-se de como as deixou. A ordenação, o filtro de lidos e a escolha entre grelha e lista ficam guardadas por cofre e continuam lá no arranque seguinte, tanto no Deep Research como nas unidades de ensino e na Imersão. A pesquisa escrita e o relatório aberto continuam a não ser conservados entre sessões, porque são um momento e não uma preferência.',
+    'pt-BR': 'As galerias lembram como você as deixou. A ordenação, o filtro de lidos e a escolha entre grade e lista ficam salvas por cofre e continuam lá na próxima inicialização, tanto no Deep Research quanto nas unidades de ensino e na Imersão. A busca digitada e o relatório aberto continuam sem ser guardados entre sessões, porque são um momento e não uma preferência.',
+  },
+  {
+    scope: 'general',
+    es: 'Volver a un informe o a una inmersión abiertos ya no pasa por la galería. Al salir de la sección y regresar, Nodus tenía que releer el elemento antes de poder dibujarlo, y mientras tanto pintaba la lista, como si la aplicación se abriera y pulsara ella sola sobre tu informe. Ahora el panel espera en silencio y solo muestra un indicador si la espera se alarga. Una sesión que ya no existe termina en la galería en vez de dejar el panel vacío.',
+    en: 'Returning to an open report or immersion no longer goes through the gallery. Leaving the section and coming back meant reading the item again before it could be drawn, and what was drawn meanwhile was the list, as if the app were opening it and clicking your report by itself. The pane now waits quietly and only shows a spinner if the wait grows. A session that no longer exists lands on the gallery instead of leaving the pane empty.',
+    fr: 'Revenir à un rapport ou à une immersion ouverts ne passe plus par la galerie. Quitter la section puis y retourner obligeait à relire l’élément avant de pouvoir l’afficher, et ce qui s’affichait entre-temps était la liste, comme si l’application l’ouvrait et cliquait toute seule sur votre rapport. Le volet attend désormais en silence et n’affiche un indicateur que si l’attente se prolonge. Une session qui n’existe plus aboutit à la galerie au lieu de laisser le volet vide.',
+    de: 'Die Rückkehr zu einem geöffneten Bericht oder einer Immersion führt nicht mehr über die Galerie. Beim Verlassen des Bereichs und der Rückkehr musste der Eintrag erst erneut gelesen werden, bevor er gezeichnet werden konnte, und gezeichnet wurde derweil die Liste, als würde die App sie öffnen und von selbst auf Ihren Bericht klicken. Der Bereich wartet jetzt still und zeigt nur dann eine Anzeige, wenn das Warten länger dauert. Eine Sitzung, die es nicht mehr gibt, landet in der Galerie, statt den Bereich leer zu lassen.',
+    pt: 'Voltar a um relatório ou a uma imersão abertos já não passa pela galeria. Ao sair da secção e regressar, o elemento tinha de ser lido outra vez antes de poder ser desenhado, e o que aparecia entretanto era a lista, como se a aplicação a abrisse e carregasse sozinha no seu relatório. O painel espera agora em silêncio e só mostra um indicador se a espera se prolongar. Uma sessão que já não existe acaba na galeria em vez de deixar o painel vazio.',
+    'pt-BR': 'Voltar a um relatório ou a uma imersão abertos já não passa pela galeria. Ao sair da seção e voltar, o item precisava ser lido de novo antes de poder ser desenhado, e o que aparecia enquanto isso era a lista, como se o aplicativo a abrisse e clicasse sozinho no seu relatório. O painel agora espera em silêncio e só mostra um indicador se a espera se alongar. Uma sessão que já não existe termina na galeria em vez de deixar o painel vazio.',
+  },
+  {
+    scope: 'estudio',
+    es: 'El título de la vista de organización de estudio y docencia ya se traduce. Con la interfaz en otro idioma, el encabezado seguía leyéndose «Cursos y asignaturas» en español entre un antetítulo y una ruta que sí estaban traducidos. Ahora los tres títulos posibles salen en los ocho idiomas de la interfaz.',
+    en: 'The heading of the study and teaching organisation view is now translated. With the interface in another language it still read «Cursos y asignaturas» in Spanish, between an eyebrow and a breadcrumb that were translated. All three possible headings now appear in the eight interface languages.',
+    fr: 'Le titre de la vue d’organisation des études et de l’enseignement est désormais traduit. Avec l’interface dans une autre langue, il affichait encore « Cursos y asignaturas » en espagnol, entre un surtitre et un fil d’Ariane qui, eux, étaient traduits. Les trois titres possibles apparaissent maintenant dans les huit langues de l’interface.',
+    de: 'Die Überschrift der Organisationsansicht von Studium und Unterricht wird jetzt übersetzt. Mit der Oberfläche in einer anderen Sprache stand dort weiterhin „Cursos y asignaturas“ auf Spanisch, zwischen einer Dachzeile und einem Pfad, die übersetzt waren. Alle drei möglichen Überschriften erscheinen nun in den acht Sprachen der Oberfläche.',
+    pt: 'O título da vista de organização de estudo e ensino passa a estar traduzido. Com a interface noutro idioma, o cabeçalho continuava a ler-se «Cursos y asignaturas» em espanhol, entre um antetítulo e um caminho que estavam traduzidos. Os três títulos possíveis aparecem agora nos oito idiomas da interface.',
+    'pt-BR': 'O título da visão de organização de estudo e ensino agora é traduzido. Com a interface em outro idioma, o cabeçalho continuava aparecendo como «Cursos y asignaturas» em espanhol, entre um antetítulo e um caminho que estavam traduzidos. Os três títulos possíveis agora saem nos oito idiomas da interface.',
+  },
+];
+
+/**
+ * 4.1.5 — the selection ribbon lands where the hand left it, and the two remaining
+ * places that stopped the window while it thought stop doing it.
+ */
+const RELEASE_4_1_5_HIGHLIGHTS: RawReleaseHighlight[] = [
+  {
+    scope: 'general',
+    es: 'La cinta de opciones aparece ahora donde soltaste el ratón. Antes se colocaba sobre la primera línea de la selección, así que arrastrar un párrafo de arriba abajo la dejaba lejos de donde estabas mirando. También espera a que sueltes en lugar de seguir a la selección mientras crece. Si seleccionas con el teclado, la cinta sigue al cursor. Vale igual para el lector y para los editores de notas del espacio de trabajo, de estudio y de docencia.',
+    en: 'The options ribbon now appears where you released the pointer. It used to sit above the first line of the selection, so dragging a paragraph downwards left it far from where you were looking. It also waits for you to let go instead of following the selection as it grows. A selection made with the keyboard follows the caret instead. This applies to the reader and to the note editors in the workspace, study and teaching.',
+    fr: 'Le ruban d’options apparaît désormais là où vous avez relâché le pointeur. Il se plaçait avant au-dessus de la première ligne de la sélection, si bien que faire glisser un paragraphe vers le bas le laissait loin de votre regard. Il attend aussi que vous relâchiez au lieu de suivre la sélection pendant qu’elle grandit. Une sélection faite au clavier suit le curseur de texte. Cela vaut pour le lecteur comme pour les éditeurs de notes de l’espace de travail, des études et de l’enseignement.',
+    de: 'Das Optionsband erscheint jetzt dort, wo Sie den Zeiger losgelassen haben. Früher saß es über der ersten Zeile der Auswahl, sodass es beim Ziehen eines Absatzes nach unten weit weg von Ihrem Blick lag. Es wartet außerdem auf das Loslassen, statt der wachsenden Auswahl zu folgen. Eine mit der Tastatur getroffene Auswahl folgt stattdessen der Schreibmarke. Das gilt für den Reader ebenso wie für die Notizeditoren in Arbeitsbereich, Studium und Unterricht.',
+    pt: 'A fita de opções aparece agora onde largou o rato. Antes ficava sobre a primeira linha da seleção, por isso arrastar um parágrafo de cima para baixo deixava-a longe de onde estava a olhar. Também espera que largue, em vez de seguir a seleção enquanto ela cresce. Se selecionar com o teclado, a fita segue o cursor de texto. Vale tanto para o leitor como para os editores de notas do espaço de trabalho, do estudo e do ensino.',
+    'pt-BR': 'A faixa de opções aparece agora onde você soltou o mouse. Antes ela ficava sobre a primeira linha da seleção, então arrastar um parágrafo de cima para baixo a deixava longe de onde você estava olhando. Ela também espera você soltar, em vez de seguir a seleção enquanto cresce. Se você selecionar com o teclado, a faixa segue o cursor de texto. Vale tanto para o leitor quanto para os editores de notas do espaço de trabalho, do estudo e do ensino.',
+  },
+  {
+    scope: 'academic',
+    es: 'Al pulsar un subrayado guardado vuelve a abrirse la cinta completa. Antes solo ofrecía borrarlo. Ahora tienes los colores, el comentario, copiar, el marcador y citar en Nodi, con el color que ya tiene marcado y la papelera al final. Cambiar de color un subrayado ya funciona desde ahí.',
+    en: 'Clicking a stored highlight now reopens the whole ribbon. It used to offer deletion alone. You get the colours, the comment, copy, the bookmark and quoting in Nodi, with the colour it already has marked and the bin at the end. Recolouring a highlight now works from there.',
+    fr: 'Cliquer sur un surlignage enregistré rouvre désormais le ruban entier. Il ne proposait avant que la suppression. Vous retrouvez les couleurs, le commentaire, la copie, le signet et la citation dans Nodi, avec la couleur qu’il a déjà cochée et la corbeille à la fin. Changer la couleur d’un surlignage se fait maintenant de là.',
+    de: 'Ein Klick auf eine gespeicherte Markierung öffnet jetzt das ganze Band. Zuvor bot es nur das Löschen an. Sie erhalten die Farben, den Kommentar, Kopieren, das Lesezeichen und das Zitieren in Nodi, mit der bereits vorhandenen Farbe markiert und dem Papierkorb am Ende. Die Farbe einer Markierung lässt sich nun von dort ändern.',
+    pt: 'Ao carregar num sublinhado guardado, a fita completa volta a abrir. Antes só oferecia apagá-lo. Agora tem as cores, o comentário, copiar, o marcador e citar no Nodi, com a cor que já tem assinalada e o caixote no fim. Mudar a cor de um sublinhado passa a fazer-se a partir daí.',
+    'pt-BR': 'Ao clicar em um destaque salvo, a faixa completa volta a abrir. Antes ela só oferecia excluí-lo. Agora você tem as cores, o comentário, copiar, o marcador e citar no Nodi, com a cor que ele já tem assinalada e a lixeira no fim. Mudar a cor de um destaque passa a ser feito ali mesmo.',
+  },
+  {
+    scope: 'nodi',
+    es: 'Preguntar a Nodi o al chat de investigación ya no congela la ventana. La búsqueda por similitud recorría todo el corpus de una sola vez y dejaba la aplicación quieta hasta que empezaba a llegar la respuesta. Ahora lo recorre por tramos y devuelve exactamente los mismos resultados. Además, un chat nuevo empieza con la bóveda activa ya seleccionada, porque casi siempre preguntas por ella. Todas las bóvedas sigue estando a un clic.',
+    en: 'Asking Nodi or the research chat no longer freezes the window. The similarity search walked the whole corpus in one go and left the app still until the answer started arriving. It now walks it in stages and returns exactly the same results. A new chat also starts with the current vault already selected, because that is nearly always what you are asking about. All vaults stays one click away.',
+    fr: 'Poser une question à Nodi ou au chat de recherche ne fige plus la fenêtre. La recherche par similarité parcourait tout le corpus d’un seul coup et laissait l’application immobile jusqu’à l’arrivée de la réponse. Elle le parcourt désormais par tranches et renvoie exactement les mêmes résultats. Un nouveau chat démarre aussi avec le coffre actif déjà sélectionné, car c’est presque toujours celui dont vous parlez. Tous les coffres reste à un clic.',
+    de: 'Eine Frage an Nodi oder den Recherche-Chat friert das Fenster nicht mehr ein. Die Ähnlichkeitssuche durchlief das gesamte Korpus in einem Zug und ließ die App stillstehen, bis die Antwort einzutreffen begann. Jetzt durchläuft sie es in Abschnitten und liefert genau dieselben Ergebnisse. Ein neuer Chat startet außerdem mit dem aktiven Tresor bereits ausgewählt, denn fast immer geht es um diesen. Alle Tresore bleibt einen Klick entfernt.',
+    pt: 'Perguntar ao Nodi ou ao chat de investigação já não congela a janela. A pesquisa por semelhança percorria todo o corpus de uma só vez e deixava a aplicação parada até a resposta começar a chegar. Agora percorre-o por troços e devolve exatamente os mesmos resultados. Além disso, um chat novo começa com o cofre ativo já selecionado, porque é quase sempre sobre ele que pergunta. Todos os cofres continua a um clique.',
+    'pt-BR': 'Perguntar ao Nodi ou ao chat de pesquisa já não congela a janela. A busca por semelhança percorria todo o corpus de uma só vez e deixava o aplicativo parado até a resposta começar a chegar. Agora ele o percorre por trechos e devolve exatamente os mesmos resultados. Além disso, um chat novo começa com o cofre ativo já selecionado, porque é quase sempre sobre ele que você pergunta. Todos os cofres continua a um clique.',
+  },
+  {
+    scope: 'mcp',
+    es: 'Las búsquedas que hace un cliente MCP dejan de bloquear la ventana de Nodus. Buscar ideas o pasajes desde otra aplicación congelaba Nodus por detrás, sin nada en pantalla que lo explicara, y otra vez por cada búsqueda del turno. Ahora esas dos búsquedas recorren el corpus por tramos y devuelven el mismo orden de resultados.',
+    en: 'Searches made by an MCP client no longer block the Nodus window. Searching ideas or passages from another application froze Nodus behind it, with nothing on screen to explain it, and again for every search in a turn. Those two searches now walk the corpus in stages and return the same ranking.',
+    fr: 'Les recherches lancées par un client MCP ne bloquent plus la fenêtre de Nodus. Chercher des idées ou des passages depuis une autre application figeait Nodus à l’arrière-plan, sans rien à l’écran pour l’expliquer, et de nouveau à chaque recherche du tour. Ces deux recherches parcourent maintenant le corpus par tranches et renvoient le même classement.',
+    de: 'Suchen eines MCP-Clients blockieren das Nodus-Fenster nicht mehr. Das Suchen von Ideen oder Passagen aus einer anderen Anwendung ließ Nodus im Hintergrund einfrieren, ohne dass etwas auf dem Bildschirm es erklärte, und erneut bei jeder Suche im selben Zug. Diese beiden Suchen durchlaufen das Korpus nun in Abschnitten und liefern dieselbe Reihenfolge.',
+    pt: 'As pesquisas feitas por um cliente MCP deixam de bloquear a janela do Nodus. Procurar ideias ou passagens a partir de outra aplicação congelava o Nodus por trás, sem nada no ecrã que o explicasse, e outra vez a cada pesquisa do turno. Essas duas pesquisas percorrem agora o corpus por troços e devolvem a mesma ordem de resultados.',
+    'pt-BR': 'As buscas feitas por um cliente MCP deixam de bloquear a janela do Nodus. Procurar ideias ou passagens a partir de outro aplicativo congelava o Nodus por trás, sem nada na tela que explicasse, e de novo a cada busca do turno. Essas duas buscas percorrem agora o corpus por trechos e devolvem a mesma ordem de resultados.',
+  },
+];
+
+/** 4.1.4 — a new public home and a desktop that stays responsive during upkeep. */
+const RELEASE_4_1_4_HIGHLIGHTS: RawReleaseHighlight[] = [
+  {
+    scope: 'general',
+    es: 'Nodus estrena casa en nodusresearch.com. La nueva web reúne la wiki, los manuales, las demos interactivas, las preguntas frecuentes, el blog y una página para contribuir. Está rediseñada para orientarte desde el primer vistazo y funciona mejor en pantallas pequeñas. La aplicación te avisará una sola vez y el centro de notificaciones abrirá la nueva dirección.',
+    en: 'Nodus has a new home at nodusresearch.com. The new website brings together the wiki, manuals, interactive demos, frequently asked questions, the blog and a page for contributing. It has been redesigned to orient you at first glance and works better on small screens. The app will tell you once, and the notification centre will open the new address.',
+    fr: 'Nodus a une nouvelle adresse, nodusresearch.com. Le nouveau site réunit le wiki, les manuels, les démos interactives, les questions fréquentes, le blog et une page pour contribuer. Il a été repensé pour vous orienter dès le premier regard et fonctionne mieux sur les petits écrans. L’application vous préviendra une seule fois et le centre de notifications ouvrira la nouvelle adresse.',
+    de: 'Nodus hat unter nodusresearch.com ein neues Zuhause. Die neue Website vereint Wiki, Handbücher, interaktive Demos, häufige Fragen, Blog und eine Seite zum Mitmachen. Sie wurde neu gestaltet, damit Sie sich auf den ersten Blick zurechtfinden, und funktioniert besser auf kleinen Bildschirmen. Die App weist Sie einmal darauf hin und die Mitteilungszentrale öffnet die neue Adresse.',
+    pt: 'O Nodus tem uma nova casa em nodusresearch.com. O novo site reúne a wiki, os manuais, as demonstrações interativas, as perguntas frequentes, o blogue e uma página para contribuir. Foi redesenhado para orientar à primeira vista e funciona melhor em ecrãs pequenos. A aplicação avisará uma única vez e o centro de notificações abrirá o novo endereço.',
+    'pt-BR': 'O Nodus tem uma nova casa em nodusresearch.com. O novo site reúne a wiki, os manuais, as demonstrações interativas, as perguntas frequentes, o blog e uma página para contribuir. Ele foi redesenhado para orientar logo de início e funciona melhor em telas pequenas. O aplicativo avisará uma única vez e a central de notificações abrirá o novo endereço.',
+  },
+  {
+    scope: 'general',
+    es: 'Las copias de seguridad automáticas y la publicación de bóvedas conectadas dejan de bloquear la aplicación. El trabajo pesado ocurre ahora fuera de la ventana principal, usa memoria de forma acotada y se detiene si un proceso externo queda colgado. Puedes seguir usando Nodus mientras una bóveda grande se cifra, comprime o envía al servidor. Los fallos de publicación esperan antes de volver a intentarlo y los datos sin cambios no se reconstruyen.',
+    en: 'Automatic backups and publishing connected vaults no longer block the app. Heavy work now runs outside the main window, uses bounded memory and stops if an external process hangs. You can keep using Nodus while a large vault is encrypted, compressed or sent to the server. Failed publications wait before trying again, and unchanged data is not rebuilt.',
+    fr: 'Les sauvegardes automatiques et la publication des coffres connectés ne bloquent plus l’application. Le travail lourd s’effectue désormais hors de la fenêtre principale, utilise une quantité de mémoire limitée et s’arrête si un processus externe se fige. Vous pouvez continuer à utiliser Nodus pendant le chiffrement, la compression ou l’envoi au serveur d’un grand coffre. Les publications échouées attendent avant de réessayer et les données inchangées ne sont pas reconstruites.',
+    de: 'Automatische Sicherungen und die Veröffentlichung verbundener Tresore blockieren die App nicht mehr. Aufwendige Arbeit läuft nun außerhalb des Hauptfensters, nutzt begrenzten Speicher und wird beendet, falls ein externer Prozess hängen bleibt. Sie können Nodus weiterverwenden, während ein großer Tresor verschlüsselt, komprimiert oder an den Server gesendet wird. Fehlgeschlagene Veröffentlichungen warten vor dem nächsten Versuch und unveränderte Daten werden nicht neu aufgebaut.',
+    pt: 'As cópias de segurança automáticas e a publicação de cofres ligados deixam de bloquear a aplicação. O trabalho pesado passa a decorrer fora da janela principal, usa memória de forma limitada e termina se um processo externo ficar bloqueado. Pode continuar a usar o Nodus enquanto um cofre grande é cifrado, comprimido ou enviado para o servidor. As publicações falhadas aguardam antes de tentar novamente e os dados inalterados não são reconstruídos.',
+    'pt-BR': 'Os backups automáticos e a publicação de cofres conectados não bloqueiam mais o aplicativo. O trabalho pesado agora acontece fora da janela principal, usa memória de forma limitada e é interrompido se um processo externo travar. Você pode continuar usando o Nodus enquanto um cofre grande é criptografado, compactado ou enviado ao servidor. As publicações com falha aguardam antes de tentar novamente e os dados inalterados não são reconstruídos.',
+  },
+  {
+    scope: 'general',
+    es: 'El despliegue de Nodus Cloud en Cloudflare ya puede crear su primera cuenta de administración. El servicio real rechazaba la operación de contraseña que aceptaba el entorno de prueba, por lo que el asistente terminaba siempre con un error 500 y no dejaba iniciar el servidor. La configuración respeta ahora el límite de Cloudflare, conserva la compatibilidad con las contraseñas existentes y muestra el motivo que devuelve el servidor cuando algo falla.',
+    en: 'A Nodus Cloud deployment on Cloudflare can now create its first administrator account. The production service rejected a password operation that the test environment accepted, so the wizard always ended with a 500 error and could not initialise the server. The setup now respects Cloudflare’s limit, remains compatible with existing passwords and shows the reason returned by the server when something fails.',
+    fr: 'Un déploiement de Nodus Cloud sur Cloudflare peut désormais créer son premier compte administrateur. Le service de production refusait une opération de mot de passe acceptée par l’environnement de test. L’assistant se terminait donc toujours par une erreur 500 et ne pouvait pas initialiser le serveur. La configuration respecte maintenant la limite de Cloudflare, reste compatible avec les mots de passe existants et affiche la raison renvoyée par le serveur en cas d’échec.',
+    de: 'Eine Nodus-Cloud-Bereitstellung auf Cloudflare kann jetzt ihr erstes Administratorkonto anlegen. Der Produktionsdienst lehnte einen Passwortvorgang ab, den die Testumgebung akzeptierte. Deshalb endete der Assistent immer mit Fehler 500 und konnte den Server nicht initialisieren. Die Einrichtung hält nun das Cloudflare-Limit ein, bleibt mit vorhandenen Passwörtern kompatibel und zeigt bei einem Fehler den vom Server zurückgegebenen Grund an.',
+    pt: 'Uma instalação do Nodus Cloud na Cloudflare já pode criar a primeira conta de administração. O serviço de produção recusava uma operação de palavra-passe que o ambiente de teste aceitava. Por isso, o assistente terminava sempre com um erro 500 e não conseguia iniciar o servidor. A configuração respeita agora o limite da Cloudflare, mantém a compatibilidade com as palavras-passe existentes e mostra o motivo devolvido pelo servidor quando algo falha.',
+    'pt-BR': 'Uma implantação do Nodus Cloud na Cloudflare agora pode criar a primeira conta de administração. O serviço de produção recusava uma operação de senha aceita pelo ambiente de teste. Por isso, o assistente sempre terminava com um erro 500 e não conseguia iniciar o servidor. A configuração agora respeita o limite da Cloudflare, mantém a compatibilidade com as senhas existentes e mostra o motivo devolvido pelo servidor quando algo falha.',
+  },
+  {
+    scope: 'nodi',
+    es: 'Actualizar el centro de notificaciones ya da una respuesta clara. Después de pulsar el botón, Nodus indica si la lista se ha actualizado, si no hay novedades, si los avisos están desactivados o si no ha podido consultar la fuente. La lista sigue conservando la última copia válida cuando la red falla.',
+    en: 'Refreshing the notification centre now gives a clear answer. After you press the button, Nodus says whether the list was updated, there is nothing new, announcements are disabled or the source could not be reached. The list keeps its last valid copy when the network fails.',
+    fr: 'L’actualisation du centre de notifications donne désormais une réponse claire. Après avoir appuyé sur le bouton, Nodus indique si la liste a été mise à jour, s’il n’y a rien de nouveau, si les annonces sont désactivées ou si la source n’a pas pu être consultée. La liste conserve sa dernière copie valide en cas de panne du réseau.',
+    de: 'Das Aktualisieren der Mitteilungszentrale liefert jetzt eine klare Rückmeldung. Nach dem Drücken der Schaltfläche sagt Nodus, ob die Liste aktualisiert wurde, ob es nichts Neues gibt, ob Hinweise deaktiviert sind oder ob die Quelle nicht erreicht werden konnte. Bei einem Netzfehler behält die Liste ihre letzte gültige Kopie.',
+    pt: 'Atualizar o centro de notificações passa a dar uma resposta clara. Depois de premir o botão, o Nodus indica se a lista foi atualizada, se não há novidades, se os avisos estão desativados ou se não foi possível consultar a fonte. A lista conserva a última cópia válida quando a rede falha.',
+    'pt-BR': 'Atualizar a central de notificações agora dá uma resposta clara. Depois de apertar o botão, o Nodus informa se a lista foi atualizada, se não há novidades, se os avisos estão desativados ou se não foi possível consultar a fonte. A lista mantém a última cópia válida quando a rede falha.',
+  },
+];
+
+/**
+ * 4.1.2 — the author dossier gets read in a sensible order and stops flashing its own
+ * seams, every section remembers where you left it, and the Cloudflare wizard from 4.1.1
+ * catches up to the other seven interface languages.
+ */
+const RELEASE_4_1_2_HIGHLIGHTS: RawReleaseHighlight[] = [
+  {
+    scope: 'academic',
+    es: 'El dosier de un autor mejora en varios frentes. Sus obras aparecen ahora antes que sus ideas, como conviene al acercarse a alguien por primera vez. La lista de autores conectados muestra las cinco relaciones más fuertes y abre la lista completa en un modal aparte, y ya se ve bien en modo claro. Los modales que abre el dosier tampoco dejan una franja de color por encima de la barra de título.',
+    en: 'The author dossier improves on several fronts. Their works now appear before their ideas, the way you approach someone for the first time. The connected authors list shows the five strongest relations and opens the full list in its own modal, and it now reads correctly in light mode. The modals the dossier opens no longer leave a bright strip above the title bar.',
+    fr: 'Le dossier d’un auteur s’améliore sur plusieurs points. Ses œuvres apparaissent désormais avant ses idées, comme il convient en découvrant quelqu’un pour la première fois. La liste des auteurs connectés affiche les cinq relations les plus fortes et ouvre la liste complète dans une fenêtre à part, et elle s’affiche enfin correctement en mode clair. Les fenêtres ouvertes depuis le dossier ne laissent plus de bande colorée au-dessus de la barre de titre.',
+    de: 'Das Autorendossier verbessert sich an mehreren Stellen. Seine Werke erscheinen jetzt vor seinen Ideen, so wie man jemandem zum ersten Mal begegnet. Die Liste verbundener Autoren zeigt die fünf stärksten Beziehungen und öffnet die vollständige Liste in einem eigenen Fenster, und sie sieht im hellen Modus jetzt richtig aus. Die vom Dossier geöffneten Fenster lassen keinen farbigen Streifen mehr über der Titelleiste.',
+    pt: 'O dossiê de um autor melhora em várias frentes. As suas obras aparecem agora antes das suas ideias, como convém ao conhecer alguém pela primeira vez. A lista de autores ligados mostra as cinco relações mais fortes e abre a lista completa numa janela própria, e já se vê bem em modo claro. As janelas que o dossiê abre também deixam de ter uma faixa colorida acima da barra de título.',
+    'pt-BR': 'O dossiê de um autor melhora em várias frentes. As obras dele agora aparecem antes das ideias, como convém ao conhecer alguém pela primeira vez. A lista de autores conectados mostra as cinco relações mais fortes e abre a lista completa em uma janela própria, e agora aparece corretamente no modo claro. As janelas que o dossiê abre também deixam de ter uma faixa colorida acima da barra de título.',
+  },
+  {
+    scope: 'general',
+    es: 'Cada sección recuerda dónde la dejaste. Al volver a Ideas, Autores, Biblioteca global, Mapa de argumentos o Espacio de trabajo, se restauran los filtros, el orden, la pestaña activa y la fila donde estabas. Cambiar de bóveda no arrastra ese recuerdo de otra distinta.',
+    en: 'Every section remembers where you left it. Returning to Ideas, Authors, the Global Library, the Argument Map, or the Workspace restores your filters, sort order, active tab, and the row you were on. Switching vaults never carries over another vault’s memory.',
+    fr: 'Chaque section se souvient où vous l’avez laissée. En revenant sur Idées, Auteurs, la Bibliothèque globale, la Carte des arguments ou l’Espace de travail, les filtres, l’ordre, l’onglet actif et la ligne où vous étiez sont restaurés. Changer de coffre n’importe jamais le souvenir d’un autre coffre.',
+    de: 'Jeder Bereich merkt sich, wo Sie ihn verlassen haben. Bei der Rückkehr zu Ideen, Autoren, der globalen Bibliothek, der Argumentkarte oder dem Arbeitsbereich werden Filter, Sortierung, aktiver Reiter und die Zeile, bei der Sie waren, wiederhergestellt. Ein Tresorwechsel überträgt nie die Erinnerung eines anderen Tresors.',
+    pt: 'Cada secção recorda onde a deixou. Ao voltar a Ideias, Autores, Biblioteca global, Mapa de argumentos ou Espaço de trabalho, os filtros, a ordem, o separador ativo e a linha onde estava são repostos. Mudar de cofre nunca arrasta a memória de outro cofre.',
+    'pt-BR': 'Cada seção lembra onde você a deixou. Ao voltar para Ideias, Autores, Biblioteca global, Mapa de argumentos ou Espaço de trabalho, os filtros, a ordem, a aba ativa e a linha em que você estava são restaurados. Trocar de cofre nunca traz a memória de outro cofre.',
+  },
+  {
+    scope: 'general',
+    es: 'La cinta de selección del lector se adapta al modo claro. Sus botones ya no conservan el resaltado oscuro de antes y los discos de color recuperan un borde visible sobre fondo blanco.',
+    en: 'The reader’s selection ribbon now adapts to light mode. Its buttons no longer keep the previous dark highlight, and the colour discs regain a visible edge against a white bar.',
+    fr: 'Le ruban de sélection du lecteur s’adapte désormais au mode clair. Ses boutons ne gardent plus le surlignage sombre d’avant, et les disques de couleur retrouvent un contour visible sur fond blanc.',
+    de: 'Das Auswahlband des Readers passt sich jetzt dem hellen Modus an. Seine Schaltflächen behalten nicht mehr die vorherige dunkle Hervorhebung, und die Farbkreise erhalten wieder einen sichtbaren Rand auf weißem Grund.',
+    pt: 'A fita de seleção do leitor adapta-se agora ao modo claro. Os seus botões deixam de manter o realce escuro anterior e os discos de cor recuperam um contorno visível sobre fundo branco.',
+    'pt-BR': 'A faixa de seleção do leitor agora se adapta ao modo claro. Os botões deixam de manter o realce escuro anterior e os discos de cor recuperam um contorno visível sobre fundo branco.',
+  },
+  {
+    scope: 'general',
+    es: 'El asistente de despliegue en Cloudflare habla ahora tus ocho idiomas. Antes de aceptar el proyecto, Nodus muestra qué crea exactamente en tu cuenta y qué permisos concede, todo traducido.',
+    en: 'The Cloudflare deployment wizard now speaks all eight interface languages. Before you accept the project, Nodus shows exactly what it creates in your account and what permissions it grants, fully translated.',
+    fr: 'L’assistant de déploiement Cloudflare parle désormais vos huit langues. Avant d’accepter le projet, Nodus affiche exactement ce qu’il crée dans votre compte et les autorisations accordées, entièrement traduit.',
+    de: 'Der Cloudflare-Bereitstellungsassistent spricht jetzt alle acht Oberflächensprachen. Bevor Sie das Projekt annehmen, zeigt Nodus genau, was in Ihrem Konto erstellt wird und welche Berechtigungen erteilt werden, vollständig übersetzt.',
+    pt: 'O assistente de implementação na Cloudflare fala agora os seus oito idiomas. Antes de aceitar o projeto, o Nodus mostra exatamente o que cria na sua conta e que permissões concede, tudo traduzido.',
+    'pt-BR': 'O assistente de implantação na Cloudflare agora fala seus oito idiomas. Antes de aceitar o projeto, o Nodus mostra exatamente o que cria na sua conta e quais permissões concede, tudo traduzido.',
+  },
+];
+
+/**
+ * 4.1.1 — the patch that follows 4.1, written for someone who never saw the pull requests.
+ *
+ * Three corrections inside a vault, then three things that appear outside it: your own
+ * Cloudflare deployment, the website wiki, and the small editor and window details that
+ * 4.1 shipped with. Short sentences, no semicolons, no em dashes.
+ */
+const RELEASE_4_1_1_HIGHLIGHTS: RawReleaseHighlight[] = [
+  {
+    scope: 'academic',
+    es: 'La Biblioteca global estrena su propia ventana de opciones. Decides cómo se nombran los archivos que añades, con tres formatos a partir de autor, año y título, y a qué tipos se aplica. También puedes desactivar la preparación automática de la copia legible. Borrar una nota ahora pide confirmación.',
+    en: 'The Global Library gains its own settings window. You decide how added files are named, with three formats built from author, year and title, and which file types it applies to. You can also turn off the automatic preparation of the readable copy. Deleting a note now asks for confirmation.',
+    fr: 'La Bibliothèque globale reçoit sa propre fenêtre d’options. Vous décidez comment sont nommés les fichiers ajoutés, avec trois formats construits à partir de l’auteur, de l’année et du titre, et à quels types ils s’appliquent. Vous pouvez aussi désactiver la préparation automatique de la copie lisible. La suppression d’une note demande désormais confirmation.',
+    de: 'Die globale Bibliothek erhält ein eigenes Einstellungsfenster. Sie legen fest, wie hinzugefügte Dateien benannt werden, mit drei Formaten aus Autor, Jahr und Titel, und für welche Dateitypen das gilt. Auch die automatische Aufbereitung der lesbaren Kopie lässt sich abschalten. Das Löschen einer Notiz fragt jetzt nach.',
+    pt: 'A Biblioteca global passa a ter a sua própria janela de opções. Decide como são nomeados os ficheiros que adiciona, com três formatos a partir de autor, ano e título, e a que tipos se aplica. Também pode desativar a preparação automática da cópia legível. Apagar uma nota passa a pedir confirmação.',
+    'pt-BR': 'A Biblioteca global ganha sua própria janela de opções. Você decide como são nomeados os arquivos que adiciona, com três formatos a partir de autor, ano e título, e a quais tipos se aplica. Também pode desativar a preparação automática da cópia legível. Excluir uma nota agora pede confirmação.',
+  },
+  {
+    scope: 'academic',
+    es: 'Cobertura recupera tus preguntas guardadas al abrir el vault activo. Puedes lanzar varias seguidas y se procesan en orden, una detrás de otra, sin pisarse. Borrar una pregunta pide confirmación antes de hacerlo.',
+    en: 'Coverage brings back your saved questions when you open the active vault. You can launch several in a row and they are processed in order, one after another, without colliding. Deleting a question asks for confirmation first.',
+    fr: 'Couverture retrouve vos questions enregistrées à l’ouverture du coffre actif. Vous pouvez en lancer plusieurs de suite et elles sont traitées dans l’ordre, l’une après l’autre, sans se gêner. La suppression d’une question demande confirmation au préalable.',
+    de: 'Abdeckung holt Ihre gespeicherten Fragen zurück, wenn Sie den aktiven Tresor öffnen. Sie können mehrere hintereinander starten, und sie werden der Reihe nach abgearbeitet, ohne sich zu stören. Das Löschen einer Frage fragt vorher nach.',
+    pt: 'A Cobertura recupera as suas perguntas guardadas ao abrir o cofre ativo. Pode lançar várias seguidas e são processadas por ordem, uma a seguir à outra, sem se atropelarem. Apagar uma pergunta pede confirmação antes.',
+    'pt-BR': 'A Cobertura recupera suas perguntas salvas ao abrir o cofre ativo. Você pode lançar várias seguidas e elas são processadas em ordem, uma após a outra, sem se atropelar. Excluir uma pergunta pede confirmação antes.',
+  },
+  {
+    scope: 'academic',
+    es: 'Contradicciones se dibuja ahora en el atlas semántico, igual que el resto del grafo. La vista mantiene un tamaño acotado y conserva las dos partes de cada debate que muestra. Antes podía quedarse con un solo lado de la discusión.',
+    en: 'Contradictions is now drawn in the semantic atlas, like the rest of the graph. The view stays within a bounded size and keeps both sides of every debate it shows. Before, it could end up holding only one side of the argument.',
+    fr: 'Contradictions se dessine désormais dans l’atlas sémantique, comme le reste du graphe. La vue conserve une taille bornée et garde les deux côtés de chaque débat affiché. Auparavant, elle pouvait ne retenir qu’un seul côté de la discussion.',
+    de: 'Widersprüche wird jetzt im semantischen Atlas gezeichnet, wie der übrige Graph. Die Ansicht bleibt in ihrer Größe begrenzt und behält beide Seiten jeder gezeigten Debatte. Zuvor konnte nur eine Seite der Auseinandersetzung übrig bleiben.',
+    pt: 'As Contradições passam a desenhar-se no atlas semântico, como o resto do grafo. A vista mantém um tamanho limitado e conserva os dois lados de cada debate que mostra. Antes podia ficar apenas com um lado da discussão.',
+    'pt-BR': 'As Contradições agora são desenhadas no atlas semântico, como o resto do grafo. A visualização mantém um tamanho limitado e conserva os dois lados de cada debate que mostra. Antes podia ficar só com um lado da discussão.',
+  },
+  {
+    scope: 'general',
+    es: 'Se corrigen tres detalles del editor y de las ventanas. El botón de sinónimos ya no se queda con un contorno marcado después de usarlo. Las marcas internas que protegen citas y enlaces dejan de aparecer en las mejoras de texto y en el documento. Nodi se dibuja de inmediato en las ventanas de actualización y novedades, y los marcadores de tipo de idea vuelven a ser redondos.',
+    en: 'Three details of the editor and the windows are corrected. The synonyms button no longer keeps a marked outline after you use it. The internal marks that protect citations and links stop appearing in text improvements and in the document. Nodi is drawn immediately in the update and what’s-new windows, and idea type markers are round again.',
+    fr: 'Trois détails de l’éditeur et des fenêtres sont corrigés. Le bouton des synonymes ne conserve plus un contour marqué après usage. Les marques internes qui protègent citations et liens cessent d’apparaître dans les améliorations de texte et dans le document. Nodi se dessine immédiatement dans les fenêtres de mise à jour et de nouveautés, et les marqueurs de type d’idée redeviennent ronds.',
+    de: 'Drei Details des Editors und der Fenster sind korrigiert. Die Synonym-Schaltfläche behält nach der Nutzung keinen markierten Rahmen mehr. Die internen Marken, die Zitate und Links schützen, erscheinen nicht mehr in Textverbesserungen und im Dokument. Nodi wird in den Update- und Neuigkeitenfenstern sofort gezeichnet, und die Ideentyp-Markierungen sind wieder rund.',
+    pt: 'Corrigem-se três pormenores do editor e das janelas. O botão de sinónimos deixa de ficar com um contorno marcado depois de o usar. As marcas internas que protegem citações e ligações deixam de aparecer nas melhorias de texto e no documento. O Nodi é desenhado de imediato nas janelas de atualização e novidades, e os marcadores de tipo de ideia voltam a ser redondos.',
+    'pt-BR': 'Três detalhes do editor e das janelas foram corrigidos. O botão de sinônimos não fica mais com um contorno marcado depois de usado. As marcas internas que protegem citações e links deixam de aparecer nas melhorias de texto e no documento. O Nodi é desenhado de imediato nas janelas de atualização e novidades, e os marcadores de tipo de ideia voltam a ser redondos.',
+  },
+  {
+    scope: 'general',
+    es: 'Puedes montar tu propio Nodus Cloud en tu cuenta de Cloudflare. Desde Ajustes se abre el asistente oficial de Cloudflare, que crea la base de datos y el almacenamiento y publica una dirección gratuita. Nodus no recibe tus credenciales ni permisos sobre esa cuenta. El código desplegado es tuyo y se actualiza cuando tú quieras.',
+    en: 'You can run your own Nodus Cloud on your Cloudflare account. Settings opens the official Cloudflare wizard, which creates the database and the storage and publishes a free address. Nodus never receives your credentials or any permission over that account. The deployed code is yours and updates when you decide.',
+    fr: 'Vous pouvez héberger votre propre Nodus Cloud sur votre compte Cloudflare. Les Paramètres ouvrent l’assistant officiel de Cloudflare, qui crée la base de données et le stockage puis publie une adresse gratuite. Nodus ne reçoit jamais vos identifiants ni aucune autorisation sur ce compte. Le code déployé vous appartient et se met à jour quand vous le décidez.',
+    de: 'Sie können Ihr eigenes Nodus Cloud in Ihrem Cloudflare-Konto betreiben. Die Einstellungen öffnen den offiziellen Cloudflare-Assistenten, der Datenbank und Speicher anlegt und eine kostenlose Adresse veröffentlicht. Nodus erhält niemals Ihre Zugangsdaten oder Rechte an diesem Konto. Der bereitgestellte Code gehört Ihnen und wird aktualisiert, wenn Sie es möchten.',
+    pt: 'Pode montar o seu próprio Nodus Cloud na sua conta Cloudflare. As Definições abrem o assistente oficial da Cloudflare, que cria a base de dados e o armazenamento e publica um endereço gratuito. O Nodus nunca recebe as suas credenciais nem permissões sobre essa conta. O código publicado é seu e atualiza-se quando quiser.',
+    'pt-BR': 'Você pode montar o seu próprio Nodus Cloud na sua conta Cloudflare. As Configurações abrem o assistente oficial da Cloudflare, que cria o banco de dados e o armazenamento e publica um endereço gratuito. O Nodus nunca recebe suas credenciais nem permissões sobre essa conta. O código publicado é seu e se atualiza quando você quiser.',
+  },
+  {
+    scope: 'general',
+    es: 'La web de Nodus estrena una wiki completa con manuales por tipo de bóveda. Cada sección explica las pantallas con capturas reales y se puede leer desde el móvil. Los manuales también se descargan en PDF.',
+    en: 'The Nodus website gains a complete wiki with manuals for each vault type. Every section explains the screens with real captures and reads well on a phone. The manuals can also be downloaded as PDF.',
+    fr: 'Le site de Nodus inaugure un wiki complet avec des manuels par type de coffre. Chaque section explique les écrans avec de vraies captures et se lit depuis un téléphone. Les manuels se téléchargent aussi en PDF.',
+    de: 'Die Nodus-Website erhält ein vollständiges Wiki mit Handbüchern für jeden Tresortyp. Jeder Abschnitt erklärt die Bildschirme mit echten Aufnahmen und liest sich auch auf dem Telefon gut. Die Handbücher lassen sich zudem als PDF herunterladen.',
+    pt: 'O site do Nodus estreia uma wiki completa com manuais por tipo de cofre. Cada secção explica os ecrãs com capturas reais e lê-se a partir do telemóvel. Os manuais também podem ser descarregados em PDF.',
+    'pt-BR': 'O site do Nodus estreia uma wiki completa com manuais por tipo de cofre. Cada seção explica as telas com capturas reais e pode ser lida no celular. Os manuais também podem ser baixados em PDF.',
+  },
+];
+
 const RELEASE_4_1_0_HIGHLIGHTS: RawReleaseHighlight[] = [
   {
     scope: 'academic',
@@ -1261,6 +1530,36 @@ const RELEASE_4_0_0_HIGHLIGHTS: RawReleaseHighlight[] = [
 ];
 
 const RAW_RELEASE_NOTES: RawReleaseNote[] = [
+  {
+    version: '4.1.6',
+    date: '2026-08-18',
+    highlights: RELEASE_4_1_6_HIGHLIGHTS,
+  },
+  {
+    version: '4.1.5',
+    date: '2026-08-17',
+    highlights: RELEASE_4_1_5_HIGHLIGHTS,
+  },
+  {
+    version: '4.1.4',
+    date: '2026-08-16',
+    highlights: RELEASE_4_1_4_HIGHLIGHTS,
+  },
+  {
+    version: '4.1.3',
+    date: '2026-08-15',
+    highlights: RELEASE_4_1_3_HIGHLIGHTS,
+  },
+  {
+    version: '4.1.2',
+    date: '2026-08-15',
+    highlights: RELEASE_4_1_2_HIGHLIGHTS,
+  },
+  {
+    version: '4.1.1',
+    date: '2026-08-14',
+    highlights: RELEASE_4_1_1_HIGHLIGHTS,
+  },
   {
     version: '4.1.0',
     date: '2026-08-13',

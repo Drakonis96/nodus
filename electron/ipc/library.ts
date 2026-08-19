@@ -29,6 +29,8 @@ import {
   deleteGlobalLibrarySavedSearch,
   getGlobalLibraryViewPreferences,
   setGlobalLibraryViewPreferences,
+  getGlobalLibrarySettings,
+  setGlobalLibrarySettings,
   getGlobalLibraryItem,
   createGlobalLibraryCollection,
   updateGlobalLibraryCollection,
@@ -115,6 +117,8 @@ export function registerLibraryIpc({ h }: IpcContext): void {
   h('library:deleteSavedSearch', async (_event, id) => deleteGlobalLibrarySavedSearch(id));
   h('library:viewPreferences', async () => getGlobalLibraryViewPreferences());
   h('library:setViewPreferences', async (_event, preferences) => setGlobalLibraryViewPreferences(preferences));
+  h('library:settings', async () => getGlobalLibrarySettings());
+  h('library:setSettings', async (_event, settings) => setGlobalLibrarySettings(settings));
   h('library:item', async (_event, itemId) => getGlobalLibraryItem(itemId));
   h('library:createCollection', async (_event, name, parentId) => createGlobalLibraryCollection(name, parentId));
   h('library:updateCollection', async (_event, id, patch) => updateGlobalLibraryCollection(id, patch));

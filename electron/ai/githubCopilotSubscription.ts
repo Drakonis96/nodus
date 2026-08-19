@@ -59,9 +59,16 @@ let loginDiagnostic = '';
 let lastSession: GitHubCopilotSessionUsage | null = null;
 let modelCache: CopilotModelInfo[] | null = null;
 let modelCacheAt = 0;
+let activeRuntimeRequests = 0;
+let idleTimer: NodeJS.Timeout | null = null;
+let lifetimeTimer: NodeJS.Timeout | null = null;
 /** The catalogue follows the GitHub plan, so a tier change or a newly released model
  *  has to become visible without making the user sign out or restart Nodus. */
 const MODEL_CACHE_TTL_MS = 10 * 60_000;
+// Keep the authenticated runtime warm between nearby requests, but never let a
+// vendor subprocess live for days just because Electron's main process does.
+const COPILOT_IDLE_TIMEOUT_MS = 2 * 60_000;
+const COPILOT_MAX_LIFETIME_MS = 30 * 60_000;
 
 function copilotHome(): string {
   const dir = path.join(app.getPath('userData'), 'github-copilot-subscription');
@@ -132,7 +139,40 @@ function getClient(): CopilotClient {
     useLoggedInUser: true,
     logLevel: 'none',
   });
+  if (lifetimeTimer) clearTimeout(lifetimeTimer);
+  lifetimeTimer = setTimeout(() => {
+    lifetimeTimer = null;
+    forceStopClient();
+  }, COPILOT_MAX_LIFETIME_MS);
+  lifetimeTimer.unref?.();
   return client;
+}
+
+function clearIdleTimer(): void {
+  if (!idleTimer) return;
+  clearTimeout(idleTimer);
+  idleTimer = null;
+}
+
+function armIdleTimer(): void {
+  clearIdleTimer();
+  if (!client || activeRuntimeRequests > 0) return;
+  idleTimer = setTimeout(() => {
+    idleTimer = null;
+    void stopClient();
+  }, COPILOT_IDLE_TIMEOUT_MS);
+  idleTimer.unref?.();
+}
+
+async function withCopilotRuntime<T>(work: (runtime: CopilotClient) => Promise<T>): Promise<T> {
+  clearIdleTimer();
+  activeRuntimeRequests += 1;
+  try {
+    return await work(getClient());
+  } finally {
+    activeRuntimeRequests = Math.max(0, activeRuntimeRequests - 1);
+    armIdleTimer();
+  }
 }
 
 function emit(status: GitHubCopilotSubscriptionStatus): void {
@@ -168,39 +208,40 @@ function mapQuota(id: string, raw: any): GitHubCopilotSubscriptionQuotaWindow {
 
 async function readStatus(): Promise<GitHubCopilotSubscriptionStatus> {
   try {
-    const runtime = getClient();
-    await runtime.start();
-    const auth = await runtime.getAuthStatus();
-    if (!auth.isAuthenticated) {
+    return await withCopilotRuntime(async (runtime) => {
+      await runtime.start();
+      const auth = await runtime.getAuthStatus();
+      if (!auth.isAuthenticated) {
+        return {
+          ...EMPTY_STATUS,
+          available: true,
+          loginPending: loginProcess !== null,
+          statusMessage: auth.statusMessage ?? null,
+          lastSession,
+          error: loginDiagnostic || null,
+        };
+      }
+      let quota: GitHubCopilotSubscriptionQuotaWindow[] = [];
+      try {
+        const response = await runtime.rpc.account.getQuota({});
+        quota = Object.entries(response.quotaSnapshots ?? {})
+          .flatMap(([id, value]) => value ? [mapQuota(id, value)] : [])
+          .sort((a, b) => Number(b.id === 'premium_interactions') - Number(a.id === 'premium_interactions') || a.id.localeCompare(b.id));
+      } catch { /* authentication/catalogue still useful without a quota snapshot */ }
       return {
-        ...EMPTY_STATUS,
         available: true,
+        connected: true,
         loginPending: loginProcess !== null,
+        login: auth.login ?? null,
+        authType: auth.authType ?? null,
         statusMessage: auth.statusMessage ?? null,
+        // Never log the user out of GitHub CLI or revoke environment credentials.
+        canLogout: auth.authType === 'user',
+        quota,
         lastSession,
-        error: loginDiagnostic || null,
+        error: null,
       };
-    }
-    let quota: GitHubCopilotSubscriptionQuotaWindow[] = [];
-    try {
-      const response = await runtime.rpc.account.getQuota({});
-      quota = Object.entries(response.quotaSnapshots ?? {})
-        .flatMap(([id, value]) => value ? [mapQuota(id, value)] : [])
-        .sort((a, b) => Number(b.id === 'premium_interactions') - Number(a.id === 'premium_interactions') || a.id.localeCompare(b.id));
-    } catch { /* authentication/catalogue still useful without a quota snapshot */ }
-    return {
-      available: true,
-      connected: true,
-      loginPending: loginProcess !== null,
-      login: auth.login ?? null,
-      authType: auth.authType ?? null,
-      statusMessage: auth.statusMessage ?? null,
-      // Never log the user out of GitHub CLI or revoke environment credentials.
-      canLogout: auth.authType === 'user',
-      quota,
-      lastSession,
-      error: null,
-    };
+    });
   } catch (error) {
     return {
       ...EMPTY_STATUS,
@@ -264,30 +305,32 @@ export async function cancelGitHubCopilotSubscriptionLogin(): Promise<GitHubCopi
 }
 
 export async function logoutGitHubCopilotSubscription(): Promise<GitHubCopilotSubscriptionStatus> {
-  const runtime = getClient();
-  await runtime.start();
-  const auth = await runtime.getAuthStatus();
-  if (auth.authType !== 'user') {
-    throw new Error('Esta conexión procede de GitHub CLI o del entorno. Nodus no cerrará una sesión global de GitHub; gestiónala en GitHub CLI.');
-  }
-  const current = await runtime.rpc.account.getCurrentAuth();
-  if (current.authInfo) await runtime.rpc.account.logout({ authInfo: current.authInfo });
+  await withCopilotRuntime(async (runtime) => {
+    await runtime.start();
+    const auth = await runtime.getAuthStatus();
+    if (auth.authType !== 'user') {
+      throw new Error('Esta conexión procede de GitHub CLI o del entorno. Nodus no cerrará una sesión global de GitHub; gestiónala en GitHub CLI.');
+    }
+    const current = await runtime.rpc.account.getCurrentAuth();
+    if (current.authInfo) await runtime.rpc.account.logout({ authInfo: current.authInfo });
+  });
   await stopClient();
   return refresh();
 }
 
 async function copilotModels(): Promise<CopilotModelInfo[]> {
   if (modelCache && Date.now() - modelCacheAt < MODEL_CACHE_TTL_MS) return modelCache;
-  const runtime = getClient();
-  await runtime.start();
-  const auth = await runtime.getAuthStatus();
-  if (!auth.isAuthenticated) {
-    throw new ProviderRuntimeError('Conecta primero tu cuenta de GitHub Copilot en Proveedores y modelos.', 'auth');
-  }
-  const models = await runtime.listModels();
-  modelCache = models;
-  modelCacheAt = Date.now();
-  return models;
+  return withCopilotRuntime(async (runtime) => {
+    await runtime.start();
+    const auth = await runtime.getAuthStatus();
+    if (!auth.isAuthenticated) {
+      throw new ProviderRuntimeError('Conecta primero tu cuenta de GitHub Copilot en Proveedores y modelos.', 'auth');
+    }
+    const models = await runtime.listModels();
+    modelCache = models;
+    modelCacheAt = Date.now();
+    return models;
+  });
 }
 
 export async function listGitHubCopilotSubscriptionModels(): Promise<ModelInfo[]> {
@@ -311,11 +354,11 @@ export async function completeWithGitHubCopilotSubscription(options: CompletionO
   const workdir = await fs.promises.mkdtemp(path.join(app.getPath('temp') || os.tmpdir(), 'nodus-github-copilot-'));
   try { await fs.promises.chmod(workdir, 0o700); } catch { /* Windows */ }
   try {
-    const result = await runIsolatedGitHubCopilotCompletion(getClient(), {
-      ...options,
-      supportsReasoning: Boolean(selected.capabilities?.supports?.reasoningEffort),
-      workdir,
-    });
+    const result = await withCopilotRuntime((runtime) => runIsolatedGitHubCopilotCompletion(runtime, {
+        ...options,
+        supportsReasoning: Boolean(selected.capabilities?.supports?.reasoningEffort),
+        workdir,
+      }));
     if (result.usage) lastSession = result.usage;
     void refresh();
     return result.text;
@@ -325,6 +368,9 @@ export async function completeWithGitHubCopilotSubscription(options: CompletionO
 }
 
 async function stopClient(): Promise<void> {
+  clearIdleTimer();
+  if (lifetimeTimer) clearTimeout(lifetimeTimer);
+  lifetimeTimer = null;
   const current = client;
   client = null;
   modelCache = null;
@@ -339,4 +385,29 @@ export async function stopGitHubCopilotSubscription(): Promise<void> {
     try { child.kill('SIGTERM'); } catch { /* already exited */ }
   }
   await stopClient();
+}
+
+function forceStopClient(): void {
+  clearIdleTimer();
+  if (lifetimeTimer) clearTimeout(lifetimeTimer);
+  lifetimeTimer = null;
+  const current = client;
+  client = null;
+  modelCache = null;
+  modelCacheAt = 0;
+  if (current) void current.forceStop();
+}
+
+/** before-quit cannot await. Detach the SDK first, then issue its synchronous
+ * SIGKILL path so neither Copilot nor a pending login can outlive Electron. */
+export function killGitHubCopilotSubscriptionServer(): void {
+  clearIdleTimer();
+  if (lifetimeTimer) clearTimeout(lifetimeTimer);
+  lifetimeTimer = null;
+  const child = loginProcess;
+  loginProcess = null;
+  if (child && child.exitCode === null) {
+    try { child.kill('SIGKILL'); } catch { /* already exited */ }
+  }
+  forceStopClient();
 }

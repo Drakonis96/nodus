@@ -11,6 +11,7 @@ import { ensureOutboxTriggers } from '../serverSync/outboxTriggers';
 import { activeVaultDbPath, getVault, getVaultByPath } from '../vaults/vaultRegistry';
 import { auditQaDatabaseOpen } from '../qa/databaseAudit';
 import { migrateDatabaseSafely } from './migrationSafety';
+import { ensureBackupRevisionTriggers } from '../export/backupVaultRevision';
 
 let db: Database.Database | null = null;
 const jobDatabase = new AsyncLocalStorage<Database.Database>();
@@ -130,6 +131,7 @@ function openDatabase(file: string): Database.Database {
   // stops a reader from queueing anything: without triggers, nothing can write to
   // server_outbox no matter what the rest of the app believes.
   ensureOutboxTriggers(next, mayQueueMutations(file));
+  ensureBackupRevisionTriggers(next);
   next.pragma('busy_timeout = 5000');
   next.pragma('synchronous = NORMAL');
   next.pragma('temp_store = MEMORY');

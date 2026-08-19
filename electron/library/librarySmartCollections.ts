@@ -7,9 +7,11 @@ import type {
   LibrarySmartSearchGroup,
   LibrarySortField,
   LibraryViewPreferences,
+  GlobalLibrarySettings,
 } from '@shared/libraryTypes';
 import { atomicWriteJson, readJsonFile } from './libraryFileUtils';
 import { LIBRARY_COLUMNS } from '@shared/libraryBibliography';
+import { normalizeGlobalLibrarySettings } from '@shared/libraryAttachmentNaming';
 
 const COLUMNS = new Set<LibraryColumnId>(LIBRARY_COLUMNS.map((column) => column.id));
 const SORT_FIELDS = new Set<LibrarySortField>(LIBRARY_COLUMNS.flatMap((column) => column.sort ? [column.sort] : []));
@@ -58,10 +60,12 @@ function normalizePreferences(value: unknown): LibraryViewPreferences {
 export class LibrarySmartCollectionStore {
   private readonly searchesFile: string;
   private readonly preferencesFile: string;
+  private readonly settingsFile: string;
 
   constructor(root: string) {
     this.searchesFile = path.join(root, '.nodus', 'saved-searches.json');
     this.preferencesFile = path.join(root, '.nodus', 'view-preferences.json');
+    this.settingsFile = path.join(root, '.nodus', 'library-settings.json');
   }
 
   list(): LibrarySavedSearchRecord[] {
@@ -112,5 +116,15 @@ export class LibrarySmartCollectionStore {
     const preferences = normalizePreferences(value);
     atomicWriteJson(this.preferencesFile, preferences);
     return preferences;
+  }
+
+  settings(): GlobalLibrarySettings {
+    return normalizeGlobalLibrarySettings(readJsonFile<unknown>(this.settingsFile));
+  }
+
+  setSettings(value: GlobalLibrarySettings): GlobalLibrarySettings {
+    const settings = normalizeGlobalLibrarySettings(value);
+    atomicWriteJson(this.settingsFile, settings);
+    return settings;
   }
 }

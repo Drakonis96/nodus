@@ -46,8 +46,14 @@ const PAYLOAD = {
 
 const ETAG = '"announcements-v1"';
 let requests = [];
+let responseStatus = 200;
 const server = createServer((req, res) => {
   requests.push({ url: req.url, ifNoneMatch: req.headers['if-none-match'] ?? null });
+  if (responseStatus !== 200) {
+    res.writeHead(responseStatus);
+    res.end('unavailable');
+    return;
+  }
   res.setHeader('ETag', ETAG);
   if (req.headers['if-none-match'] === ETAG) {
     res.writeHead(304);
@@ -103,12 +109,12 @@ async function launch() {
 /** The main process schedules its first check 45s out; use the manual action now. */
 async function refresh(page) {
   const before = requests.length;
-  await page.evaluate(() => window.nodus.refreshNotifications());
+  const snapshot = await page.evaluate(() => window.nodus.refreshNotifications());
   const deadline = Date.now() + 15_000;
   while (Date.now() < deadline && requests.length === before) {
     await new Promise((resolve) => setTimeout(resolve, 200));
   }
-  return requests.length > before;
+  return { requested: requests.length > before, snapshot };
 }
 
 let app;
@@ -117,8 +123,9 @@ try {
   let page = await app.firstWindow();
 
   // ── 1. The first check downloads and stores the list ───────────────────────
-  const gotFirst = await refresh(page);
-  assert.ok(gotFirst, 'the app must ask for the announcements file');
+  const first = await refresh(page);
+  assert.ok(first.requested, 'the app must ask for the announcements file');
+  assert.equal(first.snapshot.refresh.status, 'updated');
   assert.equal(requests[0].ifNoneMatch, null, 'the first request carries no validator');
   console.log(`[announcements] first request: ${requests[0].url} (no If-None-Match)`);
 
@@ -154,6 +161,10 @@ try {
     await new Promise((resolve) => setTimeout(resolve, 100));
   }
   assert.ok(requests.length > requestsBeforeButton, 'the header refresh icon must perform a real announcement check');
+  const refreshStatus = panel.getByTestId('header-notifications-refresh-status');
+  await refreshStatus.waitFor({ timeout: 5_000 });
+  assert.equal(await refreshStatus.getAttribute('data-status'), 'not-modified');
+  assert.equal((await refreshStatus.innerText()).trim(), 'Sin novedades.');
   await panel.getByRole('button', { name: 'Limpiar' }).evaluate((button) => button.click());
   const confirmation = page.getByRole('dialog', { name: 'Limpiar notificaciones' });
   await confirmation.waitFor({ timeout: 5_000 });
@@ -166,6 +177,14 @@ try {
   const second = requests[requests.length - 1];
   assert.equal(second.ifNoneMatch, ETAG, 'the second request must replay the ETag');
   console.log(`[announcements] second request sent If-None-Match: ${second.ifNoneMatch} → 304, no body`);
+
+  // A failed manual check is observable and must retain the last known-good payload.
+  responseStatus = 503;
+  const failed = await page.evaluate(() => window.nodus.refreshNotifications());
+  assert.equal(failed.refresh.status, 'error');
+  assert.equal(failed.announcements.length, 2, 'a failed refresh must retain cached announcements');
+  responseStatus = 200;
+  console.log('[announcements] a failed refresh reports error and preserves the last good list');
 
   // ── 3. Reading is per notice, and it persists across a restart ─────────────
   const afterRead = await page.evaluate(() => window.nodus.markAnnouncementRead('live-notice'));
@@ -193,7 +212,8 @@ try {
   // ── 5. Turned off means no request at all ─────────────────────────────────
   await page.evaluate(() => window.nodus.updateSettings({ announcementsEnabled: false }));
   requests = [];
-  await page.evaluate(() => window.nodus.updateSettings({ announcementsEnabled: false }));
+  const disabled = await page.evaluate(() => window.nodus.refreshNotifications());
+  assert.equal(disabled.refresh.status, 'disabled');
   await new Promise((resolve) => setTimeout(resolve, 4_000));
   assert.deepEqual(requests, [], `the setting is off, so nothing may be requested (got ${requests.length})`);
   // Turning it off stops the asking and does not resurrect notices dismissed earlier.

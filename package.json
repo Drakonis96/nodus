@@ -1,6 +1,6 @@
 {
   "name": "nodus",
-  "version": "4.1.0",
+  "version": "4.1.6",
   "description": "Local-first desktop app that turns a Zotero library into a navigable graph of ideas and authors.",
   "author": "Nodus",
   "license": "AGPL-3.0-only",
@@ -9,8 +9,12 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "npm run typecheck && vite build",
+    "build": "npm run build:cloudflare && npm run typecheck && vite build",
+    "build:cloudflare": "node scripts/build-cloudflare-worker.mjs",
     "test": "node --test scripts/test-*.mjs",
+    "test:cloudflare": "node --test scripts/test-cloudflare-contract.mjs",
+    "blog:feed": "node scripts/build-blog-feed.mjs",
+    "site:sitemap": "node scripts/build-sitemap.mjs",
     "citation:sync": "node scripts/sync-citation.mjs",
     "citation:check": "node scripts/sync-citation.mjs --check",
     "release:verify-source": "node scripts/verify-source-offer.mjs",
@@ -19,6 +23,7 @@
     "test:e2e:saved-authors": "node scripts/e2e-saved-authors.mjs",
     "test:e2e:deep-research-annotations": "npm run build && node scripts/e2e-deep-research-annotations.mjs",
     "test:e2e:library-reader": "npm run build && node scripts/e2e-library-reader.mjs",
+    "test:e2e:view-snapshots": "npm run build && node scripts/e2e-view-snapshots.mjs",
     "test:e2e:global-library": "npm run build && node scripts/e2e-global-library.mjs",
     "test:e2e:browser-connector": "node scripts/e2e-browser-connector.mjs",
     "test:e2e:office-references": "node scripts/e2e-office-references.mjs",
@@ -223,6 +228,10 @@
           "!data/**/*",
           "!.env"
         ]
+      },
+      {
+        "from": "cloudflare/dist",
+        "to": "nodus-cloudflare"
       }
     ],
     "files": [

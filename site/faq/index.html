@@ -1,0 +1,114 @@
+<!--
+SPDX-FileCopyrightText: 2026 Jorge Pérez Burgueño and Nodus contributors
+SPDX-License-Identifier: AGPL-3.0-only
+-->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Nodus FAQ — questions before you begin</title>
+<meta name="description" content="Clear answers about Nodus: what to expect and what not to, how to get started safely, choosing an AI setup, citations and academic rigour, and what the app can and cannot do."/>
+<meta property="og:title" content="Nodus FAQ — questions before you begin"/>
+<meta property="og:description" content="Nodus, AI and academic rigour: the essentials, answered."/>
+<meta property="og:url" content="https://nodusresearch.com/faq/"/>
+<link rel="canonical" href="https://nodusresearch.com/faq/"/>
+<link rel="icon" href="../favicon.ico" sizes="any"/>
+  <link rel="icon" type="image/png" href="../favicon.png" sizes="512x512"/>
+  <link rel="icon" type="image/svg+xml" href="../assets/nodus-logo.svg"/>
+  <link rel="apple-touch-icon" href="../apple-touch-icon.png"/>
+<link rel="preload" as="font" type="font/woff2" href="../assets/fonts/inter-latin.woff2" crossorigin/>
+<link rel="preload" as="font" type="font/woff2" href="../assets/fonts/fraunces-latin.woff2" crossorigin/>
+<link rel="stylesheet" href="../assets/css/nodus.css?v=20260818c"/>
+<link rel="stylesheet" href="faq.css?v=20260815"/>
+</head>
+<body>
+
+<a class="skip-link" href="#main">Skip to the questions</a>
+<canvas id="organism" aria-hidden="true"></canvas>
+
+<div data-nodus-site-header data-base="../" data-page="faq"></div>
+<script defer src="../site-header.js?v=20260818c"></script>
+
+<main id="main" data-accent="#22d3ee" data-second="#a78bfa" data-energy="0.26">
+  <header class="page-hero">
+    <div class="wrap">
+      <div class="scrim" style="max-width:760px">
+        <span class="kicker">Questions before you begin</span>
+        <h1 class="display" data-split>Nodus, AI and academic rigour.</h1>
+        <p class="lead">Clear answers for getting started safely, choosing an AI setup, and understanding what the app can and cannot do. If something is missing, <a href="https://github.com/Drakonis96/nodus/discussions" target="_blank" rel="noopener">ask on GitHub</a>.</p>
+      </div>
+    </div>
+  </header>
+
+  <section style="padding-top:0">
+    <div class="wrap">
+      <div class="filter-bar">
+        <div class="search-wrap">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.4-3.4"/></svg>
+          <input id="faq-search" type="search" autocomplete="off" placeholder="Search the FAQ…" aria-label="Search the FAQ" aria-controls="faq-list"/>
+          <button class="search-clear" id="faq-clear" type="button" aria-label="Clear search" hidden>×</button>
+        </div>
+        <div class="filter-tabs" id="faq-cats" role="toolbar" aria-label="FAQ categories"></div>
+      </div>
+
+      <p class="result-meta" id="faq-meta" role="status" aria-live="polite"></p>
+      <div class="faq-list" id="faq-list"></div>
+      <div class="empty-state" id="faq-empty" hidden>
+        <b>No questions match that search.</b>
+        Try a provider name, “embeddings”, “citations” or “local AI”.
+      </div>
+
+      <aside class="faq-more">
+        <h2>Still stuck?</h2>
+        <p>The Wiki documents every vault and view in full. For anything else, the discussions board is the fastest way to reach a human.</p>
+        <div class="faq-more-links">
+          <a class="btn" href="../wiki/">Read the Wiki</a>
+          <a class="btn" href="https://github.com/Drakonis96/nodus/discussions" target="_blank" rel="noopener">Ask a question</a>
+          <a class="btn" href="https://github.com/Drakonis96/nodus/issues/new/choose" target="_blank" rel="noopener">Report a bug</a>
+        </div>
+      </aside>
+    </div>
+  </section>
+</main>
+
+<footer class="site-foot">
+  <div class="wrap">
+    <div class="foot-grid">
+      <div class="foot-brand">
+        <span class="logo"><img src="../assets/nodus-logo.svg" alt=""/> Nodus</span>
+        <p>A free, open-source, local-first workspace for research, teaching and study.</p>
+      </div>
+      <div class="foot-col">
+        <h3>Product</h3>
+        <a href="../index.html#vaults">The four vaults</a>
+        <a href="../index.html#tools">Nodus Toolkit</a>
+        <a href="../demo/index.html">Live demos</a>
+      </div>
+      <div class="foot-col">
+        <h3>Learn</h3>
+        <a href="../wiki/">Wiki</a>
+        <a href="../blog/">Blog</a>
+        <a href="./">FAQ</a>
+      </div>
+      <div class="foot-col">
+        <h3>Project</h3>
+        <a href="../contribute/">Contribute</a>
+        <a href="https://github.com/Drakonis96/nodus" target="_blank" rel="noopener">GitHub</a>
+        <a href="https://github.com/Drakonis96/nodus/releases" target="_blank" rel="noopener">Releases</a>
+      </div>
+    </div>
+    <div class="foot-base">
+      <span>© 2026 Jorge Pérez Burgueño and Nodus contributors.</span>
+      <a href="https://github.com/Drakonis96/nodus/blob/main/LICENSE" target="_blank" rel="noopener">AGPL-3.0-only</a>
+    </div>
+  </div>
+</footer>
+
+<script src="../assets/js/organism.js?v=20260818c"></script>
+<script src="../assets/js/site.js?v=20260815"></script>
+<script src="faq-data.js?v=20260815"></script>
+<script src="faq.js?v=20260815"></script>
+<script src="../assets/js/back-to-top.js?v=20260817b"></script>
+</body>
+</html>

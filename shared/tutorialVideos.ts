@@ -766,7 +766,7 @@ export function tutorialVideoShelves(
 // remote CSS value in a `style` attribute could fetch a remote image and undo the
 // promise that an unopened grid makes no requests.
 
-export const TUTORIAL_CATALOGUE_URL = 'https://drakonis96.github.io/nodus/tutorials.json';
+export const TUTORIAL_CATALOGUE_URL = 'https://nodusresearch.com/tutorials.json';
 
 const YOUTUBE_ID_SHAPE = /^[A-Za-z0-9_-]{11}$/;
 const SLUG_SHAPE = /^[a-z0-9][a-z0-9-]{0,39}$/;

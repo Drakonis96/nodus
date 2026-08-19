@@ -2,6 +2,103 @@
   "version": 1,
   "notices": [
     {
+      "id": "2026-08-nodusresearch-website",
+      "date": "2026-08-16",
+      "severity": "info",
+      "url": "https://nodusresearch.com/",
+      "copy": {
+        "es": {
+          "title": "Nodus estrena nueva web",
+          "body": "La web de Nodus tiene una nueva dirección: nodusresearch.com. Reúne la wiki, los tutoriales, el blog y las demos interactivas en un mismo sitio.",
+          "linkLabel": "Visitar nodusresearch.com"
+        },
+        "en": {
+          "title": "Nodus has a new website",
+          "body": "The Nodus website has a new address: nodusresearch.com. It brings the wiki, tutorials, blog, and interactive demos together in one place.",
+          "linkLabel": "Visit nodusresearch.com"
+        },
+        "fr": {
+          "title": "Nodus a un nouveau site web",
+          "body": "Le site web de Nodus a une nouvelle adresse : nodusresearch.com. Il réunit le wiki, les tutoriels, le blog et les démos interactives au même endroit.",
+          "linkLabel": "Visiter nodusresearch.com"
+        },
+        "de": {
+          "title": "Nodus hat eine neue Website",
+          "body": "Die Nodus-Website hat eine neue Adresse: nodusresearch.com. Dort sind Wiki, Tutorials, Blog und interaktive Demos an einem Ort vereint.",
+          "linkLabel": "nodusresearch.com besuchen"
+        },
+        "pt": {
+          "title": "O Nodus estreia um novo site",
+          "body": "O site do Nodus tem um novo endereço: nodusresearch.com. Reúne a wiki, os tutoriais, o blogue e as demonstrações interativas num só lugar.",
+          "linkLabel": "Visitar nodusresearch.com"
+        },
+        "pt-BR": {
+          "title": "O Nodus está de site novo",
+          "body": "O site do Nodus tem um novo endereço: nodusresearch.com. Ele reúne a wiki, os tutoriais, o blog e as demonstrações interativas em um só lugar.",
+          "linkLabel": "Visitar nodusresearch.com"
+        },
+        "it": {
+          "title": "Nodus ha un nuovo sito",
+          "body": "Il sito di Nodus ha un nuovo indirizzo: nodusresearch.com. Riunisce wiki, tutorial, blog e demo interattive in un unico posto.",
+          "linkLabel": "Visita nodusresearch.com"
+        },
+        "tr": {
+          "title": "Nodus’un yeni web sitesi yayında",
+          "body": "Nodus web sitesinin yeni adresi nodusresearch.com. Wiki, eğitim içerikleri, blog ve etkileşimli demolar artık tek bir yerde.",
+          "linkLabel": "nodusresearch.com adresini ziyaret et"
+        }
+      }
+    },
+    {
+      "id": "2026-08-nodus-connector-for-chrome",
+      "date": "2026-08-14",
+      "severity": "info",
+      "url": "https://chromewebstore.google.com/detail/nodus-connector/ilcclajjhofhieoljdjmikmfopfbamej",
+      "minVersion": "4.1.0",
+      "copy": {
+        "es": {
+          "title": "Nodus Connector para Chrome, ya en la Chrome Web Store",
+          "body": "Nodus Connector para Chrome captura en la Biblioteca local la página o el documento académico que tengas abierto. Detecta los metadatos bibliográficos incrustados, el DOI o el ISBN y los archivos disponibles, y te deja elegir una colección anidada de Nodus y etiquetas existentes o nuevas antes de guardar. Solo lee la pestaña activa después de pulsar su icono en la barra de herramientas.",
+          "linkLabel": "Instalar desde la Chrome Web Store"
+        },
+        "en": {
+          "title": "Nodus Connector for Chrome, now on the Chrome Web Store",
+          "body": "Nodus Connector for Chrome captures the open academic page or document into the local Library. It detects embedded bibliographic metadata, DOI/ISBN and available files, then lets the user choose a nested Nodus collection and existing or new tags before saving. It reads the active tab only after its toolbar icon is clicked.",
+          "linkLabel": "Install from the Chrome Web Store"
+        },
+        "fr": {
+          "title": "Nodus Connector pour Chrome, disponible sur le Chrome Web Store",
+          "body": "Nodus Connector pour Chrome enregistre dans la Bibliothèque locale la page ou le document universitaire ouvert. Il détecte les métadonnées bibliographiques intégrées, le DOI ou l’ISBN et les fichiers disponibles, puis vous laisse choisir une collection Nodus imbriquée ainsi que des étiquettes existantes ou nouvelles avant l’enregistrement. Il ne lit l’onglet actif qu’après un clic sur son icône dans la barre d’outils.",
+          "linkLabel": "Installer depuis le Chrome Web Store"
+        },
+        "de": {
+          "title": "Nodus Connector für Chrome, jetzt im Chrome Web Store",
+          "body": "Nodus Connector für Chrome speichert die geöffnete wissenschaftliche Seite oder das geöffnete Dokument in der lokalen Bibliothek. Er erkennt eingebettete bibliografische Metadaten, DOI/ISBN und verfügbare Dateien und lässt dich vor dem Speichern eine verschachtelte Nodus-Sammlung sowie vorhandene oder neue Schlagwörter wählen. Den aktiven Tab liest er erst, nachdem sein Symbol in der Symbolleiste angeklickt wurde.",
+          "linkLabel": "Im Chrome Web Store installieren"
+        },
+        "pt": {
+          "title": "Nodus Connector para Chrome, já na Chrome Web Store",
+          "body": "O Nodus Connector para Chrome guarda na Biblioteca local a página ou o documento académico que tens aberto. Deteta os metadados bibliográficos incorporados, o DOI ou o ISBN e os ficheiros disponíveis e permite escolher uma coleção aninhada do Nodus e etiquetas existentes ou novas antes de guardar. Só lê o separador ativo depois de clicares no seu ícone na barra de ferramentas.",
+          "linkLabel": "Instalar a partir da Chrome Web Store"
+        },
+        "pt-BR": {
+          "title": "Nodus Connector para Chrome, já na Chrome Web Store",
+          "body": "O Nodus Connector para Chrome salva na Biblioteca local a página ou o documento acadêmico que você tem aberto. Ele detecta os metadados bibliográficos incorporados, o DOI ou o ISBN e os arquivos disponíveis e permite escolher uma coleção aninhada do Nodus e tags existentes ou novas antes de salvar. Ele só lê a aba ativa depois que você clica no seu ícone na barra de ferramentas.",
+          "linkLabel": "Instalar na Chrome Web Store"
+        },
+        "it": {
+          "title": "Nodus Connector per Chrome, ora sul Chrome Web Store",
+          "body": "Nodus Connector per Chrome salva nella Biblioteca locale la pagina o il documento accademico che hai aperto. Rileva i metadati bibliografici incorporati, il DOI o l’ISBN e i file disponibili, poi ti lascia scegliere una raccolta annidata di Nodus e tag esistenti o nuovi prima di salvare. Legge la scheda attiva solo dopo che ne è stata premuta l’icona nella barra degli strumenti.",
+          "linkLabel": "Installa dal Chrome Web Store"
+        },
+        "tr": {
+          "title": "Chrome için Nodus Connector artık Chrome Web Mağazası’nda",
+          "body": "Chrome için Nodus Connector, açık olan akademik sayfayı veya belgeyi yerel Kitaplığa kaydeder. Gömülü bibliyografik üstverileri, DOI/ISBN bilgisini ve mevcut dosyaları algılar; kaydetmeden önce iç içe bir Nodus koleksiyonu ile var olan veya yeni etiketleri seçmene izin verir. Etkin sekmeyi yalnızca araç çubuğundaki simgesine tıklandıktan sonra okur.",
+          "linkLabel": "Chrome Web Mağazası’ndan yükle"
+        }
+      }
+    },
+    {
       "id": "2026-08-nodus-4-agpl-license",
       "date": "2026-08-13",
       "severity": "warning",

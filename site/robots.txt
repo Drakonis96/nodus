@@ -1,0 +1,7 @@
+# robots.txt for https://nodusresearch.com/
+# All site pages may be crawled and indexed.
+
+User-agent: *
+Allow: /
+
+Sitemap: https://nodusresearch.com/sitemap.xml

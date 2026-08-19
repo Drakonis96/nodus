@@ -1,3 +1,8 @@
+/* RETAINED, CURRENTLY UNUSED.
+ * Translation packs for the previous twelve-language landing page. The site was
+ * rebuilt in English only (August 2026) and no page loads this file. It is kept
+ * so the translations are not lost when the site is localised again.
+ */
 /* Generated completion packs for every language offered by the landing page.
  * The coverage test in scripts/test-site-i18n-coverage.mjs keeps this file in sync
  * with both site/index.html and site/faq.js.

@@ -11,12 +11,14 @@
 
   function lang() {
     try {
+      // the page's own language wins: the site is authored in one language, and a
+      // stale nodus.lang from an earlier visit must not make Nodi speak another
+      var d = (document.documentElement.lang || '').slice(0, 2).toLowerCase();
+      if (LINES[d]) return d;
       var s = localStorage.getItem('nodus.lang');
       if (s && LINES[s]) return s;
       var sb = (s || '').slice(0, 2).toLowerCase();
       if (LINES[sb]) return sb;
-      var d = (document.documentElement.lang || '').slice(0, 2).toLowerCase();
-      if (LINES[d]) return d;
       var n = (navigator.language || 'en').slice(0, 2);
       if (LINES[n]) return n;
     } catch (e) {}

@@ -23,8 +23,8 @@ try {
   const repo = require(path.join(repoRoot, 'electron/db/databasesRepo.ts'));
   const pages = require(path.join(repoRoot, 'shared/pages.ts'));
 
-  // A genuine v142 vault receives one source per database and one primary link per view.
-  const historical = new Database(path.join(root, 'historical-v142.sqlite')); migrateThrough(historical, migrations, 142);
+  // A genuine v143 vault receives one source per database and one primary link per view.
+  const historical = new Database(path.join(root, 'historical-v143.sqlite')); migrateThrough(historical, migrations, 143);
   const timestamp = '2026-08-14T08:00:00.000Z';
   historical.prepare(`INSERT INTO db_databases (id, short_id, name, icon, position, created_at, updated_at, revision, created_by, updated_by)
     VALUES ('legacy-db', 'DB-LEGACY', 'Legado', NULL, 0, ?, ?, 4, 'alice', 'alice')`).run(timestamp, timestamp);

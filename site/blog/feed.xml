@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<?xml-stylesheet type="text/xsl" href="feed.xsl"?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>Nodus Blog</title>
+    <link>https://nodusresearch.com/blog/</link>
+    <atom:link href="https://nodusresearch.com/blog/feed.xml" rel="self" type="application/rss+xml"/>
+    <description>Notes from the Nodus project: comparisons with the tools around it, workflows worth stealing, and what is being built next.</description>
+    <language>en</language>
+    <lastBuildDate>Mon, 17 Aug 2026 12:00:00 GMT</lastBuildDate>
+    <item>
+      <title>How Nodus can support research in the humanities</title>
+      <link>https://nodusresearch.com/blog/post.html?p=how-nodus-can-support-research-in-the-humanities</link>
+      <guid isPermaLink="true">https://nodusresearch.com/blog/post.html?p=how-nodus-can-support-research-in-the-humanities</guid>
+      <pubDate>Mon, 17 Aug 2026 12:00:00 GMT</pubDate>
+      <description>Humanities projects rarely fit one tool: books, archival documents, photographs, interviews and datasets all belong to the same argument. Nodus keeps them in one local-first workspace, with every finding still attached to its source.</description>
+      <category>Humanities</category>
+      <category>Digital Humanities</category>
+      <category>Archives</category>
+      <category>Research</category>
+      <category>AI</category>
+    </item>
+    <item>
+      <title>How to Organize a Large Academic Research Library</title>
+      <link>https://nodusresearch.com/blog/post.html?p=how-to-organize-a-large-academic-research-library</link>
+      <guid isPermaLink="true">https://nodusresearch.com/blog/post.html?p=how-to-organize-a-large-academic-research-library</guid>
+      <pubDate>Sun, 16 Aug 2026 12:00:00 GMT</pubDate>
+      <description>Once a project grows to hundreds of sources, the hard part is no longer storage but context: knowing why a source was collected and how it connects to your ideas.</description>
+      <category>Research</category>
+      <category>Workflows</category>
+      <category>AI</category>
+    </item>
+    <item>
+      <title>Nodus: an open source research workspace for academic work</title>
+      <link>https://nodusresearch.com/blog/post.html?p=nodus-open-source-research-workspace</link>
+      <guid isPermaLink="true">https://nodusresearch.com/blog/post.html?p=nodus-open-source-research-workspace</guid>
+      <pubDate>Sun, 16 Aug 2026 12:00:00 GMT</pubDate>
+      <description>Research is spread across reference managers, PDF folders, note apps and chatbots. Nodus keeps sources, ideas and the evidence behind them in one local-first workspace.</description>
+      <category>Project</category>
+      <category>Research</category>
+      <category>AI</category>
+    </item>
+  </channel>
+</rss>

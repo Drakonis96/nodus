@@ -15,6 +15,19 @@ import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+
+test('vendor subscription runtimes have explicit bounded lifecycles', () => {
+  const codex = fs.readFileSync(path.join(repoRoot, 'electron/ai/codexAppServerClient.ts'), 'utf8');
+  const copilot = fs.readFileSync(path.join(repoRoot, 'electron/ai/githubCopilotSubscription.ts'), 'utf8');
+  const main = fs.readFileSync(path.join(repoRoot, 'electron/main.ts'), 'utf8');
+  assert.match(codex, /idleTimeoutMs \?\? 5 \* 60_000/);
+  assert.match(codex, /maxLifetimeMs \?\? 30 \* 60_000/);
+  assert.match(codex, /this\.killNow\(\)/, 'the Codex lifetime ceiling also terminates a wedged request');
+  assert.match(copilot, /COPILOT_IDLE_TIMEOUT_MS = 2 \* 60_000/);
+  assert.match(copilot, /COPILOT_MAX_LIFETIME_MS = 30 \* 60_000/);
+  assert.match(copilot, /forceStopClient\(\)/, 'the Copilot lifetime ceiling reaches the SDK SIGKILL path');
+  assert.match(main, /killGitHubCopilotSubscriptionServer\(\)/);
+});
 const outDir = fs.mkdtempSync(path.join(os.tmpdir(), 'nodus-subscription-failures-'));
 const bundle = path.join(outDir, 'failure-paths.cjs');
 const entry = path.join(outDir, 'entry.ts');
