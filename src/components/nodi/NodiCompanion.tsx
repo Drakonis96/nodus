@@ -539,6 +539,17 @@ export function NodiCompanion({ context, costumes }: { context: Ctx; costumes?: 
     };
   }, [hasOpenSurface, isOverlay]);
 
+  // The in-window companion shares the same native stacking constraint as every
+  // other React overlay: a browser WebContentsView would otherwise cover Nodi's
+  // chat after an Ask action. The standalone companion is another native window
+  // and needs no visibility change.
+  useEffect(() => {
+    if (isOverlay) return;
+    if (hasOpenSurface) void window.nodus.setBrowserOverlayVisible(true);
+    else void window.nodus.setBrowserOverlayVisible(false);
+    return () => { void window.nodus.setBrowserOverlayVisible(false); };
+  }, [hasOpenSurface, isOverlay]);
+
   // ── Auto-scroll chat ──────────────────────────────────────────────────────
   useEffect(() => {
     if (panel === 'chat' && msgsRef.current) msgsRef.current.scrollTop = msgsRef.current.scrollHeight;

@@ -181,12 +181,20 @@ export function NodusBrowserView() {
 
   const askNodi = async (about: 'page' | 'selection') => {
     setPanel(null);
-    const ok = about === 'page'
-      ? await window.nodus.askNodiAboutBrowserPage()
-      : await window.nodus.askNodiAboutBrowserSelection();
-    setNotice(ok
-      ? (about === 'page' ? t('Nodi ya tiene esta página como contexto.') : t('Nodi ya tiene la selección.'))
-      : t('No había nada que enviar.'));
+    try {
+      // Match quoting from readers: an explicit Ask action is also permission
+      // to bring Nodi back when the companion is currently disabled.
+      const settings = await window.nodus.getSettings();
+      if (!settings.mascotEnabled) await window.nodus.updateSettings({ mascotEnabled: true });
+      const ok = about === 'page'
+        ? await window.nodus.askNodiAboutBrowserPage()
+        : await window.nodus.askNodiAboutBrowserSelection();
+      setNotice(ok
+        ? (about === 'page' ? t('Nodi ya tiene esta página como contexto.') : t('Nodi ya tiene la selección.'))
+        : t('No había nada que enviar.'));
+    } catch (cause) {
+      setNotice(cause instanceof Error ? cause.message : String(cause));
+    }
   };
 
   return (

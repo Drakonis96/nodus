@@ -409,6 +409,35 @@ try {
     assert.match(context.text, new RegExp(origin.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')), 'the active URL must be present');
   });
 
+  await check('both browser Ask Nodi buttons open chat with the requested context', async () => {
+    await page.getByRole('button', { name: 'Acciones de Nodus', exact: true }).click();
+    await page.getByRole('button', { name: 'Preguntar a Nodi sobre esta página', exact: true }).click();
+    const chat = page.locator('.nodi-chat-panel');
+    await chat.waitFor({ state: 'visible' });
+    assert.match(await chat.locator('.nodi-chat-quote').innerText(), /Fixture home/);
+    assert.match(await chat.locator('.nodi-chat-quote').innerText(), new RegExp(origin.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
+    await chat.getByRole('button', { name: 'Cerrar', exact: true }).click();
+
+    await app.evaluate(async ({ webContents }) => {
+      const target = webContents.getAllWebContents().find((contents) => contents.getURL().startsWith('http://127.0.0.1'));
+      if (!target) throw new Error('browser fixture missing');
+      await target.executeJavaScript(`
+        (() => {
+          const range = document.createRange();
+          range.selectNodeContents(document.querySelector('h1'));
+          const selection = getSelection();
+          selection.removeAllRanges();
+          selection.addRange(range);
+        })()
+      `, true);
+    });
+    await page.getByRole('button', { name: 'Acciones de Nodus', exact: true }).click();
+    await page.getByRole('button', { name: 'Preguntar a Nodi sobre la selección', exact: true }).click();
+    await chat.waitFor({ state: 'visible' });
+    assert.equal((await chat.locator('.nodi-chat-quote').innerText()).trim(), 'Fixture home');
+    await chat.getByRole('button', { name: 'Cerrar', exact: true }).click();
+  });
+
   await check('cookies and localStorage written by a page really persist', async () => {
     await call('submitBrowserOmnibox', `${origin}/storage`);
     await waitFor((s) => s.tabs.some((t) => t.url.endsWith('/storage') && !t.loading), 'the storage page');

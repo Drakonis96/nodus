@@ -128,6 +128,18 @@ export function registerBrowserIpc({ h, getWindow }: IpcContext): void {
     window.webContents.send('browser:downloads', browserDownloads());
   };
 
+  const quoteToEveryNodi = (text: string): boolean => {
+    const selection = setNodiQuoteSelection(text);
+    if (!selection) return false;
+    // Nodi may live inside the app or in its independent always-on-top window.
+    // Sending only to the main renderer made browser actions look inert whenever
+    // the user had chosen the floating companion.
+    for (const window of BrowserWindow.getAllWindows()) {
+      if (!window.isDestroyed()) window.webContents.send('nodi:quoteSelection', selection);
+    }
+    return true;
+  };
+
   let wired = false;
   const ensureWired = () => {
     if (wired) return;
@@ -136,11 +148,7 @@ export function registerBrowserIpc({ h, getWindow }: IpcContext): void {
     initBrowserTabs(window, broadcast, {
       openInNewTab: (url) => { void createTab(url); },
       quoteToNodi: (text) => {
-        const selection = setNodiQuoteSelection(text);
-        const target = getWindow();
-        if (selection && target && !target.isDestroyed()) {
-          target.webContents.send('nodi:quoteSelection', selection);
-        }
+        quoteToEveryNodi(text);
       },
       // Both of these are the same work the toolbar menu does; the renderer owns
       // the modal, so the context menu asks it to open rather than duplicating it.
@@ -363,7 +371,10 @@ export function registerBrowserIpc({ h, getWindow }: IpcContext): void {
    */
   h('browser:askNodiAboutPage', async (event) => {
     assertUiSender(event, getWindow);
-    return syncActiveBrowserNodiContext();
+    if (!await syncActiveBrowserNodiContext()) return false;
+    const tab = activeTabSummary();
+    const reference = [tab?.title, tab?.url].map((value) => String(value ?? '').trim()).filter(Boolean).join('\n');
+    return quoteToEveryNodi(reference || 'Nodus Browser');
   });
 
   h('browser:downloads', async (event) => {
@@ -438,12 +449,6 @@ export function registerBrowserIpc({ h, getWindow }: IpcContext): void {
     assertUiSender(event, getWindow);
     const collected = await collectFromTab('selection');
     const text = String(((collected ?? {}) as { text?: unknown }).text ?? '');
-    if (!text.trim()) return false;
-    const selection = setNodiQuoteSelection(text);
-    const window = getWindow();
-    if (selection && window && !window.isDestroyed()) {
-      window.webContents.send('nodi:quoteSelection', selection);
-    }
-    return Boolean(selection);
+    return quoteToEveryNodi(text);
   });
 }
