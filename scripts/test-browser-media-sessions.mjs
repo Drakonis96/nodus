@@ -8,7 +8,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { createRequire } from 'node:module';
@@ -152,6 +152,29 @@ test('previous/next are commands, not guessed capability flags in the state', ()
   // inventing capability flags.
   assert.equal('canPrevious' in state, false);
   assert.equal('canNext' in state, false);
+});
+
+test('media controls do not restart the popover effect or blink the volume slider', () => {
+  const source = readFileSync(path.join(repoRoot, 'src/components/browser/BrowserMedia.tsx'), 'utf8');
+  const popover = source.slice(source.indexOf('export function BrowserMediaPopover'), source.indexOf('function MediaRow'));
+  assert.match(popover, /const onCloseRef = useRef\(onClose\)/,
+    'the changing close callback must be read through a stable ref');
+  assert.match(popover, /onCloseRef\.current\(\)/);
+  assert.match(popover, /}, \[anchorEl\]\);/,
+    'only opening or closing the popover may restart its volume/overlay effect');
+  assert.doesNotMatch(popover, /setDeviceVolumeReady\(false\);[\s\S]{0,120}getBrowserDeviceVolume/,
+    'an ordinary media update must not disable the already-ready slider');
+});
+
+test('mute keeps normal contrast and replaces volume with a crossed-out icon', () => {
+  const source = readFileSync(path.join(repoRoot, 'src/components/browser/BrowserMedia.tsx'), 'utf8');
+  const row = source.slice(source.indexOf('function MediaRow'));
+  assert.match(row, /aria-pressed=\{state\.muted\}/);
+  assert.match(row, /state\.muted \? 'volumeOff' : 'volume'/);
+  assert.doesNotMatch(row, /state\.muted \? 'text-neutral-600'/,
+    'mute must not be represented only by dimming the same icon');
+  const icons = readFileSync(path.join(repoRoot, 'src/components/ui.tsx'), 'utf8');
+  assert.match(icons, /volumeOff:[^\n]*<line x1="3" y1="3" x2="21" y2="21"\/>/);
 });
 
 test('the internal timer handle never crosses to the renderer', () => {

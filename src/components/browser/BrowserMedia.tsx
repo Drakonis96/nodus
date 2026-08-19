@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { Icon } from '../ui';
 import { t } from '../../i18n';
@@ -62,24 +62,28 @@ export function BrowserMediaPopover({
   const states = useBrowserMedia();
   const [deviceVolume, setDeviceVolume] = useState(50);
   const [deviceVolumeReady, setDeviceVolumeReady] = useState(false);
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
 
   useEffect(() => {
     if (!anchorEl) return;
     void window.nodus.setBrowserOverlayVisible(true);
-    setDeviceVolumeReady(false);
     void window.nodus.getBrowserDeviceVolume()
       .then((volume) => {
         setDeviceVolume(Math.max(0, Math.min(100, Math.round(volume))));
         setDeviceVolumeReady(true);
       })
       .catch(() => setDeviceVolumeReady(false));
-    const onKey = (event: KeyboardEvent) => { if (event.key === 'Escape') onClose(); };
+    const onKey = (event: KeyboardEvent) => { if (event.key === 'Escape') onCloseRef.current(); };
     window.addEventListener('keydown', onKey);
     return () => {
       window.removeEventListener('keydown', onKey);
       void window.nodus.setBrowserOverlayVisible(false);
     };
-  }, [anchorEl, onClose]);
+    // Media-state updates recreate the callback supplied by the header. They
+    // must not restart this effect: doing so briefly disabled and repainted the
+    // volume slider after Pause, Previous, Next or Mute.
+  }, [anchorEl]);
 
   if (!anchorEl || states.length === 0) return null;
   const rect = anchorEl.getBoundingClientRect();
@@ -181,12 +185,14 @@ function MediaRow({
 
       <button
         type="button"
+        data-testid="browser-media-mute"
+        aria-pressed={state.muted}
         aria-label={state.muted ? t('Activar sonido') : t('Silenciar')}
         title={state.muted ? t('Activar sonido') : t('Silenciar')}
-        className={`shrink-0 rounded p-1 hover:bg-neutral-700 ${state.muted ? 'text-neutral-600' : 'text-neutral-300'}`}
+        className="shrink-0 rounded p-1 text-neutral-300 hover:bg-neutral-700"
         onClick={() => void window.nodus.setBrowserTabMuted(state.tabId, !state.muted)}
       >
-        <Icon name="volume" size={14} />
+        <Icon name={state.muted ? 'volumeOff' : 'volume'} size={14} />
       </button>
     </div>
   );

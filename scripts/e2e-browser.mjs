@@ -931,6 +931,22 @@ try {
     await page.getByTestId('browser-media-header-action').getByRole('button', { name: 'Medios', exact: true }).click();
     const popover = page.getByTestId('browser-media-popover');
     await popover.waitFor({ state: 'visible' });
+    const deviceVolume = page.getByTestId('browser-device-volume').getByRole('slider', { name: 'Volumen' });
+    await deviceVolume.waitFor({ state: 'visible' });
+    await deviceVolume.waitFor({ state: 'attached' });
+    await page.waitForFunction(() => {
+      const slider = document.querySelector('[data-testid="browser-device-volume"] input');
+      return slider instanceof HTMLInputElement && !slider.disabled;
+    });
+    await deviceVolume.evaluate((slider) => {
+      globalThis.__nodusVolumeSlider = slider;
+      globalThis.__nodusVolumeDisabledTransitions = 0;
+      globalThis.__nodusVolumeObserver?.disconnect();
+      globalThis.__nodusVolumeObserver = new MutationObserver(() => {
+        if (slider.disabled) globalThis.__nodusVolumeDisabledTransitions += 1;
+      });
+      globalThis.__nodusVolumeObserver.observe(slider, { attributes: true, attributeFilter: ['disabled'] });
+    });
     const activeMediaTrack = () => app.evaluate(async ({ webContents }) => {
       const target = webContents.getAllWebContents().find((wc) => wc.getURL().endsWith('/media'));
       if (!target) throw new Error('media tab missing');
@@ -953,13 +969,26 @@ try {
     activeTrack = await waitForTrack('a');
     assert.equal(activeTrack, 'a', 'Previous must return to the preceding real media element');
 
-    const deviceVolume = page.getByTestId('browser-device-volume').getByRole('slider', { name: 'Volumen' });
-    await deviceVolume.waitFor({ state: 'visible' });
-    await deviceVolume.waitFor({ state: 'attached' });
-    await page.waitForFunction(() => {
-      const slider = document.querySelector('[data-testid="browser-device-volume"] input');
-      return slider instanceof HTMLInputElement && !slider.disabled;
+    const mute = popover.getByTestId('browser-media-mute').first();
+    await mute.click();
+    await page.waitForFunction(() => document.querySelector('[data-testid="browser-media-mute"]')?.getAttribute('aria-pressed') === 'true');
+    assert.equal(await mute.locator('svg line[x1="3"][y1="3"][x2="21"][y2="21"]').count(), 1,
+      'Mute must replace the volume glyph with its crossed-out variant');
+    await mute.click();
+    await page.waitForFunction(() => document.querySelector('[data-testid="browser-media-mute"]')?.getAttribute('aria-pressed') === 'false');
+
+    const sliderStability = await page.evaluate(() => {
+      const current = document.querySelector('[data-testid="browser-device-volume"] input');
+      const result = {
+        sameElement: current === globalThis.__nodusVolumeSlider,
+        disabledTransitions: globalThis.__nodusVolumeDisabledTransitions,
+        disabled: !(current instanceof HTMLInputElement) || current.disabled,
+      };
+      globalThis.__nodusVolumeObserver?.disconnect();
+      return result;
     });
+    assert.deepEqual(sliderStability, { sameElement: true, disabledTransitions: 0, disabled: false },
+      'Previous, Next and Mute must neither remount nor briefly disable the volume slider');
     const currentVolume = await deviceVolume.inputValue();
     await deviceVolume.fill(currentVolume);
     assert.equal(await deviceVolume.inputValue(), currentVolume);
