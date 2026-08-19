@@ -13,7 +13,7 @@
  */
 
 import { ipcRenderer } from 'electron';
-import type { BrowserState, BrowserViewport } from '@shared/browser';
+import type { BrowserMediaCommand, BrowserState, BrowserViewport } from '@shared/browser';
 import type { OmniboxResolution } from '@shared/browserOmnibox';
 import type {
   BrowserDataCategory, BrowserDownloadView, BrowserMediaState,
@@ -70,7 +70,7 @@ export const browserApi = {
     return () => ipcRenderer.removeListener('browser:permissionRequest', listener);
   },
   getBrowserMedia: (): Promise<BrowserMediaState[]> => ipcRenderer.invoke('browser:media'),
-  browserMediaCommand: (tabId: string, command: 'play' | 'pause' | 'stop'): Promise<void> =>
+  browserMediaCommand: (tabId: string, command: BrowserMediaCommand): Promise<void> =>
     ipcRenderer.invoke('browser:mediaCommand', tabId, command).then(() => undefined),
   setBrowserTabMuted: (tabId: string, muted: boolean): Promise<void> =>
     ipcRenderer.invoke('browser:setTabMuted', tabId, muted).then(() => undefined),

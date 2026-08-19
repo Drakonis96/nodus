@@ -64,15 +64,10 @@ export interface BrowserState {
   activeTabId: string | null;
 }
 
-/**
- * A media session in one tab.
- *
- * `canPrevious`/`canNext` are deliberately ABSENT rather than present-and-false.
- * Neither the Media Session API nor Electron exposes a way to discover whether a
- * page registered `previoustrack`/`nexttrack` handlers — `setActionHandler` has
- * no getter. A field would invite a UI to render controls that cannot work, so
- * adding them later has to be a deliberate, typed change.
- */
+/** Commands the header can send to a browser media session. */
+export type BrowserMediaCommand = 'previous' | 'play' | 'pause' | 'next' | 'stop';
+
+/** A media session in one tab. */
 export interface BrowserMediaState {
   tabId: string;
   /** The media title where the page exposed one, else the page title. */

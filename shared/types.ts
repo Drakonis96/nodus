@@ -7989,7 +7989,7 @@ export interface BrowserApi {
     cb: (request: import('./browser').PendingBrowserPermission | null) => void,
   ): () => void;
   getBrowserMedia(): Promise<import('./browser').BrowserMediaState[]>;
-  browserMediaCommand(tabId: string, command: 'play' | 'pause' | 'stop'): Promise<void>;
+  browserMediaCommand(tabId: string, command: import('./browser').BrowserMediaCommand): Promise<void>;
   setBrowserTabMuted(tabId: string, muted: boolean): Promise<void>;
   onBrowserMediaChanged(cb: (states: import('./browser').BrowserMediaState[]) => void): () => void;
   captureBrowserPage(): Promise<{

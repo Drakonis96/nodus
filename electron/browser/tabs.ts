@@ -22,7 +22,7 @@
 import { ipcMain, WebContentsView, type BaseWindow, type WebContents } from 'electron';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
-import type { BrowserState, BrowserTabError, BrowserTabState, BrowserViewport } from '@shared/browser';
+import type { BrowserMediaCommand, BrowserState, BrowserTabError, BrowserTabState, BrowserViewport } from '@shared/browser';
 import { MAX_BROWSER_TABS } from '@shared/browser';
 import { decideNavigation } from '@shared/browserNavigation';
 import { NODUS_BROWSER_PARTITION, browserSession } from './session';
@@ -485,9 +485,14 @@ export function setTabMuted(id: string, muted: boolean): void {
 }
 
 /** Drive one tab's media from the header. */
-export function sendMediaCommand(id: string, command: 'play' | 'pause' | 'stop'): void {
+export function sendMediaCommand(id: string, command: BrowserMediaCommand): void {
   const tab = tabs.get(id);
   if (!tab || tab.view.webContents.isDestroyed()) return;
+  if (command === 'previous' || command === 'next') {
+    const keyCode = command === 'previous' ? 'MediaPreviousTrack' : 'MediaNextTrack';
+    tab.view.webContents.sendInputEvent({ type: 'keyDown', keyCode });
+    tab.view.webContents.sendInputEvent({ type: 'keyUp', keyCode });
+  }
   tab.view.webContents.send('nodus-browser:page:mediaCommand', command);
 }
 

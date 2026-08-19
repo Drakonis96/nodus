@@ -320,7 +320,7 @@ export function registerBrowserIpc({ h, getWindow }: IpcContext): void {
 
   h('browser:mediaCommand', async (event, tabId: string, command: string) => {
     assertUiSender(event, getWindow);
-    if (command !== 'play' && command !== 'pause' && command !== 'stop') return;
+    if (command !== 'previous' && command !== 'play' && command !== 'pause' && command !== 'next' && command !== 'stop') return;
     sendMediaCommand(String(tabId), command);
   });
 

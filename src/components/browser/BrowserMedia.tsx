@@ -119,12 +119,32 @@ function MediaRow({
 
       <button
         type="button"
+        aria-label={t('Anterior')}
+        title={t('Anterior')}
+        className="shrink-0 rounded p-1 text-neutral-300 hover:bg-neutral-700"
+        onClick={() => void window.nodus.browserMediaCommand(state.tabId, 'previous')}
+      >
+        <Icon name="skipBack" size={14} />
+      </button>
+
+      <button
+        type="button"
         aria-label={state.playing ? t('Pausar') : t('Reproducir')}
         title={state.playing ? t('Pausar') : t('Reproducir')}
         className="shrink-0 rounded p-1 text-neutral-300 hover:bg-neutral-700"
         onClick={() => void window.nodus.browserMediaCommand(state.tabId, state.playing ? 'pause' : 'play')}
       >
         <Icon name={state.playing ? 'pause' : 'play'} size={14} />
+      </button>
+
+      <button
+        type="button"
+        aria-label={t('Siguiente')}
+        title={t('Siguiente')}
+        className="shrink-0 rounded p-1 text-neutral-300 hover:bg-neutral-700"
+        onClick={() => void window.nodus.browserMediaCommand(state.tabId, 'next')}
+      >
+        <Icon name="skipForward" size={14} />
       </button>
 
       <button

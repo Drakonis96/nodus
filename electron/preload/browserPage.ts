@@ -53,6 +53,55 @@ function mediaElements(): MediaEl[] {
   return found ? Array.prototype.slice.call(found) as MediaEl[] : [];
 }
 
+function playMedia(element: MediaEl): void {
+  try {
+    const result = element.play?.();
+    if (result && typeof (result as PromiseLike<unknown>).then === 'function') {
+      void Promise.resolve(result).catch(() => undefined);
+    }
+  } catch {
+    // A page can deny autoplay even for a user-initiated header command.
+  }
+}
+
+/**
+ * Move between concrete media elements when the page exposes an actual list.
+ * Chromium also receives the standard media key from main for players that own
+ * their playlist internally; this DOM fallback makes ordinary multi-track pages
+ * deterministic without guessing at site-specific buttons.
+ */
+function switchMediaElement(command: 'previous' | 'next'): void {
+  const elements = mediaElements();
+  if (elements.length === 0) return;
+  let activeIndex = elements.findIndex((element) => element.paused === false);
+  if (activeIndex < 0) activeIndex = elements.findIndex((element) => Number(element.currentTime) > 0);
+  if (activeIndex < 0) activeIndex = 0;
+
+  if (elements.length === 1) {
+    if (command === 'previous') {
+      try { elements[0].currentTime = 0; } catch { /* live streams refuse this */ }
+      playMedia(elements[0]);
+    }
+    return;
+  }
+
+  const targetIndex = command === 'previous'
+    ? Math.max(0, activeIndex - 1)
+    : Math.min(elements.length - 1, activeIndex + 1);
+  const current = elements[activeIndex];
+  const target = elements[targetIndex];
+  if (target === current) {
+    if (command === 'previous') {
+      try { current.currentTime = 0; } catch { /* live streams refuse this */ }
+      playMedia(current);
+    }
+    return;
+  }
+  try { current.pause?.(); } catch { /* one element must not block the next */ }
+  try { target.currentTime = 0; } catch { /* live streams refuse this */ }
+  playMedia(target);
+}
+
 function kindOf(target: unknown): 'audio' | 'video' | 'unknown' {
   const tag = String((target as MediaEl | null)?.tagName ?? '').toUpperCase();
   return tag === 'VIDEO' ? 'video' : tag === 'AUDIO' ? 'audio' : 'unknown';
@@ -82,6 +131,10 @@ page.document?.addEventListener('ended', (event) => report(event.target, false),
  * no data from the page, so there is nothing here a site can steer.
  */
 ipcRenderer.on('nodus-browser:page:mediaCommand', (_event, command: string) => {
+  if (command === 'previous' || command === 'next') {
+    switchMediaElement(command);
+    return;
+  }
   for (const element of mediaElements()) {
     try {
       if (command === 'play') element.play?.();
