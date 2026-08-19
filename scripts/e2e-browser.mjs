@@ -650,6 +650,48 @@ try {
     assert.ok(authors.includes('Braudel'), `expected Braudel, got ${JSON.stringify(authors)}`);
   });
 
+  await check('the integrated Nodus Connector matches the extension review flow', async () => {
+    const research = await call('createGlobalLibraryCollection', 'Research', null);
+    const archives = await call('createGlobalLibraryCollection', 'Archives', research.id);
+    await call('createGlobalLibraryItem', {
+      title: 'Tag seed', itemType: 'webpage', creators: [], url: `${origin}/`, tags: ['Memory'],
+    }, []);
+
+    await call('submitBrowserOmnibox', `${origin}/paper`);
+    await waitFor((s) => s.tabs.some((tab) => tab.url === `${origin}/paper` && !tab.loading), 'the Connector fixture page');
+    const connectorButton = page.getByTestId('browser-connector-button');
+    await connectorButton.click();
+    const modal = page.getByTestId('browser-capture-modal');
+    await modal.waitFor({ state: 'visible' });
+    await page.getByTestId('browser-connector-capture').waitFor({ state: 'visible' });
+    assert.equal(await page.getByTestId('browser-capture-title').inputValue(), 'Structures of the Longue Durée');
+    assert.equal(await page.getByTestId('browser-connector-type').inputValue(), 'journal-article');
+
+    await page.getByTestId('browser-connector-collection').click();
+    await modal.getByPlaceholder('Buscar colecciones').fill('Research / Archives');
+    await modal.getByRole('option', { name: 'Archives', exact: true }).click();
+    assert.equal(await page.getByTestId('browser-connector-collection').innerText(), 'Archives');
+
+    const tags = page.getByTestId('browser-connector-tags');
+    await tags.fill('Mem');
+    await modal.getByRole('button', { name: /Memory · 1/ }).click();
+    assert.match(await modal.innerText(), /Memory/);
+    const snapshot = modal.getByRole('checkbox').last();
+    assert.equal(await snapshot.isChecked(), true, 'a page without a detected full text defaults to a readable snapshot');
+
+    await page.getByTestId('browser-capture-save').click();
+    await page.getByTestId('browser-connector-success').waitFor({ state: 'visible' });
+    await modal.getByRole('button', { name: 'Abrir en Nodus', exact: true }).click();
+    await modal.waitFor({ state: 'detached' });
+    await page.getByTestId('browser-toolbar').waitFor({ state: 'detached' });
+    // A snapshot plus source URL can open the Library's source chooser. Close
+    // that child overlay before returning through the sidebar.
+    await page.keyboard.press('Escape');
+    await page.locator('[data-tour="nav-browser"]').click();
+    await page.locator('[data-browser-viewport]').waitFor({ state: 'visible' });
+    assert.equal(archives.parentId, research.id, 'the selected destination must be a nested Nodus collection');
+  });
+
   await check('Add to Library saves while automatic backups are disabled', async () => {
     await call('submitBrowserOmnibox', `${origin}/`);
     await waitFor((s) => {

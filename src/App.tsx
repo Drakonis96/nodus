@@ -1034,6 +1034,20 @@ export function App() {
     });
   }, []);
 
+  // Trusted Browser chrome uses the same Library navigation target as the
+  // external Connector. The event originates in Nodus' renderer; arbitrary web
+  // pages live in another WebContents and cannot dispatch into this document.
+  useEffect(() => {
+    const openBrowserCapture = (event: Event) => {
+      const itemId = (event as CustomEvent<{ itemId?: unknown }>).detail?.itemId;
+      if (typeof itemId !== 'string' || !itemId || itemId.length > 200) return;
+      setLibraryTarget({ scope: 'global', readerItemId: itemId, nonce: Date.now() });
+      setView('library');
+    };
+    window.addEventListener('nodus:open-library-item', openBrowserCapture);
+    return () => window.removeEventListener('nodus:open-library-item', openBrowserCapture);
+  }, []);
+
   // Una nota se abre con la misma experiencia de catálogo y pestañas, bajo el nombre
   // Espacio de trabajo en la académica y Notas en las demás bóvedas.
   const openNoteFromSearch = useCallback((id: string) => {

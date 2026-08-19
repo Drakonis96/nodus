@@ -10,6 +10,7 @@ import { fileURLToPath } from 'node:url';
 import { filterCollectionRows, hierarchicalCollections, normalizeTags } from '../browser-extension/lib/collections.js';
 import { DEFAULT_NODUS_PORT, connectorPortCandidates, discoverNodus, extensionOrigin, normalizeConnectorPort, requestLocalJson } from '../browser-extension/lib/connection.js';
 import { detectCapture } from '../browser-extension/lib/detector.js';
+import { ITEM_TYPES, byline, typeGlyph, typeLabel } from '../browser-extension/lib/presentation.js';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const base = { lang: 'en', links: [], anchors: [], coins: [], jsonLd: [], metas: [], html: '' };
@@ -131,6 +132,36 @@ test('collection paths remain hierarchical and searchable without losing context
   assert.equal(filterCollectionRows(collections, 'women postwar').length, 0);
   assert.equal(filterCollectionRows(collections, 'Women / Postwar')[0].collection.id, 'postwar');
   assert.deepEqual(normalizeTags([' Memory ', 'memory', 'Women', '', 'Women ']), ['Memory', 'Women']);
+});
+
+test('Connector presentation rules are shared by Chrome and the integrated Browser surface', () => {
+  assert.equal(typeLabel('journal-article'), 'Journal article');
+  assert.equal(typeLabel('journal-article', true), 'Artículo académico');
+  assert.equal(typeGlyph('book'), 'B');
+  assert.equal(typeGlyph('webpage'), 'W');
+  assert.equal(byline({
+    itemType: 'journal-article', title: 'Memory', creators: [{ firstName: 'María', lastName: 'García' }],
+    year: 2026, publicationTitle: 'Historical Methods',
+  }), 'María García · 2026 · Historical Methods');
+  assert.ok(ITEM_TYPES.some(([value]) => value === 'dataset'));
+
+  const popup = readFileSync(path.join(root, 'browser-extension/popup.js'), 'utf8');
+  const integrated = readFileSync(path.join(root, 'src/components/browser/BrowserCaptureModal.tsx'), 'utf8');
+  const toolbar = readFileSync(path.join(root, 'src/views/NodusBrowserView.tsx'), 'utf8');
+  const architecture = readFileSync(path.join(root, 'docs/architecture/browser-connector.md'), 'utf8');
+
+  for (const source of [popup, integrated]) {
+    assert.match(source, /lib\/presentation\.js/, 'both Connector adapters must import shared presentation rules');
+    assert.match(source, /lib\/collections\.js/, 'both Connector adapters must import shared collection/tag rules');
+  }
+  assert.match(integrated, /listGlobalLibraryCollections\(\)/);
+  assert.match(integrated, /listGlobalLibraryTags\(\)/);
+  assert.match(integrated, /selectedAttachments/);
+  assert.match(integrated, /snapshotAvailable/);
+  assert.match(integrated, /onOpenInNodus/);
+  assert.match(toolbar, /dataTestId="browser-connector-button"/);
+  assert.match(toolbar, /browser-extension\/icons\/icon\.svg/);
+  assert.match(architecture, /any Connector capability, field, state or review-flow change must be applied\s+to both adapters/);
 });
 
 test('recovers from a stale connector port by probing the Nodus default', async () => {

@@ -19,6 +19,7 @@ import { BrowserHistoryManager } from '../components/browser/BrowserHistoryManag
 import { NodusBookmarksPage, NodusResearchAtlasPage } from '../components/browser/NodusStartPages';
 import { canonicalBookmarkUrl, emptyBrowserBookmarkStore } from '@shared/browserBookmarks';
 import type { BrowserBookmarkStore } from '@shared/browserBookmarks';
+import connectorIcon from '../../browser-extension/icons/icon.svg';
 
 /**
  * Nodus Browser.
@@ -43,6 +44,8 @@ export function NodusBrowserView() {
   const [permission, setPermission] = useState<PendingBrowserPermission | null>(null);
   const [capture, setCapture] = useState<
     { request: BrowserConnectorCaptureRequest & { snapshotAvailable?: boolean }; warnings: string[] } | null>(null);
+  const [captureOpen, setCaptureOpen] = useState(false);
+  const [captureError, setCaptureError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [restarting, setRestarting] = useState(false);
@@ -199,14 +202,17 @@ export function NodusBrowserView() {
 
   const addToLibrary = async () => {
     setPanel(null);
+    setCaptureOpen(true);
+    setCapture(null);
+    setCaptureError(null);
     setBusy(true);
     setNotice(null);
     try {
       const preview = await window.nodus.captureBrowserPage();
-      if (!preview) { setNotice(t('Esta página no ofrece nada que se pueda guardar.')); return; }
+      if (!preview) { setCaptureError(t('Esta página no ofrece nada que se pueda guardar.')); return; }
       setCapture(preview);
     } catch (cause) {
-      setNotice(cause instanceof Error ? cause.message : String(cause));
+      setCaptureError(cause instanceof Error ? cause.message : String(cause));
     } finally {
       setBusy(false);
     }
@@ -350,6 +356,17 @@ export function NodusBrowserView() {
             </button>
           </div>
         </form>
+
+        <div>
+          <ToolbarButton
+            imageSrc={connectorIcon}
+            label="Nodus Connector"
+            disabled={active?.kind !== 'web' || busy}
+            busy={busy && captureOpen}
+            dataTestId="browser-connector-button"
+            onClick={() => void addToLibrary()}
+          />
+        </div>
 
         <div>
           <ToolbarButton
@@ -498,14 +515,26 @@ export function NodusBrowserView() {
           : <BrowserErrorPane tab={active} />)}
       </div>
 
-      {capture && (
+      {captureOpen && (
         <BrowserCaptureModal
-          preview={capture.request}
-          warnings={capture.warnings}
-          onClose={() => setCapture(null)}
+          preview={capture?.request ?? null}
+          warnings={capture?.warnings ?? []}
+          loading={busy}
+          loadError={captureError}
+          onRetry={() => void addToLibrary()}
+          onClose={() => { setCaptureOpen(false); setCapture(null); setCaptureError(null); }}
           onSaved={(result) => {
-            setCapture(null);
             setNotice(t('Guardado en la Biblioteca: {title}').replace('{title}', result.title));
+          }}
+          onOpenInNodus={(itemId) => {
+            setCaptureOpen(false);
+            setCapture(null);
+            window.dispatchEvent(new CustomEvent('nodus:open-library-item', { detail: { itemId } }));
+          }}
+          onOpenSettings={() => {
+            setCaptureOpen(false);
+            setCapture(null);
+            setPanel('settings');
           }}
         />
       )}
@@ -594,8 +623,8 @@ function permissionLabel(request: PendingBrowserPermission): string {
 }
 
 function ToolbarButton({
-  icon, label, onClick, disabled, dataTestId,
-}: { icon: string; label: string; onClick: () => void; disabled?: boolean; dataTestId?: string }) {
+  icon, imageSrc, label, onClick, disabled, busy, dataTestId,
+}: { icon?: string; imageSrc?: string; label: string; onClick: () => void; disabled?: boolean; busy?: boolean; dataTestId?: string }) {
   return (
     <button
       type="button"
@@ -606,7 +635,9 @@ function ToolbarButton({
       onClick={onClick}
       className="rounded-lg p-1.5 text-neutral-600 transition-colors hover:bg-neutral-100 disabled:cursor-not-allowed disabled:opacity-40 dark:text-neutral-400 dark:hover:bg-neutral-900"
     >
-      <Icon name={icon} size={16} />
+      {imageSrc
+        ? <img src={imageSrc} alt="" className={`h-4 w-4 ${busy ? 'animate-pulse' : ''}`} />
+        : icon ? <Icon name={icon} size={16} /> : null}
     </button>
   );
 }

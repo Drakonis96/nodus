@@ -4,29 +4,7 @@
 import { detectCapture } from './lib/detector.js';
 import { filterCollectionRows, normalizeTags } from './lib/collections.js';
 import { DEFAULT_NODUS_PORT, discoverNodus, extensionOrigin, normalizeConnectorPort, requestLocalJson } from './lib/connection.js';
-
-const ITEM_TYPES = [
-  ['journal-article', 'Journal article'], ['book', 'Book'], ['book-chapter', 'Book chapter'], ['conference-paper', 'Conference paper'],
-  ['thesis', 'Thesis'], ['report', 'Report'], ['manuscript', 'Manuscript'], ['preprint', 'Preprint'], ['dataset', 'Dataset'],
-  ['presentation', 'Presentation'], ['newspaper-article', 'Newspaper article'], ['magazine-article', 'Magazine article'],
-  ['encyclopedia-article', 'Encyclopedia article'], ['dictionary-entry', 'Dictionary entry'], ['interview', 'Interview'],
-  ['letter', 'Letter'], ['email', 'Email'], ['instant-message', 'Instant message'], ['case', 'Case'], ['hearing', 'Hearing'], ['bill', 'Bill'], ['statute', 'Statute'],
-  ['patent', 'Patent'], ['artwork', 'Artwork'], ['map', 'Map'], ['film', 'Film'], ['audio-recording', 'Audio recording'],
-  ['video-recording', 'Video recording'], ['radio-broadcast', 'Radio broadcast'], ['tv-broadcast', 'TV broadcast'],
-  ['podcast', 'Podcast'], ['blog-post', 'Blog post'], ['forum-post', 'Forum post'], ['computer-program', 'Computer program'],
-  ['webpage', 'Web page'], ['document', 'Document'], ['standard', 'Standard'], ['other', 'Other'],
-];
-const ITEM_TYPE_LABELS_ES = {
-  'journal-article': 'Artículo académico', book: 'Libro', 'book-chapter': 'Capítulo de libro', 'conference-paper': 'Ponencia',
-  thesis: 'Tesis', report: 'Informe', manuscript: 'Manuscrito', preprint: 'Preprint', dataset: 'Conjunto de datos',
-  presentation: 'Presentación', 'newspaper-article': 'Artículo de periódico', 'magazine-article': 'Artículo de revista',
-  'encyclopedia-article': 'Artículo de enciclopedia', 'dictionary-entry': 'Entrada de diccionario', interview: 'Entrevista',
-  letter: 'Carta', email: 'Correo electrónico', 'instant-message': 'Mensaje instantáneo', case: 'Caso', hearing: 'Audiencia',
-  bill: 'Proyecto de ley', statute: 'Estatuto', patent: 'Patente', artwork: 'Obra de arte', map: 'Mapa', film: 'Película',
-  'audio-recording': 'Grabación de audio', 'video-recording': 'Grabación de vídeo', 'radio-broadcast': 'Emisión de radio',
-  'tv-broadcast': 'Emisión de televisión', podcast: 'Podcast', 'blog-post': 'Entrada de blog', 'forum-post': 'Entrada de foro',
-  'computer-program': 'Programa informático', webpage: 'Página web', document: 'Documento', standard: 'Norma', other: 'Otro',
-};
+import { ITEM_TYPES, byline, typeGlyph, typeLabel } from './lib/presentation.js';
 const spanishUi = chrome.i18n.getUILanguage().toLowerCase().startsWith('es');
 const $ = (id) => document.getElementById(id);
 const state = { capture: null, tab: null, port: DEFAULT_NODUS_PORT, token: '', collections: [], tags: [], selectedCollection: null, selectedTags: [], savedItemId: null };
@@ -43,23 +21,14 @@ function localize() {
   for (const element of document.querySelectorAll('[data-i18n-title]')) { element.title = msg(element.dataset.i18nTitle); element.setAttribute('aria-label', msg(element.dataset.i18nTitle)); }
 }
 
-function byline(metadata) {
-  const names = (metadata.creators || []).slice(0, 3).map((creator) => creator.name || [creator.firstName, creator.lastName].filter(Boolean).join(' ')).filter(Boolean);
-  return [names.join(', '), metadata.year || metadata.date || '', metadata.publicationTitle || ''].filter(Boolean).join(' · ');
-}
-
-function typeLabel(type) {
-  return (spanishUi ? ITEM_TYPE_LABELS_ES[type] : '') || ITEM_TYPES.find(([id]) => id === type)?.[1] || type;
-}
-
 function renderCapture() {
   const metadata = state.capture.metadata;
   $('item-type').replaceChildren(...ITEM_TYPES.map(([value]) => {
-    const option = document.createElement('option'); option.value = value; option.textContent = typeLabel(value); option.selected = value === metadata.itemType; return option;
+    const option = document.createElement('option'); option.value = value; option.textContent = typeLabel(value, spanishUi); option.selected = value === metadata.itemType; return option;
   }));
   $('document-title').textContent = metadata.title;
   $('document-byline').textContent = byline(metadata) || new URL(state.capture.pageUrl).hostname;
-  $('type-icon').textContent = metadata.itemType === 'book' ? 'B' : metadata.itemType.includes('article') ? 'A' : metadata.itemType === 'webpage' ? 'W' : 'Aa';
+  $('type-icon').textContent = typeGlyph(metadata.itemType);
   $('files-block').classList.toggle('hidden', !state.capture.attachments.length);
   $('files-list').replaceChildren(...state.capture.attachments.map((attachment, index) => {
     const label = document.createElement('label'); label.className = 'file-row';
