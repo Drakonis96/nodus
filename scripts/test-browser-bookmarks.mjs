@@ -158,6 +158,12 @@ test('trusted Bookmarks UI reuses Atlas styling and avoids native prompt dialogs
   assert.match(pages, /global search/);
   assert.match(pages, /data-testid="nodus-site-header"/);
   assert.match(pages, /data-testid="nodus-site-footer"/);
+  assert.match(pages, /label="Atlas" url=\{NODUS_RESEARCH_ATLAS_URL\}/,
+    'the Atlas navigation item must open the public online Atlas');
+  assert.doesNotMatch(pages, /label="Atlas" url=\{NODUS_RESEARCH_ATLAS_START_URL\}/);
+  assert.match(pages, /page !== 'bookmarks' && <[\s\S]*atlas-engine-wrap/,
+    'Bookmarks must omit the Atlas engine selector so the full control is search');
+  assert.match(styles, /\.atlas-searchbar\.is-bookmarks\s*\{\s*grid-template-columns:minmax\(0,1fr\) 52px/);
   const siteHeader = pages.indexOf('<NodusSiteHeader page={page} />');
   const atlasGrid = pages.indexOf('<div className="atlas-grid">{children}</div>', siteHeader);
   const siteFooter = pages.indexOf('<NodusSiteFooter />', atlasGrid);

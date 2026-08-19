@@ -92,6 +92,7 @@
 .nodus-start-page .card.lit::before { content:''; position:absolute; inset:-1px; pointer-events:none; background:radial-gradient(340px circle at 50% 0%,var(--accent-soft),transparent 68%); opacity:0; transition:opacity .4s var(--ease); }
 .nodus-start-page .card.lit:hover::before { opacity:1; }
 .nodus-start-page button, .nodus-start-page input, .nodus-start-page select { font-family: inherit; }
+.nodus-start-page .atlas-searchbar.is-bookmarks { grid-template-columns:minmax(0,1fr) 52px; }
 .nodus-start-page .atlas-card > * { position: relative; z-index: 1; }
 .nodus-start-page .atlas-card-actions { display:flex; flex-wrap:wrap; gap:7px; margin-top:17px; }
 .nodus-start-page .atlas-card-actions .atlas-open { margin-top:0; cursor:pointer; }
@@ -131,5 +132,10 @@
 @media (max-width:560px) {
   .nodus-start-page .nodus-site-foot-grid { grid-template-columns:1fr; }
   .nodus-start-page .nodus-site-foot-brand { grid-column:auto; }
+}
+@media (max-width:760px) {
+  .nodus-start-page .atlas-searchbar.is-bookmarks { grid-template-columns:minmax(0,1fr) 46px; }
+  .nodus-start-page .atlas-searchbar.is-bookmarks .atlas-input-wrap { grid-column:1; grid-row:1; min-height:56px; }
+  .nodus-start-page .atlas-searchbar.is-bookmarks .atlas-submit { grid-column:2; grid-row:1; }
 }
 @media (prefers-reduced-motion:reduce) { .nodus-start-page .nodus-site-organism { display:none; } }

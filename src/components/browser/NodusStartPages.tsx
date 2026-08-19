@@ -144,7 +144,7 @@ function NodusSiteHeader({ page }: { page: 'atlas' | 'bookmarks' }) {
     <button type="button" className="nodus-site-nav-toggle" aria-label={open ? 'Close menu' : 'Open menu'} aria-expanded={open} onClick={() => setOpen((value) => !value)}><span /><span /><span /></button>
     <nav className={`nodus-site-links${open ? ' open' : ''}`} aria-label="Nodus Research">
       <SiteLink className="nodus-site-link" label="Home" url={NODUS_SITE} onOpen={close} />
-      <SiteLink className="nodus-site-link" label="Atlas" url={NODUS_RESEARCH_ATLAS_START_URL} current={page === 'atlas'} onOpen={close} />
+      <SiteLink className="nodus-site-link" label="Atlas" url={NODUS_RESEARCH_ATLAS_URL} current={page === 'atlas'} onOpen={close} />
       <SiteLink className="nodus-site-link" label="Bookmarks" url={NODUS_BOOKMARKS_URL} current={page === 'bookmarks'} onOpen={close} />
       <SiteLink className="nodus-site-link" label="Wiki" url={`${NODUS_SITE}wiki/`} onOpen={close} />
       <SiteLink className="nodus-site-link" label="Blog" url={`${NODUS_SITE}blog/`} onOpen={close} />
@@ -158,7 +158,7 @@ function NodusSiteHeader({ page }: { page: 'atlas' | 'bookmarks' }) {
 }
 
 const FOOTER_GROUPS = [
-  { title: 'Research', links: [['Research Atlas', NODUS_RESEARCH_ATLAS_START_URL], ['Nodus Bookmarks', NODUS_BOOKMARKS_URL], ['The Nodus App', `${NODUS_SITE}app/`], ['Academic research', `${NODUS_SITE}research/`], ['Nodus and Zotero', `${NODUS_SITE}zotero/`]] },
+  { title: 'Research', links: [['Research Atlas', NODUS_RESEARCH_ATLAS_URL], ['Nodus Bookmarks', NODUS_BOOKMARKS_URL], ['The Nodus App', `${NODUS_SITE}app/`], ['Academic research', `${NODUS_SITE}research/`], ['Nodus and Zotero', `${NODUS_SITE}zotero/`]] },
   { title: 'Product', links: [['The four vaults', `${NODUS_SITE}#vaults`], ['Other vaults', `${NODUS_SITE}#more-vaults`], ['Nodus Toolkit', `${NODUS_SITE}#tools`], ['Live demos', `${NODUS_SITE}demo/`]] },
   { title: 'Learn', links: [['Wiki', `${NODUS_SITE}wiki/`], ['Blog', `${NODUS_SITE}blog/`], ['FAQ', `${NODUS_SITE}faq/`], ['Video tutorials', `${NODUS_SITE}wiki/#videos`]] },
   { title: 'Project', links: [['Contribute', `${NODUS_SITE}contribute/`], ['GitHub', NODUS_REPOSITORY], ['Releases', `${NODUS_REPOSITORY}/releases`], ['AGPL-3.0-only', `${NODUS_REPOSITORY}/blob/main/LICENSE`]] },
@@ -188,9 +188,11 @@ function StartShell({ title, copy, query, onQuery, status, children, toolbar }: 
           <h1 className="atlas-title">{title}</h1>
           <p className="atlas-copy">{copy}</p>
           <div className="atlas-search-wrap">
-            <div className="atlas-searchbar">
-              <div className="atlas-engine-wrap"><span className="atlas-engine flex items-center">Nodus</span></div>
-              <span className="atlas-search-sep" aria-hidden="true" />
+            <div className={`atlas-searchbar${page === 'bookmarks' ? ' is-bookmarks' : ''}`}>
+              {page !== 'bookmarks' && <>
+                <div className="atlas-engine-wrap"><span className="atlas-engine flex items-center">Nodus</span></div>
+                <span className="atlas-search-sep" aria-hidden="true" />
+              </>}
               <div className="atlas-input-wrap">
                 <Icon name="search" size={19} className="atlas-search-icon" />
                 <input
@@ -267,7 +269,7 @@ export function NodusBookmarksPage({ store, onEditBookmark, onNewBookmark, onNew
         <div className="atlas-filterbar">
           <button className="atlas-facet-button" type="button" onClick={() => onNewFolder(folderId)}><Icon name="folderPlus" size={13} /> New folder</button>
           <button className="atlas-facet-button" type="button" onClick={() => onNewBookmark(folderId)}><Icon name="bookmark" size={13} /> Add bookmark</button>
-          <button className="atlas-facet-button" type="button" onClick={() => void window.nodus.openBrowserTab(NODUS_RESEARCH_ATLAS_START_URL)}><Icon name="globe" size={13} /> Research Atlas</button>
+          <button className="atlas-facet-button" type="button" onClick={() => void window.nodus.openBrowserTab(NODUS_RESEARCH_ATLAS_URL)}><Icon name="globe" size={13} /> Research Atlas</button>
         </div>
         {!query && <div className="bookmark-breadcrumbs"><button onClick={() => setFolderId(null)}>Bookmarks</button>{pathFolders.map((entry) => <span key={entry.id}> / <button onClick={() => setFolderId(entry.id)}>{entry.name}</button></span>)}</div>}
       </>}
@@ -304,7 +306,7 @@ export function NodusBookmarksPage({ store, onEditBookmark, onNewBookmark, onNew
         );
       })}
       {!folders.length && !bookmarks.length && (
-        <div className="atlas-empty"><h2>{query ? 'No matching bookmarks' : folder ? 'This folder is empty' : 'No bookmarks yet'}</h2><p>{query ? 'Search includes titles, URLs, descriptions and folder names.' : 'Save websites from Nodus Browser or Research Atlas to build your personal research start page.'}</p><div className="flex justify-center gap-2"><button className="atlas-open" onClick={() => onNewBookmark(folderId)}>Add a bookmark</button><button className="atlas-open" onClick={() => void window.nodus.openBrowserTab(NODUS_RESEARCH_ATLAS_START_URL)}>Open Research Atlas</button></div></div>
+        <div className="atlas-empty"><h2>{query ? 'No matching bookmarks' : folder ? 'This folder is empty' : 'No bookmarks yet'}</h2><p>{query ? 'Search includes titles, URLs, descriptions and folder names.' : 'Save websites from Nodus Browser or Research Atlas to build your personal research start page.'}</p><div className="flex justify-center gap-2"><button className="atlas-open" onClick={() => onNewBookmark(folderId)}>Add a bookmark</button><button className="atlas-open" onClick={() => void window.nodus.openBrowserTab(NODUS_RESEARCH_ATLAS_URL)}>Open Research Atlas</button></div></div>
       )}
     </StartShell>
   );
