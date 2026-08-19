@@ -4182,7 +4182,7 @@ export interface ServerInboxEntry {
   title: string | null;
   entityKind: string | null;
   /** Root item that owns this change. Child annotations from one report/document share it. */
-  parentEntityKind: 'deep_research' | 'library_document' | null;
+  parentEntityKind: 'deep_research' | 'immersion' | 'library_document' | null;
   parentEntityId: string | null;
   /** Human title captured on arrival, so grouping never has to show an opaque id. */
   parentTitle: string | null;
@@ -6464,11 +6464,12 @@ export interface WritingWorkshopSavedDraft {
   updatedAt: string;
 }
 
-/** The six quiet colours offered by the Deep Research reader highlighter. */
+/** The six quiet colours offered by the document-reader highlighter. */
 export type WritingDraftAnnotationColor = 'yellow' | 'rose' | 'blue' | 'mint' | 'lavender' | 'peach';
 
 /**
- * A text annotation belongs to one immutable rendering of a saved report.
+ * A text annotation belongs to one immutable reader rendering: a saved report,
+ * an Immersion step, or a supported library document.
  *
  * `scope` is `source` for the original report and `translation:<id>` for a saved
  * translation. Offsets make the common path exact and cheap; the selected text plus

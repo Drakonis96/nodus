@@ -3,6 +3,7 @@ import { SCHEMA_VERSION } from '../db/migrations';
 import { identityColumns, quoteIdentifier, tableColumns } from '../db/rowIdentity';
 import { MUTABLE_TABLES } from './outboxTriggers';
 import { compareHlc, formatHlc, parseHlc } from '@shared/syncOperations';
+import { immersionSessionIdFromAnnotationDocument } from '@shared/readerAnnotations';
 
 /**
  * The owner's side of the relay: take what collaborators wrote, apply it to the canonical
@@ -56,7 +57,7 @@ export interface InboxEntry {
   /** Something a person would recognise: a report's objective, a note's title. */
   title?: string | null;
   entityKind?: string | null;
-  parentEntityKind?: 'deep_research' | 'library_document' | null;
+  parentEntityKind?: 'deep_research' | 'immersion' | 'library_document' | null;
   parentEntityId?: string | null;
   parentTitle?: string | null;
   schemaVersion?: number;
@@ -109,10 +110,13 @@ export function titleOf(
   }
   if (table === 'notes') return { title: text(row.title), entityKind: 'note' };
   if (table === 'note_folders') return { title: text(row.name), entityKind: 'note_folder' };
+  if (table === 'immersion_sessions') return { title: text(row.title) ?? text(row.topic), entityKind: 'immersion' };
   if (table === 'writing_draft_annotations') {
     return {
       title: text(row.comment_text) ?? text(row.selected_text),
-      entityKind: 'deep_research_annotation',
+      entityKind: immersionSessionIdFromAnnotationDocument(String(row.draft_id ?? ''))
+        ? 'immersion_annotation'
+        : 'deep_research_annotation',
     };
   }
   return { title: null, entityKind: null };
@@ -139,6 +143,16 @@ function descriptionOf(
   // Global-library annotations are handled before this path by the external route. Its
   // document metadata lives on disk rather than in writing_saved_drafts.
   if (!draftId || draftId.startsWith('nodus-library:')) return own;
+  const immersionId = immersionSessionIdFromAnnotationDocument(draftId);
+  if (immersionId) {
+    const session = db.prepare('SELECT title, topic FROM immersion_sessions WHERE id = ?').get(immersionId) as Record<string, unknown> | undefined;
+    return {
+      ...own,
+      parentEntityKind: 'immersion',
+      parentEntityId: immersionId,
+      parentTitle: titleOf('immersion_sessions', session).title,
+    };
+  }
   const report = db.prepare('SELECT title, brief_json FROM writing_saved_drafts WHERE id = ?').get(draftId) as Record<string, unknown> | undefined;
   return {
     ...own,

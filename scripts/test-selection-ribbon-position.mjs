@@ -103,6 +103,8 @@ test('the ribbon is anchored to the pointer in the reader and in the editor', ()
   const reader = fs.readFileSync(path.join(repoRoot, 'src/components/ReaderSelectionActions.tsx'), 'utf8');
   assert.match(reader, /pointer \? pointerAnchor\(pointer\.x, pointer\.y\) : focusAnchor\(/);
   assert.match(reader, /const onPointerUp = \(event: PointerEvent\)/);
+  assert.match(reader, /document\.addEventListener\('pointerup', onPointerUp, true\)/);
+  assert.match(reader, /target\.closest\('\[data-reader-selection-actions\]'\)/);
   const editor = fs.readFileSync(path.join(repoRoot, 'src/components/editor/StudyEditor.tsx'), 'utf8');
   assert.match(editor, /anchorToolbarToPointer\(root\.parentElement \?\? root, toolbar\)/);
 });

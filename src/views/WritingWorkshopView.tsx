@@ -18,7 +18,6 @@ import type {
   WritingWorkshopThemeCandidate,
   WritingWorkshopWorkCandidate,
 } from '@shared/types';
-import type { PendingGraphNavigationTarget } from '../navigation';
 import { Badge, EDGE_LABELS, Icon, NODE_LABELS, modelLabel } from '../components/ui';
 import { ModelPicker } from '../components/ModelPicker';
 import { confirm } from '../components/feedback';
@@ -66,10 +65,8 @@ const TAB_SELECTION_KEYS: Record<MaterialTab, keyof WritingWorkshopSelection> = 
 
 export function WritingWorkshopView({
   settings,
-  onOpenGraph,
 }: {
   settings: AppSettings;
-  onOpenGraph: (target: PendingGraphNavigationTarget) => void;
 }) {
   const [brief, setBrief] = useState<WritingWorkshopBrief>({
     kind: 'literature_review',
@@ -620,10 +617,6 @@ export function WritingWorkshopView({
         <SourceCitationModal
           target={citation}
           onClose={() => setCitation(null)}
-          onOpenGraph={(target) => {
-            setCitation(null);
-            onOpenGraph(target);
-          }}
         />
       )}
 

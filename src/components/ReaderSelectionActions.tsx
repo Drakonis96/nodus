@@ -615,6 +615,8 @@ export const ReaderSelectionActions = forwardRef<ReaderSelectionActionsHandle, {
     const root = targetRef.current;
     if (!root) return;
     const onPointerUp = (event: PointerEvent) => {
+      const target = event.target;
+      if (target instanceof Element && target.closest('[data-reader-selection-actions]')) return;
       const pointer = { x: event.clientX, y: event.clientY };
       window.setTimeout(() => showSelection(undefined, pointer), 0);
     };
@@ -655,13 +657,16 @@ export const ReaderSelectionActions = forwardRef<ReaderSelectionActionsHandle, {
       setActiveMarkActions(null);
       setActiveHighlightActions(null);
     };
-    root.addEventListener('pointerup', onPointerUp);
+    // A selection may begin in the text and end over the empty gutter around
+    // the report. Listen on the document so that release still opens the
+    // contextual ribbon even though the pointer is no longer inside `root`.
+    document.addEventListener('pointerup', onPointerUp, true);
     root.addEventListener('keyup', onKeyUp);
     root.addEventListener('contextmenu', onContextMenu);
     root.addEventListener('click', onClick);
     document.addEventListener('pointerdown', hide, true);
     return () => {
-      root.removeEventListener('pointerup', onPointerUp);
+      document.removeEventListener('pointerup', onPointerUp, true);
       root.removeEventListener('keyup', onKeyUp);
       root.removeEventListener('contextmenu', onContextMenu);
       root.removeEventListener('click', onClick);

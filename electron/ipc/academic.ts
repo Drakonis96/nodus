@@ -121,6 +121,7 @@ import type {
   ZoteroItem,
   ZoteroStudyMaterialImportInput,
 } from '@shared/types';
+import { immersionAnnotationDocumentId } from '@shared/readerAnnotations';
 import { applyDecorativeImageOption, invalidateDecorativeImageGeneration } from '../ai/decorativeImages';
 import * as zotero from '../zotero/zoteroClient';
 import * as dedupe from '../db/dedupeRepo';
@@ -1209,6 +1210,7 @@ export function registerAcademicIpc({ h, getWindow, chatAborters }: IpcContext):
     invalidateDecorativeImageGeneration('immersion', id);
     translationsRepo.deleteEntityTranslations('immersion', id);
     immersionRepo.deleteImmersionSession(id);
+    announceWritingDraftAnnotations(immersionAnnotationDocumentId(id));
   });
 
   // main-theme management ("temas principales")

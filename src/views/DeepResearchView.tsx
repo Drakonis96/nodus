@@ -24,7 +24,6 @@ import type { StudyDeepResearchAudience } from '@shared/studyDeepResearchAudienc
 import { DECORATIVE_IMAGE_STYLES } from '@shared/imageStyles';
 import { toReadingCopy } from '@shared/readingCopy';
 import { stripLeadingAbstract } from '@shared/writingDocument';
-import type { PendingGraphNavigationTarget } from '../navigation';
 import type { DeepResearchSnapshot } from '../app/viewSnapshots';
 import { useListPlacement } from '../listPlacement';
 import { useReadingPlace, type ReadingPlace } from '../readingPlace';
@@ -32,7 +31,7 @@ import { HoverLabelButton, Icon, RestoringPane, modelLabel } from '../components
 import { SectionHeader } from '../components/SectionHeader';
 import { ModelPicker } from '../components/ModelPicker';
 import { confirm } from '../components/feedback';
-import { SourceCitationModal, type CitationTarget } from '../components/SourceCitationModal';
+import { SourceCitationModal, type CitationTarget, type OpenCitationLibraryWork } from '../components/SourceCitationModal';
 import { SaveToNotesModal } from '../components/SaveToNotesModal';
 import { TranslationModal } from '../components/TranslationModal';
 import { Markdown } from '../components/Markdown';
@@ -243,7 +242,7 @@ export function DeepResearchView({
   isTeaching = false,
   snapshot,
   onSnapshotChange,
-  onOpenGraph,
+  onOpenLibraryWork,
   onOpenStudyDocument,
   onOpenStudyMaterial,
   onOpenStudyRecording,
@@ -256,7 +255,7 @@ export function DeepResearchView({
   /** Where this section was last left. Read once, at mount, and never again. */
   snapshot?: DeepResearchSnapshot;
   onSnapshotChange?: (patch: Partial<DeepResearchSnapshot>) => void;
-  onOpenGraph: (target: PendingGraphNavigationTarget) => void;
+  onOpenLibraryWork?: OpenCitationLibraryWork;
   onOpenStudyDocument?: (id: string) => void;
   onOpenStudyMaterial?: (id: string) => void;
   onOpenStudyRecording?: (id: string, timestamp?: number | null) => void;
@@ -812,10 +811,7 @@ export function DeepResearchView({
           <SourceCitationModal
             target={citation}
             onClose={() => setCitation(null)}
-            onOpenGraph={(target) => {
-              setCitation(null);
-              onOpenGraph(target);
-            }}
+            onOpenLibraryWork={onOpenLibraryWork}
           />
         )}
         {savingToNotes && (
