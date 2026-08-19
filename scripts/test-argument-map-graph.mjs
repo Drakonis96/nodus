@@ -125,7 +125,9 @@ try {
     addIdea.run(HUB, 'claim', 'idea central', 'La idea semilla del recorrido.', '2026-01-01');
     insertionOrder.forEach(({ link, i }) => {
       const id = `g-n${i}`;
-      addIdea.run(id, 'claim', `vecina ${i}`, `Enunciado de la vecina ${i}.`, '2026-01-01');
+      // The original ideas schema allows a missing statement. This reproduces the
+      // renderer crash that used to call null.toLowerCase() in the route search.
+      addIdea.run(id, 'claim', `vecina ${i}`, i === 0 ? null : `Enunciado de la vecina ${i}.`, '2026-01-01');
       addEdge.run(`e-hub-${i}`, HUB, id, link.type, 'basis', link.confidence);
       for (let k = 0; k < OUTER_PER_NEIGHBOUR; k++) {
         const outer = `g-o${i}-${k}`;
@@ -148,6 +150,10 @@ try {
   const route = discoverArgumentRoutes().find((r) => r.ideaId === HUB);
   assert.equal(route.degree, HUB_DEGREE, 'the fixture reproduces the reported hub');
   assert.equal(route.debateCount, HUB_DEBATES);
+  assert.equal(discoverArgumentRoutes().find((r) => r.ideaId === 'g-n0').statement, '',
+    'nullable SQLite statements are normalized before any view can search them');
+  assert.equal(nodes.find((node) => node.block.ideaId === 'g-n0')?.block.statement, '',
+    'the map tab receives the same safe text contract as the route catalogue');
   // The header used to quote the post-cap figures (79 / 9 for the real route),
   // so the map appeared to have lost connections the list had just promised.
   assert.equal(map.root.summary, `${HUB_DEGREE} conexiones · ${HUB_DEBATES} debate(s)`,

@@ -74,13 +74,14 @@ const SYNTH_FILTER_LABELS: Record<SynthFilter, string> = {
 };
 
 /**
- * A tab can only be the active one if it is still open. The pair is written to the
- * snapshot together, but a closed author with `surface: 'author'` would render an
- * empty pane, so the surface answers to what actually exists.
+ * An author surface can only be active if its tab is still open. The collection and
+ * active id are written to the snapshot together, but a closed author with
+ * `surface: 'author'` would render an empty pane, so the surface answers to what
+ * actually exists.
  */
 function restoredSurface(snapshot?: AuthorsSnapshot): AuthorsSurface {
   const surface = snapshot?.surface ?? 'catalog';
-  if (surface === 'author' && !snapshot?.openAuthor) return 'catalog';
+  if (surface === 'author' && !snapshot?.openAuthors?.some((author) => author.id === snapshot.activeAuthorId)) return 'catalog';
   if (surface === 'matrix' && !snapshot?.matrixOpen) return 'catalog';
   return surface;
 }
@@ -101,7 +102,12 @@ export function AuthorsView({
 }) {
   // Restored as initial values only. A reactive `snapshot` prop would fight the
   // reader for control of their own tabs on every re-render of the shell.
-  const [openAuthor, setOpenAuthor] = useState<OpenAuthor | null>(() => snapshot?.openAuthor ?? null);
+  const [openAuthors, setOpenAuthors] = useState<OpenAuthor[]>(() => snapshot?.openAuthors ?? []);
+  const [activeAuthorId, setActiveAuthorId] = useState<string | null>(() => (
+    snapshot?.openAuthors?.some((author) => author.id === snapshot.activeAuthorId)
+      ? snapshot.activeAuthorId
+      : null
+  ));
   const [matrixOpen, setMatrixOpen] = useState(() => snapshot?.matrixOpen ?? false);
   const [surface, setSurface] = useState<AuthorsSurface>(() => restoredSurface(snapshot));
   const [catalogRevision, setCatalogRevision] = useState(0);
@@ -117,14 +123,32 @@ export function AuthorsView({
     report.current?.({
       surface,
       matrixOpen,
-      openAuthor: openAuthor ? { id: openAuthor.id, label: openAuthor.label } : null,
+      openAuthors: openAuthors.map(({ id, label }) => ({ id, label })),
+      activeAuthorId,
     });
-  }, [matrixOpen, openAuthor, surface]);
+  }, [activeAuthorId, matrixOpen, openAuthors, surface]);
 
   const showAuthor = useCallback((author: OpenAuthor) => {
-    setOpenAuthor(author);
+    setOpenAuthors((current) => (
+      current.some((open) => open.id === author.id)
+        ? current
+        : [...current, author]
+    ));
+    setActiveAuthorId(author.id);
     setSurface('author');
   }, []);
+
+  const closeAuthor = useCallback((authorId: string) => {
+    const closingIndex = openAuthors.findIndex((author) => author.id === authorId);
+    if (closingIndex < 0) return;
+    const remaining = openAuthors.filter((author) => author.id !== authorId);
+    setOpenAuthors(remaining);
+    if (activeAuthorId !== authorId) return;
+
+    const nextActive = remaining[Math.min(closingIndex, remaining.length - 1)] ?? null;
+    setActiveAuthorId(nextActive?.id ?? null);
+    if (surface === 'author' && !nextActive) setSurface('catalog');
+  }, [activeAuthorId, openAuthors, surface]);
 
   const showMatrix = useCallback(() => {
     setMatrixOpen(true);
@@ -159,16 +183,19 @@ export function AuthorsView({
           >
             <Icon name="list" size={13} /> {t('Autores')}
           </button>
-          {openAuthor && (
-            <div className={`flex h-9 shrink-0 items-center rounded-t-lg border border-b-0 ${surface === 'author' ? 'border-neutral-300 bg-white text-neutral-900 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-100' : 'border-transparent text-neutral-500 hover:bg-neutral-100 hover:text-neutral-800 dark:hover:bg-neutral-900/60 dark:hover:text-neutral-300'}`}>
-              <button data-testid="authors-tab-author" className="flex h-full max-w-64 items-center gap-2 px-3 text-xs" onClick={() => setSurface('author')}>
-                <Icon name="user" size={13} /><span className="truncate">{openAuthor.label}</span>
-              </button>
-              <button className="mr-1 grid h-6 w-6 place-items-center rounded hover:bg-neutral-200 dark:hover:bg-neutral-800" aria-label={t('Cerrar')} onClick={() => { setOpenAuthor(null); if (surface === 'author') setSurface('catalog'); }}>
-                <Icon name="x" size={11} />
-              </button>
-            </div>
-          )}
+          {openAuthors.map((author) => {
+            const active = surface === 'author' && activeAuthorId === author.id;
+            return (
+              <div key={author.id} className={`flex h-9 shrink-0 items-center rounded-t-lg border border-b-0 ${active ? 'border-neutral-300 bg-white text-neutral-900 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-100' : 'border-transparent text-neutral-500 hover:bg-neutral-100 hover:text-neutral-800 dark:hover:bg-neutral-900/60 dark:hover:text-neutral-300'}`}>
+                <button data-testid="authors-tab-author" data-author-id={author.id} className="flex h-full max-w-64 items-center gap-2 px-3 text-xs" onClick={() => { setActiveAuthorId(author.id); setSurface('author'); }}>
+                  <Icon name="user" size={13} /><span className="truncate">{author.label}</span>
+                </button>
+                <button className="mr-1 grid h-6 w-6 place-items-center rounded hover:bg-neutral-200 dark:hover:bg-neutral-800" aria-label={`${t('Cerrar')}: ${author.label}`} onClick={() => closeAuthor(author.id)}>
+                  <Icon name="x" size={11} />
+                </button>
+              </div>
+            );
+          })}
           {matrixOpen && (
             <div className={`flex h-9 shrink-0 items-center rounded-t-lg border border-b-0 ${surface === 'matrix' ? 'border-neutral-300 bg-white text-neutral-900 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-100' : 'border-transparent text-neutral-500 hover:bg-neutral-100 hover:text-neutral-800 dark:hover:bg-neutral-900/60 dark:hover:text-neutral-300'}`}>
               <button data-testid="authors-tab-matrix" className="flex h-full items-center gap-2 px-3 text-xs" onClick={() => setSurface('matrix')}>
@@ -184,7 +211,11 @@ export function AuthorsView({
 
       <main className="min-h-0 flex-1">
         <div className={surface === 'catalog' ? 'h-full' : 'hidden'}><AuthorsCatalog vaultId={vaultId} refreshKey={catalogRevision} snapshot={snapshot} onSnapshotChange={onSnapshotChange} onOpenAuthor={showAuthor} onOpenMatrix={showMatrix} /></div>
-        {openAuthor && <div className={surface === 'author' ? 'h-full' : 'hidden'}><AuthorDetailTab key={openAuthor.id} author={openAuthor} vaultId={vaultId} model={model} onOpenAuthor={showAuthor} onOpenGraph={onOpenGraph} onSavedChange={() => setCatalogRevision((value) => value + 1)} /></div>}
+        {openAuthors.map((author) => (
+          <div key={author.id} className={surface === 'author' && activeAuthorId === author.id ? 'h-full' : 'hidden'}>
+            <AuthorDetailTab author={author} vaultId={vaultId} model={model} onOpenAuthor={showAuthor} onOpenGraph={onOpenGraph} onSavedChange={() => setCatalogRevision((value) => value + 1)} />
+          </div>
+        ))}
         {matrixOpen && <div className={surface === 'matrix' ? 'h-full p-5' : 'hidden'}><MatrixTab onOpenGraph={onOpenGraph} model={model} /></div>}
       </main>
     </div>

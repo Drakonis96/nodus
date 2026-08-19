@@ -368,8 +368,8 @@ export function ChipSelectCell({
 
   const byId = new Map(options.map((o) => [o.id, o]));
   const query = q.trim().toLowerCase();
-  const filtered = options.filter((o) => !query || o.label.toLowerCase().includes(query));
-  const exact = options.some((o) => o.label.toLowerCase() === query);
+  const filtered = options.filter((o) => !query || (o.label ?? '').toLowerCase().includes(query));
+  const exact = options.some((o) => (o.label ?? '').toLowerCase() === query);
 
   const toggle = (id: string) => {
     if (values.includes(id)) onChange(values.filter((v) => v !== id));

@@ -75,12 +75,13 @@ test('the two halves of a section merge instead of overwriting each other', () =
   // In Autores the tab strip lives in AuthorsView and the filters in its catalogue
   // child. Each reports only what it owns, and neither may erase the other's half.
   store.patchViewSnapshot('vault-a', 'authors', AUTHORS_CUT);
-  store.patchViewSnapshot('vault-a', 'authors', { surface: 'author', openAuthor: { id: 'A1', label: 'Ricoeur' }, matrixOpen: false });
+  store.patchViewSnapshot('vault-a', 'authors', { surface: 'author', openAuthors: [{ id: 'A1', label: 'Ricoeur' }], activeAuthorId: 'A1', matrixOpen: false });
 
   assert.deepEqual(store.readViewSnapshot('vault-a', 'authors'), {
     ...AUTHORS_CUT,
     surface: 'author',
-    openAuthor: { id: 'A1', label: 'Ricoeur' },
+    openAuthors: [{ id: 'A1', label: 'Ricoeur' }],
+    activeAuthorId: 'A1',
     matrixOpen: false,
   });
 });
@@ -311,7 +312,7 @@ test('a snapshot is an initial value, never a reactive prop', async () => {
   }
 });
 
-test('Autores restores its filters, its ordering and its open tab', async () => {
+test('Autores restores its filters, its ordering and its open tabs', async () => {
   const view = await readSource('src/views/AuthorsView.tsx');
   for (const restored of ['sortBy', 'synthFilter', 'savedOnly', 'filtersOpen', 'query']) {
     assert.match(view, new RegExp(`useState[^\\n]*\\(\\) => snapshot\\?\\.${restored}`), `${restored} survives leaving the section`);
@@ -321,16 +322,16 @@ test('Autores restores its filters, its ordering and its open tab', async () => 
   assert.match(view, /const \[query, setQuery\] = useState\(\(\) => snapshot\?\.query \?\? ''\)/);
   assert.match(view, /const \[queryFilter, setQueryFilter\] = useState\(\(\) => snapshot\?\.query \?\? ''\)/);
   // A tab that is no longer open cannot be the active one.
-  assert.match(view, /surface === 'author' && !snapshot\?\.openAuthor\) return 'catalog'/);
+  assert.match(view, /surface === 'author' && !snapshot\?\.openAuthors\?\.some\(\(author\) => author\.id === snapshot\.activeAuthorId\)\) return 'catalog'/);
   assert.match(view, /surface === 'matrix' && !snapshot\?\.matrixOpen\) return 'catalog'/);
 });
 
-test('Ideas restores its filters and its open idea together with the selection behind it', async () => {
+test('Ideas restores its filters and its open idea tabs together with the active one', async () => {
   const view = await readSource('src/views/IdeasView.tsx');
-  for (const restored of ['search', 'typeFilter', 'sortKey', 'filtersOpen', 'openIdea']) {
+  for (const restored of ['search', 'typeFilter', 'sortKey', 'filtersOpen', 'openIdeas']) {
     assert.match(view, new RegExp(`useState[^\\n]*\\(\\) => snapshot\\?\\.${restored}`), `${restored} survives leaving the section`);
   }
-  assert.match(view, /setSelectedId[\s\S]{0,120}snapshot\?\.openIdea\?\.id/, 'the open tab and the detail it shows are restored as a pair');
+  assert.match(view, /snapshot\?\.openIdeas\?\.some\(\(idea\) => idea\.id === snapshot\.activeIdeaId\)/, 'only an open idea can be restored as the active tab');
 });
 
 test('Biblioteca keeps a cut per scope, and only what nothing else already persists', async () => {

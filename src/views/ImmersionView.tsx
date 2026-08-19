@@ -568,11 +568,11 @@ function ImmersionHome({
 
   const visible = useMemo(() => {
     const q = search.trim().toLowerCase();
-    const filtered = q ? sessions.filter((s) => s.title.toLowerCase().includes(q)) : sessions;
+    const filtered = q ? sessions.filter((s) => (s.title ?? '').toLowerCase().includes(q)) : sessions;
     const sorted = [...filtered];
-    if (sortKey === 'title') sorted.sort((a, b) => a.title.localeCompare(b.title));
-    else if (sortKey === 'oldest') sorted.sort((a, b) => a.updatedAt.localeCompare(b.updatedAt));
-    else sorted.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+    if (sortKey === 'title') sorted.sort((a, b) => (a.title ?? '').localeCompare(b.title ?? ''));
+    else if (sortKey === 'oldest') sorted.sort((a, b) => (a.updatedAt ?? '').localeCompare(b.updatedAt ?? ''));
+    else sorted.sort((a, b) => (b.updatedAt ?? '').localeCompare(a.updatedAt ?? ''));
     return sorted;
   }, [sessions, search, sortKey]);
 

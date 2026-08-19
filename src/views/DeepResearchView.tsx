@@ -400,7 +400,7 @@ export function DeepResearchView({
     if (!composerOpen || !isGenealogy) return;
     let cancelled = false;
     void window.nodus.listPersons().then((list) => {
-      if (!cancelled) setPersonsList([...list].sort((a, b) => a.displayName.localeCompare(b.displayName)));
+      if (!cancelled) setPersonsList([...list].sort((a, b) => (a.displayName ?? '').localeCompare(b.displayName ?? '')));
     });
     return () => {
       cancelled = true;
@@ -706,16 +706,16 @@ export function DeepResearchView({
     const q = search.trim().toLowerCase();
     const filtered = savedDrafts.filter((draft) => {
       const matchesSearch = !q
-        || draft.title.toLowerCase().includes(q)
-        || draft.brief.objective.toLowerCase().includes(q);
+        || (draft.title ?? '').toLowerCase().includes(q)
+        || (draft.brief.objective ?? '').toLowerCase().includes(q);
       const matchesReadState = readFilter === 'all'
         || (readFilter === 'read' ? !!draft.readAt : !draft.readAt);
       return matchesSearch && matchesReadState;
     });
     const sorted = [...filtered];
-    if (sortKey === 'title') sorted.sort((a, b) => a.title.localeCompare(b.title));
-    else if (sortKey === 'oldest') sorted.sort((a, b) => a.updatedAt.localeCompare(b.updatedAt));
-    else sorted.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+    if (sortKey === 'title') sorted.sort((a, b) => (a.title ?? '').localeCompare(b.title ?? ''));
+    else if (sortKey === 'oldest') sorted.sort((a, b) => (a.updatedAt ?? '').localeCompare(b.updatedAt ?? ''));
+    else sorted.sort((a, b) => (b.updatedAt ?? '').localeCompare(a.updatedAt ?? ''));
     return sorted;
   }, [savedDrafts, search, readFilter, sortKey]);
 

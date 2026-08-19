@@ -238,7 +238,7 @@ export function buildGraphModel(
     if (f.authors.length && !n.authors.some((a) => f.authors.includes(a))) return false;
     if (f.yearMin != null && !n.years.some((y) => y >= f.yearMin!)) return false;
     if (f.yearMax != null && !n.years.some((y) => y <= f.yearMax!)) return false;
-    if (includeSearch && q && !(n.label.toLowerCase().includes(q) || (n.statement ?? '').toLowerCase().includes(q) || n.authors.some((a) => a.toLowerCase().includes(q)))) {
+    if (includeSearch && q && !((n.label ?? '').toLowerCase().includes(q) || (n.statement ?? '').toLowerCase().includes(q) || n.authors.some((a) => (a ?? '').toLowerCase().includes(q)))) {
       return false;
     }
     return true;
@@ -531,11 +531,11 @@ function buildIdeaPresetAtlas(
         // the corpus has the least connective tissue — the useful gap signal the
         // legacy preset was trying to expose with edge filters alone.
         return a.degree - b.degree || Number(a.read) - Number(b.read)
-          || b.labelRank - a.labelRank || a.label.localeCompare(b.label);
+          || b.labelRank - a.labelRank || (a.label ?? '').localeCompare(b.label ?? '');
       }
       // Reading atlases lead with the ideas that best connect their territory.
       return b.degree - a.degree || b.workCount - a.workCount
-        || b.labelRank - a.labelRank || a.label.localeCompare(b.label);
+        || b.labelRank - a.labelRank || (a.label ?? '').localeCompare(b.label ?? '');
     });
     const room = Math.max(0, globalCap - selected.length);
     if (room === 0) break;
@@ -575,8 +575,8 @@ function buildIdeaPresetAtlas(
   }
 
   const rankedSelected = [...selected].sort((a, b) => {
-    if (preset === 'gaps') return a.degree - b.degree || a.label.localeCompare(b.label);
-    return b.degree - a.degree || a.label.localeCompare(b.label);
+    if (preset === 'gaps') return a.degree - b.degree || (a.label ?? '').localeCompare(b.label ?? '');
+    return b.degree - a.degree || (a.label ?? '').localeCompare(b.label ?? '');
   });
   const selectedNodes = rankedSelected.map((node, index) => ({
     ...node,
@@ -681,7 +681,7 @@ function buildContradictionPresetAtlas(data: GraphData, base: GraphModel): Graph
     .map((id) => candidateById.get(id)!)
     .sort((a, b) => (degreeById.get(b.id) ?? 0) - (degreeById.get(a.id) ?? 0)
       || b.labelRank - a.labelRank
-      || a.label.localeCompare(b.label));
+      || (a.label ?? '').localeCompare(b.label ?? ''));
   const selectedNodes: NodeModel[] = rankedSelected.map((node, index) => {
     const degree = degreeById.get(node.id) ?? 0;
     return {
@@ -748,7 +748,7 @@ function buildContradictionPresetAtlas(data: GraphData, base: GraphModel): Graph
 function buildAuthorPresetAtlas(base: GraphModel): GraphModel {
   const ranked = base.nodes
     .filter((node) => node.type === 'author')
-    .sort((a, b) => b.degree - a.degree || b.workCount - a.workCount || a.label.localeCompare(b.label))
+    .sort((a, b) => b.degree - a.degree || b.workCount - a.workCount || (a.label ?? '').localeCompare(b.label ?? ''))
     .slice(0, AUTHOR_ATLAS_CAP);
   if (ranked.length === 0) return { nodes: [], edges: [] };
 

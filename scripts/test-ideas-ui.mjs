@@ -34,13 +34,14 @@ test('Ideas catalogue can be searched, filtered and sorted', async () => {
   }
 });
 
-test('clicking an idea opens a persistent detail tab', async () => {
+test('clicking ideas opens independent persistent detail tabs', async () => {
   const view = await readSource('src/views/IdeasView.tsx');
-  assert.match(view, /setSelectedId\(idea\.id\);[\s\S]*setOpenIdea\(idea\);[\s\S]*setSurface\('idea'\)/);
+  assert.match(view, /setOpenIdeas\(\(current\) => \([\s\S]*current\.some\(\(open\) => open\.id === idea\.id\)[\s\S]*\[\.\.\.current, idea\][\s\S]*setActiveIdeaId\(idea\.id\);[\s\S]*setSurface\('idea'\)/, 'a new idea gets its own tab and an existing one is focused');
   assert.match(view, /data-testid="ideas-tab-catalog"/);
   assert.match(view, /data-testid="ideas-tab-idea"/);
+  assert.match(view, /openIdeas\.map\(\(idea\) =>/, 'all open idea details remain mounted');
   assert.match(view, /surface === 'catalog' \? 'flex h-full min-h-0 flex-col' : 'hidden'/, 'catalogue stays mounted behind the detail tab');
-  assert.match(view, /surface === 'idea' \? 'h-full overflow-y-auto p-5' : 'hidden'/, 'idea detail is rendered as a workspace tab');
+  assert.match(view, /surface === 'idea' && activeIdeaId === idea\.id \? 'h-full' : 'hidden'/, 'each idea detail is rendered as its own workspace tab');
 });
 
 test('idea detail keeps evidence, works and expandable connected ideas', async () => {

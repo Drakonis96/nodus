@@ -111,7 +111,7 @@ test('a manual toggle takes over from the automatic unfold', () => {
   );
 });
 
-test('the catalogue and current idea are persistent workspace tabs', () => {
+test('the catalogue and open maps are persistent workspace tabs', () => {
   assert.match(view, /data-testid="argument-map-tabs"/, 'the argument workspace exposes a tab strip');
   assert.match(view, /data-testid="argument-tab-catalog"/, 'the catalogue is always reachable as the first tab');
   assert.match(view, /data-testid="argument-tab-map"/, 'the selected idea owns a named map tab');
@@ -122,7 +122,7 @@ test('the catalogue and current idea are persistent workspace tabs', () => {
   );
   assert.match(
     view,
-    /className=\{surface === 'map' \? 'flex h-full min-h-0' : 'hidden'\}/,
-    'the nested map stays mounted when the reader returns to the catalogue',
+    /<ArgumentMapTab key=\{tab\.key\} tab=\{tab\} active=\{surface === 'map' && activeMapKey === tab\.key\}/,
+    'every nested map stays mounted when the reader switches tabs or returns to the catalogue',
   );
 });

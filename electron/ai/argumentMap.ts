@@ -73,6 +73,25 @@ interface IdeaRow {
   statement: string;
 }
 
+type RawIdeaRow = Omit<IdeaRow, 'type' | 'label' | 'statement'> & {
+  type: IdeaType | null;
+  label: string | null;
+  statement: string | null;
+};
+
+/** SQLite's original ideas table allowed nullable text; renderer contracts do not. */
+function listArgumentIdeas(): IdeaRow[] {
+  const rows = getDb()
+    .prepare('SELECT global_id, type, label, statement FROM ideas')
+    .all() as RawIdeaRow[];
+  return rows.map((row) => ({
+    global_id: row.global_id,
+    type: row.type ?? 'claim',
+    label: row.label ?? row.global_id,
+    statement: row.statement ?? '',
+  }));
+}
+
 interface EdgeRow {
   id: string;
   from_id: string;
@@ -104,9 +123,7 @@ function isDebateEdge(type: string): boolean {
 
 /** BFS the real idea↔idea edges from a seed, returning the focused subgraph. */
 function buildLocalSubgraph(seedId: string, maxIdeas = AI_MAX_IDEAS, maxEdges = AI_MAX_EDGES): LocalSubgraph {
-  const allIdeas = getDb()
-    .prepare('SELECT global_id, type, label, statement FROM ideas')
-    .all() as IdeaRow[];
+  const allIdeas = listArgumentIdeas();
   const ideaById = new Map(allIdeas.map((i) => [i.global_id, i]));
   if (!ideaById.has(seedId)) {
     throw new Error('La idea indicada no existe en el grafo.');
@@ -434,9 +451,7 @@ function pickBranches(candidates: AdjEntry[], cap: number): AdjEntry[] {
 
 /** Rank idea hubs by weighted connectivity for the automatic route picker. */
 export function discoverArgumentRoutes(): ArgumentRouteSuggestion[] {
-  const allIdeas = getDb()
-    .prepare('SELECT global_id, type, label, statement FROM ideas')
-    .all() as IdeaRow[];
+  const allIdeas = listArgumentIdeas();
   const ideaById = new Map(allIdeas.map((i) => [i.global_id, i]));
   if (allIdeas.length === 0) return [];
 

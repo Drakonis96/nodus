@@ -221,7 +221,7 @@ export function CollectionsModal({
     return items.filter((it) => {
       if (q) {
         const hit =
-          it.title.toLowerCase().includes(q) ||
+          (it.title ?? '').toLowerCase().includes(q) ||
           it.creators.some((c) => (c.lastName ?? c.name ?? '').toLowerCase().includes(q)) ||
           String(it.year ?? '').includes(q) ||
           (it.abstract ?? '').toLowerCase().includes(q);
@@ -230,7 +230,7 @@ export function CollectionsModal({
       if (types.size && !types.has(it.itemType)) return false;
       if (min != null && (it.year ?? 0) < min) return false;
       if (max != null && (it.year ?? 9999) > max) return false;
-      if (onlyTag && !it.tags.some((t) => t.toLowerCase() === readTagLower)) return false;
+      if (onlyTag && !it.tags.some((tag) => (tag ?? '').toLowerCase() === readTagLower)) return false;
       if (statusFilter === 'summary' && worksByKey.get(it.key)?.summary_status !== 'done') return false;
       if (statusFilter !== 'all' && statusFilter !== 'summary' && statusOf(it.key) !== statusFilter) return false;
       return true;
