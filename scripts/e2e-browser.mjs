@@ -890,13 +890,23 @@ try {
       'fresh configured home after clear all',
     );
     assert.equal(rebuilt.tabs.length, 1);
+    const rendererBounds = await page.locator('[data-browser-viewport]').evaluate((element) => {
+      const rect = element.getBoundingClientRect();
+      return { x: Math.round(rect.x), y: Math.round(rect.y), width: Math.round(rect.width), height: Math.round(rect.height) };
+    });
     const after = await app.evaluate(async ({ BrowserWindow, session, webContents }, oldIds) => {
       const browserSession = session.fromPartition('persist:nodus-browser');
       const current = webContents.getAllWebContents().filter((contents) => contents.session === browserSession);
+      const window = BrowserWindow.getAllWindows()[0];
+      const attached = window.contentView.children.find((view) =>
+        'webContents' in view && current.some((contents) => contents.id === view.webContents.id));
       return {
-        mainId: BrowserWindow.getAllWindows()[0].webContents.id,
+        mainId: window.webContents.id,
         oldDestroyed: oldIds.every((id) => !webContents.fromId(id) || webContents.fromId(id).isDestroyed()),
         browserCount: current.length,
+        attached: Boolean(attached),
+        visible: attached?.getVisible() ?? false,
+        bounds: attached?.getBounds() ?? null,
         storage: current[0]
           ? await current[0].executeJavaScript(`({ cookie: document.cookie, local: localStorage.getItem('nodus_e2e') })`)
           : null,
@@ -905,6 +915,9 @@ try {
     assert.equal(after.mainId, before.mainId, 'clear-all must not restart the Nodus renderer');
     assert.equal(after.oldDestroyed, true, 'clear-all must destroy every loaded website');
     assert.equal(after.browserCount, 1, 'clear-all must leave exactly one usable Browser tab');
+    assert.equal(after.attached, true, 'the replacement WebContentsView must be attached to the Nodus window');
+    assert.equal(after.visible, true, 'the replacement website must be visible after the confirmation closes');
+    assert.deepEqual(after.bounds, rendererBounds, 'the replacement website must retain the published viewport');
     assert.equal(after.storage.local, null, 'localStorage must be gone');
     assert.doesNotMatch(after.storage.cookie, /nodus_e2e=/, 'cookies must be gone');
   });

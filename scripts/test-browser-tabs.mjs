@@ -157,7 +157,9 @@ test('clear-all reconstructs a usable Browser even when Chromium clearing fails'
   const end = ipc.indexOf("h('browser:bookmarks:get'", start);
   const clearAll = ipc.slice(start, end);
   assert.match(clearAll, /assertUiSender\(event, getWindow\)/);
-  assert.ok(clearAll.indexOf('destroyBrowserSubsystem()') < clearAll.indexOf('clearAllBrowserData()'));
+  assert.match(clearAll, /destroyBrowserSubsystem\(\{ preserveViewport: true \}\)/,
+    'clear-all must retain the host and bounds needed to attach its replacement view');
+  assert.ok(clearAll.indexOf('destroyBrowserSubsystem') < clearAll.indexOf('clearAllBrowserData()'));
   assert.match(clearAll, /finally\s*\{[\s\S]*createTab\(replacementUrl\)/,
     'a failed or successful wipe must always recreate one configured home tab');
 });

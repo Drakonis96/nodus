@@ -560,7 +560,11 @@ export function registerBrowserIpc({ h, getWindow }: IpcContext): void {
   h('browser:clearAllData', async (event) => {
     assertUiSender(event, getWindow);
     const replacementUrl = homeUrl();
-    destroyBrowserSubsystem();
+    // This is a destroy-and-recreate operation while the Browser UI stays
+    // mounted. Keep the host window and the renderer-published viewport or the
+    // replacement WebContentsView loads correctly but can never be attached —
+    // a permanently white page that even Restart Browser cannot recover from.
+    destroyBrowserSubsystem({ preserveViewport: true });
     try {
       await clearAllBrowserData();
     } finally {
