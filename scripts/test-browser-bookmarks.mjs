@@ -149,6 +149,14 @@ test('trusted Bookmarks UI reuses Atlas styling and avoids native prompt dialogs
   assert.doesNotMatch(manager, /window\.(?:prompt|confirm)\(/);
   assert.doesNotMatch(browserView, /window\.(?:prompt|confirm)\(/);
   assert.match(browserView, /setBookmarksManager\(false\)[\s\S]{0,180}setReturnToBookmarksManager\(true\)/);
+  const omniboxStart = browserView.indexOf('data-testid="browser-omnibox-shell"');
+  const bookmarkButton = browserView.indexOf('data-testid="browser-add-bookmark"');
+  const omniboxEnd = browserView.indexOf('</div>', bookmarkButton);
+  const managerButton = browserView.indexOf('dataTestId="browser-bookmarks-manager-button"');
+  assert.ok(omniboxStart >= 0 && bookmarkButton > omniboxStart && omniboxEnd > bookmarkButton,
+    'the page bookmark action must live inside the navigation bar');
+  assert.ok(managerButton > omniboxEnd,
+    'the separate toolbar bookmark icon must only open the bookmark manager');
 });
 
 test('home-page preferences expose Atlas, Bookmarks, custom and blank modes', () => {

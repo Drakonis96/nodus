@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Icon } from '../components/ui';
 import { t } from '../i18n';
 import { MAX_BROWSER_TABS } from '@shared/browser';
@@ -15,7 +15,7 @@ import { BrowserCaptureModal } from '../components/browser/BrowserCaptureModal';
 import { BrowserBookmarkModal, type BookmarkEditorTarget } from '../components/browser/BrowserBookmarkModal';
 import { BrowserBookmarksManager } from '../components/browser/BrowserBookmarksManager';
 import { NodusBookmarksPage, NodusResearchAtlasPage } from '../components/browser/NodusStartPages';
-import { emptyBrowserBookmarkStore } from '@shared/browserBookmarks';
+import { canonicalBookmarkUrl, emptyBrowserBookmarkStore } from '@shared/browserBookmarks';
 import type { BrowserBookmarkStore } from '@shared/browserBookmarks';
 
 /**
@@ -54,6 +54,12 @@ export function NodusBrowserView() {
 
   const active: BrowserTabState | null =
     state.tabs.find((tab) => tab.id === state.activeTabId) ?? null;
+  const activeBookmark = useMemo(() => {
+    if (active?.kind !== 'web') return null;
+    const currentUrl = canonicalBookmarkUrl(active.url);
+    if (!currentUrl) return null;
+    return bookmarks.bookmarks.find((entry) => canonicalBookmarkUrl(entry.url) === currentUrl) ?? null;
+  }, [active?.kind, active?.url, bookmarks.bookmarks]);
 
   // Subscribe first, then read: doing it the other way round drops any change
   // that lands between the read and the subscription.
@@ -321,6 +327,24 @@ export function NodusBrowserView() {
                 }
               }}
             />
+            <button
+              type="button"
+              data-testid="browser-add-bookmark"
+              title={activeBookmark ? t('Editar') : t('Añadir marcador')}
+              aria-label={activeBookmark ? t('Editar') : t('Añadir marcador')}
+              disabled={active?.kind !== 'web'}
+              onClick={() => {
+                if (activeBookmark) {
+                  setReturnToBookmarksManager(false);
+                  setBookmarkEditor({ mode: 'edit', bookmark: activeBookmark });
+                  return;
+                }
+                void addBookmark();
+              }}
+              className="-mr-1 shrink-0 rounded-md border-l border-neutral-200 p-1.5 pl-2.5 text-neutral-500 transition-colors hover:bg-neutral-100 hover:text-neutral-800 disabled:cursor-not-allowed disabled:opacity-35 dark:border-neutral-700 dark:text-neutral-400 dark:hover:bg-neutral-800 dark:hover:text-neutral-100"
+            >
+              <Icon name={activeBookmark ? 'bookmarkFill' : 'bookmark'} size={16} />
+            </button>
           </div>
         </form>
 
@@ -331,16 +355,6 @@ export function NodusBrowserView() {
             onClick={() => setPanel((current) => (current === 'downloads' ? null : 'downloads'))}
           />
           {downloads.length > 0 && <span className="header-action-badge">{downloads.length}</span>}
-        </div>
-
-        <div>
-          <ToolbarButton
-            icon="bookmark"
-            label={t('Añadir marcador')}
-            disabled={active?.kind !== 'web'}
-            dataTestId="browser-add-bookmark"
-            onClick={() => void addBookmark()}
-          />
         </div>
 
         <div>
