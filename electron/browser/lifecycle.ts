@@ -24,7 +24,7 @@ export interface DestroyBrowserSubsystemOptions {
 export function destroyBrowserSubsystem(options: DestroyBrowserSubsystemOptions = {}): void {
   // Closing tabs stops all page loads and media before other transient state is
   // discarded. closeAllBrowserTabs itself uses the same per-tab destructor as
-  // ordinary close and render-process-gone.
+  // ordinary close and unexpected WebContents destruction.
   closeAllBrowserTabs({ preserveViewport: options.preserveViewport });
   cancelPermissionRequests();
   resetBrowserDownloads();

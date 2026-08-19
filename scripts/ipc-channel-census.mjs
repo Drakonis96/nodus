@@ -36,6 +36,11 @@ const isBridge = (file) => path.relative(repoRoot, file).startsWith(path.join('e
 const HANDLE = /(?:^|[^A-Za-z0-9_$.])(?:(?:ctx|context)\.)?h\(\s*(['"])([^'"\n]+)\1/g;
 const IPC_MAIN_HANDLE = /ipcMain\.handle(?:Once)?\(\s*(['"])([^'"\n]+)\1/g;
 const IPC_MAIN_ON = /ipcMain\.(?:on|once)\(\s*(['"])([^'"\n]+)\1/g;
+// Electron 43 exposes a WebContents-local IPC bus. Browser-page preload
+// replies deliberately use it so they are unreachable from every other
+// renderer even if a channel name leaks; it is still the main-process listener
+// paired with ipcRenderer.send and belongs in the same contract census.
+const WEB_CONTENTS_IPC_ON = /[A-Za-z0-9_$.]+\.ipc\.(?:on|once)\(\s*(['"])([^'"\n]+)\1/g;
 const RENDERER_INVOKE = /ipcRenderer\.invoke\(\s*(['"])([^'"\n]+)\1/g;
 const RENDERER_SEND = /ipcRenderer\.(?:send|sendSync)\(\s*(['"])([^'"\n]+)\1/g;
 const RENDERER_ON = /ipcRenderer\.(?:on|once)\(\s*(['"])([^'"\n]+)\1/g;
@@ -80,7 +85,7 @@ export function ipcCensus() {
 
   cached = {
     handled: [...collect(HANDLE, main), ...collect(IPC_MAIN_HANDLE, main)],
-    listened: collect(IPC_MAIN_ON, main),
+    listened: [...collect(IPC_MAIN_ON, main), ...collect(WEB_CONTENTS_IPC_ON, main)],
     invoked: collect(RENDERER_INVOKE, bridge),
     sent: collect(RENDERER_SEND, bridge),
     subscribed: collect(RENDERER_ON, bridge),

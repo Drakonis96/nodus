@@ -13,6 +13,7 @@
 import { ipcMain, type BrowserWindow } from 'electron';
 import { localizeIpcPayload, localizeRuntimeError } from '@shared/uiLanguage';
 import { getSettings } from '../db/settingsRepo';
+import { assertNotBrowserIpcSender } from './trust';
 
 export interface IpcContext {
   /**
@@ -53,6 +54,10 @@ export function localizedForUi<T>(payload: T): T {
 export function createIpcContext(getWindow: () => BrowserWindow | null): IpcContext {
   const h: typeof ipcMain.handle = (channel, listener) => ipcMain.handle(channel, async (event, ...args) => {
     try {
+      // Defence in depth for the entire legacy IPC surface. A Browser renderer
+      // that somehow gains ipcRenderer still cannot reach vaults, files, AI,
+      // settings, databases or any other handler registered through `h`.
+      assertNotBrowserIpcSender(event);
       const result = await listener(event, ...args);
       return localizeIpcPayload(result, getSettings().uiLanguage);
     } catch (error) {

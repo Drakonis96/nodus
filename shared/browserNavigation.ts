@@ -37,6 +37,12 @@ const TOP_LEVEL_ALLOWED = new Set(['http', 'https', 'about']);
  */
 const SUBFRAME_EXTRA_ALLOWED = new Set(['blob', 'data']);
 
+/** Schemes a web document may use for subresources in the Browser session. */
+const RESOURCE_ALLOWED = new Set(['http', 'https', 'ws', 'wss', 'blob', 'data']);
+
+/** Chromium's built-in PDF viewer. It is not a Nodus extension or protocol. */
+const CHROMIUM_PDF_VIEWER_ID = 'mhjfbmdgcfjbbpaeojofohoefgiehjai';
+
 function schemeOf(url: string): string | null {
   const match = /^([a-z][a-z0-9+.-]*):/i.exec(url.trim());
   return match ? match[1].toLowerCase() : null;
@@ -80,4 +86,26 @@ export function decideNavigation(url: string, options: { isMainFrame?: boolean }
 /** Convenience wrapper for the common main-frame case. */
 export function isNavigationAllowed(url: string, isMainFrame = true): boolean {
   return decideNavigation(url, { isMainFrame }).allowed;
+}
+
+/**
+ * Decide whether the Browser session may issue one network/resource request.
+ *
+ * This is deliberately a separate, smaller allowlist than navigation: pages
+ * legitimately need data:, blob: and WebSockets for their own resources, but
+ * no arbitrary application/custom scheme is ever allowed to reach Chromium's
+ * protocol dispatcher. The one non-web exception is Chromium's bundled PDF
+ * viewer extension, required to display untrusted PDFs outside Nodus's renderer.
+ */
+export function isBrowserResourceAllowed(url: string, resourceType = 'other'): boolean {
+  const scheme = schemeOf(url);
+  if (!scheme) return false;
+  if (scheme === 'chrome-extension') {
+    try { return new URL(url).hostname === CHROMIUM_PDF_VIEWER_ID; } catch { return false; }
+  }
+  if (resourceType === 'mainFrame' || resourceType === 'subFrame') {
+    return decideNavigation(url, { isMainFrame: resourceType === 'mainFrame' }).allowed;
+  }
+  if (RESOURCE_ALLOWED.has(scheme)) return true;
+  return scheme === 'about' && url.trim().toLowerCase() === 'about:blank';
 }

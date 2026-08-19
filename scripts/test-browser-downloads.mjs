@@ -27,7 +27,8 @@ execFileSync(
 
 const require = createRequire(import.meta.url);
 const {
-  classifyDownload, isImportable, isTooLarge, MAX_DOWNLOAD_BYTES, MAX_IMPORTABLE_BYTES,
+  classifyDownload, isImportable, isTooLarge, safeBrowserDownloadName,
+  MAX_DOWNLOAD_BYTES, MAX_IMPORTABLE_BYTES,
 } = require(bundle);
 
 test('a PDF is recognised by MIME and by extension', () => {
@@ -108,6 +109,16 @@ test('missing or hostile input classifies as other rather than throwing', () => 
   for (const [name, mime] of [[undefined, undefined], ['', ''], ['.', ''], ['no-extension', ''], ['__proto__', 'constructor']]) {
     assert.equal(classifyDownload(name, mime), 'other', String(name));
   }
+});
+
+test('a site-controlled filename cannot escape the trusted download directory', () => {
+  assert.equal(safeBrowserDownloadName('../../vault.sqlite'), 'vault.sqlite');
+  assert.equal(safeBrowserDownloadName('..\\..\\vault.sqlite'), 'vault.sqlite');
+  assert.equal(safeBrowserDownloadName('/etc/passwd'), 'passwd');
+  assert.equal(safeBrowserDownloadName('..'), 'download');
+  assert.equal(safeBrowserDownloadName('a\u0000\nb.pdf'), 'ab.pdf');
+  assert.equal(safeBrowserDownloadName(undefined), 'download');
+  assert.ok(safeBrowserDownloadName('x'.repeat(500)).length <= 240);
 });
 
 test.after(() => rmSync(dir, { recursive: true, force: true }));

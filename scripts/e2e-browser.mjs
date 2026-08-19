@@ -76,6 +76,50 @@ const PAGES = {
   '/download': `<!doctype html><html><head><title>Download page</title></head><body><main>
         <a id="slow-download" href="/slow-download.bin" download>Download slowly</a>
         </main></body></html>`,
+
+  // Deliberately hostile. Every assertion below is observed from inside this
+  // renderer, not inferred from WebPreferences in the main process.
+  '/hostile': `<!doctype html><html><head><title>Hostile fixture</title></head><body><main>
+        <h1>Hostile fixture</h1>
+        <a id="normal-link" href="/second">normal link</a>
+        <button id="popup" onclick="window.open('/second')">popup</button>
+        <button id="external" onclick="window.open('shell://run/anything')">external</button>
+        <iframe id="internal-frame" src="nodus-library://item/secret"></iframe>
+        <script>
+          window.hostileReport = (async () => {
+            const timeout = (label) => new Promise((resolve) => setTimeout(() => resolve('timeout:' + label), 3000));
+            const fails = (label, fn) => Promise.race([
+              Promise.resolve().then(fn).then(() => false, () => true),
+              timeout(label),
+            ]);
+            const geolocation = await Promise.race([
+              navigator.permissions.query({ name: 'geolocation' })
+                .then((value) => value.state).catch(() => 'denied'),
+              timeout('geolocation'),
+            ]);
+            const notifications = typeof Notification === 'undefined'
+              ? 'unavailable'
+              : await Promise.race([Notification.requestPermission().catch(() => 'denied'), timeout('notifications')]);
+            return {
+              nodus: typeof window.nodus,
+              require: typeof window.require,
+              process: typeof window.process,
+              ipcRenderer: typeof window.ipcRenderer,
+              electron: typeof window.electron,
+              fs: typeof window.fs,
+              path: typeof window.path,
+              childProcess: typeof window.child_process,
+              fileFetchBlocked: await fails('file', () => fetch('file:///etc/passwd')),
+              libraryFetchBlocked: await fails('library', () => fetch('nodus-library://item/secret')),
+              imageFetchBlocked: await fails('image', () => fetch('nodus-image://vault/secret.png')),
+              archiveFetchBlocked: await fails('archive', () => fetch('nodus-archive://vault/secret')),
+              geolocation,
+              notifications,
+              displayCaptureBlocked: !navigator.mediaDevices?.getDisplayMedia
+                || await fails('display', () => navigator.mediaDevices.getDisplayMedia({ video: true })),
+            };
+          })();
+        </script></main></body></html>`,
 };
 
 let server;
@@ -117,6 +161,11 @@ async function startFixtures() {
         response.write(Buffer.alloc(size, 0x5a));
       }, 50);
       response.once('close', () => clearInterval(timer));
+      return;
+    }
+    if (url.pathname === '/redirect-internal') {
+      response.writeHead(302, { Location: 'nodus-library://item/secret' });
+      response.end();
       return;
     }
     const body = PAGES[url.pathname];
@@ -351,6 +400,96 @@ try {
     void browserView;
   });
 
+  await check('a hostile page cannot reach Node, IPC, files, vault protocols or forbidden permissions', async () => {
+    await call('submitBrowserOmnibox', `${origin}/hostile`);
+    await waitFor((s) => s.tabs.some((t) => t.url.endsWith('/hostile') && !t.loading), 'the hostile fixture');
+    const report = await app.evaluate(async ({ webContents }) => {
+      const target = webContents.getAllWebContents().find((wc) => wc.getURL().endsWith('/hostile'));
+      if (!target) throw new Error('hostile Browser renderer missing');
+      return target.executeJavaScript('window.hostileReport', true);
+    });
+    for (const name of ['nodus', 'require', 'process', 'ipcRenderer', 'electron', 'fs', 'path', 'childProcess']) {
+      assert.equal(report[name], 'undefined', `${name} leaked into untrusted content`);
+    }
+    for (const name of ['fileFetchBlocked', 'libraryFetchBlocked', 'imageFetchBlocked', 'archiveFetchBlocked']) {
+      assert.equal(report[name], true, `${name} must be true`);
+    }
+    assert.equal(report.geolocation, 'denied', 'geolocation must fail closed without prompting');
+    assert.notEqual(report.notifications, 'granted', 'notifications must never be granted');
+    assert.notEqual(report.displayCaptureBlocked, false,
+      `display capture acquired a stream: ${String(report.displayCaptureBlocked)}`);
+
+    const frameUrls = await app.evaluate(({ webContents }) => {
+      const target = webContents.getAllWebContents().find((wc) => wc.getURL().endsWith('/hostile'));
+      return target?.mainFrame.frames.map((frame) => frame.url) ?? [];
+    });
+    assert.equal(frameUrls.some((url) => url.startsWith('nodus-library:')), false,
+      `an iframe reached the Library protocol: ${JSON.stringify(frameUrls)}`);
+  });
+
+  await check('popups are controlled tabs with identical security settings and custom schemes are denied', async () => {
+    const before = await state();
+    await app.evaluate(async ({ webContents }) => {
+      const target = webContents.getAllWebContents().find((wc) => wc.getURL().endsWith('/hostile'));
+      if (!target) throw new Error('hostile Browser renderer missing');
+      await target.executeJavaScript(`document.getElementById('external').click()`, true);
+    });
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    assert.equal((await state()).tabs.length, before.tabs.length,
+      'a privileged external/custom scheme must not create a tab or BrowserWindow');
+
+    await app.evaluate(async ({ webContents }) => {
+      const target = webContents.getAllWebContents().find((wc) => wc.getURL().endsWith('/hostile'));
+      await target.executeJavaScript(`document.getElementById('popup').click()`, true);
+    });
+    await waitFor((s) => s.tabs.length === before.tabs.length + 1 && s.tabs.some((t) => t.url.endsWith('/second') && !t.loading),
+      'a controlled popup tab');
+    const popup = await app.evaluate(async ({ session, webContents }) => {
+      const browserSession = session.fromPartition('persist:nodus-browser');
+      const target = webContents.getAllWebContents().find((wc) => wc.session === browserSession && wc.getURL().endsWith('/second'));
+      if (!target) return null;
+      const prefs = target.getLastWebPreferences();
+      const workerGlobals = await target.executeJavaScript(`new Promise((resolve) => {
+        const worker = new Worker(URL.createObjectURL(new Blob([
+          "postMessage({ process: typeof process, require: typeof require })"
+        ], { type: 'text/javascript' })));
+        worker.onmessage = (event) => { resolve(event.data); worker.terminate(); };
+        worker.onerror = () => resolve({ process: 'unavailable', require: 'unavailable' });
+      })`, true);
+      target.openDevTools({ mode: 'detach' });
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      return {
+        sandbox: prefs.sandbox,
+        contextIsolation: prefs.contextIsolation,
+        nodeIntegration: prefs.nodeIntegration,
+        webSecurity: prefs.webSecurity,
+        devToolsOpened: target.isDevToolsOpened(),
+        workerGlobals,
+        browserSession: target.session === browserSession,
+      };
+    });
+    assert.deepEqual(popup, {
+      sandbox: true,
+      contextIsolation: true,
+      nodeIntegration: false,
+      webSecurity: true,
+      devToolsOpened: false,
+      workerGlobals: { process: 'undefined', require: 'undefined' },
+      browserSession: true,
+    });
+  });
+
+  await check('an HTTP redirect cannot cross into a Nodus custom protocol', async () => {
+    await call('submitBrowserOmnibox', `${origin}/redirect-internal`);
+    const blocked = await waitFor(
+      (s) => s.tabs.some((t) => t.error?.kind === 'blocked-scheme'),
+      'the custom-protocol redirect to be refused',
+    );
+    const tab = blocked.tabs.find((entry) => entry.error?.kind === 'blocked-scheme');
+    assert.ok(tab, 'the trusted chrome must show a blocked-scheme state');
+    assert.equal(tab.url.startsWith('nodus-library:'), false, 'the tab must never commit the privileged URL');
+  });
+
   await check('the address bar refuses file: and the nodus vault schemes', async () => {
     for (const blocked of ['file:///etc/passwd', 'nodus-library://item/1', 'javascript:alert(1)']) {
       const result = await call('submitBrowserOmnibox', blocked);
@@ -395,7 +534,10 @@ try {
 
   await check('Add to Library saves while automatic backups are disabled', async () => {
     await call('submitBrowserOmnibox', `${origin}/`);
-    await waitFor((s) => s.tabs.some((t) => t.url === `${origin}/` && !t.loading), 'the capturable page');
+    await waitFor((s) => {
+      const active = s.tabs.find((t) => t.id === s.activeTabId);
+      return active?.url === `${origin}/` && !active.loading;
+    }, 'the active capturable page');
     const preview = await call('captureBrowserPage');
     const saved = await call('saveBrowserCapture', preview.request, false);
     assert.equal(saved.ok, true);
@@ -561,6 +703,36 @@ try {
     const report = await waitFor(async () => true, 'noop').then(() => call('getBrowserStorage', true));
     assert.ok(report.cookieCount >= 1, `expected a cookie, got ${report.cookieCount}`);
     assert.ok(report.sites.some((site) => site.origin.includes('127.0.0.1')), 'the fixture host must appear');
+  });
+
+  await check('Browser cookies and storage are isolated from the trusted default session', async () => {
+    const isolation = await app.evaluate(async ({ session, webContents }, fixtureOrigin) => {
+      const browserSession = session.fromPartition('persist:nodus-browser');
+      await session.defaultSession.cookies.set({
+        url: fixtureOrigin,
+        name: 'trusted_default_only',
+        value: 'secret',
+      });
+      const browserCookies = await browserSession.cookies.get({ url: fixtureOrigin });
+      const defaultCookies = await session.defaultSession.cookies.get({ url: fixtureOrigin });
+      const target = webContents.getAllWebContents().find((wc) => wc.session === browserSession && wc.getURL().startsWith(fixtureOrigin));
+      const pageStorage = target
+        ? await target.executeJavaScript(`({ cookie: document.cookie, local: localStorage.getItem('nodus_e2e') })`)
+        : null;
+      return {
+        browserNames: browserCookies.map((cookie) => cookie.name),
+        defaultNames: defaultCookies.map((cookie) => cookie.name),
+        pageStorage,
+      };
+    }, origin);
+    assert.ok(isolation.browserNames.includes('nodus_e2e'), 'Browser session cookie is missing');
+    assert.equal(isolation.browserNames.includes('trusted_default_only'), false,
+      'a default-session cookie leaked into Browser');
+    assert.equal(isolation.defaultNames.includes('nodus_e2e'), false,
+      'a Browser cookie leaked into trusted Nodus');
+    assert.ok(isolation.defaultNames.includes('trusted_default_only'));
+    assert.equal(isolation.pageStorage.local, 'yes');
+    assert.doesNotMatch(isolation.pageStorage.cookie, /trusted_default_only/);
   });
 
   await check('restart destroys every old Browser WebContents but preserves Nodus and its persistent session', async () => {
@@ -767,6 +939,35 @@ try {
     assert.deepEqual(await call('getBrowserMedia'), [], 'all Browser media state must be cleared');
   });
 
+  await check('a compromised Browser renderer can crash and recover without restarting Nodus', async () => {
+    await call('restartNodusBrowser', false);
+    await waitFor((s) => s.tabs.length === 1 && s.tabs[0].url === `${origin}/` && !s.tabs[0].loading,
+      'one clean tab before the crash');
+    const before = await app.evaluate(({ BrowserWindow, session, webContents }) => {
+      const browserSession = session.fromPartition('persist:nodus-browser');
+      const target = webContents.getAllWebContents().find((wc) => wc.session === browserSession);
+      if (!target) throw new Error('Browser renderer missing before crash');
+      return { mainId: BrowserWindow.getAllWindows()[0].webContents.id, browserId: target.id };
+    });
+
+    await app.evaluate(({ webContents }, id) => webContents.fromId(id)?.forcefullyCrashRenderer(), before.browserId);
+    const crashed = await waitFor(
+      (s) => s.tabs.length === 1 && s.tabs[0].error?.kind === 'crashed',
+      'the controlled Page crashed state',
+    );
+    assert.match(crashed.tabs[0].error.description, /crash|kill|exit|process/i);
+    const mainAfterCrash = await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].webContents.id);
+    assert.equal(mainAfterCrash, before.mainId, 'the trusted Nodus renderer must remain the same process endpoint');
+    assert.ok(await page.evaluate(() => window.nodus.getSettings()), 'trusted Nodus IPC must still work after the crash');
+
+    await call('browserReload');
+    const recovered = await waitFor(
+      (s) => s.tabs.length === 1 && s.tabs[0].url === `${origin}/` && !s.tabs[0].loading && !s.tabs[0].error,
+      'the crashed tab to reload with a fresh Chromium renderer',
+    );
+    assert.equal(recovered.tabs[0].title, 'Fixture home');
+  });
+
   await check('tabs close without leaking WebContents', async () => {
     const before = await app.evaluate(({ webContents }) => webContents.getAllWebContents().length);
     const ids = [];
@@ -798,6 +999,7 @@ try {
     const settings = await page.evaluate(() => window.nodus.getSettings());
     assert.ok(settings, 'IPC must still round-trip');
   });
+
 } finally {
   if (app) await app.close().catch(() => undefined);
   server?.close();

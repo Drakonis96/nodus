@@ -38,11 +38,14 @@ test('every browser tab is created with the hardened webPreferences', () => {
     /sandbox:\s*true/,
     /contextIsolation:\s*true/,
     /nodeIntegration:\s*false/,
+    /nodeIntegrationInWorker:\s*false/,
     /nodeIntegrationInSubFrames:\s*false/,
     /webSecurity:\s*true/,
     /allowRunningInsecureContent:\s*false/,
     /experimentalFeatures:\s*false/,
     /webviewTag:\s*false/,
+    /devTools:\s*false/,
+    /navigateOnDragDrop:\s*false/,
   ];
   for (const pattern of required) {
     assert.match(tabs, pattern, `browser tabs must set ${pattern}`);
@@ -73,7 +76,18 @@ test('navigation is filtered in both the main frame and subframes', () => {
   const tabs = code('electron/browser/tabs.ts');
   assert.match(tabs, /'will-navigate'/, 'main-frame navigation must be guarded');
   assert.match(tabs, /'will-frame-navigate'/, 'subframe navigation must be guarded');
+  assert.match(tabs, /'will-redirect'/, 'redirect navigation must be guarded separately');
   assert.match(tabs, /decideNavigation/, 'both guards must use the shared policy');
+});
+
+test('Browser preload replies are scoped to the exact tab and its main frame', () => {
+  const tabs = code('electron/browser/tabs.ts');
+  assert.match(tabs, /webContents\.ipc\.on|contents\.ipc\.on/,
+    'remote preload IPC must be scoped to a single WebContents');
+  assert.match(tabs, /event\.senderFrame\s*!==\s*tab\.view\.webContents\.mainFrame|event\.senderFrame\s*!==\s*contents\.mainFrame/,
+    'remote preload IPC must reject subframes');
+  assert.doesNotMatch(tabs, /ipcMain\.on\(['"]nodus-browser:page:/,
+    'remote page channels must never be registered on the global IPC bus');
 });
 
 test('certificate errors are never overridden', () => {
@@ -121,6 +135,34 @@ test('every browser IPC channel validates its sender', () => {
   });
 });
 
+test('Browser UI IPC requires the exact trusted Nodus main frame', () => {
+  const trust = code('electron/ipc/trust.ts');
+  assert.match(trust, /event\.sender\s*!==\s*window\.webContents/);
+  assert.match(trust, /event\.senderFrame\s*!==\s*window\.webContents\.mainFrame/);
+  const browserIpc = code('electron/ipc/browser.ts');
+  assert.match(browserIpc, /assertTrustedNodusMainFrame/);
+});
+
+test('the whole privileged IPC surface rejects the Browser partition', () => {
+  const context = code('electron/ipc/context.ts');
+  const trust = code('electron/ipc/trust.ts');
+  assert.match(context, /assertNotBrowserIpcSender\(event\)/,
+    'every handler registered through h must reject Browser senders first');
+  assert.match(trust, /session\.fromPartition\(NODUS_BROWSER_PARTITION\)/,
+    'the rejection must key on the dedicated session, not a caller-controlled value');
+
+  for (const [file, channel] of [
+    ['electron/ipc.ts', 'nodi:setMouseIgnore:async'],
+    ['electron/ipc/toolkit.ts', 'presenter:control'],
+  ]) {
+    const source = code(file);
+    const at = source.indexOf(`ipcMain.on('${channel}'`);
+    assert.ok(at >= 0, `${channel} must still exist`);
+    assert.match(source.slice(at, at + 300), /assertNotBrowserIpcSender\(/,
+      `${channel} must reject Browser senders`);
+  }
+});
+
 test('both permission handlers are installed, not just the request one', () => {
   // permissions.query() goes through the check handler, and the two unions
   // differ. Installing only the request handler leaves that path unguarded.
@@ -143,6 +185,11 @@ test('hardware access is refused through the handlers that actually govern it', 
   assert.match(perms, /setDisplayMediaRequestHandler/, 'screen capture must be handled');
   assert.match(perms, /setUSBProtectedClassesHandler/, 'USB classes must stay protected');
   assert.match(perms, /setBluetoothPairingHandler/, 'bluetooth pairing must be refused');
+  for (const event of ['select-usb-device', 'select-hid-device', 'select-serial-port']) {
+    assert.match(perms, new RegExp(`'${event}'`), `${event} must be refused explicitly`);
+  }
+  const tabs = code('electron/browser/tabs.ts');
+  assert.match(tabs, /'select-bluetooth-device'/, 'the per-WebContents bluetooth chooser must be refused');
 });
 
 test('the vault protocols can never be reached from a page', () => {
@@ -161,10 +208,30 @@ test('the browser session is separate from the one Nodus itself uses', () => {
   assert.doesNotMatch(session, /defaultSession/, 'the browser must never touch the default session');
 });
 
+test('Browser subresources fail closed before internal protocol handlers', () => {
+  const session = code('electron/browser/session.ts');
+  assert.match(session, /webRequest\.onBeforeRequest/);
+  assert.match(session, /isBrowserResourceAllowed/);
+  for (const protocolFile of ['electron/imageProtocol.ts', 'electron/archiveProtocol.ts', 'electron/libraryProtocol.ts']) {
+    const protocolSource = code(protocolFile);
+    assert.match(protocolSource, /protocol\./,
+      `${protocolFile} should remain a default-session-only internal protocol`);
+    assert.doesNotMatch(protocolSource, /browserSession|persist:nodus-browser/,
+      `${protocolFile} must never register on the Browser session`);
+  }
+});
+
 test('the browser never opens a URL externally without scheme validation', () => {
   for (const file of ['electron/browser/tabs.ts', 'electron/browser/session.ts', 'electron/ipc/browser.ts']) {
     assert.doesNotMatch(code(file), /shell\.openExternal/, `${file} must not call openExternal directly`);
   }
+  const menu = code('electron/browser/contextMenu.ts');
+  assert.match(menu, /linkIsNavigable\s*=.*decideNavigation/,
+    'the one explicit system-browser action must use the shared URL policy');
+  const externalAt = menu.indexOf('shell.openExternal(linkUrl)');
+  const guardAt = menu.lastIndexOf('if (linkIsNavigable)', externalAt);
+  assert.ok(externalAt > 0 && guardAt > 0 && guardAt < externalAt,
+    'shell.openExternal must remain inside the validated-link branch');
 });
 
 test('every icon the browser view names actually exists', () => {

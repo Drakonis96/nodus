@@ -61,7 +61,7 @@ test('the policy table covers every permission Electron can check', () => {
 });
 
 test('anything unknown denies rather than falls through', () => {
-  for (const invented of ['teleportation', 'nfc', '', 'proto', 'constructor', '__proto__']) {
+  for (const invented of ['teleportation', 'nfc', '', 'proto', 'constructor', '__proto__', 'prototype']) {
     assert.equal(resolveBrowserPermission(invented, 'https://x.org', null).policy, 'deny', invented);
   }
 });
@@ -71,7 +71,7 @@ test('the sensitive permissions are denied outright', () => {
     'notifications', 'clipboard-read', 'deprecated-sync-clipboard-read', 'pointerLock',
     'keyboardLock', 'display-capture', 'fileSystem', 'midi', 'midiSysex', 'usb', 'serial',
     'hid', 'bluetooth', 'idle-detection', 'window-management', 'speaker-selection',
-    'storage-access', 'top-level-storage-access', 'openExternal', 'unknown',
+    'storage-access', 'top-level-storage-access', 'openExternal', 'geolocation', 'unknown',
   ];
   for (const name of denied) {
     assert.equal(BROWSER_PERMISSION_POLICY[name], 'deny', `${name} must be denied`);
@@ -82,7 +82,7 @@ test('camera and microphone ask rather than resolve silently either way', () => 
   // There is no 'camera'/'microphone' permission in Electron; both arrive as
   // 'media' and the prompt reads details.mediaTypes to say which.
   assert.equal(BROWSER_PERMISSION_POLICY.media, 'ask');
-  assert.equal(BROWSER_PERMISSION_POLICY.geolocation, 'ask');
+  assert.equal(BROWSER_PERMISSION_POLICY.geolocation, 'deny');
   assert.equal(BROWSER_PERMISSION_POLICY.camera, undefined);
   assert.equal(BROWSER_PERMISSION_POLICY.microphone, undefined);
 });
@@ -93,19 +93,20 @@ test('normal playback is allowed so ordinary sites work', () => {
   assert.equal(BROWSER_PERMISSION_POLICY['clipboard-sanitized-write'], 'allow');
 });
 
-test('a remembered decision wins over the table, in both directions', () => {
+test('a remembered decision only applies to an explicitly promptable permission', () => {
   const stored = {
-    'https://jstor.org': { media: 'allow', fullscreen: 'deny' },
+    'https://jstor.org': { media: 'allow', fullscreen: 'deny', geolocation: 'allow', fileSystem: 'allow' },
   };
   assert.deepEqual(
     resolveBrowserPermission('media', 'https://jstor.org', stored),
     { policy: 'allow', remembered: true },
   );
-  // A user can revoke something the table allows.
-  assert.deepEqual(
-    resolveBrowserPermission('fullscreen', 'https://jstor.org', stored),
-    { policy: 'deny', remembered: true },
-  );
+  assert.deepEqual(resolveBrowserPermission('fullscreen', 'https://jstor.org', stored),
+    { policy: 'allow', remembered: false });
+  assert.deepEqual(resolveBrowserPermission('geolocation', 'https://jstor.org', stored),
+    { policy: 'deny', remembered: false });
+  assert.deepEqual(resolveBrowserPermission('fileSystem', 'https://jstor.org', stored),
+    { policy: 'deny', remembered: false });
 });
 
 test('a decision is scoped to its own origin and does not leak to another', () => {

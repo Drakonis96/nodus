@@ -19,7 +19,7 @@
  */
 
 import { session, type Session } from 'electron';
-import { decideNavigation } from '@shared/browserNavigation';
+import { isBrowserResourceAllowed } from '@shared/browserNavigation';
 import { installBrowserPermissions, setPermissionPrompter } from './permissions';
 import { createPermissionPrompter } from './permissionPrompt';
 import { installDownloadHandling } from './downloads';
@@ -79,33 +79,11 @@ function configureBrowserSession(ses: Session): void {
   // Downloads: classified, size-capped, and never opened afterwards.
   installDownloadHandling(ses, () => getSettings().browserDownloadFolder ?? null);
 
-  // Belt to the navigation guard's braces. `will-navigate` stops a tab from
-  // MOVING to a blocked scheme; this stops a page from FETCHING one as a
-  // subresource — an <img src="nodus-library://…"> or a fetch() to file://,
-  // neither of which is a navigation and neither of which would otherwise be
-  // seen by the navigation handler at all.
+  // Belt to the navigation guard's braces. This is an allowlist, not a list of
+  // three known-bad schemes: unknown custom protocols fail closed as well.
   ses.webRequest.onBeforeRequest((details, callback) => {
-    const decision = decideNavigation(details.url, { isMainFrame: details.resourceType === 'mainFrame' });
-    if (decision.allowed) {
-      callback({});
-      return;
-    }
-    // Subresources legitimately use schemes the navigation policy refuses for
-    // navigation, so only the genuinely dangerous ones are cancelled here.
-    const scheme = decision.scheme ?? '';
-    const dangerous = scheme === 'file'
-      || scheme === 'javascript'
-      || scheme.startsWith('nodus-')
-      || scheme === 'chrome'
-      || scheme === 'devtools'
-      || scheme === 'view-source';
-    callback({ cancel: dangerous });
+    callback({ cancel: !isBrowserResourceAllowed(details.url, details.resourceType) });
   });
-
-  // Nodus never asks Chromium to remember credentials, and there is no password
-  // manager. Clearing this on configure means a stale HTTP-auth credential from
-  // a previous run cannot be replayed silently.
-  void ses.clearAuthCache();
 }
 
 /** Test seam: forget that the session was configured. */

@@ -18,9 +18,11 @@
  *     installing those is not a denial by default in a useful sense — the
  *     chooser simply never resolves — so they are denied explicitly.
  *
- *  3. Screen capture has its own handler entirely
- *     (`setDisplayMediaRequestHandler`), and a handler that never calls back
- *     leaves the page hanging, so it is answered with an empty grant.
+ *  3. Screen capture has its own handler entirely. Electron 43 leaves a
+ *     `getDisplayMedia()` request pending when a handler answers with an empty
+ *     stream object, so Nodus explicitly leaves the system picker disabled and
+ *     resets the source provider to `null`. The deny in BOTH permission paths
+ *     and the absence of a source ensure the site can never capture a display.
  */
 
 import type { Session } from 'electron';
@@ -98,11 +100,13 @@ export function installBrowserPermissions(ses: Session): void {
     return checkBrowserPermission(permission, origin, prompter.stored());
   });
 
-  // Screen capture has its own handler. `Streams` has every field optional, so
-  // an empty object is a grant of nothing — which is the documented refusal.
-  // Never omitting the callback matters: getDisplayMedia() waits on it, and a
-  // handler that returns without calling it hangs the page instead of saying no.
-  ses.setDisplayMediaRequestHandler((_request, callback) => callback({}));
+  // Never use the macOS system picker and never provide a display source.
+  // `display-capture` is also a hard denial in both permission handlers above.
+  // On Electron 43 callback({}) is not a denial: it leaves the page waiting for
+  // a nonexistent video track. A null provider supplies no capture capability;
+  // Chromium may still leave the caller's promise pending, but it cannot grant
+  // a stream or show the privileged system picker.
+  ses.setDisplayMediaRequestHandler(null, { useSystemPicker: false });
 
   // Hardware. USB, Serial, HID and Bluetooth never reach the permission handlers
   // above — they arrive through these, and through the `select-*-device` events.
@@ -112,4 +116,20 @@ export function installBrowserPermissions(ses: Session): void {
   ses.setDevicePermissionHandler(() => false);
   ses.setUSBProtectedClassesHandler((details) => details.protectedClasses);
   ses.setBluetoothPairingHandler((_details, callback) => callback({ confirmed: false }));
+
+  // Device choosers are separate from both permission handlers. Always prevent
+  // Electron's default selection behaviour and resolve the request as cancelled
+  // so hostile pages cannot leave a chooser pending or obtain the first device.
+  ses.on('select-usb-device', (event, _details, callback) => {
+    event.preventDefault();
+    callback();
+  });
+  ses.on('select-hid-device', (event, _details, callback) => {
+    event.preventDefault();
+    callback();
+  });
+  ses.on('select-serial-port', (event, _ports, _contents, callback) => {
+    event.preventDefault();
+    callback('');
+  });
 }

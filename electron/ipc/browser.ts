@@ -43,6 +43,7 @@ import { clearAllBrowserData, clearBrowserData, measureBrowserStorage } from '..
 import { setNodiQuoteSelection, setNodiViewContext } from '../ai/nodiChat';
 import { localizeIpcPayload } from '@shared/uiLanguage';
 import { getSettings } from '../db/settingsRepo';
+import { assertTrustedNodusMainFrame } from './trust';
 import {
   activateTab,
   browserState,
@@ -71,12 +72,11 @@ import {
  * main window's own WebContents means a browser tab — which lives in a different
  * WebContents entirely — can never drive the browser it is displayed in.
  */
-function assertUiSender(event: { sender: Electron.WebContents }, getWindow: () => BrowserWindow | null): void {
-  const window = getWindow();
-  if (!window || window.isDestroyed()) throw new Error('The Nodus window is not available.');
-  if (event.sender !== window.webContents) {
-    throw new Error('This channel is only available to the Nodus window.');
-  }
+function assertUiSender(
+  event: Pick<Electron.IpcMainInvokeEvent, 'sender' | 'senderFrame'>,
+  getWindow: () => BrowserWindow | null,
+): void {
+  assertTrustedNodusMainFrame(event, getWindow());
 }
 
 function sanitizeViewport(raw: unknown): BrowserViewport | null {
@@ -88,6 +88,12 @@ function sanitizeViewport(raw: unknown): BrowserViewport | null {
   return { x, y, width: Math.max(0, width), height: Math.max(0, height) };
 }
 
+function cleanPageText(value: unknown, limit: number): string {
+  return String(value ?? '')
+    .replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/g, '')
+    .slice(0, limit);
+}
+
 /**
  * Publish the page that lives in the native WebContentsView as Nodi's Current
  * view. The app shell cannot discover this text through `main.innerText`: that
@@ -97,11 +103,11 @@ async function syncActiveBrowserNodiContext(): Promise<boolean> {
   const collected = await collectFromTab('text');
   const payload = (collected ?? {}) as { title?: unknown; text?: unknown };
   const tab = activeTabSummary();
-  const text = String(payload.text ?? '');
+  const text = cleanPageText(payload.text, 120_000);
   if (!text.trim()) return false;
   setNodiViewContext({
     viewId: 'browser',
-    title: String(payload.title ?? tab?.title ?? 'Nodus Browser'),
+    title: cleanPageText(payload.title ?? tab?.title ?? 'Nodus Browser', 300),
     text: `${tab?.url ?? ''}\n\n${text}`,
     capturedAt: Date.now(),
     complete: true,
@@ -136,7 +142,7 @@ export function registerBrowserIpc({ h, getWindow }: IpcContext): void {
   };
 
   const quoteToEveryNodi = (text: string): boolean => {
-    const selection = setNodiQuoteSelection(text);
+    const selection = setNodiQuoteSelection(cleanPageText(text, 20_000));
     if (!selection) return false;
     // Nodi may live inside the app or in its independent always-on-top window.
     // Sending only to the main renderer made browser actions look inert whenever
@@ -149,7 +155,6 @@ export function registerBrowserIpc({ h, getWindow }: IpcContext): void {
 
   let wired = false;
   const ensureWired = () => {
-    if (wired) return;
     const window = getWindow();
     if (!window) return;
     initBrowserTabs(window, broadcast, {
@@ -172,6 +177,7 @@ export function registerBrowserIpc({ h, getWindow }: IpcContext): void {
       // The native menu speaks the app's language through the same table the UI uses.
       t: (key: string) => String(localizeIpcPayload({ v: key }, getSettings().uiLanguage).v),
     });
+    if (wired) return;
     setPermissionPromptNotifier(broadcastPermission);
     setMediaNotifier(broadcastMedia);
     setDownloadNotifier(broadcastDownloads);
@@ -513,7 +519,7 @@ export function registerBrowserIpc({ h, getWindow }: IpcContext): void {
   h('browser:askNodiAboutSelection', async (event) => {
     assertUiSender(event, getWindow);
     const collected = await collectFromTab('selection');
-    const text = String(((collected ?? {}) as { text?: unknown }).text ?? '');
+    const text = cleanPageText(((collected ?? {}) as { text?: unknown }).text, 20_000);
     return quoteToEveryNodi(text);
   });
 }

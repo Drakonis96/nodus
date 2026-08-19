@@ -28,7 +28,7 @@ execFileSync(
 );
 
 const require = createRequire(import.meta.url);
-const { decideNavigation, isNavigationAllowed } = require(bundle);
+const { decideNavigation, isNavigationAllowed, isBrowserResourceAllowed } = require(bundle);
 
 test('ordinary web navigation is allowed in both frame kinds', () => {
   for (const url of ['https://www.jstor.org/stable/1', 'http://example.org/a?b=c']) {
@@ -105,6 +105,30 @@ test('the frame default is the strict one', () => {
   // Calling decideNavigation with no options must behave as a main frame, so a
   // caller that forgets the flag gets the tighter policy rather than the looser.
   assert.equal(decideNavigation('data:text/html,<p>hi').allowed, false);
+});
+
+test('subresource requests use an explicit allowlist and fail closed', () => {
+  for (const url of [
+    'https://example.org/app.js',
+    'http://example.org/image.png',
+    'wss://example.org/socket',
+    'ws://example.org/socket',
+    'blob:https://example.org/abc',
+    'data:image/png;base64,AA==',
+  ]) {
+    assert.equal(isBrowserResourceAllowed(url, 'script'), true, url);
+  }
+  for (const url of [
+    'file:///etc/passwd',
+    'javascript:alert(1)',
+    'nodus-image://vault/secret.png',
+    'nodus-archive://vault/item',
+    'nodus-library://item/42',
+    'shell://open/calculator',
+    'weirdapp://privileged/action',
+  ]) {
+    assert.equal(isBrowserResourceAllowed(url, 'subFrame'), false, url);
+  }
 });
 
 test.after(() => rmSync(dir, { recursive: true, force: true }));

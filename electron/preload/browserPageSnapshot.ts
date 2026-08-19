@@ -75,10 +75,17 @@ function sanitizedHtml(doc: Doc): string {
   if (!root) return '';
   try {
     const clone = root.cloneNode(true);
-    for (const element of list(clone.querySelectorAll('script,noscript,iframe,object,embed,form'))) element.remove();
+    for (const element of list(clone.querySelectorAll('script,noscript,iframe,object,embed,form,base,style,link[rel="stylesheet"]'))) element.remove();
     for (const element of list(clone.querySelectorAll('*'))) {
       for (const attribute of list(element.attributes as unknown as ArrayLike<El>) as unknown as Attr[]) {
-        if (/^on/i.test(attribute.name) || attribute.name === 'srcdoc') element.removeAttribute(attribute.name);
+        const name = attribute.name.toLowerCase();
+        if (/^on/i.test(name) || ['srcdoc', 'style', 'src', 'srcset', 'poster'].includes(name)) {
+          element.removeAttribute(attribute.name);
+          continue;
+        }
+        if ((name === 'href' || name === 'xlink:href') && /^(?:\s*javascript:|\s*file:|\s*nodus-)/i.test(attribute.value)) {
+          element.removeAttribute(attribute.name);
+        }
       }
     }
     const html = `<!doctype html>\n${String(clone.outerHTML ?? '')}`;

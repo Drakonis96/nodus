@@ -158,18 +158,18 @@ export async function saveBrowserCapture(request: BrowserConnectorCaptureRequest
       warnings.push(`${candidate.title || candidate.url}: ${reason}`);
       pendingUploads.push({ ...candidate, reason });
     } finally {
-      if (temporary) fs.rmSync(temporary.dir, { recursive: true, force: true });
+      if (temporary) await fs.promises.rm(temporary.dir, { recursive: true, force: true });
     }
   }
 
   if (request.snapshotHtml && request.snapshotHtml.length <= MAX_SNAPSHOT_CHARS) {
-    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'nodus-browser-snapshot-'));
+    const dir = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'nodus-browser-snapshot-'));
     const file = path.join(dir, 'webpage.html');
     try {
-      fs.writeFileSync(file, request.snapshotHtml, { encoding: 'utf8', mode: 0o600 });
+      await fs.promises.writeFile(file, request.snapshotHtml, { encoding: 'utf8', mode: 0o600 });
       record = await attachFile(record.id, file, { url: request.pageUrl, title: 'Web page snapshot', mimeType: 'text/html', role: 'snapshot' });
     } finally {
-      fs.rmSync(dir, { recursive: true, force: true });
+      await fs.promises.rm(dir, { recursive: true, force: true });
     }
   } else if (request.snapshotHtml && request.snapshotHtml.length > MAX_SNAPSHOT_CHARS) {
     warnings.push('The web page snapshot exceeded 6 MB and was not stored.');
@@ -194,10 +194,10 @@ export async function uploadBrowserAttachment(itemId: string, bytes: Uint8Array,
   const current = getGlobalLibraryItem(itemId);
   if (!current || current.deletedAt) throw new Error('The captured library item no longer exists.');
   const fileName = safeRemoteFileName(input.fileName || input.title, input.mimeType, input.url);
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'nodus-browser-upload-'));
+  const dir = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'nodus-browser-upload-'));
   const file = path.join(dir, fileName);
   try {
-    fs.writeFileSync(file, bytes, { mode: 0o600 });
+    await fs.promises.writeFile(file, bytes, { mode: 0o600 });
     const saved = await attachFile(itemId, file, input as BrowserConnectorAttachmentCandidate, input.role === 'original');
     return {
       ok: true,
@@ -209,6 +209,6 @@ export async function uploadBrowserAttachment(itemId: string, bytes: Uint8Array,
       pendingUploads: [],
     };
   } finally {
-    fs.rmSync(dir, { recursive: true, force: true });
+    await fs.promises.rm(dir, { recursive: true, force: true });
   }
 }

@@ -86,11 +86,22 @@ test('only the active tab is attached to the window', () => {
 });
 
 test('shutdown is wired into every one of main.ts’s exit paths', () => {
-  // window-all-closed, before-quit and before-quit-for-update are three separate
-  // handlers. Missing one leaves WebContents alive during an update install.
+  // Window close matters independently on macOS, where closing the last window
+  // does not quit. The remaining paths cover normal quit, its final backstop,
+  // platform window-all-closed, and updater installs.
   const main = readFileSync(path.join(repoRoot, 'electron/main.ts'), 'utf8');
-  const occurrences = [...main.matchAll(/destroyBrowserSubsystem\(\)/g)].length;
-  assert.equal(occurrences, 3, `expected 3 shutdown call sites, found ${occurrences}`);
+  for (const marker of [
+    "mainWindow.on('closed'",
+    "app.on('window-all-closed'",
+    "app.on('before-quit'",
+    "app.on('will-quit'",
+    "updateAwareApp.on('before-quit-for-update'",
+  ]) {
+    const at = main.indexOf(marker);
+    assert.ok(at >= 0, `${marker} must exist`);
+    assert.match(main.slice(at, at + 2_500), /destroyBrowserSubsystem\(\)/,
+      `${marker} must destroy Browser contents`);
+  }
 });
 
 test('restart and application exit share one Browser subsystem cleanup', () => {
@@ -105,11 +116,24 @@ test('restart and application exit share one Browser subsystem cleanup', () => {
     'restart must never clear the persistent Browser session');
 });
 
-test('renderer crashes use the same per-tab destructor', () => {
+test('renderer crashes become a recoverable controlled tab state', () => {
   const crashAt = code.indexOf("'render-process-gone'");
-  const crash = code.slice(crashAt, code.indexOf('export async function createTab', crashAt));
-  assert.match(crash, /destroyTab\(tab\.id/,
-    'crashed Browser renderers must not remain registered or attached');
+  const crash = code.slice(crashAt, code.indexOf("'unresponsive'", crashAt));
+  assert.match(crash, /finishPendingCollections\(tab\)/,
+    'a crash must release page-collection requests');
+  assert.match(crash, /dropMediaSession\(tab\.id\)/,
+    'a crash must clear Browser-owned media state');
+  assert.match(crash, /kind:\s*'crashed'/,
+    'the trusted Nodus renderer must receive a controlled crash state');
+  assert.doesNotMatch(crash, /destroyTab\(tab\.id/,
+    'the WebContents shell stays owned so Reload can create a fresh renderer');
+});
+
+test('unexpected WebContents destruction still goes through the shared destructor', () => {
+  const destroyedAt = code.indexOf("'destroyed'");
+  const destroyed = code.slice(destroyedAt, code.indexOf('export async function createTab', destroyedAt));
+  assert.match(destroyed, /destroyTab\(tab\.id/,
+    'external destruction must remove registry state, listeners and media');
 });
 
 test('restart IPC is trusted-UI only and warns from main-process activity state', () => {

@@ -44,8 +44,8 @@ export const BROWSER_PERMISSION_POLICY: Readonly<Record<string, PermissionPolicy
   // — Ask: real research uses, never silently.
   // Camera and microphone both arrive here; the prompt names which.
   media: 'ask',
-  // Occasionally a library locator. The prompt defaults to Deny.
-  geolocation: 'ask',
+  // Location is not necessary for research browsing and is never prompted.
+  geolocation: 'deny',
 
   // — Denied: no research use, or too costly to be worth one.
   // Nodus has its own notification centre; web push from publisher sites is noise.
@@ -107,17 +107,22 @@ export function resolveBrowserPermission(
   origin: string,
   stored: BrowserSitePermissions | null | undefined,
 ): PermissionResolution {
+  const listed = Object.hasOwn(BROWSER_PERMISSION_POLICY, permission)
+    ? BROWSER_PERMISSION_POLICY[permission]
+    : undefined;
+
   // Own-property lookups only, on both maps. A plain `map[key]` walks the
   // prototype chain, so a page asking for a permission named "constructor" got
   // Object's constructor back — a truthy value, which sailed straight past the
   // `?? 'deny'` fallback and resolved to a function instead of a refusal.
   const siteRules = stored && Object.hasOwn(stored, origin) ? stored[origin] : undefined;
   const remembered = siteRules && Object.hasOwn(siteRules, permission) ? siteRules[permission] : undefined;
-  if (remembered === 'allow' || remembered === 'deny') return { policy: remembered, remembered: true };
-
-  const listed = Object.hasOwn(BROWSER_PERMISSION_POLICY, permission)
-    ? BROWSER_PERMISSION_POLICY[permission]
-    : undefined;
+  // Stored decisions may only answer an explicitly promptable permission.
+  // Corrupted or manually edited preferences must never turn a hard denial
+  // (filesystem, geolocation, devices...) into a grant.
+  if (listed === 'ask' && (remembered === 'allow' || remembered === 'deny')) {
+    return { policy: remembered, remembered: true };
+  }
   return { policy: listed ?? 'deny', remembered: false };
 }
 

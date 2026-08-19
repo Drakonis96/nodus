@@ -150,6 +150,7 @@ import { reuseVaultAnalysisForWorks } from './vaults/vaultAnalysisImport';
 import { initializeVaultModelSelection, validateVaultModelSelection } from './vaults/vaultCreationSettings';
 import { setPersistentDockIcon } from './dockIcon';
 import { closeCrossVaultConnections } from './db/crossVault';
+import { assertNotBrowserIpcSender } from './ipc/trust';
 
 
 function withVaultKeyProviders(vault: VaultSummary): VaultSummary {
@@ -491,6 +492,7 @@ export function registerIpc(
   // when a `sendSync` would have been serviced too — the synchronous form only
   // added a stall of Nodi's own renderer while heavy work held the loop.
   ipcMain.on('nodi:setMouseIgnore:async', (e, ignore: boolean) => {
+    assertNotBrowserIpcSender(e);
     const win = BrowserWindow.fromWebContents(e.sender);
     win?.setIgnoreMouseEvents(Boolean(ignore), { forward: true });
   });

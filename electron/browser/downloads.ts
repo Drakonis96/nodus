@@ -17,7 +17,13 @@
 
 import { app, type DownloadItem, type Session } from 'electron';
 import path from 'node:path';
-import { classifyDownload, isImportable, isTooLarge, type DownloadKind } from '@shared/browserDownloads';
+import {
+  classifyDownload,
+  isImportable,
+  isTooLarge,
+  safeBrowserDownloadName,
+  type DownloadKind,
+} from '@shared/browserDownloads';
 
 export interface BrowserDownload {
   id: string;
@@ -90,7 +96,7 @@ export function installDownloadHandling(ses: Session, defaultFolder: () => strin
   ses.on('will-download', (_event, item) => {
     counter += 1;
     const id = `dl-${counter}`;
-    const filename = item.getFilename();
+    const filename = safeBrowserDownloadName(item.getFilename());
     const totalBytes = item.getTotalBytes();
 
     if (isTooLarge(totalBytes)) {
@@ -130,6 +136,13 @@ export function installDownloadHandling(ses: Session, defaultFolder: () => strin
       const current = downloads.get(id);
       if (!current) return;
       current.receivedBytes = item.getReceivedBytes();
+      if (isTooLarge(current.receivedBytes)) {
+        item.cancel();
+        current.state = 'cancelled';
+        current.importable = false;
+        notify?.();
+        return;
+      }
       current.state = state === 'interrupted' ? 'interrupted' : item.isPaused() ? 'paused' : 'progressing';
       notify?.();
     });

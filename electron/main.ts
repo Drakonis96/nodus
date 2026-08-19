@@ -398,6 +398,10 @@ function createWindow(): void {
   }
 
   mainWindow.on('closed', () => {
+    // On macOS closing the last window does not quit the app. Native Browser
+    // views must still die with their host instead of surviving invisibly until
+    // a later Cmd+Q or being retained when a new main window is created.
+    destroyBrowserSubsystem();
     mainWindow = null;
     // Don't let the always-on-top mascot window keep the app alive after the main
     // window closes (matters on Windows/Linux, where window-all-closed quits).
@@ -989,6 +993,13 @@ app.on('before-quit', () => {
   destroyBrowserSubsystem();
   closeGlobalLibraryRuntime();
   closeDb();
+});
+
+// Final idempotent backstop for every cooperative quit path. before-quit does
+// the substantive shutdown; will-quit proves no Browser-owned WebContents can
+// survive a handler added later that closes the window in a different order.
+app.on('will-quit', () => {
+  destroyBrowserSubsystem();
 });
 
 const updateAwareApp = app as typeof app & { on(event: 'before-quit-for-update', listener: () => void): typeof app };

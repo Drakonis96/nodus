@@ -44,6 +44,17 @@ export const MAX_DOWNLOAD_BYTES = 2 * 1024 * 1024 * 1024;
 /** The largest download Nodus will route through the Library import path. */
 export const MAX_IMPORTABLE_BYTES = 64 * 1024 * 1024;
 
+/** A site-controlled Content-Disposition value must never become a path. */
+export function safeBrowserDownloadName(value: unknown): string {
+  const leaf = String(value ?? '').replace(/\\/g, '/').split('/').at(-1) ?? '';
+  const clean = leaf
+    .replace(/[\u0000-\u001f\u007f]/g, '')
+    .replace(/[/:]/g, '-')
+    .trim()
+    .replace(/^\.+$/, '');
+  return clean.slice(0, 240) || 'download';
+}
+
 function extensionOf(filename: string): string {
   const match = /\.([A-Za-z0-9]+)$/.exec(filename.trim());
   return match ? match[1].toLowerCase() : '';

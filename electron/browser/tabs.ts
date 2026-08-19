@@ -19,7 +19,7 @@
  *     them. That is what makes a tab cheap enough to have twelve of.
  */
 
-import { ipcMain, nativeTheme, WebContentsView, type BaseWindow, type WebContents } from 'electron';
+import { nativeTheme, WebContentsView, type BaseWindow, type WebContents } from 'electron';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import type { BrowserMediaCommand, BrowserState, BrowserTabError, BrowserTabState, BrowserViewport } from '@shared/browser';
@@ -153,34 +153,6 @@ export function initBrowserTabs(window: BaseWindow, onChange: () => void, menu?:
   hostWindow = window;
   notify = onChange;
   if (menu) contextMenuActions = menu;
-
-  /**
-   * The page preload's only outbound channel: whether the element that started
-   * is audio or video, which Electron's own media events do not say.
-   *
-   * The sender is matched against the live tab registry. A message from anything
-   * that is not one of our tabs is dropped rather than trusted — this is the one
-   * channel in the browser that a page's preload can reach, so it is the one
-   * place where a sender check earns its keep.
-   */
-  ipcMain.on('nodus-browser:page:media', (event, payload: { playing?: unknown; kind?: unknown }) => {
-    const tab = [...tabs.values()].find((candidate) =>
-      !candidate.view.webContents.isDestroyed() && candidate.view.webContents.id === event.sender.id);
-    if (!tab) return;
-    const kind = payload?.kind === 'audio' || payload?.kind === 'video' ? payload.kind : 'unknown';
-    if (payload?.playing === true) {
-      noteMediaPlaying(tab.id, () => ({
-        title: tab.state.title || tab.state.url,
-        url: tab.state.url,
-        origin: originOf(tab.state.url),
-        faviconDataUrl: tab.state.faviconDataUrl,
-      }), kind);
-      patch(tab, { hasMedia: true, mediaPlaying: true });
-    } else {
-      noteMediaPaused(tab.id);
-      patch(tab, { mediaPlaying: false });
-    }
-  });
 }
 
 export function browserState(): BrowserState {
@@ -198,6 +170,9 @@ function patch(tab: Tab, next: Partial<BrowserTabState>): void {
   }
   if (!changed) return;
   Object.assign(tab.state, next);
+  // Error UI lives in the trusted renderer and must not be covered by the
+  // native website view. Clearing the error makes the page visible again.
+  if (Object.hasOwn(next, 'error') && tab.id === activeTabId) applyVisibility();
   notify?.();
 }
 
@@ -214,14 +189,14 @@ function applyBounds(tab: Tab): void {
 }
 
 function attach(tab: Tab): void {
-  if (!hostWindow) return;
+  if (!hostWindow || hostWindow.isDestroyed()) return;
   hostWindow.contentView.addChildView(tab.view);
   applyBounds(tab);
-  tab.view.setVisible(sectionVisible && !overlayOpen);
+  tab.view.setVisible(sectionVisible && !overlayOpen && !tab.state.error);
 }
 
 function detach(tab: Tab): void {
-  if (!hostWindow) return;
+  if (!hostWindow || hostWindow.isDestroyed()) return;
   hostWindow.contentView.removeChildView(tab.view);
 }
 
@@ -238,6 +213,33 @@ function wire(tab: Tab): void {
   if (contextMenuActions) installContextMenu(contents, contextMenuActions);
   void applyPageColorScheme(contents);
 
+  /**
+   * The page preload's only unsolicited message. Register it on this exact
+   * WebContents instead of ipcMain's global bus, then still require its main
+   * frame. A different tab or any Nodus window has no listener to reach.
+   */
+  const pageMediaListener = (
+    event: Electron.IpcMainEvent,
+    payload: { playing?: unknown; kind?: unknown },
+  ) => {
+    if (event.sender !== contents || event.senderFrame !== contents.mainFrame) return;
+    const kind = payload?.kind === 'audio' || payload?.kind === 'video' ? payload.kind : 'unknown';
+    if (payload?.playing === true) {
+      noteMediaPlaying(tab.id, () => ({
+        title: tab.state.title || tab.state.url,
+        url: tab.state.url,
+        origin: originOf(tab.state.url),
+        faviconDataUrl: tab.state.faviconDataUrl,
+      }), kind);
+      patch(tab, { hasMedia: true, mediaPlaying: true });
+    } else {
+      noteMediaPaused(tab.id);
+      patch(tab, { mediaPlaying: false });
+    }
+  };
+  contents.ipc.on('nodus-browser:page:media', pageMediaListener);
+  tab.disposers.push(() => contents.ipc.removeListener('nodus-browser:page:media', pageMediaListener));
+
   // Never let a page dictate the options of a window it opens. `allow` would
   // hand the site control of webPreferences; instead every popup becomes an
   // ordinary Nodus tab, created by us with our own configuration.
@@ -245,6 +247,11 @@ function wire(tab: Tab): void {
     if (decideNavigation(url, { isMainFrame: true }).allowed) void createTab(url);
     return { action: 'deny' };
   });
+
+  on(tab, contents, 'select-bluetooth-device', ((event: Electron.Event, _devices: unknown[], callback: (id: string) => void) => {
+    event.preventDefault();
+    callback('');
+  }) as never);
 
   on(tab, contents, 'will-navigate', ((event: Electron.Event, url: string) => {
     if (decideNavigation(url, { isMainFrame: true }).allowed) return;
@@ -257,6 +264,20 @@ function wire(tab: Tab): void {
   on(tab, contents, 'will-frame-navigate', ((details: { url: string; isMainFrame: boolean; preventDefault(): void }) => {
     if (decideNavigation(details.url, { isMainFrame: details.isMainFrame }).allowed) return;
     details.preventDefault();
+  }) as never);
+
+  // Electron reports server redirects separately from will-navigate. Guard
+  // them explicitly so an allowed HTTP endpoint cannot bounce into file: or a
+  // privileged Nodus protocol between the initial request and the commit.
+  on(tab, contents, 'will-redirect', ((details: { url: string; isMainFrame: boolean; preventDefault(): void }) => {
+    if (decideNavigation(details.url, { isMainFrame: details.isMainFrame }).allowed) return;
+    details.preventDefault();
+    if (details.isMainFrame) {
+      patch(tab, {
+        loading: false,
+        error: { kind: 'blocked-scheme', code: null, description: details.url, url: details.url },
+      });
+    }
   }) as never);
 
   on(tab, contents, 'did-start-loading', (() => patch(tab, { loading: true, error: null })) as never);
@@ -347,20 +368,51 @@ function wire(tab: Tab): void {
     patch(tab, { loading: false, error: { kind: 'certificate', code: null, description: error, url } });
   }) as never);
 
-  on(tab, contents, 'render-process-gone', (() => {
-    // A dead renderer is not a reusable tab. Run it through the exact same
-    // destructor as a user-closed tab so its view, listeners, media state and
-    // pending collectors cannot remain reachable. If it was the only tab,
-    // leave the Browser usable with one clean blank renderer rather than trying
-    // to reload the page that just crashed.
-    const wasLastTab = tabs.size === 1;
+  on(tab, contents, 'render-process-gone', ((_event: unknown, details: { reason?: string; exitCode?: number }) => {
+    // Keep the owned WebContents shell so Electron can create a fresh renderer
+    // on Reload, but discard every document-scoped capability and hide the
+    // native view behind Nodus's controlled crash pane. Nodus itself stays up.
+    finishPendingCollections(tab);
+    dropMediaSession(tab.id);
+    patch(tab, {
+      loading: false,
+      audible: false,
+      hasMedia: false,
+      mediaPlaying: false,
+      error: {
+        kind: 'crashed',
+        code: Number.isInteger(details?.exitCode) ? Number(details.exitCode) : null,
+        description: String(details?.reason ?? 'renderer process exited'),
+        url: tab.state.url,
+      },
+    });
+  }) as never);
+
+  on(tab, contents, 'unresponsive', (() => {
+    finishPendingCollections(tab);
+    patch(tab, {
+      loading: false,
+      error: { kind: 'crashed', code: null, description: 'renderer unresponsive', url: tab.state.url },
+    });
+  }) as never);
+
+  on(tab, contents, 'responsive', (() => {
+    if (tab.state.error?.kind === 'crashed' && tab.state.error.description === 'renderer unresponsive') {
+      patch(tab, { error: null });
+    }
+  }) as never);
+
+  on(tab, contents, 'destroyed', (() => {
+    // Covers destruction initiated outside the normal close/restart paths. The
+    // ordinary destructor removes this listener before close(), so it cannot
+    // recurse during expected teardown.
     destroyTab(tab.id, { activateReplacement: true, publish: true });
-    if (wasLastTab) void createTab('about:blank');
   }) as never);
 }
 
 export async function createTab(url: string): Promise<string | null> {
   if (tabs.size >= MAX_BROWSER_TABS) return null;
+  if (!decideNavigation(url, { isMainFrame: true }).allowed) return null;
 
   const view = new WebContentsView({
     webPreferences: {
@@ -369,11 +421,15 @@ export async function createTab(url: string): Promise<string | null> {
       sandbox: true,
       contextIsolation: true,
       nodeIntegration: false,
+      nodeIntegrationInWorker: false,
       nodeIntegrationInSubFrames: false,
       webSecurity: true,
       allowRunningInsecureContent: false,
       experimentalFeatures: false,
       webviewTag: false,
+      // The isolated-world preload contains ipcRenderer. Production DevTools
+      // would make that world selectable from an arbitrary page's console.
+      devTools: false,
       // The single relaxation, and it buys Chromium's own PDF viewer. The
       // alternative — decoding untrusted PDF bytes with pdfjs inside the TRUSTED
       // renderer — is strictly worse.
@@ -381,6 +437,7 @@ export async function createTab(url: string): Promise<string | null> {
       safeDialogs: true,
       spellcheck: true,
       backgroundThrottling: true,
+      navigateOnDragDrop: false,
     },
   });
   view.setBackgroundColor(browserSurfaceColor());
@@ -423,7 +480,12 @@ interface DestroyTabOptions {
   publish: boolean;
 }
 
-/** The single destructor used by close, crash, restart and application exit. */
+function finishPendingCollections(tab: Tab): void {
+  for (const finish of [...tab.pendingCollections]) finish(null);
+  tab.pendingCollections.clear();
+}
+
+/** The single destructor used by close, external destruction, restart and exit. */
 function destroyTab(id: string, options: DestroyTabOptions): void {
   const tab = tabs.get(id);
   if (!tab) return;
@@ -436,8 +498,7 @@ function destroyTab(id: string, options: DestroyTabOptions): void {
   // teardown would patch state for a tab that no longer exists.
   for (const dispose of tab.disposers) dispose();
   tab.disposers.length = 0;
-  for (const finish of [...tab.pendingCollections]) finish(null);
-  tab.pendingCollections.clear();
+  finishPendingCollections(tab);
   tabs.delete(id);
   dropMediaSession(id);
 
@@ -463,7 +524,7 @@ export function setViewport(next: BrowserViewport): void {
 
 function applyVisibility(): void {
   const tab = activeTabId ? tabs.get(activeTabId) : null;
-  tab?.view.setVisible(sectionVisible && !overlayOpen);
+  tab?.view.setVisible(sectionVisible && !overlayOpen && !tab.state.error);
 }
 
 /**
@@ -552,7 +613,7 @@ export function collectFromTab(what: 'text' | 'selection' | 'capture' | 'pdf'): 
     const finish = (value: unknown) => {
       if (settled) return;
       settled = true;
-      ipcMain.removeListener('nodus-browser:page:collected', listener);
+      tab.view.webContents.ipc.removeListener('nodus-browser:page:collected', listener);
       clearTimeout(timer);
       tab.pendingCollections.delete(finish);
       resolve(value);
@@ -560,12 +621,16 @@ export function collectFromTab(what: 'text' | 'selection' | 'capture' | 'pdf'): 
     const listener = (event: Electron.IpcMainEvent, id: string, payload: unknown) => {
       // Match BOTH the request id and the sender: another tab replying to an id
       // it happened to see must not answer this question.
-      if (id !== requestId || event.sender.id !== tab.view.webContents.id) return;
+      if (
+        id !== requestId
+        || event.sender !== tab.view.webContents
+        || event.senderFrame !== tab.view.webContents.mainFrame
+      ) return;
       finish(payload);
     };
     timer = setTimeout(() => finish(null), COLLECT_TIMEOUT_MS);
     timer.unref?.();
-    ipcMain.on('nodus-browser:page:collected', listener);
+    tab.view.webContents.ipc.on('nodus-browser:page:collected', listener);
     tab.pendingCollections.add(finish);
     tab.view.webContents.send('nodus-browser:page:collect', requestId, what);
   });
@@ -610,7 +675,12 @@ export function closeAllBrowserTabs(options: { preserveViewport?: boolean } = {}
     destroyTab(id, { activateReplacement: false, publish: false });
   }
   activeTabId = null;
-  if (!options.preserveViewport) viewport = null;
+  if (!options.preserveViewport) {
+    viewport = null;
+    hostWindow = null;
+    sectionVisible = false;
+    overlayOpen = false;
+  }
   // Also cancels the ended-grace timers, so none outlives the window.
   clearAllMediaSessions();
   notify?.();
