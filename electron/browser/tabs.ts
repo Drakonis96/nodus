@@ -46,6 +46,8 @@ interface Tab {
   state: BrowserTabState;
   /** Every listener this tab registered, so closing it can undo all of them. */
   disposers: (() => void)[];
+  /** In-flight page collection requests, completed with null during teardown. */
+  pendingCollections: Set<(value: unknown) => void>;
 }
 
 const tabs = new Map<string, Tab>();
@@ -345,11 +347,15 @@ function wire(tab: Tab): void {
     patch(tab, { loading: false, error: { kind: 'certificate', code: null, description: error, url } });
   }) as never);
 
-  on(tab, contents, 'render-process-gone', ((_e: unknown, details: { reason: string }) => {
-    patch(tab, {
-      loading: false,
-      error: { kind: 'crashed', code: null, description: details.reason, url: tab.state.url },
-    });
+  on(tab, contents, 'render-process-gone', (() => {
+    // A dead renderer is not a reusable tab. Run it through the exact same
+    // destructor as a user-closed tab so its view, listeners, media state and
+    // pending collectors cannot remain reachable. If it was the only tab,
+    // leave the Browser usable with one clean blank renderer rather than trying
+    // to reload the page that just crashed.
+    const wasLastTab = tabs.size === 1;
+    destroyTab(tab.id, { activateReplacement: true, publish: true });
+    if (wasLastTab) void createTab('about:blank');
   }) as never);
 }
 
@@ -382,7 +388,13 @@ export async function createTab(url: string): Promise<string | null> {
   browserSession();
 
   const id = randomUUID();
-  const tab: Tab = { id, view, state: emptyState(id, url), disposers: [] };
+  const tab: Tab = {
+    id,
+    view,
+    state: emptyState(id, url),
+    disposers: [],
+    pendingCollections: new Set(),
+  };
   tabs.set(id, tab);
   wire(tab);
   await activateTab(id);
@@ -406,15 +418,26 @@ export async function activateTab(id: string): Promise<void> {
   notify?.();
 }
 
-export function closeTab(id: string): void {
+interface DestroyTabOptions {
+  activateReplacement: boolean;
+  publish: boolean;
+}
+
+/** The single destructor used by close, crash, restart and application exit. */
+function destroyTab(id: string, options: DestroyTabOptions): void {
   const tab = tabs.get(id);
   if (!tab) return;
 
+  // Stop first: close() alone can leave an in-flight navigation completing
+  // callbacks while the rest of the tab is already being dismantled.
+  if (!tab.view.webContents.isDestroyed()) tab.view.webContents.stop();
   detach(tab);
   // Undo every listener before destroying the contents: a handler firing during
   // teardown would patch state for a tab that no longer exists.
   for (const dispose of tab.disposers) dispose();
   tab.disposers.length = 0;
+  for (const finish of [...tab.pendingCollections]) finish(null);
+  tab.pendingCollections.clear();
   tabs.delete(id);
   dropMediaSession(id);
 
@@ -423,9 +446,13 @@ export function closeTab(id: string): void {
   if (activeTabId === id) {
     activeTabId = null;
     const next = [...tabs.keys()].at(-1) ?? null;
-    if (next) void activateTab(next);
+    if (next && options.activateReplacement) void activateTab(next);
   }
-  notify?.();
+  if (options.publish) notify?.();
+}
+
+export function closeTab(id: string): void {
+  destroyTab(id, { activateReplacement: true, publish: true });
 }
 
 export function setViewport(next: BrowserViewport): void {
@@ -521,11 +548,13 @@ export function collectFromTab(what: 'text' | 'selection' | 'capture' | 'pdf'): 
   const requestId = `collect-${Date.now()}-${Math.random().toString(36).slice(2)}`;
   return new Promise((resolve) => {
     let settled = false;
+    let timer: ReturnType<typeof setTimeout>;
     const finish = (value: unknown) => {
       if (settled) return;
       settled = true;
       ipcMain.removeListener('nodus-browser:page:collected', listener);
       clearTimeout(timer);
+      tab.pendingCollections.delete(finish);
       resolve(value);
     };
     const listener = (event: Electron.IpcMainEvent, id: string, payload: unknown) => {
@@ -534,9 +563,10 @@ export function collectFromTab(what: 'text' | 'selection' | 'capture' | 'pdf'): 
       if (id !== requestId || event.sender.id !== tab.view.webContents.id) return;
       finish(payload);
     };
-    const timer = setTimeout(() => finish(null), COLLECT_TIMEOUT_MS);
+    timer = setTimeout(() => finish(null), COLLECT_TIMEOUT_MS);
     timer.unref?.();
     ipcMain.on('nodus-browser:page:collected', listener);
+    tab.pendingCollections.add(finish);
     tab.view.webContents.send('nodus-browser:page:collect', requestId, what);
   });
 }
@@ -568,13 +598,22 @@ export function sendMediaCommand(id: string, command: BrowserMediaCommand): void
   tab.view.webContents.send('nodus-browser:page:mediaCommand', command);
 }
 
-/** Destroy every tab. Called from all three of main.ts's shutdown paths. */
-export function closeAllBrowserTabs(): void {
-  for (const id of [...tabs.keys()]) closeTab(id);
+/**
+ * Destroy every Browser-owned renderer through the same per-tab destructor.
+ *
+ * Restart preserves the last published viewport because the React chrome stays
+ * mounted and the replacement view must have non-zero bounds immediately.
+ * Application shutdown clears it because the host window is going away.
+ */
+export function closeAllBrowserTabs(options: { preserveViewport?: boolean } = {}): void {
+  for (const id of [...tabs.keys()]) {
+    destroyTab(id, { activateReplacement: false, publish: false });
+  }
   activeTabId = null;
-  viewport = null;
+  if (!options.preserveViewport) viewport = null;
   // Also cancels the ended-grace timers, so none outlives the window.
   clearAllMediaSessions();
+  notify?.();
 }
 
 /** Test seam: how many WebContents this module still owns. */

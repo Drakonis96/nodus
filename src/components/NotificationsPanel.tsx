@@ -142,6 +142,8 @@ interface NotificationsPanelProps {
   onRefresh: () => Promise<AnnouncementRefreshResult>;
   refreshing: boolean;
   onClearAll: () => void;
+  captureBrowserOverlaySnapshot: () => Promise<string | null>;
+  setBrowserOverlayVisible: (visible: boolean) => Promise<void>;
 }
 
 export function NotificationsPanel({
@@ -154,6 +156,8 @@ export function NotificationsPanel({
   onRefresh,
   refreshing,
   onClearAll,
+  captureBrowserOverlaySnapshot,
+  setBrowserOverlayVisible,
 }: NotificationsPanelProps) {
   const open = anchorEl != null;
   const panelRef = useRef<HTMLDivElement>(null);
@@ -232,7 +236,7 @@ export function NotificationsPanel({
     if (!open) return;
     let cancelled = false;
     const prepare = async () => {
-      const dataUrl = await window.nodus.captureBrowserOverlaySnapshot().catch(() => null);
+      const dataUrl = await captureBrowserOverlaySnapshot().catch(() => null);
       if (cancelled) return;
       const viewport = document.querySelector<HTMLElement>('[data-browser-viewport]');
       const rect = viewport?.getBoundingClientRect();
@@ -248,15 +252,15 @@ export function NotificationsPanel({
           requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
         });
       }
-      if (!cancelled) await window.nodus.setBrowserOverlayVisible(true);
+      if (!cancelled) await setBrowserOverlayVisible(true);
     };
     void prepare();
     return () => {
       cancelled = true;
       setBrowserSnapshot(null);
-      void window.nodus.setBrowserOverlayVisible(false);
+      void setBrowserOverlayVisible(false);
     };
-  }, [open]);
+  }, [captureBrowserOverlaySnapshot, open, setBrowserOverlayVisible]);
 
   const empty = announcements.length === 0 && notifications.length === 0;
 

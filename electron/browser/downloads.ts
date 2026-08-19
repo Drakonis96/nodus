@@ -46,6 +46,35 @@ export function browserDownloads(): BrowserDownload[] {
   return [...downloads.values()].map((entry) => ({ ...entry }));
 }
 
+/** Downloads which would be interrupted by a Browser subsystem restart. */
+export function activeBrowserDownloadCount(): number {
+  let active = 0;
+  for (const entry of downloads.values()) {
+    if (entry.state === 'progressing' || entry.state === 'paused') active += 1;
+  }
+  return active;
+}
+
+/**
+ * Stop Browser-owned transfers and forget the transient downloads UI state.
+ *
+ * Downloaded files are deliberately left on disk. The persistent Chromium
+ * session is also untouched; this only releases live DownloadItem handles and
+ * the in-memory list owned by the current Browser runtime.
+ */
+export function resetBrowserDownloads(): void {
+  for (const [id, item] of items) {
+    const state = downloads.get(id)?.state;
+    if (state === 'progressing' || state === 'paused') item.cancel();
+  }
+  items.clear();
+  downloads.clear();
+  // Keep ids monotonic. A cancelled DownloadItem emits `done` asynchronously;
+  // reusing its id for a new post-restart download would let that late event
+  // overwrite the new record.
+  notify?.();
+}
+
 /** Forget a finished download. The file on disk is untouched. */
 export function dismissDownload(id: string): void {
   downloads.delete(id);

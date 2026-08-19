@@ -131,7 +131,16 @@ const RADIAL_MAX_SPAN_DEG = 88;
 const DRAG_THRESHOLD_PX = 7;
 const NOTE_AUTOSAVE_DELAY_MS = 600;
 
-export function NodiCompanion({ context, costumes }: { context: Ctx; costumes?: boolean }) {
+export function NodiCompanion({
+  context,
+  costumes,
+  setBrowserOverlayVisible,
+}: {
+  context: Ctx;
+  costumes?: boolean;
+  /** Supplied only by the trusted main-window shell, never by standalone Nodi. */
+  setBrowserOverlayVisible?: (visible: boolean) => Promise<void>;
+}) {
   const isOverlay = context === 'overlay';
   const figureH = isOverlay ? 200 : 168;
   const figureW = Math.round((figureH * 270) / 300);
@@ -544,11 +553,11 @@ export function NodiCompanion({ context, costumes }: { context: Ctx; costumes?: 
   // chat after an Ask action. The standalone companion is another native window
   // and needs no visibility change.
   useEffect(() => {
-    if (isOverlay) return;
-    if (hasOpenSurface) void window.nodus.setBrowserOverlayVisible(true);
-    else void window.nodus.setBrowserOverlayVisible(false);
-    return () => { void window.nodus.setBrowserOverlayVisible(false); };
-  }, [hasOpenSurface, isOverlay]);
+    if (isOverlay || !setBrowserOverlayVisible) return;
+    if (hasOpenSurface) void setBrowserOverlayVisible(true);
+    else void setBrowserOverlayVisible(false);
+    return () => { void setBrowserOverlayVisible(false); };
+  }, [hasOpenSurface, isOverlay, setBrowserOverlayVisible]);
 
   // ── Auto-scroll chat ──────────────────────────────────────────────────────
   useEffect(() => {

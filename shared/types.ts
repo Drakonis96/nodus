@@ -7971,6 +7971,8 @@ export interface BrowserApi {
   browserReload(): Promise<void>;
   browserStop(): Promise<void>;
   browserGoHome(): Promise<{ url: string }>;
+  /** Destroy and recreate only the Browser subsystem; websites cannot call it. */
+  restartNodusBrowser(confirmed?: boolean): Promise<import('./browser').BrowserRestartResult>;
   revealBrowserDownload(id: string): Promise<void>;
   clearBrowserDownloads(): Promise<import('./browser').BrowserDownloadView[]>;
   /** The native context menu asking the renderer to open one of its dialogs. */

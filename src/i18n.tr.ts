@@ -7896,4 +7896,9 @@ export const TR: Record<string, string> = {
   "Abrir enlace en una pestaña nueva": "Bağlantıyı yeni sekmede aç",
   "Copiar dirección del enlace": "Bağlantı adresini kopyala",
   "Abrir enlace en el navegador del sistema": "Bağlantıyı sistem tarayıcısında aç",
+  "Reiniciar Nodus Browser": "Nodus Browser'ı yeniden başlat",
+  "Nodus Browser se ha reiniciado.": "Nodus Browser yeniden başlatıldı.",
+  "{n} descarga(s) activa(s)": "{n} etkin indirme",
+  "{n} sesión(es) multimedia": "{n} medya oturumu",
+  "Reiniciar interrumpirá {activity}. Las sesiones y preferencias persistentes se conservarán.": "Yeniden başlatma {activity} öğesini kesintiye uğratacak. Kalıcı oturumlar ve tercihler korunacaktır.",
 };

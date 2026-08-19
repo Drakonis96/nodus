@@ -8087,4 +8087,9 @@ export const PT: Record<string, string> = {
   "Abrir enlace en una pestaña nueva": "Abrir ligação num separador novo",
   "Copiar dirección del enlace": "Copiar endereço da ligação",
   "Abrir enlace en el navegador del sistema": "Abrir ligação no navegador do sistema",
+  "Reiniciar Nodus Browser": "Reiniciar o Nodus Browser",
+  "Nodus Browser se ha reiniciado.": "O Nodus Browser foi reiniciado.",
+  "{n} descarga(s) activa(s)": "{n} transferência(s) ativa(s)",
+  "{n} sesión(es) multimedia": "{n} sessão(ões) multimédia",
+  "Reiniciar interrumpirá {activity}. Las sesiones y preferencias persistentes se conservarán.": "Reiniciar interromperá {activity}. As sessões e preferências persistentes serão mantidas.",
 };

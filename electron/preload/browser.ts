@@ -13,7 +13,7 @@
  */
 
 import { ipcRenderer } from 'electron';
-import type { BrowserMediaCommand, BrowserState, BrowserViewport } from '@shared/browser';
+import type { BrowserMediaCommand, BrowserRestartResult, BrowserState, BrowserViewport } from '@shared/browser';
 import type { OmniboxResolution } from '@shared/browserOmnibox';
 import type {
   BrowserDataCategory, BrowserDownloadView, BrowserMediaState,
@@ -42,6 +42,8 @@ export const browserApi = {
   browserReload: (): Promise<void> => ipcRenderer.invoke('browser:reload').then(() => undefined),
   browserStop: (): Promise<void> => ipcRenderer.invoke('browser:stop').then(() => undefined),
   browserGoHome: (): Promise<{ url: string }> => ipcRenderer.invoke('browser:goHome'),
+  restartNodusBrowser: (confirmed = false): Promise<BrowserRestartResult> =>
+    ipcRenderer.invoke('browser:restart', confirmed === true),
   revealBrowserDownload: (id: string): Promise<void> =>
     ipcRenderer.invoke('browser:revealDownload', id).then(() => undefined),
   clearBrowserDownloads: (): Promise<BrowserDownloadView[]> => ipcRenderer.invoke('browser:clearDownloads'),

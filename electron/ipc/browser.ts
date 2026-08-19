@@ -18,7 +18,7 @@
 
 import { BrowserWindow, shell } from 'electron';
 import type { IpcContext } from './context';
-import { NODUS_RESEARCH_ATLAS_URL, type BrowserViewport } from '@shared/browser';
+import { NODUS_RESEARCH_ATLAS_URL, type BrowserRestartResult, type BrowserViewport } from '@shared/browser';
 import { parseOmniboxInput } from '@shared/browserOmnibox';
 import {
   cancelPermissionRequests,
@@ -30,8 +30,14 @@ import { browserMediaStates, setMediaNotifier } from '../browser/media';
 import { getSystemVolume, setSystemVolume } from '../toolkit/presenter/systemAudio';
 import { activePageIsPdf, captureActivePage, importPdfIntoItem, saveCapture } from '../browser/capture';
 import {
-  browserDownloads, cancelDownload, completedDownloadPath, dismissDownload, setDownloadNotifier,
+  activeBrowserDownloadCount,
+  browserDownloads,
+  cancelDownload,
+  completedDownloadPath,
+  dismissDownload,
+  setDownloadNotifier,
 } from '../browser/downloads';
+import { destroyBrowserSubsystem, restartBrowserSubsystem } from '../browser/lifecycle';
 import { addGlobalLibraryAttachments, createGlobalLibraryItem } from '../library/libraryService';
 import { clearAllBrowserData, clearBrowserData, measureBrowserStorage } from '../browser/storage';
 import { setNodiQuoteSelection, setNodiViewContext } from '../ai/nodiChat';
@@ -41,7 +47,6 @@ import {
   activateTab,
   browserState,
   captureOverlaySnapshot,
-  closeAllBrowserTabs,
   closeTab,
   createTab,
   goBack,
@@ -196,6 +201,49 @@ export function registerBrowserIpc({ h, getWindow }: IpcContext): void {
     }
     return settings.browserHomeMode === 'start' ? NODUS_RESEARCH_ATLAS_URL : 'about:blank';
   };
+
+  let restartInFlight: Promise<BrowserRestartResult> | null = null;
+
+  /**
+   * Destroy and recreate the Browser runtime — never the Nodus renderer.
+   *
+   * Confirmation is enforced here rather than trusted to React: the warning is
+   * based on the live main-process state, and a future trusted caller cannot
+   * accidentally skip it. Arbitrary websites fail assertUiSender before they
+   * can inspect or trigger any part of the lifecycle.
+   */
+  h('browser:restart', async (event, confirmed: boolean): Promise<BrowserRestartResult> => {
+    assertUiSender(event, getWindow);
+    ensureWired();
+
+    const activeDownloads = activeBrowserDownloadCount();
+    const mediaSessions = browserMediaStates().length;
+    const target = homeUrl();
+    if (!confirmed && (activeDownloads > 0 || mediaSessions > 0)) {
+      return {
+        restarted: false,
+        requiresConfirmation: true,
+        activeDownloads,
+        mediaSessions,
+        tabId: null,
+        url: target,
+      };
+    }
+
+    if (!restartInFlight) {
+      restartInFlight = restartBrowserSubsystem(target)
+        .then((tabId) => ({
+          restarted: true,
+          requiresConfirmation: false,
+          activeDownloads,
+          mediaSessions,
+          tabId,
+          url: target,
+        }))
+        .finally(() => { restartInFlight = null; });
+    }
+    return restartInFlight;
+  });
 
   h('browser:openTab', async (event, url: string) => {
     assertUiSender(event, getWindow);
@@ -457,7 +505,7 @@ export function registerBrowserIpc({ h, getWindow }: IpcContext): void {
    */
   h('browser:clearAllData', async (event) => {
     assertUiSender(event, getWindow);
-    closeAllBrowserTabs();
+    destroyBrowserSubsystem();
     await clearAllBrowserData();
     return measureBrowserStorage(true);
   });

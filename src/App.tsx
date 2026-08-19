@@ -294,6 +294,14 @@ export function App() {
       setRefreshingNotifications(false);
     }
   }, [refreshNotificationSources, refreshingNotifications]);
+  const captureNotificationsBrowserSnapshot = useCallback(
+    () => window.nodus.captureBrowserOverlaySnapshot(),
+    [],
+  );
+  const setNotificationsBrowserOverlayVisible = useCallback(
+    (visible: boolean) => window.nodus.setBrowserOverlayVisible(visible),
+    [],
+  );
   const [graphTarget, setGraphTarget] = useState<PendingGraphNavigationTarget & { nonce: number } | null>(null);
   const [ideaTarget, setIdeaTarget] = useState<PendingIdeaNavigationTarget & { nonce: number } | null>(null);
   const [libraryTarget, setLibraryTarget] = useState<PendingLibraryNavigationTarget & { nonce: number } | null>(null);
@@ -1452,6 +1460,8 @@ export function App() {
           onRefresh={refreshNotificationCenter}
           refreshing={refreshingNotifications}
           onClearAll={() => void window.nodus.clearNotifications().then(setNotifications).catch(() => {})}
+          captureBrowserOverlaySnapshot={captureNotificationsBrowserSnapshot}
+          setBrowserOverlayVisible={setNotificationsBrowserOverlayVisible}
         />
       </header>
 

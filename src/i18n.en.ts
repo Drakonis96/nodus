@@ -8372,4 +8372,9 @@ export const EN: Record<string, string> = {
   "Abrir enlace en una pestaña nueva": "Open link in a new tab",
   "Copiar dirección del enlace": "Copy link address",
   "Abrir enlace en el navegador del sistema": "Open link in system browser",
+  "Reiniciar Nodus Browser": "Restart Nodus Browser",
+  "Nodus Browser se ha reiniciado.": "Nodus Browser has restarted.",
+  "{n} descarga(s) activa(s)": "{n} active download(s)",
+  "{n} sesión(es) multimedia": "{n} media session(s)",
+  "Reiniciar interrumpirá {activity}. Las sesiones y preferencias persistentes se conservarán.": "Restarting will interrupt {activity}. Persistent sessions and preferences will be preserved.",
 };

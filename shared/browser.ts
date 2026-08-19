@@ -64,6 +64,18 @@ export interface BrowserState {
   activeTabId: string | null;
 }
 
+/** Result of requesting a real Browser subsystem restart. */
+export interface BrowserRestartResult {
+  /** False when main requires an explicit warning confirmation first. */
+  restarted: boolean;
+  requiresConfirmation: boolean;
+  activeDownloads: number;
+  mediaSessions: number;
+  /** The single fresh tab, once restarted. */
+  tabId: string | null;
+  url: string;
+}
+
 /** Commands the header can send to a browser media session. */
 export type BrowserMediaCommand = 'previous' | 'play' | 'pause' | 'next' | 'stop';
 

@@ -2,7 +2,13 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Icon } from '../components/ui';
 import { t } from '../i18n';
 import { MAX_BROWSER_TABS } from '@shared/browser';
-import type { BrowserDownloadView, BrowserState, BrowserTabState, PendingBrowserPermission } from '@shared/browser';
+import type {
+  BrowserDownloadView,
+  BrowserRestartResult,
+  BrowserState,
+  BrowserTabState,
+  PendingBrowserPermission,
+} from '@shared/browser';
 import type { BrowserConnectorCaptureRequest } from '@shared/browserConnector';
 import type { AppSettings } from '@shared/types';
 import { BrowserCaptureModal } from '../components/browser/BrowserCaptureModal';
@@ -32,6 +38,8 @@ export function NodusBrowserView() {
     { request: BrowserConnectorCaptureRequest & { snapshotAvailable?: boolean }; warnings: string[] } | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [restarting, setRestarting] = useState(false);
+  const [restartWarning, setRestartWarning] = useState<BrowserRestartResult | null>(null);
   const [downloads, setDownloads] = useState<BrowserDownloadView[]>([]);
   const [panel, setPanel] = useState<null | 'downloads' | 'settings' | 'actions'>(null);
 
@@ -197,6 +205,25 @@ export function NodusBrowserView() {
     }
   };
 
+  const restartBrowser = async (confirmed = false) => {
+    setPanel(null);
+    setRestarting(true);
+    setNotice(null);
+    try {
+      const result = await window.nodus.restartNodusBrowser(confirmed);
+      if (result.requiresConfirmation) {
+        setRestartWarning(result);
+        return;
+      }
+      setRestartWarning(null);
+      setNotice(t('Nodus Browser se ha reiniciado.'));
+    } catch (cause) {
+      setNotice(cause instanceof Error ? cause.message : String(cause));
+    } finally {
+      setRestarting(false);
+    }
+  };
+
   return (
     <div className="flex h-full min-h-0 flex-col" data-testid="nodus-browser">
       <BrowserTabStrip
@@ -278,6 +305,16 @@ export function NodusBrowserView() {
             onClick={() => setPanel((current) => (current === 'actions' ? null : 'actions'))}
           />
         </div>
+
+        <div>
+          <ToolbarButton
+            icon="rotateCcw"
+            label={t('Reiniciar Nodus Browser')}
+            disabled={restarting}
+            dataTestId="browser-restart"
+            onClick={() => void restartBrowser(false)}
+          />
+        </div>
       </div>
 
       {panel === 'downloads' && (
@@ -309,6 +346,15 @@ export function NodusBrowserView() {
         >
           {refusal}
         </div>
+      )}
+
+      {restartWarning?.requiresConfirmation && (
+        <BrowserRestartWarning
+          status={restartWarning}
+          disabled={restarting}
+          onCancel={() => setRestartWarning(null)}
+          onConfirm={() => void restartBrowser(true)}
+        />
       )}
 
       {notice && (
@@ -416,11 +462,12 @@ function permissionLabel(request: PendingBrowserPermission): string {
 }
 
 function ToolbarButton({
-  icon, label, onClick, disabled,
-}: { icon: string; label: string; onClick: () => void; disabled?: boolean }) {
+  icon, label, onClick, disabled, dataTestId,
+}: { icon: string; label: string; onClick: () => void; disabled?: boolean; dataTestId?: string }) {
   return (
     <button
       type="button"
+      data-testid={dataTestId}
       title={label}
       aria-label={label}
       disabled={disabled}
@@ -429,6 +476,56 @@ function ToolbarButton({
     >
       <Icon name={icon} size={16} />
     </button>
+  );
+}
+
+/**
+ * A trusted chrome bar, never website content. Main has already refused the
+ * first restart request, so this confirmation cannot race past live activity.
+ */
+function BrowserRestartWarning({
+  status, disabled, onCancel, onConfirm,
+}: {
+  status: BrowserRestartResult;
+  disabled: boolean;
+  onCancel: () => void;
+  onConfirm: () => void;
+}) {
+  const affected: string[] = [];
+  if (status.activeDownloads > 0) {
+    affected.push(t('{n} descarga(s) activa(s)').replace('{n}', String(status.activeDownloads)));
+  }
+  if (status.mediaSessions > 0) {
+    affected.push(t('{n} sesión(es) multimedia').replace('{n}', String(status.mediaSessions)));
+  }
+  return (
+    <div
+      data-testid="browser-restart-warning"
+      className="flex flex-wrap items-center gap-2 border-b border-amber-400/40 bg-amber-50 px-3 py-2 text-xs text-amber-950 dark:bg-amber-950/40 dark:text-amber-100"
+    >
+      <Icon name="alert" size={14} className="shrink-0" />
+      <span className="min-w-0 flex-1">
+        {t('Reiniciar interrumpirá {activity}. Las sesiones y preferencias persistentes se conservarán.')
+          .replace('{activity}', affected.join(` ${t('y')} `))}
+      </span>
+      <button
+        type="button"
+        className="btn btn-ghost border border-neutral-300 py-0.5 dark:border-neutral-700"
+        disabled={disabled}
+        onClick={onCancel}
+      >
+        {t('Cancelar')}
+      </button>
+      <button
+        type="button"
+        data-testid="browser-restart-confirm"
+        className="btn btn-ghost border border-amber-500/70 py-0.5"
+        disabled={disabled}
+        onClick={onConfirm}
+      >
+        {t('Reiniciar Nodus Browser')}
+      </button>
+    </div>
   );
 }
 

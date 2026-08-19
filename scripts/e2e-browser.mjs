@@ -72,6 +72,10 @@ const PAGES = {
           localStorage.setItem('nodus_e2e', 'yes');
         </script>
         <h1>Storage seeded</h1></main></body></html>`,
+
+  '/download': `<!doctype html><html><head><title>Download page</title></head><body><main>
+        <a id="slow-download" href="/slow-download.bin" download>Download slowly</a>
+        </main></body></html>`,
 };
 
 let server;
@@ -91,6 +95,28 @@ async function startFixtures() {
       header.write('data', 36); header.writeUInt32LE(samples, 40);
       response.setHeader('Content-Type', 'audio/wav');
       response.end(Buffer.concat([header, Buffer.alloc(samples, 128)]));
+      return;
+    }
+    if (url.pathname === '/slow-download.bin') {
+      // Long enough for the restart action to observe and warn about it.
+      const total = 16 * 1024 * 1024;
+      let sent = 0;
+      response.writeHead(200, {
+        'Content-Type': 'application/octet-stream',
+        'Content-Disposition': 'attachment; filename="restart-e2e.bin"',
+        'Content-Length': total,
+      });
+      const timer = setInterval(() => {
+        if (sent >= total || response.destroyed) {
+          clearInterval(timer);
+          if (!response.destroyed) response.end();
+          return;
+        }
+        const size = Math.min(64 * 1024, total - sent);
+        sent += size;
+        response.write(Buffer.alloc(size, 0x5a));
+      }, 50);
+      response.once('close', () => clearInterval(timer));
       return;
     }
     const body = PAGES[url.pathname];
@@ -145,6 +171,7 @@ await writeFile(
     autoBackupFolder: libraryRoot,
     autoBackupEnabled: false,
     libraryGlobalEnabled: true,
+    browserDownloadFolder: libraryRoot,
   }),
   'utf8',
 );
@@ -536,6 +563,123 @@ try {
     assert.ok(report.sites.some((site) => site.origin.includes('127.0.0.1')), 'the fixture host must appear');
   });
 
+  await check('restart destroys every old Browser WebContents but preserves Nodus and its persistent session', async () => {
+    await call('updateSettings', {
+      browserHomeMode: 'custom',
+      browserHomeUrl: `${origin}/`,
+      browserNewTabMode: 'home',
+      browserSearchEngine: 'duckduckgo',
+    });
+    await call('openBrowserTab', `${origin}/second`);
+    await waitFor((s) => s.tabs.length >= 2, 'multiple tabs before restart');
+
+    const beforeSettings = await call('getSettings');
+    const before = await app.evaluate(({ BrowserWindow, session, webContents }) => {
+      const main = BrowserWindow.getAllWindows()[0];
+      const browserSession = session.fromPartition('persist:nodus-browser');
+      globalThis.__restartE2eSession = browserSession;
+      return {
+        mainId: main.webContents.id,
+        browserIds: webContents.getAllWebContents()
+          .filter((contents) => contents.session === browserSession)
+          .map((contents) => contents.id),
+      };
+    });
+    assert.ok(before.browserIds.length >= 2, `expected old Browser renderers: ${JSON.stringify(before)}`);
+
+    const result = await call('restartNodusBrowser', false);
+    assert.equal(result.restarted, true);
+    assert.equal(result.requiresConfirmation, false);
+    const restarted = await waitFor(
+      (s) => s.tabs.length === 1 && s.tabs[0].url === `${origin}/` && !s.tabs[0].loading,
+      'one fresh configured home tab',
+    );
+    assert.equal(restarted.tabs.length, 1);
+
+    const after = await app.evaluate(async ({ BrowserWindow, session, webContents }, oldIds) => {
+      const main = BrowserWindow.getAllWindows()[0];
+      const browserSession = session.fromPartition('persist:nodus-browser');
+      const current = webContents.getAllWebContents().filter((contents) => contents.session === browserSession);
+      return {
+        mainId: main.webContents.id,
+        oldDestroyed: oldIds.every((id) => {
+          const contents = webContents.fromId(id);
+          return !contents || contents.isDestroyed();
+        }),
+        browserCount: current.length,
+        sameSessionObject: current[0]?.session === globalThis.__restartE2eSession,
+        storage: current[0]
+          ? await current[0].executeJavaScript(`({ cookie: document.cookie, local: localStorage.getItem('nodus_e2e') })`)
+          : null,
+      };
+    }, before.browserIds);
+    assert.equal(after.mainId, before.mainId, 'the main Nodus renderer must not restart');
+    assert.equal(after.oldDestroyed, true, 'all old Browser WebContents must be destroyed');
+    assert.equal(after.browserCount, 1, 'restart must own exactly one fresh Browser WebContents');
+    assert.equal(after.sameSessionObject, true, 'the persistent Chromium session object must be reused');
+    assert.match(after.storage.cookie, /nodus_e2e=1/, 'cookies must survive Browser restart');
+    assert.equal(after.storage.local, 'yes', 'site localStorage must survive Browser restart');
+
+    const afterSettings = await call('getSettings');
+    for (const key of ['browserHomeMode', 'browserHomeUrl', 'browserNewTabMode', 'browserSearchEngine']) {
+      assert.deepEqual(afterSettings[key], beforeSettings[key], `${key} must survive Browser restart`);
+    }
+
+    // Resource count must remain flat across repeated destroy-and-recreate
+    // cycles; a normal reload cannot satisfy these destruction assertions.
+    for (let cycle = 0; cycle < 3; cycle += 1) {
+      const old = await app.evaluate(({ session, webContents }) => {
+        const browserSession = session.fromPartition('persist:nodus-browser');
+        return webContents.getAllWebContents()
+          .filter((contents) => contents.session === browserSession)
+          .map((contents) => contents.id);
+      });
+      assert.equal(old.length, 1, `cycle ${cycle}: expected exactly one Browser renderer before restart`);
+      await call('restartNodusBrowser', false);
+      await waitFor((s) => s.tabs.length === 1 && s.tabs[0].url === `${origin}/` && !s.tabs[0].loading,
+        `cycle ${cycle}: fresh home tab`);
+      const resources = await app.evaluate(({ session, webContents }, oldIds) => {
+        const browserSession = session.fromPartition('persist:nodus-browser');
+        return {
+          count: webContents.getAllWebContents().filter((contents) => contents.session === browserSession).length,
+          oldDestroyed: oldIds.every((id) => !webContents.fromId(id) || webContents.fromId(id).isDestroyed()),
+        };
+      }, old);
+      assert.equal(resources.oldDestroyed, true, `cycle ${cycle}: old WebContents leaked`);
+      assert.equal(resources.count, 1, `cycle ${cycle}: Browser resource count grew`);
+    }
+  });
+
+  await check('restart warns for an active download, then cancels it and clears transient state', async () => {
+    await call('submitBrowserOmnibox', `${origin}/download`);
+    await waitFor((s) => s.tabs.some((tab) => tab.url.endsWith('/download') && !tab.loading), 'the download fixture');
+    await app.evaluate(async ({ webContents }) => {
+      const target = webContents.getAllWebContents().find((contents) => contents.getURL().endsWith('/download'));
+      if (!target) throw new Error('download fixture missing');
+      await target.executeJavaScript(`document.getElementById('slow-download').click()`, true);
+    });
+    const deadline = Date.now() + 10_000;
+    let activeDownloads = [];
+    while (Date.now() < deadline) {
+      activeDownloads = await call('getBrowserDownloads');
+      if (activeDownloads.some((download) => download.state === 'progressing')) break;
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    }
+    assert.ok(activeDownloads.some((download) => download.state === 'progressing'), 'the fixture download never became active');
+    const tabBeforeWarning = (await state()).activeTabId;
+
+    await page.getByTestId('browser-restart').click();
+    const warning = page.getByTestId('browser-restart-warning');
+    await warning.waitFor({ state: 'visible' });
+    assert.match(await warning.innerText(), /descarga/i);
+    assert.equal((await state()).activeTabId, tabBeforeWarning, 'warning request must not restart yet');
+    await page.getByTestId('browser-restart-confirm').click();
+    await warning.waitFor({ state: 'detached' });
+    await waitFor((s) => s.tabs.length === 1 && s.tabs[0].url === `${origin}/` && !s.tabs[0].loading,
+      'fresh home after confirmed download interruption');
+    assert.deepEqual(await call('getBrowserDownloads'), [], 'transient download state must be cleared');
+  });
+
   await check('clearing cookies actually removes them', async () => {
     const after = await call('clearBrowserData', ['cookies']);
     assert.equal(after.cookieCount, 0, 'no cookie may survive a cookie wipe');
@@ -608,6 +752,19 @@ try {
     assert.equal(await deviceVolume.inputValue(), currentVolume);
     await page.keyboard.press('Escape');
     await popover.waitFor({ state: 'detached' });
+  });
+
+  await check('restart warns for media and stops the Browser media session', async () => {
+    assert.ok((await call('getBrowserMedia')).length > 0, 'media session must exist before restart');
+    await page.getByTestId('browser-restart').click();
+    const warning = page.getByTestId('browser-restart-warning');
+    await warning.waitFor({ state: 'visible' });
+    assert.match(await warning.innerText(), /multimedia/i);
+    await page.getByTestId('browser-restart-confirm').click();
+    await warning.waitFor({ state: 'detached' });
+    await waitFor((s) => s.tabs.length === 1 && s.tabs[0].url === `${origin}/` && !s.tabs[0].loading,
+      'fresh home after confirmed media stop');
+    assert.deepEqual(await call('getBrowserMedia'), [], 'all Browser media state must be cleared');
   });
 
   await check('tabs close without leaking WebContents', async () => {
