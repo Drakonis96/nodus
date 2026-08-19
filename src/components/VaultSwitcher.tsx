@@ -375,6 +375,7 @@ export function VaultSwitcher({ anchorEl, onClose, vaults, onVaultsChanged, onAc
           {open && pos && (
             <motion.div
               ref={panelRef}
+              data-browser-native-overlay="true"
               key="vault-panel"
               initial={{ opacity: 0, scaleY: 0.8, y: -8 }}
               animate={{ opacity: 1, scaleY: 1, y: 0 }}

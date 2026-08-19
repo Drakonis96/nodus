@@ -723,6 +723,38 @@ try {
     assert.equal(restored, true, 'closing Notifications must restore the native page');
   });
 
+  await check('global vault overlays stay above Browser pages', async () => {
+    const callsBefore = await app.evaluate(() => globalThis.__nodusBrowserVisibilityCalls?.length ?? 0);
+    await page.locator('[data-vault-trigger]').first().click();
+    const vaultPanel = page.locator('[data-browser-native-overlay="true"]');
+    await vaultPanel.waitFor({ state: 'visible' });
+
+    let hidden = false;
+    const hiddenDeadline = Date.now() + 5_000;
+    while (!hidden && Date.now() < hiddenDeadline) {
+      hidden = await app.evaluate((from) =>
+        globalThis.__nodusBrowserVisibilityCalls?.slice(from).includes(false) ?? false, callsBefore);
+      if (!hidden) await new Promise((resolve) => setTimeout(resolve, 25));
+    }
+    assert.equal(hidden, true, 'the anchored vault switcher must hide the native page');
+
+    await vaultPanel.getByTitle(/Añadir bóveda|Add vault/).click();
+    const addVaultDialog = page.getByRole('dialog', { name: /Añadir bóveda|Add vault/ });
+    await addVaultDialog.waitFor({ state: 'visible' });
+    assert.equal(await vaultPanel.isVisible(), true, 'the parent switcher must remain behind the creation dialog');
+    await addVaultDialog.getByRole('button', { name: /Cancelar|Cancel/, exact: true }).click();
+    await vaultPanel.getByTitle(/Cerrar|Close/).click();
+    await vaultPanel.waitFor({ state: 'detached' });
+
+    let restored = false;
+    const restoredDeadline = Date.now() + 5_000;
+    while (!restored && Date.now() < restoredDeadline) {
+      restored = await app.evaluate(() => globalThis.__nodusBrowserVisibilityCalls?.at(-1) === true);
+      if (!restored) await new Promise((resolve) => setTimeout(resolve, 25));
+    }
+    assert.equal(restored, true, 'closing the last trusted overlay must restore the native page');
+  });
+
   await check('leaving and returning to Browser preserves the active tab', async () => {
     const before = await state();
     const activeBefore = before.tabs.find((tab) => tab.id === before.activeTabId);

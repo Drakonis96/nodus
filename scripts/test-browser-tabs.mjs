@@ -85,6 +85,28 @@ test('only the active tab is attached to the window', () => {
   assert.match(activate, /attach\(tab\)/, 'the new tab must be attached');
 });
 
+test('trusted Nodus overlays automatically cover native Browser pages', () => {
+  const overlayGuard = readFileSync(path.join(repoRoot, 'src/browserOverlay.ts'), 'utf8');
+  const app = readFileSync(path.join(repoRoot, 'src/App.tsx'), 'utf8');
+  const vaultSwitcher = readFileSync(path.join(repoRoot, 'src/components/VaultSwitcher.tsx'), 'utf8');
+  const bookmarksStyles = readFileSync(path.join(repoRoot, 'src/components/browser/NodusBookmarks.css'), 'utf8');
+
+  assert.match(overlayGuard, /new MutationObserver\(schedule\)/,
+    'the guard must discover overlays opened anywhere in the trusted renderer');
+  assert.match(overlayGuard, /\[role="dialog"\]/,
+    'accessible dialogs must automatically hide native content');
+  assert.match(overlayGuard, /\.fixed\.inset-0/,
+    'legacy full-window backdrops and tours must be covered too');
+  assert.match(overlayGuard, /requestAnimationFrame\(synchronize\)/,
+    'overlapping overlay cleanup must settle after the React commit');
+  assert.match(app, /useBrowserNativeOverlayGuard\(view === 'browser'\)/,
+    'the app shell must enable the guard whenever Browser is the active section');
+  assert.match(vaultSwitcher, /data-browser-native-overlay="true"/,
+    'the anchored vault switcher must opt into native Browser occlusion');
+  assert.match(bookmarksStyles, /\.nodus-site-header[\s\S]{0,180}z-index:20/,
+    'the local start-page header must stay below global Nodus overlays');
+});
+
 test('shutdown is wired into every one of main.ts’s exit paths', () => {
   // Window close matters independently on macOS, where closing the last window
   // does not quit. The remaining paths cover normal quit, its final backstop,

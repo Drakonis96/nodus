@@ -74,6 +74,7 @@ import nodusLogoOrange from './assets/nodus-logo-orange.svg';
 import nodusLogoViolet from './assets/nodus-logo-violet.svg';
 import nodusLogoCyan from './assets/nodus-logo-cyan.svg';
 import { buildDockIconDataUrl, dockColorForVaultType } from './dockIcon';
+import { useBrowserNativeOverlayGuard } from './browserOverlay';
 
 const CsvImportModal = lazy(() => import('./views/DatabasesView').then((module) => ({ default: module.CsvImportModal })));
 const CollectionsModal = lazy(() => import('./views/CollectionsModal').then((module) => ({ default: module.CollectionsModal })));
@@ -199,6 +200,7 @@ export function App() {
     typeof window !== 'undefined' && window.matchMedia('(prefers-color-scheme: dark)').matches
   );
   const [view, setView] = useState<View>('home');
+  useBrowserNativeOverlayGuard(view === 'browser');
   // Página activa dentro de Herramientas. Vive aquí (y no en ToolkitView) porque
   // el sidebar navega directamente a una herramienta, y porque así salir de la
   // sección y volver no pierde el sitio aunque la vista se desmonte.
