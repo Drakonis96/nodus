@@ -1575,6 +1575,9 @@ export interface AppSettings {
   // Nodi mascot: show the floating companion (visual/animation only for now — no wired
   // behaviour yet). App-wide preference, on by default.
   mascotEnabled: boolean;
+  // Discrete scale shared by the in-app and always-on-top companions. The default 1
+  // preserves the size used before this setting was introduced.
+  mascotScale: number;
   // Keep Nodi pinned on top of every application in a floating desktop window, on the
   // operating systems that allow it. When off, Nodi lives inside the app window only.
   mascotAlwaysOnTop: boolean;

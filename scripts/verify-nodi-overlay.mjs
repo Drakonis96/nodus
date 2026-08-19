@@ -100,6 +100,27 @@ try {
   await nativeOverlay.evaluate((win) => win.focus());
   const figure = overlay.locator('.nodi-figure');
   await figure.waitFor({ timeout: 30_000 });
+  const verifyFigureSize = async (scale, expected) => {
+    await page.evaluate((mascotScale) => window.nodus.updateSettings({ mascotScale }), scale);
+    await overlay.waitForFunction(([width, height]) => {
+      const rect = document.querySelector('.nodi-figure')?.getBoundingClientRect();
+      return Math.round(rect?.width ?? 0) === width && Math.round(rect?.height ?? 0) === height;
+    }, expected);
+    const rect = await figure.boundingBox();
+    assert.deepEqual(
+      [Math.round(rect?.width ?? 0), Math.round(rect?.height ?? 0)],
+      expected,
+      `Nodi scale ${scale} did not reach the overlay figure`,
+    );
+    assert.deepEqual(
+      await nativeOverlay.evaluate((win) => [win.getBounds().width, win.getBounds().height]),
+      [600, 520],
+      `Nodi scale ${scale} resized the stable native host`,
+    );
+  };
+  await verifyFigureSize(0.6, [108, 120]);
+  await verifyFigureSize(1.4, [252, 280]);
+  await verifyFigureSize(1, [180, 200]);
   const figureScreenPosition = async () => {
     const [bounds, box] = await Promise.all([
       nativeOverlay.evaluate((win) => win.getBounds()),

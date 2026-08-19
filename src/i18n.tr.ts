@@ -38,6 +38,9 @@ import { LIBRARY_ONBOARDING_TRANSLATIONS } from './i18n.libraryOnboarding';
 
 /** Complete static Turkish interface table; coverage prohibits runtime fallbacks. */
 export const TR: Record<string, string> = {
+  'Tamaño de Nodi': 'Nodi boyutu',
+  'El marcador central conserva el tamaño predeterminado. Elige uno de los nueve tamaños disponibles.': 'Ortadaki işaretçi varsayılan boyutu korur. Kullanılabilir dokuz boyuttan birini seçin.',
+  'Tamaños predeterminados': 'Önceden ayarlanmış boyutlar',
   ...PAGE_TRANSLATIONS.tr,
   ...DATABASE_PROPERTY_TRANSLATIONS.tr,
   ...DATABASE_RELATION_FORMULA_TRANSLATIONS.tr,

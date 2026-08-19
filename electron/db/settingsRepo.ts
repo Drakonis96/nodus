@@ -3,6 +3,7 @@ import type { AppSettings, ModelRef } from '@shared/types';
 import { DEFAULT_EMBEDDING_MODELS, DEFAULT_LOCAL_BASE_URLS, normalizeEmbeddingProvider } from '@shared/providers';
 import { isOpenAiStudySttModel } from '@shared/sttModels';
 import { NODI_ORB_DEFAULT_COLOR } from '@shared/nodiOrb';
+import { NODI_DEFAULT_SCALE, normalizeNodiScale } from '@shared/nodiSize';
 import { lockedApiKeyProviders, providerKeyMap } from '../secrets/secretStore';
 import { GRANULAR_MODEL_KEYS, migrateModelSettings } from '@shared/modelSettings';
 import { DEFAULT_NODUS_IMAGE_QUALITY, isNodusImageQuality } from '@shared/localImageModels';
@@ -125,6 +126,7 @@ const DEFAULTS: Omit<AppSettings, 'providerKeys' | 'lockedProviderKeys'> = {
   announcementsEnabled: true,
   betaUpdates: false,
   mascotEnabled: true,
+  mascotScale: NODI_DEFAULT_SCALE,
   mascotAlwaysOnTop: false,
   mascotVaultCostumes: true,
   // The classic Nodi stays the default: an existing install must never wake up with a
@@ -272,6 +274,7 @@ export function getSettings(): AppSettings {
     merged.libraryScopeOnboardingVersion = 0;
   }
   merged.codexReasoningEfforts = sanitizeCodexReasoningEfforts(parsed.codexReasoningEfforts);
+  merged.mascotScale = normalizeNodiScale(parsed.mascotScale);
   merged.studyImproveToolbarStyleIds = [...new Set((Array.isArray(merged.studyImproveToolbarStyleIds) ? merged.studyImproveToolbarStyleIds : [])
     .filter((value): value is string => typeof value === 'string' && value.trim().length > 0))].slice(0, 4);
   merged.customEventTypes = sanitizeCustomEventTypes(parsed.customEventTypes);
@@ -311,6 +314,9 @@ export function getSettings(): AppSettings {
     if (globalPrefs[key] === undefined) seed[key] = merged[key];
     else (merged as Record<string, unknown>)[key] = globalPrefs[key];
   }
+  // The global preferences file is user-editable, so validate the shared size again
+  // after it has overlaid the vault defaults.
+  merged.mascotScale = normalizeNodiScale(merged.mascotScale);
   // Global preferences are user-editable JSON on disk. Fail closed to the v3-safe
   // vault scope if those three values are missing or malformed.
   if (merged.libraryScope !== 'global' && merged.libraryScope !== 'vault') merged.libraryScope = 'vault';
@@ -415,6 +421,9 @@ export function getSettings(): AppSettings {
 }
 
 export function updateSettings(patch: Partial<AppSettings>): AppSettings {
+  if (patch.mascotScale !== undefined) {
+    patch = { ...patch, mascotScale: normalizeNodiScale(patch.mascotScale) };
+  }
   if (patch.customEventTypes !== undefined) {
     patch = { ...patch, customEventTypes: sanitizeCustomEventTypes(patch.customEventTypes) };
   }

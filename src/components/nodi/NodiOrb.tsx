@@ -250,11 +250,6 @@ export function NodiOrb({
           <stop offset="60%" className="st-ped2" stopOpacity=".14" />
           <stop offset="100%" className="st-ped2" stopOpacity="0" />
         </radialGradient>
-        <radialGradient id={u('pedShadowG')} cx="50%" cy="50%" r="50%">
-          <stop offset="0%" stopColor="#26314a" stopOpacity=".38" />
-          <stop offset="70%" stopColor="#26314a" stopOpacity=".12" />
-          <stop offset="100%" stopColor="#26314a" stopOpacity="0" />
-        </radialGradient>
         <radialGradient id={u('satHaloGold')} cx="50%" cy="50%" r="50%">
           <stop offset="0%" stopColor="#ffe9a8" stopOpacity=".9" />
           <stop offset="40%" stopColor="#f7c95e" stopOpacity=".35" />
@@ -308,10 +303,6 @@ export function NodiOrb({
           <ellipse className="ped-pulse ped-ln1" cx="160" cy="297" rx="80" ry="12" fill="none" strokeWidth="1.2" filter={ref('b1')} />
           <ellipse className="ped-ln2" cx="160" cy="299" rx="48" ry="7" fill="none" strokeWidth="1" filter={ref('b1')} />
         </g>
-        <g className="ped-shadow">
-          <ellipse cx="160" cy="292" rx="72" ry="13" fill={ref('pedShadowG')} />
-        </g>
-
         {/* Orbits: a soft blurred underlay carries the light, a crisp line the shape. */}
         <g transform="rotate(-16 160 160)">
           <ellipse className="ring ring-glow add" cx="160" cy="160" rx="130" ry="42" stroke="rgba(232,198,106,.35)" strokeWidth="3.2" filter={ref('b4')} fill="none" />

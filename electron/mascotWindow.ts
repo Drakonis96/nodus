@@ -1,6 +1,7 @@
 import { BrowserWindow, screen } from 'electron';
 import path from 'node:path';
 import type { NodiOverlayPlacement } from '@shared/types';
+import { normalizeNodiScale } from '@shared/nodiSize';
 import { getSettings } from './db/settingsRepo';
 
 // Standalone always-on-top desktop window that hosts the Nodi mascot (mascot.html).
@@ -16,8 +17,8 @@ const RENDERER_DIST = path.join(__dirname, '../dist');
 // exact transient is the diagonal jump seen when Nodi opens outside the main app.
 const EXPANDED_WIDTH = 600;
 const EXPANDED_HEIGHT = 520;
-const FIGURE_WIDTH = 180;
-const FIGURE_HEIGHT = 200;
+const BASE_FIGURE_WIDTH = 180;
+const BASE_FIGURE_HEIGHT = 200;
 const MARGIN = 16;
 
 let mascotWindow: BrowserWindow | null = null;
@@ -25,23 +26,31 @@ let tutorialVisible = false;
 let placement: NodiOverlayPlacement = { x: MARGIN, y: MARGIN, horizontal: 'left', vertical: 'up' };
 let windowDrag: { cursorX: number; cursorY: number; nodiX: number; nodiY: number } | null = null;
 let requestedBounds: { x: number; y: number; width: number; height: number } | null = null;
+let figureWidth = BASE_FIGURE_WIDTH;
+let figureHeight = BASE_FIGURE_HEIGHT;
+
+function syncFigureSize(): void {
+  const scale = normalizeNodiScale(getSettings().mascotScale);
+  figureWidth = Math.round(BASE_FIGURE_WIDTH * scale);
+  figureHeight = Math.round(BASE_FIGURE_HEIGHT * scale);
+}
 
 const clamp = (value: number, min: number, max: number) => Math.min(Math.max(min, value), Math.max(min, max));
 
 function placeWindowAroundNodi(win: BrowserWindow, desiredX: number, desiredY: number): NodiOverlayPlacement {
   const display = screen.getDisplayNearestPoint({
-    x: Math.round(desiredX + FIGURE_WIDTH / 2),
-    y: Math.round(desiredY + FIGURE_HEIGHT / 2),
+    x: Math.round(desiredX + figureWidth / 2),
+    y: Math.round(desiredY + figureHeight / 2),
   });
   const { workArea } = display;
-  const nodiX = clamp(desiredX, workArea.x, workArea.x + workArea.width - FIGURE_WIDTH);
-  const nodiY = clamp(desiredY, workArea.y, workArea.y + workArea.height - FIGURE_HEIGHT);
-  const horizontal: NodiOverlayPlacement['horizontal'] = nodiX + FIGURE_WIDTH / 2 >= workArea.x + workArea.width / 2 ? 'left' : 'right';
-  const vertical: NodiOverlayPlacement['vertical'] = nodiY + FIGURE_HEIGHT / 2 >= workArea.y + workArea.height / 2 ? 'up' : 'down';
+  const nodiX = clamp(desiredX, workArea.x, workArea.x + workArea.width - figureWidth);
+  const nodiY = clamp(desiredY, workArea.y, workArea.y + workArea.height - figureHeight);
+  const horizontal: NodiOverlayPlacement['horizontal'] = nodiX + figureWidth / 2 >= workArea.x + workArea.width / 2 ? 'left' : 'right';
+  const vertical: NodiOverlayPlacement['vertical'] = nodiY + figureHeight / 2 >= workArea.y + workArea.height / 2 ? 'up' : 'down';
   const width = Math.min(EXPANDED_WIDTH, workArea.width);
   const height = Math.min(EXPANDED_HEIGHT, workArea.height);
-  const idealX = horizontal === 'left' ? nodiX - (width - FIGURE_WIDTH - MARGIN) : nodiX - MARGIN;
-  const idealY = vertical === 'up' ? nodiY - (height - FIGURE_HEIGHT - MARGIN) : nodiY - MARGIN;
+  const idealX = horizontal === 'left' ? nodiX - (width - figureWidth - MARGIN) : nodiX - MARGIN;
+  const idealY = vertical === 'up' ? nodiY - (height - figureHeight - MARGIN) : nodiY - MARGIN;
   const x = clamp(idealX, workArea.x, workArea.x + workArea.width - width);
   const y = clamp(idealY, workArea.y, workArea.y + workArea.height - height);
 
@@ -71,8 +80,8 @@ function placeWindowAroundNodi(win: BrowserWindow, desiredX: number, desiredY: n
   // host window to be, or the next pointer event feeds that error back as a bounce.
   const appliedBounds = win.getBounds();
   placement = {
-    x: Math.round(clamp(nodiX - appliedBounds.x, 0, appliedBounds.width - FIGURE_WIDTH)),
-    y: Math.round(clamp(nodiY - appliedBounds.y, 0, appliedBounds.height - FIGURE_HEIGHT)),
+    x: Math.round(clamp(nodiX - appliedBounds.x, 0, appliedBounds.width - figureWidth)),
+    y: Math.round(clamp(nodiY - appliedBounds.y, 0, appliedBounds.height - figureHeight)),
     horizontal,
     vertical,
   };
@@ -88,9 +97,9 @@ function cursorIsOverNodi(win: BrowserWindow): boolean {
   const cursor = screen.getCursorScreenPoint();
   const nodi = currentNodiPosition(win);
   return cursor.x >= nodi.x
-    && cursor.x < nodi.x + FIGURE_WIDTH
+    && cursor.x < nodi.x + figureWidth
     && cursor.y >= nodi.y
-    && cursor.y < nodi.y + FIGURE_HEIGHT;
+    && cursor.y < nodi.y + figureHeight;
 }
 
 function applyClosedMousePassthrough(win: BrowserWindow): void {
@@ -104,12 +113,13 @@ function positionBottomRight(win: BrowserWindow): void {
   const { workArea } = screen.getPrimaryDisplay();
   placeWindowAroundNodi(
     win,
-    workArea.x + workArea.width - FIGURE_WIDTH - MARGIN,
-    workArea.y + workArea.height - FIGURE_HEIGHT - MARGIN
+    workArea.x + workArea.width - figureWidth - MARGIN,
+    workArea.y + workArea.height - figureHeight - MARGIN
   );
 }
 
 function createMascotWindow(): BrowserWindow {
+  syncFigureSize();
   const isMac = process.platform === 'darwin';
   const win = new BrowserWindow({
     width: EXPANDED_WIDTH,
@@ -254,6 +264,9 @@ export function applyMascotWindow(): void {
     if (!mascotWindow || mascotWindow.isDestroyed()) {
       mascotWindow = createMascotWindow();
     } else {
+      const nodi = currentNodiPosition(mascotWindow);
+      syncFigureSize();
+      placeWindowAroundNodi(mascotWindow, nodi.x, nodi.y);
       mascotWindow.showInactive();
     }
   } else if (tutorialVisible && mascotWindow && !mascotWindow.isDestroyed()) {

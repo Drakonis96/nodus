@@ -42,6 +42,9 @@ import { LIBRARY_ONBOARDING_TRANSLATIONS } from './i18n.libraryOnboarding';
  * every non-Spanish interface language.
  */
 export const EN: Record<string, string> = {
+  'Tamaño de Nodi': 'Nodi size',
+  'El marcador central conserva el tamaño predeterminado. Elige uno de los nueve tamaños disponibles.': 'The centre marker keeps the default size. Choose one of the nine available sizes.',
+  'Tamaños predeterminados': 'Preset sizes',
   ...PAGE_TRANSLATIONS.en,
   ...DATABASE_PROPERTY_TRANSLATIONS.en,
   ...DATABASE_RELATION_FORMULA_TRANSLATIONS.en,

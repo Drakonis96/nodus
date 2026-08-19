@@ -473,6 +473,15 @@ test('a new Nodi chat starts on documentation, the current view and the current 
   assert.doesNotMatch(types, /NODI_DEFAULT_CONTEXTS[^\n]*all_vaults/);
 });
 
+test('Nodi keeps the reading position stable while an answer is streaming', async () => {
+  const companion = await read('src/components/nodi/NodiCompanion.tsx');
+  assert.match(companion, /const scrollChatToBottom = useCallback/);
+  assert.match(companion, /if \(panel === 'chat'\) scrollChatToBottom\(\);\s*\}, \[panel, scrollChatToBottom\]\);/s);
+  assert.doesNotMatch(companion, /\[messages,\s*panel\]/, 'message deltas must not drive the scroll position');
+  const deltaHandler = companion.match(/onDelta: \(delta\) => \{([\s\S]*?)\n\s*\},/)?.[1] ?? '';
+  assert.doesNotMatch(deltaHandler, /scrollChatToBottom|scrollTop|scrollIntoView/);
+});
+
 test('the chat retrieval never holds the main process for a whole similarity scan', async () => {
   const assistant = await read('electron/ai/researchAssistant.ts');
   // researchAssistant builds the context for the research chat AND for Nodi's
