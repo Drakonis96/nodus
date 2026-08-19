@@ -130,7 +130,9 @@ await writeFile(
     firstVaultVersion: 1,
     // The basics tutorial opens on a language picker that covers the shell.
     basicsTutorialVersion: 999,
-    tutorialVideosWatched: true,
+    mascotEnabled: false,
+    mascotStyleChosen: true,
+    tutorialVideosWatched: [],
     uiLanguage: 'es',
   }),
   'utf8',
@@ -160,6 +162,30 @@ try {
   });
   const page = await app.firstWindow();
   await page.waitForLoadState('domcontentloaded');
+  await page.evaluate(async (version) => {
+    // Onboarding and the in-app tours are vault settings, not global preferences,
+    // so writing them to app-prefs.json above would be silently ignored. Seed the
+    // active vault through the same IPC path the UI uses, then reload into the shell.
+    localStorage.setItem('nodus.lastSeenVersion', version);
+    localStorage.setItem('nodus.mobileTeaserSeen.3.2.4', '1');
+    localStorage.setItem('nodus.platformHighlightsSeen.2026-07', '1');
+    localStorage.setItem('nodus.tutorialVideosAnnouncementSeen.2026-07', '1');
+    localStorage.setItem('nodus.toolkitBetaGuideSeen.2.4.0', '1');
+    await window.nodus.updateSettings({
+      onboardingComplete: true,
+      tourComplete: true,
+      advancedTourComplete: true,
+    });
+  }, require(path.join(repoRoot, 'package.json')).version);
+  await page.reload();
+  await page.waitForLoadState('domcontentloaded');
+  const updateModal = page.getByTestId('startup-update-modal');
+  if (await updateModal.count()) {
+    await page.waitForFunction(() =>
+      document.querySelector('[data-testid="startup-update-modal"]')?.getAttribute('data-update-status') === 'not-available');
+    await updateModal.getByRole('button', { name: 'Entendido', exact: false }).click();
+    await updateModal.waitFor({ state: 'detached' });
+  }
 
   /** Drive the browser through the real bridge, exactly as the UI does. */
   const call = (method, ...args) =>
@@ -176,6 +202,41 @@ try {
     }
     throw new Error(`timed out waiting for ${description}; last state: ${JSON.stringify(last)}`);
   };
+
+  await check('entering through the UI gives the page a non-zero viewport', async () => {
+    await page.locator('[data-tour="nav-browser"]').click();
+    const viewport = page.locator('[data-browser-viewport]');
+    await viewport.waitFor({ state: 'visible' });
+    await page.getByTestId('browser-omnibox').fill(`${origin}/`);
+    await page.getByTestId('browser-omnibox').press('Enter');
+    await waitFor(
+      (s) => s.tabs.some((tab) => tab.url === `${origin}/` && !tab.loading),
+      'the fixture home entered through the omnibox',
+    );
+    const rendererBounds = await viewport.evaluate((element) => {
+      const rect = element.getBoundingClientRect();
+      return { x: rect.x, y: rect.y, width: rect.width, height: rect.height };
+    });
+
+    const nativeViews = await app.evaluate(({ BrowserWindow }) => {
+      const window = BrowserWindow.getAllWindows()[0];
+      return window.contentView.children.map((view) => ({
+        url: 'webContents' in view ? view.webContents.getURL() : null,
+        bounds: view.getBounds(),
+      }));
+    });
+    const browserView = nativeViews.find((view) => view.url === `${origin}/`);
+
+    assert.ok(rendererBounds.width > 0 && rendererBounds.height > 0,
+      `renderer published ${JSON.stringify(rendererBounds)}`);
+    assert.ok(browserView, `no browser WebContentsView found: ${JSON.stringify(nativeViews)}`);
+    assert.deepEqual(browserView.bounds, {
+      x: Math.round(rendererBounds.x),
+      y: Math.round(rendererBounds.y),
+      width: Math.round(rendererBounds.width),
+      height: Math.round(rendererBounds.height),
+    }, `native view did not receive the renderer rectangle ${JSON.stringify(rendererBounds)}`);
+  });
 
   await check('a tab opens and loads a real page', async () => {
     await call('openBrowserTab', `${origin}/`);
@@ -326,14 +387,6 @@ try {
     const current = await state();
     assert.ok(current.tabs.length <= 12, `the cap must hold, got ${current.tabs.length} tabs`);
   });
-
-  // NOT COVERED, and it should be: entering the section through the UI and
-  // asserting the page view gets a non-zero rectangle. Every check above drives
-  // the browser over IPC, so the viewport is never published and the view stays
-  // sized 0x0 — invisible rather than broken, and green at every level above it.
-  // That blind spot is exactly where the open rendering bug lives. Reaching the
-  // shell from this harness needs the first-run tutorial and vault wizard seeded
-  // past, which is unsolved here.
 
   await check('the main window is still responsive after all of that', async () => {
     const settings = await page.evaluate(() => window.nodus.getSettings());
