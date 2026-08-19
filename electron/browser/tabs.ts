@@ -29,6 +29,7 @@ import { decideNavigation } from '@shared/browserNavigation';
 import { NODUS_BROWSER_PARTITION, browserSession } from './session';
 import { installContextMenu, type ContextMenuActions } from './contextMenu';
 import { cachePageFavicon } from './favicon';
+import { recordBrowserHistoryVisit } from './history';
 import {
   describeMediaSession,
   dropMediaSession,
@@ -322,6 +323,18 @@ function wire(tab: Tab): void {
       url,
       canGoBack: contents.navigationHistory.canGoBack(),
       canGoForward: contents.navigationHistory.canGoForward(),
+    });
+    recordBrowserHistoryVisit({ title: contents.getTitle() || tab.state.title, url });
+  }) as never);
+
+  // Record only committed, successfully loaded main documents. The website has
+  // no history API: Electron main observes Chromium and writes bounded plain
+  // data to Nodus's private history repository.
+  on(tab, contents, 'did-finish-load', (() => {
+    if (!isWeb()) return;
+    recordBrowserHistoryVisit({
+      title: contents.getTitle() || tab.state.title,
+      url: contents.getURL() || tab.state.url,
     });
   }) as never);
 

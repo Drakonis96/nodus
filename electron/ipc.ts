@@ -33,6 +33,7 @@ import { registerAcademicIpc } from './ipc/academic';
 import { registerLibraryIpc } from './ipc/library';
 import { registerBrowserIpc } from './ipc/browser';
 import { setBrowserTheme } from './browser/tabs';
+import { browserHistoryRepository } from './browser/history';
 import {
   restartMcpServer,
   startMcpServer,
@@ -327,6 +328,15 @@ export function registerIpc(
   h('settings:get', async () => getSettings());
   h('settings:update', async (_e, patch: Partial<AppSettings>) => {
     const previous = getSettings();
+    if (
+      patch.browserHistoryRetention !== undefined
+      && !['none', '7d', '30d', '90d', '1y', 'forever'].includes(patch.browserHistoryRetention)
+    ) {
+      throw new Error('The Browser history retention period is not valid.');
+    }
+    if (patch.browserClearHistoryOnClose !== undefined && typeof patch.browserClearHistoryOnClose !== 'boolean') {
+      throw new Error('The Browser history close policy is not valid.');
+    }
     if (patch.backupCleanupEnabled !== undefined && typeof patch.backupCleanupEnabled !== 'boolean') {
       throw new Error('El estado de la limpieza automática no es válido.');
     }
@@ -342,6 +352,9 @@ export function registerIpc(
       }
     }
     const next = updateSettings(patch);
+    if (patch.browserHistoryRetention !== undefined) {
+      await browserHistoryRepository().list(next.browserHistoryRetention);
+    }
     if (patch.theme !== undefined && next.theme !== previous.theme) {
       setBrowserTheme(next.theme);
       getWindow()?.setBackgroundColor(nativeTheme.shouldUseDarkColors ? '#0a0a0a' : '#ffffff');

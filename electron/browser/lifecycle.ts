@@ -14,6 +14,7 @@
 import { cancelPermissionRequests } from './permissionPrompt';
 import { resetBrowserDownloads } from './downloads';
 import { closeAllBrowserTabs, createTab } from './tabs';
+import { clearBrowserHistoryOnCloseIfConfigured } from './history';
 
 export interface DestroyBrowserSubsystemOptions {
   /** Keep the current renderer-published rectangle for the replacement view. */
@@ -22,6 +23,7 @@ export interface DestroyBrowserSubsystemOptions {
 
 /** Shared cleanup for Browser restart, normal quit and updater shutdown. */
 export function destroyBrowserSubsystem(options: DestroyBrowserSubsystemOptions = {}): void {
+  clearBrowserHistoryOnCloseIfConfigured();
   // Closing tabs stops all page loads and media before other transient state is
   // discarded. closeAllBrowserTabs itself uses the same per-tab destructor as
   // ordinary close and unexpected WebContents destruction.

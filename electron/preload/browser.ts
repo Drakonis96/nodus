@@ -32,6 +32,7 @@ import type {
   BrowserBookmark,
   BrowserBookmarkFolder,
 } from '@shared/browserBookmarks';
+import type { BrowserHistoryStore } from '@shared/browserHistory';
 
 export interface BrowserCapturePreview {
   request: BrowserConnectorCaptureRequest & { snapshotAvailable?: boolean };
@@ -151,6 +152,15 @@ export const browserApi = {
     const listener = (_event: unknown, store: BrowserBookmarkStore) => callback(store);
     ipcRenderer.on('browser:bookmarks', listener);
     return () => ipcRenderer.removeListener('browser:bookmarks', listener);
+  },
+  getBrowserHistory: (): Promise<BrowserHistoryStore> => ipcRenderer.invoke('browser:history:get'),
+  deleteBrowserHistoryEntry: (id: string): Promise<BrowserHistoryStore> =>
+    ipcRenderer.invoke('browser:history:delete', id),
+  clearBrowserHistory: (): Promise<BrowserHistoryStore> => ipcRenderer.invoke('browser:history:clear'),
+  onBrowserHistoryChanged: (callback: (store: BrowserHistoryStore) => void): (() => void) => {
+    const listener = (_event: unknown, store: BrowserHistoryStore) => callback(store);
+    ipcRenderer.on('browser:history', listener);
+    return () => ipcRenderer.removeListener('browser:history', listener);
   },
   onBrowserStateChanged: (callback: (state: BrowserState) => void): (() => void) => {
     const listener = (_event: unknown, state: BrowserState) => callback(state);

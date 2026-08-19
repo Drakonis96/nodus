@@ -194,12 +194,13 @@ test('home-page preferences expose Atlas, Bookmarks, custom and blank modes', ()
 test('Browser toolbar orders actions, downloads, restart and settings, with safe clear-all access', () => {
   const browserView = readFileSync(path.join(repoRoot, 'src/views/NodusBrowserView.tsx'), 'utf8');
   const manager = browserView.indexOf('dataTestId="browser-bookmarks-manager-button"');
-  const actions = browserView.indexOf('dataTestId="browser-actions"', manager);
+  const history = browserView.indexOf('dataTestId="browser-history-button"', manager);
+  const actions = browserView.indexOf('dataTestId="browser-actions"', history);
   const downloads = browserView.indexOf('dataTestId="browser-downloads"', actions);
   const restart = browserView.indexOf('dataTestId="browser-restart"', downloads);
   const settings = browserView.indexOf('dataTestId="browser-settings"', restart);
-  assert.ok(manager >= 0 && actions > manager && downloads > actions && restart > downloads && settings > restart,
-    'the bookmark manager must remain separate, followed by actions, downloads, restart and settings');
+  assert.ok(manager >= 0 && history > manager && actions > history && downloads > actions && restart > downloads && settings > restart,
+    'the bookmark manager and history must remain separate, followed by actions, downloads, restart and settings');
 
   const quickComponent = browserView.indexOf('function BrowserQuickSettings');
   const quickSettings = browserView.indexOf('data-testid="browser-quick-settings"', quickComponent);

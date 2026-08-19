@@ -33,6 +33,7 @@ import type {
   BrowserBookmarkNodeRef,
   BrowserBookmarkStore,
 } from '@shared/browserBookmarks';
+import type { BrowserHistoryStore } from '@shared/browserHistory';
 import {
   exportBrowserBookmarksHtml,
   exportBrowserBookmarksJson,
@@ -89,6 +90,7 @@ import {
   stopLoading,
 } from '../browser/tabs';
 import { browserBookmarksRepository } from '../browser/bookmarks';
+import { browserHistoryRepository, currentBrowserHistoryRetention } from '../browser/history';
 import { showImportOpenDialog } from '../privacy';
 
 /**
@@ -175,6 +177,18 @@ export function registerBrowserIpc({ h, getWindow }: IpcContext): void {
     window.webContents.send('browser:bookmarks', store);
   };
   bookmarks.setNotifier(broadcastBookmarks);
+
+  const history = browserHistoryRepository();
+  const broadcastHistory = (store: BrowserHistoryStore) => {
+    const window = getWindow();
+    if (!window || window.isDestroyed()) return;
+    window.webContents.send('browser:history', store);
+  };
+  history.setNotifier(broadcastHistory);
+  // Registration happens at app startup, before the Browser section is opened.
+  // Enforce retention then as well as on every visit/read so stale records do
+  // not wait for the user to open the History modal before being deleted.
+  void history.list(currentBrowserHistoryRetention()).catch(() => undefined);
 
   const quoteToEveryNodi = (text: string): boolean => {
     const selection = setNodiQuoteSelection(cleanPageText(text, 20_000));
@@ -566,6 +580,7 @@ export function registerBrowserIpc({ h, getWindow }: IpcContext): void {
     // a permanently white page that even Restart Browser cannot recover from.
     destroyBrowserSubsystem({ preserveViewport: true });
     try {
+      await history.clear();
       await clearAllBrowserData();
     } finally {
       // Clearing data is a Browser reset, not a terminal shutdown. Always leave
@@ -573,6 +588,22 @@ export function registerBrowserIpc({ h, getWindow }: IpcContext): void {
       await createTab(replacementUrl);
     }
     return measureBrowserStorage(true);
+  });
+
+  h('browser:history:get', async (event) => {
+    assertUiSender(event, getWindow);
+    return history.list(currentBrowserHistoryRetention());
+  });
+
+  h('browser:history:delete', async (event, id: unknown) => {
+    assertUiSender(event, getWindow);
+    if (typeof id !== 'string' || !id || id.length > 120) throw new Error('That history entry is not valid.');
+    return history.delete(id);
+  });
+
+  h('browser:history:clear', async (event) => {
+    assertUiSender(event, getWindow);
+    return history.clear();
   });
 
   h('browser:bookmarks:get', async (event) => {

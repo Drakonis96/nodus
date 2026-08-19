@@ -15,6 +15,7 @@ import type { AppSettings } from '@shared/types';
 import { BrowserCaptureModal } from '../components/browser/BrowserCaptureModal';
 import { BrowserBookmarkModal, type BookmarkEditorTarget } from '../components/browser/BrowserBookmarkModal';
 import { BrowserBookmarksManager } from '../components/browser/BrowserBookmarksManager';
+import { BrowserHistoryManager } from '../components/browser/BrowserHistoryManager';
 import { NodusBookmarksPage, NodusResearchAtlasPage } from '../components/browser/NodusStartPages';
 import { canonicalBookmarkUrl, emptyBrowserBookmarkStore } from '@shared/browserBookmarks';
 import type { BrowserBookmarkStore } from '@shared/browserBookmarks';
@@ -51,6 +52,7 @@ export function NodusBrowserView() {
   const [bookmarks, setBookmarks] = useState<BrowserBookmarkStore>(emptyBrowserBookmarkStore);
   const [bookmarkEditor, setBookmarkEditor] = useState<BookmarkEditorTarget | null>(null);
   const [bookmarksManager, setBookmarksManager] = useState(false);
+  const [historyManager, setHistoryManager] = useState(false);
   const [returnToBookmarksManager, setReturnToBookmarksManager] = useState(false);
 
   const active: BrowserTabState | null =
@@ -360,6 +362,15 @@ export function NodusBrowserView() {
 
         <div>
           <ToolbarButton
+            icon="clock"
+            label="Browsing History"
+            dataTestId="browser-history-button"
+            onClick={() => { setPanel(null); setHistoryManager(true); }}
+          />
+        </div>
+
+        <div>
+          <ToolbarButton
             icon="menu"
             label={t('Acciones de Nodus')}
             disabled={busy}
@@ -509,6 +520,9 @@ export function NodusBrowserView() {
           })}
           onNotice={setNotice}
         />
+      )}
+      {historyManager && (
+        <BrowserHistoryManager onClose={() => setHistoryManager(false)} onNotice={setNotice} />
       )}
       {bookmarkEditor && (
         <BrowserBookmarkModal
@@ -1092,7 +1106,7 @@ function BrowserQuickSettings({ onClose }: { onClose: () => void }) {
         <div>
           <p className="mb-1.5 text-xs font-semibold text-neutral-700 dark:text-neutral-200">{t('Almacenamiento del navegador')}</p>
           <p className="mb-2 text-[11px] leading-relaxed text-neutral-500">
-            Nodus Bookmarks is preserved when browsing data is cleared.
+            Cookies, site data, cache and Browsing History are cleared. Nodus Bookmarks is preserved.
           </p>
           <button
             type="button"
@@ -1114,6 +1128,7 @@ function BrowserQuickSettings({ onClose }: { onClose: () => void }) {
               <div className="space-y-2 text-sm">
                 <p className="text-amber-500">{t('Borrar las cookies cerrará tu sesión en los sitios donde la tengas iniciada.')}</p>
                 <p className="text-neutral-400">{t('También se cerrarán todas las pestañas abiertas del navegador.')}</p>
+                <p className="text-neutral-400">Browsing History on this device will also be cleared.</p>
                 <p className="text-indigo-400">Nodus Bookmarks will be preserved.</p>
               </div>
             }

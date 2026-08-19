@@ -76,6 +76,8 @@ export const GLOBAL_PREF_KEYS = [
   'browserNewTabMode',
   'browserSearchEngine',
   'browserSearchTemplate',
+  'browserHistoryRetention',
+  'browserClearHistoryOnClose',
 ] as const;
 export type GlobalPrefKey = (typeof GLOBAL_PREF_KEYS)[number];
 

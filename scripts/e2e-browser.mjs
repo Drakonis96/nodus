@@ -377,6 +377,70 @@ try {
     );
   });
 
+  await check('Browsing History records visits and its trusted toolbar view can search, open and delete them', async () => {
+    await call('updateSettings', { browserHistoryRetention: '30d', browserClearHistoryOnClose: false });
+    await call('clearBrowserHistory');
+    await call('submitBrowserOmnibox', `${origin}/second`);
+    await waitFor((s) => s.tabs.find((tab) => tab.id === s.activeTabId)?.url === `${origin}/second`
+      && !s.tabs.find((tab) => tab.id === s.activeTabId)?.loading, 'the history fixture visit');
+
+    const deadline = Date.now() + 5_000;
+    let history;
+    while (Date.now() < deadline) {
+      history = await call('getBrowserHistory');
+      if (history.entries.some((entry) => entry.url === `${origin}/second`)) break;
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    }
+    const recorded = history.entries.find((entry) => entry.url === `${origin}/second`);
+    assert.ok(recorded, `the committed page was not recorded: ${JSON.stringify(history)}`);
+    assert.equal(recorded.title, 'Second page');
+    assert.equal(recorded.domain, '127.0.0.1');
+    assert.ok(Number.isFinite(Date.parse(recorded.visitedAt)));
+
+    await page.getByTestId('browser-history-button').click();
+    const manager = page.getByTestId('browser-history-manager');
+    await manager.waitFor({ state: 'visible' });
+    await page.getByTestId('browser-history-search').fill('Second page');
+    assert.equal(await page.getByTestId('browser-history-entry').count(), 1);
+    await page.getByRole('button', { name: 'Open Second page in new tab' }).click();
+    await manager.waitFor({ state: 'detached' });
+    await waitFor((s) => s.tabs.filter((tab) => tab.url === `${origin}/second`).length >= 2,
+      'a history entry opened in a new tab');
+
+    await page.getByTestId('browser-history-button').click();
+    await manager.waitFor({ state: 'visible' });
+    const beforeDelete = (await call('getBrowserHistory')).entries.length;
+    await page.getByTestId('browser-history-search').fill('Second page');
+    await page.getByRole('button', { name: 'Delete Second page from history' }).first().click();
+    await page.waitForFunction((count) => document.querySelectorAll('[data-testid="browser-history-entry"]').length < count,
+      Math.max(1, await page.getByTestId('browser-history-entry').count() + 1));
+    assert.equal((await call('getBrowserHistory')).entries.length, beforeDelete - 1);
+
+    await page.getByTestId('browser-history-retention').selectOption('7d');
+    assert.equal((await call('getSettings')).browserHistoryRetention, '7d');
+    await page.getByTestId('browser-history-clear-on-close').check();
+    assert.equal((await call('getSettings')).browserClearHistoryOnClose, true);
+    await page.getByTestId('browser-history-clear-on-close').uncheck();
+    await page.getByTestId('browser-history-retention').selectOption('30d');
+    await page.getByRole('button', { name: 'Close', exact: true }).click();
+    await manager.waitFor({ state: 'detached' });
+  });
+
+  await check('Clear history removes visits without changing Nodus Bookmarks', async () => {
+    const bookmarksBefore = await call('getBrowserBookmarks');
+    assert.ok((await call('getBrowserHistory')).entries.length > 0, 'the fixture must have history to clear');
+    await page.getByTestId('browser-history-button').click();
+    const manager = page.getByTestId('browser-history-manager');
+    await manager.waitFor({ state: 'visible' });
+    await page.getByTestId('browser-history-clear').click();
+    await page.getByTestId('browser-history-clear-confirm').click();
+    await page.waitForFunction(() => document.querySelectorAll('[data-testid="browser-history-entry"]').length === 0);
+    assert.equal((await call('getBrowserHistory')).entries.length, 0);
+    assert.deepEqual(await call('getBrowserBookmarks'), bookmarksBefore);
+    await page.getByRole('button', { name: 'Close', exact: true }).click();
+    await manager.waitFor({ state: 'detached' });
+  });
+
   await check('browser chrome and pages inherit light, dark and system themes', async () => {
     const originalTheme = (await call('getSettings')).theme;
     const pagePrefersDark = () => app.evaluate(async ({ webContents }) => {
@@ -399,14 +463,23 @@ try {
     await page.waitForFunction(() => document.documentElement.classList.contains('light'));
     await waitForPageTheme(false);
     const lightColor = await omniboxColor();
+    await page.getByTestId('browser-history-button').click();
+    const lightHistoryColor = await page.getByTestId('browser-history-manager')
+      .evaluate((element) => getComputedStyle(element).backgroundColor);
+    await page.getByRole('button', { name: 'Close', exact: true }).click();
     assert.equal(await app.evaluate(({ nativeTheme }) => nativeTheme.themeSource), 'light');
 
     await call('updateSettings', { theme: 'dark' });
     await page.waitForFunction(() => document.documentElement.classList.contains('dark'));
     await waitForPageTheme(true);
     const darkColor = await omniboxColor();
+    await page.getByTestId('browser-history-button').click();
+    const darkHistoryColor = await page.getByTestId('browser-history-manager')
+      .evaluate((element) => getComputedStyle(element).backgroundColor);
+    await page.getByRole('button', { name: 'Close', exact: true }).click();
     assert.equal(await app.evaluate(({ nativeTheme }) => nativeTheme.themeSource), 'dark');
     assert.notEqual(lightColor, darkColor, 'the browser chrome did not change theme');
+    assert.notEqual(lightHistoryColor, darkHistoryColor, 'the history modal did not change theme');
 
     await call('updateSettings', { theme: 'system' });
     const systemDark = await app.evaluate(({ nativeTheme }) => ({
@@ -796,6 +869,8 @@ try {
     await waitFor((s) => s.tabs.length >= 2, 'multiple tabs before restart');
 
     const beforeSettings = await call('getSettings');
+    const beforeHistory = await call('getBrowserHistory');
+    assert.ok(beforeHistory.entries.length > 0, 'restart fixture must have history to preserve');
     const before = await app.evaluate(({ BrowserWindow, session, webContents }) => {
       const main = BrowserWindow.getAllWindows()[0];
       const browserSession = session.fromPartition('persist:nodus-browser');
@@ -846,6 +921,9 @@ try {
     for (const key of ['browserHomeMode', 'browserHomeUrl', 'browserNewTabMode', 'browserSearchEngine']) {
       assert.deepEqual(afterSettings[key], beforeSettings[key], `${key} must survive Browser restart`);
     }
+    const afterHistory = await call('getBrowserHistory');
+    assert.equal(beforeHistory.entries.every((entry) => afterHistory.entries.some((next) => next.id === entry.id)), true,
+      'Browser restart must preserve prior history when clear-on-close is disabled');
 
     // Resource count must remain flat across repeated destroy-and-recreate
     // cycles; a normal reload cannot satisfy these destruction assertions.
@@ -872,9 +950,25 @@ try {
     }
   });
 
+  await check('clear-on-close removes history when the Browser subsystem restarts', async () => {
+    await call('submitBrowserOmnibox', `${origin}/paper`);
+    await waitFor((s) => s.tabs.some((tab) => tab.url === `${origin}/paper` && !tab.loading), 'history before close-policy restart');
+    const before = await call('getBrowserHistory');
+    assert.ok(before.entries.some((entry) => entry.url === `${origin}/paper`));
+    await call('updateSettings', { browserClearHistoryOnClose: true });
+    await call('restartNodusBrowser', false);
+    await waitFor((s) => s.tabs.length === 1 && s.tabs[0].url === `${origin}/` && !s.tabs[0].loading,
+      'home after close-policy restart');
+    const after = await call('getBrowserHistory');
+    assert.equal(before.entries.every((entry) => !after.entries.some((next) => next.id === entry.id)), true);
+    await call('updateSettings', { browserClearHistoryOnClose: false });
+  });
+
   await check('clear all destroys the loaded site and immediately rebuilds a usable Browser', async () => {
     await call('submitBrowserOmnibox', `${origin}/storage`);
     await waitFor((s) => s.tabs.some((tab) => tab.url === `${origin}/storage` && !tab.loading), 'storage page before clear all');
+    const historyBeforeClear = await call('getBrowserHistory');
+    const bookmarksBeforeClear = await call('getBrowserBookmarks');
     const before = await app.evaluate(({ BrowserWindow, session, webContents }) => {
       const browserSession = session.fromPartition('persist:nodus-browser');
       return {
@@ -920,6 +1014,11 @@ try {
     assert.deepEqual(after.bounds, rendererBounds, 'the replacement website must retain the published viewport');
     assert.equal(after.storage.local, null, 'localStorage must be gone');
     assert.doesNotMatch(after.storage.cookie, /nodus_e2e=/, 'cookies must be gone');
+    const historyAfterClear = await call('getBrowserHistory');
+    assert.equal(historyBeforeClear.entries.every((entry) => !historyAfterClear.entries.some((next) => next.id === entry.id)), true,
+      'clear-all must remove every pre-existing visit');
+    assert.deepEqual(await call('getBrowserBookmarks'), bookmarksBeforeClear,
+      'clear-all must never change Nodus Bookmarks');
   });
 
   await check('restart warns for an active download, then cancels it and clears transient state', async () => {

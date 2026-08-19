@@ -1519,6 +1519,10 @@ export interface AppSettings {
   browserSearchEngine: 'google' | 'scholar' | 'bing' | 'duckduckgo' | 'custom';
   /** Only used when the engine is 'custom'; must contain %s. */
   browserSearchTemplate: string;
+  /** How long private Nodus Browser visit records remain on this device. */
+  browserHistoryRetention: import('./browserHistory').BrowserHistoryRetention;
+  /** Remove the private visit file whenever the Browser subsystem is destroyed. */
+  browserClearHistoryOnClose: boolean;
   // Nodi mascot: show the floating companion (visual/animation only for now — no wired
   // behaviour yet). App-wide preference, on by default.
   mascotEnabled: boolean;
@@ -8050,6 +8054,11 @@ export interface BrowserApi {
   }>;
   exportBrowserBookmarks(format: 'json' | 'html'): Promise<import('./browserBookmarks').BrowserBookmarksExportResult>;
   onBrowserBookmarksChanged(cb: (store: import('./browserBookmarks').BrowserBookmarkStore) => void): () => void;
+  /** Local visit data. Never exposed to Browser page renderers or included in backups. */
+  getBrowserHistory(): Promise<import('./browserHistory').BrowserHistoryStore>;
+  deleteBrowserHistoryEntry(id: string): Promise<import('./browserHistory').BrowserHistoryStore>;
+  clearBrowserHistory(): Promise<import('./browserHistory').BrowserHistoryStore>;
+  onBrowserHistoryChanged(cb: (store: import('./browserHistory').BrowserHistoryStore) => void): () => void;
 }
 
 export interface NodusApi extends ProsopographyApi, TestimoniesApi, ToolkitApi, TeachingApi, DatabasesApi, PrimarySourcesApi, ArchiveApi, WorldbuildingApi, PlatformApi, RecordsApi, AcademicApi, LibraryApi, BrowserApi {
