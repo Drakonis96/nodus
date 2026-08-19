@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Icon } from '../ui';
 import atlasCatalogue from '../../../site/data/research-atlas.json';
 import type {
@@ -23,22 +23,28 @@ import './NodusBookmarks.css';
 const NODUS_SITE = 'https://nodusresearch.com/';
 const NODUS_REPOSITORY = 'https://github.com/Drakonis96/nodus';
 const NODUS_LOGO = new URL('../../../site/assets/nodus-logo.svg', import.meta.url).href;
+const NODUS_ORGANISM_SCRIPT = new URL('../../../site/assets/js/organism.js', import.meta.url).href;
+
+interface NodusOrganismController {
+  start(): void;
+  stop(): void;
+  resize(): void;
+  pointer(x: number, y: number): void;
+  pointerOut(): void;
+  pulse(x: number, y: number, strength: number): void;
+  scrolled(velocity: number): void;
+}
+
+declare global {
+  interface Window {
+    NodusOrganismFactory?: { create(canvas: HTMLCanvasElement): NodusOrganismController | null };
+  }
+}
 
 interface AtlasResource {
   id: string; name: string; url: string; description: string; access_model?: string;
   geography?: { continent?: string | null; country?: string | null; region?: string | null };
   knowledge_domains?: string[]; type_of_use?: string[];
-}
-
-function useLightTheme(): boolean {
-  const read = () => !document.documentElement.classList.contains('dark');
-  const [light, setLight] = useState(read);
-  useEffect(() => {
-    const observer = new MutationObserver(() => setLight(read()));
-    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
-    return () => observer.disconnect();
-  }, []);
-  return light;
 }
 
 function openSitePage(url: string) {
@@ -60,30 +66,73 @@ function SiteLink({ label, url, className = '', current = false, onOpen }: {
 }
 
 function NodusSiteBackdrop() {
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    let disposed = false;
+    let organism: NodusOrganismController | null = null;
+    const removers: Array<() => void> = [];
+    const listen = (target: EventTarget, type: string, handler: EventListener) => {
+      target.addEventListener(type, handler, { passive: true });
+      removers.push(() => target.removeEventListener(type, handler));
+    };
+
+    const mount = () => {
+      if (disposed || organism || !window.NodusOrganismFactory) return;
+      organism = window.NodusOrganismFactory.create(canvas);
+      if (!organism) {
+        canvas.classList.add('organism-unavailable');
+        return;
+      }
+      organism.start();
+      requestAnimationFrame(() => { if (!disposed) canvas.classList.add('awake'); });
+
+      const page = canvas.closest<HTMLElement>('.nodus-start-page');
+      let previousScroll = page?.scrollTop ?? 0;
+      let resizeTimer = 0;
+      listen(window, 'resize', (() => {
+        window.clearTimeout(resizeTimer);
+        resizeTimer = window.setTimeout(() => organism?.resize(), 140);
+      }) as EventListener);
+      listen(window, 'pointermove', ((event: PointerEvent) => organism?.pointer(event.clientX, event.clientY)) as EventListener);
+      listen(window, 'pointerleave', (() => organism?.pointerOut()) as EventListener);
+      listen(window, 'pointerdown', ((event: PointerEvent) => organism?.pulse(event.clientX, event.clientY, 1)) as EventListener);
+      if (page) listen(page, 'scroll', (() => {
+        const next = page.scrollTop;
+        organism?.scrolled(next - previousScroll);
+        previousScroll = next;
+      }) as EventListener);
+      listen(document, 'visibilitychange', (() => {
+        if (document.hidden) organism?.stop(); else organism?.start();
+      }) as EventListener);
+      removers.push(() => window.clearTimeout(resizeTimer));
+    };
+
+    if (window.NodusOrganismFactory) mount();
+    else {
+      const existing = document.querySelector<HTMLScriptElement>('script[data-nodus-organism]');
+      const script = existing ?? document.createElement('script');
+      const onLoad = () => mount();
+      script.addEventListener('load', onLoad, { once: true });
+      removers.push(() => script.removeEventListener('load', onLoad));
+      if (!existing) {
+        script.src = NODUS_ORGANISM_SCRIPT;
+        script.dataset.nodusOrganism = 'true';
+        document.head.appendChild(script);
+      }
+    }
+
+    return () => {
+      disposed = true;
+      for (const remove of removers.splice(0)) remove();
+      organism?.stop();
+      canvas.classList.remove('awake');
+    };
+  }, []);
+
   return <div className="nodus-site-backdrop" aria-hidden="true">
-    <svg viewBox="0 0 1200 760" preserveAspectRatio="xMidYMid slice">
-      <defs>
-        <linearGradient id="local-atlas-line" x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0" stopColor="#22d3ee" stopOpacity=".08" />
-          <stop offset=".55" stopColor="#a78bfa" stopOpacity=".32" />
-          <stop offset="1" stopColor="#7c3aed" stopOpacity=".08" />
-        </linearGradient>
-        <radialGradient id="local-atlas-node">
-          <stop offset="0" stopColor="#fff" stopOpacity=".95" />
-          <stop offset=".28" stopColor="#ddd6fe" stopOpacity=".78" />
-          <stop offset="1" stopColor="#8b5cf6" stopOpacity="0" />
-        </radialGradient>
-      </defs>
-      <g className="nodus-site-mesh-links" fill="none" stroke="url(#local-atlas-line)" strokeWidth="1">
-        <path d="M-40 245 105 166 248 238 382 134 517 225 661 118 806 216 960 136 1245 255" />
-        <path d="M32 570 172 476 322 548 455 425 602 522 750 408 900 520 1052 420 1228 508" />
-        <path d="M105 166 172 476M248 238 322 548M382 134 455 425M517 225 602 522M661 118 750 408M806 216 900 520M960 136 1052 420" />
-        <path d="M-20 388 172 476 248 238 455 425 517 225 750 408 806 216 1052 420 1218 330" opacity=".58" />
-      </g>
-      <g className="nodus-site-nodes" fill="url(#local-atlas-node)">
-        {[['105','166'],['248','238'],['382','134'],['517','225'],['661','118'],['806','216'],['960','136'],['172','476'],['322','548'],['455','425'],['602','522'],['750','408'],['900','520'],['1052','420']].map(([cx, cy], index) => <circle key={`${cx}-${cy}`} cx={cx} cy={cy} r={index % 4 === 0 ? 13 : 9} />)}
-      </g>
-    </svg>
+    <canvas ref={canvasRef} className="nodus-site-organism" data-organism-managed="host" />
   </div>;
 }
 
@@ -129,10 +178,9 @@ function StartShell({ title, copy, query, onQuery, status, children, toolbar }: 
   title: string; copy: string; query: string; onQuery: (value: string) => void;
   status: string; children: React.ReactNode; toolbar?: React.ReactNode;
 }) {
-  const light = useLightTheme();
   const page = title === 'Nodus Bookmarks' ? 'bookmarks' : 'atlas';
   return (
-    <main className={`nodus-start-page atlas-main${light ? ' nodus-start-light' : ''}`}>
+    <main className="nodus-start-page atlas-main">
       <NodusSiteBackdrop />
       <NodusSiteHeader page={page} />
       <div className="nodus-site-content atlas-shell">

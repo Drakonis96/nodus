@@ -150,3 +150,22 @@ test('restart IPC is trusted-UI only and warns from main-process activity state'
   assert.match(restart, /requiresConfirmation: true/,
     'activity must require an explicit second request');
 });
+
+test('clear-all reconstructs a usable Browser even when Chromium clearing fails', () => {
+  const ipc = readFileSync(path.join(repoRoot, 'electron/ipc/browser.ts'), 'utf8');
+  const start = ipc.indexOf("h('browser:clearAllData'");
+  const end = ipc.indexOf("h('browser:bookmarks:get'", start);
+  const clearAll = ipc.slice(start, end);
+  assert.match(clearAll, /assertUiSender\(event, getWindow\)/);
+  assert.ok(clearAll.indexOf('destroyBrowserSubsystem()') < clearAll.indexOf('clearAllBrowserData()'));
+  assert.match(clearAll, /finally\s*\{[\s\S]*createTab\(replacementUrl\)/,
+    'a failed or successful wipe must always recreate one configured home tab');
+});
+
+test('theme changes are serialised per page so a stale async update cannot win', () => {
+  assert.match(code, /pageThemeJobs = new WeakMap/);
+  const themeAt = code.indexOf('async function applyPageColorScheme');
+  const theme = code.slice(themeAt, code.indexOf('/**', themeAt + 10));
+  assert.match(theme, /previous[\s\S]*\.then\(/);
+  assert.match(theme, /value: dark \? 'dark' : 'light'/);
+});

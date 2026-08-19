@@ -68,6 +68,7 @@ let sectionVisible = false;
 let overlayOpen = false;
 let notify: (() => void) | null = null;
 let contextMenuActions: ContextMenuActions | null = null;
+const pageThemeJobs = new WeakMap<WebContents, Promise<void>>();
 
 function browserSurfaceColor(): string {
   return nativeTheme.shouldUseDarkColors ? '#0a0a0a' : '#ffffff';
@@ -75,9 +76,10 @@ function browserSurfaceColor(): string {
 
 function applyBrowserSurfaceColor(): void {
   const color = browserSurfaceColor();
+  const dark = nativeTheme.shouldUseDarkColors;
   for (const tab of tabs.values()) {
     tab.view.setBackgroundColor(color);
-    void applyPageColorScheme(tab.view.webContents);
+    void applyPageColorScheme(tab.view.webContents, dark);
   }
 }
 
@@ -87,23 +89,29 @@ function applyBrowserSurfaceColor(): void {
  * media-query value. Chromium's own Emulation domain makes that preference
  * deterministic without reloading the page or injecting site CSS.
  */
-async function applyPageColorScheme(contents: WebContents): Promise<void> {
-  if (contents.isDestroyed()) return;
-  const attachedHere = !contents.debugger.isAttached();
-  try {
-    if (attachedHere) contents.debugger.attach('1.3');
-    await contents.debugger.sendCommand('Emulation.setEmulatedMedia', {
-      features: [{
-        name: 'prefers-color-scheme',
-        value: nativeTheme.shouldUseDarkColors ? 'dark' : 'light',
-      }],
-    });
-  } catch {
-    // A user-opened DevTools session can own the debugger transport. The native
-    // theme still supplies the normal fallback; never break browsing for style.
-  } finally {
-    if (attachedHere && contents.debugger.isAttached()) contents.debugger.detach();
-  }
+async function applyPageColorScheme(
+  contents: WebContents,
+  dark = nativeTheme.shouldUseDarkColors,
+): Promise<void> {
+  const previous = pageThemeJobs.get(contents) ?? Promise.resolve();
+  const job = previous.catch(() => undefined).then(async () => {
+    if (contents.isDestroyed()) return;
+    const attachedHere = !contents.debugger.isAttached();
+    try {
+      if (attachedHere) contents.debugger.attach('1.3');
+      await contents.debugger.sendCommand('Emulation.setEmulatedMedia', {
+        features: [{ name: 'prefers-color-scheme', value: dark ? 'dark' : 'light' }],
+      });
+    } catch {
+      // A user-opened DevTools session can own the debugger transport. The native
+      // theme still supplies the normal fallback; never break browsing for style.
+    } finally {
+      if (attachedHere && contents.debugger.isAttached()) contents.debugger.detach();
+    }
+  });
+  pageThemeJobs.set(contents, job);
+  await job;
+  if (pageThemeJobs.get(contents) === job) pageThemeJobs.delete(contents);
 }
 
 /**
@@ -214,7 +222,7 @@ function on(tab: Tab, contents: WebContents, event: string, handler: (...args: n
 function wire(tab: Tab): void {
   const contents = tab.view.webContents;
   const isWeb = () => tab.state.kind === 'web';
-  if (contextMenuActions) installContextMenu(contents, contextMenuActions);
+  if (contextMenuActions) installContextMenu(contents, contextMenuActions, hostWindow);
   void applyPageColorScheme(contents);
 
   /**

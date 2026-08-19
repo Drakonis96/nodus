@@ -559,8 +559,15 @@ export function registerBrowserIpc({ h, getWindow }: IpcContext): void {
    */
   h('browser:clearAllData', async (event) => {
     assertUiSender(event, getWindow);
+    const replacementUrl = homeUrl();
     destroyBrowserSubsystem();
-    await clearAllBrowserData();
+    try {
+      await clearAllBrowserData();
+    } finally {
+      // Clearing data is a Browser reset, not a terminal shutdown. Always leave
+      // the subsystem usable, even if Chromium rejects one clearing operation.
+      await createTab(replacementUrl);
+    }
     return measureBrowserStorage(true);
   });
 

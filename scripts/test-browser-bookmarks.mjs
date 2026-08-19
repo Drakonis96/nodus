@@ -144,8 +144,16 @@ test('trusted Bookmarks UI reuses Atlas styling and avoids native prompt dialogs
   const manager = readFileSync(path.join(repoRoot, 'src/components/browser/BrowserBookmarksManager.tsx'), 'utf8');
   const browserView = readFileSync(path.join(repoRoot, 'src/views/NodusBrowserView.tsx'), 'utf8');
   assert.match(styles, /@import url\([^)]*research-atlas\.css/);
-  assert.match(styles, /radial-gradient\(900px 620px at 22% 8%/,
-    'the local start page must reuse the Nodus Research organism fallback');
+  assert.match(pages, /site\/assets\/js\/organism\.js/,
+    'the local start pages must load the exact Nodus Research organism engine');
+  assert.match(pages, /NodusOrganismFactory\.create\(canvas\)/,
+    'Atlas and Bookmarks must instantiate the shared live WebGL field');
+  assert.match(styles, /\.nodus-site-organism\.awake/);
+  assert.doesNotMatch(pages, /nodus-site-mesh-links|<svg viewBox="0 0 1200 760"/,
+    'a hand-drawn static mesh is not visual parity with Research Atlas');
+  assert.doesNotMatch(pages, /nodus-start-light|useLightTheme/);
+  assert.doesNotMatch(styles, /nodus-start-light/,
+    'the public Nodus Research design has no light variant, so neither local start page may invent one');
   assert.match(pages, /isSaved \? 'Saved' : 'Save'/);
   assert.match(pages, /global search/);
   assert.match(pages, /data-testid="nodus-site-header"/);

@@ -15,7 +15,7 @@
  * DATA. It is length-capped, never evaluated, and never used to build a path.
  */
 
-import { Menu, MenuItem, clipboard, shell, type WebContents } from 'electron';
+import { Menu, MenuItem, clipboard, shell, type BaseWindow, type WebContents } from 'electron';
 import { searchUrlFor, type BrowserSearchEngineId } from '@shared/browserOmnibox';
 import { decideNavigation } from '@shared/browserNavigation';
 import { browserMenuIcon } from './menuIcons';
@@ -46,8 +46,9 @@ function label(raw: string, limit = MAX_LABEL_CHARS): string {
   return clean.length > limit ? `${clean.slice(0, limit)}…` : clean;
 }
 
-export function installContextMenu(contents: WebContents, actions: ContextMenuActions): void {
-  contents.on('context-menu', (_event, params) => {
+export function installContextMenu(contents: WebContents, actions: ContextMenuActions, ownerWindow: BaseWindow | null): void {
+  contents.on('context-menu', (event, params) => {
+    event.preventDefault();
     const menu = new Menu();
     const t = actions.t;
     const selection = String(params.selectionText ?? '').slice(0, MAX_SELECTION_CHARS).trim();
@@ -135,6 +136,13 @@ export function installContextMenu(contents: WebContents, actions: ContextMenuAc
     // product, and opening them on an arbitrary website is a way to run code in
     // a context the user has no reason to trust.
 
-    menu.popup();
+    // WebContentsView is not a BrowserWindow, so relying on Electron's
+    // "focused window" fallback can silently discard the menu on macOS. Anchor
+    // it to the exact Nodus window and frame that produced the selection.
+    menu.popup({
+      ...(ownerWindow && !ownerWindow.isDestroyed() ? { window: ownerWindow } : {}),
+      ...(params.frame ? { frame: params.frame } : {}),
+      sourceType: params.menuSourceType,
+    });
   });
 }

@@ -710,32 +710,41 @@ try {
     await waitFor((s) => s.tabs.some((tab) => tab.url === `${origin}/second` && !tab.loading), 'the second fixture page');
     await call('browserGoBack');
     await waitFor((s) => s.tabs.some((tab) => tab.url === `${origin}/` && !tab.loading), 'the fixture home with forward history');
-    const items = await app.evaluate(({ Menu, webContents }) => {
+    const result = await app.evaluate(({ Menu, webContents }) => {
       const original = Menu.prototype.popup;
       try {
         let captured = [];
-        Menu.prototype.popup = function popupProbe() {
+        let anchored = false;
+        let hasFrame = false;
+        Menu.prototype.popup = function popupProbe(options = {}) {
           captured = this.items.map((item) => ({
             label: item.label,
             type: item.type,
             hasIcon: Boolean(item.icon && !item.icon.isEmpty()),
           }));
+          anchored = Boolean(options.window && !options.window.isDestroyed());
+          hasFrame = Boolean(options.frame);
         };
         const target = webContents.getAllWebContents().find((contents) => contents.getURL().startsWith('http://127.0.0.1'));
         if (!target) throw new Error('browser fixture missing');
-        target.emit('context-menu', {}, {
+        target.emit('context-menu', { preventDefault() {} }, {
           isEditable: false,
           selectionText: 'Fixture home',
           linkURL: `${target.getURL()}second`,
+          frame: target.mainFrame,
+          menuSourceType: 'mouse',
         });
-        return captured;
+        return { items: captured, anchored, hasFrame };
       } finally {
         Menu.prototype.popup = original;
       }
     });
+    const { items } = result;
     const actions = items.filter((item) => item.type !== 'separator' && item.label);
     assert.ok(actions.length >= 10, `expected the complete menu, got ${JSON.stringify(items)}`);
     assert.deepEqual(actions.filter((item) => !item.hasIcon), [], `missing native icons: ${JSON.stringify(actions)}`);
+    assert.equal(result.anchored, true, 'the native menu must be owned by the Nodus window');
+    assert.equal(result.hasFrame, true, 'the native menu must target the frame containing the selection');
   });
 
   await check('cookies and localStorage written by a page really persist', async () => {
@@ -861,6 +870,43 @@ try {
       assert.equal(resources.oldDestroyed, true, `cycle ${cycle}: old WebContents leaked`);
       assert.equal(resources.count, 1, `cycle ${cycle}: Browser resource count grew`);
     }
+  });
+
+  await check('clear all destroys the loaded site and immediately rebuilds a usable Browser', async () => {
+    await call('submitBrowserOmnibox', `${origin}/storage`);
+    await waitFor((s) => s.tabs.some((tab) => tab.url === `${origin}/storage` && !tab.loading), 'storage page before clear all');
+    const before = await app.evaluate(({ BrowserWindow, session, webContents }) => {
+      const browserSession = session.fromPartition('persist:nodus-browser');
+      return {
+        mainId: BrowserWindow.getAllWindows()[0].webContents.id,
+        browserIds: webContents.getAllWebContents()
+          .filter((contents) => contents.session === browserSession)
+          .map((contents) => contents.id),
+      };
+    });
+    await call('clearAllBrowserData');
+    const rebuilt = await waitFor(
+      (s) => s.tabs.length === 1 && s.tabs[0].url === `${origin}/` && !s.tabs[0].loading,
+      'fresh configured home after clear all',
+    );
+    assert.equal(rebuilt.tabs.length, 1);
+    const after = await app.evaluate(async ({ BrowserWindow, session, webContents }, oldIds) => {
+      const browserSession = session.fromPartition('persist:nodus-browser');
+      const current = webContents.getAllWebContents().filter((contents) => contents.session === browserSession);
+      return {
+        mainId: BrowserWindow.getAllWindows()[0].webContents.id,
+        oldDestroyed: oldIds.every((id) => !webContents.fromId(id) || webContents.fromId(id).isDestroyed()),
+        browserCount: current.length,
+        storage: current[0]
+          ? await current[0].executeJavaScript(`({ cookie: document.cookie, local: localStorage.getItem('nodus_e2e') })`)
+          : null,
+      };
+    }, before.browserIds);
+    assert.equal(after.mainId, before.mainId, 'clear-all must not restart the Nodus renderer');
+    assert.equal(after.oldDestroyed, true, 'clear-all must destroy every loaded website');
+    assert.equal(after.browserCount, 1, 'clear-all must leave exactly one usable Browser tab');
+    assert.equal(after.storage.local, null, 'localStorage must be gone');
+    assert.doesNotMatch(after.storage.cookie, /nodus_e2e=/, 'cookies must be gone');
   });
 
   await check('restart warns for an active download, then cancels it and clears transient state', async () => {
