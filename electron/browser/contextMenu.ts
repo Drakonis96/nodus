@@ -18,6 +18,7 @@
 import { Menu, MenuItem, clipboard, shell, type WebContents } from 'electron';
 import { searchUrlFor, type BrowserSearchEngineId } from '@shared/browserOmnibox';
 import { decideNavigation } from '@shared/browserNavigation';
+import { browserMenuIcon } from './menuIcons';
 
 const MAX_LABEL_CHARS = 40;
 const MAX_SELECTION_CHARS = 20_000;
@@ -54,6 +55,7 @@ export function installContextMenu(contents: WebContents, actions: ContextMenuAc
     if (params.isEditable || selection) {
       menu.append(new MenuItem({
         label: t('Copiar'),
+        icon: browserMenuIcon('copy'),
         enabled: Boolean(selection),
         click: () => clipboard.writeText(selection),
       }));
@@ -62,12 +64,14 @@ export function installContextMenu(contents: WebContents, actions: ContextMenuAc
     if (selection) {
       menu.append(new MenuItem({
         label: t('Buscar «{q}»').replace('{q}', label(selection)),
+        icon: browserMenuIcon('search'),
         click: () => actions.openInNewTab(
           searchUrlFor(selection, actions.searchEngine(), actions.customSearchTemplate()),
         ),
       }));
       menu.append(new MenuItem({
         label: t('Abrir la selección en una pestaña nueva'),
+        icon: browserMenuIcon('external'),
         // Only when the selection IS a URL — offering it otherwise would open a
         // search dressed up as a navigation.
         visible: decideNavigation(selection, { isMainFrame: true }).allowed,
@@ -76,6 +80,7 @@ export function installContextMenu(contents: WebContents, actions: ContextMenuAc
       menu.append(new MenuItem({ type: 'separator' }));
       menu.append(new MenuItem({
         label: t('Citar con Nodi'),
+        icon: browserMenuIcon('quote'),
         click: () => actions.quoteToNodi(selection),
       }));
     }
@@ -84,14 +89,17 @@ export function installContextMenu(contents: WebContents, actions: ContextMenuAc
       if (menu.items.length > 0) menu.append(new MenuItem({ type: 'separator' }));
       menu.append(new MenuItem({
         label: t('Abrir enlace en una pestaña nueva'),
+        icon: browserMenuIcon('external'),
         click: () => actions.openInNewTab(linkUrl),
       }));
       menu.append(new MenuItem({
         label: t('Copiar dirección del enlace'),
+        icon: browserMenuIcon('copy'),
         click: () => clipboard.writeText(linkUrl),
       }));
       menu.append(new MenuItem({
         label: t('Abrir enlace en el navegador del sistema'),
+        icon: browserMenuIcon('globe'),
         // Scheme already validated above; shell.openExternal never receives
         // anything this policy has not allowed.
         click: () => void shell.openExternal(linkUrl).catch(() => undefined),
@@ -102,17 +110,19 @@ export function installContextMenu(contents: WebContents, actions: ContextMenuAc
 
     menu.append(new MenuItem({
       label: t('Añadir a la Biblioteca'),
+      icon: browserMenuIcon('book'),
       click: () => actions.addToLibrary(),
     }));
     menu.append(new MenuItem({
       label: t('Preguntar a Nodi sobre esta página'),
+      icon: browserMenuIcon('chat'),
       click: () => actions.askNodiAboutPage(),
     }));
 
     menu.append(new MenuItem({ type: 'separator' }));
-    menu.append(new MenuItem({ label: t('Atrás'), enabled: contents.navigationHistory.canGoBack(), click: () => contents.navigationHistory.goBack() }));
-    menu.append(new MenuItem({ label: t('Adelante'), enabled: contents.navigationHistory.canGoForward(), click: () => contents.navigationHistory.goForward() }));
-    menu.append(new MenuItem({ label: t('Recargar'), click: () => contents.reload() }));
+    menu.append(new MenuItem({ label: t('Atrás'), icon: browserMenuIcon('back'), enabled: contents.navigationHistory.canGoBack(), click: () => contents.navigationHistory.goBack() }));
+    menu.append(new MenuItem({ label: t('Adelante'), icon: browserMenuIcon('forward'), enabled: contents.navigationHistory.canGoForward(), click: () => contents.navigationHistory.goForward() }));
+    menu.append(new MenuItem({ label: t('Recargar'), icon: browserMenuIcon('refresh'), click: () => contents.reload() }));
 
     // Deliberately no "Inspect element": developer tools are not part of this
     // product, and opening them on an arbitrary website is a way to run code in

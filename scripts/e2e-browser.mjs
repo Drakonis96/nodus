@@ -438,6 +438,41 @@ try {
     await chat.getByRole('button', { name: 'Cerrar', exact: true }).click();
   });
 
+  await check('every browser context-menu action has a native icon', async () => {
+    // Give both navigation rows a live state so this exercises the complete
+    // native menu in the same state a user sees after navigating.
+    await call('submitBrowserOmnibox', `${origin}/second`);
+    await waitFor((s) => s.tabs.some((tab) => tab.url === `${origin}/second` && !tab.loading), 'the second fixture page');
+    await call('browserGoBack');
+    await waitFor((s) => s.tabs.some((tab) => tab.url === `${origin}/` && !tab.loading), 'the fixture home with forward history');
+    const items = await app.evaluate(({ Menu, webContents }) => {
+      const original = Menu.prototype.popup;
+      try {
+        let captured = [];
+        Menu.prototype.popup = function popupProbe() {
+          captured = this.items.map((item) => ({
+            label: item.label,
+            type: item.type,
+            hasIcon: Boolean(item.icon && !item.icon.isEmpty()),
+          }));
+        };
+        const target = webContents.getAllWebContents().find((contents) => contents.getURL().startsWith('http://127.0.0.1'));
+        if (!target) throw new Error('browser fixture missing');
+        target.emit('context-menu', {}, {
+          isEditable: false,
+          selectionText: 'Fixture home',
+          linkURL: `${target.getURL()}second`,
+        });
+        return captured;
+      } finally {
+        Menu.prototype.popup = original;
+      }
+    });
+    const actions = items.filter((item) => item.type !== 'separator' && item.label);
+    assert.ok(actions.length >= 10, `expected the complete menu, got ${JSON.stringify(items)}`);
+    assert.deepEqual(actions.filter((item) => !item.hasIcon), [], `missing native icons: ${JSON.stringify(actions)}`);
+  });
+
   await check('cookies and localStorage written by a page really persist', async () => {
     await call('submitBrowserOmnibox', `${origin}/storage`);
     await waitFor((s) => s.tabs.some((t) => t.url.endsWith('/storage') && !t.loading), 'the storage page');
