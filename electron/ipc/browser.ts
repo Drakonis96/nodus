@@ -27,6 +27,7 @@ import {
   setPermissionPromptNotifier,
 } from '../browser/permissionPrompt';
 import { browserMediaStates, setMediaNotifier } from '../browser/media';
+import { getSystemVolume, setSystemVolume } from '../toolkit/presenter/systemAudio';
 import { activePageIsPdf, captureActivePage, importPdfIntoItem, saveCapture } from '../browser/capture';
 import {
   browserDownloads, cancelDownload, completedDownloadPath, dismissDownload, setDownloadNotifier,
@@ -327,6 +328,16 @@ export function registerBrowserIpc({ h, getWindow }: IpcContext): void {
   h('browser:setTabMuted', async (event, tabId: string, muted: boolean) => {
     assertUiSender(event, getWindow);
     setTabMuted(String(tabId), muted === true);
+  });
+
+  h('browser:deviceVolume:get', async (event) => {
+    assertUiSender(event, getWindow);
+    return getSystemVolume();
+  });
+
+  h('browser:deviceVolume:set', async (event, volume: number) => {
+    assertUiSender(event, getWindow);
+    await setSystemVolume(Number(volume));
   });
 
   /**

@@ -7991,6 +7991,9 @@ export interface BrowserApi {
   getBrowserMedia(): Promise<import('./browser').BrowserMediaState[]>;
   browserMediaCommand(tabId: string, command: import('./browser').BrowserMediaCommand): Promise<void>;
   setBrowserTabMuted(tabId: string, muted: boolean): Promise<void>;
+  /** Read and set the device's general output volume (0–100). */
+  getBrowserDeviceVolume(): Promise<number>;
+  setBrowserDeviceVolume(volume: number): Promise<void>;
   onBrowserMediaChanged(cb: (states: import('./browser').BrowserMediaState[]) => void): () => void;
   captureBrowserPage(): Promise<{
     request: import('./browserConnector').BrowserConnectorCaptureRequest & { snapshotAvailable?: boolean };

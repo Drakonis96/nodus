@@ -60,10 +60,19 @@ export function BrowserMediaPopover({
   anchorEl, onClose, onOpenTab,
 }: { anchorEl: HTMLElement | null; onClose: () => void; onOpenTab: (tabId: string) => void }) {
   const states = useBrowserMedia();
+  const [deviceVolume, setDeviceVolume] = useState(50);
+  const [deviceVolumeReady, setDeviceVolumeReady] = useState(false);
 
   useEffect(() => {
     if (!anchorEl) return;
     void window.nodus.setBrowserOverlayVisible(true);
+    setDeviceVolumeReady(false);
+    void window.nodus.getBrowserDeviceVolume()
+      .then((volume) => {
+        setDeviceVolume(Math.max(0, Math.min(100, Math.round(volume))));
+        setDeviceVolumeReady(true);
+      })
+      .catch(() => setDeviceVolumeReady(false));
     const onKey = (event: KeyboardEvent) => { if (event.key === 'Escape') onClose(); };
     window.addEventListener('keydown', onKey);
     return () => {
@@ -97,6 +106,29 @@ export function BrowserMediaPopover({
             {t('Pausar todo')}
           </button>
         )}
+        <label
+          data-testid="browser-device-volume"
+          className="mt-2 grid grid-cols-[auto_1fr_auto] items-center gap-2 border-t border-neutral-700 px-2 pt-3 text-xs text-neutral-300"
+        >
+          <Icon name="volume" size={14} className="text-neutral-400" />
+          <span className="sr-only">{t('Volumen')}</span>
+          <input
+            type="range"
+            min={0}
+            max={100}
+            step={1}
+            aria-label={t('Volumen')}
+            disabled={!deviceVolumeReady}
+            value={deviceVolume}
+            onChange={(event) => {
+              const volume = Number(event.currentTarget.value);
+              setDeviceVolume(volume);
+              void window.nodus.setBrowserDeviceVolume(volume);
+            }}
+            className="w-full accent-indigo-500 disabled:opacity-50"
+          />
+          <output className="w-9 text-right tabular-nums text-neutral-400">{deviceVolume}%</output>
+        </label>
       </div>
     </>,
     document.body,

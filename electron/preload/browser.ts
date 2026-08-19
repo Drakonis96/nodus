@@ -74,6 +74,9 @@ export const browserApi = {
     ipcRenderer.invoke('browser:mediaCommand', tabId, command).then(() => undefined),
   setBrowserTabMuted: (tabId: string, muted: boolean): Promise<void> =>
     ipcRenderer.invoke('browser:setTabMuted', tabId, muted).then(() => undefined),
+  getBrowserDeviceVolume: (): Promise<number> => ipcRenderer.invoke('browser:deviceVolume:get'),
+  setBrowserDeviceVolume: (volume: number): Promise<void> =>
+    ipcRenderer.invoke('browser:deviceVolume:set', volume).then(() => undefined),
   onBrowserMediaChanged: (callback: (states: BrowserMediaState[]) => void): (() => void) => {
     const listener = (_event: unknown, states: BrowserMediaState[]) => callback(states);
     ipcRenderer.on('browser:media', listener);

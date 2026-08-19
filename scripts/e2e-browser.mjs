@@ -61,6 +61,9 @@ const PAGES = {
   '/media': `<!doctype html><html><head><title>Media page</title></head><body><main>
         <audio id="a" controls loop>
           <source src="/tone.wav" type="audio/wav">
+        </audio>
+        <audio id="b" controls loop>
+          <source src="/tone.wav" type="audio/wav">
         </audio></main></body></html>`,
 
   '/storage': `<!doctype html><html><head><title>Storage page</title></head><body><main>
@@ -513,6 +516,46 @@ try {
     const afterPause = await call('getBrowserMedia');
     assert.ok(afterPause.length > 0, 'the media session must survive a pause');
     assert.equal(afterPause[0].hasMedia, true);
+  });
+
+  await check('header media controls expose previous, next and device volume', async () => {
+    await page.getByTestId('browser-media-header-action').getByRole('button', { name: 'Medios', exact: true }).click();
+    const popover = page.getByTestId('browser-media-popover');
+    await popover.waitFor({ state: 'visible' });
+    const activeMediaTrack = () => app.evaluate(async ({ webContents }) => {
+      const target = webContents.getAllWebContents().find((wc) => wc.getURL().endsWith('/media'));
+      if (!target) throw new Error('media tab missing');
+      return target.executeJavaScript('[...document.querySelectorAll("audio")].find((audio) => !audio.paused)?.id ?? ""');
+    });
+    const waitForTrack = async (id) => {
+      const deadline = Date.now() + 5000;
+      let active = '';
+      while (Date.now() < deadline) {
+        active = await activeMediaTrack();
+        if (active === id) return active;
+        await new Promise((resolve) => setTimeout(resolve, 50));
+      }
+      return active;
+    };
+    await popover.getByRole('button', { name: 'Siguiente', exact: true }).click();
+    let activeTrack = await waitForTrack('b');
+    assert.equal(activeTrack, 'b', 'Next must start the following real media element');
+    await popover.getByRole('button', { name: 'Anterior', exact: true }).click();
+    activeTrack = await waitForTrack('a');
+    assert.equal(activeTrack, 'a', 'Previous must return to the preceding real media element');
+
+    const deviceVolume = page.getByTestId('browser-device-volume').getByRole('slider', { name: 'Volumen' });
+    await deviceVolume.waitFor({ state: 'visible' });
+    await deviceVolume.waitFor({ state: 'attached' });
+    await page.waitForFunction(() => {
+      const slider = document.querySelector('[data-testid="browser-device-volume"] input');
+      return slider instanceof HTMLInputElement && !slider.disabled;
+    });
+    const currentVolume = await deviceVolume.inputValue();
+    await deviceVolume.fill(currentVolume);
+    assert.equal(await deviceVolume.inputValue(), currentVolume);
+    await page.keyboard.press('Escape');
+    await popover.waitFor({ state: 'detached' });
   });
 
   await check('tabs close without leaking WebContents', async () => {
