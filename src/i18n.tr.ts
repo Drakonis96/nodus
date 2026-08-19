@@ -35,6 +35,7 @@ import { DATABASE_TASK_TRANSLATIONS } from './i18n.databaseTasks';
 import { DATABASE_AUTOMATION_TRANSLATIONS } from './i18n.databaseAutomations';
 import { NOTION_IMPORT_TRANSLATIONS } from './i18n.notionImport';
 import { LIBRARY_ONBOARDING_TRANSLATIONS } from './i18n.libraryOnboarding';
+import { SOURCE_CITATION_TRANSLATIONS } from './i18n.sourceCitation';
 
 /** Complete static Turkish interface table; coverage prohibits runtime fallbacks. */
 export const TR: Record<string, string> = {
@@ -49,6 +50,7 @@ export const TR: Record<string, string> = {
   'Recalcular fórmulas y rollups': 'Formülleri ve rollup’ları yeniden hesapla',
   'Actualizando fórmulas y rollups…': 'Formüller ve rollup’lar güncelleniyor…',
   ...LIBRARY_READER_TRANSLATIONS.tr,
+  ...SOURCE_CITATION_TRANSLATIONS.tr,
   ...LIBRARY_BIBLIOGRAPHY_TRANSLATIONS.tr,
   ...LIBRARY_ONBOARDING_TRANSLATIONS.tr,
   ...LIBRARY_RECOVERY_TRANSLATIONS.tr,

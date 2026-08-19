@@ -35,6 +35,7 @@ import { DATABASE_TASK_TRANSLATIONS } from './i18n.databaseTasks';
 import { DATABASE_AUTOMATION_TRANSLATIONS } from './i18n.databaseAutomations';
 import { NOTION_IMPORT_TRANSLATIONS } from './i18n.notionImport';
 import { LIBRARY_ONBOARDING_TRANSLATIONS } from './i18n.libraryOnboarding';
+import { SOURCE_CITATION_TRANSLATIONS } from './i18n.sourceCitation';
 
 /** Complete static Italian interface table; coverage prohibits runtime fallbacks. */
 export const IT: Record<string, string> = {
@@ -49,6 +50,7 @@ export const IT: Record<string, string> = {
   'Recalcular fórmulas y rollups': 'Ricalcola formule e rollup',
   'Actualizando fórmulas y rollups…': 'Aggiornamento di formule e rollup…',
   ...LIBRARY_READER_TRANSLATIONS.it,
+  ...SOURCE_CITATION_TRANSLATIONS.it,
   ...LIBRARY_BIBLIOGRAPHY_TRANSLATIONS.it,
   ...LIBRARY_ONBOARDING_TRANSLATIONS.it,
   ...LIBRARY_RECOVERY_TRANSLATIONS.it,

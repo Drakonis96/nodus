@@ -41,6 +41,7 @@ import { DATABASE_TASK_TRANSLATIONS } from './i18n.databaseTasks';
 import { DATABASE_AUTOMATION_TRANSLATIONS } from './i18n.databaseAutomations';
 import { NOTION_IMPORT_TRANSLATIONS } from './i18n.notionImport';
 import { LIBRARY_ONBOARDING_TRANSLATIONS } from './i18n.libraryOnboarding';
+import { SOURCE_CITATION_TRANSLATIONS } from './i18n.sourceCitation';
 
 export const PT: Record<string, string> = {
   ...PAGE_TRANSLATIONS.pt,
@@ -51,6 +52,7 @@ export const PT: Record<string, string> = {
   ...DATABASE_AUTOMATION_TRANSLATIONS.pt,
   ...NOTION_IMPORT_TRANSLATIONS.pt,
   ...LIBRARY_READER_TRANSLATIONS.pt,
+  ...SOURCE_CITATION_TRANSLATIONS.pt,
   ...LIBRARY_BIBLIOGRAPHY_TRANSLATIONS.pt,
   ...LIBRARY_ONBOARDING_TRANSLATIONS.pt,
   ...LIBRARY_RECOVERY_TRANSLATIONS.pt,
