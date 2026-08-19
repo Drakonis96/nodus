@@ -32,6 +32,8 @@ export interface ContextMenuActions {
   askNodiAboutPage(): void;
   /** Start an Add-to-Library capture of this page. */
   addToLibrary(): void;
+  /** Ask the trusted Nodus renderer to open its bookmark dialog. */
+  addBookmark(): void;
   searchEngine(): BrowserSearchEngineId;
   customSearchTemplate(): string;
   /** Localised label, so the menu speaks the app's language. */
@@ -112,6 +114,11 @@ export function installContextMenu(contents: WebContents, actions: ContextMenuAc
       label: t('Añadir a la Biblioteca'),
       icon: browserMenuIcon('book'),
       click: () => actions.addToLibrary(),
+    }));
+    menu.append(new MenuItem({
+      label: t('Añadir marcador'),
+      icon: browserMenuIcon('bookmark'),
+      click: () => actions.addBookmark(),
     }));
     menu.append(new MenuItem({
       label: t('Preguntar a Nodi sobre esta página'),

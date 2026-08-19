@@ -20,6 +20,18 @@ import type {
   BrowserStorageReport, PendingBrowserPermission,
 } from '@shared/browser';
 import type { BrowserConnectorCaptureRequest, BrowserConnectorSaveResult } from '@shared/browserConnector';
+import type {
+  BrowserBookmarkDraft,
+  BrowserBookmarkFolderDraft,
+  BrowserBookmarkNodeRef,
+  BrowserBookmarkStore,
+  BrowserBookmarkCandidate,
+  BrowserBookmarksExportResult,
+  BrowserBookmarksImportPreview,
+  BrowserBookmarksImportSummary,
+  BrowserBookmark,
+  BrowserBookmarkFolder,
+} from '@shared/browserBookmarks';
 
 export interface BrowserCapturePreview {
   request: BrowserConnectorCaptureRequest & { snapshotAvailable?: boolean };
@@ -112,6 +124,32 @@ export const browserApi = {
   clearBrowserData: (categories: BrowserDataCategory[], origins?: string[]): Promise<BrowserStorageReport> =>
     ipcRenderer.invoke('browser:clearData', categories, origins ?? null),
   clearAllBrowserData: (): Promise<BrowserStorageReport> => ipcRenderer.invoke('browser:clearAllData'),
+  getBrowserBookmarks: (): Promise<BrowserBookmarkStore> => ipcRenderer.invoke('browser:bookmarks:get'),
+  getCurrentBrowserBookmarkCandidate: (): Promise<BrowserBookmarkCandidate | null> =>
+    ipcRenderer.invoke('browser:bookmarks:candidate'),
+  createBrowserBookmark: (draft: BrowserBookmarkDraft): Promise<{ store: BrowserBookmarkStore; bookmark: BrowserBookmark; duplicate: boolean }> =>
+    ipcRenderer.invoke('browser:bookmarks:create', draft),
+  updateBrowserBookmark: (id: string, patch: Partial<BrowserBookmarkDraft>): Promise<BrowserBookmarkStore> =>
+    ipcRenderer.invoke('browser:bookmarks:update', id, patch),
+  createBrowserBookmarkFolder: (draft: BrowserBookmarkFolderDraft): Promise<{ store: BrowserBookmarkStore; folder: BrowserBookmarkFolder }> =>
+    ipcRenderer.invoke('browser:bookmarks:createFolder', draft),
+  updateBrowserBookmarkFolder: (id: string, patch: Partial<BrowserBookmarkFolderDraft>): Promise<BrowserBookmarkStore> =>
+    ipcRenderer.invoke('browser:bookmarks:updateFolder', id, patch),
+  deleteBrowserBookmarkNode: (ref: BrowserBookmarkNodeRef): Promise<BrowserBookmarkStore> =>
+    ipcRenderer.invoke('browser:bookmarks:delete', ref),
+  moveBrowserBookmarkNode: (ref: BrowserBookmarkNodeRef, parentId: string | null, index: number): Promise<BrowserBookmarkStore> =>
+    ipcRenderer.invoke('browser:bookmarks:move', ref, parentId, index),
+  previewBrowserBookmarksImport: (): Promise<BrowserBookmarksImportPreview | null> =>
+    ipcRenderer.invoke('browser:bookmarks:previewImport'),
+  commitBrowserBookmarksImport: (token: string): Promise<{ store: BrowserBookmarkStore; summary: BrowserBookmarksImportSummary }> =>
+    ipcRenderer.invoke('browser:bookmarks:commitImport', token),
+  exportBrowserBookmarks: (format: 'json' | 'html'): Promise<BrowserBookmarksExportResult> =>
+    ipcRenderer.invoke('browser:bookmarks:export', format),
+  onBrowserBookmarksChanged: (callback: (store: BrowserBookmarkStore) => void): (() => void) => {
+    const listener = (_event: unknown, store: BrowserBookmarkStore) => callback(store);
+    ipcRenderer.on('browser:bookmarks', listener);
+    return () => ipcRenderer.removeListener('browser:bookmarks', listener);
+  },
   onBrowserStateChanged: (callback: (state: BrowserState) => void): (() => void) => {
     const listener = (_event: unknown, state: BrowserState) => callback(state);
     ipcRenderer.on('browser:state', listener);

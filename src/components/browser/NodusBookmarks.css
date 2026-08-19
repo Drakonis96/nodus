@@ -1,0 +1,62 @@
+/* Nodus Bookmarks deliberately reuses Research Atlas classes and proportions. */
+@import url('../../../site/assets/css/research-atlas.css');
+
+@font-face { font-family: 'Atlas Inter'; src: url('../../../site/assets/fonts/inter-latin.woff2') format('woff2'); font-display: swap; }
+@font-face { font-family: 'Atlas Fraunces'; src: url('../../../site/assets/fonts/fraunces-latin.woff2') format('woff2'); font-display: swap; }
+
+.nodus-start-page {
+  --void: #06050b; --deep: #0a0813; --raised: #100d1c;
+  --skin: rgba(255,255,255,.04); --skin-2: rgba(255,255,255,.07);
+  --membrane: rgba(255,255,255,.09); --membrane-2: rgba(255,255,255,.16);
+  --ink: #f6f4fd; --ink-2: #a9a3c2; --ink-3: #6f6a86;
+  --violet-2: #a78bfa; --violet-3: #ddd6fe; --accent: #a78bfa;
+  --accent-soft: rgba(167,139,250,.16); --sans: 'Atlas Inter', Inter, sans-serif;
+  --serif: 'Atlas Fraunces', Georgia, serif; --mono: ui-monospace, 'SF Mono', monospace;
+  --gut: clamp(20px,5vw,68px); --measure: 1240px; --nav-h: 0px;
+  --r-l: 24px; --ease: cubic-bezier(.22,1,.36,1);
+  --shadow: 0 24px 70px -30px rgba(0,0,0,.85);
+  position: absolute; inset: 0; overflow: auto; color: var(--ink);
+  background:
+    radial-gradient(circle at 18% 10%, rgba(34,211,238,.08), transparent 32%),
+    radial-gradient(circle at 82% 5%, rgba(139,92,246,.13), transparent 34%), var(--void);
+  font-family: var(--sans); color-scheme: dark;
+}
+.nodus-start-page.atlas-main { min-height: 100%; padding-top: clamp(48px,7vw,78px); }
+.nodus-start-page .card {
+  position: relative; padding: 26px; border: 1px solid var(--membrane); border-radius: var(--r-l);
+  background: linear-gradient(180deg,rgba(23,19,40,.86),rgba(11,9,21,.82)); overflow: hidden;
+  transition: border-color .35s var(--ease),transform .35s var(--ease),background .35s var(--ease);
+}
+.nodus-start-page .card:hover { border-color: rgba(167,139,250,.4); transform: translateY(-3px); }
+.nodus-start-page .card.lit::before { content:''; position:absolute; inset:-1px; pointer-events:none; background:radial-gradient(340px circle at 50% 0%,var(--accent-soft),transparent 68%); opacity:0; transition:opacity .4s var(--ease); }
+.nodus-start-page .card.lit:hover::before { opacity:1; }
+.nodus-start-page button, .nodus-start-page input, .nodus-start-page select { font-family: inherit; }
+.nodus-start-page .atlas-card > * { position: relative; z-index: 1; }
+.nodus-start-page .atlas-card-actions { display:flex; flex-wrap:wrap; gap:7px; margin-top:17px; }
+.nodus-start-page .atlas-card-actions .atlas-open { margin-top:0; cursor:pointer; }
+.nodus-start-page .atlas-card-actions .is-saved { color:#fbbf24; border-color:rgba(251,191,36,.3); }
+.nodus-start-page .bookmark-favicon { width:22px; height:22px; object-fit:contain; border-radius:5px; }
+.nodus-start-page .bookmark-folder-icon { display:grid; place-items:center; width:36px; height:36px; border:1px solid rgba(167,139,250,.25); border-radius:11px; background:rgba(139,92,246,.12); color:var(--violet-3); }
+.nodus-start-page .bookmark-heading { display:flex; align-items:center; gap:11px; min-width:0; }
+.nodus-start-page .bookmark-breadcrumbs { display:flex; justify-content:center; align-items:center; flex-wrap:wrap; gap:5px; margin-top:16px; color:var(--ink-3); font:600 11px/1 var(--mono); }
+.nodus-start-page .bookmark-breadcrumbs button { border:0; background:transparent; color:inherit; cursor:pointer; }
+.nodus-start-page .bookmark-breadcrumbs button:hover { color:var(--violet-3); }
+.nodus-start-page .bookmark-drop { outline:2px solid var(--violet-2); outline-offset:3px; }
+.nodus-start-page .atlas-empty h2 { margin:0 0 8px; color:var(--ink); font:650 24px/1.2 var(--serif); }
+.nodus-start-page .atlas-empty p { margin:0 auto 20px; max-width:580px; }
+
+.nodus-start-page.nodus-start-light {
+  --void:#f7f7fb; --deep:#fff; --raised:#fff;
+  --skin:rgba(17,24,39,.04); --skin-2:rgba(17,24,39,.075);
+  --membrane:rgba(17,24,39,.13); --membrane-2:rgba(17,24,39,.22);
+  --ink:#171522; --ink-2:#5d586d; --ink-3:#858092;
+  --violet-3:#6d28d9; --shadow:0 20px 55px -35px rgba(33,24,60,.35);
+  background:radial-gradient(circle at 80% 0%,rgba(139,92,246,.09),transparent 35%),#f7f7fb; color-scheme:light;
+}
+.nodus-start-page.nodus-start-light .atlas-searchbar,
+.nodus-start-page.nodus-start-light .atlas-facet-button { background:rgba(255,255,255,.82); }
+.nodus-start-page.nodus-start-light .atlas-searchbar:focus-within { background:#fff; }
+.nodus-start-page.nodus-start-light .card { background:linear-gradient(180deg,#fff,#faf9fe); box-shadow:0 18px 50px -42px rgba(32,20,75,.55); }
+
+.browser-bookmarks-tree { max-height:min(62vh,680px); overflow:auto; }
+.browser-bookmark-row[data-drag-over='true'] { outline:2px solid rgb(129 140 248); outline-offset:-2px; }

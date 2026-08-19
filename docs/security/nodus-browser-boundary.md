@@ -122,6 +122,19 @@ Electron 43 is supported until 2027-01-05 according to the official
     WebContents and cancels live downloads/prompts. No vault, database, Library,
     setting or persistent Browser storage is part of this cleanup.
 
+13. **Nodus Bookmarks.** Bookmark storage is global Nodus application data in
+    `browser-bookmarks.json`, never Chromium site data. Research Atlas and Nodus
+    Bookmarks are synthetic tab identifiers rendered inside the trusted Nodus
+    React renderer; no custom protocol is registered and no remote document
+    receives the bookmark tree. The native untrusted WebContents remains blank
+    and hidden for these tabs. Create, edit, move, import, export and delete are
+    exact-main-frame IPC actions. URLs are restricted to HTTP(S), favicon bytes
+    are fetched by the isolated Browser session with type/time/size bounds and
+    cached as raster data URLs, and imported text/hierarchy is normalized with
+    count/depth/size limits. Clearing Chromium data or destroying Browser
+    renderers cannot touch bookmarks. Normal Nodus backup/restore includes the
+    file as a global auxiliary data file.
+
 ## Threat-to-control table
 
 | Threat | Attack path | Mitigation | Test |
@@ -136,6 +149,8 @@ Electron 43 is supported until 2027-01-05 according to the official
 | Old renderers leak | close/restart/quit/updater paths | one shared destructor and lifecycle cleanup | close, repeated restart and updater-shutdown E2E |
 | Huge hostile page freezes main | oversized DOM/text/metadata/attachments | bounded IPC data, validation, async temporary-file I/O | sanitizer/size assertions and capture tests |
 | Browser session contaminates Nodus | shared cookies/storage/protocol registry | persistent dedicated partition, default session untouched | two-way cookie/storage isolation E2E |
+| Website reads or changes bookmarks | preload/IPC/custom start-page protocol | no page bridge; exact trusted sender; start pages live only in trusted React; no registered scheme | bookmark boundary/static tests |
+| Malformed bookmark import corrupts hierarchy | cycles, huge files, unsafe URLs, duplicate IDs | bounded parsing, normalization, cycle/depth checks, preview and non-overwriting merge | bookmark model/import tests |
 
 ## Remaining unavoidable risks
 
@@ -179,3 +194,6 @@ Electron 43 is supported until 2027-01-05 according to the official
 - `scripts/e2e-browser.mjs`: real Electron hostile page, popup, redirect,
   permission, session isolation, renderer crash, close, restart and updater
   shutdown.
+- `scripts/test-browser-bookmarks.mjs`: hierarchy, ordering, cycle prevention,
+  duplicate handling, search, URL/favicon sanitization, JSON/HTML import/export,
+  1,000-item behavior, backup inclusion and trusted-IPC boundary.

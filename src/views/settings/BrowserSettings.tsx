@@ -77,6 +77,19 @@ export function BrowserSettings({ settings, onChange }: { settings: AppSettings;
   return (
     <div className="flex flex-col gap-6" data-testid="settings-browser">
       <section>
+        <h3 className="mb-2 text-sm font-semibold text-neutral-200">{t('Página de inicio')}</h3>
+        <div className="grid gap-2 sm:grid-cols-2">
+          {(['start', 'bookmarks', 'blank', 'custom'] as const).map((mode) => (
+            <label key={mode} className="flex items-center gap-2 rounded-lg border border-neutral-800 px-3 py-2 text-xs text-neutral-300">
+              <input type="radio" name="browser-settings-home" checked={settings.browserHomeMode === mode} onChange={() => void window.nodus.updateSettings({ browserHomeMode: mode }).then(onChange)} />
+              {mode === 'start' ? 'Research Atlas' : mode === 'bookmarks' ? 'Nodus Bookmarks' : mode === 'blank' ? t('Página en blanco') : t('Dirección personalizada')}
+            </label>
+          ))}
+        </div>
+        {settings.browserHomeMode === 'custom' && <input className="input mt-2 w-full" defaultValue={settings.browserHomeUrl} placeholder="https://…" onBlur={(event) => void window.nodus.updateSettings({ browserHomeUrl: event.target.value }).then(onChange)} />}
+      </section>
+
+      <section>
         <h3 className="mb-2 text-sm font-semibold text-neutral-200">{t('Descargas')}</h3>
         <label className="flex items-center gap-2 text-xs text-neutral-300">
           <input
@@ -94,6 +107,9 @@ export function BrowserSettings({ settings, onChange }: { settings: AppSettings;
         <h3 className="mb-1 text-sm font-semibold text-neutral-200">{t('Almacenamiento del navegador')}</h3>
         <p className="mb-3 text-xs text-neutral-500">
           {t('Nodus puede medir la caché y el tamaño total del perfil. Chromium no informa del tamaño de cada categoría de almacenamiento por separado, así que las demás se muestran por número de sitios afectados.')}
+        </p>
+        <p className="mb-3 rounded-lg border border-indigo-500/20 bg-indigo-500/10 px-3 py-2 text-xs text-indigo-200">
+          Nodus Bookmarks is application data. Clearing cache, cookies or site storage never deletes bookmarks, folders or their order.
         </p>
 
         <dl className="mb-3 grid grid-cols-[1fr,auto] gap-y-1 text-xs">
@@ -192,6 +208,7 @@ export function BrowserSettings({ settings, onChange }: { settings: AppSettings;
               {confirming === 'all' && (
                 <p className="text-neutral-400">{t('También se cerrarán todas las pestañas abiertas del navegador.')}</p>
               )}
+              <p className="text-indigo-300">Nodus Bookmarks will be preserved.</p>
             </div>
           }
           confirmLabel={t('Borrar')}

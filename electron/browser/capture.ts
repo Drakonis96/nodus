@@ -43,6 +43,7 @@ const MAX_SNAPSHOT_CHARS = 6 * 1024 * 1024;
 
 function clean(value: unknown, limit: number): string {
   return typeof value === 'string'
+    // eslint-disable-next-line no-control-regex -- page metadata is hostile input
     ? value.replace(/[\u0000-\u001f\u007f]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, limit)
     : '';
 }

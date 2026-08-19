@@ -1513,7 +1513,7 @@ export interface AppSettings {
   /** Where Nodus Browser saves downloads. Null asks each time. */
   browserDownloadFolder: string | null;
   /** What Home and a new tab open. */
-  browserHomeMode: 'start' | 'blank' | 'custom';
+  browserHomeMode: 'start' | 'bookmarks' | 'blank' | 'custom';
   browserHomeUrl: string;
   browserNewTabMode: 'home' | 'blank';
   browserSearchEngine: 'google' | 'scholar' | 'bing' | 'duckduckgo' | 'custom';
@@ -8025,6 +8025,29 @@ export interface BrowserApi {
     origins?: string[],
   ): Promise<import('./browser').BrowserStorageReport>;
   clearAllBrowserData(): Promise<import('./browser').BrowserStorageReport>;
+  /** Global Nodus data. Never exposed to the untrusted Browser-page preload. */
+  getBrowserBookmarks(): Promise<import('./browserBookmarks').BrowserBookmarkStore>;
+  getCurrentBrowserBookmarkCandidate(): Promise<import('./browserBookmarks').BrowserBookmarkCandidate | null>;
+  createBrowserBookmark(draft: import('./browserBookmarks').BrowserBookmarkDraft): Promise<{
+    store: import('./browserBookmarks').BrowserBookmarkStore;
+    bookmark: import('./browserBookmarks').BrowserBookmark;
+    duplicate: boolean;
+  }>;
+  updateBrowserBookmark(id: string, patch: Partial<import('./browserBookmarks').BrowserBookmarkDraft>): Promise<import('./browserBookmarks').BrowserBookmarkStore>;
+  createBrowserBookmarkFolder(draft: import('./browserBookmarks').BrowserBookmarkFolderDraft): Promise<{
+    store: import('./browserBookmarks').BrowserBookmarkStore;
+    folder: import('./browserBookmarks').BrowserBookmarkFolder;
+  }>;
+  updateBrowserBookmarkFolder(id: string, patch: Partial<import('./browserBookmarks').BrowserBookmarkFolderDraft>): Promise<import('./browserBookmarks').BrowserBookmarkStore>;
+  deleteBrowserBookmarkNode(ref: import('./browserBookmarks').BrowserBookmarkNodeRef): Promise<import('./browserBookmarks').BrowserBookmarkStore>;
+  moveBrowserBookmarkNode(ref: import('./browserBookmarks').BrowserBookmarkNodeRef, parentId: string | null, index: number): Promise<import('./browserBookmarks').BrowserBookmarkStore>;
+  previewBrowserBookmarksImport(): Promise<import('./browserBookmarks').BrowserBookmarksImportPreview | null>;
+  commitBrowserBookmarksImport(token: string): Promise<{
+    store: import('./browserBookmarks').BrowserBookmarkStore;
+    summary: import('./browserBookmarks').BrowserBookmarksImportSummary;
+  }>;
+  exportBrowserBookmarks(format: 'json' | 'html'): Promise<import('./browserBookmarks').BrowserBookmarksExportResult>;
+  onBrowserBookmarksChanged(cb: (store: import('./browserBookmarks').BrowserBookmarkStore) => void): () => void;
 }
 
 export interface NodusApi extends ProsopographyApi, TestimoniesApi, ToolkitApi, TeachingApi, DatabasesApi, PrimarySourcesApi, ArchiveApi, WorldbuildingApi, PlatformApi, RecordsApi, AcademicApi, LibraryApi, BrowserApi {

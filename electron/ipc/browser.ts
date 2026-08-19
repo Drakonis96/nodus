@@ -16,9 +16,33 @@
  * preload with `ipcRenderer` on it. Defence in depth, deliberately redundant.
  */
 
-import { BrowserWindow, shell } from 'electron';
+import { BrowserWindow, dialog, shell } from 'electron';
+import { randomUUID } from 'node:crypto';
+import fsp from 'node:fs/promises';
+import path from 'node:path';
 import type { IpcContext } from './context';
-import { NODUS_RESEARCH_ATLAS_URL, type BrowserRestartResult, type BrowserViewport } from '@shared/browser';
+import {
+  NODUS_BOOKMARKS_URL,
+  NODUS_RESEARCH_ATLAS_START_URL,
+  type BrowserRestartResult,
+  type BrowserViewport,
+} from '@shared/browser';
+import type {
+  BrowserBookmarkDraft,
+  BrowserBookmarkFolderDraft,
+  BrowserBookmarkNodeRef,
+  BrowserBookmarkStore,
+} from '@shared/browserBookmarks';
+import {
+  exportBrowserBookmarksHtml,
+  exportBrowserBookmarksJson,
+  findDuplicateBookmark,
+  MAX_BOOKMARK_IMPORT_BYTES,
+  mergeBrowserBookmarkStores,
+  parseBrowserBookmarksHtml,
+  parseBrowserBookmarksJson,
+  sanitizeBookmarkUrl,
+} from '@shared/browserBookmarks';
 import { parseOmniboxInput } from '@shared/browserOmnibox';
 import {
   cancelPermissionRequests,
@@ -64,6 +88,8 @@ import {
   setViewport,
   stopLoading,
 } from '../browser/tabs';
+import { browserBookmarksRepository } from '../browser/bookmarks';
+import { showImportOpenDialog } from '../privacy';
 
 /**
  * Refuse anything that is not the main Nodus window.
@@ -90,6 +116,7 @@ function sanitizeViewport(raw: unknown): BrowserViewport | null {
 
 function cleanPageText(value: unknown, limit: number): string {
   return String(value ?? '')
+    // eslint-disable-next-line no-control-regex -- page content is hostile input
     .replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/g, '')
     .slice(0, limit);
 }
@@ -141,6 +168,14 @@ export function registerBrowserIpc({ h, getWindow }: IpcContext): void {
     window.webContents.send('browser:downloads', browserDownloads());
   };
 
+  const bookmarks = browserBookmarksRepository();
+  const broadcastBookmarks = (store: BrowserBookmarkStore) => {
+    const window = getWindow();
+    if (!window || window.isDestroyed()) return;
+    window.webContents.send('browser:bookmarks', store);
+  };
+  bookmarks.setNotifier(broadcastBookmarks);
+
   const quoteToEveryNodi = (text: string): boolean => {
     const selection = setNodiQuoteSelection(cleanPageText(text, 20_000));
     if (!selection) return false;
@@ -171,6 +206,10 @@ export function registerBrowserIpc({ h, getWindow }: IpcContext): void {
       addToLibrary: () => {
         const target = getWindow();
         if (target && !target.isDestroyed()) target.webContents.send('browser:requestAction', 'addToLibrary');
+      },
+      addBookmark: () => {
+        const target = getWindow();
+        if (target && !target.isDestroyed()) target.webContents.send('browser:requestAction', 'addBookmark');
       },
       searchEngine: () => getSettings().browserSearchEngine ?? 'google',
       customSearchTemplate: () => getSettings().browserSearchTemplate ?? '',
@@ -205,7 +244,8 @@ export function registerBrowserIpc({ h, getWindow }: IpcContext): void {
         if (resolved.kind === 'navigate' || resolved.kind === 'search') return resolved.url;
       }
     }
-    return settings.browserHomeMode === 'start' ? NODUS_RESEARCH_ATLAS_URL : 'about:blank';
+    if (settings.browserHomeMode === 'bookmarks') return NODUS_BOOKMARKS_URL;
+    return settings.browserHomeMode === 'start' ? NODUS_RESEARCH_ATLAS_START_URL : 'about:blank';
   };
 
   let restartInFlight: Promise<BrowserRestartResult> | null = null;
@@ -514,6 +554,152 @@ export function registerBrowserIpc({ h, getWindow }: IpcContext): void {
     destroyBrowserSubsystem();
     await clearAllBrowserData();
     return measureBrowserStorage(true);
+  });
+
+  h('browser:bookmarks:get', async (event) => {
+    assertUiSender(event, getWindow);
+    return bookmarks.snapshot();
+  });
+
+  h('browser:bookmarks:candidate', async (event) => {
+    assertUiSender(event, getWindow);
+    const tab = activeTabSummary();
+    const url = tab?.kind === 'web' ? sanitizeBookmarkUrl(tab.url) : null;
+    if (!tab || !url) return null;
+    return {
+      title: cleanPageText(tab.title, 300) || new URL(url).hostname,
+      url,
+      description: '',
+      faviconDataUrl: tab.faviconDataUrl,
+      existingId: findDuplicateBookmark(bookmarks.snapshot(), url)?.id ?? null,
+    };
+  });
+
+  h('browser:bookmarks:create', async (event, raw: unknown) => {
+    assertUiSender(event, getWindow);
+    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) throw new Error('El marcador no es válido.');
+    return bookmarks.createBookmark(raw as BrowserBookmarkDraft);
+  });
+
+  h('browser:bookmarks:update', async (event, id: string, raw: unknown) => {
+    assertUiSender(event, getWindow);
+    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) throw new Error('Los cambios del marcador no son válidos.');
+    return bookmarks.editBookmark(String(id), raw as Partial<BrowserBookmarkDraft>);
+  });
+
+  h('browser:bookmarks:createFolder', async (event, raw: unknown) => {
+    assertUiSender(event, getWindow);
+    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) throw new Error('La carpeta no es válida.');
+    return bookmarks.createFolder(raw as BrowserBookmarkFolderDraft);
+  });
+
+  h('browser:bookmarks:updateFolder', async (event, id: string, raw: unknown) => {
+    assertUiSender(event, getWindow);
+    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) throw new Error('Los cambios de la carpeta no son válidos.');
+    return bookmarks.editFolder(String(id), raw as Partial<BrowserBookmarkFolderDraft>);
+  });
+
+  h('browser:bookmarks:delete', async (event, raw: unknown) => {
+    assertUiSender(event, getWindow);
+    const candidate = raw as Partial<BrowserBookmarkNodeRef> | null;
+    if (!candidate || (candidate.kind !== 'bookmark' && candidate.kind !== 'folder') || typeof candidate.id !== 'string') {
+      throw new Error('El elemento de marcadores no es válido.');
+    }
+    return bookmarks.deleteNode({ kind: candidate.kind, id: candidate.id });
+  });
+
+  h('browser:bookmarks:move', async (event, raw: unknown, parentId: unknown, index: unknown) => {
+    assertUiSender(event, getWindow);
+    const candidate = raw as Partial<BrowserBookmarkNodeRef> | null;
+    if (!candidate || (candidate.kind !== 'bookmark' && candidate.kind !== 'folder') || typeof candidate.id !== 'string') {
+      throw new Error('El elemento de marcadores no es válido.');
+    }
+    return bookmarks.moveNode(
+      { kind: candidate.kind, id: candidate.id },
+      typeof parentId === 'string' && parentId ? parentId : null,
+      Math.max(0, Math.floor(Number(index) || 0)),
+    );
+  });
+
+  interface PendingBookmarksImport {
+    store: BrowserBookmarkStore;
+    invalidUrls: number;
+    truncated: boolean;
+    expiresAt: number;
+  }
+  const pendingImports = new Map<string, PendingBookmarksImport>();
+
+  h('browser:bookmarks:previewImport', async (event) => {
+    assertUiSender(event, getWindow);
+    const owner = getWindow() ?? undefined;
+    const openOptions: Electron.OpenDialogOptions = {
+      title: 'Importar Nodus Bookmarks',
+      properties: ['openFile'],
+      filters: [
+        { name: 'Marcadores', extensions: ['json', 'html', 'htm'] },
+        { name: 'Todos los archivos', extensions: ['*'] },
+      ],
+    };
+    const selected = owner
+      ? await showImportOpenDialog(owner, openOptions)
+      : await showImportOpenDialog(openOptions);
+    if (selected.canceled || !selected.filePaths[0]) return null;
+    const file = selected.filePaths[0];
+    const stat = await fsp.stat(file);
+    if (!stat.isFile() || stat.size > MAX_BOOKMARK_IMPORT_BYTES) throw new Error('El archivo de marcadores es demasiado grande.');
+    const source = await fsp.readFile(file, 'utf8');
+    const format = path.extname(file).toLowerCase() === '.json' ? 'json' as const : 'html' as const;
+    const parsed = format === 'json'
+      ? { store: parseBrowserBookmarksJson(source), invalidUrls: 0, truncated: false }
+      : parseBrowserBookmarksHtml(source, randomUUID);
+    const previewMerge = mergeBrowserBookmarkStores(bookmarks.snapshot(), parsed.store, randomUUID);
+    const token = randomUUID();
+    pendingImports.set(token, { ...parsed, expiresAt: Date.now() + 10 * 60_000 });
+    for (const [key, value] of pendingImports) if (value.expiresAt < Date.now()) pendingImports.delete(key);
+    return {
+      token,
+      format,
+      fileName: path.basename(file),
+      bookmarks: parsed.store.bookmarks.length,
+      folders: parsed.store.folders.length,
+      duplicates: previewMerge.summary.duplicates,
+      invalidUrls: parsed.invalidUrls,
+      truncated: parsed.truncated || previewMerge.summary.truncated,
+    };
+  });
+
+  h('browser:bookmarks:commitImport', async (event, token: string) => {
+    assertUiSender(event, getWindow);
+    const pending = pendingImports.get(String(token));
+    pendingImports.delete(String(token));
+    if (!pending || pending.expiresAt < Date.now()) throw new Error('La vista previa de importación ha caducado.');
+    const merged = mergeBrowserBookmarkStores(bookmarks.snapshot(), pending.store, randomUUID);
+    merged.summary.invalidUrls = pending.invalidUrls;
+    merged.summary.truncated ||= pending.truncated;
+    return { store: await bookmarks.replace(merged.store), summary: merged.summary };
+  });
+
+  h('browser:bookmarks:export', async (event, rawFormat: string) => {
+    assertUiSender(event, getWindow);
+    const format = rawFormat === 'html' ? 'html' as const : 'json' as const;
+    const store = bookmarks.snapshot();
+    const saveOptions: Electron.SaveDialogOptions = {
+      title: 'Exportar Nodus Bookmarks',
+      defaultPath: `nodus-bookmarks.${format}`,
+      filters: format === 'json'
+        ? [{ name: 'Nodus Bookmarks JSON', extensions: ['json'] }]
+        : [{ name: 'Marcadores HTML', extensions: ['html'] }],
+    };
+    const owner = getWindow();
+    const selected = owner
+      ? await dialog.showSaveDialog(owner, saveOptions)
+      : await dialog.showSaveDialog(saveOptions);
+    if (selected.canceled || !selected.filePath) {
+      return { canceled: true, format, bookmarks: store.bookmarks.length, folders: store.folders.length };
+    }
+    const payload = format === 'json' ? exportBrowserBookmarksJson(store) : exportBrowserBookmarksHtml(store);
+    await fsp.writeFile(selected.filePath, payload, { encoding: 'utf8', mode: 0o600 });
+    return { canceled: false, format, bookmarks: store.bookmarks.length, folders: store.folders.length };
   });
 
   h('browser:askNodiAboutSelection', async (event) => {

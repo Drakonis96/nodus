@@ -24,10 +24,11 @@ import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import type { BrowserMediaCommand, BrowserState, BrowserTabError, BrowserTabState, BrowserViewport } from '@shared/browser';
 import type { ThemeMode } from '@shared/types';
-import { MAX_BROWSER_TABS } from '@shared/browser';
+import { browserInternalPage, MAX_BROWSER_TABS } from '@shared/browser';
 import { decideNavigation } from '@shared/browserNavigation';
 import { NODUS_BROWSER_PARTITION, browserSession } from './session';
 import { installContextMenu, type ContextMenuActions } from './contextMenu';
+import { cachePageFavicon } from './favicon';
 import {
   describeMediaSession,
   dropMediaSession,
@@ -132,10 +133,12 @@ function originOf(url: string): string {
 }
 
 function emptyState(id: string, url: string): BrowserTabState {
+  const kind = browserInternalPage(url) ?? 'web';
   return {
     id,
+    kind,
     url,
-    title: '',
+    title: kind === 'bookmarks' ? 'Nodus Bookmarks' : kind === 'atlas' ? 'Research Atlas' : '',
     faviconDataUrl: null,
     loading: false,
     canGoBack: false,
@@ -192,7 +195,7 @@ function attach(tab: Tab): void {
   if (!hostWindow || hostWindow.isDestroyed()) return;
   hostWindow.contentView.addChildView(tab.view);
   applyBounds(tab);
-  tab.view.setVisible(sectionVisible && !overlayOpen && !tab.state.error);
+  tab.view.setVisible(tab.state.kind === 'web' && sectionVisible && !overlayOpen && !tab.state.error);
 }
 
 function detach(tab: Tab): void {
@@ -210,6 +213,7 @@ function on(tab: Tab, contents: WebContents, event: string, handler: (...args: n
 
 function wire(tab: Tab): void {
   const contents = tab.view.webContents;
+  const isWeb = () => tab.state.kind === 'web';
   if (contextMenuActions) installContextMenu(contents, contextMenuActions);
   void applyPageColorScheme(contents);
 
@@ -222,6 +226,7 @@ function wire(tab: Tab): void {
     event: Electron.IpcMainEvent,
     payload: { playing?: unknown; kind?: unknown },
   ) => {
+    if (!isWeb()) return;
     if (event.sender !== contents || event.senderFrame !== contents.mainFrame) return;
     const kind = payload?.kind === 'audio' || payload?.kind === 'video' ? payload.kind : 'unknown';
     if (payload?.playing === true) {
@@ -280,28 +285,20 @@ function wire(tab: Tab): void {
     }
   }) as never);
 
-  on(tab, contents, 'did-start-loading', (() => patch(tab, { loading: true, error: null })) as never);
-  on(tab, contents, 'dom-ready', (() => { void applyPageColorScheme(contents); }) as never);
+  on(tab, contents, 'did-start-loading', (() => { if (isWeb()) patch(tab, { loading: true, error: null }); }) as never);
+  on(tab, contents, 'dom-ready', (() => { if (isWeb()) void applyPageColorScheme(contents); }) as never);
 
   // The address bar must follow navigation, not page load completion. A modern
   // page can keep the load event open for seconds (or indefinitely), so waiting
   // for did-stop-loading left the previous URL visible while the user was
   // already looking at the next document.
   on(tab, contents, 'did-redirect-navigation', ((details: { url: string; isMainFrame: boolean }) => {
-    if (!details.isMainFrame) return;
+    if (!isWeb() || !details.isMainFrame) return;
     patch(tab, { url: details.url });
   }) as never);
 
-  on(tab, contents, 'did-navigate', ((_event: unknown, url: string) => patch(tab, {
-    url,
-    canGoBack: contents.navigationHistory.canGoBack(),
-    canGoForward: contents.navigationHistory.canGoForward(),
-  })) as never);
-
-  on(tab, contents, 'did-navigate-in-page', ((
-    _event: unknown, url: string, isMainFrame: boolean,
-  ) => {
-    if (!isMainFrame) return;
+  on(tab, contents, 'did-navigate', ((_event: unknown, url: string) => {
+    if (!isWeb()) return;
     patch(tab, {
       url,
       canGoBack: contents.navigationHistory.canGoBack(),
@@ -309,15 +306,39 @@ function wire(tab: Tab): void {
     });
   }) as never);
 
-  on(tab, contents, 'did-stop-loading', (() => patch(tab, {
-    loading: false,
-    canGoBack: contents.navigationHistory.canGoBack(),
-    canGoForward: contents.navigationHistory.canGoForward(),
-  })) as never);
+  on(tab, contents, 'did-navigate-in-page', ((
+    _event: unknown, url: string, isMainFrame: boolean,
+  ) => {
+    if (!isWeb() || !isMainFrame) return;
+    patch(tab, {
+      url,
+      canGoBack: contents.navigationHistory.canGoBack(),
+      canGoForward: contents.navigationHistory.canGoForward(),
+    });
+  }) as never);
+
+  on(tab, contents, 'did-stop-loading', (() => {
+    if (!isWeb()) return;
+    patch(tab, {
+      loading: false,
+      canGoBack: contents.navigationHistory.canGoBack(),
+      canGoForward: contents.navigationHistory.canGoForward(),
+    });
+  }) as never);
 
   on(tab, contents, 'page-title-updated', ((_e: unknown, title: string) => {
+    if (!isWeb()) return;
     patch(tab, { title });
     describeMediaSession(tab.id, { title });
+  }) as never);
+
+  on(tab, contents, 'page-favicon-updated', ((_event: unknown, urls: string[]) => {
+    if (!isWeb()) return;
+    const expectedUrl = tab.state.url;
+    void cachePageFavicon(Array.isArray(urls) ? urls : []).then((faviconDataUrl) => {
+      if (!faviconDataUrl || !isWeb() || tab.state.url !== expectedUrl) return;
+      patch(tab, { faviconDataUrl });
+    });
   }) as never);
 
   /**
@@ -329,6 +350,7 @@ function wire(tab: Tab): void {
    * video, which is the one thing the page preload adds.
    */
   on(tab, contents, 'media-started-playing', (() => {
+    if (!isWeb()) return;
     noteMediaPlaying(tab.id, () => ({
       title: tab.state.title || tab.state.url,
       url: tab.state.url,
@@ -339,6 +361,7 @@ function wire(tab: Tab): void {
   }) as never);
 
   on(tab, contents, 'media-paused', (() => {
+    if (!isWeb()) return;
     noteMediaPaused(tab.id);
     patch(tab, { mediaPlaying: false });
   }) as never);
@@ -346,6 +369,7 @@ function wire(tab: Tab): void {
   // Audibility is about sound, not about existence: it goes false on pause, and
   // a header that keyed on it would lose its own Play button.
   on(tab, contents, 'audio-state-changed', ((event: { audible: boolean }) => {
+    if (!isWeb()) return;
     noteAudioState(tab.id, event.audible);
     patch(tab, { audible: event.audible });
   }) as never);
@@ -356,7 +380,7 @@ function wire(tab: Tab): void {
   on(tab, contents, 'did-start-navigation', ((details: {
     url: string; isMainFrame: boolean; isSameDocument: boolean;
   }) => {
-    if (!details.isMainFrame) return;
+    if (!isWeb() || !details.isMainFrame) return;
     patch(tab, {
       url: details.url,
       ...(details.isSameDocument ? {} : { loading: true, error: null }),
@@ -372,7 +396,7 @@ function wire(tab: Tab): void {
   ) => {
     // Subframe failures are ordinary noise (blocked trackers, dead embeds) and
     // must never replace a page that loaded fine.
-    if (!isMainFrame) return;
+    if (!isWeb() || !isMainFrame) return;
     // -3 is ABORTED, which is what a user pressing Stop or navigating away looks
     // like. Showing an error pane for it would be wrong.
     if (errorCode === -3) return;
@@ -399,10 +423,12 @@ function wire(tab: Tab): void {
   on(tab, contents, 'certificate-error', ((
     _e: unknown, url: string, error: string,
   ) => {
+    if (!isWeb()) return;
     patch(tab, { loading: false, url, error: { kind: 'certificate', code: null, description: error, url } });
   }) as never);
 
   on(tab, contents, 'render-process-gone', ((_event: unknown, details: { reason?: string; exitCode?: number }) => {
+    if (!isWeb()) return;
     // Keep the owned WebContents shell so Electron can create a fresh renderer
     // on Reload, but discard every document-scoped capability and hide the
     // native view behind Nodus's controlled crash pane. Nodus itself stays up.
@@ -423,6 +449,7 @@ function wire(tab: Tab): void {
   }) as never);
 
   on(tab, contents, 'unresponsive', (() => {
+    if (!isWeb()) return;
     finishPendingCollections(tab);
     patch(tab, {
       loading: false,
@@ -446,7 +473,8 @@ function wire(tab: Tab): void {
 
 export async function createTab(url: string): Promise<string | null> {
   if (tabs.size >= MAX_BROWSER_TABS) return null;
-  if (!decideNavigation(url, { isMainFrame: true }).allowed) return null;
+  const internalKind = browserInternalPage(url);
+  if (!internalKind && !decideNavigation(url, { isMainFrame: true }).allowed) return null;
 
   const view = new WebContentsView({
     webPreferences: {
@@ -490,7 +518,7 @@ export async function createTab(url: string): Promise<string | null> {
   wire(tab);
   await activateTab(id);
 
-  if (url && url !== 'about:blank') {
+  if (!internalKind && url && url !== 'about:blank') {
     // A load failure is reported through did-fail-load, which the UI already
     // renders; letting the rejection escape here would be a duplicate report.
     void view.webContents.loadURL(url).catch(() => undefined);
@@ -558,7 +586,7 @@ export function setViewport(next: BrowserViewport): void {
 
 function applyVisibility(): void {
   const tab = activeTabId ? tabs.get(activeTabId) : null;
-  tab?.view.setVisible(sectionVisible && !overlayOpen && !tab.state.error);
+  tab?.view.setVisible(tab.state.kind === 'web' && sectionVisible && !overlayOpen && !tab.state.error);
 }
 
 /**
@@ -597,7 +625,7 @@ export function setOverlayVisible(open: boolean): void {
  */
 export async function captureOverlaySnapshot(): Promise<string | null> {
   const tab = activeTabId ? tabs.get(activeTabId) : null;
-  if (!tab || tab.view.webContents.isDestroyed() || !sectionVisible || !viewport) return null;
+  if (!tab || tab.state.kind !== 'web' || tab.view.webContents.isDestroyed() || !sectionVisible || !viewport) return null;
   try {
     const image = await tab.view.webContents.capturePage();
     return image.isEmpty() ? null : image.toDataURL();
@@ -608,7 +636,7 @@ export async function captureOverlaySnapshot(): Promise<string | null> {
 
 function withActive<T>(fn: (contents: WebContents) => T): T | undefined {
   const tab = activeTabId ? tabs.get(activeTabId) : null;
-  if (!tab || tab.view.webContents.isDestroyed()) return undefined;
+  if (!tab || tab.state.kind !== 'web' || tab.view.webContents.isDestroyed()) return undefined;
   return fn(tab.view.webContents);
 }
 
@@ -622,8 +650,41 @@ export function reload(): void { withActive((c) => c.reload()); }
 export function stopLoading(): void { withActive((c) => c.stop()); }
 
 export function navigate(url: string): boolean {
+  const tab = activeTabId ? tabs.get(activeTabId) : null;
+  if (!tab || tab.view.webContents.isDestroyed()) return false;
+  const internalKind = browserInternalPage(url);
+  if (internalKind) {
+    tab.view.webContents.stop();
+    dropMediaSession(tab.id);
+    patch(tab, {
+      kind: internalKind,
+      url,
+      title: internalKind === 'bookmarks' ? 'Nodus Bookmarks' : 'Research Atlas',
+      faviconDataUrl: null,
+      loading: false,
+      canGoBack: false,
+      canGoForward: false,
+      audible: false,
+      muted: false,
+      hasMedia: false,
+      mediaPlaying: false,
+      error: null,
+    });
+    applyVisibility();
+    void tab.view.webContents.loadURL('about:blank').catch(() => undefined);
+    return true;
+  }
   if (!decideNavigation(url, { isMainFrame: true }).allowed) return false;
-  withActive((c) => void c.loadURL(url).catch(() => undefined));
+  patch(tab, {
+    kind: 'web',
+    url,
+    title: '',
+    faviconDataUrl: null,
+    loading: true,
+    error: null,
+  });
+  applyVisibility();
+  void tab.view.webContents.loadURL(url).catch(() => undefined);
   return true;
 }
 
@@ -638,12 +699,11 @@ const COLLECT_TIMEOUT_MS = 5_000;
 
 export function collectFromTab(what: 'text' | 'selection' | 'capture' | 'pdf'): Promise<unknown> {
   const tab = activeTabId ? tabs.get(activeTabId) : null;
-  if (!tab || tab.view.webContents.isDestroyed()) return Promise.resolve(null);
+  if (!tab || tab.state.kind !== 'web' || tab.view.webContents.isDestroyed()) return Promise.resolve(null);
 
   const requestId = `collect-${Date.now()}-${Math.random().toString(36).slice(2)}`;
   return new Promise((resolve) => {
     let settled = false;
-    let timer: ReturnType<typeof setTimeout>;
     const finish = (value: unknown) => {
       if (settled) return;
       settled = true;
@@ -662,7 +722,7 @@ export function collectFromTab(what: 'text' | 'selection' | 'capture' | 'pdf'): 
       ) return;
       finish(payload);
     };
-    timer = setTimeout(() => finish(null), COLLECT_TIMEOUT_MS);
+    const timer = setTimeout(() => finish(null), COLLECT_TIMEOUT_MS);
     timer.unref?.();
     tab.view.webContents.ipc.on('nodus-browser:page:collected', listener);
     tab.pendingCollections.add(finish);
@@ -671,15 +731,15 @@ export function collectFromTab(what: 'text' | 'selection' | 'capture' | 'pdf'): 
 }
 
 /** The active tab's identity, for attributing a capture. */
-export function activeTabSummary(): { id: string; url: string; title: string } | null {
+export function activeTabSummary(): { id: string; url: string; title: string; kind: BrowserTabState['kind']; faviconDataUrl: string | null } | null {
   const tab = activeTabId ? tabs.get(activeTabId) : null;
-  return tab ? { id: tab.id, url: tab.state.url, title: tab.state.title } : null;
+  return tab ? { id: tab.id, url: tab.state.url, title: tab.state.title, kind: tab.state.kind, faviconDataUrl: tab.state.faviconDataUrl } : null;
 }
 
 /** Mute or unmute one tab, whether or not it is the active one. */
 export function setTabMuted(id: string, muted: boolean): void {
   const tab = tabs.get(id);
-  if (!tab || tab.view.webContents.isDestroyed()) return;
+  if (!tab || tab.state.kind !== 'web' || tab.view.webContents.isDestroyed()) return;
   tab.view.webContents.setAudioMuted(muted);
   noteMuted(id, muted);
   patch(tab, { muted });
@@ -688,7 +748,7 @@ export function setTabMuted(id: string, muted: boolean): void {
 /** Drive one tab's media from the header. */
 export function sendMediaCommand(id: string, command: BrowserMediaCommand): void {
   const tab = tabs.get(id);
-  if (!tab || tab.view.webContents.isDestroyed()) return;
+  if (!tab || tab.state.kind !== 'web' || tab.view.webContents.isDestroyed()) return;
   if (command === 'previous' || command === 'next') {
     const keyCode = command === 'previous' ? 'MediaPreviousTrack' : 'MediaNextTrack';
     tab.view.webContents.sendInputEvent({ type: 'keyDown', keyCode });

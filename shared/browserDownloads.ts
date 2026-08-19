@@ -48,6 +48,7 @@ export const MAX_IMPORTABLE_BYTES = 64 * 1024 * 1024;
 export function safeBrowserDownloadName(value: unknown): string {
   const leaf = String(value ?? '').replace(/\\/g, '/').split('/').at(-1) ?? '';
   const clean = leaf
+    // eslint-disable-next-line no-control-regex -- Content-Disposition is hostile input
     .replace(/[\u0000-\u001f\u007f]/g, '')
     .replace(/[/:]/g, '-')
     .trim()

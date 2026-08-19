@@ -42,6 +42,8 @@ export interface BrowserTabError {
  */
 export interface BrowserTabState {
   id: string;
+  /** Internal start pages are drawn by trusted React, never by a website. */
+  kind: 'web' | 'bookmarks' | 'atlas';
   url: string;
   /** What the user typed or what the page reports, whichever is newer. */
   title: string;
@@ -96,7 +98,7 @@ export interface BrowserMediaState {
 }
 
 /** Where a new tab or the Home button should go. */
-export type BrowserHomeMode = 'start' | 'blank' | 'custom';
+export type BrowserHomeMode = 'start' | 'bookmarks' | 'blank' | 'custom';
 
 export interface BrowserPrefs {
   homeMode: BrowserHomeMode;
@@ -120,6 +122,16 @@ export const DEFAULT_BROWSER_PREFS: BrowserPrefs = {
 
 /** The first-party start page used by Home and, by default, every new tab. */
 export const NODUS_RESEARCH_ATLAS_URL = 'https://nodusresearch.com/research-atlas/';
+
+/** Synthetic identifiers. They are not registered protocols and never navigate. */
+export const NODUS_BOOKMARKS_URL = 'nodus://bookmarks';
+export const NODUS_RESEARCH_ATLAS_START_URL = 'nodus://research-atlas';
+
+export function browserInternalPage(url: string): BrowserTabState['kind'] | null {
+  if (url === NODUS_BOOKMARKS_URL) return 'bookmarks';
+  if (url === NODUS_RESEARCH_ATLAS_START_URL) return 'atlas';
+  return null;
+}
 
 /**
  * The most tabs Nodus Browser will hold open.

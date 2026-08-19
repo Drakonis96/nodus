@@ -12,6 +12,11 @@ import type {
 import type { BrowserConnectorCaptureRequest } from '@shared/browserConnector';
 import type { AppSettings } from '@shared/types';
 import { BrowserCaptureModal } from '../components/browser/BrowserCaptureModal';
+import { BrowserBookmarkModal, type BookmarkEditorTarget } from '../components/browser/BrowserBookmarkModal';
+import { BrowserBookmarksManager } from '../components/browser/BrowserBookmarksManager';
+import { NodusBookmarksPage, NodusResearchAtlasPage } from '../components/browser/NodusStartPages';
+import { emptyBrowserBookmarkStore } from '@shared/browserBookmarks';
+import type { BrowserBookmarkStore } from '@shared/browserBookmarks';
 
 /**
  * Nodus Browser.
@@ -42,6 +47,10 @@ export function NodusBrowserView() {
   const [restartWarning, setRestartWarning] = useState<BrowserRestartResult | null>(null);
   const [downloads, setDownloads] = useState<BrowserDownloadView[]>([]);
   const [panel, setPanel] = useState<null | 'downloads' | 'settings' | 'actions'>(null);
+  const [bookmarks, setBookmarks] = useState<BrowserBookmarkStore>(emptyBrowserBookmarkStore);
+  const [bookmarkEditor, setBookmarkEditor] = useState<BookmarkEditorTarget | null>(null);
+  const [bookmarksManager, setBookmarksManager] = useState(false);
+  const [returnToBookmarksManager, setReturnToBookmarksManager] = useState(false);
 
   const active: BrowserTabState | null =
     state.tabs.find((tab) => tab.id === state.activeTabId) ?? null;
@@ -57,6 +66,12 @@ export function NodusBrowserView() {
       // (including the user's existing tab) arrived from main.
       if (current.tabs.length === 0) void window.nodus.openBrowserTab('');
     });
+    return stop;
+  }, []);
+
+  useEffect(() => {
+    const stop = window.nodus.onBrowserBookmarksChanged(setBookmarks);
+    void window.nodus.getBrowserBookmarks().then(setBookmarks);
     return stop;
   }, []);
 
@@ -98,7 +113,7 @@ export function NodusBrowserView() {
   // tab becomes active or finishes navigation, so chat sees the page the user
   // actually has open without requiring an explicit toolbar action first.
   useEffect(() => {
-    if (!active || active.loading || active.error) return;
+    if (!active || active.kind !== 'web' || active.loading || active.error) return;
     let cancelled = false;
     const timer = window.setTimeout(() => {
       if (!cancelled) void window.nodus.syncBrowserNodiContext();
@@ -167,6 +182,7 @@ export function NodusBrowserView() {
   // The native context menu cannot open a React dialog itself, so it asks.
   useEffect(() => window.nodus.onBrowserActionRequested((action) => {
     if (action === 'addToLibrary') void addToLibrary();
+    else if (action === 'addBookmark') void addBookmark();
     else if (action === 'askNodiPage') void askNodi('page');
   }));
 
@@ -185,6 +201,34 @@ export function NodusBrowserView() {
     } finally {
       setBusy(false);
     }
+  };
+
+  const addBookmark = async (parentId: string | null = null) => {
+    setPanel(null); setNotice(null);
+    try {
+      const candidate = await window.nodus.getCurrentBrowserBookmarkCandidate();
+      if (!candidate) { setNotice(t('Solo se pueden guardar páginas web HTTP o HTTPS.')); return; }
+      if (candidate.existingId) { setNotice(t('Esta página ya está guardada en Nodus Bookmarks.')); return; }
+      setReturnToBookmarksManager(false);
+      setBookmarkEditor({ mode: 'create', candidate, parentId });
+    } catch (cause) { setNotice(cause instanceof Error ? cause.message : String(cause)); }
+  };
+
+  const createManualBookmark = (parentId: string | null) => {
+    setReturnToBookmarksManager(false);
+    setBookmarkEditor({
+      mode: 'create', parentId,
+      candidate: { title: '', url: 'https://', description: '', faviconDataUrl: null, existingId: null },
+    });
+  };
+
+  const editFromBookmarksManager = (target: BookmarkEditorTarget) => {
+    // Only one Browser overlay may own native-view visibility at a time. Keeping
+    // the manager mounted behind the editor allowed the first cleanup to reveal
+    // the hostile WebContents over the remaining modal.
+    setBookmarksManager(false);
+    setReturnToBookmarksManager(true);
+    setBookmarkEditor(target);
   };
 
   const askNodi = async (about: 'page' | 'selection') => {
@@ -291,6 +335,25 @@ export function NodusBrowserView() {
 
         <div>
           <ToolbarButton
+            icon="bookmark"
+            label={t('Añadir marcador')}
+            disabled={active?.kind !== 'web'}
+            dataTestId="browser-add-bookmark"
+            onClick={() => void addBookmark()}
+          />
+        </div>
+
+        <div>
+          <ToolbarButton
+            icon="bookmarkFill"
+            label="Nodus Bookmarks"
+            dataTestId="browser-bookmarks-manager-button"
+            onClick={() => { setPanel(null); setBookmarksManager(true); }}
+          />
+        </div>
+
+        <div>
+          <ToolbarButton
             icon="settings"
             label={t('Configuración del navegador')}
             onClick={() => setPanel((current) => (current === 'settings' ? null : 'settings'))}
@@ -329,6 +392,8 @@ export function NodusBrowserView() {
       {panel === 'actions' && (
         <div data-testid="browser-actions-menu" className="flex shrink-0 flex-wrap items-center gap-1 border-b border-neutral-300 bg-neutral-50 px-3 py-2 dark:border-neutral-800 dark:bg-neutral-900/60">
           <MenuItem icon="book" label={t('Añadir a la Biblioteca')} onClick={() => void addToLibrary()} />
+          <MenuItem icon="bookmark" label={t('Añadir marcador')} onClick={() => void addBookmark()} />
+          <MenuItem icon="bookmarkFill" label="Nodus Bookmarks" onClick={() => { setPanel(null); setBookmarksManager(true); }} />
           <MenuItem icon="chat" label={t('Preguntar a Nodi sobre esta página')} onClick={() => void askNodi('page')} />
           <MenuItem icon="quote" label={t('Preguntar a Nodi sobre la selección')} onClick={() => void askNodi('selection')} />
           <MenuItem icon="copy" label={t('Copiar dirección')} onClick={() => { setPanel(null); void navigator.clipboard.writeText(active?.url ?? ''); }} />
@@ -388,6 +453,17 @@ export function NodusBrowserView() {
       {/* The page goes here. This div is deliberately empty and never painted
           into: the main process positions the native view over its rectangle. */}
       <div ref={viewportRef} data-browser-viewport className="relative min-h-0 flex-1">
+        {active?.kind === 'bookmarks' && (
+          <NodusBookmarksPage
+            store={bookmarks}
+            onEditBookmark={(bookmark) => { setReturnToBookmarksManager(false); setBookmarkEditor({ mode: 'edit', bookmark }); }}
+            onNewBookmark={createManualBookmark}
+            onNewFolder={() => setBookmarksManager(true)}
+          />
+        )}
+        {active?.kind === 'atlas' && (
+          <NodusResearchAtlasPage store={bookmarks} onSave={(candidate) => { setReturnToBookmarksManager(false); setBookmarkEditor({ mode: 'create', candidate }); }} />
+        )}
         {active?.error && (active.error.kind === 'certificate'
           ? <CertificateInterstitial tab={active} />
           : <BrowserErrorPane tab={active} />)}
@@ -401,6 +477,30 @@ export function NodusBrowserView() {
           onSaved={(result) => {
             setCapture(null);
             setNotice(t('Guardado en la Biblioteca: {title}').replace('{title}', result.title));
+          }}
+        />
+      )}
+      {bookmarksManager && (
+        <BrowserBookmarksManager
+          store={bookmarks}
+          onClose={() => setBookmarksManager(false)}
+          onEdit={(bookmark) => editFromBookmarksManager({ mode: 'edit', bookmark })}
+          onCreate={(parentId) => editFromBookmarksManager({
+            mode: 'create', parentId,
+            candidate: { title: '', url: 'https://', description: '', faviconDataUrl: null, existingId: null },
+          })}
+          onNotice={setNotice}
+        />
+      )}
+      {bookmarkEditor && (
+        <BrowserBookmarkModal
+          target={bookmarkEditor}
+          store={bookmarks}
+          onClose={() => { setBookmarkEditor(null); if (returnToBookmarksManager) setBookmarksManager(true); }}
+          onSaved={(next, duplicate) => {
+            setBookmarks(next); setBookmarkEditor(null);
+            if (returnToBookmarksManager) setBookmarksManager(true);
+            setNotice(duplicate ? t('Esta página ya estaba guardada.') : t('Guardado en Nodus Bookmarks.'));
           }}
         />
       )}
@@ -888,7 +988,7 @@ function BrowserQuickSettings({ onClose }: { onClose: () => void }) {
         <div className="grid gap-x-6 md:grid-cols-3">
         <div>
         <p className="mb-1.5 text-xs font-semibold text-neutral-700 dark:text-neutral-200">{t('Página de inicio')}</p>
-        {(['start', 'blank', 'custom'] as const).map((mode) => (
+        {(['start', 'bookmarks', 'blank', 'custom'] as const).map((mode) => (
           <label key={mode} className="mb-1 flex items-center gap-2 text-xs text-neutral-700 dark:text-neutral-300">
             <input
               type="radio"
@@ -896,7 +996,7 @@ function BrowserQuickSettings({ onClose }: { onClose: () => void }) {
               checked={settings?.browserHomeMode === mode}
               onChange={() => void patch({ browserHomeMode: mode })}
             />
-            {mode === 'start' ? 'Research Atlas' : mode === 'blank' ? t('Página en blanco') : t('Dirección personalizada')}
+            {mode === 'start' ? 'Research Atlas' : mode === 'bookmarks' ? 'Nodus Bookmarks' : mode === 'blank' ? t('Página en blanco') : t('Dirección personalizada')}
           </label>
         ))}
         {settings?.browserHomeMode === 'custom' && (
