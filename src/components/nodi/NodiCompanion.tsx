@@ -3,6 +3,7 @@ import { deriveNodiNoteTitle } from '@shared/nodiNotes';
 import { announcementCopyFor, type AnnouncementRefreshResult } from '@shared/announcements';
 import { NODI_DEFAULT_CONTEXTS } from '@shared/types';
 import type { AppSettings, ModelRef, NodiChatMessage, NodiContextKind, NodiConversation, NodiNote, NodiNotification, NodiOverlayPlacement, NodiQuoteSelection, VaultType } from '@shared/types';
+import { normalizeNodiScale } from '@shared/nodiSize';
 import { vaultTypeColor } from '@shared/vaultTypes';
 import { type NodiRole, type NodiState } from './Nodi';
 import { NodiAvatar } from './NodiAvatar';
@@ -133,11 +134,13 @@ const NOTE_AUTOSAVE_DELAY_MS = 600;
 
 export function NodiCompanion({ context, costumes }: { context: Ctx; costumes?: boolean }) {
   const isOverlay = context === 'overlay';
-  const figureH = isOverlay ? 200 : 168;
+  const [settings, setSettings] = useState<AppSettings | null>(null);
+  const sizeScale = normalizeNodiScale(settings?.mascotScale);
+  const figureH = Math.round((isOverlay ? 200 : 168) * sizeScale);
   const figureW = Math.round((figureH * 270) / 300);
   const anchorR = Math.round(figureW * 0.52);
   const anchorB = Math.round(figureH * 0.533);
-  const R = isOverlay ? 104 : 92;
+  const R = Math.round((isOverlay ? 104 : 92) * sizeScale);
 
   const [menuOpen, setMenuOpen] = useState(false);
   const [panel, setPanel] = useState<'none' | 'notifications' | 'chat' | 'notes'>('none');
@@ -170,7 +173,6 @@ export function NodiCompanion({ context, costumes }: { context: Ctx; costumes?: 
   const [copiedMessageIndex, setCopiedMessageIndex] = useState<number | null>(null);
   // The source detail opened from an inline citation in an answer (idea/work/passage/…).
   const [citation, setCitation] = useState<MarkdownCitation | null>(null);
-  const [settings, setSettings] = useState<AppSettings | null>(null);
   const [nodiModel, setNodiModel] = useState<ModelRef | null>(null);
   const [deleteConfirmation, setDeleteConfirmation] = useState<{ kind: 'conversation'; conversation: NodiConversation } | { kind: 'all' } | null>(null);
   const [contextMenuOpen, setContextMenuOpen] = useState(false);
@@ -539,10 +541,18 @@ export function NodiCompanion({ context, costumes }: { context: Ctx; costumes?: 
     };
   }, [hasOpenSurface, isOverlay]);
 
-  // ── Auto-scroll chat ──────────────────────────────────────────────────────
+  // Scroll only at deliberate navigation points. Following every `messages`
+  // update used to pin the viewport to the bottom while Nodi streamed a reply,
+  // making the beginning impossible to read until the answer had finished.
+  const scrollChatToBottom = useCallback(() => {
+    window.requestAnimationFrame(() => {
+      if (msgsRef.current) msgsRef.current.scrollTop = msgsRef.current.scrollHeight;
+    });
+  }, []);
+
   useEffect(() => {
-    if (panel === 'chat' && msgsRef.current) msgsRef.current.scrollTop = msgsRef.current.scrollHeight;
-  }, [messages, panel]);
+    if (panel === 'chat') scrollChatToBottom();
+  }, [panel, scrollChatToBottom]);
 
   // Leaving the chat panel dismisses any open source card so it never lingers behind.
   useEffect(() => {
@@ -772,6 +782,7 @@ export function NodiCompanion({ context, costumes }: { context: Ctx; costumes?: 
     setCopiedMessageIndex(null);
     setChatTool('none');
     setCitation(null);
+    scrollChatToBottom();
   };
 
   const copyMessage = async (content: string, index: number) => {
@@ -820,6 +831,9 @@ export function NodiCompanion({ context, costumes }: { context: Ctx; costumes?: 
       : question;
     const next: NodiChatMessage[] = [...messages, { role: 'user', content: text }];
     setMessages([...next, { role: 'assistant', content: '' }]);
+    // Bring the new question and the beginning of Nodi's answer into view once.
+    // From here on the scroll position stays fixed while streaming deltas arrive.
+    scrollChatToBottom();
     // A starter chip passes its text explicitly; don't wipe a draft the user may be typing.
     if (!explicit) setInput('');
     setQuotedSelection(null);

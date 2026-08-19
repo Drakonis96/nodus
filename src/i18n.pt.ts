@@ -43,6 +43,9 @@ import { NOTION_IMPORT_TRANSLATIONS } from './i18n.notionImport';
 import { LIBRARY_ONBOARDING_TRANSLATIONS } from './i18n.libraryOnboarding';
 
 export const PT: Record<string, string> = {
+  'Tamaño de Nodi': 'Tamanho do Nodi',
+  'El marcador central conserva el tamaño predeterminado. Elige uno de los nueve tamaños disponibles.': 'O marcador central mantém o tamanho predefinido. Escolha um dos nove tamanhos disponíveis.',
+  'Tamaños predeterminados': 'Tamanhos predefinidos',
   ...PAGE_TRANSLATIONS.pt,
   ...DATABASE_PROPERTY_TRANSLATIONS.pt,
   ...DATABASE_RELATION_FORMULA_TRANSLATIONS.pt,

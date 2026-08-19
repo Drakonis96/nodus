@@ -57,6 +57,7 @@ import { errorText, t, tx } from '../i18n';
 import { updateStatusMessage } from '../updateStatus';
 import { DEFAULT_EMBEDDING_MODELS, EMBEDDING_PROVIDERS } from '@shared/providers';
 import { ORB_COLOR_CHOICES, orbHue } from '@shared/nodiOrb';
+import { NODI_DEFAULT_SCALE, NODI_SIZE_SCALES } from '@shared/nodiSize';
 import { effectiveSidebarHidden, isViewAllowedForVaultType } from '@shared/vaultTypes';
 import chromeWebStoreLogo from '../assets/brands/chrome-web-store.svg';
 
@@ -996,6 +997,50 @@ export function Settings({
             <div className="flex items-center justify-between gap-4">
               <label className="text-sm text-neutral-300">{t('Mostrar a Nodi')}</label>
               <input type="checkbox" checked={settings.mascotEnabled} onChange={(e) => void patch({ mascotEnabled: e.target.checked })} />
+            </div>
+            <div data-testid="nodi-size-setting">
+              <label className="text-sm text-neutral-300" htmlFor="nodi-size-slider">{t('Tamaño de Nodi')}</label>
+              <p className="mt-0.5 text-xs text-neutral-500">
+                {t('El marcador central conserva el tamaño predeterminado. Elige uno de los nueve tamaños disponibles.')}
+              </p>
+              <div className="mt-2 flex w-full max-w-md items-start gap-3">
+                <div className="min-w-0 flex-1">
+                  <input
+                    id="nodi-size-slider"
+                    className="block w-full"
+                    type="range"
+                    min={NODI_SIZE_SCALES[0]}
+                    max={NODI_SIZE_SCALES[NODI_SIZE_SCALES.length - 1]}
+                    step={0.1}
+                    value={settings.mascotScale}
+                    aria-label={t('Tamaño de Nodi')}
+                    onChange={(e) => void patch({ mascotScale: Number(e.target.value) })}
+                  />
+                  <div className="mt-1 flex justify-between px-1" aria-label={t('Tamaños predeterminados')}>
+                    {NODI_SIZE_SCALES.map((scale) => {
+                      const selected = settings.mascotScale === scale;
+                      const isDefault = scale === NODI_DEFAULT_SCALE;
+                      const label = isDefault
+                        ? `${Math.round(scale * 100)}% · ${t('Predeterminado')}`
+                        : `${Math.round(scale * 100)}%`;
+                      return (
+                        <button
+                          key={scale}
+                          type="button"
+                          className={`h-3 w-3 rounded-full border transition-colors ${selected ? 'border-amber-300 bg-amber-300' : isDefault ? 'border-neutral-300 bg-neutral-500' : 'border-neutral-600 bg-neutral-800 hover:border-neutral-400'}`}
+                          aria-label={label}
+                          aria-pressed={selected}
+                          title={label}
+                          onClick={() => void patch({ mascotScale: scale })}
+                        />
+                      );
+                    })}
+                  </div>
+                </div>
+                <output className="w-12 pt-0.5 text-right text-xs text-neutral-400" htmlFor="nodi-size-slider">
+                  {Math.round(settings.mascotScale * 100)}%
+                </output>
+              </div>
             </div>
             <div>
               <label className="text-sm text-neutral-300">{t('Aspecto de Nodi')}</label>

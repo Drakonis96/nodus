@@ -398,7 +398,7 @@ export function registerIpc(
       if (next.zoteroPluginEnabled || next.browserConnectorEnabled) await restartZoteroPluginServer();
       else await stopZoteroPluginServer();
     }
-    if (patch.mascotEnabled !== undefined || patch.mascotAlwaysOnTop !== undefined) {
+    if (patch.mascotEnabled !== undefined || patch.mascotAlwaysOnTop !== undefined || patch.mascotScale !== undefined) {
       applyMascotWindow();
     }
     // Turning announcements back on asks straight away. The alternative is a panel that

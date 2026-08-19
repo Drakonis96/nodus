@@ -38,6 +38,9 @@ import { LIBRARY_ONBOARDING_TRANSLATIONS } from './i18n.libraryOnboarding';
 
 /** Complete static Italian interface table; coverage prohibits runtime fallbacks. */
 export const IT: Record<string, string> = {
+  'Tamaño de Nodi': 'Dimensione di Nodi',
+  'El marcador central conserva el tamaño predeterminado. Elige uno de los nueve tamaños disponibles.': "L'indicatore centrale mantiene la dimensione predefinita. Scegli una delle nove dimensioni disponibili.",
+  'Tamaños predeterminados': 'Dimensioni predefinite',
   ...PAGE_TRANSLATIONS.it,
   ...DATABASE_PROPERTY_TRANSLATIONS.it,
   ...DATABASE_RELATION_FORMULA_TRANSLATIONS.it,
