@@ -31,10 +31,9 @@ export function NodusBrowserView() {
   const [capture, setCapture] = useState<
     { request: BrowserConnectorCaptureRequest & { snapshotAvailable?: boolean }; warnings: string[] } | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
-  const [menuOpen, setMenuOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [downloads, setDownloads] = useState<BrowserDownloadView[]>([]);
-  const [panel, setPanel] = useState<null | 'downloads' | 'settings'>(null);
+  const [panel, setPanel] = useState<null | 'downloads' | 'settings' | 'actions'>(null);
 
   const active: BrowserTabState | null =
     state.tabs.find((tab) => tab.id === state.activeTabId) ?? null;
@@ -43,7 +42,13 @@ export function NodusBrowserView() {
   // that lands between the read and the subscription.
   useEffect(() => {
     const stop = window.nodus.onBrowserStateChanged(setState);
-    void window.nodus.getBrowserState().then(setState);
+    void window.nodus.getBrowserState().then((current) => {
+      setState(current);
+      // The renderer starts with an empty placeholder state. Opening from that
+      // placeholder created a fresh tab on every remount, before the real state
+      // (including the user's existing tab) arrived from main.
+      if (current.tabs.length === 0) void window.nodus.openBrowserTab('');
+    });
     return stop;
   }, []);
 
@@ -123,13 +128,6 @@ export function NodusBrowserView() {
     };
   }, [publishViewport]);
 
-  // Open the first tab once, when the section is first shown.
-  useEffect(() => {
-    if (state.tabs.length === 0) void window.nodus.openBrowserTab('');
-    // Deliberately runs on mount only: re-running on every state change would
-    // reopen a tab the moment the user closed the last one.
-  }, []);
-
   const submit = async (event: React.FormEvent) => {
     event.preventDefault();
     setRefusal(null);
@@ -142,13 +140,6 @@ export function NodusBrowserView() {
     (document.activeElement as HTMLElement | null)?.blur();
   };
 
-  // Anything drawn over the page has to hide the native view first: a view on
-  // top does not merely paint over HTML, it also swallows the pointer, so an
-  // HTML menu above a page looks right and sends its clicks to the website.
-  useEffect(() => {
-    void window.nodus.setBrowserOverlayVisible(menuOpen || panel !== null);
-  }, [menuOpen, panel]);
-
   // The native context menu cannot open a React dialog itself, so it asks.
   useEffect(() => window.nodus.onBrowserActionRequested((action) => {
     if (action === 'addToLibrary') void addToLibrary();
@@ -158,7 +149,7 @@ export function NodusBrowserView() {
   const loading = Boolean(active?.loading);
 
   const addToLibrary = async () => {
-    setMenuOpen(false);
+    setPanel(null);
     setBusy(true);
     setNotice(null);
     try {
@@ -173,7 +164,7 @@ export function NodusBrowserView() {
   };
 
   const askNodi = async (about: 'page' | 'selection') => {
-    setMenuOpen(false);
+    setPanel(null);
     const ok = about === 'page'
       ? await window.nodus.askNodiAboutBrowserPage()
       : await window.nodus.askNodiAboutBrowserSelection();
@@ -245,57 +236,47 @@ export function NodusBrowserView() {
             onClick={() => setPanel((current) => (current === 'downloads' ? null : 'downloads'))}
           />
           {downloads.length > 0 && <span className="header-action-badge">{downloads.length}</span>}
-          {panel === 'downloads' && (
-            <DownloadsPanel
-              downloads={downloads}
-              onClose={() => setPanel(null)}
-              onImported={(title: string) => { setPanel(null); setNotice(t('Guardado en la Biblioteca: {title}').replace('{title}', title)); }}
-              onError={(message: string) => { setPanel(null); setNotice(message); }}
-            />
-          )}
         </div>
 
-        <div className="relative">
+        <div>
           <ToolbarButton
             icon="settings"
             label={t('Configuración del navegador')}
             onClick={() => setPanel((current) => (current === 'settings' ? null : 'settings'))}
           />
-          {panel === 'settings' && <BrowserQuickSettings onClose={() => setPanel(null)} />}
         </div>
 
-        <div className="relative">
+        <div>
           <ToolbarButton
             icon="menu"
             label={t('Acciones de Nodus')}
             disabled={busy}
-            onClick={() => setMenuOpen((open) => !open)}
+            onClick={() => setPanel((current) => (current === 'actions' ? null : 'actions'))}
           />
-          {menuOpen && (
-            <>
-              <div className="fixed inset-0 z-[120]" onClick={() => setMenuOpen(false)} />
-              <div
-                data-testid="browser-actions-menu"
-                className="absolute right-0 z-[121] mt-1 w-60 rounded-xl border border-neutral-700 bg-neutral-900 p-1 shadow-xl"
-              >
-                <MenuItem icon="book" label={t('Añadir a la Biblioteca')} onClick={() => void addToLibrary()} />
-                <MenuItem icon="chat" label={t('Preguntar a Nodi sobre esta página')} onClick={() => void askNodi('page')} />
-                <MenuItem icon="quote" label={t('Preguntar a Nodi sobre la selección')} onClick={() => void askNodi('selection')} />
-                <MenuItem
-                  icon="copy"
-                  label={t('Copiar dirección')}
-                  onClick={() => { setMenuOpen(false); void navigator.clipboard.writeText(active?.url ?? ''); }}
-                />
-                <MenuItem
-                  icon="external"
-                  label={t('Abrir en el navegador del sistema')}
-                  onClick={() => { setMenuOpen(false); if (active?.url) void window.nodus.openExternal(active.url); }}
-                />
-              </div>
-            </>
-          )}
         </div>
       </div>
+
+      {panel === 'downloads' && (
+        <DownloadsPanel
+          downloads={downloads}
+          onClose={() => setPanel(null)}
+          onImported={(title: string) => { setPanel(null); setNotice(t('Guardado en la Biblioteca: {title}').replace('{title}', title)); }}
+          onError={(message: string) => { setPanel(null); setNotice(message); }}
+        />
+      )}
+      {panel === 'settings' && <BrowserQuickSettings onClose={() => setPanel(null)} />}
+      {panel === 'actions' && (
+        <div data-testid="browser-actions-menu" className="flex shrink-0 flex-wrap items-center gap-1 border-b border-neutral-800 bg-neutral-900/60 px-3 py-2">
+          <MenuItem icon="book" label={t('Añadir a la Biblioteca')} onClick={() => void addToLibrary()} />
+          <MenuItem icon="chat" label={t('Preguntar a Nodi sobre esta página')} onClick={() => void askNodi('page')} />
+          <MenuItem icon="quote" label={t('Preguntar a Nodi sobre la selección')} onClick={() => void askNodi('selection')} />
+          <MenuItem icon="copy" label={t('Copiar dirección')} onClick={() => { setPanel(null); void navigator.clipboard.writeText(active?.url ?? ''); }} />
+          <MenuItem icon="external" label={t('Abrir en el navegador del sistema')} onClick={() => { setPanel(null); if (active?.url) void window.nodus.openExternal(active.url); }} />
+          <button type="button" className="ml-auto rounded p-1 text-neutral-500 hover:bg-neutral-800" aria-label={t('Cerrar')} onClick={() => setPanel(null)}>
+            <Icon name="x" size={13} />
+          </button>
+        </div>
+      )}
 
       {refusal && (
         <div
@@ -612,7 +593,7 @@ function MenuItem({ icon, label, onClick }: { icon: string; label: string; onCli
     <button
       type="button"
       onClick={onClick}
-      className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-xs text-neutral-300 hover:bg-neutral-800"
+      className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-left text-xs text-neutral-300 hover:bg-neutral-800"
     >
       <Icon name={icon} size={13} className="shrink-0 opacity-70" />
       <span className="min-w-0 truncate">{label}</span>
@@ -711,12 +692,11 @@ function DownloadsPanel({
 }) {
   const finished = downloads.some((entry) => entry.state !== 'progressing' && entry.state !== 'paused');
   return (
-    <>
-      <div className="fixed inset-0 z-[120]" onClick={onClose} />
-      <div
-        data-testid="browser-downloads-panel"
-        className="absolute right-0 z-[121] mt-1 w-80 rounded-xl border border-neutral-300 bg-white p-1 shadow-xl dark:border-neutral-700 dark:bg-neutral-900"
-      >
+      <div data-testid="browser-downloads-panel" className="shrink-0 border-b border-neutral-300 bg-white px-3 py-2 dark:border-neutral-800 dark:bg-neutral-900/60">
+        <div className="mb-1 flex items-center justify-between">
+          <p className="text-xs font-semibold text-neutral-700 dark:text-neutral-200">{t('Descargas')}</p>
+          <button type="button" className="rounded p-1 text-neutral-500 hover:bg-neutral-800" aria-label={t('Cerrar')} onClick={onClose}><Icon name="x" size={13} /></button>
+        </div>
         {downloads.length === 0 && (
           <p className="px-3 py-4 text-center text-xs text-neutral-500">{t('Todavía no hay descargas.')}</p>
         )}
@@ -759,7 +739,6 @@ function DownloadsPanel({
           </button>
         )}
       </div>
-    </>
   );
 }
 
@@ -780,12 +759,13 @@ function BrowserQuickSettings({ onClose }: { onClose: () => void }) {
   };
 
   return (
-    <>
-      <div className="fixed inset-0 z-[120]" onClick={onClose} />
-      <div
-        data-testid="browser-quick-settings"
-        className="absolute right-0 z-[121] mt-1 w-72 rounded-xl border border-neutral-300 bg-white p-3 shadow-xl dark:border-neutral-700 dark:bg-neutral-900"
-      >
+      <div data-testid="browser-quick-settings" className="shrink-0 border-b border-neutral-300 bg-white px-3 py-2 dark:border-neutral-800 dark:bg-neutral-900/60">
+        <div className="mb-1 flex items-center justify-between">
+          <p className="text-xs font-semibold text-neutral-700 dark:text-neutral-200">{t('Configuración del navegador')}</p>
+          <button type="button" className="rounded p-1 text-neutral-500 hover:bg-neutral-800" aria-label={t('Cerrar')} onClick={onClose}><Icon name="x" size={13} /></button>
+        </div>
+        <div className="grid gap-x-6 md:grid-cols-3">
+        <div>
         <p className="mb-1.5 text-xs font-semibold text-neutral-700 dark:text-neutral-200">{t('Página de inicio')}</p>
         {(['start', 'blank', 'custom'] as const).map((mode) => (
           <label key={mode} className="mb-1 flex items-center gap-2 text-xs text-neutral-700 dark:text-neutral-300">
@@ -806,7 +786,8 @@ function BrowserQuickSettings({ onClose }: { onClose: () => void }) {
             onBlur={(event) => void patch({ browserHomeUrl: event.target.value })}
           />
         )}
-
+        </div>
+        <div>
         <p className="mb-1.5 mt-3 text-xs font-semibold text-neutral-700 dark:text-neutral-200">{t('Al abrir una pestaña nueva')}</p>
         {(['home', 'blank'] as const).map((mode) => (
           <label key={mode} className="mb-1 flex items-center gap-2 text-xs text-neutral-700 dark:text-neutral-300">
@@ -819,7 +800,8 @@ function BrowserQuickSettings({ onClose }: { onClose: () => void }) {
             {mode === 'home' ? t('La página de inicio') : t('Página en blanco')}
           </label>
         ))}
-
+        </div>
+        <div>
         <p className="mb-1.5 mt-3 text-xs font-semibold text-neutral-700 dark:text-neutral-200">{t('Buscador')}</p>
         <select
           className="input w-full text-xs"
@@ -840,7 +822,8 @@ function BrowserQuickSettings({ onClose }: { onClose: () => void }) {
             onBlur={(event) => void patch({ browserSearchTemplate: event.target.value })}
           />
         )}
+        </div>
+        </div>
       </div>
-    </>
   );
 }

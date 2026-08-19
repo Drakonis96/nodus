@@ -117,6 +117,8 @@ async function check(name, fn) {
 
 const profile = await mkdtemp(path.join(os.tmpdir(), 'nodus-e2e-browser-'));
 await mkdir(profile, { recursive: true });
+const libraryRoot = path.join(profile, 'library-root');
+await mkdir(libraryRoot, { recursive: true });
 // Skip the "we detected a previous installation" recovery wall, which otherwise
 // covers the app before any test can reach the browser section.
 // recoverySetupVersion skips the "previous installation detected" wall;
@@ -134,6 +136,12 @@ await writeFile(
     mascotStyleChosen: true,
     tutorialVideosWatched: [],
     uiLanguage: 'es',
+    // The Library needs a durable root, but this suite must never run a backup.
+    // Keeping the two settings explicit catches the same configuration used by
+    // the manual no-backup browser profile.
+    autoBackupFolder: libraryRoot,
+    autoBackupEnabled: false,
+    libraryGlobalEnabled: true,
   }),
   'utf8',
 );
@@ -311,12 +319,59 @@ try {
     assert.ok(authors.includes('Braudel'), `expected Braudel, got ${JSON.stringify(authors)}`);
   });
 
+  await check('Add to Library saves while automatic backups are disabled', async () => {
+    await call('submitBrowserOmnibox', `${origin}/`);
+    await waitFor((s) => s.tabs.some((t) => t.url === `${origin}/` && !t.loading), 'the capturable page');
+    const preview = await call('captureBrowserPage');
+    const saved = await call('saveBrowserCapture', preview.request, false);
+    assert.equal(saved.ok, true);
+    assert.equal(saved.title, 'Fixture home');
+    assert.ok(saved.itemId, 'the saved Library item must have an id');
+    const settings = await page.evaluate(() => window.nodus.getSettings());
+    assert.equal(settings.autoBackupEnabled, false, 'saving must not silently enable backups');
+  });
+
+  await check('toolbar panels keep the native page visible instead of blanking it', async () => {
+    const inspectActiveView = () => app.evaluate(({ BrowserWindow }) => {
+      const window = BrowserWindow.getAllWindows()[0];
+      const view = window.contentView.children.find((child) =>
+        'webContents' in child && child.webContents.getURL().startsWith('http://127.0.0.1'));
+      return view ? { bounds: view.getBounds() } : null;
+    });
+    const initial = await inspectActiveView();
+    assert.ok(initial, 'the active native page must be attached');
+
+    for (const label of ['Descargas', 'Configuración del navegador', 'Acciones de Nodus']) {
+      await page.getByRole('button', { name: label, exact: true }).click();
+      // ResizeObserver publishes on the next animation frame; wait for the
+      // native child view to receive the smaller rectangle.
+      await new Promise((resolve) => setTimeout(resolve, 150));
+      const opened = await inspectActiveView();
+      assert.ok(opened, `${label} detached the native page`);
+      assert.ok(opened.bounds.height < initial.bounds.height, `${label} did not reserve chrome space`);
+      await page.getByRole('button', { name: label, exact: true }).click();
+    }
+  });
+
+  await check('leaving and returning to Browser preserves the active tab', async () => {
+    const before = await state();
+    const activeBefore = before.tabs.find((tab) => tab.id === before.activeTabId);
+    assert.ok(activeBefore, 'an active tab must exist before leaving');
+    await page.locator('[data-tour="nav-ideas"]').click();
+    await page.locator('[data-tour="nav-browser"]').click();
+    await page.locator('[data-browser-viewport]').waitFor({ state: 'visible' });
+    const after = await state();
+    assert.equal(after.tabs.length, before.tabs.length, 'returning must not create a tab');
+    assert.equal(after.activeTabId, before.activeTabId, 'the active tab must be preserved');
+    assert.equal(after.tabs.find((tab) => tab.id === after.activeTabId)?.url, activeBefore.url);
+  });
+
   await check('Ask Nodi puts the real page text into the Nodi context', async () => {
     const ok = await call('askNodiAboutBrowserPage');
     assert.equal(ok, true, 'the page must yield text');
     const context = await page.evaluate(() => window.nodus.getNodiViewContext());
     assert.equal(context.viewId, 'browser');
-    assert.match(context.text, /Structures/, 'the captured text must be the page contents');
+    assert.match(context.text, /Fixture home/, 'the captured text must be the page contents');
   });
 
   await check('cookies and localStorage written by a page really persist', async () => {
