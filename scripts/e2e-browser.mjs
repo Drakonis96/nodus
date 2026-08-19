@@ -400,6 +400,10 @@ try {
     await page.getByTestId('browser-history-button').click();
     const manager = page.getByTestId('browser-history-manager');
     await manager.waitFor({ state: 'visible' });
+    const searchBox = await page.getByTestId('browser-history-search').locator('..').boundingBox();
+    const retentionBox = await page.getByTestId('browser-history-retention').boundingBox();
+    assert.ok(searchBox && retentionBox, 'history search and retention controls must be rendered');
+    assert.equal(searchBox.height, retentionBox.height, 'history search and retention controls must have equal heights');
     await page.getByTestId('browser-history-search').fill('Second page');
     assert.equal(await page.getByTestId('browser-history-entry').count(), 1);
     await page.getByRole('button', { name: 'Open Second page in new tab' }).click();

@@ -130,11 +130,11 @@ export function BrowserHistoryManager({ onClose, onNotice }: {
         </header>
 
         <div className="grid gap-3 border-b border-neutral-200 p-3 dark:border-neutral-800 md:grid-cols-[minmax(220px,1fr)_180px_auto]">
-          <label className="flex min-w-0 items-center gap-2 rounded-lg border border-neutral-300 px-2 dark:border-neutral-700">
+          <label className="flex h-10 min-w-0 self-end items-center gap-2 rounded-lg border border-neutral-300 px-2 dark:border-neutral-700">
             <Icon name="search" size={14} className="text-neutral-500" />
             <input
               data-testid="browser-history-search"
-              className="h-9 min-w-0 flex-1 bg-transparent text-sm outline-none"
+              className="h-full min-w-0 flex-1 bg-transparent text-sm outline-none"
               placeholder="Search history…"
               value={query}
               onChange={(event) => setQuery(event.target.value)}
@@ -144,7 +144,7 @@ export function BrowserHistoryManager({ onClose, onNotice }: {
             Retention
             <select
               data-testid="browser-history-retention"
-              className="input mt-1 h-8 w-full text-xs"
+              className="input mt-1 h-10 w-full text-xs"
               value={settings?.browserHistoryRetention ?? '30d'}
               disabled={busy || !settings}
               onChange={(event) => void patchSettings({ browserHistoryRetention: event.target.value as BrowserHistoryRetention })}
