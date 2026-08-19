@@ -7964,6 +7964,8 @@ export type BrowserSitePermissionMap = Record<string, Record<string, 'allow' | '
 export interface BrowserApi {
   getBrowserState(): Promise<import('./browser').BrowserState>;
   openBrowserTab(url: string): Promise<string | null>;
+  /** Navigate the current tab to a trusted local start page; remote pages never receive this API. */
+  navigateBrowserStartPage(page: 'atlas' | 'bookmarks'): Promise<boolean>;
   activateBrowserTab(id: string): Promise<void>;
   closeBrowserTab(id: string): Promise<void>;
   browserGoBack(): Promise<void>;

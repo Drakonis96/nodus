@@ -144,8 +144,24 @@ test('trusted Bookmarks UI reuses Atlas styling and avoids native prompt dialogs
   const manager = readFileSync(path.join(repoRoot, 'src/components/browser/BrowserBookmarksManager.tsx'), 'utf8');
   const browserView = readFileSync(path.join(repoRoot, 'src/views/NodusBrowserView.tsx'), 'utf8');
   assert.match(styles, /@import url\([^)]*research-atlas\.css/);
+  assert.match(styles, /radial-gradient\(900px 620px at 22% 8%/,
+    'the local start page must reuse the Nodus Research organism fallback');
   assert.match(pages, /isSaved \? 'Saved' : 'Save'/);
   assert.match(pages, /global search/);
+  assert.match(pages, /data-testid="nodus-site-header"/);
+  assert.match(pages, /data-testid="nodus-site-footer"/);
+  const siteHeader = pages.indexOf('<NodusSiteHeader page={page} />');
+  const atlasGrid = pages.indexOf('<div className="atlas-grid">{children}</div>', siteHeader);
+  const siteFooter = pages.indexOf('<NodusSiteFooter />', atlasGrid);
+  assert.ok(siteHeader >= 0 && atlasGrid > siteHeader && siteFooter > atlasGrid,
+    'Atlas and Bookmarks must render inside the same Nodus Research site shell');
+  assert.match(pages, /navigateBrowserStartPage\('atlas'\)/);
+  assert.match(pages, /navigateBrowserStartPage\('bookmarks'\)/);
+  const ipc = readFileSync(path.join(repoRoot, 'electron/ipc/browser.ts'), 'utf8');
+  const localNavigation = ipc.indexOf("h('browser:navigateStartPage'");
+  assert.ok(localNavigation >= 0);
+  assert.match(ipc.slice(localNavigation, localNavigation + 550), /assertUiSender\(event, getWindow\)/);
+  assert.match(ipc.slice(localNavigation, localNavigation + 550), /page === 'atlas'[\s\S]*page === 'bookmarks'/);
   assert.doesNotMatch(manager, /window\.(?:prompt|confirm)\(/);
   assert.doesNotMatch(browserView, /window\.(?:prompt|confirm)\(/);
   assert.match(browserView, /setBookmarksManager\(false\)[\s\S]{0,180}setReturnToBookmarksManager\(true\)/);

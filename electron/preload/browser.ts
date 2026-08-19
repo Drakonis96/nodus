@@ -45,6 +45,8 @@ export type BrowserOmniboxResult =
 export const browserApi = {
   getBrowserState: (): Promise<BrowserState> => ipcRenderer.invoke('browser:state'),
   openBrowserTab: (url: string): Promise<string | null> => ipcRenderer.invoke('browser:openTab', url),
+  navigateBrowserStartPage: (page: 'atlas' | 'bookmarks'): Promise<boolean> =>
+    ipcRenderer.invoke('browser:navigateStartPage', page),
   activateBrowserTab: (id: string): Promise<void> =>
     ipcRenderer.invoke('browser:activateTab', id).then(() => undefined),
   closeBrowserTab: (id: string): Promise<void> =>

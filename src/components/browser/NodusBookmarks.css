@@ -12,16 +12,74 @@
   --violet-2: #a78bfa; --violet-3: #ddd6fe; --accent: #a78bfa;
   --accent-soft: rgba(167,139,250,.16); --sans: 'Atlas Inter', Inter, sans-serif;
   --serif: 'Atlas Fraunces', Georgia, serif; --mono: ui-monospace, 'SF Mono', monospace;
-  --gut: clamp(20px,5vw,68px); --measure: 1240px; --nav-h: 0px;
+  --gut: clamp(20px,5vw,68px); --measure: 1240px; --nav-h: 62px;
   --r-l: 24px; --ease: cubic-bezier(.22,1,.36,1);
   --shadow: 0 24px 70px -30px rgba(0,0,0,.85);
   position: absolute; inset: 0; overflow: auto; color: var(--ink);
   background:
-    radial-gradient(circle at 18% 10%, rgba(34,211,238,.08), transparent 32%),
-    radial-gradient(circle at 82% 5%, rgba(139,92,246,.13), transparent 34%), var(--void);
+    radial-gradient(900px 620px at 22% 8%,rgba(139,92,246,.20),transparent 62%),
+    radial-gradient(760px 520px at 84% 30%,rgba(34,211,238,.10),transparent 60%),
+    radial-gradient(680px 680px at 50% 92%,rgba(109,40,217,.16),transparent 64%),var(--void);
   font-family: var(--sans); color-scheme: dark;
 }
-.nodus-start-page.atlas-main { min-height: 100%; padding-top: clamp(48px,7vw,78px); }
+.nodus-start-page.atlas-main { min-height: 100%; padding: 0; }
+.nodus-start-page .nodus-site-content {
+  position:relative; z-index:2; padding:clamp(52px,7vw,90px) var(--gut) clamp(96px,11vw,140px);
+}
+
+/* The local page uses the same Nodus Research organism fallback. The SVG adds
+   the node field without running website JavaScript inside the trusted app UI. */
+.nodus-start-page .nodus-site-backdrop { position:sticky; top:0; z-index:0; height:0; pointer-events:none; overflow:visible; }
+.nodus-start-page .nodus-site-backdrop svg { position:absolute; inset:0; width:100%; height:max(720px,100vh); opacity:.72; }
+.nodus-start-page .nodus-site-mesh-links { animation:nodus-site-drift 22s ease-in-out infinite alternate; transform-origin:center; }
+.nodus-start-page .nodus-site-nodes circle { animation:nodus-site-pulse 5.5s ease-in-out infinite alternate; }
+.nodus-start-page .nodus-site-nodes circle:nth-child(3n) { animation-delay:-2.1s; }
+@keyframes nodus-site-drift { to { transform:translate3d(14px,-9px,0) scale(1.015); } }
+@keyframes nodus-site-pulse { from { opacity:.45; } to { opacity:.95; } }
+
+/* Exact structural counterpart of the nodusresearch.com header, scoped so none
+   of the marketing-site selectors can leak into the surrounding application. */
+.nodus-start-page .nodus-site-header {
+  position:sticky; inset:0 0 auto; top:0; z-index:100; display:flex; align-items:center; gap:22px;
+  height:var(--nav-h); padding:0 clamp(14px,3vw,30px); border-bottom:1px solid var(--membrane);
+  background:rgba(6,5,11,.82); backdrop-filter:blur(18px) saturate(1.3); -webkit-backdrop-filter:blur(18px) saturate(1.3);
+}
+.nodus-start-page .nodus-site-logo,
+.nodus-start-page .nodus-site-link,
+.nodus-start-page .nodus-site-badge,
+.nodus-start-page .nodus-site-primary,
+.nodus-start-page .nodus-site-foot-col button,
+.nodus-start-page .nodus-site-foot-base button { border:0; background:transparent; cursor:pointer; font:inherit; }
+.nodus-start-page .nodus-site-logo { display:inline-flex; align-items:center; gap:10px; flex:0 0 auto; padding:0; color:var(--ink); font-size:17.5px; font-weight:800; letter-spacing:-.02em; }
+.nodus-start-page .nodus-site-logo img { width:27px; height:27px; }
+.nodus-start-page .nodus-site-links { display:flex; align-items:center; gap:4px; min-width:0; margin-left:auto; font-size:14px; font-weight:550; }
+.nodus-start-page .nodus-site-link { position:relative; display:inline-flex; align-items:center; height:var(--nav-h); padding:0 13px; color:var(--ink-2); white-space:nowrap; }
+.nodus-start-page .nodus-site-link:hover { color:var(--ink); background:var(--skin); }
+.nodus-start-page .nodus-site-link[aria-current='page'] { color:var(--ink); }
+.nodus-start-page .nodus-site-link[aria-current='page']::after { content:''; position:absolute; right:13px; bottom:12px; left:13px; height:2px; border-radius:2px; background:var(--accent); }
+.nodus-start-page .nodus-site-nav-sep { width:1px; height:22px; margin:0 8px; flex:0 0 auto; background:var(--membrane); }
+.nodus-start-page .nodus-site-badge { display:inline-flex; align-items:center; min-height:34px; padding:7px 13px; border:1px solid var(--membrane); border-radius:10px; background:var(--skin); color:var(--ink); font-size:12.5px; font-weight:620; white-space:nowrap; }
+.nodus-start-page .nodus-site-primary { display:inline-flex; align-items:center; justify-content:center; min-height:38px; padding:9px 17px; border-radius:10px; color:#fff; font-size:13.5px; font-weight:700; white-space:nowrap; background:linear-gradient(135deg,#7c3aed,#a855f7 55%,#8b5cf6); box-shadow:0 10px 34px -12px rgba(124,58,237,.75); }
+.nodus-start-page .nodus-site-nav-toggle { display:none; flex:0 0 auto; width:40px; height:36px; margin-left:auto; padding:0; border:1px solid var(--membrane); border-radius:10px; background:var(--skin); color:var(--ink); cursor:pointer; }
+.nodus-start-page .nodus-site-nav-toggle span { display:block; width:16px; height:1.6px; margin:3.4px auto; border-radius:2px; background:currentColor; transition:transform .3s,opacity .2s; }
+.nodus-start-page .nodus-site-nav-toggle[aria-expanded='true'] span:nth-child(1) { transform:translateY(5px) rotate(45deg); }
+.nodus-start-page .nodus-site-nav-toggle[aria-expanded='true'] span:nth-child(2) { opacity:0; }
+.nodus-start-page .nodus-site-nav-toggle[aria-expanded='true'] span:nth-child(3) { transform:translateY(-5px) rotate(-45deg); }
+
+/* Same footer grid and typography as Research Atlas. */
+.nodus-start-page .nodus-site-footer { position:relative; z-index:2; padding:clamp(56px,7vw,90px) 0 46px; border-top:1px solid var(--membrane); background:linear-gradient(180deg,transparent,rgba(10,8,19,.85)); }
+.nodus-start-page .nodus-site-wrap { width:min(100% - calc(var(--gut) * 2),var(--measure)); margin-inline:auto; }
+.nodus-start-page .nodus-site-foot-grid { display:grid; grid-template-columns:minmax(0,1.4fr) repeat(4,minmax(0,1fr)); gap:40px 32px; }
+.nodus-start-page .nodus-site-foot-brand { display:flex; flex-direction:column; gap:14px; }
+.nodus-start-page .nodus-site-foot-logo { display:inline-flex; align-items:center; gap:10px; color:var(--ink); font-size:19px; font-weight:800; letter-spacing:-.02em; }
+.nodus-start-page .nodus-site-foot-logo img { width:28px; height:28px; }
+.nodus-start-page .nodus-site-foot-brand p { max-width:40ch; margin:0; color:var(--ink-3); font-size:14px; line-height:1.6; }
+.nodus-start-page .nodus-site-foot-col h3 { margin:0 0 14px; color:var(--ink-3); font-size:11.5px; font-weight:700; letter-spacing:.14em; text-transform:uppercase; }
+.nodus-start-page .nodus-site-foot-col button { display:block; padding:5px 0; color:var(--ink-2); text-align:left; font-size:14px; transition:color .2s,transform .2s; }
+.nodus-start-page .nodus-site-foot-col button:hover { color:var(--ink); transform:translateX(3px); }
+.nodus-start-page .nodus-site-foot-base { display:flex; flex-wrap:wrap; align-items:center; gap:12px 26px; margin-top:46px; padding-top:26px; border-top:1px solid var(--membrane); color:var(--ink-3); font-size:13px; }
+.nodus-start-page .nodus-site-foot-base button { padding:0; color:var(--ink-3); }
+.nodus-start-page .nodus-site-foot-base button:hover { color:var(--ink-2); }
 .nodus-start-page .card {
   position: relative; padding: 26px; border: 1px solid var(--membrane); border-radius: var(--r-l);
   background: linear-gradient(180deg,rgba(23,19,40,.86),rgba(11,9,21,.82)); overflow: hidden;
@@ -51,8 +109,11 @@
   --membrane:rgba(17,24,39,.13); --membrane-2:rgba(17,24,39,.22);
   --ink:#171522; --ink-2:#5d586d; --ink-3:#858092;
   --violet-3:#6d28d9; --shadow:0 20px 55px -35px rgba(33,24,60,.35);
-  background:radial-gradient(circle at 80% 0%,rgba(139,92,246,.09),transparent 35%),#f7f7fb; color-scheme:light;
+  background:radial-gradient(900px 620px at 22% 8%,rgba(139,92,246,.12),transparent 62%),radial-gradient(760px 520px at 84% 30%,rgba(34,211,238,.07),transparent 60%),#f7f7fb; color-scheme:light;
 }
+.nodus-start-page.nodus-start-light .nodus-site-header { background:rgba(247,247,251,.86); }
+.nodus-start-page.nodus-start-light .nodus-site-footer { background:linear-gradient(180deg,transparent,rgba(238,236,247,.92)); }
+.nodus-start-page.nodus-start-light .nodus-site-backdrop { opacity:.42; }
 .nodus-start-page.nodus-start-light .atlas-searchbar,
 .nodus-start-page.nodus-start-light .atlas-facet-button { background:rgba(255,255,255,.82); }
 .nodus-start-page.nodus-start-light .atlas-searchbar:focus-within { background:#fff; }
@@ -60,3 +121,32 @@
 
 .browser-bookmarks-tree { max-height:min(62vh,680px); overflow:auto; }
 .browser-bookmark-row[data-drag-over='true'] { outline:2px solid rgb(129 140 248); outline-offset:-2px; }
+
+@media (max-width:1320px) {
+  .nodus-start-page .nodus-site-nav-toggle { display:block; }
+  .nodus-start-page .nodus-site-links {
+    position:absolute; inset:var(--nav-h) 0 auto 0; flex-direction:column; align-items:stretch; gap:2px;
+    margin:0; padding:16px clamp(14px,4vw,28px) 24px; border-bottom:1px solid var(--membrane);
+    background:rgba(8,6,15,.97); backdrop-filter:blur(20px); -webkit-backdrop-filter:blur(20px);
+    font-size:16px; opacity:0; visibility:hidden; transform:translateY(-8px); transition:opacity .25s,transform .25s,visibility .25s;
+  }
+  .nodus-start-page.nodus-start-light .nodus-site-links { background:rgba(247,247,251,.98); }
+  .nodus-start-page .nodus-site-links.open { opacity:1; visibility:visible; transform:translateY(0); }
+  .nodus-start-page .nodus-site-link { height:auto; padding:13px 12px; }
+  .nodus-start-page .nodus-site-link[aria-current='page']::after { right:auto; bottom:8px; left:12px; width:16px; }
+  .nodus-start-page .nodus-site-nav-sep { display:none; }
+  .nodus-start-page .nodus-site-badge,
+  .nodus-start-page .nodus-site-primary { justify-content:center; margin-top:8px; }
+}
+@media (max-width:860px) {
+  .nodus-start-page .nodus-site-foot-grid { grid-template-columns:minmax(0,1fr) minmax(0,1fr); }
+  .nodus-start-page .nodus-site-foot-brand { grid-column:1/-1; }
+}
+@media (max-width:560px) {
+  .nodus-start-page .nodus-site-foot-grid { grid-template-columns:1fr; }
+  .nodus-start-page .nodus-site-foot-brand { grid-column:auto; }
+}
+@media (prefers-reduced-motion:reduce) {
+  .nodus-start-page .nodus-site-mesh-links,
+  .nodus-start-page .nodus-site-nodes circle { animation:none; }
+}

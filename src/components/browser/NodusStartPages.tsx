@@ -13,8 +13,16 @@ import {
   canonicalBookmarkUrl,
   searchBrowserBookmarks,
 } from '@shared/browserBookmarks';
-import { NODUS_RESEARCH_ATLAS_URL, NODUS_RESEARCH_ATLAS_START_URL } from '@shared/browser';
+import {
+  NODUS_BOOKMARKS_URL,
+  NODUS_RESEARCH_ATLAS_URL,
+  NODUS_RESEARCH_ATLAS_START_URL,
+} from '@shared/browser';
 import './NodusBookmarks.css';
+
+const NODUS_SITE = 'https://nodusresearch.com/';
+const NODUS_REPOSITORY = 'https://github.com/Drakonis96/nodus';
+const NODUS_LOGO = new URL('../../../site/assets/nodus-logo.svg', import.meta.url).href;
 
 interface AtlasResource {
   id: string; name: string; url: string; description: string; access_model?: string;
@@ -33,14 +41,101 @@ function useLightTheme(): boolean {
   return light;
 }
 
+function openSitePage(url: string) {
+  if (url === NODUS_RESEARCH_ATLAS_START_URL) {
+    void window.nodus.navigateBrowserStartPage('atlas');
+    return;
+  }
+  if (url === NODUS_BOOKMARKS_URL) {
+    void window.nodus.navigateBrowserStartPage('bookmarks');
+    return;
+  }
+  void window.nodus.submitBrowserOmnibox(url);
+}
+
+function SiteLink({ label, url, className = '', current = false, onOpen }: {
+  label: string; url: string; className?: string; current?: boolean; onOpen?: () => void;
+}) {
+  return <button type="button" className={className} aria-current={current ? 'page' : undefined} onClick={() => { onOpen?.(); openSitePage(url); }}>{label}</button>;
+}
+
+function NodusSiteBackdrop() {
+  return <div className="nodus-site-backdrop" aria-hidden="true">
+    <svg viewBox="0 0 1200 760" preserveAspectRatio="xMidYMid slice">
+      <defs>
+        <linearGradient id="local-atlas-line" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stopColor="#22d3ee" stopOpacity=".08" />
+          <stop offset=".55" stopColor="#a78bfa" stopOpacity=".32" />
+          <stop offset="1" stopColor="#7c3aed" stopOpacity=".08" />
+        </linearGradient>
+        <radialGradient id="local-atlas-node">
+          <stop offset="0" stopColor="#fff" stopOpacity=".95" />
+          <stop offset=".28" stopColor="#ddd6fe" stopOpacity=".78" />
+          <stop offset="1" stopColor="#8b5cf6" stopOpacity="0" />
+        </radialGradient>
+      </defs>
+      <g className="nodus-site-mesh-links" fill="none" stroke="url(#local-atlas-line)" strokeWidth="1">
+        <path d="M-40 245 105 166 248 238 382 134 517 225 661 118 806 216 960 136 1245 255" />
+        <path d="M32 570 172 476 322 548 455 425 602 522 750 408 900 520 1052 420 1228 508" />
+        <path d="M105 166 172 476M248 238 322 548M382 134 455 425M517 225 602 522M661 118 750 408M806 216 900 520M960 136 1052 420" />
+        <path d="M-20 388 172 476 248 238 455 425 517 225 750 408 806 216 1052 420 1218 330" opacity=".58" />
+      </g>
+      <g className="nodus-site-nodes" fill="url(#local-atlas-node)">
+        {[['105','166'],['248','238'],['382','134'],['517','225'],['661','118'],['806','216'],['960','136'],['172','476'],['322','548'],['455','425'],['602','522'],['750','408'],['900','520'],['1052','420']].map(([cx, cy], index) => <circle key={`${cx}-${cy}`} cx={cx} cy={cy} r={index % 4 === 0 ? 13 : 9} />)}
+      </g>
+    </svg>
+  </div>;
+}
+
+function NodusSiteHeader({ page }: { page: 'atlas' | 'bookmarks' }) {
+  const [open, setOpen] = useState(false);
+  const close = () => setOpen(false);
+  return <header className="nodus-site-header" data-testid="nodus-site-header">
+    <button type="button" className="nodus-site-logo" aria-label="Nodus Research, home" onClick={() => openSitePage(NODUS_SITE)}><img src={NODUS_LOGO} alt="" /> Nodus</button>
+    <button type="button" className="nodus-site-nav-toggle" aria-label={open ? 'Close menu' : 'Open menu'} aria-expanded={open} onClick={() => setOpen((value) => !value)}><span /><span /><span /></button>
+    <nav className={`nodus-site-links${open ? ' open' : ''}`} aria-label="Nodus Research">
+      <SiteLink className="nodus-site-link" label="Home" url={NODUS_SITE} onOpen={close} />
+      <SiteLink className="nodus-site-link" label="Atlas" url={NODUS_RESEARCH_ATLAS_START_URL} current={page === 'atlas'} onOpen={close} />
+      <SiteLink className="nodus-site-link" label="Bookmarks" url={NODUS_BOOKMARKS_URL} current={page === 'bookmarks'} onOpen={close} />
+      <SiteLink className="nodus-site-link" label="Wiki" url={`${NODUS_SITE}wiki/`} onOpen={close} />
+      <SiteLink className="nodus-site-link" label="Blog" url={`${NODUS_SITE}blog/`} onOpen={close} />
+      <SiteLink className="nodus-site-link" label="Contribute" url={`${NODUS_SITE}contribute/`} onOpen={close} />
+      <SiteLink className="nodus-site-link" label="FAQ" url={`${NODUS_SITE}faq/`} onOpen={close} />
+      <span className="nodus-site-nav-sep" aria-hidden="true" />
+      <SiteLink className="nodus-site-badge" label="Star on GitHub" url={NODUS_REPOSITORY} onOpen={close} />
+      <SiteLink className="nodus-site-primary" label="Try the live demo" url={`${NODUS_SITE}demo/`} onOpen={close} />
+    </nav>
+  </header>;
+}
+
+const FOOTER_GROUPS = [
+  { title: 'Research', links: [['Research Atlas', NODUS_RESEARCH_ATLAS_START_URL], ['Nodus Bookmarks', NODUS_BOOKMARKS_URL], ['The Nodus App', `${NODUS_SITE}app/`], ['Academic research', `${NODUS_SITE}research/`], ['Nodus and Zotero', `${NODUS_SITE}zotero/`]] },
+  { title: 'Product', links: [['The four vaults', `${NODUS_SITE}#vaults`], ['Other vaults', `${NODUS_SITE}#more-vaults`], ['Nodus Toolkit', `${NODUS_SITE}#tools`], ['Live demos', `${NODUS_SITE}demo/`]] },
+  { title: 'Learn', links: [['Wiki', `${NODUS_SITE}wiki/`], ['Blog', `${NODUS_SITE}blog/`], ['FAQ', `${NODUS_SITE}faq/`], ['Video tutorials', `${NODUS_SITE}wiki/#videos`]] },
+  { title: 'Project', links: [['Contribute', `${NODUS_SITE}contribute/`], ['GitHub', NODUS_REPOSITORY], ['Releases', `${NODUS_REPOSITORY}/releases`], ['AGPL-3.0-only', `${NODUS_REPOSITORY}/blob/main/LICENSE`]] },
+] as const;
+
+function NodusSiteFooter() {
+  return <footer className="nodus-site-footer" data-testid="nodus-site-footer"><div className="nodus-site-wrap">
+    <div className="nodus-site-foot-grid">
+      <div className="nodus-site-foot-brand"><span className="nodus-site-foot-logo"><img src={NODUS_LOGO} alt="" /> Nodus</span><p>A free, open-source, local-first research workspace for connecting sources, ideas and evidence. Your corpus stays on your machine.</p></div>
+      {FOOTER_GROUPS.map((group) => <div className="nodus-site-foot-col" key={group.title}><h3>{group.title}</h3>{group.links.map(([label, url]) => <SiteLink key={label} label={label} url={url} />)}</div>)}
+    </div>
+    <div className="nodus-site-foot-base"><span>© 2026 Jorge Pérez Burgueño and Nodus contributors.</span><SiteLink label="Privacy" url={`${NODUS_REPOSITORY}/blob/main/PRIVACY.md`} /><SiteLink label="Code of conduct" url={`${NODUS_REPOSITORY}/blob/main/CODE_OF_CONDUCT.md`} /><SiteLink label="Security" url={`${NODUS_REPOSITORY}/blob/main/SECURITY.md`} /></div>
+  </div></footer>;
+}
+
 function StartShell({ title, copy, query, onQuery, status, children, toolbar }: {
   title: string; copy: string; query: string; onQuery: (value: string) => void;
   status: string; children: React.ReactNode; toolbar?: React.ReactNode;
 }) {
   const light = useLightTheme();
+  const page = title === 'Nodus Bookmarks' ? 'bookmarks' : 'atlas';
   return (
     <main className={`nodus-start-page atlas-main${light ? ' nodus-start-light' : ''}`}>
-      <div className="atlas-shell">
+      <NodusSiteBackdrop />
+      <NodusSiteHeader page={page} />
+      <div className="nodus-site-content atlas-shell">
         <div className="atlas-intro">
           <h1 className="atlas-title">{title}</h1>
           <p className="atlas-copy">{copy}</p>
@@ -68,6 +163,7 @@ function StartShell({ title, copy, query, onQuery, status, children, toolbar }: 
         </div>
         <div className="atlas-grid">{children}</div>
       </div>
+      <NodusSiteFooter />
     </main>
   );
 }

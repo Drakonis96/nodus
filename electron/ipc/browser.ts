@@ -301,6 +301,14 @@ export function registerBrowserIpc({ h, getWindow }: IpcContext): void {
     return createTab(requested);
   });
 
+  h('browser:navigateStartPage', async (event, page: unknown) => {
+    assertUiSender(event, getWindow);
+    ensureWired();
+    if (page === 'atlas') return navigate(NODUS_RESEARCH_ATLAS_START_URL);
+    if (page === 'bookmarks') return navigate(NODUS_BOOKMARKS_URL);
+    throw new Error('Unknown Browser start page.');
+  });
+
   h('browser:goHome', async (event) => {
     assertUiSender(event, getWindow);
     ensureWired();
