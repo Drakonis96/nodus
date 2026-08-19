@@ -8003,6 +8003,8 @@ export interface BrowserApi {
   browserPageIsPdf(): Promise<{ isPdf: boolean; url: string }>;
   importBrowserPdf(itemId: string, url: string, title: string):
     Promise<import('./browserConnector').BrowserConnectorSaveResult>;
+  /** Refresh Nodi's Current view context from the active native browser page. */
+  syncBrowserNodiContext(): Promise<boolean>;
   askNodiAboutBrowserPage(): Promise<boolean>;
   askNodiAboutBrowserSelection(): Promise<boolean>;
   getBrowserDownloads(): Promise<import('./browser').BrowserDownloadView[]>;

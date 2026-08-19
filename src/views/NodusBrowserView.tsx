@@ -85,6 +85,22 @@ export function NodusBrowserView() {
     setOmnibox(active?.url ?? '');
   }, [active?.url, omniboxFocused]);
 
+  // Unlike every ordinary Nodus section, the active website is not inside this
+  // renderer's <main>. Refresh Nodi's default Current view context whenever a
+  // tab becomes active or finishes navigation, so chat sees the page the user
+  // actually has open without requiring an explicit toolbar action first.
+  useEffect(() => {
+    if (!active || active.loading || active.error) return;
+    let cancelled = false;
+    const timer = window.setTimeout(() => {
+      if (!cancelled) void window.nodus.syncBrowserNodiContext();
+    }, 0);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [active?.id, active?.url, active?.title, active?.loading, active?.error]);
+
   /**
    * Report the rectangle the page should occupy.
    *

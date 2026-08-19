@@ -85,6 +85,7 @@ export const browserApi = {
   browserPageIsPdf: (): Promise<{ isPdf: boolean; url: string }> => ipcRenderer.invoke('browser:isPdf'),
   importBrowserPdf: (itemId: string, url: string, title: string): Promise<BrowserConnectorSaveResult> =>
     ipcRenderer.invoke('browser:importPdf', itemId, url, title),
+  syncBrowserNodiContext: (): Promise<boolean> => ipcRenderer.invoke('browser:syncNodiContext'),
   askNodiAboutBrowserPage: (): Promise<boolean> => ipcRenderer.invoke('browser:askNodiAboutPage'),
   askNodiAboutBrowserSelection: (): Promise<boolean> => ipcRenderer.invoke('browser:askNodiAboutSelection'),
   getBrowserDownloads: (): Promise<BrowserDownloadView[]> => ipcRenderer.invoke('browser:downloads'),

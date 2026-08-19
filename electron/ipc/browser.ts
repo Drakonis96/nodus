@@ -81,6 +81,27 @@ function sanitizeViewport(raw: unknown): BrowserViewport | null {
   return { x, y, width: Math.max(0, width), height: Math.max(0, height) };
 }
 
+/**
+ * Publish the page that lives in the native WebContentsView as Nodi's Current
+ * view. The app shell cannot discover this text through `main.innerText`: that
+ * only sees the React browser chrome, while the website is another renderer.
+ */
+async function syncActiveBrowserNodiContext(): Promise<boolean> {
+  const collected = await collectFromTab('text');
+  const payload = (collected ?? {}) as { title?: unknown; text?: unknown };
+  const tab = activeTabSummary();
+  const text = String(payload.text ?? '');
+  if (!text.trim()) return false;
+  setNodiViewContext({
+    viewId: 'browser',
+    title: String(payload.title ?? tab?.title ?? 'Nodus Browser'),
+    text: `${tab?.url ?? ''}\n\n${text}`,
+    capturedAt: Date.now(),
+    complete: true,
+  });
+  return true;
+}
+
 export function registerBrowserIpc({ h, getWindow }: IpcContext): void {
   /** Push the whole browser state; the renderer re-renders from it wholesale. */
   const broadcast = () => {
@@ -328,6 +349,11 @@ export function registerBrowserIpc({ h, getWindow }: IpcContext): void {
     return importPdfIntoItem(String(itemId), String(url), String(title ?? ''));
   });
 
+  h('browser:syncNodiContext', async (event) => {
+    assertUiSender(event, getWindow);
+    return syncActiveBrowserNodiContext();
+  });
+
   /**
    * Ask Nodi about this page.
    *
@@ -337,19 +363,7 @@ export function registerBrowserIpc({ h, getWindow }: IpcContext): void {
    */
   h('browser:askNodiAboutPage', async (event) => {
     assertUiSender(event, getWindow);
-    const collected = await collectFromTab('text');
-    const payload = (collected ?? {}) as { title?: unknown; text?: unknown };
-    const tab = activeTabSummary();
-    const text = String(payload.text ?? '');
-    if (!text.trim()) return false;
-    setNodiViewContext({
-      viewId: 'browser',
-      title: String(payload.title ?? tab?.title ?? 'Nodus Browser'),
-      text: `${tab?.url ?? ''}\n\n${text}`,
-      capturedAt: Date.now(),
-      complete: true,
-    });
-    return true;
+    return syncActiveBrowserNodiContext();
   });
 
   h('browser:downloads', async (event) => {

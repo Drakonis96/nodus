@@ -394,12 +394,19 @@ try {
     assert.equal(after.tabs.find((tab) => tab.id === after.activeTabId)?.url, activeBefore.url);
   });
 
-  await check('Ask Nodi puts the real page text into the Nodi context', async () => {
-    const ok = await call('askNodiAboutBrowserPage');
-    assert.equal(ok, true, 'the page must yield text');
-    const context = await page.evaluate(() => window.nodus.getNodiViewContext());
+  await check('Nodi automatically sees the real active browser page', async () => {
+    await call('submitBrowserOmnibox', `${origin}/`);
+    await waitFor((s) => s.tabs.some((t) => t.url === `${origin}/` && !t.loading), 'the fixture home page');
+    const started = Date.now();
+    let context = null;
+    while (Date.now() - started < 8_000) {
+      context = await page.evaluate(() => window.nodus.getNodiViewContext());
+      if (context?.viewId === 'browser' && /Fixture home/.test(context.text)) break;
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    }
     assert.equal(context.viewId, 'browser');
     assert.match(context.text, /Fixture home/, 'the captured text must be the page contents');
+    assert.match(context.text, new RegExp(origin.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')), 'the active URL must be present');
   });
 
   await check('cookies and localStorage written by a page really persist', async () => {

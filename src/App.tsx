@@ -451,6 +451,10 @@ export function App() {
   // and captures the document synchronously before the user can send the question.
   useEffect(() => {
     if (!settings?.mascotEnabled) return;
+    // The website is a separate native WebContentsView, not a descendant of
+    // this <main>. NodusBrowserView publishes its real document text instead;
+    // publishing `main.innerText` here would overwrite it with browser chrome.
+    if (view === 'browser') return;
     let timer: number | null = null;
     let idleId: number | null = null;
     let observer: MutationObserver | null = null;
