@@ -345,6 +345,20 @@ export class Store {
     return path.join(this.spacesDir, spaceId, 'assets');
   }
 
+  // Yjs deltas are arbitrary binary, never images. They use their own content-addressed
+  // namespace so the image sniffer can remain strict and the JSON relay stays scalar-only.
+  documentUpdatePath(spaceId, hash) {
+    return path.join(this.spacesDir, spaceId, 'document-updates', hash.slice(0, 2), hash);
+  }
+
+  sharedBlobPath(spaceId, hash) {
+    return path.join(this.spacesDir, spaceId, 'blobs', hash.slice(0, 2), hash);
+  }
+
+  sharedBlobUploadDir(spaceId, hash) {
+    return path.join(this.spacesDir, spaceId, 'blob-uploads', hash);
+  }
+
   // Clean-Markdown document packages are deliberately separate from the image channel.
   // They are ZIPs addressed by the SHA-256 of their bytes; source PDFs never enter here.
   libraryPackagePath(spaceId, hash) {

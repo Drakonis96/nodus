@@ -16,6 +16,9 @@ import {
 import { registerIpc } from './ipc';
 import { scanQueue } from './pipeline/scanQueue';
 import { getSettings } from './db/settingsRepo';
+import { runDueDatabaseRowTemplates } from './db/databaseTasksRepo';
+import { runDueAutomationRules } from './db/databaseAutomationsRepo';
+import { startDatabaseFormServer, stopDatabaseFormServer } from './automation/formServer';
 import { getActiveVault } from './vaults/vaultRegistry';
 import { generateDemoPortraits, hasDemoPortraitKey, demoPortraitsPending } from './ai/genealogyDemoPortraits';
 import { interruptDecorativeImageGenerations } from './ai/decorativeImages';
@@ -126,6 +129,10 @@ let suppressAutoInstallOnQuitUntilRestart = false;
 let autoBackupTimer: NodeJS.Timeout | null = null;
 let autoBackupFirstTimer: NodeJS.Timeout | null = null;
 let autoBackupRunning = false;
+let taskTemplateTimer: NodeJS.Timeout | null = null;
+let taskTemplateFirstTimer: NodeJS.Timeout | null = null;
+let databaseAutomationTimer: NodeJS.Timeout | null = null;
+let databaseAutomationFirstTimer: NodeJS.Timeout | null = null;
 let announcementsFirstTimer: NodeJS.Timeout | null = null;
 /** Set once shutdown starts, so timers that fire mid-quit do not reopen the DB. */
 let quitting = false;
@@ -807,6 +814,7 @@ app.whenReady().then(async () => {
   });
   if (preV4.snapshotPath) console.log(`[recovery] pre-v4 snapshot: ${preV4.snapshotPath}`);
   getDb(); // open + migrate before anything touches data
+  await startDatabaseFormServer(Number.parseInt(process.env.NODUS_DATABASE_FORM_PORT ?? '0', 10) || 0);
   upgradeWorldbuildingDemoDynasties();
   upgradeWorldbuildingDemoImageQuality();
   upgradeWorldbuildingDemoNarrativeDepth();
@@ -887,6 +895,37 @@ app.whenReady().then(async () => {
   autoBackupFirstTimer = setTimeout(autoBackupTick, 2 * 60 * 1000);
   autoBackupTimer = setInterval(autoBackupTick, 30 * 60 * 1000);
 
+  // Recurring database templates are local, transactional and idempotent. A short
+  // heartbeat also covers vault switches; every occurrence key is unique, so a crash
+  // or overlapping wake-up cannot create the same scheduled page twice.
+  const recurringTemplateTick = () => {
+    if (quitting) return;
+    try {
+      const created = runDueDatabaseRowTemplates(new Date().toISOString(), 25);
+      if (created.length) mainWindow?.webContents.send('db:templatesInstantiated', { count: created.length });
+    } catch (error) {
+      console.error(`[database-templates] failed: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  };
+  taskTemplateFirstTimer = setTimeout(recurringTemplateTick, 5_000);
+  taskTemplateTimer = setInterval(recurringTemplateTick, 60_000);
+
+  // Automation schedules share the same idempotent run log as interactive triggers.
+  // A single-flight tick prevents slow webhooks from overlapping with the next wake-up.
+  let databaseAutomationRunning = false;
+  const databaseAutomationTick = () => {
+    if (quitting || databaseAutomationRunning) return;
+    databaseAutomationRunning = true;
+    void runDueAutomationRules(new Date().toISOString(), 25)
+      .then((runs) => {
+        if (runs.length) mainWindow?.webContents.send('db:automationsRan', { count: runs.length });
+      })
+      .catch((error) => console.error(`[database-automations] failed: ${error instanceof Error ? error.message : String(error)}`))
+      .finally(() => { databaseAutomationRunning = false; });
+  };
+  databaseAutomationFirstTimer = setTimeout(databaseAutomationTick, 7_000);
+  databaseAutomationTimer = setInterval(databaseAutomationTick, 60_000);
+
   if (settings.syncMode === 'realtime') startRealtimeSync();
   startNodusServerSync();
   // And the other direction, on its own timer too: an incoming mutation dirties nothing,
@@ -940,6 +979,11 @@ app.on('window-all-closed', () => {
     quitting = true;
     if (autoBackupTimer) clearInterval(autoBackupTimer);
     if (autoBackupFirstTimer) clearTimeout(autoBackupFirstTimer);
+    if (taskTemplateTimer) clearInterval(taskTemplateTimer);
+    if (taskTemplateFirstTimer) clearTimeout(taskTemplateFirstTimer);
+    if (databaseAutomationTimer) clearInterval(databaseAutomationTimer);
+    if (databaseAutomationFirstTimer) clearTimeout(databaseAutomationFirstTimer);
+    void stopDatabaseFormServer();
     stopRealtimeSync();
     stopNodusServerSync();
     stopInboxPolling();
@@ -963,6 +1007,11 @@ app.on('before-quit', () => {
   // closeDb() would resurrect the database on a shutting-down process.
   if (autoBackupTimer) clearInterval(autoBackupTimer);
   if (autoBackupFirstTimer) clearTimeout(autoBackupFirstTimer);
+  if (taskTemplateTimer) clearInterval(taskTemplateTimer);
+  if (taskTemplateFirstTimer) clearTimeout(taskTemplateFirstTimer);
+  if (databaseAutomationTimer) clearInterval(databaseAutomationTimer);
+  if (databaseAutomationFirstTimer) clearTimeout(databaseAutomationFirstTimer);
+  void stopDatabaseFormServer();
   stopRealtimeSync();
   stopNodusServerSync();
   stopInboxPolling();
@@ -991,6 +1040,11 @@ updateAwareApp.on('before-quit-for-update', () => {
   if (announcementsFirstTimer) clearTimeout(announcementsFirstTimer);
   if (autoBackupTimer) clearInterval(autoBackupTimer);
   if (autoBackupFirstTimer) clearTimeout(autoBackupFirstTimer);
+  if (taskTemplateTimer) clearInterval(taskTemplateTimer);
+  if (taskTemplateFirstTimer) clearTimeout(taskTemplateFirstTimer);
+  if (databaseAutomationTimer) clearInterval(databaseAutomationTimer);
+  if (databaseAutomationFirstTimer) clearTimeout(databaseAutomationFirstTimer);
+  void stopDatabaseFormServer();
   stopRealtimeSync();
   stopNodusServerSync();
   stopInboxPolling();

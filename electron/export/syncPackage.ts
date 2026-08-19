@@ -9,6 +9,8 @@ import { describeSyncCoverage, groupOfTable, localTableNames, syncedTablesByGrou
 import { getPrimarySourcePolicySettings } from '../db/primarySourceGovernanceRepo';
 import { decidePrimarySourcePolicy } from '@shared/primarySourcesTypes';
 import { getActiveVault } from '../vaults/vaultRegistry';
+import { databaseCellStorage } from '@shared/databaseCellStorage';
+import { columnTypeDef } from '@shared/databases';
 
 /** Re-exported so the sync package stays the single entry point for callers. */
 export { describeSyncCoverage };
@@ -124,6 +126,59 @@ const ROW_NORMALIZERS: Record<string, (row: Record<string, unknown>) => void> = 
       row.from_id = reversed.from_id;
       row.to_id = reversed.to_id;
     }
+  },
+  db_cells: (row) => {
+    const db = getDb();
+    const source = db.prepare(
+      `SELECT data_row.database_id AS row_database_id, data_row.created_at, data_row.updated_at,
+              property.database_id AS column_database_id, property.type
+       FROM db_rows data_row JOIN db_columns property ON property.id = ?
+       WHERE data_row.id = ?`,
+    ).get(row.column_id, row.row_id) as
+      | { row_database_id: string; column_database_id: string; type: string; created_at: string; updated_at: string }
+      | undefined;
+    if (!source || source.row_database_id !== source.column_database_id) return;
+    row.database_id ??= source.row_database_id;
+    row.created_at ??= source.created_at;
+    if (typeof row.updated_at !== 'string' || row.updated_at < source.updated_at) row.updated_at = source.updated_at;
+    row.revision ??= 1;
+    row.created_by ??= 'legacy-sync';
+    row.updated_by ??= 'legacy-sync';
+    if (typeof row.value_text === 'string') {
+      const storage = databaseCellStorage(columnTypeDef(source.type).id, row.value_text);
+      Object.assign(row, storage);
+    }
+  },
+  db_select_options: (row) => {
+    const column = getDb().prepare('SELECT database_id, created_at, updated_at FROM db_columns WHERE id = ?').get(row.column_id) as
+      | { database_id: string; created_at: string; updated_at: string }
+      | undefined;
+    if (!column) return;
+    row.database_id ??= column.database_id;
+    row.created_at ??= column.created_at;
+    row.updated_at ??= column.updated_at;
+  },
+  db_attachments: (row) => {
+    const dataRow = getDb().prepare('SELECT database_id, created_at, updated_at FROM db_rows WHERE id = ?').get(row.row_id) as
+      | { database_id: string; created_at: string; updated_at: string }
+      | undefined;
+    if (!dataRow) return;
+    row.database_id ??= dataRow.database_id;
+    row.updated_at ??= row.created_at ?? dataRow.updated_at;
+  },
+  db_relations: (row) => {
+    const dataRow = getDb().prepare('SELECT database_id, created_at, updated_at FROM db_rows WHERE id = ?').get(row.row_id) as
+      | { database_id: string; created_at: string; updated_at: string }
+      | undefined;
+    if (!dataRow) return;
+    row.database_id ??= dataRow.database_id;
+    row.updated_at ??= row.created_at ?? dataRow.updated_at;
+  },
+  db_columns: (row) => {
+    row.updated_at ??= row.created_at;
+  },
+  db_views: (row) => {
+    row.updated_at ??= row.created_at;
   },
 };
 
@@ -592,9 +647,12 @@ function buildIdRemap(tables: TableRows, present: Set<string>): Map<string, Map<
     const pk = columns.filter((c) => c.pk > 0).sort((a, b) => a.pk - b.pk).map((c) => c.name);
     if (pk.length !== 1) continue; // composite keys have no single id to rewrite
 
-    const indexes = db.pragma(`index_list(${quoteIdentifier(table)})`) as { name: string; unique: number; origin: string }[];
+    const indexes = db.pragma(`index_list(${quoteIdentifier(table)})`) as { name: string; unique: number; origin: string; partial: number }[];
     const uniqueKeys = indexes
-      .filter((index) => index.unique === 1 && index.origin !== 'pk')
+      // A partial index is only unique for rows satisfying its WHERE predicate. Treating
+      // its columns as an unconditional natural key remapped every legacy db_row whose
+      // unique_sequence was 0, even though those rows are deliberately outside the index.
+      .filter((index) => index.unique === 1 && index.origin !== 'pk' && index.partial !== 1)
       .map((index) => (db.pragma(`index_info(${JSON.stringify(index.name)})`) as { name: string | null }[])
         .map((info) => info.name)
         .filter((name): name is string => typeof name === 'string'));
@@ -654,18 +712,17 @@ function applyRemap(tables: TableRows, present: Set<string>, remap: Map<string, 
  * are worth keeping: two rows whose timestamps moved but whose fields are identical are
  * not a conflict, and storing them would bury the genuine ones in noise.
  */
-function rowsDiffer(incoming: Record<string, unknown>, local: Record<string, unknown>): boolean {
-  for (const [name, value] of Object.entries(incoming)) {
-    if (name === 'updated_at' || name === 'created_at') continue;
-    const other = local[name];
-    if (Buffer.isBuffer(value) || Buffer.isBuffer(other)) {
-      if (!Buffer.isBuffer(value) || !Buffer.isBuffer(other) || !value.equals(other)) return true;
-      continue;
-    }
-    // NULL and "column absent" are the same absence for this purpose.
-    if ((value ?? null) !== (other ?? null)) return true;
+function rowValuesEqual(value: unknown, other: unknown): boolean {
+  if (Buffer.isBuffer(value) || Buffer.isBuffer(other)) {
+    return Buffer.isBuffer(value) && Buffer.isBuffer(other) && value.equals(other);
   }
-  return false;
+  // NULL and "column absent" are the same absence for this purpose.
+  return (value ?? null) === (other ?? null);
+}
+
+function rowsDiffer(incoming: Record<string, unknown>, local: Record<string, unknown>): boolean {
+  return Object.entries(incoming).some(([name, value]) =>
+    name !== 'updated_at' && name !== 'created_at' && !rowValuesEqual(value, local[name]));
 }
 
 /** Merge one table's rows: insert unknown primary keys, take the newer side otherwise.
@@ -761,7 +818,12 @@ function mergeTable(
         }
         continue;
       }
-      const mutable = names.filter((name) => !primaryKeys.includes(name));
+      // Only mention fields that really changed in the UPDATE. SQLite's `UPDATE OF`
+      // triggers fire when a column is present in SET even if its value is identical;
+      // updating every portable field made a note-content merge spuriously revise its
+      // universal page, so importing the same package again looked like a conflict.
+      const mutable = names.filter((name) =>
+        !primaryKeys.includes(name) && !rowValuesEqual(row[name], local[name]));
       if (mutable.length === 0) {
         counts.skipped += 1;
         continue;
@@ -787,11 +849,14 @@ function mergeTable(
       // SQLite rolls back the failed STATEMENT, not the transaction, so the merge
       // carries on and the user gets a report instead of a dead sync.
       counts.skipped += 1;
+      const collision = table === 'pages' && portable.row_id
+        ? db.prepare('SELECT id, row_id FROM pages WHERE row_id = ?').get(portable.row_id as string) as { id: string; row_id: string } | undefined
+        : undefined;
       conflicts.push({
         table,
         reason: 'constraint',
         rows: 1,
-        detail: error instanceof Error ? error.message : String(error),
+        detail: `${error instanceof Error ? error.message : String(error)} [${primaryKeys.map((key) => `${key}=${String(portable[key])}`).join(', ')}]${collision ? ` local=${collision.id}` : ''}`,
       });
     }
   }
@@ -920,7 +985,15 @@ export function mergeTables(
     applyIncomingTombstones(incomingTombstones, present, groups.tombstones, conflicts, supersededKept, deletions, packageDate);
     const localTombstones = readLocalTombstones();
 
-    for (const [table, rows] of tables) {
+    // Universal pages must precede both their page_* children and db_rows/notes. Those
+    // owner tables have compatibility triggers that create an empty page on INSERT;
+    // importing the canonical page first makes the trigger's INSERT OR IGNORE a no-op
+    // instead of creating a competing id for the same UNIQUE row_id/note_id.
+    const mergePriority = (table: string) => table === 'pages' ? -100 : table.startsWith('page_') ? 100 : 0;
+    const orderedTables = [...tables.entries()].map((entry, index) => ({ entry, index }))
+      .sort((left, right) => mergePriority(left.entry[0]) - mergePriority(right.entry[0]) || left.index - right.index)
+      .map(({ entry }) => entry);
+    for (const [table, rows] of orderedTables) {
       if (table === 'sync_tombstones') continue; // handled above, not as ordinary rows
       const group = tableGroup.get(table);
       if (!present.has(table) || !group) {

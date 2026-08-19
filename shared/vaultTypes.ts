@@ -345,6 +345,7 @@ export const VAULT_TYPE_SCOPED_VIEWS: Record<string, VaultType[]> = {
   relations: ['primary_sources', 'genealogy', 'worldbuilding'],
   // Databases mode: the table workspace and its Analysis + Chat sections only exist
   // in a 'databases' vault.
+  pages: ['databases'],
   databases: ['databases'],
   dbSearch: ['databases'],
   dbAnalysis: ['databases'],

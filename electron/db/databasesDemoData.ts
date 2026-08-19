@@ -15,6 +15,7 @@ import { getSettings, updateSettings } from './settingsRepo';
 import { getActiveVault, setVaultType } from '../vaults/vaultRegistry';
 import type { VaultType, DatabaseColumnType } from '@shared/types';
 import { encodeMultiSelect } from '@shared/databases';
+import { databaseCellStorage } from '@shared/databaseCellStorage';
 
 type Localized = { es: string; en: string };
 function loc(v: Localized): string {
@@ -264,15 +265,20 @@ export function seedDatabasesDemoData(): boolean {
     'INSERT INTO db_databases (id, short_id, name, icon, position, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)'
   );
   const insCol = db.prepare(
-    'INSERT INTO db_columns (id, database_id, name, type, position, config_json, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)'
+    'INSERT INTO db_columns (id, database_id, name, type, position, config_json, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
   );
   const insOpt = db.prepare(
-    'INSERT INTO db_select_options (id, column_id, label, color, position) VALUES (?, ?, ?, ?, ?)'
+    'INSERT INTO db_select_options (id, database_id, column_id, label, color, position, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
   );
   const insRow = db.prepare(
     'INSERT INTO db_rows (id, database_id, position, created_at, updated_at) VALUES (?, ?, ?, ?, ?)'
   );
-  const insCell = db.prepare('INSERT INTO db_cells (row_id, column_id, value_text) VALUES (?, ?, ?)');
+  const insCell = db.prepare(
+    `INSERT INTO db_cells
+      (database_id, row_id, column_id, value_type, value_text, value_number, value_integer,
+       value_date, value_json, value_reference, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+  );
 
   const tx = db.transaction(() => {
     DATABASES.forEach((demoDb, dbIndex) => {
@@ -282,9 +288,9 @@ export function seedDatabasesDemoData(): boolean {
 
       const colId = (colKey: string) => `demo-col-${demoDb.key}-${colKey}`;
       demoDb.columns.forEach((col, colIndex) => {
-        insCol.run(colId(col.key), dbId, loc(col.name), col.type, colIndex, JSON.stringify(col.config ?? {}), now);
+        insCol.run(colId(col.key), dbId, loc(col.name), col.type, colIndex, JSON.stringify(col.config ?? {}), now, now);
         (col.options ?? []).forEach((opt, optIndex) =>
-          insOpt.run(optionId(demoDb.key, col.key, opt.key), colId(col.key), loc(opt.label), opt.color, optIndex)
+          insOpt.run(optionId(demoDb.key, col.key, opt.key), dbId, colId(col.key), loc(opt.label), opt.color, optIndex, now, now)
         );
       });
 
@@ -293,14 +299,21 @@ export function seedDatabasesDemoData(): boolean {
         insRow.run(rowId, dbId, rowIndex, now, now);
         for (const col of demoDb.columns) {
           const encoded = encodeCell(demoDb.key, col, row[col.key]);
-          if (encoded != null) insCell.run(rowId, colId(col.key), encoded);
+          if (encoded != null) {
+            const storage = databaseCellStorage(col.type, encoded);
+            insCell.run(
+              dbId, rowId, colId(col.key), storage.value_type, storage.value_text,
+              storage.value_number, storage.value_integer, storage.value_date,
+              storage.value_json, storage.value_reference, now, now,
+            );
+          }
         }
       });
     });
 
     // A few relations from Experiments → Field samples, to showcase relation columns.
     const insRel = db.prepare(
-      'INSERT INTO db_relations (id, row_id, column_id, target_kind, target_id, position, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)'
+      'INSERT INTO db_relations (id, database_id, row_id, column_id, target_kind, target_id, position, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'
     );
     const relCol = 'demo-col-experiments-sample';
     const links: [string, string][] = [
@@ -309,7 +322,7 @@ export function seedDatabasesDemoData(): boolean {
       ['demo-row-experiments-3', 'demo-row-samples-4'],
       ['demo-row-experiments-5', 'demo-row-samples-3'],
     ];
-    links.forEach(([rowId, targetId], i) => insRel.run(`demo-drel-${i + 1}`, rowId, relCol, 'db_row', targetId, 0, now));
+    links.forEach(([rowId, targetId], i) => insRel.run(`demo-drel-${i + 1}`, 'demo-db-experiments', rowId, relCol, 'db_row', targetId, 0, now, now));
 
     // Universal Notes and the dedicated data chat should also teach by example.
     db.prepare('INSERT INTO note_folders (id,parent_id,name,order_idx,created_at,updated_at,summary) VALUES (?,?,?,?,?,?,?)')

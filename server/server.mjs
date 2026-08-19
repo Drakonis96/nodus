@@ -1002,7 +1002,7 @@ const corpusRoutes = createCorpusRoutes({
 });
 
 const apiRoutes = createApiRoutes({
-  store, authorize, json, body, jsonBody, fs,
+  store, authorize, json, body, jsonBody, fs, path,
   readSnapshot, invalidateSnapshot, expandSnapshot,
   publicUrl, language, rateLimit, clearRateLimit, mib,
   gunzip: (bytes, maxOutputLength) => gunzipSync(bytes, { maxOutputLength }),

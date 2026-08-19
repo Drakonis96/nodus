@@ -305,6 +305,8 @@ try {
   assert.equal(csv.normalizeCsvValue('checkbox', 'sí'), '1');
   assert.equal(csv.normalizeCsvValue('date', '13/05/2020'), null, 'a non-ISO date has nowhere to go');
   assert.equal(csv.normalizeCsvValue('date', '2020-05-13'), '2020-05-13');
+  assert.equal(csv.normalizeCsvValue('date', '2020-05-13T09:30:00'), '2020-05-13T09:30:00');
+  assert.equal(csv.normalizeCsvValue('date', '2020-05-13T09:30:00+02:00'), '2020-05-13T09:30:00+02:00');
 
   // ── Column suggestions: null markers, headers, tag lists ───────────────────
   // A "no data" placeholder must not drag a numeric column down to text: real sheets
@@ -539,6 +541,8 @@ try {
   assert.equal(ruCliRow.rollups[ruSum.id], '15', 'rollup sums the related Importe (10+5)');
   assert.equal(ruCliRow.rollups[ruCount.id], '2', 'rollup counts the related rows');
   assert.equal(dbmode.getRow(ruCli1.id).rollups[ruSum.id], '15', 'getRow also computes rollups');
+  dbmode.setCell(ruOrd1.id, ruOrdAmount.id, '20');
+  assert.equal(dbmode.getRow(ruCli1.id).rollups[ruSum.id], '25', 'editing a target invalidates only rollups that reference that row');
 
   // ── Cross-vault entity relation kind (gap) — resolve + search ──────────────
   getDb().prepare("INSERT INTO gaps (id, statement) VALUES ('g1', 'Falta evidencia sobre X')").run();

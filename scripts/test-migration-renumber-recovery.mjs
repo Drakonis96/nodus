@@ -39,7 +39,9 @@ installTsHook();
 
 try {
   const Database = require('better-sqlite3');
-  const { migrations, runMigrations, SCHEMA_VERSION } = require(path.join(repoRoot, 'electron/db/migrations.ts'));
+  const { migrations, runMigrations, SCHEMA_VERSION, splitMigrationStatements } = require(
+    path.join(repoRoot, 'electron/db/migrations.ts')
+  );
 
   // The migrations that create the two tables the real corruption involved. Found by
   // content, not by hard-coded version, so this test survives future append-only work.
@@ -48,11 +50,20 @@ try {
   assert.ok(protectMig, 'expected a migration that creates protect_copies');
   assert.ok(supersededMig, 'expected a migration that creates sync_superseded');
 
-  // The splitter and CREATE-only recovery assume no migration body carries a trigger or a
-  // BEGIN...END block (the only source of nested semicolons). Guard that invariant here so
-  // a future migration that breaks it fails loudly rather than silently mis-splitting.
-  for (const m of migrations) {
-    assert.ok(!/CREATE\s+TRIGGER/i.test(m.up), `migration v${m.version} must not define a trigger`);
+  // Trigger-bearing migrations are deliberately supported by the recovery splitter.
+  // Every trigger must remain one complete top-level statement, including its inner
+  // semicolons and any CASE...END expression in the body.
+  for (const m of migrations.filter((migration) => /CREATE\s+TRIGGER/i.test(migration.up))) {
+    const statements = splitMigrationStatements(m.up);
+    const declared = [...m.up.matchAll(/CREATE\s+(?:TEMP(?:ORARY)?\s+)?TRIGGER\s+([A-Za-z_][A-Za-z0-9_]*)/gi)]
+      .map((match) => match[1]);
+    const parsed = statements
+      .filter((statement) => /CREATE\s+(?:TEMP(?:ORARY)?\s+)?TRIGGER/i.test(statement))
+      .map((statement) => {
+        assert.match(statement, /\bBEGIN\b[\s\S]*\bEND\s*$/i, `migration v${m.version} has a complete trigger`);
+        return statement.match(/CREATE\s+(?:TEMP(?:ORARY)?\s+)?TRIGGER\s+([A-Za-z_][A-Za-z0-9_]*)/i)?.[1];
+      });
+    assert.deepEqual(parsed, declared, `migration v${m.version} preserves every trigger as one statement`);
   }
 
   // -- Scenario (a): future CREATE-only migration's objects already present -------------

@@ -38,6 +38,11 @@ import * as workSummaries from '../db/workSummariesRepo';
 import { listPersons, getPerson, listEvents, listEvidenceFor, recordCounts } from '../db/entitiesRepo';
 import * as archive from '../db/archiveRepo';
 import * as dbMode from '../db/databasesRepo';
+import * as pages from '../db/pagesRepo';
+import * as pageComments from '../db/pageCommentsRepo';
+import * as pageAcl from '../db/aclRepo';
+import * as databaseTasks from '../db/databaseTasksRepo';
+import * as databaseAutomations from '../db/databaseAutomationsRepo';
 import {
   decodeCheckbox,
   decodeMultiSelect,
@@ -479,7 +484,7 @@ const querySchema = z
 
 class McpToolError extends Error {
   constructor(
-    readonly category: 'not_found' | 'invalid_input' | 'ai_unconfigured' | 'ai_transient' | 'internal',
+    readonly category: 'not_found' | 'invalid_input' | 'permission_denied' | 'ai_unconfigured' | 'ai_transient' | 'internal',
     message: string
   ) {
     super(message);
@@ -488,6 +493,32 @@ class McpToolError extends Error {
 
 function notFound(kind: string, id: string): McpToolError {
   return new McpToolError('not_found', `No ${kind} exists with id "${id}".`);
+}
+
+function assertMcpAcl(
+  resourceType: 'vault' | 'page' | 'database' | 'view' | 'row',
+  resourceId: string,
+  capability: 'view' | 'comment' | 'edit_content' | 'edit',
+): void {
+  try {
+    pageAcl.assertAcl(resourceType, resourceId, 'local', capability);
+  } catch (error) {
+    if (error instanceof Error && error.message.includes('permiso')) {
+      throw new McpToolError(
+        'permission_denied',
+        `The local MCP principal does not have ${capability} permission for this ${resourceType}.`,
+      );
+    }
+    throw error;
+  }
+}
+
+function canMcpView(resourceType: 'page' | 'database' | 'view' | 'row', resourceId: string): boolean {
+  try {
+    return pageAcl.getEffectiveAcl(resourceType, resourceId, 'local').canView;
+  } catch {
+    return false;
+  }
 }
 
 function json(value: unknown) {
@@ -999,8 +1030,20 @@ const TOOL_VAULT_SCOPE: Record<string, VaultType[]> = {
   nodus_get_database_schema: DATABASE_VAULTS,
   nodus_query_database: DATABASE_VAULTS,
   nodus_get_database_row: DATABASE_VAULTS,
+  nodus_list_database_views: DATABASE_VAULTS,
+  nodus_list_database_templates: DATABASE_VAULTS,
+  nodus_list_database_automations: DATABASE_VAULTS,
+  nodus_list_database_forms: DATABASE_VAULTS,
   nodus_create_database_row: DATABASE_VAULTS,
   nodus_set_database_cell: DATABASE_VAULTS,
+  nodus_list_pages: DATABASE_VAULTS,
+  nodus_search_pages: DATABASE_VAULTS,
+  nodus_get_page: DATABASE_VAULTS,
+  nodus_list_page_comments: DATABASE_VAULTS,
+  nodus_create_page: DATABASE_VAULTS,
+  nodus_update_page: DATABASE_VAULTS,
+  nodus_replace_page_markdown: DATABASE_VAULTS,
+  nodus_create_page_comment: DATABASE_VAULTS,
   // Study organisation layer (shared with teaching).
   nodus_study_get_workspace: STUDY_VAULTS,
   nodus_study_get_document: STUDY_VAULTS,
@@ -2679,7 +2722,9 @@ export function registerTools(server: McpServer): void {
       annotations: { readOnlyHint: true, openWorldHint: false },
     },
     tool(() => ({
-      databases: dbMode.listDatabases().map((d) => ({ id: d.id, shortId: d.shortId, name: d.name, rows: d.rowCount })),
+      databases: dbMode.listDatabases()
+        .filter((database) => canMcpView('database', database.id))
+        .map((d) => ({ id: d.id, shortId: d.shortId, name: d.name, rows: d.rowCount })),
     }))
   );
 
@@ -2695,7 +2740,7 @@ export function registerTools(server: McpServer): void {
     ({ databaseId }) =>
       tool(() => {
         const detail = dbMode.getDatabaseDetail(databaseId);
-        if (!detail) throw notFound('database', databaseId);
+        if (!detail || !canMcpView('database', databaseId)) throw notFound('database', databaseId);
         return {
           database: { id: detail.database.id, shortId: detail.database.shortId, name: detail.database.name, rows: detail.database.rowCount },
           columns: detail.columns.map((c) => ({
@@ -2755,7 +2800,7 @@ export function registerTools(server: McpServer): void {
     ({ databaseId, query, filter, sorts, limit, offset }) =>
       tool(() => {
         const detail = dbMode.getDatabaseDetail(databaseId);
-        if (!detail) throw notFound('database', databaseId);
+        if (!detail || !canMcpView('database', databaseId)) throw notFound('database', databaseId);
         let rows = dbMode.listRows(databaseId, { sort: 'position' });
         if (filter) {
           const conditions = filter.conditions.map((cond) => dbBuildCondition(detail.columns, cond));
@@ -2784,7 +2829,7 @@ export function registerTools(server: McpServer): void {
     ({ rowId }) =>
       tool(() => {
         const row = dbMode.getRow(rowId);
-        if (!row) throw notFound('row', rowId);
+        if (!row || !canMcpView('row', rowId)) throw notFound('row', rowId);
         const detail = dbMode.getDatabaseDetail(row.databaseId);
         if (!detail) throw notFound('database', row.databaseId);
         const record = dbRowRecord(detail.columns, row);
@@ -2798,8 +2843,268 @@ export function registerTools(server: McpServer): void {
         }
         return {
           database: { id: detail.database.id, name: detail.database.name },
+          page: (() => {
+            const linked = pages.getPageForRow(row.id);
+            return linked && pageAcl.getEffectiveAcl('page', linked.id, 'local').canView
+              ? { id: linked.id, title: linked.title, revision: linked.revision }
+              : null;
+          })(),
           ...record,
         };
+      })()
+  );
+
+  server.registerTool(
+    'nodus_list_database_views',
+    {
+      title: 'List database views',
+      description: 'Lists every versioned view configuration of one database, including layout, recursive filters, sorts, grouping, card/calendar/timeline options, scope and revision. Hidden databases return not-found. Read-only.',
+      inputSchema: { databaseId: z.string().trim().min(1) },
+      annotations: { readOnlyHint: true, openWorldHint: false },
+    },
+    ({ databaseId }) => tool(() => {
+      if (!dbMode.getDatabase(databaseId) || !canMcpView('database', databaseId)) throw notFound('database', databaseId);
+      return { views: dbMode.listViews(databaseId) };
+    })()
+  );
+
+  server.registerTool(
+    'nodus_list_database_templates',
+    {
+      title: 'List database templates',
+      description: 'Lists row/page templates with default properties, blocks, relations, recurrence, timezone and revision. Read-only.',
+      inputSchema: { databaseId: z.string().trim().min(1) },
+      annotations: { readOnlyHint: true, openWorldHint: false },
+    },
+    ({ databaseId }) => tool(() => {
+      if (!dbMode.getDatabase(databaseId) || !canMcpView('database', databaseId)) throw notFound('database', databaseId);
+      return { templates: databaseTasks.listDatabaseRowTemplates(databaseId) };
+    })()
+  );
+
+  server.registerTool(
+    'nodus_list_database_automations',
+    {
+      title: 'List database automations',
+      description: 'Lists versioned automation rules and a bounded page of recent execution records for one visible database. Read-only.',
+      inputSchema: {
+        databaseId: z.string().trim().min(1),
+        runLimit: z.number().int().min(1).max(200).default(50),
+      },
+      annotations: { readOnlyHint: true, openWorldHint: false },
+    },
+    ({ databaseId, runLimit }) => tool(() => {
+      if (!dbMode.getDatabase(databaseId) || !canMcpView('database', databaseId)) throw notFound('database', databaseId);
+      return {
+        rules: databaseAutomations.listAutomationRules(databaseId),
+        runs: databaseAutomations.listAutomationRuns(databaseId, runLimit),
+      };
+    })()
+  );
+
+  server.registerTool(
+    'nodus_list_database_forms',
+    {
+      title: 'List database forms',
+      description: 'Lists public or authenticated form definitions, fields, validation/rate-limit configuration, enabled state, submission count and revision for one visible database. Authentication secrets are never returned. Read-only.',
+      inputSchema: { databaseId: z.string().trim().min(1) },
+      annotations: { readOnlyHint: true, openWorldHint: false },
+    },
+    ({ databaseId }) => tool(() => {
+      if (!dbMode.getDatabase(databaseId) || !canMcpView('database', databaseId)) throw notFound('database', databaseId);
+      return { forms: databaseAutomations.listDatabaseForms(databaseId) };
+    })()
+  );
+
+  // ── Universal pages, blocks and comments ─────────────────────────────────
+  // The local MCP token represents the local workspace actor. Every operation still
+  // crosses the same ACL boundary as Electron IPC, and every mutation requires the
+  // revision the client actually read so a stale model call can never overwrite a
+  // newer edit silently.
+  server.registerTool(
+    'nodus_list_pages',
+    {
+      title: 'List workspace pages',
+      description:
+        'Lists standalone workspace pages as a compact, paginated tree. Database-row pages are discoverable through nodus_search_pages and their page id is returned by nodus_get_database_row. Pages the local MCP principal cannot view are omitted. Read-only.',
+      inputSchema: {
+        state: z.enum(['active', 'trashed', 'all']).default('active'),
+        limit: z.number().int().min(1).max(200).default(50),
+        offset: z.number().int().min(0).default(0),
+      },
+      annotations: { readOnlyHint: true, openWorldHint: false },
+    },
+    ({ state, limit, offset }) =>
+      tool(() => {
+        const visible = pages.listPages(state).filter((item) => pageAcl.getEffectiveAcl('page', item.id, 'local').canView);
+        return page('pages', visible, limit, offset);
+      })()
+  );
+
+  server.registerTool(
+    'nodus_search_pages',
+    {
+      title: 'Search workspace pages and blocks',
+      description:
+        'Full-text search over page titles and block text, including database-row pages. Results include ranked snippets but never pages hidden by ACL. Read-only and paginated.',
+      inputSchema: {
+        query: z.string().trim().min(1).max(500),
+        limit: z.number().int().min(1).max(100).default(25),
+        offset: z.number().int().min(0).default(0),
+      },
+      annotations: { readOnlyHint: true, openWorldHint: false },
+    },
+    ({ query, limit, offset }) =>
+      tool(() => {
+        const requested = Math.min(200, limit + offset);
+        const visible = pages.searchPages(query, 'lexical', requested)
+          .filter((item) => item.pageId != null && pageAcl.getEffectiveAcl('page', item.pageId, 'local').canView);
+        return page('results', visible, limit, offset);
+      })()
+  );
+
+  server.registerTool(
+    'nodus_get_page',
+    {
+      title: 'Get a workspace page',
+      description:
+        'Returns one universal page with Markdown and revision tokens. Set includeBlocks to receive the structured block projection as well; Yjs binary state is never returned. Pages hidden by ACL return not-found. Read-only.',
+      inputSchema: {
+        pageId: z.string().trim().min(1),
+        includeBlocks: z.boolean().default(true),
+      },
+      annotations: { readOnlyHint: true, openWorldHint: false },
+    },
+    ({ pageId, includeBlocks }) =>
+      tool(() => {
+        const access = pageAcl.getEffectiveAcl('page', pageId, 'local');
+        if (!access.canView) throw notFound('page', pageId);
+        const document = pages.getPageDocument(pageId);
+        if (!document) throw notFound('page', pageId);
+        return {
+          page: document.page,
+          documentRevision: document.revision,
+          updateSequence: document.updateSequence,
+          markdown: document.markdown,
+          markdownHash: document.markdownHash,
+          blocks: includeBlocks ? document.blocks : undefined,
+          access,
+        };
+      })()
+  );
+
+  server.registerTool(
+    'nodus_list_page_comments',
+    {
+      title: 'List page comments',
+      description: 'Lists page and block comment threads visible to the local MCP principal. Resolved threads are omitted unless requested. Read-only.',
+      inputSchema: {
+        pageId: z.string().trim().min(1),
+        includeResolved: z.boolean().default(false),
+      },
+      annotations: { readOnlyHint: true, openWorldHint: false },
+    },
+    ({ pageId, includeResolved }) =>
+      tool(() => {
+        assertMcpAcl('page', pageId, 'view');
+        return { comments: pageComments.listPageComments(pageId, includeResolved) };
+      })()
+  );
+
+  server.registerTool(
+    'nodus_create_page',
+    {
+      title: 'Create a workspace page',
+      description:
+        'Creates a standalone page, optionally below another page, and atomically initializes its Markdown blocks. The parent ACL must allow structural editing. Returns both page and document revisions. Not read-only.',
+      inputSchema: {
+        title: z.string().trim().min(1).max(500),
+        parentPageId: z.string().trim().min(1).nullable().default(null),
+        icon: z.string().trim().max(32).nullable().default(null),
+        markdown: z.string().max(2_000_000).default(''),
+      },
+      annotations: { readOnlyHint: false, openWorldHint: false },
+    },
+    ({ title, parentPageId, icon, markdown }) =>
+      tool(() => {
+        assertMcpAcl(parentPageId ? 'page' : 'vault', parentPageId ?? 'vault', 'edit');
+        return getDb().transaction(() => {
+          let document = pages.createPage({ title, parentPageId, icon, actorId: 'local' });
+          if (markdown) {
+            const result = pages.replacePageFromMarkdown(document.page.id, markdown, document.revision, 'local');
+            if (!result.ok) throw new Error('La página cambió durante su creación.');
+            document = result.document;
+          }
+          return { page: document.page, documentRevision: document.revision, markdownHash: document.markdownHash };
+        })();
+      })()
+  );
+
+  server.registerTool(
+    'nodus_update_page',
+    {
+      title: 'Update page properties',
+      description:
+        'Updates user-authored page properties with optimistic concurrency. expectedPageRevision must equal the revision returned by nodus_get_page; stale writes fail explicitly. Not read-only.',
+      inputSchema: {
+        pageId: z.string().trim().min(1),
+        expectedPageRevision: z.number().int().min(1),
+        title: z.string().trim().min(1).max(500).optional(),
+        icon: z.string().trim().max(32).nullable().optional(),
+        fullWidth: z.boolean().optional(),
+        locked: z.boolean().optional(),
+      },
+      annotations: { readOnlyHint: false, openWorldHint: false },
+    },
+    ({ pageId, expectedPageRevision, title, icon, fullWidth, locked }) =>
+      tool(() => {
+        assertMcpAcl('page', pageId, 'edit');
+        const updated = pages.updatePage(pageId, { title, icon, fullWidth, locked }, expectedPageRevision, 'local');
+        if (!updated) throw notFound('page', pageId);
+        return { page: updated };
+      })()
+  );
+
+  server.registerTool(
+    'nodus_replace_page_markdown',
+    {
+      title: 'Replace page Markdown',
+      description:
+        'Replaces a page document through the universal block engine. expectedDocumentRevision must come from nodus_get_page. A concurrent edit returns an explicit conflict with the current revision instead of overwriting it. Not read-only.',
+      inputSchema: {
+        pageId: z.string().trim().min(1),
+        expectedDocumentRevision: z.number().int().min(1),
+        markdown: z.string().max(2_000_000),
+      },
+      annotations: { readOnlyHint: false, openWorldHint: false },
+    },
+    ({ pageId, expectedDocumentRevision, markdown }) =>
+      tool(() => {
+        assertMcpAcl('page', pageId, 'edit_content');
+        const result = pages.replacePageFromMarkdown(pageId, markdown, expectedDocumentRevision, 'local');
+        return result.ok
+          ? { ok: true, page: result.document.page, documentRevision: result.document.revision, markdownHash: result.document.markdownHash }
+          : { ok: false, conflict: { kind: result.conflict.kind, expectedRevision: result.conflict.expectedRevision, actualRevision: result.conflict.actualRevision } };
+      })()
+  );
+
+  server.registerTool(
+    'nodus_create_page_comment',
+    {
+      title: 'Create a page comment',
+      description: 'Creates a page, block or threaded reply comment when the local MCP principal has comment access. Not read-only.',
+      inputSchema: {
+        pageId: z.string().trim().min(1),
+        blockId: z.string().trim().min(1).nullable().default(null),
+        parentCommentId: z.string().trim().min(1).nullable().default(null),
+        body: z.string().trim().min(1).max(20_000),
+      },
+      annotations: { readOnlyHint: false, openWorldHint: false },
+    },
+    ({ pageId, blockId, parentCommentId, body }) =>
+      tool(() => {
+        assertMcpAcl('page', pageId, 'comment');
+        return { comment: pageComments.createPageComment({ pageId, blockId, parentCommentId, body, actorId: 'local' }) };
       })()
   );
 
@@ -3297,6 +3602,7 @@ export function registerTools(server: McpServer): void {
     ({ databaseId }) =>
       tool(() => {
         if (!dbMode.getDatabase(databaseId)) throw notFound('database', databaseId);
+        assertMcpAcl('database', databaseId, 'edit_content');
         const row = dbMode.createRow(databaseId);
         return { databaseId, row: { id: row.id, position: row.position } };
       })()
@@ -3319,6 +3625,7 @@ export function registerTools(server: McpServer): void {
       tool(() => {
         const row = dbMode.getRow(rowId);
         if (!row) throw notFound('database row', rowId);
+        assertMcpAcl('row', rowId, 'edit_content');
         const column = dbMode.getColumn(columnId);
         if (!column || column.databaseId !== row.databaseId) throw notFound('database column', columnId);
         const raw = encodeCellForWrite(column, value);

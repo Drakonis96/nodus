@@ -7,6 +7,7 @@
 // that the server checks columns against the last published snapshot, which is the vault's
 // schema expressed as data, without the server needing to know any SQL at all.
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import { mkdtemp, rm } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
@@ -279,8 +280,12 @@ test('a writer sends, the owner drains and acknowledges, and a replay changes no
     assert.equal(drained.spaceSchemaVersion, 121, 'the owner can compare its own schema against the space');
 
     const acked = await (await server.api(owner.deviceToken, 'POST', `/api/v1/spaces/${spaceId}/mutations/ack`, { json: { cursor: drained.cursor } })).json();
-    assert.equal(acked.pending, 0);
+    assert.equal(acked.pending, 2, 'owner acknowledgement cannot discard operations another replica has not read');
     assert.deepEqual((await (await server.api(owner.deviceToken, 'GET', `/api/v1/spaces/${spaceId}/mutations`)).json()).mutations, []);
+    const writerStream = await (await server.api(writer.deviceToken, 'GET', `/api/v1/spaces/${spaceId}/mutations`)).json();
+    assert.deepEqual(writerStream.mutations.map((entry) => entry.id), ['mut-1', 'mut-3']);
+    const writerAck = await (await server.api(writer.deviceToken, 'POST', `/api/v1/spaces/${spaceId}/mutations/ack`, { json: { cursor: writerStream.cursor } })).json();
+    assert.equal(writerAck.pending, 0, 'the relay compacts only after every live device advanced');
 
     // Batch bounds.
     const empty = await server.api(writer.deviceToken, 'POST', `/api/v1/spaces/${spaceId}/mutations`, { json: { mutations: [] } });
@@ -460,5 +465,120 @@ test('a mutation that names an image the server does not hold is a retryable 409
     const retried = await server.api(writer.deviceToken, 'POST', `/api/v1/spaces/${spaceId}/mutations`, { json: { mutations: [withImage] } });
     assert.equal(retried.status, 200);
     assert.deepEqual((await retried.json()).accepted, ['mut-image']);
+  });
+});
+
+test('Yjs bytes use a verified binary channel and only metadata enters the relay', { timeout: 60_000 }, async () => {
+  await withServer({ label: 'mutations-yjs' }, async (server) => {
+    const spaceId = await server.createSpace('Páginas colaborativas');
+    const owner = await server.deviceToken(server.adminEmail, server.adminPassword, spaceId);
+    await server.createUser('yjs-writer@example.test', 'yjs-writer-password', [{ spaceId, role: 'writer' }]);
+    const writer = await server.deviceToken('yjs-writer@example.test', 'yjs-writer-password', spaceId);
+    await publish(server.origin, owner.deviceToken, spaceId, academicSnapshot());
+    const bytes = Buffer.from([1, 2, 3, 4, 5, 250, 251]);
+    const hash = createHash('sha256').update(bytes).digest('hex');
+    const update = mutation({
+      id: 'mut-yjs', table: 'page_document_updates', key: ['update-yjs'], documentHash: hash,
+      row: {
+        id: 'update-yjs', page_id: 'page-yjs', sequence_no: 1, update_hash: hash,
+        actor_id: 'writer', client_id: 'writer-device', created_at: '2026-02-02T00:00:00.000Z',
+      }, schemaVersion: 150,
+    });
+    const missing = await server.api(writer.deviceToken, 'POST', `/api/v1/spaces/${spaceId}/mutations`, { json: { mutations: [update] } });
+    assert.equal(missing.status, 409, 'metadata is not accepted before its binary delta exists');
+    assert.deepEqual((await missing.json()).missing, [hash]);
+
+    const uploaded = await server.api(writer.deviceToken, 'PUT', `/api/v1/spaces/${spaceId}/document-updates/${hash}`, { body: bytes });
+    assert.equal(uploaded.status, 200);
+    const accepted = await server.api(writer.deviceToken, 'POST', `/api/v1/spaces/${spaceId}/mutations`, { json: { mutations: [update] } });
+    assert.equal(accepted.status, 200);
+    const relayed = await (await server.api(owner.deviceToken, 'GET', `/api/v1/spaces/${spaceId}/mutations?since=0`)).json();
+    assert.equal(relayed.mutations[0].documentHash, hash);
+    assert.equal(Object.prototype.hasOwnProperty.call(relayed.mutations[0].row, 'update_blob'), false, 'binary never enters mutation JSON');
+    const downloaded = await server.api(owner.deviceToken, 'GET', `/api/v1/spaces/${spaceId}/document-updates/${hash}`);
+    assert.deepEqual(Buffer.from(await downloaded.arrayBuffer()), bytes);
+  });
+});
+
+test('shared files resume missing chunks and verify chunk plus final checksums', { timeout: 60_000 }, async () => {
+  await withServer({ label: 'mutations-shared-blobs' }, async (server) => {
+    const spaceId = await server.createSpace('Adjuntos compartidos');
+    const owner = await server.deviceToken(server.adminEmail, server.adminPassword, spaceId);
+    await server.createUser('blob-writer@example.test', 'blob-writer-password', [{ spaceId, role: 'writer' }]);
+    const writer = await server.deviceToken('blob-writer@example.test', 'blob-writer-password', spaceId);
+    await publish(server.origin, owner.deviceToken, spaceId, academicSnapshot());
+    const bytes = Buffer.alloc(2 * 1024 * 1024 + 37);
+    for (let index = 0; index < bytes.length; index += 1) bytes[index] = index % 251;
+    const hash = createHash('sha256').update(bytes).digest('hex');
+    const endpoint = `/api/v1/spaces/${spaceId}/blobs/${hash}`;
+    const chunks = [bytes.subarray(0, 1024 * 1024), bytes.subarray(1024 * 1024, 2 * 1024 * 1024), bytes.subarray(2 * 1024 * 1024)];
+    const upload = (index) => server.api(writer.deviceToken, 'PUT', `${endpoint}/chunks/${index}`, {
+      headers: {
+        'x-nodus-total-chunks': '3', 'x-nodus-total-bytes': String(bytes.length),
+        'x-nodus-chunk-sha256': createHash('sha256').update(chunks[index]).digest('hex'),
+      }, body: chunks[index],
+    });
+    assert.equal((await upload(0)).status, 200);
+    assert.equal((await upload(2)).status, 200);
+    const partial = await (await server.api(writer.deviceToken, 'GET', `${endpoint}/status`)).json();
+    assert.deepEqual(partial.received, [0, 2], 'a reconnect learns exactly which chunks need retrying');
+    assert.equal(partial.complete, false);
+    assert.equal((await upload(1)).status, 200);
+    assert.equal((await server.api(writer.deviceToken, 'POST', `${endpoint}/complete`)).status, 200);
+    const complete = await (await server.api(writer.deviceToken, 'GET', `${endpoint}/status`)).json();
+    assert.equal(complete.complete, true);
+    const range = await server.api(owner.deviceToken, 'GET', endpoint, { headers: { range: 'bytes=1048576-1048612' } });
+    assert.equal(range.status, 206);
+    assert.deepEqual(Buffer.from(await range.arrayBuffer()), bytes.subarray(1024 * 1024, 1024 * 1024 + 37));
+  });
+});
+
+test('presence and text cursors are authorized, ephemeral, and absent from server backups', { timeout: 60_000 }, async () => {
+  await withServer({ label: 'ephemeral-presence' }, async (server) => {
+    const spaceId = await server.createSpace('Presencia');
+    const owner = await server.deviceToken(server.adminEmail, server.adminPassword, spaceId);
+    await server.createUser('presence-reader@example.test', 'presence-reader-password', [{ spaceId, role: 'reader' }]);
+    const reader = await server.deviceToken('presence-reader@example.test', 'presence-reader-password', spaceId, 'Lector presente');
+    const marker = 'page-presence-must-never-persist';
+    const posted = await server.api(reader.deviceToken, 'POST', `/api/v1/spaces/${spaceId}/presence`, {
+      json: { pageId: marker, blockId: 'block-1', cursor: { anchor: 3, head: 8 }, color: '#5b7cfa' },
+    });
+    assert.equal(posted.status, 200, 'a reader may announce presence without gaining write access to content');
+    const visible = await (await server.api(owner.deviceToken, 'GET', `/api/v1/spaces/${spaceId}/presence`)).json();
+    assert.equal(visible.participants.length, 1);
+    assert.deepEqual(visible.participants[0].cursor, { anchor: 3, head: 8 });
+    assert.equal(visible.participants[0].pageId, marker);
+    assert.equal(JSON.stringify(await server.readState()).includes(marker), false, 'presence is never written to state.json or a backup');
+    await server.api(reader.deviceToken, 'DELETE', `/api/v1/spaces/${spaceId}/presence`);
+    assert.deepEqual((await (await server.api(owner.deviceToken, 'GET', `/api/v1/spaces/${spaceId}/presence`)).json()).participants, []);
+  });
+});
+
+test('SSE wakes every authorized replica immediately and polling remains available', { timeout: 60_000 }, async () => {
+  await withServer({ label: 'mutation-events' }, async (server) => {
+    const spaceId = await server.createSpace('Relay inmediato');
+    const owner = await server.deviceToken(server.adminEmail, server.adminPassword, spaceId);
+    await server.createUser('stream-writer@example.test', 'stream-writer-password', [{ spaceId, role: 'writer' }]);
+    const writer = await server.deviceToken('stream-writer@example.test', 'stream-writer-password', spaceId);
+    await publish(server.origin, owner.deviceToken, spaceId, academicSnapshot());
+    const aborter = new AbortController();
+    try {
+      const events = await fetch(`${server.origin}/api/v1/spaces/${spaceId}/mutations/events`, {
+        headers: { authorization: `Bearer ${owner.deviceToken}` }, signal: aborter.signal,
+      });
+      assert.equal(events.status, 200); assert.match(events.headers.get('content-type'), /text\/event-stream/);
+      const reader = events.body.getReader(); const decoder = new TextDecoder();
+      const ready = decoder.decode((await reader.read()).value); assert.match(ready, /event: ready/);
+      const sent = await server.api(writer.deviceToken, 'POST', `/api/v1/spaces/${spaceId}/mutations`, { json: { mutations: [mutation({ id: 'sse-mut' })] } });
+      assert.equal(sent.status, 200);
+      let received = '';
+      for (let index = 0; index < 4 && !received.includes('event: mutation'); index += 1) {
+        const next = await Promise.race([reader.read(), new Promise((_, reject) => setTimeout(() => reject(new Error('SSE timeout')), 3_000))]);
+        received += decoder.decode(next.value);
+      }
+      assert.match(received, /event: mutation/); assert.match(received, /"cursor":1/);
+      const polled = await (await server.api(owner.deviceToken, 'GET', `/api/v1/spaces/${spaceId}/mutations?since=0`)).json();
+      assert.deepEqual(polled.mutations.map((entry) => entry.id), ['sse-mut']);
+    } finally { aborter.abort(); }
   });
 });

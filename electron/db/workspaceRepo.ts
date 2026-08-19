@@ -32,6 +32,7 @@ import { normalizeStudyDocStyle, parseStudyDocLinks } from '@shared/studyEditor'
 import type { Note, WorkspaceLibraryLink, WorkspaceLibraryLinkInput } from '@shared/types';
 import { getDb } from './database';
 import { getNote } from './notesRepo';
+import { reconcileLegacyNoteCache, synchronizeNotePage } from './pagesRepo';
 
 type Row = Record<string, unknown>;
 
@@ -174,6 +175,7 @@ function noteBacklinks(noteId: string, title: string): StudyDocLink[] {
 // ── Lo que el editor pide al abrir una nota ──────────────────────────────────────
 
 export function getWorkspaceNoteEditorData(noteId: string): StudyDocEditorData {
+  reconcileLegacyNoteCache(noteId);
   const db = getDb();
   const row = noteRow(noteId);
   return {
@@ -223,6 +225,7 @@ export function updateWorkspaceNote(noteId: string, input: StudyDocUpdateInput):
       JSON.stringify(input.customDictionary ?? parseJson<string[]>(current.custom_dictionary_json, [])),
       now(), noteId
     );
+    synchronizeNotePage(noteId, title, content);
     return getNote(noteId)!;
   })();
 }

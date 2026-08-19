@@ -920,6 +920,7 @@ export class LibraryCatalog {
     const limit = Math.max(1, Math.min(500, Math.trunc(query.limit ?? 100)));
     const offset = Math.max(0, Math.trunc(query.offset ?? 0));
     const where: string[] = [];
+    const joins: string[] = [];
     const params: Record<string, unknown> = { limit, offset };
     if (!query.includeDeleted && !(query.smartSearch && smartSearchUsesTrash(query.smartSearch))) where.push('i.deleted_at IS NULL');
     if (query.source) { where.push('i.source=@source'); params.source = query.source; }
@@ -932,7 +933,10 @@ export class LibraryCatalog {
     if (query.hasAttachments === true) where.push('i.attachment_count>0');
     if (query.hasAttachments === false) where.push('i.attachment_count=0');
     if (query.collectionId) {
-      where.push('EXISTS (SELECT 1 FROM library_item_collections ic WHERE ic.item_id=i.id AND ic.collection_id=@collectionId)');
+      // Start from the selective `(collection_id, item_id)` index. A correlated EXISTS
+      // made SQLite scan every library item twice (COUNT + page) to find a handful of
+      // memberships, which became unstable under the parallel release suite.
+      joins.push('JOIN library_item_collections query_collection ON query_collection.item_id=i.id AND query_collection.collection_id=@collectionId');
       params.collectionId = this.resolveCollectionId(query.collectionId) ?? query.collectionId;
     }
     if (query.smartSearch) {
@@ -940,12 +944,12 @@ export class LibraryCatalog {
       where.push(smartSearchSql(query.smartSearch, params));
     }
     const normalizedSearch = query.search?.trim();
-    let join = '';
     if (normalizedSearch) {
-      join = 'JOIN library_items_fts f ON f.item_id=i.id';
+      joins.push('JOIN library_items_fts f ON f.item_id=i.id');
       where.push('library_items_fts MATCH @search');
       params.search = ftsQuery(normalizedSearch);
     }
+    const join = joins.join(' ');
     const clause = where.length ? `WHERE ${where.join(' AND ')}` : '';
     const total = Number((this.handle.prepare(
       `SELECT COUNT(*) AS count FROM library_items i ${join} ${clause}`

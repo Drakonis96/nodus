@@ -33,6 +33,43 @@ export const MUTABLE_TABLES = [
   'notes',
   'note_folders',
   'note_links',
+  'pages',
+  'page_blocks',
+  'page_favorites',
+  'page_links',
+  'page_document_updates',
+  'page_revisions',
+  'page_comments',
+  'page_comment_reactions',
+  'page_comment_mentions',
+  'workspace_actors',
+  'workspace_groups',
+  'workspace_group_members',
+  'acl_entries',
+  'db_databases',
+  'db_data_sources',
+  'db_columns',
+  'db_rows',
+  'db_cells',
+  'db_views',
+  'db_view_sources',
+  'db_view_revisions',
+  'db_select_options',
+  'db_relations',
+  'db_attachments',
+  'db_row_templates',
+  'db_template_runs',
+  'db_row_hierarchy',
+  'db_row_dependencies',
+  'db_task_configs',
+  'db_sprints',
+  'db_sprint_rows',
+  'automation_rules',
+  'automation_runs',
+  'automation_notifications',
+  'database_forms',
+  'database_form_fields',
+  'database_form_submissions',
   'writing_saved_drafts',
   'writing_draft_annotations',
   'decorative_images',
@@ -62,14 +99,20 @@ function keyExpression(alias: 'OLD' | 'NEW', identity: string[]): string {
  */
 function enqueueStatement(table: string, op: 'upsert' | 'delete', keySql: string): string {
   const literal = `'${table.replace(/'/g, "''")}'`;
+  const device = "COALESCE((SELECT id FROM workspace_devices ORDER BY created_at, id LIMIT 1), 'local-device')";
+  const actor = "COALESCE((SELECT actor_id FROM workspace_devices ORDER BY created_at, id LIMIT 1), 'local')";
+  const hlc = `printf('%013d-%06d-%s', CAST((julianday('now') - 2440587.5) * 86400000 AS INTEGER), (COALESCE((SELECT MAX(seq) FROM server_outbox), 0) + 1) % 1000000, ${device})`;
   return (
-    `INSERT INTO server_outbox (id, seq, table_name, row_key, op, schema_version, created_at, state, attempts, last_error) ` +
+    `INSERT INTO server_outbox (id, seq, table_name, row_key, op, schema_version, created_at, state, attempts, last_error, actor_id, device_id, hlc) ` +
     `VALUES (lower(hex(randomblob(16))), ` +
     `COALESCE((SELECT MAX(seq) FROM server_outbox), 0) + 1, ` +
-    `${literal}, ${keySql}, '${op}', ${SCHEMA_VERSION}, strftime('%Y-%m-%dT%H:%M:%fZ','now'), 'pending', 0, NULL) ` +
+    `${literal}, ${keySql}, '${op}', ${SCHEMA_VERSION}, strftime('%Y-%m-%dT%H:%M:%fZ','now'), 'pending', 0, NULL, ${actor}, ${device}, ${hlc}) ` +
     `ON CONFLICT(table_name, row_key) WHERE state = 'pending' DO UPDATE SET ` +
     `op = excluded.op, created_at = excluded.created_at, schema_version = excluded.schema_version, ` +
-    `attempts = 0, last_error = NULL;`
+    `actor_id = excluded.actor_id, device_id = excluded.device_id, hlc = excluded.hlc, ` +
+    `attempts = 0, last_error = NULL; ` +
+    `UPDATE workspace_devices SET last_hlc = COALESCE((SELECT hlc FROM server_outbox ORDER BY seq DESC LIMIT 1), last_hlc), revision = revision + 1, ` +
+    `updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id = ${device};`
   );
 }
 
@@ -187,6 +230,9 @@ export interface OutboxEntry {
   state: 'pending' | 'sending' | 'sent' | 'rejected';
   attempts: number;
   last_error: string | null;
+  actor_id: string;
+  device_id: string;
+  hlc: string;
 }
 
 export function listPendingOutbox(db: Database.Database, limit: number): OutboxEntry[] {

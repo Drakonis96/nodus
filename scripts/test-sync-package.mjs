@@ -36,6 +36,8 @@ try {
   const Database = require('better-sqlite3');
   const { runMigrations, SCHEMA_VERSION } = require(path.join(repoRoot, 'electron/db/migrations.ts'));
   const sync = require(path.join(repoRoot, 'electron/export/syncPackage.ts'));
+  const { databaseCellStorage } = require(path.join(repoRoot, 'shared/databaseCellStorage.ts'));
+  const dbmode = require(path.join(repoRoot, 'electron/db/databasesRepo.ts'));
 
   const makeDb = (name) => {
     const db = new Database(path.join(root, name));
@@ -56,6 +58,22 @@ try {
   const T1 = '2026-07-05T10:00:00.000Z';
   const T2 = '2026-07-09T10:00:00.000Z';
   const ins = (db, table, row) => {
+    row = { ...row };
+    if (table === 'db_columns') row.updated_at ??= row.created_at;
+    if (table === 'db_cells') {
+      const source = db.prepare(
+        'SELECT data_row.database_id, data_row.created_at, data_row.updated_at, property.type FROM db_rows data_row JOIN db_columns property ON property.id = ? WHERE data_row.id = ?',
+      ).get(row.column_id, row.row_id);
+      Object.assign(row, databaseCellStorage(source.type, row.value_text), {
+        database_id: source.database_id,
+        created_at: source.created_at,
+        updated_at: source.updated_at,
+      });
+    }
+    if (table === 'db_attachments' || table === 'db_relations') {
+      row.database_id ??= db.prepare('SELECT database_id FROM db_rows WHERE id = ?').get(row.row_id).database_id;
+      row.updated_at ??= row.created_at;
+    }
     const keys = Object.keys(row);
     db.prepare(`INSERT INTO ${table} (${keys.join(', ')}) VALUES (${keys.map(() => '?').join(', ')})`).run(...Object.values(row));
   };
@@ -253,14 +271,9 @@ try {
   // one row per label — the merge must not resurrect a duplicate on the way back.
   assert.equal(dbA.prepare("SELECT COUNT(*) AS n FROM study_academic_years WHERE label = '2024/2025'").get().n, 1, 'no duplicate year on the way back');
 
-  // ── An edited cell travels, even though cells have no timestamp ────────────
-  // db_cells is (row_id, column_id, value_text): editing a value bumps
-  // db_rows.updated_at, not the cell. Merging rows generically without accounting for
-  // that would mean a changed cell value silently never reaches the other machine.
-  const T3 = '2026-07-12T10:00:00.000Z';
+  // ── An edited typed cell travels with its own revision timestamp ───────────
   useDb(dbA);
-  dbA.prepare("UPDATE db_cells SET value_text = 'editado en A' WHERE row_id = 'rowA' AND column_id = 'colA'").run();
-  dbA.prepare('UPDATE db_rows SET updated_at = ? WHERE id = ?').run(T3, 'rowA');
+  dbmode.setCell('rowA', 'colA', 'editado en A');
   const editPkg = sync.buildSyncPackage('test', PASS);
   useDb(dbB);
   const editSummary = sync.mergeSyncPackage(editPkg.buffer, PASS);

@@ -8,6 +8,13 @@
 import { decodeCheckbox, decodeMultiSelect, decodeNumber } from './databases';
 import type { DatabaseColumn, DatabaseColumnType, DatabaseRow } from './databases';
 import { comparableType } from './databaseFormula';
+import { databaseDateSortValue, databasePropertyPlainText } from './databaseProperties';
+import type {
+  DatabaseViewConfig,
+  DatabaseViewEditPermission,
+  DatabaseViewLayout,
+  DatabaseViewScope,
+} from './databaseViewConfig';
 
 export type FilterOp =
   | 'contains'
@@ -61,18 +68,45 @@ export interface DatabaseSavedView {
   id: string;
   databaseId: string;
   name: string;
-  layout: 'table' | 'gallery';
+  layout: DatabaseViewLayout;
   filter: DatabaseFilterState;
   sorts: SortRule[];
+  config: DatabaseViewConfig;
+  scope: DatabaseViewScope;
+  ownerActorId: string;
+  editPermission: DatabaseViewEditPermission;
+  sourceViewId: string | null;
   position: number;
+  revision: number;
   createdAt: string;
+  updatedAt: string;
 }
 
 export interface SavedViewInput {
   name: string;
-  layout: 'table' | 'gallery';
+  layout: DatabaseViewLayout;
   filter: DatabaseFilterState;
   sorts: SortRule[];
+  config?: DatabaseViewConfig;
+  scope?: DatabaseViewScope;
+  ownerActorId?: string;
+  editPermission?: DatabaseViewEditPermission;
+  sourceViewId?: string | null;
+}
+
+export interface SavedViewPatch extends Partial<SavedViewInput> {
+  expectedRevision?: number;
+}
+
+export interface DatabaseViewRevision {
+  id: string;
+  viewId: string;
+  revision: number;
+  name: string;
+  config: DatabaseViewConfig;
+  reason: 'create' | 'update' | 'restore' | 'reorder';
+  actorId: string;
+  createdAt: string;
 }
 
 const OP_LABELS: Record<FilterOp, string> = {
@@ -111,21 +145,34 @@ export function operatorsForColumn(column: DatabaseColumn): FilterOp[] {
 export function operatorsForType(type: DatabaseColumnType): FilterOp[] {
   switch (type) {
     case 'title':
+    case 'rich_text':
     case 'text':
     case 'ai':
+    case 'url':
+    case 'email':
+    case 'phone':
+    case 'location':
+    case 'person':
+    case 'created_by':
+    case 'last_edited_by':
+    case 'unique_id':
       return ['contains', 'notContains', 'equals', 'notEquals', 'isEmpty', 'notEmpty'];
     case 'number':
       return ['equals', 'notEquals', 'gt', 'gte', 'lt', 'lte', 'isEmpty', 'notEmpty'];
     case 'date':
     case 'time':
+    case 'created_time':
+    case 'last_edited_time':
       return ['equals', 'before', 'after', 'isEmpty', 'notEmpty'];
     case 'select':
+    case 'status':
       return ['isAnyOf', 'isNoneOf', 'isEmpty', 'notEmpty'];
     case 'multi_select':
       return ['isAnyOf', 'hasAllOf', 'isNoneOf', 'isEmpty', 'notEmpty'];
     case 'checkbox':
       return ['isChecked', 'isUnchecked'];
     case 'attachment':
+    case 'files':
     case 'relation':
       return ['isEmpty', 'notEmpty'];
     default:
@@ -156,9 +203,10 @@ export function matchesCondition(column: DatabaseColumn, row: DatabaseRow, cond:
   // A formula column stores its result in cells; compare it as whatever it computes.
   switch (comparableType(column)) {
     case 'title':
+    case 'rich_text':
     case 'text':
     case 'ai': {
-      const text = (raw ?? '').toLowerCase();
+      const text = databasePropertyPlainText(column.type, raw).toLowerCase();
       const q = String(cond.value ?? '').toLowerCase();
       switch (cond.op) {
         case 'contains':
@@ -207,7 +255,7 @@ export function matchesCondition(column: DatabaseColumn, row: DatabaseRow, cond:
     }
     case 'date':
     case 'time': {
-      const v = raw ?? '';
+      const v = column.type === 'date' ? databaseDateSortValue(raw) : raw ?? '';
       const target = String(cond.value ?? '');
       switch (cond.op) {
         case 'isEmpty':

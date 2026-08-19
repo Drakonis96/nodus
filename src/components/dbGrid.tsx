@@ -20,7 +20,7 @@ import { t } from '../i18n';
 
 // ── Layout constants ────────────────────────────────────────────────────────────
 export const ROW_HEIGHT = 40;
-export const GUTTER_WIDTH = 58;
+export const GUTTER_WIDTH = 64;
 export const ADD_COLUMN_WIDTH = 44;
 export const MIN_COL_WIDTH = 80;
 export const MAX_COL_WIDTH = 640;
@@ -127,24 +127,34 @@ export function defaultColumnWidth(type: DatabaseColumnType): number {
       return 240;
     case 'checkbox':
       return 90;
+    case 'unique_id':
+      return 130;
     case 'number':
     case 'date':
     case 'time':
+    case 'created_time':
+    case 'last_edited_time':
       return 150;
     case 'attachment':
+    case 'files':
     case 'ai_image':
       return 220;
     case 'relation':
+    case 'person':
+    case 'created_by':
+    case 'last_edited_by':
+    case 'location':
       return 220;
     default:
       return 190;
   }
 }
 
-/** Chip background/border/text derived from an option color (or a neutral grey). */
+/** Chip background/border derived from an option color (or a neutral grey).
+ * Labels use `.db-option-chip` so accent colours never reduce text contrast. */
 export function chipStyle(color: string | null): React.CSSProperties {
   const c = color || '#6b7280';
-  return { backgroundColor: `${c}22`, color: c, borderColor: `${c}66` };
+  return { backgroundColor: `${c}22`, borderColor: `${c}99` };
 }
 
 // ── Cell editors (type-agnostic; value/onChange contract) ───────────────────────
@@ -159,7 +169,7 @@ export function TextCell({
 }: {
   value: string | null;
   onChange: (raw: string | null) => void;
-  inputType: 'text' | 'number' | 'date' | 'time';
+  inputType: 'text' | 'number' | 'date' | 'time' | 'url' | 'email' | 'tel';
   align?: 'left' | 'right';
   wrap?: boolean;
 }) {
@@ -195,8 +205,8 @@ export function TextCell({
   const display = inputType === 'number' && value != null ? String(decodeNumber(value) ?? value) : value ?? '';
   return (
     <button
-      className={`w-full h-full px-2 text-sm text-left hover:bg-neutral-800/40 ${wrap ? 'whitespace-normal break-words py-1' : 'truncate'} ${align === 'right' ? 'text-right' : ''} ${
-        value == null ? 'text-neutral-600' : ''
+      className={`w-full h-full px-2 text-sm text-left text-neutral-800 hover:bg-neutral-100 dark:text-neutral-100 dark:hover:bg-neutral-800/40 ${wrap ? 'whitespace-normal break-words py-1' : 'truncate'} ${align === 'right' ? 'text-right' : ''} ${
+        value == null ? 'text-neutral-500 dark:text-neutral-600' : ''
       }`}
       onClick={() => setEditing(true)}
     >
@@ -227,6 +237,18 @@ export function LongTextCell({
   const [preview, setPreview] = useState(false);
   const [draft, setDraft] = useState(value ?? '');
   useEffect(() => setDraft(value ?? ''), [value]);
+  useEffect(() => {
+    const closeForGridPaste = () => {
+      // A spreadsheet-style paste belongs to the grid selection, not to the popover
+      // opened by the selecting click. Cancel its stale draft before the bulk write so
+      // a later backdrop click cannot overwrite the pasted value.
+      setDraft(value ?? '');
+      setPreview(false);
+      setOpen(false);
+    };
+    window.addEventListener('nodus:database-grid-paste', closeForGridPaste);
+    return () => window.removeEventListener('nodus:database-grid-paste', closeForGridPaste);
+  }, [value]);
 
   const commit = () => {
     setOpen(false);
@@ -244,7 +266,7 @@ export function LongTextCell({
     <div className="w-full h-full">
       <button
         ref={btnRef}
-        className={`w-full h-full px-2 text-sm text-left hover:bg-neutral-800/40 ${wrap ? 'whitespace-pre-wrap break-words py-1' : 'truncate'} ${value == null ? 'text-neutral-600' : ''}`}
+        className={`w-full h-full px-2 text-sm text-left text-neutral-800 hover:bg-neutral-100 dark:text-neutral-100 dark:hover:bg-neutral-800/40 ${wrap ? 'whitespace-pre-wrap break-words py-1' : 'truncate'} ${value == null ? 'text-neutral-500 dark:text-neutral-600' : ''}`}
         onClick={() => setOpen(true)}
         title={value ?? ''}
       >
@@ -375,7 +397,7 @@ export function ChipSelectCell({
               return (
                 <span
                   key={id}
-                  className="whitespace-nowrap rounded-full border px-2 py-0.5 text-[11px]"
+                  className="db-option-chip whitespace-nowrap rounded-full border px-2 py-0.5 text-[11px]"
                   style={chipStyle(opt?.color ?? null)}
                 >
                   {opt?.label ?? id}
@@ -416,7 +438,7 @@ export function ChipSelectCell({
                       return (
                         <span
                           key={id}
-                          className="flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px]"
+                          className="db-option-chip flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px]"
                           style={chipStyle(opt?.color ?? null)}
                         >
                           {opt?.label ?? id}
@@ -467,16 +489,20 @@ export function CheckboxCell({
   value,
   onChange,
   align = 'center',
+  label,
 }: {
   value: string | null;
   onChange: (raw: string | null) => void;
   align?: 'center' | 'start';
+  label: string;
 }) {
   const checked = decodeCheckbox(value);
   return (
     <button
       className={`w-full h-full flex items-center hover:bg-neutral-800/40 ${align === 'start' ? 'justify-start px-3 py-2' : 'justify-center'}`}
       onClick={() => onChange(encodeCheckbox(!checked))}
+      aria-label={`${label}: ${checked ? t('Sí') : t('No')}`}
+      aria-pressed={checked}
     >
       <span
         className={`w-4 h-4 rounded border flex items-center justify-center ${

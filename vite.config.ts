@@ -14,6 +14,19 @@ const require = createRequire(import.meta.url);
 const eventsPolyfill = require.resolve('events/');
 const pkg = require('./package.json') as { version: string };
 
+const databaseComputeWorkerAliases = () => ({
+  name: 'database-compute-worker-aliases',
+  enforce: 'pre' as const,
+  resolveId(source: string, _importer?: string) {
+    // This plugin is installed only in the standalone calculation-worker build, so
+    // every database accessor in that graph must resolve to the authorized worker
+    // connection (query suffixes may be normalized before resolveId runs).
+    if (source === './database' || source === '../db/database') return path.resolve(__dirname, 'electron/db/databaseComputeRuntime.ts');
+    if (source === './crossVault') return path.resolve(__dirname, 'electron/db/crossVaultComputeStub.ts');
+    return null;
+  },
+});
+
 // Native node modules and Electron-only deps must stay external in the main process bundle.
 const mainExternals = [
   'better-sqlite3',
@@ -23,6 +36,7 @@ const mainExternals = [
   'adm-zip',
   'tesseract.js',
   '@napi-rs/canvas',
+  'sharp',
   'heic-decode',
   '@anthropic-ai/sdk',
   '@google/genai',
@@ -83,6 +97,60 @@ const preloadBuild = (name: string, entry: string) => ({
     },
   },
 });
+
+const databaseComputeWorkerBuild = {
+  onstart: (args: { reload: () => void }) => args.reload(),
+  vite: {
+    plugins: [databaseComputeWorkerAliases()],
+    resolve: { alias: { '@shared': path.resolve(__dirname, 'shared') } },
+    build: {
+      outDir: 'dist-electron',
+      emptyOutDir: false,
+      rollupOptions: {
+        input: path.join(__dirname, 'electron/workers/databaseComputeWorker.ts'),
+        external: mainExternals,
+        // worker_threads in Electron cannot translate native CommonJS addons from an
+        // ESM worker reliably. A self-contained CJS entry loads better-sqlite3 through
+        // Node's native require path and keeps the worker independent from main chunks.
+        output: { format: 'cjs' as const, entryFileNames: 'databaseComputeWorker.cjs', inlineDynamicImports: true },
+      },
+    },
+  },
+};
+
+const databaseScaleFixtureWorkerBuild = {
+  onstart: (args: { reload: () => void }) => args.reload(),
+  vite: {
+    plugins: [databaseComputeWorkerAliases()],
+    resolve: { alias: { '@shared': path.resolve(__dirname, 'shared') } },
+    build: {
+      outDir: 'dist-electron',
+      emptyOutDir: false,
+      rollupOptions: {
+        input: path.join(__dirname, 'electron/workers/databaseScaleFixtureWorker.ts'),
+        external: mainExternals,
+        output: { format: 'cjs' as const, entryFileNames: 'databaseScaleFixtureWorker.cjs', inlineDynamicImports: true },
+      },
+    },
+  },
+};
+
+const databaseAggregateWorkerBuild = {
+  onstart: (args: { reload: () => void }) => args.reload(),
+  vite: {
+    plugins: [databaseComputeWorkerAliases()],
+    resolve: { alias: { '@shared': path.resolve(__dirname, 'shared') } },
+    build: {
+      outDir: 'dist-electron',
+      emptyOutDir: false,
+      rollupOptions: {
+        input: path.join(__dirname, 'electron/workers/databaseAggregateWorker.ts'),
+        external: mainExternals,
+        output: { format: 'cjs' as const, entryFileNames: 'databaseAggregateWorker.cjs', inlineDynamicImports: true },
+      },
+    },
+  },
+};
 
 /** A utility process must not share Rollup chunks with Electron's main entry: a shared
  * chunk may pull `app`/`BrowserWindow` imports into a process where Electron does not
@@ -222,6 +290,9 @@ export default defineConfig({
     electronPlugin([
       preloadBuild('preload.nodi', 'electron/preload/nodi.ts'),
       preloadBuild('preload.presenter', 'electron/preload/presenter.ts'),
+      databaseComputeWorkerBuild,
+      databaseScaleFixtureWorkerBuild,
+      databaseAggregateWorkerBuild,
       utilityBuild('backupUtilityWorker', 'electron/export/backupUtilityWorker.ts'),
       utilityBuild('serverPublishWorker', 'electron/serverSync/serverPublishWorker.ts'),
     ]),

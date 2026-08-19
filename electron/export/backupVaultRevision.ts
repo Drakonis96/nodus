@@ -15,15 +15,13 @@ function quoteIdentifier(value: string): string {
  * them); their source/content tables are tracked normally.
  */
 export function ensureBackupRevisionTriggers(db: Database.Database): void {
-  const tables = db.prepare(`
-    SELECT name
-    FROM sqlite_master
-    WHERE type = 'table'
-      AND name NOT LIKE 'sqlite_%'
-      AND name <> 'backup_revision'
-      AND COALESCE(sql, '') NOT LIKE 'CREATE VIRTUAL TABLE%'
-    ORDER BY name
-  `).all() as Array<{ name: string }>;
+  // `sqlite_master` describes FTS shadow storage as ordinary CREATE TABLE rows, even
+  // though SQLite rejects user triggers on them. `table_list` exposes the real kind and
+  // lets us retain only normal main-schema tables.
+  const tables = (db.pragma('table_list') as Array<{ schema: string; name: string; type: string }>)
+    .filter((table) => table.schema === 'main' && table.type === 'table')
+    .filter((table) => !table.name.startsWith('sqlite_') && table.name !== 'backup_revision')
+    .sort((left, right) => left.name.localeCompare(right.name));
   const desired = new Set<string>();
   for (const { name } of tables) {
     for (const operation of ['insert', 'update', 'delete'] as const) {

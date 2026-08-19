@@ -54,6 +54,10 @@ try {
   await page.waitForFunction(() => Boolean(document.getElementById('root')?.children.length));
   await page.evaluate((version) => {
     localStorage.setItem('nodus.lastSeenVersion', version);
+    localStorage.setItem('nodus.mobileTeaserSeen.3.2.4', '1');
+    localStorage.setItem('nodus.toolkitBetaGuideSeen.2.4.0', '1');
+    localStorage.setItem('nodus.tutorialVideosAnnouncementSeen.2026-07', '1');
+    localStorage.setItem('nodus.platformHighlightsSeen.2026-07', '1');
     sessionStorage.setItem('nodus.startupUpdateChecked', '1');
   }, appVersion);
   await page.evaluate(async () => {
@@ -89,7 +93,7 @@ try {
     return { databaseId: database.id, rowId: rows[0].id, notesId: notes.id, aiId: ai.id };
   }, { note: longNote, summary: generatedSummary });
 
-  await page.getByText('Muestras de campo', { exact: true }).first().click();
+  await page.getByRole('button', { name: 'Muestras de campo', exact: true }).first().click();
   await page.getByTitle(longNote).waitFor();
   console.log('[database-records] Database table open');
 
@@ -148,7 +152,7 @@ try {
   await page.evaluate(() => window.nodus.updateSettings({ theme: 'dark' }));
   await page.reload();
   await page.getByTestId('app-shell').waitFor();
-  await page.getByText('Muestras de campo', { exact: true }).first().click();
+  await page.getByRole('button', { name: 'Muestras de campo', exact: true }).first().click();
   await page.getByRole('button', { name: 'Galería', exact: true }).click();
   await page.getByText('Musgo alpino', { exact: true }).click();
   const darkModal = page.getByTestId('database-record-modal');

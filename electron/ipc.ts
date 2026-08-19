@@ -24,6 +24,7 @@ import { registerTestimoniesIpc } from './ipc/testimonies';
 import { registerToolkitIpc } from './ipc/toolkit';
 import { registerTeachingIpc } from './ipc/teaching';
 import { registerDatabasesIpc } from './ipc/databases';
+import { registerPagesIpc } from './ipc/pages';
 import { registerPrimarySourcesIpc } from './ipc/primarySources';
 import { registerArchiveIpc } from './ipc/archive';
 import { registerWorldbuildingIpc } from './ipc/worldbuilding';
@@ -101,10 +102,12 @@ import {
   createConnectedVault,
   detachReplica,
   getReplicaOverview,
+  listReplicaPresence,
   signInToNodusServer,
   startReplicaSync,
   stopReplicaSync,
   syncReplicaNow,
+  updateReplicaPresence,
   type RemoteSpaceOption,
 } from './serverSync/replicaService';
 import { restartLocalServer } from './localServer/process';
@@ -148,6 +151,7 @@ import { reuseVaultAnalysisForWorks } from './vaults/vaultAnalysisImport';
 import { initializeVaultModelSelection, validateVaultModelSelection } from './vaults/vaultCreationSettings';
 import { setPersistentDockIcon } from './dockIcon';
 import { closeCrossVaultConnections } from './db/crossVault';
+import { listMigrationRecoverySnapshots } from './db/migrationSafety';
 
 
 function withVaultKeyProviders(vault: VaultSummary): VaultSummary {
@@ -208,6 +212,7 @@ export function registerIpc(
   registerArchiveIpc(context);
   registerPrimarySourcesIpc(context);
   registerDatabasesIpc(context);
+  registerPagesIpc(context);
   registerTeachingIpc(context);
   registerToolkitIpc(context);
   registerTestimoniesIpc(context);
@@ -566,6 +571,8 @@ export function registerIpc(
   }) => ({ vault: withVaultKeyProviders(await createConnectedVault(input)) }));
   h('vaults:replicaOverview', async () => getReplicaOverview());
   h('vaults:replicaSyncNow', async (_e, vaultId: string) => syncReplicaNow(vaultId));
+  h('vaults:replicaPresence', async (_e, vaultId: string) => listReplicaPresence(vaultId));
+  h('vaults:replicaUpdatePresence', async (_e, vaultId: string, input) => updateReplicaPresence(vaultId, input));
   h('vaults:replicaDetach', async (_e, vaultId: string) => detachReplica(vaultId));
 
   h('vaults:rename', async (_e, id: string, name: string) => withVaultKeyProviders(renameVault(id, name)));
@@ -589,6 +596,15 @@ export function registerIpc(
     } finally {
       if (fs.existsSync(tmp)) fs.unlinkSync(tmp);
     }
+  });
+  h('migrationRecovery:list', async () => listMigrationRecoverySnapshots(getActiveVault().path));
+  h('migrationRecovery:open', async (_e, id: string) => {
+    const source = getActiveVault();
+    const snapshot = listMigrationRecoverySnapshots(source.path).find((candidate) => candidate.id === id);
+    if (!snapshot) throw new Error('La copia previa a la migración no existe o ya no supera la validación.');
+    const name = `${source.name} · antes de v${snapshot.targetVersion}`;
+    const vault = createVaultFromDatabaseFile(snapshot.databasePath, name, source.type);
+    return { vault: withVaultKeyProviders(vault) };
   });
   h('vaults:delete', async (_e, id: string, deleteFiles?: boolean) => {
     deleteVault(id, Boolean(deleteFiles));

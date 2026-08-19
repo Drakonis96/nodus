@@ -50,6 +50,9 @@ __pycache__/
 # Locally generated analysis reports
 reports/
 
+# Reproducible throwaway profile retained by `npm run qa:notion-parity -- --retain`.
+.qa/notion-parity-userdata/
+
 # Local artifact previews (published website manuals live in site/manuals/)
 output/
 
