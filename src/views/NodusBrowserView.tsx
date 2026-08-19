@@ -189,7 +189,7 @@ export function NodusBrowserView() {
         activeTabId={state.activeTabId}
         onSelect={(id) => void window.nodus.activateBrowserTab(id)}
         onClose={(id) => void window.nodus.closeBrowserTab(id)}
-        onNew={() => void window.nodus.openBrowserTab('about:blank')}
+        onNew={() => void window.nodus.openBrowserTab('')}
       />
 
       <div className="flex items-center gap-1 border-b border-neutral-800 px-2 py-1.5">
@@ -795,7 +795,7 @@ function BrowserQuickSettings({ onClose }: { onClose: () => void }) {
               checked={settings?.browserHomeMode === mode}
               onChange={() => void patch({ browserHomeMode: mode })}
             />
-            {mode === 'start' ? t('Página en blanco de Nodus') : mode === 'blank' ? t('Página en blanco') : t('Dirección personalizada')}
+            {mode === 'start' ? 'Research Atlas' : mode === 'blank' ? t('Página en blanco') : t('Dirección personalizada')}
           </label>
         ))}
         {settings?.browserHomeMode === 'custom' && (

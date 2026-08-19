@@ -1,0 +1,222 @@
+<!-- SPDX-FileCopyrightText: 2026 Jorge Pérez Burgueño and Nodus contributors -->
+<!-- SPDX-License-Identifier: AGPL-3.0-only -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Research Atlas | Nodus</title>
+<link rel="canonical" href="https://nodusresearch.com/research-atlas/"/>
+<meta property="og:title" content="Research Atlas | Nodus"/>
+<meta property="og:description" content="Search and filter a curated international directory of research websites, digital libraries, archives, repositories and primary-source collections."/>
+<meta property="og:type" content="website"/>
+<meta property="og:url" content="https://nodusresearch.com/research-atlas/"/>
+<meta property="og:site_name" content="Nodus"/>
+<meta name="twitter:card" content="summary"/>
+<meta name="twitter:title" content="Research Atlas | Nodus"/>
+<meta name="twitter:description" content="A curated international directory of research websites, digital libraries, archives and repositories."/>
+<meta name="description" content="Search and filter research websites, digital libraries, archives, repositories and primary-source collections."/>
+<link rel="icon" href="../favicon.ico" sizes="any"/>
+<link rel="icon" type="image/png" href="../favicon.png" sizes="512x512"/>
+<link rel="icon" type="image/svg+xml" href="../assets/nodus-logo.svg"/>
+<link rel="apple-touch-icon" href="../apple-touch-icon.png"/>
+<link rel="preload" as="font" type="font/woff2" href="../assets/fonts/inter-latin.woff2" crossorigin/>
+<link rel="preload" as="font" type="font/woff2" href="../assets/fonts/fraunces-latin.woff2" crossorigin/>
+<link rel="stylesheet" href="../assets/css/nodus.css?v=20260819a"/>
+<link rel="stylesheet" href="../assets/css/research-atlas.css?v=20260819"/>
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to content</a>
+<canvas id="organism" aria-hidden="true"></canvas>
+
+<div data-nodus-site-header data-base="../" data-page="atlas"></div>
+<script defer src="../site-header.js?v=20260819a"></script>
+
+<main id="main" class="atlas-main" data-accent="#a78bfa" data-second="#22d3ee" data-energy="0.30">
+  <div class="atlas-shell">
+    <div class="atlas-intro">
+      <h1 class="atlas-title">Research Atlas</h1>
+      <p class="atlas-copy">Search the research directory itself or send the same query to a web search engine. Refine the directory by geography, knowledge area and resource type.</p>
+
+      <div class="atlas-search-wrap">
+        <div class="atlas-searchbar">
+          <div class="atlas-engine-wrap">
+            <label class="sr-only" for="atlas-engine">Search engine</label>
+            <select class="atlas-engine" id="atlas-engine">
+              <option value="directory">Directory</option>
+              <option value="google">Google</option>
+              <option value="bing">Bing</option>
+              <option value="duckduckgo">DuckDuckGo</option>
+              <option value="brave">Brave Search</option>
+              <option value="startpage">Startpage</option>
+              <option value="scholar">Google Scholar</option>
+            </select>
+          </div>
+          <span class="atlas-search-sep" aria-hidden="true"></span>
+          <div class="atlas-input-wrap">
+            <svg class="atlas-search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <circle cx="11" cy="11" r="7"/><path d="m20 20-4.1-4.1"/>
+            </svg>
+            <label class="sr-only" for="atlas-search">Search</label>
+            <input id="atlas-search" class="atlas-search" type="search" autocomplete="off" spellcheck="false" placeholder="Search the research directory…"/>
+            <button id="atlas-clear" class="atlas-clear" type="button" aria-label="Clear search" hidden>×</button>
+          </div>
+          <button id="atlas-submit" class="atlas-submit" type="button" aria-label="Search" title="Filter directory">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <circle cx="11" cy="11" r="6"/><path d="m20 20-4.2-4.2"/>
+            </svg>
+          </button>
+        </div>
+
+        <div class="atlas-filterbar" aria-label="Research filters">
+
+    <div class="atlas-facet" data-facet="continent">
+      <button class="atlas-facet-button" type="button" aria-expanded="false">
+        <span class="atlas-facet-label">Continent</span>
+        <span class="atlas-facet-value">Continent</span>
+        <span class="atlas-facet-chevron" aria-hidden="true"></span>
+      </button>
+      <div class="atlas-facet-panel" hidden>
+        <div class="atlas-facet-search-wrap">
+          <svg class="atlas-facet-search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <circle cx="11" cy="11" r="7"/><path d="m20 20-4.1-4.1"/>
+          </svg>
+          <input class="atlas-facet-search" type="search" placeholder="Search continent…" autocomplete="off"/>
+        </div>
+        <div class="atlas-facet-options"></div>
+      </div>
+    </div>
+
+    <div class="atlas-facet" data-facet="country">
+      <button class="atlas-facet-button" type="button" aria-expanded="false">
+        <span class="atlas-facet-label">Country</span>
+        <span class="atlas-facet-value">Country</span>
+        <span class="atlas-facet-chevron" aria-hidden="true"></span>
+      </button>
+      <div class="atlas-facet-panel" hidden>
+        <div class="atlas-facet-search-wrap">
+          <svg class="atlas-facet-search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <circle cx="11" cy="11" r="7"/><path d="m20 20-4.1-4.1"/>
+          </svg>
+          <input class="atlas-facet-search" type="search" placeholder="Search country…" autocomplete="off"/>
+        </div>
+        <div class="atlas-facet-options"></div>
+      </div>
+    </div>
+
+    <div class="atlas-facet" data-facet="region">
+      <button class="atlas-facet-button" type="button" aria-expanded="false">
+        <span class="atlas-facet-label">Region</span>
+        <span class="atlas-facet-value">Region</span>
+        <span class="atlas-facet-chevron" aria-hidden="true"></span>
+      </button>
+      <div class="atlas-facet-panel" hidden>
+        <div class="atlas-facet-search-wrap">
+          <svg class="atlas-facet-search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <circle cx="11" cy="11" r="7"/><path d="m20 20-4.1-4.1"/>
+          </svg>
+          <input class="atlas-facet-search" type="search" placeholder="Search region…" autocomplete="off"/>
+        </div>
+        <div class="atlas-facet-options"></div>
+      </div>
+    </div>
+
+    <div class="atlas-facet" data-facet="area">
+      <button class="atlas-facet-button" type="button" aria-expanded="false">
+        <span class="atlas-facet-label">Knowledge area</span>
+        <span class="atlas-facet-value">Knowledge area</span>
+        <span class="atlas-facet-chevron" aria-hidden="true"></span>
+      </button>
+      <div class="atlas-facet-panel" hidden>
+        <div class="atlas-facet-search-wrap">
+          <svg class="atlas-facet-search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <circle cx="11" cy="11" r="7"/><path d="m20 20-4.1-4.1"/>
+          </svg>
+          <input class="atlas-facet-search" type="search" placeholder="Search knowledge area…" autocomplete="off"/>
+        </div>
+        <div class="atlas-facet-options"></div>
+      </div>
+    </div>
+
+    <div class="atlas-facet" data-facet="type">
+      <button class="atlas-facet-button" type="button" aria-expanded="false">
+        <span class="atlas-facet-label">Resource type</span>
+        <span class="atlas-facet-value">Resource type</span>
+        <span class="atlas-facet-chevron" aria-hidden="true"></span>
+      </button>
+      <div class="atlas-facet-panel" hidden>
+        <div class="atlas-facet-search-wrap">
+          <svg class="atlas-facet-search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <circle cx="11" cy="11" r="7"/><path d="m20 20-4.1-4.1"/>
+          </svg>
+          <input class="atlas-facet-search" type="search" placeholder="Search resource type…" autocomplete="off"/>
+        </div>
+        <div class="atlas-facet-options"></div>
+      </div>
+    </div>
+          <button class="atlas-reset" id="atlas-reset" type="button">Clear filters</button>
+        </div>
+
+        <p class="atlas-status" id="atlas-status" aria-live="polite"></p>
+      </div>
+    </div>
+
+    <div class="atlas-grid" id="atlas-grid"></div>
+  </div>
+</main>
+
+
+<footer class="site-foot">
+  <div class="wrap">
+    <div class="foot-grid wide">
+      <div class="foot-brand">
+        <span class="logo"><img src="../assets/nodus-logo.svg" alt=""/> Nodus</span>
+        <p>A free, open-source, local-first research workspace for connecting sources, ideas and evidence. Your corpus stays on your machine.</p>
+      </div>
+      <div class="foot-col">
+        <h3>Research</h3>
+        <a href="./">Research Atlas</a>
+        <a href="../app/">The Nodus App</a>
+        <a href="../research/">Academic research</a>
+        <a href="../zotero/">Nodus and Zotero</a>
+        <a href="../ai-research/">AI for research</a>
+        <a href="../open-source/">Open source</a>
+      </div>
+      <div class="foot-col">
+        <h3>Product</h3>
+        <a href="../index.html#vaults">The four vaults</a>
+        <a href="../index.html#more-vaults">Other vaults</a>
+        <a href="../index.html#tools">Nodus Toolkit</a>
+        <a href="../demo/index.html">Live demos</a>
+      </div>
+      <div class="foot-col">
+        <h3>Learn</h3>
+        <a href="../wiki/">Wiki</a>
+        <a href="../blog/">Blog</a>
+        <a href="../faq/">FAQ</a>
+        <a href="../wiki/#videos">Video tutorials</a>
+      </div>
+      <div class="foot-col">
+        <h3>Project</h3>
+        <a href="../contribute/">Contribute</a>
+        <a href="https://github.com/Drakonis96/nodus" target="_blank" rel="noopener">GitHub</a>
+        <a href="https://github.com/Drakonis96/nodus/releases" target="_blank" rel="noopener">Releases</a>
+        <a href="https://github.com/Drakonis96/nodus/blob/main/LICENSE" target="_blank" rel="noopener">AGPL-3.0-only</a>
+      </div>
+    </div>
+    <div class="foot-base">
+      <span>© 2026 Jorge Pérez Burgueño and Nodus contributors.</span>
+      <a href="https://github.com/Drakonis96/nodus/blob/main/PRIVACY.md" target="_blank" rel="noopener">Privacy</a>
+      <a href="https://github.com/Drakonis96/nodus/blob/main/CODE_OF_CONDUCT.md" target="_blank" rel="noopener">Code of conduct</a>
+      <a href="https://github.com/Drakonis96/nodus/blob/main/SECURITY.md" target="_blank" rel="noopener">Security</a>
+    </div>
+  </div>
+</footer>
+
+
+<script src="../assets/js/organism.js?v=20260818c"></script>
+<script src="../assets/js/research-atlas.js?v=20260819"></script>
+<script src="../assets/js/site.js?v=20260815"></script>
+<script src="../assets/js/back-to-top.js?v=20260817b"></script>
+</body>
+</html>

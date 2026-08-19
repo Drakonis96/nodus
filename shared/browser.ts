@@ -111,6 +111,9 @@ export const DEFAULT_BROWSER_PREFS: BrowserPrefs = {
   newTabMode: 'home',
 };
 
+/** The first-party start page used by Home and, by default, every new tab. */
+export const NODUS_RESEARCH_ATLAS_URL = 'https://nodusresearch.com/research-atlas/';
+
 /**
  * The most tabs Nodus Browser will hold open.
  *

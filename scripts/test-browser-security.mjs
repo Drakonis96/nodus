@@ -187,3 +187,16 @@ test('every icon the browser view names actually exists', () => {
   const missing = [...used].filter((name) => !known.has(name));
   assert.deepEqual(missing, [], `icons named but absent from ICON_PATHS: ${missing.join(', ')}`);
 });
+
+test('the first-party Atlas is the default home and new-tab destination', () => {
+  const contract = code('shared/browser.ts');
+  const ipc = code('electron/ipc/browser.ts');
+  const view = code('src/views/NodusBrowserView.tsx');
+
+  assert.match(contract, /NODUS_RESEARCH_ATLAS_URL\s*=\s*'https:\/\/nodusresearch\.com\/research-atlas\/'/);
+  assert.match(contract, /homeMode:\s*'start'/);
+  assert.match(contract, /newTabMode:\s*'home'/);
+  assert.match(ipc, /browserHomeMode === 'start' \? NODUS_RESEARCH_ATLAS_URL : 'about:blank'/);
+  assert.match(view, /onNew=\{\(\) => void window\.nodus\.openBrowserTab\(''\)\}/,
+    'the tab-strip button must ask main to apply the new-tab preference');
+});

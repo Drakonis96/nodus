@@ -18,7 +18,7 @@
 
 import { BrowserWindow, shell } from 'electron';
 import type { IpcContext } from './context';
-import type { BrowserViewport } from '@shared/browser';
+import { NODUS_RESEARCH_ATLAS_URL, type BrowserViewport } from '@shared/browser';
 import { parseOmniboxInput } from '@shared/browserOmnibox';
 import {
   cancelPermissionRequests,
@@ -163,9 +163,7 @@ export function registerBrowserIpc({ h, getWindow }: IpcContext): void {
         if (resolved.kind === 'navigate' || resolved.kind === 'search') return resolved.url;
       }
     }
-    // 'start' has no start page yet, so it behaves as blank rather than
-    // pretending to open something that does not exist.
-    return 'about:blank';
+    return settings.browserHomeMode === 'start' ? NODUS_RESEARCH_ATLAS_URL : 'about:blank';
   };
 
   h('browser:openTab', async (event, url: string) => {
