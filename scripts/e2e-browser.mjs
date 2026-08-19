@@ -353,6 +353,34 @@ try {
     }
   });
 
+  await check('Notifications sits above the browser and a page click closes it', async () => {
+    await app.evaluate(({ BrowserWindow }) => {
+      const window = BrowserWindow.getAllWindows()[0];
+      const view = window.contentView.children.find((child) => 'webContents' in child);
+      if (!view) throw new Error('the active browser view is not attached');
+      const calls = [];
+      const original = view.setVisible.bind(view);
+      view.setVisible = (visible) => {
+        calls.push(visible);
+        original(visible);
+      };
+      globalThis.__nodusBrowserVisibilityCalls = calls;
+    });
+
+    await page.getByRole('button', { name: 'Notificaciones', exact: true }).click();
+    await page.getByTestId('header-notifications-panel').waitFor({ state: 'visible' });
+    const hidden = await app.evaluate(() => globalThis.__nodusBrowserVisibilityCalls?.includes(false));
+    assert.equal(hidden, true, 'opening Notifications must hide the native page behind it');
+
+    const backdrop = page.getByTestId('header-notifications-backdrop');
+    const box = await backdrop.boundingBox();
+    assert.ok(box, 'the notification backdrop must cover the browser');
+    await backdrop.click({ position: { x: 12, y: box.height - 12 } });
+    await page.getByTestId('header-notifications-panel').waitFor({ state: 'detached' });
+    const restored = await app.evaluate(() => globalThis.__nodusBrowserVisibilityCalls?.at(-1));
+    assert.equal(restored, true, 'closing Notifications must restore the native page');
+  });
+
   await check('leaving and returning to Browser preserves the active tab', async () => {
     const before = await state();
     const activeBefore = before.tabs.find((tab) => tab.id === before.activeTabId);

@@ -217,11 +217,28 @@ export function NotificationsPanel({
     if (!open) setClearConfirmation(false);
   }, [open]);
 
+  // A browser tab is a native WebContentsView, so z-index cannot put this React
+  // panel above it. Hide that native child while the notification centre is
+  // open; the transparent backdrop below then receives clicks over the page and
+  // can close the panel instead of the website swallowing them.
+  useEffect(() => {
+    if (!open) return;
+    void window.nodus.setBrowserOverlayVisible(true);
+    return () => { void window.nodus.setBrowserOverlayVisible(false); };
+  }, [open]);
+
   const empty = announcements.length === 0 && notifications.length === 0;
 
   return createPortal(
     <AnimatePresence>
-      {open && pos && (
+      {open && pos && [
+        <motion.div
+          key="notifications-backdrop"
+          data-testid="header-notifications-backdrop"
+          className="fixed inset-0 z-[54]"
+          aria-hidden="true"
+          onMouseDown={onClose}
+        />,
         <motion.div
           ref={panelRef}
           key="notifications-panel"
@@ -348,8 +365,8 @@ export function NotificationsPanel({
               }}
             />
           )}
-        </motion.div>
-      )}
+        </motion.div>,
+      ]}
     </AnimatePresence>,
     document.body
   );
