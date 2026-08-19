@@ -183,6 +183,29 @@ test('home-page preferences expose Atlas, Bookmarks, custom and blank modes', ()
   assert.match(quickSettings, /Nodus Bookmarks/);
 });
 
+test('Browser toolbar orders actions, downloads, restart and settings, with safe clear-all access', () => {
+  const browserView = readFileSync(path.join(repoRoot, 'src/views/NodusBrowserView.tsx'), 'utf8');
+  const manager = browserView.indexOf('dataTestId="browser-bookmarks-manager-button"');
+  const actions = browserView.indexOf('dataTestId="browser-actions"', manager);
+  const downloads = browserView.indexOf('dataTestId="browser-downloads"', actions);
+  const restart = browserView.indexOf('dataTestId="browser-restart"', downloads);
+  const settings = browserView.indexOf('dataTestId="browser-settings"', restart);
+  assert.ok(manager >= 0 && actions > manager && downloads > actions && restart > downloads && settings > restart,
+    'the bookmark manager must remain separate, followed by actions, downloads, restart and settings');
+
+  const quickComponent = browserView.indexOf('function BrowserQuickSettings');
+  const quickSettings = browserView.indexOf('data-testid="browser-quick-settings"', quickComponent);
+  const clearAllButton = browserView.indexOf('data-testid="browser-quick-clear-all"', quickSettings);
+  const clearAllCall = browserView.indexOf('window.nodus.clearAllBrowserData()', quickComponent);
+  const confirmation = browserView.indexOf("title={t('¿Borrar todos los datos de navegación?')}", quickSettings);
+  assert.ok(quickComponent >= 0 && quickSettings > quickComponent && clearAllButton > quickSettings
+    && clearAllCall > quickComponent && confirmation > quickSettings,
+    'quick Browser settings must expose the existing clear-all operation behind a trusted confirmation');
+  assert.match(browserView.slice(quickComponent), /setBrowserOverlayVisible\(true\)[\s\S]*setBrowserOverlayVisible\(false\)/,
+    'the confirmation must hide and restore the native web view');
+  assert.match(browserView.slice(confirmation), /Nodus Bookmarks will be preserved/);
+});
+
 test('all bookmark mutations are trusted-UI IPC and the remote preload exposes none', () => {
   const ipc = readFileSync(path.join(repoRoot, 'electron/ipc/browser.ts'), 'utf8');
   for (const channel of ['bookmarks:create', 'bookmarks:update', 'bookmarks:delete', 'bookmarks:move', 'bookmarks:previewImport', 'bookmarks:export']) {

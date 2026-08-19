@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { ConfirmModal } from '../components/ConfirmModal';
 import { Icon } from '../components/ui';
 import { t } from '../i18n';
 import { MAX_BROWSER_TABS } from '@shared/browser';
@@ -348,15 +349,6 @@ export function NodusBrowserView() {
           </div>
         </form>
 
-        <div className="relative">
-          <ToolbarButton
-            icon="download"
-            label={t('Descargas')}
-            onClick={() => setPanel((current) => (current === 'downloads' ? null : 'downloads'))}
-          />
-          {downloads.length > 0 && <span className="header-action-badge">{downloads.length}</span>}
-        </div>
-
         <div>
           <ToolbarButton
             icon="bookmarkFill"
@@ -368,19 +360,22 @@ export function NodusBrowserView() {
 
         <div>
           <ToolbarButton
-            icon="settings"
-            label={t('Configuración del navegador')}
-            onClick={() => setPanel((current) => (current === 'settings' ? null : 'settings'))}
-          />
-        </div>
-
-        <div>
-          <ToolbarButton
             icon="menu"
             label={t('Acciones de Nodus')}
             disabled={busy}
+            dataTestId="browser-actions"
             onClick={() => setPanel((current) => (current === 'actions' ? null : 'actions'))}
           />
+        </div>
+
+        <div className="relative">
+          <ToolbarButton
+            icon="download"
+            label={t('Descargas')}
+            dataTestId="browser-downloads"
+            onClick={() => setPanel((current) => (current === 'downloads' ? null : 'downloads'))}
+          />
+          {downloads.length > 0 && <span className="header-action-badge">{downloads.length}</span>}
         </div>
 
         <div>
@@ -390,6 +385,15 @@ export function NodusBrowserView() {
             disabled={restarting}
             dataTestId="browser-restart"
             onClick={() => void restartBrowser(false)}
+          />
+        </div>
+
+        <div>
+          <ToolbarButton
+            icon="settings"
+            label={t('Configuración del navegador')}
+            dataTestId="browser-settings"
+            onClick={() => setPanel((current) => (current === 'settings' ? null : 'settings'))}
           />
         </div>
       </div>
@@ -980,17 +984,44 @@ function DownloadsPanel({
 /**
  * The settings a person changes while browsing, rather than in Settings.
  *
- * Only the two that come up in the moment — what Home opens and what a new tab
- * opens. Everything heavier (storage, per-site data, permissions) stays in
- * Settings → Nodus Browser, where there is room to explain it.
+ * Home, new-tab and search defaults live here alongside one direct privacy
+ * action. Fine-grained storage and per-site controls remain in Settings →
+ * Nodus Browser, where there is room to explain them.
  */
 function BrowserQuickSettings({ onClose }: { onClose: () => void }) {
   const [settings, setSettings] = useState<AppSettings | null>(null);
+  const [confirmClearAll, setConfirmClearAll] = useState(false);
+  const [clearing, setClearing] = useState(false);
+  const [clearError, setClearError] = useState<string | null>(null);
   useEffect(() => { void window.nodus.getSettings().then(setSettings); }, []);
+
+  // A native WebContentsView paints above React. Hide it while this trusted
+  // confirmation is open so the dialog cannot appear behind the website.
+  useEffect(() => {
+    if (!confirmClearAll) return;
+    void window.nodus.setBrowserOverlayVisible(true);
+    return () => { void window.nodus.setBrowserOverlayVisible(false); };
+  }, [confirmClearAll]);
 
   const patch = async (next: Partial<AppSettings>) => {
     await window.nodus.updateSettings(next);
     setSettings(await window.nodus.getSettings());
+  };
+
+  const clearAll = async () => {
+    if (clearing) return;
+    setClearing(true);
+    setClearError(null);
+    try {
+      await window.nodus.clearAllBrowserData();
+      setConfirmClearAll(false);
+      onClose();
+    } catch (cause) {
+      setConfirmClearAll(false);
+      setClearError(cause instanceof Error ? cause.message : String(cause));
+    } finally {
+      setClearing(false);
+    }
   };
 
   return (
@@ -999,7 +1030,7 @@ function BrowserQuickSettings({ onClose }: { onClose: () => void }) {
           <p className="text-xs font-semibold text-neutral-700 dark:text-neutral-200">{t('Configuración del navegador')}</p>
           <button type="button" className="rounded p-1 text-neutral-500 hover:bg-neutral-200 dark:hover:bg-neutral-800" aria-label={t('Cerrar')} onClick={onClose}><Icon name="x" size={13} /></button>
         </div>
-        <div className="grid gap-x-6 md:grid-cols-3">
+        <div className="grid gap-x-6 gap-y-3 md:grid-cols-4">
         <div>
         <p className="mb-1.5 text-xs font-semibold text-neutral-700 dark:text-neutral-200">{t('Página de inicio')}</p>
         {(['start', 'bookmarks', 'blank', 'custom'] as const).map((mode) => (
@@ -1023,7 +1054,7 @@ function BrowserQuickSettings({ onClose }: { onClose: () => void }) {
         )}
         </div>
         <div>
-        <p className="mb-1.5 mt-3 text-xs font-semibold text-neutral-700 dark:text-neutral-200">{t('Al abrir una pestaña nueva')}</p>
+        <p className="mb-1.5 text-xs font-semibold text-neutral-700 dark:text-neutral-200">{t('Al abrir una pestaña nueva')}</p>
         {(['home', 'blank'] as const).map((mode) => (
           <label key={mode} className="mb-1 flex items-center gap-2 text-xs text-neutral-700 dark:text-neutral-300">
             <input
@@ -1037,7 +1068,7 @@ function BrowserQuickSettings({ onClose }: { onClose: () => void }) {
         ))}
         </div>
         <div>
-        <p className="mb-1.5 mt-3 text-xs font-semibold text-neutral-700 dark:text-neutral-200">{t('Buscador')}</p>
+        <p className="mb-1.5 text-xs font-semibold text-neutral-700 dark:text-neutral-200">{t('Buscador')}</p>
         <select
           className="input w-full text-xs"
           value={settings?.browserSearchEngine ?? 'google'}
@@ -1058,7 +1089,39 @@ function BrowserQuickSettings({ onClose }: { onClose: () => void }) {
           />
         )}
         </div>
+        <div>
+          <p className="mb-1.5 text-xs font-semibold text-neutral-700 dark:text-neutral-200">{t('Almacenamiento del navegador')}</p>
+          <p className="mb-2 text-[11px] leading-relaxed text-neutral-500">
+            Nodus Bookmarks is preserved when browsing data is cleared.
+          </p>
+          <button
+            type="button"
+            data-testid="browser-quick-clear-all"
+            className="btn btn-ghost w-full justify-center border border-red-500/50 px-2 py-1 text-xs text-red-600 dark:text-red-300"
+            disabled={clearing}
+            onClick={() => { setClearError(null); setConfirmClearAll(true); }}
+          >
+            {t('Borrar todos los datos de navegación')}
+          </button>
+          {clearError && <p role="alert" className="mt-1.5 text-[11px] text-red-600 dark:text-red-300">{clearError}</p>}
         </div>
+        </div>
+        {confirmClearAll && (
+          <ConfirmModal
+            danger
+            title={t('¿Borrar todos los datos de navegación?')}
+            message={
+              <div className="space-y-2 text-sm">
+                <p className="text-amber-500">{t('Borrar las cookies cerrará tu sesión en los sitios donde la tengas iniciada.')}</p>
+                <p className="text-neutral-400">{t('También se cerrarán todas las pestañas abiertas del navegador.')}</p>
+                <p className="text-indigo-400">Nodus Bookmarks will be preserved.</p>
+              </div>
+            }
+            confirmLabel={t('Borrar')}
+            onCancel={() => { if (!clearing) setConfirmClearAll(false); }}
+            onConfirm={() => void clearAll()}
+          />
+        )}
       </div>
   );
 }
