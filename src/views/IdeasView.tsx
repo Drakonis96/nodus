@@ -62,20 +62,19 @@ export function IdeasView({
   const [searchQuery, setSearchQuery] = useState(() => snapshot?.search ?? '');
   const [typeFilter, setTypeFilter] = useState<IdeaType | ''>(() => snapshot?.typeFilter ?? '');
   const [sortKey, setSortKey] = useState<SortKey>(() => snapshot?.sortKey ?? 'label');
-  const [openIdea, setOpenIdea] = useState<OpenIdea | null>(() => snapshot?.openIdea ?? null);
+  const [openIdeas, setOpenIdeas] = useState<OpenIdea[]>(() => snapshot?.openIdeas ?? []);
+  const [activeIdeaId, setActiveIdeaId] = useState<string | null>(() => (
+    snapshot?.openIdeas?.some((idea) => idea.id === snapshot.activeIdeaId)
+      ? snapshot.activeIdeaId
+      : null
+  ));
   // An idea tab that is no longer open cannot be the active surface.
-  const [surface, setSurface] = useState<IdeasSurface>(() => (snapshot?.surface === 'idea' && snapshot.openIdea ? 'idea' : 'catalog'));
+  const [surface, setSurface] = useState<IdeasSurface>(() => (
+    snapshot?.surface === 'idea' && snapshot.openIdeas?.some((idea) => idea.id === snapshot.activeIdeaId)
+      ? 'idea'
+      : 'catalog'
+  ));
   const [filtersOpen, setFiltersOpen] = useState(() => snapshot?.filtersOpen ?? false);
-  // Paired with `openIdea` by `showIdea`; restoring one without the other would draw
-  // a tab with an empty pane behind it.
-  const [selectedId, setSelectedId] = useState<string | null>(() => snapshot?.openIdea?.id ?? null);
-  const [detail, setDetail] = useState<IdeaDetail | null>(null);
-  const [connections, setConnections] = useState<IdeaConnection[]>([]);
-  const [detailLoading, setDetailLoading] = useState(false);
-  const [savingIdeaToNotes, setSavingIdeaToNotes] = useState(false);
-  const [savingIdea, setSavingIdea] = useState(false);
-  const [deletingIdea, setDeletingIdea] = useState(false);
-  const [confirmDeleteIdea, setConfirmDeleteIdea] = useState(false);
   // A cached page is useful while the reader changes pages or returns to a previous
   // sort during the same visit. It must not survive leaving and re-entering Ideas,
   // though: deep scans can finish while the view is unmounted, so the queue-idle
@@ -83,9 +82,31 @@ export function IdeasView({
   const initialListLoad = useRef(true);
 
   const showIdea = useCallback((idea: OpenIdea) => {
-    setSelectedId(idea.id);
-    setOpenIdea(idea);
+    setOpenIdeas((current) => (
+      current.some((open) => open.id === idea.id)
+        ? current
+        : [...current, idea]
+    ));
+    setActiveIdeaId(idea.id);
     setSurface('idea');
+  }, []);
+
+  const closeIdea = useCallback((ideaId: string) => {
+    const closingIndex = openIdeas.findIndex((idea) => idea.id === ideaId);
+    if (closingIndex < 0) return;
+    const remaining = openIdeas.filter((idea) => idea.id !== ideaId);
+    setOpenIdeas(remaining);
+    if (activeIdeaId !== ideaId) return;
+
+    const nextActive = remaining[Math.min(closingIndex, remaining.length - 1)] ?? null;
+    setActiveIdeaId(nextActive?.id ?? null);
+    if (surface === 'idea' && !nextActive) setSurface('catalog');
+  }, [activeIdeaId, openIdeas, surface]);
+
+  const updateIdeaLabel = useCallback((ideaId: string, label: string) => {
+    setOpenIdeas((current) => current.map((idea) => (
+      idea.id === ideaId && idea.label !== label ? { ...idea, label } : idea
+    )));
   }, []);
 
   useEffect(() => {
@@ -136,8 +157,16 @@ export function IdeasView({
   const report = useRef(onSnapshotChange);
   report.current = onSnapshotChange;
   useEffect(() => {
-    report.current?.({ surface, openIdea, search: searchQuery, typeFilter, sortKey, filtersOpen });
-  }, [filtersOpen, openIdea, searchQuery, sortKey, surface, typeFilter]);
+    report.current?.({
+      surface,
+      openIdeas: openIdeas.map(({ id, label }) => ({ id, label })),
+      activeIdeaId,
+      search: searchQuery,
+      typeFilter,
+      sortKey,
+      filtersOpen,
+    });
+  }, [activeIdeaId, filtersOpen, openIdeas, searchQuery, sortKey, surface, typeFilter]);
 
   // Changing the cut throws the place away with it: a row that was at the top of one
   // filter means nothing under another. It must skip its own first run, though, or
@@ -175,64 +204,7 @@ export function IdeasView({
   useDataRefresh(reload);
   useScanComplete(reload);
 
-  useEffect(() => {
-    if (!selectedId) {
-      setDetail(null);
-      setConnections([]);
-      return;
-    }
-    setDetailLoading(true);
-    let on = true;
-    const cacheKey = `${dataSource.key}:idea-detail:${selectedId}`;
-    const cached = getVaultQueryCache<{ detail: IdeaDetail | null; connections: IdeaConnection[] }>(vaultId, cacheKey);
-    if (cached) {
-      setDetail(cached.detail);
-      setConnections(cached.connections);
-      if (cached.detail) {
-        setOpenIdea((current) => current?.id === selectedId ? { id: selectedId, label: cached.detail!.idea.label } : current);
-      }
-      setDetailLoading(false);
-      return;
-    }
-    void Promise.all([dataSource.getIdeaDetail(selectedId), dataSource.listIdeaConnections(selectedId)]).then(([d, linked]) => {
-      if (on) {
-        setDetail(d);
-        setConnections(linked);
-        if (d) setOpenIdea((current) => current?.id === selectedId ? { id: selectedId, label: d.idea.label } : current);
-        setVaultQueryCache(vaultId, cacheKey, { detail: d, connections: linked });
-        setDetailLoading(false);
-      }
-    });
-    return () => {
-      on = false;
-    };
-  }, [dataSource, selectedId, vaultId]);
-
   useEffect(() => dataSource.subscribe?.(() => reload(true)), [dataSource, reload]);
-
-  const selectedNode = selectedId ? ideas.find((idea) => idea.id === selectedId) : null;
-
-  const deleteSelectedIdea = async () => {
-    if (!selectedId || deletingIdea) return;
-    setDeletingIdea(true);
-    try {
-      await dataSource.deleteIdea(selectedId);
-      setConfirmDeleteIdea(false);
-      setSelectedId(null);
-      setOpenIdea(null);
-      setSurface('catalog');
-      setDetail(null);
-      setConnections([]);
-      notifyDataChanged();
-      reload(true);
-    } finally {
-      setDeletingIdea(false);
-    }
-  };
-
-  const detailWorkCount = detail ? new Set(detail.occurrences.map((occurrence) => occurrence.nodus_id)).size : 0;
-  const detailConfidence = selectedNode?.maxConfidence
-    ?? (detail?.occurrences.length ? Math.max(...detail.occurrences.map((occurrence) => occurrence.confidence)) : 0);
 
   return (
     <div data-testid={testId ?? 'ideas-workspace'} className="flex h-full min-h-0 flex-col bg-white text-neutral-900 dark:bg-neutral-950 dark:text-neutral-100">
@@ -255,20 +227,23 @@ export function IdeasView({
           >
             <Icon name="list" size={13} /> {t('Ideas')}
           </button>
-          {openIdea && (
-            <div className={`flex h-9 min-w-0 shrink-0 items-center rounded-t-lg border border-b-0 ${surface === 'idea' ? 'border-neutral-300 bg-white text-neutral-900 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-100' : 'border-transparent text-neutral-500 hover:bg-neutral-100 hover:text-neutral-800 dark:hover:bg-neutral-900/60 dark:hover:text-neutral-300'}`}>
-              <button data-testid="ideas-tab-idea" className="flex h-full max-w-80 min-w-0 items-center gap-2 px-3 text-xs" onClick={() => setSurface('idea')}>
-                <Icon name="bulb" size={13} /><span className="truncate">{openIdea.label}</span>
-              </button>
-              <button
-                className="mr-1 grid h-6 w-6 shrink-0 place-items-center rounded hover:bg-neutral-200 dark:hover:bg-neutral-800"
-                aria-label={t('Cerrar')}
-                onClick={() => { setOpenIdea(null); setSelectedId(null); setDetail(null); setConnections([]); setSurface('catalog'); }}
-              >
-                <Icon name="x" size={11} />
-              </button>
-            </div>
-          )}
+          {openIdeas.map((idea) => {
+            const active = surface === 'idea' && activeIdeaId === idea.id;
+            return (
+              <div key={idea.id} className={`flex h-9 min-w-0 shrink-0 items-center rounded-t-lg border border-b-0 ${active ? 'border-neutral-300 bg-white text-neutral-900 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-100' : 'border-transparent text-neutral-500 hover:bg-neutral-100 hover:text-neutral-800 dark:hover:bg-neutral-900/60 dark:hover:text-neutral-300'}`}>
+                <button data-testid="ideas-tab-idea" data-idea-id={idea.id} className="flex h-full max-w-80 min-w-0 items-center gap-2 px-3 text-xs" onClick={() => { setActiveIdeaId(idea.id); setSurface('idea'); }}>
+                  <Icon name="bulb" size={13} /><span className="truncate">{idea.label}</span>
+                </button>
+                <button
+                  className="mr-1 grid h-6 w-6 shrink-0 place-items-center rounded hover:bg-neutral-200 dark:hover:bg-neutral-800"
+                  aria-label={`${t('Cerrar')}: ${idea.label}`}
+                  onClick={() => closeIdea(idea.id)}
+                >
+                  <Icon name="x" size={11} />
+                </button>
+              </div>
+            );
+          })}
         </div>
       </header>
 
@@ -370,78 +345,174 @@ export function IdeasView({
           </footer>
         </div>
 
-        {selectedId && (
-          <div data-testid={testId ? 'study-idea-detail' : 'idea-detail-tab'} className={surface === 'idea' ? 'h-full overflow-y-auto p-5' : 'hidden'}>
-            {detailLoading && !detail && <div className="grid h-64 place-items-center"><Spinner label={t('Cargando detalle…')} /></div>}
-            {detail && (
-              <div className="mx-auto max-w-[1480px] space-y-4">
-                <section className="rounded-2xl border border-indigo-100 bg-indigo-50/80 p-5 dark:border-neutral-800 dark:bg-neutral-900/35">
-                  <div className="flex flex-wrap items-start gap-4">
-                    <span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-indigo-100 text-indigo-600 dark:bg-indigo-500/15 dark:text-indigo-300"><Icon name="bulb" size={22} /></span>
-                    <div className="min-w-0 flex-1">
-                      <div className="flex flex-wrap items-center gap-2"><Badge color="indigo">{t(NODE_LABELS[detail.idea.type as IdeaType]) ?? detail.idea.type}</Badge></div>
-                      <h2 className="mt-2 text-xl font-semibold">{detail.idea.label}</h2>
-                      <p className="mt-1 max-w-5xl text-sm leading-6 text-neutral-600 dark:text-neutral-400">{detail.idea.statement}</p>
-                      <div className="mt-3 flex flex-wrap gap-2">
-                        <Badge>{tx('{n} obra(s)', { n: detailWorkCount })}</Badge>
-                        <Badge>{tx('{n} conexión(es)', { n: connections.length })}</Badge>
-                        <Badge>{t('Confianza')} {detailConfidence.toFixed(2)}</Badge>
-                        {selectedNode?.themes.map((theme) => <Badge key={theme} color="amber">{theme}</Badge>)}
-                      </div>
-                    </div>
-                    <div className="flex max-w-lg flex-wrap justify-end gap-2">
-                      <button className="btn btn-ghost border border-neutral-300 text-xs gap-1.5 dark:border-neutral-700" onClick={() => onOpenGraph({ preset: 'overview', nodeId: detail.idea.global_id, label: `${t('Idea:')} ${detail.idea.label}` })}><Icon name="layers" size={13} /> {t('Grafo')}</button>
-                      <button className="btn btn-ghost border border-neutral-300 text-xs gap-1.5 dark:border-neutral-700" onClick={() => onOpenAssistant({ title: `${t('Idea:')} ${detail.idea.label}`, selection: ASSISTANT_CONTEXTS.idea, prompt: `${t('Analiza esta idea dentro del corpus y resume sus conexiones, tensiones y lecturas prioritarias.')}\n\n${t('Idea:')} ${detail.idea.label}\n${detail.idea.statement}` })}><Icon name="chat" size={13} /> {t('Asistente')}</button>
-                      <button className="btn btn-ghost border border-neutral-300 text-xs gap-1.5 dark:border-neutral-700" disabled={savingIdea} onClick={() => { if (!dataSource.saveIdea) { setSavingIdeaToNotes(true); return; } setSavingIdea(true); void dataSource.saveIdea(detail).finally(() => setSavingIdea(false)); }}><Icon name="notebook" size={13} /> {t(savingIdea ? 'Guardando…' : 'Guardar en notas')}</button>
-                      <button className="btn btn-ghost border border-red-200 text-xs text-red-600 gap-1.5 dark:border-red-900/70 dark:text-red-400" disabled={deletingIdea} onClick={() => setConfirmDeleteIdea(true)}><Icon name="trash" size={13} /> {t('Eliminar idea')}</button>
-                    </div>
+        {openIdeas.map((idea) => (
+          <div key={idea.id} className={surface === 'idea' && activeIdeaId === idea.id ? 'h-full' : 'hidden'}>
+            <IdeaDetailTab
+              idea={idea}
+              summary={ideas.find((candidate) => candidate.id === idea.id) ?? null}
+              vaultId={vaultId}
+              dataSource={dataSource}
+              onOpenIdea={showIdea}
+              onOpenGraph={onOpenGraph}
+              onOpenAssistant={onOpenAssistant}
+              onLabelChange={updateIdeaLabel}
+              onDeleted={() => {
+                closeIdea(idea.id);
+                notifyDataChanged();
+                reload(true);
+              }}
+              testId={testId}
+            />
+          </div>
+        ))}
+      </main>
+    </div>
+  );
+}
+
+function IdeaDetailTab({
+  idea,
+  summary,
+  vaultId,
+  dataSource,
+  onOpenIdea,
+  onOpenGraph,
+  onOpenAssistant,
+  onLabelChange,
+  onDeleted,
+  testId,
+}: {
+  idea: OpenIdea;
+  summary: IdeaListItem | null;
+  vaultId: string | null;
+  dataSource: KnowledgeViewSource;
+  onOpenIdea: (idea: OpenIdea) => void;
+  onOpenGraph: (target: PendingGraphNavigationTarget) => void;
+  onOpenAssistant: (target?: PendingAssistantNavigationTarget) => void;
+  onLabelChange: (ideaId: string, label: string) => void;
+  onDeleted: () => void;
+  testId?: string;
+}) {
+  const [detail, setDetail] = useState<IdeaDetail | null>(null);
+  const [connections, setConnections] = useState<IdeaConnection[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [savingToNotes, setSavingToNotes] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+
+  useEffect(() => {
+    let mounted = true;
+    setLoading(true);
+    const cacheKey = `${dataSource.key}:idea-detail:${idea.id}`;
+    const cached = getVaultQueryCache<{ detail: IdeaDetail | null; connections: IdeaConnection[] }>(vaultId, cacheKey);
+    if (cached) {
+      setDetail(cached.detail);
+      setConnections(cached.connections);
+      if (cached.detail) onLabelChange(idea.id, cached.detail.idea.label);
+      setLoading(false);
+      return;
+    }
+    void Promise.all([dataSource.getIdeaDetail(idea.id), dataSource.listIdeaConnections(idea.id)]).then(([nextDetail, linked]) => {
+      if (!mounted) return;
+      setDetail(nextDetail);
+      setConnections(linked);
+      if (nextDetail) onLabelChange(idea.id, nextDetail.idea.label);
+      setVaultQueryCache(vaultId, cacheKey, { detail: nextDetail, connections: linked });
+      setLoading(false);
+    });
+    return () => {
+      mounted = false;
+    };
+  }, [dataSource, idea.id, onLabelChange, vaultId]);
+
+  const deleteIdea = async () => {
+    if (deleting) return;
+    setDeleting(true);
+    try {
+      await dataSource.deleteIdea(idea.id);
+      setConfirmDelete(false);
+      onDeleted();
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  const workCount = detail ? new Set(detail.occurrences.map((occurrence) => occurrence.nodus_id)).size : 0;
+  const confidence = summary?.maxConfidence
+    ?? (detail?.occurrences.length ? Math.max(...detail.occurrences.map((occurrence) => occurrence.confidence)) : 0);
+
+  return (
+    <>
+      <div data-testid={testId ? 'study-idea-detail' : 'idea-detail-tab'} className="h-full overflow-y-auto p-5">
+        {loading && !detail && <div className="grid h-64 place-items-center"><Spinner label={t('Cargando detalle…')} /></div>}
+        {detail && (
+          <div className="mx-auto max-w-[1480px] space-y-4">
+            <section className="rounded-2xl border border-indigo-100 bg-indigo-50/80 p-5 dark:border-neutral-800 dark:bg-neutral-900/35">
+              <div className="flex flex-wrap items-start gap-4">
+                <span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-indigo-100 text-indigo-600 dark:bg-indigo-500/15 dark:text-indigo-300"><Icon name="bulb" size={22} /></span>
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-2"><Badge color="indigo">{t(NODE_LABELS[detail.idea.type as IdeaType]) ?? detail.idea.type}</Badge></div>
+                  <h2 className="mt-2 text-xl font-semibold">{detail.idea.label}</h2>
+                  <p className="mt-1 max-w-5xl text-sm leading-6 text-neutral-600 dark:text-neutral-400">{detail.idea.statement}</p>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <Badge>{tx('{n} obra(s)', { n: workCount })}</Badge>
+                    <Badge>{tx('{n} conexión(es)', { n: connections.length })}</Badge>
+                    <Badge>{t('Confianza')} {confidence.toFixed(2)}</Badge>
+                    {summary?.themes.map((theme) => <Badge key={theme} color="amber">{theme}</Badge>)}
                   </div>
-                </section>
-
-                <div className="grid items-start gap-4 xl:grid-cols-12">
-                  <div className="space-y-4 xl:col-span-7">
-                    <section className="rounded-xl border border-neutral-200 bg-white p-4 dark:border-neutral-800 dark:bg-neutral-950/70">
-                      <div className="mb-3 flex items-center gap-2"><Icon name="book" size={15} className="text-indigo-500" /><h3 className="font-semibold">{t('Obras que la desarrollan')}</h3><span className="text-xs text-neutral-500">{detail.occurrences.length}</span></div>
-                      {detail.occurrences.length > 0 ? <div className="space-y-2">{detail.occurrences.map((occurrence) => <OccurrenceCard key={occurrence.nodus_id} occurrence={occurrence} />)}</div> : <p className="text-sm text-neutral-500">—</p>}
-                    </section>
-
-                    <section className="rounded-xl border border-neutral-200 bg-white p-4 dark:border-neutral-800 dark:bg-neutral-950/70">
-                      <div className="mb-3 flex items-center gap-2"><Icon name="quote" size={15} className="text-indigo-500" /><h3 className="font-semibold">{t('Evidencia anclada')}</h3><span className="text-xs text-neutral-500">{detail.evidence.length}</span></div>
-                      {detail.evidence.length > 0 ? <div className="space-y-2">{detail.evidence.map((evidence) => <blockquote key={evidence.id} className="rounded-r-lg border-l-2 border-indigo-500 bg-neutral-50 px-3 py-2 text-sm italic leading-6 text-neutral-600 dark:bg-neutral-900/45 dark:text-neutral-300">“{evidence.quote}” <EvidenceLocationLink nodusId={evidence.nodus_id} location={evidence.location} suffix={` · ${evidence.kind}`} onOpen={dataSource.openEvidence} /></blockquote>)}</div> : <p className="text-sm text-neutral-500">—</p>}
-                    </section>
-                  </div>
-
-                  <section data-testid="idea-connections" className="rounded-xl border border-neutral-200 bg-white p-4 dark:border-neutral-800 dark:bg-neutral-950/70 xl:col-span-5">
-                    <div className="mb-3 flex items-center gap-2"><Icon name="share" size={15} className="text-indigo-500" /><h3 className="font-semibold">{tx('Ideas conectadas ({n})', { n: connections.length })}</h3></div>
-                    {connections.length > 0 ? <div className="space-y-2">{connections.map(({ edge, node }) => <ConnectedIdeaRow key={edge.id} edge={edge} node={node} onSelectIdea={(id) => showIdea({ id, label: node.label })} onOpenGraph={onOpenGraph} dataSource={dataSource} />)}</div> : <p className="text-sm text-neutral-500">{t('Esta idea aún no tiene conexiones con otras ideas.')}</p>}
-                  </section>
+                </div>
+                <div className="flex max-w-lg flex-wrap justify-end gap-2">
+                  <button className="btn btn-ghost border border-neutral-300 text-xs gap-1.5 dark:border-neutral-700" onClick={() => onOpenGraph({ preset: 'overview', nodeId: detail.idea.global_id, label: `${t('Idea:')} ${detail.idea.label}` })}><Icon name="layers" size={13} /> {t('Grafo')}</button>
+                  <button className="btn btn-ghost border border-neutral-300 text-xs gap-1.5 dark:border-neutral-700" onClick={() => onOpenAssistant({ title: `${t('Idea:')} ${detail.idea.label}`, selection: ASSISTANT_CONTEXTS.idea, prompt: `${t('Analiza esta idea dentro del corpus y resume sus conexiones, tensiones y lecturas prioritarias.')}\n\n${t('Idea:')} ${detail.idea.label}\n${detail.idea.statement}` })}><Icon name="chat" size={13} /> {t('Asistente')}</button>
+                  <button className="btn btn-ghost border border-neutral-300 text-xs gap-1.5 dark:border-neutral-700" disabled={saving} onClick={() => { if (!dataSource.saveIdea) { setSavingToNotes(true); return; } setSaving(true); void dataSource.saveIdea(detail).finally(() => setSaving(false)); }}><Icon name="notebook" size={13} /> {t(saving ? 'Guardando…' : 'Guardar en notas')}</button>
+                  <button className="btn btn-ghost border border-red-200 text-xs text-red-600 gap-1.5 dark:border-red-900/70 dark:text-red-400" disabled={deleting} onClick={() => setConfirmDelete(true)}><Icon name="trash" size={13} /> {t('Eliminar idea')}</button>
                 </div>
               </div>
-            )}
+            </section>
+
+            <div className="grid items-start gap-4 xl:grid-cols-12">
+              <div className="space-y-4 xl:col-span-7">
+                <section className="rounded-xl border border-neutral-200 bg-white p-4 dark:border-neutral-800 dark:bg-neutral-950/70">
+                  <div className="mb-3 flex items-center gap-2"><Icon name="book" size={15} className="text-indigo-500" /><h3 className="font-semibold">{t('Obras que la desarrollan')}</h3><span className="text-xs text-neutral-500">{detail.occurrences.length}</span></div>
+                  {detail.occurrences.length > 0 ? <div className="space-y-2">{detail.occurrences.map((occurrence) => <OccurrenceCard key={occurrence.nodus_id} occurrence={occurrence} />)}</div> : <p className="text-sm text-neutral-500">—</p>}
+                </section>
+
+                <section className="rounded-xl border border-neutral-200 bg-white p-4 dark:border-neutral-800 dark:bg-neutral-950/70">
+                  <div className="mb-3 flex items-center gap-2"><Icon name="quote" size={15} className="text-indigo-500" /><h3 className="font-semibold">{t('Evidencia anclada')}</h3><span className="text-xs text-neutral-500">{detail.evidence.length}</span></div>
+                  {detail.evidence.length > 0 ? <div className="space-y-2">{detail.evidence.map((evidence) => <blockquote key={evidence.id} className="rounded-r-lg border-l-2 border-indigo-500 bg-neutral-50 px-3 py-2 text-sm italic leading-6 text-neutral-600 dark:bg-neutral-900/45 dark:text-neutral-300">“{evidence.quote}” <EvidenceLocationLink nodusId={evidence.nodus_id} location={evidence.location} suffix={` · ${evidence.kind}`} onOpen={dataSource.openEvidence} /></blockquote>)}</div> : <p className="text-sm text-neutral-500">—</p>}
+                </section>
+              </div>
+
+              <section data-testid="idea-connections" className="rounded-xl border border-neutral-200 bg-white p-4 dark:border-neutral-800 dark:bg-neutral-950/70 xl:col-span-5">
+                <div className="mb-3 flex items-center gap-2"><Icon name="share" size={15} className="text-indigo-500" /><h3 className="font-semibold">{tx('Ideas conectadas ({n})', { n: connections.length })}</h3></div>
+                {connections.length > 0 ? <div className="space-y-2">{connections.map(({ edge, node }) => <ConnectedIdeaRow key={edge.id} edge={edge} node={node} onSelectIdea={(id) => onOpenIdea({ id, label: node.label })} onOpenGraph={onOpenGraph} dataSource={dataSource} />)}</div> : <p className="text-sm text-neutral-500">{t('Esta idea aún no tiene conexiones con otras ideas.')}</p>}
+              </section>
+            </div>
           </div>
         )}
-      </main>
+      </div>
 
-      {savingIdeaToNotes && detail && !dataSource.saveIdea && (
+      {savingToNotes && detail && !dataSource.saveIdea && (
         <SaveToNotesModal
           content={buildIdeaNote(detail)}
           defaultTitle={detail.idea.label}
           kind="idea"
           source={{ origin: 'idea', ref: detail.idea.global_id }}
-          onClose={() => setSavingIdeaToNotes(false)}
+          onClose={() => setSavingToNotes(false)}
         />
       )}
-      {confirmDeleteIdea && detail && (
+      {confirmDelete && detail && (
         <ConfirmModal
           title={t('Eliminar idea')}
           message={tx('Se eliminará «{name}» junto con su embedding, evidencia y conexiones. Esta acción no se puede deshacer.', { name: detail.idea.label })}
           confirmLabel={t('Eliminar idea')}
           danger
-          onCancel={() => setConfirmDeleteIdea(false)}
-          onConfirm={() => void deleteSelectedIdea()}
+          onCancel={() => setConfirmDelete(false)}
+          onConfirm={() => void deleteIdea()}
         />
       )}
-    </div>
+    </>
   );
 }
 

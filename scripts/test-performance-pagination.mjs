@@ -27,7 +27,7 @@ assert.match(worksRepo, /Math\.min\(250,/, 'works endpoint must enforce a server
 
 assert.match(ideas, /listIdeasPage\(/, 'Ideas must use its compact list endpoint');
 assert.equal(ideas.includes("getGraph('ideas')"), false, 'Ideas list must not transfer the full graph');
-assert.match(ideas, /listIdeaConnections\(selectedId\)/, 'connections must load only for the selected idea');
+assert.match(ideas, /listIdeaConnections\(idea\.id\)/, 'connections must load only for each opened idea');
 assert.match(ideasRepo, /LIMIT @limit OFFSET @offset/, 'ideas must be paginated inside SQLite');
 
 assert.match(gaps, /getGapsPage\(/, 'Gaps must request a bounded page');

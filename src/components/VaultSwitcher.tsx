@@ -156,11 +156,11 @@ export function VaultSwitcher({ anchorEl, onClose, vaults, onVaultsChanged, onAc
   const shownVaults = useMemo(() => {
     const q = query.trim().toLowerCase();
     const filtered = vaults.filter(
-      (v) => (typeFilter === 'all' || v.type === typeFilter) && (!q || v.name.toLowerCase().includes(q))
+      (v) => (typeFilter === 'all' || v.type === typeFilter) && (!q || (v.name ?? '').toLowerCase().includes(q))
     );
     const byRecent = (a: VaultSummary, b: VaultSummary) => (b.lastOpenedAt || '').localeCompare(a.lastOpenedAt || '');
     const byCreated = (a: VaultSummary, b: VaultSummary) => (b.createdAt || '').localeCompare(a.createdAt || '');
-    const byName = (a: VaultSummary, b: VaultSummary) => a.name.localeCompare(b.name);
+    const byName = (a: VaultSummary, b: VaultSummary) => (a.name ?? '').localeCompare(b.name ?? '');
     return [...filtered].sort(sortKey === 'created' ? byCreated : sortKey === 'name' ? byName : byRecent);
   }, [vaults, query, typeFilter, sortKey]);
 

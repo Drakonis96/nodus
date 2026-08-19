@@ -348,7 +348,7 @@ export function CastPicker({
   const [query, setQuery] = useState('');
   const anchorRef = useRef<HTMLDivElement>(null);
   const shown = query.trim()
-    ? tracks.filter((track) => track.personName.toLowerCase().includes(query.trim().toLowerCase()))
+    ? tracks.filter((track) => (track.personName ?? '').toLowerCase().includes(query.trim().toLowerCase()))
     : tracks;
 
   const label = selected.size === 0

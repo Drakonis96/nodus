@@ -404,7 +404,7 @@ export function NodiCompanion({ context, costumes }: { context: Ctx; costumes?: 
   const filteredNotes = useMemo(() => {
     const q = noteSearch.trim().toLowerCase();
     if (!q) return notes;
-    return notes.filter((n) => n.title.toLowerCase().includes(q) || n.content.toLowerCase().includes(q));
+    return notes.filter((n) => (n.title ?? '').toLowerCase().includes(q) || (n.content ?? '').toLowerCase().includes(q));
   }, [notes, noteSearch]);
 
   // Markdown formatting acting on the textarea's current selection.

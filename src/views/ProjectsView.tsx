@@ -74,7 +74,7 @@ export function ProjectsView({ settings }: { settings: AppSettings }) {
 
   const filteredProjects = useMemo(() => {
     const q = search.trim().toLowerCase();
-    return q ? projects.filter((p) => p.title.toLowerCase().includes(q)) : projects;
+    return q ? projects.filter((p) => (p.title ?? '').toLowerCase().includes(q)) : projects;
   }, [projects, search]);
 
   const selectedChapter = useMemo(

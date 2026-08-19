@@ -45,7 +45,7 @@ export function PersonLinkPicker({
   const results = useMemo(() => {
     const query = q.trim().toLowerCase();
     return persons
-      .filter((p) => !linkedIds.has(p.personId) && (!query || p.displayName.toLowerCase().includes(query)))
+      .filter((p) => !linkedIds.has(p.personId) && (!query || (p.displayName ?? '').toLowerCase().includes(query)))
       .slice(0, 8);
   }, [persons, linkedIds, q]);
 

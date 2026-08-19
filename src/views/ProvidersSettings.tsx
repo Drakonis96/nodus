@@ -241,7 +241,7 @@ function ChatGptSubscriptionRow({
 
   const filtered = (models ?? []).filter((model) => {
     const query = search.toLowerCase();
-    return !query || model.id.toLowerCase().includes(query) || (model.name ?? '').toLowerCase().includes(query);
+    return !query || (model.id ?? '').toLowerCase().includes(query) || (model.name ?? '').toLowerCase().includes(query);
   });
 
   return (
@@ -422,7 +422,7 @@ function GitHubCopilotSubscriptionRow({
 
   const filtered = (models ?? []).filter((model) => {
     const query = search.toLowerCase();
-    return !query || model.id.toLowerCase().includes(query) || (model.name ?? '').toLowerCase().includes(query);
+    return !query || (model.id ?? '').toLowerCase().includes(query) || (model.name ?? '').toLowerCase().includes(query);
   });
 
   return (
@@ -559,15 +559,15 @@ export function ImageGenerationSettings({ settings, onChange }: { settings: AppS
       !q || `${model.provider} ${model.name} ${model.id}`.toLowerCase().includes(q)
     );
     return [...filtered].sort((a, b) => {
-      if (sort === 'provider') return a.provider.localeCompare(b.provider) || a.name.localeCompare(b.name);
-      if (sort === 'alpha') return a.name.localeCompare(b.name) || a.provider.localeCompare(b.provider);
+      if (sort === 'provider') return (a.provider ?? '').localeCompare(b.provider ?? '') || (a.name ?? '').localeCompare(b.name ?? '');
+      if (sort === 'alpha') return (a.name ?? '').localeCompare(b.name ?? '') || (a.provider ?? '').localeCompare(b.provider ?? '');
       // Providers publish unlike sizes/units. Price order is therefore scoped
       // to one provider and never implies a false cross-provider comparison.
-      const providerOrder = a.provider.localeCompare(b.provider);
+      const providerOrder = (a.provider ?? '').localeCompare(b.provider ?? '');
       if (providerOrder !== 0) return providerOrder;
       const aPrice = a.imagePriceUsd;
       const bPrice = b.imagePriceUsd;
-      if (aPrice == null && bPrice == null) return a.name.localeCompare(b.name);
+      if (aPrice == null && bPrice == null) return (a.name ?? '').localeCompare(b.name ?? '');
       if (aPrice == null) return 1;
       if (bPrice == null) return -1;
       return sort === 'price_asc' ? aPrice - bPrice : bPrice - aPrice;
@@ -719,7 +719,7 @@ function ProviderRow({
 
   const filtered = (models ?? []).filter((m) => {
     const q = search.toLowerCase();
-    return !q || m.id.toLowerCase().includes(q) || (m.name ?? '').toLowerCase().includes(q);
+    return !q || (m.id ?? '').toLowerCase().includes(q) || (m.name ?? '').toLowerCase().includes(q);
   });
   const shown = filtered.slice(0, 300);
 
@@ -942,7 +942,7 @@ function LocalProviderRow({
 
   const filtered = (models ?? []).filter((m) => {
     const q = search.toLowerCase();
-    return !q || m.id.toLowerCase().includes(q) || (m.name ?? '').toLowerCase().includes(q);
+    return !q || (m.id ?? '').toLowerCase().includes(q) || (m.name ?? '').toLowerCase().includes(q);
   });
   const shown = filtered.slice(0, 300);
 

@@ -165,11 +165,11 @@ function clipboardInputForColumn(column: DatabaseColumn, value: string): string 
   const trimmed = value.trim();
   if (!trimmed) return null;
   if (column.type === 'select' || column.type === 'status') {
-    return column.options.find((option) => option.label.localeCompare(trimmed, undefined, { sensitivity: 'accent' }) === 0)?.id ?? trimmed;
+    return column.options.find((option) => (option.label ?? '').localeCompare(trimmed, undefined, { sensitivity: 'accent' }) === 0)?.id ?? trimmed;
   }
   if (column.type === 'multi_select') {
     const ids = trimmed.split(/[,;]\s*/).filter(Boolean).map((label) =>
-      column.options.find((option) => option.label.localeCompare(label, undefined, { sensitivity: 'accent' }) === 0)?.id ?? label,
+      column.options.find((option) => (option.label ?? '').localeCompare(label, undefined, { sensitivity: 'accent' }) === 0)?.id ?? label,
     );
     return encodeMultiSelect(ids);
   }
@@ -3643,8 +3643,8 @@ function SelectCell({
   const selected = selectedIds.map((id) => optionById.get(id)).filter((o): o is DatabaseSelectOption => Boolean(o));
 
   const qLower = query.trim().toLowerCase();
-  const filtered = qLower ? column.options.filter((o) => o.label.toLowerCase().includes(qLower)) : column.options;
-  const exactMatch = column.options.some((o) => o.label.toLowerCase() === qLower);
+  const filtered = qLower ? column.options.filter((o) => (o.label ?? '').toLowerCase().includes(qLower)) : column.options;
+  const exactMatch = column.options.some((o) => (o.label ?? '').toLowerCase() === qLower);
   const nextColor = OPTION_COLORS[column.options.length % OPTION_COLORS.length];
 
   const setValue = (ids: string[]) => onChange(multi ? encodeMultiSelect(ids) : ids[0] ?? null);

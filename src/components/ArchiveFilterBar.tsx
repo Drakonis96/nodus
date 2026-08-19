@@ -309,7 +309,7 @@ function SimpleFilterDropdown({
   const [q, setQ] = useState('');
   const ref = useDismissableLayer<HTMLDivElement>({ open, onDismiss: () => setOpen(false) });
 
-  const filtered = searchable && q.trim() ? options.filter((o) => o.label.toLowerCase().includes(q.trim().toLowerCase())) : options;
+  const filtered = searchable && q.trim() ? options.filter((o) => (o.label ?? '').toLowerCase().includes(q.trim().toLowerCase())) : options;
 
   const toggle = (value: string) => {
     onChange(selected.includes(value) ? selected.filter((v) => v !== value) : [...selected, value]);

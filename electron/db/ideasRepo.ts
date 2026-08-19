@@ -232,10 +232,21 @@ export function clearAllEmbeddings(): void {
 export function getIdea(globalId: string): Idea | null {
   const db = getDb();
   const row = db.prepare('SELECT * FROM ideas WHERE global_id = ?').get(globalId) as
-    | (Omit<Idea, 'embedding'> & { embedding: Buffer | null })
+    | (Omit<Idea, 'type' | 'label' | 'statement' | 'embedding'> & {
+        type: IdeaType | null;
+        label: string | null;
+        statement: string | null;
+        embedding: Buffer | null;
+      })
     | undefined;
   if (!row) return null;
-  return { ...row, embedding: row.embedding ? decodeEmbedding(row.embedding) : null };
+  return {
+    ...row,
+    type: row.type ?? 'claim',
+    label: row.label ?? row.global_id,
+    statement: row.statement ?? '',
+    embedding: row.embedding ? decodeEmbedding(row.embedding) : null,
+  };
 }
 
 /**
@@ -248,9 +259,19 @@ export function getIdeaSummary(globalId: string): Idea | null {
   const db = getDb();
   const row = db
     .prepare('SELECT global_id, type, label, statement, created_at FROM ideas WHERE global_id = ?')
-    .get(globalId) as Omit<Idea, 'embedding'> | undefined;
+    .get(globalId) as (Omit<Idea, 'type' | 'label' | 'statement' | 'embedding'> & {
+      type: IdeaType | null;
+      label: string | null;
+      statement: string | null;
+    }) | undefined;
   if (!row) return null;
-  return { ...row, embedding: null };
+  return {
+    ...row,
+    type: row.type ?? 'claim',
+    label: row.label ?? row.global_id,
+    statement: row.statement ?? '',
+    embedding: null,
+  };
 }
 
 /**
@@ -799,7 +820,7 @@ export function getIdeaDetail(globalId: string, worksCache?: Map<string, WorkVie
  * join plus DISTINCT, so no statement text has to be sorted to deduplicate.
  */
 export function listPickerIdeas(): IdeaPickerItem[] {
-  return getDb()
+  const rows = getDb()
     .prepare(
       `SELECT i.global_id, i.type, i.label, i.statement
          FROM ideas i
@@ -812,7 +833,17 @@ export function listPickerIdeas(): IdeaPickerItem[] {
              AND w.deep_status = 'done'
         )`
     )
-    .all() as IdeaPickerItem[];
+    .all() as Array<Omit<IdeaPickerItem, 'type' | 'label' | 'statement'> & {
+      type: IdeaType | null;
+      label: string | null;
+      statement: string | null;
+    }>;
+  return rows.map((row) => ({
+    ...row,
+    type: row.type ?? 'claim',
+    label: row.label ?? row.global_id,
+    statement: row.statement ?? '',
+  }));
 }
 
 export function listIdeasPage(request: IdeaPageRequest): IdeaPage {
@@ -863,9 +894,9 @@ export function listIdeasPage(request: IdeaPageRequest): IdeaPage {
     )
     .all(params) as Array<{
       id: string;
-      label: string;
-      type: IdeaType;
-      statement: string;
+      label: string | null;
+      type: IdeaType | null;
+      statement: string | null;
       work_count: number;
       max_confidence: number | null;
       connection_count: number;
@@ -890,9 +921,9 @@ export function listIdeasPage(request: IdeaPageRequest): IdeaPage {
   }
   const items: IdeaListItem[] = rows.map((row) => ({
     id: row.id,
-    label: row.label,
-    type: row.type,
-    statement: row.statement,
+    label: row.label ?? row.id,
+    type: row.type ?? 'claim',
+    statement: row.statement ?? '',
     workCount: Number(row.work_count),
     themes: themes.get(row.id) ?? [],
     maxConfidence: Number(row.max_confidence ?? 0),
@@ -925,9 +956,9 @@ export function listIdeaConnections(globalId: string): IdeaConnection[] {
       basis: EdgeBasis;
       confidence: number;
       other_id: string;
-      label: string;
-      idea_type: IdeaType;
-      statement: string;
+      label: string | null;
+      idea_type: IdeaType | null;
+      statement: string | null;
       work_count: number;
       max_confidence: number | null;
       connection_count: number;
@@ -943,9 +974,9 @@ export function listIdeaConnections(globalId: string): IdeaConnection[] {
     } satisfies GraphEdge,
     node: {
       id: row.other_id,
-      label: row.label,
-      type: row.idea_type,
-      statement: row.statement,
+      label: row.label ?? row.other_id,
+      type: row.idea_type ?? 'claim',
+      statement: row.statement ?? '',
       workCount: Number(row.work_count),
       themes: [],
       maxConfidence: Number(row.max_confidence ?? 0),

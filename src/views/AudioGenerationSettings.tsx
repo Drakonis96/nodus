@@ -90,7 +90,7 @@ export function AudioGenerationSettings({
   const voices = useMemo(() => {
     const q = query.trim().toLowerCase();
     return baseVoices.filter((v) => {
-      if (q && !v.name.toLowerCase().includes(q)) return false;
+      if (q && !(v.name ?? '').toLowerCase().includes(q)) return false;
       // Local providers filter language client-side (Hume did it server-side).
       if (!isCloud && langFilter && v.languageLabel !== langFilter) return false;
       if (isCloud && humeLibrary !== 'all' && v.humeProvider !== humeLibrary) return false;

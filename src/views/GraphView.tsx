@@ -1738,7 +1738,7 @@ export function GraphView({
       if (f.authors.length && !n.authors.some((a) => f.authors.includes(a))) return false;
       if (f.yearMin != null && !n.years.some((y) => y >= f.yearMin!)) return false;
       if (f.yearMax != null && !n.years.some((y) => y <= f.yearMax!)) return false;
-      if (q && !(n.label.toLowerCase().includes(q) || (n.statement ?? '').toLowerCase().includes(q) || n.authors.some((a) => a.toLowerCase().includes(q)))) {
+      if (q && !((n.label ?? '').toLowerCase().includes(q) || (n.statement ?? '').toLowerCase().includes(q) || n.authors.some((a) => (a ?? '').toLowerCase().includes(q)))) {
         return false;
       }
       return true;
@@ -1859,7 +1859,7 @@ export function GraphView({
   const activeThemeTotal = useMemo(() => {
     if (!activeThemeLabel || !constellationModel) return 0;
     const key = activeThemeLabel.trim().toLowerCase();
-    return constellationModel.nodes.find((n) => n.label.trim().toLowerCase() === key)?.workCount ?? 0;
+    return constellationModel.nodes.find((n) => (n.label ?? '').trim().toLowerCase() === key)?.workCount ?? 0;
   }, [activeThemeLabel, constellationModel]);
   const backboneShown = backboneModel?.nodes.filter((node) => !node.bridge).length ?? 0;
   const maximumThemeIdeas = Math.min(250, activeThemeTotal);
