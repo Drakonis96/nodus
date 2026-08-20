@@ -45,7 +45,7 @@ import { DEEP_RESEARCH_APPROACH_TRANSLATIONS } from './i18n.deepResearchApproach
  */
 export const EN: Record<string, string> = {
   'Tamaño de Nodi': 'Nodi size',
-  'El marcador central conserva el tamaño predeterminado. Elige uno de los nueve tamaños disponibles.': 'The centre marker keeps the default size. Choose one of the nine available sizes.',
+  'El 100 % conserva el tamaño original de Nodi y es el máximo. Puedes reducirlo hasta el 40 %.': "100% keeps Nodi's original size and is the maximum. You can reduce it to 40%.",
   'Tamaños predeterminados': 'Preset sizes',
   ...PAGE_TRANSLATIONS.en,
   ...DATABASE_PROPERTY_TRANSLATIONS.en,

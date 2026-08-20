@@ -15,7 +15,7 @@ import { RELEASE_NOTES_TR } from './releaseNotes.tr';
 // identity of its own: the MCP server, the Nodi mascot, the tools hub or a new
 // interface language. They get their own icon and colour instead of dissolving
 // into 'general'.
-export type ReleaseNoteScope = 'general' | VaultType | 'mcp' | 'nodi' | 'toolkit' | 'plugin' | 'languages';
+export type ReleaseNoteScope = 'general' | VaultType | 'mcp' | 'nodi' | 'toolkit' | 'plugin' | 'languages' | 'browser' | 'radar';
 
 interface RawReleaseHighlight {
   es: string;
@@ -1107,6 +1107,94 @@ const RELEASE_4_1_3_HIGHLIGHTS: RawReleaseHighlight[] = [
 ];
 
 /**
+ * 4.2.0 — Browser and Radar become first-class research surfaces, while databases,
+ * Deep Research, reading, Nodi and large backup restores gain substantial new workflows.
+ */
+const RELEASE_4_2_0_HIGHLIGHTS: RawReleaseHighlight[] = [
+  {
+    scope: 'browser',
+    es: 'Nodus Browser llega como navegador de investigación integrado y seguro con varias pestañas, descargas, controles multimedia y permisos por sitio. Incluye Research Atlas, marcadores e historial locales, acciones de Nodi sobre páginas y selecciones, y captura directa de referencias y PDF en la Biblioteca mediante Nodus Connector.',
+    en: 'Nodus Browser arrives as a secure, integrated research browser with multiple tabs, downloads, media controls and per-site permissions. It includes Research Atlas, local bookmarks and history, Nodi actions for pages and selections, and direct capture of references and PDFs into the Library through Nodus Connector.',
+    fr: 'Nodus Browser devient un navigateur de recherche intégré et sécurisé avec plusieurs onglets, des téléchargements, des commandes multimédias et des autorisations par site. Il comprend Research Atlas, des favoris et un historique locaux, des actions de Nodi sur les pages et les sélections, ainsi que la capture directe de références et de PDF dans la Bibliothèque grâce à Nodus Connector.',
+    de: 'Nodus Browser ist ein integrierter und sicherer Forschungsbrowser mit mehreren Tabs, Downloads, Mediensteuerung und Berechtigungen pro Website. Er umfasst Research Atlas, lokale Lesezeichen und einen lokalen Verlauf, Nodi-Aktionen für Seiten und Textauswahlen sowie die direkte Übernahme von Referenzen und PDFs in die Bibliothek über Nodus Connector.',
+    pt: 'O Nodus Browser chega como navegador de investigação integrado e seguro, com vários separadores, transferências, controlos multimédia e permissões por site. Inclui o Research Atlas, marcadores e histórico locais, ações do Nodi sobre páginas e seleções e a captura direta de referências e PDF para a Biblioteca através do Nodus Connector.',
+    'pt-BR': 'O Nodus Browser chega como navegador de pesquisa integrado e seguro, com várias abas, downloads, controles de mídia e permissões por site. Inclui o Research Atlas, favoritos e histórico locais, ações do Nodi sobre páginas e seleções e a captura direta de referências e PDFs na Biblioteca por meio do Nodus Connector.',
+  },
+  {
+    scope: 'radar',
+    es: 'Puedes seguir temas, búsquedas, autores, revistas, artículos, fuentes RSS y sitios web con revisiones diarias o semanales. Las novedades se reúnen en una bandeja global, llegan al centro de notificaciones y a Nodi, y pueden abrirse o guardarse directamente en la Biblioteca.',
+    en: 'You can follow topics, searches, authors, journals, papers, RSS feeds and websites with daily or weekly checks. Updates gather in a global inbox, reach the notification centre and Nodi, and can be opened or saved directly to the Library.',
+    fr: 'Vous pouvez suivre des sujets, des recherches, des auteurs, des revues, des articles, des flux RSS et des sites web avec des vérifications quotidiennes ou hebdomadaires. Les nouveautés se rassemblent dans une boîte de réception globale, arrivent dans le centre de notifications et auprès de Nodi, et peuvent être ouvertes ou enregistrées directement dans la Bibliothèque.',
+    de: 'Sie können Themen, Suchanfragen, Autoren, Zeitschriften, Aufsätze, RSS-Feeds und Websites mit täglichen oder wöchentlichen Prüfungen verfolgen. Neuigkeiten sammeln sich in einem globalen Posteingang, erreichen die Benachrichtigungszentrale und Nodi und lassen sich direkt öffnen oder in der Bibliothek speichern.',
+    pt: 'Pode seguir temas, pesquisas, autores, revistas, artigos, fontes RSS e sites com verificações diárias ou semanais. As novidades reúnem-se numa caixa de entrada global, chegam ao centro de notificações e ao Nodi e podem ser abertas ou guardadas diretamente na Biblioteca.',
+    'pt-BR': 'Você pode acompanhar temas, pesquisas, autores, periódicos, artigos, feeds RSS e sites com verificações diárias ou semanais. As novidades se reúnem em uma caixa de entrada global, chegam à central de notificações e ao Nodi e podem ser abertas ou salvas diretamente na Biblioteca.',
+  },
+  {
+    scope: 'databases',
+    es: 'Las Bases de datos estrenan páginas y bloques, propiedades avanzadas, fórmulas, relaciones, rollups, plantillas, tareas, automatizaciones, formularios, comentarios, historial y permisos. La búsqueda y las vistas virtualizadas mantienen la fluidez incluso con cientos de miles de filas, y la importación desde Notion es mucho más fiel.',
+    en: 'Databases gain pages and blocks, advanced properties, formulas, relations, rollups, templates, tasks, automations, forms, comments, history and permissions. Search and virtualized views stay responsive even with hundreds of thousands of rows, and importing from Notion is much more faithful.',
+    fr: 'Les Bases de données accueillent des pages et des blocs, des propriétés avancées, des formules, des relations, des agrégations, des modèles, des tâches, des automatisations, des formulaires, des commentaires, un historique et des autorisations. La recherche et les vues virtualisées restent fluides même avec des centaines de milliers de lignes, et l’importation depuis Notion est bien plus fidèle.',
+    de: 'Datenbanken erhalten Seiten und Blöcke, erweiterte Eigenschaften, Formeln, Beziehungen, Rollups, Vorlagen, Aufgaben, Automatisierungen, Formulare, Kommentare, Verlauf und Berechtigungen. Suche und virtualisierte Ansichten bleiben auch bei Hunderttausenden von Zeilen flüssig, und der Import aus Notion ist deutlich originalgetreuer.',
+    pt: 'As Bases de dados passam a ter páginas e blocos, propriedades avançadas, fórmulas, relações, rollups, modelos, tarefas, automatizações, formulários, comentários, histórico e permissões. A pesquisa e as vistas virtualizadas mantêm-se fluidas mesmo com centenas de milhares de linhas, e a importação do Notion é muito mais fiel.',
+    'pt-BR': 'Os Bancos de dados ganham páginas e blocos, propriedades avançadas, fórmulas, relações, rollups, modelos, tarefas, automações, formulários, comentários, histórico e permissões. A busca e as visualizações virtualizadas continuam fluidas mesmo com centenas de milhares de linhas, e a importação do Notion é muito mais fiel.',
+  },
+  {
+    scope: 'academic',
+    es: 'Deep Research permite elegir entre investigación general, revisión de la literatura, estado de la cuestión, debate académico, análisis comparativo, análisis cronológico y síntesis conceptual o teórica. Cada opción adapta la búsqueda, la planificación y la redacción al objetivo, y el informe conserva el enfoque y el modelo utilizados.',
+    en: 'Deep Research lets you choose general research, literature review, state of the art, scholarly debate, comparative analysis, chronological analysis or conceptual and theoretical synthesis. Each option adapts retrieval, planning and writing to the goal, and the report keeps the approach and model used to create it.',
+    fr: 'Deep Research permet de choisir entre recherche générale, revue de la littérature, état de l’art, débat scientifique, analyse comparative, analyse chronologique et synthèse conceptuelle ou théorique. Chaque option adapte la recherche documentaire, la planification et la rédaction à l’objectif, et le rapport conserve l’approche et le modèle utilisés.',
+    de: 'Deep Research bietet allgemeine Forschung, Literaturübersicht, Forschungsstand, wissenschaftliche Debatte, vergleichende Analyse, chronologische Analyse und begriffliche oder theoretische Synthese. Jede Option passt Recherche, Planung und Ausarbeitung an das Ziel an, und der Bericht bewahrt den verwendeten Ansatz und das verwendete Modell.',
+    pt: 'O Deep Research permite escolher entre investigação geral, revisão da literatura, estado da arte, debate académico, análise comparativa, análise cronológica e síntese conceptual ou teórica. Cada opção adapta a pesquisa, o planeamento e a redação ao objetivo, e o relatório conserva a abordagem e o modelo utilizados.',
+    'pt-BR': 'O Deep Research permite escolher entre pesquisa geral, revisão da literatura, estado da arte, debate acadêmico, análise comparativa, análise cronológica e síntese conceitual ou teórica. Cada opção adapta a busca, o planejamento e a redação ao objetivo, e o relatório preserva a abordagem e o modelo utilizados.',
+  },
+  {
+    scope: 'academic',
+    es: 'Deep Research e Inmersión comparten un sistema completo de subrayados, comentarios y marcadores persistentes. El nuevo espacio de fuentes permite explorar ideas, autores y obras en pestañas sin abandonar el informe, y abrir las referencias disponibles en Zotero o en la Biblioteca de Nodus.',
+    en: 'Deep Research and Immersion now share a complete system of persistent highlights, comments and bookmarks. The new source workspace lets you explore ideas, authors and works in tabs without leaving the report, and open available references in Zotero or the Nodus Library.',
+    fr: 'Deep Research et Immersion partagent désormais un système complet de surlignages, de commentaires et de signets persistants. Le nouvel espace des sources permet d’explorer des idées, des auteurs et des œuvres dans des onglets sans quitter le rapport, et d’ouvrir les références disponibles dans Zotero ou dans la Bibliothèque de Nodus.',
+    de: 'Deep Research und Immersion teilen jetzt ein vollständiges System für dauerhafte Hervorhebungen, Kommentare und Lesezeichen. Im neuen Quellenbereich können Sie Ideen, Autoren und Werke in Tabs erkunden, ohne den Bericht zu verlassen, und verfügbare Referenzen in Zotero oder der Nodus-Bibliothek öffnen.',
+    pt: 'O Deep Research e a Imersão partilham agora um sistema completo de realces, comentários e marcadores persistentes. O novo espaço de fontes permite explorar ideias, autores e obras em separadores sem sair do relatório e abrir as referências disponíveis no Zotero ou na Biblioteca do Nodus.',
+    'pt-BR': 'O Deep Research e a Imersão agora compartilham um sistema completo de destaques, comentários e marcadores persistentes. O novo espaço de fontes permite explorar ideias, autores e obras em abas sem sair do relatório e abrir as referências disponíveis no Zotero ou na Biblioteca do Nodus.',
+  },
+  {
+    scope: 'general',
+    es: 'Puedes mantener abiertos varios autores, ideas y mapas argumentales para compararlos sin que una selección sustituya a la anterior. Las búsquedas ya no fallan cuando encuentran registros importados con metadatos incompletos.',
+    en: 'You can keep several authors, ideas and argument maps open for comparison without each selection replacing the previous one. Searches no longer fail when they encounter imported records with incomplete metadata.',
+    fr: 'Vous pouvez garder plusieurs auteurs, idées et cartes argumentatives ouverts afin de les comparer sans que chaque sélection remplace la précédente. Les recherches n’échouent plus lorsqu’elles rencontrent des fiches importées dont les métadonnées sont incomplètes.',
+    de: 'Sie können mehrere Autoren, Ideen und Argumentkarten zum Vergleichen geöffnet halten, ohne dass jede Auswahl die vorherige ersetzt. Suchvorgänge schlagen nicht mehr fehl, wenn sie auf importierte Einträge mit unvollständigen Metadaten treffen.',
+    pt: 'Pode manter vários autores, ideias e mapas argumentativos abertos para os comparar sem que cada seleção substitua a anterior. As pesquisas já não falham quando encontram registos importados com metadados incompletos.',
+    'pt-BR': 'Você pode manter vários autores, ideias e mapas argumentativos abertos para compará-los sem que cada seleção substitua a anterior. As buscas não falham mais quando encontram registros importados com metadados incompletos.',
+  },
+  {
+    scope: 'academic',
+    es: 'Las acciones principales de cada registro están ahora disponibles en la cabecera de la Biblioteca Global, sin necesidad de desplazarse. El editor de metadatos es más claro y revelar un adjunto en Finder funciona de forma fiable desde cualquiera de sus accesos.',
+    en: 'The main actions for each record are now available in the Global Library header without scrolling. The metadata editor is clearer, and revealing an attachment in Finder works reliably from either place that offers the action.',
+    fr: 'Les actions principales de chaque fiche sont désormais disponibles dans l’en-tête de la Bibliothèque globale sans avoir à faire défiler la page. L’éditeur de métadonnées est plus clair, et afficher une pièce jointe dans le Finder fonctionne de manière fiable depuis chacun des accès proposés.',
+    de: 'Die wichtigsten Aktionen für jeden Eintrag stehen jetzt ohne Scrollen in der Kopfzeile der Globalen Bibliothek bereit. Der Metadateneditor ist übersichtlicher, und das Anzeigen eines Anhangs im Finder funktioniert an beiden Stellen, die diese Aktion anbieten, zuverlässig.',
+    pt: 'As ações principais de cada registo estão agora disponíveis no cabeçalho da Biblioteca Global, sem ser necessário deslocar a página. O editor de metadados é mais claro, e revelar um anexo no Finder funciona de forma fiável a partir de qualquer um dos acessos.',
+    'pt-BR': 'As principais ações de cada registro agora ficam disponíveis no cabeçalho da Biblioteca Global, sem necessidade de rolar a página. O editor de metadados está mais claro, e revelar um anexo no Finder funciona de forma confiável em qualquer um dos acessos.',
+  },
+  {
+    scope: 'nodi',
+    es: 'El tamaño original de Nodi es ahora el máximo y puedes reducirlo hasta el 40 % para ajustarlo a tu escritorio. Cuando una respuesta llega progresivamente, el chat ya no te arrastra al final y permite leer desde el principio.',
+    en: 'Nodi’s original size is now the maximum, and you can reduce it to 40% to fit your desktop. When an answer streams in, the chat no longer pulls you to the bottom and lets you read from the beginning.',
+    fr: 'La taille d’origine de Nodi est désormais le maximum, et vous pouvez la réduire jusqu’à 40 % pour l’adapter à votre bureau. Lorsqu’une réponse arrive progressivement, le chat ne vous entraîne plus vers le bas et vous permet de lire depuis le début.',
+    de: 'Nodis ursprüngliche Größe ist jetzt das Maximum, und Sie können ihn für Ihren Desktop bis auf 40 % verkleinern. Wenn eine Antwort schrittweise eintrifft, zieht der Chat Sie nicht mehr nach unten und lässt Sie von Anfang an lesen.',
+    pt: 'O tamanho original do Nodi passa a ser o máximo, e pode reduzi-lo até 40% para o adaptar ao seu ambiente de trabalho. Quando uma resposta chega progressivamente, o chat já não o arrasta para o fim e permite ler desde o início.',
+    'pt-BR': 'O tamanho original do Nodi agora é o máximo, e você pode reduzi-lo até 40% para ajustá-lo à sua área de trabalho. Quando uma resposta chega progressivamente, o chat não arrasta mais você para o fim e permite ler desde o começo.',
+  },
+  {
+    scope: 'general',
+    es: 'Las copias de seguridad de gran tamaño se restauran usando mucha menos memoria. La pantalla muestra el progreso real durante el descifrado, la verificación y la extracción, manteniendo la copia de seguridad previa y el mecanismo de recuperación.',
+    en: 'Large backups now restore with much less memory. The screen shows real progress during decryption, verification and extraction while preserving the pre-restore safety snapshot and the existing recovery mechanism.',
+    fr: 'Les sauvegardes volumineuses sont désormais restaurées avec beaucoup moins de mémoire. L’écran affiche la progression réelle pendant le déchiffrement, la vérification et l’extraction, tout en conservant la copie de sécurité préalable et le mécanisme de récupération existant.',
+    de: 'Große Sicherungen werden jetzt mit deutlich weniger Speicher wiederhergestellt. Der Bildschirm zeigt den tatsächlichen Fortschritt beim Entschlüsseln, Prüfen und Extrahieren, während die vorherige Sicherheitskopie und der bestehende Wiederherstellungsmechanismus erhalten bleiben.',
+    pt: 'As cópias de segurança de grande dimensão passam a ser restauradas com muito menos memória. O ecrã mostra o progresso real durante a desencriptação, a verificação e a extração, mantendo a cópia de segurança anterior e o mecanismo de recuperação existente.',
+    'pt-BR': 'Backups grandes agora são restaurados usando muito menos memória. A tela mostra o progresso real durante a descriptografia, a verificação e a extração, preservando a cópia de segurança anterior e o mecanismo de recuperação existente.',
+  },
+];
+
+/**
  * 4.1.6 — the Zotero import finishes what it started, and the two reading galleries
  * stop forgetting how they were set and stop flashing on the way back in.
  */
@@ -1530,6 +1618,11 @@ const RELEASE_4_0_0_HIGHLIGHTS: RawReleaseHighlight[] = [
 ];
 
 const RAW_RELEASE_NOTES: RawReleaseNote[] = [
+  {
+    version: '4.2.0',
+    date: '2026-08-20',
+    highlights: RELEASE_4_2_0_HIGHLIGHTS,
+  },
   {
     version: '4.1.6',
     date: '2026-08-18',

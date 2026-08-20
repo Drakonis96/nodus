@@ -1,5 +1,5 @@
-/** Nine discrete Nodi sizes. The centre value preserves the pre-setting size. */
-export const NODI_SIZE_SCALES = [0.6, 0.7, 0.8, 0.9, 1, 1.1, 1.2, 1.3, 1.4] as const;
+/** Seven discrete Nodi sizes. The original 100% size is now the maximum. */
+export const NODI_SIZE_SCALES = [0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1] as const;
 
 export const NODI_DEFAULT_SCALE = 1;
 

@@ -488,6 +488,17 @@ test('Nodi keeps the reading position stable while an answer is streaming', asyn
   assert.doesNotMatch(deltaHandler, /scrollChatToBottom|scrollTop|scrollIntoView/);
 });
 
+test('Nodi only scales down from its original size and reaches forty percent', async () => {
+  const [sizes, settings] = await Promise.all([
+    read('shared/nodiSize.ts'),
+    read('src/views/Settings.tsx'),
+  ]);
+  assert.match(sizes, /NODI_SIZE_SCALES = \[0\.4, 0\.5, 0\.6, 0\.7, 0\.8, 0\.9, 1\]/);
+  assert.match(sizes, /NODI_DEFAULT_SCALE = 1/);
+  assert.doesNotMatch(sizes, /1\.1|1\.2|1\.3|1\.4/);
+  assert.match(settings, /El 100 % conserva el tamaño original de Nodi y es el máximo\. Puedes reducirlo hasta el 40 %\./);
+});
+
 test('the chat retrieval never holds the main process for a whole similarity scan', async () => {
   const assistant = await read('electron/ai/researchAssistant.ts');
   // researchAssistant builds the context for the research chat AND for Nodi's

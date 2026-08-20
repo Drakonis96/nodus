@@ -1004,7 +1004,7 @@ export function Settings({
             <div data-testid="nodi-size-setting">
               <label className="text-sm text-neutral-300" htmlFor="nodi-size-slider">{t('Tamaño de Nodi')}</label>
               <p className="mt-0.5 text-xs text-neutral-500">
-                {t('El marcador central conserva el tamaño predeterminado. Elige uno de los nueve tamaños disponibles.')}
+                {t('El 100 % conserva el tamaño original de Nodi y es el máximo. Puedes reducirlo hasta el 40 %.')}
               </p>
               <div className="mt-2 flex w-full max-w-md items-start gap-3">
                 <div className="min-w-0 flex-1">

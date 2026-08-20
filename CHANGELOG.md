@@ -1,5 +1,36 @@
 # Changelog
 
+## 4.2.0 — 2026-08-20
+
+Nodus 4.2 introduces an integrated research browser and a global research radar, brings
+databases much closer to Notion-scale workflows, and expands how research reports are
+planned, read, annotated and connected back to the Library.
+
+- Nodus Browser provides secure multi-tab browsing, downloads, media controls, local
+  bookmarks and history, Research Atlas, Nodi page actions and direct Connector capture
+  into the Library.
+- Nodus Radar follows topics, searches, authors, journals, papers, RSS feeds and websites,
+  checks them on a schedule and gathers updates in a global inbox with notifications and
+  Library actions.
+- Databases add universal pages and blocks, advanced properties, formulas, rollups,
+  relations, templates, tasks, automations, forms, comments, history, permissions and
+  virtualized large-data views, together with more faithful Notion imports.
+- Deep Research adds seven research approaches that adapt retrieval, planning and writing,
+  and records the chosen approach and model with each report.
+- Deep Research and Immersion share persistent highlights, comments and bookmarks, while
+  the source workspace opens ideas, authors and works in state-preserving tabs with Zotero
+  and Nodus Library actions.
+- Authors, ideas and argument maps can remain open in independent tabs for comparison, and
+  nullable metadata no longer breaks affected searches.
+- Global Library record actions move to the detail header, metadata editing is clearer and
+  revealing attachments in Finder is reliable from both entry points.
+- Nodi's original 100% size is now the maximum, with seven presets down to 40%, and streamed
+  answers no longer force the chat viewport to the bottom.
+- Large encrypted backups restore with bounded memory and real progress through decryption,
+  verification, extraction and finalization while preserving safety snapshots and rollback.
+- The What's New modal presents this release in all eight interface languages, with dedicated
+  Browser and Radar icons.
+
 ## 4.1.6 — 2026-08-18
 
 Nodus 4.1.6 repairs the Zotero import of the Global Library, which catalogued documents
