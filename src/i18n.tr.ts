@@ -1520,6 +1520,8 @@ export const TR: Record<string, string> = {
   "Pulido y estabilidad": "Parlatma ve stabilite",
   "Corregir errores, mejorar el rendimiento y pulir la experiencia general con feedback de usuarios.": "Kullanıcı geri bildirimleriyle hataları düzeltin, performansı artırın ve genel deneyimi iyileştirin.",
   "Nodus Toolkit": "Nodus Araç Seti",
+  "Nodus Radar": "Nodus Radar",
+  "Nodus Tools": "Nodus Tools",
   "Herramientas prácticas y local-first para convertir archivos y procesar documentos, integradas en Nodus.": "Dosyaları dönüştürmek ve belgeleri işlemek için Nodus'ta yerleşik, kullanışlı, yerel öncelikli araçlar.",
   "Nodus PDF Presenter": "Nodus PDF Sunucusu",
   "Presentar archivos PDF y presentaciones externas con vista del presentador, control remoto desde el móvil, notas del orador y herramientas de anotación en directo.": "Sunum yapan kişi görünümü, mobil uzaktan kumanda, konuşmacı notları ve canlı açıklama ekleme araçlarıyla PDF'ler ve harici sunumlar sunun.",

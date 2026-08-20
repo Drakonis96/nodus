@@ -33,6 +33,7 @@ import { setCopilotWindowProvider, startCopilotServer, stopCopilotServer } from 
 import { setZoteroPluginWindowProvider, startZoteroPluginServer, stopZoteroPluginServer } from './zotero-plugin/server';
 import { applyMascotWindow, destroyMascotWindow, setMascotTutorialVisible } from './mascotWindow';
 import { seedWelcomeNotification } from './notifications';
+import { startRadarScheduler, stopRadarScheduler } from './radar/scheduler';
 import { refreshAnnouncements } from './announcements';
 import { startStudyCalendarReminders, stopStudyCalendarReminders } from './studyCalendarReminders';
 import { restorePersistedDockIcon } from './dockIcon';
@@ -953,6 +954,7 @@ app.whenReady().then(async () => {
   if (settings.zoteroPluginEnabled || settings.browserConnectorEnabled) void startZoteroPluginServer();
   // Nodi mascot: open the always-on-top desktop window when the user has opted into it.
   seedWelcomeNotification();
+  startRadarScheduler();
   startStudyCalendarReminders();
   applyMascotWindow();
   setupAutoUpdates();
@@ -996,6 +998,7 @@ app.on('window-all-closed', () => {
     stopRealtimeSync();
     stopNodusServerSync();
     stopInboxPolling();
+    stopRadarScheduler();
   stopReplicaSync();
     interruptDecorativeImageGenerations();
     stopAllWhisperCpp();
@@ -1025,6 +1028,7 @@ app.on('before-quit', () => {
   stopRealtimeSync();
   stopNodusServerSync();
   stopInboxPolling();
+  stopRadarScheduler();
   stopReplicaSync();
   interruptDecorativeImageGenerations();
   killMcpTunnelSync();
@@ -1066,6 +1070,7 @@ updateAwareApp.on('before-quit-for-update', () => {
   stopRealtimeSync();
   stopNodusServerSync();
   stopInboxPolling();
+  stopRadarScheduler();
   stopReplicaSync();
   interruptDecorativeImageGenerations();
   stopAllWhisperCpp();

@@ -51,15 +51,16 @@ const AGREED_SECTIONS = [
   'testimonyContrasts',
   'notes',
   'browser',
+  'radar',
   'toolkit',
   'settings',
 ];
 
-// Nueve desde que Nodus Browser existe: es transversal como el Toolkit — consultar
+// Diez desde que Nodus Radar existe: es transversal como Browser y Toolkit — consultar
 // un archivo o un fondo en la web sirve igual aquí que en cualquier otra bóveda —
 // y como el Toolkit no aporta ninguna superficie de OTRO vault al menú, que es lo
 // que esta lista cerrada protege.
-test('el menú tiene exactamente las nueve entradas acordadas', () => {
+test('el menú tiene exactamente las diez entradas acordadas', () => {
   const nav = navigation.dedicatedVaultNavIds('testimonios');
   assert.ok(nav, 'testimonios es un workspace dedicado, no el sidebar genérico');
   // Inicio y Ajustes van fijos fuera de los grupos y no forman parte de la lista.
@@ -109,7 +110,7 @@ test('el sidebar y la lista de navegación no pueden separarse', () => {
   // El grupo «Herramientas» lo pinta App.tsx aparte para todas las bóvedas dedicadas
   // (`navGroups.filter(group => group.id === 'tools')`), así que sus entradas son las
   // únicas de la lista que no están en el sidebar propio de Testimonios.
-  const paintedByShell = new Set(['toolkit', 'browser']);
+  const paintedByShell = new Set(['toolkit', 'browser', 'radar']);
   assert.deepEqual([...sidebarViews].sort(), nav.filter((id) => !paintedByShell.has(id)).sort());
 });
 

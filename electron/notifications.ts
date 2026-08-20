@@ -62,6 +62,7 @@ export function addNotification(input: {
   title: NodiNotificationText | string;
   body?: NodiNotificationText | string;
   kind?: NodiNotification['kind'];
+  action?: NodiNotification['action'];
   dedupeKey?: string;
   cooldownMs?: number;
 }): NodiNotification | null {
@@ -81,6 +82,7 @@ export function addNotification(input: {
     kind: input.kind ?? 'info',
     createdAt: timestamp,
     read: false,
+    ...(input.action ? { action: input.action } : {}),
   };
   write([item, ...read()]);
   notify?.();
@@ -90,6 +92,31 @@ export function addNotification(input: {
 export function markNotificationRead(id: string): void {
   write(read().map((x) => (x.id === id ? { ...x, read: true } : x)));
   notify?.();
+}
+
+/** Replace one activity line without creating another badge entry. Used by producers
+ * that coalesce a short burst into one useful notification. */
+export function updateNotification(id: string, input: {
+  title: NodiNotificationText | string;
+  body?: NodiNotificationText | string;
+  kind?: NodiNotification['kind'];
+  action?: NodiNotification['action'];
+}): NodiNotification | null {
+  const current = read();
+  const existing = current.find((item) => item.id === id);
+  if (!existing) return null;
+  const replacement: NodiNotification = {
+    id: existing.id,
+    ...(typeof input.title === 'string' ? { title: input.title } : { titleText: input.title }),
+    ...(input.body === undefined ? {} : typeof input.body === 'string' ? { body: input.body } : { bodyText: input.body }),
+    kind: input.kind ?? existing.kind,
+    createdAt: Date.now(),
+    read: false,
+    ...(input.action ? { action: input.action } : {}),
+  };
+  write(current.map((item) => item.id === id ? replacement : item));
+  notify?.();
+  return replacement;
 }
 
 export function markAllNotificationsRead(): void {

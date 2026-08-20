@@ -1129,6 +1129,8 @@ export const IT: Record<string, string> = {
   "Pulido y estabilidad": "Polacco e stabilità",
   "Corregir errores, mejorar el rendimiento y pulir la experiencia general con feedback de usuarios.": "Correggi bug, migliora le prestazioni e perfeziona l'esperienza complessiva con il feedback degli utenti.",
   "Nodus Toolkit": "Nodus Toolkit",
+  "Nodus Radar": "Nodus Radar",
+  "Nodus Tools": "Nodus Tools",
   "Herramientas prácticas y local-first para convertir archivos y procesar documentos, integradas en Nodus.": "Pratici strumenti locali per la conversione di file e l'elaborazione di documenti, integrati in Nodus.",
   "Nodus PDF Presenter": "Presentatore PDF Nodus",
   "Presentar archivos PDF y presentaciones externas con vista del presentador, control remoto desde el móvil, notas del orador y herramientas de anotación en directo.": "Presenta PDF e presentazioni esterne con la visualizzazione presentatore, il telecomando mobile, le note del relatore e gli strumenti di annotazione in tempo reale.",

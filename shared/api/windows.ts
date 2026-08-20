@@ -21,6 +21,7 @@ export const NODI_WINDOW_METHODS = [
   'refreshNotifications',
   'markNotificationsRead',
   'clearNotifications',
+  'openNotification',
   'onNotificationsChanged',
   // published announcements, shown in the same panel
   'listAnnouncements',

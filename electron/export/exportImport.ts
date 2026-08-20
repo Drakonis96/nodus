@@ -114,7 +114,7 @@ export interface BackupInventory {
   apiKeyProviders: AiProvider[];
 }
 
-const GLOBAL_AUXILIARY_FILES = ['app-prefs.json', 'browser-bookmarks.json', 'nodi-chat-history.json', 'nodi-notes.json', 'nodi-notifications.json', 'nodi-welcome.seed'] as const;
+const GLOBAL_AUXILIARY_FILES = ['app-prefs.json', 'browser-bookmarks.json', 'radar-store.json', 'nodi-chat-history.json', 'nodi-notes.json', 'nodi-notifications.json', 'nodi-welcome.seed'] as const;
 const VAULT_HISTORY_FILES = ['study-chat-history.json', 'study-search-index.json'] as const;
 const VAULT_MEDIA_FILES = ['study-audio-meta.json'] as const;
 /** Cloud TTS keys live outside the AI-provider store, encrypted per vault. The blobs

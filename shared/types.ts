@@ -16,6 +16,7 @@ import type { TeachingApi } from './api/teaching';
 import type { ToolkitApi } from './api/toolkit';
 import type { TestimoniesApi } from './api/testimonies';
 import type { LibraryApi } from './api/library';
+import type { RadarApi } from './api/radar';
 import type { LibraryAttachmentRecord } from './libraryTypes';
 
 export type {
@@ -7401,6 +7402,8 @@ export interface NodiNotification {
   kind: 'info' | 'success' | 'warning';
   createdAt: number;
   read: boolean;
+  /** Optional destination. Older builds can still render the notification as prose. */
+  action?: { type: 'radar'; updateId?: string };
 }
 
 export interface NodiChatMessage {
@@ -7549,6 +7552,7 @@ export interface NodiOverlayPlacement {
 
 export type NodiNavigationTarget =
   | 'settings'
+  | { view: 'radar'; updateId?: string }
   | {
       view: 'characters' | 'places' | 'factions' | 'scenes' | 'encyclopedia' | 'map' | 'rules' | 'conflicts';
       kind: string;
@@ -8163,7 +8167,7 @@ export interface BrowserApi {
   onBrowserHistoryChanged(cb: (store: import('./browserHistory').BrowserHistoryStore) => void): () => void;
 }
 
-export interface NodusApi extends ProsopographyApi, TestimoniesApi, ToolkitApi, TeachingApi, DatabasesApi, PagesApi, PrimarySourcesApi, ArchiveApi, WorldbuildingApi, PlatformApi, RecordsApi, AcademicApi, LibraryApi, BrowserApi {
+export interface NodusApi extends ProsopographyApi, TestimoniesApi, ToolkitApi, TeachingApi, DatabasesApi, PagesApi, PrimarySourcesApi, ArchiveApi, WorldbuildingApi, PlatformApi, RecordsApi, AcademicApi, LibraryApi, RadarApi, BrowserApi {
   // settings + secrets
   getSettings(): Promise<AppSettings>;
   updateSettings(patch: Partial<AppSettings>): Promise<AppSettings>;
@@ -8178,6 +8182,7 @@ export interface NodusApi extends ProsopographyApi, TestimoniesApi, ToolkitApi, 
   }>;
   markNotificationsRead(): Promise<NodiNotification[]>;
   clearNotifications(): Promise<NodiNotification[]>;
+  openNotification(id: string): Promise<void>;
   onNotificationsChanged(cb: (list: NodiNotification[]) => void): () => void;
   /** Published announcements. Read state is per notice, unlike the activity feed. */
   listAnnouncements(): Promise<AnnouncementEntry[]>;
