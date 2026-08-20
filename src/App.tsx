@@ -321,6 +321,7 @@ export function App() {
   const [studyRecordingTarget, setStudyRecordingTarget] = useState<{ id: string; timestamp?: number | null } | null>(null);
   const [studyGraphTarget, setStudyGraphTarget] = useState<PendingGraphNavigationTarget & { nonce: number } | null>(null);
   const [studyChatTarget, setStudyChatTarget] = useState<{ prompt: string; nonce: number } | null>(null);
+  const [radarTarget, setRadarTarget] = useState<{ updateId?: string; nonce: number } | null>(null);
   const [primarySourceTarget, setPrimarySourceTarget] = useState<{
     itemId: string;
     excerptId?: string | null;
@@ -521,6 +522,9 @@ export function App() {
     if (target === 'settings') {
       localStorage.setItem('nodus.settingsTarget', 'nodi');
       setView('settings');
+    } else if (target.view === 'radar') {
+      setRadarTarget({ ...(target.updateId ? { updateId: target.updateId } : {}), nonce: Date.now() });
+      setView('radar');
     } else {
       setView(target.view);
     }
@@ -1211,6 +1215,7 @@ export function App() {
     studyRecordingTarget,
     studyGraphTarget,
     studyChatTarget,
+    radarTarget,
     setView,
     navigate,
     setToolkitPage,

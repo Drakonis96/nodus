@@ -1042,6 +1042,16 @@ export function NodiCompanion({
                       {(n.bodyText || n.body) && (
                         <div className="nodi-ntf-body">{notificationLine(n.bodyText, n.body)}</div>
                       )}
+                      {n.action?.type === 'radar' && (
+                        <div className="nodi-ntf-actions">
+                          <button
+                            data-testid={`nodi-notification-open-radar-${n.id}`}
+                            onClick={() => void window.nodus.openNotification(n.id)}
+                          >
+                            Nodus Radar →
+                          </button>
+                        </div>
+                      )}
                       <div className="nodi-ntf-time">{relTime(n.createdAt)}</div>
                     </div>
                   </div>

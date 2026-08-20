@@ -37,6 +37,8 @@ export const NODI_NOTIFICATION_TEXT = {
   scanQueueFailedBody: '{done} tareas completadas y {failed} con errores.',
   connectionsTitle: 'Nuevas conexiones en tu bóveda',
   connectionsBody: '{relations} relaciones y {themes} temas nuevos detectados.',
+  radarUpdatesTitle: 'Nodus Radar ha encontrado novedades',
+  radarUpdatesBody: 'Actualizaciones de investigación listas para revisar: {count}.',
   bridgesTitle: 'Nodi ha encontrado relaciones semánticas',
   bridgesBody: '{added} conexiones nuevas tras revisar {scanned} candidatos.',
   ideaEmbeddingsFailedTitle: 'La indexación semántica necesita atención',

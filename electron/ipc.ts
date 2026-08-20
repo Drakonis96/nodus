@@ -33,6 +33,7 @@ import { registerRecordsIpc } from './ipc/records';
 import { registerAcademicIpc } from './ipc/academic';
 import { registerLibraryIpc } from './ipc/library';
 import { registerBrowserIpc } from './ipc/browser';
+import { registerRadarIpc } from './ipc/radar';
 import { setBrowserTheme } from './browser/tabs';
 import { browserHistoryRepository } from './browser/history';
 import {
@@ -59,10 +60,12 @@ import {
 } from './mascotWindow';
 import {
   listNotifications,
+  markNotificationRead,
   markAllNotificationsRead,
   clearNotifications,
   setNotificationsNotifier,
 } from './notifications';
+import { radarService } from './radar/radarService';
 import {
   clearAnnouncements,
   listAnnouncements,
@@ -211,6 +214,7 @@ export function registerIpc(
   registerAcademicIpc(context);
   registerLibraryIpc(context);
   registerBrowserIpc(context);
+  registerRadarIpc(context);
   registerRecordsIpc(context);
   registerPlatformIpc(context);
   registerWorldbuildingIpc(context);
@@ -446,6 +450,7 @@ export function registerIpc(
   h('nodi:notifications:list', async () => listNotifications());
   h('nodi:notifications:refresh', async () => {
     const refresh = await refreshAnnouncements('manual');
+    await radarService().check({ reason: 'manual' }).catch(() => null);
     const notifications = listNotifications();
     const announcements = listAnnouncements();
     // Refresh every renderer, not only the button that initiated the check. Nodi can
@@ -465,6 +470,19 @@ export function registerIpc(
     clearNotifications();
     clearAnnouncements();
     return listNotifications();
+  });
+  h('nodi:notifications:open', async (_event, id: string) => {
+    const notification = listNotifications().find((candidate) => candidate.id === String(id));
+    if (!notification) return;
+    markNotificationRead(notification.id);
+    const win = getWindow();
+    if (!win || !notification.action) return;
+    if (win.isMinimized()) win.restore();
+    win.show();
+    win.focus();
+    if (notification.action.type === 'radar') {
+      win.webContents.send('nodi:navigate', { view: 'radar', updateId: notification.action.updateId });
+    }
   });
   setAnnouncementsNotifier(() => {
     const list = listAnnouncements();

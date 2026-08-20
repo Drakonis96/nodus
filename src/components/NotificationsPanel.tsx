@@ -392,6 +392,19 @@ export function NotificationsPanel({
                               {notificationLine(notification.bodyText, notification.body)}
                             </p>
                           )}
+                          {notification.action?.type === 'radar' && (
+                            <button
+                              type="button"
+                              data-testid={`notification-open-radar-${notification.id}`}
+                              className="mt-1.5 inline-flex items-center gap-1 text-[11px] font-medium text-indigo-300 hover:text-indigo-200"
+                              onClick={() => {
+                                onClose();
+                                void window.nodus.openNotification(notification.id);
+                              }}
+                            >
+                              Nodus Radar <Icon name="arrowRight" size={11} />
+                            </button>
+                          )}
                           <p className="mt-1 text-[10px] text-neutral-500">
                             {new Date(notification.createdAt).toLocaleString()}
                           </p>

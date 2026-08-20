@@ -27,6 +27,7 @@ import { recordsApi } from './records';
 import { academicApi } from './academic';
 import { libraryApi } from './library';
 import { browserApi } from './browser';
+import { radarApi } from './radar';
 
 // Tracks the Nodi chat stream currently in flight so `cancelNodiChat` can abort
 // it without the renderer having to juggle request ids. Only one chat stream
@@ -67,6 +68,7 @@ function readInitialOverlayPlacement(): NodiOverlayPlacement {
 export const nodusApi: NodusApi = {
   ...libraryApi,
   ...browserApi,
+  ...radarApi,
   ...prosopographyApi,
   ...academicApi,
   ...recordsApi,
@@ -87,6 +89,7 @@ export const nodusApi: NodusApi = {
   refreshNotifications: () => ipcRenderer.invoke('nodi:notifications:refresh'),
   markNotificationsRead: () => ipcRenderer.invoke('nodi:notifications:markRead'),
   clearNotifications: () => ipcRenderer.invoke('nodi:notifications:clear'),
+  openNotification: (id) => ipcRenderer.invoke('nodi:notifications:open', id).then(() => undefined),
   listNodiConversations: () => ipcRenderer.invoke('nodi:conversations:list'),
   getNodiConversation: (id) => ipcRenderer.invoke('nodi:conversations:get', id),
   saveNodiConversation: (input) => ipcRenderer.invoke('nodi:conversations:save', input),

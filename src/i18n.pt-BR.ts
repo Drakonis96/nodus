@@ -1199,6 +1199,8 @@ export const PT_BR: Record<string, string> = {
   'Corregir errores, mejorar el rendimiento y pulir la experiencia general con feedback de usuarios.':
     'Corrigir erros, melhorar o desempenho e aprimorar a experiência geral com o feedback dos usuários.',
   'Nodus Toolkit': 'Nodus Toolkit',
+  'Nodus Radar': 'Nodus Radar',
+  'Nodus Tools': 'Nodus Tools',
   'Herramientas prácticas y local-first para convertir archivos y procesar documentos, integradas en Nodus.':
     'Ferramentas práticas e local-first para converter arquivos e processar documentos, integradas ao Nodus.',
   'Nodus PDF Presenter': 'Nodus PDF Presenter',
