@@ -306,7 +306,7 @@ export class RadarService {
     const startedAt = this.now();
     this.checking = true;
     this.notify?.(this.snapshot());
-    let store = this.read();
+    const store = this.read();
     const requested = request.followIds ? new Set(request.followIds) : null;
     const follows = store.follows.filter((follow) => !follow.paused && (!requested || requested.has(follow.id)));
     let errors = 0;
