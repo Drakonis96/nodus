@@ -79,7 +79,7 @@ test('every static HTML link resolves inside the website tree', () => {
       if (!pathname) continue;
       const resolved = path.resolve(referenceBase, pathname);
       assert.ok(
-        resolved.startsWith(`${siteRoot}${path.sep}`),
+        resolved === siteRoot || resolved.startsWith(`${siteRoot}${path.sep}`),
         `${path.relative(repoRoot, htmlFile)} keeps ${reference} inside site/`,
       );
       const target = pathname.endsWith('/') ? path.join(resolved, 'index.html') : resolved;
