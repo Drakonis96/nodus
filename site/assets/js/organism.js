@@ -847,7 +847,7 @@ for reduced motion.
   /* ------------------------------------------------------------ boot */
 
   /* The opening sequence on the home page is a title shot for the field: the
-     nodes gather into the Nodus N, hold, and burst as the page arrives. With no
+     nodes gather into the Nodus N, then flow back as the page arrives. With no
      field there is no N, and holding a blank page for five seconds shows the
      visitor nothing at all. So every path that stands the field down also hands
      the page straight back, and home.js finds the sequence already over. */
@@ -890,9 +890,9 @@ for reduced motion.
     organism.start();
     requestAnimationFrame(() => canvas.classList.add('awake'));
 
-    // The field draws the Nodus N on arrival and holds it: on the home page that
-    // is the whole opening shot, with the rest of the page still hidden. The
-    // sequence in home.js decides when it bursts and the page arrives.
+    // The field draws the Nodus N on arrival: on the home page that is the whole
+    // opening shot, with the rest of the page still hidden. The sequence in
+    // home.js releases it into the normal flow as soon as the mark is complete.
     const openingIsArmed = document.documentElement.classList.contains('intro-armed');
     if (document.body.dataset.formation === 'on' && openingIsArmed) {
       organism.assemble(true);

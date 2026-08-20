@@ -9,14 +9,13 @@ actually draw on. The video gallery lives in the wiki (site/wiki/wiki.js).
   'use strict';
 
   /* ------------------------------------------------------------ the opening */
-  /* The page arrives empty. The field gathers into the Nodus N, holds, then
-     bursts apart as the mark lands and the motto rises line by line.
+  /* The page arrives empty. The field gathers into the Nodus N, then flows
+     straight back into the organism as the mark lands and the motto rises.
 
      The CSS owns the choreography (see the opening block in home.css); this only
      moves the page between the three states, drives the organism's handoff, and
      makes sure the sequence can always be skipped or recovered from. */
 
-  const HOLD = 1200;              // time to read the N after it is fully assembled
   const ASSEMBLY_TIMEOUT = 3600;  // recovery path if the renderer never settles
   const TAIL = 2750;              // the CSS timeline that runs after the release
 
@@ -53,16 +52,16 @@ actually draw on. The video gallery lives in the wiki (site/wiki/wiki.js).
       root.classList.add('intro-run');
       const engine = window.NodusOrganism;
       if (engine) {
+        // Formation itself is the reveal: return immediately and smoothly to
+        // the field's normal anchors instead of pausing or exploding outward.
         engine.assemble(false);
-        // the letter blows apart from its own centre
-        engine.pulse(innerWidth / 2, innerHeight * 0.46, 2.4);
       }
       timers.push(setTimeout(finish, TAIL));
     };
 
     const onAssembled = () => {
       if (finished) return;
-      timers.push(setTimeout(release, HOLD));
+      release();
     };
 
     // anyone who has seen it can leave early
@@ -98,9 +97,9 @@ actually draw on. The video gallery lives in the wiki (site/wiki/wiki.js).
 
     // The visual signal normally wins. This timeout exists only so a context
     // that keeps drawing but never converges cannot hold the page indefinitely.
-    timers.push(setTimeout(release, ASSEMBLY_TIMEOUT + HOLD));
+    timers.push(setTimeout(release, ASSEMBLY_TIMEOUT));
     // last-resort guard: the page can never stay stuck in its opening state
-    timers.push(setTimeout(finish, ASSEMBLY_TIMEOUT + HOLD + TAIL + 700));
+    timers.push(setTimeout(finish, ASSEMBLY_TIMEOUT + TAIL + 700));
   }
 
   /* ------------------------------------------------------------ presenter stage */
