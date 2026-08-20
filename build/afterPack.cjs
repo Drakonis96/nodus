@@ -5,6 +5,7 @@
 const { execFileSync, spawnSync } = require('node:child_process');
 const { copyFileSync, existsSync, mkdirSync } = require('node:fs');
 const path = require('node:path');
+const { verifyPackagedNativeRuntime } = require('../scripts/verify-packaged-native-runtime.cjs');
 
 exports.default = async function afterPack(context) {
   const appName = context.packager.appInfo.productFilename; // "Nodus"
@@ -29,6 +30,11 @@ exports.default = async function afterPack(context) {
   copyFileSync(chromiumLicenses, path.join(resourcesPath, 'LICENSES.chromium.html'));
 
   if (context.electronPlatformName !== 'darwin') return;
+
+  // npm optional native packages follow the runner architecture. The macOS
+  // product is ARM64-only, so fail packaging before signing if an Intel runner
+  // (or a stale Intel dependency tree) ever slips back into the release path.
+  verifyPackagedNativeRuntime(appPath);
 
   const signature = spawnSync('codesign', ['-dv', '--verbose=4', appPath], { encoding: 'utf8' });
   const signatureInfo = `${signature.stdout || ''}\n${signature.stderr || ''}`;
