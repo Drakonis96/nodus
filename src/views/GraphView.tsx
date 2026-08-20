@@ -15,11 +15,10 @@ import type { GraphNavigationTarget, GraphPresetId } from '../navigation';
 import { t, tx } from '../i18n';
 import { academicKnowledgeViewSource, type KnowledgeViewSource } from './knowledgeViewSource';
 
-// The Sigma (WebGL) + worker-layout + LOD renderer is the default engine.
-// Fall back to the legacy Cytoscape canvas renderer by setting:
-//   localStorage.setItem('nodus.graph.engine', 'cytoscape')
-const enginePref = typeof localStorage !== 'undefined' ? localStorage.getItem('nodus.graph.engine') : null;
-const USE_SIGMA = enginePref !== 'cytoscape';
+// Sigma is the only supported graph renderer. This must not be user-selectable
+// through persistent browser state: old installations may still carry the
+// retired `nodus.graph.engine=cytoscape` preference.
+const USE_SIGMA = true;
 const EMPTY_GRAPH_DATA: GraphData = { nodes: [], edges: [] };
 
 const IDEA_TYPES: IdeaType[] = ['claim', 'finding', 'construct', 'method', 'framework'];
@@ -1496,6 +1495,10 @@ export function GraphView({
   const pendingGraphTransitionRef = useRef<{ first: number | null; second: number | null }>({ first: null, second: null });
 
   useEffect(() => { dataSourceRef.current = dataSource; }, [dataSource]);
+
+  useEffect(() => {
+    localStorage.removeItem('nodus.graph.engine');
+  }, []);
 
   useEffect(() => {
     localStorage.setItem(filterStorageKey, JSON.stringify(filters));
