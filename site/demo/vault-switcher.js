@@ -23,7 +23,7 @@ corresponding static demo instead of loading a local database.
   const appIcon = (name) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${appIconPaths[name]}</svg>`;
 
   const vaults = [
-    { page: 'index.html', name: 'Learning science', type: 'Academic', tone: 'academic', icon: 'network' },
+    { page: 'index.html', href: './', name: 'Learning science', type: 'Academic', tone: 'academic', icon: 'network' },
     { page: 'teaching.html', name: 'Year 9 History', type: 'Teaching', tone: 'teaching', icon: 'presentation', phase: 'BETA' },
     { page: 'study.html', name: 'General Biology', type: 'Study', tone: 'study', icon: 'graduation', phase: 'BETA' },
     { page: 'databases.html', name: 'Field research', type: 'Databases', tone: 'databases', icon: 'table', phase: 'BETA' },
@@ -39,7 +39,7 @@ corresponding static demo instead of loading a local database.
   const bar = document.createElement('header');
   bar.className = 'demo-appbar';
   bar.innerHTML = `
-    <a class="demo-app-brand" href="../index.html" aria-label="Nodus home">
+    <a class="demo-app-brand" href="../" aria-label="Nodus home">
       <img src="../assets/nodus-logo.svg" alt=""/><span>Nodus</span>
     </a>
     <button class="demo-vault-trigger ${active.tone}" type="button" data-demo-vault-trigger
@@ -58,7 +58,7 @@ corresponding static demo instead of loading a local database.
       <div class="demo-vault-list">
         ${vaults.map((vault) => {
           const current = vault.page === active.page;
-          return `<a class="demo-vault-option ${vault.tone}${current ? ' active' : ''}" href="${vault.page}" role="menuitem"${current ? ' aria-current="page"' : ''}>
+          return `<a class="demo-vault-option ${vault.tone}${current ? ' active' : ''}" href="${vault.href || vault.page}" role="menuitem"${current ? ' aria-current="page"' : ''}>
             <span class="demo-vault-option-icon">${appIcon(vault.icon)}</span>
             <span class="demo-vault-copy"><b>${vault.name}</b><span>${vault.type}${vault.phase ? ` <em>${vault.phase}</em>` : ''}</span></span>
             ${current ? '<span class="demo-vault-active">Active</span><span class="demo-vault-check" aria-hidden="true">✓</span>' : '<span class="demo-vault-load">Open</span><span class="demo-vault-arrow" aria-hidden="true">›</span>'}

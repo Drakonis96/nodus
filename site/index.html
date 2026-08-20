@@ -37,7 +37,7 @@ SPDX-License-Identifier: AGPL-3.0-only
     /* Only on a pointer that hovers. On a phone the title sequence holds the
        whole page back for five seconds on the smallest screen and the slowest
        connection, which costs a visitor far more than the shot is worth. */
-    if (matchMedia('(pointer: fine)').matches
+    if (matchMedia('(min-width: 701px) and (hover: hover) and (pointer: fine)').matches
         && !matchMedia('(prefers-reduced-motion: reduce)').matches) {
       var root = document.documentElement;
       root.classList.add('intro-armed');
@@ -91,7 +91,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 <div id="scroll-progress" aria-hidden="true"></div>
 
 <div data-nodus-site-header data-base="" data-page="home"></div>
-<script defer src="site-header.js?v=20260820a"></script>
+<script defer src="site-header.js?v=20260820b"></script>
 
 <main id="main">
 
@@ -113,7 +113,7 @@ SPDX-License-Identifier: AGPL-3.0-only
     </h1>
     <p class="sub">Nodus is a free desktop app for academic research. Connect your Zotero library or your own documents, and turn what you read into ideas, notes and evidence you can search, question and cite. Every claim stays anchored to the passage it came from. Built for scholars, students and teachers.</p>
     <div class="ctas">
-      <a class="btn primary" href="demo/index.html" data-magnet="0.16">
+      <a class="btn primary" href="demo/" data-magnet="0.16">
         <svg class="ic" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7-11-7Z"/></svg>
         Try the live demo
       </a>
@@ -199,7 +199,7 @@ SPDX-License-Identifier: AGPL-3.0-only
         <div class="cap"><em>02</em><p><b>Surface debates, contradictions and research gaps</b>, then explore them through semantic search, coverage analysis and reading paths.</p></div>
         <div class="cap"><em>03</em><p><b>Research and write with verifiable citations</b> through Deep Research, the writing workshop and copilots for Word and LibreOffice.</p></div>
       </div>
-      <a class="arrow-link" href="demo/index.html">Open the academic demo
+      <a class="arrow-link" href="demo/">Open the academic demo
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
     </div>
     <div class="scene-visual reveal" style="--delay:120ms">
@@ -565,7 +565,7 @@ SPDX-License-Identifier: AGPL-3.0-only
     <h2 class="title" data-split>Ready to meet your library?</h2>
     <p class="lead">Try the demo right here in your browser, or download the app and point it at your own material. <b style="color:#6ee7b7">Free and open source, forever.</b></p>
     <div class="ctas">
-      <a class="btn primary" href="demo/index.html" data-magnet="0.16">
+      <a class="btn primary" href="demo/" data-magnet="0.16">
         <svg class="ic" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7-11-7Z"/></svg>
         Try the live demo</a>
       <button class="btn" type="button" data-download data-magnet="0.12">
@@ -598,7 +598,7 @@ SPDX-License-Identifier: AGPL-3.0-only
         <a href="#vaults">The four vaults</a>
         <a href="#more-vaults">Other vaults</a>
         <a href="#tools">Nodus Toolkit</a>
-        <a href="demo/index.html">Live demos</a>
+        <a href="demo/">Live demos</a>
       </div>
       <div class="foot-col">
         <h3>Learn</h3>
@@ -648,9 +648,9 @@ SPDX-License-Identifier: AGPL-3.0-only
 </div>
 
 
-<script src="assets/js/organism.js?v=20260818c"></script>
+<script src="assets/js/organism.js?v=20260820a"></script>
 <script src="assets/js/site.js?v=20260815"></script>
-<script src="assets/js/home.js?v=20260820b"></script>
+<script src="assets/js/home.js?v=20260820d"></script>
 <script src="assets/js/back-to-top.js?v=20260817b"></script>
 </body>
 </html>

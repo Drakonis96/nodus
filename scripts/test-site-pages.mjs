@@ -43,7 +43,8 @@ test('the home page presents the four main vaults, the rest, and the toolkit', (
   assert.doesNotMatch(home, /at no extra cost/, 'the toolkit no longer needs the price disclaimer');
   // the vault demos advertised on the home page must exist
   for (const demo of ['index', 'teaching', 'study', 'databases', 'genealogy', 'worldbuilding']) {
-    assert.ok(home.includes(`demo/${demo}.html`), `the home page links the ${demo} demo`);
+    const href = demo === 'index' ? 'demo/' : `demo/${demo}.html`;
+    assert.ok(home.includes(href), `the home page links the ${demo} demo`);
     assert.ok(fs.existsSync(path.join(siteRoot, 'demo', `${demo}.html`)), `site/demo/${demo}.html exists`);
   }
 });
@@ -228,12 +229,15 @@ test('the home page opens with the mark forming, and can never strand a visitor'
 
   // armed before the first paint, so the page never flashes and then hides
   assert.match(home, /classList\.add\('intro-armed'\)/, 'the opening is armed inline in <head>');
+  assert.match(home, /min-width: 701px/, 'the opening is never armed in a mobile viewport');
   assert.match(home, /prefers-reduced-motion: reduce/, 'reduced motion never arms the opening');
   // the same inline script owns a watchdog, so a missing home.js cannot leave a blank page
   assert.match(home, /setTimeout\(function \(\) \{[\s\S]*?intro-done[\s\S]*?\}, 6000\)/, 'the inline watchdog reveals the page on its own');
   assert.match(css, /body \{[\s\S]*?radial-gradient[\s\S]*?background-attachment: fixed;/, 'a finished-looking background exists before WebGL starts');
   assert.match(css, /#organism \{ transition-duration: 0\.3s; \}/, 'the live field replaces the static paint quickly');
   assert.match(script, /const HOLD = 1200;/, 'the opening releases promptly instead of holding an empty hero');
+  assert.match(script, /organism-assembled/, 'the hold starts only after the field has finished assembling the mark');
+  assert.match(read('assets/js/organism.js'), /dataset\.formation === 'on' && openingIsArmed/, 'mobile and unarmed visits never assemble a hidden N');
   assert.match(css, /\.hero \{[\s\S]*?-webkit-user-select: none;[\s\S]*?user-select: none;/, 'visible hero copy cannot be accidentally selected');
 
   // three separately masked lines, one per beat of the motto
@@ -313,8 +317,33 @@ test('the topic pages are linked from the home page and to each other', () => {
     for (const href of required) {
       assert.ok(html.includes(`href="${href}"`), `${page} links to ${href}`);
     }
-    assert.ok(html.includes('href="../index.html"'), `${page} links back to the home page`);
+    assert.ok(html.includes('href="../"'), `${page} links back to the canonical home page`);
   }
+});
+
+test('internal navigation only advertises canonical directory URLs', () => {
+  const publishedSources = [];
+  const visit = (directory) => {
+    for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
+      const absolute = path.join(directory, entry.name);
+      if (entry.isDirectory()) visit(absolute);
+      else if (/\.(?:html|js)$/.test(entry.name)) publishedSources.push(fs.readFileSync(absolute, 'utf8'));
+    }
+  };
+  visit(siteRoot);
+  publishedSources.push(fs.readFileSync(path.join(repoRoot, 'scripts', 'build-blog-pages.mjs'), 'utf8'));
+
+  for (const source of publishedSources) {
+    assert.doesNotMatch(source, /href\s*=\s*["'][^"']*index\.html/i, 'no rendered or generated link points to an index filename');
+  }
+
+  const header = read('site-header.js');
+  assert.match(header, /href: \(base\) => base \|\| '\.\/'/, 'the shared Home link resolves to the canonical directory');
+  assert.match(header, /pathname\.endsWith\('\/index\.html'\)[\s\S]*?location\.replace/, 'GitHub Pages index aliases are replaced client-side');
+
+  const demoSwitcher = read('demo/vault-switcher.js');
+  assert.match(demoSwitcher, /\{ page: 'index\.html', href: '\.\/'/, 'the academic demo advertises its directory URL');
+  assert.match(demoSwitcher, /href="\$\{vault\.href \|\| vault\.page\}"/, 'the demo switcher uses a canonical override when one exists');
 });
 
 test('the sitemap lists every static page of the site', () => {

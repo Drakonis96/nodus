@@ -16,15 +16,18 @@ actually draw on. The video gallery lives in the wiki (site/wiki/wiki.js).
      moves the page between the three states, drives the organism's handoff, and
      makes sure the sequence can always be skipped or recovered from. */
 
-  const HOLD = 1200;   // enough to read the assembled N without delaying the page
-  const TAIL = 2750;   // the CSS timeline that runs after the release
+  const HOLD = 1200;              // time to read the N after it is fully assembled
+  const ASSEMBLY_TIMEOUT = 3600;  // recovery path if the renderer never settles
+  const TAIL = 2750;              // the CSS timeline that runs after the release
 
   function opening() {
     const root = document.documentElement;
     if (!root.classList.contains('intro-armed')) return; // reduced motion, or JS-off markup
 
     let finished = false;
+    let released = false;
     let timers = [];
+    const canvas = document.getElementById('organism');
 
     const finish = () => {
       if (finished) return;
@@ -33,6 +36,7 @@ actually draw on. The video gallery lives in the wiki (site/wiki/wiki.js).
       timers = [];
       root.classList.remove('intro-armed', 'intro-run');
       root.classList.add('intro-done');
+      if (canvas) canvas.removeEventListener('organism-assembled', onAssembled);
       const engine = window.NodusOrganism;
       if (engine) engine.assemble(false);
       skip.remove();
@@ -40,7 +44,11 @@ actually draw on. The video gallery lives in the wiki (site/wiki/wiki.js).
     };
 
     const release = () => {
-      if (finished) return;
+      if (finished || released) return;
+      // The organism can stand down while we wait (WebGL loss or frame-budget
+      // governor). In that case it already revealed the page; never re-arm it.
+      if (!root.classList.contains('intro-armed')) { finish(); return; }
+      released = true;
       root.classList.remove('intro-armed');
       root.classList.add('intro-run');
       const engine = window.NodusOrganism;
@@ -50,6 +58,11 @@ actually draw on. The video gallery lives in the wiki (site/wiki/wiki.js).
         engine.pulse(innerWidth / 2, innerHeight * 0.46, 2.4);
       }
       timers.push(setTimeout(finish, TAIL));
+    };
+
+    const onAssembled = () => {
+      if (finished) return;
+      timers.push(setTimeout(release, HOLD));
     };
 
     // anyone who has seen it can leave early
@@ -76,9 +89,18 @@ actually draw on. The video gallery lives in the wiki (site/wiki/wiki.js).
     // back to a title sequence.
     if (scrollY > 40 || location.hash) { finish(); return; }
 
-    timers.push(setTimeout(release, HOLD));
+    if (!canvas || !window.NodusOrganism) {
+      finish();
+      return;
+    }
+    if (canvas.dataset.organismAssembled === 'true') onAssembled();
+    else canvas.addEventListener('organism-assembled', onAssembled, { once: true });
+
+    // The visual signal normally wins. This timeout exists only so a context
+    // that keeps drawing but never converges cannot hold the page indefinitely.
+    timers.push(setTimeout(release, ASSEMBLY_TIMEOUT + HOLD));
     // last-resort guard: the page can never stay stuck in its opening state
-    timers.push(setTimeout(finish, HOLD + TAIL + 1500));
+    timers.push(setTimeout(finish, ASSEMBLY_TIMEOUT + HOLD + TAIL + 700));
   }
 
   /* ------------------------------------------------------------ presenter stage */
