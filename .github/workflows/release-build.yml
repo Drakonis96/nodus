@@ -72,6 +72,12 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      # npm can omit Rollup's platform package when a lockfile was generated on
+      # another OS. Repair only that build-time optional dependency without
+      # changing package.json or package-lock.json on the runner.
+      - name: Ensure native Rollup binary
+        run: node scripts/ensure-rollup-native.mjs
+
       - name: Build renderer + main
         env:
           NODE_OPTIONS: --max-old-space-size=4096
