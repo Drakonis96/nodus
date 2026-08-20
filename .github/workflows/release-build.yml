@@ -43,7 +43,11 @@ jobs:
       max-parallel: 1
       matrix:
         include:
-          - os: macos-latest
+          # The release targets arm64, but packaging remains pinned to the Intel
+          # image: electron-builder cross-builds the arm64 app there and the
+          # Electron npm distribution includes the legal bundle required by
+          # beforePack. macos-latest is now an arm64 image and omits that bundle.
+          - os: macos-15-intel
             platform: '--mac'
           - os: windows-latest
             platform: '--win'
@@ -80,7 +84,7 @@ jobs:
         run: npx electron-builder ${{ matrix.platform }} --publish always --config build/electron-builder.release.cjs
 
       - name: Build and publish signed macOS installer
-        if: matrix.os == 'macos-latest' && env.HAS_MACOS_SIGNING == 'true'
+        if: matrix.os == 'macos-15-intel' && env.HAS_MACOS_SIGNING == 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CSC_LINK: ${{ secrets.MACOS_CERTIFICATE }}
@@ -92,7 +96,7 @@ jobs:
         run: npx electron-builder ${{ matrix.platform }} --publish always --config build/electron-builder.release.cjs
 
       - name: Build and publish ad-hoc macOS installer
-        if: matrix.os == 'macos-latest' && env.HAS_MACOS_SIGNING != 'true'
+        if: matrix.os == 'macos-15-intel' && env.HAS_MACOS_SIGNING != 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CSC_IDENTITY_AUTO_DISCOVERY: false
