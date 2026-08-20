@@ -8152,4 +8152,7 @@ export const PT_BR: Record<string, string> = {
   "La copia previa se abrió como un vault separado.": "A cópia anterior à migração foi aberta como um cofre separado.",
   "Abriendo…": "Abrindo…",
   "Abrir como vault separado": "Abrir como cofre separado",
+  "Descifrando…": "Descriptografando…",
+  "Finalizando…": "Finalizando…",
+  "Progreso de restauración": "Progresso da restauração",
 };

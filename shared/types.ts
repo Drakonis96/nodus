@@ -1969,6 +1969,24 @@ export interface RecoverySetupResult {
   recoveryKey?: string;
 }
 
+export type RecoveryRestoreProgressPhase =
+  | 'preparing'
+  | 'decrypting'
+  | 'verifying'
+  | 'restoring'
+  | 'finalizing'
+  | 'complete';
+
+/** Live, monotonic restore progress. `progress` is the overall 0..1 value shown
+ * by the UI; byte counters describe the real work completed in the current
+ * streaming phase. Milestone-only phases intentionally report zero bytes. */
+export interface RecoveryRestoreProgress {
+  phase: RecoveryRestoreProgressPhase;
+  progress: number;
+  completedBytes: number;
+  totalBytes: number;
+}
+
 /**
  * Where a vault's canonical data lives.
  *
@@ -8304,7 +8322,13 @@ export interface NodusApi extends ProsopographyApi, TestimoniesApi, ToolkitApi, 
   /** Create a recovery root and commit its first verified full-state snapshot. */
   initializeRecoveryFolder(path: string, password: string, language?: AppLanguage): Promise<RecoverySetupResult>;
   /** Restore a selected snapshot from an existing recovery root. */
-  restoreRecoverySnapshot(root: string, fileName: string, password: string, language?: AppLanguage): Promise<RecoverySetupResult>;
+  restoreRecoverySnapshot(
+    root: string,
+    fileName: string,
+    password: string,
+    language?: AppLanguage,
+    onProgress?: (progress: RecoveryRestoreProgress) => void,
+  ): Promise<RecoverySetupResult>;
   /** The absolute path of a file dropped on the window. webUtils, not a channel. */
   getPathForDroppedFile(file: unknown): string;
 

@@ -2,7 +2,7 @@ import Database from 'better-sqlite3';
 import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
-import { verifyBackupBytes } from './backupVerificationCore';
+import { verifyBackupFile } from './backupVerificationCore';
 import { backupVaultRevision } from './backupVaultRevision';
 import type { BackupUtilityRequest, BackupUtilityResponse } from './backupUtilityTypes';
 
@@ -116,8 +116,11 @@ async function snapshot(request: Extract<BackupUtilityRequest, { kind: 'snapshot
 
 export async function runBackupUtilityRequest(request: BackupUtilityRequest): Promise<BackupUtilityResponse> {
   if (request.kind === 'snapshot') return snapshot(request);
-  const archive = await fs.promises.readFile(request.archivePath);
-  return { kind: 'verify-done', id: request.id, result: verifyBackupBytes(archive, request.password, request.schemaVersion) };
+  return {
+    kind: 'verify-done',
+    id: request.id,
+    result: await verifyBackupFile(request.archivePath, request.password, request.schemaVersion),
+  };
 }
 
 process.parentPort?.on('message', (event) => {

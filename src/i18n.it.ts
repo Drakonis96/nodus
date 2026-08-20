@@ -7607,4 +7607,7 @@ export const IT: Record<string, string> = {
   "La copia previa se abrió como un vault separado.": "La copia precedente alla migrazione è stata aperta come vault separato.",
   "Abriendo…": "Apertura…",
   "Abrir como vault separado": "Apri come vault separato",
+  "Descifrando…": "Decifratura…",
+  "Finalizando…": "Finalizzazione…",
+  "Progreso de restauración": "Avanzamento del ripristino",
 };

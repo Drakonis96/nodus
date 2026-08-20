@@ -8202,4 +8202,7 @@ export const DE: Record<string, string> = {
   "La copia previa se abrió como un vault separado.": "Die Kopie vor der Migration wurde als separater Vault geöffnet.",
   "Abriendo…": "Wird geöffnet…",
   "Abrir como vault separado": "Als separaten Vault öffnen",
+  "Descifrando…": "Wird entschlüsselt…",
+  "Finalizando…": "Wird abgeschlossen…",
+  "Progreso de restauración": "Wiederherstellungsfortschritt",
 };

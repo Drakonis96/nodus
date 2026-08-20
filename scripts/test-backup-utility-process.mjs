@@ -53,8 +53,16 @@ test('production backup contains no sqlite backup or synchronous auto verificati
   const automatic = fs.readFileSync(path.join(repoRoot, 'electron/export/autoBackup.ts'), 'utf8');
   assert.match(host, /utilityProcess\.fork\(/);
   assert.match(worker, /VACUUM INTO/);
+  assert.match(worker, /await verifyBackupFile\(/);
+  assert.doesNotMatch(worker, /readFile\(request\.archivePath\)/);
   assert.doesNotMatch(writer, /\.backup\(/);
   assert.match(writer, /await zip\.addFile\('backup\.bin', ciphertextPath, true\)/);
+  assert.match(writer, /restoreBackupArchiveFileSafely/);
   assert.match(automatic, /await verifyBackupFileInUtility\(target, password\)/);
   assert.doesNotMatch(automatic, /verifyBackupArchive\(|readFile\(target\)/);
+
+  const recovery = fs.readFileSync(path.join(repoRoot, 'electron/recovery/recoveryManager.ts'), 'utf8');
+  assert.match(recovery, /readZipEntrySync\(filePath, 'manifest\.json'/);
+  assert.match(recovery, /restoreBackupArchiveFileSafely\(snapshot\.path/);
+  assert.doesNotMatch(recovery, /new AdmZip\(filePath\)|readFileSync\(snapshot\.path\)/);
 });

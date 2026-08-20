@@ -1,6 +1,6 @@
 import { createCipheriv, createDecipheriv, createHash, randomBytes, scrypt, scryptSync } from 'node:crypto';
 import fs from 'node:fs';
-import { Transform } from 'node:stream';
+import { Readable, Transform } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
 
 const PASSWORD_BYTES = 24;
@@ -193,6 +193,62 @@ export async function encryptBackupPayloadFile(
     plaintextSha256: plaintextHash.digest('hex'),
     ciphertextSha256: ciphertextHash.digest('hex'),
   };
+}
+
+/** Decrypt an authenticated backup entry to a temporary file with bounded RAM.
+ * Plaintext is written before GCM's final authentication check, so callers must
+ * only use the file after this promise resolves; every failure removes it. */
+export async function decryptBackupPayloadStream(
+  ciphertext: Readable,
+  targetPath: string,
+  password: string,
+  metadata: BackupCipherMetadata,
+  onProgress?: (completedBytes: number) => void,
+): Promise<void> {
+  if (metadata.formatVersion !== 1 || metadata.algorithm !== 'aes-256-gcm' || metadata.kdf.name !== 'scrypt') {
+    throw new Error('Formato de cifrado no soportado.');
+  }
+  const salt = Buffer.from(metadata.kdf.salt, 'base64');
+  const iv = Buffer.from(metadata.iv, 'base64');
+  const authTag = Buffer.from(metadata.authTag, 'base64');
+  const key = await deriveKeyAsync(password, salt);
+  const decipher = createDecipheriv('aes-256-gcm', key, iv);
+  decipher.setAuthTag(authTag);
+  const ciphertextHash = createHash('sha256');
+  const plaintextHash = createHash('sha256');
+  let completedBytes = 0;
+  const hashCiphertext = new Transform({
+    transform(chunk, _encoding, callback) {
+      ciphertextHash.update(chunk);
+      completedBytes += Buffer.byteLength(chunk);
+      onProgress?.(completedBytes);
+      callback(null, chunk);
+    },
+  });
+  const hashPlaintext = new Transform({
+    transform(chunk, _encoding, callback) {
+      plaintextHash.update(chunk);
+      callback(null, chunk);
+    },
+  });
+  try {
+    await pipeline(
+      ciphertext,
+      hashCiphertext,
+      decipher,
+      hashPlaintext,
+      fs.createWriteStream(targetPath, { flags: 'wx', mode: 0o600 }),
+    );
+    if (ciphertextHash.digest('hex') !== metadata.ciphertextSha256) {
+      throw new Error('La copia de seguridad no supera la verificación de integridad.');
+    }
+    if (plaintextHash.digest('hex') !== metadata.plaintextSha256) {
+      throw new Error('El contenido descifrado no coincide con el hash esperado.');
+    }
+  } catch (error) {
+    await fs.promises.rm(targetPath, { force: true });
+    throw error;
+  }
 }
 
 function sealPayload(plaintext: Buffer, key: Buffer, salt: Buffer): { ciphertext: Buffer; metadata: BackupCipherMetadata } {

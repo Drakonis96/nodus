@@ -1,4 +1,3 @@
-import AdmZip from 'adm-zip';
 import fs from 'node:fs';
 import path from 'node:path';
 import type {
@@ -6,11 +5,12 @@ import type {
   RecoveryFolderInspection,
   RecoveryHealth,
   RecoverySetupResult,
+  RecoveryRestoreProgress,
   RecoverySnapshotSummary,
   RecoveryStatus,
 } from '@shared/types';
 import { getSettings, updateSettings } from '../db/settingsRepo';
-import { restoreBackupArchiveSafely } from '../export/exportImport';
+import { restoreBackupArchiveFileSafely } from '../export/exportImport';
 import { runAutoBackupNow } from '../export/autoBackup';
 import {
   clearBackupPassword,
@@ -22,6 +22,7 @@ import {
   setBackupRecoveryKey,
 } from '../secrets/secretStore';
 import { generateBackupPassword } from '../export/backupCrypto';
+import { readZipEntrySync } from '../export/zipFile';
 import { listVaults } from '../vaults/vaultRegistry';
 import {
   createRecoveryManifest,
@@ -48,10 +49,9 @@ function snapshotSummary(filePath: string): RecoverySnapshotSummary | null {
   try {
     const stat = fs.statSync(filePath);
     if (!stat.isFile()) return null;
-    const zip = new AdmZip(filePath);
-    const entry = zip.getEntry('manifest.json');
-    if (!entry) return null;
-    const manifest = JSON.parse(zip.readAsText(entry)) as OuterBackupManifest;
+    const manifestBytes = readZipEntrySync(filePath, 'manifest.json', 1024 * 1024);
+    if (!manifestBytes) return null;
+    const manifest = JSON.parse(manifestBytes.toString('utf8')) as OuterBackupManifest;
     if (manifest.format !== 'nodus.encrypted-backup' || !Number.isFinite(manifest.formatVersion)) return null;
     return {
       fileName: path.basename(filePath),
@@ -266,19 +266,14 @@ export async function restoreRecoverySnapshot(
   fileName: string,
   password: string,
   appVersion: string,
-  language: AppLanguage = 'es'
+  language: AppLanguage = 'es',
+  onProgress?: (progress: RecoveryRestoreProgress) => void,
 ): Promise<RecoverySetupResult> {
   const inspection = inspectRecoveryFolder(root, language);
   if (inspection.kind !== 'recovery') return { ok: false, message: inspection.message };
   const snapshot = inspection.snapshots.find((candidate) => candidate.fileName === path.basename(fileName));
   if (!snapshot) return { ok: false, message: tr(language, { es: 'La copia seleccionada no pertenece a esta carpeta de recuperación.', en: 'The selected snapshot does not belong to this recovery folder.', fr: "La sauvegarde sélectionnée n'appartient pas à ce dossier de récupération.", de: 'Die ausgewählte Sicherung gehört nicht zu diesem Wiederherstellungsordner.', pt: 'A cópia de segurança selecionada não pertence a esta pasta de recuperação.', 'pt-BR': 'O backup selecionado não pertence a esta pasta de recuperação.', it: 'La copia selezionata non appartiene a questa cartella di ripristino.', tr: 'Seçilen anlık görüntü bu kurtarma klasörüne ait değil.' }) };
-  let archive: Buffer;
-  try {
-    archive = fs.readFileSync(snapshot.path);
-  } catch (error) {
-    return { ok: false, message: error instanceof Error ? error.message : String(error) };
-  }
-  const result = await restoreBackupArchiveSafely(archive, password, appVersion);
+  const result = await restoreBackupArchiveFileSafely(snapshot.path, password, appVersion, onProgress);
   if (!result.ok) return { ...result, message: localizeRestoreMessage(result.message, language) };
   if (result.recoveryKey) setBackupRecoveryKey(result.recoveryKey);
   // A restore with the recovery key must not make both credentials identical.

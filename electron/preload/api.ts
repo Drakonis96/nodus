@@ -11,6 +11,7 @@ import { ipcRenderer, webUtils } from 'electron';
 import type {
   NodusApi,
   NodiOverlayPlacement,
+  RecoveryRestoreProgress,
   UpdateProgressEvent,
 } from '@shared/types';
 import { prosopographyApi } from './prosopography';
@@ -226,7 +227,15 @@ export const nodusApi: NodusApi = {
   getRecoveryStatus: () => ipcRenderer.invoke('recovery:status'),
   chooseRecoveryFolder: (mode, language) => ipcRenderer.invoke('recovery:chooseFolder', mode, language),
   initializeRecoveryFolder: (folder, password, language) => ipcRenderer.invoke('recovery:initialize', folder, password, language),
-  restoreRecoverySnapshot: (root, fileName, password, language) => ipcRenderer.invoke('recovery:restore', root, fileName, password, language),
+  restoreRecoverySnapshot: (root, fileName, password, language, onProgress) => {
+    const requestId = `recovery-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    const listener = (_event: unknown, id: string, progress: RecoveryRestoreProgress) => {
+      if (id === requestId) onProgress?.(progress);
+    };
+    ipcRenderer.on('recovery:restore:progress', listener);
+    return ipcRenderer.invoke('recovery:restore', root, fileName, password, language, requestId)
+      .finally(() => ipcRenderer.removeListener('recovery:restore:progress', listener));
+  },
 
   // Dropped-file paths come from webUtils, not from a channel, so this one lives
   // wherever the bridge itself lives rather than with any domain slice.

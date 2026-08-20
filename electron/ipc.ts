@@ -8,6 +8,7 @@ import {
 import type {
   AppLanguage,
   AppSettings,
+  RecoveryRestoreProgress,
   UpdateCheckResponse,
   CreateVaultInput,
   VaultSummary,
@@ -805,8 +806,20 @@ export function registerIpc(
   h('recovery:initialize', async (_e, folder: string, password: string, language: AppLanguage = 'es') =>
     initializeRecoveryFolder(folder, password, app.getVersion(), language)
   );
-  h('recovery:restore', async (_e, root: string, fileName: string, password: string, language: AppLanguage = 'es') => {
-    const result = await restoreRecoverySnapshot(root, fileName, password, app.getVersion(), language);
+  h('recovery:restore', async (event, root: string, fileName: string, password: string, language: AppLanguage = 'es', requestId = '') => {
+    let lastSentAt = 0;
+    let lastPhase: RecoveryRestoreProgress['phase'] | null = null;
+    const report = (progress: RecoveryRestoreProgress) => {
+      if (!requestId || event.sender.isDestroyed()) return;
+      const now = Date.now();
+      const phaseChanged = progress.phase !== lastPhase;
+      const phaseComplete = progress.totalBytes > 0 && progress.completedBytes >= progress.totalBytes;
+      if (!phaseChanged && !phaseComplete && now - lastSentAt < 80) return;
+      lastSentAt = now;
+      lastPhase = progress.phase;
+      event.sender.send('recovery:restore:progress', requestId, progress);
+    };
+    const result = await restoreRecoverySnapshot(root, fileName, password, app.getVersion(), language, report);
     if (result.ok) {
       stopNodusServerSync();
       stopInboxPolling();

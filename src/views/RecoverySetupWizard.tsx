@@ -4,6 +4,7 @@ import { t } from '../i18n';
 import type {
   AppLanguage,
   RecoveryFolderInspection,
+  RecoveryRestoreProgress,
   RecoverySetupResult,
   RecoveryStatus,
 } from '@shared/types';
@@ -30,6 +31,7 @@ export function RecoverySetupWizard({
   const [selectedSnapshot, setSelectedSnapshot] = useState('');
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<RecoverySetupResult | null>(null);
+  const [restoreProgress, setRestoreProgress] = useState<RecoveryRestoreProgress | null>(null);
 
   const snapshots = folder?.snapshots ?? [];
   const effectiveSnapshot = selectedSnapshot || snapshots[0]?.fileName || '';
@@ -43,17 +45,20 @@ export function RecoverySetupWizard({
     setFolder(picked);
     setSelectedSnapshot(picked.snapshots[0]?.fileName ?? '');
     setResult(null);
+    setRestoreProgress(null);
   };
 
   const submit = async () => {
     if (!folder || !canSubmit) return;
     setBusy(true);
     setResult(null);
+    if (mode === 'restore') setRestoreProgress({ phase: 'preparing', progress: 0, completedBytes: 0, totalBytes: 0 });
     try {
       const next = mode === 'create'
         ? await window.nodus.initializeRecoveryFolder(folder.path, password, language)
-        : await window.nodus.restoreRecoverySnapshot(folder.path, effectiveSnapshot, password, language);
+        : await window.nodus.restoreRecoverySnapshot(folder.path, effectiveSnapshot, password, language, setRestoreProgress);
       setResult(next);
+      if (!next.ok) setRestoreProgress(null);
     } finally {
       setBusy(false);
     }
@@ -107,8 +112,8 @@ export function RecoverySetupWizard({
 
         <section className="recovery-form">
           <div className="recovery-mode-tabs">
-            <button className={mode === 'create' ? 'active' : ''} onClick={() => { setMode('create'); setFolder(null); setResult(null); }}><Icon name="lock" />{status.previousInstallation ? (t('Migrar y proteger este equipo')) : (t('Crear carpeta segura'))}</button>
-            <button className={mode === 'restore' ? 'active' : ''} onClick={() => { setMode('restore'); setFolder(null); setResult(null); }}><Icon name="upload" />{t('Recuperar otro equipo')}</button>
+            <button className={mode === 'create' ? 'active' : ''} onClick={() => { setMode('create'); setFolder(null); setResult(null); setRestoreProgress(null); }}><Icon name="lock" />{status.previousInstallation ? (t('Migrar y proteger este equipo')) : (t('Crear carpeta segura'))}</button>
+            <button className={mode === 'restore' ? 'active' : ''} onClick={() => { setMode('restore'); setFolder(null); setResult(null); setRestoreProgress(null); }}><Icon name="upload" />{t('Recuperar otro equipo')}</button>
           </div>
 
           <div className="recovery-block">
@@ -145,11 +150,44 @@ export function RecoverySetupWizard({
           </div>
 
           {result && !result.ok && <div className="recovery-error"><Icon name="alert" />{result.message}</div>}
-          <footer className="recovery-footer"><span><Icon name="lock" />{t('AES-256-GCM · instantáneas SQLite consistentes · hashes de integridad')}</span><button className="btn btn-primary" disabled={!canSubmit || busy} onClick={() => void submit()}>{busy ? (t('Verificando y guardando…')) : mode === 'create' ? (t('Crear primera copia segura')) : (t('Verificar y recuperar'))}<Icon name={busy ? 'sync' : 'chevronRight'} className={busy ? 'animate-spin' : ''} /></button></footer>
+          {mode === 'restore' && busy && restoreProgress && (
+            <div
+              className="recovery-restore-progress"
+              data-testid="recovery-restore-progress"
+              data-phase={restoreProgress.phase}
+              role="progressbar"
+              aria-live="polite"
+              aria-label={t('Progreso de restauración')}
+              aria-valuemin={0}
+              aria-valuemax={100}
+              aria-valuenow={Math.round(restoreProgress.progress * 100)}
+            >
+              <div className="recovery-restore-progress-heading">
+                <span>{restoreProgressLabel(restoreProgress.phase)}</span>
+                <b>{Math.round(restoreProgress.progress * 100)}%</b>
+              </div>
+              <div className="recovery-restore-progress-track" aria-hidden="true">
+                <span style={{ width: `${Math.max(0, Math.min(100, restoreProgress.progress * 100))}%` }} />
+              </div>
+              {restoreProgress.totalBytes > 0 && (
+                <small>{formatBytes(restoreProgress.completedBytes)} / {formatBytes(restoreProgress.totalBytes)}</small>
+              )}
+            </div>
+          )}
+          <footer className="recovery-footer"><span><Icon name="lock" />{t('AES-256-GCM · instantáneas SQLite consistentes · hashes de integridad')}</span><button className="btn btn-primary" disabled={!canSubmit || busy} onClick={() => void submit()}>{busy ? (mode === 'restore' && restoreProgress ? restoreProgressLabel(restoreProgress.phase) : t('Verificando y guardando…')) : mode === 'create' ? (t('Crear primera copia segura')) : (t('Verificar y recuperar'))}<Icon name={busy ? 'sync' : 'chevronRight'} className={busy ? 'animate-spin' : ''} /></button></footer>
         </section>
       </motion.main>
     </div>
   );
+}
+
+function restoreProgressLabel(phase: RecoveryRestoreProgress['phase']): string {
+  if (phase === 'preparing') return t('Preparando…');
+  if (phase === 'decrypting') return t('Descifrando…');
+  if (phase === 'verifying') return t('Verificando…');
+  if (phase === 'restoring') return t('Restaurando…');
+  if (phase === 'finalizing' || phase === 'complete') return t('Finalizando…');
+  return t('Restaurando…');
 }
 
 function PasswordField({ value, onChange, visible, onToggle, placeholder, language }: {
