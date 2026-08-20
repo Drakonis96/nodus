@@ -30,27 +30,50 @@ jobs:
       - name: Verify citation version
         run: npm run citation:check && npm run release:verify-source
 
-  release:
+  prepare-release:
     needs: validate-release
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      RELEASE_TAG: ${{ inputs.tag }}
+    steps:
+      - name: Create or reuse the single draft release
+        run: |
+          if gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            draft="$(gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --json isDraft --jq .isDraft)"
+            if [[ "$draft" != true ]]; then
+              echo "::error::Release $RELEASE_TAG already exists and is not a draft"
+              exit 1
+            fi
+          else
+            gh release create "$RELEASE_TAG" \
+              --repo "$GITHUB_REPOSITORY" \
+              --verify-tag \
+              --draft \
+              --title "${RELEASE_TAG#v}"
+          fi
+
+  release:
+    needs: prepare-release
     env:
       HAS_MACOS_SIGNING: ${{ secrets.MACOS_CERTIFICATE != '' }}
       NODUS_RELEASE_CHANNEL: ${{ inputs.channel }}
       RELEASE_TAG: ${{ inputs.tag }}
     strategy:
       fail-fast: false
-      # electron-builder creates one shared draft. Serialising the native builds
-      # prevents simultaneous attempts to create that draft release.
-      max-parallel: 1
       matrix:
         include:
-          # The release targets arm64, but packaging remains pinned to Intel so
-          # electron-builder can cross-build the configured target consistently.
-          - os: macos-15-intel
+          # The application targets Apple Silicon. npm selects native optional
+          # dependencies from the host architecture, so this must be ARM64 too.
+          - os: macos-latest
             platform: '--mac'
+            asset-platform: mac
           - os: windows-latest
             platform: '--win'
+            asset-platform: win
           - os: ubuntu-latest
             platform: '--linux'
+            asset-platform: linux
     runs-on: ${{ matrix.os }}
     steps:
       - name: Checkout release tag
@@ -81,36 +104,35 @@ jobs:
           NODE_OPTIONS: --max-old-space-size=4096
         run: npm run build
 
-      - name: Build and publish Windows installer
+      - name: Build Windows installer
         if: matrix.os == 'windows-latest'
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: npx electron-builder ${{ matrix.platform }} --publish always --config build/electron-builder.release.cjs
+        run: npx electron-builder ${{ matrix.platform }} --publish never --config build/electron-builder.release.cjs
 
-      - name: Build and publish signed macOS installer
-        if: matrix.os == 'macos-15-intel' && env.HAS_MACOS_SIGNING == 'true'
+      - name: Build signed macOS installer
+        if: matrix.os == 'macos-latest' && env.HAS_MACOS_SIGNING == 'true'
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CSC_LINK: ${{ secrets.MACOS_CERTIFICATE }}
           CSC_KEY_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
           CSC_IDENTITY_AUTO_DISCOVERY: true
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-        run: npx electron-builder ${{ matrix.platform }} --publish always --config build/electron-builder.release.cjs
+        run: npx electron-builder ${{ matrix.platform }} --publish never --config build/electron-builder.release.cjs
 
-      - name: Build and publish ad-hoc macOS installer
-        if: matrix.os == 'macos-15-intel' && env.HAS_MACOS_SIGNING != 'true'
+      - name: Build ad-hoc macOS installer
+        if: matrix.os == 'macos-latest' && env.HAS_MACOS_SIGNING != 'true'
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CSC_IDENTITY_AUTO_DISCOVERY: false
-        run: npx electron-builder ${{ matrix.platform }} --publish always --config build/electron-builder.release.cjs
+        run: npx electron-builder ${{ matrix.platform }} --publish never --config build/electron-builder.release.cjs
 
-      - name: Build and publish Linux installer
+      - name: Build Linux installer
         if: matrix.os == 'ubuntu-latest'
+        run: npx electron-builder ${{ matrix.platform }} --publish never --config build/electron-builder.release.cjs
+
+      - name: Upload platform assets to the single draft
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: npx electron-builder ${{ matrix.platform }} --publish always --config build/electron-builder.release.cjs
+        run: node scripts/upload-release-assets.mjs ${{ matrix.asset-platform }}
 
   build-zotero-plugin:
     # The fixed-name plugin assets remain stable-only: installed plugins resolve

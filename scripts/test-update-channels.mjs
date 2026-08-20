@@ -104,39 +104,46 @@ test('stable and beta publication have isolated entry points and shared build lo
   assert.match(shared, /beta-mac\.yml beta\.yml beta-linux\.yml/);
   assert.match(shared, /Beta release contains stable update manifest/);
   assert.match(shared, /--prerelease --latest=false/);
-  assert.match(shared, /os: macos-15-intel/, 'macOS packaging stays on the explicit Intel runner used for cross-building');
-  assert.doesNotMatch(shared, /- os: macos-latest/, 'release packaging does not depend on the moving macOS runner alias');
+  assert.match(shared, /- os: macos-latest/, 'ARM64 macOS packaging runs on an ARM64 host for native optional dependencies');
+  assert.doesNotMatch(shared, /macos-15-intel/, 'the ARM64 application is never packaged from an Intel dependency tree');
   assert.match(shared, /node node_modules\/electron\/install\.js/, 'release runners install Electron legal files before packaging');
+  assert.match(shared, /gh release create[\s\S]*--draft/, 'the workflow creates one explicit draft before native builds');
+  assert.match(shared, /upload-release-assets\.mjs/, 'all platforms upload to the explicit shared draft');
+  assert.doesNotMatch(shared, /--publish always/, 'electron-builder cannot create competing draft releases');
 
   const lock = JSON.parse(await read('package-lock.json'));
   const nativePackages = [
-    '@esbuild/darwin-x64',
+    '@esbuild/darwin-arm64',
     '@esbuild/linux-x64',
     '@esbuild/win32-x64',
-    '@github/copilot-darwin-x64',
+    '@github/copilot-darwin-arm64',
     '@github/copilot-linux-x64',
     '@github/copilot-win32-x64',
-    '@img/sharp-darwin-x64',
+    '@img/sharp-darwin-arm64',
+    '@img/sharp-libvips-darwin-arm64',
     '@img/sharp-linux-x64',
     '@img/sharp-win32-x64',
-    '@koromix/koffi-darwin-x64',
+    '@koromix/koffi-darwin-arm64',
     '@koromix/koffi-linux-x64',
     '@koromix/koffi-win32-x64',
-    '@napi-rs/canvas-darwin-x64',
+    '@napi-rs/canvas-darwin-arm64',
     '@napi-rs/canvas-linux-x64-gnu',
     '@napi-rs/canvas-win32-x64-msvc',
-    '@openai/codex-darwin-x64',
+    '@openai/codex-darwin-arm64',
     '@openai/codex-linux-x64',
     '@openai/codex-win32-x64',
-    '@rollup/rollup-darwin-x64',
+    '@rollup/rollup-darwin-arm64',
     '@rollup/rollup-linux-x64-gnu',
     '@rollup/rollup-win32-x64-msvc',
   ];
   for (const packageName of nativePackages) {
-    assert.ok(lock.packages[`node_modules/${packageName}`], `${packageName} is locked for release runners`);
+    const entry = lock.packages[`node_modules/${packageName}`];
+    assert.ok(entry, `${packageName} is locked for release runners`);
+    assert.ok(entry.resolved, `${packageName} has a deterministic tarball URL`);
+    assert.ok(entry.integrity, `${packageName} has a deterministic integrity hash`);
   }
-  assert.equal(lock.packages['node_modules/@koromix/koffi-darwin-x64'].version, '3.1.1');
-  assert.equal(lock.packages['node_modules/@rollup/rollup-darwin-x64'].version, '4.62.0');
+  assert.equal(lock.packages['node_modules/@koromix/koffi-darwin-arm64'].version, '3.1.1');
+  assert.equal(lock.packages['node_modules/@rollup/rollup-darwin-arm64'].version, '4.62.0');
 
   const configPath = require.resolve(path.join(repoRoot, 'build/electron-builder.release.cjs'));
   const previousChannel = process.env.NODUS_RELEASE_CHANNEL;
