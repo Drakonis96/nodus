@@ -25,10 +25,11 @@ test('Authors is a library-style catalogue with real metadata and saved authors 
 
 test('author and synthesis-matrix clicks open persistent internal tabs', async () => {
   const view = await readSource('src/views/AuthorsView.tsx');
-  assert.match(view, /setOpenAuthor\(author\);[\s\S]*setSurface\('author'\)/);
+  assert.match(view, /setOpenAuthors\(\(current\) => \([\s\S]*current\.some\(\(open\) => open\.id === author\.id\)[\s\S]*\[\.\.\.current, author\][\s\S]*setActiveAuthorId\(author\.id\);[\s\S]*setSurface\('author'\)/, 'a new author gets its own tab and an already-open author is focused');
+  assert.match(view, /openAuthors\.map\(\(author\) =>/, 'all open author dossiers remain mounted independently');
   assert.match(view, /setMatrixOpen\(true\);[\s\S]*setSurface\('matrix'\)/);
   assert.match(view, /surface === 'catalog' \? 'h-full' : 'hidden'/, 'the catalogue remains mounted behind other tabs');
-  assert.match(view, /surface === 'author' \? 'h-full' : 'hidden'/, 'author detail remains mounted as a tab');
+  assert.match(view, /surface === 'author' && activeAuthorId === author\.id \? 'h-full' : 'hidden'/, 'each author detail remains mounted in its own tab');
   assert.match(view, /surface === 'matrix' \? 'h-full p-5' : 'hidden'/, 'the synthesis matrix remains mounted as a tab');
 });
 

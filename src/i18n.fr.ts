@@ -33,10 +33,29 @@ import { ANNOUNCEMENT_TRANSLATIONS } from './i18n.announcements';
 import { LIBRARY_READER_TRANSLATIONS } from './i18n.libraryReader';
 import { LIBRARY_BIBLIOGRAPHY_TRANSLATIONS } from './i18n.libraryBibliography';
 import { LIBRARY_RECOVERY_TRANSLATIONS } from './i18n.libraryRecovery';
+import { PAGE_TRANSLATIONS } from './i18n.pages';
+import { DATABASE_PROPERTY_TRANSLATIONS } from './i18n.databaseProperties';
+import { DATABASE_RELATION_FORMULA_TRANSLATIONS } from './i18n.databaseRelationsFormulas';
+import { DATABASE_VIEW_TRANSLATIONS } from './i18n.databaseViews';
+import { DATABASE_TASK_TRANSLATIONS } from './i18n.databaseTasks';
+import { DATABASE_AUTOMATION_TRANSLATIONS } from './i18n.databaseAutomations';
+import { NOTION_IMPORT_TRANSLATIONS } from './i18n.notionImport';
 import { LIBRARY_ONBOARDING_TRANSLATIONS } from './i18n.libraryOnboarding';
+import { SOURCE_CITATION_TRANSLATIONS } from './i18n.sourceCitation';
 
 export const FR: Record<string, string> = {
+  'Tamaño de Nodi': 'Taille de Nodi',
+  'El marcador central conserva el tamaño predeterminado. Elige uno de los nueve tamaños disponibles.': 'Le repère central conserve la taille par défaut. Choisissez l’une des neuf tailles disponibles.',
+  'Tamaños predeterminados': 'Tailles prédéfinies',
+  ...PAGE_TRANSLATIONS.fr,
+  ...DATABASE_PROPERTY_TRANSLATIONS.fr,
+  ...DATABASE_RELATION_FORMULA_TRANSLATIONS.fr,
+  ...DATABASE_VIEW_TRANSLATIONS.fr,
+  ...DATABASE_TASK_TRANSLATIONS.fr,
+  ...DATABASE_AUTOMATION_TRANSLATIONS.fr,
+  ...NOTION_IMPORT_TRANSLATIONS.fr,
   ...LIBRARY_READER_TRANSLATIONS.fr,
+  ...SOURCE_CITATION_TRANSLATIONS.fr,
   ...LIBRARY_BIBLIOGRAPHY_TRANSLATIONS.fr,
   ...LIBRARY_ONBOARDING_TRANSLATIONS.fr,
   ...LIBRARY_RECOVERY_TRANSLATIONS.fr,
@@ -1077,6 +1096,7 @@ export const FR: Record<string, string> = {
   'Cargando Nodus…': 'Chargement de Nodus…',
   'No se pudo iniciar Nodus': 'Impossible de démarrer Nodus',
   'Reintentar': 'Réessayer',
+  'No se pudieron cargar las filas.': 'Impossible de charger les lignes.',
   'Configura un modelo de IA': 'Configurez un modèle d\'IA',
   'Modelo: sin configurar': 'Modèle : non configuré',
   'Abrir asistente de investigación': 'Ouvrir l\'assistant de recherche',
@@ -1594,6 +1614,9 @@ export const FR: Record<string, string> = {
   'Ver últimos cambios': 'Voir les derniers changements',
   'Reiniciar': 'Redémarrer',
   'Buscando…': 'Recherche…',
+  'Cargar más resultados': 'Charger plus de résultats',
+  'Recalcular fórmulas y rollups': 'Recalculer les formules et les rollups',
+  'Actualizando fórmulas y rollups…': 'Mise à jour des formules et rollups…',
   'Buscar actualización': 'Rechercher une mise à jour',
   'Comprobando actualizaciones': 'Vérification des mises à jour',
   'Buscando una nueva versión de Nodus…': 'Recherche d\'une nouvelle version de Nodus…',
@@ -6167,6 +6190,7 @@ export const FR: Record<string, string> = {
   'Elige la columna que quieres medir.': 'Choisissez la colonne à mesurer.',
   'Esta columna todavía no tiene fórmula.': 'Cette colonne n’a pas encore de formule.',
   'La fórmula usa una columna que ya no existe.': 'La formule utilise une colonne qui n’existe plus.',
+  'La vista hace referencia a una propiedad que ya no existe.': 'La vue fait référence à une propriété qui n’existe plus.',
   'Referencia circular: la fórmula se usa a sí misma.': 'Référence circulaire : la formule s’utilise elle-même.',
   'de': 'de',
   'o': 'ou',
@@ -8160,4 +8184,9 @@ export const FR: Record<string, string> = {
   "No se ha podido leer esta página": "Cette page n’a pas pu être lue",
   "Raíz de la Biblioteca": "Racine de la Bibliothèque",
   "Se han guardado {n} archivo(s).": "{n} fichier(s) enregistré(s).",
+  "Copias previas a migraciones": "Copies antérieures aux migrations",
+  "Antes de cambiar el esquema, Nodus conserva una copia inmutable y verificada. Puedes abrirla como un vault separado sin sustituir el actual.": "Avant de modifier le schéma, Nodus conserve une copie immuable et vérifiée. Vous pouvez l’ouvrir comme coffre séparé sans remplacer le coffre actuel.",
+  "La copia previa se abrió como un vault separado.": "La copie antérieure à la migration a été ouverte comme coffre séparé.",
+  "Abriendo…": "Ouverture…",
+  "Abrir como vault separado": "Ouvrir comme coffre séparé",
 };

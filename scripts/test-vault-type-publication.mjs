@@ -109,9 +109,15 @@ test('a database attachment travels as metadata and never as bytes', async () =>
     db.prepare('INSERT INTO db_columns (id, database_id, name, type, position, config_json, created_at) VALUES (?,?,?,?,?,?,?)')
       .run('c-1', 'db-1', 'Título', 'text', 0, '{}', NOW);
     db.prepare('INSERT INTO db_rows (id, database_id, position, created_at, updated_at) VALUES (?,?,?,?,?)').run('r-1', 'db-1', 0, NOW, NOW);
-    db.prepare('INSERT INTO db_cells (row_id, column_id, value_text) VALUES (?,?,?)').run('r-1', 'c-1', 'Una fotografía');
-    db.prepare('INSERT INTO db_attachments (id, row_id, column_id, file_name, mime_type, bytes, blob, content_hash, position, created_at) VALUES (?,?,?,?,?,?,?,?,?,?)')
-      .run('a-1', 'r-1', 'c-1', 'expediente.pdf', 'application/pdf', pdf.length, pdf, 'hash', 0, NOW);
+    db.prepare(`INSERT INTO db_cells
+      (database_id, row_id, column_id, value_type, value_text, created_at, updated_at)
+      VALUES (?,?,?,?,?,?,?)`)
+      .run('db-1', 'r-1', 'c-1', 'text', 'Una fotografía', NOW, NOW);
+    db.prepare(`INSERT INTO db_attachments
+      (id, database_id, row_id, column_id, file_name, mime_type, bytes, blob, content_hash,
+       position, created_at, updated_at)
+      VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`)
+      .run('a-1', 'db-1', 'r-1', 'c-1', 'expediente.pdf', 'application/pdf', pdf.length, pdf, 'hash', 0, NOW, NOW);
 
     const { built, payload } = publish(db, 'databases');
     const attachment = payload.tables.db_attachments[0];

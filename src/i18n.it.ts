@@ -27,11 +27,33 @@ import { ANNOUNCEMENT_TRANSLATIONS } from './i18n.announcements';
 import { LIBRARY_READER_TRANSLATIONS } from './i18n.libraryReader';
 import { LIBRARY_BIBLIOGRAPHY_TRANSLATIONS } from './i18n.libraryBibliography';
 import { LIBRARY_RECOVERY_TRANSLATIONS } from './i18n.libraryRecovery';
+import { PAGE_TRANSLATIONS } from './i18n.pages';
+import { DATABASE_PROPERTY_TRANSLATIONS } from './i18n.databaseProperties';
+import { DATABASE_RELATION_FORMULA_TRANSLATIONS } from './i18n.databaseRelationsFormulas';
+import { DATABASE_VIEW_TRANSLATIONS } from './i18n.databaseViews';
+import { DATABASE_TASK_TRANSLATIONS } from './i18n.databaseTasks';
+import { DATABASE_AUTOMATION_TRANSLATIONS } from './i18n.databaseAutomations';
+import { NOTION_IMPORT_TRANSLATIONS } from './i18n.notionImport';
 import { LIBRARY_ONBOARDING_TRANSLATIONS } from './i18n.libraryOnboarding';
+import { SOURCE_CITATION_TRANSLATIONS } from './i18n.sourceCitation';
 
 /** Complete static Italian interface table; coverage prohibits runtime fallbacks. */
 export const IT: Record<string, string> = {
+  'Tamaño de Nodi': 'Dimensione di Nodi',
+  'El marcador central conserva el tamaño predeterminado. Elige uno de los nueve tamaños disponibles.': "L'indicatore centrale mantiene la dimensione predefinita. Scegli una delle nove dimensioni disponibili.",
+  'Tamaños predeterminados': 'Dimensioni predefinite',
+  ...PAGE_TRANSLATIONS.it,
+  ...DATABASE_PROPERTY_TRANSLATIONS.it,
+  ...DATABASE_RELATION_FORMULA_TRANSLATIONS.it,
+  ...DATABASE_VIEW_TRANSLATIONS.it,
+  ...DATABASE_TASK_TRANSLATIONS.it,
+  ...DATABASE_AUTOMATION_TRANSLATIONS.it,
+  ...NOTION_IMPORT_TRANSLATIONS.it,
+  'Cargar más resultados': 'Carica altri risultati',
+  'Recalcular fórmulas y rollups': 'Ricalcola formule e rollup',
+  'Actualizando fórmulas y rollups…': 'Aggiornamento di formule e rollup…',
   ...LIBRARY_READER_TRANSLATIONS.it,
+  ...SOURCE_CITATION_TRANSLATIONS.it,
   ...LIBRARY_BIBLIOGRAPHY_TRANSLATIONS.it,
   ...LIBRARY_ONBOARDING_TRANSLATIONS.it,
   ...LIBRARY_RECOVERY_TRANSLATIONS.it,
@@ -1009,6 +1031,7 @@ export const IT: Record<string, string> = {
   "Cargando Nodus…": "Caricamento Nodus...",
   "No se pudo iniciar Nodus": "Impossibile avviare Nodus",
   "Reintentar": "Riprova",
+  'No se pudieron cargar las filas.': 'Impossibile caricare le righe.',
   "Configura un modelo de IA": "Configura un modello di intelligenza artificiale",
   "Modelo: sin configurar": "Modello: non configurato",
   "Abrir asistente de investigación": "Assistente di ricerca aperto",
@@ -5591,6 +5614,7 @@ export const IT: Record<string, string> = {
   "Elige la columna que quieres medir.": "Scegli la colonna che vuoi misurare.",
   "Esta columna todavía no tiene fórmula.": "Questa colonna non ha ancora una formula.",
   "La fórmula usa una columna que ya no existe.": "La formula utilizza una colonna che non esiste più.",
+  "La vista hace referencia a una propiedad que ya no existe.": "La vista fa riferimento a una proprietà che non esiste più.",
   "Referencia circular: la fórmula se usa a sí misma.": "Riferimento circolare: la formula utilizza se stessa.",
   "de": "di",
   "o": "o",
@@ -7574,4 +7598,9 @@ export const IT: Record<string, string> = {
   "No se ha podido leer esta página": "Impossibile leggere questa pagina",
   "Raíz de la Biblioteca": "Radice della Biblioteca",
   "Se han guardado {n} archivo(s).": "{n} file salvati.",
+  "Copias previas a migraciones": "Copie precedenti alle migrazioni",
+  "Antes de cambiar el esquema, Nodus conserva una copia inmutable y verificada. Puedes abrirla como un vault separado sin sustituir el actual.": "Prima di modificare lo schema, Nodus conserva una copia immutabile e verificata. Puoi aprirla come vault separato senza sostituire quello attuale.",
+  "La copia previa se abrió como un vault separado.": "La copia precedente alla migrazione è stata aperta come vault separato.",
+  "Abriendo…": "Apertura…",
+  "Abrir como vault separado": "Apri come vault separato",
 };

@@ -33,8 +33,13 @@ test('durable backup revision changes on content writes, not on reads', () => {
   const dbPath = path.join(dir, 'vault.sqlite');
   const db = new Database(dbPath);
   try {
-    db.exec('CREATE TABLE notes (id TEXT PRIMARY KEY, body TEXT); CREATE TABLE backup_revision (singleton INTEGER PRIMARY KEY CHECK (singleton = 1), sequence INTEGER NOT NULL); INSERT INTO backup_revision VALUES (1, 1)');
+    db.exec('CREATE TABLE notes (id TEXT PRIMARY KEY, body TEXT); CREATE TABLE backup_revision (singleton INTEGER PRIMARY KEY CHECK (singleton = 1), sequence INTEGER NOT NULL); INSERT INTO backup_revision VALUES (1, 1); CREATE VIRTUAL TABLE search_fts USING fts5(content)');
     ensureBackupRevisionTriggers(db);
+    assert.equal(
+      db.prepare("SELECT COUNT(*) AS n FROM sqlite_master WHERE type='trigger' AND name LIKE 'nodus_backup_revision_%_search_fts_%'").get().n,
+      0,
+      'FTS shadow tables never receive user triggers',
+    );
     const initial = backupVaultRevision(db);
     db.prepare('SELECT COUNT(*) AS n FROM notes').get();
     assert.equal(backupVaultRevision(db), initial, 'reads do not invalidate a reusable vault entry');

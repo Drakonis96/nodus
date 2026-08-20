@@ -13,6 +13,7 @@ export function DatabasesSearchView({ onOpenDatabase }: { onOpenDatabase: (datab
   const [query, setQuery] = useState('');
   const [dbHits, setDbHits] = useState<DatabaseSearchHit[]>([]);
   const [rowHits, setRowHits] = useState<DatabaseRowHit[]>([]);
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -20,6 +21,7 @@ export function DatabasesSearchView({ onOpenDatabase }: { onOpenDatabase: (datab
     if (!q) {
       setDbHits([]);
       setRowHits([]);
+      setNextCursor(null);
       setLoading(false);
       return;
     }
@@ -27,10 +29,14 @@ export function DatabasesSearchView({ onOpenDatabase }: { onOpenDatabase: (datab
     let cancelled = false;
     const timer = setTimeout(async () => {
       try {
-        const [dbs, rows] = await Promise.all([window.nodus.searchDatabases(q, true), window.nodus.searchDatabaseRows(q, 80)]);
+        const [dbs, page] = await Promise.all([
+          window.nodus.searchDatabases(q, true),
+          window.nodus.searchDatabaseRowsPage({ query: q, limit: 80 }),
+        ]);
         if (!cancelled) {
           setDbHits(dbs);
-          setRowHits(rows);
+          setRowHits(page.hits);
+          setNextCursor(page.nextCursor);
         }
       } finally {
         if (!cancelled) setLoading(false);
@@ -44,6 +50,17 @@ export function DatabasesSearchView({ onOpenDatabase }: { onOpenDatabase: (datab
 
   const hasQuery = query.trim().length > 0;
   const empty = hasQuery && !loading && dbHits.length === 0 && rowHits.length === 0;
+  const loadMore = async () => {
+    if (!nextCursor || loading) return;
+    setLoading(true);
+    try {
+      const page = await window.nodus.searchDatabaseRowsPage({ query: query.trim(), cursor: nextCursor, limit: 80 });
+      setRowHits((current) => [...current, ...page.hits]);
+      setNextCursor(page.nextCursor);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <div className="h-full overflow-y-auto">
@@ -51,7 +68,7 @@ export function DatabasesSearchView({ onOpenDatabase }: { onOpenDatabase: (datab
         <h1 className="mb-1 flex items-center gap-2 text-2xl font-semibold">
           <Icon name="search" size={20} /> {t('Buscar')}
         </h1>
-        <p className="mb-4 text-sm text-neutral-500">{t('Busca en todas tus bases de datos: por nombre y dentro del contenido de las filas.')}</p>
+        <p className="mb-4 text-sm text-neutral-700 dark:text-neutral-300">{t('Busca en todas tus bases de datos: por nombre y dentro del contenido de las filas.')}</p>
 
         <div className="relative mb-5">
           <Icon name="search" size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-neutral-500" />
@@ -64,25 +81,25 @@ export function DatabasesSearchView({ onOpenDatabase }: { onOpenDatabase: (datab
           />
         </div>
 
-        {!hasQuery && <p className="text-sm text-neutral-600">{t('Empieza a escribir para ver resultados.')}</p>}
-        {loading && <p className="text-sm text-neutral-500">{t('Buscando…')}</p>}
-        {empty && <p className="text-sm text-neutral-500">{t('Sin coincidencias.')}</p>}
+        {!hasQuery && <p className="text-sm text-neutral-700 dark:text-neutral-300">{t('Empieza a escribir para ver resultados.')}</p>}
+        {loading && <p className="text-sm text-neutral-700 dark:text-neutral-300">{t('Buscando…')}</p>}
+        {empty && <p className="text-sm text-neutral-700 dark:text-neutral-300">{t('Sin coincidencias.')}</p>}
 
         {dbHits.length > 0 && (
           <section className="mb-6">
-            <h2 className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-neutral-500">{t('Bases de datos')}</h2>
+            <h2 className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-neutral-700 dark:text-neutral-300">{t('Bases de datos')}</h2>
             <div className="flex flex-col gap-1">
               {dbHits.map((d) => (
                 <button
                   key={d.id}
                   onClick={() => onOpenDatabase(d.id)}
-                  className="flex items-center gap-2 rounded-lg border border-neutral-800 px-3 py-2 text-left transition-colors hover:border-indigo-600/70 hover:bg-neutral-900"
+                  className="flex items-center gap-2 rounded-lg border border-neutral-300 px-3 py-2 text-left transition-colors hover:border-indigo-500 hover:bg-indigo-50 dark:border-neutral-700 dark:hover:border-indigo-500 dark:hover:bg-neutral-900"
                 >
                   <Icon name={d.icon || 'table'} className="shrink-0 opacity-70" />
                   <span className="flex-1 truncate text-sm">{d.name}</span>
-                  <span className="shrink-0 text-[10px] text-neutral-500">{d.shortId}</span>
+                  <span className="shrink-0 text-[10px] font-medium text-neutral-700 dark:text-neutral-300">{d.shortId}</span>
                   {d.contentMatches > 0 && (
-                    <span className="shrink-0 rounded-full bg-indigo-600/20 px-1.5 py-0.5 text-[10px] text-indigo-300">
+                    <span className="shrink-0 rounded-full bg-indigo-100 px-1.5 py-0.5 text-[10px] font-medium text-indigo-700 dark:bg-indigo-500/20 dark:text-indigo-200">
                       {tx('{n} en el contenido', { n: d.contentMatches })}
                     </span>
                   )}
@@ -94,25 +111,30 @@ export function DatabasesSearchView({ onOpenDatabase }: { onOpenDatabase: (datab
 
         {rowHits.length > 0 && (
           <section>
-            <h2 className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-neutral-500">{t('Filas')}</h2>
+            <h2 className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-neutral-700 dark:text-neutral-300">{t('Filas')}</h2>
             <div className="flex flex-col gap-1">
               {rowHits.map((r) => (
                 <button
                   key={r.rowId}
                   onClick={() => onOpenDatabase(r.databaseId, r.rowId)}
-                  className="rounded-lg border border-neutral-800 px-3 py-2 text-left transition-colors hover:border-indigo-600/70 hover:bg-neutral-900"
+                  className="rounded-lg border border-neutral-300 px-3 py-2 text-left transition-colors hover:border-indigo-500 hover:bg-indigo-50 dark:border-neutral-700 dark:hover:border-indigo-500 dark:hover:bg-neutral-900"
                 >
                   <div className="flex items-center gap-2 text-sm">
                     <span className="truncate font-medium">{r.title || t('Sin título')}</span>
-                    <span className="shrink-0 text-[10px] text-neutral-500">{r.databaseName}</span>
+                    <span className="shrink-0 text-[10px] font-medium text-neutral-700 dark:text-neutral-300">{r.databaseName}</span>
                   </div>
-                  <div className="mt-0.5 truncate text-xs text-neutral-500">
-                    <span className="text-neutral-600">{r.columnName}: </span>
+                  <div className="mt-0.5 truncate text-xs text-neutral-700 dark:text-neutral-300">
+                    <span className="font-medium text-neutral-800 dark:text-neutral-200">{r.columnName}: </span>
                     {r.snippet}
                   </div>
                 </button>
               ))}
             </div>
+            {nextCursor && (
+              <button className="btn btn-ghost mt-3 w-full justify-center" onClick={() => void loadMore()} disabled={loading}>
+                {loading ? t('Buscando…') : t('Cargar más resultados')}
+              </button>
+            )}
           </section>
         )}
       </div>

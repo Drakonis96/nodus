@@ -61,7 +61,12 @@ const ROUTES_PAGE_SIZE = 40;
 type ArgumentMapSurface = 'catalog' | 'map';
 /** Exported because the section's snapshot stores it. */
 export type RouteSortKey = 'label' | 'type' | 'connections' | 'debates' | 'confidence';
-type OpenArgumentMap = { ideaId: string; label: string; mode: 'auto' | 'ai' };
+type OpenArgumentMap = { key: string; ideaId: string; label: string; mode: 'auto' | 'ai' };
+type ArgumentMapTabState = OpenArgumentMap & {
+  map: ArgumentMap | null;
+  building: boolean;
+  error: string | null;
+};
 
 export function ArgumentMapView({
   settings,
@@ -77,7 +82,8 @@ export function ArgumentMapView({
   // data of its own — redrawing it means rebuilding it, and in AI mode that would
   // spend a model call on the act of walking back into the section.
   const [surface, setSurface] = useState<ArgumentMapSurface>('catalog');
-  const [openArgumentMap, setOpenArgumentMap] = useState<OpenArgumentMap | null>(null);
+  const [openArgumentMaps, setOpenArgumentMaps] = useState<ArgumentMapTabState[]>([]);
+  const [activeMapKey, setActiveMapKey] = useState<string | null>(null);
   const [ideaNodes, setIdeaNodes] = useState<IdeaPickerItem[]>([]);
   const [graphLoaded, setGraphLoaded] = useState(false);
   const [mode, setMode] = useState<'auto' | 'ai'>(() => snapshot?.mode ?? 'auto');
@@ -103,22 +109,7 @@ export function ArgumentMapView({
     report.current?.({ mode, seedId, suggestionSearch, minConnections, routeSort });
   }, [minConnections, mode, routeSort, seedId, suggestionSearch]);
   const [model, setModel] = useFeatureModel(settings, 'argumentMapModel');
-  const [map, setMap] = useState<ArgumentMap | null>(null);
-  const [building, setBuilding] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  // Progressive unfold: the map opens one level per tick after it is built. The
-  // expanded set is the single source of truth, so a manual toggle and the
-  // automatic unfold can never disagree about what is on screen.
-  const [expanded, setExpanded] = useState<Set<string>>(new Set());
-  const revealTimerRef = useRef<number | null>(null);
-
-  const [ideaDetail, setIdeaDetail] = useState<IdeaDetail | null>(null);
-  const [edgeDetail, setEdgeDetail] = useState<EdgeDetail | null>(null);
-  const [detailLoading, setDetailLoading] = useState<DetailLoading | null>(null);
-  const detailSeqRef = useRef(0);
-  const [detailWidth, setDetailWidth] = useState(() => loadNumber(DETAIL_WIDTH_KEY, DETAIL_DEFAULT_WIDTH, DETAIL_MIN_WIDTH, DETAIL_MAX_WIDTH));
-  const [detailFontSize, setDetailFontSize] = useState(() => loadNumber(DETAIL_FONT_KEY, DETAIL_DEFAULT_FONT, DETAIL_MIN_FONT, DETAIL_MAX_FONT));
+  const [catalogError, setCatalogError] = useState<string | null>(null);
   const seedSearchRef = useDismissableLayer<HTMLDivElement>({
     open: seedSearchOpen,
     onDismiss: () => setSeedSearchOpen(false),
@@ -147,12 +138,12 @@ export function ArgumentMapView({
   const discoverRoutes = useCallback(async (manual = false) => {
     setSuggestionsLoading(true);
     if (manual) setRefreshing(true);
-    setError(null);
+    setCatalogError(null);
     try {
       const raw = await window.nodus.discoverArgumentRoutes();
       setSuggestions([...raw].sort((a, b) => b.degree - a.degree));
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setCatalogError(e instanceof Error ? e.message : String(e));
     } finally {
       setSuggestionsLoading(false);
       setRefreshing(false);
@@ -170,22 +161,15 @@ export function ArgumentMapView({
   const switchMode = (next: 'auto' | 'ai') => {
     if (next === mode) return;
     setMode(next);
-    setError(null);
+    setCatalogError(null);
     setSeedId('');
     setSearch('');
   };
 
-  useEffect(() => {
-    localStorage.setItem(DETAIL_WIDTH_KEY, String(detailWidth));
-  }, [detailWidth]);
-  useEffect(() => {
-    localStorage.setItem(DETAIL_FONT_KEY, String(detailFontSize));
-  }, [detailFontSize]);
-
   const filteredIdeas = useMemo(() => {
     const q = search.trim().toLowerCase();
     const base = q
-      ? ideaNodes.filter((n) => n.label.toLowerCase().includes(q) || (n.statement ?? '').toLowerCase().includes(q))
+      ? ideaNodes.filter((n) => (n.label ?? '').toLowerCase().includes(q) || (n.statement ?? '').toLowerCase().includes(q))
       : ideaNodes;
     return base.slice(0, 60);
   }, [ideaNodes, search]);
@@ -193,11 +177,11 @@ export function ArgumentMapView({
   const filteredSuggestions = useMemo(() => {
     const q = suggestionSearch.trim().toLowerCase();
     let base = suggestions;
-    if (q) base = base.filter((s) => s.label.toLowerCase().includes(q) || s.statement.toLowerCase().includes(q));
+    if (q) base = base.filter((s) => (s.label ?? '').toLowerCase().includes(q) || (s.statement ?? '').toLowerCase().includes(q));
     if (minConnections > 1) base = base.filter((s) => s.degree >= minConnections);
     return [...base].sort((a, b) => {
-      if (routeSort === 'label') return a.label.localeCompare(b.label);
-      if (routeSort === 'type') return a.type.localeCompare(b.type) || a.label.localeCompare(b.label);
+      if (routeSort === 'label') return (a.label ?? '').localeCompare(b.label ?? '');
+      if (routeSort === 'type') return (a.type ?? '').localeCompare(b.type ?? '') || (a.label ?? '').localeCompare(b.label ?? '');
       if (routeSort === 'debates') return b.debateCount - a.debateCount || b.degree - a.degree;
       if (routeSort === 'confidence') return b.avgConfidence - a.avgConfidence || b.degree - a.degree;
       return b.degree - a.degree || b.debateCount - a.debateCount;
@@ -226,119 +210,56 @@ export function ArgumentMapView({
     onCapture: (topId) => report.current?.({ placement: topId ? { anchorId: topId } : null }),
   });
 
-  const stopReveal = useCallback(() => {
-    if (revealTimerRef.current != null) {
-      window.clearInterval(revealTimerRef.current);
-      revealTimerRef.current = null;
-    }
-  }, []);
-
-  // Drive the progressive unfold once a map is built: open the root, then one
-  // deeper level per tick. Stops as soon as the last level is open.
-  useEffect(() => {
-    stopReveal();
-    if (!map) {
-      setExpanded(new Set());
-      return;
-    }
-    const levels = expandableIdsByDepth(map.root);
-    setExpanded(new Set(levels[0] ?? []));
-    if (levels.length <= 1) return;
-    let level = 1;
-    revealTimerRef.current = window.setInterval(() => {
-      const ids = levels[level++] ?? [];
-      setExpanded((cur) => {
-        const next = new Set(cur);
-        for (const id of ids) next.add(id);
-        return next;
-      });
-      if (level >= levels.length) stopReveal();
-    }, 260);
-    return stopReveal;
-  }, [map, stopReveal]);
-
   const build = useCallback(async (explicitSeed?: string) => {
     const sid = explicitSeed ?? seedId;
     if (!sid) return;
     const candidate = suggestions.find((entry) => entry.ideaId === sid);
     const pickerIdea = ideaNodes.find((entry) => entry.global_id === sid);
     const label = (candidate?.label ?? pickerIdea?.label ?? search.trim()) || t('Idea');
-    setOpenArgumentMap({ ideaId: sid, label, mode });
+    const key = `${mode}:${sid}`;
+    const existing = openArgumentMaps.find((tab) => tab.key === key);
+    if (existing && !existing.error) {
+      setActiveMapKey(key);
+      setSurface('map');
+      return;
+    }
+    const tab: ArgumentMapTabState = { key, ideaId: sid, label, mode, map: null, building: true, error: null };
+    setOpenArgumentMaps((current) => existing
+      ? current.map((open) => open.key === key ? tab : open)
+      : [...current, tab]
+    );
+    setActiveMapKey(key);
     setSurface('map');
-    setBuilding(true);
-    setError(null);
-    setMap(null);
-    setIdeaDetail(null);
-    setEdgeDetail(null);
-    setDetailLoading(null);
     try {
       const result = await window.nodus.buildArgumentMap({ seedIdeaId: sid, model, mode });
-      // The unfold effect seeds `expanded` from the new map.
-      setMap(result);
+      setOpenArgumentMaps((current) => current.map((open) => (
+        open.key === key ? { ...open, map: result, building: false } : open
+      )));
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
-    } finally {
-      setBuilding(false);
+      const message = e instanceof Error ? e.message : String(e);
+      setOpenArgumentMaps((current) => current.map((open) => (
+        open.key === key ? { ...open, building: false, error: message } : open
+      )));
     }
-  }, [ideaNodes, mode, model, search, seedId, suggestions]);
+  }, [ideaNodes, mode, model, openArgumentMaps, search, seedId, suggestions]);
 
-  const closeMapTab = useCallback(() => {
-    stopReveal();
-    setSurface('catalog');
-    setOpenArgumentMap(null);
-    setMap(null);
-    setError(null);
-    detailSeqRef.current++;
-    setIdeaDetail(null);
-    setEdgeDetail(null);
-    setDetailLoading(null);
-  }, [stopReveal]);
+  const closeMapTab = useCallback((key: string) => {
+    const closingIndex = openArgumentMaps.findIndex((tab) => tab.key === key);
+    if (closingIndex < 0) return;
+    const remaining = openArgumentMaps.filter((tab) => tab.key !== key);
+    setOpenArgumentMaps(remaining);
+    if (activeMapKey !== key) return;
 
-  const selectBlock = useCallback((block: ArgumentBlock) => {
-    if (!block.ideaId) return;
-    detailSeqRef.current++;
-    setIdeaDetail(null);
-    setEdgeDetail(null);
-    setDetailLoading({ kind: 'idea', id: block.ideaId, label: block.label, type: block.type });
-    const seq = detailSeqRef.current;
-    void window.nodus.getIdeaDetail(block.ideaId).then(
-      (d) => {
-        if (seq !== detailSeqRef.current) return;
-        setIdeaDetail(d);
-        setDetailLoading(null);
-      },
-      () => {
-        if (seq !== detailSeqRef.current) return;
-        setDetailLoading(null);
-      }
-    );
-  }, []);
-
-  // A manual toggle hands control to the user: the automatic unfold stops so it
-  // cannot reopen a branch the user just collapsed.
-  const toggleExpand = useCallback((id: string) => {
-    stopReveal();
-    setExpanded((cur) => {
-      const next = new Set(cur);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  }, [stopReveal]);
-
-  const closeDetail = () => {
-    detailSeqRef.current++;
-    setIdeaDetail(null);
-    setEdgeDetail(null);
-    setDetailLoading(null);
-  };
-
-  const changeDetailFont = (delta: number) => {
-    setDetailFontSize((v) => Math.min(DETAIL_MAX_FONT, Math.max(DETAIL_MIN_FONT, v + delta)));
-  };
+    const nextActive = remaining[Math.min(closingIndex, remaining.length - 1)] ?? null;
+    setActiveMapKey(nextActive?.key ?? null);
+    if (surface === 'map' && !nextActive) setSurface('catalog');
+  }, [activeMapKey, openArgumentMaps, surface]);
 
   const hasModel = !!model;
   const isAuto = mode === 'auto';
+  const selectedMapBuilding = seedId
+    ? openArgumentMaps.some((tab) => tab.key === `${mode}:${seedId}` && tab.building)
+    : false;
 
   return (
     <div data-testid="argument-map-workspace" className="flex h-full min-h-0 flex-col bg-white text-neutral-900 dark:bg-neutral-950 dark:text-neutral-100">
@@ -363,16 +284,19 @@ export function ArgumentMapView({
           >
             <Icon name="list" size={13} /> {t('Ideas')}
           </button>
-          {openArgumentMap && (
-            <div className={`flex h-9 min-w-0 shrink-0 items-center rounded-t-lg border border-b-0 ${surface === 'map' ? 'border-neutral-300 bg-neutral-50 text-neutral-900 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-100' : 'border-transparent text-neutral-500 hover:bg-neutral-100 hover:text-neutral-700 dark:hover:bg-neutral-900/60 dark:hover:text-neutral-300'}`}>
-              <button data-testid="argument-tab-map" className="flex h-full max-w-72 min-w-0 items-center gap-2 px-3 text-xs" onClick={() => setSurface('map')}>
-                <Icon name="layers" size={13} /><span className="truncate">{openArgumentMap.label}</span>
-              </button>
-              <button className="mr-1 grid h-6 w-6 shrink-0 place-items-center rounded hover:bg-neutral-200 dark:hover:bg-neutral-800" aria-label={t('Cerrar')} onClick={closeMapTab}>
-                <Icon name="x" size={11} />
-              </button>
-            </div>
-          )}
+          {openArgumentMaps.map((tab) => {
+            const active = surface === 'map' && activeMapKey === tab.key;
+            return (
+              <div key={tab.key} className={`flex h-9 min-w-0 shrink-0 items-center rounded-t-lg border border-b-0 ${active ? 'border-neutral-300 bg-neutral-50 text-neutral-900 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-100' : 'border-transparent text-neutral-500 hover:bg-neutral-100 hover:text-neutral-700 dark:hover:bg-neutral-900/60 dark:hover:text-neutral-300'}`}>
+                <button data-testid="argument-tab-map" data-map-key={tab.key} className="flex h-full max-w-72 min-w-0 items-center gap-2 px-3 text-xs" onClick={() => { setActiveMapKey(tab.key); setSurface('map'); }}>
+                  <Icon name="layers" size={13} /><span className="truncate">{tab.label}</span>
+                </button>
+                <button className="mr-1 grid h-6 w-6 shrink-0 place-items-center rounded hover:bg-neutral-200 dark:hover:bg-neutral-800" aria-label={`${t('Cerrar')}: ${tab.label}`} onClick={() => closeMapTab(tab.key)}>
+                  <Icon name="x" size={11} />
+                </button>
+              </div>
+            );
+          })}
         </div>
       </header>
 
@@ -470,8 +394,8 @@ export function ArgumentMapView({
                     <label className="uppercase tracking-wide text-neutral-500">{t('Modelo')}</label>
                     <ModelPicker settings={settings} value={model} onChange={setModel} compact />
                   </div>
-                  <button className="btn btn-primary gap-1.5" onClick={() => build()} disabled={!seedId || building || !hasModel} title={!hasModel ? t('Configura un modelo de IA en Ajustes') : t('Trazar el mapa de argumentos')}>
-                    <Icon name="map" /> {building ? t('Trazando…') : t('Trazar mapa')}
+                  <button className="btn btn-primary gap-1.5" onClick={() => build()} disabled={!seedId || selectedMapBuilding || !hasModel} title={!hasModel ? t('Configura un modelo de IA en Ajustes') : t('Trazar el mapa de argumentos')}>
+                    <Icon name="map" /> {selectedMapBuilding ? t('Trazando…') : t('Trazar mapa')}
                   </button>
                 </>
               )}
@@ -489,10 +413,10 @@ export function ArgumentMapView({
             </div>
           ) : (
             <div ref={routesScrollerRef} data-testid="argument-routes-table" className="min-h-0 flex-1 overflow-auto">
-              {error && <div className="m-4 flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:border-red-900/60 dark:bg-red-950/30 dark:text-red-400"><Icon name="alert" /> <span>{error}</span></div>}
+              {catalogError && <div className="m-4 flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:border-red-900/60 dark:bg-red-950/30 dark:text-red-400"><Icon name="alert" /> <span>{catalogError}</span></div>}
               {suggestionsLoading && suggestions.length === 0 ? (
                 <div className="grid h-48 place-items-center text-neutral-500"><Spinner label={t('Detectando recorridos…')} /></div>
-              ) : suggestions.length === 0 && !error ? (
+              ) : suggestions.length === 0 && !catalogError ? (
                 <div className="grid h-48 place-items-center p-8 text-center text-sm text-neutral-500"><div><Icon name="map" size={32} className="mx-auto text-neutral-300 dark:text-neutral-700" /><p className="mt-3">{t('No hay ideas conectadas todavía. Analiza tus obras (escaneo profundo) para que el grafo genere conexiones entre ideas.')}</p></div></div>
               ) : (
                 <div className="min-w-[1120px]">
@@ -540,31 +464,128 @@ export function ArgumentMapView({
           )}
         </section>
 
-        {openArgumentMap && (
-          <section className={surface === 'map' ? 'flex h-full min-h-0' : 'hidden'}>
-            <div className="min-w-0 flex-1 overflow-y-auto p-4">
-              {error && <div className="card flex items-start gap-2 p-4 text-sm text-red-400"><Icon name="alert" /> <span>{error}</span></div>}
-              {building && !map && <div className="flex h-full flex-col items-center justify-center gap-3 text-neutral-500"><Spinner label={openArgumentMap.mode === 'auto' ? t('Construyendo el esquema…') : t('El modelo está trazando el esquema de argumentos…')} /></div>}
-              {map && (
-                <div className="mx-auto max-w-4xl">
-                  <div className="card mb-4 bg-neutral-900/60 p-4">
-                    <div className="mb-1 flex flex-wrap items-center gap-2 text-xs text-neutral-500">
-                      <Icon name="map" size={14} /> {t('Mapa desde')} <span className="text-neutral-300">{map.seedLabel}</span>
-                      <span>· {tx('{n} ideas', { n: map.ideaCount })}</span>
-                      {map.truncated && <span className="text-amber-500">· {t('subgrafo recortado')}</span>}
-                      <span className="text-neutral-600">· {openArgumentMap.mode === 'auto' ? t('modo automático') : t('modo IA')}</span>
-                    </div>
-                    {map.overview && <p className="text-sm leading-relaxed text-neutral-300">{map.overview}</p>}
-                  </div>
-                  <BlockTree block={map.root} depth={0} expanded={expanded} onToggle={toggleExpand} onSelect={selectBlock} />
-                </div>
-              )}
-            </div>
-            {(ideaDetail || edgeDetail || detailLoading) && <NodeDetailPanel ideaDetail={ideaDetail} edgeDetail={edgeDetail} loading={detailLoading} width={detailWidth} fontSize={detailFontSize} onWidthChange={setDetailWidth} onFontChange={changeDetailFont} onClose={closeDetail} />}
-          </section>
-        )}
+        {openArgumentMaps.map((tab) => (
+          <ArgumentMapTab key={tab.key} tab={tab} active={surface === 'map' && activeMapKey === tab.key} />
+        ))}
       </main>
     </div>
+  );
+}
+
+function ArgumentMapTab({ tab, active }: { tab: ArgumentMapTabState; active: boolean }) {
+  // Every open map owns its reveal and detail state. Keeping this inside the tab is
+  // what makes switching maps preserve the exact branches and side panel the reader
+  // was using in each one.
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const revealTimerRef = useRef<number | null>(null);
+  const [ideaDetail, setIdeaDetail] = useState<IdeaDetail | null>(null);
+  const [edgeDetail, setEdgeDetail] = useState<EdgeDetail | null>(null);
+  const [detailLoading, setDetailLoading] = useState<DetailLoading | null>(null);
+  const detailSeqRef = useRef(0);
+  const [detailWidth, setDetailWidth] = useState(() => loadNumber(DETAIL_WIDTH_KEY, DETAIL_DEFAULT_WIDTH, DETAIL_MIN_WIDTH, DETAIL_MAX_WIDTH));
+  const [detailFontSize, setDetailFontSize] = useState(() => loadNumber(DETAIL_FONT_KEY, DETAIL_DEFAULT_FONT, DETAIL_MIN_FONT, DETAIL_MAX_FONT));
+
+  const stopReveal = useCallback(() => {
+    if (revealTimerRef.current != null) {
+      window.clearInterval(revealTimerRef.current);
+      revealTimerRef.current = null;
+    }
+  }, []);
+
+  useEffect(() => {
+    localStorage.setItem(DETAIL_WIDTH_KEY, String(detailWidth));
+  }, [detailWidth]);
+  useEffect(() => {
+    localStorage.setItem(DETAIL_FONT_KEY, String(detailFontSize));
+  }, [detailFontSize]);
+
+  // Drive the progressive unfold once this map is built: open the root, then one
+  // deeper level per tick. A different tab has a different timer and expanded set.
+  useEffect(() => {
+    stopReveal();
+    if (!tab.map) {
+      setExpanded(new Set());
+      return;
+    }
+    const levels = expandableIdsByDepth(tab.map.root);
+    setExpanded(new Set(levels[0] ?? []));
+    if (levels.length <= 1) return;
+    let level = 1;
+    revealTimerRef.current = window.setInterval(() => {
+      const ids = levels[level++] ?? [];
+      setExpanded((current) => {
+        const next = new Set(current);
+        for (const id of ids) next.add(id);
+        return next;
+      });
+      if (level >= levels.length) stopReveal();
+    }, 260);
+    return stopReveal;
+  }, [stopReveal, tab.map]);
+
+  const selectBlock = useCallback((block: ArgumentBlock) => {
+    if (!block.ideaId) return;
+    detailSeqRef.current++;
+    setIdeaDetail(null);
+    setEdgeDetail(null);
+    setDetailLoading({ kind: 'idea', id: block.ideaId, label: block.label, type: block.type });
+    const seq = detailSeqRef.current;
+    void window.nodus.getIdeaDetail(block.ideaId).then(
+      (detail) => {
+        if (seq !== detailSeqRef.current) return;
+        setIdeaDetail(detail);
+        setDetailLoading(null);
+      },
+      () => {
+        if (seq !== detailSeqRef.current) return;
+        setDetailLoading(null);
+      }
+    );
+  }, []);
+
+  const toggleExpand = useCallback((id: string) => {
+    stopReveal();
+    setExpanded((current) => {
+      const next = new Set(current);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }, [stopReveal]);
+
+  const closeDetail = () => {
+    detailSeqRef.current++;
+    setIdeaDetail(null);
+    setEdgeDetail(null);
+    setDetailLoading(null);
+  };
+
+  const changeDetailFont = (delta: number) => {
+    setDetailFontSize((value) => Math.min(DETAIL_MAX_FONT, Math.max(DETAIL_MIN_FONT, value + delta)));
+  };
+
+  return (
+    <section className={active ? 'flex h-full min-h-0' : 'hidden'}>
+      <div className="min-w-0 flex-1 overflow-y-auto p-4">
+        {tab.error && <div className="card flex items-start gap-2 p-4 text-sm text-red-400"><Icon name="alert" /> <span>{tab.error}</span></div>}
+        {tab.building && !tab.map && <div className="flex h-full flex-col items-center justify-center gap-3 text-neutral-500"><Spinner label={tab.mode === 'auto' ? t('Construyendo el esquema…') : t('El modelo está trazando el esquema de argumentos…')} /></div>}
+        {tab.map && (
+          <div className="mx-auto max-w-4xl">
+            <div className="card mb-4 bg-neutral-900/60 p-4">
+              <div className="mb-1 flex flex-wrap items-center gap-2 text-xs text-neutral-500">
+                <Icon name="map" size={14} /> {t('Mapa desde')} <span className="text-neutral-300">{tab.map.seedLabel}</span>
+                <span>· {tx('{n} ideas', { n: tab.map.ideaCount })}</span>
+                {tab.map.truncated && <span className="text-amber-500">· {t('subgrafo recortado')}</span>}
+                <span className="text-neutral-600">· {tab.mode === 'auto' ? t('modo automático') : t('modo IA')}</span>
+              </div>
+              {tab.map.overview && <p className="text-sm leading-relaxed text-neutral-300">{tab.map.overview}</p>}
+            </div>
+            <BlockTree block={tab.map.root} depth={0} expanded={expanded} onToggle={toggleExpand} onSelect={selectBlock} />
+          </div>
+        )}
+      </div>
+      {(ideaDetail || edgeDetail || detailLoading) && <NodeDetailPanel ideaDetail={ideaDetail} edgeDetail={edgeDetail} loading={detailLoading} width={detailWidth} fontSize={detailFontSize} onWidthChange={setDetailWidth} onFontChange={changeDetailFont} onClose={closeDetail} />}
+    </section>
   );
 }
 

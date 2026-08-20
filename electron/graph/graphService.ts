@@ -87,9 +87,9 @@ const STOPWORDS = new Set([
 
 interface IdeaRow {
   global_id: string;
-  type: IdeaType;
-  label: string;
-  statement: string;
+  type: IdeaType | null;
+  label: string | null;
+  statement: string | null;
   created_at: string;
 }
 
@@ -184,10 +184,10 @@ export async function buildIdeaGraph(): Promise<GraphData> {
     const agg = ideaAggById.get(idea.global_id);
     return {
       id: idea.global_id,
-      label: idea.label,
-      type: idea.type,
+      label: idea.label ?? idea.global_id,
+      type: idea.type ?? 'claim',
       createdAt: idea.created_at,
-      statement: idea.statement,
+      statement: idea.statement ?? '',
       workCount: agg?.works.size ?? 0,
       workIds: agg ? Array.from(agg.works) : [],
       read: agg ? agg.works.size > 0 && !agg.unread : false,
@@ -426,10 +426,10 @@ function loadBoundedIdeaNodes(ideaIds: string[], memberships: ThemeMembership): 
     const aggregate = aggregates.get(idea.global_id);
     return {
       id: idea.global_id,
-      label: idea.label,
-      type: idea.type,
+      label: idea.label ?? idea.global_id,
+      type: idea.type ?? 'claim',
       createdAt: idea.created_at,
-      statement: idea.statement,
+      statement: idea.statement ?? '',
       workCount: aggregate?.works.size ?? 0,
       workIds: aggregate ? [...aggregate.works] : [],
       read: Boolean(aggregate?.works.size) && !aggregate?.unread,

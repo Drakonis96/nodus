@@ -4,30 +4,45 @@ import type { IpcContext } from './context';
 import crypto from 'node:crypto';
 import { withVaultDatabase } from '../db/database';
 import * as dbMode from '../db/databasesRepo';
+import * as taskMode from '../db/databaseTasksRepo';
+import * as automationMode from '../db/databaseAutomationsRepo';
 import * as databaseChatHistory from '../db/databaseChatRepo';
 import { runAiCell, runAiColumn } from '../ai/databaseAiColumn';
 import { runAiImageCell, runAiImageColumn } from '../ai/databaseAiImageColumn';
 import { getDatabaseProfile, generateAnalysisReport, suggestDatabaseAnalyses, runDatabaseAnalysis, narrateAnalysisResult } from '../ai/databaseAnalysis';
 import type { AnalysisRequest, AnalysisResult } from '@shared/analysisSpec';
 import { streamDatabaseChat, DatabaseChatRequest } from '../ai/databaseChat';
-import { exportDatabase } from '../export/databaseExport';
+import { databaseExportDescriptor, exportDatabaseToFile } from '../export/databaseExport';
 import type { ExportFormat } from '@shared/databaseExport';
 import { parseCsv, detectDelimiter } from '../extraction/tabular';
 import { buildCsvImportPlan } from '@shared/databaseCsv';
 import { matchFilesToRows, codeTemplateToRegex, BulkAttachOptions } from '@shared/databaseBulk';
 import { makeThumbnail } from '../db/attachmentThumb';
 import { yieldToEventLoop, YIELD_EVERY } from '../util/async';
-import type { DatabaseColumnConfig, DatabaseColumnType, RelationTargetKind } from '@shared/databases';
-import type { SavedViewInput } from '@shared/databaseFilters';
+import type { DatabaseColumnConfig, DatabaseColumnType, DatabaseSelectOption, RelationTargetKind } from '@shared/databases';
+import type { SavedViewInput, SavedViewPatch } from '@shared/databaseFilters';
+import type { DatabaseRowQuery, DatabaseRowSearchQuery } from '@shared/databaseQuery';
+import type { DatabaseAggregateQuery, DatabaseBulkEditInput } from '@shared/databaseTableOps';
+import type { DatabaseTemporalQuery, DatabaseTemporalRangeUpdate } from '@shared/databaseTemporal';
+import type { DatabaseChartExportInput, DatabaseChartQuery, DatabaseFeedQuery, DatabaseMapQuery } from '@shared/databaseVisualization';
+import type { AttachDatabaseViewSourceInput, DatabaseContainerRowQuery } from '@shared/databaseSources';
+import type { CreateDatabaseRowTemplateInput, DatabaseDuplicateRowInput, DatabaseSprintState, DatabaseTaskConfig } from '@shared/databaseTasks';
+import type { CreateAutomationRuleInput, CreateFormDefinitionInput } from '@shared/databaseAutomations';
+import { databaseFormPublicUrl, databaseFormServerStatus } from '../automation/formServer';
 import path from 'node:path';
 import fs from 'node:fs';
 import { dialog } from 'electron';
 import { showImportOpenDialog } from '../privacy';
 import { getSettings } from '../db/settingsRepo';
+import { cancelDatabaseCalculation, getDatabaseCalculationStatus, startDatabaseCalculation } from '../db/databaseComputeHost';
+import { aggregateDatabaseRowsInWorker } from '../db/databaseAggregateHost';
 import { extractFromPath } from '../extraction/textExtractor';
 import { getActiveVault } from '../vaults/vaultRegistry';
 import { analyzeImageBytes } from '../ai/imageAnalysis';
 import { isVisionMime } from '@shared/imageAnalysis';
+import { importNotionZip } from '../import/notionZipImport';
+import { getQaDatabaseScaleFixtureStatus, startQaDatabaseScaleFixture } from '../qa/databaseScaleFixtureHost';
+import type { QaDatabaseScaleFixtureInput } from '@shared/databaseScaleQa';
 
 /**
  * Rows of the CSV the import modal is currently showing, kept out of the renderer: a real
@@ -71,6 +86,7 @@ export function registerDatabasesIpc({ h, getWindow, chatAborters }: IpcContext)
   h('db:list', async () => dbMode.listDatabases());
   h('db:search', async (_e, query: string, includeContent: boolean) => dbMode.searchDatabases(query, includeContent));
   h('db:searchRows', async (_e, query: string, limit?: number) => dbMode.searchDatabaseRows(query, limit));
+  h('db:searchRowsPage', async (_e, input: DatabaseRowSearchQuery) => dbMode.searchDatabaseRowsPage(input));
   h('db:get', async (_e, id: string) => dbMode.getDatabase(id));
   h('db:detail', async (_e, id: string) => dbMode.getDatabaseDetail(id));
   h('db:stats', async (_e, id: string) => dbMode.databaseStats(id));
@@ -95,10 +111,15 @@ export function registerDatabasesIpc({ h, getWindow, chatAborters }: IpcContext)
   h('db:reorderColumns', async (_e, databaseId: string, ids: string[]) => {
     dbMode.reorderColumns(databaseId, ids);
   });
-  h('db:addOption', async (_e, columnId: string, label: string, color?: string | null) =>
-    dbMode.addOption(columnId, label, color ?? null)
+  h('db:addOption', async (
+    _e, columnId: string, label: string, color?: string | null,
+    group?: DatabaseSelectOption['group'],
+  ) => dbMode.addOption(columnId, label, color ?? null, group ?? null)
   );
-  h('db:updateOption', async (_e, id: string, patch: { label?: string; color?: string | null }) => {
+  h('db:updateOption', async (
+    _e, id: string,
+    patch: { label?: string; color?: string | null; group?: DatabaseSelectOption['group'] },
+  ) => {
     dbMode.updateOption(id, patch);
   });
   h('db:deleteOption', async (_e, id: string) => {
@@ -110,12 +131,122 @@ export function registerDatabasesIpc({ h, getWindow, chatAborters }: IpcContext)
   h('db:listRows', async (_e, databaseId: string, opts?: { sort?: dbMode.DatabaseRowSort; limit?: number; offset?: number }) =>
     dbMode.listRows(databaseId, opts ?? {})
   );
+  h('db:queryRows', async (_e, input: DatabaseRowQuery) => dbMode.queryDatabaseRows(input));
+  h('qa:db:startScaleFixture', async (_e, input: QaDatabaseScaleFixtureInput) =>
+    startQaDatabaseScaleFixture(input, (progress) => getWindow()?.webContents.send('qa:db:scaleFixtureProgress', progress)));
+  h('qa:db:scaleFixtureStatus', async (_e, jobId: string) => getQaDatabaseScaleFixtureStatus(jobId));
+  h('db:listDataSources', async () => dbMode.listDatabaseDataSources());
+  h('db:getContainer', async (_e, viewId: string) => dbMode.getDatabaseContainer(viewId));
+  h('db:listViewSources', async (_e, viewId: string) => dbMode.listDatabaseViewSources(viewId));
+  h('db:attachViewSource', async (_e, viewId: string, databaseId: string, input?: AttachDatabaseViewSourceInput) =>
+    dbMode.attachDatabaseViewSource(viewId, databaseId, input ?? {}));
+  h('db:detachViewSource', async (_e, viewId: string, sourceId: string) => dbMode.detachDatabaseViewSource(viewId, sourceId));
+  h('db:queryContainerRows', async (_e, input: DatabaseContainerRowQuery) => dbMode.queryDatabaseContainerRows(input));
+  h('db:recalculate', async (_e, databaseId: string) => {
+    const vault = getActiveVault();
+    if (!dbMode.getDatabase(databaseId)) throw new Error('Base de datos no encontrada.');
+    return startDatabaseCalculation(vault.path, databaseId, (progress) => {
+      getWindow()?.webContents.send('db:calculationProgress', progress);
+    });
+  });
+  h('db:calculationStatus', async (_e, databaseId: string) => getDatabaseCalculationStatus(databaseId));
+  h('db:cancelCalculation', async (_e, jobId: string) => cancelDatabaseCalculation(jobId));
   h('db:getRow', async (_e, id: string) => dbMode.getRow(id));
-  h('db:createRow', async (_e, databaseId: string) => dbMode.createRow(databaseId));
+  h('db:createRow', async (_e, databaseId: string) => {
+    const row = dbMode.createRow(databaseId);
+    await automationMode.dispatchAutomationEvent({
+      type: 'row_created', databaseId, rowId: row.id, eventKey: `row-created:${row.id}`,
+    });
+    return dbMode.getRow(row.id) ?? row;
+  });
   h('db:deleteRow', async (_e, id: string) => {
     dbMode.deleteRow(id);
   });
-  h('db:setCell', async (_e, rowId: string, columnId: string, raw: string | null) => dbMode.setCell(rowId, columnId, raw));
+  h('db:listRowTemplates', async (_e, databaseId: string) => taskMode.listDatabaseRowTemplates(databaseId));
+  h('db:createRowTemplate', async (_e, databaseId: string, input: CreateDatabaseRowTemplateInput) => taskMode.createDatabaseRowTemplate(databaseId, input));
+  h('db:deleteRowTemplate', async (_e, templateId: string) => taskMode.deleteDatabaseRowTemplate(templateId));
+  h('db:instantiateRowTemplate', async (_e, templateId: string, occurrenceKey?: string | null) => taskMode.instantiateDatabaseRowTemplate(templateId, occurrenceKey ?? null));
+  h('db:runDueRowTemplates', async (_e, at?: string, limit?: number) => taskMode.runDueDatabaseRowTemplates(at, limit));
+  h('db:duplicateRow', async (_e, input: DatabaseDuplicateRowInput) => taskMode.duplicateDatabaseRow(input));
+  h('db:listRowHierarchy', async (_e, databaseId: string, limit?: number) => taskMode.listDatabaseRowHierarchy(databaseId, limit));
+  h('db:setSubitemParent', async (_e, rowId: string, parentRowId: string | null) => taskMode.setDatabaseSubitemParent(rowId, parentRowId));
+  h('db:setSubitemCollapsed', async (_e, rowId: string, collapsed: boolean) => taskMode.setDatabaseSubitemCollapsed(rowId, collapsed));
+  h('db:listRowDependencies', async (_e, databaseId: string) => taskMode.listDatabaseRowDependencies(databaseId));
+  h('db:addRowDependency', async (_e, predecessorRowId: string, successorRowId: string, lagDays?: number) => taskMode.addDatabaseRowDependency(predecessorRowId, successorRowId, lagDays));
+  h('db:removeRowDependency', async (_e, id: string) => taskMode.removeDatabaseRowDependency(id));
+  h('db:getTaskConfig', async (_e, databaseId: string) => taskMode.getDatabaseTaskConfig(databaseId));
+  h('db:updateTaskConfig', async (_e, databaseId: string, patch: Partial<Omit<DatabaseTaskConfig, 'databaseId' | 'revision' | 'updatedAt'>>) => taskMode.updateDatabaseTaskConfig(databaseId, patch));
+  h('db:shiftTaskDates', async (_e, rowId: string, deltaDays: number) => taskMode.shiftDatabaseTaskDates(rowId, deltaDays));
+  h('db:listSprints', async (_e, databaseId: string) => taskMode.listDatabaseSprints(databaseId));
+  h('db:createSprint', async (_e, databaseId: string, input: { name: string; startAt: string; endAt: string }) => taskMode.createDatabaseSprint(databaseId, input));
+  h('db:updateSprintState', async (_e, sprintId: string, state: DatabaseSprintState) => taskMode.updateDatabaseSprintState(sprintId, state));
+  h('db:assignRowToSprint', async (_e, sprintId: string, rowId: string) => taskMode.assignDatabaseRowToSprint(sprintId, rowId));
+  h('db:listAutomationRules', async (_e, databaseId: string) => automationMode.listAutomationRules(databaseId));
+  h('db:createAutomationRule', async (_e, databaseId: string, input: CreateAutomationRuleInput) => automationMode.createAutomationRule(databaseId, input));
+  h('db:updateAutomationRule', async (_e, ruleId: string, patch: Partial<CreateAutomationRuleInput>, expectedRevision: number) => automationMode.updateAutomationRule(ruleId, patch, expectedRevision));
+  h('db:deleteAutomationRule', async (_e, ruleId: string, expectedRevision: number) => automationMode.deleteAutomationRule(ruleId, expectedRevision));
+  h('db:runAutomationRule', async (_e, ruleId: string, rowId?: string | null, eventKey?: string) => automationMode.runAutomationRule(ruleId, rowId ?? null, eventKey));
+  h('db:runButtonAutomation', async (_e, columnId: string, rowId: string) => automationMode.runDatabaseButtonAutomation(columnId, rowId));
+  h('db:runDueAutomations', async (_e, at?: string, limit?: number) => automationMode.runDueAutomationRules(at, limit));
+  h('db:listAutomationRuns', async (_e, databaseId: string, limit?: number) => automationMode.listAutomationRuns(databaseId, limit));
+  h('db:listAutomationNotifications', async (_e, databaseId: string, limit?: number) => automationMode.listAutomationNotifications(databaseId, limit));
+  h('db:listForms', async (_e, databaseId: string) => automationMode.listDatabaseForms(databaseId));
+  h('db:createForm', async (_e, databaseId: string, input: CreateFormDefinitionInput) => automationMode.createDatabaseForm(databaseId, input));
+  h('db:updateForm', async (_e, formId: string, input: CreateFormDefinitionInput, expectedRevision: number) => automationMode.updateDatabaseForm(formId, input, expectedRevision));
+  h('db:deleteForm', async (_e, formId: string, expectedRevision: number) => automationMode.deleteDatabaseForm(formId, expectedRevision));
+  h('db:listFormSubmissions', async (_e, formId: string, limit?: number) => automationMode.listDatabaseFormSubmissions(formId, limit));
+  h('db:formServerStatus', async () => databaseFormServerStatus());
+  h('db:formPublicUrl', async (_e, slug: string) => databaseFormPublicUrl(slug));
+  h('db:setCell', async (_e, rowId: string, columnId: string, raw: string | null) => {
+    const row = dbMode.setCell(rowId, columnId, raw);
+    if (row) await automationMode.dispatchAutomationEvent({
+      type: 'property_changed', databaseId: row.databaseId, rowId, columnId,
+      eventKey: `property-changed:${rowId}:${columnId}:${crypto.randomUUID()}`,
+    });
+    return dbMode.getRow(rowId) ?? row;
+  });
+  h('db:setCellsBulk', async (_e, input: DatabaseBulkEditInput) => {
+    const result = dbMode.setCellsBulk(input);
+    for (const change of input.changes) {
+      await automationMode.dispatchAutomationEvent({
+        type: 'property_changed', databaseId: input.databaseId, rowId: change.rowId, columnId: change.columnId,
+        eventKey: `bulk-property-changed:${change.rowId}:${change.columnId}:${crypto.randomUUID()}`,
+      });
+    }
+    return { ...result, rows: result.rows.map((row) => dbMode.getRow(row.id) ?? row) };
+  });
+  h('db:aggregateRows', async (_e, input: DatabaseAggregateQuery) => {
+    const vault = getActiveVault();
+    if (!dbMode.getDatabase(input.databaseId)) throw new Error('Base de datos no encontrada.');
+    return aggregateDatabaseRowsInWorker(vault.path, input);
+  });
+  h('db:queryTemporalEvents', async (_e, input: DatabaseTemporalQuery) => dbMode.queryDatabaseTemporalEvents(input));
+  h('db:updateTemporalRange', async (_e, input: DatabaseTemporalRangeUpdate) => dbMode.updateDatabaseTemporalRange(input));
+  h('db:queryChart', async (_e, input: DatabaseChartQuery) => dbMode.queryDatabaseChart(input));
+  h('db:queryMap', async (_e, input: DatabaseMapQuery) => dbMode.queryDatabaseMap(input));
+  h('db:queryFeed', async (_e, input: DatabaseFeedQuery) => dbMode.queryDatabaseFeed(input));
+  h('db:exportChart', async (_e, input: DatabaseChartExportInput) => {
+    if (!input || typeof input.svg !== 'string' || input.svg.length > 5_000_000 || !/^<svg[\s>]/i.test(input.svg.trim())
+      || /<script\b|\son\w+\s*=|(?:href|src)\s*=\s*["']https?:/i.test(input.svg)) throw new Error('SVG de gráfico no válido.');
+    if (input.format !== 'svg' && input.format !== 'png') throw new Error('Formato de gráfico no válido.');
+    if (!dbMode.getDatabase(input.databaseId)) throw new Error('Base de datos no encontrada.');
+    const baseName = (input.title || 'grafico').normalize('NFKD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9_-]+/gi, '-').replace(/^-|-$/g, '').slice(0, 80) || 'grafico';
+    const fileName = `${baseName}.${input.format}`;
+    const qaExportDir = process.env.NODUS_QA_EXPORT_DIR;
+    let filePath: string | null = null;
+    if (qaExportDir) {
+      const qaRoot = process.env.NODUS_QA_ROOT; const relative = qaRoot ? path.relative(path.resolve(qaRoot), path.resolve(qaExportDir)) : '..';
+      if (!qaRoot || relative === '..' || relative.startsWith(`..${path.sep}`) || path.isAbsolute(relative)) throw new Error('QA abortado: la exportación está fuera del directorio autorizado.');
+      fs.mkdirSync(qaExportDir, { recursive: true }); filePath = path.join(qaExportDir, fileName);
+    } else {
+      const picked = await dialog.showSaveDialog(getWindow() ?? undefined!, { title: 'Exportar gráfico', defaultPath: fileName,
+        filters: [{ name: input.format.toUpperCase(), extensions: [input.format] }] });
+      if (picked.canceled || !picked.filePath) return { canceled: true, path: null }; filePath = picked.filePath;
+    }
+    if (input.format === 'svg') fs.writeFileSync(filePath, input.svg, 'utf8');
+    else { const sharp = (await import('sharp')).default; await sharp(Buffer.from(input.svg)).png().toFile(filePath); }
+    return { canceled: false, path: filePath };
+  });
   h('db:runComparisonCell', async (_e, rowId: string, columnId: string) => {
     const vaultId = getActiveVault().id;
     return withVaultDatabase(vaultId, () => dbMode.runComparisonCell(rowId, columnId));
@@ -316,6 +447,26 @@ export function registerDatabasesIpc({ h, getWindow, chatAborters }: IpcContext)
   h('db:releaseCsvImport', async (_e, token: string) => {
     pendingCsvImports.delete(token);
   });
+  h('db:importNotionZip', async () => {
+    const qaPath = process.env.NODUS_QA_NOTION_ZIP;
+    let filePath: string | null = null;
+    if (qaPath) {
+      const qaRoot = process.env.NODUS_QA_ROOT;
+      const relative = qaRoot ? path.relative(path.resolve(qaRoot), path.resolve(qaPath)) : '..';
+      if (!qaRoot || relative === '..' || relative.startsWith(`..${path.sep}`) || path.isAbsolute(relative)) {
+        throw new Error('QA abortado: el ZIP de Notion está fuera del directorio autorizado.');
+      }
+      filePath = path.resolve(qaPath);
+    } else {
+      const picked = await showImportOpenDialog(getWindow() ?? undefined!, {
+        title: 'Importar exportación de Notion', properties: ['openFile'],
+        filters: [{ name: 'Notion ZIP', extensions: ['zip'] }],
+      });
+      if (picked.canceled || picked.filePaths.length === 0) return null;
+      filePath = picked.filePaths[0];
+    }
+    return importNotionZip(filePath);
+  });
   h('db:createFromCsvToken', async (_e, token: string, name: string, types: (DatabaseColumnType | null)[]) => {
     const pending = pendingCsvImports.get(token);
     if (!pending) throw new Error('El CSV importado ya no está disponible. Vuelve a elegir el archivo.');
@@ -331,13 +482,28 @@ export function registerDatabasesIpc({ h, getWindow, chatAborters }: IpcContext)
     dbMode.createDatabaseFromCsv(name, headers, rows, types)
   );
   h('db:export', async (_e, databaseId: string, format: ExportFormat) => {
-    const result = exportDatabase(databaseId, format);
-    if (!result) return { canceled: true };
+    const descriptor = databaseExportDescriptor(databaseId, format);
+    if (!descriptor) return { canceled: true };
+    // Real E2E runs cannot operate a native save sheet reliably. The QA-only path is
+    // still the production serializer and IPC handler; it merely replaces the picker
+    // with a fail-closed destination under the isolated profile.
+    const qaExportDir = process.env.NODUS_QA_EXPORT_DIR;
+    if (qaExportDir) {
+      const qaRoot = process.env.NODUS_QA_ROOT;
+      const relative = qaRoot ? path.relative(path.resolve(qaRoot), path.resolve(qaExportDir)) : '..';
+      if (!qaRoot || relative === '..' || relative.startsWith(`..${path.sep}`) || path.isAbsolute(relative)) {
+        throw new Error('QA abortado: la exportación está fuera del directorio autorizado.');
+      }
+      fs.mkdirSync(qaExportDir, { recursive: true });
+      const filePath = path.join(qaExportDir, descriptor.fileName);
+      const metrics = await exportDatabaseToFile(databaseId, format, filePath);
+      return { canceled: false, path: filePath, metrics };
+    }
     const win = getWindow();
-    const picked = await dialog.showSaveDialog(win ?? undefined!, { title: 'Exportar base de datos', defaultPath: result.fileName });
+    const picked = await dialog.showSaveDialog(win ?? undefined!, { title: 'Exportar base de datos', defaultPath: descriptor.fileName });
     if (picked.canceled || !picked.filePath) return { canceled: true };
-    fs.writeFileSync(picked.filePath, result.content);
-    return { canceled: false, path: picked.filePath };
+    const metrics = await exportDatabaseToFile(databaseId, format, picked.filePath);
+    return { canceled: false, path: picked.filePath, metrics };
   });
   h('db:profile', async (_e, databaseId: string) => getDatabaseProfile(databaseId));
   h('db:analyzeReport', async (_e, databaseId: string) => {
@@ -372,7 +538,13 @@ export function registerDatabasesIpc({ h, getWindow, chatAborters }: IpcContext)
   h('db:chatHistory:delete', async (_e, id: string) => databaseChatHistory.deleteDatabaseChatConversation(id));
   h('db:listViews', async (_e, databaseId: string) => dbMode.listViews(databaseId));
   h('db:createView', async (_e, databaseId: string, input: SavedViewInput) => dbMode.createView(databaseId, input));
-  h('db:updateView', async (_e, id: string, patch: Partial<SavedViewInput>) => dbMode.updateView(id, patch));
+  h('db:updateView', async (_e, id: string, patch: SavedViewPatch) => dbMode.updateView(id, patch));
+  h('db:duplicateView', async (_e, id: string, name?: string) => dbMode.duplicateView(id, name));
+  h('db:linkView', async (_e, id: string, name?: string, scope?: 'personal' | 'shared') => dbMode.linkView(id, name, scope));
+  h('db:reorderViews', async (_e, databaseId: string, ids: string[]) => dbMode.reorderViews(databaseId, ids));
+  h('db:listViewRevisions', async (_e, id: string) => dbMode.listViewRevisions(id));
+  h('db:restoreViewRevision', async (_e, id: string, revision: number, expectedRevision?: number) =>
+    dbMode.restoreViewRevision(id, revision, expectedRevision));
   h('db:deleteView', async (_e, id: string) => {
     dbMode.deleteView(id);
   });
@@ -383,6 +555,10 @@ export function registerDatabasesIpc({ h, getWindow, chatAborters }: IpcContext)
   h('db:removeRelation', async (_e, id: string) => {
     dbMode.removeRelation(id);
   });
+  h('db:repairRelation', async (_e, id: string, targetId: string, targetVaultId?: string | null) =>
+    dbMode.repairRelation(id, targetId, targetVaultId ?? null)
+  );
+  h('db:cleanupBrokenRelations', async (_e, databaseId: string) => dbMode.cleanupBrokenRelations(databaseId));
   h('db:searchRelationTargets', async (_e, kind: RelationTargetKind, query: string, databaseId?: string) =>
     dbMode.searchRelationTargets(kind, query, { databaseId })
   );

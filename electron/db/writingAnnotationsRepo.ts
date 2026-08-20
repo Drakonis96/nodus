@@ -4,6 +4,7 @@ import type {
   WritingDraftAnnotationColor,
   WritingDraftAnnotationInput,
 } from '@shared/types';
+import { immersionSessionIdFromAnnotationDocument } from '@shared/readerAnnotations';
 import { getDb } from './database';
 
 interface WritingDraftAnnotationRow {
@@ -112,8 +113,11 @@ export function listWritingDraftAnnotations(draftId: string): WritingDraftAnnota
 
 export function createWritingDraftAnnotation(input: WritingDraftAnnotationInput): WritingDraftAnnotation {
   const db = getDb();
-  const report = db.prepare('SELECT 1 FROM writing_saved_drafts WHERE id = ?').get(input.draftId);
-  if (!report) throw new Error('El informe ya no existe.');
+  const immersionId = immersionSessionIdFromAnnotationDocument(input.draftId);
+  const parent = immersionId
+    ? db.prepare('SELECT 1 FROM immersion_sessions WHERE id = ?').get(immersionId)
+    : db.prepare('SELECT 1 FROM writing_saved_drafts WHERE id = ?').get(input.draftId);
+  if (!parent) throw new Error('El contenido anotado ya no existe.');
   const value = normalizedInput(input);
   // One bookmark per rendering. Both clients derive the same row id, so moving it
   // offline on two devices converges through the ordinary newest-wins merge instead

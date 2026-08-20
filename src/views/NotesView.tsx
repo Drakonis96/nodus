@@ -446,11 +446,11 @@ export function NotesView({
     else if (scope.kind === 'unfiled') list = notes.filter((n) => !n.folderId);
     else list = notes.filter((n) => n.folderId === scope.id);
     const q = search.trim().toLowerCase();
-    if (q) list = list.filter((n) => n.title.toLowerCase().includes(q) || n.content.toLowerCase().includes(q));
+    if (q) list = list.filter((n) => (n.title ?? '').toLowerCase().includes(q) || (n.content ?? '').toLowerCase().includes(q));
     const sorted = [...list];
     switch (sortMode) {
       case 'alpha':
-        sorted.sort((a, b) => a.title.localeCompare(b.title, undefined, { sensitivity: 'base' }));
+        sorted.sort((a, b) => (a.title ?? '').localeCompare(b.title ?? '', undefined, { sensitivity: 'base' }));
         break;
       case 'created-desc':
         sorted.sort((a, b) => (a.createdAt < b.createdAt ? 1 : a.createdAt > b.createdAt ? -1 : 0));
@@ -858,14 +858,6 @@ export function NotesView({
         <SourceCitationModal
           target={citation}
           onClose={() => setCitation(null)}
-          onOpenGraph={
-            onOpenGraph
-              ? (target) => {
-                  setCitation(null);
-                  onOpenGraph(target);
-                }
-              : undefined
-          }
         />
       )}
 

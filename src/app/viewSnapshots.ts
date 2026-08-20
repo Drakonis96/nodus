@@ -91,9 +91,10 @@ export interface ListPlacement {
 }
 
 export interface AuthorsSnapshot {
-  /** 'author' is only reachable with `openAuthor` set; the pair travels together. */
+  /** 'author' is only reachable with an id present in `openAuthors`. */
   surface: 'catalog' | 'author' | 'matrix';
-  openAuthor: OpenEntityTab | null;
+  openAuthors: OpenEntityTab[];
+  activeAuthorId: string | null;
   matrixOpen: boolean;
   query: string;
   sortBy: AuthorsSortKey;
@@ -105,7 +106,8 @@ export interface AuthorsSnapshot {
 
 export interface IdeasSnapshot {
   surface: 'catalog' | 'idea';
-  openIdea: OpenEntityTab | null;
+  openIdeas: OpenEntityTab[];
+  activeIdeaId: string | null;
   search: string;
   typeFilter: IdeaType | '';
   sortKey: IdeasSortKey;

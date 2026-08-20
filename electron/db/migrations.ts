@@ -1,6 +1,10 @@
 import type Database from 'better-sqlite3';
 import { createHash } from 'node:crypto';
 import { migrateWorkspaceContent } from './workspaceMigration';
+import { backfillUniversalPageDocuments, migrateUniversalPages } from './pageMigration';
+import { databaseCellStorage } from '@shared/databaseCellStorage';
+import { columnTypeDef } from '@shared/databases';
+import { normalizeDatabaseViewConfig } from '@shared/databaseViewConfig';
 
 export interface Migration {
   version: number;
@@ -11,7 +15,7 @@ export interface Migration {
 
 // Versioned, append-only migrations. Never edit an existing migration's SQL once
 // shipped — add a new one. The current schema version is the highest applied.
-export const SCHEMA_VERSION = 134;
+export const SCHEMA_VERSION = 153;
 
 export const migrations: Migration[] = [
   {
@@ -6625,6 +6629,1635 @@ export const migrations: Migration[] = [
       INSERT INTO backup_revision (singleton, sequence) VALUES (1, 1);
     `,
   },
+  {
+    version: 135,
+    up: /* sql */ `
+      -- Boundary for the Notion-parity storage programme. The detailed reports and
+      -- immutable pre-migration copies live beside the vault so they also survive a
+      -- database-level rollback; this table is the durable in-vault index for future UI.
+      CREATE TABLE schema_migration_events (
+        id             TEXT PRIMARY KEY,
+        from_version   INTEGER NOT NULL,
+        target_version INTEGER NOT NULL,
+        status         TEXT NOT NULL CHECK (status IN ('succeeded', 'failed-restored', 'failed-unrestored')),
+        report_path    TEXT,
+        created_at     TEXT NOT NULL
+      );
+      CREATE INDEX idx_schema_migration_events_created ON schema_migration_events(created_at DESC);
+    `,
+  },
+  {
+    version: 136,
+    up: /* sql */ `
+      -- Notion parity, loop 2: database identity becomes part of every EAV edge.
+      -- The legacy value_text stays during the compatibility window, while canonical
+      -- typed projections make indexed comparisons independent from JavaScript parsing.
+      CREATE UNIQUE INDEX idx_db_rows_database_identity ON db_rows(database_id, id);
+      CREATE UNIQUE INDEX idx_db_columns_database_identity ON db_columns(database_id, id);
+
+      ALTER TABLE db_databases ADD COLUMN revision INTEGER NOT NULL DEFAULT 1;
+      ALTER TABLE db_databases ADD COLUMN created_by TEXT NOT NULL DEFAULT 'local';
+      ALTER TABLE db_databases ADD COLUMN updated_by TEXT NOT NULL DEFAULT 'local';
+      ALTER TABLE db_rows ADD COLUMN revision INTEGER NOT NULL DEFAULT 1;
+      ALTER TABLE db_rows ADD COLUMN created_by TEXT NOT NULL DEFAULT 'local';
+      ALTER TABLE db_rows ADD COLUMN updated_by TEXT NOT NULL DEFAULT 'local';
+
+      ALTER TABLE db_columns ADD COLUMN updated_at TEXT NOT NULL DEFAULT '1970-01-01T00:00:00.000Z';
+      ALTER TABLE db_columns ADD COLUMN revision INTEGER NOT NULL DEFAULT 1;
+      ALTER TABLE db_columns ADD COLUMN created_by TEXT NOT NULL DEFAULT 'local';
+      ALTER TABLE db_columns ADD COLUMN updated_by TEXT NOT NULL DEFAULT 'local';
+      UPDATE db_columns SET updated_at = created_at WHERE updated_at = '1970-01-01T00:00:00.000Z';
+
+      CREATE TABLE db_integrity_quarantine (
+        id           TEXT PRIMARY KEY,
+        source_table TEXT NOT NULL,
+        source_key   TEXT NOT NULL,
+        reason       TEXT NOT NULL,
+        payload_json TEXT NOT NULL,
+        payload_blob BLOB,
+        created_at   TEXT NOT NULL,
+        resolved_at  TEXT
+      );
+
+      INSERT INTO db_integrity_quarantine (id, source_table, source_key, reason, payload_json, created_at)
+      SELECT 'cell:' || cell.row_id || ':' || cell.column_id, 'db_cells', cell.row_id || ':' || cell.column_id,
+             'row-column-database-mismatch',
+             json_object('row_id', cell.row_id, 'column_id', cell.column_id, 'value_text', cell.value_text,
+                         'row_database_id', row.database_id, 'column_database_id', col.database_id),
+             strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+      FROM db_cells cell
+      JOIN db_rows row ON row.id = cell.row_id
+      JOIN db_columns col ON col.id = cell.column_id
+      WHERE row.database_id <> col.database_id;
+
+      CREATE TABLE db_cells_v135 (
+        database_id    TEXT NOT NULL,
+        row_id          TEXT NOT NULL,
+        column_id       TEXT NOT NULL,
+        value_type      TEXT NOT NULL DEFAULT 'legacy'
+                        CHECK (value_type IN ('text','number','integer','date','json','reference','legacy')),
+        value_text      TEXT,
+        value_number    REAL,
+        value_integer   INTEGER,
+        value_date      TEXT,
+        value_json      TEXT CHECK (value_json IS NULL OR json_valid(value_json)),
+        value_reference TEXT,
+        revision        INTEGER NOT NULL DEFAULT 1 CHECK (revision >= 1),
+        created_by      TEXT NOT NULL DEFAULT 'local',
+        updated_by      TEXT NOT NULL DEFAULT 'local',
+        created_at      TEXT NOT NULL,
+        updated_at      TEXT NOT NULL,
+        PRIMARY KEY (row_id, column_id),
+        UNIQUE (database_id, row_id, column_id),
+        FOREIGN KEY (database_id, row_id) REFERENCES db_rows(database_id, id) ON DELETE CASCADE,
+        FOREIGN KEY (database_id, column_id) REFERENCES db_columns(database_id, id) ON DELETE CASCADE,
+        CHECK ((value_number IS NOT NULL) + (value_integer IS NOT NULL) + (value_date IS NOT NULL) +
+               (value_json IS NOT NULL) + (value_reference IS NOT NULL) <= 1)
+      );
+      INSERT INTO db_cells_v135
+        (database_id, row_id, column_id, value_type, value_text, created_at, updated_at)
+      SELECT row.database_id, cell.row_id, cell.column_id, 'legacy', cell.value_text,
+             row.created_at, row.updated_at
+      FROM db_cells cell
+      JOIN db_rows row ON row.id = cell.row_id
+      JOIN db_columns col ON col.id = cell.column_id AND col.database_id = row.database_id;
+      DROP TABLE db_cells;
+      ALTER TABLE db_cells_v135 RENAME TO db_cells;
+      CREATE INDEX idx_db_cells_column ON db_cells(database_id, column_id);
+      CREATE INDEX idx_db_cells_row ON db_cells(database_id, row_id);
+
+      CREATE TABLE db_select_options_v135 (
+        id          TEXT PRIMARY KEY,
+        database_id TEXT NOT NULL,
+        column_id   TEXT NOT NULL,
+        label       TEXT NOT NULL,
+        color       TEXT,
+        position    INTEGER NOT NULL DEFAULT 0,
+        revision    INTEGER NOT NULL DEFAULT 1 CHECK (revision >= 1),
+        created_by  TEXT NOT NULL DEFAULT 'local',
+        updated_by  TEXT NOT NULL DEFAULT 'local',
+        created_at  TEXT NOT NULL,
+        updated_at  TEXT NOT NULL,
+        FOREIGN KEY (database_id, column_id) REFERENCES db_columns(database_id, id) ON DELETE CASCADE
+      );
+      INSERT INTO db_select_options_v135
+        (id, database_id, column_id, label, color, position, created_at, updated_at)
+      SELECT option.id, col.database_id, option.column_id, option.label, option.color, option.position,
+             col.created_at, col.updated_at
+      FROM db_select_options option JOIN db_columns col ON col.id = option.column_id;
+      DROP TABLE db_select_options;
+      ALTER TABLE db_select_options_v135 RENAME TO db_select_options;
+      CREATE INDEX idx_db_select_options_column ON db_select_options(database_id, column_id);
+
+      CREATE TABLE db_blobs (
+        hash        TEXT PRIMARY KEY CHECK (length(hash) = 64 AND hash NOT GLOB '*[^0-9a-f]*'),
+        bytes       INTEGER NOT NULL CHECK (bytes >= 0),
+        mime_type   TEXT,
+        data        BLOB NOT NULL,
+        revision    INTEGER NOT NULL DEFAULT 1 CHECK (revision >= 1),
+        created_by  TEXT NOT NULL DEFAULT 'local',
+        updated_by  TEXT NOT NULL DEFAULT 'local',
+        created_at  TEXT NOT NULL,
+        updated_at  TEXT NOT NULL,
+        CHECK (length(data) = bytes)
+      );
+
+      INSERT INTO db_integrity_quarantine (id, source_table, source_key, reason, payload_json, payload_blob, created_at)
+      SELECT 'attachment:' || attachment.id, 'db_attachments', attachment.id,
+             'row-column-database-mismatch',
+             json_object('id', attachment.id, 'row_id', attachment.row_id, 'column_id', attachment.column_id,
+                         'file_name', attachment.file_name, 'mime_type', attachment.mime_type, 'bytes', attachment.bytes,
+                         'content_hash', attachment.content_hash, 'extracted_text', attachment.extracted_text,
+                         'description', attachment.description, 'position', attachment.position,
+                         'row_database_id', row.database_id, 'column_database_id', col.database_id),
+             attachment.blob, strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+      FROM db_attachments attachment
+      JOIN db_rows row ON row.id = attachment.row_id
+      JOIN db_columns col ON col.id = attachment.column_id
+      WHERE row.database_id <> col.database_id;
+
+      CREATE TABLE db_attachments_v135 (
+        id             TEXT PRIMARY KEY,
+        database_id    TEXT NOT NULL,
+        row_id          TEXT NOT NULL,
+        column_id       TEXT NOT NULL,
+        file_name      TEXT,
+        mime_type      TEXT,
+        bytes          INTEGER NOT NULL DEFAULT 0 CHECK (bytes >= 0),
+        blob_hash      TEXT REFERENCES db_blobs(hash) ON DELETE RESTRICT,
+        blob           BLOB,
+        content_hash   TEXT,
+        extracted_text TEXT,
+        description    TEXT,
+        ai_generated   INTEGER NOT NULL DEFAULT 0 CHECK (ai_generated IN (0, 1)),
+        ai_prompt      TEXT,
+        thumb          BLOB,
+        position       INTEGER NOT NULL DEFAULT 0,
+        revision       INTEGER NOT NULL DEFAULT 1 CHECK (revision >= 1),
+        created_by     TEXT NOT NULL DEFAULT 'local',
+        updated_by     TEXT NOT NULL DEFAULT 'local',
+        created_at     TEXT NOT NULL,
+        updated_at     TEXT NOT NULL,
+        FOREIGN KEY (database_id, row_id) REFERENCES db_rows(database_id, id) ON DELETE CASCADE,
+        FOREIGN KEY (database_id, column_id) REFERENCES db_columns(database_id, id) ON DELETE CASCADE
+      );
+      INSERT INTO db_attachments_v135
+        (id, database_id, row_id, column_id, file_name, mime_type, bytes, blob, content_hash,
+         extracted_text, description, ai_generated, ai_prompt, thumb, position, created_at, updated_at)
+      SELECT attachment.id, row.database_id, attachment.row_id, attachment.column_id,
+             attachment.file_name, attachment.mime_type, attachment.bytes, attachment.blob,
+             attachment.content_hash, attachment.extracted_text, attachment.description,
+             attachment.ai_generated, attachment.ai_prompt, attachment.thumb, attachment.position,
+             attachment.created_at, attachment.created_at
+      FROM db_attachments attachment
+      JOIN db_rows row ON row.id = attachment.row_id
+      JOIN db_columns col ON col.id = attachment.column_id AND col.database_id = row.database_id;
+      DROP TABLE db_attachments;
+      ALTER TABLE db_attachments_v135 RENAME TO db_attachments;
+      CREATE INDEX idx_db_attachments_cell ON db_attachments(database_id, row_id, column_id);
+      CREATE INDEX idx_db_attachments_blob ON db_attachments(blob_hash);
+
+      INSERT INTO db_integrity_quarantine (id, source_table, source_key, reason, payload_json, created_at)
+      SELECT 'relation:' || relation.id, 'db_relations', relation.id,
+             'row-column-database-mismatch',
+             json_object('id', relation.id, 'row_id', relation.row_id, 'column_id', relation.column_id,
+                         'target_kind', relation.target_kind, 'target_id', relation.target_id,
+                         'target_vault_id', relation.target_vault_id, 'position', relation.position,
+                         'row_database_id', row.database_id, 'column_database_id', col.database_id),
+             strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+      FROM db_relations relation
+      JOIN db_rows row ON row.id = relation.row_id
+      JOIN db_columns col ON col.id = relation.column_id
+      WHERE row.database_id <> col.database_id;
+
+      CREATE TABLE db_relations_v135 (
+        id              TEXT PRIMARY KEY,
+        database_id     TEXT NOT NULL,
+        row_id           TEXT NOT NULL,
+        column_id        TEXT NOT NULL,
+        target_kind      TEXT NOT NULL,
+        target_id        TEXT NOT NULL,
+        target_vault_id  TEXT,
+        position         INTEGER NOT NULL DEFAULT 0,
+        revision         INTEGER NOT NULL DEFAULT 1 CHECK (revision >= 1),
+        created_by       TEXT NOT NULL DEFAULT 'local',
+        updated_by       TEXT NOT NULL DEFAULT 'local',
+        created_at       TEXT NOT NULL,
+        updated_at       TEXT NOT NULL,
+        FOREIGN KEY (database_id, row_id) REFERENCES db_rows(database_id, id) ON DELETE CASCADE,
+        FOREIGN KEY (database_id, column_id) REFERENCES db_columns(database_id, id) ON DELETE CASCADE
+      );
+      INSERT INTO db_relations_v135
+        (id, database_id, row_id, column_id, target_kind, target_id, target_vault_id,
+         position, created_at, updated_at)
+      SELECT relation.id, row.database_id, relation.row_id, relation.column_id,
+             relation.target_kind, relation.target_id, relation.target_vault_id,
+             relation.position, relation.created_at, relation.created_at
+      FROM db_relations relation
+      JOIN db_rows row ON row.id = relation.row_id
+      JOIN db_columns col ON col.id = relation.column_id AND col.database_id = row.database_id;
+      DROP TABLE db_relations;
+      ALTER TABLE db_relations_v135 RENAME TO db_relations;
+      CREATE INDEX idx_db_relations_cell ON db_relations(database_id, row_id, column_id);
+
+      ALTER TABLE db_views ADD COLUMN updated_at TEXT NOT NULL DEFAULT '1970-01-01T00:00:00.000Z';
+      ALTER TABLE db_views ADD COLUMN revision INTEGER NOT NULL DEFAULT 1;
+      ALTER TABLE db_views ADD COLUMN created_by TEXT NOT NULL DEFAULT 'local';
+      ALTER TABLE db_views ADD COLUMN updated_by TEXT NOT NULL DEFAULT 'local';
+      UPDATE db_views SET updated_at = created_at WHERE updated_at = '1970-01-01T00:00:00.000Z';
+    `,
+    after: (db) => {
+      const timestamp = new Date().toISOString();
+
+      // One and only one primary title per database. Values are not rewritten: title
+      // and rich text share their lossless text representation.
+      const databases = db.prepare('SELECT id FROM db_databases ORDER BY position, created_at').all() as Array<{ id: string }>;
+      const insertTitle = db.prepare(
+        `INSERT INTO db_columns
+          (id, database_id, name, type, position, config_json, created_at, updated_at, revision, created_by, updated_by)
+         VALUES (?, ?, 'Nombre', 'title', 0, '{}', ?, ?, 1, 'migration', 'migration')`,
+      );
+      for (const database of databases) {
+        const titles = db.prepare(
+          "SELECT id FROM db_columns WHERE database_id = ? AND type = 'title' ORDER BY position, created_at, id",
+        ).all(database.id) as Array<{ id: string }>;
+        if (titles.length === 0) {
+          db.prepare('UPDATE db_columns SET position = position + 1 WHERE database_id = ?').run(database.id);
+          const suffix = createHash('sha256').update(database.id).digest('hex').slice(0, 24);
+          insertTitle.run(`dcol_title_${suffix}`, database.id, timestamp, timestamp);
+        } else if (titles.length > 1) {
+          const demote = db.prepare(
+            "UPDATE db_columns SET type = 'text', revision = revision + 1, updated_at = ?, updated_by = 'migration' WHERE id = ?",
+          );
+          for (const title of titles.slice(1)) demote.run(timestamp, title.id);
+        }
+      }
+      db.exec("CREATE UNIQUE INDEX idx_db_columns_one_title ON db_columns(database_id) WHERE type = 'title'");
+
+      const cells = db.prepare(
+        `SELECT cell.row_id, cell.column_id, cell.value_text, col.type
+         FROM db_cells cell JOIN db_columns col ON col.id = cell.column_id AND col.database_id = cell.database_id`,
+      ).all() as Array<{ row_id: string; column_id: string; value_text: string | null; type: string }>;
+      const updateCell = db.prepare(
+        `UPDATE db_cells SET value_type = ?, value_number = ?, value_integer = ?, value_date = ?,
+          value_json = ?, value_reference = ?, updated_by = 'migration' WHERE row_id = ? AND column_id = ?`,
+      );
+      for (const cell of cells) {
+        if (cell.value_text == null) continue;
+        const storage = databaseCellStorage(columnTypeDef(cell.type).id, cell.value_text);
+        updateCell.run(
+          storage.value_type, storage.value_number, storage.value_integer, storage.value_date,
+          storage.value_json, storage.value_reference, cell.row_id, cell.column_id,
+        );
+      }
+
+      const attachments = db.prepare(
+        'SELECT id, mime_type, blob, created_at FROM db_attachments WHERE blob IS NOT NULL',
+      ).all() as Array<{ id: string; mime_type: string | null; blob: Buffer; created_at: string }>;
+      const insertBlob = db.prepare(
+        `INSERT INTO db_blobs
+          (hash, bytes, mime_type, data, revision, created_by, updated_by, created_at, updated_at)
+         VALUES (?, ?, ?, ?, 1, 'migration', 'migration', ?, ?)
+         ON CONFLICT(hash) DO NOTHING`,
+      );
+      const linkBlob = db.prepare(
+        `UPDATE db_attachments SET blob_hash = ?, content_hash = ?, blob = NULL,
+          updated_at = ?, updated_by = 'migration' WHERE id = ?`,
+      );
+      for (const attachment of attachments) {
+        const hash = createHash('sha256').update(attachment.blob).digest('hex');
+        insertBlob.run(hash, attachment.blob.length, attachment.mime_type, attachment.blob, attachment.created_at, timestamp);
+        linkBlob.run(hash, hash, timestamp, attachment.id);
+      }
+    },
+  },
+  {
+    version: 137,
+    up: /* sql */ `
+      -- Notion parity, loop 4: covering indexes for the canonical typed EAV
+      -- projections. Partial indexes remain compact when a property uses another type.
+      CREATE INDEX idx_db_cells_text_value
+        ON db_cells(database_id, column_id, value_text COLLATE NOCASE, row_id)
+        WHERE value_text IS NOT NULL;
+      CREATE INDEX idx_db_cells_number_value
+        ON db_cells(database_id, column_id, value_number, row_id)
+        WHERE value_number IS NOT NULL;
+      CREATE INDEX idx_db_cells_integer_value
+        ON db_cells(database_id, column_id, value_integer, row_id)
+        WHERE value_integer IS NOT NULL;
+      CREATE INDEX idx_db_cells_date_value
+        ON db_cells(database_id, column_id, value_date, row_id)
+        WHERE value_date IS NOT NULL;
+      CREATE INDEX idx_db_cells_reference_value
+        ON db_cells(database_id, column_id, value_reference, row_id)
+        WHERE value_reference IS NOT NULL;
+      CREATE INDEX idx_db_relations_target
+        ON db_relations(target_kind, target_id, database_id, column_id, row_id);
+
+      -- Materialized values are derivable, but durable: opening a 250k-row vault never
+      -- has to reconstruct formula and rollup objects before showing its first page.
+      CREATE TABLE db_computed_cells (
+        database_id  TEXT NOT NULL,
+        row_id        TEXT NOT NULL,
+        column_id     TEXT NOT NULL,
+        computed_kind TEXT NOT NULL CHECK (computed_kind IN ('formula', 'rollup')),
+        value_type    TEXT NOT NULL DEFAULT 'text'
+                      CHECK (value_type IN ('text','number','integer','date','json','reference')),
+        value_text    TEXT,
+        value_number  REAL,
+        value_integer INTEGER,
+        value_date    TEXT,
+        value_json    TEXT CHECK (value_json IS NULL OR json_valid(value_json)),
+        color         TEXT,
+        error         TEXT,
+        source_revision INTEGER NOT NULL,
+        revision      INTEGER NOT NULL DEFAULT 1 CHECK (revision >= 1),
+        updated_at    TEXT NOT NULL,
+        PRIMARY KEY (row_id, column_id),
+        FOREIGN KEY (database_id, row_id) REFERENCES db_rows(database_id, id) ON DELETE CASCADE,
+        FOREIGN KEY (database_id, column_id) REFERENCES db_columns(database_id, id) ON DELETE CASCADE,
+        CHECK ((value_number IS NOT NULL) + (value_integer IS NOT NULL) +
+               (value_date IS NOT NULL) + (value_json IS NOT NULL) <= 1)
+      );
+      CREATE INDEX idx_db_computed_column
+        ON db_computed_cells(database_id, column_id, row_id);
+      CREATE INDEX idx_db_computed_number
+        ON db_computed_cells(database_id, column_id, value_number, row_id)
+        WHERE value_number IS NOT NULL;
+      CREATE INDEX idx_db_computed_date
+        ON db_computed_cells(database_id, column_id, value_date, row_id)
+        WHERE value_date IS NOT NULL;
+
+      CREATE TABLE db_column_dependencies (
+        source_database_id    TEXT NOT NULL,
+        source_column_id      TEXT NOT NULL,
+        dependent_database_id TEXT NOT NULL,
+        dependent_column_id   TEXT NOT NULL,
+        dependency_kind       TEXT NOT NULL CHECK (dependency_kind IN ('formula','formula_global','rollup_relation','rollup_target')),
+        PRIMARY KEY (source_database_id, source_column_id, dependent_database_id, dependent_column_id, dependency_kind)
+      );
+      CREATE INDEX idx_db_column_dependencies_source
+        ON db_column_dependencies(source_database_id, source_column_id);
+
+      CREATE TABLE db_compute_jobs (
+        id          TEXT PRIMARY KEY,
+        database_id TEXT NOT NULL REFERENCES db_databases(id) ON DELETE CASCADE,
+        status      TEXT NOT NULL CHECK (status IN ('queued','running','completed','failed','cancelled')),
+        done        INTEGER NOT NULL DEFAULT 0 CHECK (done >= 0),
+        total       INTEGER NOT NULL DEFAULT 0 CHECK (total >= 0),
+        message     TEXT,
+        created_at  TEXT NOT NULL,
+        updated_at  TEXT NOT NULL
+      );
+      CREATE INDEX idx_db_compute_jobs_database
+        ON db_compute_jobs(database_id, updated_at DESC);
+
+      -- One ranked lexical index for database cells and extracted attachment text.
+      -- Page blocks join this same index when their schema lands in loop 5.
+      CREATE VIRTUAL TABLE db_search_fts USING fts5(
+        content,
+        entity_type UNINDEXED,
+        database_id UNINDEXED,
+        row_id UNINDEXED,
+        column_id UNINDEXED,
+        entity_id UNINDEXED,
+        tokenize='unicode61 remove_diacritics 2',
+        prefix='2 3 4'
+      );
+
+      INSERT INTO db_search_fts(content, entity_type, database_id, row_id, column_id, entity_id)
+      SELECT CASE
+               WHEN col.type = 'select' THEN COALESCE(
+                 (SELECT option.label FROM db_select_options option
+                  WHERE option.id = COALESCE(cell.value_reference, cell.value_text)),
+                 cell.value_text, '')
+               WHEN col.type = 'multi_select' AND json_valid(COALESCE(cell.value_json, cell.value_text)) THEN COALESCE(
+                 (SELECT group_concat(COALESCE(option.label, item.value), ' ')
+                  FROM json_each(COALESCE(cell.value_json, cell.value_text)) item
+                  LEFT JOIN db_select_options option ON option.id = item.value),
+                 cell.value_text, '')
+               ELSE COALESCE(cell.value_text, '')
+             END,
+             'cell', cell.database_id, cell.row_id, cell.column_id,
+             cell.row_id || ':' || cell.column_id
+      FROM db_cells cell
+      JOIN db_columns col ON col.id = cell.column_id AND col.database_id = cell.database_id;
+
+      INSERT INTO db_search_fts(content, entity_type, database_id, row_id, column_id, entity_id)
+      SELECT trim(COALESCE(file_name, '') || ' ' || COALESCE(description, '') || ' ' || COALESCE(extracted_text, '')),
+             'attachment', database_id, row_id, column_id, id
+      FROM db_attachments;
+
+      CREATE TRIGGER db_cells_search_ai AFTER INSERT ON db_cells BEGIN
+        INSERT INTO db_search_fts(content, entity_type, database_id, row_id, column_id, entity_id)
+        VALUES (COALESCE(new.value_text, ''), 'cell', new.database_id, new.row_id, new.column_id,
+                new.row_id || ':' || new.column_id);
+      END;
+      CREATE TRIGGER db_cells_search_au AFTER UPDATE ON db_cells BEGIN
+        DELETE FROM db_search_fts WHERE entity_type = 'cell' AND entity_id = old.row_id || ':' || old.column_id;
+        INSERT INTO db_search_fts(content, entity_type, database_id, row_id, column_id, entity_id)
+        VALUES (COALESCE(new.value_text, ''), 'cell', new.database_id, new.row_id, new.column_id,
+                new.row_id || ':' || new.column_id);
+      END;
+      CREATE TRIGGER db_cells_search_ad AFTER DELETE ON db_cells BEGIN
+        DELETE FROM db_search_fts WHERE entity_type = 'cell' AND entity_id = old.row_id || ':' || old.column_id;
+      END;
+      CREATE TRIGGER db_computed_cells_search_ai AFTER INSERT ON db_computed_cells BEGIN
+        INSERT INTO db_search_fts(content, entity_type, database_id, row_id, column_id, entity_id)
+        VALUES (COALESCE(new.value_text, ''), 'computed', new.database_id, new.row_id, new.column_id,
+                new.row_id || ':' || new.column_id);
+      END;
+      CREATE TRIGGER db_computed_cells_search_au AFTER UPDATE ON db_computed_cells BEGIN
+        DELETE FROM db_search_fts WHERE entity_type = 'computed' AND entity_id = old.row_id || ':' || old.column_id;
+        INSERT INTO db_search_fts(content, entity_type, database_id, row_id, column_id, entity_id)
+        VALUES (COALESCE(new.value_text, ''), 'computed', new.database_id, new.row_id, new.column_id,
+                new.row_id || ':' || new.column_id);
+      END;
+      CREATE TRIGGER db_computed_cells_search_ad AFTER DELETE ON db_computed_cells BEGIN
+        DELETE FROM db_search_fts WHERE entity_type = 'computed' AND entity_id = old.row_id || ':' || old.column_id;
+      END;
+      CREATE TRIGGER db_attachments_search_ai AFTER INSERT ON db_attachments BEGIN
+        INSERT INTO db_search_fts(content, entity_type, database_id, row_id, column_id, entity_id)
+        VALUES (trim(COALESCE(new.file_name, '') || ' ' || COALESCE(new.description, '') || ' ' || COALESCE(new.extracted_text, '')),
+                'attachment', new.database_id, new.row_id, new.column_id, new.id);
+      END;
+      CREATE TRIGGER db_attachments_search_au AFTER UPDATE ON db_attachments BEGIN
+        DELETE FROM db_search_fts WHERE entity_type = 'attachment' AND entity_id = old.id;
+        INSERT INTO db_search_fts(content, entity_type, database_id, row_id, column_id, entity_id)
+        VALUES (trim(COALESCE(new.file_name, '') || ' ' || COALESCE(new.description, '') || ' ' || COALESCE(new.extracted_text, '')),
+                'attachment', new.database_id, new.row_id, new.column_id, new.id);
+      END;
+      CREATE TRIGGER db_attachments_search_ad AFTER DELETE ON db_attachments BEGIN
+        DELETE FROM db_search_fts WHERE entity_type = 'attachment' AND entity_id = old.id;
+      END;
+    `,
+  },
+  {
+    version: 138,
+    up: /* sql */ `
+      -- Notion parity, loop 5: every database row and legacy note has one universal
+      -- page. Independent pages use the same table and therefore the same editor,
+      -- search projection, export and future collaboration stream.
+      ALTER TABLE notes ADD COLUMN page_markdown_hash TEXT;
+
+      CREATE TABLE pages (
+        id              TEXT PRIMARY KEY,
+        row_id          TEXT UNIQUE REFERENCES db_rows(id) ON DELETE CASCADE,
+        note_id         TEXT UNIQUE REFERENCES notes(id) ON DELETE CASCADE,
+        parent_page_id  TEXT REFERENCES pages(id) ON DELETE SET NULL,
+        origin          TEXT NOT NULL CHECK (origin IN ('standalone','database_row','note')),
+        title           TEXT NOT NULL DEFAULT '',
+        icon            TEXT,
+        cover_blob_hash TEXT REFERENCES db_blobs(hash) ON DELETE SET NULL,
+        state           TEXT NOT NULL DEFAULT 'active' CHECK (state IN ('active','trashed')),
+        locked          INTEGER NOT NULL DEFAULT 0 CHECK (locked IN (0,1)),
+        full_width      INTEGER NOT NULL DEFAULT 0 CHECK (full_width IN (0,1)),
+        revision        INTEGER NOT NULL DEFAULT 1 CHECK (revision >= 1),
+        created_by      TEXT NOT NULL DEFAULT 'local',
+        updated_by      TEXT NOT NULL DEFAULT 'local',
+        created_at      TEXT NOT NULL,
+        updated_at      TEXT NOT NULL,
+        CHECK ((origin = 'database_row' AND row_id IS NOT NULL AND note_id IS NULL) OR
+               (origin = 'note' AND note_id IS NOT NULL AND row_id IS NULL) OR
+               (origin = 'standalone' AND row_id IS NULL AND note_id IS NULL))
+      );
+      CREATE INDEX idx_pages_parent ON pages(parent_page_id, state, updated_at DESC);
+      CREATE INDEX idx_pages_row ON pages(row_id) WHERE row_id IS NOT NULL;
+      CREATE INDEX idx_pages_note ON pages(note_id) WHERE note_id IS NOT NULL;
+
+      CREATE TABLE page_blocks (
+        id              TEXT PRIMARY KEY,
+        page_id         TEXT NOT NULL REFERENCES pages(id) ON DELETE CASCADE,
+        parent_block_id TEXT,
+        sort_order      REAL NOT NULL,
+        type            TEXT NOT NULL CHECK (type IN (
+          'paragraph','heading_1','heading_2','heading_3','bulleted_list','numbered_list',
+          'task','toggle','quote','callout','divider','code','equation','table','columns',
+          'image','file','audio','video','bookmark','embed','subpage','mention',
+          'synced_block','database_view','markdown'
+        )),
+        content_json    TEXT NOT NULL DEFAULT '{}' CHECK (json_valid(content_json)),
+        normalized_text TEXT NOT NULL DEFAULT '',
+        revision        INTEGER NOT NULL DEFAULT 1 CHECK (revision >= 1),
+        created_by      TEXT NOT NULL DEFAULT 'local',
+        updated_by      TEXT NOT NULL DEFAULT 'local',
+        created_at      TEXT NOT NULL,
+        updated_at      TEXT NOT NULL,
+        trashed_at      TEXT,
+        UNIQUE (page_id, id),
+        FOREIGN KEY (page_id, parent_block_id) REFERENCES page_blocks(page_id, id) ON DELETE CASCADE,
+        CHECK (parent_block_id IS NULL OR parent_block_id <> id)
+      );
+      CREATE INDEX idx_page_blocks_page_order ON page_blocks(page_id, parent_block_id, sort_order, id);
+      CREATE INDEX idx_page_blocks_updated ON page_blocks(page_id, updated_at DESC);
+
+      CREATE TABLE page_block_blobs (
+        block_id  TEXT NOT NULL REFERENCES page_blocks(id) ON DELETE CASCADE,
+        blob_hash TEXT NOT NULL REFERENCES db_blobs(hash) ON DELETE RESTRICT,
+        role      TEXT NOT NULL DEFAULT 'content',
+        created_at TEXT NOT NULL,
+        PRIMARY KEY (block_id, blob_hash, role)
+      );
+      CREATE INDEX idx_page_block_blobs_hash ON page_block_blobs(blob_hash, block_id);
+
+      CREATE TABLE page_documents (
+        page_id              TEXT PRIMARY KEY REFERENCES pages(id) ON DELETE CASCADE,
+        revision             INTEGER NOT NULL DEFAULT 1 CHECK (revision >= 1),
+        snapshot_sequence    INTEGER NOT NULL DEFAULT 0 CHECK (snapshot_sequence >= 0),
+        next_update_sequence INTEGER NOT NULL DEFAULT 1 CHECK (next_update_sequence >= 1),
+        snapshot_blob        BLOB NOT NULL,
+        state_vector         BLOB NOT NULL,
+        markdown_hash        TEXT NOT NULL,
+        update_count         INTEGER NOT NULL DEFAULT 0 CHECK (update_count >= 0),
+        created_at           TEXT NOT NULL,
+        updated_at           TEXT NOT NULL
+      );
+
+      CREATE TABLE page_document_updates (
+        id          TEXT PRIMARY KEY,
+        page_id     TEXT NOT NULL REFERENCES pages(id) ON DELETE CASCADE,
+        sequence_no INTEGER NOT NULL CHECK (sequence_no >= 1),
+        update_blob BLOB NOT NULL,
+        actor_id    TEXT NOT NULL,
+        client_id   TEXT NOT NULL,
+        created_at  TEXT NOT NULL,
+        UNIQUE (page_id, sequence_no)
+      );
+      CREATE INDEX idx_page_document_updates_page ON page_document_updates(page_id, sequence_no);
+
+      CREATE TABLE page_document_snapshots (
+        id              TEXT PRIMARY KEY,
+        page_id         TEXT NOT NULL REFERENCES pages(id) ON DELETE CASCADE,
+        sequence_no     INTEGER NOT NULL CHECK (sequence_no >= 0),
+        revision        INTEGER NOT NULL CHECK (revision >= 1),
+        snapshot_blob   BLOB NOT NULL,
+        state_vector    BLOB NOT NULL,
+        markdown_hash   TEXT NOT NULL,
+        created_at      TEXT NOT NULL,
+        UNIQUE (page_id, sequence_no)
+      );
+      CREATE INDEX idx_page_document_snapshots_page ON page_document_snapshots(page_id, sequence_no DESC);
+
+      CREATE TABLE page_migration_reports (
+        id                    TEXT PRIMARY KEY,
+        pages_created         INTEGER NOT NULL,
+        notes_converted       INTEGER NOT NULL,
+        raw_markdown_blocks   INTEGER NOT NULL,
+        created_at            TEXT NOT NULL
+      );
+
+      INSERT INTO pages
+        (id, row_id, note_id, parent_page_id, origin, title, icon, cover_blob_hash, state,
+         locked, full_width, revision, created_by, updated_by, created_at, updated_at)
+      SELECT 'row:' || row.id, row.id, NULL, NULL, 'database_row',
+             COALESCE((
+               SELECT cell.value_text
+               FROM db_columns col
+               LEFT JOIN db_cells cell ON cell.database_id = row.database_id
+                 AND cell.row_id = row.id AND cell.column_id = col.id
+               WHERE col.database_id = row.database_id AND col.type = 'title'
+               ORDER BY col.position, col.id LIMIT 1
+             ), ''),
+             NULL, NULL, 'active', 0, 0, row.revision, row.created_by, row.updated_by,
+             row.created_at, row.updated_at
+      FROM db_rows row;
+
+      INSERT INTO pages
+        (id, row_id, note_id, parent_page_id, origin, title, icon, cover_blob_hash, state,
+         locked, full_width, revision, created_by, updated_by, created_at, updated_at)
+      SELECT 'note:' || note.id, NULL, note.id, NULL, 'note', note.title,
+             NULL, NULL, CASE WHEN note.trashed_at IS NULL THEN 'active' ELSE 'trashed' END,
+             0, 0, 1, 'migration', 'migration', note.created_at, note.updated_at
+      FROM notes note;
+
+      -- Deterministic identities let every existing repository gain page semantics
+      -- without being rewritten at once.
+      CREATE TRIGGER pages_db_rows_ai AFTER INSERT ON db_rows BEGIN
+        INSERT OR IGNORE INTO pages
+          (id, row_id, origin, title, created_at, updated_at, revision, created_by, updated_by)
+        VALUES ('row:' || new.id, new.id, 'database_row', '', new.created_at, new.updated_at,
+                new.revision, new.created_by, new.updated_by);
+      END;
+      CREATE TRIGGER pages_notes_ai AFTER INSERT ON notes BEGIN
+        INSERT OR IGNORE INTO pages
+          (id, note_id, origin, title, state, created_at, updated_at, created_by, updated_by)
+        VALUES ('note:' || new.id, new.id, 'note', new.title,
+                CASE WHEN new.trashed_at IS NULL THEN 'active' ELSE 'trashed' END,
+                new.created_at, new.updated_at, 'local', 'local');
+      END;
+      CREATE TRIGGER pages_notes_au AFTER UPDATE OF title, trashed_at ON notes BEGIN
+        UPDATE pages SET title = new.title,
+          state = CASE WHEN new.trashed_at IS NULL THEN 'active' ELSE 'trashed' END,
+          revision = revision + 1, updated_at = new.updated_at, updated_by = 'local'
+        WHERE note_id = new.id;
+      END;
+      CREATE TRIGGER pages_title_cell_ai AFTER INSERT ON db_cells
+      WHEN EXISTS (SELECT 1 FROM db_columns col WHERE col.id = new.column_id AND col.type = 'title') BEGIN
+        UPDATE pages SET title = COALESCE(new.value_text, ''), revision = revision + 1,
+          updated_at = new.updated_at, updated_by = new.updated_by WHERE row_id = new.row_id;
+      END;
+      CREATE TRIGGER pages_title_cell_au AFTER UPDATE OF value_text ON db_cells
+      WHEN EXISTS (SELECT 1 FROM db_columns col WHERE col.id = new.column_id AND col.type = 'title') BEGIN
+        UPDATE pages SET title = COALESCE(new.value_text, ''), revision = revision + 1,
+          updated_at = new.updated_at, updated_by = new.updated_by WHERE row_id = new.row_id;
+      END;
+
+      -- Page blocks share the ranked FTS index introduced in loop 4. Database-row pages
+      -- carry database_id/row_id; independent pages and notes remain globally searchable.
+      CREATE TRIGGER page_blocks_search_ai AFTER INSERT ON page_blocks BEGIN
+        INSERT INTO db_search_fts(content, entity_type, database_id, row_id, column_id, entity_id)
+        SELECT new.normalized_text, 'page_block', row.database_id, page.row_id, NULL, new.id
+        FROM pages page LEFT JOIN db_rows row ON row.id = page.row_id WHERE page.id = new.page_id;
+      END;
+      CREATE TRIGGER page_blocks_search_au AFTER UPDATE ON page_blocks BEGIN
+        DELETE FROM db_search_fts WHERE entity_type = 'page_block' AND entity_id = old.id;
+        INSERT INTO db_search_fts(content, entity_type, database_id, row_id, column_id, entity_id)
+        SELECT new.normalized_text, 'page_block', row.database_id, page.row_id, NULL, new.id
+        FROM pages page LEFT JOIN db_rows row ON row.id = page.row_id
+        WHERE page.id = new.page_id AND new.trashed_at IS NULL;
+      END;
+      CREATE TRIGGER page_blocks_search_ad AFTER DELETE ON page_blocks BEGIN
+        DELETE FROM db_search_fts WHERE entity_type = 'page_block' AND entity_id = old.id;
+      END;
+    `,
+    after: (db) => {
+      migrateUniversalPages(db);
+      const counts = db.prepare(
+        `SELECT (SELECT COUNT(*) FROM pages) AS pages,
+                (SELECT COUNT(*) FROM pages WHERE note_id IS NOT NULL) AS notes,
+                (SELECT COUNT(*) FROM page_blocks WHERE type = 'markdown') AS raw`,
+      ).get() as { pages: number; notes: number; raw: number };
+      db.prepare(
+        `INSERT INTO page_migration_reports
+          (id, pages_created, notes_converted, raw_markdown_blocks, created_at)
+         VALUES (?, ?, ?, ?, ?)`,
+      ).run(`page-migration-${Date.now()}`, counts.pages, counts.notes, counts.raw, new Date().toISOString());
+    },
+  },
+  {
+    version: 139,
+    up: /* sql */ `
+      -- Notion parity, loop 5: SQL-created row/note pages must receive their Yjs
+      -- document and initial snapshot in the same transaction as the owning record.
+      DROP TRIGGER pages_db_rows_ai;
+      CREATE TRIGGER pages_db_rows_ai AFTER INSERT ON db_rows BEGIN
+        INSERT OR IGNORE INTO pages
+          (id, row_id, origin, title, created_at, updated_at, revision, created_by, updated_by)
+        VALUES ('row:' || new.id, new.id, 'database_row', '', new.created_at, new.updated_at,
+                new.revision, new.created_by, new.updated_by);
+        INSERT OR IGNORE INTO page_documents
+          (page_id, revision, snapshot_sequence, next_update_sequence, snapshot_blob, state_vector,
+           markdown_hash, update_count, created_at, updated_at)
+        VALUES ('row:' || new.id, 1, 0, 1, X'', X'',
+                'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855', 0,
+                new.created_at, new.updated_at);
+        INSERT OR IGNORE INTO page_document_snapshots
+          (id, page_id, sequence_no, revision, snapshot_blob, state_vector, markdown_hash, created_at)
+        VALUES ('initial-row:' || new.id, 'row:' || new.id, 0, 1, X'', X'',
+                'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855', new.created_at);
+      END;
+
+      DROP TRIGGER pages_notes_ai;
+      CREATE TRIGGER pages_notes_ai AFTER INSERT ON notes BEGIN
+        INSERT OR IGNORE INTO pages
+          (id, note_id, origin, title, state, created_at, updated_at, created_by, updated_by)
+        VALUES ('note:' || new.id, new.id, 'note', new.title,
+                CASE WHEN new.trashed_at IS NULL THEN 'active' ELSE 'trashed' END,
+                new.created_at, new.updated_at, 'local', 'local');
+        INSERT OR IGNORE INTO page_documents
+          (page_id, revision, snapshot_sequence, next_update_sequence, snapshot_blob, state_vector,
+           markdown_hash, update_count, created_at, updated_at)
+        VALUES ('note:' || new.id, 1, 0, 1, X'', X'',
+                'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855', 0,
+                new.created_at, new.updated_at);
+        INSERT OR IGNORE INTO page_document_snapshots
+          (id, page_id, sequence_no, revision, snapshot_blob, state_vector, markdown_hash, created_at)
+        VALUES ('initial-note:' || new.id, 'note:' || new.id, 0, 1, X'', X'',
+                'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855', new.created_at);
+      END;
+    `,
+    after: (db) => backfillUniversalPageDocuments(db),
+  },
+  {
+    version: 140,
+    up: /* sql */ `
+      -- Notion parity, loop 6: wiki navigation, favourites and materialized links.
+      CREATE TABLE page_favorites (
+        page_id    TEXT PRIMARY KEY REFERENCES pages(id) ON DELETE CASCADE,
+        position   REAL NOT NULL DEFAULT 1024,
+        created_at TEXT NOT NULL
+      );
+      CREATE INDEX idx_page_favorites_position ON page_favorites(position, page_id);
+
+      CREATE TABLE page_links (
+        id              TEXT PRIMARY KEY,
+        source_page_id  TEXT NOT NULL REFERENCES pages(id) ON DELETE CASCADE,
+        source_block_id TEXT NOT NULL REFERENCES page_blocks(id) ON DELETE CASCADE,
+        target_page_id  TEXT,
+        target_block_id TEXT,
+        kind            TEXT NOT NULL CHECK (kind IN ('subpage','mention','synced_block')),
+        label           TEXT NOT NULL DEFAULT '',
+        created_at      TEXT NOT NULL
+      );
+      CREATE INDEX idx_page_links_target_page ON page_links(target_page_id, kind, source_page_id);
+      CREATE INDEX idx_page_links_target_block ON page_links(target_block_id, kind, source_page_id);
+      CREATE UNIQUE INDEX idx_page_links_source_target
+        ON page_links(source_page_id, source_block_id, kind, COALESCE(target_page_id, ''), COALESCE(target_block_id, ''));
+
+      CREATE TRIGGER pages_search_ai AFTER INSERT ON pages BEGIN
+        INSERT INTO db_search_fts(content, entity_type, database_id, row_id, column_id, entity_id)
+        SELECT new.title, 'page_title', row.database_id, new.row_id, NULL, new.id
+        FROM (SELECT 1) seed LEFT JOIN db_rows row ON row.id = new.row_id
+        WHERE new.state = 'active';
+      END;
+      CREATE TRIGGER pages_search_au AFTER UPDATE OF title, state, row_id ON pages BEGIN
+        DELETE FROM db_search_fts WHERE entity_type = 'page_title' AND entity_id = old.id;
+        INSERT INTO db_search_fts(content, entity_type, database_id, row_id, column_id, entity_id)
+        SELECT new.title, 'page_title', row.database_id, new.row_id, NULL, new.id
+        FROM (SELECT 1) seed LEFT JOIN db_rows row ON row.id = new.row_id
+        WHERE new.state = 'active';
+      END;
+      CREATE TRIGGER pages_search_ad AFTER DELETE ON pages BEGIN
+        DELETE FROM db_search_fts WHERE entity_type = 'page_title' AND entity_id = old.id;
+      END;
+      INSERT INTO db_search_fts(content, entity_type, database_id, row_id, column_id, entity_id)
+      SELECT page.title, 'page_title', row.database_id, page.row_id, NULL, page.id
+      FROM pages page LEFT JOIN db_rows row ON row.id = page.row_id WHERE page.state = 'active';
+    `,
+  },
+  {
+    version: 141,
+    up: /* sql */ `
+      -- Notion parity, loop 7: status lanes and immutable per-database row sequences.
+      -- All structured property payloads continue travelling through typed db_cells, so
+      -- legacy value_text readers remain valid and no cell rewrite is necessary.
+      ALTER TABLE db_select_options ADD COLUMN group_key TEXT
+        CHECK (group_key IS NULL OR group_key IN ('pending','in_progress','complete'));
+      ALTER TABLE db_rows ADD COLUMN unique_sequence INTEGER NOT NULL DEFAULT 0
+        CHECK (unique_sequence >= 0);
+      WITH ranked AS (
+        SELECT id, ROW_NUMBER() OVER (PARTITION BY database_id ORDER BY position, created_at, id) AS sequence
+        FROM db_rows
+      )
+      UPDATE db_rows SET unique_sequence = (SELECT sequence FROM ranked WHERE ranked.id = db_rows.id);
+      CREATE UNIQUE INDEX idx_db_rows_unique_sequence
+        ON db_rows(database_id, unique_sequence) WHERE unique_sequence > 0;
+    `,
+  },
+  {
+    version: 142,
+    up: /* sql */ `
+      -- Notion parity, loop 8: durable bidirectional links and assisted repair.
+      ALTER TABLE db_relations ADD COLUMN inverse_relation_id TEXT;
+      ALTER TABLE db_relations ADD COLUMN last_known_label TEXT;
+      UPDATE db_relations SET last_known_label = target_id WHERE last_known_label IS NULL;
+      CREATE UNIQUE INDEX idx_db_relations_unique_target
+        ON db_relations(row_id, column_id, target_kind, target_id, COALESCE(target_vault_id, ''));
+      CREATE INDEX idx_db_relations_inverse ON db_relations(inverse_relation_id);
+
+      ALTER TABLE db_column_dependencies RENAME TO db_column_dependencies_v140;
+      DROP INDEX idx_db_column_dependencies_source;
+      CREATE TABLE db_column_dependencies (
+        source_database_id    TEXT NOT NULL,
+        source_column_id      TEXT NOT NULL,
+        dependent_database_id TEXT NOT NULL,
+        dependent_column_id   TEXT NOT NULL,
+        dependency_kind       TEXT NOT NULL CHECK (dependency_kind IN
+          ('formula','formula_global','formula_relation_target','rollup_relation','rollup_target')),
+        PRIMARY KEY (source_database_id, source_column_id, dependent_database_id, dependent_column_id, dependency_kind)
+      );
+      INSERT INTO db_column_dependencies SELECT * FROM db_column_dependencies_v140;
+      DROP TABLE db_column_dependencies_v140;
+      CREATE INDEX idx_db_column_dependencies_source
+        ON db_column_dependencies(source_database_id, source_column_id);
+
+      CREATE TABLE db_relation_repairs (
+        id                   TEXT PRIMARY KEY,
+        relation_id          TEXT NOT NULL,
+        old_target_id        TEXT NOT NULL,
+        new_target_id        TEXT,
+        action               TEXT NOT NULL CHECK (action IN ('repair','cleanup','cascade')),
+        actor                TEXT NOT NULL DEFAULT 'local',
+        created_at           TEXT NOT NULL
+      );
+      CREATE INDEX idx_db_relation_repairs_relation ON db_relation_repairs(relation_id, created_at);
+    `,
+  },
+  {
+    version: 143,
+    up: /* sql */ `
+      -- Notion parity, loop 9: one complete, versioned configuration per saved view.
+      -- The legacy layout/filter/sort columns remain as round-trip adapters for old
+      -- backups, MCP clients and .nodussync readers.
+      ALTER TABLE db_views ADD COLUMN config_version INTEGER NOT NULL DEFAULT 2 CHECK (config_version >= 1);
+      ALTER TABLE db_views ADD COLUMN config_json TEXT;
+      ALTER TABLE db_views ADD COLUMN scope TEXT NOT NULL DEFAULT 'shared'
+        CHECK (scope IN ('personal','shared'));
+      ALTER TABLE db_views ADD COLUMN owner_actor_id TEXT NOT NULL DEFAULT 'local';
+      ALTER TABLE db_views ADD COLUMN edit_permission TEXT NOT NULL DEFAULT 'editors'
+        CHECK (edit_permission IN ('owner','editors','everyone'));
+      ALTER TABLE db_views ADD COLUMN source_view_id TEXT REFERENCES db_views(id) ON DELETE SET NULL;
+      CREATE INDEX idx_db_views_scope_owner ON db_views(database_id, scope, owner_actor_id, position);
+      CREATE INDEX idx_db_views_source ON db_views(source_view_id);
+
+      CREATE TABLE db_view_revisions (
+        id          TEXT PRIMARY KEY,
+        view_id     TEXT NOT NULL REFERENCES db_views(id) ON DELETE CASCADE,
+        revision    INTEGER NOT NULL CHECK (revision >= 1),
+        name        TEXT NOT NULL,
+        config_json TEXT NOT NULL,
+        reason      TEXT NOT NULL CHECK (reason IN ('create','update','restore','reorder')),
+        actor_id    TEXT NOT NULL,
+        created_at  TEXT NOT NULL,
+        UNIQUE(view_id, revision)
+      );
+      CREATE INDEX idx_db_view_revisions_view ON db_view_revisions(view_id, revision DESC);
+    `,
+    after: (db) => {
+      const rows = db.prepare(
+        `SELECT id, name, layout, filter_json, sort_json, revision, created_by, created_at
+         FROM db_views ORDER BY database_id, position, created_at`,
+      ).all() as Array<{
+        id: string;
+        name: string;
+        layout: string;
+        filter_json: string | null;
+        sort_json: string | null;
+        revision: number;
+        created_by: string;
+        created_at: string;
+      }>;
+      const parse = <T>(json: string | null, fallback: T): T => {
+        if (!json) return fallback;
+        try { return JSON.parse(json) as T; } catch { return fallback; }
+      };
+      const update = db.prepare('UPDATE db_views SET config_json = ? WHERE id = ?');
+      const insertRevision = db.prepare(
+        `INSERT INTO db_view_revisions
+          (id, view_id, revision, name, config_json, reason, actor_id, created_at)
+         VALUES (?, ?, ?, ?, ?, 'create', ?, ?)`,
+      );
+      for (const row of rows) {
+        const filter = parse(row.filter_json, { conjunction: 'and' as const, conditions: [] });
+        const sorts = parse(row.sort_json, []);
+        const config = normalizeDatabaseViewConfig(null, { layout: row.layout, filter, sorts });
+        const json = JSON.stringify(config);
+        update.run(json, row.id);
+        insertRevision.run(`dviewrev_migration_${row.id}`, row.id, row.revision, row.name, json, row.created_by, row.created_at);
+      }
+    },
+  },
+  {
+    version: 144,
+    up: /* sql */ `
+      -- Notion parity, loop 13: views are visual containers; databases remain fully
+      -- compatible local data sources and may be combined without copying their rows.
+      CREATE TABLE db_data_sources (
+        id          TEXT PRIMARY KEY,
+        database_id TEXT NOT NULL UNIQUE REFERENCES db_databases(id) ON DELETE CASCADE,
+        name        TEXT NOT NULL,
+        kind        TEXT NOT NULL DEFAULT 'local_database' CHECK (kind = 'local_database'),
+        revision    INTEGER NOT NULL DEFAULT 1 CHECK (revision >= 1),
+        created_by  TEXT NOT NULL DEFAULT 'local',
+        updated_by  TEXT NOT NULL DEFAULT 'local',
+        created_at  TEXT NOT NULL,
+        updated_at  TEXT NOT NULL
+      );
+      CREATE INDEX idx_db_data_sources_database ON db_data_sources(database_id);
+
+      CREATE TABLE db_view_sources (
+        view_id           TEXT NOT NULL REFERENCES db_views(id) ON DELETE CASCADE,
+        source_id         TEXT NOT NULL REFERENCES db_data_sources(id) ON DELETE CASCADE,
+        alias             TEXT NOT NULL,
+        position          INTEGER NOT NULL DEFAULT 0 CHECK (position >= 0),
+        is_primary        INTEGER NOT NULL DEFAULT 0 CHECK (is_primary IN (0, 1)),
+        property_map_json TEXT NOT NULL DEFAULT '{}',
+        revision          INTEGER NOT NULL DEFAULT 1 CHECK (revision >= 1),
+        created_by        TEXT NOT NULL DEFAULT 'local',
+        updated_by        TEXT NOT NULL DEFAULT 'local',
+        created_at        TEXT NOT NULL,
+        updated_at        TEXT NOT NULL,
+        PRIMARY KEY (view_id, source_id)
+      );
+      CREATE UNIQUE INDEX idx_db_view_sources_position ON db_view_sources(view_id, position);
+      CREATE UNIQUE INDEX idx_db_view_sources_primary ON db_view_sources(view_id) WHERE is_primary = 1;
+      CREATE INDEX idx_db_view_sources_source ON db_view_sources(source_id, view_id);
+
+      INSERT INTO db_data_sources
+        (id, database_id, name, kind, revision, created_by, updated_by, created_at, updated_at)
+      SELECT 'dsrc_' || id, id, name, 'local_database', revision, created_by, updated_by, created_at, updated_at
+      FROM db_databases;
+
+      INSERT INTO db_view_sources
+        (view_id, source_id, alias, position, is_primary, property_map_json,
+         revision, created_by, updated_by, created_at, updated_at)
+      SELECT view.id, source.id, source.name, 0, 1, '{}', 1,
+             view.created_by, view.updated_by, view.created_at, view.updated_at
+      FROM db_views view JOIN db_data_sources source ON source.database_id = view.database_id;
+    `,
+  },
+  {
+    version: 145,
+    up: /* sql */ `
+      -- Notion parity, loop 14: reusable row/page templates, idempotent schedules,
+      -- nested subitems, acyclic task dependencies, and first-class sprints.
+      CREATE TABLE db_row_templates (
+        id                     TEXT PRIMARY KEY,
+        database_id            TEXT NOT NULL REFERENCES db_databases(id) ON DELETE CASCADE,
+        name                   TEXT NOT NULL CHECK (length(trim(name)) > 0),
+        icon                   TEXT,
+        cover_blob_hash        TEXT REFERENCES db_blobs(hash) ON DELETE SET NULL,
+        properties_json        TEXT NOT NULL DEFAULT '{}' CHECK (json_valid(properties_json) AND json_type(properties_json) = 'object'),
+        blocks_json            TEXT NOT NULL DEFAULT '[]' CHECK (json_valid(blocks_json) AND json_type(blocks_json) = 'array'),
+        default_relations_json TEXT NOT NULL DEFAULT '[]' CHECK (json_valid(default_relations_json) AND json_type(default_relations_json) = 'array'),
+        recurrence             TEXT NOT NULL DEFAULT 'none' CHECK (recurrence IN ('none','daily','weekly','monthly','yearly')),
+        time_zone              TEXT NOT NULL DEFAULT 'UTC',
+        next_run_at            TEXT,
+        revision               INTEGER NOT NULL DEFAULT 1 CHECK (revision >= 1),
+        created_by             TEXT NOT NULL DEFAULT 'local',
+        updated_by             TEXT NOT NULL DEFAULT 'local',
+        created_at             TEXT NOT NULL,
+        updated_at             TEXT NOT NULL
+      );
+      CREATE INDEX idx_db_row_templates_database ON db_row_templates(database_id, name COLLATE NOCASE);
+      CREATE INDEX idx_db_row_templates_due ON db_row_templates(next_run_at) WHERE recurrence <> 'none' AND next_run_at IS NOT NULL;
+
+      CREATE TABLE db_template_runs (
+        template_id   TEXT NOT NULL REFERENCES db_row_templates(id) ON DELETE CASCADE,
+        occurrence_key TEXT NOT NULL,
+        row_id        TEXT NOT NULL,
+        scheduled_at  TEXT NOT NULL,
+        created_at    TEXT NOT NULL,
+        PRIMARY KEY (template_id, occurrence_key)
+      );
+      CREATE INDEX idx_db_template_runs_row ON db_template_runs(row_id);
+
+      CREATE TABLE db_row_hierarchy (
+        database_id  TEXT NOT NULL REFERENCES db_databases(id) ON DELETE CASCADE,
+        row_id       TEXT NOT NULL,
+        parent_row_id TEXT,
+        sort_order   REAL NOT NULL DEFAULT 1024,
+        collapsed    INTEGER NOT NULL DEFAULT 0 CHECK (collapsed IN (0,1)),
+        revision     INTEGER NOT NULL DEFAULT 1 CHECK (revision >= 1),
+        updated_by   TEXT NOT NULL DEFAULT 'local',
+        created_at   TEXT NOT NULL,
+        updated_at   TEXT NOT NULL,
+        PRIMARY KEY (database_id, row_id),
+        FOREIGN KEY (database_id, row_id) REFERENCES db_rows(database_id, id) ON DELETE CASCADE,
+        FOREIGN KEY (database_id, parent_row_id) REFERENCES db_rows(database_id, id) ON DELETE CASCADE,
+        CHECK (parent_row_id IS NULL OR parent_row_id <> row_id)
+      );
+      CREATE INDEX idx_db_row_hierarchy_parent ON db_row_hierarchy(database_id, parent_row_id, sort_order, row_id);
+
+      CREATE TABLE db_row_dependencies (
+        id                 TEXT PRIMARY KEY,
+        database_id        TEXT NOT NULL REFERENCES db_databases(id) ON DELETE CASCADE,
+        predecessor_row_id TEXT NOT NULL,
+        successor_row_id   TEXT NOT NULL,
+        lag_days           INTEGER NOT NULL DEFAULT 0 CHECK (lag_days BETWEEN -3650 AND 3650),
+        revision           INTEGER NOT NULL DEFAULT 1 CHECK (revision >= 1),
+        created_by         TEXT NOT NULL DEFAULT 'local',
+        updated_by         TEXT NOT NULL DEFAULT 'local',
+        created_at         TEXT NOT NULL,
+        updated_at         TEXT NOT NULL,
+        UNIQUE (database_id, predecessor_row_id, successor_row_id),
+        FOREIGN KEY (database_id, predecessor_row_id) REFERENCES db_rows(database_id, id) ON DELETE CASCADE,
+        FOREIGN KEY (database_id, successor_row_id) REFERENCES db_rows(database_id, id) ON DELETE CASCADE,
+        CHECK (predecessor_row_id <> successor_row_id)
+      );
+      CREATE INDEX idx_db_row_dependencies_predecessor ON db_row_dependencies(database_id, predecessor_row_id);
+      CREATE INDEX idx_db_row_dependencies_successor ON db_row_dependencies(database_id, successor_row_id);
+
+      CREATE TABLE db_task_configs (
+        database_id       TEXT PRIMARY KEY REFERENCES db_databases(id) ON DELETE CASCADE,
+        date_column_id    TEXT REFERENCES db_columns(id) ON DELETE SET NULL,
+        status_column_id  TEXT REFERENCES db_columns(id) ON DELETE SET NULL,
+        sprint_column_id  TEXT REFERENCES db_columns(id) ON DELETE SET NULL,
+        subitem_view      TEXT NOT NULL DEFAULT 'nested' CHECK (subitem_view IN ('nested','flat')),
+        avoid_weekends    INTEGER NOT NULL DEFAULT 0 CHECK (avoid_weekends IN (0,1)),
+        shift_dependents  INTEGER NOT NULL DEFAULT 1 CHECK (shift_dependents IN (0,1)),
+        revision          INTEGER NOT NULL DEFAULT 1 CHECK (revision >= 1),
+        updated_by        TEXT NOT NULL DEFAULT 'local',
+        created_at        TEXT NOT NULL,
+        updated_at        TEXT NOT NULL
+      );
+
+      CREATE TABLE db_sprints (
+        id          TEXT PRIMARY KEY,
+        database_id TEXT NOT NULL REFERENCES db_databases(id) ON DELETE CASCADE,
+        name        TEXT NOT NULL CHECK (length(trim(name)) > 0),
+        start_at    TEXT NOT NULL,
+        end_at      TEXT NOT NULL,
+        state       TEXT NOT NULL DEFAULT 'planned' CHECK (state IN ('planned','active','completed')),
+        revision    INTEGER NOT NULL DEFAULT 1 CHECK (revision >= 1),
+        created_by  TEXT NOT NULL DEFAULT 'local',
+        updated_by  TEXT NOT NULL DEFAULT 'local',
+        created_at  TEXT NOT NULL,
+        updated_at  TEXT NOT NULL,
+        CHECK (start_at <= end_at)
+      );
+      CREATE INDEX idx_db_sprints_database ON db_sprints(database_id, start_at DESC);
+
+      CREATE TABLE db_sprint_rows (
+        sprint_id TEXT NOT NULL REFERENCES db_sprints(id) ON DELETE CASCADE,
+        row_id    TEXT NOT NULL REFERENCES db_rows(id) ON DELETE CASCADE,
+        created_at TEXT NOT NULL,
+        PRIMARY KEY (sprint_id, row_id)
+      );
+      CREATE INDEX idx_db_sprint_rows_row ON db_sprint_rows(row_id, sprint_id);
+    `,
+  },
+  {
+    version: 146,
+    up: /* sql */ `
+      -- Notion parity, loop 15: versioned automations, idempotent execution logs,
+      -- durable notifications, and transactional public/authenticated forms.
+      CREATE TABLE automation_rules (
+        id             TEXT PRIMARY KEY,
+        database_id    TEXT NOT NULL REFERENCES db_databases(id) ON DELETE CASCADE,
+        version        INTEGER NOT NULL DEFAULT 1 CHECK (version = 1),
+        name           TEXT NOT NULL CHECK (length(trim(name)) > 0),
+        enabled        INTEGER NOT NULL DEFAULT 1 CHECK (enabled IN (0,1)),
+        trigger_json   TEXT NOT NULL CHECK (json_valid(trigger_json) AND json_type(trigger_json) = 'object'),
+        condition_json TEXT CHECK (condition_json IS NULL OR json_valid(condition_json)),
+        actions_json   TEXT NOT NULL CHECK (json_valid(actions_json) AND json_type(actions_json) = 'array'),
+        variables_json TEXT NOT NULL DEFAULT '{}' CHECK (json_valid(variables_json) AND json_type(variables_json) = 'object'),
+        max_depth      INTEGER NOT NULL DEFAULT 5 CHECK (max_depth BETWEEN 1 AND 20),
+        max_attempts   INTEGER NOT NULL DEFAULT 3 CHECK (max_attempts BETWEEN 1 AND 10),
+        retry_delay_ms INTEGER NOT NULL DEFAULT 250 CHECK (retry_delay_ms BETWEEN 0 AND 60000),
+        revision       INTEGER NOT NULL DEFAULT 1 CHECK (revision >= 1),
+        created_by     TEXT NOT NULL DEFAULT 'local',
+        updated_by     TEXT NOT NULL DEFAULT 'local',
+        created_at     TEXT NOT NULL,
+        updated_at     TEXT NOT NULL
+      );
+      CREATE INDEX idx_automation_rules_database ON automation_rules(database_id, enabled, name COLLATE NOCASE);
+      CREATE INDEX idx_automation_rules_trigger ON automation_rules(database_id, enabled, json_extract(trigger_json, '$.type'));
+      CREATE INDEX idx_automation_rules_schedule ON automation_rules(json_extract(trigger_json, '$.nextRunAt'))
+        WHERE enabled = 1 AND json_extract(trigger_json, '$.type') = 'schedule';
+
+      CREATE TABLE automation_runs (
+        id                TEXT PRIMARY KEY,
+        rule_id           TEXT NOT NULL REFERENCES automation_rules(id) ON DELETE CASCADE,
+        database_id       TEXT NOT NULL REFERENCES db_databases(id) ON DELETE CASCADE,
+        row_id            TEXT REFERENCES db_rows(id) ON DELETE SET NULL,
+        event_key         TEXT NOT NULL,
+        status            TEXT NOT NULL CHECK (status IN ('running','succeeded','failed','skipped')),
+        depth             INTEGER NOT NULL DEFAULT 0 CHECK (depth BETWEEN 0 AND 20),
+        attempt           INTEGER NOT NULL DEFAULT 1 CHECK (attempt BETWEEN 1 AND 10),
+        actions_completed INTEGER NOT NULL DEFAULT 0 CHECK (actions_completed >= 0),
+        output_json       TEXT NOT NULL DEFAULT 'null' CHECK (json_valid(output_json)),
+        error             TEXT,
+        started_at        TEXT NOT NULL,
+        finished_at       TEXT,
+        UNIQUE (rule_id, event_key)
+      );
+      CREATE INDEX idx_automation_runs_database ON automation_runs(database_id, started_at DESC);
+      CREATE INDEX idx_automation_runs_rule ON automation_runs(rule_id, started_at DESC);
+
+      CREATE TABLE automation_notifications (
+        id          TEXT PRIMARY KEY,
+        rule_id     TEXT REFERENCES automation_rules(id) ON DELETE SET NULL,
+        run_id      TEXT REFERENCES automation_runs(id) ON DELETE SET NULL,
+        database_id TEXT NOT NULL REFERENCES db_databases(id) ON DELETE CASCADE,
+        row_id      TEXT REFERENCES db_rows(id) ON DELETE SET NULL,
+        title       TEXT NOT NULL,
+        body        TEXT NOT NULL DEFAULT '',
+        is_read     INTEGER NOT NULL DEFAULT 0 CHECK (is_read IN (0,1)),
+        created_at  TEXT NOT NULL
+      );
+      CREATE INDEX idx_automation_notifications_unread ON automation_notifications(is_read, created_at DESC);
+
+      CREATE TABLE database_forms (
+        id                 TEXT PRIMARY KEY,
+        database_id        TEXT NOT NULL REFERENCES db_databases(id) ON DELETE CASCADE,
+        version            INTEGER NOT NULL DEFAULT 1 CHECK (version = 1),
+        name               TEXT NOT NULL CHECK (length(trim(name)) > 0),
+        slug               TEXT NOT NULL UNIQUE CHECK (length(slug) BETWEEN 1 AND 64),
+        title              TEXT NOT NULL,
+        description        TEXT NOT NULL DEFAULT '',
+        access             TEXT NOT NULL DEFAULT 'public' CHECK (access IN ('public','authenticated')),
+        auth_token_hash    TEXT,
+        confirmation_title TEXT NOT NULL DEFAULT 'Enviado',
+        confirmation_body TEXT NOT NULL DEFAULT 'Tu respuesta se ha guardado.',
+        rate_limit_count   INTEGER NOT NULL DEFAULT 10 CHECK (rate_limit_count BETWEEN 1 AND 1000),
+        rate_limit_minutes INTEGER NOT NULL DEFAULT 60 CHECK (rate_limit_minutes BETWEEN 1 AND 10080),
+        enabled            INTEGER NOT NULL DEFAULT 1 CHECK (enabled IN (0,1)),
+        revision           INTEGER NOT NULL DEFAULT 1 CHECK (revision >= 1),
+        created_by         TEXT NOT NULL DEFAULT 'local',
+        updated_by         TEXT NOT NULL DEFAULT 'local',
+        created_at         TEXT NOT NULL,
+        updated_at         TEXT NOT NULL,
+        CHECK (access = 'public' OR auth_token_hash IS NOT NULL)
+      );
+      CREATE INDEX idx_database_forms_database ON database_forms(database_id, name COLLATE NOCASE);
+
+      CREATE TABLE database_form_fields (
+        id          TEXT PRIMARY KEY,
+        form_id     TEXT NOT NULL REFERENCES database_forms(id) ON DELETE CASCADE,
+        column_id   TEXT NOT NULL REFERENCES db_columns(id) ON DELETE CASCADE,
+        label       TEXT NOT NULL,
+        description TEXT,
+        required    INTEGER NOT NULL DEFAULT 0 CHECK (required IN (0,1)),
+        position    INTEGER NOT NULL DEFAULT 0 CHECK (position >= 0),
+        width       TEXT NOT NULL DEFAULT 'full' CHECK (width IN ('full','half')),
+        revision    INTEGER NOT NULL DEFAULT 1 CHECK (revision >= 1),
+        created_at  TEXT NOT NULL,
+        updated_at  TEXT NOT NULL,
+        UNIQUE (form_id, column_id),
+        UNIQUE (form_id, position)
+      );
+      CREATE INDEX idx_database_form_fields_column ON database_form_fields(column_id, form_id);
+
+      CREATE TABLE database_form_submissions (
+        id          TEXT PRIMARY KEY,
+        form_id     TEXT NOT NULL REFERENCES database_forms(id) ON DELETE CASCADE,
+        row_id      TEXT NOT NULL REFERENCES db_rows(id) ON DELETE CASCADE,
+        status      TEXT NOT NULL DEFAULT 'accepted' CHECK (status IN ('accepted','rejected')),
+        source      TEXT NOT NULL DEFAULT 'local-http',
+        values_json TEXT NOT NULL CHECK (json_valid(values_json) AND json_type(values_json) = 'object'),
+        created_at  TEXT NOT NULL
+      );
+      CREATE INDEX idx_database_form_submissions_form ON database_form_submissions(form_id, created_at DESC);
+
+      CREATE TABLE database_form_rate_limits (
+        form_id      TEXT NOT NULL REFERENCES database_forms(id) ON DELETE CASCADE,
+        fingerprint  TEXT NOT NULL,
+        window_start TEXT NOT NULL,
+        submissions  INTEGER NOT NULL DEFAULT 0 CHECK (submissions >= 0),
+        PRIMARY KEY (form_id, fingerprint, window_start)
+      );
+      CREATE INDEX idx_database_form_rate_limits_window ON database_form_rate_limits(window_start);
+    `,
+  },
+  {
+    version: 147,
+    up: /* sql */ `
+      -- Notion parity, loop 16A: append-only page history. Every mutation stores a
+      -- compact delta and every twentieth revision stores a complete reconstruction
+      -- point. History is initialized lazily so opening a vault with hundreds of
+      -- thousands of row-pages does not turn the migration into an unbounded rewrite.
+      CREATE TABLE page_revisions (
+        id                     TEXT PRIMARY KEY,
+        page_id                TEXT NOT NULL REFERENCES pages(id) ON DELETE CASCADE,
+        revision               INTEGER NOT NULL CHECK (revision >= 1),
+        source_page_revision   INTEGER NOT NULL CHECK (source_page_revision >= 1),
+        document_revision      INTEGER NOT NULL CHECK (document_revision >= 1),
+        actor_id               TEXT NOT NULL,
+        reason                 TEXT NOT NULL,
+        summary                TEXT NOT NULL DEFAULT '',
+        delta_json             TEXT NOT NULL CHECK (json_valid(delta_json) AND json_type(delta_json) = 'object'),
+        snapshot_json          TEXT CHECK (snapshot_json IS NULL OR (json_valid(snapshot_json) AND json_type(snapshot_json) = 'object')),
+        restored_from_revision INTEGER,
+        created_at             TEXT NOT NULL,
+        UNIQUE (page_id, revision),
+        CHECK (restored_from_revision IS NULL OR restored_from_revision >= 1)
+      );
+      CREATE INDEX idx_page_revisions_page_cursor ON page_revisions(page_id, revision DESC);
+      CREATE INDEX idx_page_revisions_created ON page_revisions(created_at DESC);
+    `,
+  },
+  {
+    version: 148,
+    up: /* sql */ `
+      -- Notion parity, loop 16B. Extend v146 append-only, then add actors,
+      -- threaded comments, reactions, explicit mentions and a durable inbox.
+      ALTER TABLE page_revisions ADD COLUMN property_changes INTEGER NOT NULL DEFAULT 0 CHECK (property_changes >= 0);
+      ALTER TABLE page_revisions ADD COLUMN block_changes INTEGER NOT NULL DEFAULT 0 CHECK (block_changes >= 0);
+
+      CREATE TABLE workspace_actors (
+        id TEXT PRIMARY KEY,
+        display_name TEXT NOT NULL CHECK (length(trim(display_name)) > 0),
+        email TEXT,
+        avatar TEXT,
+        kind TEXT NOT NULL DEFAULT 'member' CHECK (kind IN ('member','guest','system')),
+        revision INTEGER NOT NULL DEFAULT 1 CHECK (revision >= 1),
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
+      CREATE UNIQUE INDEX idx_workspace_actors_email ON workspace_actors(email COLLATE NOCASE) WHERE email IS NOT NULL;
+      INSERT INTO workspace_actors (id, display_name, kind, created_at, updated_at)
+      VALUES ('local', 'Tú', 'member', strftime('%Y-%m-%dT%H:%M:%fZ','now'), strftime('%Y-%m-%dT%H:%M:%fZ','now'));
+      INSERT INTO workspace_actors (id, display_name, kind, created_at, updated_at)
+      VALUES ('migration', 'Migración', 'system', strftime('%Y-%m-%dT%H:%M:%fZ','now'), strftime('%Y-%m-%dT%H:%M:%fZ','now'));
+
+      CREATE TABLE page_comments (
+        id TEXT PRIMARY KEY,
+        page_id TEXT NOT NULL REFERENCES pages(id) ON DELETE CASCADE,
+        block_id TEXT REFERENCES page_blocks(id) ON DELETE SET NULL,
+        parent_comment_id TEXT REFERENCES page_comments(id) ON DELETE CASCADE,
+        body TEXT NOT NULL CHECK (length(trim(body)) BETWEEN 1 AND 10000),
+        revision INTEGER NOT NULL DEFAULT 1 CHECK (revision >= 1),
+        created_by TEXT NOT NULL REFERENCES workspace_actors(id),
+        updated_by TEXT NOT NULL REFERENCES workspace_actors(id),
+        resolved_at TEXT,
+        resolved_by TEXT REFERENCES workspace_actors(id),
+        deleted_at TEXT,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
+      CREATE INDEX idx_page_comments_page ON page_comments(page_id, resolved_at, created_at, id);
+      CREATE INDEX idx_page_comments_parent ON page_comments(parent_comment_id, created_at, id);
+      CREATE INDEX idx_page_comments_block ON page_comments(block_id, resolved_at, created_at) WHERE block_id IS NOT NULL;
+
+      CREATE TABLE page_comment_reactions (
+        comment_id TEXT NOT NULL REFERENCES page_comments(id) ON DELETE CASCADE,
+        actor_id TEXT NOT NULL REFERENCES workspace_actors(id) ON DELETE CASCADE,
+        emoji TEXT NOT NULL CHECK (length(emoji) BETWEEN 1 AND 32),
+        created_at TEXT NOT NULL,
+        PRIMARY KEY (comment_id, actor_id, emoji)
+      );
+      CREATE INDEX idx_page_comment_reactions_comment ON page_comment_reactions(comment_id, emoji);
+
+      CREATE TABLE page_comment_mentions (
+        comment_id TEXT NOT NULL REFERENCES page_comments(id) ON DELETE CASCADE,
+        actor_id TEXT NOT NULL REFERENCES workspace_actors(id) ON DELETE CASCADE,
+        created_at TEXT NOT NULL,
+        PRIMARY KEY (comment_id, actor_id)
+      );
+      CREATE INDEX idx_page_comment_mentions_actor ON page_comment_mentions(actor_id, created_at DESC);
+
+      CREATE TABLE workspace_notifications (
+        id TEXT PRIMARY KEY,
+        actor_id TEXT NOT NULL REFERENCES workspace_actors(id) ON DELETE CASCADE,
+        kind TEXT NOT NULL CHECK (kind IN ('mention','comment_reply','comment_resolved','automation')),
+        page_id TEXT REFERENCES pages(id) ON DELETE CASCADE,
+        block_id TEXT REFERENCES page_blocks(id) ON DELETE SET NULL,
+        comment_id TEXT REFERENCES page_comments(id) ON DELETE CASCADE,
+        title TEXT NOT NULL,
+        body TEXT NOT NULL DEFAULT '',
+        is_read INTEGER NOT NULL DEFAULT 0 CHECK (is_read IN (0,1)),
+        created_at TEXT NOT NULL,
+        UNIQUE (actor_id, kind, comment_id)
+      );
+      CREATE INDEX idx_workspace_notifications_inbox ON workspace_notifications(actor_id, is_read, created_at DESC);
+    `,
+  },
+  {
+    version: 149,
+    up: /* sql */ `
+      -- Notion parity, loop 16C: generic hierarchical ACLs, groups and
+      -- revocable public links. Generic resource ids are validated in the
+      -- repository because SQLite cannot express a polymorphic foreign key.
+      CREATE TABLE workspace_groups (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL CHECK (length(trim(name)) BETWEEN 1 AND 120),
+        revision INTEGER NOT NULL DEFAULT 1 CHECK (revision >= 1),
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
+      CREATE UNIQUE INDEX idx_workspace_groups_name ON workspace_groups(name COLLATE NOCASE);
+
+      CREATE TABLE workspace_group_members (
+        group_id TEXT NOT NULL REFERENCES workspace_groups(id) ON DELETE CASCADE,
+        actor_id TEXT NOT NULL REFERENCES workspace_actors(id) ON DELETE CASCADE,
+        created_at TEXT NOT NULL,
+        PRIMARY KEY (group_id, actor_id)
+      );
+      CREATE INDEX idx_workspace_group_members_actor ON workspace_group_members(actor_id, group_id);
+
+      CREATE TABLE acl_entries (
+        id TEXT PRIMARY KEY,
+        resource_type TEXT NOT NULL CHECK (resource_type IN ('vault','page','database','view','row')),
+        resource_id TEXT NOT NULL,
+        principal_type TEXT NOT NULL CHECK (principal_type IN ('actor','group')),
+        principal_id TEXT NOT NULL,
+        role TEXT NOT NULL CHECK (role IN ('owner','full_access','edit','edit_content','comment','view')),
+        revision INTEGER NOT NULL DEFAULT 1 CHECK (revision >= 1),
+        created_by TEXT NOT NULL REFERENCES workspace_actors(id),
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        UNIQUE (resource_type, resource_id, principal_type, principal_id)
+      );
+      CREATE INDEX idx_acl_entries_resource ON acl_entries(resource_type, resource_id);
+      CREATE INDEX idx_acl_entries_principal ON acl_entries(principal_type, principal_id, resource_type, resource_id);
+      CREATE TRIGGER acl_entries_principal_insert BEFORE INSERT ON acl_entries BEGIN
+        SELECT CASE
+          WHEN NEW.principal_type = 'actor' AND NOT EXISTS (SELECT 1 FROM workspace_actors WHERE id = NEW.principal_id)
+            THEN RAISE(ABORT, 'ACL actor does not exist')
+          WHEN NEW.principal_type = 'group' AND NOT EXISTS (SELECT 1 FROM workspace_groups WHERE id = NEW.principal_id)
+            THEN RAISE(ABORT, 'ACL group does not exist')
+        END;
+      END;
+      CREATE TRIGGER acl_entries_principal_update BEFORE UPDATE OF principal_type, principal_id ON acl_entries BEGIN
+        SELECT CASE
+          WHEN NEW.principal_type = 'actor' AND NOT EXISTS (SELECT 1 FROM workspace_actors WHERE id = NEW.principal_id)
+            THEN RAISE(ABORT, 'ACL actor does not exist')
+          WHEN NEW.principal_type = 'group' AND NOT EXISTS (SELECT 1 FROM workspace_groups WHERE id = NEW.principal_id)
+            THEN RAISE(ABORT, 'ACL group does not exist')
+        END;
+      END;
+      INSERT INTO acl_entries
+        (id, resource_type, resource_id, principal_type, principal_id, role, revision, created_by, created_at, updated_at)
+      VALUES
+        ('acl_vault_local_owner', 'vault', 'vault', 'actor', 'local', 'owner', 1, 'local',
+         strftime('%Y-%m-%dT%H:%M:%fZ','now'), strftime('%Y-%m-%dT%H:%M:%fZ','now'));
+
+      CREATE TABLE workspace_share_links (
+        id TEXT PRIMARY KEY,
+        resource_type TEXT NOT NULL CHECK (resource_type IN ('page','database','view')),
+        resource_id TEXT NOT NULL,
+        token_hash TEXT NOT NULL UNIQUE CHECK (length(token_hash) = 64),
+        password_salt TEXT,
+        password_hash TEXT,
+        role TEXT NOT NULL CHECK (role IN ('comment','view')),
+        expires_at TEXT,
+        allow_indexing INTEGER NOT NULL DEFAULT 0 CHECK (allow_indexing IN (0,1)),
+        revision INTEGER NOT NULL DEFAULT 1 CHECK (revision >= 1),
+        created_by TEXT NOT NULL REFERENCES workspace_actors(id),
+        revoked_at TEXT,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        CHECK ((password_salt IS NULL) = (password_hash IS NULL))
+      );
+      CREATE INDEX idx_workspace_share_links_resource ON workspace_share_links(resource_type, resource_id, revoked_at, expires_at);
+    `,
+  },
+  {
+    version: 150,
+    up: /* sql */ `
+      -- Notion parity, loop 17A: stable device identity, HLC-stamped operations,
+      -- per-row convergence clocks and an inspectable conflict log.
+      CREATE TABLE workspace_devices (
+        id TEXT PRIMARY KEY,
+        actor_id TEXT NOT NULL REFERENCES workspace_actors(id),
+        name TEXT NOT NULL CHECK (length(trim(name)) > 0),
+        last_hlc TEXT NOT NULL,
+        revision INTEGER NOT NULL DEFAULT 1 CHECK (revision >= 1),
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
+      INSERT INTO workspace_devices (id, actor_id, name, last_hlc, created_at, updated_at)
+      VALUES ('local-device', 'local', 'Este dispositivo', '0000000000000-000000-local-device',
+        strftime('%Y-%m-%dT%H:%M:%fZ','now'), strftime('%Y-%m-%dT%H:%M:%fZ','now'));
+
+      ALTER TABLE server_outbox ADD COLUMN actor_id TEXT NOT NULL DEFAULT 'local';
+      ALTER TABLE server_outbox ADD COLUMN device_id TEXT NOT NULL DEFAULT 'local-device';
+      ALTER TABLE server_outbox ADD COLUMN hlc TEXT NOT NULL DEFAULT '0000000000000-000000-local-device';
+      CREATE INDEX idx_server_outbox_hlc ON server_outbox(hlc, id);
+
+      CREATE TABLE sync_row_clocks (
+        table_name TEXT NOT NULL,
+        row_key TEXT NOT NULL,
+        hlc TEXT NOT NULL,
+        operation_id TEXT NOT NULL,
+        actor_id TEXT NOT NULL,
+        device_id TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        PRIMARY KEY (table_name, row_key)
+      );
+      CREATE INDEX idx_sync_row_clocks_hlc ON sync_row_clocks(hlc, table_name, row_key);
+
+      CREATE TABLE sync_conflicts (
+        id TEXT PRIMARY KEY,
+        table_name TEXT NOT NULL,
+        row_key TEXT NOT NULL,
+        winning_operation_id TEXT NOT NULL,
+        losing_operation_id TEXT NOT NULL,
+        winner_hlc TEXT NOT NULL,
+        loser_hlc TEXT NOT NULL,
+        outcome TEXT NOT NULL CHECK (outcome IN ('kept_local','applied_remote')),
+        losing_row_json TEXT CHECK (losing_row_json IS NULL OR json_valid(losing_row_json)),
+        created_at TEXT NOT NULL,
+        UNIQUE (winning_operation_id, losing_operation_id)
+      );
+      CREATE INDEX idx_sync_conflicts_row ON sync_conflicts(table_name, row_key, created_at DESC);
+
+      CREATE TABLE sync_snapshot_cursors (
+        stream_id TEXT PRIMARY KEY,
+        cursor INTEGER NOT NULL DEFAULT 0 CHECK (cursor >= 0),
+        snapshot_revision TEXT,
+        hydrated_at TEXT,
+        updated_at TEXT NOT NULL
+      );
+    `,
+  },
+  {
+    version: 151,
+    up: /* sql */ `
+      -- Notion parity, loop 17B: content-address every Yjs delta so its binary bytes
+      -- travel outside the JSON operation relay and can be replayed idempotently.
+      ALTER TABLE page_document_updates ADD COLUMN update_hash TEXT;
+      CREATE INDEX idx_page_document_updates_hash
+        ON page_document_updates(page_id, update_hash) WHERE update_hash IS NOT NULL;
+      CREATE TABLE page_document_update_receipts (
+        update_hash TEXT PRIMARY KEY CHECK (length(update_hash) = 64),
+        page_id TEXT NOT NULL REFERENCES pages(id) ON DELETE CASCADE,
+        operation_id TEXT NOT NULL UNIQUE,
+        applied_at TEXT NOT NULL
+      );
+      CREATE INDEX idx_page_document_update_receipts_page ON page_document_update_receipts(page_id, applied_at);
+    `,
+    after: (db) => {
+      const rows = db.prepare('SELECT id, update_blob FROM page_document_updates WHERE update_hash IS NULL').all() as Array<{
+        id: string; update_blob: Buffer;
+      }>;
+      const update = db.prepare('UPDATE page_document_updates SET update_hash = ? WHERE id = ?');
+      for (const row of rows) update.run(createHash('sha256').update(row.update_blob).digest('hex'), row.id);
+    },
+  },
+  {
+    version: 152,
+    up: /* sql */ `
+      -- Notion parity, loop 19: FTS is a lexical index. Typed numbers, booleans and
+      -- numeric materializations are served by their covering indexes and only made
+      -- the FTS file larger. Keep exactly the user-visible textual property families.
+      DELETE FROM db_search_fts
+      WHERE entity_type = 'cell' AND NOT EXISTS (
+        SELECT 1 FROM db_columns col
+        WHERE col.id = db_search_fts.column_id AND col.database_id = db_search_fts.database_id
+          AND col.type IN ('title','rich_text','text','select','status','multi_select','person','url','email','phone','location')
+      );
+      DELETE FROM db_search_fts WHERE entity_type = 'computed' AND entity_id IN (
+        SELECT row_id || ':' || column_id FROM db_computed_cells WHERE value_type IN ('number','integer')
+      );
+
+      DROP TRIGGER IF EXISTS db_cells_search_ai;
+      DROP TRIGGER IF EXISTS db_cells_search_au;
+      CREATE TRIGGER db_cells_search_ai AFTER INSERT ON db_cells
+      WHEN EXISTS (
+        SELECT 1 FROM db_columns col WHERE col.id = new.column_id AND col.database_id = new.database_id
+          AND col.type IN ('title','rich_text','text','select','status','multi_select','person','url','email','phone','location')
+      ) BEGIN
+        INSERT INTO db_search_fts(content, entity_type, database_id, row_id, column_id, entity_id)
+        SELECT CASE
+                 WHEN col.type IN ('select','status') THEN COALESCE(
+                   (SELECT option.label FROM db_select_options option
+                    WHERE option.id = COALESCE(new.value_reference, new.value_text)), new.value_text, '')
+                 WHEN col.type = 'multi_select' AND json_valid(COALESCE(new.value_json, new.value_text)) THEN COALESCE(
+                   (SELECT group_concat(COALESCE(option.label, item.value), ' ')
+                    FROM json_each(COALESCE(new.value_json, new.value_text)) item
+                    LEFT JOIN db_select_options option ON option.id = item.value), new.value_text, '')
+                 ELSE COALESCE(new.value_text, '')
+               END,
+               'cell', new.database_id, new.row_id, new.column_id, new.row_id || ':' || new.column_id
+        FROM db_columns col WHERE col.id = new.column_id AND col.database_id = new.database_id;
+      END;
+      CREATE TRIGGER db_cells_search_au AFTER UPDATE ON db_cells BEGIN
+        DELETE FROM db_search_fts WHERE entity_type = 'cell' AND entity_id = old.row_id || ':' || old.column_id;
+        INSERT INTO db_search_fts(content, entity_type, database_id, row_id, column_id, entity_id)
+        SELECT CASE
+                 WHEN col.type IN ('select','status') THEN COALESCE(
+                   (SELECT option.label FROM db_select_options option
+                    WHERE option.id = COALESCE(new.value_reference, new.value_text)), new.value_text, '')
+                 WHEN col.type = 'multi_select' AND json_valid(COALESCE(new.value_json, new.value_text)) THEN COALESCE(
+                   (SELECT group_concat(COALESCE(option.label, item.value), ' ')
+                    FROM json_each(COALESCE(new.value_json, new.value_text)) item
+                    LEFT JOIN db_select_options option ON option.id = item.value), new.value_text, '')
+                 ELSE COALESCE(new.value_text, '')
+               END,
+               'cell', new.database_id, new.row_id, new.column_id, new.row_id || ':' || new.column_id
+        FROM db_columns col
+        WHERE col.id = new.column_id AND col.database_id = new.database_id
+          AND col.type IN ('title','rich_text','text','select','status','multi_select','person','url','email','phone','location');
+      END;
+
+      DROP TRIGGER IF EXISTS db_computed_cells_search_ai;
+      DROP TRIGGER IF EXISTS db_computed_cells_search_au;
+      CREATE TRIGGER db_computed_cells_search_ai AFTER INSERT ON db_computed_cells
+      WHEN new.value_type NOT IN ('number','integer') BEGIN
+        INSERT INTO db_search_fts(content, entity_type, database_id, row_id, column_id, entity_id)
+        VALUES (COALESCE(new.value_text, ''), 'computed', new.database_id, new.row_id, new.column_id,
+                new.row_id || ':' || new.column_id);
+      END;
+      CREATE TRIGGER db_computed_cells_search_au AFTER UPDATE ON db_computed_cells BEGIN
+        DELETE FROM db_search_fts WHERE entity_type = 'computed' AND entity_id = old.row_id || ':' || old.column_id;
+        INSERT INTO db_search_fts(content, entity_type, database_id, row_id, column_id, entity_id)
+        SELECT COALESCE(new.value_text, ''), 'computed', new.database_id, new.row_id, new.column_id,
+               new.row_id || ':' || new.column_id
+        WHERE new.value_type NOT IN ('number','integer');
+      END;
+    `,
+  },
+  {
+    version: 153,
+    up: /* sql */ `
+      -- Notion parity, loop 19: FTS5 UNINDEXED metadata cannot locate an entity for
+      -- UPDATE/DELETE without scanning the whole virtual table. Give every projection a
+      -- stable rowid derived from its source table so an ordinary cell edit stays O(1).
+      DROP TRIGGER IF EXISTS db_cells_search_ai; DROP TRIGGER IF EXISTS db_cells_search_au; DROP TRIGGER IF EXISTS db_cells_search_ad;
+      DROP TRIGGER IF EXISTS db_computed_cells_search_ai; DROP TRIGGER IF EXISTS db_computed_cells_search_au; DROP TRIGGER IF EXISTS db_computed_cells_search_ad;
+      DROP TRIGGER IF EXISTS db_attachments_search_ai; DROP TRIGGER IF EXISTS db_attachments_search_au; DROP TRIGGER IF EXISTS db_attachments_search_ad;
+      DROP TRIGGER IF EXISTS page_blocks_search_ai; DROP TRIGGER IF EXISTS page_blocks_search_au; DROP TRIGGER IF EXISTS page_blocks_search_ad;
+      DROP TRIGGER IF EXISTS pages_search_ai; DROP TRIGGER IF EXISTS pages_search_au; DROP TRIGGER IF EXISTS pages_search_ad;
+      DELETE FROM db_search_fts;
+
+      INSERT INTO db_search_fts(rowid, content, entity_type, database_id, row_id, column_id, entity_id)
+      SELECT cell.rowid,
+             CASE
+               WHEN col.type IN ('select','status') THEN COALESCE(
+                 (SELECT option.label FROM db_select_options option
+                  WHERE option.id = COALESCE(cell.value_reference, cell.value_text)), cell.value_text, '')
+               WHEN col.type = 'multi_select' AND json_valid(COALESCE(cell.value_json, cell.value_text)) THEN COALESCE(
+                 (SELECT group_concat(COALESCE(option.label, item.value), ' ')
+                  FROM json_each(COALESCE(cell.value_json, cell.value_text)) item
+                  LEFT JOIN db_select_options option ON option.id = item.value), cell.value_text, '')
+               ELSE COALESCE(cell.value_text, '')
+             END,
+             'cell', cell.database_id, cell.row_id, cell.column_id, cell.row_id || ':' || cell.column_id
+      FROM db_cells cell JOIN db_columns col
+        ON col.id = cell.column_id AND col.database_id = cell.database_id
+      WHERE col.type IN ('title','rich_text','text','select','status','multi_select','person','url','email','phone','location');
+      INSERT INTO db_search_fts(rowid, content, entity_type, database_id, row_id, column_id, entity_id)
+      SELECT -cell.rowid, COALESCE(cell.value_text, ''), 'computed', cell.database_id,
+             cell.row_id, cell.column_id, cell.row_id || ':' || cell.column_id
+      FROM db_computed_cells cell WHERE cell.value_type NOT IN ('number','integer');
+      INSERT INTO db_search_fts(rowid, content, entity_type, database_id, row_id, column_id, entity_id)
+      SELECT 2305843009213693952 + attachment.rowid,
+             trim(COALESCE(file_name, '') || ' ' || COALESCE(description, '') || ' ' || COALESCE(extracted_text, '')),
+             'attachment', database_id, row_id, column_id, id FROM db_attachments attachment;
+      INSERT INTO db_search_fts(rowid, content, entity_type, database_id, row_id, column_id, entity_id)
+      SELECT -2305843009213693952 + block.rowid, block.normalized_text, 'page_block', row.database_id,
+             page.row_id, NULL, block.id
+      FROM page_blocks block JOIN pages page ON page.id = block.page_id
+      LEFT JOIN db_rows row ON row.id = page.row_id WHERE block.trashed_at IS NULL;
+      INSERT INTO db_search_fts(rowid, content, entity_type, database_id, row_id, column_id, entity_id)
+      SELECT 4611686018427387904 + page.rowid, page.title, 'page_title', row.database_id,
+             page.row_id, NULL, page.id
+      FROM pages page LEFT JOIN db_rows row ON row.id = page.row_id
+      WHERE page.state = 'active' AND page.row_id IS NULL;
+
+      CREATE TRIGGER db_cells_search_ai AFTER INSERT ON db_cells
+      WHEN EXISTS (SELECT 1 FROM db_columns col WHERE col.id = new.column_id AND col.database_id = new.database_id
+        AND col.type IN ('title','rich_text','text','select','status','multi_select','person','url','email','phone','location')) BEGIN
+        INSERT INTO db_search_fts(rowid, content, entity_type, database_id, row_id, column_id, entity_id)
+        SELECT new.rowid, CASE
+          WHEN col.type IN ('select','status') THEN COALESCE((SELECT label FROM db_select_options WHERE id = COALESCE(new.value_reference,new.value_text)),new.value_text,'')
+          WHEN col.type='multi_select' AND json_valid(COALESCE(new.value_json,new.value_text)) THEN COALESCE(
+            (SELECT group_concat(COALESCE(option.label,item.value),' ') FROM json_each(COALESCE(new.value_json,new.value_text)) item
+             LEFT JOIN db_select_options option ON option.id=item.value),new.value_text,'')
+          ELSE COALESCE(new.value_text,'') END,
+          'cell',new.database_id,new.row_id,new.column_id,new.row_id||':'||new.column_id
+        FROM db_columns col WHERE col.id=new.column_id AND col.database_id=new.database_id;
+      END;
+      CREATE TRIGGER db_cells_search_au AFTER UPDATE ON db_cells BEGIN
+        DELETE FROM db_search_fts WHERE rowid=old.rowid;
+        INSERT INTO db_search_fts(rowid, content, entity_type, database_id, row_id, column_id, entity_id)
+        SELECT new.rowid, CASE
+          WHEN col.type IN ('select','status') THEN COALESCE((SELECT label FROM db_select_options WHERE id=COALESCE(new.value_reference,new.value_text)),new.value_text,'')
+          WHEN col.type='multi_select' AND json_valid(COALESCE(new.value_json,new.value_text)) THEN COALESCE(
+            (SELECT group_concat(COALESCE(option.label,item.value),' ') FROM json_each(COALESCE(new.value_json,new.value_text)) item
+             LEFT JOIN db_select_options option ON option.id=item.value),new.value_text,'')
+          ELSE COALESCE(new.value_text,'') END,
+          'cell',new.database_id,new.row_id,new.column_id,new.row_id||':'||new.column_id
+        FROM db_columns col WHERE col.id=new.column_id AND col.database_id=new.database_id
+          AND col.type IN ('title','rich_text','text','select','status','multi_select','person','url','email','phone','location');
+      END;
+      CREATE TRIGGER db_cells_search_ad AFTER DELETE ON db_cells BEGIN DELETE FROM db_search_fts WHERE rowid=old.rowid; END;
+
+      CREATE TRIGGER db_computed_cells_search_ai AFTER INSERT ON db_computed_cells WHEN new.value_type NOT IN ('number','integer') BEGIN
+        INSERT INTO db_search_fts(rowid,content,entity_type,database_id,row_id,column_id,entity_id)
+        VALUES(-new.rowid,COALESCE(new.value_text,''),'computed',new.database_id,new.row_id,new.column_id,new.row_id||':'||new.column_id);
+      END;
+      CREATE TRIGGER db_computed_cells_search_au AFTER UPDATE ON db_computed_cells BEGIN
+        DELETE FROM db_search_fts WHERE rowid=-old.rowid;
+        INSERT INTO db_search_fts(rowid,content,entity_type,database_id,row_id,column_id,entity_id)
+        SELECT -new.rowid,COALESCE(new.value_text,''),'computed',new.database_id,new.row_id,new.column_id,new.row_id||':'||new.column_id
+        WHERE new.value_type NOT IN ('number','integer');
+      END;
+      CREATE TRIGGER db_computed_cells_search_ad AFTER DELETE ON db_computed_cells BEGIN DELETE FROM db_search_fts WHERE rowid=-old.rowid; END;
+
+      CREATE TRIGGER db_attachments_search_ai AFTER INSERT ON db_attachments BEGIN
+        INSERT INTO db_search_fts(rowid,content,entity_type,database_id,row_id,column_id,entity_id)
+        VALUES(2305843009213693952+new.rowid,trim(COALESCE(new.file_name,'')||' '||COALESCE(new.description,'')||' '||COALESCE(new.extracted_text,'')),
+          'attachment',new.database_id,new.row_id,new.column_id,new.id);
+      END;
+      CREATE TRIGGER db_attachments_search_au AFTER UPDATE ON db_attachments BEGIN
+        DELETE FROM db_search_fts WHERE rowid=2305843009213693952+old.rowid;
+        INSERT INTO db_search_fts(rowid,content,entity_type,database_id,row_id,column_id,entity_id)
+        VALUES(2305843009213693952+new.rowid,trim(COALESCE(new.file_name,'')||' '||COALESCE(new.description,'')||' '||COALESCE(new.extracted_text,'')),
+          'attachment',new.database_id,new.row_id,new.column_id,new.id);
+      END;
+      CREATE TRIGGER db_attachments_search_ad AFTER DELETE ON db_attachments BEGIN DELETE FROM db_search_fts WHERE rowid=2305843009213693952+old.rowid; END;
+
+      CREATE TRIGGER page_blocks_search_ai AFTER INSERT ON page_blocks WHEN new.trashed_at IS NULL BEGIN
+        INSERT INTO db_search_fts(rowid,content,entity_type,database_id,row_id,column_id,entity_id)
+        SELECT -2305843009213693952+new.rowid,new.normalized_text,'page_block',row.database_id,page.row_id,NULL,new.id
+        FROM pages page LEFT JOIN db_rows row ON row.id=page.row_id WHERE page.id=new.page_id;
+      END;
+      CREATE TRIGGER page_blocks_search_au AFTER UPDATE ON page_blocks BEGIN
+        DELETE FROM db_search_fts WHERE rowid=-2305843009213693952+old.rowid;
+        INSERT INTO db_search_fts(rowid,content,entity_type,database_id,row_id,column_id,entity_id)
+        SELECT -2305843009213693952+new.rowid,new.normalized_text,'page_block',row.database_id,page.row_id,NULL,new.id
+        FROM pages page LEFT JOIN db_rows row ON row.id=page.row_id WHERE page.id=new.page_id AND new.trashed_at IS NULL;
+      END;
+      CREATE TRIGGER page_blocks_search_ad AFTER DELETE ON page_blocks BEGIN DELETE FROM db_search_fts WHERE rowid=-2305843009213693952+old.rowid; END;
+
+      CREATE TRIGGER pages_search_ai AFTER INSERT ON pages WHEN new.state='active' AND new.row_id IS NULL BEGIN
+        INSERT INTO db_search_fts(rowid,content,entity_type,database_id,row_id,column_id,entity_id)
+        SELECT 4611686018427387904+new.rowid,new.title,'page_title',row.database_id,new.row_id,NULL,new.id
+        FROM (SELECT 1) seed LEFT JOIN db_rows row ON row.id=new.row_id;
+      END;
+      CREATE TRIGGER pages_search_au AFTER UPDATE OF title,state,row_id ON pages BEGIN
+        DELETE FROM db_search_fts WHERE rowid=4611686018427387904+old.rowid;
+        INSERT INTO db_search_fts(rowid,content,entity_type,database_id,row_id,column_id,entity_id)
+        SELECT 4611686018427387904+new.rowid,new.title,'page_title',row.database_id,new.row_id,NULL,new.id
+        FROM (SELECT 1) seed LEFT JOIN db_rows row ON row.id=new.row_id
+        WHERE new.state='active' AND new.row_id IS NULL;
+      END;
+      CREATE TRIGGER pages_search_ad AFTER DELETE ON pages BEGIN DELETE FROM db_search_fts WHERE rowid=4611686018427387904+old.rowid; END;
+    `,
+  },
 ];
 
 /**
@@ -6673,43 +8306,114 @@ function objectNamesCreatedBy(sql: string): string[] {
 }
 
 /**
- * Split a migration body into top-level statements, honouring single-quoted string
- * literals ('' escapes included) and both comment styles so a ';' inside any of them
- * never splits a statement. Migrations contain no triggers or BEGIN...END blocks — the
- * only source of nested semicolons — which a test asserts stays true.
+ * Split a migration body into top-level statements. Besides quoted values and comments,
+ * this understands SQLite's `CREATE TRIGGER ... BEGIN ... END;` grammar: semicolons in a
+ * trigger body belong to the trigger, while the semicolon following its terminal END
+ * closes the top-level statement. CASE...END expressions are tracked independently so
+ * an END inside a trigger UPDATE/INSERT cannot terminate the trigger early.
+ *
+ * Kept exported because the renumber-recovery test exercises the real splitter against
+ * every trigger-bearing migration. It is not part of the application API.
  */
-function splitStatements(sql: string): string[] {
+export function splitMigrationStatements(sql: string): string[] {
   const statements: string[] = [];
   let current = '';
   let i = 0;
+  let word = '';
+  let prefixTokens: string[] = [];
+  let inTrigger = false;
+  let triggerBeginDepth = 0;
+  let triggerCaseDepth = 0;
+  let triggerEnded = false;
+
+  const consumeWord = () => {
+    if (!word) return;
+    const token = word.toUpperCase();
+    word = '';
+    if (!inTrigger) {
+      prefixTokens.push(token);
+      if (prefixTokens.length > 4) prefixTokens = prefixTokens.slice(-4);
+      const normalized = prefixTokens.join(' ');
+      if (/^CREATE (?:TEMP |TEMPORARY )?TRIGGER$/.test(normalized)) inTrigger = true;
+      return;
+    }
+    if (token === 'CASE') {
+      triggerCaseDepth += 1;
+    } else if (token === 'BEGIN' && triggerCaseDepth === 0) {
+      triggerBeginDepth += 1;
+    } else if (token === 'END') {
+      if (triggerCaseDepth > 0) triggerCaseDepth -= 1;
+      else if (triggerBeginDepth > 0) {
+        triggerBeginDepth -= 1;
+        triggerEnded = triggerBeginDepth === 0;
+      }
+    }
+  };
+
+  const resetStatementState = () => {
+    word = '';
+    prefixTokens = [];
+    inTrigger = false;
+    triggerBeginDepth = 0;
+    triggerCaseDepth = 0;
+    triggerEnded = false;
+  };
+
   while (i < sql.length) {
     const ch = sql[i];
     const next = sql[i + 1];
     if (ch === '-' && next === '-') {
+      consumeWord();
       while (i < sql.length && sql[i] !== '\n') { current += sql[i]; i++; }
       continue;
     }
     if (ch === '/' && next === '*') {
+      consumeWord();
       current += '/*'; i += 2;
       while (i < sql.length && !(sql[i] === '*' && sql[i + 1] === '/')) { current += sql[i]; i++; }
       current += '*/'; i += 2;
       continue;
     }
-    if (ch === "'") {
+    if (ch === "'" || ch === '"' || ch === '`') {
+      consumeWord();
+      const quote = ch;
       current += ch; i++;
       while (i < sql.length) {
         current += sql[i];
-        if (sql[i] === "'") {
-          if (sql[i + 1] === "'") { current += sql[i + 1]; i += 2; continue; }
+        if (sql[i] === quote) {
+          if (sql[i + 1] === quote) { current += sql[i + 1]; i += 2; continue; }
           i++; break;
         }
         i++;
       }
       continue;
     }
-    if (ch === ';') { statements.push(current.trim()); current = ''; i++; continue; }
+    if (ch === '[') {
+      consumeWord();
+      current += ch; i++;
+      while (i < sql.length) {
+        current += sql[i];
+        if (sql[i] === ']') { i++; break; }
+        i++;
+      }
+      continue;
+    }
+    if (/[A-Za-z_]/.test(ch)) word += ch;
+    else consumeWord();
+    if (ch === ';') {
+      if (!inTrigger || triggerEnded) {
+        if (current.trim()) statements.push(current.trim());
+        current = '';
+        resetStatementState();
+      } else {
+        current += ch;
+      }
+      i++;
+      continue;
+    }
     current += ch; i++;
   }
+  consumeWord();
   if (current.trim()) statements.push(current.trim());
   return statements.filter((s) => s.length > 0);
 }
@@ -6717,7 +8421,7 @@ function splitStatements(sql: string): string[] {
 /** Run a body statement by statement, skipping only statements whose object/column is
  *  already there. Any other error still aborts, so a real failure is never masked. */
 function execSkippingApplied(db: Database.Database, sql: string): void {
-  for (const statement of splitStatements(sql)) {
+  for (const statement of splitMigrationStatements(sql)) {
     try {
       db.exec(statement);
     } catch (error) {

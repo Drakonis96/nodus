@@ -18,6 +18,13 @@
 
 import type { DatabaseColumn, DatabaseColumnType } from './databases';
 import type { FilterCondition, FilterOp } from './databaseFilters';
+import {
+  formulaExpressionDependencies,
+  formulaExpressionResultKind,
+  validateFormulaExpression,
+  type FormulaExpression,
+  type FormulaExpressionKind,
+} from './databaseFormulaExpression';
 
 /** An operand of an arithmetic recipe: another column, or a fixed number. */
 export type FormulaOperand = { kind: 'column'; columnId: string } | { kind: 'number'; value: number };
@@ -71,7 +78,8 @@ export type FormulaSpec =
   | { kind: 'arithmetic'; op: ArithmeticOp; operands: FormulaOperand[] }
   | { kind: 'columnStat'; fn: ColumnStatFn; columnId: string }
   | { kind: 'ifThen'; rules: FormulaRule[]; otherwise: FormulaOutput; otherwiseColor?: string | null }
-  | { kind: 'concat'; parts: ConcatPart[] };
+  | { kind: 'concat'; parts: ConcatPart[] }
+  | { kind: 'expression'; source: string; ast: FormulaExpression; resultKind?: FormulaExpressionKind; parseError?: string };
 
 export type FormulaKind = FormulaSpec['kind'];
 
@@ -93,6 +101,7 @@ export const FORMULA_RECIPES: { id: FormulaKind; label: string; icon: string; hi
   { id: 'columnStat', label: 'Estadística de columna', icon: 'chartBar', hint: 'Compara cada fila con el resto de la tabla' },
   { id: 'ifThen', label: 'Si… entonces…', icon: 'route', hint: 'Reglas que deciden qué mostrar, y de qué color' },
   { id: 'concat', label: 'Texto combinado', icon: 'quote', hint: 'Une columnas y texto en una frase' },
+  { id: 'expression', label: 'Fórmula avanzada', icon: 'code', hint: 'Expresión segura con fechas, listas, relaciones y personas' },
 ];
 
 export const ARITHMETIC_OPS: { id: ArithmeticOp; label: string; symbol: string; ordered: boolean }[] = [
@@ -144,6 +153,8 @@ export function formulaResultKind(spec: FormulaSpec | undefined | null): 'number
       return 'number';
     case 'concat':
       return 'text';
+    case 'expression':
+      return (spec.resultKind ?? formulaExpressionResultKind(spec.ast)) === 'number' ? 'number' : 'text';
     case 'ifThen': {
       const kinds = [...spec.rules.map((r) => outputKind(r.output)), outputKind(spec.otherwise)].filter(Boolean);
       // Mixed or unpinned outputs compare as text: it is the only kind that can hold both.
@@ -173,6 +184,9 @@ export function formulaDependencies(spec: FormulaSpec | undefined | null): strin
     case 'concat':
       for (const p of spec.parts) if (p.kind === 'column') out.add(p.columnId);
       break;
+    case 'expression':
+      formulaExpressionDependencies(spec.ast).forEach((id) => out.add(id));
+      break;
   }
   return [...out];
 }
@@ -198,6 +212,8 @@ export function validateFormula(spec: FormulaSpec | undefined | null, columns: D
     case 'concat':
       if (spec.parts.length === 0) return 'Añade al menos una columna o un texto.';
       return null;
+    case 'expression':
+      return spec.parseError || validateFormulaExpression(spec.ast, columns);
   }
 }
 
@@ -212,6 +228,8 @@ export function emptyFormula(kind: FormulaKind): FormulaSpec {
       return { kind: 'ifThen', rules: [], otherwise: { kind: 'text', value: '' } };
     case 'concat':
       return { kind: 'concat', parts: [] };
+    case 'expression':
+      return { kind: 'expression', source: 'property("")', ast: { type: 'property', columnId: '' }, resultKind: 'text' };
   }
 }
 
@@ -223,6 +241,60 @@ export function emptyFormula(kind: FormulaKind): FormulaSpec {
  */
 export function comparableType(column: DatabaseColumn): DatabaseColumnType {
   if (column.type === 'comparison') return 'text';
+  if (column.type === 'rich_text' || column.type === 'url' || column.type === 'email' || column.type === 'phone'
+    || column.type === 'location' || column.type === 'person' || column.type === 'created_by'
+    || column.type === 'last_edited_by' || column.type === 'unique_id') return 'text';
+  if (column.type === 'status') return 'select';
+  if (column.type === 'files') return 'attachment';
+  if (column.type === 'created_time' || column.type === 'last_edited_time') return 'date';
+  if (column.type === 'button') return 'text';
   if (column.type !== 'formula') return column.type;
   return formulaResultKind(column.config.formula as FormulaSpec | undefined);
+}
+
+/** Rich result type used by typed materialization. Legacy sorting still projects every
+ * non-number expression to text through formulaResultKind/comparableType. */
+export function formulaValueKind(spec: FormulaSpec | undefined | null, columns: DatabaseColumn[] = []): FormulaExpressionKind | 'number' | 'text' {
+  if (!spec) return 'text';
+  return spec.kind === 'expression' ? (spec.resultKind ?? formulaExpressionResultKind(spec.ast, columns)) : formulaResultKind(spec);
+}
+
+/** Compile every visual recipe to the same safe AST stored by the advanced editor. Legacy
+ * specs remain the compatibility source of truth, while this projection gives sync/API
+ * clients one inspectable expression model. */
+export function formulaRecipeToExpression(spec: FormulaSpec): FormulaExpression {
+  if (spec.kind === 'expression') return spec.ast;
+  const literal = (value: string | number | boolean | null): FormulaExpression => ({ type: 'literal', value });
+  const property = (columnId: string): FormulaExpression => ({ type: 'property', columnId });
+  const call = (name: import('./databaseFormulaExpression').FormulaFunctionName, args: FormulaExpression[]): FormulaExpression => ({ type: 'call', name, args });
+  const operand = (value: FormulaOperand): FormulaExpression => value.kind === 'column' ? property(value.columnId) : literal(value.value);
+  const output = (value: FormulaOutput): FormulaExpression => value.kind === 'column' ? property(value.columnId)
+    : value.kind === 'empty' ? literal(null) : literal(value.value);
+  if (spec.kind === 'arithmetic') {
+    const args = spec.operands.map(operand);
+    if (spec.op === 'average' || spec.op === 'min' || spec.op === 'max' || spec.op === 'median') return call(spec.op, [call('list', args)]);
+    if (spec.op === 'countFilled') return call('count', [call('list', args)]);
+    const op = spec.op === 'add' ? 'add' : spec.op === 'subtract' ? 'subtract' : spec.op === 'multiply' ? 'multiply' : 'divide';
+    return args.slice(1).reduce<FormulaExpression>((left, right) => ({ type: 'binary', op, left, right }), args[0] ?? literal(null));
+  }
+  if (spec.kind === 'columnStat') return call(spec.fn, [property(spec.columnId)]);
+  if (spec.kind === 'concat') return call('concat', spec.parts.map((part) => part.kind === 'column' ? property(part.columnId) : literal(part.value)));
+  const condition = (item: FilterCondition): FormulaExpression => {
+    const left = property(item.columnId); const raw = Array.isArray(item.value) ? item.value.join(',') : (item.value ?? '');
+    if (item.op === 'isEmpty') return { type: 'binary', op: 'equal', left, right: literal('') };
+    if (item.op === 'notEmpty') return { type: 'binary', op: 'not_equal', left, right: literal('') };
+    if (item.op === 'contains' || item.op === 'isAnyOf' || item.op === 'hasAllOf') return call('contains', [left, literal(raw)]);
+    if (item.op === 'notContains' || item.op === 'isNoneOf') return { type: 'unary', op: 'not', value: call('contains', [left, literal(raw)]) };
+    if (item.op === 'isChecked' || item.op === 'isUnchecked') return { type: 'binary', op: 'equal', left, right: literal(item.op === 'isChecked') };
+    const op: Extract<FormulaExpression, { type: 'binary' }>['op'] = item.op === 'equals' ? 'equal' : item.op === 'notEquals' ? 'not_equal'
+      : item.op === 'gt' || item.op === 'after' ? 'gt' : item.op === 'gte' ? 'gte' : item.op === 'lt' || item.op === 'before' ? 'lt' : 'lte';
+    return { type: 'binary', op, left, right: literal(raw) };
+  };
+  let result = output(spec.otherwise);
+  for (const rule of [...spec.rules].reverse()) {
+    const conditions = rule.conditions.map(condition);
+    const combined = conditions.slice(1).reduce<FormulaExpression>((left, right) => ({ type: 'binary', op: rule.conjunction, left, right }), conditions[0] ?? literal(false));
+    result = call('if', [combined, output(rule.output), result]);
+  }
+  return result;
 }

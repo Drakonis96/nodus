@@ -13,6 +13,7 @@ import type {
   LocalServerStatus,
   McpServerStatus,
   McpTunnelStatus,
+  MigrationRecoverySnapshot,
   ModelInfo,
   NodusServerConnection,
   NodusServerOverview,
@@ -57,6 +58,7 @@ import { errorText, t, tx } from '../i18n';
 import { updateStatusMessage } from '../updateStatus';
 import { DEFAULT_EMBEDDING_MODELS, EMBEDDING_PROVIDERS } from '@shared/providers';
 import { ORB_COLOR_CHOICES, orbHue } from '@shared/nodiOrb';
+import { NODI_DEFAULT_SCALE, NODI_SIZE_SCALES } from '@shared/nodiSize';
 import { effectiveSidebarHidden, isViewAllowedForVaultType } from '@shared/vaultTypes';
 import chromeWebStoreLogo from '../assets/brands/chrome-web-store.svg';
 
@@ -184,6 +186,8 @@ export function Settings({
   const [autoBackupPasswordInput, setAutoBackupPasswordInput] = useState('');
   const [showAutoBackupPassword, setShowAutoBackupPassword] = useState(false);
   const [autoBackupRunning, setAutoBackupRunning] = useState(false);
+  const [migrationRecoverySnapshots, setMigrationRecoverySnapshots] = useState<MigrationRecoverySnapshot[]>([]);
+  const [migrationRecoveryBusy, setMigrationRecoveryBusy] = useState<string | null>(null);
   const [backupCleanupPreview, setBackupCleanupPreview] = useState<BackupCleanupPreview | null>(null);
   const [backupCleanupRunning, setBackupCleanupRunning] = useState(false);
   const [confirmBackupCleanupEnable, setConfirmBackupCleanupEnable] = useState(false);
@@ -252,6 +256,16 @@ export function Settings({
       active = false;
     };
   }, []);
+
+  useEffect(() => {
+    let active = true;
+    setMigrationRecoverySnapshots([]);
+    if (!activeVault) return () => { active = false; };
+    void window.nodus.listMigrationRecoverySnapshots()
+      .then((snapshots) => { if (active) setMigrationRecoverySnapshots(snapshots); })
+      .catch(() => { if (active) setMigrationRecoverySnapshots([]); });
+    return () => { active = false; };
+  }, [activeVault?.id]);
 
   useEffect(() => {
     let active = true;
@@ -986,6 +1000,50 @@ export function Settings({
             <div className="flex items-center justify-between gap-4">
               <label className="text-sm text-neutral-300">{t('Mostrar a Nodi')}</label>
               <input type="checkbox" checked={settings.mascotEnabled} onChange={(e) => void patch({ mascotEnabled: e.target.checked })} />
+            </div>
+            <div data-testid="nodi-size-setting">
+              <label className="text-sm text-neutral-300" htmlFor="nodi-size-slider">{t('Tamaño de Nodi')}</label>
+              <p className="mt-0.5 text-xs text-neutral-500">
+                {t('El marcador central conserva el tamaño predeterminado. Elige uno de los nueve tamaños disponibles.')}
+              </p>
+              <div className="mt-2 flex w-full max-w-md items-start gap-3">
+                <div className="min-w-0 flex-1">
+                  <input
+                    id="nodi-size-slider"
+                    className="block w-full"
+                    type="range"
+                    min={NODI_SIZE_SCALES[0]}
+                    max={NODI_SIZE_SCALES[NODI_SIZE_SCALES.length - 1]}
+                    step={0.1}
+                    value={settings.mascotScale}
+                    aria-label={t('Tamaño de Nodi')}
+                    onChange={(e) => void patch({ mascotScale: Number(e.target.value) })}
+                  />
+                  <div className="mt-1 flex justify-between px-1" aria-label={t('Tamaños predeterminados')}>
+                    {NODI_SIZE_SCALES.map((scale) => {
+                      const selected = settings.mascotScale === scale;
+                      const isDefault = scale === NODI_DEFAULT_SCALE;
+                      const label = isDefault
+                        ? `${Math.round(scale * 100)}% · ${t('Predeterminado')}`
+                        : `${Math.round(scale * 100)}%`;
+                      return (
+                        <button
+                          key={scale}
+                          type="button"
+                          className={`h-3 w-3 rounded-full border transition-colors ${selected ? 'border-amber-300 bg-amber-300' : isDefault ? 'border-neutral-300 bg-neutral-500' : 'border-neutral-600 bg-neutral-800 hover:border-neutral-400'}`}
+                          aria-label={label}
+                          aria-pressed={selected}
+                          title={label}
+                          onClick={() => void patch({ mascotScale: scale })}
+                        />
+                      );
+                    })}
+                  </div>
+                </div>
+                <output className="w-12 pt-0.5 text-right text-xs text-neutral-400" htmlFor="nodi-size-slider">
+                  {Math.round(settings.mascotScale * 100)}%
+                </output>
+              </div>
             </div>
             <div>
               <label className="text-sm text-neutral-300">{t('Aspecto de Nodi')}</label>
@@ -2773,6 +2831,53 @@ export function Settings({
                   <p className="text-xs text-rose-600 dark:text-rose-300">{errorText(settings.lastBackupCleanupStatus.slice('error:'.length).trim())}</p>
                 )}
               </div>
+              {migrationRecoverySnapshots.length > 0 && (
+                <div data-testid="migration-recovery-snapshots" className="mt-4 space-y-3 rounded-xl border border-indigo-200 bg-indigo-50/70 p-4 dark:border-indigo-900/60 dark:bg-indigo-950/15">
+                  <div className="flex items-start gap-3">
+                    <Icon name="shield" className="mt-0.5 shrink-0 text-indigo-600 dark:text-indigo-300" />
+                    <div>
+                      <label className="text-sm font-medium text-neutral-900 dark:text-neutral-100">{t('Copias previas a migraciones')}</label>
+                      <p className="mt-1 text-xs leading-5 text-neutral-600 dark:text-neutral-400">
+                        {t('Antes de cambiar el esquema, Nodus conserva una copia inmutable y verificada. Puedes abrirla como un vault separado sin sustituir el actual.')}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    {migrationRecoverySnapshots.map((snapshot) => (
+                      <div key={snapshot.id} className="flex flex-wrap items-center gap-3 rounded-lg border border-indigo-200 bg-white/80 p-3 dark:border-indigo-900/70 dark:bg-neutral-950/40">
+                        <div className="min-w-0 flex-1">
+                          <p className="text-xs font-medium text-neutral-800 dark:text-neutral-200">
+                            v{snapshot.fromVersion} → v{snapshot.targetVersion} · {new Date(snapshot.createdAt).toLocaleString()}
+                          </p>
+                          <p className="mt-1 truncate font-mono text-[10px] text-neutral-500" title={snapshot.sha256}>
+                            SHA-256 {snapshot.sha256} · {formatBackupBytes(snapshot.bytes)} · quick_check {snapshot.quickCheck}
+                          </p>
+                        </div>
+                        <button
+                          className="btn btn-ghost w-full min-w-0 shrink-0 whitespace-normal border border-indigo-300 text-center text-xs dark:border-indigo-800 sm:w-auto"
+                          disabled={migrationRecoveryBusy !== null}
+                          onClick={async () => {
+                            setMigrationRecoveryBusy(snapshot.id);
+                            try {
+                              const created = await window.nodus.openMigrationRecoverySnapshot(snapshot.id);
+                              await _onVaultsChanged();
+                              const switched = await window.nodus.switchVault(created.vault.id);
+                              if (!switched.ok) throw new Error(switched.message);
+                              flash(t('La copia previa se abrió como un vault separado.'));
+                            } catch (error) {
+                              flash(error instanceof Error ? error.message : String(error));
+                            } finally {
+                              setMigrationRecoveryBusy(null);
+                            }
+                          }}
+                        >
+                          <Icon name="external" /> {migrationRecoveryBusy === snapshot.id ? t('Abriendo…') : t('Abrir como vault separado')}
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
             {activeVault?.type === 'estudio' && <StudyDataAdministration />}
           </Section>

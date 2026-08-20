@@ -37,6 +37,9 @@ const SYNC_GROUPS: { key: SyncGroupKey; prefix?: string; tables?: string[] }[] =
     tables: [
       'note_folders', 'notes', 'note_links', 'testimony_note_links',
       'note_versions', 'note_annotations', 'workspace_library_links',
+      'pages', 'page_blocks', 'page_documents', 'page_document_updates', 'page_document_snapshots',
+      'page_favorites', 'page_links', 'page_revisions', 'page_comments', 'page_comment_reactions',
+      'page_comment_mentions', 'workspace_actors', 'workspace_groups', 'workspace_group_members', 'acl_entries',
     ],
   },
   {
@@ -64,7 +67,14 @@ const SYNC_GROUPS: { key: SyncGroupKey; prefix?: string; tables?: string[] }[] =
   { key: 'searches', tables: ['saved_searches'] },
   { key: 'edgeFeedback', tables: ['edge_feedback'] },
   { key: 'curation', tables: ['match_feedback'] },
-  { key: 'databases', prefix: 'db_' },
+  {
+    key: 'databases',
+    prefix: 'db_',
+    tables: [
+      'automation_rules', 'automation_runs', 'automation_notifications',
+      'database_forms', 'database_form_fields', 'database_form_submissions',
+    ],
+  },
   { key: 'protect', tables: ['protect_copies'] },
   { key: 'study', prefix: 'study_' },
   { key: 'teaching', prefix: 'teaching_' },
@@ -208,7 +218,7 @@ const SYNC_GROUPS: { key: SyncGroupKey; prefix?: string; tables?: string[] }[] =
     ],
   },
   { key: 'chats', tables: ['chat_conversations', 'chat_messages', 'database_chat_conversations'] },
-  { key: 'content', tables: ['content_translations', 'decorative_images', 'audio_clips'] },
+  { key: 'content', tables: ['content_translations', 'decorative_images', 'audio_clips', 'page_block_blobs'] },
 ];
 
 /**
@@ -238,6 +248,17 @@ const NOT_SYNCED_TABLES = new Set([
   // discarded. Shipping it would let one machine's audit trail overwrite the other's,
   // and restoring an entry there would write a row that never lost anything here.
   'sync_superseded',
+  // Local recovery audit: the immutable snapshot itself lives beside this machine's
+  // SQLite file and cannot travel in a row package. Syncing its event would advertise a
+  // recovery point that does not exist on the receiving device.
+  'schema_migration_events',
+  // Counts from the one-time local conversion are recovery evidence for this machine;
+  // they are not authored page content and another client must not overwrite them.
+  'page_migration_reports',
+  // Content-addressed update receipts only prevent this replica from applying the same
+  // Yjs payload twice. Sending them elsewhere could suppress an update the destination
+  // has not actually applied, so each device rebuilds its own receipt set.
+  'page_document_update_receipts',
   // Same reasoning: THIS machine's queue of changes still owed to a Nodus Server space.
   // Carrying it in a .nodussync package would make the receiving machine re-send work it
   // never did, and the sender would then see its own edits arrive back as someone else's.
@@ -247,6 +268,30 @@ const NOT_SYNCED_TABLES = new Set([
   // applied it — carrying it would tell a second machine it had received work it never
   // received, and its read/unread state is one person's, on one screen.
   'server_inbox',
+  // Per-device clocks, conflict diagnostics and cursors are local transport state. The
+  // authored rows they describe travel; these records must not recursively sync themselves.
+  'workspace_devices', 'sync_row_clocks', 'sync_conflicts', 'sync_snapshot_cursors',
+  // A public-link token is a credential. Links are recreated/managed by the destination
+  // server in loop 18 and their hashes never enter a replica snapshot.
+  'workspace_share_links',
+  // Inbox read state belongs to one actor/device and is rebuilt from collaborative events.
+  'workspace_notifications',
+  // Rate-limit buckets describe requests observed by this local HTTP listener. They
+  // expire by time window, contain no authored response, and must not let one device's
+  // traffic throttle a different device after sync.
+  'database_form_rate_limits',
+  // Loop 4 projections and execution state are rebuilt from canonical database rows,
+  // columns, relations and attachments. FTS5's shadow tables must never receive sync or
+  // tombstone triggers (SQLite rejects triggers on shadow tables).
+  'db_computed_cells',
+  'db_column_dependencies',
+  'db_compute_jobs',
+  'db_search_fts',
+  'db_search_fts_data',
+  'db_search_fts_idx',
+  'db_search_fts_content',
+  'db_search_fts_docsize',
+  'db_search_fts_config',
   // TESTIMONIOS NO SE SINCRONIZA, y es una decision, no una omision (decision 18 del
   // plan). Antes de activarlo hay que demostrar que TODAS estas tablas viajan, que los
   // blobs de los maestros tienen una politica explicita, y sobre todo que las
@@ -284,7 +329,8 @@ export function syncedTablesByGroup(db: Database.Database = getDb()): { key: Syn
   return SYNC_GROUPS.map((group) => ({
     key: group.key,
     tables: [...present]
-      .filter((name) => (group.prefix ? name.startsWith(group.prefix) : group.tables?.includes(name) ?? false))
+      .filter((name) => !NOT_SYNCED_TABLES.has(name))
+      .filter((name) => Boolean((group.prefix && name.startsWith(group.prefix)) || group.tables?.includes(name)))
       .sort(),
   }));
 }

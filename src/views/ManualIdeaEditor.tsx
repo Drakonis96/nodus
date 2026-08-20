@@ -488,7 +488,7 @@ function WorkPicker({ onAdd, existing }: { onAdd: (w: WorkView) => void; existin
     return all
       .filter((w) => !exclude.has(w.nodus_id))
       .filter(
-        (w) => w.title.toLowerCase().includes(q) || w.authors.some((a) => a.toLowerCase().includes(q))
+        (w) => (w.title ?? '').toLowerCase().includes(q) || w.authors.some((a) => (a ?? '').toLowerCase().includes(q))
       )
       .slice(0, 12);
   }, [all, query, existing]);

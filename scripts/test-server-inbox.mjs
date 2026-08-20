@@ -162,6 +162,7 @@ test('titleOf names what a person would recognise, and nothing else', () => {
   );
   assert.deepEqual(titleOf('notes', { title: 'Una nota' }), { title: 'Una nota', entityKind: 'note' });
   assert.deepEqual(titleOf('note_folders', { name: 'Capítulo 3' }), { title: 'Capítulo 3', entityKind: 'note_folder' });
+  assert.deepEqual(titleOf('immersion_sessions', { title: 'Ruta guiada', topic: 'Memoria' }), { title: 'Ruta guiada', entityKind: 'immersion' });
   assert.deepEqual(
     titleOf('writing_draft_annotations', { selected_text: 'Un fragmento' }),
     { title: 'Un fragmento', entityKind: 'deep_research_annotation' }
@@ -226,6 +227,25 @@ test('what applyIncomingMutations reports is exactly what the inbox can store', 
   assert.equal(grouped[0].title, 'Informe llegado del teléfono');
   assert.equal(grouped[0].unreadCount, 3);
   assert.equal(unreadServerInboxGroupCount(listServerInbox()), 1, 'the header badge counts the group, not its children');
+
+  db.prepare(`INSERT INTO immersion_sessions (
+    id, topic, title, language, minutes, model_json, plan_json, progress_json, stats_json, created_at, updated_at
+  ) VALUES ('imm-live', 'Memoria', 'Ruta de memoria', 'es', 90, NULL, '{}', '{}', '{}', ?, ?)`
+  ).run(now, now);
+  const immersionAnnotationSummary = applyIncomingMutations(db, [{
+    id: 'mut-immersion-comment', seq: 13, clientId: 'iphone-de-jorge', kind: 'upsert', table: 'writing_draft_annotations',
+    key: ['immersion-comment'],
+    row: {
+      id: 'immersion-comment', draft_id: 'immersion:imm-live', scope: 'step:1:source', kind: 'comment',
+      color: null, start_offset: 0, end_offset: 7, selected_text: 'Memoria', prefix: '', suffix: '',
+      comment_text: 'Volver sobre este concepto', created_at: now, updated_at: now, target_json: null,
+    },
+    schemaVersion: SCHEMA_VERSION, createdAt: now,
+  }]);
+  assert.deepEqual(
+    immersionAnnotationSummary.entries.map(({ entityKind, parentEntityKind, parentEntityId, parentTitle }) => ({ entityKind, parentEntityKind, parentEntityId, parentTitle })),
+    [{ entityKind: 'immersion_annotation', parentEntityKind: 'immersion', parentEntityId: 'imm-live', parentTitle: 'Ruta de memoria' }],
+  );
 
   clearServerInbox();
   await rm(userData, { recursive: true, force: true });

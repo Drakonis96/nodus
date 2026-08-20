@@ -52,7 +52,7 @@ function toEntry(row: ServerInboxRow): ServerInboxEntry | null {
       reason: row.reason,
       title: row.title,
       entityKind: row.entity_kind,
-      parentEntityKind: row.parent_entity_kind === 'deep_research' || row.parent_entity_kind === 'library_document'
+      parentEntityKind: row.parent_entity_kind === 'deep_research' || row.parent_entity_kind === 'immersion' || row.parent_entity_kind === 'library_document'
         ? row.parent_entity_kind
         : null,
       parentEntityId: row.parent_entity_id,

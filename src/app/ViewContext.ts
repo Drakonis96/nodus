@@ -10,6 +10,7 @@
 // destructures what it uses; nothing else has to change when one of them starts
 // needing one more callback.
 import type { AppSettings, CorpusHealthBucketId, DatabaseSummary, RecoveryStatus, SyncLogEntry, VaultSummary } from '@shared/types';
+import type { LibraryScope } from '@shared/libraryTypes';
 import type { TestimonyDeepLink } from '@shared/testimonyDeepLinks';
 import type {
   PendingAssistantNavigationTarget,
@@ -104,6 +105,7 @@ export interface ViewContext extends VaultFlags {
   // Cross-view jumps the shell owns, because they set a target and a view at once.
   openAssistant: (target?: PendingAssistantNavigationTarget) => void;
   openLibraryBucket: (bucket: CorpusHealthBucketId) => void;
+  openLibraryItem: (itemId: string, scope: LibraryScope) => void;
   openNoteFromSearch: (id: string) => void;
   openPrimarySourceTarget: (target: PrimarySourceTarget) => void;
   openTestimonyInterview: (interviewId: string, tab?: DossierTab) => void;
@@ -128,6 +130,7 @@ export interface ViewContext extends VaultFlags {
   setRoadmapOpen: (open: boolean) => void;
   createDatabase: () => Promise<void>;
   importCsv: () => Promise<void>;
+  importNotion: () => Promise<void>;
 
   // Demo seeding, one per vault type that offers it.
   loadDemo: () => Promise<void>;

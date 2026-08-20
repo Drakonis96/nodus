@@ -9,6 +9,7 @@
 import { decodeCheckbox, decodeMultiSelect, decodeNumber } from './databases';
 import type { DatabaseColumn, DatabaseColumnType, DatabaseRow } from './databases';
 import { comparableType } from './databaseFormula';
+import { databaseDateSortValue } from './databaseProperties';
 
 export interface HistogramBucket {
   label: string;
@@ -142,7 +143,7 @@ export function computeColumnProfile(column: DatabaseColumn, rows: DatabaseRow[]
     }
     case 'date':
     case 'time': {
-      const values = rows.map((r) => (r.cells[column.id] ?? '').trim()).filter(Boolean).sort();
+      const values = rows.map((r) => databaseDateSortValue(r.cells[column.id] ?? null)).filter(Boolean).sort();
       return {
         ...base,
         filled: values.length,

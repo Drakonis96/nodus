@@ -92,7 +92,7 @@ function FacetChip({
   const visible = useMemo(() => {
     const needle = query.trim().toLowerCase();
     if (!needle) return options;
-    return options.filter((option) => option.label.toLowerCase().includes(needle));
+    return options.filter((option) => (option.label ?? '').toLowerCase().includes(needle));
   }, [options, query]);
 
   const ref = useDismissableLayer<HTMLDivElement>({

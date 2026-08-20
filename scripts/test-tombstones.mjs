@@ -120,22 +120,34 @@ try {
   useDb(machineA);
   machineA.prepare("DELETE FROM notes WHERE id = 'nDoomed'").run();
   const written = tombstones(machineA);
-  assert.equal(written.length, 1, 'the deletion left exactly one tombstone');
-  assert.equal(written[0].table_name, 'notes');
+  assert.deepEqual(
+    written.map((row) => [row.table_name, row.row_key]),
+    [
+      ['notes', JSON.stringify(['nDoomed'])],
+      ['page_document_snapshots', JSON.stringify(['initial-note:nDoomed'])],
+      ['page_documents', JSON.stringify(['note:nDoomed'])],
+      ['pages', JSON.stringify(['note:nDoomed'])],
+    ],
+    'the note and every synchronized universal-page child are tombstoned',
+  );
+  const noteTombstone = written.find((row) => row.table_name === 'notes');
+  assert.ok(noteTombstone);
   // The trigger writes the key with json_array(); the merge writes it with
   // JSON.stringify(). If those ever disagree, tombstones silently stop matching rows.
-  assert.equal(written[0].row_key, JSON.stringify(['nDoomed']), 'SQL-written and JS-written keys are identical');
+  assert.equal(noteTombstone.row_key, JSON.stringify(['nDoomed']), 'SQL-written and JS-written keys are identical');
 
   // ══ 3 · The deletion travels, and what it removes stays recoverable ════════
   const withDeletion = sync.buildSyncPackage('test', PASS);
   useDb(machineB);
   const applied = sync.mergeSyncPackage(withDeletion.buffer, PASS);
-  assert.equal(applied.deletionsApplied, 1, 'the deletion was applied on B');
+  assert.equal(applied.deletionsApplied, written.length, 'the note and its universal-page records were deleted on B');
   assert.equal(machineB.prepare("SELECT COUNT(*) AS n FROM notes WHERE id = 'nDoomed'").get().n, 0, 'the note is gone on B');
   assert.equal(machineB.prepare("SELECT COUNT(*) AS n FROM notes WHERE id = 'nAlive'").get().n, 1, 'the other note is untouched');
 
   // A deletion arriving from another computer is never the end of the story.
-  const removed = superseded.listSuperseded().find((entry) => entry.origin === 'deleted-remotely');
+  const removed = superseded
+    .listSuperseded()
+    .find((entry) => entry.origin === 'deleted-remotely' && entry.tableName === 'notes' && entry.rowKey[0] === 'nDoomed');
   assert.ok(removed, 'the removed row was kept');
   assert.equal(removed.fields.find((f) => f.name === 'content').value, 'contenido a borrar', 'with its content');
 
@@ -210,7 +222,9 @@ try {
   // Restoring writes a row a tombstone says is dead. Without a fresh timestamp the next
   // sync would delete it again and the user would watch their recovery undo itself.
   useDb(machineB);
-  const recoverable = superseded.listSuperseded().find((entry) => entry.origin === 'deleted-remotely');
+  const recoverable = superseded
+    .listSuperseded()
+    .find((entry) => entry.origin === 'deleted-remotely' && entry.tableName === 'notes' && entry.rowKey[0] === 'nDoomed');
   assert.ok(recoverable, 'the remotely-deleted row is still recoverable');
   const restored = superseded.restoreSuperseded(recoverable.id);
   assert.equal(restored.ok, true, restored.message);

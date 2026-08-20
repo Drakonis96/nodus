@@ -19,17 +19,21 @@ test('argument map opens as a library-style metadata catalogue', () => {
 
 test('catalogue metadata can be searched, filtered and sorted', () => {
   assert.match(source, /data-testid="argument-routes-search"/);
+  assert.match(source, /\(s\.statement \?\? ''\)\.toLowerCase\(\)/, 'a route with no statement remains searchable instead of crashing the section');
+  assert.doesNotMatch(source, /s\.statement\.toLowerCase\(\)/);
   assert.match(source, /setMinConnections/);
   for (const sort of ['label', 'type', 'connections', 'debates', 'confidence']) {
     assert.match(source, new RegExp(`routeSort === '${sort}'|sort="${sort}"`), `catalogue supports ${sort} sorting`);
   }
 });
 
-test('clicking a row opens a persistent idea tab around the existing tree', () => {
-  assert.match(source, /setOpenArgumentMap\(\{ ideaId: sid, label, mode \}\);\s*setSurface\('map'\);/);
+test('clicking rows opens independent persistent map tabs around each tree', () => {
+  assert.match(source, /setOpenArgumentMaps\(\(current\) => existing[\s\S]*\[\.\.\.current, tab\][\s\S]*setActiveMapKey\(key\);\s*setSurface\('map'\);/);
+  assert.match(source, /openArgumentMaps\.find\(\(tab\) => tab\.key === key\)[\s\S]*if \(existing && !existing\.error\)/, 'an already-open successful map is focused instead of rebuilt');
   assert.match(source, /onClick=\{\(\) => build\(s\.ideaId\)\}/);
   assert.match(source, /data-testid="argument-tab-map"/);
-  assert.match(source, /<BlockTree block=\{map\.root\}/, 'the tab renders the established nested idea tree');
+  assert.match(source, /openArgumentMaps\.map\(\(tab\) =>/, 'all map tabs remain mounted independently');
+  assert.match(source, /<BlockTree block=\{tab\.map\.root\}/, 'each tab renders its own established nested idea tree');
 });
 
 test('catalogue and tabs explicitly support light and dark themes', () => {

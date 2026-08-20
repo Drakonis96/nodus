@@ -1,16 +1,11 @@
-// The mutation ledger.
-//
-// A writer's desktop replica cannot write to the owner's vault; nothing can except the
-// owner's own machine. What it can do is append an intent here. The owner's desktop drains
-// the ledger on its next tick, applies it to its SQLite through the same newest-wins merge
-// that .nodussync packages already use, and republishes. That republication is what makes
-// the change visible to everybody — including, deliberately, to its own author.
+// The convergent operation relay. Every authorized replica reads the same ordered stream;
+// the owner is no longer required to be online for two collaborators to converge.
 //
 // Two consequences worth stating plainly:
 //   • the server never interprets a mutation beyond validating its shape, so it never
 //     becomes a second authority on what the vault contains;
-//   • a change is not visible until the owner is online. That is a product decision, not
-//     an oversight, and the UI says so.
+//   • each device acknowledges independently, so one offline client cannot make another
+//     device forget operations it still needs.
 
 /**
  * Tables a non-owner may change, and how a row in each is identified.
@@ -28,6 +23,43 @@ export const MUTABLE_TABLES = {
   notes: { key: ['id'] },
   note_folders: { key: ['id'] },
   note_links: { key: ['link_id'] },
+  pages: { key: ['id'] },
+  page_blocks: { key: ['id'] },
+  page_favorites: { key: ['page_id'] },
+  page_links: { key: ['id'] },
+  page_document_updates: { key: ['id'] },
+  page_revisions: { key: ['id'] },
+  page_comments: { key: ['id'] },
+  page_comment_reactions: { key: ['comment_id', 'actor_id', 'emoji'] },
+  page_comment_mentions: { key: ['comment_id', 'actor_id'] },
+  workspace_actors: { key: ['id'] },
+  workspace_groups: { key: ['id'] },
+  workspace_group_members: { key: ['group_id', 'actor_id'] },
+  acl_entries: { key: ['id'] },
+  db_databases: { key: ['id'] },
+  db_data_sources: { key: ['id'] },
+  db_columns: { key: ['id'] },
+  db_rows: { key: ['id'] },
+  db_cells: { key: ['row_id', 'column_id'] },
+  db_views: { key: ['id'] },
+  db_view_sources: { key: ['view_id', 'source_id'] },
+  db_view_revisions: { key: ['id'] },
+  db_select_options: { key: ['id'] },
+  db_relations: { key: ['id'] },
+  db_attachments: { key: ['id'] },
+  db_row_templates: { key: ['id'] },
+  db_template_runs: { key: ['template_id', 'occurrence_key'] },
+  db_row_hierarchy: { key: ['database_id', 'row_id'] },
+  db_row_dependencies: { key: ['id'] },
+  db_task_configs: { key: ['database_id'] },
+  db_sprints: { key: ['id'] },
+  db_sprint_rows: { key: ['sprint_id', 'row_id'] },
+  automation_rules: { key: ['id'] },
+  automation_runs: { key: ['id'] },
+  automation_notifications: { key: ['id'] },
+  database_forms: { key: ['id'] },
+  database_form_fields: { key: ['id'] },
+  database_form_submissions: { key: ['id'] },
   writing_saved_drafts: { key: ['id'] },
   writing_draft_annotations: { key: ['id'] },
   decorative_images: { key: ['entity_kind', 'entity_id'], require: { entity_kind: 'deep_research' } },
@@ -77,11 +109,15 @@ export function rowKey(table, key) {
  * looks like, but the snapshot it already holds IS that schema, expressed as data. A
  * column nobody has ever published cannot be written.
  */
-export function validateMutation(mutation, { snapshot, hasAsset, maxBytes = DEFAULT_MAX_MUTATION_BYTES }) {
+export function validateMutation(mutation, {
+  snapshot, hasAsset, hasDocumentUpdate = () => false, hasSharedBlob = () => false,
+  maxBytes = DEFAULT_MAX_MUTATION_BYTES,
+}) {
   const fail = (reason) => ({ ok: false, reason });
 
   if (!mutation || typeof mutation !== 'object') return fail('malformed');
   if (typeof mutation.id !== 'string' || !mutation.id) return fail('missing_id');
+  if (mutation.hlc != null && !/^\d{13}-\d{6}-[A-Za-z0-9._:~-]{1,128}$/.test(String(mutation.hlc))) return fail('bad_hlc');
   if (!MUTATION_KINDS.has(mutation.kind)) return fail('unknown_kind');
 
   const table = String(mutation.table ?? '');
@@ -110,6 +146,17 @@ export function validateMutation(mutation, { snapshot, hasAsset, maxBytes = DEFA
 
   const row = mutation.row;
   if (!row || typeof row !== 'object' || Array.isArray(row)) return fail('missing_row');
+
+  if (table === 'page_document_updates') {
+    const hash = String(row.update_hash ?? '');
+    if (!/^[0-9a-f]{64}$/.test(hash) || String(mutation.documentHash ?? '') !== hash) return fail('bad_document_update');
+    if (!hasDocumentUpdate(hash)) return { ok: false, reason: 'missing_document_update', missingDocumentUpdate: hash };
+  }
+  if (table === 'db_attachments' && row.blob_hash != null) {
+    const hash = String(row.blob_hash);
+    if (!/^[0-9a-f]{64}$/.test(hash) || String(mutation.blobHash ?? '') !== hash) return fail('bad_shared_blob');
+    if (!hasSharedBlob(hash)) return { ok: false, reason: 'missing_shared_blob', missingSharedBlob: hash };
+  }
 
   if (table === 'writing_draft_annotations') {
     const start = Number(row.start_offset);

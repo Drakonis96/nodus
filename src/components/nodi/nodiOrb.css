@@ -103,11 +103,9 @@
   50%     { transform: translateY(-7px); }
 }
 
-/* Pedestal: a light pool in the dark, a contact shadow in the light. */
+/* Pedestal: a restrained light pool, without a contact shadow below Nodi. */
 .nodi-orb .ped-glow   { transition: opacity .5s ease; }
-.nodi-orb .ped-shadow { transition: opacity .5s ease; opacity: 0; }
 .light .nodi-orb .ped-glow   { opacity: .25; }
-.light .nodi-orb .ped-shadow { opacity: 1; }
 .nodi-orb .ped-pulse { transform-box: view-box; transform-origin: 160px 298px; animation: nodiorb-ped 4.6s ease-in-out infinite; }
 @keyframes nodiorb-ped {
   0%,100% { opacity: .5; transform: scaleX(1); }

@@ -118,7 +118,7 @@ export function RubricsView() {
 
   /* ------------------------------------------------ history (database list) --- */
   if (!rubric) {
-    const filtered = rubrics.filter((entry) => !search.trim() || entry.title.toLowerCase().includes(search.toLowerCase()));
+    const filtered = rubrics.filter((entry) => !search.trim() || (entry.title ?? '').toLowerCase().includes(search.toLowerCase()));
     return (
       <div className="flex h-full min-h-0 flex-col bg-neutral-50 text-neutral-900 dark:bg-neutral-950 dark:text-neutral-100" data-testid="rubrics-list">
         <header className="border-b border-neutral-200 bg-white px-5 py-4 dark:border-neutral-800 dark:bg-neutral-950">

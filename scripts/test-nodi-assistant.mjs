@@ -116,7 +116,13 @@ test('report selection offers icon-only copy, margin bookmark and Nodi quote act
   assert.match(deepResearch, /ReaderSelectionActions[^>]*scrollRef=\{mainRef\}/);
   assert.match(deepResearch, /label=\{t\('Ir al marcador de lectura'\)\}/);
   assert.match(deepResearch, /markActionsRef\.current\?\.goToMark\(\)/);
-  assert.match(immersion, /ReaderSelectionActions[^>]*contextId=\{`immersion:/);
+  assert.match(immersion, /immersionAnnotationDocumentId\(session\.id\)/);
+  assert.match(immersion, /ReaderSelectionActions[\s\S]*?annotations=\{visibleAnnotations\}/);
+  assert.match(immersion, /ReaderSelectionActions[\s\S]*?onCreateAnnotation=\{createAnnotation\}/);
+  assert.match(immersion, /ReaderSelectionActions[\s\S]*?onUpdateComment=\{updateComment\}/);
+  assert.match(immersion, /ReaderSelectionActions[\s\S]*?onDeleteAnnotation=\{deleteAnnotation\}/);
+  assert.match(immersion, /ReaderHighlighterControl value=\{highlighterColor\}/);
+  assert.match(immersion, /markActionsRef\.current\?\.goToMark\(\)/);
 });
 
 test('Nodi cites corpus sources like the research assistant, adapted to its own light/dark UI', async () => {
@@ -471,6 +477,15 @@ test('a new Nodi chat starts on documentation, the current view and the current 
   assert.match(store, /return \[\.\.\.NODI_DEFAULT_CONTEXTS\]/);
   // Reaching into every other vault stays a per-question decision.
   assert.doesNotMatch(types, /NODI_DEFAULT_CONTEXTS[^\n]*all_vaults/);
+});
+
+test('Nodi keeps the reading position stable while an answer is streaming', async () => {
+  const companion = await read('src/components/nodi/NodiCompanion.tsx');
+  assert.match(companion, /const scrollChatToBottom = useCallback/);
+  assert.match(companion, /if \(panel === 'chat'\) scrollChatToBottom\(\);\s*\}, \[panel, scrollChatToBottom\]\);/s);
+  assert.doesNotMatch(companion, /\[messages,\s*panel\]/, 'message deltas must not drive the scroll position');
+  const deltaHandler = companion.match(/onDelta: \(delta\) => \{([\s\S]*?)\n\s*\},/)?.[1] ?? '';
+  assert.doesNotMatch(deltaHandler, /scrollChatToBottom|scrollTop|scrollIntoView/);
 });
 
 test('the chat retrieval never holds the main process for a whole similarity scan', async () => {

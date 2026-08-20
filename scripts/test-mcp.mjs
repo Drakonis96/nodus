@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { mkdtemp, readFile, rm } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, rm } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import os from 'node:os';
 import path from 'node:path';
@@ -21,7 +21,13 @@ if (!process.argv.includes('--electron-mcp-test')) {
   process.exit(0);
 }
 
-const root = await mkdtemp(path.join(os.tmpdir(), 'nodus-mcp-test-'));
+const testParent = process.env.NODUS_USERDATA
+  ? path.resolve(process.env.NODUS_USERDATA)
+  : process.env.NODUS_QA_ROOT
+    ? path.resolve(process.env.NODUS_QA_ROOT)
+    : os.tmpdir();
+await mkdir(testParent, { recursive: true });
+const root = await mkdtemp(path.join(testParent, 'nodus-mcp-test-'));
 installRuntimeHooks(root);
 
 function FakeServer() {
@@ -101,6 +107,18 @@ try {
     'nodus_get_database_schema',
     'nodus_query_database',
     'nodus_get_database_row',
+    'nodus_list_database_views',
+    'nodus_list_database_templates',
+    'nodus_list_database_automations',
+    'nodus_list_database_forms',
+    'nodus_list_pages',
+    'nodus_search_pages',
+    'nodus_get_page',
+    'nodus_list_page_comments',
+    'nodus_create_page',
+    'nodus_update_page',
+    'nodus_replace_page_markdown',
+    'nodus_create_page_comment',
     'nodus_study_get_workspace',
     'nodus_study_get_document',
     'nodus_study_search',
@@ -211,15 +229,15 @@ try {
   assert.ok(docencia.has('nodus_get_capabilities') && docencia.has('nodus_create_note'), 'docencia keeps the universal tools');
   assert.ok(docencia.has('nodus_teaching_get_gradebook') && docencia.has('nodus_study_get_workspace'), 'docencia exposes teaching + study layers');
   assert.ok(docencia.has('nodus_list_ideas') && docencia.has('nodus_list_databases') && docencia.has('nodus_list_persons'), 'docencia retains every readable layer');
-  assert.ok(!docencia.has('nodus_create_database_row') && !docencia.has('nodus_world_create_character'), 'docencia still hides incompatible writes');
+  assert.ok(!docencia.has('nodus_create_database_row') && !docencia.has('nodus_create_page') && !docencia.has('nodus_world_create_character'), 'docencia still hides incompatible writes');
   const databases = surfaceFor('databases');
-  assert.ok(databases.has('nodus_create_database_row') && databases.has('nodus_set_database_cell'), 'databases exposes the additive write tools');
+  assert.ok(databases.has('nodus_create_database_row') && databases.has('nodus_set_database_cell') && databases.has('nodus_create_page'), 'databases exposes rows and universal-page authoring');
   assert.ok(databases.has('nodus_teaching_get_gradebook') && databases.has('nodus_list_ideas') && databases.has('nodus_study_get_workspace'), 'databases retains every readable layer');
   assert.ok(!databases.has('nodus_prosop_run_analysis') && !databases.has('nodus_world_create_character'), 'databases hides incompatible actions');
   const academic = surfaceFor('academic');
   assert.ok(academic.has('nodus_list_ideas') && academic.has('nodus_search_passages'), 'academic exposes the research surface');
   assert.ok(academic.has('nodus_list_databases') && academic.has('nodus_teaching_get_gradebook') && academic.has('nodus_list_persons'), 'academic retains every readable layer');
-  assert.ok(!academic.has('nodus_create_database_row') && !academic.has('nodus_prosop_run_analysis'), 'academic hides incompatible actions');
+  assert.ok(!academic.has('nodus_create_database_row') && !academic.has('nodus_create_page') && !academic.has('nodus_prosop_run_analysis'), 'academic hides incompatible actions');
   const genealogy = surfaceFor('genealogy');
   assert.ok(genealogy.has('nodus_list_persons') && genealogy.has('nodus_list_ideas'), 'genealogy exposes records + research layers');
   assert.ok(genealogy.has('nodus_list_databases') && genealogy.has('nodus_teaching_get_gradebook'), 'genealogy retains other readable layers');
@@ -434,6 +452,100 @@ try {
   assert.equal(qFiltered.total, 0, 'query filters by text');
   const gotRow = await callTool(server, 'nodus_get_database_row', { rowId: mRow.id });
   assert.equal(gotRow.fields.Nombre, 'Gato', 'nodus_get_database_row decodes the row');
+  assert.ok(gotRow.page?.id, 'a database row exposes its universal page id');
+
+  const view = dbmode.createView(mdb.id, { name: 'Tablero MCP', layout: 'board' });
+  const taskMode = require(path.join(repoRoot, 'electron/db/databaseTasksRepo.ts'));
+  const template = taskMode.createDatabaseRowTemplate(mdb.id, {
+    name: 'Incidencia MCP',
+    properties: { [mName.id]: 'Sin título' },
+    blocks: [{ type: 'heading_2', content: { text: 'Pasos de reproducción' } }],
+    recurrence: 'none',
+    timeZone: 'Europe/Madrid',
+  });
+  const automationMode = require(path.join(repoRoot, 'electron/db/databaseAutomationsRepo.ts'));
+  const automation = automationMode.createAutomationRule(mdb.id, {
+    name: 'Avisar al crear',
+    trigger: { type: 'row_created' },
+    actions: [{ type: 'notify', title: 'Nueva fila', body: '{{row.title}}' }],
+  });
+  const form = automationMode.createDatabaseForm(mdb.id, {
+    name: 'Alta MCP', slug: 'alta-mcp', title: 'Nueva entrada', description: 'Formulario MCP', access: 'public',
+    fields: [{ columnId: mName.id, label: 'Nombre', description: null, required: true, width: 'full' }],
+    enabled: true,
+  });
+  const mcpViews = await callTool(server, 'nodus_list_database_views', { databaseId: mdb.id });
+  assert.ok(mcpViews.views.some((item) => item.id === view.id && item.config.layout === 'board'), 'MCP exposes complete versioned view config');
+  const mcpTemplates = await callTool(server, 'nodus_list_database_templates', { databaseId: mdb.id });
+  assert.ok(mcpTemplates.templates.some((item) => item.id === template.id && item.blocks[0].type === 'heading_2'), 'MCP exposes page templates and typed blocks');
+  const mcpAutomations = await callTool(server, 'nodus_list_database_automations', { databaseId: mdb.id, runLimit: 10 });
+  assert.ok(mcpAutomations.rules.some((item) => item.id === automation.id), 'MCP exposes automation rules');
+  assert.ok(Array.isArray(mcpAutomations.runs), 'MCP automation execution history is bounded and explicit');
+  const mcpForms = await callTool(server, 'nodus_list_database_forms', { databaseId: mdb.id });
+  const listedForm = mcpForms.forms.find((item) => item.id === form.id);
+  assert.equal(listedForm.fields[0].columnId, mName.id, 'MCP exposes form fields and validation');
+  assert.equal(Object.hasOwn(listedForm, 'authToken'), false, 'MCP never exposes form authentication secrets');
+
+  const rowPage = await callTool(server, 'nodus_get_page', { pageId: gotRow.page.id, includeBlocks: true });
+  assert.equal(rowPage.page.origin, 'database_row', 'get_page opens a row through the universal page engine');
+  assert.ok(Array.isArray(rowPage.blocks), 'get_page can return the structured block projection');
+
+  // Pages, blocks, revision conflicts, comments and ACL all cross the real repositories.
+  const createdPage = await callTool(server, 'nodus_create_page', {
+    title: 'Cuaderno MCP',
+    parentPageId: null,
+    icon: '📓',
+    markdown: '# Primera nota\n\nTexto visible para la búsqueda MCP.',
+  });
+  assert.ok(createdPage.page.id, 'create_page returns the universal page id');
+  const pageList = await callTool(server, 'nodus_list_pages', { state: 'active', limit: 20, offset: 0 });
+  assert.ok(pageList.pages.some((item) => item.id === createdPage.page.id), 'list_pages returns the standalone page');
+  const pageSearch = await callTool(server, 'nodus_search_pages', { query: 'visible búsqueda', limit: 20, offset: 0 });
+  assert.ok(pageSearch.results.some((item) => item.pageId === createdPage.page.id), 'search_pages finds projected block text');
+  const fullPage = await callTool(server, 'nodus_get_page', { pageId: createdPage.page.id, includeBlocks: true });
+  assert.match(fullPage.markdown, /Primera nota/, 'get_page returns reconstructible Markdown');
+  assert.ok(fullPage.blocks.some((block) => block.type === 'heading_1'), 'Markdown is projected into typed blocks');
+
+  const metadata = await callTool(server, 'nodus_update_page', {
+    pageId: createdPage.page.id,
+    expectedPageRevision: createdPage.page.revision,
+    title: 'Cuaderno MCP revisado',
+  });
+  assert.equal(metadata.page.title, 'Cuaderno MCP revisado', 'page metadata uses its expected revision');
+  const replaced = await callTool(server, 'nodus_replace_page_markdown', {
+    pageId: createdPage.page.id,
+    expectedDocumentRevision: createdPage.documentRevision,
+    markdown: '## Segunda versión\n\nContenido convergente.',
+  });
+  assert.equal(replaced.ok, true, 'page Markdown is replaced through the block engine');
+  const conflict = await callTool(server, 'nodus_replace_page_markdown', {
+    pageId: createdPage.page.id,
+    expectedDocumentRevision: createdPage.documentRevision,
+    markdown: 'Este texto obsoleto no debe ganar.',
+  });
+  assert.equal(conflict.ok, false, 'a stale document revision returns an explicit conflict');
+  assert.equal(conflict.conflict.actualRevision, replaced.documentRevision, 'the conflict returns the current revision token');
+
+  const comment = await callTool(server, 'nodus_create_page_comment', {
+    pageId: createdPage.page.id,
+    blockId: null,
+    parentCommentId: null,
+    body: 'Comentario real desde MCP.',
+  });
+  const comments = await callTool(server, 'nodus_list_page_comments', { pageId: createdPage.page.id, includeResolved: false });
+  assert.ok(comments.comments.some((item) => item.id === comment.comment.id), 'page comments round-trip through MCP');
+
+  const acl = require(path.join(repoRoot, 'electron/db/aclRepo.ts'));
+  acl.setAclEntry({ resourceType: 'page', resourceId: createdPage.page.id, principalType: 'actor', principalId: 'local', role: 'view', actorId: 'local' });
+  const deniedWrite = await callToolRaw(server, 'nodus_replace_page_markdown', {
+    pageId: createdPage.page.id,
+    expectedDocumentRevision: replaced.documentRevision,
+    markdown: 'No autorizado',
+  });
+  assert.equal(deniedWrite.isError, true, 'MCP page writes obey the same ACL as Electron IPC');
+  const deniedWriteError = JSON.parse(deniedWrite.content[0].text).error;
+  assert.equal(deniedWriteError.category, 'permission_denied', 'ACL refusal has a stable machine-readable category');
+  assert.match(deniedWriteError.message, /permission/, 'ACL refusal is explicit');
 
   // Derived columns have to reach a client as data it can reason about. A rollup keeps its
   // value beside the cells, so reading cells alone hands the client null; a formula lives in
@@ -583,6 +695,11 @@ try {
   assert.match(JSON.parse(badFormula.content[0].text).error.message, /formula/, 'a formula column refuses a direct write');
   // Clean the write-test row back out so later row-count assertions stay stable.
   dbmode.deleteRow(created.row.id);
+  acl.setAclEntry({ resourceType: 'database', resourceId: mdb.id, principalType: 'actor', principalId: 'local', role: 'view', actorId: 'local' });
+  const deniedCell = await callToolRaw(server, 'nodus_set_database_cell', { rowId: mRow.id, columnId: mName.id, value: 'No autorizado' });
+  assert.equal(JSON.parse(deniedCell.content[0].text).error.category, 'permission_denied', 'database writes also obey ACL');
+  const stillReadable = await callTool(server, 'nodus_get_database_row', { rowId: mRow.id });
+  assert.equal(stillReadable.fields.Nombre, 'Gato', 'view ACL preserves reads and the denied write changed nothing');
 
   // Read-only study-vault tools expose organisation, grounded search, questions
   // and progress without allowing an MCP client to mutate learning state.

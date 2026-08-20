@@ -11,6 +11,7 @@ import type { WorldbuildingApi } from './api/worldbuilding';
 import type { ArchiveApi } from './api/archive';
 import type { PrimarySourcesApi } from './api/primarySources';
 import type { DatabasesApi } from './api/databases';
+import type { PagesApi } from './api/pages';
 import type { TeachingApi } from './api/teaching';
 import type { ToolkitApi } from './api/toolkit';
 import type { TestimoniesApi } from './api/testimonies';
@@ -496,11 +497,74 @@ export type {
 export type {
   DatabaseFilterState,
   DatabaseSavedView,
+  DatabaseViewRevision,
   FilterCondition,
   FilterGroup,
   SavedViewInput,
+  SavedViewPatch,
   SortRule,
 } from './databaseFilters';
+export type {
+  DatabaseViewConfig,
+  DatabaseViewDensity,
+  DatabaseViewEditPermission,
+  DatabaseViewLayout,
+  DatabaseViewOpenMode,
+  DatabaseViewPropertyConfig,
+  DatabaseViewScope,
+} from './databaseViewConfig';
+export type {
+  DatabaseRowPage,
+  DatabaseRowQuery,
+  FilterConditionNode,
+  FilterGroupNode,
+  FilterNode,
+  GroupRule,
+} from './databaseQuery';
+export type {
+  AttachDatabaseViewSourceInput,
+  DatabaseContainerDefinition,
+  DatabaseContainerProperty,
+  DatabaseContainerRow,
+  DatabaseContainerRowPage,
+  DatabaseContainerRowQuery,
+  DatabaseDataSource,
+  DatabaseViewDataSource,
+} from './databaseSources';
+export type {
+  CreateDatabaseRowTemplateInput,
+  DatabaseDuplicateRowInput,
+  DatabaseRowDependency,
+  DatabaseRowHierarchyItem,
+  DatabaseRowTemplate,
+  DatabaseSprint,
+  DatabaseSprintState,
+  DatabaseTaskConfig,
+  DatabaseTaskDateChange,
+  DatabaseTemplateInstantiation,
+  DatabaseTemplateRecurrence,
+  DatabaseTemplateRelationDefault,
+  DatabaseSubitemView,
+} from './databaseTasks';
+export type {
+  AutomationAction,
+  AutomationEvent,
+  AutomationRule,
+  AutomationRuleMutationResult,
+  AutomationRun,
+  AutomationRunStatus,
+  AutomationTrigger,
+  AutomationTriggerType,
+  AutomationValue,
+  CreateAutomationRuleInput,
+  CreateFormDefinitionInput,
+  DatabaseFormAccess,
+  DatabaseFormField,
+  DatabaseFormServerStatus,
+  DatabaseFormSubmission,
+  FormDefinition,
+  FormDefinitionMutationResult,
+} from './databaseAutomations';
 export type { ColumnProfile, DatabaseProfile, DistributionSlice, NumberStats } from './dataProfile';
 import type { DbChatTurn } from './databaseChat';
 export type { DbChatTurn } from './databaseChat';
@@ -1526,6 +1590,9 @@ export interface AppSettings {
   // Nodi mascot: show the floating companion (visual/animation only for now — no wired
   // behaviour yet). App-wide preference, on by default.
   mascotEnabled: boolean;
+  // Discrete scale shared by the in-app and always-on-top companions. The default 1
+  // preserves the size used before this setting was introduced.
+  mascotScale: number;
   // Keep Nodi pinned on top of every application in a floating desktop window, on the
   // operating systems that allow it. When off, Nodi lives inside the app window only.
   mascotAlwaysOnTop: boolean;
@@ -1981,6 +2048,24 @@ export interface ReplicaConnectionView {
   lastImages: { downloaded: number; bytes: number; skipped: number } | null;
 }
 
+export interface ReplicaPresenceParticipant {
+  id: string;
+  userId: string;
+  name: string;
+  pageId: string | null;
+  blockId: string | null;
+  cursor: { anchor: number; head: number } | null;
+  color: string | null;
+  updatedAt: string;
+}
+
+export interface ReplicaPresenceInput {
+  pageId?: string | null;
+  blockId?: string | null;
+  cursor?: { anchor: number; head: number } | null;
+  color?: string | null;
+}
+
 export interface VaultSummary {
   id: string;
   name: string;
@@ -2059,6 +2144,22 @@ export interface VaultCreateResult {
 export interface VaultDuplicateResult {
   vault: VaultSummary;
   copiedProviders: AiProvider[];
+}
+
+/** Immutable, verified copy made immediately before a schema migration. */
+export interface MigrationRecoverySnapshot {
+  id: string;
+  databasePath: string;
+  manifestPath: string;
+  sourceDatabasePath: string;
+  fromVersion: number;
+  targetVersion: number;
+  createdAt: string;
+  bytes: number;
+  sha256: string;
+  quickCheck: string;
+  immutable: boolean;
+  major: boolean;
 }
 
 // ── Primary-source / genealogy records ontology (phase B) ────────────────────
@@ -4099,7 +4200,7 @@ export interface ServerInboxEntry {
   title: string | null;
   entityKind: string | null;
   /** Root item that owns this change. Child annotations from one report/document share it. */
-  parentEntityKind: 'deep_research' | 'library_document' | null;
+  parentEntityKind: 'deep_research' | 'immersion' | 'library_document' | null;
   parentEntityId: string | null;
   /** Human title captured on arrival, so grouping never has to show an opaque id. */
   parentTitle: string | null;
@@ -6381,11 +6482,12 @@ export interface WritingWorkshopSavedDraft {
   updatedAt: string;
 }
 
-/** The six quiet colours offered by the Deep Research reader highlighter. */
+/** The six quiet colours offered by the document-reader highlighter. */
 export type WritingDraftAnnotationColor = 'yellow' | 'rose' | 'blue' | 'mint' | 'lavender' | 'peach';
 
 /**
- * A text annotation belongs to one immutable rendering of a saved report.
+ * A text annotation belongs to one immutable reader rendering: a saved report,
+ * an Immersion step, or a supported library document.
  *
  * `scope` is `source` for the original report and `translation:<id>` for a saved
  * translation. Offsets make the common path exact and cheap; the selected text plus
@@ -8061,7 +8163,7 @@ export interface BrowserApi {
   onBrowserHistoryChanged(cb: (store: import('./browserHistory').BrowserHistoryStore) => void): () => void;
 }
 
-export interface NodusApi extends ProsopographyApi, TestimoniesApi, ToolkitApi, TeachingApi, DatabasesApi, PrimarySourcesApi, ArchiveApi, WorldbuildingApi, PlatformApi, RecordsApi, AcademicApi, LibraryApi, BrowserApi {
+export interface NodusApi extends ProsopographyApi, TestimoniesApi, ToolkitApi, TeachingApi, DatabasesApi, PagesApi, PrimarySourcesApi, ArchiveApi, WorldbuildingApi, PlatformApi, RecordsApi, AcademicApi, LibraryApi, BrowserApi {
   // settings + secrets
   getSettings(): Promise<AppSettings>;
   updateSettings(patch: Partial<AppSettings>): Promise<AppSettings>;
@@ -8128,6 +8230,8 @@ export interface NodusApi extends ProsopographyApi, TestimoniesApi, ToolkitApi, 
   }): Promise<VaultCreateResult>;
   replicaOverview(): Promise<ReplicaConnectionView[]>;
   replicaSyncNow(vaultId: string): Promise<ReplicaConnectionView[]>;
+  replicaPresence(vaultId: string): Promise<ReplicaPresenceParticipant[]>;
+  replicaUpdatePresence(vaultId: string, input: ReplicaPresenceInput | null): Promise<ReplicaPresenceParticipant[]>;
   /** Keep the data, stop syncing: what a revoked or unwanted replica becomes. */
   replicaDetach(vaultId: string): Promise<ReplicaConnectionView[]>;
   renameVault(id: string, name: string): Promise<VaultSummary>;
@@ -8139,6 +8243,8 @@ export interface NodusApi extends ProsopographyApi, TestimoniesApi, ToolkitApi, 
   reuseVaultAnalysis(nodusIds: string[], operationId?: string): Promise<VaultAnalysisReuseResult>;
   cancelVaultAnalysisReuse(operationId: string): Promise<boolean>;
   copyVaultApiKeys(sourceVaultId: string, targetVaultId: string): Promise<{ copiedProviders: AiProvider[] }>;
+  listMigrationRecoverySnapshots(): Promise<MigrationRecoverySnapshot[]>;
+  openMigrationRecoverySnapshot(id: string): Promise<VaultCreateResult>;
 
 
   // core: sync, backups, recovery. Regrouped here so the academic and study

@@ -10,6 +10,10 @@ interface VirtualListProps<T> {
   style?: React.CSSProperties;
   overscan?: number;
   empty?: React.ReactNode;
+  /** Lets paged callers fetch just before the rendered window reaches either edge. */
+  onRangeChange?: (range: { start: number; end: number; total: number }) => void;
+  /** Positive items were prepended; negative items were discarded from the start. */
+  anchorAdjustment?: { token: number; items: number } | null;
   /**
    * A row to bring back under the top edge, once, when it appears among `items`.
    * The DOM-based anchoring the plain lists use cannot work here: the row to scroll
@@ -29,10 +33,14 @@ export function VirtualList<T>({
   style,
   overscan = 8,
   empty,
+  onRangeChange,
+  anchorAdjustment,
   anchorKey = null,
   onAnchorChange,
 }: VirtualListProps<T>) {
   const scrollRef = useRef<HTMLDivElement>(null);
+  const appliedAnchorToken = useRef<number | null>(null);
+  const previousVariableHeights = useRef<number[] | null>(null);
   const [scrollTop, setScrollTop] = useState(0);
   const [viewportHeight, setViewportHeight] = useState(0);
   // Reporting the top row while the restore is still pending would overwrite the
@@ -99,6 +107,26 @@ export function VirtualList<T>({
   }, [itemHeight, items.length, overscan, scrollTop, variableLayout, viewportHeight]);
 
   const visibleItems = items.slice(start, end);
+
+  useLayoutEffect(() => {
+    const element = scrollRef.current;
+    const adjustment = anchorAdjustment;
+    if (element && adjustment && adjustment.items !== 0 && appliedAnchorToken.current !== adjustment.token) {
+      const count = Math.abs(adjustment.items);
+      let pixels: number;
+      if (typeof itemHeight === 'number') pixels = count * itemHeight;
+      else if (adjustment.items > 0) pixels = (variableLayout?.heights ?? []).slice(0, count).reduce((sum, height) => sum + height, 0);
+      else pixels = (previousVariableHeights.current ?? []).slice(0, count).reduce((sum, height) => sum + height, 0);
+      element.scrollTop += adjustment.items > 0 ? pixels : -pixels;
+      setScrollTop(element.scrollTop);
+      appliedAnchorToken.current = adjustment.token;
+    }
+    previousVariableHeights.current = variableLayout?.heights ?? null;
+  }, [anchorAdjustment, itemHeight, variableLayout]);
+
+  useEffect(() => {
+    onRangeChange?.({ start, end, total: items.length });
+  }, [end, items.length, onRangeChange, start]);
 
   // Put the anchored row back under the top edge, once, as soon as it exists. A row
   // that never turns up leaves the list where it is and simply releases the hold on

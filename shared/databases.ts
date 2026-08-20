@@ -14,18 +14,42 @@
 // though databaseFormula.ts imports its column types back.
 import type { FormulaColorRule, FormulaSpec } from './databaseFormula';
 import type { ImageProvider, ModelRef } from './types';
+import {
+  decodeDatabaseButton,
+  decodeDatabaseDate,
+  decodeDatabaseLocation,
+  decodeDatabasePeople,
+  encodeDatabaseButton,
+  encodeDatabaseDate,
+  encodeDatabaseLocation,
+  encodeDatabasePeople,
+} from './databaseProperties';
 
 // ── Column types ───────────────────────────────────────────────────────────────
 
 export type DatabaseColumnType =
   | 'title'
+  | 'rich_text'
   | 'text'
   | 'number'
   | 'date'
   | 'time'
   | 'select'
+  | 'status'
   | 'multi_select'
   | 'checkbox'
+  | 'person'
+  | 'url'
+  | 'email'
+  | 'phone'
+  | 'location'
+  | 'files'
+  | 'created_by'
+  | 'last_edited_by'
+  | 'created_time'
+  | 'last_edited_time'
+  | 'unique_id'
+  | 'button'
   | 'attachment' // Phase 2
   | 'ai' // Phase 3
   | 'ai_image' // AI-generated image, stored as an attachment
@@ -49,13 +73,27 @@ export interface ColumnTypeDef {
 /** Canonical column-type registry; order here is the order shown in the type picker. */
 export const COLUMN_TYPES: ColumnTypeDef[] = [
   { id: 'title', label: 'Título', icon: 'heading', hasOptions: false, available: true },
-  { id: 'text', label: 'Texto', icon: 'notebook', hasOptions: false, available: true },
+  { id: 'rich_text', label: 'Texto enriquecido', icon: 'notebook', hasOptions: false, available: true },
+  { id: 'text', label: 'Texto (heredado)', icon: 'notebook', hasOptions: false, available: true },
   { id: 'number', label: 'Número', icon: 'hash', hasOptions: false, available: true },
   { id: 'date', label: 'Fecha', icon: 'calendar', hasOptions: false, available: true },
   { id: 'time', label: 'Hora', icon: 'clock', hasOptions: false, available: true },
   { id: 'select', label: 'Selección', icon: 'tag', hasOptions: true, available: true },
+  { id: 'status', label: 'Estado', icon: 'status', hasOptions: true, available: true },
   { id: 'multi_select', label: 'Selección múltiple', icon: 'tags', hasOptions: true, available: true },
   { id: 'checkbox', label: 'Casilla', icon: 'check', hasOptions: false, available: true },
+  { id: 'person', label: 'Persona o grupo', icon: 'users', hasOptions: false, available: true },
+  { id: 'url', label: 'URL', icon: 'link', hasOptions: false, available: true },
+  { id: 'email', label: 'Email', icon: 'mail', hasOptions: false, available: true },
+  { id: 'phone', label: 'Teléfono', icon: 'phone', hasOptions: false, available: true },
+  { id: 'location', label: 'Ubicación', icon: 'mapPin', hasOptions: false, available: true },
+  { id: 'files', label: 'Archivos', icon: 'upload', hasOptions: false, available: true },
+  { id: 'created_by', label: 'Creado por', icon: 'user', hasOptions: false, available: true },
+  { id: 'last_edited_by', label: 'Editado por', icon: 'user', hasOptions: false, available: true },
+  { id: 'created_time', label: 'Fecha de creación', icon: 'calendar', hasOptions: false, available: true },
+  { id: 'last_edited_time', label: 'Última edición', icon: 'calendar', hasOptions: false, available: true },
+  { id: 'unique_id', label: 'ID único', icon: 'hash', hasOptions: false, available: true },
+  { id: 'button', label: 'Botón', icon: 'play', hasOptions: false, available: true },
   { id: 'attachment', label: 'Adjunto', icon: 'upload', hasOptions: false, available: true },
   { id: 'ai', label: 'IA', icon: 'wand', hasOptions: false, available: true },
   { id: 'ai_image', label: 'Imagen IA', icon: 'image', hasOptions: false, available: true },
@@ -92,12 +130,22 @@ export interface DatabaseSelectOption {
   label: string;
   color: string | null;
   position: number;
+  group?: 'pending' | 'in_progress' | 'complete' | null;
 }
 
 /** Per-type column configuration. Kept open-ended; later phases add AI/relation keys. */
 export interface DatabaseColumnConfig {
   /** number: how to render the value. */
-  numberFormat?: 'plain' | 'integer' | 'decimal';
+  numberFormat?: 'plain' | 'integer' | 'decimal' | 'currency' | 'percent' | 'progress';
+  numberCurrency?: string;
+  numberDecimals?: number;
+  progressMaximum?: number;
+  dateIncludeTime?: boolean;
+  dateTimeZone?: string;
+  uniqueIdPrefix?: string;
+  uniqueIdPadding?: number;
+  buttonLabel?: string;
+  buttonColor?: string;
   /** Column width in px (user-resized); falls back to a per-type default. */
   width?: number;
   /** Show the complete cell value, wrapping it and growing the row when necessary. */
@@ -114,6 +162,10 @@ export interface DatabaseColumnConfig {
   /** relation columns: what the relation points at, and (for db_row) which database. */
   relationTargetKind?: RelationTargetKind;
   relationTargetDatabaseId?: string;
+  /** one replaces the previous target atomically; many is the default. */
+  relationCardinality?: 'one' | 'many';
+  /** A compatible relation property on the target database. New links are mirrored there. */
+  relationInverseColumnId?: string;
   /** rollup columns: aggregate a property across the rows a relation column links to. */
   rollupRelationColumnId?: string; // a 'relation' (db_row) column on THIS database
   rollupTargetColumnId?: string; // a column id on the related database ('__title__' for its title)
@@ -129,28 +181,59 @@ export interface DatabaseColumnConfig {
 
 export type RollupFunction =
   | 'show' // list the values
+  | 'show_unique'
   | 'count' // number of related rows
   | 'count_values' // non-empty values
+  | 'count_empty'
   | 'count_unique' // distinct values
+  | 'percent_empty'
+  | 'percent_not_empty'
   | 'sum'
   | 'average'
+  | 'median'
   | 'min'
   | 'max'
   | 'range' // max - min
-  | 'percent_checked'; // for checkbox target columns
+  | 'earliest_date'
+  | 'latest_date'
+  | 'date_range'
+  | 'checked'
+  | 'unchecked'
+  | 'percent_checked'
+  | 'percent_unchecked'; // for checkbox target columns
+
+export type RollupResultKind = 'text' | 'number' | 'date' | 'json';
 
 export const ROLLUP_FUNCTIONS: { id: RollupFunction; label: string }[] = [
   { id: 'show', label: 'Mostrar valores' },
+  { id: 'show_unique', label: 'Mostrar valores únicos' },
   { id: 'count', label: 'Contar' },
   { id: 'count_values', label: 'Contar con valor' },
+  { id: 'count_empty', label: 'Contar vacíos' },
   { id: 'count_unique', label: 'Contar únicos' },
+  { id: 'percent_empty', label: '% vacíos' },
+  { id: 'percent_not_empty', label: '% con valor' },
   { id: 'sum', label: 'Suma' },
   { id: 'average', label: 'Media' },
+  { id: 'median', label: 'Mediana' },
   { id: 'min', label: 'Mínimo' },
   { id: 'max', label: 'Máximo' },
   { id: 'range', label: 'Rango' },
+  { id: 'earliest_date', label: 'Fecha más temprana' },
+  { id: 'latest_date', label: 'Fecha más tardía' },
+  { id: 'date_range', label: 'Rango de fechas' },
+  { id: 'checked', label: 'Marcadas' },
+  { id: 'unchecked', label: 'Sin marcar' },
   { id: 'percent_checked', label: '% marcadas' },
+  { id: 'percent_unchecked', label: '% sin marcar' },
 ];
+
+export function rollupResultKind(fn: RollupFunction): RollupResultKind {
+  if (fn === 'earliest_date' || fn === 'latest_date') return 'date';
+  if (fn === 'date_range') return 'json';
+  if (fn === 'show' || fn === 'show_unique') return 'text';
+  return 'number';
+}
 
 /**
  * Aggregate the display values pulled from a relation's related rows into a rollup
@@ -161,25 +244,58 @@ export function aggregateRollup(fn: RollupFunction, values: (string | null)[]): 
   const nonEmpty = values.filter((v): v is string => v != null && v.trim() !== '');
   const nums = nonEmpty.map((v) => decodeNumber(v)).filter((n): n is number => n != null);
   const fmt = (n: number) => (Number.isInteger(n) ? String(n) : String(Math.round(n * 100) / 100));
+  const percentage = (amount: number) => values.length ? `${Math.round((amount / values.length) * 100)}%` : '';
+  const dates = nonEmpty.flatMap((value) => {
+    const decoded = decodeDatabaseDate(value);
+    if (!decoded?.start) return [];
+    const time = Date.parse(decoded.start);
+    return Number.isFinite(time) ? [{ raw: decoded.start, time }] : [];
+  }).sort((a, b) => a.time - b.time);
   switch (fn) {
     case 'count':
       return String(values.length);
     case 'count_values':
       return String(nonEmpty.length);
+    case 'count_empty':
+      return String(values.length - nonEmpty.length);
     case 'count_unique':
       return String(new Set(nonEmpty).size);
+    case 'percent_empty':
+      return percentage(values.length - nonEmpty.length);
+    case 'percent_not_empty':
+      return percentage(nonEmpty.length);
     case 'sum':
       return nums.length ? fmt(nums.reduce((a, b) => a + b, 0)) : '';
     case 'average':
       return nums.length ? fmt(nums.reduce((a, b) => a + b, 0) / nums.length) : '';
+    case 'median': {
+      if (!nums.length) return '';
+      const sorted = [...nums].sort((a, b) => a - b);
+      const middle = Math.floor(sorted.length / 2);
+      return fmt(sorted.length % 2 ? sorted[middle] : (sorted[middle - 1] + sorted[middle]) / 2);
+    }
     case 'min':
       return nums.length ? fmt(Math.min(...nums)) : '';
     case 'max':
       return nums.length ? fmt(Math.max(...nums)) : '';
     case 'range':
       return nums.length ? fmt(Math.max(...nums) - Math.min(...nums)) : '';
+    case 'earliest_date':
+      return dates[0]?.raw ?? '';
+    case 'latest_date':
+      return dates.at(-1)?.raw ?? '';
+    case 'date_range':
+      return dates.length ? encodeDatabaseDate({ start: dates[0].raw, end: dates.at(-1)!.raw }) ?? '' : '';
+    case 'checked':
+      return String(values.filter((v) => decodeCheckbox(v)).length);
+    case 'unchecked':
+      return String(values.filter((v) => !decodeCheckbox(v)).length);
     case 'percent_checked':
-      return values.length ? `${Math.round((values.filter((v) => decodeCheckbox(v)).length / values.length) * 100)}%` : '';
+      return percentage(values.filter((v) => decodeCheckbox(v)).length);
+    case 'percent_unchecked':
+      return percentage(values.filter((v) => !decodeCheckbox(v)).length);
+    case 'show_unique':
+      return [...new Set(nonEmpty)].join(', ');
     case 'show':
     default:
       return nonEmpty.join(', ');
@@ -234,6 +350,17 @@ export interface DatabaseRowHit {
   snippet: string;
 }
 
+export type DatabaseCalculationStatus = 'queued' | 'running' | 'completed' | 'failed' | 'cancelled';
+
+export interface DatabaseCalculationProgress {
+  jobId: string;
+  databaseId: string;
+  status: DatabaseCalculationStatus;
+  done: number;
+  total: number;
+  message: string | null;
+}
+
 /** A file attached to an attachment cell. Metadata only — the blob is fetched on demand. */
 export interface DatabaseAttachment {
   id: string;
@@ -277,6 +404,11 @@ export interface DatabaseRelation {
   vaultName?: string;
   /** True when the target could not be resolved (e.g. its vault/entity is gone). */
   broken?: boolean;
+  /** Pair created in the target row for bidirectional relations. */
+  inverseRelationId?: string | null;
+  /** Stable fallback retained when the target disappears. */
+  lastKnownLabel?: string | null;
+  updatedAt?: string;
   position: number;
   createdAt: string;
 }
@@ -330,6 +462,10 @@ export interface DatabaseRow {
   formulaErrors?: Record<string, string>;
   createdAt: string;
   updatedAt: string;
+  revision?: number;
+  createdBy?: string;
+  updatedBy?: string;
+  uniqueSequence?: number;
 }
 
 /** A database with its column definitions (no rows) — the shape the table header needs. */
@@ -435,7 +571,20 @@ export function normalizeCellValue(type: DatabaseColumnType, raw: string | null)
       return decodeCheckbox(raw) ? '1' : '0';
     case 'multi_select':
       return encodeMultiSelect(decodeMultiSelect(raw));
+    case 'date': {
+      const value = raw.trim();
+      // Preserve the compact historical ISO form so existing indexes/readers keep their
+      // exact representation; only the new structured range form is canonicalised.
+      return value.startsWith('{') ? encodeDatabaseDate(decodeDatabaseDate(value)) : value || null;
+    }
+    case 'person':
+      return encodeDatabasePeople(decodeDatabasePeople(raw));
+    case 'location':
+      return encodeDatabaseLocation(decodeDatabaseLocation(raw));
+    case 'button':
+      return encodeDatabaseButton(decodeDatabaseButton(raw));
     case 'select':
+    case 'status':
       return decodeSelect(raw);
     default: {
       const trimmed = raw === '' ? null : raw;

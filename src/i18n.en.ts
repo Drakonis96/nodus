@@ -27,7 +27,15 @@ import { ANNOUNCEMENT_TRANSLATIONS } from './i18n.announcements';
 import { LIBRARY_READER_TRANSLATIONS } from './i18n.libraryReader';
 import { LIBRARY_BIBLIOGRAPHY_TRANSLATIONS } from './i18n.libraryBibliography';
 import { LIBRARY_RECOVERY_TRANSLATIONS } from './i18n.libraryRecovery';
+import { PAGE_TRANSLATIONS } from './i18n.pages';
+import { DATABASE_PROPERTY_TRANSLATIONS } from './i18n.databaseProperties';
+import { DATABASE_RELATION_FORMULA_TRANSLATIONS } from './i18n.databaseRelationsFormulas';
+import { DATABASE_VIEW_TRANSLATIONS } from './i18n.databaseViews';
+import { DATABASE_TASK_TRANSLATIONS } from './i18n.databaseTasks';
+import { DATABASE_AUTOMATION_TRANSLATIONS } from './i18n.databaseAutomations';
+import { NOTION_IMPORT_TRANSLATIONS } from './i18n.notionImport';
 import { LIBRARY_ONBOARDING_TRANSLATIONS } from './i18n.libraryOnboarding';
+import { SOURCE_CITATION_TRANSLATIONS } from './i18n.sourceCitation';
 
 /**
  * English translations keyed by the Spanish source string (see {@link ../i18n}).
@@ -35,7 +43,18 @@ import { LIBRARY_ONBOARDING_TRANSLATIONS } from './i18n.libraryOnboarding';
  * every non-Spanish interface language.
  */
 export const EN: Record<string, string> = {
+  'Tamaño de Nodi': 'Nodi size',
+  'El marcador central conserva el tamaño predeterminado. Elige uno de los nueve tamaños disponibles.': 'The centre marker keeps the default size. Choose one of the nine available sizes.',
+  'Tamaños predeterminados': 'Preset sizes',
+  ...PAGE_TRANSLATIONS.en,
+  ...DATABASE_PROPERTY_TRANSLATIONS.en,
+  ...DATABASE_RELATION_FORMULA_TRANSLATIONS.en,
+  ...DATABASE_VIEW_TRANSLATIONS.en,
+  ...DATABASE_TASK_TRANSLATIONS.en,
+  ...DATABASE_AUTOMATION_TRANSLATIONS.en,
+  ...NOTION_IMPORT_TRANSLATIONS.en,
   ...LIBRARY_READER_TRANSLATIONS.en,
+  ...SOURCE_CITATION_TRANSLATIONS.en,
   ...LIBRARY_BIBLIOGRAPHY_TRANSLATIONS.en,
   ...LIBRARY_ONBOARDING_TRANSLATIONS.en,
   ...LIBRARY_RECOVERY_TRANSLATIONS.en,
@@ -1070,6 +1089,7 @@ export const EN: Record<string, string> = {
   'Cargando Nodus…': 'Loading Nodus…',
   'No se pudo iniciar Nodus': 'Nodus could not start',
   Reintentar: 'Retry',
+  'No se pudieron cargar las filas.': 'Rows could not be loaded.',
   'Configura un modelo de IA': 'Configure an AI model',
   'Modelo: sin configurar': 'Model: not configured',
   'Abrir asistente de investigación': 'Open research assistant',
@@ -1608,6 +1628,9 @@ export const EN: Record<string, string> = {
   'Ver últimos cambios': 'View latest changes',
   Reiniciar: 'Restart',
   'Buscando…': 'Checking…',
+  'Cargar más resultados': 'Load more results',
+  'Recalcular fórmulas y rollups': 'Recalculate formulas and rollups',
+  'Actualizando fórmulas y rollups…': 'Updating formulas and rollups…',
   'Buscar actualización': 'Check for updates',
   'Comprobando actualizaciones': 'Checking for updates',
   'Buscando una nueva versión de Nodus…': 'Looking for a new version of Nodus…',
@@ -6404,6 +6427,7 @@ export const EN: Record<string, string> = {
   'Elige la columna que quieres medir.': 'Choose the column you want to measure.',
   'Esta columna todavía no tiene fórmula.': 'This column has no formula yet.',
   'La fórmula usa una columna que ya no existe.': 'The formula uses a column that no longer exists.',
+  'La vista hace referencia a una propiedad que ya no existe.': 'The view references a property that no longer exists.',
   'Referencia circular: la fórmula se usa a sí misma.': 'Circular reference: the formula uses itself.',
   'de': 'of',
   'o': 'or',
@@ -8396,4 +8420,9 @@ export const EN: Record<string, string> = {
   "No se ha podido leer esta página": "This page could not be read",
   "Raíz de la Biblioteca": "Library root",
   "Se han guardado {n} archivo(s).": "{n} file(s) saved.",
+  "Copias previas a migraciones": "Pre-migration copies",
+  "Antes de cambiar el esquema, Nodus conserva una copia inmutable y verificada. Puedes abrirla como un vault separado sin sustituir el actual.": "Before changing the schema, Nodus keeps an immutable, verified copy. You can open it as a separate vault without replacing the current one.",
+  "La copia previa se abrió como un vault separado.": "The pre-migration copy was opened as a separate vault.",
+  "Abriendo…": "Opening…",
+  "Abrir como vault separado": "Open as a separate vault",
 };

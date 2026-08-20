@@ -24,7 +24,7 @@ export function ConnectedVaultsPanel({ replicas, busyVaultId, onSync, onDetach }
     <div className="space-y-3" data-testid="connected-vault-panel">
                 <div>
                   <h3 className="text-sm font-medium">{t('Bóvedas conectadas a un servidor')}</h3>
-                  <p className="mt-1 text-xs text-neutral-500">{t('Réplicas de espacios de Nodus Server. Se actualizan solas; lo que puedas hacer en cada una depende del nivel que te haya dado quien administra el servidor.')}</p>
+                  <p className="mt-1 text-xs text-neutral-600 dark:text-neutral-400">{t('Réplicas de espacios de Nodus Server. Se actualizan solas; lo que puedas hacer en cada una depende del nivel que te haya dado quien administra el servidor.')}</p>
                 </div>
                 {replicas.map((replica) => (
                   <div key={replica.vaultId} data-testid={`replica-${replica.vaultId}`} className="rounded-xl border border-neutral-200 p-4 dark:border-neutral-800">
@@ -40,9 +40,9 @@ export function ConnectedVaultsPanel({ replicas, busyVaultId, onSync, onDetach }
                             <span className="rounded-full bg-indigo-100 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-indigo-700 dark:bg-indigo-500/15 dark:text-indigo-300">{t('Vault actual')}</span>
                           )}
                         </div>
-                        <p className="mt-1 text-xs text-neutral-500">{replica.spaceName} · {replica.serverName}</p>
-                        <p className="mt-0.5 break-all text-xs text-neutral-500">{replica.url} · {replica.userEmail}</p>
-                        <p className="mt-0.5 text-xs text-neutral-500">
+                        <p className="mt-1 text-xs text-neutral-600 dark:text-neutral-400">{replica.spaceName} · {replica.serverName}</p>
+                        <p className="mt-0.5 break-all text-xs text-neutral-600 dark:text-neutral-400">{replica.url} · {replica.userEmail}</p>
+                        <p className="mt-0.5 text-xs text-neutral-600 dark:text-neutral-400">
                           {replica.lastPulledAt
                             ? t('Última actualización: {date}').replace('{date}', new Date(replica.lastPulledAt).toLocaleString())
                             : t('Todavía sin actualizar.')}
@@ -62,7 +62,7 @@ export function ConnectedVaultsPanel({ replicas, busyVaultId, onSync, onDetach }
                     </div>
 
                     {replica.role === 'reader' && replica.state === 'active' && (
-                      <p className="mt-3 rounded-lg border border-neutral-200 px-3 py-2 text-xs text-neutral-500 dark:border-neutral-800">
+                      <p className="mt-3 rounded-lg border border-neutral-200 px-3 py-2 text-xs text-neutral-600 dark:border-neutral-800 dark:text-neutral-400">
                         {t('Con acceso de solo lectura, todo lo que escribas o generes aquí se queda en este equipo y nunca se envía al vault principal.')}
                       </p>
                     )}
@@ -87,7 +87,7 @@ export function ConnectedVaultsPanel({ replicas, busyVaultId, onSync, onDetach }
                     )}
 
                     {replica.state === 'paused' && (
-                      <p className="mt-3 rounded-lg border border-neutral-200 px-3 py-2 text-xs text-neutral-500 dark:border-neutral-800">
+                      <p className="mt-3 rounded-lg border border-neutral-200 px-3 py-2 text-xs text-neutral-600 dark:border-neutral-800 dark:text-neutral-400">
                         {t('Desconectada del servidor. Es una bóveda local normal.')}
                       </p>
                     )}

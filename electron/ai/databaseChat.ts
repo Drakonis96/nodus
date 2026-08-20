@@ -3,7 +3,7 @@
 // native chart spec. The context assembly is pure (shared/databaseChat.ts); this module
 // wires the repo + the streaming model.
 
-import { getDatabase, getColumns, listRows } from '../db/databasesRepo';
+import { getDatabase, getColumns, queryDatabaseRows } from '../db/databasesRepo';
 import { computeProfile, profileToText } from '@shared/dataProfile';
 import { buildDbChatContext, buildDbChatUser, DB_CHAT_SYSTEM } from '@shared/databaseChat';
 import { decodeCheckbox, decodeMultiSelect } from '@shared/databases';
@@ -42,14 +42,14 @@ function sampleText(columns: DatabaseColumn[], rows: DatabaseRow[]): string {
         .map((col) => {
           const raw = row.cells[col.id] ?? null;
           let v = '';
-          if (col.type === 'select') v = col.options.find((o) => o.id === raw)?.label ?? '';
+          if (col.type === 'select' || col.type === 'status') v = col.options.find((o) => o.id === raw)?.label ?? '';
           else if (col.type === 'multi_select')
             v = decodeMultiSelect(raw)
               .map((id) => col.options.find((o) => o.id === id)?.label ?? '')
               .filter(Boolean)
               .join('/');
           else if (col.type === 'checkbox') v = decodeCheckbox(raw) ? 'sí' : 'no';
-          else if (col.type === 'attachment') v = String((row.attachments?.[col.id] ?? []).length);
+          else if (col.type === 'attachment' || col.type === 'files') v = String((row.attachments?.[col.id] ?? []).length);
           else if (col.type === 'relation') v = String(row.relationCounts?.[col.id] ?? 0);
           else v = raw ?? '';
           return v && v.trim() ? `${col.name}: ${clip(v.trim())}` : '';
@@ -60,6 +60,17 @@ function sampleText(columns: DatabaseColumn[], rows: DatabaseRow[]): string {
     .join('\n');
 }
 
+function queryAllRows(databaseId: string): DatabaseRow[] {
+  const rows: DatabaseRow[] = [];
+  let cursor: string | null = null;
+  do {
+    const page = queryDatabaseRows({ databaseId, cursor, limit: 500 });
+    rows.push(...page.rows);
+    cursor = page.nextCursor;
+  } while (cursor);
+  return rows;
+}
+
 /** Build the bounded context string for the selected databases. */
 export function buildDatabaseChatContext(databaseIds: string[]): { context: string; names: string[] } {
   const parts: DbChatPart[] = [];
@@ -68,7 +79,7 @@ export function buildDatabaseChatContext(databaseIds: string[]): { context: stri
     const database = getDatabase(id);
     if (!database) continue;
     const columns = getColumns(id);
-    const rows = listRows(id);
+    const rows = queryAllRows(id);
     const profile = computeProfile(columns, rows);
     parts.push({
       name: database.name,

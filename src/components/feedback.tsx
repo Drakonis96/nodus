@@ -173,13 +173,13 @@ function ToastCard({ item, onDismiss }: { item: ToastItem; onDismiss: (id: numbe
       animate={{ opacity: 1, x: 0, scale: 1 }}
       exit={{ opacity: 0, x: 24, scale: 0.98 }}
       transition={{ duration: 0.18 }}
-      className={`card pointer-events-auto flex items-start gap-2.5 border-l-2 ${tone.accent} px-3.5 py-2.5 shadow-lg max-w-sm`}
+      className={`pointer-events-auto flex max-w-sm items-start gap-2.5 rounded-xl border border-neutral-200 border-l-2 bg-white px-3.5 py-2.5 text-neutral-900 shadow-lg dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-100 ${tone.accent}`}
       role="status"
     >
       <Icon name={tone.icon} className={`mt-0.5 shrink-0 ${tone.iconClass}`} />
-      <span className="min-w-0 flex-1 text-sm text-neutral-200">{item.message}</span>
+      <span className="min-w-0 flex-1 text-sm text-neutral-800 dark:text-neutral-100">{item.message}</span>
       <button
-        className="shrink-0 text-neutral-500 hover:text-neutral-300 transition-colors"
+        className="shrink-0 text-neutral-600 transition-colors hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-white"
         onClick={() => onDismiss(item.id)}
         aria-label={t('Cerrar')}
       >
@@ -196,7 +196,7 @@ export function FeedbackHost() {
   return (
     <>
       {createPortal(
-        <div data-testid="app-toast-stack" className="app-toast-stack fixed bottom-4 right-4 z-[100] flex flex-col items-end gap-2 pointer-events-none">
+        <div data-testid="app-toast-stack" className="app-toast-stack pointer-events-none fixed bottom-4 right-4 z-[250] flex flex-col items-end gap-2">
           <AnimatePresence initial={false}>
             {toasts.map((item) => (
               <ToastCard key={item.id} item={item} onDismiss={dismissToast} />

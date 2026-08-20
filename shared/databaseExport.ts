@@ -5,6 +5,12 @@
 
 import { decodeCheckbox, decodeMultiSelect, decodeNumber } from './databases';
 import type { DatabaseColumn, DatabaseRow } from './databases';
+import {
+  decodeDatabaseButton,
+  decodeDatabaseDate,
+  decodeDatabaseLocation,
+  decodeDatabasePeople,
+} from './databaseProperties';
 
 export type ExportFormat = 'csv' | 'json' | 'xlsx';
 
@@ -13,6 +19,7 @@ export function exportCellText(col: DatabaseColumn, row: DatabaseRow): string {
   const raw = row.cells[col.id] ?? null;
   switch (col.type) {
     case 'select':
+    case 'status':
       return col.options.find((o) => o.id === raw)?.label ?? '';
     case 'multi_select':
       return decodeMultiSelect(raw)
@@ -22,16 +29,33 @@ export function exportCellText(col: DatabaseColumn, row: DatabaseRow): string {
     case 'checkbox':
       return decodeCheckbox(raw) ? 'sí' : 'no';
     case 'attachment':
+    case 'files':
       return (row.attachments?.[col.id] ?? []).map((a) => a.fileName ?? '').filter(Boolean).join(', ');
     case 'relation':
       return String(row.relationCounts?.[col.id] ?? 0);
+    case 'date': {
+      const value = decodeDatabaseDate(raw);
+      return value ? [value.start, value.end].filter(Boolean).join(' – ') : '';
+    }
+    case 'person':
+    case 'created_by':
+    case 'last_edited_by':
+      return decodeDatabasePeople(raw).map((person) => person.label).join(', ');
+    case 'location': {
+      const value = decodeDatabaseLocation(raw);
+      return value ? [value.name, value.address].filter(Boolean).join(' · ') : '';
+    }
+    case 'button': {
+      const value = decodeDatabaseButton(raw);
+      return value.lastClickedAt ? `${value.clicks} · ${value.lastClickedAt}` : String(value.clicks);
+    }
     default:
       return raw ?? '';
   }
 }
 
 /** A cell's value typed for JSON (numbers/booleans/arrays where meaningful). */
-export function exportCellValue(col: DatabaseColumn, row: DatabaseRow): string | number | boolean | string[] | null {
+export function exportCellValue(col: DatabaseColumn, row: DatabaseRow): unknown {
   const raw = row.cells[col.id] ?? null;
   switch (col.type) {
     case 'number':
@@ -39,13 +63,25 @@ export function exportCellValue(col: DatabaseColumn, row: DatabaseRow): string |
     case 'checkbox':
       return decodeCheckbox(raw);
     case 'select':
+    case 'status':
       return col.options.find((o) => o.id === raw)?.label ?? null;
     case 'multi_select':
       return decodeMultiSelect(raw).map((id) => col.options.find((o) => o.id === id)?.label ?? id);
     case 'attachment':
+    case 'files':
       return (row.attachments?.[col.id] ?? []).map((a) => a.fileName ?? '').filter(Boolean);
     case 'relation':
       return row.relationCounts?.[col.id] ?? 0;
+    case 'date':
+      return decodeDatabaseDate(raw);
+    case 'person':
+    case 'created_by':
+    case 'last_edited_by':
+      return decodeDatabasePeople(raw);
+    case 'location':
+      return decodeDatabaseLocation(raw);
+    case 'button':
+      return decodeDatabaseButton(raw);
     default:
       return raw;
   }
@@ -74,19 +110,35 @@ export function databaseToCsv(columns: DatabaseColumn[], rows: DatabaseRow[]): s
   return [header, ...lines].join('\r\n');
 }
 
+export function databaseRowToCsv(columns: DatabaseColumn[], row: DatabaseRow): string {
+  return columns.map((column) => csvCell(exportCellText(column, row))).join(',');
+}
+
+export function databaseRowToJsonValue(columns: DatabaseColumn[], row: DatabaseRow): Record<string, unknown> {
+  const value: Record<string, unknown> = {};
+  for (const column of columns) value[column.name] = exportCellValue(column, row);
+  return value;
+}
+
 export function databaseToJson(columns: DatabaseColumn[], rows: DatabaseRow[]): string {
   return JSON.stringify(
     {
       columns: columns.map((c) => ({ name: c.name, type: c.type })),
-      rows: rows.map((r) => {
-        const o: Record<string, unknown> = {};
-        for (const c of columns) o[c.name] = exportCellValue(c, r);
-        return o;
-      }),
+      rows: rows.map((row) => databaseRowToJsonValue(columns, row)),
     },
     null,
     2
   );
+}
+
+export function databaseRowToMatrix(columns: DatabaseColumn[], row: DatabaseRow): ExportCell[] {
+  return columns.map((column) => {
+    if (column.type === 'number') {
+      const value = decodeNumber(row.cells[column.id] ?? null);
+      return { text: value == null ? '' : String(value), numeric: value };
+    }
+    return { text: exportCellText(column, row), numeric: null };
+  });
 }
 
 /** Rows as a 2D matrix of {text, numeric} cells — the input the XLSX writer needs. */
@@ -97,14 +149,6 @@ export interface ExportCell {
 
 export function databaseToMatrix(columns: DatabaseColumn[], rows: DatabaseRow[]): { header: string[]; body: ExportCell[][] } {
   const header = columns.map((c) => c.name);
-  const body = rows.map((r) =>
-    columns.map((c) => {
-      if (c.type === 'number') {
-        const n = decodeNumber(r.cells[c.id] ?? null);
-        return { text: n == null ? '' : String(n), numeric: n };
-      }
-      return { text: exportCellText(c, r), numeric: null };
-    })
-  );
+  const body = rows.map((row) => databaseRowToMatrix(columns, row));
   return { header, body };
 }

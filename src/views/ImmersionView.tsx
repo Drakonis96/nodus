@@ -27,16 +27,19 @@ import type {
   ImmersionStation,
   DecorativeImageStyle,
   ContentTranslation,
+  WritingDraftAnnotation,
+  WritingDraftAnnotationColor,
+  WritingDraftAnnotationInput,
 } from '@shared/types';
 import { DECORATIVE_IMAGE_STYLES } from '@shared/imageStyles';
-import type { PendingGraphNavigationTarget } from '../navigation';
+import { immersionAnnotationDocumentId } from '@shared/readerAnnotations';
 import type { ImmersionSnapshot } from '../app/viewSnapshots';
 import { useListPlacement } from '../listPlacement';
 import { Badge, Icon, RestoringPane, TypeDot } from '../components/ui';
 import { SectionHeader } from '../components/SectionHeader';
 import { ModelPicker } from '../components/ModelPicker';
 import { Markdown, type MarkdownCitation } from '../components/Markdown';
-import { SourceCitationModal, type CitationTarget } from '../components/SourceCitationModal';
+import { SourceCitationModal, type CitationTarget, type OpenCitationLibraryWork } from '../components/SourceCitationModal';
 import { SaveToNotesModal } from '../components/SaveToNotesModal';
 import { TranslationModal } from '../components/TranslationModal';
 import { confirm, toast } from '../components/feedback';
@@ -62,7 +65,11 @@ import { DecorativeImageCard } from '../components/DecorativeImageCard';
 import { AudioPanel } from '../components/AudioPanel';
 import { FindInPage } from '../components/FindInPage';
 import { NodiViewContextSource } from '../components/NodiViewContextSource';
-import { ReaderSelectionActions } from '../components/ReaderSelectionActions';
+import {
+  ReaderHighlighterControl,
+  ReaderSelectionActions,
+  type ReaderSelectionActionsHandle,
+} from '../components/ReaderSelectionActions';
 
 // Wide-open filters: visibility is controlled by the data subset we feed in.
 const OPEN_FILTERS: GraphFilters = {
@@ -170,13 +177,13 @@ export function ImmersionView({
   settings,
   snapshot,
   onSnapshotChange,
-  onOpenGraph,
+  onOpenLibraryWork,
 }: {
   settings: AppSettings;
   /** Where this section was last left. Read once, at mount, and never again. */
   snapshot?: ImmersionSnapshot;
   onSnapshotChange?: (patch: Partial<ImmersionSnapshot>) => void;
-  onOpenGraph: (target: PendingGraphNavigationTarget) => void;
+  onOpenLibraryWork?: OpenCitationLibraryWork;
 }) {
   /**
    * The session this mount is walking back into, decided here rather than in an
@@ -476,10 +483,7 @@ export function ImmersionView({
         <SourceCitationModal
           target={citation}
           onClose={() => setCitation(null)}
-          onOpenGraph={(target) => {
-            setCitation(null);
-            onOpenGraph(target);
-          }}
+          onOpenLibraryWork={onOpenLibraryWork}
         />
       )}
 
@@ -568,11 +572,11 @@ function ImmersionHome({
 
   const visible = useMemo(() => {
     const q = search.trim().toLowerCase();
-    const filtered = q ? sessions.filter((s) => s.title.toLowerCase().includes(q)) : sessions;
+    const filtered = q ? sessions.filter((s) => (s.title ?? '').toLowerCase().includes(q)) : sessions;
     const sorted = [...filtered];
-    if (sortKey === 'title') sorted.sort((a, b) => a.title.localeCompare(b.title));
-    else if (sortKey === 'oldest') sorted.sort((a, b) => a.updatedAt.localeCompare(b.updatedAt));
-    else sorted.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+    if (sortKey === 'title') sorted.sort((a, b) => (a.title ?? '').localeCompare(b.title ?? ''));
+    else if (sortKey === 'oldest') sorted.sort((a, b) => (a.updatedAt ?? '').localeCompare(b.updatedAt ?? ''));
+    else sorted.sort((a, b) => (b.updatedAt ?? '').localeCompare(a.updatedAt ?? ''));
     return sorted;
   }, [sessions, search, sortKey]);
 
@@ -1312,6 +1316,10 @@ function ImmersionPlayer({
   const [translationOpen, setTranslationOpen] = useState(false);
   const [appliedTranslation, setAppliedTranslation] = useState<ContentTranslation | null>(null);
   const [exportingPdf, setExportingPdf] = useState(false);
+  const [annotations, setAnnotations] = useState<WritingDraftAnnotation[]>([]);
+  const [highlighterColor, setHighlighterColor] = useState<WritingDraftAnnotationColor | null>(null);
+  const [annotationError, setAnnotationError] = useState<string | null>(null);
+  const [hasReaderMark, setHasReaderMark] = useState(false);
   // Honest total study time from the actual route, not the requested budget:
   // a deep route can hold far more stations than a single afternoon.
   const totalMinutes = useMemo(() => steps.reduce((acc, s) => acc + stepMeta(s, session).minutes, 0), [steps, session]);
@@ -1319,6 +1327,24 @@ function ImmersionPlayer({
   const current = Math.min(progress.currentStep, steps.length - 1);
   const [direction, setDirection] = useState(1);
   const mainRef = useRef<HTMLDivElement | null>(null);
+  const markActionsRef = useRef<ReaderSelectionActionsHandle | null>(null);
+  const annotationDocumentId = immersionAnnotationDocumentId(session.id);
+
+  const refreshAnnotations = useCallback(async () => {
+    try {
+      setAnnotations(await window.nodus.listWritingDraftAnnotations(annotationDocumentId));
+      setAnnotationError(null);
+    } catch (cause) {
+      setAnnotationError(cause instanceof Error ? cause.message : String(cause));
+    }
+  }, [annotationDocumentId]);
+
+  useEffect(() => {
+    void refreshAnnotations();
+    return window.nodus.onWritingDraftAnnotationsChanged((documentId) => {
+      if (documentId === null || documentId === annotationDocumentId) void refreshAnnotations();
+    });
+  }, [annotationDocumentId, refreshAnnotations]);
 
   const exportPdf = async () => {
     setExportingPdf(true);
@@ -1391,6 +1417,39 @@ function ImmersionPlayer({
   );
 
   const step = steps[current];
+  const annotationScope = `step:${current}:${appliedTranslation ? `translation:${appliedTranslation.id}` : 'source'}`;
+  // Keep the original source key so bookmarks made before annotations became
+  // persistent are discovered and migrated by ReaderSelectionActions.
+  const readerContextId = appliedTranslation
+    ? `${annotationDocumentId}:${annotationScope}`
+    : `${annotationDocumentId}:step:${current}`;
+  const visibleAnnotations = useMemo(
+    () => annotations.filter((annotation) => annotation.scope === annotationScope),
+    [annotationScope, annotations],
+  );
+  const createAnnotation = async (input: Omit<WritingDraftAnnotationInput, 'draftId' | 'scope'>) => {
+    const created = await window.nodus.createWritingDraftAnnotation({
+      ...input,
+      draftId: annotationDocumentId,
+      scope: annotationScope,
+    });
+    setAnnotations((currentAnnotations) => [...currentAnnotations.filter((item) => item.id !== created.id), created]);
+    setAnnotationError(null);
+  };
+  const updateComment = async (id: string, comment: string) => {
+    const updated = await window.nodus.updateWritingDraftComment(id, comment);
+    if (!updated) {
+      await refreshAnnotations();
+      return;
+    }
+    setAnnotations((currentAnnotations) => currentAnnotations.map((item) => (item.id === updated.id ? updated : item)));
+    setAnnotationError(null);
+  };
+  const deleteAnnotation = async (id: string) => {
+    await window.nodus.deleteWritingDraftAnnotation(id);
+    setAnnotations((currentAnnotations) => currentAnnotations.filter((item) => item.id !== id));
+    setAnnotationError(null);
+  };
   const completedSet = new Set(progress.completedSteps);
   const overallPct = progress.finishedAt
     ? 100
@@ -1505,7 +1564,24 @@ function ImmersionPlayer({
         <button className="btn btn-ghost gap-1.5 text-xs border border-neutral-700" onClick={onSaveToNotes}>
           <Icon name="save" size={13} /> {t('Guardar en notas')}
         </button>
+        <ReaderHighlighterControl value={highlighterColor} onChange={setHighlighterColor} />
+        <button
+          type="button"
+          className={`btn btn-ghost h-9 min-h-9 border ${hasReaderMark ? 'border-amber-700/60 text-amber-300' : 'border-neutral-700 text-neutral-500'}`}
+          title={t('Ir al marcador de lectura')}
+          aria-label={t('Ir al marcador de lectura')}
+          disabled={!hasReaderMark}
+          onClick={() => markActionsRef.current?.goToMark()}
+        >
+          <Icon name={hasReaderMark ? 'bookmarkFill' : 'bookmark'} size={15} />
+        </button>
       </header>
+
+      {annotationError && (
+        <div className="border-b border-red-900 bg-red-950/30 px-4 py-2 text-xs text-red-200">
+          {annotationError}
+        </div>
+      )}
 
       {/* Segmented progress bar */}
       <div className="flex gap-1 border-b border-neutral-800 px-4 py-2">
@@ -1562,7 +1638,7 @@ function ImmersionPlayer({
         </nav>
 
         {/* Step content + context rail (the wide right side works for the reader, not against them) */}
-        <main ref={mainRef} className="min-w-0 flex-1 overflow-y-auto">
+        <main ref={mainRef} className="min-w-0 flex-1 overflow-y-auto" data-testid="immersion-reader-document">
           <AnimatePresence mode="wait" custom={direction}>
             <motion.div
               key={current}
@@ -1596,7 +1672,19 @@ function ImmersionPlayer({
             </motion.div>
           </AnimatePresence>
         </main>
-        <ReaderSelectionActions key={`${current}:${appliedTranslation?.id ?? 'source'}`} targetRef={mainRef} contextId={`immersion:${session.id}:step:${current}`} />
+        <ReaderSelectionActions
+          key={annotationScope}
+          ref={markActionsRef}
+          targetRef={mainRef}
+          contextId={readerContextId}
+          annotations={visibleAnnotations}
+          highlighterColor={highlighterColor}
+          onCreateAnnotation={createAnnotation}
+          onUpdateComment={updateComment}
+          onDeleteAnnotation={deleteAnnotation}
+          onAnnotationError={setAnnotationError}
+          onMarkChange={setHasReaderMark}
+        />
       </div>
 
       {/* Compact footer navigation */}

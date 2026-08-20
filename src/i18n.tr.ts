@@ -27,11 +27,33 @@ import { ANNOUNCEMENT_TRANSLATIONS } from './i18n.announcements';
 import { LIBRARY_READER_TRANSLATIONS } from './i18n.libraryReader';
 import { LIBRARY_BIBLIOGRAPHY_TRANSLATIONS } from './i18n.libraryBibliography';
 import { LIBRARY_RECOVERY_TRANSLATIONS } from './i18n.libraryRecovery';
+import { PAGE_TRANSLATIONS } from './i18n.pages';
+import { DATABASE_PROPERTY_TRANSLATIONS } from './i18n.databaseProperties';
+import { DATABASE_RELATION_FORMULA_TRANSLATIONS } from './i18n.databaseRelationsFormulas';
+import { DATABASE_VIEW_TRANSLATIONS } from './i18n.databaseViews';
+import { DATABASE_TASK_TRANSLATIONS } from './i18n.databaseTasks';
+import { DATABASE_AUTOMATION_TRANSLATIONS } from './i18n.databaseAutomations';
+import { NOTION_IMPORT_TRANSLATIONS } from './i18n.notionImport';
 import { LIBRARY_ONBOARDING_TRANSLATIONS } from './i18n.libraryOnboarding';
+import { SOURCE_CITATION_TRANSLATIONS } from './i18n.sourceCitation';
 
 /** Complete static Turkish interface table; coverage prohibits runtime fallbacks. */
 export const TR: Record<string, string> = {
+  'Tamaño de Nodi': 'Nodi boyutu',
+  'El marcador central conserva el tamaño predeterminado. Elige uno de los nueve tamaños disponibles.': 'Ortadaki işaretçi varsayılan boyutu korur. Kullanılabilir dokuz boyuttan birini seçin.',
+  'Tamaños predeterminados': 'Önceden ayarlanmış boyutlar',
+  ...PAGE_TRANSLATIONS.tr,
+  ...DATABASE_PROPERTY_TRANSLATIONS.tr,
+  ...DATABASE_RELATION_FORMULA_TRANSLATIONS.tr,
+  ...DATABASE_VIEW_TRANSLATIONS.tr,
+  ...DATABASE_TASK_TRANSLATIONS.tr,
+  ...DATABASE_AUTOMATION_TRANSLATIONS.tr,
+  ...NOTION_IMPORT_TRANSLATIONS.tr,
+  'Cargar más resultados': 'Daha fazla sonuç yükle',
+  'Recalcular fórmulas y rollups': 'Formülleri ve rollup’ları yeniden hesapla',
+  'Actualizando fórmulas y rollups…': 'Formüller ve rollup’lar güncelleniyor…',
   ...LIBRARY_READER_TRANSLATIONS.tr,
+  ...SOURCE_CITATION_TRANSLATIONS.tr,
   ...LIBRARY_BIBLIOGRAPHY_TRANSLATIONS.tr,
   ...LIBRARY_ONBOARDING_TRANSLATIONS.tr,
   ...LIBRARY_RECOVERY_TRANSLATIONS.tr,
@@ -1400,6 +1422,7 @@ export const TR: Record<string, string> = {
   "Cargando Nodus…": "Nodus yükleniyor…",
   "No se pudo iniciar Nodus": "Nodus başlatılamadı",
   "Reintentar": "Yeniden dene",
+  'No se pudieron cargar las filas.': 'Satırlar yüklenemedi.',
   "Configura un modelo de IA": "Yapay zeka modeli kurma",
   "Modelo: sin configurar": "Model: yapılandırılmamış",
   "Abrir asistente de investigación": "Açık araştırma görevlisi",
@@ -5954,6 +5977,7 @@ export const TR: Record<string, string> = {
   "Elige la columna que quieres medir.": "Ölçmek istediğiniz sütunu seçin.",
   "Esta columna todavía no tiene fórmula.": "Bu sütunun henüz bir formülü yok.",
   "La fórmula usa una columna que ya no existe.": "Formül artık mevcut olmayan bir sütunu kullanıyor.",
+  "La vista hace referencia a una propiedad que ya no existe.": "Görünüm artık mevcut olmayan bir özelliğe başvuruyor.",
   "Referencia circular: la fórmula se usa a sí misma.": "Döngüsel referans: Formül kendisini kullanır.",
   "de": "arasında",
   "o": "veya",
@@ -7920,4 +7944,8 @@ export const TR: Record<string, string> = {
   "No se ha podido leer esta página": "Bu sayfa okunamadı",
   "Raíz de la Biblioteca": "Kütüphane kökü",
   "Se han guardado {n} archivo(s).": "{n} dosya kaydedildi.",
+  "Copias previas a migraciones": "Geçiş öncesi kopyalar",
+  "Antes de cambiar el esquema, Nodus conserva una copia inmutable y verificada. Puedes abrirla como un vault separado sin sustituir el actual.": "Nodus, şemayı değiştirmeden önce değiştirilemez ve doğrulanmış bir kopya saklar. Geçerli kasanın yerine koymadan ayrı bir kasa olarak açabilirsiniz.",
+  "La copia previa se abrió como un vault separado.": "Geçiş öncesi kopya ayrı bir kasa olarak açıldı.",
+  "Abrir como vault separado": "Ayrı kasa olarak aç",
 };

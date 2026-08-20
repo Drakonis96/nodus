@@ -30,6 +30,7 @@ import { NODUS_LICENSE, NODUS_SOURCE_URL, NODUS_VERSION } from '../version.mjs';
 const AUTH_BODY_BYTES = 32 * 1024;
 const TICKET_TTL_MS = 5 * 60_000;
 const VECTOR_QUERY_BYTES = 256 * 1024;
+const SHARED_BLOB_CHUNK_BYTES = 1024 * 1024;
 
 /**
  * A size a person can act on, in the unit that distinguishes it from its neighbours.
@@ -51,6 +52,76 @@ export function createApiRoutes(ctx) {
   } = ctx;
 
   const vectorCache = new Map();
+  const mutationListeners = new Map();
+  const presenceBySpace = new Map();
+
+  function notifyMutationListeners(spaceId, cursor) {
+    const encoded = `event: mutation\ndata: ${JSON.stringify({ cursor })}\n\n`;
+    for (const response of mutationListeners.get(spaceId) ?? []) {
+      try { response.write(encoded); } catch { /* close handler removes it */ }
+    }
+  }
+
+  function notifyPresenceListeners(spaceId, count) {
+    const encoded = `event: presence\ndata: ${JSON.stringify({ count })}\n\n`;
+    for (const response of mutationListeners.get(spaceId) ?? []) {
+      try { response.write(encoded); } catch { /* close handler removes it */ }
+    }
+  }
+
+  function livePresence(spaceId) {
+    const now = Date.now();
+    const entries = presenceBySpace.get(spaceId) ?? new Map();
+    for (const [key, value] of entries) if (value.expiresAt <= now) entries.delete(key);
+    if (!entries.size) presenceBySpace.delete(spaceId);
+    return entries;
+  }
+
+  async function updatePresence(req, res, space, auth) {
+    const key = auth.device?.hash || `oauth:${auth.user.id}`;
+    const entries = livePresence(space.id);
+    if (req.method === 'DELETE') {
+      entries.delete(key); notifyPresenceListeners(space.id, entries.size);
+      json(res, 200, { ok: true }); return true;
+    }
+    if (req.method === 'GET') {
+      json(res, 200, { participants: [...entries.values()].map(({ expiresAt, ...entry }) => entry) }); return true;
+    }
+    const input = await jsonBody(req, 16 * 1024);
+    const cursor = input.cursor && typeof input.cursor === 'object' ? {
+      anchor: Math.max(0, Math.floor(Number(input.cursor.anchor) || 0)),
+      head: Math.max(0, Math.floor(Number(input.cursor.head) || 0)),
+    } : null;
+    const entry = {
+      id: key.slice(0, 24), userId: auth.user.id, name: String(auth.device?.deviceName || auth.user.email).slice(0, 120),
+      pageId: String(input.pageId || '').slice(0, 240) || null,
+      blockId: String(input.blockId || '').slice(0, 240) || null,
+      cursor, color: /^#[0-9a-f]{6}$/i.test(String(input.color || '')) ? String(input.color) : null,
+      updatedAt: new Date().toISOString(), expiresAt: Date.now() + 45_000,
+    };
+    entries.set(key, entry); presenceBySpace.set(space.id, entries);
+    notifyPresenceListeners(space.id, entries.size);
+    json(res, 200, { ok: true, participant: { ...entry, expiresAt: undefined } }); return true;
+  }
+
+  function mutationEvents(req, res, space) {
+    res.writeHead(200, {
+      'content-type': 'text/event-stream; charset=utf-8',
+      'cache-control': 'private, no-cache, no-transform',
+      connection: 'keep-alive',
+      'x-accel-buffering': 'no',
+    });
+    res.write(`event: ready\ndata: ${JSON.stringify({ cursor: Number(space.mutationCursor || 0) })}\n\n`);
+    let listeners = mutationListeners.get(space.id);
+    if (!listeners) { listeners = new Set(); mutationListeners.set(space.id, listeners); }
+    listeners.add(res);
+    const heartbeat = setInterval(() => { try { res.write(': heartbeat\n\n'); } catch { /* close follows */ } }, 25_000);
+    heartbeat.unref?.();
+    req.on('close', () => {
+      clearInterval(heartbeat); listeners.delete(res); if (!listeners.size) mutationListeners.delete(space.id);
+    });
+    return true;
+  }
 
   function spacesFor(user) {
     return store.state.memberships
@@ -92,6 +163,8 @@ export function createApiRoutes(ctx) {
       assets: true,
       libraryDocuments: true,
       mutations: true,
+      documentUpdates: 'content-addressed-binary',
+      sharedBlobs: { transport: 'resumable-chunks', chunkBytes: SHARED_BLOB_CHUNK_BYTES, maxBytes: limits.maxLibraryPackageBytes },
       vectors: true,
       resources: resourceMap(),
       maxAssetBytes: limits.maxAssetBytes,
@@ -106,6 +179,8 @@ export function createApiRoutes(ctx) {
       maxMutationBytes: limits.maxMutationBytes,
       maxMutationBatchBytes: limits.maxMutationBatchBytes,
       maxLedgerBytes: limits.maxLedgerBytes,
+      mutationEvents: 'sse',
+      presence: { transport: 'ephemeral-sse', ttlSeconds: 45 },
     };
   }
 
@@ -186,6 +261,151 @@ export function createApiRoutes(ctx) {
     const referenced = snapshot ? snapshotAssetHashes(snapshot) : new Set();
     for (const hash of ledger.pendingAssetHashes(store, spaceId)) referenced.add(hash);
     return referenced;
+  }
+
+  function documentUpdateExists(spaceId, hash) {
+    return isValidAssetHash(hash) && ctx.fs.existsSync(store.documentUpdatePath(spaceId, hash));
+  }
+
+  async function uploadDocumentUpdate(req, res, space, hash) {
+    if (!isValidAssetHash(hash)) {
+      json(res, 400, { error: 'bad_hash' });
+      return true;
+    }
+    const target = store.documentUpdatePath(space.id, hash);
+    if (ctx.fs.existsSync(target)) {
+      json(res, 200, { ok: true, deduplicated: true });
+      return true;
+    }
+    const bytes = await body(req, limits.maxAssetBytes);
+    if (hashBytes(bytes) !== hash) {
+      json(res, 400, { error: 'hash_mismatch' });
+      return true;
+    }
+    ctx.fs.mkdirSync(ctx.path.dirname(target), { recursive: true });
+    const temporary = `${target}.tmp-${process.pid}-${Date.now()}`;
+    ctx.fs.writeFileSync(temporary, bytes, { mode: 0o600 });
+    ctx.fs.renameSync(temporary, target);
+    json(res, 200, { ok: true, deduplicated: false, bytes: bytes.length });
+    return true;
+  }
+
+  function downloadDocumentUpdate(req, res, space, hash) {
+    if (!documentUpdateExists(space.id, hash)) {
+      json(res, 404, { error: 'not_found' });
+      return true;
+    }
+    const bytes = ctx.fs.readFileSync(store.documentUpdatePath(space.id, hash));
+    res.writeHead(200, {
+      'content-type': 'application/octet-stream',
+      'content-length': String(bytes.length),
+      'cache-control': 'private, immutable, max-age=31536000',
+      etag: `"${hash}"`,
+    });
+    if (req.method === 'HEAD') res.end(); else res.end(bytes);
+    return true;
+  }
+
+  function sharedBlobExists(spaceId, hash) {
+    return isValidAssetHash(hash) && ctx.fs.existsSync(store.sharedBlobPath(spaceId, hash));
+  }
+
+  function sharedBlobStatus(req, res, space, hash) {
+    if (!isValidAssetHash(hash)) { json(res, 400, { error: 'bad_hash' }); return true; }
+    const complete = sharedBlobExists(space.id, hash);
+    const uploadDir = store.sharedBlobUploadDir(space.id, hash);
+    let manifest = null;
+    try { manifest = JSON.parse(ctx.fs.readFileSync(ctx.path.join(uploadDir, 'manifest.json'), 'utf8')); } catch { /* no partial upload */ }
+    const received = [];
+    if (!complete && manifest) {
+      for (let index = 0; index < Number(manifest.totalChunks || 0); index += 1) {
+        if (ctx.fs.existsSync(ctx.path.join(uploadDir, `${index}.part`))) received.push(index);
+      }
+    }
+    json(res, 200, { complete, received, chunkBytes: SHARED_BLOB_CHUNK_BYTES, totalChunks: manifest?.totalChunks ?? null, totalBytes: manifest?.totalBytes ?? null });
+    return true;
+  }
+
+  async function uploadSharedBlobChunk(req, res, space, hash, indexText) {
+    const index = Number(indexText);
+    const totalChunks = Number(req.headers['x-nodus-total-chunks']);
+    const totalBytes = Number(req.headers['x-nodus-total-bytes']);
+    const chunkHash = String(req.headers['x-nodus-chunk-sha256'] || '');
+    if (!isValidAssetHash(hash) || !Number.isInteger(index) || index < 0
+      || !Number.isInteger(totalChunks) || totalChunks < 1 || totalChunks > Math.ceil(limits.maxLibraryPackageBytes / SHARED_BLOB_CHUNK_BYTES)
+      || index >= totalChunks || !Number.isInteger(totalBytes) || totalBytes < 0 || totalBytes > limits.maxLibraryPackageBytes
+      || !isValidAssetHash(chunkHash)) {
+      json(res, 400, { error: 'bad_chunk_metadata' }); return true;
+    }
+    if (sharedBlobExists(space.id, hash)) { json(res, 200, { ok: true, complete: true }); return true; }
+    const bytes = await body(req, SHARED_BLOB_CHUNK_BYTES);
+    if (hashBytes(bytes) !== chunkHash) { json(res, 400, { error: 'chunk_hash_mismatch' }); return true; }
+    const expectedBytes = index === totalChunks - 1 ? totalBytes - index * SHARED_BLOB_CHUNK_BYTES : SHARED_BLOB_CHUNK_BYTES;
+    if (bytes.length !== expectedBytes) { json(res, 400, { error: 'bad_chunk_size', expectedBytes }); return true; }
+    const dir = store.sharedBlobUploadDir(space.id, hash);
+    ctx.fs.mkdirSync(dir, { recursive: true });
+    const manifestFile = ctx.path.join(dir, 'manifest.json');
+    let manifest = null;
+    try { manifest = JSON.parse(ctx.fs.readFileSync(manifestFile, 'utf8')); } catch { /* first chunk */ }
+    if (manifest && (Number(manifest.totalChunks) !== totalChunks || Number(manifest.totalBytes) !== totalBytes)) {
+      json(res, 409, { error: 'upload_shape_changed' }); return true;
+    }
+    if (!manifest) ctx.fs.writeFileSync(manifestFile, JSON.stringify({ hash, totalChunks, totalBytes }), { mode: 0o600 });
+    const target = ctx.path.join(dir, `${index}.part`);
+    const temporary = `${target}.tmp-${process.pid}`;
+    ctx.fs.writeFileSync(temporary, bytes, { mode: 0o600 });
+    ctx.fs.renameSync(temporary, target);
+    json(res, 200, { ok: true, index, bytes: bytes.length });
+    return true;
+  }
+
+  function completeSharedBlob(req, res, space, hash) {
+    if (!isValidAssetHash(hash)) { json(res, 400, { error: 'bad_hash' }); return true; }
+    if (sharedBlobExists(space.id, hash)) { json(res, 200, { ok: true, deduplicated: true }); return true; }
+    const dir = store.sharedBlobUploadDir(space.id, hash);
+    let manifest;
+    try { manifest = JSON.parse(ctx.fs.readFileSync(ctx.path.join(dir, 'manifest.json'), 'utf8')); }
+    catch { json(res, 409, { error: 'upload_not_started' }); return true; }
+    const parts = [];
+    for (let index = 0; index < Number(manifest.totalChunks); index += 1) {
+      try { parts.push(ctx.fs.readFileSync(ctx.path.join(dir, `${index}.part`))); }
+      catch { json(res, 409, { error: 'missing_chunks', missing: [index] }); return true; }
+    }
+    const bytes = Buffer.concat(parts);
+    if (bytes.length !== Number(manifest.totalBytes) || hashBytes(bytes) !== hash) {
+      json(res, 400, { error: 'blob_checksum_mismatch' }); return true;
+    }
+    const target = store.sharedBlobPath(space.id, hash);
+    ctx.fs.mkdirSync(ctx.path.dirname(target), { recursive: true });
+    const temporary = `${target}.tmp-${process.pid}`;
+    ctx.fs.writeFileSync(temporary, bytes, { mode: 0o600 });
+    ctx.fs.renameSync(temporary, target);
+    ctx.fs.rmSync(dir, { recursive: true, force: true });
+    json(res, 200, { ok: true, deduplicated: false, bytes: bytes.length });
+    return true;
+  }
+
+  function downloadSharedBlob(req, res, space, hash) {
+    if (!sharedBlobExists(space.id, hash)) { json(res, 404, { error: 'not_found' }); return true; }
+    const file = store.sharedBlobPath(space.id, hash);
+    const bytes = ctx.fs.readFileSync(file);
+    let start = 0; let end = bytes.length - 1; let status = 200;
+    const range = String(req.headers.range || '').match(/^bytes=(\d+)-(\d*)$/);
+    if (range) {
+      start = Number(range[1]); end = range[2] ? Math.min(bytes.length - 1, Number(range[2])) : bytes.length - 1;
+      if (!Number.isInteger(start) || start < 0 || start > end || start >= bytes.length) {
+        res.writeHead(416, { 'content-range': `bytes */${bytes.length}` }); res.end(); return true;
+      }
+      status = 206;
+    }
+    const slice = bytes.subarray(start, end + 1);
+    res.writeHead(status, {
+      'content-type': 'application/octet-stream', 'content-length': String(slice.length),
+      'accept-ranges': 'bytes', ...(status === 206 ? { 'content-range': `bytes ${start}-${end}/${bytes.length}` } : {}),
+      etag: `"${hash}"`, 'cache-control': 'private, immutable, max-age=31536000',
+    });
+    if (req.method === 'HEAD') res.end(); else res.end(slice);
+    return true;
   }
 
   async function negotiateAssets(req, res, space) {
@@ -636,6 +856,8 @@ export function createApiRoutes(ctx) {
     }
     const snapshot = readSnapshot(space.id);
     const hasAsset = (hash) => assetExists(store, space.id, hash);
+    const hasDocumentUpdate = (hash) => documentUpdateExists(space.id, hash);
+    const hasSharedBlob = (hash) => sharedBlobExists(space.id, hash);
     const accepted = [];
     const duplicate = [];
     const rejected = [];
@@ -646,9 +868,11 @@ export function createApiRoutes(ctx) {
         duplicate.push(mutation.id);
         continue;
       }
-      const verdict = validateMutation(mutation, { snapshot, hasAsset, maxBytes: limits.maxMutationBytes });
+      const verdict = validateMutation(mutation, { snapshot, hasAsset, hasDocumentUpdate, hasSharedBlob, maxBytes: limits.maxMutationBytes });
       if (!verdict.ok) {
         if (verdict.missing) missingAssets.add(verdict.missing);
+        if (verdict.missingDocumentUpdate) missingAssets.add(verdict.missingDocumentUpdate);
+        if (verdict.missingSharedBlob) missingAssets.add(verdict.missingSharedBlob);
         // Only `too_large` carries numbers, and only because they are the whole difference
         // between a dead end and an explanation. Every other reason stays a bare code.
         rejected.push(verdict.reason === 'too_large'
@@ -666,6 +890,11 @@ export function createApiRoutes(ctx) {
         assets: Array.isArray(mutation.assets) ? mutation.assets : [],
         schemaVersion: Number(mutation.schemaVersion) || 0,
         createdAt: String(mutation.createdAt || new Date().toISOString()),
+        actorId: String(mutation.actorId || ''),
+        deviceId: String(mutation.deviceId || mutation.clientId || ''),
+        hlc: String(mutation.hlc || ''),
+        documentHash: mutation.documentHash ? String(mutation.documentHash) : null,
+        blobHash: mutation.blobHash ? String(mutation.blobHash) : null,
         userId: null,
       });
     }
@@ -690,6 +919,7 @@ export function createApiRoutes(ctx) {
     }
 
     const stamped = ledger.append(store, space.id, accepted);
+    if (stamped.length) notifyMutationListeners(space.id, Number(stamped.at(-1).seq));
     json(res, 200, {
       accepted: stamped.map((entry) => entry.id),
       duplicate,
@@ -699,8 +929,9 @@ export function createApiRoutes(ctx) {
     return true;
   }
 
-  function getMutations(req, res, space, url) {
-    const cursor = Number(url.searchParams.get('since') || 0);
+  function getMutations(req, res, space, url, auth) {
+    const explicit = url.searchParams.get('since');
+    const cursor = explicit == null ? Number(auth.device?.mutationCursor || space.mutationCursor || 0) : Number(explicit || 0);
     const limit = Math.max(1, Math.min(MAX_MUTATION_BATCH, Number(url.searchParams.get('limit')) || MAX_MUTATION_BATCH));
     // Bounded by bytes as well as by count, so a page of large rows cannot become a response
     // this process is unable to serialize. Callers follow `hasMore`; a short page is normal.
@@ -709,11 +940,15 @@ export function createApiRoutes(ctx) {
     return true;
   }
 
-  async function ackMutations(req, res, space) {
+  async function ackMutations(req, res, space, auth) {
     const input = await jsonBody(req, AUTH_BODY_BYTES);
     const cursor = Number(input.cursor || 0);
-    const remaining = ledger.compact(store, space.id, cursor);
-    space.mutationCursor = Math.max(Number(space.mutationCursor || 0), cursor);
+    if (auth.device) auth.device.mutationCursor = Math.max(Number(auth.device.mutationCursor || 0), cursor);
+    const devices = store.state.deviceTokens.filter((entry) => entry.spaceId === space.id
+      && (!entry.expiresAt || Date.parse(entry.expiresAt) > Date.now()));
+    const compactTo = devices.length ? Math.min(...devices.map((entry) => Number(entry.mutationCursor || 0))) : 0;
+    const remaining = compactTo > Number(space.mutationCursor || 0) ? ledger.compact(store, space.id, compactTo) : ledger.readAll(store, space.id).length;
+    space.mutationCursor = Math.max(Number(space.mutationCursor || 0), compactTo);
     store.save();
     // Anything the acknowledged mutations were holding alive may now be collectable.
     collectAssetGarbage(store, space.id, referencedAssets(space.id), limits.assetGraceMs);
@@ -953,6 +1188,23 @@ export function createApiRoutes(ctx) {
       return true;
     }
 
+    if (head === 'document-updates') {
+      const hash = rest[1] ? decodeURIComponent(rest[1]) : '';
+      if (req.method === 'PUT') return uploadDocumentUpdate(req, res, space, hash);
+      if (req.method === 'GET' || req.method === 'HEAD') return downloadDocumentUpdate(req, res, space, hash);
+      json(res, 405, { error: 'method_not_allowed' });
+      return true;
+    }
+
+    if (head === 'blobs') {
+      const hash = rest[1] ? decodeURIComponent(rest[1]) : '';
+      if (rest[2] === 'status' && req.method === 'GET') return sharedBlobStatus(req, res, space, hash);
+      if (rest[2] === 'chunks' && rest[3] != null && req.method === 'PUT') return uploadSharedBlobChunk(req, res, space, hash, rest[3]);
+      if (rest[2] === 'complete' && req.method === 'POST') return completeSharedBlob(req, res, space, hash);
+      if (!rest[2] && (req.method === 'GET' || req.method === 'HEAD')) return downloadSharedBlob(req, res, space, hash);
+      json(res, 405, { error: 'method_not_allowed' }); return true;
+    }
+
     if (head === 'library') {
       if (rest[1] === 'negotiate' && req.method === 'POST') return negotiateLibraryPackages(req, res, space);
       if (rest[1] === 'packages' && rest[2] && req.method === 'PUT') return uploadLibraryPackage(req, res, space, decodeURIComponent(rest[2]));
@@ -970,12 +1222,15 @@ export function createApiRoutes(ctx) {
     if (head === 'context' && req.method === 'POST') return contextPackage(req, res, space);
 
     if (head === 'mutations') {
-      if (rest[1] === 'ack' && req.method === 'POST') return ackMutations(req, res, space);
+      if (rest[1] === 'events' && req.method === 'GET') return mutationEvents(req, res, space);
+      if (rest[1] === 'ack' && req.method === 'POST') return ackMutations(req, res, space, auth);
       if (req.method === 'POST') return postMutations(req, res, space);
-      if (req.method === 'GET') return getMutations(req, res, space, url);
+      if (req.method === 'GET') return getMutations(req, res, space, url, auth);
       json(res, 405, { error: 'method_not_allowed' });
       return true;
     }
+
+    if (head === 'presence' && ['GET', 'POST', 'DELETE'].includes(req.method)) return updatePresence(req, res, space, auth);
 
     if (req.method !== 'GET' && req.method !== 'HEAD') {
       json(res, 405, { error: 'method_not_allowed' });
@@ -987,14 +1242,15 @@ export function createApiRoutes(ctx) {
   /**
    * What a route demands of the caller's space role.
    *
-   * Reading is `read`; sending a mutation or an image is `write`; taking mutations out of
-   * the ledger, replacing the vectors or publishing is `own`, because those are the owner's
-   * side of the relay and a writer must not be able to drain the queue that feeds it.
+   * Reading and acknowledging the shared operation stream is `read`; every device keeps its
+   * own cursor, so acknowledging no longer drains another replica's queue.
    */
   function mutatingNeed(method, head, rest) {
-    if (head === 'mutations') return method === 'POST' && rest[1] !== 'ack' ? 'write' : 'own';
+    if (head === 'mutations') return method === 'POST' && rest[1] !== 'ack' ? 'write' : 'read';
     if (head === 'vectors') return 'own';
     if (head === 'assets') return method === 'POST' || method === 'PUT' ? 'write' : 'read';
+    if (head === 'document-updates') return method === 'PUT' ? 'write' : 'read';
+    if (head === 'blobs') return method === 'PUT' || method === 'POST' ? 'write' : 'read';
     if (head === 'library') return method === 'POST' || method === 'PUT' ? 'own' : 'read';
     return 'read';
   }

@@ -33,10 +33,29 @@ import { ANNOUNCEMENT_TRANSLATIONS } from './i18n.announcements';
 import { LIBRARY_READER_TRANSLATIONS } from './i18n.libraryReader';
 import { LIBRARY_BIBLIOGRAPHY_TRANSLATIONS } from './i18n.libraryBibliography';
 import { LIBRARY_RECOVERY_TRANSLATIONS } from './i18n.libraryRecovery';
+import { PAGE_TRANSLATIONS } from './i18n.pages';
+import { DATABASE_PROPERTY_TRANSLATIONS } from './i18n.databaseProperties';
+import { DATABASE_RELATION_FORMULA_TRANSLATIONS } from './i18n.databaseRelationsFormulas';
+import { DATABASE_VIEW_TRANSLATIONS } from './i18n.databaseViews';
+import { DATABASE_TASK_TRANSLATIONS } from './i18n.databaseTasks';
+import { DATABASE_AUTOMATION_TRANSLATIONS } from './i18n.databaseAutomations';
+import { NOTION_IMPORT_TRANSLATIONS } from './i18n.notionImport';
 import { LIBRARY_ONBOARDING_TRANSLATIONS } from './i18n.libraryOnboarding';
+import { SOURCE_CITATION_TRANSLATIONS } from './i18n.sourceCitation';
 
 export const DE: Record<string, string> = {
+  'Tamaño de Nodi': 'Nodi-Größe',
+  'El marcador central conserva el tamaño predeterminado. Elige uno de los nueve tamaños disponibles.': 'Die mittlere Markierung behält die Standardgröße bei. Wähle eine der neun verfügbaren Größen.',
+  'Tamaños predeterminados': 'Voreingestellte Größen',
+  ...PAGE_TRANSLATIONS.de,
+  ...DATABASE_PROPERTY_TRANSLATIONS.de,
+  ...DATABASE_RELATION_FORMULA_TRANSLATIONS.de,
+  ...DATABASE_VIEW_TRANSLATIONS.de,
+  ...DATABASE_TASK_TRANSLATIONS.de,
+  ...DATABASE_AUTOMATION_TRANSLATIONS.de,
+  ...NOTION_IMPORT_TRANSLATIONS.de,
   ...LIBRARY_READER_TRANSLATIONS.de,
+  ...SOURCE_CITATION_TRANSLATIONS.de,
   ...LIBRARY_BIBLIOGRAPHY_TRANSLATIONS.de,
   ...LIBRARY_ONBOARDING_TRANSLATIONS.de,
   ...LIBRARY_RECOVERY_TRANSLATIONS.de,
@@ -1077,6 +1096,7 @@ export const DE: Record<string, string> = {
   'Cargando Nodus…': 'Nodus wird geladen…',
   'No se pudo iniciar Nodus': 'Nodus konnte nicht gestartet werden',
   'Reintentar': 'Erneut versuchen',
+  'No se pudieron cargar las filas.': 'Die Zeilen konnten nicht geladen werden.',
   'Configura un modelo de IA': 'KI-Modell konfigurieren',
   'Modelo: sin configurar': 'Modell: nicht konfiguriert',
   'Abrir asistente de investigación': 'Forschungsassistenten öffnen',
@@ -1595,6 +1615,9 @@ export const DE: Record<string, string> = {
   'Ver últimos cambios': 'Neueste Änderungen ansehen',
   'Reiniciar': 'Neu starten',
   'Buscando…': 'Suche…',
+  'Cargar más resultados': 'Weitere Ergebnisse laden',
+  'Recalcular fórmulas y rollups': 'Formeln und Rollups neu berechnen',
+  'Actualizando fórmulas y rollups…': 'Formeln und Rollups werden aktualisiert…',
   'Buscar actualización': 'Nach Aktualisierung suchen',
   'Comprobando actualizaciones': 'Aktualisierungen werden geprüft',
   'Buscando una nueva versión de Nodus…': 'Es wird nach einer neuen Version von Nodus gesucht…',
@@ -6176,6 +6199,7 @@ export const DE: Record<string, string> = {
   'Elige la columna que quieres medir.': 'Wähle die Spalte, die gemessen werden soll.',
   'Esta columna todavía no tiene fórmula.': 'Diese Spalte hat noch keine Formel.',
   'La fórmula usa una columna que ya no existe.': 'Die Formel verwendet eine Spalte, die nicht mehr existiert.',
+  'La vista hace referencia a una propiedad que ya no existe.': 'Die Ansicht verweist auf eine Eigenschaft, die nicht mehr existiert.',
   'Referencia circular: la fórmula se usa a sí misma.': 'Zirkelbezug: Die Formel verwendet sich selbst.',
   'de': 'von',
   'o': 'oder',
@@ -8169,4 +8193,9 @@ export const DE: Record<string, string> = {
   "No se ha podido leer esta página": "Diese Seite konnte nicht gelesen werden",
   "Raíz de la Biblioteca": "Bibliothekswurzel",
   "Se han guardado {n} archivo(s).": "{n} Datei(en) gespeichert.",
+  "Copias previas a migraciones": "Kopien vor Migrationen",
+  "Antes de cambiar el esquema, Nodus conserva una copia inmutable y verificada. Puedes abrirla como un vault separado sin sustituir el actual.": "Vor einer Schemaänderung bewahrt Nodus eine unveränderliche, geprüfte Kopie auf. Sie können sie als separaten Vault öffnen, ohne den aktuellen zu ersetzen.",
+  "La copia previa se abrió como un vault separado.": "Die Kopie vor der Migration wurde als separater Vault geöffnet.",
+  "Abriendo…": "Wird geöffnet…",
+  "Abrir como vault separado": "Als separaten Vault öffnen",
 };

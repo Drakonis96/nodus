@@ -2,6 +2,8 @@ import type Database from 'better-sqlite3';
 import { SCHEMA_VERSION } from '../db/migrations';
 import { identityColumns, quoteIdentifier, tableColumns } from '../db/rowIdentity';
 import { MUTABLE_TABLES } from './outboxTriggers';
+import { compareHlc, formatHlc, parseHlc } from '@shared/syncOperations';
+import { immersionSessionIdFromAnnotationDocument } from '@shared/readerAnnotations';
 
 /**
  * The owner's side of the relay: take what collaborators wrote, apply it to the canonical
@@ -29,6 +31,11 @@ export interface IncomingMutation {
   row?: Record<string, unknown> | null;
   schemaVersion?: number;
   createdAt?: string;
+  actorId?: string;
+  deviceId?: string;
+  hlc?: string;
+  documentHash?: string | null;
+  blobHash?: string | null;
 }
 
 /**
@@ -50,7 +57,7 @@ export interface InboxEntry {
   /** Something a person would recognise: a report's objective, a note's title. */
   title?: string | null;
   entityKind?: string | null;
-  parentEntityKind?: 'deep_research' | 'library_document' | null;
+  parentEntityKind?: 'deep_research' | 'immersion' | 'library_document' | null;
   parentEntityId?: string | null;
   parentTitle?: string | null;
   schemaVersion?: number;
@@ -103,10 +110,13 @@ export function titleOf(
   }
   if (table === 'notes') return { title: text(row.title), entityKind: 'note' };
   if (table === 'note_folders') return { title: text(row.name), entityKind: 'note_folder' };
+  if (table === 'immersion_sessions') return { title: text(row.title) ?? text(row.topic), entityKind: 'immersion' };
   if (table === 'writing_draft_annotations') {
     return {
       title: text(row.comment_text) ?? text(row.selected_text),
-      entityKind: 'deep_research_annotation',
+      entityKind: immersionSessionIdFromAnnotationDocument(String(row.draft_id ?? ''))
+        ? 'immersion_annotation'
+        : 'deep_research_annotation',
     };
   }
   return { title: null, entityKind: null };
@@ -133,6 +143,16 @@ function descriptionOf(
   // Global-library annotations are handled before this path by the external route. Its
   // document metadata lives on disk rather than in writing_saved_drafts.
   if (!draftId || draftId.startsWith('nodus-library:')) return own;
+  const immersionId = immersionSessionIdFromAnnotationDocument(draftId);
+  if (immersionId) {
+    const session = db.prepare('SELECT title, topic FROM immersion_sessions WHERE id = ?').get(immersionId) as Record<string, unknown> | undefined;
+    return {
+      ...own,
+      parentEntityKind: 'immersion',
+      parentEntityId: immersionId,
+      parentTitle: titleOf('immersion_sessions', session).title,
+    };
+  }
   const report = db.prepare('SELECT title, brief_json FROM writing_saved_drafts WHERE id = ?').get(draftId) as Record<string, unknown> | undefined;
   return {
     ...own,
@@ -152,6 +172,38 @@ function timestampOf(row: Record<string, unknown> | null | undefined, fallback?:
   }
   const parsedFallback = fallback ? Date.parse(fallback) : NaN;
   return Number.isFinite(parsedFallback) ? parsedFallback : 0;
+}
+
+function operationHlc(mutation: IncomingMutation): string {
+  if (mutation.hlc && parseHlc(mutation.hlc)) return mutation.hlc;
+  const parsed = mutation.createdAt ? Date.parse(mutation.createdAt) : NaN;
+  return formatHlc({ wallTime: Number.isFinite(parsed) ? Math.max(0, parsed) : 0, counter: 0,
+    deviceId: (mutation.deviceId || mutation.clientId || 'legacy').replace(/[^A-Za-z0-9._:~-]/g, '_').slice(0, 128) || 'legacy' });
+}
+
+function normalizedRowKey(key: unknown[]): string {
+  return JSON.stringify(key.map((value) => value == null ? null : String(value)));
+}
+
+function writeClock(db: Database.Database, mutation: IncomingMutation, rowKey: string, hlc: string): void {
+  db.prepare(`INSERT INTO sync_row_clocks (table_name, row_key, hlc, operation_id, actor_id, device_id, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?) ON CONFLICT(table_name, row_key) DO UPDATE SET
+      hlc = excluded.hlc, operation_id = excluded.operation_id, actor_id = excluded.actor_id,
+      device_id = excluded.device_id, updated_at = excluded.updated_at`)
+    .run(mutation.table, rowKey, hlc, mutation.id, mutation.actorId || 'remote', mutation.deviceId || mutation.clientId || 'remote', new Date().toISOString());
+}
+
+function writeConflict(db: Database.Database, mutation: IncomingMutation, rowKey: string, incomingHlc: string,
+  localClock: { hlc: string; operation_id: string } | undefined, outcome: 'kept_local' | 'applied_remote', losingRow: unknown): void {
+  if (!localClock) return;
+  const incomingWins = outcome === 'applied_remote';
+  db.prepare(`INSERT OR IGNORE INTO sync_conflicts
+    (id, table_name, row_key, winning_operation_id, losing_operation_id, winner_hlc, loser_hlc, outcome, losing_row_json, created_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+    .run(`conflict_${mutation.id}_${localClock.operation_id}`.slice(0, 240), mutation.table, rowKey,
+      incomingWins ? mutation.id : localClock.operation_id, incomingWins ? localClock.operation_id : mutation.id,
+      incomingWins ? incomingHlc : localClock.hlc, incomingWins ? localClock.hlc : incomingHlc, outcome,
+      losingRow == null ? null : JSON.stringify(losingRow), new Date().toISOString());
 }
 
 /**
@@ -259,6 +311,8 @@ export function applyIncomingMutations(
     }
     const where = identity.map((column) => `${quoteIdentifier(column)} IS ?`).join(' AND ');
     const key = mutation.key.map((value) => (value === undefined ? null : value));
+    const rowKey = normalizedRowKey(key);
+    const incomingHlc = operationHlc(mutation);
 
     try {
       // The transaction RETURNS its decision, so it is read only after the commit. Counting
@@ -269,19 +323,30 @@ export function applyIncomingMutations(
         db.pragma('defer_foreign_keys = ON');
         const local = db.prepare(`SELECT * FROM ${quoteIdentifier(mutation.table)} WHERE ${where}`).get(...key) as Record<string, unknown> | undefined;
         localForDescription = local;
+        const localClock = present.has('sync_row_clocks')
+          ? db.prepare('SELECT hlc, operation_id FROM sync_row_clocks WHERE table_name = ? AND row_key = ?').get(mutation.table, rowKey) as { hlc: string; operation_id: string } | undefined
+          : undefined;
+        const clockOrder = localClock ? compareHlc(localClock.hlc, incomingHlc) : null;
+        if (localClock && clockOrder !== null && clockOrder > 0) {
+          if (present.has('sync_conflicts')) writeConflict(db, mutation, rowKey, incomingHlc, localClock, 'kept_local', mutation.row ?? null);
+          return 'keptLocal';
+        }
 
         if (mutation.kind === 'delete') {
           // A local edit made after the remote deletion is the more recent fact, so the row
           // stays — the rule applyIncomingTombstones already applies to package imports.
-          if (local && timestampOf(local) > timestampOf(null, mutation.createdAt)) {
+          if (local && (clockOrder == null || clockOrder === 0) && timestampOf(local) > timestampOf(null, mutation.createdAt)) {
+            if (present.has('sync_conflicts')) writeConflict(db, mutation, rowKey, incomingHlc, localClock, 'kept_local', null);
             return 'keptLocal';
           }
           db.prepare(`DELETE FROM ${quoteIdentifier(mutation.table)} WHERE ${where}`).run(...key);
+          if (present.has('sync_row_clocks')) writeClock(db, mutation, rowKey, incomingHlc);
           return 'deleted';
         }
 
         const incoming = mutation.row ?? {};
-        if (local && timestampOf(local) > timestampOf(incoming, mutation.createdAt)) {
+        if (local && (clockOrder == null || clockOrder === 0) && timestampOf(local) > timestampOf(incoming, mutation.createdAt)) {
+          if (present.has('sync_conflicts')) writeConflict(db, mutation, rowKey, incomingHlc, localClock, 'kept_local', incoming);
           return 'keptLocal';
         }
         const localColumns = new Set(tableColumns(mutation.table, db).map((column) => column.name));
@@ -309,6 +374,10 @@ export function applyIncomingMutations(
             `VALUES (${columns.map(() => '?').join(', ')})`
           ).run(columns.map((column) => (incoming[column] === undefined ? null : incoming[column])));
         }
+        if (present.has('sync_conflicts') && localClock && compareHlc(incomingHlc, localClock.hlc) > 0) {
+          writeConflict(db, mutation, rowKey, incomingHlc, localClock, 'applied_remote', local ?? null);
+        }
+        if (present.has('sync_row_clocks')) writeClock(db, mutation, rowKey, incomingHlc);
         return 'applied';
       })();
       if (outcome === 'applied') summary.applied += 1;

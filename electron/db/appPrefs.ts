@@ -37,6 +37,7 @@ export const GLOBAL_PREF_KEYS = [
   'betaUpdates',
   'favorites',
   'mascotEnabled',
+  'mascotScale',
   'mascotAlwaysOnTop',
   'mascotVaultCostumes',
   'mascotStyle',

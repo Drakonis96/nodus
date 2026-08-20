@@ -16,7 +16,7 @@
 // Runs under Electron-as-Node so better-sqlite3 matches the app ABI.
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import { mkdtemp, rm } from 'node:fs/promises';
+import { mkdir, mkdtemp, rm } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import os from 'node:os';
 import path from 'node:path';
@@ -32,10 +32,26 @@ if (!requireElectronRuntime(path.join(repoRoot, 'scripts/test-connected-vault-re
   process.exit(0);
 }
 
-const userData = await mkdtemp(path.join(os.tmpdir(), 'nodus-replica-userdata-'));
+const externalQaProfile = Boolean(process.env.NODUS_USERDATA);
+let userData;
+if (externalQaProfile) {
+  const qaRoot = path.resolve(String(process.env.NODUS_QA_ROOT || ''));
+  const requested = path.resolve(process.env.NODUS_USERDATA);
+  if (!qaRoot || (requested !== qaRoot && !requested.startsWith(`${qaRoot}${path.sep}`))) {
+    throw new Error('NODUS_USERDATA for the replica suite must remain under NODUS_QA_ROOT.');
+  }
+  userData = path.join(requested, 'replica-test-profiles');
+  await mkdir(userData, { recursive: true });
+} else {
+  userData = await mkdtemp(path.join(os.tmpdir(), 'nodus-replica-userdata-'));
+}
 installRuntimeHooks(userData);
 
 const { runMigrations } = require(path.join(repoRoot, 'electron/db/migrations.ts'));
+const databaseRuntime = require(path.join(repoRoot, 'electron/db/database.ts'));
+const pagesRepo = require(path.join(repoRoot, 'electron/db/pagesRepo.ts'));
+const databasesRepo = require(path.join(repoRoot, 'electron/db/databasesRepo.ts'));
+const { Y } = require(path.join(repoRoot, 'shared/pageYjs.ts'));
 const { buildServerSnapshot } = require(path.join(repoRoot, 'electron/serverSync/serverSnapshot.ts'));
 const replica = require(path.join(repoRoot, 'electron/serverSync/replicaService.ts'));
 const { applyIncomingMutations } = require(path.join(repoRoot, 'electron/serverSync/mutationInbox.ts'));
@@ -117,6 +133,9 @@ test('a corpus travels to two replicas, a writer sends work back, and a reader n
     assert.equal(readerDb.prepare('SELECT COUNT(*) AS n FROM works').get().n, 1);
     assert.equal(readerDb.prepare('SELECT COUNT(*) AS n FROM ideas').get().n, 1);
     assert.equal(readerDb.prepare("SELECT title FROM notes WHERE id = 'n-owner'").get().title, 'Nota del propietario');
+    const readerDevice = readerDb.prepare('SELECT id FROM workspace_devices').get().id;
+    assert.match(readerDevice, /^device-[0-9a-f-]{36}$/);
+    assert.notEqual(readerDevice, 'local-device');
     // The gate that holds even if everything above it is wrong.
     assert.equal(outboxTriggersInstalled(readerDb), false, "a reader's database has nothing that can queue a mutation");
 
@@ -138,6 +157,9 @@ test('a corpus travels to two replicas, a writer sends work back, and a reader n
     assert.equal(writerVault.remote.role, 'writer');
 
     const writerDb = new Database(writerVault.path, { fileMustExist: true });
+    const writerDevice = writerDb.prepare('SELECT id FROM workspace_devices').get().id;
+    assert.match(writerDevice, /^device-[0-9a-f-]{36}$/);
+    assert.notEqual(writerDevice, readerDevice, 'each replica has a stable independent device identity');
     assert.equal(outboxTriggersInstalled(writerDb), true, 'a writer CAN queue');
     assert.equal(countOutbox(writerDb).pending, 0, 'hydration itself must not queue the corpus it just received');
 
@@ -146,15 +168,19 @@ test('a corpus travels to two replicas, a writer sends work back, and a reader n
       .run('n-writer', 'Aportación del colaborador', 'markdown', 'Escrita en la réplica.', writerStamp, writerStamp);
 
     const queued = writerDb.prepare("SELECT * FROM server_outbox WHERE state = 'pending'").all();
-    assert.equal(queued.length, 1);
-    assert.equal(queued[0].table_name, 'notes');
-    assert.equal(queued[0].op, 'upsert');
-    assert.equal(queued[0].row_key, '["n-writer"]', 'the key matches what the tombstone triggers write');
+    assert.equal(queued.length, 2, 'the legacy note and its universal page both travel');
+    const queuedNote = queued.find((entry) => entry.table_name === 'notes');
+    const queuedPage = queued.find((entry) => entry.table_name === 'pages');
+    assert.equal(queuedNote.op, 'upsert');
+    assert.equal(queuedNote.device_id, writerDevice);
+    assert.match(queuedNote.hlc, new RegExp(`${writerDevice}$`));
+    assert.equal(queuedNote.row_key, '["n-writer"]', 'the key matches what the tombstone triggers write');
+    assert.equal(queuedPage.row_key, '["note:n-writer"]', 'the universal page has deterministic identity');
 
     // Editing the same row again folds into the entry already queued.
     writerDb.prepare('UPDATE notes SET content = ?, updated_at = ? WHERE id = ?')
       .run('Corregida antes de enviarse.', '2026-03-03T11:00:00.000Z', 'n-writer');
-    assert.equal(countOutbox(writerDb).pending, 1, 'a second edit updates the pending entry rather than adding another');
+    assert.equal(countOutbox(writerDb).pending, 2, 'a second edit updates the pending note entry rather than adding another');
     writerDb.close();
 
     await replica.drainOutbox(writerVault.id);
@@ -164,25 +190,30 @@ test('a corpus travels to two replicas, a writer sends work back, and a reader n
 
     // ── The owner collects and applies ───────────────────────────────────────
     const ledger = await (await server.api(owner.deviceToken, 'GET', `/api/v1/spaces/${spaceId}/mutations`)).json();
-    assert.equal(ledger.mutations.length, 1);
-    assert.equal(ledger.mutations[0].table, 'notes');
-    assert.equal(ledger.mutations[0].row.content, 'Corregida antes de enviarse.', 'what travels is the live row, not a stale copy');
+    assert.equal(ledger.mutations.length, 2);
+    const noteMutation = ledger.mutations.find((mutation) => mutation.table === 'notes');
+    const pageMutation = ledger.mutations.find((mutation) => mutation.table === 'pages');
+    assert.equal(noteMutation.row.content, 'Corregida antes de enviarse.', 'what travels is the live row, not a stale copy');
+    assert.equal(pageMutation.row.note_id, 'n-writer');
 
     const ownerApply = new Database(ownerFile, { fileMustExist: true });
     const summary = applyIncomingMutations(ownerApply, ledger.mutations);
     assert.equal(summary.applied, 1);
+    assert.equal(summary.keptLocal, 1, 'the note trigger already created a newer equivalent page');
     assert.deepEqual(summary.refused, []);
     assert.equal(summary.cursor, ledger.cursor);
     // The detail behind the counters: one entry per decision, carrying enough to tell a
     // person what arrived without re-reading the row it wrote.
-    assert.equal(summary.entries.length, 1);
-    assert.equal(summary.entries[0].outcome, 'applied');
-    assert.equal(summary.entries[0].id, ledger.mutations[0].id);
-    assert.equal(summary.entries[0].seq, ledger.mutations[0].seq);
-    assert.equal(summary.entries[0].table, 'notes');
-    assert.equal(summary.entries[0].entityKind, 'note');
-    assert.equal(summary.entries[0].title, 'Aportación del colaborador');
-    assert.deepEqual(summary.entries[0].key, ['n-writer']);
+    assert.equal(summary.entries.length, 2);
+    const noteEntry = summary.entries.find((entry) => entry.table === 'notes');
+    const pageEntry = summary.entries.find((entry) => entry.table === 'pages');
+    assert.equal(noteEntry.outcome, 'applied');
+    assert.equal(noteEntry.id, noteMutation.id);
+    assert.equal(noteEntry.seq, noteMutation.seq);
+    assert.equal(noteEntry.entityKind, 'note');
+    assert.equal(noteEntry.title, 'Aportación del colaborador');
+    assert.deepEqual(noteEntry.key, ['n-writer']);
+    assert.equal(pageEntry.outcome, 'keptLocal');
     const landed = ownerApply.prepare("SELECT * FROM notes WHERE id = 'n-writer'").get();
     assert.ok(landed, "the collaborator's note is now in the owner's own vault");
     assert.equal(landed.updated_at, '2026-03-03T11:00:00.000Z', "the writer's timestamp survives the merge");
@@ -198,8 +229,8 @@ test('a corpus travels to two replicas, a writer sends work back, and a reader n
     // The replay describes the same mutation under the same id. That identity is the whole
     // reason applyIncomingMutations does not write the inbox itself: recording is the
     // caller's job, and recordServerInbox keeps the FIRST account of what happened.
-    assert.equal(replayed.entries.length, 1);
-    assert.equal(replayed.entries[0].id, summary.entries[0].id);
+    assert.equal(replayed.entries.length, 2);
+    assert.deepEqual(replayed.entries.map((entry) => entry.id), summary.entries.map((entry) => entry.id));
 
     // And a local edit made after the mutation wins: newest-wins protects the owner's own
     // later work from a stale batch arriving late.
@@ -207,7 +238,7 @@ test('a corpus travels to two replicas, a writer sends work back, and a reader n
       .run('El propietario lo revisó después.', '2026-03-04T09:00:00.000Z', 'n-writer');
     const late = applyIncomingMutations(ownerApply, ledger.mutations);
     assert.equal(late.applied, 0);
-    assert.equal(late.keptLocal, 1);
+    assert.equal(late.keptLocal, 2);
     assert.equal(late.entries[0].outcome, 'keptLocal', 'and the inbox can say so, rather than showing it as applied');
     assert.equal(ownerApply.prepare("SELECT content FROM notes WHERE id = 'n-writer'").get().content, 'El propietario lo revisó después.');
     ownerApply.close();
@@ -382,6 +413,125 @@ test('a revoked replica stops syncing and keeps every byte', { timeout: 180_000 
   });
 });
 
+test('two offline writers converge Yjs text through binary updates while the owner stays offline', { timeout: 180_000 }, async () => {
+  await withServer({ label: 'replica-yjs-convergence' }, async (server) => {
+    const spaceId = await server.createSpace('Wiki convergente');
+    const owner = await server.deviceToken(server.adminEmail, server.adminPassword, spaceId, 'Owner offline');
+    const ownerFile = path.join(userData, 'yjs-owner.sqlite');
+    fs.rmSync(ownerFile, { force: true });
+    const ownerDb = new Database(ownerFile);
+    runMigrations(ownerDb);
+    let attachmentFixture;
+    const original = databaseRuntime.withDatabaseContext(ownerDb, () => {
+      const page = pagesRepo.createPage({
+        title: 'Acta compartida',
+        blocks: [{ id: 'shared-paragraph', type: 'paragraph', content: { text: 'Base' } }],
+      });
+      const database = databasesRepo.createDatabase('Archivos compartidos');
+      const attachmentColumn = databasesRepo.createColumn(database.id, 'Archivo', 'attachment');
+      const row = databasesRepo.createRow(database.id);
+      attachmentFixture = { rowId: row.id, columnId: attachmentColumn.id };
+      return page;
+    });
+    ownerDb.close();
+    const ownerVault = { id: 'yjs-owner', name: 'Wiki convergente', type: 'databases' };
+    const published = publishSnapshot(server.origin, owner.deviceToken, spaceId, ownerFile, ownerVault);
+    const publication = await fetch(`${server.origin}/api/v1/spaces/${spaceId}/snapshot`, {
+      method: 'PUT',
+      headers: { authorization: `Bearer ${owner.deviceToken}`, 'content-encoding': 'gzip', 'x-nodus-revision': published.built.revision },
+      body: published.gzipped,
+    });
+    assert.equal(publication.status, 200);
+
+    for (const [email, password] of [['alice@example.test', 'alice-writer-password'], ['bob@example.test', 'bob-writer-password']]) {
+      await server.createUser(email, password, [{ spaceId, role: 'writer' }]);
+    }
+    const connect = async (email, password) => {
+      const signIn = await replica.signInToNodusServer(server.origin, email, password);
+      return replica.createConnectedVault({ url: signIn.url, ticket: signIn.ticket, space: signIn.spaces[0], userEmail: signIn.userEmail, serverName: signIn.serverName });
+    };
+    const alice = await connect('alice@example.test', 'alice-writer-password');
+    const bob = await connect('bob@example.test', 'bob-writer-password');
+    await replica.updateReplicaPresence(alice.id, {
+      pageId: original.page.id, blockId: 'shared-paragraph', cursor: { anchor: 4, head: 4 }, color: '#5b7cfa',
+    });
+    const presence = await replica.listReplicaPresence(bob.id);
+    assert.ok(presence.some((entry) => entry.pageId === original.page.id && entry.cursor?.anchor === 4));
+    await replica.updateReplicaPresence(alice.id, null);
+    assert.deepEqual(await replica.listReplicaPresence(bob.id), []);
+
+    const editOffline = async (vaultId, suffix, actor) => databaseRuntime.withVaultDatabase(vaultId, () => {
+      const current = pagesRepo.getPageDocument(original.page.id);
+      assert.ok(current);
+      const doc = new Y.Doc();
+      Y.applyUpdate(doc, current.yjsState);
+      const vector = Y.encodeStateVector(doc);
+      const block = doc.getMap('blockById').get('shared-paragraph');
+      assert.ok(block instanceof Y.Map);
+      const text = block.get('text');
+      assert.ok(text instanceof Y.Text);
+      text.insert(text.length, suffix);
+      const update = Y.encodeStateAsUpdate(doc, vector);
+      const saved = pagesRepo.applyPageDocumentUpdate(original.page.id, update, current.revision, actor);
+      assert.equal(saved.ok, true);
+      const stored = databaseRuntime.getDb().prepare(
+        'SELECT update_hash FROM page_document_updates WHERE page_id = ? ORDER BY sequence_no DESC LIMIT 1',
+      ).get(original.page.id);
+      return { document: saved.document, hash: stored.update_hash };
+    });
+    const aliceEdit = await editOffline(alice.id, ' · Alice', 'alice');
+    const bobEdit = await editOffline(bob.id, ' · Bob', 'bob');
+    await replica.drainOutbox(alice.id);
+    await replica.drainOutbox(bob.id);
+    const relayBeforePull = await (await server.api(owner.deviceToken, 'GET', `/api/v1/spaces/${spaceId}/mutations?since=0`)).json();
+    assert.equal(relayBeforePull.mutations.filter((entry) => entry.table === 'page_document_updates').length, 2,
+      'both writers publish their independent Yjs delta while offline from the owner');
+
+    // No owner pull or republication occurs here: replicas consume the shared operation
+    // stream directly and each merges the other writer's Yjs delta.
+    await replica.pullReplica(alice.id);
+    await replica.pullReplica(bob.id);
+    const inspect = async (vaultId) => databaseRuntime.withVaultDatabase(vaultId, () => {
+      const document = pagesRepo.getPageDocument(original.page.id);
+      const receipts = databaseRuntime.getDb().prepare('SELECT update_hash FROM page_document_update_receipts WHERE page_id = ?').all(original.page.id).map((row) => row.update_hash);
+      const pending = databaseRuntime.getDb().prepare("SELECT COUNT(*) AS count FROM server_outbox WHERE state = 'pending'").get().count;
+      return { text: document.blocks[0].content.text, receipts, pending };
+    });
+    const [aliceAfter, bobAfter] = await Promise.all([inspect(alice.id), inspect(bob.id)]);
+    assert.ok(aliceAfter.receipts.includes(bobEdit.hash), 'Alice durably receipts Bob\'s delta');
+    assert.ok(bobAfter.receipts.includes(aliceEdit.hash), 'Bob durably receipts Alice\'s delta');
+    assert.equal(aliceAfter.text, bobAfter.text);
+    assert.match(aliceAfter.text, /Alice/);
+    assert.match(aliceAfter.text, /Bob/);
+    assert.equal(aliceAfter.pending, 0);
+    assert.equal(bobAfter.pending, 0, 'applying a remote projection never queues it back');
+
+    const fileBytes = Buffer.alloc(2 * 1024 * 1024 + 91);
+    for (let index = 0; index < fileBytes.length; index += 1) fileBytes[index] = (index * 17) % 251;
+    const attachment = await databaseRuntime.withVaultDatabase(alice.id, () => databasesRepo.addAttachment({
+      rowId: attachmentFixture.rowId, columnId: attachmentFixture.columnId,
+      fileName: 'archivo-grande.bin', mimeType: 'application/octet-stream', bytes: fileBytes.length, blob: fileBytes,
+    }));
+    await replica.drainOutbox(alice.id);
+    const aliceFileQueue = await databaseRuntime.withVaultDatabase(alice.id, () => ({
+      rows: databaseRuntime.getDb().prepare("SELECT table_name, state, last_error FROM server_outbox ORDER BY seq").all(),
+      attachment: databasesRepo.getAttachment(attachment.id),
+    }));
+    assert.equal(aliceFileQueue.rows.filter((row) => row.state === 'pending').length, 0,
+      `attachment queue did not drain: ${JSON.stringify(aliceFileQueue)}`);
+    await replica.pullReplica(bob.id);
+    const bobFile = await databaseRuntime.withVaultDatabase(bob.id, () => {
+      return {
+        bytes: databasesRepo.getAttachmentBlob(attachment.id), attachment: databasesRepo.getAttachment(attachment.id),
+        blobs: databaseRuntime.getDb().prepare('SELECT hash, bytes FROM db_blobs').all(),
+        foreignKeys: databaseRuntime.getDb().pragma('foreign_key_check'),
+      };
+    });
+    assert.ok(Buffer.isBuffer(bobFile.bytes), `attachment did not hydrate: ${JSON.stringify({ ...bobFile, bytes: null, overview: replica.getReplicaOverview() })}`);
+    assert.deepEqual(bobFile.bytes, fileBytes, 'a multi-chunk arbitrary attachment reaches the other replica byte-for-byte');
+  });
+});
+
 test('the desktop and the server agree on which tables travel and how a row is keyed', () => {
   // Two lists in two languages that must not drift: the triggers decide what is queued and
   // the server decides what is accepted, and a table in one but not the other is either work
@@ -407,5 +557,5 @@ test('the desktop and the server agree on which tables travel and how a row is k
 
 test.after(async () => {
   replica.stopReplicaSync();
-  await rm(userData, { recursive: true, force: true });
+  if (!externalQaProfile) await rm(userData, { recursive: true, force: true });
 });

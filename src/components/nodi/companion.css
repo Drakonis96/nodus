@@ -14,7 +14,6 @@
   -webkit-user-select: none;
   user-select: none;
   touch-action: none;
-  filter: drop-shadow(0 6px 18px rgba(10, 14, 26, 0.28));
 }
 .nodi-figure.dragging { cursor: grabbing; }
 .nodi-figure.closing { cursor: default; }

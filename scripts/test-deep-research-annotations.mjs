@@ -38,6 +38,8 @@ try {
   stubModule('electron/db/database.ts', { getDb: () => db });
   const drafts = require(path.join(repoRoot, 'electron/db/writingDraftsRepo.ts'));
   const annotations = require(path.join(repoRoot, 'electron/db/writingAnnotationsRepo.ts'));
+  const immersion = require(path.join(repoRoot, 'electron/db/immersionRepo.ts'));
+  const { immersionAnnotationDocumentId } = require(path.join(repoRoot, 'shared/readerAnnotations.ts'));
 
   const brief = { kind: 'deep_research', objective: 'La memoria de la posguerra' };
   const draft = { title: brief.objective, brief, selection: {}, draftMarkdown: 'Memoria compartida y archivo.' };
@@ -113,6 +115,49 @@ try {
 
   assert.equal(annotations.deleteWritingDraftAnnotation(highlight.id), saved.id);
   assert.equal(annotations.listWritingDraftAnnotations(saved.id).length, 2);
+
+  const immersionId = 'immersion-annotation-test';
+  const immersionDocumentId = immersionAnnotationDocumentId(immersionId);
+  const now = new Date().toISOString();
+  const immersionPlan = {
+    topic: 'Memoria', title: 'Ruta de memoria', language: 'es', minutes: 90,
+    stations: [], stats: { stations: 0, ideas: 0, works: 0, authors: 0, citations: 0, quizQuestions: 0 },
+  };
+  db.prepare(`INSERT INTO immersion_sessions (
+    id, topic, title, language, minutes, model_json, plan_json, progress_json, stats_json, created_at, updated_at
+  ) VALUES (?, ?, ?, 'es', 90, NULL, ?, ?, ?, ?, ?)`).run(
+    immersionId,
+    immersionPlan.topic,
+    immersionPlan.title,
+    JSON.stringify(immersionPlan),
+    JSON.stringify(immersion.emptyImmersionProgress()),
+    JSON.stringify(immersionPlan.stats),
+    now,
+    now,
+  );
+  const immersionHighlight = annotations.createWritingDraftAnnotation({
+    draftId: immersionDocumentId,
+    scope: 'step:1:source',
+    kind: 'highlight',
+    color: 'mint',
+    startOffset: 0,
+    endOffset: 7,
+    selectedText: 'Memoria',
+  });
+  const immersionComment = annotations.createWritingDraftAnnotation({
+    draftId: immersionDocumentId,
+    scope: 'step:1:source',
+    kind: 'comment',
+    startOffset: 8,
+    endOffset: 14,
+    selectedText: 'social',
+    comment: 'Relacionar con el paso anterior.',
+  });
+  assert.equal(immersionHighlight.draftId, immersionDocumentId);
+  assert.equal(immersionComment.comment, 'Relacionar con el paso anterior.');
+  assert.equal(annotations.listWritingDraftAnnotations(immersionDocumentId).length, 2);
+  immersion.deleteImmersionSession(immersionId);
+  assert.equal(annotations.listWritingDraftAnnotations(immersionDocumentId).length, 0, 'deleting an immersion removes its annotations');
 
   const { syncedTableNames, syncedTablesByGroup } = require(path.join(repoRoot, 'electron/db/syncTables.ts'));
   assert.ok(syncedTableNames(db).includes('writing_draft_annotations'));

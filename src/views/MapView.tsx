@@ -35,7 +35,7 @@ export function MapView() {
   const personOptions = useMemo<PersonOption[]>(() => {
     const byId = new Map<string, PersonOption>();
     for (const p of allPoints) if (!byId.has(p.personId)) byId.set(p.personId, { personId: p.personId, personName: p.personName });
-    return [...byId.values()].sort((a, b) => a.personName.localeCompare(b.personName));
+    return [...byId.values()].sort((a, b) => (a.personName ?? '').localeCompare(b.personName ?? ''));
   }, [allPoints]);
 
   const personFiltered = useMemo(
@@ -163,7 +163,7 @@ function PersonFilter({
         ? options.find((o) => selected.has(o.personId))?.personName ?? tx('{n} seleccionadas', { n: 1 })
         : tx('{n} seleccionadas', { n: selected.size });
 
-  const filtered = q.trim() ? options.filter((o) => o.personName.toLowerCase().includes(q.trim().toLowerCase())) : options;
+  const filtered = q.trim() ? options.filter((o) => (o.personName ?? '').toLowerCase().includes(q.trim().toLowerCase())) : options;
 
   return (
     <div className="relative" ref={ref} data-testid="map-person-filter">

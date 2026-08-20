@@ -521,6 +521,11 @@ function filteredItemClause(itemIds: string[]): string {
 
 function clearTable(db: Database.Database, table: string): void {
   if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(table)) return;
+  // FTS5 owns its shadow tables (`*_data`, `*_idx`, ...). Clearing the virtual
+  // table already updates them; SQLite deliberately rejects direct writes to those
+  // internals, which can appear in snapshots created by newer database features.
+  const metadata = db.prepare('SELECT type FROM pragma_table_list WHERE name = ?').get(table) as { type: string } | undefined;
+  if (metadata?.type === 'shadow') return;
   db.prepare(`DELETE FROM ${safeIdentifier(table)}`).run();
 }
 

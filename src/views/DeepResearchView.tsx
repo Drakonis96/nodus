@@ -24,7 +24,6 @@ import type { StudyDeepResearchAudience } from '@shared/studyDeepResearchAudienc
 import { DECORATIVE_IMAGE_STYLES } from '@shared/imageStyles';
 import { toReadingCopy } from '@shared/readingCopy';
 import { stripLeadingAbstract } from '@shared/writingDocument';
-import type { PendingGraphNavigationTarget } from '../navigation';
 import type { DeepResearchSnapshot } from '../app/viewSnapshots';
 import { useListPlacement } from '../listPlacement';
 import { useReadingPlace, type ReadingPlace } from '../readingPlace';
@@ -32,7 +31,7 @@ import { HoverLabelButton, Icon, RestoringPane, modelLabel } from '../components
 import { SectionHeader } from '../components/SectionHeader';
 import { ModelPicker } from '../components/ModelPicker';
 import { confirm } from '../components/feedback';
-import { SourceCitationModal, type CitationTarget } from '../components/SourceCitationModal';
+import { SourceCitationModal, type CitationTarget, type OpenCitationLibraryWork } from '../components/SourceCitationModal';
 import { SaveToNotesModal } from '../components/SaveToNotesModal';
 import { TranslationModal } from '../components/TranslationModal';
 import { Markdown } from '../components/Markdown';
@@ -243,7 +242,7 @@ export function DeepResearchView({
   isTeaching = false,
   snapshot,
   onSnapshotChange,
-  onOpenGraph,
+  onOpenLibraryWork,
   onOpenStudyDocument,
   onOpenStudyMaterial,
   onOpenStudyRecording,
@@ -256,7 +255,7 @@ export function DeepResearchView({
   /** Where this section was last left. Read once, at mount, and never again. */
   snapshot?: DeepResearchSnapshot;
   onSnapshotChange?: (patch: Partial<DeepResearchSnapshot>) => void;
-  onOpenGraph: (target: PendingGraphNavigationTarget) => void;
+  onOpenLibraryWork?: OpenCitationLibraryWork;
   onOpenStudyDocument?: (id: string) => void;
   onOpenStudyMaterial?: (id: string) => void;
   onOpenStudyRecording?: (id: string, timestamp?: number | null) => void;
@@ -400,7 +399,7 @@ export function DeepResearchView({
     if (!composerOpen || !isGenealogy) return;
     let cancelled = false;
     void window.nodus.listPersons().then((list) => {
-      if (!cancelled) setPersonsList([...list].sort((a, b) => a.displayName.localeCompare(b.displayName)));
+      if (!cancelled) setPersonsList([...list].sort((a, b) => (a.displayName ?? '').localeCompare(b.displayName ?? '')));
     });
     return () => {
       cancelled = true;
@@ -706,16 +705,16 @@ export function DeepResearchView({
     const q = search.trim().toLowerCase();
     const filtered = savedDrafts.filter((draft) => {
       const matchesSearch = !q
-        || draft.title.toLowerCase().includes(q)
-        || draft.brief.objective.toLowerCase().includes(q);
+        || (draft.title ?? '').toLowerCase().includes(q)
+        || (draft.brief.objective ?? '').toLowerCase().includes(q);
       const matchesReadState = readFilter === 'all'
         || (readFilter === 'read' ? !!draft.readAt : !draft.readAt);
       return matchesSearch && matchesReadState;
     });
     const sorted = [...filtered];
-    if (sortKey === 'title') sorted.sort((a, b) => a.title.localeCompare(b.title));
-    else if (sortKey === 'oldest') sorted.sort((a, b) => a.updatedAt.localeCompare(b.updatedAt));
-    else sorted.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+    if (sortKey === 'title') sorted.sort((a, b) => (a.title ?? '').localeCompare(b.title ?? ''));
+    else if (sortKey === 'oldest') sorted.sort((a, b) => (a.updatedAt ?? '').localeCompare(b.updatedAt ?? ''));
+    else sorted.sort((a, b) => (b.updatedAt ?? '').localeCompare(a.updatedAt ?? ''));
     return sorted;
   }, [savedDrafts, search, readFilter, sortKey]);
 
@@ -812,10 +811,7 @@ export function DeepResearchView({
           <SourceCitationModal
             target={citation}
             onClose={() => setCitation(null)}
-            onOpenGraph={(target) => {
-              setCitation(null);
-              onOpenGraph(target);
-            }}
+            onOpenLibraryWork={onOpenLibraryWork}
           />
         )}
         {savingToNotes && (
