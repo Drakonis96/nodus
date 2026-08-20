@@ -2,7 +2,7 @@
 // chained generation queue, and an immersive reader that expands one report to
 // full width with a back button to the gallery. The heavy lifting (generation,
 // saving, citations) is shared with the Writing workshop via writingShared.
-import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode, type RefObject } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode, type RefObject } from 'react';
 import type {
   AppSettings,
   DeepResearchArchiveFormat,
@@ -1689,6 +1689,100 @@ function ReportOutlineRail({
   );
 }
 
+/**
+ * Typography is deliberately isolated from ReaderView. Re-rendering the complete
+ * reader makes react-markdown replace text nodes, which disconnects Selection and
+ * CSS Highlight ranges. This control changes only the document's custom property.
+ */
+function ReaderFontControls({
+  targetRef,
+  scrollerRef,
+  initialSize,
+}: {
+  targetRef: RefObject<HTMLDivElement | null>;
+  scrollerRef: RefObject<HTMLElement | null>;
+  initialSize: number;
+}) {
+  const [fontSize, setFontSize] = useState(initialSize);
+  const pendingAnchorRef = useRef<{ element: HTMLElement; top: number } | null>(null);
+
+  useLayoutEffect(() => {
+    const root = targetRef.current;
+    if (!root) return;
+    root.style.setProperty('--deep-research-font-size', `${fontSize}px`);
+
+    const pending = pendingAnchorRef.current;
+    const scroller = scrollerRef.current;
+    if (pending && scroller && pending.element.isConnected) {
+      scroller.scrollTop += pending.element.getBoundingClientRect().top - pending.top;
+    }
+    pendingAnchorRef.current = null;
+  }, [fontSize, scrollerRef, targetRef]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(READER_FONT_STORAGE_KEY, String(fontSize));
+    } catch {
+      // A locked-down renderer may deny storage; the control still works for this view.
+    }
+  }, [fontSize]);
+
+  const change = useCallback((delta: number) => {
+    // Let the native pointer dispatch finish before the annotated subtree reflows.
+    window.setTimeout(() => {
+      const root = targetRef.current;
+      const scroller = scrollerRef.current;
+      if (root && scroller) {
+        const blocks = readingBlocks(root);
+        const index = topBlockIndex(scroller, blocks);
+        const element = index === null ? null : blocks[index];
+        pendingAnchorRef.current = element
+          ? { element, top: element.getBoundingClientRect().top }
+          : null;
+      }
+      setFontSize((current) => Math.max(READER_FONT_MIN, Math.min(READER_FONT_MAX, current + delta)));
+    }, 0);
+  }, [scrollerRef, targetRef]);
+
+  return (
+    <div
+      data-testid="deep-research-font-controls"
+      role="group"
+      aria-label={t('Tipografía')}
+      className="flex h-9 items-stretch overflow-hidden rounded-lg border border-neutral-700 bg-neutral-900/70 shadow-sm"
+    >
+      <button
+        data-testid="deep-research-font-decrease"
+        type="button"
+        className="grid w-9 place-items-center text-xs text-neutral-400 transition-colors hover:bg-neutral-800 hover:text-white disabled:cursor-not-allowed disabled:text-neutral-700"
+        title={t('Disminuir texto')}
+        aria-label={t('Disminuir texto')}
+        disabled={fontSize <= READER_FONT_MIN}
+        onClick={() => change(-1)}
+      >
+        a
+      </button>
+      <output
+        className="grid min-w-10 place-items-center border-x border-neutral-800 px-1 text-[10px] tabular-nums text-neutral-500"
+        aria-live="polite"
+      >
+        {fontSize}
+      </output>
+      <button
+        data-testid="deep-research-font-increase"
+        type="button"
+        className="grid w-9 place-items-center text-[17px] font-semibold text-neutral-300 transition-colors hover:bg-neutral-800 hover:text-white disabled:cursor-not-allowed disabled:text-neutral-700"
+        title={t('Aumentar texto')}
+        aria-label={t('Aumentar texto')}
+        disabled={fontSize >= READER_FONT_MAX}
+        onClick={() => change(1)}
+      >
+        A
+      </button>
+    </div>
+  );
+}
+
 function ReaderView({
   saved,
   settings,
@@ -1740,8 +1834,7 @@ function ReaderView({
   const mainRef = useRef<HTMLElement | null>(null);
   const documentRef = useRef<HTMLDivElement | null>(null);
   const markActionsRef = useRef<ReaderSelectionActionsHandle | null>(null);
-  const fontFramesRef = useRef<number[]>([]);
-  const [readerFontSize, setReaderFontSize] = useState(savedReaderFontSize);
+  const initialReaderFontSize = useRef(savedReaderFontSize()).current;
   const [hasReaderMark, setHasReaderMark] = useState(false);
   const [annotations, setAnnotations] = useState<WritingDraftAnnotation[]>([]);
   const [highlighterColor, setHighlighterColor] = useState<WritingDraftAnnotationColor | null>(null);
@@ -1772,38 +1865,6 @@ function ReaderView({
     });
   }, [refreshAnnotations, saved.id]);
 
-  useEffect(() => {
-    try {
-      localStorage.setItem(READER_FONT_STORAGE_KEY, String(readerFontSize));
-    } catch {
-      // A locked-down renderer may deny storage; the control still works for this view.
-    }
-  }, [readerFontSize]);
-
-  useEffect(() => () => {
-    for (const frame of fontFramesRef.current) cancelAnimationFrame(frame);
-    fontFramesRef.current = [];
-  }, []);
-
-  const changeReaderFontSize = useCallback((delta: number) => {
-    const scroller = mainRef.current;
-    const root = documentRef.current;
-    const blockIndex = scroller && root ? topBlockIndex(scroller, readingBlocks(root)) : null;
-    setReaderFontSize((current) => Math.max(READER_FONT_MIN, Math.min(READER_FONT_MAX, current + delta)));
-
-    // Keep the sentence under the reader's eye in place while the lines reflow.
-    // Two frames let React apply the custom property before measuring the new layout.
-    if (!scroller || !root || blockIndex === null) return;
-    const first = requestAnimationFrame(() => {
-      const second = requestAnimationFrame(() => {
-        const target = readingBlocks(root)[blockIndex];
-        if (target) scroller.scrollTop += target.getBoundingClientRect().top - scroller.getBoundingClientRect().top;
-      });
-      fontFramesRef.current.push(second);
-    });
-    fontFramesRef.current.push(first);
-  }, []);
-
   const goToHeading = useCallback((heading: ReportOutlineHeading) => {
     const scroller = mainRef.current;
     const root = documentRef.current;
@@ -1813,13 +1874,13 @@ function ReaderView({
     scroller.scrollTo({ top: Math.max(0, top), behavior: settings.reduceMotion ? 'auto' : 'smooth' });
   }, [settings.reduceMotion]);
 
-  const createAnnotation = async (input: Omit<WritingDraftAnnotationInput, 'draftId' | 'scope'>) => {
+  const createAnnotation = useCallback(async (input: Omit<WritingDraftAnnotationInput, 'draftId' | 'scope'>) => {
     const created = await window.nodus.createWritingDraftAnnotation({ ...input, draftId: saved.id, scope: annotationScope });
     setAnnotations((current) => [...current.filter((item) => item.id !== created.id), created]);
     setAnnotationError(null);
-  };
+  }, [annotationScope, saved.id]);
 
-  const updateComment = async (id: string, comment: string) => {
+  const updateComment = useCallback(async (id: string, comment: string) => {
     const updated = await window.nodus.updateWritingDraftComment(id, comment);
     if (!updated) {
       await refreshAnnotations();
@@ -1827,13 +1888,13 @@ function ReaderView({
     }
     setAnnotations((current) => current.map((item) => (item.id === updated.id ? updated : item)));
     setAnnotationError(null);
-  };
+  }, [refreshAnnotations]);
 
-  const deleteAnnotation = async (id: string) => {
+  const deleteAnnotation = useCallback(async (id: string) => {
     await window.nodus.deleteWritingDraftAnnotation(id);
     setAnnotations((current) => current.filter((item) => item.id !== id));
     setAnnotationError(null);
-  };
+  }, []);
   // Where the reader was in the report, restored once the prose is on screen. The
   // rendering travels with the place: a translation is a different document, and a
   // block counted in one of them is not the same block in the other.
@@ -1874,41 +1935,7 @@ function ReaderView({
           onSaveToNotes={onSaveToNotes}
           onExport={onExport}
         />
-        <div
-          data-testid="deep-research-font-controls"
-          role="group"
-          aria-label={t('Tipografía')}
-          className="flex h-9 items-stretch overflow-hidden rounded-lg border border-neutral-700 bg-neutral-900/70 shadow-sm"
-        >
-          <button
-            data-testid="deep-research-font-decrease"
-            type="button"
-            className="grid w-9 place-items-center text-xs text-neutral-400 transition-colors hover:bg-neutral-800 hover:text-white disabled:cursor-not-allowed disabled:text-neutral-700"
-            title={t('Disminuir texto')}
-            aria-label={t('Disminuir texto')}
-            disabled={readerFontSize <= READER_FONT_MIN}
-            onClick={() => changeReaderFontSize(-1)}
-          >
-            a
-          </button>
-          <output
-            className="grid min-w-10 place-items-center border-x border-neutral-800 px-1 text-[10px] tabular-nums text-neutral-500"
-            aria-live="polite"
-          >
-            {readerFontSize}
-          </output>
-          <button
-            data-testid="deep-research-font-increase"
-            type="button"
-            className="grid w-9 place-items-center text-[17px] font-semibold text-neutral-300 transition-colors hover:bg-neutral-800 hover:text-white disabled:cursor-not-allowed disabled:text-neutral-700"
-            title={t('Aumentar texto')}
-            aria-label={t('Aumentar texto')}
-            disabled={readerFontSize >= READER_FONT_MAX}
-            onClick={() => changeReaderFontSize(1)}
-          >
-            A
-          </button>
-        </div>
+        <ReaderFontControls targetRef={documentRef} scrollerRef={mainRef} initialSize={initialReaderFontSize} />
         <ReaderHighlighterControl value={highlighterColor} onChange={setHighlighterColor} />
         <HoverLabelButton
           icon={hasReaderMark ? 'bookmarkFill' : 'bookmark'}
@@ -1965,9 +1992,9 @@ function ReaderView({
               ref={documentRef}
               className="deep-research-reader-document relative"
               data-testid="deep-research-reader-document"
-              style={{ '--deep-research-font-size': `${readerFontSize}px` } as CSSProperties}
+              style={{ '--deep-research-font-size': `${initialReaderFontSize}px` } as CSSProperties}
             >
-              {appliedTranslation ? <Markdown content={appliedTranslation.markdown} onCitation={(citation) => onCitation(citation)} onStudyDocument={onOpenStudyDocument} onStudyMaterial={onOpenStudyMaterial} onStudyRecording={onOpenStudyRecording} /> : <DraftResultMain
+              {appliedTranslation ? <Markdown content={appliedTranslation.markdown} onCitation={onCitation} onStudyDocument={onOpenStudyDocument} onStudyMaterial={onOpenStudyMaterial} onStudyRecording={onOpenStudyRecording} /> : <DraftResultMain
                 draft={saved.draft}
                 exporting={exporting}
                 savingDraft={false}

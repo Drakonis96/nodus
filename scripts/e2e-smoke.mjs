@@ -800,7 +800,10 @@ try {
   await whatsNewModal.waitFor();
   assert.equal(await whatsNewModal.count(), 1, 'Latest changes reopens the release modal even after the current version was seen');
   assert.equal(await selectedRelease.count(), 1, 'the release modal renders exactly one version at a time');
-  assert.equal(await selectedRelease.getByText(`v${appVersion}`, { exact: true }).count(), 1, 'the latest installed release is selected by default');
+  // 4.2.1 is a presentation-only hotfix: it intentionally reuses the complete
+  // 4.2.0 What's New card instead of adding a duplicate release-note entry.
+  const expectedLatestChangesVersion = appVersion === '4.2.1' ? '4.2.0' : appVersion;
+  assert.equal(await selectedRelease.getByText(`v${expectedLatestChangesVersion}`, { exact: true }).count(), 1, 'the latest available release note is selected by default');
   assert.equal(await selectedRelease.getByText('v2.5.3', { exact: true }).count(), 0, 'an older release is not rendered before it is selected');
 
   await page.getByTestId('whats-new-version-trigger').click();

@@ -1,5 +1,12 @@
 # Changelog
 
+## 4.2.1 — 2026-08-20
+
+- Fixed Deep Research typography controls freezing the interface, detaching persistent
+  highlights and comments, and preventing the selection ribbon from opening.
+- Font-size changes now preserve the visible reading position and reuse the 4.2.0 What's
+  New presentation.
+
 ## 4.2.0 — 2026-08-20
 
 Nodus 4.2 introduces an integrated research browser and a global research radar, brings

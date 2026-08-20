@@ -14,7 +14,7 @@ test('the Teaching web demo is reachable from every live vault demo', () => {
   assert.match(teachingHtml, /data-nodus-site-header data-base="\.\.\/" data-context="demo"/);
   assert.match(teachingHtml, /src="\.\.\/site-header\.js/);
   // the route back to the vault catalogue is now the header's Home link
-  assert.match(sharedHeader, /\{ id: 'home', label: 'Home', href: \(base\) => `\$\{base\}index\.html` \}/);
+  assert.match(sharedHeader, /\{ id: 'home', label: 'Home', href: \(base\) => base \|\| '\.\/' \}/);
   assert.match(teachingHtml, /src="teaching-data\.js/);
   assert.match(teachingHtml, /src="teaching-app\.js/);
   assert.match(teachingHtml, /AI for generating teaching content only; AI never evaluates students/);

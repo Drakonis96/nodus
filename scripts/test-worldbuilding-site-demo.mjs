@@ -126,7 +126,7 @@ test('every live demo returns through the shared header and the homepage links W
 
   const sharedHeader = await readFile(path.join(root, 'site', 'site-header.js'), 'utf8')
   // the route back to the vault catalogue is now the header's Home link
-  assert.match(sharedHeader, /\{ id: 'home', label: 'Home', href: \(base\) => `\$\{base\}index\.html` \}/)
+  assert.match(sharedHeader, /\{ id: 'home', label: 'Home', href: \(base\) => base \|\| '\.\/' \}/)
   const homepage = await readFile(path.join(root, 'site', 'index.html'), 'utf8')
   assert.match(homepage, /<h3>Worldbuilding<\/h3>/)
   assert.match(homepage, /href="demo\/worldbuilding\.html"/)
