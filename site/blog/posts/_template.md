@@ -6,7 +6,7 @@ appears on the blog. Copy it to write a real post.
 ## The two steps
 
 1. **Write the file.** Copy this file to `site/blog/posts/<slug>.md`, where
-   `<slug>` is kebab-case and will become the URL: `blog/post.html?p=<slug>`.
+   `<slug>` is kebab-case and will become the URL: `/blog/<slug>/`.
    Do not put a level-1 heading in it — the title comes from `posts.json`, and
    the page prints it for you. Start at `##`.
 
@@ -28,6 +28,9 @@ appears on the blog. Copy it to write a real post.
 `reading` is optional; leave it out and the page estimates it from the file.
 Set `"draft": true` to keep a post out of the index and the RSS feed while you
 are still writing it.
+
+Run `npm run blog:build` after changing the Markdown or its metadata. This
+regenerates the article HTML, RSS feed and sitemap together.
 
 `cover` is optional too. It is a path relative to `site/blog/`, so a file in
 `site/blog/media/` is written `media/<file>.png`. The same image is used as the

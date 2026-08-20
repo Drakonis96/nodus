@@ -16,7 +16,7 @@ actually draw on. The video gallery lives in the wiki (site/wiki/wiki.js).
      moves the page between the three states, drives the organism's handoff, and
      makes sure the sequence can always be skipped or recovered from. */
 
-  const HOLD = 2400;   // how long the assembled N is held before it releases
+  const HOLD = 1200;   // enough to read the assembled N without delaying the page
   const TAIL = 2750;   // the CSS timeline that runs after the release
 
   function opening() {

@@ -23,18 +23,16 @@ const PAGES = [
   { file: 'demo/databases.html', url: '/demo/databases.html' },
   { file: 'demo/genealogy.html', url: '/demo/genealogy.html' },
   { file: 'blog/index.html', url: '/blog/' },
-  { file: 'blog/post.html', url: '/blog/post.html' },
   { file: 'wiki/index.html', url: '/wiki/' },
   { file: 'faq/index.html', url: '/faq/' },
   { file: 'contribute/index.html', url: '/contribute/' },
 ];
 
-// Every published post is a page of its own: the post page reads the slug from
-// the query string, so the sitemap has to list ?p=<slug> or the posts stay unindexed.
+// Every published post is a crawlable HTML document at /blog/<slug>/.
 const index = JSON.parse(fs.readFileSync(path.join(repoRoot, 'site', 'blog', 'posts.json'), 'utf8'));
 for (const post of index.posts) {
   if (post.draft) continue;
-  PAGES.push({ file: `blog/posts/${post.slug}.md`, url: `/blog/post.html?p=${post.slug}` });
+  PAGES.push({ file: `blog/${post.slug}/index.html`, url: `/blog/${post.slug}/` });
 }
 
 const missing = PAGES.filter((page) => !fs.existsSync(path.join(repoRoot, 'site', page.file)));

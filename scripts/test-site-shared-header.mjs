@@ -67,6 +67,7 @@ test('the shared component owns every control visible in the header', () => {
   for (const token of [
     "{ id: 'home', label: 'Home'",
     "{ id: 'atlas', label: 'Atlas'",
+    "{ id: 'bookmarks', label: 'Bookmarks'",
     "{ id: 'wiki', label: 'Wiki'",
     "{ id: 'blog', label: 'Blog'",
     "{ id: 'contribute', label: 'Contribute'",
@@ -78,6 +79,8 @@ test('the shared component owns every control visible in the header', () => {
   ]) assert.ok(headerScript.includes(token), `shared header includes ${token}`);
   assert.equal((headerScript.match(/return `<nav class="nav/g) ?? []).length, 1);
   assert.match(headerScript, /class="nav\$\{isWiki \? ' wiki-nav' : ''\}" id="site-header"/);
+  assert.match(headerScript, /data-nodus-browser-bookmarks hidden/, 'Bookmarks is an inert prepared slot in ordinary browsers');
+  assert.match(headerScript, /atlas[\s\S]*bookmarks[\s\S]*wiki/, 'Bookmarks occupies the same position as on the local start page');
 });
 
 test('the redesign is English only, so the header carries no language switcher', () => {

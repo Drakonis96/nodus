@@ -11,13 +11,31 @@ const videos = await fetch('../tutorials.json')
 const $ = (selector, root = document) => root.querySelector(selector);
 const escapeHtml = (value) => String(value).replace(/[&<>'"]/g, (char) => ({ '&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;' }[char]));
 const imagePath = (image) => `./assets/${image}`;
+// At this width the complete chapter index already lives in the right rail.
+// Below it that rail disappears, so the left-side accordion remains available.
+const usesRightHandToc = matchMedia('(min-width: 1181px)');
 const vaultIconPaths = {
   network: '<circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/>',
+  archive: '<rect x="3" y="4" width="18" height="4" rx="1"/><path d="M5 8v11a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8M10 12h4"/>',
   tree: '<circle cx="12" cy="5" r="2.5"/><circle cx="5" cy="19" r="2.5"/><circle cx="19" cy="19" r="2.5"/><path d="M12 7.5V12"/><path d="M12 12H5v4.5"/><path d="M12 12h7v4.5"/>',
   table: '<rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/><path d="M3 15h18"/><path d="M9 3v18"/><path d="M15 3v18"/>',
   graduation: '<path d="M22 10L12 5 2 10l10 5 10-5z"/><path d="M6 12v5c0 1 2.5 2.5 6 2.5s6-1.5 6-2.5v-5"/>',
   presentation: '<rect x="3" y="3" width="18" height="13" rx="2"/><path d="M8 21l4-5 4 5"/><path d="M12 16v5"/><path d="M7 8h4"/><path d="M7 12h7"/>',
+  microphone: '<rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v4M8 22h8"/>',
+  users: '<circle cx="7" cy="7" r="2.5"/><circle cx="17" cy="7" r="2.5"/><circle cx="12" cy="17" r="2.5"/><path d="m9 8.5 2 6M15 8.5l-2 6M9.5 7h5"/>',
+  globe: '<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.4 2.5 3.6 5.5 3.6 9S14.4 18.5 12 21c-2.4-2.5-3.6-5.5-3.6-9S9.6 5.5 12 3Z"/>',
 };
+
+// These vaults ship in the application but do not have Wiki manuals yet. They
+// belong on the home overview so the documentation never implies that Nodus is
+// limited to the five currently documented workflows.
+const vaultsAwaitingGuides = [
+  { id: 'primary-sources', name: 'Primary Sources', accent: '#6366f1', icon: 'archive', tagline: 'Work critically with archival documents and manuscripts, keeping transcription, provenance and inference distinct.' },
+  { id: 'testimony', name: 'Testimony', accent: '#0891b2', icon: 'microphone', tagline: 'Document and analyse interviews and oral history with local transcription, consent and access controls.' },
+  { id: 'prosopography', name: 'Prosopography', accent: '#2563eb', icon: 'users', tagline: 'Study groups and collective trajectories while preserving name variants, uncertainty and source evidence.' },
+  { id: 'worldbuilding', name: 'Worldbuilding', accent: '#7c3aed', icon: 'globe', tagline: 'Build connected worlds, characters, places and narratives while keeping canon and continuity visible.' },
+];
+const allVaults = [...content.vaults, ...vaultsAwaitingGuides];
 
 function iconMarkup(icon = 'nodus') {
   const paths = vaultIconPaths[icon];
@@ -47,7 +65,7 @@ const publishedVideos = videos
   .sort((a, b) => (a.order || 0) - (b.order || 0));
 
 const allPages = [
-  { type: 'home', id: 'home', title: 'Nodus Wiki', summary: 'Complete guides for every stable Nodus vault.', accent: '#8b5cf6', icon: 'nodus' },
+  { type: 'home', id: 'home', title: 'Nodus Wiki', summary: 'An overview of all nine Nodus vaults, with complete guides for five.', accent: '#8b5cf6', icon: 'nodus' },
   { type: 'videos', id: 'videos', title: 'Video tutorials', summary: 'Watch every vault, feature and integration explained on screen.', group: 'Video tutorials', accent: '#f87171', icon: 'nodus' },
   ...content.common.map((chapter) => ({ ...chapter, type: 'common', accent: '#8b5cf6', icon: 'nodus' })),
   ...content.vaults.flatMap((vault) => [
@@ -65,16 +83,44 @@ function buildNavigation() {
     + `<div class="nav-group"><b>Core guide</b>${common}</div>`
     + `<div class="nav-group"><b>Vault manuals</b>${vaults}</div>`;
 
-  // an accordion: opening one vault closes the others, so the rail stays short
+  // On wide desktop the right rail already contains every chapter. The vault
+  // row therefore navigates straight to the manual without duplicating that
+  // index on the left. At narrower widths it remains an accordion.
   $('#wiki-nav').addEventListener('click', (event) => {
     const summary = event.target.closest('.nav-vault > summary');
     if (!summary) return;
     const vault = summary.parentElement;
+    if (usesRightHandToc.matches) {
+      event.preventDefault();
+      syncVaultNavigation(vault.dataset.vault);
+      if (location.hash === `#${vault.dataset.vault}`) render(vault.dataset.vault);
+      else location.hash = vault.dataset.vault;
+      return;
+    }
     if (!vault.open) {
       $('#wiki-nav').querySelectorAll('.nav-vault[open]').forEach((other) => {
         if (other !== vault) other.open = false;
       });
     }
+  });
+}
+
+function syncVaultNavigation(activeVaultId = null) {
+  const vaults = document.querySelectorAll('.nav-vault');
+  vaults.forEach((vault) => {
+    const isActive = vault.dataset.vault === activeVaultId;
+    const summary = $('summary', vault);
+    summary?.classList.toggle('active', isActive);
+    if (usesRightHandToc.matches) {
+      summary?.setAttribute('role', 'link');
+      if (isActive) summary?.setAttribute('aria-current', 'page');
+      else summary?.removeAttribute('aria-current');
+    } else {
+      summary?.removeAttribute('role');
+      summary?.removeAttribute('aria-current');
+    }
+    if (usesRightHandToc.matches || !isActive) vault.open = false;
+    else vault.open = true;
   });
 }
 
@@ -108,12 +154,14 @@ function sectionMarkup(chapter, accent, showFigure = true, vault = null) {
 
 function homeMarkup() {
   return `<div style="--accent:#8b5cf6"><p class="eyebrow">Official documentation</p><h1>Learn Nodus from first launch to finished work.</h1>
-    <p class="lead">A complete guide to the five stable vaults, from the first launch and basic terminology to evidence-aware workflows, privacy controls and finished outputs.</p>
-    <div class="meta-row"><span class="pill">Nodus ${escapeHtml(content.version)}</span><span class="pill">Updated ${escapeHtml(content.updated)}</span><span class="pill">${content.vaults.reduce((n,v)=>n+v.chapters.length,0)} feature tutorials</span><span class="pill">Searchable offline documentation</span></div>
+    <p class="lead">Explore all nine specialised vaults in Nodus. Five already have complete guides here, from first launch and basic terminology to evidence-aware workflows, privacy controls and finished outputs.</p>
+    <div class="meta-row"><span class="pill">Nodus ${escapeHtml(content.version)}</span><span class="pill">Updated ${escapeHtml(content.updated)}</span><span class="pill">${allVaults.length} vault types</span><span class="pill">${content.vaults.reduce((n,v)=>n+v.chapters.length,0)} guided sections</span><span class="pill">Searchable offline documentation</span></div>
     <div class="hero-actions"><a class="action primary bundle-download" href="${content.manualBundle}" download>${downloadIconMarkup()}Download all PDF manuals (.zip)</a><a class="action" href="#welcome">Start with the essentials</a><a class="action" href="https://github.com/Drakonis96/nodus/releases/latest">Download Nodus</a></div>
-    ${figure('academic/home.png', 'Nodus Academic Research home')}
-    <section class="doc-section"><p class="section-kicker">Choose a workspace</p><h2>Five vaults, one local-first engine</h2><p class="section-details">Start with the vault that matches the work, not with a generic empty canvas. Each guide explains the full navigation and the safest path from source material to a finished output.</p>
-    <div class="vault-grid">${content.vaults.map((vault) => `<article class="vault-card" style="--card-accent:${vault.accent}"><span class="vault-mark" style="--vault-accent:${vault.accent}">${iconMarkup(vault.icon)}</span><h2>${escapeHtml(vault.name)}</h2><p>${escapeHtml(vault.tagline)}</p><div class="vault-card-actions"><a href="#${vault.id}">Open the ${escapeHtml(vault.short)} guide →</a><a class="vault-pdf-download" href="${vault.pdf}" download aria-label="Download the ${escapeHtml(vault.name)} PDF manual">${downloadIconMarkup()}<span>PDF manual</span></a></div></article>`).join('')}</div></section>
+    <section class="doc-section vault-overview"><p class="section-kicker">Choose a workspace</p><h2>${allVaults.length} vaults, one local-first engine</h2><p class="section-details">Start with the vault that matches the work, not with a generic empty canvas. Complete guides are available for five vaults; the other four already ship in Nodus and will receive their Wiki guides later.</p>
+    <div class="vault-grid">${allVaults.map((vault) => {
+      const hasGuide = Array.isArray(vault.chapters) && vault.chapters.length > 0;
+      return `<article class="vault-card${hasGuide ? '' : ' guide-pending'}" style="--card-accent:${vault.accent}"><span class="vault-mark" style="--vault-accent:${vault.accent}">${iconMarkup(vault.icon)}</span><h2>${escapeHtml(vault.name)}</h2><p>${escapeHtml(vault.tagline)}</p><div class="vault-card-actions">${hasGuide ? `<a class="vault-guide-link" href="#${vault.id}">Open the ${escapeHtml(vault.short)} guide →</a><a class="vault-pdf-download" href="${vault.pdf}" download aria-label="Download the ${escapeHtml(vault.name)} PDF manual">${downloadIconMarkup()}<span>PDF manual</span></a>` : '<span class="guide-status">Available in Nodus · Wiki guide coming later</span>'}</div></article>`;
+    }).join('')}</div></section>
     <aside class="callout"><b>Documentation principle</b><p>Every generated summary, relationship or citation remains something to inspect. Nodus helps organise reasoning; it does not turn automated output into evidence.</p></aside>
   </div>`;
 }
@@ -198,13 +246,7 @@ function render(id) {
   document.title = page.type === 'home' ? 'Nodus Wiki - Complete vault guides' : `${page.title} - Nodus Wiki`;
   document.querySelectorAll('.nav-link').forEach((link) => link.classList.toggle('active', link.dataset.page === page.id));
   const parent = page.vault || (page.type === 'vault' ? page : null);
-  if (parent) {
-    // opening the current vault also closes the others: the rail is an accordion
-    document.querySelectorAll('.nav-vault[open]').forEach((vault) => {
-      if (vault.dataset.vault !== parent.id) vault.open = false;
-    });
-    $(`.nav-vault[data-vault="${parent.id}"]`)?.setAttribute('open', '');
-  }
+  syncVaultNavigation(parent?.id || null);
   $('#article').querySelectorAll('.video-card').forEach((card) => {
     card.addEventListener('click', () => openVideo(card.dataset.video, card.dataset.title));
   });
@@ -243,11 +285,6 @@ function watchSections(sections, page) {
     document.querySelectorAll('.nav-link').forEach((link) => {
       link.classList.toggle('active', link.dataset.page === current);
     });
-    // the vault entry stays marked while any of its chapters is the current one
-    const parent = page.vault || (page.type === 'vault' ? page : null);
-    if (parent && !document.querySelector(`.nav-link.active[data-page="${parent.id}"]`)) {
-      $(`.nav-vault[data-vault="${parent.id}"]`)?.setAttribute('open', '');
-    }
     document.querySelectorAll('#page-toc a').forEach((link) => {
       link.classList.toggle('active', link.getAttribute('href') === `#${current}`);
     });
@@ -285,6 +322,11 @@ function showResults(value) {
 buildNavigation();
 $('#version').textContent = `Nodus ${content.version}`;
 render(location.hash.slice(1) || 'home');
+usesRightHandToc.addEventListener('change', () => {
+  const page = allPages.find((entry) => entry.id === (location.hash.slice(1) || 'home')) || allPages[0];
+  const parent = page.vault || (page.type === 'vault' ? page : null);
+  syncVaultNavigation(parent?.id || null);
+});
 function setNavigationOpen(open, restoreFocus = false) {
   document.body.classList.toggle('nav-open', open);
   $('#nav-toggle').setAttribute('aria-expanded', String(open));

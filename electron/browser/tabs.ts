@@ -24,7 +24,12 @@ import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import type { BrowserMediaCommand, BrowserState, BrowserTabError, BrowserTabState, BrowserViewport } from '@shared/browser';
 import type { ThemeMode } from '@shared/types';
-import { browserInternalPage, MAX_BROWSER_TABS } from '@shared/browser';
+import {
+  browserInternalPage,
+  isNodusResearchSiteUrl,
+  MAX_BROWSER_TABS,
+  NODUS_BOOKMARKS_URL,
+} from '@shared/browser';
 import { decideNavigation } from '@shared/browserNavigation';
 import { NODUS_BROWSER_PARTITION, browserSession } from './session';
 import { installContextMenu, type ContextMenuActions } from './contextMenu';
@@ -227,9 +232,9 @@ function wire(tab: Tab): void {
   void applyPageColorScheme(contents);
 
   /**
-   * The page preload's only unsolicited message. Register it on this exact
-   * WebContents instead of ipcMain's global bus, then still require its main
-   * frame. A different tab or any Nodus window has no listener to reach.
+   * The page preload's media message. Register it on this exact WebContents
+   * instead of ipcMain's global bus, then still require its main frame. A
+   * different tab or any Nodus window has no listener to reach.
    */
   const pageMediaListener = (
     event: Electron.IpcMainEvent,
@@ -253,6 +258,21 @@ function wire(tab: Tab): void {
   };
   contents.ipc.on('nodus-browser:page:media', pageMediaListener);
   tab.disposers.push(() => contents.ipc.removeListener('nodus-browser:page:media', pageMediaListener));
+
+  /**
+   * The Nodus website has one inert Bookmarks slot. Its isolated preload sends
+   * this only for a trusted click; main then repeats every boundary check before
+   * changing the active tab into the local React page. No bookmark data crosses
+   * into the remote renderer.
+   */
+  const openBookmarksListener = (event: Electron.IpcMainEvent) => {
+    if (!isWeb() || tab.id !== activeTabId) return;
+    if (event.sender !== contents || event.senderFrame !== contents.mainFrame) return;
+    if (!isNodusResearchSiteUrl(contents.getURL())) return;
+    navigate(NODUS_BOOKMARKS_URL);
+  };
+  contents.ipc.on('nodus-browser:page:openBookmarks', openBookmarksListener);
+  tab.disposers.push(() => contents.ipc.removeListener('nodus-browser:page:openBookmarks', openBookmarksListener));
 
   // Never let a page dictate the options of a window it opens. `allow` would
   // hand the site control of webPreferences; instead every popup becomes an

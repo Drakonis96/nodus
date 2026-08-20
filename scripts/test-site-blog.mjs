@@ -9,12 +9,8 @@ const blogRoot = path.join(repoRoot, 'site', 'blog');
 const read = (relative) => fs.readFileSync(path.join(blogRoot, relative), 'utf8');
 const index = () => JSON.parse(read('posts.json'));
 
-/* The index and the post page each sort the posts themselves, so the order in
-   posts.json is free. Both must agree, and both must put the newest first.
-
-   blog.js and post.js are DOM-bound IIFEs, so the ordering cannot be imported
-   and called here. The first two tests state the contract; the third is the one
-   that ties the shipped code to it. */
+/* The index and the static-page generator each sort the posts themselves, so
+   the order in posts.json is free. Both must put the newest first. */
 const sortAsBlogDoes = (posts) => posts
   .filter((post) => post && post.slug && post.title && post.date && !post.draft)
   .sort((a, b) => String(b.date).localeCompare(String(a.date)));
@@ -40,12 +36,13 @@ test('a draft never reaches the index, however recent it is', () => {
   assert.deepEqual(sortAsBlogDoes(posts).map((post) => post.slug), ['published']);
 });
 
-test('both the index and the post page sort by date descending', () => {
+test('both the index and the static-page generator sort by date descending', () => {
   // b before a is what makes it descending; a before b would silently reverse the
   // blog. Whitespace is left loose so reformatting cannot fail this by accident.
   const descending = /\.sort\(\s*\(\s*a\s*,\s*b\s*\)\s*=>\s*String\(\s*b\.date\s*\)\s*\.localeCompare\(\s*String\(\s*a\.date\s*\)\s*\)\s*\)/;
   assert.match(read('blog.js'), descending, 'blog.js sorts newest first');
-  assert.match(read('post.js'), descending, 'post.js sorts newest first');
+  const generator = fs.readFileSync(path.join(repoRoot, 'scripts', 'build-blog-pages.mjs'), 'utf8');
+  assert.match(generator, descending, 'the static-page generator sorts newest first');
 });
 
 test('every listed post has the fields the blog renders, and a file to render', () => {
@@ -77,17 +74,47 @@ test('every listed post has the fields the blog renders, and a file to render', 
 test('the RSS feed carries the published posts and nothing else', () => {
   const feed = read('feed.xml');
   const published = sortAsBlogDoes(index().posts);
+  assert.match(feed, /^<\?xml version="1\.0" encoding="UTF-8"\?>/);
+  assert.match(feed, /<rss version="2\.0"[^>]*>/, 'the document declares RSS 2.0');
+  assert.match(feed, /<atom:link href="https:\/\/nodusresearch\.com\/blog\/feed\.xml" rel="self" type="application\/rss\+xml"\/>/);
   assert.equal(
     (feed.match(/<item>/g) ?? []).length,
     published.length,
     'one feed item per published post',
   );
   for (const post of published) {
-    assert.ok(feed.includes(`?p=${post.slug}`), `the feed links to ${post.slug}`);
+    const url = `https://nodusresearch.com/blog/${post.slug}/`;
+    assert.ok(
+      feed.includes(url),
+      `the feed links to the clean URL for ${post.slug}`,
+    );
+    assert.ok(feed.includes(`<guid isPermaLink="true">${url}</guid>`), `${post.slug} has a stable permalink guid`);
+    assert.ok(feed.includes(`<pubDate>${new Date(`${post.date}T12:00:00Z`).toUTCString()}</pubDate>`), `${post.slug} has a valid publication date`);
   }
 });
 
-test('the feed is readable in a browser, not just in a reader', () => {
+test('every published post is complete, crawlable HTML at its clean URL', () => {
+  for (const post of sortAsBlogDoes(index().posts)) {
+    const html = read(path.join(post.slug, 'index.html'));
+    const canonical = `https://nodusresearch.com/blog/${post.slug}/`;
+    assert.match(html, /<div class="prose" id="article" tabindex="-1">\s*<(?:p|h2)[ >]/s, `${post.slug} contains rendered article copy`);
+    assert.ok(html.includes(`<title>${post.title} · Nodus Blog</title>`), `${post.slug} has its own title`);
+    assert.ok(html.includes(`content="${post.summary.replaceAll('&', '&amp;').replaceAll('"', '&quot;')}"`), `${post.slug} has its description in source`);
+    assert.ok(html.includes(`<link rel="canonical" href="${canonical}"/>`), `${post.slug} has a clean canonical`);
+    assert.ok(html.includes(`<meta property="og:url" content="${canonical}"/>`), `${post.slug} shares its clean URL`);
+    assert.match(html, /<script type="application\/ld\+json">.*"@type":"BlogPosting"/, `${post.slug} has BlogPosting structured data`);
+    assert.doesNotMatch(html, /markdown\.js|post\.js|fetch\(/, `${post.slug} does not need JavaScript to load its article`);
+  }
+});
+
+test('the old parameter URL is a noindex compatibility redirect', () => {
+  const legacy = read('post.html');
+  assert.match(legacy, /<meta name="robots" content="noindex, follow"\/>/);
+  assert.match(legacy, /location\.replace\('\.\/' \+ encodeURIComponent\(slug\) \+ '\/'\)/);
+  assert.doesNotMatch(read('blog.js'), /post\.html\?p=/);
+});
+
+test('RSS opens an accessible subscription dialog and remains readable directly', () => {
   const feed = read('feed.xml');
   assert.match(
     feed,
@@ -98,10 +125,18 @@ test('the feed is readable in a browser, not just in a reader', () => {
   assert.match(stylesheet, /<xsl:template match="\/rss\/channel">/, 'the stylesheet transforms the channel');
   assert.match(stylesheet, /<xsl:template match="item">/, 'the stylesheet renders each post');
 
-  // the address only helps when it can be taken to a reader in one click
+  // Normal clicks stay on the blog and explain what to do; the href remains a
+  // useful no-JavaScript fallback and direct feed readers still get the XML.
   const html = read('index.html');
-  assert.match(html, /id="feed-copy"[^>]*data-url="https:\/\/nodusresearch\.com\/blog\/feed\.xml"/);
-  assert.match(read('blog.js'), /navigator\.clipboard/, 'the copy button is wired');
+  assert.match(html, /class="arrow-link rss-modal-trigger" href="feed\.xml" aria-haspopup="dialog"/);
+  assert.match(html, /class="rss-dialog" role="dialog" aria-modal="true"/);
+  assert.match(html, /id="rss-feed-url"[^>]*value="https:\/\/nodusresearch\.com\/blog\/feed\.xml"/);
+  const script = read('blog.js');
+  assert.match(script, /event\.preventDefault\(\)/, 'the enhanced click does not navigate away');
+  assert.match(script, /navigator\.clipboard/, 'modern browsers use the Clipboard API');
+  assert.match(script, /document\.execCommand\('copy'\)/, 'older or restricted browsers get a copy fallback');
+  assert.match(script, /event\.key === 'Escape'/, 'the dialog closes from the keyboard');
+  assert.match(script, /rssPreviousFocus\?\.focus\(\)/, 'focus returns to the link that opened it');
 });
 
 test('regenerating the feed keeps what the published feed says', () => {
@@ -121,6 +156,7 @@ test('the site addresses the blog by its own domain', () => {
   }
   const sitemap = fs.readFileSync(path.join(repoRoot, 'site', 'sitemap.xml'), 'utf8');
   for (const post of sortAsBlogDoes(index().posts)) {
-    assert.ok(sitemap.includes(`?p=${post.slug}`), `the sitemap lists ${post.slug}`);
+    assert.ok(sitemap.includes(`https://nodusresearch.com/blog/${post.slug}/`), `the sitemap lists ${post.slug}`);
   }
+  assert.doesNotMatch(sitemap, /blog\/post\.html|[?&]p=/, 'the sitemap exposes no legacy blog URLs');
 });

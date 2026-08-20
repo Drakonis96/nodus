@@ -8,29 +8,83 @@ tag and by free text. With no published posts it shows what is coming instead.
 (function () {
   'use strict';
 
-  // The feed address is only useful pasted into a reader, so offer it as a copy
-  // rather than as one more link into raw XML. Shown only where copying works.
-  const copyButton = document.getElementById('feed-copy');
-  if (copyButton && navigator.clipboard && window.isSecureContext) {
-    const label = document.getElementById('feed-copy-label');
-    const idle = label.textContent;
-    let restore;
-    copyButton.hidden = false;
-    copyButton.addEventListener('click', () => {
-      navigator.clipboard.writeText(copyButton.dataset.url).then(() => {
-        label.textContent = 'Copied — paste it into your feed reader';
-        copyButton.classList.add('copied');
-        clearTimeout(restore);
-        restore = setTimeout(() => {
-          label.textContent = idle;
-          copyButton.classList.remove('copied');
-        }, 3200);
-      }).catch(() => {
-        // clipboard refused: show the address so it can be selected by hand
-        label.textContent = copyButton.dataset.url;
-      });
-    });
+  const rssModal = document.getElementById('rss-modal');
+  const rssDialog = rssModal?.querySelector('.rss-dialog');
+  const rssInput = document.getElementById('rss-feed-url');
+  const rssCopy = document.getElementById('rss-copy');
+  const rssStatus = document.getElementById('rss-copy-status');
+  let rssPreviousFocus = null;
+
+  function openRssModal(event) {
+    event.preventDefault();
+    if (!rssModal || !rssDialog) return;
+    rssPreviousFocus = event.currentTarget;
+    rssModal.hidden = false;
+    document.body.classList.add('rss-modal-open');
+    rssDialog.focus();
   }
+
+  function closeRssModal() {
+    if (!rssModal || rssModal.hidden) return;
+    rssModal.hidden = true;
+    document.body.classList.remove('rss-modal-open');
+    rssStatus.textContent = '';
+    rssPreviousFocus?.focus();
+  }
+
+  document.querySelectorAll('.rss-modal-trigger').forEach((trigger) => {
+    trigger.addEventListener('click', openRssModal);
+  });
+  rssModal?.querySelectorAll('[data-rss-close]').forEach((control) => {
+    control.addEventListener('click', closeRssModal);
+  });
+
+  document.addEventListener('keydown', (event) => {
+    if (!rssModal || rssModal.hidden) return;
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      closeRssModal();
+      return;
+    }
+    if (event.key !== 'Tab') return;
+    const focusable = [...rssDialog.querySelectorAll('button, input, a[href]')]
+      .filter((element) => !element.disabled && element.getClientRects().length);
+    if (!focusable.length) return;
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+    if (event.shiftKey && document.activeElement === first) {
+      event.preventDefault();
+      last.focus();
+    } else if (!event.shiftKey && document.activeElement === last) {
+      event.preventDefault();
+      first.focus();
+    }
+  });
+
+  rssCopy?.addEventListener('click', async () => {
+    const address = rssInput.value;
+    let copied = false;
+    try {
+      if (navigator.clipboard && window.isSecureContext) {
+        await navigator.clipboard.writeText(address);
+        copied = true;
+      }
+    } catch (_) {
+      // Some browsers deny clipboard access even in a secure context.
+    }
+    if (!copied) {
+      rssInput.focus();
+      rssInput.select();
+      try {
+        copied = document.execCommand('copy');
+      } catch (_) {
+        copied = false;
+      }
+    }
+    rssStatus.textContent = copied
+      ? 'Copied — paste it into your feed reader.'
+      : 'The address is selected. Copy it with Ctrl+C or Command+C.';
+  });
 
   const list = document.getElementById('blog-list');
   const filters = document.getElementById('blog-filters');
@@ -65,7 +119,7 @@ tag and by free text. With no published posts it shows what is coming instead.
       return `${post.title} ${post.summary} ${(post.tags || []).join(' ')}`.toLowerCase().includes(needle);
     });
 
-    list.innerHTML = matches.map((post, index) => `<a class="post-card lit reveal${post.cover ? ' has-cover' : ''}" href="post.html?p=${encodeURIComponent(post.slug)}" style="--delay:${Math.min(index, 6) * 60}ms">
+    list.innerHTML = matches.map((post, index) => `<a class="post-card lit reveal${post.cover ? ' has-cover' : ''}" href="${encodeURIComponent(post.slug)}/" style="--delay:${Math.min(index, 6) * 60}ms">
       ${post.cover ? `<span class="post-card-cover"><img src="${escapeHtml(post.cover)}" alt="${escapeHtml(post.coverAlt || '')}" loading="lazy" decoding="async"/></span>` : ''}
       <span class="post-card-body">
       <div class="post-card-meta">

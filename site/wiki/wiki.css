@@ -33,7 +33,7 @@ system, so the wiki and the rest of the site cannot drift apart.
 main#article {
   min-width: 0;
   padding: clamp(38px, 5vw, 68px) clamp(26px, 4.5vw, 76px) 120px;
-  background: rgba(9, 8, 15, 0.62);
+  background: transparent;
 }
 
 /* ============================================================ navigation rail */
@@ -109,6 +109,16 @@ main#article {
 .nav-vault .nav-link { padding-left: 42px; font-size: 13px; }
 .nav-vault .nav-link.active::before { left: -16px; }
 .vault-icon-svg { display: block; width: 14px; height: 14px; }
+
+/* When the right-hand chapter index is visible, vault rows are direct links to
+   their manuals. Their nested copy stays available only at narrower widths. */
+@media (min-width: 1181px) {
+  .nav-vault[open] > .nav-link { display: none; }
+  .nav-vault[open] > summary::after { transform: none; }
+  .nav-vault > summary.active {
+    background: color-mix(in srgb, var(--vault-accent) 15%, transparent);
+  }
+}
 
 .sidebar-foot {
   display: flex; justify-content: space-between; gap: 10px;
@@ -277,28 +287,46 @@ main#article {
   display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
   gap: 16px; margin-top: 32px;
 }
+.vault-overview { margin-top: 38px; }
 .vault-card {
-  padding: 24px; border-radius: var(--r-l);
+  position: relative; padding: 24px; border-radius: var(--r-l);
   border: 1px solid var(--membrane);
   background: linear-gradient(150deg, color-mix(in srgb, var(--card-accent) 13%, rgba(19, 15, 33, 0.86)), rgba(11, 9, 21, 0.84));
   transition: transform 0.22s var(--ease), border-color 0.22s var(--ease);
 }
+.vault-card:not(.guide-pending) { cursor: pointer; }
 .vault-card:hover { transform: translateY(-3px); border-color: color-mix(in srgb, var(--card-accent) 50%, transparent); }
+.vault-card.guide-pending:hover { transform: none; border-color: var(--membrane); }
 .vault-card .vault-mark { width: 38px; height: 38px; margin-bottom: 16px; border-radius: 11px; }
 .vault-card .vault-icon-svg { width: 20px; height: 20px; }
 .wiki-page .vault-card h2 { font: 600 22px/1.22 var(--serif); }
 .vault-card p { margin: 9px 0 0; color: var(--ink-2); font-size: 13.5px; line-height: 1.6; }
 .vault-card a { font-size: 13px; font-weight: 650; color: color-mix(in srgb, var(--card-accent) 70%, white); }
 .vault-card a:hover { color: #fff; }
+.vault-guide-link::after {
+  content: ''; position: absolute; z-index: 1; inset: 0;
+  border-radius: var(--r-l);
+}
+.vault-guide-link:focus-visible { outline: none; }
+.vault-guide-link:focus-visible::after {
+  outline: 2px solid color-mix(in srgb, var(--card-accent) 78%, white);
+  outline-offset: 3px;
+}
 .vault-card-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin-top: 18px; }
 .vault-card-actions .vault-pdf-download {
-  display: inline-flex; align-items: center; gap: 7px; min-height: 32px;
+  position: relative; z-index: 2; display: inline-flex; align-items: center; gap: 7px; min-height: 32px;
   padding: 5px 11px; border-radius: var(--r-s);
   border: 1px solid color-mix(in srgb, var(--card-accent) 32%, var(--membrane));
   background: color-mix(in srgb, var(--card-accent) 9%, transparent);
   color: var(--ink-2);
 }
 .vault-card-actions .vault-pdf-download:hover { color: #fff; border-color: color-mix(in srgb, var(--card-accent) 62%, var(--membrane)); }
+.guide-status {
+  display: inline-flex; align-items: center; min-height: 30px; padding: 5px 10px;
+  border: 1px solid color-mix(in srgb, var(--card-accent) 28%, var(--membrane));
+  border-radius: 999px; background: color-mix(in srgb, var(--card-accent) 8%, transparent);
+  color: var(--ink-3); font-size: 11.5px; font-weight: 620;
+}
 
 .callout {
   margin-top: 34px; padding: 24px;
@@ -374,9 +402,6 @@ main#article {
 .video-close:hover { color: var(--ink); background: var(--skin-2); }
 .video-frame { aspect-ratio: 16 / 9; background: #000; }
 .video-frame iframe { display: block; width: 100%; height: 100%; border: 0; }
-
-/* ============================================================ the organism, behind the docs */
-#organism.awake { opacity: 0.3; }
 
 /* ============================================================ responsive */
 @media (max-width: 1180px) {

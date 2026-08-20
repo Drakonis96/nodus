@@ -221,14 +221,18 @@ test('Browser toolbar orders actions, downloads, restart and settings, with safe
   assert.match(browserView.slice(confirmation), /Nodus Bookmarks will be preserved/);
 });
 
-test('all bookmark mutations are trusted-UI IPC and the remote preload exposes none', () => {
+test('all bookmark mutations are trusted-UI IPC and the remote preload only permits gesture-gated navigation', () => {
   const ipc = readFileSync(path.join(repoRoot, 'electron/ipc/browser.ts'), 'utf8');
   for (const channel of ['bookmarks:create', 'bookmarks:update', 'bookmarks:delete', 'bookmarks:move', 'bookmarks:previewImport', 'bookmarks:export']) {
     const start = ipc.indexOf(`h('browser:${channel}'`); assert.ok(start >= 0, channel);
     assert.match(ipc.slice(start, start + 500), /assertUiSender\(event, getWindow\)/, channel);
   }
   const remote = readFileSync(path.join(repoRoot, 'electron/preload/browserPage.ts'), 'utf8');
-  assert.doesNotMatch(remote, /bookmark/i);
+  assert.doesNotMatch(remote, /browser:bookmarks:(?:create|update|delete|move|previewImport|export)/);
+  assert.doesNotMatch(remote, /from ['"][^'"]*browserBookmarks['"]/);
+  assert.doesNotMatch(remote, /exposeInMainWorld\s*\(/);
+  assert.match(remote, /event\.isTrusted !== true/);
+  assert.match(remote, /ipcRenderer\.send\('nodus-browser:page:openBookmarks'\)/);
 });
 
 test.after(() => rmSync(dir, { recursive: true, force: true }));

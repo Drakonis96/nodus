@@ -60,7 +60,12 @@ test('every static HTML link resolves inside the website tree', () => {
 
   for (const htmlFile of htmlFiles) {
     const source = fs.readFileSync(htmlFile, 'utf8');
-    const references = [...source.matchAll(/\b(?:href|src)="([^"]+)"/g)].map((match) => match[1]);
+    const baseHref = source.match(/<base\s+href="([^"]+)"/i)?.[1];
+    const referenceBase = baseHref
+      ? path.resolve(path.dirname(htmlFile), baseHref)
+      : path.dirname(htmlFile);
+    const sourceWithoutBase = source.replace(/<base\s+href="[^"]+"[^>]*>/i, '');
+    const references = [...sourceWithoutBase.matchAll(/\b(?:href|src)="([^"]+)"/g)].map((match) => match[1]);
     for (const reference of references) {
       if (
         !reference
@@ -72,7 +77,7 @@ test('every static HTML link resolves inside the website tree', () => {
 
       const pathname = reference.split(/[?#]/, 1)[0];
       if (!pathname) continue;
-      const resolved = path.resolve(path.dirname(htmlFile), pathname);
+      const resolved = path.resolve(referenceBase, pathname);
       assert.ok(
         resolved.startsWith(`${siteRoot}${path.sep}`),
         `${path.relative(repoRoot, htmlFile)} keeps ${reference} inside site/`,

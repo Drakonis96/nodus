@@ -15,7 +15,7 @@ function assertDesktopCapture(file) {
   assert.ok(buffer.readUInt32BE(20) >= 850, `${file} has desktop-app height`);
 }
 
-test('the Nodus Wiki covers all five stable vaults and every documented asset exists', () => {
+test('the Nodus Wiki retains complete manuals for its five documented vaults', () => {
   assert.deepEqual(content.vaults.map((vault) => vault.id), ['academic', 'genealogy', 'databases', 'study', 'teaching']);
   assert.ok(content.common.length >= 7, 'the core guide remains complete');
   assert.ok(content.vaults.reduce((total, vault) => total + vault.chapters.length, 0) >= 70, 'the vault manuals retain full section coverage');
@@ -38,6 +38,28 @@ test('the Nodus Wiki covers all five stable vaults and every documented asset ex
       assert.ok(chapter.tips.length >= 1, `${chapter.title} retains a good-practice note`);
     }
   }
+});
+
+test('the Wiki home presents every vault that currently ships in Nodus', () => {
+  const script = fs.readFileSync(path.join(wikiRoot, 'wiki.js'), 'utf8');
+  const html = fs.readFileSync(path.join(wikiRoot, 'index.html'), 'utf8');
+  const overviewSources = `${script}\n${fs.readFileSync(path.join(wikiRoot, 'content.json'), 'utf8')}`;
+  const expected = ['Academic Research', 'Primary Sources', 'Testimony', 'Databases', 'Teaching', 'Study', 'Genealogy', 'Prosopography', 'Worldbuilding'];
+  for (const name of expected) assert.match(overviewSources, new RegExp(name), `${name} appears in the Wiki overview`);
+  assert.match(script, /const allVaults = \[\.\.\.content\.vaults, \.\.\.vaultsAwaitingGuides\]/);
+  assert.match(script, /\$\{allVaults\.length\} vaults, one local-first engine/);
+  assert.match(script, /Available in Nodus · Wiki guide coming later/, 'undocumented vaults are described honestly');
+  assert.doesNotMatch(script, /\$\{figure\('academic\/home\.png', 'Nodus Academic Research home'\)\}/, 'the large Academic screenshot is removed from Wiki home');
+  assert.match(html, /Explore all nine Nodus vaults/, 'search metadata states the real total');
+});
+
+test('each documented vault card opens its guide while PDF remains a separate action', () => {
+  const script = fs.readFileSync(path.join(wikiRoot, 'wiki.js'), 'utf8');
+  const css = fs.readFileSync(path.join(wikiRoot, 'wiki.css'), 'utf8');
+  assert.match(script, /class="vault-guide-link" href="#\$\{vault\.id\}"/, 'documented cards expose a semantic guide link');
+  assert.match(css, /\.vault-guide-link::after\s*\{[^}]*position: absolute;[^}]*inset: 0;/s, 'the guide link covers the complete card');
+  assert.match(css, /\.vault-card-actions \.vault-pdf-download\s*\{[^}]*z-index: 2;/s, 'the PDF action stays above the card link');
+  assert.match(css, /\.vault-card\.guide-pending:hover\s*\{[^}]*transform: none;/s, 'cards without guides do not pretend to be clickable');
 });
 
 test('the wiki shell exposes global search, navigation and downloadable manuals', () => {
@@ -66,6 +88,24 @@ test('the wiki shell exposes global search, navigation and downloadable manuals'
   assert.match(script, /content\.vaults\.flatMap/);
   assert.match(script, /function setNavigationOpen/);
   assert.match(script, /event\.key === 'Escape'.*nav-open/);
+});
+
+test('the Wiki uses the same living background as the rest of the site', () => {
+  const html = fs.readFileSync(path.join(wikiRoot, 'index.html'), 'utf8');
+  const css = fs.readFileSync(path.join(wikiRoot, 'wiki.css'), 'utf8');
+  assert.match(html, /<body class="wiki-page">/, 'the Wiki does not dim the shared organism');
+  assert.doesNotMatch(css, /#organism\.awake\s*\{[^}]*opacity:/, 'the Wiki does not override the shared field opacity');
+  assert.match(css, /main#article\s*\{[^}]*background: transparent;/s, 'the document column lets the shared field show through');
+});
+
+test('wide desktop vault rows navigate without duplicating the right-hand chapter index', () => {
+  const script = fs.readFileSync(path.join(wikiRoot, 'wiki.js'), 'utf8');
+  const css = fs.readFileSync(path.join(wikiRoot, 'wiki.css'), 'utf8');
+  assert.match(script, /matchMedia\('\(min-width: 1181px\)'\)/, 'the behavior starts exactly where the right rail appears');
+  assert.match(script, /if \(usesRightHandToc\.matches\) \{\s*event\.preventDefault\(\)/, 'desktop summary clicks do not toggle details');
+  assert.match(script, /location\.hash = vault\.dataset\.vault/, 'desktop summary clicks open the selected manual');
+  assert.match(script, /if \(usesRightHandToc\.matches \|\| !isActive\) vault\.open = false;\s*else vault\.open = true;/, 'narrow layouts retain the left accordion');
+  assert.match(css, /@media \(min-width: 1181px\)[\s\S]*?\.nav-vault\[open\] > \.nav-link \{ display: none; \}/, 'desktop never paints nested chapter links in the left rail');
 });
 
 test('the manual bundle contains one current PDF for every vault', async () => {

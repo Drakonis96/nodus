@@ -23,6 +23,10 @@ Hosts opt in with a placeholder element:
   const PAGES = [
     { id: 'home', label: 'Home', href: (base) => `${base}index.html` },
     { id: 'atlas', label: 'Atlas', href: (base) => `${base}research-atlas/` },
+    // Nodus Browser reveals this prepared slot from its isolated preload. It is
+    // hidden everywhere else, so a normal web visitor never sees a local-only
+    // destination or a custom-protocol prompt that cannot work in their browser.
+    { id: 'bookmarks', label: 'Bookmarks', href: () => '#nodus-bookmarks', browserOnly: true },
     { id: 'wiki', label: 'Wiki', href: (base) => `${base}wiki/` },
     { id: 'blog', label: 'Blog', href: (base) => `${base}blog/` },
     { id: 'contribute', label: 'Contribute', href: (base) => `${base}contribute/` },
@@ -33,7 +37,8 @@ Hosts opt in with a placeholder element:
     const isWiki = context === 'wiki';
     const links = PAGES.map((item) => {
       const current = item.id === page ? ' aria-current="page"' : '';
-      return `<a class="link" href="${item.href(base)}"${current}>${item.label}</a>`;
+      const browserOnly = item.browserOnly ? ' data-nodus-browser-bookmarks hidden' : '';
+      return `<a class="link" href="${item.href(base)}"${current}${browserOnly}>${item.label}</a>`;
     }).join('');
 
     return `<nav class="nav${isWiki ? ' wiki-nav' : ''}" id="site-header">
