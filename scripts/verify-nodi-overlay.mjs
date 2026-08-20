@@ -118,8 +118,7 @@ try {
       `Nodi scale ${scale} resized the stable native host`,
     );
   };
-  await verifyFigureSize(0.6, [108, 120]);
-  await verifyFigureSize(1.4, [252, 280]);
+  await verifyFigureSize(0.4, [72, 80]);
   await verifyFigureSize(1, [180, 200]);
   const figureScreenPosition = async () => {
     const [bounds, box] = await Promise.all([

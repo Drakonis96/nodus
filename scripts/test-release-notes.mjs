@@ -25,15 +25,31 @@ try {
 
   const { RELEASE_NOTES, releaseNotesForMajor, compareVersions } = await import(pathToFileURL(bundlePath).href);
   const currentRelease = RELEASE_NOTES[0];
-  assert.equal(currentRelease?.version, '4.1.6');
-  assert.equal(currentRelease?.date, '2026-08-18');
-  assert.equal(currentRelease?.highlights.length, 5);
-  assert.deepEqual(currentRelease?.highlights.map((highlight) => highlight.scope), ['academic', 'academic', 'general', 'general', 'estudio']);
-  assert.ok(currentRelease?.highlights.some((highlight) => /copies attachments again/.test(highlight.en)));
-  assert.ok(currentRelease?.highlights.some((highlight) => /second Zotero sync no longer aborts/.test(highlight.en)));
-  assert.ok(currentRelease?.highlights.some((highlight) => /galleries remember how you left them/.test(highlight.en)));
-  assert.ok(currentRelease?.highlights.some((highlight) => /no longer goes through the gallery/.test(highlight.en)));
-  assert.ok(currentRelease?.highlights.some((highlight) => /organisation view is now translated/.test(highlight.en)));
+  assert.equal(currentRelease?.version, '4.2.0');
+  assert.equal(currentRelease?.date, '2026-08-20');
+  assert.equal(currentRelease?.highlights.length, 9);
+  assert.deepEqual(currentRelease?.highlights.map((highlight) => highlight.scope), ['browser', 'radar', 'databases', 'academic', 'academic', 'general', 'academic', 'nodi', 'general']);
+  for (const phrase of [
+    /Nodus Browser arrives/,
+    /follow topics, searches, authors/,
+    /hundreds of thousands of rows/,
+    /literature review/,
+    /persistent highlights/,
+    /argument maps open for comparison/,
+    /Global Library header/,
+    /reduce it to 40%/,
+    /Large backups now restore/,
+  ]) assert.ok(currentRelease?.highlights.some((highlight) => phrase.test(highlight.en)));
+
+  // 4.1.6 keeps the five highlights it shipped with. They are published history.
+  const zoteroImportRelease = RELEASE_NOTES.find((note) => note.version === '4.1.6');
+  assert.equal(zoteroImportRelease?.date, '2026-08-18');
+  assert.equal(zoteroImportRelease?.highlights.length, 5);
+  assert.ok(zoteroImportRelease?.highlights.some((highlight) => /copies attachments again/.test(highlight.en)));
+  assert.ok(zoteroImportRelease?.highlights.some((highlight) => /second Zotero sync no longer aborts/.test(highlight.en)));
+  assert.ok(zoteroImportRelease?.highlights.some((highlight) => /galleries remember how you left them/.test(highlight.en)));
+  assert.ok(zoteroImportRelease?.highlights.some((highlight) => /no longer goes through the gallery/.test(highlight.en)));
+  assert.ok(zoteroImportRelease?.highlights.some((highlight) => /organisation view is now translated/.test(highlight.en)));
 
   // 4.1.5 keeps the four it shipped with. They are published history.
   const selectionRibbonRelease = RELEASE_NOTES.find((note) => note.version === '4.1.5');
@@ -220,6 +236,8 @@ try {
     'toolkit',
     'plugin',
     'languages',
+    'browser',
+    'radar',
   ]);
   for (const note of RELEASE_NOTES) {
     for (const highlight of note.highlights) {

@@ -41,7 +41,7 @@ import { DEEP_RESEARCH_APPROACH_TRANSLATIONS } from './i18n.deepResearchApproach
 /** Complete static Turkish interface table; coverage prohibits runtime fallbacks. */
 export const TR: Record<string, string> = {
   'Tamaño de Nodi': 'Nodi boyutu',
-  'El marcador central conserva el tamaño predeterminado. Elige uno de los nueve tamaños disponibles.': 'Ortadaki işaretçi varsayılan boyutu korur. Kullanılabilir dokuz boyuttan birini seçin.',
+  'El 100 % conserva el tamaño original de Nodi y es el máximo. Puedes reducirlo hasta el 40 %.': "%100, Nodi'nin özgün boyutunu korur ve en büyük boyuttur. Boyutu %40'a kadar küçültebilirsiniz.",
   'Tamaños predeterminados': 'Önceden ayarlanmış boyutlar',
   ...PAGE_TRANSLATIONS.tr,
   ...DATABASE_PROPERTY_TRANSLATIONS.tr,

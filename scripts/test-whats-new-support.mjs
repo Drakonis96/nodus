@@ -80,7 +80,11 @@ assert.match(modal, /nodi: \{ icon: 'nodi', color: '#d4af37', label: 'Mascota No
 assert.match(modal, /toolkit: \{ icon: 'tools', color: '#059669', label: 'Herramientas' \}/);
 assert.match(modal, /plugin: \{ icon: 'puzzle', color: '#0ea5e9', label: 'Plugins' \}/);
 assert.match(modal, /languages: \{ icon: 'languages', color: '#db2777', label: 'Idiomas' \}/);
-assert.match(releaseNotes, /export type ReleaseNoteScope = 'general' \| VaultType \| 'mcp' \| 'nodi' \| 'toolkit' \| 'plugin' \| 'languages';/);
+assert.match(modal, /browser: \{ icon: 'globe', color: '#2563eb', label: 'Nodus Browser' \}/);
+assert.match(modal, /radar: \{ icon: 'radar', color: '#f97316', label: 'Nodus Radar' \}/);
+assert.match(releaseNotes, /export type ReleaseNoteScope = 'general' \| VaultType \| 'mcp' \| 'nodi' \| 'toolkit' \| 'plugin' \| 'languages' \| 'browser' \| 'radar';/);
+assert.match(releaseNotes, /RELEASE_4_2_0_HIGHLIGHTS[\s\S]*scope: 'browser'[\s\S]*scope: 'radar'/);
+assert.match(releaseNotes, /version: '4\.2\.0'[\s\S]*highlights: RELEASE_4_2_0_HIGHLIGHTS/);
 assert.match(releaseNotes, /version: '2\.2\.0'[\s\S]*scope: 'nodi'/);
 assert.match(releaseNotes, /version: '2\.3\.8'[\s\S]*scope: 'languages'/);
 
@@ -92,7 +96,7 @@ const scopeIcons = [
   ...[...modal.matchAll(/icon: '([^']+)'/g)].map((m) => m[1]),
   ...[...vaultIconBody.slice(0, vaultIconBody.indexOf('\n}')).matchAll(/return '([^']+)'/g)].map((m) => m[1]),
 ];
-assert.ok(scopeIcons.length >= 15, `expected every scope to declare an icon, got ${scopeIcons.length}`);
+assert.ok(scopeIcons.length >= 17, `expected every scope to declare an icon, got ${scopeIcons.length}`);
 for (const icon of scopeIcons) {
   assert.match(icons, new RegExp(`^  ${icon}: '<`, 'm'), `scope icon "${icon}" is missing from ICON_PATHS`);
 }

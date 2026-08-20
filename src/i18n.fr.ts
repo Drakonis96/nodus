@@ -46,7 +46,7 @@ import { DEEP_RESEARCH_APPROACH_TRANSLATIONS } from './i18n.deepResearchApproach
 
 export const FR: Record<string, string> = {
   'Tamaño de Nodi': 'Taille de Nodi',
-  'El marcador central conserva el tamaño predeterminado. Elige uno de los nueve tamaños disponibles.': 'Le repère central conserve la taille par défaut. Choisissez l’une des neuf tailles disponibles.',
+  'El 100 % conserva el tamaño original de Nodi y es el máximo. Puedes reducirlo hasta el 40 %.': '100 % conserve la taille d’origine de Nodi et constitue le maximum. Vous pouvez la réduire jusqu’à 40 %.',
   'Tamaños predeterminados': 'Tailles prédéfinies',
   ...PAGE_TRANSLATIONS.fr,
   ...DATABASE_PROPERTY_TRANSLATIONS.fr,

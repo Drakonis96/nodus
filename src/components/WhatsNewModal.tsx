@@ -43,6 +43,8 @@ const RELEASE_SCOPE_META: Record<ReleaseNoteScope, { icon: string; color: string
   toolkit: { icon: 'tools', color: '#059669', label: 'Herramientas' },
   plugin: { icon: 'puzzle', color: '#0ea5e9', label: 'Plugins' },
   languages: { icon: 'languages', color: '#db2777', label: 'Idiomas' },
+  browser: { icon: 'globe', color: '#2563eb', label: 'Nodus Browser' },
+  radar: { icon: 'radar', color: '#f97316', label: 'Nodus Radar' },
 };
 
 /** The rotated N is exclusive to the What's New badge for Zotero-plugin news. */

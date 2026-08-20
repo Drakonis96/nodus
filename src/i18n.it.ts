@@ -41,7 +41,7 @@ import { DEEP_RESEARCH_APPROACH_TRANSLATIONS } from './i18n.deepResearchApproach
 /** Complete static Italian interface table; coverage prohibits runtime fallbacks. */
 export const IT: Record<string, string> = {
   'Tamaño de Nodi': 'Dimensione di Nodi',
-  'El marcador central conserva el tamaño predeterminado. Elige uno de los nueve tamaños disponibles.': "L'indicatore centrale mantiene la dimensione predefinita. Scegli una delle nove dimensioni disponibili.",
+  'El 100 % conserva el tamaño original de Nodi y es el máximo. Puedes reducirlo hasta el 40 %.': 'Il 100% mantiene la dimensione originale di Nodi ed è il massimo. Puoi ridurlo fino al 40%.',
   'Tamaños predeterminados': 'Dimensioni predefinite',
   ...PAGE_TRANSLATIONS.it,
   ...DATABASE_PROPERTY_TRANSLATIONS.it,
