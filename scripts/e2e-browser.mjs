@@ -660,6 +660,19 @@ try {
     await call('submitBrowserOmnibox', `${origin}/paper`);
     await waitFor((s) => s.tabs.some((tab) => tab.url === `${origin}/paper` && !tab.loading), 'the Connector fixture page');
     const connectorButton = page.getByTestId('browser-connector-button');
+    const [omniboxBox, buttonBox, markBox, bookmarksBox] = await Promise.all([
+      page.getByTestId('browser-omnibox-shell').boundingBox(),
+      connectorButton.boundingBox(),
+      connectorButton.locator('img').boundingBox(),
+      page.getByTestId('browser-bookmarks-manager-button').boundingBox(),
+    ]);
+    assert.ok(omniboxBox && buttonBox && markBox && bookmarksBox, 'the Connector toolbar controls must be measurable');
+    const centerDeltaX = Math.abs((markBox.x + markBox.width / 2) - (buttonBox.x + buttonBox.width / 2));
+    const centerDeltaY = Math.abs((markBox.y + markBox.height / 2) - (buttonBox.y + buttonBox.height / 2));
+    assert.ok(centerDeltaX <= 0.5 && centerDeltaY <= 0.5, `the N mark is not centered: ${centerDeltaX}, ${centerDeltaY}`);
+    const leftGap = buttonBox.x - (omniboxBox.x + omniboxBox.width);
+    const rightGap = bookmarksBox.x - (buttonBox.x + buttonBox.width);
+    assert.ok(Math.abs(leftGap - rightGap) <= 0.5, `the Connector margins are asymmetric: ${leftGap}, ${rightGap}`);
     await connectorButton.click();
     const modal = page.getByTestId('browser-capture-modal');
     await modal.waitFor({ state: 'visible' });

@@ -357,7 +357,7 @@ export function NodusBrowserView() {
           </div>
         </form>
 
-        <div>
+        <div className="mx-0.5 flex items-center justify-center">
           <ToolbarButton
             imageSrc={connectorIcon}
             label="Nodus Connector"
@@ -633,7 +633,7 @@ function ToolbarButton({
       aria-label={label}
       disabled={disabled}
       onClick={onClick}
-      className="rounded-lg p-1.5 text-neutral-600 transition-colors hover:bg-neutral-100 disabled:cursor-not-allowed disabled:opacity-40 dark:text-neutral-400 dark:hover:bg-neutral-900"
+      className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-neutral-600 transition-colors hover:bg-neutral-100 disabled:cursor-not-allowed disabled:opacity-40 dark:text-neutral-400 dark:hover:bg-neutral-900"
     >
       {imageSrc
         ? <img src={imageSrc} alt="" className={`h-4 w-4 ${busy ? 'animate-pulse' : ''}`} />
