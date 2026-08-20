@@ -93,4 +93,3 @@ export function serializeRectangularClipboard(matrix: Array<Array<string | null 
   };
   return matrix.map((row) => row.map(encode).join('\t')).join('\n');
 }
-

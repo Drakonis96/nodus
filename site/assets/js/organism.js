@@ -806,6 +806,11 @@ for reduced motion.
     };
   }
 
+  /* The trusted in-app Research Atlas and Nodus Bookmarks pages reuse this
+     exact renderer. They own their React lifecycle, so expose only the field
+     constructor; no Nodus API, IPC or page data crosses this boundary. */
+  window.NodusOrganismFactory = Object.freeze({ create });
+
   /* ------------------------------------------------------------ boot */
 
   /* The opening sequence on the home page is a title shot for the field: the
@@ -829,6 +834,10 @@ for reduced motion.
   function boot() {
     const canvas = document.getElementById('organism');
     if (!canvas) return;
+
+    // A host with its own lifecycle (the trusted Nodus renderer) mounts the
+    // same engine itself so its listeners can be removed when the page closes.
+    if (canvas.dataset.organismManaged === 'host') return;
 
     if (reduceMotion.matches) {
       standDown(canvas);

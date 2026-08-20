@@ -125,6 +125,15 @@ const DEFAULTS: Omit<AppSettings, 'providerKeys' | 'lockedProviderKeys'> = {
   readingFocusMode: false,
   announcementsEnabled: true,
   betaUpdates: false,
+  browserSitePermissions: {},
+  browserDownloadFolder: null,
+  browserHomeMode: 'start',
+  browserHomeUrl: '',
+  browserNewTabMode: 'home',
+  browserSearchEngine: 'google',
+  browserSearchTemplate: '',
+  browserHistoryRetention: '30d',
+  browserClearHistoryOnClose: false,
   mascotEnabled: true,
   mascotScale: NODI_DEFAULT_SCALE,
   mascotAlwaysOnTop: false,
@@ -323,6 +332,14 @@ export function getSettings(): AppSettings {
   if (typeof merged.libraryGlobalEnabled !== 'boolean') merged.libraryGlobalEnabled = false;
   if (!Number.isInteger(merged.libraryScopeOnboardingVersion) || merged.libraryScopeOnboardingVersion < 0) {
     merged.libraryScopeOnboardingVersion = 0;
+  }
+  if (!['none', '7d', '30d', '90d', '1y', 'forever'].includes(merged.browserHistoryRetention)) {
+    merged.browserHistoryRetention = DEFAULTS.browserHistoryRetention;
+    seed.browserHistoryRetention = merged.browserHistoryRetention;
+  }
+  if (typeof merged.browserClearHistoryOnClose !== 'boolean') {
+    merged.browserClearHistoryOnClose = DEFAULTS.browserClearHistoryOnClose;
+    seed.browserClearHistoryOnClose = merged.browserClearHistoryOnClose;
   }
   // Cleanup can delete files, so corrupted or hand-edited global preferences must
   // never be treated as an enabled policy. Repair them to conservative defaults

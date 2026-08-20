@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog, session, shell } from 'electron';
+import { app, BrowserWindow, dialog, nativeTheme, session, shell } from 'electron';
 import path from 'node:path';
 import { createRequire } from 'node:module';
 import { constants as fsConstants, promises as fs } from 'node:fs';
@@ -49,6 +49,8 @@ import { registerImageProtocol, registerImageSchemePrivileges } from './imagePro
 import { registerArchiveProtocol, registerArchiveSchemePrivileges } from './archiveProtocol';
 import { registerLibraryProtocol, registerLibrarySchemePrivileges } from './libraryProtocol';
 import { closeGlobalLibraryRuntime } from './library/libraryRuntime';
+import { setBrowserTheme } from './browser/tabs';
+import { destroyBrowserSubsystem } from './browser/lifecycle';
 import { ensurePreV4Recovery } from './recovery/preV4Recovery';
 import { applyUpdateChannel, isPrereleaseVersion } from './updateChannel';
 import {
@@ -373,7 +375,7 @@ function createWindow(): void {
     height: 900,
     minWidth: 1024,
     minHeight: 700,
-    backgroundColor: '#0a0a0a',
+    backgroundColor: nativeTheme.shouldUseDarkColors ? '#0a0a0a' : '#ffffff',
     titleBarStyle: process.platform === 'darwin' ? 'hiddenInset' : 'default',
     webPreferences: {
       preload: path.join(__dirname, 'preload.cjs'),
@@ -403,6 +405,10 @@ function createWindow(): void {
   }
 
   mainWindow.on('closed', () => {
+    // On macOS closing the last window does not quit the app. Native Browser
+    // views must still die with their host instead of surviving invisibly until
+    // a later Cmd+Q or being retained when a new main window is created.
+    destroyBrowserSubsystem();
     mainWindow = null;
     // Don't let the always-on-top mascot window keep the app alive after the main
     // window closes (matters on Windows/Linux, where window-all-closed quits).
@@ -814,6 +820,9 @@ app.whenReady().then(async () => {
   });
   if (preV4.snapshotPath) console.log(`[recovery] pre-v4 snapshot: ${preV4.snapshotPath}`);
   getDb(); // open + migrate before anything touches data
+  // Do this before creating either the main window or a browser tab: Chromium
+  // then exposes the same effective preference to pages from their first frame.
+  setBrowserTheme(getSettings().theme);
   await startDatabaseFormServer(Number.parseInt(process.env.NODUS_DATABASE_FORM_PORT ?? '0', 10) || 0);
   upgradeWorldbuildingDemoDynasties();
   upgradeWorldbuildingDemoImageQuality();
@@ -990,6 +999,7 @@ app.on('window-all-closed', () => {
   stopReplicaSync();
     interruptDecorativeImageGenerations();
     stopAllWhisperCpp();
+    destroyBrowserSubsystem();
     closeGlobalLibraryRuntime();
     closeDb();
     app.quit();
@@ -1029,8 +1039,16 @@ app.on('before-quit', () => {
   // be abandoned mid-drain and leave the vendor runtimes running as orphans.
   killChatGptSubscriptionServer();
   killGitHubCopilotSubscriptionServer();
+  destroyBrowserSubsystem();
   closeGlobalLibraryRuntime();
   closeDb();
+});
+
+// Final idempotent backstop for every cooperative quit path. before-quit does
+// the substantive shutdown; will-quit proves no Browser-owned WebContents can
+// survive a handler added later that closes the window in a different order.
+app.on('will-quit', () => {
+  destroyBrowserSubsystem();
 });
 
 const updateAwareApp = app as typeof app & { on(event: 'before-quit-for-update', listener: () => void): typeof app };
@@ -1063,6 +1081,7 @@ updateAwareApp.on('before-quit-for-update', () => {
   // be abandoned mid-drain and leave the vendor runtimes running as orphans.
   killChatGptSubscriptionServer();
   killGitHubCopilotSubscriptionServer();
+  destroyBrowserSubsystem();
   closeGlobalLibraryRuntime();
   closeDb();
 });

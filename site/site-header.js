@@ -9,7 +9,7 @@ Hosts opt in with a placeholder element:
   <div data-nodus-site-header data-base="../" data-page="wiki" data-context="wiki"></div>
 
   data-base    path back to site/ from the current page ('' at the root)
-  data-page    home | wiki | blog | contribute | faq | demo — marks the current item
+  data-page    home | atlas | wiki | blog | contribute | faq | demo — marks the current item
   data-context 'wiki' adds the docs menu button
 */
 (function () {
@@ -22,6 +22,7 @@ Hosts opt in with a placeholder element:
 
   const PAGES = [
     { id: 'home', label: 'Home', href: (base) => `${base}index.html` },
+    { id: 'atlas', label: 'Atlas', href: (base) => `${base}research-atlas/` },
     { id: 'wiki', label: 'Wiki', href: (base) => `${base}wiki/` },
     { id: 'blog', label: 'Blog', href: (base) => `${base}blog/` },
     { id: 'contribute', label: 'Contribute', href: (base) => `${base}contribute/` },

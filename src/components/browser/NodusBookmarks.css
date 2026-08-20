@@ -1,0 +1,141 @@
+/* Nodus Bookmarks deliberately reuses Research Atlas classes and proportions. */
+@import url('../../../site/assets/css/research-atlas.css');
+
+@font-face { font-family: 'Atlas Inter'; src: url('../../../site/assets/fonts/inter-latin.woff2') format('woff2'); font-display: swap; }
+@font-face { font-family: 'Atlas Fraunces'; src: url('../../../site/assets/fonts/fraunces-latin.woff2') format('woff2'); font-display: swap; }
+
+.nodus-start-page {
+  --void: #06050b; --deep: #0a0813; --raised: #100d1c;
+  --skin: rgba(255,255,255,.04); --skin-2: rgba(255,255,255,.07);
+  --membrane: rgba(255,255,255,.09); --membrane-2: rgba(255,255,255,.16);
+  --ink: #f6f4fd; --ink-2: #a9a3c2; --ink-3: #6f6a86;
+  --violet-2: #a78bfa; --violet-3: #ddd6fe; --accent: #a78bfa;
+  --accent-soft: rgba(167,139,250,.16); --sans: 'Atlas Inter', Inter, sans-serif;
+  --serif: 'Atlas Fraunces', Georgia, serif; --mono: ui-monospace, 'SF Mono', monospace;
+  --gut: clamp(20px,5vw,68px); --measure: 1240px; --nav-h: 62px;
+  --r-l: 24px; --ease: cubic-bezier(.22,1,.36,1);
+  --shadow: 0 24px 70px -30px rgba(0,0,0,.85);
+  position: absolute; inset: 0; overflow: auto; color: var(--ink);
+  background:
+    radial-gradient(900px 620px at 22% 8%,rgba(139,92,246,.20),transparent 62%),
+    radial-gradient(760px 520px at 84% 30%,rgba(34,211,238,.10),transparent 60%),
+    radial-gradient(680px 680px at 50% 92%,rgba(109,40,217,.16),transparent 64%),var(--void);
+  font-family: var(--sans); color-scheme: dark;
+}
+.nodus-start-page.atlas-main { min-height: 100%; padding: 0; }
+.nodus-start-page .nodus-site-content {
+  position:relative; z-index:2; padding:clamp(52px,7vw,90px) var(--gut) clamp(96px,11vw,140px);
+}
+
+/* The same WebGL organism used by nodusresearch.com/research-atlas. This canvas
+   is fed by that exact engine; both local start pages therefore share its live
+   nebula, node physics, synapses, pointer pulses and scroll response. */
+.nodus-start-page .nodus-site-backdrop { position:sticky; top:0; z-index:0; height:0; pointer-events:none; overflow:visible; }
+.nodus-start-page .nodus-site-organism {
+  position:absolute; inset:0; display:block; width:100%; height:max(720px,100vh);
+  pointer-events:none; opacity:0; transition:opacity 1.2s var(--ease);
+}
+.nodus-start-page .nodus-site-organism.awake { opacity:1; }
+.nodus-start-page .nodus-site-organism.organism-unavailable {
+  opacity:1; background:radial-gradient(900px 620px at 22% 8%,rgba(139,92,246,.20),transparent 62%),radial-gradient(760px 520px at 84% 30%,rgba(34,211,238,.10),transparent 60%),radial-gradient(680px 680px at 50% 92%,rgba(109,40,217,.16),transparent 64%);
+}
+
+/* Exact structural counterpart of the nodusresearch.com header, scoped so none
+   of the marketing-site selectors can leak into the surrounding application. */
+.nodus-start-page .nodus-site-header {
+  position:sticky; inset:0 0 auto; top:0; z-index:20; display:flex; align-items:center; gap:22px;
+  height:var(--nav-h); padding:0 clamp(14px,3vw,30px); border-bottom:1px solid var(--membrane);
+  background:rgba(6,5,11,.82); backdrop-filter:blur(18px) saturate(1.3); -webkit-backdrop-filter:blur(18px) saturate(1.3);
+}
+.nodus-start-page .nodus-site-logo,
+.nodus-start-page .nodus-site-link,
+.nodus-start-page .nodus-site-badge,
+.nodus-start-page .nodus-site-primary,
+.nodus-start-page .nodus-site-foot-col button,
+.nodus-start-page .nodus-site-foot-base button { border:0; background:transparent; cursor:pointer; font:inherit; }
+.nodus-start-page .nodus-site-logo { display:inline-flex; align-items:center; gap:10px; flex:0 0 auto; padding:0; color:var(--ink); font-size:17.5px; font-weight:800; letter-spacing:-.02em; }
+.nodus-start-page .nodus-site-logo img { width:27px; height:27px; }
+.nodus-start-page .nodus-site-links { display:flex; align-items:center; gap:4px; min-width:0; margin-left:auto; font-size:14px; font-weight:550; }
+.nodus-start-page .nodus-site-link { position:relative; display:inline-flex; align-items:center; height:var(--nav-h); padding:0 13px; color:var(--ink-2); white-space:nowrap; }
+.nodus-start-page .nodus-site-link:hover { color:var(--ink); background:var(--skin); }
+.nodus-start-page .nodus-site-link[aria-current='page'] { color:var(--ink); }
+.nodus-start-page .nodus-site-link[aria-current='page']::after { content:''; position:absolute; right:13px; bottom:12px; left:13px; height:2px; border-radius:2px; background:var(--accent); }
+.nodus-start-page .nodus-site-nav-sep { width:1px; height:22px; margin:0 8px; flex:0 0 auto; background:var(--membrane); }
+.nodus-start-page .nodus-site-badge { display:inline-flex; align-items:center; min-height:34px; padding:7px 13px; border:1px solid var(--membrane); border-radius:10px; background:var(--skin); color:var(--ink); font-size:12.5px; font-weight:620; white-space:nowrap; }
+.nodus-start-page .nodus-site-primary { display:inline-flex; align-items:center; justify-content:center; min-height:38px; padding:9px 17px; border-radius:10px; color:#fff; font-size:13.5px; font-weight:700; white-space:nowrap; background:linear-gradient(135deg,#7c3aed,#a855f7 55%,#8b5cf6); box-shadow:0 10px 34px -12px rgba(124,58,237,.75); }
+.nodus-start-page .nodus-site-nav-toggle { display:none; flex:0 0 auto; width:40px; height:36px; margin-left:auto; padding:0; border:1px solid var(--membrane); border-radius:10px; background:var(--skin); color:var(--ink); cursor:pointer; }
+.nodus-start-page .nodus-site-nav-toggle span { display:block; width:16px; height:1.6px; margin:3.4px auto; border-radius:2px; background:currentColor; transition:transform .3s,opacity .2s; }
+.nodus-start-page .nodus-site-nav-toggle[aria-expanded='true'] span:nth-child(1) { transform:translateY(5px) rotate(45deg); }
+.nodus-start-page .nodus-site-nav-toggle[aria-expanded='true'] span:nth-child(2) { opacity:0; }
+.nodus-start-page .nodus-site-nav-toggle[aria-expanded='true'] span:nth-child(3) { transform:translateY(-5px) rotate(-45deg); }
+
+/* Same footer grid and typography as Research Atlas. */
+.nodus-start-page .nodus-site-footer { position:relative; z-index:2; padding:clamp(56px,7vw,90px) 0 46px; border-top:1px solid var(--membrane); background:linear-gradient(180deg,transparent,rgba(10,8,19,.85)); }
+.nodus-start-page .nodus-site-wrap { width:min(100% - calc(var(--gut) * 2),var(--measure)); margin-inline:auto; }
+.nodus-start-page .nodus-site-foot-grid { display:grid; grid-template-columns:minmax(0,1.4fr) repeat(4,minmax(0,1fr)); gap:40px 32px; }
+.nodus-start-page .nodus-site-foot-brand { display:flex; flex-direction:column; gap:14px; }
+.nodus-start-page .nodus-site-foot-logo { display:inline-flex; align-items:center; gap:10px; color:var(--ink); font-size:19px; font-weight:800; letter-spacing:-.02em; }
+.nodus-start-page .nodus-site-foot-logo img { width:28px; height:28px; }
+.nodus-start-page .nodus-site-foot-brand p { max-width:40ch; margin:0; color:var(--ink-3); font-size:14px; line-height:1.6; }
+.nodus-start-page .nodus-site-foot-col h3 { margin:0 0 14px; color:var(--ink-3); font-size:11.5px; font-weight:700; letter-spacing:.14em; text-transform:uppercase; }
+.nodus-start-page .nodus-site-foot-col button { display:block; padding:5px 0; color:var(--ink-2); text-align:left; font-size:14px; transition:color .2s,transform .2s; }
+.nodus-start-page .nodus-site-foot-col button:hover { color:var(--ink); transform:translateX(3px); }
+.nodus-start-page .nodus-site-foot-base { display:flex; flex-wrap:wrap; align-items:center; gap:12px 26px; margin-top:46px; padding-top:26px; border-top:1px solid var(--membrane); color:var(--ink-3); font-size:13px; }
+.nodus-start-page .nodus-site-foot-base button { padding:0; color:var(--ink-3); }
+.nodus-start-page .nodus-site-foot-base button:hover { color:var(--ink-2); }
+.nodus-start-page .card {
+  position: relative; padding: 26px; border: 1px solid var(--membrane); border-radius: var(--r-l);
+  background: linear-gradient(180deg,rgba(23,19,40,.86),rgba(11,9,21,.82)); overflow: hidden;
+  transition: border-color .35s var(--ease),transform .35s var(--ease),background .35s var(--ease);
+}
+.nodus-start-page .card:hover { border-color: rgba(167,139,250,.4); transform: translateY(-3px); }
+.nodus-start-page .card.lit::before { content:''; position:absolute; inset:-1px; pointer-events:none; background:radial-gradient(340px circle at 50% 0%,var(--accent-soft),transparent 68%); opacity:0; transition:opacity .4s var(--ease); }
+.nodus-start-page .card.lit:hover::before { opacity:1; }
+.nodus-start-page button, .nodus-start-page input, .nodus-start-page select { font-family: inherit; }
+.nodus-start-page .atlas-searchbar.is-bookmarks { grid-template-columns:minmax(0,1fr) 52px; }
+.nodus-start-page .atlas-card > * { position: relative; z-index: 1; }
+.nodus-start-page .atlas-card-actions { display:flex; flex-wrap:wrap; gap:7px; margin-top:17px; }
+.nodus-start-page .atlas-card-actions .atlas-open { margin-top:0; cursor:pointer; }
+.nodus-start-page .atlas-card-actions .is-saved { color:#fbbf24; border-color:rgba(251,191,36,.3); }
+.nodus-start-page .bookmark-favicon { width:22px; height:22px; object-fit:contain; border-radius:5px; }
+.nodus-start-page .bookmark-folder-icon { display:grid; place-items:center; width:36px; height:36px; border:1px solid rgba(167,139,250,.25); border-radius:11px; background:rgba(139,92,246,.12); color:var(--violet-3); }
+.nodus-start-page .bookmark-heading { display:flex; align-items:center; gap:11px; min-width:0; }
+.nodus-start-page .bookmark-breadcrumbs { display:flex; justify-content:center; align-items:center; flex-wrap:wrap; gap:5px; margin-top:16px; color:var(--ink-3); font:600 11px/1 var(--mono); }
+.nodus-start-page .bookmark-breadcrumbs button { border:0; background:transparent; color:inherit; cursor:pointer; }
+.nodus-start-page .bookmark-breadcrumbs button:hover { color:var(--violet-3); }
+.nodus-start-page .bookmark-drop { outline:2px solid var(--violet-2); outline-offset:3px; }
+.nodus-start-page .atlas-empty h2 { margin:0 0 8px; color:var(--ink); font:650 24px/1.2 var(--serif); }
+.nodus-start-page .atlas-empty p { margin:0 auto 20px; max-width:580px; }
+
+.browser-bookmarks-tree { max-height:min(62vh,680px); overflow:auto; }
+.browser-bookmark-row[data-drag-over='true'] { outline:2px solid rgb(129 140 248); outline-offset:-2px; }
+
+@media (max-width:1320px) {
+  .nodus-start-page .nodus-site-nav-toggle { display:block; }
+  .nodus-start-page .nodus-site-links {
+    position:absolute; inset:var(--nav-h) 0 auto 0; flex-direction:column; align-items:stretch; gap:2px;
+    margin:0; padding:16px clamp(14px,4vw,28px) 24px; border-bottom:1px solid var(--membrane);
+    background:rgba(8,6,15,.97); backdrop-filter:blur(20px); -webkit-backdrop-filter:blur(20px);
+    font-size:16px; opacity:0; visibility:hidden; transform:translateY(-8px); transition:opacity .25s,transform .25s,visibility .25s;
+  }
+  .nodus-start-page .nodus-site-links.open { opacity:1; visibility:visible; transform:translateY(0); }
+  .nodus-start-page .nodus-site-link { height:auto; padding:13px 12px; }
+  .nodus-start-page .nodus-site-link[aria-current='page']::after { right:auto; bottom:8px; left:12px; width:16px; }
+  .nodus-start-page .nodus-site-nav-sep { display:none; }
+  .nodus-start-page .nodus-site-badge,
+  .nodus-start-page .nodus-site-primary { justify-content:center; margin-top:8px; }
+}
+@media (max-width:860px) {
+  .nodus-start-page .nodus-site-foot-grid { grid-template-columns:minmax(0,1fr) minmax(0,1fr); }
+  .nodus-start-page .nodus-site-foot-brand { grid-column:1/-1; }
+}
+@media (max-width:560px) {
+  .nodus-start-page .nodus-site-foot-grid { grid-template-columns:1fr; }
+  .nodus-start-page .nodus-site-foot-brand { grid-column:auto; }
+}
+@media (max-width:760px) {
+  .nodus-start-page .atlas-searchbar.is-bookmarks { grid-template-columns:minmax(0,1fr) 46px; }
+  .nodus-start-page .atlas-searchbar.is-bookmarks .atlas-input-wrap { grid-column:1; grid-row:1; min-height:56px; }
+  .nodus-start-page .atlas-searchbar.is-bookmarks .atlas-submit { grid-column:2; grid-row:1; }
+}
+@media (prefers-reduced-motion:reduce) { .nodus-start-page .nodus-site-organism { display:none; } }

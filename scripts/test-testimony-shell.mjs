@@ -50,11 +50,16 @@ const AGREED_SECTIONS = [
   'testimonyParticipants',
   'testimonyContrasts',
   'notes',
+  'browser',
   'toolkit',
   'settings',
 ];
 
-test('el menú tiene exactamente las ocho entradas acordadas', () => {
+// Nueve desde que Nodus Browser existe: es transversal como el Toolkit — consultar
+// un archivo o un fondo en la web sirve igual aquí que en cualquier otra bóveda —
+// y como el Toolkit no aporta ninguna superficie de OTRO vault al menú, que es lo
+// que esta lista cerrada protege.
+test('el menú tiene exactamente las nueve entradas acordadas', () => {
   const nav = navigation.dedicatedVaultNavIds('testimonios');
   assert.ok(nav, 'testimonios es un workspace dedicado, no el sidebar genérico');
   // Inicio y Ajustes van fijos fuera de los grupos y no forman parte de la lista.
@@ -101,9 +106,11 @@ test('las tres secciones propias son entradas reales del menú, con su icono', (
 test('el sidebar y la lista de navegación no pueden separarse', () => {
   const sidebarViews = TESTIMONY_GROUPS.flatMap((group) => group.items.map((item) => item.view));
   const nav = navigation.dedicatedVaultNavIds('testimonios');
-  // El Toolkit lo pinta App.tsx aparte (lleva sus herramientas anidadas), así que es la
-  // única entrada de la lista que no está en el sidebar propio.
-  assert.deepEqual([...sidebarViews].sort(), nav.filter((id) => id !== 'toolkit').sort());
+  // El grupo «Herramientas» lo pinta App.tsx aparte para todas las bóvedas dedicadas
+  // (`navGroups.filter(group => group.id === 'tools')`), así que sus entradas son las
+  // únicas de la lista que no están en el sidebar propio de Testimonios.
+  const paintedByShell = new Set(['toolkit', 'browser']);
+  assert.deepEqual([...sidebarViews].sort(), nav.filter((id) => !paintedByShell.has(id)).sort());
 });
 
 test('no hay un grupo «Escribir» que solo contenga Notas', () => {

@@ -90,7 +90,8 @@
     "capture:wiki": "npm run build && electron-rebuild -f -w better-sqlite3 && node scripts/capture-wiki-desktop-screenshots.mjs",
     "verify:testimony-diarization": "npm run build && node scripts/verify-testimony-diarization.mjs",
     "audit:ai": "npm run build && node scripts/ai-audit/run.mjs",
-    "build:server-shared": "node scripts/build-server-shared.mjs"
+    "build:server-shared": "node scripts/build-server-shared.mjs",
+    "test:e2e:browser": "node scripts/e2e-browser.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.32.1",
@@ -116,8 +117,8 @@
     "@napi-rs/canvas": "^0.1.65",
     "@openai/codex": "0.144.6",
     "adm-zip": "^0.6.0",
+    "better-sqlite3": "^12.11.1",
     "archiver": "^5.3.2",
-    "better-sqlite3": "^11.5.0",
     "citeproc": "^2.4.63",
     "cytoscape": "^3.30.2",
     "diff": "^9.0.0",
@@ -170,9 +171,9 @@
     "@typescript-eslint/parser": "^8.15.0",
     "@vitejs/plugin-react": "^4.3.3",
     "autoprefixer": "^10.4.20",
+    "electron": "^43.4.0",
+    "electron-builder": "^26.15.3",
     "axe-core": "^4.13.0",
-    "electron": "^33.2.0",
-    "electron-builder": "^25.1.8",
     "esbuild": "^0.21.5",
     "eslint": "^8.57.1",
     "playwright-core": "^1.61.1",
@@ -272,8 +273,8 @@
         }
       ],
       "extendInfo": {
-        "NSMicrophoneUsageDescription": "Nodus usa el micrófono únicamente cuando inicias un dictado o una grabación de estudio.",
-        "NSAppleEventsUsageDescription": "Nodus puede usar una aplicación de presentaciones instalada únicamente para convertir a PDF el archivo que elijas importar.",
+        "NSMicrophoneUsageDescription": "Nodus usa el micr\u00f3fono \u00fanicamente cuando inicias un dictado o una grabaci\u00f3n de estudio.",
+        "NSAppleEventsUsageDescription": "Nodus puede usar una aplicaci\u00f3n de presentaciones instalada \u00fanicamente para convertir a PDF el archivo que elijas importar.",
         "NSDockTilePlugIn": "NodusDockTile.docktileplugin"
       },
       "target": [

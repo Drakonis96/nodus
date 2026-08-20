@@ -1,6 +1,7 @@
 // toolkit channels, moved verbatim out of the monolithic registerIpc.
 // The channel names are unchanged; scripts/test-ipc-contract.mjs is what proves it.
 import type { IpcContext } from './context';
+import { assertNotBrowserIpcSender } from './trust';
 import { runToolkitJob, ToolkitSignal } from '../toolkit/toolkitJobs';
 import { TOOLKIT_REGISTRY } from '../toolkit/convert';
 import { initAiOcr, resumeAiOcr, createOcrDocs, listOcrDocs, searchOcrDocs, getOcrDoc, deleteOcrDoc, cancelOcrDoc, reprocessOcrPage, reprocessOcrDocument, ocrPageImageDataUrl, ocrPageText, updateOcrPage, ocrTranscript, buildOcrExport, buildOcrExportZip, saveOcrToVault, AiOcrCreateInput } from '../toolkit/aiOcr';
@@ -370,6 +371,7 @@ export function registerToolkitIpc({ h, getWindow }: IpcContext): void {
   });
   h('presenter:cast', async () => openCastPicker());
   ipcMain.on('presenter:control', (e, action: PresenterAction) => {
+    assertNotBrowserIpcSender(e);
     presenterWindows.handlePresenterControl(e.sender, action);
   });
 

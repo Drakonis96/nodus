@@ -38,4 +38,3 @@ export async function writeNotionParityReport(outputDir, report) {
   await writeFile(htmlPath, html, 'utf8');
   return { jsonPath, htmlPath };
 }
-

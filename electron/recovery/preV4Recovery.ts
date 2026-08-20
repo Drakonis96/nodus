@@ -12,6 +12,7 @@ const MARKER_FILE = 'pre-v4-recovery.json';
 const LIBRARY_RECOVERY_RELATIVE = path.join('.nodus', 'recovery', 'pre-v4');
 const PROFILE_FILES = [
   'app-prefs.json',
+  'browser-bookmarks.json',
   'vaults.json',
   'nodi-chat-history.json',
   'nodi-notes.json',

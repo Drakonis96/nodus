@@ -5,7 +5,10 @@ import { readSource } from './ipc-channel-census.mjs';
 
 const read = async (file) => readSource(file);
 
-test('primary sources owns exactly the agreed ten-section shell', async () => {
+// Eleven since Nodus Browser landed: a cross-cutting tool, like the Toolkit, and
+// like it adds no other vault's surface to this shell — which is what the closed
+// list is actually protecting.
+test('primary sources owns exactly the agreed eleven-section shell', async () => {
   const [sidebar, navigation, app] = await Promise.all([
     read('src/components/PrimarySourcesSidebar.tsx'),
     read('src/navigation.ts'),
@@ -17,7 +20,7 @@ test('primary sources owns exactly the agreed ten-section shell', async () => {
   );
   const views = [...itemBlock.matchAll(/\bid: '([a-z]+)'/g)].map((match) => match[1]);
   assert.deepEqual(views, ['search', 'archive', 'persons', 'timeline', 'map', 'relations', 'notes']);
-  assert.match(navigation, /primary_sources:\s*\[\s*'search', 'archive', 'persons', 'timeline', 'map', 'relations', 'notes', 'toolkit'/);
+  assert.match(navigation, /primary_sources:\s*\[\s*'search', 'archive', 'persons', 'timeline', 'map', 'relations', 'notes', 'browser', 'toolkit'/);
   assert.match(app, /if \(isPrimarySources\)[\s\S]{0,500}<PrimarySourcesSidebar/);
   assert.match(
     app,

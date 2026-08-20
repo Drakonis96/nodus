@@ -13,6 +13,7 @@ import { VaultSwitcher, vaultTypeIcon, vaultTypeLabel } from './components/Vault
 import { ServerInbox } from './components/ServerInbox';
 import { unreadServerInboxGroupCount } from './serverInboxGrouping';
 import { NotificationsPanel, useAnnouncements } from './components/NotificationsPanel';
+import { BrowserMediaPopover, useBrowserMedia } from './components/browser/BrowserMedia';
 import { DatabasesSidebarExplore } from './components/DatabasesSidebarExplore';
 import { StudySidebar, type StudyNavigationTarget } from './components/StudySidebar';
 import { TeachingSidebar } from './components/TeachingSidebar';
@@ -75,6 +76,7 @@ import nodusLogoOrange from './assets/nodus-logo-orange.svg';
 import nodusLogoViolet from './assets/nodus-logo-violet.svg';
 import nodusLogoCyan from './assets/nodus-logo-cyan.svg';
 import { buildDockIconDataUrl, dockColorForVaultType } from './dockIcon';
+import { useBrowserNativeOverlayGuard } from './browserOverlay';
 
 const CsvImportModal = lazy(() => import('./views/DatabasesView').then((module) => ({ default: module.CsvImportModal })));
 const NotionImportReportModal = lazy(() => import('./views/DatabasesView').then((module) => ({ default: module.NotionImportReportModal })));
@@ -201,6 +203,7 @@ export function App() {
     typeof window !== 'undefined' && window.matchMedia('(prefers-color-scheme: dark)').matches
   );
   const [view, setView] = useState<View>('home');
+  useBrowserNativeOverlayGuard(view === 'browser');
   // Página activa dentro de Herramientas. Vive aquí (y no en ToolkitView) porque
   // el sidebar navega directamente a una herramienta, y porque así salir de la
   // sección y volver no pierde el sitio aunque la vista se desmonte.
@@ -296,6 +299,14 @@ export function App() {
       setRefreshingNotifications(false);
     }
   }, [refreshNotificationSources, refreshingNotifications]);
+  const captureNotificationsBrowserSnapshot = useCallback(
+    () => window.nodus.captureBrowserOverlaySnapshot(),
+    [],
+  );
+  const setNotificationsBrowserOverlayVisible = useCallback(
+    (visible: boolean) => window.nodus.setBrowserOverlayVisible(visible),
+    [],
+  );
   const [graphTarget, setGraphTarget] = useState<PendingGraphNavigationTarget & { nonce: number } | null>(null);
   const [ideaTarget, setIdeaTarget] = useState<PendingIdeaNavigationTarget & { nonce: number } | null>(null);
   const [libraryTarget, setLibraryTarget] = useState<PendingLibraryNavigationTarget & { nonce: number } | null>(null);
@@ -453,6 +464,10 @@ export function App() {
   // and captures the document synchronously before the user can send the question.
   useEffect(() => {
     if (!settings?.mascotEnabled) return;
+    // The website is a separate native WebContentsView, not a descendant of
+    // this <main>. NodusBrowserView publishes its real document text instead;
+    // publishing `main.innerText` here would overwrite it with browser chrome.
+    if (view === 'browser') return;
     let timer: number | null = null;
     let idleId: number | null = null;
     let observer: MutationObserver | null = null;
@@ -1037,6 +1052,20 @@ export function App() {
     });
   }, []);
 
+  // Trusted Browser chrome uses the same Library navigation target as the
+  // external Connector. The event originates in Nodus' renderer; arbitrary web
+  // pages live in another WebContents and cannot dispatch into this document.
+  useEffect(() => {
+    const openBrowserCapture = (event: Event) => {
+      const itemId = (event as CustomEvent<{ itemId?: unknown }>).detail?.itemId;
+      if (typeof itemId !== 'string' || !itemId || itemId.length > 200) return;
+      setLibraryTarget({ scope: 'global', readerItemId: itemId, nonce: Date.now() });
+      setView('library');
+    };
+    window.addEventListener('nodus:open-library-item', openBrowserCapture);
+    return () => window.removeEventListener('nodus:open-library-item', openBrowserCapture);
+  }, []);
+
   // Una nota se abre con la misma experiencia de catálogo y pestañas, bajo el nombre
   // Espacio de trabajo en la académica y Notas en las demás bóvedas.
   const openNoteFromSearch = useCallback((id: string) => {
@@ -1369,6 +1398,10 @@ export function App() {
               )}
             </span>
           )}
+          <BrowserMediaHeaderAction onOpenTab={(tabId) => {
+            setView('browser');
+            void window.nodus.activateBrowserTab(tabId);
+          }} />
           <HeaderAction
             icon="gitPr"
             label={t('Sugerir / Reportar')}
@@ -1455,6 +1488,8 @@ export function App() {
           onRefresh={refreshNotificationCenter}
           refreshing={refreshingNotifications}
           onClearAll={() => void window.nodus.clearNotifications().then(setNotifications).catch(() => {})}
+          captureBrowserOverlaySnapshot={captureNotificationsBrowserSnapshot}
+          setBrowserOverlayVisible={setNotificationsBrowserOverlayVisible}
         />
       </header>
 
@@ -1627,7 +1662,7 @@ export function App() {
                     {navButton(libraryItem)}
                     <div className={`${sidebarCompact ? 'mt-1 border-t border-neutral-800/70 pt-1' : 'mt-2'} flex flex-col gap-1`} data-tour="db-list">
                       <div className="flex items-center px-3">
-                        {!sidebarCompact && groupHeaderButton('explore', exploreLabel, exploreCollapsed, view === 'databases' || view === 'pages' || view === 'dbSearch')}
+                        {!sidebarCompact && groupHeaderButton('explore', exploreLabel, exploreCollapsed, ['databases', 'pages', 'dbSearch'].includes(view))}
                         <button
                           onClick={() => void createDatabase()}
                           title={t('Nueva base de datos')}
@@ -2007,5 +2042,39 @@ export function App() {
 
       {!manualWhatsNewOpen && updateSettled && <NodiMascot settings={settings} />}
     </div>
+  );
+}
+
+/**
+ * The header's media button.
+ *
+ * Rendered only when a browser tab holds a media session — and "holds a session"
+ * is not "is making noise". A paused lecture keeps its controls, because taking
+ * them away at the exact moment someone pauses is how a user loses the Play
+ * button they were reaching for.
+ */
+function BrowserMediaHeaderAction({ onOpenTab }: { onOpenTab: (tabId: string) => void }) {
+  const states = useBrowserMedia();
+  const [anchor, setAnchor] = useState<HTMLElement | null>(null);
+  if (states.length === 0) return null;
+  const anyPlaying = states.some((state) => state.playing);
+  return (
+    <span data-testid="browser-media-header-action" className="relative inline-flex">
+      <HeaderAction
+        icon="volume"
+        label={t('Medios')}
+        title={anyPlaying ? t('Reproduciéndose en Nodus Browser') : t('Medios en pausa en Nodus Browser')}
+        onClick={(event) => {
+          const button = event.currentTarget;
+          setAnchor((current) => (current ? null : button));
+        }}
+      />
+      {states.length > 1 && <span className="header-action-badge">{states.length}</span>}
+      <BrowserMediaPopover
+        anchorEl={anchor}
+        onClose={() => setAnchor(null)}
+        onOpenTab={(tabId) => { setAnchor(null); onOpenTab(tabId); }}
+      />
+    </span>
   );
 }

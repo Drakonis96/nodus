@@ -25,6 +25,7 @@ import {
 } from './backupCrypto';
 import { snapshotVaultInUtility } from './backupUtilityHost';
 import { StreamingZipWriter } from './streamingZip';
+import { browserBookmarksRepository } from '../browser/bookmarks';
 
 interface ExportManifestBase {
   schemaVersion: number;
@@ -113,7 +114,7 @@ export interface BackupInventory {
   apiKeyProviders: AiProvider[];
 }
 
-const GLOBAL_AUXILIARY_FILES = ['app-prefs.json', 'nodi-chat-history.json', 'nodi-notes.json', 'nodi-notifications.json', 'nodi-welcome.seed'] as const;
+const GLOBAL_AUXILIARY_FILES = ['app-prefs.json', 'browser-bookmarks.json', 'nodi-chat-history.json', 'nodi-notes.json', 'nodi-notifications.json', 'nodi-welcome.seed'] as const;
 const VAULT_HISTORY_FILES = ['study-chat-history.json', 'study-search-index.json'] as const;
 const VAULT_MEDIA_FILES = ['study-audio-meta.json'] as const;
 /** Cloud TTS keys live outside the AI-provider store, encrypted per vault. The blobs
@@ -987,12 +988,15 @@ function safeArchiveRelative(value: string): string | null {
 function restoreAuxiliaryFiles(payload: AdmZip, payloadManifest: PayloadManifest): void {
   const selection = normalizeBackupSelection(payloadManifest.selection, false);
   if (selection.includePreferences) {
+    let restoredBookmarks = false;
     for (const name of GLOBAL_AUXILIARY_FILES) {
       const entry = payload.getEntry(`aux/global/${name}`);
       if (!entry) continue;
       if (name === 'app-prefs.json') restoreGlobalPreferences(entry.getData());
       else writeAtomicFile(path.join(app.getPath('userData'), name), entry.getData());
+      if (name === 'browser-bookmarks.json') restoredBookmarks = true;
     }
+    if (restoredBookmarks) browserBookmarksRepository().reloadFromDisk();
   }
 
   const restoredVaults = new Map(listVaults().map((vault) => [vault.id, vault]));

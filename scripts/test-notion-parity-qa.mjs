@@ -52,4 +52,3 @@ test('notion-parity ephemeral profiles are created and removed only under the al
   await profile.cleanup();
   await assert.rejects(import('node:fs/promises').then(({ access }) => access(profile.profilePath)));
 });
-

@@ -142,6 +142,8 @@ interface NotificationsPanelProps {
   onRefresh: () => Promise<AnnouncementRefreshResult>;
   refreshing: boolean;
   onClearAll: () => void;
+  captureBrowserOverlaySnapshot: () => Promise<string | null>;
+  setBrowserOverlayVisible: (visible: boolean) => Promise<void>;
 }
 
 export function NotificationsPanel({
@@ -154,12 +156,21 @@ export function NotificationsPanel({
   onRefresh,
   refreshing,
   onClearAll,
+  captureBrowserOverlaySnapshot,
+  setBrowserOverlayVisible,
 }: NotificationsPanelProps) {
   const open = anchorEl != null;
   const panelRef = useRef<HTMLDivElement>(null);
   const [pos, setPos] = useState<{ left: number; top: number; width: number; originX: number } | null>(null);
   const [clearConfirmation, setClearConfirmation] = useState(false);
   const [refreshFeedback, setRefreshFeedback] = useState<AnnouncementRefreshResult | null>(null);
+  const [browserSnapshot, setBrowserSnapshot] = useState<{
+    dataUrl: string;
+    left: number;
+    top: number;
+    width: number;
+    height: number;
+  } | null>(null);
 
   const handleRefresh = async () => {
     setRefreshFeedback(null);
@@ -217,11 +228,68 @@ export function NotificationsPanel({
     if (!open) setClearConfirmation(false);
   }, [open]);
 
+  // A browser tab is a native WebContentsView, so z-index cannot put this React
+  // panel above it. Freeze the page into React first, wait until that frame has
+  // painted, and only then hide the native child. The transparent backdrop can
+  // receive clicks without exposing the window's bare black background.
+  useEffect(() => {
+    if (!open) return;
+    let cancelled = false;
+    const prepare = async () => {
+      const dataUrl = await captureBrowserOverlaySnapshot().catch(() => null);
+      if (cancelled) return;
+      const viewport = document.querySelector<HTMLElement>('[data-browser-viewport]');
+      const rect = viewport?.getBoundingClientRect();
+      if (dataUrl && rect && rect.width > 0 && rect.height > 0) {
+        setBrowserSnapshot({
+          dataUrl,
+          left: rect.left,
+          top: rect.top,
+          width: rect.width,
+          height: rect.height,
+        });
+        await new Promise<void>((resolve) => {
+          requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
+        });
+      }
+      if (!cancelled) await setBrowserOverlayVisible(true);
+    };
+    void prepare();
+    return () => {
+      cancelled = true;
+      setBrowserSnapshot(null);
+      void setBrowserOverlayVisible(false);
+    };
+  }, [captureBrowserOverlaySnapshot, open, setBrowserOverlayVisible]);
+
   const empty = announcements.length === 0 && notifications.length === 0;
 
   return createPortal(
     <AnimatePresence>
-      {open && pos && (
+      {open && pos && [
+        browserSnapshot && (
+          <img
+            key="notifications-browser-snapshot"
+            data-testid="header-notifications-browser-snapshot"
+            src={browserSnapshot.dataUrl}
+            alt=""
+            aria-hidden="true"
+            className="pointer-events-none fixed z-[53] object-fill"
+            style={{
+              left: browserSnapshot.left,
+              top: browserSnapshot.top,
+              width: browserSnapshot.width,
+              height: browserSnapshot.height,
+            }}
+          />
+        ),
+        <motion.div
+          key="notifications-backdrop"
+          data-testid="header-notifications-backdrop"
+          className="fixed inset-0 z-[54]"
+          aria-hidden="true"
+          onMouseDown={onClose}
+        />,
         <motion.div
           ref={panelRef}
           key="notifications-panel"
@@ -348,8 +416,8 @@ export function NotificationsPanel({
               }}
             />
           )}
-        </motion.div>
-      )}
+        </motion.div>,
+      ]}
     </AnimatePresence>,
     document.body
   );

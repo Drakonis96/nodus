@@ -1572,6 +1572,21 @@ export interface AppSettings {
    * the default and beta releases are never considered while this is false.
    */
   betaUpdates: boolean;
+  /** Nodus Browser: per-origin permission decisions. Absence means «ask». */
+  browserSitePermissions: BrowserSitePermissionMap;
+  /** Where Nodus Browser saves downloads. Null asks each time. */
+  browserDownloadFolder: string | null;
+  /** What Home and a new tab open. */
+  browserHomeMode: 'start' | 'bookmarks' | 'blank' | 'custom';
+  browserHomeUrl: string;
+  browserNewTabMode: 'home' | 'blank';
+  browserSearchEngine: 'google' | 'scholar' | 'bing' | 'duckduckgo' | 'custom';
+  /** Only used when the engine is 'custom'; must contain %s. */
+  browserSearchTemplate: string;
+  /** How long private Nodus Browser visit records remain on this device. */
+  browserHistoryRetention: import('./browserHistory').BrowserHistoryRetention;
+  /** Remove the private visit file whenever the Browser subsystem is destroyed. */
+  browserClearHistoryOnClose: boolean;
   // Nodi mascot: show the floating companion (visual/animation only for now — no wired
   // behaviour yet). App-wide preference, on by default.
   mascotEnabled: boolean;
@@ -8042,7 +8057,113 @@ export interface TestimonyExportResult {
 // IPC API surface exposed on window.nodus via the preload bridge.
 // ─────────────────────────────────────────────────────────────────────────────
 
-export interface NodusApi extends ProsopographyApi, TestimoniesApi, ToolkitApi, TeachingApi, DatabasesApi, PagesApi, PrimarySourcesApi, ArchiveApi, WorldbuildingApi, PlatformApi, RecordsApi, AcademicApi, LibraryApi {
+/**
+ * Nodus Browser. The renderer draws the chrome and issues commands; it never
+ * holds a WebContents. State arrives whole through `onBrowserStateChanged`.
+ */
+/**
+ * Per-origin permission decisions the user chose ("Always allow for this site").
+ * Absence means "ask"; only explicit allow/deny are stored.
+ */
+export type BrowserSitePermissionMap = Record<string, Record<string, 'allow' | 'deny'>>;
+
+export interface BrowserApi {
+  getBrowserState(): Promise<import('./browser').BrowserState>;
+  openBrowserTab(url: string): Promise<string | null>;
+  /** Navigate the current tab to a trusted local start page; remote pages never receive this API. */
+  navigateBrowserStartPage(page: 'atlas' | 'bookmarks'): Promise<boolean>;
+  activateBrowserTab(id: string): Promise<void>;
+  closeBrowserTab(id: string): Promise<void>;
+  browserGoBack(): Promise<void>;
+  browserGoForward(): Promise<void>;
+  browserReload(): Promise<void>;
+  browserStop(): Promise<void>;
+  browserGoHome(): Promise<{ url: string }>;
+  /** Destroy and recreate only the Browser subsystem; websites cannot call it. */
+  restartNodusBrowser(confirmed?: boolean): Promise<import('./browser').BrowserRestartResult>;
+  revealBrowserDownload(id: string): Promise<void>;
+  clearBrowserDownloads(): Promise<import('./browser').BrowserDownloadView[]>;
+  /** The native context menu asking the renderer to open one of its dialogs. */
+  onBrowserActionRequested(cb: (action: string) => void): () => void;
+  submitBrowserOmnibox(input: string): Promise<import('./browserOmnibox').OmniboxResolution & { ok?: boolean }>;
+  setBrowserViewport(viewport: import('./browser').BrowserViewport): Promise<void>;
+  /** Hide the native page view while a React overlay is open. */
+  setBrowserOverlayVisible(open: boolean): Promise<void>;
+  /** A transient image of the page, used beneath HTML overlays. */
+  captureBrowserOverlaySnapshot(): Promise<string | null>;
+  /** Whether the browser section is the one currently on screen. */
+  setBrowserSectionVisible(visible: boolean): Promise<void>;
+  onBrowserStateChanged(cb: (state: import('./browser').BrowserState) => void): () => void;
+  getPendingBrowserPermission(): Promise<import('./browser').PendingBrowserPermission | null>;
+  resolveBrowserPermission(id: string, granted: boolean, remember: boolean): Promise<void>;
+  cancelBrowserPermissions(): Promise<void>;
+  onBrowserPermissionRequest(
+    cb: (request: import('./browser').PendingBrowserPermission | null) => void,
+  ): () => void;
+  getBrowserMedia(): Promise<import('./browser').BrowserMediaState[]>;
+  browserMediaCommand(tabId: string, command: import('./browser').BrowserMediaCommand): Promise<void>;
+  setBrowserTabMuted(tabId: string, muted: boolean): Promise<void>;
+  /** Read and set the device's general output volume (0–100). */
+  getBrowserDeviceVolume(): Promise<number>;
+  setBrowserDeviceVolume(volume: number): Promise<void>;
+  onBrowserMediaChanged(cb: (states: import('./browser').BrowserMediaState[]) => void): () => void;
+  captureBrowserPage(): Promise<{
+    request: import('./browserConnector').BrowserConnectorCaptureRequest & { snapshotAvailable?: boolean };
+    warnings: string[];
+  } | null>;
+  saveBrowserCapture(
+    request: import('./browserConnector').BrowserConnectorCaptureRequest,
+    includeSnapshot: boolean,
+  ): Promise<import('./browserConnector').BrowserConnectorSaveResult>;
+  browserPageIsPdf(): Promise<{ isPdf: boolean; url: string }>;
+  importBrowserPdf(itemId: string, url: string, title: string):
+    Promise<import('./browserConnector').BrowserConnectorSaveResult>;
+  /** Refresh Nodi's Current view context from the active native browser page. */
+  syncBrowserNodiContext(): Promise<boolean>;
+  askNodiAboutBrowserPage(): Promise<boolean>;
+  askNodiAboutBrowserSelection(): Promise<boolean>;
+  getBrowserDownloads(): Promise<import('./browser').BrowserDownloadView[]>;
+  cancelBrowserDownload(id: string): Promise<void>;
+  dismissBrowserDownload(id: string): Promise<void>;
+  importBrowserDownload(id: string, title: string): Promise<{ itemId: string; title: string }>;
+  onBrowserDownloadsChanged(cb: (downloads: import('./browser').BrowserDownloadView[]) => void): () => void;
+  getBrowserStorage(force?: boolean): Promise<import('./browser').BrowserStorageReport>;
+  clearBrowserData(
+    categories: import('./browser').BrowserDataCategory[],
+    origins?: string[],
+  ): Promise<import('./browser').BrowserStorageReport>;
+  clearAllBrowserData(): Promise<import('./browser').BrowserStorageReport>;
+  /** Global Nodus data. Never exposed to the untrusted Browser-page preload. */
+  getBrowserBookmarks(): Promise<import('./browserBookmarks').BrowserBookmarkStore>;
+  getCurrentBrowserBookmarkCandidate(): Promise<import('./browserBookmarks').BrowserBookmarkCandidate | null>;
+  createBrowserBookmark(draft: import('./browserBookmarks').BrowserBookmarkDraft): Promise<{
+    store: import('./browserBookmarks').BrowserBookmarkStore;
+    bookmark: import('./browserBookmarks').BrowserBookmark;
+    duplicate: boolean;
+  }>;
+  updateBrowserBookmark(id: string, patch: Partial<import('./browserBookmarks').BrowserBookmarkDraft>): Promise<import('./browserBookmarks').BrowserBookmarkStore>;
+  createBrowserBookmarkFolder(draft: import('./browserBookmarks').BrowserBookmarkFolderDraft): Promise<{
+    store: import('./browserBookmarks').BrowserBookmarkStore;
+    folder: import('./browserBookmarks').BrowserBookmarkFolder;
+  }>;
+  updateBrowserBookmarkFolder(id: string, patch: Partial<import('./browserBookmarks').BrowserBookmarkFolderDraft>): Promise<import('./browserBookmarks').BrowserBookmarkStore>;
+  deleteBrowserBookmarkNode(ref: import('./browserBookmarks').BrowserBookmarkNodeRef): Promise<import('./browserBookmarks').BrowserBookmarkStore>;
+  moveBrowserBookmarkNode(ref: import('./browserBookmarks').BrowserBookmarkNodeRef, parentId: string | null, index: number): Promise<import('./browserBookmarks').BrowserBookmarkStore>;
+  previewBrowserBookmarksImport(): Promise<import('./browserBookmarks').BrowserBookmarksImportPreview | null>;
+  commitBrowserBookmarksImport(token: string): Promise<{
+    store: import('./browserBookmarks').BrowserBookmarkStore;
+    summary: import('./browserBookmarks').BrowserBookmarksImportSummary;
+  }>;
+  exportBrowserBookmarks(format: 'json' | 'html'): Promise<import('./browserBookmarks').BrowserBookmarksExportResult>;
+  onBrowserBookmarksChanged(cb: (store: import('./browserBookmarks').BrowserBookmarkStore) => void): () => void;
+  /** Local visit data. Never exposed to Browser page renderers or included in backups. */
+  getBrowserHistory(): Promise<import('./browserHistory').BrowserHistoryStore>;
+  deleteBrowserHistoryEntry(id: string): Promise<import('./browserHistory').BrowserHistoryStore>;
+  clearBrowserHistory(): Promise<import('./browserHistory').BrowserHistoryStore>;
+  onBrowserHistoryChanged(cb: (store: import('./browserHistory').BrowserHistoryStore) => void): () => void;
+}
+
+export interface NodusApi extends ProsopographyApi, TestimoniesApi, ToolkitApi, TeachingApi, DatabasesApi, PagesApi, PrimarySourcesApi, ArchiveApi, WorldbuildingApi, PlatformApi, RecordsApi, AcademicApi, LibraryApi, BrowserApi {
   // settings + secrets
   getSettings(): Promise<AppSettings>;
   updateSettings(patch: Partial<AppSettings>): Promise<AppSettings>;

@@ -85,4 +85,3 @@ function installRuntimeHooks(userDataPath) {
   Module._load = function load(request, parent, isMain) { if (request === 'electron') return { app: { getPath: () => userDataPath, getVersion: () => '0.0.0-test', getAppPath: () => repoRoot, isPackaged: false }, safeStorage: { isEncryptionAvailable: () => false }, BrowserWindow: class {}, dialog: {}, shell: {} }; return originalLoad.call(this, request, parent, isMain); };
   require.extensions['.ts'] = function loadTs(module, filename) { module._compile(ts.transpileModule(fs.readFileSync(filename, 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, esModuleInterop: true }, fileName: filename }).outputText, filename); };
 }
-

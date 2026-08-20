@@ -348,7 +348,7 @@ body.cursor-press .cursor { width: 26px; height: 26px; margin: -13px 0 0 -13px; 
 .nav-toggle[aria-expanded="true"] span:nth-child(2) { opacity: 0; }
 .nav-toggle[aria-expanded="true"] span:nth-child(3) { transform: translateY(-5px) rotate(-45deg); }
 
-@media (max-width: 1080px) {
+@media (max-width: 1320px) {
   .nav-toggle { display: block; }
   .nav .links {
     position: fixed; inset: var(--nav-h) 0 auto 0;

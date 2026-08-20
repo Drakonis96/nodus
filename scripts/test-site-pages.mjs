@@ -8,12 +8,12 @@ const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..'
 const siteRoot = path.join(repoRoot, 'site');
 const read = (relative) => fs.readFileSync(path.join(siteRoot, relative), 'utf8');
 
-test('the site has exactly the five destinations the navigation promises', () => {
-  for (const entry of ['index.html', 'wiki/index.html', 'blog/index.html', 'contribute/index.html', 'faq/index.html']) {
+test('the site has every destination the navigation promises', () => {
+  for (const entry of ['index.html', 'research-atlas/index.html', 'wiki/index.html', 'blog/index.html', 'contribute/index.html', 'faq/index.html']) {
     assert.ok(fs.existsSync(path.join(siteRoot, entry)), `site/${entry} exists`);
   }
   const home = read('index.html');
-  for (const href of ['wiki/', 'blog/', 'contribute/', 'faq/']) {
+  for (const href of ['research-atlas/', 'wiki/', 'blog/', 'contribute/', 'faq/']) {
     assert.ok(home.includes(`href="${href}"`), `the home page links to ${href}`);
   }
 });
@@ -155,7 +155,7 @@ test('the blog renders Markdown without letting a post inject markup', () => {
 test('the source files carry no stray NUL bytes', () => {
   // markdown.js delimits its code-span placeholders with NUL escapes; writing the
   // byte itself would make git treat the file as binary.
-  for (const relative of ['blog/markdown.js', 'blog/blog.js', 'blog/post.js', 'assets/js/organism.js', 'assets/js/site.js', 'assets/js/home.js']) {
+  for (const relative of ['blog/markdown.js', 'blog/blog.js', 'blog/post.js', 'assets/js/organism.js', 'assets/js/site.js', 'assets/js/home.js', 'assets/js/research-atlas.js']) {
     assert.ok(!fs.readFileSync(path.join(siteRoot, relative)).includes(0), `site/${relative} is plain text`);
   }
 });
@@ -171,7 +171,7 @@ test('the organism degrades for visitors who cannot or do not want to run it', (
   assert.match(site, /matchMedia\('\(prefers-reduced-motion: reduce\)'\)/, 'reveals and the cursor respect reduced motion');
 
   // every page that paints the organism has to provide its canvas
-  for (const page of ['index.html', 'faq/index.html', 'blog/index.html', 'blog/post.html', 'contribute/index.html', 'wiki/index.html', 'app/index.html', 'research/index.html', 'zotero/index.html', 'ai-research/index.html', 'open-source/index.html']) {
+  for (const page of ['index.html', 'research-atlas/index.html', 'faq/index.html', 'blog/index.html', 'blog/post.html', 'contribute/index.html', 'wiki/index.html', 'app/index.html', 'research/index.html', 'zotero/index.html', 'ai-research/index.html', 'open-source/index.html']) {
     assert.ok(read(page).includes('<canvas id="organism" aria-hidden="true"></canvas>'), `${page} carries the organism canvas`);
   }
 });
@@ -271,6 +271,7 @@ test('the sitemap lists every static page of the site', () => {
   const sitemap = read('sitemap.xml');
   for (const url of [
     'https://nodusresearch.com/',
+    'https://nodusresearch.com/research-atlas/',
     'https://nodusresearch.com/app/',
     'https://nodusresearch.com/research/',
     'https://nodusresearch.com/zotero/',
@@ -308,7 +309,7 @@ test('the app page documents the current desktop builds and available vaults', (
 });
 
 test('every page is reachable by keyboard and readable by a screen reader', () => {
-  for (const page of ['index.html', 'faq/index.html', 'blog/index.html', 'blog/post.html', 'contribute/index.html', 'app/index.html', 'research/index.html', 'zotero/index.html', 'ai-research/index.html', 'open-source/index.html']) {
+  for (const page of ['index.html', 'research-atlas/index.html', 'faq/index.html', 'blog/index.html', 'blog/post.html', 'contribute/index.html', 'app/index.html', 'research/index.html', 'zotero/index.html', 'ai-research/index.html', 'open-source/index.html']) {
     const html = read(page);
     assert.match(html, /class="skip-link" href="#/, `${page} offers a skip link`);
     assert.match(html, /<html lang="en">/, `${page} declares its language`);

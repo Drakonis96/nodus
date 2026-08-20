@@ -1,6 +1,6 @@
 import path from 'node:path';
 import fs from 'node:fs';
-import { ipcMain, BrowserWindow, dialog, app } from 'electron';
+import { ipcMain, BrowserWindow, dialog, app, nativeTheme } from 'electron';
 
 import {
   showImportOpenDialog,
@@ -32,6 +32,9 @@ import { registerPlatformIpc } from './ipc/platform';
 import { registerRecordsIpc } from './ipc/records';
 import { registerAcademicIpc } from './ipc/academic';
 import { registerLibraryIpc } from './ipc/library';
+import { registerBrowserIpc } from './ipc/browser';
+import { setBrowserTheme } from './browser/tabs';
+import { browserHistoryRepository } from './browser/history';
 import {
   restartMcpServer,
   startMcpServer,
@@ -151,6 +154,7 @@ import { reuseVaultAnalysisForWorks } from './vaults/vaultAnalysisImport';
 import { initializeVaultModelSelection, validateVaultModelSelection } from './vaults/vaultCreationSettings';
 import { setPersistentDockIcon } from './dockIcon';
 import { closeCrossVaultConnections } from './db/crossVault';
+import { assertNotBrowserIpcSender } from './ipc/trust';
 import { listMigrationRecoverySnapshots } from './db/migrationSafety';
 
 
@@ -206,6 +210,7 @@ export function registerIpc(
   registerProsopographyIpc(context);
   registerAcademicIpc(context);
   registerLibraryIpc(context);
+  registerBrowserIpc(context);
   registerRecordsIpc(context);
   registerPlatformIpc(context);
   registerWorldbuildingIpc(context);
@@ -328,6 +333,15 @@ export function registerIpc(
   h('settings:get', async () => getSettings());
   h('settings:update', async (_e, patch: Partial<AppSettings>) => {
     const previous = getSettings();
+    if (
+      patch.browserHistoryRetention !== undefined
+      && !['none', '7d', '30d', '90d', '1y', 'forever'].includes(patch.browserHistoryRetention)
+    ) {
+      throw new Error('The Browser history retention period is not valid.');
+    }
+    if (patch.browserClearHistoryOnClose !== undefined && typeof patch.browserClearHistoryOnClose !== 'boolean') {
+      throw new Error('The Browser history close policy is not valid.');
+    }
     if (patch.backupCleanupEnabled !== undefined && typeof patch.backupCleanupEnabled !== 'boolean') {
       throw new Error('El estado de la limpieza automática no es válido.');
     }
@@ -343,6 +357,13 @@ export function registerIpc(
       }
     }
     const next = updateSettings(patch);
+    if (patch.browserHistoryRetention !== undefined) {
+      await browserHistoryRepository().list(next.browserHistoryRetention);
+    }
+    if (patch.theme !== undefined && next.theme !== previous.theme) {
+      setBrowserTheme(next.theme);
+      getWindow()?.setBackgroundColor(nativeTheme.shouldUseDarkColors ? '#0a0a0a' : '#ffffff');
+    }
     if (patch.uiLanguage !== undefined && next.uiLanguage !== previous.uiLanguage) {
       relocalizeWorldbuildingDemoData(next.uiLanguage);
     }
@@ -489,6 +510,7 @@ export function registerIpc(
   // when a `sendSync` would have been serviced too — the synchronous form only
   // added a stall of Nodi's own renderer while heavy work held the loop.
   ipcMain.on('nodi:setMouseIgnore:async', (e, ignore: boolean) => {
+    assertNotBrowserIpcSender(e);
     const win = BrowserWindow.fromWebContents(e.sender);
     win?.setIgnoreMouseEvents(Boolean(ignore), { forward: true });
   });

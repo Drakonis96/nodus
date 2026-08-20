@@ -66,4 +66,3 @@ export function databaseFixtureFingerprint(rowCount) {
   }
   return hash.digest('hex');
 }
-

@@ -13,6 +13,7 @@ const systemStyles = read('site/assets/css/nodus.css');
 // Pages that carry the site design system and get the header from nodus.css.
 const systemPages = [
   ['site/index.html', 'home', ''],
+  ['site/research-atlas/index.html', 'atlas', '../'],
   ['site/research/index.html', 'research', '../'],
   ['site/zotero/index.html', 'zotero', '../'],
   ['site/ai-research/index.html', 'ai-research', '../'],
@@ -65,6 +66,7 @@ test('the design-system pages take the header from nodus.css, and only the other
 test('the shared component owns every control visible in the header', () => {
   for (const token of [
     "{ id: 'home', label: 'Home'",
+    "{ id: 'atlas', label: 'Atlas'",
     "{ id: 'wiki', label: 'Wiki'",
     "{ id: 'blog', label: 'Blog'",
     "{ id: 'contribute', label: 'Contribute'",
@@ -93,7 +95,7 @@ test('both header stylesheets keep the same fixed dimensions and breakpoint', ()
   assert.match(systemStyles, /--nav-h:\s*62px;/);
   assert.match(headerStyles, /\.nav \{[\s\S]*?height: 62px;/);
   for (const styles of [systemStyles, headerStyles]) {
-    assert.match(styles, /@media \(max-width: 1080px\) \{[\s\S]*?\.nav-toggle \{ display: block/);
+    assert.match(styles, /@media \(max-width: 1320px\) \{[\s\S]*?\.nav-toggle \{ display: block/);
     assert.match(styles, /\.nav \.links > a\.link\[aria-current="page"\]/);
   }
   // the demo shell has to reserve the row the fixed header occupies

@@ -213,7 +213,7 @@ Keep the two in step when the header changes; a test checks that they agree.
   .nav .links > a.link { padding: 8px 10px; font-size: 13.5px; }
 }
 
-@media (max-width: 1080px) {
+@media (max-width: 1320px) {
   .nav-toggle { display: block; }
   .nav .links {
     position: fixed;

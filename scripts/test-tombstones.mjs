@@ -145,7 +145,9 @@ try {
   assert.equal(machineB.prepare("SELECT COUNT(*) AS n FROM notes WHERE id = 'nAlive'").get().n, 1, 'the other note is untouched');
 
   // A deletion arriving from another computer is never the end of the story.
-  const removed = superseded.listSuperseded().find((entry) => entry.origin === 'deleted-remotely');
+  const removed = superseded
+    .listSuperseded()
+    .find((entry) => entry.origin === 'deleted-remotely' && entry.tableName === 'notes' && entry.rowKey[0] === 'nDoomed');
   assert.ok(removed, 'the removed row was kept');
   assert.equal(removed.fields.find((f) => f.name === 'content').value, 'contenido a borrar', 'with its content');
 
@@ -220,7 +222,9 @@ try {
   // Restoring writes a row a tombstone says is dead. Without a fresh timestamp the next
   // sync would delete it again and the user would watch their recovery undo itself.
   useDb(machineB);
-  const recoverable = superseded.listSuperseded().find((entry) => entry.origin === 'deleted-remotely');
+  const recoverable = superseded
+    .listSuperseded()
+    .find((entry) => entry.origin === 'deleted-remotely' && entry.tableName === 'notes' && entry.rowKey[0] === 'nDoomed');
   assert.ok(recoverable, 'the remotely-deleted row is still recoverable');
   const restored = superseded.restoreSuperseded(recoverable.id);
   assert.equal(restored.ok, true, restored.message);
