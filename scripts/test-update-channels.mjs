@@ -104,9 +104,39 @@ test('stable and beta publication have isolated entry points and shared build lo
   assert.match(shared, /beta-mac\.yml beta\.yml beta-linux\.yml/);
   assert.match(shared, /Beta release contains stable update manifest/);
   assert.match(shared, /--prerelease --latest=false/);
-  assert.match(shared, /os: macos-15-intel/, 'macOS packaging stays on the Intel runner that carries the Electron legal bundle');
-  assert.doesNotMatch(shared, /- os: macos-latest/, 'macos-latest is arm64 and cannot package the verified legal bundle');
-  assert.match(shared, /node scripts\/ensure-rollup-native\.mjs/, 'release runners repair npm optional Rollup binaries before building');
+  assert.match(shared, /os: macos-15-intel/, 'macOS packaging stays on the explicit Intel runner used for cross-building');
+  assert.doesNotMatch(shared, /- os: macos-latest/, 'release packaging does not depend on the moving macOS runner alias');
+  assert.match(shared, /node node_modules\/electron\/install\.js/, 'release runners install Electron legal files before packaging');
+
+  const lock = JSON.parse(await read('package-lock.json'));
+  const nativePackages = [
+    '@esbuild/darwin-x64',
+    '@esbuild/linux-x64',
+    '@esbuild/win32-x64',
+    '@github/copilot-darwin-x64',
+    '@github/copilot-linux-x64',
+    '@github/copilot-win32-x64',
+    '@img/sharp-darwin-x64',
+    '@img/sharp-linux-x64',
+    '@img/sharp-win32-x64',
+    '@koromix/koffi-darwin-x64',
+    '@koromix/koffi-linux-x64',
+    '@koromix/koffi-win32-x64',
+    '@napi-rs/canvas-darwin-x64',
+    '@napi-rs/canvas-linux-x64-gnu',
+    '@napi-rs/canvas-win32-x64-msvc',
+    '@openai/codex-darwin-x64',
+    '@openai/codex-linux-x64',
+    '@openai/codex-win32-x64',
+    '@rollup/rollup-darwin-x64',
+    '@rollup/rollup-linux-x64-gnu',
+    '@rollup/rollup-win32-x64-msvc',
+  ];
+  for (const packageName of nativePackages) {
+    assert.ok(lock.packages[`node_modules/${packageName}`], `${packageName} is locked for release runners`);
+  }
+  assert.equal(lock.packages['node_modules/@koromix/koffi-darwin-x64'].version, '3.1.1');
+  assert.equal(lock.packages['node_modules/@rollup/rollup-darwin-x64'].version, '4.62.0');
 
   const configPath = require.resolve(path.join(repoRoot, 'build/electron-builder.release.cjs'));
   const previousChannel = process.env.NODUS_RELEASE_CHANNEL;
