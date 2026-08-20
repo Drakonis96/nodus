@@ -81,6 +81,7 @@ try {
       tourComplete: true,
       advancedTourComplete: true,
       uiLanguage: 'es',
+      deepResearchModel: { provider: 'gemini', model: 'gemini-3.1-flash-lite' },
       mascotEnabled: false,
       reduceMotion: true,
     });
@@ -108,9 +109,17 @@ try {
       `## Sección ${index + 1}\n\nPárrafo ${index + 1} del informe largo, escrito para que la lectura ocupe`
       + ' bastante más que una pantalla y el sitio en el que se dejó signifique algo.'
     )).join('\n\n');
+    const generationModel = { provider: 'gemini', model: 'gemini-3.1-flash-lite' };
     await window.nodus.saveWritingWorkshopDraft({
-      draft: { ...demo.draft, title: 'AAA informe largo de prueba', draftMarkdown: body },
-      model: demo.model ?? null,
+      draft: {
+        ...demo.draft,
+        brief: { ...demo.draft.brief, deepResearchApproach: 'literature_review' },
+        title: 'AAA informe largo de prueba',
+        draftMarkdown: body,
+        deepResearchApproach: 'literature_review',
+        generationModel,
+      },
+      model: generationModel,
     });
   });
 
@@ -120,12 +129,56 @@ try {
 
   // ── The gallery's own controls ──────────────────────────────────────────────
   await openDeepResearch();
+  if (process.env.NODUS_E2E_APPROACH_SCREENSHOT) {
+    await page.getByRole('button', { name: 'Nuevo informe', exact: true }).click();
+    const composer = page.getByRole('dialog', { name: 'Nuevo informe' });
+    await composer.waitFor({ state: 'visible' });
+    await composer.locator('textarea').fill('Analiza cómo distintas estrategias de aprendizaje favorecen la memoria a largo plazo.');
+    const approachSelector = page.getByTestId('deep-research-approach');
+    assert.equal(await approachSelector.locator('option').count(), 7, 'the real composer contains every research approach');
+    await approachSelector.selectOption('literature_review');
+    assert.match(await page.getByTestId('deep-research-approach-help').innerText(), /líneas de interpretación|métodos/i);
+    await page.screenshot({ path: process.env.NODUS_E2E_APPROACH_SCREENSHOT });
+    await composer.getByRole('button', { name: 'Cerrar' }).click();
+    await composer.waitFor({ state: 'detached' });
+  }
   await sortSelect.selectOption('title');
+  const galleryGenerationTags = page.getByTestId('deep-research-generation-tags').first();
+  assert.match(await galleryGenerationTags.innerText(), /Gemini 3\.1 Flash Lite/);
+  assert.match(await galleryGenerationTags.innerText(), /Revisión de la literatura/);
 
   // ── A report, and a place inside it ─────────────────────────────────────────
   await page.getByRole('button', { name: 'Leer', exact: true }).first().click();
   await readerDocument.waitFor({ state: 'visible' });
+  const generationTags = page.getByTestId('deep-research-generation-tags').first();
+  assert.match(await generationTags.innerText(), /Gemini 3\.1 Flash Lite/);
+  assert.match(await generationTags.innerText(), /Revisión de la literatura/);
   const reportTitle = await page.locator('header .truncate.text-sm.font-semibold').first().innerText();
+  const reportProse = readerDocument.locator('.md');
+  const outlineRail = page.getByTestId('deep-research-outline-rail');
+  await outlineRail.waitFor({ state: 'visible' });
+  assert.equal(await outlineRail.locator('nav button').count(), 90, 'the margin indexes every rendered report heading');
+  assert.equal(await outlineRail.locator('[aria-current="location"]').count(), 1, 'one report section is current');
+  const markerBounds = await outlineRail.locator('[aria-current="location"] > span[aria-hidden="true"]').evaluate((marker) => {
+    const markerBox = marker.getBoundingClientRect();
+    const navBox = marker.closest('nav').getBoundingClientRect();
+    return { markerLeft: markerBox.left, markerRight: markerBox.right, navLeft: navBox.left, navRight: navBox.right };
+  });
+  assert.ok(
+    markerBounds.markerLeft >= markerBounds.navLeft && markerBounds.markerRight <= markerBounds.navRight,
+    'the section marker fits inside the scroll rail without clipping',
+  );
+
+  const wrapping = await reportProse.evaluate((element) => {
+    const style = getComputedStyle(element);
+    return { wordBreak: style.wordBreak, overflowWrap: style.overflowWrap, hyphens: style.hyphens };
+  });
+  assert.deepEqual(
+    wrapping,
+    { wordBreak: 'normal', overflowWrap: 'normal', hyphens: 'none' },
+    'report prose wraps complete words without automatic hyphenation',
+  );
+  const initialFontSize = await reportProse.evaluate((element) => parseFloat(getComputedStyle(element).fontSize));
 
   // A real wheel, not an assignment to scrollTop: the capture deliberately waits for
   // the reader's own hands before it starts overwriting the stored place.
@@ -136,6 +189,31 @@ try {
   assert.ok(leftAt, 'the reader is somewhere inside the report');
   const scrolled = await page.evaluate(() => document.querySelector('[data-testid="deep-research-reader-document"]').closest('main').scrollTop);
   assert.ok(scrolled > 200, `the wheel moved the report (scrollTop ${scrolled})`);
+  await page.waitForFunction(() => {
+    const active = document.querySelector('[data-testid="deep-research-outline-rail"] [aria-current="location"]');
+    return active && active.textContent?.trim() !== 'Sección 1';
+  });
+  assert.notEqual(
+    (await outlineRail.locator('[aria-current="location"]').innerText()).trim(),
+    'Sección 1',
+    'the margin advances as the report scrolls',
+  );
+
+  await page.getByTestId('deep-research-font-increase').evaluate((button) => button.click());
+  await page.waitForFunction((expected) => {
+    const prose = document.querySelector('[data-testid="deep-research-reader-document"] .md');
+    return prose && parseFloat(getComputedStyle(prose).fontSize) === expected;
+  }, initialFontSize + 1);
+  await page.waitForTimeout(80);
+  assert.equal(await page.evaluate(TOP_BLOCK), leftAt, 'changing type size keeps the visible paragraph in place');
+  assert.equal(
+    await page.evaluate(() => localStorage.getItem('nodus.deepResearch.readerFontSize')),
+    String(initialFontSize + 1),
+    'the reader remembers its type size',
+  );
+  if (process.env.NODUS_E2E_READER_SCREENSHOT) {
+    await page.screenshot({ path: process.env.NODUS_E2E_READER_SCREENSHOT });
+  }
 
   // ── Out of the section, and back in ─────────────────────────────────────────
   await page.locator('[data-tour="nav-ideas"]').click();
@@ -153,6 +231,11 @@ try {
   assert.equal(backAt, leftAt, 'the report reopens at the paragraph it was left on');
   const backTitle = await page.locator('header .truncate.text-sm.font-semibold').first().innerText();
   assert.equal(backTitle, reportTitle, 'and it is the same report');
+  assert.equal(
+    await readerDocument.locator('.md').evaluate((element) => parseFloat(getComputedStyle(element).fontSize)),
+    initialFontSize + 1,
+    'and the chosen type size survives reopening the report',
+  );
 
   // The same place after a resize, which is the whole reason it is a block and not a
   // pixel offset: the text rewraps and the offset it was read at no longer exists.
@@ -166,6 +249,7 @@ try {
   // ── Back to the gallery, with its controls as they were left ────────────────
   await page.getByRole('button', { name: 'Volver a la galería' }).click();
   await page.getByTitle('Vista lista').click();
+  await page.waitForSelector('.space-y-2 [data-anchor-id]');
   await page.locator('[data-tour="nav-ideas"]').click();
   await openDeepResearch();
   await readerDocument.waitFor({ state: 'detached' });

@@ -3014,6 +3014,37 @@ select.input optgroup {
   margin: 0.9em 0;
 }
 
+/* Deep Research is long-form reading, not a chat bubble. Keep ordinary words
+   whole at the right edge (Word-style wrapping) and let only genuinely
+   unbreakable material such as URLs and code fall back to character wrapping. */
+.deep-research-reader-document .md {
+  font-size: var(--deep-research-font-size, 16px);
+  line-height: 1.72;
+  overflow-wrap: normal;
+  word-break: normal;
+  hyphens: none;
+  text-wrap: pretty;
+}
+.deep-research-reader-document .md :is(p, li, blockquote, th, td) {
+  overflow-wrap: normal;
+  word-break: normal;
+  hyphens: none;
+}
+.deep-research-reader-document .md :is(a, code, .citation-link) {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+.deep-research-reader-document .md table {
+  display: block;
+  max-width: 100%;
+  overflow-x: auto;
+  table-layout: auto;
+}
+.deep-research-reader-document .md :is(h1, h2, h3, h4) {
+  scroll-margin-top: 24px;
+  text-wrap: balance;
+}
+
 /* Clean-library reader: the document remains Markdown, but it should feel like a
    quiet reading surface rather than another dashboard card. The outline and note
    rails carry navigation; the paper carries only the source. */

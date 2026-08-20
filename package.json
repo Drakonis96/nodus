@@ -53,6 +53,7 @@
     "verify:testimony-performance": "node scripts/verify-testimony-performance.mjs",
     "verify:nodi-overlay": "npm run build && node scripts/verify-nodi-overlay.mjs",
     "verify:deep-research-queue": "npm run build && node scripts/verify-deep-research-mcp-queue.mjs",
+    "verify:deep-research-approaches-live": "node scripts/verify-deep-research-approaches-live.mjs",
     "verify:vector-scan": "ELECTRON_RUN_AS_NODE=1 ./node_modules/.bin/electron scripts/verify-vector-scan.mjs",
     "verify:library-metadata-live": "node scripts/verify-library-metadata-live.mjs",
     "verify:browser-connector": "node scripts/verify-browser-connector-server.mjs",

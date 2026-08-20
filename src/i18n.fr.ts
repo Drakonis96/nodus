@@ -42,6 +42,7 @@ import { DATABASE_AUTOMATION_TRANSLATIONS } from './i18n.databaseAutomations';
 import { NOTION_IMPORT_TRANSLATIONS } from './i18n.notionImport';
 import { LIBRARY_ONBOARDING_TRANSLATIONS } from './i18n.libraryOnboarding';
 import { SOURCE_CITATION_TRANSLATIONS } from './i18n.sourceCitation';
+import { DEEP_RESEARCH_APPROACH_TRANSLATIONS } from './i18n.deepResearchApproaches';
 
 export const FR: Record<string, string> = {
   'Tamaño de Nodi': 'Taille de Nodi',
@@ -56,6 +57,7 @@ export const FR: Record<string, string> = {
   ...NOTION_IMPORT_TRANSLATIONS.fr,
   ...LIBRARY_READER_TRANSLATIONS.fr,
   ...SOURCE_CITATION_TRANSLATIONS.fr,
+  ...DEEP_RESEARCH_APPROACH_TRANSLATIONS.fr,
   ...LIBRARY_BIBLIOGRAPHY_TRANSLATIONS.fr,
   ...LIBRARY_ONBOARDING_TRANSLATIONS.fr,
   ...LIBRARY_RECOVERY_TRANSLATIONS.fr,

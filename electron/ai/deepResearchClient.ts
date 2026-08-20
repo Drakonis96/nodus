@@ -2,6 +2,7 @@ import type {
   DeepResearchMeta,
   DeepResearchRequest,
   DeepResearchReport,
+  ModelRef,
   PromptLanguage,
   WritingWorkshopBrief,
   WritingWorkshopDraft,
@@ -9,6 +10,8 @@ import type {
   WritingWorkshopSection,
   WritingWorkshopSnapshot,
 } from '@shared/types';
+import type { DeepResearchApproach } from '@shared/deepResearchApproaches';
+import { normalizeDeepResearchApproach } from '@shared/deepResearchApproaches';
 import { buildWritingWorkshopSnapshot } from './writingWorkshop';
 import {
   applyCitationPolicy,
@@ -25,6 +28,11 @@ import {
   type CitationCatalog,
   type DeepResearchPlanSection,
 } from './deepResearchCore';
+import {
+  approachRules,
+  deterministicApproachRetrievalPlan,
+  mergeApproachSnapshots,
+} from './deepResearchApproaches';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Client-driven Deep Research (Option B).
@@ -44,7 +52,7 @@ import {
 // ─────────────────────────────────────────────────────────────────────────────
 
 /** The one dependency on the outside world — injected so the shaping is testable without DB/embeddings. */
-export type SnapshotBuilder = (brief: WritingWorkshopBrief) => Promise<WritingWorkshopSnapshot>;
+export type SnapshotBuilder = (brief: WritingWorkshopBrief, extraProbes?: string[]) => Promise<WritingWorkshopSnapshot>;
 
 function briefFor(request: DeepResearchRequest): WritingWorkshopBrief {
   return {
@@ -58,6 +66,7 @@ function briefFor(request: DeepResearchRequest): WritingWorkshopBrief {
 
 export interface DeepResearchBrief {
   mode: 'client';
+  approach: DeepResearchApproach;
   objective: string;
   language: PromptLanguage;
   audience?: string;
@@ -80,11 +89,18 @@ export async function buildDeepResearchBrief(
   buildSnapshot: SnapshotBuilder = buildWritingWorkshopSnapshot
 ): Promise<DeepResearchBrief> {
   const language = request.language ?? 'es';
-  const snapshot = await buildSnapshot(briefFor(request));
+  const approach = normalizeDeepResearchApproach(request.approach);
+  const ordinary = await buildSnapshot(briefFor(request));
+  const retrieval = deterministicApproachRetrievalPlan(approach, request.objective);
+  const snapshot = approach === 'general'
+    ? ordinary
+    : mergeApproachSnapshots(ordinary, await buildSnapshot(briefFor(request), retrieval.probes), approach);
   const targetPages = resolveTargetPages(request.targetLength ?? 'adaptive', snapshot);
   const sectionPlan = resolveSectionPlan(targetPages, request.sectionLimit ?? 'auto');
+  const specializedRules = approach === 'general' ? null : approachRules(approach, 'client');
   return {
     mode: 'client',
+    approach,
     objective: request.objective,
     language,
     audience: request.audience,
@@ -100,6 +116,9 @@ export async function buildDeepResearchBrief(
       `El cuerpo debe ocupar entre ${targetPages.min} y ${targetPages.max} páginas (~${WORDS_PER_PAGE} palabras/página), repartidas en torno a ${sectionPlan.target} secciones (máximo ${sectionPlan.hardCap}).`,
       'Prefiere POCAS secciones LARGAS y profundas antes que muchas cortas: cada sección agrupa varias ideas afines y las relaciona (continuidad, tensiones, consecuencias), no una idea por sección.',
       ...DEEP_RESEARCH_NARRATIVE_RULES,
+      ...(specializedRules?.planner ?? []),
+      ...(specializedRules?.writer ?? []),
+      ...(specializedRules?.finalizer ?? []),
       'Reparte TODAS las ideas relevantes del catálogo entre las secciones. Sitúa los huecos y contradicciones donde aporten tensión argumental. Cierra con una síntesis.',
       'Cada entrada del catálogo trae en `note` el contenido real de lo que cita. Los pasajes traen el texto literal de la obra entre comillas angulares: úsalos como evidencia textual y no extiendas su sentido. Los huecos y las contradicciones traen lo que afirman, así que arguméntalos por su contenido en vez de nombrarlos de pasada.',
       'Empieza cada sección con un encabezado Markdown "## Título". No incluyas el resumen, las limitaciones ni las referencias en `sectionsMarkdown`: pásalos como campos aparte a la herramienta de ensamblado.',
@@ -111,6 +130,7 @@ export async function buildDeepResearchBrief(
 
 export interface ClientFinalizeInput {
   objective: string;
+  approach?: DeepResearchApproach;
   language?: PromptLanguage;
   audience?: string;
   /** The body the caller's model wrote: `## ` sections only, no Resumen/Referencias. */
@@ -119,6 +139,8 @@ export interface ClientFinalizeInput {
   abstract?: string;
   limitations?: string[];
   nextSteps?: string[];
+  /** Optional provenance supplied by the MCP client that actually wrote the prose. */
+  generationModel?: ModelRef | null;
 }
 
 function outlineFromMarkdown(markdown: string): WritingWorkshopSection[] {
@@ -143,9 +165,14 @@ export async function assembleClientDeepResearchReport(
   buildSnapshot: SnapshotBuilder = buildWritingWorkshopSnapshot
 ): Promise<DeepResearchReport> {
   const language = input.language ?? 'es';
-  const request: DeepResearchRequest = { objective: input.objective, language, audience: input.audience };
+  const approach = normalizeDeepResearchApproach(input.approach);
+  const request: DeepResearchRequest = { objective: input.objective, language, audience: input.audience, approach };
   const brief = briefFor(request);
-  const snapshot = await buildSnapshot(brief);
+  const ordinary = await buildSnapshot(brief);
+  const retrieval = deterministicApproachRetrievalPlan(approach, input.objective);
+  const snapshot = approach === 'general'
+    ? ordinary
+    : mergeApproachSnapshots(ordinary, await buildSnapshot(brief, retrieval.probes), approach);
   const maps = buildSnapshotMaps(snapshot);
 
   // Enforce the citation contract on the caller's prose.
@@ -212,6 +239,8 @@ export async function assembleClientDeepResearchReport(
     bibliography: references,
     nextSteps,
     limitations,
+    deepResearchApproach: approach,
+    generationModel: input.generationModel ? { ...input.generationModel } : null,
     stats: {
       selectedIdeas: cited.ideas.size,
       selectedThemes: 0,
@@ -224,6 +253,7 @@ export async function assembleClientDeepResearchReport(
       truncated: false,
     },
   };
+  draft.brief = { ...draft.brief, deepResearchApproach: approach };
 
   const meta: DeepResearchMeta = {
     sections: draft.outline.length,

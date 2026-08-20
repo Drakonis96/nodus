@@ -93,7 +93,7 @@ export function DraftActionBar({
       {onCopyReading && (
         <BarAction
           compact={compact}
-          icon="volume"
+          icon="copyText"
           label={t('Copiar sin referencias')}
           title={t('Copia solo la prosa, sin citas ni referencias, para pegarla en un lector de voz')}
           onClick={onCopyReading}
@@ -187,7 +187,7 @@ export function DraftResultMain({
           ))}
         </div>
       </section>
-      <section className={`card p-4 ${justify ? 'text-justify hyphens-auto' : ''}`}>
+      <section className={`card p-4 ${justify ? 'text-justify' : ''}`}>
         {/* The abstract is the subtitle above and the limitations have their own
             panel below, so the body drops both rather than repeating them. */}
         <Markdown content={documentBodyForPanels(draft.draftMarkdown, draft.abstract)} onCitation={onCitation} onStudyDocument={onStudyDocument} onStudyMaterial={onStudyMaterial} onStudyRecording={onStudyRecording} />

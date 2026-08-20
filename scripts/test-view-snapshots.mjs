@@ -474,6 +474,28 @@ test('Deep Research restores its gallery, the report it was left in and the plac
   }
 });
 
+test('the Deep Research reader has persistent typography and a live report outline', async () => {
+  const [view, css, shared] = await Promise.all([
+    readSource('src/views/DeepResearchView.tsx'),
+    readSource('src/index.css'),
+    readSource('src/views/writingShared.tsx'),
+  ]);
+  assert.match(view, /READER_FONT_STORAGE_KEY = 'nodus\.deepResearch\.readerFontSize'/);
+  assert.match(view, /data-testid="deep-research-font-decrease"/);
+  assert.match(view, /data-testid="deep-research-font-increase"/);
+  assert.match(view, /topBlockIndex\(scroller, readingBlocks\(root\)\)/, 'font reflow preserves the visible reading block');
+  assert.match(view, /function useReportOutline\(/);
+  assert.match(view, /querySelectorAll<HTMLElement>\('h1, h2, h3, h4'\)/);
+  assert.match(view, /data-testid="deep-research-outline-rail"/);
+  assert.match(view, /aria-current=\{active \? 'location' : undefined\}/);
+  assert.match(css, /\.deep-research-reader-document \.md \{[\s\S]*?font-size: var\(--deep-research-font-size, 16px\)/);
+  assert.match(css, /overflow-wrap: normal;\s*word-break: normal;\s*hyphens: none;/);
+  assert.match(css, /\.deep-research-reader-document \.md :is\(a, code, \.citation-link\)[\s\S]*?overflow-wrap: anywhere/);
+  assert.doesNotMatch(shared, /text-justify hyphens-auto/, 'justified report prose does not hyphenate words behind the reader');
+  assert.match(shared, /icon="copyText"\s*label=\{t\('Copiar sin referencias'\)\}/, 'plain-text copy uses a text-copy mark');
+  assert.doesNotMatch(shared, /icon="volume"\s*label=\{t\('Copiar sin referencias'\)\}/, 'plain-text copy is not presented as audio');
+});
+
 test('the gallery scroller is born and dies with the gallery', async () => {
   const view = await readSource('src/views/DeepResearchView.tsx');
   // The gallery is unmounted while a report is open. A hook called in the view would

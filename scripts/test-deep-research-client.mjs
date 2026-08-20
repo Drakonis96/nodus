@@ -26,8 +26,10 @@ const stubWritingWorkshop = {
   name: 'stub-writing-workshop',
   setup(b) {
     b.onResolve({ filter: /\/writingWorkshop$/ }, (args) => ({ path: args.path, namespace: 'stub' }));
+    b.onResolve({ filter: /\/aiClient$/ }, () => ({ path: 'ai-client', namespace: 'stub' }));
+    b.onResolve({ filter: /\/db\/database$/ }, () => ({ path: 'database', namespace: 'stub' }));
     b.onLoad({ filter: /.*/, namespace: 'stub' }, () => ({
-      contents: 'export function buildWritingWorkshopSnapshot(){throw new Error("stubbed — inject a snapshot builder");}',
+      contents: 'export function buildWritingWorkshopSnapshot(){throw new Error("stubbed — inject a snapshot builder");}\nexport async function completeJson(){return {}}\nexport function getDb(){return {prepare(){return {all(){return []}}}}}',
       loader: 'js',
     }));
   },
@@ -41,7 +43,7 @@ try {
     bundle: true,
     format: 'esm',
     platform: 'node',
-    external: ['@shared/*'],
+    alias: { '@shared': path.join(repoRoot, 'shared') },
     plugins: [stubWritingWorkshop],
     logLevel: 'silent',
   });
@@ -94,8 +96,14 @@ try {
   // ── 1. Brief: trimmed pool, real citable tokens, scope + handoff ────────────
   {
     const snap = makeSnapshot(90);
-    const brief = await buildDeepResearchBrief({ objective: 'Tema', language: 'es', targetLength: 'standard' }, async () => snap);
+    let snapshotCalls = 0;
+    const brief = await buildDeepResearchBrief({ objective: 'Tema', language: 'es', targetLength: 'standard' }, async () => {
+      snapshotCalls += 1;
+      return snap;
+    });
     assert.equal(brief.mode, 'client');
+    assert.equal(brief.approach, 'general', 'missing approach metadata remains General');
+    assert.equal(snapshotCalls, 1, 'General uses the historical one-snapshot retrieval path');
     assert.equal(brief.materials.ideas.length, 70, 'pool trimmed to POOL_LIMITS.ideas');
     assert.ok(brief.materials.ideas.every((i) => /\]\(nodus:\/\/idea\/g-\d+\)$/.test(i.token)), 'idea tokens are real nodus citations');
     assert.ok(brief.sections.target >= 3 && brief.sections.hardCap >= brief.sections.target, 'section scope resolved');
@@ -105,6 +113,30 @@ try {
     assert.ok(brief.citationPolicy.length > 0 && brief.method.length > 0, 'ships a citation policy + method');
     assert.ok(brief.method.some((rule) => rule.includes('dos puntos') && rule.includes('guion largo')), 'client writer receives the narrative punctuation contract');
     assert.ok(brief.method.some((rule) => rule.includes('no añadas subtítulos')), 'client writer receives the single-epigraph contract');
+  }
+
+  // ── 1b. Specialized client brief enriches extraction and all prompt stages ──
+  {
+    const ordinary = makeSnapshot(8);
+    const supplemental = makeSnapshot(10);
+    supplemental.ideas[8].id = 'g-extra-8';
+    supplemental.works[8].id = 'w-extra-8';
+    supplemental.ideas[8].works[0].nodus_id = 'w-extra-8';
+    const calls = [];
+    const brief = await buildDeepResearchBrief(
+      { objective: 'Tema', language: 'es', targetLength: 'concise', approach: 'literature_review' },
+      async (_brief, probes) => {
+        calls.push(probes ?? []);
+        return calls.length === 1 ? ordinary : supplemental;
+      }
+    );
+    assert.equal(brief.approach, 'literature_review');
+    assert.equal(calls.length, 2, 'specialized client generation executes supplemental retrieval');
+    assert.ok(calls[1].length > 0, 'supplemental retrieval receives approach-specific probes');
+    assert.ok(brief.materials.ideas.some((idea) => idea.token.includes('nodus://idea/g-extra-8')), 'ordinary and supplemental pools are unioned');
+    assert.ok(brief.method.some((rule) => rule.includes('Nunca crees una sección por autor')), 'planner rules reach the client handoff');
+    assert.ok(brief.method.some((rule) => rule.includes('Sintetiza las fuentes')), 'writer rules reach the client handoff');
+    assert.ok(brief.method.some((rule) => rule.includes('estructura de la literatura')), 'finalizer rules reach the client handoff');
   }
 
   // ── 2. Finalize: strip hallucinations, build references from cited works ────
@@ -148,6 +180,22 @@ try {
     assert.equal(meta.worksCited, 2);
     assert.ok(meta.pages >= 1 && meta.words > 0, 'meta word/page counts computed');
     assert.equal(meta.stoppedReason, null);
+  }
+
+  // Old client finalize calls remain General, while supplied provenance is kept.
+  {
+    const snap = makeSnapshot(2);
+    const generationModel = { provider: 'gemini', model: 'gemini-3.1-flash-lite' };
+    const report = await assembleClientDeepResearchReport({
+      objective: 'Tema',
+      approach: 'conceptual',
+      language: 'es',
+      sectionsMarkdown: '## Síntesis\n\nRelación [Autor0](nodus://idea/g-0).',
+      generationModel,
+    }, async () => snap);
+    assert.equal(report.draft.brief.deepResearchApproach, 'conceptual');
+    assert.equal(report.draft.deepResearchApproach, 'conceptual');
+    assert.deepEqual(report.draft.generationModel, generationModel);
   }
 
   console.log('deep research client (Option B) test passed');

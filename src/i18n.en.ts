@@ -36,6 +36,7 @@ import { DATABASE_AUTOMATION_TRANSLATIONS } from './i18n.databaseAutomations';
 import { NOTION_IMPORT_TRANSLATIONS } from './i18n.notionImport';
 import { LIBRARY_ONBOARDING_TRANSLATIONS } from './i18n.libraryOnboarding';
 import { SOURCE_CITATION_TRANSLATIONS } from './i18n.sourceCitation';
+import { DEEP_RESEARCH_APPROACH_TRANSLATIONS } from './i18n.deepResearchApproaches';
 
 /**
  * English translations keyed by the Spanish source string (see {@link ../i18n}).
@@ -55,6 +56,7 @@ export const EN: Record<string, string> = {
   ...NOTION_IMPORT_TRANSLATIONS.en,
   ...LIBRARY_READER_TRANSLATIONS.en,
   ...SOURCE_CITATION_TRANSLATIONS.en,
+  ...DEEP_RESEARCH_APPROACH_TRANSLATIONS.en,
   ...LIBRARY_BIBLIOGRAPHY_TRANSLATIONS.en,
   ...LIBRARY_ONBOARDING_TRANSLATIONS.en,
   ...LIBRARY_RECOVERY_TRANSLATIONS.en,

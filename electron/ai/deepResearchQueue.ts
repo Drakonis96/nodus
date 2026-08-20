@@ -7,6 +7,7 @@ import type {
   DeepResearchRequest,
   PromptLanguage,
 } from '@shared/types';
+import { normalizeDeepResearchApproach } from '@shared/deepResearchApproaches';
 
 export type { DeepResearchJobOrigin, DeepResearchJobRecord, DeepResearchJobStatus };
 
@@ -206,6 +207,8 @@ function enqueueJob(input: DeepResearchJobInput, waiter: Pick<QueuedJob, 'listen
       vaultName: vault.name,
       objective: input.request.objective,
       title: objectivePreview(input.request.objective),
+      deepResearchApproach: normalizeDeepResearchApproach(input.request.approach),
+      model: input.request.model ? { ...input.request.model } : null,
       status: 'queued',
       progress: null,
       error: null,
@@ -216,7 +219,11 @@ function enqueueJob(input: DeepResearchJobInput, waiter: Pick<QueuedJob, 'listen
       startedAt: null,
       finishedAt: null,
     },
-    request: input.request,
+    request: {
+      ...input.request,
+      approach: normalizeDeepResearchApproach(input.request.approach),
+      model: input.request.model ? { ...input.request.model } : input.request.model,
+    },
     save: input.save,
     draftTitle: input.title ?? null,
     report: null,
@@ -325,6 +332,8 @@ async function drain(): Promise<void> {
         job.listener?.(progress);
         notifyChange();
       });
+      job.record.deepResearchApproach = normalizeDeepResearchApproach(report.draft.deepResearchApproach ?? job.request.approach);
+      job.record.model = report.draft.generationModel ? { ...report.draft.generationModel } : job.record.model ?? null;
 
       // Checked again on the way out: a switch mid-generation would otherwise save
       // this report as a draft of the vault that is open *now*.

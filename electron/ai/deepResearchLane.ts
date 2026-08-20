@@ -73,7 +73,7 @@ export function ensureDeepResearchLane(): void {
   configureDeepResearchQueue({
     generate: (request, onProgress) => generateDeepResearchReport(request, onProgress),
     saveDraft: ({ report, request, title }) =>
-      saveWritingWorkshopDraft({ draft: report.draft, model: request.model ?? null, title: title ?? undefined }).id,
+      saveWritingWorkshopDraft({ draft: report.draft, model: report.draft.generationModel ?? request.model ?? null, title: title ?? undefined }).id,
     activeVault: servingVault,
     onChange: (all) => broadcast('research:deep:queue', all),
     onSettled: announce,

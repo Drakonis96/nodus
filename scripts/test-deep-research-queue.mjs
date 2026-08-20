@@ -42,7 +42,7 @@ try {
     bundle: true,
     format: 'esm',
     platform: 'node',
-    external: ['@shared/*'],
+    alias: { '@shared': path.join(repoRoot, 'shared') },
     logLevel: 'silent',
   });
   const queue = await import(pathToFileURL(outfile).href);
@@ -130,6 +130,33 @@ try {
     assert.equal(generated, 1, 'the deferred report was never generated against the new vault');
     const cancelled = queue.listDeepResearchJobs().find((job) => job.title === 'B');
     assert.equal(cancelled.status, 'cancelled');
+  }
+
+  // ── Approach/model survive queue serialization and completion metadata ──────
+  {
+    queue.__resetDeepResearchQueueForTest();
+    const model = { provider: 'gemini', model: 'gemini-3.1-flash-lite' };
+    queue.configureDeepResearchQueue({
+      generate: (request) => Promise.resolve({
+        draft: {
+          title: request.objective,
+          deepResearchApproach: request.approach,
+          generationModel: request.model,
+        },
+      }),
+      saveDraft: () => 'draft-approach',
+      activeVault: () => ({ id: 'v1', name: 'Corpus' }),
+    });
+    const report = await queue.runDeepResearchJob({
+      request: { objective: 'Comparar A y B', approach: 'comparative', model },
+      origin: 'mcp',
+      save: true,
+    });
+    const restored = JSON.parse(JSON.stringify(queue.listDeepResearchJobs()[0]));
+    assert.equal(restored.deepResearchApproach, 'comparative');
+    assert.deepEqual(restored.model, model);
+    assert.equal(report.draft.deepResearchApproach, 'comparative');
+    assert.deepEqual(report.draft.generationModel, model);
   }
 
   // ── A vault switch *during* generation must not save into the new vault ─────

@@ -8,6 +8,8 @@ import type {
   WritingWorkshopSaveDraftRequest,
   WritingWorkshopSelection,
 } from '@shared/types';
+import type { DeepResearchApproach } from '@shared/deepResearchApproaches';
+import { normalizeDeepResearchApproach } from '@shared/deepResearchApproaches';
 import { getDb } from './database';
 import { deleteDecorativeImageRow, getDecorativeImage } from './decorativeImagesRepo';
 import { deleteAnnotationsForWritingDraft } from './writingAnnotationsRepo';
@@ -49,6 +51,7 @@ export interface WritingWorkshopDraftSummary {
   tone: WritingWorkshopBrief['tone'] | null;
   language: WritingWorkshopBrief['language'] | null;
   model: ModelRef | null;
+  deepResearchApproach: DeepResearchApproach;
   abstractSnippet: string;
   generatedAt: string | null;
   stats: WritingWorkshopDraft['stats'] | null;
@@ -113,6 +116,7 @@ function toDraftSummary(row: SavedWritingDraftSummaryRow): WritingWorkshopDraftS
       tone: brief.tone ?? null,
       language: brief.language ?? null,
       model: row.model_json ? (JSON.parse(row.model_json) as ModelRef) : null,
+      deepResearchApproach: normalizeDeepResearchApproach(brief.deepResearchApproach),
       abstractSnippet: row.abstract_length > 500 ? `${abstract}…` : abstract,
       generatedAt: row.generated_at,
       stats: row.stats_json ? (JSON.parse(row.stats_json) as WritingWorkshopDraft['stats']) : null,

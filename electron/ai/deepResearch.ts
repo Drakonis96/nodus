@@ -1,10 +1,19 @@
 import type { DeepResearchProgress, DeepResearchReport, DeepResearchRequest, ModelRef } from '@shared/types';
+import type { DeepResearchApproach } from '@shared/deepResearchApproaches';
+import { normalizeDeepResearchApproach } from '@shared/deepResearchApproaches';
 import { completeJson, completeText } from './aiClient';
 import { getSettings } from '../db/settingsRepo';
 import { getActiveVault } from '../vaults/vaultRegistry';
 import { generateGenealogyDeepResearchReport } from './genealogyDeepResearch';
 import { generateStudyDeepResearchReport } from './studyDeepResearch';
 import { buildWritingWorkshopSnapshot, retrieveSectionMaterial } from './writingWorkshop';
+import {
+  academicRelationshipContext,
+  approachRules,
+  mergeApproachSnapshots,
+  planApproachRetrieval,
+  type ApproachRetrievalPlan,
+} from './deepResearchApproaches';
 import {
   orchestrateDeepResearch,
   type DeepResearchDeps,
@@ -33,21 +42,53 @@ export async function generateDeepResearchReport(
 ): Promise<DeepResearchReport> {
   const settings = getSettings();
   const model = request.model ?? settings.deepResearchModel ?? settings.synthesisModel ?? null;
+  const approach = normalizeDeepResearchApproach(request.approach);
+  let report: DeepResearchReport;
   // Study and teaching share one pipeline over the local study_* corpus. Teaching adds
   // the extracted idea network and the unit prompts, selected by `unitMode`; the vault
   // type sets it for anything that reaches here without the flag (MCP, a stale queue).
   if (request.unitMode || getActiveVault().type === 'docencia') {
-    return generateStudyDeepResearchReport({ ...request, unitMode: true }, model, onProgress);
+    report = await generateStudyDeepResearchReport({ ...request, unitMode: true }, model, onProgress);
+    return withGenerationMetadata(report, approach, model);
   }
   if (request.studyMode || getActiveVault().type === 'estudio') {
-    return generateStudyDeepResearchReport(request, model, onProgress);
+    report = await generateStudyDeepResearchReport(request, model, onProgress);
+    return withGenerationMetadata(report, approach, model);
   }
   // A genealogy vault has no idea graph; its Deep Research writes a family-history
   // report over the embedding-indexed archive + library instead (own pipeline).
   if (getActiveVault().type === 'genealogy') {
-    return generateGenealogyDeepResearchReport(request, onProgress);
+    report = await generateGenealogyDeepResearchReport(request, onProgress);
+    return withGenerationMetadata(report, approach, model);
   }
-  return orchestrateDeepResearch({ ...request, model }, realDeps(model), onProgress);
+  // Characterization boundary: General (including old requests with no approach)
+  // still receives the exact historical request/dependency path. Specialized modes
+  // alone enter the additive retrieval and prompt adapter below.
+  report = deepResearchApproachPath(approach) === 'general'
+    ? await orchestrateDeepResearch({ ...request, model }, realDeps(model), onProgress)
+    : await orchestrateDeepResearch({ ...request, model }, specializedAcademicDeps(model, approach, request), onProgress);
+  return withGenerationMetadata(report, approach, model);
+}
+
+/** Pure characterization seam used by CI to lock old/undefined requests to General. */
+export function deepResearchApproachPath(value: unknown): 'general' | 'specialized' {
+  return normalizeDeepResearchApproach(value) === 'general' ? 'general' : 'specialized';
+}
+
+function withGenerationMetadata(
+  report: DeepResearchReport,
+  approach: DeepResearchApproach,
+  model: ModelRef | null,
+): DeepResearchReport {
+  return {
+    ...report,
+    draft: {
+      ...report.draft,
+      brief: { ...report.draft.brief, deepResearchApproach: approach },
+      deepResearchApproach: approach,
+      generationModel: model ? { ...model } : null,
+    },
+  };
 }
 
 function realDeps(model: ModelRef | null): DeepResearchDeps {
@@ -65,6 +106,72 @@ function realDeps(model: ModelRef | null): DeepResearchDeps {
     finalize: (input) => aiFinalize(input, model),
     retrieveForSection: (input) => retrieveSectionMaterial(input),
     expandSection: (input) => aiExpandSection(input, model),
+    verifyCitations: (claims) => aiVerifyCitations(claims, model),
+    checkCoherence: (sections) => aiCheckCoherence(sections, model),
+  };
+}
+
+interface AcademicApproachContext {
+  approach: DeepResearchApproach;
+  rules: ReturnType<typeof approachRules>;
+  retrieval: ApproachRetrievalPlan;
+  relationships: ReturnType<typeof academicRelationshipContext>;
+}
+
+/** Specialized Academic adapter. It is intentionally unreachable from General. */
+function specializedAcademicDeps(
+  model: ModelRef | null,
+  approach: DeepResearchApproach,
+  request: DeepResearchRequest,
+): DeepResearchDeps {
+  let context: AcademicApproachContext = {
+    approach,
+    rules: approachRules(approach, 'academic'),
+    retrieval: { probes: [], comparands: [], axes: [], phases: [] },
+    relationships: [],
+  };
+  return {
+    buildSnapshot: async (brief) => {
+      // Keep the complete ordinary pool, then union/dedupe specialized retrieval.
+      const ordinary = await buildWritingWorkshopSnapshot(brief);
+      const retrieval = await planApproachRetrieval({
+        approach,
+        variant: 'academic',
+        objective: request.objective,
+        language: request.language ?? 'es',
+        model,
+        corpusPreview: {
+          themes: ordinary.themes.slice(0, 16).map((item) => item.label),
+          works: ordinary.works.slice(0, 24).map((item) => ({ title: item.title, authors: item.authors, year: item.year })),
+          contradictions: ordinary.contradictions.slice(0, 16).map((item) => item.summary),
+          gaps: ordinary.gaps.slice(0, 16).map((item) => item.summary),
+        },
+      });
+      const supplemental = await buildWritingWorkshopSnapshot(brief, retrieval.probes);
+      const merged = mergeApproachSnapshots(ordinary, supplemental, approach);
+      context = { ...context, retrieval, relationships: academicRelationshipContext(merged) };
+      return merged;
+    },
+    planReport: (input) => aiPlanReport(input, model, context),
+    writeSection: (input) => aiWriteSection(input, model, context),
+    finalize: (input) => aiFinalize(input, model, context),
+    retrieveForSection: async (input) => {
+      const ordinary = await retrieveSectionMaterial(input);
+      const facets = [...context.retrieval.axes, ...context.retrieval.phases, ...context.retrieval.comparands]
+        .slice(0, 3);
+      if (!facets.length) return ordinary;
+      const supplemental = await retrieveSectionMaterial({
+        ...input,
+        purpose: `${input.purpose}. ${facets.join('. ')}`,
+        keyClaims: [...input.keyClaims, ...facets],
+        limits: { ideas: input.limits.ideas * 2, passages: input.limits.passages * 2 },
+      });
+      return {
+        ideas: [...ordinary.ideas, ...supplemental.ideas].filter((item, index, all) => all.findIndex((candidate) => candidate.id === item.id) === index),
+        passages: [...ordinary.passages, ...supplemental.passages].filter((item, index, all) => all.findIndex((candidate) => candidate.id === item.id) === index),
+      };
+    },
+    expandSection: (input) => aiExpandSection(input, model, context),
     verifyCitations: (claims) => aiVerifyCitations(claims, model),
     checkCoherence: (sections) => aiCheckCoherence(sections, model),
   };
@@ -238,7 +345,8 @@ async function aiVerifyCitations(claims: CitationClaim[], model: ModelRef | null
  */
 async function aiExpandSection(
   input: SectionInput & { draft: string; missingWords: number },
-  model: ModelRef | null
+  model: ModelRef | null,
+  approach?: AcademicApproachContext,
 ): Promise<string> {
   const system = [
     'Eres el redactor del modo Deep Research de Nodus. Recibes un borrador PROPIO de una sección que se ha quedado corto y debes desarrollarlo.',
@@ -247,6 +355,7 @@ async function aiExpandSection(
     'NO rellenes. Desarrolla: recupera del menú de citas el material que el borrador dejó sin usar, contrasta ideas que quedaron sueltas, desarrolla las contradicciones como debates entre autores y explica los huecos en vez de nombrarlos.',
     'Conserva íntegro lo que ya estaba bien, incluidas TODAS las citas nodus:// tal cual aparecen. Puedes reordenar y reescribir para integrar lo nuevo, pero no elimines citas existentes.',
     'Cada afirmación nueva necesita su cita del menú, entre paréntesis y en el formato exacto del menú.',
+    ...(approach?.rules.writer ?? []),
     ...DEEP_RESEARCH_NARRATIVE_RULES,
     'Empieza con el encabezado Markdown "## " y el título dado. Devuelve solo el Markdown completo de la sección ampliada, sin JSON ni vallas de código.',
   ].join('\n');
@@ -258,6 +367,7 @@ async function aiExpandSection(
       menu_de_citas: input.citationMenu,
       borrador_actual: input.draft,
       afirmaciones_ya_desarrolladas_en_otras_secciones: input.alreadyDeveloped,
+      ...(approach ? { enfoque_de_investigacion: approach.approach, estrategia_de_recuperacion: approach.retrieval } : {}),
     },
     null,
     2
@@ -275,7 +385,7 @@ function isAiPlan(v: unknown): v is AiPlan {
   return typeof v === 'object' && v !== null && Array.isArray((v as AiPlan).sections);
 }
 
-async function aiPlanReport(input: PlanInput, model: ModelRef | null): Promise<DeepResearchPlan> {
+async function aiPlanReport(input: PlanInput, model: ModelRef | null, approach?: AcademicApproachContext): Promise<DeepResearchPlan> {
   const countRule =
     input.sectionMode === 'user'
       ? `El usuario ha fijado un máximo de ${input.sectionCount} secciones. No tienes que agotarlo. Usa menos si el argumento gana continuidad y nunca lo superes en el plan inicial.`
@@ -292,6 +402,7 @@ async function aiPlanReport(input: PlanInput, model: ModelRef | null): Promise<D
     'ORDEN DEL ARGUMENTO: el informe debe leerse como un razonamiento que progresa, no como una lista de temas. Marca `role` con "intro" para el planteamiento, "body" para el desarrollo y "synthesis" para el cierre, y usa `dependsOn` para declarar de qué secciones previas depende cada una porque dan por establecido algo que necesita.',
     'Ordena de modo que ninguna sección presuponga algo que solo se establece más adelante. Si el material tiene una dimensión histórica, respétala: lo que explica el origen va antes que lo que explica su consecuencia.',
     'Reparte las obras entre secciones: evita que una sección dependa casi entera de una sola obra o de un solo autor cuando el corpus ofrece alternativas.',
+    ...(approach?.rules.planner ?? []),
     'Usa EXCLUSIVAMENTE los identificadores que se te dan. No inventes ideas, obras ni ids.',
     'Devuelve SOLO JSON válido con la forma:',
     '{"title":"...","abstract":"...","sections":[{"id":"s1","role":"intro|body|synthesis","dependsOn":["s2"],"title":"...","purpose":"...","keyClaims":["..."],"ideaIds":["..."],"workIds":["..."],"gapIds":["..."],"contradictionIds":["..."],"passageIds":["..."]}]}',
@@ -310,6 +421,11 @@ async function aiPlanReport(input: PlanInput, model: ModelRef | null): Promise<D
       huecos: input.gaps,
       contradicciones: input.contradictions,
       obras: input.works,
+      ...(approach ? {
+        enfoque_de_investigacion: approach.approach,
+        plan_de_recuperacion: approach.retrieval,
+        relaciones_del_grafo: approach.relationships,
+      } : {}),
     },
     null,
     2
@@ -334,7 +450,7 @@ async function aiPlanReport(input: PlanInput, model: ModelRef | null): Promise<D
   };
 }
 
-async function aiWriteSection(input: SectionInput, model: ModelRef | null): Promise<string> {
+async function aiWriteSection(input: SectionInput, model: ModelRef | null, approach?: AcademicApproachContext): Promise<string> {
   const system = [
     'Eres el redactor del modo Deep Research de Nodus: escribes UNA sección de un informe académico de nivel profesional.',
     'Escribe en español salvo que el idioma indicado pida otra lengua.',
@@ -351,6 +467,7 @@ async function aiWriteSection(input: SectionInput, model: ModelRef | null): Prom
     'Desarrolla la sección con profundidad real: no te limites a enunciar cada idea; contrástalas, encadénalas y construye un argumento continuo que atraviese todas las ideas asignadas.',
     'Relaciona las ideas entre sí: continuidad, diferencias, niveles de abstracción, consecuencias metodológicas, tensiones y huecos.',
     'No repitas lo ya dicho en secciones anteriores. Se te dan el recorrido de cada sección previa y la lista de afirmaciones ya desarrolladas: puedes apoyarte en ellas y remitir a ellas, pero el desarrollo de esta sección debe ser nuevo.',
+    ...(approach?.rules.writer ?? []),
     ...DEEP_RESEARCH_NARRATIVE_RULES,
     input.isConclusion
       ? 'Esta es la sección de cierre: integra las líneas del informe, nombra los huecos y perfila la contribución.'
@@ -365,6 +482,13 @@ async function aiWriteSection(input: SectionInput, model: ModelRef | null): Prom
       menu_de_citas: input.citationMenu,
       recorrido_secciones_previas: input.priorSummary || '(esta es la primera sección)',
       afirmaciones_ya_desarrolladas: input.alreadyDeveloped,
+      ...(approach ? {
+        enfoque_de_investigacion: approach.approach,
+        comparandos: approach.retrieval.comparands,
+        ejes: approach.retrieval.axes,
+        fases: approach.retrieval.phases,
+        relaciones_del_grafo: approach.relationships.slice(0, 40),
+      } : {}),
     },
     null,
     2
@@ -382,13 +506,14 @@ function isAiFinal(v: unknown): v is AiFinal {
   return typeof v === 'object' && v !== null;
 }
 
-async function aiFinalize(input: FinalizeInput, model: ModelRef | null): Promise<FinalizeResult> {
+async function aiFinalize(input: FinalizeInput, model: ModelRef | null, approach?: AcademicApproachContext): Promise<FinalizeResult> {
   const system = [
     'Cierras un informe académico de Deep Research de Nodus.',
     'Escribe en español salvo que el idioma pida otra lengua.',
     'Devuelve SOLO JSON válido: {"title":"título académico breve","abstract":"resumen de 6-10 líneas con la tesis del informe","limitations":["..."],"nextSteps":["..."]}',
     'El resumen debe reflejar el objetivo y las líneas del informe. Las limitaciones deben ser honestas (p. ej. ideas del corpus no desarrolladas).',
     'Redacta el título y el resumen como prosa fluida. Evita dos puntos, punto y coma y guion largo salvo necesidad estricta.',
+    ...(approach?.rules.finalizer ?? []),
   ].join('\n');
   const user = JSON.stringify(
     {
@@ -399,6 +524,7 @@ async function aiFinalize(input: FinalizeInput, model: ModelRef | null): Promise
       ideas_cubiertas: input.ideasCovered,
       ideas_consideradas: input.ideasConsidered,
       ideas_sin_cubrir_ejemplos: input.uncoveredSamples,
+      ...(approach ? { enfoque_de_investigacion: approach.approach, plan_de_recuperacion: approach.retrieval } : {}),
     },
     null,
     2
