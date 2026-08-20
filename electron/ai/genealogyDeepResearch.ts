@@ -22,6 +22,8 @@ import type {
   WritingWorkshopMatrixRow,
   WritingWorkshopSection,
 } from '@shared/types';
+import type { DeepResearchApproach } from '@shared/deepResearchApproaches';
+import { normalizeDeepResearchApproach } from '@shared/deepResearchApproaches';
 import {
   DEEP_RESEARCH_NARRATIVE_RULES,
   WORDS_PER_PAGE,
@@ -38,6 +40,12 @@ import { getWork } from '../db/worksRepo';
 import { resolveWorkText } from '../extraction/textExtractor';
 import { LOCAL_USER_ID } from '../zotero/zoteroClient';
 import { completeJson, completeText, embed } from './aiClient';
+import {
+  approachRules,
+  planApproachRetrieval,
+  repairMalformedGenealogyCitations,
+  type ApproachRetrievalPlan,
+} from './deepResearchApproaches';
 
 // Retrieval + budget bounds. Kept modest so the plan prompt and each section stay
 // within model windows; the full text of a section's assigned documents is the heavy
@@ -435,12 +443,59 @@ export async function generateGenealogyDeepResearchReport(
 ): Promise<DeepResearchReport> {
   const settings = getSettings();
   const model = request.model ?? settings.deepResearchModel ?? settings.synthesisModel ?? null;
-  const [sources, family] = await Promise.all([
+  const approach = normalizeDeepResearchApproach(request.approach);
+  const [ordinarySources, family] = await Promise.all([
     buildGenealogySourcePool(request.objective, request.focusPersonId),
     Promise.resolve(buildFamilyFacts()),
   ]);
   const focusPerson = request.focusPersonId ? buildFocusPerson(request.focusPersonId, family) : null;
-  return orchestrateGenealogyDeepResearch(request, sources, family, realDeps(model), onProgress, focusPerson);
+  // The historical General path remains byte-for-byte the same after source gathering.
+  if (approach === 'general') {
+    return orchestrateGenealogyDeepResearch(request, ordinarySources, family, realDeps(model), onProgress, focusPerson);
+  }
+  const retrieval = await planApproachRetrieval({
+    approach,
+    variant: 'genealogy',
+    objective: request.objective,
+    language: request.language ?? 'es',
+    model,
+    corpusPreview: {
+      focusPerson,
+      persons: family.personas.slice(0, 40),
+      events: family.eventos.slice(0, 60),
+      sources: ordinarySources.map((source) => ({ kind: source.kind, title: source.title, label: source.label, persons: source.persons, snippet: source.snippet })),
+    },
+  });
+  const supplementalPools = await Promise.all(
+    retrieval.probes.slice(0, 6).map((probe) => buildGenealogySourcePool(probe, request.focusPersonId)),
+  );
+  const sources = mergeGenealogyApproachSources(ordinarySources, supplementalPools.flat(), approach);
+  return orchestrateGenealogyDeepResearch(
+    request,
+    sources,
+    family,
+    specializedGenealogyDeps(model, approach, retrieval),
+    onProgress,
+    focusPerson,
+  );
+}
+
+function mergeGenealogyApproachSources(
+  ordinary: GenSource[],
+  supplemental: GenSource[],
+  approach: DeepResearchApproach,
+): GenSource[] {
+  const seen = new Set(ordinary.map((source) => source.id));
+  const additions = supplemental.filter((source) => !seen.has(source.id) && Boolean(seen.add(source.id))).slice(0, 24);
+  const merged = [...ordinary, ...additions];
+  if (approach === 'literature_review') {
+    return [...merged.filter((source) => source.kind === 'work'), ...merged.filter((source) => source.kind === 'document')];
+  }
+  if (approach === 'chronological') {
+    const dated = (source: GenSource) => /\b(?:1[5-9]|20)\d{2}\b/.test(`${source.label} ${source.title} ${source.snippet}`) ? 1 : 0;
+    return [...merged].sort((a, b) => dated(b) - dated(a));
+  }
+  return merged;
 }
 
 function realDeps(model: ModelRef | null): GenDeepDeps {
@@ -466,6 +521,38 @@ function realDeps(model: ModelRef | null): GenDeepDeps {
   };
 }
 
+interface GenealogyApproachContext {
+  approach: DeepResearchApproach;
+  retrieval: ApproachRetrievalPlan;
+  rules: ReturnType<typeof approachRules>;
+}
+
+function specializedGenealogyDeps(
+  model: ModelRef | null,
+  approach: DeepResearchApproach,
+  retrieval: ApproachRetrievalPlan,
+): GenDeepDeps {
+  const context: GenealogyApproachContext = {
+    approach,
+    retrieval,
+    rules: approachRules(approach, 'genealogy'),
+  };
+  const base = realDeps(model);
+  return {
+    ...base,
+    planReport: (input) => aiPlan(input, model, context),
+    // Specialized prompts contain more citation-dense comparisons/debates and one
+    // provider occasionally closes a Markdown URL with `]` instead of `)`. Repair
+    // only citations whose ids are in this section's allowed source menu. General's
+    // historical writer and citation path remain untouched.
+    writeSection: async (input) => repairMalformedGenealogyCitations(
+      await aiWriteSection(input, model, context),
+      input.sources,
+    ),
+    finalize: (input) => aiFinalize(input, model, context),
+  };
+}
+
 // ── Real AI prompts ───────────────────────────────────────────────────────────
 
 interface AiPlanShape { title?: string; abstract?: string; sections?: Array<Partial<GenPlanSection>> }
@@ -473,7 +560,7 @@ function isAiPlan(v: unknown): v is AiPlanShape {
   return typeof v === 'object' && v !== null && Array.isArray((v as AiPlanShape).sections);
 }
 
-async function aiPlan(input: GenPlanInput, model: ModelRef | null): Promise<GenPlan> {
+async function aiPlan(input: GenPlanInput, model: ModelRef | null, approach?: GenealogyApproachContext): Promise<GenPlan> {
   const system = [
     'Eres el planificador de un INFORME DE HISTORIA FAMILIAR (Deep Research en modo genealogía de Nodus).',
     'Diseñas el esqueleto de un informe riguroso y bien documentado a partir de las FUENTES (documentos de archivo y bibliografía) y de los HECHOS de la familia (personas, parentescos, eventos) que se te dan.',
@@ -485,6 +572,7 @@ async function aiPlan(input: GenPlanInput, model: ModelRef | null): Promise<GenP
     input.focusPerson
       ? `Hay una PERSONA EN FOCO: ${input.focusPerson.nombre}. Este informe es SU biografía documentada, no un panorama genérico de la familia. Organiza las secciones en torno a su vida (orígenes y familia, etapas vitales, vínculos y descendencia, su rastro documental) y trae al resto de personas solo en la medida en que se relacionan con ella. El título del informe debe nombrarla.`
       : '',
+    ...(approach?.rules.planner ?? []),
     'Devuelve SOLO JSON: {"title":"...","abstract":"...","sections":[{"id":"s1","title":"...","purpose":"...","keyPoints":["..."],"sourceIds":["..."]}]}',
   ].filter(Boolean).join('\n');
   const user = JSON.stringify(
@@ -496,6 +584,7 @@ async function aiPlan(input: GenPlanInput, model: ModelRef | null): Promise<GenP
       fuentes: input.sources,
       familia: input.family,
       persona_en_foco: input.focusPerson,
+      ...(approach ? { enfoque_de_investigacion: approach.approach, plan_de_recuperacion: approach.retrieval } : {}),
     },
     null,
     2
@@ -514,7 +603,7 @@ async function aiPlan(input: GenPlanInput, model: ModelRef | null): Promise<GenP
   };
 }
 
-async function aiWriteSection(input: GenSectionInput, model: ModelRef | null): Promise<string> {
+async function aiWriteSection(input: GenSectionInput, model: ModelRef | null, approach?: GenealogyApproachContext): Promise<string> {
   const system = [
     'Eres el redactor de un INFORME DE HISTORIA FAMILIAR (Deep Research en modo genealogía). Escribes UNA sección.',
     'Escribe en español salvo que el idioma pida otra lengua. Prosa continua y desarrollada, 4-7 párrafos densos; nada de listas salvo que sean imprescindibles.',
@@ -528,6 +617,7 @@ async function aiWriteSection(input: GenSectionInput, model: ModelRef | null): P
     input.focusPerson
       ? `Hay una PERSONA EN FOCO: ${input.focusPerson.nombre}. Mantén el relato centrado en ella: el resto de personas aparece solo en la medida en que se relaciona con su vida.`
       : '',
+    ...(approach?.rules.writer ?? []),
   ].filter(Boolean).join('\n');
   const user = JSON.stringify(
     {
@@ -539,6 +629,7 @@ async function aiWriteSection(input: GenSectionInput, model: ModelRef | null): P
       persona_en_foco: input.focusPerson,
       evidencia: input.evidence,
       resumen_secciones_previas: input.priorSummary || '(esta es la primera sección)',
+      ...(approach ? { enfoque_de_investigacion: approach.approach, plan_de_recuperacion: approach.retrieval } : {}),
     },
     null,
     2
@@ -550,7 +641,7 @@ interface AiFinalShape { title?: string; abstract?: string; limitations?: string
 function isAiFinal(v: unknown): v is AiFinalShape {
   return typeof v === 'object' && v !== null;
 }
-async function aiFinalize(input: GenFinalizeInput, model: ModelRef | null): Promise<GenFinalizeResult> {
+async function aiFinalize(input: GenFinalizeInput, model: ModelRef | null, approach?: GenealogyApproachContext): Promise<GenFinalizeResult> {
   const system = [
     'Cierras un INFORME DE HISTORIA FAMILIAR (Deep Research en modo genealogía).',
     'Escribe en español salvo que el idioma pida otra lengua.',
@@ -558,9 +649,18 @@ async function aiFinalize(input: GenFinalizeInput, model: ModelRef | null): Prom
     'Las limitaciones deben ser honestas y genealógicas: vínculos aún no probados, fuentes no consultadas, fechas inciertas o contradictorias, homónimos por resolver.',
     'Los próximos pasos deben sugerir qué registros o fuentes buscar para probar lo que queda como hipótesis.',
     'Redacta el título y el resumen como prosa fluida. Evita dos puntos, punto y coma y guion largo salvo necesidad estricta.',
+    ...(approach?.rules.finalizer ?? []),
   ].join('\n');
   const user = JSON.stringify(
-    { objetivo: input.objective, idioma: input.language, titulo_provisional: input.planTitle, secciones: input.sectionTitles, fuentes_citadas: input.sourcesCited, fuentes_consideradas: input.sourcesConsidered },
+    {
+      objetivo: input.objective,
+      idioma: input.language,
+      titulo_provisional: input.planTitle,
+      secciones: input.sectionTitles,
+      fuentes_citadas: input.sourcesCited,
+      fuentes_consideradas: input.sourcesConsidered,
+      ...(approach ? { enfoque_de_investigacion: approach.approach, plan_de_recuperacion: approach.retrieval } : {}),
+    },
     null,
     2
   );

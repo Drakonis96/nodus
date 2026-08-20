@@ -342,7 +342,7 @@ export function startDeepResearchGeneration(key: string, request: DeepResearchRe
     try {
       const savedDraft = await window.nodus.saveWritingWorkshopDraft({
         draft: report.draft,
-        model: currentRequest.model,
+        model: report.draft.generationModel ?? currentRequest.model,
         decorativeImage: currentRequest.decorativeImage,
       });
       return { report, savedDraft, saveError: null };

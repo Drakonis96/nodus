@@ -52,6 +52,11 @@ try {
   const draft = { title: 'La memoria de la posguerra', brief, selection: {}, draftMarkdown: '# Uno\n\nTexto.' };
   const saved = repo.saveWritingWorkshopDraft({ draft, title: draft.title, model: null });
   assert.equal(saved.readAt, null, 'a report is unread when it is written');
+  assert.equal(
+    repo.listWritingWorkshopDraftSummaries({ kind: 'deep_research', limit: 10, offset: 0 }).drafts[0].deepResearchApproach,
+    'general',
+    'an old report without approach metadata is listed as General'
+  );
 
   const reportRow = () => db.prepare('SELECT * FROM writing_saved_drafts WHERE id = ?').get(saved.id);
   const before = JSON.stringify(reportRow());
@@ -103,7 +108,41 @@ try {
     'the mark travels in the same group as the reports it is about'
   );
 
+  // ── 5. Generation provenance survives a real database close/reopen ─────────
+  const provenanceBrief = {
+    kind: 'deep_research',
+    objective: 'Comparar dos tradiciones historiográficas',
+    deepResearchApproach: 'literature_review',
+  };
+  const provenanceModel = { provider: 'gemini', model: 'gemini-3.1-flash-lite' };
+  const provenanceDraft = {
+    title: 'Dos tradiciones historiográficas',
+    brief: provenanceBrief,
+    selection: {},
+    draftMarkdown: '# Informe\n\nTexto.',
+    deepResearchApproach: 'literature_review',
+    generationModel: provenanceModel,
+  };
+  const persisted = repo.saveWritingWorkshopDraft({
+    draft: provenanceDraft,
+    title: provenanceDraft.title,
+    model: provenanceModel,
+  });
+  assert.equal(
+    repo.listWritingWorkshopDraftSummaries({ kind: 'deep_research', limit: 10, offset: 0 })
+      .drafts.find((item) => item.id === persisted.id)?.deepResearchApproach,
+    'literature_review',
+    'the gallery summary carries the generation-time approach'
+  );
+
   db.close();
+  const reopened = new Database(path.join(root, 'vault.sqlite'), { readonly: true, fileMustExist: true });
+  const persistedRow = reopened.prepare('SELECT brief_json, model_json, draft_json FROM writing_saved_drafts WHERE id = ?').get(persisted.id);
+  assert.equal(JSON.parse(persistedRow.brief_json).deepResearchApproach, 'literature_review');
+  assert.deepEqual(JSON.parse(persistedRow.model_json), provenanceModel);
+  assert.equal(JSON.parse(persistedRow.draft_json).deepResearchApproach, 'literature_review');
+  assert.deepEqual(JSON.parse(persistedRow.draft_json).generationModel, provenanceModel);
+  reopened.close();
   console.log('deep research read marker test passed');
 } finally {
   await rm(root, { recursive: true, force: true });

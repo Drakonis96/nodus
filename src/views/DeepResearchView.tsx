@@ -2,7 +2,7 @@
 // chained generation queue, and an immersive reader that expands one report to
 // full width with a back button to the gallery. The heavy lifting (generation,
 // saving, citations) is shared with the Writing workshop via writingShared.
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode, type RefObject } from 'react';
 import type {
   AppSettings,
   DeepResearchArchiveFormat,
@@ -21,12 +21,18 @@ import type {
   WritingDraftAnnotationInput,
 } from '@shared/types';
 import type { StudyDeepResearchAudience } from '@shared/studyDeepResearchAudience';
+import type { DeepResearchApproach } from '@shared/deepResearchApproaches';
+import {
+  DEEP_RESEARCH_APPROACH_OPTIONS,
+  deepResearchApproachOption,
+  normalizeDeepResearchApproach,
+} from '@shared/deepResearchApproaches';
 import { DECORATIVE_IMAGE_STYLES } from '@shared/imageStyles';
 import { toReadingCopy } from '@shared/readingCopy';
 import { stripLeadingAbstract } from '@shared/writingDocument';
 import type { DeepResearchSnapshot } from '../app/viewSnapshots';
 import { useListPlacement } from '../listPlacement';
-import { useReadingPlace, type ReadingPlace } from '../readingPlace';
+import { readingBlocks, topBlockIndex, useReadingPlace, type ReadingPlace } from '../readingPlace';
 import { HoverLabelButton, Icon, RestoringPane, modelLabel } from '../components/ui';
 import { SectionHeader } from '../components/SectionHeader';
 import { ModelPicker } from '../components/ModelPicker';
@@ -76,6 +82,24 @@ const DEEP_SECTION_OPTIONS: { value: DeepResearchSectionLimit; label: string }[]
   { value: 8, label: 'Máx. 8 secciones' },
   { value: 10, label: 'Máx. 10 secciones' },
 ];
+
+const READER_FONT_STORAGE_KEY = 'nodus.deepResearch.readerFontSize';
+const READER_FONT_MIN = 14;
+const READER_FONT_MAX = 22;
+const READER_FONT_DEFAULT = 16;
+
+function savedReaderFontSize(): number {
+  try {
+    const stored = localStorage.getItem(READER_FONT_STORAGE_KEY);
+    if (stored === null) return READER_FONT_DEFAULT;
+    const value = Number(stored);
+    return Number.isFinite(value)
+      ? Math.max(READER_FONT_MIN, Math.min(READER_FONT_MAX, Math.round(value)))
+      : READER_FONT_DEFAULT;
+  } catch {
+    return READER_FONT_DEFAULT;
+  }
+}
 
 // Exported because the section's snapshot stores them; the unions stay declared here,
 // next to the selects that produce them.
@@ -271,6 +295,7 @@ export function DeepResearchView({
   // Composer (new report) state.
   const [composerOpen, setComposerOpen] = useState(false);
   const [objective, setObjective] = useState('');
+  const [approach, setApproach] = useState<DeepResearchApproach>('general');
   const [language, setLanguage] = useState<PromptLanguage>('es');
   const [selectedModel, setSelectedModel] = useFeatureModel(settings, 'deepResearchModel');
   const [deepTarget, setDeepTarget] = useState<DeepResearchTargetLength>('adaptive');
@@ -471,6 +496,7 @@ export function DeepResearchView({
     const outline = isTeaching && structureMode === 'manual' ? unitOutline : null;
     enqueueDeepResearch({
       objective: objective.trim(),
+      approach,
       language,
       targetLength: deepTarget,
       sectionLimit: deepSectionLimit,
@@ -486,6 +512,7 @@ export function DeepResearchView({
     });
     setComposerOpen(false);
     setObjective('');
+    setApproach('general');
     setFocusPersonId(null);
     setError(null);
     setMessage(t(copy.queuedToast));
@@ -516,6 +543,7 @@ export function DeepResearchView({
   const reusePrompt = (saved: WritingWorkshopSavedDraft) => {
     setObjective(saved.brief.objective);
     if (saved.brief.language) setLanguage(saved.brief.language as PromptLanguage);
+    setApproach(normalizeDeepResearchApproach(saved.draft.deepResearchApproach ?? saved.brief.deepResearchApproach));
     if (saved.model) setSelectedModel(saved.model);
     if (isTeaching && (saved.brief.audience === 'teacher' || saved.brief.audience === 'students')) {
       setAudience(saved.brief.audience);
@@ -1045,6 +1073,7 @@ export function DeepResearchView({
           onStructureMode={setStructureMode}
           onUnitOutline={setUnitOutline}
           objective={objective}
+          approach={approach}
           audience={audience}
           language={language}
           model={selectedModel}
@@ -1057,6 +1086,7 @@ export function DeepResearchView({
           persons={personsList}
           focusPersonId={focusPersonId}
           onObjective={setObjective}
+          onApproach={setApproach}
           onAudience={setAudience}
           onLanguage={setLanguage}
           onModel={setSelectedModel}
@@ -1155,6 +1185,37 @@ function ReadToggle({ read, onToggle }: { read: boolean; onToggle: () => void })
   );
 }
 
+function compactModelName(model: NonNullable<WritingWorkshopSavedDraft['model']>): string {
+  if (model.provider === 'gemini') {
+    const match = model.model.match(/^gemini-(\d+(?:\.\d+)?)-(.*)$/i);
+    if (match) {
+      const tail = match[2]
+        .split('-')
+        .map((part) => part ? `${part[0].toUpperCase()}${part.slice(1)}` : '')
+        .join(' ')
+        .replace(/\bLite\b/i, 'Lite');
+      return `Gemini ${match[1]} ${tail}`.trim();
+    }
+  }
+  return modelLabel(model).replace('Google Gemini · ', 'Gemini ');
+}
+
+function ReportGenerationTags({ saved, compact = false }: { saved: WritingWorkshopSavedDraft; compact?: boolean }) {
+  const model = saved.model ?? saved.draft.generationModel ?? null;
+  const approachOption = deepResearchApproachOption(saved.draft.deepResearchApproach ?? saved.brief.deepResearchApproach);
+  const chipClass = compact
+    ? 'max-w-44 truncate rounded-full border border-neutral-700/80 bg-neutral-900/70 px-2 py-0.5 text-[10px] text-neutral-400'
+    : 'max-w-56 truncate rounded-full border border-neutral-700 bg-neutral-900/80 px-2.5 py-1 text-[11px] text-neutral-300';
+  return (
+    <div className="flex min-w-0 flex-wrap items-center gap-1.5" data-testid="deep-research-generation-tags">
+      {model && <span className={chipClass} title={`${model.provider}/${model.model}`}>{compactModelName(model)}</span>}
+      <span className={`${chipClass} border-indigo-800/70 bg-indigo-950/35 text-indigo-300`}>
+        {t(approachOption.label)}
+      </span>
+    </div>
+  );
+}
+
 function DraftGridCard({
   saved,
   settings,
@@ -1224,8 +1285,8 @@ function DraftGridCard({
         </button>
         <div className="mt-1 flex items-center gap-1.5 text-[11px] text-neutral-500">
           <Icon name="clock" size={11} /> {formatDate(saved.updatedAt)}
-          {saved.model && <><span>·</span><span className="truncate">{modelLabel(saved.model)}</span></>}
         </div>
+        <div className="mt-2"><ReportGenerationTags saved={saved} compact /></div>
         {!selecting && (
           <div className="mt-3 flex items-center gap-1.5">
             <button className="btn btn-primary !py-1 gap-1 text-xs" onClick={onOpen}>
@@ -1318,7 +1379,6 @@ function DraftListRow({
         </div>
         <div className="mt-0.5 flex items-center gap-1.5 text-[11px] text-neutral-500">
           <Icon name="clock" size={11} /> {formatDate(saved.updatedAt)}
-          {saved.model && <><span>·</span><span className="truncate">{modelLabel(saved.model)}</span></>}
           {saved.readAt && (
             <span className="flex items-center gap-1 text-emerald-400">
               <span>·</span>
@@ -1326,6 +1386,7 @@ function DraftListRow({
             </span>
           )}
         </div>
+        <div className="mt-1.5"><ReportGenerationTags saved={saved} compact /></div>
       </button>
       {!selecting && (
         <>
@@ -1459,6 +1520,175 @@ function ArchiveModal({
 // Reader — immersive full-report view
 // ─────────────────────────────────────────────────────────────────────────────
 
+interface ReportOutlineHeading {
+  id: string;
+  label: string;
+  depth: number;
+}
+
+/**
+ * Build a table of contents from the prose that is actually on screen, then keep
+ * its active entry aligned with the reader's scroll position. Reading the DOM is
+ * deliberate: translated and historic reports need the same navigation as a new
+ * report without depending on the outline that happened to generate them.
+ */
+function useReportOutline({
+  scrollerRef,
+  documentRef,
+  revision,
+}: {
+  scrollerRef: RefObject<HTMLElement | null>;
+  documentRef: RefObject<HTMLDivElement | null>;
+  revision: unknown;
+}): { headings: ReportOutlineHeading[]; activeIndex: number } {
+  const [headings, setHeadings] = useState<ReportOutlineHeading[]>([]);
+  const [activeIndex, setActiveIndex] = useState(0);
+
+  useEffect(() => {
+    const scroller = scrollerRef.current;
+    const root = documentRef.current;
+    const prose = root?.querySelector<HTMLElement>('.md');
+    if (!scroller || !root || !prose) {
+      setHeadings([]);
+      setActiveIndex(0);
+      return;
+    }
+
+    let nodes: HTMLElement[] = [];
+    let frame: number | null = null;
+
+    const locate = () => {
+      frame = null;
+      if (nodes.length === 0) {
+        setActiveIndex(0);
+        return;
+      }
+      const scrollerBox = scroller.getBoundingClientRect();
+      const readingEdge = scrollerBox.top + 48;
+      let next = 0;
+      for (let index = 0; index < nodes.length; index += 1) {
+        if (nodes[index].getBoundingClientRect().top <= readingEdge) next = index;
+        else break;
+      }
+      if (scroller.scrollTop + scroller.clientHeight >= scroller.scrollHeight - 4) next = nodes.length - 1;
+      setActiveIndex((current) => current === next ? current : next);
+    };
+
+    const scheduleLocate = () => {
+      if (frame !== null) return;
+      frame = requestAnimationFrame(locate);
+    };
+
+    const scan = () => {
+      nodes = Array.from(prose.querySelectorAll<HTMLElement>('h1, h2, h3, h4'))
+        .filter((heading) => Boolean(heading.textContent?.trim()));
+      const levels = nodes.map((heading) => Number(heading.tagName.slice(1)) || 2);
+      const baseLevel = levels.length > 0 ? Math.min(...levels) : 2;
+      const next = nodes.map((heading, index) => {
+        const id = `deep-research-heading-${index + 1}`;
+        heading.id = id;
+        heading.dataset.reportHeading = String(index);
+        heading.tabIndex = -1;
+        return {
+          id,
+          label: heading.textContent?.trim() ?? '',
+          depth: Math.min(2, Math.max(0, levels[index] - baseLevel)),
+        };
+      });
+      setHeadings(next);
+      setActiveIndex((current) => Math.min(current, Math.max(0, next.length - 1)));
+      scheduleLocate();
+    };
+
+    scan();
+    const mutations = new MutationObserver(scan);
+    mutations.observe(prose, { childList: true, subtree: true, characterData: true });
+    const resize = new ResizeObserver(scheduleLocate);
+    resize.observe(root);
+    scroller.addEventListener('scroll', scheduleLocate, { passive: true });
+    return () => {
+      mutations.disconnect();
+      resize.disconnect();
+      scroller.removeEventListener('scroll', scheduleLocate);
+      if (frame !== null) cancelAnimationFrame(frame);
+    };
+  }, [documentRef, revision, scrollerRef]);
+
+  return { headings, activeIndex };
+}
+
+function ReportOutlineRail({
+  headings,
+  activeIndex,
+  deferUntilWide = false,
+  onSelect,
+}: {
+  headings: ReportOutlineHeading[];
+  activeIndex: number;
+  deferUntilWide?: boolean;
+  onSelect: (heading: ReportOutlineHeading) => void;
+}) {
+  const activeRef = useRef<HTMLButtonElement | null>(null);
+  useEffect(() => {
+    activeRef.current?.scrollIntoView({ block: 'nearest' });
+  }, [activeIndex]);
+  if (headings.length < 2) return null;
+
+  const progress = Math.round(((activeIndex + 1) / headings.length) * 100);
+  return (
+    <aside
+      data-testid="deep-research-outline-rail"
+      aria-label={t('Contenido')}
+      className={`hidden w-60 shrink-0 flex-col border-r border-neutral-800 bg-neutral-950/55 px-4 py-5 ${deferUntilWide ? 'xl:flex' : 'lg:flex'}`}
+    >
+      <div className="mb-4 flex items-center justify-between gap-3 px-1">
+        <span className="text-[10px] font-semibold uppercase tracking-[0.16em] text-neutral-500">{t('Contenido')}</span>
+        <span className="text-[10px] font-medium tabular-nums text-indigo-300">{progress}%</span>
+      </div>
+      <div className="mb-4 h-1 overflow-hidden rounded-full bg-neutral-800" aria-hidden="true">
+        <div className="h-full rounded-full bg-indigo-500 transition-[width] duration-200" style={{ width: `${progress}%` }} />
+      </div>
+      <nav className="min-h-0 flex-1 overflow-y-auto pl-2 pr-1" aria-label={t('Contenido')}>
+        <ol className="relative space-y-0.5 border-l border-neutral-800 py-1">
+          {headings.map((heading, index) => {
+            const active = index === activeIndex;
+            return (
+              <li key={heading.id} className="relative">
+                <button
+                  ref={active ? activeRef : undefined}
+                  type="button"
+                  aria-current={active ? 'location' : undefined}
+                  title={heading.label}
+                  onClick={() => onSelect(heading)}
+                  className={`group relative w-full rounded-r-lg py-2 pr-2 text-left text-[11px] leading-4 transition-colors ${
+                    active
+                      ? 'bg-indigo-500/10 font-medium text-indigo-200'
+                      : 'text-neutral-500 hover:bg-neutral-900 hover:text-neutral-200'
+                  }`}
+                  style={{ paddingLeft: `${12 + heading.depth * 11}px` }}
+                >
+                  <span
+                    aria-hidden="true"
+                    className={`absolute -left-[4.5px] top-[13px] h-2 w-2 rounded-full border transition-colors ${
+                      active
+                        ? 'border-indigo-300 bg-indigo-400 shadow-[0_0_0_3px_rgba(99,102,241,0.16)]'
+                        : 'border-neutral-700 bg-neutral-950 group-hover:border-neutral-500'
+                    }`}
+                  />
+                  <span className="line-clamp-2">{heading.label}</span>
+                </button>
+              </li>
+            );
+          })}
+        </ol>
+      </nav>
+      <div className="mt-4 border-t border-neutral-800 pt-3 text-[10px] leading-4 text-neutral-600">
+        {activeIndex + 1} / {headings.length}
+      </div>
+    </aside>
+  );
+}
+
 function ReaderView({
   saved,
   settings,
@@ -1510,11 +1740,18 @@ function ReaderView({
   const mainRef = useRef<HTMLElement | null>(null);
   const documentRef = useRef<HTMLDivElement | null>(null);
   const markActionsRef = useRef<ReaderSelectionActionsHandle | null>(null);
+  const fontFramesRef = useRef<number[]>([]);
+  const [readerFontSize, setReaderFontSize] = useState(savedReaderFontSize);
   const [hasReaderMark, setHasReaderMark] = useState(false);
   const [annotations, setAnnotations] = useState<WritingDraftAnnotation[]>([]);
   const [highlighterColor, setHighlighterColor] = useState<WritingDraftAnnotationColor | null>(null);
   const [annotationError, setAnnotationError] = useState<string | null>(null);
   const annotationScope = appliedTranslation ? `translation:${appliedTranslation.id}` : 'source';
+  const { headings, activeIndex } = useReportOutline({
+    scrollerRef: mainRef,
+    documentRef,
+    revision: appliedTranslation?.id ?? saved.id,
+  });
   const visibleAnnotations = useMemo(
     () => annotations.filter((annotation) => annotation.scope === annotationScope),
     [annotationScope, annotations],
@@ -1534,6 +1771,47 @@ function ReaderView({
       if (draftId === null || draftId === saved.id) void refreshAnnotations();
     });
   }, [refreshAnnotations, saved.id]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(READER_FONT_STORAGE_KEY, String(readerFontSize));
+    } catch {
+      // A locked-down renderer may deny storage; the control still works for this view.
+    }
+  }, [readerFontSize]);
+
+  useEffect(() => () => {
+    for (const frame of fontFramesRef.current) cancelAnimationFrame(frame);
+    fontFramesRef.current = [];
+  }, []);
+
+  const changeReaderFontSize = useCallback((delta: number) => {
+    const scroller = mainRef.current;
+    const root = documentRef.current;
+    const blockIndex = scroller && root ? topBlockIndex(scroller, readingBlocks(root)) : null;
+    setReaderFontSize((current) => Math.max(READER_FONT_MIN, Math.min(READER_FONT_MAX, current + delta)));
+
+    // Keep the sentence under the reader's eye in place while the lines reflow.
+    // Two frames let React apply the custom property before measuring the new layout.
+    if (!scroller || !root || blockIndex === null) return;
+    const first = requestAnimationFrame(() => {
+      const second = requestAnimationFrame(() => {
+        const target = readingBlocks(root)[blockIndex];
+        if (target) scroller.scrollTop += target.getBoundingClientRect().top - scroller.getBoundingClientRect().top;
+      });
+      fontFramesRef.current.push(second);
+    });
+    fontFramesRef.current.push(first);
+  }, []);
+
+  const goToHeading = useCallback((heading: ReportOutlineHeading) => {
+    const scroller = mainRef.current;
+    const root = documentRef.current;
+    const target = root?.querySelector<HTMLElement>(`#${heading.id}`);
+    if (!scroller || !target) return;
+    const top = scroller.scrollTop + target.getBoundingClientRect().top - scroller.getBoundingClientRect().top - 24;
+    scroller.scrollTo({ top: Math.max(0, top), behavior: settings.reduceMotion ? 'auto' : 'smooth' });
+  }, [settings.reduceMotion]);
 
   const createAnnotation = async (input: Omit<WritingDraftAnnotationInput, 'draftId' | 'scope'>) => {
     const created = await window.nodus.createWritingDraftAnnotation({ ...input, draftId: saved.id, scope: annotationScope });
@@ -1580,7 +1858,10 @@ function ReaderView({
         </button>
         <div className="min-w-0 flex-1">
           <div className="truncate text-sm font-semibold text-neutral-100" title={appliedTranslation?.title ?? saved.title}>{appliedTranslation?.title ?? saved.title}</div>
-          <div className="text-[11px] text-neutral-500">{formatDate(saved.updatedAt)}</div>
+          <div className="mt-0.5 flex flex-wrap items-center gap-2">
+            <span className="text-[11px] text-neutral-500">{formatDate(saved.updatedAt)}</span>
+            <ReportGenerationTags saved={saved} />
+          </div>
         </div>
         {/* Icons only: the report title needs the room, and the reader already
             auto-saves, so there is no "Guardar borrador" action to offer here. */}
@@ -1593,6 +1874,41 @@ function ReaderView({
           onSaveToNotes={onSaveToNotes}
           onExport={onExport}
         />
+        <div
+          data-testid="deep-research-font-controls"
+          role="group"
+          aria-label={t('Tipografía')}
+          className="flex h-9 items-stretch overflow-hidden rounded-lg border border-neutral-700 bg-neutral-900/70 shadow-sm"
+        >
+          <button
+            data-testid="deep-research-font-decrease"
+            type="button"
+            className="grid w-9 place-items-center text-xs text-neutral-400 transition-colors hover:bg-neutral-800 hover:text-white disabled:cursor-not-allowed disabled:text-neutral-700"
+            title={t('Disminuir texto')}
+            aria-label={t('Disminuir texto')}
+            disabled={readerFontSize <= READER_FONT_MIN}
+            onClick={() => changeReaderFontSize(-1)}
+          >
+            a
+          </button>
+          <output
+            className="grid min-w-10 place-items-center border-x border-neutral-800 px-1 text-[10px] tabular-nums text-neutral-500"
+            aria-live="polite"
+          >
+            {readerFontSize}
+          </output>
+          <button
+            data-testid="deep-research-font-increase"
+            type="button"
+            className="grid w-9 place-items-center text-[17px] font-semibold text-neutral-300 transition-colors hover:bg-neutral-800 hover:text-white disabled:cursor-not-allowed disabled:text-neutral-700"
+            title={t('Aumentar texto')}
+            aria-label={t('Aumentar texto')}
+            disabled={readerFontSize >= READER_FONT_MAX}
+            onClick={() => changeReaderFontSize(1)}
+          >
+            A
+          </button>
+        </div>
         <ReaderHighlighterControl value={highlighterColor} onChange={setHighlighterColor} />
         <HoverLabelButton
           icon={hasReaderMark ? 'bookmarkFill' : 'bookmark'}
@@ -1633,6 +1949,7 @@ function ReaderView({
       )}
 
       <div className="min-h-0 flex-1 flex">
+        <ReportOutlineRail headings={headings} activeIndex={activeIndex} deferUntilWide={showMatrix} onSelect={goToHeading} />
         <main ref={mainRef} className="min-w-0 flex-1 overflow-y-auto px-6 py-6 max-md:px-4">
           <div className="mx-auto max-w-3xl space-y-6">
             <DecorativeImageCard
@@ -1644,8 +1961,13 @@ function ReaderView({
               onChange={onImageChange}
             />
             <AudioPanel entityKind="deep_research" entityId={saved.id} />
-            <div ref={documentRef} className="relative" data-testid="deep-research-reader-document">
-              {appliedTranslation ? <Markdown content={appliedTranslation.markdown} className="text-[15px] leading-7" onCitation={(citation) => onCitation(citation)} onStudyDocument={onOpenStudyDocument} onStudyMaterial={onOpenStudyMaterial} onStudyRecording={onOpenStudyRecording} /> : <DraftResultMain
+            <div
+              ref={documentRef}
+              className="deep-research-reader-document relative"
+              data-testid="deep-research-reader-document"
+              style={{ '--deep-research-font-size': `${readerFontSize}px` } as CSSProperties}
+            >
+              {appliedTranslation ? <Markdown content={appliedTranslation.markdown} onCitation={(citation) => onCitation(citation)} onStudyDocument={onOpenStudyDocument} onStudyMaterial={onOpenStudyMaterial} onStudyRecording={onOpenStudyRecording} /> : <DraftResultMain
                 draft={saved.draft}
                 exporting={exporting}
                 savingDraft={false}
@@ -1702,6 +2024,7 @@ function ComposerModal({
   onStructureMode,
   onUnitOutline,
   objective,
+  approach,
   audience,
   language,
   model,
@@ -1714,6 +2037,7 @@ function ComposerModal({
   persons = [],
   focusPersonId = null,
   onObjective,
+  onApproach,
   onAudience,
   onLanguage,
   onModel,
@@ -1734,6 +2058,7 @@ function ComposerModal({
   onStructureMode: (v: 'ai' | 'manual') => void;
   onUnitOutline: (v: DeepResearchOutlineSection[]) => void;
   objective: string;
+  approach: DeepResearchApproach;
   audience: StudyDeepResearchAudience;
   language: PromptLanguage;
   model: AppSettings['deepResearchModel'];
@@ -1746,6 +2071,7 @@ function ComposerModal({
   persons?: Person[];
   focusPersonId?: string | null;
   onObjective: (v: string) => void;
+  onApproach: (v: DeepResearchApproach) => void;
   onAudience: (v: StudyDeepResearchAudience) => void;
   onLanguage: (v: PromptLanguage) => void;
   onModel: (m: AppSettings['deepResearchModel']) => void;
@@ -1795,6 +2121,25 @@ function ComposerModal({
               ? t('Escribe el tema de los apuntes. El contenido lo explicará paso a paso con ejemplos y autoevaluación usando tus materiales.')
               : t(copy.objectivePlaceholder)}
           />
+          <label className="block rounded-lg border border-neutral-200 bg-neutral-50/70 p-3 dark:border-neutral-800 dark:bg-neutral-900/45">
+            <span className="mb-1.5 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-neutral-600 dark:text-neutral-400">
+              <Icon name="compass" size={12} className="text-indigo-500 dark:text-indigo-300" />
+              {t('Enfoque de investigación')}
+            </span>
+            <select
+              data-testid="deep-research-approach"
+              className="input w-full text-sm font-medium"
+              value={approach}
+              onChange={(event) => onApproach(event.target.value as DeepResearchApproach)}
+            >
+              {DEEP_RESEARCH_APPROACH_OPTIONS.map((option) => (
+                <option key={option.id} value={option.id}>{t(option.label)}</option>
+              ))}
+            </select>
+            <span className="mt-1.5 block text-[11px] leading-4 text-neutral-500" data-testid="deep-research-approach-help">
+              {t(deepResearchApproachOption(approach).description)}
+            </span>
+          </label>
           {isTeaching && (
             <label className="block">
               <span className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-neutral-500">

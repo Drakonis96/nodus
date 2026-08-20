@@ -151,7 +151,13 @@ export async function buildWritingWorkshopSnapshot(
   /** Extra sub-questions to probe the corpus with, on top of the objective itself. */
   extraProbes: string[] = []
 ): Promise<WritingWorkshopSnapshot> {
-  const tokens = tokenize(`${brief.objective} ${kindLabel(brief.kind)}`);
+  // The historical General call supplies no probes and therefore tokenizes the exact
+  // same string as before. Specialized Deep Research can still enrich lexical-only
+  // vaults when semantic embeddings are unavailable by adding its probes here.
+  const lexicalQuery = extraProbes.length
+    ? `${brief.objective} ${kindLabel(brief.kind)} ${extraProbes.join(' ')}`
+    : `${brief.objective} ${kindLabel(brief.kind)}`;
+  const tokens = tokenize(lexicalQuery);
   const semantic = await buildSemanticRanking([brief.objective, ...extraProbes]);
   const ideas = rankedIdeas(tokens, semantic);
   const themes = rankedThemes(tokens, semantic);

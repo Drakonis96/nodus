@@ -6251,6 +6251,8 @@ export interface WritingWorkshopBrief {
   audience?: string;
   tone?: 'academic' | 'synthetic' | 'critical' | 'exploratory';
   language?: PromptLanguage;
+  /** Deep Research only. Missing means the historical General approach. */
+  deepResearchApproach?: import('./deepResearchApproaches').DeepResearchApproach;
 }
 
 export interface WritingWorkshopSelection {
@@ -6404,6 +6406,10 @@ export interface WritingWorkshopDraft {
   bibliography: string[];
   nextSteps: string[];
   limitations: string[];
+  /** Persisted generation-time approach. Missing on reports created before approaches existed. */
+  deepResearchApproach?: import('./deepResearchApproaches').DeepResearchApproach;
+  /** Exact generation-time model. Null means no Nodus writing model was used or recorded. */
+  generationModel?: ModelRef | null;
   /**
    * What the entailment pass concluded about individual claims, so a researcher can
    * spot-check the weakest ones instead of re-reading every source. Only claims that
@@ -6584,6 +6590,8 @@ export interface DeepResearchOutlineSection {
 export interface DeepResearchRequest {
   /** The research idea/question the whole report must develop. */
   objective: string;
+  /** Missing is General, preserving every pre-approach request and queued job. */
+  approach?: import('./deepResearchApproaches').DeepResearchApproach;
   language?: PromptLanguage;
   audience?: string;
   targetLength?: DeepResearchTargetLength;
@@ -6648,6 +6656,10 @@ export interface DeepResearchJobRecord {
   objective: string;
   /** Short single-line preview of the objective, for list UIs. */
   title: string;
+  /** Serialized with the job so queue observers never infer it from current UI state. */
+  deepResearchApproach?: import('./deepResearchApproaches').DeepResearchApproach;
+  /** Exact model selection captured when the job was enqueued, when one was explicit. */
+  model?: ModelRef | null;
   status: DeepResearchJobStatus;
   progress: DeepResearchProgress | null;
   error: string | null;

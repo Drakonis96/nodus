@@ -5,6 +5,7 @@ import { app } from 'electron';
 import { z } from 'zod';
 import { AI_PROVIDERS as SHARED_AI_PROVIDERS } from '@shared/providers';
 import { PROMPT_LANGUAGES } from '@shared/types';
+import { DEEP_RESEARCH_APPROACHES } from '@shared/deepResearchApproaches';
 import type {
   AiProvider,
   Debate,
@@ -395,6 +396,7 @@ const modelSchema = z
 /** Derived from the shared list so the MCP surface can never accept a narrower set of
  *  languages than the app itself offers. */
 const promptLanguageSchema = z.enum(PROMPT_LANGUAGES);
+const deepResearchApproachSchema = z.enum(DEEP_RESEARCH_APPROACHES).default('general');
 
 const writingBriefSchema = z.object({
   kind: z.enum(WRITING_KINDS),
@@ -402,6 +404,7 @@ const writingBriefSchema = z.object({
   audience: z.string().trim().max(1_000).optional(),
   tone: z.enum(['academic', 'synthetic', 'critical', 'exploratory']).optional(),
   language: promptLanguageSchema.optional(),
+  deepResearchApproach: z.enum(DEEP_RESEARCH_APPROACHES).optional(),
 });
 
 const writingSelectionSchema = z.object({
@@ -452,6 +455,8 @@ const writingDraftSchema = z.object({
   bibliography: z.array(z.string()),
   nextSteps: z.array(z.string()),
   limitations: z.array(z.string()),
+  deepResearchApproach: z.enum(DEEP_RESEARCH_APPROACHES).optional(),
+  generationModel: modelSchema.nullable().optional(),
   stats: z.object({
     selectedIdeas: z.number().int().nonnegative(),
     selectedThemes: z.number().int().nonnegative(),
@@ -2192,6 +2197,7 @@ export function registerTools(server: McpServer): void {
         '"client" — returns a self-contained writing kit (corpus materials with verbatim citation tokens, target scope, method and citation policy) so the MODEL CALLING THIS MCP articulates and drafts the report itself; when done, that draft is passed to nodus_finalize_deep_research to validate citations and assemble references. Both keep Nodus as the grounding authority. writer="nodus" can consume provider tokens and may take several minutes; it sends MCP progress notifications (planning, per-section, assembly) when the request carries a progressToken. It also holds this call open for the whole generation and waits behind anything already in the shared lane — prefer nodus_enqueue_deep_research unless the report is needed in this very turn.',
       inputSchema: {
         objective: z.string().trim().min(1).max(8_000),
+        approach: deepResearchApproachSchema,
         language: promptLanguageSchema.optional(),
         audience: z.string().trim().max(1_000).optional(),
         targetLength: deepResearchTargetLengthSchema,
@@ -2206,10 +2212,10 @@ export function registerTools(server: McpServer): void {
       },
       annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
     },
-    ({ objective, language, audience, targetLength, sectionLimit, writer, model, save, title }, extra) =>
+    ({ objective, approach, language, audience, targetLength, sectionLimit, writer, model, save, title }, extra) =>
       tool(async () => {
         if (writer === 'client') {
-          return buildDeepResearchBrief({ objective, language, audience, targetLength, sectionLimit });
+          return buildDeepResearchBrief({ objective, approach, language, audience, targetLength, sectionLimit });
         }
         const notify = progressNotifier(extra);
         ensureDeepResearchLane();
@@ -2218,7 +2224,7 @@ export function registerTools(server: McpServer): void {
         // response shape (the full saved draft, not just its id).
         const report = await runDeepResearchJob(
           {
-            request: { objective, language, audience, targetLength, sectionLimit, model: asModel(model) ?? null },
+            request: { objective, approach, language, audience, targetLength, sectionLimit, model: asModel(model) ?? null },
             origin: 'mcp',
             save: false,
           },
@@ -2229,7 +2235,7 @@ export function registerTools(server: McpServer): void {
                 : p.message
             )
         );
-        const saved = save ? writingDrafts.saveWritingWorkshopDraft({ draft: report.draft, model: asModel(model), title }) : null;
+        const saved = save ? writingDrafts.saveWritingWorkshopDraft({ draft: report.draft, model: report.draft.generationModel ?? asModel(model), title }) : null;
         return { report, savedDraftId: saved?.id ?? null, savedDraft: saved };
       })()
   );
@@ -2242,6 +2248,7 @@ export function registerTools(server: McpServer): void {
         'Second step of nodus_generate_deep_research(writer="client"). Takes the Markdown the calling model wrote (`## ` body sections only) and enforces Nodus\'s citation contract: hallucinated citations are stripped, labels canonicalised, and the References/bibliography are built from the works actually cited. Returns the assembled report in the standard draft shape; with save=true it also stores it as a Nodus writing draft. Pass the SAME objective/language used for the brief so the same corpus snapshot is used to validate citations.',
       inputSchema: {
         objective: z.string().trim().min(1).max(8_000),
+        approach: deepResearchApproachSchema,
         language: promptLanguageSchema.optional(),
         audience: z.string().trim().max(1_000).optional(),
         sectionsMarkdown: z.string().trim().min(1).max(200_000),
@@ -2249,14 +2256,16 @@ export function registerTools(server: McpServer): void {
         abstract: z.string().trim().max(20_000).optional(),
         limitations: z.array(z.string().trim().min(1).max(2_000)).max(30).optional(),
         nextSteps: z.array(z.string().trim().min(1).max(2_000)).max(30).optional(),
+        generationModel: modelSchema.optional().describe('Model that wrote sectionsMarkdown. Persisted as provenance; omit rather than guessing.'),
         save: z.boolean().default(false),
       },
       annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
     },
-    ({ objective, language, audience, sectionsMarkdown, title, abstract, limitations, nextSteps, save }) =>
+    ({ objective, approach, language, audience, sectionsMarkdown, title, abstract, limitations, nextSteps, generationModel, save }) =>
       tool(async () => {
         const report = await assembleClientDeepResearchReport({
           objective,
+          approach,
           language,
           audience,
           sectionsMarkdown,
@@ -2264,8 +2273,9 @@ export function registerTools(server: McpServer): void {
           abstract,
           limitations,
           nextSteps,
+          generationModel: asModel(generationModel),
         });
-        const saved = save ? writingDrafts.saveWritingWorkshopDraft({ draft: report.draft, title }) : null;
+        const saved = save ? writingDrafts.saveWritingWorkshopDraft({ draft: report.draft, model: report.draft.generationModel, title }) : null;
         return { report, savedDraftId: saved?.id ?? null, savedDraft: saved };
       })()
   );
@@ -2281,6 +2291,7 @@ export function registerTools(server: McpServer): void {
         'Poll nodus_get_deep_research_job for status; with save=true (the default) the finished report is stored as a Nodus writing draft and appears in the user\'s Deep Research gallery.',
       inputSchema: {
         objective: z.string().trim().min(1).max(8_000),
+        approach: deepResearchApproachSchema,
         language: promptLanguageSchema.optional(),
         audience: z.string().trim().max(1_000).optional(),
         targetLength: deepResearchTargetLengthSchema,
@@ -2291,11 +2302,11 @@ export function registerTools(server: McpServer): void {
       },
       annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
     },
-    ({ objective, language, audience, targetLength, sectionLimit, model, save, title }) =>
+    ({ objective, approach, language, audience, targetLength, sectionLimit, model, save, title }) =>
       tool(() => {
         ensureDeepResearchLane();
         const job = enqueueDeepResearchJob({
-          request: { objective, language, audience, targetLength, sectionLimit, model: asModel(model) ?? null },
+          request: { objective, approach, language, audience, targetLength, sectionLimit, model: asModel(model) ?? null },
           origin: 'mcp',
           save,
           title,

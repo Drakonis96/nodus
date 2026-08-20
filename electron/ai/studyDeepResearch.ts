@@ -9,6 +9,8 @@ import type {
   WritingWorkshopMatrixRow,
   WritingWorkshopSection,
 } from '@shared/types';
+import type { DeepResearchApproach } from '@shared/deepResearchApproaches';
+import { normalizeDeepResearchApproach } from '@shared/deepResearchApproaches';
 import type { StudySearchIndexEntry, StudySearchKind } from '@shared/studySearch';
 import {
   normalizeStudyDeepResearchAudience,
@@ -17,6 +19,11 @@ import {
 import { listStudyIdeasForSources } from '../db/studyKnowledgeRepo';
 import { completeJson, completeText } from './aiClient';
 import { retrieveStudyAssistantEntries } from './studySearch';
+import {
+  approachRules,
+  planApproachRetrieval,
+  type ApproachRetrievalPlan,
+} from './deepResearchApproaches';
 
 export { normalizeStudyDeepResearchAudience };
 
@@ -267,7 +274,7 @@ function sourceUrl(entry: StudySearchIndexEntry): string {
   return `nodus://study/recording/${encodeURIComponent(entry.location.recordingId || entry.sourceId)}${entry.location.timestampSeconds != null ? `?t=${Math.max(0, Math.floor(entry.location.timestampSeconds))}` : ''}`;
 }
 
-function buildSources(entries: StudySearchIndexEntry[]): StudyResearchSource[] {
+function buildSources(entries: StudySearchIndexEntry[], limit = 18): StudyResearchSource[] {
   const grouped = new Map<string, StudySearchIndexEntry[]>();
   for (const entry of entries) {
     const key = `${entry.kind}:${entry.sourceId}`;
@@ -275,7 +282,7 @@ function buildSources(entries: StudySearchIndexEntry[]): StudyResearchSource[] {
     if (bucket.length < 4) bucket.push(entry);
     grouped.set(key, bucket);
   }
-  return [...grouped.values()].slice(0, 18).map((chunks, index) => {
+  return [...grouped.values()].slice(0, limit).map((chunks, index) => {
     const entry = chunks[0];
     const location = chunks.map(locationLabel).filter(Boolean).filter((value, at, all) => all.indexOf(value) === at).slice(0, 4).join(' · ');
     const url = sourceUrl(entry);
@@ -292,6 +299,79 @@ function buildSources(entries: StudySearchIndexEntry[]): StudyResearchSource[] {
       url,
     };
   });
+}
+
+function mergeStudySources(ordinary: StudyResearchSource[], enriched: StudyResearchSource[]): StudyResearchSource[] {
+  const seen = new Set<string>();
+  return [...ordinary, ...enriched]
+    .filter((source) => {
+      const key = `${source.kind}:${source.sourceId}`;
+      return !seen.has(key) && Boolean(seen.add(key));
+    })
+    .slice(0, 24)
+    .map((source, index) => ({ ...source, id: `S${index + 1}` }));
+}
+
+interface StudyApproachContext {
+  approach: DeepResearchApproach;
+  retrieval: ApproachRetrievalPlan;
+  rules: ReturnType<typeof approachRules>;
+}
+
+function studyEntryKey(entry: StudySearchIndexEntry): string {
+  return `${entry.kind}:${entry.sourceId}:${entry.location.pageNumber ?? ''}:${entry.location.slideNumber ?? ''}:${entry.location.timestampSeconds ?? ''}:${entry.text.slice(0, 120)}`;
+}
+
+/** Ordinary hits stay in the union. Specialized ordering only determines which
+ * sources reach the existing compact 18-source prompt window. */
+export function mergeStudyApproachEntries(
+  ordinary: StudySearchIndexEntry[],
+  supplemental: StudySearchIndexEntry[],
+  approach: DeepResearchApproach,
+): StudySearchIndexEntry[] {
+  const seen = new Set<string>();
+  // The ordinary sources are added back separately and in full by mergeStudySources.
+  // Put genuinely supplemental hits first here so the enriched window cannot be
+  // consumed by a second copy of the ordinary ranking.
+  const ordinaryKeys = new Set(ordinary.map(studyEntryKey));
+  const merged = [
+    ...supplemental.filter((entry) => !ordinaryKeys.has(studyEntryKey(entry))),
+    ...ordinary,
+  ].filter((entry) => {
+    const key = studyEntryKey(entry);
+    return !seen.has(key) && Boolean(seen.add(key));
+  });
+  if (approach === 'chronological') {
+    const dated = (entry: StudySearchIndexEntry) => /\b(?:1[5-9]|20)\d{2}\b/.test(`${entry.title} ${entry.subtitle} ${entry.text}`) ? 1 : 0;
+    return [...merged].sort((a, b) => dated(b) - dated(a));
+  }
+  if (approach === 'conceptual') {
+    const conceptual = (entry: StudySearchIndexEntry) => /\b(?:concept|defin|framework|marco|teor|construct|modelo)\w*/i.test(`${entry.title} ${entry.text}`) ? 1 : 0;
+    return [...merged].sort((a, b) => conceptual(b) - conceptual(a));
+  }
+  if (approach === 'scholarly_debate') {
+    const contested = (entry: StudySearchIndexEntry) => /\b(?:debate|disagree|contrad|controvers|discusi|conflict)\w*/i.test(`${entry.title} ${entry.text}`) ? 1 : 0;
+    return [...merged].sort((a, b) => contested(b) - contested(a));
+  }
+  if (approach === 'literature_review' || approach === 'comparative') {
+    const buckets = new Map<string, StudySearchIndexEntry[]>();
+    for (const entry of merged) {
+      const key = `${entry.kind}:${entry.sourceId}`;
+      const bucket = buckets.get(key) ?? [];
+      bucket.push(entry);
+      buckets.set(key, bucket);
+    }
+    const balanced: StudySearchIndexEntry[] = [];
+    while (buckets.size) {
+      for (const [key, bucket] of [...buckets]) {
+        const next = bucket.shift();
+        if (next) balanced.push(next);
+        if (!bucket.length) buckets.delete(key);
+      }
+    }
+    return balanced;
+  }
+  return merged;
 }
 
 function targetPages(request: DeepResearchRequest, sourceCount: number): { min: number; max: number } {
@@ -399,6 +479,7 @@ export async function generateStudyDeepResearchReport(
 ): Promise<DeepResearchReport> {
   const language = request.language ?? 'es';
   const unitMode = Boolean(request.unitMode);
+  const approach = normalizeDeepResearchApproach(request.approach);
   // Existing study reports remain student-facing, while existing teaching-unit jobs
   // retain their historical teacher-plan behaviour.
   const audience = normalizeStudyDeepResearchAudience(
@@ -408,17 +489,52 @@ export async function generateStudyDeepResearchReport(
   const teacherPlan = unitMode && audience === 'teacher';
   const prompts = studyDeepResearchPromptPack(language, audience, unitMode);
   onProgress?.({ phase: 'snapshot', message: unitMode ? 'Recuperando materiales, apuntes y transcripciones de clase…' : 'Recuperando apuntes, materiales y transcripciones relevantes…' });
-  const retrieved = await retrieveStudyAssistantEntries(request.objective, { kinds: ['material', 'document', 'transcript'] }, [], 48);
-  const sources = buildSources(retrieved);
+  const ordinaryRetrieved = await retrieveStudyAssistantEntries(request.objective, { kinds: ['material', 'document', 'transcript'] }, [], 48);
+  let approachContext: StudyApproachContext | null = null;
+  let retrieved = ordinaryRetrieved;
+  if (approach !== 'general') {
+    const retrieval = await planApproachRetrieval({
+      approach,
+      variant: unitMode ? 'unit' : 'study',
+      objective: request.objective,
+      language,
+      model,
+      corpusPreview: ordinaryRetrieved.slice(0, 36).map((entry) => ({
+        kind: entry.kind,
+        title: entry.title,
+        subtitle: entry.subtitle,
+        text: entry.text.slice(0, 500),
+        location: entry.location,
+      })),
+    });
+    const supplemental = (await Promise.all(
+      retrieval.probes.slice(0, 6).map((probe) => retrieveStudyAssistantEntries(
+        probe,
+        { kinds: ['material', 'document', 'transcript'] },
+        [],
+        24,
+      )),
+    )).flat();
+    retrieved = mergeStudyApproachEntries(ordinaryRetrieved, supplemental, approach);
+    approachContext = {
+      approach,
+      retrieval,
+      rules: approachRules(approach, unitMode ? 'unit' : 'study'),
+    };
+  }
+  const ordinarySources = buildSources(ordinaryRetrieved);
+  const sources = approach === 'general'
+    ? ordinarySources
+    : mergeStudySources(ordinarySources, buildSources(retrieved, 24));
   if (!sources.length) {
     throw new Error(unitMode
       ? 'No hay contenido indexado suficiente en los materiales de clase para diseñar la unidad.'
       : 'No hay contenido indexado suficiente en los materiales de estudio para generar el informe.');
   }
-  // A unit is sequenced by concept dependencies, and those already exist as the idea
-  // network extracted from these very sources. Only in unit mode: the study report is
-  // a text-first explanation and its prompts were tuned without a graph.
-  const knowledge = unitMode
+  // A unit is sequenced by concept dependencies. Specialized Study approaches also
+  // need those relationships for debates, comparisons and conceptual dependencies;
+  // General Study deliberately keeps its historical text-only path.
+  const knowledge = unitMode || approach !== 'general'
     ? listStudyIdeasForSources(sources.map((source) => `${source.kind}:${source.sourceId}`))
     : { ideas: [], connections: [] };
   const ideaLabels = new Map(knowledge.ideas.map((idea) => [idea.id, idea.label]));
@@ -441,7 +557,13 @@ export async function generateStudyDeepResearchReport(
   });
   const sourcePayload = sources.map(({ id, kind, title, subtitle, location, text }) => ({ id, kind, title, subtitle, location, extract: text }));
   const plan = await completeJson<StudyPlan>({
-    system: requestedOutline.length ? `${prompts.plan}\n${FIXED_OUTLINE_RULE}` : prompts.plan,
+    // The teacher's fixed structure is deliberately last: no approach instruction
+    // can replace, reorder or ignore it.
+    system: [
+      prompts.plan,
+      ...(approachContext?.rules.planner ?? []),
+      ...(requestedOutline.length ? [FIXED_OUTLINE_RULE] : []),
+    ].join('\n'),
     user: JSON.stringify({
       objective: request.objective,
       audience,
@@ -452,6 +574,7 @@ export async function generateStudyDeepResearchReport(
         : {}),
       ...(ideaPayload.length ? { extractedIdeas: ideaPayload, ideaRelations: relationPayload } : {}),
       sources: sourcePayload,
+      ...(approachContext ? { researchApproach: approachContext.approach, retrievalPlan: approachContext.retrieval } : {}),
     }, null, 2),
     temperature: 0.18,
     maxTokens: 4_000,
@@ -495,7 +618,12 @@ export async function generateStudyDeepResearchReport(
       sectionTitle: section.title,
     });
     const raw = await completeText({
-      system: section.focus ? `${prompts.write}\n${SECTION_FOCUS_RULE}` : prompts.write,
+      // A teacher focus is also last and therefore authoritative inside its section.
+      system: [
+        prompts.write,
+        ...(approachContext?.rules.writer ?? []),
+        ...(section.focus ? [SECTION_FOCUS_RULE] : []),
+      ].join('\n'),
       user: JSON.stringify({
         objective: request.objective,
         audience,
@@ -510,6 +638,7 @@ export async function generateStudyDeepResearchReport(
         ...(sectionIdeas.length ? { extractedIdeas: sectionIdeas } : {}),
         allowedSources: sectionSources.map((source) => ({ id: source.id, exactCitation: source.token, title: source.title, location: source.location, extract: source.text })),
         previousSections: written.map((markdown) => markdown.replace(/^##[^\n]+/, '').slice(0, 900)),
+        ...(approachContext ? { researchApproach: approachContext.approach, retrievalPlan: approachContext.retrieval } : {}),
       }, null, 2),
       temperature: 0.25,
       maxTokens: 5_200,
@@ -535,8 +664,25 @@ export async function generateStudyDeepResearchReport(
         : 'Preparando síntesis, fuentes y actividades de comprensión…',
   });
   const final = await completeJson<StudyFinal>({
-    system: prompts.finalize,
-    user: JSON.stringify({ objective: request.objective, audience, language, provisionalTitle: plan.title, sectionTitles: sections.map((section) => section.title), sourcesUsed: [...usedSourceIds] }, null, 2),
+    system: [prompts.finalize, ...(approachContext?.rules.finalizer ?? [])].join('\n'),
+    user: JSON.stringify({
+      objective: request.objective,
+      audience,
+      language,
+      provisionalTitle: plan.title,
+      sectionTitles: sections.map((section) => section.title),
+      sourcesUsed: [...usedSourceIds],
+      ...(approachContext ? {
+        researchApproach: approachContext.approach,
+        retrievalPlan: approachContext.retrieval,
+        // General retains its historical compact finalizer payload. Specialized
+        // finalization receives the evidence it needs to avoid inventing a future
+        // direction, rule or limitation that never appeared in the materials.
+        sourceEvidence: sources
+          .filter((source) => usedSourceIds.has(source.id))
+          .map((source) => ({ id: source.id, title: source.title, extract: source.text.slice(0, 900) })),
+      } : {}),
+    }, null, 2),
     temperature: 0.18,
     maxTokens: 1_800,
   }, isFinal, model).catch((): StudyFinal => ({}));

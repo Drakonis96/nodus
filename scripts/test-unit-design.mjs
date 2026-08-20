@@ -22,7 +22,7 @@ test.after(() => rm(tmp, { recursive: true, force: true }));
 // The module reaches the DB and the providers at import time; the pure exports under
 // test do not, so those edges are stubbed rather than loaded.
 const stub = path.join(tmp, 'stub.mjs');
-await writeFile(stub, 'export const completeJson = async () => ({});\nexport const completeText = async () => "";\nexport const retrieveStudyAssistantEntries = async () => [];\nexport const listStudyIdeasForSources = () => ({ ideas: [], connections: [] });\n');
+await writeFile(stub, 'export const completeJson = async () => ({});\nexport const completeText = async () => "";\nexport const retrieveStudyAssistantEntries = async () => [];\nexport const listStudyIdeasForSources = () => ({ ideas: [], connections: [] });\nexport const approachRules = () => ({ retrieval: [], planner: [], writer: [], finalizer: [] });\nexport const planApproachRetrieval = async () => ({ probes: [], comparands: [], axes: [], phases: [] });\n');
 
 const outfile = path.join(tmp, 'studyDeepResearch.mjs');
 await build({
@@ -36,6 +36,7 @@ await build({
     name: 'stub-io',
     setup(api) {
       api.onResolve({ filter: /(aiClient|studySearch|studyKnowledgeRepo)$/ }, () => ({ path: stub }));
+      api.onResolve({ filter: /^\.\/deepResearchApproaches$/ }, () => ({ path: stub }));
     },
   }],
   logLevel: 'silent',
