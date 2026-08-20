@@ -15,13 +15,22 @@ Hosts opt in with a placeholder element:
 (function () {
   'use strict';
 
+  /* GitHub Pages serves both /section/ and /section/index.html with a 200 and
+     offers no repository-level redirect rules. Keep explicit index requests
+     from lingering as duplicate browser/search URLs until the custom domain is
+     fronted by a service that can issue the preferred HTTP 301/308. */
+  if (/^https?:$/.test(location.protocol) && location.pathname.endsWith('/index.html')) {
+    location.replace(`${location.pathname.slice(0, -'index.html'.length)}${location.search}${location.hash}`);
+    return;
+  }
+
   const REPO = 'https://github.com/Drakonis96/nodus';
 
   const LOGO_STAR = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 .25a.75.75 0 0 1 .67.42l1.88 3.8 4.2.62c.61.09.86.84.41 1.28l-3.04 2.96.72 4.18a.75.75 0 0 1-1.09.79L8 12.35l-3.76 1.97a.75.75 0 0 1-1.08-.79l.72-4.18L.83 6.37a.75.75 0 0 1 .41-1.28l4.2-.61L7.32.67A.75.75 0 0 1 8 .25Z"/></svg>';
   const LOGO_GH = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82a7.42 7.42 0 0 1 2-.27c.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8Z"/></svg>';
 
   const PAGES = [
-    { id: 'home', label: 'Home', href: (base) => `${base}index.html` },
+    { id: 'home', label: 'Home', href: (base) => base || './' },
     { id: 'atlas', label: 'Atlas', href: (base) => `${base}research-atlas/` },
     // Nodus Browser reveals this prepared slot from its isolated preload. It is
     // hidden everywhere else, so a normal web visitor never sees a local-only
@@ -48,7 +57,7 @@ Hosts opt in with a placeholder element:
           <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2Z"/>
         </svg>
       </button>` : ''}
-      <a class="logo" href="${base}index.html" aria-label="Nodus, home">
+      <a class="logo" href="${base || './'}" aria-label="Nodus, home">
         <img class="mark" src="${base}assets/nodus-logo.svg" alt=""/> Nodus
       </a>
       <button class="nav-toggle" id="site-nav-toggle" type="button" aria-label="Open menu" aria-controls="site-nav-links" aria-expanded="false">
@@ -67,7 +76,7 @@ Hosts opt in with a placeholder element:
           <span class="download-word">downloads</span>
           <span class="download-tooltip" id="release-downloads-tooltip" role="tooltip">Package downloads from GitHub Releases · updated daily</span>
         </a>
-        <a class="btn primary" href="${base}demo/index.html">Try the live demo</a>
+        <a class="btn primary" href="${base}demo/">Try the live demo</a>
       </div>
     </nav>`;
   }

@@ -377,6 +377,8 @@ for reduced motion.
       formation: 0,        // 0 = free drift, 1 = assembled into the N
       markScale: 1,        // how large the assembled mark is, relative to a phone
       formationTarget: 0,
+      formationSettledFrames: 0,
+      formationAnnounced: false,
       waves: [],           // click shockwaves
       time: 0,
       running: false,
@@ -497,6 +499,7 @@ for reduced motion.
       const form = state.formation;
       const energy = state.energy;
 
+      let formationError = 0;
       for (let i = 0; i < count; i++) {
         const s = seed[i];
         const m = mass[i];
@@ -553,11 +556,34 @@ for reduced motion.
         px[i] += vx[i] * dt * (1 + energy * 0.5);
         py[i] += vy[i] * dt * (1 + energy * 0.5);
 
+        if (state.formationTarget === 1) {
+          formationError += Math.hypot(px[i] - fx[i], py[i] - fy[i]);
+        }
+
         // wrap the drift anchors so the field never drains off one edge
         if (hx[i] < -80) hx[i] += state.width + 160;
         else if (hx[i] > state.width + 80) hx[i] -= state.width + 160;
         if (hy[i] < -80) hy[i] += state.height + 160;
         else if (hy[i] > state.height + 80) hy[i] -= state.height + 160;
+      }
+
+      /* Do not time the title shot from DOMContentLoaded: on a large viewport
+         the nodes need longer to travel than on a small one. Announce the mark
+         only after the formation blend is effectively complete and the nodes
+         themselves have settled close to their targets for several frames. */
+      if (state.formationTarget === 1 && !state.formationAnnounced) {
+        const averageError = formationError / Math.max(1, count);
+        const settledDistance = Math.max(9, 14 * state.markScale);
+        if (state.formation >= 0.985 && averageError <= settledDistance) {
+          state.formationSettledFrames++;
+          if (state.formationSettledFrames >= 6) {
+            state.formationAnnounced = true;
+            canvas.dataset.organismAssembled = 'true';
+            canvas.dispatchEvent(new CustomEvent('organism-assembled'));
+          }
+        } else {
+          state.formationSettledFrames = 0;
+        }
       }
     }
 
@@ -802,7 +828,14 @@ for reduced motion.
       scrolled(velocity) {
         state.scrollBoost = Math.min(0.8, state.scrollBoost + Math.min(0.34, Math.abs(velocity) * 0.0016));
       },
-      assemble(on) { state.formationTarget = on ? 1 : 0; },
+      assemble(on) {
+        state.formationTarget = on ? 1 : 0;
+        if (on) {
+          state.formationSettledFrames = 0;
+          state.formationAnnounced = false;
+          delete canvas.dataset.organismAssembled;
+        }
+      },
     };
   }
 
@@ -860,7 +893,8 @@ for reduced motion.
     // The field draws the Nodus N on arrival and holds it: on the home page that
     // is the whole opening shot, with the rest of the page still hidden. The
     // sequence in home.js decides when it bursts and the page arrives.
-    if (document.body.dataset.formation === 'on') {
+    const openingIsArmed = document.documentElement.classList.contains('intro-armed');
+    if (document.body.dataset.formation === 'on' && openingIsArmed) {
       organism.assemble(true);
       // home.js drives the actual release; this only stops the field being stuck
       // in the mark if that script never runs.
