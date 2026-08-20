@@ -2,7 +2,7 @@
   <img src="site/assets/nodus-logo.png" width="104" alt="Nodus logo">
 </p>
 
-<h1 align="center">Nodus</h1>
+<h1 align="center">Nodus Research</h1>
 
 <p align="center"><strong>One place for research, teaching and study</strong></p>
 
