@@ -43,10 +43,8 @@ jobs:
       max-parallel: 1
       matrix:
         include:
-          # The release targets arm64, but packaging remains pinned to the Intel
-          # image: electron-builder cross-builds the arm64 app there and the
-          # Electron npm distribution includes the legal bundle required by
-          # beforePack. macos-latest is now an arm64 image and omits that bundle.
+          # The release targets arm64, but packaging remains pinned to Intel so
+          # electron-builder can cross-build the configured target consistently.
           - os: macos-15-intel
             platform: '--mac'
           - os: windows-latest
@@ -72,11 +70,11 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      # npm can omit Rollup's platform package when a lockfile was generated on
-      # another OS. Repair only that build-time optional dependency without
-      # changing package.json or package-lock.json on the runner.
-      - name: Ensure native Rollup binary
-        run: node scripts/ensure-rollup-native.mjs
+      # Electron 43 exposes its runtime downloader as a CLI instead of running
+      # it during npm install. beforePack inventories LICENSES.chromium.html
+      # from that verified distribution on every packaging platform.
+      - name: Install Electron runtime
+        run: node node_modules/electron/install.js
 
       - name: Build renderer + main
         env:
