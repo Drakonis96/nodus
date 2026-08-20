@@ -235,8 +235,9 @@ test('the home page opens with the mark forming, and can never strand a visitor'
   assert.match(home, /setTimeout\(function \(\) \{[\s\S]*?intro-done[\s\S]*?\}, 6000\)/, 'the inline watchdog reveals the page on its own');
   assert.match(css, /body \{[\s\S]*?radial-gradient[\s\S]*?background-attachment: fixed;/, 'a finished-looking background exists before WebGL starts');
   assert.match(css, /#organism \{ transition-duration: 0\.3s; \}/, 'the live field replaces the static paint quickly');
-  assert.match(script, /const HOLD = 1200;/, 'the opening releases promptly instead of holding an empty hero');
-  assert.match(script, /organism-assembled/, 'the hold starts only after the field has finished assembling the mark');
+  assert.match(script, /organism-assembled/, 'the release starts only after the field has finished assembling the mark');
+  assert.match(script, /const onAssembled = \(\) => \{\s*if \(finished\) return;\s*release\(\);\s*\};/, 'the completed mark returns to the node flow immediately');
+  assert.doesNotMatch(script, /engine\.pulse\(innerWidth/, 'the completed mark flows away instead of exploding outward');
   assert.match(read('assets/js/organism.js'), /dataset\.formation === 'on' && openingIsArmed/, 'mobile and unarmed visits never assemble a hidden N');
   assert.match(css, /\.hero \{[\s\S]*?-webkit-user-select: none;[\s\S]*?user-select: none;/, 'visible hero copy cannot be accidentally selected');
 
