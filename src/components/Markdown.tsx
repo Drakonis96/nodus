@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { memo, useEffect, useRef, useState, type ReactNode } from 'react';
 import ReactMarkdown, { defaultUrlTransform } from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import remarkMath from 'remark-math';
@@ -44,7 +44,7 @@ export interface MarkdownReaderCitation {
   page?: number;
 }
 
-export function Markdown({
+function MarkdownComponent({
   content,
   className = '',
   onCitation,
@@ -291,6 +291,9 @@ export function Markdown({
     </div>
   );
 }
+
+/** Preserve live DOM selections and CSS Highlight ranges across parent renders. */
+export const Markdown = memo(MarkdownComponent);
 
 /**
  * Inline citation pill with a hover-card. Hovering (after a short delay, so a

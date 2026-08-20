@@ -617,6 +617,11 @@ export const ReaderSelectionActions = forwardRef<ReaderSelectionActionsHandle, {
     const onPointerUp = (event: PointerEvent) => {
       const target = event.target;
       if (target instanceof Element && target.closest('[data-reader-selection-actions]')) return;
+      // Header controls (notably the reader's typography buttons) are not the
+      // end of a text selection. Scheduling a second selection pass from their
+      // pointerup races the control's own layout update and can trap Chromium in
+      // a render loop while live annotation ranges are being repositioned.
+      if (target instanceof Element && target.closest('button, a, input, textarea, select, [role="button"]')) return;
       const pointer = { x: event.clientX, y: event.clientY };
       window.setTimeout(() => showSelection(undefined, pointer), 0);
     };
@@ -653,6 +658,7 @@ export const ReaderSelectionActions = forwardRef<ReaderSelectionActionsHandle, {
     const hide = (event: Event) => {
       const target = event.target;
       if (target instanceof Element && target.closest('[data-reader-selection-actions]')) return;
+      if (target instanceof Element && target.closest('button, a, input, textarea, select, [role="button"]')) return;
       setActive(null);
       setActiveMarkActions(null);
       setActiveHighlightActions(null);

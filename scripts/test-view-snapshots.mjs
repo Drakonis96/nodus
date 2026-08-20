@@ -483,7 +483,10 @@ test('the Deep Research reader has persistent typography and a live report outli
   assert.match(view, /READER_FONT_STORAGE_KEY = 'nodus\.deepResearch\.readerFontSize'/);
   assert.match(view, /data-testid="deep-research-font-decrease"/);
   assert.match(view, /data-testid="deep-research-font-increase"/);
-  assert.match(view, /topBlockIndex\(scroller, readingBlocks\(root\)\)/, 'font reflow preserves the visible reading block');
+  assert.match(view, /function ReaderFontControls\(/, 'typography state is isolated from the rendered document');
+  assert.match(view, /window\.setTimeout\(\(\) => \{[\s\S]*?setFontSize/, 'font reflow starts after the native pointer dispatch completes');
+  assert.match(view, /root\.style\.setProperty\('--deep-research-font-size'/, 'font size changes the existing document instead of remounting it');
+  assert.match(view, /pendingAnchorRef[\s\S]*?scroller\.scrollTop \+= pending\.element\.getBoundingClientRect\(\)\.top - pending\.top/, 'font reflow preserves the visible reading block');
   assert.match(view, /function useReportOutline\(/);
   assert.match(view, /querySelectorAll<HTMLElement>\('h1, h2, h3, h4'\)/);
   assert.match(view, /data-testid="deep-research-outline-rail"/);

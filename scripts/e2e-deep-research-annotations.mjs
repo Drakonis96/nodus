@@ -125,6 +125,30 @@ try {
   assert.ok(ribbonBox.y + ribbonBox.height <= firstSelection.release.y, 'ribbon sits above the pointer');
   await selectionBar.locator('.reader-selection-color').first().click();
   await page.waitForFunction(async (id) => (await window.nodus.listWritingDraftAnnotations(id)).filter((item) => item.kind === 'highlight').length === 1, draftId);
+  await page.waitForFunction(() => CSS.highlights?.get('nodus-reader-yellow')?.size === 1);
+
+  // Font reflow must leave the annotation layer attached to the same live text
+  // nodes. This used to freeze the renderer and make highlights, comments and
+  // the contextual ribbon blink in and out after using either typography button.
+  const initialFontSize = await documentRoot.locator('.md').evaluate((element) => parseFloat(getComputedStyle(element).fontSize));
+  await page.getByTestId('deep-research-font-increase').click();
+  await page.waitForFunction((expected) => {
+    const prose = document.querySelector('[data-testid="deep-research-reader-document"] .md');
+    return prose && parseFloat(getComputedStyle(prose).fontSize) === expected;
+  }, initialFontSize + 1);
+  assert.equal(
+    await page.evaluate(() => CSS.highlights?.get('nodus-reader-yellow')?.size),
+    1,
+    'font increase keeps the stored highlight registered',
+  );
+  await page.getByTestId('deep-research-font-decrease').click();
+  await page.waitForFunction((expected) => {
+    const prose = document.querySelector('[data-testid="deep-research-reader-document"] .md');
+    return prose && parseFloat(getComputedStyle(prose).fontSize) === expected;
+  }, initialFontSize);
+  await selectCandidate(5);
+  await selectionBar.waitFor({ state: 'visible' });
+  await page.keyboard.press('Escape');
 
   // Releasing in the blank gutter still completes a selection made in the
   // report and opens the ribbon at the edge of the viewport.
