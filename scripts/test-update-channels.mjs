@@ -104,6 +104,9 @@ test('stable and beta publication have isolated entry points and shared build lo
   assert.match(shared, /beta-mac\.yml beta\.yml beta-linux\.yml/);
   assert.match(shared, /Beta release contains stable update manifest/);
   assert.match(shared, /--prerelease --latest=false/);
+  assert.match(shared, /os: macos-15-intel/, 'macOS packaging stays on the Intel runner that carries the Electron legal bundle');
+  assert.doesNotMatch(shared, /- os: macos-latest/, 'macos-latest is arm64 and cannot package the verified legal bundle');
+  assert.match(shared, /node scripts\/ensure-rollup-native\.mjs/, 'release runners repair npm optional Rollup binaries before building');
 
   const configPath = require.resolve(path.join(repoRoot, 'build/electron-builder.release.cjs'));
   const previousChannel = process.env.NODUS_RELEASE_CHANNEL;
