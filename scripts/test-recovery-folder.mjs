@@ -62,11 +62,29 @@ try {
   fs.rmSync(path.join(vaultDir, 'study-chat-history.json'), { force: true });
   fs.rmSync(path.join(vaultDir, 'audio'), { recursive: true, force: true });
 
-  const wrong = await recovery.restoreRecoverySnapshot(recoveryRoot, initialized.snapshot.fileName, 'contraseña-errónea', '9.9.9-test');
+  const rejectedProgress = [];
+  const wrong = await recovery.restoreRecoverySnapshot(
+    recoveryRoot,
+    initialized.snapshot.fileName,
+    'contraseña-errónea',
+    '9.9.9-test',
+    'es',
+    (progress) => rejectedProgress.push(progress),
+  );
   assert.equal(wrong.ok, false, 'wrong password is rejected');
   assert.equal(entities.getPerson(alice.personId), null, 'wrong password does not mutate live data');
+  assert.ok(rejectedProgress.some((progress) => progress.phase === 'decrypting'), 'rejected restore reports real decryption work');
+  assert.ok(!rejectedProgress.some((progress) => progress.phase === 'complete'), 'rejected restore never reports completion');
 
-  const restored = await recovery.restoreRecoverySnapshot(recoveryRoot, initialized.snapshot.fileName, initialized.recoveryKey, '9.9.9-test', 'en');
+  const restoreProgress = [];
+  const restored = await recovery.restoreRecoverySnapshot(
+    recoveryRoot,
+    initialized.snapshot.fileName,
+    initialized.recoveryKey,
+    '9.9.9-test',
+    'en',
+    (progress) => restoreProgress.push(progress),
+  );
   assert.equal(restored.ok, true, restored.message);
   assert.match(restored.message, /recovery key/i, 'recovery flow reports which independent credential succeeded in English');
   assert.ok(entities.getPerson(alice.personId), 'vault database restored');
@@ -75,6 +93,26 @@ try {
   assert.equal(fs.readFileSync(path.join(vaultDir, 'audio', 'voz.wav'), 'utf8'), 'WAVE-DATA', 'generated media restored');
   const safetyFiles = fs.readdirSync(path.join(userData, 'restore-safety')).filter((name) => name.endsWith('.nodus'));
   assert.equal(safetyFiles.length, 1, 'successful restore retains a pre-restore encrypted safety snapshot');
+  assert.deepEqual(
+    [...new Set(restoreProgress.map((progress) => progress.phase))],
+    ['preparing', 'decrypting', 'verifying', 'restoring', 'finalizing', 'complete'],
+    'restore exposes every user-visible phase in order',
+  );
+  assert.ok(
+    restoreProgress.every((progress, index) => index === 0 || progress.progress >= restoreProgress[index - 1].progress),
+    'overall restore progress is monotonic',
+  );
+  for (const phase of ['decrypting', 'verifying', 'restoring']) {
+    const byteEvents = restoreProgress.filter((progress) => progress.phase === phase && progress.totalBytes > 0);
+    assert.ok(byteEvents.length > 0, `${phase} reports byte-backed progress`);
+    assert.ok(byteEvents.every((progress) => progress.completedBytes <= progress.totalBytes), `${phase} never exceeds its byte total`);
+    assert.equal(byteEvents.at(-1).completedBytes, byteEvents.at(-1).totalBytes, `${phase} reaches its real byte total`);
+  }
+  for (const phase of ['preparing', 'finalizing', 'complete']) {
+    const milestones = restoreProgress.filter((progress) => progress.phase === phase);
+    assert.ok(milestones.every((progress) => progress.completedBytes === 0 && progress.totalBytes === 0), `${phase} does not invent byte counters`);
+  }
+  assert.equal(restoreProgress.at(-1).progress, 1, 'successful restore reaches 100%');
 
   // ── Backup health must state the truth, not the last happy status ───────────
   // Every one of these used to be invisible: a broken schedule left `lastAutoBackupAt`

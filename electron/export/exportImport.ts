@@ -5,8 +5,9 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { dialog, app } from 'electron';
 import { showImportOpenDialog } from '../privacy';
-import type { AiProvider, AppSettings, BackupSelection } from '@shared/types';
+import type { AiProvider, AppSettings, BackupSelection, RecoveryRestoreProgress, RecoveryRestoreProgressPhase } from '@shared/types';
 import { SECRET_PROVIDERS } from '@shared/providers';
+import { isVaultType } from '@shared/vaultTypes';
 import { closeDb, getDb, replaceDbFile, SCHEMA_VERSION } from '../db/database';
 import { testimonyBackupInventory } from './testimonyExport';
 import { getSettings } from '../db/settingsRepo';
@@ -24,6 +25,11 @@ import {
   type BackupCipherMetadata,
 } from './backupCrypto';
 import { snapshotVaultInUtility } from './backupUtilityHost';
+import {
+  openVerifiedBackupFile,
+  type StreamedInnerManifest,
+} from './backupVerificationCore';
+import type { ZipFileEntry, ZipFileReader } from './zipFile';
 import { StreamingZipWriter } from './streamingZip';
 import { browserBookmarksRepository } from '../browser/bookmarks';
 
@@ -459,7 +465,90 @@ export async function importData(password: string): Promise<{ ok: boolean; messa
     filters: [{ name: 'Nodus', extensions: ['nodus'] }],
   });
   if (canceled || filePaths.length === 0) return { ok: false, message: 'Cancelado' };
-  return restoreBackupArchiveSafely(fs.readFileSync(filePaths[0]), password, app.getVersion());
+  return restoreBackupArchiveFileSafely(filePaths[0], password, app.getVersion());
+}
+
+/** File-backed counterpart of {@link restoreBackupArchiveSafely}. Large recovery
+ * snapshots never pass through `readFileSync`, and the pre-restore escape hatch
+ * is also created directly on disk. */
+export async function restoreBackupArchiveFileSafely(
+  archivePath: string,
+  password: string,
+  appVersion: string,
+  onProgress?: (progress: RecoveryRestoreProgress) => void,
+): Promise<BackupRestoreResult> {
+  if (!password.trim()) return { ok: false, message: 'Importación cancelada: falta la contraseña de la copia.' };
+  const safetyPassword = getBackupPassword() || password;
+  const safetyDir = path.join(app.getPath('userData'), 'restore-safety');
+  const safetyPath = path.join(safetyDir, `pre-restore-${Date.now()}-${Math.random().toString(36).slice(2)}.nodus`);
+  const stagedSafety = `${safetyPath}.tmp`;
+  try {
+    emitRestoreProgress(onProgress, 'preparing', 0, 0);
+    await fs.promises.mkdir(safetyDir, { recursive: true });
+    await createBackupArchiveFile({ password: safetyPassword, appVersion }, stagedSafety);
+    await fs.promises.rename(stagedSafety, safetyPath);
+    emitRestoreProgress(onProgress, 'preparing', 1, 1);
+    const result = await restoreBackupArchiveFile(archivePath, password, onProgress);
+    if (!result.ok) {
+      await fs.promises.rm(safetyPath, { force: true });
+      return result;
+    }
+    emitRestoreProgress(onProgress, 'finalizing', 0, 0);
+    emitRestoreProgress(onProgress, 'complete', 1, 1);
+    return {
+      ...result,
+      message: `${result.message} Se ha conservado una copia de seguridad previa en ${safetyPath}.`,
+      safetyBackupPath: safetyPath,
+    };
+  } catch (error) {
+    await fs.promises.rm(stagedSafety, { force: true });
+    const failure = error instanceof Error ? error.message : String(error);
+    if (!fs.existsSync(safetyPath)) {
+      return { ok: false, message: `La restauración se canceló antes de modificar los datos: ${failure}` };
+    }
+    try {
+      const rollback = await restoreBackupArchiveFile(safetyPath, safetyPassword);
+      if (!rollback.ok) throw new Error(rollback.message);
+      return {
+        ok: false,
+        message: `La restauración falló (${failure}), pero Nodus recuperó automáticamente el estado anterior. Copia de seguridad: ${safetyPath}`,
+        safetyBackupPath: safetyPath,
+      };
+    } catch (rollbackError) {
+      return {
+        ok: false,
+        message: `La restauración falló (${failure}) y no se pudo completar la reversión automática (${rollbackError instanceof Error ? rollbackError.message : String(rollbackError)}). No borres la copia de emergencia: ${safetyPath}`,
+        safetyBackupPath: safetyPath,
+      };
+    }
+  }
+}
+
+const RESTORE_PHASE_RANGES: Record<RecoveryRestoreProgressPhase, readonly [number, number]> = {
+  preparing: [0, 0.08],
+  decrypting: [0.08, 0.33],
+  verifying: [0.33, 0.70],
+  restoring: [0.70, 0.97],
+  finalizing: [0.97, 0.99],
+  complete: [1, 1],
+};
+
+function emitRestoreProgress(
+  reporter: ((progress: RecoveryRestoreProgress) => void) | undefined,
+  phase: RecoveryRestoreProgressPhase,
+  completedBytes: number,
+  totalBytes: number,
+): void {
+  if (!reporter) return;
+  const [start, end] = RESTORE_PHASE_RANGES[phase];
+  const fraction = totalBytes > 0 ? Math.min(1, Math.max(0, completedBytes / totalBytes)) : 0;
+  const byteBacked = phase === 'decrypting' || phase === 'verifying' || phase === 'restoring';
+  reporter({
+    phase,
+    progress: phase === 'complete' ? 1 : start + (end - start) * fraction,
+    completedBytes: byteBacked ? Math.max(0, completedBytes) : 0,
+    totalBytes: byteBacked ? Math.max(0, totalBytes) : 0,
+  });
 }
 
 /**
@@ -769,6 +858,339 @@ export function restoreBackupArchive(archive: Buffer, password: string): BackupR
       ? 'Importación completa: biblioteca, texto extraído, embeddings, pasajes, modelos, grafo y claves API restaurados.'
       : 'Importación completa: biblioteca, texto extraído, embeddings, pasajes, modelos y grafo restaurados. Las claves API locales se han conservado (la copia automática no las incluye).',
   };
+}
+
+class RestoreByteTracker {
+  private completed = 0;
+  readonly total: number;
+
+  constructor(
+    payload: ZipFileReader,
+    names: ReadonlySet<string>,
+    private readonly reporter?: (progress: RecoveryRestoreProgress) => void,
+  ) {
+    this.total = payload.entries.reduce(
+      (total, entry) => total + (!entry.isDirectory && names.has(entry.name) ? entry.uncompressedSize : 0),
+      0,
+    );
+    emitRestoreProgress(this.reporter, 'restoring', 0, this.total);
+  }
+
+  readonly advance = (chunkBytes: number): void => {
+    this.completed = Math.min(this.total, this.completed + Math.max(0, chunkBytes));
+    emitRestoreProgress(this.reporter, 'restoring', this.completed, this.total);
+  };
+
+  finish(): void {
+    this.completed = this.total;
+    emitRestoreProgress(this.reporter, 'restoring', this.completed, this.total);
+  }
+}
+
+function plannedRestoreEntries(
+  payload: ZipFileReader,
+  payloadManifest: StreamedInnerManifest,
+  formatVersion: number,
+): Set<string> {
+  const names = new Set<string>();
+  const add = (name: string): void => { if (payload.entry(name)) names.add(name); };
+  add('api-keys.json');
+  add('audio-keys.json');
+  if (formatVersion < 4) {
+    add('database.sqlite');
+    add('settings.json');
+    add('backup-inventory.json');
+    return names;
+  }
+
+  for (const vault of streamedVaultEntries(payloadManifest) ?? []) {
+    add(vault.dbFile);
+    add(vault.inventoryFile);
+  }
+  if (payloadManifest.globalLibrary) {
+    const prefix = `${payloadManifest.globalLibrary.prefix}/`;
+    for (const entry of payload.entries) if (!entry.isDirectory && entry.name.startsWith(prefix)) names.add(entry.name);
+  }
+
+  const selection = normalizeBackupSelection(payloadManifest.selection as Partial<BackupSelection> | undefined, false);
+  if (selection.includePreferences) {
+    for (const name of GLOBAL_AUXILIARY_FILES) add(`aux/global/${name}`);
+  }
+  for (const vault of streamedVaultEntries(payloadManifest) ?? []) {
+    if (selection.includeHistories) {
+      for (const name of VAULT_HISTORY_FILES) add(`aux/vaults/${vault.id}/${name}`);
+    }
+    if (selection.includeGeneratedMedia) {
+      for (const name of VAULT_MEDIA_FILES) add(`aux/vaults/${vault.id}/${name}`);
+      const prefix = `aux/vaults/${vault.id}/audio/`;
+      for (const entry of payload.entries) if (!entry.isDirectory && entry.name.startsWith(prefix)) names.add(entry.name);
+    }
+  }
+  return names;
+}
+
+async function readStreamedJson<T>(payload: ZipFileReader, name: string, tracker?: RestoreByteTracker): Promise<T | null> {
+  const entry = payload.entry(name);
+  if (!entry) return null;
+  const value = JSON.parse((await payload.read(entry, 16 * 1024 * 1024)).toString('utf8')) as T;
+  tracker?.advance(entry.uncompressedSize);
+  return value;
+}
+
+async function extractAtomicEntry(payload: ZipFileReader, entry: ZipFileEntry, target: string, tracker?: RestoreByteTracker): Promise<void> {
+  fs.mkdirSync(path.dirname(target), { recursive: true });
+  const temporary = `${target}.restore-${process.pid}-${Math.random().toString(36).slice(2)}`;
+  try {
+    await payload.extract(entry, temporary, tracker?.advance);
+    await fs.promises.rename(temporary, target);
+  } catch (error) {
+    await fs.promises.rm(temporary, { force: true });
+    throw error;
+  }
+}
+
+function streamedVaultEntries(manifest: StreamedInnerManifest): BackupVaultEntry[] | null {
+  if (!manifest.vaults?.length) return null;
+  const vaults: BackupVaultEntry[] = [];
+  for (const candidate of manifest.vaults) {
+    if (
+      typeof candidate.id !== 'string' || !candidate.id
+      || typeof candidate.name !== 'string' || !candidate.name
+      || candidate.id === '.' || candidate.id === '..'
+      || candidate.id.includes('/') || candidate.id.includes('\\')
+      || !isVaultType(candidate.type)
+      || typeof candidate.dbFile !== 'string' || !candidate.dbFile
+      || typeof candidate.inventoryFile !== 'string' || !candidate.inventoryFile
+    ) return null;
+    vaults.push({
+      id: candidate.id,
+      name: candidate.name,
+      type: candidate.type,
+      legacy: candidate.legacy === true,
+      dbFile: candidate.dbFile,
+      inventoryFile: candidate.inventoryFile,
+    });
+  }
+  return vaults;
+}
+
+async function stageGlobalLibraryRestoreFromFile(
+  payload: ZipFileReader,
+  payloadManifest: StreamedInnerManifest,
+  tracker?: RestoreByteTracker,
+): Promise<StagedGlobalLibrary | null> {
+  const descriptor = payloadManifest.globalLibrary;
+  if (!descriptor) return null;
+  const root = configuredLibraryRoot();
+  if (!root) throw new Error('Configura una carpeta de copias antes de restaurar una copia que contiene la Biblioteca global.');
+  const parent = path.dirname(root);
+  fs.mkdirSync(parent, { recursive: true });
+  const staging = path.join(parent, `.nodus-library-restore-${process.pid}-${Math.random().toString(36).slice(2)}`);
+  fs.mkdirSync(staging, { recursive: false });
+  let written = 0;
+  try {
+    const prefix = `${descriptor.prefix}/`;
+    for (const entry of payload.entries) {
+      if (entry.isDirectory || !entry.name.startsWith(prefix)) continue;
+      const relative = safeArchiveRelative(entry.name.slice(prefix.length));
+      if (!relative) throw new Error(`La copia contiene una ruta de Biblioteca no válida: ${entry.name}`);
+      const target = path.resolve(staging, ...relative.split('/'));
+      if (!target.startsWith(`${path.resolve(staging)}${path.sep}`)) throw new Error('La copia intenta escribir fuera de la Biblioteca.');
+      await payload.extract(entry, target, tracker?.advance);
+      written += 1;
+    }
+    if (written !== descriptor.fileCount) throw new Error('La copia no contiene todos los archivos declarados de la Biblioteca global.');
+    return { root, staging };
+  } catch (error) {
+    fs.rmSync(staging, { recursive: true, force: true });
+    throw error;
+  }
+}
+
+async function restoreAllVaultsFromFile(
+  payload: ZipFileReader,
+  payloadManifest: StreamedInnerManifest,
+  tracker?: RestoreByteTracker,
+): Promise<{ ok: true; restored: number } | { ok: false; message: string }> {
+  const vaults = streamedVaultEntries(payloadManifest);
+  if (!vaults) return { ok: false, message: 'Copia inválida: el archivo no contiene bóvedas válidas.' };
+  const staged: { entry: BackupVaultEntry; tmp: string }[] = [];
+  const cleanup = () => staged.forEach((item) => fs.rmSync(item.tmp, { force: true }));
+  try {
+    for (const vault of vaults) {
+      const dbEntry = payload.entry(vault.dbFile);
+      if (!dbEntry) return { ok: false, message: `Copia inválida: falta la base de datos de la bóveda «${vault.name}».` };
+      const tmp = path.join(app.getPath('temp'), `nodus-import-${Date.now()}-${Math.random().toString(36).slice(2)}.sqlite`);
+      await payload.extract(dbEntry, tmp, tracker?.advance);
+      staged.push({ entry: vault, tmp });
+      const inventory = await readStreamedJson<BackupInventory>(payload, vault.inventoryFile, tracker);
+      if (inventory && !databaseMatchesInventory(tmp, inventory)) {
+        return { ok: false, message: `Copia inválida: faltan datos en la bóveda «${vault.name}».` };
+      }
+    }
+
+    const machineLocal = captureMachineLocalSettings();
+    closeDb();
+    for (const { entry, tmp } of staged) {
+      applyMachineLocalSettings(tmp, machineLocal.get(entry.id) ?? null);
+      restoreVaultDatabase(entry, tmp);
+    }
+    const activeId = payloadManifest.activeVaultId ?? vaults[0].id;
+    try { setActiveVault(activeId); } catch { /* keep the current vault if absent */ }
+    getDb();
+    return { ok: true, restored: staged.length };
+  } finally {
+    cleanup();
+  }
+}
+
+async function restoreAuxiliaryFilesFromFile(
+  payload: ZipFileReader,
+  payloadManifest: StreamedInnerManifest,
+  tracker?: RestoreByteTracker,
+): Promise<void> {
+  const selection = normalizeBackupSelection(payloadManifest.selection as Partial<BackupSelection> | undefined, false);
+  if (selection.includePreferences) {
+    let restoredBookmarks = false;
+    for (const name of GLOBAL_AUXILIARY_FILES) {
+      const entry = payload.entry(`aux/global/${name}`);
+      if (!entry) continue;
+      if (name === 'app-prefs.json') {
+        restoreGlobalPreferences(await payload.read(entry, 16 * 1024 * 1024));
+        tracker?.advance(entry.uncompressedSize);
+      } else await extractAtomicEntry(payload, entry, path.join(app.getPath('userData'), name), tracker);
+      if (name === 'browser-bookmarks.json') restoredBookmarks = true;
+    }
+    if (restoredBookmarks) browserBookmarksRepository().reloadFromDisk();
+  }
+
+  const restoredVaults = new Map(listVaults().map((vault) => [vault.id, vault]));
+  for (const vaultEntry of streamedVaultEntries(payloadManifest) ?? []) {
+    const vault = restoredVaults.get(vaultEntry.id);
+    if (!vault) continue;
+    const targetDir = path.dirname(vault.path);
+    if (selection.includeHistories) {
+      for (const name of VAULT_HISTORY_FILES) {
+        const entry = payload.entry(`aux/vaults/${vault.id}/${name}`);
+        if (entry) await extractAtomicEntry(payload, entry, path.join(targetDir, name), tracker);
+      }
+    }
+    if (selection.includeGeneratedMedia) {
+      for (const name of VAULT_MEDIA_FILES) {
+        const entry = payload.entry(`aux/vaults/${vault.id}/${name}`);
+        if (entry) await extractAtomicEntry(payload, entry, path.join(targetDir, name), tracker);
+      }
+      const prefix = `aux/vaults/${vault.id}/audio/`;
+      for (const entry of payload.entries) {
+        if (entry.isDirectory || !entry.name.startsWith(prefix)) continue;
+        const relative = safeArchiveRelative(entry.name.slice(prefix.length));
+        if (relative) await extractAtomicEntry(payload, entry, path.join(targetDir, 'audio', ...relative.split('/')), tracker);
+      }
+    }
+  }
+}
+
+/** Restore a fully authenticated file-backed archive while keeping large vaults
+ * and media entries on disk throughout the operation. */
+export async function restoreBackupArchiveFile(
+  archivePath: string,
+  password: string,
+  onProgress?: (progress: RecoveryRestoreProgress) => void,
+): Promise<BackupRestoreResult> {
+  if (!password.trim()) return { ok: false, message: 'Importación cancelada: falta la contraseña de la copia.' };
+  const opened = await openVerifiedBackupFile(archivePath, password, SCHEMA_VERSION, (phase, completedBytes, totalBytes) => {
+    emitRestoreProgress(onProgress, phase, completedBytes, totalBytes);
+  });
+  if (!opened.ok) return opened;
+  const { manifest, payload, payloadManifest, includesSecrets, recoveredKey, usedRecoveryKey } = opened;
+  const tracker = new RestoreByteTracker(payload, plannedRestoreEntries(payload, payloadManifest, manifest.formatVersion), onProgress);
+  try {
+    const importedKeys = await readStreamedJson<Partial<Record<AiProvider, string>>>(payload, 'api-keys.json', tracker) ?? {};
+    const importedAudioKeys = await readStreamedJson<Record<string, string>>(payload, 'audio-keys.json', tracker) ?? {};
+
+    if (manifest.formatVersion >= 4) {
+      const stagedLibrary = await stageGlobalLibraryRestoreFromFile(payload, payloadManifest, tracker);
+      try {
+        const result = await restoreAllVaultsFromFile(payload, payloadManifest, tracker);
+        if (!result.ok) {
+          cleanupStagedGlobalLibrary(stagedLibrary);
+          return result;
+        }
+        if (manifest.formatVersion >= 5) await restoreAuxiliaryFilesFromFile(payload, payloadManifest, tracker);
+        applyStagedGlobalLibrary(stagedLibrary);
+        if (includesSecrets) {
+          restoreApiKeys(importedKeys);
+          restoreAudioKeys(importedAudioKeys);
+        }
+        tracker.finish();
+        return {
+          ok: true,
+          message: includesSecrets
+            ? `Importación completa: ${result.restored} bóveda(s) con su biblioteca, embeddings, grafo y claves API restauradas.`
+            : `Importación completa: ${result.restored} bóveda(s) restauradas (biblioteca, embeddings y grafo). Las claves API locales se han conservado (la copia automática no las incluye).`,
+          recoveryKey: recoveredKey,
+          usedRecoveryKey,
+        };
+      } catch (error) {
+        cleanupStagedGlobalLibrary(stagedLibrary);
+        throw error;
+      }
+    }
+
+    const dbEntry = payload.entry('database.sqlite');
+    if (!dbEntry) return { ok: false, message: 'Copia inválida: falta la base de datos.' };
+    const importedSettings = await readStreamedJson<BackupSettings>(payload, 'settings.json', tracker);
+    const inventory = await readStreamedJson<BackupInventory>(payload, 'backup-inventory.json', tracker);
+    if (manifest.formatVersion >= 2 && !inventory) return { ok: false, message: 'Copia inválida: falta el inventario de datos.' };
+    if (inventory && !settingsMatchInventory(importedSettings, importedKeys, inventory)) {
+      return { ok: false, message: 'Copia inválida: la configuración de modelos o claves no coincide con su inventario.' };
+    }
+    const tmp = path.join(app.getPath('temp'), `nodus-import-${Date.now()}-${Math.random().toString(36).slice(2)}.sqlite`);
+    try {
+      await payload.extract(dbEntry, tmp, tracker.advance);
+      if (inventory && !databaseMatchesInventory(tmp, inventory)) {
+        return { ok: false, message: 'Copia inválida: faltan datos o embeddings en la instantánea de base de datos.' };
+      }
+      const localPaths = captureMachineLocalSettings().get(getActiveVault().id) ?? null;
+      closeDb();
+      replaceDbFile(tmp);
+      if (importedSettings) {
+        const restoredSettings = {
+          ...importedSettings,
+          mcpEnabled: false,
+          mcpToken: '',
+          nodusServerEnabled: false,
+          nodusServerKind: 'classic',
+          nodusServerUrl: '',
+          nodusServerSpaceId: '',
+          nodusServerSpaceName: '',
+        } as Record<string, unknown>;
+        for (const key of MACHINE_LOCAL_SETTING_KEYS) {
+          if (localPaths && localPaths[key] !== undefined) restoredSettings[key] = localPaths[key];
+          else delete restoredSettings[key];
+        }
+        getDb().prepare('INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value')
+          .run('app', JSON.stringify(restoredSettings));
+      }
+      if (includesSecrets) {
+        restoreApiKeys(importedKeys);
+        restoreAudioKeys(importedAudioKeys);
+      }
+      tracker.finish();
+      return {
+        ok: true,
+        message: includesSecrets
+          ? 'Importación completa: biblioteca, texto extraído, embeddings, pasajes, modelos, grafo y claves API restaurados.'
+          : 'Importación completa: biblioteca, texto extraído, embeddings, pasajes, modelos y grafo restaurados. Las claves API locales se han conservado (la copia automática no las incluye).',
+        recoveryKey: recoveredKey,
+        usedRecoveryKey,
+      };
+    } finally {
+      fs.rmSync(tmp, { force: true });
+    }
+  } finally {
+    await opened.cleanup();
+  }
 }
 
 interface StagedGlobalLibrary {

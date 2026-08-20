@@ -8191,4 +8191,7 @@ export const FR: Record<string, string> = {
   "La copia previa se abrió como un vault separado.": "La copie antérieure à la migration a été ouverte comme coffre séparé.",
   "Abriendo…": "Ouverture…",
   "Abrir como vault separado": "Ouvrir comme coffre séparé",
+  "Descifrando…": "Déchiffrement…",
+  "Finalizando…": "Finalisation…",
+  "Progreso de restauración": "Progression de la restauration",
 };

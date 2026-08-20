@@ -7950,4 +7950,7 @@ export const TR: Record<string, string> = {
   "Antes de cambiar el esquema, Nodus conserva una copia inmutable y verificada. Puedes abrirla como un vault separado sin sustituir el actual.": "Nodus, şemayı değiştirmeden önce değiştirilemez ve doğrulanmış bir kopya saklar. Geçerli kasanın yerine koymadan ayrı bir kasa olarak açabilirsiniz.",
   "La copia previa se abrió como un vault separado.": "Geçiş öncesi kopya ayrı bir kasa olarak açıldı.",
   "Abrir como vault separado": "Ayrı kasa olarak aç",
+  "Descifrando…": "Şifre çözülüyor…",
+  "Finalizando…": "Tamamlanıyor…",
+  "Progreso de restauración": "Geri yükleme ilerlemesi",
 };
