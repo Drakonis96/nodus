@@ -306,6 +306,9 @@ async function assertRendererContracts() {
   const preload = await Promise.resolve(readSource('@bridge'));
   const ipc = await Promise.resolve(readSource('@main'));
 
+  assert.match(graphView, /const USE_SIGMA = true;/, 'Sigma is the only selectable graph renderer');
+  assert.doesNotMatch(graphView, /localStorage\.getItem\(['"]nodus\.graph\.engine['"]\)/, 'retired renderer cannot be restored by persisted browser state');
+  assert.match(graphView, /localStorage\.removeItem\(['"]nodus\.graph\.engine['"]\)/, 'stale renderer preferences are removed from upgraded profiles');
   assert.match(graphView, /if \(USE_SIGMA\) return \[\];/, 'Sigma path skips legacy Cytoscape elements');
   assert.match(graphView, /getGraphOverview\(\)/, 'initial scene uses the compact overview endpoint');
   assert.match(graphView, /getGraphTheme\(/, 'theme drill-down uses the bounded endpoint');
