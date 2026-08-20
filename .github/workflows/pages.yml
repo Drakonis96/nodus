@@ -5,6 +5,9 @@ on:
     branches: [main]
     paths:
       - 'site/**'
+      - 'scripts/build-blog-pages.mjs'
+      - 'scripts/build-blog-feed.mjs'
+      - 'scripts/build-sitemap.mjs'
       - '.github/workflows/pages.yml'
   schedule:
     # Keep one shared download-count cache on the site instead of making every
@@ -34,10 +37,12 @@ jobs:
           ref: ${{ github.event_name == 'schedule' && 'main' || github.ref }}
 
       - name: Set up Node
-        if: github.event_name == 'schedule'
         uses: actions/setup-node@v7
         with:
           node-version: 22
+
+      - name: Generate static blog pages, feed and sitemap
+        run: npm run blog:build
 
       - name: Refresh shared release download totals
         if: github.event_name == 'schedule'

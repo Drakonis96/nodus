@@ -73,6 +73,13 @@ const PAGES = {
         </script>
         <h1>Storage seeded</h1></main></body></html>`,
 
+  '/nodus-site': `<!doctype html><html><head><title>Nodus site fixture</title>
+        <style>nav{display:flex;gap:12px;padding:20px}a{padding:10px;color:white;background:#241b38}</style>
+        </head><body><nav aria-label="Nodus Research">
+        <a href="/">Home</a>
+        <a href="#nodus-bookmarks" data-nodus-browser-bookmarks hidden>Bookmarks</a>
+        </nav><main><h1>Nodus Research</h1></main></body></html>`,
+
   '/download': `<!doctype html><html><head><title>Download page</title></head><body><main>
         <a id="slow-download" href="/slow-download.bin" download>Download slowly</a>
         </main></body></html>`,
@@ -516,6 +523,41 @@ try {
     assert.equal(exposed.process, 'undefined', 'a page must not see process');
     assert.equal(exposed.ipc, 'undefined', 'a page must not see ipcRenderer');
     void browserView;
+  });
+
+  await check('the real-site Bookmarks slot appears only in Nodus without exposing a bridge', async () => {
+    await call('submitBrowserOmnibox', `${origin}/nodus-site`);
+    await waitFor((s) => s.tabs.some((tab) => tab.url === `${origin}/nodus-site` && !tab.loading), 'the Nodus site fixture');
+
+    const entry = await app.evaluate(async ({ webContents }, pageUrl) => {
+      const target = webContents.getAllWebContents().find((contents) => contents.getURL() === pageUrl);
+      if (!target) throw new Error(`the Nodus site fixture is missing at ${pageUrl}`);
+      return target.executeJavaScript(`(() => {
+        const link = document.querySelector('[data-nodus-browser-bookmarks]');
+        const rect = link?.getBoundingClientRect();
+        return {
+          hidden: link?.hasAttribute('hidden'),
+          text: link?.textContent,
+          nodus: typeof window.nodus,
+          rect: rect ? { x: rect.x, y: rect.y, width: rect.width, height: rect.height } : null,
+        };
+      })()`, true);
+    }, `${origin}/nodus-site`);
+    assert.equal(entry.hidden, false, 'the isolated preload did not reveal the prepared slot');
+    assert.equal(entry.text, 'Bookmarks');
+    assert.equal(entry.nodus, 'undefined', 'revealing the slot must not expose the app bridge');
+    assert.ok(entry.rect?.width > 0 && entry.rect?.height > 0, 'the Bookmarks entry is not clickable');
+
+    // Page JavaScript can manufacture a click, but the preload requires a real
+    // Chromium input event before it will ask main to leave the remote page.
+    await app.evaluate(async ({ webContents }, pageUrl) => {
+      const target = webContents.getAllWebContents().find((contents) => contents.getURL() === pageUrl);
+      await target?.executeJavaScript("document.querySelector('[data-nodus-browser-bookmarks]').click()", true);
+    }, `${origin}/nodus-site`);
+    await new Promise((resolve) => setTimeout(resolve, 150));
+    const afterSyntheticClick = await state();
+    assert.equal(afterSyntheticClick.tabs.find((tab) => tab.id === afterSyntheticClick.activeTabId)?.kind, 'web',
+      'a synthetic site click changed the active tab');
   });
 
   await check('a hostile page cannot reach Node, IPC, files, vault protocols or forbidden permissions', async () => {

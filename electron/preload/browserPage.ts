@@ -26,6 +26,7 @@
  */
 
 import { ipcRenderer } from 'electron';
+import { isNodusResearchSiteUrl } from '../../shared/browser';
 // One source of truth for page metadata: the SAME module the Chrome extension
 // loads. It is pure ESM with no Chrome API and no DOM access, so both consumers
 // share the Highwire / JSON-LD / COinS / Dublin Core / OpenGraph parsing rather
@@ -47,6 +48,57 @@ interface PageDoc {
 }
 
 const page = globalThis as unknown as { document?: PageDoc };
+
+interface BrowserBookmarksClick {
+  isTrusted?: boolean;
+  preventDefault(): void;
+}
+
+interface BrowserBookmarksEntry {
+  addEventListener(type: 'click', listener: (event: BrowserBookmarksClick) => void): void;
+  removeAttribute(name: string): void;
+}
+
+interface BrowserIntegrationDoc {
+  readyState?: string;
+  querySelector(selector: string): BrowserBookmarksEntry | null;
+  addEventListener(type: 'DOMContentLoaded', listener: () => void, options?: { once?: boolean }): void;
+}
+
+const integrationPage = globalThis as unknown as {
+  document?: BrowserIntegrationDoc;
+  location?: { href?: unknown };
+};
+
+/**
+ * Complete the public header only inside Nodus Browser.
+ *
+ * The website owns the inert, hidden slot; this isolated preload owns the
+ * action. Nothing is exposed in the page's JavaScript world, and synthetic
+ * clicks are ignored so first-party content cannot move the user into an
+ * internal page without a real gesture.
+ */
+function installNodusBookmarksEntry(): void {
+  const document = integrationPage.document;
+  if (!document || !isNodusResearchSiteUrl(String(integrationPage.location?.href ?? ''))) return;
+  const entry = document.querySelector('[data-nodus-browser-bookmarks]');
+  if (!entry) return;
+  entry.addEventListener('click', (event) => {
+    event.preventDefault();
+    if (event.isTrusted !== true) return;
+    ipcRenderer.send('nodus-browser:page:openBookmarks');
+  });
+  // Reveal only after the protected click handler is installed. If the preload
+  // ever fails, normal site navigation remains unchanged rather than exposing a
+  // dead local-only link.
+  entry.removeAttribute('hidden');
+}
+
+if (integrationPage.document?.readyState === 'loading') {
+  integrationPage.document.addEventListener('DOMContentLoaded', installNodusBookmarksEntry, { once: true });
+} else {
+  installNodusBookmarksEntry();
+}
 
 function mediaElements(): MediaEl[] {
   const found = page.document?.querySelectorAll('video, audio');

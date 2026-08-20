@@ -5,6 +5,22 @@ SPDX-License-Identifier: AGPL-3.0-only
 Home page components. The shared system lives in nodus.css.
 */
 
+/* Paint a close static approximation before WebGL has compiled its shaders.
+   The live field is opaque once awake, so this costs no extra compositing after
+   startup and prevents the first second from reading as an unloaded backdrop. */
+body {
+  background:
+    radial-gradient(900px 620px at 22% 8%, rgba(139, 92, 246, 0.2), transparent 62%),
+    radial-gradient(760px 520px at 84% 30%, rgba(34, 211, 238, 0.1), transparent 60%),
+    radial-gradient(680px 680px at 50% 92%, rgba(109, 40, 217, 0.16), transparent 64%),
+    var(--void);
+  background-attachment: fixed;
+}
+
+/* The static layer makes a long fade unnecessary: reveal the live field as
+   soon as its first frame exists. */
+#organism { transition-duration: 0.3s; }
+
 /* ============================================================ hero */
 .hero {
   position: relative;
@@ -13,6 +29,8 @@ Home page components. The shared system lives in nodus.css.
   place-items: center;
   padding: calc(var(--nav-h) + 40px) 0 90px;
   text-align: center;
+  -webkit-user-select: none;
+  user-select: none;
 }
 .hero-inner { width: min(100% - calc(var(--gut) * 2), 940px); margin-inline: auto; }
 
@@ -443,6 +461,11 @@ Home page components. The shared system lives in nodus.css.
 @keyframes n-breathe {
   0%, 100% { transform: translateY(0) scale(1); }
   50% { transform: translateY(-6px) scale(1.03); }
+}
+
+/* Keep the hero mark still on phones and other touch-first mobile devices. */
+@media (max-width: 700px), (hover: none) and (pointer: coarse) {
+  .hero .n-mark { animation: none; }
 }
 
 /* ============================================================ the opening

@@ -7,18 +7,47 @@ SPDX-License-Identifier: AGPL-3.0-only
 .hero-feed .arrow-link svg { transform: none; }
 .hero-feed .arrow-link:hover svg { transform: scale(1.12); }
 
-/* the RSS link leads to XML, which is right for a reader and puzzling in a
-   browser, so the address can also be taken straight to the clipboard */
-.feed-copy {
-  display: inline-flex; align-items: center; gap: 8px;
-  padding: 7px 14px; border-radius: 999px;
-  border: 1px solid var(--membrane); background: rgba(255, 255, 255, 0.045);
-  color: var(--ink-2); font: 600 13.5px var(--sans); cursor: pointer;
-  transition: border-color 0.3s var(--ease), color 0.3s var(--ease), background 0.3s var(--ease);
+/* ============================================================ RSS dialog */
+body.rss-modal-open { overflow: hidden; }
+.rss-modal[hidden] { display: none; }
+.rss-modal { position: fixed; inset: 0; z-index: 1000; display: grid; place-items: center; padding: 20px; }
+.rss-modal-backdrop { position: absolute; inset: 0; background: rgba(4, 3, 10, 0.8); backdrop-filter: blur(9px); }
+.rss-dialog {
+  position: relative; width: min(100%, 620px); padding: clamp(28px, 5vw, 46px);
+  border: 1px solid rgba(192, 132, 252, 0.38); border-radius: var(--r-xl);
+  background: linear-gradient(145deg, rgba(28, 21, 47, 0.98), rgba(10, 8, 18, 0.99));
+  box-shadow: 0 28px 90px rgba(0, 0, 0, 0.55), 0 0 70px rgba(139, 92, 246, 0.12);
+  outline: none;
 }
-.feed-copy svg { width: 15px; height: 15px; }
-.feed-copy:hover { color: var(--ink); border-color: var(--membrane-2); background: rgba(255, 255, 255, 0.07); }
-.feed-copy.copied { color: var(--good); border-color: rgba(52, 211, 153, 0.45); }
+.rss-dialog::before {
+  content: ''; position: absolute; inset: 0; pointer-events: none; border-radius: inherit;
+  background: radial-gradient(420px circle at 12% 0%, rgba(192, 132, 252, 0.14), transparent 67%);
+}
+.rss-modal-close {
+  position: absolute; z-index: 1; top: 16px; right: 18px; display: grid; place-items: center;
+  width: 38px; height: 38px; border: 1px solid var(--membrane); border-radius: 50%;
+  background: rgba(255, 255, 255, 0.04); color: var(--ink-2); font: 300 26px/1 var(--sans); cursor: pointer;
+}
+.rss-modal-close:hover { border-color: var(--membrane-2); color: var(--ink); }
+.rss-modal-icon {
+  display: grid; place-items: center; width: 54px; height: 54px; margin-bottom: 22px;
+  border: 1px solid rgba(192, 132, 252, 0.38); border-radius: 16px;
+  background: rgba(192, 132, 252, 0.1); color: var(--accent);
+}
+.rss-modal-icon svg { width: 25px; height: 25px; }
+.rss-dialog h2 { position: relative; margin: 12px 0 12px; font-size: clamp(25px, 4vw, 34px); letter-spacing: -0.035em; }
+.rss-dialog > p { position: relative; margin: 0; color: var(--ink-2); line-height: 1.65; }
+.rss-url-row { position: relative; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; margin-top: 26px; }
+.rss-url-row input {
+  min-width: 0; padding: 13px 15px; border: 1px solid var(--membrane); border-radius: var(--r-m);
+  background: rgba(0, 0, 0, 0.25); color: var(--ink); font: 500 13px/1.4 var(--mono); outline: none;
+}
+.rss-url-row input:focus { border-color: rgba(192, 132, 252, 0.65); box-shadow: 0 0 0 3px rgba(192, 132, 252, 0.1); }
+.rss-copy-button { white-space: nowrap; cursor: pointer; }
+.rss-copy-button svg { width: 17px; height: 17px; }
+.rss-dialog .rss-copy-status { min-height: 22px; margin-top: 8px; color: var(--good); font-size: 12.5px; }
+.rss-xml-link { position: relative; display: inline-block; margin-top: 15px; color: var(--ink-3); font-size: 13px; }
+.rss-xml-link:hover { color: var(--ink); }
 
 /* ============================================================ the list */
 .post-list { display: grid; gap: 16px; }
@@ -161,6 +190,10 @@ SPDX-License-Identifier: AGPL-3.0-only
 }
 
 @media (max-width: 620px) {
+  .rss-modal { padding: 12px; }
+  .rss-dialog { padding: 30px 22px 26px; }
+  .rss-url-row { grid-template-columns: 1fr; }
+  .rss-copy-button { justify-content: center; }
   .post-card { padding: 22px 20px; }
   .post-foot { flex-direction: column; }
   .post-foot .btn { justify-content: center; }

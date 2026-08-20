@@ -48,6 +48,48 @@ test('the home page presents the four main vaults, the rest, and the toolkit', (
   }
 });
 
+test('every live demo can switch directly to every other demo vault', () => {
+  const demoPages = ['index.html', 'teaching.html', 'study.html', 'databases.html', 'genealogy.html', 'worldbuilding.html'];
+  const switcher = read('demo/vault-switcher.js');
+
+  for (const page of demoPages) {
+    assert.match(read(`demo/${page}`), /src="vault-switcher\.js\?v=/, `${page} loads the shared vault switcher`);
+    assert.ok(switcher.includes(`page: '${page}'`), `${page} is offered by the vault panel`);
+  }
+  assert.match(switcher, /aria-expanded="false" aria-haspopup="menu"/, 'the centred badge exposes its menu state');
+  assert.match(switcher, /role="menuitem"/, 'each demo vault is keyboard reachable');
+  assert.match(switcher, /event\.key === 'Escape'/, 'Escape closes the vault panel');
+  for (const icon of ['network', 'presentation', 'graduation', 'table', 'tree', 'globe']) {
+    assert.match(switcher, new RegExp(`icon: '${icon}'`), `the switcher uses the app's ${icon} icon`);
+  }
+  assert.doesNotMatch(switcher, /symbol:/, 'no substitute text symbols remain in the switcher');
+});
+
+test('the academic web demo mirrors the current desktop navigation', () => {
+  const app = read('demo/app.js');
+  for (const group of ['Explore', 'Analyze', 'Write', 'Tools']) {
+    assert.ok(app.includes(`{ group: '${group}' }`), `the academic demo includes the ${group} group`);
+  }
+  for (const [id, label] of [
+    ['research', 'State of the art'],
+    ['workspace', 'Workspace'],
+    ['browser', 'Nodus Browser'],
+    ['toolkit', 'Nodus Toolkit'],
+  ]) {
+    assert.match(app, new RegExp(`id: '${id}', label: '${label}'`), `${label} is a current sidebar destination`);
+  }
+  for (const obsolete of [
+    "{ id: 'study', label: 'Study'",
+    "{ id: 'gaps', label: 'Gaps'",
+    "{ id: 'debate', label: 'Debates'",
+    "{ id: 'coverage', label: 'Coverage'",
+    "{ id: 'notes', label: 'Notes'",
+  ]) {
+    assert.ok(!app.includes(obsolete), `${obsolete} is no longer a standalone sidebar entry`);
+  }
+  assert.match(app, /aria-label="State of the art views"/, 'coverage, debates and gaps live in one tabbed workspace');
+});
+
 test('no page of the site loads a third-party tracker', () => {
   // the site carries no analytics container, and a page added later must not
   // quietly bring one back, so the whole tree is checked rather than page by page
@@ -103,8 +145,8 @@ test('the FAQ moved to its own page with every question intact', () => {
   }
 });
 
-test('the blog engine ships with an index, a renderer and a template, and no stray posts', () => {
-  for (const entry of ['blog/index.html', 'blog/post.html', 'blog/blog.js', 'blog/post.js', 'blog/markdown.js', 'blog/posts.json', 'blog/feed.xml']) {
+test('the blog engine ships with an index, static pages, a renderer and a template, and no stray posts', () => {
+  for (const entry of ['blog/index.html', 'blog/post.html', 'blog/blog.js', 'blog/markdown.js', 'blog/posts.json', 'blog/feed.xml']) {
     assert.ok(fs.existsSync(path.join(siteRoot, entry)), `site/${entry} exists`);
   }
   assert.ok(fs.existsSync(path.join(siteRoot, 'blog/posts/_template.md')), 'the post template documents how to add one');
@@ -121,6 +163,9 @@ test('the blog engine ships with an index, a renderer and a template, and no str
     assert.ok(files.includes(post.slug), `posts/${post.slug}.md exists`);
     assert.match(post.date, /^\d{4}-\d{2}-\d{2}$/, `${post.slug} has an ISO date`);
     assert.ok(post.title && post.summary, `${post.slug} has a title and a summary`);
+    if (!post.draft) {
+      assert.ok(fs.existsSync(path.join(siteRoot, 'blog', post.slug, 'index.html')), `blog/${post.slug}/index.html is generated`);
+    }
   }
   for (const slug of files) {
     assert.ok(index.posts.some((post) => post.slug === slug), `posts/${slug}.md is listed in posts.json`);
@@ -155,7 +200,7 @@ test('the blog renders Markdown without letting a post inject markup', () => {
 test('the source files carry no stray NUL bytes', () => {
   // markdown.js delimits its code-span placeholders with NUL escapes; writing the
   // byte itself would make git treat the file as binary.
-  for (const relative of ['blog/markdown.js', 'blog/blog.js', 'blog/post.js', 'assets/js/organism.js', 'assets/js/site.js', 'assets/js/home.js', 'assets/js/research-atlas.js']) {
+  for (const relative of ['blog/markdown.js', 'blog/blog.js', 'assets/js/organism.js', 'assets/js/site.js', 'assets/js/home.js', 'assets/js/research-atlas.js']) {
     assert.ok(!fs.readFileSync(path.join(siteRoot, relative)).includes(0), `site/${relative} is plain text`);
   }
 });
@@ -185,7 +230,11 @@ test('the home page opens with the mark forming, and can never strand a visitor'
   assert.match(home, /classList\.add\('intro-armed'\)/, 'the opening is armed inline in <head>');
   assert.match(home, /prefers-reduced-motion: reduce/, 'reduced motion never arms the opening');
   // the same inline script owns a watchdog, so a missing home.js cannot leave a blank page
-  assert.match(home, /setTimeout\(function \(\) \{[\s\S]*?intro-done[\s\S]*?\}, 9000\)/, 'the inline watchdog reveals the page on its own');
+  assert.match(home, /setTimeout\(function \(\) \{[\s\S]*?intro-done[\s\S]*?\}, 6000\)/, 'the inline watchdog reveals the page on its own');
+  assert.match(css, /body \{[\s\S]*?radial-gradient[\s\S]*?background-attachment: fixed;/, 'a finished-looking background exists before WebGL starts');
+  assert.match(css, /#organism \{ transition-duration: 0\.3s; \}/, 'the live field replaces the static paint quickly');
+  assert.match(script, /const HOLD = 1200;/, 'the opening releases promptly instead of holding an empty hero');
+  assert.match(css, /\.hero \{[\s\S]*?-webkit-user-select: none;[\s\S]*?user-select: none;/, 'visible hero copy cannot be accidentally selected');
 
   // three separately masked lines, one per beat of the motto
   assert.equal((home.match(/<span class="line"><i>/g) ?? []).length, 3, 'the motto is three animated lines');
@@ -198,6 +247,7 @@ test('the home page opens with the mark forming, and can never strand a visitor'
   assert.match(css, /\.intro-armed[\s\S]*?main > section,[\s\S]*?\{ opacity: 0; \}/, 'the page below the hero is held back');
   assert.match(css, /html\.intro-armed \{ overflow: hidden; \}/, 'scroll is locked while it plays');
   assert.match(css, /scrollbar-gutter: stable/, 'locking scroll must not shift the layout');
+  assert.match(css, /@media \(max-width: 700px\), \(hover: none\) and \(pointer: coarse\) \{\s*\.hero \.n-mark \{ animation: none; \}/, 'the N mark stays still on mobile devices');
 
   // and it is always escapable
   assert.match(script, /skip\.className = 'intro-skip'/, 'a skip control is offered');

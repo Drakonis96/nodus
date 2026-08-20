@@ -90,6 +90,26 @@ test('Browser preload replies are scoped to the exact tab and its main frame', (
     'remote page channels must never be registered on the global IPC bus');
 });
 
+test('the website Bookmarks entry is first-party, gesture-only and opens no bridge', () => {
+  const preload = code('electron/preload/browserPage.ts');
+  const tabs = code('electron/browser/tabs.ts');
+  const contract = code('shared/browser.ts');
+
+  assert.match(preload, /isNodusResearchSiteUrl/);
+  assert.match(preload, /event\.isTrusted\s*!==\s*true/,
+    'site content must not activate Bookmarks with a synthetic click');
+  assert.match(preload, /ipcRenderer\.send\('nodus-browser:page:openBookmarks'\)/);
+  assert.doesNotMatch(preload, /NODUS_BOOKMARKS_URL/,
+    'the remote renderer must never receive or navigate the internal URL');
+
+  assert.match(tabs, /contents\.ipc\.on\('nodus-browser:page:openBookmarks'/);
+  assert.match(tabs, /event\.sender\s*!==\s*contents\s*\|\|\s*event\.senderFrame\s*!==\s*contents\.mainFrame/);
+  assert.match(tabs, /isNodusResearchSiteUrl\(contents\.getURL\(\)\)/);
+  assert.match(tabs, /tab\.id\s*!==\s*activeTabId/,
+    'a hidden background page must never redirect the visible tab');
+  assert.match(contract, /url\.protocol\s*===\s*'https:'[\s\S]*url\.hostname\s*===\s*'nodusresearch\.com'/);
+});
+
 test('certificate errors are never overridden', () => {
   // Chromium validates; Nodus only reflects. Calling preventDefault() on this
   // event is what "proceed anyway" would be, and v1 has no such path.

@@ -55,6 +55,9 @@
     flask: I('<path d="M10 2v6L4.5 18a2 2 0 0 0 1.8 3h11.4a2 2 0 0 0 1.8-3L14 8V2"/><path d="M8 2h8"/>'),
     route: I('<circle cx="6" cy="19" r="2"/><circle cx="18" cy="5" r="2"/><path d="M8 19h7a3 3 0 0 0 0-6H9a3 3 0 0 1 0-6h7"/>'),
     network: I('<circle cx="12" cy="5" r="2.5"/><circle cx="5" cy="19" r="2.5"/><circle cx="19" cy="19" r="2.5"/><path d="M12 7.5 6 17M12 7.5 18 17M7.5 19h9"/>'),
+    globe: I('<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a15 15 0 0 1 0 18M12 3a15 15 0 0 0 0 18"/>'),
+    tools: I('<path d="M14.7 6.3a4 4 0 0 0-5-5L12 3.6 9.6 6 7.3 3.7a4 4 0 0 0 5 5L5 16l3 3 7.3-7.3a4 4 0 0 0 5-5L18 9l-3-3 2.3-2.3a4 4 0 0 0-2.6 2.6Z"/>'),
+    telescope: I('<path d="m6 11 8-5 3 5-8 5-3-5Z"/><path d="m14 6 2-1.2 3 5-2 1.2M9 16l-2 5M12 14l4 7M5 21h13"/>'),
     edit: I('<path d="M17 3a2.8 2.8 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3Z"/>'),
     folder: I('<path d="M4 4h5l2 3h9a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Z"/>'),
     notebook: I('<path d="M6 2h12a2 2 0 0 1 2 2v16a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2Z"/><path d="M8 2v20M13 7h4M13 11h4"/>'),
@@ -92,24 +95,23 @@
     { group: 'Explore' },
     { id: 'search', label: 'Search', icon: 'search' },
     { id: 'library', label: 'Library', icon: 'book' },
-    { id: 'graph', label: 'Graph', icon: 'layers' },
-    { id: 'argument', label: 'Argument map', icon: 'map' },
+    { id: 'graph', label: 'Graph', icon: 'network' },
+    { id: 'argument', label: 'Argument map', icon: 'layers' },
     { id: 'ideas', label: 'Ideas', icon: 'bulb' },
     { id: 'authors', label: 'Authors', icon: 'graduation' },
     { group: 'Analyze' },
-    { id: 'study', label: 'Study', icon: 'compass' },
     { id: 'immersion', label: 'Immersion', icon: 'target' },
-    { id: 'gaps', label: 'Gaps', icon: 'gap' },
-    { id: 'debate', label: 'Debates', icon: 'scale' },
-    { id: 'coverage', label: 'Coverage', icon: 'help' },
+    { id: 'research', label: 'State of the art', icon: 'compass' },
     { id: 'hypothesis', label: 'Hypotheses', icon: 'flask' },
     { id: 'reading', label: 'Reading path', icon: 'route' },
-    { id: 'deepResearch', label: 'Deep Research', icon: 'network' },
+    { id: 'deepResearch', label: 'Deep Research', icon: 'telescope' },
     { group: 'Write' },
+    { id: 'workspace', label: 'Workspace', icon: 'notebook' },
     { id: 'writing', label: 'Writing', icon: 'edit' },
     { id: 'projects', label: 'Projects', icon: 'folder' },
-    { id: 'notes', label: 'Notes', icon: 'notebook' },
-    { group: '' },
+    { group: 'Tools' },
+    { id: 'browser', label: 'Nodus Browser', icon: 'globe' },
+    { id: 'toolkit', label: 'Nodus Toolkit', icon: 'tools' },
     { id: 'settings', label: 'Settings', icon: 'settings' },
   ];
 
@@ -122,6 +124,7 @@
     draft: 'wd1',
     note: 'nn1',
     settingsTab: 'providers',
+    researchTab: 'coverage',
     graphPreset: 'Overview',
     quiz: {},               // imId -> chosen index
     toggles: { autoAnalyze: false, readTag: true, animations: true, ocr: false, mcp: true, word: true, autoBackup: true, prerelease: false },
@@ -496,20 +499,30 @@
   const title = (icon, label, sub) => `<h1 class="view-title">${ICONS[icon]} ${label}</h1><p class="view-sub">${sub}</p>`;
 
   VIEWS.home = () => `
-    ${title('home', 'Home', 'Operational status of Zotero, analysis, graph and next steps.')}
-    <div class="card" style="border-color:rgba(99,102,241,0.4);background:linear-gradient(120deg,rgba(99,102,241,0.08),transparent)">
+    <section class="academic-hero">
+      <div class="academic-eyebrow">${ICONS.book} Academic vault</div>
+      <h1>Your research workspace</h1>
+      <p>Organize your corpus, connect ideas and turn analysis into next steps from a local, private workspace.</p>
+    </section>
+    <div class="card next-step-card">
       <div class="small" style="letter-spacing:0.08em;text-transform:uppercase;color:var(--text-3);font-weight:700">Recommended next step</div>
       <h3 style="font-size:17px;margin-top:6px">Open the graph — 1 contradiction is waiting</h3>
-      <p class="muted small" style="margin:4px 0 12px">Van Gog &amp; Sweller (2015) push back on your two strongest ideas. The Debates view sets both positions head to head.</p>
+      <p class="muted small" style="margin:4px 0 12px">Van Gog &amp; Sweller (2015) push back on your two strongest ideas. State of the art sets both positions head to head.</p>
       <button class="btn primary" onclick="go('debate')">Review the debate</button>
+    </div>
+    <div class="card corpus-health" style="margin-top:14px">
+      <div class="view-head"><div><h3>Corpus health</h3><p class="muted small" style="margin:2px 0 10px">What is left to analyse, index or recover.</p></div><span class="muted small">${D.works.length} works</span></div>
+      <div class="health-grid">
+        <div><span>No text</span><b>0</b></div><div><span>Light analysis only</span><b>0</b></div><div><span>Priority to analyse</span><b>0</b></div><div><span>Embeddings</span><b>up to date</b></div>
+      </div>
     </div>
     <div class="grid cols-3" style="margin-top:14px">
       ${[
         ['Corpus', `${D.works.length}`, 'works synced', 'library', 'Library', 83],
-        ['Analysis', `${D.works.length}/${D.works.length}`, 'with themes & ideas', 'graph', 'Open graph', 100],
+        ['Analysis', `${D.works.length}/${D.works.length}`, 'with themes & ideas', 'graph', 'Analyze', 100],
         ['Graph', `${D.ideas.length}`, 'navigable ideas', 'graph', 'Open graph', 90],
-        ['Gaps & reading', `${D.gaps.length}`, 'mined gaps', 'gaps', 'Review', 60],
-        ['Debates', `${D.debates.length}`, 'live contradiction', 'debate', 'Open', 40],
+        ['State of the art', `${D.coverage.length}`, 'questions mapped', 'research', 'Review', 72],
+        ['Workspace', `${D.notes.reduce((sum, folder) => sum + folder.notes.length, 0)}`, 'notes and ideas', 'workspace', 'Open', 76],
         ['Writing', 'ready', 'academic workshop', 'writing', 'Open', 100],
       ].map(([t, n, s, view, cta, pct]) => `
         <div class="card click" onclick="go('${view}')">
@@ -519,21 +532,15 @@
           <div class="stat">${n} <span class="small muted" style="font-weight:400">${s}</span></div>
           <div class="progress"><div style="width:${pct}%"></div></div>
         </div>`).join('')}
-    </div>
-    <div class="card" style="margin-top:14px">
-      <h3>Corpus health</h3>
-      <p class="muted small" style="margin:2px 0 10px">What is left to analyse, index or recover.</p>
-      <div class="tag-row">
-        <span class="chip"><span class="dot" style="background:var(--green)"></span>0 works without text</span>
-        <span class="chip"><span class="dot" style="background:var(--green)"></span>0 light analysis only</span>
-        <span class="chip"><span class="dot" style="background:var(--green)"></span>embeddings up to date</span>
-        <span class="chip link" onclick="go('reading')"><span class="dot" style="background:var(--amber)"></span>2 works still unread</span>
-      </div>
     </div>`;
 
   VIEWS.search = () => `
-    ${title('search', 'Search', 'Semantic + exact search across ideas, authors, themes and passages.')}
-    <input class="search-input" id="search-box" placeholder="Search by idea, author or theme… (try “complexity”)" autocomplete="off"/>
+    <div class="search-heading">
+      ${title('search', 'Global search', 'Search across notes, ideas, works, gaps, themes and authors.')}
+      <div class="segmented"><button class="active">Text</button><button>Meaning</button></div>
+    </div>
+    <input class="search-input search-hero-input" id="search-box" placeholder="Search across notes, ideas, works, gaps, themes and authors…" autocomplete="off"/>
+    <div class="pills search-scopes"><button class="pill active">${ICONS.notebook} Notes</button><button class="pill active">${ICONS.bulb} Ideas</button><button class="pill active">${ICONS.book} Works</button><button class="pill active">${ICONS.gap} Gaps</button><button class="pill active">Themes</button><button class="pill active">${ICONS.graduation} Authors</button></div>
     <div id="search-results" style="margin-top:16px"></div>`;
 
   function runSearch(q) {
@@ -559,34 +566,29 @@
         <p class="view-sub" style="margin-bottom:0">Works synced from Zotero. Click any work to see its extracted ideas and analysis state.</p>
       </div>
       <div class="tag-row">
-        <button class="btn ghost" onclick="UI.toast('In the app: run themes, ideas, summaries or embeddings across the filtered works.')">${ICONS.sparkle} Operations</button>
-        <button class="btn" onclick="UI.toast('In the app: pulls new and changed items from your monitored Zotero collections.')">${ICONS.sync} Sync now</button>
+        <div class="segmented"><button class="active">This vault</button><button>Enable Global</button></div>
+        <button class="btn ghost">${ICONS.folder} Collections</button>
       </div>
     </div>
-    <div class="toolbar" style="margin:16px 0 10px">
+    <div class="toolbar library-search" style="margin:16px 0 10px">
       <input class="search-input" style="flex:1;min-width:170px" placeholder="Search title or author…"/>
-      <button class="btn ghost small">${ICONS.list} Status</button>
-      <button class="btn ghost small">Zotero tags</button>
-      <button class="btn ghost small">${ICONS.folder} Collection</button>
+      <button class="btn ghost">${ICONS.list} Filters</button>
     </div>
     <div class="tag-row" style="margin-bottom:14px">
-      <span class="chip"><b style="color:var(--green)">6</b>&nbsp;themes done</span>
-      <span class="chip"><b>0</b>&nbsp;without themes</span>
-      <span class="chip"><b style="color:var(--green)">6</b>&nbsp;ideas done</span>
-      <span class="chip"><b>0</b>&nbsp;summaries done</span>
-      <span class="chip"><b style="color:var(--cyan)">6</b>&nbsp;embeddings pending</span>
+      <span class="muted small">${D.works.length} results with the current filters</span>
+      <button class="btn ghost small">${ICONS.check} Select the ${D.works.length} on this page</button>
+      <button class="btn primary small" onclick="UI.toast('In the app: opens the analysis pipeline for the selected works.')">${ICONS.compass} Process library</button>
     </div>
     <div class="card" style="padding:0;overflow-x:auto">
-      <table class="tbl"><thead><tr><th>Title</th><th>Authors</th><th>Year</th><th>Theme</th><th>Light</th><th>Deep</th><th>Passages</th><th>Ideas</th></tr></thead><tbody>
+      <table class="tbl"><thead><tr><th>Title</th><th>Authors</th><th>Year</th><th>Theme(s)</th><th>Ideas</th><th>Status</th><th>Actions</th></tr></thead><tbody>
       ${D.works.map((w) => `<tr class="rowlink" onclick="UI.work('${w.id}')">
         <td><b>${esc(w.title.length > 46 ? w.title.slice(0, 44) + '…' : w.title)}</b><div class="muted small">${WORK_TAG[w.id]}</div></td>
         <td class="muted" style="white-space:nowrap">${esc(AUTHORS_FULL[w.id])}</td>
         <td class="muted">${w.year}</td>
         <td class="muted" style="max-width:150px"><span style="display:inline-block;max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;vertical-align:bottom">${esc(themeById(w.themeIds[0]).label)}</span></td>
-        <td><span class="chip" style="color:var(--green);border-color:rgba(52,211,153,0.4)">light ✓</span></td>
-        <td><span class="chip" style="color:#a5b4fc;border-color:rgba(99,102,241,0.4)">deep ✓</span></td>
-        <td><span class="chip">${WORK_PASSAGES[w.id]}</span></td>
         <td>${D.ideas.filter((i) => i.work === w.id).length}</td>
+        <td><span class="chip" style="color:var(--amber);border-color:rgba(251,191,36,0.42)">${ICONS.file} Abstract only</span></td>
+        <td><button class="btn ghost small" onclick="event.stopPropagation();UI.toast('The desktop app can analyze this work from its attached file.')">Analyze</button></td>
       </tr>`).join('')}
       </tbody></table>
     </div>
@@ -594,7 +596,7 @@
 
   // ---- graph (canvas force layout) ----
   VIEWS.graph = () => `
-    ${title('layers', 'Graph', 'Every idea, theme and relation in the corpus — draggable, filterable, alive. Click a node.')}
+    ${title('network', 'Graph', 'Every idea, theme and relation in the corpus — draggable, filterable, alive. Click a node.')}
     <div class="pills" id="graph-presets">
       ${['Overview', 'Contradictions', 'Gaps', 'Reading', 'Authors'].map((p, i) => `<button class="pill ${i === 0 ? 'active' : ''}" data-p="${p}">${p}</button>`).join('')}
     </div>
@@ -748,7 +750,7 @@
     }).sort((a, b) => b.conns - a.conns);
     return `
     <div class="view-head">
-      <div>${title('map', 'Argument map', 'Every idea ranked by its argumentative connections: supports, contradictions and refinements. Click a route to expand its connected ideas.')}</div>
+      <div>${title('layers', 'Argument map', 'Every idea ranked by its argumentative connections: supports, contradictions and refinements. Click a route to expand its connected ideas.')}</div>
     </div>
     <div class="toolbar" style="margin-bottom:16px">
       <div class="pills" style="margin:0"><button class="pill active">Automatic</button><button class="pill">AI</button></div>
@@ -945,13 +947,15 @@
   }
 
   let gapTab = 'mined';
-  VIEWS.gaps = () => `
-    ${title('gap', 'Research gaps', 'Corpus aggregates: future work and limitations mined from the works, plus unreconciled contradictions. Click a gap for candidate sources.')}
+  const gapsContent = () => `
     <div class="pills">
       <button class="pill ${gapTab === 'mined' ? 'active' : ''}" onclick="UI.gapTab('mined')">Mined (${D.gaps.length})</button>
       <button class="pill ${gapTab === 'contra' ? 'active' : ''}" onclick="UI.gapTab('contra')">Contradictions (1)</button>
     </div>
     ${gapTab === 'mined' ? D.gaps.map(gapRow).join('') : contraRow()}`;
+  VIEWS.gaps = () => `
+    ${title('gap', 'Research gaps', 'Corpus aggregates: future work and limitations mined from the works, plus unreconciled contradictions. Click a gap for candidate sources.')}
+    ${gapsContent()}`;
 
   function gapRow(g) {
     const [label, color] = GAP_KIND[g.id];
@@ -986,10 +990,9 @@
     </div>`;
   }
 
-  VIEWS.debate = () => {
+  const debateContent = () => {
     const d = D.debates[0];
     return `
-    ${title('scale', 'Debates', 'Each contradiction set head to head: positions, authors, evidence and the chronology of the dispute. Evidence is clickable.')}
     <div class="card"><h3 style="font-size:16px">${esc(d.title)}</h3>
       <span class="chip"><span class="dot" style="background:var(--amber)"></span>open dispute</span>
     </div>
@@ -1009,9 +1012,11 @@
       <div class="timeline">${d.timeline.map((t) => `<div class="tl-item"><b>${t.year}</b> — <span class="muted">${esc(t.event)}</span></div>`).join('')}</div>
     </div>`;
   };
+  VIEWS.debate = () => `
+    ${title('scale', 'Debates', 'Each contradiction set head to head: positions, authors, evidence and the chronology of the dispute. Evidence is clickable.')}
+    ${debateContent()}`;
 
-  VIEWS.coverage = () => `
-    ${title('help', 'Coverage', 'Research questions tracked against what the corpus can actually answer. Click one for its evidence.')}
+  const coverageContent = () => `
     ${D.coverage.map((q) => `<div class="card click" onclick="UI.coverage('${q.id}')">
       <div style="display:flex;justify-content:space-between;gap:12px;align-items:flex-start">
         <h3>${esc(q.question)}</h3>
@@ -1020,6 +1025,25 @@
       <p class="muted small" style="margin:6px 0 0">${esc(q.note)}</p>
     </div>`).join('')}
     <button class="btn" style="margin-top:14px" onclick="UI.toast('In the app: the assistant drafts a new coverage question from your latest gaps.')">${ICONS.plus} New coverage question</button>`;
+  VIEWS.coverage = () => `
+    ${title('help', 'Coverage', 'Research questions tracked against what the corpus can actually answer. Click one for its evidence.')}
+    ${coverageContent()}`;
+
+  VIEWS.research = () => {
+    const panels = {
+      coverage: coverageContent,
+      debate: debateContent,
+      gaps: gapsContent,
+    };
+    return `
+      ${title('compass', 'State of the art', 'Coverage · Debates · Gaps')}
+      <div class="workspace-tabs" role="tablist" aria-label="State of the art views">
+        <button class="workspace-tab${state.researchTab === 'coverage' ? ' active' : ''}" role="tab" aria-selected="${state.researchTab === 'coverage'}" onclick="UI.researchTab('coverage')">${ICONS.help} Coverage</button>
+        <button class="workspace-tab${state.researchTab === 'debate' ? ' active' : ''}" role="tab" aria-selected="${state.researchTab === 'debate'}" onclick="UI.researchTab('debate')">${ICONS.scale} Debates</button>
+        <button class="workspace-tab${state.researchTab === 'gaps' ? ' active' : ''}" role="tab" aria-selected="${state.researchTab === 'gaps'}" onclick="UI.researchTab('gaps')">${ICONS.gap} Gaps</button>
+      </div>
+      <div class="research-workspace">${panels[state.researchTab]()}</div>`;
+  };
 
   VIEWS.hypothesis = () => `
     ${title('flask', 'Hypotheses', 'The Hypothesis Lab turns tensions in the graph into testable statements. Click one for its test design.')}
@@ -1154,7 +1178,7 @@
       </div>`).join('')}
     </div>`;
 
-  // ---- notes ----
+  // ---- unified workspace (notes + ideas + collections, as in the desktop app) ----
   function renderNoteBody(body) {
     return esc(body).replace(/\[(idea|debate|gap): ([^\]]+)\]/g, (m, kind, label) => {
       if (kind === 'idea') {
@@ -1169,14 +1193,22 @@
       return m;
     });
   }
-  VIEWS.notes = () => {
+  VIEWS.workspace = () => {
     let sel = null;
     D.notes.forEach((f) => f.notes.forEach((n) => { if (n.id === state.note) sel = n; }));
     if (!sel) sel = D.notes[0].notes[0];
     return `
-    ${title('notebook', 'Notes', 'Your own notes in folders — with nodus:// deep links straight into ideas, debates and gaps. Links are live here too.')}
+    <div class="view-head workspace-heading">
+      <div>${title('notebook', 'Workspace', `${D.notes.reduce((sum, folder) => sum + folder.notes.length, 0)} notes and ideas · ${D.notes.length} collections`)}</div>
+      <div class="tag-row">
+        <button class="btn ghost" onclick="UI.toast('In the app: creates an idea linked to the graph.')">${ICONS.bulb} Idea</button>
+        <button class="btn primary" onclick="UI.toast('In the app: creates a source-linked note in the selected collection.')">${ICONS.note} Note</button>
+      </div>
+    </div>
     <div class="notes-grid">
       <div class="card" style="padding:10px">
+        <div class="nav-group-label" style="padding:8px 12px 4px">Collections</div>
+        <div class="note-item active">${ICONS.layers} All <span class="muted" style="margin-left:auto">${D.notes.reduce((sum, folder) => sum + folder.notes.length, 0)}</span></div>
         ${D.notes.map((f) => `
           <div class="nav-group-label" style="padding:8px 12px 2px;display:flex;gap:7px;align-items:center">${ICONS.folder} ${esc(f.folder)}</div>
           ${f.notes.map((n) => `<div class="note-item${n.id === state.note ? ' active' : ''}" onclick="UI.note('${n.id}')">${ICONS.note} ${esc(n.title)}</div>`).join('')}`).join('')}
@@ -1190,6 +1222,34 @@
       </div>
     </div>`;
   };
+  VIEWS.notes = VIEWS.workspace;
+
+  VIEWS.browser = () => `
+    ${title('globe', 'Nodus Browser', 'Research the web without leaving Nodus and keep the current vault close at hand.')}
+    <div class="browser-toolbar">
+      <button class="btn ghost" aria-label="Back">${ICONS.chevronLeft}</button>
+      <button class="btn ghost" aria-label="Reload">${ICONS.sync}</button>
+      <div class="browser-address">${ICONS.globe}<span>Search the web or enter an address…</span></div>
+      <button class="btn primary" onclick="UI.toast('In the app: saves the current academic page to your Zotero-connected library.')">${ICONS.plus} Capture source</button>
+    </div>
+    <div class="browser-empty card">
+      ${ICONS.globe}
+      <h3>Browse with your research workspace beside you</h3>
+      <p class="muted">Open sources, capture bibliographic metadata and return to the graph without changing applications.</p>
+    </div>`;
+
+  VIEWS.toolkit = () => `
+    ${title('tools', 'Nodus Toolkit', 'Focused utilities for documents, privacy, translation and presentation.')}
+    <div class="grid cols-3 toolkit-grid">
+      ${[
+        ['grid', 'Nodus Apps', 'Create small tools for research, study or teaching.'],
+        ['sync', 'Nodus Convert', 'Convert documents, PDFs and images locally.'],
+        ['shield', 'Nodus Protect', 'Redact data, watermark files and verify copies.'],
+        ['languages', 'Nodus Translate', 'Translate text and documents while preserving structure.'],
+        ['play', 'PDF Presenter', 'Present a PDF with clean controls and notes.'],
+        ['search', 'OCR Workspace', 'Recover searchable text from scanned documents.'],
+      ].map(([icon, name, description]) => `<button class="card click toolkit-card" onclick="UI.toast('${name} opens as a focused tool in the desktop app.')"><span class="toolkit-icon">${ICONS[icon]}</span><h3>${name}</h3><p class="muted small">${description}</p></button>`).join('')}
+    </div>`;
 
   // ---- settings ----
   const SET_TABS = [
@@ -1274,6 +1334,11 @@
 
   // ---------- router ----------
   window.go = function (view) {
+    if (view === 'coverage' || view === 'debate' || view === 'gaps') {
+      state.researchTab = view === 'coverage' ? 'coverage' : view;
+      view = 'research';
+    }
+    if (view === 'notes') view = 'workspace';
     cancelAnimationFrame(graphAnim);
     state.view = view;
     document.querySelectorAll('.nav-item').forEach((b) => b.classList.toggle('active', b.dataset.view === view));
@@ -1337,8 +1402,9 @@
     closeReport() { state.report = null; window.go('deepResearch'); },
     reportPage(k) { state.reportPage = k; window.go('deepResearch'); },
     draft(id) { state.draft = id; window.go('writing'); },
-    note(id) { state.note = id; window.go('notes'); },
+    note(id) { state.note = id; window.go('workspace'); },
     setTab(id) { state.settingsTab = id; window.go('settings'); },
+    researchTab(id) { state.researchTab = id; window.go('research'); },
     sw(key, el) { state.toggles[key] = !state.toggles[key]; el.classList.toggle('on', state.toggles[key]); el.setAttribute('aria-checked', String(state.toggles[key])); },
     play: playTrack,
     chat() { chat.open = true; chat.view = 'chat'; renderChat(); },

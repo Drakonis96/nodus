@@ -21,7 +21,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 <link rel="preload" as="font" type="font/woff2" href="../assets/fonts/inter-latin.woff2" crossorigin/>
 <link rel="preload" as="font" type="font/woff2" href="../assets/fonts/fraunces-latin.woff2" crossorigin/>
 <link rel="stylesheet" href="../assets/css/nodus.css?v=20260819a"/>
-<link rel="stylesheet" href="blog.css?v=20260817"/>
+<link rel="stylesheet" href="blog.css?v=20260820"/>
 </head>
 <body>
 
@@ -29,7 +29,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 <canvas id="organism" aria-hidden="true"></canvas>
 
 <div data-nodus-site-header data-base="../" data-page="blog"></div>
-<script defer src="../site-header.js?v=20260819a"></script>
+<script defer src="../site-header.js?v=20260820a"></script>
 
 <main id="main" data-accent="#c084fc" data-second="#22d3ee" data-energy="0.28">
   <header class="page-hero">
@@ -39,12 +39,8 @@ SPDX-License-Identifier: AGPL-3.0-only
         <h1 class="display" data-split>Check the latest news about Nodus.</h1>
         <p class="lead">What is new in each release, how Nodus compares with the tools researchers already use, and the workflows that get the most out of it.</p>
         <p class="hero-feed">
-          <a class="arrow-link" href="feed.xml">Subscribe by RSS
+          <a class="arrow-link rss-modal-trigger" href="feed.xml" aria-haspopup="dialog">Subscribe by RSS
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 11a9 9 0 0 1 9 9M4 4a16 16 0 0 1 16 16"/><circle cx="5" cy="19" r="1.6" fill="currentColor"/></svg></a>
-          <button class="feed-copy" id="feed-copy" type="button" data-url="https://nodusresearch.com/blog/feed.xml" hidden>
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>
-            <span id="feed-copy-label">Copy the feed URL</span>
-          </button>
         </p>
       </div>
     </div>
@@ -86,7 +82,7 @@ SPDX-License-Identifier: AGPL-3.0-only
         <div class="soon-links">
           <a class="btn" href="../wiki/">Read the Wiki</a>
           <a class="btn" href="https://github.com/Drakonis96/nodus/releases" target="_blank" rel="noopener">Release notes</a>
-          <a class="btn" href="feed.xml">RSS feed</a>
+          <a class="btn rss-modal-trigger" href="feed.xml" aria-haspopup="dialog">RSS feed</a>
         </div>
       </div>
     </div>
@@ -126,9 +122,32 @@ SPDX-License-Identifier: AGPL-3.0-only
   </div>
 </footer>
 
+<div class="rss-modal" id="rss-modal" hidden>
+  <div class="rss-modal-backdrop" data-rss-close></div>
+  <section class="rss-dialog" role="dialog" aria-modal="true" aria-labelledby="rss-modal-title" aria-describedby="rss-modal-description" tabindex="-1">
+    <button class="rss-modal-close" type="button" data-rss-close aria-label="Close RSS subscription dialog">×</button>
+    <span class="rss-modal-icon" aria-hidden="true">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 11a9 9 0 0 1 9 9M4 4a16 16 0 0 1 16 16"/><circle cx="5" cy="19" r="1.6" fill="currentColor"/></svg>
+    </span>
+    <span class="kicker">Nodus Blog RSS</span>
+    <h2 id="rss-modal-title">Subscribe in your feed reader</h2>
+    <p id="rss-modal-description">Copy this address and paste it into Feedly, Inoreader, NetNewsWire or any other RSS reader.</p>
+    <div class="rss-url-row">
+      <label class="sr-only" for="rss-feed-url">Nodus Blog feed address</label>
+      <input id="rss-feed-url" type="url" value="https://nodusresearch.com/blog/feed.xml" readonly/>
+      <button class="btn rss-copy-button" id="rss-copy" type="button">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>
+        <span>Copy URL</span>
+      </button>
+    </div>
+    <p class="rss-copy-status" id="rss-copy-status" role="status" aria-live="polite"></p>
+    <a class="rss-xml-link" href="feed.xml" target="_blank" rel="noopener">View the feed XML <span aria-hidden="true">↗</span></a>
+  </section>
+</div>
+
 <script src="../assets/js/organism.js?v=20260818c"></script>
 <script src="../assets/js/site.js?v=20260815"></script>
-<script src="blog.js?v=20260817"></script>
+<script src="blog.js?v=20260820"></script>
 <script src="../assets/js/back-to-top.js?v=20260817b"></script>
 </body>
 </html>

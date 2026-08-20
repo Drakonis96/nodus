@@ -123,6 +123,26 @@ export const DEFAULT_BROWSER_PREFS: BrowserPrefs = {
 /** The first-party start page used by Home and, by default, every new tab. */
 export const NODUS_RESEARCH_ATLAS_URL = 'https://nodusresearch.com/research-atlas/';
 
+/**
+ * Pages where Nodus may add its local-only Bookmarks entry.
+ *
+ * The production origins are exact. Loopback HTTP is included solely so the
+ * checked-in website can be exercised from its local development server; a
+ * page still needs the first-party header slot and an explicit trusted click
+ * before the app does anything.
+ */
+export function isNodusResearchSiteUrl(rawUrl: string): boolean {
+  try {
+    const url = new URL(rawUrl);
+    if (url.protocol === 'https:' && (url.hostname === 'nodusresearch.com' || url.hostname === 'www.nodusresearch.com')) {
+      return true;
+    }
+    return url.protocol === 'http:' && (url.hostname === '127.0.0.1' || url.hostname === 'localhost');
+  } catch {
+    return false;
+  }
+}
+
 /** Synthetic identifiers. They are not registered protocols and never navigate. */
 export const NODUS_BOOKMARKS_URL = 'nodus://bookmarks';
 export const NODUS_RESEARCH_ATLAS_START_URL = 'nodus://research-atlas';

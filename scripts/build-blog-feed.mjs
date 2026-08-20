@@ -26,8 +26,8 @@ if (missing.length) {
 const pubDate = (value) => new Date(`${value}T12:00:00Z`).toUTCString();
 const items = posts.map((post) => `    <item>
       <title>${escapeXml(post.title)}</title>
-      <link>${SITE}/blog/post.html?p=${encodeURIComponent(post.slug)}</link>
-      <guid isPermaLink="true">${SITE}/blog/post.html?p=${encodeURIComponent(post.slug)}</guid>
+      <link>${SITE}/blog/${encodeURIComponent(post.slug)}/</link>
+      <guid isPermaLink="true">${SITE}/blog/${encodeURIComponent(post.slug)}/</guid>
       <pubDate>${pubDate(post.date)}</pubDate>
       <description>${escapeXml(post.summary || post.title)}</description>
 ${(post.tags || []).map((tag) => `      <category>${escapeXml(tag)}</category>`).join('\n')}
