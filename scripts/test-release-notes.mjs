@@ -25,20 +25,15 @@ try {
 
   const { RELEASE_NOTES, releaseNotesForMajor, compareVersions } = await import(pathToFileURL(bundlePath).href);
   const currentRelease = RELEASE_NOTES[0];
-  assert.equal(currentRelease?.version, '4.2.0');
-  assert.equal(currentRelease?.date, '2026-08-20');
-  assert.equal(currentRelease?.highlights.length, 9);
-  assert.deepEqual(currentRelease?.highlights.map((highlight) => highlight.scope), ['browser', 'radar', 'databases', 'academic', 'academic', 'general', 'academic', 'nodi', 'general']);
+  assert.equal(currentRelease?.version, '4.2.2');
+  assert.equal(currentRelease?.date, '2026-08-21');
+  assert.equal(currentRelease?.highlights.length, 4);
+  assert.deepEqual(currentRelease?.highlights.map((highlight) => highlight.scope), ['browser', 'browser', 'academic', 'browser']);
   for (const phrase of [
-    /Nodus Browser arrives/,
-    /follow topics, searches, authors/,
-    /hundreds of thousands of rows/,
-    /literature review/,
-    /persistent highlights/,
-    /argument maps open for comparison/,
-    /Global Library header/,
-    /reduce it to 40%/,
-    /Large backups now restore/,
+    /searches inside the page/,
+    /Closing the last tab/,
+    /sources modal.*scrolls again/,
+    /Google no longer blocks sign-in/,
   ]) assert.ok(currentRelease?.highlights.some((highlight) => phrase.test(highlight.en)));
 
   // 4.1.6 keeps the five highlights it shipped with. They are published history.

@@ -95,6 +95,12 @@ const RELEASE_3_2_4_TR: string[] = [
 ];
 
 export const RELEASE_NOTES_TR: Record<string, string[]> = {
+  "4.2.2": [
+    "Nodus Browser artık sayfanın içinde arama yapıyor. Çubuğu açmak için Cmd veya Ctrl artı F tuşlarına basın, yazın ve Enter ya da Önceki ve Sonraki düğmeleriyle sonuçlar arasında ilerleyin. Yer İmleri ile Geçmiş arasındaki büyüteç aynı paneli açıyor ve arama büyük-küçük harfe duyarlı olabiliyor.",
+    "Son sekmeyi kapatmak artık tarayıcıyı boş bırakmıyor ve iki başlangıç sayfası açmıyor. Başlangıç sekmesi otomatik olarak geri geliyor ve kasa seçici ilk andan itibaren önde görünüyor. Tarayıcıdan Ayarlar'a geçerken önceki sayfa artık yeni bölümün üzerine binmiyor.",
+    "Deep Research ve Immersion kaynak penceresi yeniden kaydırılabiliyor. Pencere sabit boyutunu koruyor, sekme değiştirirken sıçramıyor ve açık temada artık koyu arka planı devralmıyor. Fikirler, eserler ve yazarlar arasında geçerken sekmeler durumlarını koruyor.",
+    "Google, Electron motorunu tanıdığı için Nodus Browser'daki oturum açmayı artık engellemiyor. Tarayıcı verileri gerçek Chromium sürümünü sunuyor ve üçüncü taraf kimlik doğrulaması Nodus içinde tamamlanıyor. Google'dan siteye dönüldüğünde oturum kaybolmuyor. Nodus'un kendi OAuth akışı da nodus:// üzerinden sistem tarayıcısından uygulamaya dönebiliyor.",
+  ],
   "4.2.0": [
     "Nodus Browser, birden fazla sekme, indirmeler, medya denetimleri ve siteye özel izinlerle güvenli ve bütünleşik bir araştırma tarayıcısı olarak geliyor. Research Atlas, yerel yer imleri ve geçmiş, sayfalar ve seçimler için Nodi eylemleri ve Nodus Connector aracılığıyla kaynakları ve PDF’leri doğrudan Kitaplığa kaydetme özelliklerini içeriyor.",
     "Konuları, aramaları, yazarları, dergileri, makaleleri, RSS akışlarını ve web sitelerini günlük ya da haftalık kontrollerle takip edebilirsiniz. Yenilikler genel bir gelen kutusunda toplanır, bildirim merkezine ve Nodi’ye ulaşır ve doğrudan açılabilir ya da Kitaplığa kaydedilebilir.",

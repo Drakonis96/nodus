@@ -155,6 +155,12 @@ const RELEASE_3_2_4_IT: string[] = [
 ];
 
 export const RELEASE_NOTES_IT: Record<string, string[]> = {
+  "4.2.2": [
+    "Nodus Browser ora cerca all'interno della pagina. Premi Cmd o Ctrl più F per aprire la barra, scrivi e passa tra i risultati con Invio o con i pulsanti Precedente e Successivo. La lente tra Segnalibri e Cronologia apre lo stesso pannello e la ricerca può distinguere maiuscole e minuscole.",
+    "Chiudere l'ultima scheda non lascia più il browser vuoto né apre due pagine iniziali. La scheda iniziale viene ripristinata automaticamente e il selettore dei vault appare davanti fin dal primo istante. Passando dal browser alle Impostazioni, la pagina precedente non resta più sopra la nuova sezione.",
+    "Il modale delle fonti di Deep Research e Immersione torna a scorrere. La finestra mantiene una dimensione fissa, non salta cambiando scheda e in modalità chiara non eredita più lo sfondo scuro. Le schede conservano il loro stato passando tra idee, opere e autori.",
+    "Google non blocca più l'accesso in Nodus Browser identificando un motore Electron. I dati del browser presentano la versione reale di Chromium e l'autenticazione di terze parti si completa dentro Nodus, senza perdere la sessione al ritorno da Google. Anche il flusso OAuth di Nodus può tornare dal browser di sistema tramite nodus://.",
+  ],
   "4.2.0": [
     "Nodus Browser arriva come browser di ricerca integrato e sicuro, con più schede, download, controlli multimediali e autorizzazioni per sito. Include Research Atlas, segnalibri e cronologia locali, azioni di Nodi su pagine e selezioni e l’acquisizione diretta di riferimenti e PDF nella Biblioteca tramite Nodus Connector.",
     "Puoi seguire argomenti, ricerche, autori, riviste, articoli, feed RSS e siti web con controlli giornalieri o settimanali. Le novità si raccolgono in una casella globale, arrivano al centro notifiche e a Nodi e possono essere aperte o salvate direttamente nella Biblioteca.",

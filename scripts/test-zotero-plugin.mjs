@@ -1244,9 +1244,9 @@ test('#9: build-zotero-xpi produces a valid xpi + updates.json', () => {
   ]) {
     assert.ok(names.includes(need), `xpi contains ${need}`);
   }
-  assert.equal(manifest.version, '4.2.1', 'the add-on shares the Nodus 4 release version');
+  assert.equal(manifest.version, '4.2.2', 'the add-on shares the Nodus 4 release version');
   assert.equal(manifest.license, 'AGPL-3.0-only');
-  assert.match(zip.readAsText('SOURCE_CODE.md'), /releases\/tag\/v4\.2\.1/);
+  assert.match(zip.readAsText('SOURCE_CODE.md'), /releases\/tag\/v4\.2\.2/);
   assert.equal(manifest.icons['64'], 'icons/nodus.svg');
   assert.match(zip.readAsText('icons/nodus.svg'), /M18 48V16L46 48V16/, 'Zotero keeps the normal Nodus N');
   assert.ok(!names.includes('icons/zotero-z.svg'), 'the rotated release-note mark is not shipped as Zotero UI');

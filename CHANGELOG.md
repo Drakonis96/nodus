@@ -1,5 +1,13 @@
 # Changelog
 
+## 4.2.2 — 2026-08-21
+
+- Added in-page search to Nodus Browser with Cmd/Ctrl+F, a toolbar search button, match navigation and case-sensitive search.
+- Fixed Browser tab recovery so closing the last tab restores exactly one home tab, and fixed vault-switcher and Browser-to-Settings overlay flashes.
+- Fixed the Deep Research and Immersion source modal: scrolling works, its size stays stable across tabs, and light mode has its own palette.
+- Improved Google compatibility in Nodus Browser by matching Chromium client hints to the real engine version. Third-party Google authentication now completes in the same Nodus Browser session, while Nodus OAuth can return through the `nodus://` protocol.
+- Added the fixes and Browser strings to the What's New modal in all eight interface languages.
+
 ## 4.2.1 — 2026-08-20
 
 - Fixed Deep Research typography controls freezing the interface, detaching persistent

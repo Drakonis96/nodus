@@ -1107,6 +1107,48 @@ const RELEASE_4_1_3_HIGHLIGHTS: RawReleaseHighlight[] = [
 ];
 
 /**
+ * 4.2.2 — Browser search, stable transitions and source workspace polish.
+ */
+const RELEASE_4_2_2_HIGHLIGHTS: RawReleaseHighlight[] = [
+  {
+    scope: 'browser',
+    es: 'Nodus Browser ahora busca dentro de la página. Pulsa Cmd o Ctrl más F para abrir la barra, escribe y recorre las coincidencias con Enter o con los botones Anterior y Siguiente. La lupa entre Marcadores e Historial abre el mismo panel y la búsqueda puede distinguir mayúsculas.',
+    en: 'Nodus Browser now searches inside the page. Press Cmd or Ctrl plus F to open the bar, type and move between matches with Enter or the Previous and Next buttons. The magnifying glass between Bookmarks and History opens the same panel and the search can be case-sensitive.',
+    fr: 'Le navigateur Nodus cherche désormais dans la page. Appuyez sur Cmd ou Ctrl plus F pour ouvrir la barre, saisissez votre terme et naviguez entre les occurrences avec Entrée ou les boutons Précédent et Suivant. La loupe entre Signets et Historique ouvre le même panneau et la recherche peut respecter la casse.',
+    de: 'Nodus Browser sucht jetzt innerhalb der Seite. Drücken Sie Cmd oder Strg plus F, um die Leiste zu öffnen, tippen Sie und wechseln Sie mit Enter oder den Schaltflächen Zurück und Weiter zwischen den Treffern. Die Lupe zwischen Lesezeichen und Verlauf öffnet dasselbe Panel und die Suche kann Groß- und Kleinschreibung beachten.',
+    pt: 'O Nodus Browser agora procura dentro da página. Prima Cmd ou Ctrl mais F para abrir a barra, escreva e percorra as ocorrências com Enter ou com os botões Anterior e Seguinte. A lupa entre Marcadores e Histórico abre o mesmo painel e a pesquisa pode distinguir maiúsculas.',
+    'pt-BR': 'O Nodus Browser agora busca dentro da página. Pressione Cmd ou Ctrl mais F para abrir a barra, digite e navegue entre as ocorrências com Enter ou com os botões Anterior e Seguinte. A lupa entre Favoritos e Histórico abre o mesmo painel e a busca pode diferenciar maiúsculas.',
+  },
+  {
+    scope: 'browser',
+    es: 'Cerrar la última pestaña ya no deja el navegador vacío ni abre dos páginas de inicio. La pestaña de inicio se recupera automáticamente y el selector de bóvedas aparece delante desde el primer instante. Al pasar del navegador a Ajustes ya no se superpone la página que estaba abierta.',
+    en: 'Closing the last tab no longer leaves the browser empty or opens two home pages. The home tab is restored automatically and the vault switcher appears in front from the first instant. Moving from the browser to Settings no longer leaves the previous page over the new section.',
+    fr: 'Fermer le dernier onglet ne laisse plus le navigateur vide et n’ouvre plus deux pages d’accueil. L’onglet d’accueil est rétabli automatiquement et le sélecteur de coffres apparaît devant dès le premier instant. Le passage du navigateur aux Paramètres ne laisse plus l’ancienne page recouvrir la nouvelle section.',
+    de: 'Das Schließen des letzten Tabs lässt den Browser nicht mehr leer und öffnet nicht mehr zwei Startseiten. Der Start-Tab wird automatisch wiederhergestellt und der Tresor-Umschalter erscheint vom ersten Moment an im Vordergrund. Beim Wechsel vom Browser zu den Einstellungen bleibt die vorherige Seite nicht mehr über dem neuen Bereich liegen.',
+    pt: 'Fechar o último separador já não deixa o navegador vazio nem abre duas páginas iniciais. O separador inicial é recuperado automaticamente e o seletor de cofres aparece à frente desde o primeiro instante. Ao passar do navegador para as Definições, a página anterior já não fica sobreposta à nova secção.',
+    'pt-BR': 'Fechar a última aba já não deixa o navegador vazio nem abre duas páginas iniciais. A aba inicial é recuperada automaticamente e o seletor de cofres aparece na frente desde o primeiro instante. Ao passar do navegador para as Configurações, a página anterior não fica mais sobre a nova seção.',
+  },
+  {
+    scope: 'academic',
+    es: 'El modal de fuentes de Deep Research e Inmersión vuelve a desplazarse. La ventana mantiene un tamaño fijo, no salta al cambiar de pestaña y en el tema claro ya no hereda el fondo oscuro. Las pestañas conservan su estado al moverte entre ideas, obras y autores.',
+    en: 'The sources modal in Deep Research and Immersion scrolls again. The window keeps a fixed size, does not jump when switching tabs and no longer inherits the dark background in light theme. Tabs keep their state when moving between ideas, works and authors.',
+    fr: 'La fenêtre des sources de Deep Research et Immersion défile à nouveau. La fenêtre conserve une taille fixe, ne saute plus lors du changement d’onglet et n’hérite plus du fond sombre en thème clair. Les onglets conservent leur état lors du passage entre idées, œuvres et auteurs.',
+    de: 'Das Quellen-Modal in Deep Research und Immersion lässt sich wieder scrollen. Das Fenster behält eine feste Größe, springt beim Tab-Wechsel nicht mehr und übernimmt im hellen Design nicht mehr den dunklen Hintergrund. Tabs behalten ihren Zustand beim Wechsel zwischen Ideen, Werken und Autoren.',
+    pt: 'O modal de fontes do Deep Research e da Imersão volta a deslocar-se. A janela mantém um tamanho fixo, não salta ao mudar de separador e no tema claro já não herda o fundo escuro. Os separadores mantêm o seu estado ao mover-se entre ideias, obras e autores.',
+    'pt-BR': 'O modal de fontes do Deep Research e da Imersão volta a rolar. A janela mantém um tamanho fixo, não pula ao trocar de aba e no tema claro não herda mais o fundo escuro. As abas mantêm seu estado ao navegar entre ideias, obras e autores.',
+  },
+  {
+    scope: 'browser',
+    es: 'Google ya no bloquea el inicio de sesión en Nodus Browser por identificar un motor Electron. Los datos del navegador presentan la versión real de Chromium y la autenticación de terceros se completa dentro de Nodus, sin perder la sesión al volver de Google. El flujo OAuth propio de Nodus también puede volver desde el navegador del sistema mediante nodus://.',
+    en: 'Google no longer blocks sign-in in Nodus Browser for identifying an Electron engine. Browser data now presents the real Chromium version and third-party authentication completes inside Nodus, keeping the session when Google returns to the site. Nodus’s own OAuth flow can also return from the system browser through nodus://.',
+    fr: 'Google ne bloque plus la connexion dans le navigateur Nodus en identifiant un moteur Electron. Les données du navigateur présentent désormais la véritable version de Chromium et l’authentification tierce s’achève dans Nodus sans perdre la session au retour de Google. Le flux OAuth de Nodus peut aussi revenir du navigateur système via nodus://.',
+    de: 'Google blockiert die Anmeldung im Nodus Browser nicht mehr, weil es eine Electron-Engine erkennt. Die Browserdaten zeigen jetzt die echte Chromium-Version und die Authentifizierung von Drittanbietern wird innerhalb von Nodus abgeschlossen, ohne die Sitzung bei der Rückkehr von Google zu verlieren. Der eigene OAuth-Ablauf von Nodus kann über nodus:// auch aus dem Systembrowser zurückkehren.',
+    pt: 'O Google já não bloqueia o início de sessão no Nodus Browser por identificar um motor Electron. Os dados do navegador apresentam agora a versão real do Chromium e a autenticação de terceiros conclui-se dentro do Nodus, sem perder a sessão ao regressar do Google. O próprio fluxo OAuth do Nodus também pode regressar do navegador do sistema através de nodus://.',
+    'pt-BR': 'O Google não bloqueia mais o login no Nodus Browser por identificar um mecanismo Electron. Os dados do navegador agora apresentam a versão real do Chromium e a autenticação de terceiros é concluída dentro do Nodus, sem perder a sessão ao voltar do Google. O fluxo OAuth do próprio Nodus também pode voltar do navegador do sistema por meio de nodus://.',
+  },
+];
+
+/**
  * 4.2.0 — Browser and Radar become first-class research surfaces, while databases,
  * Deep Research, reading, Nodi and large backup restores gain substantial new workflows.
  */
@@ -1618,6 +1660,11 @@ const RELEASE_4_0_0_HIGHLIGHTS: RawReleaseHighlight[] = [
 ];
 
 const RAW_RELEASE_NOTES: RawReleaseNote[] = [
+  {
+    version: '4.2.2',
+    date: '2026-08-21',
+    highlights: RELEASE_4_2_2_HIGHLIGHTS,
+  },
   {
     version: '4.2.0',
     date: '2026-08-20',
