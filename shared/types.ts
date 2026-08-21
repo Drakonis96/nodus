@@ -8250,6 +8250,8 @@ export interface NodusApi extends ProsopographyApi, TestimoniesApi, ToolkitApi, 
   nodiEndWindowDrag(): Promise<void>;
   onVaultChanged(cb: (vault: VaultSummary | null) => void): () => void;
   onSettingsChanged(cb: (settings: AppSettings) => void): () => void;
+  /** Deeplink received via OS (nodus://...), e.g. OAuth callback from system browser. */
+  onDeepLink(cb: (url: string) => void): () => void;
   getActiveVault(): Promise<VaultSummary>;
   createVault(input: CreateVaultInput): Promise<VaultCreateResult>;
   /** Step one of connecting to a Nodus Server space: verify credentials, list the spaces. */
