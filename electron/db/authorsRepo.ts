@@ -111,12 +111,23 @@ function getOrCreateCanonicalAuthor(key: string, display: string, affiliation: s
   return authorId;
 }
 
+/**
+ * Link a work to a canonical author with the role Zotero credits them with.
+ *
+ * The role is written as given, including when it demotes an existing 'author'
+ * row to 'editor'. It used to be sticky the other way ("once an author, always
+ * an author"), which sounds protective but made the column unrepairable: every
+ * row that predates the role column was created with its DEFAULT 'author', so
+ * editors of edited volumes could never be corrected no matter how often the
+ * work was resynced. Callers resolve the author-beats-editor tie for a single
+ * work in memory before getting here (see linkZoteroAuthors), so nothing is lost
+ * by trusting the value passed in.
+ */
 export function linkWorkAuthor(nodusId: string, authorId: string, role: 'author' | 'editor' = 'author'): void {
   getDb()
     .prepare(
       `INSERT INTO work_authors (nodus_id, author_id, role) VALUES (?, ?, ?)
-       ON CONFLICT(nodus_id, author_id) DO UPDATE SET
-         role = CASE WHEN excluded.role = 'author' THEN 'author' ELSE work_authors.role END`
+       ON CONFLICT(nodus_id, author_id) DO UPDATE SET role = excluded.role`
     )
     .run(nodusId, authorId, role);
 }
@@ -132,6 +143,23 @@ function parseCreatorsJson(value: string | null): WorkCreator[] {
   } catch {
     return [];
   }
+}
+
+/**
+ * How an editor is marked inside the stored byline (authors_json). The byline is
+ * a display string, so the role has to travel inside it; every reader that wants
+ * the role structurally should use creators_json instead.
+ */
+export const EDITOR_BYLINE_SUFFIX = ' (ed.)';
+
+/** Split a stored byline entry back into its display name and its Zotero role. */
+export function parseBylineEntry(entry: string): { display: string; role: 'author' | 'editor' } {
+  const clean = (entry || '').trim();
+  const marker = EDITOR_BYLINE_SUFFIX.trim();
+  if (clean.toLowerCase().endsWith(marker.toLowerCase())) {
+    return { display: clean.slice(0, clean.length - marker.length).trim(), role: 'editor' };
+  }
+  return { display: clean, role: 'author' };
 }
 
 function parseAuthorsJson(value: string | null): string[] {
@@ -154,7 +182,8 @@ interface CanonCreator {
 /**
  * Build one work's author links from its Zotero creators (the single source of
  * truth). Uses structured creators_json when available (carrying editor roles),
- * otherwise the legacy authors_json strings (all treated as authors). Links the
+ * otherwise the legacy authors_json byline strings (where an editor carries an
+ * "(ed.)" marker). Links the
  * canonical authors and drops any other author node previously linked to this
  * work — this is what removes the AI-extracted name variants.
  *
@@ -181,10 +210,11 @@ export function linkZoteroAuthors(
       raw.push({ key, display: structuredDisplay(c), role: c.role, affiliation: opts.affiliationByKey?.get(key) ?? null });
     }
   } else {
-    for (const name of parseAuthorsJson(work.authors_json)) {
-      const key = canonicalKey(parseDisplayName(name));
+    for (const entry of parseAuthorsJson(work.authors_json)) {
+      const { display, role } = parseBylineEntry(entry);
+      const key = canonicalKey(parseDisplayName(display));
       if (!key) continue;
-      raw.push({ key, display: name, role: 'author', affiliation: opts.affiliationByKey?.get(key) ?? null });
+      raw.push({ key, display, role, affiliation: opts.affiliationByKey?.get(key) ?? null });
     }
   }
 
@@ -297,6 +327,104 @@ export function reconcileAuthorLayerOnce(): void {
   run();
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Retroactive repair of the author/editor role (runs once on upgrade)
+//
+// work_authors.role arrived in migration 23 with DEFAULT 'author', which silently
+// credited every editor of an edited volume as one of its authors — and the old
+// sticky ON CONFLICT then made that unrepairable. Zotero's answer was never lost
+// though: it has been stored per work in creators_json all along, so the repair
+// is a pure recomputation with no network call and no re-analysis.
+//
+// This only rewrites the `role` column of existing links. It never creates a
+// link, never deletes one, and never touches ideas, works, edges, evidence,
+// themes or notes. Links whose author has no counterpart in creators_json (name
+// variants left over from AI extraction) are left exactly as they are.
+// ─────────────────────────────────────────────────────────────────────────────
+
+const ROLE_RECONCILE_FLAG = 'author_roles_reconciled';
+
+/** Zotero's role for each canonical identity credited on a work. Author wins a tie. */
+function rolesByCanonicalKey(creatorsJson: string | null): Map<string, 'author' | 'editor'> {
+  const roles = new Map<string, 'author' | 'editor'>();
+  for (const c of parseCreatorsJson(creatorsJson)) {
+    const key = canonicalKey(creatorParts(c));
+    if (!key) continue;
+    if (roles.get(key) === 'author') continue;
+    roles.set(key, c.role);
+  }
+  return roles;
+}
+
+/** Rewrite every work↔author role from creators_json. Returns the rows changed. */
+export function repairAuthorRoles(): number {
+  const db = getDb();
+  const links = db
+    .prepare(
+      `SELECT wa.nodus_id AS nodusId, wa.author_id AS authorId, wa.role AS role, a.canonical_key AS key
+         FROM work_authors wa
+         JOIN authors a ON a.author_id = wa.author_id
+        WHERE a.canonical_key IS NOT NULL
+          AND wa.nodus_id NOT LIKE 'demo-%'`
+    )
+    .all() as { nodusId: string; authorId: string; role: string; key: string }[];
+  if (links.length === 0) return 0;
+
+  const byWork = new Map<string, typeof links>();
+  for (const link of links) {
+    const list = byWork.get(link.nodusId) ?? [];
+    list.push(link);
+    byWork.set(link.nodusId, list);
+  }
+
+  const readCreators = db.prepare('SELECT creators_json FROM works WHERE nodus_id = ?');
+  const update = db.prepare('UPDATE work_authors SET role = ? WHERE nodus_id = ? AND author_id = ?');
+  let changed = 0;
+  for (const [nodusId, workLinks] of byWork) {
+    const row = readCreators.get(nodusId) as { creators_json: string | null } | undefined;
+    if (!row?.creators_json) continue;
+    const roles = rolesByCanonicalKey(row.creators_json);
+    if (roles.size === 0) continue;
+    for (const link of workLinks) {
+      const role = roles.get(link.key);
+      if (!role || role === link.role) continue;
+      update.run(role, nodusId, link.authorId);
+      changed += 1;
+    }
+  }
+  return changed;
+}
+
+/**
+ * One-time pass that repairs the stored roles and refreshes everything derived
+ * from them: the author-relations layer is rebuilt (it must no longer route a
+ * relation through an editor) and the cached AI syntheses are dropped, since
+ * they were written about a work list that included other people's chapters.
+ */
+export function reconcileAuthorRolesOnce(): void {
+  if (readFlag(ROLE_RECONCILE_FLAG) === '1') return;
+  const db = getDb();
+  const run = db.transaction(() => {
+    const changed = repairAuthorRoles();
+    // The derived layer is refreshed whenever the vault has any editor at all,
+    // not only when this pass moved a row. An everyday resync can land the right
+    // roles first, and then nothing here would change — but author_relations and
+    // the cached syntheses would still be the ones computed while editors counted
+    // as authors, which is the very thing this upgrade exists to undo.
+    const editors = (
+      db.prepare("SELECT COUNT(*) AS n FROM work_authors WHERE role = 'editor'").get() as { n: number }
+    ).n;
+    if (changed > 0 || editors > 0) {
+      db.prepare('DELETE FROM author_dossier_synthesis').run();
+      db.prepare('DELETE FROM synthesis_matrix_cell').run();
+      recomputeAuthorRelations();
+      console.log(`[authors] repaired ${changed} misfiled role(s); ${editors} editor link(s) no longer count as authorship`);
+    }
+    writeFlag(ROLE_RECONCILE_FLAG, '1');
+  });
+  run();
+}
+
 /**
  * Recompute the DERIVED author-relations layer from the idea graph.
  * Two authors are related when works they (co-)authored are connected by
@@ -341,7 +469,7 @@ function authorsForIdea(globalId: string): string[] {
     .prepare(
       `SELECT DISTINCT wa.author_id
        FROM idea_occurrences io
-       JOIN work_authors wa ON wa.nodus_id = io.nodus_id
+       JOIN work_authors wa ON wa.nodus_id = io.nodus_id AND wa.role = 'author'
        WHERE io.global_id = ?`
     )
     .all(globalId) as { author_id: string }[];

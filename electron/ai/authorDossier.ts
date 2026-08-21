@@ -86,19 +86,25 @@ export function listAuthors(): AuthorSummary[] {
     .prepare('SELECT author_id, name, affiliation FROM authors')
     .all() as { author_id: string; name: string; affiliation: string | null }[];
 
-  // works per author (drives workCount + read)
+  // Works per author, counted separately by role: only the ones this person
+  // actually wrote are their body of work. Volumes they merely edited are shown
+  // as such and never folded into the footprint.
   const waRows = db
     .prepare(
-      `SELECT wa.author_id, w.read_tag
+      `SELECT wa.author_id, wa.role, w.read_tag
          FROM work_authors wa JOIN works w ON w.nodus_id = wa.nodus_id
         WHERE w.archived = 0`
     )
-    .all() as { author_id: string; read_tag: number }[];
-  const works = new Map<string, { total: number; read: number }>();
+    .all() as { author_id: string; role: string; read_tag: number }[];
+  const works = new Map<string, { total: number; read: number; edited: number }>();
   for (const r of waRows) {
-    const cur = works.get(r.author_id) ?? { total: 0, read: 0 };
-    cur.total += 1;
-    if (r.read_tag === 1) cur.read += 1;
+    const cur = works.get(r.author_id) ?? { total: 0, read: 0, edited: 0 };
+    if (r.role === 'editor') {
+      cur.edited += 1;
+    } else {
+      cur.total += 1;
+      if (r.read_tag === 1) cur.read += 1;
+    }
     works.set(r.author_id, cur);
   }
 
@@ -109,6 +115,7 @@ export function listAuthors(): AuthorSummary[] {
          FROM work_authors wa
          JOIN works w ON w.nodus_id = wa.nodus_id AND w.archived = 0
          JOIN idea_occurrences io ON io.nodus_id = wa.nodus_id
+        WHERE wa.role = 'author'
         GROUP BY wa.author_id`
     )
     .all() as { id: string; n: number }[];
@@ -133,6 +140,7 @@ export function listAuthors(): AuthorSummary[] {
          FROM work_authors wa
          JOIN idea_theme_links itl ON itl.nodus_id = wa.nodus_id
          JOIN themes t ON t.theme_id = itl.theme_id
+        WHERE wa.role = 'author'
         GROUP BY wa.author_id, t.theme_id
         ORDER BY n DESC`
     )
@@ -152,6 +160,7 @@ export function listAuthors(): AuthorSummary[] {
          JOIN works w ON w.nodus_id = wa.nodus_id AND w.archived = 0
          JOIN work_zotero_tags wzt ON wzt.nodus_id = wa.nodus_id
          JOIN zotero_tags zt ON zt.tag_id = wzt.tag_id
+        WHERE wa.role = 'author'
         GROUP BY wa.author_id, zt.tag_id
         ORDER BY n DESC, zt.label COLLATE NOCASE`
     )
@@ -169,7 +178,7 @@ export function listAuthors(): AuthorSummary[] {
 
   return authors
     .map((a): AuthorSummary => {
-      const w = works.get(a.author_id) ?? { total: 0, read: 0 };
+      const w = works.get(a.author_id) ?? { total: 0, read: 0, edited: 0 };
       const parts = splitName(a.name);
       return {
         author_id: a.author_id,
@@ -179,6 +188,7 @@ export function listAuthors(): AuthorSummary[] {
         fullName: parts.fullName,
         affiliation: a.affiliation,
         workCount: w.total,
+        editedCount: w.edited,
         ideaCount: ideaCount.get(a.author_id) ?? 0,
         relationCount: relationCount.get(a.author_id) ?? 0,
         topTags: tagsByAuthor.get(a.author_id) ?? [],
@@ -188,7 +198,9 @@ export function listAuthors(): AuthorSummary[] {
         saved: saved.has(a.author_id),
       };
     })
-    .filter((a) => a.workCount > 0)
+    // Someone who only ever edited volumes stays listed — that is a real
+    // bibliographic fact — but with an empty authored footprint.
+    .filter((a) => a.workCount > 0 || a.editedCount > 0)
     .sort((a, b) => b.ideaCount - a.ideaCount || a.name.localeCompare(b.name));
 }
 
@@ -229,7 +241,7 @@ function themesByIdeaForAuthor(authorId: string): Map<string, string[]> {
          FROM work_authors wa
          JOIN idea_theme_links itl ON itl.nodus_id = wa.nodus_id
          JOIN themes t ON t.theme_id = itl.theme_id
-        WHERE wa.author_id = ?`
+        WHERE wa.author_id = ? AND wa.role = 'author'`
     )
     .all(authorId) as { gid: string; label: string }[];
   const map = new Map<string, string[]>();
@@ -263,7 +275,7 @@ function authorThemeSets(authorIds: string[]): Map<string, Set<string>> {
          FROM work_authors wa
          JOIN idea_theme_links itl ON itl.nodus_id = wa.nodus_id
          JOIN themes t ON t.theme_id = itl.theme_id
-        WHERE wa.author_id IN (${authorIds.map(() => '?').join(',')})
+        WHERE wa.author_id IN (${authorIds.map(() => '?').join(',')}) AND wa.role = 'author'
         ORDER BY t.label`
     )
     .all(...authorIds) as { authorId: string; label: string }[];
@@ -286,7 +298,7 @@ function loadIdeas(authorId: string): AuthorDossierIdea[] {
          JOIN works w ON w.nodus_id = wa.nodus_id AND w.archived = 0
          JOIN idea_occurrences io ON io.nodus_id = wa.nodus_id
          JOIN ideas i ON i.global_id = io.global_id
-        WHERE wa.author_id = ?
+        WHERE wa.author_id = ? AND wa.role = 'author'
         ORDER BY (io.role = 'principal') DESC, io.confidence DESC`
     )
     .all(authorId) as {
@@ -308,7 +320,7 @@ function loadIdeas(authorId: string): AuthorDossierIdea[] {
       `SELECT ev.id, ev.global_id, ev.nodus_id, ev.quote, ev.location, ev.kind
          FROM evidence ev
          JOIN work_authors wa ON wa.nodus_id = ev.nodus_id
-        WHERE wa.author_id = ?`
+        WHERE wa.author_id = ? AND wa.role = 'author'`
     )
     .all(authorId) as Evidence[];
   const evByKey = new Map<string, Evidence[]>();
@@ -383,6 +395,7 @@ function loadRelations(authorId: string): AuthorDossierRelation[] {
   return [...agg.values()].sort((a, b) => b.weight - a.weight);
 }
 
+/** Every work this person is credited on, whichever role Zotero gives them. */
 function loadWorks(authorId: string): AuthorDossierWork[] {
   return (
     getDb()
@@ -484,7 +497,11 @@ export function buildAuthorDossier(authorId: string): AuthorDossier | null {
 
   const ideas = loadIdeas(authorId);
   const relations = loadRelations(authorId);
-  const works = loadWorks(authorId);
+  // Authorship and editorship are shown apart: the ideas above come only from
+  // the works this person wrote, so the works list must not blur the two.
+  const credited = loadWorks(authorId);
+  const works = credited.filter((w) => w.role !== 'editor');
+  const editedWorks = credited.filter((w) => w.role === 'editor');
 
   // overall theme list ordered by how many of the author's ideas touch each
   const themeFreq = new Map<string, number>();
@@ -501,6 +518,7 @@ export function buildAuthorDossier(authorId: string): AuthorDossier | null {
     firstName: parts.firstName,
     lastName: parts.lastName,
     works,
+    editedWorks,
     ideas,
     relations,
     themes,

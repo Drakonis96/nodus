@@ -468,13 +468,13 @@ export function getSearchResultDetail(kind: SearchResultKind, id: string): Searc
       const works = db
         .prepare(
           `SELECT w.title, w.year FROM work_authors a JOIN works w ON w.nodus_id = a.nodus_id
-           WHERE a.author_id = ? ORDER BY w.year DESC, w.title`
+           WHERE a.author_id = ? AND a.role = 'author' ORDER BY w.year DESC, w.title`
         )
         .all(id) as Array<{ title: string; year: number | null }>;
       const ideaCount = db
         .prepare(
           `SELECT COUNT(DISTINCT o.global_id) AS count FROM work_authors a
-           JOIN idea_occurrences o ON o.nodus_id = a.nodus_id WHERE a.author_id = ?`
+           JOIN idea_occurrences o ON o.nodus_id = a.nodus_id WHERE a.author_id = ? AND a.role = 'author'`
         )
         .get(id) as { count: number };
       return {

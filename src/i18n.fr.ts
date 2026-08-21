@@ -8197,4 +8197,7 @@ export const FR: Record<string, string> = {
   "Descifrando…": "Déchiffrement…",
   "Finalizando…": "Finalisation…",
   "Progreso de restauración": "Progression de la restauration",
+  "Volúmenes que edita": "Volumes qu'iel dirige",
+  "{n} volúmenes editados": "{n} volumes dirigés",
+  "Coordina la edición del volumen; las ideas no se le atribuyen.": "Cette personne dirige le volume ; ses idées ne lui sont pas attribuées.",
 };

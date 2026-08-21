@@ -7611,4 +7611,7 @@ export const IT: Record<string, string> = {
   "Descifrando…": "Decifratura…",
   "Finalizando…": "Finalizzazione…",
   "Progreso de restauración": "Avanzamento del ripristino",
+  "Volúmenes que edita": "Volumi che cura",
+  "{n} volúmenes editados": "{n} volumi curati",
+  "Coordina la edición del volumen; las ideas no se le atribuyen.": "Cura l'edizione del volume; le idee non le vengono attribuite.",
 };

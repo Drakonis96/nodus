@@ -921,7 +921,7 @@ function listAuthors(linkedWorkIds: Set<string>, scope: RelevanceScope) {
       const relevantAuthorIds = new Set(
         (
           db
-            .prepare(`SELECT DISTINCT author_id FROM work_authors WHERE nodus_id IN (${placeholders})`)
+            .prepare(`SELECT DISTINCT author_id FROM work_authors WHERE nodus_id IN (${placeholders}) AND role = 'author'`)
             .all(...workIds) as { author_id: string }[]
         ).map((row) => row.author_id)
       );
@@ -958,7 +958,7 @@ function listAuthors(linkedWorkIds: Set<string>, scope: RelevanceScope) {
             `SELECT w.nodus_id, w.zotero_key, w.title, w.authors_json, w.year, w.item_type, w.doi, w.source_type
              FROM work_authors wa
              JOIN works w ON w.nodus_id = wa.nodus_id
-             WHERE wa.author_id = ? AND w.archived = 0
+             WHERE wa.author_id = ? AND wa.role = 'author' AND w.archived = 0
              ORDER BY w.year DESC, w.title ASC`
           )
           .all(author.author_id) as Array<WorkRow & { authors_json: string }>
@@ -969,7 +969,7 @@ function listAuthors(linkedWorkIds: Set<string>, scope: RelevanceScope) {
            FROM work_authors wa
            JOIN idea_occurrences io ON io.nodus_id = wa.nodus_id
            JOIN ideas i ON i.global_id = io.global_id
-           WHERE wa.author_id = ?
+           WHERE wa.author_id = ? AND wa.role = 'author'
            ORDER BY i.label ASC`
         )
         .all(author.author_id) as Array<{ global_id: string; type: string; label: string; statement: string }>;
@@ -1300,7 +1300,9 @@ function addThemeWorkIds(themeId: string, out: Set<string>): void {
 }
 
 function addAuthorWorkIds(authorId: string, out: Set<string>): void {
-  const rows = getDb().prepare('SELECT nodus_id FROM work_authors WHERE author_id = ?').all(authorId) as { nodus_id: string }[];
+  const rows = getDb()
+    .prepare("SELECT nodus_id FROM work_authors WHERE author_id = ? AND role = 'author'")
+    .all(authorId) as { nodus_id: string }[];
   for (const row of rows) out.add(row.nodus_id);
 }
 

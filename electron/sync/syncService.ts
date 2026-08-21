@@ -17,17 +17,29 @@ import { collectionItemsRecursive, libraries as zoteroLibraries, libraryVersion,
 import type { ZoteroCollection, ZoteroLibrary } from '@shared/types';
 import { scanQueue } from '../pipeline/scanQueue';
 import type { SyncLogEntry, WorkCreator, ZoteroItem } from '@shared/types';
-import { linkZoteroAuthors } from '../db/authorsRepo';
+import { EDITOR_BYLINE_SUFFIX, linkZoteroAuthors } from '../db/authorsRepo';
 import { getDb } from '../db/database';
 import { probeWorkTextAvailability } from '../extraction/textExtractor';
 
+/** The stored byline. Only the creators that carry intellectual responsibility
+ *  for the item appear (translators, series editors, … are dropped), and an
+ *  editor is marked as such so the byline can never be read as authorship. */
 function authorsOf(item: ZoteroItem): string[] {
-  return item.creators.map((c) => {
-    if (c.name) return c.name;
+  const authors: string[] = [];
+  const editors: string[] = [];
+  for (const c of item.creators) {
+    const type = (c.creatorType ?? 'author').toLowerCase();
+    if (type !== 'author' && type !== 'editor') continue;
     const last = c.lastName ?? '';
     const initial = c.firstName ? `, ${c.firstName.charAt(0)}.` : '';
-    return `${last}${initial}`;
-  });
+    const display = c.name || `${last}${initial}`;
+    if (type === 'editor') editors.push(`${display}${EDITOR_BYLINE_SUFFIX}`);
+    else authors.push(display);
+  }
+  // Authors first, in Zotero's order, then the editors. Zotero lists the volume
+  // editor first on a book section, and everything that shortens a citation to
+  // "authors[0] (year)" would otherwise credit the chapter to the editor.
+  return [...authors, ...editors];
 }
 
 /** Structured creators kept for building canonical author identity. Only authors

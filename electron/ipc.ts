@@ -96,7 +96,7 @@ import { onOpenCodeGoUsageStatusChanged } from './ai/openCodeGoUsage';
 import {
   interruptDecorativeImageGenerations,
 } from './ai/decorativeImages';
-import { reconcileAuthorLayerOnce } from './db/authorsRepo';
+import { reconcileAuthorLayerOnce, reconcileAuthorRolesOnce } from './db/authorsRepo';
 import { getSyncLog } from './db/syncRepo';
 import { fullSync, startRealtimeSync, stopRealtimeSync } from './sync/syncService';
 import {
@@ -312,6 +312,7 @@ export function registerIpc(
     upgradeWorldbuildingDemoNarrativeDepth();
     relocalizeWorldbuildingDemoData();
     reconcileAuthorLayerOnce();
+    reconcileAuthorRolesOnce();
 
     const settings = getSettings();
     if (settings.syncMode === 'realtime') startRealtimeSync();
@@ -669,6 +670,7 @@ export function registerIpc(
       const reset = resetVaultDatabase(id);
       getDb();
       reconcileAuthorLayerOnce();
+      reconcileAuthorRolesOnce();
       const settings = getSettings();
       if (settings.syncMode === 'realtime') startRealtimeSync();
       startNodusServerSync();

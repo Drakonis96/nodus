@@ -6781,7 +6781,10 @@ export interface AuthorSummary {
   /** Natural reading order ("Given Surname") for display. */
   fullName: string;
   affiliation: string | null;
+  /** Works this person actually wrote. Volumes they only edited are counted apart. */
   workCount: number;
+  /** Volumes this person edited without authoring — never part of their footprint. */
+  editedCount: number;
   ideaCount: number;
   relationCount: number;
   /** Most frequent Zotero tags across this author's live works. */
@@ -6882,7 +6885,10 @@ export interface AuthorDossier {
   fullName: string;
   firstName: string;
   lastName: string;
+  /** Works this person wrote — the only ones their ideas are drawn from. */
   works: AuthorDossierWork[];
+  /** Volumes they edited: listed as a bibliographic fact, never as authorship. */
+  editedWorks: AuthorDossierWork[];
   ideas: AuthorDossierIdea[];
   relations: AuthorDossierRelation[];
   themes: string[];

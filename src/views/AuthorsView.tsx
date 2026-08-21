@@ -483,7 +483,7 @@ function AuthorsCatalog({
               <input type="checkbox" checked={selected.has(author.author_id)} onChange={() => toggleSelect(author.author_id)} aria-label={t('Seleccionar para exportar')} />
               <button data-testid="author-name" className="min-w-0 pr-3 text-left font-medium text-neutral-200 hover:text-indigo-300" onClick={() => onOpenAuthor({ id: author.author_id, label: author.fullName || author.name, saved: author.saved })}><span className="block truncate">{author.firstName || author.fullName || author.name}</span>{author.affiliation && <span className="mt-1 block truncate text-[10px] font-normal text-neutral-600">{author.affiliation}</span>}</button>
               <button className="min-w-0 truncate pr-3 text-left text-neutral-400 hover:text-indigo-300" onClick={() => onOpenAuthor({ id: author.author_id, label: author.fullName || author.name, saved: author.saved })}>{author.lastName || author.name}</button>
-              <span className="tabular-nums text-neutral-400">{author.workCount}</span>
+              <span className="tabular-nums text-neutral-400">{author.workCount}{author.editedCount > 0 && <span className="ml-1 text-[10px] text-cyan-500/80" title={tx('{n} volúmenes editados', { n: author.editedCount })}>+{author.editedCount} {t('ed.')}</span>}</span>
               <span className="tabular-nums text-neutral-400">{author.ideaCount}</span>
               <span className="tabular-nums text-neutral-400">{author.relationCount}</span>
               <div className="flex min-w-0 flex-wrap gap-1 pr-3">{(author.topTags.length ? author.topTags : author.topThemes).slice(0, 4).map((tag) => <span key={tag} className="max-w-32 truncate rounded-full bg-neutral-900 px-2 py-1 text-[10px] text-neutral-500" title={tag}>{tag}</span>)}</div>
@@ -665,6 +665,11 @@ function AuthorDossierDetail({
             <Icon name="book" size={11} />
             {tx('{n} obras', { n: dossier.works.length })}
           </button>
+          {dossier.editedWorks.length > 0 && (
+            <Badge color="cyan" title={t('Coordina la edición del volumen; las ideas no se le atribuyen.')}>
+              {tx('{n} volúmenes editados', { n: dossier.editedWorks.length })}
+            </Badge>
+          )}
           <Badge>{tx('{n} ideas', { n: dossier.ideas.length })}</Badge>
           <Badge>{tx('{n} conexiones', { n: connectedAuthors.length })}</Badge>
           {dossier.themes.slice(0, 5).map((th) => (
@@ -755,6 +760,23 @@ function AuthorDossierDetail({
         </section>
       )}
 
+      {/* 2b. Volumes this person edited but did not write. Listed because it is a
+             real bibliographic fact, kept apart because none of the ideas above
+             come from them. */}
+      {dossier.editedWorks.length > 0 && (
+        <section data-testid="author-edited-works">
+          <h4 className="font-medium mb-1 flex items-center gap-2">
+            <Icon name="book" size={15} className="text-cyan-400" /> {t('Volúmenes que edita')}
+          </h4>
+          <p className="mb-2 text-xs text-neutral-500">{t('Coordina la edición del volumen; las ideas no se le atribuyen.')}</p>
+          <div className="space-y-1">
+            {dossier.editedWorks.map((w) => (
+              <AuthorWorkRow key={w.nodus_id} work={w} onOpenIdeas={(work) => setIdeasWork(work)} />
+            ))}
+          </div>
+        </section>
+      )}
+
       {/* 3. Searchable idea list */}
       <AuthorIdeasSection ideas={dossier.ideas} onOpenIdea={setSelectedIdeaId} />
 
@@ -786,7 +808,7 @@ function AuthorDossierDetail({
       {worksOpen && (
         <AuthorWorksModal
           authorName={dossier.fullName || author.name}
-          works={dossier.works}
+          works={[...dossier.works, ...dossier.editedWorks]}
           onClose={() => setWorksOpen(false)}
           onOpenWorkIdeas={(work) => {
             setWorksOpen(false);

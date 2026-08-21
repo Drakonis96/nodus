@@ -13,6 +13,7 @@ import type {
   WritingWorkshopIdeaCandidate,
 } from '@shared/types';
 import { getDb } from '../db/database';
+import { parseBylineEntry } from '../db/authorsRepo';
 import { getSettings } from '../db/settingsRepo';
 import { getApiKey } from '../secrets/secretStore';
 import { buildIdeaGraph, getContradictions } from '../graph/graphService';
@@ -104,8 +105,15 @@ function buildAuthorResolver(): (name: string) => string | null {
   };
 }
 
+/** Who an idea can be attributed to: the authors of the works it occurs in, never
+ *  the editors of the volumes those works appear in. */
 function ideaAuthors(idea: WritingWorkshopIdeaCandidate): string[] {
-  return [...new Set(idea.works.flatMap((w) => w.authors))];
+  const names = idea.works
+    .flatMap((w) => w.authors)
+    .map((entry) => parseBylineEntry(entry))
+    .filter((entry) => entry.role === 'author')
+    .map((entry) => entry.display);
+  return [...new Set(names)];
 }
 
 /**

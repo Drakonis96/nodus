@@ -48,6 +48,7 @@ export function buildSynthesisMatrix(): SynthesisMatrix {
          JOIN authors a ON a.author_id = wa.author_id
          JOIN works w ON w.nodus_id = wa.nodus_id AND w.archived = 0
          JOIN idea_occurrences io ON io.nodus_id = wa.nodus_id
+        WHERE wa.role = 'author'
         GROUP BY wa.author_id
         ORDER BY ideaCount DESC, name`
     )
@@ -84,7 +85,8 @@ export function buildSynthesisMatrix(): SynthesisMatrix {
          FROM work_authors wa
          JOIN works w ON w.nodus_id = wa.nodus_id AND w.archived = 0
          JOIN idea_theme_links itl ON itl.nodus_id = wa.nodus_id
-         JOIN ideas i ON i.global_id = itl.global_id`
+         JOIN ideas i ON i.global_id = itl.global_id
+        WHERE wa.role = 'author'`
     )
     .all() as { authorId: string; themeId: string; gid: string; label: string; type: IdeaType }[];
 
@@ -149,7 +151,7 @@ export async function synthesizeMatrixCell(
          JOIN works w ON w.nodus_id = wa.nodus_id AND w.archived = 0
          JOIN idea_theme_links itl ON itl.nodus_id = wa.nodus_id
          JOIN ideas i ON i.global_id = itl.global_id
-        WHERE wa.author_id = ? AND itl.theme_id = ?`
+        WHERE wa.author_id = ? AND itl.theme_id = ? AND wa.role = 'author'`
     )
     .all(authorId, themeId) as { global_id: string; label: string; type: IdeaType; statement: string }[];
 

@@ -8433,4 +8433,7 @@ export const EN: Record<string, string> = {
   "Descifrando…": "Decrypting…",
   "Finalizando…": "Finalizing…",
   "Progreso de restauración": "Restore progress",
+  "Volúmenes que edita": "Volumes they edit",
+  "{n} volúmenes editados": "{n} edited volumes",
+  "Coordina la edición del volumen; las ideas no se le atribuyen.": "They edit the volume; its ideas are not attributed to them.",
 };

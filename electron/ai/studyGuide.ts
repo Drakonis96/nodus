@@ -75,7 +75,7 @@ async function semanticBoosts(objective: string | undefined, enabled: boolean): 
       .prepare(
         `SELECT DISTINCT wa.author_id, io.nodus_id
            FROM idea_occurrences io
-           JOIN work_authors wa ON wa.nodus_id = io.nodus_id
+           JOIN work_authors wa ON wa.nodus_id = io.nodus_id AND wa.role = 'author'
            JOIN works w ON w.nodus_id = io.nodus_id AND w.archived = 0
           WHERE io.global_id = ?`
       )
@@ -90,7 +90,7 @@ async function semanticBoosts(objective: string | undefined, enabled: boolean): 
   const passageHits = findSimilarPassages(vector, 0.2, 50);
   for (const passage of passageHits) {
     const rows = db
-      .prepare('SELECT author_id FROM work_authors WHERE nodus_id = ?')
+      .prepare("SELECT author_id FROM work_authors WHERE nodus_id = ? AND role = 'author'")
       .all(passage.nodus_id) as { author_id: string }[];
     for (const row of rows) addBoost(authorBoosts, row.author_id, passage.similarity * 0.8);
     addBoost(workBoosts, passage.nodus_id, passage.similarity * 1.1);
@@ -100,7 +100,7 @@ async function semanticBoosts(objective: string | undefined, enabled: boolean): 
   const workHits = findSimilarWorks(vector, 0.2, 40);
   for (const work of workHits) {
     const rows = db
-      .prepare('SELECT author_id FROM work_authors WHERE nodus_id = ?')
+      .prepare("SELECT author_id FROM work_authors WHERE nodus_id = ? AND role = 'author'")
       .all(work.nodus_id) as { author_id: string }[];
     for (const row of rows) addBoost(authorBoosts, row.author_id, work.similarity * 0.9);
     addBoost(workBoosts, work.nodus_id, work.similarity);
@@ -142,6 +142,7 @@ function loadWorkInputs(workBoosts: Map<string, number>): Map<string, StudyGuide
          LEFT JOIN idea_counts ic ON ic.nodus_id = w.nodus_id
          LEFT JOIN passage_counts pc ON pc.nodus_id = w.nodus_id
          LEFT JOIN work_summaries ws ON ws.nodus_id = w.nodus_id
+        WHERE wa.role = 'author'
         ORDER BY wa.author_id, ideaCount DESC, w.year DESC`
     )
     .all() as {
@@ -197,6 +198,7 @@ function loadKeyIdeas(): Map<string, StudyGuideIdeaInput[]> {
          JOIN works w ON w.nodus_id = wa.nodus_id AND w.archived = 0
          JOIN idea_occurrences io ON io.nodus_id = w.nodus_id
          JOIN ideas i ON i.global_id = io.global_id
+        WHERE wa.role = 'author'
         ORDER BY wa.author_id, (io.role = 'principal') DESC, io.confidence DESC, i.label`
     )
     .all() as {

@@ -7956,4 +7956,7 @@ export const TR: Record<string, string> = {
   "Descifrando…": "Şifre çözülüyor…",
   "Finalizando…": "Tamamlanıyor…",
   "Progreso de restauración": "Geri yükleme ilerlemesi",
+  "Volúmenes que edita": "Derlediği ciltler",
+  "{n} volúmenes editados": "{n} derlenen cilt",
+  "Coordina la edición del volumen; las ideas no se le atribuyen.": "Cildin editörlüğünü yapar; fikirler bu kişiye atfedilmez.",
 };
