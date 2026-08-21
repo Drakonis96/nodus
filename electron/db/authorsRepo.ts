@@ -152,6 +152,34 @@ function parseCreatorsJson(value: string | null): WorkCreator[] {
  */
 export const EDITOR_BYLINE_SUFFIX = ' (ed.)';
 
+/**
+ * The stored byline for a set of Zotero creators. Only the people who carry
+ * intellectual responsibility appear (translators and the rest are already out of
+ * creators_json), an editor is marked so the byline can never be read as
+ * authorship, and authors come first in Zotero's own order.
+ *
+ * Zotero lists the volume editor first on a book section, so anything that
+ * shortens a citation to the first name in the byline — Deep Research, the
+ * writing workshop — would otherwise credit the chapter to its editor.
+ *
+ * Shared by the sync path and the retroactive repair so both produce byte-identical
+ * bylines; a corpus that never resyncs must end up with exactly what a resync writes.
+ */
+export function bylineFromCreators(creators: WorkCreator[]): string[] {
+  const authors: string[] = [];
+  const editors: string[] = [];
+  for (const c of creators) {
+    const last = (c.lastName ?? '').trim();
+    const first = (c.firstName ?? '').trim();
+    const initial = first ? `, ${first.charAt(0)}.` : '';
+    const display = (c.name ?? '').trim() || `${last}${initial}`;
+    if (!display) continue;
+    if (c.role === 'editor') editors.push(`${display}${EDITOR_BYLINE_SUFFIX}`);
+    else authors.push(display);
+  }
+  return [...authors, ...editors];
+}
+
 /** Split a stored byline entry back into its display name and its Zotero role. */
 export function parseBylineEntry(entry: string): { display: string; role: 'author' | 'editor' } {
   const clean = (entry || '').trim();
@@ -395,6 +423,39 @@ export function repairAuthorRoles(): number {
   return changed;
 }
 
+const BYLINE_RECONCILE_FLAG = 'author_bylines_reconciled';
+
+/**
+ * Rewrite every Zotero-synced work's byline from its structured creators, so a
+ * corpus that has not been resynced still cites the author of a chapter rather
+ * than the editor of the volume it sits in. Returns the rows changed.
+ *
+ * Only works that carry creators_json are touched — that is what makes them
+ * Zotero-owned. A manually created work, or one whose byline came from anywhere
+ * but a sync, is left alone.
+ */
+export function repairAuthorBylines(): number {
+  const db = getDb();
+  const works = db
+    .prepare(
+      `SELECT nodus_id AS nodusId, authors_json AS authorsJson, creators_json AS creatorsJson
+         FROM works
+        WHERE creators_json IS NOT NULL AND nodus_id NOT LIKE 'demo-%'`
+    )
+    .all() as { nodusId: string; authorsJson: string | null; creatorsJson: string }[];
+  const update = db.prepare('UPDATE works SET authors_json = ? WHERE nodus_id = ?');
+  let changed = 0;
+  for (const work of works) {
+    const creators = parseCreatorsJson(work.creatorsJson);
+    if (creators.length === 0) continue;
+    const byline = JSON.stringify(bylineFromCreators(creators));
+    if (byline === work.authorsJson) continue;
+    update.run(byline, work.nodusId);
+    changed += 1;
+  }
+  return changed;
+}
+
 /**
  * One-time pass that repairs the stored roles and refreshes everything derived
  * from them: the author-relations layer is rebuilt (it must no longer route a
@@ -402,6 +463,7 @@ export function repairAuthorRoles(): number {
  * they were written about a work list that included other people's chapters.
  */
 export function reconcileAuthorRolesOnce(): void {
+  reconcileAuthorBylinesOnce();
   if (readFlag(ROLE_RECONCILE_FLAG) === '1') return;
   const db = getDb();
   const run = db.transaction(() => {
@@ -421,6 +483,22 @@ export function reconcileAuthorRolesOnce(): void {
       console.log(`[authors] repaired ${changed} misfiled role(s); ${editors} editor link(s) no longer count as authorship`);
     }
     writeFlag(ROLE_RECONCILE_FLAG, '1');
+  });
+  run();
+}
+
+/**
+ * One-time byline repair. Kept on its own flag rather than folded into the role
+ * pass: the two shipped one after the other, and a vault that already ran the role
+ * pass must still get its bylines fixed.
+ */
+export function reconcileAuthorBylinesOnce(): void {
+  if (readFlag(BYLINE_RECONCILE_FLAG) === '1') return;
+  const db = getDb();
+  const run = db.transaction(() => {
+    const changed = repairAuthorBylines();
+    if (changed > 0) console.log(`[authors] rewrote ${changed} byline(s) so editors are marked and never lead`);
+    writeFlag(BYLINE_RECONCILE_FLAG, '1');
   });
   run();
 }
