@@ -2,6 +2,54 @@
   "version": 1,
   "notices": [
     {
+      "id": "2026-08-21-github-star",
+      "date": "2026-08-21",
+      "severity": "info",
+      "url": "https://github.com/Drakonis96/nodus",
+      "copy": {
+        "es": {
+          "title": "¿Te gusta Nodus?",
+          "body": "Si disfrutas de Nodus, regálanos una estrella en GitHub para apoyarnos y hacer crecer el proyecto.",
+          "linkLabel": "Danos una estrella en GitHub"
+        },
+        "en": {
+          "title": "Enjoying Nodus?",
+          "body": "If you enjoy Nodus, give us a star on GitHub to support the project and help it grow.",
+          "linkLabel": "Star Nodus on GitHub"
+        },
+        "fr": {
+          "title": "Vous aimez Nodus ?",
+          "body": "Si vous appréciez Nodus, mettez une étoile à notre page GitHub pour soutenir le projet et l'aider à grandir.",
+          "linkLabel": "Mettre une étoile à Nodus sur GitHub"
+        },
+        "de": {
+          "title": "Gefällt dir Nodus?",
+          "body": "Wenn dir Nodus gefällt, gib uns einen Stern auf GitHub, um das Projekt zu unterstützen und zu vergrößern.",
+          "linkLabel": "Nodus auf GitHub bewerten"
+        },
+        "pt": {
+          "title": "Gostas do Nodus?",
+          "body": "Se gostas do Nodus, dá uma estrela no GitHub para apoiar o projeto e ajudá-lo a crescer.",
+          "linkLabel": "Dar uma estrela ao Nodus no GitHub"
+        },
+        "pt-BR": {
+          "title": "Você gosta do Nodus?",
+          "body": "Se você gosta do Nodus, dê uma estrela no GitHub para apoiar o projeto e fazê-lo crescer.",
+          "linkLabel": "Dar uma estrela ao Nodus no GitHub"
+        },
+        "it": {
+          "title": "Ti piace Nodus?",
+          "body": "Se ti piace Nodus, lascia una stella su GitHub per supportare il progetto e aiutarlo a crescere.",
+          "linkLabel": "Metti una stella su GitHub"
+        },
+        "tr": {
+          "title": "Nodus'u beğendin mi?",
+          "body": "Nodus'u beğeniyorsanız, projeyi desteklemek ve büyütmek için GitHub'da bize bir yıldız verin.",
+          "linkLabel": "GitHub'da Nodus'a yıldız ver"
+        }
+      }
+    },
+    {
       "id": "2026-08-nodusresearch-website",
       "date": "2026-08-16",
       "severity": "info",
