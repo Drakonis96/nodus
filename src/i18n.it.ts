@@ -7614,4 +7614,8 @@ export const IT: Record<string, string> = {
   "Volúmenes que edita": "Volumi che cura",
   "{n} volúmenes editados": "{n} volumi curati",
   "Coordina la edición del volumen; las ideas no se le atribuyen.": "Cura l'edizione del volume; le idee non le vengono attribuite.",
+  "Excepción: los marcados no registran ningún autor, así que sus ideas se muestran aquí de forma provisional.": "Eccezione: i volumi segnalati non registrano alcun autore, quindi le loro idee compaiono qui in via provvisoria.",
+  "Esta obra no registra ningún autor: sus ideas se atribuyen provisionalmente a quien la edita": "Quest'opera non registra alcun autore: le sue idee sono attribuite in via provvisoria a chi la cura",
+  "atribución provisional": "attribuzione provvisoria",
+  "provisional": "provvisoria",
 };

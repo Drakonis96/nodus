@@ -112,10 +112,9 @@ export function listAuthors(): AuthorSummary[] {
   const ideaRows = db
     .prepare(
       `SELECT wa.author_id AS id, COUNT(DISTINCT io.global_id) AS n
-         FROM work_authors wa
+         FROM work_attributions wa
          JOIN works w ON w.nodus_id = wa.nodus_id AND w.archived = 0
          JOIN idea_occurrences io ON io.nodus_id = wa.nodus_id
-        WHERE wa.role = 'author'
         GROUP BY wa.author_id`
     )
     .all() as { id: string; n: number }[];
@@ -137,10 +136,9 @@ export function listAuthors(): AuthorSummary[] {
   const themeRows = db
     .prepare(
       `SELECT wa.author_id AS id, t.label AS label, COUNT(*) AS n
-         FROM work_authors wa
+         FROM work_attributions wa
          JOIN idea_theme_links itl ON itl.nodus_id = wa.nodus_id
          JOIN themes t ON t.theme_id = itl.theme_id
-        WHERE wa.role = 'author'
         GROUP BY wa.author_id, t.theme_id
         ORDER BY n DESC`
     )
@@ -156,11 +154,10 @@ export function listAuthors(): AuthorSummary[] {
   const tagRows = db
     .prepare(
       `SELECT wa.author_id AS id, zt.label AS label, COUNT(DISTINCT wzt.nodus_id) AS n
-         FROM work_authors wa
+         FROM work_attributions wa
          JOIN works w ON w.nodus_id = wa.nodus_id AND w.archived = 0
          JOIN work_zotero_tags wzt ON wzt.nodus_id = wa.nodus_id
          JOIN zotero_tags zt ON zt.tag_id = wzt.tag_id
-        WHERE wa.role = 'author'
         GROUP BY wa.author_id, zt.tag_id
         ORDER BY n DESC, zt.label COLLATE NOCASE`
     )
@@ -238,10 +235,10 @@ function themesByIdeaForAuthor(authorId: string): Map<string, string[]> {
   const rows = getDb()
     .prepare(
       `SELECT DISTINCT itl.global_id AS gid, t.label AS label
-         FROM work_authors wa
+         FROM work_attributions wa
          JOIN idea_theme_links itl ON itl.nodus_id = wa.nodus_id
          JOIN themes t ON t.theme_id = itl.theme_id
-        WHERE wa.author_id = ? AND wa.role = 'author'`
+        WHERE wa.author_id = ?`
     )
     .all(authorId) as { gid: string; label: string }[];
   const map = new Map<string, string[]>();
@@ -272,10 +269,10 @@ function authorThemeSets(authorIds: string[]): Map<string, Set<string>> {
   const rows = getDb()
     .prepare(
       `SELECT DISTINCT wa.author_id AS authorId, t.label AS label
-         FROM work_authors wa
+         FROM work_attributions wa
          JOIN idea_theme_links itl ON itl.nodus_id = wa.nodus_id
          JOIN themes t ON t.theme_id = itl.theme_id
-        WHERE wa.author_id IN (${authorIds.map(() => '?').join(',')}) AND wa.role = 'author'
+        WHERE wa.author_id IN (${authorIds.map(() => '?').join(',')})
         ORDER BY t.label`
     )
     .all(...authorIds) as { authorId: string; label: string }[];
@@ -293,12 +290,13 @@ function loadIdeas(authorId: string): AuthorDossierIdea[] {
     .prepare(
       `SELECT io.global_id AS global_id, i.type AS type, i.label AS label, i.statement AS statement,
               io.role AS role, io.development AS development, io.confidence AS confidence,
-              io.nodus_id AS workId, w.title AS workTitle, w.year AS year
-         FROM work_authors wa
+              io.nodus_id AS workId, w.title AS workTitle, w.year AS year,
+              wa.basis AS basis
+         FROM work_attributions wa
          JOIN works w ON w.nodus_id = wa.nodus_id AND w.archived = 0
          JOIN idea_occurrences io ON io.nodus_id = wa.nodus_id
          JOIN ideas i ON i.global_id = io.global_id
-        WHERE wa.author_id = ? AND wa.role = 'author'
+        WHERE wa.author_id = ?
         ORDER BY (io.role = 'principal') DESC, io.confidence DESC`
     )
     .all(authorId) as {
@@ -312,6 +310,7 @@ function loadIdeas(authorId: string): AuthorDossierIdea[] {
     workId: string;
     workTitle: string;
     year: number | null;
+    basis: 'author' | 'editor_only';
   }[];
 
   // evidence for the author's works, grouped by idea+work
@@ -319,8 +318,8 @@ function loadIdeas(authorId: string): AuthorDossierIdea[] {
     .prepare(
       `SELECT ev.id, ev.global_id, ev.nodus_id, ev.quote, ev.location, ev.kind
          FROM evidence ev
-         JOIN work_authors wa ON wa.nodus_id = ev.nodus_id
-        WHERE wa.author_id = ? AND wa.role = 'author'`
+         JOIN work_attributions wa ON wa.nodus_id = ev.nodus_id
+        WHERE wa.author_id = ?`
     )
     .all(authorId) as Evidence[];
   const evByKey = new Map<string, Evidence[]>();
@@ -350,6 +349,9 @@ function loadIdeas(authorId: string): AuthorDossierIdea[] {
       workId: r.workId,
       workTitle: r.workTitle,
       year: r.year,
+      // The volume has no author on record, so this idea is shown here only
+      // because somebody has to hold it. Marked, never presented as authorship.
+      provisional: r.basis === 'editor_only',
       themes: themesByIdea.get(r.global_id) ?? [],
       evidence: evByKey.get(`${r.global_id}::${r.workId}`) ?? [],
     });
@@ -403,8 +405,12 @@ function loadWorks(authorId: string): AuthorDossierWork[] {
         `SELECT w.nodus_id, w.title, w.authors_json AS authorsJson, w.year, w.item_type AS itemType,
                 w.doi, w.zotero_key AS zoteroKey, w.source_type AS sourceType,
                 w.light_status AS lightStatus, w.deep_status AS deepStatus, w.summary_status AS summaryStatus,
-                w.notes, w.read_tag AS readTag, wa.role AS role
-           FROM work_authors wa JOIN works w ON w.nodus_id = wa.nodus_id
+                w.notes, w.read_tag AS readTag, wa.role AS role,
+                (att.author_id IS NOT NULL) AS attributed
+           FROM work_authors wa
+           JOIN works w ON w.nodus_id = wa.nodus_id
+           LEFT JOIN work_attributions att
+                  ON att.nodus_id = wa.nodus_id AND att.author_id = wa.author_id
           WHERE wa.author_id = ? AND w.archived = 0
           ORDER BY w.year DESC, w.title`
       )
@@ -423,6 +429,7 @@ function loadWorks(authorId: string): AuthorDossierWork[] {
       notes: string | null;
       readTag: number;
       role: string | null;
+      attributed: number;
     }[]
   ).map((w) => ({
     nodus_id: w.nodus_id,
@@ -439,6 +446,7 @@ function loadWorks(authorId: string): AuthorDossierWork[] {
     notes: w.notes,
     read: w.readTag === 1,
     role: w.role === 'editor' ? ('editor' as const) : ('author' as const),
+    attributed: w.attributed === 1,
   }));
 }
 

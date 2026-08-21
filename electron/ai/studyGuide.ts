@@ -75,7 +75,7 @@ async function semanticBoosts(objective: string | undefined, enabled: boolean): 
       .prepare(
         `SELECT DISTINCT wa.author_id, io.nodus_id
            FROM idea_occurrences io
-           JOIN work_authors wa ON wa.nodus_id = io.nodus_id AND wa.role = 'author'
+           JOIN work_attributions wa ON wa.nodus_id = io.nodus_id
            JOIN works w ON w.nodus_id = io.nodus_id AND w.archived = 0
           WHERE io.global_id = ?`
       )
@@ -137,12 +137,11 @@ function loadWorkInputs(workBoosts: Map<string, number>): Map<string, StudyGuide
               COALESCE(ic.ideaCount, 0) AS ideaCount,
               COALESCE(ic.principalIdeaCount, 0) AS principalIdeaCount,
               COALESCE(pc.passageCount, 0) AS passageCount
-         FROM work_authors wa
+         FROM work_attributions wa
          JOIN works w ON w.nodus_id = wa.nodus_id AND w.archived = 0
          LEFT JOIN idea_counts ic ON ic.nodus_id = w.nodus_id
          LEFT JOIN passage_counts pc ON pc.nodus_id = w.nodus_id
          LEFT JOIN work_summaries ws ON ws.nodus_id = w.nodus_id
-        WHERE wa.role = 'author'
         ORDER BY wa.author_id, ideaCount DESC, w.year DESC`
     )
     .all() as {
@@ -194,11 +193,10 @@ function loadKeyIdeas(): Map<string, StudyGuideIdeaInput[]> {
     .prepare(
       `SELECT wa.author_id, i.global_id, i.type, i.label, i.statement,
               io.nodus_id AS workId, w.title AS workTitle, io.role, io.confidence
-         FROM work_authors wa
+         FROM work_attributions wa
          JOIN works w ON w.nodus_id = wa.nodus_id AND w.archived = 0
          JOIN idea_occurrences io ON io.nodus_id = w.nodus_id
          JOIN ideas i ON i.global_id = io.global_id
-        WHERE wa.role = 'author'
         ORDER BY wa.author_id, (io.role = 'principal') DESC, io.confidence DESC, i.label`
     )
     .all() as {

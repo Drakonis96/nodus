@@ -8436,4 +8436,8 @@ export const EN: Record<string, string> = {
   "Volúmenes que edita": "Volumes they edit",
   "{n} volúmenes editados": "{n} edited volumes",
   "Coordina la edición del volumen; las ideas no se le atribuyen.": "They edit the volume; its ideas are not attributed to them.",
+  "Excepción: los marcados no registran ningún autor, así que sus ideas se muestran aquí de forma provisional.": "Exception: the marked ones record no author at all, so their ideas are shown here provisionally.",
+  "Esta obra no registra ningún autor: sus ideas se atribuyen provisionalmente a quien la edita": "This work records no author: its ideas are provisionally attributed to whoever edited it",
+  "atribución provisional": "provisional attribution",
+  "provisional": "provisional",
 };

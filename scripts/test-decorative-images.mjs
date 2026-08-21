@@ -419,6 +419,12 @@ try {
     INSERT INTO gaps VALUES ('g1','evidence','Hueco de prueba',0.8,'w1','i1','e1');
     INSERT INTO authors VALUES ('a1','Autora de prueba','Universidad','autora-prueba');
     INSERT INTO work_authors VALUES ('a1','w1','author');
+    CREATE VIEW work_attributions AS
+      SELECT wa.nodus_id, wa.author_id, wa.role,
+             CASE WHEN wa.role = 'author' THEN 'author' ELSE 'editor_only' END AS basis
+      FROM work_authors wa
+      WHERE wa.role = 'author'
+         OR NOT EXISTS (SELECT 1 FROM work_authors peer WHERE peer.nodus_id = wa.nodus_id AND peer.role = 'author');
     INSERT INTO note_folders VALUES ('f1','Carpeta');
     INSERT INTO notes VALUES ('n1','Nota de prueba','markdown','Contenido completo','f1','2026-01-01','2026-01-02',NULL);
   `);

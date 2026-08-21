@@ -769,6 +769,11 @@ function AuthorDossierDetail({
             <Icon name="book" size={15} className="text-cyan-400" /> {t('Volúmenes que edita')}
           </h4>
           <p className="mb-2 text-xs text-neutral-500">{t('Coordina la edición del volumen; las ideas no se le atribuyen.')}</p>
+          {dossier.editedWorks.some((w) => w.attributed) && (
+            <p className="mb-2 text-xs text-amber-400/80">
+              {t('Excepción: los marcados no registran ningún autor, así que sus ideas se muestran aquí de forma provisional.')}
+            </p>
+          )}
           <div className="space-y-1">
             {dossier.editedWorks.map((w) => (
               <AuthorWorkRow key={w.nodus_id} work={w} onOpenIdeas={(work) => setIdeasWork(work)} />
@@ -900,6 +905,14 @@ function AuthorIdeasSection({ ideas, onOpenIdea }: { ideas: AuthorDossierIdea[];
               <div className="mt-2 flex items-center gap-2 text-[10px] text-neutral-600">
                 <span className="truncate">{idea.workTitle || t('(sin título)')}</span>
                 {idea.year && <span className="shrink-0">{idea.year}</span>}
+                {idea.provisional && (
+                  <span
+                    className="shrink-0 rounded-full bg-amber-500/10 px-1.5 py-0.5 text-amber-400/90"
+                    title={t('Esta obra no registra ningún autor: sus ideas se atribuyen provisionalmente a quien la edita')}
+                  >
+                    {t('provisional')}
+                  </span>
+                )}
                 <span className="ml-auto flex shrink-0 gap-1">{idea.themes.slice(0, 2).map((theme) => <span key={theme} className="rounded-full bg-neutral-950 px-1.5 py-0.5">{theme}</span>)}</span>
               </div>
             </button>
@@ -1148,6 +1161,11 @@ function AuthorWorkRow({
       {work.role === 'editor' && (
         <Badge color="cyan" title={t('Figura como editor/a de esta obra')}>
           {t('ed.')}
+        </Badge>
+      )}
+      {work.role === 'editor' && work.attributed && (
+        <Badge color="amber" title={t('Esta obra no registra ningún autor: sus ideas se atribuyen provisionalmente a quien la edita')}>
+          {t('atribución provisional')}
         </Badge>
       )}
       {work.read && (

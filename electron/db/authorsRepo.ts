@@ -547,7 +547,7 @@ function authorsForIdea(globalId: string): string[] {
     .prepare(
       `SELECT DISTINCT wa.author_id
        FROM idea_occurrences io
-       JOIN work_authors wa ON wa.nodus_id = io.nodus_id AND wa.role = 'author'
+       JOIN work_attributions wa ON wa.nodus_id = io.nodus_id
        WHERE io.global_id = ?`
     )
     .all(globalId) as { author_id: string }[];

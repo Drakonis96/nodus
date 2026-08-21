@@ -777,8 +777,8 @@ export function buildAuthorGraph(): GraphData {
   // Batch-load all author→work mappings in one query instead of N+1.
   const waRows = db
     .prepare(
-      `SELECT wa.author_id, w.nodus_id, w.year, w.read_tag FROM work_authors wa JOIN works w ON w.nodus_id = wa.nodus_id
-        WHERE w.archived = 0 AND wa.role = 'author'`
+      `SELECT wa.author_id, w.nodus_id, w.year, w.read_tag FROM work_attributions wa JOIN works w ON w.nodus_id = wa.nodus_id
+        WHERE w.archived = 0`
     )
     .all() as { author_id: string; nodus_id: string; year: number | null; read_tag: number }[];
   const worksByAuthor = new Map<string, { nodus_id: string; year: number | null; read_tag: number }[]>();
@@ -1250,13 +1250,12 @@ function readPathRows(db: ReturnType<typeof getDb>): ReadingWorkRow[] {
         SELECT wa.nodus_id,
                COUNT(ar.type) AS author_relation_count,
                COALESCE(SUM(ar.weight), 0) AS author_weight
-        FROM work_authors wa
+        FROM work_attributions wa
         LEFT JOIN (
           SELECT from_author AS author_id, type, weight FROM author_relations
           UNION ALL
           SELECT to_author AS author_id, type, weight FROM author_relations
         ) ar ON ar.author_id = wa.author_id
-        WHERE wa.role = 'author'
         GROUP BY wa.nodus_id
       ),
       dependency_stats AS (
