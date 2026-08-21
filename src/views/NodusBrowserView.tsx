@@ -144,13 +144,16 @@ export function NodusBrowserView() {
   }, [findText, findCaseSensitive, findOpen, active?.id]);
 
   useEffect(() => {
-    if (!findOpen) return;
     const onKey = (event: KeyboardEvent) => {
       const cmd = event.metaKey || event.ctrlKey;
       if (cmd && !event.altKey && event.key.toLowerCase() === 'f') {
         event.preventDefault();
-        setFindOpen(true);
-        requestAnimationFrame(() => findInputRef.current?.select());
+        setFindOpen((prev) => {
+          const next = !prev;
+          if (next) requestAnimationFrame(() => findInputRef.current?.select());
+          else void window.nodus.browserStopFindInPage('clearSelection');
+          return next;
+        });
       } else if (findOpen && event.key === 'Escape') {
         event.preventDefault();
         setFindOpen(false);
@@ -443,6 +446,7 @@ export function NodusBrowserView() {
             icon="search"
             label={t('Buscar en la página')}
             dataTestId="browser-find-button"
+            active={findOpen}
             onClick={() => setFindOpen((v) => !v)}
           />
         </div>
@@ -722,17 +726,18 @@ function permissionLabel(request: PendingBrowserPermission): string {
 }
 
 function ToolbarButton({
-  icon, imageSrc, label, onClick, disabled, busy, dataTestId,
-}: { icon?: string; imageSrc?: string; label: string; onClick: () => void; disabled?: boolean; busy?: boolean; dataTestId?: string }) {
+  icon, imageSrc, label, onClick, disabled, busy, dataTestId, active,
+}: { icon?: string; imageSrc?: string; label: string; onClick: () => void; disabled?: boolean; busy?: boolean; dataTestId?: string; active?: boolean }) {
   return (
     <button
       type="button"
       data-testid={dataTestId}
       title={label}
       aria-label={label}
+      aria-pressed={active}
       disabled={disabled}
       onClick={onClick}
-      className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-neutral-600 transition-colors hover:bg-neutral-100 disabled:cursor-not-allowed disabled:opacity-40 dark:text-neutral-400 dark:hover:bg-neutral-900"
+      className={`inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${active ? 'bg-neutral-200 text-neutral-900 dark:bg-neutral-800 dark:text-neutral-100' : 'text-neutral-600 hover:bg-neutral-100 dark:text-neutral-400 dark:hover:bg-neutral-900'}`}
     >
       {imageSrc
         ? <img src={imageSrc} alt="" className={`h-4 w-4 ${busy ? 'animate-pulse' : ''}`} />
