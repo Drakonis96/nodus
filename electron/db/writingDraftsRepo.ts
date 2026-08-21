@@ -13,6 +13,7 @@ import { normalizeDeepResearchApproach } from '@shared/deepResearchApproaches';
 import { getDb } from './database';
 import { deleteDecorativeImageRow, getDecorativeImage } from './decorativeImagesRepo';
 import { deleteAnnotationsForWritingDraft } from './writingAnnotationsRepo';
+import { relabelSavedDraft } from '../citations/liveCitations';
 
 interface SavedWritingDraftRow {
   id: string;
@@ -76,9 +77,16 @@ const SELECT_DRAFTS =
   'SELECT d.*, r.updated_at AS read_at FROM writing_saved_drafts d ' +
   'LEFT JOIN writing_draft_reads r ON r.draft_id = d.id';
 
+/**
+ * Every read of a saved report goes through here, which is why the citation labels
+ * are refreshed here and nowhere else: the reader, the exports, the archive and the
+ * MCP tools all inherit it from this one place. The stored row is never written
+ * back — the report on disk stays exactly as it was written, and the names it shows
+ * are re-derived from the corpus each time it is opened.
+ */
 function toSavedDraft(row: SavedWritingDraftRow): WritingWorkshopSavedDraft | null {
   try {
-    return {
+    return relabelSavedDraft({
       id: row.id,
       title: row.title,
       brief: JSON.parse(row.brief_json) as WritingWorkshopBrief,
@@ -89,7 +97,7 @@ function toSavedDraft(row: SavedWritingDraftRow): WritingWorkshopSavedDraft | nu
       readAt: row.read_at ?? null,
       createdAt: row.created_at,
       updatedAt: row.updated_at,
-    };
+    });
   } catch {
     // One corrupt local record must not prevent opening the rest of the workshop.
     return null;

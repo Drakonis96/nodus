@@ -28,7 +28,11 @@ try {
     bundle: true,
     format: 'esm',
     platform: 'node',
-    external: ['@shared/*'],
+    // Types from @shared are erased at build time, but citation naming is a real
+    // value import — the writer and the reader that re-derives its labels share one
+    // implementation — so it has to be bundled in rather than left external.
+    external: ['@shared/types', '@shared/deepResearchApproaches'],
+    alias: { '@shared': path.join(repoRoot, 'shared') },
     logLevel: 'silent',
   });
   const mod = await import(pathToFileURL(outfile).href);

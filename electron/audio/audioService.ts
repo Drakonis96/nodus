@@ -21,6 +21,7 @@ import type {
   StudyPronunciationEntry,
 } from '@shared/types';
 import { getDb } from '../db/database';
+import { relabelCitations } from '../citations/liveCitations';
 import { deepResearchSegments, immersionSegments, studyNarrationSegments } from './speakable';
 import { activeVaultDir } from '../vaults/vaultRegistry';
 import { audioDir, audioFilePath } from './audioPaths';
@@ -51,7 +52,13 @@ export function getEntitySegments(kind: AudioEntityKind, id: string, request: Au
     } catch {
       /* fall back to the row title only */
     }
-    return deepResearchSegments({ title: draft.title || row.title, abstract: draft.abstract, draftMarkdown: draft.draftMarkdown });
+    // Narration reads this report aloud, so it must speak the names the report
+    // would show today, not the ones frozen into it when it was generated.
+    return deepResearchSegments({
+      title: draft.title || row.title,
+      abstract: draft.abstract,
+      draftMarkdown: relabelCitations(draft.draftMarkdown ?? ''),
+    });
   }
   const row = getDb().prepare('SELECT title, topic, plan_json FROM immersion_sessions WHERE id = ?').get(id) as
     | { title: string; topic: string; plan_json: string }
