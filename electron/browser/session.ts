@@ -69,6 +69,35 @@ function browserUserAgent(ses: Session): string {
 function configureBrowserSession(ses: Session): void {
   ses.setUserAgent(browserUserAgent(ses));
 
+  // Spoof Sec-CH-UA to hide Electron: Google's "browser not secure" checks both
+  // the User-Agent string and the Sec-CH-UA brand list. setUserAgent() alone
+  // does not affect Sec-CH-UA, so we rewrite it here before it leaves the
+  // Nodus Browser partition.
+  ses.webRequest.onBeforeSendHeaders((details, callback) => {
+    const headers = { ...details.requestHeaders };
+    // Remove Electron brand; keep a plausible Chrome list.
+    if (headers['Sec-CH-UA']) {
+      headers['Sec-CH-UA'] = '"Not A(Brand";v="8", "Chromium";v="132", "Google Chrome";v="132"';
+    }
+    if (headers['Sec-CH-UA-Full-Version-List']) {
+      headers['Sec-CH-UA-Full-Version-List'] =
+        '"Not A(Brand";v="8.0.0.0", "Chromium";v="132.0.6734.0", "Google Chrome";v="132.0.6734.0"';
+    }
+    if (headers['Sec-CH-UA-Platform']) {
+      // Keep whatever platform was detected, but ensure it is quoted correctly.
+      headers['Sec-CH-UA-Platform'] = headers['Sec-CH-UA-Platform'];
+    }
+    // Belt-and-braces: ensure User-Agent header matches the cleaned session UA.
+    if (headers['User-Agent']) {
+      headers['User-Agent'] = String(headers['User-Agent'])
+        .replace(/\s*Electron\/[\S]+/g, '')
+        .replace(/\s*nodus\/[\S]+/gi, '')
+        .replace(/\s+/g, ' ')
+        .trim();
+    }
+    callback({ requestHeaders: headers });
+  });
+
   // Deny-by-default permissions, both handlers plus the device ones. The
   // prompter is registered first: installing the handlers without it would
   // leave `ask` permissions resolving through the fail-closed DENY_ALL stub,

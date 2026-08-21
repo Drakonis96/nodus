@@ -315,7 +315,26 @@ function wire(tab: Tab): void {
   }) as never);
 
   on(tab, contents, 'did-start-loading', (() => { if (isWeb()) patch(tab, { loading: true, error: null }); }) as never);
-  on(tab, contents, 'dom-ready', (() => { if (isWeb()) void applyPageColorScheme(contents); }) as never);
+  on(tab, contents, 'dom-ready', (() => {
+    if (!isWeb()) return;
+    void applyPageColorScheme(contents);
+    // Google's JS check also reads navigator.userAgentData.brands; hide Electron there too
+    // (headers already spoofed in session.ts). Runs in the page's main world.
+    void contents.executeJavaScript(`
+      try {
+        const uaData = navigator.userAgentData;
+        if (uaData && Array.isArray(uaData.brands)) {
+          const filtered = uaData.brands.filter(b => !/Electron/i.test(String(b.brand||'')));
+          if (filtered.length !== uaData.brands.length) {
+            Object.defineProperty(navigator, 'userAgentData', {
+              value: { ...uaData, brands: filtered, highEntropyBrands: Array.isArray(uaData.highEntropyBrands) ? uaData.highEntropyBrands.filter(b => !/Electron/i.test(String(b.brand||''))) : uaData.highEntropyBrands },
+              configurable: true
+            });
+          }
+        }
+      } catch {}
+    `).catch(() => undefined);
+  }) as never);
 
   // The address bar must follow navigation, not page load completion. A modern
   // page can keep the load event open for seconds (or indefinitely), so waiting
