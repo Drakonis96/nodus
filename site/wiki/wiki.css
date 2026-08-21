@@ -43,8 +43,7 @@ main#article {
   overflow-y: auto; overscroll-behavior: contain;
   padding: 26px 16px 24px;
   border-right: 1px solid var(--membrane);
-  background: var(--void);
-  backdrop-filter: none; -webkit-backdrop-filter: none;
+  background: transparent;
 }
 .sidebar-head {
   display: flex; align-items: center; justify-content: space-between;
@@ -134,7 +133,7 @@ main#article {
   overflow-y: auto; overscroll-behavior: contain;
   padding: clamp(38px, 5vw, 68px) 22px;
   border-left: 1px solid var(--membrane);
-  background: var(--void);
+  background: transparent;
   backdrop-filter: none; -webkit-backdrop-filter: none;
 }
 .toc > b {
@@ -417,7 +416,7 @@ main#article {
   .sidebar {
     position: fixed; z-index: 46; top: var(--nav-h); left: 0;
     width: min(340px, 88vw);
-    background: var(--void);
+    background: transparent;
     box-shadow: 20px 0 50px rgba(0, 0, 0, 0.55);
     transform: translateX(-105%); transition: transform 0.24s var(--ease);
   }
@@ -434,7 +433,7 @@ main#article {
     position: sticky; z-index: 2; top: -26px;
     margin: -26px -16px 16px; padding: 20px 18px 14px 26px;
     border-bottom: 1px solid var(--membrane);
-    background: var(--void);
+    background: transparent;
   }
   #nav-close {
     display: grid; place-items: center; width: 34px; height: 34px; padding: 0;
@@ -521,7 +520,7 @@ main#article {
   flex: none; width: 100%; max-width: none;
   margin: 0 -16px 18px; padding: 0 16px 14px;
   --search-inset: 16px;
-  background: var(--void);
+  background: transparent;
   backdrop-filter: none; -webkit-backdrop-filter: none;
   border-bottom: 1px solid var(--membrane);
 }
