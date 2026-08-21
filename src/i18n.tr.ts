@@ -2914,6 +2914,7 @@ export const TR: Record<string, string> = {
   "Nuevo informe": "Yeni rapor",
   "Buscar entre tus informes…": "Raporlarınızda arama yapın…",
   "Buscar en la página…": "Sayfayı arayın…",
+  "Buscar en la página": "Sayfada ara",
   "0 resultados": "0 sonuç",
   "Buscar dentro del documento…": "Belgede ara…",
   "Buscar dentro del documento": "Belgede ara",

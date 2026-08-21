@@ -57,6 +57,12 @@ export function NodusBrowserView() {
   const [bookmarksManager, setBookmarksManager] = useState(false);
   const [historyManager, setHistoryManager] = useState(false);
   const [returnToBookmarksManager, setReturnToBookmarksManager] = useState(false);
+  const [findOpen, setFindOpen] = useState(false);
+  const [findText, setFindText] = useState('');
+  const [findMatches, setFindMatches] = useState(0);
+  const [findActive, setFindActive] = useState(0);
+  const [findCaseSensitive, setFindCaseSensitive] = useState(false);
+  const findInputRef = useRef<HTMLInputElement | null>(null);
 
   const active: BrowserTabState | null =
     state.tabs.find((tab) => tab.id === state.activeTabId) ?? null;
@@ -113,6 +119,64 @@ export function NodusBrowserView() {
       void window.nodus.cancelBrowserPermissions();
     };
   }, []);
+
+  // Find in page: native WebContents find (like Deep Research's FindInPage but
+  // for the native Browser view). Uses Electron's findInPage / stopFindInPage
+  // via the browser partition.
+  useEffect(() => {
+    const stop = window.nodus.onBrowserFoundInPage((result) => {
+      setFindMatches(result.matches);
+      setFindActive(result.activeMatchOrdinal);
+    });
+    return stop;
+  }, []);
+
+  useEffect(() => {
+    if (!findOpen) return;
+    const text = findText.trim();
+    if (!text) {
+      void window.nodus.browserStopFindInPage('clearSelection');
+      setFindMatches(0);
+      setFindActive(0);
+      return;
+    }
+    void window.nodus.browserFindInPage(text, { findNext: false, matchCase: findCaseSensitive });
+  }, [findText, findCaseSensitive, findOpen, active?.id]);
+
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      const cmd = event.metaKey || event.ctrlKey;
+      if (cmd && !event.altKey && event.key.toLowerCase() === 'f') {
+        event.preventDefault();
+        setFindOpen((prev) => {
+          const next = !prev;
+          if (next) requestAnimationFrame(() => findInputRef.current?.select());
+          else void window.nodus.browserStopFindInPage('clearSelection');
+          return next;
+        });
+      } else if (findOpen && event.key === 'Escape') {
+        event.preventDefault();
+        setFindOpen(false);
+        void window.nodus.browserStopFindInPage('clearSelection');
+      } else if (findOpen && ((cmd && event.key.toLowerCase() === 'g') || event.key === 'F3')) {
+        event.preventDefault();
+        const forward = !event.shiftKey;
+        void window.nodus.browserFindInPage(findText, { forward, findNext: true, matchCase: findCaseSensitive });
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [findOpen, findText, findCaseSensitive]);
+
+  useEffect(() => {
+    if (findOpen) requestAnimationFrame(() => findInputRef.current?.focus());
+    else {
+      void window.nodus.browserStopFindInPage('clearSelection');
+      setFindText('');
+      setFindMatches(0);
+      setFindActive(0);
+    }
+  }, [findOpen]);
 
   // Follow the URL of whatever tab is active, unless the user is editing.
   useEffect(() => {
@@ -379,6 +443,16 @@ export function NodusBrowserView() {
 
         <div>
           <ToolbarButton
+            icon="search"
+            label={t('Buscar en la página')}
+            dataTestId="browser-find-button"
+            active={findOpen}
+            onClick={() => setFindOpen((v) => !v)}
+          />
+        </div>
+
+        <div>
+          <ToolbarButton
             icon="clock"
             label="Browsing History"
             dataTestId="browser-history-button"
@@ -425,6 +499,35 @@ export function NodusBrowserView() {
           />
         </div>
       </div>
+
+      {findOpen && (
+        <div data-testid="browser-find-bar" className="flex items-center gap-2 border-b border-neutral-300 bg-white px-3 py-2 dark:border-neutral-800 dark:bg-neutral-900/95">
+          <Icon name="search" size={14} className="shrink-0 text-neutral-500" />
+          <input
+            ref={findInputRef}
+            data-testid="browser-find-input"
+            className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-neutral-500"
+            value={findText}
+            placeholder={t('Buscar en la página…')}
+            onChange={(event) => setFindText(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter') {
+                event.preventDefault();
+                void window.nodus.browserFindInPage(findText, { forward: !event.shiftKey, findNext: true, matchCase: findCaseSensitive });
+              } else if (event.key === 'Escape') {
+                setFindOpen(false);
+              }
+            }}
+          />
+          <span data-testid="browser-find-status" className="shrink-0 text-xs tabular-nums text-neutral-500">
+            {findMatches ? `${findActive} / ${findMatches}` : findText.trim() ? t('Sin resultados') : ''}
+          </span>
+          <button data-testid="browser-find-prev" className="rounded p-1.5 hover:bg-neutral-200 dark:hover:bg-neutral-800" onClick={() => void window.nodus.browserFindInPage(findText, { forward: false, findNext: true, matchCase: findCaseSensitive })} title={t('Anterior')}><Icon name="chevronUp" size={14} /></button>
+          <button data-testid="browser-find-next" className="rounded p-1.5 hover:bg-neutral-200 dark:hover:bg-neutral-800" onClick={() => void window.nodus.browserFindInPage(findText, { forward: true, findNext: true, matchCase: findCaseSensitive })} title={t('Siguiente')}><Icon name="chevronDown" size={14} /></button>
+          <label className="flex items-center gap-1 text-xs text-neutral-600 dark:text-neutral-400"><input type="checkbox" checked={findCaseSensitive} onChange={(event) => setFindCaseSensitive(event.target.checked)} />Aa</label>
+          <button className="rounded p-1.5 hover:bg-neutral-200 dark:hover:bg-neutral-800" onClick={() => setFindOpen(false)} aria-label={t('Cerrar')}><Icon name="x" size={14} /></button>
+        </div>
+      )}
 
       {panel === 'downloads' && (
         <DownloadsPanel
@@ -623,17 +726,18 @@ function permissionLabel(request: PendingBrowserPermission): string {
 }
 
 function ToolbarButton({
-  icon, imageSrc, label, onClick, disabled, busy, dataTestId,
-}: { icon?: string; imageSrc?: string; label: string; onClick: () => void; disabled?: boolean; busy?: boolean; dataTestId?: string }) {
+  icon, imageSrc, label, onClick, disabled, busy, dataTestId, active,
+}: { icon?: string; imageSrc?: string; label: string; onClick: () => void; disabled?: boolean; busy?: boolean; dataTestId?: string; active?: boolean }) {
   return (
     <button
       type="button"
       data-testid={dataTestId}
       title={label}
       aria-label={label}
+      aria-pressed={active}
       disabled={disabled}
       onClick={onClick}
-      className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-neutral-600 transition-colors hover:bg-neutral-100 disabled:cursor-not-allowed disabled:opacity-40 dark:text-neutral-400 dark:hover:bg-neutral-900"
+      className={`inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${active ? 'bg-neutral-200 text-neutral-900 dark:bg-neutral-800 dark:text-neutral-100' : 'text-neutral-600 hover:bg-neutral-100 dark:text-neutral-400 dark:hover:bg-neutral-900'}`}
     >
       {imageSrc
         ? <img src={imageSrc} alt="" className={`h-4 w-4 ${busy ? 'animate-pulse' : ''}`} />

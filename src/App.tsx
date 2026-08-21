@@ -202,7 +202,23 @@ export function App() {
   const [isDark, setIsDark] = useState<boolean>(() =>
     typeof window !== 'undefined' && window.matchMedia('(prefers-color-scheme: dark)').matches
   );
-  const [view, setView] = useState<View>('home');
+  const [view, setViewRaw] = useState<View>('home');
+  const viewRef = useRef<View>('home');
+  useEffect(() => { viewRef.current = view; }, [view]);
+  const setView = useCallback((next: View) => {
+    const cur = viewRef.current;
+    // Leaving Browser: hide the native WebContentsView BEFORE mounting the next
+    // section. The previous `invoke` left one frame where Settings header was
+    // painted but the atlas page (native or internal) still covered its content
+    // (see screenshot). Awaiting the hide ensures no overlap; the extra ~5ms
+    // keeps Browser visible a fraction longer instead of flashing atlas over
+    // Settings. Entering Browser is handled by NodusBrowserView's mount effect.
+    if (cur === 'browser' && next !== 'browser') {
+      void window.nodus.setBrowserSectionVisible(false).then(() => setViewRaw(next)).catch(() => setViewRaw(next));
+      return;
+    }
+    setViewRaw(next);
+  }, []);
   useBrowserNativeOverlayGuard(view === 'browser');
   // Página activa dentro de Herramientas. Vive aquí (y no en ToolkitView) porque
   // el sidebar navega directamente a una herramienta, y porque así salir de la

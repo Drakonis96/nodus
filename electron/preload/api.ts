@@ -181,6 +181,11 @@ export const nodusApi: NodusApi = {
     ipcRenderer.on('settings:changed', listener);
     return () => ipcRenderer.removeListener('settings:changed', listener);
   },
+  onDeepLink: (cb) => {
+    const listener = (_e: unknown, url: string) => cb(url);
+    ipcRenderer.on('deeplink:received', listener);
+    return () => ipcRenderer.removeListener('deeplink:received', listener);
+  },
   getActiveVault: () => ipcRenderer.invoke('vaults:getActive'),
   createVault: (input) => ipcRenderer.invoke('vaults:create', input),
   remoteSignIn: (url, email, password) => ipcRenderer.invoke('vaults:remoteSignIn', url, email, password),

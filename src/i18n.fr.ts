@@ -2823,6 +2823,7 @@ export const FR: Record<string, string> = {
   'Nuevo informe': 'Nouveau rapport',
   'Buscar entre tus informes…': 'Rechercher parmi vos rapports…',
   'Buscar en la página…': 'Rechercher dans la page…',
+  'Buscar en la página': 'Rechercher dans la page',
   '0 resultados': 'Aucun résultat',
   'Buscar dentro del documento…': 'Rechercher dans ce document…',
   'Buscar dentro del documento': 'Rechercher dans ce document',

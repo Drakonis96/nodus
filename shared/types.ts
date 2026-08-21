@@ -8195,6 +8195,9 @@ export interface BrowserApi {
   deleteBrowserHistoryEntry(id: string): Promise<import('./browserHistory').BrowserHistoryStore>;
   clearBrowserHistory(): Promise<import('./browserHistory').BrowserHistoryStore>;
   onBrowserHistoryChanged(cb: (store: import('./browserHistory').BrowserHistoryStore) => void): () => void;
+  browserFindInPage(text: string, options?: { forward?: boolean; findNext?: boolean; matchCase?: boolean }): Promise<void>;
+  browserStopFindInPage(action?: 'clearSelection' | 'keepSelection' | 'activateSelection'): Promise<void>;
+  onBrowserFoundInPage(cb: (result: { requestId: number; activeMatchOrdinal: number; matches: number; selectionArea: unknown; finalUpdate: boolean }) => void): () => void;
 }
 
 export interface NodusApi extends ProsopographyApi, TestimoniesApi, ToolkitApi, TeachingApi, DatabasesApi, PagesApi, PrimarySourcesApi, ArchiveApi, WorldbuildingApi, PlatformApi, RecordsApi, AcademicApi, LibraryApi, RadarApi, BrowserApi {
@@ -8250,6 +8253,8 @@ export interface NodusApi extends ProsopographyApi, TestimoniesApi, ToolkitApi, 
   nodiEndWindowDrag(): Promise<void>;
   onVaultChanged(cb: (vault: VaultSummary | null) => void): () => void;
   onSettingsChanged(cb: (settings: AppSettings) => void): () => void;
+  /** Deeplink received via OS (nodus://...), e.g. OAuth callback from system browser. */
+  onDeepLink(cb: (url: string) => void): () => void;
   getActiveVault(): Promise<VaultSummary>;
   createVault(input: CreateVaultInput): Promise<VaultCreateResult>;
   /** Step one of connecting to a Nodus Server space: verify credentials, list the spaces. */

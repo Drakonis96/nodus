@@ -72,6 +72,14 @@ const { autoUpdater } = require('electron-updater') as typeof import('electron-u
 // service from "nodus" to "Nodus". The normal process keeps the current name;
 // recovery explicitly requests either released credential from macOS Keychain.
 app.setName('Nodus');
+
+// Deeplink for OAuth: nodus://authorize?code=XYZ
+// Google blocks OAuth in embedded webviews; the correct pattern is
+// system browser -> your-site.com/authorize -> nodus://authorize?code=... .
+// Register the scheme so the OS launches Nodus for nodus:// URLs.
+if (!app.isDefaultProtocolClient('nodus')) {
+  try { app.setAsDefaultProtocolClient('nodus'); } catch {}
+}
 registerImageSchemePrivileges();
 registerArchiveSchemePrivileges();
 registerLibrarySchemePrivileges();
@@ -139,6 +147,21 @@ let databaseAutomationFirstTimer: NodeJS.Timeout | null = null;
 let announcementsFirstTimer: NodeJS.Timeout | null = null;
 /** Set once shutdown starts, so timers that fire mid-quit do not reopen the DB. */
 let quitting = false;
+
+let pendingDeepLink: string | null = process.argv.find((arg) => arg.startsWith('nodus://')) ?? null;
+
+function handleDeepLink(url: string): void {
+  if (!url || !url.startsWith('nodus://')) return;
+  const win = mainWindow;
+  if (win && !win.isDestroyed()) {
+    win.webContents.send('deeplink:received', url);
+    if (win.isMinimized()) win.restore();
+    if (!win.isVisible()) win.show();
+    win.focus();
+  } else {
+    pendingDeepLink = url;
+  }
+}
 
 const UPDATE_CHECK_INTERVAL_MS = 4 * 60 * 60 * 1000;
 const UPDATE_PROGRESS_MIN_INTERVAL_MS = 500;
@@ -770,9 +793,18 @@ function setupAutoUpdates(): void {
   announcementsFirstTimer = setTimeout(() => void refreshAnnouncements('startup'), ANNOUNCEMENTS_STARTUP_DELAY_MS);
 }
 
+// Deeplink via OS (macOS open-url) — must be registered before ready.
+app.on('open-url', (event, url) => {
+  event.preventDefault();
+  handleDeepLink(url);
+});
+
 // A second copy of this profile tried to start. It has already quit; bring the
 // window the user was actually looking for to the front.
-app.on('second-instance', () => {
+// If it was a nodus:// deeplink (OAuth callback via system browser), forward it.
+app.on('second-instance', (_event, argv) => {
+  const deeplink = argv.find((arg) => typeof arg === 'string' && arg.startsWith('nodus://'));
+  if (deeplink) handleDeepLink(deeplink);
   restoreAppWindows(mainWindow, createWindow, applyMascotWindow);
   const win = mainWindow;
   if (!win) return;
@@ -847,6 +879,14 @@ app.whenReady().then(async () => {
     (betaUpdates) => configureUpdateChannel(betaUpdates, 'setting changed'),
   );
   createWindow();
+  // Deliver any nodus:// deeplink that launched the app (OAuth callback via
+  // system browser, e.g. nodus://authorize?code=XYZ).
+  if (pendingDeepLink) {
+    const url = pendingDeepLink;
+    pendingDeepLink = null;
+    // createWindow is async (loadURL); wait a tick so webContents exists.
+    setTimeout(() => handleDeepLink(url), 800);
+  }
 
   // Recover API keys encrypted by the pre-2.3 lowercase Safe Storage identity.
   // The window is created first so any macOS Keychain authorization prompt has

@@ -2537,6 +2537,7 @@ export const IT: Record<string, string> = {
   "Nuevo informe": "Nuovo rapporto",
   "Buscar entre tus informes…": "Cerca nei tuoi rapporti…",
   "Buscar en la página…": "Cerca nella pagina…",
+  "Buscar en la página": "Cerca nella pagina",
   "0 resultados": "Nessun risultato",
   "Buscar dentro del documento…": "Cerca nel documento…",
   "Buscar dentro del documento": "Cerca nel documento",

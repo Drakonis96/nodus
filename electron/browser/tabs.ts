@@ -277,6 +277,10 @@ function wire(tab: Tab): void {
   // Never let a page dictate the options of a window it opens. `allow` would
   // hand the site control of webPreferences; instead every popup becomes an
   // ordinary Nodus tab, created by us with our own configuration.
+  // Google auth stays INSIDE Nodus on purpose: a third-party OAuth flow must
+  // complete in the same browser context it started in, or the callback
+  // session lands in the system browser instead of here. The Sec-CH-UA /
+  // userAgentData spoof in session.ts is what makes Google accept it.
   contents.setWindowOpenHandler(({ url }) => {
     if (decideNavigation(url, { isMainFrame: true }).allowed) void createTab(url);
     return { action: 'deny' };
@@ -315,7 +319,48 @@ function wire(tab: Tab): void {
   }) as never);
 
   on(tab, contents, 'did-start-loading', (() => { if (isWeb()) patch(tab, { loading: true, error: null }); }) as never);
-  on(tab, contents, 'dom-ready', (() => { if (isWeb()) void applyPageColorScheme(contents); }) as never);
+  on(tab, contents, 'dom-ready', (() => {
+    if (!isWeb()) return;
+    void applyPageColorScheme(contents);
+    // Google's JS check also reads navigator.userAgentData.brands; hide Electron
+    // there too (request headers are already spoofed in session.ts). Brand
+    // versions are rewritten to the Chromium major in navigator.userAgent so the
+    // JS view matches the header view — a mismatch is itself detectable.
+    // Object.create(uaData) keeps getHighEntropyValues working; its brand lists
+    // are filtered on the way out as well.
+    void contents.executeJavaScript(`
+      try {
+        const uaData = navigator.userAgentData;
+        if (uaData && Array.isArray(uaData.brands)) {
+          const m = /Chrome\\/(\\d+)/.exec(navigator.userAgent);
+          const major = m ? m[1] : null;
+          const fix = (b) => {
+            const brand = String(b.brand || '');
+            if (/Electron/i.test(brand)) return null;
+            if (major && /Chromium|Google Chrome/i.test(brand)) return { brand, version: major };
+            return b;
+          };
+          const brands = uaData.brands.map(fix).filter(Boolean);
+          const changed = brands.length !== uaData.brands.length
+            || brands.some((b, i) => b !== uaData.brands[i]);
+          if (changed) {
+            const spoofed = Object.create(uaData);
+            spoofed.brands = brands;
+            if (typeof uaData.getHighEntropyValues === 'function') {
+              spoofed.getHighEntropyValues = (hints) => uaData.getHighEntropyValues(hints).then((info) => {
+                const copy = { ...info };
+                for (const key of ['brands', 'fullVersionList']) {
+                  if (Array.isArray(copy[key])) copy[key] = copy[key].filter(b => !/Electron/i.test(String(b.brand || '')));
+                }
+                return copy;
+              });
+            }
+            Object.defineProperty(navigator, 'userAgentData', { value: spoofed, configurable: true });
+          }
+        }
+      } catch {}
+    `).catch(() => undefined);
+  }) as never);
 
   // The address bar must follow navigation, not page load completion. A modern
   // page can keep the load event open for seconds (or indefinitely), so waiting
@@ -509,6 +554,11 @@ function wire(tab: Tab): void {
     // ordinary destructor removes this listener before close(), so it cannot
     // recurse during expected teardown.
     destroyTab(tab.id, { activateReplacement: true, publish: true });
+  }) as never);
+
+  on(tab, contents, 'found-in-page', ((_: unknown, result: Electron.FoundInPageResult) => {
+    if (tab.id !== activeTabId) return;
+    foundInPageListener?.(result);
   }) as never);
 }
 
@@ -784,6 +834,21 @@ export function setTabMuted(id: string, muted: boolean): void {
   tab.view.webContents.setAudioMuted(muted);
   noteMuted(id, muted);
   patch(tab, { muted });
+}
+
+let foundInPageListener: ((result: Electron.FoundInPageResult) => void) | null = null;
+export function setFoundInPageListener(cb: ((result: Electron.FoundInPageResult) => void) | null): void {
+  foundInPageListener = cb;
+}
+export function findInPage(text: string, options: { forward?: boolean; findNext?: boolean; matchCase?: boolean } = {}): void {
+  const tab = activeTabId ? tabs.get(activeTabId) : null;
+  if (!tab || tab.state.kind !== 'web' || tab.view.webContents.isDestroyed()) return;
+  tab.view.webContents.findInPage(text, { forward: options.forward ?? true, findNext: options.findNext ?? false, matchCase: options.matchCase ?? false });
+}
+export function stopFindInPage(action: 'clearSelection' | 'keepSelection' | 'activateSelection' = 'clearSelection'): void {
+  const tab = activeTabId ? tabs.get(activeTabId) : null;
+  if (!tab || tab.view.webContents.isDestroyed()) return;
+  tab.view.webContents.stopFindInPage(action);
 }
 
 /** Drive one tab's media from the header. */

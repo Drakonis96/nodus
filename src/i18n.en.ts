@@ -2894,6 +2894,7 @@ export const EN: Record<string, string> = {
   'Nuevo informe': 'New report',
   'Buscar entre tus informes…': 'Search your reports…',
   'Buscar en la página…': 'Search the page…',
+  'Buscar en la página': 'Search in page',
   '0 resultados': 'No results',
   'Buscar dentro del documento…': 'Search within this document…',
   'Buscar dentro del documento': 'Search within this document',
