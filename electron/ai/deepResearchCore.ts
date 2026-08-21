@@ -1,3 +1,10 @@
+// Citation naming lives in @shared/citationLabel so the reader that re-derives a
+// stored label at open time cannot drift from the writer that produced it.
+import {
+  authorYearLabel,
+  referenceEntry as sharedReferenceEntry,
+  sourceLabelFromWork,
+} from '@shared/citationLabel';
 import type {
   DeepResearchMeta,
   DeepResearchProgress,
@@ -1641,11 +1648,7 @@ export function buildReferences(workIds: Set<string>, maps: SnapshotMaps, langua
 }
 
 function referenceEntry(work: WorkInfo, L: Labels): string {
-  const authors = work.authors.length ? work.authors.join('; ') : L.unknownAuthor;
-  const year = work.year ? ` (${work.year})` : ` (${L.noDate})`;
-  const title = work.title ? `. ${work.title.replace(/\.\s*$/, '')}.` : '.';
-  const doi = work.doi?.trim() ? ` https://doi.org/${work.doi.trim().replace(/^https?:\/\/(dx\.)?doi\.org\//i, '')}` : '';
-  return `${authors}${year}${title}${doi}`;
+  return sharedReferenceEntry(work, L);
 }
 
 function buildMatrix(coveredIdeaIds: Set<string>, maps: SnapshotMaps, L: Labels): WritingWorkshopMatrixRow[] {
@@ -1869,28 +1872,6 @@ export function buildCitationCatalog(snapshot: WritingWorkshopSnapshot): Citatio
   };
 }
 
-function sourceLabelFromWork(work: { authors: string[]; year: number | null; title?: string } | undefined): string {
-  if (!work) return '';
-  return authorYearLabel(work.authors[0], work.year, work.title);
-}
-
-/** Turn Nodus's stored `Apellido, I.` name into a readable inline citation. */
-function authorYearLabel(author: string | undefined, year: number | null | undefined, title?: string): string {
-  const raw = author?.replace(/\s+/g, ' ').trim();
-  if (!raw) {
-    // "Autor" reads as a placeholder in the middle of academic prose. A shortened
-    // title is a real citation for a source whose author the corpus never captured.
-    const short = clip((title ?? '').replace(/\s+/g, ' ').trim(), 42);
-    if (short) return year ? `${short} (${year})` : short;
-    return year ? `Obra sin autor (${year})` : 'Obra sin autor';
-  }
-  const comma = raw.indexOf(',');
-  const surname = (comma >= 0 ? raw.slice(0, comma) : raw.split(' ').slice(-1).join(' ')).trim() || raw;
-  const given = (comma >= 0 ? raw.slice(comma + 1) : raw.split(' ').slice(0, -1).join(' ')).trim();
-  const initial = given.match(/[\p{L}]/u)?.[0]?.toLocaleUpperCase('es-ES');
-  const name = initial ? `${surname}, ${initial}.` : surname;
-  return year ? `${name} (${year})` : name;
-}
 
 /**
  * A running synopsis of the report so far. The opening sentence of a section says

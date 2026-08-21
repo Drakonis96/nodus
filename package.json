@@ -32,6 +32,7 @@
     "test:e2e:local-server": "node scripts/e2e-local-server.mjs",
     "smoke:author-roles": "node scripts/run-smoke.mjs smoke-author-roles",
     "smoke:author-roles:realcopy": "node scripts/run-smoke.mjs smoke-author-roles-realcopy",
+    "smoke:live-citations": "node scripts/run-smoke.mjs smoke-live-citations-realcopy",
     "qa:notion-parity": "node scripts/notion-parity/cli.mjs",
     "test:database-storage": "node scripts/test-database-typed-storage.mjs",
     "test:database-properties": "node scripts/test-database-properties.mjs",

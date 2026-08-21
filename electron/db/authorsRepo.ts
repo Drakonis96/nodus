@@ -1,6 +1,7 @@
 import { getDb } from './database';
 import { v4 as uuid } from 'uuid';
 import type { WorkCreator } from '@shared/types';
+import { EDITOR_BYLINE_SUFFIX } from '@shared/citationLabel';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Canonical author identity
@@ -148,9 +149,10 @@ function parseCreatorsJson(value: string | null): WorkCreator[] {
 /**
  * How an editor is marked inside the stored byline (authors_json). The byline is
  * a display string, so the role has to travel inside it; every reader that wants
- * the role structurally should use creators_json instead.
+ * the role structurally should use creators_json instead. Defined once in
+ * @shared/citationLabel, which is where citation labels read the marker back.
  */
-export const EDITOR_BYLINE_SUFFIX = ' (ed.)';
+export { EDITOR_BYLINE_SUFFIX } from '@shared/citationLabel';
 
 /**
  * The stored byline for a set of Zotero creators. Only the people who carry
