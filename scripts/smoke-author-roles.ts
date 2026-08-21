@@ -123,9 +123,22 @@ assert(relBefore > 0, 'seed did not reproduce the bug (relations routed through 
 const misfiledBefore = count("SELECT COUNT(*) AS n FROM work_authors WHERE author_id='a-editor' AND role='author'");
 assert(misfiledBefore === 4, 'seed did not reproduce the bug (stored roles)');
 
+// The byline is what a citation is shortened from, and the seed has it in the
+// broken shape too: editor first, unmarked.
+const bylineOf = (work: string) =>
+  JSON.parse((db.prepare('SELECT authors_json FROM works WHERE nodus_id = ?').get(work) as { authors_json: string }).authors_json) as string[];
+assert(bylineOf('c1')[0] === 'Román Ruiz, G.', 'seed did not reproduce the bug (byline leads with the editor)');
+
 // ── Repair ───────────────────────────────────────────────────────────────────
 reconcileAuthorRolesOnce();
 const misfiledAfter = count("SELECT COUNT(*) AS n FROM work_authors WHERE author_id='a-editor' AND role='author'");
+// A report generated after the repair but before any Zotero resync must already
+// cite the chapter's author, so the stored byline has to be repaired too.
+const c1Byline = bylineOf('c1');
+console.log(`byline of c1 after the repair → ${c1Byline.join(' · ')}`);
+assert(c1Byline[0] === 'Arco Blanco, M.', 'the repaired byline still leads with the editor');
+assert(c1Byline[1] === 'Román Ruiz, G. (ed.)', 'the repaired byline does not mark the editor');
+assert(bylineOf('own')[0] === 'Román Ruiz, G.', 'the byline of the work she wrote was altered');
 console.log(`roles → ${misfiledBefore} links credited to the editor as author, ${misfiledAfter} after the repair`);
 assert(misfiledAfter === 1, 'the repair did not rewrite exactly the three editor links');
 

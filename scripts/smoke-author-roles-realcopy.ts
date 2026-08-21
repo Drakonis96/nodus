@@ -54,6 +54,30 @@ for (const table of RESEARCH_TABLES) {
 }
 console.log(`research tables identical (${RESEARCH_TABLES.length} checked) ✓`);
 
+// The byline is what a Deep Research citation is shortened from: a report written
+// after the repair but before any Zotero resync must already name the author.
+const bylines = db
+  .prepare("SELECT title, authors_json FROM works WHERE creators_json IS NOT NULL AND authors_json IS NOT NULL")
+  .all() as { title: string; authors_json: string }[];
+const isEditor = (name: string) => name.trim().toLowerCase().endsWith('(ed.)');
+let ledByEditor = 0;
+let editorsOnly = 0;
+for (const row of bylines) {
+  let names: string[] = [];
+  try {
+    names = JSON.parse(row.authors_json) as string[];
+  } catch {
+    continue;
+  }
+  if (names.length === 0 || !isEditor(names[0])) continue;
+  // A volume Zotero credits to editors only is legitimately led by one — there is
+  // no author to lead with. The defect is a byline that buries an author behind one.
+  if (names.some((name) => !isEditor(name))) ledByEditor += 1;
+  else editorsOnly += 1;
+}
+console.log(`\nbylines led by an editor: ${ledByEditor} burying an author, ${editorsOnly} on editor-only volumes`);
+assert(ledByEditor === 0, 'some citations would still be shortened to the volume editor');
+
 // Who stopped being credited with other people's chapters, worst first.
 const drops = authorsAfter
   .map((a) => {
