@@ -236,7 +236,7 @@ export function PageWikiView() {
         </div>
       </header>
       <div className="grid min-h-0 flex-1 grid-cols-1 lg:grid-cols-[230px_minmax(0,1fr)] xl:grid-cols-[240px_minmax(0,1fr)_250px]">
-        <aside className={`${mobilePanel === 'tree' ? 'flex' : 'hidden'} min-h-0 min-w-0 flex-col border-r border-neutral-200 bg-neutral-50/70 dark:border-neutral-800 dark:bg-neutral-950 lg:flex`} aria-label={t('Árbol de páginas')}>
+        <aside className={`${mobilePanel === 'tree' ? 'flex' : 'hidden'} min-h-0 min-w-0 flex-col border-r border-neutral-200 bg-inherit dark:border-neutral-800 lg:flex`} aria-label={t('Árbol de páginas')}>
           <div className="space-y-2 border-b border-neutral-200 p-3 dark:border-neutral-800">
             <div className="flex gap-1">
               <input className="input h-9 min-w-0 flex-1 text-sm" value={query} onChange={(event) => { setQuery(event.target.value); setHasSearched(false); setResults([]); }} onKeyDown={(event) => { if (event.key === 'Enter') void runSearch(); }} placeholder={t('Buscar páginas, filas y adjuntos')} aria-label={t('Buscar páginas, filas y adjuntos')} />
@@ -286,7 +286,7 @@ export function PageWikiView() {
           )}
         </main>
 
-        <aside className={`${mobilePanel === 'context' ? 'block' : 'hidden'} min-h-0 min-w-0 overflow-x-hidden overflow-y-auto border-l border-neutral-200 bg-neutral-50/50 p-3 dark:border-neutral-800 dark:bg-neutral-950 lg:col-start-2 lg:row-start-1 xl:col-start-3 xl:block`} aria-label={t('Contexto de página')}>
+        <aside className={`${mobilePanel === 'context' ? 'block' : 'hidden'} min-h-0 min-w-0 overflow-x-hidden overflow-y-auto border-l border-neutral-200 bg-inherit p-3 dark:border-neutral-800 lg:col-start-2 lg:row-start-1 xl:col-start-3 xl:block`} aria-label={t('Contexto de página')}>
           <section className="mb-5"><h2 className="mb-2 text-xs font-semibold uppercase tracking-wide text-neutral-600 dark:text-neutral-400">{t('Tabla de contenidos')}</h2>{headings.length ? <div className="space-y-1">{headings.map((heading) => <button key={heading.id} className="block w-full truncate rounded px-2 py-1 text-left text-xs hover:bg-neutral-100 dark:hover:bg-neutral-900" onClick={() => globalThis.document.getElementById(`page-block-anchor-${heading.id}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' })}>{String(heading.content.text ?? '')}</button>)}</div> : <p className="text-xs text-neutral-600 dark:text-neutral-400">{t('Añade encabezados para crear el índice.')}</p>}</section>
           <section className="mb-5" data-testid="page-revision-history">
             <div className="mb-2 flex items-center gap-2"><Icon name="clock" size={13} className="text-indigo-500" /><h2 className="text-xs font-semibold uppercase tracking-wide text-neutral-600 dark:text-neutral-400">{t('Historial de versiones')}</h2></div>
