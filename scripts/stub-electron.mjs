@@ -2,7 +2,7 @@
 // Only what the DB/AI modules touch at import time is provided; safeStorage is
 // never actually invoked on the pure-assembly code path.
 const tmp = process.env.NODUS_TEST_USERDATA || '/tmp/nodus-smoke-userdata';
-export const app = { getPath: () => tmp };
+export const app = { getPath: () => tmp, getAppPath: () => process.cwd(), isPackaged: false };
 export const safeStorage = {
   isEncryptionAvailable: () => false,
   encryptString: (s) => Buffer.from(String(s)),

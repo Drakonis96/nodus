@@ -5,7 +5,7 @@ import { constants as fsConstants, promises as fs } from 'node:fs';
 import os from 'node:os';
 import { spawn, spawnSync } from 'node:child_process';
 import { getDb, closeDb } from './db/database';
-import { reconcileAuthorLayerOnce } from './db/authorsRepo';
+import { reconcileAuthorLayerOnce, reconcileAuthorRolesOnce } from './db/authorsRepo';
 import { pruneDormantIdeas } from './db/ideasRepo';
 import {
   maybeRunAutoBackup,
@@ -865,6 +865,7 @@ app.whenReady().then(async () => {
   registerArchiveProtocol();
   registerLibraryProtocol();
   reconcileAuthorLayerOnce(); // one-time: collapse duplicate author nodes onto Zotero identity
+  reconcileAuthorRolesOnce(); // one-time: stop crediting volume editors as authors
   // Maintenance: drop ideas that have sat dormant (no occurrences) for >30 days.
   // Recent dormancy is kept — it lets fusion revive an idea with the same
   // global_id when its work is rescanned.

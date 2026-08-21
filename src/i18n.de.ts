@@ -8206,4 +8206,7 @@ export const DE: Record<string, string> = {
   "Descifrando…": "Wird entschlüsselt…",
   "Finalizando…": "Wird abgeschlossen…",
   "Progreso de restauración": "Wiederherstellungsfortschritt",
+  "Volúmenes que edita": "Herausgegebene Bände",
+  "{n} volúmenes editados": "{n} herausgegebene Bände",
+  "Coordina la edición del volumen; las ideas no se le atribuyen.": "Diese Person gibt den Band heraus; dessen Ideen werden ihr nicht zugeschrieben.",
 };
