@@ -44,11 +44,10 @@ export function buildSynthesisMatrix(): SynthesisMatrix {
       `SELECT wa.author_id AS id, a.name AS name,
               COUNT(DISTINCT wa.nodus_id) AS workCount,
               COUNT(DISTINCT io.global_id) AS ideaCount
-         FROM work_authors wa
+         FROM work_attributions wa
          JOIN authors a ON a.author_id = wa.author_id
          JOIN works w ON w.nodus_id = wa.nodus_id AND w.archived = 0
          JOIN idea_occurrences io ON io.nodus_id = wa.nodus_id
-        WHERE wa.role = 'author'
         GROUP BY wa.author_id
         ORDER BY ideaCount DESC, name`
     )
@@ -82,11 +81,10 @@ export function buildSynthesisMatrix(): SynthesisMatrix {
     .prepare(
       `SELECT DISTINCT wa.author_id AS authorId, itl.theme_id AS themeId,
               i.global_id AS gid, i.label AS label, i.type AS type
-         FROM work_authors wa
+         FROM work_attributions wa
          JOIN works w ON w.nodus_id = wa.nodus_id AND w.archived = 0
          JOIN idea_theme_links itl ON itl.nodus_id = wa.nodus_id
-         JOIN ideas i ON i.global_id = itl.global_id
-        WHERE wa.role = 'author'`
+         JOIN ideas i ON i.global_id = itl.global_id`
     )
     .all() as { authorId: string; themeId: string; gid: string; label: string; type: IdeaType }[];
 
@@ -147,11 +145,11 @@ export async function synthesizeMatrixCell(
   const ideaRows = db
     .prepare(
       `SELECT DISTINCT i.global_id AS global_id, i.label AS label, i.type AS type, i.statement AS statement
-         FROM work_authors wa
+         FROM work_attributions wa
          JOIN works w ON w.nodus_id = wa.nodus_id AND w.archived = 0
          JOIN idea_theme_links itl ON itl.nodus_id = wa.nodus_id
          JOIN ideas i ON i.global_id = itl.global_id
-        WHERE wa.author_id = ? AND itl.theme_id = ? AND wa.role = 'author'`
+        WHERE wa.author_id = ? AND itl.theme_id = ?`
     )
     .all(authorId, themeId) as { global_id: string; label: string; type: IdeaType; statement: string }[];
 

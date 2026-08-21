@@ -6828,6 +6828,13 @@ export interface AuthorDossierWork {
   read: boolean;
   /** How this person is credited on the work (from Zotero). */
   role: 'author' | 'editor';
+  /**
+   * Whether this work's ideas count towards this person. True for everything they
+   * wrote, and — as the one deliberate exception — for a volume they edited that
+   * Zotero credits to no author at all, whose ideas would otherwise belong to
+   * nobody. The interface marks that second case as provisional.
+   */
+  attributed: boolean;
 }
 
 export interface AuthorDossierIdea {
@@ -6841,6 +6848,8 @@ export interface AuthorDossierIdea {
   workId: string;
   workTitle: string;
   year: number | null;
+  /** Attributed here only because the volume records no author. Shown as provisional. */
+  provisional: boolean;
   themes: string[];
   evidence: Evidence[];
 }

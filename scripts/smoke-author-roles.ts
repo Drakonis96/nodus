@@ -87,6 +87,17 @@ insWork.run(
 );
 insLink.run('own', 'a-editor');
 
+// The exception: a volume Zotero credits to EDITORS ONLY. Nobody wrote it on
+// record, so its ideas would belong to no one at all if editors were filtered out.
+insWork.run(
+  'vol',
+  'z-vol',
+  'The volume itself',
+  JSON.stringify([`${editor.last}, ${editor.first.charAt(0)}. (ed.)`]),
+  JSON.stringify([{ lastName: editor.last, firstName: editor.first, name: null, role: 'editor' }])
+);
+insLink.run('vol', 'a-editor');
+
 // Ideas + evidence + one cross-chapter edge, so attribution and relations are measurable.
 const insIdea = db.prepare("INSERT INTO ideas (global_id, type, label, statement, created_at) VALUES (?, 'claim', ?, ?, '2024-01-01')");
 const insOcc = db.prepare("INSERT INTO idea_occurrences (global_id, nodus_id, role, development, confidence) VALUES (?, ?, 'principal', '', 0.9)");
@@ -94,7 +105,7 @@ const insEv = db.prepare("INSERT INTO evidence (id, global_id, nodus_id, quote, 
 const insTheme = db.prepare("INSERT INTO themes (theme_id, label) VALUES (?, ?)");
 const insThemeLink = db.prepare("INSERT INTO idea_theme_links (global_id, nodus_id, theme_id, confidence, basis) VALUES (?, ?, ?, 0.9, 'explicit')");
 insTheme.run('t-infancia', 'infancia');
-for (const w of [...chapters.map((c) => c.id), 'own']) {
+for (const w of [...chapters.map((c) => c.id), 'own', 'vol']) {
   const gid = `i-${w}`;
   insIdea.run(gid, `Idea ${w}`, `Statement ${w}`);
   insOcc.run(gid, w);
@@ -115,13 +126,13 @@ const editorId = authorIdFor(editor.key);
 
 const summaryBefore = listAuthors().find((a) => a.author_id === editorId)!;
 console.log(`before → editor credited with ${summaryBefore.workCount} works, ${summaryBefore.ideaCount} ideas`);
-assert(summaryBefore.workCount === 4, 'seed did not reproduce the bug (works)');
-assert(summaryBefore.ideaCount === 4, 'seed did not reproduce the bug (ideas)');
+assert(summaryBefore.workCount === 5, 'seed did not reproduce the bug (works)');
+assert(summaryBefore.ideaCount === 5, 'seed did not reproduce the bug (ideas)');
 const relBefore = count(`SELECT COUNT(*) AS n FROM author_relations WHERE from_author='${editorId}' OR to_author='${editorId}'`);
 assert(relBefore > 0, 'seed did not reproduce the bug (relations routed through the editor)');
 
 const misfiledBefore = count("SELECT COUNT(*) AS n FROM work_authors WHERE author_id='a-editor' AND role='author'");
-assert(misfiledBefore === 4, 'seed did not reproduce the bug (stored roles)');
+assert(misfiledBefore === 5, 'seed did not reproduce the bug (stored roles)');
 
 // The byline is what a citation is shortened from, and the seed has it in the
 // broken shape too: editor first, unmarked.
@@ -140,7 +151,7 @@ assert(c1Byline[0] === 'Arco Blanco, M.', 'the repaired byline still leads with 
 assert(c1Byline[1] === 'Román Ruiz, G. (ed.)', 'the repaired byline does not mark the editor');
 assert(bylineOf('own')[0] === 'Román Ruiz, G.', 'the byline of the work she wrote was altered');
 console.log(`roles → ${misfiledBefore} links credited to the editor as author, ${misfiledAfter} after the repair`);
-assert(misfiledAfter === 1, 'the repair did not rewrite exactly the three editor links');
+assert(misfiledAfter === 1, 'the repair did not rewrite exactly the four editor links');
 
 // ── After: roles, attribution and integrity ──────────────────────────────────
 for (const ch of chapters) {
@@ -148,19 +159,31 @@ for (const ch of chapters) {
   assert(roleOf(ch.id, ch.author.key) === 'author', `${ch.id}: real author lost their role`);
 }
 assert(roleOf('own', editor.key) === 'author', 'the work she actually wrote was demoted');
+assert(roleOf('vol', editor.key) === 'editor', 'the editors-only volume lost its editor role');
 
 const summaryAfter = listAuthors().find((a) => a.author_id === editorId)!;
 console.log(`after  → editor: ${summaryAfter.workCount} works, ${summaryAfter.editedCount} edited, ${summaryAfter.ideaCount} ideas`);
 assert(summaryAfter.workCount === 1, 'authored count not corrected');
-assert(summaryAfter.editedCount === 3, 'edited volumes not counted apart');
-assert(summaryAfter.ideaCount === 1, 'ideas still attributed through editorship');
+assert(summaryAfter.editedCount === 4, 'edited volumes not counted apart');
+// One idea from the work she wrote, plus the one from the volume nobody is
+// recorded as writing — the deliberate exception, never a chapter of someone else's.
+assert(summaryAfter.ideaCount === 2, 'ideas still attributed through editorship');
 assert(summaryAfter.topThemes.length === 1, 'themes still attributed through editorship');
 
 const dossier = buildAuthorDossier(editorId)!;
 assert(dossier.works.length === 1 && dossier.works[0].nodus_id === 'own', 'dossier works not restricted to authorship');
-assert(dossier.editedWorks.length === 3, 'edited volumes missing from the dossier');
-assert(dossier.ideas.length === 1 && dossier.ideas[0].workId === 'own', 'dossier ideas still borrowed from chapters');
-assert(dossier.ideas[0].evidence.length === 1, 'evidence lost for the work she wrote');
+assert(dossier.editedWorks.length === 4, 'edited volumes missing from the dossier');
+const ownIdea = dossier.ideas.find((i) => i.workId === 'own');
+const volIdea = dossier.ideas.find((i) => i.workId === 'vol');
+assert(dossier.ideas.length === 2, 'dossier ideas still borrowed from chapters');
+assert(ownIdea !== undefined && !ownIdea.provisional, 'her own idea was marked provisional');
+assert(volIdea !== undefined && volIdea.provisional, 'the author-less volume\'s idea is not marked provisional');
+assert(ownIdea.evidence.length === 1, 'evidence lost for the work she wrote');
+
+// The chapters stay unattributed to her; only the author-less volume is flagged.
+const attributedEdited = dossier.editedWorks.filter((w) => w.attributed).map((w) => w.nodus_id);
+console.log(`edited volumes whose ideas she provisionally holds → ${attributedEdited.join(', ') || 'none'}`);
+assert(attributedEdited.length === 1 && attributedEdited[0] === 'vol', 'the exception leaked to chapters that do have an author');
 
 const relAfter = count(`SELECT COUNT(*) AS n FROM author_relations WHERE from_author='${editorId}' OR to_author='${editorId}'`);
 assert(relAfter === 0, 'author relations still routed through the editor');
@@ -180,7 +203,7 @@ assert(count('SELECT COUNT(*) AS n FROM work_authors') === linksBefore, 'work↔
 db.prepare("DELETE FROM settings WHERE key='author_roles_reconciled'").run();
 reconcileAuthorRolesOnce();
 const summaryTwice = listAuthors().find((a) => a.author_id === editorId)!;
-assert(summaryTwice.workCount === 1 && summaryTwice.editedCount === 3, 'second repair changed the outcome');
+assert(summaryTwice.workCount === 1 && summaryTwice.editedCount === 4, 'second repair changed the outcome');
 
 // ── The everyday path is self-healing on its own ─────────────────────────────
 // Put one chapter back into the broken shape and resync it the way ingest does:

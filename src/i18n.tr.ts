@@ -7959,4 +7959,8 @@ export const TR: Record<string, string> = {
   "Volúmenes que edita": "Derlediği ciltler",
   "{n} volúmenes editados": "{n} derlenen cilt",
   "Coordina la edición del volumen; las ideas no se le atribuyen.": "Cildin editörlüğünü yapar; fikirler bu kişiye atfedilmez.",
+  "Excepción: los marcados no registran ningún autor, así que sus ideas se muestran aquí de forma provisional.": "İstisna: İşaretli olanlar hiçbir yazar kaydetmiyor, bu yüzden fikirleri burada geçici olarak gösteriliyor.",
+  "Esta obra no registra ningún autor: sus ideas se atribuyen provisionalmente a quien la edita": "Bu eser hiçbir yazar kaydetmiyor: fikirleri geçici olarak derleyen kişiye atfediliyor",
+  "atribución provisional": "geçici atıf",
+  "provisional": "geçici",
 };

@@ -107,12 +107,29 @@ for (const d of drops.slice(0, 20)) {
 const gains = authorsAfter.filter((a) => a.ideaCount > (byIdBefore.get(a.author_id)?.ideaCount ?? 0));
 assert(gains.length === 0, `${gains.length} authors gained ideas they did not have before`);
 
-// Every work that was credited to somebody still is: no work fell off the map.
-const orphans = c(
+// No work loses its voice. A volume Zotero credits to editors only keeps its ideas
+// under those editors, marked provisional; everything else is attributed to authors.
+const editorsOnlyWorks = c(
   `SELECT COUNT(*) AS n FROM works w
     WHERE w.nodus_id IN (SELECT nodus_id FROM work_authors)
       AND NOT EXISTS (SELECT 1 FROM work_authors wa WHERE wa.nodus_id = w.nodus_id AND wa.role = 'author')`
 );
-console.log(`\nworks left with editors but no author: ${orphans}`);
+const unattributed = c(
+  `SELECT COUNT(*) AS n FROM works w
+    WHERE w.nodus_id IN (SELECT nodus_id FROM work_authors)
+      AND NOT EXISTS (SELECT 1 FROM work_attributions att WHERE att.nodus_id = w.nodus_id)`
+);
+const provisional = c("SELECT COUNT(*) AS n FROM work_attributions WHERE basis = 'editor_only'");
+console.log(`\nworks Zotero credits to editors only: ${editorsOnlyWorks} (${provisional} provisional attributions)`);
+console.log(`works left with nobody to attribute their ideas to: ${unattributed}`);
+assert(unattributed === 0, 'some credited works ended up with no attribution at all');
+
+// The exception must not leak: a work that HAS an author never attributes to its editor.
+const leaked = c(
+  `SELECT COUNT(*) AS n FROM work_attributions att
+    WHERE att.basis = 'editor_only'
+      AND EXISTS (SELECT 1 FROM work_authors wa WHERE wa.nodus_id = att.nodus_id AND wa.role = 'author')`
+);
+assert(leaked === 0, 'the editors-only exception leaked to works that do have an author');
 
 console.log('\nROLES REPAIRED · NO RESEARCH DATA TOUCHED ✓');

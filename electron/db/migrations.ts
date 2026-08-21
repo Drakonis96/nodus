@@ -15,7 +15,7 @@ export interface Migration {
 
 // Versioned, append-only migrations. Never edit an existing migration's SQL once
 // shipped — add a new one. The current schema version is the highest applied.
-export const SCHEMA_VERSION = 153;
+export const SCHEMA_VERSION = 154;
 
 export const migrations: Migration[] = [
   {
@@ -8256,6 +8256,35 @@ export const migrations: Migration[] = [
         WHERE new.state='active' AND new.row_id IS NULL;
       END;
       CREATE TRIGGER pages_search_ad AFTER DELETE ON pages BEGIN DELETE FROM db_search_fts WHERE rowid=4611686018427387904+old.rowid; END;
+    `,
+  },
+  {
+    version: 154,
+    up: /* sql */ `
+      -- Single source of truth for "who may be credited with this work's ideas".
+      -- Normally that is its authors, and only its authors: crediting the editor of
+      -- an edited volume with the chapters inside it is what this whole layer exists
+      -- to prevent.
+      --
+      -- The one exception, and it is deliberate: a work Zotero credits to editors
+      -- ONLY has no author on record, so filtering editors out would leave its ideas
+      -- attributed to nobody and invisible in every author view. Until the real
+      -- chapter authors can be recovered from richer metadata, those ideas are shown
+      -- under the editors, marked in the interface as a provisional attribution.
+      --
+      -- 'basis' says which of the two cases a row is, so a reader never has to guess:
+      -- 'author' is authorship, 'editor_only' is the exception.
+      CREATE VIEW work_attributions AS
+        SELECT wa.nodus_id,
+               wa.author_id,
+               wa.role,
+               CASE WHEN wa.role = 'author' THEN 'author' ELSE 'editor_only' END AS basis
+        FROM work_authors wa
+        WHERE wa.role = 'author'
+           OR NOT EXISTS (
+                SELECT 1 FROM work_authors peer
+                 WHERE peer.nodus_id = wa.nodus_id AND peer.role = 'author'
+              );
     `,
   },
 ];
