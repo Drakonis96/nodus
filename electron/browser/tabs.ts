@@ -19,7 +19,7 @@
  *     them. That is what makes a tab cheap enough to have twelve of.
  */
 
-import { nativeTheme, shell, WebContentsView, type BaseWindow, type WebContents } from 'electron';
+import { nativeTheme, WebContentsView, type BaseWindow, type WebContents } from 'electron';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import type { BrowserMediaCommand, BrowserState, BrowserTabError, BrowserTabState, BrowserViewport } from '@shared/browser';
@@ -144,22 +144,6 @@ function classifyError(code: number): BrowserTabError['kind'] {
 
 function originOf(url: string): string {
   try { return new URL(url).origin; } catch { return ''; }
-}
-
-function isGoogleAuthUrl(url: string): boolean {
-  try {
-    const u = new URL(url);
-    const host = u.hostname.toLowerCase();
-    // Google explicitly blocks OAuth / sign-in in embedded webviews. Open in
-    // the system browser instead; see https://developers.googleblog.com/2016/08/modernizing-oauth-interactions-in-native-apps.html
-    if (host === 'accounts.google.com' || host.endsWith('.accounts.google.com')) return true;
-    if (host === 'accounts.youtube.com' || host.endsWith('.accounts.youtube.com')) return true;
-    // Heuristic for Google OAuth endpoints that may appear on other hosts
-    if (u.pathname.includes('/o/oauth2/') || u.pathname.includes('/ServiceLogin')) {
-      if (host.endsWith('.google.com') || host.endsWith('.googleapis.com')) return true;
-    }
-    return false;
-  } catch { return false; }
 }
 
 function emptyState(id: string, url: string): BrowserTabState {
@@ -293,13 +277,11 @@ function wire(tab: Tab): void {
   // Never let a page dictate the options of a window it opens. `allow` would
   // hand the site control of webPreferences; instead every popup becomes an
   // ordinary Nodus tab, created by us with our own configuration.
-  // Google blocks its OAuth / sign-in in embedded webviews (see session.ts
-  // Sec-CH-UA spoof). Open those flows in the system browser instead.
+  // Google auth stays INSIDE Nodus on purpose: a third-party OAuth flow must
+  // complete in the same browser context it started in, or the callback
+  // session lands in the system browser instead of here. The Sec-CH-UA /
+  // userAgentData spoof in session.ts is what makes Google accept it.
   contents.setWindowOpenHandler(({ url }) => {
-    if (isGoogleAuthUrl(url)) {
-      void shell.openExternal(url);
-      return { action: 'deny' };
-    }
     if (decideNavigation(url, { isMainFrame: true }).allowed) void createTab(url);
     return { action: 'deny' };
   });
@@ -310,11 +292,6 @@ function wire(tab: Tab): void {
   }) as never);
 
   on(tab, contents, 'will-navigate', ((event: Electron.Event, url: string) => {
-    if (isGoogleAuthUrl(url)) {
-      event.preventDefault();
-      void shell.openExternal(url);
-      return;
-    }
     if (decideNavigation(url, { isMainFrame: true }).allowed) return;
     event.preventDefault();
     patch(tab, {
@@ -323,11 +300,6 @@ function wire(tab: Tab): void {
   }) as never);
 
   on(tab, contents, 'will-frame-navigate', ((details: { url: string; isMainFrame: boolean; preventDefault(): void }) => {
-    if (isGoogleAuthUrl(details.url) && details.isMainFrame) {
-      details.preventDefault();
-      void shell.openExternal(details.url);
-      return;
-    }
     if (decideNavigation(details.url, { isMainFrame: details.isMainFrame }).allowed) return;
     details.preventDefault();
   }) as never);
@@ -336,11 +308,6 @@ function wire(tab: Tab): void {
   // them explicitly so an allowed HTTP endpoint cannot bounce into file: or a
   // privileged Nodus protocol between the initial request and the commit.
   on(tab, contents, 'will-redirect', ((details: { url: string; isMainFrame: boolean; preventDefault(): void }) => {
-    if (isGoogleAuthUrl(details.url) && details.isMainFrame) {
-      details.preventDefault();
-      void shell.openExternal(details.url);
-      return;
-    }
     if (decideNavigation(details.url, { isMainFrame: details.isMainFrame }).allowed) return;
     details.preventDefault();
     if (details.isMainFrame) {
@@ -355,18 +322,40 @@ function wire(tab: Tab): void {
   on(tab, contents, 'dom-ready', (() => {
     if (!isWeb()) return;
     void applyPageColorScheme(contents);
-    // Google's JS check also reads navigator.userAgentData.brands; hide Electron there too
-    // (headers already spoofed in session.ts). Runs in the page's main world.
+    // Google's JS check also reads navigator.userAgentData.brands; hide Electron
+    // there too (request headers are already spoofed in session.ts). Brand
+    // versions are rewritten to the Chromium major in navigator.userAgent so the
+    // JS view matches the header view — a mismatch is itself detectable.
+    // Object.create(uaData) keeps getHighEntropyValues working; its brand lists
+    // are filtered on the way out as well.
     void contents.executeJavaScript(`
       try {
         const uaData = navigator.userAgentData;
         if (uaData && Array.isArray(uaData.brands)) {
-          const filtered = uaData.brands.filter(b => !/Electron/i.test(String(b.brand||'')));
-          if (filtered.length !== uaData.brands.length) {
-            Object.defineProperty(navigator, 'userAgentData', {
-              value: { ...uaData, brands: filtered, highEntropyBrands: Array.isArray(uaData.highEntropyBrands) ? uaData.highEntropyBrands.filter(b => !/Electron/i.test(String(b.brand||''))) : uaData.highEntropyBrands },
-              configurable: true
-            });
+          const m = /Chrome\\/(\\d+)/.exec(navigator.userAgent);
+          const major = m ? m[1] : null;
+          const fix = (b) => {
+            const brand = String(b.brand || '');
+            if (/Electron/i.test(brand)) return null;
+            if (major && /Chromium|Google Chrome/i.test(brand)) return { brand, version: major };
+            return b;
+          };
+          const brands = uaData.brands.map(fix).filter(Boolean);
+          const changed = brands.length !== uaData.brands.length
+            || brands.some((b, i) => b !== uaData.brands[i]);
+          if (changed) {
+            const spoofed = Object.create(uaData);
+            spoofed.brands = brands;
+            if (typeof uaData.getHighEntropyValues === 'function') {
+              spoofed.getHighEntropyValues = (hints) => uaData.getHighEntropyValues(hints).then((info) => {
+                const copy = { ...info };
+                for (const key of ['brands', 'fullVersionList']) {
+                  if (Array.isArray(copy[key])) copy[key] = copy[key].filter(b => !/Electron/i.test(String(b.brand || '')));
+                }
+                return copy;
+              });
+            }
+            Object.defineProperty(navigator, 'userAgentData', { value: spoofed, configurable: true });
           }
         }
       } catch {}

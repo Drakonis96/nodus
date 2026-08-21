@@ -66,26 +66,38 @@ function browserUserAgent(ses: Session): string {
     .trim();
 }
 
-function configureBrowserSession(ses: Session): void {
-  ses.setUserAgent(browserUserAgent(ses));
+/**
+ * The real Chromium version embedded in this Electron build, taken from the
+ * session's own User-Agent. The Sec-CH-UA spoof MUST use this exact version:
+ * a mismatch (e.g. UA says Chrome/142 but Sec-CH-UA says 132) is precisely
+ * what Google's anti-spoofing detects, and a hard-coded version goes stale
+ * with every Electron upgrade.
+ */
+function chromeVersionFromUserAgent(ua: string): { major: string; full: string } {
+  const match = /Chrome\/([\d.]+)/.exec(ua);
+  if (!match) return { major: '132', full: '132.0.0.0' };
+  const full = match[1];
+  return { major: full.split('.')[0], full };
+}
 
-  // Spoof Sec-CH-UA to hide Electron: Google's "browser not secure" checks both
-  // the User-Agent string and the Sec-CH-UA brand list. setUserAgent() alone
-  // does not affect Sec-CH-UA, so we rewrite it here before it leaves the
-  // Nodus Browser partition.
+function configureBrowserSession(ses: Session): void {
+  const cleanUa = browserUserAgent(ses);
+  ses.setUserAgent(cleanUa);
+  const { major, full } = chromeVersionFromUserAgent(cleanUa);
+
+  // Spoof Sec-CH-UA to hide Electron: Google's "browser not secure" check reads
+  // the User-Agent string AND the Sec-CH-UA brand list. setUserAgent() alone
+  // does not affect Sec-CH-UA, so it is rewritten here with the real Chromium
+  // version from the UA above.
   ses.webRequest.onBeforeSendHeaders((details, callback) => {
     const headers = { ...details.requestHeaders };
-    // Remove Electron brand; keep a plausible Chrome list.
     if (headers['Sec-CH-UA']) {
-      headers['Sec-CH-UA'] = '"Not A(Brand";v="8", "Chromium";v="132", "Google Chrome";v="132"';
+      headers['Sec-CH-UA'] =
+        `"Not A(Brand";v="8", "Chromium";v="${major}", "Google Chrome";v="${major}"`;
     }
     if (headers['Sec-CH-UA-Full-Version-List']) {
       headers['Sec-CH-UA-Full-Version-List'] =
-        '"Not A(Brand";v="8.0.0.0", "Chromium";v="132.0.6734.0", "Google Chrome";v="132.0.6734.0"';
-    }
-    if (headers['Sec-CH-UA-Platform']) {
-      // Keep whatever platform was detected, but ensure it is quoted correctly.
-      headers['Sec-CH-UA-Platform'] = headers['Sec-CH-UA-Platform'];
+        `"Not A(Brand";v="8.0.0.0", "Chromium";v="${full}", "Google Chrome";v="${full}"`;
     }
     // Belt-and-braces: ensure User-Agent header matches the cleaned session UA.
     if (headers['User-Agent']) {
