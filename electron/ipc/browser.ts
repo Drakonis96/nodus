@@ -327,6 +327,11 @@ export function registerBrowserIpc({ h, getWindow }: IpcContext): void {
     assertUiSender(event, getWindow);
     ensureWired();
     const target = homeUrl();
+    const state = browserState();
+    if (state.tabs.length === 0 || !state.activeTabId) {
+      await createTab(target);
+      return { url: target };
+    }
     if (target === 'about:blank') { navigate('about:blank'); return { url: target }; }
     navigate(target);
     return { url: target };
@@ -357,6 +362,12 @@ export function registerBrowserIpc({ h, getWindow }: IpcContext): void {
   h('browser:closeTab', async (event, id: string) => {
     assertUiSender(event, getWindow);
     closeTab(String(id));
+    // Cerrar la última pestaña dejaba el navegador vacío: el botón Inicio
+    // (navigate) no crea pestañas y el efecto inicial solo corría al montar,
+    // obligando a salir y volver a la sección. Auto-crea la página de inicio.
+    if (browserState().tabs.length === 0) {
+      await createTab(homeUrl());
+    }
   });
 
   h('browser:goBack', async (event) => { assertUiSender(event, getWindow); goBack(); });

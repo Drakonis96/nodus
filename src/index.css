@@ -4865,3 +4865,95 @@ body:has(.library-document-reader [data-testid="library-reader-sidebar"]) .app-t
 .light.testimonios .border-indigo-700\/60 { border-color: rgba(8, 145, 178, 0.45); }
 .light.testimonios .border-indigo-800\/40,
 .light.testimonios .border-indigo-800\/60 { border-color: rgba(8, 145, 178, 0.3); }
+
+/* ── Source citation modal — light theme ───────────────────────────────── */
+/* Dark-by-design sheet; light gets an opaque white surface so it never inherits charcoal. */
+.light [data-testid="source-citation-modal"] {
+  border-color: #e5e7eb;
+  background-color: #ffffff;
+  box-shadow: 0 24px 70px rgba(15, 23, 42, 0.18), 0 0 0 1px rgba(15, 23, 42, 0.06);
+}
+.light [data-testid="source-citation-modal"] > header {
+  border-color: #e5e7eb;
+  background: #f8fafc;
+}
+.light [data-testid="source-citation-modal"] [data-testid="source-citation-tabs"] {
+  border-color: #e5e7eb;
+}
+.light [data-testid="source-citation-modal"] .bg-neutral-950\/70 {
+  background-color: #ffffff;
+}
+.light [data-testid="source-citation-modal"] .bg-neutral-950\/95 {
+  background-color: #f8fafc;
+}
+.light [data-testid="source-citation-modal"] .border-neutral-700\/80,
+.light [data-testid="source-citation-modal"] .border-neutral-800\/80,
+.light [data-testid="source-citation-modal"] .border-neutral-800 {
+  border-color: #e5e7eb;
+}
+.light [data-testid="source-citation-modal"] .bg-neutral-900\/35,
+.light [data-testid="source-citation-modal"] .bg-neutral-900\/55,
+.light [data-testid="source-citation-modal"] .bg-neutral-950\/55 {
+  background-color: #ffffff;
+  border-color: #e5e7eb;
+}
+.light [data-testid="source-citation-modal"] section header.bg-neutral-900\/55 {
+  background-color: #f8fafc;
+  border-color: #e5e7eb;
+}
+.light [data-testid="source-citation-modal"] .from-indigo-500\/10 {
+  --tw-gradient-from: rgba(99, 102, 241, 0.08) var(--tw-gradient-from-position);
+}
+.light [data-testid="source-citation-modal"] .via-neutral-900\/60 {
+  --tw-gradient-to: rgba(255, 255, 255, 0) var(--tw-gradient-to-position);
+  --tw-gradient-stops: var(--tw-gradient-from), #ffffff var(--tw-gradient-via-position), var(--tw-gradient-to);
+}
+.light [data-testid="source-citation-modal"] .to-neutral-950 {
+  --tw-gradient-to: #f8fafc var(--tw-gradient-to-position);
+}
+.light [data-testid="source-citation-modal"] .from-sky-500\/10 {
+  --tw-gradient-from: rgba(14, 165, 233, 0.08) var(--tw-gradient-from-position);
+}
+.light [data-testid="source-citation-modal"] .from-violet-500\/10 {
+  --tw-gradient-from: rgba(139, 92, 246, 0.08) var(--tw-gradient-from-position);
+}
+.light [data-testid="source-citation-modal"] .from-amber-500\/10 {
+  --tw-gradient-from: rgba(245, 158, 11, 0.08) var(--tw-gradient-from-position);
+}
+.light [data-testid="source-citation-modal"] .from-red-500\/10 {
+  --tw-gradient-from: rgba(239, 68, 68, 0.07) var(--tw-gradient-from-position);
+}
+.light [data-testid="source-citation-modal"] .from-emerald-500\/10 {
+  --tw-gradient-from: rgba(16, 185, 129, 0.08) var(--tw-gradient-from-position);
+}
+.light [data-testid="source-citation-modal"] .border-indigo-500\/25,
+.light [data-testid="source-citation-modal"] .border-sky-500\/20,
+.light [data-testid="source-citation-modal"] .border-violet-500\/20,
+.light [data-testid="source-citation-modal"] .border-amber-500\/25,
+.light [data-testid="source-citation-modal"] .border-red-500\/25,
+.light [data-testid="source-citation-modal"] .border-emerald-500\/25 {
+  border-color: #e5e7eb;
+}
+.light [data-testid="source-citation-modal"] .bg-indigo-500\/15 {
+  background-color: rgba(99, 102, 241, 0.12);
+}
+.light [data-testid="source-citation-modal"] .border-neutral-700 {
+  border-color: #e5e7eb;
+}
+.light [data-testid="source-citation-modal"] .bg-neutral-950\/55 {
+  background-color: #ffffff;
+}
+.light [data-testid="source-citation-modal"] .text-neutral-100,
+.light [data-testid="source-citation-modal"] .text-neutral-200 {
+  color: #0f172a;
+}
+.light [data-testid="source-citation-modal"] .text-neutral-300 {
+  color: #1e293b;
+}
+.light [data-testid="source-citation-modal"] .text-neutral-400,
+.light [data-testid="source-citation-modal"] .text-neutral-500 {
+  color: #475569;
+}
+.light [data-testid="source-citation-modal"] .text-neutral-600 {
+  color: #64748b;
+}
