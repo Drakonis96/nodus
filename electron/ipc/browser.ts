@@ -75,11 +75,13 @@ import {
   captureOverlaySnapshot,
   closeTab,
   createTab,
+  findInPage,
   goBack,
   goForward,
   initBrowserTabs,
   navigate,
   reload,
+  setFoundInPageListener,
   setOverlayVisible,
   setSectionVisible,
   activeTabSummary,
@@ -87,6 +89,7 @@ import {
   sendMediaCommand,
   setTabMuted,
   setViewport,
+  stopFindInPage,
   stopLoading,
 } from '../browser/tabs';
 import { browserBookmarksRepository } from '../browser/bookmarks';
@@ -234,6 +237,11 @@ export function registerBrowserIpc({ h, getWindow }: IpcContext): void {
     setPermissionPromptNotifier(broadcastPermission);
     setMediaNotifier(broadcastMedia);
     setDownloadNotifier(broadcastDownloads);
+    setFoundInPageListener((result) => {
+      const win = getWindow();
+      if (!win || win.isDestroyed()) return;
+      win.webContents.send('browser:found-in-page', result);
+    });
     wired = true;
   };
 
@@ -374,6 +382,17 @@ export function registerBrowserIpc({ h, getWindow }: IpcContext): void {
   h('browser:goForward', async (event) => { assertUiSender(event, getWindow); goForward(); });
   h('browser:reload', async (event) => { assertUiSender(event, getWindow); reload(); });
   h('browser:stop', async (event) => { assertUiSender(event, getWindow); stopLoading(); });
+
+  h('browser:findInPage', async (event, text: string, options: { forward?: boolean; findNext?: boolean; matchCase?: boolean }) => {
+    assertUiSender(event, getWindow);
+    findInPage(String(text ?? ''), options ?? {});
+  });
+  h('browser:stopFindInPage', async (event, action: string) => {
+    assertUiSender(event, getWindow);
+    const allowed = ['clearSelection', 'keepSelection', 'activateSelection'] as const;
+    const next = allowed.includes(action as typeof allowed[number]) ? action as typeof allowed[number] : 'clearSelection';
+    stopFindInPage(next);
+  });
 
   /**
    * What the user typed in the address bar.

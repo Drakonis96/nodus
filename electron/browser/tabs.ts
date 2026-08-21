@@ -555,6 +555,11 @@ function wire(tab: Tab): void {
     // recurse during expected teardown.
     destroyTab(tab.id, { activateReplacement: true, publish: true });
   }) as never);
+
+  on(tab, contents, 'found-in-page', ((_: unknown, result: Electron.FoundInPageResult) => {
+    if (tab.id !== activeTabId) return;
+    foundInPageListener?.(result);
+  }) as never);
 }
 
 export async function createTab(url: string): Promise<string | null> {
@@ -829,6 +834,21 @@ export function setTabMuted(id: string, muted: boolean): void {
   tab.view.webContents.setAudioMuted(muted);
   noteMuted(id, muted);
   patch(tab, { muted });
+}
+
+let foundInPageListener: ((result: Electron.FoundInPageResult) => void) | null = null;
+export function setFoundInPageListener(cb: ((result: Electron.FoundInPageResult) => void) | null): void {
+  foundInPageListener = cb;
+}
+export function findInPage(text: string, options: { forward?: boolean; findNext?: boolean; matchCase?: boolean } = {}): void {
+  const tab = activeTabId ? tabs.get(activeTabId) : null;
+  if (!tab || tab.state.kind !== 'web' || tab.view.webContents.isDestroyed()) return;
+  tab.view.webContents.findInPage(text, { forward: options.forward ?? true, findNext: options.findNext ?? false, matchCase: options.matchCase ?? false });
+}
+export function stopFindInPage(action: 'clearSelection' | 'keepSelection' | 'activateSelection' = 'clearSelection'): void {
+  const tab = activeTabId ? tabs.get(activeTabId) : null;
+  if (!tab || tab.view.webContents.isDestroyed()) return;
+  tab.view.webContents.stopFindInPage(action);
 }
 
 /** Drive one tab's media from the header. */

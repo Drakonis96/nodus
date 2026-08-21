@@ -71,6 +71,15 @@ export const browserApi = {
     ipcRenderer.invoke('browser:submitOmnibox', input),
   setBrowserViewport: (viewport: BrowserViewport): Promise<void> =>
     ipcRenderer.invoke('browser:setViewport', viewport).then(() => undefined),
+  browserFindInPage: (text: string, options?: { forward?: boolean; findNext?: boolean; matchCase?: boolean }): Promise<void> =>
+    ipcRenderer.invoke('browser:findInPage', text, options ?? {}).then(() => undefined),
+  browserStopFindInPage: (action?: 'clearSelection' | 'keepSelection' | 'activateSelection'): Promise<void> =>
+    ipcRenderer.invoke('browser:stopFindInPage', action ?? 'clearSelection').then(() => undefined),
+  onBrowserFoundInPage: (callback: (result: { requestId: number; activeMatchOrdinal: number; matches: number; selectionArea: unknown; finalUpdate: boolean }) => void): (() => void) => {
+    const listener = (_event: unknown, result: { requestId: number; activeMatchOrdinal: number; matches: number; selectionArea: unknown; finalUpdate: boolean }) => callback(result);
+    ipcRenderer.on('browser:found-in-page', listener);
+    return () => ipcRenderer.removeListener('browser:found-in-page', listener);
+  },
   setBrowserOverlayVisible: (open: boolean): Promise<void> =>
     ipcRenderer.invoke('browser:setOverlayVisible', open).then(() => undefined),
   captureBrowserOverlaySnapshot: (): Promise<string | null> =>

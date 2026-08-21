@@ -8195,6 +8195,9 @@ export interface BrowserApi {
   deleteBrowserHistoryEntry(id: string): Promise<import('./browserHistory').BrowserHistoryStore>;
   clearBrowserHistory(): Promise<import('./browserHistory').BrowserHistoryStore>;
   onBrowserHistoryChanged(cb: (store: import('./browserHistory').BrowserHistoryStore) => void): () => void;
+  browserFindInPage(text: string, options?: { forward?: boolean; findNext?: boolean; matchCase?: boolean }): Promise<void>;
+  browserStopFindInPage(action?: 'clearSelection' | 'keepSelection' | 'activateSelection'): Promise<void>;
+  onBrowserFoundInPage(cb: (result: { requestId: number; activeMatchOrdinal: number; matches: number; selectionArea: unknown; finalUpdate: boolean }) => void): () => void;
 }
 
 export interface NodusApi extends ProsopographyApi, TestimoniesApi, ToolkitApi, TeachingApi, DatabasesApi, PagesApi, PrimarySourcesApi, ArchiveApi, WorldbuildingApi, PlatformApi, RecordsApi, AcademicApi, LibraryApi, RadarApi, BrowserApi {
