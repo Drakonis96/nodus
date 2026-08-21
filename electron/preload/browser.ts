@@ -75,8 +75,19 @@ export const browserApi = {
     ipcRenderer.invoke('browser:setOverlayVisible', open).then(() => undefined),
   captureBrowserOverlaySnapshot: (): Promise<string | null> =>
     ipcRenderer.invoke('browser:overlaySnapshot'),
-  setBrowserSectionVisible: (visible: boolean): Promise<void> =>
-    ipcRenderer.invoke('browser:setSectionVisible', visible).then(() => undefined),
+  setBrowserSectionVisible: (visible: boolean): Promise<void> => {
+    // Hide must be synchronous to avoid the native WebContentsView flashing over
+    // the next section (e.g. Settings). `invoke` is async (IPC roundtrip ≈ one
+    // frame) and the new view paints before main hides the view. `sendSync`
+    // blocks the renderer until main has called `setVisible(false)`.
+    if (!visible) {
+      try {
+        ipcRenderer.sendSync('browser:setSectionVisibleSync', visible);
+      } catch {}
+      return Promise.resolve();
+    }
+    return ipcRenderer.invoke('browser:setSectionVisible', visible).then(() => undefined);
+  },
   getPendingBrowserPermission: (): Promise<PendingBrowserPermission | null> =>
     ipcRenderer.invoke('browser:pendingPermission'),
   resolveBrowserPermission: (id: string, granted: boolean, remember: boolean): Promise<void> =>

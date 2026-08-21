@@ -16,7 +16,7 @@
  * preload with `ipcRenderer` on it. Defence in depth, deliberately redundant.
  */
 
-import { BrowserWindow, dialog, shell } from 'electron';
+import { BrowserWindow, dialog, ipcMain, shell } from 'electron';
 import { randomUUID } from 'node:crypto';
 import fsp from 'node:fs/promises';
 import path from 'node:path';
@@ -236,6 +236,19 @@ export function registerBrowserIpc({ h, getWindow }: IpcContext): void {
     setDownloadNotifier(broadcastDownloads);
     wired = true;
   };
+
+  // Synchronous hide to prevent native view flashing over the next section.
+  // `invoke` would leave one frame where Settings header is painted but the
+  // atlas WebContentsView is still visible (see screenshot).
+  ipcMain.on('browser:setSectionVisibleSync', (event, visible: unknown) => {
+    try {
+      assertUiSender(event as unknown as Electron.IpcMainInvokeEvent, getWindow);
+    } catch {}
+    ensureWired();
+    setSectionVisible(Boolean(visible));
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- `returnValue` is the sync IPC contract
+    (event as any).returnValue = null;
+  });
 
   h('browser:state', async (event) => {
     assertUiSender(event, getWindow);
