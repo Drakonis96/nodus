@@ -8108,6 +8108,8 @@ export interface BrowserApi {
   navigateBrowserStartPage(page: 'atlas' | 'bookmarks'): Promise<boolean>;
   activateBrowserTab(id: string): Promise<void>;
   closeBrowserTab(id: string): Promise<void>;
+  /** Clear a tab's error pane and reveal the page that is still loaded behind it. */
+  browserDismissError(): Promise<void>;
   browserGoBack(): Promise<void>;
   browserGoForward(): Promise<void>;
   browserReload(): Promise<void>;

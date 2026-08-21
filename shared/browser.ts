@@ -21,6 +21,8 @@ export type BrowserTabErrorKind =
   | 'certificate'
   | 'blocked-scheme'
   | 'crashed'
+  /** Google refuses to sign in from any embedded browser. See isGoogleSignInUrl. */
+  | 'google-sign-in'
   | 'unknown';
 
 export interface BrowserTabError {
@@ -30,6 +32,21 @@ export interface BrowserTabError {
   /** Chromium's own description. Shown verbatim under the localized heading. */
   description: string;
   url: string;
+  /**
+   * For `google-sign-in`: the page the sign-in was started FROM, when there was
+   * one — and the address the hand-off must actually use.
+   *
+   * A federated login has to begin and end in the same browser. Sites built on
+   * Firebase keep the flow's state in `sessionStorage` under their own origin,
+   * so handing the system browser the half-finished accounts.google.com URL
+   * lands it on a page whose opening move happened somewhere else, and it fails
+   * with `auth/missing-initial-state`. Handing over the SITE instead lets the
+   * whole flow run start-to-finish in one place.
+   *
+   * Null when the user asked for Google directly (typed it, or opened a link
+   * into a new tab), where there is no site to go back to.
+   */
+  siteUrl?: string | null;
 }
 
 /**
@@ -138,6 +155,38 @@ export function isNodusResearchSiteUrl(rawUrl: string): boolean {
       return true;
     }
     return url.protocol === 'http:' && (url.hostname === '127.0.0.1' || url.hostname === 'localhost');
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Google's sign-in host, which no embedded browser is allowed to use.
+ *
+ * This is not a Nodus limitation and not a bug to be worked around. Google
+ * announced in 2019 that it would block sign-in from Chromium EMBEDDERS — CEF
+ * and Electron — as a man-in-the-middle defence, and it has never published a
+ * way for one to be re-admitted. The block is on the framework, not on the
+ * User-Agent: dressing Electron up as Chrome (matching `window.chrome`, the
+ * Sec-CH-UA brand list and `navigator.userAgentData`) was measured against the
+ * real page and still ends at "Este navegador o aplicación puede que no sean
+ * seguros". Apps that genuinely needed it forked Chromium outright — Wavebox
+ * left Electron for exactly this reason — and the ones that did not, such as
+ * Obsidian's Web Viewer, document the limitation instead.
+ *
+ * So Nodus does not try. It recognises the destination BEFORE Google's wall
+ * loads and offers the only thing that actually works: the system browser.
+ *
+ * The whole host is matched rather than a list of sign-in paths. Everything on
+ * accounts.google.com is account flow — sign-in, the account chooser, the OAuth
+ * authorization endpoint third-party "Continue with Google" buttons redirect to
+ * — and none of it can succeed here.
+ */
+export function isGoogleSignInUrl(rawUrl: string): boolean {
+  try {
+    const url = new URL(rawUrl);
+    if (url.protocol !== 'https:') return false;
+    return url.hostname === 'accounts.google.com';
   } catch {
     return false;
   }
