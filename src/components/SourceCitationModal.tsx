@@ -201,7 +201,7 @@ function CitationWorkspace({
         aria-modal="true"
         aria-label={t('Fuentes y contexto')}
         data-testid="source-citation-modal"
-        className="flex max-h-[90vh] min-h-[560px] w-full max-w-5xl flex-col overflow-hidden rounded-2xl border border-neutral-700/80 bg-neutral-950 shadow-2xl shadow-black/60"
+        className="flex h-[min(90vh,760px)] max-h-[90vh] min-h-0 w-full max-w-5xl flex-col overflow-hidden rounded-2xl border border-neutral-700/80 bg-neutral-950 shadow-2xl shadow-black/60"
         onClick={(event) => event.stopPropagation()}
       >
         <header className="flex min-h-14 shrink-0 items-center gap-3 border-b border-neutral-800 bg-neutral-950/95 px-4 sm:px-5">
@@ -247,7 +247,7 @@ function CitationWorkspace({
           </div>
         </div>
 
-        <main className="min-h-0 flex-1 bg-neutral-950/70" data-testid="source-citation-content">
+        <main className="flex min-h-0 flex-1 flex-col overflow-hidden bg-neutral-950/70" data-testid="source-citation-content">
           {tabs.map((tab) => (
             <CitationTabPane
               key={tab.key}
@@ -282,7 +282,7 @@ function CitationTabPane({
 }) {
   const reportTitle = useCallback((title: string) => onTitle(tab.key, title), [onTitle, tab.key]);
   return (
-    <div className={`${active ? 'h-full overflow-y-auto' : 'hidden'}`} role="tabpanel" data-testid={`source-citation-panel-${tab.key}`}>
+    <div className={`${active ? 'min-h-0 flex-1 overflow-y-auto overscroll-contain' : 'hidden'}`} role="tabpanel" data-testid={`source-citation-panel-${tab.key}`}>
       <div className="mx-auto max-w-4xl p-4 sm:p-6">
         <CitationPanel target={tab.target} authors={authors} onOpenTarget={onOpenTarget} onTitle={reportTitle} onOpenLibraryWork={onOpenLibraryWork} />
       </div>

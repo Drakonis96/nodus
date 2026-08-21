@@ -42,14 +42,19 @@ export function useBrowserNativeOverlayGuard(enabled: boolean): void {
   useEffect(() => {
     if (!enabled) return undefined;
 
-    let animationFrame = 0;
+    let scheduled = false;
     const synchronize = () => {
-      animationFrame = 0;
+      scheduled = false;
       void setBrowserOverlayVisible(hasVisibleTrustedOverlay()).catch(() => undefined);
     };
     const schedule = () => {
-      if (animationFrame) window.cancelAnimationFrame(animationFrame);
-      animationFrame = window.requestAnimationFrame(synchronize);
+      if (scheduled) return;
+      scheduled = true;
+      // Microtask, not rAF: hides the native WebContentsView BEFORE the next paint,
+      // so the vault switcher never flashes behind the page. rAF was one frame too
+      // late (visible flash on open). Microtask still settles after the React commit
+      // but before `requestAnimationFrame` / paint.
+      queueMicrotask(synchronize);
     };
 
     const observer = new MutationObserver(schedule);
@@ -63,7 +68,6 @@ export function useBrowserNativeOverlayGuard(enabled: boolean): void {
 
     return () => {
       observer.disconnect();
-      if (animationFrame) window.cancelAnimationFrame(animationFrame);
       void setBrowserOverlayVisible(false).catch(() => undefined);
     };
   }, [enabled]);

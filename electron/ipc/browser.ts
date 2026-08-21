@@ -16,7 +16,7 @@
  * preload with `ipcRenderer` on it. Defence in depth, deliberately redundant.
  */
 
-import { BrowserWindow, dialog, shell } from 'electron';
+import { BrowserWindow, dialog, ipcMain, shell } from 'electron';
 import { randomUUID } from 'node:crypto';
 import fsp from 'node:fs/promises';
 import path from 'node:path';
@@ -237,6 +237,19 @@ export function registerBrowserIpc({ h, getWindow }: IpcContext): void {
     wired = true;
   };
 
+  // Synchronous hide to prevent native view flashing over the next section.
+  // `invoke` would leave one frame where Settings header is painted but the
+  // atlas WebContentsView is still visible (see screenshot).
+  ipcMain.on('browser:setSectionVisibleSync', (event, visible: unknown) => {
+    try {
+      assertUiSender(event as unknown as Electron.IpcMainInvokeEvent, getWindow);
+    } catch {}
+    ensureWired();
+    setSectionVisible(Boolean(visible));
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- `returnValue` is the sync IPC contract
+    (event as any).returnValue = null;
+  });
+
   h('browser:state', async (event) => {
     assertUiSender(event, getWindow);
     ensureWired();
@@ -327,6 +340,11 @@ export function registerBrowserIpc({ h, getWindow }: IpcContext): void {
     assertUiSender(event, getWindow);
     ensureWired();
     const target = homeUrl();
+    const state = browserState();
+    if (state.tabs.length === 0 || !state.activeTabId) {
+      await createTab(target);
+      return { url: target };
+    }
     if (target === 'about:blank') { navigate('about:blank'); return { url: target }; }
     navigate(target);
     return { url: target };
@@ -357,6 +375,12 @@ export function registerBrowserIpc({ h, getWindow }: IpcContext): void {
   h('browser:closeTab', async (event, id: string) => {
     assertUiSender(event, getWindow);
     closeTab(String(id));
+    // Cerrar la última pestaña dejaba el navegador vacío: el botón Inicio
+    // (navigate) no crea pestañas y el efecto inicial solo corría al montar,
+    // obligando a salir y volver a la sección. Auto-crea la página de inicio.
+    if (browserState().tabs.length === 0) {
+      await createTab(homeUrl());
+    }
   });
 
   h('browser:goBack', async (event) => { assertUiSender(event, getWindow); goBack(); });

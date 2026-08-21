@@ -7,6 +7,7 @@ import { errorText, t, tr, tx } from '../i18n';
 import { clearFilterPreferences } from '../app/filterPreferences';
 import { ConfirmModal } from './ConfirmModal';
 import { Icon } from './ui';
+import { setBrowserOverlayVisible } from '../browserOverlay';
 import {
   NEW_VAULT_TYPES,
   isPreAlphaVaultType,
@@ -116,6 +117,14 @@ export function VaultSwitcher({ anchorEl, onClose, vaults, onVaultsChanged, onAc
       window.removeEventListener('scroll', compute, true);
     };
   }, [open, anchorEl]);
+
+  // El panel es un overlay nativo detrás de Browser: sin esto, el WebContentsView
+  // pinta por encima durante el microtask del guard y se ve un flash. LayoutEffect
+  // corre antes del paint, así que el navegador queda oculto desde el primer frame.
+  useLayoutEffect(() => {
+    if (!open) return;
+    void setBrowserOverlayVisible(true).catch(() => undefined);
+  }, [open]);
 
   // Dismiss on outside click / Escape. Clicks on a trigger (`data-vault-trigger`)
   // or inside an open child modal (`[role="dialog"]`) are ignored so they can

@@ -97,7 +97,7 @@ test('trusted Nodus overlays automatically cover native Browser pages', () => {
     'accessible dialogs must automatically hide native content');
   assert.match(overlayGuard, /\.fixed\.inset-0/,
     'legacy full-window backdrops and tours must be covered too');
-  assert.match(overlayGuard, /requestAnimationFrame\(synchronize\)/,
+  assert.match(overlayGuard, /(requestAnimationFrame|queueMicrotask)\(synchronize\)/,
     'overlapping overlay cleanup must settle after the React commit');
   assert.match(app, /useBrowserNativeOverlayGuard\(view === 'browser'\)/,
     'the app shell must enable the guard whenever Browser is the active section');
