@@ -2806,6 +2806,7 @@ export const PT_BR: Record<string, string> = {
   'Nuevo informe': 'Novo relatório',
   'Buscar entre tus informes…': 'Buscar nos seus relatórios…',
   'Buscar en la página…': 'Buscar na página…',
+  'Buscar en la página': 'Buscar na página',
   '0 resultados': '0 resultados',
   'Buscar dentro del documento…': 'Pesquisar neste documento…',
   'Buscar dentro del documento': 'Pesquisar neste documento',
