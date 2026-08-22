@@ -387,7 +387,7 @@ export const PT: Record<string, string> = {
     'Depois da mudança, reveja e complete os modelos de «Definições avançadas comuns» e do espaço atual. Uma tarefa sem um modelo válido pode falhar.',
   'Cambiar a configuración básica': 'Mudar para a configuração básica',
   'Cambiar a configuración avanzada': 'Mudar para a configuração avançada',
-  'Acerca de Nodus': 'Acerca do Nodus',
+  'Acerca de Nodus Research': 'Acerca do Nodus Research',
   'Nodus es un proyecto independiente de código abierto, desarrollado y mantenido principalmente por una sola persona. No es un servicio comercial ni un producto de pago: la aplicación seguirá siendo gratuita y su código permanecerá abierto.':
     'O Nodus é um projeto independente de código aberto, desenvolvido e mantido principalmente por uma única pessoa. Não é um serviço comercial nem um produto pago: a aplicação continuará a ser gratuita e o seu código permanecerá aberto.',
   'Si Nodus te ayuda a estudiar, investigar o escribir y quieres contribuir voluntariamente a su desarrollo, puedes apoyar el proyecto mediante PayPal o Ko-fi. La donación es completamente opcional: no desbloquea funciones ni cambia el acceso a la aplicación.':

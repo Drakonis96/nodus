@@ -212,7 +212,9 @@ function installRuntimeHooks(userDataPath) {
     },
     dialog: {},
     shell: {},
-    BrowserWindow: class {},
+    BrowserWindow: class {
+      static getAllWindows() { return []; }
+    },
   };
 
   Module._resolveFilename = function resolveFilename(request, parent, isMain, options) {

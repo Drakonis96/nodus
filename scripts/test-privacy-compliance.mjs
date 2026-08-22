@@ -266,15 +266,17 @@ test('public copy matches the no-AI-student-evaluation product boundary', async 
   }
 });
 
-test('only three tables can ever produce a published image, and no document can', async () => {
+test('only the five named image tables can produce a published asset, and no document can', async () => {
   const snapshot = await read('electron/serverSync/serverSnapshot.ts');
   // ASSET_SOURCES is the single code path that turns a database blob into something the
   // server can receive. Anything added to it becomes publishable, so its size is pinned.
   const sources = snapshot.slice(snapshot.indexOf('export const ASSET_SOURCES'), snapshot.indexOf('const IMAGE_SIGNATURES'));
   assert.ok(sources.length > 0, 'the ASSET_SOURCES block was not found — this test is reading nothing');
-  assert.equal((sources.match(/table: '/g) ?? []).length, 3, 'exactly three tables may produce an asset');
+  assert.equal((sources.match(/table: '/g) ?? []).length, 5, 'exactly five named image tables may produce an asset');
   assert.match(sources, /table: 'decorative_images'/);
   assert.match(sources, /table: 'person_portraits'/);
+  assert.match(sources, /table: 'world_images'/);
+  assert.match(sources, /table: 'map_images'/);
   assert.match(sources, /entity_kind = 'deep_research'/, 'immersion illustrations are not published');
 
   // The third source is the one that needs watching. An attachment column takes any file the
@@ -304,15 +306,20 @@ test('only three tables can ever produce a published image, and no document can'
 });
 
 test('a replica can only send back content its own user authored', async () => {
-  const [desktop, syncTables] = await Promise.all([
+  const [desktop, generatedDesktopTables, syncTables] = await Promise.all([
     read('electron/serverSync/outboxTriggers.ts'),
+    read('electron/serverSync/generatedMutableTables.ts'),
     read('electron/db/syncTables.ts'),
   ]);
   const { MUTABLE_TABLES } = await import('../server/lib/core/mutations.mjs');
   const serverTables = Object.keys(MUTABLE_TABLES);
-  // The desktop list is read from source (it is TypeScript); the round-trip test asserts the
-  // two are identical, so pinning either one pins both.
-  const desktopList = desktop.slice(desktop.indexOf('export const MUTABLE_TABLES'), desktop.indexOf('] as const'));
+  // Desktop consumes the generated TypeScript view of the same registry as the server. Read
+  // that generated source here so this privacy assertion cannot be bypassed by a runtime shim.
+  const desktopList = generatedDesktopTables.slice(
+    generatedDesktopTables.indexOf('export const MUTABLE_TABLES'),
+    generatedDesktopTables.indexOf('] as const')
+  );
+  assert.match(desktop, /from '\.\/generatedMutableTables'/);
 
   // Anything derived from the owner's corpus, and everything about students, testimonies or
   // prosopography, must be absent from both whitelists.
@@ -322,11 +329,11 @@ test('a replica can only send back content its own user authored', async () => {
     'testimony_interviews', 'prosop_audit_log', 'settings',
   ]) {
     assert.ok(!serverTables.includes(forbidden), `${forbidden} must not be writable from a replica`);
-    assert.doesNotMatch(desktopList, new RegExp(`'${forbidden}'`), `${forbidden} must not be queued by a replica`);
+    assert.doesNotMatch(desktopList, new RegExp(`["']${forbidden}["']`), `${forbidden} must not be queued by a replica`);
   }
   for (const allowed of ['notes', 'writing_saved_drafts', 'immersion_sessions']) {
     assert.ok(serverTables.includes(allowed));
-    assert.match(desktopList, new RegExp(`'${allowed}'`));
+    assert.match(desktopList, new RegExp(`["']${allowed}["']`));
   }
   // decorative_images travels only as a Deep Research illustration, never an immersion one.
   assert.equal(MUTABLE_TABLES.decorative_images.require.entity_kind, 'deep_research');

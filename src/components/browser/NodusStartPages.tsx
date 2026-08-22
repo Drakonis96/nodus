@@ -140,7 +140,7 @@ function NodusSiteHeader({ page }: { page: 'atlas' | 'bookmarks' }) {
   const [open, setOpen] = useState(false);
   const close = () => setOpen(false);
   return <header className="nodus-site-header" data-testid="nodus-site-header">
-    <button type="button" className="nodus-site-logo" aria-label="Nodus Research, home" onClick={() => openSitePage(NODUS_SITE)}><img src={NODUS_LOGO} alt="" /> Nodus</button>
+    <button type="button" className="nodus-site-logo" aria-label="Nodus Research, home" onClick={() => openSitePage(NODUS_SITE)}><img src={NODUS_LOGO} alt="" /> Nodus Research</button>
     <button type="button" className="nodus-site-nav-toggle" aria-label={open ? 'Close menu' : 'Open menu'} aria-expanded={open} onClick={() => setOpen((value) => !value)}><span /><span /><span /></button>
     <nav className={`nodus-site-links${open ? ' open' : ''}`} aria-label="Nodus Research">
       <SiteLink className="nodus-site-link" label="Home" url={NODUS_SITE} onOpen={close} />
@@ -167,7 +167,7 @@ const FOOTER_GROUPS = [
 function NodusSiteFooter() {
   return <footer className="nodus-site-footer" data-testid="nodus-site-footer"><div className="nodus-site-wrap">
     <div className="nodus-site-foot-grid">
-      <div className="nodus-site-foot-brand"><span className="nodus-site-foot-logo"><img src={NODUS_LOGO} alt="" /> Nodus</span><p>A free, open-source, local-first research workspace for connecting sources, ideas and evidence. Your corpus stays on your machine.</p></div>
+      <div className="nodus-site-foot-brand"><span className="nodus-site-foot-logo"><img src={NODUS_LOGO} alt="" /> Nodus Research</span><p>A free, open-source, local-first research workspace for connecting sources, ideas and evidence. Your corpus stays on your machine.</p></div>
       {FOOTER_GROUPS.map((group) => <div className="nodus-site-foot-col" key={group.title}><h3>{group.title}</h3>{group.links.map(([label, url]) => <SiteLink key={label} label={label} url={url} />)}</div>)}
     </div>
     <div className="nodus-site-foot-base"><span>© 2026 Jorge Pérez Burgueño and Nodus contributors.</span><SiteLink label="Privacy" url={`${NODUS_REPOSITORY}/blob/main/PRIVACY.md`} /><SiteLink label="Code of conduct" url={`${NODUS_REPOSITORY}/blob/main/CODE_OF_CONDUCT.md`} /><SiteLink label="Security" url={`${NODUS_REPOSITORY}/blob/main/SECURITY.md`} /></div>
@@ -190,7 +190,7 @@ function StartShell({ title, copy, query, onQuery, status, children, toolbar }: 
           <div className="atlas-search-wrap">
             <div className={`atlas-searchbar${page === 'bookmarks' ? ' is-bookmarks' : ''}`}>
               {page !== 'bookmarks' && <>
-                <div className="atlas-engine-wrap"><span className="atlas-engine flex items-center">Nodus</span></div>
+                <div className="atlas-engine-wrap"><span className="atlas-engine flex items-center">Nodus Research</span></div>
                 <span className="atlas-search-sep" aria-hidden="true" />
               </>}
               <div className="atlas-input-wrap">

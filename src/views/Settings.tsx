@@ -75,7 +75,7 @@ const SETTINGS_TABS: { id: SettingsTabId; label: string; icon: string; keywords:
   { id: 'server', label: 'Servidor', icon: 'globe', keywords: 'servidor docker compartir vault boveda estudiantes investigadores dominio subdominio oauth claude chatgpt reverse proxy caddy nginx publicar sincronizar' },
   { id: 'system', label: 'Tutoriales', icon: 'graduation', keywords: 'sistema ayuda tutorial' },
   { id: 'data', label: 'Backup / copia de seguridad', icon: 'download', keywords: 'datos backup exportar importar demo copia cifrada peligro reinicializar grafo borrar' },
-  { id: 'about', label: 'Acerca de Nodus', icon: 'info', keywords: 'acerca proyecto codigo abierto open source gratuito privacidad privacy rgpd gdpr datos alumnado inteligencia artificial licencia terceros legal redes sociales social reddit youtube comunidad' },
+  { id: 'about', label: 'Acerca de Nodus Research', icon: 'info', keywords: 'acerca proyecto codigo abierto open source gratuito privacidad privacy rgpd gdpr datos alumnado inteligencia artificial licencia terceros legal redes sociales social reddit youtube comunidad' },
   { id: 'updates', label: 'Actualizaciones y novedades', icon: 'sync', keywords: 'actualizaciones update actualizar version novedades ultimos cambios latest changes changelog buscar instalar reiniciar beta testers prerelease canal estable' },
 ];
 
@@ -774,7 +774,7 @@ export function Settings({
     visibleSettingsSection('models', 'Modelos de IA', 'basico avanzado modelo general extraccion sintesis tutor resumen fusion embeddings transcripcion voz imagen'),
     visibleSettingsSection('extraction', 'Extracción de texto PDFs grandes', 'pdf texto zotero ocr tesseract paginas idiomas'),
     visibleSettingsSection('data', 'Zona de peligro', 'reinicializar grafo borrar ideas temas conexiones autores huecos'),
-    visibleSettingsSection('about', 'Acerca de Nodus', 'proyecto independiente codigo abierto open source gratuito privacidad privacy rgpd gdpr datos alumnado licencia roadmap hoja de ruta futuro redes sociales social reddit youtube comunidad'),
+    visibleSettingsSection('about', 'Acerca de Nodus Research', 'proyecto independiente codigo abierto open source gratuito privacidad privacy rgpd gdpr datos alumnado licencia roadmap hoja de ruta futuro redes sociales social reddit youtube comunidad'),
     visibleSettingsSection('updates', 'Actualizaciones y novedades', 'actualizaciones update version novedades ultimos cambios latest changes changelog buscar instalar reiniciar avisos anuncios encuestas noticias beta testers prerelease canal estable'),
   ].filter(Boolean).length;
 
@@ -1400,15 +1400,15 @@ export function Settings({
           </Section>
       )}
 
-      {visibleSettingsSection('about', 'Acerca de Nodus', 'proyecto independiente codigo abierto open source gratuito privacidad privacy rgpd gdpr datos alumnado licencia terceros legal actualizaciones update version novedades roadmap hoja de ruta futuro redes sociales social reddit youtube comunidad') && (
-        <Section title={t('Acerca de Nodus')}>
+      {visibleSettingsSection('about', 'Acerca de Nodus Research', 'proyecto independiente codigo abierto open source gratuito privacidad privacy rgpd gdpr datos alumnado licencia terceros legal actualizaciones update version novedades roadmap hoja de ruta futuro redes sociales social reddit youtube comunidad') && (
+        <Section title={t('Acerca de Nodus Research')}>
           <div className={ABOUT_CARD_CLASS}>
             <div className="flex items-start gap-3">
               <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-indigo-100 text-indigo-600 dark:bg-indigo-500/15 dark:text-indigo-300">
                 <Icon name="network" size={22} />
               </div>
               <div>
-                <h2 className="text-base font-semibold text-neutral-900 dark:text-neutral-100">Nodus</h2>
+                <h2 className="text-base font-semibold text-neutral-900 dark:text-neutral-100">Nodus Research</h2>
                 <p className="mt-0.5 text-xs text-neutral-500">v{__APP_VERSION__}</p>
               </div>
             </div>

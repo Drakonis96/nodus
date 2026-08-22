@@ -12,6 +12,7 @@ import {
   safeLibraryFolderName,
 } from './libraryFileUtils';
 import {
+  isLibraryCollectionRecord,
   isLibraryItemRecord,
   legacyMetadataToRecord,
   librarySourceIdentityKey,
@@ -219,6 +220,17 @@ export class LibraryDiskStore {
     this.writeVersion('collections', record);
     this.materializeCollection(record);
     return record;
+  }
+
+  /** Materialize an immutable collection version received from another account device. */
+  mergeCollection(record: LibraryCollectionRecord): LibraryCollectionRecord {
+    if (!isLibraryCollectionRecord(record)) throw new Error('El registro de colección no es válido.');
+    this.initialize();
+    this.writeVersion('collections', record);
+    const current = this.readMaterializedCollection(record.id);
+    const winner = !current || compareClocks(current, record) < 0 ? record : current;
+    this.materializeCollection(winner);
+    return winner;
   }
 
   private readVersions<T extends LibraryItemRecord | LibraryCollectionRecord>(

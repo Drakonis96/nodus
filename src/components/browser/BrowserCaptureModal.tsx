@@ -351,7 +351,7 @@ export function BrowserCaptureModal({
         <header className="flex h-14 items-center justify-between border-b border-neutral-200 px-4 dark:border-neutral-800">
           <div className="flex items-center gap-2.5">
             <img src={connectorIcon} alt="" className="h-8 w-8" />
-            <div className="flex flex-col leading-none"><strong className="text-sm">Nodus</strong><span className="mt-1 text-[10px] uppercase tracking-[0.12em] text-neutral-500">{t('Conector')}</span></div>
+            <div className="flex flex-col leading-none"><strong className="text-sm">Nodus Research</strong><span className="mt-1 text-[10px] uppercase tracking-[0.12em] text-neutral-500">{t('Conector')}</span></div>
           </div>
           <div className="flex items-center gap-1">
             <button type="button" title={t('Configuración')} aria-label={t('Configuración')} disabled={busy} className="rounded-lg p-2 text-neutral-500 hover:bg-neutral-200 dark:hover:bg-neutral-800" onClick={onOpenSettings}><Icon name="settings" size={17} /></button>

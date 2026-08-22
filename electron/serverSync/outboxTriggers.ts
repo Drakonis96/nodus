@@ -1,6 +1,7 @@
 import type Database from 'better-sqlite3';
 import { identityColumns, quoteIdentifier } from '../db/rowIdentity';
 import { SCHEMA_VERSION } from '../db/migrations';
+import { MUTABLE_TABLES, type MutableTable } from './generatedMutableTables';
 
 /**
  * Which changes a connected vault owes the server, recorded by trigger.
@@ -29,59 +30,7 @@ const TRIGGER_LIKE = "(name LIKE 'nodus_outbox_up_%' OR name LIKE 'nodus_outbox_
  * `gaps` are the product of the owner's analysis pipeline and their identity depends on it.
  * So is anything about students, testimonies or prosopography, which are not shareable.
  */
-export const MUTABLE_TABLES = [
-  'notes',
-  'note_folders',
-  'note_links',
-  'pages',
-  'page_blocks',
-  'page_favorites',
-  'page_links',
-  'page_document_updates',
-  'page_revisions',
-  'page_comments',
-  'page_comment_reactions',
-  'page_comment_mentions',
-  'workspace_actors',
-  'workspace_groups',
-  'workspace_group_members',
-  'acl_entries',
-  'db_databases',
-  'db_data_sources',
-  'db_columns',
-  'db_rows',
-  'db_cells',
-  'db_views',
-  'db_view_sources',
-  'db_view_revisions',
-  'db_select_options',
-  'db_relations',
-  'db_attachments',
-  'db_row_templates',
-  'db_template_runs',
-  'db_row_hierarchy',
-  'db_row_dependencies',
-  'db_task_configs',
-  'db_sprints',
-  'db_sprint_rows',
-  'automation_rules',
-  'automation_runs',
-  'automation_notifications',
-  'database_forms',
-  'database_form_fields',
-  'database_form_submissions',
-  'writing_saved_drafts',
-  'writing_draft_annotations',
-  'decorative_images',
-  'immersion_sessions',
-  'saved_searches',
-  'research_questions',
-  'research_subquestions',
-  'research_coverage_links',
-  'edge_feedback',
-] as const;
-
-export type MutableTable = (typeof MUTABLE_TABLES)[number];
+export { MUTABLE_TABLES, type MutableTable };
 
 /** `json_array(NEW."a", NEW."b")` — byte-identical to `JSON.stringify(values)` on the JS
  *  side, so a key written by SQL and one written by the sender compare equal. Getting this

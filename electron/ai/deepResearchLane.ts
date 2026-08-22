@@ -1,5 +1,6 @@
+import fs from 'node:fs';
 import path from 'node:path';
-import { BrowserWindow } from 'electron';
+import { app, BrowserWindow } from 'electron';
 import { nodiText } from '@shared/nodiNotifications';
 import { openDbPath } from '../db/database';
 import { saveWritingWorkshopDraft } from '../db/writingDraftsRepo';
@@ -8,6 +9,7 @@ import { getActiveVault, listVaults } from '../vaults/vaultRegistry';
 import { generateDeepResearchReport } from './deepResearch';
 import {
   configureDeepResearchQueue,
+  type DeepResearchPersistedJob,
   type DeepResearchJobRecord,
   type DeepResearchQueueVault,
 } from './deepResearchQueue';
@@ -37,6 +39,27 @@ function broadcast(channel: string, payload: unknown): void {
   for (const win of BrowserWindow.getAllWindows()) {
     if (!win.isDestroyed() && !win.webContents.isDestroyed()) win.webContents.send(channel, payload);
   }
+}
+
+function queueFile(): string {
+  return path.join(app.getPath('userData'), 'deep-research-queue.v1.json');
+}
+
+function loadDurableQueue(): DeepResearchPersistedJob[] {
+  try {
+    const decoded: unknown = JSON.parse(fs.readFileSync(queueFile(), 'utf8'));
+    return Array.isArray(decoded) ? decoded as DeepResearchPersistedJob[] : [];
+  } catch {
+    return [];
+  }
+}
+
+function persistDurableQueue(jobs: DeepResearchPersistedJob[]): void {
+  const file = queueFile();
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  const temporary = `${file}.${process.pid}.tmp`;
+  fs.writeFileSync(temporary, JSON.stringify(jobs), { encoding: 'utf8', mode: 0o600 });
+  fs.renameSync(temporary, file);
 }
 
 /**
@@ -75,6 +98,8 @@ export function ensureDeepResearchLane(): void {
     saveDraft: ({ report, request, title }) =>
       saveWritingWorkshopDraft({ draft: report.draft, model: report.draft.generationModel ?? request.model ?? null, title: title ?? undefined }).id,
     activeVault: servingVault,
+    load: loadDurableQueue,
+    persist: persistDurableQueue,
     onChange: (all) => broadcast('research:deep:queue', all),
     onSettled: announce,
   });

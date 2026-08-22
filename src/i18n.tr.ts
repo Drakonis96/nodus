@@ -755,7 +755,7 @@ export const TR: Record<string, string> = {
   "Después del cambio, revisa y completa los modelos de «Ajustes avanzados comunes» y del vault actual. Una tarea sin un modelo válido puede fallar.": "Değişiklikten sonra \"Ortak Gelişmiş Ayarlar\"ı ve mevcut kasa şablonlarını gözden geçirip tamamlayın. Geçerli bir modeli olmayan bir görev başarısız olabilir.",
   "Cambiar a configuración básica": "Temel ayarlara geç",
   "Cambiar a configuración avanzada": "Gelişmiş ayarlara geç",
-  "Acerca de Nodus": "Nodus Hakkında",
+  "Acerca de Nodus Research": "Nodus Research Hakkında",
   "Nodus es un proyecto independiente de código abierto, desarrollado y mantenido principalmente por una sola persona. No es un servicio comercial ni un producto de pago: la aplicación seguirá siendo gratuita y su código permanecerá abierto.": "Nodus, öncelikle tek bir kişi tarafından geliştirilen ve sürdürülen bağımsız bir açık kaynak projesidir. Ticari bir hizmet ya da ücretli bir ürün değildir; uygulama ücretsiz kalacak ve kodu açık kalacaktır.",
   "Si Nodus te ayuda a estudiar, investigar o escribir y quieres contribuir voluntariamente a su desarrollo, puedes apoyar el proyecto mediante PayPal o Ko-fi. La donación es completamente opcional: no desbloquea funciones ni cambia el acceso a la aplicación.": "Nodus çalışmanıza, araştırmanıza veya yazmanıza yardımcı oluyorsa ve geliştirilmesine gönüllü olarak katkıda bulunmak istiyorsanız projeyi PayPal veya Ko-fi aracılığıyla destekleyebilirsiniz. Bağış yapmak tamamen isteğe bağlıdır; özelliklerin kilidini açmaz veya uygulamaya erişimi değiştirmez.",
   "Apoyar con PayPal": "PayPal ile destek",

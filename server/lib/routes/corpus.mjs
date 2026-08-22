@@ -13,11 +13,27 @@ import { deepResearchReportInput, renderProfessionalReportHtml } from '../core/g
 import { counts, page, readLimit, readOffset, rows, visibleEdges, worksById } from '../core/snapshot.mjs';
 import { getDebate, listDebates } from '../core/debates.mjs';
 import { lexicalSearch, matchesRow } from '../core/search.mjs';
+import {
+  workspaceArgumentRoutes,
+  workspaceAuthorDossier,
+  workspaceAuthorPage,
+  workspaceIdeaPage,
+  workspaceSynthesisMatrix,
+} from '../core/academicWorkspace.mjs';
 
 const SNIPPET_CHARS = 240;
 /** How far a subgraph walk may reach, and how many ideas it may carry back. */
 const MAX_GRAPH_DEPTH = 3;
 const MAX_GRAPH_IDEAS = 200;
+const ACADEMIC_WORKSPACE_TABLES = [
+  'works', 'authors', 'work_authors', 'zotero_tags', 'work_zotero_tags', 'themes',
+  'ideas', 'idea_occurrences', 'idea_theme_links', 'evidence', 'edges', 'edge_feedback',
+  'author_relations', 'author_dossier_synthesis', 'synthesis_matrix_cell',
+];
+
+function academicWorkspace(snapshot) {
+  return Object.fromEntries(ACADEMIC_WORKSPACE_TABLES.map((table) => [table, rows(snapshot, table)]));
+}
 
 function snippet(value) {
   const clean = String(value ?? '').replace(/\s+/g, ' ').trim();
@@ -240,12 +256,45 @@ export function createCorpusRoutes({ readSnapshot, readAssetBytes }) {
       if (!snapshot) return true;
       const all = rows(snapshot, collection.table);
       if (rest.length === 0) {
+        if (url.searchParams.get('surface') === 'workspace' && head === 'ideas') {
+          const result = workspaceIdeaPage(academicWorkspace(snapshot), {
+            offset: readOffset(url.searchParams.get('offset')),
+            limit: readLimit(url.searchParams.get('limit')),
+            search: url.searchParams.get('q') ?? '',
+            type: url.searchParams.get('type') ?? '',
+            sort: url.searchParams.get('sort') ?? 'label',
+          });
+          if (notModified(req, res, json, space, url, key)) return true;
+          const { items, ...pageResult } = result;
+          return send(res, json, { ideas: items, ...pageResult, revision: space.revision });
+        }
+        if (url.searchParams.get('surface') === 'workspace' && head === 'authors') {
+          const result = workspaceAuthorPage(academicWorkspace(snapshot), {
+            offset: readOffset(url.searchParams.get('offset')),
+            limit: readLimit(url.searchParams.get('limit')),
+            query: url.searchParams.get('q') ?? '',
+            synthesis: url.searchParams.get('synthesis') ?? 'all',
+            sort: url.searchParams.get('sort') ?? 'surname',
+          });
+          if (notModified(req, res, json, space, url, key)) return true;
+          const { items, ...pageResult } = result;
+          return send(res, json, { authors: items, ...pageResult, revision: space.revision });
+        }
         const query = url.searchParams.get('q');
         const filtered = query ? all.filter((row) => matchesRow(row, query)) : all;
         if (notModified(req, res, json, space, url, key)) return true;
         const limit = readLimit(url.searchParams.get('limit'));
         const offset = readOffset(url.searchParams.get('offset'));
         return send(res, json, { ...page(collection.key, filtered, limit, offset), revision: space.revision });
+      }
+
+      if (head === 'ideas' && rest[0] === 'routes') {
+        if (notModified(req, res, json, space, url, key)) return true;
+        return send(res, json, { routes: workspaceArgumentRoutes(academicWorkspace(snapshot)), revision: space.revision });
+      }
+      if (head === 'authors' && rest[0] === 'matrix') {
+        if (notModified(req, res, json, space, url, key)) return true;
+        return send(res, json, { matrix: workspaceSynthesisMatrix(academicWorkspace(snapshot)), revision: space.revision });
       }
       const wanted = decodeURIComponent(rest[0]);
       const row = all.find((candidate) => String(candidate[collection.id] ?? candidate.id) === wanted);
@@ -410,6 +459,10 @@ export function createCorpusRoutes({ readSnapshot, readAssetBytes }) {
       if (head === 'authors') {
         if (notModified(req, res, json, space, url, key)) return true;
         const authorId = String(row.author_id);
+        if (rest[1] === 'dossier') {
+          const dossier = workspaceAuthorDossier(academicWorkspace(snapshot), authorId);
+          return dossier ? send(res, json, { dossier, revision: space.revision }) : missing(res, json);
+        }
         const workIds = new Set(rows(snapshot, 'work_authors').filter((entry) => String(entry.author_id) === authorId).map((entry) => String(entry.nodus_id)));
         return send(res, json, {
           author: row,
@@ -481,6 +534,8 @@ export function createCorpusRoutes({ readSnapshot, readAssetBytes }) {
       const snapshot = requireSnapshot(res, json, space.id);
       if (!snapshot) return true;
       const drafts = rows(snapshot, 'writing_saved_drafts').filter(isDeepResearchDraft);
+      const readAt = new Map(rows(snapshot, 'writing_draft_reads')
+        .map((entry) => [String(entry.draft_id), entry.updated_at ?? null]));
       const assets = new Map(
         (Array.isArray(snapshot.assets) ? snapshot.assets : [])
           .filter((asset) => asset.kind === 'deep_research_image')
@@ -488,7 +543,7 @@ export function createCorpusRoutes({ readSnapshot, readAssetBytes }) {
       );
       if (rest.length === 0) {
         if (notModified(req, res, json, space, url, key)) return true;
-        const listed = drafts.map((row) => ({ ...draftSummary(row), image: assets.get(String(row.id)) ?? null }));
+        const listed = drafts.map((row) => ({ ...draftSummary(row), read_at: readAt.get(String(row.id)) ?? null, image: assets.get(String(row.id)) ?? null }));
         return send(res, json, { ...page('reports', listed, readLimit(url.searchParams.get('limit')), readOffset(url.searchParams.get('offset'))), revision: space.revision });
       }
       const wanted = decodeURIComponent(rest[0]);
@@ -538,7 +593,7 @@ export function createCorpusRoutes({ readSnapshot, readAssetBytes }) {
 
       if (notModified(req, res, json, space, url, key)) return true;
       return send(res, json, {
-        report: { ...draftSummary(row), draft },
+        report: { ...draftSummary(row), draft, read_at: readAt.get(wanted) ?? null },
         image: assets.get(wanted) ?? null,
         translations: rows(snapshot, 'content_translations').filter((entry) => entry.entity_kind === 'deep_research' && String(entry.entity_id) === wanted),
         // Small anchored rows, included with the document they decorate. A phone

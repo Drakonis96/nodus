@@ -79,12 +79,12 @@ export const NODUS_DOCUMENTATION = `# Guía interna verificable de Nodus
 - El botón Asistente de la cabecera abre el asistente de investigación. Nodi es la mascota independiente situada en la zona inferior derecha cuando está habilitada.
 
 ## Roadmap oficial visible
-El roadmap se abre desde Ajustes > Acerca de Nodus > Ver roadmap de Nodus, y también desde la paleta de comandos. El orden vigente es:
+El roadmap se abre desde Ajustes > Acerca de Nodus Research > Ver roadmap de Nodus Research, y también desde la paleta de comandos. El orden vigente es:
 ${ROADMAP_GUIDE}
 
 ## Ajustes
 - Ajustes es el último elemento de la barra lateral y también tiene un icono en el extremo derecho de la cabecera.
-- Sus pestañas reales son: Proveedores, Modelos IA, Biblioteca, Texto y OCR, Interfaz, Integraciones, Servidor, Tutoriales, Backup / copia de seguridad, Acerca de Nodus y Actualizaciones y novedades.
+- Sus pestañas reales son: Proveedores, Modelos IA, Biblioteca, Texto y OCR, Interfaz, Integraciones, Servidor, Tutoriales, Backup / copia de seguridad, Acerca de Nodus Research y Actualizaciones y novedades.
 - Proveedores: claves API, proveedores locales y modelos favoritos.
 - Modelos IA: modelo general y modelos específicos de las distintas tareas.
 - Biblioteca: integración y sincronización con Zotero. Testimonios, Prosopografía y Worldbuilding no usan Zotero y no muestran ese recorrido.

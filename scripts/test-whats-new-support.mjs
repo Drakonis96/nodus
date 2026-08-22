@@ -130,7 +130,7 @@ assert.match(translations, /Donations are entirely optional: they do not unlock 
 assert.match(translations, /'Apoyar con Ko-fi': 'Support through Ko-fi'/);
 assert.match(icons, /paypal:/);
 assert.match(icons, /sparkles:/);
-// "Acerca de Nodus" offers the same two ways of supporting as the release modal, or
+// "Acerca de Nodus Research" offers the same two ways of supporting as the release modal, or
 // somebody who reads one surface would think only PayPal exists.
 assert.match(settings, /data-testid="support-nodus-paypal"[\s\S]*https:\/\/paypal\.me\/Jorgepb96/);
 assert.match(settings, /data-testid="support-nodus-kofi"[\s\S]*https:\/\/ko-fi\.com\/nodus_app/);

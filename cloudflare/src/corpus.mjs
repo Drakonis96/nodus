@@ -1,4 +1,11 @@
 import { getDebate, listDebates } from './generated/debates.mjs';
+import {
+  workspaceArgumentRoutes,
+  workspaceAuthorDossier,
+  workspaceAuthorPage,
+  workspaceIdeaPage,
+  workspaceSynthesisMatrix,
+} from './generated/academicWorkspace.mjs';
 import { deepResearchReportInput, renderProfessionalReportHtml } from './generated/deepResearchReport.mjs';
 import {
   HttpError,
@@ -38,6 +45,12 @@ const COLLECTIONS = {
   'teaching-rubrics': { table: 'teaching_rubrics', key: 'rubrics', id: 'id' },
   databases: { table: 'db_databases', key: 'databases', id: 'id' },
 };
+
+const ACADEMIC_WORKSPACE_TABLES = [
+  'works', 'authors', 'work_authors', 'zotero_tags', 'work_zotero_tags', 'themes',
+  'ideas', 'idea_occurrences', 'idea_theme_links', 'evidence', 'edges', 'edge_feedback',
+  'author_relations', 'author_dossier_synthesis', 'synthesis_matrix_cell',
+];
 
 const SEARCH_KEYS = {
   works: 'nodus_id', ideas: 'global_id', themes: 'theme_id', gaps: 'id', notes: 'id', passages: 'passage_id',
@@ -114,6 +127,10 @@ async function snapshotForTables(env, space, tables) {
   return { tables: Object.fromEntries(entries) };
 }
 
+async function academicWorkspace(env, space) {
+  return snapshotForTables(env, space, ACADEMIC_WORKSPACE_TABLES);
+}
+
 function page(key, items, total, limit, offset) {
   return { [key]: items, total, limit, offset, hasMore: offset + items.length < total };
 }
@@ -137,6 +154,20 @@ async function listCollection(env, space, request, collection) {
   const limit = clampInteger(url.searchParams.get('limit'), 1, 200, 100);
   const offset = clampInteger(url.searchParams.get('offset'), 0, Number.MAX_SAFE_INTEGER, 0);
   const query = url.searchParams.get('q') || '';
+  if (url.searchParams.get('surface') === 'workspace' && collection.table === 'ideas') {
+    const result = workspaceIdeaPage(await academicWorkspace(env, space), {
+      offset, limit, search: query, type: url.searchParams.get('type') || '', sort: url.searchParams.get('sort') || 'label',
+    });
+    const { items, ...pageResult } = result;
+    return cachedJson(space, request, { ideas: items, ...pageResult, revision: space.revision });
+  }
+  if (url.searchParams.get('surface') === 'workspace' && collection.table === 'authors') {
+    const result = workspaceAuthorPage(await academicWorkspace(env, space), {
+      offset, limit, query, synthesis: url.searchParams.get('synthesis') || 'all', sort: url.searchParams.get('sort') || 'surname',
+    });
+    const { items, ...pageResult } = result;
+    return cachedJson(space, request, { authors: items, ...pageResult, revision: space.revision });
+  }
   const [items, total] = await Promise.all([
     tableRows(env, space, collection.table, { limit, offset, query, ceiling: 200 }),
     tableCount(env, space, collection.table, query),
@@ -361,12 +392,14 @@ async function bytesDataUrl(object, mime) {
 
 async function deepResearchRoute(env, space, request, rest) {
   const rows = await tableRows(env, space, 'writing_saved_drafts', { limit: 20_000, ceiling: 20_000, fallback: 20_000 });
+  const reads = await tableRows(env, space, 'writing_draft_reads', { limit: 20_000, ceiling: 20_000, fallback: 20_000 });
+  const readAt = new Map(reads.map((entry) => [String(entry.draft_id), entry.updated_at ?? null]));
   const reports = rows.map(researchDraft).filter(Boolean);
   const publication = await first(env.DB, 'SELECT manifest_json FROM publications WHERE space_id=?1 AND generation=?2', space.id, space.active_generation);
   const assets = new Map((safeJsonParse(publication?.manifest_json, {})?.assets || []).filter((asset) => asset.kind === 'deep_research_image').map((asset) => [String(asset.key?.[1] ?? ''), asset]));
   if (!rest[0]) {
     const url = new URL(request.url); const limit = clampInteger(url.searchParams.get('limit'), 1, 200, 100); const offset = clampInteger(url.searchParams.get('offset'), 0, 1_000_000, 0);
-    const listed = reports.map((value) => ({ ...researchSummary(value), image: assets.get(String(value.row.id)) || null }));
+    const listed = reports.map((value) => ({ ...researchSummary(value), read_at: readAt.get(String(value.row.id)) ?? null, image: assets.get(String(value.row.id)) || null }));
     return cachedJson(space, request, { ...page('reports', listed.slice(offset, offset + limit), listed.length, limit, offset), revision: space.revision });
   }
   const wanted = decodeURIComponent(rest[0]); const report = reports.find((value) => String(value.row.id) === wanted);
@@ -388,7 +421,7 @@ async function deepResearchRoute(env, space, request, rest) {
     rowsWhere(env, space, 'content_translations', (entry) => entry.entity_kind === 'deep_research' && String(entry.entity_id) === wanted),
     rowsWhere(env, space, 'writing_draft_annotations', (entry) => String(entry.draft_id) === wanted),
   ]);
-  return cachedJson(space, request, { report: { ...researchSummary(report), draft: report.draft }, image, translations, annotations, revision: space.revision });
+  return cachedJson(space, request, { report: { ...researchSummary(report), draft: report.draft, read_at: readAt.get(wanted) ?? null }, image, translations, annotations, revision: space.revision });
 }
 
 export async function handleCorpus(env, auth, request, segments) {
@@ -443,6 +476,12 @@ export async function handleCorpus(env, auth, request, segments) {
   const collection = COLLECTIONS[head];
   if (!collection) return problem(404, 'not_found');
   if (!rest[0]) return listCollection(env, space, request, collection);
+  if (head === 'ideas' && rest[0] === 'routes') {
+    return cachedJson(space, request, { routes: workspaceArgumentRoutes(await academicWorkspace(env, space)), revision: space.revision });
+  }
+  if (head === 'authors' && rest[0] === 'matrix') {
+    return cachedJson(space, request, { matrix: workspaceSynthesisMatrix(await academicWorkspace(env, space)), revision: space.revision });
+  }
   const wanted = decodeURIComponent(rest[0]);
   const row = await tableRow(env, space, collection.table, collection.id, wanted);
   if (!row) return problem(404, 'not_found');
@@ -450,6 +489,10 @@ export async function handleCorpus(env, auth, request, segments) {
   if (head === 'ideas') return ideaDetail(env, space, request, row);
   if (head === 'works') return workDetail(env, space, request, row);
   if (head === 'persons') return personDetail(env, space, request, row);
+  if (head === 'authors' && rest[1] === 'dossier') {
+    const dossier = workspaceAuthorDossier(await academicWorkspace(env, space), wanted);
+    return dossier ? cachedJson(space, request, { dossier, revision: space.revision }) : problem(404, 'not_found');
+  }
   if (head === 'authors') return authorDetail(env, space, request, row);
   if (head === 'databases') return databaseDetail(env, space, request, row);
   if (head === 'teaching-exams') {

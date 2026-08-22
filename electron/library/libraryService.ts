@@ -81,6 +81,7 @@ import { getSettings } from '../db/settingsRepo';
 import { buildOcrTextPrompt, OCR_USER_PROMPT } from '@shared/aiOcrPrompt';
 import { DEFAULT_OCR_OPTIONS } from '@shared/aiOcrTypes';
 import { LibraryOperations } from './libraryOperations';
+import { normalizeLibraryCollectionRecord, normalizeLibraryItemRecord } from './libraryRecord';
 import { resolveLibraryMetadata } from './libraryMetadataResolver';
 import { downloadLibraryFullText } from './libraryFullText';
 import { libraryItemIdentifier, runLibraryMetadataBatch } from './libraryMetadataBatch';
@@ -503,6 +504,100 @@ export function getGlobalLibraryItem(itemId: string): LibraryItemRecord | null {
   if (!current) return null;
   const storageId = current.catalog.itemStorageId(itemId);
   return storageId ? current.store.readMaterializedItem(storageId) : null;
+}
+
+/** Full immutable records consumed by the account-global sync lane. This deliberately returns
+ * no vault links, provider credentials or local paths: those never leave Desktop. */
+export function getGlobalLibrarySyncSnapshot(): {
+  root: string;
+  deviceId: string;
+  items: LibraryItemRecord[];
+  collections: import('@shared/libraryTypes').LibraryCollectionRecord[];
+  savedSearches: LibrarySavedSearchRecord[];
+  preferences: LibraryViewPreferences & { format: 'nodus.library-view-preferences'; formatVersion: 1; id: string; updatedAt: string };
+} | null {
+  const current = service();
+  if (!current) return null;
+  const preferenceFile = `${current.root}/.nodus/view-preferences.json`;
+  let preferenceUpdatedAt = '1970-01-01T00:00:00.000Z';
+  try { preferenceUpdatedAt = fs.statSync(preferenceFile).mtime.toISOString(); } catch { /* defaults have no file yet */ }
+  return {
+    root: current.root,
+    deviceId: current.deviceId,
+    items: current.store.scanMaterializedItems().records,
+    collections: current.store.scanMaterializedCollections().records,
+    savedSearches: current.operations.listSavedSearches(),
+    preferences: {
+      format: 'nodus.library-view-preferences', formatVersion: 1,
+      id: 'nodus:library-view-preferences:default',
+      ...current.operations.getViewPreferences(), updatedAt: preferenceUpdatedAt,
+    },
+  };
+}
+
+/** Merge one cloud winner using the Library's own vector-clock comparison and rebuild only its
+ * catalogue row. Opaque or future record formats are refused instead of guessed. */
+export function mergeGlobalLibrarySyncRecord(payload: unknown): 'item' | 'collection' | 'saved-search' | 'preferences' | null {
+  const current = service();
+  if (!current) return null;
+  const item = normalizeLibraryItemRecord(payload);
+  if (item) {
+    const winner = current.store.mergeItem(item);
+    current.catalog.indexItem(winner, current.store);
+    broadcast(current.catalog.status(current.root, current.deviceId));
+    return 'item';
+  }
+  const collection = normalizeLibraryCollectionRecord(payload);
+  if (collection) {
+    const winner = current.store.mergeCollection(collection);
+    current.catalog.indexCollection(winner);
+    broadcast(current.catalog.status(current.root, current.deviceId));
+    return 'collection';
+  }
+  if (payload && typeof payload === 'object') {
+    const record = payload as Record<string, unknown>;
+    if (record.format === 'nodus.library-saved-search' && record.formatVersion === 1 && typeof record.id === 'string'
+      && typeof record.name === 'string' && typeof record.createdAt === 'string' && typeof record.updatedAt === 'string' && record.query) {
+      current.operations.mergeSavedSearch(record as unknown as LibrarySavedSearchRecord);
+      broadcast(current.catalog.status(current.root, current.deviceId));
+      return 'saved-search';
+    }
+    if (record.format === 'nodus.library-view-preferences' && Array.isArray(record.visibleColumns) && Array.isArray(record.sort)) {
+      current.operations.setViewPreferences(record as unknown as LibraryViewPreferences);
+      broadcast(current.catalog.status(current.root, current.deviceId));
+      return 'preferences';
+    }
+  }
+  return null;
+}
+
+export function globalLibrarySyncAttachmentPath(itemId: string, attachmentId: string): string | null {
+  const current = service();
+  if (!current) return null;
+  try { return current.operations.attachmentPath(itemId, attachmentId); } catch { return null; }
+}
+
+export function mergeGlobalLibrarySyncTombstone(recordId: string): boolean {
+  const current = service();
+  if (!current) return false;
+  const storageId = current.catalog.itemStorageId(recordId);
+  if (storageId) {
+    const item = current.store.readMaterializedItem(storageId);
+    if (!item) return false;
+    const next = current.store.upsertItem({ ...item, deletedAt: new Date().toISOString() }, item.clock.revision);
+    current.catalog.indexItem(next, current.store);
+    broadcast(current.catalog.status(current.root, current.deviceId));
+    return true;
+  }
+  const collection = current.store.readMaterializedCollection(recordId);
+  if (!collection) {
+    if (recordId.startsWith('saved-search:') || recordId.startsWith('nodus:saved-search:')) return current.operations.deleteSavedSearch(recordId);
+    return false;
+  }
+  const next = current.store.upsertCollection({ ...collection, deletedAt: new Date().toISOString() }, collection.clock.revision);
+  current.catalog.indexCollection(next);
+  broadcast(current.catalog.status(current.root, current.deviceId));
+  return true;
 }
 
 export function createGlobalLibraryCollection(name: string, parentId: string | null): LibraryCollectionView {

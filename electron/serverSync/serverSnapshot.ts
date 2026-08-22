@@ -72,7 +72,7 @@ const USER_TABLES = [
   'pages', 'page_blocks', 'page_favorites', 'page_links',
   'page_revisions', 'page_comments', 'page_comment_reactions', 'page_comment_mentions',
   'workspace_actors', 'workspace_groups', 'workspace_group_members', 'acl_entries',
-  'writing_saved_drafts', 'writing_draft_annotations', 'projects', 'project_sections',
+  'writing_saved_drafts', 'writing_draft_reads', 'writing_draft_annotations', 'projects', 'project_sections',
   'project_chapters', 'project_chapter_versions', 'project_chapter_chunks',
   'project_chapter_ideas', 'project_chapter_idea_relations', 'project_links',
   'project_insertion_suggestions', 'saved_searches', 'immersion_sessions',
@@ -94,11 +94,11 @@ const TEACHING_TABLES = TEACHING_SERVER_TABLES;
 // proposals stay local; snapshots remain a read-only consultation projection.
 export const WORLDBUILDING_SERVER_TABLES = [
   'persons', 'person_names', 'person_places', 'places', 'events', 'event_participants', 'relationships',
-  'character_profiles', 'event_world_dates', 'character_abilities',
+  'character_profiles', 'event_world_dates', 'character_abilities', 'world_images',
   'world_groups', 'character_affiliations', 'place_profiles',
   'world_secrets', 'secret_knowers',
   'world_scenes', 'scene_characters', 'world_scene_days',
-  'world_maps', 'map_layers', 'map_markers', 'map_travel_modes',
+  'world_maps', 'map_images', 'map_layers', 'map_markers', 'map_travel_modes',
   'world_calendar', 'world_calendar_eras', 'world_calendar_months',
   'world_articles', 'world_links',
   'world_threads', 'thread_parties', 'world_beats', 'world_rules',
@@ -186,11 +186,10 @@ export const MAX_ASSET_BYTES = 8 * 1024 * 1024;
 /**
  * The ONLY code path that turns a database blob into something the server can receive.
  *
- * The product rule is that heavy documents never travel — no PDFs, no audio — while three
- * kinds of image do: the illustration on a Deep Research report, a person's portrait, and the
- * pictures in a database's attachment columns. Rather than scan for blob columns and try to
- * exclude the wrong ones, this list names the three tables that may produce an asset. Nothing
- * else is even looked at.
+ * The product rule is that heavy documents never travel — no PDFs, no audio. Only explicitly
+ * named image domains do: report illustrations, portraits, authored world galleries, maps and
+ * image-valued database attachments. Rather than scan for blob columns and try to exclude the
+ * wrong ones, this list names every table that may produce an asset. Nothing else is looked at.
  *
  * The third one is different in kind from the first two, and worth saying out loud: a Deep
  * Research illustration and a portrait are images by construction, while an attachment column
@@ -224,6 +223,28 @@ export const ASSET_SOURCES = [
     mimeColumn: 'mime',
     thumbColumn: 'thumbnail',
     thumbMimeColumn: 'thumbnail_mime',
+  },
+  {
+    kind: 'world_image',
+    table: 'world_images',
+    keyColumns: ['image_id'],
+    where: null,
+    blobColumn: 'blob',
+    mimeColumn: 'mime_type',
+    thumbColumn: 'thumbnail',
+    thumbMimeColumn: 'thumbnail_mime_type',
+  },
+  {
+    // Maps retain their native image rather than going through the gallery downsampler. The
+    // ordinary asset ceiling still applies before bytes leave Desktop.
+    kind: 'world_map_image',
+    table: 'map_images',
+    keyColumns: ['image_id'],
+    where: null,
+    blobColumn: 'blob',
+    mimeColumn: 'mime_type',
+    thumbColumn: 'thumbnail',
+    thumbMimeColumn: 'thumbnail_mime_type',
   },
   {
     // The images in a database's `attachment` and `ai_image` columns.

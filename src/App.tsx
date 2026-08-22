@@ -1311,7 +1311,7 @@ export function App() {
                   ? 'h-6 w-6'
                   : 'h-7 w-7'}
             />
-            <span className={sidebarCompact || (IS_MAC && sidebarWidth < MACOS_FULL_SIDEBAR_BRAND_MIN_WIDTH) ? 'sr-only' : undefined}>Nodus</span>
+            <span className={sidebarCompact || (IS_MAC && sidebarWidth < MACOS_FULL_SIDEBAR_BRAND_MIN_WIDTH) ? 'sr-only' : undefined}>Nodus Research</span>
           </span>
           {!sidebarCompact && (
             <Icon

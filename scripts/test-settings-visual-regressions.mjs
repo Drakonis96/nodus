@@ -19,16 +19,16 @@ assert.match(
 );
 
 const tutorialsSection = settings.indexOf("visibleSettingsSection('system', 'Ayuda'");
-const aboutSection = settings.indexOf("visibleSettingsSection('about', 'Acerca de Nodus'", tutorialsSection);
+const aboutSection = settings.indexOf("visibleSettingsSection('about', 'Acerca de Nodus Research'", tutorialsSection);
 // Updates and Latest changes live in their own section, rendered right after About.
 const updatesSection = settings.indexOf("visibleSettingsSection('updates', 'Actualizaciones y novedades'", aboutSection);
 const latestChangesControl = settings.indexOf('data-testid="about-latest-changes"', updatesSection);
 const updatesControl = settings.indexOf('data-testid="about-updates"', updatesSection);
 assert.ok(tutorialsSection >= 0 && aboutSection > tutorialsSection, 'settings sections must be present in their expected order');
-assert.ok(updatesSection > aboutSection, 'the Updates & what\'s new section must follow About Nodus');
+assert.ok(updatesSection > aboutSection, 'the Updates & what\'s new section must follow About Nodus Research');
 assert.ok(latestChangesControl > updatesSection, 'the latest changes control must be rendered in the Updates section');
 assert.ok(updatesControl > latestChangesControl, 'latest changes must be presented before the update checker');
-assert.equal(settings.slice(aboutSection, updatesSection).includes('data-testid="about-updates"'), false, 'About Nodus must not render the updates control anymore');
+assert.equal(settings.slice(aboutSection, updatesSection).includes('data-testid="about-updates"'), false, 'About Nodus Research must not render the updates control anymore');
 assert.match(
   settings,
   /const ABOUT_ACTION_BUTTON_CLASS = 'btn btn-ghost w-full min-h-9[^']+sm:h-9 sm:w-auto sm:min-w-56 sm:whitespace-nowrap'/,

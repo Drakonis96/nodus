@@ -1,6 +1,7 @@
 // platform channels, moved verbatim out of the monolithic registerIpc.
 // The channel names are unchanged; scripts/test-ipc-contract.mjs is what proves it.
 import { localizedForUi, type IpcContext } from './context';
+import { BrowserWindow } from 'electron';
 import { originalImagePayloadFromUrl } from '../imageProtocol';
 import { openPrivacyPolicy } from '../privacy';
 import type { AudioEntityKind, AudioProvider, AudioSegmentRequest, AiProvider, LocalProvider, ZoteroLibrary, EmbeddingProvider, TranslationEntityKind, GenerateTranslationRequest, DecorativeImageActionRequest, DecorativeImageEntityKind, DecorativeImageStyle, StudyPronunciationEntry } from '@shared/types';
@@ -48,6 +49,8 @@ import { scanQueue } from '../pipeline/scanQueue';
 import { getCorpusHealth } from '../db/corpusHealthRepo';
 import * as translationsRepo from '../db/translationsRepo';
 import { completeCloudflareDirectDeployment, getCloudflareDeployState, prepareCloudflareDirectDeployment, previewCloudflareDeployment } from '../cloudflare/deployment';
+import { createDesktopBridgeOffer, desktopBridgeStatus, revokeDesktopBridgePairing } from '../desktopBridge/server';
+import type { DesktopBridgeDomain } from '@shared/types';
 
 function extensionForOriginalImage(mime: string): string {
   switch (mime.toLowerCase()) {
@@ -155,6 +158,13 @@ export function registerPlatformIpc({ h, getWindow }: IpcContext): void {
       recordPowerError(error instanceof Error ? error.message : String(error));
     }
     return powerStatus();
+  });
+  h('desktopBridge:status', async () => desktopBridgeStatus());
+  h('desktopBridge:offer', async (_e, vaultIds: string[], domains: DesktopBridgeDomain[]) =>
+    createDesktopBridgeOffer(vaultIds, domains));
+  h('desktopBridge:revoke', async (_e, id: string) => {
+    revokeDesktopBridgePairing(id);
+    return desktopBridgeStatus();
   });
   h('copilot:status', async () => getCopilotStatus());
   h('copilot:regenerateToken', async () => regenerateCopilotToken());
@@ -369,17 +379,21 @@ export function registerPlatformIpc({ h, getWindow }: IpcContext): void {
     const pending = translationsRepo.beginContentTranslation({ entityKind: request.entityKind, entityId: request.entityId, language: language.code, languageLabel: language.nativeName, sourceTitle: request.sourceTitle, model: request.model ?? null });
     try {
       const markdown = await translateMarkdown({ markdown: source, language, model: request.model });
-      return translationsRepo.upsertContentTranslation({
+      const saved = translationsRepo.upsertContentTranslation({
         entityKind: request.entityKind, entityId: request.entityId, language: language.code, languageLabel: language.nativeName,
         title: titleFromMarkdown(markdown, request.sourceTitle), markdown, model: request.model ?? null,
       });
+      for (const win of BrowserWindow.getAllWindows()) win.webContents.send('translations:changed', [request.entityKind, request.entityId]);
+      return saved;
     } catch (cause) {
       translationsRepo.failContentTranslation(pending.id, cause instanceof Error ? cause.message : String(cause));
       throw cause;
     }
   });
   h('translations:delete', async (_e, id: string) => {
+    const current = translationsRepo.getContentTranslation(id);
     translationsRepo.deleteContentTranslation(id);
+    for (const win of BrowserWindow.getAllWindows()) win.webContents.send('translations:changed', [current?.entityKind ?? null, current?.entityId ?? null]);
   });
 
   // zotero

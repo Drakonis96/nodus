@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { execFileSync } from 'node:child_process';
 import test from 'node:test';
 
@@ -16,13 +17,31 @@ test('Cloudflare Worker bundles and every source module parses', () => {
 });
 
 test('D1 schema covers auth, publication, idempotency, sync and recovery', () => {
-  const sql = read('cloudflare/migrations/0001_initial.sql');
-  for (const table of ['installation', 'users', 'spaces', 'memberships', 'device_tokens', 'sessions', 'oauth_clients', 'oauth_codes', 'oauth_tokens', 'publications', 'published_rows', 'objects', 'multipart_uploads', 'vector_sets', 'vector_chunks', 'vector_members', 'mutations', 'rate_limits', 'recovery_events']) {
+  const sql = fs.readdirSync(path.join(root, 'cloudflare', 'migrations')).sort()
+    .map((name) => read(`cloudflare/migrations/${name}`)).join('\n');
+  for (const table of ['installation', 'users', 'spaces', 'memberships', 'device_tokens', 'sessions', 'oauth_clients', 'oauth_codes', 'oauth_tokens', 'publications', 'published_rows', 'objects', 'multipart_uploads', 'vector_sets', 'vector_chunks', 'vector_members', 'mutations', 'rate_limits', 'recovery_events', 'space_actions', 'library_record_versions', 'library_records', 'library_objects', 'library_commands']) {
     assert.match(sql, new RegExp(`CREATE TABLE IF NOT EXISTS ${table}\\b`));
   }
   assert.match(sql, /CREATE VIRTUAL TABLE IF NOT EXISTS published_search USING fts5/);
   assert.match(sql, /PRIMARY KEY \(space_id, generation, kind, chunk_id\)/);
   assert.match(sql, /PRIMARY KEY \(space_id, kind, hash\)/);
+});
+
+test('one generated mutation registry drives Desktop, local server, Cloudflare and Swift', async () => {
+  execFileSync(process.execPath, [path.join(root, 'scripts', 'generate-mutation-contract.mjs')]);
+  const contract = JSON.parse(read('shared/mutableTables.json'));
+  assert.ok(Object.keys(contract.tables).length > 0, 'the generated registry must not be empty');
+  const server = await import(`${pathToFileURL(path.join(root, 'server/lib/core/generatedMutableTables.mjs'))}?t=${Date.now()}`);
+  const cloud = await import(`${pathToFileURL(path.join(root, 'cloudflare/src/generated/mutableTables.mjs'))}?t=${Date.now()}`);
+  assert.deepEqual(server.MUTABLE_TABLES, contract.tables);
+  assert.deepEqual(cloud.MUTABLE_TABLES, contract.tables);
+  const desktop = read('electron/serverSync/generatedMutableTables.ts');
+  for (const name of Object.keys(contract.tables)) assert.match(desktop, new RegExp(`['"]${name}['"]`));
+  const mobilePath = path.resolve(root, '..', 'nodus-mobile/ios/Packages/NodusKit/Sources/NodusKit/Generated/MutableTable.generated.swift');
+  if (fs.existsSync(mobilePath)) {
+    const mobile = fs.readFileSync(mobilePath, 'utf8');
+    for (const name of Object.keys(contract.tables)) assert.match(mobile, new RegExp(`= "${name}"`));
+  }
 });
 
 test('pricing catalog is source-backed and has no non-official links', () => {
@@ -89,11 +108,33 @@ test('release package includes every migration and public deployment configurati
   execFileSync(process.execPath, [path.join(root, 'scripts', 'build-cloudflare-worker.mjs')]);
   const manifest = JSON.parse(read('cloudflare/dist/migrations.json'));
   assert.equal(manifest.schemaVersion, 1);
-  assert.deepEqual(manifest.migrations, ['0001_initial.sql']);
+  assert.deepEqual(manifest.migrations, ['0001_initial.sql', '0002_mobile_parity.sql']);
   for (const name of [...manifest.migrations, 'catalog-config.json', 'pricing.v1.json']) {
     assert.ok(fs.statSync(path.join(root, 'cloudflare', 'dist', name)).size > 0, `${name} is missing from the packaged resources`);
   }
   assert.equal(fs.existsSync(path.join(root, 'cloudflare', 'dist', 'oauth-client.json')), false);
+});
+
+test('mobile parity routes are typed, account-isolated and never relay private Bridge data', () => {
+  const worker = read('cloudflare/src/worker.mjs');
+  const actions = read('cloudflare/src/actions.mjs');
+  const library = read('cloudflare/src/librarySync.mjs');
+  assert.match(worker, /resource === 'actions'/);
+  assert.match(worker, /head === 'library'/);
+  assert.match(actions, /ACTION_KINDS = new Set/);
+  assert.doesNotMatch(actions, /ipc|sql|methodName/i);
+  assert.match(library, /WHERE user_id=\?1/);
+  assert.match(library, /hash_mismatch/);
+  assert.match(worker, /desktopBridgeRelay: false/);
+  assert.doesNotMatch(worker, /head === ['"]bridge['"]|resource === ['"]bridge['"]|pathname.*bridge\/v1/i);
+  const privateTables = [
+    'testimony_interviews', 'testimony_transcripts', 'teaching_students',
+    'teaching_grade_entries', 'study_recordings', 'archive_item_files', 'prosop_person_profiles',
+  ];
+  const cloudSources = fs.readdirSync(path.join(root, 'cloudflare', 'src'), { recursive: true })
+    .filter((name) => String(name).endsWith('.mjs'))
+    .map((name) => read(`cloudflare/src/${name}`)).join('\n');
+  for (const table of privateTables) assert.doesNotMatch(cloudSources, new RegExp(`['"]${table}['"]`));
 });
 
 test('publication object validation uses bounded D1 and R2 operations', () => {

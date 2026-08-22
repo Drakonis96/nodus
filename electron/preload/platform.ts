@@ -39,6 +39,9 @@ export const platformApi: PlatformApi = {
   getLocalServerPower: () => ipcRenderer.invoke('localServer:power'),
   setLocalServerKeepAwake: (enable) => ipcRenderer.invoke('localServer:setKeepAwake', enable),
   setLocalServerLidServing: (enable) => ipcRenderer.invoke('localServer:setLidServing', enable),
+  getDesktopBridgeStatus: () => ipcRenderer.invoke('desktopBridge:status'),
+  createDesktopBridgeOffer: (vaultIds, domains) => ipcRenderer.invoke('desktopBridge:offer', vaultIds, domains),
+  revokeDesktopBridgePairing: (id) => ipcRenderer.invoke('desktopBridge:revoke', id),
   getCopilotStatus: () => ipcRenderer.invoke('copilot:status'),
   regenerateCopilotToken: () => ipcRenderer.invoke('copilot:regenerateToken'),
   getZoteroPluginStatus: () => ipcRenderer.invoke('zoteroPlugin:status'),
@@ -184,6 +187,11 @@ export const platformApi: PlatformApi = {
   getContentTranslation: (id) => ipcRenderer.invoke('translations:get', id),
   generateContentTranslation: (request) => ipcRenderer.invoke('translations:generate', request),
   deleteContentTranslation: (id) => ipcRenderer.invoke('translations:delete', id).then(() => undefined),
+  onContentTranslationsChanged: (cb) => {
+    const listener = (_event: unknown, payload: [import('@shared/types').TranslationEntityKind | null, string | null]) => cb(payload?.[0] ?? null, payload?.[1] ?? null);
+    ipcRenderer.on('translations:changed', listener);
+    return () => ipcRenderer.removeListener('translations:changed', listener);
+  },
 
   zoteroPing: () => ipcRenderer.invoke('zotero:ping'),
   zoteroLibraries: () => ipcRenderer.invoke('zotero:libraries'),

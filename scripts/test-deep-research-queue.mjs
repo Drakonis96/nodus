@@ -6,8 +6,7 @@
 // It locks the guarantees that make a *deferred* report safe to queue:
 //   • only one report is ever generated at a time, whoever asked for it;
 //   • a caller waiting behind others is told how many are ahead;
-//   • a report whose vault changed before it started is cancelled, never researched
-//     against the corpus that happens to be open when its turn arrives;
+//   • a queued report survives a vault switch and resumes only against its own corpus;
 //   • a report whose vault changed *during* generation is never saved as a draft of
 //     the new vault;
 //   • a report that cannot be filed is still returned, not thrown away;
@@ -97,7 +96,7 @@ try {
     assert.equal(queue.isDeepResearchLaneBusy(), false);
   }
 
-  // ── A vault switch before the turn arrives cancels, it does not mis-research ─
+  // ── A vault switch parks the job until its own corpus is active again ────────
   {
     queue.__resetDeepResearchQueueForTest();
     let generated = 0;
@@ -118,18 +117,19 @@ try {
     });
 
     const running = queue.runDeepResearchJob({ request: { objective: 'A' }, origin: 'app', save: false });
-    // Caught eagerly: the rejection lands while the first report is still being awaited.
-    const deferred = queue.runDeepResearchJob({ request: { objective: 'B' }, origin: 'mcp', save: false }).catch((e) => e);
+    const deferred = queue.runDeepResearchJob({ request: { objective: 'B' }, origin: 'mcp', save: false });
     await waitFor(() => gates.length === 1, 'the first report to start');
 
     gates[0]();
     await running;
-    // The switch lands in the gap between the two reports — the exact window a queued
-    // report has to survive, and the only one where the first report is unaffected.
-    assert.match((await deferred).message, /Corpus A[\s\S]*Corpus B/, 'the deferred report explains which corpus it was for');
+    await waitFor(() => queue.listDeepResearchJobs().find((job) => job.title === 'B')?.status === 'queued', 'the deferred report to remain parked');
     assert.equal(generated, 1, 'the deferred report was never generated against the new vault');
-    const cancelled = queue.listDeepResearchJobs().find((job) => job.title === 'B');
-    assert.equal(cancelled.status, 'cancelled');
+    vault = { id: 'v1', name: 'Corpus A' };
+    assert.equal(queue.cancelDeepResearchJobsForOtherVaults('v1'), 0, 'the legacy switch hook preserves durable work');
+    await waitFor(() => gates.length === 2, 'the parked report to resume in its vault');
+    gates[1]();
+    assert.equal((await deferred).draft.title, 'B');
+    assert.equal(generated, 2);
   }
 
   // ── Approach/model survive queue serialization and completion metadata ──────
@@ -266,29 +266,40 @@ try {
     assert.deepEqual(queue.listDeepResearchJobs(), [], 'clearing empties the finished tail');
   }
 
-  // ── The vault-switch sweep drops only what is bound elsewhere ──────────────
+  // ── Relaunch restores running work as queued and keeps foreign-vault work ───
   {
     queue.__resetDeepResearchQueueForTest();
-    const gates = [];
+    let vault = { id: 'v2', name: 'Corpus B' };
+    const persisted = [];
+    const restored = {
+      record: {
+        id: 'drj-restored', origin: 'mcp', vaultId: 'v1', vaultName: 'Corpus A', objective: 'Restored', title: 'Restored',
+        deepResearchApproach: 'general', model: null, status: 'running', progress: { phase: 'writing', message: 'Writing' },
+        error: null, savedDraftId: null, saveError: null, ahead: null, enqueuedAt: new Date().toISOString(),
+        startedAt: new Date().toISOString(), finishedAt: null,
+      },
+      request: { objective: 'Restored', language: 'en' },
+      save: false,
+      draftTitle: null,
+    };
     queue.configureDeepResearchQueue({
-      generate: (request) => new Promise((resolve) => gates.push(() => resolve(fakeReport(request.objective)))),
+      generate: (request) => Promise.resolve(fakeReport(request.objective)),
       saveDraft: () => 'draft-1',
-      activeVault: () => ({ id: 'v1', name: 'Corpus A' }),
+      activeVault: () => vault,
+      load: () => [restored],
+      persist: (jobs) => persisted.push(structuredClone(jobs)),
     });
 
-    const running = queue.runDeepResearchJob({ request: { objective: 'A' }, origin: 'app', save: false });
-    const waiting = queue.enqueueDeepResearchJob({ request: { objective: 'B' }, origin: 'mcp', save: false });
-    await waitFor(() => gates.length === 1, 'the first report to start');
-
-    assert.equal(queue.cancelDeepResearchJobsForOtherVaults('v1'), 0, 'reports of the vault still open are kept');
-    assert.equal(queue.cancelDeepResearchJobsForOtherVaults('v2'), 1, 'a switch drops what was queued for the old vault');
-    const dropped = queue.getDeepResearchJob(waiting.id).job;
-    assert.equal(dropped.status, 'cancelled');
-    assert.match(dropped.error, /Corpus A/, 'the dropped report names the vault it was queued against');
-    assert.equal(queue.isDeepResearchLaneBusy(), true, 'the report already generating is left alone');
-
-    gates[0]();
-    await running;
+    let parked = queue.getDeepResearchJob('drj-restored').job;
+    assert.equal(parked.status, 'queued', 'a process interruption turns running back into recoverable queued work');
+    assert.match(parked.progress.message, /Recovered/);
+    assert.equal(queue.cancelDeepResearchJobsForOtherVaults('v2'), 0);
+    parked = queue.getDeepResearchJob('drj-restored').job;
+    assert.equal(parked.status, 'queued', 'opening another vault never deletes the restored request');
+    vault = { id: 'v1', name: 'Corpus A' };
+    queue.cancelDeepResearchJobsForOtherVaults('v1');
+    await waitFor(() => queue.getDeepResearchJob('drj-restored').job.status === 'completed', 'the restored request to finish');
+    assert.ok(persisted.some((snapshot) => snapshot.some((job) => job.record.status === 'completed')), 'terminal state is durably checkpointed');
   }
 
   // ── The finished tail stays bounded ────────────────────────────────────────

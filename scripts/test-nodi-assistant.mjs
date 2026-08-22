@@ -47,7 +47,7 @@ test('Nodi context is explicit, bounded and rejects invented product claims', as
   assert.match(backend, /No puedo verificarlo con las fuentes seleccionadas/);
   assert.match(backend, /termina con «Base:»/);
   assert.match(backend, /temperature: 0\.2/);
-  assert.match(documentation, /El roadmap se abre desde Ajustes > Acerca de Nodus/);
+  assert.match(documentation, /El roadmap se abre desde Ajustes > Acerca de Nodus Research/);
   assert.match(documentation, /Notificaciones está inmediatamente antes de Ajustes/);
   assert.match(documentation, /NODUS_ROADMAP/);
   assert.match(documentation, /Vault de docencia/);

@@ -89,6 +89,9 @@ function TranslationPanel({
   }, [entityKind, entityId]);
 
   useEffect(() => { void refresh(); }, [refresh]);
+  useEffect(() => window.nodus.onContentTranslationsChanged((kind, id) => {
+    if ((kind === null || kind === entityKind) && (id === null || id === entityId)) void refresh();
+  }), [entityId, entityKind, refresh]);
   useEffect(() => {
     if (!list.some((item) => item.status === 'generating')) return;
     const timer = window.setInterval(() => void refresh(), 1200);

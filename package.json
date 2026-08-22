@@ -194,7 +194,7 @@
   },
   "build": {
     "appId": "app.nodus.desktop",
-    "productName": "Nodus",
+    "productName": "Nodus Research",
     "directories": {
       "output": "release"
     },
@@ -281,8 +281,8 @@
         }
       ],
       "extendInfo": {
-        "NSMicrophoneUsageDescription": "Nodus usa el micr\u00f3fono \u00fanicamente cuando inicias un dictado o una grabaci\u00f3n de estudio.",
-        "NSAppleEventsUsageDescription": "Nodus puede usar una aplicaci\u00f3n de presentaciones instalada \u00fanicamente para convertir a PDF el archivo que elijas importar.",
+        "NSMicrophoneUsageDescription": "Nodus Research usa el micr\u00f3fono \u00fanicamente cuando inicias un dictado o una grabaci\u00f3n de estudio.",
+        "NSAppleEventsUsageDescription": "Nodus Research puede usar una aplicaci\u00f3n de presentaciones instalada \u00fanicamente para convertir a PDF el archivo que elijas importar.",
         "NSDockTilePlugIn": "NodusDockTile.docktileplugin"
       },
       "target": [

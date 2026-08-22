@@ -348,6 +348,10 @@ export class LibraryOperations {
     return this.smartCollections.save(input);
   }
 
+  mergeSavedSearch(record: LibrarySavedSearchRecord): LibrarySavedSearchRecord {
+    return this.smartCollections.merge(record);
+  }
+
   deleteSavedSearch(id: string): boolean {
     return this.smartCollections.delete(id);
   }

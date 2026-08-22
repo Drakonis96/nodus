@@ -117,9 +117,15 @@ try {
     const created = await window.nodus.createVault({ name: 'Memoria del valle', type: 'testimonios' });
     const switched = await window.nodus.switchVault(created.vault.id);
     if (!switched.ok) throw new Error(switched.message);
-    await window.nodus.updateSettings({ onboardingComplete: true, tourComplete: true, advancedTourComplete: true, basicsTutorialVersion: 99, recoverySetupVersion: 99, mascotStyleChosen: true, mascotEnabled: false });
+    await window.nodus.updateSettings({ onboardingComplete: true, tourComplete: true, advancedTourComplete: true, testimonyTourComplete: true, basicsTutorialVersion: 99, recoverySetupVersion: 99, mascotStyleChosen: true, mascotEnabled: false });
   });
   await page.reload();
+  const startupUpdate = page.getByTestId('startup-update-modal');
+  if (await startupUpdate.count()) {
+    await page.waitForFunction(() => document.querySelector('[data-testid="startup-update-modal"]')?.getAttribute('data-update-status') === 'not-available');
+    await startupUpdate.getByRole('button', { name: 'Entendido', exact: false }).click();
+    await startupUpdate.waitFor({ state: 'detached' });
+  }
 
   // ── 1. El armazón: ocho secciones, ni una más, y el acento cian de verdad ──
   const sidebar = page.getByTestId('testimony-sidebar');
@@ -150,7 +156,8 @@ try {
   assert.equal(accent, 'rgb(8, 145, 178)', 'el acento del vault es el cian #0891b2');
 
   // Ninguna superficie académica ni docente aparece por ningún lado.
-  for (const forbidden of ['Biblioteca', 'Grafo', 'Ideas', 'Autores', 'Escritura', 'Proyectos', 'Grabaciones', 'Cursos y asignaturas']) {
+  // Biblioteca is account-global and intentionally remains reachable from every vault.
+  for (const forbidden of ['Grafo', 'Ideas', 'Autores', 'Escritura', 'Proyectos', 'Grabaciones', 'Cursos y asignaturas']) {
     assert.equal(
       await page.locator('nav').getByRole('button', { name: forbidden, exact: true }).count(),
       0,
@@ -465,9 +472,9 @@ try {
   // El enlace de la nota DEVUELVE a la entrevista y a su pestaña de análisis. Es la
   // promesa que cierra el círculo del vault: la interpretación vuelve a la voz.
   await page.getByTestId('testimony-sidebar').getByRole('button', { name: 'Notas', exact: true }).click();
-  await page.locator('span[title^="Carmen R."]').first().click();
-  await page.getByRole('button', { name: 'Vista', exact: true }).waitFor({ timeout: 30_000 });
-  await page.getByRole('button', { name: 'Vista', exact: true }).click();
+  await page.locator('[data-testid^="workspace-item-"][role="button"]').first().click();
+  await page.getByTestId('editor-title').waitFor({ timeout: 30_000 });
+  await page.locator('button[title^="Dividir"]').click();
   await page.getByRole('button', { name: 'Abrir el fragmento en su minuto', exact: true }).click();
   await page.getByTestId('testimony-dossier').waitFor({ timeout: 30_000 });
   await page.getByTestId('testimony-analysis').waitFor({ timeout: 30_000 });
@@ -612,7 +619,7 @@ try {
     const created = await window.nodus.createVault({ name: 'Demo del valle', type: 'testimonios' });
     const switched = await window.nodus.switchVault(created.vault.id);
     if (!switched.ok) throw new Error(switched.message);
-    await window.nodus.updateSettings({ onboardingComplete: true, basicsTutorialVersion: 99, recoverySetupVersion: 99, mascotStyleChosen: true, mascotEnabled: false });
+    await window.nodus.updateSettings({ onboardingComplete: true, testimonyTourComplete: true, basicsTutorialVersion: 99, recoverySetupVersion: 99, mascotStyleChosen: true, mascotEnabled: false });
   });
   await page.reload();
   await page.getByTestId('testimonios-demo-offer').waitFor({ timeout: 30_000 });
@@ -670,7 +677,22 @@ try {
   });
   assert.equal(noteHasLink, true, 'las notas de la demo enlazan al fragmento y su minuto');
 
+  // Optional visual-parity artifact. This deliberately reuses the real seeded Desktop
+  // surface instead of maintaining a screenshot-only mock or exposing private data.
+  if (process.env.NODUS_PARITY_SCREENSHOT) {
+    await page.getByTestId('testimony-sidebar').getByRole('button', { name: 'Contrastes', exact: true }).click();
+    await page.getByTestId('testimony-contrasts').waitFor({ timeout: 30_000 });
+    const savedContrast = page.locator('button[data-testid^="testimony-saved-"]').first();
+    if (await savedContrast.count()) await savedContrast.click();
+    await page.getByTestId('testimony-contrast-mode-parallel').click();
+    await page.getByTestId('testimony-parallel').waitFor({ timeout: 30_000 });
+    await page.screenshot({ path: process.env.NODUS_PARITY_SCREENSHOT });
+  }
+
   // El recorrido guiado arranca sobre la demo.
+  await page.evaluate(async () => {
+    await window.nodus.updateSettings({ testimonyTourComplete: false });
+  });
   await page.reload();
   const tour = page.getByTestId('tour-card');
   await tour.waitFor({ timeout: 30_000 });

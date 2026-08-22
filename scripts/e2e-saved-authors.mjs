@@ -45,6 +45,13 @@ try {
   const pageErrors = [];
   page.on('pageerror', (error) => pageErrors.push(error));
   await page.waitForLoadState('domcontentloaded');
+  const dismissStartupOverlays = async () => {
+    const whatsNew = page.getByTestId('whats-new-cinematic-modal');
+    if (await whatsNew.waitFor({ state: 'visible', timeout: 1_500 }).then(() => true, () => false)) {
+      await whatsNew.getByRole('button', { name: 'Cerrar', exact: true }).click();
+      await whatsNew.waitFor({ state: 'detached' });
+    }
+  };
 
   await page.evaluate(async (version) => {
     localStorage.setItem('nodus.lastSeenVersion', version);
@@ -67,6 +74,7 @@ try {
   }, appVersion);
   await page.reload();
   await page.getByTestId('app-shell').waitFor();
+  await dismissStartupOverlays();
   assert.equal(
     await page.evaluate(() => typeof window.nodus.setAuthorSaved),
     'function',
@@ -105,6 +113,7 @@ try {
 
   await page.reload();
   await page.getByTestId('app-shell').waitFor();
+  await dismissStartupOverlays();
   await page.locator('[data-tour="nav-authors"]').click();
   await page.getByRole('button', { name: 'Filtros', exact: true }).click();
   await page.getByTestId('authors-tab-saved').click();

@@ -1,4 +1,5 @@
 import { BrowserWindow } from 'electron';
+import { createHash } from 'node:crypto';
 import { getDb } from '../db/database';
 import { listServerInbox, recordServerInbox } from '../db/serverInboxRepo';
 import { getNodusServerTokenFor } from '../secrets/secretStore';
@@ -7,6 +8,8 @@ import { applyIncomingMutations, type IncomingMutation } from './mutationInbox';
 import { applyPublishedLibraryAnnotationMutation } from '../libraryReader/libraryReaderStore';
 import { isPublishing, markVaultDirty, noteVaultInbox } from './serverSyncService';
 import { fetchWithTimeout, normalizeUrl, readVaultConfig } from './serverSyncShared';
+import { drainOneSpaceAction } from './spaceActionProcessor';
+import { drainAccountLibrary } from './accountLibrarySync';
 
 /**
  * Drain the mutation ledger on this desktop's own timer.
@@ -22,9 +25,12 @@ import { fetchWithTimeout, normalizeUrl, readVaultConfig } from './serverSyncSha
  * to get past.
  */
 
-const TICK_MS = 30_000;
-/** Offset from the publisher's own 5 s first tick so the two do not collide at launch. */
-const FIRST_TICK_MS = 8_000;
+// Reader state is interactive collaboration, not background maintenance. Two seconds keeps
+// read flags, translations and annotations close to the keystroke that created them while the
+// durable ledger still remains the source of truth when either device is offline.
+const TICK_MS = 2_000;
+/** Offset from the publisher's first tick so both jobs do not collide at launch. */
+const FIRST_TICK_MS = 2_500;
 /**
  * How many mutations to ask for at a time.
  *
@@ -34,12 +40,38 @@ const FIRST_TICK_MS = 8_000;
  * beachball. The server clamps this to 1..200 itself.
  */
 const BATCH = 25;
-/** 8 × 25 = 200 mutations per tick. Whatever is left waits thirty seconds. */
+/** 8 × 25 = 200 mutations per tick. Whatever is left waits for the next two-second pass. */
 const MAX_BATCHES_PER_TICK = 8;
 
 let timer: ReturnType<typeof setInterval> | null = null;
 let firstTimer: ReturnType<typeof setTimeout> | null = null;
 let draining = false;
+
+/**
+ * Image bytes never ride inside a mutation row. A mobile writer first uploads the image to the
+ * content-addressed asset channel and then references that hash from a `world_images` or
+ * `map_images` mutation. The owner Desktop resolves it here, verifies it again, and only then
+ * lets the canonical SQLite upsert see a blob.
+ */
+async function hydrateImageMutations(
+  mutations: IncomingMutation[], base: string, spaceId: string, token: string,
+): Promise<void> {
+  for (const mutation of mutations) {
+    if (mutation.kind !== 'upsert' || !['world_images', 'map_images', 'decorative_images'].includes(mutation.table)) continue;
+    const hash = String(mutation.assets?.[0]?.hash ?? '');
+    if (!/^[0-9a-f]{64}$/.test(hash)) throw new Error('world_image_missing_asset');
+    const response = await fetchWithTimeout(
+      `${base}/api/v1/spaces/${encodeURIComponent(spaceId)}/assets/${hash}`,
+      { headers: { authorization: `Bearer ${token}`, accept: 'image/*' } },
+    );
+    if (!response.ok) throw new Error(`world_image_asset_http_${response.status}`);
+    const bytes = Buffer.from(await response.arrayBuffer());
+    if (createHash('sha256').update(bytes).digest('hex') !== hash) throw new Error('world_image_hash_mismatch');
+    mutation.row = mutation.table === 'decorative_images'
+      ? { ...(mutation.row ?? {}), image_blob: bytes, thumbnail_blob: bytes }
+      : { ...(mutation.row ?? {}), blob: bytes, bytes: bytes.length };
+  }
+}
 
 function broadcast(channel: string, payload: unknown): void {
   for (const win of BrowserWindow.getAllWindows()) {
@@ -80,6 +112,10 @@ async function tick(): Promise<void> {
 
   draining = true;
   try {
+    // Cloudflare-only in this release. A classic server or an older Worker answers 404 and
+    // mutation delivery proceeds exactly as before.
+    await drainOneSpaceAction(config).catch(() => undefined);
+    await drainAccountLibrary(config).catch(() => undefined);
     for (let batch = 0; batch < MAX_BATCHES_PER_TICK; batch += 1) {
       // No `since`. ledger.compact removes the file once it empties and nextSeq recomputes
       // from what is left, so sequence numbers RESTART AT 1 after a full compaction — a
@@ -95,6 +131,8 @@ async function tick(): Promise<void> {
       const value = await response.json() as { mutations?: IncomingMutation[]; hasMore?: boolean };
       const mutations = value.mutations ?? [];
       if (mutations.length === 0) return;
+
+      await hydrateImageMutations(mutations, base, config.spaceId, token);
 
       // The user can switch vaults across any of these awaits, and `db` was resolved before
       // the first one. Applying one space's mutations to a different corpus would be a
@@ -128,6 +166,17 @@ async function tick(): Promise<void> {
       // watching the table. Without this it appears only when the view is remounted.
       if (summary.entries.some((entry) => entry.table === 'writing_saved_drafts' && (entry.outcome === 'applied' || entry.outcome === 'deleted'))) {
         broadcast('writing:saved:changed', null);
+      }
+      if (summary.entries.some((entry) => ['writing_draft_reads', 'content_translations', 'decorative_images'].includes(entry.table)
+        && (entry.outcome === 'applied' || entry.outcome === 'deleted'))) {
+        // An open report is derived from the saved-draft list. Re-reading that list replaces
+        // its value in place, so read state, translations and cover changes become visible
+        // without backing out to the gallery.
+        broadcast('writing:saved:changed', null);
+      }
+      if (summary.entries.some((entry) => entry.table === 'content_translations'
+        && (entry.outcome === 'applied' || entry.outcome === 'deleted'))) {
+        broadcast('translations:changed', [null, null]);
       }
       if (summary.entries.some((entry) => entry.table === 'writing_draft_annotations' && (entry.outcome === 'applied' || entry.outcome === 'deleted'))) {
         // A deletion carries only its annotation id, so the renderer treats null as

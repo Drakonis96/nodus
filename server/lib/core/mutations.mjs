@@ -1,3 +1,5 @@
+import { MUTABLE_TABLES } from './generatedMutableTables.mjs';
+
 // The convergent operation relay. Every authorized replica reads the same ordered stream;
 // the owner is no longer required to be online for two collaborators to converge.
 //
@@ -19,57 +21,7 @@
  * pipeline and their identity depends on it. So is everything about students, testimonies
  * and prosopography, which are not shareable material at all.
  */
-export const MUTABLE_TABLES = {
-  notes: { key: ['id'] },
-  note_folders: { key: ['id'] },
-  note_links: { key: ['link_id'] },
-  pages: { key: ['id'] },
-  page_blocks: { key: ['id'] },
-  page_favorites: { key: ['page_id'] },
-  page_links: { key: ['id'] },
-  page_document_updates: { key: ['id'] },
-  page_revisions: { key: ['id'] },
-  page_comments: { key: ['id'] },
-  page_comment_reactions: { key: ['comment_id', 'actor_id', 'emoji'] },
-  page_comment_mentions: { key: ['comment_id', 'actor_id'] },
-  workspace_actors: { key: ['id'] },
-  workspace_groups: { key: ['id'] },
-  workspace_group_members: { key: ['group_id', 'actor_id'] },
-  acl_entries: { key: ['id'] },
-  db_databases: { key: ['id'] },
-  db_data_sources: { key: ['id'] },
-  db_columns: { key: ['id'] },
-  db_rows: { key: ['id'] },
-  db_cells: { key: ['row_id', 'column_id'] },
-  db_views: { key: ['id'] },
-  db_view_sources: { key: ['view_id', 'source_id'] },
-  db_view_revisions: { key: ['id'] },
-  db_select_options: { key: ['id'] },
-  db_relations: { key: ['id'] },
-  db_attachments: { key: ['id'] },
-  db_row_templates: { key: ['id'] },
-  db_template_runs: { key: ['template_id', 'occurrence_key'] },
-  db_row_hierarchy: { key: ['database_id', 'row_id'] },
-  db_row_dependencies: { key: ['id'] },
-  db_task_configs: { key: ['database_id'] },
-  db_sprints: { key: ['id'] },
-  db_sprint_rows: { key: ['sprint_id', 'row_id'] },
-  automation_rules: { key: ['id'] },
-  automation_runs: { key: ['id'] },
-  automation_notifications: { key: ['id'] },
-  database_forms: { key: ['id'] },
-  database_form_fields: { key: ['id'] },
-  database_form_submissions: { key: ['id'] },
-  writing_saved_drafts: { key: ['id'] },
-  writing_draft_annotations: { key: ['id'] },
-  decorative_images: { key: ['entity_kind', 'entity_id'], require: { entity_kind: 'deep_research' } },
-  immersion_sessions: { key: ['id'] },
-  saved_searches: { key: ['id'] },
-  research_questions: { key: ['id'] },
-  research_subquestions: { key: ['id'] },
-  research_coverage_links: { key: ['id'] },
-  edge_feedback: { key: ['from_id', 'to_id', 'type'] },
-};
+export { MUTABLE_TABLES };
 
 export const MUTATION_KINDS = new Set(['upsert', 'delete']);
 const ANNOTATION_KINDS = new Set(['highlight', 'comment', 'bookmark']);
