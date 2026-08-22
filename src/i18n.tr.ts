@@ -2945,6 +2945,8 @@ export const TR: Record<string, string> = {
   "Quitar de la cola": "sıradan kaldır",
   "Falló": "Başarısız",
   "Abrir a pantalla completa": "Tam ekranı aç",
+  "Lectura a pantalla completa": "Tam ekran okuma",
+  "Salir de pantalla completa": "Tam ekrandan çık",
   "Leer": "Oku",
   "Reutilizar la idea para un informe nuevo": "Fikri yeni bir rapor için yeniden kullanın",
   "Volver a la galería": "Galeriye dön",

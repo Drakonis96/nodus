@@ -70,6 +70,51 @@ try {
   ));
   assert.ok(draftId, 'the demo supplies a saved Deep Research report');
 
+  // Full-screen reading lifts the same reader out of the app shell and hands it the
+  // whole window; Escape and the toggle both put it back. The column has to grow with
+  // it, or the extra room would be spent on margins.
+  const readerShell = page.getByTestId('deep-research-reader-shell');
+  const columnWidth = () => documentRoot.evaluate((node) => Math.round(node.getBoundingClientRect().width));
+  const windowedWidth = await columnWidth();
+  assert.equal(await readerShell.getAttribute('data-fullscreen'), 'off', 'the reader opens inside the shell');
+  await page.getByTestId('deep-research-fullscreen-toggle').click();
+  await page.waitForFunction(() => document.querySelector('[data-testid="deep-research-reader-shell"]')?.getAttribute('data-fullscreen') === 'on');
+  const fullscreenBox = await readerShell.evaluate((node) => {
+    const box = node.getBoundingClientRect();
+    return { position: getComputedStyle(node).position, width: Math.round(box.width), height: Math.round(box.height), viewport: [window.innerWidth, window.innerHeight] };
+  });
+  assert.equal(fullscreenBox.position, 'fixed', 'full screen is a fixed layer over the window');
+  assert.deepEqual([fullscreenBox.width, fullscreenBox.height], fullscreenBox.viewport, 'it covers the whole window');
+  assert.ok(await columnWidth() > windowedWidth, 'full screen widens the reading column');
+  await page.keyboard.press('Escape');
+  await page.waitForFunction(() => document.querySelector('[data-testid="deep-research-reader-shell"]')?.getAttribute('data-fullscreen') === 'off');
+  assert.equal(await columnWidth(), windowedWidth, 'leaving full screen restores the reading column');
+
+  // The rail's percentage is how far the reader has come, not which section they are
+  // in: scrolling inside one section has to move it, or the bar sits still for pages
+  // and then jumps at a heading. The demo report fits on one screen, so the window is
+  // squeezed to give it something to scroll and put back afterwards.
+  const readingProgress = () => page.evaluate(() => Number(document.querySelector('[data-testid="deep-research-reading-progress"]')?.textContent?.replace('%', '')));
+  const activeHeading = () => page.evaluate(() => document.querySelector('[data-testid="deep-research-outline-rail"] [aria-current="location"]')?.textContent?.trim() ?? null);
+  const scrollReader = (top) => page.evaluate((value) => new Promise((resolve) => {
+    const scroller = document.querySelector('[data-testid="deep-research-reader-document"]').closest('main');
+    scroller.scrollTop = value;
+    requestAnimationFrame(() => requestAnimationFrame(resolve));
+  }), top);
+  assert.equal(await readingProgress(), 100, 'a report that fits on screen is already read');
+  await page.setViewportSize({ width: 1440, height: 420 });
+  await scrollReader(0);
+  await page.waitForFunction(() => Number(document.querySelector('[data-testid="deep-research-reading-progress"]')?.textContent?.replace('%', '')) === 0);
+  const headingAtTop = await activeHeading();
+  await scrollReader(60);
+  const partway = await readingProgress();
+  assert.ok(partway > 0 && partway < 100, `scrolling inside a section advances the percentage (${partway}%)`);
+  assert.equal(await activeHeading(), headingAtTop, 'and it advances without changing section');
+  await scrollReader(120);
+  assert.ok(await readingProgress() > partway, 'scrolling further advances it again');
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await scrollReader(0);
+
   async function selectCandidate(index, releaseInGutter = false, readerTestId = 'deep-research-reader-document') {
     return page.evaluate(({ candidateIndex, releaseInGutter, readerTestId }) => {
       const root = document.querySelector(`[data-testid="${readerTestId}"]`);

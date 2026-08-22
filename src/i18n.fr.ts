@@ -2855,6 +2855,8 @@ export const FR: Record<string, string> = {
   'Quitar de la cola': 'Retirer de la file',
   'Falló': 'Échoué',
   'Abrir a pantalla completa': 'Ouvrir en plein écran',
+  'Lectura a pantalla completa': 'Lecture en plein écran',
+  'Salir de pantalla completa': 'Quitter le plein écran',
   'Leer': 'Lire',
   'Reutilizar la idea para un informe nuevo': 'Réutiliser l\'idée pour un nouveau rapport',
   'Volver a la galería': 'Retour à la galerie',
