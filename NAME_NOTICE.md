@@ -18,6 +18,4 @@ Nodus Research is independent. It is not affiliated with, sponsored by or endors
 
 The project is currently personal and non-commercial: it sells no product or service and runs no paid plan under these names. This status is separate from the software licence. Nodus 4.0.0 and later are distributed under `AGPL-3.0-only`, which governs how recipients may use, modify and redistribute the source, including in commercial contexts.
 
-Neither this repository nor the project website claims that “Nodus” or “Nodus Research” is a registered trade mark.
-
 The website carries a more specific [legal and name notice](https://nodusresearch.com/legal/).

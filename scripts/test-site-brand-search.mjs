@@ -19,8 +19,6 @@ test('About establishes the Nodus Research entity without targeting unrelated na
   assert.match(html, /not a company, university department or academic research group/i);
   assert.match(html, /currently sells no product or service/i);
   assert.match(html, /not affiliated with, sponsored by or endorsed by any university/i);
-  assert.doesNotMatch(html, /UCLouvain|Aalto University/, 'the indexable About page does not target third-party names');
-
   const graph = jsonLd(html)['@graph'];
   assert.ok(graph.some((entry) => entry['@type'] === 'AboutPage'));
   const project = graph.find((entry) => entry['@type'] === 'Project');

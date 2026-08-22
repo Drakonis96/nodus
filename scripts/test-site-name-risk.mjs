@@ -39,17 +39,15 @@ test('public identity copy records origin, independence and current status', () 
   }
   assert.match(about, /not affiliated with, sponsored by or endorsed by any university, research group, company or other software project/i);
   assert.match(about, /AGPL-3\.0-only governs reuse and redistribution by others/i);
-  assert.doesNotMatch(about, /UCLouvain|Aalto University/, 'the indexable About page does not pursue third-party branded queries');
 });
 
-test('the specific legal notice is transparent but excluded from search results', () => {
+test('the generic legal notice is transparent but excluded from search results', () => {
   const legal = read('legal/index.html');
   const sitemap = read('sitemap.xml');
 
   assert.match(legal, /<meta name="robots" content="noindex, follow, noarchive"\/>/);
-  assert.match(legal, /not affiliated with or endorsed by <b>UCLouvain<\/b>/);
-  assert.match(legal, /not affiliated with or endorsed by <b>Aalto University<\/b>/);
-  assert.match(legal, /makes no claim that “Nodus” or “Nodus Research” is a registered trade mark/);
+  assert.match(legal, /not affiliated with, sponsored by or endorsed by any university, research group, company or other software project/i);
+  assert.match(legal, /does not represent Nodus Research as a company, university department or academic research group/);
   assert.match(legal, /This status is separate from the software licence/);
   assert.doesNotMatch(sitemap, /\/legal\//, 'a noindex legal notice is not placed in the sitemap');
 });
@@ -78,7 +76,7 @@ test('site footers preserve the independence statement and legal notice', () => 
   }
 });
 
-test('the repository makes no registered-mark claim or public donation solicitation', () => {
+test('the repository keeps its identity generic and makes no public donation solicitation', () => {
   const readme = fs.readFileSync(path.join(repoRoot, 'README.md'), 'utf8');
   const notice = fs.readFileSync(path.join(repoRoot, 'NAME_NOTICE.md'), 'utf8');
   const publicIdentity = `${readme}\n${notice}\n${read('index.html')}\n${read('about/index.html')}`;
@@ -86,5 +84,5 @@ test('the repository makes no registered-mark claim or public donation solicitat
   assert.doesNotMatch(publicIdentity, /(?:®|™)/);
   assert.doesNotMatch(readme, /paypal\.me|ko-fi\.com/i);
   assert.match(readme, /personal, independent open-source project developed in Spain/i);
-  assert.match(notice, /Neither this repository nor the project website claims/);
+  assert.match(notice, /Nodus Research is independent/);
 });
