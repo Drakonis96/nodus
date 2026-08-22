@@ -100,6 +100,20 @@ export class LibrarySmartCollectionStore {
     return record;
   }
 
+  /** Apply an account-sync winner without rewriting its immutable timestamps. */
+  merge(record: LibrarySavedSearchRecord): LibrarySavedSearchRecord {
+    if (!validateLibrarySmartSearchGroup(record.query) || !record.name.trim()) throw new Error('Búsqueda guardada no válida.');
+    const records = this.list();
+    const local = records.find((entry) => entry.id === record.id);
+    if (local && local.updatedAt.localeCompare(record.updatedAt) > 0) return local;
+    const normalized: LibrarySavedSearchRecord = {
+      ...record,
+      name: record.name.trim().replace(/\s+/g, ' '),
+    };
+    atomicWriteJson(this.searchesFile, [...records.filter((entry) => entry.id !== normalized.id), normalized]);
+    return normalized;
+  }
+
   delete(id: string): boolean {
     const records = this.list();
     const next = records.filter((record) => record.id !== id);

@@ -28,6 +28,7 @@ import { startInboxPolling, stopInboxPolling } from './serverSync/inboxPoller';
 import { startReplicaSync, stopReplicaSync } from './serverSync/replicaService';
 import { killMcpTunnelSync, startMcpServer, startMcpTunnelIfConfigured, stopMcpServer } from './mcp';
 import { killLocalServerSync, startLocalServerIfEnabled } from './localServer/process';
+import { stopDesktopBridge } from './desktopBridge/server';
 import { holdAwake, releaseAllPower } from './localServer/power';
 import { setCopilotWindowProvider, startCopilotServer, stopCopilotServer } from './copilot/server';
 import { setZoteroPluginWindowProvider, startZoteroPluginServer, stopZoteroPluginServer } from './zotero-plugin/server';
@@ -68,9 +69,10 @@ installProcessSafetyNet();
 const require = createRequire(__filename);
 const { autoUpdater } = require('electron-updater') as typeof import('electron-updater');
 
-// 2.3.0 made the display name explicit, which also changed the macOS Safe Storage
-// service from "nodus" to "Nodus". The normal process keeps the current name;
-// recovery explicitly requests either released credential from macOS Keychain.
+// Keep the released Safe Storage identity even though the product and every visible surface are
+// now called Nodus Research. Changing this value would silently strand encrypted provider,
+// server and Bridge credentials in the macOS Keychain. It is a compatibility identifier, not a
+// user-facing product name.
 app.setName('Nodus');
 
 // Deeplink for OAuth: nodus://authorize?code=XYZ
@@ -214,7 +216,7 @@ function unsignedMacUpdateHelperScript(): string {
     '  [ "$WAITED" -ge 1200 ] && fail',
     'done',
     '/usr/bin/ditto -x -k "$ZIP" "$STAGING" || fail',
-    'NEW_APP="$(/usr/bin/find "$STAGING" -type d -name Nodus.app -print -quit)"',
+    'NEW_APP="$(/usr/bin/find "$STAGING" -type d \\( -name \'Nodus Research.app\' -o -name Nodus.app \\) -print -quit)"',
     '[ -n "$NEW_APP" ] && [ -d "$NEW_APP/Contents" ] || fail',
     '/bin/rm -rf "$BACKUP"',
     '/bin/mv "$TARGET" "$BACKUP" || fail',
@@ -1040,7 +1042,8 @@ app.on('window-all-closed', () => {
     stopNodusServerSync();
     stopInboxPolling();
     stopRadarScheduler();
-  stopReplicaSync();
+    stopReplicaSync();
+    void stopDesktopBridge();
     interruptDecorativeImageGenerations();
     stopAllWhisperCpp();
     destroyBrowserSubsystem();
@@ -1071,6 +1074,7 @@ app.on('before-quit', () => {
   stopInboxPolling();
   stopRadarScheduler();
   stopReplicaSync();
+  void stopDesktopBridge();
   interruptDecorativeImageGenerations();
   killMcpTunnelSync();
   // The local server is a child process and the sleep defences are machine-wide state: both
@@ -1113,6 +1117,7 @@ updateAwareApp.on('before-quit-for-update', () => {
   stopInboxPolling();
   stopRadarScheduler();
   stopReplicaSync();
+  void stopDesktopBridge();
   interruptDecorativeImageGenerations();
   stopAllWhisperCpp();
   killMcpTunnelSync();

@@ -26,6 +26,9 @@ import type {
   DecorativeImageActionRequest,
   DecorativeImageEntityKind,
   DecorativeImageStyle,
+  DesktopBridgeDomain,
+  DesktopBridgeOffer,
+  DesktopBridgeStatus,
   EmbeddingProvider,
   GenerateTranslationRequest,
   GitHubCopilotSubscriptionStatus,
@@ -110,6 +113,9 @@ export interface PlatformApi {
   setLocalServerKeepAwake(enable: boolean): Promise<LocalServerPowerStatus>;
   /** Disable system sleep so a closed lid keeps serving. Raises the system's own admin dialog. */
   setLocalServerLidServing(enable: boolean): Promise<LocalServerPowerStatus>;
+  getDesktopBridgeStatus(): Promise<DesktopBridgeStatus>;
+  createDesktopBridgeOffer(vaultIds: string[], domains: DesktopBridgeDomain[]): Promise<DesktopBridgeOffer>;
+  revokeDesktopBridgePairing(id: string): Promise<DesktopBridgeStatus>;
   getCopilotStatus(): Promise<CopilotServerStatus>;
   regenerateCopilotToken(): Promise<string>;
   /** Runtime state of the opt-in local server for the Nodus-for-Zotero plugin. */
@@ -237,6 +243,8 @@ export interface PlatformApi {
   getContentTranslation(id: string): Promise<ContentTranslation | null>;
   generateContentTranslation(request: GenerateTranslationRequest): Promise<ContentTranslationSummary>;
   deleteContentTranslation(id: string): Promise<void>;
+  /** Fires for local and server-received translation changes while a reader stays open. */
+  onContentTranslationsChanged(cb: (entityKind: TranslationEntityKind | null, entityId: string | null) => void): () => void;
   // Hume cloud TTS (BYO-key). The key is stored in the main process; the renderer
   // only learns whether one exists, the voice list, and the audio bytes.
   humeStatus(): Promise<{ hasKey: boolean }>;

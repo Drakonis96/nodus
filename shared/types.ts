@@ -4118,6 +4118,45 @@ export interface LocalServerStatus {
   error: string | null;
 }
 
+export type DesktopBridgeDomain =
+  | 'testimonies'
+  | 'teaching-roster'
+  | 'teaching-grades'
+  | 'study-recordings'
+  | 'primary-source-files'
+  | 'prosopography-private';
+
+export interface DesktopBridgePairingSummary {
+  id: string;
+  deviceId: string;
+  deviceName: string;
+  vaultIds: string[];
+  domains: DesktopBridgeDomain[];
+  createdAt: string;
+  expiresAt: string | null;
+  revokedAt: string | null;
+  lastSeenAt: string | null;
+}
+
+export interface DesktopBridgeStatus {
+  running: boolean;
+  port: number | null;
+  origins: string[];
+  certificateFingerprint: string | null;
+  pairings: DesktopBridgePairingSummary[];
+  error: string | null;
+}
+
+export interface DesktopBridgeOffer {
+  id: string;
+  code: string;
+  origins: string[];
+  certificateFingerprint: string;
+  vaultIds: string[];
+  domains: DesktopBridgeDomain[];
+  expiresAt: string;
+}
+
 /** Which sleep defences are currently held, and whether the platform can hold them. */
 export interface LocalServerPowerStatus {
   /** Idle sleep is blocked. Costs nothing and needs no password. */

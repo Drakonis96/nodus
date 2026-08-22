@@ -48,12 +48,12 @@ import { publishSourceRevision } from './publishSourceRevision';
 // vault is "unconfigured".
 
 // The mobile client watches the published revision, so this is the latency budget for the
-// desktop half of that conversation. Five seconds of quiet coalesces an editor's writes into
-// one snapshot; the fifteen-second floor prevents a sequence of short pauses from uploading a
-// large vault continuously. Together with mobile's cheap five-second HEAD probe, a settled edit
-// is normally visible on the other device in around twenty seconds or less.
-const CHECK_INTERVAL_MS = 5_000;
-const QUIET_PERIOD_MS = 5_000;
+// desktop half of that conversation. A short quiet window coalesces one editing gesture while
+// the five-second publication floor prevents continuous snapshot churn. Together with mobile's
+// two-second revision probe, a settled edit is normally visible on the other device in roughly
+// three to seven seconds.
+const CHECK_INTERVAL_MS = 2_000;
+const QUIET_PERIOD_MS = 1_000;
 const FIRST_TICK_MS = 1_500;
 interface VaultRuntime {
   /** Last lightweight revision observed for the active vault (change detection). */
@@ -152,6 +152,11 @@ export function isPublishing(): boolean {
  */
 export function markVaultDirty(vaultId: string): void {
   ensureRuntime(vaultId).pending = true;
+}
+
+/** Last revision this process actually published, for optimistic action preconditions. */
+export function currentPublishedRevision(vaultId: string): string | null {
+  return runtimes.get(vaultId)?.lastRevision ?? null;
 }
 
 /** Record what the last drain of the mutation ledger did, for the Settings panel. */

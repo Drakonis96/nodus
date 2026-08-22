@@ -463,6 +463,32 @@ export function DeepResearchView({
    */
   useEffect(() => window.nodus.onWritingDraftsChanged(() => void refreshSavedDrafts()), [refreshSavedDrafts]);
 
+  // The gallery and the reader deliberately keep separate state so opening a report does not
+  // disturb search, selection or scroll. A server refresh must nevertheless replace both
+  // copies. Otherwise a phone edit repaints the card behind the reader while the report that is
+  // actually on screen remains stale until Back is pressed. A remotely deleted report returns
+  // to the gallery because there is no longer a canonical document to keep open.
+  useEffect(() => {
+    if (!galleryRead || reopening.current || mode !== 'reader' || !openDraft) return;
+    const refreshed = savedDrafts.find((item) => item.id === openDraft.id);
+    if (refreshed) {
+      if (refreshed !== openDraft) setOpenDraft(refreshed);
+      return;
+    }
+    restoredReading.current = null;
+    setOpenDraft(null);
+    setAppliedTranslation(null);
+    setTranslationOpen(false);
+    setMode('gallery');
+  }, [galleryRead, mode, openDraft?.id, savedDrafts]);
+
+  useEffect(() => window.nodus.onContentTranslationsChanged((kind, id) => {
+    if (!openDraft || (kind !== null && kind !== 'deep_research') || (id !== null && id !== openDraft.id)) return;
+    if (appliedTranslation) {
+      void window.nodus.getContentTranslation(appliedTranslation.id).then((next) => setAppliedTranslation(next));
+    }
+  }), [appliedTranslation?.id, openDraft?.id]);
+
   /**
    * The exception: a report that generated but could not be filed. Nothing was saved,
    * so nothing is announced, and the queue would otherwise empty with the work lost in

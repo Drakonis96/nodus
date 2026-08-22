@@ -34,6 +34,7 @@ export interface IncomingMutation {
   actorId?: string;
   deviceId?: string;
   hlc?: string;
+  assets?: { hash: string }[];
   documentHash?: string | null;
   blobHash?: string | null;
 }

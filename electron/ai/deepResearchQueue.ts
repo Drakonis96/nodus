@@ -55,6 +55,17 @@ export interface DeepResearchQueueDeps {
   onChange?: (jobs: DeepResearchJobRecord[]) => void;
   /** Called once per job that reaches a terminal state. */
   onSettled?: (job: DeepResearchJobRecord) => void;
+  /** Restores the durable lane written by an earlier Desktop process. */
+  load?: () => DeepResearchPersistedJob[];
+  /** Atomically replaces the durable lane after every state transition. */
+  persist?: (jobs: DeepResearchPersistedJob[]) => void;
+}
+
+export interface DeepResearchPersistedJob {
+  record: DeepResearchJobRecord;
+  request: DeepResearchRequest;
+  save: boolean;
+  draftTitle: string | null;
 }
 
 interface QueuedJob {
@@ -81,6 +92,11 @@ let sequence = 0;
 
 export function configureDeepResearchQueue(next: DeepResearchQueueDeps): void {
   deps = next;
+  if (jobs.length === 0 && next.load) restorePersistedJobs(next.load());
+  evictFinished();
+  reportQueuePositions();
+  notifyChange();
+  void drain();
 }
 
 function requireDeps(): DeepResearchQueueDeps {
@@ -110,6 +126,7 @@ function terminal(status: DeepResearchJobStatus): boolean {
 function aheadOf(index: number): number {
   let ahead = 0;
   for (let i = 0; i < index; i++) {
+    if (jobs[i].record.vaultId !== jobs[index].record.vaultId) continue;
     if (jobs[i].record.status === 'queued' || jobs[i].record.status === 'running') ahead += 1;
   }
   return ahead;
@@ -138,7 +155,54 @@ export function getDeepResearchJob(id: string): { job: DeepResearchJobRecord; re
 }
 
 function notifyChange(): void {
+  try {
+    deps?.persist?.(jobs.map((job) => ({
+      record: { ...job.record, ahead: null },
+      request: { ...job.request, model: job.request.model ? { ...job.request.model } : job.request.model },
+      save: job.save,
+      draftTitle: job.draftTitle,
+    })));
+  } catch {
+    // The lane remains usable when a checkpoint cannot be written. The next state
+    // transition retries the atomic replacement and the report itself is still saved.
+  }
   deps?.onChange?.(snapshot());
+}
+
+function restorePersistedJobs(persisted: DeepResearchPersistedJob[]): void {
+  for (const stored of persisted) {
+    if (!stored?.record?.id || !stored.request?.objective) continue;
+    const wasRunning = stored.record.status === 'running';
+    jobs.push({
+      record: {
+        ...stored.record,
+        status: wasRunning ? 'queued' : stored.record.status,
+        progress: wasRunning
+          ? {
+              phase: 'queued',
+              message: isSpanish(stored.request.language)
+                ? 'Recuperado tras reiniciar Nodus…'
+                : 'Recovered after restarting Nodus…',
+            }
+          : stored.record.progress,
+        startedAt: wasRunning ? null : stored.record.startedAt,
+        finishedAt: wasRunning ? null : stored.record.finishedAt,
+        ahead: null,
+      },
+      request: {
+        ...stored.request,
+        approach: normalizeDeepResearchApproach(stored.request.approach),
+        model: stored.request.model ? { ...stored.request.model } : stored.request.model,
+      },
+      save: stored.save,
+      draftTitle: stored.draftTitle ?? null,
+      report: null,
+      listener: null,
+      resolve: null,
+      reject: null,
+    });
+  }
+  sequence = Math.max(sequence, jobs.length);
 }
 
 /**
@@ -282,37 +346,25 @@ export function clearFinishedDeepResearchJobs(): number {
 }
 
 /**
- * Called when the app switches vault. Everything still waiting was written against
- * the corpus that is about to close, so it is cancelled here rather than left to
- * fail obscurely against whichever database is open when its turn arrives.
+ * Legacy switch hook. Queued work now survives a vault switch and remains bound to
+ * its original corpus. Returning to that vault lets the durable lane resume it.
  */
 export function cancelDeepResearchJobsForOtherVaults(activeVaultId: string): number {
-  let cancelled = 0;
-  // Named from the deps, not from the id alone: a message that calls the new vault by
-  // the old one's name reads as "requested against X, but X is now active".
-  const active = deps?.activeVault() ?? { id: activeVaultId, name: activeVaultId };
-  // Settling can evict the finished tail, so iterate a copy rather than the live lane.
-  for (const job of [...jobs]) {
-    if (job.record.status !== 'queued' || job.record.vaultId === activeVaultId) continue;
-    job.record.status = 'cancelled';
-    settle(job, { error: vaultChangedMessage(job, active) });
-    cancelled += 1;
-  }
-  if (cancelled > 0) {
-    reportQueuePositions();
-    notifyChange();
-  }
-  return cancelled;
+  void activeVaultId;
+  reportQueuePositions();
+  notifyChange();
+  void drain();
+  return 0;
 }
 
 async function drain(): Promise<void> {
   if (draining) return;
-  const job = jobs.find((entry) => entry.record.status === 'queued');
+  const active = requireDeps().activeVault();
+  const job = jobs.find((entry) => entry.record.status === 'queued' && entry.record.vaultId === active.id);
   if (!job) return;
   draining = true;
 
   try {
-    const active = requireDeps().activeVault();
     // The vault may have changed while this job waited its turn. Running it now would
     // research a corpus nobody asked about, so it is cancelled instead.
     if (active.id !== job.record.vaultId) {

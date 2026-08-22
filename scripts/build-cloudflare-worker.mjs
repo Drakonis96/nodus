@@ -3,6 +3,7 @@ import path from 'node:path';
 import { build } from 'esbuild';
 
 const root = process.cwd();
+await import('./generate-mutation-contract.mjs');
 const output = path.join(root, 'cloudflare', 'dist');
 const generated = path.join(root, 'cloudflare', 'src', 'generated');
 fs.rmSync(output, { recursive: true, force: true });
@@ -18,6 +19,7 @@ fs.copyFileSync(path.join(root, 'LICENSE'), path.join(root, 'cloudflare', 'LICEN
 // never reaches into the parent monorepo at deployment time.
 for (const entry of [
   { source: 'server/lib/core/debates.mjs', target: 'debates.mjs' },
+  { source: 'server/lib/core/academicWorkspace.mjs', target: 'academicWorkspace.mjs' },
   { source: 'shared/deepResearchReport.ts', target: 'deepResearchReport.mjs' },
 ]) {
   await build({

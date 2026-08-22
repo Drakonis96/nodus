@@ -13,6 +13,7 @@ import {
   sha256Hex,
   strictRateLimit,
 } from './util.mjs';
+import { MUTABLE_TABLES } from './generated/mutableTables.mjs';
 
 const MAX_LEDGER_BYTES = 50 * 1024 * 1024;
 const MUTATION_BODY_INLINE_BYTES = 96 * 1024;
@@ -20,21 +21,6 @@ const MAX_NODI_NOTES = 500;
 const MAX_NODI_NOTE_BYTES = 64 * 1024;
 const TOMBSTONE_TTL_MS = 90 * 86400_000;
 const ID = /^[A-Za-z0-9_.:-]{1,128}$/;
-
-const MUTABLE_TABLES = {
-  notes: { key: ['id'] },
-  note_folders: { key: ['id'] },
-  note_links: { key: ['link_id'] },
-  writing_saved_drafts: { key: ['id'] },
-  writing_draft_annotations: { key: ['id'] },
-  decorative_images: { key: ['entity_kind', 'entity_id'], require: { entity_kind: 'deep_research' } },
-  immersion_sessions: { key: ['id'] },
-  saved_searches: { key: ['id'] },
-  research_questions: { key: ['id'] },
-  research_subquestions: { key: ['id'] },
-  research_coverage_links: { key: ['id'] },
-  edge_feedback: { key: ['from_id', 'to_id', 'type'] },
-};
 
 function utf8Bytes(value) {
   return new TextEncoder().encode(value).byteLength;

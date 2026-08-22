@@ -39,6 +39,18 @@ import {
 import { contextPackage, handleCorpus } from './corpus.mjs';
 import { semanticSearch, uploadExactVectorSet, upsertVectorChunk } from './vectors.mjs';
 import { ackMutations, cleanupSync, getMutations, getNodiNotes, postMutations, postNodiNotes } from './sync.mjs';
+import { cancelSpaceAction, claimSpaceAction, createSpaceAction, getSpaceAction, listSpaceActions, updateSpaceAction } from './actions.mjs';
+import {
+  cancelLibraryCommand,
+  claimLibraryCommand,
+  createLibraryCommand,
+  getLibraryObject,
+  libraryChanges,
+  listLibraryCommands,
+  postLibraryRecords,
+  putLibraryObject,
+  updateLibraryCommand,
+} from './librarySync.mjs';
 import {
   authorizationServerMetadata,
   authorizeDecision,
@@ -71,11 +83,15 @@ async function capabilityDocument(env, request) {
     license: 'AGPL-3.0-only', sourceCodeUrl: String(env.NODUS_SOURCE_URL || ''),
     server: { name: installation?.name || 'Nodus Cloud', publicUrl: new URL(request.url).origin, language: installation?.language || 'en', installationId: installation?.installation_id || null, version: String(env.NODUS_VERSION || '1.0.0'), license: 'AGPL-3.0-only', sourceCodeUrl: String(env.NODUS_SOURCE_URL || '') },
     snapshotVersions: [1, 2], assets: true, libraryDocuments: true, mutations: true, vectors: true,
+    spaceActions: { schemaVersion: 1, statuses: ['queued', 'claimed', 'running', 'applied', 'refused', 'failed', 'cancelled'] },
+    accountLibrarySync: { schemaVersion: 1, immutableVersions: true, objects: 'sha256-r2', maxRecordBatch: 12 },
+    desktopBridge: { protocol: '/bridge/v1', relay: false, transport: 'private-tls' },
     resources: { api: `${new URL(request.url).origin}/api/v1`, mcp: `${new URL(request.url).origin}/mcp` },
     publication: { generations: true, resumable: true, tableChunkRows: TABLE_CHUNK_ROWS, tableChunkBytes: TABLE_CHUNK_BYTES, objectPartBytes: OBJECT_PART_BYTES, maxMutationBytes: MAX_MUTATION_BYTES, maxMutationBatch: MAX_MUTATION_BATCH },
     storage: { structured: 'd1', objects: 'r2', vectorSearch: vectorizeDimensions.length ? ['vectorize', 'r2-exact', 'lexical'] : ['r2-exact', 'lexical'], vectorizeDimensions },
-    features: { snapshots: true, assets: true, library: true, vectors: true, mutations: true, nodiNotes: true, oauth: true, mcp: true, recovery: true },
-    maxAssetBytes: 8 * 1024 * 1024, maxLibraryPackageBytes: 128 * 1024 * 1024,
+    features: { snapshots: true, assets: true, library: true, librarySync: true, vectors: true, mutations: true, spaceActions: true, desktopBridgeRelay: false, nodiNotes: true, oauth: true, mcp: true, recovery: true },
+    maxAssetBytes: 8 * 1024 * 1024, maxSpaceAssetBytes: 1024 * 1024 * 1024,
+    maxLibraryPackageBytes: 128 * 1024 * 1024, maxSpaceLibraryBytes: 4 * 1024 * 1024 * 1024,
     maxSnapshotBytes: 512 * 1024 * 1024, maxSnapshotJsonBytes: 512 * 1024 * 1024,
     maxMutationBatch: MAX_MUTATION_BATCH, maxMutationBytes: MAX_MUTATION_BYTES, maxMutationBatchBytes: 8 * 1024 * 1024, maxLedgerBytes: 50 * 1024 * 1024,
   };
@@ -102,6 +118,36 @@ async function api(env, request, segments) {
     if (request.method === 'GET') return json(await getNodiNotes(env, auth, request));
     if (request.method === 'POST') return json(await postNodiNotes(env, auth, request));
     method(request, ['GET', 'POST']);
+  }
+  if (head === 'library') {
+    const auth = await apiAuthorize({ via: ['device'] });
+    if (rest[0] === 'changes') { method(request, ['GET']); return json(await libraryChanges(env, auth, request)); }
+    if (rest[0] === 'records' && rest[1] === 'batch') { method(request, ['POST']); return json(await postLibraryRecords(env, auth, request)); }
+    if (rest[0] === 'objects' && rest[1]) {
+      method(request, ['GET', 'HEAD', 'PUT']);
+      return request.method === 'PUT'
+        ? json(await putLibraryObject(env, auth, decodeURIComponent(rest[1]), request))
+        : getLibraryObject(env, auth, decodeURIComponent(rest[1]), request);
+    }
+    if (rest[0] === 'commands') {
+      if (rest[1] === 'claim') {
+        method(request, ['POST']);
+        if (auth.device_kind !== 'publisher') throw new HttpError(403, 'publisher_required', 'Only Nodus Desktop may claim Library commands.');
+        return json(await claimLibraryCommand(env, auth, request));
+      }
+      if (!rest[1]) {
+        if (request.method === 'GET') return json(await listLibraryCommands(env, auth, request));
+        if (request.method === 'POST') return json(await createLibraryCommand(env, auth, request), 201);
+        method(request, ['GET', 'POST']);
+      }
+      if (rest[2] === 'cancel') { method(request, ['POST']); return json(await cancelLibraryCommand(env, auth, decodeURIComponent(rest[1]))); }
+      if (rest[2] === 'status') {
+        method(request, ['POST']);
+        if (auth.device_kind !== 'publisher') throw new HttpError(403, 'publisher_required', 'Only Nodus Desktop may finish Library commands.');
+        return json(await updateLibraryCommand(env, auth, decodeURIComponent(rest[1]), request));
+      }
+    }
+    return problem(404, 'not_found');
   }
   if (head === 'settings' && rest[0] === 'language') {
     method(request, ['PUT']);
@@ -173,6 +219,33 @@ async function api(env, request, segments) {
     if (request.method === 'GET') return json(await getMutations(env, auth, request));
     if (request.method === 'POST') return json(await postMutations(env, auth, request));
     method(request, ['GET', 'POST']);
+  }
+  if (resource === 'actions') {
+    if (tail[1] === 'claim') {
+      const auth = await apiAuthorize({ via: ['device'], spaceId, need: 'owner' });
+      method(request, ['POST']);
+      if (auth.device_kind !== 'publisher') throw new HttpError(403, 'publisher_required', 'Only Nodus Desktop may claim actions.');
+      return json(await claimSpaceAction(env, auth, request));
+    }
+    if (!tail[1]) {
+      const auth = await apiAuthorize({ via: ['device', 'oauth'], spaceId, need: request.method === 'POST' ? 'writer' : 'reader', scope: request.method === 'POST' ? 'materials.write' : 'materials.read' });
+      if (request.method === 'GET') return json(await listSpaceActions(env, auth, request));
+      if (request.method === 'POST') return json(await createSpaceAction(env, auth, request), 201);
+      method(request, ['GET', 'POST']);
+    }
+    const id = decodeURIComponent(tail[1]);
+    if (tail[2] === 'cancel') {
+      const auth = await apiAuthorize({ via: ['device', 'oauth'], spaceId, need: 'reader', scope: 'materials.read' });
+      method(request, ['POST']); return json(await cancelSpaceAction(env, auth, id));
+    }
+    if (tail[2] === 'status') {
+      const auth = await apiAuthorize({ via: ['device'], spaceId, need: 'owner' });
+      method(request, ['POST']);
+      if (auth.device_kind !== 'publisher') throw new HttpError(403, 'publisher_required', 'Only Nodus Desktop may finish actions.');
+      return json(await updateSpaceAction(env, auth, id, request));
+    }
+    const auth = await apiAuthorize({ via: ['device', 'oauth'], spaceId, need: 'reader', scope: 'materials.read' });
+    method(request, ['GET']); return json(await getSpaceAction(env, auth, id));
   }
   if (resource === 'search' && tail[1] === 'semantic') {
     const auth = await apiAuthorize({ via: ['device', 'oauth'], spaceId, need: 'reader', scope: 'materials.read' });

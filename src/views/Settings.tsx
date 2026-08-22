@@ -1400,15 +1400,15 @@ export function Settings({
           </Section>
       )}
 
-      {visibleSettingsSection('about', 'Acerca de Nodus', 'proyecto independiente codigo abierto open source gratuito privacidad privacy rgpd gdpr datos alumnado licencia terceros legal actualizaciones update version novedades roadmap hoja de ruta futuro redes sociales social reddit youtube comunidad') && (
-        <Section title={t('Acerca de Nodus')}>
+      {visibleSettingsSection('about', 'Acerca de Nodus Research', 'proyecto independiente codigo abierto open source gratuito privacidad privacy rgpd gdpr datos alumnado licencia terceros legal actualizaciones update version novedades roadmap hoja de ruta futuro redes sociales social reddit youtube comunidad') && (
+        <Section title={t('Acerca de Nodus Research')}>
           <div className={ABOUT_CARD_CLASS}>
             <div className="flex items-start gap-3">
               <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-indigo-100 text-indigo-600 dark:bg-indigo-500/15 dark:text-indigo-300">
                 <Icon name="network" size={22} />
               </div>
               <div>
-                <h2 className="text-base font-semibold text-neutral-900 dark:text-neutral-100">Nodus</h2>
+                <h2 className="text-base font-semibold text-neutral-900 dark:text-neutral-100">Nodus Research</h2>
                 <p className="mt-0.5 text-xs text-neutral-500">v{__APP_VERSION__}</p>
               </div>
             </div>

@@ -304,8 +304,8 @@ export function registerIpc(
     closeDb();
     setActiveVault(id);
     getDb();
-    // Reports still waiting were researched against the corpus just closed; running
-    // them now would answer about a vault nobody asked about.
+    // Wake the durable lane for this vault. Work belonging to another vault remains
+    // queued against that corpus and resumes when its owner returns to it.
     cancelDeepResearchJobsForOtherVaults(id);
     upgradeWorldbuildingDemoDynasties();
     upgradeWorldbuildingDemoImageQuality();

@@ -256,6 +256,19 @@ async function pullRelayOperations(vault: VaultSummary, token: string, db: Datab
     const value = await response.json() as { mutations?: IncomingMutation[]; hasMore?: boolean };
     const mutations = value.mutations ?? []; if (!mutations.length) return;
     for (const mutation of mutations) {
+      if (mutation.kind !== 'upsert' || !['world_images', 'map_images'].includes(mutation.table)) continue;
+      const hash = String(mutation.assets?.[0]?.hash ?? '');
+      if (!/^[0-9a-f]{64}$/.test(hash)) throw new Error('El servidor entregó una imagen de mundo sin hash válido.');
+      const binary = await request(
+        `${normalizeUrl(vault.remote!.url)}/api/v1/spaces/${encodeURIComponent(vault.remote!.spaceId)}/assets/${hash}`,
+        { headers: { authorization: `Bearer ${token}`, accept: 'image/*' } },
+      );
+      if (!binary.ok) throw new Error(`No se pudo descargar la imagen ${hash.slice(0, 12)} (HTTP ${binary.status}).`);
+      const bytes = Buffer.from(await binary.arrayBuffer());
+      if (createHash('sha256').update(bytes).digest('hex') !== hash) throw new Error('Una imagen de mundo no coincide con su hash.');
+      mutation.row = { ...(mutation.row ?? {}), blob: bytes, bytes: bytes.length };
+    }
+    for (const mutation of mutations) {
       if (mutation.table !== 'page_document_updates' || mutation.kind !== 'upsert') continue;
       const hash = String(mutation.documentHash ?? mutation.row?.update_hash ?? '');
       if (!/^[0-9a-f]{64}$/.test(hash)) throw new Error('El servidor entregó una actualización Yjs sin hash válido.');
