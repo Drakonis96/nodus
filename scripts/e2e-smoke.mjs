@@ -736,7 +736,7 @@ try {
   assert.ok(Math.max(...advancedPickerHeights) - Math.min(...advancedPickerHeights) <= 1, 'the Nodi model selector has the same height as adjacent advanced selectors');
   assert.ok(Math.max(...advancedPickerWidths) - Math.min(...advancedPickerWidths) <= 1, 'all common advanced model selectors have the same width');
   console.log('[e2e] image provider settings rendered');
-  await page.getByRole('button', { name: 'Acerca de Nodus', exact: true }).click();
+  await page.getByRole('button', { name: 'Acerca de Nodus Research', exact: true }).click();
   await page.getByTestId('about-privacy').waitFor();
   const sourceCodeButton = page.getByTestId('source-code');
   await sourceCodeButton.waitFor();
