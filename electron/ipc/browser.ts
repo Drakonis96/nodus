@@ -76,6 +76,7 @@ import {
   closeTab,
   createTab,
   findInPage,
+  dismissError,
   goBack,
   goForward,
   initBrowserTabs,
@@ -391,6 +392,7 @@ export function registerBrowserIpc({ h, getWindow }: IpcContext): void {
     }
   });
 
+  h('browser:dismissError', async (event) => { assertUiSender(event, getWindow); dismissError(); });
   h('browser:goBack', async (event) => { assertUiSender(event, getWindow); goBack(); });
   h('browser:goForward', async (event) => { assertUiSender(event, getWindow); goForward(); });
   h('browser:reload', async (event) => { assertUiSender(event, getWindow); reload(); });

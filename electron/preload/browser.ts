@@ -52,6 +52,7 @@ export const browserApi = {
     ipcRenderer.invoke('browser:activateTab', id).then(() => undefined),
   closeBrowserTab: (id: string): Promise<void> =>
     ipcRenderer.invoke('browser:closeTab', id).then(() => undefined),
+  browserDismissError: (): Promise<void> => ipcRenderer.invoke('browser:dismissError').then(() => undefined),
   browserGoBack: (): Promise<void> => ipcRenderer.invoke('browser:goBack').then(() => undefined),
   browserGoForward: (): Promise<void> => ipcRenderer.invoke('browser:goForward').then(() => undefined),
   browserReload: (): Promise<void> => ipcRenderer.invoke('browser:reload').then(() => undefined),

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ConfirmModal } from '../components/ConfirmModal';
 import { Icon } from '../components/ui';
-import { t } from '../i18n';
+import { t, tx } from '../i18n';
 import { MAX_BROWSER_TABS } from '@shared/browser';
 import type {
   BrowserDownloadView,
@@ -615,7 +615,9 @@ export function NodusBrowserView() {
         )}
         {active?.error && (active.error.kind === 'certificate'
           ? <CertificateInterstitial tab={active} />
-          : <BrowserErrorPane tab={active} />)}
+          : active.error.kind === 'google-sign-in'
+            ? <GoogleSignInNotice tab={active} />
+            : <BrowserErrorPane tab={active} />)}
       </div>
 
       {captureOpen && (
@@ -942,6 +944,107 @@ function CertificateInterstitial({ tab }: { tab: BrowserTabState }) {
   );
 }
 
+/**
+ * Google sign-in, which no embedded browser is allowed to complete.
+ *
+ * Its own pane rather than a row in BrowserErrorPane, because it is not a
+ * failure: nothing went wrong, the destination is simply somewhere Nodus is not
+ * permitted to go. That difference decides the buttons. A Retry here would be a
+ * lie — the second attempt fails exactly like the first — so the primary action
+ * is the only one that actually works, handing the address to the real browser.
+ *
+ * The copy says plainly that this is Google's rule and not a Nodus defect,
+ * because the alternative is a user who concludes the browser is broken. It also
+ * names the one workaround worth knowing: sites that offer a password or a
+ * magic-link login do work here, since those never touch Google's OAuth flow.
+ */
+function GoogleSignInNotice({ tab }: { tab: BrowserTabState }) {
+  const error = tab.error;
+  if (!error) return null;
+
+  const site = error.siteUrl ?? null;
+  let siteHost = '';
+  try { siteHost = site ? new URL(site).host : ''; } catch { siteHost = ''; }
+
+  return (
+    <div
+      data-testid="browser-google-signin-notice"
+      className="absolute inset-0 flex flex-col items-center justify-center gap-4 overflow-y-auto bg-white px-8 py-10 text-center dark:bg-neutral-950"
+    >
+      <Icon name="external" size={28} className="shrink-0 text-neutral-600" />
+      <h2 className="text-base font-semibold text-neutral-800 dark:text-neutral-200">
+        {t('Google no permite iniciar sesión desde un navegador integrado')}
+      </h2>
+      <p className="max-w-md text-sm text-neutral-700 dark:text-neutral-300">
+        {t('No es un fallo de Nodus: Google rechaza el inicio de sesión desde cualquier navegador incrustado en otra aplicación.')}
+      </p>
+
+      {/*
+        The consequence goes ABOVE the button and in full contrast, not in a grey
+        footnote under it. Buried, it reads as a formality and the user goes to
+        their browser expecting to come back signed in — which never happens, and
+        the trip is wasted before they find out.
+      */}
+      <p className="max-w-md rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-200">
+        {site
+          ? tx('Ojo: si entras en tu navegador, la sesión se queda allí. Seguirás sin haber iniciado sesión en {host} dentro de Nodus, porque las cookies no se comparten entre navegadores.', { host: siteHost })
+          : t('Ojo: si entras en tu navegador, la sesión se queda allí. Seguirás sin haber iniciado sesión en Google dentro de Nodus, porque las cookies no se comparten entre navegadores.')}
+      </p>
+
+      {site ? (
+        <>
+          <p className="max-w-md text-sm text-neutral-700 dark:text-neutral-300">
+            {tx('Si {host} admite entrar con contraseña o con un enlace por correo, esa vía sí funciona aquí dentro, y Nodus recordará la sesión.', { host: siteHost })}
+          </p>
+          <div className="flex flex-wrap items-center justify-center gap-2">
+            <button
+              type="button"
+              className="btn btn-ghost border border-neutral-300 dark:border-neutral-700"
+              onClick={() => void window.nodus.browserDismissError()}
+            >
+              {t('Volver e intentar con contraseña')}
+            </button>
+            {/*
+              Opens the SITE, never the half-finished accounts.google.com URL: a
+              federated login has to start and finish in one browser, and handing
+              over the middle of the flow is what produced Firebase's
+              auth/missing-initial-state.
+            */}
+            <button
+              type="button"
+              className="btn btn-ghost border border-neutral-300 dark:border-neutral-700"
+              onClick={() => void window.nodus.openExternal(site)}
+            >
+              {tx('Usar {host} en mi navegador', { host: siteHost })}
+            </button>
+          </div>
+        </>
+      ) : (
+        <div className="flex flex-wrap items-center justify-center gap-2">
+          <button
+            type="button"
+            className="btn btn-ghost border border-neutral-300 dark:border-neutral-700"
+            onClick={() => void window.nodus.browserDismissError()}
+          >
+            {t('Volver atrás')}
+          </button>
+          <button
+            type="button"
+            className="btn btn-ghost border border-neutral-300 dark:border-neutral-700"
+            onClick={() => void window.nodus.openExternal(error.url)}
+          >
+            {t('Abrir en tu navegador')}
+          </button>
+        </div>
+      )}
+
+      <p className="max-w-md text-xs text-neutral-500">
+        {t('Para que Nodus lea tu Gmail o tu Drive haría falta otra cosa: conectar la cuenta desde Ajustes, que es la vía que Google sí admite para aplicaciones de escritorio. Todavía no está disponible.')}
+      </p>
+    </div>
+  );
+}
+
 /** Rendered by React, over the hidden native view, when a navigation failed. */
 function BrowserErrorPane({ tab }: { tab: BrowserTabState }) {
   const error = tab.error;
@@ -953,6 +1056,7 @@ function BrowserErrorPane({ tab }: { tab: BrowserTabState }) {
     timeout: t('El sitio tardó demasiado en responder'),
     'blocked-scheme': t('Nodus Browser no abre este tipo de dirección'),
     crashed: t('Esta página dejó de responder'),
+    'google-sign-in': t('Google no permite iniciar sesión desde un navegador integrado'),
     unknown: t('No se pudo cargar la página'),
     none: '',
   };

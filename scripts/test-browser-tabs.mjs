@@ -193,3 +193,50 @@ test('theme changes are serialised per page so a stale async update cannot win',
   assert.match(theme, /previous[\s\S]*\.then\(/);
   assert.match(theme, /value: dark \? 'dark' : 'light'/);
 });
+
+// Back, and the step Chromium does not record.
+//
+// Nodus's start pages (Bookmarks, Research Atlas) are drawn by React and load
+// NOTHING into the WebContents, so they leave no entry in Chromium's history. A
+// tab that opens on one and then visits a site has exactly one history entry,
+// canGoBack() is false, and the old goBack() — a lone `if (canGoBack) goBack()`
+// — silently did nothing. Measured in Electron 43: goBack() with no history
+// emits no events whatsoever, so there was not even a failure to notice.
+test('Back never falls through and does nothing', () => {
+  const goBack = body('goBack');
+
+  // Chromium's own history first, when there is some.
+  assert.match(goBack, /navigationHistory\.canGoBack\(\)/);
+  assert.match(goBack, /navigationHistory\.goBack\(\)/);
+
+  // Then the start page Chromium never recorded.
+  assert.match(goBack, /tab\.internalReturn/, 'Back must consider the remembered start page');
+  assert.match(goBack, /restoreInternalReturn\(tab,\s*back\)/,
+    'Back must delegate restoration of the remembered start page');
+
+  const restoreInternalReturn = body('restoreInternalReturn');
+  assert.match(restoreInternalReturn, /kind:\s*back\.kind/,
+    'returning must restore the internal page kind');
+
+  // Then an error pane, which is raised without any navigation at all.
+  assert.match(goBack, /dismissError\(\)/, 'with nothing to navigate, Back must at least clear the pane');
+});
+
+test('leaving a start page records it, arriving at one clears the debt', () => {
+  const navigate = body('navigate');
+  assert.match(navigate, /tab\.state\.kind !== 'web'[\s\S]{0,200}internalReturn = \{/,
+    'going from a start page to the web must record where to return');
+  assert.match(navigate, /internalReturn = null/,
+    'arriving at a start page must clear the pending return');
+});
+
+test('the toolbar Back button is enabled exactly when Back will do something', () => {
+  // Publishing Chromium's raw canGoBack() would grey out the button in the very
+  // case the remembered start page exists — a correct action behind a disabled
+  // control is indistinguishable from a broken one.
+  assert.match(code, /function canGoBackFrom/, 'the combined check must exist');
+  assert.doesNotMatch(code, /canGoBack:\s*contents\.navigationHistory\.canGoBack\(\)/,
+    'no tab state may publish Chromium history alone as canGoBack');
+  const uses = code.match(/canGoBack:\s*canGoBackFrom\(tab\)/g) ?? [];
+  assert.ok(uses.length >= 4, `every canGoBack publication must use it, found ${uses.length}`);
+});

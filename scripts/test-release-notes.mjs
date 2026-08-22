@@ -33,8 +33,13 @@ try {
     /searches inside the page/,
     /Closing the last tab/,
     /sources modal.*scrolls again/,
-    /Google no longer blocks sign-in/,
+    /Google does not allow sign-in/,
   ]) assert.ok(currentRelease?.highlights.some((highlight) => phrase.test(highlight.en)));
+
+  const googleSignInHighlight = currentRelease?.highlights.find((highlight) =>
+    /Google does not allow sign-in/.test(highlight.en));
+  assert.match(googleSignInHighlight?.en ?? '', /system browser/);
+  assert.match(googleSignInHighlight?.en ?? '', /not shared with Nodus/);
 
   // 4.1.6 keeps the five highlights it shipped with. They are published history.
   const zoteroImportRelease = RELEASE_NOTES.find((note) => note.version === '4.1.6');

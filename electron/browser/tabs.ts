@@ -26,9 +26,11 @@ import type { BrowserMediaCommand, BrowserState, BrowserTabError, BrowserTabStat
 import type { ThemeMode } from '@shared/types';
 import {
   browserInternalPage,
+  isGoogleSignInUrl,
   isNodusResearchSiteUrl,
   MAX_BROWSER_TABS,
   NODUS_BOOKMARKS_URL,
+  shouldRestoreInternalReturnOnDismiss,
 } from '@shared/browser';
 import { decideNavigation } from '@shared/browserNavigation';
 import { NODUS_BROWSER_PARTITION, browserSession } from './session';
@@ -55,6 +57,17 @@ interface Tab {
   disposers: (() => void)[];
   /** In-flight page collection requests, completed with null during teardown. */
   pendingCollections: Set<(value: unknown) => void>;
+  /**
+   * The Nodus start page this tab was showing before it went to the web.
+   *
+   * Internal pages (Bookmarks, Research Atlas) are drawn by React and never load
+   * anything into the WebContents, so they leave NO entry in Chromium's history.
+   * A tab that opens on one and then visits a site therefore has exactly one
+   * history entry, canGoBack() is false, and Back is a button that silently does
+   * nothing — measured, not assumed: goBack() with no history emits no events at
+   * all. Nodus has to remember the step Chromium never recorded.
+   */
+  internalReturn: { kind: 'bookmarks' | 'atlas'; url: string } | null;
 }
 
 const tabs = new Map<string, Tab>();
@@ -140,6 +153,51 @@ function classifyError(code: number): BrowserTabError['kind'] {
   if (code === -7 || code === -118) return 'timeout';       // TIMED_OUT / CONNECTION_TIMED_OUT
   if (code <= -200 && code >= -299) return 'certificate';   // the whole CERT_ block
   return 'unknown';
+}
+
+/**
+ * Stop before Google's wall, and say so in Nodus's own words.
+ *
+ * Google rejects sign-in from every embedded browser, so letting the navigation
+ * proceed only replaces a page the user wanted with a dead end that blames their
+ * browser. Catching it here means the tab can offer the one route that works —
+ * the system browser — instead of a Retry button that will never succeed.
+ *
+ * `siteUrl` is the page the sign-in started from, and callers must pass it only
+ * when there IS one. A federated login has to begin and end in the same browser:
+ * handing the system browser the half-finished accounts.google.com URL strands
+ * it without the state the site left in its own sessionStorage back here, which
+ * is what produces Firebase's `auth/missing-initial-state`. So the hand-off
+ * offers the SITE, and the whole flow runs once, in one place. When the user
+ * asked for Google directly there is no such page, and null is correct.
+ *
+ * Returns whether the navigation was intercepted, so each caller can skip it.
+ */
+function interceptGoogleSignIn(tab: Tab, url: string, siteUrl: string | null = null): boolean {
+  if (!isGoogleSignInUrl(url)) return false;
+  patch(tab, {
+    loading: false,
+    error: { kind: 'google-sign-in', code: null, description: '', url, siteUrl: handoffTarget(siteUrl) },
+  });
+  return true;
+}
+
+/**
+ * The originating page, if it is somewhere the system browser can usefully be
+ * sent. Anything that is not an ordinary web page — about:blank on a tab that
+ * has not navigated yet, an internal Nodus start page, or Google's own sign-in
+ * host — leaves the hand-off with nothing to offer but the Google URL itself.
+ */
+function handoffTarget(siteUrl: string | null): string | null {
+  if (!siteUrl) return null;
+  try {
+    const url = new URL(siteUrl);
+    if (url.protocol !== 'https:' && url.protocol !== 'http:') return null;
+    if (isGoogleSignInUrl(siteUrl)) return null;
+    return siteUrl;
+  } catch {
+    return null;
+  }
 }
 
 function originOf(url: string): string {
@@ -277,11 +335,17 @@ function wire(tab: Tab): void {
   // Never let a page dictate the options of a window it opens. `allow` would
   // hand the site control of webPreferences; instead every popup becomes an
   // ordinary Nodus tab, created by us with our own configuration.
-  // Google auth stays INSIDE Nodus on purpose: a third-party OAuth flow must
-  // complete in the same browser context it started in, or the callback
-  // session lands in the system browser instead of here. The Sec-CH-UA /
-  // userAgentData spoof in session.ts is what makes Google accept it.
+  // A third-party OAuth flow must complete in the browser context it started
+  // in, or its callback session lands somewhere the user is not. That argued
+  // for keeping Google auth inside Nodus and dressing Electron up as Chrome —
+  // which was tried, measured against the real page, and does not work: Google
+  // blocks the EMBEDDER, not the User-Agent. So the flow is recognised and
+  // stopped instead, and the user is told plainly. See isGoogleSignInUrl.
   contents.setWindowOpenHandler(({ url }) => {
+    // A "Continue with Google" button usually opens a window rather than
+    // redirecting. Opening a fresh tab on it would spend a tab to show Google's
+    // refusal, so the notice replaces it in the tab the user is already looking at.
+    if (interceptGoogleSignIn(tab, url, contents.getURL())) return { action: 'deny' };
     if (decideNavigation(url, { isMainFrame: true }).allowed) void createTab(url);
     return { action: 'deny' };
   });
@@ -292,6 +356,10 @@ function wire(tab: Tab): void {
   }) as never);
 
   on(tab, contents, 'will-navigate', ((event: Electron.Event, url: string) => {
+    if (interceptGoogleSignIn(tab, url, contents.getURL())) {
+      event.preventDefault();
+      return;
+    }
     if (decideNavigation(url, { isMainFrame: true }).allowed) return;
     event.preventDefault();
     patch(tab, {
@@ -308,6 +376,10 @@ function wire(tab: Tab): void {
   // them explicitly so an allowed HTTP endpoint cannot bounce into file: or a
   // privileged Nodus protocol between the initial request and the commit.
   on(tab, contents, 'will-redirect', ((details: { url: string; isMainFrame: boolean; preventDefault(): void }) => {
+    if (details.isMainFrame && interceptGoogleSignIn(tab, details.url, contents.getURL())) {
+      details.preventDefault();
+      return;
+    }
     if (decideNavigation(details.url, { isMainFrame: details.isMainFrame }).allowed) return;
     details.preventDefault();
     if (details.isMainFrame) {
@@ -375,7 +447,7 @@ function wire(tab: Tab): void {
     if (!isWeb()) return;
     patch(tab, {
       url,
-      canGoBack: contents.navigationHistory.canGoBack(),
+      canGoBack: canGoBackFrom(tab),
       canGoForward: contents.navigationHistory.canGoForward(),
     });
   }) as never);
@@ -386,7 +458,7 @@ function wire(tab: Tab): void {
     if (!isWeb() || !isMainFrame) return;
     patch(tab, {
       url,
-      canGoBack: contents.navigationHistory.canGoBack(),
+      canGoBack: canGoBackFrom(tab),
       canGoForward: contents.navigationHistory.canGoForward(),
     });
     recordBrowserHistoryVisit({ title: contents.getTitle() || tab.state.title, url });
@@ -407,7 +479,7 @@ function wire(tab: Tab): void {
     if (!isWeb()) return;
     patch(tab, {
       loading: false,
-      canGoBack: contents.navigationHistory.canGoBack(),
+      canGoBack: canGoBackFrom(tab),
       canGoForward: contents.navigationHistory.canGoForward(),
     });
   }) as never);
@@ -604,10 +676,16 @@ export async function createTab(url: string): Promise<string | null> {
     state: emptyState(id, url),
     disposers: [],
     pendingCollections: new Set(),
+    internalReturn: null,
   };
   tabs.set(id, tab);
   wire(tab);
   await activateTab(id);
+
+  if (!internalKind && interceptGoogleSignIn(tab, url)) {
+    notify?.();
+    return id;
+  }
 
   if (!internalKind && url && url !== 'about:blank') {
     // A load failure is reported through did-fail-load, which the UI already
@@ -731,8 +809,115 @@ function withActive<T>(fn: (contents: WebContents) => T): T | undefined {
   return fn(tab.view.webContents);
 }
 
+/**
+ * Whether Back has anywhere to go: Chromium's own history, or the start page
+ * Chromium never recorded. Used everywhere the tab's canGoBack is published, so
+ * the toolbar button is enabled exactly when pressing it will do something.
+ */
+function canGoBackFrom(tab: Tab): boolean {
+  if (tab.view.webContents.navigationHistory.canGoBack()) return true;
+  return tab.internalReturn !== null;
+}
+
+/** Restore the React start page represented by the history step Chromium lacks. */
+function restoreInternalReturn(
+  tab: Tab,
+  back: NonNullable<Tab['internalReturn']>,
+): void {
+  const contents = tab.view.webContents;
+  tab.internalReturn = null;
+  contents.stop();
+  dropMediaSession(tab.id);
+  patch(tab, {
+    kind: back.kind,
+    url: back.url,
+    title: back.kind === 'bookmarks' ? 'Nodus Bookmarks' : 'Research Atlas',
+    faviconDataUrl: null,
+    loading: false,
+    canGoBack: false,
+    canGoForward: false,
+    audible: false,
+    muted: false,
+    hasMedia: false,
+    mediaPlaying: false,
+    error: null,
+  });
+  applyVisibility();
+  void contents.loadURL('about:blank').catch(() => undefined);
+}
+
+/**
+ * Put the tab back on the page it never actually left.
+ *
+ * The Google sign-in notice is raised WITHOUT a navigation: the popup is denied,
+ * or will-navigate is preventDefault()ed, so the site's own page is still loaded
+ * and merely hidden, because a tab with an error hides its native view. Going
+ * back from here was therefore the wrong move twice over — it lands on whatever
+ * preceded the login page, and on a tab with no history it silently does nothing
+ * at all, which is exactly how it looked: a dead button.
+ *
+ * Clearing the error normally reveals the live page again, and the visible
+ * state is resynced from the WebContents rather than trusted: the omnibox path
+ * patches the tab's url to the Google address before raising the notice, and
+ * leaving that in place would show one address over a different page. The one
+ * exception is a React start page, whose WebContents is only about:blank; that
+ * remembered page must be restored rather than replaced with an empty surface.
+ */
+export function dismissError(): void {
+  const tab = activeTabId ? tabs.get(activeTabId) : null;
+  if (!tab || tab.view.webContents.isDestroyed()) return;
+  const contents = tab.view.webContents;
+  const live = contents.getURL();
+  const internalReturn = shouldRestoreInternalReturnOnDismiss(live, tab.internalReturn !== null)
+    ? tab.internalReturn
+    : null;
+  if (internalReturn) {
+    restoreInternalReturn(tab, internalReturn);
+    return;
+  }
+  patch(tab, {
+    error: null,
+    loading: false,
+    // about:blank is meaningful here: a direct Google request in a fresh tab
+    // has no live site to reveal, so retaining Google's blocked address would
+    // put one URL over a different page.
+    url: live || tab.state.url,
+    title: contents.getTitle() || tab.state.title,
+    canGoBack: canGoBackFrom(tab),
+    canGoForward: contents.navigationHistory.canGoForward(),
+  });
+  applyVisibility();
+}
+
+/**
+ * Back, including the step Chromium does not know about.
+ *
+ * Three cases, in order. Chromium's history when there is one. Otherwise the
+ * start page this tab left, which never became a history entry because internal
+ * pages are drawn by React. Otherwise, if an error pane is up, clear it — the
+ * Google sign-in notice is raised WITHOUT a navigation, so the page it covers is
+ * still loaded and revealing it is the only sensible meaning of "back".
+ *
+ * What must not happen is the fourth case that used to be the only one: falling
+ * through and doing nothing at all, which is how this reached the user.
+ */
 export function goBack(): void {
-  withActive((c) => { if (c.navigationHistory.canGoBack()) c.navigationHistory.goBack(); });
+  const tab = activeTabId ? tabs.get(activeTabId) : null;
+  if (!tab || tab.view.webContents.isDestroyed()) return;
+  const contents = tab.view.webContents;
+
+  if (contents.navigationHistory.canGoBack()) {
+    contents.navigationHistory.goBack();
+    return;
+  }
+
+  const back = tab.internalReturn;
+  if (back) {
+    restoreInternalReturn(tab, back);
+    return;
+  }
+
+  if (tab.state.error) dismissError();
 }
 export function goForward(): void {
   withActive((c) => { if (c.navigationHistory.canGoForward()) c.navigationHistory.goForward(); });
@@ -746,6 +931,7 @@ export function navigate(url: string): boolean {
   const internalKind = browserInternalPage(url);
   if (internalKind) {
     tab.view.webContents.stop();
+    tab.internalReturn = null;
     dropMediaSession(tab.id);
     patch(tab, {
       kind: internalKind,
@@ -766,6 +952,11 @@ export function navigate(url: string): boolean {
     return true;
   }
   if (!decideNavigation(url, { isMainFrame: true }).allowed) return false;
+  // Leaving a start page: remember it, because Chromium is about to record this
+  // navigation as the tab's FIRST history entry and Back would have nowhere to go.
+  if (tab.state.kind !== 'web') {
+    tab.internalReturn = { kind: tab.state.kind, url: tab.state.url };
+  }
   patch(tab, {
     kind: 'web',
     url,
@@ -774,6 +965,12 @@ export function navigate(url: string): boolean {
     loading: true,
     error: null,
   });
+  // After the patch above, so the notice replaces a tab that already shows the
+  // target address rather than one still displaying the previous page.
+  if (interceptGoogleSignIn(tab, url)) {
+    applyVisibility();
+    return true;
+  }
   applyVisibility();
   void tab.view.webContents.loadURL(url).catch(() => undefined);
   return true;
