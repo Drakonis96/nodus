@@ -11,10 +11,10 @@ SPDX-License-Identifier: AGPL-3.0-only
 <meta name="description" content="Download the Nodus app for macOS, Windows or Linux. Learn how this open source desktop research software brings sources, notes, vaults, semantic search and optional AI into one application."/>
 <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1"/>
 <meta property="og:title" content="Nodus App | Open Source Research Software"/>
-<meta property="og:description" content="The desktop application behind Nodus Research: focused vaults for research, teaching, study and structured data, available for macOS, Windows and Linux."/>
+<meta property="og:description" content="The desktop application developed by the Nodus Research project: focused vaults for research, teaching, study and structured data on macOS, Windows and Linux."/>
 <meta property="og:type" content="website"/>
 <meta property="og:url" content="https://nodusresearch.com/app/"/>
-<meta property="og:site_name" content="Nodus"/>
+<meta property="og:site_name" content="Nodus Research"/>
 <meta property="og:locale" content="en_GB"/>
 <meta property="og:image" content="https://nodusresearch.com/favicon.png"/>
 <meta name="twitter:card" content="summary"/>
@@ -44,9 +44,8 @@ SPDX-License-Identifier: AGPL-3.0-only
     },
     {
       "@type": "SoftwareApplication",
-      "@id": "https://nodusresearch.com/app/#software",
+      "@id": "https://nodusresearch.com/#software",
       "name": "Nodus",
-      "alternateName": ["Nodus App", "Nodus desktop app", "Nodus research software"],
       "url": "https://nodusresearch.com/app/",
       "mainEntityOfPage": "https://nodusresearch.com/app/",
       "isPartOf": {
@@ -63,8 +62,20 @@ SPDX-License-Identifier: AGPL-3.0-only
       "isAccessibleForFree": true,
       "downloadUrl": "https://github.com/Drakonis96/nodus/releases/latest",
       "softwareHelp": "https://nodusresearch.com/wiki/",
-      "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
-      "author": { "@type": "Person", "name": "Jorge Pérez Burgueño" }
+      "identifier": {
+        "@type": "PropertyValue",
+        "propertyID": "DOI",
+        "value": "10.5281/zenodo.21515531"
+      },
+      "sameAs": [
+        "https://github.com/Drakonis96/nodus",
+        "https://doi.org/10.5281/zenodo.21515531"
+      ],
+      "author": {
+        "@type": "Person",
+        "name": "Jorge Pérez Burgueño",
+        "sameAs": "https://orcid.org/0000-0002-1150-1930"
+      }
     }
   ]
 }
@@ -76,7 +87,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 <canvas id="organism" aria-hidden="true"></canvas>
 
 <div data-nodus-site-header data-base="../" data-page="app"></div>
-<script defer src="../site-header.js?v=20260820b"></script>
+<script defer src="../site-header.js?v=20260822b"></script>
 
 <main id="main">
 
@@ -90,7 +101,8 @@ SPDX-License-Identifier: AGPL-3.0-only
       </nav>
       <span class="kicker">Desktop application</span>
       <h1 class="display" data-split>The Nodus App</h1>
-      <p class="lead"><b>An open source research app for scholars, researchers, students and teachers.</b> Nodus brings sources, documents, notes, data and the work you do with them into one desktop application, while giving different kinds of work a structure of their own.</p>
+      <p class="lead"><b>Nodus is the desktop application developed within the Nodus Research project.</b> It brings sources, documents, notes, data and the work you do with them into one local-first workspace, while giving different kinds of work a structure of their own.</p>
+      <div class="guide-note"><p>Nodus is distributed by a personal, independent and currently non-commercial open-source project developed in Spain.</p></div>
       <div class="guide-actions">
         <a class="btn primary" href="#download" data-magnet="0.14">
           <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M7 10l5 5 5-5"/><path d="M4 19h16"/></svg>
@@ -116,7 +128,7 @@ SPDX-License-Identifier: AGPL-3.0-only
   <div class="wrap">
     <div class="section-head scrim reveal">
       <span class="kicker">One application, clearly named</span>
-      <h2 class="title" data-split>Nodus is the app behind Nodus Research.</h2>
+      <h2 class="title" data-split>One project. One clearly named application.</h2>
       <p class="lead">The Nodus desktop app solves a practical problem: research material often ends up divided between a reference manager, folders, notes, spreadsheets and a manuscript. The Nodus software is built to give that material one local workspace, then separate the work into vaults so a literature review does not have to behave like a course, a study plan or a database.</p>
     </div>
 
@@ -305,6 +317,13 @@ SPDX-License-Identifier: AGPL-3.0-only
           <p>The built-in MCP server can expose approved read and writing tools for the active vault to a compatible client. It is optional and configured from the desktop app.</p>
         </div>
       </div>
+      <div class="guide-step">
+        <em>05</em>
+        <div>
+          <h3>Nodus Apps</h3>
+          <p>The built-in mini-app workspace turns a described research, teaching or study task into a small tool that can be tested, refined, kept locally and, where appropriate, shared in a temporary QR session. <a href="../apps/">Explore Nodus Apps</a>.</p>
+        </div>
+      </div>
     </div>
   </div>
 </section>
@@ -402,8 +421,8 @@ SPDX-License-Identifier: AGPL-3.0-only
   <div class="wrap">
     <div class="foot-grid wide">
       <div class="foot-brand">
-        <span class="logo"><img src="../assets/nodus-logo.svg" alt=""/> Nodus</span>
-        <p>An open source desktop research app organised around focused vaults. Available for macOS, Windows and Linux.</p>
+        <a class="logo" href="../"><img src="../assets/nodus-logo.svg" alt=""/> Nodus Research</a>
+        <p>A personal, independent open-source project developed in Spain. Nodus is its local-first desktop application.</p>
       </div>
       <div class="foot-col">
         <h3>App</h3>
@@ -417,6 +436,7 @@ SPDX-License-Identifier: AGPL-3.0-only
         <a href="../research/">Academic research</a>
         <a href="../zotero/">Nodus and Zotero</a>
         <a href="../ai-research/">AI for research</a>
+        <a href="../apps/">Nodus Apps</a>
         <a href="../open-source/">Open source</a>
       </div>
       <div class="foot-col">
@@ -427,6 +447,9 @@ SPDX-License-Identifier: AGPL-3.0-only
       </div>
       <div class="foot-col">
         <h3>Project</h3>
+        <a href="../about/">About Nodus Research</a>
+        <a href="../cite/">Cite Nodus</a>
+        <a href="../legal/">Legal notice</a>
         <a href="https://github.com/Drakonis96/nodus" target="_blank" rel="noopener">GitHub</a>
         <a href="https://github.com/Drakonis96/nodus/releases" target="_blank" rel="noopener">Releases</a>
         <a href="https://github.com/Drakonis96/nodus/blob/main/LICENSE" target="_blank" rel="noopener">AGPL-3.0-only</a>

@@ -10,12 +10,15 @@ const SITE = 'https://nodusresearch.com';
 
 const PAGES = [
   { file: 'index.html', url: '/' },
+  { file: 'about/index.html', url: '/about/' },
   { file: 'research-atlas/index.html', url: '/research-atlas/' },
   { file: 'app/index.html', url: '/app/' },
+  { file: 'apps/index.html', url: '/apps/' },
   { file: 'research/index.html', url: '/research/' },
   { file: 'zotero/index.html', url: '/zotero/' },
   { file: 'ai-research/index.html', url: '/ai-research/' },
   { file: 'open-source/index.html', url: '/open-source/' },
+  { file: 'cite/index.html', url: '/cite/' },
   { file: 'demo/index.html', url: '/demo/' },
   { file: 'demo/study.html', url: '/demo/study.html' },
   { file: 'demo/teaching.html', url: '/demo/teaching.html' },

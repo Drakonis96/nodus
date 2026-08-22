@@ -154,7 +154,7 @@ function sectionMarkup(chapter, accent, showFigure = true, vault = null) {
 
 function homeMarkup() {
   return `<div style="--accent:#8b5cf6"><p class="eyebrow">Official documentation</p><h1>Learn Nodus from first launch to finished work.</h1>
-    <p class="lead">Explore all nine specialised vaults in Nodus. Five already have complete guides here, from first launch and basic terminology to evidence-aware workflows, privacy controls and finished outputs.</p>
+    <p class="lead">Nodus is the desktop application developed by the Nodus Research project. Explore all nine specialised vaults, from first launch and basic terminology to evidence-aware workflows, privacy controls and finished outputs.</p>
     <div class="meta-row"><span class="pill">Nodus ${escapeHtml(content.version)}</span><span class="pill">Updated ${escapeHtml(content.updated)}</span><span class="pill">${allVaults.length} vault types</span><span class="pill">${content.vaults.reduce((n,v)=>n+v.chapters.length,0)} guided sections</span><span class="pill">Searchable offline documentation</span></div>
     <div class="hero-actions"><a class="action primary bundle-download" href="${content.manualBundle}" download>${downloadIconMarkup()}Download all PDF manuals (.zip)</a><a class="action" href="#welcome">Start with the essentials</a><a class="action" href="https://github.com/Drakonis96/nodus/releases/latest">Download Nodus</a></div>
     <section class="doc-section vault-overview"><p class="section-kicker">Choose a workspace</p><h2>${allVaults.length} vaults, one local-first engine</h2><p class="section-details">Start with the vault that matches the work, not with a generic empty canvas. Complete guides are available for five vaults; the other four already ship in Nodus and will receive their Wiki guides later.</p>
@@ -243,7 +243,7 @@ function render(id) {
   else if (page.type === 'common') $('#article').innerHTML = commonMarkup(page);
   else $('#article').innerHTML = vaultMarkup(page.vault);
   document.documentElement.style.setProperty('--accent', page.accent || '#8b5cf6');
-  document.title = page.type === 'home' ? 'Nodus Wiki - Complete vault guides' : `${page.title} - Nodus Wiki`;
+  document.title = page.type === 'home' ? 'Nodus Documentation | Nodus Research' : `${page.title} | Nodus Documentation`;
   document.querySelectorAll('.nav-link').forEach((link) => link.classList.toggle('active', link.dataset.page === page.id));
   const parent = page.vault || (page.type === 'vault' ? page : null);
   syncVaultNavigation(parent?.id || null);

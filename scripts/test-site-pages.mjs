@@ -9,11 +9,11 @@ const siteRoot = path.join(repoRoot, 'site');
 const read = (relative) => fs.readFileSync(path.join(siteRoot, relative), 'utf8');
 
 test('the site has every destination the navigation promises', () => {
-  for (const entry of ['index.html', 'research-atlas/index.html', 'wiki/index.html', 'blog/index.html', 'contribute/index.html', 'faq/index.html']) {
+  for (const entry of ['index.html', 'about/index.html', 'app/index.html', 'apps/index.html', 'research-atlas/index.html', 'wiki/index.html', 'blog/index.html', 'cite/index.html', 'legal/index.html', 'contribute/index.html', 'faq/index.html']) {
     assert.ok(fs.existsSync(path.join(siteRoot, entry)), `site/${entry} exists`);
   }
   const home = read('index.html');
-  for (const href of ['research-atlas/', 'wiki/', 'blog/', 'contribute/', 'faq/']) {
+  for (const href of ['about/', 'app/', 'apps/', 'research-atlas/', 'wiki/', 'blog/', 'cite/', 'legal/', 'contribute/', 'faq/']) {
     assert.ok(home.includes(`href="${href}"`), `the home page links to ${href}`);
   }
 });
@@ -217,7 +217,7 @@ test('the organism degrades for visitors who cannot or do not want to run it', (
   assert.match(site, /matchMedia\('\(prefers-reduced-motion: reduce\)'\)/, 'reveals and the cursor respect reduced motion');
 
   // every page that paints the organism has to provide its canvas
-  for (const page of ['index.html', 'research-atlas/index.html', 'faq/index.html', 'blog/index.html', 'blog/post.html', 'contribute/index.html', 'wiki/index.html', 'app/index.html', 'research/index.html', 'zotero/index.html', 'ai-research/index.html', 'open-source/index.html']) {
+  for (const page of ['index.html', 'about/index.html', 'app/index.html', 'apps/index.html', 'cite/index.html', 'legal/index.html', 'research-atlas/index.html', 'faq/index.html', 'blog/index.html', 'blog/post.html', 'contribute/index.html', 'wiki/index.html', 'research/index.html', 'zotero/index.html', 'ai-research/index.html', 'open-source/index.html']) {
     assert.ok(read(page).includes('<canvas id="organism" aria-hidden="true"></canvas>'), `${page} carries the organism canvas`);
   }
 });
@@ -260,9 +260,44 @@ test('the home page opens with the mark forming, and can never strand a visitor'
   assert.match(script, /addEventListener\('keydown', onKey\)/, 'any key ends it');
 });
 
+test('Nodus Research is the project and Nodus is the application', () => {
+  const home = read('index.html');
+  assert.match(home, /<title>Nodus Research \| Open Source Research Workspace<\/title>/);
+  assert.match(home, /<h1 class="hero-name">Nodus Research<\/h1>/);
+  assert.match(home, /<meta property="og:site_name" content="Nodus Research"\/>/);
+
+  const structuredData = JSON.parse(home.match(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/)[1]);
+  const website = structuredData['@graph'].find((entry) => entry['@type'] === 'WebSite');
+  const software = structuredData['@graph'].find((entry) => entry['@type'] === 'SoftwareApplication');
+  assert.equal(website.name, 'Nodus Research');
+  assert.deepEqual(website.alternateName, ['nodusresearch.com']);
+  assert.equal(software.name, 'Nodus');
+  assert.equal(Object.hasOwn(software, 'alternateName'), false);
+  assert.equal(software.url, 'https://nodusresearch.com/app/');
+
+  for (const page of ['app/index.html', 'research/index.html', 'zotero/index.html', 'ai-research/index.html', 'open-source/index.html']) {
+    const html = read(page);
+    assert.match(html, /<meta property="og:site_name" content="Nodus Research"\/>/, `${page} names the project as its site`);
+    assert.match(html, /<a class="logo" href="\.\.\/"><img[^>]+\/> Nodus Research<\/a>/, `${page} links its footer brand to the project home`);
+  }
+
+  const app = read('app/index.html');
+  assert.match(app, /Nodus is the desktop application developed within the Nodus Research project\./);
+  const appStructuredData = JSON.parse(app.match(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/)[1]);
+  assert.equal(appStructuredData['@graph'].find((entry) => entry['@type'] === 'SoftwareApplication')['@id'], 'https://nodusresearch.com/#software');
+
+  const research = read('research/index.html');
+  assert.match(research, /<h1[^>]*>Academic Research with Nodus Research<\/h1>/);
+  for (const page of ['research/index.html', 'zotero/index.html', 'ai-research/index.html', 'open-source/index.html']) {
+    assert.match(read(page), /<a href="\.\.\/">Nodus Research<\/a>[\s\S]*?<span class="sep"/, `${page} uses the project name in its breadcrumb`);
+  }
+});
+
 // The long-form product and topic pages, and the URL each one is published at.
 const TOPIC_PAGES = [
+  ['about/index.html', 'https://nodusresearch.com/about/'],
   ['app/index.html', 'https://nodusresearch.com/app/'],
+  ['apps/index.html', 'https://nodusresearch.com/apps/'],
   ['research/index.html', 'https://nodusresearch.com/research/'],
   ['zotero/index.html', 'https://nodusresearch.com/zotero/'],
   ['ai-research/index.html', 'https://nodusresearch.com/ai-research/'],
@@ -300,18 +335,20 @@ test('the topic pages are indexable, canonical and described only once each', ()
 
 test('the topic pages are linked from the home page and to each other', () => {
   const home = read('index.html');
-  for (const href of ['app/', 'research/', 'zotero/', 'ai-research/', 'open-source/']) {
+  for (const href of ['about/', 'app/', 'apps/', 'research/', 'zotero/', 'ai-research/', 'open-source/']) {
     assert.ok(home.includes(`href="${href}"`), `the home page links to /${href}`);
   }
   // descriptive anchors, not "click here" — the anchor text is the link's whole signal
   assert.match(home, /Nodus for academic research/, 'the home page names the research page');
 
   const links = {
-    'app/index.html': ['../research/', '../zotero/', '../ai-research/', '../open-source/', '../faq/', '../wiki/'],
-    'research/index.html': ['../zotero/', '../ai-research/', '../open-source/'],
-    'zotero/index.html': ['../research/', '../open-source/'],
-    'ai-research/index.html': ['../research/', '../zotero/', '../open-source/'],
-    'open-source/index.html': ['../research/', '../zotero/', '../ai-research/'],
+    'about/index.html': ['../app/', '../apps/', '../cite/', '../open-source/'],
+    'app/index.html': ['../about/', '../apps/', '../research/', '../zotero/', '../ai-research/', '../open-source/', '../faq/', '../wiki/'],
+    'apps/index.html': ['../about/', '../app/#download', '../research/'],
+    'research/index.html': ['../about/', '../apps/', '../zotero/', '../ai-research/', '../open-source/'],
+    'zotero/index.html': ['../about/', '../apps/', '../research/', '../open-source/'],
+    'ai-research/index.html': ['../about/', '../apps/', '../research/', '../zotero/', '../open-source/'],
+    'open-source/index.html': ['../about/', '../apps/', '../research/', '../zotero/', '../ai-research/'],
   };
   for (const [page, required] of Object.entries(links)) {
     const html = read(page);
@@ -351,14 +388,17 @@ test('the sitemap lists every static page of the site', () => {
   const sitemap = read('sitemap.xml');
   for (const url of [
     'https://nodusresearch.com/',
+    'https://nodusresearch.com/about/',
     'https://nodusresearch.com/research-atlas/',
     'https://nodusresearch.com/app/',
+    'https://nodusresearch.com/apps/',
     'https://nodusresearch.com/research/',
     'https://nodusresearch.com/zotero/',
     'https://nodusresearch.com/ai-research/',
     'https://nodusresearch.com/open-source/',
     'https://nodusresearch.com/wiki/',
     'https://nodusresearch.com/faq/',
+    'https://nodusresearch.com/cite/',
     'https://nodusresearch.com/contribute/',
   ]) {
     assert.ok(sitemap.includes(`<loc>${url}</loc>`), `the sitemap lists ${url}`);
@@ -389,7 +429,7 @@ test('the app page documents the current desktop builds and available vaults', (
 });
 
 test('every page is reachable by keyboard and readable by a screen reader', () => {
-  for (const page of ['index.html', 'research-atlas/index.html', 'faq/index.html', 'blog/index.html', 'blog/post.html', 'contribute/index.html', 'app/index.html', 'research/index.html', 'zotero/index.html', 'ai-research/index.html', 'open-source/index.html']) {
+  for (const page of ['index.html', 'about/index.html', 'app/index.html', 'apps/index.html', 'cite/index.html', 'legal/index.html', 'research-atlas/index.html', 'faq/index.html', 'blog/index.html', 'blog/post.html', 'contribute/index.html', 'research/index.html', 'zotero/index.html', 'ai-research/index.html', 'open-source/index.html']) {
     const html = read(page);
     assert.match(html, /class="skip-link" href="#/, `${page} offers a skip link`);
     assert.match(html, /<html lang="en">/, `${page} declares its language`);

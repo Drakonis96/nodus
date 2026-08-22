@@ -1,0 +1,197 @@
+<!--
+SPDX-FileCopyrightText: 2026 Jorge Pérez Burgueño and Nodus contributors
+SPDX-License-Identifier: AGPL-3.0-only
+-->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Nodus Apps | Build Local Research and Teaching Tools</title>
+<meta name="description" content="Nodus Apps is the built-in workspace for creating, adapting and sharing small local-first tools for research, teaching and study inside the Nodus desktop application."/>
+<meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1"/>
+<meta property="og:title" content="Nodus Apps | Build Local Research and Teaching Tools"/>
+<meta property="og:description" content="Describe a tool, test it, refine it with AI and share a temporary live session by QR — all from inside the Nodus desktop application."/>
+<meta property="og:type" content="website"/>
+<meta property="og:url" content="https://nodusresearch.com/apps/"/>
+<meta property="og:site_name" content="Nodus Research"/>
+<meta property="og:locale" content="en_GB"/>
+<meta property="og:image" content="https://nodusresearch.com/favicon.png"/>
+<meta name="twitter:card" content="summary"/>
+<meta name="twitter:title" content="Nodus Apps"/>
+<meta name="twitter:description" content="Build adaptable mini apps for research, teaching and study inside Nodus."/>
+<meta name="twitter:image" content="https://nodusresearch.com/favicon.png"/>
+<link rel="canonical" href="https://nodusresearch.com/apps/"/>
+<link rel="icon" href="../favicon.ico" sizes="any"/>
+<link rel="icon" type="image/png" href="../favicon.png" sizes="512x512"/>
+<link rel="icon" type="image/svg+xml" href="../assets/nodus-logo.svg"/>
+<link rel="apple-touch-icon" href="../apple-touch-icon.png"/>
+<link rel="preload" as="font" type="font/woff2" href="../assets/fonts/inter-latin.woff2" crossorigin/>
+<link rel="preload" as="font" type="font/woff2" href="../assets/fonts/fraunces-latin.woff2" crossorigin/>
+<link rel="stylesheet" href="../assets/css/nodus.css?v=20260819a"/>
+<link rel="stylesheet" href="../assets/css/guide.css?v=20260818b"/>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "BreadcrumbList",
+      "itemListElement": [
+        { "@type": "ListItem", "position": 1, "name": "Nodus Research", "item": "https://nodusresearch.com/" },
+        { "@type": "ListItem", "position": 2, "name": "Nodus Apps", "item": "https://nodusresearch.com/apps/" }
+      ]
+    },
+    {
+      "@type": "SoftwareApplication",
+      "@id": "https://nodusresearch.com/apps/#software",
+      "name": "Nodus Apps",
+      "url": "https://nodusresearch.com/apps/",
+      "applicationCategory": "EducationalApplication",
+      "applicationSubCategory": "Mini app builder for research, teaching and study",
+      "operatingSystem": "macOS, Windows, Linux",
+      "isAccessibleForFree": true,
+      "description": "The built-in Nodus workspace for creating, adapting and sharing local-first mini applications.",
+      "isPartOf": {
+        "@type": "SoftwareApplication",
+        "@id": "https://nodusresearch.com/#software",
+        "name": "Nodus",
+        "url": "https://nodusresearch.com/app/"
+      },
+      "author": {
+        "@type": "Person",
+        "name": "Jorge Pérez Burgueño",
+        "sameAs": "https://orcid.org/0000-0002-1150-1930"
+      }
+    },
+    {
+      "@type": "FAQPage",
+      "mainEntity": [
+        {
+          "@type": "Question",
+          "name": "What is Nodus Apps?",
+          "acceptedAnswer": { "@type": "Answer", "text": "Nodus Apps is a workspace inside the Nodus desktop application for creating, testing, adapting and sharing small tools for research, teaching and study." }
+        },
+        {
+          "@type": "Question",
+          "name": "Is Nodus Apps a separate application?",
+          "acceptedAnswer": { "@type": "Answer", "text": "No. Nodus Apps is included inside the free Nodus desktop application developed by Nodus Research." }
+        },
+        {
+          "@type": "Question",
+          "name": "Can a Nodus app be shared by QR code?",
+          "acceptedAnswer": { "@type": "Answer", "text": "Yes. Compatible apps can open a temporary live session from Nodus and let participants join from a phone using a QR code or PIN." }
+        }
+      ]
+    }
+  ]
+}
+</script>
+</head>
+<body>
+
+<a class="skip-link" href="#main">Skip to content</a>
+<canvas id="organism" aria-hidden="true"></canvas>
+
+<div data-nodus-site-header data-base="../" data-page="apps"></div>
+<script defer src="../site-header.js?v=20260822b"></script>
+
+<main id="main">
+
+<header class="page-hero guide-hero" data-accent="#a78bfa" data-second="#34d399" data-energy="0.37">
+  <div class="wrap">
+    <div class="scrim" style="max-width:850px">
+      <nav class="breadcrumb" aria-label="Breadcrumb"><a href="../">Nodus Research</a><span class="sep" aria-hidden="true">/</span><span aria-current="page">Nodus Apps</span></nav>
+      <span class="kicker">Built into the Nodus desktop application</span>
+      <h1 class="display" data-split>Nodus Apps</h1>
+      <p class="lead"><b>Nodus Apps is the mini-app workspace inside Nodus.</b> Describe a tool for research, teaching or study, let AI build a working first version, test it in an isolated preview and refine it in your own words.</p>
+      <div class="guide-actions"><a class="btn primary" href="../app/#download">Download Nodus</a><a class="btn" href="../demo/">Try the Nodus demo</a></div>
+      <nav class="guide-jump" aria-label="On this page"><a href="#what"><em>01</em> What it is</a><a href="#workflow"><em>02</em> How it works</a><a href="#uses"><em>03</em> What to build</a><a href="#included"><em>04</em> Included apps</a><a href="#share"><em>05</em> Sharing and privacy</a><a href="#apps-faq"><em>06</em> FAQ</a></nav>
+    </div>
+  </div>
+</header>
+
+<section id="what" class="section-line" data-accent="#a78bfa" data-second="#22d3ee" data-energy="0.29">
+  <div class="wrap">
+    <div class="section-head scrim reveal"><span class="kicker">01 · What it is</span><h2 class="title" data-split>Small software shaped around one real task.</h2><p class="lead">A Nodus app is a focused HTML, CSS and JavaScript tool that runs inside a sandboxed part of the desktop application. It can keep its own local data, adapt to mobile or desktop screens and, where appropriate, support a temporary shared session.</p></div>
+    <div class="guide-note reveal"><p><b>Nodus Apps is not a separate mobile app or subscription service.</b> It is included in the free Nodus desktop application from the Nodus Research project.</p></div>
+  </div>
+</section>
+
+<section id="workflow" class="section-line" data-accent="#22d3ee" data-second="#fbbf24" data-energy="0.3">
+  <div class="wrap">
+    <div class="section-head scrim reveal"><span class="kicker">02 · How it works</span><h2 class="title" data-split>Describe, test, adjust, keep.</h2></div>
+    <div class="guide-steps reveal">
+      <div class="guide-step"><em>01</em><div><h3>Describe the job</h3><p>Ask for a planner, calculator, classroom activity, research checklist, structured form, visual aid or another small tool with a clear purpose.</p></div></div>
+      <div class="guide-step"><em>02</em><div><h3>Review a working app</h3><p>Nodus generates the interface and behaviour as a complete bundle, then opens it in an isolated preview where every control can be tested.</p></div></div>
+      <div class="guide-step"><em>03</em><div><h3>Request changes in plain language</h3><p>Explain what should be clearer, what field is missing or how an interaction should change. Each revision keeps the app focused on the original task.</p></div></div>
+      <div class="guide-step"><em>04</em><div><h3>Use it locally or export it</h3><p>Keep the app in your Nodus catalogue, download its source and ready-to-use version, or start a live QR session when participation is part of the design.</p></div></div>
+    </div>
+  </div>
+</section>
+
+<section id="uses" class="section-line" data-accent="#fbbf24" data-second="#34d399" data-energy="0.28">
+  <div class="wrap">
+    <div class="section-head scrim reveal"><span class="kicker">03 · What to build</span><h2 class="title" data-split>Tools for the work between the big steps.</h2></div>
+    <div class="guide-grid">
+      <article class="card lit guide-card reveal"><h3>Research</h3><p>Extraction forms, sampling helpers, coding checklists, source-comparison grids, fieldwork utilities and small calculators built around a particular method.</p></article>
+      <article class="card lit guide-card reveal" style="--delay:70ms"><h3>Teaching</h3><p>Live brainstorms, topic distributors, anonymous polls, classroom games, activity timers and participation tools that students can join by QR.</p></article>
+      <article class="card lit guide-card reveal" style="--delay:140ms"><h3>Study</h3><p>Revision planners, flashcard helpers, practice activities, concept sorters, progress trackers and tools shaped around one course or assessment.</p></article>
+      <article class="card lit guide-card reveal" style="--delay:210ms"><h3>Everyday utilities</h3><p>Decision wheels, calculators, checklists, simple forms and other single-purpose tools that do not need a new account or cloud service.</p></article>
+    </div>
+  </div>
+</section>
+
+<section id="included" class="section-line" data-accent="#34d399" data-second="#a78bfa" data-energy="0.28">
+  <div class="wrap">
+    <div class="section-head scrim reveal"><span class="kicker">04 · Included apps</span><h2 class="title" data-split>Useful before you generate anything.</h2><p class="lead">Nodus ships with a small catalogue so the workspace can be used and inspected immediately.</p></div>
+    <div class="guide-grid">
+      <article class="card lit guide-card reveal"><span class="kicker">Live classroom</span><h3>Brainstorm</h3><p>Open a question, share a QR code and collect anonymous ideas on a live wall as participants send them.</p></article>
+      <article class="card lit guide-card reveal" style="--delay:80ms"><span class="kicker">Utility</span><h3>Options wheel</h3><p>Add alternatives, spin the wheel and keep a short local history of the choices it made.</p></article>
+      <article class="card lit guide-card reveal" style="--delay:160ms"><span class="kicker">Teaching</span><h3>Topic distributor</h3><p>Prepare groups and a pool of topics, then create a unique assignment for each group and reshuffle when needed.</p></article>
+    </div>
+  </div>
+</section>
+
+<section id="share" class="section-line" data-accent="#a78bfa" data-second="#fb7185" data-energy="0.26">
+  <div class="wrap">
+    <div class="section-head scrim reveal"><span class="kicker">05 · Sharing and privacy</span><h2 class="title" data-split>Local by default. Shared only when you start a session.</h2></div>
+    <div class="guide-grid two">
+      <article class="card lit guide-card reveal"><h3>Sandboxed execution</h3><p>Each mini app runs inside an isolated frame rather than sharing unrestricted access to the rest of Nodus. Its saved data belongs to that app and stays local.</p></article>
+      <article class="card lit guide-card reveal" style="--delay:70ms"><h3>Temporary participation</h3><p>For multiplayer apps, Nodus can host an ephemeral local session and show a QR code or PIN. Participants join the app, not the user's vault or Library.</p></article>
+      <article class="card lit guide-card reveal" style="--delay:140ms"><h3>Exportable source</h3><p>A downloaded package contains a ready-to-run page plus the separate HTML, CSS and JavaScript, so the tool can be preserved, inspected and modified.</p></article>
+      <article class="card lit guide-card reveal" style="--delay:210ms"><h3>Your model choice</h3><p>Creating or repairing an app uses the AI model configured in Nodus, including a compatible local model. Running an existing app does not require generation.</p></article>
+    </div>
+  </div>
+</section>
+
+<section id="apps-faq" class="section-line" data-accent="#22d3ee" data-second="#34d399" data-energy="0.25">
+  <div class="wrap">
+    <div class="section-head scrim reveal"><span class="kicker">06 · Short answers</span><h2 class="title" data-split>Nodus Apps, without the ambiguity.</h2></div>
+    <div class="guide-steps reveal">
+      <div class="guide-step"><em>01</em><div><h3>What is Nodus Apps?</h3><p>The built-in workspace for creating, testing, adapting and sharing small applications from inside Nodus.</p></div></div>
+      <div class="guide-step"><em>02</em><div><h3>Is it a separate Nodus app?</h3><p>No. Nodus Apps is one part of the Nodus desktop application and uses the same free, open-source installation.</p></div></div>
+      <div class="guide-step"><em>03</em><div><h3>Can people join from a phone?</h3><p>Yes, when an app supports participation. The host starts a temporary session and other people open it with a QR code or PIN.</p></div></div>
+      <div class="guide-step"><em>04</em><div><h3>Do generated apps belong to the user?</h3><p>They remain in the user's local catalogue and can be downloaded as an inspectable package with their source files.</p></div></div>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<footer class="site-foot">
+  <div class="wrap">
+    <div class="foot-grid">
+      <div class="foot-brand"><a class="logo" href="../"><img src="../assets/nodus-logo.svg" alt=""/> Nodus Research</a><p>A personal, independent open-source project developed in Spain. Nodus is its local-first desktop application.</p></div>
+      <div class="foot-col"><h3>Research</h3><a href="../research/">Academic research</a><a href="../zotero/">Nodus and Zotero</a><a href="../ai-research/">AI for research</a><a href="./" aria-current="page">Nodus Apps</a></div>
+      <div class="foot-col"><h3>Learn</h3><a href="../wiki/">Wiki</a><a href="../blog/">Blog</a><a href="../faq/">FAQ</a></div>
+      <div class="foot-col"><h3>Project</h3><a href="../about/">About</a><a href="../cite/">Cite Nodus</a><a href="../legal/">Legal notice</a><a href="../contribute/">Contribute</a><a href="https://github.com/Drakonis96/nodus" target="_blank" rel="noopener">GitHub</a></div>
+    </div>
+    <div class="foot-base"><span>© 2026 Jorge Pérez Burgueño and Nodus contributors.</span><a href="https://github.com/Drakonis96/nodus/blob/main/LICENSE" target="_blank" rel="noopener">AGPL-3.0-only</a></div>
+  </div>
+</footer>
+
+<script src="../assets/js/organism.js?v=20260820a"></script>
+<script src="../assets/js/site.js?v=20260815"></script>
+<script src="../assets/js/back-to-top.js?v=20260817b"></script>
+</body>
+</html>

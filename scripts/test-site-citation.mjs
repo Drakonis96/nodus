@@ -1,0 +1,66 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import path from 'node:path';
+import test from 'node:test';
+import { fileURLToPath } from 'node:url';
+
+const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const readRepo = (relative) => fs.readFileSync(path.join(repoRoot, relative), 'utf8');
+const readSite = (relative) => readRepo(path.join('site', relative));
+const pkg = JSON.parse(readRepo('package.json'));
+
+const VERSION_DOI = '10.5281/zenodo.22055445';
+const CONCEPT_DOI = '10.5281/zenodo.21515531';
+
+test('CITATION.cff describes the current Nodus release and its project identity', () => {
+  const citation = readRepo('CITATION.cff');
+
+  assert.match(citation, new RegExp(`version: "${pkg.version.replaceAll('.', '\\.') }"`));
+  assert.match(citation, new RegExp(`doi: "${VERSION_DOI.replaceAll('.', '\\.')}"`));
+  assert.match(citation, /Nodus is the open-source desktop application developed by the Nodus\s+Research project\./);
+  for (const keyword of ['Nodus Research', 'research software', 'academic research', 'Zotero', 'local-first', 'knowledge graph', 'evidence', 'research workspace']) {
+    assert.ok(citation.includes(`- "${keyword}"`), `CITATION.cff includes ${keyword}`);
+  }
+});
+
+test('the citation page distinguishes the project DOI from the release DOI', () => {
+  const page = readSite('cite/index.html');
+
+  assert.match(page, /<title>Cite Nodus Research \| DOI and Software Citation<\/title>/);
+  assert.match(page, /<h1[^>]*>Cite Nodus Research<\/h1>/);
+  assert.match(page, /rel="canonical" href="https:\/\/nodusresearch\.com\/cite\/"/);
+  assert.match(page, new RegExp(CONCEPT_DOI.replaceAll('.', '\\.')));
+  assert.match(page, new RegExp(VERSION_DOI.replaceAll('.', '\\.')));
+  for (const detail of ['APA', 'BibTeX', 'CITATION.cff', 'ORCID', 'AGPL-3.0-only', 'Zenodo', 'GitHub', pkg.version]) {
+    assert.ok(page.includes(detail), `the citation page includes ${detail}`);
+  }
+});
+
+test('project-level metadata uses the conceptual DOI consistently', () => {
+  for (const relative of ['site/index.html', 'site/app/index.html', 'README.md']) {
+    const source = readRepo(relative);
+    assert.ok(source.includes(CONCEPT_DOI), `${relative} includes the conceptual DOI`);
+  }
+
+  const sitemap = readSite('sitemap.xml');
+  assert.match(sitemap, /<loc>https:\/\/nodusresearch\.com\/cite\/<\/loc>/);
+});
+
+test('the citation page is linked from each standard project footer', () => {
+  const pages = [
+    'index.html',
+    'app/index.html',
+    'ai-research/index.html',
+    'contribute/index.html',
+    'faq/index.html',
+    'open-source/index.html',
+    'research-atlas/index.html',
+    'research/index.html',
+    'zotero/index.html',
+    'blog/index.html',
+  ];
+
+  for (const relative of pages) {
+    assert.match(readSite(relative), /<a href="(?:\.\.\/)?cite\/">Cite Nodus<\/a>/, `${relative} links to /cite/`);
+  }
+});

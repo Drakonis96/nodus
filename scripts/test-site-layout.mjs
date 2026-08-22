@@ -11,6 +11,7 @@ const read = (relative) => fs.readFileSync(path.join(repoRoot, relative), 'utf8'
 test('the public website is isolated from repository documentation', () => {
   for (const relative of [
     '.nojekyll',
+    'CNAME',
     'index.html',
     'faq.js',
     'i18n-complete.js',

@@ -1,0 +1,18 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "nodus-site-canonical-redirects",
+  "main": "worker.mjs",
+  "compatibility_date": "2026-08-22",
+  "workers_dev": false,
+  "preview_urls": false,
+  "routes": [
+    {
+      "pattern": "nodusresearch.com/*",
+      "zone_name": "nodusresearch.com"
+    },
+    {
+      "pattern": "www.nodusresearch.com/*",
+      "zone_name": "nodusresearch.com"
+    }
+  ]
+}

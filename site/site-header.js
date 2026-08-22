@@ -9,7 +9,7 @@ Hosts opt in with a placeholder element:
   <div data-nodus-site-header data-base="../" data-page="wiki" data-context="wiki"></div>
 
   data-base    path back to site/ from the current page ('' at the root)
-  data-page    home | atlas | wiki | blog | contribute | faq | demo — marks the current item
+  data-page    home | atlas | apps | wiki | blog | about | contribute | faq | demo — marks the current item
   data-context 'wiki' adds the docs menu button
 */
 (function () {
@@ -32,12 +32,14 @@ Hosts opt in with a placeholder element:
   const PAGES = [
     { id: 'home', label: 'Home', href: (base) => base || './' },
     { id: 'atlas', label: 'Atlas', href: (base) => `${base}research-atlas/` },
+    { id: 'apps', label: 'Apps', href: (base) => `${base}apps/` },
     // Nodus Browser reveals this prepared slot from its isolated preload. It is
     // hidden everywhere else, so a normal web visitor never sees a local-only
     // destination or a custom-protocol prompt that cannot work in their browser.
     { id: 'bookmarks', label: 'Bookmarks', href: () => '#nodus-bookmarks', browserOnly: true },
     { id: 'wiki', label: 'Wiki', href: (base) => `${base}wiki/` },
     { id: 'blog', label: 'Blog', href: (base) => `${base}blog/` },
+    { id: 'about', label: 'About', href: (base) => `${base}about/` },
     { id: 'contribute', label: 'Contribute', href: (base) => `${base}contribute/` },
     { id: 'faq', label: 'FAQ', href: (base) => `${base}faq/` },
   ];
@@ -57,8 +59,8 @@ Hosts opt in with a placeholder element:
           <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2Z"/>
         </svg>
       </button>` : ''}
-      <a class="logo" href="${base || './'}" aria-label="Nodus, home">
-        <img class="mark" src="${base}assets/nodus-logo.svg" alt=""/> Nodus
+      <a class="logo" href="${base || './'}" aria-label="Nodus Research, home">
+        <img class="mark" src="${base}assets/nodus-logo.svg" alt=""/> Nodus Research
       </a>
       <button class="nav-toggle" id="site-nav-toggle" type="button" aria-label="Open menu" aria-controls="site-nav-links" aria-expanded="false">
         <span></span><span></span><span></span>

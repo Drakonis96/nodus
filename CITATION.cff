@@ -1,7 +1,10 @@
 cff-version: "1.2.0"
 message: "If Nodus contributes substantially to research that leads to a publication, please cite the software using these metadata."
 title: "Nodus"
-abstract: "A local-first desktop workspace that brings sources, notes, data, ideas, and learning materials together for research, teaching, and study."
+abstract: >-
+  Nodus is the open-source desktop application developed by the Nodus
+  Research project. It provides local-first workspaces for academic
+  research, teaching, study and structured data.
 authors:
   - family-names: "Pérez Burgueño"
     given-names: "Jorge"
@@ -14,9 +17,13 @@ date-released: "2026-08-22"
 license: "AGPL-3.0-only"
 repository-code: "https://github.com/Drakonis96/nodus"
 url: "https://nodusresearch.com/"
+doi: "10.5281/zenodo.22055445"
 keywords:
+  - "Nodus Research"
   - "research software"
-  - "knowledge management"
-  - "academic writing"
-  - "teaching"
-  - "study"
+  - "academic research"
+  - "Zotero"
+  - "local-first"
+  - "knowledge graph"
+  - "evidence"
+  - "research workspace"

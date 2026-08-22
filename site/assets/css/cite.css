@@ -1,0 +1,94 @@
+/*
+SPDX-FileCopyrightText: 2026 Jorge Pérez Burgueño and Nodus contributors
+SPDX-License-Identifier: AGPL-3.0-only
+*/
+
+.citation-meta {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 1px;
+  max-width: 1000px;
+  margin-top: 40px;
+  overflow: hidden;
+  border: 1px solid var(--membrane);
+  border-radius: var(--r-l);
+  background: var(--membrane);
+}
+
+.citation-meta > div {
+  min-width: 0;
+  padding: 22px 24px;
+  background: color-mix(in srgb, var(--void-2) 96%, transparent);
+}
+
+.citation-meta dt {
+  margin-bottom: 8px;
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+
+.citation-meta dd {
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.55;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+
+.citation-meta a { color: var(--accent); }
+
+.doi-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(290px, 1fr));
+  gap: 16px;
+  margin-top: 38px;
+}
+
+.doi-card { padding: 28px; }
+.doi-card .kicker { margin-bottom: 14px; }
+.doi-card h3 { margin-bottom: 10px; font-size: 18px; }
+.doi-card p { margin: 0; color: var(--ink-2); font-size: 14px; line-height: 1.65; }
+.doi-card .doi-value {
+  display: block;
+  margin: 20px 0 0;
+  font-family: var(--mono);
+  font-size: clamp(13px, 2.2vw, 16px);
+  color: var(--accent);
+  overflow-wrap: anywhere;
+}
+
+.citation-block {
+  max-width: 960px;
+  margin-top: 32px;
+  padding: 26px;
+  border: 1px solid var(--membrane);
+  border-radius: var(--r-l);
+  background: rgba(9, 9, 16, 0.72);
+}
+
+.citation-block h3 { margin-bottom: 16px; font-size: 16px; }
+.citation-block p { margin: 0; color: var(--ink-2); line-height: 1.7; }
+.citation-block pre {
+  margin: 0;
+  overflow-x: auto;
+  white-space: pre;
+  font-family: var(--mono);
+  font-size: 12.5px;
+  line-height: 1.65;
+  color: var(--ink-prose);
+}
+
+.citation-links {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: 16px;
+  margin-top: 38px;
+}
+
+@media (max-width: 600px) {
+  .citation-block, .doi-card { padding: 22px; }
+}

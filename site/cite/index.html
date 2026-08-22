@@ -1,0 +1,277 @@
+<!--
+SPDX-FileCopyrightText: 2026 Jorge Pérez Burgueño and Nodus contributors
+SPDX-License-Identifier: AGPL-3.0-only
+-->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Cite Nodus Research | DOI and Software Citation</title>
+<meta name="description" content="Cite Nodus Research and the Nodus desktop application using its Zenodo DOI, APA or BibTeX metadata, CITATION.cff, ORCID and versioned software archive."/>
+<meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1"/>
+<meta property="og:title" content="Cite Nodus Research | DOI and Software Citation"/>
+<meta property="og:description" content="DOIs and ready-to-use APA, BibTeX and CFF metadata for citing Nodus Research and a specific version of Nodus."/>
+<meta property="og:type" content="website"/>
+<meta property="og:url" content="https://nodusresearch.com/cite/"/>
+<meta property="og:site_name" content="Nodus Research"/>
+<meta property="og:locale" content="en_GB"/>
+<meta property="og:image" content="https://nodusresearch.com/favicon.png"/>
+<meta name="twitter:card" content="summary"/>
+<meta name="twitter:title" content="Cite Nodus Research"/>
+<meta name="twitter:description" content="DOI and software citation metadata for Nodus Research."/>
+<meta name="twitter:image" content="https://nodusresearch.com/favicon.png"/>
+<link rel="canonical" href="https://nodusresearch.com/cite/"/>
+<link rel="icon" href="../favicon.ico" sizes="any"/>
+<link rel="icon" type="image/png" href="../favicon.png" sizes="512x512"/>
+<link rel="icon" type="image/svg+xml" href="../assets/nodus-logo.svg"/>
+<link rel="apple-touch-icon" href="../apple-touch-icon.png"/>
+<link rel="preload" as="font" type="font/woff2" href="../assets/fonts/inter-latin.woff2" crossorigin/>
+<link rel="preload" as="font" type="font/woff2" href="../assets/fonts/fraunces-latin.woff2" crossorigin/>
+<link rel="stylesheet" href="../assets/css/nodus.css?v=20260819a"/>
+<link rel="stylesheet" href="../assets/css/guide.css?v=20260818b"/>
+<link rel="stylesheet" href="../assets/css/cite.css?v=20260822a"/>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "BreadcrumbList",
+      "itemListElement": [
+        { "@type": "ListItem", "position": 1, "name": "Nodus Research", "item": "https://nodusresearch.com/" },
+        { "@type": "ListItem", "position": 2, "name": "Cite Nodus Research", "item": "https://nodusresearch.com/cite/" }
+      ]
+    },
+    {
+      "@type": "WebPage",
+      "@id": "https://nodusresearch.com/cite/#webpage",
+      "url": "https://nodusresearch.com/cite/",
+      "name": "Cite Nodus Research",
+      "description": "DOI and software citation metadata for Nodus Research and Nodus.",
+      "about": { "@id": "https://nodusresearch.com/#software" }
+    },
+    {
+      "@type": "SoftwareApplication",
+      "@id": "https://nodusresearch.com/#software",
+      "name": "Nodus",
+      "isPartOf": { "@id": "https://nodusresearch.com/#website" },
+      "softwareVersion": "4.2.3",
+      "applicationCategory": "EducationalApplication",
+      "operatingSystem": "macOS, Windows, Linux",
+      "license": "https://spdx.org/licenses/AGPL-3.0-only.html",
+      "identifier": [
+        {
+          "@type": "PropertyValue",
+          "propertyID": "Concept DOI",
+          "value": "10.5281/zenodo.21515531"
+        },
+        {
+          "@type": "PropertyValue",
+          "propertyID": "Version DOI",
+          "value": "10.5281/zenodo.22055445"
+        }
+      ],
+      "sameAs": [
+        "https://github.com/Drakonis96/nodus",
+        "https://doi.org/10.5281/zenodo.21515531"
+      ],
+      "author": {
+        "@type": "Person",
+        "name": "Jorge Pérez Burgueño",
+        "sameAs": "https://orcid.org/0000-0002-1150-1930"
+      }
+    }
+  ]
+}
+</script>
+</head>
+<body>
+
+<a class="skip-link" href="#main">Skip to content</a>
+<canvas id="organism" aria-hidden="true"></canvas>
+
+<div data-nodus-site-header data-base="../" data-page="cite"></div>
+<script defer src="../site-header.js?v=20260822b"></script>
+
+<main id="main">
+
+<header class="page-hero guide-hero" data-accent="#fbbf24" data-second="#a78bfa" data-energy="0.3">
+  <div class="wrap">
+    <div class="scrim" style="max-width:850px">
+      <nav class="breadcrumb" aria-label="Breadcrumb">
+        <a href="../">Nodus Research</a>
+        <span class="sep" aria-hidden="true">/</span>
+        <span aria-current="page">Cite</span>
+      </nav>
+      <span class="kicker">DOI and software citation</span>
+      <h1 class="display" data-split>Cite Nodus Research</h1>
+      <p class="lead">Nodus Research is the open-source project behind Nodus. If the application contributes substantially to published work, cite the exact software version you used; use the conceptual DOI when you need to refer to the project across all releases.</p>
+      <div class="guide-actions">
+        <a class="btn primary" href="https://doi.org/10.5281/zenodo.22055445" target="_blank" rel="noopener">Current version DOI</a>
+        <a class="btn" href="https://github.com/Drakonis96/nodus/blob/main/CITATION.cff" target="_blank" rel="noopener">CITATION.cff</a>
+      </div>
+      <nav class="guide-jump" aria-label="On this page">
+        <a href="#details"><em>01</em> Citation details</a>
+        <a href="#doi"><em>02</em> Choose a DOI</a>
+        <a href="#formats"><em>03</em> Citation formats</a>
+        <a href="#records"><em>04</em> Records and licence</a>
+      </nav>
+    </div>
+  </div>
+</header>
+
+<section id="details" class="section-line" data-accent="#fbbf24" data-second="#34d399" data-energy="0.25">
+  <div class="wrap">
+    <div class="section-head scrim reveal">
+      <span class="kicker">01 · Citation details</span>
+      <h2 class="title" data-split>The identity behind the citation.</h2>
+      <p class="lead">Nodus Research is the project and Nodus is the software. The archived release below is the current desktop version.</p>
+    </div>
+
+    <dl class="citation-meta reveal">
+      <div><dt>Project</dt><dd>Nodus Research</dd></div>
+      <div><dt>Software</dt><dd>Nodus</dd></div>
+      <div><dt>Version</dt><dd>4.2.3</dd></div>
+      <div><dt>Released</dt><dd>22 August 2026</dd></div>
+      <div><dt>Author</dt><dd><a href="https://orcid.org/0000-0002-1150-1930" target="_blank" rel="noopener">Jorge Pérez Burgueño · ORCID</a></dd></div>
+      <div><dt>Licence</dt><dd><a href="https://spdx.org/licenses/AGPL-3.0-only.html" target="_blank" rel="noopener">AGPL-3.0-only</a></dd></div>
+    </dl>
+  </div>
+</section>
+
+<section id="doi" class="section-line" data-accent="#a78bfa" data-second="#22d3ee" data-energy="0.3">
+  <div class="wrap">
+    <div class="section-head scrim reveal">
+      <span class="kicker">02 · Choose a DOI</span>
+      <h2 class="title" data-split>One project DOI. One DOI for each release.</h2>
+      <p class="lead">Zenodo keeps the distinction explicit. Cite the version DOI for reproducible research; use the conceptual DOI when discussing Nodus Research as a continuing project.</p>
+    </div>
+
+    <div class="doi-grid">
+      <article class="card lit doi-card reveal">
+        <span class="kicker">All versions · conceptual DOI</span>
+        <h3>Nodus Research over time</h3>
+        <p>This persistent identifier represents every archived release and always resolves through the complete version history.</p>
+        <a class="doi-value" href="https://doi.org/10.5281/zenodo.21515531" target="_blank" rel="noopener">10.5281/zenodo.21515531</a>
+      </article>
+      <article class="card lit doi-card reveal" style="--delay:80ms">
+        <span class="kicker">Nodus 4.2.3 · version DOI</span>
+        <h3>The exact software release</h3>
+        <p>Use this DOI when methods, results or supplementary material depend on the version of Nodus used in the work.</p>
+        <a class="doi-value" href="https://doi.org/10.5281/zenodo.22055445" target="_blank" rel="noopener">10.5281/zenodo.22055445</a>
+      </article>
+    </div>
+  </div>
+</section>
+
+<section id="formats" class="section-line" data-accent="#22d3ee" data-second="#fbbf24" data-energy="0.28">
+  <div class="wrap">
+    <div class="section-head scrim reveal">
+      <span class="kicker">03 · Citation formats</span>
+      <h2 class="title" data-split>Ready to paste, still worth checking.</h2>
+      <p class="lead">Adapt punctuation and capitalisation to the style guide used by your journal, institution or repository.</p>
+    </div>
+
+    <div class="citation-block reveal">
+      <h3>APA</h3>
+      <p>Pérez Burgueño, J., &amp; Nodus contributors. (2026). <i>Nodus: Open-Source Research Workspace</i> (Version 4.2.3) [Computer software]. Zenodo. <a href="https://doi.org/10.5281/zenodo.22055445" target="_blank" rel="noopener">https://doi.org/10.5281/zenodo.22055445</a></p>
+    </div>
+
+    <div class="citation-block reveal">
+      <h3>BibTeX</h3>
+      <pre><code>@software{perez_burgueno_nodus_2026,
+  author    = {Pérez Burgueño, Jorge and Nodus contributors},
+  title     = {Nodus: Open-Source Research Workspace},
+  version   = {4.2.3},
+  year      = {2026},
+  publisher = {Zenodo},
+  doi       = {10.5281/zenodo.22055445},
+  url       = {https://doi.org/10.5281/zenodo.22055445},
+  license   = {AGPL-3.0-only}
+}</code></pre>
+    </div>
+
+    <div class="guide-note reveal">
+      <p><b>Machine-readable citation.</b> GitHub reads the repository's <a href="https://github.com/Drakonis96/nodus/blob/main/CITATION.cff" target="_blank" rel="noopener"><code>CITATION.cff</code></a>, which carries the same version, release date, DOI, author, ORCID and licence.</p>
+    </div>
+  </div>
+</section>
+
+<section id="records" class="section-line" data-accent="#34d399" data-second="#a78bfa" data-energy="0.27">
+  <div class="wrap">
+    <div class="section-head scrim reveal">
+      <span class="kicker">04 · Records and licence</span>
+      <h2 class="title" data-split>Follow the citation back to the source.</h2>
+      <p class="lead">The archive, source repository and researcher identifier are public and cross-linked so the record can be checked independently.</p>
+    </div>
+
+    <div class="citation-links">
+      <a class="card lit next-card reveal" href="https://zenodo.org/records/22055445" target="_blank" rel="noopener">
+        <h3>Zenodo</h3>
+        <p>Archived files, DOI metadata, version history and generated citation exports.</p>
+        <span class="arrow-link">Open the current record</span>
+      </a>
+      <a class="card lit next-card reveal" href="https://github.com/Drakonis96/nodus" target="_blank" rel="noopener" style="--delay:70ms">
+        <h3>GitHub</h3>
+        <p>Source code, tagged releases, issues, contribution history and citation metadata.</p>
+        <span class="arrow-link">Browse the repository</span>
+      </a>
+      <a class="card lit next-card reveal" href="https://orcid.org/0000-0002-1150-1930" target="_blank" rel="noopener" style="--delay:140ms">
+        <h3>ORCID</h3>
+        <p>The persistent researcher identifier for Jorge Pérez Burgueño.</p>
+        <span class="arrow-link">Open the ORCID record</span>
+      </a>
+      <a class="card lit next-card reveal" href="https://github.com/Drakonis96/nodus/blob/main/LICENSE" target="_blank" rel="noopener" style="--delay:210ms">
+        <h3>AGPL-3.0-only</h3>
+        <p>The complete licence text that applies to Nodus 4.0.0 and later.</p>
+        <span class="arrow-link">Read the licence</span>
+      </a>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<footer class="site-foot">
+  <div class="wrap">
+    <div class="foot-grid">
+      <div class="foot-brand">
+        <a class="logo" href="../"><img src="../assets/nodus-logo.svg" alt=""/> Nodus Research</a>
+        <p>A personal, independent open-source project developed in Spain. Nodus is its local-first desktop application.</p>
+      </div>
+      <div class="foot-col">
+        <h3>Research</h3>
+        <a href="../research/">Academic research</a>
+        <a href="../zotero/">Nodus and Zotero</a>
+        <a href="../ai-research/">AI for research</a>
+        <a href="../apps/">Nodus Apps</a>
+        <a href="../open-source/">Open source</a>
+      </div>
+      <div class="foot-col">
+        <h3>Learn</h3>
+        <a href="../wiki/">Wiki</a>
+        <a href="../blog/">Blog</a>
+        <a href="../faq/">FAQ</a>
+      </div>
+      <div class="foot-col">
+        <h3>Project</h3>
+        <a href="../about/">About Nodus Research</a>
+        <a href="./" aria-current="page">Cite Nodus</a>
+        <a href="../legal/">Legal notice</a>
+        <a href="../contribute/">Contribute</a>
+        <a href="https://github.com/Drakonis96/nodus" target="_blank" rel="noopener">GitHub</a>
+        <a href="https://github.com/Drakonis96/nodus/releases" target="_blank" rel="noopener">Releases</a>
+      </div>
+    </div>
+    <div class="foot-base">
+      <span>© 2026 Jorge Pérez Burgueño and Nodus contributors.</span>
+      <a href="https://github.com/Drakonis96/nodus/blob/main/LICENSE" target="_blank" rel="noopener">AGPL-3.0-only</a>
+    </div>
+  </div>
+</footer>
+
+<script src="../assets/js/organism.js?v=20260820a"></script>
+<script src="../assets/js/site.js?v=20260815"></script>
+<script src="../assets/js/back-to-top.js?v=20260817b"></script>
+</body>
+</html>

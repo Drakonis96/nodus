@@ -12,12 +12,9 @@
   <a href="https://nodusresearch.com/demo/">Try the interactive tour</a>
 </p>
 
-<p align="center">
-  <a href="https://paypal.me/Jorgepb96"><img src="https://img.shields.io/badge/PayPal-Support-0070BA?logo=paypal&logoColor=white" alt="Support Nodus with PayPal"></a>
-  <a href="https://ko-fi.com/nodus_app"><img src="https://img.shields.io/badge/Ko--fi-Support-FF5E5B?logo=kofi&logoColor=white" alt="Support Nodus on Ko-fi"></a>
-</p>
+Nodus Research is the open-source project behind Nodus. Nodus is a local-first desktop application for university work that brings sources, notes, data, ideas and learning materials together without forcing every project into the same shape.
 
-Nodus is a desktop centre for university work. It brings sources, notes, data, ideas and learning materials together without forcing every project into the same shape.
+Nodus Research is a personal, independent open-source project developed in Spain. It currently sells no product or service and is not affiliated with, sponsored by or endorsed by any university, research group, company or unrelated software project that uses “Nodus” or a similar name. See the [name and independence notice](NAME_NOTICE.md).
 
 Each vault is a focused workspace. Researchers can build a connected corpus, historians can document a family tree, teams can explore structured data, teachers can plan and assess their courses, and students can organise an entire degree. You can move between them from one calm, consistent app.
 
@@ -152,7 +149,7 @@ backups include both every vault and `nodus-library`. See the
 
 ## Cite Nodus
 
-If Nodus contributes substantially to research that leads to a publication, please cite the version you used. The repository provides machine-readable citation metadata in [`CITATION.cff`](CITATION.cff), which GitHub can render in APA and BibTeX formats.
+If Nodus contributes substantially to research that leads to a publication, please cite the version you used. The repository provides machine-readable citation metadata in [`CITATION.cff`](CITATION.cff), which GitHub can render in APA and BibTeX formats. Use the [conceptual Zenodo DOI (10.5281/zenodo.21515531)](https://doi.org/10.5281/zenodo.21515531) for the project across all releases, or the [Nodus 4.2.2 DOI (10.5281/zenodo.22041926)](https://doi.org/10.5281/zenodo.22041926) for the current archived version. Ready-to-use formats are available at [nodusresearch.com/cite/](https://nodusresearch.com/cite/).
 
 ## Roadmap
 

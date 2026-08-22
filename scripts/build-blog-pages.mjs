@@ -50,8 +50,16 @@ for (const [position, post] of posts.entries()) {
     dateModified: post.date,
     mainEntityOfPage: canonical,
     ...(image ? { image } : {}),
-    author: { '@type': 'Organization', name: 'Nodus' },
-    publisher: { '@type': 'Organization', name: 'Nodus', url: SITE },
+    author: {
+      '@type': 'Person',
+      name: 'Jorge Pérez Burgueño',
+      sameAs: 'https://orcid.org/0000-0002-1150-1930',
+    },
+    publisher: {
+      '@type': 'Person',
+      name: 'Jorge Pérez Burgueño',
+      sameAs: 'https://orcid.org/0000-0002-1150-1930',
+    },
   }).replaceAll('<', '\\u003c');
 
   const html = `<!--
@@ -69,7 +77,7 @@ Generated from posts/${post.slug}.md by scripts/build-blog-pages.mjs.
 <title>${escapeHtml(post.title)} · Nodus Blog</title>
 <meta name="description" content="${escapeHtml(post.summary)}"/>
 <meta property="og:type" content="article"/>
-<meta property="og:site_name" content="Nodus"/>
+<meta property="og:site_name" content="Nodus Research"/>
 <meta property="og:title" content="${escapeHtml(post.title)}"/>
 <meta property="og:description" content="${escapeHtml(post.summary)}"/>
 <meta property="og:url" content="${canonical}"/>
@@ -97,7 +105,7 @@ ${image ? `<meta name="twitter:image" content="${escapeHtml(image)}"/>` : ''}
 <div id="scroll-progress" aria-hidden="true"></div>
 
 <div data-nodus-site-header data-base="../" data-page="blog"></div>
-<script defer src="../site-header.js?v=20260820b"></script>
+<script defer src="../site-header.js?v=20260822b"></script>
 
 <main id="main" data-accent="#c084fc" data-second="#a78bfa" data-energy="0.22">
   <article class="post-page">
@@ -130,13 +138,14 @@ ${next ? `        <a class="btn" href="${encodeURIComponent(next.slug)}/">${esca
   <div class="wrap">
     <div class="foot-grid">
       <div class="foot-brand">
-        <span class="logo"><img src="../assets/nodus-logo.svg" alt=""/> Nodus</span>
-        <p>A free, open-source, local-first workspace for research, teaching and study.</p>
+        <a class="logo" href="../"><img src="../assets/nodus-logo.svg" alt=""/> Nodus Research</a>
+        <p>A personal, independent open-source project developed in Spain. Nodus is its local-first desktop application.</p>
       </div>
       <div class="foot-col">
         <h3>Product</h3>
         <a href="../#vaults">The four vaults</a>
         <a href="../#tools">Nodus Toolkit</a>
+        <a href="../apps/">Nodus Apps</a>
         <a href="../demo/">Live demos</a>
       </div>
       <div class="foot-col">
@@ -147,6 +156,9 @@ ${next ? `        <a class="btn" href="${encodeURIComponent(next.slug)}/">${esca
       </div>
       <div class="foot-col">
         <h3>Project</h3>
+        <a href="../about/">About Nodus Research</a>
+        <a href="../cite/">Cite Nodus</a>
+        <a href="../legal/">Legal notice</a>
         <a href="../contribute/">Contribute</a>
         <a href="https://github.com/Drakonis96/nodus" target="_blank" rel="noopener">GitHub</a>
         <a href="https://github.com/Drakonis96/nodus/releases" target="_blank" rel="noopener">Releases</a>

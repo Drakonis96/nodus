@@ -7,19 +7,19 @@ SPDX-License-Identifier: AGPL-3.0-only
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
-<title>Nodus | Open Source Research Workspace</title>
-<meta name="description" content="Nodus is a free, open source, local-first research workspace for academic work. Connect your Zotero library or your own documents, turn what you read into ideas anchored to the passage that supports them, and search, question and cite your own corpus."/>
+<title>Nodus Research | Open Source Research Workspace</title>
+<meta name="description" content="Nodus Research is the open-source project behind Nodus, a local-first desktop workspace for connecting academic sources, ideas and evidence."/>
 <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1"/>
-<meta property="og:title" content="Nodus | Open Source Research Workspace"/>
-<meta property="og:description" content="An open source research workspace for connecting sources, ideas and evidence. Build a corpus from Zotero or your own files, search it semantically and write with citations you can open. Free, local-first, no accounts."/>
+<meta property="og:title" content="Nodus Research | Open Source Research Workspace"/>
+<meta property="og:description" content="The open-source project behind Nodus, a local-first desktop workspace for connecting academic sources, ideas and evidence."/>
 <meta property="og:type" content="website"/>
 <meta property="og:url" content="https://nodusresearch.com/"/>
-<meta property="og:site_name" content="Nodus"/>
+<meta property="og:site_name" content="Nodus Research"/>
 <meta property="og:locale" content="en_GB"/>
 <meta property="og:image" content="https://nodusresearch.com/favicon.png"/>
 <meta name="twitter:card" content="summary"/>
-<meta name="twitter:title" content="Nodus | Open Source Research Workspace"/>
-<meta name="twitter:description" content="An open source research workspace for connecting sources, ideas and evidence. Free, local-first, and built around your own library."/>
+<meta name="twitter:title" content="Nodus Research | Open Source Research Workspace"/>
+<meta name="twitter:description" content="The open-source project behind Nodus, a local-first desktop workspace for connecting academic sources, ideas and evidence."/>
 <meta name="twitter:image" content="https://nodusresearch.com/favicon.png"/>
 <link rel="canonical" href="https://nodusresearch.com/"/>
 <link rel="icon" href="favicon.ico" sizes="any"/>
@@ -29,7 +29,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 <link rel="preload" as="font" type="font/woff2" href="assets/fonts/inter-latin.woff2" crossorigin/>
 <link rel="preload" as="font" type="font/woff2" href="assets/fonts/fraunces-latin.woff2" crossorigin/>
 <link rel="stylesheet" href="assets/css/nodus.css?v=20260819a"/>
-<link rel="stylesheet" href="assets/css/home.css?v=20260820c"/>
+<link rel="stylesheet" href="assets/css/home.css?v=20260822a"/>
 <script>
   /* Arm the opening sequence before the first paint. Anything that goes wrong
      here simply leaves the page in its ordinary, fully visible state. */
@@ -60,15 +60,22 @@ SPDX-License-Identifier: AGPL-3.0-only
       "@type": "WebSite",
       "@id": "https://nodusresearch.com/#website",
       "url": "https://nodusresearch.com/",
-      "name": "Nodus",
-      "description": "An open source research workspace for connecting sources, ideas and evidence.",
-      "inLanguage": "en"
+      "name": "Nodus Research",
+      "alternateName": ["nodusresearch.com"],
+      "description": "Nodus Research is the independent open-source project behind the Nodus desktop application.",
+      "inLanguage": "en",
+      "creator": {
+        "@type": "Person",
+        "name": "Jorge Pérez Burgueño",
+        "sameAs": "https://orcid.org/0000-0002-1150-1930"
+      }
     },
     {
       "@type": "SoftwareApplication",
-      "@id": "https://nodusresearch.com/#app",
+      "@id": "https://nodusresearch.com/#software",
       "name": "Nodus",
-      "url": "https://nodusresearch.com/",
+      "url": "https://nodusresearch.com/app/",
+      "isPartOf": { "@id": "https://nodusresearch.com/#website" },
       "applicationCategory": "EducationalApplication",
       "applicationSubCategory": "Research workspace",
       "operatingSystem": "macOS, Windows, Linux",
@@ -77,8 +84,20 @@ SPDX-License-Identifier: AGPL-3.0-only
       "isAccessibleForFree": true,
       "downloadUrl": "https://github.com/Drakonis96/nodus/releases/latest",
       "softwareHelp": "https://nodusresearch.com/wiki/",
-      "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
-      "author": { "@type": "Person", "name": "Jorge Pérez Burgueño" }
+      "identifier": {
+        "@type": "PropertyValue",
+        "propertyID": "DOI",
+        "value": "10.5281/zenodo.21515531"
+      },
+      "sameAs": [
+        "https://github.com/Drakonis96/nodus",
+        "https://doi.org/10.5281/zenodo.21515531"
+      ],
+      "author": {
+        "@type": "Person",
+        "name": "Jorge Pérez Burgueño",
+        "sameAs": "https://orcid.org/0000-0002-1150-1930"
+      }
     }
   ]
 }
@@ -91,7 +110,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 <div id="scroll-progress" aria-hidden="true"></div>
 
 <div data-nodus-site-header data-base="" data-page="home"></div>
-<script defer src="site-header.js?v=20260820b"></script>
+<script defer src="site-header.js?v=20260822b"></script>
 
 <main id="main">
 
@@ -106,12 +125,13 @@ SPDX-License-Identifier: AGPL-3.0-only
       <circle cx="18" cy="16" r="6.5" fill="#ddd6fe"/><circle cx="18" cy="48" r="6.5" fill="#a78bfa"/>
       <circle cx="46" cy="48" r="6.5" fill="#8b5cf6"/><circle cx="46" cy="16" r="6.5" fill="#7c3aed"/>
     </svg>
-    <h1 class="hero-title">
+    <h1 class="hero-name">Nodus Research</h1>
+    <p class="hero-title" aria-label="Research deeper. Teach smarter. Study better.">
       <span class="line"><i><span class="verb">Research</span> deeper</i></span>
       <span class="line"><i><span class="verb">Teach</span> smarter</i></span>
       <span class="line"><i><span class="verb">Study</span> better</i></span>
-    </h1>
-    <p class="sub">Nodus is a free desktop app for academic research. Connect your Zotero library or your own documents, and turn what you read into ideas, notes and evidence you can search, question and cite. Every claim stays anchored to the passage it came from. Built for scholars, students and teachers.</p>
+    </p>
+    <p class="sub">Nodus is a free, open-source, local-first desktop application for academic research, teaching and study.</p>
     <div class="ctas">
       <a class="btn primary" href="demo/" data-magnet="0.16">
         <svg class="ic" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7-11-7Z"/></svg>
@@ -126,7 +146,7 @@ SPDX-License-Identifier: AGPL-3.0-only
         </span>
       </button>
     </div>
-    <p class="meta"><b>Completely free and open source.</b> No accounts, no subscriptions, no telemetry, and your corpus never leaves your machine.</p>
+    <p class="meta"><b>Nodus Research is a personal, independent open-source project developed in Spain.</b> It currently sells no product or service. Nodus is free to download and use, with no accounts, subscriptions or telemetry.</p>
     <p class="hero-links">Read on: <a href="app/">the Nodus app</a> · <a href="research/">Nodus for academic research</a> · <a href="zotero/">the Zotero integration</a> · <a href="ai-research/">AI for academic research</a> · <a href="open-source/">open source and local-first</a></p>
   </div>
   <div class="scroll-cue" aria-hidden="true"><span class="rail"></span>Scroll</div>
@@ -461,6 +481,7 @@ SPDX-License-Identifier: AGPL-3.0-only
         <h3>Nodus Apps</h3>
         <p>Build small tools for researching, studying or teaching with AI, adjust them by describing the change out loud, and hand them to a class or a colleague with a QR code.</p>
         <div class="tags"><span>Made by describing it</span><span>Share by QR</span></div>
+        <a class="arrow-link" href="apps/">Explore Nodus Apps</a>
       </article>
       <article class="card lit tool-card reveal" style="--tc:#34d399;--delay:70ms">
         <span class="pic"><svg viewBox="0 0 24 24"><path d="M7 7h11l-3-3M17 17H6l3 3M18 7l-3 3M6 17l3-3"/></svg></span>
@@ -581,8 +602,8 @@ SPDX-License-Identifier: AGPL-3.0-only
   <div class="wrap">
     <div class="foot-grid wide">
       <div class="foot-brand">
-        <span class="logo"><img src="assets/nodus-logo.svg" alt=""/> Nodus</span>
-        <p>A free, open-source, local-first research workspace for connecting sources, ideas and evidence. Your corpus stays on your machine.</p>
+        <a class="logo" href="./"><img src="assets/nodus-logo.svg" alt=""/> Nodus Research</a>
+        <p>A personal, independent open-source project developed in Spain. Nodus is its local-first desktop application.</p>
       </div>
       <div class="foot-col">
         <h3>Research</h3>
@@ -598,6 +619,7 @@ SPDX-License-Identifier: AGPL-3.0-only
         <a href="#vaults">The four vaults</a>
         <a href="#more-vaults">Other vaults</a>
         <a href="#tools">Nodus Toolkit</a>
+        <a href="apps/">Nodus Apps</a>
         <a href="demo/">Live demos</a>
       </div>
       <div class="foot-col">
@@ -609,6 +631,9 @@ SPDX-License-Identifier: AGPL-3.0-only
       </div>
       <div class="foot-col">
         <h3>Project</h3>
+        <a href="about/">About Nodus Research</a>
+        <a href="cite/">Cite Nodus</a>
+        <a href="legal/">Legal notice</a>
         <a href="contribute/">Contribute</a>
         <a href="https://github.com/Drakonis96/nodus" target="_blank" rel="noopener">GitHub</a>
         <a href="https://github.com/Drakonis96/nodus/releases" target="_blank" rel="noopener">Releases</a>
