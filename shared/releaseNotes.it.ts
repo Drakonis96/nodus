@@ -155,6 +155,13 @@ const RELEASE_3_2_4_IT: string[] = [
 ];
 
 export const RELEASE_NOTES_IT: Record<string, string[]> = {
+  "4.2.3": [
+    "Deep Research introduce una lettura a schermo intero con una colonna del rapporto più ampia. Una barra sottile mostra a che punto sei e l'intestazione ricompare quando risali. Le fonti si adattano meglio all'altezza disponibile e ogni autore citato apre direttamente la propria scheda.",
+    "Le citazioni dei rapporti vengono verificate nel corpus ogni volta che li apri. Se l'autore o l'anno di un'opera sono stati corretti dopo la generazione, Nodus aggiorna citazioni, matrice e bibliografia mentre le mostra senza modificare il rapporto salvato.",
+    "Autori e curatori non vengono più confusi. I capitoli attribuiscono le idee a chi li ha scritti, i volumi senza autore possono apparire sotto il curatore con un indicatore provvisorio e le schede separano le opere scritte da quelle curate. Con l'aggiornamento Nodus ripara anche le firme già salvate.",
+    "Nodus Browser gestisce più chiaramente l'accesso con Google. Si ferma prima della pagina di blocco, spiega che l'accesso deve terminare nel browser di sistema e conserva il sito di origine per continuare lì. Chiudendo l'avviso torna la pagina precedente o la home di Nodus, mentre Indietro riporta correttamente a Segnalibri o Research Atlas.",
+    "La wiki integrata torna a sembrare parte di Nodus. Le barre laterali non formano più blocchi di un altro colore e condividono lo sfondo del contenuto centrale sia nell'app sia sul web, anche passando tra il tema chiaro e quello scuro.",
+  ],
   "4.2.2": [
     "Nodus Browser ora cerca all'interno della pagina. Premi Cmd o Ctrl più F per aprire la barra, scrivi e passa tra i risultati con Invio o con i pulsanti Precedente e Successivo. La lente tra Segnalibri e Cronologia apre lo stesso pannello e la ricerca può distinguere maiuscole e minuscole.",
     "Chiudere l'ultima scheda non lascia più il browser vuoto né apre due pagine iniziali. La scheda iniziale viene ripristinata automaticamente e il selettore dei vault appare davanti fin dal primo istante. Passando dal browser alle Impostazioni, la pagina precedente non resta più sopra la nuova sezione.",

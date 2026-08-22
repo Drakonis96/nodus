@@ -95,6 +95,13 @@ const RELEASE_3_2_4_TR: string[] = [
 ];
 
 export const RELEASE_NOTES_TR: Record<string, string[]> = {
+  "4.2.3": [
+    "Deep Research, daha geniş bir rapor sütunuyla tam ekran okuma görünümü kazanıyor. İnce bir çubuk ne kadar ilerlediğinizi gösteriyor ve yukarı döndüğünüzde başlık yeniden beliriyor. Kaynaklar kullanılabilir yüksekliğe daha iyi uyuyor ve alıntılanan her yazar doğrudan kendi dosyasını açıyor.",
+    "Rapor alıntıları her açılışta külliyatla karşılaştırılıyor. Bir eserin yazarı veya yılı rapor üretildikten sonra düzeltildiyse Nodus, kaydedilmiş raporu değiştirmeden alıntıları, matrisi ve kaynakçayı görüntülenirken yeniliyor.",
+    "Yazarlar ve editörler artık birbirine karıştırılmıyor. Bölümlerin fikirleri onları yazan kişilere bağlanıyor, yazarsız ciltler geçici bir işaretle editörün altında görünebiliyor ve dosyalar yazılan eserlerle düzenlenen eserleri ayırıyor. Güncelleme sırasında Nodus önceden kaydedilmiş imzaları da onarıyor.",
+    "Nodus Browser, Google ile oturum açmayı daha anlaşılır biçimde ele alıyor. Engelleme sayfasından önce duruyor, işlemin sistem tarayıcısında tamamlanması gerektiğini açıklıyor ve orada devam edebilmeniz için başlangıç sitesini koruyor. Uyarıyı kapatınca önceki sayfa veya Nodus başlangıç sayfası geri geliyor, Geri düğmesi de Yer İmleri ya da Research Atlas'a doğru biçimde dönüyor.",
+    "Bütünleşik wiki yeniden Nodus'un bir parçası gibi görünüyor. Kenar çubukları artık farklı renkli bloklar oluşturmuyor ve hem uygulamada hem web'de, açık ve koyu temalar arasında geçerken de ana içeriğin arka planını paylaşıyor.",
+  ],
   "4.2.2": [
     "Nodus Browser artık sayfanın içinde arama yapıyor. Çubuğu açmak için Cmd veya Ctrl artı F tuşlarına basın, yazın ve Enter ya da Önceki ve Sonraki düğmeleriyle sonuçlar arasında ilerleyin. Yer İmleri ile Geçmiş arasındaki büyüteç aynı paneli açıyor ve arama büyük-küçük harfe duyarlı olabiliyor.",
     "Son sekmeyi kapatmak artık tarayıcıyı boş bırakmıyor ve iki başlangıç sayfası açmıyor. Başlangıç sekmesi otomatik olarak geri geliyor ve kasa seçici ilk andan itibaren önde görünüyor. Tarayıcıdan Ayarlar'a geçerken önceki sayfa artık yeni bölümün üzerine binmiyor.",

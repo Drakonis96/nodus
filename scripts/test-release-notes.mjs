@@ -25,21 +25,28 @@ try {
 
   const { RELEASE_NOTES, releaseNotesForMajor, compareVersions } = await import(pathToFileURL(bundlePath).href);
   const currentRelease = RELEASE_NOTES[0];
-  assert.equal(currentRelease?.version, '4.2.2');
-  assert.equal(currentRelease?.date, '2026-08-21');
-  assert.equal(currentRelease?.highlights.length, 4);
-  assert.deepEqual(currentRelease?.highlights.map((highlight) => highlight.scope), ['browser', 'browser', 'academic', 'browser']);
+  assert.equal(currentRelease?.version, '4.2.3');
+  assert.equal(currentRelease?.date, '2026-08-22');
+  assert.equal(currentRelease?.highlights.length, 5);
+  assert.deepEqual(currentRelease?.highlights.map((highlight) => highlight.scope), ['academic', 'academic', 'academic', 'browser', 'general']);
   for (const phrase of [
-    /searches inside the page/,
-    /Closing the last tab/,
-    /sources modal.*scrolls again/,
-    /Google does not allow sign-in/,
+    /full-screen reading view/,
+    /checked against the corpus/,
+    /Authors and editors are no longer confused/,
+    /Google sign-in more clearly/,
+    /integrated wiki/,
   ]) assert.ok(currentRelease?.highlights.some((highlight) => phrase.test(highlight.en)));
 
   const googleSignInHighlight = currentRelease?.highlights.find((highlight) =>
-    /Google does not allow sign-in/.test(highlight.en));
+    /Google sign-in more clearly/.test(highlight.en));
   assert.match(googleSignInHighlight?.en ?? '', /system browser/);
-  assert.match(googleSignInHighlight?.en ?? '', /not shared with Nodus/);
+  assert.match(googleSignInHighlight?.en ?? '', /restores the previous page/);
+
+  // 4.2.2 keeps the four highlights it shipped with. They are published history.
+  const browserSearchRelease = RELEASE_NOTES.find((note) => note.version === '4.2.2');
+  assert.equal(browserSearchRelease?.date, '2026-08-21');
+  assert.equal(browserSearchRelease?.highlights.length, 4);
+  assert.ok(browserSearchRelease?.highlights.some((highlight) => /searches inside the page/.test(highlight.en)));
 
   // 4.1.6 keeps the five highlights it shipped with. They are published history.
   const zoteroImportRelease = RELEASE_NOTES.find((note) => note.version === '4.1.6');

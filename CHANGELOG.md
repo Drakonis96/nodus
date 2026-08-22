@@ -1,5 +1,15 @@
 # Changelog
 
+## 4.2.3 — 2026-08-22
+
+- Added a full-screen Deep Research reading mode with a wider report column, live reading progress, a returning header, height-aware source panels and direct links from cited authors to their dossiers.
+- Re-derived saved-report citation labels from the current corpus when reports are read, keeping inline citations, synthesis matrices and bibliographies aligned with corrected authorship and dates without rewriting saved reports.
+- Repaired author and editor attribution across existing vaults. Chapter ideas now belong to their authors, edited works are separated in author dossiers, editor-only volumes are marked provisional and stored bylines are corrected during the upgrade.
+- Reworked Google sign-in handling in Nodus Browser so blocked embedded flows explain the system-browser route, preserve the originating site and restore the previous internal or web page when dismissed. Back also returns reliably to Bookmarks and Research Atlas.
+- Unified the integrated wiki sidebars with the central content background in the app and on the web across light and dark themes.
+- Updated project social links and public GitHub release download totals, and added the GitHub star announcement channel entry.
+- Added this release to the What's New modal in all eight interface languages.
+
 ## 4.2.2 — 2026-08-21
 
 - Added in-page search to Nodus Browser with Cmd/Ctrl+F, a toolbar search button, match navigation and case-sensitive search.

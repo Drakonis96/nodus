@@ -1107,6 +1107,58 @@ const RELEASE_4_1_3_HIGHLIGHTS: RawReleaseHighlight[] = [
 ];
 
 /**
+ * 4.2.3 — Clearer Deep Research reading, trustworthy authorship and citations,
+ * and small but visible Browser and wiki repairs.
+ */
+const RELEASE_4_2_3_HIGHLIGHTS: RawReleaseHighlight[] = [
+  {
+    scope: 'academic',
+    es: 'Deep Research estrena una lectura a pantalla completa con una columna de informe más ancha. Una barra fina muestra cuánto has leído y el encabezado reaparece al volver hacia arriba. Las fuentes se adaptan mejor a la altura disponible y cada autor citado abre su ficha directamente.',
+    en: 'Deep Research gains a full-screen reading view with a wider report column. A slim bar shows how far you have read and the header returns when you move back up. Sources fit the available height better and every cited author opens their dossier directly.',
+    fr: 'Deep Research propose une lecture en plein écran avec une colonne de rapport plus large. Une barre fine indique votre progression et l’en-tête réapparaît lorsque vous remontez. Les sources s’adaptent mieux à la hauteur disponible et chaque auteur cité ouvre directement sa fiche.',
+    de: 'Deep Research erhält eine Vollbild-Leseansicht mit einer breiteren Berichtsspalte. Eine schmale Leiste zeigt den Lesefortschritt und die Kopfzeile kehrt beim Hochscrollen zurück. Quellen nutzen die verfügbare Höhe besser und jeder zitierte Autor öffnet direkt sein Dossier.',
+    pt: 'O Deep Research ganha uma leitura em ecrã inteiro com uma coluna de relatório mais larga. Uma barra fina mostra quanto já leu e o cabeçalho reaparece ao voltar para cima. As fontes adaptam-se melhor à altura disponível e cada autor citado abre diretamente a respetiva ficha.',
+    'pt-BR': 'O Deep Research ganha uma leitura em tela cheia com uma coluna de relatório mais larga. Uma barra fina mostra quanto você já leu e o cabeçalho reaparece ao voltar para cima. As fontes se adaptam melhor à altura disponível e cada autor citado abre diretamente o respectivo dossiê.',
+  },
+  {
+    scope: 'academic',
+    es: 'Las citas de los informes vuelven a comprobarse contra el corpus cada vez que los abres. Si la autoría o el año de una obra se corrigieron después de generar el informe, Nodus actualiza las citas, la matriz y la bibliografía al mostrarlas sin alterar el informe guardado.',
+    en: 'Report citations are checked against the corpus each time you open them. If a work’s authorship or year was corrected after the report was generated, Nodus refreshes its citations, matrix and bibliography as they are displayed without changing the saved report.',
+    fr: 'Les citations des rapports sont vérifiées dans le corpus à chaque ouverture. Si l’auteur ou l’année d’une œuvre a été corrigé après la création du rapport, Nodus actualise les citations, la matrice et la bibliographie à l’affichage sans modifier le rapport enregistré.',
+    de: 'Berichtszitate werden bei jedem Öffnen mit dem Korpus abgeglichen. Wenn Urheberschaft oder Jahr eines Werks nach der Berichtserstellung korrigiert wurden, aktualisiert Nodus Zitate, Matrix und Literaturverzeichnis bei der Anzeige, ohne den gespeicherten Bericht zu verändern.',
+    pt: 'As citações dos relatórios são verificadas no corpus sempre que os abre. Se a autoria ou o ano de uma obra foram corrigidos depois de gerar o relatório, o Nodus atualiza as citações, a matriz e a bibliografia ao apresentá-las sem alterar o relatório guardado.',
+    'pt-BR': 'As citações dos relatórios são verificadas no corpus sempre que você os abre. Se a autoria ou o ano de uma obra foram corrigidos depois da geração, o Nodus atualiza as citações, a matriz e a bibliografia ao exibi-las sem alterar o relatório salvo.',
+  },
+  {
+    scope: 'academic',
+    es: 'Autores y editores ya no se confunden. Los capítulos atribuyen sus ideas a quien los escribió, los volúmenes sin autor pueden aparecer bajo su editor con una marca provisional y las fichas separan obras escritas de obras editadas. Al actualizar, Nodus repara también las firmas ya guardadas.',
+    en: 'Authors and editors are no longer confused. Chapters credit their ideas to the people who wrote them, authorless volumes can appear under an editor with a provisional marker, and dossiers separate authored from edited works. On update, Nodus also repairs bylines already stored in the vault.',
+    fr: 'Auteurs et éditeurs ne sont plus confondus. Les chapitres attribuent leurs idées à la personne qui les a écrits, les volumes sans auteur peuvent apparaître sous leur éditeur avec une mention provisoire et les fiches séparent les œuvres écrites des œuvres dirigées. La mise à jour répare aussi les signatures déjà enregistrées.',
+    de: 'Autoren und Herausgeber werden nicht mehr verwechselt. Kapitel schreiben ihre Ideen den Verfassern zu, Bände ohne Autor können mit einer vorläufigen Markierung beim Herausgeber erscheinen und Dossiers trennen verfasste von herausgegebenen Werken. Beim Update repariert Nodus auch bereits gespeicherte Verfasserzeilen.',
+    pt: 'Autores e editores deixam de ser confundidos. Os capítulos atribuem as ideias a quem os escreveu, os volumes sem autor podem aparecer sob o editor com uma marca provisória e as fichas separam obras escritas de obras editadas. Ao atualizar, o Nodus também repara as autorias já guardadas.',
+    'pt-BR': 'Autores e editores não são mais confundidos. Os capítulos atribuem as ideias a quem os escreveu, os volumes sem autor podem aparecer sob o editor com uma marca provisória e os dossiês separam obras escritas de obras editadas. Na atualização, o Nodus também repara as autorias já salvas.',
+  },
+  {
+    scope: 'browser',
+    es: 'Nodus Browser trata mejor el inicio de sesión con Google. Lo detiene antes de la página de bloqueo, explica que debe completarse en el navegador del sistema y conserva el sitio de origen para que puedas continuar allí. Al cerrar el aviso recuperas la página anterior o el inicio de Nodus, y Atrás vuelve correctamente a Marcadores o Research Atlas.',
+    en: 'Nodus Browser handles Google sign-in more clearly. It stops before the block page, explains that sign-in must finish in the system browser and keeps the originating site so you can continue there. Dismissing the notice restores the previous page or Nodus start page, and Back now returns correctly to Bookmarks or Research Atlas.',
+    fr: 'Le navigateur Nodus gère plus clairement la connexion Google. Il s’arrête avant la page de blocage, explique que la connexion doit se terminer dans le navigateur système et conserve le site d’origine pour y poursuivre. Fermer l’avis rétablit la page précédente ou l’accueil de Nodus, et Retour ramène correctement aux Signets ou à Research Atlas.',
+    de: 'Nodus Browser behandelt die Google-Anmeldung verständlicher. Er stoppt vor der Sperrseite, erklärt den Abschluss im Systembrowser und merkt sich die Ausgangsseite, damit Sie dort fortfahren können. Beim Schließen des Hinweises kehrt die vorherige Seite oder die Nodus-Startseite zurück, und Zurück führt korrekt zu Lesezeichen oder Research Atlas.',
+    pt: 'O Nodus Browser trata o início de sessão com o Google de forma mais clara. Interrompe antes da página de bloqueio, explica que deve terminar no navegador do sistema e conserva o site de origem para continuar aí. Fechar o aviso repõe a página anterior ou o início do Nodus, e Voltar regressa corretamente aos Marcadores ou ao Research Atlas.',
+    'pt-BR': 'O Nodus Browser trata o login com o Google de forma mais clara. Ele para antes da página de bloqueio, explica que o processo deve terminar no navegador do sistema e preserva o site de origem para você continuar lá. Fechar o aviso restaura a página anterior ou o início do Nodus, e Voltar retorna corretamente aos Favoritos ou ao Research Atlas.',
+  },
+  {
+    scope: 'general',
+    es: 'La wiki integrada vuelve a sentirse parte de Nodus. Sus barras laterales ya no forman bloques de otro color y ahora comparten el fondo del contenido central tanto dentro de la aplicación como en la web, también al cambiar entre tema claro y oscuro.',
+    en: 'The integrated wiki feels like part of Nodus again. Its sidebars no longer form blocks in a different colour and now share the central content background both inside the app and on the web, including when switching between light and dark themes.',
+    fr: 'Le wiki intégré retrouve sa place dans Nodus. Ses barres latérales ne forment plus des blocs d’une autre couleur et partagent désormais le fond du contenu central dans l’application comme sur le web, y compris lors du passage entre les thèmes clair et sombre.',
+    de: 'Das integrierte Wiki wirkt wieder wie ein Teil von Nodus. Seine Seitenleisten bilden keine andersfarbigen Blöcke mehr und teilen nun in der App und im Web den Hintergrund des Hauptinhalts, auch beim Wechsel zwischen hellem und dunklem Design.',
+    pt: 'A wiki integrada volta a parecer parte do Nodus. As barras laterais deixam de formar blocos de outra cor e passam a partilhar o fundo do conteúdo central tanto na aplicação como na web, também ao alternar entre os temas claro e escuro.',
+    'pt-BR': 'A wiki integrada volta a parecer parte do Nodus. As barras laterais não formam mais blocos de outra cor e agora compartilham o fundo do conteúdo central tanto no aplicativo quanto na web, inclusive ao alternar entre os temas claro e escuro.',
+  },
+];
+
+/**
  * 4.2.2 — Browser search, stable transitions and source workspace polish.
  */
 const RELEASE_4_2_2_HIGHLIGHTS: RawReleaseHighlight[] = [
@@ -1660,6 +1712,11 @@ const RELEASE_4_0_0_HIGHLIGHTS: RawReleaseHighlight[] = [
 ];
 
 const RAW_RELEASE_NOTES: RawReleaseNote[] = [
+  {
+    version: '4.2.3',
+    date: '2026-08-22',
+    highlights: RELEASE_4_2_3_HIGHLIGHTS,
+  },
   {
     version: '4.2.2',
     date: '2026-08-21',
