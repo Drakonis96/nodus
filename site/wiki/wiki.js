@@ -195,7 +195,7 @@ function videosMarkup() {
   return `<div style="--accent:#f87171"><p class="eyebrow">Video tutorials</p><h1>Watch it work, step by step.</h1>
     <p class="lead">Short guided videos for setting up each vault, discovering key features and connecting Nodus to the tools you already use. They play here, and the whole catalogue is also inside the app under Settings → Help.</p>
     <div class="meta-row"><span class="pill">${publishedVideos.length} videos</span><span class="pill">Watch without leaving the wiki</span></div>
-    ${sections || '<p class="lead">The video catalogue could not be loaded. <a href="https://www.youtube.com/@nodusapp">Open the channel</a>.</p>'}
+    ${sections || '<p class="lead">The video catalogue could not be loaded. <a href="https://www.youtube.com/@nodusresearch">Open the channel</a>.</p>'}
   </div>`;
 }
 

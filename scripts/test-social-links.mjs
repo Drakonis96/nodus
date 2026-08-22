@@ -45,7 +45,7 @@ test('the table holds exactly the three accounts, with their real addresses', ()
     NODUS_SOCIAL_LINKS.map((link) => [link.id, link.url]),
     [
       ['reddit', 'https://www.reddit.com/r/NodusApp/'],
-      ['youtube', 'https://www.youtube.com/@nodus_app'],
+      ['youtube', 'https://www.youtube.com/@nodusresearch'],
       ['x', 'https://x.com/nodusresearch'],
     ]
   );
