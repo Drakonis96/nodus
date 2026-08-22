@@ -123,6 +123,7 @@ export function DraftResultMain({
   draftSaved = false,
   hideActions = false,
   justify = false,
+  wide = false,
   onCopy,
   onSaveDraft,
   onSaveToNotes,
@@ -141,6 +142,8 @@ export function DraftResultMain({
   hideActions?: boolean;
   /** Justify the rendered report body. */
   justify?: boolean;
+  /** Let the report use the full reading column instead of the workshop's measure. */
+  wide?: boolean;
   onCopy: () => void;
   onSaveDraft?: () => void;
   onSaveToNotes: () => void;
@@ -151,7 +154,7 @@ export function DraftResultMain({
   onStudyRecording?: (id: string, timestamp?: number | null) => void;
 }) {
   return (
-    <div className="max-w-4xl mx-auto space-y-5">
+    <div className={`mx-auto space-y-5 ${wide ? 'max-w-none' : 'max-w-4xl'}`}>
       <div className="space-y-3">
         <div className="min-w-0">
           <h2 className="text-xl font-semibold break-words">{draft.title}</h2>

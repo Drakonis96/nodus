@@ -27,6 +27,7 @@ export const SOURCE_CITATION_TRANSLATIONS = {
     'No hay fragmentos de evidencia anclados.': 'There are no anchored evidence excerpts.',
     'Abrir en la biblioteca local': 'Open in local library',
     'Biblioteca local': 'Local library',
+    'Abrir en una pestaña nueva': 'Open in a new tab',
   },
   fr: {
     'Fuentes y contexto': 'Sources et contexte',
@@ -52,6 +53,7 @@ export const SOURCE_CITATION_TRANSLATIONS = {
     'No hay fragmentos de evidencia anclados.': 'Aucun extrait de preuve ancré.',
     'Abrir en la biblioteca local': 'Ouvrir dans la bibliothèque locale',
     'Biblioteca local': 'Bibliothèque locale',
+    'Abrir en una pestaña nueva': 'Ouvrir dans un nouvel onglet',
   },
   de: {
     'Fuentes y contexto': 'Quellen und Kontext',
@@ -77,6 +79,7 @@ export const SOURCE_CITATION_TRANSLATIONS = {
     'No hay fragmentos de evidencia anclados.': 'Es sind keine verankerten Belegauszüge vorhanden.',
     'Abrir en la biblioteca local': 'In der lokalen Bibliothek öffnen',
     'Biblioteca local': 'Lokale Bibliothek',
+    'Abrir en una pestaña nueva': 'In neuem Tab öffnen',
   },
   pt: {
     'Fuentes y contexto': 'Fontes e contexto',
@@ -102,6 +105,7 @@ export const SOURCE_CITATION_TRANSLATIONS = {
     'No hay fragmentos de evidencia anclados.': 'Não existem excertos de evidência ancorados.',
     'Abrir en la biblioteca local': 'Abrir na biblioteca local',
     'Biblioteca local': 'Biblioteca local',
+    'Abrir en una pestaña nueva': 'Abrir num separador novo',
   },
   'pt-BR': {
     'Fuentes y contexto': 'Fontes e contexto',
@@ -127,6 +131,7 @@ export const SOURCE_CITATION_TRANSLATIONS = {
     'No hay fragmentos de evidencia anclados.': 'Não há trechos de evidências ancorados.',
     'Abrir en la biblioteca local': 'Abrir na biblioteca local',
     'Biblioteca local': 'Biblioteca local',
+    'Abrir en una pestaña nueva': 'Abrir em uma nova aba',
   },
   it: {
     'Fuentes y contexto': 'Fonti e contesto',
@@ -152,6 +157,7 @@ export const SOURCE_CITATION_TRANSLATIONS = {
     'No hay fragmentos de evidencia anclados.': 'Non sono presenti estratti di prova ancorati.',
     'Abrir en la biblioteca local': 'Apri nella biblioteca locale',
     'Biblioteca local': 'Biblioteca locale',
+    'Abrir en una pestaña nueva': 'Apri in una nuova scheda',
   },
   tr: {
     'Fuentes y contexto': 'Kaynaklar ve bağlam',
@@ -177,5 +183,6 @@ export const SOURCE_CITATION_TRANSLATIONS = {
     'No hay fragmentos de evidencia anclados.': 'Bağlantılı kanıt alıntısı yok.',
     'Abrir en la biblioteca local': 'Yerel kitaplıkta aç',
     'Biblioteca local': 'Yerel kitaplık',
+    'Abrir en una pestaña nueva': 'Yeni sekmede aç',
   },
 } satisfies Record<string, Record<string, string>>;

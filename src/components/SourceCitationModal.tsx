@@ -18,6 +18,7 @@ import type {
 } from '@shared/types';
 import type { LibraryItemRecord, LibraryScope } from '@shared/libraryTypes';
 import { Badge, EDGE_LABELS, Icon, NODE_LABELS } from './ui';
+import { buildAuthorIndex, lookupAuthor } from '../authorLinks';
 import { t, tx } from '../i18n';
 
 export type CitationTarget =
@@ -195,13 +196,13 @@ function CitationWorkspace({
   };
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/75 p-3 backdrop-blur-[2px] sm:p-6" onClick={onClose}>
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/75 p-2 backdrop-blur-[2px] sm:p-4" onClick={onClose}>
       <div
         role="dialog"
         aria-modal="true"
         aria-label={t('Fuentes y contexto')}
         data-testid="source-citation-modal"
-        className="flex h-[min(90vh,760px)] max-h-[90vh] min-h-0 w-full max-w-5xl flex-col overflow-hidden rounded-2xl border border-neutral-700/80 bg-neutral-950 shadow-2xl shadow-black/60"
+        className="flex h-[min(94vh,1100px)] max-h-[94vh] min-h-0 w-full max-w-[92rem] flex-col overflow-hidden rounded-2xl border border-neutral-700/80 bg-neutral-950 shadow-2xl shadow-black/60"
         onClick={(event) => event.stopPropagation()}
       >
         <header className="flex min-h-14 shrink-0 items-center gap-3 border-b border-neutral-800 bg-neutral-950/95 px-4 sm:px-5">
@@ -283,7 +284,7 @@ function CitationTabPane({
   const reportTitle = useCallback((title: string) => onTitle(tab.key, title), [onTitle, tab.key]);
   return (
     <div className={`${active ? 'min-h-0 flex-1 overflow-y-auto overscroll-contain' : 'hidden'}`} role="tabpanel" data-testid={`source-citation-panel-${tab.key}`}>
-      <div className="mx-auto max-w-4xl p-4 sm:p-6">
+      <div className="mx-auto max-w-6xl p-4 sm:p-6">
         <CitationPanel target={tab.target} authors={authors} onOpenTarget={onOpenTarget} onTitle={reportTitle} onOpenLibraryWork={onOpenLibraryWork} />
       </div>
     </div>
@@ -595,22 +596,11 @@ function useLocalWork(workId: string): { id: string; scope: LibraryScope } | nul
 }
 
 function AuthorLinks({ names, authors, onOpenTarget }: { names: string[]; authors: AuthorSummary[]; onOpenTarget: CitationPanelProps['onOpenTarget'] }) {
-  const index = useMemo(() => {
-    const map = new Map<string, AuthorSummary>();
-    for (const author of authors) { map.set(normalizeAuthorName(author.name), author); map.set(normalizeAuthorName(author.fullName), author); }
-    return map;
-  }, [authors]);
+  const index = useMemo(() => buildAuthorIndex(authors), [authors]);
   return <div className="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-xs text-neutral-400">{names.map((name, indexInList) => {
-    const author = index.get(normalizeAuthorName(name));
-    return <span key={`${name}:${indexInList}`} className="inline-flex items-center gap-1.5">{indexInList > 0 && <span className="text-neutral-700">·</span>}{author ? <button className="rounded px-1 py-0.5 text-neutral-400 hover:bg-violet-500/10 hover:text-violet-200" onClick={() => onOpenTarget({ kind: 'author', id: author.author_id }, author.fullName || author.name)}>{name}</button> : <span>{name}</span>}</span>;
+    const author = lookupAuthor(index, name);
+    return <span key={`${name}:${indexInList}`} className="inline-flex items-center gap-1.5">{indexInList > 0 && <span className="text-neutral-700">·</span>}{author ? <button className="rounded px-1 py-0.5 text-neutral-400 hover:bg-violet-500/10 hover:text-violet-200" title={t('Abrir en una pestaña nueva')} onClick={() => onOpenTarget({ kind: 'author', id: author.author_id }, author.fullName || author.name)}>{name}</button> : <span>{name}</span>}</span>;
   })}</div>;
-}
-
-function normalizeAuthorName(value: string): string {
-  const plain = value.normalize('NFKD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase().replace(/[^a-z0-9, ]/g, ' ').replace(/\s+/g, ' ').trim();
-  if (!plain.includes(',')) return plain;
-  const [last, first] = plain.split(',', 2).map((part) => part.trim());
-  return `${first} ${last}`.trim();
 }
 
 function Subheading({ children }: { children: React.ReactNode }) { return <h4 className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-neutral-500">{children}</h4>; }

@@ -2838,6 +2838,8 @@ export const PT_BR: Record<string, string> = {
   'Quitar de la cola': 'Remover da fila',
   'Falló': 'Falhou',
   'Abrir a pantalla completa': 'Abrir em tela cheia',
+  'Lectura a pantalla completa': 'Leitura em tela cheia',
+  'Salir de pantalla completa': 'Sair da tela cheia',
   'Leer': 'Ler',
   'Reutilizar la idea para un informe nuevo': 'Reaproveitar a ideia para um novo relatório',
   'Volver a la galería': 'Voltar à galeria',

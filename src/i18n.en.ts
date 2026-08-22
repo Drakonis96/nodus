@@ -2926,6 +2926,8 @@ export const EN: Record<string, string> = {
   'Quitar de la cola': 'Remove from queue',
   'Falló': 'Failed',
   'Abrir a pantalla completa': 'Open full-screen',
+  'Lectura a pantalla completa': 'Full-screen reading',
+  'Salir de pantalla completa': 'Leave full screen',
   'Leer': 'Read',
   'Reutilizar la idea para un informe nuevo': 'Reuse the idea for a new report',
   'Volver a la galería': 'Back to gallery',

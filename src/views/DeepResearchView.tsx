@@ -343,6 +343,7 @@ export function DeepResearchView({
   // Reader + shared modals.
   const [openDraft, setOpenDraft] = useState<WritingWorkshopSavedDraft | null>(null);
   const [showMatrix, setShowMatrix] = useState(false);
+  const [fullscreen, setFullscreen] = useState(false);
   const [citation, setCitation] = useState<CitationTarget>(null);
   const [savingToNotes, setSavingToNotes] = useState(false);
   const [translationOpen, setTranslationOpen] = useState(false);
@@ -532,6 +533,7 @@ export function DeepResearchView({
 
   const backToGallery = () => {
     setMode('gallery');
+    setFullscreen(false);
     setOpenDraft(null);
     restoredReading.current = null;
     report.current?.({ reading: null });
@@ -789,6 +791,25 @@ export function DeepResearchView({
     void window.nodus.clearFinishedDeepResearchJobs();
   };
 
+  /**
+   * Escape leaves full-screen reading — but only when it is the outermost thing on
+   * screen. A citation workspace, a translation dialog or the find panel each close
+   * on Escape too, and taking the reader out from under them would answer one key
+   * press twice.
+   */
+  useEffect(() => {
+    if (!fullscreen) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape' || event.defaultPrevented) return;
+      if (citation || translationOpen || savingToNotes) return;
+      if (document.querySelector('[role="dialog"][aria-modal="true"], [data-testid="find-in-page"]')) return;
+      event.preventDefault();
+      setFullscreen(false);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [citation, fullscreen, savingToNotes, translationOpen]);
+
   // A report that was left open is the section's first frame, never its second. The
   // gallery below is a screen full of cards; painting it for the frames the read of
   // the report takes is what makes returning to the section look like the app opening
@@ -799,30 +820,37 @@ export function DeepResearchView({
   if (mode === 'reader' && openDraft) {
     return (
       <>
-        <ReaderView
-          saved={openDraft}
-          settings={settings}
-          initialReading={restoredReading.current}
-          onReadingChange={(place) => report.current?.({ reading: place })}
-          showMatrix={showMatrix}
-          exporting={exporting}
-          message={message}
-          error={error}
-          appliedTranslation={appliedTranslation}
-          onToggleMatrix={() => setShowMatrix((v) => !v)}
-          onBack={backToGallery}
-          onCopy={() => void copyDraft()}
-          onCopyReading={() => void copyForListening()}
-          onSaveToNotes={() => setSavingToNotes(true)}
-          onToggleRead={() => void toggleRead(openDraft)}
-          onTranslate={() => setTranslationOpen(true)}
-          onExport={(format) => void exportDraft(format)}
-          onCitation={setCitation}
-          onImageChange={onImageChange}
-          onOpenStudyDocument={onOpenStudyDocument}
-          onOpenStudyMaterial={onOpenStudyMaterial}
-          onOpenStudyRecording={onOpenStudyRecording}
-        />
+        {/* Full screen is the same reader lifted out of the shell: a fixed layer over
+            the window, so the report and its own toolbar are all that is left on
+            screen. `display: contents` keeps the normal case exactly as it was. */}
+        <div className={fullscreen ? 'fixed inset-0 z-40 flex flex-col bg-neutral-950' : 'contents'} data-testid="deep-research-reader-shell" data-fullscreen={fullscreen ? 'on' : 'off'}>
+          <ReaderView
+            saved={openDraft}
+            settings={settings}
+            initialReading={restoredReading.current}
+            onReadingChange={(place) => report.current?.({ reading: place })}
+            showMatrix={showMatrix}
+            fullscreen={fullscreen}
+            exporting={exporting}
+            message={message}
+            error={error}
+            appliedTranslation={appliedTranslation}
+            onToggleMatrix={() => setShowMatrix((v) => !v)}
+            onToggleFullscreen={() => setFullscreen((v) => !v)}
+            onBack={backToGallery}
+            onCopy={() => void copyDraft()}
+            onCopyReading={() => void copyForListening()}
+            onSaveToNotes={() => setSavingToNotes(true)}
+            onToggleRead={() => void toggleRead(openDraft)}
+            onTranslate={() => setTranslationOpen(true)}
+            onExport={(format) => void exportDraft(format)}
+            onCitation={setCitation}
+            onImageChange={onImageChange}
+            onOpenStudyDocument={onOpenStudyDocument}
+            onOpenStudyMaterial={onOpenStudyMaterial}
+            onOpenStudyRecording={onOpenStudyRecording}
+          />
+        </div>
         {translationOpen && (
           <TranslationModal
             entityKind="deep_research"
@@ -1540,9 +1568,10 @@ function useReportOutline({
   scrollerRef: RefObject<HTMLElement | null>;
   documentRef: RefObject<HTMLDivElement | null>;
   revision: unknown;
-}): { headings: ReportOutlineHeading[]; activeIndex: number } {
+}): { headings: ReportOutlineHeading[]; activeIndex: number; progress: number } {
   const [headings, setHeadings] = useState<ReportOutlineHeading[]>([]);
   const [activeIndex, setActiveIndex] = useState(0);
+  const [progress, setProgress] = useState(0);
 
   useEffect(() => {
     const scroller = scrollerRef.current;
@@ -1551,6 +1580,7 @@ function useReportOutline({
     if (!scroller || !root || !prose) {
       setHeadings([]);
       setActiveIndex(0);
+      setProgress(0);
       return;
     }
 
@@ -1559,6 +1589,12 @@ function useReportOutline({
 
     const locate = () => {
       frame = null;
+      // How far down the report the reader has actually come. Counting sections
+      // instead would sit still for pages at a time and then jump a fifth of the
+      // way at a heading, which reads as a broken bar rather than a coarse one.
+      const scrollable = scroller.scrollHeight - scroller.clientHeight;
+      const read = scrollable > 1 ? Math.min(100, Math.max(0, Math.round((scroller.scrollTop / scrollable) * 100))) : 100;
+      setProgress((current) => current === read ? current : read);
       if (nodes.length === 0) {
         setActiveIndex(0);
         return;
@@ -1603,8 +1639,12 @@ function useReportOutline({
     scan();
     const mutations = new MutationObserver(scan);
     mutations.observe(prose, { childList: true, subtree: true, characterData: true });
+    // Both boxes matter: the report grows as images land, and the window (or the
+    // support-matrix panel) changes how much of it fits on screen. Either one moves
+    // how much is left to read.
     const resize = new ResizeObserver(scheduleLocate);
     resize.observe(root);
+    resize.observe(scroller);
     scroller.addEventListener('scroll', scheduleLocate, { passive: true });
     return () => {
       mutations.disconnect();
@@ -1614,17 +1654,20 @@ function useReportOutline({
     };
   }, [documentRef, revision, scrollerRef]);
 
-  return { headings, activeIndex };
+  return { headings, activeIndex, progress };
 }
 
 function ReportOutlineRail({
   headings,
   activeIndex,
+  progress,
   deferUntilWide = false,
   onSelect,
 }: {
   headings: ReportOutlineHeading[];
   activeIndex: number;
+  /** Share of the report already scrolled past, 0–100. */
+  progress: number;
   deferUntilWide?: boolean;
   onSelect: (heading: ReportOutlineHeading) => void;
 }) {
@@ -1634,7 +1677,6 @@ function ReportOutlineRail({
   }, [activeIndex]);
   if (headings.length < 2) return null;
 
-  const progress = Math.round(((activeIndex + 1) / headings.length) * 100);
   return (
     <aside
       data-testid="deep-research-outline-rail"
@@ -1643,7 +1685,7 @@ function ReportOutlineRail({
     >
       <div className="mb-4 flex items-center justify-between gap-3 px-1">
         <span className="text-[10px] font-semibold uppercase tracking-[0.16em] text-neutral-500">{t('Contenido')}</span>
-        <span className="text-[10px] font-medium tabular-nums text-indigo-300">{progress}%</span>
+        <span data-testid="deep-research-reading-progress" className="text-[10px] font-medium tabular-nums text-indigo-300">{progress}%</span>
       </div>
       <div className="mb-4 h-1 overflow-hidden rounded-full bg-neutral-800" aria-hidden="true">
         <div className="h-full rounded-full bg-indigo-500 transition-[width] duration-200" style={{ width: `${progress}%` }} />
@@ -1789,11 +1831,13 @@ function ReaderView({
   initialReading,
   onReadingChange,
   showMatrix,
+  fullscreen,
   exporting,
   message,
   error,
   appliedTranslation,
   onToggleMatrix,
+  onToggleFullscreen,
   onBack,
   onCopy,
   onCopyReading,
@@ -1813,11 +1857,14 @@ function ReaderView({
   initialReading: ReadingPlace | null;
   onReadingChange: (place: ReadingPlace | null) => void;
   showMatrix: boolean;
+  /** Reading with the app shell out of the way; only the report's own tools remain. */
+  fullscreen: boolean;
   exporting: boolean;
   message: string | null;
   error: string | null;
   appliedTranslation: ContentTranslation | null;
   onToggleMatrix: () => void;
+  onToggleFullscreen: () => void;
   onBack: () => void;
   onCopy: () => void;
   onCopyReading: () => void;
@@ -1840,7 +1887,7 @@ function ReaderView({
   const [highlighterColor, setHighlighterColor] = useState<WritingDraftAnnotationColor | null>(null);
   const [annotationError, setAnnotationError] = useState<string | null>(null);
   const annotationScope = appliedTranslation ? `translation:${appliedTranslation.id}` : 'source';
-  const { headings, activeIndex } = useReportOutline({
+  const { headings, activeIndex, progress } = useReportOutline({
     scrollerRef: mainRef,
     documentRef,
     revision: appliedTranslation?.id ?? saved.id,
@@ -1967,6 +2014,17 @@ function ReaderView({
           showLabel={showMatrix}
           className={`btn-ghost h-9 min-h-9 border ${showMatrix ? 'border-indigo-700/60 text-indigo-200' : 'border-neutral-700'}`}
         />
+        {/* Clicked with the mouse, the button hands focus back: a focused toolbar
+            button keeps its label open, and a label that wide re-wraps the row under
+            whatever the reader reaches for next. Keyboard activation (detail 0) keeps
+            its focus, which is the whole point of having it there. */}
+        <HoverLabelButton
+          icon={fullscreen ? 'minimize' : 'maximize'}
+          label={fullscreen ? t('Salir de pantalla completa') : t('Lectura a pantalla completa')}
+          onClick={(event) => { if (event.detail > 0) event.currentTarget.blur(); onToggleFullscreen(); }}
+          data-testid="deep-research-fullscreen-toggle"
+          className={`btn-ghost h-9 min-h-9 border ${fullscreen ? 'border-indigo-700/60 text-indigo-200' : 'border-neutral-700'}`}
+        />
       </header>
 
       {(message || error || annotationError) && (
@@ -1976,9 +2034,9 @@ function ReaderView({
       )}
 
       <div className="min-h-0 flex-1 flex">
-        <ReportOutlineRail headings={headings} activeIndex={activeIndex} deferUntilWide={showMatrix} onSelect={goToHeading} />
-        <main ref={mainRef} className="min-w-0 flex-1 overflow-y-auto px-6 py-6 max-md:px-4">
-          <div className="mx-auto max-w-3xl space-y-6">
+        <ReportOutlineRail headings={headings} activeIndex={activeIndex} progress={progress} deferUntilWide={showMatrix} onSelect={goToHeading} />
+        <main ref={mainRef} className={`min-w-0 flex-1 overflow-y-auto py-6 max-md:px-4 ${fullscreen ? 'px-10 max-lg:px-6' : 'px-6'}`}>
+          <div className={`mx-auto space-y-6 ${fullscreen ? 'max-w-6xl' : 'max-w-5xl'}`}>
             <DecorativeImageCard
               entityKind="deep_research"
               entityId={saved.id}
@@ -2001,6 +2059,7 @@ function ReaderView({
                 draftSaved
                 hideActions
                 justify
+                wide
                 onCopy={onCopy}
                 onSaveToNotes={onSaveToNotes}
                 onExport={onExport}

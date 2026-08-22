@@ -2858,6 +2858,8 @@ export const DE: Record<string, string> = {
   'Quitar de la cola': 'Aus der Warteschlange entfernen',
   'Falló': 'Fehlgeschlagen',
   'Abrir a pantalla completa': 'Im Vollbild öffnen',
+  'Lectura a pantalla completa': 'Vollbildlesen',
+  'Salir de pantalla completa': 'Vollbild verlassen',
   'Leer': 'Lesen',
   'Reutilizar la idea para un informe nuevo': 'Idee für einen neuen Bericht wiederverwenden',
   'Volver a la galería': 'Zurück zur Galerie',

@@ -2568,6 +2568,8 @@ export const IT: Record<string, string> = {
   "Quitar de la cola": "Rimuovi dalla coda",
   "Falló": "Fallito",
   "Abrir a pantalla completa": "Apri a schermo intero",
+  "Lectura a pantalla completa": "Lettura a schermo intero",
+  "Salir de pantalla completa": "Esci dallo schermo intero",
   "Leer": "Leggi",
   "Reutilizar la idea para un informe nuevo": "Riutilizzare l'idea per un nuovo report",
   "Volver a la galería": "Torna alla galleria",
