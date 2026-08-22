@@ -28,7 +28,6 @@ import { deleteWorldRule } from '../db/worldRulesRepo';
 import { deleteWorldQuestion } from '../db/worldQuestionsRepo';
 import { getPageDocument, restorePageRevision } from '../db/pagesRepo';
 import { createDatabaseFromCsv } from '../db/databasesRepo';
-import { getDb } from '../db/database';
 import * as projects from '../db/projectsRepo';
 import { generateWritingWorkshopDraft } from '../ai/writingWorkshop';
 import { saveWritingWorkshopDraft } from '../db/writingDraftsRepo';
