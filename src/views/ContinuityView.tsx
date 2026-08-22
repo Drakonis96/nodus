@@ -319,8 +319,9 @@ function ExceptionsAction() {
         className="btn btn-ghost h-9 gap-1.5 border border-neutral-300 dark:border-neutral-700 px-2 text-xs"
         data-testid="continuity-exceptions"
         onClick={() => {
-          void load();
-          setOpen(true);
+          // Populate the modal before mounting it. Opening first raced the async IPC read
+          // and briefly presented an incorrect empty state for an accepted exception.
+          void load().then(() => setOpen(true));
         }}
       >
         <Icon name="check" size={14} /> {tx('Excepciones aceptadas ({count})', { count: String(mutes.length) })}
