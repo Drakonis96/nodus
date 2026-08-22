@@ -30,6 +30,7 @@ import {
   isNodusResearchSiteUrl,
   MAX_BROWSER_TABS,
   NODUS_BOOKMARKS_URL,
+  shouldRestoreInternalReturnOnDismiss,
 } from '@shared/browser';
 import { decideNavigation } from '@shared/browserNavigation';
 import { NODUS_BROWSER_PARTITION, browserSession } from './session';
@@ -809,21 +810,6 @@ function withActive<T>(fn: (contents: WebContents) => T): T | undefined {
 }
 
 /**
- * Put the tab back on the page it never actually left.
- *
- * The Google sign-in notice is raised WITHOUT a navigation: the popup is denied,
- * or will-navigate is preventDefault()ed, so the site's own page is still loaded
- * and merely hidden, because a tab with an error hides its native view. Going
- * back from here was therefore the wrong move twice over — it lands on whatever
- * preceded the login page, and on a tab with no history it silently does nothing
- * at all, which is exactly how it looked: a dead button.
- *
- * Clearing the error reveals the live page again, and the visible state is
- * resynced from the WebContents rather than trusted: the omnibox path patches
- * the tab's url to the Google address before raising the notice, and leaving
- * that in place would show one address over a different page.
- */
-/**
  * Whether Back has anywhere to go: Chromium's own history, or the start page
  * Chromium never recorded. Used everywhere the tab's canGoBack is published, so
  * the toolbar button is enabled exactly when pressing it will do something.
@@ -833,15 +819,69 @@ function canGoBackFrom(tab: Tab): boolean {
   return tab.internalReturn !== null;
 }
 
+/** Restore the React start page represented by the history step Chromium lacks. */
+function restoreInternalReturn(
+  tab: Tab,
+  back: NonNullable<Tab['internalReturn']>,
+): void {
+  const contents = tab.view.webContents;
+  tab.internalReturn = null;
+  contents.stop();
+  dropMediaSession(tab.id);
+  patch(tab, {
+    kind: back.kind,
+    url: back.url,
+    title: back.kind === 'bookmarks' ? 'Nodus Bookmarks' : 'Research Atlas',
+    faviconDataUrl: null,
+    loading: false,
+    canGoBack: false,
+    canGoForward: false,
+    audible: false,
+    muted: false,
+    hasMedia: false,
+    mediaPlaying: false,
+    error: null,
+  });
+  applyVisibility();
+  void contents.loadURL('about:blank').catch(() => undefined);
+}
+
+/**
+ * Put the tab back on the page it never actually left.
+ *
+ * The Google sign-in notice is raised WITHOUT a navigation: the popup is denied,
+ * or will-navigate is preventDefault()ed, so the site's own page is still loaded
+ * and merely hidden, because a tab with an error hides its native view. Going
+ * back from here was therefore the wrong move twice over — it lands on whatever
+ * preceded the login page, and on a tab with no history it silently does nothing
+ * at all, which is exactly how it looked: a dead button.
+ *
+ * Clearing the error normally reveals the live page again, and the visible
+ * state is resynced from the WebContents rather than trusted: the omnibox path
+ * patches the tab's url to the Google address before raising the notice, and
+ * leaving that in place would show one address over a different page. The one
+ * exception is a React start page, whose WebContents is only about:blank; that
+ * remembered page must be restored rather than replaced with an empty surface.
+ */
 export function dismissError(): void {
   const tab = activeTabId ? tabs.get(activeTabId) : null;
   if (!tab || tab.view.webContents.isDestroyed()) return;
   const contents = tab.view.webContents;
   const live = contents.getURL();
+  const internalReturn = shouldRestoreInternalReturnOnDismiss(live, tab.internalReturn !== null)
+    ? tab.internalReturn
+    : null;
+  if (internalReturn) {
+    restoreInternalReturn(tab, internalReturn);
+    return;
+  }
   patch(tab, {
     error: null,
     loading: false,
-    url: live && live !== 'about:blank' ? live : tab.state.url,
+    // about:blank is meaningful here: a direct Google request in a fresh tab
+    // has no live site to reveal, so retaining Google's blocked address would
+    // put one URL over a different page.
+    url: live || tab.state.url,
     title: contents.getTitle() || tab.state.title,
     canGoBack: canGoBackFrom(tab),
     canGoForward: contents.navigationHistory.canGoForward(),
@@ -873,25 +913,7 @@ export function goBack(): void {
 
   const back = tab.internalReturn;
   if (back) {
-    tab.internalReturn = null;
-    contents.stop();
-    dropMediaSession(tab.id);
-    patch(tab, {
-      kind: back.kind,
-      url: back.url,
-      title: back.kind === 'bookmarks' ? 'Nodus Bookmarks' : 'Research Atlas',
-      faviconDataUrl: null,
-      loading: false,
-      canGoBack: false,
-      canGoForward: false,
-      audible: false,
-      muted: false,
-      hasMedia: false,
-      mediaPlaying: false,
-      error: null,
-    });
-    applyVisibility();
-    void contents.loadURL('about:blank').catch(() => undefined);
+    restoreInternalReturn(tab, back);
     return;
   }
 

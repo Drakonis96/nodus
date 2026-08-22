@@ -33,7 +33,7 @@ execFileSync(
   ],
   { cwd: repoRoot, stdio: 'inherit' },
 );
-const { isGoogleSignInUrl } = createRequire(import.meta.url)(bundle);
+const { isGoogleSignInUrl, shouldRestoreInternalReturnOnDismiss } = createRequire(import.meta.url)(bundle);
 process.on('exit', () => rmSync(dir, { recursive: true, force: true }));
 
 /** Source with comments removed, so prose about a pattern never satisfies a scan. */
@@ -89,6 +89,20 @@ test('lookalike hosts do not match', () => {
   assert.equal(isGoogleSignInUrl('http://accounts.google.com/signin'), false);
   assert.equal(isGoogleSignInUrl('not a url'), false);
   assert.equal(isGoogleSignInUrl(''), false);
+});
+
+test('dismissing from a React start page restores it instead of revealing about:blank', () => {
+  // Research Atlas and Bookmarks are React pages, so Chromium only has an
+  // empty WebContents behind them. A direct Google request remembers the start
+  // page but never navigates; dismissing the notice must spend that remembered
+  // return rather than expose a blank native view.
+  assert.equal(shouldRestoreInternalReturnOnDismiss('about:blank', true), true);
+  assert.equal(shouldRestoreInternalReturnOnDismiss('', true), true);
+
+  // A denied popup can cover a real site while an older start-page return is
+  // still remembered. That live page wins: dismiss should reveal it in place.
+  assert.equal(shouldRestoreInternalReturnOnDismiss('https://app.example/login', true), false);
+  assert.equal(shouldRestoreInternalReturnOnDismiss('about:blank', false), false);
 });
 
 test('all five ways a navigation can start are intercepted', () => {
@@ -233,6 +247,10 @@ test('dismissing an error resyncs the tab from the live page', () => {
   // from a Nodus start page can go back to it even with no history entry.
   assert.match(body, /canGoBack:\s*canGoBackFrom\(tab\)/,
     'the back/forward state must be resynced, including the remembered start page');
+  assert.match(body, /shouldRestoreInternalReturnOnDismiss/,
+    'an empty WebContents with a remembered start page must restore that page');
+  assert.match(body, /restoreInternalReturn\(tab, internalReturn\)/,
+    'dismiss must not reveal about:blank over a React start page');
 });
 
 test('the dismiss channel validates its sender like every other browser channel', () => {

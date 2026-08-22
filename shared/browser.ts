@@ -192,6 +192,21 @@ export function isGoogleSignInUrl(rawUrl: string): boolean {
   }
 }
 
+/**
+ * Whether dismissing a navigation notice must restore the React start page
+ * Chromium never recorded instead of revealing an empty native WebContents.
+ *
+ * A real web page always wins, even when an internal return is remembered: the
+ * notice may be covering a live site whose own Google popup was denied. Only an
+ * empty WebContents means there is nothing useful behind the notice.
+ */
+export function shouldRestoreInternalReturnOnDismiss(
+  liveUrl: string,
+  hasInternalReturn: boolean,
+): boolean {
+  return hasInternalReturn && (!liveUrl || liveUrl === 'about:blank');
+}
+
 /** Synthetic identifiers. They are not registered protocols and never navigate. */
 export const NODUS_BOOKMARKS_URL = 'nodus://bookmarks';
 export const NODUS_RESEARCH_ATLAS_START_URL = 'nodus://research-atlas';

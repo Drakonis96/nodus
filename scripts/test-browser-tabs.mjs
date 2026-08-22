@@ -211,7 +211,12 @@ test('Back never falls through and does nothing', () => {
 
   // Then the start page Chromium never recorded.
   assert.match(goBack, /tab\.internalReturn/, 'Back must consider the remembered start page');
-  assert.match(goBack, /kind:\s*back\.kind/, 'returning must restore the internal page kind');
+  assert.match(goBack, /restoreInternalReturn\(tab,\s*back\)/,
+    'Back must delegate restoration of the remembered start page');
+
+  const restoreInternalReturn = body('restoreInternalReturn');
+  assert.match(restoreInternalReturn, /kind:\s*back\.kind/,
+    'returning must restore the internal page kind');
 
   // Then an error pane, which is raised without any navigation at all.
   assert.match(goBack, /dismissError\(\)/, 'with nothing to navigate, Back must at least clear the pane');
