@@ -376,7 +376,7 @@ export const EN: Record<string, string> = {
   'Después del cambio, revisa y completa los modelos de «Ajustes avanzados comunes» y del vault actual. Una tarea sin un modelo válido puede fallar.': 'After switching, review and complete the models under “Common advanced settings” and for the current vault. A task without a valid model may fail.',
   'Cambiar a configuración básica': 'Switch to basic configuration',
   'Cambiar a configuración avanzada': 'Switch to advanced configuration',
-  'Acerca de Nodus': 'About Nodus',
+  'Acerca de Nodus Research': 'About Nodus Research',
   'Nodus es un proyecto independiente de código abierto, desarrollado y mantenido principalmente por una sola persona. No es un servicio comercial ni un producto de pago: la aplicación seguirá siendo gratuita y su código permanecerá abierto.': 'Nodus is an independent open-source project, developed and maintained primarily by one person. It is not a commercial service or a paid product: the application will remain free and its source code will stay open.',
   'Si Nodus te ayuda a estudiar, investigar o escribir y quieres contribuir voluntariamente a su desarrollo, puedes apoyar el proyecto mediante PayPal o Ko-fi. La donación es completamente opcional: no desbloquea funciones ni cambia el acceso a la aplicación.': 'If Nodus helps you study, research, or write and you would like to contribute voluntarily to its continued development, you can support the project through PayPal or Ko-fi. Donations are entirely optional: they do not unlock features or change access to the application.',
   'Apoyar con PayPal': 'Support through PayPal',

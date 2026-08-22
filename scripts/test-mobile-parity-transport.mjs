@@ -82,12 +82,17 @@ test('an open Deep Research reader converges through the server on both platform
   assert.match(desktopReader, /onWritingDraftsChanged[\s\S]+setOpenDraft\(refreshed\)/);
   assert.match(desktopReader, /onContentTranslationsChanged/);
 
+  // Desktop CI is self-contained. A sibling mobile checkout exists in local development
+  // and in the mobile parity workflow, where the cross-platform half is asserted too.
   const mobileRoot = path.resolve(root, '../nodus-mobile');
-  const session = fs.readFileSync(path.join(mobileRoot, 'ios/Nodus/State/SpaceSession.swift'), 'utf8');
-  const mobileReader = fs.readFileSync(path.join(mobileRoot, 'ios/Nodus/Screens/ResearchLibraryView.swift'), 'utf8');
-  const translationStore = fs.readFileSync(path.join(mobileRoot, 'ios/Nodus/State/DeepResearchTranslationStore.swift'), 'utf8');
-  assert.match(session, /monitorPublishedContent\(every interval: Duration = \.seconds\(2\)\)/);
-  assert.match(mobileReader, /\.task\(id: session\.publishedRevision\) \{ await refreshPublishedCopy\(\) \}/);
-  assert.match(mobileReader, /\.task\(id: session\.publishedRevision\) \{ await load\(\) \}/);
-  assert.match(translationStore, /replaceFromServer\(rows:/);
+  const sessionPath = path.join(mobileRoot, 'ios/Nodus/State/SpaceSession.swift');
+  if (fs.existsSync(sessionPath)) {
+    const session = fs.readFileSync(sessionPath, 'utf8');
+    const mobileReader = fs.readFileSync(path.join(mobileRoot, 'ios/Nodus/Screens/ResearchLibraryView.swift'), 'utf8');
+    const translationStore = fs.readFileSync(path.join(mobileRoot, 'ios/Nodus/State/DeepResearchTranslationStore.swift'), 'utf8');
+    assert.match(session, /monitorPublishedContent\(every interval: Duration = \.seconds\(2\)\)/);
+    assert.match(mobileReader, /\.task\(id: session\.publishedRevision\) \{ await refreshPublishedCopy\(\) \}/);
+    assert.match(mobileReader, /\.task\(id: session\.publishedRevision\) \{ await load\(\) \}/);
+    assert.match(translationStore, /replaceFromServer\(rows:/);
+  }
 });

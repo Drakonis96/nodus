@@ -100,10 +100,13 @@ try {
 
   const snapshot = fs.readFileSync(path.join(repoRoot, 'electron/serverSync/serverSnapshot.ts'), 'utf8'); const syncTables = fs.readFileSync(path.join(repoRoot, 'electron/db/syncTables.ts'), 'utf8');
   const outbox = fs.readFileSync(path.join(repoRoot, 'electron/serverSync/outboxTriggers.ts'), 'utf8'); const serverMutations = fs.readFileSync(path.join(repoRoot, 'server/lib/core/mutations.mjs'), 'utf8');
+  const mutationRegistry = JSON.parse(fs.readFileSync(path.join(repoRoot, 'shared/mutableTables.json'), 'utf8'));
   for (const table of ['automation_rules','automation_runs','automation_notifications','database_forms','database_form_fields','database_form_submissions']) {
-    for (const sourceText of [snapshot,syncTables,outbox]) assert.match(sourceText, new RegExp(`['\"]${table}['\"]`), `${table} covered by desktop sync`);
-    assert.match(serverMutations, new RegExp(`(?:['\"]${table}['\"]|\\b${table}\\s*:)`), `${table} covered by server mutations`);
+    for (const sourceText of [snapshot,syncTables]) assert.match(sourceText, new RegExp(`['\"]${table}['\"]`), `${table} covered by desktop sync`);
+    assert.ok(mutationRegistry.tables[table], `${table} covered by the generated mutation registry`);
   }
+  assert.match(outbox, /generatedMutableTables/);
+  assert.match(serverMutations, /generatedMutableTables/);
   assert.match(snapshot, /'auth_token_hash'/, 'form secrets are stripped from publication');
   assert.deepEqual(sqlite.pragma('foreign_key_check'), []); assert.equal(sqlite.pragma('quick_check', { simple: true }), 'ok');
   console.log('database automations, retries, schedules, buttons and real HTTP forms test passed');
