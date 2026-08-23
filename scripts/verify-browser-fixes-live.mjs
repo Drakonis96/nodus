@@ -185,7 +185,24 @@ try {
   check('the page is frozen into React instead of vanishing', snapshotShown.present && snapshotShown.width > 200 && snapshotShown.bytes > 5000, JSON.stringify(snapshotShown));
   await page.screenshot({ path: path.join(shots, '02-media-popover.png') });
   await page.keyboard.press('Escape');
-  await page.waitForTimeout(400);
+  await page.waitForTimeout(900);
+  const restored = await page.evaluate(() => ({
+    popover: Boolean(document.querySelector('[data-testid="browser-media-popover"]')),
+    snapshot: Boolean(document.querySelector('[data-testid="browser-media-page-snapshot"]')),
+  }));
+  console.log('after close (renderer):', JSON.stringify(restored));
+  const nativeVisible = await app.evaluate(async ({ BrowserWindow }) => {
+    const win = BrowserWindow.getAllWindows()[0];
+    return win.contentView.children.map((child) => ({
+      visible: typeof child.getVisible === 'function' ? child.getVisible() : 'n/a',
+      bounds: child.getBounds?.() ?? null,
+      url: child.webContents?.getURL?.() ?? null,
+    }));
+  });
+  console.log('after close (native views):', JSON.stringify(nativeVisible));
+  check('closing the panel brings the page back', restored.popover === false && restored.snapshot === false
+    && nativeVisible.some((v) => v.visible === true && String(v.url).startsWith('http://127.0.0.1')),
+    JSON.stringify(nativeVisible));
   await page.screenshot({ path: path.join(shots, '03-after-close.png') });
 
   // ---- 5. Cmd/Ctrl+T while the PAGE has focus ------------------------------
