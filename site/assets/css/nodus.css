@@ -418,6 +418,9 @@ body.cursor-press .cursor { width: 26px; height: 26px; margin: -13px 0 0 -13px; 
 .wrap-narrow { width: min(100% - calc(var(--gut) * 2), 820px); margin-inline: auto; }
 
 section { padding: clamp(72px, 11vw, 148px) 0; }
+/* The section that follows an inner-page hero sits closer to it, so its heading
+   is already on screen when the page loads. */
+.page-hero + section { padding-top: clamp(54px, 9vh, 132px); }
 .section-line { border-top: 1px solid var(--membrane); }
 
 .kicker {
@@ -602,11 +605,14 @@ footer.site-foot {
 }
 
 /* ============================================================ page hero (inner pages) */
+/* The hero keeps its own proportions but is measured against the height of the
+   window as well as its width, so the first section under it always breaks the
+   fold instead of being pushed out of sight on a short screen. */
 .page-hero {
-  padding: calc(var(--nav-h) + clamp(52px, 8vw, 108px)) 0 clamp(38px, 5vw, 66px);
+  padding: calc(var(--nav-h) + clamp(30px, 6vh, 86px)) 0 clamp(22px, 3.6vh, 48px);
 }
-.page-hero .display { font-size: clamp(38px, 5.6vw, 68px); }
-.page-hero .lead { margin-top: 24px; font-size: clamp(16.5px, 1.4vw, 19px); }
+.page-hero .display { font-size: clamp(34px, 3.4vw + 1.1vh, 62px); }
+.page-hero .lead { margin-top: clamp(14px, 2.2vh, 24px); font-size: clamp(16.5px, 1.4vw, 19px); line-height: 1.55; }
 
 /* ============================================================ prose */
 .prose { font-size: 16.5px; line-height: 1.75; color: var(--ink-prose); }
