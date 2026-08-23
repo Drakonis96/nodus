@@ -32,6 +32,18 @@ const ENDED_GRACE_MS = 30_000;
 
 interface Session extends BrowserMediaState {
   endedTimer: NodeJS.Timeout | null;
+  /**
+   * How many players Chromium currently reports as running in this tab.
+   *
+   * `media-started-playing` and `media-paused` fire once PER PLAYER, not once
+   * per tab. A page that keeps spare <audio> elements around — elevenreader.io
+   * ships eight and sources one — pauses them constantly, and treating any one
+   * of those pauses as "the tab is paused" is what left the header showing Play
+   * over a track that was still running, with a Play button that then did
+   * nothing because the element was already playing. Counting is what makes the
+   * flag mean "something is playing" instead of "the last event was a pause".
+   */
+  activePlayers: number;
 }
 
 const sessions = new Map<string, Session>();
@@ -47,7 +59,8 @@ function publish(): void {
 
 /** Everything the header should currently offer controls for. */
 export function browserMediaStates(): BrowserMediaState[] {
-  return [...sessions.values()].map(({ endedTimer: _endedTimer, ...state }) => state);
+  return [...sessions.values()]
+    .map(({ endedTimer: _endedTimer, activePlayers: _activePlayers, ...state }) => state);
 }
 
 export function hasMediaSession(tabId: string): boolean {
@@ -60,8 +73,29 @@ function clearGrace(session: Session): void {
   session.endedTimer = null;
 }
 
+function createSession(
+  tabId: string,
+  description: Pick<BrowserMediaState, 'title' | 'url' | 'origin' | 'faviconDataUrl'>,
+  kind: BrowserMediaState['kind'],
+  activePlayers: number,
+): void {
+  sessions.set(tabId, {
+    tabId,
+    ...description,
+    hasMedia: true,
+    playing: activePlayers > 0,
+    audible: activePlayers > 0,
+    muted: false,
+    canPlayPause: true,
+    kind,
+    endedTimer: null,
+    activePlayers,
+  });
+  publish();
+}
+
 /**
- * Record that a tab is playing, creating the session if this is the first time.
+ * One player in a tab started, creating the session if this is the first.
  *
  * `describe` supplies the page's identity lazily, because the title and favicon
  * are usually not final at the moment playback starts.
@@ -73,42 +107,69 @@ export function noteMediaPlaying(
 ): void {
   const description = describe();
   const existing = sessions.get(tabId);
-  if (existing) {
-    clearGrace(existing);
-    const nextKind = kind === 'unknown' ? existing.kind : kind;
-    const changed = !existing.playing
-      || !existing.hasMedia
-      || existing.title !== description.title
-      || existing.url !== description.url
-      || existing.origin !== description.origin
-      || existing.faviconDataUrl !== description.faviconDataUrl
-      || existing.kind !== nextKind;
-    if (!changed) return;
-    Object.assign(existing, description, { playing: true, hasMedia: true, kind: nextKind });
-    publish();
+  if (!existing) {
+    createSession(tabId, description, kind, 1);
     return;
   }
-  sessions.set(tabId, {
-    tabId,
-    ...description,
-    hasMedia: true,
-    playing: true,
-    audible: true,
-    muted: false,
-    canPlayPause: true,
-    kind,
-    endedTimer: null,
-  });
+  clearGrace(existing);
+  existing.activePlayers += 1;
+  const nextKind = kind === 'unknown' ? existing.kind : kind;
+  const changed = !existing.playing
+    || !existing.hasMedia
+    || existing.title !== description.title
+    || existing.url !== description.url
+    || existing.origin !== description.origin
+    || existing.faviconDataUrl !== description.faviconDataUrl
+    || existing.kind !== nextKind;
+  if (!changed) return;
+  Object.assign(existing, description, { playing: true, hasMedia: true, kind: nextKind });
   publish();
 }
 
-/** Playback paused. The session STAYS — this is the whole point of the design. */
+/**
+ * One player stopped. The session STAYS — this is the whole point of the design.
+ *
+ * The tab only counts as paused once the LAST player has stopped. See
+ * `Session.activePlayers`.
+ */
 export function noteMediaPaused(tabId: string): void {
   const session = sessions.get(tabId);
   if (!session) return;
+  session.activePlayers = Math.max(0, session.activePlayers - 1);
+  if (session.activePlayers > 0) return;
   if (!session.playing) return;
   clearGrace(session);
   session.playing = false;
+  publish();
+}
+
+/**
+ * The page's own aggregate answer to "is anything playing here?".
+ *
+ * Authoritative, because it is one answer about the whole document rather than
+ * one element's edge, and because it arrives after every header command — so a
+ * command the page refused (an autoplay policy denying `play()`) corrects the
+ * button instead of leaving it lying.
+ */
+export function noteMediaPlaybackState(
+  tabId: string,
+  playing: boolean,
+  describe: () => Pick<BrowserMediaState, 'title' | 'url' | 'origin' | 'faviconDataUrl'>,
+  kind: BrowserMediaState['kind'] = 'unknown',
+): void {
+  const session = sessions.get(tabId);
+  if (!session) {
+    // Nothing playing and no session: there is no media to offer controls for.
+    if (!playing) return;
+    createSession(tabId, describe(), kind, 1);
+    return;
+  }
+  clearGrace(session);
+  session.activePlayers = playing ? Math.max(1, session.activePlayers) : 0;
+  const nextKind = kind === 'unknown' ? session.kind : kind;
+  if (session.playing === playing && session.kind === nextKind) return;
+  session.playing = playing;
+  session.kind = nextKind;
   publish();
 }
 
@@ -117,6 +178,7 @@ export function noteMediaEnded(tabId: string): void {
   const session = sessions.get(tabId);
   if (!session) return;
   session.playing = false;
+  session.activePlayers = 0;
   clearGrace(session);
   session.endedTimer = setTimeout(() => {
     sessions.delete(tabId);

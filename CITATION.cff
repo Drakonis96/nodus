@@ -12,8 +12,8 @@ authors:
     orcid: "https://orcid.org/0000-0002-1150-1930"
   - name: "Nodus contributors"
 type: software
-version: "4.2.3"
-date-released: "2026-08-22"
+version: "4.2.4"
+date-released: "2026-08-23"
 license: "AGPL-3.0-only"
 repository-code: "https://github.com/Drakonis96/nodus"
 url: "https://nodusresearch.com/"

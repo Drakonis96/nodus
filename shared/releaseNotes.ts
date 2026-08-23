@@ -1711,7 +1711,51 @@ const RELEASE_4_0_0_HIGHLIGHTS: RawReleaseHighlight[] = [
   },
 ];
 
+const RELEASE_4_2_4_HIGHLIGHTS: RawReleaseHighlight[] = [
+  {
+    scope: 'browser',
+    es: 'El botón de medios del navegador vuelve a decir la verdad y a obedecer. Antes daba por pausada una pestaña en cuanto cualquier reproductor de repuesto de la página se detenía, así que ofrecía Reproducir sobre algo que ya sonaba y pulsarlo no hacía nada. Ahora Nodus mira toda la página, incluidos marcos del mismo sitio y componentes propios, y actúa sobre la pista que realmente estás escuchando.',
+    en: 'The browser media button tells the truth again, and obeys. It used to call a tab paused as soon as any spare player on the page stopped, so it offered Play for audio that was already running and pressing it did nothing. Nodus now looks at the whole page, including same-site frames and custom components, and acts on the track you are actually listening to.',
+    fr: 'Le bouton multimédia du navigateur redit la vérité et obéit. Il considérait un onglet en pause dès qu’un lecteur de réserve de la page s’arrêtait, proposait donc Lecture sur un son qui jouait déjà et rester sans effet. Nodus examine désormais toute la page, y compris les cadres du même site et les composants propres, et agit sur la piste que vous écoutez vraiment.',
+    de: 'Die Medienschaltfläche im Browser sagt wieder die Wahrheit und gehorcht. Sie hielt einen Tab für pausiert, sobald irgendein Reserve-Player der Seite stoppte, bot also Wiedergabe für bereits laufenden Ton an und tat beim Drücken nichts. Nodus betrachtet jetzt die ganze Seite, samt Rahmen derselben Site und eigener Komponenten, und wirkt auf den Titel, den Sie wirklich hören.',
+    pt: 'O botão de multimédia do navegador volta a dizer a verdade e a obedecer. Dava uma aba por pausada assim que qualquer leitor sobresselente da página parava, por isso oferecia Reproduzir sobre som que já tocava e premi-lo não fazia nada. O Nodus olha agora para a página inteira, incluindo molduras do mesmo sítio e componentes próprios, e atua sobre a faixa que está mesmo a ouvir.',
+    'pt-BR': 'O botão de mídia do navegador volta a dizer a verdade e a obedecer. Ele dava uma aba como pausada assim que qualquer player reserva da página parava, então oferecia Reproduzir sobre um áudio que já tocava e apertá-lo não fazia nada. O Nodus agora olha a página inteira, incluindo quadros do mesmo site e componentes próprios, e age sobre a faixa que você está realmente ouvindo.',
+  },
+  {
+    scope: 'browser',
+    es: 'Abrir el panel de medios ya no hace desaparecer la web. La página se congela en su sitio mientras el panel está abierto y reaparece intacta al cerrarlo.',
+    en: 'Opening the media panel no longer makes the website vanish. The page freezes in place while the panel is open and comes back untouched when it closes.',
+    fr: 'Ouvrir le panneau multimédia ne fait plus disparaître le site. La page se fige à sa place tant que le panneau est ouvert et revient intacte à sa fermeture.',
+    de: 'Das Öffnen des Medienpanels lässt die Website nicht mehr verschwinden. Die Seite friert an Ort und Stelle ein, solange das Panel offen ist, und kehrt beim Schließen unverändert zurück.',
+    pt: 'Abrir o painel de multimédia já não faz o site desaparecer. A página congela no lugar enquanto o painel está aberto e regressa intacta quando se fecha.',
+    'pt-BR': 'Abrir o painel de mídia não faz mais o site sumir. A página congela no lugar enquanto o painel está aberto e volta intacta quando ele fecha.',
+  },
+  {
+    scope: 'browser',
+    es: 'El menú del botón derecho ofrece Cortar, Copiar y Pegar en los campos de texto, en ese orden. La barra de direcciones y el resto de campos de Nodus también tienen ya su propio menú, que antes no aparecía.',
+    en: 'The right-click menu offers Cut, Copy and Paste in text fields, in that order. The address bar and every other Nodus field now have their own menu too, where none appeared before.',
+    fr: 'Le menu contextuel propose Couper, Copier et Coller dans les champs de texte, dans cet ordre. La barre d’adresse et les autres champs de Nodus ont aussi leur propre menu, là où aucun n’apparaissait.',
+    de: 'Das Kontextmenü bietet in Textfeldern Ausschneiden, Kopieren und Einfügen, in dieser Reihenfolge. Auch die Adressleiste und alle anderen Felder in Nodus haben jetzt ein eigenes Menü, wo zuvor keines erschien.',
+    pt: 'O menu do botão direito oferece Cortar, Copiar e Colar nos campos de texto, por esta ordem. A barra de endereços e os restantes campos do Nodus passam a ter também o seu próprio menu, que antes não aparecia.',
+    'pt-BR': 'O menu do botão direito oferece Recortar, Copiar e Colar nos campos de texto, nessa ordem. A barra de endereços e os demais campos do Nodus agora também têm seu próprio menu, que antes não aparecia.',
+  },
+  {
+    scope: 'browser',
+    es: 'Cmd o Ctrl más T abre una pestaña nueva, también mientras estás leyendo una página. Y si pulsas Atrás o Adelante con Cmd o Ctrl, o con el botón central, esa página se abre en una pestaña nueva sin mover la actual.',
+    en: 'Cmd or Ctrl plus T opens a new tab, including while you are reading a page. And clicking Back or Forward with Cmd or Ctrl, or with the middle button, opens that page in a new tab without moving the current one.',
+    fr: 'Cmd ou Ctrl plus T ouvre un nouvel onglet, y compris pendant la lecture d’une page. Et cliquer sur Précédent ou Suivant avec Cmd ou Ctrl, ou avec le bouton du milieu, ouvre cette page dans un nouvel onglet sans déplacer l’onglet courant.',
+    de: 'Cmd oder Strg plus T öffnet einen neuen Tab, auch während Sie eine Seite lesen. Und ein Klick auf Zurück oder Vorwärts mit Cmd oder Strg oder mit der mittleren Taste öffnet diese Seite in einem neuen Tab, ohne den aktuellen zu bewegen.',
+    pt: 'Cmd ou Ctrl mais T abre um separador novo, mesmo enquanto está a ler uma página. E clicar em Retroceder ou Avançar com Cmd ou Ctrl, ou com o botão do meio, abre essa página num separador novo sem mexer no atual.',
+    'pt-BR': 'Cmd ou Ctrl mais T abre uma aba nova, inclusive enquanto você está lendo uma página. E clicar em Voltar ou Avançar com Cmd ou Ctrl, ou com o botão do meio, abre essa página em uma aba nova sem mexer na atual.',
+  },
+];
+
 const RAW_RELEASE_NOTES: RawReleaseNote[] = [
+  {
+    version: '4.2.4',
+    date: '2026-08-23',
+    highlights: RELEASE_4_2_4_HIGHLIGHTS,
+  },
   {
     version: '4.2.3',
     date: '2026-08-22',

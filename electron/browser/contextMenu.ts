@@ -19,6 +19,7 @@ import { Menu, MenuItem, clipboard, shell, type BaseWindow, type WebContents } f
 import { searchUrlFor, type BrowserSearchEngineId } from '@shared/browserOmnibox';
 import { decideNavigation } from '@shared/browserNavigation';
 import { browserMenuIcon } from './menuIcons';
+import { appendEditItems, clipboardHasContent } from './editMenu';
 
 const MAX_LABEL_CHARS = 40;
 const MAX_SELECTION_CHARS = 20_000;
@@ -55,14 +56,20 @@ export function installContextMenu(contents: WebContents, actions: ContextMenuAc
     const linkUrl = String(params.linkURL ?? '');
     const linkIsNavigable = Boolean(linkUrl) && decideNavigation(linkUrl, { isMainFrame: true }).allowed;
 
-    if (params.isEditable || selection) {
-      menu.append(new MenuItem({
-        label: t('Copiar'),
-        icon: browserMenuIcon('copy'),
-        enabled: Boolean(selection),
-        click: () => clipboard.writeText(selection),
-      }));
-    }
+    // Cut, Copy, Paste — in that order, and all three inside a text field. A web
+    // form used to offer Copy alone, which made filling one in from the clipboard
+    // impossible without a keyboard shortcut. Paste hands the clipboard to a
+    // remote page, so it is only ever the user's own click that does it: nothing
+    // here reads the clipboard on the page's behalf.
+    const editItems = appendEditItems(menu, contents, {
+      isEditable: params.isEditable,
+      hasSelection: Boolean(selection),
+      canCut: params.editFlags.canCut,
+      canCopy: params.editFlags.canCopy,
+      canPaste: params.editFlags.canPaste,
+      clipboardHasContent: clipboardHasContent(),
+    }, t);
+    if (editItems > 0 && selection) menu.append(new MenuItem({ type: 'separator' }));
 
     if (selection) {
       menu.append(new MenuItem({

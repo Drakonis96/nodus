@@ -1,8 +1,9 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent } from 'react';
 import { ConfirmModal } from '../components/ConfirmModal';
 import { Icon } from '../components/ui';
 import { t, tx } from '../i18n';
 import { MAX_BROWSER_TABS } from '@shared/browser';
+import { opensInNewTab } from '@shared/browserShortcuts';
 import type {
   BrowserDownloadView,
   BrowserRestartResult,
@@ -146,7 +147,13 @@ export function NodusBrowserView() {
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       const cmd = event.metaKey || event.ctrlKey;
-      if (cmd && !event.altKey && event.key.toLowerCase() === 'f') {
+      // The twin of the main-process handler in electron/browser/tabs.ts: that one
+      // catches Cmd/Ctrl+T while a page has focus, this one while the toolbar,
+      // the tab strip or the address bar does. Either way, one new tab.
+      if (cmd && !event.altKey && !event.shiftKey && event.key.toLowerCase() === 't') {
+        event.preventDefault();
+        void window.nodus.openBrowserTab('');
+      } else if (cmd && !event.altKey && event.key.toLowerCase() === 'f') {
         event.preventDefault();
         setFindOpen((prev) => {
           const next = !prev;
@@ -362,13 +369,19 @@ export function NodusBrowserView() {
           icon="chevronLeft"
           label={t('Atrás')}
           disabled={!active?.canGoBack}
-          onClick={() => void window.nodus.browserGoBack()}
+          // Cmd/Ctrl-click and middle-click mean "that destination, new tab" in
+          // every browser, and leave this tab exactly where it is.
+          onClick={(event) => void (opensInNewTab(event)
+            ? window.nodus.openBrowserHistoryNeighbourTab('back')
+            : window.nodus.browserGoBack())}
         />
         <ToolbarButton
           icon="chevronRight"
           label={t('Adelante')}
           disabled={!active?.canGoForward}
-          onClick={() => void window.nodus.browserGoForward()}
+          onClick={(event) => void (opensInNewTab(event)
+            ? window.nodus.openBrowserHistoryNeighbourTab('forward')
+            : window.nodus.browserGoForward())}
         />
         <ToolbarButton
           icon={loading ? 'stop' : 'refresh'}
@@ -729,7 +742,11 @@ function permissionLabel(request: PendingBrowserPermission): string {
 
 function ToolbarButton({
   icon, imageSrc, label, onClick, disabled, busy, dataTestId, active,
-}: { icon?: string; imageSrc?: string; label: string; onClick: () => void; disabled?: boolean; busy?: boolean; dataTestId?: string; active?: boolean }) {
+}: {
+  icon?: string; imageSrc?: string; label: string;
+  onClick: (event: ReactMouseEvent<HTMLButtonElement>) => void;
+  disabled?: boolean; busy?: boolean; dataTestId?: string; active?: boolean;
+}) {
   return (
     <button
       type="button"
@@ -739,6 +756,9 @@ function ToolbarButton({
       aria-pressed={active}
       disabled={disabled}
       onClick={onClick}
+      // Middle-click never fires `click`. Back and Forward are the buttons where
+      // it means "open that destination in a new tab", so it has to be heard.
+      onAuxClick={(event) => { if (event.button === 1) { event.preventDefault(); onClick(event); } }}
       className={`inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${active ? 'bg-neutral-200 text-neutral-900 dark:bg-neutral-800 dark:text-neutral-100' : 'text-neutral-600 hover:bg-neutral-100 dark:text-neutral-400 dark:hover:bg-neutral-900'}`}
     >
       {imageSrc

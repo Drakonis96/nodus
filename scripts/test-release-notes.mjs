@@ -25,19 +25,40 @@ try {
 
   const { RELEASE_NOTES, releaseNotesForMajor, compareVersions } = await import(pathToFileURL(bundlePath).href);
   const currentRelease = RELEASE_NOTES[0];
-  assert.equal(currentRelease?.version, '4.2.3');
-  assert.equal(currentRelease?.date, '2026-08-22');
-  assert.equal(currentRelease?.highlights.length, 5);
-  assert.deepEqual(currentRelease?.highlights.map((highlight) => highlight.scope), ['academic', 'academic', 'academic', 'browser', 'general']);
+  assert.equal(currentRelease?.version, '4.2.4');
+  assert.equal(currentRelease?.date, '2026-08-23');
+  assert.equal(currentRelease?.highlights.length, 4);
+  assert.deepEqual(currentRelease?.highlights.map((highlight) => highlight.scope), ['browser', 'browser', 'browser', 'browser']);
+  for (const phrase of [
+    /media button tells the truth again/,
+    /no longer makes the website vanish/,
+    /Cut, Copy and Paste in text fields, in that order/,
+    /opens a new tab, including while you are reading a page/,
+  ]) assert.ok(currentRelease?.highlights.some((highlight) => phrase.test(highlight.en)));
+
+  const mediaHighlight = currentRelease?.highlights.find((highlight) =>
+    /media button tells the truth again/.test(highlight.en));
+  assert.match(mediaHighlight?.en ?? '', /spare player/);
+  assert.match(mediaHighlight?.en ?? '', /the track you are actually listening to/);
+
+  const addressBarHighlight = currentRelease?.highlights.find((highlight) =>
+    /Cut, Copy and Paste/.test(highlight.en));
+  assert.match(addressBarHighlight?.en ?? '', /address bar/);
+
+  // 4.2.3 keeps the five highlights it shipped with. They are published history.
+  const deepResearchReadingRelease = RELEASE_NOTES.find((note) => note.version === '4.2.3');
+  assert.equal(deepResearchReadingRelease?.date, '2026-08-22');
+  assert.equal(deepResearchReadingRelease?.highlights.length, 5);
+  assert.deepEqual(deepResearchReadingRelease?.highlights.map((highlight) => highlight.scope), ['academic', 'academic', 'academic', 'browser', 'general']);
   for (const phrase of [
     /full-screen reading view/,
     /checked against the corpus/,
     /Authors and editors are no longer confused/,
     /Google sign-in more clearly/,
     /integrated wiki/,
-  ]) assert.ok(currentRelease?.highlights.some((highlight) => phrase.test(highlight.en)));
+  ]) assert.ok(deepResearchReadingRelease?.highlights.some((highlight) => phrase.test(highlight.en)));
 
-  const googleSignInHighlight = currentRelease?.highlights.find((highlight) =>
+  const googleSignInHighlight = deepResearchReadingRelease?.highlights.find((highlight) =>
     /Google sign-in more clearly/.test(highlight.en));
   assert.match(googleSignInHighlight?.en ?? '', /system browser/);
   assert.match(googleSignInHighlight?.en ?? '', /restores the previous page/);
