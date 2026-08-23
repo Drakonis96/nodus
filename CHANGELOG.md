@@ -1,5 +1,11 @@
 # Changelog
 
+## 4.2.5 — 2026-08-23
+
+- Fixed the macOS updater leaving a second Nodus behind. It moved the running bundle to `Nodus.app.previous` and never removed it, and that suffix is on the directory name only: what stayed was a complete application bundle with the same identifier, which LaunchServices registered as a second copy of Nodus. macOS then showed two Dock icons for one app, and every update kept another 1.8 GB forever. The displaced bundle is now unregistered before the relaunch and deleted after it.
+- The updater relaunches with `open` rather than `open -n`, which forced a new process even when one was already running.
+- Nodus also removes such a bundle on launch. An updater fix only reaches the update *after* the one that ships it, so without this a 4.2.4 install would keep its duplicate for one more cycle.
+
 ## 4.2.4 — 2026-08-23
 
 - Fixed the Nodus Browser media button, which reported a tab as paused as soon as any spare player on the page stopped and then did nothing when pressed. Playback state is now the page's own answer about the whole document, Play and Pause act on the track actually playing, and the search reaches same-origin frames and open shadow roots.

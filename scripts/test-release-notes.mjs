@@ -25,23 +25,31 @@ try {
 
   const { RELEASE_NOTES, releaseNotesForMajor, compareVersions } = await import(pathToFileURL(bundlePath).href);
   const currentRelease = RELEASE_NOTES[0];
-  assert.equal(currentRelease?.version, '4.2.4');
+  assert.equal(currentRelease?.version, '4.2.5');
   assert.equal(currentRelease?.date, '2026-08-23');
-  assert.equal(currentRelease?.highlights.length, 4);
-  assert.deepEqual(currentRelease?.highlights.map((highlight) => highlight.scope), ['browser', 'browser', 'browser', 'browser']);
+  assert.equal(currentRelease?.highlights.length, 1);
+  assert.deepEqual(currentRelease?.highlights.map((highlight) => highlight.scope), ['general']);
+  assert.match(currentRelease?.highlights[0]?.en ?? '', /stops installing itself twice on macOS/);
+  assert.match(currentRelease?.highlights[0]?.en ?? '', /two Nodus icons in the Dock/);
+
+  // 4.2.4 keeps the four highlights it shipped with. They are published history.
+  const browserFixesRelease = RELEASE_NOTES.find((note) => note.version === '4.2.4');
+  assert.equal(browserFixesRelease?.date, '2026-08-23');
+  assert.equal(browserFixesRelease?.highlights.length, 4);
+  assert.deepEqual(browserFixesRelease?.highlights.map((highlight) => highlight.scope), ['browser', 'browser', 'browser', 'browser']);
   for (const phrase of [
     /media button tells the truth again/,
     /no longer makes the website vanish/,
     /Cut, Copy and Paste in text fields, in that order/,
     /opens a new tab, including while you are reading a page/,
-  ]) assert.ok(currentRelease?.highlights.some((highlight) => phrase.test(highlight.en)));
+  ]) assert.ok(browserFixesRelease?.highlights.some((highlight) => phrase.test(highlight.en)));
 
-  const mediaHighlight = currentRelease?.highlights.find((highlight) =>
+  const mediaHighlight = browserFixesRelease?.highlights.find((highlight) =>
     /media button tells the truth again/.test(highlight.en));
   assert.match(mediaHighlight?.en ?? '', /spare player/);
   assert.match(mediaHighlight?.en ?? '', /the track you are actually listening to/);
 
-  const addressBarHighlight = currentRelease?.highlights.find((highlight) =>
+  const addressBarHighlight = browserFixesRelease?.highlights.find((highlight) =>
     /Cut, Copy and Paste/.test(highlight.en));
   assert.match(addressBarHighlight?.en ?? '', /address bar/);
 

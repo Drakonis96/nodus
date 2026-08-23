@@ -155,6 +155,9 @@ const RELEASE_3_2_4_IT: string[] = [
 ];
 
 export const RELEASE_NOTES_IT: Record<string, string[]> = {
+  "4.2.5": [
+    "Nodus smette di installarsi due volte su macOS. Ogni aggiornamento metteva da parte la versione precedente e la lasciava lì per sempre, e macOS continuava a vederla come un'altra applicazione. Da qui venivano le due icone di Nodus nel Dock. Aprendo questa versione quella copia si cancella da sola e recuperi quasi 2 GB di disco.",
+  ],
   "4.2.4": [
     "Il pulsante multimediale del browser torna a dire la verità e a obbedire. Dava una scheda per messa in pausa non appena un qualsiasi lettore di riserva della pagina si fermava, quindi offriva Riproduci su un audio che stava già suonando e premerlo non faceva nulla. Ora Nodus guarda l'intera pagina, compresi i frame dello stesso sito e i componenti propri, e agisce sulla traccia che stai davvero ascoltando.",
     "Aprire il pannello multimediale non fa più sparire il sito. La pagina si congela al suo posto mentre il pannello è aperto e ricompare intatta alla chiusura.",

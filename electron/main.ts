@@ -231,9 +231,71 @@ function unsignedMacUpdateHelperScript(): string {
     '/bin/mv "$TARGET" "$BACKUP" || fail',
     'if ! /bin/mv "$NEW_APP" "$TARGET"; then /bin/mv "$BACKUP" "$TARGET" || true; fail; fi',
     '/usr/bin/xattr -dr com.apple.quarantine "$TARGET" 2>/dev/null || true',
+    // The swap has landed, so the displaced copy has stopped being a rollback and
+    // started being a problem. `.previous` is a suffix on the DIRECTORY name only:
+    // inside it is a complete application bundle carrying the same
+    // CFBundleIdentifier, so LaunchServices registers it as a second copy of Nodus
+    // and macOS shows two Dock icons for one app. It is also ~1.8 GB, kept forever,
+    // by every update.
+    //
+    // Unregister before relaunching, so nothing can resolve to it, but delete after,
+    // because removing that much takes seconds the user would spend staring at no
+    // window at all.
+    'LSREGISTER=/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister',
+    '[ -x "$LSREGISTER" ] && "$LSREGISTER" -u "$BACKUP" >/dev/null 2>&1 || true',
     " /usr/bin/printf '%s\\n' '{\"status\":\"installed\"}' > \"$STATE\"",
-    '/usr/bin/open -n "$TARGET" || true',
+    // Not `open -n`. The app is known dead here (the wait above only ends when the
+    // PID is gone), so -n buys nothing, and if anything did manage to start Nodus
+    // meanwhile it would force a SECOND process instead of activating the first.
+    '/usr/bin/open "$TARGET" || true',
+    '/bin/rm -rf "$BACKUP" 2>/dev/null || true',
   ].join('\n');
+}
+
+/**
+ * Remove a bundle an earlier update left standing beside this one.
+ *
+ * The helper that performs an update always belongs to the version being
+ * REPLACED, so fixing the helper only helps the update after next. Every release
+ * up to 4.2.4 moved the running bundle to "<app>.previous" and left it there, and
+ * ".previous" is a suffix on the directory name only: what remains is a complete
+ * application bundle carrying the same CFBundleIdentifier, which LaunchServices
+ * registers as a second copy of Nodus. macOS then shows two Dock icons for one
+ * app, and roughly 1.8 GB stays on disk forever.
+ *
+ * So the app also cleans up after itself on launch. That closes the gap the
+ * helper cannot reach: whichever version installed this one, the leftover is gone
+ * the first time it runs.
+ *
+ * Unregistered before deletion so nothing resolves to it in the meantime, and
+ * done off the startup path entirely — it is housekeeping, not a prerequisite for
+ * a window.
+ */
+function removeDisplacedMacBundle(): void {
+  if (process.platform !== 'darwin' || !app.isPackaged) return;
+  const appPath = macAppBundlePath();
+  if (!appPath) return;
+  const displaced = `${appPath}.previous`;
+  void (async () => {
+    try {
+      await fs.access(displaced, fsConstants.F_OK);
+    } catch {
+      return; // Nothing left behind. The common case once this has run once.
+    }
+    const lsregister = '/System/Library/Frameworks/CoreServices.framework/Frameworks/'
+      + 'LaunchServices.framework/Support/lsregister';
+    try {
+      spawnSync(lsregister, ['-u', displaced], { stdio: 'ignore', timeout: 20_000 });
+    } catch {
+      // Unregistering is a courtesy to the Dock; removal is the part that matters.
+    }
+    try {
+      await fs.rm(displaced, { recursive: true, force: true });
+      console.log(`[updates] removed the bundle a previous update left behind: ${displaced}`);
+    } catch (error) {
+      console.warn(`[updates] could not remove ${displaced}: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  })();
 }
 
 async function installUnsignedMacUpdate(downloadedFile: string): Promise<void> {
@@ -835,6 +897,7 @@ app.on('second-instance', (_event, argv) => {
 app.whenReady().then(async () => {
   // Losing the lock queues a quit; do not open the database or a window.
   if (!hasSingleInstanceLock) return;
+  removeDisplacedMacBundle();
   restorePersistedDockIcon();
   // YouTube (embedded by the PDF Presenter's audience overlay) flags Electron's
   // User-Agent as a bot. Strip the Electron/app tokens so the embed loads; the
