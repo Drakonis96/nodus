@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { spawn, spawnSync } from 'node:child_process';
+import { existsSync } from 'node:fs';
 import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
@@ -44,7 +45,14 @@ try {
   });
   assert.equal(result, 0, 'The update helper should finish successfully');
   assert.equal(await readFile(path.join(targetApp, 'Contents', 'version.txt'), 'utf8'), 'new');
-  assert.equal(await readFile(path.join(`${targetApp}.previous`, 'Contents', 'version.txt'), 'utf8'), 'old');
+  // The displaced bundle must be GONE. This assertion used to require the opposite,
+  // and that is what shipped two Dock icons in 4.2.4: ".previous" is a suffix on the
+  // directory name only, so what stayed behind was a complete application bundle
+  // carrying the same CFBundleIdentifier. LaunchServices duly registered it as a
+  // second copy of Nodus. It was never a rollback either — nothing has ever read it
+  // — just ~1.8 GB kept forever by every update.
+  assert.equal(existsSync(`${targetApp}.previous`), false,
+    'the helper must not leave a second, registered application behind');
   assert.deepEqual(JSON.parse(await readFile(statePath, 'utf8')), { status: 'installed' });
   console.log('macOS update-helper replacement test passed');
 } finally {

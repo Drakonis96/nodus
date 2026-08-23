@@ -164,3 +164,56 @@ test('a released helper installs the bundle name we are about to ship', { skip: 
   assert.equal(result.replaced, true, 'the old bundle must have been replaced, not left in place');
   assert.equal(result.isApplication, true);
 });
+
+// ── What the update LEAVES BEHIND ───────────────────────────────────────────
+// 4.2.4 updated correctly and still put two Nodus icons in the Dock. The helper
+// moves the running bundle to "<target>.previous" and never removes it, and that
+// suffix is on the DIRECTORY name only: inside is a complete application bundle
+// with the same CFBundleIdentifier. LaunchServices registers it as a second copy
+// of the app — confirmed on a real machine after the 4.2.4 update:
+//
+//   path: /Applications/Nodus.app            (0x17b74)
+//   path: /Applications/Nodus.app.previous   (0x17b38)
+//
+// It is also ~1.8 GB, kept forever, by every update.
+
+test('the update does not leave a second application behind', { skip: process.platform !== 'darwin' }, () => {
+  const script = helperFromSource();
+  assert.ok(script, 'unsignedMacUpdateHelperScript() not found');
+
+  const root = mkdtempSync(path.join(tmpdir(), 'nodus-leftover-'));
+  try {
+    const scriptPath = path.join(root, 'helper.sh');
+    writeFileSync(scriptPath, script, { mode: 0o700 });
+
+    const stage = path.join(root, 'stage', BUNDLE, 'Contents', 'MacOS');
+    mkdirSync(stage, { recursive: true });
+    writeFileSync(path.join(stage, 'nodus'), 'new');
+    const zip = path.join(root, 'update.zip');
+    execFileSync('/usr/bin/ditto', ['-c', '-k', '--sequesterRsrc', '--keepParent', path.join(root, 'stage', BUNDLE), zip]);
+
+    const target = path.join(root, 'Nodus.app');
+    mkdirSync(path.join(target, 'Contents'), { recursive: true });
+    writeFileSync(path.join(target, 'Contents', 'marker'), 'old');
+
+    const state = path.join(root, 'state.json');
+    const dead = execFileSync('/bin/sh', ['-c', '(exec /usr/bin/true) & echo $!'], { encoding: 'utf8' }).trim();
+    try { execFileSync('/bin/sh', [scriptPath, dead, zip, target, state], { stdio: 'ignore' }); } catch { /* reported through state */ }
+
+    assert.equal(JSON.parse(readFileSync(state, 'utf8')).status, 'installed');
+    assert.ok(!existsSync(`${target}.previous`),
+      'the displaced bundle must be removed: it is a second registered application, not a backup');
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('the relaunch activates rather than forcing a duplicate process', () => {
+  // `open -n` forces a NEW instance even when one is running. The app is known
+  // dead by this point, so -n bought nothing and could only ever add a second
+  // process for the single-instance lock to have to kill.
+  const helper = read('electron/main.ts');
+  const open = helper.match(/'\/usr\/bin\/open[^\n]*/)?.[0];
+  assert.ok(open, 'the helper must relaunch the app');
+  assert.doesNotMatch(open, /open -n/, 'plain `open` activates an existing instance instead of duplicating it');
+});
