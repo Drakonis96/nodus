@@ -6,6 +6,9 @@
 - Fixed the media panel blanking the web page while it was open. The page is now frozen into a snapshot before the native view is hidden, as the notifications panel already did.
 - Added Cut, Copy and Paste to the browser page context menu, in that order, and gave Nodus's own text fields a context menu of their own, including the Browser address bar.
 - Added Cmd/Ctrl+T for a new tab, working while a page has focus, and Cmd/Ctrl-click or middle-click on Back and Forward to open that destination in a new tab.
+- Fixed macOS updating, which this release would otherwise have broken. Nodus ships unsigned on macOS and replaces its own bundle with a helper script, and the helper that runs always belongs to the version being replaced. Renaming the packaged product to "Nodus Research" renamed the bundle to `Nodus Research.app`, so every installed copy searched for `Nodus.app`, found nothing, failed after the app had already quit, and never reopened. The packaged product name is `Nodus` again, which also restores the Windows install directory and the Linux package name.
+- Hardened that helper so a future rename cannot repeat this: it now locates the incoming bundle by shape rather than by a name hardcoded when it shipped.
+- Pinned the installer filenames to `Nodus-<os>-<arch>.<ext>` independently of the product name. Those filenames are what the download buttons and every electron-updater manifest resolve, and interpolating the product name into them broke the release upload.
 
 ## 4.2.3 — 2026-08-22
 

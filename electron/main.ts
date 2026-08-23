@@ -218,7 +218,14 @@ function unsignedMacUpdateHelperScript(): string {
     '  [ "$WAITED" -ge 1200 ] && fail',
     'done',
     '/usr/bin/ditto -x -k "$ZIP" "$STAGING" || fail',
-    'NEW_APP="$(/usr/bin/find "$STAGING" -type d \\( -name \'Nodus Research.app\' -o -name Nodus.app \\) -print -quit)"',
+    // Match the bundle by SHAPE, not by name. A named search is what broke the
+    // 4.2.3 -> 4.2.4 update: the helper doing the searching always belongs to the
+    // version being replaced, so the day the bundle is renamed, every copy already
+    // in the field looks for a name that is no longer there, fails after the app
+    // has quit, and never reopens. There is exactly one bundle at the top of the
+    // staging directory. `-maxdepth 2` keeps this off the nested helper apps in
+    // Contents/Frameworks, which live far deeper.
+    'NEW_APP="$(/usr/bin/find "$STAGING" -maxdepth 2 -type d -name \'*.app\' -print -quit)"',
     '[ -n "$NEW_APP" ] && [ -d "$NEW_APP/Contents" ] || fail',
     '/bin/rm -rf "$BACKUP"',
     '/bin/mv "$TARGET" "$BACKUP" || fail',

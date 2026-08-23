@@ -195,7 +195,7 @@
   },
   "build": {
     "appId": "app.nodus.desktop",
-    "productName": "Nodus Research",
+    "productName": "Nodus",
     "directories": {
       "output": "release"
     },
