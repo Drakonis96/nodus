@@ -95,6 +95,9 @@ const RELEASE_3_2_4_TR: string[] = [
 ];
 
 export const RELEASE_NOTES_TR: Record<string, string[]> = {
+  "4.2.5": [
+    "Nodus artık macOS'ta kendini iki kez kurmuyor. Her güncelleme bir önceki sürümü kenara koyuyor ve orada temelli bırakıyordu, macOS da onu ayrı bir uygulama olarak görmeye devam ediyordu. Dock'taki iki Nodus simgesi buradan geliyordu. Bu sürümü açtığınızda o kopya kendiliğinden siliniyor ve neredeyse 2 GB disk alanı geri geliyor.",
+  ],
   "4.2.4": [
     "Tarayıcının medya düğmesi yeniden doğruyu söylüyor ve söz dinliyor. Sayfadaki yedek oynatıcılardan herhangi biri durur durmaz sekmeyi duraklatılmış sayıyordu, bu yüzden zaten çalan bir ses için Oynat sunuyor ve basıldığında hiçbir şey yapmıyordu. Nodus artık aynı siteye ait çerçeveler ve özel bileşenler dahil sayfanın tamamına bakıyor ve gerçekten dinlediğiniz parça üzerinde işlem yapıyor.",
     "Medya panelini açmak artık siteyi yok etmiyor. Panel açıkken sayfa yerinde donuyor ve panel kapandığında olduğu gibi geri geliyor.",

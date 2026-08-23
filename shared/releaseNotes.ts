@@ -1750,7 +1750,24 @@ const RELEASE_4_2_4_HIGHLIGHTS: RawReleaseHighlight[] = [
   },
 ];
 
+const RELEASE_4_2_5_HIGHLIGHTS: RawReleaseHighlight[] = [
+  {
+    scope: 'general',
+    es: 'Nodus deja de instalarse dos veces en macOS. Cada actualización apartaba la versión anterior y la dejaba ahí para siempre, y macOS la seguía viendo como una aplicación más. De ahí venían los dos iconos de Nodus en el Dock. Al abrir esta versión, esa copia se borra sola y recuperas casi 2 GB de disco.',
+    en: 'Nodus stops installing itself twice on macOS. Every update set the previous version aside and left it there for good, and macOS went on seeing it as another application. That is where the two Nodus icons in the Dock came from. Opening this version deletes that copy on its own and gives you back nearly 2 GB of disk.',
+    fr: 'Nodus cesse de s’installer en double sur macOS. Chaque mise à jour mettait la version précédente de côté et l’y laissait pour de bon, et macOS continuait de la voir comme une application à part entière. D’où les deux icônes Nodus dans le Dock. Ouvrir cette version supprime cette copie toute seule et vous rend près de 2 Go de disque.',
+    de: 'Nodus installiert sich auf macOS nicht mehr doppelt. Jedes Update stellte die vorherige Version beiseite und ließ sie dort für immer, und macOS sah sie weiterhin als eigene Anwendung. Daher die zwei Nodus-Symbole im Dock. Beim Öffnen dieser Version wird diese Kopie von selbst gelöscht und gibt fast 2 GB Speicher frei.',
+    pt: 'O Nodus deixa de se instalar duas vezes no macOS. Cada atualização punha a versão anterior de lado e deixava-a lá para sempre, e o macOS continuava a vê-la como mais uma aplicação. Era daí que vinham os dois ícones do Nodus na Dock. Ao abrir esta versão, essa cópia apaga-se sozinha e recupera quase 2 GB de disco.',
+    'pt-BR': 'O Nodus para de se instalar duas vezes no macOS. Cada atualização punha a versão anterior de lado e a deixava ali para sempre, e o macOS continuava enxergando ela como mais um aplicativo. Era daí que vinham os dois ícones do Nodus no Dock. Ao abrir esta versão, essa cópia se apaga sozinha e você recupera quase 2 GB de disco.',
+  },
+];
+
 const RAW_RELEASE_NOTES: RawReleaseNote[] = [
+  {
+    version: '4.2.5',
+    date: '2026-08-23',
+    highlights: RELEASE_4_2_5_HIGHLIGHTS,
+  },
   {
     version: '4.2.4',
     date: '2026-08-23',

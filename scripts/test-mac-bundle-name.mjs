@@ -217,3 +217,35 @@ test('the relaunch activates rather than forcing a duplicate process', () => {
   assert.ok(open, 'the helper must relaunch the app');
   assert.doesNotMatch(open, /open -n/, 'plain `open` activates an existing instance instead of duplicating it');
 });
+
+// ── Self-healing, because a helper fix cannot reach backwards ────────────────
+// The helper that performs an update belongs to the version being REPLACED, so
+// #530's cleanup only takes effect for the update AFTER the one that ships it.
+// Going 4.2.4 -> 4.2.5 still runs 4.2.4's helper and still leaves a bundle
+// behind. The app therefore also clears it on launch, which is what actually
+// gets a duplicated Dock back to one icon.
+
+test('the app removes a bundle an earlier update left beside it', () => {
+  const main = read('electron/main.ts');
+  const fn = main.match(/function removeDisplacedMacBundle\(\): void \{[\s\S]*?\n\}/)?.[0];
+  assert.ok(fn, 'removeDisplacedMacBundle() is what closes the gap the helper cannot reach');
+
+  assert.match(fn, /\$\{appPath\}\.previous/, 'it must target the displaced bundle beside this one');
+  assert.match(fn, /lsregister/, 'unregister before deleting, so nothing resolves to it meanwhile');
+  assert.match(fn, /recursive: true, force: true/);
+  // Packaged only: a dev checkout has no bundle, and app.isPackaged is the guard.
+  assert.match(fn, /process\.platform !== 'darwin' \|\| !app\.isPackaged/);
+  // Never on the critical path — housekeeping must not delay or block a window.
+  assert.match(fn, /void \(async \(\) => \{/, 'it must not be awaited during startup');
+});
+
+test('the cleanup runs at startup, and only once the instance lock is held', () => {
+  // A second copy that is about to quit must not delete anything underneath the
+  // copy that owns the profile.
+  const main = read('electron/main.ts');
+  const ready = main.slice(main.indexOf('app.whenReady()'));
+  const lockGuard = ready.indexOf('if (!hasSingleInstanceLock) return;');
+  const call = ready.indexOf('removeDisplacedMacBundle();');
+  assert.ok(call > lockGuard && lockGuard >= 0,
+    'removeDisplacedMacBundle() must run after the single-instance guard');
+});
