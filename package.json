@@ -319,6 +319,7 @@
       "category": "Office",
       "maintainer": "Drakonis96 <Drakonis96@users.noreply.github.com>"
     },
-    "artifactName": "${productName}-${os}-${arch}.${ext}"
+    "_artifactNameComment": "Literal Nodus-, NOT ${productName}. The installer filenames are a public contract: the site download buttons, the README and every electron-updater manifest resolve https://github.com/Drakonis96/nodus/releases/latest/download/Nodus-<os>-<arch>.<ext>. Renaming productName to \"Nodus Research\" in 4.2.4 silently renamed every artifact through this template, which broke the v4.2.4 upload and would have broken existing installs' auto-update had it published. The displayed product name is free to change; these filenames are not.",
+    "artifactName": "Nodus-${os}-${arch}.${ext}"
   }
 }
