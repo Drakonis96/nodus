@@ -33,17 +33,18 @@ import { isNodusResearchSiteUrl } from '../../shared/browser';
 // than maintaining two implementations that must agree.
 import { detectCapture } from '../../browser-extension/lib/detector.js';
 import { collectPageSnapshot } from './browserPageSnapshot';
+import {
+  anyPlaying,
+  applyMediaCommand,
+  collectMediaElements,
+  isPlayableMedia,
+  kindOf,
+  type MediaCommand,
+  type MediaEl,
+  type MediaRoot,
+} from './browserPageMedia';
 
-interface MediaEl {
-  tagName?: unknown;
-  paused?: unknown;
-  play?: () => unknown;
-  pause?: () => unknown;
-  currentTime?: number;
-}
-
-interface PageDoc {
-  querySelectorAll(selector: string): ArrayLike<MediaEl>;
+interface PageDoc extends MediaRoot {
   addEventListener(type: string, listener: (event: { target?: unknown }) => void, capture?: boolean): void;
 }
 
@@ -101,106 +102,93 @@ if (integrationPage.document?.readyState === 'loading') {
 }
 
 function mediaElements(): MediaEl[] {
-  const found = page.document?.querySelectorAll('video, audio');
-  return found ? Array.prototype.slice.call(found) as MediaEl[] : [];
-}
-
-function playMedia(element: MediaEl): void {
-  try {
-    const result = element.play?.();
-    if (result && typeof (result as PromiseLike<unknown>).then === 'function') {
-      void Promise.resolve(result).catch(() => undefined);
-    }
-  } catch {
-    // A page can deny autoplay even for a user-initiated header command.
-  }
+  return collectMediaElements(page.document);
 }
 
 /**
- * Move between concrete media elements when the page exposes an actual list.
- * Chromium also receives the standard media key from main for players that own
- * their playlist internally; this DOM fallback makes ordinary multi-track pages
- * deterministic without guessing at site-specific buttons.
- */
-function switchMediaElement(command: 'previous' | 'next'): void {
-  const elements = mediaElements();
-  if (elements.length === 0) return;
-  let activeIndex = elements.findIndex((element) => element.paused === false);
-  if (activeIndex < 0) activeIndex = elements.findIndex((element) => Number(element.currentTime) > 0);
-  if (activeIndex < 0) activeIndex = 0;
-
-  if (elements.length === 1) {
-    if (command === 'previous') {
-      try { elements[0].currentTime = 0; } catch { /* live streams refuse this */ }
-      playMedia(elements[0]);
-    }
-    return;
-  }
-
-  const targetIndex = command === 'previous'
-    ? Math.max(0, activeIndex - 1)
-    : Math.min(elements.length - 1, activeIndex + 1);
-  const current = elements[activeIndex];
-  const target = elements[targetIndex];
-  if (target === current) {
-    if (command === 'previous') {
-      try { current.currentTime = 0; } catch { /* live streams refuse this */ }
-      playMedia(current);
-    }
-    return;
-  }
-  try { current.pause?.(); } catch { /* one element must not block the next */ }
-  try { target.currentTime = 0; } catch { /* live streams refuse this */ }
-  playMedia(target);
-}
-
-function kindOf(target: unknown): 'audio' | 'video' | 'unknown' {
-  const tag = String((target as MediaEl | null)?.tagName ?? '').toUpperCase();
-  return tag === 'VIDEO' ? 'video' : tag === 'AUDIO' ? 'audio' : 'unknown';
-}
-
-/**
- * Report what Electron's own media events cannot say.
+ * The element the page itself last started.
  *
- * `media-started-playing` and `media-paused` on the WebContents are the primary
- * signal and are what the main process trusts for session lifecycle. This adds
- * only the audio/video distinction, and only for real media elements.
+ * Kept so Play resumes what the user was listening to rather than whatever the
+ * document happens to list first. Held as a plain reference: it is only ever
+ * compared by identity against a freshly collected list, so a stale one for a
+ * removed element simply falls out of the comparison.
  */
-function report(target: unknown, playing: boolean): void {
-  const kind = kindOf(target);
-  if (kind === 'unknown') return;
+let lastPlayed: MediaEl | null = null;
+
+/**
+ * Tell main what is REALLY playing in this page.
+ *
+ * The bug this replaces: the page used to report each element's own play/pause
+ * edge, so any one of the seven empty <audio> placeholders elevenreader.io keeps
+ * around could announce "paused" while the actual track ran on. The header then
+ * showed Play for something already playing, and pressing it changed nothing —
+ * the reported symptom of a media button that "does nothing".
+ *
+ * An aggregate cannot lie that way: it is a single answer about the whole page.
+ */
+function reportPlaybackState(target?: unknown): void {
+  const elements = mediaElements();
+  const playing = anyPlaying(elements);
+  const active = elements.find((element) => element.paused === false);
+  const kind = kindOf(target) !== 'unknown' ? kindOf(target) : kindOf(active ?? lastPlayed);
   ipcRenderer.send('nodus-browser:page:media', { playing, kind });
 }
 
-page.document?.addEventListener('play', (event) => report(event.target, true), true);
-page.document?.addEventListener('pause', (event) => report(event.target, false), true);
-page.document?.addEventListener('ended', (event) => report(event.target, false), true);
+/**
+ * Coalesce the burst of events a player emits when it swaps tracks.
+ *
+ * Pausing one element and starting the next fires pause-then-play within the
+ * same task; reporting each would flick the header icon. A microtask-scale delay
+ * is enough to let the page finish and still feels instant.
+ */
+const REPORT_DELAY_MS = 30;
+let reportTimer: ReturnType<typeof setTimeout> | null = null;
+let lastReportTarget: unknown = null;
+function scheduleReport(target?: unknown): void {
+  if (kindOf(target) !== 'unknown' && (target as MediaEl | null)) {
+    // Remember the audio/video distinction from the element that moved, since
+    // by the time the timer runs there may be nothing playing to ask.
+    lastReportTarget = target;
+  }
+  if (reportTimer) clearTimeout(reportTimer);
+  reportTimer = setTimeout(() => {
+    reportTimer = null;
+    const captured = lastReportTarget;
+    lastReportTarget = null;
+    reportPlaybackState(captured);
+  }, REPORT_DELAY_MS);
+}
+
+page.document?.addEventListener('play', (event) => {
+  const target = event.target as MediaEl | null;
+  if (target && isPlayableMedia(target)) lastPlayed = target;
+  scheduleReport(event.target);
+}, true);
+page.document?.addEventListener('pause', (event) => scheduleReport(event.target), true);
+page.document?.addEventListener('ended', (event) => scheduleReport(event.target), true);
 
 /**
  * Play, pause or stop the page's media on the main process's instruction.
  *
  * Only ever driven from the Nodus header. The command set is closed and carries
  * no data from the page, so there is nothing here a site can steer.
+ *
+ * Two things follow every command. The result tells main whether the page could
+ * act at all, so it can fall back to Chromium's own media key for a player whose
+ * audio lives somewhere no DOM query reaches. The state report that follows tells
+ * the header what actually happened, so a command the page refused — an autoplay
+ * policy denying `play()`, say — leaves the button showing the truth instead of
+ * silently pretending it worked.
  */
 ipcRenderer.on('nodus-browser:page:mediaCommand', (_event, command: string) => {
-  if (command === 'previous' || command === 'next') {
-    switchMediaElement(command);
-    return;
-  }
-  for (const element of mediaElements()) {
-    try {
-      if (command === 'play') element.play?.();
-      else if (command === 'pause') element.pause?.();
-      else if (command === 'stop') {
-        element.pause?.();
-        // Rewinding is what makes Stop different from Pause; a page that
-        // refuses the seek still ends up paused, which is the important half.
-        try { element.currentTime = 0; } catch { /* live streams refuse this */ }
-      }
-    } catch {
-      // One uncooperative element must not stop us from reaching the others.
-    }
-  }
+  const known: MediaCommand[] = ['previous', 'play', 'pause', 'next', 'stop'];
+  if (known.indexOf(command as MediaCommand) < 0) return;
+  const elements = mediaElements();
+  const handled = applyMediaCommand(elements, command as MediaCommand, lastPlayed);
+  ipcRenderer.send('nodus-browser:page:mediaCommandResult', { command, handled });
+  // Long enough for a resolved play() to have flipped `paused`, short enough
+  // that the button does not sit wrong while the user is looking at it.
+  setTimeout(() => reportPlaybackState(), 120);
 });
 
 /** Everything main can ask this page for. The command set is closed. */

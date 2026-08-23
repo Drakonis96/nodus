@@ -95,6 +95,12 @@ const RELEASE_3_2_4_TR: string[] = [
 ];
 
 export const RELEASE_NOTES_TR: Record<string, string[]> = {
+  "4.2.4": [
+    "Tarayıcının medya düğmesi yeniden doğruyu söylüyor ve söz dinliyor. Sayfadaki yedek oynatıcılardan herhangi biri durur durmaz sekmeyi duraklatılmış sayıyordu, bu yüzden zaten çalan bir ses için Oynat sunuyor ve basıldığında hiçbir şey yapmıyordu. Nodus artık aynı siteye ait çerçeveler ve özel bileşenler dahil sayfanın tamamına bakıyor ve gerçekten dinlediğiniz parça üzerinde işlem yapıyor.",
+    "Medya panelini açmak artık siteyi yok etmiyor. Panel açıkken sayfa yerinde donuyor ve panel kapandığında olduğu gibi geri geliyor.",
+    "Sağ tık menüsü metin alanlarında Kes, Kopyala ve Yapıştır seçeneklerini bu sırayla sunuyor. Adres çubuğu ve Nodus'un diğer tüm alanları da artık, daha önce hiçbiri görünmezken, kendi menüsüne sahip.",
+    "Cmd veya Ctrl artı T yeni bir sekme açıyor, bir sayfayı okurken bile. Geri veya İleri düğmesine Cmd ya da Ctrl ile veya orta tuşla tıklamak da o sayfayı mevcut sekmeyi kıpırdatmadan yeni bir sekmede açıyor.",
+  ],
   "4.2.3": [
     "Deep Research, daha geniş bir rapor sütunuyla tam ekran okuma görünümü kazanıyor. İnce bir çubuk ne kadar ilerlediğinizi gösteriyor ve yukarı döndüğünüzde başlık yeniden beliriyor. Kaynaklar kullanılabilir yüksekliğe daha iyi uyuyor ve alıntılanan her yazar doğrudan kendi dosyasını açıyor.",
     "Rapor alıntıları her açılışta külliyatla karşılaştırılıyor. Bir eserin yazarı veya yılı rapor üretildikten sonra düzeltildiyse Nodus, kaydedilmiş raporu değiştirmeden alıntıları, matrisi ve kaynakçayı görüntülenirken yeniliyor.",

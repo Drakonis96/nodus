@@ -193,7 +193,11 @@ test('every change notifies exactly once, so the header does not thrash', () => 
   assert.equal(calls, 1);
   media.noteMediaPlaying('tab-1', describe());
   media.noteMediaPlaying('tab-1', describe());
-  assert.equal(calls, 1, 'duplicate native and preload play reports must collapse into one state');
+  assert.equal(calls, 1, 'three players in one tab are still one playing tab');
+  // Three players started, so three must stop before the tab is paused.
+  media.noteMediaPaused('tab-1');
+  media.noteMediaPaused('tab-1');
+  assert.equal(calls, 1, 'a tab with something still playing must not repaint as paused');
   media.noteMediaPaused('tab-1');
   assert.equal(calls, 2);
   media.noteMediaPaused('tab-1');
@@ -206,6 +210,63 @@ test('every change notifies exactly once, so the header does not thrash', () => 
   media.noteMuted('tab-1', false);
   assert.equal(calls, 2, 'an unchanged mute state must not notify');
   media.setMediaNotifier(null);
+});
+
+/**
+ * The regression that made the header's Play button inert.
+ *
+ * `media-started-playing` and `media-paused` fire once per PLAYER. A player UI
+ * that keeps spare <audio> elements around pauses them constantly while the real
+ * track runs — elevenreader.io ships eight <audio> tags and gives seven of them
+ * no source. Every one of those pauses used to flip the whole session to
+ * "paused", so the header offered Play for audio that was already playing, and
+ * pressing it did nothing at all.
+ */
+test('a spare element pausing must not claim the tab is paused', () => {
+  reset();
+  media.noteMediaPlaying('tab-1', describe('Censura visual'), 'audio');
+  // The page's six other placeholder <audio> elements settle down.
+  media.noteMediaPlaying('tab-1', describe('Censura visual'), 'audio');
+  media.noteMediaPaused('tab-1');
+  const [state] = media.browserMediaStates();
+  assert.equal(state.playing, true, 'the track is still running, so the header must offer Pause');
+});
+
+test('the page can correct the session outright, because it can see the whole document', () => {
+  reset();
+  media.noteMediaPlaying('tab-1', describe(), 'audio');
+  media.noteMediaPlaying('tab-1', describe(), 'audio');
+  // One aggregate "nothing is playing" beats any number of stale player counts.
+  media.noteMediaPlaybackState('tab-1', false, describe(), 'audio');
+  assert.equal(media.browserMediaStates()[0].playing, false);
+  media.noteMediaPlaybackState('tab-1', true, describe(), 'audio');
+  assert.equal(media.browserMediaStates()[0].playing, true);
+  // And a single pause after that report must still pause the tab, rather than
+  // decrementing a count the report already settled.
+  media.noteMediaPaused('tab-1');
+  assert.equal(media.browserMediaStates()[0].playing, false);
+});
+
+test('a page reporting silence with no session does not invent one', () => {
+  reset();
+  media.noteMediaPlaybackState('tab-1', false, describe(), 'audio');
+  assert.deepEqual(media.browserMediaStates(), [], 'silence is not a reason to show media controls');
+});
+
+test('a page reporting playback with no session opens one', () => {
+  reset();
+  media.noteMediaPlaybackState('tab-1', true, describe('Lecture 9'), 'audio');
+  const [state] = media.browserMediaStates();
+  assert.equal(state.title, 'Lecture 9');
+  assert.equal(state.playing, true);
+  assert.equal(state.kind, 'audio');
+});
+
+test('the internal player count never crosses the IPC boundary', () => {
+  reset();
+  media.noteMediaPlaying('tab-1', describe());
+  const [state] = media.browserMediaStates();
+  assert.equal('activePlayers' in state, false, 'the header has no business knowing the count');
 });
 
 test('clearing everything drops all sessions', () => {

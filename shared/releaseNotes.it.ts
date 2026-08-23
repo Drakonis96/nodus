@@ -155,6 +155,12 @@ const RELEASE_3_2_4_IT: string[] = [
 ];
 
 export const RELEASE_NOTES_IT: Record<string, string[]> = {
+  "4.2.4": [
+    "Il pulsante multimediale del browser torna a dire la verità e a obbedire. Dava una scheda per messa in pausa non appena un qualsiasi lettore di riserva della pagina si fermava, quindi offriva Riproduci su un audio che stava già suonando e premerlo non faceva nulla. Ora Nodus guarda l'intera pagina, compresi i frame dello stesso sito e i componenti propri, e agisce sulla traccia che stai davvero ascoltando.",
+    "Aprire il pannello multimediale non fa più sparire il sito. La pagina si congela al suo posto mentre il pannello è aperto e ricompare intatta alla chiusura.",
+    "Il menu del tasto destro offre Taglia, Copia e Incolla nei campi di testo, in quest'ordine. Anche la barra degli indirizzi e tutti gli altri campi di Nodus hanno ora un proprio menu, dove prima non ne compariva nessuno.",
+    "Cmd o Ctrl più T apre una nuova scheda, anche mentre stai leggendo una pagina. E facendo clic su Indietro o Avanti con Cmd o Ctrl, oppure con il tasto centrale, quella pagina si apre in una nuova scheda senza spostare quella corrente.",
+  ],
   "4.2.3": [
     "Deep Research introduce una lettura a schermo intero con una colonna del rapporto più ampia. Una barra sottile mostra a che punto sei e l'intestazione ricompare quando risali. Le fonti si adattano meglio all'altezza disponibile e ogni autore citato apre direttamente la propria scheda.",
     "Le citazioni dei rapporti vengono verificate nel corpus ogni volta che li apri. Se l'autore o l'anno di un'opera sono stati corretti dopo la generazione, Nodus aggiorna citazioni, matrice e bibliografia mentre le mostra senza modificare il rapporto salvato.",

@@ -1,5 +1,12 @@
 # Changelog
 
+## 4.2.4 — 2026-08-23
+
+- Fixed the Nodus Browser media button, which reported a tab as paused as soon as any spare player on the page stopped and then did nothing when pressed. Playback state is now the page's own answer about the whole document, Play and Pause act on the track actually playing, and the search reaches same-origin frames and open shadow roots.
+- Fixed the media panel blanking the web page while it was open. The page is now frozen into a snapshot before the native view is hidden, as the notifications panel already did.
+- Added Cut, Copy and Paste to the browser page context menu, in that order, and gave Nodus's own text fields a context menu of their own, including the Browser address bar.
+- Added Cmd/Ctrl+T for a new tab, working while a page has focus, and Cmd/Ctrl-click or middle-click on Back and Forward to open that destination in a new tab.
+
 ## 4.2.3 — 2026-08-22
 
 - Added a full-screen Deep Research reading mode with a wider report column, live reading progress, a returning header, height-aware source panels and direct links from cited authors to their dossiers.

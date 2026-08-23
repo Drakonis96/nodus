@@ -83,6 +83,7 @@ import {
   navigate,
   reload,
   setFoundInPageListener,
+  historyNeighbourUrl,
   setOverlayVisible,
   setSectionVisible,
   activeTabSummary,
@@ -233,6 +234,12 @@ export function registerBrowserIpc({ h, getWindow }: IpcContext): void {
       customSearchTemplate: () => getSettings().browserSearchTemplate ?? '',
       // The native menu speaks the app's language through the same table the UI uses.
       t: (key: string) => String(localizeIpcPayload({ v: key }, getSettings().uiLanguage).v),
+    }, {
+      // Cmd/Ctrl+T pressed while a page has focus. Same destination as the
+      // toolbar's "+", so the two cannot drift apart.
+      // `openNewTab` is declared further down but only ever called from a user
+      // gesture, long after this module's body has run.
+      newTab: () => { void openNewTab(''); },
     });
     if (wired) return;
     setPermissionPromptNotifier(broadcastPermission);
@@ -327,14 +334,19 @@ export function registerBrowserIpc({ h, getWindow }: IpcContext): void {
     return restartInFlight;
   });
 
-  h('browser:openTab', async (event, url: string) => {
-    assertUiSender(event, getWindow);
-    ensureWired();
+  /** One definition of "open a new tab", shared by the toolbar, the shortcut and IPC. */
+  const openNewTab = (url: string) => {
     const requested = String(url ?? '');
     if (requested === '') {
       return createTab(getSettings().browserNewTabMode === 'blank' ? 'about:blank' : homeUrl());
     }
     return createTab(requested);
+  };
+
+  h('browser:openTab', async (event, url: string) => {
+    assertUiSender(event, getWindow);
+    ensureWired();
+    return openNewTab(url);
   });
 
   h('browser:navigateStartPage', async (event, page: unknown) => {
@@ -395,6 +407,19 @@ export function registerBrowserIpc({ h, getWindow }: IpcContext): void {
   h('browser:dismissError', async (event) => { assertUiSender(event, getWindow); dismissError(); });
   h('browser:goBack', async (event) => { assertUiSender(event, getWindow); goBack(); });
   h('browser:goForward', async (event) => { assertUiSender(event, getWindow); goForward(); });
+
+  /**
+   * Cmd/Ctrl-click (or middle-click) on Back or Forward: same destination, new
+   * tab, and this tab stays where it is. Main resolves the history entry because
+   * the renderer has no access to a tab's navigation history at all.
+   */
+  h('browser:openHistoryNeighbour', async (event, direction: unknown) => {
+    assertUiSender(event, getWindow);
+    ensureWired();
+    if (direction !== 'back' && direction !== 'forward') return null;
+    const url = historyNeighbourUrl(direction);
+    return url ? createTab(url) : null;
+  });
   h('browser:reload', async (event) => { assertUiSender(event, getWindow); reload(); });
   h('browser:stop', async (event) => { assertUiSender(event, getWindow); stopLoading(); });
 

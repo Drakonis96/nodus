@@ -1,6 +1,6 @@
 {
   "name": "nodus",
-  "version": "4.2.3",
+  "version": "4.2.4",
   "description": "Local-first desktop app that turns a Zotero library into a navigable graph of ideas and authors.",
   "author": "Nodus",
   "license": "AGPL-3.0-only",
@@ -28,6 +28,7 @@
     "test:e2e:view-snapshots": "npm run build && node scripts/e2e-view-snapshots.mjs",
     "test:e2e:global-library": "npm run build && node scripts/e2e-global-library.mjs",
     "test:e2e:browser-connector": "node scripts/e2e-browser-connector.mjs",
+    "verify:browser-fixes": "node scripts/verify-browser-fixes-live.mjs",
     "test:e2e:office-references": "node scripts/e2e-office-references.mjs",
     "test:e2e:local-server": "node scripts/e2e-local-server.mjs",
     "smoke:author-roles": "node scripts/run-smoke.mjs smoke-author-roles",

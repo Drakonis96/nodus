@@ -35,6 +35,7 @@ import {
 import { decideNavigation } from '@shared/browserNavigation';
 import { NODUS_BROWSER_PARTITION, browserSession } from './session';
 import { installContextMenu, type ContextMenuActions } from './contextMenu';
+import { browserShortcutFor, historyNeighbourIndex } from '@shared/browserShortcuts';
 import { cachePageFavicon } from './favicon';
 import { recordBrowserHistoryVisit } from './history';
 import {
@@ -43,6 +44,7 @@ import {
   hasMediaSession,
   noteAudioState,
   noteMediaPaused,
+  noteMediaPlaybackState,
   noteMediaPlaying,
   noteMuted,
   clearAllMediaSessions,
@@ -87,6 +89,7 @@ let sectionVisible = false;
 let overlayOpen = false;
 let notify: (() => void) | null = null;
 let contextMenuActions: ContextMenuActions | null = null;
+let shortcutActions: BrowserShortcutActions | null = null;
 const pageThemeJobs = new WeakMap<WebContents, Promise<void>>();
 
 function browserSurfaceColor(): string {
@@ -223,11 +226,23 @@ function emptyState(id: string, url: string): BrowserTabState {
   };
 }
 
+/** What a keyboard shortcut caught inside a page asks the app to do. */
+export interface BrowserShortcutActions {
+  /** Open a new tab, honouring the user's new-tab preference. */
+  newTab(): void;
+}
+
 /** Wire the host window and the change notifier. Called once, from the IPC layer. */
-export function initBrowserTabs(window: BaseWindow, onChange: () => void, menu?: ContextMenuActions): void {
+export function initBrowserTabs(
+  window: BaseWindow,
+  onChange: () => void,
+  menu?: ContextMenuActions,
+  shortcuts?: BrowserShortcutActions,
+): void {
   hostWindow = window;
   notify = onChange;
   if (menu) contextMenuActions = menu;
+  if (shortcuts) shortcutActions = shortcuts;
 }
 
 export function browserState(): BrowserState {
@@ -287,6 +302,21 @@ function wire(tab: Tab): void {
   const contents = tab.view.webContents;
   const isWeb = () => tab.state.kind === 'web';
   if (contextMenuActions) installContextMenu(contents, contextMenuActions, hostWindow);
+
+  /**
+   * Nodus's own shortcuts, claimed before the page sees them.
+   *
+   * Only what `browserShortcutFor` recognises is taken; every other keystroke
+   * passes straight through to the website, which is why this cannot break a
+   * site's own bindings.
+   */
+  on(tab, contents, 'before-input-event', ((event: { preventDefault(): void }, input: unknown) => {
+    if (!isWeb()) return;
+    const shortcut = browserShortcutFor(input as Parameters<typeof browserShortcutFor>[0]);
+    if (!shortcut) return;
+    event.preventDefault();
+    if (shortcut === 'newTab') shortcutActions?.newTab();
+  }) as never);
   void applyPageColorScheme(contents);
 
   /**
@@ -301,21 +331,42 @@ function wire(tab: Tab): void {
     if (!isWeb()) return;
     if (event.sender !== contents || event.senderFrame !== contents.mainFrame) return;
     const kind = payload?.kind === 'audio' || payload?.kind === 'video' ? payload.kind : 'unknown';
-    if (payload?.playing === true) {
-      noteMediaPlaying(tab.id, () => ({
-        title: tab.state.title || tab.state.url,
-        url: tab.state.url,
-        origin: originOf(tab.state.url),
-        faviconDataUrl: tab.state.faviconDataUrl,
-      }), kind);
-      patch(tab, { hasMedia: true, mediaPlaying: true });
-    } else {
-      noteMediaPaused(tab.id);
-      patch(tab, { mediaPlaying: false });
-    }
+    // The page reports whether ANYTHING is playing, not one element's edge, so
+    // this replaces the session's flag outright rather than counting with it.
+    const playing = payload?.playing === true;
+    noteMediaPlaybackState(tab.id, playing, () => ({
+      title: tab.state.title || tab.state.url,
+      url: tab.state.url,
+      origin: originOf(tab.state.url),
+      faviconDataUrl: tab.state.faviconDataUrl,
+    }), kind);
+    patch(tab, playing ? { hasMedia: true, mediaPlaying: true } : { mediaPlaying: false });
   };
   contents.ipc.on('nodus-browser:page:media', pageMediaListener);
   tab.disposers.push(() => contents.ipc.removeListener('nodus-browser:page:media', pageMediaListener));
+
+  /**
+   * Whether the page could act on the last header command.
+   *
+   * A `false` means no reachable media element answered — the player keeps its
+   * audio somewhere no DOM query goes (a cross-origin frame, a closed shadow
+   * root, an element the page never attached). Chromium's own media key is the
+   * last resort for those, because it reaches the page's Media Session handlers,
+   * which no amount of DOM walking can.
+   */
+  const pageMediaResultListener = (
+    event: Electron.IpcMainEvent,
+    payload: { command?: unknown; handled?: unknown },
+  ) => {
+    if (!isWeb()) return;
+    if (event.sender !== contents || event.senderFrame !== contents.mainFrame) return;
+    if (payload?.handled !== false) return;
+    const command = payload?.command;
+    if (command !== 'play' && command !== 'pause' && command !== 'stop') return;
+    sendMediaKey(contents, 'MediaPlayPause');
+  };
+  contents.ipc.on('nodus-browser:page:mediaCommandResult', pageMediaResultListener);
+  tab.disposers.push(() => contents.ipc.removeListener('nodus-browser:page:mediaCommandResult', pageMediaResultListener));
 
   /**
    * The Nodus website has one inert Bookmarks slot. Its isolated preload sends
@@ -901,6 +952,24 @@ export function dismissError(): void {
  * What must not happen is the fourth case that used to be the only one: falling
  * through and doing nothing at all, which is how this reached the user.
  */
+/**
+ * Where Back or Forward would take the ACTIVE tab, without going there.
+ *
+ * What Cmd/Ctrl-clicking those buttons needs: the destination as a URL, so it
+ * can be opened in a new tab while this one stays where it is. Null when there
+ * is nowhere to go, or when the step would leave a Nodus-internal start page —
+ * those are React pages with no URL another tab could load.
+ */
+export function historyNeighbourUrl(direction: 'back' | 'forward'): string | null {
+  const tab = activeTabId ? tabs.get(activeTabId) : null;
+  if (!tab || tab.state.kind !== 'web' || tab.view.webContents.isDestroyed()) return null;
+  const history = tab.view.webContents.navigationHistory;
+  const index = historyNeighbourIndex(history.getActiveIndex(), history.length(), direction);
+  if (index === null) return null;
+  const url = history.getEntryAtIndex(index)?.url ?? '';
+  return decideNavigation(url, { isMainFrame: true }).allowed ? url : null;
+}
+
 export function goBack(): void {
   const tab = activeTabId ? tabs.get(activeTabId) : null;
   if (!tab || tab.view.webContents.isDestroyed()) return;
@@ -1048,15 +1117,27 @@ export function stopFindInPage(action: 'clearSelection' | 'keepSelection' | 'act
   tab.view.webContents.stopFindInPage(action);
 }
 
+/** Press one of Chromium's standard media keys in a page. */
+function sendMediaKey(contents: WebContents, keyCode: string): void {
+  if (contents.isDestroyed()) return;
+  try {
+    contents.sendInputEvent({ type: 'keyDown', keyCode });
+    contents.sendInputEvent({ type: 'keyUp', keyCode });
+  } catch {
+    // A view being torn down mid-command is not worth a crash.
+  }
+}
+
 /** Drive one tab's media from the header. */
 export function sendMediaCommand(id: string, command: BrowserMediaCommand): void {
   const tab = tabs.get(id);
   if (!tab || tab.state.kind !== 'web' || tab.view.webContents.isDestroyed()) return;
   if (command === 'previous' || command === 'next') {
-    const keyCode = command === 'previous' ? 'MediaPreviousTrack' : 'MediaNextTrack';
-    tab.view.webContents.sendInputEvent({ type: 'keyDown', keyCode });
-    tab.view.webContents.sendInputEvent({ type: 'keyUp', keyCode });
+    sendMediaKey(tab.view.webContents, command === 'previous' ? 'MediaPreviousTrack' : 'MediaNextTrack');
   }
+  // Play/pause deliberately does NOT send its media key up front: on a page the
+  // preload can reach, the key would toggle a second time and undo the command.
+  // The page answers whether it handled it, and only a "no" falls back to the key.
   tab.view.webContents.send('nodus-browser:page:mediaCommand', command);
 }
 

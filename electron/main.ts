@@ -33,6 +33,8 @@ import { holdAwake, releaseAllPower } from './localServer/power';
 import { setCopilotWindowProvider, startCopilotServer, stopCopilotServer } from './copilot/server';
 import { setZoteroPluginWindowProvider, startZoteroPluginServer, stopZoteroPluginServer } from './zotero-plugin/server';
 import { applyMascotWindow, destroyMascotWindow, setMascotTutorialVisible } from './mascotWindow';
+import { installAppEditContextMenu } from './browser/editMenu';
+import { localizeIpcPayload } from '@shared/uiLanguage';
 import { seedWelcomeNotification } from './notifications';
 import { startRadarScheduler, stopRadarScheduler } from './radar/scheduler';
 import { refreshAnnouncements } from './announcements';
@@ -414,6 +416,14 @@ function createWindow(): void {
     },
   });
   protectMainWindowNavigation(mainWindow);
+
+  // Right-clicking any text field in Nodus — the browser's address bar above all
+  // — offers Cut, Copy and Paste. Views that draw their own HTML context menu
+  // call preventDefault(), so Electron never raises this event for them.
+  installAppEditContextMenu(
+    mainWindow.webContents,
+    (key: string) => String(localizeIpcPayload({ v: key }, getSettings().uiLanguage).v),
+  );
 
   // `nodi:tutorialVisible` is set by a React effect in BasicsTutorial and cleared by
   // that effect's cleanup — which a full page reload never runs. The main process

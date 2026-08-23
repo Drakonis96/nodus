@@ -55,6 +55,8 @@ export const browserApi = {
   browserDismissError: (): Promise<void> => ipcRenderer.invoke('browser:dismissError').then(() => undefined),
   browserGoBack: (): Promise<void> => ipcRenderer.invoke('browser:goBack').then(() => undefined),
   browserGoForward: (): Promise<void> => ipcRenderer.invoke('browser:goForward').then(() => undefined),
+  openBrowserHistoryNeighbourTab: (direction: 'back' | 'forward'): Promise<string | null> =>
+    ipcRenderer.invoke('browser:openHistoryNeighbour', direction),
   browserReload: (): Promise<void> => ipcRenderer.invoke('browser:reload').then(() => undefined),
   browserStop: (): Promise<void> => ipcRenderer.invoke('browser:stop').then(() => undefined),
   browserGoHome: (): Promise<{ url: string }> => ipcRenderer.invoke('browser:goHome'),

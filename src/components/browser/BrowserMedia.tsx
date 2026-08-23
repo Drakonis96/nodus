@@ -48,13 +48,27 @@ export function BrowserMediaProvider({ children }: { children: ReactNode }) {
   return <MediaContext.Provider value={states}>{children}</MediaContext.Provider>;
 }
 
+interface BrowserSnapshot {
+  dataUrl: string;
+  left: number;
+  top: number;
+  width: number;
+  height: number;
+}
+
 /**
  * The popover, anchored to the header button.
  *
- * Same anchoring pattern as the notifications panel. It calls
- * `setBrowserOverlayVisible(true)` while open, because the browser page is a
- * native view that paints above this HTML — without that, opening this popover
- * while the browser section is on screen would draw it underneath the page.
+ * Same anchoring pattern as the notifications panel, including the part that
+ * used to be missing here. The browser page is a native WebContentsView that
+ * paints above all this HTML, so the popover cannot be drawn over it — the page
+ * has to be hidden. Hiding it on its own is what made clicking the media button
+ * look like it made the website disappear: the popover opened over the window's
+ * bare background.
+ *
+ * So the page is FROZEN first: main captures it, React paints that PNG in the
+ * viewport's exact place, and only once that frame is on screen does the native
+ * view go away. What the user sees is the page staying put behind the popover.
  */
 export function BrowserMediaPopover({
   anchorEl, onClose, onOpenTab,
@@ -62,12 +76,33 @@ export function BrowserMediaPopover({
   const states = useBrowserMedia();
   const [deviceVolume, setDeviceVolume] = useState(50);
   const [deviceVolumeReady, setDeviceVolumeReady] = useState(false);
+  const [snapshot, setSnapshot] = useState<BrowserSnapshot | null>(null);
   const onCloseRef = useRef(onClose);
   onCloseRef.current = onClose;
 
   useEffect(() => {
     if (!anchorEl) return;
-    void window.nodus.setBrowserOverlayVisible(true);
+    let cancelled = false;
+
+    const freezeBrowserPage = async () => {
+      const dataUrl = await window.nodus.captureBrowserOverlaySnapshot().catch(() => null);
+      if (cancelled) return;
+      const viewport = document.querySelector<HTMLElement>('[data-browser-viewport]');
+      const rect = viewport?.getBoundingClientRect();
+      if (dataUrl && rect && rect.width > 0 && rect.height > 0) {
+        setSnapshot({ dataUrl, left: rect.left, top: rect.top, width: rect.width, height: rect.height });
+        // Two frames: one for React to commit the image, one for the compositor
+        // to have actually put it on screen. Hiding the native view any earlier
+        // shows the bare window through the gap.
+        await new Promise<void>((resolve) => {
+          requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
+        });
+        if (cancelled) return;
+      }
+      await window.nodus.setBrowserOverlayVisible(true);
+    };
+    void freezeBrowserPage();
+
     void window.nodus.getBrowserDeviceVolume()
       .then((volume) => {
         setDeviceVolume(Math.max(0, Math.min(100, Math.round(volume))));
@@ -77,7 +112,9 @@ export function BrowserMediaPopover({
     const onKey = (event: KeyboardEvent) => { if (event.key === 'Escape') onCloseRef.current(); };
     window.addEventListener('keydown', onKey);
     return () => {
+      cancelled = true;
       window.removeEventListener('keydown', onKey);
+      setSnapshot(null);
       void window.nodus.setBrowserOverlayVisible(false);
     };
     // Media-state updates recreate the callback supplied by the header. They
@@ -90,6 +127,16 @@ export function BrowserMediaPopover({
 
   return createPortal(
     <>
+      {snapshot && (
+        <img
+          data-testid="browser-media-page-snapshot"
+          src={snapshot.dataUrl}
+          alt=""
+          aria-hidden="true"
+          className="pointer-events-none fixed z-[129] object-fill"
+          style={{ left: snapshot.left, top: snapshot.top, width: snapshot.width, height: snapshot.height }}
+        />
+      )}
       <div className="fixed inset-0 z-[130]" onClick={onClose} />
       <div
         data-testid="browser-media-popover"

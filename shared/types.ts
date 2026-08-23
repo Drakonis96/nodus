@@ -8166,6 +8166,8 @@ export interface BrowserApi {
   browserDismissError(): Promise<void>;
   browserGoBack(): Promise<void>;
   browserGoForward(): Promise<void>;
+  /** Open where Back/Forward would go in a NEW tab, leaving this one put. */
+  openBrowserHistoryNeighbourTab(direction: 'back' | 'forward'): Promise<string | null>;
   browserReload(): Promise<void>;
   browserStop(): Promise<void>;
   browserGoHome(): Promise<{ url: string }>;
