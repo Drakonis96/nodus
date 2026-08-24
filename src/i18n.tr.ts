@@ -37,9 +37,11 @@ import { NOTION_IMPORT_TRANSLATIONS } from './i18n.notionImport';
 import { LIBRARY_ONBOARDING_TRANSLATIONS } from './i18n.libraryOnboarding';
 import { SOURCE_CITATION_TRANSLATIONS } from './i18n.sourceCitation';
 import { DEEP_RESEARCH_APPROACH_TRANSLATIONS } from './i18n.deepResearchApproaches';
+import { DICTIONARY_TRANSLATIONS } from './i18n.dictionary';
 
 /** Complete static Turkish interface table; coverage prohibits runtime fallbacks. */
 export const TR: Record<string, string> = {
+  ...DICTIONARY_TRANSLATIONS.tr,
   'Tamaño de Nodi': 'Nodi boyutu',
   'El 100 % conserva el tamaño original de Nodi y es el máximo. Puedes reducirlo hasta el 40 %.': "%100, Nodi'nin özgün boyutunu korur ve en büyük boyuttur. Boyutu %40'a kadar küçültebilirsiniz.",
   'Tamaños predeterminados': 'Önceden ayarlanmış boyutlar',

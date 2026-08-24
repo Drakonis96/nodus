@@ -423,9 +423,18 @@ export function findSimilarIdeas(
 export async function findSimilarIdeasPaged(
   queryEmbedding: number[],
   threshold: number,
-  limit: number
+  limit: number,
+  opts: { nodusIds?: string[] } = {}
 ): Promise<{ global_id: string; type: IdeaType; label: string; statement: string; similarity: number }[]> {
   const config = currentEmbeddingConfig();
+  const nodusIds = [...new Set(opts.nodusIds ?? [])];
+  const scoped = nodusIds.length
+    ? ` AND EXISTS (
+          SELECT 1 FROM idea_occurrences scoped_occurrence
+           WHERE scoped_occurrence.global_id = ideas.global_id
+             AND scoped_occurrence.nodus_id IN (${nodusIds.map(() => '?').join(',')})
+        )`
+    : '';
   const ranked = await scanSimilar<{ global_id: string; rid: number; similarity: number }>({
     table: 'ideas',
     sql: `SELECT global_id, rowid AS rid, vec_scan(embedding) AS similarity
@@ -435,8 +444,8 @@ export async function findSimilarIdeasPaged(
              AND embedding_provider = ?
              AND embedding_model = ?
              AND embedding_dim = ?
-             AND orphaned_at IS NULL`,
-    params: [config.provider, config.model, queryEmbedding.length],
+             AND orphaned_at IS NULL${scoped}`,
+    params: [config.provider, config.model, queryEmbedding.length, ...nodusIds],
     query: queryEmbedding,
     threshold,
     limit,

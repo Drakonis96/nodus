@@ -215,6 +215,10 @@ const SYNC_GROUPS: { key: SyncGroupKey; prefix?: string; tables?: string[] }[] =
       'synthesis_matrix_cell',
       'tutor_saved_routes',
       'immersion_sessions',
+      'dictionary_entries',
+      'dictionary_evidence',
+      'dictionary_versions',
+      'dictionary_relations',
     ],
   },
   { key: 'chats', tables: ['chat_conversations', 'chat_messages', 'database_chat_conversations'] },
@@ -233,6 +237,7 @@ const NOT_SYNCED_TABLES = new Set([
   'saved_authors',
   'ideas', 'idea_occurrences', 'idea_theme_links', 'themes', 'edges', 'edge_traces', 'gaps',
   'passages', 'collections', 'zotero_tags', 'external_refs', 'extraction_cache', 'scan_checkpoints',
+  'dictionary_retrieval_state', 'dictionary_corpus_changes',
   // Rebuilt from canonical Library manifests for this vault. Syncing transient
   // freshness would let one machine incorrectly mark another machine's output current.
   'library_analysis_freshness',

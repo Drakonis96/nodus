@@ -16,7 +16,7 @@ import { ModelPicker } from '../components/ModelPicker';
 import { WorkIdeasModal } from './WorkIdeasModal';
 import { useDataRefresh, useScanComplete } from '../hooks';
 import { useFeatureModel } from '../hooks/useFeatureModel';
-import type { PendingGraphNavigationTarget } from '../navigation';
+import type { AuthorNavigationTarget, PendingGraphNavigationTarget } from '../navigation';
 import type { AuthorsSnapshot } from '../app/viewSnapshots';
 import { useListPlacement } from '../listPlacement';
 import { t, tx } from '../i18n';
@@ -92,6 +92,7 @@ export function AuthorsView({
   snapshot,
   onSnapshotChange,
   onOpenGraph,
+  target,
 }: {
   vaultId: string | null;
   settings: AppSettings;
@@ -99,6 +100,7 @@ export function AuthorsView({
   snapshot?: AuthorsSnapshot;
   onSnapshotChange?: (patch: Partial<AuthorsSnapshot>) => void;
   onOpenGraph: (target: PendingGraphNavigationTarget) => void;
+  target?: AuthorNavigationTarget | null;
 }) {
   // Restored as initial values only. A reactive `snapshot` prop would fight the
   // reader for control of their own tabs on every re-render of the shell.
@@ -137,6 +139,13 @@ export function AuthorsView({
     setActiveAuthorId(author.id);
     setSurface('author');
   }, []);
+
+  const lastTarget = useRef<number | null>(null);
+  useEffect(() => {
+    if (!target || target.nonce === lastTarget.current) return;
+    lastTarget.current = target.nonce;
+    showAuthor({ id: target.authorId, label: target.name });
+  }, [showAuthor, target]);
 
   const closeAuthor = useCallback((authorId: string) => {
     const closingIndex = openAuthors.findIndex((author) => author.id === authorId);

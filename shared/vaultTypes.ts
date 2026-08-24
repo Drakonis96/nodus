@@ -319,6 +319,7 @@ export function isPreviewVaultType(value: unknown): boolean {
  * by phase C.
  */
 export const VAULT_TYPE_SCOPED_VIEWS: Record<string, VaultType[]> = {
+  dictionary: ['academic'],
   // La ruta Espacio de trabajo sigue siendo académica. Los demás vaults conservan la
   // ruta Notas, aunque ambas rutas comparten ahora la misma experiencia de catálogo.
   workspace: ['academic'],

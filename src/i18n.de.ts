@@ -43,8 +43,10 @@ import { NOTION_IMPORT_TRANSLATIONS } from './i18n.notionImport';
 import { LIBRARY_ONBOARDING_TRANSLATIONS } from './i18n.libraryOnboarding';
 import { SOURCE_CITATION_TRANSLATIONS } from './i18n.sourceCitation';
 import { DEEP_RESEARCH_APPROACH_TRANSLATIONS } from './i18n.deepResearchApproaches';
+import { DICTIONARY_TRANSLATIONS } from './i18n.dictionary';
 
 export const DE: Record<string, string> = {
+  ...DICTIONARY_TRANSLATIONS.de,
   'Tamaño de Nodi': 'Nodi-Größe',
   'El 100 % conserva el tamaño original de Nodi y es el máximo. Puedes reducirlo hasta el 40 %.': '100 % entspricht der ursprünglichen Größe von Nodi und ist das Maximum. Sie können Nodi bis auf 40 % verkleinern.',
   'Tamaños predeterminados': 'Voreingestellte Größen',

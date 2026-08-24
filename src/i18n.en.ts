@@ -37,6 +37,7 @@ import { NOTION_IMPORT_TRANSLATIONS } from './i18n.notionImport';
 import { LIBRARY_ONBOARDING_TRANSLATIONS } from './i18n.libraryOnboarding';
 import { SOURCE_CITATION_TRANSLATIONS } from './i18n.sourceCitation';
 import { DEEP_RESEARCH_APPROACH_TRANSLATIONS } from './i18n.deepResearchApproaches';
+import { DICTIONARY_TRANSLATIONS } from './i18n.dictionary';
 
 /**
  * English translations keyed by the Spanish source string (see {@link ../i18n}).
@@ -44,6 +45,7 @@ import { DEEP_RESEARCH_APPROACH_TRANSLATIONS } from './i18n.deepResearchApproach
  * every non-Spanish interface language.
  */
 export const EN: Record<string, string> = {
+  ...DICTIONARY_TRANSLATIONS.en,
   'Tamaño de Nodi': 'Nodi size',
   'El 100 % conserva el tamaño original de Nodi y es el máximo. Puedes reducirlo hasta el 40 %.': "100% keeps Nodi's original size and is the maximum. You can reduce it to 40%.",
   'Tamaños predeterminados': 'Preset sizes',

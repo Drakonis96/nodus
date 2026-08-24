@@ -121,6 +121,17 @@ import type {
   ZoteroItem,
   ZoteroStudyMaterialImportInput,
 } from '@shared/types';
+import type {
+  DictionaryEntryInput,
+  DictionaryEntryPatch,
+  DictionaryEvidenceDecision,
+  DictionaryEvidenceRef,
+  DictionaryEvidenceRequest,
+  DictionaryGenerationRequest,
+  DictionaryProgress,
+  DictionaryListRequest,
+  DictionaryRelationType,
+} from '@shared/dictionary';
 import { immersionAnnotationDocumentId } from '@shared/readerAnnotations';
 import { applyDecorativeImageOption, invalidateDecorativeImageGeneration } from '../ai/decorativeImages';
 import * as zotero from '../zotero/zoteroClient';
@@ -209,6 +220,13 @@ import * as studyAssessments from '../db/studyAssessmentsRepo';
 import { buildStudyTest } from '../ai/studyTests';
 import * as studyGrading from '../db/studyGradingRepo';
 import { buildWritingWorkshopSnapshot, generateWritingWorkshopDraft } from '../ai/writingWorkshop';
+import * as dictionaryRepo from '../db/dictionaryRepo';
+import {
+  detectDictionaryDuplicatesSemantic,
+  generateDictionaryEntry,
+  retrieveDictionaryEvidence,
+  scanChangedDictionaryEntries,
+} from '../ai/dictionary';
 import { ensureDeepResearchLane } from '../ai/deepResearchLane';
 import {
   cancelDeepResearchJob,
@@ -323,6 +341,20 @@ function announceWritingDrafts(): void {
   }
 }
 
+function announceDictionary(entryId: string | null): void {
+  for (const win of BrowserWindow.getAllWindows()) {
+    if (!win.isDestroyed() && !win.webContents.isDestroyed()) win.webContents.send('dictionary:changed', entryId);
+  }
+}
+
+function announceDictionaryProgress(progress: DictionaryProgress): void {
+  for (const win of BrowserWindow.getAllWindows()) {
+    if (!win.isDestroyed() && !win.webContents.isDestroyed()) win.webContents.send('dictionary:progress', progress);
+  }
+}
+
+const dictionaryGenerationJobs = new Map<string, DictionaryProgress>();
+
 function announceWritingDraftAnnotations(draftId: string | null): void {
   for (const win of BrowserWindow.getAllWindows()) {
     if (!win.isDestroyed() && !win.webContents.isDestroyed()) {
@@ -343,6 +375,108 @@ export function registerAcademicIpc({ h, getWindow, chatAborters }: IpcContext):
   const studyImproveAborters = new Map<string, AbortController>();
   const studyAssistantAborters = new Map<string, AbortController>();
   const libraryReaderChatAborters = new Map<string, AbortController>();
+
+  h('dictionary:list', async (_e, request: DictionaryListRequest) => dictionaryRepo.listDictionaryEntries(request));
+  h('dictionary:facets', async () => dictionaryRepo.listDictionaryFacets());
+  h('dictionary:get', async (_e, id: string) => dictionaryRepo.getDictionaryEntryDetail(id));
+  h('dictionary:create', async (_e, input: DictionaryEntryInput) => {
+    const entry = dictionaryRepo.createDictionaryEntry(input);
+    announceDictionary(entry.id);
+    return entry;
+  });
+  h('dictionary:update', async (_e, id: string, patch: DictionaryEntryPatch, expectedUpdatedAt: string) => {
+    const entry = dictionaryRepo.updateDictionaryEntry(id, patch, expectedUpdatedAt);
+    announceDictionary(id);
+    return entry;
+  });
+  h('dictionary:delete', async (_e, ids: string[]) => {
+    const changed = dictionaryRepo.deleteDictionaryEntries(ids);
+    if (changed) announceDictionary(null);
+    return changed;
+  });
+  h('dictionary:duplicates', async (_e, name: string, aliases: string[]) => detectDictionaryDuplicatesSemantic(name, aliases));
+  h('dictionary:retrieve', async (_e, entryId: string) => {
+    const detail = await retrieveDictionaryEvidence(entryId, 'initial');
+    announceDictionary(entryId);
+    return detail;
+  });
+  h('dictionary:scan', async (_e, entryId: string) => {
+    const detail = await retrieveDictionaryEvidence(entryId, 'scan');
+    announceDictionary(entryId);
+    return detail;
+  });
+  h('dictionary:scanChanged', async (_e, limit?: number) => {
+    const ids = await scanChangedDictionaryEntries(limit);
+    if (ids.length) announceDictionary(null);
+    return ids;
+  });
+  h('dictionary:evidence:list', async (_e, request: DictionaryEvidenceRequest) => dictionaryRepo.listDictionaryEvidence(request));
+  h('dictionary:evidence:decision', async (_e, entryId: string, refs: DictionaryEvidenceRef[], decision: DictionaryEvidenceDecision) => {
+    dictionaryRepo.setDictionaryEvidenceDecision(entryId, refs, decision);
+    announceDictionary(entryId);
+  });
+  h('dictionary:generate', async (_e, request: DictionaryGenerationRequest) => {
+    try {
+      const version = await generateDictionaryEntry(request);
+      announceDictionary(request.entryId);
+      return { ok: true as const, version };
+    } catch (error) {
+      const failureDetail = error instanceof Error ? error.message : String(error);
+      console.error(`[dictionary] generation failed for ${request.entryId}`, error);
+      return { ok: false as const, failureDetail };
+    }
+  });
+  h('dictionary:generate:start', async (_e, request: DictionaryGenerationRequest) => {
+    const running = dictionaryGenerationJobs.get(request.entryId);
+    if (running && !['done', 'failed'].includes(running.phase)) return running;
+    const queued: DictionaryProgress = { entryId: request.entryId, phase: 'queued', message: 'En cola' };
+    dictionaryGenerationJobs.set(request.entryId, queued);
+    announceDictionaryProgress(queued);
+    setImmediate(() => {
+      void (async () => {
+        try {
+          const retrieving: DictionaryProgress = { entryId: request.entryId, phase: 'retrieving', message: 'Analizando corpus' };
+          dictionaryGenerationJobs.set(request.entryId, retrieving);
+          announceDictionaryProgress(retrieving);
+          await retrieveDictionaryEvidence(request.entryId, 'initial');
+          announceDictionary(request.entryId);
+
+          const generating: DictionaryProgress = { entryId: request.entryId, phase: 'generating', message: 'Generando definición' };
+          dictionaryGenerationJobs.set(request.entryId, generating);
+          announceDictionaryProgress(generating);
+          await generateDictionaryEntry(request);
+          announceDictionary(request.entryId);
+
+          const done: DictionaryProgress = { entryId: request.entryId, phase: 'done', message: 'Definición generada' };
+          dictionaryGenerationJobs.set(request.entryId, done);
+          announceDictionaryProgress(done);
+        } catch (error) {
+          const detail = error instanceof Error ? error.message : String(error);
+          console.error(`[dictionary] background generation failed for ${request.entryId}`, error);
+          const failed: DictionaryProgress = { entryId: request.entryId, phase: 'failed', message: 'Error al generar', error: detail };
+          dictionaryGenerationJobs.set(request.entryId, failed);
+          announceDictionaryProgress(failed);
+        }
+      })();
+    });
+    return queued;
+  });
+  h('dictionary:versions:list', async (_e, entryId: string) => dictionaryRepo.listDictionaryVersions(entryId));
+  h('dictionary:versions:accept', async (_e, entryId: string, versionId: string, expectedCurrentVersionId: string | null) => {
+    const detail = dictionaryRepo.acceptDictionaryVersion(entryId, versionId, expectedCurrentVersionId);
+    announceDictionary(entryId);
+    return detail;
+  });
+  h('dictionary:versions:restore', async (_e, entryId: string, versionId: string, expectedCurrentVersionId: string | null) => {
+    const detail = dictionaryRepo.restoreDictionaryVersion(entryId, versionId, expectedCurrentVersionId);
+    announceDictionary(entryId);
+    return detail;
+  });
+  h('dictionary:relations:add', async (_e, fromEntryId: string, toEntryId: string, type?: DictionaryRelationType) => {
+    const relation = dictionaryRepo.addDictionaryRelation(fromEntryId, toEntryId, type);
+    announceDictionary(fromEntryId);
+    return relation;
+  });
 
   const queueImportedStudyKnowledge = async (
     results: Awaited<ReturnType<typeof importStudyMaterialPaths>>,

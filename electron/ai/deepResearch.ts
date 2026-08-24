@@ -293,7 +293,7 @@ function isAiVerdicts(v: unknown): v is AiVerdicts {
  * cannot be obtained defaults to `supports`, because deleting a citation on the
  * strength of a failed API call would silently damage a correct report.
  */
-async function aiVerifyCitations(claims: CitationClaim[], model: ModelRef | null): Promise<CitationVerdict[]> {
+export async function aiVerifyCitations(claims: CitationClaim[], model: ModelRef | null): Promise<CitationVerdict[]> {
   const verdicts: CitationVerdict[] = new Array(claims.length).fill('supports');
   const system = [
     'Eres el verificador de citas del modo Deep Research de Nodus.',

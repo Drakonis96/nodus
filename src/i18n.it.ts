@@ -37,9 +37,11 @@ import { NOTION_IMPORT_TRANSLATIONS } from './i18n.notionImport';
 import { LIBRARY_ONBOARDING_TRANSLATIONS } from './i18n.libraryOnboarding';
 import { SOURCE_CITATION_TRANSLATIONS } from './i18n.sourceCitation';
 import { DEEP_RESEARCH_APPROACH_TRANSLATIONS } from './i18n.deepResearchApproaches';
+import { DICTIONARY_TRANSLATIONS } from './i18n.dictionary';
 
 /** Complete static Italian interface table; coverage prohibits runtime fallbacks. */
 export const IT: Record<string, string> = {
+  ...DICTIONARY_TRANSLATIONS.it,
   'Tamaño de Nodi': 'Dimensione di Nodi',
   'El 100 % conserva el tamaño original de Nodi y es el máximo. Puedes reducirlo hasta el 40 %.': 'Il 100% mantiene la dimensione originale di Nodi ed è il massimo. Puoi ridurlo fino al 40%.',
   'Tamaños predeterminados': 'Dimensioni predefinite',

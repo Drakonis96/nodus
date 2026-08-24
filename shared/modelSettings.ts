@@ -15,6 +15,7 @@ export const GRANULAR_MODEL_KEYS = [
   'writingModel',
   'argumentMapModel',
   'authorModel',
+  'dictionaryModel',
   'studyModel',
   'tutorModel',
   'hypothesisModel',

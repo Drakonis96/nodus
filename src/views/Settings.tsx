@@ -3661,7 +3661,7 @@ function SidebarOrderEditor({
   );
 }
 
-type VaultModelKey = 'chatModel' | 'deepResearchModel' | 'immersionModel' | 'writingModel' | 'argumentMapModel' | 'authorModel' | 'studyModel' | 'tutorModel' | 'hypothesisModel';
+type VaultModelKey = 'chatModel' | 'deepResearchModel' | 'immersionModel' | 'writingModel' | 'argumentMapModel' | 'authorModel' | 'dictionaryModel' | 'studyModel' | 'tutorModel' | 'hypothesisModel';
 
 const VAULT_MODEL_FIELDS: Record<VaultModelKey, string> = {
   chatModel: 'Chat con el corpus',
@@ -3670,6 +3670,7 @@ const VAULT_MODEL_FIELDS: Record<VaultModelKey, string> = {
   writingModel: 'Taller de escritura',
   argumentMapModel: 'Mapa argumental',
   authorModel: 'Autores y biografías',
+  dictionaryModel: 'Dictionary',
   studyModel: 'Guías de estudio',
   tutorModel: 'Tutor',
   hypothesisModel: 'Laboratorio de hipótesis',
@@ -3694,7 +3695,7 @@ function VaultModelOverrides({ settings, vaultType, vaultName, patch }: {
     <p className="mb-3 mt-1 text-xs text-neutral-600">{t('Estos cambios no modifican los demás vaults.')}</p>
     {vaultType === 'estudio' ? <StudyVaultModelOverrides settings={settings} patch={patch} /> : <div className="space-y-3">
       {keys.map((key) => <Row key={key} label={t(VAULT_MODEL_FIELDS[key])}>
-        <ModelWithReasoning allowEmpty={false} settings={settings} value={settings[key]} onChange={(model) => void patch({ [key]: model })} emptyLabel="Seleccionar modelo" />
+        <ModelWithReasoning allowEmpty={false} settings={settings} value={settings[key] ?? null} onChange={(model) => void patch({ [key]: model })} emptyLabel="Seleccionar modelo" />
       </Row>)}
     </div>}
   </div>;

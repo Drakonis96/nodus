@@ -1473,6 +1473,8 @@ export interface AppSettings {
   writingModel: ModelRef | null;
   argumentMapModel: ModelRef | null;
   authorModel: ModelRef | null;
+  /** Model used only to generate and update persistent Dictionary entries. */
+  dictionaryModel?: ModelRef | null;
   studyModel: ModelRef | null;
   tutorModel: ModelRef | null;
   hypothesisModel: ModelRef | null;

@@ -15,6 +15,45 @@ let activeStudyAssistantRequestId: string | null = null;
 let activeStudySttRequestId: string | null = null;
 
 export const academicApi: AcademicApi = {
+  listDictionaryEntries: (request) => ipcRenderer.invoke('dictionary:list', request),
+  listDictionaryFacets: () => ipcRenderer.invoke('dictionary:facets'),
+  getDictionaryEntry: (id) => ipcRenderer.invoke('dictionary:get', id),
+  createDictionaryEntry: (input) => ipcRenderer.invoke('dictionary:create', input),
+  updateDictionaryEntry: (id, patch, expectedUpdatedAt) =>
+    ipcRenderer.invoke('dictionary:update', id, patch, expectedUpdatedAt),
+  deleteDictionaryEntries: (ids) => ipcRenderer.invoke('dictionary:delete', ids),
+  detectDictionaryDuplicates: (name, aliases) => ipcRenderer.invoke('dictionary:duplicates', name, aliases),
+  retrieveDictionaryEvidence: (entryId) => ipcRenderer.invoke('dictionary:retrieve', entryId),
+  scanDictionaryNewEvidence: (entryId) => ipcRenderer.invoke('dictionary:scan', entryId),
+  scanChangedDictionaryEntries: (limit) => ipcRenderer.invoke('dictionary:scanChanged', limit),
+  listDictionaryEvidence: (request) => ipcRenderer.invoke('dictionary:evidence:list', request),
+  setDictionaryEvidenceDecision: (entryId, refs, decision) =>
+    ipcRenderer.invoke('dictionary:evidence:decision', entryId, refs, decision).then(() => undefined),
+  generateDictionaryEntry: async (request) => {
+    const result = await ipcRenderer.invoke('dictionary:generate', request) as
+      | { ok: true; version: Awaited<ReturnType<AcademicApi['generateDictionaryEntry']>> }
+      | { ok: false; failureDetail: string };
+    if (!result.ok) throw new Error(result.failureDetail);
+    return result.version;
+  },
+  startDictionaryGeneration: (request) => ipcRenderer.invoke('dictionary:generate:start', request),
+  onDictionaryProgress: (callback) => {
+    const listener = (_event: Electron.IpcRendererEvent, progress: Parameters<typeof callback>[0]) => callback(progress);
+    ipcRenderer.on('dictionary:progress', listener);
+    return () => ipcRenderer.removeListener('dictionary:progress', listener);
+  },
+  listDictionaryVersions: (entryId) => ipcRenderer.invoke('dictionary:versions:list', entryId),
+  acceptDictionaryVersion: (entryId, versionId, expectedCurrentVersionId) =>
+    ipcRenderer.invoke('dictionary:versions:accept', entryId, versionId, expectedCurrentVersionId),
+  restoreDictionaryVersion: (entryId, versionId, expectedCurrentVersionId) =>
+    ipcRenderer.invoke('dictionary:versions:restore', entryId, versionId, expectedCurrentVersionId),
+  addDictionaryRelation: (fromEntryId, toEntryId, type) =>
+    ipcRenderer.invoke('dictionary:relations:add', fromEntryId, toEntryId, type),
+  onDictionaryChanged: (callback) => {
+    const listener = (_event: Electron.IpcRendererEvent, entryId: string | null) => callback(entryId);
+    ipcRenderer.on('dictionary:changed', listener);
+    return () => ipcRenderer.removeListener('dictionary:changed', listener);
+  },
   // Corpus: works and ideas
   listWorks: (filter) => ipcRenderer.invoke('works:list', filter),
   listWorksPage: (filter, request) => ipcRenderer.invoke('works:listPage', filter, request),

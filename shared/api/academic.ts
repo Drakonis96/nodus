@@ -16,6 +16,25 @@ import type { StudyProgressDashboard } from '../studyStats';
 import type { StudyCalendarEvent, StudyCalendarEventInput, StudyGoal, StudyPlan, StudyPlanBlock, StudyPlannerSnapshot, StudyStudySession } from '../studyPlanner';
 import type { StudyAiUsage, StudyAiUsageSummary } from '../studyAi';
 import type { StudySchedule } from '../studySchedule';
+import type {
+  DictionaryDuplicateMatch,
+  DictionaryEntry,
+  DictionaryEntryDetail,
+  DictionaryEntryInput,
+  DictionaryEntryPage,
+  DictionaryEntryPatch,
+  DictionaryEvidenceDecision,
+  DictionaryEvidencePage,
+  DictionaryEvidenceRef,
+  DictionaryEvidenceRequest,
+  DictionaryFacets,
+  DictionaryGenerationRequest,
+  DictionaryProgress,
+  DictionaryListRequest,
+  DictionaryRelation,
+  DictionaryRelationType,
+  DictionaryVersion,
+} from '../dictionary';
 import type { StudyMaterialAiProcessingDecision, StudyMaterialAiProcessingPrompt, StudyIdeaDetail, StudyIdeaSummary, StudyKnowledgeGraph, StudyKnowledgeJob, StudyKnowledgeProgress } from '../studyKnowledge';
 import type { CreateStudyCourseInput, CreateStudyDocumentInput, CreateStudyFolderInput, CreateStudySubjectInput, CreateStudyTagInput, CreateStudyTemplateInput, CreateStudyTopicInput, StudyCourse, StudyDocument, StudyEntityMoveInput, StudyEntityKind, StudyFolder, StudyLifecycleAction, StudyPlacement, StudyPlacementInput, StudySubject, StudyTag, StudyTemplate, StudyTopic, StudyWorkspace, StudyWorkspaceOptions } from '../studyOrg';
 import type { CreateStudyAcademicYearInput, StudyAcademicYear, UpdateStudyAcademicYearInput } from '../studyAcademicYears';// Declared in shared/types.ts itself; the resulting cycle is types-only and erased at build time.
@@ -196,6 +215,28 @@ import type {
 } from '../types';
 
 export interface AcademicApi {
+  // Dictionary: persistent evidence-backed concept syntheses
+  listDictionaryEntries(request: DictionaryListRequest): Promise<DictionaryEntryPage>;
+  listDictionaryFacets(): Promise<DictionaryFacets>;
+  getDictionaryEntry(id: string): Promise<DictionaryEntryDetail | null>;
+  createDictionaryEntry(input: DictionaryEntryInput): Promise<DictionaryEntry>;
+  updateDictionaryEntry(id: string, patch: DictionaryEntryPatch, expectedUpdatedAt: string): Promise<DictionaryEntry>;
+  deleteDictionaryEntries(ids: string[]): Promise<number>;
+  detectDictionaryDuplicates(name: string, aliases: string[]): Promise<DictionaryDuplicateMatch[]>;
+  retrieveDictionaryEvidence(entryId: string): Promise<DictionaryEntryDetail>;
+  scanDictionaryNewEvidence(entryId: string): Promise<DictionaryEntryDetail>;
+  scanChangedDictionaryEntries(limit?: number): Promise<string[]>;
+  listDictionaryEvidence(request: DictionaryEvidenceRequest): Promise<DictionaryEvidencePage>;
+  setDictionaryEvidenceDecision(entryId: string, refs: DictionaryEvidenceRef[], decision: DictionaryEvidenceDecision): Promise<void>;
+  generateDictionaryEntry(request: DictionaryGenerationRequest): Promise<DictionaryVersion>;
+  startDictionaryGeneration(request: DictionaryGenerationRequest): Promise<DictionaryProgress>;
+  onDictionaryProgress(callback: (progress: DictionaryProgress) => void): () => void;
+  listDictionaryVersions(entryId: string): Promise<DictionaryVersion[]>;
+  acceptDictionaryVersion(entryId: string, versionId: string, expectedCurrentVersionId: string | null): Promise<DictionaryEntryDetail>;
+  restoreDictionaryVersion(entryId: string, versionId: string, expectedCurrentVersionId: string | null): Promise<DictionaryEntryDetail>;
+  addDictionaryRelation(fromEntryId: string, toEntryId: string, type?: DictionaryRelationType): Promise<DictionaryRelation>;
+  onDictionaryChanged(callback: (entryId: string | null) => void): () => void;
+
   // corpus: works and ideas
   listWorks(filter?: WorkFilter): Promise<WorkView[]>;
   listWorksPage(filter: WorkFilter | undefined, request: WorkPageRequest): Promise<WorkPage>;

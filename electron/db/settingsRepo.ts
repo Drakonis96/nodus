@@ -66,6 +66,7 @@ const DEFAULTS: Omit<AppSettings, 'providerKeys' | 'lockedProviderKeys'> = {
   writingModel: null,
   argumentMapModel: null,
   authorModel: null,
+  dictionaryModel: null,
   studyModel: null,
   tutorModel: null,
   hypothesisModel: null,

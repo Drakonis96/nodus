@@ -76,6 +76,7 @@ const USER_TABLES = [
   'project_chapters', 'project_chapter_versions', 'project_chapter_chunks',
   'project_chapter_ideas', 'project_chapter_idea_relations', 'project_links',
   'project_insertion_suggestions', 'saved_searches', 'immersion_sessions',
+  'dictionary_entries', 'dictionary_evidence', 'dictionary_versions', 'dictionary_relations',
   'decorative_images', 'content_translations',
 ] as const;
 

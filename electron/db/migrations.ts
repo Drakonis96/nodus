@@ -15,7 +15,7 @@ export interface Migration {
 
 // Versioned, append-only migrations. Never edit an existing migration's SQL once
 // shipped — add a new one. The current schema version is the highest applied.
-export const SCHEMA_VERSION = 154;
+export const SCHEMA_VERSION = 156;
 
 export const migrations: Migration[] = [
   {
@@ -8285,6 +8285,219 @@ export const migrations: Migration[] = [
                 SELECT 1 FROM work_authors peer
                  WHERE peer.nodus_id = wa.nodus_id AND peer.role = 'author'
               );
+    `,
+  },
+  {
+    version: 155,
+    up: /* sql */ `
+      -- Dictionary entries are authored, durable research objects. Corpus rows are
+      -- referenced by stable ids and deliberately not protected by foreign keys:
+      -- connected-vault mutations may arrive before the local Zotero-derived corpus.
+      CREATE TABLE dictionary_entries (
+        id                       TEXT PRIMARY KEY,
+        name                     TEXT NOT NULL,
+        normalized_name          TEXT NOT NULL,
+        aliases_json             TEXT NOT NULL DEFAULT '[]',
+        focus_prompt             TEXT NOT NULL DEFAULT '',
+        scope_kind               TEXT NOT NULL CHECK (scope_kind IN ('vault','authors','works','tags_collections')),
+        scope_json               TEXT NOT NULL,
+        output_language          TEXT NOT NULL DEFAULT 'es',
+        detail_level             TEXT NOT NULL DEFAULT 'standard' CHECK (detail_level IN ('concise','standard','detailed')),
+        tags_json                TEXT NOT NULL DEFAULT '[]',
+        content_markdown         TEXT NOT NULL DEFAULT '',
+        notes                    TEXT NOT NULL DEFAULT '',
+        status                   TEXT NOT NULL DEFAULT 'draft' CHECK (status IN ('draft','active','archived')),
+        current_version_id       TEXT,
+        proposed_version_id      TEXT,
+        insufficient_evidence    INTEGER NOT NULL DEFAULT 0,
+        new_evidence_count       INTEGER NOT NULL DEFAULT 0,
+        last_evidence_scan_at    TEXT,
+        last_change_seq          INTEGER NOT NULL DEFAULT 0,
+        created_at               TEXT NOT NULL,
+        updated_at               TEXT NOT NULL
+      );
+      CREATE INDEX dictionary_entries_name_idx ON dictionary_entries(normalized_name, updated_at);
+      CREATE INDEX dictionary_entries_status_idx ON dictionary_entries(status, updated_at);
+      CREATE INDEX dictionary_entries_fresh_idx ON dictionary_entries(new_evidence_count, updated_at);
+
+      CREATE TABLE dictionary_evidence (
+        entry_id                 TEXT NOT NULL,
+        kind                     TEXT NOT NULL CHECK (kind IN ('idea','passage')),
+        ref_id                   TEXT NOT NULL,
+        decision                 TEXT NOT NULL CHECK (decision IN ('included','unused','excluded')),
+        score                    REAL NOT NULL DEFAULT 0,
+        reason                   TEXT NOT NULL DEFAULT '',
+        label                    TEXT NOT NULL DEFAULT '',
+        evidence_text            TEXT NOT NULL DEFAULT '',
+        work_id                  TEXT NOT NULL DEFAULT '',
+        work_title               TEXT NOT NULL DEFAULT '',
+        zotero_key               TEXT,
+        works_json               TEXT NOT NULL DEFAULT '[]',
+        page_label               TEXT,
+        authors_json             TEXT NOT NULL DEFAULT '[]',
+        tags_json                TEXT NOT NULL DEFAULT '[]',
+        source_revision          TEXT,
+        is_new                   INTEGER NOT NULL DEFAULT 0,
+        first_seen_at            TEXT NOT NULL,
+        updated_at               TEXT NOT NULL,
+        PRIMARY KEY (entry_id, kind, ref_id)
+      );
+      CREATE INDEX dictionary_evidence_entry_decision_idx ON dictionary_evidence(entry_id, decision, is_new, score DESC);
+      CREATE INDEX dictionary_evidence_ref_idx ON dictionary_evidence(kind, ref_id);
+      CREATE INDEX dictionary_evidence_work_idx ON dictionary_evidence(entry_id, work_id);
+
+      CREATE TABLE dictionary_versions (
+        id                       TEXT PRIMARY KEY,
+        entry_id                 TEXT NOT NULL,
+        content_markdown         TEXT NOT NULL,
+        evidence_json            TEXT NOT NULL DEFAULT '[]',
+        evidence_snapshot_json   TEXT NOT NULL DEFAULT '[]',
+        citations_json           TEXT NOT NULL DEFAULT '[]',
+        author_summaries_json    TEXT NOT NULL DEFAULT '[]',
+        focus_prompt             TEXT NOT NULL,
+        scope_json               TEXT NOT NULL,
+        output_language          TEXT NOT NULL,
+        detail_level             TEXT NOT NULL,
+        model_json               TEXT,
+        generated_at             TEXT NOT NULL,
+        trigger                  TEXT NOT NULL CHECK (trigger IN ('creation','update','regeneration','manual_edit','restore')),
+        state                    TEXT NOT NULL CHECK (state IN ('applied','proposed')),
+        insufficient_evidence    INTEGER NOT NULL DEFAULT 0,
+        created_at               TEXT NOT NULL,
+        updated_at               TEXT NOT NULL
+      );
+      CREATE INDEX dictionary_versions_entry_idx ON dictionary_versions(entry_id, generated_at DESC);
+      CREATE INDEX dictionary_versions_proposed_idx ON dictionary_versions(entry_id, state, generated_at DESC);
+
+      CREATE TABLE dictionary_relations (
+        id                       TEXT PRIMARY KEY,
+        from_entry_id            TEXT NOT NULL,
+        to_entry_id              TEXT NOT NULL,
+        type                     TEXT NOT NULL CHECK (type IN ('related','broader','narrower','synonym','opposing','historically_related','frequently_co_occurring')),
+        origin                   TEXT NOT NULL CHECK (origin IN ('manual','ai')),
+        status                   TEXT NOT NULL CHECK (status IN ('suggested','confirmed','dismissed')),
+        created_at               TEXT NOT NULL,
+        updated_at               TEXT NOT NULL,
+        UNIQUE (from_entry_id, to_entry_id, type)
+      );
+      CREATE INDEX dictionary_relations_from_idx ON dictionary_relations(from_entry_id, status);
+      CREATE INDEX dictionary_relations_to_idx ON dictionary_relations(to_entry_id, status);
+
+      -- Machine-local, derived state used to avoid a full retrieval on entry open.
+      CREATE TABLE dictionary_retrieval_state (
+        entry_id                 TEXT PRIMARY KEY,
+        query_hash               TEXT NOT NULL,
+        query_embedding          BLOB,
+        embedding_provider       TEXT,
+        embedding_model          TEXT,
+        embedding_dim            INTEGER,
+        idea_floor               REAL,
+        passage_floor            REAL,
+        last_change_seq          INTEGER NOT NULL DEFAULT 0,
+        needs_full_scan          INTEGER NOT NULL DEFAULT 1,
+        updated_at               TEXT NOT NULL
+      );
+
+      CREATE TABLE dictionary_corpus_changes (
+        seq                      INTEGER PRIMARY KEY AUTOINCREMENT,
+        entity_kind              TEXT NOT NULL CHECK (entity_kind IN ('idea','passage','work')),
+        ref_id                   TEXT NOT NULL,
+        work_id                  TEXT,
+        change_kind              TEXT NOT NULL CHECK (change_kind IN ('insert','update','delete','scope')),
+        changed_at               TEXT NOT NULL
+      );
+      CREATE INDEX dictionary_corpus_changes_seq_idx ON dictionary_corpus_changes(seq, entity_kind);
+      CREATE INDEX dictionary_corpus_changes_ref_idx ON dictionary_corpus_changes(entity_kind, ref_id, seq);
+    `,
+  },
+  {
+    version: 156,
+    up: /* sql */ `
+      CREATE TRIGGER dictionary_change_ideas_insert AFTER INSERT ON ideas BEGIN
+        INSERT INTO dictionary_corpus_changes(entity_kind, ref_id, change_kind, changed_at)
+        VALUES ('idea', NEW.global_id, 'insert', strftime('%Y-%m-%dT%H:%M:%fZ','now'));
+      END;
+      CREATE TRIGGER dictionary_change_ideas_update AFTER UPDATE ON ideas BEGIN
+        INSERT INTO dictionary_corpus_changes(entity_kind, ref_id, change_kind, changed_at)
+        VALUES ('idea', NEW.global_id, 'update', strftime('%Y-%m-%dT%H:%M:%fZ','now'));
+      END;
+      CREATE TRIGGER dictionary_change_ideas_delete AFTER DELETE ON ideas BEGIN
+        INSERT INTO dictionary_corpus_changes(entity_kind, ref_id, change_kind, changed_at)
+        VALUES ('idea', OLD.global_id, 'delete', strftime('%Y-%m-%dT%H:%M:%fZ','now'));
+      END;
+
+      CREATE TRIGGER dictionary_change_occurrences_insert AFTER INSERT ON idea_occurrences BEGIN
+        INSERT INTO dictionary_corpus_changes(entity_kind, ref_id, work_id, change_kind, changed_at)
+        VALUES ('idea', NEW.global_id, NEW.nodus_id, 'update', strftime('%Y-%m-%dT%H:%M:%fZ','now'));
+      END;
+      CREATE TRIGGER dictionary_change_occurrences_update AFTER UPDATE ON idea_occurrences BEGIN
+        INSERT INTO dictionary_corpus_changes(entity_kind, ref_id, work_id, change_kind, changed_at)
+        VALUES ('idea', NEW.global_id, NEW.nodus_id, 'update', strftime('%Y-%m-%dT%H:%M:%fZ','now'));
+      END;
+      CREATE TRIGGER dictionary_change_occurrences_delete AFTER DELETE ON idea_occurrences BEGIN
+        INSERT INTO dictionary_corpus_changes(entity_kind, ref_id, work_id, change_kind, changed_at)
+        VALUES ('idea', OLD.global_id, OLD.nodus_id, 'delete', strftime('%Y-%m-%dT%H:%M:%fZ','now'));
+      END;
+
+      CREATE TRIGGER dictionary_change_evidence_insert AFTER INSERT ON evidence BEGIN
+        INSERT INTO dictionary_corpus_changes(entity_kind, ref_id, work_id, change_kind, changed_at)
+        VALUES ('idea', NEW.global_id, NEW.nodus_id, 'update', strftime('%Y-%m-%dT%H:%M:%fZ','now'));
+      END;
+      CREATE TRIGGER dictionary_change_evidence_update AFTER UPDATE ON evidence BEGIN
+        INSERT INTO dictionary_corpus_changes(entity_kind, ref_id, work_id, change_kind, changed_at)
+        VALUES ('idea', NEW.global_id, NEW.nodus_id, 'update', strftime('%Y-%m-%dT%H:%M:%fZ','now'));
+      END;
+      CREATE TRIGGER dictionary_change_evidence_delete AFTER DELETE ON evidence BEGIN
+        INSERT INTO dictionary_corpus_changes(entity_kind, ref_id, work_id, change_kind, changed_at)
+        VALUES ('idea', OLD.global_id, OLD.nodus_id, 'delete', strftime('%Y-%m-%dT%H:%M:%fZ','now'));
+      END;
+
+      CREATE TRIGGER dictionary_change_idea_tags_insert AFTER INSERT ON idea_theme_links BEGIN
+        INSERT INTO dictionary_corpus_changes(entity_kind, ref_id, work_id, change_kind, changed_at)
+        VALUES ('idea', NEW.global_id, NEW.nodus_id, 'update', strftime('%Y-%m-%dT%H:%M:%fZ','now'));
+      END;
+      CREATE TRIGGER dictionary_change_idea_tags_delete AFTER DELETE ON idea_theme_links BEGIN
+        INSERT INTO dictionary_corpus_changes(entity_kind, ref_id, work_id, change_kind, changed_at)
+        VALUES ('idea', OLD.global_id, OLD.nodus_id, 'update', strftime('%Y-%m-%dT%H:%M:%fZ','now'));
+      END;
+
+      CREATE TRIGGER dictionary_change_passages_insert AFTER INSERT ON passages BEGIN
+        INSERT INTO dictionary_corpus_changes(entity_kind, ref_id, work_id, change_kind, changed_at)
+        VALUES ('passage', NEW.passage_id, NEW.nodus_id, 'insert', strftime('%Y-%m-%dT%H:%M:%fZ','now'));
+      END;
+      CREATE TRIGGER dictionary_change_passages_update AFTER UPDATE ON passages BEGIN
+        INSERT INTO dictionary_corpus_changes(entity_kind, ref_id, work_id, change_kind, changed_at)
+        VALUES ('passage', NEW.passage_id, NEW.nodus_id, 'update', strftime('%Y-%m-%dT%H:%M:%fZ','now'));
+      END;
+      CREATE TRIGGER dictionary_change_passages_delete AFTER DELETE ON passages BEGIN
+        INSERT INTO dictionary_corpus_changes(entity_kind, ref_id, work_id, change_kind, changed_at)
+        VALUES ('passage', OLD.passage_id, OLD.nodus_id, 'delete', strftime('%Y-%m-%dT%H:%M:%fZ','now'));
+      END;
+
+      CREATE TRIGGER dictionary_change_work_authors_insert AFTER INSERT ON work_authors BEGIN
+        INSERT INTO dictionary_corpus_changes(entity_kind, ref_id, work_id, change_kind, changed_at)
+        VALUES ('work', NEW.nodus_id, NEW.nodus_id, 'scope', strftime('%Y-%m-%dT%H:%M:%fZ','now'));
+      END;
+      CREATE TRIGGER dictionary_change_work_authors_delete AFTER DELETE ON work_authors BEGIN
+        INSERT INTO dictionary_corpus_changes(entity_kind, ref_id, work_id, change_kind, changed_at)
+        VALUES ('work', OLD.nodus_id, OLD.nodus_id, 'scope', strftime('%Y-%m-%dT%H:%M:%fZ','now'));
+      END;
+      CREATE TRIGGER dictionary_change_work_tags_insert AFTER INSERT ON work_zotero_tags BEGIN
+        INSERT INTO dictionary_corpus_changes(entity_kind, ref_id, work_id, change_kind, changed_at)
+        VALUES ('work', NEW.nodus_id, NEW.nodus_id, 'scope', strftime('%Y-%m-%dT%H:%M:%fZ','now'));
+      END;
+      CREATE TRIGGER dictionary_change_work_tags_delete AFTER DELETE ON work_zotero_tags BEGIN
+        INSERT INTO dictionary_corpus_changes(entity_kind, ref_id, work_id, change_kind, changed_at)
+        VALUES ('work', OLD.nodus_id, OLD.nodus_id, 'scope', strftime('%Y-%m-%dT%H:%M:%fZ','now'));
+      END;
+      CREATE TRIGGER dictionary_change_work_collections_insert AFTER INSERT ON work_collections BEGIN
+        INSERT INTO dictionary_corpus_changes(entity_kind, ref_id, work_id, change_kind, changed_at)
+        VALUES ('work', NEW.nodus_id, NEW.nodus_id, 'scope', strftime('%Y-%m-%dT%H:%M:%fZ','now'));
+      END;
+      CREATE TRIGGER dictionary_change_work_collections_delete AFTER DELETE ON work_collections BEGIN
+        INSERT INTO dictionary_corpus_changes(entity_kind, ref_id, work_id, change_kind, changed_at)
+        VALUES ('work', OLD.nodus_id, OLD.nodus_id, 'scope', strftime('%Y-%m-%dT%H:%M:%fZ','now'));
+      END;
     `,
   },
 ];
