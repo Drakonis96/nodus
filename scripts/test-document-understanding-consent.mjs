@@ -34,6 +34,14 @@ test('acceptance starts the current vault campaign and optionally enables future
   );
 });
 
+test('the consent modal defines separate light and dark surfaces', async () => {
+  const modal = await read('src/components/DocumentUnderstandingConsentModal.tsx');
+  assert.match(modal, /from-cyan-50 via-white to-indigo-50/);
+  assert.match(modal, /dark:from-cyan-950\/55 dark:via-neutral-950 dark:to-indigo-950\/35/);
+  assert.match(modal, /text-neutral-900 dark:text-neutral-100/);
+  assert.match(modal, /border-amber-300 bg-amber-50[\s\S]*dark:border-amber-900\/50 dark:bg-amber-950\/15/);
+});
+
 test('the consent is academic-only and its campaign has a global progress/control bar', async () => {
   const [app, bar, api, ipc, main, rootIpc, exportImport] = await Promise.all([
     read('src/App.tsx'),

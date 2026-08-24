@@ -36,12 +36,15 @@ import { collectPageSnapshot } from './browserPageSnapshot';
 import {
   anyPlaying,
   applyMediaCommand,
+  applySemanticMediaCommand,
   collectMediaElements,
   isPlayableMedia,
   kindOf,
+  semanticPlaybackState,
   type MediaCommand,
   type MediaEl,
   type MediaRoot,
+  type SemanticMediaScope,
 } from './browserPageMedia';
 
 interface PageDoc extends MediaRoot {
@@ -114,15 +117,16 @@ function mediaElements(): MediaEl[] {
  * removed element simply falls out of the comparison.
  */
 let lastPlayed: MediaEl | null = null;
+let lastSemanticScope: SemanticMediaScope | null = null;
 
 /**
  * Tell main what is REALLY playing in this page.
  *
- * The bug this replaces: the page used to report each element's own play/pause
- * edge, so any one of the seven empty <audio> placeholders elevenreader.io keeps
- * around could announce "paused" while the actual track ran on. The header then
- * showed Play for something already playing, and pressing it changed nothing —
- * the reported symptom of a media button that "does nothing".
+ * The bug this replaces: pages used to report each element's own play/pause
+ * edge, so a spare <audio> placeholder could announce "paused" while the actual
+ * track ran on. The header then showed Play for something already playing, and
+ * pressing it changed nothing — the reported symptom of a media button that
+ * "does nothing".
  *
  * An aggregate cannot lie that way: it is a single answer about the whole page.
  */
@@ -184,11 +188,37 @@ ipcRenderer.on('nodus-browser:page:mediaCommand', (_event, command: string) => {
   const known: MediaCommand[] = ['previous', 'play', 'pause', 'next', 'stop'];
   if (known.indexOf(command as MediaCommand) < 0) return;
   const elements = mediaElements();
-  const handled = applyMediaCommand(elements, command as MediaCommand, lastPlayed);
+  const domHandled = applyMediaCommand(elements, command as MediaCommand, lastPlayed);
+  const semantic = domHandled
+    ? { handled: false, scope: lastSemanticScope }
+    : applySemanticMediaCommand(page.document, command as MediaCommand, lastSemanticScope);
+  if (semantic.scope) lastSemanticScope = semantic.scope;
+  const handled = domHandled || semantic.handled;
   ipcRenderer.send('nodus-browser:page:mediaCommandResult', { command, handled });
-  // Long enough for a resolved play() to have flipped `paused`, short enough
-  // that the button does not sit wrong while the user is looking at it.
-  setTimeout(() => reportPlaybackState(), 120);
+  // An aggregate report is authoritative only when this preload can actually
+  // see media elements. A WebAudio player such as ElevenReader exposes none:
+  // reporting `false` after its visible Pause button was clicked overwrote
+  // Chromium's real event and made the header lie while the audio kept going.
+  if (elements.length > 0) {
+    // Long enough for a resolved play() to have flipped `paused`, short enough
+    // that the button does not sit wrong while the user is looking at it.
+    setTimeout(() => reportPlaybackState(), 120);
+  } else if (semantic.handled) {
+    // WebAudio/custom players do not emit HTMLMediaElement events, so Chromium
+    // may keep reporting the pre-command state forever. Read the replacement
+    // Play/Pause control after React has rendered it and update the header from
+    // that. Falling back to the requested state covers players whose accessible
+    // label does not change, while a refused click remains detectable because
+    // the old control is still present.
+    setTimeout(() => {
+      const observed = semanticPlaybackState(page.document, lastSemanticScope);
+      const requested = command === 'play';
+      ipcRenderer.send('nodus-browser:page:media', {
+        playing: observed ?? requested,
+        kind: 'unknown',
+      });
+    }, 120);
+  }
 });
 
 /** Everything main can ask this page for. The command set is closed. */
