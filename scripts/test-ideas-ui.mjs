@@ -17,10 +17,16 @@ test('Ideas opens as a library-style metadata catalogue', async () => {
 
 test('idea type markers stay circular beside long labels', async () => {
   const ui = await readSource('src/components/ui.tsx');
+  const view = await readSource('src/views/IdeasView.tsx');
   assert.match(
     ui,
     /function TypeDot[\s\S]*className="[^"]*h-2\.5[^"]*w-2\.5[^"]*shrink-0[^"]*rounded-full"/,
     'the flex row must not squeeze a type dot into an oval',
+  );
+  assert.match(
+    view,
+    /className="flex min-w-0 items-center gap-2 pr-5">\s*<TypeDot type=\{node\.type\}/,
+    'the type dot must stay vertically centered against the complete idea row',
   );
 });
 

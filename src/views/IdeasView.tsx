@@ -318,7 +318,7 @@ export function IdeasView({
                   style={{ gridTemplateColumns: 'minmax(360px,2.4fr) 8rem 6.5rem 7.5rem 7rem minmax(220px,1.35fr) 2rem' }}
                   onClick={() => showIdea({ id: node.id, label: node.label })}
                 >
-                  <div className="flex min-w-0 items-start gap-2 pr-5">
+                  <div className="flex min-w-0 items-center gap-2 pr-5">
                     <TypeDot type={node.type} />
                     <div className="min-w-0">
                       <span className="block truncate font-medium text-neutral-900 dark:text-neutral-200">{node.label}</span>
