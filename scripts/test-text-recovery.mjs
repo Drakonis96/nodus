@@ -32,6 +32,7 @@ try {
     resolvedTextStateFromDoc,
   } = require(path.join(repoRoot, 'electron/extraction/textExtractor.ts'));
   const { pageText } = require(path.join(repoRoot, 'electron/extraction/pdfjsLoader.ts'));
+  const { cleanExtractedText } = require(path.join(repoRoot, 'electron/extraction/textCleanup.ts'));
   const { shouldQueueDeepAfterSync } = require(path.join(repoRoot, 'electron/sync/syncService.ts'));
 
   const epubPath = path.join(root, 'sample.epub');
@@ -90,6 +91,13 @@ try {
   assert.equal(imgDoc.text, '');
   assert.equal(imgDoc.sourceType, 'upload');
   assert.match(imgDoc.notes ?? '', /OCR desactivado/);
+  assert.equal(imgDoc.blockReason, 'scanned_no_ocr');
+
+  assert.equal(
+    cleanExtractedText('El turis-\nmo creció.\nLa línea siguiente continúa.\n\nNuevo párrafo.'),
+    'El turismo creció. La línea siguiente continúa.\n\nNuevo párrafo.',
+    'shared cleanup dehyphenates line wraps without collapsing paragraph boundaries',
+  );
 
   assert.equal(isTextAttachment({ key: 'A', contentType: 'application/epub+zip', linkMode: 'imported_file', filename: 'book.epub' }), true);
   assert.equal(isTextAttachment({ key: 'B', contentType: 'text/html', linkMode: 'imported_url', filename: 'snapshot.html' }), false);
@@ -123,6 +131,10 @@ try {
   assert.equal(resolved.sourceCount, 1);
   assert.equal(resolved.hasPageMarkers, true);
   assert.equal(resolved.blockReason, null);
+  const abstractState = resolvedTextStateFromDoc({
+    text: 'Resumen', sourceType: 'abstract_only', notes: 'Mensaje localizado libre', blockReason: 'abstract_only',
+  });
+  assert.equal(abstractState.blockReason, 'abstract_only', 'block reasons are structured and independent from localized notes');
 
   assert.equal(
     shouldQueueDeepAfterSync({

@@ -31,6 +31,11 @@ const PASSAGE_FTS_STOPWORDS = new Set([
   'with', 'from', 'into', 'this', 'that', 'what', 'which', 'where', 'when', 'during',
 ]);
 
+const PASSAGE_MATCHES_RESOLVED_TEXT = `(
+  (w.resolved_text_hash IS NOT NULL AND p.content_hash = w.resolved_text_hash)
+  OR (w.resolved_text_hash IS NULL AND (w.deep_hash IS NULL OR p.content_hash = w.deep_hash))
+)`;
+
 /** Literal passage lane for names, procedures and phrases that dense retrieval can
  * blur. The query is constructed from quoted prefix tokens, never raw FTS syntax. */
 export function lexicalPassageSearch(
@@ -62,7 +67,7 @@ export function lexicalPassageSearch(
        JOIN passages p ON p.passage_id=f.passage_id
        JOIN works w ON w.nodus_id=p.nodus_id
       WHERE passages_fts MATCH ? AND w.archived=0
-        AND (w.deep_hash IS NULL OR p.content_hash=w.deep_hash)${scoped}
+        AND ${PASSAGE_MATCHES_RESOLVED_TEXT}${scoped}
       ORDER BY rank
       LIMIT ?`
   ).all(ftsQuery, ...nodusIds, Math.max(limit, limit * 4)) as Array<Omit<SimilarPassage, 'similarity'> & { rank: number }>;
@@ -147,7 +152,7 @@ export function findSimilarPassages(
            JOIN works w ON w.nodus_id = p.nodus_id
           WHERE p.embedding IS NOT NULL
             AND w.archived = 0
-            AND (w.deep_hash IS NULL OR p.content_hash = w.deep_hash)
+            AND ${PASSAGE_MATCHES_RESOLVED_TEXT}
             AND p.embedding_provider = ?
             AND p.embedding_model = ?
             AND p.embedding_dim = ?${scoped}
@@ -184,7 +189,7 @@ export async function findSimilarPassagesPaged(
            WHERE p.rowid > ? AND p.rowid <= ?
              AND p.embedding IS NOT NULL
              AND w.archived = 0
-             AND (w.deep_hash IS NULL OR p.content_hash = w.deep_hash)
+             AND ${PASSAGE_MATCHES_RESOLVED_TEXT}
              AND p.embedding_provider = ?
              AND p.embedding_model = ?
              AND p.embedding_dim = ?${scoped}`,
@@ -225,6 +230,7 @@ export function embeddedPassageCount(): number {
          JOIN works w ON w.nodus_id = p.nodus_id
         WHERE p.embedding IS NOT NULL
           AND w.archived = 0
+          AND ${PASSAGE_MATCHES_RESOLVED_TEXT}
           AND p.embedding_provider = ?
           AND p.embedding_model = ?`
     )
@@ -239,7 +245,8 @@ export function getPassageDetail(passageId: string): PassageDetail | null {
               w.title, w.authors_json, w.year, w.zotero_key
          FROM passages p
          JOIN works w ON w.nodus_id = p.nodus_id
-        WHERE p.passage_id = ?`
+        WHERE p.passage_id = ?
+          AND ${PASSAGE_MATCHES_RESOLVED_TEXT}`
     )
     .get(passageId) as
     | {
@@ -282,9 +289,9 @@ export function workPassageStatuses(nodusIds?: string[]): WorkPassageStatus[] {
   const config = currentEmbeddingConfig();
   const rows = getDb()
     .prepare(
-      `SELECT w.nodus_id, w.deep_hash,
+      `SELECT w.nodus_id, w.deep_hash, w.resolved_text_hash,
               COUNT(p.passage_id) AS total_passages,
-              SUM(CASE WHEN (w.deep_hash IS NULL OR p.content_hash = w.deep_hash)
+              SUM(CASE WHEN ${PASSAGE_MATCHES_RESOLVED_TEXT}
                          AND p.embedding IS NOT NULL
                          AND p.embedding_provider = ?
                          AND p.embedding_model = ?
@@ -293,11 +300,12 @@ export function workPassageStatuses(nodusIds?: string[]): WorkPassageStatus[] {
          FROM works w
          LEFT JOIN passages p ON p.nodus_id = w.nodus_id
          ${where}
-        GROUP BY w.nodus_id, w.deep_hash`
+        GROUP BY w.nodus_id, w.deep_hash, w.resolved_text_hash`
     )
     .all(config.provider, config.model, ...ids) as {
     nodus_id: string;
     deep_hash: string | null;
+    resolved_text_hash: string | null;
     total_passages: number;
     current_passages: number | null;
   }[];

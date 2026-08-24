@@ -111,6 +111,7 @@ function themesState(work: WorkView): StepState {
 }
 
 function ideasState(work: WorkView): StepState {
+  if (work.deep_error) return 'failed';
   switch (work.deep_status) {
     case 'done':
       // Done, but only the abstract was read: real but degraded.

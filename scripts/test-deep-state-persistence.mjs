@@ -23,6 +23,7 @@ try {
   const database = require(path.join(repoRoot, 'electron/db/database.ts'));
   const works = require(path.join(repoRoot, 'electron/db/worksRepo.ts'));
   const ideas = require(path.join(repoRoot, 'electron/db/ideasRepo.ts'));
+  const passages = require(path.join(repoRoot, 'electron/db/passagesRepo.ts'));
   closeDb = database.closeDb;
   const db = database.getDb();
   db.prepare(`INSERT INTO works (
@@ -42,6 +43,11 @@ try {
   assert.equal(row.deep_hash, 'old-hash');
   assert.equal(row.resolved_source_type, 'epub');
 
+  passages.replaceWorkPassages('w1', 'old-hash', [{ text: 'pasaje de la versión anterior', pageLabel: 'p. 1', sourceRef: 'zotero:user:0:A', pageNumber: 1, embedding: [1, 0] }]);
+  assert.equal(passages.embeddedPassageCount(), 0, 'retrieval excludes passages whose hash differs from resolved text');
+  assert.equal(passages.getPassageDetail('w1#0'), null, 'a stale passage cannot be recovered directly');
+  assert.equal(passages.workPassageStatuses(['w1'])[0].status, 'outdated');
+
   works.setDeepPending('w1');
   works.setDeepResult('w1', 'failed', null, null, 'fallo nuevo');
   row = db.prepare('SELECT * FROM works WHERE nodus_id=?').get('w1');
@@ -49,6 +55,7 @@ try {
   assert.equal(row.source_type, 'pdf');
   assert.equal(row.notes, 'nota anterior');
   assert.equal(row.deep_error, 'fallo nuevo');
+  assert.equal(row.deep_status, 'done', 'a failed replacement attempt keeps the committed graph visible');
   assert.equal(db.prepare("SELECT COUNT(*) count FROM idea_occurrences WHERE nodus_id='w1'").get().count, 1);
 
   assert.throws(() => db.transaction(() => {

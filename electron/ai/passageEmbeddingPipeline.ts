@@ -129,7 +129,9 @@ export async function startPassageEmbedding(nodusIds?: string[]): Promise<void> 
       : db.prepare('SELECT * FROM works WHERE archived = 0').all()) as Work[];
     const statuses = new Map(workPassageStatuses(candidates.map((work) => work.nodus_id)).map((status) => [status.nodus_id, status]));
     state.works = candidates
-      .filter((work) => statuses.get(work.nodus_id)?.status !== 'complete')
+      // An explicit reindex request must resolve the source again before deciding
+      // whether its old passages are current; the persisted hash may itself be stale.
+      .filter((work) => ids.length > 0 || statuses.get(work.nodus_id)?.status !== 'complete')
       .map((work) => ({ work, title: work.title, chunks: 0 }));
 
     if (state.works.length === 0) {

@@ -16,7 +16,7 @@ import { currentEmbeddingConfig } from './ideasRepo';
 type Readiness = Exclude<WorkReadiness, 'running'>;
 
 /** Any of the three AI passes reported a failure. Outranks everything below. */
-const FAILED = `(w.light_status = 'failed' OR w.deep_status = 'failed' OR w.summary_status = 'failed')`;
+const FAILED = `(w.light_status = 'failed' OR w.deep_status = 'failed' OR w.deep_error IS NOT NULL OR w.summary_status = 'failed')`;
 
 /** Nothing has been attempted yet. */
 const UNSTARTED = `(w.light_status = 'none' AND w.deep_status = 'none')`;
@@ -48,7 +48,10 @@ const PASSAGE_IS_CURRENT = `(
   AND p.embedding_provider = @readyProv
   AND p.embedding_model    = @readyModel
   AND p.embedding_dim > 0
-  AND (w.deep_hash IS NULL OR p.content_hash = w.deep_hash)
+  AND (
+    (w.resolved_text_hash IS NOT NULL AND p.content_hash = w.resolved_text_hash)
+    OR (w.resolved_text_hash IS NULL AND (w.deep_hash IS NULL OR p.content_hash = w.deep_hash))
+  )
 )`;
 
 const PASSAGES_COMPLETE = `(

@@ -20,7 +20,7 @@ if (!process.argv.includes('--electron-deep-normalization-test')) {
 const root = await mkdtemp(path.join(os.tmpdir(), 'nodus-deep-normalization-'));
 installRuntimeHooks(root);
 try {
-  const { normalizeDeepResult, isDeepResult } = require(path.join(repoRoot, 'electron/ai/deepScan.ts'));
+  const { normalizeDeepResult, isDeepResult, mergeByLabel } = require(path.join(repoRoot, 'electron/ai/deepScan.ts'));
   const normalized = normalizeDeepResult({
     document: { processing_status: 'ok' },
     theme_nodes: [{ id: 't1', statement: 'Historia cultural del turismo', role: 'primary', confidence: 2 }],
@@ -32,7 +32,9 @@ try {
     external_references: null,
     gaps: [{ kind: 'limitation', statement: 'Faltan archivos regionales.', evidence: { quote: 'archivos regionales', location: 's1 p. 13' } }],
     authors_detail: [{ name: null }, { name: 'Ana Pérez', affiliation: 42 }],
-  }, new Map([['s1', 'zotero:user:0:ATTACH']]), 's1');
+  }, new Map([['s1', 'zotero:user:0:ATTACH']]), 's1', new Map([
+    ['zotero:user:0:ATTACH', new Map([[12, 'El texto describe una cultura de movilidad.'], [13, 'Faltan archivos regionales.']])],
+  ]));
 
   assert.equal(isDeepResult(normalized), true, 'normalizer must feed only strict results to merge/checkpoint');
   assert.equal(normalized.ideas[0].label, 'El turismo articuló una nueva cultura de movilidad.');
@@ -46,6 +48,27 @@ try {
   assert.equal(normalized.gaps[0].evidence.source_ref, 'zotero:user:0:ATTACH');
   assert.equal(normalized.gaps[0].evidence.page_number, 13);
   assert.deepEqual(normalized.authors_detail, [{ name: 'Ana Pérez', affiliation: null, stance_notes: null }]);
+
+  const corpus = new Map([['zotero:user:0:ATTACH', new Map([[1, 'La cita literal está en la primera página.'], [2, 'Otro texto.']])]]);
+  const corrected = normalizeDeepResult({
+    document: {}, ideas: [{ id: 'i1', label: 'Idea', statement: 'Idea', evidence: [
+      { quote: 'La cita literal está en la primera página.', source: 's1', page: 999, kind: 'explicit' },
+      { quote: 'Cita inventada', source: 's1', page: 888, kind: 'explicit' },
+    ] }],
+  }, new Map([['s1', 'zotero:user:0:ATTACH']]), 's1', corpus);
+  assert.equal(corrected.ideas[0].evidence[0].page_number, 1, 'a literal quote uniquely found elsewhere corrects the model page');
+  assert.equal(corrected.ideas[0].evidence[0].kind, 'explicit');
+  assert.equal(corrected.ideas[0].evidence[1].page_number, null, 'a page outside the extracted corpus is never retained');
+  assert.equal(corrected.ideas[0].evidence[1].kind, 'paraphrased', 'an invented literal quote is downgraded');
+
+  const relation = (from, to) => ({ from, to, type: 'supports', basis: 'explicit', evidence: { quote: '', location: null, source_ref: null, page_number: null, kind: 'paraphrased' }, confidence: 1 });
+  const idea = (id, label) => ({ id, type: 'claim', label, statement: label, role: 'principal', development: label, evidence: [], theme_labels: [], confidence: 1, uncertainty_reason: null });
+  const merged = mergeByLabel([
+    { document: {}, theme_nodes: [], ideas: [idea('i1', 'Primera'), idea('i2', 'Segunda')], internal_relations: [relation('i1', 'i2')], external_references: [], gaps: [], authors_detail: [] },
+    { document: {}, theme_nodes: [], ideas: [idea('i1', 'Tercera'), idea('i2', 'Cuarta')], internal_relations: [relation('i1', 'i2')], external_references: [], gaps: [], authors_detail: [] },
+  ]);
+  assert.deepEqual(merged.internal.map(({ from, to }) => [from, to]), [['primera', 'segunda'], ['tercera', 'cuarta']],
+    'provider-local ids are scoped to their own chunk');
 } finally {
   try { require(path.join(repoRoot, 'electron/db/database.ts')).closeDb(); } catch {}
   await rm(root, { recursive: true, force: true });

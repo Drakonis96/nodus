@@ -52,7 +52,7 @@ try {
     }
     if (spec.expectedPages) {
       assert.equal(doc.segments?.[0]?.pageCount ?? doc.analysis?.pageCount, spec.expectedPages);
-      assert.match(doc.text, /\[\[p\. 368\]\]/);
+      assert.match(doc.text, /\[\[(?:src:s\d+\s+)?p\.\s*368\]\]/);
     }
     output.push({ title: spec.title, mode, chars: doc.text.length, sourceType: state.sourceType, sources: state.sourceCount, pages: (doc.segments ?? []).map((segment) => segment.pageCount), origins: (doc.segments ?? []).map((segment) => segment.origin), pageMarkers: (doc.segments ?? []).map((segment) => segment.hasPageMarkers) });
   }

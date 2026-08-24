@@ -29,7 +29,7 @@ try {
   const before = source ? counts(db) : null;
   runMigrations(db);
   assert.equal(db.pragma('user_version', { simple: true }), SCHEMA_VERSION);
-  assert.equal(SCHEMA_VERSION, 160);
+  assert.equal(SCHEMA_VERSION, 161);
   const workColumns = new Set(db.prepare('PRAGMA table_info(works)').all().map((row) => row.name));
   for (const column of ['resolved_source_type', 'resolved_text_hash', 'text_block_reason', 'resolved_text_notes', 'deep_error']) {
     assert.ok(workColumns.has(column), `works.${column} exists`);
@@ -39,6 +39,10 @@ try {
     const columns = new Set(db.prepare(`PRAGMA table_info(${table})`).all().map((row) => row.name));
     assert.ok(columns.has('source_ref'));
     assert.ok(columns.has('page_number'));
+  }
+  for (const table of ['document_sections', 'document_profile_support']) {
+    const columns = new Set(db.prepare(`PRAGMA table_info(${table})`).all().map((row) => row.name));
+    for (const column of ['source_ref', 'page_start_number', 'page_end_number']) assert.ok(columns.has(column), `${table}.${column} exists`);
   }
   if (before) assert.deepEqual(counts(db), before, 'additive migration preserves corpus row counts');
   assert.deepEqual(db.pragma('quick_check'), [{ quick_check: 'ok' }]);

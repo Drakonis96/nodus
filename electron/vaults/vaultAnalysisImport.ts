@@ -506,21 +506,25 @@ function copyDocumentProfile(
   tableChange(db, tableRows, 'document_profile_fields');
   db.prepare(`
     INSERT INTO document_sections(section_id,version_id,nodus_id,parent_section_id,level,ordinal,title,role,summary,
-      concepts_json,claims_json,page_start,page_end,char_start,char_end,content_hash,created_at)
+      concepts_json,claims_json,page_start,page_end,source_ref,page_start_number,page_end_number,
+      char_start,char_end,content_hash,created_at)
     SELECT @targetId||':section:'||section_id,@versionId,@targetId,
       CASE WHEN parent_section_id IS NULL THEN NULL ELSE @targetId||':section:'||parent_section_id END,
-      level,ordinal,title,role,summary,concepts_json,claims_json,page_start,page_end,char_start,char_end,content_hash,created_at
+      level,ordinal,title,role,summary,concepts_json,claims_json,page_start,page_end,source_ref,
+      page_start_number,page_end_number,char_start,char_end,content_hash,created_at
       FROM ${SOURCE_ALIAS}.document_sections WHERE version_id=@sourceVersion
   `).run({ targetId, versionId, sourceVersion });
   tableChange(db, tableRows, 'document_sections');
   db.prepare(`
     INSERT INTO document_profile_support(support_id,version_id,nodus_id,target_kind,target_id,section_id,passage_id,
-      page_start,page_end,char_start,char_end,quote,quote_hash,support_kind,confidence,validation_status,created_at)
+      page_start,page_end,source_ref,page_start_number,page_end_number,char_start,char_end,quote,quote_hash,
+      support_kind,confidence,validation_status,created_at)
     SELECT @targetId||':support:'||support_id,@versionId,@targetId,target_kind,
       CASE WHEN target_kind='field' THEN @targetId||':field:'||target_id ELSE @targetId||':section:'||target_id END,
       CASE WHEN section_id IS NULL THEN NULL ELSE @targetId||':section:'||section_id END,
       CASE WHEN passage_id IS NULL THEN NULL ELSE @targetId||substr(passage_id,length(@sourceId)+1) END,
-      page_start,page_end,char_start,char_end,quote,quote_hash,support_kind,confidence,validation_status,created_at
+      page_start,page_end,source_ref,page_start_number,page_end_number,char_start,char_end,quote,quote_hash,
+      support_kind,confidence,validation_status,created_at
       FROM ${SOURCE_ALIAS}.document_profile_support WHERE version_id=@sourceVersion
   `).run({ targetId, sourceId, versionId, sourceVersion });
   tableChange(db, tableRows, 'document_profile_support');

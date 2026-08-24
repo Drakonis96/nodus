@@ -646,6 +646,7 @@ export type TextSourceOrigin =
   | 'library_clean'
   | 'abstract';
 export type TextBlockReason =
+  | 'abstract_only'
   | 'no_attachment'
   | 'file_missing'
   | 'scanned_no_ocr'
@@ -949,6 +950,9 @@ export interface DocumentSection {
   claims: string[];
   pageStart: string | null;
   pageEnd: string | null;
+  sourceRef?: string | null;
+  pageStartNumber?: number | null;
+  pageEndNumber?: number | null;
   charStart: number | null;
   charEnd: number | null;
   contentHash: string;
@@ -962,6 +966,9 @@ export interface DocumentProfileSupport {
   passageId: string | null;
   pageStart: string | null;
   pageEnd: string | null;
+  sourceRef?: string | null;
+  pageStartNumber?: number | null;
+  pageEndNumber?: number | null;
   quote: string;
   supportKind: string;
   confidence: number;

@@ -15,6 +15,7 @@ import type {
 import { openPdf, loadPdfjs } from '../extraction/pdfjsLoader';
 import { ocrPdfPages } from '../extraction/ocr';
 import { csvFileToText, xlsxFileToText } from '../extraction/tabular';
+import { cleanInlineText, dehyphenatingJoin } from '../extraction/textCleanup';
 import { atomicWriteFile, atomicWriteJson, assertInside, safeLibraryFolderName } from './libraryFileUtils';
 import { LibraryDiskStore } from './libraryStorage';
 import {
@@ -132,30 +133,7 @@ function sha256File(file: string): string {
   return hash.digest('hex');
 }
 
-export function cleanInlineText(value: string): string {
-  return value
-    .normalize('NFC')
-    .replace(/\u00ad/g, '')
-    .replace(/\u00a0/g, ' ')
-    .replace(/[\t ]+/g, ' ')
-    .replace(/[-‐‑‒–—]{2,}/g, '-')
-    .replace(/\b(fi|fl)\s+(?=\p{Ll}{2,})/gu, '$1')
-    .replace(/(\p{L}+)\s+([áéíóúü])\s+(\p{L}+)/giu, (_whole, left: string, vowel: string, right: string) => `${left}${vowel}${right.length > 1 ? right : ` ${right}`}`)
-    .replace(/(\p{L}{2,}[áéíóúü])\s+([bcdfghjklmnñpqrstvwxyz])(?=\s|[,.;:!?)]|$)/giu, '$1$2')
-    .replace(/\s+([,.;:!?%)\]}»”])/g, '$1')
-    .replace(/([¿¡([{«“])\s+/g, '$1')
-    .trim();
-}
-
-function dehyphenatingJoin(left: string, right: string): string {
-  const first = left.trimEnd();
-  const second = right.trimStart();
-  if (!first) return second;
-  if (!second) return first;
-  if (/\d-$/u.test(first) && /^\d/u.test(second)) return cleanInlineText(`${first}${second}`);
-  if (/\p{L}{2,}-$/u.test(first) && /^\p{Ll}/u.test(second)) return cleanInlineText(`${first.slice(0, -1)}${second}`);
-  return cleanInlineText(`${first} ${second}`);
-}
+export { cleanInlineText } from '../extraction/textCleanup';
 
 export function normalizeCleanMarkdown(value: string): string {
   const input = value.replace(/\r\n?/g, '\n').normalize('NFC').replace(/\u00ad/g, '');

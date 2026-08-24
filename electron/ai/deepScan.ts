@@ -148,20 +148,32 @@ function normalizeEvidence(
   const sourceRef = alias ? sourceMap.get(alias.replace(/^src:/i, '')) ?? (alias.startsWith('zotero:') ? alias : null) : null;
   const explicitPage = Number(raw.page_number ?? raw.page);
   const locationPage = rawLocation?.match(/(?:p(?:ág(?:ina)?)?\.?\s*)(\d+)/i)?.[1];
-  const pageNumber = Number.isInteger(explicitPage) && explicitPage > 0
+  let pageNumber = Number.isInteger(explicitPage) && explicitPage > 0
     ? explicitPage
     : locationPage ? Number(locationPage) : null;
   let kind: EvidenceKind = raw.kind === 'explicit' ? 'explicit' : 'paraphrased';
   if (!quote && !rawLocation) return null;
+  const pages = sourceRef ? citationCorpus?.get(sourceRef) : null;
+  // A page locator is durable only when that exact source/page was extracted.
+  // Fulltext fallbacks without page markers deliberately cannot carry a page.
+  if (pageNumber != null && !pages?.has(pageNumber)) pageNumber = null;
   if (kind === 'explicit' && quote) {
-    const pages = sourceRef ? citationCorpus?.get(sourceRef) : null;
     const haystack = pageNumber != null ? pages?.get(pageNumber) : pages?.get(null);
     const normalize = (text: string) => text.normalize('NFKC').replace(/\p{L}-\s+(?=\p{Ll})/gu, (match) => match[0]).replace(/-\s+(?=\p{Ll})/gu, '').replace(/\s+/g, ' ').trim().toLocaleLowerCase();
-    if (!haystack || !normalize(haystack).includes(normalize(quote))) kind = 'paraphrased';
+    if (!haystack || !normalize(haystack).includes(normalize(quote))) {
+      const matches = [...(pages?.entries() ?? [])]
+        .filter(([page, text]) => page != null && normalize(text).includes(normalize(quote)));
+      if (matches.length === 1) pageNumber = matches[0][0];
+      else {
+        kind = 'paraphrased';
+        pageNumber = null;
+      }
+    }
   }
+  const nonPageLocation = rawLocation && !/(?:p(?:ág(?:ina)?)?\.?\s*)\d+/i.test(rawLocation) ? rawLocation : null;
   return {
     quote,
-    location: pageNumber ? `p. ${pageNumber}` : rawLocation,
+    location: pageNumber ? `p. ${pageNumber}` : nonPageLocation,
     source_ref: sourceRef,
     page_number: pageNumber,
     kind,
@@ -292,7 +304,7 @@ export function normalizeDeepResult(
 }
 
 /** Merge ideas sharing the same canonical label across chunks of the same work. */
-function mergeByLabel(results: DeepResult[]): {
+export function mergeByLabel(results: DeepResult[]): {
   ideas: Map<string, DeepIdea>;
   themes: Map<string, DeepTheme>;
   internal: DeepResult['internal_relations'];
@@ -302,13 +314,16 @@ function mergeByLabel(results: DeepResult[]): {
 } {
   const ideas = new Map<string, DeepIdea>();
   const themes = new Map<string, DeepTheme>();
-  const localToLabel = new Map<string, string>();
   const internal: DeepResult['internal_relations'] = [];
   const external: DeepResult['external_references'] = [];
   const gaps: DeepResult['gaps'] = [];
   const authors: DeepResult['authors_detail'] = [];
 
   for (const r of results) {
+    // Local ids are scoped to one model response. Providers routinely reuse i1,
+    // i2, … in every chunk, so resolve endpoints before adding that chunk to the
+    // aggregate instead of keeping one cross-chunk map that later entries overwrite.
+    const localToLabel = new Map<string, string>();
     for (const theme of r.theme_nodes ?? []) {
       const key = theme.label.trim().toLowerCase();
       if (!key) continue;
@@ -334,20 +349,18 @@ function mergeByLabel(results: DeepResult[]): {
         ideas.set(key, { ...idea, evidence: [...idea.evidence], theme_labels: [...(idea.theme_labels ?? [])] });
       }
     }
-    internal.push(...(r.internal_relations ?? []));
-    external.push(...(r.external_references ?? []));
-    gaps.push(...(r.gaps ?? []));
+    const remap = (id: string) => localToLabel.get(id) ?? id;
+    internal.push(...(r.internal_relations ?? []).map((relation) => ({
+      ...relation, from: remap(relation.from), to: remap(relation.to),
+    })));
+    external.push(...(r.external_references ?? []).map((reference) => ({
+      ...reference, from: remap(reference.from),
+    })));
+    gaps.push(...(r.gaps ?? []).map((gap) => ({
+      ...gap, related_idea: gap.related_idea ? remap(gap.related_idea) : gap.related_idea,
+    })));
     authors.push(...(r.authors_detail ?? []));
   }
-
-  // Rewrite internal relation endpoints from local ids to label keys.
-  const remap = (id: string) => localToLabel.get(id) ?? id;
-  for (const rel of internal) {
-    rel.from = remap(rel.from);
-    rel.to = remap(rel.to);
-  }
-  for (const ref of external) ref.from = remap(ref.from);
-  for (const g of gaps) if (g.related_idea) g.related_idea = remap(g.related_idea);
 
   return { ideas, themes, internal, external, gaps, authors };
 }

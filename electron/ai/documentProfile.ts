@@ -255,22 +255,35 @@ function auditFailureMessage(audit: DocumentProfileAudit): string {
   return details.join(' · ');
 }
 
-function parsePageAt(text: string, offset: number): string | null {
+interface SourceLocation {
+  label: string | null;
+  sourceRef: string | null;
+  pageNumber: number | null;
+}
+
+function parseSourceLocationAt(text: string, offset: number, sourceMap: Record<string, string> = {}): SourceLocation {
   let found: RegExpExecArray | null = null;
-  const pattern = /\[\[p\.\s*(\d+)\]\]/gi;
+  const pattern = /\[\[(?:src:(s\d+)(?:\s+p\.\s*(\d+))?|p\.\s*(\d+))\]\]/gi;
   for (const match of text.matchAll(pattern)) {
     if ((match.index ?? 0) > offset) break;
     found = match as RegExpExecArray;
   }
-  return found ? `p. ${found[1]}` : null;
+  if (!found) return { label: null, sourceRef: null, pageNumber: null };
+  const marker = found[1] ?? null;
+  const pageNumber = Number(found[2] ?? found[3]) || null;
+  return {
+    label: pageNumber == null ? null : `p. ${pageNumber}`,
+    sourceRef: marker == null ? null : sourceMap[marker] ?? marker,
+    pageNumber,
+  };
 }
 
-function headingMatches(text: string): Array<{ index: number; end: number; level: number; title: string; page: string | null }> {
-  const result: Array<{ index: number; end: number; level: number; title: string; page: string | null }> = [];
+function headingMatches(text: string, sourceMap: Record<string, string>): Array<{ index: number; end: number; level: number; title: string; location: SourceLocation }> {
+  const result: Array<{ index: number; end: number; level: number; title: string; location: SourceLocation }> = [];
   const pattern = /^(#{1,6})[ \t]+([^\n]+)$/gm;
   for (const match of text.matchAll(pattern)) {
     const index = match.index ?? 0;
-    result.push({ index, end: index + match[0].length, level: match[1].length, title: clean(match[2], 300), page: parsePageAt(text, index) });
+    result.push({ index, end: index + match[0].length, level: match[1].length, title: clean(match[2], 300), location: parseSourceLocationAt(text, index, sourceMap) });
   }
   return result;
 }
@@ -290,16 +303,22 @@ function chunksWithOffsets(text: string, wordsPerChunk = 3_500): Array<{ start: 
 }
 
 /** Pure, stable structural pass reused by tests and the scanner. */
-export function deriveDocumentStructure(text: string, fallbackTitle: string): DerivedDocumentSection[] {
-  const headings = headingMatches(text);
+export function deriveDocumentStructure(text: string, fallbackTitle: string, sourceMap: Record<string, string> = {}): DerivedDocumentSection[] {
+  const headings = headingMatches(text, sourceMap);
   if (headings.length === 0) {
-    return chunksWithOffsets(text).map((chunk, ordinal) => ({
+    return chunksWithOffsets(text).map((chunk, ordinal) => {
+      const start = parseSourceLocationAt(text, chunk.start, sourceMap);
+      const end = parseSourceLocationAt(text, chunk.end, sourceMap);
+      return ({
       sectionId: `section-${sha256(`${fallbackTitle}|${ordinal}|${sha256(chunk.body)}`).slice(0, 24)}`,
       parentSectionId: null, level: 1, ordinal, title: ordinal === 0 ? fallbackTitle : `Sección ${ordinal + 1}`,
-      role: null, summary: '', concepts: [], claims: [], pageStart: parsePageAt(text, chunk.start),
-      pageEnd: parsePageAt(text, chunk.end), charStart: chunk.start, charEnd: chunk.end,
+      role: null, summary: '', concepts: [], claims: [], pageStart: start.label,
+      pageEnd: end.label, sourceRef: start.sourceRef ?? end.sourceRef,
+      pageStartNumber: start.pageNumber, pageEndNumber: end.pageNumber,
+      charStart: chunk.start, charEnd: chunk.end,
       contentHash: sha256(chunk.body), body: chunk.body,
-    }));
+      });
+    });
   }
   const sections: DerivedDocumentSection[] = [];
   const parents: Array<{ level: number; id: string }> = [];
@@ -308,7 +327,11 @@ export function deriveDocumentStructure(text: string, fallbackTitle: string): De
     sections.push({
       sectionId: `section-${sha256(`${fallbackTitle}|front|${sha256(body)}`).slice(0, 24)}`,
       parentSectionId: null, level: 1, ordinal: 0, title: fallbackTitle, role: null, summary: '',
-      concepts: [], claims: [], pageStart: parsePageAt(text, 0), pageEnd: parsePageAt(text, headings[0].index),
+      concepts: [], claims: [], pageStart: parseSourceLocationAt(text, 0, sourceMap).label,
+      pageEnd: parseSourceLocationAt(text, headings[0].index, sourceMap).label,
+      sourceRef: parseSourceLocationAt(text, headings[0].index, sourceMap).sourceRef,
+      pageStartNumber: parseSourceLocationAt(text, 0, sourceMap).pageNumber,
+      pageEndNumber: parseSourceLocationAt(text, headings[0].index, sourceMap).pageNumber,
       charStart: 0, charEnd: headings[0].index, contentHash: sha256(body), body,
     });
   }
@@ -318,11 +341,15 @@ export function deriveDocumentStructure(text: string, fallbackTitle: string): De
     const body = text.slice(heading.end, end).trim();
     if (!body) continue;
     while (parents.length && parents.at(-1)!.level >= heading.level) parents.pop();
-    const sectionId = `section-${sha256(`${heading.level}|${heading.title}|${heading.page ?? ''}|${index}|${sha256(body)}`).slice(0, 24)}`;
+    const endLocation = parseSourceLocationAt(text, end, sourceMap);
+    const sectionId = `section-${sha256(`${heading.level}|${heading.title}|${heading.location.label ?? ''}|${index}|${sha256(body)}`).slice(0, 24)}`;
     sections.push({
       sectionId, parentSectionId: parents.at(-1)?.id ?? null, level: heading.level,
       ordinal: sections.length, title: heading.title, role: null, summary: '', concepts: [], claims: [],
-      pageStart: heading.page, pageEnd: parsePageAt(text, end), charStart: heading.index, charEnd: end,
+      pageStart: heading.location.label, pageEnd: endLocation.label,
+      sourceRef: heading.location.sourceRef ?? endLocation.sourceRef,
+      pageStartNumber: heading.location.pageNumber, pageEndNumber: endLocation.pageNumber,
+      charStart: heading.index, charEnd: end,
       contentHash: sha256(body), body,
     });
     parents.push({ level: heading.level, id: sectionId });
@@ -496,18 +523,23 @@ function passageForQuote(nodusId: string, quote: string, candidate: PreparedPass
 
 function supportForQuote(input: {
   nodusId: string; text: string; quote: string; targetKind: 'field' | 'section'; targetId: string;
-  sections: DerivedDocumentSection[]; confidence: number; requestedPage: string | null;
+  sections: DerivedDocumentSection[]; confidence: number;
   candidatePassages: PreparedPassages | null;
+  sourceMap: Record<string, string>;
 }): DocumentProfileSupport | null {
   const offset = quoteOffset(input.text, input.quote);
   if (offset < 0) return null;
   const section = input.sections.find((candidate) =>
     candidate.charStart != null && candidate.charEnd != null && offset >= candidate.charStart && offset <= candidate.charEnd
   ) ?? null;
+  const location = parseSourceLocationAt(input.text, offset, input.sourceMap);
   return {
     supportId: randomUUID(), targetKind: input.targetKind, targetId: input.targetId,
     sectionId: section?.sectionId ?? null, passageId: passageForQuote(input.nodusId, input.quote, input.candidatePassages),
-    pageStart: input.requestedPage ?? parsePageAt(input.text, offset), pageEnd: input.requestedPage ?? parsePageAt(input.text, offset),
+    // A provider-supplied page label is never sufficient provenance. The quote's
+    // literal offset must resolve against an extracted marker or the page stays null.
+    pageStart: location.label, pageEnd: location.label,
+    sourceRef: location.sourceRef, pageStartNumber: location.pageNumber, pageEndNumber: location.pageNumber,
     quote: input.quote, supportKind: 'direct', confidence: input.confidence, validationStatus: 'valid',
   };
 }
@@ -714,10 +746,11 @@ export async function runDocumentProfileScan(work: Work, options: RunDocumentPro
   }
   const sourceFingerprint = sha256(document.text);
   const sourceContentHash = sha1(document.text);
+  const sourceMap = Object.fromEntries((document.segments ?? []).map((segment) => [segment.marker, segment.sourceRef]));
   if (work.deep_hash && work.deep_hash !== sourceContentHash) throw new Error('DOCUMENT_SOURCE_CHANGED');
   updateDocumentIndexJob(options.jobId, { sourceFingerprint });
   emit(options, 'structuring', 0.04, 'Reconstruyendo la estructura…');
-  const sections = deriveDocumentStructure(document.text, work.title);
+  const sections = deriveDocumentStructure(document.text, work.title, sourceMap);
   if (!sections.length) throw new Error('El documento no contiene texto estructurable.');
 
   emit(options, 'embedding', 0.05, 'Indexando los pasajes del texto completo…');
@@ -725,7 +758,7 @@ export async function runDocumentProfileScan(work: Work, options: RunDocumentPro
     work,
     document.text,
     options,
-    Object.fromEntries((document.segments ?? []).map((segment) => [segment.marker, segment.sourceRef])),
+    sourceMap,
   );
   const sectionAnalyses = new Map<string, SectionAnalysis>();
   for (let index = 0; index < sections.length; index += 1) {
@@ -862,8 +895,8 @@ export async function runDocumentProfileScan(work: Work, options: RunDocumentPro
   deterministic.supportedFields.forEach((field, index) => {
     const support = supportForQuote({
       nodusId: work.nodus_id, text: document.text, quote: field.support_quote, targetKind: 'field',
-      targetId: fields[index].fieldId, sections, confidence: field.confidence, requestedPage: field.page,
-      candidatePassages: preparedPassages,
+      targetId: fields[index].fieldId, sections, confidence: field.confidence,
+      candidatePassages: preparedPassages, sourceMap,
     });
     if (support) supports.push(support);
   });
@@ -873,8 +906,8 @@ export async function runDocumentProfileScan(work: Work, options: RunDocumentPro
     if (!quote) continue;
     const support = supportForQuote({
       nodusId: work.nodus_id, text: document.text, quote, targetKind: 'section', targetId: section.sectionId,
-      sections, confidence: analysis.claims[0].confidence, requestedPage: analysis.claims[0].page,
-      candidatePassages: preparedPassages,
+      sections, confidence: analysis.claims[0].confidence,
+      candidatePassages: preparedPassages, sourceMap,
     });
     if (support) supports.push(support);
   }

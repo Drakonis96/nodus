@@ -84,11 +84,13 @@ try {
       sectionId, parentSectionId: null, level: 1, ordinal: 0, title: 'Introducción', role: 'planteamiento',
       summary: 'Presenta una modernización territorialmente desigual.', concepts: ['modernización'],
       claims: ['La modernización fue desigual.'], pageStart: 'p. 1', pageEnd: 'p. 12',
+      sourceRef: 'zotero:user:0:ATTACH', pageStartNumber: 1, pageEndNumber: 12,
       charStart: 0, charEnd: 1200, contentHash: 'section-hash',
     }],
     supports: [{
       supportId, targetKind: 'field', targetId: fieldId, sectionId, passageId: 'w1#0',
       pageStart: 'p. 4', pageEnd: 'p. 4', quote: 'El proceso avanzó de manera desigual.',
+      sourceRef: 'zotero:user:0:ATTACH', pageStartNumber: 4, pageEndNumber: 4,
       supportKind: 'direct', confidence: 0.97, validationStatus: 'valid',
     }],
     ideaLinks: [], vectors: [], generatorModel: null, auditorModel: null,
@@ -100,7 +102,11 @@ try {
   assert.equal(profile.versionId, versionId);
   assert.equal(profile.fields[0].text, 'La modernización fue desigual.');
   assert.equal(profile.sections[0].sectionId, sectionId);
+  assert.equal(profile.sections[0].sourceRef, 'zotero:user:0:ATTACH');
+  assert.equal(profile.sections[0].pageStartNumber, 1);
   assert.equal(profile.supports[0].validationStatus, 'valid');
+  assert.equal(profile.supports[0].sourceRef, 'zotero:user:0:ATTACH');
+  assert.equal(profile.supports[0].pageStartNumber, 4);
   const exactSupport = repo.findDocumentSupportPassages([{
     kind: 'document', nodusId: 'w1', title: 'Modernización española', authors: ['Autora Uno'], year: 2024,
     versionId, sourceId: fieldId, fieldKind: 'thesis', text: 'La modernización fue desigual.', similarity: 0.8,

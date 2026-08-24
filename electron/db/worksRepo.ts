@@ -556,10 +556,13 @@ export function setLightPending(nodusId: string): void {
 }
 
 export function setDeepPending(nodusId: string): void {
-  getDb().prepare("UPDATE works SET deep_status = 'pending', deep_error = NULL WHERE nodus_id = ?").run(nodusId);
-  getDb().prepare(`UPDATE document_profile_state
-    SET status='stale',stale_reason='source_pending',error=NULL,updated_at=?
-    WHERE nodus_id=? AND current_version_id IS NOT NULL`).run(new Date().toISOString(), nodusId);
+  // Once a deep result is committed, deep_status describes that readable result.
+  // Live queue state describes its replacement attempt; do not hide the committed
+  // graph or stale a valid profile merely because a retry was enqueued.
+  getDb().prepare(`UPDATE works SET
+    deep_status=CASE WHEN deep_hash IS NULL THEN 'pending' ELSE 'done' END,
+    deep_error=NULL
+    WHERE nodus_id=?`).run(nodusId);
 }
 
 export function setSummaryPending(nodusId: string): void {
@@ -588,9 +591,11 @@ export function setDeepResult(
   if ((status === 'done' || status === 'skipped_no_text') && previous?.deep_hash !== hash) invalidateSummary(nodusId);
   const now = new Date().toISOString();
   if (status === 'failed') {
-    // A failed replacement must not destroy the last committed analysis metadata.
-    db.prepare('UPDATE works SET deep_status=?, deep_at=?, deep_error=? WHERE nodus_id=?')
-      .run(status, now, notes ?? 'El análisis profundo ha fallado.', nodusId);
+    // A failed replacement must not destroy or hide the last committed analysis.
+    db.prepare(`UPDATE works SET
+      deep_status=CASE WHEN deep_hash IS NULL THEN 'failed' ELSE 'done' END,
+      deep_at=?, deep_error=? WHERE nodus_id=?`)
+      .run(now, notes ?? 'El análisis profundo ha fallado.', nodusId);
   } else {
     // Assign nullable fields explicitly so a successful retry clears stale notes/errors.
     db.prepare(

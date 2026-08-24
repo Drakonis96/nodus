@@ -118,6 +118,17 @@ test('structure preserves heading hierarchy and full character coverage', () => 
   assert.ok(sections.every((section) => section.contentHash.length === 64));
 });
 
+test('structure resolves combined source/page markers to durable attachment locators', () => {
+  const text = `[[src:s1 p.7]]\n# Primera\n${'Texto de la primera fuente. '.repeat(90)}\n[[src:s2 p.3]]\n# Segunda\n${'Texto de la segunda fuente. '.repeat(90)}`;
+  const sections = pipeline.deriveDocumentStructure(text, 'Libro', { s1: 'zotero:user:0:A', s2: 'zotero:user:0:B' });
+  const first = sections.find((section) => section.title === 'Primera');
+  const second = sections.find((section) => section.title === 'Segunda');
+  assert.equal(first.sourceRef, 'zotero:user:0:A');
+  assert.equal(first.pageStartNumber, 7);
+  assert.equal(second.sourceRef, 'zotero:user:0:B');
+  assert.equal(second.pageStartNumber, 3);
+});
+
 test('provider audit variants normalize conservatively instead of aborting the job', () => {
   const normalized = pipeline.normalizeDocumentProfileAuditResponse({
     passed: 'true',

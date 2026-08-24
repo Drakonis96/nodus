@@ -15,7 +15,7 @@ export interface Migration {
 
 // Versioned, append-only migrations. Never edit an existing migration's SQL once
 // shipped — add a new one. The current schema version is the highest applied.
-export const SCHEMA_VERSION = 160;
+export const SCHEMA_VERSION = 161;
 
 export const migrations: Migration[] = [
   {
@@ -8841,6 +8841,19 @@ export const migrations: Migration[] = [
       ALTER TABLE passages ADD COLUMN page_number INTEGER;
 
       UPDATE works SET deep_error=notes WHERE deep_status='failed' AND notes IS NOT NULL;
+    `,
+  },
+  {
+    version: 161,
+    up: /* sql */ `
+      -- Profile citations need the same durable source identity as evidence and
+      -- passages; display labels alone are ambiguous for multi-attachment works.
+      ALTER TABLE document_sections ADD COLUMN source_ref TEXT;
+      ALTER TABLE document_sections ADD COLUMN page_start_number INTEGER;
+      ALTER TABLE document_sections ADD COLUMN page_end_number INTEGER;
+      ALTER TABLE document_profile_support ADD COLUMN source_ref TEXT;
+      ALTER TABLE document_profile_support ADD COLUMN page_start_number INTEGER;
+      ALTER TABLE document_profile_support ADD COLUMN page_end_number INTEGER;
     `,
   },
 ];

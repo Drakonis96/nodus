@@ -10,6 +10,7 @@ import type {
   TextSourceOrigin,
   ResolvedTextState,
   WorkTextSource,
+  TextBlockReason,
 } from '@shared/types';
 import { itemChildren, itemAsAttachment, getFulltext, attachmentFilePath, ZoteroAttachment } from '../zotero/zoteroClient';
 import { openPdf, pageText } from './pdfjsLoader';
@@ -19,6 +20,7 @@ import { csvFileToText, xlsxFileToText } from './tabular';
 import { getExtractionCache, upsertExtractionCache } from '../db/extractionCacheRepo';
 import { perfLog, startPerf, type PerfContext } from '../perf';
 import { getLibraryReaderRawContent } from '../libraryReader/libraryReaderStore';
+import { cleanExtractedText } from './textCleanup';
 
 export interface ExtractedDoc {
   text: string;
@@ -31,6 +33,7 @@ export interface ExtractedDoc {
    * exists" from "full text should exist but wasn't ready yet" and retry the latter.
    */
   hadTextAttachment?: boolean;
+  blockReason?: TextBlockReason | null;
   segments?: ExtractedTextSegment[];
 }
 
@@ -182,13 +185,10 @@ export function resolvedTextStateFromDoc(doc: ExtractedDoc): ResolvedTextState {
   }));
   const sourceType = sourceTypes.size > 1 ? 'mixed' : segments[0]?.sourceType ?? doc.sourceType;
   const fullText = sourceType !== 'none' && sourceType !== 'abstract_only';
-  let blockReason: ResolvedTextState['blockReason'] = null;
-  if (!fullText) {
-    if (/ocr desactivado/i.test(doc.notes ?? '')) blockReason = 'scanned_no_ocr';
-    else if (/archivo adjunto no encontrado|ubicación original/i.test(doc.notes ?? '')) blockReason = 'file_missing';
-    else if (doc.hadTextAttachment) blockReason = 'unreadable';
-    else blockReason = 'no_attachment';
-  }
+  const blockReason: ResolvedTextState['blockReason'] = fullText
+    ? null
+    : doc.blockReason
+      ?? (sourceType === 'abstract_only' ? 'abstract_only' : doc.hadTextAttachment ? 'unreadable' : 'no_attachment');
   return {
     sourceType,
     textHash: doc.text ? textHash(doc.text) : null,
@@ -389,10 +389,11 @@ export async function extractPdfStreaming(
       sourceType: 'pdf',
       analysis,
       notes: `PDF escaneado sin capa de texto (${analysis.pageCount} págs.) y OCR desactivado.`,
+      blockReason: 'scanned_no_ocr',
     };
   }
   if (analysis.strategy === 'empty') {
-    return { text: '', sourceType: 'pdf', analysis, notes: 'PDF sin páginas legibles.' };
+    return { text: '', sourceType: 'pdf', analysis, notes: 'PDF sin páginas legibles.', blockReason: 'unreadable' };
   }
 
   const extractionDone = startPerf('PDF extraction', opts.perf, { file: path.basename(filePath), pages: analysis.pageCount });
@@ -409,7 +410,7 @@ export async function extractPdfStreaming(
     }
     opts.onProgress?.({ phase: 'extract', detail: `Extrayendo p. ${p}/${total}`, pct: p / total });
     const page = await pdf.getPage(p);
-    const txt = await pageText(page);
+    const txt = cleanExtractedText(await pageText(page));
     page.cleanup?.();
     if (txt.length >= MIN_CHARS_TEXT_PAGE) {
       pageTexts.set(p, txt);
@@ -433,10 +434,11 @@ export async function extractPdfStreaming(
       );
       opts.signal?.throwIfAborted();
       for (const [p, result] of map) {
-        if (result.text && result.text.length >= MIN_CHARS_TEXT_PAGE) {
+        const cleaned = cleanExtractedText(result.text ?? '');
+        if (cleaned.length >= MIN_CHARS_TEXT_PAGE) {
           const previous = pageTexts.get(p);
-          if (!previous || textQualityScore(result.text) > textQualityScore(previous) + 0.05) {
-            pageTexts.set(p, result.text);
+          if (!previous || textQualityScore(cleaned) > textQualityScore(previous) + 0.05) {
+            pageTexts.set(p, cleaned);
             ocredPages++;
           }
         }
@@ -503,7 +505,7 @@ async function extractImage(
   perf?: PerfContext
 ): Promise<ExtractedDoc> {
   if (!ocr.enabled) {
-    return { text: '', sourceType: 'upload', notes: 'Imagen sin capa de texto y OCR desactivado.' };
+    return { text: '', sourceType: 'upload', notes: 'Imagen sin capa de texto y OCR desactivado.', blockReason: 'scanned_no_ocr' };
   }
   onProgress?.({ phase: 'ocr', detail: 'OCR de imagen…', pct: null });
   const done = startPerf('image OCR', perf, { file: path.basename(filePath), languages: ocr.languages });
@@ -514,11 +516,12 @@ async function extractImage(
       text,
       sourceType: 'upload',
       notes: text ? 'Texto reconocido por OCR.' : 'Imagen sin texto reconocible por OCR.',
+      blockReason: text ? undefined : 'unreadable',
     };
   } catch (e) {
     // OCR deps missing or failed — record the image without text rather than throw.
     done({ status: 'error', error: e instanceof Error ? e.message : String(e) });
-    return { text: '', sourceType: 'upload', notes: 'OCR de imagen no disponible.' };
+    return { text: '', sourceType: 'upload', notes: 'OCR de imagen no disponible.', blockReason: 'unreadable' };
   }
 }
 
@@ -794,12 +797,13 @@ async function readTextAttachments(
   userId: string,
   effectiveStorage: string,
   opts: ResolveOptions
-): Promise<{ doc: ExtractedDoc | null; scanNote: string | null }> {
+): Promise<{ doc: ExtractedDoc | null; scanNote: string | null; blockReason: TextBlockReason | null }> {
   // The file is the source of truth for citations. Zotero's index is consulted only
   // for an attachment whose local file is absent or unusable, and never supplies pages.
   const segments: ExtractedTextSegment[] = [];
   const notes: string[] = [];
   let scanNote: string | null = null;
+  let blockReason: TextBlockReason | null = null;
   const ordered = [...textAttachments].sort((a, b) => sourceRefForAttachment(a).localeCompare(sourceRefForAttachment(b)));
   for (const att of ordered) {
     opts.signal?.throwIfAborted();
@@ -817,6 +821,7 @@ async function readTextAttachments(
       }
     } else {
       scanNote = 'Archivo adjunto no encontrado en su ubicación original.';
+      blockReason = 'file_missing';
     }
     if (localDoc && hasUsableText(localDoc.text)) {
       const hasPages = /\[\[p\.\s*\d+\]\]/i.test(localDoc.text);
@@ -837,11 +842,13 @@ async function readTextAttachments(
       continue;
     }
     if (localDoc?.notes) scanNote = localDoc.notes;
+    if (localDoc?.blockReason) blockReason = localDoc.blockReason;
 
     if (opts.preferZoteroFulltext) {
       opts.onProgress?.({ phase: 'fulltext', detail: 'Comprobando índice de Zotero…', pct: null });
       const ft = await getFulltext(userId, att.key).catch(() => null);
-      if (ft && hasUsableText(ft.content)) {
+      const cleaned = ft ? cleanExtractedText(ft.content) : '';
+      if (ft && hasUsableText(cleaned)) {
         const note = `Texto indexado por Zotero sin páginas verificables${ft.totalPages ? ` (${ft.indexedPages ?? '?'}/${ft.totalPages} págs. indexadas)` : ''}.`;
         segments.push({
           sourceRef: sourceRefForAttachment(att),
@@ -851,8 +858,8 @@ async function readTextAttachments(
           zoteroLibraryId: String(att.library.id),
           attachmentKey: att.key,
           displayName: att.title || att.filename,
-          text: ft.content,
-          contentHash: textHash(ft.content),
+          text: cleaned,
+          contentHash: textHash(cleaned),
           pageCount: ft.totalPages ?? null,
           hasPageMarkers: false,
         });
@@ -861,15 +868,15 @@ async function readTextAttachments(
     }
   }
 
-  if (segments.length > 0) return { doc: combineSegments(segments, notes.join(' ') || null, true), scanNote: null };
-  return { doc: null, scanNote };
+  if (segments.length > 0) return { doc: combineSegments(segments, notes.join(' ') || null, true), scanNote: null, blockReason: null };
+  return { doc: null, scanNote, blockReason: blockReason ?? (textAttachments.length ? 'unreadable' : null) };
 }
 
 /**
  * Resolve full text for a work via a detector chain that escalates only as needed:
- *   1) Zotero's own indexed full text (no parsing)
- *   2) Parse the PDF in storage (digital/hybrid → text; scanned → OCR if enabled)
- *   3) Unpaywall open-access PDF (by DOI)
+ *   1) Parse every local attachment (digital/hybrid → text; scanned → OCR if enabled)
+ *   2) Use Zotero fulltext only for an attachment whose local file is unusable
+ *   3) Curated Library copy, then Unpaywall open-access PDF (by DOI)
  *   4) Abstract only / none
  */
 export async function resolveWorkText(
@@ -882,9 +889,47 @@ export async function resolveWorkText(
   itemType?: string | null
 ): Promise<ExtractedDoc> {
   opts.signal?.throwIfAborted();
-  // A work linked from the transverse Library has a curated Markdown copy. It is
-  // the canonical analysis source: deterministic, OCR-clean and independent of
-  // whether Zotero is running or its attachment index has settled yet.
+  // Fall back to the standard Zotero storage location when the user left it blank,
+  // so deep scans can still find local PDFs instead of degrading to abstract-only.
+  const effectiveStorage = storagePath || defaultZoteroStorage();
+  const isAttachmentItem = (itemType ?? '').toLowerCase() === 'attachment';
+
+  // (1+2) Resolve text from the Zotero attachments. A scan can race a just-attached
+  // file — the attachment child, its filename, or the on-disk copy may surface a
+  // moment later — so retry briefly before degrading instead of silently accepting
+  // the abstract for a work that actually has full text.
+  let hadTextAttachment = false;
+  let scanNote: string | null = null;
+  let blockReason: TextBlockReason | null = null;
+  for (let attempt = 0; attempt < ATTACHMENT_READ_ATTEMPTS; attempt++) {
+    opts.signal?.throwIfAborted();
+    if (attempt > 0) await abortableDelay(ATTACHMENT_RETRY_DELAYS_MS[attempt] ?? 1500, opts.signal);
+    let textAttachments: ZoteroAttachment[] = [];
+    const metadataDone = startPerf('Zotero attachment metadata', opts.perf, { zoteroKey, attempt });
+    try {
+      textAttachments = await textAttachmentsFor(userId, zoteroKey, itemType);
+      metadataDone({ attachments: textAttachments.length });
+    } catch (e) {
+      metadataDone({ status: 'error', error: e instanceof Error ? e.message : String(e) });
+    }
+    if (textAttachments.length > 0) hadTextAttachment = true;
+
+    const result = await readTextAttachments(textAttachments, userId, effectiveStorage, opts);
+    if (result.doc) return { ...result.doc, hadTextAttachment: true };
+    if (result.scanNote) scanNote = result.scanNote;
+    if (result.blockReason) blockReason = result.blockReason;
+
+    // Keep retrying only while a brief wait might change the outcome: attachments
+    // were found but not yet readable (file/index settling), or none surfaced yet on
+    // the first try for a normal (non-attachment) item. This costs at most one short
+    // extra wait for works that genuinely have no full text.
+    const worthRetrying = !isAttachmentItem && (textAttachments.length > 0 || attempt === 0);
+    if (!worthRetrying) break;
+  }
+
+  // A curated Library copy is the first fallback after canonical local files.
+  // It is deterministic and OCR-clean, but must never mask a newer attachment
+  // or erase that attachment's page/source inventory.
   try {
     const clean = getLibraryReaderRawContent(zoteroKey);
     if (clean?.markdown.trim()) {
@@ -904,41 +949,6 @@ export async function resolveWorkText(
     }
   } catch {
     // The backup folder may be unconfigured in headless/first-run contexts.
-  }
-  // Fall back to the standard Zotero storage location when the user left it blank,
-  // so deep scans can still find local PDFs instead of degrading to abstract-only.
-  const effectiveStorage = storagePath || defaultZoteroStorage();
-  const isAttachmentItem = (itemType ?? '').toLowerCase() === 'attachment';
-
-  // (1+2) Resolve text from the Zotero attachments. A scan can race a just-attached
-  // file — the attachment child, its filename, or the on-disk copy may surface a
-  // moment later — so retry briefly before degrading instead of silently accepting
-  // the abstract for a work that actually has full text.
-  let hadTextAttachment = false;
-  let scanNote: string | null = null;
-  for (let attempt = 0; attempt < ATTACHMENT_READ_ATTEMPTS; attempt++) {
-    opts.signal?.throwIfAborted();
-    if (attempt > 0) await abortableDelay(ATTACHMENT_RETRY_DELAYS_MS[attempt] ?? 1500, opts.signal);
-    let textAttachments: ZoteroAttachment[] = [];
-    const metadataDone = startPerf('Zotero attachment metadata', opts.perf, { zoteroKey, attempt });
-    try {
-      textAttachments = await textAttachmentsFor(userId, zoteroKey, itemType);
-      metadataDone({ attachments: textAttachments.length });
-    } catch (e) {
-      metadataDone({ status: 'error', error: e instanceof Error ? e.message : String(e) });
-    }
-    if (textAttachments.length > 0) hadTextAttachment = true;
-
-    const result = await readTextAttachments(textAttachments, userId, effectiveStorage, opts);
-    if (result.doc) return { ...result.doc, hadTextAttachment: true };
-    if (result.scanNote) scanNote = result.scanNote;
-
-    // Keep retrying only while a brief wait might change the outcome: attachments
-    // were found but not yet readable (file/index settling), or none surfaced yet on
-    // the first try for a normal (non-attachment) item. This costs at most one short
-    // extra wait for works that genuinely have no full text.
-    const worthRetrying = !isAttachmentItem && (textAttachments.length > 0 || attempt === 0);
-    if (!worthRetrying) break;
   }
 
   // (3) Unpaywall fallback by DOI.
@@ -972,7 +982,8 @@ export async function resolveWorkText(
   // disabled) and whether a document attachment existed, so the pipeline can retry
   // works that *should* have full text instead of silently accepting the abstract.
   if (abstract) {
-    return combineSegments([{
+    return {
+      ...combineSegments([{
       sourceRef: `abstract:${zoteroKey}`,
       marker: '',
       origin: 'abstract',
@@ -984,9 +995,14 @@ export async function resolveWorkText(
       contentHash: textHash(abstract),
       pageCount: null,
       hasPageMarkers: false,
-    }], scanNote ?? 'Solo abstract disponible.', hadTextAttachment);
+      }], scanNote ?? 'Solo abstract disponible.', hadTextAttachment),
+      blockReason: blockReason ?? 'abstract_only',
+    };
   }
-  return { text: '', sourceType: 'none', notes: scanNote ?? 'Sin texto ni abstract disponible.', hadTextAttachment };
+  return {
+    text: '', sourceType: 'none', notes: scanNote ?? 'Sin texto ni abstract disponible.', hadTextAttachment,
+    blockReason: blockReason ?? (hadTextAttachment ? 'unreadable' : 'no_attachment'),
+  };
 }
 
 async function tryUnpaywall(
