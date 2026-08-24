@@ -2,7 +2,7 @@ import type { CorpusHealthBucketId, ResearchContextSelection } from '@shared/typ
 import type { LibraryScope } from '@shared/libraryTypes';
 import { type VaultType, normalizeVaultType } from '@shared/vaultTypes';
 
-export type View = 'home' | 'search' | 'testimonyInterviews' | 'testimonyParticipants' | 'testimonyContrasts' | 'library' | 'graph' | 'argument' | 'ideas' | 'authors' | 'persons' | 'prosopSearch' | 'prosopPopulation' | 'prosopPersons' | 'prosopSources' | 'prosopAnalysis' | 'prosopNetworks' | 'encyclopedia' | 'continuity' | 'conflicts' | 'arcs' | 'rules' | 'questions' | 'worldChat' | 'manuscript' | 'characters' | 'places' | 'factions' | 'cultures' | 'dynasties' | 'scenes' | 'timeline' | 'tree' | 'relations' | 'map' | 'archive' | 'pages' | 'databases' | 'dbSearch' | 'dbAnalysis' | 'dbChat' | 'studyCourses' | 'studySchedule' | 'studyCalendar' | 'studySearch' | 'studyLibrary' | 'studyRecordings' | 'studyChat' | 'studyIdeas' | 'studyGraph' | 'studyQuestions' | 'studyReview' | 'studyDeepResearch' | 'teachingGroups' | 'teachingGrades' | 'teachingExams' | 'teachingRubrics' | 'teachingUnits' | 'immersion' | 'gaps' | 'debate' | 'research' | 'hypothesis' | 'reading' | 'writing' | 'deepResearch' | 'projects' | 'notes' | 'workspace' | 'browser' | 'radar' | 'toolkit' | 'settings';
+export type View = 'home' | 'search' | 'testimonyInterviews' | 'testimonyParticipants' | 'testimonyContrasts' | 'library' | 'graph' | 'argument' | 'ideas' | 'dictionary' | 'authors' | 'persons' | 'prosopSearch' | 'prosopPopulation' | 'prosopPersons' | 'prosopSources' | 'prosopAnalysis' | 'prosopNetworks' | 'encyclopedia' | 'continuity' | 'conflicts' | 'arcs' | 'rules' | 'questions' | 'worldChat' | 'manuscript' | 'characters' | 'places' | 'factions' | 'cultures' | 'dynasties' | 'scenes' | 'timeline' | 'tree' | 'relations' | 'map' | 'archive' | 'pages' | 'databases' | 'dbSearch' | 'dbAnalysis' | 'dbChat' | 'studyCourses' | 'studySchedule' | 'studyCalendar' | 'studySearch' | 'studyLibrary' | 'studyRecordings' | 'studyChat' | 'studyIdeas' | 'studyGraph' | 'studyQuestions' | 'studyReview' | 'studyDeepResearch' | 'teachingGroups' | 'teachingGrades' | 'teachingExams' | 'teachingRubrics' | 'teachingUnits' | 'immersion' | 'gaps' | 'debate' | 'research' | 'hypothesis' | 'reading' | 'writing' | 'deepResearch' | 'projects' | 'notes' | 'workspace' | 'browser' | 'radar' | 'toolkit' | 'settings';
 
 export type GraphPresetId = 'overview' | 'contradictions' | 'gaps' | 'reading' | 'unread' | 'authors';
 
@@ -113,6 +113,7 @@ export const NAV_ITEMS: NavItem[] = [
   { id: 'teachingRubrics', label: 'Rúbricas', icon: 'table', group: 'analyze' },
   { id: 'teachingUnits', label: 'Diseño de unidades', icon: 'compass', group: 'create' },
   // Analizar — superficies derivadas del grafo y síntesis.
+  { id: 'dictionary', label: 'Dictionary', icon: 'thesaurus', group: 'analyze' },
   { id: 'immersion', label: 'Inmersión', icon: 'target', group: 'analyze' },
   // 'gaps' NO tiene entrada propia: los huecos son una pestaña dentro del Estado de la
   // cuestión, porque solo significan algo mirando qué le falta a una pregunta concreta.
@@ -370,10 +371,17 @@ export interface IdeaNavigationTarget {
   ideaId: string;
 }
 
+export interface AuthorNavigationTarget {
+  nonce: number;
+  authorId: string;
+  name: string;
+}
+
 export type PendingGraphNavigationTarget = Omit<GraphNavigationTarget, 'nonce'>;
 export type PendingAssistantNavigationTarget = Omit<AssistantNavigationTarget, 'nonce'>;
 export type PendingLibraryNavigationTarget = Omit<LibraryNavigationTarget, 'nonce'>;
 export type PendingIdeaNavigationTarget = Omit<IdeaNavigationTarget, 'nonce'>;
+export type PendingAuthorNavigationTarget = Omit<AuthorNavigationTarget, 'nonce'>;
 
 export const ASSISTANT_CONTEXTS: Record<'idea' | 'gap' | 'contradiction' | 'reading', ResearchContextSelection> = {
   idea: {

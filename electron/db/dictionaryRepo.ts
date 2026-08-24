@@ -1,0 +1,623 @@
+import { createHash } from 'node:crypto';
+import { v4 as uuid } from 'uuid';
+import type {
+  DictionaryAuthorView,
+  DictionaryCitationRecord,
+  DictionaryDuplicateMatch,
+  DictionaryEntry,
+  DictionaryEntryDetail,
+  DictionaryEntryInput,
+  DictionaryEntryPage,
+  DictionaryEntryPatch,
+  DictionaryEvidenceDecision,
+  DictionaryEvidenceItem,
+  DictionaryEvidencePage,
+  DictionaryEvidenceRef,
+  DictionaryEvidenceRequest,
+  DictionaryFacets,
+  DictionaryGenerationRequest,
+  DictionaryListRequest,
+  DictionaryRelation,
+  DictionaryRelationType,
+  DictionaryScope,
+  DictionaryVersion,
+  DictionaryVersionState,
+  DictionaryVersionTrigger,
+  DictionaryWorkView,
+} from '@shared/dictionary';
+import type { ModelRef, PromptLanguage } from '@shared/types';
+import { getDb } from './database';
+
+type EntryRow = {
+  id: string; name: string; normalized_name: string; aliases_json: string; focus_prompt: string;
+  scope_kind: DictionaryScope['kind']; scope_json: string; output_language: PromptLanguage;
+  detail_level: DictionaryEntry['detailLevel']; tags_json: string; content_markdown: string; notes: string;
+  status: DictionaryEntry['status']; current_version_id: string | null; proposed_version_id: string | null;
+  insufficient_evidence: number; new_evidence_count: number; last_evidence_scan_at: string | null;
+  last_change_seq: number; created_at: string; updated_at: string;
+};
+
+type EvidenceRow = {
+  entry_id: string; kind: DictionaryEvidenceRef['kind']; ref_id: string; decision: DictionaryEvidenceDecision;
+  score: number; reason: string; label: string; evidence_text: string; work_id: string; work_title: string;
+  zotero_key: string | null; works_json: string; page_label: string | null; authors_json: string; tags_json: string;
+  source_revision: string | null; is_new: number; first_seen_at: string; updated_at: string;
+};
+
+type VersionRow = {
+  id: string; entry_id: string; content_markdown: string; evidence_json: string; evidence_snapshot_json: string;
+  citations_json: string; author_summaries_json: string; focus_prompt: string; scope_json: string;
+  output_language: PromptLanguage; detail_level: DictionaryEntry['detailLevel']; model_json: string | null;
+  generated_at: string; trigger: DictionaryVersionTrigger; state: DictionaryVersionState;
+  insufficient_evidence: number; created_at: string; updated_at: string;
+};
+
+export interface DictionaryEvidenceUpsert {
+  kind: DictionaryEvidenceRef['kind'];
+  refId: string;
+  decision: DictionaryEvidenceDecision;
+  score: number;
+  reason: string;
+  label: string;
+  text: string;
+  workId: string;
+  workTitle: string;
+  zoteroKey: string | null;
+  works: DictionaryEvidenceItem['works'];
+  pageLabel: string | null;
+  authors: DictionaryEvidenceItem['authors'];
+  tags: string[];
+  sourceRevision: string | null;
+  isNew?: boolean;
+}
+
+export interface SaveDictionaryVersionInput {
+  entryId: string;
+  contentMarkdown: string;
+  evidence: DictionaryEvidenceRef[];
+  citations: DictionaryCitationRecord[];
+  authorSummaries: DictionaryAuthorView[];
+  model: ModelRef | null;
+  trigger: DictionaryVersionTrigger;
+  state: DictionaryVersionState;
+  insufficientEvidence: boolean;
+}
+
+const now = () => new Date().toISOString();
+
+function parseJson<T>(value: unknown, fallback: T): T {
+  try { return typeof value === 'string' ? JSON.parse(value) as T : fallback; } catch { return fallback; }
+}
+
+export function normalizeDictionaryTerm(value: string): string {
+  return value.normalize('NFKD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase()
+    .replace(/[^\p{L}\p{N}]+/gu, ' ').trim().replace(/\s+/g, ' ');
+}
+
+function cleanStrings(values: string[] | undefined): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const raw of values ?? []) {
+    const value = raw.trim();
+    const key = normalizeDictionaryTerm(value);
+    if (!value || !key || seen.has(key)) continue;
+    seen.add(key); out.push(value);
+  }
+  return out;
+}
+
+function scopeFromRow(row: EntryRow): DictionaryScope {
+  const decoded = parseJson<DictionaryScope>(row.scope_json, { kind: 'vault' });
+  return decoded?.kind === row.scope_kind ? decoded : { kind: 'vault' };
+}
+
+function stripMarkdown(markdown: string): string {
+  return markdown.replace(/\[([^\]]+)\]\([^)]+\)/g, '$1').replace(/[#*_>`~]/g, '')
+    .replace(/\s+/g, ' ').trim();
+}
+
+function shortDescription(markdown: string): string {
+  const text = stripMarkdown(markdown);
+  return text.length > 220 ? `${text.slice(0, 217)}…` : text;
+}
+
+function toEntry(row: EntryRow, counts?: { authors: number; works: number; evidence: number }): DictionaryEntry {
+  return {
+    id: row.id,
+    name: row.name,
+    aliases: parseJson<string[]>(row.aliases_json, []),
+    shortDescription: shortDescription(row.content_markdown),
+    tags: parseJson<string[]>(row.tags_json, []),
+    authorCount: counts?.authors ?? 0,
+    workCount: counts?.works ?? 0,
+    evidenceCount: counts?.evidence ?? 0,
+    status: row.status,
+    insufficientEvidence: !!row.insufficient_evidence,
+    newEvidenceCount: row.new_evidence_count,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+    focusPrompt: row.focus_prompt,
+    scope: scopeFromRow(row),
+    outputLanguage: row.output_language,
+    detailLevel: row.detail_level,
+    contentMarkdown: row.content_markdown,
+    notes: row.notes,
+    currentVersionId: row.current_version_id,
+    proposedVersionId: row.proposed_version_id,
+    lastEvidenceScanAt: row.last_evidence_scan_at,
+  };
+}
+
+function entryCounts(entryId: string): { authors: number; works: number; evidence: number } {
+  const rows = getDb().prepare(
+    `SELECT authors_json, work_id, works_json FROM dictionary_evidence
+      WHERE entry_id = ? AND decision = 'included'`
+  ).all(entryId) as { authors_json: string; work_id: string; works_json: string }[];
+  const authors = new Set<string>(); const works = new Set<string>();
+  for (const row of rows) {
+    const rowWorks = parseJson<Array<{ id: string }>>(row.works_json, []);
+    for (const work of rowWorks) if (work.id) works.add(work.id);
+    if (!rowWorks.length && row.work_id) works.add(row.work_id);
+    for (const author of parseJson<Array<{ id: string | null; name: string }>>(row.authors_json, [])) {
+      authors.add(author.id || normalizeDictionaryTerm(author.name));
+    }
+  }
+  return { authors: authors.size, works: works.size, evidence: rows.length };
+}
+
+export function createDictionaryEntry(input: DictionaryEntryInput): DictionaryEntry {
+  const name = input.name.trim();
+  if (!name) throw new Error('El concepto necesita un nombre.');
+  const stamp = now(); const id = uuid();
+  const aliases = cleanStrings(input.aliases).filter((alias) => normalizeDictionaryTerm(alias) !== normalizeDictionaryTerm(name));
+  const scope = normalizeScope(input.scope);
+  getDb().prepare(
+    `INSERT INTO dictionary_entries (
+       id, name, normalized_name, aliases_json, focus_prompt, scope_kind, scope_json,
+       output_language, detail_level, tags_json, created_at, updated_at
+     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+  ).run(id, name, normalizeDictionaryTerm(name), JSON.stringify(aliases), input.focusPrompt.trim(), scope.kind,
+    JSON.stringify(scope), input.outputLanguage, input.detailLevel, JSON.stringify(cleanStrings(input.tags)), stamp, stamp);
+  markDictionaryRetrievalStale(id);
+  return getDictionaryEntry(id)!;
+}
+
+export function getDictionaryEntry(id: string): DictionaryEntry | null {
+  const row = getDb().prepare('SELECT * FROM dictionary_entries WHERE id = ?').get(id) as EntryRow | undefined;
+  return row ? toEntry(row, entryCounts(id)) : null;
+}
+
+function normalizeScope(scope: DictionaryScope): DictionaryScope {
+  if (scope.kind === 'authors') return { kind: 'authors', authorIds: cleanStrings(scope.authorIds) };
+  if (scope.kind === 'works') return { kind: 'works', workIds: cleanStrings(scope.workIds) };
+  if (scope.kind === 'tags_collections') return {
+    kind: 'tags_collections', zoteroTags: cleanStrings(scope.zoteroTags), collectionKeys: cleanStrings(scope.collectionKeys),
+  };
+  return { kind: 'vault' };
+}
+
+export function listDictionaryEntries(request: DictionaryListRequest): DictionaryEntryPage {
+  const clauses: string[] = []; const params: unknown[] = [];
+  const query = normalizeDictionaryTerm(request.query ?? '');
+  if (query) {
+    clauses.push(`(
+      e.normalized_name LIKE ? OR lower(e.aliases_json) LIKE ? OR lower(e.tags_json) LIKE ? OR
+      lower(e.content_markdown) LIKE ? OR EXISTS (
+        SELECT 1 FROM dictionary_evidence de WHERE de.entry_id=e.id AND
+          (lower(de.work_title) LIKE ? OR lower(de.authors_json) LIKE ? OR lower(de.tags_json) LIKE ?)
+      ))`);
+    const pattern = `%${query}%`; params.push(pattern, pattern, pattern, pattern, pattern, pattern, pattern);
+  }
+  if (request.letter) {
+    if (request.letter === '#') clauses.push("substr(e.normalized_name,1,1) NOT GLOB '[a-z]'");
+    else { clauses.push('substr(e.normalized_name,1,1) = ?'); params.push(normalizeDictionaryTerm(request.letter).slice(0, 1)); }
+  }
+  if (request.statuses?.length) {
+    clauses.push(`e.status IN (${request.statuses.map(() => '?').join(',')})`); params.push(...request.statuses);
+  }
+  if (request.hasNewEvidence !== undefined) clauses.push(request.hasNewEvidence ? 'e.new_evidence_count > 0' : 'e.new_evidence_count = 0');
+  if (request.insufficientEvidence !== undefined) { clauses.push('e.insufficient_evidence = ?'); params.push(request.insufficientEvidence ? 1 : 0); }
+  for (const tag of cleanStrings(request.tags)) { clauses.push('lower(e.tags_json) LIKE ?'); params.push(`%${normalizeDictionaryTerm(tag)}%`); }
+  for (const authorId of request.authorIds ?? []) {
+    clauses.push("EXISTS (SELECT 1 FROM dictionary_evidence de WHERE de.entry_id=e.id AND de.decision='included' AND de.authors_json LIKE ?)");
+    params.push(`%${authorId}%`);
+  }
+  for (const workId of request.workIds ?? []) {
+    clauses.push("EXISTS (SELECT 1 FROM dictionary_evidence de WHERE de.entry_id=e.id AND de.decision='included' AND (de.work_id=? OR de.works_json LIKE ?))");
+    params.push(workId, `%${workId}%`);
+  }
+  const where = clauses.length ? `WHERE ${clauses.join(' AND ')}` : '';
+  const total = (getDb().prepare(`SELECT COUNT(*) AS n FROM dictionary_entries e ${where}`).get(...params) as { n: number }).n;
+  const sort = request.sort ?? { key: 'updated', dir: 'desc' as const };
+  const direction = sort.dir === 'asc' ? 'ASC' : 'DESC';
+  const sortExpr: Record<typeof sort.key, string> = {
+    name: 'e.normalized_name', created: 'e.created_at', updated: 'e.updated_at',
+    authors: 'author_count', works: 'work_count', evidence: 'evidence_count',
+  };
+  const rows = getDb().prepare(
+    `SELECT e.*,
+       (SELECT COUNT(DISTINCT COALESCE(json_extract(author.value, '$.id'), lower(json_extract(author.value, '$.name'))))
+          FROM dictionary_evidence author_evidence
+          JOIN json_each(author_evidence.authors_json) AS author
+            ON TRUE
+         WHERE author_evidence.entry_id=e.id
+           AND author_evidence.decision='included') AS author_count,
+       (SELECT COUNT(DISTINCT COALESCE(json_extract(work.value, '$.id'), work_evidence.work_id))
+          FROM dictionary_evidence work_evidence
+          LEFT JOIN json_each(work_evidence.works_json) AS work
+            ON TRUE
+         WHERE work_evidence.entry_id=e.id
+           AND work_evidence.decision='included') AS work_count,
+       COUNT(DISTINCT CASE WHEN de.decision='included' THEN de.kind || ':' || de.ref_id END) AS evidence_count
+       FROM dictionary_entries e LEFT JOIN dictionary_evidence de ON de.entry_id=e.id
+       ${where} GROUP BY e.id ORDER BY ${sortExpr[sort.key]} ${direction}, e.normalized_name ASC LIMIT ? OFFSET ?`
+  ).all(...params, request.limit, request.offset) as Array<EntryRow & { author_count: number; work_count: number; evidence_count: number }>;
+  const items = rows.map((row) => {
+    const counts = entryCounts(row.id);
+    return toEntry(row, { ...counts, works: row.work_count, evidence: row.evidence_count });
+  });
+  return { items, total, offset: request.offset, limit: request.limit };
+}
+
+export function listDictionaryFacets(): DictionaryFacets {
+  const db = getDb();
+  const entries = db.prepare('SELECT id, normalized_name, tags_json FROM dictionary_entries').all() as Array<{ id: string; normalized_name: string; tags_json: string }>;
+  const letters = [...new Set(entries.map((row) => /^[a-z]/.test(row.normalized_name) ? row.normalized_name[0].toUpperCase() : '#'))].sort();
+  const tagCounts = new Map<string, number>();
+  for (const entry of entries) for (const tag of parseJson<string[]>(entry.tags_json, [])) tagCounts.set(tag, (tagCounts.get(tag) ?? 0) + 1);
+  const evidence = db.prepare("SELECT entry_id, work_id, work_title, authors_json, works_json FROM dictionary_evidence WHERE decision='included'").all() as Array<{ entry_id: string; work_id: string; work_title: string; authors_json: string; works_json: string }>;
+  const authorEntries = new Map<string, { name: string; entries: Set<string> }>();
+  const workEntries = new Map<string, { title: string; entries: Set<string> }>();
+  for (const item of evidence) {
+    const relatedWorks = parseJson<Array<{ id: string; title: string }>>(item.works_json, []);
+    if (relatedWorks.length) for (const related of relatedWorks) {
+      if (!related.id) continue;
+      const work = workEntries.get(related.id) ?? { title: related.title || related.id, entries: new Set<string>() };
+      work.entries.add(item.entry_id); workEntries.set(related.id, work);
+    } else if (item.work_id) {
+      const work = workEntries.get(item.work_id) ?? { title: item.work_title, entries: new Set<string>() };
+      work.entries.add(item.entry_id); workEntries.set(item.work_id, work);
+    }
+    for (const author of parseJson<Array<{ id: string | null; name: string }>>(item.authors_json, [])) {
+      const id = author.id || normalizeDictionaryTerm(author.name); const current = authorEntries.get(id) ?? { name: author.name, entries: new Set<string>() };
+      current.entries.add(item.entry_id); authorEntries.set(id, current);
+    }
+  }
+  return {
+    letters,
+    tags: [...tagCounts].map(([label, count]) => ({ label, count })).sort((a, b) => a.label.localeCompare(b.label)),
+    authors: [...authorEntries].map(([id, item]) => ({ id, name: item.name, count: item.entries.size })).sort((a, b) => a.name.localeCompare(b.name)),
+    works: [...workEntries].map(([id, item]) => ({ id, title: item.title, count: item.entries.size })).sort((a, b) => a.title.localeCompare(b.title)),
+  };
+}
+
+export function updateDictionaryEntry(id: string, patch: DictionaryEntryPatch, expectedUpdatedAt: string): DictionaryEntry {
+  const current = getDictionaryEntry(id);
+  if (!current) throw new Error('La entrada de Dictionary ya no existe.');
+  if (current.updatedAt !== expectedUpdatedAt) throw new Error('La entrada cambió en otra ventana o dispositivo. Recárgala antes de guardar.');
+  const name = patch.name?.trim() || current.name;
+  const aliases = cleanStrings(patch.aliases ?? current.aliases).filter((alias) => normalizeDictionaryTerm(alias) !== normalizeDictionaryTerm(name));
+  const scope = normalizeScope(patch.scope ?? current.scope); const stamp = now();
+  const content = patch.contentMarkdown ?? current.contentMarkdown;
+  validateDictionaryMarkdown(id, content, current.currentVersionId);
+  const db = getDb();
+  db.transaction(() => {
+    db.prepare(`UPDATE dictionary_entries SET name=?, normalized_name=?, aliases_json=?, focus_prompt=?, scope_kind=?, scope_json=?,
+      output_language=?, detail_level=?, tags_json=?, content_markdown=?, notes=?, status=?, updated_at=? WHERE id=?`)
+      .run(name, normalizeDictionaryTerm(name), JSON.stringify(aliases), patch.focusPrompt ?? current.focusPrompt, scope.kind, JSON.stringify(scope),
+        patch.outputLanguage ?? current.outputLanguage, patch.detailLevel ?? current.detailLevel, JSON.stringify(cleanStrings(patch.tags ?? current.tags)),
+        content, patch.notes ?? current.notes, patch.status ?? current.status, stamp, id);
+    const evidence = includedEvidenceRefs(id);
+    const citations = citationRecordsForMarkdown(id, content);
+    const versionId = insertVersion({ entryId: id, contentMarkdown: content, evidence, citations,
+      authorSummaries: currentVersionAuthorSummaries(current.currentVersionId), model: null, trigger: 'manual_edit', state: 'applied',
+      insufficientEvidence: current.insufficientEvidence }, stamp);
+    db.prepare('UPDATE dictionary_entries SET current_version_id=?, proposed_version_id=NULL WHERE id=?').run(versionId, id);
+    if (patch.focusPrompt !== undefined || patch.scope !== undefined) markDictionaryRetrievalStale(id, db);
+  })();
+  return getDictionaryEntry(id)!;
+}
+
+export function deleteDictionaryEntries(ids: string[]): number {
+  const clean = [...new Set(ids.filter(Boolean))]; if (!clean.length) return 0;
+  const db = getDb(); const placeholders = clean.map(() => '?').join(',');
+  return db.transaction(() => {
+    db.prepare(`DELETE FROM dictionary_relations WHERE from_entry_id IN (${placeholders}) OR to_entry_id IN (${placeholders})`).run(...clean, ...clean);
+    db.prepare(`DELETE FROM dictionary_versions WHERE entry_id IN (${placeholders})`).run(...clean);
+    db.prepare(`DELETE FROM dictionary_evidence WHERE entry_id IN (${placeholders})`).run(...clean);
+    db.prepare(`DELETE FROM dictionary_retrieval_state WHERE entry_id IN (${placeholders})`).run(...clean);
+    return db.prepare(`DELETE FROM dictionary_entries WHERE id IN (${placeholders})`).run(...clean).changes;
+  })();
+}
+
+export function detectDictionaryDuplicates(name: string, aliases: string[]): DictionaryDuplicateMatch[] {
+  const sought = new Set([name, ...aliases].map(normalizeDictionaryTerm).filter(Boolean));
+  if (!sought.size) return [];
+  const rows = getDb().prepare('SELECT * FROM dictionary_entries ORDER BY updated_at DESC').all() as EntryRow[];
+  const out: DictionaryDuplicateMatch[] = [];
+  for (const row of rows) {
+    const entryName = normalizeDictionaryTerm(row.name); const entryAliases = parseJson<string[]>(row.aliases_json, []).map(normalizeDictionaryTerm);
+    if (sought.has(entryName)) out.push({ entry: toEntry(row, entryCounts(row.id)), match: 'exact' });
+    else if (entryAliases.some((alias) => sought.has(alias)) || [...sought].some((term) => entryAliases.includes(term))) {
+      out.push({ entry: toEntry(row, entryCounts(row.id)), match: 'alias' });
+    }
+  }
+  return out;
+}
+
+export function upsertDictionaryEvidence(entryId: string, items: DictionaryEvidenceUpsert[]): void {
+  if (!getDictionaryEntry(entryId)) throw new Error('La entrada de Dictionary ya no existe.');
+  const stamp = now(); const db = getDb();
+  const stmt = db.prepare(`INSERT INTO dictionary_evidence (
+    entry_id,kind,ref_id,decision,score,reason,label,evidence_text,work_id,work_title,zotero_key,works_json,page_label,
+    authors_json,tags_json,source_revision,is_new,first_seen_at,updated_at
+  ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(entry_id,kind,ref_id) DO UPDATE SET
+    score=excluded.score, reason=excluded.reason, label=excluded.label, evidence_text=excluded.evidence_text,
+    work_id=excluded.work_id, work_title=excluded.work_title, zotero_key=excluded.zotero_key,
+    works_json=excluded.works_json, page_label=excluded.page_label, authors_json=excluded.authors_json, tags_json=excluded.tags_json,
+    source_revision=excluded.source_revision, is_new=MAX(dictionary_evidence.is_new, excluded.is_new), updated_at=excluded.updated_at`);
+  db.transaction(() => {
+    for (const item of items) stmt.run(entryId, item.kind, item.refId, item.decision, item.score, item.reason, item.label,
+      item.text, item.workId, item.workTitle, item.zoteroKey, JSON.stringify(item.works), item.pageLabel, JSON.stringify(item.authors), JSON.stringify(cleanStrings(item.tags)),
+      item.sourceRevision, item.isNew ? 1 : 0, stamp, stamp);
+    refreshNewEvidenceCount(entryId, db);
+  })();
+}
+
+export function setDictionaryEvidenceDecision(entryId: string, refs: DictionaryEvidenceRef[], decision: DictionaryEvidenceDecision): void {
+  const db = getDb(); const stamp = now();
+  db.transaction(() => {
+    const stmt = db.prepare('UPDATE dictionary_evidence SET decision=?, is_new=0, updated_at=? WHERE entry_id=? AND kind=? AND ref_id=?');
+    for (const ref of refs) stmt.run(decision, stamp, entryId, ref.kind, ref.id);
+    refreshNewEvidenceCount(entryId, db);
+  })();
+}
+
+function versionEvidenceSets(entryId: string): { used: Set<string>; cited: Set<string> } {
+  const entry = getDictionaryEntry(entryId); const used = new Set<string>(); const cited = new Set<string>();
+  const version = entry?.currentVersionId ? getDictionaryVersion(entry.currentVersionId) : null;
+  for (const ref of version?.evidence ?? []) used.add(`${ref.kind}:${ref.id}`);
+  for (const ref of version?.citations ?? []) cited.add(`${ref.kind}:${ref.id}`);
+  return { used, cited };
+}
+
+function evidenceUnavailable(kind: DictionaryEvidenceRef['kind'], id: string): boolean {
+  const table = kind === 'idea' ? 'ideas' : 'passages'; const column = kind === 'idea' ? 'global_id' : 'passage_id';
+  return !getDb().prepare(`SELECT 1 FROM ${table} WHERE ${column}=?`).get(id);
+}
+
+function toEvidenceItem(row: EvidenceRow, sets: { used: Set<string>; cited: Set<string> }): DictionaryEvidenceItem {
+  const key = `${row.kind}:${row.ref_id}`;
+  return {
+    entryId: row.entry_id, kind: row.kind, id: row.ref_id, label: row.label, text: row.evidence_text,
+    score: row.score, reason: row.reason, decision: row.decision, isNew: !!row.is_new,
+    usedInCurrentVersion: sets.used.has(key), citedInCurrentVersion: sets.cited.has(key), unavailable: evidenceUnavailable(row.kind, row.ref_id),
+    sourceRevision: row.source_revision, workId: row.work_id, workTitle: row.work_title, zoteroKey: row.zotero_key, works: parseJson(row.works_json, []),
+    pageLabel: row.page_label, authors: parseJson(row.authors_json, []), tags: parseJson(row.tags_json, []),
+  };
+}
+
+export function listDictionaryEvidence(request: DictionaryEvidenceRequest): DictionaryEvidencePage {
+  const clauses = ['entry_id=?']; const params: unknown[] = [request.entryId];
+  if (request.kinds?.length) { clauses.push(`kind IN (${request.kinds.map(() => '?').join(',')})`); params.push(...request.kinds); }
+  if (request.decisions?.length) { clauses.push(`decision IN (${request.decisions.map(() => '?').join(',')})`); params.push(...request.decisions); }
+  if (request.newOnly) clauses.push('is_new=1');
+  if (request.query?.trim()) { clauses.push('(lower(label) LIKE ? OR lower(evidence_text) LIKE ? OR lower(work_title) LIKE ? OR lower(authors_json) LIKE ? OR lower(tags_json) LIKE ?)'); const q = `%${request.query.trim().toLocaleLowerCase()}%`; params.push(q, q, q, q, q); }
+  for (const workId of request.workIds ?? []) { clauses.push('(work_id=? OR works_json LIKE ?)'); params.push(workId, `%${workId}%`); }
+  for (const authorId of request.authorIds ?? []) { clauses.push('authors_json LIKE ?'); params.push(`%${authorId}%`); }
+  for (const tag of request.tags ?? []) { clauses.push('lower(tags_json) LIKE ?'); params.push(`%${tag.toLocaleLowerCase()}%`); }
+  const where = clauses.join(' AND '); const db = getDb();
+  const total = (db.prepare(`SELECT COUNT(*) AS n FROM dictionary_evidence WHERE ${where}`).get(...params) as { n: number }).n;
+  const rows = db.prepare(`SELECT * FROM dictionary_evidence WHERE ${where} ORDER BY is_new DESC, score DESC, label COLLATE NOCASE LIMIT ? OFFSET ?`)
+    .all(...params, request.limit, request.offset) as EvidenceRow[];
+  const sets = versionEvidenceSets(request.entryId);
+  return { items: rows.map((row) => toEvidenceItem(row, sets)), total, offset: request.offset, limit: request.limit };
+}
+
+export function includedEvidence(entryId: string): DictionaryEvidenceItem[] {
+  const rows = getDb().prepare("SELECT * FROM dictionary_evidence WHERE entry_id=? AND decision='included' ORDER BY score DESC").all(entryId) as EvidenceRow[];
+  const sets = versionEvidenceSets(entryId); return rows.map((row) => toEvidenceItem(row, sets));
+}
+
+function includedEvidenceRefs(entryId: string): DictionaryEvidenceRef[] {
+  return includedEvidence(entryId).filter((item) => !item.unavailable).map((item) => ({ kind: item.kind, id: item.id }));
+}
+
+export function saveDictionaryVersion(input: SaveDictionaryVersionInput): DictionaryVersion {
+  const stamp = now(); const db = getDb();
+  const versionId = db.transaction(() => {
+    const id = insertVersion(input, stamp);
+    if (input.state === 'applied') {
+      db.prepare(`UPDATE dictionary_entries SET current_version_id=?, proposed_version_id=NULL, content_markdown=?,
+        insufficient_evidence=?, status=CASE WHEN status='draft' THEN 'active' ELSE status END, updated_at=? WHERE id=?`)
+        .run(id, input.contentMarkdown, input.insufficientEvidence ? 1 : 0, stamp, input.entryId);
+      db.prepare("UPDATE dictionary_versions SET state='applied', updated_at=? WHERE entry_id=? AND id<>? AND state='proposed'").run(stamp, input.entryId, id);
+      db.prepare("UPDATE dictionary_evidence SET is_new=0, updated_at=? WHERE entry_id=? AND decision='included'").run(stamp, input.entryId);
+      refreshNewEvidenceCount(input.entryId, db);
+    } else {
+      db.prepare('UPDATE dictionary_entries SET proposed_version_id=?, updated_at=? WHERE id=?').run(id, stamp, input.entryId);
+    }
+    return id;
+  })();
+  return getDictionaryVersion(versionId)!;
+}
+
+function insertVersion(input: SaveDictionaryVersionInput, stamp: string): string {
+  const entry = getDictionaryEntry(input.entryId); if (!entry) throw new Error('La entrada de Dictionary ya no existe.');
+  const id = uuid(); const snapshots = includedEvidence(input.entryId).filter((item) => input.evidence.some((ref) => ref.kind === item.kind && ref.id === item.id));
+  getDb().prepare(`INSERT INTO dictionary_versions (
+    id,entry_id,content_markdown,evidence_json,evidence_snapshot_json,citations_json,author_summaries_json,
+    focus_prompt,scope_json,output_language,detail_level,model_json,generated_at,trigger,state,insufficient_evidence,created_at,updated_at
+  ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).run(id, input.entryId, input.contentMarkdown, JSON.stringify(input.evidence), JSON.stringify(snapshots),
+    JSON.stringify(input.citations), JSON.stringify(input.authorSummaries), entry.focusPrompt, JSON.stringify(entry.scope), entry.outputLanguage,
+    entry.detailLevel, input.model ? JSON.stringify(input.model) : null, stamp, input.trigger, input.state, input.insufficientEvidence ? 1 : 0, stamp, stamp);
+  return id;
+}
+
+function toVersion(row: VersionRow): DictionaryVersion {
+  return { id: row.id, entryId: row.entry_id, contentMarkdown: row.content_markdown, evidence: parseJson(row.evidence_json, []),
+    citations: parseJson(row.citations_json, []), authorSummaries: parseJson(row.author_summaries_json, []), focusPrompt: row.focus_prompt,
+    scope: parseJson(row.scope_json, { kind: 'vault' }), outputLanguage: row.output_language, detailLevel: row.detail_level,
+    model: parseJson<ModelRef | null>(row.model_json, null), generatedAt: row.generated_at, trigger: row.trigger, state: row.state,
+    insufficientEvidence: !!row.insufficient_evidence };
+}
+
+export function getDictionaryVersion(id: string): DictionaryVersion | null {
+  const row = getDb().prepare('SELECT * FROM dictionary_versions WHERE id=?').get(id) as VersionRow | undefined;
+  return row ? toVersion(row) : null;
+}
+
+export function listDictionaryVersions(entryId: string): DictionaryVersion[] {
+  return (getDb().prepare('SELECT * FROM dictionary_versions WHERE entry_id=? ORDER BY generated_at DESC, rowid DESC').all(entryId) as VersionRow[]).map(toVersion);
+}
+
+export function acceptDictionaryVersion(entryId: string, versionId: string, expectedCurrentVersionId: string | null): DictionaryEntryDetail {
+  const entry = getDictionaryEntry(entryId); const version = getDictionaryVersion(versionId);
+  if (!entry || !version || version.entryId !== entryId || version.state !== 'proposed') throw new Error('La propuesta ya no está disponible.');
+  if (entry.currentVersionId !== expectedCurrentVersionId) throw new Error('La entrada cambió mientras revisabas la propuesta.');
+  const stamp = now(); getDb().transaction(() => {
+    getDb().prepare("UPDATE dictionary_versions SET state='applied', updated_at=? WHERE id=?").run(stamp, versionId);
+    getDb().prepare(`UPDATE dictionary_entries SET current_version_id=?, proposed_version_id=NULL, content_markdown=?,
+      insufficient_evidence=?, status=CASE WHEN status='draft' THEN 'active' ELSE status END, updated_at=? WHERE id=?`)
+      .run(versionId, version.contentMarkdown, version.insufficientEvidence ? 1 : 0, stamp, entryId);
+    getDb().prepare("UPDATE dictionary_evidence SET is_new=0, updated_at=? WHERE entry_id=? AND decision='included'").run(stamp, entryId);
+    refreshNewEvidenceCount(entryId);
+  })();
+  return getDictionaryEntryDetail(entryId)!;
+}
+
+export function restoreDictionaryVersion(entryId: string, versionId: string, expectedCurrentVersionId: string | null): DictionaryEntryDetail {
+  const entry = getDictionaryEntry(entryId); const source = getDictionaryVersion(versionId);
+  if (!entry || !source || source.entryId !== entryId) throw new Error('No se encontró esa versión.');
+  if (entry.currentVersionId !== expectedCurrentVersionId) throw new Error('La entrada cambió antes de restaurarla.');
+  for (const citation of source.citations) if (evidenceUnavailable(citation.kind, citation.id)) throw new Error('La versión contiene fuentes que ya no existen y no puede restaurarse de forma verificable.');
+  getDb().transaction(() => {
+    getDb().prepare('UPDATE dictionary_entries SET focus_prompt=?, scope_kind=?, scope_json=?, output_language=?, detail_level=? WHERE id=?')
+      .run(source.focusPrompt, source.scope.kind, JSON.stringify(source.scope), source.outputLanguage, source.detailLevel, entryId);
+    const id = insertVersion({ entryId, contentMarkdown: source.contentMarkdown, evidence: source.evidence, citations: source.citations,
+      authorSummaries: source.authorSummaries, model: source.model, trigger: 'restore', state: 'applied', insufficientEvidence: source.insufficientEvidence }, now());
+    getDb().prepare('UPDATE dictionary_entries SET current_version_id=?, proposed_version_id=NULL, content_markdown=?, insufficient_evidence=?, updated_at=? WHERE id=?')
+      .run(id, source.contentMarkdown, source.insufficientEvidence ? 1 : 0, now(), entryId);
+  })();
+  return getDictionaryEntryDetail(entryId)!;
+}
+
+function currentVersionAuthorSummaries(versionId: string | null): DictionaryAuthorView[] {
+  return versionId ? getDictionaryVersion(versionId)?.authorSummaries ?? [] : [];
+}
+
+function citationRecordsForMarkdown(entryId: string, markdown: string): DictionaryCitationRecord[] {
+  const evidence = new Map(includedEvidence(entryId).map((item) => [`${item.kind}:${item.id}`, item]));
+  const records: DictionaryCitationRecord[] = [];
+  for (const match of markdown.matchAll(/\[([^\]]*)\]\(nodus:\/\/(idea|passage)\/([^)]+)\)/g)) {
+    const kind = match[2] as DictionaryEvidenceRef['kind']; let id = match[3];
+    try { id = decodeURIComponent(id); } catch { /* use raw id */ }
+    const item = evidence.get(`${kind}:${id}`); if (!item) continue;
+    if (!records.some((record) => record.kind === kind && record.id === id)) records.push({ kind, id, label: match[1], tags: kind === 'idea' ? item.tags : [] });
+  }
+  return records;
+}
+
+function validateDictionaryMarkdown(entryId: string, markdown: string, currentVersionId: string | null): void {
+  if (!markdown.includes('nodus://')) return;
+  const allowedRefs = [...(currentVersionId ? getDictionaryVersion(currentVersionId)?.evidence ?? [] : []), ...includedEvidenceRefs(entryId)];
+  const allowed = new Set(allowedRefs.map((ref) => `${ref.kind}:${ref.id}`));
+  const proper = /\[[^\]]*\]\(nodus:\/\/(idea|passage)\/([^)]+)\)/g; const consumed = markdown.replace(proper, '');
+  if (consumed.includes('nodus://')) throw new Error('Hay una cita Nodus incompleta o con un formato no permitido.');
+  for (const match of markdown.matchAll(proper)) {
+    const kind = match[1] as DictionaryEvidenceRef['kind']; let id = match[2]; try { id = decodeURIComponent(id); } catch { /* raw */ }
+    if (!allowed.has(`${kind}:${id}`) || evidenceUnavailable(kind, id)) throw new Error('La descripción contiene una cita inexistente o ajena a la evidencia de esta versión.');
+  }
+}
+
+export function getDictionaryEntryDetail(id: string): DictionaryEntryDetail | null {
+  const entry = getDictionaryEntry(id); if (!entry) return null;
+  const evidence = getDb().prepare('SELECT * FROM dictionary_evidence WHERE entry_id=?').all(id) as EvidenceRow[];
+  const currentVersion = entry.currentVersionId ? getDictionaryVersion(entry.currentVersionId) : null;
+  const proposedVersion = entry.proposedVersionId ? getDictionaryVersion(entry.proposedVersionId) : null;
+  const used = new Set((currentVersion?.evidence ?? []).map((ref) => `${ref.kind}:${ref.id}`));
+  const cited = new Set((currentVersion?.citations ?? []).map((ref) => `${ref.kind}:${ref.id}`));
+  const coverage = { used: used.size, cited: cited.size, unused: evidence.filter((item) => item.decision === 'unused').length,
+    excluded: evidence.filter((item) => item.decision === 'excluded').length, newEvidence: evidence.filter((item) => item.is_new).length,
+    unavailable: evidence.filter((item) => evidenceUnavailable(item.kind, item.ref_id)).length };
+  const authors = buildAuthors(evidence.filter((item) => used.has(`${item.kind}:${item.ref_id}`)), currentVersion?.authorSummaries ?? []);
+  const works = buildWorks(evidence.filter((item) => used.has(`${item.kind}:${item.ref_id}`)));
+  return { entry, coverage, authors, works, currentVersion, proposedVersion };
+}
+
+function buildAuthors(rows: EvidenceRow[], summaries: DictionaryAuthorView[]): DictionaryAuthorView[] {
+  const summaryById = new Map(summaries.map((item) => [item.id, item]));
+  const map = new Map<string, { name: string; ideas: Set<string>; works: Set<string>; basis?: 'author' | 'editor_only' }>();
+  for (const row of rows) {
+    const relatedWorks = parseJson<Array<{ id: string }>>(row.works_json, []);
+    const workIds = relatedWorks.length ? relatedWorks.map((work) => work.id).filter(Boolean) : row.work_id ? [row.work_id] : [];
+    for (const author of parseJson<DictionaryEvidenceItem['authors']>(row.authors_json, [])) {
+      const id = author.id || normalizeDictionaryTerm(author.name); const item = map.get(id) ?? { name: author.name, ideas: new Set(), works: new Set(), basis: author.attributionBasis };
+      if (row.kind === 'idea') item.ideas.add(row.ref_id);
+      for (const workId of workIds) item.works.add(workId);
+      map.set(id, item);
+    }
+  }
+  return [...map].map(([id, item]) => ({ id, name: item.name, ideaCount: item.ideas.size, workCount: item.works.size,
+    summaryMarkdown: summaryById.get(id)?.summaryMarkdown ?? `Relacionado mediante ${item.ideas.size} idea(s) y ${item.works.size} obra(s) seleccionadas.`, attributionBasis: item.basis }));
+}
+
+function buildWorks(rows: EvidenceRow[]): DictionaryWorkView[] {
+  const map = new Map<string, { title: string; authors: Set<string>; evidence: Set<string>; tags: Set<string>; zoteroKey: string | null }>();
+  for (const row of rows) {
+    const works = parseJson<DictionaryEvidenceItem['works']>(row.works_json, []);
+    for (const work of works.length ? works : [{ id: row.work_id, title: row.work_title, zoteroKey: row.zotero_key, authors: [] as string[], year: null }]) {
+      if (!work.id) continue; const current = map.get(work.id) ?? { title: work.title, authors: new Set(), evidence: new Set(), tags: new Set(), zoteroKey: work.zoteroKey };
+      for (const author of work.authors) current.authors.add(author);
+      for (const tag of parseJson<string[]>(row.tags_json, [])) current.tags.add(tag);
+      current.evidence.add(`${row.kind}:${row.ref_id}`); map.set(work.id, current);
+    }
+  }
+  return [...map].map(([id, item]) => ({ id, title: item.title, authors: [...item.authors], evidenceCount: item.evidence.size, tags: [...item.tags], zoteroKey: item.zoteroKey }));
+}
+
+function refreshNewEvidenceCount(entryId: string, db = getDb()): void {
+  const count = (db.prepare('SELECT COUNT(*) AS n FROM dictionary_evidence WHERE entry_id=? AND is_new=1').get(entryId) as { n: number }).n;
+  db.prepare('UPDATE dictionary_entries SET new_evidence_count=? WHERE id=?').run(count, entryId);
+}
+
+export function markDictionaryEvidenceScanned(entryId: string, changeSeq: number): void {
+  const stamp = now(); const db = getDb();
+  db.prepare('UPDATE dictionary_entries SET last_evidence_scan_at=?, last_change_seq=?, updated_at=? WHERE id=?').run(stamp, changeSeq, stamp, entryId);
+  db.prepare('UPDATE dictionary_retrieval_state SET last_change_seq=?, needs_full_scan=0, updated_at=? WHERE entry_id=?').run(changeSeq, stamp, entryId);
+  const floor = (db.prepare('SELECT MIN(last_change_seq) AS seq FROM dictionary_entries').get() as { seq: number | null }).seq;
+  if (floor && floor > 0) db.prepare('DELETE FROM dictionary_corpus_changes WHERE seq <= ?').run(floor);
+}
+
+export function markDictionaryRetrievalStale(entryId: string, db = getDb()): void {
+  const entry = db.prepare('SELECT name,aliases_json,focus_prompt,scope_json FROM dictionary_entries WHERE id=?').get(entryId) as { name: string; aliases_json: string; focus_prompt: string; scope_json: string } | undefined;
+  if (!entry) return; const hash = createHash('sha256').update(`${entry.name}\n${entry.aliases_json}\n${entry.focus_prompt}\n${entry.scope_json}`).digest('hex');
+  db.prepare(`INSERT INTO dictionary_retrieval_state(entry_id,query_hash,last_change_seq,needs_full_scan,updated_at) VALUES(?,?,0,1,?)
+    ON CONFLICT(entry_id) DO UPDATE SET query_hash=excluded.query_hash, needs_full_scan=1, updated_at=excluded.updated_at`).run(entryId, hash, now());
+}
+
+export function currentDictionaryChangeSequence(): number {
+  return (getDb().prepare('SELECT COALESCE(MAX(seq),0) AS n FROM dictionary_corpus_changes').get() as { n: number }).n;
+}
+
+export function entriesNeedingDictionaryScan(limit = 20): string[] {
+  const seq = currentDictionaryChangeSequence();
+  return (getDb().prepare(`SELECT e.id FROM dictionary_entries e
+    LEFT JOIN dictionary_retrieval_state state ON state.entry_id=e.id
+    WHERE e.last_change_seq < ? OR COALESCE(state.needs_full_scan,0)=1
+    ORDER BY e.updated_at DESC LIMIT ?`).all(seq, limit) as { id: string }[]).map((row) => row.id);
+}
+
+export function addDictionaryRelation(fromEntryId: string, toEntryId: string, type: DictionaryRelationType = 'related', origin: 'manual' | 'ai' = 'manual', status: 'suggested' | 'confirmed' = 'confirmed'): DictionaryRelation {
+  if (fromEntryId === toEntryId) throw new Error('Una entrada no puede relacionarse consigo misma.');
+  const stamp = now(); const id = uuid();
+  getDb().prepare(`INSERT INTO dictionary_relations(id,from_entry_id,to_entry_id,type,origin,status,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?)
+    ON CONFLICT(from_entry_id,to_entry_id,type) DO UPDATE SET origin=excluded.origin,status=excluded.status,updated_at=excluded.updated_at`)
+    .run(id, fromEntryId, toEntryId, type, origin, status, stamp, stamp);
+  const row = getDb().prepare('SELECT * FROM dictionary_relations WHERE from_entry_id=? AND to_entry_id=? AND type=?').get(fromEntryId, toEntryId, type) as Record<string, unknown>;
+  return { id: String(row.id), fromEntryId, toEntryId, type, origin: row.origin as 'manual' | 'ai', status: row.status as DictionaryRelation['status'], createdAt: String(row.created_at), updatedAt: String(row.updated_at) };
+}
+
+export function generationTrigger(request: DictionaryGenerationRequest): DictionaryVersionTrigger {
+  return request.mode === 'creation' ? 'creation' : request.mode === 'update' ? 'update' : 'regeneration';
+}

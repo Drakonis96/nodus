@@ -57,6 +57,7 @@ import { setActiveVaultQueryScope } from './vaultQueryCache';
 import { viewSnapshotAccess } from './app/viewSnapshots';
 import type {
   PendingAssistantNavigationTarget,
+  PendingAuthorNavigationTarget,
   PendingGraphNavigationTarget,
   PendingIdeaNavigationTarget,
   PendingLibraryNavigationTarget,
@@ -325,6 +326,7 @@ export function App() {
   );
   const [graphTarget, setGraphTarget] = useState<PendingGraphNavigationTarget & { nonce: number } | null>(null);
   const [ideaTarget, setIdeaTarget] = useState<PendingIdeaNavigationTarget & { nonce: number } | null>(null);
+  const [authorTarget, setAuthorTarget] = useState<PendingAuthorNavigationTarget & { nonce: number } | null>(null);
   const [libraryTarget, setLibraryTarget] = useState<PendingLibraryNavigationTarget & { nonce: number } | null>(null);
   const [assistantTarget, setAssistantTarget] = useState<PendingAssistantNavigationTarget & { nonce: number } | null>(null);
   // A note the user opened from global search; the nonce re-triggers even if the
@@ -1042,6 +1044,16 @@ export function App() {
     setView('library');
   }, []);
 
+  const openIdea = useCallback((ideaId: string) => {
+    setIdeaTarget({ ideaId, nonce: Date.now() });
+    setView('ideas');
+  }, []);
+
+  const openAuthor = useCallback((authorId: string, name: string) => {
+    setAuthorTarget({ authorId, name, nonce: Date.now() });
+    setView('authors');
+  }, []);
+
   useEffect(() => {
     if (!window.nodus?.onCopilotOpenIdea) return undefined;
     return window.nodus.onCopilotOpenIdea((target) => {
@@ -1115,6 +1127,7 @@ export function App() {
     setResearchOpen(false);
     setGraphTarget(null);
     setIdeaTarget(null);
+    setAuthorTarget(null);
     setStudyGraphTarget(null);
     setStudyChatTarget(null);
     setAssistantTarget(null);
@@ -1221,6 +1234,7 @@ export function App() {
     toolkitPage,
     graphTarget,
     ideaTarget,
+    authorTarget,
     libraryTarget,
     noteTarget,
     personsTarget,
@@ -1241,6 +1255,8 @@ export function App() {
     openAssistant,
     openLibraryBucket,
     openLibraryItem,
+    openIdea,
+    openAuthor,
     openNoteFromSearch,
     openPrimarySourceTarget,
     openTestimonyInterview,

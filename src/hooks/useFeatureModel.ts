@@ -9,6 +9,7 @@ export type FeatureModelSettingKey =
   | 'writingModel'
   | 'argumentMapModel'
   | 'authorModel'
+  | 'dictionaryModel'
   | 'studyModel'
   | 'tutorModel'
   | 'hypothesisModel'

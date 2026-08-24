@@ -264,6 +264,28 @@ export const MUTABLE_TABLES = {
       "id"
     ]
   },
+  "dictionary_entries": {
+    "key": [
+      "id"
+    ]
+  },
+  "dictionary_evidence": {
+    "key": [
+      "entry_id",
+      "kind",
+      "ref_id"
+    ]
+  },
+  "dictionary_versions": {
+    "key": [
+      "id"
+    ]
+  },
+  "dictionary_relations": {
+    "key": [
+      "id"
+    ]
+  },
   "edge_feedback": {
     "key": [
       "from_id",

@@ -167,6 +167,11 @@ async function tick(): Promise<void> {
       if (summary.entries.some((entry) => entry.table === 'writing_saved_drafts' && (entry.outcome === 'applied' || entry.outcome === 'deleted'))) {
         broadcast('writing:saved:changed', null);
       }
+      if (summary.entries.some((entry) => entry.table.startsWith('dictionary_')
+        && !['dictionary_retrieval_state', 'dictionary_corpus_changes'].includes(entry.table)
+        && (entry.outcome === 'applied' || entry.outcome === 'deleted'))) {
+        broadcast('dictionary:changed', null);
+      }
       if (summary.entries.some((entry) => ['writing_draft_reads', 'content_translations', 'decorative_images'].includes(entry.table)
         && (entry.outcome === 'applied' || entry.outcome === 'deleted'))) {
         // An open report is derived from the saved-draft list. Re-reading that list replaces

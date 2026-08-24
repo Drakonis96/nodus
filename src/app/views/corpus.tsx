@@ -7,6 +7,7 @@ const GlobalLibraryView = lazy(() => import('../../views/GlobalLibraryView').the
 const GraphView = lazy(() => import('../../views/GraphView').then((module) => ({ default: module.GraphView })));
 const ArgumentMapView = lazy(() => import('../../views/ArgumentMapView').then((module) => ({ default: module.ArgumentMapView })));
 const IdeasView = lazy(() => import('../../views/IdeasView').then((module) => ({ default: module.IdeasView })));
+const DictionaryView = lazy(() => import('../../views/DictionaryView').then((module) => ({ default: module.DictionaryView })));
 const AuthorsView = lazy(() => import('../../views/AuthorsView').then((module) => ({ default: module.AuthorsView })));
 const CoverageWorkspace = lazy(() => import('../../views/CoverageWorkspace').then((module) => ({ default: module.CoverageWorkspace })));
 const HypothesisLabView = lazy(() => import('../../views/HypothesisLabView').then((module) => ({ default: module.HypothesisLabView })));
@@ -59,13 +60,17 @@ export const corpusViews = {
       onOpenAssistant={openAssistant}
     />
   ),
-  authors: ({ activeVault, navigate, settings, snapshots }) => (
+  dictionary: ({ openAuthor, openIdea, openLibraryItem, settings }) => (
+    <DictionaryView settings={settings} onOpenIdea={openIdea} onOpenAuthor={openAuthor} onOpenLibraryWork={(id) => openLibraryItem(id, 'vault')} />
+  ),
+  authors: ({ activeVault, authorTarget, navigate, settings, snapshots }) => (
     <AuthorsView
       vaultId={activeVault?.id ?? null}
       settings={settings}
       snapshot={snapshots.read('authors')}
       onSnapshotChange={(patch) => snapshots.patch('authors', patch)}
       onOpenGraph={(target) => navigate('graph', target)}
+      target={authorTarget}
     />
   ),
   immersion: ({ openLibraryItem, settings, snapshots }) => (

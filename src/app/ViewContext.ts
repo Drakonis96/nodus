@@ -14,6 +14,7 @@ import type { LibraryScope } from '@shared/libraryTypes';
 import type { TestimonyDeepLink } from '@shared/testimonyDeepLinks';
 import type {
   PendingAssistantNavigationTarget,
+  PendingAuthorNavigationTarget,
   PendingGraphNavigationTarget,
   PendingIdeaNavigationTarget,
   PendingLibraryNavigationTarget,
@@ -74,6 +75,7 @@ export interface ViewContext extends VaultFlags {
   // Pending navigation targets, consumed by the view that owns each one.
   graphTarget: Nonced<PendingGraphNavigationTarget> | null;
   ideaTarget: Nonced<PendingIdeaNavigationTarget> | null;
+  authorTarget: Nonced<PendingAuthorNavigationTarget> | null;
   libraryTarget: Nonced<PendingLibraryNavigationTarget> | null;
   noteTarget: { id: string; nonce: number } | null;
   personsTarget: { id: string; nonce: number } | null;
@@ -107,6 +109,8 @@ export interface ViewContext extends VaultFlags {
   openAssistant: (target?: PendingAssistantNavigationTarget) => void;
   openLibraryBucket: (bucket: CorpusHealthBucketId) => void;
   openLibraryItem: (itemId: string, scope: LibraryScope) => void;
+  openIdea: (ideaId: string) => void;
+  openAuthor: (authorId: string, name: string) => void;
   openNoteFromSearch: (id: string) => void;
   openPrimarySourceTarget: (target: PrimarySourceTarget) => void;
   openTestimonyInterview: (interviewId: string, tab?: DossierTab) => void;
