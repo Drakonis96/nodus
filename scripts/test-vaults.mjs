@@ -235,6 +235,7 @@ assert.ok(reusedWorkResult.imported.includes('ideas'), 'ideas are reused');
 assert.ok(reusedWorkResult.imported.includes('ideaEmbeddings'), 'idea embeddings are reused');
 assert.ok(reusedWorkResult.imported.includes('summary'), 'summaries are reused');
 assert.ok(reusedWorkResult.imported.includes('passages'), 'passage embeddings are reused');
+assert.ok(reusedWorkResult.imported.includes('documentProfile'), 'audited document profiles are reused');
 assert.equal(reused.canceled, false);
 assert.equal(reusedWorkResult.compatibility.ideas.state, 'reused');
 assert.equal(reusedWorkResult.tableRows.works, undefined, 'analysis reuse does not copy source works');
@@ -245,6 +246,19 @@ assert.equal(countWorks(db), 2, 'analysis reuse keeps the target library indepen
 assert.equal(countRows(db, 'ideas'), 1, 'reused ideas are available in the target vault');
 assert.equal(countRows(db, 'work_summaries'), 1, 'reused summaries are available in the target vault');
 assert.equal(countRows(db, 'passages'), 1, 'reused passage embeddings are available in the target vault');
+assert.equal(countRows(db, 'document_profile_versions'), 1, 'the current document profile version is copied');
+assert.equal(countRows(db, 'document_vectors'), 1, 'whole-document vectors are copied without recomputation');
+assert.equal(countRows(db, 'document_profile_overrides'), 1, 'verified user corrections travel with the reusable profile');
+assert.deepEqual(
+  db.prepare('SELECT nodus_id, status FROM document_profile_state WHERE nodus_id=?').get('work-reused'),
+  { nodus_id: 'work-reused', status: 'current' },
+  'the reused profile becomes the current profile of the target work'
+);
+assert.equal(
+  db.prepare('SELECT target_id FROM document_idea_links WHERE nodus_id=?').get('work-reused').target_id,
+  'work-reused:field:field-default',
+  'profile links are remapped to target-local field ids'
+);
 assert.deepEqual(
   db.prepare('SELECT light_status, deep_status, summary_status FROM works WHERE nodus_id = ?').get('work-reused'),
   { light_status: 'done', deep_status: 'done', summary_status: 'done' },
@@ -455,13 +469,55 @@ function seedAnalyzedWork(db) {
     'passage-embedding-hash',
     now
   );
+  db.prepare(`INSERT INTO document_profile_versions(
+    version_id,nodus_id,state,source_fingerprint,pipeline_version,schema_version,source_language,
+    presentation_language,overview,profile_json,prompt_hash,audit_json,quality_score,created_at,published_at
+  ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).run(
+    'profile-default','work-default','current','deep-hash','document-profile/1',1,'es','es',
+    'Overview','{"thesis":"Corrected thesis"}','prompt-hash','{"passed":true,"score":1,"supportCoverage":1,"structureCoverage":1,"issues":[],"repaired":false}',1,now,now,
+  );
+  db.prepare(`INSERT INTO document_profile_fields(
+    field_id,version_id,nodus_id,kind,ordinal,text,confidence,centrality,created_at
+  ) VALUES(?,?,?,?,?,?,?,?,?)`).run('field-default','profile-default','work-default','thesis',0,'Generated thesis',1,1,now);
+  db.prepare(`INSERT INTO document_sections(
+    section_id,version_id,nodus_id,parent_section_id,level,ordinal,title,role,summary,concepts_json,claims_json,
+    page_start,page_end,char_start,char_end,content_hash,created_at
+  ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).run(
+    'section-default','profile-default','work-default',null,1,0,'Chapter','argument','Section summary','["concept"]','["claim"]',
+    '1','10',0,100,'section-hash',now,
+  );
+  db.prepare(`INSERT INTO document_profile_support(
+    support_id,version_id,nodus_id,target_kind,target_id,section_id,passage_id,page_start,page_end,char_start,char_end,
+    quote,quote_hash,support_kind,confidence,validation_status,created_at
+  ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).run(
+    'support-default','profile-default','work-default','field','field-default','section-default',null,'2','2',10,40,
+    'Supporting quote','quote-hash','direct',1,'valid',now,
+  );
+  db.prepare(`INSERT INTO document_vectors(
+    vector_id,nodus_id,version_id,kind,source_id,text,text_hash,weight,embedding,
+    embedding_provider,embedding_model,embedding_dim,created_at
+  ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)`).run(
+    'vector-default','work-default','profile-default','overview',null,'Overview','vector-hash',1,Buffer.from([13,14,15,16]),
+    'openai','text-embedding-3-small',4,now,
+  );
+  db.prepare(`INSERT INTO document_idea_links(
+    version_id,nodus_id,global_id,target_kind,target_id,role,score,created_at
+  ) VALUES(?,?,?,?,?,?,?,?)`).run('profile-default','work-default','idea-default','field','field-default','principal',1,now);
+  db.prepare(`INSERT INTO document_profile_overrides(
+    override_id,nodus_id,field_path,base_version_id,generated_value_json,value_json,verified,conflict,created_at,updated_at
+  ) VALUES(?,?,?,?,?,?,?,?,?,?)`).run(
+    'override-default','work-default','fields.thesis.0','profile-default','"Generated thesis"','"Corrected thesis"',1,0,now,now,
+  );
+  db.prepare(`INSERT INTO document_profile_state(
+    nodus_id,current_version_id,status,source_fingerprint,profile_fingerprint,pipeline_version,updated_at
+  ) VALUES(?,?,?,?,?,?,?)`).run('work-default','profile-default','current','deep-hash','profile-hash','document-profile/1',now);
 }
 
 function seedProvenance(db, settings, provenance) {
   const now = '2026-07-07T00:00:00.000Z';
   const documents = {
     light: 'light-hash', deep: 'deep-hash', ideas: 'deep-hash', summary: 'summary-hash',
-    passages: 'deep-hash', embeddings: 'deep-hash',
+    passages: 'deep-hash', embeddings: 'deep-hash', documentProfile: 'deep-hash',
   };
   const insert = db.prepare(`INSERT OR REPLACE INTO library_analysis_provenance (
     work_id, component, document_fingerprint, library_item_id, library_revision_fingerprint,

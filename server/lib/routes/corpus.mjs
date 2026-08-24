@@ -323,11 +323,26 @@ export function createCorpusRoutes({ readSnapshot, readAssetBytes }) {
         if (notModified(req, res, json, space, url, key)) return true;
         const nodusId = String(row.nodus_id);
         const ideaIds = new Set(rows(snapshot, 'idea_occurrences').filter((entry) => String(entry.nodus_id) === nodusId).map((entry) => String(entry.global_id)));
+        const profileState = rows(snapshot, 'document_profile_state').find((entry) => String(entry.nodus_id) === nodusId) ?? null;
+        const profileVersionId = profileState?.current_version_id == null ? null : String(profileState.current_version_id);
+        const profileVersion = profileVersionId
+          ? rows(snapshot, 'document_profile_versions').find((entry) => String(entry.version_id) === profileVersionId) ?? null
+          : null;
+        const documentProfile = profileVersion ? {
+          state: profileState,
+          version: profileVersion,
+          fields: rows(snapshot, 'document_profile_fields').filter((entry) => String(entry.version_id) === profileVersionId),
+          sections: rows(snapshot, 'document_sections').filter((entry) => String(entry.version_id) === profileVersionId),
+          supports: rows(snapshot, 'document_profile_support').filter((entry) => String(entry.version_id) === profileVersionId),
+          ideaLinks: rows(snapshot, 'document_idea_links').filter((entry) => String(entry.version_id) === profileVersionId),
+          citationPolicy: 'orientation_only',
+        } : null;
         return send(res, json, {
           work: worksById(snapshot).get(nodusId) ?? row,
           ideas: rows(snapshot, 'ideas').filter((idea) => ideaIds.has(String(idea.global_id))),
           summary: rows(snapshot, 'work_summaries').find((entry) => String(entry.nodus_id) === nodusId) ?? null,
           passages: rows(snapshot, 'passages').filter((entry) => String(entry.nodus_id) === nodusId).length,
+          documentProfile,
           revision: space.revision,
         });
       }

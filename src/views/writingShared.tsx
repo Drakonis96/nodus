@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import type { DecorativeImageStyle, SupportAuditEntry, WritingWorkshopBrief, WritingWorkshopDraft, WritingWorkshopSavedDraft } from '@shared/types';
+import type { DeepResearchQualityAssessment } from '@shared/deepResearchQuality';
 import { documentBodyForPanels } from '@shared/writingDocument';
 import { Badge, HoverLabelButton, Icon } from '../components/ui';
 import { Markdown, type MarkdownCitation } from '../components/Markdown';
@@ -172,24 +173,26 @@ export function DraftResultMain({
           />
         )}
       </div>
-      <section className="card p-4">
-        <h3 className="font-semibold mb-3">{t('Esquema')}</h3>
-        <div className="space-y-3">
-          {draft.outline.map((section, index) => (
-            <div key={section.id} className="border-l-2 border-indigo-700 pl-3">
-              <div className="font-medium text-sm">
-                {index + 1}. {section.title}
+      {draft.deepResearchStructure !== 'single' && (
+        <section className="card p-4">
+          <h3 className="font-semibold mb-3">{t('Esquema')}</h3>
+          <div className="space-y-3">
+            {draft.outline.map((section, index) => (
+              <div key={section.id} className="border-l-2 border-indigo-700 pl-3">
+                <div className="font-medium text-sm">
+                  {index + 1}. {section.title}
+                </div>
+                <p className="text-xs text-neutral-400 mt-1">{section.purpose}</p>
+                <div className="flex flex-wrap gap-1 mt-2">
+                  {section.sources.slice(0, 6).map((source, i) => (
+                    <Badge key={`${section.id}-${i}`}>{source.replace(/\[|\]|\(.+\)/g, '')}</Badge>
+                  ))}
+                </div>
               </div>
-              <p className="text-xs text-neutral-400 mt-1">{section.purpose}</p>
-              <div className="flex flex-wrap gap-1 mt-2">
-                {section.sources.slice(0, 6).map((source, i) => (
-                  <Badge key={`${section.id}-${i}`}>{source.replace(/\[|\]|\(.+\)/g, '')}</Badge>
-                ))}
-              </div>
-            </div>
-          ))}
-        </div>
-      </section>
+            ))}
+          </div>
+        </section>
+      )}
       <section className={`card p-4 ${justify ? 'text-justify' : ''}`}>
         {/* The abstract is the subtitle above and the limitations have their own
             panel below, so the body drops both rather than repeating them. */}
@@ -279,6 +282,7 @@ export function SupportMatrix({
             </div>
           ))}
           <SupportAudit entries={draft.supportAudit ?? []} />
+          {draft.qualityAssessment && <DeepResearchQualityPanel assessment={draft.qualityAssessment} />}
           <PanelList title={t('Siguientes pasos')} items={draft.nextSteps} />
           <PanelList title={t('Limitaciones')} items={draft.limitations} />
           <PanelList title={t('Bibliografía')} items={draft.bibliography} />
@@ -429,6 +433,53 @@ export function SupportAudit({ entries }: { entries: SupportAuditEntry[] }) {
             </li>
           ))}
         </ul>
+      )}
+    </section>
+  );
+}
+
+function DeepResearchQualityPanel({ assessment }: { assessment: DeepResearchQualityAssessment }) {
+  const [open, setOpen] = useState(false);
+  // `professional` may still exist in reports generated before the quality-label
+  // migration. Render it with the new user-facing wording, but never write it.
+  const passesThresholds = assessment.grade === 'passes_thresholds'
+    || (assessment.grade as string) === 'professional';
+  const grade = passesThresholds
+    ? 'supera los umbrales de calidad'
+    : assessment.grade === 'strong'
+      ? 'sólido'
+      : assessment.grade === 'needs_review'
+        ? 'requiere revisión'
+        : 'débil';
+  const dimensions = [
+    ['Respaldo', assessment.dimensions.grounding, 30],
+    ['Profundidad', assessment.dimensions.depth, 25],
+    ['Diversidad', assessment.dimensions.diversity, 20],
+    ['Síntesis multifuente', assessment.dimensions.synthesis, 15],
+    ['Coherencia', assessment.dimensions.coherence, 10],
+  ] as const;
+  return (
+    <section className="pt-3 border-t border-neutral-800" data-testid="deep-research-quality">
+      <button className="flex items-center gap-2 w-full text-left" onClick={() => setOpen((value) => !value)}>
+        <Icon name={open ? 'chevronDown' : 'chevronRight'} size={14} className="text-neutral-500" />
+        <h3 className="font-semibold text-sm">{t('Calidad del informe')}</h3>
+        <Badge color={passesThresholds ? 'green' : assessment.grade === 'strong' ? 'indigo' : 'amber'}>{assessment.score}/100</Badge>
+        <span className="text-xs text-neutral-500">{t(grade)}</span>
+      </button>
+      <p className="text-xs text-neutral-500 mt-1">
+        {tx('{passed} de {total} secciones superan los umbrales', { passed: assessment.sectionsPassing, total: assessment.sections })}
+      </p>
+      {open && (
+        <div className="mt-3 space-y-2">
+          <div className="grid grid-cols-2 gap-2">
+            {dimensions.map(([label, value, maximum]) => <Metric key={label} label={t(label)} value={`${value}/${maximum}`} />)}
+            <Metric label={t('Cobertura del encargo')} value={`${Math.round(assessment.metrics.objectiveCoverage * 100)}%`} />
+            <Metric label={t('Fuentes efectivas')} value={assessment.metrics.effectiveSources.toFixed(1)} />
+            <Metric label={t('Citas con reparos')} value={`${Math.round(assessment.metrics.supportConcernRate * 100)}%`} />
+            <Metric label={t('Redundancia')} value={assessment.metrics.redundancyRate == null ? '—' : `${Math.round(assessment.metrics.redundancyRate * 100)}%`} />
+          </div>
+          <p className="text-[11px] text-neutral-600">{t('Indicadores reproducibles. No sustituyen la revisión de las fuentes.')}</p>
+        </div>
       )}
     </section>
   );

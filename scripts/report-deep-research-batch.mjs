@@ -60,8 +60,6 @@ function analyze(file) {
     topic: metrics.topic,
     pages: report.meta.pages,
     words: report.meta.words,
-    fill: report.meta.words / (report.meta.targetPages.max * 450),
-    inTarget: report.meta.pages >= report.meta.targetPages.min && report.meta.pages <= report.meta.targetPages.max,
     sections: body.length,
     thinSections,
     colonTitles,
@@ -75,8 +73,9 @@ function analyze(file) {
     topWorkShare,
     broken,
     verification: report.meta.verification ?? null,
-    expansions: report.meta.expansions ?? 0,
-    sectionFill: report.meta.sectionFill ?? [],
+    qualityScore: report.draft.qualityAssessment?.score ?? null,
+    objectiveCoverage: report.draft.qualityAssessment?.metrics?.objectiveCoverage ?? null,
+    redundancy: report.draft.qualityAssessment?.metrics?.redundancyRate ?? null,
     retrievals: metrics.probe?.retrievals ?? 0,
     seconds: metrics.elapsedSeconds,
     titles: body.map((b) => b.title),
@@ -90,14 +89,14 @@ if (rows.length === 0) throw new Error(`No reports in ${dir}`);
 const pad = (v, n) => String(v).padEnd(n);
 const pct = (v) => (v == null ? '—' : `${Math.round(v * 100)}%`);
 console.log(
-  pad('informe', 15) + pad('pág', 5) + pad('%obj', 6) + pad('sec', 5) + pad('flojas', 8) +
+  pad('informe', 15) + pad('pág', 5) + pad('calid', 7) + pad('sec', 5) + pad('flojas', 8) +
     pad('citas', 7) + pad('ideas', 7) + pad('pasajes', 9) + pad('huecos', 8) + pad('debates', 9) +
     pad('obras', 7) + pad('conc.', 7) + 'rotas'
 );
 console.log('─'.repeat(105));
 for (const r of rows) {
   console.log(
-    pad(r.label, 15) + pad(r.pages, 5) + pad(pct(r.fill), 6) + pad(r.sections, 5) + pad(r.thinSections, 8) +
+    pad(r.label, 15) + pad(r.pages, 5) + pad(r.qualityScore ?? '—', 7) + pad(r.sections, 5) + pad(r.thinSections, 8) +
       pad(r.citations, 7) + pad(r.ideas, 7) + pad(r.passages, 9) + pad(r.gaps, 8) + pad(r.debates, 9) +
       pad(r.works, 7) + pad(pct(r.topWorkShare), 7) + r.broken
   );
@@ -114,7 +113,8 @@ const show = (name, s, fmt = (v) => v.toFixed(1)) =>
 
 console.log(`\n═══ ${rows.length} informes ═══`);
 show('páginas del cuerpo', stat((r) => r.pages));
-show('extensión sobre el objetivo', stat((r) => r.fill), (v) => `${Math.round(v * 100)}%`);
+show('cobertura del encargo', stat((r) => r.objectiveCoverage), (v) => `${Math.round(v * 100)}%`);
+show('redundancia proposicional', stat((r) => r.redundancy), (v) => `${Math.round(v * 100)}%`);
 show('citas por informe', stat((r) => r.citations));
 show('obras distintas citadas', stat((r) => r.works));
 show('concentración en una obra', stat((r) => r.topWorkShare), (v) => `${Math.round(v * 100)}%`);
@@ -124,21 +124,6 @@ show('huecos citados', stat((r) => r.gaps));
 show('secciones flojas (<3 citas)', stat((r) => r.thinSections));
 show('referencias rotas', stat((r) => r.broken));
 show('segundos por informe', stat((r) => r.seconds), (v) => v.toFixed(0));
-
-const filled = rows.filter((r) => Array.isArray(r.sectionFill) && r.sectionFill.length);
-if (filled.length) {
-  const all = filled.flatMap((r) => r.sectionFill);
-  const ratios = all.map((s) => s.words / Math.max(1, s.target));
-  const mean = ratios.reduce((a, b) => a + b, 0) / ratios.length;
-  const under = ratios.filter((r) => r < 0.78).length;
-  const expansions = filled.reduce((n, r) => n + (r.expansions ?? 0), 0);
-  console.log(`\n═══ Extensión por sección (${all.length} secciones) ═══`);
-  console.log(`Cumplimiento medio del objetivo  ${Math.round(mean * 100)}%`);
-  console.log(`Rango                            ${Math.round(Math.min(...ratios) * 100)}% – ${Math.round(Math.max(...ratios) * 100)}%`);
-  console.log(`Secciones aún bajo el umbral     ${under}/${all.length}`);
-  console.log(`Ampliaciones aceptadas           ${expansions}`);
-  console.log(`Objetivo por sección             ${all[0].target} palabras`);
-}
 
 const verified = rows.filter((r) => r.verification);
 if (verified.length) {
@@ -152,13 +137,12 @@ if (verified.length) {
   console.log(`Tasa de respaldo verificado   ${Math.round(((checked - unsupported) / Math.max(1, checked)) * 100)}%`);
 }
 
-const inTarget = rows.filter((r) => r.inTarget).length;
 const clean = rows.filter((r) => r.broken === 0).length;
 const noThin = rows.filter((r) => r.thinSections === 0).length;
 const withDebate = rows.filter((r) => r.debates > 0).length;
 const withGap = rows.filter((r) => r.gaps > 0).length;
 const withPassage = rows.filter((r) => r.passages > 0).length;
-console.log(`\nDentro del rango de páginas   ${inTarget}/${rows.length}`);
+console.log(`\nCon evaluación de calidad     ${rows.filter((r) => r.qualityScore != null).length}/${rows.length}`);
 console.log(`Sin referencias rotas         ${clean}/${rows.length}`);
 console.log(`Sin secciones flojas          ${noThin}/${rows.length}`);
 console.log(`Con al menos un debate        ${withDebate}/${rows.length}`);

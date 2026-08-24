@@ -21,10 +21,11 @@ export const VECTOR_FORMAT = 'nodus.vectors';
 export const VECTOR_VERSION = 1;
 export const VECTOR_QUANT = 'int8-l2';
 
-export type VectorKind = 'ideas' | 'passages';
+export type VectorKind = 'ideas' | 'documents' | 'passages';
 
 const SOURCES: Record<VectorKind, { table: string; id: string }> = {
   ideas: { table: 'ideas', id: 'global_id' },
+  documents: { table: 'document_vectors', id: 'vector_id' },
   passages: { table: 'passages', id: 'passage_id' },
 };
 

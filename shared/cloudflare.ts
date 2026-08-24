@@ -78,7 +78,7 @@ export interface CloudflareVaultInventory {
     retainedGenerationBytes: number;
   };
   vectors: Array<{
-    kind: 'ideas' | 'passages';
+    kind: 'ideas' | 'documents' | 'passages';
     provider: string;
     model: string;
     count: number;
@@ -251,7 +251,7 @@ export interface CloudflarePublicationManifest {
   library: unknown | null;
   snapshot?: { bytes: number; sha256: string; contentEncoding: 'gzip' | 'identity' };
   vectors?: Array<{
-    kind: 'ideas' | 'passages';
+    kind: 'ideas' | 'documents' | 'passages';
     provider: string;
     model: string;
     dimensions: number;

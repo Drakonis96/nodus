@@ -541,7 +541,8 @@ async function transformersPipeline(model: NodusLocalModelDefinition): Promise<a
   return pending;
 }
 
-export async function embedWithNodusLocal(modelId: string, input: string | string[]): Promise<number[][]> {
+export async function embedWithNodusLocal(modelId: string, input: string | string[], signal?: AbortSignal): Promise<number[][]> {
+  signal?.throwIfAborted();
   const model = getNodusLocalModel(modelId);
   if (!model || model.kind !== 'embedding') throw new Error(`Modelo de embeddings local no soportado: ${modelId}`);
   const texts = Array.isArray(input) ? input : [input];
@@ -551,6 +552,7 @@ export async function embedWithNodusLocal(modelId: string, input: string | strin
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: 'Bearer local' },
       body: JSON.stringify({ model: modelId, input: texts }),
+      signal,
     });
     if (!response.ok) throw new Error(`Embeddings locales HTTP ${response.status}: ${await response.text()}`);
     const body = await response.json() as { data?: Array<{ index?: number; embedding?: number[] }> };

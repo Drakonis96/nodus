@@ -5,6 +5,7 @@ import { constants as fsConstants, promises as fs } from 'node:fs';
 import os from 'node:os';
 import { spawn, spawnSync } from 'node:child_process';
 import { getDb, closeDb } from './db/database';
+import { documentIndexQueue } from './pipeline/documentIndexQueue';
 import { reconcileAuthorLayerOnce, reconcileAuthorRolesOnce } from './db/authorsRepo';
 import { pruneDormantIdeas } from './db/ideasRepo';
 import {
@@ -1128,6 +1129,7 @@ app.on('window-all-closed', () => {
     stopAllWhisperCpp();
     destroyBrowserSubsystem();
     closeGlobalLibraryRuntime();
+    documentIndexQueue.stop();
     closeDb();
     app.quit();
   }
@@ -1170,6 +1172,7 @@ app.on('before-quit', () => {
   killGitHubCopilotSubscriptionServer();
   destroyBrowserSubsystem();
   closeGlobalLibraryRuntime();
+  documentIndexQueue.stop();
   closeDb();
 });
 
@@ -1214,5 +1217,6 @@ updateAwareApp.on('before-quit-for-update', () => {
   killGitHubCopilotSubscriptionServer();
   destroyBrowserSubsystem();
   closeGlobalLibraryRuntime();
+  documentIndexQueue.stop();
   closeDb();
 });

@@ -545,6 +545,9 @@ export function setLightPending(nodusId: string): void {
 
 export function setDeepPending(nodusId: string): void {
   getDb().prepare("UPDATE works SET deep_status = 'pending' WHERE nodus_id = ?").run(nodusId);
+  getDb().prepare(`UPDATE document_profile_state
+    SET status='stale',stale_reason='source_pending',error=NULL,updated_at=?
+    WHERE nodus_id=? AND current_version_id IS NOT NULL`).run(new Date().toISOString(), nodusId);
 }
 
 export function setSummaryPending(nodusId: string): void {

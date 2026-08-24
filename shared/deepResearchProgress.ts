@@ -16,9 +16,11 @@ import type { DeepResearchProgress } from './types';
 /** Where each phase starts. The section band runs from `section` to `coverage`. */
 const PHASE_FLOOR: Record<DeepResearchProgress['phase'], number> = {
   queued: 0,
-  snapshot: 0.04,
-  planning: 0.1,
-  section: 0.14,
+  discovery: 0.02,
+  document_preparation: 0.04,
+  snapshot: 0.08,
+  planning: 0.12,
+  section: 0.16,
   coverage: 0.82,
   assembling: 0.88,
   done: 1,

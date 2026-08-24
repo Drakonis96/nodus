@@ -173,7 +173,9 @@ export async function publishVaultToCloudflare(
   const preparedRows = stableRows(db, payload);
   const compressed = await gzipAsync(snapshot.buffer, { level: 1 });
   const snapshotHash = hash(compressed);
-  const vectorKinds: VectorKind[] = config.includeVectors ? (config.includePassages ? ['ideas', 'passages'] : ['ideas']) : [];
+  const vectorKinds: VectorKind[] = config.includeVectors
+    ? (config.includePassages ? ['ideas', 'documents', 'passages'] : ['ideas', 'documents'])
+    : [];
   const vectors = vectorKinds.flatMap((kind) => {
     const summary = describeVectorSet(db, kind); if (!summary) return [];
     const exact = availableVectorizeDimensions.has(summary.dim) ? null : buildVectorSet(db, kind);

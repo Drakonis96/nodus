@@ -119,7 +119,7 @@ export class NodusCloudClient {
   async acknowledgeMutations(cursor: number) { return this.request(`/api/v3/spaces/${encodeURIComponent(this.credentials.spaceId)}/mutations/ack`, { method: 'POST', body: JSON.stringify({ cursor }) }); }
   async getNodiNotes(since = 0) { return this.request(`/api/v3/nodi/notes?since=${since}`, { method: 'GET' }); }
   async putNodiNotes(notes: unknown[]) { return this.request('/api/v3/nodi/notes', { method: 'POST', body: JSON.stringify({ notes }) }); }
-  async semanticSearch(input: { kind: 'ideas' | 'passages'; query: string; vector: number[]; provider: string; model: string; dim: number; limit?: number; threshold?: number }) {
+  async semanticSearch(input: { kind: 'ideas' | 'documents' | 'passages'; query: string; vector: number[]; provider: string; model: string; dim: number; limit?: number; threshold?: number }) {
     return this.request(`/api/v3/spaces/${encodeURIComponent(this.credentials.spaceId)}/search/semantic`, { method: 'POST', body: JSON.stringify(input) });
   }
 }

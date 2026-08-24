@@ -9,7 +9,6 @@ import type {
   DeepResearchJobRecord,
   DeepResearchOutlineSection,
   DeepResearchSectionLimit,
-  DeepResearchTargetLength,
   Person,
   PromptLanguage,
   WritingWorkshopSavedDraft,
@@ -27,6 +26,13 @@ import {
   deepResearchApproachOption,
   normalizeDeepResearchApproach,
 } from '@shared/deepResearchApproaches';
+import type { DeepResearchVersion } from '@shared/deepResearchVersions';
+import {
+  DEEP_RESEARCH_VERSION_OPTIONS,
+  deepResearchVersionOption,
+  normalizeDeepResearchMetadataVersion,
+  normalizeDeepResearchRequestVersion,
+} from '@shared/deepResearchVersions';
 import { DECORATIVE_IMAGE_STYLES } from '@shared/imageStyles';
 import { toReadingCopy } from '@shared/readingCopy';
 import { stripLeadingAbstract } from '@shared/writingDocument';
@@ -67,21 +73,21 @@ import {
 } from '../backgroundJobs';
 import { useFeatureModel } from '../hooks/useFeatureModel';
 
-const DEEP_TARGET_LABELS: Record<DeepResearchTargetLength, string> = {
-  adaptive: 'Adaptativo (según corpus)',
-  concise: 'Conciso (5–8 pág.)',
-  standard: 'Estándar (9–14 pág.)',
-  exhaustive: 'Exhaustivo (15–20 pág.)',
-};
-
 const DEEP_SECTION_OPTIONS: { value: DeepResearchSectionLimit; label: string }[] = [
   { value: 'auto', label: 'Secciones: Auto (IA decide)' },
+  { value: 'single', label: 'Bloque único · sin secciones' },
   { value: 4, label: 'Máx. 4 secciones' },
   { value: 5, label: 'Máx. 5 secciones' },
   { value: 6, label: 'Máx. 6 secciones' },
   { value: 8, label: 'Máx. 8 secciones' },
   { value: 10, label: 'Máx. 10 secciones' },
 ];
+
+function parseDeepResearchSectionLimit(value: string): DeepResearchSectionLimit {
+  if (value === 'auto' || value === 'single') return value;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : 'auto';
+}
 
 const READER_FONT_STORAGE_KEY = 'nodus.deepResearch.readerFontSize';
 const READER_FONT_MIN = 14;
@@ -137,7 +143,7 @@ const REPORT_TUTORIAL = [
   {
     icon: 'edit',
     title: '1. Plantea la idea',
-    body: 'Pulsa «Nuevo informe» y escribe la pregunta o idea. El informe la convierte en un texto de varias páginas, no en una respuesta corta.',
+    body: 'Pulsa «Nuevo informe» y escribe la pregunta o idea. El informe desarrolla solo las aportaciones que el corpus permite sostener, sin una longitud prefijada.',
   },
   {
     icon: 'layers',
@@ -227,7 +233,7 @@ const DEEP_RESEARCH_COPY: Record<DeepResearchVariant, DeepResearchCopy> = {
       {
         icon: 'edit',
         title: '1. Plantea el tema',
-        body: 'Pulsa «Nueva unidad» y escribe el tema. Nodus lo convierte en una unidad de varias páginas escrita para dar clase, no en una respuesta corta.',
+        body: 'Pulsa «Nueva unidad» y escribe el tema. Nodus desarrolla las partes que tus materiales permiten sostener, sin una longitud prefijada.',
       },
       {
         icon: 'list',
@@ -296,9 +302,9 @@ export function DeepResearchView({
   const [composerOpen, setComposerOpen] = useState(false);
   const [objective, setObjective] = useState('');
   const [approach, setApproach] = useState<DeepResearchApproach>('general');
+  const [deepResearchVersion, setDeepResearchVersion] = useState<DeepResearchVersion>('v2');
   const [language, setLanguage] = useState<PromptLanguage>('es');
   const [selectedModel, setSelectedModel] = useFeatureModel(settings, 'deepResearchModel');
-  const [deepTarget, setDeepTarget] = useState<DeepResearchTargetLength>('adaptive');
   const [deepSectionLimit, setDeepSectionLimit] = useState<DeepResearchSectionLimit>('auto');
   const [audience, setAudience] = useState<StudyDeepResearchAudience>(isTeaching ? 'teacher' : 'students');
   const [includeImage, setIncludeImage] = useState(false);
@@ -520,12 +526,12 @@ export function DeepResearchView({
       setError(t(copy.missingObjective));
       return;
     }
-    const outline = isTeaching && structureMode === 'manual' ? unitOutline : null;
-    enqueueDeepResearch({
+    const outline = isTeaching && structureMode === 'manual' && deepSectionLimit !== 'single' ? unitOutline : null;
+    const request = {
       objective: objective.trim(),
       approach,
+      deepResearchVersion: normalizeDeepResearchRequestVersion(deepResearchVersion),
       language,
-      targetLength: deepTarget,
       sectionLimit: deepSectionLimit,
       ...(isStudy ? { audience } : {}),
       model: selectedModel,
@@ -536,10 +542,12 @@ export function DeepResearchView({
       // Trimmed here rather than in the editor so a slot the teacher is still typing
       // into never loses its whitespace mid-keystroke.
       ...(outline ? { outline: outline.map((slot) => ({ title: slot.title.trim(), focus: slot.focus?.trim() || undefined })) } : {}),
-    });
+    } as Parameters<typeof enqueueDeepResearch>[0] & { deepResearchVersion: DeepResearchVersion };
+    enqueueDeepResearch(request);
     setComposerOpen(false);
     setObjective('');
     setApproach('general');
+    setDeepResearchVersion('v2');
     setFocusPersonId(null);
     setError(null);
     setMessage(t(copy.queuedToast));
@@ -572,6 +580,8 @@ export function DeepResearchView({
     setObjective(saved.brief.objective);
     if (saved.brief.language) setLanguage(saved.brief.language as PromptLanguage);
     setApproach(normalizeDeepResearchApproach(saved.draft.deepResearchApproach ?? saved.brief.deepResearchApproach));
+    setDeepResearchVersion(normalizeDeepResearchMetadataVersion(saved.draft.deepResearchVersion ?? saved.brief.deepResearchVersion));
+    setDeepSectionLimit(saved.draft.deepResearchStructure === 'single' ? 'single' : 'auto');
     if (saved.model) setSelectedModel(saved.model);
     if (isTeaching && (saved.brief.audience === 'teacher' || saved.brief.audience === 'students')) {
       setAudience(saved.brief.audience);
@@ -1124,14 +1134,17 @@ export function DeepResearchView({
           copy={copy}
           structureMode={structureMode}
           unitOutline={unitOutline}
-          onStructureMode={setStructureMode}
+          onStructureMode={(mode) => {
+            setStructureMode(mode);
+            if (mode === 'manual') setDeepSectionLimit('auto');
+          }}
           onUnitOutline={setUnitOutline}
           objective={objective}
           approach={approach}
+          version={deepResearchVersion}
           audience={audience}
           language={language}
           model={selectedModel}
-          target={deepTarget}
           sectionLimit={deepSectionLimit}
           includeImage={includeImage}
           imageStyle={imageStyle}
@@ -1141,10 +1154,10 @@ export function DeepResearchView({
           focusPersonId={focusPersonId}
           onObjective={setObjective}
           onApproach={setApproach}
+          onVersion={setDeepResearchVersion}
           onAudience={setAudience}
           onLanguage={setLanguage}
           onModel={setSelectedModel}
-          onTarget={setDeepTarget}
           onSectionLimit={setDeepSectionLimit}
           onIncludeImage={setIncludeImage}
           onImageStyle={setImageStyle}
@@ -1257,6 +1270,7 @@ function compactModelName(model: NonNullable<WritingWorkshopSavedDraft['model']>
 function ReportGenerationTags({ saved, compact = false }: { saved: WritingWorkshopSavedDraft; compact?: boolean }) {
   const model = saved.model ?? saved.draft.generationModel ?? null;
   const approachOption = deepResearchApproachOption(saved.draft.deepResearchApproach ?? saved.brief.deepResearchApproach);
+  const version = normalizeDeepResearchMetadataVersion(saved.draft.deepResearchVersion ?? saved.brief.deepResearchVersion);
   const chipClass = compact
     ? 'max-w-44 truncate rounded-full border border-neutral-700/80 bg-neutral-900/70 px-2 py-0.5 text-[10px] text-neutral-400'
     : 'max-w-56 truncate rounded-full border border-neutral-700 bg-neutral-900/80 px-2.5 py-1 text-[11px] text-neutral-300';
@@ -1265,6 +1279,9 @@ function ReportGenerationTags({ saved, compact = false }: { saved: WritingWorksh
       {model && <span className={chipClass} title={`${model.provider}/${model.model}`}>{compactModelName(model)}</span>}
       <span className={`${chipClass} border-indigo-800/70 bg-indigo-950/35 text-indigo-300`}>
         {t(approachOption.label)}
+      </span>
+      <span className={`${chipClass} border-cyan-800/70 bg-cyan-950/35 text-cyan-300`} title={t(deepResearchVersionOption(version).description)}>
+        {version.toUpperCase()}
       </span>
     </div>
   );
@@ -2137,10 +2154,10 @@ function ComposerModal({
   onUnitOutline,
   objective,
   approach,
+  version,
   audience,
   language,
   model,
-  target,
   sectionLimit,
   includeImage,
   imageStyle,
@@ -2150,10 +2167,10 @@ function ComposerModal({
   focusPersonId = null,
   onObjective,
   onApproach,
+  onVersion,
   onAudience,
   onLanguage,
   onModel,
-  onTarget,
   onSectionLimit,
   onIncludeImage,
   onImageStyle,
@@ -2171,10 +2188,10 @@ function ComposerModal({
   onUnitOutline: (v: DeepResearchOutlineSection[]) => void;
   objective: string;
   approach: DeepResearchApproach;
+  version: DeepResearchVersion;
   audience: StudyDeepResearchAudience;
   language: PromptLanguage;
   model: AppSettings['deepResearchModel'];
-  target: DeepResearchTargetLength;
   sectionLimit: DeepResearchSectionLimit;
   includeImage: boolean;
   imageStyle: DecorativeImageStyle;
@@ -2184,10 +2201,10 @@ function ComposerModal({
   focusPersonId?: string | null;
   onObjective: (v: string) => void;
   onApproach: (v: DeepResearchApproach) => void;
+  onVersion: (v: DeepResearchVersion) => void;
   onAudience: (v: StudyDeepResearchAudience) => void;
   onLanguage: (v: PromptLanguage) => void;
   onModel: (m: AppSettings['deepResearchModel']) => void;
-  onTarget: (v: DeepResearchTargetLength) => void;
   onSectionLimit: (v: DeepResearchSectionLimit) => void;
   onIncludeImage: (v: boolean) => void;
   onImageStyle: (v: DecorativeImageStyle) => void;
@@ -2253,7 +2270,7 @@ function ComposerModal({
             </span>
           </label>
           {isTeaching && (
-            <label className="block">
+            <label className="block min-w-0">
               <span className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-neutral-500">
                 {t('Público objetivo y producto')}
               </span>
@@ -2276,7 +2293,7 @@ function ComposerModal({
           {isGenealogy && (
             <div>
               <select
-                className="input text-sm"
+                className="input w-full min-w-0 text-sm"
                 value={focusPersonId ?? ''}
                 onChange={(e) => onFocusPerson?.(e.target.value || null)}
               >
@@ -2301,36 +2318,75 @@ function ComposerModal({
               onOutline={onUnitOutline}
             />
           )}
-          <div className="grid grid-cols-2 gap-2 max-sm:grid-cols-1">
-            <select className="input text-sm" value={target} onChange={(e) => onTarget(e.target.value as DeepResearchTargetLength)}>
-              {Object.entries(DEEP_TARGET_LABELS).map(([id, label]) => (
-                <option key={id} value={id}>{t(label)}</option>
-              ))}
-            </select>
-            {/* Superseded once the teacher fixes the structure: the outline already says
-                how many parts there are, and offering a second, contradictory answer is
-                how a form starts lying to the person filling it in. */}
-            {!(isTeaching && structureMode === 'manual') && (
+          <div className="grid grid-cols-2 items-start gap-2 max-sm:grid-cols-1">
+            <label className="block min-w-0">
+              <span className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-neutral-500">
+                {t('Versión del sistema')}
+              </span>
               <select
-                className="input text-sm"
-                value={String(sectionLimit)}
-                onChange={(e) => onSectionLimit(e.target.value === 'auto' ? 'auto' : (Number(e.target.value) as DeepResearchSectionLimit))}
+                data-testid="deep-research-version"
+                className="input w-full min-w-0 text-sm"
+                value={version}
+                onChange={(event) => onVersion(normalizeDeepResearchRequestVersion(event.target.value))}
               >
-                {DEEP_SECTION_OPTIONS.map((option) => (
-                  <option key={String(option.value)} value={String(option.value)}>{t(option.label)}</option>
+                {DEEP_RESEARCH_VERSION_OPTIONS.map((option) => (
+                  <option key={option.id} value={option.id}>{t(option.label)}</option>
                 ))}
               </select>
-            )}
-            <select className="input text-sm" value={language} onChange={(e) => onLanguage(e.target.value as PromptLanguage)}>
-              <option value="es">Español</option>
-              <option value="en">English</option>
-              <option value="fr">Français</option>
-              <option value="de">Deutsch</option>
-              <option value="pt">Português (Portugal)</option>
-              <option value="pt-BR">Português (Brasil)</option>
-              <option value="tr">Türkçe</option>
-            </select>
-            <ModelPicker settings={settings} value={model} onChange={onModel} compact />
+              <span className="mt-1 block text-[11px] leading-4 text-neutral-500" data-testid="deep-research-version-help">
+                {t(deepResearchVersionOption(version).description)}
+              </span>
+            </label>
+            <label className="block min-w-0">
+              <span className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-neutral-500">
+                {t('Estructura del informe')}
+              </span>
+              <select
+                id="deep-research-section-limit"
+                data-testid="deep-research-section-limit"
+                className="input w-full min-w-0 self-start text-sm"
+                value={String(sectionLimit)}
+                onChange={(event) => {
+                  const next = parseDeepResearchSectionLimit(event.target.value);
+                  onSectionLimit(next);
+                  if (next === 'single' && isTeaching && structureMode === 'manual') onStructureMode('ai');
+                }}
+                aria-describedby="deep-research-section-limit-help"
+              >
+                {DEEP_SECTION_OPTIONS.map((option) => (
+                  <option
+                    key={String(option.value)}
+                    value={String(option.value)}
+                    disabled={isTeaching && structureMode === 'manual' && typeof option.value === 'number'}
+                  >
+                    {t(option.label)}
+                  </option>
+                ))}
+              </select>
+              <span id="deep-research-section-limit-help" className="mt-1 block text-[11px] leading-4 text-neutral-500">
+                {sectionLimit === 'single'
+                  ? t('Una narración continua sin encabezados internos; conserva toda la recuperación y el análisis.')
+                  : isTeaching && structureMode === 'manual'
+                    ? t('El esquema manual fija exactamente las partes y su orden.')
+                    : t('La estructura organiza el informe, pero nunca limita la evidencia relevante.')}
+              </span>
+            </label>
+            <label className="block min-w-0">
+              <span className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-neutral-500">{t('Idioma')}</span>
+              <select data-testid="deep-research-language" className="input w-full text-sm" value={language} onChange={(e) => onLanguage(e.target.value as PromptLanguage)}>
+                <option value="es">Español</option>
+                <option value="en">English</option>
+                <option value="fr">Français</option>
+                <option value="de">Deutsch</option>
+                <option value="pt">Português (Portugal)</option>
+                <option value="pt-BR">Português (Brasil)</option>
+                <option value="tr">Türkçe</option>
+              </select>
+            </label>
+            <label className="block min-w-0">
+              <span className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-neutral-500">{t('Modelo')}</span>
+              <ModelPicker settings={settings} value={model} onChange={onModel} ariaLabel={t('Modelo')} className="w-full text-sm" />
+            </label>
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <button

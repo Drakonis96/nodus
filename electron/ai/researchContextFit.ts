@@ -12,6 +12,9 @@ export const CONTEXT_DROP_ORDER = [
   'rutas_de_lectura',
   'autores',
   'documentos_resumidos',
+  // Macro profiles route the search but are not citable evidence. They must
+  // yield before ideas and literal passages in a small Nodi/local-model window.
+  'orientacion_documental',
   'temas_principales',
   'huecos_de_investigacion',
   'contradicciones',

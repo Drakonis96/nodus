@@ -5,8 +5,7 @@
 // crucially NOT the running local app instance.
 //
 // It locks the guarantees that matter for a professional report:
-//   • the loop is bounded (budget cap + hard section cap → stoppedReason);
-//   • coverage top-up lifts a thin report to its minimum length;
+//   • report scope is derived from evidence rather than word/page quotas;
 //   • hallucinated citations never survive into the report or its references;
 //   • every reference traces back to a really-cited corpus work;
 //   • the model failing on a section degrades gracefully instead of aborting.
@@ -42,17 +41,81 @@ try {
     buildSnapshotMaps,
     buildCitationCatalog,
     buildCitationMenu,
+    buildPlanInput,
     normalizePlan,
+    normalizeSectionClaimAudit,
     orderSections,
     normalizeSectionTitle,
-    resolveTargetPages,
     resolveSectionPlan,
     countWords,
     normalizeNarrativeSection,
+    recoverPlainMenuCitations,
+    extractCitationClaims,
+    applyVerification,
+    objectiveExclusionStems,
+    enforceObjectiveExclusions,
     DEEP_RESEARCH_NARRATIVE_RULES,
-    WORDS_PER_PAGE,
-    MAX_SECTIONS,
+    MAX_COVERAGE_QUESTIONS,
   } = mod;
+
+  {
+    const original = 'La propaganda controló por completo la recepción extranjera.';
+    const normalized = normalizeSectionClaimAudit({
+      items: [{ original, status: 'partial', revised: original, evidenceTokens: [], reason: 'Solo consta una orientación institucional.' }],
+    }, [original], new Set());
+    assert.match(normalized.items[0].revised, /pudo condicionar|hipótesis/iu, 'a partial claim gets a bounded standalone formulation');
+    assert.ok(!normalized.items[0].revised.includes('solo parcialmente esta proposición'), 'the saved outline never exposes an audit placeholder');
+  }
+
+  {
+    const original = 'Se distribuyeron ejemplares gratuitos a autores y editoriales extranjeras.';
+    const direct = '[Archivo (1950)](nodus://passage/free-copies)';
+    const context = '[Archivo (1951)](nodus://passage/foreign-press)';
+    const noise = '[Archivo (1952)](nodus://passage/unrelated)';
+    const normalized = normalizeSectionClaimAudit({
+      items: [{
+        original,
+        status: 'supported',
+        revised: original,
+        evidenceTokens: [direct, context, noise],
+        reason: 'Hay ejemplares gratuitos, pero no constan los destinatarios.',
+        requirements: [
+          { text: 'La distribución fue gratuita', proofRole: 'fact', supported: true, evidenceTokens: [direct] },
+          { text: 'Los destinatarios fueron autores y editoriales extranjeras', proofRole: 'actor_time', supported: false, evidenceTokens: [] },
+        ],
+        evidencePack: [
+          { token: direct, role: 'direct', reason: 'Prueba la gratuidad.' },
+          { token: context, role: 'context', reason: 'Prueba otro circuito internacional.' },
+          { token: noise, role: 'irrelevant', reason: 'No responde.' },
+        ],
+      }],
+    }, [original], new Set([direct, context, noise]));
+    assert.equal(normalized.items[0].status, 'partial', 'one unmet atomic requirement deterministically blocks supported');
+    assert.match(normalized.items[0].revised, /hipótesis|permanece|determinar/iu, 'the overbroad conjunction is replaced by a bounded proposition');
+    assert.deepEqual(normalized.items[0].evidenceTokens, [direct, context], 'irrelevant candidates never enter the usable evidence pack');
+    assert.deepEqual(normalized.items[0].requirements.map((item) => item.proofRole), ['fact', 'actor_time'], 'proof roles survive normalization and remain visible to the writer');
+  }
+
+  {
+    const original = 'Dos autores convergen en que la política fue eficaz.';
+    const direct = '[Autor A](nodus://idea/a)';
+    const normalized = normalizeSectionClaimAudit({
+      items: [{
+        original,
+        status: 'supported',
+        revised: original,
+        evidenceTokens: [direct],
+        reason: 'Solo consta una posición.',
+        requirements: [
+          { text: 'La posición de A', proofRole: 'agreement', supported: true, evidenceTokens: [direct] },
+          { text: 'La posición independiente de B', proofRole: 'agreement', supported: false, evidenceTokens: [] },
+        ],
+        evidencePack: [{ token: direct, role: 'direct', reason: 'Prueba únicamente la posición A.' }],
+      }],
+    }, [original], new Set([direct]));
+    assert.equal(normalized.items[0].status, 'partial', 'a bilateral claim cannot pass while one side is unsupported');
+    assert.match(normalized.items[0].revised, /hipótesis|determinar/iu, 'an unsupported agreement is downgraded rather than manufactured');
+  }
 
   // ── Fake corpus snapshot ────────────────────────────────────────────────────
   const makeSnapshot = (ideaCount) => {
@@ -128,6 +191,47 @@ try {
     };
   }
 
+  // ── 2d. Explicit exclusions are deterministic, not merely prompt advice ────
+  {
+    const objective = 'Analizar el turismo. Excluir el eje de género y colonialidad, ya tratado en otro informe.';
+    const stems = objectiveExclusionStems(objective);
+    assert.ok(stems.includes('colonial') && stems.includes('genero') && stems.includes('sahara') && stems.includes('feminin'));
+    const markdown = [
+      '## Sección',
+      '',
+      'La administración organizó las rutas oficiales. La lectura colonial reintroduce un eje excluido. La red de Paradores permanece en el análisis.',
+      '',
+      'Una frase sobre género también debe desaparecer. El Sahara tampoco debe reintroducir el eje. Esta evidencia territorial se conserva.',
+    ].join('\n');
+    const governed = enforceObjectiveExclusions(markdown, objective);
+    assert.ok(!/colonial|género|Sahara/iu.test(governed));
+    assert.ok(governed.includes('rutas oficiales') && governed.includes('Paradores') && governed.includes('evidencia territorial'));
+  }
+
+  // ── 2c. A sentence whose only checkable support fails is removed whole ─────
+  {
+    const snapshot = makeSnapshot(2);
+    const maps = buildSnapshotMaps(snapshot);
+    const md = '## Sección\n\nAfirmación sin respaldo [Autor0, N. (2000)](nodus://idea/g-0). Otra frase permanece.';
+    const claims = extractCitationClaims(md, maps);
+    assert.equal(claims.length, 1, 'the sentence exposes one checkable citation');
+    const outcome = applyVerification(md, claims, ['unsupported']);
+    assert.ok(!outcome.markdown.includes('Afirmación sin respaldo'), 'the unsupported claim is removed with its sentence');
+    assert.ok(outcome.markdown.includes('Otra frase permanece'), 'unrelated prose remains untouched');
+  }
+
+  // ── 2d. A weak conjunct cannot hide beside another supported citation ─────
+  {
+    const snapshot = makeSnapshot(2);
+    const maps = buildSnapshotMaps(snapshot);
+    const md = '## Sección\n\nSe repartieron ejemplares gratis y llegaron a editoriales extranjeras ([Autor0](nodus://idea/g-0); [Autor1](nodus://idea/g-1)). Otra frase permanece.';
+    const claims = extractCitationClaims(md, maps);
+    assert.equal(claims.length, 2);
+    const outcome = applyVerification(md, claims, ['supports', 'partial']);
+    assert.ok(!outcome.markdown.includes('editoriales extranjeras'), 'a partially supported conjunct removes the complete compound sentence');
+    assert.ok(outcome.markdown.includes('Otra frase permanece'));
+  }
+
   const HALLUCINATED = '[Fantasma, X. (1999)](nodus://idea/HALLUCINATED-999)';
 
   // A plan that spreads every pool idea across `sectionCount` sections + a conclusion.
@@ -164,12 +268,11 @@ try {
     return { title: 'Informe de prueba', abstract: 'resumen', sections };
   }
 
-  // Writes ~targetWords words, cites every menu token verbatim, and slips in a
-  // hallucinated citation the policy must strip.
+  // Develops every offered evidence item once and slips in a hallucinated citation
+  // the policy must strip.
   const fakeWriteSection = (input) => {
-    const cites = input.citationMenu.map((c) => `Afirmación (${c.token}).`).join(' ');
-    const filler = 'texto '.repeat(input.targetWords);
-    return `## ${input.section.title}\n\n${cites} ${filler} ${HALLUCINATED}`;
+    const cites = input.citationMenu.map((c) => `La evidencia permite explicar una aportación distinta porque documenta el mecanismo (${c.token}).`).join(' ');
+    return `## ${input.section.title}\n\n${cites} ${HALLUCINATED}`;
   }
 
   const fakeFinalize = (input) => {
@@ -188,16 +291,7 @@ try {
     finalize: async (input) => fakeFinalize(input),
   });
 
-  // ── 1. resolveTargetPages buckets ───────────────────────────────────────────
-  assert.deepEqual(resolveTargetPages('concise', { ideas: [] }), { min: 5, max: 8 });
-  assert.deepEqual(resolveTargetPages('standard', { ideas: [] }), { min: 9, max: 14 });
-  assert.deepEqual(resolveTargetPages('exhaustive', { ideas: [] }), { min: 15, max: 20 });
-  {
-    const adaptive = resolveTargetPages('adaptive', { ideas: new Array(60).fill(0) });
-    assert.ok(adaptive.min >= 5 && adaptive.max <= 20 && adaptive.max > adaptive.min, 'adaptive clamps to 5–20');
-  }
-
-  // ── 2. applyCitationPolicy: strip hallucinations, keep + relabel real ones ──
+  // ── 1. applyCitationPolicy: strip hallucinations, keep + relabel real ones ──
   {
     const snapshot = makeSnapshot(3);
     const maps = buildSnapshotMaps(snapshot);
@@ -209,6 +303,25 @@ try {
     assert.ok(markdown.includes('Autor0, N. (2000)'), 'idea label rewritten to canonical corpus label');
     assert.deepEqual([...cited.ideas], ['g-0']);
     assert.deepEqual([...cited.works], ['w-1']);
+  }
+
+  // ── 2a. A visible author-year copied from the menu regains its lost URL ─────
+  {
+    const snapshot = makeSnapshot(3);
+    const maps = buildSnapshotMaps(snapshot);
+    const menu = buildCitationMenu(
+      { id: 's1', title: 't', purpose: '', keyClaims: [], ideaIds: ['g-0', 'g-1'], workIds: [], gapIds: [], contradictionIds: [], passageIds: [] },
+      maps,
+    );
+    const recovered = recoverPlainMenuCitations(
+      'Una afirmación [Autor0, N. (2000), p. 28; Autor1, N. (2001)]. Otra [Desconocido (1999)].',
+      menu,
+    );
+    assert.match(recovered, /\[Autor0, N\. \(2000\), p\. 28\]\(nodus:\/\/idea\/g-0\)/);
+    assert.match(recovered, /\[Autor1, N\. \(2001\)\]\(nodus:\/\/idea\/g-1\)/);
+    assert.ok(recovered.includes('[Desconocido (1999)]'), 'a label outside the allowed menu is never linked');
+    const governed = applyCitationPolicy(recovered, maps);
+    assert.deepEqual([...governed.cited.ideas].sort(), ['g-0', 'g-1']);
   }
 
   // ── 2b. buildCitationCatalog: trimmed pool, and every token is really citable ──
@@ -228,16 +341,14 @@ try {
     assert.equal((markdown.match(/nodus:\/\//g) ?? []).length, md.match(/nodus:\/\//g).length, 'every catalog token survives the citation policy');
   }
 
-  // ── 3. Full report: standard length, coverage, clean citations, references ──
+  // ── 3. Full report: evidence coverage, clean citations, references ──
   {
     const snapshot = makeSnapshot(40);
-    const report = await orchestrateDeepResearch({ objective: 'X', language: 'es', targetLength: 'standard' }, baseDeps(snapshot));
+    const report = await orchestrateDeepResearch({ objective: 'X', language: 'es',}, baseDeps(snapshot));
     const { draft, meta } = report;
 
     assert.ok(meta.sections >= 4, 'produced several sections');
-    assert.ok(meta.pages >= 9, `at least the 9-page minimum (got ${meta.pages})`);
-    assert.ok(meta.pages <= 14 + 2, `does not blow past the 14-page target much (got ${meta.pages})`);
-    assert.equal(meta.stoppedReason, null, 'standard run finishes without hitting a cap');
+    assert.equal(meta.stoppedReason, null, 'evidence-driven run completes without provider failure');
 
     // No hallucinated citation anywhere in the assembled report.
     assert.ok(!draft.draftMarkdown.includes('HALLUCINATED'), 'no hallucinated citation in report body');
@@ -257,31 +368,28 @@ try {
     assert.equal(draft.stats.selectedIdeas, meta.ideasCovered);
   }
 
-  // ── 4. Budget cap: runaway section length stops the loop and flags truncation ─
+  // ── 4. Long evidence-rich output is not cut by an editorial page budget ─────
   {
     const snapshot = makeSnapshot(60);
     const deps = { ...baseDeps(snapshot), writeSection: async () => `## Larga\n\n${'palabra '.repeat(6000)}` };
-    const report = await orchestrateDeepResearch({ objective: 'X', targetLength: 'concise' }, deps);
-    assert.ok(report.meta.stoppedReason, 'runaway length trips a stop reason');
-    assert.ok(/presupuesto|páginas/.test(report.meta.stoppedReason), 'stop reason mentions the page budget');
-    assert.equal(report.draft.stats.truncated, true, 'draft marked truncated');
-    assert.ok(report.meta.sections <= 22, 'never exceeds the hard section cap');
+    const report = await orchestrateDeepResearch({ objective: 'X',}, deps);
+    assert.equal(report.meta.stoppedReason, null, 'no word or page ceiling truncates a valid section');
+    assert.equal(report.draft.stats.truncated, false, 'length alone never marks a report truncated');
   }
 
   // ── 5. Thin sections stay bounded and complete (no runaway section count) ───
   {
     const snapshot = makeSnapshot(50);
-    // Each section is deliberately tiny (ignores targetWords). Even so, the report must
-    // stay within its section budget and keep full corpus coverage — never balloon.
+    // Each section is deliberately tiny. Coverage must remain honest rather than
+    // triggering filler to reach a quota that no longer exists.
     const deps = {
       ...baseDeps(snapshot),
       writeSection: async (input) => {
         return `## ${input.section.title}\n\nBreve (${input.citationMenu[0]?.token ?? ''}).\n\n### Matiz adicional\n\nContinuación breve.`;
       },
     };
-    const report = await orchestrateDeepResearch({ objective: 'X', targetLength: 'standard' }, deps);
-    // Standard auto plan stays small (few, deep sections) and bounded by the +1 grace.
-    assert.ok(report.meta.sections >= 4 && report.meta.sections <= 7, `bounded section count (got ${report.meta.sections})`);
+    const report = await orchestrateDeepResearch({ objective: 'X',}, deps);
+    assert.ok(report.meta.sections >= 3, `evidence-derived plan has a real argument (got ${report.meta.sections})`);
     // A writer that names one source per section HAS covered almost nothing, and the
     // report must say so instead of counting every assigned idea as developed.
     assert.ok(
@@ -290,7 +398,6 @@ try {
     );
     assert.ok(report.draft.limitations.length > 0, 'a thin report declares what it left out');
     assert.ok(!report.draft.draftMarkdown.includes('HALLUCINATED'), 'thin sections also citation-clean');
-    assert.equal(report.meta.sections, 5, 'standard auto mode plans five sections, sized to what a section really delivers');
     assert.ok(!report.draft.draftMarkdown.includes('### '), 'model-added microheadings are flattened');
     assert.ok(report.draft.draftMarkdown.includes('Matiz adicional. Continuación breve.'), 'microheading content remains as prose');
   }
@@ -310,7 +417,7 @@ try {
         throw new Error('finalizer down');
       },
     };
-    const report = await orchestrateDeepResearch({ objective: 'X', targetLength: 'concise' }, deps);
+    const report = await orchestrateDeepResearch({ objective: 'X',}, deps);
     assert.ok(report.meta.sections > 0, 'fallback plan still produced sections');
     assert.ok(report.meta.stoppedReason && /degradada/.test(report.meta.stoppedReason), 'degraded generation is reported');
     assert.ok(report.draft.draftMarkdown.includes('## Referencias'), 'still assembles a full document');
@@ -321,7 +428,6 @@ try {
   // ── 7. countWords sanity ────────────────────────────────────────────────────
   assert.equal(countWords('uno dos tres'), 3);
   assert.equal(countWords('[Autor (2020)](nodus://idea/g-1) palabra'), 3, 'link label counts, url does not');
-  assert.equal(WORDS_PER_PAGE, 450);
 
   // ── 8. Narrative normalization: one epigraph, internal cuts become prose ───
   {
@@ -337,50 +443,73 @@ try {
       DEEP_RESEARCH_NARRATIVE_RULES.some((rule) => rule.includes('dos puntos') && rule.includes('guion largo')),
       'shared prose contract restricts disruptive punctuation'
     );
+    assert.ok(
+      DEEP_RESEARCH_NARRATIVE_RULES.some((rule) => rule.includes('debate historiográfico') && rule.includes('autores u obras')),
+      'shared prose contract requires named, evidence-bounded historiographical positions'
+    );
   }
 
-  // ── 9. resolveSectionPlan: auto vs. user-capped, with the +1 grace ──────────
+  // ── 9. resolveSectionPlan is evidence-derived, never page-derived ───────────
   {
-    const auto = resolveSectionPlan({ min: 15, max: 20 }, 'auto');
+    const sparse = makeSnapshot(5);
+    const rich = makeSnapshot(60);
+    const auto = resolveSectionPlan(sparse, 'auto');
     assert.equal(auto.mode, 'auto', 'auto mode reported');
-    assert.ok(auto.target >= 3 && auto.target <= 7, `auto target stays small (got ${auto.target})`);
-    assert.equal(resolveSectionPlan({ min: 9, max: 14 }, 'auto').target, 5, 'a 9-14 page target needs five sections at the measured ~1100 words each');
-    assert.ok(auto.hardCap <= MAX_SECTIONS, 'auto hard cap respects the absolute ceiling');
-    assert.ok(auto.hardCap === Math.min(MAX_SECTIONS, auto.target + 1), 'auto hard cap = target + 1 grace');
-
-    const capped = resolveSectionPlan({ min: 15, max: 20 }, 5);
-    assert.equal(capped.mode, 'user', 'user mode reported');
-    assert.equal(capped.target, 5, 'user cap becomes the target');
-    assert.equal(capped.hardCap, 6, 'user cap allows exactly one extra section');
-
-    // An absurd cap is clamped to the absolute ceiling.
-    const huge = resolveSectionPlan({ min: 15, max: 20 }, 999);
-    assert.ok(huge.target <= MAX_SECTIONS && huge.hardCap <= MAX_SECTIONS, 'huge cap clamped to the ceiling');
+    assert.ok(auto.target >= 3, `sparse evidence still yields an argument (got ${auto.target})`);
+    assert.ok(resolveSectionPlan(rich, 'auto').target > auto.target, 'richer evidence can warrant more argumentative movements');
+    const preferred = resolveSectionPlan(rich, 4, 'Marco; mecanismo uno; mecanismo dos', ['pregunta uno', 'pregunta dos']);
+    assert.equal(preferred.mode, 'user', 'user organization preference is reported');
+    assert.ok(preferred.target >= 4, 'the preference is honored without becoming an evidence cutoff');
   }
 
-  // ── 10. A user section cap is honoured end-to-end (never exceeds cap + 1) ────
+  // ── 10. A user section preference remains organizational end-to-end ─────────
   {
     const snapshot = makeSnapshot(60);
     const report = await orchestrateDeepResearch(
-      { objective: 'X', language: 'es', targetLength: 'exhaustive', sectionLimit: 4 },
+      { objective: 'X', language: 'es',sectionLimit: 4 },
       baseDeps(snapshot)
     );
-    assert.ok(report.meta.sections <= 5, `respects the 4-section cap + 1 grace (got ${report.meta.sections})`);
-    assert.ok(report.meta.sections >= 3, 'still produces a real report under a tight cap');
+    assert.ok(report.meta.sections >= 4, `honors the preferred architecture (got ${report.meta.sections})`);
     // Even capped, references still trace to really-cited works.
     assert.ok(report.draft.bibliography.length > 0, 'capped report still has references');
     assert.ok(!report.draft.draftMarkdown.includes('HALLUCINATED'), 'capped report stays citation-clean');
   }
 
-  // ── 11. Fewer/deeper by default: auto exhaustive stays tightly bounded ─────
+  // ── 11. Auto architecture remains finite because the evidence pool is finite ─
+  {
+    const snapshot = makeSnapshot(60);
+    let internalMovements = 0;
+    const deps = baseDeps(snapshot);
+    deps.writeSection = async (input) => {
+      internalMovements += 1;
+      return `${await fakeWriteSection(input)}\n\nMarcador interno ${internalMovements}.`;
+    };
+    const report = await orchestrateDeepResearch(
+      { objective: 'X', language: 'es', sectionLimit: 'single' },
+      deps
+    );
+    assert.ok(internalMovements > 1, 'continuous presentation keeps multiple evidence-sized writing movements internally');
+    for (let index = 1; index <= internalMovements; index += 1) {
+      assert.match(report.draft.draftMarkdown, new RegExp(`Marcador interno ${index}\\.`), `movement ${index} survives flattening`);
+    }
+    assert.equal(report.meta.structure, 'single', 'single-block structure is persisted in report metadata');
+    assert.equal(report.meta.sections, 1, 'the published report is one continuous block');
+    assert.equal(report.draft.deepResearchStructure, 'single', 'the saved draft preserves its presentation structure');
+    assert.equal(report.draft.outline.length, 0, 'a continuous report does not expose a contradictory section outline');
+    assert.equal((report.draft.draftMarkdown.match(/^#{1,6}\s+/gmu) ?? []).length, 0, 'the continuous body contains no Markdown section headings');
+    assert.ok(report.draft.draftMarkdown.includes('nodus://idea/'), 'continuous assembly preserves grounded citations');
+    assert.ok(report.draft.bibliography.length > 0, 'continuous assembly preserves the bibliography');
+  }
+
+  // ── 11. Auto architecture remains finite because the evidence pool is finite ─
   {
     const snapshot = makeSnapshot(60);
     const report = await orchestrateDeepResearch(
-      { objective: 'X', language: 'es', targetLength: 'exhaustive' },
+      { objective: 'X', language: 'es',},
       baseDeps(snapshot)
     );
-    assert.ok(report.meta.sections <= MAX_SECTIONS, 'never exceeds the absolute section ceiling');
-    assert.ok(report.meta.sections <= 7, `auto mode favours few, deep sections (got ${report.meta.sections})`);
+    assert.ok(report.meta.sections >= 3, 'auto mode produces an ordered argument');
+    assert.ok(report.meta.sections <= snapshot.ideas.length, 'finite evidence cannot create an unbounded plan');
   }
 
   // ── 11b. The writer is never handed a token whose content it cannot read ────
@@ -447,6 +576,169 @@ try {
     for (const item of menu) {
       assert.ok(item.note.trim().length > 12, `menu note is substantive for ${item.kind}`);
     }
+
+    const planInput = buildPlanInput(
+      { objective: 'Examinar la articulación narrativa', language: 'es' },
+      'es',
+      snapshot,
+      resolveSectionPlan(snapshot, 'auto'),
+    );
+    assert.equal(planInput.passages.length, 1, 'the planner receives only readable passages it can assign');
+    assert.ok(planInput.passages[0].extract.includes('tiempo humano'), 'the planner sees readable passage evidence');
+  }
+
+  // ── 11b0. Graph-first planning sees the scope contract; documents stay last ─
+  {
+    const snapshot = makeSnapshot(12);
+    const questions = [
+      '¿Cómo funcionaron los salvoconductos?',
+      '¿Cuándo se desbloqueó el éxodo rural?',
+      '¿Qué debate existe sobre la intencionalidad?',
+      ...Array.from({ length: 10 }, (_, index) => `¿Cómo operó el mecanismo atómico ${index + 4}?`),
+    ];
+    assert.equal(questions.length, 13);
+    assert.equal(MAX_COVERAGE_QUESTIONS, 16);
+    const writerQuestions = [];
+    const plannerInputs = [];
+    const lifecycle = [];
+    let plannedTitle = '';
+    const deps = {
+      ...baseDeps(snapshot),
+      planReport: async (input) => {
+        lifecycle.push('plan');
+        plannerInputs.push(input);
+        const plan = fakePlan(input);
+        plan.sections[0].title = 'La tesis nace del grafo';
+        plannedTitle = plan.sections[0].title;
+        return plan;
+      },
+      auditPlanCoverage: async (input) => {
+        lifecycle.push('coverage-audit');
+        input.plan.sections[0].title = 'TÍTULO INYECTADO POR COBERTURA';
+        input.plan.sections[0].purpose = 'Propósito profundizado sin alterar la arquitectura';
+        input.plan.sections[0].keyClaims = ['Mecanismo concreto añadido tras auditar la cobertura'];
+        return input.plan;
+      },
+      preparePlanEvidence: async (input) => {
+        lifecycle.push('documents');
+        assert.deepEqual(input.coverageQuestions, questions, 'coverage is audited only after the argument exists');
+        assert.ok(input.candidateWorkIds[0]?.startsWith('w-'), 'planned graph works lead document preparation');
+        // Deliberately attack the defensive copy. The executable plan must remain
+        // unchanged, proving documents cannot redesign it through this seam.
+        input.plan.sections[0].title = 'TÍTULO INYECTADO POR DOCUMENTOS';
+        return { considered: 8, requested: 2, prepared: 2, unavailable: 0, failed: 0 };
+      },
+      writeSection: async (input) => {
+        lifecycle.push('write');
+        writerQuestions.push(...(input.section.coverageQuestions ?? []));
+        return fakeWriteSection(input);
+      },
+    };
+    const report = await orchestrateDeepResearch({
+      objective: 'Explicar la inmovilización rural y su cronología.',
+      coverageQuestions: questions,
+      language: 'es',
+    }, deps);
+    assert.deepEqual(plannerInputs[0].coverageQuestions, questions, 'the planner must see every atomic requirement without waiting for documents');
+    assert.deepEqual(lifecycle.slice(0, 3), ['plan', 'coverage-audit', 'documents'], 'coverage is audited after planning and documents start last');
+    assert.notEqual(plannedTitle, 'TÍTULO INYECTADO POR COBERTURA');
+    assert.equal(report.draft.outline[0].title, 'La tesis nace del grafo', 'coverage and documents cannot rewrite the graph-first proposition');
+    assert.notEqual(report.draft.outline[0].purpose, 'Propósito profundizado sin alterar la arquitectura', 'coverage cannot inject a new historical purpose before evidence');
+    assert.ok(!report.draft.outline[0].keyClaims.includes('Mecanismo concreto añadido tras auditar la cobertura'), 'coverage cannot inject an unsupported claim');
+    assert.deepEqual([...new Set(writerQuestions)].sort(), [...questions].sort(), 'post-plan coverage audit reaches the writers');
+    assert.deepEqual(report.meta.coverage?.questions, questions, 'the report metadata records the complete atomic coverage contract');
+    assert.equal(report.meta.retrievalStrategy, 'idea_first_document_enrichment');
+    assert.equal(report.meta.documentPreparation?.prepared, 2);
+  }
+
+  // ── 11b0a. Planned propositions become facts only after evidence audit ─────
+  {
+    const snapshot = makeSnapshot(8);
+    const lifecycle = [];
+    const seenByWriter = [];
+    const deps = {
+      ...baseDeps(snapshot),
+      retrieveForSection: async () => {
+        lifecycle.push('retrieve');
+        return { ideas: [], passages: [] };
+      },
+      auditSectionClaims: async (input) => {
+        lifecycle.push('claim-audit');
+        const targets = [...input.section.keyClaims, ...(input.section.coverageQuestions ?? [])];
+        return {
+          items: targets.map((original, index) => ({
+            original,
+            status: index === 0 ? 'unsupported' : 'supported',
+            // Deliberately unsafe: normalization must not let an unsupported claim
+            // survive merely because the model repeated it confidently.
+            revised: index === 0
+              ? 'El Estado predeterminó totalmente la mirada.'
+              : index >= input.section.keyClaims.length
+                ? 'La evidencia documenta límites administrativos concretos, sin probar una recepción uniforme.'
+                : original,
+            evidenceTokens: index === 0 ? [] : input.citationMenu.slice(0, 1).map((item) => item.token),
+            reason: index === 0 ? 'La evidencia solo muestra orientación.' : 'Sostenida.',
+          })),
+        };
+      },
+      writeSection: async (input) => {
+        lifecycle.push('write');
+        seenByWriter.push(input);
+        return fakeWriteSection(input);
+      },
+      finalize: async (input) => {
+        assert.ok((input.sectionFindings ?? []).length > 0, 'the finalizer sees verified prose, not headings alone');
+        return { title: 'Final', abstract: 'El Estado controló totalmente la recepción.', limitations: ['Limitación original.'], nextSteps: [] };
+      },
+      auditFinalSummary: async (input, draft) => {
+        assert.ok((input.sectionFindings ?? []).length > 0 && draft.abstract.includes('controló totalmente'), 'the final summary audit sees both verified prose and the proposed abstract');
+        return { title: draft.title, abstract: 'El corpus documenta una orientación estatal, pero no una recepción uniforme.', limitations: [], nextSteps: [] };
+      },
+    };
+    const report = await orchestrateDeepResearch({
+      objective: 'Evaluar si el Estado predeterminó la mirada',
+      coverageQuestions: ['¿Qué límites administrativos documenta el corpus?'],
+      language: 'es',
+    }, deps);
+    assert.deepEqual(lifecycle.slice(0, 3), ['retrieve', 'claim-audit', 'write'], 'claim audit runs after section retrieval and before prose');
+    assert.ok(seenByWriter[0].claimAudit, 'the writer receives the epistemic audit');
+    assert.match(seenByWriter[0].section.keyClaims[0], /no permite establecer como hecho|pregunta abierta/iu, 'an unsupported proposition becomes an explicit unresolved question');
+    assert.ok(!seenByWriter[0].section.keyClaims[0].includes('predeterminó totalmente la mirada.'), 'the unsafe reformulation does not survive verbatim');
+    assert.match(seenByWriter[0].section.coverageClaims[0], /límites administrativos concretos/iu, 'an atomic coverage question becomes an evidence-bounded answer claim');
+    assert.ok((report.meta.claimAudit?.unsupported ?? 0) > 0, 'the report records how many planned propositions lacked support');
+    assert.match(report.draft.abstract, /no una recepción uniforme/iu, 'the cold final audit narrows an overclaim in the abstract');
+    assert.ok(report.draft.limitations.includes('Limitación original.'), 'the final audit cannot erase an established limitation');
+  }
+
+  // ── 11b1. A weak section gets one bounded, evidence-preserving quality repair ─
+  {
+    const snapshot = makeSnapshot(12);
+    const makeParagraph = (lead, tokens = []) => `${lead} ${'El razonamiento histórico desarrolla el mecanismo y delimita sus consecuencias con cautela. '.repeat(15)} ${tokens.join(' ')}`;
+    let revisions = 0;
+    const deps = {
+      ...baseDeps(snapshot),
+      writeSection: async (input) => `## ${input.section.title}\n\n${[
+        makeParagraph('Descripción sin apoyo.'),
+        makeParagraph('Otra descripción sin apoyo.'),
+        makeParagraph('Una tercera generalización sin apoyo.'),
+        makeParagraph('Cierre todavía sin apoyo.'),
+      ].join('\n\n')}`,
+      reviseSection: async (input) => {
+        revisions += 1;
+        const tokens = input.citationMenu.filter((item) => item.kind === 'idea').slice(0, 4).map((item) => item.token);
+        return `## ${input.section.title}\n\n${[
+          makeParagraph('Dos fuentes convergen porque explican el mismo mecanismo, mientras que conservan diferencias.', tokens.slice(0, 2)),
+          makeParagraph('Sin embargo, otra interpretación limita el alcance y sugiere una lectura provisional.', tokens.slice(2, 4)),
+          makeParagraph('Por tanto, la comparación revela consecuencias y distingue evidencia de hipótesis.', [tokens[0], tokens[2]]),
+          makeParagraph('La síntesis relaciona el argumento con la pregunta y no permite una generalización absoluta.', [tokens[1], tokens[3]]),
+        ].join('\n\n')}`;
+      },
+    };
+    const report = await orchestrateDeepResearch({ objective: 'Explicar el mecanismo y sus consecuencias', language: 'es',}, deps);
+    assert.ok(revisions > 0, 'weak sections reach the professional-editing pass');
+    assert.ok((report.meta.qualityRevisions ?? 0) > 0, 'accepted repairs are counted');
+    assert.ok(report.draft.qualityAssessment, 'the persisted draft carries reproducible quality metrics');
+    assert.ok(report.draft.qualityAssessment.metrics.crossSourceParagraphs > 0, 'the accepted text synthesizes sources');
   }
 
   // ── 11b2. Half-written references are repaired or dropped, never leaked ────
@@ -486,19 +778,19 @@ try {
     assert.ok(!markdown.includes('280a3b7b'), 'a target with no type segment is not printed');
   }
 
-  // ── 11c. Coverage counts citations, and a short report is topped up ─────────
+  // ── 11c. Coverage counts citations without padding a short report ───────────
   {
     const snapshot = makeSnapshot(40);
     const phases = [];
     // A writer that produces prose but cites nothing at all.
     const deps = { ...baseDeps(snapshot), writeSection: async () => `## S\n\n${'palabra '.repeat(300)}` };
     const report = await orchestrateDeepResearch(
-      { objective: 'X', language: 'es', targetLength: 'standard' },
+      { objective: 'X', language: 'es',},
       deps,
       (p) => phases.push(p.phase)
     );
     assert.equal(report.meta.ideasCovered, 0, 'citing nothing covers nothing');
-    assert.ok(phases.includes('coverage'), 'a report under its minimum length triggers the coverage top-up');
+    assert.ok(!phases.includes('coverage'), 'length alone never triggers a filler/top-up pass');
     assert.ok(report.draft.limitations.length > 0, 'the report discloses the ideas it never developed');
     assert.equal(report.draft.stats.selectedIdeas, 0, 'the saved selection matches the honest coverage');
   }
@@ -566,7 +858,7 @@ try {
         return { ideas: [extraIdea], passages: [extraPassage] };
       },
     };
-    const report = await orchestrateDeepResearch({ objective: 'X', language: 'es', targetLength: 'concise' }, deps);
+    const report = await orchestrateDeepResearch({ objective: 'X', language: 'es',}, deps);
     assert.ok(asked >= 2, 'the corpus is queried once per section, not only once per report');
     // Retrieved material survives the citation policy instead of being stripped.
     assert.ok(report.draft.draftMarkdown.includes('nodus://idea/g-late'), 'a retrieved idea is really citable');
@@ -576,10 +868,84 @@ try {
 
   // ── 11f. Report language drives the document, not the developer's locale ────
   {
+    const snapshot = makeSnapshot(6);
+    const question = '¿Cómo se catalogó el archivo fotográfico?';
+    const recoveredPassage = {
+      id: 'p-recovery',
+      label: 'Archivo institucional · p. 40',
+      summary: 'El organismo revisó el archivo fotográfico, clasificó las imágenes y publicó su catálogo.',
+      score: 0.95,
+      reason: 'test',
+      nodus_id: 'w-recovery',
+      pageLabel: 'p. 40',
+      authors: ['Archivo, Ana'],
+      year: 1962,
+      zotero_key: 'ZR',
+      citation: 'nodus://passage/p-recovery',
+    };
+    const noisyRecoveryPassage = {
+      ...recoveredPassage,
+      id: 'p-recovery-noise',
+      summary: 'El organismo celebró una exposición sin relación con la catalogación del archivo.',
+      citation: 'nodus://passage/p-recovery-noise',
+    };
+    const retrievalInputs = [];
+    const deps = {
+      ...baseDeps(snapshot),
+      retrieveForSection: async (input) => {
+        retrievalInputs.push(input);
+        return input.limits.passages === 12
+          ? { ideas: [], passages: [recoveredPassage, noisyRecoveryPassage] }
+          : { ideas: [], passages: [] };
+      },
+      auditSectionClaims: async (input) => {
+        const targets = [...input.section.keyClaims, ...(input.section.coverageQuestions ?? [])];
+        const recovered = input.citationMenu.find((item) => item.token.includes('nodus://passage/p-recovery'));
+        return {
+          items: targets.map((original, index) => {
+            const isCoverage = index >= input.section.keyClaims.length;
+            const evidence = recovered ?? input.citationMenu[0];
+            const noise = input.citationMenu.find((item) => item.token.includes('nodus://passage/p-recovery-noise'));
+            return {
+              original,
+              status: isCoverage && !recovered ? 'unsupported' : 'supported',
+              revised: isCoverage && recovered ? 'El archivo fue revisado, clasificado y catalogado institucionalmente.' : original,
+              evidenceTokens: isCoverage && !recovered ? [] : evidence ? [evidence.token] : [],
+              reason: isCoverage && !recovered ? 'Falta el pasaje procedimental.' : 'Existe evidencia directa.',
+              evidencePack: [
+                ...(evidence ? [{ token: evidence.token, role: 'direct', reason: 'Responde a la pregunta.' }] : []),
+                ...(noise ? [{ token: noise.token, role: 'irrelevant', reason: 'Solo comparte el organismo.' }] : []),
+              ],
+              requirements: [{
+                text: isCoverage ? 'Catalogación del archivo' : 'Proposición del plan',
+                supported: isCoverage ? Boolean(recovered) : Boolean(evidence),
+                evidenceTokens: isCoverage ? (recovered ? [recovered.token] : []) : evidence ? [evidence.token] : [],
+              }],
+            };
+          }),
+        };
+      },
+    };
+    const report = await orchestrateDeepResearch({
+      objective: 'Explicar el archivo fotográfico.',
+      coverageQuestions: [question],
+      language: 'es',
+    }, deps);
+    const focusedRecovery = retrievalInputs.find((input) => input.limits.passages === 12);
+    assert.deepEqual(focusedRecovery?.coverageQuestions, [question], 'an unsupported atomic requirement triggers one focused retrieval retry');
+    assert.ok(report.draft.outline.some((section) => section.keyClaims.some((claim) => /clasificado y catalogado/iu.test(claim))), 'the recovered evidence becomes an audited answer in the saved outline');
+    assert.equal(report.meta.claimAudit?.unsupported, 0, 'only the final post-recovery audit contributes to report counters');
+    assert.ok((report.meta.claimAudit?.roles?.fact?.checked ?? 0) > 0, 'saved metadata exposes support by proof role instead of one opaque total');
+    assert.ok(report.draft.draftMarkdown.includes('nodus://passage/p-recovery'), 'the selected direct recovery passage reaches the writer');
+    assert.ok(!report.draft.draftMarkdown.includes('nodus://passage/p-recovery-noise'), 'rejected recovery noise is removed before writing');
+  }
+
+  // ── 11f. Report language drives the document, not the developer's locale ────
+  {
     const snapshot = makeSnapshot(8);
     const messages = [];
     const report = await orchestrateDeepResearch(
-      { objective: 'X', language: 'en', targetLength: 'concise' },
+      { objective: 'X', language: 'en',},
       baseDeps(snapshot),
       (p) => messages.push(p.message)
     );
@@ -610,41 +976,6 @@ try {
     // An unknown dependency id is ignored rather than fatal.
     const dangling = [{ id: 'a', role: 'body', dependsOn: ['ghost'], title: 'A', purpose: '', keyClaims: [], ideaIds: [], workIds: [], gapIds: [], contradictionIds: [], passageIds: [] }];
     assert.equal(orderSections(dangling).length, 1, 'a dangling dependency is ignored');
-  }
-
-  // ── 11h. A short section is expanded once, and only if it really grew ───────
-  {
-    const snapshot = makeSnapshot(20);
-    let expansions = 0;
-    const deps = {
-      ...baseDeps(snapshot),
-      writeSection: async (input) => `## ${input.section.title}\n\nCorto (${input.citationMenu[0]?.token ?? ''}).`,
-      expandSection: async (input) => {
-        expansions += 1;
-        assert.ok(input.draft.includes('Corto'), 'the expander sees its own draft');
-        assert.ok(input.missingWords > 0, 'the expander is told how much is missing');
-        return `## ${input.section.title}\n\n${input.draft} ${'desarrollo '.repeat(600)}`;
-      },
-    };
-    const report = await orchestrateDeepResearch({ objective: 'X', language: 'es', targetLength: 'standard' }, deps);
-    assert.ok(expansions > 0, 'a section far under target is expanded');
-    assert.ok(report.meta.words > 1000, `the expansion reaches the report (got ${report.meta.words} words)`);
-
-    // An expansion that does not actually grow the section is discarded, so a model
-    // that merely reshuffles the same words cannot replace the original draft.
-    let refused = 0;
-    const stingy = {
-      ...baseDeps(snapshot),
-      writeSection: async (input) => `## ${input.section.title}\n\nBORRADOR original breve.`,
-      expandSection: async (input) => {
-        refused += 1;
-        return `## ${input.section.title}\n\nEXPANSION igual.`;
-      },
-    };
-    const weak = await orchestrateDeepResearch({ objective: 'X', language: 'es', targetLength: 'concise' }, stingy);
-    assert.ok(refused > 0, 'the expansion was attempted');
-    assert.ok(!weak.draft.draftMarkdown.includes('EXPANSION'), 'a non-growing expansion is discarded');
-    assert.ok(weak.draft.draftMarkdown.includes('BORRADOR'), 'the original draft survives instead');
   }
 
   // ── 11i. Verification: a source that does not support the claim is removed ──
@@ -681,7 +1012,7 @@ try {
         return claims.map((claim) => (rejected.has(claim.id) ? 'unsupported' : 'supports'));
       },
     };
-    const report = await orchestrateDeepResearch({ objective: 'X', language: 'es', targetLength: 'concise' }, deps);
+    const report = await orchestrateDeepResearch({ objective: 'X', language: 'es',}, deps);
 
     // The judge must receive the real sentence and the real source content.
     assert.ok(seenClaims.length > 0, 'claims reached the verifier');
@@ -704,10 +1035,70 @@ try {
     assert.ok(report.draft.draftMarkdown.includes('nodus://idea/g-0'), 'a supported citation is kept');
   }
 
+  // ── 11i1. A known partial citation cannot remain in published prose ────────
+  {
+    const snapshot = makeSnapshot(8);
+    const deps = {
+      ...baseDeps(snapshot),
+      writeSection: async (input) => {
+        const tokens = input.citationMenu.filter((item) => item.kind === 'idea').slice(0, 4).map((item) => item.token);
+        return `## ${input.section.title}\n\n${tokens.map((token, index) => `CLAIM_PARCIAL_${index} formula una conclusión más fuerte que la fuente (${token}).`).join(' ')} ${'desarrollo '.repeat(500)}`;
+      },
+      verifyCitations: async (claims) => claims.map(() => 'partial'),
+    };
+    const report = await orchestrateDeepResearch({ objective: 'X', language: 'es',}, deps);
+    assert.ok(!report.draft.draftMarkdown.includes('CLAIM_PARCIAL_'), 'sentences supported only partially are removed when no repair is available');
+    assert.ok((report.meta.verification?.partial ?? 0) > 0, 'removed partial support is reported');
+    assert.ok(report.draft.qualityAssessment.issues.includes('high_support_repair_rate'), 'the quality score exposes a high entailment-repair burden');
+    assert.notEqual(report.draft.qualityAssessment.grade, 'passes_thresholds', 'a report with pervasive partial support cannot clear the top threshold');
+  }
+
   // ── 11j. A judge that fails or answers nonsense never damages the report ────
   {
+    const snapshot = makeSnapshot(12);
+    const events = [];
+    let verificationPass = 0;
+    const paragraph = (lead, tokens) => `${lead} ${'El análisis explica el mecanismo, compara interpretaciones y delimita sus consecuencias con cautela. '.repeat(14)} ${tokens.join(' ')}`;
+    const deps = {
+      ...baseDeps(snapshot),
+      writeSection: async (input) => {
+        const tokens = input.citationMenu.filter((item) => item.kind === 'idea').slice(0, 4).map((item) => item.token);
+        return `## ${input.section.title}\n\n${[
+          paragraph('Dos fuentes convergen porque describen el mismo proceso.', tokens.slice(0, 2)),
+          paragraph('Sin embargo, la comparación revela una diferencia de alcance.', tokens.slice(2, 4)),
+          paragraph('Por tanto, el mecanismo sugiere una consecuencia verificable.', [tokens[0], tokens[2]]),
+          paragraph('La síntesis distingue evidencia e hipótesis provisional.', [tokens[1], tokens[3]]),
+        ].join('\n\n')}`;
+      },
+      verifyCitations: async (claims) => {
+        events.push('verify');
+        verificationPass += 1;
+        return claims.map((claim, index) => verificationPass === 1 && index > 0 ? 'unsupported' : 'supports');
+      },
+      reviseSection: async (input) => {
+        // The first quality pass runs before entailment. Leave it unchanged so the
+        // test isolates the repair triggered by citations removed by verification.
+        if (verificationPass === 0) return input.draft;
+        events.push('revise');
+        const tokens = input.citationMenu.filter((item) => item.kind === 'idea').slice(0, 4).map((item) => item.token);
+        return `## ${input.section.title}\n\n${[
+          paragraph('Dos fuentes convergen porque explican el mismo mecanismo.', tokens.slice(0, 2)),
+          paragraph('Sin embargo, otras dos fuentes limitan esa interpretación.', tokens.slice(2, 4)),
+          paragraph('Por tanto, la comparación revela consecuencias distintas.', [tokens[0], tokens[2]]),
+          paragraph('La síntesis relaciona el argumento con la pregunta central.', [tokens[1], tokens[3]]),
+        ].join('\n\n')}`;
+      },
+    };
+    const report = await orchestrateDeepResearch({ objective: 'Explicar y comparar el mecanismo', language: 'es',}, deps);
+    assert.ok(events.indexOf('verify') >= 0 && events.indexOf('verify') < events.indexOf('revise'), 'a quality repair can run after verification removed support');
+    assert.ok((report.meta.qualityRevisions ?? 0) >= 0, 'the repair decision is recorded without a length quota');
+    assert.equal(report.meta.verification?.unverified ?? 0, 0, 'the accepted repair is itself verified');
+  }
+
+  // ── 11k. A judge that fails or answers nonsense never damages the report ────
+  {
     const snapshot = makeSnapshot(10);
-    const base = await orchestrateDeepResearch({ objective: 'X', language: 'es', targetLength: 'concise' }, baseDeps(snapshot));
+    const base = await orchestrateDeepResearch({ objective: 'X', language: 'es',}, baseDeps(snapshot));
     for (const broken of [
       async () => {
         throw new Error('judge down');
@@ -717,7 +1108,7 @@ try {
       async () => null,
     ]) {
       const report = await orchestrateDeepResearch(
-        { objective: 'X', language: 'es', targetLength: 'concise' },
+        { objective: 'X', language: 'es',},
         { ...baseDeps(snapshot), verifyCitations: broken }
       );
       assert.equal(
@@ -728,7 +1119,7 @@ try {
     }
   }
 
-  // ── 11k. Split headings are folded into one phrase, keeping both halves ────
+  // ── 11l. Split headings are folded into one phrase, keeping both halves ────
   {
     assert.equal(
       normalizeSectionTitle('La genealogía de la mirada: del mito romántico a la gestión institucional'),
@@ -758,7 +1149,7 @@ try {
         return plan;
       },
     };
-    const report = await orchestrateDeepResearch({ objective: 'X', language: 'es', targetLength: 'concise' }, deps);
+    const report = await orchestrateDeepResearch({ objective: 'X', language: 'es',}, deps);
     assert.ok(
       report.draft.draftMarkdown.includes('## Genealogías del imaginario, del romanticismo a la propaganda'),
       'the assembled report carries the folded heading'
@@ -772,7 +1163,7 @@ try {
     let seenSections = [];
     const run = (issues) =>
       orchestrateDeepResearch(
-        { objective: 'X', language: 'es', targetLength: 'concise' },
+        { objective: 'X', language: 'es',},
         {
           ...baseDeps(snapshot),
           writeSection: async (input) =>
@@ -820,7 +1211,7 @@ try {
 
     // A failing checker must not cost the report anything.
     const broken = await orchestrateDeepResearch(
-      { objective: 'X', language: 'es', targetLength: 'concise' },
+      { objective: 'X', language: 'es',},
       {
         ...baseDeps(snapshot),
         checkCoherence: async () => {
@@ -863,10 +1254,66 @@ try {
       'electron/ai/deepResearch.ts',
       'electron/ai/genealogyDeepResearch.ts',
       'electron/ai/deepResearchClient.ts',
+      'electron/ai/studyDeepResearch.ts',
     ].map((file) => readFile(path.join(repoRoot, file), 'utf8')));
     assert.ok(sources.every((source) => source.includes('DEEP_RESEARCH_NARRATIVE_RULES')), 'all Deep Research writers share the prose contract');
-    assert.match(sources[0], /nunca superes esa cifra en el plan inicial/, 'general planner cannot spend the grace slot on an extra heading');
-    assert.match(sources[1], /nunca más de esa cifra en el plan inicial/, 'genealogy planner uses the same section discipline');
+    assert.match(sources[0], /valor marginal sea cero/, 'general writer stops when evidence adds no new value');
+    assert.match(sources[1], /valor probatorio marginal/, 'genealogy writer uses the same evidence-driven stopping rule');
+    assert.match(DEEP_RESEARCH_NARRATIVE_RULES.join('\n'), /evidencia de un solo lado/iu, 'every writer rejects unilateral agreement and contradiction claims');
+    assert.match(DEEP_RESEARCH_NARRATIVE_RULES.join('\n'), /intención no demuestra un efecto/iu, 'every writer separates intent, effect and reception');
+  }
+
+  // ── 13. Planned prose cannot replace the established writer without winning ─
+  {
+    const snapshot = makeSnapshot(18);
+    const evidencePlan = {
+      thesis: 'Tesis acotada',
+      objectiveLinks: ['obj'],
+      exclusions: [],
+      paragraphs: [0, 1, 2].map((index) => ({
+        function: `función ${index}`,
+        claim: `afirmación ${index}`,
+        evidenceTokens: [],
+        relationship: 'comparación',
+        caveat: 'cautela',
+        transition: 'continuidad',
+      })),
+    };
+    const run = (plannedWins) => orchestrateDeepResearch(
+      { objective: 'X', language: 'es',},
+      {
+        ...baseDeps(snapshot),
+        planSectionEvidence: async (input) => ({
+          ...evidencePlan,
+          paragraphs: evidencePlan.paragraphs.map((paragraph) => ({
+            ...paragraph,
+            evidenceTokens: input.citationMenu.slice(0, 2).map((item) => item.token),
+          })),
+        }),
+        writeSection: async (input) => {
+          const marker = input.evidencePlan ? 'RUTA PLANIFICADA' : 'RUTA HISTÓRICA';
+          const citations = input.citationMenu.slice(0, 4).map((item) => item.token).join(' ');
+          return `## ${input.section.title}\n\n${marker}. ${'Desarrollo porque compara mecanismos con cautela. '.repeat(220)} ${citations}`;
+        },
+        judgeSectionRevision: async (_input, original, revised) => {
+          assert.ok(original.includes('RUTA HISTÓRICA'), 'the established writer is anonymous candidate one');
+          assert.ok(revised.includes('RUTA PLANIFICADA'), 'the evidence-planned writer is anonymous candidate two');
+          return plannedWins;
+        },
+      },
+    );
+
+    const fallback = await run(false);
+    assert.ok(fallback.draft.draftMarkdown.includes('RUTA HISTÓRICA'), 'a tie or loss keeps the established prose');
+    assert.ok(!fallback.draft.draftMarkdown.includes('RUTA PLANIFICADA'), 'the losing planned prose is discarded');
+    assert.equal(fallback.meta.generationSelection?.baseline, fallback.meta.generationSelection?.compared);
+    assert.equal(fallback.meta.generationSelection?.planned, 0);
+
+    const promoted = await run(true);
+    assert.ok(promoted.draft.draftMarkdown.includes('RUTA PLANIFICADA'), 'planned prose ships only after winning the blind comparison');
+    assert.ok(!promoted.draft.draftMarkdown.includes('RUTA HISTÓRICA'), 'the losing baseline is discarded');
+    assert.equal(promoted.meta.generationSelection?.planned, promoted.meta.generationSelection?.compared);
+    assert.equal(promoted.meta.generationSelection?.baseline, 0);
   }
 
   console.log('deep research orchestration test passed');

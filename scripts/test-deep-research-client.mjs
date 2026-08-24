@@ -29,7 +29,18 @@ const stubWritingWorkshop = {
     b.onResolve({ filter: /\/aiClient$/ }, () => ({ path: 'ai-client', namespace: 'stub' }));
     b.onResolve({ filter: /\/db\/database$/ }, () => ({ path: 'database', namespace: 'stub' }));
     b.onLoad({ filter: /.*/, namespace: 'stub' }, () => ({
-      contents: 'export function buildWritingWorkshopSnapshot(){throw new Error("stubbed — inject a snapshot builder");}\nexport async function completeJson(){return {}}\nexport function getDb(){return {prepare(){return {all(){return []}}}}}',
+      contents: [
+        'const emptySnapshot = (brief, route) => {',
+        '  globalThis.__nodusClientSnapshotCalls ??= [];',
+        '  globalThis.__nodusClientSnapshotCalls.push(route);',
+        '  return { generatedAt: new Date().toISOString(), brief, stats: { ideas: 0, themes: 0, gaps: 0, contradictions: 0, works: 0, passages: 0, tutorRoutes: 0 }, recommendedSelection: { ideaIds: [], themeIds: [], gapIds: [], contradictionIds: [], workIds: [], passageIds: [], tutorRouteIds: [] }, ideas: [], themes: [], gaps: [], contradictions: [], works: [], passages: [], tutorRoutes: [] };',
+        '};',
+        'export function buildWritingWorkshopSnapshot(brief){ return Promise.resolve(emptySnapshot(brief, "hierarchical")); }',
+        'export function buildHistoricalWritingWorkshopSnapshot(brief){ return Promise.resolve(emptySnapshot(brief, "historical")); }',
+        'export function buildIdeaFirstWritingWorkshopSnapshot(brief){ return Promise.resolve(emptySnapshot(brief, "idea-first")); }',
+        'export async function completeJson(){return {}}',
+        'export function getDb(){return {prepare(){return {all(){return []}}}}}',
+      ].join('\n'),
       loader: 'js',
     }));
   },
@@ -47,7 +58,7 @@ try {
     plugins: [stubWritingWorkshop],
     logLevel: 'silent',
   });
-  const { buildDeepResearchBrief, assembleClientDeepResearchReport } = await import(pathToFileURL(outfile).href);
+  const { buildDeepResearchBrief, assembleClientDeepResearchReport, deepResearchClientRoute } = await import(pathToFileURL(outfile).href);
 
   const makeSnapshot = (ideaCount) => {
     const ideas = Array.from({ length: ideaCount }, (_, i) => ({
@@ -97,7 +108,7 @@ try {
   {
     const snap = makeSnapshot(90);
     let snapshotCalls = 0;
-    const brief = await buildDeepResearchBrief({ objective: 'Tema', language: 'es', targetLength: 'standard' }, async () => {
+    const brief = await buildDeepResearchBrief({ objective: 'Tema', language: 'es',}, async () => {
       snapshotCalls += 1;
       return snap;
     });
@@ -106,13 +117,50 @@ try {
     assert.equal(snapshotCalls, 1, 'General uses the historical one-snapshot retrieval path');
     assert.equal(brief.materials.ideas.length, 70, 'pool trimmed to POOL_LIMITS.ideas');
     assert.ok(brief.materials.ideas.every((i) => /\]\(nodus:\/\/idea\/g-\d+\)$/.test(i.token)), 'idea tokens are real nodus citations');
-    assert.ok(brief.sections.target >= 3 && brief.sections.hardCap >= brief.sections.target, 'section scope resolved');
-    assert.equal(brief.sections.target, 5, 'the client brief is sized like the in-app plan, to what a section really delivers');
-    assert.deepEqual(brief.targetPages, { min: 9, max: 14 }, 'standard length → 9–14 pp');
+    assert.ok(brief.sections.suggested >= 3, 'evidence-derived architecture is exposed as a suggestion');
+    assert.equal('hardCap' in brief.sections, false, 'the client receives no editorial section ceiling');
+    assert.equal(['target', 'Pages'].join('') in brief, false, 'the client receives no page target');
     assert.equal(brief.finalizeWith, 'nodus_finalize_deep_research', 'points the writer at the finalize tool');
     assert.ok(brief.citationPolicy.length > 0 && brief.method.length > 0, 'ships a citation policy + method');
     assert.ok(brief.method.some((rule) => rule.includes('dos puntos') && rule.includes('guion largo')), 'client writer receives the narrative punctuation contract');
     assert.ok(brief.method.some((rule) => rule.includes('no añadas subtítulos')), 'client writer receives the single-epigraph contract');
+  }
+
+  // ── 1a. Version router: independent from approach and strict at the boundary ─
+  {
+    assert.equal(deepResearchClientRoute(undefined), 'v2-idea-first', 'new client requests default to v2');
+    assert.equal(deepResearchClientRoute('v1'), 'v1-historical');
+    assert.equal(deepResearchClientRoute('v2'), 'v2-idea-first');
+    assert.throws(() => deepResearchClientRoute('v3'), /Unsupported Deep Research version/);
+
+    globalThis.__nodusClientSnapshotCalls = [];
+    await buildDeepResearchBrief({ objective: 'Tema', language: 'es', deepResearchVersion: 'v1' });
+    await buildDeepResearchBrief({ objective: 'Tema', language: 'es', deepResearchVersion: 'v2' });
+    assert.deepEqual(globalThis.__nodusClientSnapshotCalls, ['historical', 'idea-first'], 'default client builders are genuinely versioned');
+    delete globalThis.__nodusClientSnapshotCalls;
+
+    const seenVersions = [];
+    const snapshot = makeSnapshot(4);
+    const builder = async (brief) => {
+      seenVersions.push(brief.deepResearchVersion);
+      return snapshot;
+    };
+    const historical = await buildDeepResearchBrief(
+      { objective: 'Tema', language: 'es', approach: 'comparative', deepResearchVersion: 'v1' },
+      builder,
+    );
+    const current = await buildDeepResearchBrief(
+      { objective: 'Tema', language: 'es', approach: 'comparative', deepResearchVersion: 'v2' },
+      builder,
+    );
+    assert.equal(historical.deepResearchVersion, 'v1');
+    assert.equal(current.deepResearchVersion, 'v2');
+    assert.deepEqual(seenVersions, ['v1', 'v1', 'v2', 'v2'], 'version reaches both ordinary and supplemental client retrieval');
+    await assert.rejects(
+      () => buildDeepResearchBrief({ objective: 'Tema', deepResearchVersion: 'v3' }, builder),
+      /Unsupported Deep Research version/,
+      'explicit unknown versions must not silently become v2',
+    );
   }
 
   // ── 1b. Specialized client brief enriches extraction and all prompt stages ──
@@ -124,7 +172,7 @@ try {
     supplemental.ideas[8].works[0].nodus_id = 'w-extra-8';
     const calls = [];
     const brief = await buildDeepResearchBrief(
-      { objective: 'Tema', language: 'es', targetLength: 'concise', approach: 'literature_review' },
+      { objective: 'Tema', language: 'es',approach: 'literature_review' },
       async (_brief, probes) => {
         calls.push(probes ?? []);
         return calls.length === 1 ? ordinary : supplemental;
@@ -152,7 +200,7 @@ try {
     ].join('\n');
 
     const report = await assembleClientDeepResearchReport(
-      { objective: 'Tema', language: 'es', sectionsMarkdown, title: 'Informe cliente', abstract: 'Resumen breve.', limitations: ['Sesgo del corpus.'] },
+      { objective: 'Tema', language: 'es', deepResearchVersion: 'v1', sectionsMarkdown, title: 'Informe cliente', abstract: 'Resumen breve.', limitations: ['Sesgo del corpus.'] },
       async () => snap
     );
 
@@ -178,8 +226,38 @@ try {
     assert.equal(meta.ideasCovered, 2, 'coverage = distinct cited ideas');
     assert.equal(meta.ideasConsidered, 10, 'considered = whole snapshot');
     assert.equal(meta.worksCited, 2);
+    assert.equal(report.draft.deepResearchVersion, 'v1');
+    assert.equal(report.draft.brief.deepResearchVersion, 'v1');
+    assert.equal(meta.deepResearchVersion, 'v1');
     assert.ok(meta.pages >= 1 && meta.words > 0, 'meta word/page counts computed');
     assert.equal(meta.stoppedReason, null);
+  }
+
+  // Old client finalize calls remain General, while supplied provenance is kept.
+  {
+    const snap = makeSnapshot(10);
+    const brief = await buildDeepResearchBrief(
+      { objective: 'Tema continuo', language: 'es', sectionLimit: 'single' },
+      async () => snap,
+    );
+    assert.equal(brief.structure, 'single', 'the client handoff exposes the requested continuous structure');
+    assert.ok(brief.method.some((rule) => /sin encabezados/iu.test(rule)), 'the client writer is explicitly told to write without headings');
+    assert.ok(!brief.method.some((rule) => /Empieza cada sección con un encabezado/iu.test(rule)), 'the headed-section instruction is removed in continuous mode');
+
+    const report = await assembleClientDeepResearchReport({
+      objective: 'Tema continuo',
+      language: 'es',
+      sectionLimit: 'single',
+      sectionsMarkdown: '## Encabezado accidental\n\nArgumento apoyado [Autor0, N. (2000)](nodus://idea/g-0).\n\n## Otro corte\n\nSíntesis apoyada [Autor3](nodus://idea/g-3).',
+      limitations: ['Alcance acotado.'],
+    }, async () => snap);
+    assert.equal(report.meta.structure, 'single');
+    assert.equal(report.meta.sections, 1);
+    assert.equal(report.draft.deepResearchStructure, 'single');
+    assert.equal(report.draft.outline.length, 0);
+    assert.equal((report.draft.draftMarkdown.match(/^#{1,6}\s+/gmu) ?? []).length, 0, 'the assembler deterministically removes accidental headings');
+    assert.ok(report.draft.draftMarkdown.includes('nodus://idea/g-0'), 'valid citations survive continuous assembly');
+    assert.equal(report.draft.bibliography.length, 2, 'references still derive from the cited corpus');
   }
 
   // Old client finalize calls remain General, while supplied provenance is kept.
@@ -189,13 +267,22 @@ try {
     const report = await assembleClientDeepResearchReport({
       objective: 'Tema',
       approach: 'conceptual',
+      deepResearchVersion: 'v2',
       language: 'es',
       sectionsMarkdown: '## Síntesis\n\nRelación [Autor0](nodus://idea/g-0).',
       generationModel,
     }, async () => snap);
     assert.equal(report.draft.brief.deepResearchApproach, 'conceptual');
     assert.equal(report.draft.deepResearchApproach, 'conceptual');
+    assert.equal(report.draft.deepResearchVersion, 'v2');
+    assert.equal(report.draft.brief.deepResearchVersion, 'v2');
     assert.deepEqual(report.draft.generationModel, generationModel);
+
+    await assert.rejects(
+      () => assembleClientDeepResearchReport({ objective: 'Tema', deepResearchVersion: 'v3', sectionsMarkdown: '## Síntesis\n\nTexto.' }, async () => snap),
+      /Unsupported Deep Research version/,
+      'finalization rejects an explicit unknown version too',
+    );
   }
 
   console.log('deep research client (Option B) test passed');

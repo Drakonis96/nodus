@@ -23,9 +23,14 @@ import { resolveWorkText } from '../extraction/textExtractor';
 import { completeText, completeTextStream, resolveModelRef, localModelContextWindow } from './aiClient';
 import { embed } from './aiClient';
 import { enforceContextBudget, humanizeCitationLabels } from './researchContextFit';
+import { canonicalizeCitationLinks, extractCitationRefs, stripDisallowedCitations, supportedCitationKeys } from './citationSanitize';
+import { verifyCitations } from '../citations/verifyCitations';
 import { findSimilarWorksPaged } from '../db/workSummariesRepo';
-import { findSimilarPassagesPaged } from '../db/passagesRepo';
-import { findSimilarIdeasPaged } from '../db/ideasRepo';
+import {
+  retrieveHierarchical,
+  type HierarchicalDocumentHit,
+  type HierarchicalPassageHit,
+} from './hierarchicalRetrieval';
 
 const MAX_HISTORY_MESSAGES = 12;
 const MAX_DOCUMENTS = 30;
@@ -116,6 +121,10 @@ interface RelevanceScope {
   ideaIdSet: Set<string> | null;
   /** Works linked to relevant ideas ∪ works whose summary matches the question. */
   workIdSet: Set<string> | null;
+  /** Audited macro orientation; never exposed as source evidence. */
+  documentHits: HierarchicalDocumentHit[];
+  /** Already contains an independent global quota plus document-routed additions. */
+  passageHits: HierarchicalPassageHit[];
 }
 
 interface BuildResult {
@@ -160,7 +169,7 @@ export async function answerResearchChat(request: ResearchChatRequest): Promise<
     request.model
   );
 
-  return { answer: finalizeAnswer(answer, local), stats };
+  return { answer: finalizeAnswer(answer, local, user), stats };
 }
 
 export async function streamResearchChat(
@@ -181,7 +190,7 @@ export async function streamResearchChat(
     signal
   );
 
-  return { answer: finalizeAnswer(answer, local), stats };
+  return { answer: finalizeAnswer(answer, local, user), stats };
 }
 
 /**
@@ -219,9 +228,10 @@ export async function generateChatTitle(messages: ChatMessageRecord[], model?: M
 
 /** Trim, and for local models repair citation labels/links the model got wrong,
  *  resolving each id to its "Autor, Año" against the corpus. */
-function finalizeAnswer(answer: string, local: boolean): string {
+function finalizeAnswer(answer: string, local: boolean, sourceContext: string): string {
   const trimmed = answer.trim();
-  return local ? humanizeCitationLabels(trimmed, citationDisplayLabel) : trimmed;
+  const labelled = local ? humanizeCitationLabels(trimmed, citationDisplayLabel) : trimmed;
+  return sanitizeResearchCitations(labelled, sourceContext);
 }
 
 function citationDisplayLabel(kind: string, id: string): string | null {
@@ -421,16 +431,22 @@ export const CHAT_CITATION_RULES: string[] = [
   '- Para citar una contradiccion o refutacion concreta de la seccion `contradicciones`, usa `[contradiccion](nodus://contradiction/<id>)` con el `id` exacto de esa relacion.',
   '- Para citar un hueco concreto de la seccion `huecos_de_investigacion`, usa `[hueco](nodus://gap/<id>)` con el `id` exacto de ese hueco.',
   '- La sección `pasajes_relevantes` contiene texto literal de las obras. Cuando sostengas una afirmación con uno de esos pasajes, cítalo inmediatamente como `[Autor, Año, p. N](nodus://passage/<id>)` usando el campo `citation` exacto del pasaje. No atribuyas al pasaje más de lo que dice literalmente.',
+  '- Si `pasajes_relevantes` no está vacío, prioriza sus citas para las afirmaciones verificables. Un enlace general a una obra orienta, pero NO sustituye la evidencia literal disponible.',
+  '- Ante una consulta global o comparativa, usa `orientacion_documental` para planificar qué dimensiones y obras debes cubrir. Después, fundamenta cada apartado sustantivo con al menos un `pasaje_relevante` pertinente cuando exista; si no existe, usa una `idea_generada` respaldada. No rellenes una cuota con evidencia tangencial.',
   '- Si una conclusion se apoya en una idea y tambien en una contradiccion o hueco, incluye ambas citas junto a la frase relevante.',
   '- Usa SIEMPRE el id exacto que aparece en el contexto. Nunca inventes ni abrevies los ids.',
   '- No conviertas en enlace las citas a obras que no esten en el contexto; en ese caso nombra autor y año en texto plano.',
   '- La sección `documentos_resumidos` contiene resúmenes de ORIENTACIÓN. Úsala para ubicar y comparar obras, pero NUNCA la cites como evidencia ni atribuyas a ella afirmaciones verificables. Las citas deben seguir apuntando a ideas, evidencias, huecos, contradicciones o la obra original.',
+  '- La sección `orientacion_documental` es una ficha generada y auditada para ENRUTAR la búsqueda. No es una fuente y NUNCA se cita. Verifica cualquier afirmación que sugiera contra `ideas_generadas` o `pasajes_relevantes`.',
 ];
 
 /** The terse citation contract for tiny local windows (spends fewer tokens on rules). */
 export const CHAT_CITATION_RULES_COMPACT: string[] = [
   'CITAS: tras mencionar una idea/afirmacion del contexto, añade un enlace markdown [Autor, Año](nodus://idea/<id>) con el `id` EXACTO del campo "id".',
   'Documentos: [Autor, Año](nodus://work/<nodus_id>). Pasajes: [Autor, Año, p. N](nodus://passage/<id>) con el campo `citation` exacto.',
+  'Si hay `pasajes_relevantes`, úsalos como evidencia prioritaria; una cita general a la obra no los sustituye.',
+  'En consultas globales o comparativas, usa la orientación para cubrir las dimensiones centrales y respalda cada apartado con un pasaje pertinente cuando exista; nunca uses pasajes tangenciales para cumplir una cuota.',
+  '`orientacion_documental` sirve solo para localizar obras: nunca la cites como evidencia.',
   'El texto visible del enlace debe ser «Autor, Año» (el apellido del primer autor y el año de la obra), NUNCA el id. Usa el id exacto solo dentro de los parentesis; nunca lo inventes.',
 ];
 
@@ -442,6 +458,15 @@ export const CHAT_CITATION_RULES_COMPACT: string[] = [
  */
 export function humanizeResearchCitations(answer: string): string {
   return humanizeCitationLabels(answer, citationDisplayLabel);
+}
+
+/** Remove model-invented/dead citations before the final answer replaces streamed deltas. */
+export function sanitizeResearchCitations(answer: string, sourceContext: string): string {
+  const labelled = canonicalizeCitationLinks(humanizeResearchCitations(answer.trim()));
+  const refs = extractCitationRefs(labelled);
+  if (!refs.length) return labelled;
+  const allowed = supportedCitationKeys(refs, verifyCitations(refs), sourceContext);
+  return stripDisallowedCitations(labelled, allowed);
 }
 
 /**
@@ -501,14 +526,39 @@ async function buildRelevanceScope(selection: ResearchContextSelection, question
   }
 
   if (!queryEmbedding) {
-    return { queryEmbedding: null, ideaIds: null, ideaIdSet: null, workIdSet: null };
+    let lexicalHierarchy: Awaited<ReturnType<typeof retrieveHierarchical>> | null = null;
+    try {
+      lexicalHierarchy = await retrieveHierarchical(question, {
+        embedding: null, documentLimit: MAX_DOCUMENTS, ideaLimit: 0, passageLimit: 0,
+      });
+    } catch {
+      /* FTS is optional on legacy/read-only databases. */
+    }
+    const documentHits = lexicalHierarchy?.documents ?? [];
+    const documentWorkIds = new Set(documentHits.map((hit) => hit.nodusId));
+    return {
+      queryEmbedding: null, ideaIds: null, ideaIdSet: null,
+      workIdSet: documentWorkIds.size ? documentWorkIds : null,
+      documentHits, passageHits: [],
+    };
   }
 
   // Zero matches (query far from the corpus, or ideas not yet embedded for the
   // active provider) must fall back to the bounded default rather than filter
   // every section down to nothing — so an empty result becomes a null scope,
   // not an empty one. queryEmbedding is kept for documents/passages retrieval.
-  const similarIdeas = (await findSimilarIdeasPaged(queryEmbedding, IDEA_SIM_THRESHOLD, TOP_K_IDEAS)).map((row) => row.global_id);
+  const hierarchy = await retrieveHierarchical(question, {
+    embedding: queryEmbedding,
+    documentLimit: MAX_DOCUMENTS,
+    ideaLimit: TOP_K_IDEAS,
+    passageLimit: TOP_K_GLOBAL_PASSAGES,
+    routedWorkLimit: TOP_K_SCOPED_PASSAGES,
+    routedPassageLimit: TOP_K_SCOPED_PASSAGES,
+    minDocumentSimilarity: WORK_SIM_THRESHOLD,
+    minIdeaSimilarity: IDEA_SIM_THRESHOLD,
+    minPassageSimilarity: PASSAGE_SIM_THRESHOLD,
+  });
+  const similarIdeas = hierarchy.ideas.map((row) => row.global_id);
   const ideaIds = similarIdeas.length ? similarIdeas : null;
   const ideaIdSet = ideaIds ? new Set(ideaIds) : null;
 
@@ -523,9 +573,14 @@ async function buildRelevanceScope(selection: ResearchContextSelection, question
   for (const row of await findSimilarWorksPaged(queryEmbedding, WORK_SIM_THRESHOLD, TOP_K_SCOPE_WORKS)) {
     workIds.add(row.nodus_id);
   }
+  for (const hit of hierarchy.documents) workIds.add(hit.nodusId);
   const workIdSet = workIds.size ? workIds : null;
 
-  return { queryEmbedding, ideaIds, ideaIdSet, workIdSet };
+  return {
+    queryEmbedding, ideaIds, ideaIdSet, workIdSet,
+    documentHits: hierarchy.documents,
+    passageHits: hierarchy.passages,
+  };
 }
 
 /**
@@ -604,6 +659,11 @@ async function buildResearchContext(
 
   const passageScopeWorkIds = new Set(linkedWorkIds);
 
+  if (scope.documentHits.length > 0) {
+    context.orientacion_documental = compactDocumentOrientation(scope.documentHits);
+    sections.push('Orientación documental');
+  }
+
   // The full-text sections dominate the payload; on a small local budget, cap how much
   // text they pull so we neither do wasted IO nor build a giant payload just to prune it.
   const heavyCap = Math.min(maxContextChars, MAX_TOTAL_CONTEXT_CHARS);
@@ -622,7 +682,7 @@ async function buildResearchContext(
   // Default to enabled for historic saved selections created before the passage
   // toggle existed. Explicit false still gives the reader full control.
   if (selection.passages !== false) {
-    const passages = await listRelevantPassages(scope.queryEmbedding, passageScopeWorkIds, heavyCap);
+    const passages = await listRelevantPassages(scope, passageScopeWorkIds, heavyCap);
     context.pasajes_relevantes = passages;
     sections.push('Pasajes de texto completo');
   }
@@ -1152,20 +1212,17 @@ async function selectDocumentWorks(linkedWorkIds: Set<string>, queryEmbedding: n
 }
 
 async function listRelevantPassages(
-  queryEmbedding: number[] | null,
+  scope: RelevanceScope,
   linkedWorkIds: Set<string>,
   budget = MAX_TOTAL_CONTEXT_CHARS
 ): Promise<unknown[]> {
-  if (!queryEmbedding) return [];
+  if (!scope.queryEmbedding) return [];
   const passageTotal = Math.min(MAX_PASSAGE_CONTEXT_CHARS, Math.max(0, budget));
-  const scoped = linkedWorkIds.size
-    ? await findSimilarPassagesPaged(queryEmbedding, PASSAGE_SIM_THRESHOLD, TOP_K_SCOPED_PASSAGES, {
-        nodusIds: [...linkedWorkIds],
-      })
+  const unique = new Map<string, HierarchicalPassageHit>();
+  const preferred = linkedWorkIds.size
+    ? scope.passageHits.filter((hit) => linkedWorkIds.has(hit.nodus_id))
     : [];
-  const global = await findSimilarPassagesPaged(queryEmbedding, PASSAGE_SIM_THRESHOLD, TOP_K_GLOBAL_PASSAGES);
-  const unique = new Map<string, (typeof global)[number]>();
-  for (const passage of [...scoped, ...global]) {
+  for (const passage of [...preferred, ...scope.passageHits]) {
     if (!unique.has(passage.passage_id)) unique.set(passage.passage_id, passage);
   }
 
@@ -1193,6 +1250,25 @@ async function listRelevantPassages(
     });
   }
   return passages;
+}
+
+function compactDocumentOrientation(hits: HierarchicalDocumentHit[]): unknown[] {
+  const byWork = new Map<string, HierarchicalDocumentHit>();
+  for (const hit of hits) if (!byWork.has(hit.nodusId)) byWork.set(hit.nodusId, hit);
+  return [...byWork.values()].slice(0, MAX_DOCUMENTS).map((hit) => ({
+    work: {
+      nodus_id: hit.nodusId,
+      title: hit.title,
+      authors: hit.authors,
+      year: hit.year,
+    },
+    matched_level: hit.kind,
+    matched_field: hit.fieldKind,
+    orientation: clipText(hit.text, 2_000).text,
+    explanation: hit.explanation,
+    orientation_only: true,
+    citable: false,
+  }));
 }
 
 function listDocumentSummaries(candidateWorks: WorkRow[], budget = MAX_TOTAL_CONTEXT_CHARS): unknown[] {

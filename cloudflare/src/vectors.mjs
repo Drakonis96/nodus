@@ -12,7 +12,7 @@ import {
   sha256Hex,
 } from './util.mjs';
 
-const VECTOR_KINDS = new Set(['ideas', 'passages']);
+const VECTOR_KINDS = new Set(['ideas', 'documents', 'passages']);
 const VECTOR_FORMAT = 'nodus.vectors';
 const VECTOR_MAX_DIRECT_BYTES = 96 * 1024 * 1024;
 
@@ -46,7 +46,7 @@ function decodeHeader(bytes) {
 
 export async function uploadExactVectorSet(env, auth, request, publicationId, kindValue) {
   const kind = String(kindValue || 'ideas');
-  if (!VECTOR_KINDS.has(kind)) throw new HttpError(400, 'bad_kind', 'Vector kind must be ideas or passages.');
+  if (!VECTOR_KINDS.has(kind)) throw new HttpError(400, 'bad_kind', 'Vector kind must be ideas, documents or passages.');
   const publication = await first(env.DB, `SELECT * FROM publications WHERE id = ?1 AND space_id = ?2 AND status = 'staging'`, publicationId, auth.space_id);
   if (!publication) throw new HttpError(404, 'publication_not_found', 'The staging publication does not exist.');
   const bytes = await readBody(request, VECTOR_MAX_DIRECT_BYTES);
@@ -78,7 +78,7 @@ export async function uploadExactVectorSet(env, auth, request, publicationId, ki
 
 export async function upsertVectorChunk(env, auth, request, publicationId, kindValue) {
   const kind = String(kindValue || 'ideas');
-  if (!VECTOR_KINDS.has(kind)) throw new HttpError(400, 'bad_kind', 'Vector kind must be ideas or passages.');
+  if (!VECTOR_KINDS.has(kind)) throw new HttpError(400, 'bad_kind', 'Vector kind must be ideas, documents or passages.');
   const publication = await first(env.DB, `SELECT * FROM publications WHERE id = ?1 AND space_id = ?2 AND status = 'staging'`, publicationId, auth.space_id);
   if (!publication) throw new HttpError(404, 'publication_not_found', 'The staging publication does not exist.');
   const input = await readJson(request, 8 * 1024 * 1024);
@@ -151,8 +151,12 @@ function scoreExact(decoded, bytes, query, limit, threshold) {
 }
 
 async function rowsForMatches(env, space, kind, matches) {
-  const table = kind === 'ideas' ? 'ideas' : 'passages';
-  const idColumn = kind === 'ideas' ? 'global_id' : 'passage_id';
+  const source = kind === 'ideas'
+    ? { table: 'ideas', idColumn: 'global_id' }
+    : kind === 'documents'
+      ? { table: 'document_vectors', idColumn: 'vector_id' }
+      : { table: 'passages', idColumn: 'passage_id' };
+  const { table, idColumn } = source;
   const wanted = new Set(matches.map((match) => String(match.id)));
   const records = await all(env.DB, `SELECT row_json FROM published_rows
     WHERE space_id = ?1 AND generation = ?2 AND table_name = ?3
@@ -164,7 +168,7 @@ async function rowsForMatches(env, space, kind, matches) {
 
 export async function semanticSearch(env, auth, input) {
   const kind = String(input.kind || 'ideas');
-  if (!VECTOR_KINDS.has(kind)) throw new HttpError(400, 'bad_kind', 'Vector kind must be ideas or passages.');
+  if (!VECTOR_KINDS.has(kind)) throw new HttpError(400, 'bad_kind', 'Vector kind must be ideas, documents or passages.');
   const space = await first(env.DB, 'SELECT * FROM spaces WHERE id = ?1', auth.space_id);
   if (!space?.active_generation) throw new HttpError(409, 'not_published', 'This vault has not been published.');
   const set = await first(env.DB, 'SELECT * FROM vector_sets WHERE space_id = ?1 AND generation = ?2 AND kind = ?3', auth.space_id, space.active_generation, kind);

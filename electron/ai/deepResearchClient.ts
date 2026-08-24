@@ -12,7 +12,12 @@ import type {
 } from '@shared/types';
 import type { DeepResearchApproach } from '@shared/deepResearchApproaches';
 import { normalizeDeepResearchApproach } from '@shared/deepResearchApproaches';
-import { buildWritingWorkshopSnapshot } from './writingWorkshop';
+import { parseDeepResearchRequestVersion, type DeepResearchVersion } from '@shared/deepResearchVersions';
+import {
+  assessDeepResearchReport,
+  type DeepResearchQualitySource,
+} from '@shared/deepResearchQuality';
+import { buildHistoricalWritingWorkshopSnapshot, buildIdeaFirstWritingWorkshopSnapshot } from './writingWorkshop';
 import {
   applyCitationPolicy,
   assembleMarkdown,
@@ -22,8 +27,6 @@ import {
   collectCitedWorkIds,
   countWords,
   resolveSectionPlan,
-  resolveTargetPages,
-  WORDS_PER_PAGE,
   DEEP_RESEARCH_NARRATIVE_RULES,
   type CitationCatalog,
   type DeepResearchPlanSection,
@@ -54,24 +57,46 @@ import {
 /** The one dependency on the outside world — injected so the shaping is testable without DB/embeddings. */
 export type SnapshotBuilder = (brief: WritingWorkshopBrief, extraProbes?: string[]) => Promise<WritingWorkshopSnapshot>;
 
+/**
+ * The client writer has the same compatibility contract as the in-app writer:
+ * v1 is the historical idea/passage snapshot, while v2 starts from the
+ * idea-first retriever (which can then enrich with full-document evidence).
+ * Keeping this choice in one pure function prevents `approach` or any
+ * presentation setting from accidentally selecting the engine.
+ */
+export type DeepResearchClientRoute = 'v1-historical' | 'v2-idea-first';
+
+export function deepResearchClientRoute(value: unknown): DeepResearchClientRoute {
+  const version = parseDeepResearchRequestVersion(value);
+  return version === 'v1' ? 'v1-historical' : 'v2-idea-first';
+}
+
+function snapshotBuilderForVersion(version: DeepResearchVersion): SnapshotBuilder {
+  return version === 'v1' ? buildHistoricalWritingWorkshopSnapshot : buildIdeaFirstWritingWorkshopSnapshot;
+}
+
 function briefFor(request: DeepResearchRequest): WritingWorkshopBrief {
+  const deepResearchVersion = parseDeepResearchRequestVersion(request.deepResearchVersion);
   return {
     kind: 'deep_research',
     objective: request.objective,
     audience: request.audience,
     tone: 'academic',
     language: request.language ?? 'es',
+    deepResearchVersion,
   };
 }
 
 export interface DeepResearchBrief {
   mode: 'client';
+  deepResearchVersion: DeepResearchVersion;
   approach: DeepResearchApproach;
   objective: string;
   language: PromptLanguage;
   audience?: string;
-  targetPages: { min: number; max: number };
-  sections: { target: number; hardCap: number; mode: 'auto' | 'user' };
+  /** Requested visible shape. Internal evidence planning remains unchanged. */
+  structure: 'sectioned' | 'single';
+  sections: { suggested: number; mode: 'auto' | 'user' };
   materials: CitationCatalog;
   citationPolicy: string[];
   method: string[];
@@ -86,26 +111,34 @@ export interface DeepResearchBrief {
  */
 export async function buildDeepResearchBrief(
   request: DeepResearchRequest,
-  buildSnapshot: SnapshotBuilder = buildWritingWorkshopSnapshot
+  buildSnapshot?: SnapshotBuilder
 ): Promise<DeepResearchBrief> {
   const language = request.language ?? 'es';
   const approach = normalizeDeepResearchApproach(request.approach);
-  const ordinary = await buildSnapshot(briefFor(request));
+  const deepResearchVersion = parseDeepResearchRequestVersion(request.deepResearchVersion);
+  const snapshotBuilder = buildSnapshot ?? snapshotBuilderForVersion(deepResearchVersion);
+  const ordinary = await snapshotBuilder(briefFor({ ...request, deepResearchVersion }));
   const retrieval = deterministicApproachRetrievalPlan(approach, request.objective);
   const snapshot = approach === 'general'
     ? ordinary
-    : mergeApproachSnapshots(ordinary, await buildSnapshot(briefFor(request), retrieval.probes), approach);
-  const targetPages = resolveTargetPages(request.targetLength ?? 'adaptive', snapshot);
-  const sectionPlan = resolveSectionPlan(targetPages, request.sectionLimit ?? 'auto');
+    : mergeApproachSnapshots(ordinary, await snapshotBuilder(briefFor({ ...request, deepResearchVersion }), retrieval.probes), approach);
+  const sectionPlan = resolveSectionPlan(
+    snapshot,
+    request.sectionLimit ?? 'auto',
+    request.objective,
+    request.coverageQuestions ?? [],
+  );
   const specializedRules = approach === 'general' ? null : approachRules(approach, 'client');
+  const singleNarrative = request.sectionLimit === 'single';
   return {
     mode: 'client',
+    deepResearchVersion,
     approach,
     objective: request.objective,
     language,
     audience: request.audience,
-    targetPages,
-    sections: { target: sectionPlan.target, hardCap: sectionPlan.hardCap, mode: sectionPlan.mode },
+    structure: singleNarrative ? 'single' : 'sectioned',
+    sections: { suggested: sectionPlan.target, mode: sectionPlan.mode },
     materials: buildCitationCatalog(snapshot),
     citationPolicy: [
       'Cita CADA afirmación sustantiva con un token del catálogo, copiado EXACTAMENTE (incluido el enlace nodus://) y colocado entre paréntesis.',
@@ -113,15 +146,19 @@ export async function buildDeepResearchBrief(
       'Puedes citar el mismo token varias veces. No añadas una sección de Referencias ni bibliografía: Nodus la construye a partir de las obras realmente citadas.',
     ],
     method: [
-      `El cuerpo debe ocupar entre ${targetPages.min} y ${targetPages.max} páginas (~${WORDS_PER_PAGE} palabras/página), repartidas en torno a ${sectionPlan.target} secciones (máximo ${sectionPlan.hardCap}).`,
-      'Prefiere POCAS secciones LARGAS y profundas antes que muchas cortas: cada sección agrupa varias ideas afines y las relaciona (continuidad, tensiones, consecuencias), no una idea por sección.',
+      `La evidencia sugiere en torno a ${sectionPlan.target} movimientos argumentales, pero no es una cuota ni un límite. Desarrolla cada afirmación, relación, contraste y evidencia relevante una sola vez y detente cuando no aporte valor marginal verificable.`,
+      singleNarrative
+        ? 'Redacta una única narración continua, sin encabezados, subtítulos ni rótulos internos. Organiza los movimientos del argumento mediante párrafos y transiciones naturales.'
+        : 'Prefiere POCAS secciones LARGAS y profundas antes que muchas cortas: cada sección agrupa varias ideas afines y las relaciona (continuidad, tensiones, consecuencias), no una idea por sección.',
       ...DEEP_RESEARCH_NARRATIVE_RULES,
       ...(specializedRules?.planner ?? []),
       ...(specializedRules?.writer ?? []),
       ...(specializedRules?.finalizer ?? []),
       'Reparte TODAS las ideas relevantes del catálogo entre las secciones. Sitúa los huecos y contradicciones donde aporten tensión argumental. Cierra con una síntesis.',
       'Cada entrada del catálogo trae en `note` el contenido real de lo que cita. Los pasajes traen el texto literal de la obra entre comillas angulares: úsalos como evidencia textual y no extiendas su sentido. Los huecos y las contradicciones traen lo que afirman, así que arguméntalos por su contenido en vez de nombrarlos de pasada.',
-      'Empieza cada sección con un encabezado Markdown "## Título". No incluyas el resumen, las limitaciones ni las referencias en `sectionsMarkdown`: pásalos como campos aparte a la herramienta de ensamblado.',
+      singleNarrative
+        ? 'Entrega el cuerpo seguido en `sectionsMarkdown`, sin ningún encabezado Markdown. No incluyas el resumen, las limitaciones ni las referencias: pásalos como campos aparte y conserva `sectionLimit: "single"` al finalizar.'
+        : 'Empieza cada sección con un encabezado Markdown "## Título". No incluyas el resumen, las limitaciones ni las referencias en `sectionsMarkdown`: pásalos como campos aparte a la herramienta de ensamblado.',
       `Cuando termines de redactar, llama a \`${'nodus_finalize_deep_research'}\` con tu markdown para validar las citas, construir las referencias y (si quieres) guardar el borrador.`,
     ],
     finalizeWith: 'nodus_finalize_deep_research',
@@ -133,7 +170,9 @@ export interface ClientFinalizeInput {
   approach?: DeepResearchApproach;
   language?: PromptLanguage;
   audience?: string;
-  /** The body the caller's model wrote: `## ` sections only, no Resumen/Referencias. */
+  /** Must match the brief so the assembler can preserve a continuous body. */
+  sectionLimit?: DeepResearchRequest['sectionLimit'];
+  /** The body the caller wrote; headed sections normally, plain prose for `single`. */
   sectionsMarkdown: string;
   title?: string;
   abstract?: string;
@@ -141,6 +180,7 @@ export interface ClientFinalizeInput {
   nextSteps?: string[];
   /** Optional provenance supplied by the MCP client that actually wrote the prose. */
   generationModel?: ModelRef | null;
+  deepResearchVersion?: DeepResearchVersion;
 }
 
 function outlineFromMarkdown(markdown: string): WritingWorkshopSection[] {
@@ -162,17 +202,26 @@ function outlineFromMarkdown(markdown: string): WritingWorkshopSection[] {
  */
 export async function assembleClientDeepResearchReport(
   input: ClientFinalizeInput,
-  buildSnapshot: SnapshotBuilder = buildWritingWorkshopSnapshot
+  buildSnapshot?: SnapshotBuilder
 ): Promise<DeepResearchReport> {
   const language = input.language ?? 'es';
   const approach = normalizeDeepResearchApproach(input.approach);
-  const request: DeepResearchRequest = { objective: input.objective, language, audience: input.audience, approach };
+  const deepResearchVersion = parseDeepResearchRequestVersion(input.deepResearchVersion);
+  const request: DeepResearchRequest = {
+    objective: input.objective,
+    language,
+    audience: input.audience,
+    approach,
+    deepResearchVersion,
+    sectionLimit: input.sectionLimit,
+  };
   const brief = briefFor(request);
-  const ordinary = await buildSnapshot(brief);
+  const snapshotBuilder = buildSnapshot ?? snapshotBuilderForVersion(deepResearchVersion);
+  const ordinary = await snapshotBuilder(brief);
   const retrieval = deterministicApproachRetrievalPlan(approach, input.objective);
   const snapshot = approach === 'general'
     ? ordinary
-    : mergeApproachSnapshots(ordinary, await buildSnapshot(brief, retrieval.probes), approach);
+    : mergeApproachSnapshots(ordinary, await snapshotBuilder(brief, retrieval.probes), approach);
   const maps = buildSnapshotMaps(snapshot);
 
   // Enforce the citation contract on the caller's prose.
@@ -184,6 +233,7 @@ export async function assembleClientDeepResearchReport(
   const nextSteps = (input.nextSteps ?? []).map((s) => s.trim()).filter(Boolean);
   const abstract = (input.abstract ?? '').trim();
   const title = (input.title ?? '').trim() || input.objective;
+  const singleNarrative = input.sectionLimit === 'single';
 
   const syntheticSection: DeepResearchPlanSection = {
     id: 's-client',
@@ -200,7 +250,8 @@ export async function assembleClientDeepResearchReport(
     [{ section: syntheticSection, markdown: cleanedBody }],
     references,
     { title, abstract, limitations, nextSteps },
-    language
+    language,
+    input.sectionLimit,
   );
 
   const matrix: WritingWorkshopMatrixRow[] = [...cited.ideas]
@@ -217,7 +268,15 @@ export async function assembleClientDeepResearchReport(
     }));
 
   const words = countWords(cleanedBody);
-  const pages = Math.max(1, Math.round(words / WORDS_PER_PAGE));
+  // Pages are descriptive telemetry only; they never constrain generation.
+  const pages = Math.max(1, Math.round(words / 450));
+  const qualitySources = clientQualitySources(cleanedBody, maps);
+  const qualitySections = splitClientSections(cleanedBody, title);
+  const qualityAssessment = assessDeepResearchReport({
+    mode: 'client',
+    objective: input.objective,
+    sections: qualitySections.map((section) => ({ ...section, sources: qualitySources })),
+  });
 
   const draft: WritingWorkshopDraft = {
     generatedAt: new Date().toISOString(),
@@ -233,14 +292,17 @@ export async function assembleClientDeepResearchReport(
     },
     title,
     abstract,
-    outline: outlineFromMarkdown(cleanedBody),
+    outline: singleNarrative ? [] : outlineFromMarkdown(cleanedBody),
     draftMarkdown,
     matrix,
     bibliography: references,
     nextSteps,
     limitations,
     deepResearchApproach: approach,
+    deepResearchVersion,
+    deepResearchStructure: singleNarrative ? 'single' : 'sectioned',
     generationModel: input.generationModel ? { ...input.generationModel } : null,
+    qualityAssessment,
     stats: {
       selectedIdeas: cited.ideas.size,
       selectedThemes: 0,
@@ -253,18 +315,54 @@ export async function assembleClientDeepResearchReport(
       truncated: false,
     },
   };
-  draft.brief = { ...draft.brief, deepResearchApproach: approach };
+  draft.brief = { ...draft.brief, deepResearchApproach: approach, deepResearchVersion };
 
   const meta: DeepResearchMeta = {
-    sections: draft.outline.length,
+    sections: singleNarrative ? 1 : draft.outline.length,
     words,
     pages,
     ideasCovered: cited.ideas.size,
     ideasConsidered: snapshot.ideas.length,
     worksCited: citedWorkIds.size,
-    targetPages: resolveTargetPages('adaptive', snapshot),
+    deepResearchVersion,
+    structure: singleNarrative ? 'single' : 'sectioned',
     stoppedReason: null,
   };
 
   return { draft, meta };
+}
+
+function splitClientSections(markdown: string, fallbackTitle: string): { title: string; markdown: string }[] {
+  const blocks = markdown.split(/^##\s+/gmu).slice(1).map((block) => {
+    const newline = block.indexOf('\n');
+    return { title: block.slice(0, newline).trim(), markdown: `## ${block}`.trim() };
+  });
+  return blocks.length ? blocks : [{ title: fallbackTitle, markdown }];
+}
+
+function clientQualitySources(
+  markdown: string,
+  maps: ReturnType<typeof buildSnapshotMaps>,
+): DeepResearchQualitySource[] {
+  const links = [...markdown.matchAll(/\[[^\]\n]*\]\((nodus:\/\/(idea|work|passage|gap|contradiction)\/([^)\s]+))\)/giu)];
+  const sources = new Map<string, DeepResearchQualitySource>();
+  for (const match of links) {
+    const citation = match[1];
+    const kind = match[2].toLocaleLowerCase();
+    let id = match[3];
+    try { id = decodeURIComponent(id); } catch { /* retain raw */ }
+    const sourceId = kind === 'idea'
+      ? maps.ideaById.get(id)?.works[0]?.nodus_id ?? citation
+      : kind === 'passage'
+        ? maps.passageWorkId.get(id) ?? citation
+        : kind === 'work'
+          ? id
+          : citation;
+    sources.set(citation, {
+      citation,
+      sourceId,
+      evidence: kind === 'passage' ? 'literal' : 'synthesis',
+    });
+  }
+  return [...sources.values()];
 }

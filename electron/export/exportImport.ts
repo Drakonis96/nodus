@@ -32,6 +32,10 @@ import {
 import type { ZipFileEntry, ZipFileReader } from './zipFile';
 import { StreamingZipWriter } from './streamingZip';
 import { browserBookmarksRepository } from '../browser/bookmarks';
+import {
+  pauseAllDocumentIndexingAndDrain,
+  resumeAllDocumentIndexingAfterMaintenance,
+} from '../pipeline/documentIndexMaintenance';
 
 interface ExportManifestBase {
   schemaVersion: number;
@@ -106,16 +110,19 @@ export interface BackupInventory {
     ideas: EmbeddingInventory;
     workSummaries: EmbeddingInventory;
     passages: EmbeddingInventory;
+    /** Added in backup v5; absent in older archives. */
+    documents?: EmbeddingInventory;
   };
   modelSettings: Pick<
     AppSettings,
     | 'embeddingProvider' | 'embeddingModel' | 'favorites' | 'codexReasoningEfforts' | 'defaultModel' | 'modelSettingsMode' | 'modelSettingsVersion'
-    | 'extractionModel' | 'synthesisModel' | 'summaryModel' | 'fusionModel'
+    | 'extractionModel' | 'synthesisModel' | 'summaryModel' | 'fusionModel' | 'documentProfileModel' | 'documentAuditModel'
     | 'chatModel' | 'nodiModel' | 'deepResearchModel' | 'immersionModel' | 'writingModel'
     | 'argumentMapModel' | 'authorModel' | 'studyModel' | 'tutorModel' | 'hypothesisModel'
     | 'improveModel' | 'questionGenModel' | 'gradingModel' | 'flashcardModel' | 'transcriptionModel' | 'sttProvider'
     | 'sttTransformersModel' | 'sttWhisperCppModel' | 'sttWhisperCppExecutable'
     | 'imageProvider' | 'imageModel' | 'imageQuality' | 'imageStyle' | 'audioProvider' | 'audioVoice' | 'audioSpeed'
+    | 'documentIndexingEnabled' | 'documentIndexIncludeArchived' | 'documentIndexConcurrency'
   >;
   apiKeyProviders: AiProvider[];
 }
@@ -482,12 +489,14 @@ export async function restoreBackupArchiveFileSafely(
   const safetyDir = path.join(app.getPath('userData'), 'restore-safety');
   const safetyPath = path.join(safetyDir, `pre-restore-${Date.now()}-${Math.random().toString(36).slice(2)}.nodus`);
   const stagedSafety = `${safetyPath}.tmp`;
+  let pausedVaultIds: string[] | null = null;
   try {
     emitRestoreProgress(onProgress, 'preparing', 0, 0);
     await fs.promises.mkdir(safetyDir, { recursive: true });
     await createBackupArchiveFile({ password: safetyPassword, appVersion }, stagedSafety);
     await fs.promises.rename(stagedSafety, safetyPath);
     emitRestoreProgress(onProgress, 'preparing', 1, 1);
+    pausedVaultIds = await pauseAllDocumentIndexingAndDrain();
     const result = await restoreBackupArchiveFile(archivePath, password, onProgress);
     if (!result.ok) {
       await fs.promises.rm(safetyPath, { force: true });
@@ -521,6 +530,8 @@ export async function restoreBackupArchiveFileSafely(
         safetyBackupPath: safetyPath,
       };
     }
+  } finally {
+    if (pausedVaultIds) await resumeAllDocumentIndexingAfterMaintenance(pausedVaultIds);
   }
 }
 
@@ -566,6 +577,7 @@ export async function restoreBackupArchiveSafely(
   if (!password.trim()) return { ok: false, message: 'Importación cancelada: falta la contraseña de la copia.' };
   const safetyPassword = getBackupPassword() || password;
   let safetyPath = '';
+  let pausedVaultIds: string[] | null = null;
   try {
     const safetyArchive = await createBackupArchive({
       password: safetyPassword,
@@ -575,6 +587,7 @@ export async function restoreBackupArchiveSafely(
     safetyPath = path.join(safetyDir, `pre-restore-${Date.now()}.nodus`);
     writeAtomicFile(safetyPath, safetyArchive);
 
+    pausedVaultIds = await pauseAllDocumentIndexingAndDrain();
     const result = restoreBackupArchive(archive, password);
     if (!result.ok) {
       fs.rmSync(safetyPath, { force: true });
@@ -605,6 +618,8 @@ export async function restoreBackupArchiveSafely(
         safetyBackupPath: safetyPath,
       };
     }
+  } finally {
+    if (pausedVaultIds) await resumeAllDocumentIndexingAfterMaintenance(pausedVaultIds);
   }
 }
 
@@ -1514,6 +1529,7 @@ function databaseInventory(
         ideas: embeddingInventory(db, 'ideas'),
         workSummaries: embeddingInventory(db, 'work_summaries'),
         passages: embeddingInventory(db, 'passages'),
+        documents: embeddingInventory(db, 'document_vectors'),
       },
       modelSettings: modelSettings(settings),
       apiKeyProviders: Object.keys(apiKeys).sort() as AiProvider[],
@@ -1553,7 +1569,11 @@ function databaseMatchesInventory(databasePath: string, expected: BackupInventor
     actual.embeddings.workSummaries.records === expected.embeddings.workSummaries.records &&
     actual.embeddings.workSummaries.bytes === expected.embeddings.workSummaries.bytes &&
     actual.embeddings.passages.records === expected.embeddings.passages.records &&
-    actual.embeddings.passages.bytes === expected.embeddings.passages.bytes
+    actual.embeddings.passages.bytes === expected.embeddings.passages.bytes &&
+    (!expected.embeddings.documents || (
+      actual.embeddings.documents?.records === expected.embeddings.documents.records &&
+      actual.embeddings.documents?.bytes === expected.embeddings.documents.bytes
+    ))
   );
 }
 
@@ -1573,12 +1593,13 @@ function modelSettings(
   settings: Pick<
     AppSettings,
     | 'embeddingProvider' | 'embeddingModel' | 'favorites' | 'codexReasoningEfforts' | 'defaultModel' | 'modelSettingsMode' | 'modelSettingsVersion'
-    | 'extractionModel' | 'synthesisModel' | 'summaryModel' | 'fusionModel'
+    | 'extractionModel' | 'synthesisModel' | 'summaryModel' | 'fusionModel' | 'documentProfileModel' | 'documentAuditModel'
     | 'chatModel' | 'nodiModel' | 'deepResearchModel' | 'immersionModel' | 'writingModel'
     | 'argumentMapModel' | 'authorModel' | 'studyModel' | 'tutorModel' | 'hypothesisModel'
     | 'improveModel' | 'questionGenModel' | 'gradingModel' | 'flashcardModel' | 'transcriptionModel' | 'sttProvider'
     | 'sttTransformersModel' | 'sttWhisperCppModel' | 'sttWhisperCppExecutable'
     | 'imageProvider' | 'imageModel' | 'imageQuality' | 'imageStyle' | 'audioProvider' | 'audioVoice' | 'audioSpeed'
+    | 'documentIndexingEnabled' | 'documentIndexIncludeArchived' | 'documentIndexConcurrency'
   >
 ): BackupInventory['modelSettings'] {
   return {
@@ -1593,6 +1614,8 @@ function modelSettings(
     synthesisModel: settings.synthesisModel,
     summaryModel: settings.summaryModel,
     fusionModel: settings.fusionModel,
+    documentProfileModel: settings.documentProfileModel,
+    documentAuditModel: settings.documentAuditModel,
     chatModel: settings.chatModel,
     nodiModel: settings.nodiModel,
     deepResearchModel: settings.deepResearchModel,
@@ -1619,6 +1642,9 @@ function modelSettings(
     audioProvider: settings.audioProvider,
     audioVoice: settings.audioVoice,
     audioSpeed: settings.audioSpeed,
+    documentIndexingEnabled: settings.documentIndexingEnabled,
+    documentIndexIncludeArchived: settings.documentIndexIncludeArchived,
+    documentIndexConcurrency: settings.documentIndexConcurrency,
   };
 }
 

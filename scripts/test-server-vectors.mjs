@@ -108,7 +108,11 @@ test('the server searches its own matrix and never lies about an index it does n
     const owner = await server.deviceToken(server.adminEmail, server.adminPassword, spaceId);
     await server.createUser('lector@example.test', 'lector-account-password', [{ spaceId, role: 'reader' }]);
     const reader = await server.deviceToken('lector@example.test', 'lector-account-password', spaceId);
-    await publish(server.origin, owner.deviceToken, spaceId, academicSnapshot());
+    await publish(server.origin, owner.deviceToken, spaceId, academicSnapshot({ tables: {
+      document_vectors: [
+        { vector_id: 'doc-v-1', nodus_id: 'w-1', version_id: 'profile-1', kind: 'overview', source_id: null, text: 'La obra estudia globalmente memoria y archivo.' },
+      ],
+    } }));
 
     // Before any vectors exist, a semantic search degrades to lexical AND says so. An empty
     // list here would read as "the corpus does not discuss this", which would be a lie.
@@ -146,6 +150,20 @@ test('the server searches its own matrix and never lies about an index it does n
     assert.equal(matched.results[0].id, 'i-b', 'the query is its own nearest neighbour');
     assert.equal(matched.results[0].row.label, 'Tesis B', 'a hit resolves to the real corpus row');
     assert.ok(matched.results[0].score > 0.99);
+
+    const documentPayload = encodeVectorSet({
+      kind: 'documents', provider: 'openai', model: 'text-embedding-3-small', dim: DIM,
+      entries: [{ id: 'doc-v-1', vector: pseudoVector(4) }],
+    });
+    const uploadedDocuments = await server.api(owner.deviceToken, 'PUT', `/api/v1/spaces/${spaceId}/vectors?kind=documents`, { body: documentPayload });
+    assert.equal(uploadedDocuments.status, 200, 'whole-document vectors are accepted as an independent lane');
+    const documentMatches = await (await server.api(reader.deviceToken, 'POST', `/api/v1/spaces/${spaceId}/search/semantic`, {
+      json: { kind: 'documents', vector: Array.from(pseudoVector(4)), provider: 'openai', model: 'text-embedding-3-small', dim: DIM, limit: 3 },
+    })).json();
+    assert.equal(documentMatches.indexed, true);
+    assert.equal(documentMatches.results[0].id, 'doc-v-1');
+    assert.equal(documentMatches.results[0].row.nodus_id, 'w-1');
+    assert.equal(documentMatches.results[0].row.kind, 'overview');
 
     // A different provider is told exactly why, with both sides named.
     const mismatched = await (await server.api(reader.deviceToken, 'POST', `/api/v1/spaces/${spaceId}/search/semantic`, {

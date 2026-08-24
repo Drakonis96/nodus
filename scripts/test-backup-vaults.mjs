@@ -46,6 +46,17 @@ try {
   assert.equal(legacy.type, 'academic');
   const alice = entities.createPerson({ displayName: 'Alice Académica' });
   assert.ok(entities.getPerson(alice.personId), 'person seeded in vault A');
+  const documentProfiles = require(path.join(repoRoot, 'electron/db/documentProfilesRepo.ts'));
+  getDb().prepare("INSERT INTO works(nodus_id,zotero_key,title) VALUES('backup-doc','BACKUP-DOC','Obra con perfil')").run();
+  documentProfiles.publishDocumentProfile({
+    nodusId: 'backup-doc', sourceFingerprint: 'backup-source', pipelineVersion: 'document-profile/1', schemaVersion: 1,
+    sourceLanguage: 'es', presentationLanguage: 'es', overview: 'Perfil que debe sobrevivir al backup.', profile: {},
+    fields: [{ fieldId: 'backup-field', kind: 'thesis', ordinal: 0, text: 'Tesis preservada.', confidence: 1, centrality: 1 }],
+    sections: [], supports: [], ideaLinks: [],
+    vectors: [{ vectorId: 'backup-vector', kind: 'overview', sourceId: null, text: 'Perfil que debe sobrevivir al backup.', weight: 1, embedding: [1, 0, 0, 0] }],
+    generatorModel: null, auditorModel: null, promptHash: 'backup-prompt',
+    audit: { passed: true, score: 1, supportCoverage: 1, structureCoverage: 1, issues: [], repaired: false }, qualityScore: 1,
+  });
 
   const gene = vaults.createVault('Familia', 'genealogy');
   switchTo(gene.id);
@@ -142,6 +153,7 @@ try {
   assert.equal(dbmode.listDatabases().length, 0, 'database wiped from the databases vault');
   switchTo(legacy.id);
   entities.deletePerson(alice.personId); // vault A
+  getDb().prepare("DELETE FROM works WHERE nodus_id='backup-doc'").run();
   assert.equal(entities.getPerson(alice.personId), null, 'Alice deleted from vault A');
   for (const item of extraVaults) {
     switchTo(item.vault.id);
@@ -183,6 +195,12 @@ try {
 
   switchTo(legacy.id);
   assert.ok(entities.getPerson(alice.personId), 'Alice restored in the academic vault');
+  assert.equal(documentProfiles.getDocumentProfile('backup-doc').fields[0].text, 'Tesis preservada.', 'the audited document profile is restored');
+  assert.equal(
+    getDb().prepare("SELECT length(embedding) AS bytes FROM document_vectors WHERE vector_id='backup-vector'").get().bytes,
+    16,
+    'the document embedding is restored without reindexing'
+  );
   for (const item of extraVaults) {
     switchTo(item.vault.id);
     assert.ok(entities.getPerson(item.person.personId), `${item.vault.type} vault data restored`);

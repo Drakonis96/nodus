@@ -217,7 +217,7 @@ process.stdout.write('unit design (AI structure) … ');
 try {
   const auto = await generateDeepResearchReport({
     objective: 'Unidad sobre la revolución industrial y sus consecuencias sociales para 4.º ESO',
-    language: 'es', targetLength: 'concise', sectionLimit: 3, model: modelRef, unitMode: true, studyMode: true,
+    language: 'es',sectionLimit: 3, model: modelRef, unitMode: true, studyMode: true,
   });
   console.log('done');
   check('the AI proposed its own parts', () => assert.ok(auto.meta.sections >= 3, `${auto.meta.sections} sections`));
@@ -245,7 +245,7 @@ process.stdout.write('unit design (teacher structure) … ');
 try {
   const fixed = await generateDeepResearchReport({
     objective: 'Unidad sobre la revolución industrial y sus consecuencias sociales para 4.º ESO',
-    language: 'es', targetLength: 'concise', model: modelRef, unitMode: true, studyMode: true, outline: OUTLINE,
+    language: 'es',model: modelRef, unitMode: true, studyMode: true, outline: OUTLINE,
   });
   console.log('done');
   const titles = fixed.draft.outline.map((section) => section.title);

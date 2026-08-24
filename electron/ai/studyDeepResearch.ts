@@ -11,6 +11,14 @@ import type {
 } from '@shared/types';
 import type { DeepResearchApproach } from '@shared/deepResearchApproaches';
 import { normalizeDeepResearchApproach } from '@shared/deepResearchApproaches';
+import {
+  assessDeepResearchReport,
+  assessDeepResearchSection,
+  qualityPasses,
+  shouldAcceptQualityRevision,
+  type DeepResearchQualityMode,
+  type DeepResearchQualitySource,
+} from '@shared/deepResearchQuality';
 import type { StudySearchIndexEntry, StudySearchKind } from '@shared/studySearch';
 import {
   normalizeStudyDeepResearchAudience,
@@ -24,6 +32,7 @@ import {
   planApproachRetrieval,
   type ApproachRetrievalPlan,
 } from './deepResearchApproaches';
+import { assembleContinuousNarrative, DEEP_RESEARCH_NARRATIVE_RULES, MAX_COVERAGE_QUESTIONS } from './deepResearchCore';
 
 export { normalizeStudyDeepResearchAudience };
 
@@ -60,6 +69,7 @@ interface StudyPlanSection {
   sourceIds?: string[];
   /** Unit design only: extracted ideas the planner tied to this part. */
   ideaIds?: string[];
+  coverageQuestions?: string[];
 }
 
 interface StudyPlan {
@@ -374,14 +384,6 @@ export function mergeStudyApproachEntries(
   return merged;
 }
 
-function targetPages(request: DeepResearchRequest, sourceCount: number): { min: number; max: number } {
-  if (request.targetLength === 'concise') return { min: 5, max: 8 };
-  if (request.targetLength === 'standard') return { min: 9, max: 14 };
-  if (request.targetLength === 'exhaustive') return { min: 15, max: 20 };
-  const max = Math.max(5, Math.min(14, 5 + Math.ceil(sourceCount / 3)));
-  return { min: 5, max };
-}
-
 /**
  * The teacher's outline, cleaned. Blank slots survive on purpose — the teacher chose
  * how many parts the unit has, and only named the ones they had an opinion about.
@@ -397,14 +399,48 @@ export function normalizeUnitOutline(raw: DeepResearchOutlineSection[] | undefin
   return slots.length ? slots : [];
 }
 
-function sectionCount(request: DeepResearchRequest, pages: { min: number; max: number }): number {
+/** Pure final presentation seam shared by Study and Teaching. Internal parts remain
+ * available to retrieval and quality checks; `single` only flattens their headings. */
+export function assembleStudyDraftBody(input: {
+  written: string[];
+  citedSourceTokens: string[];
+  limitations: string[];
+  referencesLabel: string;
+  limitationsLabel: string;
+  abstract?: string;
+  structure: DeepResearchRequest['sectionLimit'];
+}): string {
+  if (input.structure === 'single') {
+    return assembleContinuousNarrative(
+      input.written,
+      input.citedSourceTokens,
+      input.limitations,
+      input.referencesLabel,
+      input.limitationsLabel,
+      'Sin fuentes citadas',
+      input.abstract,
+    );
+  }
+  return [
+    ...input.written,
+    input.limitations.length ? `## ${input.limitationsLabel}\n\n${input.limitations.map((item) => `- ${item}`).join('\n')}` : '',
+    `## ${input.referencesLabel}\n\n${input.citedSourceTokens.map((source) => `- ${source}`).join('\n')}`,
+  ].filter(Boolean).join('\n\n');
+}
+
+function sectionCount(request: DeepResearchRequest, sourceCount: number, ideaCount: number, coverageCount: number): number {
   // A fixed outline wins over every heuristic: the teacher asked for exactly this many
   // parts, and quietly rounding it up to the three-section floor would deliver a unit
   // that does not match the structure they typed.
   const outline = normalizeUnitOutline(request.outline);
   if (outline.length) return outline.length;
-  const natural = Math.max(3, Math.min(7, Math.round(((pages.min + pages.max) / 2) / 2.5)));
-  return typeof request.sectionLimit === 'number' ? Math.max(3, Math.min(natural, Math.round(request.sectionLimit))) : natural;
+  if (typeof request.sectionLimit === 'number' && Number.isFinite(request.sectionLimit) && request.sectionLimit > 0) {
+    return Math.max(1, Math.round(request.sectionLimit));
+  }
+  // The structure is determined by independent evidence/concept clusters, not by
+  // a desired page or word count. A sparse corpus stays compact; a richer graph can
+  // justify more distinct explanatory units.
+  return Math.max(3, Math.ceil(sourceCount / 4), Math.ceil(ideaCount / 5), Math.ceil(coverageCount / 3));
 }
 
 export interface ResolvedStudySection {
@@ -414,6 +450,7 @@ export interface ResolvedStudySection {
   /** The teacher's steer for this part. Empty unless they typed one. */
   focus: string;
   keyClaims: string[];
+  coverageQuestions: string[];
   sourceIds: string[];
   ideaIds: string[];
 }
@@ -433,6 +470,7 @@ export function resolveStudySections(input: {
   validSourceIds: Set<string>;
   validIdeaIds?: Set<string>;
   fallbackSourceIds: string[][];
+  coverageQuestions?: string[];
 }): ResolvedStudySection[] {
   const outline = normalizeUnitOutline(input.outline);
   const count = outline.length || Math.max(1, input.count);
@@ -442,7 +480,8 @@ export function resolveStudySections(input: {
       ? value.filter((item): item is string => typeof item === 'string' && (!allowed || allowed.has(item))).slice(0, limit)
       : [];
 
-  return Array.from({ length: count }, (_unused, index) => {
+  const validCoverage = new Set((input.coverageQuestions ?? []).filter((question) => question.trim().length > 0));
+  const resolved = Array.from({ length: count }, (_unused, index) => {
     const planned = input.planned[index] ?? {};
     const slot = outline[index];
     const sourceIds = strings(planned.sourceIds, input.validSourceIds, 12);
@@ -452,10 +491,32 @@ export function resolveStudySections(input: {
       purpose: planned.purpose?.trim() || '',
       focus: slot?.focus ?? '',
       keyClaims: strings(planned.keyClaims),
+      coverageQuestions: strings(planned.coverageQuestions, validCoverage, MAX_COVERAGE_QUESTIONS),
       sourceIds: sourceIds.length ? sourceIds : (input.fallbackSourceIds[index] ?? []),
       ideaIds: strings(planned.ideaIds, ideaIdsAllowed, 12),
     };
   });
+  assignStudyCoverage(resolved, [...validCoverage]);
+  return resolved;
+}
+
+function assignStudyCoverage(sections: ResolvedStudySection[], questions: string[]): void {
+  const assigned = new Set(sections.flatMap((section) => section.coverageQuestions));
+  for (const question of questions) {
+    if (assigned.has(question) || !sections.length) continue;
+    const query = studyTerms(question);
+    const ranked = sections.map((section, index) => {
+      const target = studyTerms(`${section.title} ${section.focus} ${section.purpose} ${section.keyClaims.join(' ')}`);
+      const overlap = [...query].filter((term) => target.has(term)).length / Math.max(1, query.size);
+      return { section, index, score: overlap - section.coverageQuestions.length * 0.01 };
+    }).sort((a, b) => b.score - a.score || a.index - b.index);
+    ranked[0].section.coverageQuestions.push(question);
+    assigned.add(question);
+  }
+}
+
+function studyTerms(text: string): Set<string> {
+  return new Set(text.toLocaleLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').split(/[^\p{L}\p{N}]+/u).filter((word) => word.length > 3));
 }
 
 function normalizeSectionMarkdown(raw: string, title: string, sources: StudyResearchSource[]): string {
@@ -470,6 +531,68 @@ function normalizeSectionMarkdown(raw: string, title: string, sources: StudyRese
     .trim();
   if (sources.length && !/nodus:\/\/study\//.test(markdown)) markdown = `${markdown}\n\n${sources[0].token}`;
   return `## ${title}\n\n${markdown}`.trim();
+}
+
+function studyQualitySources(sources: StudyResearchSource[]): DeepResearchQualitySource[] {
+  return sources.map((source) => ({
+    citation: source.url,
+    sourceId: `${source.kind}:${source.sourceId}`,
+    evidence: 'document',
+  }));
+}
+
+async function reviseStudySection(input: {
+  markdown: string;
+  objective: string;
+  language: PromptLanguage;
+  audience: string;
+  teacherPlan: boolean;
+  section: ResolvedStudySection;
+  sectionSources: StudyResearchSource[];
+  quality: ReturnType<typeof assessDeepResearchSection>;
+  model: ModelRef | null;
+}): Promise<string> {
+  const system = [
+    input.teacherPlan
+      ? 'Eres el editor pedagógico final de una parte de una unidad didáctica profesional.'
+      : 'Eres el editor pedagógico final de un informe de estudio riguroso.',
+    'Reescribe el borrador para corregir exclusivamente los problemas medidos que se indican.',
+    'Conserva la extensión, el idioma, la audiencia y el propósito. Usa solo los extractos permitidos y copia sus enlaces exactos. No inventes hechos, ejemplos atribuidos ni materiales.',
+    'Mejora la progresión conceptual, la explicación de mecanismos, el contraste entre fuentes, los matices y la conexión explícita con el objetivo.',
+    input.teacherPlan
+      ? 'Conserva las actividades y comprobaciones de comprensión, pero asegúrate de que se derivan de los materiales y de que son realizables.'
+      : 'Los ejemplos o analogías deben distinguirse con claridad de los hechos documentados y no sustituir la evidencia.',
+    'No acumules citas para elevar artificialmente la densidad. Cada párrafo sustantivo debe quedar respaldado y, cuando haya tres o más materiales, al menos tres párrafos deben poner dos fuentes en diálogo explícito; con dos materiales, hazlo en al menos dos párrafos. Explica la relación, no juntes enlaces.',
+    ...DEEP_RESEARCH_NARRATIVE_RULES,
+    'Mantén un único encabezado ##, sin microsecciones ni listas salvo necesidad pedagógica estricta. Devuelve solo el Markdown revisado.',
+  ].join('\n');
+  return completeText({
+    system,
+    user: JSON.stringify({
+      objective: input.objective,
+      language: input.language,
+      audience: input.audience,
+      section: {
+        title: input.section.title,
+        purpose: input.section.purpose,
+        focus: input.section.focus,
+        keyClaims: input.section.keyClaims,
+        coverageQuestions: input.section.coverageQuestions,
+      },
+      detectedProblems: input.quality.issues,
+      metricsBefore: input.quality.metrics,
+      draft: input.markdown,
+      allowedSources: input.sectionSources.map((source) => ({
+        id: source.id,
+        exactCitation: source.token,
+        title: source.title,
+        location: source.location,
+        extract: source.text,
+      })),
+    }, null, 2),
+    temperature: 0.12,
+    maxTokens: 5_600,
+  }, input.model);
 }
 
 export async function generateStudyDeepResearchReport(
@@ -542,9 +665,8 @@ export async function generateStudyDeepResearchReport(
   const relationPayload = knowledge.connections
     .map((edge) => ({ from: ideaLabels.get(edge.fromId), to: ideaLabels.get(edge.toId), type: edge.type, basis: edge.basis }))
     .filter((edge) => edge.from && edge.to);
-  const pages = targetPages(request, sources.length);
   const requestedOutline = normalizeUnitOutline(request.outline);
-  const count = sectionCount(request, pages);
+  const count = sectionCount(request, sources.length, knowledge.ideas.length, request.coverageQuestions?.length ?? 0);
   onProgress?.({
     phase: 'planning',
     message: requestedOutline.length
@@ -561,11 +683,15 @@ export async function generateStudyDeepResearchReport(
     // can replace, reorder or ignore it.
     system: [
       prompts.plan,
+      'CALIDAD DE FUENTES: asigna a cada parte de desarrollo al menos tres materiales distintos cuando existan y sean pertinentes. Evita que varias partes dependan siempre del mismo material. La diversidad nunca justifica incluir una fuente marginal.',
+      'Cada afirmación clave debe poder demostrarse con los extractos asignados. Si los materiales no cubren una parte del objetivo, conviértelo en un límite explícito y no en una afirmación especulativa.',
+      'COBERTURA OBLIGATORIA: asigna cada elemento de `coverageQuestions` al menos a una parte copiándolo literalmente en el campo `coverageQuestions` de esa parte. No omitas una pregunta difícil y no inventes una respuesta si las fuentes no bastan.',
       ...(approachContext?.rules.planner ?? []),
       ...(requestedOutline.length ? [FIXED_OUTLINE_RULE] : []),
     ].join('\n'),
     user: JSON.stringify({
       objective: request.objective,
+      coverageQuestions: request.coverageQuestions ?? [],
       audience,
       language,
       sectionCount: count,
@@ -595,11 +721,13 @@ export async function generateStudyDeepResearchReport(
     validSourceIds: new Set(sources.map((source) => source.id)),
     validIdeaIds: new Set(knowledge.ideas.map((idea) => idea.id)),
     fallbackSourceIds,
+    coverageQuestions: request.coverageQuestions,
   });
 
   const written: string[] = [];
   const outline: WritingWorkshopSection[] = [];
   const usedSourceIds = new Set<string>();
+  let qualityRevisions = 0;
   for (let index = 0; index < sections.length; index += 1) {
     const section = sections[index];
     const sectionSources = section.sourceIds.map((id) => sources.find((source) => source.id === id)).filter((source): source is StudyResearchSource => Boolean(source));
@@ -621,6 +749,10 @@ export async function generateStudyDeepResearchReport(
       // A teacher focus is also last and therefore authoritative inside its section.
       system: [
         prompts.write,
+        'La extensión la determina la evidencia y la función didáctica de esta parte. Desarrolla cada concepto, conexión, matiz o desacuerdo que aporte valor y detente cuando el valor marginal sea nulo; no persigas una cantidad de palabras/párrafos ni repitas una idea con reformulaciones.',
+        'ESTÁNDAR DE CALIDAD: cada párrafo sustantivo debe conectar su afirmación con evidencia concreta. Cuando haya tres o más materiales, incluye al menos tres párrafos que pongan dos fuentes en diálogo explícito; con dos materiales, hazlo en al menos dos. Explica si convergen, discrepan o cumplen funciones distintas: juntar enlaces no cuenta como síntesis.',
+        'No confundas una analogía pedagógica con un hecho documentado. Distingue lo que dicen los materiales de la explicación que construyes a partir de ellos y declara los límites del corpus.',
+        ...DEEP_RESEARCH_NARRATIVE_RULES,
         ...(approachContext?.rules.writer ?? []),
         ...(section.focus ? [SECTION_FOCUS_RULE] : []),
       ].join('\n'),
@@ -628,11 +760,11 @@ export async function generateStudyDeepResearchReport(
         objective: request.objective,
         audience,
         language,
-        targetWords: Math.max(850, Math.min(1_650, Math.round((pages.max * 450) / sections.length))),
         section: {
           title: section.title,
           purpose: section.purpose,
           keyClaims: section.keyClaims,
+          coverageQuestions: section.coverageQuestions,
           ...(section.focus ? { teacherFocus: section.focus } : {}),
         },
         ...(sectionIdeas.length ? { extractedIdeas: sectionIdeas } : {}),
@@ -643,14 +775,53 @@ export async function generateStudyDeepResearchReport(
       temperature: 0.25,
       maxTokens: 5_200,
     }, model);
-    written.push(normalizeSectionMarkdown(raw, section.title, sectionSources));
+    let markdown = normalizeSectionMarkdown(raw, section.title, sectionSources);
+    const qualityMode: DeepResearchQualityMode = teacherPlan ? 'teaching' : 'study';
+    const qualitySources = studyQualitySources(sectionSources);
+    const beforeQuality = assessDeepResearchSection({
+      markdown,
+      mode: qualityMode,
+      objective: request.objective,
+      keyClaims: [...section.keyClaims, ...section.coverageQuestions],
+      sources: qualitySources,
+    });
+    if (!qualityPasses(beforeQuality) || beforeQuality.score < 85 || beforeQuality.issues.length > 0) {
+      try {
+        const revisedRaw = await reviseStudySection({
+          markdown,
+          objective: request.objective,
+          language,
+          audience,
+          teacherPlan,
+          section,
+          sectionSources,
+          quality: beforeQuality,
+          model,
+        });
+        const revised = normalizeSectionMarkdown(revisedRaw, section.title, sectionSources);
+        const afterQuality = assessDeepResearchSection({
+          markdown: revised,
+          mode: qualityMode,
+          objective: request.objective,
+          keyClaims: [...section.keyClaims, ...section.coverageQuestions],
+          sources: qualitySources,
+        });
+        if (shouldAcceptQualityRevision(beforeQuality, afterQuality, new Set(sectionSources.map((source) => source.url)), revised)) {
+          markdown = revised;
+          qualityRevisions += 1;
+        }
+      } catch {
+        /* keep the valid first draft */
+      }
+    }
+    written.push(markdown);
     outline.push({
       id: section.id,
       title: section.title,
       // The teacher's steer is kept in the saved outline: it is why the part reads the
       // way it does, and the reader shows it beside the section.
       purpose: [section.focus, section.purpose].filter(Boolean).join(' · '),
-      keyClaims: section.keyClaims,
+      keyClaims: [...section.keyClaims, ...section.coverageQuestions],
       sources: sectionSources.map((source) => source.token),
     });
   }
@@ -663,37 +834,72 @@ export async function generateStudyDeepResearchReport(
         ? 'Preparando síntesis, fuentes y actividades de autoevaluación…'
         : 'Preparando síntesis, fuentes y actividades de comprensión…',
   });
-  const final = await completeJson<StudyFinal>({
-    system: [prompts.finalize, ...(approachContext?.rules.finalizer ?? [])].join('\n'),
+  const firstFinal = await completeJson<StudyFinal>({
+    system: [
+      prompts.finalize,
+      'El título y el resumen solo pueden sintetizar lo establecido en `sectionFindings`. No prometas aprendizajes, relaciones, ejemplos o certezas que el cuerpo y las fuentes usadas no desarrollen.',
+      ...(approachContext?.rules.finalizer ?? []),
+    ].join('\n'),
     user: JSON.stringify({
       objective: request.objective,
       audience,
       language,
       provisionalTitle: plan.title,
       sectionTitles: sections.map((section) => section.title),
+      sectionFindings: sections.map((section, index) => ({ title: section.title, text: (written[index] ?? '').slice(0, 3_500) })),
       sourcesUsed: [...usedSourceIds],
+      sourceEvidence: sources
+        .filter((source) => usedSourceIds.has(source.id))
+        .map((source) => ({ id: source.id, title: source.title, extract: source.text.slice(0, 700) })),
       ...(approachContext ? {
         researchApproach: approachContext.approach,
         retrievalPlan: approachContext.retrieval,
-        // General retains its historical compact finalizer payload. Specialized
-        // finalization receives the evidence it needs to avoid inventing a future
-        // direction, rule or limitation that never appeared in the materials.
-        sourceEvidence: sources
-          .filter((source) => usedSourceIds.has(source.id))
-          .map((source) => ({ id: source.id, title: source.title, extract: source.text.slice(0, 900) })),
       } : {}),
     }, null, 2),
     temperature: 0.18,
     maxTokens: 1_800,
   }, isFinal, model).catch((): StudyFinal => ({}));
+  const auditedFinal = await completeJson<StudyFinal>({
+    system: [
+      'Eres el control epistemológico final de un informe de estudio o unidad didáctica. Audita solo título, resumen, limitaciones y próximos pasos.',
+      'Compara cada afirmación del resumen con `sectionFindings`. Estrecha o elimina cualquier concepto, relación, dominio, ejemplo, aprendizaje o certeza que el cuerpo no establezca.',
+      'No introduzcas información nueva ni elimines limitaciones previas. Los próximos pasos pueden comprobar o ampliar lo aprendido, pero no presentarlo como ya demostrado.',
+      'Conserva el idioma. Devuelve SOLO JSON con {"title":"...","abstract":"...","limitations":["..."],"nextSteps":["..."]}.',
+      ...(approachContext?.rules.finalizer ?? []),
+    ].join('\n'),
+    user: JSON.stringify({
+      objective: request.objective,
+      sectionFindings: sections.map((section, index) => ({ title: section.title, text: (written[index] ?? '').slice(0, 3_500) })),
+      proposal: firstFinal,
+    }, null, 2),
+    temperature: 0,
+    maxTokens: 1_800,
+  }, isFinal, model).catch((): StudyFinal => firstFinal);
+  const final: StudyFinal = {
+    title: auditedFinal.title || firstFinal.title,
+    abstract: auditedFinal.abstract || firstFinal.abstract,
+    limitations: [...new Set([
+      ...(Array.isArray(firstFinal.limitations) ? firstFinal.limitations : []),
+      ...(Array.isArray(auditedFinal.limitations) ? auditedFinal.limitations : []),
+    ])],
+    nextSteps: Array.isArray(auditedFinal.nextSteps) && auditedFinal.nextSteps.length
+      ? auditedFinal.nextSteps
+      : firstFinal.nextSteps,
+  };
   const references = sources.filter((source) => usedSourceIds.has(source.id)).map((source) => `${source.title}${source.location ? ` · ${source.location}` : ''}`);
   const limitations = Array.isArray(final.limitations) ? final.limitations.filter((value): value is string => typeof value === 'string') : [];
   const nextSteps = Array.isArray(final.nextSteps) ? final.nextSteps.filter((value): value is string => typeof value === 'string') : [];
-  const body = [
-    ...written,
-    limitations.length ? `## ${prompts.limitations}\n\n${limitations.map((item) => `- ${item}`).join('\n')}` : '',
-    `## ${prompts.references}\n\n${sources.filter((source) => usedSourceIds.has(source.id)).map((source) => `- ${source.token}`).join('\n')}`,
-  ].filter(Boolean).join('\n\n');
+  const singleNarrative = request.sectionLimit === 'single';
+  const citedSourceTokens = sources.filter((source) => usedSourceIds.has(source.id)).map((source) => source.token);
+  const body = assembleStudyDraftBody({
+    written,
+    citedSourceTokens,
+    limitations,
+    referencesLabel: prompts.references,
+    limitationsLabel: prompts.limitations,
+    abstract: final.abstract?.trim() || plan.abstract?.trim() || '',
+    structure: request.sectionLimit,
+  });
   const matrix: WritingWorkshopMatrixRow[] = sources.filter((source) => usedSourceIds.has(source.id)).map((source) => ({
     claim: source.text.replace(/\s+/g, ' ').slice(0, 240),
     role: 'support',
@@ -707,37 +913,58 @@ export async function generateStudyDeepResearchReport(
   // surfaces built on top of a unit (activities, adaptations) can start from the same
   // concepts instead of re-deriving them from the prose.
   const usedIdeaIds = [...new Set(sections.flatMap((section) => section.ideaIds))];
+  const qualityMode: DeepResearchQualityMode = teacherPlan ? 'teaching' : 'study';
+  const qualityAssessment = assessDeepResearchReport({
+    mode: qualityMode,
+    objective: request.objective,
+    coverageQuestions: request.coverageQuestions,
+    sections: sections.map((section, index) => ({
+      title: section.title,
+      markdown: written[index] ?? '',
+      keyClaims: [...section.keyClaims, ...section.coverageQuestions],
+      sources: studyQualitySources(
+        section.sourceIds.map((id) => sources.find((source) => source.id === id)).filter((source): source is StudyResearchSource => Boolean(source)),
+      ),
+    })),
+  });
   const draft: WritingWorkshopDraft = {
     generatedAt: new Date().toISOString(),
-    brief: { kind: 'deep_research', objective: request.objective, audience, tone: 'academic', language },
+    brief: { kind: 'deep_research', objective: request.objective, audience, tone: 'academic', language, deepResearchVersion: request.deepResearchVersion ?? 'v2' },
     selection: { ideaIds: usedIdeaIds, themeIds: [], gapIds: [], contradictionIds: [], workIds: [], passageIds: [], tutorRouteIds: [] },
     title: final.title?.trim() || plan.title?.trim() || request.objective,
     abstract: final.abstract?.trim() || plan.abstract?.trim() || '',
-    outline,
+    outline: singleNarrative ? [] : outline,
     draftMarkdown: body,
     matrix,
     bibliography: references,
     nextSteps,
     limitations,
+    deepResearchStructure: singleNarrative ? 'single' : 'sectioned',
+    qualityAssessment,
     stats: { selectedIdeas: usedIdeaIds.length, selectedThemes: 0, selectedGaps: 0, selectedContradictions: 0, selectedWorks: usedSourceIds.size, selectedPassages: 0, selectedTutorRoutes: 0, contextChars: sources.reduce((sum, source) => sum + source.text.length, 0), truncated: retrieved.length >= 48 },
   };
   const meta = {
-    sections: sections.length,
+    deepResearchVersion: request.deepResearchVersion ?? 'v2',
+    structure: singleNarrative ? 'single' as const : 'sectioned' as const,
+    sections: singleNarrative ? 1 : sections.length,
     words,
     pages: Math.max(1, Math.ceil(words / 450)),
     ideasCovered: usedIdeaIds.length,
     ideasConsidered: knowledge.ideas.length,
     worksCited: usedSourceIds.size,
-    targetPages: pages,
     stoppedReason: retrieved.length >= 48 ? 'El contexto se acotó a los fragmentos más relevantes del índice de estudio.' : null,
+    qualityRevisions,
+    coverage: request.coverageQuestions?.length
+      ? { questions: [...request.coverageQuestions], ratio: qualityAssessment.metrics.objectiveCoverage }
+      : null,
   };
   onProgress?.({
     phase: 'done',
     message: teacherPlan
-      ? `Unidad lista: ${sections.length} partes · ${usedSourceIds.size} materiales`
+      ? `Unidad lista: ${singleNarrative ? 'bloque continuo' : `${sections.length} partes`} · ${usedSourceIds.size} materiales`
       : unitMode
-        ? `Apuntes listos: ${sections.length} partes · ${usedSourceIds.size} materiales`
-      : `Informe de estudio listo: ${sections.length} secciones · ${usedSourceIds.size} fuentes`,
+        ? `Apuntes listos: ${singleNarrative ? 'bloque continuo' : `${sections.length} partes`} · ${usedSourceIds.size} materiales`
+        : `Informe de estudio listo: ${singleNarrative ? 'bloque continuo' : `${sections.length} secciones`} · ${usedSourceIds.size} fuentes`,
     wordsSoFar: words,
     pagesSoFar: meta.pages,
   });

@@ -78,5 +78,5 @@ test('release and update overlays suspend hidden duplicate work', () => {
   assert.match(whatsNew, /const STARTUP_VERSION_HISTORY_LIMIT = 12/);
   assert.match(whatsNew, /showSeenReleaseNotes\) return releaseNotesSince\(null, current\)/);
   assert.match(whatsNew, /releaseNotesSince\(null, current\)\.slice\(0, STARTUP_VERSION_HISTORY_LIMIT\)/);
-  assert.match(app, /\{!manualWhatsNewOpen && updateSettled && <NodiMascot settings=\{settings\} \/>\}/);
+  assert.match(app, /\{!manualWhatsNewOpen && updateSettled && documentUnderstandingConsentSettled && <NodiMascot settings=\{settings\} \/>\}/);
 });

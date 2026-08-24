@@ -28,12 +28,15 @@ const dirB = path.resolve(argOf('--b', ''));
 const labelA = argOf('--label-a', 'A');
 const labelB = argOf('--label-b', 'B');
 const snapshotDir = path.resolve(argOf('--snapshot', path.join(os.tmpdir(), 'nodus-dr-userdata')));
-const MAX_WORDS = Number(argOf('--max-words', '5200'));
+const outputFile = argOf('--out', '').trim() ? path.resolve(argOf('--out', '')) : null;
 
 const DIMENSIONS = [
+  { key: 'relevancia', question: 'Relevancia y cobertura del encargo: ¿cuál responde de forma más completa y directa a la pregunta y a sus subproblemas, sin desvíos ni omisiones importantes?' },
+  { key: 'profundidad', question: 'Profundidad explicativa: ¿cuál identifica y conecta mejor mecanismos, causas, cronologías, escalas y consecuencias, en lugar de limitarse a resumir hallazgos?' },
   { key: 'continuidad', question: 'Continuidad argumental: ¿cuál se lee como un razonamiento que progresa, donde cada sección se apoya en la anterior, en lugar de como una lista de temas yuxtapuestos?' },
   { key: 'respaldo', question: 'Respaldo de las afirmaciones: ¿en cuál las afirmaciones sustantivas van acompañadas de una fuente concreta y pertinente, en lugar de afirmarse sin apoyo o con apoyo genérico?' },
   { key: 'riqueza', question: 'Riqueza de fuentes: ¿cuál se apoya en una variedad real de autores y obras, en lugar de descansar una y otra vez en los mismos?' },
+  { key: 'precision', question: 'Precisión y prudencia: ¿cuál distingue mejor evidencia, inferencia, límites y grados de certeza, evitando exageraciones, contradicciones o afirmaciones que las fuentes citadas no permiten establecer?' },
   { key: 'debate', question: 'Tratamiento del desacuerdo: ¿cuál expone debates y huecos de investigación explicando su contenido, en lugar de mencionarlos de pasada o ignorarlos?' },
   { key: 'utilidad', question: 'Utilidad para un investigador: ¿cuál usarías antes como punto de partida para escribir un capítulo académico?' },
 ];
@@ -73,30 +76,41 @@ try {
   const system = [
     'Eres un investigador académico experimentado que compara dos informes sobre el mismo tema.',
     'No sabes quién los ha escrito ni con qué herramienta. Júzgalos solo por lo que dicen.',
+    'Comprueba la cobertura de TODAS las partes de la pregunta, la calidad del razonamiento y si las citas realmente acompañan a la afirmación pertinente.',
+    'No premies por sí solos la longitud, el número bruto de citas, el tono seguro ni la variedad nominal de autores.',
     'Para cada criterio elige 1 o 2. Si de verdad son equivalentes puedes responder 0, pero evita el empate cómodo: si uno es mejor, dilo.',
-    'Ignora la longitud como mérito en sí: un informe más largo no es mejor por serlo.',
     'Devuelve SOLO JSON válido: {"criterios":[{"clave":"continuidad","ganador":1,"motivo":"..."}]} con una entrada por criterio.',
   ].join('\n');
 
   const tally = new Map(DIMENSIONS.map((d) => [d.key, { a: 0, b: 0, tie: 0 }]));
   const notes = [];
+  const pairResults = [];
 
   for (const pair of pairs) {
     // Same pair, both orders. Only an agreement between the two counts as a win.
-    const forward = await ask(completeJson, system, model, pair.textA, pair.textB);
-    const reverse = await ask(completeJson, system, model, pair.textB, pair.textA);
+    const forward = await ask(completeJson, system, model, pair.objective, pair.textA, pair.textB);
+    const reverse = await ask(completeJson, system, model, pair.objective, pair.textB, pair.textA);
+    const criteria = [];
     for (const dimension of DIMENSIONS) {
-      const first = forward.get(dimension.key);
-      const second = reverse.get(dimension.key);
+      const first = forward.chosen.get(dimension.key);
+      const second = reverse.chosen.get(dimension.key);
       const row = tally.get(dimension.key);
       // In the reverse run, "1" means B.
       const winnerForward = first === 1 ? 'a' : first === 2 ? 'b' : null;
       const winnerReverse = second === 1 ? 'b' : second === 2 ? 'a' : null;
-      if (winnerForward && winnerForward === winnerReverse) row[winnerForward] += 1;
+      const winner = winnerForward && winnerForward === winnerReverse ? winnerForward : 'tie';
+      if (winner === 'a' || winner === 'b') row[winner] += 1;
       else row.tie += 1;
+      criteria.push({
+        key: dimension.key,
+        winner,
+        forward: { choice: first ?? 0, reason: forward.reasons.get(dimension.key) ?? '' },
+        reverse: { choice: second ?? 0, reason: reverse.reasons.get(dimension.key) ?? '' },
+      });
     }
     const reason = forward.reasons.get('utilidad');
     if (reason) notes.push(`${pair.topic}: ${reason}`);
+    pairResults.push({ topic: pair.topic, criteria });
     console.log(`· ${pair.topic} juzgado`);
   }
 
@@ -112,6 +126,19 @@ try {
     console.log('\nMotivos citados en "utilidad":');
     for (const note of notes.slice(0, 5)) console.log(`  · ${note.slice(0, 220)}`);
   }
+  if (outputFile) {
+    fs.mkdirSync(path.dirname(outputFile), { recursive: true });
+    fs.writeFileSync(outputFile, `${JSON.stringify({
+      generatedAt: new Date().toISOString(),
+      model: model.model,
+      labels: { a: labelA, b: labelB },
+      dimensions: DIMENSIONS,
+      methodology: 'Cada par se juzga dos veces invirtiendo el orden. Solo cuenta una victoria cuando ambos juicios coinciden; cualquier desacuerdo cuenta como empate.',
+      tally: Object.fromEntries(tally),
+      pairs: pairResults,
+    }, null, 2)}\n`);
+    console.log(`\nResultado JSON: ${outputFile}`);
+  }
 } finally {
   try {
     closeDb();
@@ -120,8 +147,9 @@ try {
   }
 }
 
-async function ask(completeJson, system, model, first, second) {
+async function ask(completeJson, system, model, objective, first, second) {
   const user = [
+    '### Encargo original', objective, '',
     '### Informe 1', first, '', '### Informe 2', second, '',
     'Criterios:',
     ...DIMENSIONS.map((d) => `- ${d.key}: ${d.question}`),
@@ -142,29 +170,52 @@ async function ask(completeJson, system, model, first, second) {
   } catch {
     /* an unreadable judgement counts as a tie */
   }
-  chosen.reasons = reasons;
-  return Object.assign(chosen, { reasons });
+  return { chosen, reasons };
 }
 
-/** Pair reports by topic, anonymised and trimmed so neither side is identifiable. */
+/** Pair reports by topic and anonymise engine identity without truncating content. */
 function buildPairs(a, b) {
   const load = (dir) => {
     const map = new Map();
+    const byObjective = new Map();
     for (const file of fs.readdirSync(dir).filter((f) => f.endsWith('.json'))) {
       const { metrics, report } = JSON.parse(fs.readFileSync(path.join(dir, file), 'utf8'));
+      if (!metrics || !report?.draft) continue;
       const topic = metrics.topic ?? metrics.label;
-      if (!map.has(topic)) map.set(topic, anonymise(report));
+      if (!topic) continue;
+      const objective = metrics.objective ?? report.draft?.brief?.objective ?? topic;
+      const value = { text: anonymise(report), objective };
+      if (!map.has(topic) || path.basename(file, '.json') === topic) {
+        map.set(topic, value);
+      }
+      const objectiveKey = normaliseObjective(objective);
+      if (objectiveKey && !byObjective.has(objectiveKey)) byObjective.set(objectiveKey, value);
     }
-    return map;
+    return { map, byObjective };
   };
   const left = load(a);
   const right = load(b);
   const pairs = [];
-  for (const [topic, textA] of left) {
-    const textB = right.get(topic);
-    if (textB) pairs.push({ topic, textA, textB });
+  for (const [topic, leftReport] of left.map) {
+    const rightReport = right.map.get(topic)
+      ?? right.byObjective.get(normaliseObjective(leftReport.objective));
+    if (rightReport) pairs.push({
+      topic,
+      objective: leftReport.objective || rightReport.objective,
+      textA: leftReport.text,
+      textB: rightReport.text,
+    });
   }
   return pairs;
+}
+
+function normaliseObjective(value) {
+  return String(value ?? '')
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/gu, '')
+    .toLowerCase()
+    .replace(/\s+/gu, ' ')
+    .trim();
 }
 
 /**
@@ -177,8 +228,7 @@ function anonymise(report) {
     .split(/^##\s+(?:Referencias|References)\s*$/mu)[0]
     .replace(/^##\s+(?:Limitaciones|Limitations)[\s\S]*$/mu, '')
     .replace(/\[([^\]]*)\]\(nodus:\/\/[^)]*\)/g, '$1');
-  const words = body.split(/\s+/);
-  return words.length > MAX_WORDS ? `${words.slice(0, MAX_WORDS).join(' ')}\n\n[…]` : body;
+  return body;
 }
 
 function installRuntimeHooks(userDataPath) {

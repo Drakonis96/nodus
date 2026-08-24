@@ -267,7 +267,7 @@ export function deepResearchReportInput(
     imageCredit: image.credit,
     contentsLabel: labels.contents,
     metrics: [
-      { value: String(draft.outline.length), label: labels.sections },
+      { value: String(draft.deepResearchStructure === 'single' ? 1 : draft.outline.length), label: labels.sections },
       { value: String(draft.stats.selectedWorks || draft.bibliography.length), label: labels.sources },
       { value: words.toLocaleString(language), label: labels.words },
     ],

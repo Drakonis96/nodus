@@ -26,6 +26,7 @@ import { embed, embedMany } from './aiClient';
 import { findSimilarIdeasPaged } from '../db/ideasRepo';
 import { findSimilarWorksPaged } from '../db/workSummariesRepo';
 import { findSimilarPassagesPaged, type SimilarPassage } from '../db/passagesRepo';
+import { retrieveHierarchical, selectPassageEvidence } from './hierarchicalRetrieval';
 
 const MAX_IDEAS = 120;
 const MAX_THEMES = 30;
@@ -83,6 +84,17 @@ interface WorkshopSemanticRanking {
   passages: WritingWorkshopPassageCandidate[];
 }
 
+export type WorkshopRetrievalMode = 'hierarchical' | 'idea_first' | 'legacy';
+
+interface WorkshopSnapshotOptions {
+  /**
+   * `idea_first` deliberately recreates the pre-document retrieval boundary for
+   * Deep Research planning: idea/work vectors may rank the graph, but document
+   * profiles and literal passages cannot influence the thesis or outline.
+   */
+  retrievalMode?: WorkshopRetrievalMode;
+}
+
 interface WorkshopContext {
   payload: Record<string, unknown>;
   stats: WritingWorkshopDraft['stats'];
@@ -111,6 +123,9 @@ interface WorkRow {
   deep_status: WritingWorkshopWorkCandidate['deepStatus'];
   doi: string | null;
   orientation_summary: string | null;
+  document_overview: string | null;
+  document_status: WritingWorkshopWorkCandidate['documentStatus'];
+  document_version_id: string | null;
   themes: string | null;
   idea_count: number;
   gap_count: number;
@@ -149,7 +164,8 @@ function isAiWorkshopResult(value: unknown): value is AiWorkshopResult {
 export async function buildWritingWorkshopSnapshot(
   brief: WritingWorkshopBrief,
   /** Extra sub-questions to probe the corpus with, on top of the objective itself. */
-  extraProbes: string[] = []
+  extraProbes: string[] = [],
+  options: WorkshopSnapshotOptions = {},
 ): Promise<WritingWorkshopSnapshot> {
   // The historical General call supplies no probes and therefore tokenizes the exact
   // same string as before. Specialized Deep Research can still enrich lexical-only
@@ -158,12 +174,13 @@ export async function buildWritingWorkshopSnapshot(
     ? `${brief.objective} ${kindLabel(brief.kind)} ${extraProbes.join(' ')}`
     : `${brief.objective} ${kindLabel(brief.kind)}`;
   const tokens = tokenize(lexicalQuery);
-  const semantic = await buildSemanticRanking([brief.objective, ...extraProbes]);
+  const retrievalMode = options.retrievalMode ?? 'hierarchical';
+  const semantic = await buildSemanticRanking([brief.objective, ...extraProbes], retrievalMode);
   const ideas = rankedIdeas(tokens, semantic);
   const themes = rankedThemes(tokens, semantic);
   const gaps = rankedGaps(tokens, brief.kind, semantic);
   const contradictions = rankedContradictions(tokens, semantic);
-  const works = rankedWorks(tokens, semantic);
+  const works = rankedWorks(tokens, semantic, retrievalMode === 'hierarchical');
   const tutorRoutes = rankedTutorRoutes(tokens);
 
   return {
@@ -187,6 +204,36 @@ export async function buildWritingWorkshopSnapshot(
     passages: semantic.passages,
     tutorRoutes,
   };
+}
+
+/**
+ * Snapshot used to decide a Deep Research argument. It is intentionally blind to
+ * the new document-profile index and to passage retrieval. Once this snapshot has
+ * produced a stable plan, the ordinary hierarchical retriever may add evidence to
+ * each section without being allowed to redesign the report around documents.
+ */
+export function buildIdeaFirstWritingWorkshopSnapshot(
+  brief: WritingWorkshopBrief,
+  extraProbes: string[] = [],
+): Promise<WritingWorkshopSnapshot> {
+  return buildWritingWorkshopSnapshot(brief, extraProbes, { retrievalMode: 'idea_first' });
+}
+
+/**
+ * Compatibility snapshot for Deep Research v1.
+ *
+ * This is deliberately a separate named entry point instead of relying on the
+ * default builder. The default has evolved to hierarchical retrieval; v1 must
+ * remain reproducible and use only the historical idea/work vector indexes plus
+ * the direct passage vector index. In particular, it must never call
+ * `retrieveHierarchical`, route through document profiles, or use document/support
+ * lanes to influence the workshop argument.
+ */
+export function buildHistoricalWritingWorkshopSnapshot(
+  brief: WritingWorkshopBrief,
+  extraProbes: string[] = [],
+): Promise<WritingWorkshopSnapshot> {
+  return buildWritingWorkshopSnapshot(brief, extraProbes, { retrievalMode: 'legacy' });
 }
 
 export async function generateWritingWorkshopDraft(request: WritingWorkshopDraftRequest): Promise<WritingWorkshopDraft> {
@@ -264,7 +311,10 @@ function countTable(table: string): number {
  * idea/work vectors for broad ranking and the fine passage index for direct
  * evidence candidates; lexical matching remains only as an offline fallback.
  */
-async function buildSemanticRanking(queries: string[]): Promise<WorkshopSemanticRanking> {
+async function buildSemanticRanking(
+  queries: string[],
+  retrievalMode: WorkshopRetrievalMode = 'hierarchical',
+): Promise<WorkshopSemanticRanking> {
   const empty: WorkshopSemanticRanking = { active: false, ideaScores: new Map(), workScores: new Map(), passages: [] };
   // One probe reaches only the corpus neighbourhood of the objective *as a whole*.
   // A question spanning several axes ("turismo, género y mirada colonial") retrieves
@@ -308,9 +358,20 @@ async function buildSemanticRanking(queries: string[]): Promise<WorkshopSemantic
     // without ever lowering its standard of relevance.
     // Paged: each of these walks the whole index, and a snapshot runs one set per
     // probe. Run as a single blocking scan they froze the window for the duration.
-    const objectiveIdeas = await findSimilarIdeasPaged(vectors[0], -1, MAX_IDEAS);
+    const objectiveHierarchy = retrievalMode === 'hierarchical'
+      ? await retrieveHierarchical(probes[0], {
+        embedding: vectors[0], documentLimit: MAX_WORKS, ideaLimit: MAX_IDEAS,
+        passageLimit: MAX_PASSAGES * 2, routedWorkLimit: 16, routedPassageLimit: MAX_PASSAGES,
+        minDocumentSimilarity: 0.2, minIdeaSimilarity: -1, minPassageSimilarity: -1,
+      })
+      : null;
+    const objectiveIdeas = objectiveHierarchy?.ideas
+      ?? await findSimilarIdeasPaged(vectors[0], -1, MAX_IDEAS);
     const objectiveWorks = await findSimilarWorksPaged(vectors[0], -1, MAX_WORKS);
-    const objectivePassages = await findSimilarPassagesPaged(vectors[0], -1, MAX_PASSAGES * 2);
+    // Passages are an evidence layer, not part of the argument-discovery layer.
+    const objectivePassages = retrievalMode === 'legacy'
+      ? await findSimilarPassagesPaged(vectors[0], -1, MAX_PASSAGES * 2)
+      : objectiveHierarchy?.passages ?? [];
     const weakest = <T extends { similarity: number }>(hits: T[]) => (hits.length ? hits[hits.length - 1].similarity : -1);
     const floors = {
       ideas: weakest(objectiveIdeas),
@@ -320,24 +381,48 @@ async function buildSemanticRanking(queries: string[]): Promise<WorkshopSemantic
 
     for (const [index, vector] of vectors.entries()) {
       const isObjective = index === 0;
-      const ideaHits = isObjective
-        ? objectiveIdeas.slice(0, quotaFor(MAX_IDEAS, index))
-        : await findSimilarIdeasPaged(vector, floors.ideas, quotaFor(MAX_IDEAS, index));
+      const hierarchy = retrievalMode === 'hierarchical'
+        ? (isObjective ? objectiveHierarchy! : await retrieveHierarchical(probes[index], {
+          embedding: vector,
+          documentLimit: quotaFor(MAX_WORKS, index),
+          ideaLimit: quotaFor(MAX_IDEAS, index),
+          passageLimit: quotaFor(MAX_PASSAGES * 2, index),
+          routedWorkLimit: 12,
+          routedPassageLimit: Math.max(2, Math.floor(quotaFor(MAX_PASSAGES * 2, index) / 2)),
+          minDocumentSimilarity: 0.2,
+          minIdeaSimilarity: floors.ideas,
+          minPassageSimilarity: floors.passages,
+        }))
+        : null;
+      const ideaHits = (hierarchy?.ideas ?? (isObjective
+        ? objectiveIdeas
+        : await findSimilarIdeasPaged(vector, floors.ideas, quotaFor(MAX_IDEAS, index))))
+        .slice(0, quotaFor(MAX_IDEAS, index));
       const workHits = isObjective
         ? objectiveWorks.slice(0, quotaFor(MAX_WORKS, index))
         : await findSimilarWorksPaged(vector, floors.works, quotaFor(MAX_WORKS, index));
-      const passageHits = isObjective
-        ? objectivePassages.slice(0, quotaFor(MAX_PASSAGES * 2, index))
-        : await findSimilarPassagesPaged(vector, floors.passages, quotaFor(MAX_PASSAGES * 2, index));
+      const passageHits = (retrievalMode === 'legacy'
+        ? (isObjective
+          ? objectivePassages
+          : await findSimilarPassagesPaged(vector, floors.passages, quotaFor(MAX_PASSAGES * 2, index)))
+        : hierarchy?.passages ?? []).slice(0, quotaFor(MAX_PASSAGES * 2, index));
       for (const hit of ideaHits) {
         if (reserve(ideaScores, MAX_IDEAS) || ideaScores.has(hit.global_id)) {
           ideaScores.set(hit.global_id, Math.max(ideaScores.get(hit.global_id) ?? 0, semanticStrength(hit.similarity)));
         }
       }
       for (const hit of workHits) {
-        if (reserve(workScores, MAX_WORKS) || workScores.has(hit.nodus_id)) {
-          workScores.set(hit.nodus_id, Math.max(workScores.get(hit.nodus_id) ?? 0, semanticStrength(hit.similarity)));
-        }
+        workScores.set(hit.nodus_id, Math.max(workScores.get(hit.nodus_id) ?? 0, semanticStrength(hit.similarity)));
+      }
+      const topDocumentScore = hierarchy?.documents[0]?.retrievalScore ?? 1;
+      for (const hit of hierarchy?.documents ?? []) {
+        // Document routing is an independent lane. The old MAX_WORKS guard was
+        // already full after summary vectors, so a newly discovered book could
+        // never enter the pool; profiles merely reranked books we already knew.
+        // Keep the union here and let rankedWorks perform the final bounded sort.
+        const rankStrength = Math.min(0.65, 0.65 * (hit.retrievalScore / topDocumentScore));
+        const strength = Math.max(rankStrength, semanticStrength(hit.similarity));
+        workScores.set(hit.nodusId, Math.max(workScores.get(hit.nodusId) ?? 0, strength));
       }
       for (const hit of passageHits) {
         const strength = semanticStrength(hit.similarity);
@@ -374,7 +459,7 @@ async function buildSemanticRanking(queries: string[]): Promise<WorkshopSemantic
       active: ideaScores.size > 0 || workScores.size > 0 || rankedPassages.length > 0,
       ideaScores,
       workScores,
-      passages: rankedPassages.map(toPassageCandidate),
+      passages: rankedPassages.map((hit) => toPassageCandidate(hit)),
     };
   } catch (error) {
     console.warn('[writingWorkshop] semantic ranking unavailable:', error instanceof Error ? error.message : String(error));
@@ -404,13 +489,26 @@ function semanticReason(semantic: WorkshopSemanticRanking, score: number, suppor
   return reasonFor(score, support, semantic.active ? 0 : score - support);
 }
 
-function toPassageCandidate(hit: SimilarPassage): WritingWorkshopPassageCandidate {
+function toPassageCandidate(
+  hit: SimilarPassage & { lanes?: Array<'global' | 'lexical' | 'support' | 'document'> },
+  scope: 'objective' | 'section' = 'objective',
+): WritingWorkshopPassageCandidate {
+  const lanes = hit.lanes ?? [];
+  const route = lanes.length > 1
+    ? `recuperación híbrida (${lanes.join(', ')})`
+    : lanes[0] === 'lexical'
+      ? 'coincidencia literal'
+      : lanes[0] === 'support'
+        ? 'soporte verificable de la ficha documental'
+        : lanes[0] === 'document'
+          ? 'búsqueda dentro de una obra enrutada'
+          : 'similitud semántica';
   return {
     id: hit.passage_id,
     label: `${hit.title}${hit.page_label ? ` · ${hit.page_label}` : ''}`,
     summary: clip(hit.text, 520),
     score: semanticStrength(hit.similarity),
-    reason: 'Pasaje recuperado por similitud semántica con el objetivo.',
+    reason: `Pasaje recuperado por ${route} con ${scope === 'section' ? 'esta sección' : 'el objetivo'}.`,
     nodus_id: hit.nodus_id,
     pageLabel: hit.page_label,
     authors: parseAuthors(hit.authors_json),
@@ -434,10 +532,159 @@ export async function retrieveSectionMaterial(input: {
   sectionTitle: string;
   purpose: string;
   keyClaims: string[];
+  coverageQuestions?: string[];
   excludeIdeaIds: string[];
   excludePassageIds: string[];
   limits: { ideas: number; passages: number };
-}): Promise<{ ideas: WritingWorkshopIdeaCandidate[]; passages: WritingWorkshopPassageCandidate[] }> {
+}): Promise<{
+  ideas: WritingWorkshopIdeaCandidate[];
+  passages: WritingWorkshopPassageCandidate[];
+  evidencePacks: Array<{
+    question: string;
+    passageIds: string[];
+    candidates: Array<{
+      passageId: string;
+      query: string;
+      rank: number;
+      lanes: Array<'global' | 'lexical' | 'support' | 'document'>;
+      score: number;
+      reason: string;
+    }>;
+  }>;
+}> {
+  const query = [
+    input.sectionTitle,
+    ...(input.coverageQuestions ?? []),
+    input.purpose,
+    ...input.keyClaims,
+  ].filter(Boolean).join('. ').trim();
+  if (!query) return { ideas: [], passages: [], evidencePacks: [] };
+
+  const skipIdeas = new Set(input.excludeIdeaIds);
+  const skipPassages = new Set(input.excludePassageIds);
+  const atomicProbes = [...new Set((input.coverageQuestions ?? []).map((probe) => probe.trim()).filter(Boolean))];
+  const primaryProbes = atomicProbes.length ? atomicProbes : [query];
+  // Every atomic requirement receives an independent semantic + literal search.
+  // Concatenating all requirements into one vector retrieves their intersection;
+  // fusing all literal lists before selection lets generic shared vocabulary evict
+  // the one passage that answers a narrow operation. Keep the lists separate until
+  // after each question has received its first evidence slot.
+  const retrieveProbe = async (probe: string, literalQueries: string[]) => {
+    let vector: number[] | null = null;
+    try { vector = await embed(`${input.sectionTitle}\n${probe}`); } catch { /* FTS remains available */ }
+    return retrieveHierarchical(`${probe}\n${input.sectionTitle}`, {
+      embedding: vector,
+      documentLimit: 20,
+      ideaLimit: input.limits.ideas * 4,
+      passageLimit: input.limits.passages * 4,
+      routedWorkLimit: 10,
+      routedPassageLimit: input.limits.passages * 2,
+      lexicalPassageQueries: literalQueries,
+      minIdeaSimilarity: -1,
+      minPassageSimilarity: -1,
+    });
+  };
+  const primary = await Promise.all(primaryProbes.map((probe) => retrieveProbe(probe, [probe])));
+  // The complete title/purpose/claims query remains an independent fallback. It can
+  // fill spare slots, but it can no longer erase the best hit of an atomic question.
+  const contextual = atomicProbes.length ? await retrieveProbe(`${query}\n${input.objective}`, [query]) : null;
+
+  const roundRobinUnique = <T>(lists: T[][], limit: number, key: (item: T) => string): T[] => {
+    const selected: T[] = [];
+    const seen = new Set<string>();
+    const positions = lists.map(() => 0);
+    while (selected.length < limit) {
+      let progressed = false;
+      for (let index = 0; index < lists.length && selected.length < limit; index += 1) {
+        while (positions[index] < lists[index].length) {
+          const item = lists[index][positions[index]++];
+          const id = key(item);
+          if (seen.has(id)) continue;
+          seen.add(id);
+          selected.push(item);
+          progressed = true;
+          break;
+        }
+      }
+      if (!progressed) break;
+    }
+    return selected;
+  };
+
+  // Atomic questions are evidence probes, not a replacement idea graph. Additional
+  // ideas therefore come from the complete section argument; otherwise one weak
+  // neighbour per narrow question can inject unrelated concepts into the plan.
+  const ideaSource = contextual ?? primary[0];
+  const ideaHits = ideaSource.ideas
+    .filter((hit) => !skipIdeas.has(hit.global_id))
+    .slice(0, input.limits.ideas);
+  const passageLists = primary.map((hierarchy) => selectPassageEvidence(
+    hierarchy.passages.filter((hit) => !skipPassages.has(hit.passage_id)),
+    input.limits.passages,
+    { preferLexical: atomicProbes.length > 0, preferSourceDiversity: true },
+  ));
+  const evidencePacks = atomicProbes.map((question, index) => {
+    const candidates = (passageLists[index] ?? []).map((hit, rank) => ({
+      passageId: hit.passage_id,
+      query: question,
+      rank: rank + 1,
+      lanes: [...hit.lanes],
+      score: hit.similarity,
+      reason: `Candidato ${rank + 1} para la pregunta atómica, recuperado por ${hit.lanes.join('+')}.`,
+    }));
+    return { question, passageIds: candidates.map((candidate) => candidate.passageId), candidates };
+  });
+  // Preserve each question's complete recall window until the epistemic audit.
+  // The eventual writer still receives only the 3 direct + 2 contextual passages
+  // selected for each question, but no rare answer is lost in global fusion first.
+  const atomicWindow = atomicProbes.length
+    ? passageLists.reduce((total, list) => total + list.length, 0)
+    : input.limits.passages;
+  const passageHits = roundRobinUnique(passageLists, atomicWindow, (hit) => hit.passage_id);
+  if (contextual && passageHits.length < atomicWindow + input.limits.passages) {
+    const seen = new Set(passageHits.map((hit) => hit.passage_id));
+    for (const hit of selectPassageEvidence(
+      contextual.passages.filter((candidate) => !skipPassages.has(candidate.passage_id)),
+      input.limits.passages,
+      { preferSourceDiversity: true },
+    )) {
+      if (seen.has(hit.passage_id)) continue;
+      seen.add(hit.passage_id);
+      passageHits.push(hit);
+      if (passageHits.length >= atomicWindow + input.limits.passages) break;
+    }
+  }
+
+  return {
+    ideas: ideaHits.slice(0, input.limits.ideas).map((hit) => ideaCandidateById(hit.global_id, semanticStrength(hit.similarity))).filter((idea): idea is WritingWorkshopIdeaCandidate => !!idea),
+    passages: passageHits.map((hit) => toPassageCandidate(hit, 'section')),
+    evidencePacks,
+  };
+}
+
+/**
+ * Per-section retrieval used by the v1 compatibility engine.
+ *
+ * Keep this implementation intentionally narrow: it is the pre-hierarchical
+ * route from the historical engine — one embedding over the section focus,
+ * followed by the idea and passage vector indexes. It does not consult
+ * `retrieveHierarchical`, document profiles, routed works, or support/document
+ * lanes. The current section retriever remains separate so improvements to v2
+ * cannot silently change the meaning of an old report.
+ */
+export async function retrieveSectionMaterialLegacy(input: {
+  objective: string;
+  sectionTitle: string;
+  purpose: string;
+  keyClaims: string[];
+  coverageQuestions?: string[];
+  excludeIdeaIds: string[];
+  excludePassageIds: string[];
+  limits: { ideas: number; passages: number };
+}): Promise<{
+  ideas: WritingWorkshopIdeaCandidate[];
+  passages: WritingWorkshopPassageCandidate[];
+}> {
   const query = [input.sectionTitle, input.purpose, ...input.keyClaims].filter(Boolean).join('. ').trim();
   if (!query) return { ideas: [], passages: [] };
   const vector = await embed(`${input.objective}\n${query}`);
@@ -445,17 +692,22 @@ export async function retrieveSectionMaterial(input: {
 
   const skipIdeas = new Set(input.excludeIdeaIds);
   const skipPassages = new Set(input.excludePassageIds);
-  // Paged: this runs once per section, on top of the snapshot's own scans.
-  const ideaHits = (await findSimilarIdeasPaged(vector, -1, input.limits.ideas * 4)).filter((hit) => !skipIdeas.has(hit.global_id));
-  const passageHits = (await findSimilarPassagesPaged(vector, -1, input.limits.passages * 4)).filter(
-    (hit) => !skipPassages.has(hit.passage_id)
-  );
+  const ideaHits = (await findSimilarIdeasPaged(vector, -1, input.limits.ideas * 4))
+    .filter((hit) => !skipIdeas.has(hit.global_id));
+  const passageHits = (await findSimilarPassagesPaged(vector, -1, input.limits.passages * 4))
+    .filter((hit) => !skipPassages.has(hit.passage_id));
 
   return {
-    ideas: ideaHits.slice(0, input.limits.ideas).map((hit) => ideaCandidateById(hit.global_id, semanticStrength(hit.similarity))).filter((idea): idea is WritingWorkshopIdeaCandidate => !!idea),
-    passages: passageHits.slice(0, input.limits.passages).map(toPassageCandidate),
+    ideas: ideaHits
+      .slice(0, input.limits.ideas)
+      .map((hit) => ideaCandidateById(hit.global_id, semanticStrength(hit.similarity)))
+      .filter((idea): idea is WritingWorkshopIdeaCandidate => !!idea),
+    passages: passageHits.slice(0, input.limits.passages).map((hit) => toPassageCandidate(hit)),
   };
 }
+
+/** Descriptive alias for callers that prefer the full compatibility name. */
+export const retrieveHistoricalSectionMaterial = retrieveSectionMaterialLegacy;
 
 /** Load one idea in snapshot shape. Used by the per-section retrieval. */
 function ideaCandidateById(globalId: string, score: number): WritingWorkshopIdeaCandidate | null {
@@ -706,16 +958,25 @@ function rankedContradictions(tokens: Set<string>, semanticIndex: WorkshopSemant
     .map(({ item, score, reason }) => ({ ...item, score, reason }));
 }
 
-function rankedWorks(tokens: Set<string>, semanticIndex: WorkshopSemanticRanking): WritingWorkshopWorkCandidate[] {
+function rankedWorks(
+  tokens: Set<string>,
+  semanticIndex: WorkshopSemanticRanking,
+  includeDocumentProfiles = true,
+): WritingWorkshopWorkCandidate[] {
   const rows = getDb()
     .prepare(
       `SELECT w.nodus_id, w.zotero_key, w.title, w.authors_json, w.year, w.deep_status, w.doi,
               CASE WHEN w.summary_status = 'done' THEN ws.summary ELSE NULL END AS orientation_summary,
+              dpv.overview AS document_overview,
+              COALESCE(dps.status, 'missing') AS document_status,
+              dps.current_version_id AS document_version_id,
               COALESCE(GROUP_CONCAT(DISTINCT t.label), '') AS themes,
               COUNT(DISTINCT io.global_id) AS idea_count,
               COUNT(DISTINCT g.id) AS gap_count
          FROM works w
          LEFT JOIN work_summaries ws ON ws.nodus_id = w.nodus_id
+         LEFT JOIN document_profile_state dps ON dps.nodus_id = w.nodus_id
+         LEFT JOIN document_profile_versions dpv ON dpv.version_id = dps.current_version_id
          LEFT JOIN work_themes wt ON wt.nodus_id = w.nodus_id
          LEFT JOIN themes t ON t.theme_id = wt.theme_id
          LEFT JOIN idea_occurrences io ON io.nodus_id = w.nodus_id
@@ -729,17 +990,22 @@ function rankedWorks(tokens: Set<string>, semanticIndex: WorkshopSemanticRanking
   return rows
     .map((row): Scored<WritingWorkshopWorkCandidate> => {
       const themes = splitList(row.themes);
-      const lexical = relevance(tokens, [row.title, themes.join(' '), row.orientation_summary ?? ''].join(' '));
+      const orientation = includeDocumentProfiles
+        ? row.document_overview ?? row.orientation_summary ?? ''
+        : row.orientation_summary ?? '';
+      const lexical = relevance(tokens, [row.title, themes.join(' '), orientation].join(' '));
       const semantic = semanticOrLexical(semanticIndex, semanticIndex.workScores.get(row.nodus_id) ?? null, lexical);
       const support = Math.min(0.18, row.idea_count * 0.03) + Math.min(0.14, row.gap_count * 0.035) + (row.deep_status === 'done' ? 0.08 : 0);
       const score = semantic + support;
       return {
         score,
-        reason: row.deep_status === 'done' ? (semanticIndex.active ? 'Obra recuperada semánticamente con evidencia indexada.' : 'Obra con ideas y evidencias extraídas.') : semanticReason(semanticIndex, score, support),
+        reason: includeDocumentProfiles && row.document_status === 'current'
+          ? 'Obra orientada por su ficha documental auditada; las afirmaciones se respaldarán con ideas y pasajes.'
+          : row.deep_status === 'done' ? (semanticIndex.active ? 'Obra recuperada semánticamente con evidencia indexada.' : 'Obra con ideas y evidencias extraídas.') : semanticReason(semanticIndex, score, support),
         item: {
           id: row.nodus_id,
           label: row.title,
-          summary: row.orientation_summary ?? `${parseAuthors(row.authors_json)[0] ?? 'Autoría no disponible'}${row.year ? `, ${row.year}` : ''}`,
+          summary: orientation || `${parseAuthors(row.authors_json)[0] ?? 'Autoría no disponible'}${row.year ? `, ${row.year}` : ''}`,
           score,
           reason: '',
           title: row.title,
@@ -750,6 +1016,9 @@ function rankedWorks(tokens: Set<string>, semanticIndex: WorkshopSemanticRanking
           themes,
           deepStatus: row.deep_status,
           orientationSummary: row.orientation_summary,
+          documentOverview: includeDocumentProfiles ? row.document_overview : null,
+          documentStatus: includeDocumentProfiles ? row.document_status : 'missing',
+          documentVersionId: includeDocumentProfiles ? row.document_version_id : null,
           ideaCount: row.idea_count,
           gapCount: row.gap_count,
         },

@@ -6,6 +6,7 @@ import { z } from 'zod';
 import { AI_PROVIDERS as SHARED_AI_PROVIDERS } from '@shared/providers';
 import { PROMPT_LANGUAGES } from '@shared/types';
 import { DEEP_RESEARCH_APPROACHES } from '@shared/deepResearchApproaches';
+import { DEEP_RESEARCH_VERSIONS } from '@shared/deepResearchVersions';
 import type {
   AiProvider,
   Debate,
@@ -36,6 +37,8 @@ import * as researchQuestions from '../db/researchMapRepo';
 import * as themes from '../db/themesRepo';
 import * as tutorRoutes from '../db/tutorRepo';
 import * as workSummaries from '../db/workSummariesRepo';
+import { getDocumentProfile } from '../db/documentProfilesRepo';
+import { retrieveHierarchical } from '../ai/hierarchicalRetrieval';
 import { listPersons, getPerson, listEvents, listEvidenceFor, recordCounts } from '../db/entitiesRepo';
 import * as archive from '../db/archiveRepo';
 import * as dbMode from '../db/databasesRepo';
@@ -397,6 +400,10 @@ const modelSchema = z
  *  languages than the app itself offers. */
 const promptLanguageSchema = z.enum(PROMPT_LANGUAGES);
 const deepResearchApproachSchema = z.enum(DEEP_RESEARCH_APPROACHES).default('general');
+const deepResearchVersionSchema = z
+  .enum(DEEP_RESEARCH_VERSIONS)
+  .default('v2')
+  .describe('Deep Research engine. v2 is the current ideas-first engine; v1 preserves the historical orchestration for reproducible comparisons.');
 
 const writingBriefSchema = z.object({
   kind: z.enum(WRITING_KINDS),
@@ -405,6 +412,7 @@ const writingBriefSchema = z.object({
   tone: z.enum(['academic', 'synthetic', 'critical', 'exploratory']).optional(),
   language: promptLanguageSchema.optional(),
   deepResearchApproach: z.enum(DEEP_RESEARCH_APPROACHES).optional(),
+  deepResearchVersion: z.enum(DEEP_RESEARCH_VERSIONS).optional(),
 });
 
 const writingSelectionSchema = z.object({
@@ -417,14 +425,10 @@ const writingSelectionSchema = z.object({
   tutorRouteIds: z.array(z.string().min(1)).max(100),
 });
 
-const deepResearchTargetLengthSchema = z
-  .enum(['adaptive', 'concise', 'standard', 'exhaustive'])
-  .default('adaptive')
-  .describe('Target length. adaptive: sized by the corpus; concise ~5-8 pp; standard ~9-14 pp; exhaustive ~15-20 pp.');
 const deepResearchSectionLimitSchema = z
-  .union([z.literal('auto'), z.number().int().min(1).max(20)])
+  .union([z.literal('auto'), z.literal('single'), z.number().int().min(1).max(20)])
   .default('auto')
-  .describe("Section cap. 'auto' sizes it by the corpus; a number fixes it (with one grace section).");
+  .describe('Report structure. "auto" lets Nodus choose headed sections; "single" publishes one continuous narrative without internal headings; a number is a preferred section maximum.');
 
 const writingDraftSchema = z.object({
   generatedAt: z.string().min(1),
@@ -456,6 +460,8 @@ const writingDraftSchema = z.object({
   nextSteps: z.array(z.string()),
   limitations: z.array(z.string()),
   deepResearchApproach: z.enum(DEEP_RESEARCH_APPROACHES).optional(),
+  deepResearchVersion: z.enum(DEEP_RESEARCH_VERSIONS).optional(),
+  deepResearchStructure: z.enum(['sectioned', 'single']).optional(),
   generationModel: modelSchema.nullable().optional(),
   stats: z.object({
     selectedIdeas: z.number().int().nonnegative(),
@@ -997,6 +1003,9 @@ const TOOL_VAULT_SCOPE: Record<string, VaultType[]> = {
   nodus_get_author_synthesis: RESEARCH_VAULTS,
   nodus_list_works: RESEARCH_VAULTS,
   nodus_get_work: RESEARCH_VAULTS,
+  nodus_get_document_profile: RESEARCH_VAULTS,
+  nodus_search_documents: RESEARCH_VAULTS,
+  nodus_search_hybrid: RESEARCH_VAULTS,
   nodus_list_work_passages: RESEARCH_VAULTS,
   nodus_get_passage: RESEARCH_VAULTS,
   nodus_search_passages: RESEARCH_VAULTS,
@@ -1623,6 +1632,90 @@ export function registerTools(server: McpServer): void {
   );
 
   server.registerTool(
+    'nodus_get_document_profile',
+    {
+      title: 'Get document profile',
+      description:
+        'Gets the current audited whole-document profile for one work: overview, central question, thesis, method, scope, section architecture and links to extracted ideas. The profile is generated orientation metadata, never a citable source; verify claims through its support passages or the original work. workId accepts a nodus_id or Zotero key. Read-only.',
+      inputSchema: { workId: z.string().trim().min(1) },
+      annotations: { readOnlyHint: true, openWorldHint: false },
+    },
+    ({ workId }) =>
+      tool(() => {
+        const nodusId = resolveWorkNodusId(workId);
+        if (!nodusId) throw notFound('work', workId);
+        const profile = getDocumentProfile(nodusId);
+        if (!profile) throw notFound('document profile', workId);
+        return {
+          profile,
+          citationPolicy: 'orientation_only',
+          citationGuidance: 'Cite supporting passages or the original work, never this generated profile.',
+        };
+      })()
+  );
+
+  server.registerTool(
+    'nodus_search_documents',
+    {
+      title: 'Search whole documents',
+      description:
+        'Finds globally relevant works using audited document profiles and section representations. It distinguishes central treatment from incidental mentions and falls back to lexical profile search when embeddings are unavailable. Results orient retrieval and are not citable evidence. Read-only.',
+      inputSchema: {
+        query: z.string().trim().min(1).max(8_000),
+        limit: z.number().int().min(1).max(50).default(15),
+      },
+      annotations: { readOnlyHint: true, openWorldHint: false },
+    },
+    ({ query, limit }) =>
+      tool(async () => {
+        const result = await retrieveHierarchical(query, {
+          documentLimit: limit,
+          ideaLimit: 0,
+          passageLimit: 0,
+          routedPassageLimit: 0,
+        });
+        return {
+          embeddingAvailable: result.embeddingAvailable,
+          documents: result.documents,
+          citationPolicy: 'orientation_only',
+          citationGuidance: 'Use nodus_search_hybrid or passage tools to obtain citable evidence.',
+        };
+      })()
+  );
+
+  server.registerTool(
+    'nodus_search_hybrid',
+    {
+      title: 'Search documents, ideas and evidence',
+      description:
+        'Runs hierarchical retrieval across three independent lanes: whole-document profiles, extracted ideas and full-text passages. Document routing can add passages but never removes globally relevant ideas or evidence. Cite passages/original works; profiles only orient and contextualize. Read-only.',
+      inputSchema: {
+        query: z.string().trim().min(1).max(8_000),
+        documentLimit: z.number().int().min(1).max(50).default(12),
+        ideaLimit: z.number().int().min(1).max(100).default(30),
+        passageLimit: z.number().int().min(1).max(50).default(16),
+      },
+      annotations: { readOnlyHint: true, openWorldHint: false },
+    },
+    ({ query, documentLimit, ideaLimit, passageLimit }) =>
+      tool(async () => {
+        const result = await retrieveHierarchical(query, { documentLimit, ideaLimit, passageLimit });
+        return {
+          ...result,
+          documents: result.documents.map((hit) => ({ ...hit, citationPolicy: 'orientation_only' })),
+          passages: result.passages.map((hit) => ({
+            ...hit,
+            text: undefined,
+            textSnippet: snippet(hit.text, 700),
+            citationPolicy: 'citable_source_evidence',
+          })),
+          ideas: result.ideas.map((hit) => ({ ...hit, citationPolicy: 'derived_claim_verify_in_source' })),
+          citationGuidance: 'Cite passage pages or original works. Do not cite generated document profiles.',
+        };
+      })()
+  );
+
+  server.registerTool(
     'nodus_list_work_passages',
     {
       title: 'List full-text passages',
@@ -2192,15 +2285,15 @@ export function registerTools(server: McpServer): void {
     {
       title: 'Generate a Deep Research report',
       description:
-        'Runs the orchestrated, coverage-guided, fully-cited Deep Research pipeline over the whole corpus (5–20 pp). Two writers via `writer`: ' +
+        'Runs the orchestrated, coverage-guided, fully-cited Deep Research pipeline over the whole corpus. The report grows only as long as the retrieved evidence and distinct analytical value require; no editorial word/page target is applied. Two writers via `writer`: ' +
         '"nodus" (default) — Nodus\'s own configured model plans and writes the whole report and returns it (save=true also stores it as a draft). ' +
-        '"client" — returns a self-contained writing kit (corpus materials with verbatim citation tokens, target scope, method and citation policy) so the MODEL CALLING THIS MCP articulates and drafts the report itself; when done, that draft is passed to nodus_finalize_deep_research to validate citations and assemble references. Both keep Nodus as the grounding authority. writer="nodus" can consume provider tokens and may take several minutes; it sends MCP progress notifications (planning, per-section, assembly) when the request carries a progressToken. It also holds this call open for the whole generation and waits behind anything already in the shared lane — prefer nodus_enqueue_deep_research unless the report is needed in this very turn.',
+        '"client" — returns a self-contained writing kit (corpus materials with verbatim citation tokens, evidence-derived section plan, method and citation policy) so the MODEL CALLING THIS MCP articulates and drafts the report itself; when done, that draft is passed to nodus_finalize_deep_research to validate citations and assemble references. Both keep Nodus as the grounding authority. writer="nodus" can consume provider tokens and may take several minutes; it sends MCP progress notifications (planning, per-section, assembly) when the request carries a progressToken. It also holds this call open for the whole generation and waits behind anything already in the shared lane — prefer nodus_enqueue_deep_research unless the report is needed in this very turn.',
       inputSchema: {
         objective: z.string().trim().min(1).max(8_000),
         approach: deepResearchApproachSchema,
+        deepResearchVersion: deepResearchVersionSchema,
         language: promptLanguageSchema.optional(),
         audience: z.string().trim().max(1_000).optional(),
-        targetLength: deepResearchTargetLengthSchema,
         sectionLimit: deepResearchSectionLimitSchema,
         writer: z
           .enum(['nodus', 'client'])
@@ -2212,10 +2305,10 @@ export function registerTools(server: McpServer): void {
       },
       annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
     },
-    ({ objective, approach, language, audience, targetLength, sectionLimit, writer, model, save, title }, extra) =>
+    ({ objective, approach, deepResearchVersion, language, audience, sectionLimit, writer, model, save, title }, extra) =>
       tool(async () => {
         if (writer === 'client') {
-          return buildDeepResearchBrief({ objective, approach, language, audience, targetLength, sectionLimit });
+          return buildDeepResearchBrief({ objective, approach, deepResearchVersion, language, audience, sectionLimit });
         }
         const notify = progressNotifier(extra);
         ensureDeepResearchLane();
@@ -2224,7 +2317,7 @@ export function registerTools(server: McpServer): void {
         // response shape (the full saved draft, not just its id).
         const report = await runDeepResearchJob(
           {
-            request: { objective, approach, language, audience, targetLength, sectionLimit, model: asModel(model) ?? null },
+            request: { objective, approach, deepResearchVersion, language, audience, sectionLimit, model: asModel(model) ?? null },
             origin: 'mcp',
             save: false,
           },
@@ -2245,12 +2338,14 @@ export function registerTools(server: McpServer): void {
     {
       title: 'Finalize a client-written Deep Research report',
       description:
-        'Second step of nodus_generate_deep_research(writer="client"). Takes the Markdown the calling model wrote (`## ` body sections only) and enforces Nodus\'s citation contract: hallucinated citations are stripped, labels canonicalised, and the References/bibliography are built from the works actually cited. Returns the assembled report in the standard draft shape; with save=true it also stores it as a Nodus writing draft. Pass the SAME objective/language used for the brief so the same corpus snapshot is used to validate citations.',
+        'Second step of nodus_generate_deep_research(writer="client"). Takes the Markdown the calling model wrote (headed body sections normally, or plain continuous prose when sectionLimit="single") and enforces Nodus\'s citation contract: hallucinated citations are stripped, labels canonicalised, and the References/bibliography are built from the works actually cited. Returns the assembled report in the standard draft shape; with save=true it also stores it as a Nodus writing draft. Pass the SAME objective/language/sectionLimit used for the brief so the same corpus and visible structure are preserved.',
       inputSchema: {
         objective: z.string().trim().min(1).max(8_000),
         approach: deepResearchApproachSchema,
+        deepResearchVersion: deepResearchVersionSchema,
         language: promptLanguageSchema.optional(),
         audience: z.string().trim().max(1_000).optional(),
+        sectionLimit: deepResearchSectionLimitSchema,
         sectionsMarkdown: z.string().trim().min(1).max(200_000),
         title: z.string().trim().min(1).max(2_000).optional(),
         abstract: z.string().trim().max(20_000).optional(),
@@ -2261,13 +2356,15 @@ export function registerTools(server: McpServer): void {
       },
       annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
     },
-    ({ objective, approach, language, audience, sectionsMarkdown, title, abstract, limitations, nextSteps, generationModel, save }) =>
+    ({ objective, approach, deepResearchVersion, language, audience, sectionLimit, sectionsMarkdown, title, abstract, limitations, nextSteps, generationModel, save }) =>
       tool(async () => {
         const report = await assembleClientDeepResearchReport({
           objective,
           approach,
+          deepResearchVersion,
           language,
           audience,
+          sectionLimit,
           sectionsMarkdown,
           title,
           abstract,
@@ -2292,9 +2389,9 @@ export function registerTools(server: McpServer): void {
       inputSchema: {
         objective: z.string().trim().min(1).max(8_000),
         approach: deepResearchApproachSchema,
+        deepResearchVersion: deepResearchVersionSchema,
         language: promptLanguageSchema.optional(),
         audience: z.string().trim().max(1_000).optional(),
-        targetLength: deepResearchTargetLengthSchema,
         sectionLimit: deepResearchSectionLimitSchema,
         model: modelSchema.optional(),
         save: z.boolean().default(true).describe('Store the finished report as a Nodus writing draft. Leave true unless the user only wants to read it here.'),
@@ -2302,11 +2399,11 @@ export function registerTools(server: McpServer): void {
       },
       annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
     },
-    ({ objective, approach, language, audience, targetLength, sectionLimit, model, save, title }) =>
+    ({ objective, approach, deepResearchVersion, language, audience, sectionLimit, model, save, title }) =>
       tool(() => {
         ensureDeepResearchLane();
         const job = enqueueDeepResearchJob({
-          request: { objective, approach, language, audience, targetLength, sectionLimit, model: asModel(model) ?? null },
+          request: { objective, approach, deepResearchVersion, language, audience, sectionLimit, model: asModel(model) ?? null },
           origin: 'mcp',
           save,
           title,

@@ -21,6 +21,70 @@ export interface SimilarPassage {
   zotero_key: string;
 }
 
+const PASSAGE_FTS_STOPWORDS = new Set([
+  'para', 'como', 'desde', 'hasta', 'entre', 'sobre', 'este', 'esta', 'estos', 'estas',
+  'cuál', 'cual', 'cómo', 'como', 'qué', 'que', 'quién', 'quien', 'donde', 'cuando',
+  'with', 'from', 'into', 'this', 'that', 'what', 'which', 'where', 'when', 'during',
+]);
+
+/** Literal passage lane for names, procedures and phrases that dense retrieval can
+ * blur. The query is constructed from quoted prefix tokens, never raw FTS syntax. */
+export function lexicalPassageSearch(
+  query: string,
+  limit: number,
+  opts: { nodusIds?: string[] } = {},
+): SimilarPassage[] {
+  if (limit <= 0) return [];
+  const fold = (value: string) => value.normalize('NFKD').replace(/\p{M}+/gu, '').toLocaleLowerCase();
+  const tokens = fold(query).match(/[\p{L}\p{N}]+/gu) ?? [];
+  // FTS5 has no language stemmer in this index. Prefix roots recover predictable
+  // inflection/OCR variants such as distribuyó/distribución and
+  // gratuitamente/gratuita without ever accepting raw FTS syntax from the user.
+  const rootFor = (token: string) => /^\d+$/u.test(token)
+    ? token
+    : token.length >= 8 ? token.slice(0, 7) : token;
+  const unique = [...new Set(tokens
+    .filter((token) => (token.length >= 4 || /^\d+$/u.test(token)) && !PASSAGE_FTS_STOPWORDS.has(token))
+    .map(rootFor))]
+    .slice(0, 32);
+  const ftsQuery = unique.map((token) => `"${token.replaceAll('"', '""')}"*`).join(' OR ');
+  if (!ftsQuery) return [];
+  const nodusIds = [...new Set(opts.nodusIds ?? [])];
+  const scoped = nodusIds.length ? ` AND p.nodus_id IN (${nodusIds.map(() => '?').join(',')})` : '';
+  const rows = getDb().prepare(
+    `SELECT p.passage_id,p.nodus_id,p.text,p.page_label,
+            w.title,w.authors_json,w.year,w.zotero_key,bm25(passages_fts) AS rank
+       FROM passages_fts f
+       JOIN passages p ON p.passage_id=f.passage_id
+       JOIN works w ON w.nodus_id=p.nodus_id
+      WHERE passages_fts MATCH ? AND w.archived=0
+        AND (w.deep_hash IS NULL OR p.content_hash=w.deep_hash)${scoped}
+      ORDER BY rank
+      LIMIT ?`
+  ).all(ftsQuery, ...nodusIds, Math.max(limit, limit * 4)) as Array<Omit<SimilarPassage, 'similarity'> & { rank: number }>;
+  // BM25 alone rewards a very frequent generic term. Re-rank its bounded candidate
+  // pool by how many distinct roots from this one atomic question the passage
+  // actually covers, with a small proximity and original-rank tie-breaker.
+  return rows.map(({ rank: _rank, ...row }, index) => {
+    const passageTokens = fold(row.text).match(/[\p{L}\p{N}]+/gu) ?? [];
+    const positions = unique.map((root) => passageTokens
+      .map((token, at) => token.startsWith(root) ? at : -1)
+      .filter((at) => at >= 0));
+    const covered = positions.filter((items) => items.length > 0).length;
+    let closePairs = 0;
+    for (let left = 0; left < positions.length - 1; left += 1) {
+      if (!positions[left].length || !positions[left + 1].length) continue;
+      if (positions[left].some((a) => positions[left + 1].some((b) => Math.abs(a - b) <= 12))) closePairs += 1;
+    }
+    const coverage = covered / Math.max(1, unique.length);
+    const proximity = closePairs / Math.max(1, unique.length - 1);
+    const originalRank = 1 / (index + 1);
+    return { row, score: coverage * 0.72 + proximity * 0.18 + originalRank * 0.10 };
+  }).sort((a, b) => b.score - a.score)
+    .slice(0, limit)
+    .map(({ row, score }) => ({ ...row, similarity: Math.min(1, score) }));
+}
+
 /** Replace one work atomically so interrupted/reprocessed runs never mix chunks. */
 export function replaceWorkPassages(nodusId: string, contentHash: string, rows: PassageInsert[]): void {
   const db = getDb();

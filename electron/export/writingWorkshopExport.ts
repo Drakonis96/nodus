@@ -177,14 +177,16 @@ function renderDraftMarkdown(draft: WritingWorkshopDraft): string {
     '## Resumen',
     draft.abstract,
     '',
-    '## Esquema',
-    ...draft.outline.flatMap((section, index) => [
-      `### ${index + 1}. ${section.title}`,
-      section.purpose,
-      '',
-      ...section.keyClaims.map((claim) => `- ${claim}`),
-      ...(section.sources.length ? ['', `Fuentes: ${section.sources.join('; ')}`] : []),
-      '',
+    ...(draft.deepResearchStructure === 'single' ? [] : [
+      '## Esquema',
+      ...draft.outline.flatMap((section, index) => [
+        `### ${index + 1}. ${section.title}`,
+        section.purpose,
+        '',
+        ...section.keyClaims.map((claim) => `- ${claim}`),
+        ...(section.sources.length ? ['', `Fuentes: ${section.sources.join('; ')}`] : []),
+        '',
+      ]),
     ]),
     '## Borrador',
     // The body already opens with the abstract and closes with its limitations and

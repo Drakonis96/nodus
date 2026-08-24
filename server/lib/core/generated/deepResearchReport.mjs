@@ -8,11 +8,19 @@
 function stripLeadingAbstract(markdown, abstract) {
   const lines = (markdown ?? "").replace(/\r\n?/g, "\n").split("\n");
   const first = lines.findIndex((line) => line.trim().length > 0);
-  if (first < 0 || !/^#{1,3}\s+/.test(lines[first])) return markdown;
+  if (first < 0) return markdown;
+  const expected = (abstract ?? "").replace(/\s+/g, " ").trim();
+  if (!/^#{1,3}\s+/.test(lines[first])) {
+    let next2 = first + 1;
+    while (next2 < lines.length && lines[next2].trim().length > 0) next2 += 1;
+    const paragraph = lines.slice(first, next2).join(" ").replace(/\s+/g, " ").trim();
+    if (!expected || !paragraph.includes(expected.slice(0, Math.min(80, expected.length)))) return markdown;
+    while (next2 < lines.length && !lines[next2].trim()) next2 += 1;
+    return lines.slice(next2).join("\n").trim();
+  }
   let next = first + 1;
   while (next < lines.length && !/^#{1,3}\s+/.test(lines[next])) next++;
   const block = lines.slice(first + 1, next).join(" ").replace(/\s+/g, " ").trim();
-  const expected = (abstract ?? "").replace(/\s+/g, " ").trim();
   if (!expected || !block || !block.includes(expected.slice(0, Math.min(80, expected.length)))) return markdown;
   return lines.slice(next).join("\n").trim();
 }
@@ -796,7 +804,7 @@ function deepResearchReportInput(draft, image = { dataUrl: null, credit: null })
     imageCredit: image.credit,
     contentsLabel: labels.contents,
     metrics: [
-      { value: String(draft.outline.length), label: labels.sections },
+      { value: String(draft.deepResearchStructure === "single" ? 1 : draft.outline.length), label: labels.sections },
       { value: String(draft.stats.selectedWorks || draft.bibliography.length), label: labels.sources },
       { value: words.toLocaleString(language), label: labels.words }
     ],

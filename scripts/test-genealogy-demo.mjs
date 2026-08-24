@@ -171,6 +171,7 @@ try {
   const family = gdr.buildFamilyFacts();
   assert.equal(family.personas.length, 14, 'family facts include the whole family');
 
+  const seenCoverageQuestions = [];
   const fakeDeps = {
     planReport: async (input) => ({
       title: 'Los Serrano–Vidal',
@@ -181,6 +182,7 @@ try {
       ],
     }),
     writeSection: async (input) => {
+      seenCoverageQuestions.push(...(input.section.coverageQuestions ?? []));
       const first = input.sources[0];
       const good = first ? `[${first.title}](nodus://archive/${first.id.replace(/^doc:/, '')})` : '';
       // The section is given the assigned documents' FULL TEXT — assert it arrived.
@@ -188,10 +190,20 @@ try {
       return `## ${input.section.title}\n\nDesarrollo ${good}, y una cita inventada [x](nodus://archive/inexistente).`;
     },
     finalize: async () => ({ title: 'Los Serrano–Vidal', abstract: 'Resumen final.', limitations: ['Vínculos por probar.'], nextSteps: ['Buscar más partidas.'] }),
+    auditFinalSummary: async (input, draft) => {
+      assert.ok(input.sectionFindings?.some((finding) => finding.text.includes('Desarrollo')), 'the genealogy summary audit sees grounded section findings');
+      assert.equal(draft.abstract, 'Resumen final.');
+      return { title: draft.title, abstract: 'Resumen final acotado a los documentos citados.', limitations: [], nextSteps: draft.nextSteps };
+    },
     resolveWorkFullText: async () => '',
   };
   const report = await gdr.orchestrateGenealogyDeepResearch(
-    { objective: 'Historia de la familia Serrano', targetLength: 'concise', sectionLimit: 2, language: 'es' },
+    {
+      objective: 'Historia de la familia Serrano',
+      coverageQuestions: ['¿Qué prueba la partida de bautismo?', '¿Qué vínculos siguen siendo inciertos?'],
+      sectionLimit: 2,
+      language: 'es',
+    },
     gsources,
     family,
     fakeDeps
@@ -203,6 +215,22 @@ try {
   assert.ok(report.draft.bibliography.length > 0, 'cited documents listed in references');
   assert.ok(report.draft.matrix.length > 0, 'support matrix built from the cited sources');
   assert.ok(report.draft.draftMarkdown.includes('Limitaciones'), 'genealogical limitations included');
+  assert.equal(report.draft.abstract, 'Resumen final acotado a los documentos citados.', 'the cold summary audit can narrow the abstract');
+  assert.ok(report.draft.limitations.includes('Vínculos por probar.'), 'the cold summary audit cannot erase an established limitation');
+  assert.deepEqual([...new Set(seenCoverageQuestions)].sort(), ['¿Qué prueba la partida de bautismo?', '¿Qué vínculos siguen siendo inciertos?'].sort(), 'every genealogy coverage question reaches a section even when the planner omits assignments');
+  assert.ok(report.draft.qualityAssessment, 'genealogy persists the shared professional quality assessment');
+
+  const continuousReport = await gdr.orchestrateGenealogyDeepResearch(
+    { objective: 'Historia continua de la familia Serrano', sectionLimit: 'single', language: 'es' },
+    gsources,
+    family,
+    fakeDeps,
+  );
+  assert.equal(continuousReport.meta.structure, 'single', 'genealogy persists continuous structure metadata');
+  assert.equal(continuousReport.meta.sections, 1, 'genealogy publishes one logical block');
+  assert.equal(continuousReport.draft.outline.length, 0, 'genealogy hides its internal evidence movements');
+  assert.equal((continuousReport.draft.draftMarkdown.match(/^#{1,6}\s+/gmu) ?? []).length, 0, 'genealogy continuous prose has no section headings');
+  assert.ok(continuousReport.draft.bibliography.length > 0, 'genealogy continuous mode keeps cited sources');
 
   // ── Clear restores everything ──────────────────────────────────────────────
   clearDemoData();

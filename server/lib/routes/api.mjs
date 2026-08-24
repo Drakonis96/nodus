@@ -774,8 +774,12 @@ export function createApiRoutes(ctx) {
       limit: Math.max(1, Math.min(100, Number(input.limit) || 20)),
       threshold: Number.isFinite(Number(input.threshold)) ? Number(input.threshold) : 0,
     });
-    const table = kind === 'ideas' ? 'ideas' : 'passages';
-    const idColumn = kind === 'ideas' ? 'global_id' : 'passage_id';
+    const source = kind === 'ideas'
+      ? { table: 'ideas', idColumn: 'global_id' }
+      : kind === 'documents'
+        ? { table: 'document_vectors', idColumn: 'vector_id' }
+        : { table: 'passages', idColumn: 'passage_id' };
+    const { table, idColumn } = source;
     const byId = new Map(rows(snapshot, table).map((row) => [String(row[idColumn]), row]));
     json(res, 200, {
       results: matches.map((match) => ({ id: match.id, score: match.score, row: byId.get(String(match.id)) ?? null })),
@@ -817,7 +821,10 @@ export function createApiRoutes(ctx) {
       if (kept.length) sections.push({ kind, items: kept });
     };
 
-    const wanted = new Set(Array.isArray(input.include) && input.include.length ? input.include : ['ideas', 'passages', 'themes', 'gaps', 'works']);
+    const wanted = new Set(Array.isArray(input.include) && input.include.length ? input.include : [
+      'ideas', 'passages', 'themes', 'gaps', 'works',
+      'document_profile_versions', 'document_profile_fields', 'document_sections',
+    ]);
     const hits = lexicalSearch(snapshot, input.query, 200);
     const hitIds = new Set(hits.map((hit) => String(hit.id)));
 
@@ -826,6 +833,9 @@ export function createApiRoutes(ctx) {
     if (wanted.has('themes')) push('themes', rows(snapshot, 'themes'));
     if (wanted.has('gaps')) push('gaps', rows(snapshot, 'gaps').filter((row) => hitIds.has(String(row.id))));
     if (wanted.has('works')) push('works', rows(snapshot, 'works').filter((row) => hitIds.has(String(row.nodus_id))));
+    if (wanted.has('document_profile_versions')) push('document_profile_versions', rows(snapshot, 'document_profile_versions').filter((row) => hitIds.has(String(row.version_id))));
+    if (wanted.has('document_profile_fields')) push('document_profile_fields', rows(snapshot, 'document_profile_fields').filter((row) => hitIds.has(String(row.field_id))));
+    if (wanted.has('document_sections')) push('document_sections', rows(snapshot, 'document_sections').filter((row) => hitIds.has(String(row.section_id))));
 
     json(res, 200, {
       sections,
@@ -834,6 +844,7 @@ export function createApiRoutes(ctx) {
       revision: space.revision,
       // A citation always resolves against real corpus rows, never against model output.
       citationScheme: { idea: 'nodus://idea/<global_id>', passage: 'nodus://passage/<passage_id>', work: 'nodus://work/<nodus_id>' },
+      documentProfilePolicy: 'orientation_only',
     });
     return true;
   }

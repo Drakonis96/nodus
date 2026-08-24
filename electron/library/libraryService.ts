@@ -92,6 +92,7 @@ import type { LibraryAnalysisReuseComponent, LibraryAnalysisReuseStatus } from '
 import { reuseVaultAnalysisForWorks } from '../vaults/vaultAnalysisImport';
 import { libraryRevisionFingerprint } from './libraryVaultProvenance';
 import { notifyGlobalLibraryChanged, registerGlobalLibraryCloser } from './libraryRuntime';
+import { documentIndexQueue } from '../pipeline/documentIndexQueue';
 import {
   formatLibraryCitationCsl,
   formatLibraryOfficeDocumentCsl,
@@ -1193,6 +1194,11 @@ export async function linkGlobalLibraryItemsToVault(itemIds: string[], vaultId: 
       nextLinks.push(vaultAnalysis(record.id, vault.id, vault.name, String(vault.type), linked.nodus_id));
     }
     return nextLinks;
+  });
+  // Linking materializes works in a vault; an enabled continuous campaign should
+  // see those works immediately, while disabled vaults remain completely inert.
+  await documentIndexQueue.refreshVault(vault.id).catch((error) => {
+    console.error('[document-index] post-library-link refresh failed', error);
   });
   current.catalog.upsertVaultLinks(links);
   broadcast(current.catalog.status(current.root, current.deviceId));

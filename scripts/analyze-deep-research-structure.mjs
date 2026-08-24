@@ -2,7 +2,7 @@
 //
 // Answers the questions a page count cannot: does each section develop NEW material
 // or re-tread the previous one, do the ideas inside a section share a theme, and how
-// close does the writer get to the length it was asked for. Reads saved runs only —
+// much source-backed novelty each section adds. Reads saved runs only —
 // no model calls, no writes.
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
@@ -76,15 +76,13 @@ function analyze(label) {
 }
 
 for (const label of ['before', 'after']) {
-  const { rows, meta } = analyze(label);
-  const target = Math.min(1800, Math.max(800, Math.round((meta.targetPages.max * 450) / rows.length)));
-  console.log(`\n═══ ${label.toUpperCase()} — objetivo por sección ≈ ${target} palabras`);
-  console.log('sección'.padEnd(48) + 'palab'.padEnd(8) + '%obj'.padEnd(7) + 'ideas'.padEnd(7) + 'nuevas'.padEnd(8) + 'tema dominante'.padEnd(28) + 'pasajes  tensiones');
+  const { rows } = analyze(label);
+  console.log(`\n═══ ${label.toUpperCase()} — estructura guiada por evidencia`);
+  console.log('sección'.padEnd(48) + 'palab'.padEnd(8) + 'ideas'.padEnd(7) + 'nuevas'.padEnd(8) + 'tema dominante'.padEnd(28) + 'pasajes  tensiones');
   for (const r of rows) {
     console.log(
       r.title.padEnd(48) +
         String(r.words).padEnd(8) +
-        `${Math.round((r.words / target) * 100)}%`.padEnd(7) +
         String(r.ideas).padEnd(7) +
         `${Math.round(r.freshShare * 100)}%`.padEnd(8) +
         r.topTheme.padEnd(28) +
@@ -93,6 +91,6 @@ for (const label of ['before', 'after']) {
     );
   }
   const totalWords = rows.reduce((n, r) => n + r.words, 0);
-  console.log(`→ ${rows.length} secciones · ${totalWords} palabras · ${Math.round((totalWords / (target * rows.length)) * 100)}% de la extensión pedida`);
+  console.log(`→ ${rows.length} secciones · ${totalWords} palabras observadas · sin cuota editorial`);
 }
 db.close();

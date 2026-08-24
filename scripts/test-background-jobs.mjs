@@ -181,7 +181,6 @@ try {
   jobs.startDeepResearchGeneration(jobs.DEEP_RESEARCH_MAIN_JOB_KEY, {
     objective: 'Pregunta principal',
     language: 'es',
-    targetLength: 'standard',
     sectionLimit: 4,
     model: null,
   });

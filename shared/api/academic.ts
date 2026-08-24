@@ -79,6 +79,11 @@ import type {
   DeepResearchStreamHandlers,
   DuplicateIdeaGroup,
   DuplicateWorkGroup,
+  DocumentIndexCampaign,
+  DocumentIndexProgress,
+  DocumentProfile,
+  DocumentProfileOverride,
+  DocumentUnderstandingState,
   EdgeDetail,
   EdgeFeedbackVerdict,
   EdgeFeedbackView,
@@ -311,6 +316,32 @@ export interface AcademicApi {
   /** Enqueue a semantic bridge discovery job into the scan queue. */
   enqueueBridgeDiscovery(model?: ModelRef | null): Promise<void>;
   onQueueProgress(cb: (p: QueueProgress) => void): () => void;
+
+  // audited whole-document understanding
+  getDocumentProfile(nodusId: string): Promise<DocumentProfile | null>;
+  saveDocumentProfileOverride(input: {
+    nodusId: string;
+    fieldPath: string;
+    value: string;
+    generatedValue: string;
+    baseVersionId: string;
+    verified?: boolean;
+  }): Promise<DocumentProfileOverride>;
+  deleteDocumentProfileOverride(overrideId: string): Promise<void>;
+  getDocumentProfileStatuses(nodusIds?: string[]): Promise<Array<{
+    nodusId: string;
+    status: DocumentUnderstandingState;
+    currentVersionId: string | null;
+    sourceFingerprint: string | null;
+    staleReason: string | null;
+    error: string | null;
+  }>>;
+  getDocumentIndexProgress(): Promise<DocumentIndexProgress>;
+  startDocumentIndexCampaign(options?: { includeArchived?: boolean; nodusIds?: string[] }): Promise<DocumentIndexCampaign>;
+  enqueueDocumentProfile(nodusId: string): Promise<void>;
+  setDocumentIndexCampaignStatus(vaultId: string, campaignId: string, status: 'running' | 'paused' | 'cancelled'): Promise<void>;
+  cancelDocumentIndexJob(jobId: string): Promise<void>;
+  onDocumentIndexProgress(cb: (p: DocumentIndexProgress) => void): () => void;
 
   // graph
   getGraph(lens: 'ideas' | 'authors'): Promise<GraphData>;
@@ -672,8 +703,8 @@ export interface AcademicApi {
   /** Push notification for local edits and annotations received through server sync. */
   onWritingDraftAnnotationsChanged(cb: (draftId: string | null) => void): () => void;
 
-  // deep research (orchestrated, coverage-guided multi-page report over the whole corpus)
-  /** Plan → write section by section (guided by coverage) → assemble a fully cited 5–20 page report. */
+  // deep research (orchestrated, coverage-guided report over the whole corpus)
+  /** Plan → write evidence-bearing sections → stop when the corpus adds no relevant contribution. */
   generateDeepResearchReport(request: DeepResearchRequest, handlers?: DeepResearchStreamHandlers): Promise<DeepResearchReport>;
   /** Every report in the shared generation lane, including those queued by MCP clients. */
   listDeepResearchJobs(): Promise<DeepResearchJobRecord[]>;

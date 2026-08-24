@@ -14,6 +14,7 @@ import { findSimilarIdeas, getIdea } from '../db/ideasRepo';
 import { findSimilarPassages } from '../db/passagesRepo';
 import { findSimilarWorks } from '../db/workSummariesRepo';
 import { embed } from './aiClient';
+import { retrieveHierarchical } from './hierarchicalRetrieval';
 
 const DEFAULT_KINDS: SearchResultKind[] = ['idea', 'passage', 'work'];
 const SEMANTIC_KINDS: SearchResultKind[] = ['idea', 'passage', 'work'];
@@ -138,7 +139,46 @@ export async function semanticSearch(
   const limit = options.limit ?? DEFAULT_LIMIT;
   const threshold = options.minSimilarity ?? DEFAULT_MIN_SIMILARITY;
 
-  return { available: true, results: rankByVector(vector, kinds, limit, threshold) };
+  const results = rankByVector(vector, kinds, limit, threshold);
+  if (kinds.has('work')) {
+    // Whole-document and section vectors complement the historical summary vector.
+    // Keep one search-result row per work; its snippet may now come from the most
+    // relevant audited document field or section.
+    const hierarchy = await retrieveHierarchical(q, {
+      embedding: vector,
+      documentLimit: limit * 2,
+      ideaLimit: 0,
+      passageLimit: 0,
+      minDocumentSimilarity: threshold,
+    });
+    const topDocumentScore = hierarchy.documents[0]?.retrievalScore ?? 0;
+    for (const hit of hierarchy.documents) {
+      // RRF is ordinal. Normalise it inside this result set before comparing it
+      // with cosine scores; a fixed multiplier made a lexical match look like a
+      // near-perfect vector match and destabilised the legacy work ranking.
+      const routedStrength = topDocumentScore > 0
+        ? 0.65 * (hit.retrievalScore / topDocumentScore)
+        : 0;
+      results.push({
+        kind: 'work',
+        id: hit.nodusId,
+        title: hit.title || '(sin título)',
+        subtitle: workSubtitle(hit.authors, hit.year),
+        snippet: snippet(hit.text),
+        similarity: Math.max(hit.similarity, routedStrength),
+      });
+    }
+  }
+  const unique = new Map<string, GlobalSearchResult>();
+  for (const result of results) {
+    const key = `${result.kind}:${result.id}`;
+    const previous = unique.get(key);
+    if (!previous || (result.similarity ?? 0) > (previous.similarity ?? 0)) unique.set(key, result);
+  }
+  return {
+    available: true,
+    results: [...unique.values()].sort((a, b) => (b.similarity ?? 0) - (a.similarity ?? 0)).slice(0, limit),
+  };
 }
 
 /** "Ideas parecidas a esta": rank ideas by similarity to one already-embedded idea. */

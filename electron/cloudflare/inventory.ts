@@ -41,7 +41,7 @@ function uniqueAssetBytes(assets: ReturnType<typeof buildServerSnapshot>['assets
 
 function vectorInventory(db: Database.Database, includeVectors: boolean, includePassages: boolean) {
   if (!includeVectors) return [];
-  const kinds: VectorKind[] = includePassages ? ['ideas', 'passages'] : ['ideas'];
+  const kinds: VectorKind[] = includePassages ? ['ideas', 'documents', 'passages'] : ['ideas', 'documents'];
   return kinds.flatMap((kind) => {
     const summary = describeVectorSet(db, kind);
     if (!summary) return [];

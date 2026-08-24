@@ -45,12 +45,14 @@ Student lists, groups, ratings and evaluation results are not published using th
 
 **Semantic search vectors.** Earlier versions of this document said embeddings were never uploaded.
 That is no longer accurate and the statement has been corrected. A published space can now carry the
-numerical vectors of its **ideas**, so that a phone or a shared replica can search by meaning instead
-of only by literal text; without them, a search that finds nothing is indistinguishable from a corpus
-that does not discuss the topic. These vectors are derived from ideas that already travel, they are
-quantized, and they are not reversible into the original text. It is a switch — *Include semantic
-vectors* in Settings — and turning it off stops them being sent. Vectors derived from passages follow
-the passages switch: a matrix built from full text is not published when the text itself was withheld.
+numerical vectors of its **ideas and audited document profiles**, so that a phone or a shared replica
+can search by meaning instead of only by literal text; without them, a search that finds nothing is
+indistinguishable from a corpus that does not discuss the topic. Document vectors represent generated
+macro-level fields such as a work's thesis and overview, not the source PDF. These vectors are derived
+from data that already travels, they are quantized, and they are not reversible into the original text.
+It is a switch — *Include semantic vectors* in Settings — and turning it off stops them being sent.
+Vectors derived from passages follow the passages switch: a matrix built from full text is not
+published when the text itself was withheld.
 
 The publication also carries the user's **dismissed relations** (`edge_feedback`). These are needed
 so a shared space hides the same debates the owner has already dismissed on their own screen; without
