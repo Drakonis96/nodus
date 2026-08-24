@@ -156,18 +156,8 @@ the raw material for a "future research" section or a thesis justification.
 
 ### Step 4 — Produce something, with citations
 
-Now turn all of that into text. Two paths, sharing the same viewer, export, and
-clickable-citation machinery:
-
-![Writing workshop](screenshots/08-writing.png)
-
-- **Writing** (the workshop) — pick a form (literature review, theoretical
-  framework, debate synthesis, gap justification, chapter section, research
-  question), describe your objective, select the materials to draw on (ideas,
-  themes, gaps, contradictions, works, passages), and generate a structured
-  result: outline, draft, a support matrix, a bibliography, next steps, and
-  limitations.
-- **Deep Research** — write one research idea and Nodus plans an outline, then
+Now turn all of that into text. **Deep Research** takes one research idea and
+plans an outline, then
   writes it section by section, **guided by how much of your corpus each pass has
   already covered**, and assembles a 5–20 page academic report. Every substantive
   claim carries an inline `(Author, year)` citation and there's a full reference
@@ -178,10 +168,10 @@ Every `nodus://` citation in the output is clickable and resolves to the real
 source and evidence inside Nodus. Drafts and reports can be saved locally and
 reopened, or exported to Markdown.
 
-![Notes](screenshots/06-notes.png)
+![Workspace](screenshots/06-notes.png)
 
-Along the way, **Notes** is your Markdown workspace with folders, where those
-`nodus://` citations stay live and clickable.
+Along the way, **Workspace** keeps notes, ideas and collections together, with
+live, clickable `nodus://` citations in the editor.
 
 ---
 
@@ -220,9 +210,7 @@ what each one is for:
 
 | Section | What it's for |
 |---------|---------------|
-| **Writing** | The writing workshop: outline + draft + support matrix + bibliography from selected graph material. |
-| **Projects** | Organize longer work (thesis, article, chapter) into structured, writable pieces. |
-| **Notes** | A Markdown workspace with folders and live, clickable `nodus://` citations. |
+| **Workspace** | Keep notes, ideas and collections together in a Markdown workspace with live, clickable `nodus://` citations. |
 
 Pinned outside the groups: **Home** (corpus status and next steps) and
 **Settings** (providers, models, library automation, integrations, data, backups).
