@@ -8232,4 +8232,9 @@ export const FR: Record<string, string> = {
   "provisional": "provisoire",
   "Reparando": "Réparation",
   "Publicando": "Publication",
+  "El texto disponible ha cambiado. Se conserva el análisis anterior hasta completar un reescaneo.": "Le texte disponible a changé. L’analyse précédente est conservée jusqu’à la fin d’une nouvelle analyse.",
+  "El adjunto existe en Zotero, pero el archivo ya no está en su ubicación original.": "La pièce jointe existe dans Zotero, mais le fichier n’est plus à son emplacement d’origine.",
+  "El PDF está escaneado y no tiene capa de texto. Activa OCR y vuelve a analizar.": "Le PDF est numérisé et ne contient pas de couche de texte. Activez l’OCR et relancez l’analyse.",
+  "El adjunto no produjo texto utilizable. Revisa el archivo o activa OCR.": "La pièce jointe n’a produit aucun texte exploitable. Vérifiez le fichier ou activez l’OCR.",
+  "El formato del adjunto no es compatible con la extracción de texto.": "Le format de la pièce jointe n’est pas pris en charge pour l’extraction de texte.",
 };

@@ -21,17 +21,25 @@ const root = await mkdtemp(path.join(os.tmpdir(), 'nodus-document-profiles-'));
 installRuntimeHooks(root);
 try {
   const Database = require('better-sqlite3');
-  const { runMigrations, SCHEMA_VERSION } = require(path.join(repoRoot, 'electron/db/migrations.ts'));
+  const { migrations, runMigrations, SCHEMA_VERSION } = require(path.join(repoRoot, 'electron/db/migrations.ts'));
   const sqlite = new Database(path.join(root, 'profiles.sqlite'));
   runMigrations(sqlite);
   globalThis.__documentProfilesDb = sqlite;
   assert.equal(sqlite.pragma('user_version', { simple: true }), SCHEMA_VERSION);
-  // Exercise the real v157 -> v158 path as well as a clean install. This catches
-  // accidentally attaching additive objects to an already-shipped migration.
-  sqlite.exec('DROP TRIGGER works_document_profile_stale_deep; DROP TRIGGER works_document_profile_title_fts; PRAGMA user_version=157;');
-  runMigrations(sqlite);
-  assert.equal(sqlite.prepare("SELECT COUNT(*) n FROM sqlite_master WHERE type='trigger' AND name LIKE 'works_document_profile_%'").get().n, 2);
-  assert.equal(sqlite.prepare("SELECT COUNT(*) n FROM sqlite_master WHERE type='index' AND name='document_index_jobs_campaign_status'").get().n, 1);
+  // Exercise a real v157 -> current migration as well as a clean install. Never
+  // fake an old database by rewinding user_version on a schema that already has
+  // later columns: that is not a state any shipped Nodus build can produce.
+  const legacy = new Database(path.join(root, 'profiles-v157.sqlite'));
+  for (const migration of migrations.filter((entry) => entry.version <= 157)) {
+    legacy.transaction(() => {
+      legacy.exec(migration.up);
+      legacy.pragma(`user_version = ${migration.version}`);
+    })();
+  }
+  runMigrations(legacy);
+  assert.equal(legacy.prepare("SELECT COUNT(*) n FROM sqlite_master WHERE type='trigger' AND name LIKE 'works_document_profile_%'").get().n, 2);
+  assert.equal(legacy.prepare("SELECT COUNT(*) n FROM sqlite_master WHERE type='index' AND name='document_index_jobs_campaign_status'").get().n, 1);
+  legacy.close();
   for (const table of [
     'document_profile_state', 'document_profile_versions', 'document_profile_fields',
     'document_sections', 'document_profile_support', 'document_vectors',

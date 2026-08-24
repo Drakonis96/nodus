@@ -1,9 +1,17 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
+import crypto from 'node:crypto';
 import AdmZip from 'adm-zip';
-import type { DeepContextMode, SourceType, PdfAnalysis } from '@shared/types';
-import { itemChildren, itemAsAttachment, getFulltext, ZoteroAttachment } from '../zotero/zoteroClient';
+import type {
+  DeepContextMode,
+  SourceType,
+  PdfAnalysis,
+  TextSourceOrigin,
+  ResolvedTextState,
+  WorkTextSource,
+} from '@shared/types';
+import { itemChildren, itemAsAttachment, getFulltext, attachmentFilePath, ZoteroAttachment } from '../zotero/zoteroClient';
 import { openPdf, pageText } from './pdfjsLoader';
 import { analyzePdf } from './pdfAnalyzer';
 import { ocrPdfPages, ocrImageFile } from './ocr';
@@ -23,6 +31,21 @@ export interface ExtractedDoc {
    * exists" from "full text should exist but wasn't ready yet" and retry the latter.
    */
   hadTextAttachment?: boolean;
+  segments?: ExtractedTextSegment[];
+}
+
+export interface ExtractedTextSegment {
+  sourceRef: string;
+  marker: string;
+  origin: TextSourceOrigin;
+  sourceType: SourceType;
+  zoteroLibraryId: string | null;
+  attachmentKey: string | null;
+  displayName: string | null;
+  text: string;
+  contentHash: string;
+  pageCount: number | null;
+  hasPageMarkers: boolean;
 }
 
 export interface ExtractProgress {
@@ -39,6 +62,7 @@ export interface OcrOptions {
 }
 
 const MIN_CHARS_TEXT_PAGE = 50;
+const MIN_USABLE_ALPHA_CHARS = 200;
 // A freshly-attached file can take a moment to surface through the local Zotero API
 // (its attachment child, filename, or on-disk copy), so we retry a couple of times
 // before concluding a work has no readable full text.
@@ -65,6 +89,117 @@ export interface ChunkPlan {
   maxIdeasPerChunk: number;
   maxRelationsPerChunk: number;
   maxGapsPerChunk: number;
+}
+
+function textHash(text: string): string {
+  // Keep the aggregate comparable with deep_hash and passage content_hash.
+  return crypto.createHash('sha1').update(text).digest('hex');
+}
+
+function hasUsableText(text: string): boolean {
+  return (text.match(/\p{L}/gu) ?? []).length >= MIN_USABLE_ALPHA_CHARS;
+}
+
+export function textQualityScore(text: string): number {
+  const compact = text.replace(/\s+/g, ' ').trim();
+  if (compact.length < MIN_CHARS_TEXT_PAGE) return 0;
+  const letters = (compact.match(/\p{L}/gu) ?? []).length;
+  const controls = [...compact].filter((character) => {
+    const code = character.charCodeAt(0);
+    return code === 0xfffd || code <= 8 || code === 11 || code === 12 || (code >= 14 && code <= 31);
+  }).length;
+  const words = compact.match(/[\p{L}\p{N}]+/gu) ?? [];
+  const singletons = words.filter((word) => word.length === 1).length;
+  const letterRatio = letters / Math.max(1, compact.length);
+  const singletonRatio = singletons / Math.max(1, words.length);
+  return Math.max(0, Math.min(1,
+    0.65 * Math.min(1, letterRatio / 0.55)
+    + 0.35 * (1 - Math.min(1, singletonRatio / 0.35))
+    - Math.min(1, controls / Math.max(1, compact.length) * 30)
+  ));
+}
+
+function sourceRefForAttachment(att: ZoteroAttachment): string {
+  return `zotero:${att.library.type}:${att.library.id}:${att.itemKey}`;
+}
+
+function sourceMarkedText(text: string, marker: string): string {
+  const replaced = text.replace(/\[\[p\.\s*(\d+)\]\]/gi, `[[src:${marker} p.$1]]`);
+  return /\[\[src:/i.test(replaced) ? replaced : `[[src:${marker}]]\n${replaced}`;
+}
+
+function combineSegments(segments: ExtractedTextSegment[], notes: string | null, hadTextAttachment: boolean): ExtractedDoc {
+  const unique: ExtractedTextSegment[] = [];
+  const hashes = new Set<string>();
+  for (const segment of segments) {
+    if (hashes.has(segment.contentHash)) continue;
+    hashes.add(segment.contentHash);
+    const marker = `s${unique.length + 1}`;
+    unique.push({ ...segment, marker });
+  }
+  const text = unique.map((segment) => sourceMarkedText(segment.text, segment.marker)).join('\n\n');
+  return {
+    text,
+    sourceType: unique[0]?.sourceType ?? 'none',
+    notes,
+    analysis: undefined,
+    hadTextAttachment,
+    segments: unique,
+  };
+}
+
+export function resolvedTextStateFromDoc(doc: ExtractedDoc): ResolvedTextState {
+  const now = new Date().toISOString();
+  const segments = doc.segments ?? (doc.text.trim() ? [{
+    sourceRef: `extracted:${textHash(doc.text).slice(0, 24)}`,
+    marker: 's1',
+    origin: 'uploaded_file' as const,
+    sourceType: doc.sourceType,
+    zoteroLibraryId: null,
+    attachmentKey: null,
+    displayName: null,
+    text: doc.text,
+    contentHash: textHash(doc.text),
+    pageCount: doc.analysis?.pageCount ?? null,
+    hasPageMarkers: /\[\[p\.\s*\d+\]\]/i.test(doc.text),
+  }] : []);
+  const sourceTypes = new Set(segments.map((segment) => segment.sourceType));
+  const sources: WorkTextSource[] = segments.map((segment, ordinal) => ({
+    nodus_id: '',
+    source_ref: segment.sourceRef,
+    origin: segment.origin,
+    source_type: segment.sourceType,
+    zotero_library_id: segment.zoteroLibraryId,
+    attachment_key: segment.attachmentKey,
+    display_name: segment.displayName,
+    content_hash: segment.contentHash,
+    char_count: segment.text.length,
+    page_count: segment.pageCount,
+    has_page_markers: segment.hasPageMarkers ? 1 : 0,
+    ordinal,
+    active: 1,
+    resolved_at: now,
+  }));
+  const sourceType = sourceTypes.size > 1 ? 'mixed' : segments[0]?.sourceType ?? doc.sourceType;
+  const fullText = sourceType !== 'none' && sourceType !== 'abstract_only';
+  let blockReason: ResolvedTextState['blockReason'] = null;
+  if (!fullText) {
+    if (/ocr desactivado/i.test(doc.notes ?? '')) blockReason = 'scanned_no_ocr';
+    else if (/archivo adjunto no encontrado|ubicación original/i.test(doc.notes ?? '')) blockReason = 'file_missing';
+    else if (doc.hadTextAttachment) blockReason = 'unreadable';
+    else blockReason = 'no_attachment';
+  }
+  return {
+    sourceType,
+    textHash: doc.text ? textHash(doc.text) : null,
+    textChars: doc.text.length,
+    sourceCount: sources.length,
+    hasPageMarkers: sources.some((source) => Boolean(source.has_page_markers)),
+    blockReason,
+    notes: doc.notes,
+    resolvedAt: now,
+    sources,
+  };
 }
 
 function abortableDelay(ms: number, signal?: AbortSignal): Promise<void> {
@@ -130,17 +265,42 @@ export function chunkText(text: string, opts: ChunkOptions = {}): string[] {
 
 export function planTextChunks(text: string, opts: ChunkOptions = {}): ChunkPlan {
   const config = chunkConfig(opts);
-  const words = text.split(/\s+/).filter(Boolean);
-  if (words.length <= config.chunkWords) {
-    return { ...config, chunks: [text], wordCount: words.length };
+  const rawTokens = text.match(/\[\[src:[^\]\s]+(?:\s+p\.\s*\d+)?\]\]|\[\[p\.\s*\d+\]\]|\S+/gi) ?? [];
+  const words: Array<{ value: string; marker: string | null; source: string | null }> = [];
+  let marker: string | null = null;
+  let source: string | null = null;
+  for (const token of rawTokens) {
+    const sourceMarker = /^\[\[src:([^\]\s]+)(?:\s+p\.\s*\d+)?\]\]$/i.exec(token);
+    if (sourceMarker) {
+      marker = token;
+      source = sourceMarker[1];
+      continue;
+    }
+    if (/^\[\[p\.\s*\d+\]\]$/i.test(token)) {
+      marker = token;
+      continue;
+    }
+    words.push({ value: token, marker, source });
   }
+  if (words.length === 0) return { ...config, chunks: [], wordCount: 0 };
   const chunks: string[] = [];
   let start = 0;
   while (start < words.length) {
-    const end = Math.min(start + config.chunkWords, words.length);
-    chunks.push(words.slice(start, end).join(' '));
-    if (end >= words.length) break;
-    start = end - config.overlapWords;
+    let sourceEnd = start + 1;
+    while (sourceEnd < words.length && words[sourceEnd].source === words[start].source) sourceEnd++;
+    const end = Math.min(start + config.chunkWords, sourceEnd);
+    const out: string[] = [];
+    let emittedMarker: string | null = null;
+    for (const word of words.slice(start, end)) {
+      if (word.marker && word.marker !== emittedMarker) {
+        out.push(word.marker);
+        emittedMarker = word.marker;
+      }
+      out.push(word.value);
+    }
+    chunks.push(out.join(' '));
+    if (end >= sourceEnd) start = sourceEnd;
+    else start = Math.max(start + 1, end - config.overlapWords);
   }
   return { ...config, chunks, wordCount: words.length };
 }
@@ -149,6 +309,8 @@ export interface RetrievalChunk {
   text: string;
   /** The most recent PDF page marker that precedes this chunk, if present. */
   pageLabel: string | null;
+  sourceRef: string | null;
+  pageNumber: number | null;
 }
 
 /**
@@ -158,30 +320,47 @@ export interface RetrievalChunk {
  */
 export function planRetrievalChunks(
   text: string,
-  opts: { chunkWords?: number; overlapWords?: number } = {}
+  opts: { chunkWords?: number; overlapWords?: number; sourceMap?: Record<string, string> } = {}
 ): RetrievalChunk[] {
   const chunkWords = clampInt(opts.chunkWords, RETRIEVAL_CHUNK_WORDS, 80, 1000);
   const overlapWords = clampInt(opts.overlapWords, RETRIEVAL_OVERLAP_WORDS, 0, Math.max(0, chunkWords - 1));
-  const tokens: { value: string; pageLabel: string | null }[] = [];
+  const tokens: { value: string; pageLabel: string | null; sourceRef: string | null; pageNumber: number | null }[] = [];
   let pageLabel: string | null = null;
-  const rawTokens = text.match(/\[\[p\.\s*\d+\]\]|\S+/gi) ?? [];
+  let pageNumber: number | null = null;
+  let sourceRef: string | null = null;
+  const rawTokens = text.match(/\[\[src:[^\]\s]+(?:\s+p\.\s*\d+)?\]\]|\[\[p\.\s*\d+\]\]|\S+/gi) ?? [];
   for (const raw of rawTokens) {
-    const marker = raw.match(/^\[\[p\.\s*(\d+)\]\]$/i);
-    if (marker) {
-      pageLabel = `p. ${marker[1]}`;
+    const sourceMarker = raw.match(/^\[\[src:([^\]\s]+)(?:\s+p\.\s*(\d+))?\]\]$/i);
+    if (sourceMarker) {
+      sourceRef = opts.sourceMap?.[sourceMarker[1]] ?? sourceMarker[1];
+      pageNumber = sourceMarker[2] ? Number(sourceMarker[2]) : null;
+      pageLabel = pageNumber == null ? null : `p. ${pageNumber}`;
       continue;
     }
-    tokens.push({ value: raw, pageLabel });
+    const marker = raw.match(/^\[\[p\.\s*(\d+)\]\]$/i);
+    if (marker) {
+      pageNumber = Number(marker[1]);
+      pageLabel = `p. ${pageNumber}`;
+      continue;
+    }
+    tokens.push({ value: raw, pageLabel, sourceRef, pageNumber });
   }
   if (tokens.length === 0) return [];
 
   const chunks: RetrievalChunk[] = [];
   for (let start = 0; start < tokens.length; ) {
-    const end = Math.min(start + chunkWords, tokens.length);
+    let sourceEnd = start + 1;
+    while (sourceEnd < tokens.length && tokens[sourceEnd].sourceRef === tokens[start].sourceRef) sourceEnd++;
+    const end = Math.min(start + chunkWords, sourceEnd);
     const slice = tokens.slice(start, end);
-    chunks.push({ text: slice.map((token) => token.value).join(' '), pageLabel: slice[0]?.pageLabel ?? null });
-    if (end >= tokens.length) break;
-    start = end - overlapWords;
+    chunks.push({
+      text: slice.map((token) => token.value).join(' '),
+      pageLabel: slice[0]?.pageLabel ?? null,
+      sourceRef: slice[0]?.sourceRef ?? null,
+      pageNumber: slice[0]?.pageNumber ?? null,
+    });
+    if (end >= sourceEnd) start = sourceEnd;
+    else start = Math.max(start + 1, end - overlapWords);
   }
   return chunks;
 }
@@ -221,6 +400,7 @@ export async function extractPdfStreaming(
   const total: number = pdf.numPages;
   const pageTexts = new Map<number, string>();
   const blanks: number[] = [];
+  const lowQuality: number[] = [];
 
   for (let p = 1; p <= total; p++) {
     if (opts.signal?.aborted) {
@@ -231,15 +411,18 @@ export async function extractPdfStreaming(
     const page = await pdf.getPage(p);
     const txt = await pageText(page);
     page.cleanup?.();
-    if (txt.length >= MIN_CHARS_TEXT_PAGE) pageTexts.set(p, txt);
-    else blanks.push(p);
+    if (txt.length >= MIN_CHARS_TEXT_PAGE) {
+      pageTexts.set(p, txt);
+      if (textQualityScore(txt) < 0.45) lowQuality.push(p);
+    } else blanks.push(p);
   }
-  extractionDone({ textPages: pageTexts.size, blankPages: blanks.length });
+  extractionDone({ textPages: pageTexts.size, blankPages: blanks.length, lowQualityPages: lowQuality.length });
 
   let ocredPages = 0;
   let skippedPages = blanks.length;
-  if (opts.ocr.enabled && blanks.length) {
-    const toOcr = blanks.slice(0, opts.ocr.maxPages);
+  const ocrCandidates = [...blanks, ...lowQuality].slice(0, opts.ocr.maxPages);
+  if (opts.ocr.enabled && ocrCandidates.length) {
+    const toOcr = ocrCandidates;
     const ocrDone = startPerf('OCR', opts.perf, { pages: toOcr.length, languages: opts.ocr.languages });
     try {
       const map = await ocrPdfPages(pdf, toOcr, opts.ocr.languages, ({ page, totalPages }) =>
@@ -251,11 +434,14 @@ export async function extractPdfStreaming(
       opts.signal?.throwIfAborted();
       for (const [p, result] of map) {
         if (result.text && result.text.length >= MIN_CHARS_TEXT_PAGE) {
-          pageTexts.set(p, result.text);
-          ocredPages++;
+          const previous = pageTexts.get(p);
+          if (!previous || textQualityScore(result.text) > textQualityScore(previous) + 0.05) {
+            pageTexts.set(p, result.text);
+            ocredPages++;
+          }
         }
       }
-      skippedPages = blanks.length - ocredPages;
+      skippedPages = blanks.filter((page) => !pageTexts.has(page)).length;
       ocrDone({ recoveredPages: ocredPages, skippedPages });
     } catch (e) {
       if (opts.signal?.aborted) {
@@ -578,98 +764,105 @@ export async function probeWorkTextAvailability(
   opts: { preferZoteroFulltext: boolean; itemType?: string | null }
 ): Promise<TextAvailabilityProbe> {
   const textAttachments = await textAttachmentsFor(userId, zoteroKey, opts.itemType);
+  const effectiveStorage = storagePath || defaultZoteroStorage();
+  for (const att of textAttachments) {
+    let filePath = await attachmentFilePath(userId, att.key).catch(() => null);
+    if (!filePath && att.filename && effectiveStorage) {
+      const fallback = path.join(effectiveStorage, att.itemKey, att.filename);
+      if (fs.existsSync(fallback)) filePath = fallback;
+    }
+    if (filePath && fs.existsSync(filePath) && TEXT_FILE_EXT_RE.test(filePath)) {
+      return { available: true, sourceType: attachmentSourceType(att), reason: 'local_file' };
+    }
+  }
   if (opts.preferZoteroFulltext) {
     for (const att of textAttachments) {
       const ft = await getFulltext(userId, att.key).catch(() => null);
-      if (ft && ft.content.trim().length > 500) {
+      if (ft && hasUsableText(ft.content)) {
         return { available: true, sourceType: attachmentSourceType(att), reason: 'zotero_fulltext' };
       }
-    }
-  }
-
-  const effectiveStorage = storagePath || defaultZoteroStorage();
-  if (!effectiveStorage) return { available: false, sourceType: null, reason: 'none' };
-  for (const att of textAttachments) {
-    if (!att.filename) continue;
-    const filePath = path.join(effectiveStorage, att.key, att.filename);
-    if (fs.existsSync(filePath) && TEXT_FILE_EXT_RE.test(att.filename)) {
-      return { available: true, sourceType: attachmentSourceType(att), reason: 'local_file' };
     }
   }
   return { available: false, sourceType: null, reason: 'none' };
 }
 
-/**
- * Resolve full text for a work via a detector chain that escalates only as needed:
- *   1) Zotero's own indexed full text (no parsing)
- *   2) Parse the PDF in storage (digital/hybrid → text; scanned → OCR if enabled)
- *   3) Unpaywall open-access PDF (by DOI)
- *   4) Abstract only / none
- */
-/**
- * Phases 1 & 2 of resolution: reuse Zotero's indexed full text when it's complete,
- * else parse the local attachment file(s) directly. Returns the extracted document,
- * or null (with any scan note, e.g. "OCR disabled") when no attachment yields text.
- */
+/** Resolve every local attachment first; Zotero full text is only the per-file
+ * fallback when that canonical file is missing or unreadable. Returns the combined
+ * source-aware document, or null with the most useful extraction note. */
 async function readTextAttachments(
   textAttachments: ZoteroAttachment[],
   userId: string,
   effectiveStorage: string,
   opts: ResolveOptions
 ): Promise<{ doc: ExtractedDoc | null; scanNote: string | null }> {
-  // (1) Reuse Zotero's indexed full text when it's substantial and reasonably complete.
-  if (opts.preferZoteroFulltext) {
-    const fulltextDone = startPerf('Zotero fulltext', opts.perf, { attachments: textAttachments.length });
-    let checked = 0;
-    for (const att of textAttachments) {
-      opts.signal?.throwIfAborted();
-      checked++;
+  // The file is the source of truth for citations. Zotero's index is consulted only
+  // for an attachment whose local file is absent or unusable, and never supplies pages.
+  const segments: ExtractedTextSegment[] = [];
+  const notes: string[] = [];
+  let scanNote: string | null = null;
+  const ordered = [...textAttachments].sort((a, b) => sourceRefForAttachment(a).localeCompare(sourceRefForAttachment(b)));
+  for (const att of ordered) {
+    opts.signal?.throwIfAborted();
+    let localDoc: ExtractedDoc | null = null;
+    let filePath = await attachmentFilePath(userId, att.key).catch(() => null);
+    if (!filePath && att.filename && effectiveStorage) {
+      const fallback = path.join(effectiveStorage, att.itemKey, att.filename);
+      if (fs.existsSync(fallback)) filePath = fallback;
+    }
+    if (filePath && fs.existsSync(filePath)) {
+      try {
+        localDoc = await extractFromPath(filePath, { ocr: opts.ocr, onProgress: opts.onProgress, perf: opts.perf, signal: opts.signal });
+      } catch (error) {
+        console.error(`[resolveWorkText] Error extracting from ${filePath}:`, error);
+      }
+    } else {
+      scanNote = 'Archivo adjunto no encontrado en su ubicación original.';
+    }
+    if (localDoc && hasUsableText(localDoc.text)) {
+      const hasPages = /\[\[p\.\s*\d+\]\]/i.test(localDoc.text);
+      segments.push({
+        sourceRef: sourceRefForAttachment(att),
+        marker: '',
+        origin: 'local_attachment',
+        sourceType: localDoc.sourceType,
+        zoteroLibraryId: String(att.library.id),
+        attachmentKey: att.key,
+        displayName: att.title || att.filename,
+        text: localDoc.text,
+        contentHash: textHash(localDoc.text),
+        pageCount: localDoc.analysis?.pageCount ?? null,
+        hasPageMarkers: hasPages,
+      });
+      if (localDoc.notes) notes.push(localDoc.notes);
+      continue;
+    }
+    if (localDoc?.notes) scanNote = localDoc.notes;
+
+    if (opts.preferZoteroFulltext) {
       opts.onProgress?.({ phase: 'fulltext', detail: 'Comprobando índice de Zotero…', pct: null });
       const ft = await getFulltext(userId, att.key).catch(() => null);
-      if (ft && ft.content.trim().length > 500) {
-        const complete =
-          ft.totalPages == null || ft.indexedPages == null || ft.indexedPages >= Math.floor(ft.totalPages * 0.9);
-        if (complete) {
-          fulltextDone({ checked, hit: true, chars: ft.content.length });
-          return {
-            doc: {
-              text: ft.content,
-              sourceType: attachmentSourceType(att),
-              notes: `Texto indexado por Zotero${ft.totalPages ? ` (${ft.indexedPages}/${ft.totalPages} págs.)` : ''}.`,
-            },
-            scanNote: null,
-          };
-        }
+      if (ft && hasUsableText(ft.content)) {
+        const note = `Texto indexado por Zotero sin páginas verificables${ft.totalPages ? ` (${ft.indexedPages ?? '?'}/${ft.totalPages} págs. indexadas)` : ''}.`;
+        segments.push({
+          sourceRef: sourceRefForAttachment(att),
+          marker: '',
+          origin: 'zotero_fulltext',
+          sourceType: attachmentSourceType(att),
+          zoteroLibraryId: String(att.library.id),
+          attachmentKey: att.key,
+          displayName: att.title || att.filename,
+          text: ft.content,
+          contentHash: textHash(ft.content),
+          pageCount: ft.totalPages ?? null,
+          hasPageMarkers: false,
+        });
+        notes.push(note);
       }
     }
-    fulltextDone({ checked, hit: false });
   }
 
-  // (2) Parse the PDF/text file from the storage folder ourselves.
-  const docs: ExtractedDoc[] = [];
-  for (const att of textAttachments) {
-    opts.signal?.throwIfAborted();
-    if (!att.filename || !effectiveStorage) continue;
-    const filePath = path.join(effectiveStorage, att.key, att.filename);
-    if (!fs.existsSync(filePath)) continue;
-    try {
-      docs.push(await extractFromPath(filePath, { ocr: opts.ocr, onProgress: opts.onProgress, perf: opts.perf, signal: opts.signal }));
-    } catch (e) {
-      console.error(`[resolveWorkText] Error extracting from ${filePath}:`, e);
-      /* skip unreadable attachment */
-    }
-  }
-
-  const withText = docs.filter((d) => d.text.trim().length > 0);
-  if (withText.length > 0) {
-    const combined = withText
-      .map((d, i) => (withText.length > 1 ? `--- documento ${i + 1} ---\n${d.text}` : d.text))
-      .join('\n\n');
-    const notes = withText.map((d) => d.notes).filter(Boolean).join(' ') || null;
-    return { doc: { text: combined, sourceType: withText[0].sourceType, notes, analysis: withText[0].analysis }, scanNote: null };
-  }
-
-  return { doc: null, scanNote: docs.find((d) => d.notes)?.notes ?? null };
+  if (segments.length > 0) return { doc: combineSegments(segments, notes.join(' ') || null, true), scanNote: null };
+  return { doc: null, scanNote };
 }
 
 /**
@@ -695,12 +888,19 @@ export async function resolveWorkText(
   try {
     const clean = getLibraryReaderRawContent(zoteroKey);
     if (clean?.markdown.trim()) {
-      return {
-        text: clean.markdown,
+      return combineSegments([{
+        sourceRef: `library:${zoteroKey}`,
+        marker: '',
+        origin: 'library_clean',
         sourceType: 'markdown',
-        notes: 'Versión limpia de la Biblioteca global.',
-        hadTextAttachment: clean.document.originalAvailable,
-      };
+        zoteroLibraryId: null,
+        attachmentKey: null,
+        displayName: clean.document.title,
+        text: clean.markdown,
+        contentHash: textHash(clean.markdown),
+        pageCount: clean.document.pageCount,
+        hasPageMarkers: /\[\[p\.\s*\d+\]\]/i.test(clean.markdown),
+      }], 'Versión limpia de la Biblioteca global.', clean.document.originalAvailable);
     }
   } catch {
     // The backup folder may be unconfigured in headless/first-run contexts.
@@ -751,14 +951,40 @@ export async function resolveWorkText(
       return null;
     });
     unpaywallDone({ hit: Boolean(oa), chars: oa?.text.length ?? 0 });
-    if (oa && oa.text.trim()) return { ...oa, hadTextAttachment };
+    if (oa && oa.text.trim()) {
+      return combineSegments([{
+        sourceRef: `oa:${textHash(doi.toLowerCase()).slice(0, 24)}`,
+        marker: '',
+        origin: 'unpaywall_pdf',
+        sourceType: 'pdf',
+        zoteroLibraryId: null,
+        attachmentKey: null,
+        displayName: doi,
+        text: oa.text,
+        contentHash: textHash(oa.text),
+        pageCount: oa.analysis?.pageCount ?? null,
+        hasPageMarkers: /\[\[p\.\s*\d+\]\]/i.test(oa.text),
+      }], oa.notes, hadTextAttachment);
+    }
   }
 
   // (4) Degrade to abstract-only / none. Carry forward any scan note (e.g. OCR
   // disabled) and whether a document attachment existed, so the pipeline can retry
   // works that *should* have full text instead of silently accepting the abstract.
   if (abstract) {
-    return { text: abstract, sourceType: 'abstract_only', notes: scanNote ?? 'Solo abstract disponible.', hadTextAttachment };
+    return combineSegments([{
+      sourceRef: `abstract:${zoteroKey}`,
+      marker: '',
+      origin: 'abstract',
+      sourceType: 'abstract_only',
+      zoteroLibraryId: null,
+      attachmentKey: null,
+      displayName: 'Abstract',
+      text: abstract,
+      contentHash: textHash(abstract),
+      pageCount: null,
+      hasPageMarkers: false,
+    }], scanNote ?? 'Solo abstract disponible.', hadTextAttachment);
   }
   return { text: '', sourceType: 'none', notes: scanNote ?? 'Sin texto ni abstract disponible.', hadTextAttachment };
 }

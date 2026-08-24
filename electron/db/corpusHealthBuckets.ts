@@ -13,7 +13,7 @@ const WITHOUT_TEXT_WHERE = `
   archived = 0 AND (
     deep_status = 'skipped_no_text'
     OR summary_status = 'skipped_no_text'
-    OR source_type IN ('none', 'abstract_only')
+    OR COALESCE(resolved_source_type, source_type) IN ('none', 'abstract_only')
   )`;
 
 /** Light analysis done (themes) but never deep-analysed, and text is available. */
@@ -33,7 +33,7 @@ const PDFS_TO_RECOVER_WHERE = `
   archived = 0
   AND (
     deep_status = 'skipped_no_text'
-    OR (source_type IN ('none', 'abstract_only') AND doi IS NOT NULL AND doi <> '')
+    OR (COALESCE(resolved_source_type, source_type) IN ('none', 'abstract_only') AND doi IS NOT NULL AND doi <> '')
   )`;
 
 export const HEALTH_BUCKET_WHERE: Record<CorpusHealthBucketId, string> = {

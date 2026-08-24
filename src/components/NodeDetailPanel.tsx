@@ -237,7 +237,7 @@ export function NodeDetailPanel({
               <div className="text-xs uppercase text-neutral-500 mb-1">{t('Evidencia anclada')}</div>
               {ideaDetail.evidence.map((ev) => (
                 <blockquote key={ev.id} className="border-l-2 border-indigo-700 pl-3 py-2 my-2 text-xs text-neutral-300 italic bg-neutral-950/35 rounded-r-md">
-                  “{ev.quote}” <EvidenceLocationLink nodusId={ev.nodus_id} location={ev.location} suffix={` · ${ev.kind}`} onOpen={onOpenEvidence} />
+                  “{ev.quote}” <EvidenceLocationLink nodusId={ev.nodus_id} location={ev.location} sourceRef={ev.source_ref} pageNumber={ev.page_number} suffix={` · ${ev.kind}`} onOpen={onOpenEvidence} />
                 </blockquote>
               ))}
             </div>
@@ -272,7 +272,7 @@ export function NodeDetailPanel({
           )}
           {edgeDetail.evidence.map((ev) => (
             <blockquote key={ev.id} className="border-l-2 border-indigo-700 pl-3 py-2 my-2 text-xs text-neutral-300 italic bg-neutral-950/35 rounded-r-md">
-              “{ev.quote}” <EvidenceLocationLink nodusId={ev.nodus_id} location={ev.location} onOpen={onOpenEvidence} />
+              “{ev.quote}” <EvidenceLocationLink nodusId={ev.nodus_id} location={ev.location} sourceRef={ev.source_ref} pageNumber={ev.page_number} onOpen={onOpenEvidence} />
             </blockquote>
           ))}
           {showEdgeAudit && <EdgeAuditControls edgeDetail={edgeDetail} onEdgeFeedback={onEdgeFeedback} />}
@@ -299,15 +299,19 @@ export function NodeDetailPanel({
 export function EvidenceLocationLink({
   nodusId,
   location,
+  sourceRef = null,
+  pageNumber = null,
   suffix = '',
   onOpen,
 }: {
   nodusId: string;
   location: string | null;
+  sourceRef?: string | null;
+  pageNumber?: number | null;
   suffix?: string;
   onOpen?: (sourceRef: string, location: string | null) => void;
 }) {
-  const page = parsePageNumber(location);
+  const page = pageNumber ?? parsePageNumber(location);
   if (page === null && !onOpen) {
     return <span className="text-neutral-500 not-italic">{(location ?? '') + suffix}</span>;
   }
@@ -316,7 +320,9 @@ export function EvidenceLocationLink({
       <button
         className="inline-flex items-center gap-0.5 text-indigo-400 hover:text-indigo-300"
         title={onOpen ? t('Abrir fuente') : t('Abrir el PDF en Zotero por esta página')}
-        onClick={() => onOpen ? onOpen(nodusId, location) : void window.nodus.openEvidenceAtPage(nodusId, location)}
+        onClick={() => onOpen
+          ? onOpen(nodusId, location)
+          : void window.nodus.openEvidenceAtPage(nodusId, { location, sourceRef, pageNumber: page })}
       >
         <Icon name="external" size={11} /> {location || t('Abrir fuente')}
       </button>

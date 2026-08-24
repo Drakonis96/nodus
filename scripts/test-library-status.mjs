@@ -149,7 +149,7 @@ test('the SQL presets stay in step with the JS readiness derivation', async () =
 
   // READY_CORE must cover exactly READY_STEPS: themes, ideas and citable text.
   assert.match(status, /READY_STEPS: readonly StepId\[\] = \['themes', 'ideas', 'citable'\]/);
-  assert.match(sql, /READY_CORE = `w\.light_status = 'done' AND w\.deep_status = 'done' AND \$\{HAS_IDEAS\} AND \$\{PASSAGES_COMPLETE\}`/);
+  assert.match(sql, /READY_CORE = `w\.light_status = 'done' AND w\.deep_status = 'done'[\s\S]{0,120}w\.deep_hash = w\.resolved_text_hash[\s\S]{0,80}\$\{HAS_IDEAS\} AND \$\{PASSAGES_COMPLETE\}`/);
   // The semantic index cannot be evaluated in SQL, so it must not gate readiness
   // on either side; if it ever appears here the two would silently disagree.
   assert.doesNotMatch(sql, /embedding_text_hash/);

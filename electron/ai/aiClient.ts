@@ -43,7 +43,12 @@ export class AiError extends Error {
    * @param config    misconfiguration (no model / no key) — the SAME for every job, so the
    *                  queue should pause and surface it once instead of failing every item.
    */
-  constructor(message: string, public retriable = false, public config = false) {
+  constructor(
+    message: string,
+    public retriable = false,
+    public config = false,
+    public code: 'output_truncated' | null = null,
+  ) {
     super(message);
   }
 }
@@ -583,6 +588,9 @@ async function rawComplete(
         ],
       }, { signal: opts.signal });
       const block = res.content.find((b: any) => b.type === 'text');
+      if (jsonMode && (res as any).stop_reason === 'max_tokens') {
+        throw new AiError(truncatedJsonMessage(model, opts.maxTokens ?? 8000), true, false, 'output_truncated');
+      }
       return (block as any)?.text ?? '';
     } catch (e: any) {
       throw wrapProviderError(e);
@@ -646,7 +654,7 @@ async function rawComplete(
     // hunting for a prompt bug that isn't there. Refuse instead. Prose (jsonMode=false)
     // stays untouched: a clipped sentence is still usable, an unterminated object is not.
     if (jsonMode && choice?.finish_reason === 'length') {
-      throw new AiError(truncatedJsonMessage(model, maxTokens), false);
+      throw new AiError(truncatedJsonMessage(model, maxTokens), true, false, 'output_truncated');
     }
     return content;
   } catch (e: any) {
@@ -656,6 +664,9 @@ async function rawComplete(
 }
 
 function wrapProviderError(e: any): AiError {
+  if (/cortó la respuesta|límite de salida|json quedó incompleto|output.*truncat/i.test(e?.message ?? '')) {
+    return new AiError(e?.message ?? 'La respuesta JSON quedó truncada.', true, false, 'output_truncated');
+  }
   const status = e?.status ?? e?.response?.status;
   // A prompt that overflows the model's context window can arrive at various statuses
   // (400 from local servers, 400/413 from cloud). Reword it before status-based mapping

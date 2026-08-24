@@ -21,7 +21,8 @@ import {
 } from '../db/documentProfilesRepo';
 import { cosineSimilarity, currentEmbeddingConfig, decodeEmbedding } from '../db/ideasRepo';
 import type { PassageInsert } from '../db/passagesRepo';
-import { planRetrievalChunks, resolveWorkText } from '../extraction/textExtractor';
+import { planRetrievalChunks, resolveWorkText, resolvedTextStateFromDoc } from '../extraction/textExtractor';
+import { setResolvedTextState } from '../db/worksRepo';
 import { analysisFingerprint, analysisModelFingerprint, upsertLibraryAnalysisProvenance } from '../db/libraryAnalysisProvenance';
 import { getItem, LOCAL_USER_ID } from '../zotero/zoteroClient';
 import { AiError, completeJson, embedMany } from './aiClient';
@@ -511,14 +512,19 @@ function supportForQuote(input: {
   };
 }
 
-async function preparePassages(work: Work, text: string, options: RunDocumentProfileOptions): Promise<PreparedPassages | null> {
+async function preparePassages(
+  work: Work,
+  text: string,
+  options: RunDocumentProfileOptions,
+  sourceMap: Record<string, string> = {},
+): Promise<PreparedPassages | null> {
   options.signal?.throwIfAborted();
   const contentHash = sha1(text);
   const current = getDb().prepare(
     'SELECT COUNT(*) count, MIN(content_hash) hash FROM passages WHERE nodus_id=?'
   ).get(work.nodus_id) as { count: number; hash: string | null };
   if (current.count > 0 && current.hash === contentHash) return null;
-  const chunks = planRetrievalChunks(text);
+  const chunks = planRetrievalChunks(text, { sourceMap });
   const embeddingConfig = currentEmbeddingConfig();
   const embeddings = await embedMany(chunks.map((chunk) => chunk.text), options.signal);
   options.signal?.throwIfAborted();
@@ -700,6 +706,7 @@ export async function runDocumentProfileScan(work: Work, options: RunDocumentPro
     },
     work.item_type
   );
+  setResolvedTextState(work.nodus_id, resolvedTextStateFromDoc(document));
   options.signal?.throwIfAborted();
   if (!document.text.trim() || document.sourceType === 'none' || document.sourceType === 'abstract_only') {
     setDocumentProfileState(work.nodus_id, 'unavailable', { error: document.notes ?? 'No hay texto completo legible.' });
@@ -714,7 +721,12 @@ export async function runDocumentProfileScan(work: Work, options: RunDocumentPro
   if (!sections.length) throw new Error('El documento no contiene texto estructurable.');
 
   emit(options, 'embedding', 0.05, 'Indexando los pasajes del texto completo…');
-  const preparedPassages = await preparePassages(work, document.text, options);
+  const preparedPassages = await preparePassages(
+    work,
+    document.text,
+    options,
+    Object.fromEntries((document.segments ?? []).map((segment) => [segment.marker, segment.sourceRef])),
+  );
   const sectionAnalyses = new Map<string, SectionAnalysis>();
   for (let index = 0; index < sections.length; index += 1) {
     emit(options, 'analyzing_sections', 0.08 + (index / sections.length) * 0.54, `Analizando sección ${index + 1} de ${sections.length}…`);

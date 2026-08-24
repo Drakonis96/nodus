@@ -6,6 +6,8 @@ import { scanSimilar } from './vectorScan';
 export interface PassageInsert {
   text: string;
   pageLabel: string | null;
+  sourceRef?: string | null;
+  pageNumber?: number | null;
   embedding: number[] | null;
 }
 
@@ -14,6 +16,8 @@ export interface SimilarPassage {
   nodus_id: string;
   text: string;
   page_label: string | null;
+  source_ref: string | null;
+  page_number: number | null;
   similarity: number;
   title: string;
   authors_json: string;
@@ -52,7 +56,7 @@ export function lexicalPassageSearch(
   const nodusIds = [...new Set(opts.nodusIds ?? [])];
   const scoped = nodusIds.length ? ` AND p.nodus_id IN (${nodusIds.map(() => '?').join(',')})` : '';
   const rows = getDb().prepare(
-    `SELECT p.passage_id,p.nodus_id,p.text,p.page_label,
+    `SELECT p.passage_id,p.nodus_id,p.text,p.page_label,p.source_ref,p.page_number,
             w.title,w.authors_json,w.year,w.zotero_key,bm25(passages_fts) AS rank
        FROM passages_fts f
        JOIN passages p ON p.passage_id=f.passage_id
@@ -92,9 +96,9 @@ export function replaceWorkPassages(nodusId: string, contentHash: string, rows: 
   const now = new Date().toISOString();
   const insert = db.prepare(
     `INSERT INTO passages (
-       passage_id, nodus_id, chunk_index, text, page_label, char_len, content_hash,
+       passage_id, nodus_id, chunk_index, text, page_label, source_ref, page_number, char_len, content_hash,
        embedding, embedding_provider, embedding_model, embedding_dim, embedding_text_hash, created_at
-     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
   );
   db.transaction(() => {
     db.prepare('DELETE FROM passages WHERE nodus_id = ?').run(nodusId);
@@ -106,6 +110,8 @@ export function replaceWorkPassages(nodusId: string, contentHash: string, rows: 
         chunkIndex,
         row.text,
         row.pageLabel,
+        row.sourceRef ?? null,
+        row.pageNumber ?? null,
         row.text.length,
         contentHash,
         embedding ? encodeEmbedding(embedding) : null,
@@ -134,7 +140,7 @@ export function findSimilarPassages(
   return getDb()
     .prepare(
       `SELECT * FROM (
-         SELECT p.passage_id, p.nodus_id, p.text, p.page_label,
+         SELECT p.passage_id, p.nodus_id, p.text, p.page_label, p.source_ref, p.page_number,
                 w.title, w.authors_json, w.year, w.zotero_key,
                 vec_cosine(p.embedding, ?) AS similarity
            FROM passages p
@@ -192,7 +198,7 @@ export async function findSimilarPassagesPaged(
   const byId = new Map(ranked.map((row) => [row.passage_id, row.similarity]));
   const rows = getDb()
     .prepare(
-      `SELECT p.passage_id, p.nodus_id, p.text, p.page_label,
+      `SELECT p.passage_id, p.nodus_id, p.text, p.page_label, p.source_ref, p.page_number,
               w.title, w.authors_json, w.year, w.zotero_key
          FROM passages p
          JOIN works w ON w.nodus_id = p.nodus_id
@@ -229,7 +235,7 @@ export function embeddedPassageCount(): number {
 export function getPassageDetail(passageId: string): PassageDetail | null {
   const row = getDb()
     .prepare(
-      `SELECT p.passage_id, p.nodus_id, p.text, p.page_label, p.chunk_index,
+      `SELECT p.passage_id, p.nodus_id, p.text, p.page_label, p.source_ref, p.page_number, p.chunk_index,
               w.title, w.authors_json, w.year, w.zotero_key
          FROM passages p
          JOIN works w ON w.nodus_id = p.nodus_id
@@ -241,6 +247,8 @@ export function getPassageDetail(passageId: string): PassageDetail | null {
         nodus_id: string;
         text: string;
         page_label: string | null;
+        source_ref: string | null;
+        page_number: number | null;
         chunk_index: number;
         title: string;
         authors_json: string;
@@ -260,6 +268,8 @@ export function getPassageDetail(passageId: string): PassageDetail | null {
     nodus_id: row.nodus_id,
     text: row.text,
     page_label: row.page_label,
+    source_ref: row.source_ref,
+    page_number: row.page_number,
     chunk_index: row.chunk_index,
     work: { title: row.title, authors, year: row.year, zotero_key: row.zotero_key },
   };

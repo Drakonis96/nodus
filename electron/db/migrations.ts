@@ -15,7 +15,7 @@ export interface Migration {
 
 // Versioned, append-only migrations. Never edit an existing migration's SQL once
 // shipped — add a new one. The current schema version is the highest applied.
-export const SCHEMA_VERSION = 159;
+export const SCHEMA_VERSION = 160;
 
 export const migrations: Migration[] = [
   {
@@ -8797,6 +8797,50 @@ export const migrations: Migration[] = [
       -- progress bar is visible. Keep them indexed even after years of history.
       CREATE INDEX document_index_jobs_campaign_status
         ON document_index_jobs(campaign_id, status, updated_at);
+    `,
+  },
+  {
+    version: 160,
+    up: /* sql */ `
+      -- Current text availability is independent from the source used by the last
+      -- successfully committed deep analysis.
+      ALTER TABLE works ADD COLUMN resolved_source_type TEXT;
+      ALTER TABLE works ADD COLUMN resolved_text_hash TEXT;
+      ALTER TABLE works ADD COLUMN resolved_text_chars INTEGER NOT NULL DEFAULT 0;
+      ALTER TABLE works ADD COLUMN resolved_text_source_count INTEGER NOT NULL DEFAULT 0;
+      ALTER TABLE works ADD COLUMN resolved_has_page_markers INTEGER NOT NULL DEFAULT 0;
+      ALTER TABLE works ADD COLUMN text_block_reason TEXT;
+      ALTER TABLE works ADD COLUMN text_resolved_at TEXT;
+      ALTER TABLE works ADD COLUMN resolved_text_notes TEXT;
+      ALTER TABLE works ADD COLUMN deep_error TEXT;
+
+      CREATE TABLE work_text_sources (
+        nodus_id            TEXT NOT NULL,
+        source_ref          TEXT NOT NULL,
+        origin              TEXT NOT NULL,
+        source_type         TEXT NOT NULL,
+        zotero_library_id   TEXT,
+        attachment_key      TEXT,
+        display_name        TEXT,
+        content_hash        TEXT NOT NULL,
+        char_count          INTEGER NOT NULL,
+        page_count          INTEGER,
+        has_page_markers    INTEGER NOT NULL DEFAULT 0,
+        ordinal             INTEGER NOT NULL,
+        active              INTEGER NOT NULL DEFAULT 1,
+        resolved_at         TEXT NOT NULL,
+        PRIMARY KEY (nodus_id, source_ref),
+        FOREIGN KEY (nodus_id) REFERENCES works(nodus_id) ON DELETE CASCADE
+      );
+      CREATE INDEX idx_work_text_sources_attachment
+        ON work_text_sources(zotero_library_id, attachment_key);
+
+      ALTER TABLE evidence ADD COLUMN source_ref TEXT;
+      ALTER TABLE evidence ADD COLUMN page_number INTEGER;
+      ALTER TABLE passages ADD COLUMN source_ref TEXT;
+      ALTER TABLE passages ADD COLUMN page_number INTEGER;
+
+      UPDATE works SET deep_error=notes WHERE deep_status='failed' AND notes IS NOT NULL;
     `,
   },
 ];

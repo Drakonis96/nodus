@@ -80,17 +80,21 @@ const QUEUE_KIND_STEP: Partial<Record<QueueItem['kind'], StepId>> = {
  * tokens and cannot succeed until the PDF/EPUB reaches Zotero.
  */
 export function hasNoFullText(work: WorkView): boolean {
+  const currentSource = work.resolved_source_type ?? work.source_type;
   return (
     work.deep_status === 'skipped_no_text' ||
     work.summary_status === 'skipped_no_text' ||
-    work.source_type === 'none' ||
-    work.source_type === 'abstract_only'
+    currentSource === 'none' ||
+    currentSource === 'abstract_only'
   );
 }
 
 /** The deep analysis ran, but against the abstract alone. Re-scannable once the file exists. */
 export function isAbstractOnly(work: WorkView): boolean {
-  return work.deep_status === 'done' && (work.source_type === 'abstract_only' || work.source_type === 'none');
+  const currentSource = work.resolved_source_type ?? work.source_type;
+  return work.deep_status === 'done'
+    && (work.source_type === 'abstract_only' || work.source_type === 'none')
+    && (currentSource === 'abstract_only' || currentSource === 'none');
 }
 
 function themesState(work: WorkView): StepState {
@@ -150,6 +154,9 @@ function semanticStep(work: WorkView, embedding: WorkEmbeddingStatus | undefined
 
 function citableStep(work: WorkView, passage: WorkPassageStatus | undefined): StepStatus {
   if (hasNoFullText(work)) return { id: 'citable', state: 'blocked' };
+  if (work.resolved_text_hash && work.deep_hash !== work.resolved_text_hash) {
+    return { id: 'citable', state: passage ? 'partial' : 'missing', total: passage?.totalPassages };
+  }
   if (!passage || passage.status === 'missing') return { id: 'citable', state: 'missing' };
   if (passage.status === 'complete') return { id: 'citable', state: 'done', total: passage.totalPassages };
   // 'outdated': the text was re-extracted or the embedding model changed.

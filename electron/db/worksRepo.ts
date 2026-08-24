@@ -1,7 +1,19 @@
 import { getDb } from './database';
 import { expandCollectionKeys } from './collectionsRepo';
 import { currentEmbeddingConfig } from './ideasRepo';
-import type { Work, WorkView, WorkFilter, WorkPage, WorkPageRequest, DeepTrigger, ZoteroTag, SummaryStatus, WorkCreator } from '@shared/types';
+import type {
+  Work,
+  WorkView,
+  WorkFilter,
+  WorkPage,
+  WorkPageRequest,
+  DeepTrigger,
+  ZoteroTag,
+  SummaryStatus,
+  WorkCreator,
+  ResolvedTextState,
+  WorkTextSource,
+} from '@shared/types';
 import { HEALTH_BUCKET_WHERE } from './corpusHealthBuckets';
 import { readinessWhere } from './readinessFilters';
 
@@ -544,7 +556,7 @@ export function setLightPending(nodusId: string): void {
 }
 
 export function setDeepPending(nodusId: string): void {
-  getDb().prepare("UPDATE works SET deep_status = 'pending' WHERE nodus_id = ?").run(nodusId);
+  getDb().prepare("UPDATE works SET deep_status = 'pending', deep_error = NULL WHERE nodus_id = ?").run(nodusId);
   getDb().prepare(`UPDATE document_profile_state
     SET status='stale',stale_reason='source_pending',error=NULL,updated_at=?
     WHERE nodus_id=? AND current_version_id IS NOT NULL`).run(new Date().toISOString(), nodusId);
@@ -574,12 +586,83 @@ export function setDeepResult(
   const db = getDb();
   const previous = db.prepare('SELECT deep_hash FROM works WHERE nodus_id = ?').get(nodusId) as { deep_hash: string | null } | undefined;
   if ((status === 'done' || status === 'skipped_no_text') && previous?.deep_hash !== hash) invalidateSummary(nodusId);
-  db
-    .prepare(
-      'UPDATE works SET deep_status=?, deep_at=?, deep_hash=?, source_type=COALESCE(?, source_type), notes=COALESCE(?, notes) WHERE nodus_id=?'
-    )
-    .run(status, new Date().toISOString(), hash, sourceType ?? null, notes ?? null, nodusId);
+  const now = new Date().toISOString();
+  if (status === 'failed') {
+    // A failed replacement must not destroy the last committed analysis metadata.
+    db.prepare('UPDATE works SET deep_status=?, deep_at=?, deep_error=? WHERE nodus_id=?')
+      .run(status, now, notes ?? 'El análisis profundo ha fallado.', nodusId);
+  } else {
+    // Assign nullable fields explicitly so a successful retry clears stale notes/errors.
+    db.prepare(
+      'UPDATE works SET deep_status=?, deep_at=?, deep_hash=?, source_type=?, notes=?, deep_error=NULL WHERE nodus_id=?'
+    ).run(status, now, hash, sourceType, notes ?? null, nodusId);
+  }
   markLibraryAnalysisFreshness(db, nodusId, 'deep', status === 'done' ? 'current' : status === 'failed' ? 'failed' : status === 'skipped_no_text' ? 'unavailable' : 'queued', hash);
+}
+
+/** Replace the locally-resolved text inventory without touching the last deep result. */
+export function setResolvedTextState(nodusId: string, state: ResolvedTextState): void {
+  const db = getDb();
+  const insert = db.prepare(`
+    INSERT INTO work_text_sources (
+      nodus_id, source_ref, origin, source_type, zotero_library_id, attachment_key,
+      display_name, content_hash, char_count, page_count, has_page_markers, ordinal, resolved_at
+      , active
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ON CONFLICT(nodus_id, source_ref) DO UPDATE SET
+      origin=excluded.origin, source_type=excluded.source_type,
+      zotero_library_id=excluded.zotero_library_id, attachment_key=excluded.attachment_key,
+      display_name=excluded.display_name, content_hash=excluded.content_hash,
+      char_count=excluded.char_count, page_count=excluded.page_count,
+      has_page_markers=excluded.has_page_markers, ordinal=excluded.ordinal,
+      resolved_at=excluded.resolved_at, active=1
+  `);
+  db.transaction(() => {
+    // Historical source refs stay addressable by old evidence while only the latest
+    // inventory is marked active for readiness/hash calculations.
+    db.prepare('UPDATE work_text_sources SET active=0 WHERE nodus_id=?').run(nodusId);
+    for (const source of state.sources) {
+      insert.run(
+        nodusId,
+        source.source_ref,
+        source.origin,
+        source.source_type,
+        source.zotero_library_id,
+        source.attachment_key,
+        source.display_name,
+        source.content_hash,
+        source.char_count,
+        source.page_count,
+        source.has_page_markers,
+        source.ordinal,
+        state.resolvedAt,
+        1,
+      );
+    }
+    db.prepare(`
+      UPDATE works SET
+        resolved_source_type=?, resolved_text_hash=?, resolved_text_chars=?,
+        resolved_text_source_count=?, resolved_has_page_markers=?, text_block_reason=?,
+        text_resolved_at=?, resolved_text_notes=?
+      WHERE nodus_id=?
+    `).run(
+      state.sourceType,
+      state.textHash,
+      state.textChars,
+      state.sourceCount,
+      state.hasPageMarkers ? 1 : 0,
+      state.blockReason,
+      state.resolvedAt,
+      state.notes,
+      nodusId,
+    );
+  })();
+}
+
+export function listWorkTextSources(nodusId: string): WorkTextSource[] {
+  return getDb().prepare(
+    'SELECT * FROM work_text_sources WHERE nodus_id=? AND active=1 ORDER BY ordinal, source_ref'
+  ).all(nodusId) as WorkTextSource[];
 }
 
 export function setSummaryResult(nodusId: string, status: SummaryStatus, hash: string | null): void {

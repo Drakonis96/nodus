@@ -86,6 +86,8 @@ Reutiliza etiquetas canónicas ya obvias entre fragmentos: "turismo", "franquism
 
 ═══ EVIDENCIA ═══
 - "quote": pasaje VERBATIM (idioma original), máx ~30 palabras. Nunca parafrasees.
+- "source": el alias sN del marcador [[src:sN ...]] que precede al pasaje, o null.
+- "page": el N de [[src:sN p.N]], o null cuando el marcador no trae página.
 - "location": "p. 4" | "sección 3.2" | "párr. 7" | null. NUNCA inventes páginas.
 - "kind": "explicit" | "paraphrased".
 
@@ -137,16 +139,16 @@ Datos faltantes → null. Nunca supongas.
     "processing_status": "ok"|"partial_no_fulltext"|"unreadable"|"out_of_scope",
     "notes": string|null },
   "theme_nodes": [ { "id","label","statement","role",
-    "evidence":[{"quote","location","kind"}],"confidence" } ],
+    "evidence":[{"quote","source","page","location","kind"}],"confidence" } ],
   "ideas": [ { "id","type","label","statement","role","development",
-    "evidence":[{"quote","location","kind"}],"theme_labels":[],
+    "evidence":[{"quote","source","page","location","kind"}],"theme_labels":[],
     "confidence","uncertainty_reason" } ],
   "internal_relations": [ { "from","to","type","basis",
-    "evidence":{"quote","location","kind"},"confidence" } ],
+    "evidence":{"quote","source","page","location","kind"},"confidence" } ],
   "external_references": [ { "from","cited_work","type","basis",
-    "evidence":{"quote","location","kind"},"confidence" } ],
+    "evidence":{"quote","source","page","location","kind"},"confidence" } ],
   "gaps": [ { "kind","statement","related_idea",
-    "evidence":{"quote","location","kind"},"confidence" } ],
+    "evidence":{"quote","source","page","location","kind"},"confidence" } ],
   "authors_detail": [ { "name","affiliation","stance_notes" } ]
 }
 Arrays vacíos como []. Campos no aplicables como null.`;

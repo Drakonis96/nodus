@@ -3,7 +3,8 @@ import type { PassageEmbeddingProgress, Work } from '@shared/types';
 import { getDb } from '../db/database';
 import { clearAllPassages, replaceWorkPassages, workPassageStatuses } from '../db/passagesRepo';
 import { getSettings } from '../db/settingsRepo';
-import { planRetrievalChunks, resolveWorkText } from '../extraction/textExtractor';
+import { planRetrievalChunks, resolveWorkText, resolvedTextStateFromDoc } from '../extraction/textExtractor';
+import { setResolvedTextState } from '../db/worksRepo';
 import { getItem, LOCAL_USER_ID } from '../zotero/zoteroClient';
 import { embedMany } from './aiClient';
 import { addNotification } from '../notifications';
@@ -166,9 +167,12 @@ export async function startPassageEmbedding(nodusIds?: string[]): Promise<void> 
         },
         entry.work.item_type
       );
+      setResolvedTextState(entry.work.nodus_id, resolvedTextStateFromDoc(document));
       if (state.stopRequested || (await waitIfPaused())) break;
 
-      const chunks = planRetrievalChunks(document.text);
+      const chunks = planRetrievalChunks(document.text, {
+        sourceMap: Object.fromEntries((document.segments ?? []).map((segment) => [segment.marker, segment.sourceRef])),
+      });
       entry.chunks = chunks.length;
       state.currentWorkPassages = chunks.length;
       state.totalPassages += chunks.length;

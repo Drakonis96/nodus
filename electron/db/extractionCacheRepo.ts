@@ -2,7 +2,7 @@ import { getDb } from './database';
 import { planExtractionCacheEviction } from '@shared/extractionCachePrune';
 import type { PdfAnalysis, SourceType } from '@shared/types';
 
-export const EXTRACTION_CACHE_VERSION = 1;
+export const EXTRACTION_CACHE_VERSION = 2;
 
 /** How much extracted text the cache may hold before the oldest entries go. */
 const MAX_CACHE_BYTES = 64 * 1024 * 1024;
