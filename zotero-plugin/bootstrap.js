@@ -339,18 +339,24 @@ function registerSelectionPopup() {
       const L = POPUP_I18N[lang];
 
       const wrap = doc.createElement("div");
-      wrap.style.cssText = "display:flex;flex-direction:column;gap:6px;padding:5px 4px;width:238px;max-width:238px;box-sizing:border-box;";
+      wrap.style.cssText = "display:flex;flex-direction:column;gap:6px;padding:5px 4px;width:238px;max-width:100%;min-width:0;box-sizing:border-box;overflow:hidden;";
       const head = doc.createElement("div");
       head.style.cssText = "display:flex;align-items:center;gap:5px;font-size:11px;font-weight:700;color:#7c3aed;";
       head.innerHTML = MARK_SVG + "<span>Nodus</span>";
       wrap.appendChild(head);
 
       const row = doc.createElement("div");
-      row.style.cssText = "display:flex;gap:5px;";
+      // Zotero owns the popup and may make it narrower than our preferred
+      // width. Let actions shrink (and, if more are added, wrap) inside that
+      // available width instead of allowing their intrinsic content to escape.
+      row.style.cssText = "display:flex;flex-wrap:wrap;gap:5px;width:100%;max-width:100%;min-width:0;box-sizing:border-box;overflow:hidden;";
       const mkBtn = (label, iconSvg) => {
         const b = doc.createElement("button");
-        b.style.cssText = "flex:1;display:inline-flex;align-items:center;justify-content:center;gap:4px;padding:5px 6px;border:1px solid rgba(124,58,237,.35);border-radius:6px;background:#fff;color:#7c3aed;font-size:11px;font-weight:600;cursor:pointer;";
-        b.innerHTML = iconSvg + "<span>" + label + "</span>";
+        b.type = "button";
+        b.title = label;
+        b.setAttribute("aria-label", label);
+        b.style.cssText = "flex:1 1 44px;min-width:0;max-width:100%;height:32px;box-sizing:border-box;overflow:hidden;display:inline-flex;align-items:center;justify-content:center;padding:5px;border:1px solid rgba(124,58,237,.35);border-radius:6px;background:#fff;color:#7c3aed;cursor:pointer;";
+        b.innerHTML = iconSvg;
         return b;
       };
       const citeBtn = mkBtn(L.cite, POPUP_ICO.quote);
