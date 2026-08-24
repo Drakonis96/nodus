@@ -181,9 +181,9 @@ export async function findSimilarPassagesPaged(
   const config = currentEmbeddingConfig();
   const nodusIds = [...new Set(opts.nodusIds ?? [])];
   const scoped = nodusIds.length ? ` AND p.nodus_id IN (${nodusIds.map(() => '?').join(',')})` : '';
-  const ranked = await scanSimilar<{ passage_id: string; rid: number; similarity: number }>({
+  const ranked = await scanSimilar<{ passage_id: string; content_hash: string; rid: number; similarity: number }>({
     table: 'passages',
-    sql: `SELECT p.passage_id, p.rowid AS rid, vec_scan(p.embedding) AS similarity
+    sql: `SELECT p.passage_id, p.content_hash, p.rowid AS rid, vec_scan(p.embedding) AS similarity
             FROM passages p
             JOIN works w ON w.nodus_id = p.nodus_id
            WHERE p.rowid > ? AND p.rowid <= ?
@@ -200,19 +200,28 @@ export async function findSimilarPassagesPaged(
   });
   if (ranked.length === 0) return [];
 
-  const byId = new Map(ranked.map((row) => [row.passage_id, row.similarity]));
+  const byId = new Map(ranked.map((row) => [row.passage_id, {
+    similarity: row.similarity,
+    contentHash: row.content_hash,
+  }]));
   const rows = getDb()
     .prepare(
-      `SELECT p.passage_id, p.nodus_id, p.text, p.page_label, p.source_ref, p.page_number,
+      `SELECT p.passage_id, p.nodus_id, p.text, p.page_label, p.source_ref, p.page_number, p.content_hash,
               w.title, w.authors_json, w.year, w.zotero_key
          FROM passages p
          JOIN works w ON w.nodus_id = p.nodus_id
-        WHERE p.passage_id IN (${ranked.map(() => '?').join(',')})`
+        WHERE p.passage_id IN (${ranked.map(() => '?').join(',')})
+          AND w.archived = 0
+          AND ${PASSAGE_MATCHES_RESOLVED_TEXT}`
     )
-    .all(...ranked.map((row) => row.passage_id)) as Omit<SimilarPassage, 'similarity'>[];
+    .all(...ranked.map((row) => row.passage_id)) as Array<Omit<SimilarPassage, 'similarity'> & { content_hash: string }>;
   // Back into the ranked order the scan produced; the IN clause has none of its own.
   return rows
-    .map((row) => ({ ...row, similarity: byId.get(row.passage_id) ?? 0 }))
+    .filter((row) => byId.get(row.passage_id)?.contentHash === row.content_hash)
+    .map(({ content_hash: _contentHash, ...row }) => ({
+      ...row,
+      similarity: byId.get(row.passage_id)?.similarity ?? 0,
+    }))
     .sort((a, b) => b.similarity - a.similarity);
 }
 

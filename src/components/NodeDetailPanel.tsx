@@ -292,9 +292,9 @@ export function NodeDetailPanel({
 }
 
 /**
- * The location tail of an evidence quote. When the location carries a
- * parseable page ("p. 12"), it becomes a link that opens the work's PDF at
- * that exact page in Zotero's reader; otherwise it stays plain text.
+ * The location tail of an evidence quote. A page opens that exact position;
+ * a source reference without a page still opens the exact attachment. It stays
+ * plain text only when neither locator nor a custom opener is available.
  */
 export function EvidenceLocationLink({
   nodusId,
@@ -312,16 +312,16 @@ export function EvidenceLocationLink({
   onOpen?: (sourceRef: string, location: string | null) => void;
 }) {
   const page = pageNumber ?? parsePageNumber(location);
-  if (page === null && !onOpen) {
+  if (page === null && !sourceRef && !onOpen) {
     return <span className="text-neutral-500 not-italic">{(location ?? '') + suffix}</span>;
   }
   return (
     <span className="text-neutral-500 not-italic">
       <button
         className="inline-flex items-center gap-0.5 text-indigo-400 hover:text-indigo-300"
-        title={onOpen ? t('Abrir fuente') : t('Abrir el PDF en Zotero por esta página')}
+        title={onOpen || page === null ? t('Abrir fuente') : t('Abrir el PDF en Zotero por esta página')}
         onClick={() => onOpen
-          ? onOpen(nodusId, location)
+          ? onOpen(sourceRef ?? nodusId, location)
           : void window.nodus.openEvidenceAtPage(nodusId, { location, sourceRef, pageNumber: page })}
       >
         <Icon name="external" size={11} /> {location || t('Abrir fuente')}

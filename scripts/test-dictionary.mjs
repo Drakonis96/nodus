@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import { mkdtemp, rm } from "node:fs/promises";
@@ -180,6 +181,48 @@ try {
     automaticAfterGeneration.currentVersionId,
     generated.id,
     "generated version is persisted as current",
+  );
+
+  const stalePassageEntry = repo.createDictionaryEntry({
+    name: "Pasaje mutable",
+    aliases: [],
+    focusPrompt: "No reutilizar texto antiguo",
+    scope: { kind: "vault" },
+    outputLanguage: "es",
+    detailLevel: "concise",
+  });
+  repo.upsertDictionaryEvidence(stalePassageEntry.id, [
+    evidence(
+      "passage",
+      "work-1#0",
+      "included",
+      "Obra Uno · p. 12",
+      "La memoria colectiva cambia entre generaciones.",
+    ),
+  ]);
+  assert.equal(
+    repo.includedEvidence(stalePassageEntry.id)[0].unavailable,
+    false,
+    "a persisted passage is usable while its exact text revision is current",
+  );
+  db.prepare("UPDATE passages SET text=? WHERE passage_id='work-1#0'").run(
+    "Texto nuevo asignado al mismo identificador de pasaje.",
+  );
+  assert.equal(
+    repo.includedEvidence(stalePassageEntry.id)[0].unavailable,
+    true,
+    "a reindexed passage id cannot revive the Dictionary copy of the old text",
+  );
+  await assert.rejects(
+    () => ai.__generateDictionaryEntryForTesting(
+      { entryId: stalePassageEntry.id, mode: "creation", model: null },
+      async () => ({ descriptionMarkdown: "No debe ejecutarse.", authorSummaries: [] }),
+    ),
+    /evidencia relevante suficiente/,
+    "Dictionary excludes a stale persisted passage before synthesis",
+  );
+  db.prepare("UPDATE passages SET text=? WHERE passage_id='work-1#0'").run(
+    "La memoria colectiva cambia entre generaciones.",
   );
 
   // Citation labels contain author initials and years (for example, "Uno, A.
@@ -606,7 +649,9 @@ function evidence(kind, id, decision, label, text) {
       { id: "author-1", name: "Autora Uno", attributionBasis: "author" },
     ],
     tags: kind === "idea" ? ["memoria"] : [],
-    sourceRevision: `rev-${id}`,
+    sourceRevision: kind === "passage"
+      ? createHash("sha256").update(text).digest("hex")
+      : `rev-${id}`,
   };
 }
 

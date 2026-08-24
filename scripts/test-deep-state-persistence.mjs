@@ -80,6 +80,33 @@ try {
   });
   assert.equal(db.prepare("SELECT active FROM work_text_sources WHERE nodus_id='w1' AND source_ref='zotero:user:0:A'").get().active, 0, 'old evidence source remains addressable');
   assert.equal(db.prepare("SELECT active FROM work_text_sources WHERE nodus_id='w1' AND source_ref='zotero:user:0:B'").get().active, 1);
+
+  db.prepare(`INSERT INTO works (
+    nodus_id,zotero_key,title,authors_json,archived,resolved_text_hash
+  ) VALUES ('race','ZR','Race','[]',0,'race-hash'), ('fill','ZF','Fill','[]',0,NULL)`).run();
+  passages.replaceWorkPassages('race', 'race-hash', [{
+    text: 'candidate that becomes stale between vector windows', pageLabel: 'p. 4',
+    sourceRef: 'zotero:user:0:R', pageNumber: 4, embedding: [1, 0],
+  }]);
+  const filler = db.prepare(`INSERT INTO passages (
+    passage_id,nodus_id,chunk_index,text,page_label,char_len,content_hash,created_at
+  ) VALUES (?,?,?,?,?,?,?,?)`);
+  db.transaction(() => {
+    for (let index = 0; index < 1_600; index += 1) {
+      filler.run(`fill#${index}`, 'fill', index, 'filler', null, 6, 'fill-hash', '2026-01-02T00:00:00.000Z');
+    }
+  })();
+  const mutateBeforeNextWindow = new Promise((resolve) => setImmediate(() => {
+    db.prepare("UPDATE works SET resolved_text_hash='replacement-hash' WHERE nodus_id='race'").run();
+    passages.replaceWorkPassages('race', 'replacement-hash', [{
+      text: 'replacement text under the same stable passage id', pageLabel: 'p. 9',
+      sourceRef: 'zotero:user:0:R2', pageNumber: 9, embedding: [-1, 0],
+    }]);
+    resolve();
+  }));
+  const raced = await passages.findSimilarPassagesPaged([1, 0], -1, 10, { nodusIds: ['race'] });
+  await mutateBeforeNextWindow;
+  assert.deepEqual(raced, [], 'paged vector materialization cannot attach an old score to a reindexed stable passage id');
 } finally {
   try { closeDb(); } catch {}
   await rm(root, { recursive: true, force: true });

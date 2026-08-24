@@ -374,8 +374,8 @@ function copyDeepAnalysis(
 
   db.prepare(
     /* sql */ `
-      INSERT OR IGNORE INTO evidence (id, global_id, nodus_id, quote, location, kind)
-      SELECT id, global_id, @targetId, quote, location, kind
+      INSERT OR IGNORE INTO evidence (id, global_id, nodus_id, quote, location, kind, source_ref, page_number)
+      SELECT id, global_id, @targetId, quote, location, kind, source_ref, page_number
         FROM ${SOURCE_ALIAS}.evidence
        WHERE nodus_id = @sourceId
     `
@@ -449,10 +449,10 @@ function copyPassages(
   db.prepare(
     /* sql */ `
       INSERT OR REPLACE INTO passages (
-        passage_id, nodus_id, chunk_index, text, page_label, char_len, content_hash,
+        passage_id, nodus_id, chunk_index, text, page_label, source_ref, page_number, char_len, content_hash,
         embedding, embedding_provider, embedding_model, embedding_dim, embedding_text_hash, created_at
       )
-      SELECT @targetId || '#' || chunk_index, @targetId, chunk_index, text, page_label, char_len, content_hash,
+      SELECT @targetId || '#' || chunk_index, @targetId, chunk_index, text, page_label, source_ref, page_number, char_len, content_hash,
              CASE WHEN @includeEmbeddings THEN embedding ELSE NULL END,
              CASE WHEN @includeEmbeddings THEN embedding_provider ELSE NULL END,
              CASE WHEN @includeEmbeddings THEN embedding_model ELSE NULL END,
