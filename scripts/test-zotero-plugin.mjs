@@ -1145,6 +1145,19 @@ test('composer: Enter sends and Alt+Enter keeps the textarea newline', () => {
   );
 });
 
+test('reader selection popup keeps icon actions inside Zotero popup bounds', () => {
+  const src = readSource('zotero-plugin/bootstrap.js');
+  const popup = src.slice(src.indexOf('function registerSelectionPopup()'));
+
+  assert.match(popup, /wrap\.style\.cssText = "[^"]*width:238px[^"]*max-width:100%[^"]*min-width:0[^"]*overflow:hidden/, 'the whole Nodus block respects a narrower host popup');
+  assert.match(popup, /row\.style\.cssText = "[^"]*flex-wrap:wrap[^"]*max-width:100%[^"]*overflow:hidden/, 'the action row wraps and clips to the host popup');
+  assert.match(popup, /b\.style\.cssText = "[^"]*flex:1 1 44px[^"]*min-width:0[^"]*max-width:100%[^"]*overflow:hidden/, 'actions can shrink without intrinsic-width overflow');
+  assert.match(popup, /b\.setAttribute\("aria-label", label\)/, 'icon-only actions retain an accessible name');
+  assert.match(popup, /b\.title = label/, 'icon-only actions explain themselves on hover');
+  assert.match(popup, /b\.innerHTML = iconSvg;/, 'actions render only their icon');
+  assert.doesNotMatch(popup, /iconSvg \+ "<span>" \+ label/, 'visible labels cannot widen the action buttons');
+});
+
 // ─────────────────────────────────────────── auto-highlighter engine (pure)
 test('highlighter: parsePassages extracts {text,level} robustly', () => {
   const { NodusHighlighter: H } = loadModule('highlighter.js');
