@@ -328,7 +328,9 @@ export function getSearchResultDetail(kind: SearchResultKind, id: string): Searc
         .prepare(
           `SELECT
              (SELECT COUNT(*) FROM idea_occurrences WHERE nodus_id = ?) AS ideas,
-             (SELECT COUNT(*) FROM passages WHERE nodus_id = ?) AS passages,
+             (SELECT COUNT(*) FROM passages p JOIN works pw ON pw.nodus_id = p.nodus_id WHERE p.nodus_id = ?
+               AND ((pw.resolved_text_hash IS NOT NULL AND p.content_hash = pw.resolved_text_hash)
+                 OR (pw.resolved_text_hash IS NULL AND (pw.deep_hash IS NULL OR p.content_hash = pw.deep_hash)))) AS passages,
              (SELECT COUNT(*) FROM gaps WHERE nodus_id = ?) AS gaps`
         )
         .get(id, id, id) as { ideas: number; passages: number; gaps: number };
@@ -357,7 +359,9 @@ export function getSearchResultDetail(kind: SearchResultKind, id: string): Searc
         .prepare(
           `SELECT p.passage_id, p.text, p.page_label, p.chunk_index, p.char_len,
                   p.created_at, w.nodus_id, w.title, w.authors_json, w.year, w.zotero_key
-           FROM passages p JOIN works w ON w.nodus_id = p.nodus_id WHERE p.passage_id = ?`
+           FROM passages p JOIN works w ON w.nodus_id = p.nodus_id WHERE p.passage_id = ?
+             AND ((w.resolved_text_hash IS NOT NULL AND p.content_hash = w.resolved_text_hash)
+               OR (w.resolved_text_hash IS NULL AND (w.deep_hash IS NULL OR p.content_hash = w.deep_hash)))`
         )
         .get(id) as
         | {

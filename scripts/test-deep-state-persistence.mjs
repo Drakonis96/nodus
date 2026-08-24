@@ -47,6 +47,8 @@ try {
   assert.equal(passages.embeddedPassageCount(), 0, 'retrieval excludes passages whose hash differs from resolved text');
   assert.equal(passages.getPassageDetail('w1#0'), null, 'a stale passage cannot be recovered directly');
   assert.equal(passages.workPassageStatuses(['w1'])[0].status, 'outdated');
+  assert.equal(works.listWorks({ statusFlags: ['passages'] }).length, 0, 'advanced work filters do not count stale passages');
+  assert.equal(works.listWorks({ statusFlags: ['!passages'] })[0].nodus_id, 'w1');
 
   works.setDeepPending('w1');
   works.setDeepResult('w1', 'failed', null, null, 'fallo nuevo');

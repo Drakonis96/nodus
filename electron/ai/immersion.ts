@@ -139,8 +139,10 @@ function lexicalPassageFallback(topic: string, workIds: string[]): { id: string;
     .prepare(
       `SELECT passage_id, hits FROM (
          SELECT p.passage_id, (${hitsExpr}) AS hits
-           FROM passages p
+           FROM passages p JOIN works w ON w.nodus_id = p.nodus_id
           WHERE p.nodus_id IN (${workIds.map(() => '?').join(',')})
+            AND ((w.resolved_text_hash IS NOT NULL AND p.content_hash = w.resolved_text_hash)
+              OR (w.resolved_text_hash IS NULL AND (w.deep_hash IS NULL OR p.content_hash = w.deep_hash)))
        ) WHERE hits > 0
        ORDER BY hits DESC
        LIMIT ?`
@@ -198,7 +200,9 @@ export async function buildImmersionMaterial(topic: string): Promise<ImmersionMa
         `SELECT p.passage_id, p.nodus_id, p.text, p.page_label, w.title, w.authors_json, w.year, w.zotero_key
            FROM passages p
            JOIN works w ON w.nodus_id = p.nodus_id
-          WHERE p.passage_id IN (${passageCandidates.map(() => '?').join(',')})`
+          WHERE p.passage_id IN (${passageCandidates.map(() => '?').join(',')})
+            AND ((w.resolved_text_hash IS NOT NULL AND p.content_hash = w.resolved_text_hash)
+              OR (w.resolved_text_hash IS NULL AND (w.deep_hash IS NULL OR p.content_hash = w.deep_hash)))`
       )
       .all(...passageCandidates.map((p) => p.id)) as {
       passage_id: string;

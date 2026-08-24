@@ -681,7 +681,8 @@ export function findDocumentSupportPassages(
        JOIN works w ON w.nodus_id=s.nodus_id
       WHERE s.version_id=? AND s.target_id=? AND s.validation_status='valid'
         AND s.passage_id IS NOT NULL AND w.archived=0
-        AND (w.deep_hash IS NULL OR p.content_hash=w.deep_hash)
+        AND ((w.resolved_text_hash IS NOT NULL AND p.content_hash=w.resolved_text_hash)
+          OR (w.resolved_text_hash IS NULL AND (w.deep_hash IS NULL OR p.content_hash=w.deep_hash)))
       ORDER BY s.confidence DESC,s.support_id
       LIMIT ?`
   );

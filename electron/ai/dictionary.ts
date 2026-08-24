@@ -225,7 +225,10 @@ function lexicalPassages(
     .prepare(
       `SELECT p.passage_id,p.nodus_id,p.text,p.page_label,w.title,w.authors_json,w.year,w.zotero_key
     FROM passages p JOIN works w ON w.nodus_id=p.nodus_id
-    WHERE p.nodus_id IN (${placeholders(workIds)}) AND (${clauses}) ORDER BY p.chunk_index LIMIT ?`,
+    WHERE p.nodus_id IN (${placeholders(workIds)}) AND (${clauses})
+      AND ((w.resolved_text_hash IS NOT NULL AND p.content_hash = w.resolved_text_hash)
+        OR (w.resolved_text_hash IS NULL AND (w.deep_hash IS NULL OR p.content_hash = w.deep_hash)))
+    ORDER BY p.chunk_index LIMIT ?`,
     )
     .all(...workIds, ...terms.map((term) => `%${term}%`), limit) as Array<
     Omit<SimilarPassage, "similarity">

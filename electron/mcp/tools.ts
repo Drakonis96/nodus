@@ -1733,7 +1733,11 @@ export function registerTools(server: McpServer): void {
         const nodusId = workId ? resolveWorkNodusId(workId) : null;
         if (workId && !nodusId) throw notFound('work', workId);
         const params: unknown[] = [];
-        const clauses: string[] = ['w.archived = 0'];
+        const clauses: string[] = [
+          'w.archived = 0',
+          `((w.resolved_text_hash IS NOT NULL AND p.content_hash = w.resolved_text_hash)
+            OR (w.resolved_text_hash IS NULL AND (w.deep_hash IS NULL OR p.content_hash = w.deep_hash)))`,
+        ];
         if (nodusId) {
           clauses.push('p.nodus_id = ?');
           params.push(nodusId);

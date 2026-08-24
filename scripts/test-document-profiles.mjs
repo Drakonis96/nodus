@@ -114,6 +114,13 @@ try {
   }], 5);
   assert.equal(exactSupport[0].passage_id, 'w1#0', 'a matched profile field follows its validated support to the original passage');
   assert.equal(exactSupport[0].similarity, 0.776);
+  sqlite.prepare("UPDATE works SET resolved_text_hash='replacement-source' WHERE nodus_id='w1'").run();
+  assert.equal(repo.findDocumentSupportPassages([{
+    kind: 'document', nodusId: 'w1', title: 'Modernización española', authors: ['Autora Uno'], year: 2024,
+    versionId, sourceId: fieldId, fieldKind: 'thesis', text: 'La modernización fue desigual.', similarity: 0.8,
+    centrality: 1, explanation: 'Coincidencia en tesis', stale: true,
+  }], 5).length, 0, 'profile support never revives a passage from a replaced text');
+  sqlite.prepare("UPDATE works SET resolved_text_hash=NULL WHERE nodus_id='w1'").run();
   assert.equal(repo.lexicalDocumentSearch('modernización', 5)[0].nodusId, 'w1');
   assert.equal(repo.lexicalDocumentSearch('¿Qué explica la modernización española?', 5)[0].nodusId, 'w1',
     'natural-language punctuation is never interpreted as FTS5 syntax');

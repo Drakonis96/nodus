@@ -244,7 +244,8 @@ function queryWorks(filter: WorkFilter, request?: WorkPageRequest): WorkPage {
                             AND p.embedding_provider = @passProv
                             AND p.embedding_model    = @passModel
                             AND p.embedding_dim > 0
-                            AND (w.deep_hash IS NULL OR p.content_hash = w.deep_hash))
+                            AND ((w.resolved_text_hash IS NOT NULL AND p.content_hash = w.resolved_text_hash)
+                              OR (w.resolved_text_hash IS NULL AND (w.deep_hash IS NULL OR p.content_hash = w.deep_hash))))
               )
             )`
           );
@@ -264,7 +265,8 @@ function queryWorks(filter: WorkFilter, request?: WorkPageRequest): WorkPage {
                             AND p.embedding_provider = @passNegProv
                             AND p.embedding_model    = @passNegModel
                             AND p.embedding_dim > 0
-                            AND (w.deep_hash IS NULL OR p.content_hash = w.deep_hash))
+                            AND ((w.resolved_text_hash IS NOT NULL AND p.content_hash = w.resolved_text_hash)
+                              OR (w.resolved_text_hash IS NULL AND (w.deep_hash IS NULL OR p.content_hash = w.deep_hash))))
               )
             )`
           );
@@ -436,7 +438,10 @@ function workOrderBy(
       const config = currentEmbeddingConfig();
       params.sortPassageProvider = config.provider;
       params.sortPassageModel = config.model;
-      expression = `(SELECT COUNT(*) FROM passages p WHERE p.nodus_id = w.nodus_id AND p.embedding IS NOT NULL AND p.embedding_provider = @sortPassageProvider AND p.embedding_model = @sortPassageModel)`;
+      expression = `(SELECT COUNT(*) FROM passages p WHERE p.nodus_id = w.nodus_id
+        AND p.embedding IS NOT NULL AND p.embedding_provider = @sortPassageProvider AND p.embedding_model = @sortPassageModel
+        AND ((w.resolved_text_hash IS NOT NULL AND p.content_hash = w.resolved_text_hash)
+          OR (w.resolved_text_hash IS NULL AND (w.deep_hash IS NULL OR p.content_hash = w.deep_hash))))`;
       break;
     }
   }
