@@ -2,11 +2,10 @@
 //
 // The bug this file exists to prevent: a flat `querySelectorAll('audio, video')`
 // on the top document is not "the page's media". Real players do not oblige.
-// elevenreader.io keeps EIGHT <audio> tags in its document and gives seven of
-// them no source at all, so the old code played eight elements at once, and let
-// Previous/Next land on a dead placeholder — pausing the track that was running.
-// Others put their player in an open shadow root or a same-origin frame, where a
-// flat query never looked.
+// Older elevenreader.io builds kept spare <audio> tags; the current player has
+// no media element at all and exposes only accessible Play/Pause controls.
+// Others put their player in an open shadow root or a same-origin frame, where
+// a flat query never looked.
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { execFileSync } from 'node:child_process';
@@ -60,14 +59,47 @@ const track = (options = {}) => el({ currentSrc: 'https://cdn.example/track.mp3'
 function doc(nodes, extras = {}) {
   const frames = extras.frames ?? [];
   const hosts = extras.hosts ?? [];
+  const buttons = extras.buttons ?? [];
   return {
     querySelectorAll(selector) {
       if (selector === 'audio, video') return nodes;
       if (selector === 'iframe, frame') return frames;
       if (selector === '*') return [...nodes, ...frames, ...hosts];
+      if (selector === 'button, [role="button"]') return buttons;
       return [];
     },
   };
+}
+
+function semanticButton(label, options = {}) {
+  const attributes = new Map(Object.entries({
+    'aria-label': label,
+    ...(options.attributes ?? {}),
+  }));
+  return {
+    textContent: options.textContent ?? '',
+    disabled: options.disabled ?? false,
+    parentElement: options.parentElement ?? null,
+    clicks: 0,
+    getAttribute(name) { return attributes.has(name) ? attributes.get(name) : null; },
+    getClientRects() { return options.visible === false ? [] : [{}]; },
+    querySelectorAll() { return []; },
+    click() { this.clicks += 1; options.onClick?.(); },
+  };
+}
+
+function playerScope(buttons, options = {}) {
+  const scope = {
+    parentElement: options.parentElement ?? null,
+    isConnected: options.isConnected ?? true,
+    querySelectorAll(selector) {
+      if (selector === 'button, [role="button"]') return buttons;
+      if (selector.includes('[role="slider"]')) return options.progress === false ? [] : [{}];
+      return [];
+    },
+  };
+  buttons.forEach((button) => { button.parentElement = scope; });
+  return scope;
 }
 
 test('an empty or missing document yields nothing rather than throwing', () => {
@@ -196,6 +228,75 @@ test('PAUSE on a page with nothing running reports unhandled, so main can use th
 
 test('PLAY on a page with no reachable media reports unhandled', () => {
   assert.equal(media.applyMediaCommand([], 'play', null), false);
+});
+
+test('a custom player with no media elements pauses through its visible semantic control', () => {
+  const cardPause = semanticButton('Pause');
+  const playerPause = semanticButton('Pause');
+  const scope = playerScope([playerPause]);
+  const result = media.applySemanticMediaCommand(doc([], { buttons: [cardPause, playerPause] }), 'pause');
+  assert.equal(result.handled, true);
+  assert.equal(result.scope, scope, 'the stable player shell is remembered for resume');
+  assert.equal(playerPause.clicks, 1, 'the control beside Progress is the active player');
+  assert.equal(cardPause.clicks, 0, 'a duplicate card control must not toggle too');
+});
+
+test('PLAY resumes inside the remembered player instead of choosing another book', () => {
+  const unrelated = semanticButton('Play');
+  const resume = semanticButton('Play');
+  const scope = playerScope([resume]);
+  const page = doc([], { buttons: [unrelated, resume] });
+  const result = media.applySemanticMediaCommand(page, 'play', scope);
+  assert.equal(result.handled, true);
+  assert.equal(resume.clicks, 1);
+  assert.equal(unrelated.clicks, 0);
+});
+
+test('a semantic player reports its actual state after React swaps the control', () => {
+  const controls = [];
+  const play = semanticButton('Play', {
+    onClick() { controls.splice(0, controls.length, pause); pause.parentElement = scope; },
+  });
+  const pause = semanticButton('Pause');
+  const scope = playerScope(controls);
+  controls.push(play);
+  play.parentElement = scope;
+  const page = doc([], { buttons: [play] });
+
+  assert.equal(media.semanticPlaybackState(page, scope), false);
+  assert.equal(media.applySemanticMediaCommand(page, 'play', scope).handled, true);
+  assert.equal(media.semanticPlaybackState(page, scope), true);
+});
+
+test('a detached remembered player is ignored instead of clicking a stale control', () => {
+  const stalePlay = semanticButton('Play');
+  const stale = playerScope([stalePlay], { isConnected: false });
+  const activePause = semanticButton('Pause');
+  const active = playerScope([activePause]);
+  const result = media.applySemanticMediaCommand(doc([], { buttons: [activePause] }), 'play', stale);
+  assert.equal(result.handled, false);
+  assert.equal(stalePlay.clicks, 0);
+  assert.equal(media.semanticPlaybackState(doc([], { buttons: [activePause] }), stale), true);
+  assert.equal(active.isConnected, true);
+});
+
+test('PLAY refuses an ambiguous page when no prior player scope exists', () => {
+  const first = semanticButton('Play');
+  const second = semanticButton('Play');
+  const result = media.applySemanticMediaCommand(doc([], { buttons: [first, second] }), 'play');
+  assert.equal(result.handled, false, 'starting the wrong book is worse than doing nothing');
+  assert.equal(first.clicks + second.clicks, 0);
+});
+
+test('semantic media controls work in open shadow roots and ignore hidden controls', () => {
+  const hidden = semanticButton('Pause', { visible: false });
+  const visible = semanticButton('Pause');
+  const shadow = doc([], { buttons: [visible] });
+  const page = doc([], { buttons: [hidden], hosts: [{ shadowRoot: shadow }] });
+  const result = media.applySemanticMediaCommand(page, 'pause');
+  assert.equal(result.handled, true);
+  assert.equal(hidden.clicks, 0);
+  assert.equal(visible.clicks, 1);
 });
 
 test('NEXT moves between real tracks, never onto a placeholder', () => {
