@@ -1398,7 +1398,7 @@ function DictionaryEntryView({
       count: entry.authorCount,
     },
     { id: "works", label: t("Obras"), icon: "book", count: entry.workCount },
-    { id: "versions", label: t("Versiones"), icon: "history" },
+    { id: "versions", label: t("Versiones"), icon: "clock" },
   ];
   return (
     <div
@@ -1798,7 +1798,7 @@ function OverviewTab({
       <div className="space-y-4 xl:col-span-4">
         <section className={`${panel} p-4`}>
           <div className="mb-3 flex items-center gap-2">
-            <Icon name="chart" size={15} className="text-indigo-500" />
+            <Icon name="chartBar" size={15} className="text-indigo-500" />
             <h3 className="font-semibold">{t("Cobertura")}</h3>
           </div>
           <div className="grid grid-cols-2 gap-2 text-xs">
@@ -2410,7 +2410,7 @@ function VersionsTab({
             className="flex w-full items-center gap-3 text-left"
             onClick={() => setOpen(open === version.id ? null : version.id)}
           >
-            <Icon name="history" className="text-neutral-500" />
+            <Icon name="clock" className="text-neutral-500" />
             <div>
               <p className="text-sm font-medium">
                 {dictionaryVersionText(version.trigger)}
