@@ -19,6 +19,9 @@ import { _electron as electron } from 'playwright-core';
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const screenshotsDir = path.join(repoRoot, 'docs', 'screenshots');
 const require = createRequire(import.meta.url);
+const documentUnderstandingConsentKey = 'nodus.documentUnderstandingConsent.2026-08';
+const tutorialVideosAnnouncementKey = 'nodus.tutorialVideosAnnouncementSeen.2026-07';
+const startupUpdateSessionKey = 'nodus.startupUpdateChecked';
 
 if (!existsSync(path.join(repoRoot, 'dist-electron', 'main.js')) || !existsSync(path.join(repoRoot, 'dist', 'index.html'))) {
   throw new Error('Run `npm run build` before capturing documentation screenshots.');
@@ -70,6 +73,9 @@ try {
 
   async function prepareCurrentVault() {
     await page.evaluate((version) => localStorage.setItem('nodus.lastSeenVersion', version), appVersion);
+    await page.evaluate((key) => localStorage.setItem(key, '1'), documentUnderstandingConsentKey);
+    await page.evaluate((key) => localStorage.setItem(key, '1'), tutorialVideosAnnouncementKey);
+    await page.evaluate((key) => sessionStorage.setItem(key, '1'), startupUpdateSessionKey);
     await page.evaluate((settings) => window.nodus.updateSettings(settings), publicSettings);
   }
 
@@ -99,6 +105,17 @@ try {
     ), view);
     if (readySelector) await page.locator(readySelector).waitFor({ state: 'visible' });
     await page.waitForTimeout(view === 'graph' || view === 'tree' ? 1_200 : 350);
+  }
+
+  async function openCoverageTab(tab, readySelector) {
+    const button = page.locator(`[data-testid="coverage-tab-${tab}"]`);
+    assert.equal(await button.count(), 1, `coverage tab ${tab} must be unique`);
+    await button.click();
+    await page.waitForFunction((target) => (
+      document.querySelector(`[data-testid="coverage-tab-${target}"]`)?.getAttribute('aria-selected') === 'true'
+    ), tab);
+    await page.locator(readySelector).waitFor({ state: 'visible' });
+    await page.waitForTimeout(350);
   }
 
   async function assertCaptureContract() {
@@ -158,18 +175,20 @@ try {
   assert.equal(await closeNodiHelp.count(), 1, 'Nodi help close button must be unique');
   await closeNodiHelp.click();
 
+  await openView('toolkit', '[data-testid="toolkit-home"]');
+  await capture('readme-toolkit-demo.png');
+
   await openView('ideas');
   await capture('03-ideas.png');
-  await openView('debate');
+  await openView('research', '[data-testid="coverage-workspace"]');
+  await openCoverageTab('debate', '[data-testid="debates-catalog"]');
   await capture('04-debates.png');
-  await openView('gaps');
+  await openCoverageTab('gaps', '[data-testid="gaps-catalog"]');
   await capture('05-gaps.png');
-  await openView('notes');
+  await openView('workspace');
   await capture('06-notes.png');
   await openView('library');
   await capture('07-library.png');
-  await openView('writing');
-  await capture('08-writing.png');
   await openView('argument');
   await capture('09-argument-map.png');
 
@@ -184,9 +203,9 @@ try {
   await createAndSwitch('Databases demo', 'databases');
   assert.equal(await page.evaluate(() => window.nodus.seedDatabasesDemoData()), true);
   await settleAfterSeed();
-  const fieldSamples = page.getByRole('button', { name: 'Field samples', exact: true });
-  assert.equal(await fieldSamples.count(), 1, 'the demo table must be unique in the sidebar');
-  await fieldSamples.click();
+  const readingList = page.getByRole('button', { name: 'Reading list', exact: true });
+  assert.equal(await readingList.count(), 1, 'the English demo table must be unique in the sidebar');
+  await readingList.click();
   await page.locator('[data-tour="db-table"]').waitFor({ state: 'visible' });
   await capture('readme-databases-demo.jpg');
 

@@ -7,9 +7,10 @@
 <p align="center"><strong>One place for research, teaching and study</strong></p>
 
 <p align="center">
-  <a href="https://github.com/Drakonis96/nodus/releases/latest">Download Nodus</a> ·
-  <a href="https://nodusresearch.com/">Visit the website</a> ·
-  <a href="https://nodusresearch.com/demo/">Try the interactive tour</a>
+  <a href="https://github.com/Drakonis96/nodus/releases/latest"><img alt="Download Nodus" src="https://img.shields.io/badge/Download_Nodus-4f46e5?style=for-the-badge&amp;logo=github&amp;logoColor=white"></a>
+  <a href="https://nodusresearch.com/"><img alt="Visit the website" src="https://img.shields.io/badge/Visit_the_website-6d28d9?style=for-the-badge&amp;logo=googlechrome&amp;logoColor=white"></a>
+  <a href="https://nodusresearch.com/demo/"><img alt="Try the interactive tour" src="https://img.shields.io/badge/Try_the_interactive_tour-0f766e?style=for-the-badge&amp;logo=safari&amp;logoColor=white"></a>
+  <a href="https://github.com/Drakonis96/nodus/releases"><img alt="Total Nodus downloads" src="https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fnodusresearch.com%2Fdata%2Fgithub-release-downloads.json&amp;query=%24.total&amp;label=Downloads&amp;style=for-the-badge&amp;color=374151"></a>
 </p>
 
 Nodus Research is the open-source project behind Nodus. Nodus is a local-first desktop application for university work that brings sources, notes, data, ideas and learning materials together without forcing every project into the same shape.
@@ -132,37 +133,9 @@ from Zotero, and formats them locally after installation. A document can then be
 for search and analysis without duplicating the global copy. See the
 [architecture, recovery and privacy guide](docs/global-library.md).
 
-### Updating to Nodus 4
-
-Updating from 3.2.7 keeps **This vault** as the initial Library scope and does
-not enable or migrate the cross-vault Library automatically. Before Nodus 4
-opens an existing database, it creates and verifies a one-time pre-v4 recovery
-copy. The optional migration assistant then inventories selected academic
-vaults and can be cancelled, resumed, verified, or rolled back without writing
-to the source vaults.
-
-Nodus 4 opens backups created by Nodus 3.x. A profile or Library already
-migrated to v4 is not guaranteed to open in a 3.x application, so keep the
-automatic pre-v4 recovery copy for downgrade recovery. Complete v4 encrypted
-backups include both every vault and `nodus-library`. See the
-[Library recovery contract](docs/global-library.md#updating-from-nodus-327).
-
 ## Cite Nodus
 
 If Nodus contributes substantially to research that leads to a publication, please cite the version you used. The repository provides machine-readable citation metadata in [`CITATION.cff`](CITATION.cff), which GitHub can render in APA and BibTeX formats. Use the [conceptual Zenodo DOI (10.5281/zenodo.21515531)](https://doi.org/10.5281/zenodo.21515531) for the project across all releases, or the [Nodus 4.2.2 DOI (10.5281/zenodo.22041926)](https://doi.org/10.5281/zenodo.22041926) for the current archived version. Ready-to-use formats are available at [nodusresearch.com/cite/](https://nodusresearch.com/cite/).
-
-## Roadmap
-
-Nodus is growing through new vaults rather than adding every possible tool to one menu.
-
-| Project | Status | What it will bring |
-| --- | --- | --- |
-| Primary sources vault | Alpha | Archival description, source criticism and evidence-led work with historical material |
-| Testimonies vault | Alpha | Interviews, transcription, coding and oral history workflows |
-| Worldbuilding vault | Alpha | Characters, places, rules and narratives for research-based creative projects |
-| iOS, iPadOS and Android companion app | In development | Access to shared vaults from a phone or tablet |
-
-The three vaults are in alpha and may change as they develop. They are clearly marked in the app and are not presented as finished features.
 
 ## Explore before importing anything
 
@@ -170,8 +143,6 @@ Every working vault includes a demo mode with sample content. It is the quickest
 
 You can also visit the [interactive browser tour](https://nodusresearch.com/demo/) without installing the app.
 
-## Open and evolving
+## License
 
-Nodus 4.0.0 and later are released exclusively under [GNU AGPL v3](LICENSE), SPDX `AGPL-3.0-only`. Published versions through 3.2.7 remain under MIT. Every build links to its [Corresponding Source](SOURCE_CODE.md). The [privacy policy](PRIVACY.md), [third-party notices](THIRD_PARTY_NOTICES.md) and [deployment checklist](legal/RGPD_DEPLOYMENT_CHECKLIST.md) document the privacy and licensing boundaries of each installation. Ideas, bug reports and academic use cases are welcome through [GitHub Issues](https://github.com/Drakonis96/nodus/issues).
-
-Before participating, read the [contribution guide](CONTRIBUTING.md) and [Code of Conduct](CODE_OF_CONDUCT.md). Report vulnerabilities privately according to the [security policy](SECURITY.md).
+Nodus 4.0.0 and later are licensed under the [GNU Affero General Public License v3.0](LICENSE), SPDX `AGPL-3.0-only`; published versions through 3.2.7 remain under the MIT License.
