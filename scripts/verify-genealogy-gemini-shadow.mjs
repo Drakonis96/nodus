@@ -213,7 +213,7 @@ try {
   const progress = [];
   const deepReport = await retryOnce(() => genealogyDeep.generateGenealogyDeepResearchReport({
     objective: 'Reconstruir la vida documentada de Elena Ruiz Navarro, su parentesco probado y su red social con Emilio Salvatierra, separando hechos, hipotesis y ausencia de evidencia.',
-    language: 'es', targetLength: 'concise', sectionLimit: 3, model, focusPersonId: person('Elena Ruiz Navarro').personId,
+    language: 'es',sectionLimit: 3, model, focusPersonId: person('Elena Ruiz Navarro').personId,
   }, (event) => progress.push(event)));
   assert.ok(progress.some((event) => event.phase === 'planning') && progress.some((event) => event.phase === 'done'));
   assert.ok(deepReport.meta.sections >= 3);

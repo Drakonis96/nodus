@@ -159,7 +159,7 @@ test('a Deep Research report fits, and a row that does not says by how much', ()
   const check = (input, maxBytes) => validateMutation(input, { snapshot: payload, hasAsset, ...(maxBytes ? { maxBytes } : {}) });
 
   // The regression this whole change exists for. Fifteen pages at 450 words a page is what
-  // `targetPages(.exhaustive)` promises, and at 64 KiB it was refused every single time.
+  // complete evidence-rich reports can exceed 64 KiB and were refused every single time.
   const exhaustive = reportMutation(15 * 450);
   assert.ok(check(exhaustive).bytes > 64 * 1024, 'a real report is larger than the old ceiling');
   assert.equal(check(exhaustive).ok, true, 'and the feature the app ships must fit the limit it ships with');

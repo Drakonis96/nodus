@@ -2,7 +2,7 @@
 // electron/ipc/academic.ts. Typed as AcademicApi so the compiler, not a test,
 // guarantees the slice is complete.
 import { ipcRenderer } from 'electron';
-import type { QueueProgress, ReprocessProgress, EmbeddingPipelineProgress, PassageEmbeddingProgress, SemanticBridgeProgress, ChapterRelationsProgress } from '@shared/types';
+import type { QueueProgress, ReprocessProgress, EmbeddingPipelineProgress, PassageEmbeddingProgress, SemanticBridgeProgress, ChapterRelationsProgress, DocumentIndexProgress } from '@shared/types';
 import type { AcademicApi } from '@shared/api/academic';
 
 // The stream currently in flight for each cancellable channel, so the Stop
@@ -142,6 +142,20 @@ export const academicApi: AcademicApi = {
     const listener = (_e: unknown, p: QueueProgress) => cb(p);
     ipcRenderer.on('queue:progress', listener);
     return () => ipcRenderer.removeListener('queue:progress', listener);
+  },
+  getDocumentProfile: (nodusId) => ipcRenderer.invoke('documents:profile:get', nodusId),
+  saveDocumentProfileOverride: (input) => ipcRenderer.invoke('documents:profile:override:save', input),
+  deleteDocumentProfileOverride: (overrideId) => ipcRenderer.invoke('documents:profile:override:delete', overrideId).then(() => undefined),
+  getDocumentProfileStatuses: (nodusIds) => ipcRenderer.invoke('documents:profile:statuses', nodusIds),
+  getDocumentIndexProgress: () => ipcRenderer.invoke('documents:index:progress'),
+  startDocumentIndexCampaign: (options) => ipcRenderer.invoke('documents:index:startCampaign', options),
+  enqueueDocumentProfile: (nodusId) => ipcRenderer.invoke('documents:index:enqueue', nodusId).then(() => undefined),
+  setDocumentIndexCampaignStatus: (vaultId, campaignId, status) => ipcRenderer.invoke('documents:index:campaignStatus', vaultId, campaignId, status).then(() => undefined),
+  cancelDocumentIndexJob: (jobId) => ipcRenderer.invoke('documents:index:cancelJob', jobId).then(() => undefined),
+  onDocumentIndexProgress: (cb) => {
+    const listener = (_e: unknown, progress: DocumentIndexProgress) => cb(progress);
+    ipcRenderer.on('documents:index:progress', listener);
+    return () => ipcRenderer.removeListener('documents:index:progress', listener);
   },
 
   getGraph: (lens) => ipcRenderer.invoke('graph:get', lens),

@@ -44,6 +44,7 @@ await build({
 const {
   normalizeStudyDeepResearchAudience,
   normalizeUnitOutline,
+  assembleStudyDraftBody,
   resolveStudySections,
   studyDeepResearchPromptPack,
   STUDY_DEEP_RESEARCH_PROMPTS,
@@ -150,6 +151,19 @@ test('ids the model invented are dropped, and a section is never left uncitable'
   assert.deepEqual(withNone.sourceIds, ['S2'], 'an empty assignment falls back to its share of the corpus');
 });
 
+test('coverage questions omitted by the planner are assigned without changing the teacher outline', () => {
+  const questions = ['¿Cómo cambia el trabajo?', '¿Qué debate existe?'];
+  const sections = resolveStudySections({
+    ...base,
+    planned: [{ id: 'a', title: 'Trabajo', coverageQuestions: [questions[0]] }, { id: 'b', title: 'Debates' }],
+    outline: [{ title: 'El trabajo' }, { title: 'El debate' }],
+    coverageQuestions: questions,
+    count: 2,
+  });
+  assert.deepEqual(sections.map((section) => section.title), ['El trabajo', 'El debate']);
+  assert.deepEqual([...new Set(sections.flatMap((section) => section.coverageQuestions))].sort(), questions.sort());
+});
+
 test('every supported language has a complete teaching-unit prompt pack', () => {
   for (const [language, pack] of Object.entries(TEACHING_UNIT_PROMPTS)) {
     for (const field of ['plan', 'write', 'finalize', 'references', 'limitations']) {
@@ -182,4 +196,20 @@ test('the audience selects a native teacher plan or student notes in every langu
       `${language} student output uses the learner-facing notes contract`,
     );
   }
+});
+
+test('Study and Teaching can publish one continuous block without losing sources', () => {
+  const body = assembleStudyDraftBody({
+    written: ['## Primer movimiento\n\nExplicación con [Material](nodus://study-material/m1).', '## Segundo movimiento\n\nContraste final.'],
+    citedSourceTokens: ['[Material](nodus://study-material/m1)'],
+    limitations: ['El corpus es parcial.'],
+    referencesLabel: 'Fuentes',
+    limitationsLabel: 'Limitaciones',
+    structure: 'single',
+  });
+  assert.equal((body.match(/^#{1,6}\s+/gmu) ?? []).length, 0, 'all internal headings are flattened');
+  assert.match(body, /Explicación/iu, 'only the heading is removed, not the first movement prose');
+  assert.match(body, /Contraste final/iu, 'later evidence movements remain present');
+  assert.match(body, /nodus:\/\/study-material\/m1/u, 'the citable source survives');
+  assert.match(body, /\*\*Fuentes\*\*/u, 'technical references stay visible without becoming a section');
 });

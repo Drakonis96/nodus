@@ -67,8 +67,21 @@ export interface ChunkPlan {
   maxGapsPerChunk: number;
 }
 
-function sleep(ms: number): Promise<void> {
-  return ms > 0 ? new Promise((resolve) => setTimeout(resolve, ms)) : Promise.resolve();
+function abortableDelay(ms: number, signal?: AbortSignal): Promise<void> {
+  signal?.throwIfAborted();
+  if (ms <= 0) return Promise.resolve();
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(done, ms);
+    function done() {
+      signal?.removeEventListener('abort', aborted);
+      resolve();
+    }
+    function aborted() {
+      clearTimeout(timer);
+      reject(signal?.reason ?? new Error('AbortError'));
+    }
+    signal?.addEventListener('abort', aborted, { once: true });
+  });
 }
 
 function clampInt(value: number | undefined, fallback: number, min: number, max: number): number {
@@ -182,8 +195,9 @@ export function planRetrievalChunks(
  */
 export async function extractPdfStreaming(
   filePath: string,
-  opts: { ocr: OcrOptions; onProgress?: OnExtractProgress; analysis?: PdfAnalysis; perf?: PerfContext }
+  opts: { ocr: OcrOptions; onProgress?: OnExtractProgress; analysis?: PdfAnalysis; perf?: PerfContext; signal?: AbortSignal }
 ): Promise<ExtractedDoc> {
+  opts.signal?.throwIfAborted();
   const analysisDone = opts.analysis ? null : startPerf('PDF analysis', opts.perf, { file: path.basename(filePath) });
   const analysis = opts.analysis ?? (await analyzePdf(filePath));
   analysisDone?.({ strategy: analysis.strategy, pages: analysis.pageCount });
@@ -209,6 +223,10 @@ export async function extractPdfStreaming(
   const blanks: number[] = [];
 
   for (let p = 1; p <= total; p++) {
+    if (opts.signal?.aborted) {
+      await pdf.destroy?.();
+      opts.signal.throwIfAborted();
+    }
     opts.onProgress?.({ phase: 'extract', detail: `Extrayendo p. ${p}/${total}`, pct: p / total });
     const page = await pdf.getPage(p);
     const txt = await pageText(page);
@@ -225,8 +243,12 @@ export async function extractPdfStreaming(
     const ocrDone = startPerf('OCR', opts.perf, { pages: toOcr.length, languages: opts.ocr.languages });
     try {
       const map = await ocrPdfPages(pdf, toOcr, opts.ocr.languages, ({ page, totalPages }) =>
-        opts.onProgress?.({ phase: 'ocr', detail: `OCR p. ${page}/${totalPages}`, pct: page / totalPages })
+        {
+          opts.signal?.throwIfAborted();
+          opts.onProgress?.({ phase: 'ocr', detail: `OCR p. ${page}/${totalPages}`, pct: page / totalPages });
+        }
       );
+      opts.signal?.throwIfAborted();
       for (const [p, result] of map) {
         if (result.text && result.text.length >= MIN_CHARS_TEXT_PAGE) {
           pageTexts.set(p, result.text);
@@ -236,6 +258,10 @@ export async function extractPdfStreaming(
       skippedPages = blanks.length - ocredPages;
       ocrDone({ recoveredPages: ocredPages, skippedPages });
     } catch (e) {
+      if (opts.signal?.aborted) {
+        await pdf.destroy?.();
+        throw e;
+      }
       // OCR deps missing or failed — keep whatever digital text we have.
       skippedPages = blanks.length;
       ocrDone({ status: 'error', error: e instanceof Error ? e.message : String(e) });
@@ -418,8 +444,9 @@ export function extractEpub(filePath: string): string {
 
 export async function extractFromPath(
   filePath: string,
-  opts: { ocr?: OcrOptions; onProgress?: OnExtractProgress; perf?: PerfContext } = {}
+  opts: { ocr?: OcrOptions; onProgress?: OnExtractProgress; perf?: PerfContext; signal?: AbortSignal } = {}
 ): Promise<ExtractedDoc> {
+  opts.signal?.throwIfAborted();
   const ext = path.extname(filePath).toLowerCase();
   const ocr = opts.ocr ?? { enabled: false, languages: 'spa+eng', maxPages: 300 };
   const stat = fs.statSync(filePath);
@@ -435,7 +462,7 @@ export async function extractFromPath(
     const analysisDone = startPerf('PDF analysis', opts.perf, { file: path.basename(filePath) });
     const analysis = await analyzePdf(filePath);
     analysisDone({ strategy: analysis.strategy, pages: analysis.pageCount });
-    doc = await extractPdfStreaming(filePath, { ocr, onProgress: opts.onProgress, analysis, perf: opts.perf });
+    doc = await extractPdfStreaming(filePath, { ocr, onProgress: opts.onProgress, analysis, perf: opts.perf, signal: opts.signal });
   } else if (ext === '.docx') {
     const done = startPerf('document extraction', opts.perf, { file: path.basename(filePath), type: 'docx' });
     doc = { text: await extractDocx(filePath), sourceType: 'upload', notes: null };
@@ -466,6 +493,7 @@ export async function extractFromPath(
     throw new Error(`Tipo de archivo no soportado: ${ext}`);
   }
 
+  opts.signal?.throwIfAborted();
   upsertExtractionCache(cacheKey, doc);
   perfLog('extraction cache write', 0, opts.perf, { file: path.basename(filePath), chars: doc.text.length });
   return doc;
@@ -518,6 +546,7 @@ export interface ResolveOptions {
   ocr: OcrOptions;
   onProgress?: OnExtractProgress;
   perf?: PerfContext;
+  signal?: AbortSignal;
 }
 
 export interface TextAvailabilityProbe {
@@ -593,6 +622,7 @@ async function readTextAttachments(
     const fulltextDone = startPerf('Zotero fulltext', opts.perf, { attachments: textAttachments.length });
     let checked = 0;
     for (const att of textAttachments) {
+      opts.signal?.throwIfAborted();
       checked++;
       opts.onProgress?.({ phase: 'fulltext', detail: 'Comprobando índice de Zotero…', pct: null });
       const ft = await getFulltext(userId, att.key).catch(() => null);
@@ -618,11 +648,12 @@ async function readTextAttachments(
   // (2) Parse the PDF/text file from the storage folder ourselves.
   const docs: ExtractedDoc[] = [];
   for (const att of textAttachments) {
+    opts.signal?.throwIfAborted();
     if (!att.filename || !effectiveStorage) continue;
     const filePath = path.join(effectiveStorage, att.key, att.filename);
     if (!fs.existsSync(filePath)) continue;
     try {
-      docs.push(await extractFromPath(filePath, { ocr: opts.ocr, onProgress: opts.onProgress, perf: opts.perf }));
+      docs.push(await extractFromPath(filePath, { ocr: opts.ocr, onProgress: opts.onProgress, perf: opts.perf, signal: opts.signal }));
     } catch (e) {
       console.error(`[resolveWorkText] Error extracting from ${filePath}:`, e);
       /* skip unreadable attachment */
@@ -657,6 +688,7 @@ export async function resolveWorkText(
   opts: ResolveOptions,
   itemType?: string | null
 ): Promise<ExtractedDoc> {
+  opts.signal?.throwIfAborted();
   // A work linked from the transverse Library has a curated Markdown copy. It is
   // the canonical analysis source: deterministic, OCR-clean and independent of
   // whether Zotero is running or its attachment index has settled yet.
@@ -685,7 +717,8 @@ export async function resolveWorkText(
   let hadTextAttachment = false;
   let scanNote: string | null = null;
   for (let attempt = 0; attempt < ATTACHMENT_READ_ATTEMPTS; attempt++) {
-    if (attempt > 0) await sleep(ATTACHMENT_RETRY_DELAYS_MS[attempt] ?? 1500);
+    opts.signal?.throwIfAborted();
+    if (attempt > 0) await abortableDelay(ATTACHMENT_RETRY_DELAYS_MS[attempt] ?? 1500, opts.signal);
     let textAttachments: ZoteroAttachment[] = [];
     const metadataDone = startPerf('Zotero attachment metadata', opts.perf, { zoteroKey, attempt });
     try {
@@ -712,7 +745,8 @@ export async function resolveWorkText(
   if (doi && opts.unpaywallEmail) {
     opts.onProgress?.({ phase: 'download', detail: 'Buscando texto abierto (Unpaywall)…', pct: null });
     const unpaywallDone = startPerf('Unpaywall', opts.perf, { doi });
-    const oa = await tryUnpaywall(doi, opts.unpaywallEmail, opts.ocr, opts.onProgress, opts.perf).catch((e) => {
+    const oa = await tryUnpaywall(doi, opts.unpaywallEmail, opts.ocr, opts.onProgress, opts.perf, opts.signal).catch((e) => {
+      if (opts.signal?.aborted) throw e;
       unpaywallDone({ status: 'error', error: e instanceof Error ? e.message : String(e) });
       return null;
     });
@@ -734,20 +768,22 @@ async function tryUnpaywall(
   email: string,
   ocr: OcrOptions,
   onProgress?: OnExtractProgress,
-  perf?: PerfContext
+  perf?: PerfContext,
+  signal?: AbortSignal,
 ): Promise<ExtractedDoc | null> {
-  const res = await fetch(`https://api.unpaywall.org/v2/${encodeURIComponent(doi)}?email=${encodeURIComponent(email)}`);
+  signal?.throwIfAborted();
+  const res = await fetch(`https://api.unpaywall.org/v2/${encodeURIComponent(doi)}?email=${encodeURIComponent(email)}`, { signal });
   if (!res.ok) return null;
   const data = (await res.json()) as any;
   const url = data?.best_oa_location?.url_for_pdf;
   if (!url) return null;
-  const pdfRes = await fetch(url);
+  const pdfRes = await fetch(url, { signal });
   if (!pdfRes.ok) return null;
   const buf = Buffer.from(await pdfRes.arrayBuffer());
   const tmp = path.join(os.tmpdir(), `nodus-${Date.now()}.pdf`);
   fs.writeFileSync(tmp, buf);
   try {
-    const doc = await extractPdfStreaming(tmp, { ocr, onProgress, perf });
+    const doc = await extractPdfStreaming(tmp, { ocr, onProgress, perf, signal });
     return { ...doc, notes: `Texto recuperado vía Unpaywall.${doc.notes ? ' ' + doc.notes : ''}` };
   } finally {
     fs.unlinkSync(tmp);

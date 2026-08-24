@@ -55,8 +55,6 @@ try {
       sections: report.meta.sections,
       bodyWords: report.meta.words,
       bodyPages: report.meta.pages,
-      targetPages: `${report.meta.targetPages.min}–${report.meta.targetPages.max}`,
-      insideTarget: report.meta.pages >= report.meta.targetPages.min && report.meta.pages <= report.meta.targetPages.max,
       readerWords: words,
       headings: [...body.matchAll(HEADING)].map((m) => m[1]),
       citationsTotal: total,
@@ -82,8 +80,7 @@ try {
   const rows = [
     ['secciones', before.sections, after.sections],
     ['palabras del cuerpo', before.bodyWords, after.bodyWords],
-    ['páginas del cuerpo', `${before.bodyPages} (objetivo ${before.targetPages})`, `${after.bodyPages} (objetivo ${after.targetPages})`],
-    ['dentro del objetivo', before.insideTarget, after.insideTarget],
+    ['páginas observadas del cuerpo', before.bodyPages, after.bodyPages],
     ['citas totales', before.citationsTotal, after.citationsTotal],
     ['palabras por cita', before.wordsPerCitation, after.wordsPerCitation],
     ['ideas declaradas cubiertas', before.ideasClaimed, after.ideasClaimed],

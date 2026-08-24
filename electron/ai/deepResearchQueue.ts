@@ -8,6 +8,7 @@ import type {
   PromptLanguage,
 } from '@shared/types';
 import { normalizeDeepResearchApproach } from '@shared/deepResearchApproaches';
+import { normalizeDeepResearchMetadataVersion, parseDeepResearchRequestVersion } from '@shared/deepResearchVersions';
 
 export type { DeepResearchJobOrigin, DeepResearchJobRecord, DeepResearchJobStatus };
 
@@ -263,6 +264,7 @@ function vaultChangedMessage(job: QueuedJob, current: DeepResearchQueueVault): s
 
 function enqueueJob(input: DeepResearchJobInput, waiter: Pick<QueuedJob, 'listener' | 'resolve' | 'reject'>): QueuedJob {
   const vault = requireDeps().activeVault();
+  const deepResearchVersion = parseDeepResearchRequestVersion(input.request.deepResearchVersion);
   const job: QueuedJob = {
     record: {
       id: `drj-${Date.now()}-${++sequence}`,
@@ -272,6 +274,8 @@ function enqueueJob(input: DeepResearchJobInput, waiter: Pick<QueuedJob, 'listen
       objective: input.request.objective,
       title: objectivePreview(input.request.objective),
       deepResearchApproach: normalizeDeepResearchApproach(input.request.approach),
+      deepResearchVersion,
+      structure: input.request.sectionLimit === 'single' ? 'single' : 'sectioned',
       model: input.request.model ? { ...input.request.model } : null,
       status: 'queued',
       progress: null,
@@ -286,6 +290,7 @@ function enqueueJob(input: DeepResearchJobInput, waiter: Pick<QueuedJob, 'listen
     request: {
       ...input.request,
       approach: normalizeDeepResearchApproach(input.request.approach),
+      deepResearchVersion,
       model: input.request.model ? { ...input.request.model } : input.request.model,
     },
     save: input.save,
@@ -385,6 +390,9 @@ async function drain(): Promise<void> {
         notifyChange();
       });
       job.record.deepResearchApproach = normalizeDeepResearchApproach(report.draft.deepResearchApproach ?? job.request.approach);
+      job.record.deepResearchVersion = normalizeDeepResearchMetadataVersion(
+        report.draft.deepResearchVersion ?? report.meta?.deepResearchVersion ?? job.request.deepResearchVersion,
+      );
       job.record.model = report.draft.generationModel ? { ...report.draft.generationModel } : job.record.model ?? null;
 
       // Checked again on the way out: a switch mid-generation would otherwise save

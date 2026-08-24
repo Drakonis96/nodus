@@ -877,7 +877,7 @@ export interface LibraryStatus {
   lastRebuiltAt: string | null;
 }
 
-export type LibraryAnalysisReuseComponent = 'light' | 'deep' | 'summary' | 'ideas' | 'passages' | 'embeddings';
+export type LibraryAnalysisReuseComponent = 'light' | 'deep' | 'summary' | 'ideas' | 'passages' | 'embeddings' | 'documentProfile';
 export type LibraryAnalysisReuseState = 'current' | 'reused' | 'pending' | 'incompatible' | 'unavailable' | 'canceled';
 
 export interface LibraryAnalysisReuseStatus {

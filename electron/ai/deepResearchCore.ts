@@ -10,7 +10,6 @@ import type {
   DeepResearchProgress,
   DeepResearchReport,
   DeepResearchRequest,
-  DeepResearchTargetLength,
   PromptLanguage,
   WritingWorkshopBrief,
   WritingWorkshopDraft,
@@ -20,71 +19,69 @@ import type {
   WritingWorkshopSnapshot,
   SupportAuditEntry,
 } from '@shared/types';
+import {
+  assessDeepResearchReport,
+  assessDeepResearchSection,
+  qualityPasses,
+  shouldAcceptEditorialRevision,
+  shouldAcceptEvidenceRepair,
+  shouldAcceptQualityRevision,
+  type DeepResearchQualitySource,
+  type DeepResearchSectionQuality,
+} from '@shared/deepResearchQuality';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Pure orchestration core for Deep Research. This module has NO Electron / DB /
 // AI-provider imports (only erased type imports), so the whole control flow —
-// planning, coverage top-up, budget caps, citation policy, assembly — can be
+// planning, coverage, citation policy and assembly — can be
 // unit-tested with injected fakes. The AI/DB wiring lives in ./deepResearch.ts.
 //
-// Every long-running loop below is bounded so a slow or misbehaving model can
-// never produce an unbounded report, spend, or hang.
+// Provider calls remain technically bounded, but editorial completeness is driven
+// by evidence and coverage rather than a word/page target.
 // ─────────────────────────────────────────────────────────────────────────────
 
-/** Rough academic density used to translate word counts into a page estimate. */
-export const WORDS_PER_PAGE = 450;
-const MIN_TARGET_PAGES = 5;
-const MAX_TARGET_PAGES = 20;
-/**
- * How many words a section actually holds, used to decide how many sections a page
- * target needs.
- *
- * This was 1400, chosen as an aspiration: few long sections, depth over
- * fragmentation. Measured against real reports the aspiration never happened — a
- * section asked for 1575 words came back with ~1040, and it stayed at ~1040 even
- * after the expansion pass rewrote it (10 of 12 sections were expanded and 11 of 12
- * still finished under target). Every report therefore landed at the floor of its
- * page range. Sizing the plan to what a section really delivers is what puts a
- * report in the middle of its range instead: the sections are the same length as
- * before, there are simply enough of them to reach the target.
- */
-const SECTION_TARGET_WORDS = 1100;
+/** Descriptive conversion used only in progress/result metadata, never planning. */
+const OBSERVED_WORDS_PER_PAGE = 450;
 /** Never fewer than this many sections (intro · body · synthesis at the very least). */
 export const MIN_SECTIONS = 3;
-/** Absolute safety ceiling on total sections (planned + coverage top-ups) — stops runaway loops. */
-export const MAX_SECTIONS = 14;
-/** The heuristic never *targets* more than this many sections before the +1 grace. */
-const MAX_PLAN_SECTIONS = 7;
-/** A numeric user cap is allowed to be exceeded by at most this many sections. */
-const SECTION_GRACE = 1;
-/** Coverage top-up may add at most this many extra sections beyond the plan. */
-const MAX_TOPUP_SECTIONS = 2;
-/** Per-section word budget is clamped to this window (min, max). Upper end allows deep sections. */
-const SECTION_WORDS_RANGE = { min: 800, max: 1800 } as const;
 /** Trim the material pool handed to the planner so the prompt stays within limits. */
-export const POOL_LIMITS = { ideas: 70, themes: 20, gaps: 20, contradictions: 16, works: 40, passages: 20 } as const;
+export const POOL_LIMITS = { ideas: 70, themes: 20, gaps: 20, contradictions: 16, works: 40, passages: 32 } as const;
 const MAX_MATRIX_ROWS = 80;
 /**
  * A section can only develop so much material in one pass. Beyond this the citation
  * menu turns into a catalogue the writer skims instead of an argument it builds, so
  * surplus ideas are left for the coverage top-up rather than dumped into a section.
  */
-const MAX_SECTION_IDEAS = 18;
+export const MAX_SECTION_IDEAS = 18;
+/** Maximum number of atomic requirements preserved from a complex research brief.
+ * Ten clipped real objectives that separately named institutions, operations,
+ * chronology and historiographical tests. Sixteen keeps those requirements intact
+ * while still bounding every downstream prompt and retrieval loop. */
+export const MAX_COVERAGE_QUESTIONS = 16;
 /** How much of an idea's statement reaches the writer. */
 const IDEA_NOTE_CHARS = 240;
 /** How much of a literal passage reaches the writer. Never truncate below usefulness. */
 const PASSAGE_NOTE_CHARS = 480;
 /** Extra material a per-section retrieval may add on top of what the planner assigned. */
-const SECTION_RETRIEVAL_LIMITS = { ideas: 6, passages: 4 } as const;
+export const SECTION_RETRIEVAL_LIMITS = { ideas: 6, passages: 6 } as const;
+/** One focused retry is allowed when the epistemic audit cannot answer an atomic
+ * requirement. It asks only for the missing questions and a wider passage window. */
+const MAX_COVERAGE_RECOVERY_PASSES = 1;
+export const COVERAGE_RECOVERY_RETRIEVAL_LIMITS = { ideas: 2, passages: 12 } as const;
 /** How many flagged claims the audit lists. Enough to spot-check, not a second report. */
 const MAX_SUPPORT_AUDIT = 40;
-/** Below this share of its word target a section gets one expansion pass. */
-const MIN_SECTION_FILL = 0.78;
 
 /** Shared prose contract for every Deep Research writer, including genealogy and
  * MCP-client mode. These are writing constraints, not a locale-specific UI copy. */
 export const DEEP_RESEARCH_NARRATIVE_RULES = [
   'Prioriza una narración argumental continua, bien hilada y razonada. Cada párrafo debe avanzar desde el anterior mediante transiciones naturales.',
+  'Cada párrafo debe cumplir una función inferencial nueva. No repitas la tesis central, una conclusión o la misma cautela metodológica en varias secciones con palabras distintas.',
+  'Integra cada cita inmediatamente después de la cláusula concreta que sostiene. Evita racimos mecánicos de referencias al final del párrafo; si varias fuentes aportan cosas distintas, atribuye y explica cada aportación en la frase correspondiente.',
+  'Distingue con precisión cuatro niveles: dato documentado, interpretación de un autor, inferencia construida por el informe y cuestión que el corpus no permite resolver. No presentes una inferencia causal o una metáfora de control como hecho probado.',
+  'Antes de afirmar un mecanismo, una causalidad, un efecto o una recepción, comprueba que la evidencia sostiene esa relación específica, además del tema, actor, escala y periodo. Una intención no demuestra un efecto y una audiencia prevista no demuestra recepción.',
+  'Cuando exista desacuerdo, desarrolla el debate completo: qué sostiene cada posición, en qué evidencia o escala descansa, por qué divergen y qué dato permitiría decidir entre ellas. No basta con anunciar que hay debate o contradicción.',
+  'No declares consenso, convergencia, divergencia ni contradicción con evidencia de un solo lado. Identifica y cita cada posición por separado; si falta una, presenta el hueco como límite probatorio.',
+  'Si el encargo pide un debate historiográfico, atribuye cada posición a los autores u obras que figuren en el menú de evidencias y contrasta sus corpus, periodizaciones o escalas. Si el material no identifica posiciones nominales suficientes, decláralo como límite en vez de inventar una escuela o un consenso.',
   'Usa pocos epígrafes amplios. Dentro de cada sección no añadas subtítulos, microsecciones, rótulos temáticos ni encabezados adicionales.',
   'No conviertas cada idea, fuente, autor, periodo o matiz en una sección independiente. Intégralos dentro de una misma línea argumental cuando formen parte del mismo movimiento del razonamiento.',
   'Evita los dos puntos, el punto y coma y el guion largo. Úsalos únicamente cuando sean estrictamente necesarios, por ejemplo dentro de una cita literal o una referencia que deba conservarse.',
@@ -102,6 +99,19 @@ export interface DeepResearchPlanSection {
   gapIds: string[];
   contradictionIds: string[];
   passageIds: string[];
+  /** Exact subquestions from the user's brief that this section must answer. */
+  coverageQuestions?: string[];
+  /** Evidence-bounded answers produced after section retrieval. Questions remain
+   * the coverage contract; these propositions are what the writer may assert. */
+  coverageClaims?: string[];
+  /** Retrieval candidates kept separate per atomic question until the claim audit.
+   * This prevents round-robin fusion from evicting a rare answer before the
+   * epistemic model has inspected that question's own recall window. */
+  retrievalEvidencePacks?: Array<{
+    question: string;
+    passageIds: string[];
+    candidates?: AtomicPassageRetrieval[];
+  }>;
   /** Where the section sits in the report's architecture. */
   role?: 'intro' | 'body' | 'synthesis';
   /** Ids of the sections whose ground this one presupposes. The planner states the
@@ -118,20 +128,56 @@ export interface DeepResearchPlan {
 
 export interface PlanInput {
   objective: string;
+  /**
+   * Kept for backwards-compatible planners. In the production academic pipeline
+   * this is empty while the argument is designed; coverage is audited afterwards.
+   */
+  coverageQuestions: string[];
   language: PromptLanguage;
   audience?: string;
   /** Soft target number of sections the planner should aim for. */
   sectionCount: number;
-  /** Hard ceiling the planner must not exceed (already includes the +1 grace). */
-  sectionHardCap: number;
   /** Whether the user pinned a section cap ('user') or left it to the model ('auto'). */
   sectionMode: 'auto' | 'user';
-  targetPages: { min: number; max: number };
   ideas: { id: string; label: string; type: string; statement: string; works: string }[];
   themes: { id: string; label: string; summary: string }[];
   gaps: { id: string; label: string; summary: string }[];
   contradictions: { id: string; label: string; summary: string }[];
   works: { id: string; label: string; summary: string }[];
+  passages: { id: string; workId: string; source: string; page: string | null; extract: string }[];
+  /** Explicit graph edges among the retrieved ideas. Document profiles never
+   * contribute to this list. */
+  relationships?: Array<{ from: string; relation: string; to: string; confidence: number }>;
+}
+
+export interface PlanEvidencePreparationInput {
+  objective: string;
+  language: PromptLanguage;
+  coverageQuestions: string[];
+  /** A defensive copy of the already-normalized argument. Implementations may use
+   * it to choose documents, but cannot mutate the plan the writer will execute. */
+  plan: DeepResearchPlan;
+  /** Work ids ordered by their participation in the plan's ideas, then by the
+   * original graph-first ranking. */
+  candidateWorkIds: string[];
+}
+
+export interface PlanEvidencePreparationResult {
+  considered: number;
+  requested: number;
+  prepared: number;
+  unavailable: number;
+  failed: number;
+}
+
+export interface PlanCoverageAuditInput {
+  objective: string;
+  language: PromptLanguage;
+  coverageQuestions: string[];
+  plan: DeepResearchPlan;
+  ideas: PlanInput['ideas'];
+  gaps: PlanInput['gaps'];
+  contradictions: PlanInput['contradictions'];
 }
 
 /**
@@ -146,6 +192,18 @@ export interface CitationMenuItem {
   kind: 'idea' | 'work' | 'gap' | 'contradiction' | 'passage';
   /** Author/year the token resolves to, so the writer can attribute in prose. */
   source?: string;
+  /** Explains why a question-level retrieval included this candidate. Raw scores
+   * from heterogeneous lanes are diagnostic only and are never added together. */
+  retrieval?: Omit<AtomicPassageRetrieval, 'passageId'>;
+}
+
+export interface AtomicPassageRetrieval {
+  passageId: string;
+  query: string;
+  rank: number;
+  lanes: Array<'global' | 'lexical' | 'support' | 'document'>;
+  score: number;
+  reason: string;
 }
 
 export interface SectionInput {
@@ -153,13 +211,103 @@ export interface SectionInput {
   language: PromptLanguage;
   audience?: string;
   section: DeepResearchPlanSection;
-  targetWords: number;
   isConclusion: boolean;
   citationMenu: CitationMenuItem[];
+  /** Question-scoped view of the wide passage pool. The general menu remains the
+   * complete trust boundary, while these packs prevent cross-question evidence
+   * leakage during the epistemic audit. */
+  atomicEvidencePacks?: Array<{ question: string; candidates: CitationMenuItem[] }>;
   priorSummary: string;
   /** Claims already developed earlier, verbatim, so the writer can build on them
    * instead of restating them. Derived from what was really cited, not from the plan. */
   alreadyDeveloped: string[];
+  /** Responsibilities owned by sibling sections. The writer may refer back to
+   * them, but must not develop them again in this section. */
+  reservedForOtherSections?: Array<{ title: string; responsibilities: string[] }>;
+  /** Optional claim-to-evidence scaffold produced before prose. It forces the
+   * writer to decide what each paragraph proves, with which exact sources and
+   * caveats, instead of discovering an argument while generating sentences. */
+  evidencePlan?: SectionEvidencePlan;
+  /** Evidence-bounded status of the plan's propositions after section-specific
+   * idea/passage retrieval. Plan claims are hypotheses until this audit runs. */
+  claimAudit?: SectionClaimAudit;
+}
+
+export type DeepResearchProofRole = 'fact' | 'actor_time' | 'mechanism' | 'causality' | 'comparison_side' | 'agreement' | 'contradiction' | 'effect' | 'reception' | 'limit' | 'method';
+
+export interface SectionClaimAuditItem {
+  original: string;
+  status: 'supported' | 'partial' | 'unsupported';
+  /** The strongest formulation the cited menu can actually sustain. Unsupported
+   * propositions become an explicit open question or evidentiary limit. */
+  revised: string;
+  evidenceTokens: string[];
+  reason: string;
+  /** Small question-level evidence pack selected after the wider recovery window.
+   * `direct` must entail part of the answer; `context` may delimit it but never
+   * upgrades a claim by itself. Rejected candidates remain visible to metrics but
+   * are removed from the writer's menu. */
+  evidencePack?: Array<{
+    token: string;
+    role: 'direct' | 'context' | 'irrelevant';
+    reason: string;
+  }>;
+  /** Atomic entailment checklist. A compound claim cannot be `supported` while
+   * any one of its required components remains unproved. */
+  requirements?: Array<{
+    text: string;
+    /** What this atomic unit has to prove. A thematic match can never satisfy a
+     * causal, reception or bilateral-relation role by itself. */
+    proofRole?: DeepResearchProofRole;
+    supported: boolean;
+    evidenceTokens: string[];
+  }>;
+}
+
+export interface SectionClaimAudit {
+  items: SectionClaimAuditItem[];
+}
+
+export interface SectionEvidencePlan {
+  thesis: string;
+  objectiveLinks: string[];
+  exclusions: string[];
+  paragraphs: Array<{
+    function: string;
+    proofRole?: DeepResearchProofRole;
+    claim: string;
+    evidenceTokens: string[];
+    relationship: string;
+    /** Auditable sides of a synthesis. Empty for a single-source factual unit.
+     * Agreement and contradiction require both sides to be directly evidenced. */
+    relationshipSides?: Array<{ label: string; claim: string; evidenceTokens: string[] }>;
+    caveat: string;
+    transition: string;
+  }>;
+}
+
+export interface SectionRevisionInput extends SectionInput {
+  draft: string;
+  quality: DeepResearchSectionQuality;
+  /** Sentences whose original citations were partial or unsupported. The editor
+   * must narrow, remove or re-ground them before the replacement is re-verified. */
+  verificationConcerns?: string[];
+  /** Cross-section diagnosis from the final report editor. */
+  editorialDirective?: ReportEditorialDirective;
+}
+
+export interface ReportEditorialDirective {
+  sectionTitle: string;
+  diagnosis: string;
+  remove: string[];
+  deepen: string[];
+  cautions: string[];
+  transition: string;
+}
+
+export interface ReportEditorialReview {
+  overall: string;
+  directives: ReportEditorialDirective[];
 }
 
 /**
@@ -171,6 +319,9 @@ export interface SectionInput {
 export interface CitationClaim {
   /** Position in the section markdown, used to apply the verdict back. */
   offset: number;
+  /** Bounds of the complete sentence in the section markdown. */
+  sentenceOffset: number;
+  sentenceEnd: number;
   /** The full citation link as it appears, so it can be removed verbatim. */
   link: string;
   kind: 'idea' | 'passage' | 'gap' | 'contradiction';
@@ -189,10 +340,22 @@ export interface SectionRetrievalInput {
   sectionTitle: string;
   purpose: string;
   keyClaims: string[];
+  coverageQuestions?: string[];
   /** Already on the section's desk; the retriever should return something else. */
   excludeIdeaIds: string[];
   excludePassageIds: string[];
   limits: { ideas: number; passages: number };
+}
+
+export interface SectionRetrievalResult {
+  ideas?: WritingWorkshopIdeaCandidate[];
+  passages?: WritingWorkshopSnapshot['passages'];
+  /** Ranked independently for every atomic question, before global deduplication. */
+  evidencePacks?: Array<{
+    question: string;
+    passageIds: string[];
+    candidates?: AtomicPassageRetrieval[];
+  }>;
 }
 
 export interface FinalizeInput {
@@ -203,6 +366,12 @@ export interface FinalizeInput {
   ideasCovered: number;
   ideasConsidered: number;
   uncoveredSamples: string[];
+  /** Verified prose, clipped per section. The finalizer summarizes what the report
+   * actually established rather than guessing from headings and idea counts. */
+  sectionFindings?: Array<{ title: string; text: string }>;
+  /** Remaining partial/removed support findings that the abstract and limitations
+   * must not silently turn back into confident conclusions. */
+  supportConcerns?: string[];
 }
 
 export interface FinalizeResult {
@@ -221,6 +390,18 @@ export interface DeepResearchDeps {
   planReport(input: PlanInput): Promise<DeepResearchPlan>;
   writeSection(input: SectionInput): Promise<string>;
   finalize(input: FinalizeInput): Promise<FinalizeResult>;
+  /** Final entailment guard for title/abstract. It may narrow the summary after
+   * seeing verified section findings, but cannot remove recorded limitations. */
+  auditFinalSummary?(input: FinalizeInput, draft: FinalizeResult): Promise<FinalizeResult>;
+  /** Decomposes explicit requirements after graph retrieval but before planning.
+   * They constrain scope without replacing ideas/relationships as the argument. */
+  decomposeObjective?(objective: string, language: PromptLanguage): Promise<string[]>;
+  /** Post-plan diagnostic. It may add graph assignments and coverage ownership;
+   * the core preserves every historical proposition and the complete architecture. */
+  auditPlanCoverage?(input: PlanCoverageAuditInput): Promise<DeepResearchPlan>;
+  /** Builds any missing whole-document profiles only after planning. Its result is
+   * observational; section retrieval is the only route by which evidence is added. */
+  preparePlanEvidence?(input: PlanEvidencePreparationInput): Promise<PlanEvidencePreparationResult>;
   /**
    * Optional second retrieval pass, run once per section with that section's own
    * focus as the query. The initial snapshot is ranked against the whole objective,
@@ -228,17 +409,30 @@ export interface DeepResearchDeps {
    * corpus about it — least of all for literal passages, which the snapshot caps
    * hard. Omitted (undefined) keeps the single-shot behaviour.
    */
-  retrieveForSection?(input: SectionRetrievalInput): Promise<{
-    ideas?: WritingWorkshopIdeaCandidate[];
-    passages?: WritingWorkshopSnapshot['passages'];
-  }>;
+  retrieveForSection?(input: SectionRetrievalInput): Promise<SectionRetrievalResult>;
+  /** Evidence-bounds each planned proposition after the section has retrieved its
+   * literal passages. This is the trust boundary between planning and prose. */
+  auditSectionClaims?(input: SectionInput): Promise<SectionClaimAudit>;
+  /** Optional pre-writing claim/evidence architecture. This is deliberately a
+   * separate bounded call: planning evidence before prose substantially reduces
+   * decorative citations, overclaiming and paragraph-by-paragraph drift. */
+  planSectionEvidence?(input: SectionInput): Promise<SectionEvidencePlan>;
   /**
-   * Optional single expansion of a section that came back far shorter than asked.
-   * Writers systematically under-deliver against a word target (measured at ~60% of
-   * it), and the engine used to accept whatever arrived, so reports landed at the
-   * floor of their page range. Omitted keeps the single-pass behaviour.
+   * One bounded professional-editing pass for a section that fails the shared
+   * grounding/diversity/synthesis gates. The orchestrator accepts the rewrite only
+   * when deterministic metrics improve and every citation remains in the menu.
    */
-  expandSection?(input: SectionInput & { draft: string; missingWords: number }): Promise<string>;
+  reviseSection?(input: SectionRevisionInput): Promise<string>;
+  /** Two-order blind comparison for an evidence-safe final line edit. The core
+   * never trusts this judgement alone: deterministic grounding and coverage
+   * invariants must pass first. */
+  judgeSectionRevision?(input: SectionInput, original: string, revised: string): Promise<boolean>;
+  /** One report-wide diagnosis before the last bounded edit. It cannot add source
+   * material; it only tells each section what to remove, deepen or connect. */
+  reviewReport?(input: {
+    objective: string;
+    sections: Array<{ title: string; purpose: string; responsibilities: string[]; markdown: string }>;
+  }): Promise<ReportEditorialReview>;
   /**
    * Optional entailment check over the finished prose. The citation policy proves a
    * source exists and is really in the corpus; only this proves the source supports
@@ -311,6 +505,7 @@ export async function orchestrateDeepResearch(
   emit({ phase: 'snapshot', message: L.gathering });
   const brief: WritingWorkshopBrief = {
     kind: 'deep_research',
+    deepResearchVersion: request.deepResearchVersion,
     objective: request.objective,
     audience: request.audience,
     tone: 'academic',
@@ -319,19 +514,83 @@ export async function orchestrateDeepResearch(
   const snapshot = await deps.buildSnapshot(brief);
   const maps = buildSnapshotMaps(snapshot);
 
-  const targetPages = resolveTargetPages(request.targetLength ?? 'adaptive', snapshot);
-  const sectionPlan = resolveSectionPlan(targetPages, request.sectionLimit ?? 'auto');
+  let coverageQuestions = (request.coverageQuestions ?? [])
+    .map((question) => question.trim())
+    .filter(Boolean)
+    .slice(0, MAX_COVERAGE_QUESTIONS);
+  if (!coverageQuestions.length && deps.decomposeObjective) {
+    try {
+      coverageQuestions = (await deps.decomposeObjective(request.objective, language))
+        .map((question) => question.trim())
+        .filter(Boolean)
+        .slice(0, MAX_COVERAGE_QUESTIONS);
+    } catch {
+      /* The original objective remains the complete coverage contract. */
+    }
+  }
+  const sectionPlan = resolveSectionPlan(snapshot, request.sectionLimit ?? 'auto', request.objective, coverageQuestions);
   const sectionCount = sectionPlan.target;
-  const sectionHardCap = sectionPlan.hardCap;
 
-  emit({ phase: 'planning', message: L.planning(sectionCount, targetPages) });
-  const plan = await planWithFallback(deps, request, language, snapshot, sectionPlan, targetPages);
+  emit({ phase: 'planning', message: L.planning(sectionCount) });
+  // Ideas and their relationships still choose the thesis and progression. Atomic
+  // questions enter the same planning pass only as a coverage contract: hiding them
+  // until after the architecture was frozen caused plans to omit the most concrete
+  // institutional mechanisms even when the objective named them explicitly.
+  const effectiveRequest: DeepResearchRequest = { ...request, coverageQuestions };
+  const plan = await planWithFallback(deps, effectiveRequest, language, snapshot, sectionPlan);
 
-  // Budget is measured over the BODY sections only. The abstract, limitations and
-  // the final bibliography are assembled separately and never consume this budget,
-  // so references at the end never eat into the page/word target.
-  const maxWords = targetPages.max * WORDS_PER_PAGE;
-  const minWords = targetPages.min * WORDS_PER_PAGE;
+  // A bounded diagnostic pass can add graph assignments and one primary owner per
+  // question, but the reconciliation guard preserves every historical proposition.
+  assignMissingCoverageQuestions(plan.sections, coverageQuestions);
+  if (coverageQuestions.length && deps.auditPlanCoverage) {
+    try {
+      const planningPool = buildPlanInput(effectiveRequest, language, snapshot, sectionPlan);
+      const audited = await deps.auditPlanCoverage({
+        objective: request.objective,
+        language,
+        coverageQuestions,
+        plan: clonePlan(plan),
+        ideas: planningPool.ideas,
+        gaps: planningPool.gaps,
+        contradictions: planningPool.contradictions,
+      });
+      reconcileCoverageAudit(plan, audited, snapshot, coverageQuestions);
+    } catch {
+      /* The graph-first plan remains valid without the diagnostic pass. */
+    }
+  }
+  enforcePlanObjectiveExclusions(plan, snapshot, request.objective);
+  assignMissingCoverageQuestions(plan.sections, coverageQuestions);
+
+  let documentPreparation: PlanEvidencePreparationResult | null = null;
+  if (deps.preparePlanEvidence) {
+    const candidates = plannedCandidateWorkIds(plan, snapshot);
+    emit({
+      phase: 'document_preparation',
+      message: `Preparando evidencia documental para ${Math.min(candidates.length, 8)} obras elegidas por el argumento…`,
+    });
+    try {
+      documentPreparation = await deps.preparePlanEvidence({
+        objective: request.objective,
+        language,
+        coverageQuestions,
+        plan: clonePlan(plan),
+        candidateWorkIds: candidates,
+      });
+      emit({
+        phase: 'document_preparation',
+        message: documentPreparation.requested
+          ? `${documentPreparation.prepared} fichas documentales listas para reforzar lagunas concretas del plan.`
+          : 'El plan ya dispone de la evidencia documental disponible; se mantiene su arquitectura argumental.',
+      });
+    } catch {
+      documentPreparation = null;
+      emit({
+        phase: 'document_preparation',
+        message: 'La preparación documental no estaba disponible; el informe continúa con el grafo de ideas.',
+      });
+    }
+  }
 
   const written: { section: DeepResearchPlanSection; markdown: string }[] = [];
   /** Ideas the prose really cites. */
@@ -347,31 +606,36 @@ export async function orchestrateDeepResearch(
   };
   let totalWords = 0;
   let stoppedReason: string | null = null;
-  const verification = { checked: 0, partial: 0, unsupported: 0 };
+  const verification = { checked: 0, partial: 0, unsupported: 0, unverified: 0 };
   const supportAudit: SupportAuditEntry[] = [];
-  let expansions = 0;
-  const sectionFill: { words: number; target: number }[] = [];
+  let qualityRevisions = 0;
+  let generationComparisons = 0;
+  let plannedSectionsSelected = 0;
+  let baselineSectionsSelected = 0;
+  const claimAudit = { checked: 0, supported: 0, partial: 0, unsupported: 0 };
+  const claimAuditRoles = Object.fromEntries([
+    'fact', 'actor_time', 'mechanism', 'causality', 'comparison_side',
+    'agreement', 'contradiction', 'effect', 'reception', 'limit', 'method',
+  ].map((role) => [role, { checked: 0, supported: 0 }])) as Record<DeepResearchProofRole, { checked: number; supported: number }>;
+  const coverageEvidence: Array<{
+    question: string;
+    status: 'supported' | 'partial' | 'unsupported';
+    revised: string;
+    evidenceTokens: string[];
+  }> = [];
 
   const runSection = async (
     section: DeepResearchPlanSection,
     isConclusion: boolean,
     mergeIntoIndex: number | null = null
   ): Promise<void> => {
-    // Spread the page budget across the planned sections → fewer sections means each
-    // one gets a bigger, deeper word target (clamped so it stays writable in one pass).
-    const targetWords = clamp(
-      Math.round(maxWords / Math.max(sectionCount, 1)),
-      SECTION_WORDS_RANGE.min,
-      SECTION_WORDS_RANGE.max
-    );
     emit({
       phase: 'section',
       message: `${L.writing}: ${section.title}`,
       sectionIndex: written.length + 1,
-      // What the progress bar divides by. The plan is the honest denominator: the
-      // budget caps below can end the report early, but never make it longer, and a
-      // coverage top-up merges into a section that has already been counted.
-      sectionTotal: Math.min(plan.sections.length, sectionHardCap),
+      // What the progress bar divides by. The finite evidence-derived plan is the
+      // honest denominator; no page or word budget can stop it early.
+      sectionTotal: plan.sections.length,
       sectionTitle: section.title,
       wordsSoFar: totalWords,
       pagesSoFar: pagesFromWords(totalWords),
@@ -379,18 +643,22 @@ export async function orchestrateDeepResearch(
 
     // Ask the corpus again, this time about THIS section. Anything it returns is
     // folded into the maps first, so it is genuinely citable rather than stripped.
+    const retrievedPassageIds = new Set<string>();
     if (deps.retrieveForSection) {
       try {
         const material = await deps.retrieveForSection({
-          objective: request.objective,
+          objective: effectiveRequest.objective,
           sectionTitle: section.title,
           purpose: section.purpose,
-          keyClaims: section.keyClaims,
-          excludeIdeaIds: section.ideaIds,
-          excludePassageIds: section.passageIds,
+          keyClaims: [...section.keyClaims],
+          coverageQuestions: [...(section.coverageQuestions ?? [])],
+          excludeIdeaIds: [...new Set([...section.ideaIds, ...coveredIdeaIds])],
+          excludePassageIds: [...new Set([...section.passageIds, ...citedIds.passages])],
           limits: SECTION_RETRIEVAL_LIMITS,
         });
         const merged = mergeRetrievedMaterial(maps, material ?? {});
+        for (const id of merged.passageIds) retrievedPassageIds.add(id);
+        mergeSectionEvidencePacks(section, material?.evidencePacks ?? []);
         const roomForIdeas = Math.max(0, MAX_SECTION_IDEAS - section.ideaIds.length);
         section.ideaIds = [...new Set([...section.ideaIds, ...merged.ideaIds.slice(0, roomForIdeas)])];
         section.passageIds = [...new Set([...section.passageIds, ...merged.passageIds])];
@@ -399,46 +667,220 @@ export async function orchestrateDeepResearch(
       }
     }
 
+    let inputForSection = sectionInput(effectiveRequest, language, section, isConclusion, maps, written, coveredIdeaIds, plan.sections);
+    const coverageQuestionsForSection = section.coverageQuestions ?? [];
+    const plannedClaims = [...section.keyClaims];
+    const auditTargets = [...plannedClaims, ...coverageQuestionsForSection];
+    if (deps.auditSectionClaims && auditTargets.length > 0) {
+      try {
+        let audited: SectionClaimAudit | null = null;
+        for (let recoveryPass = 0; recoveryPass <= MAX_COVERAGE_RECOVERY_PASSES; recoveryPass += 1) {
+          audited = normalizeSectionClaimAudit(
+            await deps.auditSectionClaims(inputForSection),
+            auditTargets,
+            new Set(inputForSection.citationMenu.map((item) => item.token)),
+          );
+          const missingQuestions = audited.items
+            .slice(plannedClaims.length)
+            .map((item, index) => ({ item, question: coverageQuestionsForSection[index] }))
+            .filter(({ item, question }) => Boolean(question) && item.status !== 'supported')
+            .map(({ question }) => question);
+          if (recoveryPass >= MAX_COVERAGE_RECOVERY_PASSES || !missingQuestions.length || !deps.retrieveForSection) break;
+          let recovery: SectionRetrievalResult | null = null;
+          try {
+            recovery = await deps.retrieveForSection({
+              objective: effectiveRequest.objective,
+              sectionTitle: section.title,
+              purpose: section.purpose,
+              keyClaims: plannedClaims,
+              coverageQuestions: missingQuestions,
+              excludeIdeaIds: [...new Set([...section.ideaIds, ...coveredIdeaIds])],
+              excludePassageIds: [...new Set([...section.passageIds, ...citedIds.passages])],
+              limits: COVERAGE_RECOVERY_RETRIEVAL_LIMITS,
+            });
+          } catch {
+            break;
+          }
+          const merged = mergeRetrievedMaterial(maps, recovery ?? {});
+          for (const id of merged.passageIds) retrievedPassageIds.add(id);
+          mergeSectionEvidencePacks(section, recovery?.evidencePacks ?? []);
+          const roomForIdeas = Math.max(0, MAX_SECTION_IDEAS - section.ideaIds.length);
+          section.ideaIds = [...new Set([...section.ideaIds, ...merged.ideaIds.slice(0, roomForIdeas)])];
+          section.passageIds = [...new Set([...section.passageIds, ...merged.passageIds])];
+          inputForSection = sectionInput(
+            effectiveRequest,
+            language,
+            section,
+            isConclusion,
+            maps,
+            written,
+            coveredIdeaIds,
+            plan.sections,
+          );
+        }
+        if (!audited) throw new Error('empty claim audit');
+        if (audited.items.length === auditTargets.length) {
+          // The recovery pass deliberately maximizes recall. The epistemic audit
+          // then converts that wide pool into a small evidence pack, so irrelevant
+          // retry passages cannot distract the writer or inflate apparent depth.
+          if (retrievedPassageIds.size > 0) {
+            const selectedRecoveryPassages = new Set(
+              audited.items.flatMap((item) => {
+                const packed = (item.evidencePack ?? [])
+                  .filter((entry) => entry.role !== 'irrelevant')
+                  .map((entry) => entry.token);
+                return packed.length > 0 ? packed : item.evidenceTokens;
+              }).map(passageIdFromCitationToken).filter((id): id is string => Boolean(id)),
+            );
+            section.passageIds = section.passageIds.filter((id) =>
+              !retrievedPassageIds.has(id) || selectedRecoveryPassages.has(id));
+            section.retrievalEvidencePacks = (section.retrievalEvidencePacks ?? []).map((pack) => ({
+              question: pack.question,
+              passageIds: pack.passageIds.filter((id) => selectedRecoveryPassages.has(id)),
+              candidates: (pack.candidates ?? []).filter((candidate) => selectedRecoveryPassages.has(candidate.passageId)),
+            }));
+          }
+          claimAudit.checked += audited.items.length;
+          for (const item of audited.items) {
+            claimAudit[item.status] += 1;
+            for (const requirement of item.requirements ?? []) {
+              const role = requirement.proofRole ?? 'fact';
+              claimAuditRoles[role].checked += 1;
+              if (requirement.supported) claimAuditRoles[role].supported += 1;
+            }
+          }
+          const plannedClaimCount = plannedClaims.length;
+          section.keyClaims = audited.items.slice(0, plannedClaimCount).map((item) => item.revised);
+          section.coverageClaims = audited.items.slice(plannedClaimCount).map((item) => item.revised);
+          coverageQuestionsForSection.forEach((question, index) => {
+            const item = audited.items[plannedClaimCount + index];
+            if (!item) return;
+            coverageEvidence.push({
+              question,
+              status: item.status,
+              revised: item.revised,
+              evidenceTokens: [...item.evidenceTokens],
+            });
+          });
+          inputForSection = {
+            ...sectionInput(effectiveRequest, language, section, isConclusion, maps, written, coveredIdeaIds, plan.sections),
+            claimAudit: {
+              items: audited.items.map((item) => ({
+                ...item,
+                evidencePack: (item.evidencePack ?? []).filter((entry) => entry.role !== 'irrelevant'),
+              })),
+            },
+          };
+        }
+      } catch {
+        /* The writer still treats unaudited plan propositions as hypotheses. */
+      }
+    }
+    if (deps.planSectionEvidence) {
+      try {
+        const evidencePlan = await deps.planSectionEvidence(inputForSection);
+        if (evidencePlan?.paragraphs?.length) inputForSection = { ...inputForSection, evidencePlan };
+      } catch {
+        /* the ordinary section writer remains a complete fallback */
+      }
+    }
+
     let raw = '';
     try {
-      raw = await deps.writeSection(sectionInput(request, language, section, targetWords, isConclusion, maps, written, coveredIdeaIds));
+      raw = await deps.writeSection(inputForSection);
     } catch {
       // One retry, then a graceful degraded section — never fail the whole report.
       try {
-        raw = await deps.writeSection(sectionInput(request, language, section, targetWords, isConclusion, maps, written, coveredIdeaIds));
+        raw = await deps.writeSection(inputForSection);
       } catch {
         raw = degradedSection(section, maps, L);
         if (!stoppedReason) stoppedReason = L.degraded;
       }
     }
 
-    // A section that came back well under its target gets exactly one chance to
-    // develop further. Bounded to a single call so a terse model cannot loop.
-    if (deps.expandSection && raw.trim()) {
-      const draftWords = countWords(raw);
-      if (draftWords < targetWords * MIN_SECTION_FILL) {
+    // The evidence-planned writer is deliberately not allowed to replace the
+    // established monolithic writer on faith. Generate both from the same evidence
+    // menu and keep the planned version only when a two-order blind comparison
+    // selects it. A tie, order effect or judge failure preserves the baseline. This
+    // is expensive, but it gives the new retrieval/writing path a per-section
+    // non-regression barrier instead of trusting proxy metrics that can be gamed by
+    // extra citations and headings.
+    if (inputForSection.evidencePlan && deps.judgeSectionRevision) {
+      try {
+        const baselineInput: SectionInput = { ...inputForSection, evidencePlan: undefined };
+        const baselineRaw = await deps.writeSection(baselineInput);
+        generationComparisons += 1;
+        const plannedWon = await deps.judgeSectionRevision(baselineInput, baselineRaw, raw);
+        if (plannedWon) {
+          plannedSectionsSelected += 1;
+        } else {
+          raw = baselineRaw;
+          inputForSection = baselineInput;
+          baselineSectionsSelected += 1;
+        }
+      } catch {
+        // The planned draft is already complete. Failure of the optional baseline
+        // candidate must not discard a usable section or fail the report.
+      }
+    }
+
+    const normalized = recoverPlainMenuCitations(
+      enforceObjectiveExclusions(normalizeNarrativeSection(raw, section.title), effectiveRequest.objective),
+      inputForSection.citationMenu,
+    );
+    let { markdown, cited } = applyCitationPolicy(normalized, maps);
+    const qualitySources = qualitySourcesFromMenu(inputForSection.citationMenu);
+
+    // A professional-editing pass is triggered by measurable weakness, not by prose
+    // length. The model gets the exact failed gates, then code rejects any rewrite
+    // that loses grounding, invents a citation, pads citations or thins the section.
+    if (deps.reviseSection) {
+      const beforeQuality = assessDeepResearchSection({
+        markdown,
+        mode: 'academic',
+        objective: effectiveRequest.objective,
+        keyClaims: [...section.keyClaims, ...(section.coverageClaims ?? [])],
+        sources: qualitySources,
+      });
+      const finalEditorialPass = Boolean(inputForSection.evidencePlan);
+      if (finalEditorialPass || !qualityPasses(beforeQuality) || beforeQuality.score < 85 || beforeQuality.issues.length > 0) {
         try {
-          const expanded = await deps.expandSection({
-            ...sectionInput(request, language, section, targetWords, isConclusion, maps, written, coveredIdeaIds),
-            draft: raw,
-            missingWords: Math.max(0, targetWords - draftWords),
+          const revisedRaw = await deps.reviseSection({ ...inputForSection, draft: markdown, quality: beforeQuality });
+          const revised = applyCitationPolicy(recoverPlainMenuCitations(
+            enforceObjectiveExclusions(normalizeNarrativeSection(revisedRaw, section.title), effectiveRequest.objective),
+            inputForSection.citationMenu,
+          ), maps).markdown;
+          const afterQuality = assessDeepResearchSection({
+            markdown: revised,
+            mode: 'academic',
+            objective: effectiveRequest.objective,
+            keyClaims: [...section.keyClaims, ...(section.coverageClaims ?? [])],
+            sources: qualitySources,
           });
-          // Only accept an expansion that genuinely grew the argument.
-          if (countWords(expanded) > draftWords * 1.1) {
-            raw = expanded;
-            expansions += 1;
+          const deterministicAcceptance = finalEditorialPass
+            ? shouldAcceptEditorialRevision(beforeQuality, afterQuality, citationUrlsFromMenu(inputForSection.citationMenu), revised)
+            : shouldAcceptQualityRevision(beforeQuality, afterQuality, citationUrlsFromMenu(inputForSection.citationMenu), revised);
+          const qualitativeAcceptance = deterministicAcceptance && finalEditorialPass && deps.judgeSectionRevision
+            ? await deps.judgeSectionRevision(inputForSection, markdown, revised)
+            : true;
+          if (deterministicAcceptance && qualitativeAcceptance) {
+            markdown = revised;
+            ({ cited } = applyCitationPolicy(markdown, maps));
+            qualityRevisions += 1;
           }
         } catch {
-          /* the original section stands */
+          /* the already-grounded draft remains available */
         }
       }
     }
 
-    let { markdown, cited } = applyCitationPolicy(normalizeNarrativeSection(raw, section.title), maps);
-
     // Entailment pass. Everything downstream — the cited sets, the references, the
     // matrix — is derived from the VERIFIED text, so a citation the source does not
     // support cannot survive anywhere in the report, not even in the bibliography.
+    let verificationConcerns: string[] = [];
+    let concernCount = 0;
+    let firstVerificationOutcome: VerificationOutcome | null = null;
+    const supportAuditStart = supportAudit.length;
     if (deps.verifyCitations) {
       const claims = extractCitationClaims(markdown, maps);
       if (claims.length > 0) {
@@ -446,6 +888,9 @@ export async function orchestrateDeepResearch(
           const verdicts = await deps.verifyCitations(claims);
           if (Array.isArray(verdicts) && verdicts.length === claims.length) {
             const outcome = applyVerification(markdown, claims, verdicts);
+            firstVerificationOutcome = outcome;
+            concernCount = outcome.partial + outcome.unsupported;
+            verificationConcerns = dedupe(outcome.audit.map((entry) => entry.claim.sentence)).slice(0, 12);
             verification.checked += outcome.checked;
             verification.partial += outcome.partial;
             verification.unsupported += outcome.unsupported;
@@ -460,13 +905,97 @@ export async function orchestrateDeepResearch(
                 sourceLabel: sourceLabelForClaim(entry.claim, maps),
               });
             }
-            if (outcome.unsupported > 0) {
+            if (outcome.partial > 0 || outcome.unsupported > 0) {
               markdown = outcome.markdown;
               ({ cited } = applyCitationPolicy(markdown, maps));
             }
           }
         } catch {
+          verification.unverified += claims.length;
           /* an unavailable judge must not cost the report its section */
+        }
+      }
+    }
+
+    // Verification can legitimately remove links from an otherwise strong draft.
+    // Re-evaluate the text that will actually be published and permit one final,
+    // bounded repair. The repair itself is verified again before acceptance, so
+    // this closes the quality gap without widening the evidence boundary.
+    if (deps.reviseSection && deps.verifyCitations) {
+      const postVerificationQuality = assessDeepResearchSection({
+        markdown,
+        mode: 'academic',
+        objective: effectiveRequest.objective,
+        keyClaims: [...section.keyClaims, ...(section.coverageClaims ?? [])],
+        sources: qualitySources,
+      });
+      const structuralRepairNeeded = !qualityPasses(postVerificationQuality)
+        || postVerificationQuality.score < 85
+        || postVerificationQuality.issues.length > 0;
+      if (structuralRepairNeeded || concernCount > 0) {
+        try {
+          const repairedRaw = await deps.reviseSection({
+            ...inputForSection,
+            draft: markdown,
+            quality: postVerificationQuality,
+            verificationConcerns,
+          });
+          let repaired = applyCitationPolicy(recoverPlainMenuCitations(
+            enforceObjectiveExclusions(normalizeNarrativeSection(repairedRaw, section.title), effectiveRequest.objective),
+            inputForSection.citationMenu,
+          ), maps).markdown;
+          const repairedClaims = extractCitationClaims(repaired, maps);
+          if (repairedClaims.length > 0) {
+            const repairedVerdicts = await deps.verifyCitations(repairedClaims);
+            if (Array.isArray(repairedVerdicts) && repairedVerdicts.length === repairedClaims.length) {
+              const repairedOutcome = applyVerification(repaired, repairedClaims, repairedVerdicts);
+              repaired = repairedOutcome.markdown;
+              const repairedQuality = assessDeepResearchSection({
+                markdown: repaired,
+                mode: 'academic',
+                objective: effectiveRequest.objective,
+                keyClaims: [...section.keyClaims, ...(section.coverageClaims ?? [])],
+                sources: qualitySources,
+              });
+              const concernsAfter = repairedOutcome.partial + repairedOutcome.unsupported;
+              const allowedUrls = citationUrlsFromMenu(inputForSection.citationMenu);
+              const accepted = concernCount > 0
+                ? shouldAcceptEvidenceRepair(
+                  postVerificationQuality, repairedQuality, allowedUrls, repaired,
+                  concernCount, concernsAfter,
+                )
+                : shouldAcceptQualityRevision(
+                  postVerificationQuality, repairedQuality, allowedUrls, repaired,
+                );
+              if (accepted) {
+                markdown = repaired;
+                ({ cited } = applyCitationPolicy(markdown, maps));
+                if (firstVerificationOutcome) {
+                  verification.checked -= firstVerificationOutcome.checked;
+                  verification.partial -= firstVerificationOutcome.partial;
+                  verification.unsupported -= firstVerificationOutcome.unsupported;
+                  supportAudit.splice(supportAuditStart);
+                }
+                verification.checked += repairedOutcome.checked;
+                verification.partial += repairedOutcome.partial;
+                verification.unsupported += repairedOutcome.unsupported;
+                for (const entry of repairedOutcome.audit) {
+                  if (supportAudit.length >= MAX_SUPPORT_AUDIT) break;
+                  supportAudit.push({
+                    verdict: entry.verdict,
+                    kind: entry.claim.kind,
+                    section: section.title,
+                    sentence: entry.claim.sentence,
+                    source: clip(entry.claim.content, 400),
+                    sourceLabel: sourceLabelForClaim(entry.claim, maps),
+                  });
+                }
+                qualityRevisions += 1;
+              }
+            }
+          }
+        } catch {
+          /* the already-verified draft remains available */
         }
       }
     }
@@ -493,48 +1022,148 @@ export async function orchestrateDeepResearch(
       const workId = maps.passageWorkId.get(id);
       if (workId) citedIds.works.add(workId);
     });
-    sectionFill.push({ words: countWords(markdown), target: targetWords });
     totalWords += countWords(markdown);
   };
 
   // Planned sections.
   for (let i = 0; i < plan.sections.length; i++) {
-    if (written.length >= sectionHardCap) {
-      stoppedReason = L.stoppedSections(sectionHardCap);
-      break;
-    }
-    if (totalWords >= maxWords) {
-      stoppedReason = L.stoppedPages(targetPages.max);
-      break;
-    }
-    // The page range is a target, not a cap. A stronger model writes longer sections
-    // than the plan assumed and overshoots by a page or two; cutting a section to
-    // claw that back would cost an argument to save a page, which is a bad trade in
-    // a research report. Only the hard budget check above stops the loop.
     const isConclusion = i === plan.sections.length - 1;
     await runSection(plan.sections[i], isConclusion);
   }
 
-  // Coverage top-up: keep deepening while the report is under its minimum length
-  // and relevant ideas remain uncovered — but never past the hard caps.
-  let topups = 0;
-  while (totalWords < minWords && written.length < sectionHardCap && topups < MAX_TOPUP_SECTIONS && !stoppedReason) {
-    const uncovered = pendingIdeas(snapshot, coveredIdeaIds, assignedIdeaIds).slice(0, 6);
-    if (uncovered.length === 0) break;
-    topups += 1;
-    emit({
-      phase: 'coverage',
-      message: L.coverage(uncovered.length),
-      wordsSoFar: totalWords,
-      pagesSoFar: pagesFromWords(totalWords),
-    });
-    // Expand the last body section instead of creating a new "development
-    // complement" epigraph. Coverage grows the argument, not the outline.
-    const mergeIntoIndex = Math.max(0, written.length - (written.length > 1 ? 2 : 1));
-    const before = totalWords;
-    await runSection(coverageSection(topups, uncovered, L), false, mergeIntoIndex);
-    // A top-up that adds nothing would spin the loop against the same ideas.
-    if (totalWords <= before) break;
+  // Report-wide edit. A section cannot know that a later section repeats its
+  // mechanism or that a debate is developed elsewhere. The reviewer sees the full
+  // argument, but every rewrite remains bounded by its original citation menu,
+  // deterministic quality guards, a two-order blind comparison and entailment.
+  if (deps.reviewReport && deps.reviseSection && deps.judgeSectionRevision && deps.verifyCitations && written.length > 1) {
+    try {
+      const review = await deps.reviewReport({
+        objective: effectiveRequest.objective,
+        sections: written.map((item) => ({
+          title: item.section.title,
+          purpose: item.section.purpose,
+          responsibilities: [...item.section.keyClaims, ...(item.section.coverageQuestions ?? [])],
+          markdown: item.markdown,
+        })),
+      });
+      const staged = written.map((item) => ({ section: item.section, markdown: item.markdown }));
+      let acceptedGlobalEdits = 0;
+      for (let index = 0; index < staged.length; index += 1) {
+        const item = staged[index];
+        const directive = review.directives.find((candidate) => normalizeForMatch(candidate.sectionTitle) === normalizeForMatch(item.section.title));
+        if (!directive) continue;
+        const input = sectionInput(
+          request,
+          language,
+          item.section,
+          index === written.length - 1,
+          maps,
+          staged.slice(0, index),
+          coveredIdeaIds,
+          plan.sections,
+        );
+        const qualitySources = qualitySourcesFromMenu(input.citationMenu);
+        const beforeQuality = assessDeepResearchSection({
+          markdown: item.markdown,
+          mode: 'academic',
+          objective: effectiveRequest.objective,
+          keyClaims: [...item.section.keyClaims, ...(item.section.coverageClaims ?? [])],
+          sources: qualitySources,
+        });
+        const revisedRaw = await deps.reviseSection({
+          ...input,
+          draft: item.markdown,
+          quality: beforeQuality,
+          editorialDirective: directive,
+        });
+        let revised = applyCitationPolicy(recoverPlainMenuCitations(
+          enforceObjectiveExclusions(normalizeNarrativeSection(revisedRaw, item.section.title), effectiveRequest.objective),
+          input.citationMenu,
+        ), maps).markdown;
+        const revisedClaims = extractCitationClaims(revised, maps);
+        let concernsAfter = 0;
+        if (revisedClaims.length) {
+          const verdicts = await deps.verifyCitations(revisedClaims);
+          if (!Array.isArray(verdicts) || verdicts.length !== revisedClaims.length) continue;
+          const outcome = applyVerification(revised, revisedClaims, verdicts);
+          revised = outcome.markdown;
+          concernsAfter = outcome.partial + outcome.unsupported;
+        }
+        const concernsBefore = supportAudit.filter((entry) => entry.section === item.section.title).length;
+        if (concernsAfter > concernsBefore) continue;
+        const afterQuality = assessDeepResearchSection({
+          markdown: revised,
+          mode: 'academic',
+          objective: effectiveRequest.objective,
+          keyClaims: [...item.section.keyClaims, ...(item.section.coverageClaims ?? [])],
+          sources: qualitySources,
+        });
+        if (!shouldAcceptEditorialRevision(beforeQuality, afterQuality, citationUrlsFromMenu(input.citationMenu), revised)) continue;
+        if (!await deps.judgeSectionRevision(input, item.markdown, revised)) continue;
+        item.markdown = revised;
+        acceptedGlobalEdits += 1;
+      }
+
+      // The preliminary per-section counters no longer describe edited prose.
+      // Re-verify the exact final text from zero so the visible audit is honest.
+      const finalVerification = { checked: 0, partial: 0, unsupported: 0, unverified: 0 };
+      const finalSupportAudit: SupportAuditEntry[] = [];
+      for (const item of staged) {
+        const claims = extractCitationClaims(item.markdown, maps);
+        if (!claims.length) continue;
+        try {
+          const verdicts = await deps.verifyCitations(claims);
+          if (!Array.isArray(verdicts) || verdicts.length !== claims.length) {
+            finalVerification.unverified += claims.length;
+            continue;
+          }
+          const outcome = applyVerification(item.markdown, claims, verdicts);
+          item.markdown = outcome.markdown;
+          finalVerification.checked += outcome.checked;
+          finalVerification.partial += outcome.partial;
+          finalVerification.unsupported += outcome.unsupported;
+          for (const entry of outcome.audit) {
+            if (finalSupportAudit.length >= MAX_SUPPORT_AUDIT) break;
+            finalSupportAudit.push({
+              verdict: entry.verdict,
+              kind: entry.claim.kind,
+              section: item.section.title,
+              sentence: entry.claim.sentence,
+              source: clip(entry.claim.content, 400),
+              sourceLabel: sourceLabelForClaim(entry.claim, maps),
+            });
+          }
+        } catch {
+          finalVerification.unverified += claims.length;
+        }
+      }
+
+      // Commit only after the complete staged pass and final verification finish.
+      staged.forEach((item, index) => { written[index].markdown = item.markdown; });
+      Object.assign(verification, finalVerification);
+      supportAudit.splice(0, supportAudit.length, ...finalSupportAudit);
+      qualityRevisions += acceptedGlobalEdits;
+
+      // All downstream coverage, bibliography and metrics derive from the edited,
+      // re-verified prose, never from the preliminary drafts.
+      coveredIdeaIds.clear();
+      Object.values(citedIds).forEach((set) => set.clear());
+      for (const item of staged) {
+        const { cited } = applyCitationPolicy(item.markdown, maps);
+        cited.ideas.forEach((id) => { citedIds.ideas.add(id); coveredIdeaIds.add(id); });
+        cited.works.forEach((id) => citedIds.works.add(id));
+        cited.gaps.forEach((id) => citedIds.gaps.add(id));
+        cited.contradictions.forEach((id) => citedIds.contradictions.add(id));
+        cited.passages.forEach((id) => {
+          citedIds.passages.add(id);
+          const workId = maps.passageWorkId.get(id);
+          if (workId) citedIds.works.add(workId);
+        });
+      }
+      totalWords = staged.reduce((sum, item) => sum + countWords(item.markdown), 0);
+    } catch {
+      /* the individually verified report remains the safe fallback */
+    }
   }
 
   emit({
@@ -562,35 +1191,67 @@ export async function orchestrateDeepResearch(
   const pending = pendingIdeas(snapshot, coveredIdeaIds, assignedIdeaIds);
   const uncoveredSamples = pending.slice(0, 5).map((idea) => idea.label);
 
-  const finalize = await finalizeWithFallback(
-    deps,
-    {
-      objective: request.objective,
-      language,
-      planTitle: plan.title,
-      sectionTitles: written.map((w) => w.section.title),
-      ideasCovered: coveredIdeaIds.size,
-      ideasConsidered: snapshot.ideas.length,
-      uncoveredSamples,
-    },
-    L
-  );
+  const finalizeInput: FinalizeInput = {
+    objective: effectiveRequest.objective,
+    language,
+    planTitle: plan.title,
+    sectionTitles: written.map((w) => w.section.title),
+    ideasCovered: coveredIdeaIds.size,
+    ideasConsidered: snapshot.ideas.length,
+    uncoveredSamples,
+    sectionFindings: written.map((item) => ({
+      title: item.section.title,
+      text: clip(stripInitialHeading(item.markdown), 2_400),
+    })),
+    supportConcerns: supportAudit.slice(0, 20).map((entry) => entry.sentence),
+  };
+  let finalize = await finalizeWithFallback(deps, finalizeInput, L);
+  if (deps.auditFinalSummary) {
+    try {
+      const audited = await deps.auditFinalSummary(finalizeInput, finalize);
+      finalize = {
+        title: cleanStr(audited.title, finalize.title),
+        abstract: cleanStr(audited.abstract, finalize.abstract),
+        // A final audit may discover another limitation; it can never erase one
+        // already established by coverage, support or the first finalizer.
+        limitations: dedupe([...finalize.limitations, ...strList(audited.limitations)]),
+        nextSteps: strList(audited.nextSteps).length ? strList(audited.nextSteps) : finalize.nextSteps,
+      };
+    } catch {
+      /* the first finalizer already received verified findings and remains safe */
+    }
+  }
 
   // Works actually referenced = works cited directly + the works behind every cited idea.
   const citedWorkIds = collectCitedWorkIds(citedIds, maps);
   const references = buildReferences(citedWorkIds, maps, language);
-  const draftMarkdown = assembleMarkdown(written, references, finalize, language);
+  const singleNarrative = effectiveRequest.sectionLimit === 'single';
+  const draftMarkdown = assembleMarkdown(written, references, finalize, language, effectiveRequest.sectionLimit);
   const worksCited = citedWorkIds.size;
 
-  const outline: WritingWorkshopSection[] = written.map((w, index) => ({
+  const outline: WritingWorkshopSection[] = singleNarrative ? [] : written.map((w, index) => ({
     id: w.section.id || `s${index + 1}`,
     title: w.section.title,
     purpose: w.section.purpose,
-    keyClaims: w.section.keyClaims.slice(0, 8),
+    keyClaims: [...w.section.keyClaims, ...(w.section.coverageClaims ?? [])].slice(0, 16),
     sources: sectionSources(w.section, maps),
   }));
 
   const matrix = buildMatrix(coveredIdeaIds, maps, L);
+  const qualityAssessment = assessDeepResearchReport({
+    mode: 'academic',
+    objective: effectiveRequest.objective,
+    coverageQuestions: effectiveRequest.coverageQuestions,
+    coverageEvidence,
+    verification,
+    internalContradictions: coherenceIssues.length,
+    sections: written.map((item) => ({
+      title: item.section.title,
+      markdown: item.markdown,
+      keyClaims: [...item.section.keyClaims, ...(item.section.coverageClaims ?? [])],
+      sources: qualitySourcesFromMenu(buildCitationMenu(item.section, maps)),
+    })),
+  });
 
   const draft: WritingWorkshopDraft = {
     generatedAt: new Date().toISOString(),
@@ -604,7 +1265,7 @@ export async function orchestrateDeepResearch(
       passageIds: [...citedIds.passages],
       tutorRouteIds: [],
     },
-    title: finalize.title || plan.title || request.objective,
+    title: finalize.title || plan.title || effectiveRequest.objective,
     abstract: finalize.abstract,
     outline,
     draftMarkdown,
@@ -612,7 +1273,9 @@ export async function orchestrateDeepResearch(
     bibliography: references,
     nextSteps: finalize.nextSteps,
     supportAudit,
+    qualityAssessment,
     limitations: [...finalize.limitations, ...coherenceIssues.map((issue) => L.coherenceLimitation(issue))],
+    deepResearchStructure: singleNarrative ? 'single' : 'sectioned',
     stats: {
       selectedIdeas: coveredIdeaIds.size,
       selectedThemes: 0,
@@ -627,23 +1290,39 @@ export async function orchestrateDeepResearch(
   };
 
   const meta: DeepResearchMeta = {
-    sections: written.length,
+    deepResearchVersion: request.deepResearchVersion ?? 'v2',
+    structure: singleNarrative ? 'single' : 'sectioned',
+    sections: singleNarrative ? 1 : written.length,
     words: totalWords,
     pages: pagesFromWords(totalWords),
     ideasCovered: coveredIdeaIds.size,
     ideasConsidered: snapshot.ideas.length,
     worksCited,
-    targetPages,
     stoppedReason,
-    verification: verification.checked > 0 ? { ...verification } : null,
-    expansions,
-    sectionFill,
+    verification: verification.checked > 0 || verification.unverified > 0 ? { ...verification } : null,
+    qualityRevisions,
+    generationSelection: generationComparisons > 0 ? {
+      compared: generationComparisons,
+      planned: plannedSectionsSelected,
+      baseline: baselineSectionsSelected,
+    } : null,
     coherenceIssues: coherenceIssues.length,
+    coverage: effectiveRequest.coverageQuestions?.length
+      ? { questions: [...effectiveRequest.coverageQuestions], ratio: qualityAssessment.metrics.objectiveCoverage }
+      : null,
+    retrievalStrategy: request.deepResearchVersion === 'v1'
+      ? 'legacy'
+      : 'idea_first_document_enrichment',
+    documentPreparation,
+    claimAudit: claimAudit.checked > 0 ? {
+      ...claimAudit,
+      roles: Object.fromEntries(Object.entries(claimAuditRoles).filter(([, counts]) => counts.checked > 0)),
+    } : null,
   };
 
   emit({
     phase: 'done',
-    message: L.done(written.length, meta.pages),
+    message: L.done(meta.sections, meta.pages),
     wordsSoFar: totalWords,
     pagesSoFar: meta.pages,
   });
@@ -655,27 +1334,147 @@ function sectionInput(
   request: DeepResearchRequest,
   language: PromptLanguage,
   section: DeepResearchPlanSection,
-  targetWords: number,
   isConclusion: boolean,
   maps: SnapshotMaps,
   written: { section: DeepResearchPlanSection; markdown: string }[],
-  covered: Set<string>
+  covered: Set<string>,
+  planSections: DeepResearchPlanSection[],
 ): SectionInput {
+  const citationMenu = buildCitationMenu(section, maps)
+    .filter((item) => !matchesObjectiveExclusion(citationMenuExclusionText(item, maps), request.objective));
+  const passageMenuById = new Map<string, CitationMenuItem>();
+  for (const item of citationMenu) {
+    const id = passageIdFromCitationToken(item.token);
+    if (id) passageMenuById.set(id, item);
+  }
   return {
     objective: request.objective,
     language,
     audience: request.audience,
     section,
-    targetWords,
     isConclusion,
-    citationMenu: buildCitationMenu(section, maps),
+    citationMenu,
+    atomicEvidencePacks: (section.retrievalEvidencePacks ?? []).map((pack) => ({
+      question: pack.question,
+      candidates: pack.passageIds
+        .map((id) => {
+          const item = passageMenuById.get(id);
+          const retrieval = pack.candidates?.find((candidate) => candidate.passageId === id);
+          return item && retrieval
+            ? { ...item, retrieval: {
+              query: retrieval.query,
+              rank: retrieval.rank,
+              lanes: [...retrieval.lanes],
+              score: retrieval.score,
+              reason: retrieval.reason,
+            } }
+            : item;
+        })
+        .filter((item): item is CitationMenuItem => Boolean(item)),
+    })),
     priorSummary: summarizePrior(written),
     alreadyDeveloped: [...covered]
       .map((id) => maps.ideaById.get(id))
       .filter((idea): idea is WritingWorkshopIdeaCandidate => !!idea)
       .slice(0, 24)
       .map((idea) => clip(idea.statement || idea.label, 140)),
+    reservedForOtherSections: isConclusion ? [] : planSections
+      .filter((candidate) => candidate.id !== section.id)
+      .map((candidate) => ({
+        title: candidate.title,
+        responsibilities: [...candidate.keyClaims, ...(candidate.coverageQuestions ?? [])].slice(0, 8),
+      })),
   };
+}
+
+export function citationMenuExclusionText(item: CitationMenuItem, maps: SnapshotMaps): string {
+  const target = item.token.match(/\]\(nodus:\/\/(idea|work|passage|gap|contradiction)\/([^)]*)\)$/u);
+  const kind = target?.[1];
+  let id = target?.[2] ?? '';
+  try { id = decodeURIComponent(id); } catch { /* keep raw id */ }
+  const titles: string[] = [];
+  if (kind === 'idea') {
+    for (const work of maps.ideaById.get(id)?.works ?? []) titles.push(work.title);
+  } else if (kind === 'work') {
+    const title = maps.workInfoById.get(id)?.title;
+    if (title) titles.push(title);
+  } else if (kind === 'passage') {
+    const workId = maps.passageWorkId.get(id);
+    const title = workId ? maps.workInfoById.get(workId)?.title : '';
+    if (title) titles.push(title);
+  }
+  return `${item.source ?? ''} ${item.note} ${titles.join(' ')}`;
+}
+
+function passageIdFromCitationToken(token: string): string | null {
+  const match = token.match(/\]\(nodus:\/\/passage\/([^)]*)\)$/u);
+  if (!match?.[1]) return null;
+  try { return decodeURIComponent(match[1]); } catch { return match[1]; }
+}
+
+/**
+ * Explicit negative scope is a hard contract, not a suggestion to the writer.
+ * Prompts alone were measured to leak excluded axes back into long reports because
+ * the retrieved menu still made them salient. These stems remove that material from
+ * the menu and police the final prose in the common UI languages.
+ */
+export function objectiveExclusionStems(objective: string): string[] {
+  const patterns = [
+    /\b(?:excluir|excluye|excluindo|excluir\s+o|exclure|escludere|exclude|excluding|ausschlie(?:ß|ss)en|hariç\s+tut(?:mak|un|ulan))\b\s+([^.!?;]+)/giu,
+    /\b(?:sin\s+abordar|no\s+abordar|without\s+addressing|do\s+not\s+cover|sans\s+aborder|senza\s+trattare|sem\s+abordar|ohne\s+zu\s+behandeln)\b\s+([^.!?;]+)/giu,
+  ];
+  const stop = new Set([
+    'este', 'esta', 'estos', 'estas', 'that', 'this', 'the', 'eje', 'axis', 'tema', 'theme', 'aspecto', 'aspect',
+    'ya', 'tratado', 'tratada', 'otro', 'otra', 'informe', 'report', 'and', 'with', 'from', 'dans', 'avec', 'dans',
+    'sujet', 'asse', 'tema', 'bereits', 'behandelt', 'rapporto', 'relatorio', 'relatório', 'outro', 'autre', 'einen',
+  ]);
+  const roots = new Set<string>();
+  for (const pattern of patterns) {
+    for (const match of objective.matchAll(pattern)) {
+      const scope = String(match[1] ?? '').split(/[,(—]/u)[0];
+      for (const token of normalizeForMatch(scope).match(/[\p{L}\p{N}]+/gu) ?? []) {
+        if (token.length < 5 || stop.has(token)) continue;
+        let root = token;
+        for (const suffix of ['idad', 'idade', 'ity', 'ité', 'ita', 'ità']) {
+          if (root.endsWith(suffix) && root.length - suffix.length >= 5) root = root.slice(0, -suffix.length);
+        }
+        roots.add(root);
+      }
+    }
+  }
+  const expanded = new Set(roots);
+  for (const root of roots) {
+    if (root.startsWith('colon')) ['colon', 'sahara', 'imperi', 'oriental'].forEach((item) => expanded.add(item));
+    if (root.startsWith('gener') || root === 'gender') ['gener', 'gender', 'mujer', 'women', 'feminin', 'masculin', 'sex'].forEach((item) => expanded.add(item));
+  }
+  return [...expanded].slice(0, 20);
+}
+
+export function matchesObjectiveExclusion(text: string, objective: string): boolean {
+  const haystack = normalizeForMatch(text);
+  return objectiveExclusionStems(objective).some((stem) => haystack.includes(stem));
+}
+
+/** Remove only the sentences that violate an explicit exclusion; headings and all
+ * unrelated prose remain byte-for-byte intact. */
+export function enforceObjectiveExclusions(markdown: string, objective: string): string {
+  const stems = objectiveExclusionStems(objective);
+  if (!stems.length) return markdown;
+  return markdown
+    .split(/(\n{2,})/u)
+    .map((block) => {
+      if (/^\n{2,}$/u.test(block) || /^\s*#{1,6}\s/u.test(block)) return block;
+      return block
+        .split(/(?<=[.!?])\s+(?=[¿¡"\u00ab(A-ZÁÉÍÓÚÑ])/u)
+        .filter((sentence) => {
+          const normalized = normalizeForMatch(sentence);
+          return !stems.some((stem) => normalized.includes(stem));
+        })
+        .join(' ')
+        .trim();
+    })
+    .join('')
+    .replace(/\n{3,}/g, '\n\n');
 }
 
 /** Spanish and English function words that start a subtitle and read better lowercased. */
@@ -722,33 +1521,38 @@ function pendingIdeas(
 // Planning
 // ─────────────────────────────────────────────────────────────────────────────
 
-/** Resolved section budget: a soft target the planner aims for and a hard cap it must not exceed. */
+/** Evidence-derived report architecture. It organizes the argument; it is not a
+ * proxy for pages or words and never stops prose that still adds supported value. */
 export interface SectionPlan {
   target: number;
-  hardCap: number;
   mode: 'auto' | 'user';
 }
 
 /**
- * Decide how many sections a report should have. The whole design bias is toward
- * FEWER, LONGER sections. `'auto'` derives a small count from the page target; a
- * numeric `sectionLimit` pins the target and allows the model exactly one extra
- * section (the grace) when it genuinely needs it.
+ * Decide how many broad argumentative movements the retrieved evidence warrants.
+ * A numeric preference controls organization only; coverage questions and distinct
+ * debates may increase the plan so the preference can never discard evidence.
  */
 export function resolveSectionPlan(
-  targetPages: { min: number; max: number },
-  sectionLimit: 'auto' | number
+  snapshot: Pick<WritingWorkshopSnapshot, 'ideas' | 'gaps' | 'contradictions' | 'works'>,
+  sectionLimit: NonNullable<DeepResearchRequest['sectionLimit']>,
+  objective = '',
+  coverageQuestions: string[] = [],
 ): SectionPlan {
-  const natural = clamp(
-    Math.round((midpoint(targetPages) * WORDS_PER_PAGE) / SECTION_TARGET_WORDS),
+  const explicitMechanisms = (objective.match(/;/gu) ?? []).length + 1;
+  const evidenceClusters = Math.max(
     MIN_SECTIONS,
-    MAX_PLAN_SECTIONS
+    Math.ceil(snapshot.ideas.length / 10)
+      + Math.ceil((snapshot.gaps.length + snapshot.contradictions.length) / 4)
+      + Math.ceil(snapshot.works.length / 18),
+    Math.ceil(Math.max(coverageQuestions.length, explicitMechanisms) / 2) + 2,
   );
   if (typeof sectionLimit === 'number' && Number.isFinite(sectionLimit) && sectionLimit > 0) {
-    const target = clamp(Math.round(sectionLimit), MIN_SECTIONS, MAX_SECTIONS);
-    return { target, hardCap: Math.min(MAX_SECTIONS, target + SECTION_GRACE), mode: 'user' };
+    const preferred = Math.max(MIN_SECTIONS, Math.round(sectionLimit));
+    const target = Math.max(preferred, evidenceClusters);
+    return { target, mode: 'user' };
   }
-  return { target: natural, hardCap: Math.min(MAX_SECTIONS, natural + SECTION_GRACE), mode: 'auto' };
+  return { target: evidenceClusters, mode: 'auto' };
 }
 
 export function buildPlanInput(
@@ -756,16 +1560,16 @@ export function buildPlanInput(
   language: PromptLanguage,
   snapshot: WritingWorkshopSnapshot,
   sectionPlan: SectionPlan,
-  targetPages: { min: number; max: number }
 ): PlanInput {
   return {
     objective: request.objective,
+    coverageQuestions: (request.coverageQuestions ?? [])
+      .filter((question) => question.trim().length > 0)
+      .slice(0, MAX_COVERAGE_QUESTIONS),
     language,
     audience: request.audience,
     sectionCount: sectionPlan.target,
-    sectionHardCap: sectionPlan.hardCap,
     sectionMode: sectionPlan.mode,
-    targetPages,
     ideas: snapshot.ideas.slice(0, POOL_LIMITS.ideas).map((i) => ({
       id: i.id,
       label: i.label,
@@ -779,6 +1583,16 @@ export function buildPlanInput(
       .slice(0, POOL_LIMITS.contradictions)
       .map((c) => ({ id: c.id, label: c.label, summary: clip(c.summary, 160) })),
     works: snapshot.works.slice(0, POOL_LIMITS.works).map((w) => ({ id: w.id, label: w.label, summary: clip(w.summary, 140) })),
+    passages: snapshot.passages
+      .filter((passage) => passage.summary.trim().length > 0)
+      .slice(0, POOL_LIMITS.passages)
+      .map((passage) => ({
+        id: passage.id,
+        workId: passage.nodus_id,
+        source: `${passage.authors[0] ?? 'Autor'}${passage.year ? ` (${passage.year})` : ''}`,
+        page: passage.pageLabel,
+        extract: clip(passage.summary, 360),
+      })),
   };
 }
 
@@ -788,25 +1602,245 @@ async function planWithFallback(
   language: PromptLanguage,
   snapshot: WritingWorkshopSnapshot,
   sectionPlan: SectionPlan,
-  targetPages: { min: number; max: number }
 ): Promise<DeepResearchPlan> {
-  const input = buildPlanInput(request, language, snapshot, sectionPlan, targetPages);
+  const input = buildPlanInput(request, language, snapshot, sectionPlan);
   let plan: DeepResearchPlan | null = null;
   try {
     // The grace slot is reserved for a genuine coverage expansion. A planner
     // cannot spend it merely by returning one more short heading.
-    plan = normalizePlan(await deps.planReport(input), snapshot, sectionPlan.target);
+    plan = normalizePlan(await deps.planReport(input), snapshot, Number.MAX_SAFE_INTEGER, input.coverageQuestions);
+    enforcePlanObjectiveExclusions(plan, snapshot, request.objective);
   } catch {
     plan = null;
   }
-  if (!plan || plan.sections.length === 0) return fallbackPlan(request, snapshot, sectionPlan.target, labels(language));
+  if (!plan || plan.sections.length === 0) {
+    const fallback = fallbackPlan(request, snapshot, sectionPlan.target, labels(language));
+    assignMissingCoverageQuestions(fallback.sections, input.coverageQuestions);
+    return fallback;
+  }
   return plan;
+}
+
+/** Clone the plan at the trust boundary so an I/O dependency cannot rewrite the
+ * argument while preparing document profiles. */
+function clonePlan(plan: DeepResearchPlan): DeepResearchPlan {
+  return {
+    title: plan.title,
+    abstract: plan.abstract,
+    sections: plan.sections.map((section) => ({
+      ...section,
+      keyClaims: [...section.keyClaims],
+      ideaIds: [...section.ideaIds],
+      workIds: [...section.workIds],
+      gapIds: [...section.gapIds],
+      contradictionIds: [...section.contradictionIds],
+      passageIds: [...section.passageIds],
+      coverageQuestions: [...(section.coverageQuestions ?? [])],
+      coverageClaims: [...(section.coverageClaims ?? [])],
+      retrievalEvidencePacks: (section.retrievalEvidencePacks ?? []).map((pack) => ({
+        question: pack.question,
+        passageIds: [...pack.passageIds],
+        candidates: (pack.candidates ?? []).map((candidate) => ({ ...candidate, lanes: [...candidate.lanes] })),
+      })),
+      dependsOn: [...(section.dependsOn ?? [])],
+    })),
+  };
+}
+
+/** Apply a post-plan coverage audit without surrendering the argument to it. */
+export function reconcileCoverageAudit(
+  base: DeepResearchPlan,
+  audited: DeepResearchPlan,
+  snapshot: WritingWorkshopSnapshot,
+  coverageQuestions: string[],
+): void {
+  const normalized = normalizePlan(audited, snapshot, base.sections.length, coverageQuestions);
+  const byId = new Map(normalized.sections.map((section) => [section.id, section]));
+  for (const section of base.sections) {
+    const revision = byId.get(section.id);
+    if (!revision) continue;
+    // Coverage is diagnostic, never a source of historical propositions. Earlier
+    // versions let this pass replace titles/purposes/keyClaims and it hardened user
+    // hypotheses into facts before documentary evidence was available. Preserve the
+    // graph-first argument verbatim; only assignments and coverage ownership enter.
+    section.ideaIds = [...new Set([...section.ideaIds, ...revision.ideaIds])].slice(0, MAX_SECTION_IDEAS);
+    section.workIds = [...new Set([...section.workIds, ...revision.workIds])];
+    section.gapIds = [...new Set([...section.gapIds, ...revision.gapIds])];
+    section.contradictionIds = [...new Set([...section.contradictionIds, ...revision.contradictionIds])];
+    section.passageIds = [];
+    section.coverageQuestions = [...new Set([
+      ...(section.coverageQuestions ?? []),
+      ...(revision.coverageQuestions ?? []),
+    ])].filter((question) => coverageQuestions.includes(question));
+  }
+}
+
+export function normalizeSectionClaimAudit(
+  audit: SectionClaimAudit,
+  originals: string[],
+  allowedTokens: Set<string>,
+): SectionClaimAudit {
+  const input = Array.isArray(audit?.items) ? audit.items : [];
+  return {
+    items: originals.map((original, index) => {
+      const candidate = input[index];
+      const proposedStatus = candidate?.status === 'supported' || candidate?.status === 'partial' || candidate?.status === 'unsupported'
+        ? candidate.status
+        : 'unsupported';
+      const rawEvidenceTokens = Array.isArray(candidate?.evidenceTokens)
+        ? candidate.evidenceTokens.filter((token) => typeof token === 'string' && allowedTokens.has(token)).slice(0, 6)
+        : [];
+      const evidencePack = Array.isArray(candidate?.evidencePack)
+        ? candidate.evidencePack
+          .filter((entry) => entry && typeof entry.token === 'string' && allowedTokens.has(entry.token))
+          .map((entry) => ({
+            token: entry.token,
+            // A work token only names a book and cannot entail a factual clause.
+            // Ideas, passages, gaps and contradictions carry actual audited notes.
+            role: entry.role === 'direct' && !entry.token.includes('(nodus://work/')
+              ? 'direct' as const
+              : entry.role === 'direct' || entry.role === 'context'
+                ? 'context' as const
+                : 'irrelevant' as const,
+            reason: String(entry.reason ?? '').trim(),
+          }))
+          .filter((entry, at, all) => all.findIndex((other) => other.token === entry.token) === at)
+        : [];
+      const direct = evidencePack.filter((entry) => entry.role === 'direct').slice(0, 3);
+      const context = evidencePack.filter((entry) => entry.role === 'context').slice(0, 2);
+      const irrelevant = evidencePack.filter((entry) => entry.role === 'irrelevant').slice(0, 12);
+      const boundedEvidencePack = [...direct, ...context, ...irrelevant];
+      const packedSupportTokens = [...direct, ...context].map((entry) => entry.token);
+      const evidenceTokens = [...new Set(packedSupportTokens.length > 0 ? packedSupportTokens : rawEvidenceTokens)].slice(0, 5);
+      const directTokens = new Set(direct.map((entry) => entry.token));
+      const requirements = Array.isArray(candidate?.requirements)
+        ? candidate.requirements.slice(0, 12).map((requirement) => {
+          const requirementEvidence = Array.isArray(requirement?.evidenceTokens)
+            ? requirement.evidenceTokens
+              .filter((token) => typeof token === 'string' && allowedTokens.has(token))
+              .slice(0, 3)
+            : [];
+          return {
+            text: String(requirement?.text ?? '').trim(),
+            proofRole: normalizeProofRole(requirement?.proofRole),
+            // The model proposes the checklist, but cannot self-certify it. Only
+            // overlap with evidence it separately classified as direct counts.
+            supported: requirementEvidence.some((token) => directTokens.has(token)),
+            evidenceTokens: requirementEvidence.filter((token) => directTokens.has(token)),
+          };
+        }).filter((requirement) => requirement.text.length > 0)
+        : [];
+      const supportedRequirements = requirements.filter((requirement) => requirement.supported).length;
+      const status = requirements.length > 0
+        ? supportedRequirements === requirements.length && direct.length > 0
+          ? 'supported'
+          : supportedRequirements > 0
+            ? 'partial'
+            : 'unsupported'
+        : evidencePack.length > 0 && direct.length === 0
+          ? 'unsupported'
+          : proposedStatus;
+      const proposed = String(candidate?.revised ?? '').trim();
+      const revised = proposed || epistemicFallback(original, status);
+      return {
+        original,
+        status,
+        revised: status === 'unsupported' && !isExplicitlyUnresolved(revised)
+          ? epistemicFallback(original, status)
+          : status === 'partial' && !isExplicitlyQualified(revised)
+            ? epistemicFallback(original, status)
+            : revised,
+        evidenceTokens,
+        reason: String(candidate?.reason ?? '').trim(),
+        evidencePack: boundedEvidencePack,
+        requirements,
+      };
+    }),
+  };
+}
+
+function normalizeProofRole(value: unknown): DeepResearchProofRole {
+  const normalized = String(value ?? '').trim().toLocaleLowerCase();
+  const roles = new Set([
+    'fact', 'actor_time', 'mechanism', 'causality', 'comparison_side',
+    'agreement', 'contradiction', 'effect', 'reception', 'limit', 'method',
+  ]);
+  return roles.has(normalized)
+    ? normalized as DeepResearchProofRole
+    : 'fact';
+}
+
+function epistemicFallback(claim: string, status: SectionClaimAuditItem['status']): string {
+  if (status === 'supported') return claim;
+  if (status === 'partial') {
+    const original = claim.trim().replace(/[.!?]+$/u, '');
+    const replacements: Array<[RegExp, string]> = [
+      [/\bfuncion[oó]\b/iu, 'pudo funcionar'],
+      [/\boper[oó]\b/iu, 'pudo operar'],
+      [/\bcontribuy[oó]\b/iu, 'pudo contribuir'],
+      [/\bfacilit[oó]\b/iu, 'pudo facilitar'],
+      [/\bpermiti[oó]\b/iu, 'pudo permitir'],
+      [/\btransform[oó]\b/iu, 'pudo transformar'],
+      [/\bcontrol[oó]\b/iu, 'pudo condicionar'],
+      [/\bdetermin[oó]\b/iu, 'pudo influir en'],
+    ];
+    let bounded = original;
+    for (const [pattern, replacement] of replacements) {
+      if (!pattern.test(bounded)) continue;
+      bounded = bounded.replace(pattern, replacement);
+      break;
+    }
+    if (bounded === original) {
+      const decapitalized = original.length > 1
+        ? `${original[0].toLocaleLowerCase()}${original.slice(1)}`
+        : original.toLocaleLowerCase();
+      bounded = `Cabe plantear como hipótesis que ${decapitalized}`;
+    }
+    return `${bounded}, aunque su alcance efectivo y su grado de generalización permanecen por determinar.`;
+  }
+  return `El corpus disponible no permite establecer como hecho esta proposición y debe tratarse como una pregunta abierta: ${claim}`;
+}
+
+function isExplicitlyUnresolved(value: string): boolean {
+  return /\b(?:no permite|no demuestra|no establece|pregunta abierta|hip[oó]tesis|queda por determinar|evidencia insuficiente|cannot establish|open question|hypothesis|insufficient evidence)\b/iu.test(value);
+}
+
+function isExplicitlyQualified(value: string): boolean {
+  return /\b(?:parcial|provisional|sugiere|apunta|parece|podr[ií]a|pudo|cabe|permite sostener|en parte|aunque|sin que|no implica|no demuestra|no permite|seg[uú]n|para .+ autor|se ha interpretado|hip[oó]tesis|partial|provisional|suggests|may|might|could|although|does not imply|according to)\b/iu.test(value);
+}
+
+/**
+ * Document preparation follows the graph's decisions. Planned works come first,
+ * then works behind the assigned ideas, then the remaining graph-ranked works.
+ * This order is the inverse of document-led planning by construction.
+ */
+export function plannedCandidateWorkIds(
+  plan: DeepResearchPlan,
+  snapshot: WritingWorkshopSnapshot,
+): string[] {
+  const result: string[] = [];
+  const seen = new Set<string>();
+  const add = (id: string | null | undefined) => {
+    if (!id || seen.has(id)) return;
+    seen.add(id);
+    result.push(id);
+  };
+  const ideas = new Map(snapshot.ideas.map((idea) => [idea.id, idea]));
+  for (const section of plan.sections) {
+    section.workIds.forEach(add);
+    for (const ideaId of section.ideaIds) {
+      for (const work of ideas.get(ideaId)?.works ?? []) add(work.nodus_id);
+    }
+  }
+  snapshot.works.forEach((work) => add(work.id));
+  return result;
 }
 
 export function normalizePlan(
   plan: DeepResearchPlan,
   snapshot: WritingWorkshopSnapshot,
-  maxSections: number = MAX_SECTIONS
+  maxSections: number = Number.MAX_SAFE_INTEGER,
+  coverageQuestions: string[] = [],
 ): DeepResearchPlan {
   const ideaIds = new Set(snapshot.ideas.map((i) => i.id));
   const workIds = new Set(snapshot.works.map((w) => w.id));
@@ -814,6 +1848,7 @@ export function normalizePlan(
   const contradictionIds = new Set(snapshot.contradictions.map((c) => c.id));
   const passageIds = new Set(snapshot.passages.map((p) => p.id));
 
+  const validCoverageQuestions = new Set(coverageQuestions);
   const sections = (plan.sections ?? []).slice(0, maxSections).map((s, index) => ({
     id: cleanStr(s.id, `s${index + 1}`),
     title: normalizeSectionTitle(cleanStr(s.title, `Sección ${index + 1}`)),
@@ -824,15 +1859,90 @@ export function normalizePlan(
     gapIds: strList(s.gapIds).filter((id) => gapIds.has(id)),
     contradictionIds: strList(s.contradictionIds).filter((id) => contradictionIds.has(id)),
     passageIds: strList(s.passageIds).filter((id) => passageIds.has(id)),
+    coverageQuestions: strList(s.coverageQuestions).filter((question) => validCoverageQuestions.has(question)),
+    coverageClaims: [],
+    retrievalEvidencePacks: [],
     role: (s.role === 'intro' || s.role === 'synthesis' ? s.role : 'body') as DeepResearchPlanSection['role'],
     dependsOn: strList(s.dependsOn),
   }));
 
+  assignMissingCoverageQuestions(sections, coverageQuestions);
   return {
     title: cleanStr(plan.title, ''),
     abstract: cleanStr(plan.abstract, ''),
     sections: ensureIdeaAssignment(orderSections(sections), snapshot),
   };
+}
+
+/** Remove excluded axes at the plan boundary, before their ids can drive document
+ * preparation or section retrieval. Prompt instructions alone proved insufficient. */
+export function enforcePlanObjectiveExclusions(
+  plan: DeepResearchPlan,
+  snapshot: WritingWorkshopSnapshot,
+  objective: string,
+): void {
+  if (objectiveExclusionStems(objective).length === 0) return;
+  const ideaById = new Map(snapshot.ideas.map((item) => [item.id, item]));
+  const gapById = new Map(snapshot.gaps.map((item) => [item.id, item]));
+  const contradictionById = new Map(snapshot.contradictions.map((item) => [item.id, item]));
+  plan.abstract = plan.abstract
+    .split(/(?<=[.!?])\s+/u)
+    .filter((sentence) => !matchesObjectiveExclusion(sentence, objective))
+    .join(' ')
+    .trim();
+  for (const section of plan.sections) {
+    section.keyClaims = section.keyClaims.filter((claim) => !matchesObjectiveExclusion(claim, objective));
+    section.coverageClaims = (section.coverageClaims ?? []).filter((claim) => !matchesObjectiveExclusion(claim, objective));
+    section.ideaIds = section.ideaIds.filter((id) => {
+      const item = ideaById.get(id);
+      return !item || !matchesObjectiveExclusion(`${item.label} ${item.statement} ${item.summary}`, objective);
+    });
+    section.gapIds = section.gapIds.filter((id) => {
+      const item = gapById.get(id);
+      return !item || !matchesObjectiveExclusion(`${item.label} ${item.summary}`, objective);
+    });
+    section.contradictionIds = section.contradictionIds.filter((id) => {
+      const item = contradictionById.get(id);
+      return !item || !matchesObjectiveExclusion(`${item.label} ${item.summary}`, objective);
+    });
+  }
+}
+
+/**
+ * A planner may silently omit the hardest part of a compound brief. Keep its own
+ * assignments when valid, then deterministically place every missing question in
+ * the section whose stated purpose overlaps it most. Ties prefer body sections.
+ */
+export function assignMissingCoverageQuestions(sections: DeepResearchPlanSection[], questions: string[]): void {
+  if (!sections.length || !questions.length) return;
+  const valid = new Set(questions);
+  const assigned = new Set<string>();
+  // One primary home per requirement. Duplicates are diagnostic noise and made
+  // multiple sections repeat the same answer even though coverage entered late.
+  for (const section of sections) {
+    section.coverageQuestions = (section.coverageQuestions ?? []).filter((question) => {
+      if (!valid.has(question) || assigned.has(question)) return false;
+      assigned.add(question);
+      return true;
+    });
+  }
+  for (const question of questions) {
+    if (assigned.has(question)) continue;
+    let best = sections[0];
+    let bestScore = -Infinity;
+    for (const section of sections) {
+      const text = `${section.title} ${section.purpose} ${section.keyClaims.join(' ')}`;
+      const score = relevanceScore(tokenSet(question), text)
+        + (section.role === 'body' ? 0.08 : 0)
+        - (section.coverageQuestions?.length ?? 0) * 0.015;
+      if (score > bestScore) {
+        best = section;
+        bestScore = score;
+      }
+    }
+    best.coverageQuestions = [...(best.coverageQuestions ?? []), question];
+    assigned.add(question);
+  }
 }
 
 /**
@@ -1069,20 +2179,6 @@ async function finalizeWithFallback(deps: DeepResearchDeps, input: FinalizeInput
 // Coverage / degraded fallbacks
 // ─────────────────────────────────────────────────────────────────────────────
 
-function coverageSection(index: number, uncovered: WritingWorkshopIdeaCandidate[], L: Labels): DeepResearchPlanSection {
-  return {
-    id: `cov-${index}`,
-    title: `${L.coverageTitle} ${index}`,
-    purpose: L.coveragePurpose,
-    keyClaims: uncovered.slice(0, 4).map((i) => i.label),
-    ideaIds: uncovered.map((i) => i.id),
-    workIds: [],
-    gapIds: [],
-    contradictionIds: [],
-    passageIds: [],
-  };
-}
-
 function mergePlanSections(a: DeepResearchPlanSection, b: DeepResearchPlanSection): DeepResearchPlanSection {
   const unique = (values: string[]) => [...new Set(values)];
   return {
@@ -1136,6 +2232,61 @@ function degradedSection(section: DeepResearchPlanSection, maps: SnapshotMaps, L
   if (bullets.length > 0) lines.push(...bullets);
   else lines.push(`_${L.degradedEmpty}_`);
   return lines.join('\n');
+}
+
+/**
+ * Gemini occasionally copies an allowed citation as `[Author, year]` but drops the
+ * Markdown target. It looks scholarly while being unverifiable. Recover only labels
+ * that identify an entry already present in this section's menu; the normal citation
+ * policy and entailment verifier still run afterwards, so this cannot widen the
+ * evidence boundary or make an unsupported attribution survive.
+ */
+export function recoverPlainMenuCitations(markdown: string, menu: CitationMenuItem[]): string {
+  const allowed = menu.flatMap((item) => {
+    const match = item.token.match(/^\[([^\]\n]+)\]\((nodus:\/\/[^)\s]+)\)$/u);
+    return match ? [{ label: item.source || match[1], anchor: match[1], url: match[2] }] : [];
+  });
+  if (!allowed.length) return markdown;
+  return markdown.replace(/\[([^\]\n]{3,220})\](?!\()/gu, (whole, contents: string) => {
+    const parts = contents.split(/\s*;\s*/u);
+    let recovered = 0;
+    const rendered = parts.map((part) => {
+      const item = bestPlainCitationMatch(part, allowed);
+      if (!item) return `[${part}]`;
+      recovered += 1;
+      return `[${part}](${item.url})`;
+    });
+    return recovered > 0 ? rendered.join('; ') : whole;
+  });
+}
+
+function bestPlainCitationMatch(
+  visible: string,
+  allowed: { label: string; anchor: string; url: string }[],
+): { label: string; anchor: string; url: string } | null {
+  const normalizedVisible = normalizeCitationIdentity(visible);
+  const exact = allowed.find((item) => {
+    const label = normalizeCitationIdentity(item.label);
+    const anchor = normalizeCitationIdentity(item.anchor);
+    return normalizedVisible === label || normalizedVisible === anchor
+      || normalizedVisible.startsWith(`${label} `) || normalizedVisible.startsWith(`${anchor} `);
+  });
+  if (exact) return exact;
+  const visibleYear = normalizedVisible.match(/\b(?:1[5-9]|20)\d{2}\b/u)?.[0];
+  if (!visibleYear) return null;
+  return allowed.find((item) => {
+    const identity = normalizeCitationIdentity(item.label || item.anchor);
+    if (!identity.includes(visibleYear)) return false;
+    const authorTerms = identity
+      .split(/\s+/u)
+      .filter((term) => term.length > 2 && !/^\d{4}$/u.test(term) && term !== 'ed')
+      .slice(0, 2);
+    return authorTerms.length > 0 && authorTerms.every((term) => normalizedVisible.includes(term));
+  }) ?? null;
+}
+
+function normalizeCitationIdentity(value: string): string {
+  return value.toLocaleLowerCase('es-ES').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1258,6 +2409,28 @@ export function mergeRetrievedMaterial(
     passageIds.push(p.id);
   }
   return { ideaIds, passageIds };
+}
+
+function mergeSectionEvidencePacks(
+  section: DeepResearchPlanSection,
+  incoming: NonNullable<SectionRetrievalResult['evidencePacks']>,
+): void {
+  const packs = section.retrievalEvidencePacks ?? [];
+  for (const pack of incoming) {
+    const question = String(pack?.question ?? '').trim();
+    if (!question) continue;
+    const passageIds = (pack.passageIds ?? []).filter((id): id is string => typeof id === 'string' && id.length > 0);
+    const existing = packs.find((candidate) => candidate.question === question);
+    const candidates = (pack.candidates ?? []).filter((candidate) => passageIds.includes(candidate.passageId));
+    if (existing) {
+      existing.passageIds = [...new Set([...existing.passageIds, ...passageIds])];
+      existing.candidates = [...(existing.candidates ?? []), ...candidates]
+        .filter((candidate, index, all) => all.findIndex((item) => item.passageId === candidate.passageId) === index);
+    } else {
+      packs.push({ question, passageIds: [...new Set(passageIds)], candidates: [...candidates] });
+    }
+  }
+  section.retrievalEvidencePacks = packs;
 }
 
 const CITATION_RE = /\[([^\]]*)\]\(nodus:\/\/(idea|work|passage|gap|contradiction)\/([^)]+)\)/g;
@@ -1499,6 +2672,8 @@ export function extractCitationClaims(markdown: string, maps: SnapshotMaps): Cit
       if (!content) continue;
       claims.push({
         offset: bodyStart + span.start + (match.index ?? 0),
+        sentenceOffset: bodyStart + span.start,
+        sentenceEnd: bodyStart + span.end,
         link: match[0],
         kind: type,
         id,
@@ -1578,6 +2753,8 @@ export function groundCoherenceIssues(
 function normalizeForMatch(text: string): string {
   return stripMarkdown(text ?? '')
     .toLocaleLowerCase('es-ES')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
     .replace(/\s+/g, ' ')
     .trim();
 }
@@ -1594,34 +2771,64 @@ export interface VerificationOutcome {
 }
 
 /**
- * Apply the verdicts. A citation the source does not support is a false attribution,
- * so it is removed outright — leaving the sentence standing but unsupported is bad,
- * leaving a wrong attribution in an academic report is worse. What was removed is
- * counted and surfaced instead of being swallowed.
+ * Apply the verdicts. A citation the source does not support is a false attribution.
+ * Remove the complete sentence whenever any attached source is partial or
+ * unsupported. Merely deleting the weak link can leave an unsupported conjunct
+ * alive beside a different, valid citation. The bounded evidence-repair pass may
+ * restore a narrower sentence, and that replacement must itself be re-verified.
  */
 export function applyVerification(markdown: string, claims: CitationClaim[], verdicts: CitationVerdict[]): VerificationOutcome {
-  const doomed = claims
-    .map((claim, index) => ({ claim, verdict: verdicts[index] }))
-    .filter((entry) => entry.verdict === 'unsupported');
+  const judged = claims.map((claim, index) => ({ claim, verdict: verdicts[index] }));
+  const unsupportedEntries = judged.filter((entry) => entry.verdict === 'unsupported');
   const partial = verdicts.filter((v) => v === 'partial').length;
+
+  // A partial verdict is a known mismatch between sentence and source, not an
+  // acceptable final citation. Fail the whole sentence closed even when another
+  // citation passed: otherwise “A y B (source A; source B)” can retain B after its
+  // only support was rejected. The repair pass can split and restore proven parts.
+  const bySentence = new Map<string, typeof judged>();
+  for (const entry of judged) {
+    const key = `${entry.claim.sentenceOffset}:${entry.claim.sentenceEnd}`;
+    const group = bySentence.get(key) ?? [];
+    group.push(entry);
+    bySentence.set(key, group);
+  }
+  const removedSentenceKeys = new Set(
+    [...bySentence.entries()]
+      .filter(([, entries]) => entries.some((entry) => entry.verdict !== 'supports'))
+      .map(([key]) => key),
+  );
+  const operations: Array<{ start: number; end: number; sentence: string }> = [];
+  for (const [key, entries] of bySentence) {
+    if (removedSentenceKeys.has(key)) {
+      const claim = entries[0].claim;
+      operations.push({ start: claim.sentenceOffset, end: claim.sentenceEnd, sentence: claim.sentence });
+      continue;
+    }
+    for (const { claim, verdict } of entries) {
+      if (verdict !== 'supports') operations.push({ start: claim.offset, end: claim.offset + claim.link.length, sentence: claim.sentence });
+    }
+  }
 
   // Remove from the end so earlier offsets stay valid.
   let out = markdown;
   const strippedSentences: string[] = [];
-  for (const { claim } of [...doomed].sort((a, b) => b.claim.offset - a.claim.offset)) {
-    if (out.slice(claim.offset, claim.offset + claim.link.length) !== claim.link) continue;
-    out = out.slice(0, claim.offset) + out.slice(claim.offset + claim.link.length);
-    strippedSentences.push(claim.sentence);
+  for (const operation of operations.sort((a, b) => b.start - a.start)) {
+    out = out.slice(0, operation.start) + out.slice(operation.end);
+    strippedSentences.push(operation.sentence);
   }
   out = out
     .replace(/\(\s*[;,]?\s*\)/g, '')
     .replace(/\s+([.,;)])/g, '$1')
-    .replace(/[ \t]{2,}/g, ' ');
+    .replace(/[,;:]\s*([.!?])/g, '$1')
+    .replace(/[ \t]{2,}/g, ' ')
+    .replace(/\n[ \t]+/g, '\n')
+    .replace(/\n{3,}/g, '\n\n');
   const audit = claims
     .map((claim, index) => ({ verdict: verdicts[index], claim }))
     .filter((entry) => entry.verdict === 'partial' || entry.verdict === 'unsupported')
     .map((entry) => ({ verdict: entry.verdict === 'partial' ? ('partial' as const) : ('removed' as const), claim: entry.claim }));
-  return { markdown: out, checked: claims.length, partial, unsupported: doomed.length, strippedSentences, audit };
+  return { markdown: out, checked: claims.length, partial, unsupported: unsupportedEntries.length, strippedSentences, audit };
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1686,9 +2893,21 @@ export function assembleMarkdown(
   written: { section: DeepResearchPlanSection; markdown: string }[],
   references: string[],
   finalize: FinalizeResult,
-  language: PromptLanguage
+  language: PromptLanguage,
+  structure: DeepResearchRequest['sectionLimit'] = 'auto',
 ): string {
   const L = labels(language);
+  if (structure === 'single') {
+    return assembleContinuousNarrative(
+      written.map((item) => item.markdown),
+      references,
+      finalize.limitations,
+      L.references,
+      L.limitations,
+      L.noReferences,
+      finalize.abstract,
+    );
+  }
   const parts: string[] = [];
   if (finalize.abstract) {
     parts.push(`## ${L.abstract}`, '', finalize.abstract, '');
@@ -1703,6 +2922,37 @@ export function assembleMarkdown(
   if (references.length > 0) parts.push(...references.map((r) => `- ${r}`));
   else parts.push(`- ${L.noReferences}`);
   return parts.join('\n').replace(/\n{3,}/g, '\n\n').trim();
+}
+
+/**
+ * Publish a continuous report without weakening retrieval. Writers may still work
+ * over several evidence-sized argumentative movements; this deterministic final
+ * pass removes their presentation headings and joins the verified prose. Keeping
+ * the technical references/limitations as bold labels makes them navigable without
+ * turning them into report sections.
+ */
+export function assembleContinuousNarrative(
+  narrativeParts: string[],
+  references: string[],
+  limitations: string[],
+  referencesLabel: string,
+  limitationsLabel: string,
+  noReferencesLabel: string,
+  abstract = '',
+): string {
+  const prose = narrativeParts
+    .map((part) => part
+      .replace(/^#{1,6}\s+[^\n]+\n*/gmu, '')
+      .replace(/\n{3,}/gu, '\n\n')
+      .trim())
+    .filter(Boolean)
+    .join('\n\n');
+  const parts = [abstract.trim(), prose];
+  if (limitations.length) {
+    parts.push(`**${limitationsLabel}.** ${limitations.map((item) => item.trim().replace(/[.]+$/u, '')).filter(Boolean).join('. ')}.`);
+  }
+  parts.push(`**${referencesLabel}**\n\n${references.length ? references.map((reference) => `- ${reference}`).join('\n') : `- ${noReferencesLabel}`}`);
+  return parts.filter(Boolean).join('\n\n').replace(/\n{3,}/gu, '\n\n').trim();
 }
 
 function sectionSources(section: DeepResearchPlanSection, maps: SnapshotMaps): string[] {
@@ -1723,7 +2973,7 @@ export function buildCitationMenu(section: DeepResearchPlanSection, maps: Snapsh
   // the report worse: verbatim quoting more than tripled, the argument leaned on a
   // third fewer distinct works because each passage belongs to a single one, and
   // unsupported citations doubled as claims overreached a narrow snippet.
-  for (const id of section.ideaIds) {
+  for (const id of sourceBalancedIdeaIds(section.ideaIds, maps)) {
     const idea = maps.ideaById.get(id);
     if (!idea) continue;
     items.push({
@@ -1780,6 +3030,64 @@ export function buildCitationMenu(section: DeepResearchPlanSection, maps: Snapsh
     });
   }
   return items;
+}
+
+/**
+ * Preserve the planner's relevance order while interleaving works. Models privilege
+ * early menu items; grouping ten ideas from one book before the alternatives made a
+ * diverse menu behave like a single-source menu in practice.
+ */
+function sourceBalancedIdeaIds(ids: string[], maps: SnapshotMaps): string[] {
+  const buckets = new Map<string, string[]>();
+  const order: string[] = [];
+  for (const id of ids) {
+    const idea = maps.ideaById.get(id);
+    if (!idea) continue;
+    const source = idea.works[0]?.nodus_id ?? `idea:${id}`;
+    if (!buckets.has(source)) {
+      buckets.set(source, []);
+      order.push(source);
+    }
+    buckets.get(source)!.push(id);
+  }
+  const out: string[] = [];
+  let remaining = true;
+  while (remaining) {
+    remaining = false;
+    for (const source of order) {
+      const next = buckets.get(source)?.shift();
+      if (!next) continue;
+      out.push(next);
+      remaining = true;
+    }
+  }
+  return out;
+}
+
+function citationUrlFromToken(token: string): string | null {
+  return token.match(/\]\((nodus:\/\/[^)\s]+)\)/u)?.[1] ?? null;
+}
+
+function normalizedQualitySource(item: CitationMenuItem): string {
+  const source = item.source?.trim();
+  if (source) return source.replace(/,\s*(?:p\.?\s*)?\d+(?:[-–]\d+)?$/iu, '').toLocaleLowerCase();
+  return citationUrlFromToken(item.token) ?? item.token;
+}
+
+export function qualitySourcesFromMenu(menu: CitationMenuItem[]): DeepResearchQualitySource[] {
+  return menu.flatMap((item) => {
+    const citation = citationUrlFromToken(item.token);
+    if (!citation) return [];
+    return [{
+      citation,
+      sourceId: normalizedQualitySource(item),
+      evidence: item.kind === 'passage' ? 'literal' as const : 'synthesis' as const,
+    }];
+  });
+}
+
+function citationUrlsFromMenu(menu: CitationMenuItem[]): Set<string> {
+  return new Set(menu.map((item) => citationUrlFromToken(item.token)).filter((url): url is string => Boolean(url)));
 }
 
 /** Author-year behind a flagged claim, so the reader knows which source to open. */
@@ -1892,46 +3200,17 @@ function summarizePrior(written: { section: DeepResearchPlanSection; markdown: s
 
 /** The last `count` sentences of a passage of prose. */
 function closingSentences(text: string, count: number): string {
-  const sentences = (text ?? '').match(/[^.!?]+[.!?]+/g);
-  if (!sentences || sentences.length === 0) return text ?? '';
+  const sentences = (text ?? '').split(/(?<=[.!?])\s+/u).filter(Boolean);
+  if (sentences.length === 0) return text ?? '';
   return sentences.slice(-count).join(' ').trim();
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Target sizing
-// ─────────────────────────────────────────────────────────────────────────────
-
-export function resolveTargetPages(
-  target: DeepResearchTargetLength,
-  snapshot: Pick<WritingWorkshopSnapshot, 'ideas'>
-): { min: number; max: number } {
-  switch (target) {
-    case 'concise':
-      return { min: 5, max: 8 };
-    case 'standard':
-      return { min: 9, max: 14 };
-    case 'exhaustive':
-      return { min: 15, max: 20 };
-    case 'adaptive':
-    default: {
-      const ideas = snapshot.ideas.length;
-      const estimate = clamp(Math.round(ideas / 6), MIN_TARGET_PAGES, 18);
-      const min = clamp(estimate, MIN_TARGET_PAGES, MAX_TARGET_PAGES - 2);
-      const max = clamp(min + 4, min + 2, MAX_TARGET_PAGES);
-      return { min, max };
-    }
-  }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Small pure utilities
 // ─────────────────────────────────────────────────────────────────────────────
 
-function midpoint(range: { min: number; max: number }): number {
-  return (range.min + range.max) / 2;
-}
 function pagesFromWords(words: number): number {
-  return Math.max(1, Math.round(words / WORDS_PER_PAGE));
+  return Math.max(1, Math.round(words / OBSERVED_WORDS_PER_PAGE));
 }
 export function countWords(text: string): number {
   return stripMarkdown(text).split(/\s+/).filter(Boolean).length;
@@ -1946,9 +3225,6 @@ function stripMarkdown(text: string): string {
 function firstSentence(text: string): string {
   const match = text.match(/^.*?[.!?](\s|$)/);
   return (match ? match[0] : text).trim();
-}
-function clamp(value: number, min: number, max: number): number {
-  return Math.max(min, Math.min(max, value));
 }
 function clip(text: string, max: number): string {
   const clean = (text ?? '').replace(/\s+/g, ' ').trim();
@@ -1972,13 +3248,11 @@ export interface Labels {
   references: string;
   noReferences: string;
   gathering: string;
-  planning: (sections: number, pages: { min: number; max: number }) => string;
+  planning: (sections: number) => string;
   writing: string;
   coverage: (pending: number) => string;
   assembling: string;
   done: (sections: number, pages: number) => string;
-  stoppedSections: (cap: number) => string;
-  stoppedPages: (pages: number) => string;
   degraded: string;
   degradedEmpty: string;
   coverageTitle: string;
@@ -2008,13 +3282,11 @@ const ES: Labels = {
   references: 'Referencias',
   noReferences: 'Sin fuentes citadas.',
   gathering: 'Reuniendo materiales del corpus…',
-  planning: (s, p) => `Planificando ~${s} secciones de fondo (${p.min}–${p.max} páginas)…`,
+  planning: (s) => `Planificando ${s} movimientos argumentales según la evidencia…`,
   writing: 'Redactando',
   coverage: (n) => `Ampliando cobertura (${n} ideas pendientes)…`,
   assembling: 'Ensamblando informe y referencias…',
   done: (s, p) => `Informe listo: ${s} secciones · ~${p} páginas`,
-  stoppedSections: (c) => `Se alcanzó el máximo de ${c} secciones.`,
-  stoppedPages: (p) => `Se alcanzó el presupuesto máximo de ~${p} páginas.`,
   degraded: 'Una o más secciones no pudieron generarse con el modelo y se resolvieron de forma degradada.',
   degradedEmpty: 'No se pudo desarrollar esta sección con el modelo; revisar los materiales asignados.',
   coverageTitle: 'Desarrollo complementario',
@@ -2047,13 +3319,11 @@ const EN: Labels = {
   references: 'References',
   noReferences: 'No sources cited.',
   gathering: 'Gathering corpus material…',
-  planning: (s, p) => `Planning ~${s} substantial sections (${p.min}–${p.max} pages)…`,
+  planning: (s) => `Planning ${s} evidence-derived argumentative movements…`,
   writing: 'Writing',
   coverage: (n) => `Widening coverage (${n} ideas still untouched)…`,
   assembling: 'Assembling report and references…',
   done: (s, p) => `Report ready: ${s} sections · ~${p} pages`,
-  stoppedSections: (c) => `Reached the ceiling of ${c} sections.`,
-  stoppedPages: (p) => `Reached the maximum budget of ~${p} pages.`,
   degraded: 'One or more sections could not be generated by the model and were resolved in a degraded form.',
   degradedEmpty: 'The model could not develop this section; review the assigned material.',
   coverageTitle: 'Further development',

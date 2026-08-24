@@ -883,6 +883,27 @@ export function Settings({
             <Row label={t('Reanudar cola al abrir')}>
               <input type="checkbox" checked={settings.autoResumeQueue} onChange={(e) => patch({ autoResumeQueue: e.target.checked })} />
             </Row>
+            {activeVault?.type === 'academic' && <>
+              <div className="mt-4 border-t border-neutral-800 pt-4">
+                <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-neutral-500">{t('Comprensión documental')}</h3>
+                <p className="mb-3 text-xs leading-5 text-neutral-500">{t('Crea una ficha jerárquica auditada de cada obra completa para orientar chat, Nodi, Deep Research e Immersion. Las citas siguen apuntando al texto original.')}</p>
+              </div>
+              <Row label={t('Indexar obras nuevas automáticamente')} hint={t('Continúa en segundo plano y entre vaults. Las obras actuales no se vuelven a procesar.') }>
+                <input type="checkbox" checked={settings.documentIndexingEnabled} onChange={async (event) => {
+                  const enabled = event.target.checked;
+                  await patch({ documentIndexingEnabled: enabled });
+                }} />
+              </Row>
+              <Row label={t('Incluir obras archivadas')}>
+                <input type="checkbox" checked={settings.documentIndexIncludeArchived} onChange={(event) => void patch({ documentIndexIncludeArchived: event.target.checked })} />
+              </Row>
+              <Row label={t('Concurrencia documental')} hint={t('Automático usa dos trabajadores; reduce el valor si el proveedor limita las solicitudes.') }>
+                <select className="input" value={settings.documentIndexConcurrency} onChange={(event) => void patch({ documentIndexConcurrency: Number(event.target.value) })}>
+                  <option value={0}>{t('Automática')}</option>
+                  {[1, 2, 3, 4, 6, 8].map((value) => <option key={value} value={value}>{value}</option>)}
+                </select>
+              </Row>
+            </>}
             <p className="text-xs text-neutral-500">
               {t('Apagado por defecto: sincronizar solo incorpora metadatos. Los análisis manuales desde Biblioteca o Colecciones se ejecutan siempre.')}
             </p>
@@ -2071,6 +2092,7 @@ export function Settings({
                         <div>
                           <label className="text-sm text-neutral-700 dark:text-neutral-300">{t('Incluir vectores semánticos')}</label>
                           <p className="mt-0.5 text-xs text-neutral-500">{t('Permite buscar por significado desde el móvil o una réplica. Sin ellos solo se puede buscar por texto literal. Se derivan de ideas que ya viajan y no se pueden revertir al texto original.')}</p>
+                          <p className="mt-0.5 text-xs text-neutral-500">{t('Incluye las representaciones auditadas de documentos; los vectores de pasajes solo viajan si también compartes los pasajes.')}</p>
                         </div>
                         <input type="checkbox" checked={settings.nodusServerIncludeVectors} onChange={(event) => void patch({ nodusServerIncludeVectors: event.target.checked })} />
                       </div>
@@ -2946,6 +2968,13 @@ export function Settings({
                 <SubscriptionQuotaNotice model={settings.visionModel} />
                 <Row label={t('Resúmenes de obras')}><ModelWithReasoning allowEmpty={false} settings={settings} value={settings.summaryModel} onChange={(summaryModel) => void patch({ summaryModel })} emptyLabel="Seleccionar modelo" /></Row>
                 <SubscriptionQuotaNotice model={settings.summaryModel} />
+                {activeVault?.type === 'academic' && <>
+                  <Row label={t('Comprensión de documentos completos')} hint={t('Analiza todas las secciones y sintetiza la arquitectura global de cada obra.')}><ModelWithReasoning settings={settings} value={settings.documentProfileModel} onChange={(documentProfileModel) => void patch({ documentProfileModel })} emptyLabel="Usar modelo de resúmenes" requireExtraction /></Row>
+                  <ExtractionCapabilityNotice model={settings.documentProfileModel ?? settings.summaryModel} />
+                  <SubscriptionQuotaNotice model={settings.documentProfileModel ?? settings.summaryModel} />
+                  <Row label={t('Auditor de fichas documentales')} hint={t('Revisa soporte, cobertura y fidelidad antes de publicar una versión nueva.')}><ModelWithReasoning settings={settings} value={settings.documentAuditModel} onChange={(documentAuditModel) => void patch({ documentAuditModel })} emptyLabel="Usar modelo de comprensión documental" requireExtraction /></Row>
+                  <SubscriptionQuotaNotice model={settings.documentAuditModel ?? settings.documentProfileModel ?? settings.summaryModel} />
+                </>}
                 <Row label={t('Fusión y deduplicación')}><ModelWithReasoning allowEmpty={false} settings={settings} value={settings.fusionModel} onChange={(fusionModel) => void patch({ fusionModel })} emptyLabel="Seleccionar modelo" requireExtraction /></Row>
                 <ExtractionCapabilityNotice model={settings.fusionModel} />
                 <SubscriptionQuotaNotice model={settings.fusionModel} />

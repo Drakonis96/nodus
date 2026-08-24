@@ -398,10 +398,12 @@ test('the vectors switch exists and the privacy notice matches what really trave
   assert.doesNotMatch(privacy, /Never uploads[^.]*embeddings/i, 'the notice still claims embeddings never travel');
   assert.match(privacy, /Semantic search vectors/);
   assert.match(privacy, /no longer accurate and the statement has been corrected/);
+  assert.match(privacy, /ideas and audited document profiles/);
   assert.match(privacy, /Vectors derived from passages follow\s+the passages switch/);
   assert.match(settings, /nodusServerIncludeVectors/);
+  assert.match(settings, /Incluye las representaciones auditadas de documentos/);
   // Off means off.
   assert.match(publisher, /if \(!config\.includeVectors\) return;/);
   // Passage vectors are gated by the passages switch, not by the vectors one alone.
-  assert.match(publisher, /config\.includePassages \? \['ideas', 'passages'\] : \['ideas'\]/);
+  assert.match(publisher, /config\.includePassages \? \['ideas', 'documents', 'passages'\] : \['ideas', 'documents'\]/);
 });

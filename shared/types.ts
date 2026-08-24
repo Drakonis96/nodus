@@ -856,6 +856,193 @@ export interface WorkSummary {
   updated_at: string;
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Hierarchical document understanding
+// ─────────────────────────────────────────────────────────────────────────────
+
+export type DocumentUnderstandingState =
+  | 'missing' | 'queued' | 'waiting_source' | 'structuring' | 'analyzing'
+  | 'synthesizing' | 'auditing' | 'embedding' | 'aligning' | 'current'
+  | 'stale' | 'failed' | 'paused' | 'unavailable';
+
+export type DocumentProfileFieldKind =
+  | 'object' | 'problem' | 'question' | 'thesis' | 'argument' | 'method'
+  | 'sources' | 'concept' | 'temporal_scope' | 'geographic_scope'
+  | 'disciplinary_scope' | 'structure' | 'conclusion' | 'contribution'
+  | 'limitation' | 'genre' | 'audience' | 'positioning' | 'original_abstract';
+
+export interface DocumentProfileField {
+  fieldId: string;
+  kind: DocumentProfileFieldKind;
+  ordinal: number;
+  text: string;
+  generatedText?: string;
+  confidence: number;
+  centrality: number;
+  overridden?: boolean;
+  overrideId?: string;
+  verified?: boolean;
+  conflict?: boolean;
+}
+
+export interface DocumentSection {
+  sectionId: string;
+  parentSectionId: string | null;
+  level: number;
+  ordinal: number;
+  title: string;
+  role: string | null;
+  summary: string;
+  concepts: string[];
+  claims: string[];
+  pageStart: string | null;
+  pageEnd: string | null;
+  charStart: number | null;
+  charEnd: number | null;
+  contentHash: string;
+}
+
+export interface DocumentProfileSupport {
+  supportId: string;
+  targetKind: 'field' | 'section';
+  targetId: string;
+  sectionId: string | null;
+  passageId: string | null;
+  pageStart: string | null;
+  pageEnd: string | null;
+  quote: string;
+  supportKind: string;
+  confidence: number;
+  validationStatus: 'pending' | 'valid' | 'invalid';
+}
+
+export interface DocumentIdeaLink {
+  globalId: string;
+  targetKind: 'field' | 'section';
+  targetId: string;
+  role: 'principal' | 'supporting' | 'development' | 'contrast' | 'tangential';
+  score: number;
+}
+
+export interface DocumentProfileAudit {
+  passed: boolean;
+  score: number;
+  supportCoverage: number;
+  structureCoverage: number;
+  issues: string[];
+  repaired: boolean;
+}
+
+export interface DocumentProfile {
+  nodusId: string;
+  versionId: string;
+  status: DocumentUnderstandingState;
+  sourceFingerprint: string;
+  pipelineVersion: string;
+  sourceLanguage: string | null;
+  presentationLanguage: string;
+  overview: string;
+  generatedOverview?: string;
+  overviewOverridden?: boolean;
+  overviewOverrideId?: string;
+  overviewVerified?: boolean;
+  overviewConflict?: boolean;
+  fields: DocumentProfileField[];
+  sections: DocumentSection[];
+  supports: DocumentProfileSupport[];
+  ideaLinks: DocumentIdeaLink[];
+  audit: DocumentProfileAudit | null;
+  qualityScore: number | null;
+  generatorModel: ModelRef | null;
+  auditorModel: ModelRef | null;
+  createdAt: string;
+  publishedAt: string | null;
+  staleReason: string | null;
+}
+
+export interface DocumentProfileOverride {
+  overrideId: string;
+  nodusId: string;
+  fieldPath: string;
+  value: unknown;
+  generatedValue: unknown;
+  baseVersionId: string | null;
+  verified: boolean;
+  conflict: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type DocumentIndexJobStatus = 'queued' | 'running' | 'paused' | 'completed' | 'cancelled' | 'failed' | 'unavailable';
+export type DocumentIndexJobPhase =
+  | 'queued' | 'paused' | 'waiting_source' | 'structuring' | 'analyzing_sections'
+  | 'synthesizing' | 'auditing' | 'repairing' | 'embedding' | 'aligning' | 'publishing' | 'done';
+
+export interface DocumentIndexJob {
+  jobId: string;
+  campaignId: string | null;
+  vaultId: string;
+  nodusId: string;
+  title?: string;
+  priority: number;
+  reason: string;
+  status: DocumentIndexJobStatus;
+  phase: DocumentIndexJobPhase;
+  progress: number;
+  sourceFingerprint: string | null;
+  generatorModel: ModelRef | null;
+  auditorModel: ModelRef | null;
+  attempts: number;
+  maxAttempts: number;
+  error: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface DocumentIndexCampaign {
+  campaignId: string;
+  vaultId: string;
+  mode: 'continuous' | 'manual' | 'research';
+  status: 'queued' | 'running' | 'paused' | 'completed' | 'cancelled' | 'failed';
+  includeArchived: boolean;
+  totalJobs: number;
+  completedJobs: number;
+  failedJobs: number;
+  estimatedUnits: number;
+  completedUnits: number;
+  inputTokens: number;
+  outputTokens: number;
+  estimatedCostUsd: number | null;
+  error: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface DocumentIndexProgress {
+  campaigns: DocumentIndexCampaign[];
+  jobs: DocumentIndexJob[];
+  active: number;
+  queued: number;
+  failed: number;
+}
+
+export interface DocumentSearchHit {
+  kind: 'document' | 'section';
+  nodusId: string;
+  title: string;
+  authors: string[];
+  year: number | null;
+  versionId: string;
+  sourceId: string;
+  fieldKind: string;
+  text: string;
+  similarity: number;
+  lexicalScore?: number;
+  centrality: number;
+  explanation: string;
+  stale: boolean;
+}
+
 /** A Zotero tag available in the local library, with its current work count. */
 export interface ZoteroTag {
   label: string;
@@ -1459,6 +1646,10 @@ export interface AppSettings {
   synthesisModel: ModelRef | null;
   // Short orientation summaries of individual works. Falls back to synthesisModel.
   summaryModel: ModelRef | null;
+  /** Model used for section-by-section document understanding. Falls back to summaryModel. */
+  documentProfileModel: ModelRef | null;
+  /** Independent semantic auditor for profiles. Falls back to documentProfileModel. */
+  documentAuditModel: ModelRef | null;
   // Fusion: the many small dedup/relate calls during deep scan. Kept separate from
   // synthesisModel so a fast model can be used here without slowing long-form output.
   // Falls back to synthesisModel when unset.
@@ -1542,6 +1733,12 @@ export interface AppSettings {
   autoDeepScanOnReadTag: boolean;
   // After a deep scan completes, auto-generate the work's orientation summary.
   autoSummaryAfterDeep: boolean;
+  /** Opt-in, per-vault continuous document indexing policy. */
+  documentIndexingEnabled: boolean;
+  /** Include archived works in the continuous campaign. */
+  documentIndexIncludeArchived: boolean;
+  /** 0 selects provider-aware automatic concurrency; otherwise 1..8. */
+  documentIndexConcurrency: number;
   // When the queue drains after deep scans, auto-run semantic bridge discovery.
   autoBridgeAfterQueue: boolean;
   autoResumeQueue: boolean;
@@ -2125,6 +2322,7 @@ export type VaultAnalysisReuseKind =
   | 'ideaEmbeddings'
   | 'summary'
   | 'passages'
+  | 'documentProfile'
   | 'relations'
   | 'authors'
   | 'synthesis';
@@ -6312,6 +6510,8 @@ export interface WritingWorkshopBrief {
   language?: PromptLanguage;
   /** Deep Research only. Missing means the historical General approach. */
   deepResearchApproach?: import('./deepResearchApproaches').DeepResearchApproach;
+  /** Deep Research engine used for this request. Missing on historical drafts. */
+  deepResearchVersion?: import('./deepResearchVersions').DeepResearchVersion;
 }
 
 export interface WritingWorkshopSelection {
@@ -6378,6 +6578,10 @@ export interface WritingWorkshopWorkCandidate extends WritingWorkshopCandidateBa
   deepStatus: DeepStatus;
   /** Orientation only; never evidence or a citation target. */
   orientationSummary?: string | null;
+  /** Audited whole-document orientation. It routes retrieval but is never cited. */
+  documentOverview?: string | null;
+  documentStatus?: DocumentUnderstandingState;
+  documentVersionId?: string | null;
   ideaCount: number;
   gapCount: number;
 }
@@ -6467,6 +6671,10 @@ export interface WritingWorkshopDraft {
   limitations: string[];
   /** Persisted generation-time approach. Missing on reports created before approaches existed. */
   deepResearchApproach?: import('./deepResearchApproaches').DeepResearchApproach;
+  /** Persisted engine generation. Missing means the historical v1 architecture. */
+  deepResearchVersion?: import('./deepResearchVersions').DeepResearchVersion;
+  /** Persisted presentation structure. Missing reports use ordinary headed sections. */
+  deepResearchStructure?: 'sectioned' | 'single';
   /** Exact generation-time model. Null means no Nodus writing model was used or recorded. */
   generationModel?: ModelRef | null;
   /**
@@ -6476,6 +6684,8 @@ export interface WritingWorkshopDraft {
    * of the sentence, and those whose citation was removed for not supporting it.
    */
   supportAudit?: SupportAuditEntry[];
+  /** Reproducible quality signals shared by every Deep Research variant. */
+  qualityAssessment?: import('./deepResearchQuality').DeepResearchQualityAssessment;
   stats: {
     selectedIdeas: number;
     selectedThemes: number;
@@ -6618,19 +6828,12 @@ export interface WritingWorkshopStreamHandlers {
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
- * How ambitious the report should be. `adaptive` (default) sizes the page target
- * from the amount of relevant material in the corpus; the fixed buckets let the
- * user pin a range. Every bucket is clamped to the professional 5–20 page window.
+ * How the report is organised. `'auto'` lets the model/heuristic pick from the
+ * corpus size; `'single'` preserves the same evidence-led internal planning but
+ * publishes one continuous narrative without section headings; a positive number
+ * is a soft ceiling. The bibliography, abstract and limitations never count.
  */
-export type DeepResearchTargetLength = 'adaptive' | 'concise' | 'standard' | 'exhaustive';
-
-/**
- * How the number of report sections is decided. `'auto'` lets the model/heuristic
- * pick from the corpus size; a positive number is a soft ceiling — the planner aims
- * for at most that many sections and may exceed it by one only when strictly needed.
- * The bibliography, abstract and limitations never count as sections.
- */
-export type DeepResearchSectionLimit = 'auto' | number;
+export type DeepResearchSectionLimit = 'auto' | 'single' | number;
 
 /**
  * One section of a teacher-authored outline (teaching vaults, Unit design).
@@ -6649,15 +6852,21 @@ export interface DeepResearchOutlineSection {
 export interface DeepResearchRequest {
   /** The research idea/question the whole report must develop. */
   objective: string;
+  /**
+   * Internal coverage contract derived from the objective before planning. Each
+   * question must be assigned to a section. Callers normally omit this field.
+   */
+  coverageQuestions?: string[];
   /** Missing is General, preserving every pre-approach request and queued job. */
   approach?: import('./deepResearchApproaches').DeepResearchApproach;
+  /** Missing requests are normalized by their entry point; the new UI always sends v2. */
+  deepResearchVersion?: import('./deepResearchVersions').DeepResearchVersion;
   language?: PromptLanguage;
   audience?: string;
-  targetLength?: DeepResearchTargetLength;
   /**
-   * Upper bound on the number of sections. `'auto'` (default) sizes it from the
-   * corpus; a number caps it (with a one-section grace). Fewer, longer sections are
-   * preferred over many short ones.
+   * Visible report structure. `'auto'` (default) sizes headed sections from the
+   * corpus; `'single'` publishes the same evidence-led research as one continuous
+   * narrative; a number expresses a preferred section ceiling.
    */
   sectionLimit?: DeepResearchSectionLimit;
   model?: ModelRef | null;
@@ -6687,7 +6896,7 @@ export interface DeepResearchRequest {
 /** One live progress event emitted while a report is being orchestrated. */
 export interface DeepResearchProgress {
   /** `queued` is emitted while the report waits its turn in the single generation lane. */
-  phase: 'queued' | 'snapshot' | 'planning' | 'section' | 'coverage' | 'assembling' | 'done';
+  phase: 'queued' | 'discovery' | 'document_preparation' | 'snapshot' | 'planning' | 'section' | 'coverage' | 'assembling' | 'done';
   message: string;
   /** 1-based index of the section being written (phase === 'section'). */
   sectionIndex?: number;
@@ -6717,6 +6926,10 @@ export interface DeepResearchJobRecord {
   title: string;
   /** Serialized with the job so queue observers never infer it from current UI state. */
   deepResearchApproach?: import('./deepResearchApproaches').DeepResearchApproach;
+  /** Serialized independently from approach so old and new engines remain reproducible. */
+  deepResearchVersion?: import('./deepResearchVersions').DeepResearchVersion;
+  /** Requested visible structure, available while the report is still queued. */
+  structure?: 'sectioned' | 'single';
   /** Exact model selection captured when the job was enqueued, when one was explicit. */
   model?: ModelRef | null;
   status: DeepResearchJobStatus;
@@ -6732,29 +6945,59 @@ export interface DeepResearchJobRecord {
   finishedAt: string | null;
 }
 
-/** Coverage + budget accounting attached to a finished report. */
+/** Coverage + evidence accounting attached to a finished report. */
 export interface DeepResearchMeta {
+  /** Engine generation that produced the report. */
+  deepResearchVersion: import('./deepResearchVersions').DeepResearchVersion;
+  /** Visible report structure; internal evidence planning may still use movements. */
+  structure?: 'sectioned' | 'single';
   sections: number;
   words: number;
   pages: number;
   ideasCovered: number;
   ideasConsidered: number;
   worksCited: number;
-  targetPages: { min: number; max: number };
-  /** Non-null when the loop stopped before covering everything (budget cap, cap on sections, etc.). */
+  /** Non-null when the loop stopped before covering everything (section safety cap, provider failure, etc.). */
   stoppedReason: string | null;
   /**
    * Result of checking that each citation's source really supports the sentence it
    * was attached to. Null when no verification pass ran. `unsupported` citations were
    * removed from the prose, so this is a record of what the report stopped claiming.
    */
-  verification?: { checked: number; partial: number; unsupported: number } | null;
-  /** How many sections came back under their word target and were developed further. */
-  expansions?: number;
-  /** Words each section ended up with, against the target it was given. */
-  sectionFill?: { words: number; target: number }[];
+  verification?: { checked: number; partial: number; unsupported: number; unverified?: number } | null;
+  /** Professional-editing rewrites accepted because they improved the quality gates. */
+  qualityRevisions?: number;
+  /** Per-section blind A/B barrier between the established writer and the
+   * evidence-planned writer. A tie or order-sensitive judgement keeps baseline. */
+  generationSelection?: { compared: number; planned: number; baseline: number } | null;
   /** Passages of the report that contradict each other, reported rather than repaired. */
   coherenceIssues?: number;
+  /** Atomic brief questions used by planning and their deterministic report coverage. */
+  coverage?: { questions: string[]; ratio: number } | null;
+  /** Retrieval order used for this report. New academic reports lock the idea-graph
+   * argument before whole-document evidence can enter. */
+  retrievalStrategy?: 'idea_first_document_enrichment' | 'legacy' | null;
+  /** Outcome of the bounded, post-plan document-profile preparation pass. */
+  documentPreparation?: {
+    considered: number;
+    requested: number;
+    prepared: number;
+    unavailable: number;
+    failed: number;
+  } | null;
+  /** Planned propositions checked against section-specific evidence before prose. */
+  claimAudit?: {
+    checked: number;
+    supported: number;
+    partial: number;
+    unsupported: number;
+    /** Atomic support rate by evidentiary function. This exposes whether a report
+     * is strong on facts but weak on causality, reception or bilateral debate. */
+    roles?: Partial<Record<'fact' | 'actor_time' | 'mechanism' | 'causality' | 'comparison_side' | 'agreement' | 'contradiction' | 'effect' | 'reception' | 'limit' | 'method', {
+      checked: number;
+      supported: number;
+    }>>;
+  } | null;
 }
 
 /**
@@ -7425,7 +7668,7 @@ export interface ImmersionSessionSummary {
 }
 
 export interface ImmersionBuildProgress {
-  phase: 'material' | 'curriculum' | 'panorama' | 'station' | 'contrasts' | 'frontiers' | 'exam' | 'assembling' | 'done';
+  phase: 'discovery' | 'document_preparation' | 'material' | 'curriculum' | 'panorama' | 'station' | 'contrasts' | 'frontiers' | 'exam' | 'assembling' | 'done';
   message: string;
   stationIndex?: number;
   stationTotal?: number;

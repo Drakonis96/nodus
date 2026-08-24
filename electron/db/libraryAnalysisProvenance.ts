@@ -10,6 +10,7 @@ export const ANALYSIS_PIPELINES: Record<LibraryAnalysisReuseComponent, string> =
   ideas: 'nodus-deep-scan/2',
   passages: 'nodus-passage-index/2',
   embeddings: 'nodus-embeddings/2',
+  documentProfile: 'document-profile/1',
 };
 
 export interface LibraryAnalysisProvenanceRecord {
@@ -58,6 +59,13 @@ export function analysisModelFingerprint(component: LibraryAnalysisReuseComponen
     longChunkWords: settings.deepLongChunkWords,
   });
   if (component === 'summary') return analysisFingerprint({ model: model(settings.summaryModel ?? settings.synthesisModel) });
+  if (component === 'documentProfile') return analysisFingerprint({
+    generator: model(settings.documentProfileModel ?? settings.summaryModel ?? settings.synthesisModel),
+    auditor: model(settings.documentAuditModel ?? settings.documentProfileModel ?? settings.summaryModel ?? settings.synthesisModel),
+    presentationLanguage: settings.promptLanguage,
+    embeddingProvider: settings.embeddingProvider,
+    embeddingModel: settings.embeddingModel,
+  });
   return analysisFingerprint({ provider: settings.embeddingProvider, model: settings.embeddingModel });
 }
 

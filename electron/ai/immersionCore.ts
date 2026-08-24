@@ -89,6 +89,8 @@ export interface MaterialWork {
   zoteroKey: string | null;
   score: number;
   ideaCount: number;
+  /** Audited macro orientation; useful for route design, never literal evidence. */
+  orientation: string | null;
 }
 
 export interface MaterialAuthor {
@@ -146,6 +148,7 @@ export interface CurriculumInput {
   stationCount: number;
   ideas: { id: string; label: string; statement: string; authors: string[]; themes: string[] }[];
   passages: { id: string; workTitle: string; pageLabel: string | null; excerpt: string }[];
+  works: { id: string; title: string; orientation: string }[];
   authors: string[];
   debates: { fromLabel: string; toLabel: string; type: string }[];
 }
@@ -168,7 +171,7 @@ export interface PanoramaInput {
   language: 'es' | 'en';
   stationQuestions: string[];
   ideas: { id: string; label: string; statement: string; authors: string[]; citation: string }[];
-  works: { id: string; title: string; authors: string[]; year: number | null; citation: string }[];
+  works: { id: string; title: string; authors: string[]; year: number | null; citation: string; orientation: string | null }[];
   debates: { fromLabel: string; toLabel: string }[];
 }
 
@@ -252,6 +255,22 @@ export interface ImmersionDeps {
 
 type ProgressFn = (p: ImmersionBuildProgress) => void;
 
+/**
+ * `completeJson` already retries malformed JSON, but deliberately aborts after a
+ * transport/provider error so generic structured calls cannot stall every caller.
+ * Immersion is a long, explicitly requested workflow: degrading an otherwise
+ * complete route because one of its many independent generations had a single
+ * transient failure is a poor trade. Give each stage one fresh top-level attempt
+ * before using the honest structural fallback.
+ */
+async function generateWithRecovery<T>(generate: () => Promise<T>): Promise<T> {
+  try {
+    return await generate();
+  } catch {
+    return generate();
+  }
+}
+
 /** Target number of guided stations for the chosen depth and the material.
  *
  *  Depth scales with the budget, anchored on the three presets and interpolated
@@ -293,7 +312,7 @@ export async function orchestrateImmersion(
   let curriculum: CurriculumResult;
   try {
     curriculum = normalizeCurriculum(
-      await deps.planCurriculum(curriculumInput(request.topic, language, stationCount, material)),
+      await generateWithRecovery(() => deps.planCurriculum(curriculumInput(request.topic, language, stationCount, material))),
       material,
       stationCount,
       request.topic
@@ -309,7 +328,7 @@ export async function orchestrateImmersion(
   const citationLabels = buildCitationLabels(material);
   let panorama: PanoramaResult;
   try {
-    panorama = await deps.writePanorama(panoramaInput(request.topic, language, curriculum, material));
+    panorama = await generateWithRecovery(() => deps.writePanorama(panoramaInput(request.topic, language, curriculum, material)));
     panorama = {
       overview:
         applyCitationPolicy(normalizeBareCitations(cleanStr(panorama.overview, ''), citationLabels), catalog) ||
@@ -335,7 +354,7 @@ export async function orchestrateImmersion(
     const input = stationInput(request, language, spec, material);
     let result: StationResult;
     try {
-      result = await deps.writeStation(input);
+      result = await generateWithRecovery(() => deps.writeStation(input));
     } catch {
       degradations.push(`${msg.degradedStation} «${spec.title}»`);
       result = fallbackStation(input);
@@ -348,7 +367,7 @@ export async function orchestrateImmersion(
   let contrasts: ImmersionContrasts;
   try {
     contrasts = normalizeContrasts(
-      await deps.writeContrasts(contrastsInput(request.topic, language, stations, material)),
+      await generateWithRecovery(() => deps.writeContrasts(contrastsInput(request.topic, language, stations, material))),
       stations,
       material
     );
@@ -368,7 +387,7 @@ export async function orchestrateImmersion(
     exam = { questions: [], feynman: msg.feynman(request.topic) };
   } else {
     try {
-      const result = await deps.writeExam(examInput(request.topic, language, stations, material));
+      const result = await generateWithRecovery(() => deps.writeExam(examInput(request.topic, language, stations, material)));
       exam = {
         questions: normalizeQuiz(result.questions, material, 'exam', IMMERSION_LIMITS.examQuestions),
         feynman: cleanStr(result.feynman, msg.feynman(request.topic)),
@@ -450,6 +469,11 @@ function curriculumInput(topic: string, language: 'es' | 'en', stationCount: num
       pageLabel: p.pageLabel,
       excerpt: clip(p.text, 260),
     })),
+    works: material.works.filter((work) => work.orientation).slice(0, 20).map((work) => ({
+      id: work.nodusId,
+      title: work.title,
+      orientation: clip(work.orientation ?? '', 500),
+    })),
     authors: material.authors.slice(0, 20).map((a) => a.name),
     debates: material.debates.slice(0, 14).map((d) => ({ fromLabel: d.fromLabel, toLabel: d.toLabel, type: d.type })),
   };
@@ -473,6 +497,7 @@ function panoramaInput(topic: string, language: 'es' | 'en', curriculum: Curricu
       authors: w.authors.slice(0, 4),
       year: w.year,
       citation: `nodus://work/${w.nodusId}`,
+      orientation: w.orientation,
     })),
     debates: material.debates.slice(0, 8).map((d) => ({ fromLabel: d.fromLabel, toLabel: d.toLabel })),
   };

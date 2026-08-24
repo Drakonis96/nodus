@@ -445,7 +445,7 @@ async function publishVault(vaultId: string): Promise<void> {
       },
       library: library?.manifest ?? null,
       vectorKinds: config.includeVectors
-        ? (config.includePassages ? ['ideas', 'passages'] : ['ideas']) as VectorKind[]
+        ? (config.includePassages ? ['ideas', 'documents', 'passages'] : ['ideas', 'documents']) as VectorKind[]
         : [],
     });
     publishPhaseStartedAt = logPublishPerf('utility-snapshot-gzip:complete', publishPhaseStartedAt, {

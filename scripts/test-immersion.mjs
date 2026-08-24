@@ -222,6 +222,25 @@ try {
     assert.equal(plan.stats.quizQuestions, 0, 'stats reflect no quiz');
   }
 
+  // ── One transient generation failure is retried before degradation ──────────
+  {
+    const material = makeMaterial();
+    const deps = happyDeps(material);
+    const writeStation = deps.writeStation;
+    let stationCalls = 0;
+    deps.writeStation = async (input) => {
+      stationCalls += 1;
+      if (stationCalls === 1) throw new Error('transient provider failure');
+      return writeStation(input);
+    };
+    const plan = await orchestrateImmersion(
+      { topic: material.topic, language: 'es', minutes: 90, includeQuiz: true, model: null },
+      deps
+    );
+    assert.equal(plan.stoppedReason, null, 'a recovered transient failure does not mark the route as degraded');
+    assert.equal(stationCalls, plan.stations.length + 1, 'the failed station received exactly one fresh attempt');
+  }
+
   // ── Every AI step failing → structural fallback, still completes ────────────
   {
     const material = makeMaterial();

@@ -38,6 +38,10 @@ import { LIBRARY_ONBOARDING_TRANSLATIONS } from './i18n.libraryOnboarding';
 import { SOURCE_CITATION_TRANSLATIONS } from './i18n.sourceCitation';
 import { DEEP_RESEARCH_APPROACH_TRANSLATIONS } from './i18n.deepResearchApproaches';
 import { DICTIONARY_TRANSLATIONS } from './i18n.dictionary';
+import { DEEP_RESEARCH_VERSION_TRANSLATIONS } from './i18n.deepResearchVersions';
+import { DOCUMENT_UNDERSTANDING_TRANSLATIONS } from './i18n.documentUnderstanding';
+import { DEEP_RESEARCH_QUALITY_TRANSLATIONS } from './i18n.deepResearchQuality';
+import { DOCUMENT_UNDERSTANDING_CONSENT_TRANSLATIONS } from './i18n.documentUnderstandingConsent';
 
 /** Complete static Turkish interface table; coverage prohibits runtime fallbacks. */
 export const TR: Record<string, string> = {
@@ -58,6 +62,10 @@ export const TR: Record<string, string> = {
   ...LIBRARY_READER_TRANSLATIONS.tr,
   ...SOURCE_CITATION_TRANSLATIONS.tr,
   ...DEEP_RESEARCH_APPROACH_TRANSLATIONS.tr,
+  ...DEEP_RESEARCH_VERSION_TRANSLATIONS.tr,
+  ...DOCUMENT_UNDERSTANDING_TRANSLATIONS.tr,
+  ...DEEP_RESEARCH_QUALITY_TRANSLATIONS.tr,
+  ...DOCUMENT_UNDERSTANDING_CONSENT_TRANSLATIONS.tr,
   ...LIBRARY_BIBLIOGRAPHY_TRANSLATIONS.tr,
   ...LIBRARY_ONBOARDING_TRANSLATIONS.tr,
   ...LIBRARY_RECOVERY_TRANSLATIONS.tr,
@@ -2986,6 +2994,11 @@ export const TR: Record<string, string> = {
   "Secciones:": "Bölümler:",
   "Número máximo de secciones (menos secciones = mayor profundidad)": "Maksimum bölüm sayısı (daha az bölüm = daha fazla derinlik)",
   "Secciones: Auto (IA decide)": "Bölümler: Otomatik (Yapay zeka karar verir)",
+  "Bloque único · sin secciones": "Tek kesintisiz blok · bölümsüz",
+  "Estructura del informe": "Rapor yapısı",
+  "Una narración continua sin encabezados internos; conserva toda la recuperación y el análisis.": "İç başlıkları olmayan kesintisiz bir anlatı; tüm erişim ve analiz korunur.",
+  "El esquema manual fija exactamente las partes y su orden.": "Manuel taslak bölümleri ve sıralarını tam olarak belirler.",
+  "La estructura organiza el informe, pero nunca limita la evidencia relevante.": "Yapı raporu düzenler ancak ilgili kanıtları asla sınırlamaz.",
   "Secciones: Auto": "Bölümler: Araba",
   "Máx. {n} secciones": "Maks. {n} bölümler",
   "Máx. 4 secciones": "Maks. 4 bölüm",
@@ -7976,4 +7989,6 @@ export const TR: Record<string, string> = {
   "Esta obra no registra ningún autor: sus ideas se atribuyen provisionalmente a quien la edita": "Bu eser hiçbir yazar kaydetmiyor: fikirleri geçici olarak derleyen kişiye atfediliyor",
   "atribución provisional": "geçici atıf",
   "provisional": "geçici",
+  "Reparando": "Onarılıyor",
+  "Publicando": "Yayınlanıyor",
 };

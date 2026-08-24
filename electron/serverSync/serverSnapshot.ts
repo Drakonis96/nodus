@@ -57,6 +57,9 @@ const CORE_TABLES = [
   'works', 'work_aliases', 'authors', 'work_authors', 'collections', 'work_collections',
   'zotero_tags', 'work_zotero_tags', 'themes', 'work_themes', 'ideas', 'idea_occurrences',
   'idea_theme_links', 'evidence', 'edges', 'edge_feedback', 'gaps', 'external_refs', 'work_summaries',
+  'document_profile_state', 'document_profile_versions', 'document_profile_fields',
+  'document_sections', 'document_profile_support', 'document_vectors',
+  'document_idea_links', 'document_profile_overrides',
   'author_relations', 'author_dossier_synthesis', 'synthesis_matrix_cell', 'work_idea_synthesis',
   'research_questions', 'research_subquestions', 'research_coverage_links', 'tutor_saved_routes',
 ] as const;

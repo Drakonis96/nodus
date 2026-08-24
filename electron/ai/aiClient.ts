@@ -197,6 +197,8 @@ interface CallOpts {
   noRetry?: boolean;
   /** Per-request transport timeout override. */
   timeoutMs?: number;
+  /** Cooperative cancellation for long-running corpus jobs. */
+  signal?: AbortSignal;
   /** Images to attach for vision models (base64 + media type). */
   images?: VisionImagePart[];
   /** Skip the vault-type prompt pack (keep only the output-language directive). Used
@@ -517,6 +519,7 @@ async function rawComplete(
         reasoning: codexReasoning === undefined ? reasoning : codexReasoning,
         timeoutMs: opts.timeoutMs,
         images: opts.images,
+        signal: opts.signal,
       });
     } catch (error) {
       throw subscriptionError(error);
@@ -531,6 +534,7 @@ async function rawComplete(
         reasoning,
         timeoutMs: opts.timeoutMs,
         images: opts.images,
+        signal: opts.signal,
       });
     } catch (error) {
       throw subscriptionError(error);
@@ -552,6 +556,7 @@ async function rawComplete(
         jsonMode,
         timeoutMs: opts.timeoutMs,
         images: opts.images,
+        signal: opts.signal,
       });
       await recordOpenCodeGoUsage(model.model, result.usage);
       return result.text;
@@ -576,7 +581,7 @@ async function rawComplete(
         messages: [
           { role: 'user', content: opts.images?.length ? (anthropicVisionContent(opts.user, opts.images) as any) : opts.user },
         ],
-      });
+      }, { signal: opts.signal });
       const block = res.content.find((b: any) => b.type === 'text');
       return (block as any)?.text ?? '';
     } catch (e: any) {
@@ -619,12 +624,12 @@ async function rawComplete(
   try {
     let res;
     try {
-      res = await withProviderRetries(freeTier, () => client.chat.completions.create({ ...baseBody, ...extras } as any));
+      res = await withProviderRetries(freeTier, () => client.chat.completions.create({ ...baseBody, ...extras } as any, { signal: opts.signal }));
     } catch (e: any) {
       // The optional reasoning/JSON/routing params may be unsupported by this model.
       // Retry once as a plain request before surfacing the error.
       if (!opts.noRetry && isBadRequest(e) && Object.keys(extras).length > 0) {
-        res = await withProviderRetries(freeTier, () => client.chat.completions.create(baseBody as any));
+        res = await withProviderRetries(freeTier, () => client.chat.completions.create(baseBody as any, { signal: opts.signal }));
       } else {
         throw e;
       }
@@ -801,6 +806,7 @@ export async function completeJson<T>(
         { temperature: langOpts.temperature ?? 0.15, jsonMode: true },
       ];
   for (let i = 0; i < attempts.length; i++) {
+    langOpts.signal?.throwIfAborted();
     const attempt = attempts[i];
     const retryDone = startPerf('JSON retry', langOpts.perf, { attempt: i + 1, jsonMode: attempt.jsonMode });
     let text: string;
@@ -1091,7 +1097,7 @@ function embeddingConfig(): { provider: EmbeddingProvider; modelId: string } {
   };
 }
 
-async function requestEmbeddings(provider: EmbeddingProvider, key: string, modelId: string, input: string | string[]): Promise<number[][]> {
+async function requestEmbeddings(provider: EmbeddingProvider, key: string, modelId: string, input: string | string[], signal?: AbortSignal): Promise<number[][]> {
   const validate = (vectors: number[][]): number[][] => {
     const dimension = vectors[0]?.length ?? 0;
     for (const vector of vectors) {
@@ -1110,7 +1116,8 @@ async function requestEmbeddings(provider: EmbeddingProvider, key: string, model
     }
     return vectors;
   };
-  if (provider === 'nodus') return validate(await embedWithNodusLocal(modelId, input));
+  signal?.throwIfAborted();
+  if (provider === 'nodus') return validate(await embedWithNodusLocal(modelId, input, signal));
   const baseURL = openAiCompatBase(provider) ?? undefined;
   const OpenAI = (await import('openai')).default;
   const client = new OpenAI({
@@ -1124,7 +1131,7 @@ async function requestEmbeddings(provider: EmbeddingProvider, key: string, model
           }
         : undefined,
   });
-  const res = await client.embeddings.create({ model: modelId, input });
+  const res = await client.embeddings.create({ model: modelId, input }, { signal });
   return validate([...res.data]
     .sort((a, b) => (a.index ?? 0) - (b.index ?? 0))
     .map((d) => d.embedding));
@@ -1135,19 +1142,22 @@ async function requestEmbeddings(provider: EmbeddingProvider, key: string, model
  * Returns null when unavailable — fusion then stays conservative (treats ideas
  * as new).
  */
-export async function embed(text: string): Promise<number[] | null> {
+export async function embed(text: string, signal?: AbortSignal): Promise<number[] | null> {
+  signal?.throwIfAborted();
   const { provider, modelId } = embeddingConfig();
   const key = resolveProviderKey(provider);
   if (!key) return null;
   try {
-    const vectors = await requestEmbeddings(provider, key, modelId, text.slice(0, 8000));
+    const vectors = await requestEmbeddings(provider, key, modelId, text.slice(0, 8000), signal);
     return vectors[0] ?? null;
-  } catch {
+  } catch (error) {
+    if (signal?.aborted) throw error;
     return null;
   }
 }
 
-export async function embedMany(texts: string[]): Promise<(number[] | null)[]> {
+export async function embedMany(texts: string[], signal?: AbortSignal): Promise<(number[] | null)[]> {
+  signal?.throwIfAborted();
   if (texts.length === 0) return [];
   const clipped = texts.map((t) => t.slice(0, 8000));
   const { provider, modelId } = embeddingConfig();
@@ -1157,14 +1167,15 @@ export async function embedMany(texts: string[]): Promise<(number[] | null)[]> {
   // Gemini Embedding 2's native API aggregates multiple inputs; the OpenAI
   // compatibility endpoint can evolve, so keep this path one-text-per-call.
   if (provider === 'gemini' && /embedding-2/i.test(modelId)) {
-    return Promise.all(clipped.map((text) => embed(text)));
+    return Promise.all(clipped.map((text) => embed(text, signal)));
   }
 
   try {
-    const vectors = await requestEmbeddings(provider, key, modelId, clipped);
+    const vectors = await requestEmbeddings(provider, key, modelId, clipped, signal);
     if (vectors.length === clipped.length) return vectors;
-  } catch {
+  } catch (error) {
+    if (signal?.aborted) throw error;
     /* fall back below */
   }
-  return Promise.all(clipped.map((text) => embed(text)));
+  return Promise.all(clipped.map((text) => embed(text, signal)));
 }

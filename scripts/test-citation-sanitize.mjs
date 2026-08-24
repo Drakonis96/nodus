@@ -26,7 +26,7 @@ try {
     logLevel: 'silent',
   });
   const mod = await import(pathToFileURL(outfile).href);
-  const { CITATION_KINDS, citationUrl, dedupeRefs, normalizeRefs, extractCitationRefs, stripDisallowedCitations } = mod;
+  const { CITATION_KINDS, citationUrl, dedupeRefs, normalizeRefs, extractCitationRefs, stripDisallowedCitations, supportedCitationKeys, canonicalizeCitationLinks } = mod;
 
   // ── citationUrl / extractCitationRefs round-trip ────────────────────────────
   assert.equal(citationUrl({ kind: 'idea', id: 'g-0001' }), 'nodus://idea/g-0001');
@@ -40,6 +40,11 @@ try {
   );
   // Encoded ids are decoded back.
   assert.deepEqual(extractCitationRefs('[a](nodus://work/a%20b)'), [{ kind: 'work', id: 'a b' }]);
+  assert.deepEqual(
+    extractCitationRefs('[cortada](nodus://work/a%2)'),
+    [{ kind: 'work', id: 'a%2' }],
+    'a provider-truncated percent escape is retained for validation instead of throwing',
+  );
 
   // ── normalizeRefs: only real project kinds survive (no passage) ─────────────
   assert.ok(!CITATION_KINDS.includes('passage'), 'passage is not a project citation kind');
@@ -91,6 +96,11 @@ try {
   // Nothing allowed ⇒ all citations stripped, text still tidy.
   const stripped = stripDisallowedCitations('Idea [x](nodus://idea/zzz).', new Set());
   assert.equal(stripped, 'Idea.', 'all-disallowed collapses cleanly');
+  assert.equal(
+    stripDisallowedCitations('Idea [x](nodus://idea/a%E0%A4%A).', new Set()),
+    'Idea.',
+    'malformed UTF-8 in an untrusted citation is removed without aborting the answer',
+  );
 
   // Exact reported scenario: a stray bare nodus://<uuid> in prose followed by a
   // blocked [pasaje] chip. Both must vanish, leaving clean prose.
@@ -112,6 +122,40 @@ try {
   );
   assert.ok(mixed.includes('[b](nodus://idea/g-1)'), 'allowed link untouched by bare-url removal');
   assert.ok(!mixed.includes('9b1afd69'), 'bare malformed url removed');
+
+  // Chat answers must pass two gates: the id resolves and the exact id was in the
+  // context sent to the model. Existing-but-out-of-context references are not enough.
+  const answerRefs = [
+    { kind: 'idea', id: 'g-1' },
+    { kind: 'work', id: 'w-2' },
+    { kind: 'passage', id: 'work-1#7' },
+  ];
+  const supported = supportedCitationKeys(answerRefs, {
+    'idea:g-1': true,
+    'work:w-2': true,
+    'passage:work-1#7': false,
+  }, '{"id":"g-1","citation":"nodus://passage/work-1%237"}');
+  assert.deepEqual([...supported], ['idea:g-1'], 'only resolvable, in-context citations survive');
+  assert.equal(
+    canonicalizeCitationLinks('[Autor, 2020, p. 7](nodus://passage/work-1#7)'),
+    '[Autor, 2020, p. 7](nodus://passage/work-1%237)',
+    'a raw passage separator cannot become a URL fragment',
+  );
+  assert.equal(
+    canonicalizeCitationLinks('[Autor](nodus://passage/work-1%237)'),
+    '[Autor](nodus://passage/work-1%237)',
+    'already canonical ids are not double encoded',
+  );
+  assert.equal(
+    canonicalizeCitationLinks('[Autor, 2020](nodus://idea/g-1, p. 207)'),
+    '[Autor, 2020, p. 207](nodus://idea/g-1)',
+    'a locator accidentally placed in the URL is moved to the visible label',
+  );
+  assert.equal(
+    stripDisallowedCitations('Afirmación ([Autor](nodus://passage/uuid-truncado', new Set()),
+    'Afirmación',
+    'an answer cut off in the middle of a citation leaves no broken link or punctuation',
+  );
 
   console.log('citation sanitiser test passed');
 } finally {

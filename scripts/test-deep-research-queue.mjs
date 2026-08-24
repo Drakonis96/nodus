@@ -132,30 +132,41 @@ try {
     assert.equal(generated, 2);
   }
 
-  // ── Approach/model survive queue serialization and completion metadata ──────
+  // ── Version/approach/model survive queue serialization and completion metadata ─
   {
     queue.__resetDeepResearchQueueForTest();
     const model = { provider: 'gemini', model: 'gemini-3.1-flash-lite' };
+    let seenSectionLimit = null;
     queue.configureDeepResearchQueue({
-      generate: (request) => Promise.resolve({
-        draft: {
-          title: request.objective,
-          deepResearchApproach: request.approach,
-          generationModel: request.model,
-        },
-      }),
+      generate: (request) => {
+        seenSectionLimit = request.sectionLimit;
+        return Promise.resolve({
+          draft: {
+            title: request.objective,
+            deepResearchApproach: request.approach,
+            deepResearchVersion: request.deepResearchVersion,
+            deepResearchStructure: request.sectionLimit === 'single' ? 'single' : 'sectioned',
+            generationModel: request.model,
+          },
+        });
+      },
       saveDraft: () => 'draft-approach',
       activeVault: () => ({ id: 'v1', name: 'Corpus' }),
     });
     const report = await queue.runDeepResearchJob({
-      request: { objective: 'Comparar A y B', approach: 'comparative', model },
+      request: { objective: 'Comparar A y B', approach: 'comparative', deepResearchVersion: 'v1', sectionLimit: 'single', model },
       origin: 'mcp',
       save: true,
     });
     const restored = JSON.parse(JSON.stringify(queue.listDeepResearchJobs()[0]));
     assert.equal(restored.deepResearchApproach, 'comparative');
+    assert.equal(restored.deepResearchVersion, 'v1');
+    assert.equal(restored.structure, 'single');
     assert.deepEqual(restored.model, model);
+    assert.equal(seenSectionLimit, 'single', 'continuous structure survives the queue request boundary');
     assert.equal(report.draft.deepResearchApproach, 'comparative');
+    assert.equal(report.draft.deepResearchVersion, 'v1');
+    assert.equal(report.draft.deepResearchStructure, 'single');
     assert.deepEqual(report.draft.generationModel, model);
   }
 

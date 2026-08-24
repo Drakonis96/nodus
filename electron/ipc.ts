@@ -160,6 +160,7 @@ import { setPersistentDockIcon } from './dockIcon';
 import { closeCrossVaultConnections } from './db/crossVault';
 import { assertNotBrowserIpcSender } from './ipc/trust';
 import { listMigrationRecoverySnapshots } from './db/migrationSafety';
+import { documentIndexQueue } from './pipeline/documentIndexQueue';
 
 
 function withVaultKeyProviders(vault: VaultSummary): VaultSummary {
@@ -363,6 +364,9 @@ export function registerIpc(
       }
     }
     const next = updateSettings(patch);
+    if (patch.documentIndexingEnabled !== undefined || patch.documentIndexIncludeArchived !== undefined) {
+      await documentIndexQueue.configureContinuous(getActiveVault().id, next.documentIndexingEnabled);
+    }
     if (patch.browserHistoryRetention !== undefined) {
       await browserHistoryRepository().list(next.browserHistoryRetention);
     }
@@ -657,6 +661,10 @@ export function registerIpc(
     if (target.active) {
       const busy = vaultBusyMessage();
       if (busy) throw new Error(busy);
+    }
+    await documentIndexQueue.pauseVaultAndDrain(id);
+    try {
+      if (target.active) {
       stopRealtimeSync();
       stopNodusServerSync();
       stopInboxPolling();
@@ -681,8 +689,11 @@ export function registerIpc(
       if (settings.zoteroPluginEnabled) void startZoteroPluginServer();
       emitVaultChanged();
       return withVaultKeyProviders(reset);
+      }
+      return withVaultKeyProviders(resetVaultDatabase(id));
+    } finally {
+      await documentIndexQueue.resumeVaultAfterMaintenance(id);
     }
-    return withVaultKeyProviders(resetVaultDatabase(id));
   });
   const analysisReuseControllers = new Map<string, AbortController>();
   h('vaults:reuseAnalysis', async (_e, nodusIds: string[], operationId?: string) => {

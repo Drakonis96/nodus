@@ -116,22 +116,43 @@ test('specialized Genealogy repairs only malformed citations to allowed sources'
   );
 });
 
-test('General still calls the historical retrieval and prompt dependency path', async () => {
+test('Academic Deep Research freezes an idea-first argument before document enrichment', async () => {
   const [source, workshop] = await Promise.all([
     readFile(path.join(repoRoot, 'electron/ai/deepResearch.ts'), 'utf8'),
     readFile(path.join(repoRoot, 'electron/ai/writingWorkshop.ts'), 'utf8'),
   ]);
-  assert.match(source, /deepResearchApproachPath\(approach\) === 'general'[\s\S]*orchestrateDeepResearch\(\{ \.\.\.request, model \}, realDeps\(model\), onProgress\)/);
-  assert.match(source, /buildSnapshot: \(brief\) => buildWritingWorkshopSnapshot\(brief\)/, 'General retrieval is still the one-probe snapshot');
-  assert.match(source, /planReport: \(input\) => aiPlanReport\(input, model\)/, 'General planner receives no approach argument');
+  assert.match(source, /deepResearchEnginePath\(deepResearchVersion, approach\) === 'v1-general'[\s\S]*legacyAcademicDeps\(model\)/, 'v1 retains the historical dependency route');
+  assert.match(source, /deepResearchEnginePath\(deepResearchVersion, approach\) === 'v2-general'[\s\S]*realDeps\(model\)/, 'v2 retains the idea-first document-enrichment route');
+  assert.match(source, /orchestrateDeepResearch\(\{ \.\.\.versionedRequest, model \}, deps, onProgress\)/, 'both routes share the versioned orchestration boundary');
+  assert.match(source, /buildIdeaFirstWritingWorkshopSnapshot\(brief, academicObjectiveProbes\(brief\.objective\)\)/, 'General planning uses clause probes over the graph-only snapshot');
+  assert.match(source, /function academicObjectiveProbes[\s\S]*split\(\/\[.;\]/, 'graph recall probes are deterministic clauses from the user objective');
+  assert.match(source, /planReport: \(input\) => aiPlanReport\(\{ \.\.\.input, relationships \}, model\)/, 'General planning receives explicit graph relationships');
+  assert.match(source, /preparePlanEvidence:[\s\S]*prepareRelevantDocumentProfiles/, 'document profiles are prepared through the post-plan seam');
+  assert.doesNotMatch(source, /await prepareDeepResearchDocuments\(/, 'there is no pre-plan document preparation');
   assert.match(source, /writeSection: \(input\) => aiWriteSection\(input, model\)/, 'General writer receives no approach argument');
   assert.match(source, /finalize: \(input\) => aiFinalize\(input, model\)/, 'General finalizer receives no approach argument');
+  assert.match(
+    source,
+    /NODUS_EXPERIMENTAL_DEEP_RESEARCH_PROSE === '1'[\s\S]*\.\.\.\(experimentalProse \? \{[\s\S]*planSectionEvidence/,
+    'the evidence-planned prose route is opt-in after losing the historical full-text blind benchmark',
+  );
   assert.match(source, /function specializedAcademicDeps/);
   assert.match(
     workshop,
     /const lexicalQuery = extraProbes\.length[\s\S]*\? `\$\{brief\.objective\}[\s\S]*: `\$\{brief\.objective\} \$\{kindLabel\(brief\.kind\)\}`/,
     'General retains the exact historical lexical query while specialized probes enrich lexical-only vaults',
   );
+  assert.match(workshop, /retrievalMode === 'hierarchical'[\s\S]*retrieveHierarchical/);
+  assert.match(workshop, /buildIdeaFirstWritingWorkshopSnapshot[\s\S]*retrievalMode: 'idea_first'/);
+  assert.match(workshop, /export function buildHistoricalWritingWorkshopSnapshot[\s\S]*retrievalMode: 'legacy'/, 'v1 has a named historical snapshot builder');
+  assert.match(workshop, /retrievalMode === 'legacy'[\s\S]*findSimilarPassagesPaged\(vectors\[0\], -1, MAX_PASSAGES \* 2\)/, 'legacy snapshot retrieves passages directly from the historical index');
+  assert.match(workshop, /retrievalMode === 'legacy'[\s\S]*findSimilarPassagesPaged\(vector, floors\.passages/, 'legacy probes use direct passage similarity');
+  assert.match(workshop, /export async function retrieveSectionMaterialLegacy[\s\S]*findSimilarIdeasPaged[\s\S]*findSimilarPassagesPaged/, 'v1 sections use direct historical indexes');
+  assert.match(source, /buildSnapshot: \(brief\) => buildHistoricalWritingWorkshopSnapshot\(brief\)/, 'v1 general selects the historical snapshot builder');
+  assert.match(source, /retrieveForSection: \(input\) => retrieveSectionMaterialLegacy\(input\)/, 'v1 general selects historical section retrieval');
+  assert.match(source, /const ordinary = await buildHistoricalWritingWorkshopSnapshot\(brief\)/, 'v1 specialized starts from historical retrieval');
+  assert.match(source, /const supplemental = await buildHistoricalWritingWorkshopSnapshot\(brief, retrieval\.probes\)/, 'v1 specialized keeps historical probe retrieval');
+  assert.doesNotMatch(source, /legacyAcademicDeps[\s\S]*retrieveHierarchical/, 'v1 dependency block never reaches hierarchical retrieval');
 });
 
 test('UI, gallery, reader, queue and MCP carry the approach metadata', async () => {

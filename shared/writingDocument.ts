@@ -31,13 +31,32 @@ function normalizeHeading(text: string): string {
 export function stripLeadingAbstract(markdown: string, abstract: string): string {
   const lines = (markdown ?? '').replace(/\r\n?/g, '\n').split('\n');
   const first = lines.findIndex((line) => line.trim().length > 0);
-  if (first < 0 || !/^#{1,3}\s+/.test(lines[first])) return markdown;
+  if (first < 0) return markdown;
+  const expected = (abstract ?? '').replace(/\s+/g, ' ').trim();
+  // Continuous reports intentionally have no heading, including for the opening
+  // abstract. It is still part of the self-contained Markdown, so remove the first
+  // paragraph when it matches the structured abstract rendered by the reader.
+  if (!/^#{1,3}\s+/.test(lines[first])) {
+    let next = first + 1;
+    while (next < lines.length && lines[next].trim().length > 0) next += 1;
+    const paragraph = lines.slice(first, next).join(' ').replace(/\s+/g, ' ').trim();
+    if (!expected || !paragraph.includes(expected.slice(0, Math.min(80, expected.length)))) return markdown;
+    while (next < lines.length && !lines[next].trim()) next += 1;
+    return lines.slice(next).join('\n').trim();
+  }
   let next = first + 1;
   while (next < lines.length && !/^#{1,3}\s+/.test(lines[next])) next++;
   const block = lines.slice(first + 1, next).join(' ').replace(/\s+/g, ' ').trim();
-  const expected = (abstract ?? '').replace(/\s+/g, ' ').trim();
   if (!expected || !block || !block.includes(expected.slice(0, Math.min(80, expected.length)))) return markdown;
   return lines.slice(next).join('\n').trim();
+}
+
+/** Remove the bold inline limitations paragraph used by continuous reports. */
+function stripInlineLimitations(markdown: string): string {
+  const aliases = SECTION_ALIASES.limitations.map((label) => label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|');
+  return markdown
+    .replace(new RegExp(`^\\*\\*(?:${aliases})[.:;]?\\*\\*\\s+.*(?:\\n\\n|$)`, 'imu'), '')
+    .trim();
 }
 
 /** Drop a whole `## <heading>` block from the body, headings matched by language alias. */
@@ -61,5 +80,5 @@ export function stripSection(markdown: string, kind: 'abstract' | 'limitations')
  * Everything those surfaces render themselves is removed exactly once.
  */
 export function documentBodyForPanels(markdown: string, abstract: string): string {
-  return stripSection(stripLeadingAbstract(markdown, abstract), 'limitations');
+  return stripInlineLimitations(stripSection(stripLeadingAbstract(markdown, abstract), 'limitations'));
 }

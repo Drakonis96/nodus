@@ -44,6 +44,10 @@ import { LIBRARY_ONBOARDING_TRANSLATIONS } from './i18n.libraryOnboarding';
 import { SOURCE_CITATION_TRANSLATIONS } from './i18n.sourceCitation';
 import { DEEP_RESEARCH_APPROACH_TRANSLATIONS } from './i18n.deepResearchApproaches';
 import { DICTIONARY_TRANSLATIONS } from './i18n.dictionary';
+import { DEEP_RESEARCH_VERSION_TRANSLATIONS } from './i18n.deepResearchVersions';
+import { DOCUMENT_UNDERSTANDING_TRANSLATIONS } from './i18n.documentUnderstanding';
+import { DEEP_RESEARCH_QUALITY_TRANSLATIONS } from './i18n.deepResearchQuality';
+import { DOCUMENT_UNDERSTANDING_CONSENT_TRANSLATIONS } from './i18n.documentUnderstandingConsent';
 
 export const PT: Record<string, string> = {
   ...DICTIONARY_TRANSLATIONS.pt,
@@ -60,6 +64,10 @@ export const PT: Record<string, string> = {
   ...LIBRARY_READER_TRANSLATIONS.pt,
   ...SOURCE_CITATION_TRANSLATIONS.pt,
   ...DEEP_RESEARCH_APPROACH_TRANSLATIONS.pt,
+  ...DEEP_RESEARCH_VERSION_TRANSLATIONS.pt,
+  ...DOCUMENT_UNDERSTANDING_TRANSLATIONS.pt,
+  ...DEEP_RESEARCH_QUALITY_TRANSLATIONS.pt,
+  ...DOCUMENT_UNDERSTANDING_CONSENT_TRANSLATIONS.pt,
   ...LIBRARY_BIBLIOGRAPHY_TRANSLATIONS.pt,
   ...LIBRARY_ONBOARDING_TRANSLATIONS.pt,
   ...LIBRARY_RECOVERY_TRANSLATIONS.pt,
@@ -2884,6 +2892,11 @@ export const PT: Record<string, string> = {
   'Secciones:': 'Secções:',
   'Número máximo de secciones (menos secciones = mayor profundidad)': 'Número máximo de secções (menos secções = maior profundidade)',
   'Secciones: Auto (IA decide)': 'Secções: Auto (a IA decide)',
+  'Bloque único · sin secciones': 'Bloco contínuo único · sem secções',
+  'Estructura del informe': 'Estrutura do relatório',
+  'Una narración continua sin encabezados internos; conserva toda la recuperación y el análisis.': 'Uma narrativa contínua sem títulos internos; preserva toda a recuperação e análise.',
+  'El esquema manual fija exactamente las partes y su orden.': 'O esquema manual fixa exatamente as partes e a sua ordem.',
+  'La estructura organiza el informe, pero nunca limita la evidencia relevante.': 'A estrutura organiza o relatório, mas nunca limita a evidência relevante.',
   'Secciones: Auto': 'Secções: Auto',
   'Máx. {n} secciones': 'Máx. {n} secções',
   'Máx. 4 secciones': 'Máx. 4 secções',
@@ -8168,4 +8181,6 @@ export const PT: Record<string, string> = {
   "Esta obra no registra ningún autor: sus ideas se atribuyen provisionalmente a quien la edita": "Esta obra não regista qualquer autor: as suas ideias são atribuídas provisoriamente a quem a coordena",
   "atribución provisional": "atribuição provisória",
   "provisional": "provisória",
+  "Reparando": "Reparando",
+  "Publicando": "Publicando",
 };

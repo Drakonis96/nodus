@@ -19,6 +19,7 @@ import { getApiKey } from '../secrets/secretStore';
 import { buildIdeaGraph, getContradictions } from '../graph/graphService';
 import { getImmersionSession, recordImmersionAnswer, saveImmersionSession } from '../db/immersionRepo';
 import { buildWritingWorkshopSnapshot } from './writingWorkshop';
+import { prepareRelevantDocumentProfiles } from './documentPreparation';
 import { completeJson, embed } from './aiClient';
 import {
   IMMERSION_LIMITS,
@@ -55,6 +56,7 @@ const IDEA_MAX_KEEP = 60;
 const PASSAGE_SCORE_CUT = 0.25;
 const PASSAGE_MAX_KEEP = 24;
 const WORK_MAX_KEEP = 40;
+const DOCUMENT_WORK_MAX_KEEP = 20;
 const GAP_SCORE_CUT = 0.2;
 
 /** Let the event loop breathe between heavy synchronous steps (queries + graph build). */
@@ -234,20 +236,37 @@ export async function buildImmersionMaterial(topic: string): Promise<ImmersionMa
 
   // ── Works: union of the scoped ideas' works and the strongest passage works.
   const workScore = new Map<string, number>();
-  const workMeta = new Map<string, { title: string; authors: string[]; year: number | null; zoteroKey: string | null }>();
+  const workMeta = new Map<string, { title: string; authors: string[]; year: number | null; zoteroKey: string | null; orientation: string | null }>();
   const ideaCountByWork = new Map<string, number>();
   for (const idea of ideas) {
     for (const work of idea.works) {
-      workMeta.set(work.nodusId, { title: work.title, authors: [], year: work.year, zoteroKey: work.zoteroKey });
+      workMeta.set(work.nodusId, { title: work.title, authors: [], year: work.year, zoteroKey: work.zoteroKey, orientation: null });
       workScore.set(work.nodusId, Math.max(workScore.get(work.nodusId) ?? 0, idea.score));
       ideaCountByWork.set(work.nodusId, (ideaCountByWork.get(work.nodusId) ?? 0) + 1);
     }
   }
   for (const passage of passages) {
     if (!workMeta.has(passage.workId)) {
-      workMeta.set(passage.workId, { title: passage.workTitle, authors: passage.authors, year: passage.year, zoteroKey: passage.zoteroKey });
+      workMeta.set(passage.workId, { title: passage.workTitle, authors: passage.authors, year: passage.year, zoteroKey: passage.zoteroKey, orientation: null });
     }
     workScore.set(passage.workId, Math.max(workScore.get(passage.workId) ?? 0, passage.score));
+  }
+  // Macro profiles are a genuine third lane. Previously Immersion prepared them
+  // and then threw them away unless the same work also happened to own a top idea
+  // or passage, which made the preparation phase a no-op in measured scopes.
+  for (const work of snapshot.works
+    .filter((candidate) => candidate.documentStatus === 'current' && candidate.documentOverview)
+    .slice(0, DOCUMENT_WORK_MAX_KEEP)) {
+    const previous = workMeta.get(work.id);
+    workMeta.set(work.id, {
+      title: work.title,
+      authors: work.authors,
+      year: work.year,
+      zoteroKey: work.zotero_key ?? null,
+      orientation: work.documentOverview ?? null,
+    });
+    workScore.set(work.id, Math.max(workScore.get(work.id) ?? 0, work.score));
+    if (previous?.orientation) workMeta.get(work.id)!.orientation = previous.orientation;
   }
   // Fill author lists from the snapshot works pool (it has them parsed already).
   const snapshotWorkById = new Map(snapshot.works.map((w) => [w.id, w] as const));
@@ -262,6 +281,7 @@ export async function buildImmersionMaterial(topic: string): Promise<ImmersionMa
         zoteroKey: (fromSnapshot?.zotero_key ?? meta.zoteroKey) || null,
         score: workScore.get(nodusId) ?? 0,
         ideaCount: ideaCountByWork.get(nodusId) ?? 0,
+        orientation: meta.orientation,
       };
     })
     .sort((a, b) => b.score - a.score)
@@ -411,7 +431,26 @@ export async function generateImmersionSession(
 ): Promise<ImmersionSession> {
   const settings = getSettings();
   const model = request.model ?? settings.immersionModel ?? settings.synthesisModel ?? null;
-  const plan = await orchestrateImmersion({ ...request, model }, realDeps(model), onProgress);
+  const emit = (progress: ImmersionBuildProgress) => {
+    try { onProgress?.(progress); } catch { /* progress cannot abort generation */ }
+  };
+  emit({ phase: 'discovery', message: 'Cartografiando ideas, obras y pasajes relevantes…' });
+  const preliminary = await buildImmersionMaterial(request.topic);
+  const candidates = preliminary.works.map((work) => work.nodusId);
+  emit({
+    phase: 'document_preparation',
+    message: `Preparando la comprensión integral de hasta ${Math.min(32, candidates.length)} obras para la ruta…`,
+  });
+  const prepared = await prepareRelevantDocumentProfiles(candidates, 'immersion', 32);
+  emit({
+    phase: 'document_preparation',
+    message: prepared.requested
+      ? `${prepared.prepared} fichas documentales auditadas listas para estructurar la inmersión; ${prepared.unavailable + prepared.failed} obras continúan mediante ideas y pasajes.`
+      : 'El material ya estaba preparado; continuando con ideas y evidencia literal.',
+  });
+  // Rebuild once: new profiles can change which works and sections route the topic.
+  const refreshed = prepared.requested ? await buildImmersionMaterial(request.topic) : preliminary;
+  const plan = await orchestrateImmersion({ ...request, model }, realDeps(model, refreshed), onProgress);
   return saveImmersionSession(plan, model);
 }
 
@@ -466,9 +505,17 @@ export async function evaluateImmersionAnswer(request: ImmersionAnswerRequest): 
 // Real AI dependencies
 // ─────────────────────────────────────────────────────────────────────────────
 
-function realDeps(model: ModelRef | null): ImmersionDeps {
+function realDeps(model: ModelRef | null, preparedMaterial?: ImmersionMaterial): ImmersionDeps {
+  let material = preparedMaterial;
   return {
-    buildMaterial: (topic) => buildImmersionMaterial(topic),
+    buildMaterial: async (topic) => {
+      if (material && material.topic === topic.trim()) {
+        const cached = material;
+        material = undefined;
+        return cached;
+      }
+      return buildImmersionMaterial(topic);
+    },
     planCurriculum: (input) => aiPlanCurriculum(input, model),
     writePanorama: (input) => aiWritePanorama(input, model),
     writeStation: (input) => aiWriteStation(input, model),
@@ -490,6 +537,7 @@ async function aiPlanCurriculum(input: CurriculumInput, model: ModelRef | null):
     'PROFUNDIDAD POR CONTINUACIÓN: cuando un aspecto es rico, dedícale VARIAS estaciones CONSECUTIVAS que avancen de lo general a lo particular (p. ej. «X: panorama» → «X: mecanismos» → «X: evidencia y casos» → «X: consecuencias y tensiones»), en lugar de comprimirlo en una sola parada. Encadena las continuaciones para que cada una presuponga la anterior.',
     'Cada estación responde UNA sub-pregunta concreta y distinta, con su propio foco. No repartas la misma idea entre varias estaciones salvo que una continuación la retome deliberadamente desde un ángulo nuevo.',
     'COBERTURA: en conjunto, las estaciones deben abordar las ideas más fuertes del material y las voces y debates principales; no dejes fuera lo central del tema.',
+    'Las fichas de obras son ORIENTACIÓN MACRO auditada: úsalas para decidir qué ejes son centrales y cómo ordenar la ruta, pero no como evidencia literal ni para inventar ideaIds o passageIds.',
     'Asigna a cada estación los pasajes de las mismas obras que sus ideas cuando existan, para que haya lectura literal donde corresponde.',
     'Usa EXCLUSIVAMENTE los identificadores (ideaIds, passageIds) que se te dan en el material. No inventes ids ni cites nada que no esté en la lista.',
     `Escribe los títulos y las preguntas en ${input.language === 'en' ? 'inglés' : 'español'}: títulos breves y evocadores; preguntas concretas y respondibles con este material.`,
@@ -502,6 +550,7 @@ async function aiPlanCurriculum(input: CurriculumInput, model: ModelRef | null):
       estaciones_objetivo: input.stationCount,
       ideas: input.ideas,
       pasajes: input.passages,
+      orientacion_de_obras: input.works,
       autores: input.authors,
       debates: input.debates,
     },
@@ -521,6 +570,7 @@ async function aiWritePanorama(input: PanoramaInput, model: ModelRef | null): Pr
     `Escribe en ${input.language === 'en' ? 'inglés' : 'español'}.`,
     'En 350-500 palabras de Markdown: qué está en juego en el tema, las 2-4 líneas o posiciones principales, qué autores las encarnan y cómo se conectan las sub-preguntas de la ruta.',
     'Usa SOLO los materiales dados. Cada afirmación sustantiva lleva una cita Markdown con la forma exacta [Autor (año)](nodus://idea/<id>) o [Autor (año)](nodus://work/<id>) usando el campo citation.',
+    'El campo orientation de una obra sirve para situar su argumento global; no lo presentes como una cita literal ni inventes páginas. Prefiere las ideas para sostener afirmaciones concretas.',
     'Añade un vocabulario mínimo del campo: términos que el lector debe reconocer, con definiciones de una frase basadas en las ideas dadas.',
     'Devuelve SOLO JSON válido: {"overview":"markdown","keyTerms":[{"term":"...","definition":"..."}]}',
   ].join('\n');

@@ -1091,9 +1091,11 @@ function ProgressRing({ pct, finished, size = 48 }: { pct: number; finished: boo
 // Scope — the territory map (phase 0, no AI) + generation overlay
 // ─────────────────────────────────────────────────────────────────────────────
 
-const GEN_PHASES: ImmersionBuildProgress['phase'][] = ['material', 'curriculum', 'panorama', 'station', 'contrasts', 'frontiers', 'exam', 'assembling'];
+const GEN_PHASES: ImmersionBuildProgress['phase'][] = ['discovery', 'document_preparation', 'material', 'curriculum', 'panorama', 'station', 'contrasts', 'frontiers', 'exam', 'assembling'];
 
 const GEN_PHASE_LABELS: Record<ImmersionBuildProgress['phase'], string> = {
+  discovery: 'Localizando las mejores obras',
+  document_preparation: 'Comprendiendo documentos completos',
   material: 'Cartografiando el territorio',
   curriculum: 'Diseñando la ruta',
   panorama: 'Redactando el panorama',
@@ -2264,7 +2266,7 @@ function ExamStep({
     startDeepResearchGeneration(dossierKey, {
       objective: session.plan.topic,
       language: session.plan.language,
-      targetLength: 'standard',
+      deepResearchVersion: 'v2',
       sectionLimit: 'auto',
       model: session.model,
       decorativeImage: {

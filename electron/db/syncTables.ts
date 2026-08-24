@@ -238,6 +238,20 @@ const NOT_SYNCED_TABLES = new Set([
   'ideas', 'idea_occurrences', 'idea_theme_links', 'themes', 'edges', 'edge_traces', 'gaps',
   'passages', 'collections', 'zotero_tags', 'external_refs', 'extraction_cache', 'scan_checkpoints',
   'dictionary_retrieval_state', 'dictionary_corpus_changes',
+  // Audited document understanding is derived from the local source corpus. It
+  // can be rebuilt or copied only through the exact-provenance reuse path; row
+  // sync would otherwise publish a profile without its source and model contract.
+  'document_profile_state', 'document_profile_versions', 'document_profile_fields',
+  'document_sections', 'document_profile_support', 'document_vectors', 'document_idea_links',
+  'document_profile_overrides', 'document_index_campaigns', 'document_index_jobs',
+  'document_index_checkpoints',
+  // FTS projections and every SQLite-managed shadow table are local indexes.
+  'document_profiles_fts', 'document_profiles_fts_data', 'document_profiles_fts_idx',
+  'document_profiles_fts_content', 'document_profiles_fts_docsize', 'document_profiles_fts_config',
+  'document_sections_fts', 'document_sections_fts_data', 'document_sections_fts_idx',
+  'document_sections_fts_content', 'document_sections_fts_docsize', 'document_sections_fts_config',
+  'passages_fts', 'passages_fts_data', 'passages_fts_idx', 'passages_fts_content',
+  'passages_fts_docsize', 'passages_fts_config',
   // Rebuilt from canonical Library manifests for this vault. Syncing transient
   // freshness would let one machine incorrectly mark another machine's output current.
   'library_analysis_freshness',

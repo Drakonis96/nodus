@@ -138,8 +138,9 @@ test('Nodi cites corpus sources like the research assistant, adapted to its own 
   // research chat, and Nodi enables it only for the academic idea-graph with a vault context.
   assert.match(assistant, /export const CHAT_CITATION_RULES/);
   assert.match(assistant, /export function humanizeResearchCitations/);
+  assert.match(assistant, /export function sanitizeResearchCitations/);
   assert.match(backend, /CHAT_CITATION_RULES/);
-  assert.match(backend, /humanizeResearchCitations/);
+  assert.match(backend, /sanitizeResearchCitations/);
   assert.match(backend, /function corpusCitationsEnabled/);
   // Academic corpus citations and world-entry citations are separate, explicit contracts.
   assert.match(backend, /return wantsVault && active\.type === 'academic'/);
@@ -500,7 +501,10 @@ test('Nodi only scales down from its original size and reaches forty percent', a
 });
 
 test('the chat retrieval never holds the main process for a whole similarity scan', async () => {
-  const assistant = await read('electron/ai/researchAssistant.ts');
+  const [assistant, hierarchy] = await Promise.all([
+    read('electron/ai/researchAssistant.ts'),
+    read('electron/ai/hierarchicalRetrieval.ts'),
+  ]);
   // researchAssistant builds the context for the research chat AND for Nodi's
   // active-vault context, both while the user is looking at the window. The
   // blocking queries scan every embedded row inside one statement: measured on a
@@ -508,15 +512,19 @@ test('the chat retrieval never holds the main process for a whole similarity sca
   // 366 ms per passage scan of frozen UI — the beachball. The paged scans
   // (db/vectorScan.ts) return the same rows and yield between rowid windows.
   for (const blocking of ['findSimilarIdeas', 'findSimilarWorks', 'findSimilarPassages']) {
-    assert.doesNotMatch(
-      assistant,
-      new RegExp(`${blocking}\\(`),
-      `${blocking}() blocks the event loop for the whole scan — use ${blocking}Paged()`
-    );
+    for (const [name, source] of [['research assistant', assistant], ['hierarchical retrieval', hierarchy]]) {
+      assert.doesNotMatch(
+        source,
+        new RegExp(`${blocking}\\(`),
+        `${name}: ${blocking}() blocks the event loop for the whole scan — use ${blocking}Paged()`
+      );
+    }
   }
-  for (const paged of ['findSimilarIdeasPaged', 'findSimilarWorksPaged', 'findSimilarPassagesPaged']) {
-    assert.match(assistant, new RegExp(`await ${paged}\\(`), `${paged} is awaited`);
-  }
+  assert.match(assistant, /await findSimilarWorksPaged\(/, 'summary similarity remains an awaited paged scan');
+  assert.match(hierarchy, /findSimilarIdeasPaged\(/, 'idea similarity is delegated to the paged hierarchy lane');
+  assert.match(hierarchy, /findSimilarPassagesPaged\(/, 'passage similarity is delegated to the paged hierarchy lanes');
+  assert.match(hierarchy, /await Promise\.all\(/, 'the first paged lanes are awaited as one bounded batch');
+  assert.match(hierarchy, /await findSimilarPassagesPaged\(/, 'the routed passage lane is awaited');
   // The passage section is the largest scan of all and runs twice per question.
   assert.match(assistant, /async function listRelevantPassages/);
   assert.match(assistant, /await listRelevantPassages\(/);

@@ -15,7 +15,7 @@ export interface Migration {
 
 // Versioned, append-only migrations. Never edit an existing migration's SQL once
 // shipped — add a new one. The current schema version is the highest applied.
-export const SCHEMA_VERSION = 156;
+export const SCHEMA_VERSION = 159;
 
 export const migrations: Migration[] = [
   {
@@ -8498,6 +8498,305 @@ export const migrations: Migration[] = [
         INSERT INTO dictionary_corpus_changes(entity_kind, ref_id, work_id, change_kind, changed_at)
         VALUES ('work', OLD.nodus_id, OLD.nodus_id, 'scope', strftime('%Y-%m-%dT%H:%M:%fZ','now'));
       END;
+    `,
+  },
+  {
+    version: 157,
+    up: /* sql */ `
+      CREATE TABLE document_profile_state (
+        nodus_id TEXT PRIMARY KEY REFERENCES works(nodus_id) ON DELETE CASCADE,
+        current_version_id TEXT,
+        status TEXT NOT NULL DEFAULT 'missing' CHECK (status IN (
+          'missing','queued','waiting_source','structuring','analyzing','synthesizing',
+          'auditing','embedding','aligning','current','stale','failed','paused','unavailable'
+        )),
+        source_fingerprint TEXT,
+        profile_fingerprint TEXT,
+        pipeline_version TEXT,
+        stale_reason TEXT,
+        error TEXT,
+        updated_at TEXT NOT NULL
+      );
+      CREATE INDEX document_profile_state_status ON document_profile_state(status, updated_at);
+
+      CREATE TABLE document_profile_versions (
+        version_id TEXT PRIMARY KEY,
+        nodus_id TEXT NOT NULL REFERENCES works(nodus_id) ON DELETE CASCADE,
+        state TEXT NOT NULL CHECK (state IN ('candidate','current','superseded','rejected')),
+        source_fingerprint TEXT NOT NULL,
+        pipeline_version TEXT NOT NULL,
+        schema_version INTEGER NOT NULL,
+        source_language TEXT,
+        presentation_language TEXT NOT NULL,
+        overview TEXT NOT NULL,
+        profile_json TEXT NOT NULL,
+        generator_model_json TEXT,
+        auditor_model_json TEXT,
+        prompt_hash TEXT NOT NULL,
+        audit_json TEXT,
+        quality_score REAL,
+        input_tokens INTEGER NOT NULL DEFAULT 0,
+        output_tokens INTEGER NOT NULL DEFAULT 0,
+        estimated_cost_usd REAL,
+        created_at TEXT NOT NULL,
+        published_at TEXT
+      );
+      CREATE INDEX document_profile_versions_work ON document_profile_versions(nodus_id, created_at DESC);
+
+      CREATE TABLE document_profile_fields (
+        field_id TEXT PRIMARY KEY,
+        version_id TEXT NOT NULL REFERENCES document_profile_versions(version_id) ON DELETE CASCADE,
+        nodus_id TEXT NOT NULL REFERENCES works(nodus_id) ON DELETE CASCADE,
+        kind TEXT NOT NULL,
+        ordinal INTEGER NOT NULL DEFAULT 0,
+        text TEXT NOT NULL,
+        confidence REAL NOT NULL DEFAULT 0,
+        centrality REAL NOT NULL DEFAULT 0,
+        created_at TEXT NOT NULL
+      );
+      CREATE INDEX document_profile_fields_work ON document_profile_fields(nodus_id, kind, ordinal);
+      CREATE INDEX document_profile_fields_version ON document_profile_fields(version_id, kind, ordinal);
+
+      CREATE TABLE document_sections (
+        section_id TEXT PRIMARY KEY,
+        version_id TEXT NOT NULL REFERENCES document_profile_versions(version_id) ON DELETE CASCADE,
+        nodus_id TEXT NOT NULL REFERENCES works(nodus_id) ON DELETE CASCADE,
+        parent_section_id TEXT,
+        level INTEGER NOT NULL,
+        ordinal INTEGER NOT NULL,
+        title TEXT NOT NULL,
+        role TEXT,
+        summary TEXT NOT NULL,
+        concepts_json TEXT NOT NULL DEFAULT '[]',
+        claims_json TEXT NOT NULL DEFAULT '[]',
+        page_start TEXT,
+        page_end TEXT,
+        char_start INTEGER,
+        char_end INTEGER,
+        content_hash TEXT NOT NULL,
+        created_at TEXT NOT NULL
+      );
+      CREATE INDEX document_sections_work ON document_sections(nodus_id, ordinal);
+      CREATE INDEX document_sections_version ON document_sections(version_id, ordinal);
+
+      CREATE TABLE document_profile_support (
+        support_id TEXT PRIMARY KEY,
+        version_id TEXT NOT NULL REFERENCES document_profile_versions(version_id) ON DELETE CASCADE,
+        nodus_id TEXT NOT NULL REFERENCES works(nodus_id) ON DELETE CASCADE,
+        target_kind TEXT NOT NULL CHECK (target_kind IN ('field','section')),
+        target_id TEXT NOT NULL,
+        section_id TEXT,
+        passage_id TEXT,
+        page_start TEXT,
+        page_end TEXT,
+        char_start INTEGER,
+        char_end INTEGER,
+        quote TEXT NOT NULL,
+        quote_hash TEXT NOT NULL,
+        support_kind TEXT NOT NULL DEFAULT 'direct',
+        confidence REAL NOT NULL DEFAULT 0,
+        validation_status TEXT NOT NULL DEFAULT 'pending' CHECK (validation_status IN ('pending','valid','invalid')),
+        created_at TEXT NOT NULL
+      );
+      CREATE INDEX document_profile_support_target ON document_profile_support(target_kind, target_id);
+      CREATE INDEX document_profile_support_work ON document_profile_support(nodus_id, version_id);
+
+      CREATE TABLE document_vectors (
+        vector_id TEXT PRIMARY KEY,
+        nodus_id TEXT NOT NULL REFERENCES works(nodus_id) ON DELETE CASCADE,
+        version_id TEXT NOT NULL REFERENCES document_profile_versions(version_id) ON DELETE CASCADE,
+        kind TEXT NOT NULL,
+        source_id TEXT,
+        text TEXT NOT NULL,
+        text_hash TEXT NOT NULL,
+        weight REAL NOT NULL DEFAULT 1,
+        embedding BLOB,
+        embedding_provider TEXT,
+        embedding_model TEXT,
+        embedding_dim INTEGER,
+        created_at TEXT NOT NULL
+      );
+      CREATE INDEX document_vectors_work ON document_vectors(nodus_id, version_id, kind);
+      CREATE INDEX document_vectors_embedding ON document_vectors(embedding_provider, embedding_model, embedding_dim);
+
+      CREATE TABLE document_idea_links (
+        version_id TEXT NOT NULL REFERENCES document_profile_versions(version_id) ON DELETE CASCADE,
+        nodus_id TEXT NOT NULL REFERENCES works(nodus_id) ON DELETE CASCADE,
+        global_id TEXT NOT NULL REFERENCES ideas(global_id) ON DELETE CASCADE,
+        target_kind TEXT NOT NULL CHECK (target_kind IN ('field','section')),
+        target_id TEXT NOT NULL,
+        role TEXT NOT NULL CHECK (role IN ('principal','supporting','development','contrast','tangential')),
+        score REAL NOT NULL,
+        created_at TEXT NOT NULL,
+        PRIMARY KEY(version_id, global_id, target_kind, target_id)
+      );
+      CREATE INDEX document_idea_links_work ON document_idea_links(nodus_id, score DESC);
+
+      CREATE TABLE document_profile_overrides (
+        override_id TEXT PRIMARY KEY,
+        nodus_id TEXT NOT NULL REFERENCES works(nodus_id) ON DELETE CASCADE,
+        field_path TEXT NOT NULL,
+        base_version_id TEXT,
+        generated_value_json TEXT,
+        value_json TEXT NOT NULL,
+        verified INTEGER NOT NULL DEFAULT 0,
+        conflict INTEGER NOT NULL DEFAULT 0,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        UNIQUE(nodus_id, field_path)
+      );
+
+      CREATE TABLE document_index_campaigns (
+        campaign_id TEXT PRIMARY KEY,
+        vault_id TEXT NOT NULL,
+        mode TEXT NOT NULL CHECK (mode IN ('continuous','manual','research')),
+        status TEXT NOT NULL CHECK (status IN ('queued','running','paused','completed','cancelled','failed')),
+        include_archived INTEGER NOT NULL DEFAULT 0,
+        generator_model_json TEXT,
+        auditor_model_json TEXT,
+        total_jobs INTEGER NOT NULL DEFAULT 0,
+        completed_jobs INTEGER NOT NULL DEFAULT 0,
+        failed_jobs INTEGER NOT NULL DEFAULT 0,
+        estimated_units INTEGER NOT NULL DEFAULT 0,
+        completed_units INTEGER NOT NULL DEFAULT 0,
+        input_tokens INTEGER NOT NULL DEFAULT 0,
+        output_tokens INTEGER NOT NULL DEFAULT 0,
+        estimated_cost_usd REAL,
+        error TEXT,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
+      CREATE INDEX document_index_campaigns_status ON document_index_campaigns(status, updated_at);
+
+      CREATE TABLE document_index_jobs (
+        job_id TEXT PRIMARY KEY,
+        campaign_id TEXT REFERENCES document_index_campaigns(campaign_id) ON DELETE SET NULL,
+        vault_id TEXT NOT NULL,
+        nodus_id TEXT NOT NULL REFERENCES works(nodus_id) ON DELETE CASCADE,
+        priority INTEGER NOT NULL DEFAULT 0,
+        reason TEXT NOT NULL,
+        status TEXT NOT NULL CHECK (status IN ('queued','running','paused','completed','cancelled','failed','unavailable')),
+        phase TEXT NOT NULL,
+        progress REAL NOT NULL DEFAULT 0,
+        source_fingerprint TEXT,
+        generator_model_json TEXT,
+        auditor_model_json TEXT,
+        attempts INTEGER NOT NULL DEFAULT 0,
+        max_attempts INTEGER NOT NULL DEFAULT 5,
+        error TEXT,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
+      CREATE UNIQUE INDEX document_index_jobs_active ON document_index_jobs(vault_id, nodus_id)
+        WHERE status IN ('queued','running','paused');
+      CREATE INDEX document_index_jobs_queue ON document_index_jobs(status, priority DESC, created_at);
+
+      CREATE TABLE document_index_checkpoints (
+        job_id TEXT NOT NULL REFERENCES document_index_jobs(job_id) ON DELETE CASCADE,
+        checkpoint_key TEXT NOT NULL,
+        content_hash TEXT NOT NULL,
+        payload_json TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        PRIMARY KEY(job_id, checkpoint_key)
+      );
+
+      CREATE VIRTUAL TABLE document_profiles_fts USING fts5(
+        nodus_id UNINDEXED, version_id UNINDEXED, title, overview, fields,
+        tokenize='unicode61 remove_diacritics 2'
+      );
+      CREATE VIRTUAL TABLE document_sections_fts USING fts5(
+        section_id UNINDEXED, nodus_id UNINDEXED, title, summary, concepts,
+        tokenize='unicode61 remove_diacritics 2'
+      );
+      CREATE VIRTUAL TABLE passages_fts USING fts5(
+        passage_id UNINDEXED, nodus_id UNINDEXED, text,
+        tokenize='unicode61 remove_diacritics 2'
+      );
+      INSERT INTO passages_fts(passage_id, nodus_id, text)
+        SELECT passage_id, nodus_id, text FROM passages;
+      CREATE TRIGGER passages_document_fts_ai AFTER INSERT ON passages BEGIN
+        INSERT INTO passages_fts(passage_id, nodus_id, text) VALUES (new.passage_id, new.nodus_id, new.text);
+      END;
+      CREATE TRIGGER passages_document_fts_au AFTER UPDATE OF text, nodus_id ON passages BEGIN
+        DELETE FROM passages_fts WHERE passage_id=old.passage_id;
+        INSERT INTO passages_fts(passage_id, nodus_id, text) VALUES (new.passage_id, new.nodus_id, new.text);
+      END;
+      CREATE TRIGGER passages_document_fts_ad AFTER DELETE ON passages BEGIN
+        DELETE FROM passages_fts WHERE passage_id=old.passage_id;
+      END;
+    `,
+  },
+  {
+    version: 158,
+    up: /* sql */ `
+      -- Document profiles are reusable derived analysis. SQLite CHECK constraints
+      -- cannot be widened in place, so preserve every row while rebuilding both
+      -- provenance tables with the new component in their closed vocabularies.
+      ALTER TABLE library_analysis_provenance RENAME TO library_analysis_provenance_v157;
+      CREATE TABLE library_analysis_provenance (
+        work_id                         TEXT NOT NULL,
+        component                       TEXT NOT NULL CHECK (component IN ('light','deep','summary','ideas','passages','embeddings','documentProfile')),
+        document_fingerprint            TEXT NOT NULL,
+        library_item_id                 TEXT,
+        library_revision_fingerprint    TEXT,
+        pipeline_version                TEXT NOT NULL,
+        model_fingerprint               TEXT NOT NULL,
+        output_fingerprint              TEXT NOT NULL,
+        source_vault_id                 TEXT,
+        source_work_id                  TEXT,
+        updated_at                      TEXT NOT NULL,
+        PRIMARY KEY (work_id, component)
+      );
+      INSERT INTO library_analysis_provenance SELECT * FROM library_analysis_provenance_v157;
+      DROP TABLE library_analysis_provenance_v157;
+      CREATE INDEX library_analysis_provenance_library
+        ON library_analysis_provenance(library_item_id, library_revision_fingerprint, component);
+
+      ALTER TABLE library_analysis_freshness RENAME TO library_analysis_freshness_v157;
+      CREATE TABLE library_analysis_freshness (
+        work_id       TEXT NOT NULL,
+        component     TEXT NOT NULL CHECK (component IN ('extraction','light','deep','passages','ideas','embeddings','summary','documentProfile')),
+        freshness     TEXT NOT NULL CHECK (freshness IN ('none','queued','running','current','stale','failed','unavailable')),
+        fingerprint   TEXT,
+        reason        TEXT,
+        updated_at    TEXT NOT NULL,
+        PRIMARY KEY (work_id, component)
+      );
+      INSERT INTO library_analysis_freshness SELECT * FROM library_analysis_freshness_v157;
+      DROP TABLE library_analysis_freshness_v157;
+      CREATE INDEX idx_library_analysis_freshness_state
+        ON library_analysis_freshness(freshness, component, work_id);
+
+      -- A changed Zotero revision or a newly-extracted deep source invalidates the
+      -- macro representation. Keep the last accepted profile readable while the
+      -- continuous queue prepares its replacement.
+      CREATE TRIGGER works_document_profile_stale_deep
+      AFTER UPDATE OF deep_hash, zotero_version ON works
+      WHEN OLD.deep_hash IS NOT NEW.deep_hash OR OLD.zotero_version IS NOT NEW.zotero_version
+      BEGIN
+        UPDATE document_profile_state
+           SET status='stale', stale_reason='source_changed', error=NULL,
+               updated_at=strftime('%Y-%m-%dT%H:%M:%fZ','now')
+         WHERE nodus_id=NEW.nodus_id AND current_version_id IS NOT NULL;
+      END;
+
+      -- Titles remain mutable bibliographic metadata and therefore update the
+      -- document-level lexical route without forcing an expensive rescan.
+      CREATE TRIGGER works_document_profile_title_fts
+      AFTER UPDATE OF title ON works
+      WHEN OLD.title IS NOT NEW.title
+      BEGIN
+        UPDATE document_profiles_fts SET title=NEW.title WHERE nodus_id=NEW.nodus_id;
+      END;
+    `,
+  },
+  {
+    version: 159,
+    up: /* sql */ `
+      -- Campaign refresh and pause/cancel operations are frequent while the global
+      -- progress bar is visible. Keep them indexed even after years of history.
+      CREATE INDEX document_index_jobs_campaign_status
+        ON document_index_jobs(campaign_id, status, updated_at);
     `,
   },
 ];

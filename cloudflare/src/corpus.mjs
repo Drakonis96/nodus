@@ -54,6 +54,7 @@ const ACADEMIC_WORKSPACE_TABLES = [
 
 const SEARCH_KEYS = {
   works: 'nodus_id', ideas: 'global_id', themes: 'theme_id', gaps: 'id', notes: 'id', passages: 'passage_id',
+  document_profile_versions: 'version_id', document_profile_fields: 'field_id', document_sections: 'section_id',
   persons: 'person_id', character_profiles: 'person_id', places: 'place_id', place_profiles: 'place_id',
   world_groups: 'group_id', world_scenes: 'scene_id', world_scene_text: 'scene_id', world_articles: 'article_id',
   world_threads: 'thread_id', world_rules: 'rule_id', world_questions: 'question_id', world_secrets: 'secret_id',
@@ -231,17 +232,46 @@ async function ideaGraph(env, space, request, seed) {
 
 async function workDetail(env, space, request, work) {
   const id = String(work.nodus_id);
-  const [occurrences, ideas, summaries, passageCount] = await Promise.all([
+  const [occurrences, ideas, summaries, passageCount, profileStates] = await Promise.all([
     rowsWhere(env, space, 'idea_occurrences', (row) => String(row.nodus_id) === id),
     tableRows(env, space, 'ideas', { limit: 100_000, ceiling: 100_000, fallback: 100_000 }),
     rowsWhere(env, space, 'work_summaries', (row) => String(row.nodus_id) === id),
     tableCount(env, space, 'passages'),
+    rowsWhere(env, space, 'document_profile_state', (row) => String(row.nodus_id) === id),
   ]);
   const ideaIds = new Set(occurrences.map((row) => String(row.global_id)));
   let authors = [];
   try { authors = JSON.parse(work.authors_json || '[]'); } catch { authors = []; }
   const ownPassages = passageCount ? (await rowsWhere(env, space, 'passages', (row) => String(row.nodus_id) === id)).length : 0;
-  return cachedJson(space, request, { work: { ...work, authors }, ideas: ideas.filter((idea) => ideaIds.has(String(idea.global_id))), summary: summaries[0] || null, passages: ownPassages, revision: space.revision });
+  const profileState = profileStates[0] || null;
+  const profileVersionId = profileState?.current_version_id == null ? null : String(profileState.current_version_id);
+  let documentProfile = null;
+  if (profileVersionId) {
+    const [versions, fields, sections, supports, ideaLinks] = await Promise.all([
+      rowsWhere(env, space, 'document_profile_versions', (row) => String(row.version_id) === profileVersionId),
+      rowsWhere(env, space, 'document_profile_fields', (row) => String(row.version_id) === profileVersionId),
+      rowsWhere(env, space, 'document_sections', (row) => String(row.version_id) === profileVersionId),
+      rowsWhere(env, space, 'document_profile_support', (row) => String(row.version_id) === profileVersionId),
+      rowsWhere(env, space, 'document_idea_links', (row) => String(row.version_id) === profileVersionId),
+    ]);
+    if (versions[0]) documentProfile = {
+      state: profileState,
+      version: versions[0],
+      fields,
+      sections,
+      supports,
+      ideaLinks,
+      citationPolicy: 'orientation_only',
+    };
+  }
+  return cachedJson(space, request, {
+    work: { ...work, authors },
+    ideas: ideas.filter((idea) => ideaIds.has(String(idea.global_id))),
+    summary: summaries[0] || null,
+    passages: ownPassages,
+    documentProfile,
+    revision: space.revision,
+  });
 }
 
 async function personDetail(env, space, request, person) {
@@ -513,7 +543,10 @@ export async function contextPackage(env, auth, request, input) {
   const space = await activeSpace(env, auth.space_id);
   const budget = clampInteger(input.budget, 1000, 200_000, 60_000);
   const hits = await lexicalSearch(env, space, input.query, 50);
-  const wanted = new Set(Array.isArray(input.include) && input.include.length ? input.include : ['ideas', 'passages', 'themes', 'gaps', 'works']);
+  const wanted = new Set(Array.isArray(input.include) && input.include.length ? input.include : [
+    'ideas', 'passages', 'themes', 'gaps', 'works',
+    'document_profile_versions', 'document_profile_fields', 'document_sections',
+  ]);
   const hitByTable = new Map();
   for (const hit of hits) {
     if (!hitByTable.has(hit.type)) hitByTable.set(hit.type, new Set());
@@ -534,5 +567,5 @@ export async function contextPackage(env, auth, request, input) {
     }
     if (kept.length) sections.push({ kind: table, items: kept });
   }
-  return { sections, stats: { chars: used, budget, truncated, matched: hits.length }, vault: safeJsonParse(space.vault_json, null), revision: space.revision, citationScheme: { idea: 'nodus://idea/<global_id>', passage: 'nodus://passage/<passage_id>', work: 'nodus://work/<nodus_id>' } };
+  return { sections, stats: { chars: used, budget, truncated, matched: hits.length }, vault: safeJsonParse(space.vault_json, null), revision: space.revision, citationScheme: { idea: 'nodus://idea/<global_id>', passage: 'nodus://passage/<passage_id>', work: 'nodus://work/<nodus_id>' }, documentProfilePolicy: 'orientation_only' };
 }

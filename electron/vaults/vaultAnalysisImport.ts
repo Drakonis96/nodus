@@ -21,6 +21,7 @@ interface AnalysisCounts {
   relations: number;
   authors: number;
   synthesis: number;
+  documentProfile: number;
 }
 
 interface SourceMatch {
@@ -95,6 +96,7 @@ function sourceCounts(db: Database.Database, nodusId: string): AnalysisCounts {
           (SELECT COUNT(*) FROM edges WHERE source_work = @id) AS relations,
           (SELECT COUNT(*) FROM work_authors WHERE nodus_id = @id) AS authors,
           (SELECT COUNT(*) FROM work_idea_synthesis WHERE nodus_id = @id) AS synthesis
+          ,(SELECT COUNT(*) FROM document_profile_state WHERE nodus_id = @id AND status='current') AS documentProfile
       `
     )
     .get({ id: nodusId }) as AnalysisCounts;
@@ -108,6 +110,7 @@ function availableKinds(work: WorkRow, counts: AnalysisCounts): VaultAnalysisReu
   if (counts.ideaEmbeddings > 0) kinds.add('ideaEmbeddings');
   if (work.summary_status === 'done' || counts.summary > 0) kinds.add('summary');
   if (counts.passages > 0) kinds.add('passages');
+  if (counts.documentProfile > 0) kinds.add('documentProfile');
   return [...kinds];
 }
 
@@ -194,6 +197,7 @@ function kindComponent(kind: VaultAnalysisReuseKind): LibraryAnalysisReuseCompon
   if (kind === 'summary') return 'summary';
   if (kind === 'passages') return 'passages';
   if (kind === 'ideaEmbeddings') return 'embeddings';
+  if (kind === 'documentProfile') return 'documentProfile';
   return 'ideas';
 }
 
@@ -205,6 +209,7 @@ function targetDocumentFingerprint(
   if (component === 'light') return target.light_hash;
   if (component === 'summary') return target.summary_hash;
   if (component === 'deep' || component === 'ideas') return target.deep_hash;
+  if (component === 'documentProfile') return target.deep_hash;
   const passage = targetDb.prepare('SELECT content_hash FROM passages WHERE nodus_id=? ORDER BY chunk_index LIMIT 1').get(target.nodus_id) as { content_hash: string | null } | undefined;
   return passage?.content_hash ?? target.deep_hash;
 }
@@ -219,7 +224,7 @@ function decideCompatibility(
   const available = new Set(availableKinds(match.work, match.counts));
   const imported: VaultAnalysisReuseKind[] = [];
   const compatibility: Compatibility = {};
-  const kinds: VaultAnalysisReuseKind[] = ['themes', 'ideas', 'ideaEmbeddings', 'summary', 'passages'];
+  const kinds: VaultAnalysisReuseKind[] = ['themes', 'ideas', 'ideaEmbeddings', 'summary', 'passages', 'documentProfile'];
   const targetCount = (table: string, predicate = 'nodus_id=?'): number => Number((targetDb.prepare(`SELECT COUNT(*) AS n FROM ${table} WHERE ${predicate}`).get(target.nodus_id) as { n: number }).n);
   const targetHasLocalOutput = (kind: VaultAnalysisReuseKind): boolean => {
     if (kind === 'themes') return target.light_status === 'done' || targetCount('work_themes') > 0;
@@ -228,6 +233,7 @@ function decideCompatibility(
       || targetCount('passages', 'nodus_id=? AND embedding IS NOT NULL') > 0;
     if (kind === 'summary') return target.summary_status === 'done' || targetCount('work_summaries') > 0;
     if (kind === 'passages') return targetCount('passages') > 0;
+    if (kind === 'documentProfile') return targetCount('document_profile_state', "nodus_id=? AND status='current'") > 0;
     return false;
   };
   for (const kind of kinds) {
@@ -466,6 +472,101 @@ function copiedComponents(imported: VaultAnalysisReuseKind[]): LibraryAnalysisRe
   return [...components];
 }
 
+function copyDocumentProfile(
+  db: Database.Database,
+  sourceId: string,
+  targetId: string,
+  tableRows: Record<string, number>,
+): void {
+  const state = db.prepare(
+    `SELECT current_version_id FROM ${SOURCE_ALIAS}.document_profile_state WHERE nodus_id=? AND status='current'`
+  ).get(sourceId) as { current_version_id: string } | undefined;
+  if (!state?.current_version_id) return;
+  const sourceVersion = state.current_version_id;
+  const versionId = `${targetId}:doc:${sourceVersion}`;
+  db.prepare('DELETE FROM document_profile_state WHERE nodus_id=?').run(targetId);
+  db.prepare('DELETE FROM document_profile_versions WHERE nodus_id=?').run(targetId);
+  for (const table of ['document_profile_state', 'document_profile_versions']) tableChange(db, tableRows, table);
+  db.prepare(`
+    INSERT INTO document_profile_versions (
+      version_id,nodus_id,state,source_fingerprint,pipeline_version,schema_version,source_language,
+      presentation_language,overview,profile_json,generator_model_json,auditor_model_json,prompt_hash,
+      audit_json,quality_score,input_tokens,output_tokens,estimated_cost_usd,created_at,published_at
+    ) SELECT @versionId,@targetId,'current',source_fingerprint,pipeline_version,schema_version,source_language,
+             presentation_language,overview,profile_json,generator_model_json,auditor_model_json,prompt_hash,
+             audit_json,quality_score,input_tokens,output_tokens,estimated_cost_usd,created_at,published_at
+        FROM ${SOURCE_ALIAS}.document_profile_versions WHERE version_id=@sourceVersion
+  `).run({ versionId, targetId, sourceVersion });
+  tableChange(db, tableRows, 'document_profile_versions');
+  db.prepare(`
+    INSERT INTO document_profile_fields(field_id,version_id,nodus_id,kind,ordinal,text,confidence,centrality,created_at)
+    SELECT @targetId||':field:'||field_id,@versionId,@targetId,kind,ordinal,text,confidence,centrality,created_at
+      FROM ${SOURCE_ALIAS}.document_profile_fields WHERE version_id=@sourceVersion
+  `).run({ targetId, versionId, sourceVersion });
+  tableChange(db, tableRows, 'document_profile_fields');
+  db.prepare(`
+    INSERT INTO document_sections(section_id,version_id,nodus_id,parent_section_id,level,ordinal,title,role,summary,
+      concepts_json,claims_json,page_start,page_end,char_start,char_end,content_hash,created_at)
+    SELECT @targetId||':section:'||section_id,@versionId,@targetId,
+      CASE WHEN parent_section_id IS NULL THEN NULL ELSE @targetId||':section:'||parent_section_id END,
+      level,ordinal,title,role,summary,concepts_json,claims_json,page_start,page_end,char_start,char_end,content_hash,created_at
+      FROM ${SOURCE_ALIAS}.document_sections WHERE version_id=@sourceVersion
+  `).run({ targetId, versionId, sourceVersion });
+  tableChange(db, tableRows, 'document_sections');
+  db.prepare(`
+    INSERT INTO document_profile_support(support_id,version_id,nodus_id,target_kind,target_id,section_id,passage_id,
+      page_start,page_end,char_start,char_end,quote,quote_hash,support_kind,confidence,validation_status,created_at)
+    SELECT @targetId||':support:'||support_id,@versionId,@targetId,target_kind,
+      CASE WHEN target_kind='field' THEN @targetId||':field:'||target_id ELSE @targetId||':section:'||target_id END,
+      CASE WHEN section_id IS NULL THEN NULL ELSE @targetId||':section:'||section_id END,
+      CASE WHEN passage_id IS NULL THEN NULL ELSE @targetId||substr(passage_id,length(@sourceId)+1) END,
+      page_start,page_end,char_start,char_end,quote,quote_hash,support_kind,confidence,validation_status,created_at
+      FROM ${SOURCE_ALIAS}.document_profile_support WHERE version_id=@sourceVersion
+  `).run({ targetId, sourceId, versionId, sourceVersion });
+  tableChange(db, tableRows, 'document_profile_support');
+  db.prepare(`
+    INSERT INTO document_vectors(vector_id,nodus_id,version_id,kind,source_id,text,text_hash,weight,embedding,
+      embedding_provider,embedding_model,embedding_dim,created_at)
+    SELECT @targetId||':vector:'||vector_id,@targetId,@versionId,kind,
+      CASE WHEN kind='section' THEN @targetId||':section:'||source_id
+           WHEN kind='overview' THEN source_id ELSE @targetId||':field:'||source_id END,
+      text,text_hash,weight,embedding,embedding_provider,embedding_model,embedding_dim,created_at
+      FROM ${SOURCE_ALIAS}.document_vectors WHERE version_id=@sourceVersion
+  `).run({ targetId, versionId, sourceVersion });
+  tableChange(db, tableRows, 'document_vectors');
+  db.prepare(`
+    INSERT INTO document_idea_links(version_id,nodus_id,global_id,target_kind,target_id,role,score,created_at)
+    SELECT @versionId,@targetId,link.global_id,link.target_kind,
+      CASE WHEN link.target_kind='field' THEN @targetId||':field:'||link.target_id ELSE @targetId||':section:'||link.target_id END,
+      link.role,link.score,link.created_at
+      FROM ${SOURCE_ALIAS}.document_idea_links link JOIN ideas i ON i.global_id=link.global_id
+     WHERE link.version_id=@sourceVersion
+  `).run({ targetId, versionId, sourceVersion });
+  tableChange(db, tableRows, 'document_idea_links');
+  db.prepare(`
+    INSERT INTO document_profile_overrides(override_id,nodus_id,field_path,base_version_id,generated_value_json,value_json,
+      verified,conflict,created_at,updated_at)
+    SELECT @targetId||':override:'||override_id,@targetId,field_path,@versionId,generated_value_json,value_json,
+      verified,conflict,created_at,updated_at FROM ${SOURCE_ALIAS}.document_profile_overrides WHERE nodus_id=@sourceId
+  `).run({ targetId, sourceId, versionId });
+  tableChange(db, tableRows, 'document_profile_overrides');
+  const sourceState = db.prepare(`SELECT * FROM ${SOURCE_ALIAS}.document_profile_state WHERE nodus_id=?`).get(sourceId) as Record<string, unknown>;
+  db.prepare(`INSERT INTO document_profile_state(nodus_id,current_version_id,status,source_fingerprint,profile_fingerprint,
+    pipeline_version,stale_reason,error,updated_at) VALUES(?,?,'current',?,?,?,?,?,?)`).run(
+      targetId, versionId, sourceState.source_fingerprint, sourceState.profile_fingerprint,
+      sourceState.pipeline_version, null, null, sourceState.updated_at,
+    );
+  tableChange(db, tableRows, 'document_profile_state');
+  const title = (db.prepare('SELECT title FROM works WHERE nodus_id=?').get(targetId) as { title: string }).title;
+  const overview = (db.prepare('SELECT overview FROM document_profile_versions WHERE version_id=?').get(versionId) as { overview: string }).overview;
+  const fields = (db.prepare('SELECT text FROM document_profile_fields WHERE version_id=? ORDER BY kind,ordinal').all(versionId) as Array<{ text: string }>).map((row) => row.text).join('\n');
+  db.prepare('DELETE FROM document_profiles_fts WHERE nodus_id=?').run(targetId);
+  db.prepare('INSERT INTO document_profiles_fts(nodus_id,version_id,title,overview,fields) VALUES(?,?,?,?,?)').run(targetId, versionId, title, overview, fields);
+  db.prepare('DELETE FROM document_sections_fts WHERE nodus_id=?').run(targetId);
+  db.prepare(`INSERT INTO document_sections_fts(section_id,nodus_id,title,summary,concepts)
+    SELECT section_id,nodus_id,title,summary,concepts_json FROM document_sections WHERE version_id=?`).run(versionId);
+}
+
 function copyProvenance(
   db: Database.Database,
   sourceId: string,
@@ -598,6 +699,7 @@ function importMatch(
       else if (imported.includes('ideaEmbeddings')) copyIdeaEmbeddings(targetDb, match.work.nodus_id, target.nodus_id, tableRows);
       if (imported.includes('summary')) copySummary(targetDb, match.work.nodus_id, target.nodus_id, tableRows);
       if (imported.includes('passages')) copyPassages(targetDb, match.work.nodus_id, target.nodus_id, tableRows, imported.includes('ideaEmbeddings'));
+      if (imported.includes('documentProfile')) copyDocumentProfile(targetDb, match.work.nodus_id, target.nodus_id, tableRows);
       // Checkpoints describe an in-flight operation, not a reusable result.
       updateWorkStatus(targetDb, match.work, target.nodus_id, imported);
       copyProvenance(targetDb, match.work.nodus_id, target.nodus_id, match.vaultId, imported, tableRows);

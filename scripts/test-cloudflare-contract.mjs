@@ -108,7 +108,7 @@ test('release package includes every migration and public deployment configurati
   execFileSync(process.execPath, [path.join(root, 'scripts', 'build-cloudflare-worker.mjs')]);
   const manifest = JSON.parse(read('cloudflare/dist/migrations.json'));
   assert.equal(manifest.schemaVersion, 1);
-  assert.deepEqual(manifest.migrations, ['0001_initial.sql', '0002_mobile_parity.sql']);
+  assert.deepEqual(manifest.migrations, ['0001_initial.sql', '0002_mobile_parity.sql', '0003_document_vectors.sql']);
   for (const name of [...manifest.migrations, 'catalog-config.json', 'pricing.v1.json']) {
     assert.ok(fs.statSync(path.join(root, 'cloudflare', 'dist', name)).size > 0, `${name} is missing from the packaged resources`);
   }

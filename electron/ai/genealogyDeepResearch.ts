@@ -25,8 +25,16 @@ import type {
 import type { DeepResearchApproach } from '@shared/deepResearchApproaches';
 import { normalizeDeepResearchApproach } from '@shared/deepResearchApproaches';
 import {
+  assessDeepResearchReport,
+  assessDeepResearchSection,
+  qualityPasses,
+  shouldAcceptQualityRevision,
+  type DeepResearchQualitySource,
+  type DeepResearchSectionQuality,
+} from '@shared/deepResearchQuality';
+import {
+  assembleContinuousNarrative,
   DEEP_RESEARCH_NARRATIVE_RULES,
-  WORDS_PER_PAGE,
   countWords,
   normalizeNarrativeSection,
 } from './deepResearchCore';
@@ -57,9 +65,8 @@ const PER_DOC_FULLTEXT = 5000;
 const PER_SECTION_FULLTEXT = 22000;
 const MAX_PERSONS_CONTEXT = 200;
 const MAX_EVENTS_CONTEXT = 200;
-const MIN_SECTIONS = 3;
-const MAX_SECTIONS = 12;
-const SECTION_WORDS = { min: 700, max: 1800 } as const;
+/** Observational display conversion only. It never controls retrieval or writing. */
+const OBSERVED_PAGE_WORD_RATIO = 450;
 
 // ── Source pool ─────────────────────────────────────────────────────────────
 
@@ -213,6 +220,7 @@ export interface GenPlanSection {
   purpose: string;
   keyPoints: string[];
   sourceIds: string[];
+  coverageQuestions?: string[];
 }
 export interface GenPlan {
   title: string;
@@ -221,10 +229,9 @@ export interface GenPlan {
 }
 export interface GenPlanInput {
   objective: string;
+  coverageQuestions: string[];
   language: string;
-  targetPages: { min: number; max: number };
   sectionTarget: number;
-  sectionHardCap: number;
   sources: { id: string; kind: string; title: string; label: string; persons: string[]; snippet: string }[];
   family: FamilyFacts;
   focusPerson: FocusPerson | null;
@@ -233,7 +240,6 @@ export interface GenSectionInput {
   objective: string;
   language: string;
   section: GenPlanSection;
-  targetWords: number;
   isConclusion: boolean;
   sources: { id: string; title: string; label: string; persons: string[]; texto: string }[];
   family: FamilyFacts;
@@ -248,6 +254,9 @@ export interface GenFinalizeInput {
   sectionTitles: string[];
   sourcesCited: number;
   sourcesConsidered: number;
+  /** Grounded section prose, not merely headings, so the abstract cannot invent a
+   * family relationship or certainty absent from the report. */
+  sectionFindings?: Array<{ title: string; text: string }>;
 }
 export interface GenFinalizeResult {
   title: string;
@@ -260,8 +269,10 @@ export interface GenDeepDeps {
   planReport(input: GenPlanInput): Promise<GenPlan>;
   writeSection(input: GenSectionInput): Promise<string>;
   finalize(input: GenFinalizeInput): Promise<GenFinalizeResult>;
+  auditFinalSummary?(input: GenFinalizeInput, draft: GenFinalizeResult): Promise<GenFinalizeResult>;
   /** Dynamic full text of a Zotero work (resolved only for the sections that use it). */
   resolveWorkFullText(nodusId: string): Promise<string>;
+  reviseSection?(input: GenSectionInput & { draft: string; quality: DeepResearchSectionQuality }): Promise<string>;
 }
 
 export async function orchestrateGenealogyDeepResearch(
@@ -281,61 +292,61 @@ export async function orchestrateGenealogyDeepResearch(
     }
   };
   const sourceById = new Map(sources.map((s) => [s.id, s]));
-  const targetPages = resolveTargetPages(request.targetLength ?? 'adaptive', sources.length);
-  const { target: sectionTarget, hardCap: sectionHardCap } = resolveSections(targetPages, request.sectionLimit ?? 'auto');
+  const { target: sectionTarget, hardCap: sectionHardCap } = resolveSections(
+    sources.length,
+    request.coverageQuestions?.length ?? 0,
+    request.sectionLimit ?? 'auto',
+  );
 
   emit({
     phase: 'snapshot',
     message: focusPerson ? `Reuniendo documentos y evidencia sobre ${focusPerson.nombre}…` : 'Reuniendo documentos y evidencia de la familia…',
   });
-  emit({ phase: 'planning', message: `Planificando ~${sectionTarget} secciones (${targetPages.min}–${targetPages.max} páginas)…` });
+  emit({ phase: 'planning', message: `Planificando ${sectionTarget} secciones según la evidencia disponible…` });
 
   let plan: GenPlan;
   try {
     plan = normalizePlan(
       await deps.planReport({
         objective: request.objective,
+        coverageQuestions: request.coverageQuestions ?? [],
         language,
-        targetPages,
         sectionTarget,
-        sectionHardCap,
         sources: sources.map((s) => ({ id: s.id, kind: s.kind, title: s.title, label: s.label, persons: s.persons, snippet: s.snippet })),
         family,
         focusPerson,
       }),
       sourceById,
-      sectionTarget
+      sectionTarget,
+      request.coverageQuestions ?? [],
     );
   } catch {
     plan = fallbackPlan(request.objective, sources, focusPerson);
+    assignGenealogyCoverage(plan.sections, request.coverageQuestions ?? []);
   }
-  if (plan.sections.length === 0) plan = fallbackPlan(request.objective, sources, focusPerson);
+  if (plan.sections.length === 0) {
+    plan = fallbackPlan(request.objective, sources, focusPerson);
+    assignGenealogyCoverage(plan.sections, request.coverageQuestions ?? []);
+  }
 
-  const maxWords = targetPages.max * WORDS_PER_PAGE;
   const written: { section: GenPlanSection; markdown: string }[] = [];
   const citedSourceIds = new Set<string>();
   let totalWords = 0;
   let stoppedReason: string | null = null;
+  let qualityRevisions = 0;
 
   for (let i = 0; i < plan.sections.length; i++) {
     if (written.length >= sectionHardCap) {
       stoppedReason = `Se alcanzó el máximo de ${sectionHardCap} secciones.`;
       break;
     }
-    if (totalWords >= maxWords) {
-      stoppedReason = `Se alcanzó el presupuesto de ~${targetPages.max} páginas.`;
-      break;
-    }
     const section = plan.sections[i];
     const isConclusion = i === plan.sections.length - 1;
-    const targetWords = clamp(Math.round(maxWords / Math.max(sectionTarget, 1)), SECTION_WORDS.min, SECTION_WORDS.max);
 
     emit({
       phase: 'section',
       message: `Redactando: ${section.title}`,
       sectionIndex: written.length + 1,
-      // What the progress bar divides by. The plan is the honest denominator: the
-      // caps above can end the report early, but never make it longer.
       sectionTotal: Math.min(plan.sections.length, sectionHardCap),
       sectionTitle: section.title,
       wordsSoFar: totalWords,
@@ -361,15 +372,55 @@ export async function orchestrateGenealogyDeepResearch(
 
     let raw = '';
     try {
-      raw = await deps.writeSection({ objective: request.objective, language, section, targetWords, isConclusion, sources: sectionSources, family, focusPerson, evidence, priorSummary: summarizePrior(written) });
+      raw = await deps.writeSection({ objective: request.objective, language, section, isConclusion, sources: sectionSources, family, focusPerson, evidence, priorSummary: summarizePrior(written) });
     } catch {
       raw = degradedSection(section, sectionSources);
       if (!stoppedReason) stoppedReason = 'Una o más secciones se resolvieron de forma degradada por un fallo del modelo.';
     }
 
-    const { markdown, cited } = applyGenealogyCitations(normalizeNarrativeSection(raw, section.title), sourceById);
+    let { markdown, cited } = applyGenealogyCitations(normalizeNarrativeSection(raw, section.title), sourceById);
+    const qualitySources = genealogyQualitySources(assigned);
+    const beforeQuality = assessDeepResearchSection({
+      markdown,
+      mode: 'genealogy',
+      objective: request.objective,
+      keyClaims: [...section.keyPoints, ...(section.coverageQuestions ?? [])],
+      sources: qualitySources,
+    });
+    if (deps.reviseSection && (!qualityPasses(beforeQuality) || beforeQuality.score < 85 || beforeQuality.issues.length > 0)) {
+      try {
+        const revisedRaw = await deps.reviseSection({
+          objective: request.objective,
+          language,
+          section,
+          isConclusion,
+          sources: sectionSources,
+          family,
+          focusPerson,
+          evidence,
+          priorSummary: summarizePrior(written),
+          draft: markdown,
+          quality: beforeQuality,
+        });
+        const revisedOutcome = applyGenealogyCitations(normalizeNarrativeSection(revisedRaw, section.title), sourceById);
+        const afterQuality = assessDeepResearchSection({
+          markdown: revisedOutcome.markdown,
+          mode: 'genealogy',
+          objective: request.objective,
+          keyClaims: [...section.keyPoints, ...(section.coverageQuestions ?? [])],
+          sources: qualitySources,
+        });
+        const allowed = new Set(qualitySources.map((source) => source.citation));
+        if (shouldAcceptQualityRevision(beforeQuality, afterQuality, allowed, revisedOutcome.markdown)) {
+          markdown = revisedOutcome.markdown;
+          cited = revisedOutcome.cited;
+          qualityRevisions += 1;
+        }
+      } catch {
+        /* preserve the first grounded draft */
+      }
+    }
     for (const id of cited) citedSourceIds.add(id);
-    for (const id of section.sourceIds) if (sourceById.has(id)) citedSourceIds.add(id);
     written.push({ section, markdown });
     totalWords += countWords(markdown);
   }
@@ -378,24 +429,63 @@ export async function orchestrateGenealogyDeepResearch(
 
   let finalize: GenFinalizeResult;
   try {
-    finalize = await deps.finalize({ objective: request.objective, language, planTitle: plan.title, sectionTitles: written.map((w) => w.section.title), sourcesCited: citedSourceIds.size, sourcesConsidered: sources.length });
+    const finalizeInput: GenFinalizeInput = {
+      objective: request.objective,
+      language,
+      planTitle: plan.title,
+      sectionTitles: written.map((w) => w.section.title),
+      sourcesCited: citedSourceIds.size,
+      sourcesConsidered: sources.length,
+      sectionFindings: written.map((item) => ({ title: item.section.title, text: item.markdown.slice(0, 4_500) })),
+    };
+    finalize = await deps.finalize(finalizeInput);
+    if (deps.auditFinalSummary) {
+      try {
+        const audited = await deps.auditFinalSummary(finalizeInput, finalize);
+        finalize = {
+          title: audited.title || finalize.title,
+          abstract: audited.abstract || finalize.abstract,
+          limitations: [...new Set([...finalize.limitations, ...audited.limitations])],
+          nextSteps: audited.nextSteps.length ? audited.nextSteps : finalize.nextSteps,
+        };
+      } catch {
+        /* the first grounded finalizer remains valid */
+      }
+    }
   } catch {
     finalize = { title: plan.title || request.objective, abstract: plan.abstract, limitations: [], nextSteps: ['Contrastar cada dato con la fuente original y buscar registros que confirmen los vínculos aún no probados.'] };
   }
 
   const citedSources = [...citedSourceIds].map((id) => sourceById.get(id)).filter((s): s is GenSource => !!s);
   const references = buildReferences(citedSources);
-  const draftMarkdown = assemble(written, references, finalize, language);
+  const singleNarrative = request.sectionLimit === 'single';
+  const draftMarkdown = assemble(written, references, finalize, language, singleNarrative);
+  const qualityAssessment = assessDeepResearchReport({
+    mode: 'genealogy',
+    objective: request.objective,
+    coverageQuestions: request.coverageQuestions,
+    sections: written.map((item) => ({
+      title: item.section.title,
+      markdown: item.markdown,
+      keyClaims: [...item.section.keyPoints, ...(item.section.coverageQuestions ?? [])],
+      sources: genealogyQualitySources(
+        item.section.sourceIds.map((id) => sourceById.get(id)).filter((source): source is GenSource => Boolean(source)),
+      ),
+    })),
+  });
 
-  const outline: WritingWorkshopSection[] = written.map((w, i) => ({
+  const outline: WritingWorkshopSection[] = singleNarrative ? [] : written.map((w, i) => ({
     id: w.section.id || `s${i + 1}`,
     title: w.section.title,
     purpose: w.section.purpose,
-    keyClaims: w.section.keyPoints.slice(0, 8),
+    keyClaims: [...w.section.keyPoints, ...(w.section.coverageQuestions ?? [])].slice(0, 16),
     sources: w.section.sourceIds.map((id) => sourceById.get(id)?.title ?? id).slice(0, 8),
   }));
 
-  const brief: WritingWorkshopBrief = { kind: 'deep_research', objective: request.objective, audience: request.audience, tone: 'academic', language };
+  const brief: WritingWorkshopBrief = {
+    kind: 'deep_research', objective: request.objective, audience: request.audience, tone: 'academic', language,
+    deepResearchVersion: request.deepResearchVersion ?? 'v2',
+  };
   const draft: WritingWorkshopDraft = {
     generatedAt: new Date().toISOString(),
     brief,
@@ -408,6 +498,8 @@ export async function orchestrateGenealogyDeepResearch(
     bibliography: references,
     nextSteps: finalize.nextSteps,
     limitations: finalize.limitations,
+    deepResearchStructure: singleNarrative ? 'single' : 'sectioned',
+    qualityAssessment,
     stats: {
       selectedIdeas: 0,
       selectedThemes: 0,
@@ -422,17 +514,22 @@ export async function orchestrateGenealogyDeepResearch(
   };
 
   const meta: DeepResearchMeta = {
-    sections: written.length,
+    deepResearchVersion: request.deepResearchVersion ?? 'v2',
+    structure: singleNarrative ? 'single' : 'sectioned',
+    sections: singleNarrative ? 1 : written.length,
     words: totalWords,
     pages: pages(totalWords),
     ideasCovered: citedSourceIds.size,
     ideasConsidered: sources.length,
     worksCited: citedSources.length,
-    targetPages,
     stoppedReason,
+    qualityRevisions,
+    coverage: request.coverageQuestions?.length
+      ? { questions: [...request.coverageQuestions], ratio: qualityAssessment.metrics.objectiveCoverage }
+      : null,
   };
 
-  emit({ phase: 'done', message: `Informe listo: ${written.length} secciones · ~${meta.pages} páginas`, wordsSoFar: totalWords, pagesSoFar: meta.pages });
+  emit({ phase: 'done', message: `Informe listo: ${singleNarrative ? 'bloque continuo' : `${written.length} secciones`} · ~${meta.pages} páginas`, wordsSoFar: totalWords, pagesSoFar: meta.pages });
   return { draft, meta };
 }
 
@@ -502,7 +599,9 @@ function realDeps(model: ModelRef | null): GenDeepDeps {
   return {
     planReport: (input) => aiPlan(input, model),
     writeSection: (input) => aiWriteSection(input, model),
+    reviseSection: (input) => aiReviseGenealogySection(input, model),
     finalize: (input) => aiFinalize(input, model),
+    auditFinalSummary: (input, draft) => aiAuditGenealogyFinalSummary(input, draft, model),
     resolveWorkFullText: async (nodusId) => {
       const w = getWork(nodusId);
       if (!w) return '';
@@ -550,6 +649,7 @@ function specializedGenealogyDeps(
       input.sources,
     ),
     finalize: (input) => aiFinalize(input, model, context),
+    auditFinalSummary: (input, draft) => aiAuditGenealogyFinalSummary(input, draft, model, context),
   };
 }
 
@@ -565,21 +665,23 @@ async function aiPlan(input: GenPlanInput, model: ModelRef | null, approach?: Ge
     'Eres el planificador de un INFORME DE HISTORIA FAMILIAR (Deep Research en modo genealogía de Nodus).',
     'Diseñas el esqueleto de un informe riguroso y bien documentado a partir de las FUENTES (documentos de archivo y bibliografía) y de los HECHOS de la familia (personas, parentescos, eventos) que se te dan.',
     'PRINCIPIO: pocas secciones LARGAS y de fondo, no muchas cortas. Organiza el relato de forma útil (p. ej. por generaciones, por figuras clave, por lugares o migraciones, y una sección de fuentes y método).',
-    `Planifica en torno a ${input.sectionTarget} secciones amplias y nunca más de esa cifra en el plan inicial. Usa menos si el relato queda más unido. El cuerpo debe ocupar entre ${input.targetPages.min} y ${input.targetPages.max} páginas.`,
+    `Organiza ${input.sectionTarget} unidades narrativas solo cuando cada una tenga una función probatoria distinta. No añadas secciones para alcanzar una longitud: si una sección no aporta evidencia o análisis nuevo, intégrala en otra.`,
     'Cada título debe abarcar una etapa o línea narrativa sustantiva. Evita títulos partidos por dos puntos, punto y coma o guion largo.',
     'Sigue el estándar de prueba genealógico: identidad y parentesco son HIPÓTESIS probadas con evidencia; no des por ciertos vínculos sin apoyo documental.',
     'Asigna a cada sección los `sourceIds` que la sostienen (copia los ids EXACTOS de la lista de fuentes). No inventes fuentes ni ids.',
+    'Cuando existan fuentes independientes pertinentes, asigna varias a la misma sección para triangular identidad, fecha, lugar y parentesco. No cuentes como corroboración dos extractos derivados del mismo documento.',
+    'COBERTURA OBLIGATORIA: asigna cada elemento de `preguntas_de_cobertura` a una sección copiándolo literalmente en `coverageQuestions`. Si las fuentes no permiten responderlo, la sección debe declararlo como límite probatorio, no omitirlo.',
     input.focusPerson
       ? `Hay una PERSONA EN FOCO: ${input.focusPerson.nombre}. Este informe es SU biografía documentada, no un panorama genérico de la familia. Organiza las secciones en torno a su vida (orígenes y familia, etapas vitales, vínculos y descendencia, su rastro documental) y trae al resto de personas solo en la medida en que se relacionan con ella. El título del informe debe nombrarla.`
       : '',
     ...(approach?.rules.planner ?? []),
-    'Devuelve SOLO JSON: {"title":"...","abstract":"...","sections":[{"id":"s1","title":"...","purpose":"...","keyPoints":["..."],"sourceIds":["..."]}]}',
+    'Devuelve SOLO JSON: {"title":"...","abstract":"...","sections":[{"id":"s1","title":"...","purpose":"...","keyPoints":["..."],"coverageQuestions":["pregunta exacta"],"sourceIds":["..."]}]}',
   ].filter(Boolean).join('\n');
   const user = JSON.stringify(
     {
       objetivo: input.objective,
+      preguntas_de_cobertura: input.coverageQuestions,
       idioma: input.language,
-      paginas: input.targetPages,
       secciones_objetivo: input.sectionTarget,
       fuentes: input.sources,
       familia: input.family,
@@ -599,6 +701,7 @@ async function aiPlan(input: GenPlanInput, model: ModelRef | null, approach?: Ge
       purpose: s.purpose ?? '',
       keyPoints: Array.isArray(s.keyPoints) ? s.keyPoints : [],
       sourceIds: Array.isArray(s.sourceIds) ? s.sourceIds : [],
+      coverageQuestions: Array.isArray(s.coverageQuestions) ? s.coverageQuestions : [],
     })),
   };
 }
@@ -606,10 +709,11 @@ async function aiPlan(input: GenPlanInput, model: ModelRef | null, approach?: Ge
 async function aiWriteSection(input: GenSectionInput, model: ModelRef | null, approach?: GenealogyApproachContext): Promise<string> {
   const system = [
     'Eres el redactor de un INFORME DE HISTORIA FAMILIAR (Deep Research en modo genealogía). Escribes UNA sección.',
-    'Escribe en español salvo que el idioma pida otra lengua. Prosa continua y desarrollada, 4-7 párrafos densos; nada de listas salvo que sean imprescindibles.',
-    `Extensión objetivo: ~${input.targetWords} palabras.`,
+    'Escribe en español salvo que el idioma pida otra lengua. Desarrolla todas las afirmaciones, comparaciones e incertidumbres que la evidencia justifique y detente cuando no quede valor probatorio marginal; no persigas un número de párrafos o palabras ni repitas una idea con otras formulaciones.',
     'Usa SOLO las fuentes y los hechos del contexto (documentos con su texto, personas, eventos, evidencia). No inventes personas, documentos, fechas ni parentescos.',
     'Sigue el estándar de prueba genealógico: distingue lo que la fuente AFIRMA de lo que se infiere; nunca afirmes una identidad o un parentesco sin apoyo documental; señala los datos inciertos o contradictorios.',
+    'Cuando haya varias fuentes independientes, compáralas explícitamente y explica qué dato corrobora, contradice o deja abierto cada una. Cuando solo exista una, formula la conclusión como provisional.',
+    'Cuando existan tres o más fuentes independientes, distribuye al menos tres triangulaciones explícitas en párrafos distintos; con dos fuentes, hazlo en al menos dos. Una triangulación debe explicar qué confirma, contradice o limita cada registro, no limitarse a juntar enlaces.',
     'CITAS: cuando sostengas un hecho con una fuente, cítala inmediatamente como enlace Markdown. Documentos: `[Título](nodus://archive/<itemId>)`. Obras: `[Autor, Año](nodus://work/<nodusId>)`. Copia el `id` EXACTO del campo `id` de la fuente (quita el prefijo `doc:`/`work:`). Nunca inventes ids.',
     'Respeta los nombres y las fechas de época tal como constan; no los modernices. Nombra a las personas por su nombre completo.',
     ...DEEP_RESEARCH_NARRATIVE_RULES,
@@ -623,7 +727,7 @@ async function aiWriteSection(input: GenSectionInput, model: ModelRef | null, ap
     {
       objetivo: input.objective,
       idioma: input.language,
-      seccion: { titulo: input.section.title, proposito: input.section.purpose, puntos_clave: input.section.keyPoints },
+      seccion: { titulo: input.section.title, proposito: input.section.purpose, puntos_clave: input.section.keyPoints, preguntas_de_cobertura: input.section.coverageQuestions ?? [] },
       fuentes_asignadas: input.sources,
       familia_relevante: input.family,
       persona_en_foco: input.focusPerson,
@@ -637,6 +741,50 @@ async function aiWriteSection(input: GenSectionInput, model: ModelRef | null, ap
   return completeText({ system, user, temperature: 0.3, maxTokens: 5200 }, model);
 }
 
+async function aiReviseGenealogySection(
+  input: GenSectionInput & { draft: string; quality: DeepResearchSectionQuality },
+  model: ModelRef | null,
+): Promise<string> {
+  const system = [
+    'Eres el editor final de un informe de historia familiar sometido al estándar de prueba genealógico.',
+    'Reescribe la sección para corregir únicamente los fallos medidos. Conserva el idioma y todo dato ya correctamente formulado, y elimina cualquier repetición sin valor probatorio.',
+    'Usa exclusivamente las fuentes, hechos y evidencias proporcionados. No inventes identidades, parentescos, fechas, lugares ni documentos.',
+    'Distingue explícitamente dato documentado, inferencia razonada, conflicto entre registros y ausencia de prueba. Una coincidencia de nombre nunca basta por sí sola para identificar a una persona.',
+    'Compara fuentes independientes cuando existan y explica qué aporta cada una. Si una fuente es única, limita la conclusión en vez de reforzarla retóricamente.',
+    'Cuando haya tres o más fuentes independientes, conserva al menos tres párrafos de triangulación explícita; con dos fuentes, al menos dos. Cada párrafo debe explicar la relación probatoria entre registros, no acumular citas.',
+    'Copia solo los enlaces nodus:// permitidos. No acumules citas ni dejes afirmaciones sustantivas sin apoyo.',
+    'Mantén un único encabezado ## y prosa continua. Devuelve solo el Markdown completo revisado.',
+  ].join('\n');
+  const allowedSources = input.sources.map((source) => {
+    const [prefix, ...rest] = source.id.split(':');
+    const refId = rest.join(':');
+    const kind = prefix === 'doc' ? 'archive' : 'work';
+    return {
+      id: source.id,
+      exactCitation: `[${source.label || source.title}](nodus://${kind}/${encodeURIComponent(refId)})`,
+      title: source.title,
+      text: source.texto,
+    };
+  });
+  return completeText({
+    system,
+    user: JSON.stringify({
+      objective: input.objective,
+      language: input.language,
+      section: input.section,
+      detectedProblems: input.quality.issues,
+      metricsBefore: input.quality.metrics,
+      draft: input.draft,
+      allowedSources,
+      relevantFamilyFacts: input.family,
+      focusPerson: input.focusPerson,
+      evidence: input.evidence,
+    }, null, 2),
+    temperature: 0.12,
+    maxTokens: 5_600,
+  }, model);
+}
+
 interface AiFinalShape { title?: string; abstract?: string; limitations?: string[]; nextSteps?: string[] }
 function isAiFinal(v: unknown): v is AiFinalShape {
   return typeof v === 'object' && v !== null;
@@ -647,6 +795,7 @@ async function aiFinalize(input: GenFinalizeInput, model: ModelRef | null, appro
     'Escribe en español salvo que el idioma pida otra lengua.',
     'Devuelve SOLO JSON: {"title":"título breve del informe","abstract":"resumen de 6-10 líneas","limitations":["..."],"nextSteps":["..."]}',
     'Las limitaciones deben ser honestas y genealógicas: vínculos aún no probados, fuentes no consultadas, fechas inciertas o contradictorias, homónimos por resolver.',
+    'El título y el resumen solo pueden sintetizar hallazgos presentes en `hallazgos_verificados`. No conviertas una hipótesis, coincidencia nominal, ausencia documental o relación posible en parentesco o identidad demostrados.',
     'Los próximos pasos deben sugerir qué registros o fuentes buscar para probar lo que queda como hipótesis.',
     'Redacta el título y el resumen como prosa fluida. Evita dos puntos, punto y coma y guion largo salvo necesidad estricta.',
     ...(approach?.rules.finalizer ?? []),
@@ -659,6 +808,7 @@ async function aiFinalize(input: GenFinalizeInput, model: ModelRef | null, appro
       secciones: input.sectionTitles,
       fuentes_citadas: input.sourcesCited,
       fuentes_consideradas: input.sourcesConsidered,
+      hallazgos_verificados: input.sectionFindings ?? [],
       ...(approach ? { enfoque_de_investigacion: approach.approach, plan_de_recuperacion: approach.retrieval } : {}),
     },
     null,
@@ -673,9 +823,49 @@ async function aiFinalize(input: GenFinalizeInput, model: ModelRef | null, appro
   };
 }
 
+async function aiAuditGenealogyFinalSummary(
+  input: GenFinalizeInput,
+  draft: GenFinalizeResult,
+  model: ModelRef | null,
+  approach?: GenealogyApproachContext,
+): Promise<GenFinalizeResult> {
+  const system = [
+    'Eres el control epistemológico final de un informe de historia familiar. Audita únicamente título, resumen, limitaciones y próximos pasos.',
+    'Compara cada afirmación del título y del resumen con `hallazgos_verificados`. Estrecha o elimina cualquier identidad, parentesco, cronología, causalidad o certeza que el cuerpo no establezca de forma explícita.',
+    'Distingue coincidencia nominal, hipótesis razonada, evidencia conflictiva y vínculo probado. Nunca mejores el grado de certeza del cuerpo.',
+    'No elimines ninguna limitación previa. Puedes añadir otras cuando el resumen dependa de homónimos, registros ausentes o fuentes únicas.',
+    'No introduzcas datos nuevos. Conserva el idioma y devuelve SOLO JSON con {"title":"...","abstract":"...","limitations":["..."],"nextSteps":["..."]}.',
+    ...(approach?.rules.finalizer ?? []),
+  ].join('\n');
+  const ai = await completeJson<AiFinalShape>({
+    system,
+    user: JSON.stringify({
+      objetivo: input.objective,
+      hallazgos_verificados: input.sectionFindings ?? [],
+      propuesta: draft,
+    }, null, 2),
+    temperature: 0,
+    maxTokens: 2_400,
+  }, isAiFinal, model);
+  return {
+    title: ai.title ?? draft.title,
+    abstract: ai.abstract ?? draft.abstract,
+    limitations: Array.isArray(ai.limitations) ? ai.limitations : draft.limitations,
+    nextSteps: Array.isArray(ai.nextSteps) ? ai.nextSteps : draft.nextSteps,
+  };
+}
+
 // ── Pure helpers ──────────────────────────────────────────────────────────────
 
 const CITATION_RE = /\[([^\]]*)\]\(nodus:\/\/(archive|work)\/([^)]+)\)/g;
+
+function genealogyQualitySources(sources: GenSource[]): DeepResearchQualitySource[] {
+  return sources.map((source) => ({
+    citation: `nodus://${source.kind === 'document' ? 'archive' : 'work'}/${encodeURIComponent(source.refId)}`,
+    sourceId: source.id,
+    evidence: 'document',
+  }));
+}
 
 /** Keep only citations that point at a source in the pool; strip hallucinated ones. */
 export function applyGenealogyCitations(markdown: string, sourceById: Map<string, GenSource>): { markdown: string; cited: Set<string> } {
@@ -715,18 +905,46 @@ function buildMatrix(cited: GenSource[]): WritingWorkshopMatrixRow[] {
   }));
 }
 
-function normalizePlan(plan: GenPlan, sourceById: Map<string, GenSource>, maxSections: number): GenPlan {
+function normalizePlan(
+  plan: GenPlan,
+  sourceById: Map<string, GenSource>,
+  maxSections: number,
+  coverageQuestions: string[] = [],
+): GenPlan {
+  const validCoverage = new Set(coverageQuestions);
   const sections = (plan.sections ?? []).slice(0, maxSections).map((s, i) => ({
     id: cleanStr(s.id, `s${i + 1}`),
     title: cleanStr(s.title, `Sección ${i + 1}`),
     purpose: cleanStr(s.purpose, ''),
     keyPoints: strList(s.keyPoints).slice(0, 8),
     sourceIds: strList(s.sourceIds).filter((id) => sourceById.has(id)),
+    coverageQuestions: strList(s.coverageQuestions).filter((question) => validCoverage.has(question)),
   }));
   // Any section with no valid sources borrows the top documents so it has grounding.
   const topDocs = [...sourceById.values()].filter((s) => s.kind === 'document').slice(0, 4).map((s) => s.id);
   for (const s of sections) if (s.sourceIds.length === 0) s.sourceIds = topDocs;
+  assignGenealogyCoverage(sections, coverageQuestions);
   return { title: cleanStr(plan.title, ''), abstract: cleanStr(plan.abstract, ''), sections };
+}
+
+function assignGenealogyCoverage(sections: GenPlanSection[], questions: string[]): void {
+  if (!sections.length) return;
+  const assigned = new Set(sections.flatMap((section) => section.coverageQuestions ?? []));
+  for (const question of questions) {
+    if (assigned.has(question)) continue;
+    const query = genealogyTerms(question);
+    const ranked = sections.map((section, index) => {
+      const target = genealogyTerms(`${section.title} ${section.purpose} ${section.keyPoints.join(' ')}`);
+      const overlap = [...query].filter((term) => target.has(term)).length / Math.max(1, query.size);
+      return { section, index, score: overlap - (section.coverageQuestions?.length ?? 0) * 0.01 };
+    }).sort((a, b) => b.score - a.score || a.index - b.index);
+    ranked[0].section.coverageQuestions = [...(ranked[0].section.coverageQuestions ?? []), question];
+    assigned.add(question);
+  }
+}
+
+function genealogyTerms(text: string): Set<string> {
+  return new Set(text.toLocaleLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').split(/[^\p{L}\p{N}]+/u).filter((word) => word.length > 3));
 }
 
 function fallbackPlan(objective: string, sources: GenSource[], focusPerson: FocusPerson | null = null): GenPlan {
@@ -768,8 +986,25 @@ function evidenceForPersons(names: Set<string>): { persona: string; cita: string
   return out;
 }
 
-function assemble(written: { section: GenPlanSection; markdown: string }[], references: string[], finalize: GenFinalizeResult, language: string): string {
+function assemble(
+  written: { section: GenPlanSection; markdown: string }[],
+  references: string[],
+  finalize: GenFinalizeResult,
+  language: string,
+  singleNarrative = false,
+): string {
   const L = labels(language);
+  if (singleNarrative) {
+    return assembleContinuousNarrative(
+      written.map((item) => item.markdown),
+      references,
+      finalize.limitations,
+      L.sources,
+      L.limitations,
+      L.noSources,
+      finalize.abstract,
+    );
+  }
   const parts: string[] = [];
   if (finalize.abstract) parts.push(`## ${L.abstract}`, '', finalize.abstract, '');
   for (const w of written) parts.push(w.markdown.trim(), '');
@@ -779,38 +1014,27 @@ function assemble(written: { section: GenPlanSection; markdown: string }[], refe
   return parts.join('\n').replace(/\n{3,}/g, '\n\n').trim();
 }
 
-function resolveTargetPages(target: DeepResearchRequest['targetLength'], sourceCount: number): { min: number; max: number } {
-  switch (target) {
-    case 'concise':
-      return { min: 4, max: 7 };
-    case 'standard':
-      return { min: 8, max: 12 };
-    case 'exhaustive':
-      return { min: 13, max: 20 };
-    default: {
-      const est = clamp(Math.round(sourceCount / 3), 4, 16);
-      return { min: est, max: clamp(est + 3, est + 2, 20) };
-    }
-  }
-}
-
-function resolveSections(targetPages: { min: number; max: number }, sectionLimit: 'auto' | number): { target: number; hardCap: number } {
-  const natural = clamp(Math.round(((targetPages.min + targetPages.max) / 2) / 3.5), MIN_SECTIONS, 7);
+function resolveSections(
+  sourceCount: number,
+  coverageCount: number,
+  sectionLimit: NonNullable<DeepResearchRequest['sectionLimit']>,
+): { target: number; hardCap: number } {
   if (typeof sectionLimit === 'number' && Number.isFinite(sectionLimit) && sectionLimit > 0) {
-    const target = clamp(Math.round(sectionLimit), MIN_SECTIONS, MAX_SECTIONS);
-    return { target, hardCap: Math.min(MAX_SECTIONS, target + 1) };
+    const target = Math.max(1, Math.round(sectionLimit));
+    return { target, hardCap: target };
   }
-  return { target: natural, hardCap: Math.min(MAX_SECTIONS, natural + 1) };
+  // The structure follows the evidence graph, not a page/word budget. A small
+  // corpus stays compact; additional independent source/coverage clusters may
+  // receive their own section when the planner can give them a distinct purpose.
+  const target = Math.max(3, Math.ceil(sourceCount / 4), Math.ceil(coverageCount / 3));
+  return { target, hardCap: target };
 }
 
 function summarizePrior(written: { section: GenPlanSection; markdown: string }[]): string {
   return written.map((w, i) => `${i + 1}. ${w.section.title}`).join('\n');
 }
 function pages(words: number): number {
-  return Math.max(1, Math.round(words / WORDS_PER_PAGE));
-}
-function clamp(v: number, min: number, max: number): number {
-  return Math.max(min, Math.min(max, v));
+  return Math.max(1, Math.round(words / OBSERVED_PAGE_WORD_RATIO));
 }
 function clip(text: string, max: number): string {
   const clean = (text ?? '').replace(/\s+/g, ' ').trim();

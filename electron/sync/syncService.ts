@@ -20,6 +20,8 @@ import type { SyncLogEntry, WorkCreator, ZoteroItem } from '@shared/types';
 import { bylineFromCreators, linkZoteroAuthors } from '../db/authorsRepo';
 import { getDb } from '../db/database';
 import { probeWorkTextAvailability } from '../extraction/textExtractor';
+import { getActiveVault } from '../vaults/vaultRegistry';
+import { documentIndexQueue } from '../pipeline/documentIndexQueue';
 
 
 /** Structured creators kept for building canonical author identity. Only authors
@@ -234,6 +236,14 @@ export async function fullSync(mode: 'manual' | 'realtime'): Promise<SyncLogEntr
     setLibraryVersions(await fetchLibraryVersions(userId, settings.monitoredCollections));
   } catch {
     /* ignore */
+  }
+
+  // Continuous document understanding is opt-in. When enabled, reconcile now so
+  // newly synced or changed works do not have to wait for the periodic safety poll.
+  if (settings.documentIndexingEnabled && (added > 0 || changed > 0)) {
+    await documentIndexQueue.refreshVault(getActiveVault().id).catch((error) => {
+      console.error('[document-index] post-sync refresh failed', error);
+    });
   }
 
   const summary = `${added} altas, ${changed} cambios, ${lightQueued} temas encolados, ${deepQueued} profundos encolados`;

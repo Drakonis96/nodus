@@ -97,6 +97,11 @@ try {
     await updateModal.waitFor({ state: 'detached' });
   };
   await dismissUpdateModal();
+  const documentConsent = page.getByTestId('document-understanding-consent');
+  if (await documentConsent.count()) {
+    await documentConsent.getByRole('button', { name: 'Ahora no', exact: true }).click();
+    await documentConsent.waitFor({ state: 'detached' });
+  }
 
   // The demo's report is one screen long, and a place only means something in a
   // document that does not fit on one. This is the demo report with a long body: same
@@ -129,7 +134,7 @@ try {
 
   // ── The gallery's own controls ──────────────────────────────────────────────
   await openDeepResearch();
-  if (process.env.NODUS_E2E_APPROACH_SCREENSHOT) {
+  if (process.env.NODUS_E2E_APPROACH_SCREENSHOT || process.env.NODUS_E2E_STRUCTURE_SCREENSHOT || process.env.NODUS_E2E_SINGLE_BLOCK_SCREENSHOT) {
     await page.getByRole('button', { name: 'Nuevo informe', exact: true }).click();
     const composer = page.getByRole('dialog', { name: 'Nuevo informe' });
     await composer.waitFor({ state: 'visible' });
@@ -138,7 +143,48 @@ try {
     assert.equal(await approachSelector.locator('option').count(), 7, 'the real composer contains every research approach');
     await approachSelector.selectOption('literature_review');
     assert.match(await page.getByTestId('deep-research-approach-help').innerText(), /líneas de interpretación|métodos/i);
-    await page.screenshot({ path: process.env.NODUS_E2E_APPROACH_SCREENSHOT });
+    const versionSelector = page.getByTestId('deep-research-version');
+    assert.deepEqual(await versionSelector.locator('option').allTextContents(), [
+      'v1 · Deep Research histórico',
+      'v2 · Ideas primero y documentos completos',
+    ], 'the real composer exposes both reproducible Deep Research versions');
+    assert.equal(await versionSelector.inputValue(), 'v2', 'new reports default to v2');
+    const sectionSelector = page.getByTestId('deep-research-section-limit');
+    assert.deepEqual(await sectionSelector.locator('option').allTextContents(), [
+      'Secciones: Auto (IA decide)',
+      'Bloque único · sin secciones',
+      'Máx. 4 secciones',
+      'Máx. 5 secciones',
+      'Máx. 6 secciones',
+      'Máx. 8 secciones',
+      'Máx. 10 secciones',
+    ], 'the real composer exposes continuous and sectioned structures');
+    const languageSelector = page.getByTestId('deep-research-language');
+    const modelSelector = composer.locator('select[aria-label="Modelo"]');
+    const controlHeights = await Promise.all([versionSelector, sectionSelector, languageSelector, modelSelector].map((locator) => locator.evaluate((element) => element.getBoundingClientRect().height)));
+    assert.ok(Math.max(...controlHeights) - Math.min(...controlHeights) <= 2, `all four composer controls are visually balanced (${controlHeights.join(' vs ')} px)`);
+    if (process.env.NODUS_E2E_APPROACH_SCREENSHOT) await page.screenshot({ path: process.env.NODUS_E2E_APPROACH_SCREENSHOT });
+    if (process.env.NODUS_E2E_STRUCTURE_SCREENSHOT) await composer.screenshot({ path: process.env.NODUS_E2E_STRUCTURE_SCREENSHOT });
+    if (process.env.NODUS_E2E_SINGLE_BLOCK_SCREENSHOT) {
+      await sectionSelector.selectOption('single');
+      assert.match(await page.locator('#deep-research-section-limit-help').innerText(), /narración continua|sin encabezados/i);
+      await composer.screenshot({ path: process.env.NODUS_E2E_SINGLE_BLOCK_SCREENSHOT });
+    }
+    await page.setViewportSize({ width: 600, height: 900 });
+    const mobileLayout = await composer.evaluate((element) => ({
+      clientWidth: element.clientWidth,
+      scrollWidth: element.scrollWidth,
+      controls: [...element.querySelectorAll('#deep-research-section-limit, [data-testid="deep-research-version"], [data-testid="deep-research-language"], select[aria-label="Modelo"]')]
+        .map((control) => control.getBoundingClientRect().width),
+    }));
+    assert.ok(mobileLayout.scrollWidth <= mobileLayout.clientWidth, 'the one-column composer has no horizontal overflow');
+    assert.ok(Math.max(...mobileLayout.controls) - Math.min(...mobileLayout.controls) <= 2, `mobile controls share one balanced width (${mobileLayout.controls.join(' vs ')} px)`);
+    await page.setViewportSize({ width: 1400, height: 900 });
+    if (process.env.NODUS_E2E_VERSION_V1_SCREENSHOT) {
+      await versionSelector.selectOption('v1');
+      assert.match(await page.getByTestId('deep-research-version-help').innerText(), /sistema anterior|compatibilidad/i);
+      await page.screenshot({ path: process.env.NODUS_E2E_VERSION_V1_SCREENSHOT });
+    }
     await composer.getByRole('button', { name: 'Cerrar' }).click();
     await composer.waitFor({ state: 'detached' });
   }

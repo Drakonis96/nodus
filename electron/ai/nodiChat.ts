@@ -1,7 +1,7 @@
 import { completeTextStream, resolveModelRef } from './aiClient';
 import { getSettings } from '../db/settingsRepo';
 import { getActiveVault } from '../vaults/vaultRegistry';
-import { buildNodiResearchContext, CHAT_CITATION_RULES, humanizeResearchCitations } from './researchAssistant';
+import { buildNodiResearchContext, CHAT_CITATION_RULES, sanitizeResearchCitations } from './researchAssistant';
 import { buildGenealogyContext } from './genealogyChatContext';
 import {
   buildPrimarySourcesChatContext,
@@ -149,6 +149,9 @@ function buildSystemPrompt(request: NodiChatRequest, sources: string[]): string 
     'Al responder hechos sobre producto o vaults, termina con «Base:» y enumera solo las fuentes realmente disponibles que sustentan la respuesta.',
     citeCorpus
       ? 'Cuando la afirmación provenga del contexto de bóveda (ideas, contradicciones, huecos, autores o pasajes), cítala en línea con un enlace `nodus://` según las reglas de más abajo, en lugar de listarla en «Base:». Reserva «Base:» para hechos sobre el producto o la documentación.'
+      : '',
+    citeCorpus
+      ? 'En investigación, usa la orientación documental para escoger las obras, pero fundamenta la respuesta con las ideas y, sobre todo, los pasajes literales disponibles. No sustituyas un pasaje disponible por una cita genérica a la obra.'
       : '',
     citeWorld
       ? 'Para el mundo de ficción, los bloques CALCULADO POR NODUS son hechos autoritativos. Toda afirmación sobre el mundo debe llevar exactamente uno de los enlaces `[Título](nodus://world/tipo/id)` suministrados. No inventes canon, títulos, ids ni relaciones.'
@@ -337,5 +340,5 @@ export async function streamNodiChat(
   if (primarySourceCitationsEnabled(request)) {
     return validatePrimarySourceAnswerCitations(answer);
   }
-  return corpusCitationsEnabled(request) ? humanizeResearchCitations(answer) : answer;
+  return corpusCitationsEnabled(request) ? sanitizeResearchCitations(answer, user) : answer;
 }

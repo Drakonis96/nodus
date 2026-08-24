@@ -14,12 +14,15 @@ import type {
   CollectionFacet,
   WorkSortKey,
   LibraryReaderReference,
+  DocumentUnderstandingState,
 } from '@shared/types';
 import { Icon } from '../components/ui';
 import { confirm, toast } from '../components/feedback';
 import { WorkGraphModal } from './WorkGraphModal';
 import { WorkIdeasModal } from './WorkIdeasModal';
 import { WorkStatusModal } from './WorkStatusModal';
+import { DocumentProfileModal } from './DocumentProfileModal';
+import { DocumentIndexManager } from './DocumentIndexManager';
 import { VirtualList } from '../components/VirtualList';
 import { anchorStyle, useAnchoredCoords } from '../components/dbGrid';
 import { useDataRefresh, useDismissableLayer, useScanComplete } from '../hooks';
@@ -449,6 +452,7 @@ export function Library({
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [embeddingStatuses, setEmbeddingStatuses] = useState<Map<string, WorkEmbeddingStatus>>(new Map());
   const [passageStatuses, setPassageStatuses] = useState<Map<string, WorkPassageStatus>>(new Map());
+  const [documentStatuses, setDocumentStatuses] = useState<Map<string, DocumentUnderstandingState>>(new Map());
   const [reuseAnalysisFromVaults, setReuseAnalysisFromVaults] = useState(false);
   const [reuseNotice, setReuseNotice] = useState<string | null>(null);
   const [filtersOpen, setFiltersOpen] = useState(() => snapshot?.filtersOpen ?? false);
@@ -457,6 +461,8 @@ export function Library({
   const [graphWork, setGraphWork] = useState<{ nodus_id: string; title: string } | null>(null);
   const [ideasWork, setIdeasWork] = useState<{ nodus_id: string; title: string } | null>(null);
   const [statusWork, setStatusWork] = useState<WorkView | null>(null);
+  const [documentWork, setDocumentWork] = useState<WorkView | null>(null);
+  const [documentManagerOpen, setDocumentManagerOpen] = useState(false);
   // Live scan-queue items indexed by work. The persisted *_status fields go
   // 'pending' when a job is enqueued but never say whether it is waiting in line
   // or running right now, so this is the only way a row can show "Analizando…".
@@ -493,12 +499,14 @@ export function Library({
         total: number;
         embeddings: WorkEmbeddingStatus[];
         passages: WorkPassageStatus[];
+        documents: Array<{ nodusId: string; status: DocumentUnderstandingState }>;
       }>(vaultId, cacheKey);
       if (cached) {
         setWorks(cached.items);
         setTotalWorks(cached.total);
         setEmbeddingStatuses(new Map(cached.embeddings.map((status) => [status.nodus_id, status])));
         setPassageStatuses(new Map(cached.passages.map((status) => [status.nodus_id, status])));
+        setDocumentStatuses(new Map((cached.documents ?? []).map((status) => [status.nodusId, status.status])));
         setLoading(false);
         return;
       }
@@ -520,18 +528,21 @@ export function Library({
       setWorks(page.items);
       setTotalWorks(page.total);
       const ids = page.items.map((work) => work.nodus_id);
-      const [statuses, passageIndexStatuses] = await Promise.all([
+      const [statuses, passageIndexStatuses, documentProfileStatuses] = await Promise.all([
         window.nodus.getWorkEmbeddingStatuses(ids),
         window.nodus.getWorkPassageStatuses(ids),
+        window.nodus.getDocumentProfileStatuses(ids),
       ]);
       if (requestId !== loadRequestRef.current) return;
       setEmbeddingStatuses(new Map(statuses.map((status) => [status.nodus_id, status])));
       setPassageStatuses(new Map(passageIndexStatuses.map((status) => [status.nodus_id, status])));
+      setDocumentStatuses(new Map(documentProfileStatuses.map((status) => [status.nodusId, status.status])));
       setVaultQueryCache(vaultId, cacheKey, {
         items: page.items,
         total: page.total,
         embeddings: statuses,
         passages: passageIndexStatuses,
+        documents: documentProfileStatuses,
       });
     } finally {
       if (requestId === loadRequestRef.current) {
@@ -582,6 +593,13 @@ export function Library({
   useEffect(() => window.nodus.onPassageProgress((progress) => {
     if (!progress.running) refreshAllRef.current();
   }), []);
+  useEffect(() => window.nodus.onDocumentIndexProgress(() => {
+    const ids = works.map((work) => work.nodus_id);
+    if (!ids.length) return;
+    void window.nodus.getDocumentProfileStatuses(ids).then((statuses) => {
+      setDocumentStatuses(new Map(statuses.map((status) => [status.nodusId, status.status])));
+    });
+  }), [works]);
   // Seed from the current queue as well as subscribing: a reader arriving at the
   // Library mid-analysis would otherwise see nothing until the next queue event.
   useEffect(() => {
@@ -1024,6 +1042,13 @@ export function Library({
         </div>
         {scopeControls}
         <div className="library-header-actions">
+          {vaultType === 'academic' && <button
+            className="btn btn-ghost border border-neutral-700 gap-1.5"
+            onClick={() => setDocumentManagerOpen(true)}
+            title={t('Gestionar la comprensión jerárquica de documentos completos')}
+          >
+            <Icon name="layers" /> {t('Índice documental')}
+          </button>}
           <div className="relative z-40" ref={collectionsMenuRef}>
             <button
               data-testid="library-collections-menu-toggle"
@@ -1516,6 +1541,7 @@ export function Library({
               { label: t('Generar resumen'), icon: 'wand', onClick: () => void summarizeSelected() },
               { label: t('Preparar búsqueda semántica'), icon: 'search', onClick: () => void embedSelected() },
               { label: t('Indexar texto citable'), icon: 'book', onClick: () => void indexSelectedPassages() },
+              { label: t('Comprender documentos completos'), icon: 'layers', onClick: () => void window.nodus.startDocumentIndexCampaign({ nodusIds: selectedVisibleIds }) },
             ]}
           />
           <div className="flex-1" />
@@ -1627,6 +1653,19 @@ export function Library({
                 </div>
                 <div className="min-w-0 p-1">
                   {status && <StatusPill status={status} onClick={() => setStatusWork(w)} />}
+                  {vaultType === 'academic' && <button
+                    className={`mt-1 block max-w-full truncate text-[10px] ${documentStatuses.get(w.nodus_id) === 'current' ? 'text-cyan-400' : documentStatuses.get(w.nodus_id) === 'failed' ? 'text-red-400' : 'text-neutral-600'}`}
+                    onClick={() => setDocumentWork(w)}
+                    title={t('Abrir la ficha documental completa')}
+                  >
+                    {documentStatuses.get(w.nodus_id) === 'current'
+                      ? t('Documento comprendido')
+                      : documentStatuses.get(w.nodus_id) === 'unavailable'
+                        ? t('Sin texto completo')
+                        : documentStatuses.get(w.nodus_id) && !['missing', 'failed', 'stale'].includes(documentStatuses.get(w.nodus_id)!)
+                          ? t('Comprendiendo…')
+                          : t('Sin ficha documental')}
+                  </button>}
                 </div>
                 <div className="p-1 whitespace-nowrap">
                   <div className="flex items-center gap-1">
@@ -1678,6 +1717,11 @@ export function Library({
                           label: w.summary_status === 'done' ? t('Regenerar resumen') : t('Generar resumen'),
                           icon: 'wand',
                           onClick: () => void summarizeWork(w),
+                        },
+                        {
+                          label: t('Comprensión documental'),
+                          icon: 'layers',
+                          onClick: () => setDocumentWork(w),
                         },
                         {
                           label: t('Grafo de ideas de la obra'),
@@ -1762,6 +1806,8 @@ export function Library({
           onChanged={() => void load()}
         />
       )}
+      {documentWork && <DocumentProfileModal work={documentWork} vaultId={vaultId} onClose={() => setDocumentWork(null)} />}
+      {documentManagerOpen && <DocumentIndexManager vaultId={vaultId} onClose={() => setDocumentManagerOpen(false)} />}
     </div>
   );
 }

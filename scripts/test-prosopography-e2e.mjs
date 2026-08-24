@@ -103,6 +103,12 @@ try {
   );
   await startupUpdateModal.getByRole('button', { name: 'Entendido', exact: false }).click();
   await startupUpdateModal.waitFor({ state: 'detached' });
+  const documentUnderstandingConsent = page.getByTestId('document-understanding-consent');
+  assert.equal(
+    await documentUnderstandingConsent.count(),
+    0,
+    'document understanding consent is restricted to editable academic vaults',
+  );
 
   for (const label of ['Buscar', 'Población', 'Personas', 'Fuentes', 'Análisis', 'Redes', 'Notas']) {
     assert.equal(await page.getByRole('button', { name: label, exact: true }).count(), 1, `${label} appears once`);

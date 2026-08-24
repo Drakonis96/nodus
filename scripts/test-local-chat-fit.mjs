@@ -36,8 +36,10 @@ try {
     autores: { authors: Array.from({ length: 20 }, (_, i) => ({ id: `a-${i}`, name: `Autor ${i}`, bio: 'y'.repeat(200) })), relations: [] },
     huecos_de_investigacion: Array.from({ length: 20 }, (_, i) => ({ id: `gap-${i}`, statement: 'g'.repeat(150) })),
     contradicciones: Array.from({ length: 20 }, (_, i) => ({ id: `c-${i}`, explanation: 'c'.repeat(150) })),
+    orientacion_documental: Array.from({ length: 20 }, (_, i) => ({ id: `w-${i}`, orientation: 'o'.repeat(500) })),
     // ideas are relevance-ordered: idea-0 is the MOST relevant and must survive.
     ideas_generadas: Array.from({ length: 60 }, (_, i) => ({ id: `g-${String(i).padStart(4, '0')}`, statement: 's'.repeat(150) })),
+    pasajes_relevantes: Array.from({ length: 8 }, (_, i) => ({ id: `p-${i}`, text: 'p'.repeat(300) })),
   });
 
   // ── enforceContextBudget: always fits, degrades gracefully ──────────────────
@@ -57,7 +59,9 @@ try {
     const ctx = makeContext();
     enforceContextBudget(ctx, 6000);
     assert.ok(!('autores' in ctx), 'autores (panoramic) dropped first');
+    assert.ok(!('orientacion_documental' in ctx), 'non-citable orientation yields before literal evidence');
     assert.ok(Array.isArray(ctx.ideas_generadas) && ctx.ideas_generadas.length > 0, 'ideas survive partially');
+    assert.ok(Array.isArray(ctx.pasajes_relevantes) && ctx.pasajes_relevantes.length > 0, 'literal passages survive orientation');
     assert.equal(ctx.ideas_generadas[0].id, 'g-0000', 'the most-relevant idea is kept (front-of-array)');
   }
 

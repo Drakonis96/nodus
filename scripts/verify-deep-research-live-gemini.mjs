@@ -33,8 +33,15 @@ const label = argOf('--label', 'run');
 const outDir = path.resolve(argOf('--out', path.join(os.tmpdir(), 'nodus-dr-ab')));
 const snapshotDir = path.resolve(argOf('--snapshot', path.join(os.tmpdir(), 'nodus-dr-userdata')));
 const sourceDb = argOf('--source-db', path.join(os.homedir(), 'Library/Application Support/nodus/nodus.sqlite'));
+const sourceBefore = fs.statSync(sourceDb);
 
-const OBJECTIVE =
+const benchmark = argOf('--benchmark', '').trim();
+const benchmarkPayload = benchmark
+  ? JSON.parse(fs.readFileSync(path.join(repoRoot, 'reports/deep-research-professional/historical', `${benchmark}.json`), 'utf8'))
+  : null;
+const benchmarkObjective = benchmarkPayload?.metrics?.objective ?? '';
+const benchmarkAudience = benchmarkPayload?.report?.draft?.brief?.audience ?? '';
+const OBJECTIVE = benchmarkObjective ||
   argOf(
     '--objective',
     'Analiza cómo el turismo y la literatura de viajes contribuyeron a construir la identidad nacional y regional española durante el franquismo, atendiendo a la cultura visual, la fotografía y los usos propagandísticos del patrimonio.'
@@ -55,6 +62,7 @@ if (!process.argv.includes(FLAG)) {
 const apiKey = process.env.GEMINI_API_KEY?.trim();
 const openRouterKey = process.env.OPENROUTER_API_KEY?.trim() || null;
 assert.ok(apiKey, 'Gemini key reaches only the isolated child process.');
+assert.ok(openRouterKey, 'OpenRouter key is required so embeddings use only baai/bge-m3.');
 
 // ── 1. Consistent snapshot of the live corpus (never touches the original) ────
 fs.mkdirSync(snapshotDir, { recursive: true });
@@ -96,17 +104,35 @@ try {
 
   const wanted = argOf('--model', 'gemini-3.1-flash-lite');
   const available = await providers.listModels('gemini', secrets.getApiKey('gemini'));
-  const modelName = available.some((m) => m.id === wanted)
-    ? wanted
-    : available.find((m) => /flash-lite/.test(m.id))?.id;
-  assert.ok(modelName, 'No flash-lite model available on this key.');
-  console.log(`[model] ${modelName}${modelName === wanted ? '' : ` (fallback; "${wanted}" not offered)`}`);
+  const modelName = available.some((m) => m.id === wanted) ? wanted : null;
+  assert.equal(modelName, 'gemini-3.1-flash-lite', 'The audit is restricted to gemini-3.1-flash-lite.');
+  console.log(`[model] ${modelName}`);
 
   // Only the Deep Research model is forced. Embedding provider/model stay exactly
   // as the vault has them, or the stored idea/passage vectors stop matching.
   const before = settingsRepo.getSettings();
-  settingsRepo.updateSettings({ deepResearchModel: { provider: 'gemini', model: modelName }, promptLanguage: 'es' });
-  console.log(`[embeddings] ${before.embeddingProvider} · ${before.embeddingModel}`);
+  const textModel = { provider: 'gemini', model: modelName };
+  settingsRepo.updateSettings({
+    deepResearchModel: textModel,
+    synthesisModel: textModel,
+    documentProfileModel: textModel,
+    documentAuditModel: textModel,
+    embeddingProvider: 'openrouter',
+    embeddingModel: 'baai/bge-m3',
+    promptLanguage: 'es',
+    syncMode: 'manual',
+    autoLightScan: false,
+    autoDeepScanOnReadTag: false,
+    autoSummaryAfterDeep: false,
+    autoBridgeAfterQueue: false,
+    autoResumeQueue: false,
+    documentIndexingEnabled: false,
+    libraryGlobalEnabled: false,
+    mcpEnabled: false,
+    nodusServerEnabled: false,
+    localServerEnabled: false,
+  });
+  console.log('[embeddings] openrouter · baai/bge-m3');
 
   // Instrument the per-section retrieval from the outside, so the A/B can show
   // whether it actually fired without the product code knowing it is measured.
@@ -125,7 +151,7 @@ try {
 
   const { generateDeepResearchReport } = require(path.join(repoRoot, 'electron/ai/deepResearch.ts'));
   const report = await generateDeepResearchReport(
-    { objective: OBJECTIVE, language: 'es', targetLength: 'standard', audience: 'comunidad académica' },
+    { objective: OBJECTIVE, language: 'es',audience: benchmarkAudience || 'comunidad académica' },
     (p) => {
       phases.push({ phase: p.phase, message: p.message, words: p.wordsSoFar ?? null });
       console.log(`  · ${p.phase}: ${p.message}`);
@@ -134,7 +160,7 @@ try {
 
   const metrics = measure(report, phases, Date.now() - startedAt, modelName, OBJECTIVE);
   metrics.sectionRetrieval = retrieval;
-  metrics.embeddings = { provider: before.embeddingProvider, model: before.embeddingModel };
+  metrics.embeddings = { provider: 'openrouter', model: 'baai/bge-m3' };
   fs.writeFileSync(path.join(outDir, `${label}.json`), JSON.stringify({ metrics, report }, null, 2));
   fs.writeFileSync(
     path.join(outDir, `${label}.md`),
@@ -148,6 +174,12 @@ try {
   } catch {
     /* best effort */
   }
+  const sourceAfter = fs.statSync(sourceDb);
+  assert.deepEqual(
+    { dev: sourceAfter.dev, ino: sourceAfter.ino, size: sourceAfter.size, mtimeMs: sourceAfter.mtimeMs },
+    { dev: sourceBefore.dev, ino: sourceBefore.ino, size: sourceBefore.size, mtimeMs: sourceBefore.mtimeMs },
+    'The real Nodus database must remain byte-state unchanged.',
+  );
 }
 
 // ── Metrics ──────────────────────────────────────────────────────────────────
@@ -195,7 +227,9 @@ function measure(report, phases, elapsedMs, model, objective) {
     sectionsWritten: report.meta.sections,
     limitations: report.draft.limitations,
     nextSteps: report.draft.nextSteps,
-    abstractDuplicatedInBody: abstract.length > 0 && md.includes(abstract),
+    // The assembled Markdown deliberately contains the abstract once under its own
+    // heading. Only flag it when the same abstract was also copied into the body.
+    abstractDuplicatedInBody: abstract.length > 0 && md.split(abstract).length - 1 > 1,
     bibliographyEntries: (report.draft.bibliography ?? []).length,
     phases: phases.map((p) => p.phase),
   };

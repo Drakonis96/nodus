@@ -17,7 +17,7 @@
 export const VECTOR_FORMAT = 'nodus.vectors';
 export const VECTOR_VERSION = 1;
 export const VECTOR_QUANT = 'int8-l2';
-export const VECTOR_KINDS = new Set(['ideas', 'passages']);
+export const VECTOR_KINDS = new Set(['ideas', 'documents', 'passages']);
 
 export function decodeVectorSet(buffer) {
   if (!Buffer.isBuffer(buffer) || buffer.length < 8) throw new Error('The vector payload is truncated.');

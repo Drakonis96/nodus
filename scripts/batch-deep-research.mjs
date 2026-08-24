@@ -135,7 +135,7 @@ try {
       const phases = [];
       try {
         const report = await generateDeepResearchReport(
-          { objective: topic.objective, language: 'es', targetLength: 'standard', audience: 'comunidad académica' },
+          { objective: topic.objective, language: 'es',audience: 'comunidad académica' },
           (p) => phases.push(p.phase)
         );
         fs.writeFileSync(

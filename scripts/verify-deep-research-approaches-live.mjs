@@ -222,7 +222,7 @@ function seedFixture(kind, vaults) {
 
 function requestFor(kind, approach, objective) {
   const base = {
-    objective, approach, language: 'es', targetLength: 'concise', sectionLimit: 3,
+    objective, approach, language: 'es',sectionLimit: 3,
     model: MODEL, audience: kind === 'teaching' ? 'teacher' : kind === 'study' ? 'students' : 'comunidad académica',
   };
   if (kind === 'study') return { ...base, studyMode: true };

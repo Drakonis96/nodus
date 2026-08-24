@@ -64,6 +64,9 @@ try {
     'nodus_get_author_synthesis',
     'nodus_list_works',
     'nodus_get_work',
+    'nodus_get_document_profile',
+    'nodus_search_documents',
+    'nodus_search_hybrid',
     'nodus_list_work_passages',
     'nodus_get_passage',
     'nodus_search_passages',
@@ -957,6 +960,14 @@ try {
   assert.equal(work.counts.ideas, 1);
   assert.equal(work.counts.passages, 2);
 
+  const documentProfile = await callTool(server, 'nodus_get_document_profile', { workId: 'ZOT1' });
+  assert.equal(documentProfile.profile.nodusId, 'work-1');
+  assert.equal(documentProfile.profile.fields[0].kind, 'thesis');
+  assert.equal(documentProfile.citationPolicy, 'orientation_only');
+  const documentSearch = await callTool(server, 'nodus_search_documents', { query: 'memoria visual', limit: 5 });
+  assert.equal(documentSearch.documents[0].nodusId, 'work-1');
+  assert.equal(documentSearch.citationPolicy, 'orientation_only');
+
   const passages = await callTool(server, 'nodus_list_work_passages', { workId: 'work-1', query: 'visual', limit: 1, offset: 0 });
   assert.equal(passages.total, 2);
   assert.equal(passages.passages[0].passage_id, 'passage-1');
@@ -1057,11 +1068,30 @@ try {
   // plan + sections), so it walks every phase and the bridge must fire throughout.
   const deepArgs = {
     objective: 'Estado del turismo visual en el corpus',
-    targetLength: 'adaptive',
     sectionLimit: 'auto',
     writer: 'nodus',
     save: false,
   };
+  const continuousClientBrief = await callTool(server, 'nodus_generate_deep_research', {
+    objective: 'Informe continuo sobre el corpus',
+    sectionLimit: 'single',
+    writer: 'client',
+    save: false,
+  });
+  assert.equal(continuousClientBrief.structure, 'single', 'MCP accepts and propagates the continuous structure to the client writer');
+  assert.ok(continuousClientBrief.method.some((rule) => /sin encabezados/i.test(rule)), 'MCP client instructions match continuous output');
+  const continuousClientFinal = await callTool(server, 'nodus_finalize_deep_research', {
+    objective: 'Informe continuo sobre el corpus',
+    sectionLimit: 'single',
+    sectionsMarkdown: '## Corte accidental\n\nCuerpo continuo verificado por el ensamblador.',
+    abstract: 'Resumen continuo.',
+    limitations: ['Corpus de prueba.'],
+    save: false,
+  });
+  assert.equal(continuousClientFinal.report.meta.structure, 'single', 'MCP finalize preserves the continuous structure');
+  assert.equal(continuousClientFinal.report.meta.sections, 1);
+  assert.equal((continuousClientFinal.report.draft.draftMarkdown.match(/^#{1,6}\s+/gmu) ?? []).length, 0, 'MCP finalize removes accidental headings');
+  assert.match(continuousClientFinal.report.draft.draftMarkdown, /^Resumen continuo\./u, 'the self-contained Markdown keeps its abstract without adding a section');
   const progressNotes = [];
   const deepReport = await callToolRaw(server, 'nodus_generate_deep_research', deepArgs, {
     _meta: { progressToken: 'tok-1' },
@@ -1071,7 +1101,7 @@ try {
   assert.ok(progressNotes.length >= 3, `expected several MCP progress notifications, got ${progressNotes.length}`);
   assert.equal(progressNotes[0].method, 'notifications/progress');
   assert.equal(progressNotes[0].params.progressToken, 'tok-1');
-  assert.match(progressNotes[0].params.message, /corpus/i);
+  assert.match(progressNotes[0].params.message, /obras|corpus/i);
   assert.ok(
     progressNotes.some((note) => /\[section \d+/.test(note.params.message)),
     'expected per-section progress messages'
@@ -1092,13 +1122,11 @@ try {
   // which is exactly when it can be cancelled.
   const firstQueued = await callTool(server, 'nodus_enqueue_deep_research', {
     objective: 'Informe encolado sobre el corpus',
-    targetLength: 'adaptive',
-    sectionLimit: 'auto',
+    sectionLimit: 'single',
     save: true,
   });
   const secondQueued = await callTool(server, 'nodus_enqueue_deep_research', {
     objective: 'Segundo informe encolado',
-    targetLength: 'adaptive',
     sectionLimit: 'auto',
     save: false,
   });
@@ -1126,6 +1154,9 @@ try {
   assert.equal(finished.job.status, 'completed', `queued report failed: ${finished.job.error}`);
   assert.ok(finished.job.savedDraftId, 'save=true files the finished report as a draft');
   assert.ok(finished.report.draft.title, 'includeReport returns the report itself');
+  assert.equal(finished.report.meta.structure, 'single', 'MCP queue preserves the requested continuous structure');
+  assert.equal(finished.report.meta.sections, 1, 'the queued continuous report publishes one logical block');
+  assert.equal((finished.report.draft.draftMarkdown.match(/^#{1,6}\s+/gmu) ?? []).length, 0, 'the queued continuous report has no section headings');
   const savedByQueue = await callTool(server, 'nodus_list_writing_drafts', {
     sort: 'newest',
     limit: 25,
@@ -1563,6 +1594,28 @@ function seedMcpDatabase(db) {
       passage_id, nodus_id, chunk_index, text, page_label, char_len, content_hash, created_at
     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
   ).run('passage-2', 'work-1', 1, 'Segundo pasaje sobre memoria local.', '13', 34, 'hash-1', now);
+
+  db.prepare(`INSERT INTO document_profile_versions(
+    version_id,nodus_id,state,source_fingerprint,pipeline_version,schema_version,source_language,
+    presentation_language,overview,profile_json,prompt_hash,audit_json,quality_score,created_at,published_at
+  ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).run(
+    'profile-1','work-1','current','hash-1','document-profile/1',1,'es','es',
+    'La obra estudia el turismo y la memoria visual.','{}','prompt-1',
+    '{"passed":true,"score":1,"supportCoverage":1,"structureCoverage":1,"issues":[],"repaired":false}',1,now,now,
+  );
+  db.prepare(`INSERT INTO document_profile_fields(
+    field_id,version_id,nodus_id,kind,ordinal,text,confidence,centrality,created_at
+  ) VALUES(?,?,?,?,?,?,?,?,?)`).run(
+    'profile-field-1','profile-1','work-1','thesis',0,'El turismo reorganiza la memoria visual local.',1,1,now,
+  );
+  db.prepare(`INSERT INTO document_profile_state(
+    nodus_id,current_version_id,status,source_fingerprint,profile_fingerprint,pipeline_version,updated_at
+  ) VALUES(?,?,?,?,?,?,?)`).run('work-1','profile-1','current','hash-1','profile-hash','document-profile/1',now);
+  db.prepare(`INSERT INTO document_profiles_fts(nodus_id,version_id,title,overview,fields)
+    VALUES(?,?,?,?,?)`).run(
+    'work-1','profile-1','Turismo visual y memoria','La obra estudia el turismo y la memoria visual.',
+    'El turismo reorganiza la memoria visual local.',
+  );
 
   db.prepare('INSERT INTO note_folders (id, parent_id, name, summary, order_idx, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)').run(
     'folder-1',

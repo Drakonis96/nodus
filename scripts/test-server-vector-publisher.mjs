@@ -107,6 +107,26 @@ test('what the desktop encodes is exactly what the server decodes', { timeout: 1
       .map((hit) => hit.id);
     const overlap = approximate.filter((candidate) => exact.includes(candidate)).length;
     assert.ok(overlap >= 9, `top-10 overlap was ${overlap}/10`);
+
+    db.prepare("INSERT INTO works(nodus_id,zotero_key,title) VALUES('w-doc','Z-DOC','Document')").run();
+    db.prepare(`INSERT INTO document_profile_versions(
+      version_id,nodus_id,state,source_fingerprint,pipeline_version,schema_version,presentation_language,
+      overview,profile_json,prompt_hash,created_at,published_at
+    ) VALUES('profile-doc','w-doc','current','source','document-profile/1',1,'en','Overview','{}','prompt','2026-01-01','2026-01-01')`).run();
+    const documentVector = pseudoVector(777, dim);
+    db.prepare(`INSERT INTO document_vectors(
+      vector_id,nodus_id,version_id,kind,source_id,text,text_hash,weight,embedding,
+      embedding_provider,embedding_model,embedding_dim,created_at
+    ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)`).run(
+      'doc-vector','w-doc','profile-doc','overview',null,'Overview','hash',1,encode(documentVector),
+      'openrouter','baai/bge-m3',dim,'2026-01-01',
+    );
+    const documentSet = buildVectorSet(db, 'documents');
+    assert.equal(documentSet.summary.count, 1);
+    assert.equal(documentSet.summary.kind, 'documents');
+    const decodedDocuments = decodeVectorSet(documentSet.buffer);
+    assert.equal(decodedDocuments.header.kind, 'documents');
+    assert.equal(searchVectors(decodedDocuments, documentVector, { limit: 1 })[0].id, 'doc-vector');
   } finally {
     db.close();
   }

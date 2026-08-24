@@ -666,19 +666,21 @@ async function synthesize(
 export async function generateDictionaryEntry(
   request: DictionaryGenerationRequest,
 ): Promise<DictionaryVersion> {
-  return generateDictionaryEntryUsing(request, synthesize);
+  return generateDictionaryEntryUsing(request, synthesize, aiVerifyCitations);
 }
 
 export async function __generateDictionaryEntryForTesting(
   request: DictionaryGenerationRequest,
   generator: typeof synthesize,
+  verifyCitations: typeof aiVerifyCitations = aiVerifyCitations,
 ): Promise<DictionaryVersion> {
-  return generateDictionaryEntryUsing(request, generator);
+  return generateDictionaryEntryUsing(request, generator, verifyCitations);
 }
 
 async function generateDictionaryEntryUsing(
   request: DictionaryGenerationRequest,
   generator: typeof synthesize,
+  verifyCitations: typeof aiVerifyCitations,
 ): Promise<DictionaryVersion> {
   const entry = getDictionaryEntry(request.entryId);
   if (!entry) throw new Error("La entrada de Dictionary ya no existe.");
@@ -718,7 +720,7 @@ async function generateDictionaryEntryUsing(
       cleaned = applyVerification(
         cleaned,
         claims,
-        await aiVerifyCitations(claims, request.model ?? null),
+        await verifyCitations(claims, request.model ?? null),
       ).markdown;
     if (uncitedSubstantiveSentences(cleaned).length)
       throw new Error(

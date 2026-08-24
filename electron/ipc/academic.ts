@@ -238,6 +238,13 @@ import { reprocessConnections } from '../ai/reprocessConnections';
 import { startEmbedding, reindexAll, pauseEmbedding, resumeEmbedding, stopEmbedding, clearEmbeddingProgress, onEmbeddingProgress, getWorkEmbeddingStatuses } from '../ai/embeddingPipeline';
 import { startPassageEmbedding, pausePassageEmbedding, resumePassageEmbedding, stopPassageEmbedding, clearPassageProgress, onPassageProgress, getWorkPassageStatuses } from '../ai/passageEmbeddingPipeline';
 import { getPassageDetail } from '../db/passagesRepo';
+import {
+  deleteDocumentProfileOverride,
+  documentProfileStatuses,
+  getDocumentProfile,
+  upsertDocumentProfileOverride,
+} from '../db/documentProfilesRepo';
+import { documentIndexQueue } from '../pipeline/documentIndexQueue';
 import { discoverSemanticBridges, onSemanticBridgeProgress } from '../ai/semanticBridges';
 import * as manualIdeas from '../db/manualIdeasRepo';
 import * as tutorRoutes from '../db/tutorRepo';
@@ -766,6 +773,27 @@ export function registerAcademicIpc({ h, getWindow, chatAborters }: IpcContext):
   h('queue:stopAll', async () => scanQueue.stopAll());
   h('queue:retryFailed', async () => scanQueue.retryFailed());
   h('queue:enqueueBridge', async (_e, model?: ModelRef | null) => scanQueue.enqueueBridge(model));
+  h('documents:profile:get', async (_e, nodusId: string) => getDocumentProfile(nodusId));
+  h('documents:profile:override:save', async (_e, input: {
+    nodusId: string; fieldPath: string; value: string; generatedValue: string;
+    baseVersionId: string; verified?: boolean;
+  }) => upsertDocumentProfileOverride(input));
+  h('documents:profile:override:delete', async (_e, overrideId: string) => deleteDocumentProfileOverride(overrideId));
+  h('documents:profile:statuses', async (_e, nodusIds?: string[]) => documentProfileStatuses(nodusIds));
+  h('documents:index:progress', async () => documentIndexQueue.snapshot());
+  h('documents:index:startCampaign', async (_e, options?: { includeArchived?: boolean; nodusIds?: string[] }) => {
+    const vault = getActiveVault();
+    return documentIndexQueue.startVaultCampaign(vault.id, { ...options, mode: 'manual' });
+  });
+  h('documents:index:enqueue', async (_e, nodusId: string) => {
+    await documentIndexQueue.enqueueWork(getActiveVault().id, nodusId, 750, 'manual');
+  });
+  h('documents:index:campaignStatus', async (_e, vaultId: string, campaignId: string, status: 'running' | 'paused' | 'cancelled') => {
+    await documentIndexQueue.setCampaignStatus(vaultId, campaignId, status);
+  });
+  h('documents:index:cancelJob', async (_e, jobId: string) => {
+    await documentIndexQueue.cancelJob(getActiveVault().id, jobId);
+  });
 
   // graph
   h('graph:get', async (_e, lens: 'ideas' | 'authors') =>
@@ -1881,6 +1909,11 @@ export function registerAcademicIpc({ h, getWindow, chatAborters }: IpcContext):
   // Stream queue progress to the renderer.
   scanQueue.onProgress((p) => {
     getWindow()?.webContents.send('queue:progress', p);
+  });
+
+  void documentIndexQueue.initialize();
+  documentIndexQueue.onProgress((p) => {
+    getWindow()?.webContents.send('documents:index:progress', localizedForUi(p));
   });
 
   // Stream embedding pipeline progress to the renderer.

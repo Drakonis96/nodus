@@ -67,12 +67,13 @@ installTsHook();
 try {
   const repo = require(path.join(repoRoot, "electron/db/dictionaryRepo.ts"));
   const database = require(path.join(repoRoot, "electron/db/database.ts"));
+  const { SCHEMA_VERSION } = require(path.join(repoRoot, "electron/db/migrations.ts"));
   const ai = require(path.join(repoRoot, "electron/ai/dictionary.ts"));
   const db = database.getDb();
 
   assert.equal(
     db.pragma("user_version", { simple: true }),
-    156,
+    SCHEMA_VERSION,
     "migration reaches Dictionary schema",
   );
   for (const table of [
@@ -191,6 +192,7 @@ try {
         "La memoria se construye socialmente [Autora, A. (2020)](nodus://idea/idea-1).",
       authorSummaries: [],
     }),
+    async (claims) => claims.map(() => "supports"),
   );
   assert.match(
     citedWithBibliographicLabel.contentMarkdown,
