@@ -134,6 +134,7 @@ import type {
 } from '@shared/dictionary';
 import { immersionAnnotationDocumentId } from '@shared/readerAnnotations';
 import { applyDecorativeImageOption, invalidateDecorativeImageGeneration } from '../ai/decorativeImages';
+import { DictionaryGenerationQueue } from '../ai/dictionaryGenerationQueue';
 import * as zotero from '../zotero/zoteroClient';
 import * as dedupe from '../db/dedupeRepo';
 import * as ideaDedupe from '../db/ideaDedupeRepo';
@@ -359,7 +360,22 @@ function announceDictionaryProgress(progress: DictionaryProgress): void {
   }
 }
 
-const dictionaryGenerationJobs = new Map<string, DictionaryProgress>();
+const dictionaryGenerationJobs = new DictionaryGenerationQueue(
+  async (request, report) => {
+    const current = dictionaryRepo.getDictionaryEntryDetail(request.entryId);
+    const needsInitialRetrieval = request.mode === 'creation' && (current?.coverage.included ?? 0) === 0;
+    if (needsInitialRetrieval) {
+      report({ entryId: request.entryId, phase: 'retrieving', message: 'Analizando corpus' });
+      await retrieveDictionaryEvidence(request.entryId, 'initial');
+      announceDictionary(request.entryId);
+    }
+
+    report({ entryId: request.entryId, phase: 'generating', message: 'Generando definición' });
+    await generateDictionaryEntry(request);
+    announceDictionary(request.entryId);
+  },
+  announceDictionaryProgress,
+);
 
 function announceWritingDraftAnnotations(draftId: string | null): void {
   for (const win of BrowserWindow.getAllWindows()) {
@@ -397,7 +413,7 @@ export function registerAcademicIpc({ h, getWindow, chatAborters }: IpcContext):
   });
   h('dictionary:delete', async (_e, ids: string[]) => {
     const changed = dictionaryRepo.deleteDictionaryEntries(ids);
-    for (const id of ids) dictionaryGenerationJobs.delete(id);
+    dictionaryGenerationJobs.delete(ids);
     if (changed) announceDictionary(null);
     return changed;
   });
@@ -434,45 +450,9 @@ export function registerAcademicIpc({ h, getWindow, chatAborters }: IpcContext):
     }
   });
   h('dictionary:generate:start', async (_e, request: DictionaryGenerationRequest) => {
-    const running = dictionaryGenerationJobs.get(request.entryId);
-    if (running && !['done', 'failed'].includes(running.phase)) return running;
-    const queued: DictionaryProgress = { entryId: request.entryId, phase: 'queued', message: 'En cola' };
-    dictionaryGenerationJobs.set(request.entryId, queued);
-    announceDictionaryProgress(queued);
-    setImmediate(() => {
-      void (async () => {
-        try {
-          const current = dictionaryRepo.getDictionaryEntryDetail(request.entryId);
-          const needsInitialRetrieval = request.mode === 'creation' && (current?.coverage.included ?? 0) === 0;
-          if (needsInitialRetrieval) {
-            const retrieving: DictionaryProgress = { entryId: request.entryId, phase: 'retrieving', message: 'Analizando corpus' };
-            dictionaryGenerationJobs.set(request.entryId, retrieving);
-            announceDictionaryProgress(retrieving);
-            await retrieveDictionaryEvidence(request.entryId, 'initial');
-            announceDictionary(request.entryId);
-          }
-
-          const generating: DictionaryProgress = { entryId: request.entryId, phase: 'generating', message: 'Generando definición' };
-          dictionaryGenerationJobs.set(request.entryId, generating);
-          announceDictionaryProgress(generating);
-          await generateDictionaryEntry(request);
-          announceDictionary(request.entryId);
-
-          const done: DictionaryProgress = { entryId: request.entryId, phase: 'done', message: 'Definición generada' };
-          dictionaryGenerationJobs.set(request.entryId, done);
-          announceDictionaryProgress(done);
-        } catch (error) {
-          const detail = error instanceof Error ? error.message : String(error);
-          console.error(`[dictionary] background generation failed for ${request.entryId}`, error);
-          const failed: DictionaryProgress = { entryId: request.entryId, phase: 'failed', message: 'Error al generar', error: detail };
-          dictionaryGenerationJobs.set(request.entryId, failed);
-          announceDictionaryProgress(failed);
-        }
-      })();
-    });
-    return queued;
+    return dictionaryGenerationJobs.start(request);
   });
-  h('dictionary:generate:jobs', async () => [...dictionaryGenerationJobs.values()]);
+  h('dictionary:generate:jobs', async () => dictionaryGenerationJobs.list());
   h('dictionary:versions:list', async (_e, entryId: string) => dictionaryRepo.listDictionaryVersions(entryId));
   h('dictionary:versions:accept', async (_e, entryId: string, versionId: string, expectedCurrentVersionId: string | null) => {
     const detail = dictionaryRepo.acceptDictionaryVersion(entryId, versionId, expectedCurrentVersionId);

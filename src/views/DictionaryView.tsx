@@ -97,6 +97,25 @@ const emptyInput = (): DictionaryEntryInput => ({
   outputLanguage: "es",
   detailLevel: "standard",
 });
+type DictionaryCreationDraft = {
+  key: number;
+  name: string;
+  aliases: string;
+};
+let dictionaryCreationDraftKey = 0;
+const emptyCreationDraft = (): DictionaryCreationDraft => ({
+  key: ++dictionaryCreationDraftKey,
+  name: "",
+  aliases: "",
+});
+const normalizedCreationName = (value: string): string =>
+  value
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLocaleLowerCase()
+    .replace(/[^\p{L}\p{N}]+/gu, " ")
+    .trim()
+    .replace(/\s+/g, " ");
 const promptLanguageLabel = (language: PromptLanguage): string => {
   switch (language) {
     case "es":
@@ -400,19 +419,24 @@ function CreationDialog({
   onModel: (model: ModelRef | null) => void;
   onClose: () => void;
   onOpenExisting: (entry: DictionaryEntrySummary) => void;
-  onQueued: (id: string, name: string) => void;
+  onQueued: (entries: Array<Pick<DictionaryEntry, "id" | "name">>) => void;
 }) {
   const [input, setInput] = useState(emptyInput);
+  const [drafts, setDrafts] = useState<DictionaryCreationDraft[]>(() => [
+    emptyCreationDraft(),
+  ]);
   const [promptPreset, setPromptPreset] = useState<
     DictionaryPromptPreset | "custom"
   >(DEFAULT_DICTIONARY_PROMPT_PRESET);
-  const [aliases, setAliases] = useState("");
   const [duplicates, setDuplicates] = useState<
-    DictionaryDuplicateMatch[] | null
+    Map<number, DictionaryDuplicateMatch[]> | null
   >(null);
-  const [relateTo, setRelateTo] = useState<string | null>(null);
-  const [created, setCreated] = useState<DictionaryEntry | null>(null);
-  const [relationAdded, setRelationAdded] = useState(false);
+  const [relateTo, setRelateTo] = useState<Map<number, string>>(new Map());
+  const [created, setCreated] = useState<Map<number, DictionaryEntry>>(
+    new Map(),
+  );
+  const [relationsAdded, setRelationsAdded] = useState<Set<number>>(new Set());
+  const [queuedDrafts, setQueuedDrafts] = useState<Set<number>>(new Set());
   const [phase, setPhase] = useState<"checking" | "creating" | null>(null);
   const [error, setError] = useState<string | null>(null);
   const interfaceLanguage = getActiveLang();
@@ -429,43 +453,127 @@ function CreationDialog({
     );
   }, [interfaceLanguage, promptPreset]);
 
+  const updateDraft = (
+    key: number,
+    patch: Partial<Pick<DictionaryCreationDraft, "name" | "aliases">>,
+  ) =>
+    setDrafts((current) =>
+      current.map((draft) =>
+        draft.key === key ? { ...draft, ...patch } : draft,
+      ),
+    );
+  const removeDraft = (key: number) => {
+    setDrafts((current) => current.filter((draft) => draft.key !== key));
+    setCreated((current) => {
+      const next = new Map(current);
+      next.delete(key);
+      return next;
+    });
+    setRelateTo((current) => {
+      const next = new Map(current);
+      next.delete(key);
+      return next;
+    });
+    setRelationsAdded((current) => {
+      const next = new Set(current);
+      next.delete(key);
+      return next;
+    });
+    setQueuedDrafts((current) => {
+      const next = new Set(current);
+      next.delete(key);
+      return next;
+    });
+  };
+  const namedDrafts = () => drafts.filter((draft) => draft.name.trim());
+
   const createAndQueue = async () => {
+    const batch = namedDrafts();
+    if (!batch.length) return;
     setPhase("creating");
     setError(null);
+    setDuplicates(null);
     try {
-      const entry =
-        created ??
-        (await window.nodus.createDictionaryEntry({
-          ...input,
-          aliases: csv(aliases),
-        }));
-      if (!created) setCreated(entry);
-      if (relateTo && !relationAdded) {
-        await window.nodus.addDictionaryRelation(entry.id, relateTo, "related");
-        setRelationAdded(true);
+      const results = await Promise.allSettled(
+        batch.map(async (draft) => {
+          const existing = created.get(draft.key);
+          const entry =
+            existing ??
+            (await window.nodus.createDictionaryEntry({
+              ...input,
+              name: draft.name,
+              aliases: csv(draft.aliases),
+            }));
+          if (!existing) {
+            setCreated((current) => new Map(current).set(draft.key, entry));
+          }
+          const relation = relateTo.get(draft.key);
+          if (relation && !relationsAdded.has(draft.key)) {
+            await window.nodus.addDictionaryRelation(
+              entry.id,
+              relation,
+              "related",
+            );
+            setRelationsAdded((current) => new Set(current).add(draft.key));
+          }
+          if (!queuedDrafts.has(draft.key)) {
+            await window.nodus.startDictionaryGeneration({
+              entryId: entry.id,
+              mode: "creation",
+              model,
+            });
+            setQueuedDrafts((current) => new Set(current).add(draft.key));
+          }
+          return entry;
+        }),
+      );
+      const failures = results.flatMap((result, index) =>
+        result.status === "rejected"
+          ? [`${batch[index]?.name ?? index + 1}: ${message(result.reason)}`]
+          : [],
+      );
+      if (failures.length) {
+        setError(failures.join(" · "));
+        setPhase(null);
+        return;
       }
-      await window.nodus.startDictionaryGeneration({
-        entryId: entry.id,
-        mode: "creation",
-        model,
-      });
-      onQueued(entry.id, entry.name);
+      onQueued(
+        results.flatMap((result) =>
+          result.status === "fulfilled" ? [result.value] : [],
+        ),
+      );
     } catch (reason) {
       setError(message(reason));
       setPhase(null);
     }
   };
   const check = async () => {
-    if (!input.name.trim()) return;
+    const batch = namedDrafts();
+    if (!batch.length) return;
+    const names = batch.map((draft) => normalizedCreationName(draft.name));
+    if (new Set(names).size !== names.length) {
+      setError(t("Hay conceptos repetidos en el lote."));
+      return;
+    }
     setPhase("checking");
     setError(null);
     try {
-      const matches = await window.nodus.detectDictionaryDuplicates(
-        input.name,
-        csv(aliases),
+      const matches = await Promise.all(
+        batch.map((draft) =>
+          created.has(draft.key)
+            ? Promise.resolve([])
+            : window.nodus.detectDictionaryDuplicates(
+                draft.name,
+                csv(draft.aliases),
+              ),
+        ),
       );
-      if (matches.length) {
-        setDuplicates(matches);
+      const matching = new Map<number, DictionaryDuplicateMatch[]>();
+      matches.forEach((items, index) => {
+        if (items.length) matching.set(batch[index]!.key, items);
+      });
+      if (matching.size) {
+        setDuplicates(matching);
         setPhase(null);
       } else await createAndQueue();
     } catch (reason) {
@@ -517,40 +625,57 @@ function CreationDialog({
                 {t("No se fusionará nada automáticamente.")}
               </p>
             </div>
-            {duplicates.map((match) => (
-              <div
-                key={match.entry.id}
-                className="flex items-center gap-3 rounded-xl border border-neutral-200 p-3 dark:border-neutral-800"
-              >
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-medium">
-                    {match.entry.name}
-                  </p>
-                  <p className="text-[10px] uppercase tracking-wider text-neutral-500">
-                    {t(match.match)}
-                    {match.similarity
-                      ? ` · ${Math.round(match.similarity * 100)}%`
-                      : ""}
-                  </p>
-                </div>
-                <button
-                  className="btn btn-ghost"
-                  onClick={() => onOpenExisting(match.entry)}
+            {[...duplicates.entries()].map(([draftKey, matches]) => {
+              const draft = drafts.find((item) => item.key === draftKey);
+              return (
+                <section
+                  key={draftKey}
+                  className="space-y-2 rounded-xl border border-neutral-200 p-3 dark:border-neutral-800"
                 >
-                  {t("Abrir")}
-                </button>
-                <button
-                  className={`btn ${relateTo === match.entry.id ? "btn-primary" : "btn-ghost"}`}
-                  onClick={() =>
-                    setRelateTo(
-                      relateTo === match.entry.id ? null : match.entry.id,
-                    )
-                  }
-                >
-                  {t("Relacionar")}
-                </button>
-              </div>
-            ))}
+                  <h4 className="text-sm font-semibold">
+                    {draft?.name ?? t("Concepto")}
+                  </h4>
+                  {matches.map((match) => (
+                    <div
+                      key={match.entry.id}
+                      className="flex items-center gap-3 rounded-lg bg-neutral-50 p-2 dark:bg-neutral-900/60"
+                    >
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-medium">
+                          {match.entry.name}
+                        </p>
+                        <p className="text-[10px] uppercase tracking-wider text-neutral-500">
+                          {t(match.match)}
+                          {match.similarity
+                            ? ` · ${Math.round(match.similarity * 100)}%`
+                            : ""}
+                        </p>
+                      </div>
+                      <button
+                        className="btn btn-ghost"
+                        onClick={() => onOpenExisting(match.entry)}
+                      >
+                        {t("Abrir")}
+                      </button>
+                      <button
+                        className={`btn ${relateTo.get(draftKey) === match.entry.id ? "btn-primary" : "btn-ghost"}`}
+                        onClick={() =>
+                          setRelateTo((current) => {
+                            const next = new Map(current);
+                            if (next.get(draftKey) === match.entry.id)
+                              next.delete(draftKey);
+                            else next.set(draftKey, match.entry.id);
+                            return next;
+                          })
+                        }
+                      >
+                        {t("Relacionar")}
+                      </button>
+                    </div>
+                  ))}
+                </section>
+              );
+            })}
             {error && <ErrorNotice>{error}</ErrorNotice>}
             <div className="flex justify-end gap-2">
               <button
@@ -566,34 +691,93 @@ function CreationDialog({
                 onClick={() => void createAndQueue()}
               >
                 {phase === "creating" ? (
-                  <ButtonBusy label={t("Preparando definición…")} />
+                  <ButtonBusy
+                    label={tx("Preparando {n} definiciones…", {
+                      n: namedDrafts().length,
+                    })}
+                  />
                 ) : (
-                  t("Generar de todos modos")
+                  namedDrafts().length > 1
+                    ? tx("Generar {n} definiciones de todos modos", {
+                        n: namedDrafts().length,
+                      })
+                    : t("Generar de todos modos")
                 )}
               </button>
             </div>
           </div>
         ) : (
           <div className="space-y-4">
-            <div className="grid gap-4 md:grid-cols-2">
-              <Field label={t("Concepto")}>
-                <input
-                  autoFocus
-                  className="input mt-1 w-full"
-                  value={input.name}
-                  onChange={(event) =>
-                    setInput({ ...input, name: event.target.value })
+            <div className="space-y-2">
+              {drafts.map((draft, index) => {
+                const persisted = created.has(draft.key);
+                return (
+                  <div
+                    key={draft.key}
+                    data-testid="dictionary-concept-row"
+                    className="grid items-end gap-3 rounded-xl border border-neutral-200 p-3 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] dark:border-neutral-800"
+                  >
+                    <Field label={`${t("Concepto")} ${index + 1}`}>
+                      <input
+                        autoFocus={index === 0}
+                        data-testid={`dictionary-concept-name-${index}`}
+                        className="input mt-1 w-full"
+                        value={draft.name}
+                        disabled={persisted || phase !== null}
+                        onChange={(event) =>
+                          updateDraft(draft.key, { name: event.target.value })
+                        }
+                      />
+                    </Field>
+                    <Field label={t("Aliases o términos alternativos")}>
+                      <input
+                        className="input mt-1 w-full"
+                        placeholder={t("Separados por comas")}
+                        value={draft.aliases}
+                        disabled={persisted || phase !== null}
+                        onChange={(event) =>
+                          updateDraft(draft.key, {
+                            aliases: event.target.value,
+                          })
+                        }
+                      />
+                    </Field>
+                    <button
+                      type="button"
+                      className="btn btn-ghost h-9 w-9 p-0"
+                      aria-label={t("Quitar concepto")}
+                      title={t("Quitar concepto")}
+                      disabled={
+                        drafts.length === 1 || persisted || phase !== null
+                      }
+                      onClick={() => removeDraft(draft.key)}
+                    >
+                      <Icon name="x" />
+                    </button>
+                  </div>
+                );
+              })}
+              <div className="flex flex-wrap items-center gap-3">
+                <button
+                  type="button"
+                  data-testid="dictionary-add-concept"
+                  className="btn btn-ghost"
+                  disabled={phase !== null}
+                  onClick={() =>
+                    setDrafts((current) => [
+                      ...current,
+                      emptyCreationDraft(),
+                    ])
                   }
-                />
-              </Field>
-              <Field label={t("Aliases o términos alternativos")}>
-                <input
-                  className="input mt-1 w-full"
-                  placeholder={t("Separados por comas")}
-                  value={aliases}
-                  onChange={(event) => setAliases(event.target.value)}
-                />
-              </Field>
+                >
+                  <Icon name="plus" /> {t("Añadir concepto")}
+                </button>
+                <p className="text-xs text-neutral-500">
+                  {t(
+                    "Cada concepto se guardará como una entrada independiente y se procesará en paralelo.",
+                  )}
+                </p>
+              </div>
             </div>
             <div className="grid gap-4 md:grid-cols-[minmax(280px,0.9fr)_minmax(0,1.6fr)]">
               <label className="rounded-xl border border-neutral-200 bg-neutral-50 p-3 dark:border-neutral-800 dark:bg-neutral-900/50">
@@ -711,11 +895,16 @@ function CreationDialog({
             </div>
             {error && <ErrorNotice>{error}</ErrorNotice>}
             <div className="flex items-center justify-end gap-2">
-              {created && (
+              {created.size > 0 && (
                 <span className="mr-auto text-xs text-neutral-500">
-                  {t(
-                    "La entrada ya está guardada; reintentar no creará un duplicado.",
-                  )}
+                  {created.size === 1
+                    ? t(
+                        "La entrada ya está guardada; reintentar no creará un duplicado.",
+                      )
+                    : tx(
+                        "{n} entradas ya están guardadas; reintentar no creará duplicados.",
+                        { n: created.size },
+                      )}
                 </span>
               )}
               <button
@@ -727,15 +916,24 @@ function CreationDialog({
               </button>
               <button
                 className="btn btn-primary !text-white disabled:!text-white"
-                disabled={phase !== null || !input.name.trim()}
-                onClick={() => void (created ? createAndQueue() : check())}
+                disabled={
+                  phase !== null ||
+                  !drafts.some((draft) => draft.name.trim())
+                }
+                onClick={() => void check()}
               >
                 {phase === "checking" ? (
                   <ButtonBusy label={t("Comprobando duplicados…")} />
                 ) : phase === "creating" ? (
-                  <ButtonBusy label={t("Preparando definición…")} />
-                ) : created ? (
+                  <ButtonBusy
+                    label={tx("Preparando {n} definiciones…", {
+                      n: namedDrafts().length,
+                    })}
+                  />
+                ) : created.size > 0 ? (
                   t("Reintentar generación")
+                ) : namedDrafts().length > 1 ? (
+                  tx("Generar {n} definiciones", { n: namedDrafts().length })
                 ) : (
                   t("Generar definición")
                 )}
@@ -1304,17 +1502,20 @@ export function DictionaryView({
             setCreating(false);
             openEntry(entry);
           }}
-          onQueued={(id) => {
+          onQueued={(queuedEntries) => {
             setCreating(false);
             setActiveId(null);
             setGenerationJobs((current) => {
-              if (current.has(id)) return current;
               const next = new Map(current);
-              next.set(id, {
-                entryId: id,
-                phase: "queued",
-                message: t("En cola"),
-              });
+              for (const entry of queuedEntries) {
+                if (!next.has(entry.id)) {
+                  next.set(entry.id, {
+                    entryId: entry.id,
+                    phase: "queued",
+                    message: t("En cola"),
+                  });
+                }
+              }
               return next;
             });
             void reload(false);
