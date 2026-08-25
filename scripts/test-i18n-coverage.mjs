@@ -615,6 +615,19 @@ test('legacy Spanish Electron errors cannot leak into a non-Spanish interface', 
   assert.deepEqual(payload, { ok: false, message: 'The operation could not be completed.', nested: { error: 'The operation could not be completed.' } });
   const rendererTranslated = 'No se puede cambiar de bóveda mientras se están indexando pasajes.';
   assert.equal(localizeIpcPayload({ message: rendererTranslated }, 'en').message, rendererTranslated);
+
+  assert.equal(
+    localizeRuntimeError('La fuente cambió repetidamente durante el análisis. La campaña se ha pausado para evitar reintentos indefinidos.', 'en'),
+    'The document source kept changing during analysis. Indexing was paused to prevent endless retries.',
+  );
+  assert.equal(
+    localizeRuntimeError('Falta la clave de IA para gemini. Configúrala en Ajustes.', 'en'),
+    'The AI key for gemini is missing. Configure it in Settings.',
+  );
+  assert.equal(
+    localizeRuntimeError('Clave de IA inválida. Revísala en Ajustes.', 'en'),
+    'The AI key is invalid. Check it in Settings.',
+  );
 });
 
 test('issue #12 queue payloads translate at runtime', () => {

@@ -43,9 +43,11 @@ test('the consent modal defines separate light and dark surfaces', async () => {
 });
 
 test('the consent is academic-only and its campaign has a global progress/control bar', async () => {
-  const [app, bar, api, ipc, main, rootIpc, exportImport] = await Promise.all([
+  const [app, bar, manager, css, api, ipc, main, rootIpc, exportImport] = await Promise.all([
     read('src/App.tsx'),
     read('src/components/DocumentIndexProgressBar.tsx'),
+    read('src/views/DocumentIndexManager.tsx'),
+    read('src/index.css'),
     read('shared/api/academic.ts'),
     read('electron/ipc/academic.ts'),
     read('electron/main.ts'),
@@ -63,6 +65,9 @@ test('the consent is academic-only and its campaign has a global progress/contro
   assert.match(bar, /applyStatus\('paused'\)/);
   assert.match(bar, /applyStatus\('running'\)/);
   assert.match(bar, /applyStatus\('cancelled'\)/);
+  assert.match(bar, /document-index-warning/);
+  assert.match(manager, /document-index-manager-warning/);
+  assert.match(css, /\.light \.document-index-warning \{[\s\S]*background-color: #fffbeb;[\s\S]*color: #78350f;/);
   assert.match(api, /setDocumentIndexCampaignStatus\(vaultId: string, campaignId: string/);
   assert.match(ipc, /documentIndexQueue\.setCampaignStatus\(vaultId, campaignId, status\)/);
   assert.match(main, /documentIndexQueue\.stop\(\);[\s\S]*closeDb\(\)/, 'shutdown aborts document workers before closing their database');

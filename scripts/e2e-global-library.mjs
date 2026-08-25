@@ -145,10 +145,19 @@ try {
   await page.reload();
   await page.waitForFunction(() => Boolean(document.getElementById('root')?.children.length));
   const updateModal = page.getByTestId('startup-update-modal');
+  // The update status arrives asynchronously after the root mounts. Give the
+  // optional modal a chance to attach before deciding there is nothing to dismiss.
+  await updateModal.waitFor({ state: 'attached', timeout: 2_000 }).catch(() => {});
   if (await updateModal.count()) {
     await page.waitForFunction(() => document.querySelector('[data-testid="startup-update-modal"]')?.getAttribute('data-update-status') === 'not-available');
     await updateModal.getByRole('button', { name: 'Entendido', exact: false }).click();
     await updateModal.waitFor({ state: 'detached' });
+  }
+  const documentConsent = page.getByTestId('document-understanding-consent');
+  await documentConsent.waitFor({ state: 'attached', timeout: 1_000 }).catch(() => {});
+  if (await documentConsent.count()) {
+    await documentConsent.getByRole('button', { name: 'Ahora no', exact: true }).click();
+    await documentConsent.waitFor({ state: 'detached' });
   }
 
   await page.locator('[data-tour="nav-library"]').click();
@@ -198,6 +207,26 @@ try {
   await vaultFiltersToggle.click();
   await page.getByTestId('library-vault-filters-panel').waitFor({ state: 'visible' });
   await page.screenshot({ path: path.join(os.tmpdir(), 'nodus-library-vault-filters-dark-wide.png'), fullPage: true });
+
+  const unstartedFilter = page.getByRole('button', { name: 'Sin analizar', exact: true });
+  await unstartedFilter.click();
+  await page.locator('[data-tour="nav-home"]').click();
+  await page.locator('[data-tour="nav-library"]').click();
+  await page.getByTestId('library-vault-filters-panel').waitFor({ state: 'visible' });
+  assert.match(await unstartedFilter.getAttribute('class'), /is-active/, 'an active Library filter survives leaving the section');
+  await unstartedFilter.click();
+  await page.locator('[data-tour="nav-home"]').click();
+  await page.locator('[data-tour="nav-library"]').click();
+  await page.getByTestId('library-vault-filters-panel').waitFor({ state: 'visible' });
+  assert.doesNotMatch(await unstartedFilter.getAttribute('class'), /is-active/, 'an explicitly removed Library filter stays removed');
+  await vaultFiltersToggle.click();
+  await page.locator('[data-tour="nav-home"]').click();
+  await page.locator('[data-tour="nav-library"]').click();
+  assert.equal(await page.getByTestId('library-vault-filters-panel').count(), 0, 'an explicitly closed Library filter panel stays closed');
+  await vaultFiltersToggle.click();
+  await page.locator('[data-tour="nav-home"]').click();
+  await page.locator('[data-tour="nav-library"]').click();
+  await page.getByTestId('library-vault-filters-panel').waitFor({ state: 'visible' });
   await vaultFiltersToggle.click();
   await page.getByTestId('library-collections-menu-toggle').click();
   await page.getByTestId('library-collections-menu').waitFor({ state: 'visible' });

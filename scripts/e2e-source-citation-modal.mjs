@@ -38,12 +38,14 @@ try {
     localStorage.setItem('nodus.platformHighlightsSeen.2026-07', '1');
     localStorage.setItem('nodus.tutorialVideosAnnouncementSeen.2026-07', '1');
     localStorage.setItem('nodus.toolkitBetaGuideSeen.2.4.0', '1');
+    localStorage.setItem('nodus.documentUnderstandingConsent.2026-08', '1');
     await window.nodus.updateSettings({
       onboardingComplete: true,
       basicsTutorialVersion: 999,
       recoverySetupVersion: 999,
       tourComplete: true,
       advancedTourComplete: true,
+      theme: 'light',
       uiLanguage: 'es',
       mascotEnabled: false,
       reduceMotion: true,
@@ -70,6 +72,14 @@ try {
   assert.equal(await modal.getByTestId('source-citation-linked-works').count(), 1, 'the idea groups linked works');
   assert.equal(await modal.getByTestId('source-citation-evidence').count(), 1, 'the idea groups anchored evidence');
   assert.equal(await modal.getByText(/Ver en grafo|Ver conexiones en grafo/i).count(), 0, 'the citation workspace has no graph actions');
+
+  const connectionLabel = modal.getByText('La recuperación activa supera a la relectura', { exact: true });
+  await connectionLabel.hover();
+  assert.equal(
+    await connectionLabel.evaluate((element) => getComputedStyle(element).color),
+    'rgb(67, 56, 202)',
+    'idea links use the readable indigo-700 hover colour in the light theme',
+  );
 
   const workLink = modal.getByTestId('source-citation-work-link-demo-w1');
   await workLink.locator('button').first().click();

@@ -740,9 +740,10 @@ function LibraryScopeControls({
 }
 
 function GlobalLibraryContent({
-  target, snapshot, onSnapshotChange, onOpenSettings, scopeControls, onOpenReader,
+  target, onTargetConsumed, snapshot, onSnapshotChange, onOpenSettings, scopeControls, onOpenReader,
 }: {
   target?: (PendingLibraryNavigationTarget & { nonce: number }) | null;
+  onTargetConsumed?: () => void;
   snapshot?: LibraryGlobalSnapshot;
   onSnapshotChange?: (next: LibraryGlobalSnapshot) => void;
   onOpenSettings: () => void;
@@ -782,7 +783,7 @@ function GlobalLibraryContent({
   const [error, setError] = useState<string | null>(null);
   const [zoteroOpen, setZoteroOpen] = useState(false);
   const [migrationOpen, setMigrationOpen] = useState(false);
-  const [filtersOpen, setFiltersOpen] = useState(() => snapshot?.filtersOpen ?? false);
+  const [filtersOpen, setFiltersOpenState] = useState(() => snapshot?.filtersOpen ?? false);
   const [collectionTarget, setCollectionTarget] = useState('');
   const [metadataItem, setMetadataItem] = useState<LibraryItemRecord | null>(null);
   const [createReferenceMode, setCreateReferenceMode] = useState<'identifier' | 'manual' | null>(null);
@@ -904,6 +905,39 @@ function GlobalLibraryContent({
   snapshotOf.current = currentSnapshot;
   useEffect(() => { reportSnapshot.current?.(currentSnapshot()); }, [currentSnapshot]);
 
+  // Report explicit filter actions immediately. If the click that dismisses a
+  // filter also leaves the section, this component may unmount before the passive
+  // effect above can publish the new value.
+  const reportSnapshotNow = useCallback((overrides: Partial<Omit<LibraryGlobalSnapshot, 'filters'>> & {
+    filters?: Partial<LibraryGlobalSnapshot['filters']>;
+  }) => {
+    const current = snapshotOf.current();
+    reportSnapshot.current?.({
+      ...current,
+      ...overrides,
+      filters: { ...current.filters, ...overrides.filters },
+    });
+  }, []);
+  const toggleFilterPanel = () => {
+    const nextOpen = !filtersOpen;
+    setFiltersOpenState(nextOpen);
+    reportSnapshotNow({ filtersOpen: nextOpen });
+  };
+  const rememberCatalogFilters = (filters: Partial<LibraryGlobalSnapshot['filters']>) => {
+    setOffset(0);
+    reportSnapshotNow({ filters });
+  };
+  const clearCatalogFilters = () => {
+    setSource(''); setExtraction(''); setYearFrom(''); setYearTo(''); setItemType('');
+    setFacetTag(''); setFacetVault(''); setAttachmentFilter(''); setOffset(0);
+    reportSnapshotNow({
+      filters: {
+        source: '', extraction: '', yearFrom: '', yearTo: '', itemType: '',
+        facetTag: '', facetVault: '', attachmentFilter: '',
+      },
+    });
+  };
+
   // The anchor is restored by VirtualList, which is the only thing that knows where a
   // row that is not rendered yet would be. What it cannot decide is what to do when
   // the row is gone: that is this view's call, and the answer is the first page.
@@ -983,6 +1017,7 @@ function GlobalLibraryContent({
   useEffect(() => {
     const itemId = target?.readerItemId;
     if (!itemId) return;
+    onTargetConsumed?.();
     void window.nodus.getGlobalLibraryItem(itemId).then((item) => {
       if (!item) return;
       if (item.files?.reader || item.attachments.length) onOpenReader({
@@ -994,10 +1029,12 @@ function GlobalLibraryContent({
       });
       else setDetailId(item.id);
     });
-  }, [onOpenReader, target?.nonce, target?.readerItemId]);
+  }, [onOpenReader, onTargetConsumed, target?.nonce, target?.readerItemId]);
   useEffect(() => {
-    if (target?.citationStyles) setCitationItems([]);
-  }, [target?.citationStyles, target?.nonce]);
+    if (!target?.citationStyles) return;
+    setCitationItems([]);
+    onTargetConsumed?.();
+  }, [onTargetConsumed, target?.citationStyles, target?.nonce]);
 
   const children = useMemo(() => collectionChildren(collections), [collections]);
   const localCollections = useMemo(() => collections.filter((entry) => entry.source === 'nodus'), [collections]);
@@ -1450,17 +1487,17 @@ function GlobalLibraryContent({
           <div className="border-b border-neutral-800 p-3">
             <div className="flex items-center gap-2">
               <div className="relative min-w-[220px] flex-1"><Icon name="search" size={15} className="pointer-events-none absolute left-3 top-1/2 z-10 -translate-y-1/2 text-neutral-600" /><input data-testid="global-library-search" className="input input-with-leading-icon w-full" value={searchDraft} onChange={(event) => setSearchDraft(event.target.value)} placeholder={t('Buscar título, autor, etiqueta, DOI, ISBN, ISSN, PMID o arXiv…')} /></div>
-              <button className={`btn border border-neutral-700 ${filtersOpen || source || extraction || yearFrom || yearTo || itemType || facetTag || facetVault || attachmentFilter ? 'bg-indigo-500/10 text-indigo-300' : 'btn-ghost'}`} onClick={() => setFiltersOpen((value) => !value)}><Icon name="filter" /> {t('Filtros')}</button>
+              <button className={`btn border border-neutral-700 ${filtersOpen || source || extraction || yearFrom || yearTo || itemType || facetTag || facetVault || attachmentFilter ? 'bg-indigo-500/10 text-indigo-300' : 'btn-ghost'}`} onClick={toggleFilterPanel}><Icon name="filter" /> {t('Filtros')}</button>
               <button data-testid="library-table-settings" className="btn btn-ghost border border-neutral-700" onClick={() => setTablePreferencesOpen(true)} title={t('Columnas y orden')}><Icon name="columns" /></button>
             </div>
             {filtersOpen && <div className="mt-2 rounded-xl bg-neutral-900/55 p-2"><div className="grid gap-2 sm:grid-cols-3 xl:grid-cols-6">
-              <select className="input text-xs" value={source} onChange={(event) => { setSource(event.target.value as LibraryItemSource | ''); setOffset(0); }}><option value="">{t('Todos los orígenes')}</option>{Object.entries(SOURCE_LABEL).map(([id, label]) => <option key={id} value={id}>{label}</option>)}</select>
-              <select className="input text-xs" value={extraction} onChange={(event) => { setExtraction(event.target.value as typeof extraction); setOffset(0); }}><option value="">{t('Cualquier estado')}</option>{Object.entries(EXTRACTION_LABEL).map(([id, label]) => <option key={id} value={id}>{t(label)}</option>)}</select>
-              <select className="input text-xs" value={itemType} onChange={(event) => { setItemType(event.target.value as LibraryItemType | ''); setOffset(0); }}><option value="">{t('Todos los tipos')}</option>{facets.itemTypes.map((entry) => <option key={entry.value} value={entry.value}>{t(libraryItemTypeLabel(entry.value as LibraryItemType))} ({entry.count})</option>)}</select>
-              <select className="input text-xs" value={attachmentFilter} onChange={(event) => { setAttachmentFilter(event.target.value as typeof attachmentFilter); setOffset(0); }}><option value="">{t('Cualquier adjunto')}</option><option value="with">{t('Con adjuntos')}</option><option value="without">{t('Sin adjuntos')}</option></select>
-              <input className="input text-xs" type="number" value={yearFrom} onChange={(event) => { setYearFrom(event.target.value); setOffset(0); }} placeholder={t('Año desde')} />
-              <input className="input text-xs" type="number" value={yearTo} onChange={(event) => { setYearTo(event.target.value); setOffset(0); }} placeholder={t('Año hasta')} />
-            </div><div className="mt-2 flex flex-wrap items-center gap-1.5 text-[10px]"><span className="text-neutral-600">{t('Etiquetas')}</span>{facets.tags.slice(0, 8).map((entry) => <button key={entry.value} className={`rounded-full px-2 py-1 ${facetTag === entry.value ? 'bg-indigo-600 text-white' : 'bg-neutral-950 text-neutral-500 hover:text-neutral-200'}`} onClick={() => { setFacetTag((current) => current === entry.value ? '' : entry.value); setOffset(0); }}>{entry.value} · {entry.count}</button>)}{facets.vaults.map((entry) => <button key={entry.value} className={`rounded-full px-2 py-1 ${facetVault === entry.value ? 'bg-indigo-600 text-white' : 'bg-neutral-950 text-neutral-500 hover:text-neutral-200'}`} onClick={() => { setFacetVault((current) => current === entry.value ? '' : entry.value); setOffset(0); }}><Icon name="vault" size={9} /> {entry.value} · {entry.count}</button>)}{(source || extraction || yearFrom || yearTo || itemType || facetTag || facetVault || attachmentFilter) && <button className="ml-auto text-indigo-300" onClick={() => { setSource(''); setExtraction(''); setYearFrom(''); setYearTo(''); setItemType(''); setFacetTag(''); setFacetVault(''); setAttachmentFilter(''); setOffset(0); }}>{t('Limpiar filtros')}</button>}</div></div>}
+              <select className="input text-xs" value={source} onChange={(event) => { const next = event.target.value as LibraryItemSource | ''; setSource(next); rememberCatalogFilters({ source: next }); }}><option value="">{t('Todos los orígenes')}</option>{Object.entries(SOURCE_LABEL).map(([id, label]) => <option key={id} value={id}>{label}</option>)}</select>
+              <select className="input text-xs" value={extraction} onChange={(event) => { const next = event.target.value as typeof extraction; setExtraction(next); rememberCatalogFilters({ extraction: next }); }}><option value="">{t('Cualquier estado')}</option>{Object.entries(EXTRACTION_LABEL).map(([id, label]) => <option key={id} value={id}>{t(label)}</option>)}</select>
+              <select className="input text-xs" value={itemType} onChange={(event) => { const next = event.target.value as LibraryItemType | ''; setItemType(next); rememberCatalogFilters({ itemType: next }); }}><option value="">{t('Todos los tipos')}</option>{facets.itemTypes.map((entry) => <option key={entry.value} value={entry.value}>{t(libraryItemTypeLabel(entry.value as LibraryItemType))} ({entry.count})</option>)}</select>
+              <select className="input text-xs" value={attachmentFilter} onChange={(event) => { const next = event.target.value as typeof attachmentFilter; setAttachmentFilter(next); rememberCatalogFilters({ attachmentFilter: next }); }}><option value="">{t('Cualquier adjunto')}</option><option value="with">{t('Con adjuntos')}</option><option value="without">{t('Sin adjuntos')}</option></select>
+              <input className="input text-xs" type="number" value={yearFrom} onChange={(event) => { const next = event.target.value; setYearFrom(next); rememberCatalogFilters({ yearFrom: next }); }} placeholder={t('Año desde')} />
+              <input className="input text-xs" type="number" value={yearTo} onChange={(event) => { const next = event.target.value; setYearTo(next); rememberCatalogFilters({ yearTo: next }); }} placeholder={t('Año hasta')} />
+            </div><div className="mt-2 flex flex-wrap items-center gap-1.5 text-[10px]"><span className="text-neutral-600">{t('Etiquetas')}</span>{facets.tags.slice(0, 8).map((entry) => <button key={entry.value} className={`rounded-full px-2 py-1 ${facetTag === entry.value ? 'bg-indigo-600 text-white' : 'bg-neutral-950 text-neutral-500 hover:text-neutral-200'}`} onClick={() => { const next = facetTag === entry.value ? '' : entry.value; setFacetTag(next); rememberCatalogFilters({ facetTag: next }); }}>{entry.value} · {entry.count}</button>)}{facets.vaults.map((entry) => <button key={entry.value} className={`rounded-full px-2 py-1 ${facetVault === entry.value ? 'bg-indigo-600 text-white' : 'bg-neutral-950 text-neutral-500 hover:text-neutral-200'}`} onClick={() => { const next = facetVault === entry.value ? '' : entry.value; setFacetVault(next); rememberCatalogFilters({ facetVault: next }); }}><Icon name="vault" size={9} /> {entry.value} · {entry.count}</button>)}{(source || extraction || yearFrom || yearTo || itemType || facetTag || facetVault || attachmentFilter) && <button className="ml-auto text-indigo-300" onClick={clearCatalogFilters}>{t('Limpiar filtros')}</button>}</div></div>}
           </div>
 
           {selected.size > 0 && <div data-testid="global-library-bulk-actions" className="flex flex-wrap items-center gap-2 border-b border-indigo-500/20 bg-indigo-500/5 px-3 py-2 text-xs"><b>{tx('{n} seleccionados', { n: selected.size })}</b>{trashMode ? <><button data-testid="bulk-restore-library-trash" className="btn btn-secondary h-8" onClick={() => void restoreSelected()}><Icon name="refresh" size={13} /> {t('Restaurar')}</button><button data-testid="bulk-purge-library-trash" className="btn btn-ghost h-8 text-red-400" onClick={() => setTrashImpactItems([...selected])}><Icon name="trash" size={13} /> {t('Revisar y vaciar')}</button></> : <><select aria-label={t('Acción de colección')} className="input ml-2 h-8 text-xs" value={collectionAction} onChange={(event) => setCollectionAction(event.target.value as typeof collectionAction)}><option value="copy">{t('Copiar a')}</option><option value="move">{t('Mover a')}</option><option value="remove">{t('Quitar de esta colección')}</option></select>{collectionAction !== 'remove' && <select className="input h-8 min-w-44 text-xs" value={collectionTarget} onChange={(event) => setCollectionTarget(event.target.value)}><option value="">{t('Elegir colección…')}</option>{localCollections.map((collection) => <option key={collection.id} value={collection.id}>{collection.name}</option>)}</select>}<button className="btn btn-ghost h-8" disabled={collectionAction === 'remove' ? collections.find((entry) => entry.id === selectedCollection)?.source !== 'nodus' : !collectionTarget} onClick={() => void addSelectedToCollection()}>{t('Aplicar')}</button><input className="input h-8 w-32 text-xs" value={bulkTag} onChange={(event) => setBulkTag(event.target.value)} placeholder={t('Etiqueta…')} /><button className="btn btn-ghost h-8" disabled={!bulkTag.trim()} onClick={() => void applyBulkTag()}><Icon name="tag" size={13} /> {t('Etiquetar')}</button><button data-testid="bulk-resolve-library-metadata" className="btn btn-ghost h-8" onClick={() => setMetadataBatchItems([...selected])}><Icon name="search" size={13} /> {t('Completar metadatos')}</button><button data-testid="bulk-library-citations" className="btn btn-ghost h-8" onClick={() => setCitationItems([...selected])}><Icon name="quote" size={13} /> {t('Citar / exportar')}</button><button data-testid="bulk-add-library-to-vault" className="btn btn-ghost h-8" onClick={() => setVaultLinkItems([...selected])}><Icon name="vault" size={13} /> {t('Usar en un vault')}</button><details className="relative"><summary className="btn btn-ghost h-8 list-none border border-neutral-700" aria-label={t('Acciones avanzadas')} title={t('Acciones avanzadas')}><Icon name="menu" size={13} /></summary><div className="library-action-menu absolute right-0 top-[calc(100%+.3rem)] z-40 w-60 rounded-xl border border-neutral-800 bg-neutral-950 p-1.5 shadow-2xl"><button className="library-action-menu-item" onClick={() => void rebuildSelectedCleanReading()}><Icon name="refresh" /><span><b>{t('Reconstruir versiones limpias')}</b><small>{t('Repite extracción, OCR y estructura')}</small></span></button><button className="library-action-menu-item text-red-400" onClick={() => void deleteSelected()}><Icon name="trash" /><span><b>{t('Enviar a la papelera')}</b></span></button></div></details></>}<button className="ml-auto text-neutral-500 hover:text-neutral-200" onClick={() => setSelected(new Set())}>{t('Limpiar selección')}</button></div>}
@@ -1641,6 +1678,7 @@ function GlobalLibraryContent({
 
 export function GlobalLibraryView({
   target,
+  onTargetConsumed,
   settings,
   vaultId,
   vaultType,
@@ -1654,6 +1692,8 @@ export function GlobalLibraryView({
   onOpenArchive,
 }: {
   target?: (PendingLibraryNavigationTarget & { nonce: number }) | null;
+  /** Clear a navigation command after the matching Library surface applies it. */
+  onTargetConsumed?: () => void;
   settings: AppSettings;
   /** Where this section was last left. Read once, at mount, and never again. */
   snapshot?: LibrarySnapshot;
@@ -1691,7 +1731,10 @@ export function GlobalLibraryView({
 
   // Contextual entries (Home health buckets and Zotero reader links) choose their
   // scope once. After arrival the user remains free to change the switcher.
-  useEffect(() => setScope(preferredScope), [target?.nonce]);
+  useEffect(() => {
+    if (!requestedScope) return;
+    setScope(requestedScope);
+  }, [requestedScope, target?.nonce]);
 
   const chooseScope = async (next: 'global' | 'vault') => {
     if (switching || next === scope) return;
@@ -1769,6 +1812,7 @@ export function GlobalLibraryView({
           <Library
             vaultId={vaultId}
             target={target}
+            onTargetConsumed={onTargetConsumed}
             vaultType={vaultType}
             snapshot={snapshot?.vault}
             onSnapshotChange={(vault) => onSnapshotChange?.({ vault })}
@@ -1783,6 +1827,7 @@ export function GlobalLibraryView({
         ) : (
           <GlobalLibraryContent
             target={target}
+            onTargetConsumed={onTargetConsumed}
             snapshot={snapshot?.global}
             onSnapshotChange={(next) => onSnapshotChange?.({ global: next })}
             onOpenSettings={onOpenSettings}

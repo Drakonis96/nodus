@@ -119,6 +119,7 @@ export interface ViewContext extends VaultFlags {
 
   // Target setters, for the jumps a view performs on its own.
   setNoteTarget: (target: { id: string; nonce: number } | null) => void;
+  setLibraryTarget: (target: Nonced<PendingLibraryNavigationTarget> | null) => void;
   setPersonsTarget: (target: { id: string; nonce: number } | null) => void;
   setPrimarySourceTarget: (target: Nonced<PrimarySourceTarget> | null) => void;
   setStudyTarget: (target: StudyNavigationTarget | null) => void;

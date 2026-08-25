@@ -3,7 +3,7 @@
 // This module turns raw GraphData (+ filters / lens / preset) into a plain
 // structure of nodes and edges with every visual attribute pre-computed
 // (size, degree, label rank, which edges participate in the physics layout).
-// It is deliberately free of any Cytoscape or Sigma types so it can feed the
+// It is deliberately free of Sigma types so it can feed the
 // graphology graph used by the Sigma renderer — and be unit-reasoned in
 // isolation. The logic mirrors the original `elements` memo in GraphView.
 import type { GraphData, GraphNodeType, IdeaType } from '@shared/types';

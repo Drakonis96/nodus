@@ -234,7 +234,8 @@ test('stop during passage embeddings prevents every later write and publication'
   assert.equal(globalThis.__documentPipeline.published, null, 'a cancelled candidate is never published');
 });
 
-test('a full-text file changed outside Nodus is rejected until its deep hash catches up', async () => {
+test('a legacy deep hash does not make the current resolved source look unstable', async () => {
+  globalThis.__documentPipeline.sourceReads = 0;
   globalThis.__documentPipeline.published = null;
   globalThis.__documentPipeline.text = `# Texto sustituido\n${'Contenido externo nuevo. '.repeat(100)}`;
   const work = {
@@ -243,11 +244,16 @@ test('a full-text file changed outside Nodus is rejected until its deep hash cat
     light_at:null,light_hash:null,deep_status:'done',deep_at:null,deep_hash:'hash-anterior',summary_status:'none',summary_at:null,
     summary_hash:null,archived:0,notes:null,
   };
-  await assert.rejects(
-    pipeline.runDocumentProfileScan(work, { jobId:'job-external-source-change',generatorModel:null,auditorModel:null,onProgress() {} }),
-    /DOCUMENT_SOURCE_CHANGED/,
+  const result = await pipeline.runDocumentProfileScan(work, {
+    jobId:'job-legacy-deep-hash',generatorModel:null,auditorModel:null,onProgress() {},
+  });
+  assert.equal(result, 'published-v1');
+  assert.match(globalThis.__documentPipeline.published.expectedWorkRevision.resolvedTextHash, /^[a-f0-9]{40}$/);
+  assert.equal(
+    globalThis.__documentPipeline.provenance.documentFingerprint,
+    globalThis.__documentPipeline.published.expectedWorkRevision.resolvedTextHash,
+    'profile provenance follows the canonical resolved corpus rather than a legacy deep-analysis hash',
   );
-  assert.equal(globalThis.__documentPipeline.published, null);
 });
 
 test('stop after passages are prepared preserves the previously published passage set', async () => {

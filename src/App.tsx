@@ -1273,6 +1273,7 @@ export function App() {
     openTestimonyLink,
     onSync,
     setNoteTarget,
+    setLibraryTarget,
     setPersonsTarget,
     setPrimarySourceTarget,
     setStudyTarget,

@@ -1,7 +1,7 @@
 // Renderer-agnostic local-graph traversal.
 //
 // Ports GraphView's `collectLocalGraph` to operate on a lightweight adjacency
-// index (built once from the model) instead of Cytoscape collections, returning
+// index (built once from the model), returning
 // plain id sets. The Sigma renderer turns those sets into focus / secondary /
 // context styling tiers. Keeping this pure makes the "tap a node, highlight its
 // neighbourhood" path O(local) and free of any renderer object churn.

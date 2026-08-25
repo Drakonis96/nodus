@@ -18,7 +18,7 @@ import { buildIdeaGraph, getContradictions } from '../graph/graphService';
 import { completeJson, completeText, completeTextStream } from './aiClient';
 
 // The plan is built from the SAME graph the user sees, so node ids returned by the
-// model can be spotlighted directly in Cytoscape. We send a compact projection and
+// model can be spotlighted directly in the graph. We send a compact projection and
 // cap the volume so even large corpora stay within a long-context window.
 const STATEMENT_CLIP = 200;
 const MAX_IDEAS = 600;

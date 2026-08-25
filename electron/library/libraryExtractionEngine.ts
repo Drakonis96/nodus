@@ -16,7 +16,7 @@ import { openPdf, loadPdfjs } from '../extraction/pdfjsLoader';
 import { ocrPdfPages } from '../extraction/ocr';
 import { csvFileToText, xlsxFileToText } from '../extraction/tabular';
 import { cleanInlineText, dehyphenatingJoin } from '../extraction/textCleanup';
-import { atomicWriteFile, atomicWriteJson, assertInside, safeLibraryFolderName } from './libraryFileUtils';
+import { atomicWriteFile, atomicWriteJson, assertInside, resolveLibraryFile, safeLibraryFolderName } from './libraryFileUtils';
 import { LibraryDiskStore } from './libraryStorage';
 import {
   extractionFingerprint,
@@ -1220,8 +1220,8 @@ function originalPath(item: LibraryItemRecord, store: LibraryDiskStore): string 
     ...[...item.attachments].sort((a, b) => (a.role === 'original' ? -1 : b.role === 'original' ? 1 : 0)).map((attachment) => attachment.relativePath),
   ].filter((value): value is string => !!value);
   for (const relative of candidates) {
-    const file = assertInside(folder, path.join(folder, relative));
-    if (fs.existsSync(file) && fs.statSync(file).isFile()) return file;
+    const file = resolveLibraryFile(folder, relative);
+    if (file) return file;
   }
   throw new Error('El documento no tiene un original local compatible para extraer.');
 }

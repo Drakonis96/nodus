@@ -264,7 +264,7 @@ function AuthorsCatalog({
   const [sortBy, setSortBy] = useState<SortKey>(() => snapshot?.sortBy ?? 'surname');
   const [synthFilter, setSynthFilter] = useState<SynthFilter>(() => snapshot?.synthFilter ?? 'all');
   const [savedOnly, setSavedOnly] = useState(() => snapshot?.savedOnly ?? false);
-  const [filtersOpen, setFiltersOpen] = useState(() => snapshot?.filtersOpen ?? false);
+  const [filtersOpen, setFiltersOpenState] = useState(() => snapshot?.filtersOpen ?? false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [exportFormat, setExportFormat] = useState<'markdown' | 'pdf'>('markdown');
   const [exporting, setExporting] = useState(false);
@@ -320,6 +320,24 @@ function AuthorsCatalog({
   useEffect(() => {
     report.current?.({ query: queryFilter, sortBy, synthFilter, savedOnly, filtersOpen });
   }, [filtersOpen, queryFilter, savedOnly, sortBy, synthFilter]);
+
+  // Filter controls report on the click itself as well as through the effect. This
+  // preserves a deliberate close even when dismissing the panel and navigating
+  // away are handled in the same browser interaction.
+  const toggleFilterPanel = () => {
+    const nextOpen = !filtersOpen;
+    setFiltersOpenState(nextOpen);
+    report.current?.({ filtersOpen: nextOpen });
+  };
+  const toggleSavedFilter = () => {
+    const nextSavedOnly = !savedOnly;
+    setSavedOnly(nextSavedOnly);
+    report.current?.({ savedOnly: nextSavedOnly });
+  };
+  const changeSynthesisFilter = (nextSynthFilter: SynthFilter) => {
+    setSynthFilter(nextSynthFilter);
+    report.current?.({ synthFilter: nextSynthFilter });
+  };
 
   // Changing the cut throws the place away with it: a row that was at the top of one
   // filter means nothing under another. It must skip its own first run, though, or
@@ -429,7 +447,7 @@ function AuthorsCatalog({
             <Icon name="search" size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-neutral-600" />
             <input data-testid="authors-search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder={t('Buscar autor…')} className="input input-with-leading-icon w-full" />
           </div>
-          <button className={`btn border border-neutral-700 ${filtersOpen || savedOnly || synthFilter !== 'all' ? 'bg-indigo-500/10 text-indigo-300' : 'btn-ghost'}`} onClick={() => setFiltersOpen((value) => !value)}>
+          <button className={`btn border border-neutral-700 ${filtersOpen || savedOnly || synthFilter !== 'all' ? 'bg-indigo-500/10 text-indigo-300' : 'btn-ghost'}`} onClick={toggleFilterPanel}>
             <Icon name="filter" /> {t('Filtros')}
           </button>
           <button data-testid="authors-open-matrix" className="btn btn-secondary" onClick={onOpenMatrix}>
@@ -442,13 +460,13 @@ function AuthorsCatalog({
               data-testid="authors-tab-saved"
               aria-pressed={savedOnly}
               className={`btn h-8 text-xs ${savedOnly ? 'bg-amber-500/15 text-amber-300' : 'btn-ghost border border-neutral-700'}`}
-              onClick={() => setSavedOnly((value) => !value)}
+              onClick={toggleSavedFilter}
             >
               <Icon name="star" size={13} className={savedOnly ? 'fill-current' : ''} /> {t('Autores guardados')}
             </button>
             <label className="flex items-center gap-2 text-xs text-neutral-500">
               {t('Síntesis')}
-              <select className="input h-8 text-xs" value={synthFilter} onChange={(event) => setSynthFilter(event.target.value as SynthFilter)}>
+              <select className="input h-8 text-xs" value={synthFilter} onChange={(event) => changeSynthesisFilter(event.target.value as SynthFilter)}>
                 {(Object.keys(SYNTH_FILTER_LABELS) as SynthFilter[]).map((key) => <option key={key} value={key}>{t(SYNTH_FILTER_LABELS[key])}</option>)}
               </select>
             </label>

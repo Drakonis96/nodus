@@ -36,7 +36,14 @@ import type {
 } from '@shared/libraryTypes';
 import { canonicalJson, normalizeLibraryMetadata } from './libraryRecord';
 import { LibraryCatalog } from './libraryCatalog';
-import { assertInside, atomicWriteJson, safeLibraryFolderName } from './libraryFileUtils';
+import {
+  assertInside,
+  atomicWriteJson,
+  libraryFilePathWithLiteralExtension,
+  resolveLibraryFile,
+  safeLibraryFileName,
+  safeLibraryFolderName,
+} from './libraryFileUtils';
 import { LibraryDiskStore } from './libraryStorage';
 import { importBibliographyFiles } from './libraryBibliographyImport';
 import { bibliographicFingerprint } from './libraryRevision';
@@ -451,9 +458,10 @@ export class LibraryOperations {
       const folder = this.store.itemFolder(item.storageId);
       for (const attachment of item.attachments) {
         checkedAttachments += 1;
-        const file = assertInside(folder, path.join(folder, attachment.relativePath));
-        if (!fs.existsSync(file) || !fs.statSync(file).isFile()) {
-          missingFiles += 1; issues.push({ code: 'missing-attachment', itemId: item.id, path: file, message: `Missing attachment: ${attachment.fileName}`, recoverable: true }); continue;
+        const declared = assertInside(folder, path.join(folder, attachment.relativePath));
+        const file = resolveLibraryFile(folder, attachment.relativePath);
+        if (!file) {
+          missingFiles += 1; issues.push({ code: 'missing-attachment', itemId: item.id, path: declared, message: `Missing attachment: ${attachment.fileName}`, recoverable: true }); continue;
         }
         if (sha256File(file) !== attachment.sha256) {
           corruptFiles += 1; issues.push({ code: 'corrupt-attachment', itemId: item.id, path: file, message: `Attachment checksum mismatch: ${attachment.fileName}`, recoverable: true });
@@ -487,6 +495,39 @@ export class LibraryOperations {
     };
   }
 
+  /** Migrate legacy `%2Epdf` manifest paths to a literal `.pdf` suffix. The old
+   * immutable copy is retained; only a verified canonical copy and a new record
+   * revision are added, which is safe inside synchronized backup folders. */
+  repairCloudRenamedAttachmentPaths(): number {
+    let repairedItems = 0;
+    for (const current of this.store.scanMaterializedItems().records) {
+      const folder = this.store.itemFolder(current.storageId);
+      const replacements = new Map<string, string>();
+      const attachments = current.attachments.map((attachment) => {
+        const relativePath = libraryFilePathWithLiteralExtension(attachment.relativePath);
+        if (relativePath === attachment.relativePath) return attachment;
+        const source = resolveLibraryFile(folder, attachment.relativePath);
+        if (!source) return attachment;
+        const expectedHash = /^[a-f0-9]{64}$/i.test(attachment.sha256) ? attachment.sha256.toLowerCase() : null;
+        if (expectedHash && sha256File(source) !== expectedHash) return attachment;
+        const destination = assertInside(folder, path.join(folder, relativePath));
+        if (source !== destination) copyImmutable(source, destination);
+        if (!fs.existsSync(destination) || !fs.statSync(destination).isFile()) return attachment;
+        if (expectedHash && sha256File(destination) !== expectedHash) return attachment;
+        replacements.set(attachment.relativePath, relativePath);
+        return { ...attachment, relativePath };
+      });
+      if (!replacements.size) continue;
+      const files = current.files?.original && replacements.has(current.files.original)
+        ? { ...current.files, original: replacements.get(current.files.original)! }
+        : current.files;
+      const repaired = this.store.upsertItem({ ...current, attachments, files }, current.clock.revision);
+      this.catalog.indexItem(repaired, this.store);
+      repairedItems += 1;
+    }
+    return repairedItems;
+  }
+
   importLocalFiles(files: string[], collectionId?: string | null): LibraryLocalImportReport {
     const report: LibraryLocalImportReport = { created: 0, skipped: 0, itemIds: [], warnings: [] };
     const knownHashes = new Set(this.catalog.attachmentHashes());
@@ -510,7 +551,7 @@ export class LibraryOperations {
       const fileName = autoRenamed
         ? buildAutomaticAttachmentFileName(metadata, originalFileName, librarySettings.attachmentRenameTemplate)
         : originalFileName;
-      const relativePath = path.join('attachments', safeLibraryFolderName(fileName));
+      const relativePath = path.join('attachments', safeLibraryFileName(fileName));
       const destination = assertInside(folder, path.join(folder, relativePath));
       copyImmutable(source, destination);
       const stat = fs.statSync(destination);
@@ -567,12 +608,16 @@ export class LibraryOperations {
     const id = `nodus:${randomUUID()}`;
     const destinationFolder = this.store.itemFolder(id);
     const sourceFolder = this.store.itemFolder(current.storageId);
-    for (const attachment of current.attachments) {
-      const source = assertInside(sourceFolder, path.join(sourceFolder, attachment.relativePath));
-      if (fs.existsSync(source)) copyImmutable(source, assertInside(destinationFolder, path.join(destinationFolder, attachment.relativePath)));
-    }
+    const pathReplacements = new Map<string, string>();
+    const attachments = current.attachments.map((attachment) => {
+      const source = resolveLibraryFile(sourceFolder, attachment.relativePath);
+      const relativePath = source ? libraryFilePathWithLiteralExtension(attachment.relativePath) : attachment.relativePath;
+      if (source) copyImmutable(source, assertInside(destinationFolder, path.join(destinationFolder, relativePath)));
+      pathReplacements.set(attachment.relativePath, relativePath);
+      return { ...attachment, id: `local:${randomUUID()}`, relativePath, sourceKey: undefined };
+    });
     for (const relative of Object.values(current.files ?? {})) {
-      if (!relative) continue;
+      if (!relative || relative === current.files?.original) continue;
       const source = assertInside(sourceFolder, path.join(sourceFolder, relative));
       if (fs.existsSync(source) && fs.statSync(source).isFile()) copyImmutable(source, assertInside(destinationFolder, path.join(destinationFolder, relative)));
     }
@@ -582,9 +627,12 @@ export class LibraryOperations {
     const result = this.store.upsertItem({
       id, storageId: id, source: 'nodus', citationKey,
       metadata: current.metadata, collectionIds: current.collectionIds,
-      attachments: orderedAttachments(current.attachments.map((entry) => ({ ...entry, id: `local:${randomUUID()}`, sourceKey: undefined }))),
+      attachments: orderedAttachments(attachments),
       notes: (current.notes ?? []).filter((note) => note.source === 'nodus').map((note) => ({ ...note, id: `note:${randomUUID()}`, createdAt: now, updatedAt: now })),
-      relations: [], files: current.files, extraction: current.extraction, contentRevision: current.contentRevision,
+      relations: [], files: current.files?.original && pathReplacements.has(current.files.original)
+        ? { ...current.files, original: pathReplacements.get(current.files.original)! }
+        : current.files,
+      extraction: current.extraction, contentRevision: current.contentRevision,
       deletedAt: null,
     });
     this.catalog.indexItem(result, this.store);
@@ -612,7 +660,7 @@ export class LibraryOperations {
       const fileName = autoRenamed
         ? buildAutomaticAttachmentFileName(current.metadata, originalFileName, librarySettings.attachmentRenameTemplate)
         : originalFileName;
-      const relativePath = path.join('attachments', `${id.slice(6, 14)}-${safeLibraryFolderName(fileName)}`);
+      const relativePath = path.join('attachments', `${id.slice(6, 14)}-${safeLibraryFileName(fileName)}`);
       const destination = assertInside(folder, path.join(folder, relativePath)); copyImmutable(source, destination);
       const detectedMime = mimeType(extension);
       additions.push({ id, title: originalFileName, fileName, relativePath, mimeType: detectedMime,
@@ -632,11 +680,11 @@ export class LibraryOperations {
     const current = this.item(itemId); const target = current.attachments.find((entry) => entry.id === attachmentId);
     if (!target) throw new Error('El adjunto ya no existe.');
     const folder = this.store.itemFolder(current.storageId); let relativePath = target.relativePath;
-    const fileName = patch.fileName?.trim() ? safeLibraryFolderName(path.basename(patch.fileName.trim())) : target.fileName;
+    const fileName = patch.fileName?.trim() ? path.basename(patch.fileName.trim()) : target.fileName;
     if (fileName !== target.fileName) {
-      const source = assertInside(folder, path.join(folder, target.relativePath));
-      relativePath = path.join('attachments', `${target.id.replace(/[^a-z0-9]/gi, '').slice(-8)}-${fileName}`);
-      if (fs.existsSync(source)) copyImmutable(source, assertInside(folder, path.join(folder, relativePath)));
+      const source = resolveLibraryFile(folder, target.relativePath);
+      relativePath = path.join('attachments', `${target.id.replace(/[^a-z0-9]/gi, '').slice(-8)}-${safeLibraryFileName(fileName)}`);
+      if (source) copyImmutable(source, assertInside(folder, path.join(folder, relativePath)));
     }
     const desired = { ...target, title: patch.title?.trim() || target.title, fileName, relativePath,
       autoRenamed: patch.fileName !== undefined ? false : target.autoRenamed,
@@ -662,7 +710,7 @@ export class LibraryOperations {
     const fileName = autoRenamed
       ? buildAutomaticAttachmentFileName(current.metadata, originalFileName, librarySettings.attachmentRenameTemplate)
       : originalFileName;
-    const relativePath = path.join('attachments', `${attachmentId.replace(/[^a-z0-9]/gi, '').slice(-8)}-${sha256.slice(0, 10)}-${safeLibraryFolderName(fileName)}`);
+    const relativePath = path.join('attachments', `${attachmentId.replace(/[^a-z0-9]/gi, '').slice(-8)}-${sha256.slice(0, 10)}-${safeLibraryFileName(fileName)}`);
     const folder = this.store.itemFolder(current.storageId); const destination = assertInside(folder, path.join(folder, relativePath));
     copyImmutable(source, destination);
     const attachments = orderedAttachments(current.attachments.map((entry) => entry.id === attachmentId ? {
@@ -687,8 +735,8 @@ export class LibraryOperations {
   attachmentPath(itemId: string, attachmentId: string): string {
     const current = this.item(itemId); const attachment = current.attachments.find((entry) => entry.id === attachmentId);
     if (!attachment) throw new Error('El adjunto ya no existe.');
-    const file = assertInside(this.store.itemFolder(current.storageId), path.join(this.store.itemFolder(current.storageId), attachment.relativePath));
-    if (!fs.existsSync(file)) throw new Error('El archivo adjunto no está disponible.');
+    const file = resolveLibraryFile(this.store.itemFolder(current.storageId), attachment.relativePath);
+    if (!file) throw new Error('El archivo adjunto no está disponible.');
     return file;
   }
 
@@ -779,9 +827,9 @@ export class LibraryOperations {
         if (!attachment.autoRenamed || !settings.autoRenameAttachmentTypes.includes(attachmentRenameType(attachment.fileName))) return attachment;
         const fileName = buildAutomaticAttachmentFileName(merged, attachment.fileName, settings.attachmentRenameTemplate);
         if (fileName === attachment.fileName) return attachment;
-        const source = assertInside(folder, path.join(folder, attachment.relativePath));
-        if (!fs.existsSync(source)) return attachment;
-        const relativePath = path.join('attachments', `${attachment.id.replace(/[^a-z0-9]/gi, '').slice(-8)}-${safeLibraryFolderName(fileName)}`);
+        const source = resolveLibraryFile(folder, attachment.relativePath);
+        if (!source) return attachment;
+        const relativePath = path.join('attachments', `${attachment.id.replace(/[^a-z0-9]/gi, '').slice(-8)}-${safeLibraryFileName(fileName)}`);
         copyImmutable(source, assertInside(folder, path.join(folder, relativePath)));
         return { ...attachment, fileName, relativePath };
       });
@@ -914,9 +962,9 @@ export class LibraryOperations {
       const duplicateFolder = this.store.itemFolder(duplicate.storageId);
       for (const attachment of duplicate.attachments) {
         if (hashes.has(attachment.sha256)) continue;
-        const source = assertInside(duplicateFolder, path.join(duplicateFolder, attachment.relativePath));
-        if (!fs.existsSync(source)) continue;
-        const relativePath = path.join('attachments', 'merged', `${safeLibraryFolderName(duplicate.storageId)}-${safeLibraryFolderName(attachment.fileName)}`);
+        const source = resolveLibraryFile(duplicateFolder, attachment.relativePath);
+        if (!source) continue;
+        const relativePath = path.join('attachments', 'merged', `${safeLibraryFolderName(duplicate.storageId)}-${safeLibraryFileName(attachment.fileName)}`);
         copyImmutable(source, assertInside(folder, path.join(folder, relativePath)));
         const role = !files.original && attachment.role === 'original' ? 'original' : attachment.role === 'original' ? 'supplement' : attachment.role;
         attachments.push({ ...attachment, id: `merged:${randomUUID()}`, relativePath, role }); hashes.add(attachment.sha256);

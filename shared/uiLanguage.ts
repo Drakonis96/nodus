@@ -48,6 +48,68 @@ export function looksLikeSpanishUiText(value: string): boolean {
  * unknown Spanish prose becomes a localized generic error instead of leaking Spanish.
  */
 export function localizeRuntimeError(message: string, language: unknown): string {
+  if (message === 'No hay un modelo de IA configurado. Elige uno en Ajustes.') {
+    return uiText(language, {
+      es: message,
+      en: 'No AI model is configured. Choose one in Settings.',
+      fr: 'Aucun modèle d’IA n’est configuré. Choisissez-en un dans les Réglages.',
+      de: 'Es ist kein KI-Modell konfiguriert. Wählen Sie eines in den Einstellungen aus.',
+      pt: 'Não há nenhum modelo de IA configurado. Escolha um nas Definições.',
+      'pt-BR': 'Nenhum modelo de IA está configurado. Escolha um nas Configurações.',
+      it: 'Non è configurato alcun modello di IA. Scegline uno nelle Impostazioni.',
+      tr: 'Yapılandırılmış bir yapay zekâ modeli yok. Ayarlar’dan bir model seçin.',
+    });
+  }
+  if (message === 'Clave de IA inválida. Revísala en Ajustes.') {
+    return uiText(language, {
+      es: message,
+      en: 'The AI key is invalid. Check it in Settings.',
+      fr: 'La clé d’IA n’est pas valide. Vérifiez-la dans les Réglages.',
+      de: 'Der KI-Schlüssel ist ungültig. Prüfen Sie ihn in den Einstellungen.',
+      pt: 'A chave de IA é inválida. Verifique-a nas Definições.',
+      'pt-BR': 'A chave de IA é inválida. Verifique-a nas Configurações.',
+      it: 'La chiave IA non è valida. Controllala nelle Impostazioni.',
+      tr: 'Yapay zekâ anahtarı geçersiz. Ayarlar’dan kontrol edin.',
+    });
+  }
+  const missingKey = /^Falta la clave de IA para (.+)\. Configúrala en Ajustes\.$/.exec(message);
+  if (missingKey) {
+    const provider = missingKey[1];
+    return uiText(language, {
+      es: message,
+      en: `The AI key for ${provider} is missing. Configure it in Settings.`,
+      fr: `La clé d’IA pour ${provider} est manquante. Configurez-la dans les Réglages.`,
+      de: `Der KI-Schlüssel für ${provider} fehlt. Konfigurieren Sie ihn in den Einstellungen.`,
+      pt: `Falta a chave de IA para ${provider}. Configure-a nas Definições.`,
+      'pt-BR': `Falta a chave de IA para ${provider}. Configure-a nas Configurações.`,
+      it: `Manca la chiave IA per ${provider}. Configurala nelle Impostazioni.`,
+      tr: `${provider} için yapay zekâ anahtarı eksik. Ayarlar’dan yapılandırın.`,
+    });
+  }
+  if (message === 'La fuente cambió repetidamente durante el análisis. La campaña se ha pausado para evitar reintentos indefinidos.') {
+    return uiText(language, {
+      es: message,
+      en: 'The document source kept changing during analysis. Indexing was paused to prevent endless retries.',
+      fr: 'La source du document a changé à plusieurs reprises pendant l’analyse. L’indexation a été suspendue pour éviter des tentatives sans fin.',
+      de: 'Die Dokumentquelle hat sich während der Analyse wiederholt geändert. Die Indizierung wurde pausiert, um endlose Wiederholungen zu vermeiden.',
+      pt: 'A fonte do documento mudou repetidamente durante a análise. A indexação foi pausada para evitar tentativas intermináveis.',
+      'pt-BR': 'A fonte do documento mudou repetidamente durante a análise. A indexação foi pausada para evitar tentativas intermináveis.',
+      it: 'La fonte del documento è cambiata ripetutamente durante l’analisi. L’indicizzazione è stata sospesa per evitare tentativi infiniti.',
+      tr: 'Belge kaynağı analiz sırasında tekrar tekrar değişti. Sonsuz yeniden denemeleri önlemek için dizin oluşturma duraklatıldı.',
+    });
+  }
+  if (message === 'La fuente sigue cambiando. Reanuda cuando la sincronización haya terminado.') {
+    return uiText(language, {
+      es: message,
+      en: 'The source is still changing. Resume after synchronization has finished.',
+      fr: 'La source continue de changer. Reprenez une fois la synchronisation terminée.',
+      de: 'Die Quelle ändert sich weiterhin. Setzen Sie den Vorgang fort, sobald die Synchronisierung abgeschlossen ist.',
+      pt: 'A fonte continua a mudar. Retome quando a sincronização terminar.',
+      'pt-BR': 'A fonte continua mudando. Retome quando a sincronização terminar.',
+      it: 'La fonte continua a cambiare. Riprendi al termine della sincronizzazione.',
+      tr: 'Kaynak değişmeye devam ediyor. Eşitleme tamamlandıktan sonra devam edin.',
+    });
+  }
   if (!looksLikeSpanishUiText(message)) return message;
   return uiText(language, {
     es: message,

@@ -14,6 +14,7 @@ import { _electron as electron } from 'playwright-core';
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const require = createRequire(import.meta.url);
+const appVersion = require(path.join(repoRoot, 'package.json')).version;
 
 if (!process.argv.includes('--electron-graph-progressive-e2e')) {
   execFileSync(
@@ -69,8 +70,9 @@ try {
     'theme edges have present endpoints'
   );
 
-  await page.evaluate(async () => {
-    localStorage.setItem('nodus.lastSeenVersion', '9999.0.0');
+  await page.evaluate(async (version) => {
+    localStorage.setItem('nodus.lastSeenVersion', version);
+    localStorage.setItem(`nodus.mobileTeaserSeen.${version}`, '1');
     await window.nodus.updateSettings({
       onboardingComplete: true,
       basicsTutorialVersion: 5,
@@ -78,16 +80,40 @@ try {
       tourComplete: true,
       advancedTourComplete: true,
     });
-  });
+  }, appVersion);
   await page.reload();
   await page.locator('[data-tour="nav-graph"]').click();
   await page.locator('canvas').first().waitFor({ state: 'visible' });
   await page.waitForTimeout(250);
   assert.deepEqual(pageErrors, [], 'progressive graph renders without uncaught renderer errors');
 
+  // Regression: opening Graph from an idea tab used to leave the new renderer
+  // on the whole corpus because the deep-link still targeted the removed engine.
+  await page.locator('[data-tour="nav-ideas"]').click();
+  await page.getByTestId('ideas-catalog-table').waitFor({ state: 'visible' });
+  const firstIdea = page.locator('[data-testid^="idea-row-"]').first();
+  await firstIdea.waitFor({ state: 'visible' });
+  await firstIdea.click();
+  const ideaDetail = page.getByTestId('idea-detail-tab');
+  await ideaDetail.waitFor({ state: 'visible' });
+  const ideaLabel = (await ideaDetail.locator('h2').innerText()).trim();
+  assert.ok(ideaLabel, 'idea detail tab exposes its label');
+  await ideaDetail.getByRole('button', { name: /Graph|Grafo/, exact: true }).click();
+
+  await page.getByTestId('sigma-graph-engine').waitFor({ state: 'visible' });
+  const focusedPanel = page.locator('.graph-detail-panel');
+  await focusedPanel.waitFor({ state: 'visible' });
+  await focusedPanel.locator('h3').filter({ hasText: ideaLabel }).waitFor({ state: 'visible' });
+  assert.equal(
+    await page.getByTestId('knowledge-atlas-hud').getAttribute('data-preset'),
+    'overview',
+    'idea deep-link stays on the overview preset',
+  );
+  assert.deepEqual(pageErrors, [], 'idea-to-graph deep-link renders without uncaught renderer errors');
+
   console.log(
     `[e2e:graph] passed (${result.overview.nodes.length} overview themes, `
-      + `${ideaNodes.length} bounded theme ideas)`
+      + `${ideaNodes.length} bounded theme ideas; idea deep-link focused by Sigma)`
   );
   await app.close();
   app = null;

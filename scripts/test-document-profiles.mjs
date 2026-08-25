@@ -220,8 +220,8 @@ try {
 
   sqlite.prepare(`INSERT INTO works(
     nodus_id,zotero_key,title,authors_json,year,item_type,source_type,archived,
-    light_status,deep_status,summary_status
-  ) VALUES('w3','Z3','Obra pausada','[]',2022,'book','pdf',0,'done','done','none')`).run();
+    light_status,deep_status,summary_status,resolved_text_hash
+  ) VALUES('w3','Z3','Obra pausada','[]',2022,'book','pdf',0,'done','done','none','stable-passages')`).run();
   const pauseCampaign = repo.createDocumentIndexCampaign({
     vaultId: 'vault-a', mode: 'manual', includeArchived: false,
     generatorModel: null, auditorModel: null,
@@ -294,7 +294,7 @@ try {
     qualityScore: 1,
     expectedWorkRevision: {
       zoteroKey: 'Z3', zoteroVersion: null, title: 'Obra pausada', authorsJson: '[]', year: 2022,
-      itemType: 'book', doi: null, deepHash: null,
+      itemType: 'book', doi: null, deepHash: null, resolvedTextHash: 'stable-passages',
     },
     passages: {
       contentHash: 'stable-passages', embeddingProvider: 'captured-provider', embeddingModel: 'captured-model',
@@ -338,6 +338,9 @@ try {
     'Pasaje estable anterior.',
     'a failed late publication rolls back the staged passage replacement too',
   );
+  sqlite.prepare("UPDATE works SET resolved_text_hash='replacement-source' WHERE nodus_id='w3'").run();
+  assert.throws(() => repo.publishDocumentProfile(replayInput), /DOCUMENT_SOURCE_CHANGED/);
+  sqlite.prepare("UPDATE works SET resolved_text_hash='stable-passages' WHERE nodus_id='w3'").run();
   sqlite.prepare("UPDATE works SET zotero_version=5 WHERE nodus_id='w3'").run();
   assert.throws(() => repo.publishDocumentProfile(replayInput), /DOCUMENT_SOURCE_CHANGED/);
   assert.equal(repo.getDocumentProfile('w3').versionId, firstReplayVersion, 'a source change during analysis cannot overwrite the accepted profile');

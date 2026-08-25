@@ -87,9 +87,36 @@ try {
   assert.equal(catalog.listVaultLinks(merged.id).some((link) => link.workId === 'work:duplicate'), true, 'vault links remap without deleting the duplicate vault work');
   assert.equal(store.readMaterializedItem(related.storageId).relations[0].targetItemId, merged.id, 'inbound relations never dangle after merge');
 
+  const cloudId = 'nodus:cloud-renamed';
+  const cloudFolder = store.itemFolder(cloudId);
+  const legacyRelativePath = 'attachments/N%C3%BA%C3%B1ez%2Epdf';
+  const cloudPayload = '%PDF-1.4 cloud provider fixture';
+  const cloudHash = createHash('sha256').update(cloudPayload).digest('hex');
+  await mkdir(path.dirname(path.join(cloudFolder, legacyRelativePath)), { recursive: true });
+  await writeFile(`${path.join(cloudFolder, legacyRelativePath)}.pdf`, cloudPayload);
+  await writeFile(path.join(cloudFolder, 'reader.md'), '# Cloud renamed\n');
+  const cloudItem = store.upsertItem({
+    id: cloudId, storageId: cloudId, source: 'nodus',
+    metadata: { title: 'Cloud renamed', itemType: 'document', creators: [], year: 2024, isbn: [], issn: [], tags: [] },
+    collectionIds: [], attachments: [{
+      id: 'attachment:cloud-renamed', title: 'Original', fileName: 'Núñez.pdf', relativePath: legacyRelativePath,
+      mimeType: 'application/pdf', byteSize: cloudPayload.length, sha256: cloudHash, role: 'original',
+    }],
+    files: { original: legacyRelativePath, reader: 'reader.md' }, extraction: { status: 'ready' }, deletedAt: null,
+  });
+  catalog.indexItem(cloudItem, store);
+  assert.equal(operations.attachmentPath(cloudId, 'attachment:cloud-renamed'), `${path.join(cloudFolder, legacyRelativePath)}.pdf`, 'the reader can use the cloud alias before migration');
+  assert.equal(operations.repairCloudRenamedAttachmentPaths(), 1);
+  const repairedCloud = store.readMaterializedItem(cloudId);
+  assert.equal(repairedCloud.attachments[0].relativePath, 'attachments/N%C3%BA%C3%B1ez.pdf');
+  assert.equal(repairedCloud.files.original, 'attachments/N%C3%BA%C3%B1ez.pdf');
+  assert.ok(existsSync(path.join(cloudFolder, repairedCloud.files.original)), 'repair creates a portable canonical copy');
+  assert.equal(operations.repairCloudRenamedAttachmentPaths(), 0, 'cloud path repair is idempotent');
+
   await writeFile(path.join(store.itemFolder(linkedTrash.storageId), 'attachments', 'original.pdf'), 'damaged');
   const audit = operations.auditRecovery();
   assert.equal(audit.corruptFiles, 1);
+  assert.equal(audit.missingFiles, 0, 'a repaired cloud filename is not reported as missing');
   assert.ok(audit.issues.some((issue) => issue.code === 'corrupt-attachment'));
 
   catalog.close(); await rm(path.dirname(catalogPath), { recursive: true, force: true });

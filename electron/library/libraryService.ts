@@ -173,6 +173,14 @@ function service(): NonNullable<typeof live> | null {
   const migrations = new LibraryMigrationSessionManager(store, catalog, listVaults, broadcastMigration);
   const operations = new LibraryOperations(store, catalog);
   live = { root, deviceId, store, catalog, extraction, operations, migrations };
+  setImmediate(() => {
+    if (live?.root !== root) return;
+    try {
+      if (operations.repairCloudRenamedAttachmentPaths() > 0) broadcast(catalog.status(root, deviceId));
+    } catch (error) {
+      console.error('[library] encoded attachment path repair failed', error);
+    }
+  });
   if (catalog.status(root, deviceId).lastRebuiltAt) {
     setImmediate(() => {
       if (live?.root !== root) return;

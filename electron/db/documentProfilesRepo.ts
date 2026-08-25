@@ -77,8 +77,8 @@ export interface PublishDocumentProfileInput {
   inputTokens?: number;
   outputTokens?: number;
   estimatedCostUsd?: number | null;
-  /** Source metadata captured before reading the document. Publication is rejected
-   * if the library row changed while the candidate was being generated. */
+  /** Source metadata captured before candidate generation. Publication is rejected
+   * if either the library row or resolved corpus changed while it was being generated. */
   expectedWorkRevision?: {
     zoteroKey: string;
     zoteroVersion: number | null;
@@ -88,6 +88,7 @@ export interface PublishDocumentProfileInput {
     itemType: string;
     doi: string | null;
     deepHash: string | null;
+    resolvedTextHash: string | null;
   };
   /** Passage replacement staged in memory and committed with the profile. */
   passages?: {
@@ -364,11 +365,12 @@ export function publishDocumentProfile(input: PublishDocumentProfileInput): stri
   const db = getDb();
   if (input.expectedWorkRevision) {
     const work = db.prepare(
-      `SELECT zotero_key,zotero_version,title,authors_json,year,item_type,doi,deep_hash
+      `SELECT zotero_key,zotero_version,title,authors_json,year,item_type,doi,deep_hash,resolved_text_hash
          FROM works WHERE nodus_id=?`
     ).get(input.nodusId) as {
       zotero_key: string; zotero_version: number | null; title: string; authors_json: string;
       year: number | null; item_type: string; doi: string | null; deep_hash: string | null;
+      resolved_text_hash: string | null;
     } | undefined;
     const expected = input.expectedWorkRevision;
     if (!work
@@ -379,7 +381,8 @@ export function publishDocumentProfile(input: PublishDocumentProfileInput): stri
       || work.year !== expected.year
       || work.item_type !== expected.itemType
       || work.doi !== expected.doi
-      || work.deep_hash !== expected.deepHash) {
+      || work.deep_hash !== expected.deepHash
+      || work.resolved_text_hash !== expected.resolvedTextHash) {
       throw new Error('DOCUMENT_SOURCE_CHANGED');
     }
   }
