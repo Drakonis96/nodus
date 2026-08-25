@@ -181,6 +181,11 @@ export const nodusApi: NodusApi = {
     ipcRenderer.on('settings:changed', listener);
     return () => ipcRenderer.removeListener('settings:changed', listener);
   },
+  onAiModelRequired: (cb) => {
+    const listener = () => cb();
+    ipcRenderer.on('ai:modelRequired', listener);
+    return () => ipcRenderer.removeListener('ai:modelRequired', listener);
+  },
   onDeepLink: (cb) => {
     const listener = (_e: unknown, url: string) => cb(url);
     ipcRenderer.on('deeplink:received', listener);

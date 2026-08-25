@@ -48,8 +48,10 @@ import { DEEP_RESEARCH_VERSION_TRANSLATIONS } from './i18n.deepResearchVersions'
 import { DOCUMENT_UNDERSTANDING_TRANSLATIONS } from './i18n.documentUnderstanding';
 import { DEEP_RESEARCH_QUALITY_TRANSLATIONS } from './i18n.deepResearchQuality';
 import { DOCUMENT_UNDERSTANDING_CONSENT_TRANSLATIONS } from './i18n.documentUnderstandingConsent';
+import { MODEL_SETTINGS_TRANSLATIONS } from './i18n.modelSettings';
 
 export const FR: Record<string, string> = {
+  ...MODEL_SETTINGS_TRANSLATIONS.fr,
   ...DICTIONARY_TRANSLATIONS.fr,
   'Tamaño de Nodi': 'Taille de Nodi',
   'El 100 % conserva el tamaño original de Nodi y es el máximo. Puedes reducirlo hasta el 40 %.': '100 % conserve la taille d’origine de Nodi et constitue le maximum. Vous pouvez la réduire jusqu’à 40 %.',

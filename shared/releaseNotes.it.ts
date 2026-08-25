@@ -155,6 +155,15 @@ const RELEASE_3_2_4_IT: string[] = [
 ];
 
 export const RELEASE_NOTES_IT: Record<string, string[]> = {
+  "5.0.1": [
+    "Il Dizionario ora guida ogni definizione in modo più chiaro. Quando crei una voce puoi scegliere fra sei approcci, aggiungere istruzioni personali e rivedere le prove che Nodus userà. La voce aperta, la ricerca e i filtri restano al loro posto quando esci e torni, e rigenerare una definizione conserva una versione recuperabile.",
+    "Puoi anche generare più voci del Dizionario insieme. La coda elabora i concetti in parallelo fino al limite di richieste configurato, mostra l'avanzamento e il risultato di ogni voce e permette di riprovare soltanto quelle non riuscite. Puoi continuare a usare il Dizionario mentre il lavoro prosegue.",
+    "La Biblioteca accademica e la Biblioteca globale conservano con maggiore affidabilità ricerca, filtri, posizione e documento aperto durante la navigazione. Gli allegati collegati e quelli delle biblioteche di gruppo tornano ad aprirsi dal percorso reale, le azioni non si applicano più a una selezione vecchia e le citazioni mantengono la destinazione esatta.",
+    "La comprensione documentale recupera le campagne interrotte senza restare bloccata in uno stato precedente e mantiene visibili i profili pubblicati mentre ripara o ripete il lavoro in sospeso. Stati ed errori dei processi in background seguono la lingua dell'interfaccia e le fonti modificate durante l'analisi vengono rimesse in coda in sicurezza.",
+    "Deep Research usa ora un'unica coda persistente per i rapporti avviati nell'applicazione e dai client MCP. Un rapporto in attesa o in corso può essere rimosso dopo la conferma, la coda sopravvive al riavvio e recupera i vecchi lavori rimasti bloccati. Al termine, la bozza appare nella galleria senza duplicati o rapporti fantasma.",
+    "Aprire le Impostazioni non può più bloccare Nodus mentre controlla le copie precedenti a una migrazione o pulisce i backup automatici. I controlli dei file e di SQLite vengono eseguiti fuori dal processo della finestra, hanno limiti chiari e ignorano risultati obsoleti se cambi vault o cartella durante l'operazione.",
+    "Le Impostazioni spiegano ora ogni modello e controllo IA con una descrizione breve e uniforme. Se avvii un'attività IA senza un modello configurato, Nodus mostra un piccolo avviso adatto al tema chiaro o scuro e apre direttamente Impostazioni e Modelli. Il messaggio è disponibile in tutte le otto lingue dell'interfaccia.",
+  ],
   "5.0.0": [
     "Il vault accademico introduce un Dizionario. Puoi creare concetti dalle prove del corpus, cercare e filtrare le voci, modificare le definizioni, esaminare citazioni e relazioni e ripristinare versioni precedenti. Nodus rileva nuove prove e conserva la versione precedente quando aggiorni o rigeneri una voce.",
     "Nodus ora comprende ogni documento a livelli. Crea profili con sezioni e riepiloghi, collega l'analisi al testo esatto e approfondisce solo le fonti rilevanti. L'indicizzazione si svolge in background dopo una chiara richiesta di consenso e può essere sospesa, ripresa, interrotta o ritentata dalla Biblioteca senza perdere i progressi.",

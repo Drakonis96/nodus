@@ -1,5 +1,33 @@
 # Changelog
 
+## 5.0.1 — 2026-08-25
+
+Nodus 5.0.1 collects every repair merged since 5.0.0 and makes model setup easier
+to understand and harder to miss.
+
+- Expanded Dictionary creation with six evidence-oriented prompt presets, custom
+  instructions, evidence review and state restoration for the open entry, search,
+  filters and table position. Regeneration preserves a recoverable prior version.
+- Added parallel Dictionary generation with a visible per-entry queue, concurrency
+  limits, failure isolation and selective retry while the rest of the Dictionary
+  remains usable.
+- Hardened the academic and Global Library navigation state, linked and group-library
+  attachment resolution, stale selection handling, exact citation destinations and
+  published document-profile continuity.
+- Recovered interrupted document-index campaigns safely, requeued sources changed
+  during analysis and localized status and error payloads arriving from background
+  processes.
+- Unified app and MCP Deep Research generation in one durable main-process queue.
+  Queued and running jobs can be removed with confirmation, survive restarts, recover
+  previously stalled records and refresh the gallery without duplicate jobs.
+- Moved migration-copy and automatic-backup inspections out of the Electron main
+  process, bounded their work and prevented stale results after changing vault or
+  backup folder from freezing or misleading Settings.
+- Added consistent short descriptions to every AI model and related control in
+  Settings. AI tasks without a configured model now raise a compact translated modal
+  in light and dark themes with a direct route to Settings → AI Models.
+- Added all of these changes to the What's New modal in all eight interface languages.
+
 ## 5.0.0 — 2026-08-25
 
 Nodus 5 adds evidence-backed document understanding and a versioned academic

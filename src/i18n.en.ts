@@ -42,6 +42,7 @@ import { DEEP_RESEARCH_VERSION_TRANSLATIONS } from './i18n.deepResearchVersions'
 import { DOCUMENT_UNDERSTANDING_TRANSLATIONS } from './i18n.documentUnderstanding';
 import { DEEP_RESEARCH_QUALITY_TRANSLATIONS } from './i18n.deepResearchQuality';
 import { DOCUMENT_UNDERSTANDING_CONSENT_TRANSLATIONS } from './i18n.documentUnderstandingConsent';
+import { MODEL_SETTINGS_TRANSLATIONS } from './i18n.modelSettings';
 
 /**
  * English translations keyed by the Spanish source string (see {@link ../i18n}).
@@ -49,6 +50,7 @@ import { DOCUMENT_UNDERSTANDING_CONSENT_TRANSLATIONS } from './i18n.documentUnde
  * every non-Spanish interface language.
  */
 export const EN: Record<string, string> = {
+  ...MODEL_SETTINGS_TRANSLATIONS.en,
   ...DICTIONARY_TRANSLATIONS.en,
   'Tamaño de Nodi': 'Nodi size',
   'El 100 % conserva el tamaño original de Nodi y es el máximo. Puedes reducirlo hasta el 40 %.': "100% keeps Nodi's original size and is the maximum. You can reduce it to 40%.",

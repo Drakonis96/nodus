@@ -95,6 +95,15 @@ const RELEASE_3_2_4_TR: string[] = [
 ];
 
 export const RELEASE_NOTES_TR: Record<string, string[]> = {
+  "5.0.1": [
+    "Sözlük artık her tanım için daha açık yönlendirme sunuyor. Bir girdi oluştururken altı yaklaşımdan birini seçebilir, kendi talimatlarınızı ekleyebilir ve Nodus'un kullanacağı kanıtları inceleyebilirsiniz. Ayrılıp geri döndüğünüzde açık girdi, arama ve filtreler korunur, tanım yeniden üretildiğinde geri getirilebilir bir sürüm saklanır.",
+    "Aynı anda birden fazla Sözlük girdisi de üretebilirsiniz. Kuyruk, kavramları yapılandırılmış istek sınırına kadar paralel işler, her girdinin ilerlemesini ve sonucunu gösterir ve yalnızca başarısız olanları yeniden denemenize izin verir. İş sürerken Sözlüğü kullanmaya devam edebilirsiniz.",
+    "Akademik Kitaplık ve Genel Kitaplık, gezinirken aramayı, filtreleri, konumu ve açık belgeyi daha güvenilir biçimde koruyor. Bağlı ekler ve grup kitaplığı ekleri yeniden gerçek yollarından açılıyor, eylemler eski bir seçime uygulanmıyor ve kaynak alıntıları tam hedeflerini koruyor.",
+    "Belge anlama, kesintiye uğramış kampanyaları eski bir durumda takılmadan kurtarıyor ve bekleyen işler onarılırken ya da yeniden denenirken yayımlanmış profilleri görünür tutuyor. Arka plan süreçlerinden gelen durumlar ve hatalar arayüz dilinde gösteriliyor, analiz sırasında değişen kaynaklar güvenle yeniden sıraya alınıyor.",
+    "Deep Research artık uygulamadan ve MCP istemcilerinden başlatılan raporlar için tek bir kalıcı kuyruk kullanıyor. Bekleyen veya çalışan rapor onayla kaldırılabiliyor, kuyruk yeniden başlatmadan sonra korunuyor ve takılı kalan eski işleri kurtarıyor. İş bitince taslak, yinelenen veya hayalet raporlar olmadan galeride görünüyor.",
+    "Ayarlar'ı açmak, Nodus geçiş öncesi kopyaları incelerken veya otomatik yedekleri temizlerken artık uygulamayı donduramıyor. Dosya ve SQLite kontrolleri pencere sürecinin dışında, açık sınırlarla çalışıyor ve işlem sırasında vault ya da klasör değiştirirseniz eskiyen sonuçları yok sayıyor.",
+    "Ayarlar artık her modelin ve yapay zekâ denetiminin amacını kısa ve tutarlı bir açıklamayla anlatıyor. Yapılandırılmış model olmadan bir yapay zekâ görevi başlatırsanız Nodus açık veya koyu temaya uygun küçük bir uyarı gösterip doğrudan Ayarlar ve Modellere götürüyor. Mesaj sekiz arayüz dilinin tamamında bulunuyor.",
+  ],
   "5.0.0": [
     "Akademik kasa artık bir Sözlük içeriyor. Külliyat kanıtlarından kavramlar oluşturabilir, girdileri arayıp süzebilir, tanımları düzenleyebilir, alıntı ve ilişkileri inceleyebilir ve eski sürümleri geri getirebilirsiniz. Nodus yeni kanıtları algılar ve bir girdiyi güncellerken ya da yeniden üretirken önceki sürümü korur.",
     "Nodus artık her belgeyi katmanlar hâlinde anlıyor. Bölümler ve özetler içeren profiller oluşturuyor, analizi tam metne bağlıyor ve yalnızca gerekli kaynakları derinleştiriyor. İndeksleme bir defalık açık izin sonrasında arka planda çalışıyor ve ilerleme kaybolmadan Kitaplık üzerinden duraklatılabiliyor, sürdürülebiliyor, durdurulabiliyor veya yeniden denenebiliyor.",

@@ -1763,6 +1763,76 @@ const RELEASE_4_2_5_HIGHLIGHTS: RawReleaseHighlight[] = [
 ];
 
 /**
+ * 5.0.1 — every user-visible repair merged after 5.0.0, including the work
+ * that was already on main before this release branch started.
+ */
+const RELEASE_5_0_1_HIGHLIGHTS: RawReleaseHighlight[] = [
+  {
+    scope: 'academic',
+    es: 'El Diccionario guía mejor cada definición. Al crear una entrada puedes elegir entre seis enfoques, añadir instrucciones propias y revisar la evidencia que Nodus usará. La entrada abierta, la búsqueda y los filtros se conservan al salir y volver, y regenerar una definición mantiene una versión recuperable.',
+    en: 'The Dictionary now guides each definition more clearly. When creating an entry you can choose among six approaches, add your own instructions, and review the evidence Nodus will use. The open entry, search, and filters remain when you leave and return, and regenerating a definition keeps a recoverable version.',
+    fr: 'Le Dictionnaire guide désormais plus clairement chaque définition. Lors de la création d’une entrée, vous pouvez choisir parmi six approches, ajouter vos propres consignes et examiner les preuves que Nodus utilisera. L’entrée ouverte, la recherche et les filtres sont conservés quand vous partez puis revenez, et une définition régénérée garde une version récupérable.',
+    de: 'Das Wörterbuch führt jetzt klarer durch jede Definition. Beim Erstellen eines Eintrags können Sie aus sechs Ansätzen wählen, eigene Anweisungen ergänzen und die von Nodus verwendeten Belege prüfen. Geöffneter Eintrag, Suche und Filter bleiben beim Verlassen erhalten, und bei einer neuen Definition bleibt eine wiederherstellbare Version bestehen.',
+    pt: 'O Dicionário passa a orientar melhor cada definição. Ao criar uma entrada pode escolher entre seis abordagens, acrescentar instruções próprias e rever a evidência que o Nodus utilizará. A entrada aberta, a pesquisa e os filtros conservam-se ao sair e voltar, e uma definição regenerada mantém uma versão recuperável.',
+    'pt-BR': 'O Dicionário agora orienta melhor cada definição. Ao criar uma entrada você pode escolher entre seis abordagens, adicionar instruções próprias e revisar as evidências que o Nodus usará. A entrada aberta, a busca e os filtros são preservados ao sair e voltar, e uma definição regenerada mantém uma versão recuperável.',
+  },
+  {
+    scope: 'academic',
+    es: 'También puedes generar varias entradas del Diccionario a la vez. La cola procesa conceptos en paralelo hasta el límite de llamadas configurado, muestra el progreso y el resultado de cada entrada y permite reintentar solo las que fallen. Puedes seguir usando el Diccionario mientras el trabajo continúa.',
+    en: 'You can also generate several Dictionary entries at once. The queue processes concepts in parallel up to the configured request limit, shows the progress and result of every entry, and lets you retry only the ones that fail. You can keep using the Dictionary while the work continues.',
+    fr: 'Vous pouvez également générer plusieurs entrées du Dictionnaire à la fois. La file traite les concepts en parallèle jusqu’à la limite de requêtes configurée, affiche la progression et le résultat de chaque entrée et permet de relancer uniquement celles qui échouent. Le Dictionnaire reste utilisable pendant le traitement.',
+    de: 'Sie können außerdem mehrere Wörterbucheinträge gleichzeitig erzeugen. Die Warteschlange verarbeitet Begriffe parallel bis zur festgelegten Anfragegrenze, zeigt Fortschritt und Ergebnis jedes Eintrags und lässt nur fehlgeschlagene Einträge erneut starten. Das Wörterbuch bleibt währenddessen nutzbar.',
+    pt: 'Também pode gerar várias entradas do Dicionário ao mesmo tempo. A fila processa conceitos em paralelo até ao limite de pedidos configurado, mostra o progresso e o resultado de cada entrada e permite repetir apenas as que falharem. Pode continuar a usar o Dicionário enquanto o trabalho decorre.',
+    'pt-BR': 'Também é possível gerar várias entradas do Dicionário ao mesmo tempo. A fila processa conceitos em paralelo até o limite de solicitações configurado, mostra o progresso e o resultado de cada entrada e permite repetir apenas as que falharem. Você pode continuar usando o Dicionário durante o processamento.',
+  },
+  {
+    scope: 'academic',
+    es: 'La Biblioteca académica y la Biblioteca global conservan con más fiabilidad la búsqueda, los filtros, la posición y el documento abierto al navegar. Los adjuntos vinculados y de bibliotecas de grupo vuelven a abrirse desde su ruta real, las acciones no se aplican a una selección antigua y las citas de fuentes mantienen su destino exacto.',
+    en: 'The academic Library and Global Library now preserve search, filters, position, and the open document more reliably while you navigate. Linked and group-library attachments open again from their real path, actions no longer apply to a stale selection, and source citations keep their exact destination.',
+    fr: 'La Bibliothèque académique et la Bibliothèque globale conservent plus sûrement la recherche, les filtres, la position et le document ouvert pendant la navigation. Les pièces jointes liées ou issues de bibliothèques de groupe s’ouvrent de nouveau depuis leur chemin réel, les actions ne visent plus une ancienne sélection et les citations gardent leur destination exacte.',
+    de: 'Die akademische und die globale Bibliothek bewahren Suche, Filter, Position und geöffnetes Dokument beim Navigieren zuverlässiger. Verknüpfte Anhänge und Anhänge aus Gruppenbibliotheken öffnen wieder ihren echten Pfad, Aktionen treffen keine veraltete Auswahl mehr, und Quellenzitate behalten ihr genaues Ziel.',
+    pt: 'A Biblioteca académica e a Biblioteca global passam a conservar com maior fiabilidade a pesquisa, os filtros, a posição e o documento aberto durante a navegação. Os anexos ligados e de bibliotecas de grupo voltam a abrir pelo caminho real, as ações deixam de afetar uma seleção antiga e as citações mantêm o destino exato.',
+    'pt-BR': 'A Biblioteca acadêmica e a Biblioteca global agora preservam com mais segurança a busca, os filtros, a posição e o documento aberto durante a navegação. Anexos vinculados e de bibliotecas de grupo voltam a abrir pelo caminho real, ações não afetam mais uma seleção antiga e citações mantêm o destino exato.',
+  },
+  {
+    scope: 'academic',
+    es: 'La comprensión documental recupera campañas interrumpidas sin atascarse en un estado antiguo y mantiene visibles los perfiles ya publicados mientras repara o repite el trabajo pendiente. Los estados y errores que llegan desde procesos en segundo plano aparecen en el idioma de la interfaz, y las fuentes que cambian durante un análisis se vuelven a poner en cola de forma segura.',
+    en: 'Document understanding now recovers interrupted campaigns without getting stuck in an old state and keeps published profiles visible while pending work is repaired or retried. Status and errors arriving from background processes use the interface language, and sources that change during analysis are safely queued again.',
+    fr: 'La compréhension documentaire récupère les campagnes interrompues sans rester bloquée dans un ancien état et garde les profils publiés visibles pendant la réparation ou la reprise du travail en attente. Les états et erreurs des processus en arrière-plan suivent la langue de l’interface, et une source modifiée pendant l’analyse est remise en file en toute sécurité.',
+    de: 'Das Dokumentverständnis stellt unterbrochene Kampagnen wieder her, ohne in einem alten Zustand hängen zu bleiben, und hält veröffentlichte Profile sichtbar, während ausstehende Arbeit repariert oder wiederholt wird. Status und Fehler aus Hintergrundprozessen erscheinen in der Oberflächensprache, und während der Analyse geänderte Quellen werden sicher neu eingereiht.',
+    pt: 'A compreensão documental recupera campanhas interrompidas sem ficar presa num estado antigo e mantém os perfis publicados visíveis enquanto o trabalho pendente é reparado ou repetido. Os estados e erros dos processos em segundo plano aparecem no idioma da interface, e as fontes alteradas durante uma análise voltam à fila em segurança.',
+    'pt-BR': 'A compreensão documental recupera campanhas interrompidas sem ficar presa em um estado antigo e mantém os perfis publicados visíveis enquanto o trabalho pendente é reparado ou repetido. Estados e erros de processos em segundo plano aparecem no idioma da interface, e fontes alteradas durante uma análise voltam à fila com segurança.',
+  },
+  {
+    scope: 'academic',
+    es: 'Deep Research usa ahora una única cola duradera para los informes iniciados en la aplicación y por clientes MCP. Un informe pendiente o en curso se puede quitar con confirmación, la cola sobrevive a un reinicio y recupera trabajos antiguos que habían quedado atascados. Al terminar, el borrador aparece en la galería sin duplicados ni informes fantasma.',
+    en: 'Deep Research now uses one durable queue for reports started in the app and by MCP clients. A queued or running report can be removed with confirmation, the queue survives a restart, and it recovers older jobs that had become stuck. When work finishes, its draft appears in the gallery without duplicates or ghost reports.',
+    fr: 'Deep Research utilise désormais une file durable unique pour les rapports lancés dans l’application ou par des clients MCP. Un rapport en attente ou en cours peut être retiré après confirmation, la file survit au redémarrage et récupère les anciennes tâches bloquées. Une fois terminé, le brouillon apparaît dans la galerie sans doublon ni rapport fantôme.',
+    de: 'Deep Research verwendet jetzt eine einzige dauerhafte Warteschlange für Berichte aus der App und von MCP-Clients. Ein wartender oder laufender Bericht kann nach Bestätigung entfernt werden, die Warteschlange übersteht einen Neustart und stellt ältere festgefahrene Aufträge wieder her. Fertige Entwürfe erscheinen ohne Duplikate oder Geisterberichte in der Galerie.',
+    pt: 'O Deep Research passa a usar uma única fila duradoura para relatórios iniciados na aplicação e por clientes MCP. Um relatório pendente ou em curso pode ser removido com confirmação, a fila sobrevive a um reinício e recupera trabalhos antigos que tinham ficado bloqueados. Ao terminar, o rascunho aparece na galeria sem duplicados nem relatórios fantasma.',
+    'pt-BR': 'O Deep Research agora usa uma única fila durável para relatórios iniciados no aplicativo e por clientes MCP. Um relatório pendente ou em andamento pode ser removido com confirmação, a fila sobrevive a uma reinicialização e recupera trabalhos antigos que ficaram travados. Ao terminar, o rascunho aparece na galeria sem duplicatas nem relatórios fantasmas.',
+  },
+  {
+    scope: 'general',
+    es: 'Abrir Ajustes ya no puede congelar Nodus mientras inspecciona copias previas a una migración o limpia copias automáticas. Las comprobaciones de archivos y SQLite se ejecutan fuera del proceso de la ventana, tienen límites claros y descartan resultados que hayan quedado obsoletos si cambias de vault o de carpeta durante la operación.',
+    en: 'Opening Settings can no longer freeze Nodus while it inspects pre-migration copies or cleans automatic backups. File and SQLite checks run outside the window process, use clear limits, and discard results that became stale if you change vault or folder during the operation.',
+    fr: 'Ouvrir les Réglages ne peut plus figer Nodus pendant l’inspection des copies antérieures à une migration ou le nettoyage des sauvegardes automatiques. Les vérifications des fichiers et de SQLite s’exécutent hors du processus de la fenêtre, ont des limites claires et ignorent tout résultat devenu obsolète si vous changez de coffre ou de dossier.',
+    de: 'Das Öffnen der Einstellungen kann Nodus nicht mehr einfrieren, während Kopien vor einer Migration geprüft oder automatische Sicherungen bereinigt werden. Datei- und SQLite-Prüfungen laufen außerhalb des Fensterprozesses, haben klare Grenzen und verwerfen veraltete Ergebnisse, wenn Sie währenddessen Vault oder Ordner wechseln.',
+    pt: 'Abrir os Ajustes já não pode bloquear o Nodus enquanto inspeciona cópias anteriores a uma migração ou limpa cópias automáticas. As verificações de ficheiros e SQLite decorrem fora do processo da janela, têm limites claros e descartam resultados desatualizados se mudar de cofre ou de pasta durante a operação.',
+    'pt-BR': 'Abrir as Configurações não pode mais travar o Nodus enquanto ele inspeciona cópias anteriores a uma migração ou limpa backups automáticos. As verificações de arquivos e SQLite rodam fora do processo da janela, têm limites claros e descartam resultados obsoletos se você trocar de vault ou pasta durante a operação.',
+  },
+  {
+    scope: 'general',
+    es: 'Ajustes explica ahora para qué sirve cada modelo y cada control de IA con una descripción breve y uniforme. Si intentas iniciar una tarea de IA sin un modelo configurado, Nodus muestra un aviso pequeño en modo claro u oscuro y te lleva directamente a Ajustes y Modelos. El mensaje está disponible en los ocho idiomas de la interfaz.',
+    en: 'Settings now explains what every model and AI control is for with a short, consistent description. If you try to start an AI task without a configured model, Nodus shows a small light or dark mode notice and takes you directly to Settings and Models. The message is available in all eight interface languages.',
+    fr: 'Les Réglages expliquent désormais le rôle de chaque modèle et de chaque commande d’IA avec une description courte et cohérente. Si vous lancez une tâche d’IA sans modèle configuré, Nodus affiche un petit avis adapté au thème clair ou sombre et ouvre directement Réglages et Modèles. Le message existe dans les huit langues de l’interface.',
+    de: 'Die Einstellungen erklären jetzt jedes Modell und jede KI-Steuerung mit einer kurzen, einheitlichen Beschreibung. Wenn Sie eine KI-Aufgabe ohne konfiguriertes Modell starten, zeigt Nodus einen kleinen Hinweis im hellen oder dunklen Design und öffnet direkt Einstellungen und Modelle. Die Meldung ist in allen acht Oberflächensprachen verfügbar.',
+    pt: 'Os Ajustes passam a explicar para que serve cada modelo e controlo de IA com uma descrição breve e uniforme. Se tentar iniciar uma tarefa de IA sem um modelo configurado, o Nodus mostra um pequeno aviso em modo claro ou escuro e abre diretamente Ajustes e Modelos. A mensagem está disponível nos oito idiomas da interface.',
+    'pt-BR': 'As Configurações agora explicam para que serve cada modelo e controle de IA com uma descrição breve e uniforme. Se você tentar iniciar uma tarefa de IA sem um modelo configurado, o Nodus mostra um pequeno aviso em modo claro ou escuro e abre diretamente Configurações e Modelos. A mensagem está disponível nos oito idiomas da interface.',
+  },
+];
+
+/**
  * 5.0.0 — every user-visible change since 4.2.5, including the fixes that
  * landed after the beta tag. Keep this list aligned by index with the Italian
  * and Turkish tables so the startup modal never falls back to English.
@@ -1843,6 +1913,11 @@ const RELEASE_5_0_0_HIGHLIGHTS: RawReleaseHighlight[] = [
 ];
 
 const RAW_RELEASE_NOTES: RawReleaseNote[] = [
+  {
+    version: '5.0.1',
+    date: '2026-08-25',
+    highlights: RELEASE_5_0_1_HIGHLIGHTS,
+  },
   {
     version: '5.0.0',
     date: '2026-08-25',

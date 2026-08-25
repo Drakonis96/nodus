@@ -37,7 +37,7 @@ assert.match(
 assert.equal((settings.match(/className=\{ABOUT_ACTION_BUTTON_CLASS\}/g) ?? []).length, 12, 'About actions must use the same responsive button class');
 assert.match(settings, /data-testid="open-latest-changes"[\s\S]*onClick=\{onOpenWhatsNew\}/);
 
-const nodiOverride = settings.match(/<Row label=\{t\('Asistente Nodi'\)\}>(.*?)<\/Row>/s)?.[1] ?? '';
+const nodiOverride = settings.match(/<Row label=\{t\('Asistente Nodi'\)\}[^>]*>(.*?)<\/Row>/s)?.[1] ?? '';
 // ModelWithReasoning is the native picker plus its reasoning level; every adjacent
 // advanced field uses it, so naming it here still pins Nodi to the same control.
 assert.match(nodiOverride, /<ModelWithReasoning/);

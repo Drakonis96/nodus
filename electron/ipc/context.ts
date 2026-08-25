@@ -14,6 +14,7 @@ import { ipcMain, type BrowserWindow } from 'electron';
 import { localizeIpcPayload, localizeRuntimeError } from '@shared/uiLanguage';
 import { getSettings } from '../db/settingsRepo';
 import { assertNotBrowserIpcSender } from './trust';
+import { isAiModelRequiredError } from '@shared/aiModelRequired';
 
 export interface IpcContext {
   /**
@@ -61,6 +62,9 @@ export function createIpcContext(getWindow: () => BrowserWindow | null): IpcCont
       const result = await listener(event, ...args);
       return localizeIpcPayload(result, getSettings().uiLanguage);
     } catch (error) {
+      if (isAiModelRequiredError(error)) {
+        getWindow()?.webContents.send('ai:modelRequired');
+      }
       const message = error instanceof Error ? error.message : String(error);
       const localized = localizeRuntimeError(message, getSettings().uiLanguage);
       if (localized === message) throw error;
