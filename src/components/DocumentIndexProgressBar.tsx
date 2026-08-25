@@ -4,6 +4,7 @@ import type { DocumentIndexCampaign, DocumentIndexJob, DocumentIndexJobPhase, Do
 import { ConfirmModal } from './ConfirmModal';
 import { Icon } from './ui';
 import { t, tx } from '../i18n';
+import { compareDocumentIndexJobsForDisplay, documentIndexPercentLabel } from '@shared/documentIndexProgress';
 
 const LIVE = new Set<DocumentIndexCampaign['status']>(['queued', 'running', 'paused']);
 const TERMINAL = new Set<DocumentIndexJob['status']>(['completed', 'failed', 'unavailable', 'cancelled']);
@@ -42,7 +43,8 @@ export function DocumentIndexProgressBar() {
   );
   const campaignIds = useMemo(() => new Set(liveCampaigns.map((campaign) => campaign.campaignId)), [liveCampaigns]);
   const jobs = useMemo(
-    () => progress?.jobs.filter((job) => job.campaignId && campaignIds.has(job.campaignId)) ?? [],
+    () => (progress?.jobs.filter((job) => job.campaignId && campaignIds.has(job.campaignId)) ?? [])
+      .sort(compareDocumentIndexJobsForDisplay),
     [progress, campaignIds],
   );
 
@@ -54,7 +56,8 @@ export function DocumentIndexProgressBar() {
   const estimatedUnits = liveCampaigns.reduce((sum, campaign) => sum + campaign.estimatedUnits, 0);
   const completedUnits = liveCampaigns.reduce((sum, campaign) => sum + campaign.completedUnits, 0);
   const fraction = estimatedUnits ? Math.max(0, Math.min(1, completedUnits / estimatedUnits)) : 1;
-  const pct = Math.round(fraction * 100);
+  const pctValue = fraction * 100;
+  const pct = documentIndexPercentLabel(fraction);
   const current = jobs.find((job) => job.status === 'running')
     ?? jobs.find((job) => job.status === 'paused')
     ?? jobs.find((job) => job.status === 'queued')
@@ -95,10 +98,10 @@ export function DocumentIndexProgressBar() {
           <div className="mb-1 flex justify-between gap-3 text-xs text-neutral-500 dark:text-neutral-400">
             <span className="min-w-0 truncate">
               {allPaused ? t('Análisis documental en pausa') : current ? (
-                <>{tx('{done} de {total} obras', { done: completed + failed, total })} — <span className="text-neutral-800 dark:text-neutral-200">{current.title ?? current.nodusId}</span> · <span className="text-cyan-700 dark:text-cyan-300">{phaseLabel(current.phase)} ({Math.round(current.progress * 100)}%)</span></>
+                <>{tx('{done} de {total} obras', { done: completed + failed, total })} — <span className="text-neutral-800 dark:text-neutral-200">{current.title ?? current.nodusId}</span> · <span className="text-cyan-800 dark:text-cyan-300">{jobPhaseDetail(current)} ({Math.round(current.progress * 100)}%)</span></>
               ) : tx('{done} de {total} obras', { done: completed + failed, total })}
             </span>
-            <span className="shrink-0 tabular-nums" data-testid="document-index-progress-percent">{pct}%</span>
+            <span className="shrink-0 tabular-nums" data-testid="document-index-progress-percent">{pct}</span>
           </div>
           <div
             className="h-1.5 overflow-hidden rounded-full bg-neutral-300 dark:bg-neutral-800"
@@ -106,12 +109,12 @@ export function DocumentIndexProgressBar() {
             aria-label={t('Índice documental')}
             aria-valuemin={0}
             aria-valuemax={100}
-            aria-valuenow={pct}
-            aria-valuetext={`${pct}% · ${tx('{done} de {total} obras', { done: completed + failed, total })}`}
+            aria-valuenow={pctValue}
+            aria-valuetext={`${pct} · ${tx('{done} de {total} obras', { done: completed + failed, total })}`}
           >
-            <motion.div className="h-full bg-cyan-500" animate={{ width: `${pct}%` }} transition={{ ease: 'easeOut', duration: 0.3 }} />
+            <motion.div className="h-full bg-cyan-500" animate={{ width: `${Math.max(pctValue, jobs.some((job) => job.status === 'running') ? 0.2 : 0)}%` }} transition={{ ease: 'easeOut', duration: 0.3 }} />
           </div>
-          <span className="sr-only" aria-live="polite">{pct}% · {phaseLabel(current?.phase ?? 'queued')}</span>
+          <span className="sr-only" aria-live="polite">{pct} · {jobPhaseDetail(current)}</span>
         </div>
         {allPaused ? (
           <button className="btn btn-ghost" disabled={busy} title={t('Reanudar indexación')} aria-label={t('Reanudar indexación')} onClick={() => void applyStatus('running')}>
@@ -132,9 +135,12 @@ export function DocumentIndexProgressBar() {
           <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden">
             <div className="mt-2 max-h-40 divide-y divide-neutral-800 overflow-y-auto">
               {jobs.filter((job) => !TERMINAL.has(job.status) || job.status === 'failed' || job.status === 'unavailable').slice(0, 50).map((job) => (
-                <div key={job.jobId} className="flex items-center gap-3 py-1.5 text-xs">
+                <div key={job.jobId} className={`flex items-center gap-3 py-1.5 text-xs ${job.status === 'running' ? 'text-neutral-100' : ''}`} data-testid={`document-index-rail-job-${job.jobId}`}>
+                  <span className={`w-5 shrink-0 text-center font-semibold tabular-nums ${job.status === 'running' ? 'text-cyan-300' : 'text-neutral-500'}`} aria-label={job.status === 'queued' ? `${t('En cola')} ${queuedPosition(jobs, job.jobId)}` : undefined}>
+                    {job.status === 'running' ? '●' : job.status === 'queued' ? queuedPosition(jobs, job.jobId) : '—'}
+                  </span>
                   <span className="min-w-0 flex-1 truncate">{job.title ?? job.nodusId}</span>
-                  <span className="text-neutral-500">{phaseLabel(job.phase)}</span>
+                  <span className={job.status === 'running' ? 'text-cyan-300' : 'text-neutral-500'}>{jobPhaseDetail(job)}</span>
                   <span className="w-10 text-right tabular-nums text-neutral-500">{Math.round(job.progress * 100)}%</span>
                 </div>
               ))}
@@ -155,4 +161,15 @@ export function DocumentIndexProgressBar() {
       )}
     </div>
   );
+}
+
+function queuedPosition(jobs: DocumentIndexJob[], jobId: string): number {
+  return jobs.filter((job) => job.status === 'queued').findIndex((job) => job.jobId === jobId) + 1;
+}
+
+function jobPhaseDetail(job: DocumentIndexJob | null): string {
+  if (!job) return phaseLabel('queued');
+  const phase = phaseLabel(job.phase);
+  if (job.phase !== 'analyzing_sections' || !job.currentUnit || !job.totalUnits) return phase;
+  return `${phase} · ${job.currentUnit}/${job.totalUnits}`;
 }

@@ -2,7 +2,7 @@ import type { CorpusHealthBucketId, ResearchContextSelection } from '@shared/typ
 import type { LibraryScope } from '@shared/libraryTypes';
 import { type VaultType, normalizeVaultType } from '@shared/vaultTypes';
 
-export type View = 'home' | 'search' | 'testimonyInterviews' | 'testimonyParticipants' | 'testimonyContrasts' | 'library' | 'graph' | 'argument' | 'ideas' | 'dictionary' | 'authors' | 'persons' | 'prosopSearch' | 'prosopPopulation' | 'prosopPersons' | 'prosopSources' | 'prosopAnalysis' | 'prosopNetworks' | 'encyclopedia' | 'continuity' | 'conflicts' | 'arcs' | 'rules' | 'questions' | 'worldChat' | 'manuscript' | 'characters' | 'places' | 'factions' | 'cultures' | 'dynasties' | 'scenes' | 'timeline' | 'tree' | 'relations' | 'map' | 'archive' | 'pages' | 'databases' | 'dbSearch' | 'dbAnalysis' | 'dbChat' | 'studyCourses' | 'studySchedule' | 'studyCalendar' | 'studySearch' | 'studyLibrary' | 'studyRecordings' | 'studyChat' | 'studyIdeas' | 'studyGraph' | 'studyQuestions' | 'studyReview' | 'studyDeepResearch' | 'teachingGroups' | 'teachingGrades' | 'teachingExams' | 'teachingRubrics' | 'teachingUnits' | 'immersion' | 'gaps' | 'debate' | 'research' | 'hypothesis' | 'reading' | 'writing' | 'deepResearch' | 'projects' | 'notes' | 'workspace' | 'browser' | 'radar' | 'toolkit' | 'settings';
+export type View = 'home' | 'search' | 'testimonyInterviews' | 'testimonyParticipants' | 'testimonyContrasts' | 'library' | 'graph' | 'argument' | 'ideas' | 'dictionary' | 'authors' | 'persons' | 'prosopSearch' | 'prosopPopulation' | 'prosopPersons' | 'prosopSources' | 'prosopAnalysis' | 'prosopNetworks' | 'encyclopedia' | 'continuity' | 'conflicts' | 'arcs' | 'rules' | 'questions' | 'worldChat' | 'manuscript' | 'characters' | 'places' | 'factions' | 'cultures' | 'dynasties' | 'scenes' | 'timeline' | 'tree' | 'relations' | 'map' | 'archive' | 'pages' | 'databases' | 'dbSearch' | 'dbAnalysis' | 'dbChat' | 'studyCourses' | 'studySchedule' | 'studyCalendar' | 'studySearch' | 'studyLibrary' | 'studyRecordings' | 'studyChat' | 'studyIdeas' | 'studyGraph' | 'studyQuestions' | 'studyReview' | 'studyDeepResearch' | 'teachingGroups' | 'teachingGrades' | 'teachingExams' | 'teachingRubrics' | 'teachingUnits' | 'immersion' | 'gaps' | 'debate' | 'research' | 'hypothesis' | 'reading' | 'writing' | 'deepResearch' | 'projects' | 'notes' | 'workspace' | 'browser' | 'radar' | 'compass' | 'toolkit' | 'settings';
 
 export type GraphPresetId = 'overview' | 'contradictions' | 'gaps' | 'reading' | 'unread' | 'authors';
 
@@ -138,6 +138,7 @@ export const NAV_ITEMS: NavItem[] = [
   // Vistas universales: disponibles en todos los tipos de vault.
   { id: 'browser', label: 'Nodus Browser', icon: 'globe', group: 'tools' },
   { id: 'radar', label: 'Nodus Radar', icon: 'radar', group: 'tools' },
+  { id: 'compass', label: 'Nodus Compass', icon: 'compassSearch', group: 'tools' },
   { id: 'toolkit', label: 'Nodus Tools', icon: 'tools', group: 'tools' },
   { id: 'settings', label: 'Ajustes', icon: 'settings' },
 ];
@@ -263,30 +264,30 @@ export interface NavGroup extends NavGroupDef {
 const DEDICATED_VAULT_NAV_IDS: Partial<Record<ReturnType<typeof normalizeVaultType>, View[]>> = {
   prosopography: [
     'prosopSearch', 'prosopPopulation', 'prosopPersons', 'prosopSources',
-    'prosopAnalysis', 'prosopNetworks', 'notes', 'browser', 'radar', 'toolkit',
+    'prosopAnalysis', 'prosopNetworks', 'notes', 'browser', 'radar', 'compass', 'toolkit',
   ],
   primary_sources: [
-    'search', 'archive', 'persons', 'timeline', 'map', 'relations', 'notes', 'browser', 'radar', 'toolkit',
+    'search', 'archive', 'persons', 'timeline', 'map', 'relations', 'notes', 'browser', 'radar', 'compass', 'toolkit',
   ],
   estudio: [
     'studyCourses', 'studySchedule', 'studyCalendar', 'studySearch', 'studyLibrary',
     'studyRecordings', 'studyChat', 'studyIdeas', 'studyGraph', 'studyQuestions',
-    'studyReview', 'studyDeepResearch', 'browser', 'radar', 'toolkit',
+    'studyReview', 'studyDeepResearch', 'browser', 'radar', 'compass', 'toolkit',
   ],
   docencia: [
     'studyCourses', 'teachingGroups', 'studySchedule', 'studyCalendar', 'studyLibrary',
     'studyRecordings', 'studyChat', 'studyIdeas', 'studyGraph', 'studyQuestions',
-    'teachingRubrics', 'teachingExams', 'teachingGrades', 'teachingUnits', 'browser', 'radar', 'toolkit',
+    'teachingRubrics', 'teachingExams', 'teachingGrades', 'teachingUnits', 'browser', 'radar', 'compass', 'toolkit',
   ],
-  databases: ['pages', 'dbSearch', 'dbAnalysis', 'dbChat', 'notes', 'browser', 'radar', 'toolkit'],
+  databases: ['pages', 'dbSearch', 'dbAnalysis', 'dbChat', 'notes', 'browser', 'radar', 'compass', 'toolkit'],
   // Las ocho entradas acordadas del vault de Testimonios, menos Inicio y Ajustes, que
   // van fijas fuera de los grupos. Es una lista CERRADA a propósito: la regla de diseño
   // del vault es que solo sale al menú lo que atraviesa varias entrevistas.
-  testimonios: ['search', 'testimonyInterviews', 'testimonyParticipants', 'testimonyContrasts', 'notes', 'browser', 'radar', 'toolkit'],
+  testimonios: ['search', 'testimonyInterviews', 'testimonyParticipants', 'testimonyContrasts', 'notes', 'browser', 'radar', 'compass', 'toolkit'],
   worldbuilding: [
     'encyclopedia', 'characters', 'places', 'factions', 'cultures', 'timeline', 'map',
     'relations', 'tree', 'dynasties', 'worldChat', 'rules', 'conflicts', 'arcs',
-    'continuity', 'questions', 'notes', 'scenes', 'manuscript', 'browser', 'radar', 'toolkit',
+    'continuity', 'questions', 'notes', 'scenes', 'manuscript', 'browser', 'radar', 'compass', 'toolkit',
   ],
 };
 
@@ -321,7 +322,7 @@ export function groupedNav(sidebarOrder: string[], sidebarHidden: string[]): Nav
   const ordered = orderedNav(sidebarOrder).filter(
     (n) => n.id !== 'home' && n.id !== 'settings' && !hidden.has(n.id),
   );
-  const toolsOrder = new Map<View, number>([['browser', 0], ['radar', 1], ['toolkit', 2]]);
+  const toolsOrder = new Map<View, number>([['browser', 0], ['radar', 1], ['compass', 2], ['toolkit', 3]]);
   return NAV_GROUPS.map((g) => ({
     ...g,
     items: ordered

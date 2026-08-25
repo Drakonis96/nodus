@@ -649,6 +649,15 @@ export async function getLibraryReaderAttachmentContent(documentId: string, atta
   return task ? getLibraryReaderAttachmentContentFromTask(task) : null;
 }
 
+export async function getLibraryReaderAttachmentBytes(documentId: string, attachmentId: string): Promise<ArrayBuffer | null> {
+  const task = libraryReaderAttachmentTask(documentId, attachmentId);
+  if (!task || task.viewer !== 'pdf') return null;
+  const stat = await fs.promises.stat(task.file);
+  if (stat.size > 512 * 1024 * 1024) throw new Error('El PDF supera el límite de lectura de 512 MB.');
+  const bytes = await fs.promises.readFile(task.file);
+  return bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
+}
+
 export interface LibraryReaderAttachmentTask {
   attachmentId: string;
   file: string;

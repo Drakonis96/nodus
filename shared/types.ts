@@ -17,6 +17,7 @@ import type { ToolkitApi } from './api/toolkit';
 import type { TestimoniesApi } from './api/testimonies';
 import type { LibraryApi } from './api/library';
 import type { RadarApi } from './api/radar';
+import type { CompassApi } from './api/compass';
 import type { LibraryAttachmentRecord } from './libraryTypes';
 
 export type {
@@ -1050,6 +1051,10 @@ export interface DocumentIndexJob {
   status: DocumentIndexJobStatus;
   phase: DocumentIndexJobPhase;
   progress: number;
+  /** Stable, structured unit progress for phases that process sections/chunks. */
+  progressMessage: string | null;
+  currentUnit: number | null;
+  totalUnits: number | null;
   sourceFingerprint: string | null;
   generatorModel: ModelRef | null;
   auditorModel: ModelRef | null;
@@ -1069,6 +1074,9 @@ export interface DocumentIndexCampaign {
   totalJobs: number;
   completedJobs: number;
   failedJobs: number;
+  runningJobs: number;
+  queuedJobs: number;
+  pausedJobs: number;
   estimatedUnits: number;
   completedUnits: number;
   inputTokens: number;
@@ -8572,7 +8580,7 @@ export interface BrowserApi {
   onBrowserFoundInPage(cb: (result: { requestId: number; activeMatchOrdinal: number; matches: number; selectionArea: unknown; finalUpdate: boolean }) => void): () => void;
 }
 
-export interface NodusApi extends ProsopographyApi, TestimoniesApi, ToolkitApi, TeachingApi, DatabasesApi, PagesApi, PrimarySourcesApi, ArchiveApi, WorldbuildingApi, PlatformApi, RecordsApi, AcademicApi, LibraryApi, RadarApi, BrowserApi {
+export interface NodusApi extends ProsopographyApi, TestimoniesApi, ToolkitApi, TeachingApi, DatabasesApi, PagesApi, PrimarySourcesApi, ArchiveApi, WorldbuildingApi, PlatformApi, RecordsApi, AcademicApi, LibraryApi, RadarApi, CompassApi, BrowserApi {
   // settings + secrets
   getSettings(): Promise<AppSettings>;
   updateSettings(patch: Partial<AppSettings>): Promise<AppSettings>;
@@ -8835,6 +8843,8 @@ export interface WorkPassageStatus {
   nodus_id: string;
   totalPassages: number;
   status: 'complete' | 'outdated' | 'missing';
+  /** Why an existing passage index is not current. Null for complete/missing indexes. */
+  outdatedReason: 'text_changed' | 'model_changed' | 'text_and_model_changed' | 'missing_embeddings' | null;
 }
 
 export interface PassageDetail {

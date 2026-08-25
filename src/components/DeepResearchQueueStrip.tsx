@@ -34,7 +34,27 @@ function OriginBadge() {
 
 export function progressDetail(progress: DeepResearchProgress | null): string | null {
   if (!progress) return null;
-  return progress.pagesSoFar != null ? `${progress.message} · ~${progress.pagesSoFar} ${t('pág.')}` : progress.message;
+  // Core messages follow the requested report language. The queue belongs to the
+  // application chrome, though, so derive its stable copy from the structured phase
+  // in the active interface language. This also prevents legacy IPC error
+  // localization from replacing an ordinary Spanish progress sentence with a
+  // generic English error while the report is still running.
+  const message = (() => {
+    switch (progress.phase) {
+      case 'discovery':
+      case 'snapshot': return t('Reuniendo el corpus');
+      case 'document_preparation': return t('Preparando evidencia documental');
+      case 'planning': return t('Planificando secciones');
+      case 'section': return progress.sectionTitle
+        ? `${t('Redactando secciones')}: ${progress.sectionTitle}`
+        : t('Redactando secciones');
+      case 'coverage': return t('Ampliando cobertura');
+      case 'assembling': return t('Ensamblando y referenciando');
+      case 'done': return t('Informe listo');
+      default: return progress.message;
+    }
+  })();
+  return progress.pagesSoFar != null ? `${message} · ~${progress.pagesSoFar} ${t('pág.')}` : message;
 }
 
 /**
@@ -93,16 +113,18 @@ export function DeepResearchQueueStrip({
       </div>
       <div className="flex flex-col gap-1.5">
         {active.map((item, index) => {
-          const ahead = active.slice(0, index).length;
+          const queuePosition = index + 1;
           const percent = item.status === 'running' ? deepResearchProgressPercent(item.progress) : null;
           return (
             <div key={item.id} className="rounded-md border border-neutral-800 bg-neutral-950/40 px-2.5 py-1.5 text-xs">
               <div className="flex items-center gap-2">
-                <Icon
-                  name={item.status === 'running' ? 'sync' : 'clock'}
-                  size={12}
-                  className={item.status === 'running' ? 'animate-spin text-indigo-300' : 'text-neutral-500'}
-                />
+                <span
+                  className="w-5 shrink-0 text-center text-[11px] font-semibold tabular-nums text-indigo-300"
+                  aria-label={`${t('En cola')} ${queuePosition}`}
+                  data-testid={`deep-research-queue-position-${item.id}`}
+                >
+                  {queuePosition}
+                </span>
                 <span className="min-w-0 flex-1 truncate text-neutral-300" title={item.title}>{item.title}</span>
                 {item.origin === 'mcp' && <OriginBadge />}
                 {item.status === 'running' ? (
@@ -113,9 +135,7 @@ export function DeepResearchQueueStrip({
                     )}
                   </>
                 ) : (
-                  <span className="shrink-0 text-[11px] text-neutral-500">
-                    {ahead > 0 ? tx('En cola · {n} por delante', { n: ahead }) : t('En cola')}
-                  </span>
+                  <span className="shrink-0 text-[11px] text-neutral-500">{t('En cola')}</span>
                 )}
                 <button
                   className="shrink-0 rounded p-0.5 text-neutral-500 hover:bg-red-950/50 hover:text-red-400"
@@ -134,9 +154,16 @@ export function DeepResearchQueueStrip({
         {failed.map((item) => (
           <div key={item.id} className="flex items-center gap-2 rounded-md border border-red-900/50 bg-red-950/20 px-2.5 py-1.5 text-xs">
             <Icon name="alert" size={12} className="text-red-400" />
-            <span className="min-w-0 flex-1 truncate text-red-300" title={item.error ?? item.title}>{item.title}</span>
+            <span
+              className="min-w-0 flex-1 truncate text-red-300"
+              title={item.error ? t(item.error) : item.title}
+            >
+              {item.title}
+            </span>
             {item.origin === 'mcp' && <OriginBadge />}
-            <span className="shrink-0 text-[11px] text-red-400/80">{t('Falló')}</span>
+            <span className="max-w-[45%] shrink-0 truncate text-[11px] text-red-400/80" title={item.error ? t(item.error) : undefined}>
+              {item.error ? `${t('Falló')}: ${t(item.error)}` : t('Falló')}
+            </span>
           </div>
         ))}
       </div>

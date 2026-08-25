@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import type { AppSettings, ArgumentBlock, ArgumentMap, ArgumentRouteSuggestion, EdgeDetail, EdgeType, IdeaDetail, IdeaPickerItem, IdeaType } from '@shared/types';
-import { EDGE_LABELS, NODE_COLORS, NODE_LABELS, Icon, Spinner } from '../components/ui';
+import { EDGE_LABELS, NODE_COLORS, NODE_LABELS, Icon, Spinner, TypeDot } from '../components/ui';
 import { ModelPicker } from '../components/ModelPicker';
 import {
   NodeDetailPanel,
@@ -380,7 +380,7 @@ export function ArgumentMapView({
                               onClick={() => { setSeedId(n.global_id); setSearch(n.label); setSeedSearchOpen(false); }}
                             >
                               <div className="flex items-center gap-2">
-                                <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: NODE_COLORS[n.type as IdeaType] ?? '#888' }} />
+                                <TypeDot type={n.type as IdeaType} />
                                 <span className="truncate font-medium">{n.label}</span>
                               </div>
                               {n.statement && <div className="mt-0.5 line-clamp-2 text-[11px] text-neutral-500">{n.statement}</div>}
@@ -442,9 +442,12 @@ export function ArgumentMapView({
                           onClick={() => build(s.ideaId)}
                           title={t('Trazar el esquema desde esta idea')}
                         >
-                          <div className="min-w-0 pr-4">
-                            <div className="flex items-center gap-2"><span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: NODE_COLORS[s.type as IdeaType] ?? '#888' }} /><span className="truncate font-medium text-neutral-800 dark:text-neutral-100">{s.label}</span></div>
-                            {s.statement && <p className="mt-1 line-clamp-2 pl-4 text-[11px] leading-relaxed text-neutral-500">{s.statement}</p>}
+                          <div className="flex min-w-0 items-center gap-2 pr-4">
+                            <TypeDot type={s.type as IdeaType} />
+                            <div className="min-w-0">
+                              <span className="block truncate font-medium text-neutral-800 dark:text-neutral-100">{s.label}</span>
+                              {s.statement && <p className="mt-1 line-clamp-2 text-[11px] leading-relaxed text-neutral-500">{s.statement}</p>}
+                            </div>
                           </div>
                           <span className="text-neutral-600 dark:text-neutral-400">{t(NODE_LABELS[s.type as IdeaType]) ?? s.type}</span>
                           <span className="tabular-nums text-neutral-600 dark:text-neutral-400">{s.degree}</span>

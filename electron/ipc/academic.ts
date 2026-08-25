@@ -692,6 +692,8 @@ export function registerAcademicIpc({ h, getWindow, chatAborters }: IpcContext):
   h('libraryReader:get', async (_e, nodusId: string) => libraryReader.getLibraryReaderDocument(nodusId));
   h('libraryReader:attachmentContent', async (_e, nodusId: string, attachmentId: string) =>
     getLibraryReaderAttachmentContentInWorker(nodusId, attachmentId));
+  h('libraryReader:attachmentBytes', async (_e, nodusId: string, attachmentId: string) =>
+    libraryReader.getLibraryReaderAttachmentBytes(nodusId, attachmentId));
   h('libraryReader:openOriginal', async (_e, nodusId: string) => {
     const originalPath = libraryReader.libraryReaderOriginalPath(nodusId);
     if (!originalPath) return false;

@@ -613,6 +613,76 @@ function substantiveWordCount(markdown: string): number {
   return body.match(/\p{L}[\p{L}\p{M}'’-]*/gu)?.length ?? 0;
 }
 
+function groundingProblems(
+  markdown: string,
+  maps: ReturnType<typeof buildSnapshotMaps>,
+): string[] {
+  const survivingClaims = extractCitationClaims(markdown, maps);
+  const uncited = uncitedSubstantiveSentences(markdown);
+  const problems: string[] = [];
+  if (substantiveWordCount(markdown) < 5)
+    problems.push("la definición quedó vacía o era demasiado trivial");
+  if (!survivingClaims.length)
+    problems.push("no sobrevivió ninguna afirmación con una cita válida");
+  if (uncited.length)
+    problems.push(`${uncited.length} afirmaciones quedaron sin cita`);
+  return problems;
+}
+
+function stripUncitedSubstantiveSentences(markdown: string): string {
+  let cleaned = markdown;
+  // Work backwards from the longest matches so repeated or overlapping prose
+  // cannot leave fragments behind. Citation-bearing sentences have already
+  // survived both the local citation policy and semantic verification.
+  const unsupported = [...uncitedSubstantiveSentences(markdown)].sort(
+    (left, right) => right.length - left.length,
+  );
+  for (const sentence of unsupported)
+    cleaned = cleaned.split(sentence).join("");
+  return cleaned
+    .replace(/^\s*[-*]\s*$/gm, "")
+    .replace(/[ \t]+(?=\n)/g, "")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
+function extractiveDictionaryFallback(
+  evidence: DictionaryEvidenceItem[],
+): string {
+  const excerpts = evidence.slice(0, 4).flatMap((item, index) => {
+    const normalized = item.text.replace(/\s+/g, " ").trim();
+    const citation = `[evidencia ${index + 1}](nodus://${item.kind}/${encodeURIComponent(item.id)})`;
+    const sentences = normalized.split(/(?<=[.!?])\s+/u).slice(0, 2);
+    return sentences.map((sentence) => {
+      const shortened =
+        sentence.length > 600
+          ? `${sentence.slice(0, 597).replace(/\s+\S*$/, "").trim()}…`
+          : sentence.replace(/[.!?]+$/u, "").trim();
+      return `> ${shortened} ${citation}.`;
+    });
+  });
+  return `## Evidencia verificable\n\n${excerpts.join("\n\n")}`;
+}
+
+function recoverableDictionaryOutputError(error: unknown): boolean {
+  if (!error || typeof error !== "object") return false;
+  const candidate = error as { code?: unknown; message?: unknown };
+  if (candidate.code === "output_truncated") return true;
+  const message =
+    typeof candidate.message === "string" ? candidate.message.toLowerCase() : "";
+  return [
+    "json",
+    "parse",
+    "parsing",
+    "esquema",
+    "schema",
+    "structured output",
+    "formato de respuesta",
+    "respuesta truncada",
+    "respuesta se cortó",
+  ].some((fragment) => message.includes(fragment));
+}
+
 async function groundGeneratedDescription(
   generated: GeneratedDictionary,
   snapshot: WritingWorkshopSnapshot,
@@ -639,15 +709,7 @@ async function groundGeneratedDescription(
     strippedSentences = outcome.strippedSentences;
   }
 
-  const survivingClaims = extractCitationClaims(cleaned, maps);
-  const uncited = uncitedSubstantiveSentences(cleaned);
-  const problems: string[] = [];
-  if (substantiveWordCount(cleaned) < 5)
-    problems.push("la definición quedó vacía o era demasiado trivial");
-  if (!survivingClaims.length)
-    problems.push("no sobrevivió ninguna afirmación con una cita válida");
-  if (uncited.length)
-    problems.push(`${uncited.length} afirmaciones quedaron sin cita`);
+  const problems = groundingProblems(cleaned, maps);
   return { markdown: cleaned, problems, strippedSentences };
 }
 
@@ -760,20 +822,40 @@ async function generateDictionaryEntryUsing(
     let generated!: GeneratedDictionary;
     let grounded!: Awaited<ReturnType<typeof groundGeneratedDescription>>;
     let correction = "";
+    let verificationRemovedClaims = false;
     for (let attempt = 0; attempt < 2; attempt += 1) {
-      generated = await generator(
-        request.entryId,
-        evidence,
-        request.model ?? null,
-        request.mode === "update" ? entry.contentMarkdown : "",
-        correction,
-      );
+      try {
+        generated = await generator(
+          request.entryId,
+          evidence,
+          request.model ?? null,
+          request.mode === "update" ? entry.contentMarkdown : "",
+          correction,
+        );
+      } catch (error) {
+        if (!recoverableDictionaryOutputError(error)) throw error;
+        // completeJson has already exhausted its local JSON repair and structured
+        // retries by this point. Do not multiply those calls at queue level or show
+        // a recurring terminal error: persist a fully traceable extractive result.
+        const extractiveMarkdown = extractiveDictionaryFallback(evidence);
+        generated = {
+          descriptionMarkdown: extractiveMarkdown,
+          authorSummaries: [],
+        };
+        grounded = {
+          markdown: extractiveMarkdown,
+          problems: groundingProblems(extractiveMarkdown, maps),
+          strippedSentences: [],
+        };
+        break;
+      }
       grounded = await groundGeneratedDescription(
         generated,
         snapshot,
         verifyCitations,
         request.model ?? null,
       );
+      verificationRemovedClaims ||= grounded.strippedSentences.length > 0;
       if (!grounded.problems.length) break;
       correction = [
         `La salida fue rechazada porque ${grounded.problems.join("; ")}.`,
@@ -785,6 +867,35 @@ async function generateDictionaryEntryUsing(
       ]
         .filter(Boolean)
         .join("\n");
+    }
+    if (grounded.problems.length) {
+      // A provider may keep appending a closing sentence without a citation even
+      // after the bounded rewrite attempts. Preserve the verified, cited claims
+      // instead of rejecting the entire generation for that removable tail.
+      const salvagedMarkdown = stripUncitedSubstantiveSentences(
+        grounded.markdown,
+      );
+      grounded = {
+        ...grounded,
+        markdown: salvagedMarkdown,
+        problems: groundingProblems(salvagedMarkdown, maps),
+      };
+    }
+    const providerReturnedNoNodusCitation =
+      !/nodus:\/\/(?:idea|passage)\//.test(generated.descriptionMarkdown);
+    if (
+      grounded.problems.length &&
+      (verificationRemovedClaims || providerReturnedNoNodusCitation)
+    ) {
+      // If semantic verification rejects every generated claim, use the selected
+      // evidence itself as a cited, extractive result. This is deliberately less
+      // polished, but it remains useful and cannot introduce unsupported prose.
+      const extractiveMarkdown = extractiveDictionaryFallback(evidence);
+      grounded = {
+        ...grounded,
+        markdown: extractiveMarkdown,
+        problems: groundingProblems(extractiveMarkdown, maps),
+      };
     }
     if (grounded.problems.length)
       throw new Error(
@@ -871,7 +982,10 @@ async function generateDictionaryEntryUsing(
     authorSummaries,
     model: request.model ?? null,
     trigger: generationTrigger(request),
-    state: request.mode === "creation" ? "applied" : "proposed",
+    // Regenerate is an explicit replacement action. The previous version remains
+    // immutable in history and can be restored, so making the new definition current
+    // immediately matches the button's promise without sacrificing reversibility.
+    state: request.mode === "update" ? "proposed" : "applied",
     insufficientEvidence: insufficient,
   });
 }

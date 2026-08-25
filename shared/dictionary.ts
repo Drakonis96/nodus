@@ -229,6 +229,8 @@ export interface DictionaryDuplicateMatch {
 
 export interface DictionaryProgress {
   entryId: string;
+  /** The action that owns this progress, so the matching control stays visibly busy. */
+  mode?: DictionaryGenerationRequest["mode"];
   phase:
     | "queued"
     | "retrieving"

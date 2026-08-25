@@ -60,20 +60,53 @@ test('the consent is academic-only and its campaign has a global progress/contro
   assert.match(bar, /onDocumentIndexProgress/);
   assert.match(bar, /document-index-progress-percent/);
   assert.match(bar, /role="progressbar"/);
-  assert.match(bar, /aria-valuenow=\{pct\}/);
+  assert.match(bar, /aria-valuenow=\{pctValue\}/);
   assert.match(bar, /aria-live="polite"/);
   assert.match(bar, /applyStatus\('paused'\)/);
   assert.match(bar, /applyStatus\('running'\)/);
   assert.match(bar, /applyStatus\('cancelled'\)/);
   assert.match(bar, /document-index-warning/);
   assert.match(manager, /document-index-manager-warning/);
+  assert.match(manager, /campaign\.queuedJobs \+ campaign\.pausedJobs/);
+  assert.match(manager, /jobPhaseDetail\(job\)/);
+  assert.match(bar, /jobPhaseDetail\(job\)/);
+  assert.match(bar, /queuedPosition\(jobs, job\.jobId\)/);
   assert.match(css, /\.light \.document-index-warning \{[\s\S]*background-color: #fffbeb;[\s\S]*color: #78350f;/);
+  assert.match(css, /\.light \.library-status-warning \{[\s\S]*color: #7c2d12;/);
   assert.match(api, /setDocumentIndexCampaignStatus\(vaultId: string, campaignId: string/);
   assert.match(ipc, /documentIndexQueue\.setCampaignStatus\(vaultId, campaignId, status\)/);
   assert.match(main, /documentIndexQueue\.stop\(\);[\s\S]*closeDb\(\)/, 'shutdown aborts document workers before closing their database');
   assert.match(main, /before-quit-for-update[\s\S]*documentIndexQueue\.stop\(\);[\s\S]*closeDb\(\)/, 'application updates use the same safe shutdown ordering');
   assert.match(rootIpc, /await documentIndexQueue\.pauseVaultAndDrain\(id\)[\s\S]*resetVaultDatabase/, 'vault reset drains document workers before replacing SQLite');
   assert.match(exportImport, /pausedVaultIds = await pauseAllDocumentIndexingAndDrain\(\)[\s\S]*finally[\s\S]*resumeAllDocumentIndexingAfterMaintenance/, 'backup restore drains every vault and always releases maintenance');
+});
+
+test('live document jobs keep their place while progress timestamps change', async () => {
+  const tmp = await mkdtemp(path.join(os.tmpdir(), 'nodus-document-progress-'));
+  try {
+    const outfile = path.join(tmp, 'progress.mjs');
+    await build({
+      entryPoints: [path.join(repoRoot, 'shared/documentIndexProgress.ts')],
+      outfile,
+      bundle: true,
+      format: 'esm',
+      platform: 'node',
+      logLevel: 'silent',
+    });
+    const { compareDocumentIndexJobsForDisplay, documentIndexPercentLabel } = await import(pathToFileURL(outfile).href);
+    const job = (id, createdAt, updatedAt, progress) => ({
+      jobId: id, status: 'running', priority: 0, createdAt, updatedAt, progress,
+    });
+    const first = job('first', '2026-08-25T10:00:00Z', '2026-08-25T10:05:00Z', 0.1);
+    const second = job('second', '2026-08-25T10:01:00Z', '2026-08-25T10:06:00Z', 0.2);
+    assert.deepEqual([second, first].sort(compareDocumentIndexJobsForDisplay).map((item) => item.jobId), ['first', 'second']);
+    first.updatedAt = '2026-08-25T10:07:00Z';
+    first.progress = 0.3;
+    assert.deepEqual([second, first].sort(compareDocumentIndexJobsForDisplay).map((item) => item.jobId), ['first', 'second']);
+    assert.equal(documentIndexPercentLabel(0.0002), '0.02%', 'large campaigns no longer look permanently stuck at zero');
+  } finally {
+    await rm(tmp, { recursive: true, force: true });
+  }
 });
 
 test('the complete consent copy exists in all seven non-Spanish language tables', async () => {

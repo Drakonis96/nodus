@@ -17,6 +17,16 @@ test('argument map opens as a library-style metadata catalogue', () => {
   assert.match(source, /s\.neighborLabels/);
 });
 
+test('idea type markers use the same shared dot and row alignment as the Ideas catalogue', () => {
+  const ideasSource = fs.readFileSync(path.join(repoRoot, 'src/views/IdeasView.tsx'), 'utf8');
+  assert.match(source, /import \{[^}]*TypeDot[^}]*\} from '\.\.\/components\/ui'/);
+  assert.match(source, /<TypeDot type=\{s\.type as IdeaType\} \/>/);
+  assert.match(source, /<TypeDot type=\{n\.type as IdeaType\} \/>/);
+  assert.match(source, /flex min-w-0 items-center gap-2 pr-4/);
+  assert.match(ideasSource, /flex min-w-0 items-center gap-2 pr-5/);
+  assert.doesNotMatch(source, /h-2 w-2 shrink-0 rounded-full[^\n]*NODE_COLORS/, 'the map must not keep a smaller local copy of the marker');
+});
+
 test('catalogue metadata can be searched, filtered and sorted', () => {
   assert.match(source, /data-testid="argument-routes-search"/);
   assert.match(source, /\(s\.statement \?\? ''\)\.toLowerCase\(\)/, 'a route with no statement remains searchable instead of crashing the section');

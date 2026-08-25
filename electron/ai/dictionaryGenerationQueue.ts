@@ -15,6 +15,15 @@ export type DictionaryGenerationExecutor = (
 const isRunning = (progress: DictionaryProgress): boolean =>
   !["done", "failed"].includes(progress.phase);
 
+const MAX_TRANSIENT_RETRIES = 2;
+
+function retriable(error: unknown): boolean {
+  return !!error && typeof error === "object" && (error as { retriable?: unknown }).retriable === true;
+}
+
+const retryDelay = (attempt: number): Promise<void> =>
+  new Promise((resolve) => setTimeout(resolve, 750 * 2 ** attempt));
+
 /**
  * Owns the lifetime of background Dictionary work independently from any
  * renderer. Every entry gets its own scheduled execution, so starting a batch
@@ -36,6 +45,7 @@ export class DictionaryGenerationQueue {
     const token = Symbol(request.entryId);
     const queued: DictionaryProgress = {
       entryId: request.entryId,
+      mode: request.mode,
       phase: "queued",
       message: "En cola",
     };
@@ -63,26 +73,43 @@ export class DictionaryGenerationQueue {
     request: DictionaryGenerationRequest,
     token: symbol,
   ): Promise<void> {
-    const report = (progress: DictionaryProgress) => this.#set(progress, token);
-    try {
-      await this.execute(request, report);
-      report({
-        entryId: request.entryId,
-        phase: "done",
-        message: "Definición generada",
-      });
-    } catch (error) {
-      const detail = error instanceof Error ? error.message : String(error);
-      console.error(
-        `[dictionary] background generation failed for ${request.entryId}`,
-        error,
-      );
-      report({
-        entryId: request.entryId,
-        phase: "failed",
-        message: "Error al generar",
-        error: detail,
-      });
+    const report = (progress: DictionaryProgress) =>
+      this.#set({ ...progress, mode: request.mode }, token);
+    for (let attempt = 0; ; attempt += 1) {
+      try {
+        await this.execute(request, report);
+        report({
+          entryId: request.entryId,
+          mode: request.mode,
+          phase: "done",
+          message: "Definición generada",
+        });
+        return;
+      } catch (error) {
+        if (retriable(error) && attempt < MAX_TRANSIENT_RETRIES) {
+          report({
+            entryId: request.entryId,
+            mode: request.mode,
+            phase: "queued",
+            message: "En cola",
+          });
+          await retryDelay(attempt);
+          continue;
+        }
+        const detail = error instanceof Error ? error.message : String(error);
+        console.error(
+          `[dictionary] background generation failed for ${request.entryId}`,
+          error,
+        );
+        report({
+          entryId: request.entryId,
+          mode: request.mode,
+          phase: "failed",
+          message: "Error al generar",
+          error: detail,
+        });
+        return;
+      }
     }
   }
 

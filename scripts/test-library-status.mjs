@@ -39,7 +39,7 @@ const work = (over = {}) => ({
   ...over,
 });
 const embedded = (over = {}) => ({ nodus_id: 'w1', totalIdeas: 10, embeddedIdeas: 10, complete: true, ...over });
-const indexed = (over = {}) => ({ nodus_id: 'w1', totalPassages: 40, status: 'complete', ...over });
+const indexed = (over = {}) => ({ nodus_id: 'w1', totalPassages: 40, status: 'complete', outdatedReason: null, ...over });
 
 test('a fully processed work is ready, and the summary does not gate it', () => {
   assert.equal(deriveWorkStatus(work(), embedded(), indexed()).readiness, 'ready');
@@ -71,7 +71,7 @@ test('abstract-only is its own state, distinct from having no text at all', () =
   const w = work({ source_type: 'abstract_only' });
   assert.equal(isAbstractOnly(w), true);
   assert.equal(hasNoFullText(w), true);
-  const s = deriveWorkStatus(w, embedded(), { nodus_id: 'w1', totalPassages: 0, status: 'missing' });
+  const s = deriveWorkStatus(w, embedded(), { nodus_id: 'w1', totalPassages: 0, status: 'missing', outdatedReason: null });
   assert.equal(s.readiness, 'abstractOnly');
   // Deep analysis really did run — it just only saw the abstract.
   assert.equal(s.steps.ideas.state, 'partial');
@@ -92,7 +92,7 @@ test('partial embeddings and outdated passages are partial, and carry their numb
   const s = deriveWorkStatus(
     work(),
     embedded({ embeddedIdeas: 31, totalIdeas: 47, complete: false }),
-    indexed({ status: 'outdated' })
+    indexed({ status: 'outdated', outdatedReason: 'model_changed' })
   );
   assert.equal(s.readiness, 'incomplete');
   assert.equal(s.steps.semantic.state, 'partial');
@@ -103,6 +103,18 @@ test('partial embeddings and outdated passages are partial, and carry their numb
   // its freshness, so counting it here would make the preset and the pill differ.
   assert.deepEqual(s.missing, ['citable']);
   assert.ok(!READY_STEPS.includes('semantic'));
+});
+
+test('newly indexed passages are current even while the deep analysis still belongs to the previous text', () => {
+  const s = deriveWorkStatus(
+    work({ deep_hash: 'old-text', resolved_text_hash: 'new-text' }),
+    embedded(),
+    indexed(),
+  );
+  assert.equal(s.steps.ideas.state, 'partial', 'the stale analytical ideas are the step that needs repair');
+  assert.equal(s.steps.ideas.reason, 'analysis_text_changed');
+  assert.equal(s.steps.citable.state, 'done', 'a current passage index must not inherit the ideas hash');
+  assert.deepEqual(s.missing, ['ideas']);
 });
 
 test('failure outranks absence, and live queue activity outranks both', () => {
@@ -173,7 +185,10 @@ test('the SQL presets stay in step with the JS readiness derivation', async () =
 });
 
 test('the status modal repairs missing steps without wasting work', async () => {
-  const source = await readFile(path.join(root, 'src/views/WorkStatusModal.tsx'), 'utf8');
+  const [source, passagePipeline] = await Promise.all([
+    readFile(path.join(root, 'src/views/WorkStatusModal.tsx'), 'utf8'),
+    readFile(path.join(root, 'electron/ai/passageEmbeddingPipeline.ts'), 'utf8'),
+  ]);
 
   // Indexes are built FROM the ideas. Firing startEmbedding alongside a pending
   // deep pass would index nothing, so the chain has to take over in that case.
@@ -190,6 +205,10 @@ test('the status modal repairs missing steps without wasting work', async () => 
   assert.match(source, /summarizeWork\(work\.nodus_id\)/);
   assert.match(source, /startEmbedding\(\[work\.nodus_id\]\)/);
   assert.match(source, /startPassageEmbedding\(\[work\.nodus_id\]\)/);
+  assert.match(source, /await window\.nodus\.getPassageStatus\(\)/, 'passage provider errors are surfaced in the modal');
+  assert.match(source, /await onChanged\(\)/, 'the modal waits for fresh row data before reporting success');
+  assert.match(source, /if \(progress\.running\) setCitableQueued\(true\)/, 'a retry joining a live passage run stays visibly queued');
+  assert.match(passagePipeline, /if \(state\.running\)[\s\S]{0,1000}state\.works\.push/, 'per-work retries join an existing passage run instead of returning silently');
 
   // Blocked and not-applicable steps are terminal: offering a retry there spends
   // tokens on something that cannot succeed.

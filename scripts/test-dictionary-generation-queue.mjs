@@ -17,7 +17,7 @@ const deferred = () => {
 };
 
 const waitFor = async (predicate, label) => {
-  const deadline = Date.now() + 2_000;
+  const deadline = Date.now() + 5_000;
   while (!predicate()) {
     if (Date.now() >= deadline) throw new Error(`Timed out waiting for ${label}`);
     await new Promise((resolve) => setTimeout(resolve, 5));
@@ -132,6 +132,45 @@ test("Dictionary jobs run in parallel and remain isolated", async () => {
           event.error === "provider down",
       ),
     );
+  } finally {
+    await rm(output, { recursive: true, force: true });
+  }
+});
+
+test("Dictionary retries transient provider failures without exposing a terminal error", async () => {
+  const output = await mkdtemp(path.join(os.tmpdir(), "nodus-dictionary-retry-"));
+  try {
+    const bundle = path.join(output, "queue.mjs");
+    await build({
+      entryPoints: [path.join(root, "electron/ai/dictionaryGenerationQueue.ts")],
+      outfile: bundle,
+      bundle: true,
+      format: "esm",
+      platform: "node",
+      logLevel: "silent",
+    });
+    const { DictionaryGenerationQueue } = await import(pathToFileURL(bundle));
+    const events = [];
+    let attempts = 0;
+    const queue = new DictionaryGenerationQueue(
+      async () => {
+        attempts += 1;
+        if (attempts < 3) {
+          const error = new Error("rate limited");
+          error.retriable = true;
+          throw error;
+        }
+      },
+      (progress) => events.push(progress),
+    );
+    queue.start({ entryId: "retry", mode: "regeneration", model: null });
+    await waitFor(
+      () => queue.list().find((job) => job.entryId === "retry")?.phase === "done",
+      "transient retry completion",
+    );
+    assert.equal(attempts, 3);
+    assert.equal(events.some((event) => event.phase === "failed"), false);
+    assert.ok(events.filter((event) => event.phase === "queued").length >= 3);
   } finally {
     await rm(output, { recursive: true, force: true });
   }

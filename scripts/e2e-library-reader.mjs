@@ -82,6 +82,7 @@ try {
 
   const work = await page.evaluate(async ({ version, backup }) => {
     localStorage.setItem('nodus.lastSeenVersion', version);
+    localStorage.setItem('nodus.documentUnderstandingConsent.2026-08', '1');
     localStorage.setItem('nodus.mobileTeaserSeen.3.2.4', '1');
     localStorage.setItem('nodus.platformHighlightsSeen.2026-07', '1');
     localStorage.setItem('nodus.tutorialVideosAnnouncementSeen.2026-07', '1');
@@ -250,7 +251,8 @@ ${longReaderBody}
   await page.reload();
   await page.waitForFunction(() => Boolean(document.getElementById('root')?.children.length));
   const updateModal = page.getByTestId('startup-update-modal');
-  if (await updateModal.count()) {
+  await updateModal.waitFor({ state: 'visible', timeout: 5_000 }).catch(() => undefined);
+  if (await updateModal.isVisible().catch(() => false)) {
     await page.waitForFunction(() => document.querySelector('[data-testid="startup-update-modal"]')?.getAttribute('data-update-status') === 'not-available');
     await updateModal.getByRole('button', { name: 'Entendido', exact: false }).click();
     await updateModal.waitFor({ state: 'detached' });
@@ -427,9 +429,24 @@ ${longReaderBody}
   await filesToggle.click();
   const sourceSwitchStarted = Date.now();
   await page.getByTestId('library-reader-file-zotero:READERPDF').click();
-  await page.getByTestId('library-reader-pdf-viewer').waitFor({ state: 'visible' });
+  const firstPdfViewer = page.getByTestId('library-reader-pdf-viewer');
+  await firstPdfViewer.waitFor({ state: 'visible' });
   assert.ok(Date.now() - sourceSwitchStarted < 300, 'choosing a preserved file switches the reader without blocking the interface');
   assert.equal(await filesToggle.getAttribute('aria-expanded'), 'false', 'the compact file menu closes after choosing a source');
+  await Promise.race([
+    page.waitForFunction(() => Number(document.querySelector('[data-testid="library-reader-pdf-viewer"]')?.getAttribute('data-rendered-scale')) > 0),
+    firstPdfViewer.getByRole('alert').waitFor({ state: 'visible' }).then(async () => { throw new Error(`PDF load failed: ${await firstPdfViewer.getByRole('alert').innerText()}`); }),
+  ]);
+  assert.equal(await firstPdfViewer.getByRole('alert').count(), 0, 'the first clean-to-PDF switch finishes without a transport error');
+  await page.getByTestId('library-reader-source-picker').locator('select').selectOption('clean');
+  await documentRoot.waitFor({ state: 'visible' });
+  await page.getByTestId('library-reader-source-picker').locator('select').selectOption('zotero:READERPDF');
+  const repeatedPdfViewer = page.getByTestId('library-reader-pdf-viewer');
+  await Promise.race([
+    page.waitForFunction(() => Number(document.querySelector('[data-testid="library-reader-pdf-viewer"]')?.getAttribute('data-rendered-scale')) > 0),
+    repeatedPdfViewer.getByRole('alert').waitFor({ state: 'visible' }).then(async () => { throw new Error(`Repeated PDF load failed: ${await repeatedPdfViewer.getByRole('alert').innerText()}`); }),
+  ]);
+  assert.equal(await page.getByTestId('library-reader-pdf-viewer').getByRole('alert').count(), 0, 'PDF also finishes after switching away and back');
   await page.getByTestId('library-reader-source-picker').locator('select').selectOption('clean');
   await documentRoot.waitFor({ state: 'visible' });
   assert.equal(await page.getByTestId('library-reader-source-picker').locator('option').count(), 6, 'clean Markdown and five preserved attachments are directly selectable');

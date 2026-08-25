@@ -26,6 +26,7 @@ import { runDocumentProfileScan } from '../ai/documentProfile';
 import { AiError } from '../ai/aiClient';
 import { coalesce } from '../util/coalesce';
 import { registerDocumentIndexMaintenanceController } from './documentIndexMaintenance';
+import { compareDocumentIndexJobsForDisplay } from '@shared/documentIndexProgress';
 
 type Listener = (progress: DocumentIndexProgress) => void;
 const POLL_MS = 350;
@@ -98,10 +99,7 @@ class DocumentIndexQueue {
     }
     return {
       campaigns: campaigns.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)),
-      jobs: jobs.sort((a, b) => {
-        const live = (job: DocumentIndexJob) => ['running', 'queued', 'paused'].includes(job.status) ? 0 : 1;
-        return live(a) - live(b) || b.priority - a.priority || b.updatedAt.localeCompare(a.updatedAt);
-      }),
+      jobs: jobs.sort(compareDocumentIndexJobsForDisplay),
       active,
       queued,
       failed,
@@ -500,7 +498,10 @@ class DocumentIndexQueue {
         });
         const live = listDocumentIndexJobs().find((item) => item.jobId === job.jobId);
         if (live?.status === 'cancelled') return;
-        updateDocumentIndexJob(job.jobId, { status: 'completed', phase: 'done', progress: 1, error: null });
+        updateDocumentIndexJob(job.jobId, {
+          status: 'completed', phase: 'done', progress: 1, error: null,
+          progressMessage: null, currentUnit: null, totalUnits: null,
+        });
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         const current = listDocumentIndexJobs().find((item) => item.jobId === job.jobId) ?? job;

@@ -79,11 +79,11 @@ const READINESS_LABEL: Record<WorkReadiness, string> = {
 const READINESS_TONE: Record<WorkReadiness, string> = {
   // Reuses utilities that already have a light-mode remap in index.css.
   unstarted: 'border-neutral-700 text-neutral-400',
-  running: 'border-amber-700/60 bg-amber-900/20 text-amber-300',
+  running: 'library-status-warning',
   failed: 'border-red-700/60 bg-red-900/20 text-red-300',
   noText: 'border-neutral-700 bg-neutral-900/40 text-neutral-400',
-  abstractOnly: 'border-amber-700/60 bg-amber-900/20 text-amber-300',
-  incomplete: 'border-amber-700/60 bg-amber-900/20 text-amber-300',
+  abstractOnly: 'library-status-warning',
+  incomplete: 'library-status-warning',
   ready: 'border-emerald-700/60 bg-emerald-900/20 text-emerald-300',
 };
 
@@ -1842,14 +1842,20 @@ export function Library({
           }}
         />
       )}
-      {statusWork && statusByWork.get(statusWork.nodus_id) && (
+      {statusWork && (() => {
+        // Keep an open modal attached to the freshly loaded row. Holding the
+        // original object made successful retries look ineffective until close/reopen.
+        const currentWork = works.find((work) => work.nodus_id === statusWork.nodus_id) ?? statusWork;
+        const currentStatus = statusByWork.get(currentWork.nodus_id);
+        return currentStatus ? (
         <WorkStatusModal
-          work={statusWork}
-          status={statusByWork.get(statusWork.nodus_id)!}
+          work={currentWork}
+          status={currentStatus}
           onClose={() => setStatusWork(null)}
-          onChanged={() => void load()}
+          onChanged={() => load()}
         />
-      )}
+        ) : null;
+      })()}
       {documentWork && <DocumentProfileModal work={documentWork} vaultId={vaultId} onClose={() => setDocumentWork(null)} />}
       {documentManagerOpen && <DocumentIndexManager vaultId={vaultId} onClose={() => setDocumentManagerOpen(false)} />}
     </div>

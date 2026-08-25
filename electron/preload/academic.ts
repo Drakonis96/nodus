@@ -85,6 +85,7 @@ export const academicApi: AcademicApi = {
   openEvidenceAtPage: (nodusId, location) => ipcRenderer.invoke('works:openAtPage', nodusId, location),
   getLibraryReaderDocument: (nodusId) => ipcRenderer.invoke('libraryReader:get', nodusId),
   getLibraryReaderAttachmentContent: (nodusId, attachmentId) => ipcRenderer.invoke('libraryReader:attachmentContent', nodusId, attachmentId),
+  getLibraryReaderAttachmentBytes: (nodusId, attachmentId) => ipcRenderer.invoke('libraryReader:attachmentBytes', nodusId, attachmentId),
   openLibraryReaderOriginal: (nodusId) => ipcRenderer.invoke('libraryReader:openOriginal', nodusId),
   listLibraryReaderAnnotations: (nodusId) => ipcRenderer.invoke('libraryReader:annotations:list', nodusId),
   listLibraryReaderOrphanedAnnotations: (nodusId) => ipcRenderer.invoke('libraryReader:annotations:listOrphaned', nodusId),

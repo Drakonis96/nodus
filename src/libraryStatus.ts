@@ -57,6 +57,7 @@ export interface StepStatus {
   /** Progress numbers where the step has them (embedded ideas, indexed passages). */
   done?: number;
   total?: number;
+  reason?: 'analysis_text_changed' | WorkPassageStatus['outdatedReason'];
 }
 
 export interface WorkStatus {
@@ -115,7 +116,10 @@ function ideasState(work: WorkView): StepState {
   switch (work.deep_status) {
     case 'done':
       // Done, but only the abstract was read: real but degraded.
-      return isAbstractOnly(work) ? 'partial' : 'done';
+      return isAbstractOnly(work)
+        || Boolean(work.resolved_text_hash && work.deep_hash !== work.resolved_text_hash)
+        ? 'partial'
+        : 'done';
     case 'pending':
       return 'running';
     case 'failed':
@@ -155,13 +159,9 @@ function semanticStep(work: WorkView, embedding: WorkEmbeddingStatus | undefined
 
 function citableStep(work: WorkView, passage: WorkPassageStatus | undefined): StepStatus {
   if (hasNoFullText(work)) return { id: 'citable', state: 'blocked' };
-  if (work.resolved_text_hash && work.deep_hash !== work.resolved_text_hash) {
-    return { id: 'citable', state: passage ? 'partial' : 'missing', total: passage?.totalPassages };
-  }
   if (!passage || passage.status === 'missing') return { id: 'citable', state: 'missing' };
   if (passage.status === 'complete') return { id: 'citable', state: 'done', total: passage.totalPassages };
-  // 'outdated': the text was re-extracted or the embedding model changed.
-  return { id: 'citable', state: 'partial', total: passage.totalPassages };
+  return { id: 'citable', state: 'partial', total: passage.totalPassages, reason: passage.outdatedReason };
 }
 
 /**
@@ -181,7 +181,13 @@ export function deriveWorkStatus(
 ): WorkStatus {
   const steps: Record<StepId, StepStatus> = {
     themes: { id: 'themes', state: themesState(work) },
-    ideas: { id: 'ideas', state: ideasState(work) },
+    ideas: {
+      id: 'ideas',
+      state: ideasState(work),
+      reason: work.deep_status === 'done' && work.resolved_text_hash && work.deep_hash !== work.resolved_text_hash
+        ? 'analysis_text_changed'
+        : undefined,
+    },
     summary: { id: 'summary', state: summaryState(work) },
     semantic: semanticStep(work, embedding),
     citable: citableStep(work, passage),

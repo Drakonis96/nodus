@@ -59,6 +59,7 @@ const SOURCE_LABEL: Record<LibraryItemSource, string> = {
   nodus: 'Nodus', zotero: 'Zotero', mendeley: 'Mendeley', ris: 'RIS', bibtex: 'BibTeX',
   biblatex: 'BibLaTeX', 'csl-json': 'CSL JSON', 'endnote-xml': 'EndNote XML',
   'zotero-rdf': 'Zotero RDF', csv: 'CSV', markdown: 'Markdown', legacy: 'Legado',
+  compass: 'Nodus Compass',
 };
 
 const EXTRACTION_LABEL: Record<LibraryCatalogItem['extractionStatus'], string> = {

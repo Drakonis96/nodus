@@ -260,9 +260,9 @@ const ReaderFilesMenu = memo(function ReaderFilesMenu({
 });
 
 function OriginalPagePreview({
-  url, initialPage, title, onClose, onOpenFull,
+  documentId, attachmentId, initialPage, title, onClose, onOpenFull,
 }: {
-  url: string; initialPage: number; title: string; onClose: () => void; onOpenFull: () => void;
+  documentId: string; attachmentId: string; initialPage: number; title: string; onClose: () => void; onOpenFull: () => void;
 }) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [pdf, setPdf] = useState<PDFDocumentProxy | null>(null);
@@ -272,14 +272,19 @@ function OriginalPagePreview({
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    let current: PDFDocumentProxy | null = null;
-    const task = getDocument({ url });
+    let live = true; let task: ReturnType<typeof getDocument> | null = null;
     setLoading(true); setError('');
-    void task.promise.then((document) => {
-      current = document; setPdf(document); setPageNumber((value) => Math.min(document.numPages, Math.max(1, value))); setLoading(false);
-    }).catch((cause) => { setError(cause instanceof Error ? cause.message : String(cause)); setLoading(false); });
-    return () => { void task.destroy(); void current?.destroy(); };
-  }, [url]);
+    void window.nodus.getLibraryReaderAttachmentBytes(documentId, attachmentId).then((buffer) => {
+      if (!buffer?.byteLength) throw new Error('The PDF file is unavailable or empty.');
+      if (!live) return null;
+      task = getDocument({ data: new Uint8Array(buffer) });
+      return task.promise;
+    }).then((document) => {
+      if (!document || !live) return;
+      setPdf(document); setPageNumber((value) => Math.min(document.numPages, Math.max(1, value))); setLoading(false);
+    }).catch((cause) => { if (live) { setError(cause instanceof Error ? cause.message : String(cause)); setLoading(false); } });
+    return () => { live = false; void task?.destroy(); };
+  }, [attachmentId, documentId]);
 
   useEffect(() => { setPageNumber(Math.max(1, initialPage)); }, [initialPage]);
   useEffect(() => {
@@ -1065,7 +1070,7 @@ export function LibraryDocumentReader({
         onChoose={chooseOpeningFormat}
         onCancel={onBack}
       />}
-      {previewPage && reader.originalUrl && <OriginalPagePreview url={reader.originalUrl} initialPage={previewPage} title={reader.title} onClose={() => setPreviewPage(null)} onOpenFull={() => void window.nodus.openLibraryReaderOriginal(reference.id)} />}
+      {previewPage && primaryOriginalAttachment(reader) && <OriginalPagePreview documentId={reference.id} attachmentId={primaryOriginalAttachment(reader)!.id} initialPage={previewPage} title={reader.title} onClose={() => setPreviewPage(null)} onOpenFull={() => void window.nodus.openLibraryReaderOriginal(reference.id)} />}
       {citation && <SourceCitationModal target={citation} onClose={() => setCitation(null)} />}
     </div>
   );

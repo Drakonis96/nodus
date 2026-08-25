@@ -466,7 +466,7 @@ export function isViewAllowedForVaultType(viewId: string, type: unknown): boolea
   if (normalizeVaultType(type) === 'prosopography') {
     return [
       'home', 'settings', 'prosopSearch', 'prosopPopulation', 'prosopPersons',
-      'prosopSources', 'prosopAnalysis', 'prosopNetworks', 'library', 'notes', 'browser', 'radar', 'toolkit',
+      'prosopSources', 'prosopAnalysis', 'prosopNetworks', 'library', 'notes', 'browser', 'radar', 'compass', 'toolkit',
     ].includes(viewId);
   }
   const allowed = VAULT_TYPE_SCOPED_VIEWS[viewId];

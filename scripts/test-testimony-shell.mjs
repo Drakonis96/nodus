@@ -42,7 +42,7 @@ const participantsSource = await readFile(path.join(repoRoot, 'src/views/Testimo
 
 test.after(() => rm(outDir, { recursive: true, force: true }));
 
-/** Las ocho entradas acordadas (decisión 3 del plan), en su orden de menú. */
+/** Las secciones acordadas, incluidos los cuatro instrumentos globales, en orden. */
 const AGREED_SECTIONS = [
   'home',
   'search',
@@ -52,15 +52,16 @@ const AGREED_SECTIONS = [
   'notes',
   'browser',
   'radar',
+  'compass',
   'toolkit',
   'settings',
 ];
 
-// Diez desde que Nodus Radar existe: es transversal como Browser y Toolkit — consultar
+// Once desde que Nodus Compass existe: es transversal como Browser, Radar y Toolkit — consultar
 // un archivo o un fondo en la web sirve igual aquí que en cualquier otra bóveda —
 // y como el Toolkit no aporta ninguna superficie de OTRO vault al menú, que es lo
 // que esta lista cerrada protege.
-test('el menú tiene exactamente las diez entradas acordadas', () => {
+test('el menú tiene exactamente las once entradas acordadas', () => {
   const nav = navigation.dedicatedVaultNavIds('testimonios');
   assert.ok(nav, 'testimonios es un workspace dedicado, no el sidebar genérico');
   // Inicio y Ajustes van fijos fuera de los grupos y no forman parte de la lista.
@@ -110,7 +111,7 @@ test('el sidebar y la lista de navegación no pueden separarse', () => {
   // El grupo «Herramientas» lo pinta App.tsx aparte para todas las bóvedas dedicadas
   // (`navGroups.filter(group => group.id === 'tools')`), así que sus entradas son las
   // únicas de la lista que no están en el sidebar propio de Testimonios.
-  const paintedByShell = new Set(['toolkit', 'browser', 'radar']);
+  const paintedByShell = new Set(['toolkit', 'compass', 'browser', 'radar']);
   assert.deepEqual([...sidebarViews].sort(), nav.filter((id) => !paintedByShell.has(id)).sort());
 });
 

@@ -37,6 +37,9 @@ import { completeWithGitHubCopilotSubscription } from './githubCopilotSubscripti
 import { completeWithOpenCodeGo, OUTPUT_TRUNCATED_MARKER } from './openCodeGoCompletion';
 import { recordOpenCodeGoUsage } from './openCodeGoUsage';
 import { AI_MODEL_REQUIRED_ERROR_CODE } from '@shared/aiModelRequired';
+import { AiRequestGate } from './aiRequestGate';
+
+const textRequestGate = new AiRequestGate(() => getSettings().concurrency);
 
 export class AiError extends Error {
   /**
@@ -511,6 +514,19 @@ async function rawComplete(
   reasoning: ReasoningEffort = 'off',
   codexReasoning?: CodexReasoningEffort | null
 ): Promise<string> {
+  return textRequestGate.run(
+    () => rawCompleteTransport(model, opts, jsonMode, reasoning, codexReasoning),
+    opts.signal,
+  );
+}
+
+async function rawCompleteTransport(
+  model: ModelRef,
+  opts: CallOpts,
+  jsonMode = true,
+  reasoning: ReasoningEffort = 'off',
+  codexReasoning?: CodexReasoningEffort | null
+): Promise<string> {
   // Student names must leave before any provider-specific branch. Subscription
   // providers do not use API keys, so this deliberately precedes key resolution.
   // The public entry points map the opaque codes back after parsing/repair.
@@ -924,6 +940,20 @@ export async function completeTextStream(
 }
 
 async function rawCompleteStream(
+  model: ModelRef,
+  opts: CallOpts,
+  onDelta: TextDeltaHandler,
+  reasoning: ReasoningEffort = 'off',
+  signal?: AbortSignal,
+  codexReasoning?: CodexReasoningEffort | null
+): Promise<string> {
+  return textRequestGate.run(
+    () => rawCompleteStreamTransport(model, opts, onDelta, reasoning, signal, codexReasoning),
+    signal ?? opts.signal,
+  );
+}
+
+async function rawCompleteStreamTransport(
   model: ModelRef,
   opts: CallOpts,
   onDelta: TextDeltaHandler,

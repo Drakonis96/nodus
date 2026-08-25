@@ -13,6 +13,7 @@ export type LibraryWorkerOperation =
   | 'ensure-citation-keys'
   | 'import-files'
   | 'import-bibliography'
+  | 'import-compass-candidates'
   | 'duplicate-item'
   | 'update-collection'
   | 'delete-collection'
@@ -48,6 +49,7 @@ async function execute(operations: LibraryOperations, catalog: LibraryCatalog, s
     case 'ensure-citation-keys': return operations.ensureCitationKeys();
     case 'import-files': return operations.importLocalFiles(args[0], args[1]);
     case 'import-bibliography': return operations.importBibliographyFiles(args[0], args[1]);
+    case 'import-compass-candidates': return operations.importCompassCandidates(args[0], args[1], args[2]);
     case 'duplicate-item': return operations.duplicateItem(args[0]);
     case 'update-collection': return operations.updateCollection(args[0], args[1]);
     case 'delete-collection': return operations.deleteCollection(args[0], args[1]);

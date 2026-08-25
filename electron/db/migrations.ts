@@ -15,7 +15,7 @@ export interface Migration {
 
 // Versioned, append-only migrations. Never edit an existing migration's SQL once
 // shipped — add a new one. The current schema version is the highest applied.
-export const SCHEMA_VERSION = 164;
+export const SCHEMA_VERSION = 165;
 
 export const migrations: Migration[] = [
   {
@@ -8912,6 +8912,24 @@ export const migrations: Migration[] = [
          AND reason='deep-research'
          AND status='paused'
          AND error LIKE 'La fuente cambió repetidamente durante el análisis.%';
+    `,
+  },
+  {
+    version: 165,
+    up: /* sql */ `
+      -- Keep exact campaign counters even when the renderer receives only a bounded
+      -- queue sample, and retain the section/chunk currently being analysed.
+      ALTER TABLE document_index_campaigns ADD COLUMN running_jobs INTEGER NOT NULL DEFAULT 0;
+      ALTER TABLE document_index_campaigns ADD COLUMN queued_jobs INTEGER NOT NULL DEFAULT 0;
+      ALTER TABLE document_index_campaigns ADD COLUMN paused_jobs INTEGER NOT NULL DEFAULT 0;
+      ALTER TABLE document_index_jobs ADD COLUMN progress_message TEXT;
+      ALTER TABLE document_index_jobs ADD COLUMN current_unit INTEGER;
+      ALTER TABLE document_index_jobs ADD COLUMN total_units INTEGER;
+
+      UPDATE document_index_campaigns SET
+        running_jobs=(SELECT COUNT(*) FROM document_index_jobs j WHERE j.campaign_id=document_index_campaigns.campaign_id AND j.status='running'),
+        queued_jobs=(SELECT COUNT(*) FROM document_index_jobs j WHERE j.campaign_id=document_index_campaigns.campaign_id AND j.status='queued'),
+        paused_jobs=(SELECT COUNT(*) FROM document_index_jobs j WHERE j.campaign_id=document_index_campaigns.campaign_id AND j.status='paused');
     `,
   },
 ];

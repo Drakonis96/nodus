@@ -169,6 +169,7 @@ const ICON_PATHS: Record<string, string> = {
   archive: '<polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5"/><line x1="10" y1="12" x2="14" y2="12"/>',
   key: '<path d="M21 2l-2 2"/><path d="M17 6l-2 2"/><circle cx="7.5" cy="14.5" r="5.5"/><path d="M12 10l7-7 2 2-7 7"/><path d="M7.5 14.5h.01"/>',
   compass: '<circle cx="12" cy="12" r="10"/><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"/>',
+  compassSearch: '<circle cx="10.5" cy="10.5" r="7.5"/><path d="m16 16 5 5"/><path d="m13.5 7.5-5 6 2-1 1 2 4-5-2 1z"/>',
   chevronLeft: '<polyline points="15 18 9 12 15 6"/>',
   chevronRight: '<polyline points="9 18 15 12 9 6"/>',
   skipBack: '<polygon points="19 20 9 12 19 4 19 20"/><line x1="5" y1="19" x2="5" y2="5"/>',

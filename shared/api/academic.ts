@@ -288,6 +288,7 @@ export interface AcademicApi {
   /** Clean Markdown reader stored under the configured backup root. */
   getLibraryReaderDocument(nodusId: string): Promise<LibraryReaderDocument | null>;
   getLibraryReaderAttachmentContent(nodusId: string, attachmentId: string): Promise<LibraryReaderAttachmentContent | null>;
+  getLibraryReaderAttachmentBytes(nodusId: string, attachmentId: string): Promise<ArrayBuffer | null>;
   openLibraryReaderOriginal(nodusId: string): Promise<boolean>;
   listLibraryReaderAnnotations(nodusId: string): Promise<WritingDraftAnnotation[]>;
   listLibraryReaderOrphanedAnnotations(nodusId: string): Promise<WritingDraftAnnotation[]>;

@@ -203,6 +203,23 @@ const CASES = [
 console.log(`vault: ${file}\n`);
 let checked = 0;
 for (const testCase of CASES) {
+  const columns = new Set(
+    db
+      .prepare(`PRAGMA table_info(${testCase.embeddedFrom})`)
+      .all()
+      .map((column) => column.name),
+  );
+  const missingConfigColumns = [
+    'embedding_provider',
+    'embedding_model',
+    'embedding_dim',
+  ].filter((column) => !columns.has(column));
+  if (missingConfigColumns.length) {
+    console.log(
+      `${testCase.name}: incompatible legacy schema (${missingConfigColumns.join(', ')} missing), skipped`,
+    );
+    continue;
+  }
   const sample = db
     .prepare(`SELECT embedding, embedding_provider provider, embedding_model model, embedding_dim dim FROM ${testCase.embeddedFrom} WHERE embedding IS NOT NULL LIMIT 1`)
     .get();
@@ -237,3 +254,6 @@ if (checked === 0) {
   process.exit(0);
 }
 console.log(`Verified ${checked} scan(s): same ranking, and the event loop is never held for a whole scan.`);
+// The production scan host intentionally keeps its worker alive for reuse. This
+// one-shot diagnostic has finished all comparisons, so do not keep Electron open.
+process.exit(0);

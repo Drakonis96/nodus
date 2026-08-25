@@ -252,6 +252,16 @@ async function ensureConnectedForCompletion(): Promise<void> {
   }
 }
 
+/**
+ * Fail a multi-step workflow before it starts if its selected Codex model cannot
+ * be used. Deep Research deliberately recovers from optional generation stages;
+ * without this gate an authentication error would be swallowed by each fallback
+ * and the report could appear to advance for minutes without a working model.
+ */
+export async function assertChatGptSubscriptionConnected(): Promise<void> {
+  await ensureConnectedForCompletion();
+}
+
 async function refreshAndEmitStatus(): Promise<ChatGptSubscriptionStatus> {
   const status = await readStatus(false);
   emitStatus(status);

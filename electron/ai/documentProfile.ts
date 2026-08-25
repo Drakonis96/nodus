@@ -94,6 +94,8 @@ export interface DocumentProfileScanProgress {
   phase: 'waiting_source' | 'structuring' | 'analyzing_sections' | 'synthesizing' | 'auditing' | 'repairing' | 'embedding' | 'aligning' | 'publishing';
   progress: number;
   message: string;
+  currentUnit?: number;
+  totalUnits?: number;
 }
 
 export interface RunDocumentProfileOptions {
@@ -707,8 +709,20 @@ function alignIdeas(nodusId: string, vectors: Array<{ sourceId: string; kind: st
   return links;
 }
 
-function emit(options: RunDocumentProfileOptions, phase: DocumentProfileScanProgress['phase'], progress: number, message: string): void {
-  options.onProgress?.({ phase, progress, message });
+function emit(
+  options: RunDocumentProfileOptions,
+  phase: DocumentProfileScanProgress['phase'],
+  progress: number,
+  message: string,
+  unit?: { current: number; total: number },
+): void {
+  options.onProgress?.({
+    phase,
+    progress,
+    message,
+    currentUnit: unit?.current,
+    totalUnits: unit?.total,
+  });
   const state = phase === 'analyzing_sections' ? 'analyzing'
     : phase === 'synthesizing' ? 'synthesizing'
     : phase === 'auditing' || phase === 'repairing' ? 'auditing'
@@ -716,7 +730,11 @@ function emit(options: RunDocumentProfileOptions, phase: DocumentProfileScanProg
     : phase === 'aligning' ? 'aligning'
     : phase === 'structuring' ? 'structuring'
     : phase === 'waiting_source' ? 'waiting_source' : null;
-  if (!advanceRunningDocumentIndexJob(options.jobId, phase, progress, state)) {
+  if (!advanceRunningDocumentIndexJob(options.jobId, phase, progress, state, {
+    message,
+    currentUnit: unit?.current ?? null,
+    totalUnits: unit?.total ?? null,
+  })) {
     throw new Error('DOCUMENT_INDEX_CANCELLED');
   }
 }
@@ -764,7 +782,13 @@ export async function runDocumentProfileScan(work: Work, options: RunDocumentPro
   );
   const sectionAnalyses = new Map<string, SectionAnalysis>();
   for (let index = 0; index < sections.length; index += 1) {
-    emit(options, 'analyzing_sections', 0.08 + (index / sections.length) * 0.54, `Analizando sección ${index + 1} de ${sections.length}…`);
+    emit(
+      options,
+      'analyzing_sections',
+      0.08 + (index / sections.length) * 0.54,
+      `Analizando sección ${index + 1} de ${sections.length}…`,
+      { current: index + 1, total: sections.length },
+    );
     const analysis = await analyzeSection(sections[index], options);
     sectionAnalyses.set(sections[index].sectionId, analysis);
     sections[index] = {

@@ -1,6 +1,6 @@
 {
   "name": "nodus",
-  "version": "5.0.1",
+  "version": "5.0.2",
   "description": "Local-first desktop app that turns a Zotero library into a navigable graph of ideas and authors.",
   "author": "Nodus",
   "license": "AGPL-3.0-only",
@@ -101,7 +101,8 @@
     "build:server-shared": "node scripts/build-server-shared.mjs",
     "test:e2e:browser": "node scripts/e2e-browser.mjs",
     "test:radar": "node --test scripts/test-radar.mjs",
-    "test:e2e:radar": "npm run build && node scripts/e2e-radar.mjs"
+    "test:e2e:radar": "npm run build && node scripts/e2e-radar.mjs",
+    "test:e2e:compass": "npm run build && node scripts/e2e-compass.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.32.1",

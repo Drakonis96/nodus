@@ -301,6 +301,16 @@ export function workPassageStatuses(nodusIds?: string[]): WorkPassageStatus[] {
       `SELECT w.nodus_id, w.deep_hash, w.resolved_text_hash,
               COUNT(p.passage_id) AS total_passages,
               SUM(CASE WHEN ${PASSAGE_MATCHES_RESOLVED_TEXT}
+                       THEN 1 ELSE 0 END) AS text_current_passages,
+              SUM(CASE WHEN p.embedding IS NOT NULL
+                         AND p.embedding_dim > 0
+                       THEN 1 ELSE 0 END) AS embedded_passages,
+              SUM(CASE WHEN p.embedding IS NOT NULL
+                         AND p.embedding_provider = ?
+                         AND p.embedding_model = ?
+                         AND p.embedding_dim > 0
+                       THEN 1 ELSE 0 END) AS model_current_passages,
+              SUM(CASE WHEN ${PASSAGE_MATCHES_RESOLVED_TEXT}
                          AND p.embedding IS NOT NULL
                          AND p.embedding_provider = ?
                          AND p.embedding_model = ?
@@ -311,20 +321,41 @@ export function workPassageStatuses(nodusIds?: string[]): WorkPassageStatus[] {
          ${where}
         GROUP BY w.nodus_id, w.deep_hash, w.resolved_text_hash`
     )
-    .all(config.provider, config.model, ...ids) as {
+    .all(config.provider, config.model, config.provider, config.model, ...ids) as {
     nodus_id: string;
     deep_hash: string | null;
     resolved_text_hash: string | null;
     total_passages: number;
+    text_current_passages: number | null;
+    embedded_passages: number | null;
+    model_current_passages: number | null;
     current_passages: number | null;
   }[];
   return rows.map((row) => {
     const totalPassages = Number(row.total_passages ?? 0);
     const current = Number(row.current_passages ?? 0);
+    const textCurrent = Number(row.text_current_passages ?? 0);
+    const embedded = Number(row.embedded_passages ?? 0);
+    const modelCurrent = Number(row.model_current_passages ?? 0);
+    const status = totalPassages === 0 ? 'missing' : current === totalPassages ? 'complete' : 'outdated';
+    const textChanged = totalPassages > 0 && textCurrent !== totalPassages;
+    // Only call this a model change when every passage still has a vector. Missing
+    // vectors are a different repair condition and must not accuse Settings.
+    const modelChanged = totalPassages > 0 && embedded === totalPassages && modelCurrent !== totalPassages;
+    const outdatedReason = status !== 'outdated'
+      ? null
+      : textChanged && modelChanged
+        ? 'text_and_model_changed'
+        : textChanged
+          ? 'text_changed'
+          : modelChanged
+            ? 'model_changed'
+            : 'missing_embeddings';
     return {
       nodus_id: row.nodus_id,
       totalPassages,
-      status: totalPassages === 0 ? 'missing' : current === totalPassages ? 'complete' : 'outdated',
+      status,
+      outdatedReason,
     };
   });
 }

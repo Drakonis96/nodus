@@ -80,10 +80,26 @@ function PdfViewer(props: ViewerProps) {
   const [loading, setLoading] = useState(true); const [error, setError] = useState('');
   useEffect(() => {
     if (!attachment.url) return;
-    const task = getDocument({ url: attachment.url }); let current: PDFDocumentProxy | null = null; setLoading(true); setError('');
-    void task.promise.then((document) => { current = document; setPdf(document); setPageNumber((value) => Math.min(document.numPages, Math.max(1, value))); setRenderedScales({}); setLoading(false); }).catch((cause) => { setError(cause instanceof Error ? cause.message : String(cause)); setLoading(false); });
-    return () => { void task.destroy(); void current?.destroy(); };
-  }, [attachment.url]);
+    let live = true; let task: ReturnType<typeof getDocument> | null = null;
+    setPdf(null); setLoading(true); setError(''); setRenderedScales({});
+    // PDF.js URL loading uses XHR, which can turn a successful custom-protocol
+    // response into status 0 in packaged Electron. Read validated local bytes
+    // asynchronously in main and hand those bytes directly to PDF.js instead.
+    void window.nodus.getLibraryReaderAttachmentBytes(props.documentId, attachment.id).then((buffer) => {
+      if (!buffer?.byteLength) throw new Error('The PDF file is unavailable or empty.');
+      if (!live) return null;
+      const data = new Uint8Array(buffer);
+      task = getDocument({ data });
+      return task.promise;
+    }).then((document) => {
+      if (!document || !live) return;
+      setPdf(document); setPageNumber((value) => Math.min(document.numPages, Math.max(1, value))); setLoading(false);
+    }).catch((cause) => {
+      if (!live) return;
+      setError(cause instanceof Error ? cause.message : String(cause)); setLoading(false);
+    });
+    return () => { live = false; void task?.destroy(); };
+  }, [attachment.id, attachment.url, props.documentId]);
   useEffect(() => { writeAttachmentSessionNumber(props.documentId, attachment.id, 'page', pageNumber); }, [attachment.id, pageNumber, props.documentId]);
   useEffect(() => { writeAttachmentSessionNumber(props.documentId, attachment.id, 'scale', scale); }, [attachment.id, props.documentId, scale]);
   const selectTextLayer = useCallback((number: number, layer: HTMLDivElement | null) => {

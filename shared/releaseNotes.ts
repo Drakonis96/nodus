@@ -1763,6 +1763,68 @@ const RELEASE_4_2_5_HIGHLIGHTS: RawReleaseHighlight[] = [
 ];
 
 /**
+ * 5.0.2 — reliability and interface repairs completed after 5.0.1, plus the
+ * first release of Compass. Keep this list aligned by index with the Italian
+ * and Turkish tables so every highlight is native in all eight languages.
+ */
+const RELEASE_5_0_2_HIGHLIGHTS: RawReleaseHighlight[] = [
+  {
+    scope: 'academic',
+    es: 'Deep Research vuelve a completar los informes desde la interfaz aunque cambies de pestaña. El trabajo pesado sale del camino que dibuja la ventana, los fallos transitorios o de formato se reparan y reintentan, y la cola muestra una sola animación junto a su título y números que se actualizan con la posición real.',
+    en: 'Deep Research completes reports from the interface again even when you change tabs. Heavy work leaves the path that draws the window, transient or formatting failures are repaired and retried, and the queue shows one animation beside its title plus numbers that update with each report’s real position.',
+    fr: 'Deep Research termine de nouveau les rapports depuis l’interface même si vous changez d’onglet. Le travail lourd quitte le chemin qui dessine la fenêtre, les erreurs transitoires ou de format sont réparées puis relancées, et la file affiche une seule animation près de son titre ainsi que des numéros actualisés selon la position réelle.',
+    de: 'Deep Research schließt Berichte wieder über die Oberfläche ab, auch wenn Sie den Tab wechseln. Aufwendige Arbeit blockiert das Zeichnen des Fensters nicht mehr, vorübergehende Fehler und Formatfehler werden repariert und erneut versucht, und die Warteschlange zeigt nur eine Animation am Titel sowie laufend aktualisierte Positionsnummern.',
+    pt: 'O Deep Research volta a concluir relatórios a partir da interface mesmo que mude de separador. O trabalho pesado sai do caminho que desenha a janela, as falhas transitórias ou de formato são reparadas e repetidas, e a fila mostra uma única animação junto ao título e números atualizados com a posição real.',
+    'pt-BR': 'O Deep Research volta a concluir relatórios pela interface mesmo quando você muda de aba. O trabalho pesado sai do caminho que desenha a janela, falhas transitórias ou de formato são reparadas e repetidas, e a fila mostra uma única animação ao lado do título e números atualizados conforme a posição real.',
+  },
+  {
+    scope: 'academic',
+    es: 'Los formularios del Diccionario vuelven a aceptar texto y los botones muestran de inmediato que han respondido. Regenerar y actualizar conservan una alineación estable, reparan respuestas incompletas del modelo y reintentan de forma controlada cuando el resultado no se puede interpretar, sin llenar la interfaz de errores repetidos.',
+    en: 'Dictionary forms accept text again and their buttons immediately show that they responded. Regenerate and Update keep a stable alignment, repair incomplete model responses, and retry in a controlled way when a result cannot be interpreted, without filling the interface with repeated errors.',
+    fr: 'Les formulaires du Dictionnaire acceptent de nouveau le texte et leurs boutons indiquent immédiatement qu’ils ont répondu. Régénérer et Mettre à jour restent alignés, réparent les réponses incomplètes du modèle et relancent de façon contrôlée un résultat impossible à interpréter, sans remplir l’interface d’erreurs répétées.',
+    de: 'Die Formulare des Wörterbuchs nehmen wieder Text an und ihre Schaltflächen zeigen sofort eine Reaktion. Neu erzeugen und Aktualisieren bleiben stabil ausgerichtet, reparieren unvollständige Modellantworten und wiederholen kontrolliert, wenn ein Ergebnis nicht gelesen werden kann, ohne die Oberfläche mit wiederholten Fehlern zu füllen.',
+    pt: 'Os formulários do Dicionário voltam a aceitar texto e os botões mostram de imediato que responderam. Regenerar e Atualizar mantêm um alinhamento estável, reparam respostas incompletas do modelo e repetem de forma controlada quando o resultado não pode ser interpretado, sem encher a interface de erros repetidos.',
+    'pt-BR': 'Os formulários do Dicionário voltam a aceitar texto e os botões mostram imediatamente que responderam. Regenerar e Atualizar mantêm um alinhamento estável, reparam respostas incompletas do modelo e repetem de forma controlada quando o resultado não pode ser interpretado, sem encher a interface de erros repetidos.',
+  },
+  {
+    scope: 'academic',
+    es: 'El lector abre de nuevo el PDF dentro de Nodus al cambiar desde el Markdown limpio. La aplicación resuelve el adjunto local antes de entregarlo al visor y ya no deja una respuesta de servidor vacía en pantalla, mientras que Abrir fuera de Nodus conserva el acceso directo al archivo original.',
+    en: 'The reader opens the PDF inside Nodus again when you switch from clean Markdown. The app resolves the local attachment before handing it to the viewer and no longer leaves an empty server response on screen, while Open outside Nodus keeps its direct route to the original file.',
+    fr: 'Le lecteur ouvre de nouveau le PDF dans Nodus lorsque vous quittez le Markdown nettoyé. L’application résout la pièce jointe locale avant de la transmettre au lecteur et ne laisse plus une réponse serveur vide à l’écran, tandis qu’Ouvrir hors de Nodus conserve son accès direct au fichier original.',
+    de: 'Der Reader öffnet das PDF beim Wechsel von bereinigtem Markdown wieder innerhalb von Nodus. Die App löst den lokalen Anhang auf, bevor sie ihn an die Anzeige übergibt, und zeigt keine leere Serverantwort mehr. Außerhalb von Nodus öffnen behält zugleich den direkten Weg zur Originaldatei.',
+    pt: 'O leitor volta a abrir o PDF dentro do Nodus ao mudar a partir do Markdown limpo. A aplicação resolve o anexo local antes de o entregar ao visualizador e deixa de mostrar uma resposta vazia do servidor, enquanto Abrir fora do Nodus mantém o acesso direto ao ficheiro original.',
+    'pt-BR': 'O leitor volta a abrir o PDF dentro do Nodus ao mudar do Markdown limpo. O aplicativo resolve o anexo local antes de entregá-lo ao visualizador e não deixa mais uma resposta vazia do servidor na tela, enquanto Abrir fora do Nodus mantém o acesso direto ao arquivo original.',
+  },
+  {
+    scope: 'academic',
+    es: 'El índice documental informa del trabajo que realmente avanza. La campaña y la tira inferior comparten los mismos recuentos, cada obra conserva su lugar mientras muestra el progreso de sus secciones, y Reintentar explica si cambió el texto o el modelo correcto. El modal también recupera sus colores de modo claro.',
+    en: 'The documentary index now reports the work that is actually moving. The campaign and lower strip share the same counts, each work keeps its place while section progress advances, and Retry explains whether the text or the correct model changed. The modal also restores its proper light-mode colours.',
+    fr: 'L’index documentaire indique désormais le travail qui avance réellement. La campagne et la bande inférieure partagent les mêmes comptes, chaque œuvre garde sa place tandis que ses sections progressent, et Réessayer précise si le texte ou le bon modèle a changé. La fenêtre retrouve aussi ses couleurs correctes en mode clair.',
+    de: 'Der Dokumentindex meldet jetzt die Arbeit, die tatsächlich vorankommt. Kampagne und unterer Streifen verwenden dieselben Zähler, jedes Werk behält seinen Platz, während die Abschnitte fortschreiten, und Wiederholen erklärt, ob sich der Text oder das richtige Modell geändert hat. Das Fenster verwendet außerdem wieder korrekte Farben im hellen Modus.',
+    pt: 'O índice documental passa a mostrar o trabalho que realmente avança. A campanha e a faixa inferior partilham as mesmas contagens, cada obra mantém o seu lugar enquanto as secções progridem, e Repetir explica se mudou o texto ou o modelo correto. O modal recupera também as cores adequadas no modo claro.',
+    'pt-BR': 'O índice documental agora mostra o trabalho que realmente avança. A campanha e a faixa inferior compartilham as mesmas contagens, cada obra mantém seu lugar enquanto as seções progridem, e Tentar novamente explica se mudou o texto ou o modelo correto. O modal também recupera as cores adequadas no modo claro.',
+  },
+  {
+    scope: 'academic',
+    es: 'Ideas y Argument map comparten ahora el mismo lenguaje visual. Los puntos de tipo usan los mismos colores en ambas listas, las filas de Ideas ganan el margen vertical que les faltaba y títulos, descripciones y columnas permanecen alineados incluso en una ventana estrecha.',
+    en: 'Ideas and Argument map now share the same visual language. Type dots use the same colours in both lists, Ideas rows gain the vertical breathing room they were missing, and titles, descriptions, and columns remain aligned even in a narrow window.',
+    fr: 'Idées et Carte argumentative partagent désormais le même langage visuel. Les points de type utilisent les mêmes couleurs dans les deux listes, les lignes d’Idées gagnent l’espace vertical qui leur manquait et titres, descriptions et colonnes restent alignés même dans une fenêtre étroite.',
+    de: 'Ideen und Argumentkarte verwenden jetzt dieselbe Bildsprache. Typmarkierungen haben in beiden Listen dieselben Farben, Ideenreihen erhalten den fehlenden vertikalen Abstand, und Titel, Beschreibungen und Spalten bleiben auch in einem schmalen Fenster ausgerichtet.',
+    pt: 'Ideias e Mapa de argumentos passam a partilhar a mesma linguagem visual. Os pontos de tipo usam as mesmas cores nas duas listas, as linhas de Ideias ganham o espaço vertical que faltava e títulos, descrições e colunas mantêm-se alinhados mesmo numa janela estreita.',
+    'pt-BR': 'Ideias e Mapa de argumentos agora compartilham a mesma linguagem visual. Os pontos de tipo usam as mesmas cores nas duas listas, as linhas de Ideias ganham o espaço vertical que faltava e títulos, descrições e colunas permanecem alinhados mesmo em uma janela estreita.',
+  },
+  {
+    scope: 'toolkit',
+    es: 'Nodus Compass llega a Herramientas para descubrir literatura académica en fuentes abiertas. Busca en varios catálogos a la vez, combina duplicados, explica por qué recomienda cada resultado y permite guardar candidatos o importarlos a la Biblioteca con comprobación de duplicados y procedencia visible.',
+    en: 'Nodus Compass arrives in Tools to discover academic literature across open sources. It searches several catalogues at once, merges duplicates, explains why each result is recommended, and lets you save candidates or import them into the Library with duplicate checks and visible provenance.',
+    fr: 'Nodus Compass arrive dans les Outils pour découvrir la littérature académique dans des sources ouvertes. Il interroge plusieurs catalogues à la fois, fusionne les doublons, explique chaque recommandation et permet d’enregistrer des candidats ou de les importer dans la Bibliothèque avec contrôle des doublons et provenance visible.',
+    de: 'Nodus Compass kommt zu den Werkzeugen und entdeckt wissenschaftliche Literatur in offenen Quellen. Es durchsucht mehrere Kataloge gleichzeitig, führt Dubletten zusammen, erklärt jede Empfehlung und lässt Kandidaten speichern oder mit Dublettenprüfung und sichtbarer Herkunft in die Bibliothek importieren.',
+    pt: 'O Nodus Compass chega às Ferramentas para descobrir literatura académica em fontes abertas. Pesquisa vários catálogos ao mesmo tempo, reúne duplicados, explica cada recomendação e permite guardar candidatos ou importá-los para a Biblioteca com verificação de duplicados e proveniência visível.',
+    'pt-BR': 'O Nodus Compass chega às Ferramentas para descobrir literatura acadêmica em fontes abertas. Ele pesquisa vários catálogos ao mesmo tempo, reúne duplicatas, explica cada recomendação e permite salvar candidatos ou importá-los para a Biblioteca com verificação de duplicatas e procedência visível.',
+  },
+];
+
+/**
  * 5.0.1 — every user-visible repair merged after 5.0.0, including the work
  * that was already on main before this release branch started.
  */
@@ -1913,6 +1975,11 @@ const RELEASE_5_0_0_HIGHLIGHTS: RawReleaseHighlight[] = [
 ];
 
 const RAW_RELEASE_NOTES: RawReleaseNote[] = [
+  {
+    version: '5.0.2',
+    date: '2026-08-26',
+    highlights: RELEASE_5_0_2_HIGHLIGHTS,
+  },
   {
     version: '5.0.1',
     date: '2026-08-25',
