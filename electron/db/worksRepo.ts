@@ -564,10 +564,30 @@ export function setDeepPending(nodusId: string): void {
   // Once a deep result is committed, deep_status describes that readable result.
   // Live queue state describes its replacement attempt; do not hide the committed
   // graph or stale a valid profile merely because a retry was enqueued.
+  //
+  // deep_queued is what makes that separation survive a restart: the queue lives in
+  // memory only, and resumePending() used to find abandoned work by deep_status alone.
+  // Without this flag a rescan of an already-analysed work — every degraded work the
+  // recovery pass enqueues — would be dropped silently when the app closes mid-run.
+  // The queue clears it again from the job's outcome; see clearDeepQueued.
   getDb().prepare(`UPDATE works SET
     deep_status=CASE WHEN deep_hash IS NULL THEN 'pending' ELSE 'done' END,
-    deep_error=NULL
+    deep_error=NULL,
+    deep_queued=1
     WHERE nodus_id=?`).run(nodusId);
+}
+
+/**
+ * Drop the queued marker. The scan queue is its only caller and reaches it through
+ * ScanQueue.syncDeepQueued, never from setDeepResult: an abandoned scan (stop button on
+ * a running job) still writes its result long after a replacement job was queued for the
+ * same work, and clearing on the write would strand that replacement — the very loss
+ * this marker exists to prevent. Everything that ends a deep scan, including the upload
+ * path that runs one without a queue item, goes through syncDeepQueued so the flag can
+ * only ever mean "this queue has a live deep job for this work".
+ */
+export function clearDeepQueued(nodusId: string): void {
+  getDb().prepare('UPDATE works SET deep_queued=0 WHERE nodus_id=?').run(nodusId);
 }
 
 export function setSummaryPending(nodusId: string): void {
@@ -706,7 +726,10 @@ export function invalidateSummary(nodusId: string): void {
 }
 
 export function setArchived(nodusId: string, value: boolean): void {
-  getDb().prepare('UPDATE works SET archived = ? WHERE nodus_id = ?').run(value ? 1 : 0, nodusId);
+  // Archiving hides the work from every resume query, so a marker left behind would be
+  // dormant until the work came back and then fire a scan nobody asked for.
+  getDb().prepare('UPDATE works SET archived = ?, deep_queued = CASE WHEN ? THEN 0 ELSE deep_queued END WHERE nodus_id = ?')
+    .run(value ? 1 : 0, value ? 1 : 0, nodusId);
 }
 
 /** Works eligible for deep scan: tag OR manual, not archived. */

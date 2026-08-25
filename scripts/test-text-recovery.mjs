@@ -99,6 +99,20 @@ try {
     'shared cleanup dehyphenates line wraps without collapsing paragraph boundaries',
   );
 
+  // Cleanup repairs what the line structure PROVES was split, and guesses at nothing
+  // else. Rules that glued an isolated accented vowel or a standalone `fi` to their
+  // neighbours fired 21 times over one real 368-page Spanish book and corrupted the text
+  // every single time: `y` is a word, `á` was a word, and `Wi fi` is two of them.
+  for (const [input, expected] of [
+    ['nació y creció el turismo', 'nació y creció el turismo'],
+    ['empezó á depender del clima', 'empezó á depender del clima'],
+    ['aquí y allí', 'aquí y allí'],
+    ['Wi fi network', 'Wi fi network'],
+    ['tres ó cuatro balnearios', 'tres ó cuatro balnearios'],
+  ]) {
+    assert.equal(cleanExtractedText(input), expected, `cleanup must not rewrite words: ${input}`);
+  }
+
   assert.equal(isTextAttachment({ key: 'A', contentType: 'application/epub+zip', linkMode: 'imported_file', filename: 'book.epub' }), true);
   assert.equal(isTextAttachment({ key: 'B', contentType: 'text/html', linkMode: 'imported_url', filename: 'snapshot.html' }), false);
 

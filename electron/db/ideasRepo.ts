@@ -701,7 +701,7 @@ export function resetGraphData(): void {
         light_status = 'none', light_at = NULL, light_hash = NULL,
         deep_status = 'none', deep_at = NULL, deep_hash = NULL,
         summary_status = 'none', summary_at = NULL, summary_hash = NULL,
-        source_type = NULL, notes = NULL, deep_error = NULL;
+        source_type = NULL, notes = NULL, deep_error = NULL, deep_queued = 0;
     `);
   });
   tx();

@@ -716,6 +716,8 @@ export interface Work {
   text_resolved_at: string | null;
   resolved_text_notes: string | null;
   deep_error: string | null;
+  /** 1 while a deep job for this work is queued or running; survives a restart. */
+  deep_queued: number;
   summary_status: SummaryStatus;
   summary_at: string | null;
   summary_hash: string | null;

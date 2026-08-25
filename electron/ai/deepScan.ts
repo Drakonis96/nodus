@@ -304,6 +304,29 @@ export function normalizeDeepResult(
 }
 
 /** Merge ideas sharing the same canonical label across chunks of the same work. */
+/**
+ * A checkpointed chunk result that is safe to reuse, or null to analyse the chunk again.
+ *
+ * normalizeDeepResult is TOTAL: it turns any input at all — `{}`, a number, a string, an
+ * old schema — into a well-formed DeepResult. Feeding it a checkpoint the resume path had
+ * only tested for truthiness therefore produced an EMPTY result that sailed through the
+ * strict guard: the chunk was skipped, its ideas were lost, the emptied result was written
+ * back over the checkpoint, and the work still finished as 'done' with no error anywhere.
+ * So the RAW row is checked first: a checkpoint already shaped like a deep result is worth
+ * repairing (that is how label-less ideas from older runs are rescued), and anything else
+ * is not a result at all and must be re-analysed.
+ */
+export function usableCheckpoint(
+  saved: unknown,
+  sourceMap: Map<string, string>,
+  defaultSourceAlias: string | null,
+  citationCorpus?: Map<string, Map<number | null, string>>,
+): DeepResult | null {
+  if (!saved || !isRawDeepResult(saved)) return null;
+  const normalized = normalizeDeepResult(saved, sourceMap, defaultSourceAlias, citationCorpus);
+  return isDeepResult(normalized) ? normalized : null;
+}
+
 export function mergeByLabel(results: DeepResult[]): {
   ideas: Map<string, DeepIdea>;
   themes: Map<string, DeepTheme>;
@@ -483,15 +506,12 @@ export async function runDeepScan(
     for (let i = 0; i < chunks.length; i++) {
       // Resume from checkpoint if available.
       const defaultSourceAlias = chunks[i].match(/\[\[src:([^\]\s]+)/i)?.[1] ?? null;
-      const saved = checkpoints.get(i);
-      if (saved) {
-        const normalized = normalizeDeepResult(saved, sourceMap, defaultSourceAlias, citationCorpus);
-        if (isDeepResult(normalized)) {
-          results.push(normalized);
-          // Upgrade legacy checkpoints in place so every later resume is strict.
-          saveCheckpoint(work.nodus_id, hash, 'deep_chunk', i, normalized);
-          continue;
-        }
+      const reusable = usableCheckpoint(checkpoints.get(i), sourceMap, defaultSourceAlias, citationCorpus);
+      if (reusable) {
+        results.push(reusable);
+        // Upgrade legacy checkpoints in place so every later resume is strict.
+        saveCheckpoint(work.nodus_id, hash, 'deep_chunk', i, reusable);
+        continue;
       }
       onProgress?.({ detail: `Analizando fragmento ${i + 1}/${chunks.length} con IA…`, pct: i / chunks.length });
       const chunkWordCount = chunks[i].split(/\s+/).filter(Boolean).length;

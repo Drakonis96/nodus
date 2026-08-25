@@ -29,9 +29,9 @@ try {
   const before = source ? counts(db) : null;
   runMigrations(db);
   assert.equal(db.pragma('user_version', { simple: true }), SCHEMA_VERSION);
-  assert.equal(SCHEMA_VERSION, 161);
+  assert.equal(SCHEMA_VERSION, 163);
   const workColumns = new Set(db.prepare('PRAGMA table_info(works)').all().map((row) => row.name));
-  for (const column of ['resolved_source_type', 'resolved_text_hash', 'text_block_reason', 'resolved_text_notes', 'deep_error']) {
+  for (const column of ['resolved_source_type', 'resolved_text_hash', 'text_block_reason', 'resolved_text_notes', 'deep_error', 'deep_queued']) {
     assert.ok(workColumns.has(column), `works.${column} exists`);
   }
   assert.ok(db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='work_text_sources'").get());
@@ -47,6 +47,33 @@ try {
   if (before) assert.deepEqual(counts(db), before, 'additive migration preserves corpus row counts');
   assert.deepEqual(db.pragma('quick_check'), [{ quick_check: 'ok' }]);
   assert.equal(db.pragma('foreign_key_check').length, 0);
+
+  // A database built by a differently-numbered build can sit above the version that
+  // introduced the text inventory without ever having created it. That is why the table
+  // lives in a CREATE-only body (migration 162) and carries no cascading key: only such
+  // a body may be replayed to put it back. Simulate the hole and let the repair run.
+  // A database built by an EARLIER build of this branch already ran 160 and 161, so a
+  // column appended to 160 afterwards would never reach it: runMigrations only executes
+  // bodies above user_version, and the CREATE-only backfill cannot replay an ALTER. Every
+  // later column therefore needs its own migration, and this is that database.
+  db.exec('ALTER TABLE works DROP COLUMN deep_queued');
+  db.pragma('user_version = 161');
+  runMigrations(db);
+  assert.ok(
+    new Set(db.prepare('PRAGMA table_info(works)').all().map((row) => row.name)).has('deep_queued'),
+    'a column added after 160 shipped still reaches a database that stopped at 161'
+  );
+  assert.equal(db.pragma('user_version', { simple: true }), SCHEMA_VERSION);
+
+  db.prepare('DROP TABLE work_text_sources').run();
+  runMigrations(db);
+  assert.ok(
+    db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='work_text_sources'").get(),
+    'the missing text inventory is backfilled without a version bump'
+  );
+  assert.ok(db.prepare("SELECT 1 FROM sqlite_master WHERE type='index' AND name='idx_work_text_sources_attachment'").get());
+  assert.equal(db.pragma('user_version', { simple: true }), SCHEMA_VERSION);
+  if (before) assert.deepEqual(counts(db), before, 'the repair pass changes no corpus row');
   db.close();
 } finally {
   await rm(root, { recursive: true, force: true });

@@ -608,6 +608,7 @@ export function clearGenealogyDemoData(): void {
       DELETE FROM writing_saved_drafts WHERE id LIKE 'demo-genealogy-%';
       DELETE FROM notes WHERE id LIKE 'demo-genealogy-%';
       DELETE FROM note_folders WHERE id LIKE 'demo-genealogy-%';
+      DELETE FROM work_text_sources WHERE nodus_id LIKE 'demo-genealogy-%';
       DELETE FROM works WHERE nodus_id LIKE 'demo-genealogy-%';
       DELETE FROM social_relations WHERE relation_id LIKE 'demo-%';
       DELETE FROM social_contacts WHERE contact_id LIKE 'demo-%';

@@ -1,6 +1,14 @@
 import type { ReasoningEffort } from '@shared/types';
 import type { VisionImagePart } from '@shared/imageAnalysis';
 
+/**
+ * Prefix that marks an output-ceiling cutoff. aiClient re-types errors carrying it as
+ * `output_truncated` so the deep scan can widen or split the chunk. It is a stable token
+ * rather than a phrase because matching prose classified unrelated failures as
+ * truncation — an upstream gateway saying "output may have been truncated" was enough.
+ */
+export const OUTPUT_TRUNCATED_MARKER = 'NODUS_OUTPUT_TRUNCATED';
+
 export type OpenCodeGoProtocol = 'openai' | 'anthropic';
 
 export interface OpenCodeGoNormalizedUsage {
@@ -220,7 +228,7 @@ async function completeOpenAi(options: OpenCodeGoCompletionOptions, url: string,
     if (body?.error) throw apiError(response.status, body);
     const choice = body?.choices?.[0];
     if (options.jsonMode && choice?.finish_reason === 'length') {
-      throw new Error('OpenCode Go cortó la respuesta al alcanzar el límite de salida y el JSON quedó incompleto.');
+      throw new Error(`${OUTPUT_TRUNCATED_MARKER}: OpenCode Go cortó la respuesta al alcanzar el límite de salida y el JSON quedó incompleto.`);
     }
     return { text: assertText(choice?.message?.content ?? ''), usage: openAiUsage(body?.usage) };
   }
@@ -244,7 +252,7 @@ async function completeOpenAi(options: OpenCodeGoCompletionOptions, url: string,
     usage = openAiUsage(chunk?.usage) ?? usage;
   }
   if (options.jsonMode && finishReason === 'length') {
-    throw new Error('OpenCode Go cortó la respuesta al alcanzar el límite de salida y el JSON quedó incompleto.');
+    throw new Error(`${OUTPUT_TRUNCATED_MARKER}: OpenCode Go cortó la respuesta al alcanzar el límite de salida y el JSON quedó incompleto.`);
   }
   return { text: assertText(text), usage };
 }
@@ -280,7 +288,7 @@ async function completeAnthropic(options: OpenCodeGoCompletionOptions, url: stri
     const body = await response.json() as any;
     if (body?.error) throw apiError(response.status, body);
     if (options.jsonMode && body?.stop_reason === 'max_tokens') {
-      throw new Error('OpenCode Go cortó la respuesta al alcanzar el límite de salida y el JSON quedó incompleto.');
+      throw new Error(`${OUTPUT_TRUNCATED_MARKER}: OpenCode Go cortó la respuesta al alcanzar el límite de salida y el JSON quedó incompleto.`);
     }
     const text = (body?.content ?? []).filter((block: any) => block?.type === 'text').map((block: any) => block.text ?? '').join('');
     return { text: assertText(text), usage: anthropicUsage(body?.usage) };
@@ -308,7 +316,7 @@ async function completeAnthropic(options: OpenCodeGoCompletionOptions, url: stri
     }
   }
   if (options.jsonMode && stopReason === 'max_tokens') {
-    throw new Error('OpenCode Go cortó la respuesta al alcanzar el límite de salida y el JSON quedó incompleto.');
+    throw new Error(`${OUTPUT_TRUNCATED_MARKER}: OpenCode Go cortó la respuesta al alcanzar el límite de salida y el JSON quedó incompleto.`);
   }
   return { text: assertText(text), usage: anthropicUsage({ ...(inputUsage ?? {}), ...(outputUsage ?? {}) }) };
 }

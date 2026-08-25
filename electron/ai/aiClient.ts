@@ -34,7 +34,7 @@ import {
 import { classifyProviderError } from './providerErrors';
 import { completeWithChatGptSubscription } from './codexSubscription';
 import { completeWithGitHubCopilotSubscription } from './githubCopilotSubscription';
-import { completeWithOpenCodeGo } from './openCodeGoCompletion';
+import { completeWithOpenCodeGo, OUTPUT_TRUNCATED_MARKER } from './openCodeGoCompletion';
 import { recordOpenCodeGoUsage } from './openCodeGoUsage';
 
 export class AiError extends Error {
@@ -664,8 +664,12 @@ async function rawComplete(
 }
 
 function wrapProviderError(e: any): AiError {
-  if (/cortó la respuesta|límite de salida|json quedó incompleto|output.*truncat/i.test(e?.message ?? '')) {
-    return new AiError(e?.message ?? 'La respuesta JSON quedó truncada.', true, false, 'output_truncated');
+  // Only OUR OWN cutoff errors are re-typed. Matching prose used to catch anything that
+  // said "truncated" — an upstream gateway timeout was enough to send a deep scan
+  // doubling its budget and splitting a chunk to chase a network hiccup.
+  const message: string = e?.message ?? '';
+  if (message.includes(OUTPUT_TRUNCATED_MARKER)) {
+    return new AiError(message.replace(new RegExp(`^${OUTPUT_TRUNCATED_MARKER}:\\s*`), '') || 'La respuesta JSON quedó truncada.', true, false, 'output_truncated');
   }
   const status = e?.status ?? e?.response?.status;
   // A prompt that overflows the model's context window can arrive at various statuses
@@ -702,6 +706,41 @@ function wrapProviderError(e: any): AiError {
 
 function errorMessage(e: unknown): string {
   return e instanceof Error ? e.message : String(e);
+}
+
+/**
+ * True when the text ends inside an unclosed JSON structure — the response was cut off.
+ *
+ * The provider's own signal is checked first everywhere it exists (`finish_reason`,
+ * `stop_reason`), but the subscription runtimes (codex, github-copilot) return a bare
+ * string with no signal at all. Without this, `extractJson` slices to the last `}` — the
+ * end of the last COMPLETE inner object — and jsonrepair closes the remains into
+ * something the schema guard happily accepts, so a chunk cut in half is checkpointed as
+ * a success and its ideas are lost with no error anywhere.
+ */
+function endsMidJson(text: string): boolean {
+  const start = text.indexOf('{');
+  if (start === -1) return false;
+  let depth = 0;
+  let inString = false;
+  let escaped = false;
+  let closed = false;
+  for (let i = start; i < text.length; i += 1) {
+    const char = text[i];
+    if (inString) {
+      if (escaped) escaped = false;
+      else if (char === '\\') escaped = true;
+      else if (char === '"') inString = false;
+      continue;
+    }
+    if (char === '"') inString = true;
+    else if (char === '{' || char === '[') depth += 1;
+    else if (char === '}' || char === ']') {
+      depth -= 1;
+      if (depth === 0) closed = true;
+    }
+  }
+  return inString || depth > 0 || !closed;
 }
 
 /** Strip code fences and locate the outermost JSON object. */
@@ -759,8 +798,12 @@ async function parseOrRepair<T>(
   model: ModelRef,
   text: string,
   guard: (v: unknown) => v is T,
-  perf?: PerfContext
+  perf?: PerfContext,
+  maxTokens?: number
 ): Promise<T> {
+  if (endsMidJson(text)) {
+    throw new AiError(truncatedJsonMessage(model, maxTokens ?? 0), true, false, 'output_truncated');
+  }
   let parsed: unknown;
   try {
     parsed = extractJson(text);
@@ -832,7 +875,7 @@ export async function completeJson<T>(
       throw e;
     }
     try {
-      const parsed = await parseOrRepair(resolved, text, guard, langOpts.perf);
+      const parsed = await parseOrRepair(resolved, text, guard, langOpts.perf, langOpts.maxTokens);
       if (i > 0) retryDone({ status: 'ok' });
       return deanonymizeResult(parsed);
     } catch (e) {

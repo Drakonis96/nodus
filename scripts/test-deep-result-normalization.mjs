@@ -20,7 +20,7 @@ if (!process.argv.includes('--electron-deep-normalization-test')) {
 const root = await mkdtemp(path.join(os.tmpdir(), 'nodus-deep-normalization-'));
 installRuntimeHooks(root);
 try {
-  const { normalizeDeepResult, isDeepResult, mergeByLabel } = require(path.join(repoRoot, 'electron/ai/deepScan.ts'));
+  const { normalizeDeepResult, isDeepResult, mergeByLabel, usableCheckpoint } = require(path.join(repoRoot, 'electron/ai/deepScan.ts'));
   const normalized = normalizeDeepResult({
     document: { processing_status: 'ok' },
     theme_nodes: [{ id: 't1', statement: 'Historia cultural del turismo', role: 'primary', confidence: 2 }],
@@ -69,6 +69,23 @@ try {
   ]);
   assert.deepEqual(merged.internal.map(({ from, to }) => [from, to]), [['primera', 'segunda'], ['tercera', 'cuarta']],
     'provider-local ids are scoped to their own chunk');
+
+  // Resuming from a checkpoint is where normalisation turns dangerous: it accepts ANY
+  // input, so an unusable row would normalise into an EMPTY result, pass the strict
+  // guard, and skip that chunk for good — the work finishing as 'done' with its ideas
+  // missing and no error raised. Proof that the trap is real, then that the gate closes it.
+  const empties = normalizeDeepResult({}, new Map(), null);
+  assert.ok(isDeepResult(empties) && empties.ideas.length === 0,
+    'normalisation is total: garbage becomes a valid, empty result');
+  for (const rubbish of [null, 0, '', {}, 42, 'texto', true, [1, 2, 3], { ideas: 'no', document: {} }, { ideas: [], nodocument: true }]) {
+    assert.equal(usableCheckpoint(rubbish, new Map(), null), null,
+      `a checkpoint that is not a deep result must be re-analysed: ${JSON.stringify(rubbish)}`);
+  }
+  const legacy = usableCheckpoint(
+    { document: {}, ideas: [{ id: 'i1', statement: 'Una idea sin etiqueta guardada por una versión anterior.' }] },
+    new Map(), null,
+  );
+  assert.ok(legacy && legacy.ideas[0].label, 'a checkpoint that IS a deep result is still repaired, not discarded');
 } finally {
   try { require(path.join(repoRoot, 'electron/db/database.ts')).closeDb(); } catch {}
   await rm(root, { recursive: true, force: true });

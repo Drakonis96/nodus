@@ -921,6 +921,7 @@ export function clearDemoData(): void {
       DELETE FROM authors WHERE author_id LIKE 'demo-%';
       DELETE FROM notes WHERE id LIKE 'demo-%';
       DELETE FROM note_folders WHERE id LIKE 'demo-%';
+      DELETE FROM work_text_sources WHERE nodus_id LIKE 'demo-%';
       DELETE FROM works WHERE nodus_id LIKE 'demo-%';
     `);
     updateSettings({ demoMode: false });

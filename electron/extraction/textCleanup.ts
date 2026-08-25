@@ -7,9 +7,14 @@ export function cleanInlineText(value: string): string {
     .replace(/\u00a0/g, ' ')
     .replace(/[\t ]+/g, ' ')
     .replace(/[-‐‑‒–—]{2,}/g, '-')
-    .replace(/\b(fi|fl)\s+(?=\p{Ll}{2,})/gu, '$1')
-    .replace(/(\p{L}+)\s+([áéíóúü])\s+(\p{L}+)/giu, (_whole, left: string, vowel: string, right: string) => `${left}${vowel}${right.length > 1 ? right : ` ${right}`}`)
-    .replace(/(\p{L}{2,}[áéíóúü])\s+([bcdfghjklmnñpqrstvwxyz])(?=\s|[,.;:!?)]|$)/giu, '$1$2')
+    // NO LEXICAL REPAIR HERE, DELIBERATELY. Three rules used to guess at OCR damage —
+    // rejoining a standalone `fi`/`fl`, and gluing an isolated accented vowel to its
+    // neighbours. Measured over the raw text of a real 368-page Spanish book: 21 firings,
+    // every single one of them corruption and not one repair. `nació y` became `nacióy`
+    // (19 times, the rule never met a genuine split), `empezó á depender` became one
+    // word, and `Wi fi network` became `Wi finetwork`. An accented vowel followed by a
+    // lone consonant is ordinary Spanish — `y` is a word. Only line structure (see
+    // dehyphenatingJoin) is evidence of a split; a guess about a word is not.
     .replace(/\s+([,.;:!?%)\]}»”])/g, '$1')
     .replace(/([¿¡([{«“])\s+/g, '$1')
     .trim();

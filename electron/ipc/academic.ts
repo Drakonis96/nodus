@@ -605,7 +605,8 @@ export function registerAcademicIpc({ h, getWindow, chatAborters }: IpcContext):
   h('works:rescanDegraded', async (_e, model?: ModelRef | null) => {
     // Re-scan works that only ever saw the abstract (e.g. the PDF wasn't attached/
     // indexed when they were first analysed). A bare enqueue is idempotent: if the
-    // resolved text is unchanged, runDeepScan is a no-op and no tokens are spent.
+    // resolved text is unchanged, runDeepScan re-commits the same result and returns
+    // without calling the model, so no tokens are spent.
     const rows = getDb()
       .prepare(
         `SELECT nodus_id, title FROM works
@@ -771,8 +772,18 @@ export function registerAcademicIpc({ h, getWindow, chatAborters }: IpcContext):
       ocr: { enabled: s.ocrEnabled, languages: s.ocrLanguages, maxPages: s.ocrMaxPages },
       perf: { nodusId, title: w.title },
     });
+    // This path scans OUTSIDE the queue, so nothing else will ever clear the queued
+    // marker setDeepPending leaves behind. Without the finally, a failed upload scan
+    // would have resumePending() start a queued scan of this work on the next launch —
+    // one that resolves text from Zotero and overwrites the uploaded-text analysis.
     works.setDeepPending(nodusId);
-    await runDeepScan(w, doc);
+    try {
+      await runDeepScan(w, doc);
+    } finally {
+      // Ask the queue rather than clearing outright: this work may also have a deep job
+      // waiting, and zeroing the marker under it would lose that job on the next launch.
+      scanQueue.syncDeepQueued(nodusId);
+    }
   });
 
   // queue

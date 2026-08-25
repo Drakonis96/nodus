@@ -107,6 +107,152 @@ try {
   const raced = await passages.findSimilarPassagesPaged([1, 0], -1, 10, { nodusIds: ['race'] });
   await mutateBeforeNextWindow;
   assert.deepEqual(raced, [], 'paged vector materialization cannot attach an old score to a reindexed stable passage id');
+
+  // --- A queued rescan outlives the process, and a failed one stays retriable ---------
+  // The queue lives in memory only: resumePending() reading the database IS the entire
+  // restart story. Since a rescan of an already-analysed work deliberately keeps
+  // deep_status='done', deep_queued is the only trace a restart can find. The worker
+  // loop is neutralised so this exercises that bookkeeping without running a scan.
+  const queue = require(path.join(repoRoot, 'electron/pipeline/scanQueue.ts')).scanQueue;
+  Object.getPrototypeOf(queue).run = async () => undefined;
+  const deepItemsFor = (nodusId) => queue.snapshot().items.filter((item) => item.nodus_id === nodusId && item.kind === 'deep');
+
+  db.prepare(`INSERT INTO works (
+    nodus_id,zotero_key,title,authors_json,item_type,source_type,light_status,deep_status,
+    deep_hash,summary_status,archived,read_tag,manual_deep
+  ) VALUES ('degraded','ZD','Degradada','[]','book','abstract_only','done','done','deg-hash','none',0,0,0)`).run();
+  queue.enqueue('degraded', 'Degradada', 'deep');
+  let degraded = db.prepare("SELECT * FROM works WHERE nodus_id='degraded'").get();
+  assert.equal(degraded.deep_status, 'done', 'enqueueing a rescan never hides the committed analysis');
+  assert.equal(degraded.deep_queued, 1, 'the queued marker is the only thing a restart can see');
+
+  queue.items.length = 0; // the process dies: the in-memory queue goes with it
+  queue.resumePending();
+  assert.equal(deepItemsFor('degraded').length, 1, 'a rescan of an analysed work is re-enqueued after a restart');
+
+  // Finishing the JOB is what drops the marker — process() marks the item terminal and
+  // then asks the queue. setDeepResult deliberately does not, because an abandoned scan
+  // writes one too (see below).
+  works.setDeepResult('degraded', 'done', 'deg-hash-2', 'pdf', null);
+  queue.items.find((item) => item.nodus_id === 'degraded' && item.kind === 'deep').state = 'done';
+  queue.syncDeepQueued('degraded');
+  assert.equal(db.prepare("SELECT deep_queued FROM works WHERE nodus_id='degraded'").get().deep_queued, 0);
+  queue.items.length = 0;
+  queue.resumePending();
+  assert.equal(deepItemsFor('degraded').length, 0, 'a finished rescan is not resumed forever');
+
+  // Cancelling is not crashing: an abandoned job must drop its marker too.
+  queue.enqueue('degraded', 'Degradada', 'deep');
+  queue.stopAll();
+  assert.equal(db.prepare("SELECT deep_queued FROM works WHERE nodus_id='degraded'").get().deep_queued, 0);
+  queue.resumePending();
+  assert.equal(deepItemsFor('degraded').length, 0, 'a cancelled rescan is not resurrected');
+
+  // Stopping a running job detaches it while its scan keeps going. If the user queues the
+  // work again, the abandoned scan's own result must not clear the replacement's marker.
+  queue.enqueue('degraded', 'Degradada', 'deep');
+  const abandoned = queue.snapshot().items.find((item) => item.nodus_id === 'degraded' && item.kind === 'deep');
+  queue.items.find((item) => item.id === abandoned.id).state = 'running';
+  queue.removeItem(abandoned.id);
+  assert.equal(db.prepare("SELECT deep_queued FROM works WHERE nodus_id='degraded'").get().deep_queued, 0,
+    'stopping the only job drops the marker: deep_status stayed done, so nothing else records it');
+  queue.enqueue('degraded', 'Degradada', 'deep');
+  works.setDeepResult('degraded', 'done', 'deg-hash-3', 'pdf', null); // the abandoned scan lands
+  assert.equal(db.prepare("SELECT deep_queued FROM works WHERE nodus_id='degraded'").get().deep_queued, 1,
+    'an abandoned scan writing its result cannot strand the replacement job already queued');
+  queue.items.length = 0;
+  queue.resumePending();
+  assert.equal(deepItemsFor('degraded').length, 1, 'the replacement rescan still survives a restart');
+  queue.stopAll();
+
+  // A failed replacement keeps deep_status='done' so the old graph stays readable; the
+  // Library still counts it as failed (deep_error), so the retry action must find it —
+  // but only within the eligibility it always had, or every historical failure (including
+  // the ones migration 160 backfilled from notes) would become a full-library rescan.
+  db.prepare("UPDATE works SET manual_deep=1 WHERE nodus_id='degraded'").run();
+  queue.enqueue('degraded', 'Degradada', 'deep');
+  works.setDeepResult('degraded', 'failed', null, null, 'truncado');
+  db.prepare(`INSERT INTO works (
+    nodus_id,zotero_key,title,authors_json,archived,read_tag,manual_deep,deep_status,deep_error
+  ) VALUES ('untagged','ZU','Sin marcar','[]',0,0,0,'done','fallo antiguo')`).run();
+  queue.items.length = 0;
+  queue.retryFailed();
+  const retried = db.prepare("SELECT * FROM works WHERE nodus_id='degraded'").get();
+  assert.equal(deepItemsFor('degraded').length, 1, 'retrying failures re-enqueues a work whose failure is recorded in deep_error');
+  assert.equal(retried.deep_error, null, 'the retry clears the previous error');
+  assert.equal(retried.deep_status, 'done', 'retrying never hides the analysis the failure preserved');
+  assert.equal(retried.deep_hash, 'deg-hash-3', 'and never drops it');
+  assert.equal(deepItemsFor('untagged').length, 0, 'a work that was never read-tagged or marked stays out of the retry');
+  queue.stopAll();
+
+  // Migration 162 dropped the cascading key, so a merge that forgot this table would
+  // leak the duplicate's inventory rows on every new database.
+  const dedupe = require(path.join(repoRoot, 'electron/db/dedupe.ts'));
+  db.prepare(`INSERT INTO works (nodus_id,zotero_key,title,authors_json,archived) VALUES ('dup','ZDUP','Duplicada','[]',0)`).run();
+  works.setResolvedTextState('dup', {
+    sourceType: 'pdf', textHash: 'dup-hash', textChars: 10, sourceCount: 1,
+    hasPageMarkers: true, blockReason: null, notes: null, resolvedAt: '2026-01-03T00:00:00.000Z',
+    sources: [{ nodus_id: 'dup', source_ref: 'zotero:user:0:D', origin: 'local_attachment', source_type: 'pdf', zotero_library_id: '0', attachment_key: 'D', display_name: 'd.pdf', content_hash: 'd', char_count: 10, page_count: 1, has_page_markers: 1, ordinal: 0, active: 1, resolved_at: '2026-01-03T00:00:00.000Z' }],
+  });
+  dedupe.mergeWorks(db, 'w1', ['dup']);
+  assert.equal(db.prepare("SELECT COUNT(*) count FROM work_text_sources WHERE nodus_id='dup'").get().count, 0,
+    'merging a duplicate takes its text inventory with it');
+
+  // A marker must not outlive the work's visibility: archived works are invisible to
+  // both resume branches, and a graph reset wipes the analysis the marker belonged to.
+  works.setDeepPending('degraded');
+  works.setArchived('degraded', true);
+  assert.equal(db.prepare("SELECT deep_queued FROM works WHERE nodus_id='degraded'").get().deep_queued, 0,
+    'archiving drops the queued marker instead of leaving it dormant');
+  works.setArchived('degraded', false);
+  works.setDeepPending('degraded');
+  ideas.resetGraphData();
+  assert.equal(db.prepare("SELECT deep_queued FROM works WHERE nodus_id='degraded'").get().deep_queued, 0,
+    'resetting the graph clears the queued marker with the analysis');
+
+  // The upload path scans outside the queue, so nothing else can clear its marker.
+  const uploadHandler = fs.readFileSync(path.join(repoRoot, 'electron/ipc/academic.ts'), 'utf8');
+  const uploadStart = uploadHandler.indexOf("h('works:uploadText'");
+  const uploadBody = uploadHandler.slice(uploadStart, uploadHandler.indexOf("\n  h('", uploadStart));
+  assert.match(uploadBody, /finally\s*\{[^}]*scanQueue\.syncDeepQueued\(nodusId\)/,
+    'works:uploadText settles the queued marker through the queue even when its scan throws');
+
+  // Everything above drives the queue's public surface. The marker is cleared by the
+  // JOB's terminal branch inside process(), so run that for real — with the scan itself
+  // stubbed, since this is about bookkeeping, not about analysing anything.
+  const proto = Object.getPrototypeOf(queue);
+  proto.chainAfterDeep = () => undefined;
+  db.prepare("UPDATE works SET archived=0, deep_queued=0 WHERE nodus_id='degraded'").run();
+
+  proto.doDeep = async () => works.setDeepResult('degraded', 'done', 'deg-hash-4', 'pdf', null);
+  queue.items.length = 0;
+  queue.enqueue('degraded', 'Degradada', 'deep');
+  await queue.process(queue.items.find((item) => item.nodus_id === 'degraded' && item.kind === 'deep'));
+  assert.equal(db.prepare("SELECT deep_queued FROM works WHERE nodus_id='degraded'").get().deep_queued, 0,
+    'a finished job drops its own marker from inside process()');
+
+  proto.doDeep = async () => { throw new Error('boom'); };
+  queue.items.length = 0;
+  queue.enqueue('degraded', 'Degradada', 'deep');
+  await queue.process(queue.items.find((item) => item.nodus_id === 'degraded' && item.kind === 'deep'));
+  const afterFailure = db.prepare("SELECT deep_queued, deep_status, deep_error FROM works WHERE nodus_id='degraded'").get();
+  assert.equal(afterFailure.deep_queued, 0, 'a failed job drops its marker too');
+  assert.equal(afterFailure.deep_status, 'done', 'and still does not hide the committed analysis');
+  assert.equal(afterFailure.deep_error, 'boom');
+
+  // Cancelling and clearing are list mutations like any other: a work whose deep_status
+  // stays 'done' has nothing but the marker to record that its job is gone.
+  for (const stop of ['cancelItem', 'clear']) {
+    queue.items.length = 0;
+    queue.enqueue('degraded', 'Degradada', 'deep');
+    if (stop === 'cancelItem') queue.cancelItem(queue.items.find((item) => item.nodus_id === 'degraded').id);
+    else queue.clear();
+    assert.equal(db.prepare("SELECT deep_queued FROM works WHERE nodus_id='degraded'").get().deep_queued, 0,
+      `${stop} drops the marker of the job it removed`);
+    queue.items.length = 0;
+    queue.resumePending();
+    assert.equal(deepItemsFor('degraded').length, 0, `${stop} is not undone by the next launch`);
+  }
 } finally {
   try { closeDb(); } catch {}
   await rm(root, { recursive: true, force: true });
