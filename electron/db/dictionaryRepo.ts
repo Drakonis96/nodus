@@ -381,9 +381,38 @@ function versionEvidenceSets(entryId: string): { used: Set<string>; cited: Set<s
   return { used, cited };
 }
 
-function evidenceUnavailable(kind: DictionaryEvidenceRef['kind'], id: string): boolean {
-  const table = kind === 'idea' ? 'ideas' : 'passages'; const column = kind === 'idea' ? 'global_id' : 'passage_id';
-  return !getDb().prepare(`SELECT 1 FROM ${table} WHERE ${column}=?`).get(id);
+function evidenceUnavailable(row: EvidenceRow): boolean {
+  if (row.kind === 'idea') {
+    return !getDb().prepare('SELECT 1 FROM ideas WHERE global_id=?').get(row.ref_id);
+  }
+  // Passage ids are stable (`work#chunk`) and are deliberately reused by a
+  // reindex. Existence alone therefore cannot prove that the copied Dictionary
+  // text still describes the current passage. Require both a current source
+  // generation and the exact text revision captured when evidence was retrieved.
+  const current = getDb().prepare(`
+    SELECT p.text
+      FROM passages p
+      JOIN works w ON w.nodus_id=p.nodus_id
+     WHERE p.passage_id=?
+       AND w.archived=0
+       AND (
+         (w.resolved_text_hash IS NOT NULL AND p.content_hash=w.resolved_text_hash)
+         OR (w.resolved_text_hash IS NULL AND (w.deep_hash IS NULL OR p.content_hash=w.deep_hash))
+       )
+  `).get(row.ref_id) as { text: string } | undefined;
+  if (!current || !row.source_revision) return true;
+  return createHash('sha256').update(current.text).digest('hex') !== row.source_revision;
+}
+
+function evidenceReferenceUnavailable(
+  entryId: string,
+  kind: DictionaryEvidenceRef['kind'],
+  id: string,
+): boolean {
+  const row = getDb().prepare(
+    'SELECT * FROM dictionary_evidence WHERE entry_id=? AND kind=? AND ref_id=?',
+  ).get(entryId, kind, id) as EvidenceRow | undefined;
+  return !row || evidenceUnavailable(row);
 }
 
 function toEvidenceItem(row: EvidenceRow, sets: { used: Set<string>; cited: Set<string> }): DictionaryEvidenceItem {
@@ -391,7 +420,7 @@ function toEvidenceItem(row: EvidenceRow, sets: { used: Set<string>; cited: Set<
   return {
     entryId: row.entry_id, kind: row.kind, id: row.ref_id, label: row.label, text: row.evidence_text,
     score: row.score, reason: row.reason, decision: row.decision, isNew: !!row.is_new,
-    usedInCurrentVersion: sets.used.has(key), citedInCurrentVersion: sets.cited.has(key), unavailable: evidenceUnavailable(row.kind, row.ref_id),
+    usedInCurrentVersion: sets.used.has(key), citedInCurrentVersion: sets.cited.has(key), unavailable: evidenceUnavailable(row),
     sourceRevision: row.source_revision, workId: row.work_id, workTitle: row.work_title, zoteroKey: row.zotero_key, works: parseJson(row.works_json, []),
     pageLabel: row.page_label, authors: parseJson(row.authors_json, []), tags: parseJson(row.tags_json, []),
   };
@@ -490,7 +519,7 @@ export function restoreDictionaryVersion(entryId: string, versionId: string, exp
   const entry = getDictionaryEntry(entryId); const source = getDictionaryVersion(versionId);
   if (!entry || !source || source.entryId !== entryId) throw new Error('No se encontró esa versión.');
   if (entry.currentVersionId !== expectedCurrentVersionId) throw new Error('La entrada cambió antes de restaurarla.');
-  for (const citation of source.citations) if (evidenceUnavailable(citation.kind, citation.id)) throw new Error('La versión contiene fuentes que ya no existen y no puede restaurarse de forma verificable.');
+  for (const citation of source.citations) if (evidenceReferenceUnavailable(entryId, citation.kind, citation.id)) throw new Error('La versión contiene fuentes que ya no existen y no puede restaurarse de forma verificable.');
   getDb().transaction(() => {
     getDb().prepare('UPDATE dictionary_entries SET focus_prompt=?, scope_kind=?, scope_json=?, output_language=?, detail_level=? WHERE id=?')
       .run(source.focusPrompt, source.scope.kind, JSON.stringify(source.scope), source.outputLanguage, source.detailLevel, entryId);
@@ -526,7 +555,7 @@ function validateDictionaryMarkdown(entryId: string, markdown: string, currentVe
   if (consumed.includes('nodus://')) throw new Error('Hay una cita Nodus incompleta o con un formato no permitido.');
   for (const match of markdown.matchAll(proper)) {
     const kind = match[1] as DictionaryEvidenceRef['kind']; let id = match[2]; try { id = decodeURIComponent(id); } catch { /* raw */ }
-    if (!allowed.has(`${kind}:${id}`) || evidenceUnavailable(kind, id)) throw new Error('La descripción contiene una cita inexistente o ajena a la evidencia de esta versión.');
+    if (!allowed.has(`${kind}:${id}`) || evidenceReferenceUnavailable(entryId, kind, id)) throw new Error('La descripción contiene una cita inexistente o ajena a la evidencia de esta versión.');
   }
 }
 
@@ -539,7 +568,7 @@ export function getDictionaryEntryDetail(id: string): DictionaryEntryDetail | nu
   const cited = new Set((currentVersion?.citations ?? []).map((ref) => `${ref.kind}:${ref.id}`));
   const coverage = { used: used.size, cited: cited.size, unused: evidence.filter((item) => item.decision === 'unused').length,
     excluded: evidence.filter((item) => item.decision === 'excluded').length, newEvidence: evidence.filter((item) => item.is_new).length,
-    unavailable: evidence.filter((item) => evidenceUnavailable(item.kind, item.ref_id)).length };
+    unavailable: evidence.filter((item) => evidenceUnavailable(item)).length };
   const authors = buildAuthors(evidence.filter((item) => used.has(`${item.kind}:${item.ref_id}`)), currentVersion?.authorSummaries ?? []);
   const works = buildWorks(evidence.filter((item) => used.has(`${item.kind}:${item.ref_id}`)));
   return { entry, coverage, authors, works, currentVersion, proposedVersion };

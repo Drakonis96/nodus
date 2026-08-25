@@ -16,19 +16,21 @@ import { currentEmbeddingConfig } from './ideasRepo';
 type Readiness = Exclude<WorkReadiness, 'running'>;
 
 /** Any of the three AI passes reported a failure. Outranks everything below. */
-const FAILED = `(w.light_status = 'failed' OR w.deep_status = 'failed' OR w.summary_status = 'failed')`;
+const FAILED = `(w.light_status = 'failed' OR w.deep_status = 'failed' OR w.deep_error IS NOT NULL OR w.summary_status = 'failed')`;
 
 /** Nothing has been attempted yet. */
 const UNSTARTED = `(w.light_status = 'none' AND w.deep_status = 'none')`;
 
+const EFFECTIVE_SOURCE = `COALESCE(w.resolved_source_type, w.source_type)`;
+
 /** The deep pass finished, but it only ever saw the abstract. */
-const ABSTRACT_ONLY = `(w.deep_status = 'done' AND w.source_type IN ('abstract_only', 'none'))`;
+const ABSTRACT_ONLY = `(w.deep_status = 'done' AND w.source_type IN ('abstract_only', 'none') AND ${EFFECTIVE_SOURCE} IN ('abstract_only', 'none'))`;
 
 /** Extraction was attempted and there was nothing usable to read. */
 const NO_TEXT = `(
   w.deep_status = 'skipped_no_text'
   OR w.summary_status = 'skipped_no_text'
-  OR w.source_type IN ('none', 'abstract_only')
+  OR ${EFFECTIVE_SOURCE} IN ('none', 'abstract_only')
 )`;
 
 const HAS_IDEAS = `EXISTS (SELECT 1 FROM idea_occurrences io WHERE io.nodus_id = w.nodus_id)`;
@@ -46,7 +48,10 @@ const PASSAGE_IS_CURRENT = `(
   AND p.embedding_provider = @readyProv
   AND p.embedding_model    = @readyModel
   AND p.embedding_dim > 0
-  AND (w.deep_hash IS NULL OR p.content_hash = w.deep_hash)
+  AND (
+    (w.resolved_text_hash IS NOT NULL AND p.content_hash = w.resolved_text_hash)
+    OR (w.resolved_text_hash IS NULL AND (w.deep_hash IS NULL OR p.content_hash = w.deep_hash))
+  )
 )`;
 
 const PASSAGES_COMPLETE = `(
@@ -62,7 +67,9 @@ const PASSAGES_COMPLETE = `(
 const ANALYSABLE = `NOT ${FAILED} AND NOT ${UNSTARTED} AND NOT ${ABSTRACT_ONLY} AND NOT ${NO_TEXT}`;
 
 /** Ready = themes + ideas + citable text, matching READY_STEPS. */
-const READY_CORE = `w.light_status = 'done' AND w.deep_status = 'done' AND ${HAS_IDEAS} AND ${PASSAGES_COMPLETE}`;
+const READY_CORE = `w.light_status = 'done' AND w.deep_status = 'done'
+  AND (w.resolved_text_hash IS NULL OR w.deep_hash = w.resolved_text_hash)
+  AND ${HAS_IDEAS} AND ${PASSAGES_COMPLETE}`;
 
 /**
  * The WHERE fragment for a readiness preset, plus the bound parameters it needs.

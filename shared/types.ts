@@ -637,6 +637,50 @@ export type DeepStatus = 'none' | 'pending' | 'done' | 'failed' | 'skipped_no_te
 export type SummaryStatus = 'none' | 'pending' | 'done' | 'failed' | 'skipped_no_text';
 export type DeepTrigger = 'tag' | 'manual' | 'both' | null;
 export type SourceType = 'pdf' | 'epub' | 'markdown' | 'upload' | 'abstract_only' | 'none';
+export type ResolvedSourceType = SourceType | 'mixed';
+export type TextSourceOrigin =
+  | 'local_attachment'
+  | 'zotero_fulltext'
+  | 'unpaywall_pdf'
+  | 'uploaded_file'
+  | 'library_clean'
+  | 'abstract';
+export type TextBlockReason =
+  | 'abstract_only'
+  | 'no_attachment'
+  | 'file_missing'
+  | 'scanned_no_ocr'
+  | 'unreadable'
+  | 'unsupported';
+
+export interface WorkTextSource {
+  nodus_id: string;
+  source_ref: string;
+  origin: TextSourceOrigin;
+  source_type: SourceType;
+  zotero_library_id: string | null;
+  attachment_key: string | null;
+  display_name: string | null;
+  content_hash: string;
+  char_count: number;
+  page_count: number | null;
+  has_page_markers: number;
+  ordinal: number;
+  active: number;
+  resolved_at: string;
+}
+
+export interface ResolvedTextState {
+  sourceType: ResolvedSourceType;
+  textHash: string | null;
+  textChars: number;
+  sourceCount: number;
+  hasPageMarkers: boolean;
+  blockReason: TextBlockReason | null;
+  notes: string | null;
+  resolvedAt: string;
+  sources: WorkTextSource[];
+}
 
 export type GapKind =
   | 'future_work'
@@ -663,6 +707,17 @@ export interface Work {
   deep_status: DeepStatus;
   deep_at: string | null;
   deep_hash: string | null;
+  resolved_source_type: ResolvedSourceType | null;
+  resolved_text_hash: string | null;
+  resolved_text_chars: number;
+  resolved_text_source_count: number;
+  resolved_has_page_markers: number;
+  text_block_reason: TextBlockReason | null;
+  text_resolved_at: string | null;
+  resolved_text_notes: string | null;
+  deep_error: string | null;
+  /** 1 while a deep job for this work is queued or running; survives a restart. */
+  deep_queued: number;
   summary_status: SummaryStatus;
   summary_at: string | null;
   summary_hash: string | null;
@@ -897,6 +952,9 @@ export interface DocumentSection {
   claims: string[];
   pageStart: string | null;
   pageEnd: string | null;
+  sourceRef?: string | null;
+  pageStartNumber?: number | null;
+  pageEndNumber?: number | null;
   charStart: number | null;
   charEnd: number | null;
   contentHash: string;
@@ -910,6 +968,9 @@ export interface DocumentProfileSupport {
   passageId: string | null;
   pageStart: string | null;
   pageEnd: string | null;
+  sourceRef?: string | null;
+  pageStartNumber?: number | null;
+  pageEndNumber?: number | null;
   quote: string;
   supportKind: string;
   confidence: number;
@@ -1120,7 +1181,15 @@ export interface Evidence {
   nodus_id: string;
   quote: string;
   location: string | null;
+  source_ref?: string | null;
+  page_number?: number | null;
   kind: EvidenceKind;
+}
+
+export interface EvidenceLocator {
+  location: string | null;
+  sourceRef: string | null;
+  pageNumber: number | null;
 }
 
 export interface Edge {
@@ -8771,6 +8840,8 @@ export interface PassageDetail {
   nodus_id: string;
   text: string;
   page_label: string | null;
+  source_ref: string | null;
+  page_number: number | null;
   chunk_index: number;
   work: {
     title: string;

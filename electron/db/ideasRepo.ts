@@ -536,12 +536,13 @@ export function addEvidence(
   nodusId: string,
   quote: string,
   location: string | null,
-  kind: EvidenceKind
+  kind: EvidenceKind,
+  locator: { sourceRef?: string | null; pageNumber?: number | null } = {},
 ): string {
   const id = uuid();
   getDb()
-    .prepare('INSERT INTO evidence (id, global_id, nodus_id, quote, location, kind) VALUES (?, ?, ?, ?, ?, ?)')
-    .run(id, globalId, nodusId, quote, location, kind);
+    .prepare('INSERT INTO evidence (id, global_id, nodus_id, quote, location, kind, source_ref, page_number) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
+    .run(id, globalId, nodusId, quote, location, kind, locator.sourceRef ?? null, locator.pageNumber ?? null);
   return id;
 }
 
@@ -700,7 +701,7 @@ export function resetGraphData(): void {
         light_status = 'none', light_at = NULL, light_hash = NULL,
         deep_status = 'none', deep_at = NULL, deep_hash = NULL,
         summary_status = 'none', summary_at = NULL, summary_hash = NULL,
-        source_type = NULL, notes = NULL;
+        source_type = NULL, notes = NULL, deep_error = NULL, deep_queued = 0;
     `);
   });
   tx();

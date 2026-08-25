@@ -297,7 +297,6 @@ function processFullChain(nodusId: string, model?: ModelRef | null): void {
     works.setLightPending(nodusId);
     scanQueue.enqueue(nodusId, w.title, 'light', model);
   }
-  if (w.deep_status === 'done') ideas.purgeDeepData(nodusId);
   works.setManualDeep(nodusId, true);
   works.setDeepPending(nodusId);
   scanQueue.enqueue(nodusId, w.title, 'deep', model, { chain: true });
@@ -548,7 +547,6 @@ export function registerAcademicIpc({ h, getWindow, chatAborters }: IpcContext):
     // Themes first, then ideas — each as its own queue job so progress is visible.
     works.setLightPending(nodusId);
     scanQueue.enqueue(nodusId, w.title, 'light', model);
-    if (w.deep_status === 'done') ideas.purgeDeepData(nodusId);
     works.setManualDeep(nodusId, true);
     works.setDeepPending(nodusId);
     scanQueue.enqueue(nodusId, w.title, 'deep', model);
@@ -559,7 +557,6 @@ export function registerAcademicIpc({ h, getWindow, chatAborters }: IpcContext):
       if (!w) continue;
       works.setLightPending(id);
       scanQueue.enqueue(id, w.title, 'light', model);
-      if (w.deep_status === 'done') ideas.purgeDeepData(id);
       works.setManualDeep(id, true);
       works.setDeepPending(id);
       scanQueue.enqueue(id, w.title, 'deep', model);
@@ -597,7 +594,6 @@ export function registerAcademicIpc({ h, getWindow, chatAborters }: IpcContext):
     const w = works.getWork(nodusId);
     if (!w) return;
     if (kind === 'deep') {
-      ideas.purgeDeepData(nodusId);
       works.setDeepPending(nodusId);
     } else if (kind === 'summary') {
       works.setSummaryPending(nodusId);
@@ -609,10 +605,17 @@ export function registerAcademicIpc({ h, getWindow, chatAborters }: IpcContext):
   h('works:rescanDegraded', async (_e, model?: ModelRef | null) => {
     // Re-scan works that only ever saw the abstract (e.g. the PDF wasn't attached/
     // indexed when they were first analysed). A bare enqueue is idempotent: if the
-    // resolved text is unchanged, runDeepScan is a no-op and no tokens are spent.
+    // resolved text is unchanged, runDeepScan re-commits the same result and returns
+    // without calling the model, so no tokens are spent.
     const rows = getDb()
       .prepare(
-        "SELECT nodus_id, title FROM works WHERE archived = 0 AND deep_status = 'done' AND source_type IN ('abstract_only','none')"
+        `SELECT nodus_id, title FROM works
+          WHERE archived = 0
+            AND deep_status IN ('done','failed','skipped_no_text')
+            AND (
+              COALESCE(resolved_source_type, source_type) IN ('abstract_only','none')
+              OR text_block_reason IS NOT NULL
+            )`
       )
       .all() as { nodus_id: string; title: string }[];
     for (const w of rows) scanQueue.enqueue(w.nodus_id, w.title, 'deep', model);
@@ -667,16 +670,27 @@ export function registerAcademicIpc({ h, getWindow, chatAborters }: IpcContext):
   // extractor writes are physical 1-based page indices, which is exactly what
   // zotero://open-pdf expects; when the location has no parseable page (or the
   // work has no PDF attachment) we fall back to selecting the item.
-  h('works:openAtPage', async (_e, nodusId: string, location: string | null) => {
+  h('works:openAtPage', async (_e, nodusId: string, locator: string | null | { location?: string | null; sourceRef?: string | null; pageNumber?: number | null }) => {
     const work = works.getWork(nodusId);
     if (!work?.zotero_key) return { ok: false, mode: 'none' as const };
-    const page = parsePageNumber(location);
+    const structured = locator && typeof locator === 'object' ? locator : null;
+    const location = typeof locator === 'string' || locator === null ? locator : structured?.location ?? null;
+    const page = structured?.pageNumber ?? parsePageNumber(location);
+    const source = structured?.sourceRef
+      ? getDb().prepare('SELECT attachment_key FROM work_text_sources WHERE nodus_id=? AND source_ref=?')
+        .get(nodusId, structured.sourceRef) as { attachment_key: string | null } | undefined
+      : undefined;
     if (page !== null) {
-      const attachmentKey = await zotero.resolvePdfAttachmentKey(getSettings().zoteroUserId, work.zotero_key);
+      const attachmentKey = source?.attachment_key
+        ?? await zotero.resolvePdfAttachmentKey(getSettings().zoteroUserId, work.zotero_key);
       if (attachmentKey) {
         await shell.openExternal(zoteroOpenPdfUrl(attachmentKey, page));
         return { ok: true, mode: 'pdf-page' as const, page };
       }
+    }
+    if (source?.attachment_key) {
+      await shell.openExternal(zoteroSelectUrl(source.attachment_key));
+      return { ok: true, mode: 'select' as const, page };
     }
     await shell.openExternal(zoteroSelectUrl(work.zotero_key));
     return { ok: true, mode: 'select' as const, page };
@@ -758,8 +772,18 @@ export function registerAcademicIpc({ h, getWindow, chatAborters }: IpcContext):
       ocr: { enabled: s.ocrEnabled, languages: s.ocrLanguages, maxPages: s.ocrMaxPages },
       perf: { nodusId, title: w.title },
     });
+    // This path scans OUTSIDE the queue, so nothing else will ever clear the queued
+    // marker setDeepPending leaves behind. Without the finally, a failed upload scan
+    // would have resumePending() start a queued scan of this work on the next launch —
+    // one that resolves text from Zotero and overwrites the uploaded-text analysis.
     works.setDeepPending(nodusId);
-    await runDeepScan(w, doc);
+    try {
+      await runDeepScan(w, doc);
+    } finally {
+      // Ask the queue rather than clearing outright: this work may also have a deep job
+      // waiting, and zeroing the marker under it would lose that job on the next launch.
+      scanQueue.syncDeepQueued(nodusId);
+    }
   });
 
   // queue

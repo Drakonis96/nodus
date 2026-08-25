@@ -122,6 +122,9 @@ function sectionRow(row: Record<string, unknown>): DocumentSection {
     claims: json<string[]>(row.claims_json, []),
     pageStart: row.page_start == null ? null : String(row.page_start),
     pageEnd: row.page_end == null ? null : String(row.page_end),
+    sourceRef: row.source_ref == null ? null : String(row.source_ref),
+    pageStartNumber: row.page_start_number == null ? null : Number(row.page_start_number),
+    pageEndNumber: row.page_end_number == null ? null : Number(row.page_end_number),
     charStart: row.char_start == null ? null : Number(row.char_start),
     charEnd: row.char_end == null ? null : Number(row.char_end),
     contentHash: String(row.content_hash),
@@ -137,6 +140,9 @@ function supportRow(row: Record<string, unknown>): DocumentProfileSupport {
     passageId: row.passage_id == null ? null : String(row.passage_id),
     pageStart: row.page_start == null ? null : String(row.page_start),
     pageEnd: row.page_end == null ? null : String(row.page_end),
+    sourceRef: row.source_ref == null ? null : String(row.source_ref),
+    pageStartNumber: row.page_start_number == null ? null : Number(row.page_start_number),
+    pageEndNumber: row.page_end_number == null ? null : Number(row.page_end_number),
     quote: String(row.quote),
     supportKind: String(row.support_kind),
     confidence: Number(row.confidence),
@@ -448,27 +454,30 @@ export function publishDocumentProfile(input: PublishDocumentProfileInput): stri
     const insertSection = db.prepare(
       `INSERT INTO document_sections(
          section_id,version_id,nodus_id,parent_section_id,level,ordinal,title,role,summary,
-         concepts_json,claims_json,page_start,page_end,char_start,char_end,content_hash,created_at
-       ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`
+         concepts_json,claims_json,page_start,page_end,source_ref,page_start_number,page_end_number,
+         char_start,char_end,content_hash,created_at
+       ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`
     );
     for (const section of input.sections) insertSection.run(
       section.sectionId, versionId, input.nodusId, section.parentSectionId, section.level,
       section.ordinal, section.title, section.role, section.summary, JSON.stringify(section.concepts),
-      JSON.stringify(section.claims), section.pageStart, section.pageEnd, section.charStart,
+      JSON.stringify(section.claims), section.pageStart, section.pageEnd, section.sourceRef ?? null,
+      section.pageStartNumber ?? null, section.pageEndNumber ?? null, section.charStart,
       section.charEnd, section.contentHash, now
     );
     if (input.passages) {
       const passageConfig = currentEmbeddingConfig();
       const insertPassage = db.prepare(
         `INSERT INTO passages(
-           passage_id,nodus_id,chunk_index,text,page_label,char_len,content_hash,
+           passage_id,nodus_id,chunk_index,text,page_label,source_ref,page_number,char_len,content_hash,
            embedding,embedding_provider,embedding_model,embedding_dim,embedding_text_hash,created_at
-         ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)`
+         ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`
       );
       db.prepare('DELETE FROM passages WHERE nodus_id=?').run(input.nodusId);
       input.passages.rows.forEach((row, chunkIndex) => {
         insertPassage.run(
           `${input.nodusId}#${chunkIndex}`, input.nodusId, chunkIndex, row.text, row.pageLabel,
+          row.sourceRef ?? null, row.pageNumber ?? null,
           row.text.length, input.passages!.contentHash,
           row.embedding ? encodeEmbedding(row.embedding) : null,
           row.embedding ? (input.passages!.embeddingProvider ?? passageConfig.provider) : null,
@@ -482,12 +491,14 @@ export function publishDocumentProfile(input: PublishDocumentProfileInput): stri
     const insertSupport = db.prepare(
       `INSERT INTO document_profile_support(
          support_id,version_id,nodus_id,target_kind,target_id,section_id,passage_id,page_start,
-         page_end,char_start,char_end,quote,quote_hash,support_kind,confidence,validation_status,created_at
-       ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`
+         page_end,source_ref,page_start_number,page_end_number,char_start,char_end,quote,quote_hash,
+         support_kind,confidence,validation_status,created_at
+       ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`
     );
     for (const support of input.supports) insertSupport.run(
       support.supportId, versionId, input.nodusId, support.targetKind, support.targetId,
-      support.sectionId, support.passageId, support.pageStart, support.pageEnd, null, null,
+      support.sectionId, support.passageId, support.pageStart, support.pageEnd, support.sourceRef ?? null,
+      support.pageStartNumber ?? null, support.pageEndNumber ?? null, null, null,
       support.quote, createHash('sha256').update(support.quote).digest('hex'), support.supportKind,
       clamp01(support.confidence), support.validationStatus, now
     );
@@ -670,7 +681,8 @@ export function findDocumentSupportPassages(
        JOIN works w ON w.nodus_id=s.nodus_id
       WHERE s.version_id=? AND s.target_id=? AND s.validation_status='valid'
         AND s.passage_id IS NOT NULL AND w.archived=0
-        AND (w.deep_hash IS NULL OR p.content_hash=w.deep_hash)
+        AND ((w.resolved_text_hash IS NOT NULL AND p.content_hash=w.resolved_text_hash)
+          OR (w.resolved_text_hash IS NULL AND (w.deep_hash IS NULL OR p.content_hash=w.deep_hash)))
       ORDER BY s.confidence DESC,s.support_id
       LIMIT ?`
   );

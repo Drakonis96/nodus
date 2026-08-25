@@ -7991,4 +7991,9 @@ export const TR: Record<string, string> = {
   "provisional": "geçici",
   "Reparando": "Onarılıyor",
   "Publicando": "Yayınlanıyor",
+  "El texto disponible ha cambiado. Se conserva el análisis anterior hasta completar un reescaneo.": "Mevcut metin değişti. Yeniden tarama tamamlanana kadar önceki analiz korunur.",
+  "El adjunto existe en Zotero, pero el archivo ya no está en su ubicación original.": "Ek Zotero’da mevcut, ancak dosya artık özgün konumunda değil.",
+  "El PDF está escaneado y no tiene capa de texto. Activa OCR y vuelve a analizar.": "PDF taranmış ve metin katmanı yok. OCR’yi etkinleştirip yeniden analiz edin.",
+  "El adjunto no produjo texto utilizable. Revisa el archivo o activa OCR.": "Ek, kullanılabilir metin üretmedi. Dosyayı kontrol edin veya OCR’yi etkinleştirin.",
+  "El formato del adjunto no es compatible con la extracción de texto.": "Ek biçimi metin çıkarma için desteklenmiyor.",
 };

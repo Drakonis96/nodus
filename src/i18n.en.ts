@@ -8468,4 +8468,9 @@ export const EN: Record<string, string> = {
   "provisional": "provisional",
   "Reparando": "Repairing",
   "Publicando": "Publishing",
+  "El texto disponible ha cambiado. Se conserva el análisis anterior hasta completar un reescaneo.": "The available text has changed. The previous analysis is kept until a rescan completes.",
+  "El adjunto existe en Zotero, pero el archivo ya no está en su ubicación original.": "The attachment exists in Zotero, but the file is no longer in its original location.",
+  "El PDF está escaneado y no tiene capa de texto. Activa OCR y vuelve a analizar.": "The PDF is scanned and has no text layer. Enable OCR and analyze it again.",
+  "El adjunto no produjo texto utilizable. Revisa el archivo o activa OCR.": "The attachment produced no usable text. Check the file or enable OCR.",
+  "El formato del adjunto no es compatible con la extracción de texto.": "The attachment format is not supported for text extraction.",
 };

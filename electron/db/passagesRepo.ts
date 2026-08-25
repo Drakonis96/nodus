@@ -6,6 +6,8 @@ import { scanSimilar } from './vectorScan';
 export interface PassageInsert {
   text: string;
   pageLabel: string | null;
+  sourceRef?: string | null;
+  pageNumber?: number | null;
   embedding: number[] | null;
 }
 
@@ -14,6 +16,8 @@ export interface SimilarPassage {
   nodus_id: string;
   text: string;
   page_label: string | null;
+  source_ref: string | null;
+  page_number: number | null;
   similarity: number;
   title: string;
   authors_json: string;
@@ -26,6 +30,11 @@ const PASSAGE_FTS_STOPWORDS = new Set([
   'cuál', 'cual', 'cómo', 'como', 'qué', 'que', 'quién', 'quien', 'donde', 'cuando',
   'with', 'from', 'into', 'this', 'that', 'what', 'which', 'where', 'when', 'during',
 ]);
+
+const PASSAGE_MATCHES_RESOLVED_TEXT = `(
+  (w.resolved_text_hash IS NOT NULL AND p.content_hash = w.resolved_text_hash)
+  OR (w.resolved_text_hash IS NULL AND (w.deep_hash IS NULL OR p.content_hash = w.deep_hash))
+)`;
 
 /** Literal passage lane for names, procedures and phrases that dense retrieval can
  * blur. The query is constructed from quoted prefix tokens, never raw FTS syntax. */
@@ -52,13 +61,13 @@ export function lexicalPassageSearch(
   const nodusIds = [...new Set(opts.nodusIds ?? [])];
   const scoped = nodusIds.length ? ` AND p.nodus_id IN (${nodusIds.map(() => '?').join(',')})` : '';
   const rows = getDb().prepare(
-    `SELECT p.passage_id,p.nodus_id,p.text,p.page_label,
+    `SELECT p.passage_id,p.nodus_id,p.text,p.page_label,p.source_ref,p.page_number,
             w.title,w.authors_json,w.year,w.zotero_key,bm25(passages_fts) AS rank
        FROM passages_fts f
        JOIN passages p ON p.passage_id=f.passage_id
        JOIN works w ON w.nodus_id=p.nodus_id
       WHERE passages_fts MATCH ? AND w.archived=0
-        AND (w.deep_hash IS NULL OR p.content_hash=w.deep_hash)${scoped}
+        AND ${PASSAGE_MATCHES_RESOLVED_TEXT}${scoped}
       ORDER BY rank
       LIMIT ?`
   ).all(ftsQuery, ...nodusIds, Math.max(limit, limit * 4)) as Array<Omit<SimilarPassage, 'similarity'> & { rank: number }>;
@@ -92,9 +101,9 @@ export function replaceWorkPassages(nodusId: string, contentHash: string, rows: 
   const now = new Date().toISOString();
   const insert = db.prepare(
     `INSERT INTO passages (
-       passage_id, nodus_id, chunk_index, text, page_label, char_len, content_hash,
+       passage_id, nodus_id, chunk_index, text, page_label, source_ref, page_number, char_len, content_hash,
        embedding, embedding_provider, embedding_model, embedding_dim, embedding_text_hash, created_at
-     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
   );
   db.transaction(() => {
     db.prepare('DELETE FROM passages WHERE nodus_id = ?').run(nodusId);
@@ -106,6 +115,8 @@ export function replaceWorkPassages(nodusId: string, contentHash: string, rows: 
         chunkIndex,
         row.text,
         row.pageLabel,
+        row.sourceRef ?? null,
+        row.pageNumber ?? null,
         row.text.length,
         contentHash,
         embedding ? encodeEmbedding(embedding) : null,
@@ -134,14 +145,14 @@ export function findSimilarPassages(
   return getDb()
     .prepare(
       `SELECT * FROM (
-         SELECT p.passage_id, p.nodus_id, p.text, p.page_label,
+         SELECT p.passage_id, p.nodus_id, p.text, p.page_label, p.source_ref, p.page_number,
                 w.title, w.authors_json, w.year, w.zotero_key,
                 vec_cosine(p.embedding, ?) AS similarity
            FROM passages p
            JOIN works w ON w.nodus_id = p.nodus_id
           WHERE p.embedding IS NOT NULL
             AND w.archived = 0
-            AND (w.deep_hash IS NULL OR p.content_hash = w.deep_hash)
+            AND ${PASSAGE_MATCHES_RESOLVED_TEXT}
             AND p.embedding_provider = ?
             AND p.embedding_model = ?
             AND p.embedding_dim = ?${scoped}
@@ -170,15 +181,15 @@ export async function findSimilarPassagesPaged(
   const config = currentEmbeddingConfig();
   const nodusIds = [...new Set(opts.nodusIds ?? [])];
   const scoped = nodusIds.length ? ` AND p.nodus_id IN (${nodusIds.map(() => '?').join(',')})` : '';
-  const ranked = await scanSimilar<{ passage_id: string; rid: number; similarity: number }>({
+  const ranked = await scanSimilar<{ passage_id: string; content_hash: string; rid: number; similarity: number }>({
     table: 'passages',
-    sql: `SELECT p.passage_id, p.rowid AS rid, vec_scan(p.embedding) AS similarity
+    sql: `SELECT p.passage_id, p.content_hash, p.rowid AS rid, vec_scan(p.embedding) AS similarity
             FROM passages p
             JOIN works w ON w.nodus_id = p.nodus_id
            WHERE p.rowid > ? AND p.rowid <= ?
              AND p.embedding IS NOT NULL
              AND w.archived = 0
-             AND (w.deep_hash IS NULL OR p.content_hash = w.deep_hash)
+             AND ${PASSAGE_MATCHES_RESOLVED_TEXT}
              AND p.embedding_provider = ?
              AND p.embedding_model = ?
              AND p.embedding_dim = ?${scoped}`,
@@ -189,19 +200,28 @@ export async function findSimilarPassagesPaged(
   });
   if (ranked.length === 0) return [];
 
-  const byId = new Map(ranked.map((row) => [row.passage_id, row.similarity]));
+  const byId = new Map(ranked.map((row) => [row.passage_id, {
+    similarity: row.similarity,
+    contentHash: row.content_hash,
+  }]));
   const rows = getDb()
     .prepare(
-      `SELECT p.passage_id, p.nodus_id, p.text, p.page_label,
+      `SELECT p.passage_id, p.nodus_id, p.text, p.page_label, p.source_ref, p.page_number, p.content_hash,
               w.title, w.authors_json, w.year, w.zotero_key
          FROM passages p
          JOIN works w ON w.nodus_id = p.nodus_id
-        WHERE p.passage_id IN (${ranked.map(() => '?').join(',')})`
+        WHERE p.passage_id IN (${ranked.map(() => '?').join(',')})
+          AND w.archived = 0
+          AND ${PASSAGE_MATCHES_RESOLVED_TEXT}`
     )
-    .all(...ranked.map((row) => row.passage_id)) as Omit<SimilarPassage, 'similarity'>[];
+    .all(...ranked.map((row) => row.passage_id)) as Array<Omit<SimilarPassage, 'similarity'> & { content_hash: string }>;
   // Back into the ranked order the scan produced; the IN clause has none of its own.
   return rows
-    .map((row) => ({ ...row, similarity: byId.get(row.passage_id) ?? 0 }))
+    .filter((row) => byId.get(row.passage_id)?.contentHash === row.content_hash)
+    .map(({ content_hash: _contentHash, ...row }) => ({
+      ...row,
+      similarity: byId.get(row.passage_id)?.similarity ?? 0,
+    }))
     .sort((a, b) => b.similarity - a.similarity);
 }
 
@@ -219,6 +239,7 @@ export function embeddedPassageCount(): number {
          JOIN works w ON w.nodus_id = p.nodus_id
         WHERE p.embedding IS NOT NULL
           AND w.archived = 0
+          AND ${PASSAGE_MATCHES_RESOLVED_TEXT}
           AND p.embedding_provider = ?
           AND p.embedding_model = ?`
     )
@@ -229,11 +250,12 @@ export function embeddedPassageCount(): number {
 export function getPassageDetail(passageId: string): PassageDetail | null {
   const row = getDb()
     .prepare(
-      `SELECT p.passage_id, p.nodus_id, p.text, p.page_label, p.chunk_index,
+      `SELECT p.passage_id, p.nodus_id, p.text, p.page_label, p.source_ref, p.page_number, p.chunk_index,
               w.title, w.authors_json, w.year, w.zotero_key
          FROM passages p
          JOIN works w ON w.nodus_id = p.nodus_id
-        WHERE p.passage_id = ?`
+        WHERE p.passage_id = ?
+          AND ${PASSAGE_MATCHES_RESOLVED_TEXT}`
     )
     .get(passageId) as
     | {
@@ -241,6 +263,8 @@ export function getPassageDetail(passageId: string): PassageDetail | null {
         nodus_id: string;
         text: string;
         page_label: string | null;
+        source_ref: string | null;
+        page_number: number | null;
         chunk_index: number;
         title: string;
         authors_json: string;
@@ -260,6 +284,8 @@ export function getPassageDetail(passageId: string): PassageDetail | null {
     nodus_id: row.nodus_id,
     text: row.text,
     page_label: row.page_label,
+    source_ref: row.source_ref,
+    page_number: row.page_number,
     chunk_index: row.chunk_index,
     work: { title: row.title, authors, year: row.year, zotero_key: row.zotero_key },
   };
@@ -272,9 +298,9 @@ export function workPassageStatuses(nodusIds?: string[]): WorkPassageStatus[] {
   const config = currentEmbeddingConfig();
   const rows = getDb()
     .prepare(
-      `SELECT w.nodus_id, w.deep_hash,
+      `SELECT w.nodus_id, w.deep_hash, w.resolved_text_hash,
               COUNT(p.passage_id) AS total_passages,
-              SUM(CASE WHEN (w.deep_hash IS NULL OR p.content_hash = w.deep_hash)
+              SUM(CASE WHEN ${PASSAGE_MATCHES_RESOLVED_TEXT}
                          AND p.embedding IS NOT NULL
                          AND p.embedding_provider = ?
                          AND p.embedding_model = ?
@@ -283,11 +309,12 @@ export function workPassageStatuses(nodusIds?: string[]): WorkPassageStatus[] {
          FROM works w
          LEFT JOIN passages p ON p.nodus_id = w.nodus_id
          ${where}
-        GROUP BY w.nodus_id, w.deep_hash`
+        GROUP BY w.nodus_id, w.deep_hash, w.resolved_text_hash`
     )
     .all(config.provider, config.model, ...ids) as {
     nodus_id: string;
     deep_hash: string | null;
+    resolved_text_hash: string | null;
     total_passages: number;
     current_passages: number | null;
   }[];

@@ -37,6 +37,24 @@ export interface FuseIdeaOptions {
   themes?: string[];
 }
 
+export interface FusionPlan {
+  idea: ExtractedIdea;
+  embedding: number[] | null;
+  embeddingText: string;
+  themes: string[];
+  model: ModelRef | null;
+  existingId: string | null;
+  label: string;
+  edge: {
+    to: string;
+    type: EdgeType;
+    basis: EdgeBasis;
+    confidence: number;
+    similarity: number | null;
+    rationale: string;
+  } | null;
+}
+
 function isFusionResult(v: unknown): v is FusionResult {
   if (typeof v !== 'object' || v === null) return false;
   const o = v as Record<string, unknown>;
@@ -78,7 +96,12 @@ const STOPWORDS = new Set([
   'y',
 ]);
 
-function tokens(text: string): Set<string> {
+function tokens(text: string | null | undefined): Set<string> {
+  // The column is nullable and the corpus has rows to prove it: six ideas in a real
+  // 14,612-idea vault carry a null statement. This path runs whenever no embedding is
+  // available (no provider configured, missing key, exhausted quota), so a single such
+  // row used to take down fusion — and with it the whole scan — for every work.
+  if (!text) return new Set();
   return new Set(
     text
       .toLowerCase()
@@ -96,7 +119,7 @@ function jaccard(a: Set<string>, b: Set<string>): number {
   return overlap / (a.size + b.size - overlap);
 }
 
-function lexicalSimilarity(a: ExtractedIdea, b: { label: string; statement: string }): number {
+function lexicalSimilarity(a: ExtractedIdea, b: { label: string | null; statement: string | null }): number {
   return 0.65 * jaccard(tokens(a.label), tokens(b.label)) + 0.35 * jaccard(tokens(a.statement), tokens(b.statement));
 }
 
@@ -109,6 +132,14 @@ export async function fuseIdea(
   sourceWork: string,
   optionsOrModel: FuseIdeaOptions | ModelRef | null = {}
 ): Promise<string> {
+  return applyFusionPlan(await planIdeaFusion(idea, optionsOrModel), sourceWork);
+}
+
+/** Resolve a fusion decision without mutating the graph. */
+export async function planIdeaFusion(
+  idea: ExtractedIdea,
+  optionsOrModel: FuseIdeaOptions | ModelRef | null = {}
+): Promise<FusionPlan> {
   const opts: FuseIdeaOptions = optionsOrModel && 'provider' in optionsOrModel ? { model: optionsOrModel } : optionsOrModel ?? {};
   const settings = getSettings();
   const fusionModel = opts.model ?? settings.fusionModel ?? settings.synthesisModel ?? null;
@@ -147,7 +178,7 @@ export async function fuseIdea(
   // No candidates → straight to a new idea, no model call needed.
   if (candidates.length === 0) {
     perfLog('LLM fusion', 0, opts.perf, { idea: idea.label, status: 'skipped', candidates: 0 });
-    return createIdea({ type: idea.type, label: idea.label, statement: idea.statement, embedding, embeddingText, themes: opts.themes }).global_id;
+    return { idea, embedding, embeddingText, themes: opts.themes ?? [], model: fusionModel, existingId: null, label: idea.label, edge: null };
   }
 
   const input = {
@@ -173,43 +204,64 @@ export async function fuseIdea(
   } catch {
     // On fusion failure, be conservative: treat as new (avoid wrong merges).
     fusionDone({ status: 'error' });
-    return createIdea({ type: idea.type, label: idea.label, statement: idea.statement, embedding, embeddingText, themes: opts.themes }).global_id;
+    return { idea, embedding, embeddingText, themes: opts.themes ?? [], model: fusionModel, existingId: null, label: idea.label, edge: null };
   }
 
   if (result.resolution === 'same_as' && result.matched_id && getIdea(result.matched_id)) {
-    return result.matched_id;
+    return { idea, embedding, embeddingText, themes: opts.themes ?? [], model: fusionModel, existingId: result.matched_id, label: idea.label, edge: null };
   }
 
-  // variant_of or new → create a distinct node, optionally edge it to the matched candidate.
-  const created = createIdea({
-    type: idea.type,
-    label: result.merged_label || idea.label,
-    statement: idea.statement,
+  const matched = result.matched_id && result.edge_to_existing && getIdea(result.matched_id)
+    ? candidates.find((candidate) => candidate.global_id === result.matched_id)
+    : null;
+  return {
+    idea,
     embedding,
     embeddingText,
-    themes: opts.themes,
-  });
-
-  if (result.matched_id && result.edge_to_existing && getIdea(result.matched_id)) {
-    const matched = candidates.find((candidate) => candidate.global_id === result.matched_id);
-    const config = embedding ? currentEmbeddingConfig() : { provider: null, model: null };
-    addEdge({
-      from_id: created.global_id,
-      to_id: result.matched_id,
+    themes: opts.themes ?? [],
+    model: fusionModel,
+    existingId: null,
+    label: result.merged_label || idea.label,
+    edge: matched && result.edge_to_existing ? {
+      to: matched.global_id,
       type: result.edge_to_existing.type,
       basis: result.edge_to_existing.basis,
       confidence: result.edge_to_existing.confidence,
+      similarity: matched.similarity,
+      rationale: result.rationale,
+    } : null,
+  };
+}
+
+/** Apply a previously planned decision. Callers may compose this inside a transaction. */
+export function applyFusionPlan(plan: FusionPlan, sourceWork: string): string {
+  if (plan.existingId && getIdea(plan.existingId)) return plan.existingId;
+  const created = createIdea({
+    type: plan.idea.type,
+    label: plan.label,
+    statement: plan.idea.statement,
+    embedding: plan.embedding,
+    embeddingText: plan.embeddingText,
+    themes: plan.themes,
+  });
+  if (plan.edge && getIdea(plan.edge.to)) {
+    const config = plan.embedding ? currentEmbeddingConfig() : { provider: null, model: null };
+    addEdge({
+      from_id: created.global_id,
+      to_id: plan.edge.to,
+      type: plan.edge.type,
+      basis: plan.edge.basis,
+      confidence: plan.edge.confidence,
       source_work: sourceWork,
       trace: {
         method: 'fusion',
-        model: fusionModel,
+        model: plan.model,
         embeddingProvider: config.provider,
         embeddingModel: config.model,
-        similarity: matched?.similarity ?? null,
-        rationale: result.rationale,
+        similarity: plan.edge.similarity,
+        rationale: plan.edge.rationale,
       },
     });
   }
-
   return created.global_id;
 }

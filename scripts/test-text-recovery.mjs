@@ -24,7 +24,15 @@ installRuntimeHooks(root);
 
 try {
   const AdmZip = require('adm-zip');
-  const { extractFromPath, isTextAttachment } = require(path.join(repoRoot, 'electron/extraction/textExtractor.ts'));
+  const {
+    extractFromPath,
+    isTextAttachment,
+    planTextChunks,
+    planRetrievalChunks,
+    resolvedTextStateFromDoc,
+  } = require(path.join(repoRoot, 'electron/extraction/textExtractor.ts'));
+  const { pageText } = require(path.join(repoRoot, 'electron/extraction/pdfjsLoader.ts'));
+  const { cleanExtractedText } = require(path.join(repoRoot, 'electron/extraction/textCleanup.ts'));
   const { shouldQueueDeepAfterSync } = require(path.join(repoRoot, 'electron/sync/syncService.ts'));
 
   const epubPath = path.join(root, 'sample.epub');
@@ -83,9 +91,64 @@ try {
   assert.equal(imgDoc.text, '');
   assert.equal(imgDoc.sourceType, 'upload');
   assert.match(imgDoc.notes ?? '', /OCR desactivado/);
+  assert.equal(imgDoc.blockReason, 'scanned_no_ocr');
+
+  assert.equal(
+    cleanExtractedText('El turis-\nmo creció.\nLa línea siguiente continúa.\n\nNuevo párrafo.'),
+    'El turismo creció. La línea siguiente continúa.\n\nNuevo párrafo.',
+    'shared cleanup dehyphenates line wraps without collapsing paragraph boundaries',
+  );
+
+  // Cleanup repairs what the line structure PROVES was split, and guesses at nothing
+  // else. Rules that glued an isolated accented vowel or a standalone `fi` to their
+  // neighbours fired 21 times over one real 368-page Spanish book and corrupted the text
+  // every single time: `y` is a word, `á` was a word, and `Wi fi` is two of them.
+  for (const [input, expected] of [
+    ['nació y creció el turismo', 'nació y creció el turismo'],
+    ['empezó á depender del clima', 'empezó á depender del clima'],
+    ['aquí y allí', 'aquí y allí'],
+    ['Wi fi network', 'Wi fi network'],
+    ['tres ó cuatro balnearios', 'tres ó cuatro balnearios'],
+  ]) {
+    assert.equal(cleanExtractedText(input), expected, `cleanup must not rewrite words: ${input}`);
+  }
 
   assert.equal(isTextAttachment({ key: 'A', contentType: 'application/epub+zip', linkMode: 'imported_file', filename: 'book.epub' }), true);
   assert.equal(isTextAttachment({ key: 'B', contentType: 'text/html', linkMode: 'imported_url', filename: 'snapshot.html' }), false);
+
+  // PDF.js line reconstruction preserves real line endings and only joins a
+  // lowercase word split by a terminal hyphen.
+  const reconstructed = await pageText({ getTextContent: async () => ({ items: [
+    { str: 'turis-', transform: [1, 0, 0, 10, 10, 100], width: 25, height: 10, hasEOL: true },
+    { str: 'mo español', transform: [1, 0, 0, 10, 10, 88], width: 55, height: 10, hasEOL: true },
+    { str: 'Nueva línea.', transform: [1, 0, 0, 10, 10, 76], width: 50, height: 10, hasEOL: true },
+  ] }) });
+  assert.equal(reconstructed, 'turismo español\nNueva línea.');
+
+  // Deep and retrieval chunks may never cross attachment boundaries, and every
+  // continuation starts with the source/page marker needed for a valid citation.
+  const words = (prefix, count) => Array.from({ length: count }, (_, i) => `${prefix}${i}`).join(' ');
+  const marked = `[[src:s1 p.1]] ${words('a', 620)} [[src:s2 p.1]] ${words('b', 620)}`;
+  const deepChunks = planTextChunks(marked, { standardChunkWords: 500 }).chunks;
+  assert.ok(deepChunks.length >= 4);
+  assert.ok(deepChunks.every((chunk) => !(chunk.includes('src:s1') && chunk.includes('src:s2'))));
+  assert.ok(deepChunks.every((chunk) => /^\[\[src:s[12] p\.1\]\]/.test(chunk)));
+  const retrieval = planRetrievalChunks(marked, { chunkWords: 280, sourceMap: { s1: 'zotero:one', s2: 'zotero:two' } });
+  assert.ok(retrieval.every((chunk) => chunk.sourceRef === 'zotero:one' || chunk.sourceRef === 'zotero:two'));
+  assert.ok(retrieval.every((chunk) => chunk.pageNumber === 1));
+
+  const resolved = resolvedTextStateFromDoc({
+    text: '[[src:s1 p.1]] texto utilizable '.repeat(20), sourceType: 'pdf', notes: null,
+    segments: [{ sourceRef: 'zotero:one', marker: 's1', origin: 'local_attachment', sourceType: 'pdf', zoteroLibraryId: '0', attachmentKey: 'A', displayName: 'A.pdf', text: 'texto utilizable '.repeat(20), contentHash: 'h', pageCount: 1, hasPageMarkers: true }],
+  });
+  assert.equal(resolved.sourceType, 'pdf');
+  assert.equal(resolved.sourceCount, 1);
+  assert.equal(resolved.hasPageMarkers, true);
+  assert.equal(resolved.blockReason, null);
+  const abstractState = resolvedTextStateFromDoc({
+    text: 'Resumen', sourceType: 'abstract_only', notes: 'Mensaje localizado libre', blockReason: 'abstract_only',
+  });
+  assert.equal(abstractState.blockReason, 'abstract_only', 'block reasons are structured and independent from localized notes');
 
   assert.equal(
     shouldQueueDeepAfterSync({

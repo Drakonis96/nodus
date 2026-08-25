@@ -122,6 +122,7 @@ export function WorkStatusModal({
       case 'themes':
         return work.themes.length > 0 ? work.themes.join(', ') : '—';
       case 'ideas':
+        if (step.state === 'failed' && work.deep_error) return work.deep_error;
         if (step.state === 'partial') return t('El análisis solo pudo usar el abstract.');
         return work.ideaCount > 0 ? tx('{n} ideas extraídas', { n: work.ideaCount }) : '—';
       case 'summary':
@@ -129,6 +130,10 @@ export function WorkStatusModal({
       case 'semantic':
         return step.total ? tx('{a}/{b} ideas indexadas', { a: step.done ?? 0, b: step.total }) : '—';
       case 'citable':
+        if (work.text_block_reason === 'file_missing') return t('El adjunto existe en Zotero, pero el archivo ya no está en su ubicación original.');
+        if (work.text_block_reason === 'scanned_no_ocr') return t('El PDF está escaneado y no tiene capa de texto. Activa OCR y vuelve a analizar.');
+        if (work.text_block_reason === 'unreadable') return t('El adjunto no produjo texto utilizable. Revisa el archivo o activa OCR.');
+        if (work.text_block_reason === 'unsupported') return t('El formato del adjunto no es compatible con la extracción de texto.');
         if (step.state === 'partial') return t('El texto o el modelo de embeddings cambió.');
         return step.total ? tx('{n} fragmentos indexados', { n: step.total }) : '—';
     }
@@ -159,6 +164,11 @@ export function WorkStatusModal({
         </div>
 
         <div className="min-h-0 flex-1 overflow-y-auto p-4">
+          {work.deep_hash && work.resolved_text_hash && work.deep_hash !== work.resolved_text_hash && (
+            <p className="mb-3 rounded-lg border border-amber-700/50 bg-amber-950/30 p-3 text-xs text-amber-200">
+              {t('El texto disponible ha cambiado. Se conserva el análisis anterior hasta completar un reescaneo.')}
+            </p>
+          )}
           <div className="space-y-2">
             {STEP_ORDER.map((id) => {
               const step = status.steps[id];

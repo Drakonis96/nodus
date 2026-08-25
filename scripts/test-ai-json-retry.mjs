@@ -117,6 +117,28 @@ try {
   run([{ content: 'una frase cortada por la mitad', finish_reason: 'length' }]);
   assert.equal(await aiClient.completeText(opts, model), 'una frase cortada por la mitad');
 
+  // 7. Truncation a provider does not admit to. The subscription runtimes (codex,
+  //    github-copilot) hand back a bare string with no finish_reason at all, and any
+  //    provider can simply be wrong. jsonrepair closes the dangling braces, the shard
+  //    passes the guard, and half a chunk's ideas disappear with no error anywhere — so
+  //    the shape of the text has to be read on its own: it ends inside an unclosed
+  //    object, therefore it was cut. A fresh sample may well complete, so this one does
+  //    retry, unlike case 5 where the provider itself said a repeat is pointless.
+  run([{ content: '{"ideas":[{"a":1},{"b":', finish_reason: 'stop' }, '{"ideas":["recovered"]}']);
+  assert.deepEqual((await aiClient.completeJson(opts, guard, model)).ideas, ['recovered'],
+    'a silently truncated response is refused, not repaired into a plausible shard');
+
+  run([
+    { content: '{"ideas":[{"a":1},{"b":', finish_reason: 'stop' },
+    { content: '{"ideas":[{"a":1},{"b":', finish_reason: 'stop' },
+    { content: '{"ideas":[{"a":1},{"b":', finish_reason: 'stop' },
+  ]);
+  await assert.rejects(() => aiClient.completeJson(opts, guard, model), (e) => {
+    assert.match(e.message, /se cortó/i, 'the error names truncation even with no provider signal');
+    assert.equal(e.code, 'output_truncated', 'and carries the code the deep scan splits on');
+    return true;
+  });
+
   console.log('AI JSON retry budget verified.');
 } finally {
   try { closeDb(); } catch { /* database may not have opened */ }

@@ -75,8 +75,9 @@ try {
   const resolved = await resolveWorkText('0', 'LIBKEY01', '', null, null, {
     unpaywallEmail: '', preferZoteroFulltext: true, ocr: { enabled: false, languages: 'spa+eng', maxPages: 0 },
   });
-  assert.equal(resolved.text, markdown);
+  assert.equal(resolved.text, `[[src:s1]]\n${markdown}`);
   assert.equal(resolved.sourceType, 'markdown');
+  assert.equal(resolved.segments?.[0]?.sourceRef, 'library:LIBKEY01');
 
   const again = await library.linkGlobalLibraryItemsToVault(['zotero:LIBKEY01'], vault.id);
   assert.equal(again.existing, 1, 'linking twice is idempotent');

@@ -104,7 +104,22 @@ const READINESS_ICON: Record<WorkReadiness, string> = {
  * at the call site, and a map read through a variable slips past it — which ships
  * Spanish to every other language with nothing failing.
  */
-function readinessHint(readiness: WorkReadiness): string | null {
+function readinessHint(readiness: WorkReadiness, work?: WorkView): string | null {
+  if (work?.deep_hash && work.resolved_text_hash && work.deep_hash !== work.resolved_text_hash) {
+    return t('El texto disponible ha cambiado. Se conserva el análisis anterior hasta completar un reescaneo.');
+  }
+  if (work?.text_block_reason === 'file_missing') {
+    return t('El adjunto existe en Zotero, pero el archivo ya no está en su ubicación original.');
+  }
+  if (work?.text_block_reason === 'scanned_no_ocr') {
+    return t('El PDF está escaneado y no tiene capa de texto. Activa OCR y vuelve a analizar.');
+  }
+  if (work?.text_block_reason === 'unreadable') {
+    return t('El adjunto no produjo texto utilizable. Revisa el archivo o activa OCR.');
+  }
+  if (work?.text_block_reason === 'unsupported') {
+    return t('El formato del adjunto no es compatible con la extracción de texto.');
+  }
   if (readiness === 'noText') {
     return t('Nodus no encontró texto que leer. Añade el PDF o EPUB en Zotero y vuelve a analizar.');
   }
@@ -290,9 +305,9 @@ const STEP_LABEL: Record<StepId, string> = {
  * The one status a reader actually needs: can I use this work yet? Clicking it
  * opens the per-step breakdown, which is where retrying an individual step lives.
  */
-function StatusPill({ status, onClick }: { status: WorkStatus; onClick: () => void }) {
+function StatusPill({ status, work, onClick }: { status: WorkStatus; work: WorkView; onClick: () => void }) {
   const { readiness, missing } = status;
-  const hint = readinessHint(readiness);
+  const hint = readinessHint(readiness, work);
   const detail = hint
     ? hint
     : missing.length > 0
@@ -1652,7 +1667,7 @@ export function Library({
                   )}
                 </div>
                 <div className="min-w-0 p-1">
-                  {status && <StatusPill status={status} onClick={() => setStatusWork(w)} />}
+                  {status && <StatusPill status={status} work={w} onClick={() => setStatusWork(w)} />}
                   {vaultType === 'academic' && <button
                     className={`mt-1 block max-w-full truncate text-[10px] ${documentStatuses.get(w.nodus_id) === 'current' ? 'text-cyan-400' : documentStatuses.get(w.nodus_id) === 'failed' ? 'text-red-400' : 'text-neutral-600'}`}
                     onClick={() => setDocumentWork(w)}

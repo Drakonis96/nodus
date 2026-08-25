@@ -351,6 +351,8 @@ async function loadSessionPassages(
          FROM passages p
          JOIN works w ON w.nodus_id = p.nodus_id
         WHERE p.nodus_id IN (${workIds.map(() => '?').join(',')})
+          AND ((w.resolved_text_hash IS NOT NULL AND p.content_hash = w.resolved_text_hash)
+            OR (w.resolved_text_hash IS NULL AND (w.deep_hash IS NULL OR p.content_hash = w.deep_hash)))
         ORDER BY p.nodus_id, p.chunk_index
         LIMIT ?`
     )

@@ -21,17 +21,25 @@ const root = await mkdtemp(path.join(os.tmpdir(), 'nodus-document-profiles-'));
 installRuntimeHooks(root);
 try {
   const Database = require('better-sqlite3');
-  const { runMigrations, SCHEMA_VERSION } = require(path.join(repoRoot, 'electron/db/migrations.ts'));
+  const { migrations, runMigrations, SCHEMA_VERSION } = require(path.join(repoRoot, 'electron/db/migrations.ts'));
   const sqlite = new Database(path.join(root, 'profiles.sqlite'));
   runMigrations(sqlite);
   globalThis.__documentProfilesDb = sqlite;
   assert.equal(sqlite.pragma('user_version', { simple: true }), SCHEMA_VERSION);
-  // Exercise the real v157 -> v158 path as well as a clean install. This catches
-  // accidentally attaching additive objects to an already-shipped migration.
-  sqlite.exec('DROP TRIGGER works_document_profile_stale_deep; DROP TRIGGER works_document_profile_title_fts; PRAGMA user_version=157;');
-  runMigrations(sqlite);
-  assert.equal(sqlite.prepare("SELECT COUNT(*) n FROM sqlite_master WHERE type='trigger' AND name LIKE 'works_document_profile_%'").get().n, 2);
-  assert.equal(sqlite.prepare("SELECT COUNT(*) n FROM sqlite_master WHERE type='index' AND name='document_index_jobs_campaign_status'").get().n, 1);
+  // Exercise a real v157 -> current migration as well as a clean install. Never
+  // fake an old database by rewinding user_version on a schema that already has
+  // later columns: that is not a state any shipped Nodus build can produce.
+  const legacy = new Database(path.join(root, 'profiles-v157.sqlite'));
+  for (const migration of migrations.filter((entry) => entry.version <= 157)) {
+    legacy.transaction(() => {
+      legacy.exec(migration.up);
+      legacy.pragma(`user_version = ${migration.version}`);
+    })();
+  }
+  runMigrations(legacy);
+  assert.equal(legacy.prepare("SELECT COUNT(*) n FROM sqlite_master WHERE type='trigger' AND name LIKE 'works_document_profile_%'").get().n, 2);
+  assert.equal(legacy.prepare("SELECT COUNT(*) n FROM sqlite_master WHERE type='index' AND name='document_index_jobs_campaign_status'").get().n, 1);
+  legacy.close();
   for (const table of [
     'document_profile_state', 'document_profile_versions', 'document_profile_fields',
     'document_sections', 'document_profile_support', 'document_vectors',
@@ -76,11 +84,13 @@ try {
       sectionId, parentSectionId: null, level: 1, ordinal: 0, title: 'Introducción', role: 'planteamiento',
       summary: 'Presenta una modernización territorialmente desigual.', concepts: ['modernización'],
       claims: ['La modernización fue desigual.'], pageStart: 'p. 1', pageEnd: 'p. 12',
+      sourceRef: 'zotero:user:0:ATTACH', pageStartNumber: 1, pageEndNumber: 12,
       charStart: 0, charEnd: 1200, contentHash: 'section-hash',
     }],
     supports: [{
       supportId, targetKind: 'field', targetId: fieldId, sectionId, passageId: 'w1#0',
       pageStart: 'p. 4', pageEnd: 'p. 4', quote: 'El proceso avanzó de manera desigual.',
+      sourceRef: 'zotero:user:0:ATTACH', pageStartNumber: 4, pageEndNumber: 4,
       supportKind: 'direct', confidence: 0.97, validationStatus: 'valid',
     }],
     ideaLinks: [], vectors: [], generatorModel: null, auditorModel: null,
@@ -92,7 +102,11 @@ try {
   assert.equal(profile.versionId, versionId);
   assert.equal(profile.fields[0].text, 'La modernización fue desigual.');
   assert.equal(profile.sections[0].sectionId, sectionId);
+  assert.equal(profile.sections[0].sourceRef, 'zotero:user:0:ATTACH');
+  assert.equal(profile.sections[0].pageStartNumber, 1);
   assert.equal(profile.supports[0].validationStatus, 'valid');
+  assert.equal(profile.supports[0].sourceRef, 'zotero:user:0:ATTACH');
+  assert.equal(profile.supports[0].pageStartNumber, 4);
   const exactSupport = repo.findDocumentSupportPassages([{
     kind: 'document', nodusId: 'w1', title: 'Modernización española', authors: ['Autora Uno'], year: 2024,
     versionId, sourceId: fieldId, fieldKind: 'thesis', text: 'La modernización fue desigual.', similarity: 0.8,
@@ -100,6 +114,13 @@ try {
   }], 5);
   assert.equal(exactSupport[0].passage_id, 'w1#0', 'a matched profile field follows its validated support to the original passage');
   assert.equal(exactSupport[0].similarity, 0.776);
+  sqlite.prepare("UPDATE works SET resolved_text_hash='replacement-source' WHERE nodus_id='w1'").run();
+  assert.equal(repo.findDocumentSupportPassages([{
+    kind: 'document', nodusId: 'w1', title: 'Modernización española', authors: ['Autora Uno'], year: 2024,
+    versionId, sourceId: fieldId, fieldKind: 'thesis', text: 'La modernización fue desigual.', similarity: 0.8,
+    centrality: 1, explanation: 'Coincidencia en tesis', stale: true,
+  }], 5).length, 0, 'profile support never revives a passage from a replaced text');
+  sqlite.prepare("UPDATE works SET resolved_text_hash=NULL WHERE nodus_id='w1'").run();
   assert.equal(repo.lexicalDocumentSearch('modernización', 5)[0].nodusId, 'w1');
   assert.equal(repo.lexicalDocumentSearch('¿Qué explica la modernización española?', 5)[0].nodusId, 'w1',
     'natural-language punctuation is never interpreted as FTS5 syntax');

@@ -284,6 +284,16 @@ assert.deepEqual(
   { passage_id: 'work-reused#0', nodus_id: 'work-reused' },
   'reused passages are rewritten for the selected target work'
 );
+assert.deepEqual(
+  db.prepare('SELECT source_ref, page_number FROM evidence WHERE nodus_id = ?').get('work-reused'),
+  { source_ref: 'zotero:user:0:ATTACHMENT-B', page_number: 7 },
+  'reused graph evidence preserves its exact attachment and page'
+);
+assert.deepEqual(
+  db.prepare('SELECT source_ref, page_number FROM passages WHERE nodus_id = ?').get('work-reused'),
+  { source_ref: 'zotero:user:0:ATTACHMENT-A', page_number: 12 },
+  'reused passages preserve their exact attachment and page'
+);
 assert.equal(
   Buffer.from(db.prepare('SELECT embedding FROM ideas WHERE global_id = ?').get('idea-default').embedding).toString('hex'),
   Buffer.from([1, 2, 3, 4]).toString('hex'),
@@ -422,13 +432,15 @@ function seedAnalyzedWork(db) {
     'development',
     0.9
   );
-  db.prepare('INSERT INTO evidence (id, global_id, nodus_id, quote, location, kind) VALUES (?, ?, ?, ?, ?, ?)').run(
+  db.prepare('INSERT INTO evidence (id, global_id, nodus_id, quote, location, kind, source_ref, page_number) VALUES (?, ?, ?, ?, ?, ?, ?, ?)').run(
     'evidence-default',
     'idea-default',
     'work-default',
     'quote',
     'p. 1',
-    'quote'
+    'quote',
+    'zotero:user:0:ATTACHMENT-B',
+    7
   );
   db.prepare(
     `INSERT INTO work_summaries (
@@ -451,15 +463,17 @@ function seedAnalyzedWork(db) {
   );
   db.prepare(
     `INSERT INTO passages (
-      passage_id, nodus_id, chunk_index, text, page_label, char_len, content_hash,
+      passage_id, nodus_id, chunk_index, text, page_label, source_ref, page_number, char_len, content_hash,
       embedding, embedding_provider, embedding_model, embedding_dim, embedding_text_hash, created_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
   ).run(
     'passage-default',
     'work-default',
     0,
     'Passage',
     '1',
+    'zotero:user:0:ATTACHMENT-A',
+    12,
     7,
     'deep-hash',
     Buffer.from([9, 10, 11, 12]),

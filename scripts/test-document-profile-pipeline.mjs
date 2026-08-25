@@ -45,6 +45,9 @@ await build({
         export function advanceRunningDocumentIndexJob(id,phase,progress,state){globalThis.__documentPipeline.jobs.push({id,patch:{phase,progress,state}});return true}
         export function publishDocumentProfile(input){globalThis.__documentPipeline.published=input;if(input.passages)globalThis.__documentPipeline.passages=input.passages.rows.map((row,index)=>({passage_id:input.nodusId+'#'+index,text:row.text}));return 'published-v1'}
       `);
+      stub(/\.\.\/db\/worksRepo$/, 'works-repo', `
+        export function setResolvedTextState(id,state){globalThis.__documentPipeline.resolvedState={id,state}}
+      `);
       stub(/\.\.\/db\/ideasRepo$/, 'ideas', `
         export function cosineSimilarity(){return 0} export function decodeEmbedding(){return []}
         export function currentEmbeddingConfig(){return {provider:'openrouter',model:'baai/bge-m3'}}
@@ -60,6 +63,10 @@ await build({
           const changed=globalThis.__documentPipeline.sourceReads>1&&globalThis.__documentPipeline.changedTextAtPublication;
           return {text:changed||globalThis.__documentPipeline.text,sourceType:'markdown',notes:null}
         }
+        export function resolvedTextStateFromDoc(doc){return {
+          sourceType:doc.sourceType,textHash:'fixture-hash',textChars:doc.text.length,
+          sourceCount:1,hasPageMarkers:false,blockReason:null,resolvedAt:'2026-08-24T00:00:00.000Z',notes:doc.notes,sources:[]
+        }}
         export function planRetrievalChunks(text){return [{text:text.replace(/\\[\\[p\\. \\d+\\]\\]/g,' '),pageLabel:'p. 1'}]}
       `);
       stub(/\.\.\/zotero\/zoteroClient$/, 'zotero', `export const LOCAL_USER_ID='0';export async function getItem(){return {abstract:'Resumen original'}}`);
@@ -109,6 +116,17 @@ test('structure preserves heading hierarchy and full character coverage', () => 
   assert.equal(chapter.parentSectionId, part.sectionId);
   assert.equal(chapter.pageStart, 'p. 1', 'heading precedes the next physical page marker');
   assert.ok(sections.every((section) => section.contentHash.length === 64));
+});
+
+test('structure resolves combined source/page markers to durable attachment locators', () => {
+  const text = `[[src:s1 p.7]]\n# Primera\n${'Texto de la primera fuente. '.repeat(90)}\n[[src:s2 p.3]]\n# Segunda\n${'Texto de la segunda fuente. '.repeat(90)}`;
+  const sections = pipeline.deriveDocumentStructure(text, 'Libro', { s1: 'zotero:user:0:A', s2: 'zotero:user:0:B' });
+  const first = sections.find((section) => section.title === 'Primera');
+  const second = sections.find((section) => section.title === 'Segunda');
+  assert.equal(first.sourceRef, 'zotero:user:0:A');
+  assert.equal(first.pageStartNumber, 7);
+  assert.equal(second.sourceRef, 'zotero:user:0:B');
+  assert.equal(second.pageStartNumber, 3);
 });
 
 test('provider audit variants normalize conservatively instead of aborting the job', () => {

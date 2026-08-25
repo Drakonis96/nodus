@@ -15,7 +15,7 @@ export interface Migration {
 
 // Versioned, append-only migrations. Never edit an existing migration's SQL once
 // shipped — add a new one. The current schema version is the highest applied.
-export const SCHEMA_VERSION = 159;
+export const SCHEMA_VERSION = 163;
 
 export const migrations: Migration[] = [
   {
@@ -8797,6 +8797,89 @@ export const migrations: Migration[] = [
       -- progress bar is visible. Keep them indexed even after years of history.
       CREATE INDEX document_index_jobs_campaign_status
         ON document_index_jobs(campaign_id, status, updated_at);
+    `,
+  },
+  {
+    version: 160,
+    up: /* sql */ `
+      -- Current text availability is independent from the source used by the last
+      -- successfully committed deep analysis.
+      ALTER TABLE works ADD COLUMN resolved_source_type TEXT;
+      ALTER TABLE works ADD COLUMN resolved_text_hash TEXT;
+      ALTER TABLE works ADD COLUMN resolved_text_chars INTEGER NOT NULL DEFAULT 0;
+      ALTER TABLE works ADD COLUMN resolved_text_source_count INTEGER NOT NULL DEFAULT 0;
+      ALTER TABLE works ADD COLUMN resolved_has_page_markers INTEGER NOT NULL DEFAULT 0;
+      ALTER TABLE works ADD COLUMN text_block_reason TEXT;
+      ALTER TABLE works ADD COLUMN text_resolved_at TEXT;
+      ALTER TABLE works ADD COLUMN resolved_text_notes TEXT;
+      ALTER TABLE works ADD COLUMN deep_error TEXT;
+
+      ALTER TABLE evidence ADD COLUMN source_ref TEXT;
+      ALTER TABLE evidence ADD COLUMN page_number INTEGER;
+      ALTER TABLE passages ADD COLUMN source_ref TEXT;
+      ALTER TABLE passages ADD COLUMN page_number INTEGER;
+
+      UPDATE works SET deep_error=notes WHERE deep_status='failed' AND notes IS NOT NULL;
+    `,
+  },
+  {
+    version: 161,
+    up: /* sql */ `
+      -- Profile citations need the same durable source identity as evidence and
+      -- passages; display labels alone are ambiguous for multi-attachment works.
+      ALTER TABLE document_sections ADD COLUMN source_ref TEXT;
+      ALTER TABLE document_sections ADD COLUMN page_start_number INTEGER;
+      ALTER TABLE document_sections ADD COLUMN page_end_number INTEGER;
+      ALTER TABLE document_profile_support ADD COLUMN source_ref TEXT;
+      ALTER TABLE document_profile_support ADD COLUMN page_start_number INTEGER;
+      ALTER TABLE document_profile_support ADD COLUMN page_end_number INTEGER;
+    `,
+  },
+  {
+    version: 162,
+    // The per-attachment text inventory lives in its own body so isCreateOnly() accepts
+    // it: only a CREATE-only migration can be replayed to backfill a table missing from
+    // a database built by a differently-numbered build. NO FOREIGN KEY, for the same
+    // reason as migrations 98-103 — `ON DELETE CASCADE` contains a DELETE keyword and
+    // would disqualify the body. Duplicate merges drop these rows explicitly (dedupe.ts),
+    // and the inventory is rebuilt from local files on the next resolution anyway.
+    //
+    // Two populations exist and both are correct: a database built before this table was
+    // moved out of 160 keeps the older shape, WITH the cascading key, because 162 is
+    // skipped there as already applied. Every deletion path removes these rows itself, so
+    // the end state matches — but do not write code that assumes either shape.
+    up: /* sql */ `
+      CREATE TABLE work_text_sources (
+        nodus_id            TEXT NOT NULL,
+        source_ref          TEXT NOT NULL,
+        origin              TEXT NOT NULL,
+        source_type         TEXT NOT NULL,
+        zotero_library_id   TEXT,
+        attachment_key      TEXT,
+        display_name        TEXT,
+        content_hash        TEXT NOT NULL,
+        char_count          INTEGER NOT NULL,
+        page_count          INTEGER,
+        has_page_markers    INTEGER NOT NULL DEFAULT 0,
+        ordinal             INTEGER NOT NULL,
+        active              INTEGER NOT NULL DEFAULT 1,
+        resolved_at         TEXT NOT NULL,
+        PRIMARY KEY (nodus_id, source_ref)
+      );
+      CREATE INDEX idx_work_text_sources_attachment
+        ON work_text_sources(zotero_library_id, attachment_key);
+    `,
+  },
+  {
+    version: 163,
+    up: /* sql */ `
+      -- A queued rescan of an already-analysed work must survive a restart without
+      -- overwriting deep_status, which describes the last COMMITTED result. This is a
+      -- migration of its own, not an extra line in 160: 160 has already run on every
+      -- database built from this branch, and runMigrations only executes bodies above
+      -- user_version, so an edit there would never reach them (and the CREATE-only
+      -- backfill cannot rescue an ALTER).
+      ALTER TABLE works ADD COLUMN deep_queued INTEGER NOT NULL DEFAULT 0;
     `,
   },
 ];

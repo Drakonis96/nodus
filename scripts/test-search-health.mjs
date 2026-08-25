@@ -71,6 +71,8 @@ try {
       read_tag       INTEGER DEFAULT 0,
       manual_deep    INTEGER DEFAULT 0,
       source_type    TEXT,
+      resolved_source_type TEXT,
+      resolved_text_hash TEXT,
       light_status   TEXT DEFAULT 'none',
       deep_status    TEXT DEFAULT 'none',
       deep_hash      TEXT,

@@ -34,6 +34,7 @@ const work = (over = {}) => ({
   source_type: 'pdf',
   light_status: 'done',
   deep_status: 'done',
+  deep_error: null,
   summary_status: 'done',
   ...over,
 });
@@ -107,6 +108,8 @@ test('partial embeddings and outdated passages are partial, and carry their numb
 test('failure outranks absence, and live queue activity outranks both', () => {
   const failed = deriveWorkStatus(work({ summary_status: 'failed', light_status: 'none' }), embedded(), indexed());
   assert.equal(failed.readiness, 'failed');
+  assert.equal(deriveWorkStatus(work({ deep_error: 'falló el reintento' }), embedded(), indexed()).readiness, 'failed',
+    'a replacement failure is visible even while the committed deep graph remains readable');
 
   // A queued job wins even though nothing is persisted as pending yet.
   const running = deriveWorkStatus(work({ deep_status: 'failed' }), embedded(), indexed(), [
@@ -138,7 +141,7 @@ test('the SQL presets stay in step with the JS readiness derivation', async () =
 
   // Same precedence chain as deriveWorkStatus: failed, then unstarted, then the
   // two text-shortage states, and only then ready vs incomplete.
-  assert.match(sql, /w\.light_status = 'failed' OR w\.deep_status = 'failed' OR w\.summary_status = 'failed'/);
+  assert.match(sql, /w\.light_status = 'failed' OR w\.deep_status = 'failed' OR w\.deep_error IS NOT NULL OR w\.summary_status = 'failed'/);
   assert.match(sql, /w\.light_status = 'none' AND w\.deep_status = 'none'/);
   assert.match(sql, /w\.deep_status = 'done' AND w\.source_type IN \('abstract_only', 'none'\)/);
   assert.match(sql, /NOT \$\{FAILED\} AND NOT \$\{UNSTARTED\} AND NOT \$\{ABSTRACT_ONLY\} AND NOT \$\{NO_TEXT\}/);
@@ -149,7 +152,7 @@ test('the SQL presets stay in step with the JS readiness derivation', async () =
 
   // READY_CORE must cover exactly READY_STEPS: themes, ideas and citable text.
   assert.match(status, /READY_STEPS: readonly StepId\[\] = \['themes', 'ideas', 'citable'\]/);
-  assert.match(sql, /READY_CORE = `w\.light_status = 'done' AND w\.deep_status = 'done' AND \$\{HAS_IDEAS\} AND \$\{PASSAGES_COMPLETE\}`/);
+  assert.match(sql, /READY_CORE = `w\.light_status = 'done' AND w\.deep_status = 'done'[\s\S]{0,120}w\.deep_hash = w\.resolved_text_hash[\s\S]{0,80}\$\{HAS_IDEAS\} AND \$\{PASSAGES_COMPLETE\}`/);
   // The semantic index cannot be evaluated in SQL, so it must not gate readiness
   // on either side; if it ever appears here the two would silently disagree.
   assert.doesNotMatch(sql, /embedding_text_hash/);

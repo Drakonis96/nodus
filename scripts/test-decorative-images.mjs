@@ -394,28 +394,30 @@ try {
   globalThis.__nodusDecorativeTestDb = db;
   db.exec(`
     CREATE TABLE ideas (global_id TEXT PRIMARY KEY, type TEXT, label TEXT, statement TEXT, created_at TEXT);
-    CREATE TABLE works (nodus_id TEXT PRIMARY KEY, title TEXT, authors_json TEXT, year INTEGER, item_type TEXT, doi TEXT, zotero_key TEXT, notes TEXT, source_type TEXT);
+    CREATE TABLE works (nodus_id TEXT PRIMARY KEY, title TEXT, authors_json TEXT, year INTEGER, item_type TEXT, doi TEXT, zotero_key TEXT, notes TEXT, source_type TEXT, resolved_text_hash TEXT, deep_hash TEXT);
     CREATE TABLE idea_occurrences (global_id TEXT, nodus_id TEXT, role TEXT, development TEXT, confidence REAL);
     CREATE TABLE evidence (id TEXT, global_id TEXT, quote TEXT, location TEXT, kind TEXT);
     CREATE TABLE themes (theme_id TEXT PRIMARY KEY, label TEXT, pinned INTEGER, created_at TEXT);
     CREATE TABLE idea_theme_links (global_id TEXT, theme_id TEXT);
     CREATE TABLE work_themes (nodus_id TEXT, theme_id TEXT);
     CREATE TABLE work_summaries (nodus_id TEXT, summary TEXT);
-    CREATE TABLE passages (passage_id TEXT PRIMARY KEY, nodus_id TEXT, text TEXT, page_label TEXT, chunk_index INTEGER, char_len INTEGER, created_at TEXT);
+    CREATE TABLE passages (passage_id TEXT PRIMARY KEY, nodus_id TEXT, text TEXT, page_label TEXT, chunk_index INTEGER, char_len INTEGER, created_at TEXT, content_hash TEXT);
     CREATE TABLE gaps (id TEXT PRIMARY KEY, kind TEXT, statement TEXT, confidence REAL, nodus_id TEXT, related_idea TEXT, evidence_id TEXT);
     CREATE TABLE authors (author_id TEXT PRIMARY KEY, name TEXT, affiliation TEXT, canonical_key TEXT);
     CREATE TABLE work_authors (author_id TEXT, nodus_id TEXT, role TEXT NOT NULL DEFAULT 'author');
     CREATE TABLE note_folders (id TEXT PRIMARY KEY, name TEXT);
     CREATE TABLE notes (id TEXT PRIMARY KEY, title TEXT, kind TEXT, content TEXT, folder_id TEXT, created_at TEXT, updated_at TEXT, trashed_at TEXT);
     INSERT INTO ideas VALUES ('i1','claim','Idea de prueba','Enunciado completo','2026-01-01');
-    INSERT INTO works VALUES ('w1','Obra de prueba','["Autora, A."]',2026,'book','10/test','Z1','Notas','pdf');
+    INSERT INTO works (nodus_id,title,authors_json,year,item_type,doi,zotero_key,notes,source_type)
+      VALUES ('w1','Obra de prueba','["Autora, A."]',2026,'book','10/test','Z1','Notas','pdf');
     INSERT INTO idea_occurrences VALUES ('i1','w1','central','Desarrollo',0.9);
     INSERT INTO evidence VALUES ('e1','i1','Cita literal','p. 4','quote');
     INSERT INTO themes VALUES ('t1','Tema de prueba',1,'2026-01-01');
     INSERT INTO idea_theme_links VALUES ('i1','t1');
     INSERT INTO work_themes VALUES ('w1','t1');
     INSERT INTO work_summaries VALUES ('w1','Resumen completo');
-    INSERT INTO passages VALUES ('p1','w1','Pasaje completo','4',0,15,'2026-01-01');
+    INSERT INTO passages (passage_id,nodus_id,text,page_label,chunk_index,char_len,created_at)
+      VALUES ('p1','w1','Pasaje completo','4',0,15,'2026-01-01');
     INSERT INTO gaps VALUES ('g1','evidence','Hueco de prueba',0.8,'w1','i1','e1');
     INSERT INTO authors VALUES ('a1','Autora de prueba','Universidad','autora-prueba');
     INSERT INTO work_authors VALUES ('a1','w1','author');

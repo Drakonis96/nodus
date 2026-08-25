@@ -3,7 +3,8 @@ import type { PassageEmbeddingProgress, Work } from '@shared/types';
 import { getDb } from '../db/database';
 import { clearAllPassages, replaceWorkPassages, workPassageStatuses } from '../db/passagesRepo';
 import { getSettings } from '../db/settingsRepo';
-import { planRetrievalChunks, resolveWorkText } from '../extraction/textExtractor';
+import { planRetrievalChunks, resolveWorkText, resolvedTextStateFromDoc } from '../extraction/textExtractor';
+import { setResolvedTextState } from '../db/worksRepo';
 import { getItem, LOCAL_USER_ID } from '../zotero/zoteroClient';
 import { embedMany } from './aiClient';
 import { addNotification } from '../notifications';
@@ -128,7 +129,9 @@ export async function startPassageEmbedding(nodusIds?: string[]): Promise<void> 
       : db.prepare('SELECT * FROM works WHERE archived = 0').all()) as Work[];
     const statuses = new Map(workPassageStatuses(candidates.map((work) => work.nodus_id)).map((status) => [status.nodus_id, status]));
     state.works = candidates
-      .filter((work) => statuses.get(work.nodus_id)?.status !== 'complete')
+      // An explicit reindex request must resolve the source again before deciding
+      // whether its old passages are current; the persisted hash may itself be stale.
+      .filter((work) => ids.length > 0 || statuses.get(work.nodus_id)?.status !== 'complete')
       .map((work) => ({ work, title: work.title, chunks: 0 }));
 
     if (state.works.length === 0) {
@@ -166,9 +169,12 @@ export async function startPassageEmbedding(nodusIds?: string[]): Promise<void> 
         },
         entry.work.item_type
       );
+      setResolvedTextState(entry.work.nodus_id, resolvedTextStateFromDoc(document));
       if (state.stopRequested || (await waitIfPaused())) break;
 
-      const chunks = planRetrievalChunks(document.text);
+      const chunks = planRetrievalChunks(document.text, {
+        sourceMap: Object.fromEntries((document.segments ?? []).map((segment) => [segment.marker, segment.sourceRef])),
+      });
       entry.chunks = chunks.length;
       state.currentWorkPassages = chunks.length;
       state.totalPassages += chunks.length;

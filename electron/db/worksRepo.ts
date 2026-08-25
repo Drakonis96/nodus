@@ -1,7 +1,19 @@
 import { getDb } from './database';
 import { expandCollectionKeys } from './collectionsRepo';
 import { currentEmbeddingConfig } from './ideasRepo';
-import type { Work, WorkView, WorkFilter, WorkPage, WorkPageRequest, DeepTrigger, ZoteroTag, SummaryStatus, WorkCreator } from '@shared/types';
+import type {
+  Work,
+  WorkView,
+  WorkFilter,
+  WorkPage,
+  WorkPageRequest,
+  DeepTrigger,
+  ZoteroTag,
+  SummaryStatus,
+  WorkCreator,
+  ResolvedTextState,
+  WorkTextSource,
+} from '@shared/types';
 import { HEALTH_BUCKET_WHERE } from './corpusHealthBuckets';
 import { readinessWhere } from './readinessFilters';
 
@@ -232,7 +244,8 @@ function queryWorks(filter: WorkFilter, request?: WorkPageRequest): WorkPage {
                             AND p.embedding_provider = @passProv
                             AND p.embedding_model    = @passModel
                             AND p.embedding_dim > 0
-                            AND (w.deep_hash IS NULL OR p.content_hash = w.deep_hash))
+                            AND ((w.resolved_text_hash IS NOT NULL AND p.content_hash = w.resolved_text_hash)
+                              OR (w.resolved_text_hash IS NULL AND (w.deep_hash IS NULL OR p.content_hash = w.deep_hash))))
               )
             )`
           );
@@ -252,7 +265,8 @@ function queryWorks(filter: WorkFilter, request?: WorkPageRequest): WorkPage {
                             AND p.embedding_provider = @passNegProv
                             AND p.embedding_model    = @passNegModel
                             AND p.embedding_dim > 0
-                            AND (w.deep_hash IS NULL OR p.content_hash = w.deep_hash))
+                            AND ((w.resolved_text_hash IS NOT NULL AND p.content_hash = w.resolved_text_hash)
+                              OR (w.resolved_text_hash IS NULL AND (w.deep_hash IS NULL OR p.content_hash = w.deep_hash))))
               )
             )`
           );
@@ -424,7 +438,10 @@ function workOrderBy(
       const config = currentEmbeddingConfig();
       params.sortPassageProvider = config.provider;
       params.sortPassageModel = config.model;
-      expression = `(SELECT COUNT(*) FROM passages p WHERE p.nodus_id = w.nodus_id AND p.embedding IS NOT NULL AND p.embedding_provider = @sortPassageProvider AND p.embedding_model = @sortPassageModel)`;
+      expression = `(SELECT COUNT(*) FROM passages p WHERE p.nodus_id = w.nodus_id
+        AND p.embedding IS NOT NULL AND p.embedding_provider = @sortPassageProvider AND p.embedding_model = @sortPassageModel
+        AND ((w.resolved_text_hash IS NOT NULL AND p.content_hash = w.resolved_text_hash)
+          OR (w.resolved_text_hash IS NULL AND (w.deep_hash IS NULL OR p.content_hash = w.deep_hash))))`;
       break;
     }
   }
@@ -544,10 +561,33 @@ export function setLightPending(nodusId: string): void {
 }
 
 export function setDeepPending(nodusId: string): void {
-  getDb().prepare("UPDATE works SET deep_status = 'pending' WHERE nodus_id = ?").run(nodusId);
-  getDb().prepare(`UPDATE document_profile_state
-    SET status='stale',stale_reason='source_pending',error=NULL,updated_at=?
-    WHERE nodus_id=? AND current_version_id IS NOT NULL`).run(new Date().toISOString(), nodusId);
+  // Once a deep result is committed, deep_status describes that readable result.
+  // Live queue state describes its replacement attempt; do not hide the committed
+  // graph or stale a valid profile merely because a retry was enqueued.
+  //
+  // deep_queued is what makes that separation survive a restart: the queue lives in
+  // memory only, and resumePending() used to find abandoned work by deep_status alone.
+  // Without this flag a rescan of an already-analysed work — every degraded work the
+  // recovery pass enqueues — would be dropped silently when the app closes mid-run.
+  // The queue clears it again from the job's outcome; see clearDeepQueued.
+  getDb().prepare(`UPDATE works SET
+    deep_status=CASE WHEN deep_hash IS NULL THEN 'pending' ELSE 'done' END,
+    deep_error=NULL,
+    deep_queued=1
+    WHERE nodus_id=?`).run(nodusId);
+}
+
+/**
+ * Drop the queued marker. The scan queue is its only caller and reaches it through
+ * ScanQueue.syncDeepQueued, never from setDeepResult: an abandoned scan (stop button on
+ * a running job) still writes its result long after a replacement job was queued for the
+ * same work, and clearing on the write would strand that replacement — the very loss
+ * this marker exists to prevent. Everything that ends a deep scan, including the upload
+ * path that runs one without a queue item, goes through syncDeepQueued so the flag can
+ * only ever mean "this queue has a live deep job for this work".
+ */
+export function clearDeepQueued(nodusId: string): void {
+  getDb().prepare('UPDATE works SET deep_queued=0 WHERE nodus_id=?').run(nodusId);
 }
 
 export function setSummaryPending(nodusId: string): void {
@@ -574,12 +614,85 @@ export function setDeepResult(
   const db = getDb();
   const previous = db.prepare('SELECT deep_hash FROM works WHERE nodus_id = ?').get(nodusId) as { deep_hash: string | null } | undefined;
   if ((status === 'done' || status === 'skipped_no_text') && previous?.deep_hash !== hash) invalidateSummary(nodusId);
-  db
-    .prepare(
-      'UPDATE works SET deep_status=?, deep_at=?, deep_hash=?, source_type=COALESCE(?, source_type), notes=COALESCE(?, notes) WHERE nodus_id=?'
-    )
-    .run(status, new Date().toISOString(), hash, sourceType ?? null, notes ?? null, nodusId);
+  const now = new Date().toISOString();
+  if (status === 'failed') {
+    // A failed replacement must not destroy or hide the last committed analysis.
+    db.prepare(`UPDATE works SET
+      deep_status=CASE WHEN deep_hash IS NULL THEN 'failed' ELSE 'done' END,
+      deep_at=?, deep_error=? WHERE nodus_id=?`)
+      .run(now, notes ?? 'El análisis profundo ha fallado.', nodusId);
+  } else {
+    // Assign nullable fields explicitly so a successful retry clears stale notes/errors.
+    db.prepare(
+      'UPDATE works SET deep_status=?, deep_at=?, deep_hash=?, source_type=?, notes=?, deep_error=NULL WHERE nodus_id=?'
+    ).run(status, now, hash, sourceType, notes ?? null, nodusId);
+  }
   markLibraryAnalysisFreshness(db, nodusId, 'deep', status === 'done' ? 'current' : status === 'failed' ? 'failed' : status === 'skipped_no_text' ? 'unavailable' : 'queued', hash);
+}
+
+/** Replace the locally-resolved text inventory without touching the last deep result. */
+export function setResolvedTextState(nodusId: string, state: ResolvedTextState): void {
+  const db = getDb();
+  const insert = db.prepare(`
+    INSERT INTO work_text_sources (
+      nodus_id, source_ref, origin, source_type, zotero_library_id, attachment_key,
+      display_name, content_hash, char_count, page_count, has_page_markers, ordinal, resolved_at
+      , active
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ON CONFLICT(nodus_id, source_ref) DO UPDATE SET
+      origin=excluded.origin, source_type=excluded.source_type,
+      zotero_library_id=excluded.zotero_library_id, attachment_key=excluded.attachment_key,
+      display_name=excluded.display_name, content_hash=excluded.content_hash,
+      char_count=excluded.char_count, page_count=excluded.page_count,
+      has_page_markers=excluded.has_page_markers, ordinal=excluded.ordinal,
+      resolved_at=excluded.resolved_at, active=1
+  `);
+  db.transaction(() => {
+    // Historical source refs stay addressable by old evidence while only the latest
+    // inventory is marked active for readiness/hash calculations.
+    db.prepare('UPDATE work_text_sources SET active=0 WHERE nodus_id=?').run(nodusId);
+    for (const source of state.sources) {
+      insert.run(
+        nodusId,
+        source.source_ref,
+        source.origin,
+        source.source_type,
+        source.zotero_library_id,
+        source.attachment_key,
+        source.display_name,
+        source.content_hash,
+        source.char_count,
+        source.page_count,
+        source.has_page_markers,
+        source.ordinal,
+        state.resolvedAt,
+        1,
+      );
+    }
+    db.prepare(`
+      UPDATE works SET
+        resolved_source_type=?, resolved_text_hash=?, resolved_text_chars=?,
+        resolved_text_source_count=?, resolved_has_page_markers=?, text_block_reason=?,
+        text_resolved_at=?, resolved_text_notes=?
+      WHERE nodus_id=?
+    `).run(
+      state.sourceType,
+      state.textHash,
+      state.textChars,
+      state.sourceCount,
+      state.hasPageMarkers ? 1 : 0,
+      state.blockReason,
+      state.resolvedAt,
+      state.notes,
+      nodusId,
+    );
+  })();
+}
+
+export function listWorkTextSources(nodusId: string): WorkTextSource[] {
+  return getDb().prepare(
+    'SELECT * FROM work_text_sources WHERE nodus_id=? AND active=1 ORDER BY ordinal, source_ref'
+  ).all(nodusId) as WorkTextSource[];
 }
 
 export function setSummaryResult(nodusId: string, status: SummaryStatus, hash: string | null): void {
@@ -613,7 +726,10 @@ export function invalidateSummary(nodusId: string): void {
 }
 
 export function setArchived(nodusId: string, value: boolean): void {
-  getDb().prepare('UPDATE works SET archived = ? WHERE nodus_id = ?').run(value ? 1 : 0, nodusId);
+  // Archiving hides the work from every resume query, so a marker left behind would be
+  // dormant until the work came back and then fire a scan nobody asked for.
+  getDb().prepare('UPDATE works SET archived = ?, deep_queued = CASE WHEN ? THEN 0 ELSE deep_queued END WHERE nodus_id = ?')
+    .run(value ? 1 : 0, value ? 1 : 0, nodusId);
 }
 
 /** Works eligible for deep scan: tag OR manual, not archived. */

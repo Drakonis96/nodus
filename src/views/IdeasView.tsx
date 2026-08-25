@@ -480,7 +480,7 @@ function IdeaDetailTab({
 
                 <section className="rounded-xl border border-neutral-200 bg-white p-4 dark:border-neutral-800 dark:bg-neutral-950/70">
                   <div className="mb-3 flex items-center gap-2"><Icon name="quote" size={15} className="text-indigo-500" /><h3 className="font-semibold">{t('Evidencia anclada')}</h3><span className="text-xs text-neutral-500">{detail.evidence.length}</span></div>
-                  {detail.evidence.length > 0 ? <div className="space-y-2">{detail.evidence.map((evidence) => <blockquote key={evidence.id} className="rounded-r-lg border-l-2 border-indigo-500 bg-neutral-50 px-3 py-2 text-sm italic leading-6 text-neutral-600 dark:bg-neutral-900/45 dark:text-neutral-300">“{evidence.quote}” <EvidenceLocationLink nodusId={evidence.nodus_id} location={evidence.location} suffix={` · ${evidence.kind}`} onOpen={dataSource.openEvidence} /></blockquote>)}</div> : <p className="text-sm text-neutral-500">—</p>}
+                  {detail.evidence.length > 0 ? <div className="space-y-2">{detail.evidence.map((evidence) => <blockquote key={evidence.id} className="rounded-r-lg border-l-2 border-indigo-500 bg-neutral-50 px-3 py-2 text-sm italic leading-6 text-neutral-600 dark:bg-neutral-900/45 dark:text-neutral-300">“{evidence.quote}” <EvidenceLocationLink nodusId={evidence.nodus_id} location={evidence.location} sourceRef={evidence.source_ref ?? null} pageNumber={evidence.page_number ?? null} suffix={` · ${evidence.kind}`} onOpen={dataSource.openEvidence} /></blockquote>)}</div> : <p className="text-sm text-neutral-500">—</p>}
                 </section>
               </div>
 
@@ -617,7 +617,7 @@ function ConnectedIdeaRow({
                       key={ev.id}
                       className="border-l-2 border-indigo-700 pl-2 mt-1 text-xs italic text-neutral-400"
                     >
-                      "{ev.quote}" <EvidenceLocationLink nodusId={ev.nodus_id} location={ev.location} onOpen={dataSource.openEvidence} />
+                      "{ev.quote}" <EvidenceLocationLink nodusId={ev.nodus_id} location={ev.location} sourceRef={ev.source_ref ?? null} pageNumber={ev.page_number ?? null} onOpen={dataSource.openEvidence} />
                     </blockquote>
                   ))}
                 </div>

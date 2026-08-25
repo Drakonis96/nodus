@@ -1,5 +1,5 @@
 import { v4 as uuid } from 'uuid';
-import type { QueueItem, QueueKind, QueueProgress, Work, ModelRef, SourceType } from '@shared/types';
+import type { QueueItem, QueueKind, QueueProgress, Work, ModelRef } from '@shared/types';
 import { getDb } from '../db/database';
 import { getSettings } from '../db/settingsRepo';
 import { runLightScan } from '../ai/lightScan';
@@ -7,11 +7,10 @@ import { runDeepScan } from '../ai/deepScan';
 import { runSummaryScan } from '../ai/summaryScan';
 import { reprocessConnections } from '../ai/reprocessConnections';
 import { listThemeLabels } from '../db/themesRepo';
-import { resolveWorkText } from '../extraction/textExtractor';
+import { resolveWorkText, resolvedTextStateFromDoc } from '../extraction/textExtractor';
 import { getItem } from '../zotero/zoteroClient';
-import { setDeepResult, setSummaryPending } from '../db/worksRepo';
+import { clearDeepQueued, setDeepPending, setDeepResult, setResolvedTextState, setSummaryPending } from '../db/worksRepo';
 import { failedSummaryWorks, pendingSummaryWorks } from '../db/workSummariesRepo';
-import { purgeDeepData } from '../db/ideasRepo';
 import { AiError } from '../ai/aiClient';
 import { discoverSemanticBridges } from '../ai/semanticBridges';
 import { startEmbedding, getEmbeddingSnapshot } from '../ai/embeddingPipeline';
@@ -27,7 +26,6 @@ const MAX_RETRIES = 4;
 // A deep scan that degraded to abstract-only may simply have raced a just-attached
 // file. Re-scan once after this delay so the full text is picked up automatically
 // once Zotero has finished landing the attachment.
-const DEGRADED_RETRY_DELAY_MS = 90_000;
 
 class ScanQueue {
   private items: QueueItem[] = [];
@@ -47,7 +45,6 @@ class ScanQueue {
   private pendingIndexWorks = new Set<string>();
   /** Works already given a delayed re-scan after degrading to abstract-only, so a
    *  work is retried at most once per session (the re-scan itself is idempotent). */
-  private degradedRetryScheduled = new Set<string>();
   /** True when a completed deep scan requested semantic bridge discovery on drain. */
   private bridgeAfterDrain = false;
   /** Terminal jobs already represented in a drain notification. */
@@ -141,6 +138,7 @@ class ScanQueue {
       if (opts?.chain) existing.chain = true;
       return;
     }
+    if (kind === 'deep') setDeepPending(nodusId);
     this.insertPending({
       id: uuid(),
       nodus_id: nodusId,
@@ -196,6 +194,10 @@ class ScanQueue {
       item.state = 'cancelled';
       this.resetPendingStatus(item);
       this.moveTerminalToEnd(item);
+      // A cancelled deep item stays in the list as history, so only the marker records
+      // that the job is gone: resetPendingStatus cannot, since a rescan of an analysed
+      // work never went to 'pending'. Without this the work re-enqueues on every launch.
+      if (item.kind === 'deep') this.syncDeepQueued(item.nodus_id);
     }
     this.emit();
   }
@@ -215,12 +217,15 @@ class ScanQueue {
   }
 
   clear(): void {
+    const dropped: QueueItem[] = [];
     for (const item of this.items) {
       if (item.state === 'queued' || item.state === 'cancelled' || item.state === 'paused') {
         this.resetPendingStatus(item);
+        dropped.push(item);
       }
     }
     this.items = this.items.filter((i) => i.state === 'running');
+    for (const item of dropped) if (item.kind === 'deep') this.syncDeepQueued(item.nodus_id);
     this.emit();
   }
 
@@ -235,6 +240,7 @@ class ScanQueue {
     this.resetPendingStatus(item);
     this.retries.delete(item.id);
     this.items = this.items.filter((i) => i.id !== id);
+    if (item.kind === 'deep') this.syncDeepQueued(item.nodus_id);
     this.emit();
   }
 
@@ -244,12 +250,13 @@ class ScanQueue {
    * abandoned work isn't auto-resumed.
    */
   stopAll(): void {
+    const dropped = [...this.items];
     for (const item of this.items) this.resetPendingStatus(item);
     this.items = [];
+    for (const item of dropped) if (item.kind === 'deep') this.syncDeepQueued(item.nodus_id);
     this.retries.clear();
     this.lastKind = null;
     this.pendingIndexWorks.clear();
-    this.degradedRetryScheduled.clear();
     this.bridgeAfterDrain = false;
     this.deepSinceReprocess = false;
     this.notifiedTerminalIds.clear();
@@ -262,6 +269,22 @@ class ScanQueue {
     if (item.kind === 'bridge') return;
     const column = item.kind === 'deep' ? 'deep_status' : item.kind === 'summary' ? 'summary_status' : 'light_status';
     getDb().prepare(`UPDATE works SET ${column} = 'none' WHERE nodus_id = ? AND ${column} = 'pending'`).run(item.nodus_id);
+  }
+
+  /**
+   * Make works.deep_queued say what this queue says. A rescan of an already-analysed
+   * work keeps deep_status='done', so the marker is the only trace a restart can find —
+   * and it belongs to the WORK, not to the item. Stopping a running job detaches it
+   * while its scan keeps going, so the same work can hold an abandoned scan and a fresh
+   * queued job at once: clearing on either one's outcome would strand the other. Ask the
+   * list instead, always after it has been mutated. Public because the upload path runs a
+   * deep scan without a queue item and must answer the same question when it ends.
+   */
+  syncDeepQueued(nodusId: string): void {
+    const live = this.items.some(
+      (i) => i.nodus_id === nodusId && i.kind === 'deep' && (i.state === 'queued' || i.state === 'running')
+    );
+    if (!live) clearDeepQueued(nodusId);
   }
 
   /**
@@ -448,6 +471,7 @@ class ScanQueue {
     if (!work) {
       item.state = 'failed';
       item.error = 'Obra no encontrada';
+      // No marker to settle: the row this item names is gone from works entirely.
       this.moveTerminalToEnd(item);
       this.emit();
       return;
@@ -456,9 +480,8 @@ class ScanQueue {
       if (item.kind === 'light') {
         await this.doLight(work, item.model ?? null);
       } else if (item.kind === 'deep') {
-        const deepInfo = await this.doDeep(work, item);
+        await this.doDeep(work, item);
         this.deepSinceReprocess = true;
-        this.maybeScheduleDegradedRetry(work, deepInfo);
       } else {
         await this.doSummary(work, item);
       }
@@ -493,16 +516,16 @@ class ScanQueue {
         console.error(`[scanQueue] ${item.kind} falló: ${item.title} -> ${(e as Error).message}`);
         // Persist deep-scan failure so it's visible in the library and not
         // re-enqueued forever by resumePending(). (Light scans already persist.)
-        if (item.kind === 'deep') {
-          purgeDeepData(work.nodus_id);
-          setDeepResult(work.nodus_id, 'failed', null, null, (e as Error).message);
-        }
+        if (item.kind === 'deep') setDeepResult(work.nodus_id, 'failed', null, null, (e as Error).message);
       }
     }
     // After a successful deep scan, chain the rest of the pipeline (summary now;
     // index + bridge on drain). Kept outside the try/catch so a chaining hiccup
     // can never re-mark the completed deep scan as failed.
     if (item.kind === 'deep' && item.state === 'done') this.chainAfterDeep(work, item);
+    // The marker follows the job's outcome, never the database write: an abandoned scan
+    // writes its result too, and by then the work may already hold a queued replacement.
+    if (item.kind === 'deep' && (item.state === 'done' || item.state === 'failed')) this.syncDeepQueued(work.nodus_id);
     if (item.state === 'done' || item.state === 'failed') this.moveTerminalToEnd(item);
     this.emit();
   }
@@ -524,7 +547,7 @@ class ScanQueue {
   private async doDeep(
     work: Work,
     queueItem: QueueItem
-  ): Promise<{ sourceType: SourceType | null; hadTextAttachment: boolean }> {
+  ): Promise<void> {
     const settings = getSettings();
     const perf = { nodusId: work.nodus_id, title: work.title };
     let abstract: string | null = null;
@@ -556,6 +579,7 @@ class ScanQueue {
       },
       work.item_type
     );
+    setResolvedTextState(work.nodus_id, resolvedTextStateFromDoc(doc));
     queueItem.detail = 'Analizando con IA…';
     queueItem.subPct = null;
     this.emit();
@@ -564,32 +588,6 @@ class ScanQueue {
       queueItem.subPct = p.pct;
       this.emit();
     });
-    return { sourceType: doc.sourceType, hadTextAttachment: Boolean(doc.hadTextAttachment) };
-  }
-
-  /**
-   * A deep scan that fell back to the abstract (source_type abstract_only/none)
-   * while the Zotero item *does* expose a document attachment usually just raced a
-   * file that landed in storage moments after the text was resolved. Schedule one
-   * delayed re-scan so the full text is picked up automatically. Re-running is
-   * idempotent — if the resolved text is unchanged, runDeepScan is a no-op — and
-   * each work is retried at most once per session to prevent loops.
-   */
-  private maybeScheduleDegradedRetry(
-    work: Work,
-    info: { sourceType: SourceType | null; hadTextAttachment: boolean }
-  ): void {
-    const degraded = info.sourceType === 'abstract_only' || info.sourceType === 'none';
-    if (!degraded || !info.hadTextAttachment || this.degradedRetryScheduled.has(work.nodus_id)) return;
-    this.degradedRetryScheduled.add(work.nodus_id);
-    setTimeout(() => {
-      const current = getWorkById(work.nodus_id);
-      // Skip if the work is gone, failed meanwhile, or already recovered full text
-      // (source_type is no longer abstract-only) — a re-scan would only be a no-op.
-      if (!current || current.deep_status === 'failed') return;
-      if (current.source_type !== 'abstract_only' && current.source_type !== 'none') return;
-      this.enqueue(current.nodus_id, current.title, 'deep');
-    }, DEGRADED_RETRY_DELAY_MS);
   }
 
   private async doSummary(work: Work, item: QueueItem): Promise<void> {
@@ -638,21 +636,28 @@ class ScanQueue {
     const failedLight = db
       .prepare("SELECT nodus_id, title FROM works WHERE light_status = 'failed' AND archived = 0")
       .all() as { nodus_id: string; title: string }[];
+    // A work that still holds a committed analysis records its failed replacement in
+    // deep_error and keeps deep_status='done' — the Library counts it as failed, so
+    // this must find it too. Its state is set by enqueue(); do not overwrite it here,
+    // or the retry would hide the very analysis the failure was allowed to preserve.
+    //
+    // The read-tag/manual guard stays OUTSIDE that OR on purpose: every failure writes
+    // deep_error, including the ones migration 160 backfilled from old notes, so an
+    // unguarded clause would turn this button into a full-library rescan. Degraded works
+    // that were never read-tagged are recovered by "rescan degraded", which is the
+    // action that queued them in the first place.
     const failedDeep = db
       .prepare(
-        "SELECT nodus_id, title FROM works WHERE deep_status = 'failed' AND archived = 0 AND (read_tag = 1 OR manual_deep = 1)"
+        `SELECT nodus_id, title FROM works
+          WHERE archived = 0
+            AND (deep_status = 'failed' OR deep_error IS NOT NULL)
+            AND (read_tag = 1 OR manual_deep = 1)`
       )
       .all() as { nodus_id: string; title: string }[];
     const failedSummary = failedSummaryWorks();
     db.prepare("UPDATE works SET light_status = 'pending' WHERE light_status = 'failed' AND archived = 0").run();
-    db.prepare(
-      "UPDATE works SET deep_status = 'pending' WHERE deep_status = 'failed' AND archived = 0 AND (read_tag = 1 OR manual_deep = 1)"
-    ).run();
     for (const w of failedSummary) setSummaryPending(w.nodus_id);
-    for (const w of failedDeep) {
-      purgeDeepData(w.nodus_id);
-      this.enqueue(w.nodus_id, w.title, 'deep');
-    }
+    for (const w of failedDeep) this.enqueue(w.nodus_id, w.title, 'deep');
     for (const w of failedLight) this.enqueue(w.nodus_id, w.title, 'light');
     for (const w of failedSummary) this.enqueue(w.nodus_id, w.title, 'summary');
     this.resume();
@@ -664,16 +669,20 @@ class ScanQueue {
     const pendingLight = db
       .prepare("SELECT nodus_id, title FROM works WHERE light_status = 'pending' AND archived = 0")
       .all() as { nodus_id: string; title: string }[];
+    // deep_queued covers the rescans that deep_status can no longer describe: a work
+    // with a committed analysis stays 'done' while its replacement is queued. That half
+    // carries no read-tag/manual guard on purpose: the work is here because the user
+    // queued it, and enqueue() asks for no eligibility either — losing a job the user
+    // asked for is the failure this whole marker exists to prevent.
     const pendingDeep = db
       .prepare(
-        "SELECT nodus_id, title FROM works WHERE deep_status = 'pending' AND archived = 0 AND (read_tag = 1 OR manual_deep = 1)"
+        `SELECT nodus_id, title FROM works
+          WHERE archived = 0
+            AND ((deep_status = 'pending' AND (read_tag = 1 OR manual_deep = 1)) OR deep_queued = 1)`
       )
       .all() as { nodus_id: string; title: string }[];
     const pendingSummary = pendingSummaryWorks();
-    for (const w of pendingDeep) {
-      purgeDeepData(w.nodus_id);
-      this.enqueue(w.nodus_id, w.title, 'deep');
-    }
+    for (const w of pendingDeep) this.enqueue(w.nodus_id, w.title, 'deep');
     for (const w of pendingLight) this.enqueue(w.nodus_id, w.title, 'light');
     for (const w of pendingSummary) this.enqueue(w.nodus_id, w.title, 'summary');
   }

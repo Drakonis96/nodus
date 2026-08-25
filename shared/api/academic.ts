@@ -283,7 +283,7 @@ export interface AcademicApi {
   getWorkMeta(nodusId: string): Promise<WorkMeta | null>;
   openInZotero(zoteroKey: string): Promise<void>;
   /** Open a work's PDF in Zotero at the page parsed from an evidence/passage location; falls back to selecting the item. */
-  openEvidenceAtPage(nodusId: string, location: string | null): Promise<{ ok: boolean; mode: 'pdf-page' | 'select' | 'none'; page?: number | null }>;
+  openEvidenceAtPage(nodusId: string, locator: string | null | import('../types').EvidenceLocator): Promise<{ ok: boolean; mode: 'pdf-page' | 'select' | 'none'; page?: number | null }>;
   /** Clean Markdown reader stored under the configured backup root. */
   getLibraryReaderDocument(nodusId: string): Promise<LibraryReaderDocument | null>;
   getLibraryReaderAttachmentContent(nodusId: string, attachmentId: string): Promise<LibraryReaderAttachmentContent | null>;

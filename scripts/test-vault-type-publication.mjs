@@ -175,4 +175,31 @@ test('a replica applies a publication twice without cascades destroying it', asy
   }
 });
 
+test('a pull never carries away the queue this machine is running', async () => {
+  const source = fresh('queue-source');
+  const target = fresh('queue-target');
+  try {
+    for (const db of [source, target]) {
+      db.prepare(`INSERT INTO works (nodus_id, zotero_key, title, authors_json, deep_status, deep_hash)
+        VALUES ('w-queue','ZQ','Obra','[]','done','h1')`).run();
+    }
+    // The replica queued a rescan of a work that already holds an analysis: deep_status
+    // stays 'done', so deep_queued is the ONLY record that the job exists, and
+    // resumePending is the only thing that survives a restart to find it.
+    target.prepare("UPDATE works SET deep_queued = 1 WHERE nodus_id = 'w-queue'").run();
+
+    const { payload } = publish(source, 'academico');
+    assert.ok(Array.isArray(payload.tables.works), 'works travel in a publication');
+    assert.ok(payload.tables.works.every((row) => !('deep_queued' in row) || row.deep_queued === 0),
+      'the owner never publishes a queue for anyone else to run');
+
+    applySnapshotToReplica(target, payload);
+    assert.equal(target.prepare("SELECT deep_queued FROM works WHERE nodus_id = 'w-queue'").get().deep_queued, 1,
+      'a pull wiped a rescan this replica had queued');
+  } finally {
+    source.close();
+    target.close();
+  }
+});
+
 test.after(async () => { await rm(root, { recursive: true, force: true }); });

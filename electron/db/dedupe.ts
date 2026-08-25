@@ -219,6 +219,9 @@ export function mergeWorks(db: Database.Database, canonicalId: string, duplicate
       }
       // Scan checkpoints are resumption caches tied to the old id — just drop them.
       db.prepare('DELETE FROM scan_checkpoints WHERE nodus_id = ?').run(dup);
+      // The resolved text inventory is rebuilt from local files on the next resolution,
+      // and its table carries no cascading key (see migration 162), so drop it here.
+      db.prepare('DELETE FROM work_text_sources WHERE nodus_id = ?').run(dup);
 
       // Preserve the duplicate's Zotero key so the work still resolves from it.
       if (dupRow.zotero_key) {

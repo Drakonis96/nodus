@@ -237,6 +237,9 @@ const NOT_SYNCED_TABLES = new Set([
   'saved_authors',
   'ideas', 'idea_occurrences', 'idea_theme_links', 'themes', 'edges', 'edge_traces', 'gaps',
   'passages', 'collections', 'zotero_tags', 'external_refs', 'extraction_cache', 'scan_checkpoints',
+  // Source-resolution provenance is rebuilt from this machine's Zotero/library files.
+  // Shipping it would create attachment locators that may not exist on the receiver.
+  'work_text_sources',
   'dictionary_retrieval_state', 'dictionary_corpus_changes',
   // Audited document understanding is derived from the local source corpus. It
   // can be rebuilt or copied only through the exact-provenance reuse path; row

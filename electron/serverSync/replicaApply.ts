@@ -48,11 +48,57 @@ function insertStatement(db: Database.Database, table: string, columns: string[]
   );
 }
 
+/**
+ * Columns that describe THIS machine's live work rather than the corpus. A snapshot taken
+ * while the owner had a deep scan queued would otherwise hand every replica a queued job
+ * to run on its own AI budget the next time it resumes.
+ */
+const LOCAL_ONLY_COLUMNS: Record<string, Set<string>> = { works: new Set(['deep_queued']) };
+
+/**
+ * The local-only values this replica has to carry across the wipe. A corpus table is
+ * emptied and refilled from the publication, and the publication deliberately does not
+ * carry these columns, so the refilled row would take their defaults — discarding state
+ * that belongs to THIS machine. `works.deep_queued` is exactly that: a rescan queued here
+ * would be forgotten by the next pull and lost at the next restart. Same shape as the
+ * asset-blob rescue above, and for the same reason. Defaults need no rescue, so only
+ * values that are actually set are captured.
+ */
+function captureLocalOnly(
+  db: Database.Database,
+  table: string
+): { keyColumns: string[]; entries: { key: unknown[]; values: Record<string, unknown> }[] } | null {
+  const wanted = LOCAL_ONLY_COLUMNS[table];
+  if (!wanted) return null;
+  const columns = tableColumns(table, db);
+  const keyColumns = columns.filter((column) => column.pk > 0).sort((a, b) => a.pk - b.pk).map((column) => column.name);
+  const local = columns.map((column) => column.name).filter((name) => wanted.has(name));
+  if (keyColumns.length === 0 || local.length === 0) return null;
+  const rows = db
+    .prepare(`SELECT ${[...keyColumns, ...local].map(quoteIdentifier).join(', ')} FROM ${quoteIdentifier(table)}`)
+    .all() as Record<string, unknown>[];
+  const entries = rows
+    .map((row) => ({
+      key: keyColumns.map((column) => row[column]),
+      values: Object.fromEntries(
+        local.filter((column) => row[column] !== null && row[column] !== 0 && row[column] !== '')
+          .map((column) => [column, row[column]])
+      ),
+    }))
+    .filter((entry) => Object.keys(entry.values).length > 0);
+  return entries.length > 0 ? { keyColumns, entries } : null;
+}
+
 /** Only the columns the local schema actually has: an older replica simply drops the rest. */
 function usableColumns(db: Database.Database, table: string, rows: Record<string, unknown>[]): string[] {
   const local = new Set(tableColumns(table, db).map((column) => column.name));
+  const localOnly = LOCAL_ONLY_COLUMNS[table];
   const seen = new Set<string>();
-  for (const row of rows) for (const column of Object.keys(row)) if (local.has(column)) seen.add(column);
+  for (const row of rows) {
+    for (const column of Object.keys(row)) {
+      if (local.has(column) && !localOnly?.has(column)) seen.add(column);
+    }
+  }
   return [...seen];
 }
 
@@ -171,9 +217,12 @@ export function applySnapshotToReplica(db: Database.Database, snapshot: { tables
       // before people came out.
       const replaceable = incoming.map(([table]) => table).filter((table) => present.has(table) && !AUTHORED.has(table));
       const preserved = new Map<string, ReturnType<typeof captureAssetBlobs>>();
+      const preservedLocal = new Map<string, NonNullable<ReturnType<typeof captureLocalOnly>>>();
       for (const table of replaceable) {
         const captured = captureAssetBlobs(db, table);
         if (captured.length > 0) preserved.set(table, captured);
+        const local = captureLocalOnly(db, table);
+        if (local) preservedLocal.set(table, local);
       }
       for (const table of deletionOrder(db, replaceable)) {
         db.prepare(`DELETE FROM ${quoteIdentifier(table)}`).run();
@@ -204,6 +253,16 @@ export function applySnapshotToReplica(db: Database.Database, snapshot: { tables
           if (keep && source) {
             const where = source.keyColumns.map((column) => `${quoteIdentifier(column)} = ?`).join(' AND ');
             for (const entry of keep) {
+              const columns = Object.keys(entry.values);
+              db.prepare(`UPDATE ${quoteIdentifier(table)} SET ${columns.map((column) => `${quoteIdentifier(column)} = ?`).join(', ')} WHERE ${where}`)
+                .run([...columns.map((column) => entry.values[column]), ...entry.key]);
+            }
+          }
+          // Put back this machine's own columns, which the publication never carried.
+          const localKeep = preservedLocal.get(table);
+          if (localKeep) {
+            const where = localKeep.keyColumns.map((column) => `${quoteIdentifier(column)} = ?`).join(' AND ');
+            for (const entry of localKeep.entries) {
               const columns = Object.keys(entry.values);
               db.prepare(`UPDATE ${quoteIdentifier(table)} SET ${columns.map((column) => `${quoteIdentifier(column)} = ?`).join(', ')} WHERE ${where}`)
                 .run([...columns.map((column) => entry.values[column]), ...entry.key]);
