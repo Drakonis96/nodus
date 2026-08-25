@@ -112,8 +112,8 @@ async function tick(): Promise<void> {
 
   draining = true;
   try {
-    // Cloudflare-only in this release. A classic server or an older Worker answers 404 and
-    // mutation delivery proceeds exactly as before.
+    // Both server transports expose the typed action endpoint. Older deployments answer 404;
+    // mutation delivery proceeds exactly as before in that case.
     await drainOneSpaceAction(config).catch(() => undefined);
     await drainAccountLibrary(config).catch(() => undefined);
     for (let batch = 0; batch < MAX_BATCHES_PER_TICK; batch += 1) {

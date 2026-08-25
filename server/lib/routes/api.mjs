@@ -31,6 +31,16 @@ const AUTH_BODY_BYTES = 32 * 1024;
 const TICKET_TTL_MS = 5 * 60_000;
 const VECTOR_QUERY_BYTES = 256 * 1024;
 const SHARED_BLOB_CHUNK_BYTES = 1024 * 1024;
+const ACTION_BODY_BYTES = 512 * 1024;
+const ACTION_KINDS = new Set([
+  'deepResearch.generate', 'deepResearch.saveToNotes', 'idea.delete', 'idea.saveToNotes',
+  'author.synthesis.generate', 'authors.matrix.generate', 'argumentMap.generate',
+  'library.importToSpace', 'academic.recompute', 'hypothesis.saveToNotes', 'writing.generate',
+  'projects.create', 'projects.update', 'projects.section.update', 'projects.chapter.import',
+  'worldbuilding.continuity', 'worldbuilding.entityDelete', 'worldbuilding.proseReview',
+  'pages.restoreRevision', 'databases.importCSV', 'pages.automationRun', 'toolkit.desktopRun',
+]);
+const ACTION_TERMINAL = new Set(['applied', 'refused', 'failed', 'cancelled']);
 
 /**
  * A size a person can act on, in the unit that distinguishes it from its neighbours.
@@ -181,6 +191,7 @@ export function createApiRoutes(ctx) {
       maxLedgerBytes: limits.maxLedgerBytes,
       mutationEvents: 'sse',
       presence: { transport: 'ephemeral-sse', ttlSeconds: 45 },
+      spaceActions: { schemaVersion: 1, statuses: ['queued', 'claimed', 'running', 'applied', 'refused', 'failed', 'cancelled'] },
     };
   }
 
@@ -849,6 +860,170 @@ export function createApiRoutes(ctx) {
     return true;
   }
 
+  // ── Desktop actions ───────────────────────────────────────────────────────
+  // Keep the classic server's wire contract identical to the Cloudflare worker. Mobile queues
+  // typed work here; the paired Desktop claims it and reports the terminal result later.
+
+  function actionView(action) {
+    return {
+      id: action.id,
+      sequence: Number(action.sequence),
+      spaceId: action.spaceId,
+      idempotencyKey: action.idempotencyKey,
+      kind: action.kind,
+      schemaVersion: Number(action.schemaVersion),
+      payload: action.payload,
+      actorUserId: action.actorUserId,
+      createdByDevice: action.createdByDevice,
+      inputRevision: action.inputRevision,
+      inputFingerprint: action.inputFingerprint,
+      status: action.status,
+      claimedByDevice: action.claimedByDevice,
+      result: action.result,
+      errorCode: action.errorCode,
+      createdAt: action.createdAt,
+      updatedAt: action.updatedAt,
+      claimedAt: action.claimedAt,
+      finishedAt: action.finishedAt,
+    };
+  }
+
+  function actionVisible(auth, action) {
+    return auth.role === 'owner' || action.actorUserId === auth.user.id;
+  }
+
+  function spaceActions() {
+    if (!Array.isArray(store.state.spaceActions)) store.state.spaceActions = [];
+    return store.state.spaceActions;
+  }
+
+  async function createSpaceAction(req, res, space, auth) {
+    if (!rateLimit(req, res, 'space-actions-create', 120, 60_000)) return true;
+    const input = await jsonBody(req, ACTION_BODY_BYTES);
+    const id = String(input.id || `act_${token(16)}`);
+    const idempotencyKey = String(input.idempotencyKey || '');
+    const kind = String(input.kind || '');
+    const schemaVersion = Number(input.schemaVersion);
+    if (!/^[A-Za-z0-9_.:-]{1,128}$/.test(id) || !/^[A-Za-z0-9_.:-]{1,128}$/.test(idempotencyKey)) {
+      json(res, 400, { error: 'bad_id', error_description: 'Action and idempotency identifiers must be 1–128 safe characters.' });
+      return true;
+    }
+    if (!ACTION_KINDS.has(kind)) {
+      json(res, 400, { error: 'unknown_action_kind', error_description: 'This action kind is not part of the typed Nodus contract.' });
+      return true;
+    }
+    if (!Number.isSafeInteger(schemaVersion) || schemaVersion < 1) {
+      json(res, 400, { error: 'bad_schema_version' });
+      return true;
+    }
+    if (!input.payload || typeof input.payload !== 'object' || Array.isArray(input.payload)) {
+      json(res, 400, { error: 'bad_payload' });
+      return true;
+    }
+    const actions = spaceActions();
+    const duplicate = actions.find((action) => action.spaceId === space.id && action.idempotencyKey === idempotencyKey);
+    if (duplicate) {
+      if (duplicate.kind !== kind || Number(duplicate.schemaVersion) !== schemaVersion || JSON.stringify(duplicate.payload) !== JSON.stringify(input.payload)) {
+        json(res, 409, { error: 'idempotency_conflict' });
+        return true;
+      }
+      json(res, 200, { action: actionView(duplicate), duplicate: true });
+      return true;
+    }
+    const now = new Date().toISOString();
+    const sequence = actions.reduce((highest, action) => action.spaceId === space.id ? Math.max(highest, Number(action.sequence) || 0) : highest, 0) + 1;
+    const action = {
+      id,
+      sequence,
+      spaceId: space.id,
+      idempotencyKey,
+      kind,
+      schemaVersion,
+      payload: input.payload,
+      actorUserId: auth.user.id,
+      createdByDevice: auth.device?.hash ?? null,
+      inputRevision: input.inputRevision == null ? null : String(input.inputRevision),
+      inputFingerprint: input.inputFingerprint == null ? null : String(input.inputFingerprint),
+      status: 'queued',
+      claimedByDevice: null,
+      result: null,
+      errorCode: null,
+      createdAt: now,
+      updatedAt: now,
+      claimedAt: null,
+      finishedAt: null,
+    };
+    actions.push(action);
+    store.save();
+    json(res, 201, { action: actionView(action), duplicate: false });
+    return true;
+  }
+
+  function listSpaceActions(req, res, space, auth, url) {
+    const since = Math.max(0, Number(url.searchParams.get('since')) || 0);
+    const limit = Math.max(1, Math.min(100, Number(url.searchParams.get('limit')) || 50));
+    const visible = spaceActions()
+      .filter((action) => action.spaceId === space.id && action.sequence > since && actionVisible(auth, action))
+      .sort((left, right) => left.sequence - right.sequence);
+    const page = visible.slice(0, limit);
+    json(res, 200, { actions: page.map(actionView), cursor: Number(page.at(-1)?.sequence || since), hasMore: visible.length > limit });
+    return true;
+  }
+
+  function getSpaceAction(req, res, space, auth, id) {
+    const action = spaceActions().find((candidate) => candidate.spaceId === space.id && candidate.id === id);
+    if (!action || !actionVisible(auth, action)) { json(res, 404, { error: 'action_not_found' }); return true; }
+    json(res, 200, { action: actionView(action) });
+    return true;
+  }
+
+  async function cancelSpaceAction(req, res, space, auth, id) {
+    const action = spaceActions().find((candidate) => candidate.spaceId === space.id && candidate.id === id);
+    if (!action || !actionVisible(auth, action)) { json(res, 404, { error: 'action_not_found' }); return true; }
+    if (ACTION_TERMINAL.has(action.status)) { json(res, 200, { action: actionView(action), changed: false }); return true; }
+    if (!['queued', 'claimed'].includes(action.status)) { json(res, 409, { error: 'action_running' }); return true; }
+    const now = new Date().toISOString();
+    Object.assign(action, { status: 'cancelled', updatedAt: now, finishedAt: now });
+    store.save();
+    json(res, 200, { action: actionView(action), changed: true });
+    return true;
+  }
+
+  async function claimSpaceAction(req, res, space, auth) {
+    if ((auth.device?.kind ?? 'publisher') !== 'publisher') { json(res, 403, { error: 'publisher_required' }); return true; }
+    const input = await jsonBody(req, AUTH_BODY_BYTES);
+    const requested = input.id == null ? null : String(input.id);
+    const action = spaceActions().find((candidate) => candidate.spaceId === space.id && candidate.status === 'queued' && (!requested || candidate.id === requested));
+    if (!action) { json(res, 200, { action: null }); return true; }
+    const now = new Date().toISOString();
+    Object.assign(action, { status: 'claimed', claimedByDevice: auth.device.hash, claimedAt: now, updatedAt: now });
+    store.save();
+    json(res, 200, { action: actionView(action) });
+    return true;
+  }
+
+  async function updateSpaceAction(req, res, space, auth, id) {
+    if ((auth.device?.kind ?? 'publisher') !== 'publisher') { json(res, 403, { error: 'publisher_required' }); return true; }
+    const input = await jsonBody(req, ACTION_BODY_BYTES);
+    const status = String(input.status || '');
+    if (!['running', 'applied', 'refused', 'failed'].includes(status)) { json(res, 400, { error: 'bad_action_status' }); return true; }
+    const action = spaceActions().find((candidate) => candidate.spaceId === space.id && candidate.id === id);
+    if (!action) { json(res, 404, { error: 'action_not_found' }); return true; }
+    if (action.claimedByDevice !== auth.device.hash) { json(res, 403, { error: 'wrong_action_owner' }); return true; }
+    if (ACTION_TERMINAL.has(action.status)) { json(res, 200, { action: actionView(action), changed: false }); return true; }
+    const now = new Date().toISOString();
+    Object.assign(action, {
+      status,
+      result: input.result == null ? null : input.result,
+      errorCode: input.errorCode == null ? null : String(input.errorCode).slice(0, 128),
+      updatedAt: now,
+      finishedAt: status === 'running' ? null : now,
+    });
+    store.save();
+    json(res, 200, { action: actionView(action), changed: true });
+    return true;
+  }
+
   // ── Mutations ─────────────────────────────────────────────────────────────
 
   async function postMutations(req, res, space) {
@@ -1232,6 +1407,31 @@ export function createApiRoutes(ctx) {
     if (head === 'search' && rest[1] === 'semantic' && req.method === 'POST') return semanticSearch(req, res, space);
     if (head === 'context' && req.method === 'POST') return contextPackage(req, res, space);
 
+    if (head === 'actions') {
+      if (rest[1] === 'claim') {
+        if (req.method !== 'POST') { json(res, 405, { error: 'method_not_allowed' }); return true; }
+        return claimSpaceAction(req, res, space, auth);
+      }
+      if (!rest[1]) {
+        if (req.method === 'GET') return listSpaceActions(req, res, space, auth, url);
+        if (req.method === 'POST') return createSpaceAction(req, res, space, auth);
+        json(res, 405, { error: 'method_not_allowed' });
+        return true;
+      }
+      const id = decodeURIComponent(rest[1]);
+      if (rest[2] === 'cancel') {
+        if (req.method !== 'POST') { json(res, 405, { error: 'method_not_allowed' }); return true; }
+        return cancelSpaceAction(req, res, space, auth, id);
+      }
+      if (rest[2] === 'status') {
+        if (req.method !== 'POST') { json(res, 405, { error: 'method_not_allowed' }); return true; }
+        return updateSpaceAction(req, res, space, auth, id);
+      }
+      if (req.method === 'GET') return getSpaceAction(req, res, space, auth, id);
+      json(res, 405, { error: 'method_not_allowed' });
+      return true;
+    }
+
     if (head === 'mutations') {
       if (rest[1] === 'events' && req.method === 'GET') return mutationEvents(req, res, space);
       if (rest[1] === 'ack' && req.method === 'POST') return ackMutations(req, res, space, auth);
@@ -1258,6 +1458,11 @@ export function createApiRoutes(ctx) {
    */
   function mutatingNeed(method, head, rest) {
     if (head === 'mutations') return method === 'POST' && rest[1] !== 'ack' ? 'write' : 'read';
+    if (head === 'actions') {
+      if (rest[1] === 'claim' || rest[2] === 'status') return 'own';
+      if (rest[2] === 'cancel') return 'read';
+      return method === 'POST' ? 'write' : 'read';
+    }
     if (head === 'vectors') return 'own';
     if (head === 'assets') return method === 'POST' || method === 'PUT' ? 'write' : 'read';
     if (head === 'document-updates') return method === 'PUT' ? 'write' : 'read';

@@ -289,7 +289,7 @@ async function report(base: string, spaceId: string, token: string, id: string, 
 /** Claim and execute at most one job. The thirty-second inbox timer supplies backpressure and
  * keeps AI work sequential with the existing Deep Research lane. */
 export async function drainOneSpaceAction(config: VaultServerConfig): Promise<void> {
-  if (config.kind !== 'cloudflare' || !config.configured || !config.enabled) return;
+  if (!config.configured || !config.enabled) return;
   const token = getNodusServerTokenFor(config.vaultId);
   if (!token) return;
   const base = normalizeUrl(config.url);

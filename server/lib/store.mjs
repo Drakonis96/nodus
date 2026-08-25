@@ -86,6 +86,9 @@ function initialState() {
     oauthCodes: [],
     accessTokens: [],
     refreshTokens: [],
+    // Typed Desktop work is kept in the control-plane state so the classic server can serve
+    // the same action contract as the Cloudflare worker without introducing a second database.
+    spaceActions: [],
   };
 }
 
