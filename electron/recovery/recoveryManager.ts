@@ -22,7 +22,6 @@ import {
   setBackupRecoveryKey,
 } from '../secrets/secretStore';
 import { generateBackupPassword } from '../export/backupCrypto';
-import { readZipEntrySync } from '../export/zipFile';
 import { listVaults } from '../vaults/vaultRegistry';
 import {
   createRecoveryManifest,
@@ -32,41 +31,17 @@ import {
   visibleDirectoryEntries,
   writeRecoveryManifest,
 } from './recoveryPaths';
+import {
+  snapshotSummary,
+  type RecoveryFolderProbe,
+} from './recoveryFolderProbe';
+import {
+  INTERACTIVE_RECOVERY_PROBE_TIMEOUT_MS,
+  STARTUP_RECOVERY_PROBE_TIMEOUT_MS,
+  probeRecoveryFolderInUtility,
+} from './recoveryProbeUtilityHost';
 
 export const RECOVERY_SETUP_VERSION = 1;
-
-interface OuterBackupManifest {
-  format: string;
-  formatVersion: number;
-  schemaVersion: number;
-  appVersion: string;
-  date: string;
-  includesSecrets?: boolean;
-  vaultCount?: number;
-}
-
-function snapshotSummary(filePath: string): RecoverySnapshotSummary | null {
-  try {
-    const stat = fs.statSync(filePath);
-    if (!stat.isFile()) return null;
-    const manifestBytes = readZipEntrySync(filePath, 'manifest.json', 1024 * 1024);
-    if (!manifestBytes) return null;
-    const manifest = JSON.parse(manifestBytes.toString('utf8')) as OuterBackupManifest;
-    if (manifest.format !== 'nodus.encrypted-backup' || !Number.isFinite(manifest.formatVersion)) return null;
-    return {
-      fileName: path.basename(filePath),
-      path: filePath,
-      date: manifest.date,
-      appVersion: manifest.appVersion,
-      schemaVersion: manifest.schemaVersion,
-      vaultCount: manifest.vaultCount ?? 1,
-      bytes: stat.size,
-      includesSecrets: manifest.includesSecrets === true,
-    };
-  } catch {
-    return null;
-  }
-}
 
 /**
  * The main process cannot reach the renderer's i18n table, so the handful of
@@ -133,6 +108,38 @@ export function inspectRecoveryFolder(folder: string, language: AppLanguage = 'e
   };
 }
 
+function inspectionFromProbe(probe: RecoveryFolderProbe, language: AppLanguage): RecoveryFolderInspection {
+  if (probe.kind === 'missing') {
+    return { ...probe, message: tr(language, { es: 'No se puede acceder a la carpeta.', en: 'The folder cannot be accessed.', fr: "Impossible d'accéder au dossier.", de: 'Auf den Ordner kann nicht zugegriffen werden.', pt: 'Não é possível aceder à pasta.', 'pt-BR': 'Não é possível acessar a pasta.', it: 'Impossibile accedere alla cartella.', tr: 'Klasöre erişilemiyor.' }) };
+  }
+  if (probe.kind === 'empty') {
+    return { ...probe, message: tr(language, { es: 'Carpeta vacía y disponible.', en: 'Empty folder, ready to use.', fr: 'Dossier vide et disponible.', de: 'Ordner leer und verfügbar.', pt: 'Pasta vazia e disponível.', 'pt-BR': 'Pasta vazia e disponível.', it: 'Cartella vuota e disponibile.', tr: 'Boş klasör, kullanıma hazır.' }) };
+  }
+  if (probe.kind === 'recovery') {
+    return {
+      ...probe,
+      message: probe.snapshots.length
+        ? tr(language, { es: `${probe.snapshots.length} copia(s) válida(s) encontrada(s).`, en: `${probe.snapshots.length} valid snapshot(s) found.`, fr: `${probe.snapshots.length} sauvegarde(s) valide(s) trouvée(s).`, de: `${probe.snapshots.length} gültige Sicherung(en) gefunden.`, pt: `${probe.snapshots.length} cópia(s) de segurança válida(s) encontrada(s).`, 'pt-BR': `${probe.snapshots.length} backup(s) válido(s) encontrado(s).`, it: `Trovate ${probe.snapshots.length} copie valide.`, tr: `${probe.snapshots.length} geçerli anlık görüntü bulundu.` })
+        : tr(language, { es: 'Carpeta de recuperación válida, todavía sin copias.', en: 'Valid recovery folder, with no snapshots yet.', fr: 'Dossier de récupération valide, encore sans sauvegarde.', de: 'Gültiger Wiederherstellungsordner, noch ohne Sicherungen.', pt: 'Pasta de recuperação válida, ainda sem cópias de segurança.', 'pt-BR': 'Pasta de recuperação válida, ainda sem backups.', it: 'Cartella di ripristino valida, ancora senza copie.', tr: 'Geçerli kurtarma klasörü; henüz anlık görüntü yok.' }),
+    };
+  }
+  const entries = probe.visibleEntries ?? 0;
+  return {
+    ...probe,
+    message: tr(language, { es: `La carpeta debe estar vacía o contener una recuperación de Nodus válida. Contiene ${entries} elemento(s).`, en: `The folder must be empty or contain a valid Nodus recovery. It contains ${entries} item(s).`, fr: `Le dossier doit être vide ou contenir une récupération Nodus valide. Il contient ${entries} élément(s).`, de: `Der Ordner muss leer sein oder eine gültige Nodus-Wiederherstellung enthalten. Er enthält ${entries} Element(e).`, pt: `A pasta deve estar vazia ou conter uma recuperação válida do Nodus. Contém ${entries} elemento(s).`, 'pt-BR': `A pasta deve estar vazia ou conter uma recuperação válida do Nodus. Ela contém ${entries} elemento(s).`, it: `La cartella deve essere vuota o contenere un ripristino Nodus valido. Contiene ${entries} elementi.`, tr: `Klasör boş olmalı veya geçerli bir Nodus kurtarması içermelidir. ${entries} öğe içeriyor.` }),
+  };
+}
+
+export async function inspectRecoveryFolderSafely(
+  folder: string,
+  language: AppLanguage = 'es',
+  mode: 'cached' | 'deep' = 'deep',
+  timeoutMs = INTERACTIVE_RECOVERY_PROBE_TIMEOUT_MS,
+): Promise<RecoveryFolderInspection> {
+  const probe = await probeRecoveryFolderInUtility(folder, mode, timeoutMs);
+  return inspectionFromProbe(probe, language);
+}
+
 /** How many days a snapshot may age before protection counts as lapsed. The scheduler
  *  aims for a slot per chosen weekday, so a week without one is already anomalous. */
 const STALE_AFTER_DAYS = 8;
@@ -172,10 +179,20 @@ function assessRecoveryHealth(
   return { level: 'ok', code: 'ok', daysSinceLastBackup, detail };
 }
 
-export function getRecoveryStatus(): RecoveryStatus {
+export async function getRecoveryStatus(): Promise<RecoveryStatus> {
   const settings = getSettings();
   const configuredRoot = settings.autoBackupFolder?.trim() ?? '';
-  const folder = configuredRoot ? inspectRecoveryFolder(configuredRoot, settings.uiLanguage) : null;
+  // The cloud provider owns this path. Probe it in a disposable process and accept a
+  // last-known health answer after a short deadline: startup must never depend on a
+  // File Provider placeholder completing a read.
+  const folder = configuredRoot
+    ? await inspectRecoveryFolderSafely(
+      configuredRoot,
+      settings.uiLanguage,
+      'cached',
+      STARTUP_RECOVERY_PROBE_TIMEOUT_MS,
+    ).catch(() => null)
+    : null;
   return {
     health: assessRecoveryHealth(settings, folder),
     setupVersion: settings.recoverySetupVersion ?? 0,
@@ -214,7 +231,12 @@ export async function initializeRecoveryFolder(
 ): Promise<RecoverySetupResult> {
   const cleanPassword = password.trim();
   if (cleanPassword.length < 8) return { ok: false, message: tr(language, { es: 'La contraseña debe tener al menos 8 caracteres.', en: 'The password must be at least 8 characters long.', fr: 'Le mot de passe doit contenir au moins 8 caractères.', de: 'Das Passwort muss mindestens 8 Zeichen lang sein.', pt: 'A palavra-passe deve ter pelo menos 8 caracteres.', 'pt-BR': 'A senha deve ter pelo menos 8 caracteres.', it: 'La password deve contenere almeno 8 caratteri.', tr: 'Parola en az 8 karakter uzunluğunda olmalıdır.' }) };
-  const inspection = inspectRecoveryFolder(folder, language);
+  let inspection: RecoveryFolderInspection;
+  try {
+    inspection = await inspectRecoveryFolderSafely(folder, language, 'deep');
+  } catch {
+    return { ok: false, message: tr(language, { es: 'La carpeta no respondió a tiempo. Haz que esté disponible sin conexión y vuelve a intentarlo.', en: 'The folder did not respond in time. Make it available offline and try again.', fr: 'Le dossier n’a pas répondu à temps. Rendez-le disponible hors connexion et réessayez.', de: 'Der Ordner hat nicht rechtzeitig geantwortet. Machen Sie ihn offline verfügbar und versuchen Sie es erneut.', pt: 'A pasta não respondeu a tempo. Disponibilize-a offline e tente novamente.', 'pt-BR': 'A pasta não respondeu a tempo. Disponibilize-a off-line e tente novamente.', it: 'La cartella non ha risposto in tempo. Rendila disponibile offline e riprova.', tr: 'Klasör zamanında yanıt vermedi. Çevrimdışı kullanılabilir yapıp yeniden deneyin.' }) };
+  }
   if (inspection.kind !== 'empty') return { ok: false, message: inspection.message };
 
   const root = inspection.path;
@@ -269,7 +291,12 @@ export async function restoreRecoverySnapshot(
   language: AppLanguage = 'es',
   onProgress?: (progress: RecoveryRestoreProgress) => void,
 ): Promise<RecoverySetupResult> {
-  const inspection = inspectRecoveryFolder(root, language);
+  let inspection: RecoveryFolderInspection;
+  try {
+    inspection = await inspectRecoveryFolderSafely(root, language, 'deep');
+  } catch {
+    return { ok: false, message: tr(language, { es: 'La carpeta de recuperación no respondió a tiempo. Hazla disponible sin conexión antes de restaurar.', en: 'The recovery folder did not respond in time. Make it available offline before restoring.', fr: 'Le dossier de récupération n’a pas répondu à temps. Rendez-le disponible hors connexion avant la restauration.', de: 'Der Wiederherstellungsordner hat nicht rechtzeitig geantwortet. Machen Sie ihn vor der Wiederherstellung offline verfügbar.', pt: 'A pasta de recuperação não respondeu a tempo. Disponibilize-a offline antes de restaurar.', 'pt-BR': 'A pasta de recuperação não respondeu a tempo. Disponibilize-a off-line antes de restaurar.', it: 'La cartella di ripristino non ha risposto in tempo. Rendila disponibile offline prima del ripristino.', tr: 'Kurtarma klasörü zamanında yanıt vermedi. Geri yüklemeden önce çevrimdışı kullanılabilir yapın.' }) };
+  }
   if (inspection.kind !== 'recovery') return { ok: false, message: inspection.message };
   const snapshot = inspection.snapshots.find((candidate) => candidate.fileName === path.basename(fileName));
   if (!snapshot) return { ok: false, message: tr(language, { es: 'La copia seleccionada no pertenece a esta carpeta de recuperación.', en: 'The selected snapshot does not belong to this recovery folder.', fr: "La sauvegarde sélectionnée n'appartient pas à ce dossier de récupération.", de: 'Die ausgewählte Sicherung gehört nicht zu diesem Wiederherstellungsordner.', pt: 'A cópia de segurança selecionada não pertence a esta pasta de recuperação.', 'pt-BR': 'O backup selecionado não pertence a esta pasta de recuperação.', it: 'La copia selezionata non appartiene a questa cartella di ripristino.', tr: 'Seçilen anlık görüntü bu kurtarma klasörüne ait değil.' }) };

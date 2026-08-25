@@ -302,7 +302,11 @@ export async function createBackupArchiveFile(options: {
   appVersion: string;
   /** Independent credential used by automatic recovery snapshots (v6). */
   recoveryKey?: string;
-}, targetPath: string): Promise<{ bytes: number; reusedVaults: number }> {
+}, targetPath: string): Promise<{
+  bytes: number;
+  reusedVaults: number;
+  manifest: Pick<BackupManifest, 'date' | 'appVersion' | 'schemaVersion' | 'vaultCount' | 'includesSecrets'>;
+}> {
   const backupStartedAt = process.hrtime.bigint();
   let phaseStartedAt = backupStartedAt;
   logBackupPerf('create:start', backupStartedAt);
@@ -429,7 +433,17 @@ export async function createBackupArchiveFile(options: {
     const bytes = (await fs.promises.stat(targetPath)).size;
     logBackupPerf('outer-zip-store:complete', phaseStartedAt, { bytes });
     logBackupPerf('create:complete', backupStartedAt, { bytes });
-    return { bytes, reusedVaults };
+    return {
+      bytes,
+      reusedVaults,
+      manifest: {
+        date: outerManifest.date,
+        appVersion: outerManifest.appVersion,
+        schemaVersion: outerManifest.schemaVersion,
+        vaultCount: outerManifest.vaultCount,
+        includesSecrets: outerManifest.includesSecrets,
+      },
+    };
   } finally {
     await fs.promises.rm(tempRoot, { recursive: true, force: true });
   }

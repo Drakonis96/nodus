@@ -298,6 +298,7 @@ export default defineConfig({
       databaseScaleFixtureWorkerBuild,
       databaseAggregateWorkerBuild,
       utilityBuild('backupUtilityWorker', 'electron/export/backupUtilityWorker.ts'),
+      utilityBuild('recoveryProbeUtilityWorker', 'electron/recovery/recoveryProbeUtilityWorker.ts'),
       utilityBuild('serverPublishWorker', 'electron/serverSync/serverPublishWorker.ts'),
     ]),
     renderer(),

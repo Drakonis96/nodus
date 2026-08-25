@@ -62,7 +62,10 @@ test('production backup contains no sqlite backup or synchronous auto verificati
   assert.doesNotMatch(automatic, /verifyBackupArchive\(|readFile\(target\)/);
 
   const recovery = fs.readFileSync(path.join(repoRoot, 'electron/recovery/recoveryManager.ts'), 'utf8');
-  assert.match(recovery, /readZipEntrySync\(filePath, 'manifest\.json'/);
+  const recoveryProbe = fs.readFileSync(path.join(repoRoot, 'electron/recovery/recoveryFolderProbe.ts'), 'utf8');
+  assert.match(recoveryProbe, /readZipEntrySync\(filePath, 'manifest\.json'/);
+  assert.match(recoveryProbe, /if \(mode === 'cached'\) return/);
+  assert.doesNotMatch(recovery, /readZipEntrySync\(filePath/);
   assert.match(recovery, /restoreBackupArchiveFileSafely\(snapshot\.path/);
   assert.doesNotMatch(recovery, /new AdmZip\(filePath\)|readFileSync\(snapshot\.path\)/);
 });

@@ -20,6 +20,7 @@ import { FirstVaultSetup } from '../views/FirstVaultSetup';
 import { Onboarding } from '../views/Onboarding';
 import { RecoverySetupWizard } from '../views/RecoverySetupWizard';
 import { markTutorialVideosAnnouncementSeen } from '../components/TutorialVideosGuide';
+import { RecoveryStatusLoading } from '../components/RecoveryStatusLoading';
 import { preferencesForTutorialLanguage } from '@shared/tutorialPreferences';
 import { t, setActiveLang } from '../i18n';
 
@@ -127,9 +128,7 @@ const SETTLED_GUARDS: readonly Guard<SettledState>[] = [
   {
     id: 'recovery-status-unknown',
     when: (state) => !state.isPreviewVault && state.recoveryStatus === null,
-    render: () => (
-      <div className="h-full flex items-center justify-center text-neutral-500">{t('Verificando la protección de tus datos…')}</div>
-    ),
+    render: () => <RecoveryStatusLoading />,
   },
   {
     // New installs see this immediately after the cinematic tutorial. Existing
