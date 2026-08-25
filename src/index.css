@@ -5,6 +5,36 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Startup protection probe: these are the exact SVG files used by the sidebar,
+   cross-faded through its vault variants. No recreated mark, JavaScript loop,
+   canvas, blur or simulated nodes. */
+.startup-protection-loading { display: grid; width: 100%; height: 100%; place-content: center; justify-items: center; gap: 22px; color: #737686; contain: layout paint; }
+.startup-protection-loading > p { margin: 0; font-size: 13px; letter-spacing: .01em; }
+.startup-protection-brand { display: grid; justify-items: center; gap: 15px; }
+.startup-protection-brand > span { color: #a5b4fc; font-size: 12px; font-weight: 800; letter-spacing: .22em; line-height: 1; white-space: nowrap; }
+.startup-protection-logo-stack { position: relative; width: 78px; height: 78px; }
+.startup-protection-logo-stack img { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; animation: startup-protection-vault-logos 7s linear infinite; }
+.startup-protection-logo-stack img:nth-child(1) { animation-delay: 0s; }
+.startup-protection-logo-stack img:nth-child(2) { animation-delay: -1s; }
+.startup-protection-logo-stack img:nth-child(3) { animation-delay: -2s; }
+.startup-protection-logo-stack img:nth-child(4) { animation-delay: -3s; }
+.startup-protection-logo-stack img:nth-child(5) { animation-delay: -4s; }
+.startup-protection-logo-stack img:nth-child(6) { animation-delay: -5s; }
+.startup-protection-logo-stack img:nth-child(7) { animation-delay: -6s; }
+.light .startup-protection-loading { color: #64748b; }
+.light .startup-protection-brand > span { color: #4f46e5; }
+@keyframes startup-protection-vault-logos {
+  0%, 8% { opacity: 1; }
+  14.285%, 93.7% { opacity: 0; }
+  100% { opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .startup-protection-logo-stack img { display: none; animation: none; }
+  .startup-protection-logo-stack img:first-child { display: block; opacity: 1; }
+}
+.reduce-motion .startup-protection-logo-stack img { display: none; animation: none; }
+.reduce-motion .startup-protection-logo-stack img:first-child { display: block; opacity: 1; }
+
 /* Native overlay scrollbars can paint above a portalled dialog even when its source
    surface is inert. Suppress only that background surface; the dialog keeps its own
    vertical scrollbar and remains fully keyboard-scrollable. */

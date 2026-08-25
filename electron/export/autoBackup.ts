@@ -15,6 +15,7 @@ import { generateBackupPassword } from './backupCrypto';
 import { createBackupArchiveFile } from './exportImport';
 import { verifyBackupFileInUtility } from './backupUtilityHost';
 import { resolveBackupOutputDir } from '../recovery/recoveryPaths';
+import { recordVerifiedRecoverySnapshot } from '../recovery/recoveryFolderProbe';
 
 /**
  * Scheduled encrypted backups. Every run encrypts with the ONE master password
@@ -707,6 +708,21 @@ async function writeVerifiedBackup(options: VerifiedBackupOptions): Promise<Auto
     }
 
     const prunedCount = options.prune(folder, hostname);
+    try {
+      recordVerifiedRecoverySnapshot(configuredFolder, {
+        fileName: path.basename(target),
+        path: target,
+        date: built.manifest.date,
+        appVersion: built.manifest.appVersion,
+        schemaVersion: built.manifest.schemaVersion,
+        vaultCount: built.manifest.vaultCount ?? 1,
+        bytes: built.bytes,
+        includesSecrets: built.manifest.includesSecrets === true,
+      });
+    } catch {
+      // The archive itself is already authenticated. A cloud client refusing the tiny
+      // optional index must never turn a good backup into a failed/deleted backup.
+    }
     logBackupPerf('run:complete', backupStartedAt, { bytes: built.bytes, reusedVaults: built.reusedVaults });
     const locked = lockedApiKeyProviders();
     const warning = locked.length > 0

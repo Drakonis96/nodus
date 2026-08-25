@@ -33,6 +33,7 @@ try {
   const { closeDb } = require(path.join(repoRoot, 'electron/db/database.ts'));
   const entities = require(path.join(repoRoot, 'electron/db/entitiesRepo.ts'));
   const recovery = require(path.join(repoRoot, 'electron/recovery/recoveryManager.ts'));
+  const recoveryProbe = require(path.join(repoRoot, 'electron/recovery/recoveryFolderProbe.ts'));
 
   fs.writeFileSync(path.join(invalidRoot, 'unrelated.txt'), 'do not overwrite');
   assert.equal(recovery.inspectRecoveryFolder(recoveryRoot).kind, 'empty');
@@ -53,9 +54,15 @@ try {
   assert.equal(initialized.ok, true, initialized.message);
   assert.ok(initialized.recoveryKey && initialized.recoveryKey !== 'clave-maestra-segura', 'independent recovery key returned once');
   assert.ok(initialized.snapshot?.path && fs.existsSync(initialized.snapshot.path), 'verified initial snapshot exists');
+  assert.ok(fs.existsSync(path.join(recoveryRoot, recoveryProbe.RECOVERY_SNAPSHOT_INDEX_FILE)), 'verified backup writes the startup-safe sidecar index');
+  assert.deepEqual(
+    recoveryProbe.probeRecoveryFolder(recoveryRoot, 'cached').snapshots.map((snapshot) => snapshot.fileName),
+    [initialized.snapshot.fileName],
+    'cached startup status discovers the verified snapshot without reopening its archive',
+  );
   assert.equal(recovery.inspectRecoveryFolder(recoveryRoot).kind, 'recovery');
-  assert.equal(recovery.getRecoveryStatus().needsSetup, false, 'setup gate committed only after first verified snapshot');
-  assert.equal(recovery.getRecoveryStatus().hasRecoveryKey, true, 'recovery-key availability is exposed without revealing it');
+  assert.equal((await recovery.getRecoveryStatus()).needsSetup, false, 'setup gate committed only after first verified snapshot');
+  assert.equal((await recovery.getRecoveryStatus()).hasRecoveryKey, true, 'recovery-key availability is exposed without revealing it');
 
   entities.deletePerson(alice.personId);
   fs.writeFileSync(path.join(userData, 'nodi-chat-history.json'), '[]');
@@ -119,30 +126,30 @@ try {
   // frozen on the last success, so the UI kept reporting "ok" while nothing was being
   // written. That is the failure a backup system cannot afford.
   const settingsRepo = require(path.join(repoRoot, 'electron/db/settingsRepo.ts'));
-  assert.equal(recovery.getRecoveryStatus().health.level, 'ok', 'a working setup reads as healthy');
+  assert.equal((await recovery.getRecoveryStatus()).health.level, 'ok', 'a working setup reads as healthy');
 
   settingsRepo.updateSettings({ lastAutoBackupStatus: 'error: no se pudo leer la contraseña maestra' });
-  const failedHealth = recovery.getRecoveryStatus().health;
+  const failedHealth = (await recovery.getRecoveryStatus()).health;
   assert.equal(failedHealth.code, 'last-run-failed', 'a failed run is surfaced');
   assert.equal(failedHealth.level, 'critical', 'and it is critical, not a footnote');
 
   settingsRepo.updateSettings({ lastAutoBackupStatus: 'ok: copia verificada' });
   settingsRepo.updateSettings({ lastAutoBackupAt: new Date(Date.now() - 40 * 86400e3).toISOString() });
-  const staleHealth = recovery.getRecoveryStatus().health;
+  const staleHealth = (await recovery.getRecoveryStatus()).health;
   assert.equal(staleHealth.code, 'stale', 'a long gap since the last snapshot is surfaced');
   assert.equal(staleHealth.daysSinceLastBackup, 40, 'the age is reported so the user can judge it');
 
   settingsRepo.updateSettings({ lastAutoBackupAt: new Date().toISOString() });
   fs.rmSync(path.join(recoveryRoot, 'nodus-recovery.json'), { force: true });
   assert.equal(
-    recovery.getRecoveryStatus().health.code,
+    (await recovery.getRecoveryStatus()).health.code,
     'folder-unreachable',
     'an unusable destination outranks a successful last run'
   );
 
   settingsRepo.updateSettings({ autoBackupEnabled: false });
-  assert.equal(recovery.getRecoveryStatus().health.code, 'disabled', 'no protection at all is reported as critical');
-  assert.equal(recovery.getRecoveryStatus().health.level, 'critical');
+  assert.equal((await recovery.getRecoveryStatus()).health.code, 'disabled', 'no protection at all is reported as critical');
+  assert.equal((await recovery.getRecoveryStatus()).health.level, 'critical');
 
   closeDb();
   console.log('Recovery folder integration test passed!');

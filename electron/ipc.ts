@@ -123,7 +123,7 @@ import { scanQueue } from './pipeline/scanQueue';
 import {
   getRecoveryStatus,
   initializeRecoveryFolder,
-  inspectRecoveryFolder,
+  inspectRecoveryFolderSafely,
   restoreRecoverySnapshot,
 } from './recovery/recoveryManager';
 import { getTutorialCatalogue } from './tutorialCatalogue';
@@ -814,7 +814,9 @@ export function registerIpc(
       title: titles[language],
       properties: mode === 'restore' ? ['openDirectory'] : ['openDirectory', 'createDirectory'],
     });
-    return canceled || filePaths.length === 0 ? null : inspectRecoveryFolder(filePaths[0], language);
+    return canceled || filePaths.length === 0
+      ? null
+      : inspectRecoveryFolderSafely(filePaths[0], language, 'deep');
   });
   h('recovery:initialize', async (_e, folder: string, password: string, language: AppLanguage = 'es') =>
     initializeRecoveryFolder(folder, password, app.getVersion(), language)
