@@ -17,7 +17,7 @@ test('Authors is a library-style catalogue with real metadata and saved authors 
   for (const field of ['firstName', 'lastName', 'workCount', 'ideaCount', 'relationCount', 'topTags']) {
     assert.match(view, new RegExp(`author\\.${field}`), `${field} is visible in the author catalogue`);
   }
-  assert.match(view, /setSavedOnly\(\(value\) => !value\)/, 'saved authors is a filter instead of a separate workspace');
+  assert.match(view, /const toggleSavedFilter = \(\) => \{[\s\S]*setSavedOnly\(nextSavedOnly\)[\s\S]*report\.current\?\.\(\{ savedOnly: nextSavedOnly \}\)[\s\S]*\}/, 'saved authors is a persisted filter instead of a separate workspace');
   assert.doesNotMatch(view, /AuthorsSurface[^\n]*saved/, 'saved authors is not an internal tab');
   assert.match(types, /topTags: string\[\]/, 'the author summary carries real source tags');
   assert.match(dossier, /JOIN work_zotero_tags[\s\S]*JOIN zotero_tags/, 'author tags come from Zotero work metadata');
