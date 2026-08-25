@@ -30,7 +30,8 @@ test('the complete Global Library ships with recovery, privacy, hardening and re
   assert.match(privacy, /Cross-vault Library/);
   assert.match(privacy, /Clean-reader chat and remote OCR/);
   assert.match(readerStore, /realpathSync\.native/);
-  assert.match(readerStore, /atomicWriteJson, configuredLibraryRootOrThrow/);
+  assert.match(readerStore, /function libraryRoot\(\): string \{\s*return configuredLibraryRootOrThrow\(\);\s*\}/, 'the reader requires a configured library root');
+  assert.match(readerStore, /atomicWriteJson\(/, 'reader writes remain atomic');
 
   for (const file of [
     'scripts/test-library-storage.mjs',
