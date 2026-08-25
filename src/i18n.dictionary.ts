@@ -14,6 +14,18 @@ export const DICTIONARY_TRANSLATIONS = {
     Cancelar: "Cancel",
     "Generar de todos modos": "Generate anyway",
     Concepto: "Concept",
+    "Añadir concepto": "Add concept",
+    "Quitar concepto": "Remove concept",
+    "Cada concepto se guardará como una entrada independiente y se procesará en paralelo.":
+      "Each concept will be saved as a separate entry and processed in parallel.",
+    "Hay conceptos repetidos en el lote.":
+      "The batch contains duplicate concepts.",
+    "Preparando {n} definiciones…": "Preparing {n} definitions…",
+    "Generar {n} definiciones": "Generate {n} definitions",
+    "Generar {n} definiciones de todos modos":
+      "Generate {n} definitions anyway",
+    "{n} entradas ya están guardadas; reintentar no creará duplicados.":
+      "{n} entries are already saved; retrying will not create duplicates.",
     "Aliases o términos alternativos": "Aliases or alternative terms",
     "Separados por comas": "Separated by commas",
     "Prompt de enfoque": "Focus prompt",
@@ -182,6 +194,18 @@ export const DICTIONARY_TRANSLATIONS = {
     Cancelar: "Annuler",
     "Generar de todos modos": "Générer quand même",
     Concepto: "Concept",
+    "Añadir concepto": "Ajouter un concept",
+    "Quitar concepto": "Supprimer le concept",
+    "Cada concepto se guardará como una entrada independiente y se procesará en paralelo.":
+      "Chaque concept sera enregistré comme une entrée distincte et traité en parallèle.",
+    "Hay conceptos repetidos en el lote.":
+      "Le lot contient des concepts en double.",
+    "Preparando {n} definiciones…": "Préparation de {n} définitions…",
+    "Generar {n} definiciones": "Générer {n} définitions",
+    "Generar {n} definiciones de todos modos":
+      "Générer quand même {n} définitions",
+    "{n} entradas ya están guardadas; reintentar no creará duplicados.":
+      "{n} entrées sont déjà enregistrées ; réessayer ne créera pas de doublons.",
     "Aliases o términos alternativos": "Alias ou termes alternatifs",
     "Separados por comas": "Séparés par des virgules",
     "Prompt de enfoque": "Question de cadrage",

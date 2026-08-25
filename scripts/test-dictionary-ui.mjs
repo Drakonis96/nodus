@@ -11,6 +11,7 @@ const [
   authors,
   ai,
   academicIpc,
+  generationQueue,
   preload,
   promptPresets,
   dictionaryI18n,
@@ -23,6 +24,10 @@ const [
     readFile(path.join(root, "src/views/AuthorsView.tsx"), "utf8"),
     readFile(path.join(root, "electron/ai/dictionary.ts"), "utf8"),
     readFile(path.join(root, "electron/ipc/academic.ts"), "utf8"),
+    readFile(
+      path.join(root, "electron/ai/dictionaryGenerationQueue.ts"),
+      "utf8",
+    ),
     readFile(path.join(root, "electron/preload/academic.ts"), "utf8"),
     readFile(path.join(root, "shared/dictionaryPromptPresets.ts"), "utf8"),
     readFile(path.join(root, "src/i18n.dictionary.ts"), "utf8"),
@@ -226,6 +231,26 @@ assert.equal(
   2,
   "creation, regeneration and update all enter the main-process background pipeline",
 );
+assert.match(
+  view,
+  /data-testid="dictionary-add-concept"/,
+  "the creation dialog can add more concepts to a batch",
+);
+assert.match(
+  view,
+  /Promise\.allSettled\([\s\S]*batch\.map[\s\S]*startDictionaryGeneration/,
+  "all concepts are persisted and queued independently without one failure cancelling the batch",
+);
+assert.match(
+  view,
+  /if \(!queuedDrafts\.has\(draft\.key\)\)[\s\S]*startDictionaryGeneration[\s\S]*setQueuedDrafts/,
+  "retrying a partial batch does not generate entries that were already queued successfully",
+);
+assert.match(
+  view,
+  /new Set\(names\)\.size !== names\.length/,
+  "a batch rejects duplicate normalized concept names before persisting them",
+);
 assert.doesNotMatch(
   view,
   /window\.nodus\.generateDictionaryEntry/,
@@ -258,8 +283,8 @@ assert.match(
 );
 assert.match(
   academicIpc,
-  /dictionary:generate:start[\s\S]*retrieveDictionaryEvidence[\s\S]*generateDictionaryEntry/,
-  "the background IPC automatically retrieves and generates in order",
+  /new DictionaryGenerationQueue\([\s\S]*retrieveDictionaryEvidence[\s\S]*generateDictionaryEntry/,
+  "the background queue automatically retrieves and generates each entry in order",
 );
 assert.match(
   academicIpc,
@@ -268,8 +293,18 @@ assert.match(
 );
 assert.match(
   academicIpc,
-  /dictionary:generate:jobs[\s\S]*dictionaryGenerationJobs\.values/,
+  /dictionary:generate:jobs[\s\S]*dictionaryGenerationJobs\.list\(\)/,
   "the main process exposes running and completed jobs for view reconnection",
+);
+assert.match(
+  generationQueue,
+  /setImmediate\([\s\S]*this\.#run\(request, token\)/,
+  "every entry gets its own independently scheduled background execution",
+);
+assert.match(
+  generationQueue,
+  /#tokens[\s\S]*delete\(entryIds[\s\S]*#tokens\.delete/,
+  "deleting an entry invalidates its running job so stale progress cannot return",
 );
 assert.match(
   preload,
@@ -288,8 +323,8 @@ assert.match(
 );
 assert.match(
   view,
-  /<ButtonBusy label=\{t\("Preparando definición…"\)\} \/>/,
-  "creation closes after preparing the persisted background job",
+  /<ButtonBusy[\s\S]*tx\("Preparando \{n\} definiciones…"/,
+  "batch creation closes after preparing all persisted background jobs",
 );
 assert.match(
   view,
