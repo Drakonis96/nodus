@@ -37,6 +37,7 @@ try {
     ...process.env,
     NODUS_USERDATA: userData,
     NODUS_DISABLE_AUTO_UPDATE: '1',
+    NODUS_E2E_UPDATE_STATUS: 'not-available',
   };
   delete childEnv.ELECTRON_RUN_AS_NODE;
   app = await electron.launch({
@@ -71,8 +72,12 @@ try {
   );
 
   await page.evaluate(async (version) => {
+    sessionStorage.setItem('nodus.startupUpdateChecked', '1');
     localStorage.setItem('nodus.lastSeenVersion', version);
     localStorage.setItem(`nodus.mobileTeaserSeen.${version}`, '1');
+    localStorage.setItem('nodus.platformHighlightsSeen.2026-07', '1');
+    localStorage.setItem('nodus.tutorialVideosAnnouncementSeen.2026-07', '1');
+    localStorage.setItem('nodus.toolkitBetaGuideSeen.2.4.0', '1');
     await window.nodus.updateSettings({
       onboardingComplete: true,
       basicsTutorialVersion: 5,
