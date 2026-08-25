@@ -16,7 +16,13 @@ import type {
 import type { LibraryContentRevision, LibraryItemRecord } from '@shared/libraryTypes';
 import { getWork } from '../db/worksRepo';
 import { xlsxFileToText } from '../extraction/tabular';
-import { atomicWriteJson, configuredLibraryRootOrThrow, safeLibraryFolderName } from '../library/libraryPaths';
+import {
+  atomicWriteJson,
+  configuredLibraryRootOrThrow,
+  pathStaysInside,
+  resolveLibraryFile,
+  safeLibraryFolderName,
+} from '../library/libraryPaths';
 import { legacyMetadataToRecord, normalizeLibraryItemRecord } from '../library/libraryRecord';
 import { notifyGlobalLibraryChanged } from '../library/libraryRuntime';
 import type { IncomingMutation, ExternalMutationDecision } from '../serverSync/mutationInbox';
@@ -151,34 +157,8 @@ function readJson<T>(filePath: string): T | null {
   }
 }
 
-function pathEntryExists(filePath: string): boolean {
-  try {
-    fs.lstatSync(filePath);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-/** Resolve the closest existing ancestor so both existing symlinks and symlinked
- * parent directories are rejected before a reader can read or create a file. */
-function pathStaysInside(root: string, target: string): boolean {
-  const resolvedRoot = path.resolve(root);
-  const resolvedTarget = path.resolve(target);
-  if (resolvedTarget !== resolvedRoot && !resolvedTarget.startsWith(`${resolvedRoot}${path.sep}`)) return false;
-  let probe = resolvedTarget;
-  while (!pathEntryExists(probe) && probe !== path.dirname(probe)) probe = path.dirname(probe);
-  try {
-    const realRoot = fs.realpathSync.native(resolvedRoot);
-    const realProbe = fs.realpathSync.native(probe);
-    return realProbe === realRoot || realProbe.startsWith(`${realRoot}${path.sep}`);
-  } catch {
-    return false;
-  }
-}
-
 function safeDocumentFolder(root: string, folder: string): boolean {
-  return pathStaysInside(root, folder) && pathEntryExists(folder) && fs.statSync(folder).isDirectory();
+  return pathStaysInside(root, folder) && fs.existsSync(folder) && fs.statSync(folder).isDirectory();
 }
 
 /** Metadata may name a nested file, but it can never escape its document folder. */
@@ -194,6 +174,11 @@ function documentFile(folder: string, declaredName: string | undefined, fallback
 function optionalDocumentFile(folder: string, declaredName: string | undefined, fallbackName: string): string | null {
   try { return documentFile(folder, declaredName, fallbackName); }
   catch { return null; }
+}
+
+function resolvedDocumentFile(folder: string, declaredName: string | undefined, fallbackName: string): string | null {
+  const declared = optionalDocumentFile(folder, declaredName, fallbackName);
+  return declared ? resolveLibraryFile(folder, path.relative(folder, declared)) : null;
 }
 
 function regularFilePath(filePath: string | null): string | null {
@@ -223,7 +208,7 @@ function normalizedSha256(value: string | undefined): string | null {
 }
 
 function resolvedReaderAttachment(folder: string, record: LibraryItemRecord['attachments'][number]): ResolvedReaderAttachment {
-  const filePath = regularFilePath(optionalDocumentFile(folder, record.relativePath, record.fileName));
+  const filePath = resolvedDocumentFile(folder, record.relativePath, record.fileName);
   return { record, filePath, physicalKey: physicalFileKey(filePath), sha256: normalizedSha256(record.sha256) };
 }
 
@@ -427,7 +412,7 @@ export function getLibraryReaderDocument(documentId: string): LibraryReaderDocum
   const sourceMapName = metadata.files?.sourceMap || 'source-map.json';
   const markdownPath = optionalDocumentFile(folder, readerName, 'reader.md');
   const sourceMapPath = optionalDocumentFile(folder, sourceMapName, 'source-map.json');
-  const originalPath = optionalDocumentFile(folder, originalName, 'original.pdf');
+  const originalPath = resolvedDocumentFile(folder, originalName, 'original.pdf');
   const cleanAvailable = !!markdownPath && fs.existsSync(markdownPath) && fs.statSync(markdownPath).isFile();
   const rawMarkdown = cleanAvailable && markdownPath ? fs.readFileSync(markdownPath, 'utf8') : '';
   const sourceMap = sourceMapPath ? readJson<ReaderSourceMap>(sourceMapPath) : null;
@@ -521,7 +506,7 @@ function attachmentViewer(mimeType: string, fileName: string): LibraryReaderAtta
 
 function readerAttachment(documentId: string, folder: string, attachment: LibraryItemRecord['attachments'][number], resolvedFile?: string | null): LibraryReaderAttachment {
   const file = resolvedFile === undefined
-    ? regularFilePath(optionalDocumentFile(folder, attachment.relativePath, attachment.fileName))
+    ? resolvedDocumentFile(folder, attachment.relativePath, attachment.fileName)
     : resolvedFile;
   const available = !!file;
   const viewer = attachmentViewer(attachment.mimeType, attachment.fileName);
@@ -539,8 +524,7 @@ export function libraryReaderOriginalPath(documentId: string): string | null {
   const resolved = resolvedDocument(documentId);
   if (!resolved) return null;
   const name = resolved.metadata.files?.original || 'original.pdf';
-  const target = optionalDocumentFile(resolved.folder, name, 'original.pdf');
-  return target && fs.existsSync(target) && fs.statSync(target).isFile() ? target : null;
+  return resolvedDocumentFile(resolved.folder, name, 'original.pdf');
 }
 
 export function libraryReaderAttachmentPath(documentId: string, attachmentId: string): string | null {
@@ -551,8 +535,7 @@ export function libraryReaderAttachmentPath(documentId: string, attachmentId: st
     if (attachmentId === 'original') return libraryReaderOriginalPath(documentId);
     return null;
   }
-  const target = optionalDocumentFile(resolved.folder, attachment.relativePath, attachment.fileName);
-  return target && fs.existsSync(target) && fs.statSync(target).isFile() ? target : null;
+  return resolvedDocumentFile(resolved.folder, attachment.relativePath, attachment.fileName);
 }
 
 function safeZipPath(base: string, target: string): string | null {

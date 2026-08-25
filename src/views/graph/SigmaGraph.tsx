@@ -1,6 +1,6 @@
 // WebGL graph renderer (Sigma + graphology) with worker layout and LOD.
 //
-// This is the new rendering core that replaces the Cytoscape canvas renderer.
+// This is the rendering core for the interactive knowledge graph.
 // Responsibilities:
 //  • build a graphology graph from the renderer-agnostic model,
 //  • lay it out with ForceAtlas2 in a Web Worker (non-blocking),

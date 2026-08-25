@@ -209,7 +209,7 @@ function targetDocumentFingerprint(
   if (component === 'light') return target.light_hash;
   if (component === 'summary') return target.summary_hash;
   if (component === 'deep' || component === 'ideas') return target.deep_hash;
-  if (component === 'documentProfile') return target.deep_hash;
+  if (component === 'documentProfile') return target.resolved_text_hash ?? target.deep_hash;
   const passage = targetDb.prepare('SELECT content_hash FROM passages WHERE nodus_id=? ORDER BY chunk_index LIMIT 1').get(target.nodus_id) as { content_hash: string | null } | undefined;
   return passage?.content_hash ?? target.deep_hash;
 }

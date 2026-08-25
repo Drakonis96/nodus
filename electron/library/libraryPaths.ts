@@ -3,7 +3,17 @@ import { randomUUID } from 'node:crypto';
 import path from 'node:path';
 import { readGlobalPrefsRaw } from '../db/appPrefs';
 import { atomicWriteJson, readJsonFile } from './libraryFileUtils';
-export { assertInside, atomicWriteFile, atomicWriteJson, readJsonFile, safeLibraryFolderName } from './libraryFileUtils';
+export {
+  assertInside,
+  atomicWriteFile,
+  atomicWriteJson,
+  libraryFilePathWithLiteralExtension,
+  pathStaysInside,
+  readJsonFile,
+  resolveLibraryFile,
+  safeLibraryFileName,
+  safeLibraryFolderName,
+} from './libraryFileUtils';
 
 export function configuredLibraryRoot(): string | null {
   const configured = readGlobalPrefsRaw().autoBackupFolder;

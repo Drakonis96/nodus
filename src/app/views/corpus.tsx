@@ -26,9 +26,10 @@ export const corpusViews = {
   // `snapshot` is the same shape as `target` and `initialTab`: a starting value the
   // shell hands down, read once at mount. `onSnapshotChange` is the return path, so
   // the cut survives the unmount that leaving the section causes.
-  library: ({ activeVault, isPrimarySources, libraryTarget, navigate, openAssistant, reloadSettings, setCollectionsOpen, settings, setView, snapshots }) => (
+  library: ({ activeVault, isPrimarySources, libraryTarget, navigate, openAssistant, reloadSettings, setCollectionsOpen, setLibraryTarget, settings, setView, snapshots }) => (
     <GlobalLibraryView
       target={libraryTarget}
+      onTargetConsumed={() => setLibraryTarget(null)}
       snapshot={snapshots.read('library')}
       onSnapshotChange={(patch) => snapshots.patch('library', patch)}
       settings={settings}

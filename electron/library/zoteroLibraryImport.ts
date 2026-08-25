@@ -17,7 +17,7 @@ import type {
 import type { ZoteroAttachmentInfo, ZoteroCollection, ZoteroItem, ZoteroLibrary } from '@shared/types';
 import * as zotero from '../zotero/zoteroClient';
 import { LibraryCatalog } from './libraryCatalog';
-import { assertInside, safeLibraryFolderName } from './libraryPaths';
+import { assertInside, resolveLibraryFile, safeLibraryFileName, safeLibraryFolderName } from './libraryPaths';
 import {
   canonicalJson,
   librarySourceIdentityKey,
@@ -597,18 +597,18 @@ export async function importZoteroLibraries(options: {
             }
             const sourceHash = await sha256(sourcePath);
             const previous = previousBySource?.sha256 === sourceHash ? previousBySource : undefined;
-            if (previous && fs.existsSync(path.join(store.itemFolder(current.storageId), previous.relativePath))) {
+            if (previous && resolveLibraryFile(store.itemFolder(current.storageId), previous.relativePath)) {
               copied.push({ ...previous, sourceState: 'available' });
               report.attachmentsUnchanged += 1;
               processedAttachments += 1;
               continue;
             }
             const fileName = path.basename(attachment.filename || path.basename(sourcePath) || 'adjunto');
-            const baseName = `${safeLibraryFolderName(attachment.itemKey)}-${safeLibraryFolderName(fileName)}`;
+            const baseName = `${safeLibraryFolderName(attachment.itemKey)}-${safeLibraryFileName(fileName)}`;
             const attachmentDirectory = assertInside(store.itemFolder(current.storageId), path.join(store.itemFolder(current.storageId), 'attachments'));
             let destination = assertInside(attachmentDirectory, path.join(attachmentDirectory, baseName));
             if (fs.existsSync(destination)) destination = assertInside(attachmentDirectory, path.join(
-              attachmentDirectory, `${safeLibraryFolderName(attachment.itemKey)}-${sourceHash.slice(0, 12)}-${safeLibraryFolderName(fileName)}`,
+              attachmentDirectory, `${safeLibraryFolderName(attachment.itemKey)}-${sourceHash.slice(0, 12)}-${safeLibraryFileName(fileName)}`,
             ));
             if (!fs.existsSync(destination)) await copyImmutable(sourcePath, destination);
             const stat = fs.statSync(destination);

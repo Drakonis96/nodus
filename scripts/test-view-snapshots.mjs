@@ -393,6 +393,41 @@ test('Biblioteca keeps a cut per scope, and only what nothing else already persi
   assert.doesNotMatch(librarySnapshot, /scope/, 'the scope switch is settings, not a snapshot');
 });
 
+test('explicit filter closes reach the snapshot before a section can unmount', async () => {
+  const [vaultLibrary, globalLibrary, authors, ideas] = await Promise.all([
+    readSource('src/views/Library.tsx'),
+    readSource('src/views/GlobalLibraryView.tsx'),
+    readSource('src/views/AuthorsView.tsx'),
+    readSource('src/views/IdeasView.tsx'),
+  ]);
+
+  // A passive effect is still useful as a catch-all, but it is too late when the
+  // interaction that dismisses a filter also navigates away and unmounts the view.
+  assert.match(vaultLibrary, /const updateFilter =[\s\S]*?reportSnapshot\.current\?\.\(\{ \.\.\.snapshotOf\.current\(\), filter: next \}\);/);
+  assert.match(vaultLibrary, /const toggleFilterPanel =[\s\S]*?filtersOpen: nextOpen,[\s\S]*?advancedFiltersOpen:/);
+  assert.match(globalLibrary, /const toggleFilterPanel =[\s\S]*?reportSnapshotNow\(\{ filtersOpen: nextOpen \}\);/);
+  assert.match(globalLibrary, /const clearCatalogFilters =[\s\S]*?reportSnapshotNow\(\{[\s\S]*?filters:/);
+  assert.match(authors, /const toggleFilterPanel =[\s\S]*?report\.current\?\.\(\{ filtersOpen: nextOpen \}\);/);
+  assert.match(ideas, /const toggleFilterPanel =[\s\S]*?report\.current\?\.\(\{ filtersOpen: nextOpen \}\);/);
+});
+
+test('a contextual Library filter is consumed once and cannot overwrite a later close', async () => {
+  const [registry, wrapper, vaultLibrary, context, app] = await Promise.all([
+    readSource('src/app/views/corpus.tsx'),
+    readSource('src/views/GlobalLibraryView.tsx'),
+    readSource('src/views/Library.tsx'),
+    readSource('src/app/ViewContext.ts'),
+    readSource('src/App.tsx'),
+  ]);
+
+  assert.match(context, /setLibraryTarget: \(target: Nonced<PendingLibraryNavigationTarget> \| null\) => void/);
+  assert.match(app, /^\s*setLibraryTarget,$/m, 'the section can consume the shell-owned command');
+  assert.match(registry, /onTargetConsumed=\{\(\) => setLibraryTarget\(null\)\}/);
+  assert.match(wrapper, /onTargetConsumed=\{onTargetConsumed\}/g);
+  assert.match(vaultLibrary, /setFilter\(target\.healthBucket \? \{ healthBucket: target\.healthBucket \} : \{\}\);\s*onTargetConsumed\?\.\(\);/);
+  assert.match(wrapper, /if \(!requestedScope\) return;\s*setScope\(requestedScope\);/, 'consuming a target does not bounce the Library back to its stored scope');
+});
+
 test('the page and the row are one field, so neither can be restored without the other', async () => {
   const types = await readSource('src/app/viewSnapshots.ts');
   // The whole point of the single field: there is no way to express a restored page

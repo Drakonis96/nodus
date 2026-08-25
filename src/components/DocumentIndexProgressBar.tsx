@@ -82,9 +82,9 @@ export function DocumentIndexProgressBar() {
       data-testid="document-index-progress-bar"
     >
       {error && (
-        <div className="mb-2 flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs text-amber-700 dark:border-amber-800/60 dark:bg-amber-950/60 dark:text-amber-300" role="alert">
-          <Icon name="warning" size={14} />
-          <span className="flex-1">{error}</span>
+        <div className="document-index-warning mb-2 flex items-start gap-2 rounded-lg border px-3 py-2 text-xs leading-5" role="alert">
+          <Icon name="warning" size={14} className="mt-0.5 shrink-0" />
+          <span className="min-w-0 flex-1 break-words">{error}</span>
         </div>
       )}
       <div className="flex items-center gap-3">
@@ -122,7 +122,7 @@ export function DocumentIndexProgressBar() {
             <Icon name="pause" size={16} />
           </button>
         )}
-        <button className="btn btn-ghost text-red-400 hover:text-red-300" disabled={busy} title={t('Detener indexación')} aria-label={t('Detener indexación')} onClick={() => setConfirmStop(true)}>
+        <button className="btn btn-ghost document-index-danger" disabled={busy} title={t('Detener indexación')} aria-label={t('Detener indexación')} onClick={() => setConfirmStop(true)}>
           <Icon name="stop" size={16} />
         </button>
       </div>
