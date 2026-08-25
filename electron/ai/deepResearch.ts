@@ -7,6 +7,7 @@ import {
   type DeepResearchVersion,
 } from '@shared/deepResearchVersions';
 import { completeJson, completeText } from './aiClient';
+import { assertChatGptSubscriptionConnected } from './codexSubscription';
 import { getSettings } from '../db/settingsRepo';
 import { getActiveVault } from '../vaults/vaultRegistry';
 import { generateGenealogyDeepResearchReport } from './genealogyDeepResearch';
@@ -97,6 +98,11 @@ export async function generateDeepResearchReport(
   signal?.throwIfAborted();
   const settings = getSettings();
   const model = request.model ?? settings.deepResearchModel ?? settings.synthesisModel ?? null;
+  // Deep Research has useful fallbacks for an unavailable optional stage, but a
+  // disconnected provider is not an optional-stage failure. Check Codex once up
+  // front so we neither make dozens of doomed calls nor leave a job looking alive.
+  if (model?.provider === 'codex') await assertChatGptSubscriptionConnected();
+  signal?.throwIfAborted();
   const approach = normalizeDeepResearchApproach(request.approach);
   const deepResearchVersion = parseDeepResearchRequestVersion(request.deepResearchVersion);
   const versionedRequest: DeepResearchRequest = { ...request, deepResearchVersion };

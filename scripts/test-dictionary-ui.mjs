@@ -203,18 +203,23 @@ assert.match(
 );
 assert.match(
   view,
-  /w-\[220px\] shrink-0 justify-center whitespace-nowrap[\s\S]*busy === "scan"/,
-  "new-evidence button keeps a reserved width while its busy label changes",
+  /grid-cols-\[minmax\(0,1fr\)_minmax\(118px,0\.58fr\)_minmax\(118px,0\.58fr\)\][\s\S]*busy === "scan"/,
+  "the three entry actions share one stable aligned grid",
 );
 assert.match(
   view,
-  /btn btn-primary !text-white disabled:!text-white h-9 w-\[112px\] shrink-0[\s\S]*busy === mode/,
-  "generation button keeps its reserved width while its busy label changes",
+  /const regenerationBusy =[\s\S]*backgroundBusy[\s\S]*DictionaryGenerationState/,
+  "regeneration keeps visible progress after the enqueue IPC returns",
 );
 assert.match(
   view,
-  /w-\[112px\] shrink-0 justify-center whitespace-nowrap border border-neutral-300[\s\S]*busy === "update"/,
-  "update button keeps its reserved width while its busy label changes",
+  /const updateBusy =[\s\S]*progress\?\.mode === "update"[\s\S]*updateBusy \?/,
+  "update owns its own persistent busy feedback",
+);
+assert.match(
+  view,
+  /setTab\(generation === "update" \? "versions" : "overview"\)/,
+  "regeneration returns to the regenerated description",
 );
 assert.match(
   view,

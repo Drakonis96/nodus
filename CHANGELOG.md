@@ -1,5 +1,27 @@
 # Changelog
 
+## 5.0.2 — 2026-08-26
+
+Nodus 5.0.2 repairs the generation and document-analysis workflows reported after
+5.0.1, polishes the shared catalogue views and introduces Nodus Compass.
+
+- Kept Deep Research running when changing tabs, moved heavy work away from the
+  renderer path, repaired and retried transient or malformed model responses, and
+  simplified the queue to one animation plus live position numbers.
+- Restored editable Dictionary forms and responsive Regenerate and Update actions,
+  aligned their controls, and added controlled recovery for incomplete or malformed
+  generated definitions.
+- Fixed switching from clean Markdown to the internal PDF viewer by resolving the
+  local attachment before serving it, while preserving direct external opening.
+- Unified documentary campaign and lower-strip progress, kept rows stable while
+  section counts advance, corrected rescan reasons, and repaired light-mode styling.
+- Matched idea-type colours between Ideas and Argument map and added the missing
+  vertical spacing and alignment to Ideas rows.
+- Added Nodus Compass for federated academic discovery across open catalogues, with
+  deduplication, recommendation reasons, saved candidates, provenance and checked
+  Library import.
+- Added all 5.0.2 changes to the What's New modal in all eight interface languages.
+
 ## 5.0.1 — 2026-08-25
 
 Nodus 5.0.1 collects every repair merged since 5.0.0 and makes model setup easier

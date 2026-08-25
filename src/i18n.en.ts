@@ -1217,6 +1217,7 @@ export const EN: Record<string, string> = {
     'Fix bugs, improve performance, and polish the overall experience with user feedback.',
   'Nodus Toolkit': 'Nodus Toolkit',
   'Nodus Radar': 'Nodus Radar',
+  'Nodus Compass': 'Nodus Compass',
   'Nodus Tools': 'Nodus Tools',
   'Herramientas prácticas y local-first para convertir archivos y procesar documentos, integradas en Nodus.':
     'Handy local-first tools for file conversion and document processing, built into Nodus.',
@@ -3031,6 +3032,7 @@ export const EN: Record<string, string> = {
   'Planifica, redacta sección a sección guiado por la cobertura del corpus y ensambla un informe académico de 5–20 páginas con todas las fuentes citadas.':
     'Plan, write section by section guided by corpus coverage, and assemble a 5–20 page academic report with every source cited.',
   'Reuniendo el corpus': 'Gathering the corpus',
+  'Preparando evidencia documental': 'Preparing documentary evidence',
   'Planificando secciones': 'Planning sections',
   'Redactando secciones': 'Writing sections',
   'Ampliando cobertura': 'Extending coverage',
@@ -3670,6 +3672,11 @@ export const EN: Record<string, string> = {
   'Crea resúmenes de orientación independientes a partir de ideas, evidencia, temas y abstract. No son evidencia citable.': 'Creates standalone orientation summaries from ideas, evidence, themes and abstract. They are not citable evidence.',
   'El análisis profundo solo usó el abstract, no el texto completo (el PDF/EPUB no estaba disponible al analizar). Reanaliza cuando esté en Zotero.': 'The deep analysis used only the abstract, not the full text (the PDF/EPUB was unavailable when analyzing). Re-analyze once it is in Zotero.',
   'El texto o el modelo de embeddings cambió.': 'The text or the embedding model changed.',
+  'Las ideas pertenecen a la versión anterior del texto. Vuelve a analizarlas para usar el texto actual.': 'The ideas belong to the previous text version. Analyze them again to use the current text.',
+  'El texto cambió; vuelve a indexar sus fragmentos.': 'The text changed; index its passages again.',
+  'Los fragmentos se indexaron con otro modelo de embeddings.': 'The passages were indexed with a different embedding model.',
+  'El texto y el modelo de embeddings cambiaron.': 'Both the text and the embedding model changed.',
+  'Algunos fragmentos no tienen un embedding válido.': 'Some passages do not have a valid embedding.',
   'Generar resúmenes faltantes': 'Generate missing summaries',
   'Indexa fragmentos de texto completo en las obras que faltan o están obsoletas. No requiere análisis de ideas; el texto se mantiene como evidencia citable.': 'Indexes full-text fragments in works that are missing or stale. It does not require idea analysis; the text remains citable evidence.',
   'Indexar pasajes': 'Index passages',

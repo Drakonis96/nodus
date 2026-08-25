@@ -1858,6 +1858,19 @@ body {
   color: #991b1b;
 }
 
+/* Library readiness warnings used amber text assembled from dark-theme utilities.
+   Give them a semantic surface so “Text only”/“Incomplete” stay legible in light mode. */
+.library-status-warning {
+  border-color: rgba(217, 119, 6, 0.65);
+  background-color: rgba(120, 53, 15, 0.35);
+  color: #fde68a;
+}
+.light .library-status-warning {
+  border-color: #d97706;
+  background-color: #fff7ed;
+  color: #7c2d12;
+}
+
 /* Genealogy vault → golden accent instead of the indigo/purple default. Remaps the
    accent utility classes used across the app (the analog of the .light overrides). */
 .genealogy {

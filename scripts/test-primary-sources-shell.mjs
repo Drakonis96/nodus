@@ -19,7 +19,7 @@ test('primary sources owns the agreed vault shell plus global tools', async () =
   );
   const views = [...itemBlock.matchAll(/\bid: '([a-z]+)'/g)].map((match) => match[1]);
   assert.deepEqual(views, ['search', 'archive', 'persons', 'timeline', 'map', 'relations', 'notes']);
-  assert.match(navigation, /primary_sources:\s*\[\s*'search', 'archive', 'persons', 'timeline', 'map', 'relations', 'notes', 'browser', 'radar', 'toolkit'/);
+  assert.match(navigation, /primary_sources:\s*\[\s*'search', 'archive', 'persons', 'timeline', 'map', 'relations', 'notes', 'browser', 'radar', 'compass', 'toolkit'/);
   assert.match(app, /if \(isPrimarySources\)[\s\S]{0,500}<PrimarySourcesSidebar/);
   assert.match(
     app,

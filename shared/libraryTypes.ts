@@ -3,7 +3,7 @@ export type LibraryScope = 'global' | 'vault';
 
 export type LibraryItemSource =
   | 'nodus' | 'zotero' | 'mendeley' | 'ris' | 'bibtex' | 'biblatex' | 'csl-json'
-  | 'endnote-xml' | 'zotero-rdf' | 'csv' | 'markdown' | 'legacy';
+  | 'endnote-xml' | 'zotero-rdf' | 'csv' | 'markdown' | 'compass' | 'legacy';
 
 /** External identity is never the Nodus item ID. All fields participate in equality. */
 export interface LibrarySourceIdentity {
@@ -11,6 +11,57 @@ export interface LibrarySourceIdentity {
   libraryType: 'user' | 'group' | 'personal' | 'shared' | 'import';
   libraryId: string;
   itemKey: string;
+}
+
+/** A provider record retained with an imported Compass item. */
+export interface LibraryProviderProvenance {
+  provider: string;
+  providerId?: string;
+  sourceUrl?: string;
+  retrievedAt?: string;
+  attribution?: string;
+  metadataLicense?: string;
+}
+
+/** Bounded, renderer-safe payload accepted by the global-library importer. */
+export interface LibraryCompassCandidate {
+  canonicalKey: string;
+  metadata: LibraryItemMetadata;
+  provider?: string;
+  providerId?: string;
+  provenance?: LibraryProviderProvenance[];
+  sourceIdentities?: LibrarySourceIdentity[];
+}
+
+export type LibraryCompassImportItemState =
+  | 'queued' | 'checking' | 'created' | 'linked-existing' | 'metadata-completed' | 'skipped-duplicate' | 'failed' | 'canceled';
+
+export interface LibraryCompassImportItemResult {
+  canonicalKey: string;
+  state: LibraryCompassImportItemState;
+  itemId?: string;
+  error?: string;
+}
+
+export interface LibraryCompassImportProgress {
+  requestId: string;
+  completed: number;
+  total: number;
+  created: number;
+  linked: number;
+  failed: number;
+  canceled: boolean;
+  currentKey: string | null;
+}
+
+export interface LibraryCompassImportReport {
+  requestId: string;
+  status: 'completed' | 'canceled' | 'failed';
+  items: LibraryCompassImportItemResult[];
+  created: number;
+  linked: number;
+  failed: number;
+  canceled: boolean;
 }
 
 export type LibraryItemType =
@@ -222,6 +273,8 @@ export interface LibraryItemRecord {
   /** Permanent former IDs, including IDs of records merged into this item. */
   aliases: string[];
   sourceIdentities: LibrarySourceIdentity[];
+  /** Provider records merged into this item; kept independently of user metadata. */
+  provenance?: LibraryProviderProvenance[];
   source: LibraryItemSource;
   sourceLibraryId?: string;
   sourceKey?: string;

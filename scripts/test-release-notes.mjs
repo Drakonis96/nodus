@@ -25,21 +25,25 @@ try {
 
   const { RELEASE_NOTES, releaseNotesForMajor, compareVersions } = await import(pathToFileURL(bundlePath).href);
   const currentRelease = RELEASE_NOTES[0];
-  assert.equal(currentRelease?.version, '5.0.1');
-  assert.equal(currentRelease?.date, '2026-08-25');
-  assert.equal(currentRelease?.highlights.length, 7);
+  assert.equal(currentRelease?.version, '5.0.2');
+  assert.equal(currentRelease?.date, '2026-08-26');
+  assert.equal(currentRelease?.highlights.length, 6);
   assert.deepEqual(currentRelease?.highlights.map((highlight) => highlight.scope), [
-    'academic', 'academic', 'academic', 'academic', 'academic', 'general', 'general',
+    'academic', 'academic', 'academic', 'academic', 'academic', 'toolkit',
   ]);
   for (const phrase of [
-    /guides each definition more clearly/,
-    /generate several Dictionary entries at once/,
-    /preserve search, filters, position/,
-    /recovers interrupted campaigns/,
-    /one durable queue/,
-    /Opening Settings can no longer freeze/,
-    /without a configured model/,
+    /completes reports from the interface again/,
+    /Dictionary forms accept text again/,
+    /opens the PDF inside Nodus again/,
+    /documentary index now reports/,
+    /same visual language/,
+    /Nodus Compass arrives in Tools/,
   ]) assert.ok(currentRelease?.highlights.some((highlight) => phrase.test(highlight.en)));
+
+  // 5.0.1 keeps the seven repair highlights it shipped with underneath 5.0.2.
+  const previousPatchRelease = RELEASE_NOTES.find((note) => note.version === '5.0.1');
+  assert.equal(previousPatchRelease?.date, '2026-08-25');
+  assert.equal(previousPatchRelease?.highlights.length, 7);
 
   // 5.0.0 keeps the eight highlights it shipped with underneath this repair release.
   const majorRelease = RELEASE_NOTES.find((note) => note.version === '5.0.0');

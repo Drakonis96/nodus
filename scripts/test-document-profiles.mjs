@@ -39,6 +39,7 @@ try {
   runMigrations(legacy);
   assert.equal(legacy.prepare("SELECT COUNT(*) n FROM sqlite_master WHERE type='trigger' AND name LIKE 'works_document_profile_%'").get().n, 2);
   assert.equal(legacy.prepare("SELECT COUNT(*) n FROM sqlite_master WHERE type='index' AND name='document_index_jobs_campaign_status'").get().n, 1);
+  assert.equal(legacy.prepare("SELECT COUNT(*) n FROM pragma_table_info('document_index_jobs') WHERE name='current_unit'").get().n, 1);
   legacy.close();
   for (const table of [
     'document_profile_state', 'document_profile_versions', 'document_profile_fields',
@@ -231,6 +232,19 @@ try {
     priority: 1, reason: 'manual', generatorModel: null, auditorModel: null,
   });
   assert.equal(repo.claimNextDocumentIndexJob().jobId, pauseJob.jobId);
+  assert.equal(
+    repo.advanceRunningDocumentIndexJob(pauseJob.jobId, 'analyzing_sections', 0.25, 'analyzing', {
+      message: 'Analizando sección 3 de 12…', currentUnit: 3, totalUnits: 12,
+    }),
+    true,
+  );
+  const granular = repo.listDocumentIndexJobs().find((job) => job.jobId === pauseJob.jobId);
+  assert.equal(granular.progressMessage, 'Analizando sección 3 de 12…');
+  assert.equal(granular.currentUnit, 3);
+  assert.equal(granular.totalUnits, 12, 'the UI can display real section/chunk progress');
+  const granularCampaign = repo.listDocumentIndexCampaigns().find((item) => item.campaignId === pauseCampaign.campaignId);
+  assert.equal(granularCampaign.runningJobs, 1);
+  assert.equal(granularCampaign.queuedJobs, 0, 'campaign counters are exact and independent of the renderer sample cap');
   repo.updateDocumentIndexJob(pauseJob.jobId, { progress: 0.61, phase: 'analyzing_sections' });
   repo.saveDocumentCheckpoint(pauseJob.jobId, 'section:kept', 'source-hash', { summary: 'Trabajo parcial conservado' });
   repo.setDocumentCampaignStatus(pauseCampaign.campaignId, 'paused');

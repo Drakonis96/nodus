@@ -1,0 +1,17 @@
+[
+  {"name":"English recent climate policy articles","query":"climate policy adaptation since 2020 language:english type:article","filters":{"fromYear":2020,"languages":["en"],"types":["article"]}},
+  {"name":"Spanish open access medieval history","query":"historia medieval de la Corona de Aragón acceso abierto idioma:español","filters":{"languages":["es"],"openAccessOnly":true,"disciplines":["history"]}},
+  {"name":"French theses on migration","query":"migration author:durand type:thesis language:fr","filters":{"languages":["fr"],"types":["thesis"]}},
+  {"name":"German books about memory","query":"Gedächtnis und Erinnerung type:book language:de","filters":{"languages":["de"],"types":["book"]}},
+  {"name":"Portuguese public health reports","query":"saúde pública type:report language:pt 2018-2024","filters":{"languages":["pt"],"types":["report"],"fromYear":2018,"toYear":2024}},
+  {"name":"Italian Renaissance chapters","query":"\"Rinascimento digitale\" type:chapter language:it","filters":{"languages":["it"],"types":["chapter"]}},
+  {"name":"Catalan education datasets","query":"educació inclusiva type:dataset language:ca","filters":{"languages":["ca"],"types":["dataset"]}},
+  {"name":"Arabic archaeology preprints","query":"archaeology of the Levant type:preprint language:ar","filters":{"languages":["ar"],"types":["preprint"]}},
+  {"name":"DOI exact lookup","query":"10.1038/s41586-020-2649-2","filters":{"providers":["crossref","unpaywall","opencitations"]}},
+  {"name":"ISBN book lookup","query":"ISBN 978-0-262-03384-8 type:book","filters":{"types":["book"]}},
+  {"name":"OpenAlex provider route","query":"graph neural networks","filters":{"providers":["openalex"]}},
+  {"name":"HAL repository route","query":"repository humanities thesis","filters":{"providers":["hal"]}},
+  {"name":"Citation-focused search","query":"open scholarly infrastructure","filters":{"sort":"citations"}},
+  {"name":"No-results sentinel","query":"zzzz nonexistent bibliographic phrase 2099","filters":{"fromYear":2099,"toYear":2099}},
+  {"name":"Provider failure recovery","query":"marine biodiversity monitoring","filters":{"providers":["openalex","crossref","openaire"]},"failure":{"provider":"crossref","status":503}}
+]

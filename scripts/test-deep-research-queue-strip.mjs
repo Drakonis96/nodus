@@ -57,12 +57,19 @@ test('the report being generated carries a progress bar', () => {
     item({
       id: 'drq-running',
       status: 'running',
-      progress: { phase: 'section', message: 'Redactando: La mirada del viajero', sectionIndex: 3, sectionTotal: 6, pagesSoFar: 7 },
+      progress: {
+        phase: 'section',
+        message: 'Redactando: La mirada del viajero',
+        sectionIndex: 3,
+        sectionTotal: 6,
+        sectionTitle: 'La mirada del viajero',
+        pagesSoFar: 7,
+      },
     }),
   ]);
   assert.match(html, /role="progressbar"/, 'the bar is announced as one');
   assert.match(html, /aria-valuenow="\d+"/, 'and reports where it is');
-  assert.match(html, /Redactando: La mirada del viajero/, 'the phase is still spelled out');
+  assert.match(html, /Redactando secciones: La mirada del viajero/, 'the phase is still spelled out');
   assert.match(html, /~7 pág\./, 'along with how much has been written');
   const width = barWidth(html);
   assert.ok(width > 20 && width < 80, `a report halfway through reads as halfway (got ${width}%)`);
@@ -87,16 +94,48 @@ test('a report with no progress yet is not left blank', () => {
   assert.ok(barWidth(html) !== null, 'and the bar is there, waiting for its first phase');
 });
 
-test('reports still waiting say how many are ahead of them', () => {
+test('progress chrome follows the interface language, not report prose or a localized IPC fallback', () => {
+  const planning = renderStrip([
+    item({
+      status: 'running',
+      progress: { phase: 'planning', message: 'The operation could not be completed.' },
+    }),
+  ], [], true, 'en');
+  assert.match(planning, /Planning sections/);
+  assert.doesNotMatch(planning, /operation could not be completed/i);
+
+  const preparation = renderStrip([
+    item({
+      status: 'running',
+      progress: { phase: 'document_preparation', message: 'Preparando evidencia documental para 8 obras…' },
+    }),
+  ], [], true, 'en');
+  assert.match(preparation, /Preparing documentary evidence/);
+  assert.doesNotMatch(preparation, /Preparando/);
+});
+
+test('active reports show their live position without a second rotating arrow', () => {
   const html = renderStrip([
     item({ id: 'a', status: 'running', progress: { phase: 'planning', message: 'Planificando…' } }),
     item({ id: 'b', title: 'Segundo informe' }),
     item({ id: 'c', title: 'Tercer informe' }),
   ]);
-  assert.match(html, /1 por delante/, 'the second is behind one');
-  assert.match(html, /2 por delante/, 'the third behind two');
+  assert.match(html, /data-testid="deep-research-queue-position-a"[^>]*>1<\/span>/);
+  assert.match(html, /data-testid="deep-research-queue-position-b"[^>]*>2<\/span>/);
+  assert.match(html, /data-testid="deep-research-queue-position-c"[^>]*>3<\/span>/);
+  assert.equal(html.match(/animate-spin/g)?.length, 1, 'only the queue header rotates');
   // Only the running one has a bar: a queue of five bars at 3% would say nothing.
   assert.equal(html.match(/data-testid="deep-research-progress"/g).length, 1);
+});
+
+test('positions update when the queue advances', () => {
+  const advanced = renderStrip([
+    item({ id: 'b', title: 'Segundo informe', status: 'running', progress: { phase: 'planning', message: 'Planificando…' } }),
+    item({ id: 'c', title: 'Tercer informe' }),
+  ]);
+  assert.match(advanced, /data-testid="deep-research-queue-position-b"[^>]*>1<\/span>/);
+  assert.match(advanced, /data-testid="deep-research-queue-position-c"[^>]*>2<\/span>/);
+  assert.doesNotMatch(advanced, /deep-research-queue-position-a/);
 });
 
 test('every active report has a trash action, including the one running', () => {
@@ -127,6 +166,17 @@ test('a report asked for over MCP is marked as such, and a failure states it fai
   assert.match(html, />MCP</);
   assert.match(html, /Informe fallido/);
   assert.match(html, /El proveedor no respondió\./, 'the reason is readable, not just the word "failed"');
+});
+
+test('a failed disconnected Luna job explains the single actionable failure in the interface language', () => {
+  const html = renderStrip([], [item({
+    id: 'luna-auth',
+    title: 'Informe con Luna',
+    status: 'failed',
+    error: 'La suscripción de ChatGPT no está conectada. Ábrela en Proveedores y modelos.',
+  })], false, 'en');
+  assert.match(html, /Failed: The ChatGPT subscription is not connected/);
+  assert.doesNotMatch(html, /Falló/);
 });
 
 test.after(() => rm(tmp, { recursive: true, force: true }));

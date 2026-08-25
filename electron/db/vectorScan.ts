@@ -1,5 +1,6 @@
 import { getDb, setVectorScanQuery } from './database';
 import { yieldToEventLoop } from '../util/async';
+import { scanSimilarInWorker } from './vectorScanHost';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Similarity search that lets the app breathe.
@@ -84,6 +85,8 @@ export async function scanSimilar<T extends ScoredRow>(scan: VectorScan): Promis
   if (!query) return [];
 
   const db = getDb();
+  const background = await scanSimilarInWorker<T>(db.name, scan);
+  if (background) return background;
   const highest = (db.prepare(`SELECT MAX(rowid) AS top FROM ${scan.table}`).get() as { top: number | null }).top ?? 0;
   if (highest === 0) return [];
   const statement = db.prepare(scan.sql);

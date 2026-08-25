@@ -343,6 +343,10 @@ test('the global reader exposes annotations, metadata, chat and native attachmen
   assert.match(store, /nodus-library:\/\/attachment/);
   assert.match(store, /application\/epub\+zip/);
   assert.match(store, /getLibraryReaderAttachmentContent/);
+  assert.match(attachmentViewer, /getLibraryReaderAttachmentBytes\(props\.documentId, attachment\.id\)/, 'PDF bytes cross the validated reader bridge instead of a custom-scheme network request');
+  assert.match(attachmentViewer, /getDocument\(\{ data \}\)/, 'PDF.js receives local bytes so custom-scheme status 0 cannot abort the reader');
+  assert.doesNotMatch(attachmentViewer, /getDocument\(\{ url: attachment\.url \}\)/, 'the attachment viewer never gives the custom URL to PDF.js XHR');
+  assert.match(store, /fs\.promises\.readFile\(task\.file\)/, 'the PDF is read asynchronously so disk I/O does not block Electron main');
   const chat = await readSource('electron/ai/libraryReaderChat.ts');
   assert.match(chat, /getLibraryReaderAttachmentContent/);
   assert.match(chat, /extractFromPath/);

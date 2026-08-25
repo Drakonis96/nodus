@@ -711,6 +711,8 @@ function campaignRow(row: Record<string, unknown>): DocumentIndexCampaign {
     mode: String(row.mode) as DocumentIndexCampaign['mode'], status: String(row.status) as DocumentIndexCampaign['status'],
     includeArchived: Boolean(row.include_archived), totalJobs: Number(row.total_jobs),
     completedJobs: Number(row.completed_jobs), failedJobs: Number(row.failed_jobs),
+    runningJobs: Number(row.running_jobs ?? 0), queuedJobs: Number(row.queued_jobs ?? 0),
+    pausedJobs: Number(row.paused_jobs ?? 0),
     estimatedUnits: Number(row.estimated_units), completedUnits: Number(row.completed_units),
     inputTokens: Number(row.input_tokens), outputTokens: Number(row.output_tokens),
     estimatedCostUsd: row.estimated_cost_usd == null ? null : Number(row.estimated_cost_usd),
@@ -725,6 +727,9 @@ function jobRow(row: Record<string, unknown>): DocumentIndexJob {
     title: row.title == null ? undefined : String(row.title), priority: Number(row.priority), reason: String(row.reason),
     status: String(row.status) as DocumentIndexJobStatus, phase: String(row.phase) as DocumentIndexJobPhase,
     progress: Number(row.progress), sourceFingerprint: row.source_fingerprint == null ? null : String(row.source_fingerprint),
+    progressMessage: row.progress_message == null ? null : String(row.progress_message),
+    currentUnit: row.current_unit == null ? null : Number(row.current_unit),
+    totalUnits: row.total_units == null ? null : Number(row.total_units),
     generatorModel: json<ModelRef | null>(row.generator_model_json, null), auditorModel: json<ModelRef | null>(row.auditor_model_json, null),
     attempts: Number(row.attempts), maxAttempts: Number(row.max_attempts),
     error: row.error == null ? null : String(row.error), createdAt: String(row.created_at), updatedAt: String(row.updated_at),
@@ -801,7 +806,12 @@ export function listDocumentIndexCampaigns(): DocumentIndexCampaign[] {
 export function listDocumentIndexJobs(status?: DocumentIndexJobStatus): DocumentIndexJob[] {
   const rows = status
     ? getDb().prepare(`SELECT j.*,w.title FROM document_index_jobs j JOIN works w ON w.nodus_id=j.nodus_id WHERE j.status=? ORDER BY j.priority DESC,j.created_at`).all(status)
-    : getDb().prepare(`SELECT j.*,w.title FROM document_index_jobs j JOIN works w ON w.nodus_id=j.nodus_id ORDER BY CASE WHEN j.status IN ('running','queued') THEN 0 ELSE 1 END,j.priority DESC,j.updated_at DESC`).all();
+    : getDb().prepare(`SELECT j.*,w.title FROM document_index_jobs j JOIN works w ON w.nodus_id=j.nodus_id
+        ORDER BY CASE j.status WHEN 'running' THEN 0 WHEN 'paused' THEN 1 WHEN 'queued' THEN 2 ELSE 3 END,
+          j.priority DESC,
+          CASE WHEN j.status IN ('running','paused','queued') THEN j.created_at END ASC,
+          CASE WHEN j.status NOT IN ('running','paused','queued') THEN j.updated_at END DESC,
+          j.job_id`).all();
   return (rows as Record<string, unknown>[]).map(jobRow);
 }
 
@@ -830,6 +840,7 @@ export function claimNextDocumentIndexJob(): DocumentIndexJob | null {
 export function updateDocumentIndexJob(jobId: string, patch: {
   status?: DocumentIndexJobStatus; phase?: DocumentIndexJobPhase; progress?: number;
   sourceFingerprint?: string | null; error?: string | null;
+  progressMessage?: string | null; currentUnit?: number | null; totalUnits?: number | null;
 }): DocumentIndexJob | null {
   const current = getDb().prepare('SELECT * FROM document_index_jobs WHERE job_id=?').get(jobId) as Record<string, unknown> | undefined;
   if (!current) return null;
@@ -837,11 +848,16 @@ export function updateDocumentIndexJob(jobId: string, patch: {
   const nextPhase = patch.phase ?? String(current.phase) as DocumentIndexJobPhase;
   const now = new Date().toISOString();
   getDb().prepare(
-    `UPDATE document_index_jobs SET status=?,phase=?,progress=?,source_fingerprint=?,error=?,updated_at=? WHERE job_id=?`
+    `UPDATE document_index_jobs SET status=?,phase=?,progress=?,source_fingerprint=?,error=?,
+       progress_message=?,current_unit=?,total_units=?,updated_at=? WHERE job_id=?`
   ).run(
     nextStatus, nextPhase, clamp01(Math.max(Number(current.progress), patch.progress ?? Number(current.progress))),
     patch.sourceFingerprint === undefined ? current.source_fingerprint : patch.sourceFingerprint,
-    patch.error === undefined ? current.error : patch.error, now, jobId
+    patch.error === undefined ? current.error : patch.error,
+    patch.progressMessage === undefined ? current.progress_message : patch.progressMessage,
+    patch.currentUnit === undefined ? current.current_unit : patch.currentUnit,
+    patch.totalUnits === undefined ? current.total_units : patch.totalUnits,
+    now, jobId
   );
   const campaignId = current.campaign_id == null ? null : String(current.campaign_id);
   refreshCampaign(campaignId);
@@ -859,6 +875,7 @@ export function advanceRunningDocumentIndexJob(
   phase: DocumentIndexJobPhase,
   progress: number,
   profileState: DocumentUnderstandingState | null,
+  detail?: { message?: string | null; currentUnit?: number | null; totalUnits?: number | null },
 ): boolean {
   return getDb().transaction(() => {
     const current = getDb().prepare(
@@ -868,9 +885,17 @@ export function advanceRunningDocumentIndexJob(
     if (!current) return false;
     const now = new Date().toISOString();
     const changed = getDb().prepare(
-      `UPDATE document_index_jobs SET phase=?,progress=?,updated_at=?
+      `UPDATE document_index_jobs SET phase=?,progress=?,progress_message=?,current_unit=?,total_units=?,updated_at=?
         WHERE job_id=? AND status='running'`
-    ).run(phase, clamp01(Math.max(Number(current.progress), progress)), now, jobId);
+    ).run(
+      phase,
+      clamp01(Math.max(Number(current.progress), progress)),
+      detail?.message ?? null,
+      detail?.currentUnit ?? null,
+      detail?.totalUnits ?? null,
+      now,
+      jobId,
+    );
     if (!changed.changes) return false;
     if (profileState) setDocumentProfileState(current.nodus_id, profileState);
     refreshCampaign(current.campaign_id);
@@ -1001,20 +1026,27 @@ function refreshCampaign(campaignId: string | null): void {
     `SELECT COUNT(*) total,
             COALESCE(SUM(CASE WHEN status='completed' THEN 1 ELSE 0 END),0) completed,
             COALESCE(SUM(CASE WHEN status IN ('failed','unavailable') THEN 1 ELSE 0 END),0) failed,
+            COALESCE(SUM(CASE WHEN status='running' THEN 1 ELSE 0 END),0) running,
+            COALESCE(SUM(CASE WHEN status='queued' THEN 1 ELSE 0 END),0) queued,
+            COALESCE(SUM(CASE WHEN status='paused' THEN 1 ELSE 0 END),0) paused,
             COALESCE(SUM(CASE WHEN status='completed' THEN 1 ELSE progress END),0) units,
             COALESCE(SUM(CASE WHEN status IN ('queued','running','paused') THEN 1 ELSE 0 END),0) active
        FROM document_index_jobs WHERE campaign_id=?`
-  ).get(campaignId) as { total: number; completed: number; failed: number; units: number; active: number };
+  ).get(campaignId) as {
+    total: number; completed: number; failed: number; running: number;
+    queued: number; paused: number; units: number; active: number;
+  };
   const campaign = getDb().prepare('SELECT status FROM document_index_campaigns WHERE campaign_id=?').get(campaignId) as { status: string } | undefined;
   if (!campaign) return;
   const terminal = counts.active === 0;
   const status = terminal && !['cancelled','failed'].includes(campaign.status)
     ? (counts.failed > 0 ? 'failed' : 'completed') : campaign.status;
   getDb().prepare(
-    `UPDATE document_index_campaigns SET total_jobs=?,completed_jobs=?,failed_jobs=?,estimated_units=?,
-       completed_units=?,status=?,updated_at=? WHERE campaign_id=?`
+    `UPDATE document_index_campaigns SET total_jobs=?,completed_jobs=?,failed_jobs=?,
+       running_jobs=?,queued_jobs=?,paused_jobs=?,estimated_units=?,completed_units=?,status=?,updated_at=?
+       WHERE campaign_id=?`
   ).run(
-    counts.total, counts.completed, counts.failed, counts.total,
+    counts.total, counts.completed, counts.failed, counts.running, counts.queued, counts.paused, counts.total,
     Number(counts.units ?? 0), status, new Date().toISOString(), campaignId
   );
 }

@@ -83,8 +83,8 @@ test('the toolkit shows in every vault type, including databases and study', () 
   const groups = navigation.groupedNav([], vaultTypes.defaultHiddenViewsForType('databases'));
   const tools = groups.find((g) => g.id === 'tools');
   assert.ok(tools, 'the tools group survives the databases preset');
-  // Order is part of the contract: global tools remain Browser, Radar, then Tools.
-  assert.deepEqual(tools.items.map((n) => n.id), ['browser', 'radar', 'toolkit']);
+  // Order is part of the contract: Compass sits directly below Radar.
+  assert.deepEqual(tools.items.map((n) => n.id), ['browser', 'radar', 'compass', 'toolkit']);
 });
 
 test('the hub renders every built tool including Nodus Translate', async () => {

@@ -152,6 +152,22 @@ const databaseAggregateWorkerBuild = {
   },
 };
 
+const vectorScanWorkerBuild = {
+  onstart: (args: { reload: () => void }) => args.reload(),
+  vite: {
+    resolve: { alias: { '@shared': path.resolve(__dirname, 'shared') } },
+    build: {
+      outDir: 'dist-electron',
+      emptyOutDir: false,
+      rollupOptions: {
+        input: path.join(__dirname, 'electron/workers/vectorScanWorker.ts'),
+        external: mainExternals,
+        output: { format: 'cjs' as const, entryFileNames: 'vectorScanWorker.cjs', inlineDynamicImports: true },
+      },
+    },
+  },
+};
+
 /** A utility process must not share Rollup chunks with Electron's main entry: a shared
  * chunk may pull `app`/`BrowserWindow` imports into a process where Electron does not
  * expose them. Build it as one self-contained ESM file instead. */
@@ -245,6 +261,7 @@ export default defineConfig({
           libraryExtractionWorker: 'electron/workers/libraryExtractionWorker.ts',
           libraryOperationWorker: 'electron/workers/libraryOperationWorker.ts',
           libraryReaderWorker: 'electron/workers/libraryReaderWorker.ts',
+          compassWorker: 'electron/workers/compassWorker.ts',
         },
         vite: {
           // The top-level resolve.alias only applies to the renderer build;
@@ -297,6 +314,7 @@ export default defineConfig({
       databaseComputeWorkerBuild,
       databaseScaleFixtureWorkerBuild,
       databaseAggregateWorkerBuild,
+      vectorScanWorkerBuild,
       utilityBuild('backupUtilityWorker', 'electron/export/backupUtilityWorker.ts'),
       utilityBuild('recoveryProbeUtilityWorker', 'electron/recovery/recoveryProbeUtilityWorker.ts'),
       utilityBuild('migrationRecoveryUtilityWorker', 'electron/db/migrationRecoveryUtilityWorker.ts'),

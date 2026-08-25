@@ -95,6 +95,14 @@ const RELEASE_3_2_4_TR: string[] = [
 ];
 
 export const RELEASE_NOTES_TR: Record<string, string[]> = {
+  "5.0.2": [
+    "Deep Research, sekme değiştirseniz bile raporları yeniden arayüzden tamamlıyor. Ağır işler pencereyi çizen yoldan çıkarılıyor, geçici hatalar ve biçim hataları onarılıp yeniden deneniyor, kuyruk ise başlığın yanında tek bir animasyon ve her raporun gerçek konumuyla güncellenen numaralar gösteriyor.",
+    "Sözlük formları yeniden metin kabul ediyor ve düğmeler yanıt verdiklerini hemen gösteriyor. Yeniden Üret ve Güncelle hizalarını koruyor, eksik model yanıtlarını onarıyor ve sonuç yorumlanamadığında denetimli biçimde yeniden deniyor. Böylece arayüz tekrarlanan hatalarla dolmuyor.",
+    "Temiz Markdown görünümünden geçtiğinizde okuyucu PDF’yi yeniden Nodus içinde açıyor. Uygulama dosyayı görüntüleyiciye vermeden önce yerel eki çözüyor ve ekranda boş bir sunucu yanıtı bırakmıyor. Nodus Dışında Aç ise özgün dosyaya doğrudan erişimi koruyor.",
+    "Belge dizini artık gerçekten ilerleyen işi gösteriyor. Kampanya ile alttaki şerit aynı sayıları kullanıyor, bölümler ilerlerken her eser yerini koruyor ve Yeniden Dene metnin mi yoksa doğru modelin mi değiştiğini açıklıyor. Pencere ayrıca açık temadaki doğru renklerine kavuşuyor.",
+    "Fikirler ve Argüman haritası artık aynı görsel dili paylaşıyor. Tür noktaları iki listede de aynı renkleri kullanıyor, Fikir satırları eksik olan dikey boşluğa kavuşuyor ve başlıklar, açıklamalar ile sütunlar dar bir pencerede bile hizalı kalıyor.",
+    "Nodus Compass, açık kaynaklarda akademik literatür keşfetmek için Araçlara geliyor. Aynı anda birden çok katalogda arama yapıyor, kopyaları birleştiriyor, her sonucu neden önerdiğini açıklıyor ve adayları kaydetmenize ya da kopya denetimi ve görünür kaynak bilgisiyle Kitaplığa aktarmanıza izin veriyor.",
+  ],
   "5.0.1": [
     "Sözlük artık her tanım için daha açık yönlendirme sunuyor. Bir girdi oluştururken altı yaklaşımdan birini seçebilir, kendi talimatlarınızı ekleyebilir ve Nodus'un kullanacağı kanıtları inceleyebilirsiniz. Ayrılıp geri döndüğünüzde açık girdi, arama ve filtreler korunur, tanım yeniden üretildiğinde geri getirilebilir bir sürüm saklanır.",
     "Aynı anda birden fazla Sözlük girdisi de üretebilirsiniz. Kuyruk, kavramları yapılandırılmış istek sınırına kadar paralel işler, her girdinin ilerlemesini ve sonucunu gösterir ve yalnızca başarısız olanları yeniden denemenize izin verir. İş sürerken Sözlüğü kullanmaya devam edebilirsiniz.",

@@ -326,7 +326,7 @@ export function IdeasView({
                   key={node.id}
                   data-testid={testId ? 'study-idea-card' : `idea-row-${node.id}`}
                   data-anchor-id={node.id}
-                  className="grid min-h-[76px] w-full items-center border-b border-neutral-100 px-4 text-left text-xs transition-colors hover:bg-neutral-50 dark:border-neutral-900 dark:hover:bg-neutral-900/55"
+                  className="grid min-h-[88px] w-full items-center border-b border-neutral-100 px-4 py-3 text-left text-xs transition-colors hover:bg-neutral-50 dark:border-neutral-900 dark:hover:bg-neutral-900/55"
                   style={{ gridTemplateColumns: 'minmax(360px,2.4fr) 8rem 6.5rem 7.5rem 7rem minmax(220px,1.35fr) 2rem' }}
                   onClick={() => showIdea({ id: node.id, label: node.label })}
                 >
@@ -334,7 +334,7 @@ export function IdeasView({
                     <TypeDot type={node.type} />
                     <div className="min-w-0">
                       <span className="block truncate font-medium text-neutral-900 dark:text-neutral-200">{node.label}</span>
-                      <span className="mt-1 block line-clamp-2 leading-5 text-neutral-500">{node.statement}</span>
+                      <span className="mt-1 block line-clamp-2 text-[11px] leading-relaxed text-neutral-500">{node.statement}</span>
                     </div>
                   </div>
                   <span className="text-neutral-600 dark:text-neutral-400">{t(NODE_LABELS[node.type as IdeaType]) ?? node.type}</span>

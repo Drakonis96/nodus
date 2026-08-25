@@ -46,7 +46,9 @@ try {
   passages.replaceWorkPassages('w1', 'old-hash', [{ text: 'pasaje de la versión anterior', pageLabel: 'p. 1', sourceRef: 'zotero:user:0:A', pageNumber: 1, embedding: [1, 0] }]);
   assert.equal(passages.embeddedPassageCount(), 0, 'retrieval excludes passages whose hash differs from resolved text');
   assert.equal(passages.getPassageDetail('w1#0'), null, 'a stale passage cannot be recovered directly');
-  assert.equal(passages.workPassageStatuses(['w1'])[0].status, 'outdated');
+  const stalePassages = passages.workPassageStatuses(['w1'])[0];
+  assert.equal(stalePassages.status, 'outdated');
+  assert.equal(stalePassages.outdatedReason, 'text_changed', 'the UI must not blame an unchanged embedding model');
   assert.equal(works.listWorks({ statusFlags: ['passages'] }).length, 0, 'advanced work filters do not count stale passages');
   assert.equal(works.listWorks({ statusFlags: ['!passages'] })[0].nodus_id, 'w1');
 

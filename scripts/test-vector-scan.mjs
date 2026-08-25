@@ -65,8 +65,28 @@ const { scanSimilar } = require(bundle);
 const shimModule = require(shim);
 
 const DIM = 16;
-const db = new Database(':memory:');
+const databaseFile = path.join(outDir, 'vectors.sqlite');
+const db = new Database(databaseFile);
 shimModule.__setDb(db);
+
+// Build the packaged background worker beside the bundled host. scanSimilar now
+// prefers this path for real on-disk vaults and keeps the old paged loop only as a
+// source-test/dev fallback.
+const workerFile = path.join(outDir, 'vectorScanWorker.cjs');
+execFileSync(
+  path.join(repoRoot, 'node_modules/.bin/esbuild'),
+  [
+    path.join(repoRoot, 'electron/workers/vectorScanWorker.ts'),
+    '--bundle',
+    '--platform=node',
+    '--format=cjs',
+    '--target=es2022',
+    '--external:better-sqlite3',
+    `--outfile=${workerFile}`,
+  ],
+  { cwd: repoRoot, stdio: 'pipe' }
+);
+process.env.NODUS_VECTOR_SCAN_WORKER_FILE = workerFile;
 
 db.function('vec_cosine', (a, b) => {
   if (!a || !b) return 0;
@@ -226,12 +246,11 @@ test('the event loop really does get a turn mid-scan', async () => {
   let timer = setImmediate(tick);
   await pagedIdeas(-1, 120);
   clearImmediate(timer);
-  // 4,000 rowids at 1,500 per window is three windows, so at least two yields. This
-  // is the whole point of the module: without them nothing else in the process runs.
-  assert.ok(ticks >= 2, `the scan yielded ${ticks} times, so the app can keep moving`);
+  assert.ok(ticks >= 2, `the background scan allowed ${ticks} event-loop turns`);
 });
 
 test.after(() => {
+  delete process.env.NODUS_VECTOR_SCAN_WORKER_FILE;
   db.close();
   rmSync(outDir, { recursive: true, force: true });
 });

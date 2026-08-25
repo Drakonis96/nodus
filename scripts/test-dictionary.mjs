@@ -290,6 +290,128 @@ try {
     /construcción social situada/,
     "only the grounded correction is persisted",
   );
+  assert.equal(
+    repairedAfterVerification.state,
+    "applied",
+    "Regenerate makes the successfully grounded definition current immediately",
+  );
+  assert.equal(
+    repo.getDictionaryEntry(automatic.id).currentVersionId,
+    repairedAfterVerification.id,
+    "the overview reads the regenerated version without a second accept action",
+  );
+
+  // Some providers repeatedly append a generic conclusion without a citation.
+  // After the bounded rewrites, retain the verified cited material and remove
+  // only that unsupported sentence instead of failing the whole background job.
+  let salvageAttempts = 0;
+  const salvagedUncitedTail = await ai.__generateDictionaryEntryForTesting(
+    { entryId: automatic.id, mode: "regeneration", model: null },
+    async () => {
+      salvageAttempts += 1;
+      return {
+        descriptionMarkdown:
+          "La memoria se construye mediante prácticas sociales documentadas [Autora (2020)](nodus://idea/idea-1). Esta conclusión universal carece de respaldo en la evidencia seleccionada.",
+        authorSummaries: [],
+      };
+    },
+    async (claims) => claims.map(() => "supports"),
+  );
+  assert.equal(
+    salvageAttempts,
+    2,
+    "an uncited tail still receives the bounded rewrite before local salvage",
+  );
+  assert.match(
+    salvagedUncitedTail.contentMarkdown,
+    /prácticas sociales documentadas/,
+    "verified cited prose survives local salvage",
+  );
+  assert.doesNotMatch(
+    salvagedUncitedTail.contentMarkdown,
+    /conclusión universal/,
+    "only the persistently uncited sentence is removed",
+  );
+
+  let extractiveFallbackAttempts = 0;
+  const extractiveFallback = await ai.__generateDictionaryEntryForTesting(
+    { entryId: automatic.id, mode: "regeneration", model: null },
+    async () => {
+      extractiveFallbackAttempts += 1;
+      return {
+        descriptionMarkdown:
+          "La memoria explica absolutamente cualquier transformación social posible [Autora (2020)](nodus://idea/idea-1).",
+        authorSummaries: [],
+      };
+    },
+    async (claims) => claims.map(() => "unsupported"),
+  );
+  assert.equal(
+    extractiveFallbackAttempts,
+    2,
+    "semantic rejection receives the bounded provider rewrite first",
+  );
+  assert.match(
+    extractiveFallback.contentMarkdown,
+    /## Evidencia verificable/,
+    "total semantic rejection falls back to cited evidence excerpts",
+  );
+  assert.match(
+    extractiveFallback.contentMarkdown,
+    /nodus:\/\/(?:idea|passage)\//,
+    "the extractive fallback remains traceable to selected evidence",
+  );
+  assert.doesNotMatch(
+    extractiveFallback.contentMarkdown,
+    /absolutamente cualquier transformación/,
+    "unsupported provider prose is never persisted in the fallback",
+  );
+
+  const missingCitationFallback = await ai.__generateDictionaryEntryForTesting(
+    { entryId: automatic.id, mode: "regeneration", model: null },
+    async () => ({
+      descriptionMarkdown:
+        "La memoria conserva información entre generaciones y contextos sociales.",
+      authorSummaries: [],
+    }),
+  );
+  assert.match(
+    missingCitationFallback.contentMarkdown,
+    /## Evidencia verificable/,
+    "a provider that omits every citation gets the safe extractive fallback",
+  );
+  assert.doesNotMatch(
+    missingCitationFallback.contentMarkdown,
+    /conserva información entre generaciones/,
+    "uncited provider prose is not persisted",
+  );
+
+  let malformedOutputCalls = 0;
+  const malformedOutputFallback =
+    await ai.__generateDictionaryEntryForTesting(
+      { entryId: automatic.id, mode: "regeneration", model: null },
+      async () => {
+        malformedOutputCalls += 1;
+        const error = new Error("Fallo de parseo JSON tras agotar la reparación");
+        error.code = "output_truncated";
+        throw error;
+      },
+    );
+  assert.equal(
+    malformedOutputCalls,
+    1,
+    "Dictionary does not multiply completeJson's exhausted repair attempts",
+  );
+  assert.match(
+    malformedOutputFallback.contentMarkdown,
+    /## Evidencia verificable/,
+    "malformed or truncated structured output recovers to cited evidence",
+  );
+  assert.equal(
+    malformedOutputFallback.state,
+    "applied",
+    "structured-output recovery still produces a current Dictionary version",
+  );
 
   // A provider failure must reject the IPC operation without creating an empty
   // version or changing the draft entry. This is the failure mode reported by the

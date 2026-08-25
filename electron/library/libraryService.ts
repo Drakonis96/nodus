@@ -55,6 +55,10 @@ import type {
   LibraryRecoveryReport,
   LibraryReadingPreparationPlan,
   GlobalLibrarySettings,
+  LibraryCompassCandidate,
+  LibraryCompassImportItemResult,
+  LibraryCompassImportProgress,
+  LibraryCompassImportReport,
 } from '@shared/libraryTypes';
 import { DEFAULT_GLOBAL_LIBRARY_SETTINGS } from '@shared/libraryAttachmentNaming';
 import type {
@@ -116,6 +120,7 @@ let live: {
   migrations: LibraryMigrationSessionManager;
 } | null = null;
 const zoteroImports = new Map<string, AbortController>();
+const compassImports = new Map<string, AbortController>();
 const metadataBatches = new Map<string, { controller: AbortController; result: LibraryMetadataBatchResult | null }>();
 const SHORT_READING_PAGE_LIMIT = 50;
 const LONG_REFLOWABLE_BYTE_THRESHOLD = 8 * 1024 * 1024;
@@ -395,6 +400,76 @@ export function cancelZoteroLibraryImport(requestId: string): boolean {
   if (!controller) return false;
   controller.abort();
   return true;
+}
+
+/** Import Compass results in bounded worker requests, retaining per-item state. */
+export async function startGlobalLibraryCompassImport(
+  requestId: string,
+  candidates: LibraryCompassCandidate[],
+  collectionIds: string[] = [],
+  onProgress: (progress: LibraryCompassImportProgress) => void = () => undefined,
+): Promise<LibraryCompassImportReport> {
+  if (!requestId?.trim()) throw new Error('La importación de Compass necesita un identificador de solicitud.');
+  if (compassImports.has(requestId)) throw new Error('Esa importación de Compass ya está en curso.');
+  if (!Array.isArray(candidates) || candidates.length > 10_000) throw new Error('La importación de Compass supera el límite permitido.');
+  const current = service();
+  if (!current) throw new Error('Configura primero la carpeta de copias de seguridad de Nodus.');
+  await ensureCatalogReady(current);
+  const controller = new AbortController(); compassImports.set(requestId, controller);
+  const unique = [...new Map(candidates.map((candidate) => [String(candidate?.canonicalKey ?? '').trim(), candidate])).values()]
+    .filter((candidate) => !!candidate && String(candidate.canonicalKey ?? '').trim());
+  const items: LibraryCompassImportItemResult[] = [];
+  const emit = (currentKey: string | null): void => {
+    onProgress({ requestId, completed: items.length, total: unique.length,
+      created: items.filter((item) => item.state === 'created').length,
+      linked: items.filter((item) => ['linked-existing', 'metadata-completed', 'skipped-duplicate'].includes(item.state)).length,
+      failed: items.filter((item) => item.state === 'failed').length,
+      canceled: controller.signal.aborted, currentKey });
+  };
+  emit(null);
+  let status: LibraryCompassImportReport['status'] = 'completed';
+  try {
+    for (let offset = 0; offset < unique.length; offset += 25) {
+      const chunk = unique.slice(offset, offset + 25);
+      if (controller.signal.aborted) {
+        items.push(...chunk.map((candidate) => ({ canonicalKey: candidate.canonicalKey, state: 'canceled' as const })));
+        status = 'canceled'; emit(null); break;
+      }
+      try {
+        const result = await runLibraryOperationInWorker<LibraryCompassImportReport>(
+          workerContext(current), 'import-compass-candidates', [chunk, collectionIds, requestId],
+          () => current.operations.importCompassCandidates(chunk, collectionIds, requestId),
+          { signal: controller.signal },
+        );
+        for (const item of result.items) { items.push(item); emit(item.canonicalKey); }
+      } catch (error) {
+        if (controller.signal.aborted) {
+          items.push(...chunk.map((candidate) => ({ canonicalKey: candidate.canonicalKey, state: 'canceled' as const })));
+          status = 'canceled'; emit(null); break;
+        }
+        items.push(...chunk.map((candidate) => ({ canonicalKey: candidate.canonicalKey, state: 'failed' as const, error: error instanceof Error ? error.message : String(error) })));
+        status = 'failed'; emit(chunk.at(-1)?.canonicalKey ?? null);
+      }
+    }
+    if (controller.signal.aborted && items.length < unique.length) {
+      items.push(...unique.slice(items.length).map((candidate) => ({ canonicalKey: candidate.canonicalKey, state: 'canceled' as const })));
+      status = 'canceled';
+    }
+    if (items.some((item) => item.state === 'canceled')) status = 'canceled';
+    broadcast(current.catalog.status(current.root, current.deviceId));
+    return {
+      requestId, status, items,
+      created: items.filter((item) => item.state === 'created').length,
+      linked: items.filter((item) => ['linked-existing', 'metadata-completed', 'skipped-duplicate'].includes(item.state)).length,
+      failed: items.filter((item) => item.state === 'failed').length,
+      canceled: status === 'canceled',
+    };
+  } finally { compassImports.delete(requestId); }
+}
+
+export function cancelGlobalLibraryCompassImport(requestId: string): boolean {
+  const controller = compassImports.get(requestId); if (!controller) return false;
+  controller.abort(); return true;
 }
 
 export function enqueueLibraryExtraction(

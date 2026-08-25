@@ -108,7 +108,27 @@ async function waitIfPaused(): Promise<boolean> {
  * text can be useful evidence even when it has never entered the graph.
  */
 export async function startPassageEmbedding(nodusIds?: string[]): Promise<void> {
-  if (state.running) return;
+  const requestedIds = [...new Set(nodusIds ?? [])];
+  if (state.running) {
+    // A per-work Retry can arrive while a vault-wide passage run is active. The
+    // old early return made the button a silent no-op even though the modal said
+    // the repair would be queued. Append genuinely new/already-processed targets;
+    // targets still ahead in this run are already queued and need no duplicate.
+    if (requestedIds.length > 0) {
+      const existingIndex = new Map(state.works.map((entry, index) => [entry.work.nodus_id, index]));
+      const candidates = getDb().prepare(
+        `SELECT * FROM works WHERE nodus_id IN (${requestedIds.map(() => '?').join(',')}) AND archived = 0`
+      ).all(...requestedIds) as Work[];
+      for (const work of candidates) {
+        const index = existingIndex.get(work.nodus_id);
+        if (index === undefined || index < state.currentWorkIndex) {
+          state.works.push({ work, title: work.title, chunks: 0 });
+        }
+      }
+      emit();
+    }
+    return;
+  }
   state.running = true;
   state.paused = false;
   state.stopRequested = false;
@@ -123,7 +143,7 @@ export async function startPassageEmbedding(nodusIds?: string[]): Promise<void> 
 
   try {
     const db = getDb();
-    const ids = [...new Set(nodusIds ?? [])];
+    const ids = requestedIds;
     const candidates = (ids.length
       ? db.prepare(`SELECT * FROM works WHERE nodus_id IN (${ids.map(() => '?').join(',')}) AND archived = 0`).all(...ids)
       : db.prepare('SELECT * FROM works WHERE archived = 0').all()) as Work[];

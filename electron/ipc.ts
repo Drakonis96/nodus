@@ -35,6 +35,7 @@ import { registerAcademicIpc } from './ipc/academic';
 import { registerLibraryIpc } from './ipc/library';
 import { registerBrowserIpc } from './ipc/browser';
 import { registerRadarIpc } from './ipc/radar';
+import { registerCompassIpc } from './ipc/compass';
 import { setBrowserTheme } from './browser/tabs';
 import { browserHistoryRepository } from './browser/history';
 import {
@@ -217,6 +218,7 @@ export function registerIpc(
   registerLibraryIpc(context);
   registerBrowserIpc(context);
   registerRadarIpc(context);
+  registerCompassIpc(context);
   registerRecordsIpc(context);
   registerPlatformIpc(context);
   registerWorldbuildingIpc(context);

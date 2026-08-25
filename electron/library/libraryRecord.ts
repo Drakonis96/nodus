@@ -11,7 +11,7 @@ import type {
 
 const SOURCES = new Set<LibraryItemSource>([
   'nodus', 'zotero', 'mendeley', 'ris', 'bibtex', 'biblatex', 'csl-json',
-  'endnote-xml', 'zotero-rdf', 'csv', 'markdown', 'legacy',
+  'endnote-xml', 'zotero-rdf', 'csv', 'markdown', 'compass', 'legacy',
 ]);
 const ITEM_TYPES = new Set<LibraryItemType>([
   'article-journal', 'journal-article', 'magazine-article', 'newspaper-article', 'book', 'book-chapter', 'chapter', 'book-section',
@@ -50,9 +50,38 @@ export function normalizeLibrarySourceIdentity(value: unknown): LibrarySourceIde
   const libraryType = input.libraryType as LibrarySourceIdentity['libraryType'];
   const libraryId = stringValue(input.libraryId, 1_000);
   const itemKey = stringValue(input.itemKey, 2_000);
-  if (!['zotero', 'mendeley', 'ris', 'bibtex', 'biblatex', 'csl-json', 'endnote-xml', 'zotero-rdf', 'csv', 'markdown'].includes(source)) return null;
+  if (!['zotero', 'mendeley', 'ris', 'bibtex', 'biblatex', 'csl-json', 'endnote-xml', 'zotero-rdf', 'csv', 'markdown', 'compass'].includes(source)) return null;
   if (!['user', 'group', 'personal', 'shared', 'import'].includes(libraryType)) return null;
   return libraryId && itemKey ? { source, libraryType, libraryId, itemKey } : null;
+}
+
+function normalizeProviderProvenance(value: unknown): NonNullable<LibraryItemRecord['provenance']> {
+  if (!Array.isArray(value)) return [];
+  return value.slice(0, 128).flatMap((entry) => {
+    if (!entry || typeof entry !== 'object') return [];
+    const input = entry as Record<string, unknown>;
+    const provider = stringValue(input.provider, 200);
+    if (!provider) return [];
+    return [{
+      provider,
+      ...(stringValue(input.providerId, 2_000) ? { providerId: stringValue(input.providerId, 2_000) } : {}),
+      ...(stringValue(input.sourceUrl, 10_000) ? { sourceUrl: stringValue(input.sourceUrl, 10_000) } : {}),
+      ...(stringValue(input.retrievedAt, 100) ? { retrievedAt: stringValue(input.retrievedAt, 100) } : {}),
+      ...(stringValue(input.attribution, 2_000) ? { attribution: stringValue(input.attribution, 2_000) } : {}),
+      ...(stringValue(input.metadataLicense, 500) ? { metadataLicense: stringValue(input.metadataLicense, 500) } : {}),
+    }];
+  });
+}
+
+/** Stable comparison key for duplicate detection across providers. */
+export function normalizeLibraryDedupTitle(value: string | undefined): string {
+  return String(value ?? '').normalize('NFKD').replace(/\p{M}/gu, '').toLocaleLowerCase()
+    .replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
+}
+
+export function libraryCreatorDedupKey(creators: LibraryCreator[] | undefined): string {
+  const first = creators?.find((creator) => creator.creatorType === 'author' || creator.creatorType === 'bookAuthor') ?? creators?.[0];
+  return normalizeLibraryDedupTitle(first?.name || [first?.firstName, first?.lastName].filter(Boolean).join(' '));
 }
 
 export function librarySourceIdentityKey(identity: LibrarySourceIdentity): string {
@@ -210,12 +239,14 @@ export function normalizeLibraryItemRecord(value: unknown): LibraryItemRecord | 
   const identities = normalizeSourceIdentities(input.sourceIdentities);
   const inferred = legacySourceIdentity(input);
   if (inferred && !identities.some((entry) => librarySourceIdentityKey(entry) === librarySourceIdentityKey(inferred))) identities.push(inferred);
+  const provenance = normalizeProviderProvenance(input.provenance);
   const { clock: rawClock, ...withoutClock } = input;
   const base = {
     ...withoutClock,
     formatVersion: 2 as const,
     aliases,
     sourceIdentities: identities,
+    ...(provenance.length ? { provenance } : {}),
     metadata: normalizeLibraryMetadata(input.metadata, stringValue((input.metadata as Record<string, unknown> | undefined)?.title, 10_000)),
     attachments: Array.isArray(input.attachments) ? input.attachments.map((entry, position) => ({
       ...(entry as object), position: Number.isFinite(Number((entry as { position?: unknown }).position)) ? Number((entry as { position?: unknown }).position) : position,

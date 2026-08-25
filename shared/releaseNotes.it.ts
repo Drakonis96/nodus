@@ -155,6 +155,14 @@ const RELEASE_3_2_4_IT: string[] = [
 ];
 
 export const RELEASE_NOTES_IT: Record<string, string[]> = {
+  "5.0.2": [
+    "Deep Research torna a completare i report dall’interfaccia anche quando cambi scheda. Il lavoro pesante esce dal percorso che disegna la finestra, gli errori transitori o di formato vengono riparati e ritentati, e la coda mostra una sola animazione accanto al titolo più numeri aggiornati secondo la posizione reale.",
+    "I moduli del Dizionario accettano di nuovo il testo e i pulsanti mostrano subito di aver risposto. Rigenera e Aggiorna restano allineati, riparano le risposte incomplete del modello e riprovano in modo controllato quando un risultato non può essere interpretato, senza riempire l’interfaccia di errori ripetuti.",
+    "Il lettore apre di nuovo il PDF dentro Nodus quando passi dal Markdown pulito. L’app risolve l’allegato locale prima di consegnarlo al visualizzatore e non lascia più sullo schermo una risposta vuota del server, mentre Apri fuori da Nodus conserva l’accesso diretto al file originale.",
+    "L’indice documentario ora mostra il lavoro che avanza davvero. La campagna e la barra inferiore condividono gli stessi conteggi, ogni opera mantiene il proprio posto mentre avanzano le sezioni, e Riprova spiega se è cambiato il testo o il modello corretto. La finestra recupera anche i colori giusti in modalità chiara.",
+    "Idee e Mappa argomentativa condividono ora lo stesso linguaggio visivo. I punti del tipo usano gli stessi colori in entrambe le liste, le righe di Idee guadagnano lo spazio verticale che mancava e titoli, descrizioni e colonne restano allineati anche in una finestra stretta.",
+    "Nodus Compass arriva negli Strumenti per scoprire letteratura accademica in fonti aperte. Cerca in più cataloghi insieme, unisce i duplicati, spiega perché raccomanda ogni risultato e consente di salvare candidati o importarli nella Libreria con controllo dei duplicati e provenienza visibile.",
+  ],
   "5.0.1": [
     "Il Dizionario ora guida ogni definizione in modo più chiaro. Quando crei una voce puoi scegliere fra sei approcci, aggiungere istruzioni personali e rivedere le prove che Nodus userà. La voce aperta, la ricerca e i filtri restano al loro posto quando esci e torni, e rigenerare una definizione conserva una versione recuperabile.",
     "Puoi anche generare più voci del Dizionario insieme. La coda elabora i concetti in parallelo fino al limite di richieste configurato, mostra l'avanzamento e il risultato di ogni voce e permette di riprovare soltanto quelle non riuscite. Puoi continuare a usare il Dizionario mentre il lavoro prosegue.",

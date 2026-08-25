@@ -30,6 +30,16 @@ test('idea type markers stay circular beside long labels', async () => {
   );
 });
 
+test('idea rows keep the same breathing room as the argument catalogue', async () => {
+  const view = await readSource('src/views/IdeasView.tsx');
+  assert.match(
+    view,
+    /data-anchor-id=\{node\.id\}[\s\S]{0,220}min-h-\[88px\][^\"]*px-4 py-3/,
+    'each idea row keeps a visible vertical inset around its title and statement',
+  );
+  assert.match(view, /className="mt-1 block line-clamp-2 text-\[11px\] leading-relaxed[^\"]*">\{node\.statement\}/);
+});
+
 test('Ideas catalogue can be searched, filtered and sorted', async () => {
   const view = await readSource('src/views/IdeasView.tsx');
   assert.match(view, /data-testid="ideas-filters-toggle"/);

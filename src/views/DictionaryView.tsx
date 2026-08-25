@@ -223,14 +223,12 @@ function ButtonBusy({ label }: { label: string }) {
 }
 
 function dictionaryProgressText(value: string): string {
-  const known = new Set([
-    "En cola",
-    "Analizando corpus…",
-    "Generando definición…",
-    "Redactando definición…",
-    "Comprobando…",
-  ]);
-  return known.has(value) ? t(value) : value;
+  if (value === "En cola") return t("En cola");
+  if (value.startsWith("Analizando corpus")) return t("Analizando corpus…");
+  if (value.startsWith("Generando definición")) return t("Generando definición…");
+  if (value.startsWith("Redactando definición")) return t("Redactando definición…");
+  if (value.startsWith("Comprobando")) return t("Comprobando…");
+  return value;
 }
 
 function dictionaryVersionText(value: string): string {
@@ -1796,7 +1794,7 @@ function DictionaryEntryView({
       })
       .then((nextProgress) => {
         onGenerationStarted(nextProgress);
-        setTab(generation === "creation" ? "overview" : "versions");
+        setTab(generation === "update" ? "versions" : "overview");
       })
       .catch((reason) => setError(message(reason)))
       .finally(() => setBusy(""));
@@ -1823,6 +1821,12 @@ function DictionaryEntryView({
     { id: "works", label: t("Obras"), icon: "book", count: entry.workCount },
     { id: "versions", label: t("Versiones"), icon: "clock" },
   ];
+  const regenerationBusy =
+    busy === mode ||
+    (backgroundBusy && progress?.mode !== "update");
+  const updateBusy =
+    busy === "update" ||
+    (backgroundBusy && progress?.mode === "update");
   return (
     <div
       className="min-h-0 flex-1 overflow-y-auto p-5"
@@ -1869,61 +1873,73 @@ function DictionaryEntryView({
                 )}
               </div>
             </div>
-            <div className="flex max-w-xl flex-wrap items-center justify-end gap-2">
-              <ModelPicker
-                settings={settings}
-                value={model}
-                onChange={() => undefined}
-                compact
-                disabled
-                ariaLabel={t("Modelo del Diccionario")}
-              />
-              <button
-                className="btn btn-ghost h-9 w-[220px] shrink-0 justify-center whitespace-nowrap border border-neutral-300 text-xs dark:border-neutral-700"
-                disabled={!!busy || backgroundBusy}
-                onClick={() =>
-                  void run(
-                    "scan",
-                    () => window.nodus.scanDictionaryNewEvidence(entryId),
-                    "evidence",
-                  )
-                }
-              >
-                <Icon name="search" size={13} />{" "}
-                {busy === "scan"
-                  ? t("Buscando…")
-                  : entry.lastEvidenceScanAt
-                    ? t("Buscar evidencia nueva")
-                    : t("Recuperar evidencia")}
-              </button>
-              <button
-                className="btn btn-primary !text-white disabled:!text-white h-9 w-[112px] shrink-0 justify-center whitespace-nowrap text-xs"
-                disabled={!!busy || backgroundBusy || !hasEvidence}
-                onClick={() => generate(mode)}
-              >
-                {busy === mode ? (
-                  <ButtonBusy label={t("Generando…")} />
-                ) : (
-                  <>
-                    <Icon name="sparkles" size={13} />
-                    {entry.currentVersionId ? t("Regenerar") : t("Generar")}
-                  </>
+            <div className="ml-auto grid w-full gap-2 sm:w-[620px]">
+              <div className="flex min-h-9 items-center justify-end gap-3">
+                {progress && (
+                  <div className="min-w-0 flex-1" aria-live="polite">
+                    <DictionaryGenerationState progress={progress} status={entry.status} />
+                  </div>
                 )}
-              </button>
-              <button
-                className="btn btn-ghost h-9 w-[112px] shrink-0 justify-center whitespace-nowrap border border-neutral-300 text-xs dark:border-neutral-700"
-                disabled={
-                  !!busy ||
-                  backgroundBusy ||
-                  !entry.currentVersionId ||
-                  entry.newEvidenceCount === 0 ||
-                  !hasEvidence
-                }
-                onClick={() => generate("update")}
-              >
-                <Icon name="refresh" size={13} />{" "}
-                {busy === "update" ? t("Actualizando…") : t("Actualizar")}
-              </button>
+                <ModelPicker
+                  settings={settings}
+                  value={model}
+                  onChange={() => undefined}
+                  compact
+                  disabled
+                  ariaLabel={t("Modelo del Diccionario")}
+                />
+              </div>
+              <div className="grid grid-cols-[minmax(0,1fr)_minmax(118px,0.58fr)_minmax(118px,0.58fr)] gap-2">
+                <button
+                  className="btn btn-ghost h-9 min-w-0 justify-center whitespace-nowrap border border-neutral-300 text-xs dark:border-neutral-700"
+                  disabled={!!busy || backgroundBusy}
+                  onClick={() =>
+                    void run(
+                      "scan",
+                      () => window.nodus.scanDictionaryNewEvidence(entryId),
+                      "evidence",
+                    )
+                  }
+                >
+                  <Icon name="search" size={13} />{" "}
+                  {busy === "scan"
+                    ? t("Buscando…")
+                    : entry.lastEvidenceScanAt
+                      ? t("Buscar evidencia nueva")
+                      : t("Recuperar evidencia")}
+                </button>
+                <button
+                  className="btn btn-primary h-9 min-w-0 justify-center whitespace-nowrap text-xs !text-white disabled:!text-white"
+                  disabled={!!busy || backgroundBusy || !hasEvidence}
+                  onClick={() => generate(mode)}
+                >
+                  {regenerationBusy ? (
+                    <ButtonBusy label={t("Generando…")} />
+                  ) : (
+                    <>
+                      <Icon name="sparkles" size={13} />
+                      {entry.currentVersionId ? t("Regenerar") : t("Generar")}
+                    </>
+                  )}
+                </button>
+                <button
+                  className="btn btn-ghost h-9 min-w-0 justify-center whitespace-nowrap border border-neutral-300 text-xs dark:border-neutral-700"
+                  disabled={
+                    !!busy ||
+                    backgroundBusy ||
+                    !entry.currentVersionId ||
+                    entry.newEvidenceCount === 0 ||
+                    !hasEvidence
+                  }
+                  onClick={() => generate("update")}
+                >
+                  {updateBusy ? (
+                    <ButtonBusy label={t("Actualizando…")} />
+                  ) : (
+                    <><Icon name="refresh" size={13} /> {t("Actualizar")}</>
+                  )}
+                </button>
+              </div>
             </div>
           </div>
         </section>

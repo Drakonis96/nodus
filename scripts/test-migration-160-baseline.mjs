@@ -35,7 +35,7 @@ try {
     : [];
   runMigrations(db);
   assert.equal(db.pragma('user_version', { simple: true }), SCHEMA_VERSION);
-  assert.equal(SCHEMA_VERSION, 164);
+  assert.equal(SCHEMA_VERSION, 165);
   const workColumns = new Set(db.prepare('PRAGMA table_info(works)').all().map((row) => row.name));
   for (const column of ['resolved_source_type', 'resolved_text_hash', 'text_block_reason', 'resolved_text_notes', 'deep_error', 'deep_queued']) {
     assert.ok(workColumns.has(column), `works.${column} exists`);
@@ -75,6 +75,12 @@ try {
   // bodies above user_version, and the CREATE-only backfill cannot replay an ALTER. Every
   // later column therefore needs its own migration, and this is that database.
   db.exec('ALTER TABLE works DROP COLUMN deep_queued');
+  for (const column of ['running_jobs', 'queued_jobs', 'paused_jobs']) {
+    db.exec(`ALTER TABLE document_index_campaigns DROP COLUMN ${column}`);
+  }
+  for (const column of ['progress_message', 'current_unit', 'total_units']) {
+    db.exec(`ALTER TABLE document_index_jobs DROP COLUMN ${column}`);
+  }
   db.pragma('user_version = 161');
   runMigrations(db);
   assert.ok(
@@ -117,6 +123,12 @@ try {
   insertPausedJob.run('migration-164-recover-job', null, 'vault', 'migration-164-recover', 'deep-research', sourceChanged, now, now);
   insertPausedJob.run('migration-164-other-job', null, 'vault', 'migration-164-other', 'deep-research', 'El proveedor no respondió.', now, now);
   insertPausedJob.run('migration-164-campaign-job', 'migration-164-campaign-id', 'vault', 'migration-164-campaign', 'deep-research', sourceChanged, now, now);
+  for (const column of ['running_jobs', 'queued_jobs', 'paused_jobs']) {
+    db.exec(`ALTER TABLE document_index_campaigns DROP COLUMN ${column}`);
+  }
+  for (const column of ['progress_message', 'current_unit', 'total_units']) {
+    db.exec(`ALTER TABLE document_index_jobs DROP COLUMN ${column}`);
+  }
   db.pragma('user_version = 163');
   runMigrations(db);
   const recoveredJob = db.prepare("SELECT status, phase, progress, attempts, error FROM document_index_jobs WHERE job_id='migration-164-recover-job'").get();

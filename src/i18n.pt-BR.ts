@@ -1214,6 +1214,7 @@ export const PT_BR: Record<string, string> = {
     'Corrigir erros, melhorar o desempenho e aprimorar a experiência geral com o feedback dos usuários.',
   'Nodus Toolkit': 'Nodus Toolkit',
   'Nodus Radar': 'Nodus Radar',
+  'Nodus Compass': 'Nodus Compass',
   'Nodus Tools': 'Nodus Tools',
   'Herramientas prácticas y local-first para convertir archivos y procesar documentos, integradas en Nodus.':
     'Ferramentas práticas e local-first para converter arquivos e processar documentos, integradas ao Nodus.',
@@ -2935,6 +2936,7 @@ export const PT_BR: Record<string, string> = {
   'Planifica, redacta sección a sección guiado por la cobertura del corpus y ensambla un informe académico de 5–20 páginas con todas las fuentes citadas.':
     'Planeja, redige seção a seção guiado pela cobertura do corpus e monta um relatório acadêmico de 5–20 páginas com todas as fontes citadas.',
   'Reuniendo el corpus': 'Reunindo o corpus',
+  'Preparando evidencia documental': 'Preparando evidências documentais',
   'Planificando secciones': 'Planejando seções',
   'Redactando secciones': 'Redigindo seções',
   'Ampliando cobertura': 'Ampliando cobertura',
@@ -3527,6 +3529,11 @@ export const PT_BR: Record<string, string> = {
   'El análisis profundo solo usó el abstract, no el texto completo (el PDF/EPUB no estaba disponible al analizar). Reanaliza cuando esté en Zotero.':
     'A análise profunda usou apenas o abstract, não o texto completo (o PDF/EPUB não estava disponível durante a análise). Reanalise quando estiver no Zotero.',
   'El texto o el modelo de embeddings cambió.': 'O texto ou o modelo de embeddings mudou.',
+  'Las ideas pertenecen a la versión anterior del texto. Vuelve a analizarlas para usar el texto actual.': 'As ideias pertencem à versão anterior do texto. Analise-as novamente para usar o texto atual.',
+  'El texto cambió; vuelve a indexar sus fragmentos.': 'O texto mudou; indexe seus trechos novamente.',
+  'Los fragmentos se indexaron con otro modelo de embeddings.': 'Os trechos foram indexados com outro modelo de embeddings.',
+  'El texto y el modelo de embeddings cambiaron.': 'O texto e o modelo de embeddings mudaram.',
+  'Algunos fragmentos no tienen un embedding válido.': 'Alguns trechos não têm um embedding válido.',
   'Generar resúmenes faltantes': 'Gerar resumos faltantes',
   'Indexa fragmentos de texto completo en las obras que faltan o están obsoletas. No requiere análisis de ideas; el texto se mantiene como evidencia citable.':
     'Indexa fragmentos de texto completo nas obras que estão faltando ou desatualizadas. Não requer análise de ideias; o texto permanece como evidência citável.',

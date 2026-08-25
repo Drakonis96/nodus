@@ -56,6 +56,7 @@ import type { IdeaType, LibraryReaderReference, WorkFilter } from '@shared/types
 import type { DictionaryEntryStatus, DictionarySortKey } from '@shared/dictionary';
 import type { SortState } from '../views/Library';
 import type { ReadingPlace } from '../readingPlace';
+import type { CompassSnapshot } from '@shared/compass';
 
 /** An open inner tab: enough to redraw the tab strip and refetch its contents. */
 export interface OpenEntityTab {
@@ -290,6 +291,9 @@ export interface ImmersionSnapshot {
   placement: ListPlacement | null;
 }
 
+/** Search cut and reader placement for the universal academic discovery surface. */
+export type { CompassSnapshot } from '@shared/compass';
+
 /** One optional entry per section that has opted in. Keys are `View` members. */
 export interface ViewSnapshots {
   authors?: AuthorsSnapshot;
@@ -315,6 +319,7 @@ export interface ViewSnapshots {
   deepResearch?: DeepResearchSnapshot;
   studyDeepResearch?: DeepResearchSnapshot;
   teachingUnits?: DeepResearchSnapshot;
+  compass?: CompassSnapshot;
 }
 
 export type SnapshotView = keyof ViewSnapshots;

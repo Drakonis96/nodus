@@ -20,7 +20,7 @@ import type {
   LibrarySortRule,
 } from '@shared/libraryTypes';
 import { LibraryDiskStore } from './libraryStorage';
-import { librarySourceIdentityKey } from './libraryRecord';
+import { libraryCreatorDedupKey, librarySourceIdentityKey, normalizeLibraryDedupTitle } from './libraryRecord';
 import { validateLibrarySmartSearchGroup } from './librarySmartCollections';
 import { atomicWriteJson } from './libraryFileUtils';
 
@@ -43,6 +43,21 @@ function creatorsText(record: LibraryItemRecord): string {
 function ftsQuery(value: string): string {
   return value.normalize('NFKC').trim().split(/\s+/).filter(Boolean).slice(0, 20)
     .map((term) => `"${term.replace(/"/g, '""')}"*`).join(' AND ');
+}
+
+function isbnForms(value: string): string[] {
+  const clean = value.toUpperCase().replace(/[^0-9X]/g, '');
+  if (/^\d{9}[\dX]$/.test(clean)) {
+    const body = `978${clean.slice(0, 9)}`;
+    const checksum = (10 - body.split('').reduce((sum, digit, index) => sum + Number(digit) * (index % 2 ? 3 : 1), 0) % 10) % 10;
+    return [clean, `${body}${checksum}`];
+  }
+  if (/^978\d{10}$/.test(clean)) {
+    const body = clean.slice(3, 12);
+    const check = (11 - (body.split('').reduce((sum, digit, index) => sum + Number(digit) * (10 - index), 0) % 11)) % 11;
+    return [clean, `${body}${check === 10 ? 'X' : check}`];
+  }
+  return clean ? [clean] : [];
 }
 
 function emptyFacets(): LibraryCatalogFacets {
@@ -213,6 +228,10 @@ export class LibraryCatalog {
       CREATE INDEX IF NOT EXISTS library_items_updated ON library_items (deleted_at, updated_at DESC);
       CREATE INDEX IF NOT EXISTS library_items_source ON library_items (source, deleted_at);
       CREATE INDEX IF NOT EXISTS library_items_doi ON library_items (doi) WHERE doi IS NOT NULL;
+      CREATE INDEX IF NOT EXISTS library_items_year ON library_items (year) WHERE deleted_at IS NULL;
+      CREATE INDEX IF NOT EXISTS library_items_pmid ON library_items (json_extract(metadata_json, '$.pmid')) WHERE deleted_at IS NULL;
+      CREATE INDEX IF NOT EXISTS library_items_pmcid ON library_items (json_extract(metadata_json, '$.pmcid')) WHERE deleted_at IS NULL;
+      CREATE INDEX IF NOT EXISTS library_items_arxiv ON library_items (json_extract(metadata_json, '$.arxiv')) WHERE deleted_at IS NULL;
       CREATE TABLE IF NOT EXISTS library_collections (
         id TEXT PRIMARY KEY,
         name TEXT NOT NULL,
@@ -670,7 +689,7 @@ export class LibraryCatalog {
     const params: Record<string, string> = {};
     const doi = metadata.doi?.replace(/^https?:\/\/(?:dx\.)?doi\.org\//i, '').replace(/^doi:\s*/i, '').trim().toLowerCase();
     if (doi) {
-      conditions.push("LOWER(REPLACE(REPLACE(REPLACE(COALESCE(doi, ''), 'https://doi.org/', ''), 'http://doi.org/', ''), 'http://dx.doi.org/', ''))=@doi");
+      conditions.push("LOWER(REPLACE(REPLACE(REPLACE(REPLACE(COALESCE(doi, ''), 'https://doi.org/', ''), 'http://doi.org/', ''), 'https://dx.doi.org/', ''), 'http://dx.doi.org/', ''))=@doi");
       params.doi = doi;
     }
     for (const key of ['pmid', 'pmcid', 'arxiv'] as const) {
@@ -679,11 +698,12 @@ export class LibraryCatalog {
       conditions.push(`LOWER(COALESCE(json_extract(metadata_json, '$.${key}'), ''))=@${key}`);
       params[key] = value;
     }
-    const isbn = metadata.isbn?.map((value) => value.toUpperCase().replace(/[^0-9X]/g, '')).find(Boolean);
-    if (isbn) {
-      conditions.push("EXISTS (SELECT 1 FROM json_each(isbn_json) candidate_isbn WHERE UPPER(REPLACE(REPLACE(CAST(candidate_isbn.value AS TEXT), '-', ''), ' ', ''))=@isbn)");
-      params.isbn = isbn;
-    }
+    const isbns = [...new Set((metadata.isbn ?? []).flatMap(isbnForms))];
+    isbns.forEach((isbn, index) => {
+      const key = `isbn${index}`;
+      conditions.push(`EXISTS (SELECT 1 FROM json_each(isbn_json) candidate_isbn WHERE UPPER(REPLACE(REPLACE(CAST(candidate_isbn.value AS TEXT), '-', ''), ' ', ''))=@${key})`);
+      params[key] = isbn;
+    });
     if (!conditions.length) return null;
     const row = this.handle.prepare(`
       SELECT id FROM library_items
@@ -691,6 +711,36 @@ export class LibraryCatalog {
       ORDER BY updated_at DESC LIMIT 1
     `).get(params) as { id: string } | undefined;
     return row?.id ?? null;
+  }
+
+  /**
+   * Fallback identity for records with no stable external identifier. The
+   * year index keeps this bounded for normal bibliographic records; title and
+   * creator are normalized in TypeScript so punctuation/diacritics agree with
+   * Compass and imported bibliography files.
+   */
+  findItemIdByNormalizedBibliography(metadata: LibraryItemMetadata): string | null {
+    const title = normalizeLibraryDedupTitle(metadata.title);
+    if (!title) return null;
+    const year = metadata.year == null ? null : Number(metadata.year);
+    const rows = (year == null
+      ? this.handle.prepare('SELECT id, title, creators_json, year FROM library_items WHERE deleted_at IS NULL LIMIT 5000').all()
+      : this.handle.prepare('SELECT id, title, creators_json, year FROM library_items WHERE deleted_at IS NULL AND year=? LIMIT 5000').all(year)) as Array<{ id: string; title: string; creators_json: string; year: number | null }>;
+    const creator = libraryCreatorDedupKey(metadata.creators);
+    for (const row of rows) {
+      if (normalizeLibraryDedupTitle(row.title) !== title) continue;
+      if (year != null && row.year !== year) continue;
+      let creators: unknown = [];
+      try { creators = JSON.parse(row.creators_json); } catch { /* malformed cache row */ }
+      const rowCreator = libraryCreatorDedupKey(Array.isArray(creators) ? creators : []);
+      if (creator && rowCreator && rowCreator !== creator) continue;
+      // Exact normalized titles are a fallback identity when incomplete
+      // provider metadata omits one creator. Require a substantial title to
+      // avoid collapsing generic works such as “Introduction”.
+      if ((!creator || !rowCreator) && title.length < 24) continue;
+      return row.id;
+    }
+    return null;
   }
 
   citationKeys(exceptItemId?: string): string[] {

@@ -19,6 +19,10 @@ import type {
   LibraryAttachmentRecord,
   LibraryNoteRecord,
   LibraryItemRelationType,
+  LibraryCompassCandidate,
+  LibraryCompassImportItemResult,
+  LibraryCompassImportReport,
+  LibrarySourceIdentity,
   LibraryTagPatch,
   LibraryTagRecord,
   LibrarySavedSearchRecord,
@@ -34,7 +38,7 @@ import type {
   LibraryRecoveryIssue,
   GlobalLibrarySettings,
 } from '@shared/libraryTypes';
-import { canonicalJson, normalizeLibraryMetadata } from './libraryRecord';
+import { canonicalJson, librarySourceIdentityKey, normalizeLibraryMetadata, normalizeLibrarySourceIdentity } from './libraryRecord';
 import { LibraryCatalog } from './libraryCatalog';
 import {
   assertInside,
@@ -593,6 +597,91 @@ export class LibraryOperations {
     });
     this.catalog.indexItem(result, this.store);
     return result;
+  }
+
+  /**
+   * Import a bounded Compass chunk. The operation is deliberately self
+   * contained so it can run in a worker with its own catalog/store handles.
+   * Existing user metadata is never overwritten; only missing fields and
+   * provider provenance/identities are filled in.
+   */
+  importCompassCandidates(
+    candidates: LibraryCompassCandidate[],
+    collectionIds: string[] = [],
+    requestId = 'compass-import',
+  ): LibraryCompassImportReport {
+    if (!Array.isArray(candidates) || candidates.length > 25) throw new Error('La importación de Compass acepta como máximo 25 fichas por lote.');
+    const resolvedCollections = [...new Set(collectionIds.map((id) => this.catalog.resolveCollectionId(id) ?? id))];
+    for (const collectionId of resolvedCollections) {
+      const collection = this.store.readMaterializedCollection(collectionId);
+      if (!collection || collection.deletedAt) throw new Error('Una de las colecciones de destino ya no existe.');
+    }
+    const items: LibraryCompassImportItemResult[] = [];
+    for (const candidate of candidates) {
+      const canonicalKey = String(candidate?.canonicalKey ?? '').trim().slice(0, 2_000);
+      try {
+        if (!canonicalKey || !candidate?.metadata) throw new Error('La ficha de Compass no tiene una clave canónica válida.');
+        const metadata = normalizeLibraryMetadata(candidate.metadata);
+        const provider = String(candidate.provider ?? 'compass').trim().slice(0, 200) || 'compass';
+        const providerId = String(candidate.providerId ?? canonicalKey).trim().slice(0, 2_000) || canonicalKey;
+        const ownIdentity = { source: 'compass' as const, libraryType: 'import' as const, libraryId: provider, itemKey: providerId };
+        const suppliedIdentities = (candidate.sourceIdentities ?? []).map((identity) => normalizeLibrarySourceIdentity(identity))
+          .filter((identity): identity is LibrarySourceIdentity => !!identity && identity.source === 'compass');
+        const identities = [...new Map([ownIdentity, ...suppliedIdentities].map((identity) => [librarySourceIdentityKey(identity), identity])).values()];
+        const provenance = [...new Map((candidate.provenance ?? []).filter((entry) => entry && typeof entry.provider === 'string').map((entry) => {
+          const value = { ...entry, provider: String(entry.provider).slice(0, 200),
+            providerId: typeof entry.providerId === 'string' ? entry.providerId.slice(0, 2_000) : undefined,
+            sourceUrl: typeof entry.sourceUrl === 'string' ? entry.sourceUrl.slice(0, 10_000) : undefined };
+          return [`${value.provider}:${value.providerId ?? ''}:${value.sourceUrl ?? ''}`, value];
+        })).values()];
+        const identityMatch = identities.map((identity) => this.catalog.findItemIdBySourceIdentity(identity)).find(Boolean) ?? null;
+        const existingId = identityMatch ?? this.catalog.findItemIdByMetadataIdentifiers(metadata) ?? this.catalog.findItemIdByNormalizedBibliography(metadata);
+        if (existingId) {
+          const existing = this.item(existingId);
+          const overrides = new Set(Object.keys(existing.metadataOverrides ?? {}));
+          const merged = { ...existing.metadata } as LibraryItemMetadata;
+          let metadataChanged = false;
+          for (const [key, incoming] of Object.entries(metadata) as Array<[keyof LibraryItemMetadata, LibraryItemMetadata[keyof LibraryItemMetadata]]>) {
+            if (overrides.has(key) || incoming == null || incoming === '' || (Array.isArray(incoming) && incoming.length === 0)) continue;
+            const current = merged[key];
+            if (current == null || current === '' || (Array.isArray(current) && current.length === 0)) { (merged as any)[key] = incoming; metadataChanged = true; }
+          }
+          const mergedIdentities = [...new Map([...existing.sourceIdentities, ...identities].map((identity) => [librarySourceIdentityKey(identity), identity])).values()];
+          const mergedProvenance = [...new Map([...(existing.provenance ?? []), ...provenance].map((entry) => [`${entry.provider}:${entry.providerId ?? ''}:${entry.sourceUrl ?? ''}`, entry])).values()];
+          const collectionSet = [...new Set([...existing.collectionIds, ...resolvedCollections])];
+          const changed = metadataChanged || canonicalJson(existing.sourceIdentities) !== canonicalJson(mergedIdentities)
+            || canonicalJson(existing.provenance ?? []) !== canonicalJson(mergedProvenance)
+            || canonicalJson(existing.collectionIds) !== canonicalJson(collectionSet);
+          if (changed) {
+            const updated = this.store.upsertItem({ ...existing, metadata: normalizeLibraryMetadata(merged), sourceIdentities: mergedIdentities, provenance: mergedProvenance, collectionIds: collectionSet }, existing.clock.revision);
+            this.catalog.indexItem(updated, this.store);
+            items.push({ canonicalKey, state: metadataChanged ? 'metadata-completed' : 'linked-existing', itemId: updated.id });
+          } else items.push({ canonicalKey, state: 'skipped-duplicate', itemId: existing.id });
+          continue;
+        }
+        const id = `compass:${randomUUID()}`;
+        const citationKey = generateCitationKey(metadata, this.catalog.citationKeys());
+        const created = this.store.upsertItem({
+          id, storageId: id, source: 'compass', sourceLibraryId: provider, sourceKey: canonicalKey,
+          sourceIdentities: identities, provenance, citationKey, metadata,
+          collectionIds: resolvedCollections, attachments: [], notes: [], relations: [], files: { annotations: 'annotations.json' },
+          extraction: { status: 'pending' }, deletedAt: null,
+        });
+        this.catalog.indexItem(created, this.store);
+        items.push({ canonicalKey, state: 'created', itemId: created.id });
+      } catch (error) {
+        items.push({ canonicalKey: canonicalKey || String(candidate?.canonicalKey ?? ''), state: 'failed', error: error instanceof Error ? error.message : String(error) });
+      }
+    }
+    return {
+      requestId,
+      status: 'completed',
+      items,
+      created: items.filter((item) => item.state === 'created').length,
+      linked: items.filter((item) => ['linked-existing', 'metadata-completed', 'skipped-duplicate'].includes(item.state)).length,
+      failed: items.filter((item) => item.state === 'failed').length,
+      canceled: false,
+    };
   }
 
   private item(itemId: string): LibraryItemRecord {
