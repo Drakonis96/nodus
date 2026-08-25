@@ -146,7 +146,7 @@ export function CompassView({ snapshot, onSnapshotChange }: { snapshot?: Compass
     if (!searchStarted.current || !query.trim()) return;
     const timer = window.setTimeout(() => { void startSearch(query); }, 220);
     return () => window.clearTimeout(timer);
-  }, [filters, sort]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [filters, sort]);
 
   useEffect(() => {
     let active = true;
@@ -225,7 +225,7 @@ export function CompassView({ snapshot, onSnapshotChange }: { snapshot?: Compass
   const dismissCandidate = async (item: CompassResult) => {
     if (!searchId) return;
     const isDismissed = dismissed.has(item.canonicalKey);
-    try { await (isDismissed ? api.restoreCompassCandidate : api.dismissCompassCandidate)(searchId, item.canonicalKey); setDismissed((current) => { const next = new Set(current); isDismissed ? next.delete(item.canonicalKey) : next.add(item.canonicalKey); return next; }); } catch { /* no optimistic state on failure */ }
+    try { await (isDismissed ? api.restoreCompassCandidate : api.dismissCompassCandidate)(searchId, item.canonicalKey); setDismissed((current) => { const next = new Set(current); if (isDismissed) next.delete(item.canonicalKey); else next.add(item.canonicalKey); return next; }); } catch { /* no optimistic state on failure */ }
   };
   const findSimilar = async (item: CompassResult) => {
     try {

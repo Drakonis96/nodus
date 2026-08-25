@@ -1,7 +1,7 @@
 import type { CompassApi } from '@shared/api/compass';
 import type {
-  CompassFilters, CompassImportProgress, CompassProviderId, CompassProviderStatus,
-  CompassResultSummary, CompassSearchProgress, CompassSearchRequest, CompassSearchResponse, CompassSearchSession,
+  CompassFilters, CompassImportProgress, CompassProviderId,
+  CompassResultSummary, CompassSearchProgress, CompassSearchResponse, CompassSearchSession,
   CompassSnapshot,
 } from '@shared/compass';
 

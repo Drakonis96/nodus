@@ -1,4 +1,4 @@
-import type { CompassProviderAdapter, CompassProviderContext, CompassProviderId } from '@shared/compass';
+import type { CompassProviderAdapter, CompassProviderId } from '@shared/compass';
 import { adapter, author, identifier, page, queryString, requestJson, requestText, result, text } from './provider';
 function authors(values: unknown[]): Array<NonNullable<ReturnType<typeof author>>> { return values.map(author).filter((entry): entry is NonNullable<ReturnType<typeof author>> => !!entry); }
 

@@ -1,5 +1,5 @@
 import type {
-  CompassFilters, CompassImportProgress, CompassImportRequest, CompassImportJob,
+  CompassImportProgress, CompassImportRequest, CompassImportJob,
   CompassProviderId, CompassProviderStatus, CompassSearchProgress, CompassSearchRequest, CompassSearchResponse,
   CompassSearchSession, CompassResultSummary,
 } from '../compass';

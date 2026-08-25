@@ -18,7 +18,7 @@ const queued = (index: number): DocumentIndexJob => ({
   status: 'queued', phase: 'queued', progressMessage: null, currentUnit: null, totalUnits: null,
 });
 
-let snapshot: DocumentIndexProgress = {
+const snapshot: DocumentIndexProgress = {
   campaigns: [{
     campaignId: 'campaign', vaultId: 'vault', mode: 'manual', status: 'running', includeArchived: false,
     totalJobs: 1194, completedJobs: 0, failedJobs: 0, runningJobs: 2, queuedJobs: 1192, pausedJobs: 0,
