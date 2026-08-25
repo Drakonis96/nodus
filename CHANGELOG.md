@@ -1,5 +1,9 @@
 # Changelog
 
+## 5.0.0-beta.1 — 2026-08-25
+
+- First public beta of Nodus 5. This prerelease is available only to users who explicitly enable beta updates.
+
 ## 4.2.5 — 2026-08-23
 
 - Fixed the macOS updater leaving a second Nodus behind. It moved the running bundle to `Nodus.app.previous` and never removed it, and that suffix is on the directory name only: what stayed was a complete application bundle with the same identifier, which LaunchServices registered as a second copy of Nodus. macOS then showed two Dock icons for one app, and every update kept another 1.8 GB forever. The displaced bundle is now unregistered before the relaunch and deleted after it.
