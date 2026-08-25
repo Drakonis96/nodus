@@ -1762,7 +1762,92 @@ const RELEASE_4_2_5_HIGHLIGHTS: RawReleaseHighlight[] = [
   },
 ];
 
+/**
+ * 5.0.0 — every user-visible change since 4.2.5, including the fixes that
+ * landed after the beta tag. Keep this list aligned by index with the Italian
+ * and Turkish tables so the startup modal never falls back to English.
+ */
+const RELEASE_5_0_0_HIGHLIGHTS: RawReleaseHighlight[] = [
+  {
+    scope: 'academic',
+    es: 'El vault académico estrena Diccionario. Puedes crear conceptos desde la evidencia del corpus, buscar y filtrar entradas, editar definiciones, consultar sus citas y relaciones y recuperar versiones anteriores. Nodus detecta nueva evidencia y conserva la versión previa cuando actualizas o regeneras una entrada.',
+    en: 'The academic vault gains a Dictionary. You can create concepts from corpus evidence, search and filter entries, edit definitions, inspect their citations and relations, and restore earlier versions. Nodus detects new evidence and preserves the previous version when you update or regenerate an entry.',
+    fr: 'Le coffre académique accueille un Dictionnaire. Vous pouvez créer des concepts à partir des preuves du corpus, rechercher et filtrer les entrées, modifier les définitions, consulter leurs citations et relations et restaurer les versions précédentes. Nodus détecte les nouvelles preuves et conserve la version antérieure lors d’une mise à jour ou d’une régénération.',
+    de: 'Der akademische Tresor erhält ein Wörterbuch. Sie können Begriffe aus Korpusbelegen erstellen, Einträge suchen und filtern, Definitionen bearbeiten, Zitate und Beziehungen prüfen und frühere Versionen wiederherstellen. Nodus erkennt neue Belege und bewahrt bei Aktualisierung oder Neuerstellung die vorherige Version auf.',
+    pt: 'O cofre académico estreia um Dicionário. Pode criar conceitos a partir da evidência do corpus, pesquisar e filtrar entradas, editar definições, consultar citações e relações e recuperar versões anteriores. O Nodus deteta nova evidência e conserva a versão anterior quando atualiza ou volta a gerar uma entrada.',
+    'pt-BR': 'O cofre acadêmico ganha um Dicionário. Você pode criar conceitos a partir das evidências do corpus, pesquisar e filtrar entradas, editar definições, consultar citações e relações e recuperar versões anteriores. O Nodus detecta novas evidências e preserva a versão anterior ao atualizar ou gerar novamente uma entrada.',
+  },
+  {
+    scope: 'academic',
+    es: 'Nodus entiende cada documento por niveles. Crea perfiles con secciones y resúmenes, enlaza el análisis con el texto exacto y amplía solo las fuentes que hacen falta. La indexación ocurre en segundo plano después de pedir permiso una vez y se puede pausar, reanudar, detener o reintentar desde la Biblioteca sin perder el progreso.',
+    en: 'Nodus now understands each document in layers. It builds profiles with sections and summaries, ties analysis to the exact text, and expands only the sources that matter. Indexing runs in the background after one clear consent request and can be paused, resumed, stopped, or retried from Library without losing progress.',
+    fr: 'Nodus comprend désormais chaque document par niveaux. Il crée des profils avec sections et résumés, relie l’analyse au texte exact et développe uniquement les sources utiles. L’indexation s’exécute en arrière-plan après une demande de consentement claire et peut être suspendue, reprise, arrêtée ou relancée depuis la Bibliothèque sans perdre la progression.',
+    de: 'Nodus versteht jetzt jedes Dokument in mehreren Ebenen. Es erstellt Profile mit Abschnitten und Zusammenfassungen, bindet Analysen an den genauen Text und vertieft nur relevante Quellen. Die Indizierung läuft nach einer klaren Einwilligung im Hintergrund und lässt sich in der Bibliothek ohne Fortschrittsverlust pausieren, fortsetzen, stoppen oder erneut starten.',
+    pt: 'O Nodus passa a compreender cada documento por níveis. Cria perfis com secções e resumos, liga a análise ao texto exato e aprofunda apenas as fontes necessárias. A indexação decorre em segundo plano após um pedido claro de consentimento e pode ser pausada, retomada, parada ou repetida na Biblioteca sem perder o progresso.',
+    'pt-BR': 'O Nodus agora compreende cada documento em camadas. Ele cria perfis com seções e resumos, liga a análise ao texto exato e aprofunda somente as fontes necessárias. A indexação roda em segundo plano após um pedido claro de consentimento e pode ser pausada, retomada, interrompida ou repetida na Biblioteca sem perder o progresso.',
+  },
+  {
+    scope: 'academic',
+    es: 'Deep Research v2 parte de ideas, relaciones y evidencia antes de abrir documentos completos. Deja de perseguir una longitud prefijada y termina cuando las fuentes y proposiciones ya sostienen la respuesta. Añade controles equilibrados, salida en un solo bloque y metadatos reproducibles, mientras los informes anteriores siguen abriéndose con su versión original.',
+    en: 'Deep Research v2 starts from ideas, relationships, and evidence before opening full documents. It stops chasing a preset length and finishes when the sources and propositions support the answer. It adds balanced controls, continuous single-block output, and reproducible metadata, while earlier reports still open with their original version.',
+    fr: 'Deep Research v2 part des idées, des relations et des preuves avant d’ouvrir les documents complets. Il ne poursuit plus une longueur prédéfinie et s’arrête lorsque les sources et les propositions étayent la réponse. Il ajoute des réglages équilibrés, une sortie continue en un seul bloc et des métadonnées reproductibles, tandis que les anciens rapports gardent leur version d’origine.',
+    de: 'Deep Research v2 beginnt mit Ideen, Beziehungen und Belegen, bevor vollständige Dokumente geöffnet werden. Es verfolgt keine vorgegebene Länge mehr und endet, wenn Quellen und Aussagen die Antwort tragen. Hinzu kommen ausgewogene Einstellungen, eine fortlaufende Einblock-Ausgabe und reproduzierbare Metadaten, während ältere Berichte mit ihrer ursprünglichen Version geöffnet werden.',
+    pt: 'O Deep Research v2 parte de ideias, relações e evidência antes de abrir documentos completos. Deixa de perseguir um tamanho predefinido e termina quando as fontes e proposições sustentam a resposta. Acrescenta controlos equilibrados, saída contínua num só bloco e metadados reprodutíveis, enquanto os relatórios anteriores abrem com a versão original.',
+    'pt-BR': 'O Deep Research v2 parte de ideias, relações e evidências antes de abrir documentos completos. Ele deixa de perseguir um tamanho predefinido e termina quando as fontes e proposições sustentam a resposta. Traz controles equilibrados, saída contínua em bloco único e metadados reproduzíveis, enquanto relatórios antigos abrem com sua versão original.',
+  },
+  {
+    scope: 'academic',
+    es: 'El archivo local vuelve a ser la fuente de verdad para cada obra, incluidos los adjuntos enlazados y las bibliotecas de grupo. Las citas abren el adjunto y la página que realmente contienen la evidencia. Un texto truncado se divide y reintenta, un reescaneo sobrevive al reinicio y un fallo conserva el análisis anterior en vez de ocultarlo.',
+    en: 'The local file is once again the source of truth for each work, including linked attachments and group libraries. Citations open the attachment and page that actually contain the evidence. Truncated text splits and retries, a queued rescan survives a restart, and a failure preserves the previous analysis instead of hiding it.',
+    fr: 'Le fichier local redevient la source de vérité pour chaque œuvre, y compris les pièces jointes liées et les bibliothèques de groupe. Les citations ouvrent la pièce jointe et la page qui contiennent réellement la preuve. Un texte tronqué est divisé puis relancé, une nouvelle analyse en attente survit au redémarrage et un échec conserve l’analyse précédente.',
+    de: 'Die lokale Datei ist wieder die maßgebliche Quelle für jedes Werk, einschließlich verknüpfter Anhänge und Gruppenbibliotheken. Zitate öffnen den Anhang und die Seite mit dem tatsächlichen Beleg. Abgeschnittener Text wird geteilt und erneut verarbeitet, ein geplanter Scan übersteht den Neustart und ein Fehler bewahrt die vorherige Analyse auf.',
+    pt: 'O ficheiro local volta a ser a fonte de verdade de cada obra, incluindo anexos ligados e bibliotecas de grupo. As citações abrem o anexo e a página que contêm realmente a evidência. Um texto truncado é dividido e repetido, uma nova análise em fila sobrevive ao reinício e uma falha conserva a análise anterior.',
+    'pt-BR': 'O arquivo local volta a ser a fonte de verdade de cada obra, incluindo anexos vinculados e bibliotecas de grupo. As citações abrem o anexo e a página que realmente contêm a evidência. Um texto truncado é dividido e repetido, uma nova análise na fila sobrevive à reinicialização e uma falha preserva a análise anterior.',
+  },
+  {
+    scope: 'browser',
+    es: 'Nodus Browser ya controla reproductores personalizados y audio web cuando una página no ofrece un elemento multimedia normal. Pausa y Reanudar siguen al reproductor activo sin accionar botones ambiguos. También corregimos el tema del permiso de análisis, el desbordamiento de acciones en Zotero y la alineación de los marcadores de tipo de idea.',
+    en: 'Nodus Browser can now control custom players and web audio when a page exposes no standard media element. Pause and Resume follow the active player without pressing ambiguous controls. We also fixed the analysis-consent theme, overflowing actions in Zotero, and the vertical alignment of idea type markers.',
+    fr: 'Nodus Browser peut désormais contrôler les lecteurs personnalisés et l’audio web lorsqu’une page ne présente aucun élément multimédia standard. Pause et Reprendre suivent le lecteur actif sans actionner de commande ambiguë. Nous avons aussi corrigé le thème du consentement à l’analyse, les actions qui débordaient dans Zotero et l’alignement des marqueurs de type d’idée.',
+    de: 'Nodus Browser kann jetzt eigene Player und Web-Audio steuern, wenn eine Seite kein normales Medienelement anbietet. Pause und Fortsetzen folgen dem aktiven Player, ohne mehrdeutige Bedienelemente auszulösen. Außerdem wurden das Design der Analyse-Einwilligung, überlaufende Aktionen in Zotero und die Ausrichtung der Ideentyp-Markierungen korrigiert.',
+    pt: 'O Nodus Browser passa a controlar leitores personalizados e áudio web quando uma página não apresenta um elemento multimédia normal. Pausar e Retomar seguem o leitor ativo sem acionar controlos ambíguos. Corrigimos também o tema do consentimento de análise, as ações que transbordavam no Zotero e o alinhamento dos marcadores de tipo de ideia.',
+    'pt-BR': 'O Nodus Browser agora controla players personalizados e áudio da web quando uma página não apresenta um elemento de mídia normal. Pausar e Retomar seguem o player ativo sem acionar controles ambíguos. Também corrigimos o tema do consentimento de análise, as ações que transbordavam no Zotero e o alinhamento dos marcadores de tipo de ideia.',
+  },
+  {
+    scope: 'general',
+    es: 'Una carpeta de recuperación en iCloud, OneDrive o cualquier proveedor lento ya no puede bloquear el arranque. Nodus consulta un índice pequeño con un plazo estricto y continúa si el proveedor no responde. Las inspecciones manuales también tienen límite, y la pantalla de protección muestra el logotipo de Nodus con el color del vault mientras termina.',
+    en: 'A recovery folder in iCloud, OneDrive, or any slow provider can no longer block startup. Nodus checks a small index under a strict deadline and continues if the provider does not answer. Manual inspections are bounded too, and the protection screen shows the Nodus mark in the vault colour while it finishes.',
+    fr: 'Un dossier de récupération dans iCloud, OneDrive ou tout fournisseur lent ne peut plus bloquer le démarrage. Nodus consulte un petit index avec un délai strict et continue si le fournisseur ne répond pas. Les inspections manuelles sont également limitées, et l’écran de protection affiche le logo Nodus dans la couleur du coffre pendant la vérification.',
+    de: 'Ein Wiederherstellungsordner in iCloud, OneDrive oder bei einem langsamen Anbieter kann den Start nicht mehr blockieren. Nodus prüft einen kleinen Index mit fester Frist und fährt fort, wenn der Anbieter nicht antwortet. Auch manuelle Prüfungen sind begrenzt, und der Schutzbildschirm zeigt währenddessen das Nodus-Zeichen in der Tresorfarbe.',
+    pt: 'Uma pasta de recuperação no iCloud, OneDrive ou noutro fornecedor lento já não pode bloquear o arranque. O Nodus consulta um pequeno índice com um prazo estrito e continua se o fornecedor não responder. As inspeções manuais também têm limite, e o ecrã de proteção mostra o símbolo do Nodus na cor do cofre enquanto termina.',
+    'pt-BR': 'Uma pasta de recuperação no iCloud, OneDrive ou em qualquer provedor lento não pode mais bloquear a inicialização. O Nodus consulta um índice pequeno com prazo rígido e continua se o provedor não responder. As inspeções manuais também têm limite, e a tela de proteção mostra a marca do Nodus na cor do cofre enquanto termina.',
+  },
+  {
+    scope: 'general',
+    es: 'Las acciones enviadas desde una bóveda conectada llegan también cuando usas el Nodus Server clásico. El escritorio puede reclamarlas y procesarlas con el mismo contrato seguro de Cloudflare, incluido regenerar la síntesis de un autor, y el servidor las conserva hasta que el equipo confirma su resultado.',
+    en: 'Actions sent from a connected vault now arrive when you use the classic Nodus Server too. Desktop can claim and process them with the same safe contract used by Cloudflare, including regenerating an author synthesis, and the server keeps them until the computer confirms the result.',
+    fr: 'Les actions envoyées depuis un coffre connecté arrivent désormais aussi avec le Nodus Server classique. L’application de bureau peut les réclamer et les traiter avec le même contrat sûr que Cloudflare, y compris régénérer la synthèse d’un auteur, et le serveur les conserve jusqu’à la confirmation du résultat par l’ordinateur.',
+    de: 'Aktionen aus einem verbundenen Tresor kommen jetzt auch mit dem klassischen Nodus Server an. Die Desktop-App kann sie mit demselben sicheren Vertrag wie bei Cloudflare übernehmen und verarbeiten, einschließlich der Neuerstellung einer Autorenzusammenfassung. Der Server bewahrt sie auf, bis der Computer das Ergebnis bestätigt.',
+    pt: 'As ações enviadas a partir de um cofre ligado passam a chegar também com o Nodus Server clássico. O ambiente de trabalho pode reclamá-las e processá-las com o mesmo contrato seguro da Cloudflare, incluindo voltar a gerar a síntese de um autor, e o servidor conserva-as até o computador confirmar o resultado.',
+    'pt-BR': 'As ações enviadas por um cofre conectado agora chegam também com o Nodus Server clássico. O aplicativo de desktop pode assumi-las e processá-las com o mesmo contrato seguro do Cloudflare, incluindo gerar novamente a síntese de um autor, e o servidor as guarda até o computador confirmar o resultado.',
+  },
+  {
+    scope: 'general',
+    es: 'La documentación pública se ha puesto al día con la interfaz actual. El README y la guía de inicio usan capturas nuevas de los vaults de demostración en inglés, explican la navegación vigente y muestran accesos más claros a la descarga, la documentación y la licencia.',
+    en: 'The public documentation now matches the current interface. The README and getting-started guide use new captures of the English demo vaults, explain the current navigation, and provide clearer paths to downloads, documentation, and the license.',
+    fr: 'La documentation publique correspond désormais à l’interface actuelle. Le README et le guide de démarrage utilisent de nouvelles captures des coffres de démonstration en anglais, expliquent la navigation en vigueur et proposent des accès plus clairs aux téléchargements, à la documentation et à la licence.',
+    de: 'Die öffentliche Dokumentation entspricht jetzt der aktuellen Oberfläche. README und Einstiegshilfe verwenden neue Aufnahmen der englischen Demo-Tresore, erklären die heutige Navigation und bieten klarere Wege zu Downloads, Dokumentation und Lizenz.',
+    pt: 'A documentação pública passa a corresponder à interface atual. O README e o guia de iniciação usam novas capturas dos cofres de demonstração em inglês, explicam a navegação vigente e oferecem caminhos mais claros para as transferências, a documentação e a licença.',
+    'pt-BR': 'A documentação pública agora corresponde à interface atual. O README e o guia de primeiros passos usam novas capturas dos cofres de demonstração em inglês, explicam a navegação vigente e oferecem caminhos mais claros para downloads, documentação e licença.',
+  },
+];
+
 const RAW_RELEASE_NOTES: RawReleaseNote[] = [
+  {
+    version: '5.0.0',
+    date: '2026-08-25',
+    highlights: RELEASE_5_0_0_HIGHLIGHTS,
+  },
   {
     version: '4.2.5',
     date: '2026-08-23',

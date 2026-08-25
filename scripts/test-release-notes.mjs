@@ -25,12 +25,29 @@ try {
 
   const { RELEASE_NOTES, releaseNotesForMajor, compareVersions } = await import(pathToFileURL(bundlePath).href);
   const currentRelease = RELEASE_NOTES[0];
-  assert.equal(currentRelease?.version, '4.2.5');
-  assert.equal(currentRelease?.date, '2026-08-23');
-  assert.equal(currentRelease?.highlights.length, 1);
-  assert.deepEqual(currentRelease?.highlights.map((highlight) => highlight.scope), ['general']);
-  assert.match(currentRelease?.highlights[0]?.en ?? '', /stops installing itself twice on macOS/);
-  assert.match(currentRelease?.highlights[0]?.en ?? '', /two Nodus icons in the Dock/);
+  assert.equal(currentRelease?.version, '5.0.0');
+  assert.equal(currentRelease?.date, '2026-08-25');
+  assert.equal(currentRelease?.highlights.length, 8);
+  assert.deepEqual(currentRelease?.highlights.map((highlight) => highlight.scope), [
+    'academic', 'academic', 'academic', 'academic', 'browser', 'general', 'general', 'general',
+  ]);
+  for (const phrase of [
+    /gains a Dictionary/,
+    /understands each document in layers/,
+    /Deep Research v2/,
+    /local file is once again the source of truth/,
+    /control custom players and web audio/,
+    /can no longer block startup/,
+    /classic Nodus Server/,
+    /public documentation now matches/,
+  ]) assert.ok(currentRelease?.highlights.some((highlight) => phrase.test(highlight.en)));
+
+  // 4.2.5 keeps the highlight it shipped with. It remains available in history.
+  const updaterCleanupRelease = RELEASE_NOTES.find((note) => note.version === '4.2.5');
+  assert.equal(updaterCleanupRelease?.date, '2026-08-23');
+  assert.equal(updaterCleanupRelease?.highlights.length, 1);
+  assert.match(updaterCleanupRelease?.highlights[0]?.en ?? '', /stops installing itself twice on macOS/);
+  assert.match(updaterCleanupRelease?.highlights[0]?.en ?? '', /two Nodus icons in the Dock/);
 
   // 4.2.4 keeps the four highlights it shipped with. They are published history.
   const browserFixesRelease = RELEASE_NOTES.find((note) => note.version === '4.2.4');

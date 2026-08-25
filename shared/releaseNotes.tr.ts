@@ -95,6 +95,16 @@ const RELEASE_3_2_4_TR: string[] = [
 ];
 
 export const RELEASE_NOTES_TR: Record<string, string[]> = {
+  "5.0.0": [
+    "Akademik kasa artık bir Sözlük içeriyor. Külliyat kanıtlarından kavramlar oluşturabilir, girdileri arayıp süzebilir, tanımları düzenleyebilir, alıntı ve ilişkileri inceleyebilir ve eski sürümleri geri getirebilirsiniz. Nodus yeni kanıtları algılar ve bir girdiyi güncellerken ya da yeniden üretirken önceki sürümü korur.",
+    "Nodus artık her belgeyi katmanlar hâlinde anlıyor. Bölümler ve özetler içeren profiller oluşturuyor, analizi tam metne bağlıyor ve yalnızca gerekli kaynakları derinleştiriyor. İndeksleme bir defalık açık izin sonrasında arka planda çalışıyor ve ilerleme kaybolmadan Kitaplık üzerinden duraklatılabiliyor, sürdürülebiliyor, durdurulabiliyor veya yeniden denenebiliyor.",
+    "Deep Research v2 tam belgeleri açmadan önce fikirlerden, ilişkilerden ve kanıtlardan başlıyor. Önceden belirlenmiş bir uzunluğun peşinden gitmiyor ve kaynaklarla önermeler yanıtı desteklediğinde bitiriyor. Dengeli denetimler, kesintisiz tek blok çıktı ve yeniden üretilebilir üstveri ekliyor, eski raporlar ise özgün sürümleriyle açılmaya devam ediyor.",
+    "Bağlı ekler ve grup kitaplıkları dahil her eser için yerel dosya yeniden temel kaynak oluyor. Alıntılar kanıtı gerçekten içeren eki ve sayfayı açıyor. Kesilmiş metin bölünüp yeniden deneniyor, sıradaki tarama yeniden başlatmadan sonra sürüyor ve bir hata önceki analizi gizlemek yerine koruyor.",
+    "Bir sayfa standart medya öğesi göstermediğinde Nodus Browser artık özel oynatıcıları ve web sesini denetleyebiliyor. Duraklat ve Sürdür, belirsiz düğmelere basmadan etkin oynatıcıyı izliyor. Ayrıca analiz izni temasını, Zotero'da taşan eylemleri ve fikir türü işaretlerinin dikey hizasını düzelttik.",
+    "iCloud, OneDrive veya başka bir yavaş sağlayıcıdaki kurtarma klasörü artık başlangıcı engelleyemiyor. Nodus küçük bir dizini kesin süre sınırıyla denetliyor ve sağlayıcı yanıt vermezse devam ediyor. Elle yapılan incelemeler de sınırlı, koruma ekranı tamamlanana kadar kasa renginde Nodus simgesini gösteriyor.",
+    "Bağlı bir kasadan gönderilen eylemler artık klasik Nodus Server kullanıldığında da geliyor. Masaüstü, bir yazar sentezini yeniden üretmek dahil bu eylemleri Cloudflare ile aynı güvenli sözleşmeyle alıp işleyebiliyor ve sunucu bilgisayar sonucu doğrulayana kadar onları saklıyor.",
+    "Genel belgeler artık güncel arayüzle eşleşiyor. README ve başlangıç kılavuzu İngilizce demo kasalarının yeni görüntülerini kullanıyor, geçerli gezinmeyi açıklıyor ve indirmelere, belgelere ve lisansa daha açık yollar sunuyor.",
+  ],
   "4.2.5": [
     "Nodus artık macOS'ta kendini iki kez kurmuyor. Her güncelleme bir önceki sürümü kenara koyuyor ve orada temelli bırakıyordu, macOS da onu ayrı bir uygulama olarak görmeye devam ediyordu. Dock'taki iki Nodus simgesi buradan geliyordu. Bu sürümü açtığınızda o kopya kendiliğinden siliniyor ve neredeyse 2 GB disk alanı geri geliyor.",
   ],

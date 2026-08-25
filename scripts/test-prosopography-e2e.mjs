@@ -96,6 +96,14 @@ try {
   await page.reload();
   await page.getByTestId('prosopography-home').waitFor();
   await page.getByTestId('prosopography-sidebar').waitFor();
+  // A renderer reload can preserve the already-mounted release modal while its
+  // localStorage sentinel is being advanced. Follow the real startup sequence
+  // instead of waiting behind it forever when a new release note has just landed.
+  const whatsNewModal = page.getByTestId('whats-new-cinematic-modal');
+  if (await whatsNewModal.isVisible()) {
+    await whatsNewModal.getByRole('button', { name: 'Cerrar', exact: true }).click();
+    await whatsNewModal.waitFor({ state: 'detached' });
+  }
   const startupUpdateModal = page.getByTestId('startup-update-modal');
   await startupUpdateModal.waitFor();
   await page.waitForFunction(() =>

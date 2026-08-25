@@ -1,5 +1,54 @@
 # Changelog
 
+## 5.0.0 — 2026-08-25
+
+Nodus 5 adds evidence-backed document understanding and a versioned academic
+Dictionary, rebuilds Deep Research around hierarchical retrieval, and hardens the path
+from a local attachment to every claim and citation. This stable release includes every
+change since 4.2.5, including the fixes merged after the first beta tag.
+
+- Added a persistent Dictionary to academic vaults with list and table browsing, search,
+  filters, sorting, editing, evidence and citation navigation, concept relations, version
+  history and incremental detection of new relevant evidence. Updates and regenerations
+  preserve the previous definition, and suggested relations still require confirmation.
+- Added hierarchical document understanding with document profiles, section summaries,
+  lexical and vector indexes, freshness tracking and evidence-first drill-down. Background
+  indexing asks for explicit one-time consent and provides durable progress with pause,
+  resume, stop, retry and crash recovery from Library and Settings.
+- Added Deep Research v2 with idea-and-relationship-first retrieval, selective expansion
+  into full documents, version routing and reproducible report metadata. Source and
+  proposition coverage now decide when research is complete instead of a requested word
+  count, and every Deep Research workflow gains balanced controls and continuous
+  single-block output while saved v1 reports remain compatible.
+- Integrated hierarchical retrieval into Research Assistant, Nodi, Immersion, Writing,
+  Study, Teaching, Genealogy, Prosopography and MCP clients, while keeping citation
+  verification fail-closed and traceable to exact evidence.
+- Made each local attachment the source of truth for extracted text, including linked
+  files and Zotero group libraries. Zotero's full-text index is now only a fallback for an
+  unavailable file and can never invent a page number. Citations retain their attachment
+  and verified page and open directly at that location.
+- Made deep scans recover safely from truncated model output by widening the budget once
+  and then splitting at page-aware boundaries. Replacing an analysis is atomic, failed
+  work keeps its previous graph and checkpoints, queued rescans survive restarts, stale
+  passages are excluded from retrieval, and text cleanup no longer glues valid words
+  together by guesswork.
+- Fixed Nodus Browser control of custom and WebAudio players. Pause and Resume track the
+  active player and avoid ambiguous page-wide controls even when a React page replaces
+  its buttons. The document-understanding consent modal now has correct light and dark
+  surfaces.
+- Fixed the Zotero selection popup so localized actions remain accessible without
+  overflowing, and vertically centered idea type markers against complete catalogue rows.
+- Prevented slow or stalled cloud recovery folders from blocking startup. Authenticated
+  snapshot metadata is read from a small sidecar index inside a disposable utility process
+  with separate startup and interactive deadlines. Startup fails open, manual inspection
+  remains bounded and the protection screen now uses the vault-coloured Nodus mark.
+- Added the typed connected-vault action contract to the classic Nodus Server. Desktop can
+  claim, process and confirm actions from classic and Cloudflare deployments through the
+  same durable flow, including author-synthesis regeneration.
+- Refreshed the README and getting-started guide with current English demo screenshots,
+  navigation, download totals, primary actions and concise licensing information.
+- Added all of these changes to the What's New modal in all eight interface languages.
+
 ## 4.2.5 — 2026-08-23
 
 - Fixed the macOS updater leaving a second Nodus behind. It moved the running bundle to `Nodus.app.previous` and never removed it, and that suffix is on the directory name only: what stayed was a complete application bundle with the same identifier, which LaunchServices registered as a second copy of Nodus. macOS then showed two Dock icons for one app, and every update kept another 1.8 GB forever. The displaced bundle is now unregistered before the relaunch and deleted after it.

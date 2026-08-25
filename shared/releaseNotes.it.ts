@@ -155,6 +155,16 @@ const RELEASE_3_2_4_IT: string[] = [
 ];
 
 export const RELEASE_NOTES_IT: Record<string, string[]> = {
+  "5.0.0": [
+    "Il vault accademico introduce un Dizionario. Puoi creare concetti dalle prove del corpus, cercare e filtrare le voci, modificare le definizioni, esaminare citazioni e relazioni e ripristinare versioni precedenti. Nodus rileva nuove prove e conserva la versione precedente quando aggiorni o rigeneri una voce.",
+    "Nodus ora comprende ogni documento a livelli. Crea profili con sezioni e riepiloghi, collega l'analisi al testo esatto e approfondisce solo le fonti rilevanti. L'indicizzazione si svolge in background dopo una chiara richiesta di consenso e può essere sospesa, ripresa, interrotta o ritentata dalla Biblioteca senza perdere i progressi.",
+    "Deep Research v2 parte da idee, relazioni e prove prima di aprire i documenti completi. Non insegue più una lunghezza prestabilita e termina quando fonti e proposizioni sostengono la risposta. Aggiunge controlli equilibrati, un'uscita continua in un solo blocco e metadati riproducibili, mentre i rapporti precedenti si aprono ancora con la loro versione originale.",
+    "Il file locale torna a essere la fonte di verità per ogni opera, compresi gli allegati collegati e le biblioteche di gruppo. Le citazioni aprono l'allegato e la pagina che contengono davvero la prova. Un testo troncato viene diviso e ritentato, una nuova scansione in coda sopravvive al riavvio e un errore conserva l'analisi precedente.",
+    "Nodus Browser ora controlla lettori personalizzati e audio web quando una pagina non espone un normale elemento multimediale. Pausa e Riprendi seguono il lettore attivo senza azionare comandi ambigui. Abbiamo anche corretto il tema del consenso all'analisi, le azioni che uscivano dal popup di Zotero e l'allineamento dei marcatori del tipo di idea.",
+    "Una cartella di recupero su iCloud, OneDrive o qualsiasi provider lento non può più bloccare l'avvio. Nodus controlla un piccolo indice entro una scadenza rigorosa e prosegue se il provider non risponde. Anche le ispezioni manuali hanno un limite, mentre la schermata di protezione mostra il simbolo Nodus nel colore del vault.",
+    "Le azioni inviate da un vault collegato ora arrivano anche quando usi il Nodus Server classico. Il desktop può acquisirle ed elaborarle con lo stesso contratto sicuro di Cloudflare, compresa la rigenerazione della sintesi di un autore, e il server le conserva finché il computer non conferma il risultato.",
+    "La documentazione pubblica ora corrisponde all'interfaccia attuale. Il README e la guida introduttiva usano nuove schermate dei vault dimostrativi in inglese, spiegano la navigazione corrente e offrono percorsi più chiari verso download, documentazione e licenza.",
+  ],
   "4.2.5": [
     "Nodus smette di installarsi due volte su macOS. Ogni aggiornamento metteva da parte la versione precedente e la lasciava lì per sempre, e macOS continuava a vederla come un'altra applicazione. Da qui venivano le due icone di Nodus nel Dock. Aprendo questa versione quella copia si cancella da sola e recuperi quasi 2 GB di disco.",
   ],

@@ -14,16 +14,16 @@ const json = async (relative) => JSON.parse(await read(relative));
 
 const AGPL_SHA256 = '0d96a4ff68ad6d4b6f1f30f713b18d5184912ba8dd389f86aa7710db079abcb0';
 const LICENSE_ID = 'AGPL-3.0-only';
-const VERSION = '4.2.5';
+const VERSION = '5.0.0';
 
-test('Nodus 4 carries the unmodified GNU AGPL v3 license text', async () => {
+test('Nodus 5 carries the unmodified GNU AGPL v3 license text', async () => {
   const license = await read('LICENSE');
   assert.equal(createHash('sha256').update(license).digest('hex'), AGPL_SHA256);
   assert.match(license, /GNU AFFERO GENERAL PUBLIC LICENSE/);
   assert.match(license, /13\. Remote Network Interaction/);
 });
 
-test('all first-party release metadata identifies 4.2.5 as AGPL-3.0-only', async () => {
+test('all first-party release metadata identifies 5.0.0 as AGPL-3.0-only', async () => {
   const [pkg, lock, serverPkg, plugin, citation] = await Promise.all([
     json('package.json'),
     json('package-lock.json'),
