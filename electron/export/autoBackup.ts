@@ -365,7 +365,7 @@ function cleanupResultFailure(message: string): BackupCleanupResult {
   };
 }
 
-function readCleanupContext(now = new Date()): CleanupContext | { error: string } {
+async function readCleanupContext(now = new Date()): Promise<CleanupContext | { error: string }> {
   const settings = getSettings();
   const cutoff = retentionCutoff(settings.backupRetentionValue, settings.backupRetentionUnit, now);
   if (!cutoff) return { error: 'La antigüedad configurada no es válida. No se ha movido ni eliminado ninguna copia.' };
@@ -374,9 +374,9 @@ function readCleanupContext(now = new Date()): CleanupContext | { error: string 
   const folder = resolveBackupOutputDir(settings.autoBackupFolder);
   let entries: fs.Dirent[];
   try {
-    const folderStat = fs.lstatSync(folder);
+    const folderStat = await fs.promises.lstat(folder);
     if (!folderStat.isDirectory()) return { error: 'La carpeta de copias configurada no es un directorio. No se ha modificado nada.' };
-    entries = fs.readdirSync(folder, { withFileTypes: true });
+    entries = await fs.promises.readdir(folder, { withFileTypes: true });
   } catch (error) {
     return { error: `No se puede leer la carpeta de copias. No se ha modificado nada: ${error instanceof Error ? error.message : String(error)}` };
   }
@@ -391,7 +391,7 @@ function readCleanupContext(now = new Date()): CleanupContext | { error: string 
     if (!parsed) continue;
     const filePath = path.join(folder, entry.name);
     try {
-      const stat = fs.lstatSync(filePath);
+      const stat = await fs.promises.lstat(filePath);
       if (!stat.isFile() || stat.isSymbolicLink()) continue;
       active.push({
         ...parsed,
@@ -411,35 +411,35 @@ function readCleanupContext(now = new Date()): CleanupContext | { error: string 
 
   const trashPath = path.join(folder, CLEANUP_TRASH_DIR);
   const trash: TrashedBackup[] = [];
-  if (fs.existsSync(trashPath)) {
-    try {
-      const trashStat = fs.lstatSync(trashPath);
-      if (!trashStat.isDirectory() || trashStat.isSymbolicLink()) {
-        return { error: 'La papelera de seguridad no es un directorio válido. No se ha modificado nada.' };
-      }
-      for (const entry of fs.readdirSync(trashPath, { withFileTypes: true })) {
-        if (!entry.isFile()) continue;
-        const match = TRASHED_BACKUP_RE.exec(entry.name);
-        if (!match) continue;
-        const [, originalFile, trashedAtRaw] = match;
-        if (!parseBackupFile(hostname, originalFile)) continue;
-        const trashedAt = Number(trashedAtRaw);
-        if (!Number.isSafeInteger(trashedAt) || trashedAt <= 0) continue;
-        const filePath = path.join(trashPath, entry.name);
-        const stat = fs.lstatSync(filePath);
-        if (!stat.isFile() || stat.isSymbolicLink()) continue;
-        trash.push({
-          path: filePath,
-          file: entry.name,
-          originalFile,
-          trashedAt,
-          bytes: stat.size,
-          modifiedAt: stat.mtimeMs,
-          device: stat.dev,
-          inode: stat.ino,
-        });
-      }
-    } catch (error) {
+  try {
+    const trashStat = await fs.promises.lstat(trashPath);
+    if (!trashStat.isDirectory() || trashStat.isSymbolicLink()) {
+      return { error: 'La papelera de seguridad no es un directorio válido. No se ha modificado nada.' };
+    }
+    for (const entry of await fs.promises.readdir(trashPath, { withFileTypes: true })) {
+      if (!entry.isFile()) continue;
+      const match = TRASHED_BACKUP_RE.exec(entry.name);
+      if (!match) continue;
+      const [, originalFile, trashedAtRaw] = match;
+      if (!parseBackupFile(hostname, originalFile)) continue;
+      const trashedAt = Number(trashedAtRaw);
+      if (!Number.isSafeInteger(trashedAt) || trashedAt <= 0) continue;
+      const filePath = path.join(trashPath, entry.name);
+      const stat = await fs.promises.lstat(filePath);
+      if (!stat.isFile() || stat.isSymbolicLink()) continue;
+      trash.push({
+        path: filePath,
+        file: entry.name,
+        originalFile,
+        trashedAt,
+        bytes: stat.size,
+        modifiedAt: stat.mtimeMs,
+        device: stat.dev,
+        inode: stat.ino,
+      });
+    }
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
       return { error: `No se puede inspeccionar la papelera de seguridad. No se ha modificado nada: ${error instanceof Error ? error.message : String(error)}` };
     }
   }
@@ -448,9 +448,10 @@ function readCleanupContext(now = new Date()): CleanupContext | { error: string 
 }
 
 /** Read-only and deliberately password-free: Settings can show the exact scope before
- * the user opts into a destructive policy. */
-export function previewBackupCleanup(now = new Date()): BackupCleanupPreview {
-  const context = readCleanupContext(now);
+ * the user opts into a destructive policy. File Provider calls use asynchronous fs so
+ * an iCloud/Dropbox placeholder cannot stop Electron's main event loop. */
+export async function previewBackupCleanup(now = new Date()): Promise<BackupCleanupPreview> {
+  const context = await readCleanupContext(now);
   if ('error' in context) return cleanupPreviewFailure(context.error);
   return cleanupPreviewFromContext(context, now);
 }
@@ -484,7 +485,7 @@ function cleanupPreviewFromContext(context: CleanupContext, now: Date): BackupCl
 }
 
 async function executeBackupCleanup(now: Date, expectedScopeToken?: string): Promise<BackupCleanupResult> {
-  const context = readCleanupContext(now);
+  const context = await readCleanupContext(now);
   if ('error' in context) return cleanupResultFailure(context.error);
   const preview = cleanupPreviewFromContext(context, now);
   if (expectedScopeToken && preview.scopeToken !== expectedScopeToken) {

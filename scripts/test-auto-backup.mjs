@@ -313,7 +313,7 @@ try {
     lastBackupCleanupAt: null,
     lastBackupCleanupStatus: null,
   });
-  const cleanupPreview = autoBackup.previewBackupCleanup(cleanupNow);
+  const cleanupPreview = await autoBackup.previewBackupCleanup(cleanupNow);
   assert.equal(cleanupPreview.ok, true, cleanupPreview.message);
   assert.equal(cleanupPreview.protectedCount, 3, 'the three newest regular backups are unconditionally protected');
   assert.equal(cleanupPreview.candidateCount, 3, 'only old files beyond the protected floor are candidates');
@@ -334,7 +334,7 @@ try {
   assert.equal(existsSync(path.join(backupDir, '.nodus-cleanup-trash')), false, 'a stale confirmation moves and deletes nothing');
   await rm(path.join(backupDir, appearedAfterPreview));
 
-  const refreshedPreview = autoBackup.previewBackupCleanup(cleanupNow);
+  const refreshedPreview = await autoBackup.previewBackupCleanup(cleanupNow);
   const cleaned = await autoBackup.runBackupCleanupNow(cleanupNow, refreshedPreview.scopeToken);
   assert.equal(cleaned.ok, true, cleaned.message);
   assert.equal(cleaned.quarantinedCount, 3, 'eligible files move to quarantine first');
