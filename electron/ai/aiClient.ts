@@ -36,6 +36,7 @@ import { completeWithChatGptSubscription } from './codexSubscription';
 import { completeWithGitHubCopilotSubscription } from './githubCopilotSubscription';
 import { completeWithOpenCodeGo, OUTPUT_TRUNCATED_MARKER } from './openCodeGoCompletion';
 import { recordOpenCodeGoUsage } from './openCodeGoUsage';
+import { AI_MODEL_REQUIRED_ERROR_CODE } from '@shared/aiModelRequired';
 
 export class AiError extends Error {
   /**
@@ -47,7 +48,7 @@ export class AiError extends Error {
     message: string,
     public retriable = false,
     public config = false,
-    public code: 'output_truncated' | null = null,
+    public code: 'output_truncated' | typeof AI_MODEL_REQUIRED_ERROR_CODE | null = null,
   ) {
     super(message);
   }
@@ -286,7 +287,7 @@ function resolveModel(override?: ModelRef | null): ModelRef {
   if (override?.provider && override.model) return override;
   const def = getSettings().synthesisModel;
   if (!def?.provider || !def.model) {
-    throw new AiError('No hay un modelo de IA configurado. Elige uno en Ajustes.', false, true);
+    throw new AiError('No hay un modelo de IA configurado. Elige uno en Ajustes.', false, true, AI_MODEL_REQUIRED_ERROR_CODE);
   }
   return def;
 }

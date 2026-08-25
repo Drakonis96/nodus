@@ -42,9 +42,11 @@ import { DEEP_RESEARCH_VERSION_TRANSLATIONS } from './i18n.deepResearchVersions'
 import { DOCUMENT_UNDERSTANDING_TRANSLATIONS } from './i18n.documentUnderstanding';
 import { DEEP_RESEARCH_QUALITY_TRANSLATIONS } from './i18n.deepResearchQuality';
 import { DOCUMENT_UNDERSTANDING_CONSENT_TRANSLATIONS } from './i18n.documentUnderstandingConsent';
+import { MODEL_SETTINGS_TRANSLATIONS } from './i18n.modelSettings';
 
 /** Complete static Turkish interface table; coverage prohibits runtime fallbacks. */
 export const TR: Record<string, string> = {
+  ...MODEL_SETTINGS_TRANSLATIONS.tr,
   ...DICTIONARY_TRANSLATIONS.tr,
   'Tamaño de Nodi': 'Nodi boyutu',
   'El 100 % conserva el tamaño original de Nodi y es el máximo. Puedes reducirlo hasta el 40 %.': "%100, Nodi'nin özgün boyutunu korur ve en büyük boyuttur. Boyutu %40'a kadar küçültebilirsiniz.",

@@ -43,6 +43,7 @@ import { TutorialVideosUpdateTour } from './components/TutorialVideosGuide';
 import { PlatformHighlightsUpdateTour } from './components/PlatformHighlightsGuide';
 import { ToolkitBetaUpdateTour } from './components/ToolkitBetaGuide';
 import { StartupUpdateModal } from './components/StartupUpdateModal';
+import { AiModelRequiredModal } from './components/AiModelRequiredModal';
 import {
   DocumentUnderstandingConsentModal,
   hasSeenDocumentUnderstandingConsent,
@@ -175,6 +176,7 @@ export function App() {
   const [backupWarningDismissed, setBackupWarningDismissed] = useState(false);
   const [whatsNewSettled, setWhatsNewSettled] = useState(() => !hasPendingWhatsNew());
   const [manualWhatsNewOpen, setManualWhatsNewOpen] = useState(false);
+  const [aiModelRequiredOpen, setAiModelRequiredOpen] = useState(false);
   // The mobile app does not exist in this build, so there is no tutorial chapter that
   // could have covered it: every 3.2.4 user gets the teaser once, new install or not.
   const [mobileTeaserSettled, setMobileTeaserSettled] = useState(false);
@@ -231,6 +233,7 @@ export function App() {
     setViewRaw(next);
   }, []);
   useBrowserNativeOverlayGuard(view === 'browser');
+  useEffect(() => window.nodus.onAiModelRequired(() => setAiModelRequiredOpen(true)), []);
   // Página activa dentro de Herramientas. Vive aquí (y no en ToolkitView) porque
   // el sidebar navega directamente a una herramienta, y porque así salir de la
   // sección y volver no pierde el sitio aunque la vista se desmonte.
@@ -1118,7 +1121,7 @@ export function App() {
   const openAssistant = useCallback(
     (target?: PendingAssistantNavigationTarget) => {
       if (!(settings?.chatModel ?? settings?.synthesisModel)) {
-        setView('settings');
+        setAiModelRequiredOpen(true);
         return;
       }
       if (isWorldbuilding) {
@@ -2018,6 +2021,17 @@ export function App() {
             onSettled={() => setWhatsNewSettled(true)}
           />
         )}
+
+      {aiModelRequiredOpen && (
+        <AiModelRequiredModal
+          onClose={() => setAiModelRequiredOpen(false)}
+          onOpenSettings={() => {
+            localStorage.setItem('nodus.settingsTarget', 'models');
+            setAiModelRequiredOpen(false);
+            setView('settings');
+          }}
+        />
+      )}
 
       {!isPreviewVault && recoveryStatus?.needsSetup && recoveryStatus.previousInstallation && !whatsNewSettled && (
         <WhatsNewModal

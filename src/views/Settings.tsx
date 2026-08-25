@@ -171,10 +171,16 @@ export function Settings({
   const serverTabRequested = settingsTabRequested('server', settingsTab, settingsQuery);
 
   useEffect(() => {
-    if (localStorage.getItem('nodus.settingsTarget') !== 'nodi') return;
+    const target = localStorage.getItem('nodus.settingsTarget');
+    if (target !== 'nodi' && target !== 'models') return;
     localStorage.removeItem('nodus.settingsTarget');
-    setSettingsTab('interface');
-    setSettingsQuery('Nodi');
+    if (target === 'models') {
+      setSettingsTab('models');
+      setSettingsQuery('');
+    } else {
+      setSettingsTab('interface');
+      setSettingsQuery('Nodi');
+    }
   }, []);
 
   useEffect(() => {
@@ -2956,7 +2962,10 @@ export function Settings({
               <ExtractionCapabilityNotice model={settings.synthesisModel} />
               <SubscriptionQuotaNotice model={settings.synthesisModel} />
             </>}
-            <Row label={t('Modelo de embeddings (similitud semántica multilingüe)')}>
+            <Row
+              label={t('Modelo de embeddings (similitud semántica multilingüe)')}
+              hint={t('Representa el significado del texto para la búsqueda semántica y la recuperación por similitud.')}
+            >
               <EmbeddingModelControl
                 settings={settings}
                 onEmbeddingChange={(provider, model) => setPendingEmbeddingChange({ provider, model })}
@@ -2982,12 +2991,12 @@ export function Settings({
                 <h3 className="mb-3 text-xs font-semibold uppercase tracking-wide text-neutral-500">{t('Ajustes avanzados comunes')}</h3>
                 {/* The four selectors below drive the scan pipeline: one run covers a
                     whole corpus, so a subscription plan's quota is the real limit. */}
-                <Row label={t('Extracción de temas, ideas y evidencias')}><ModelWithReasoning allowEmpty={false} settings={settings} value={settings.extractionModel} onChange={(extractionModel) => void patch({ extractionModel })} emptyLabel="Seleccionar modelo" requireExtraction /></Row>
+                <Row label={t('Extracción de temas, ideas y evidencias')} hint={t('Extrae temas, ideas, evidencias y relaciones cuando Nodus analiza el corpus.')}><ModelWithReasoning allowEmpty={false} settings={settings} value={settings.extractionModel} onChange={(extractionModel) => void patch({ extractionModel })} emptyLabel="Seleccionar modelo" requireExtraction /></Row>
                 <ExtractionCapabilityNotice model={settings.extractionModel} />
                 <SubscriptionQuotaNotice model={settings.extractionModel} />
-                <Row label={t('Visión y OCR de imágenes')}><ModelWithReasoning allowEmpty={false} settings={settings} value={settings.visionModel} onChange={(visionModel) => void patch({ visionModel })} emptyLabel="Seleccionar modelo" /></Row>
+                <Row label={t('Visión y OCR de imágenes')} hint={t('Interpreta imágenes y páginas escaneadas y obtiene su texto cuando hace falta.')}><ModelWithReasoning allowEmpty={false} settings={settings} value={settings.visionModel} onChange={(visionModel) => void patch({ visionModel })} emptyLabel="Seleccionar modelo" /></Row>
                 <SubscriptionQuotaNotice model={settings.visionModel} />
-                <Row label={t('Resúmenes de obras')}><ModelWithReasoning allowEmpty={false} settings={settings} value={settings.summaryModel} onChange={(summaryModel) => void patch({ summaryModel })} emptyLabel="Seleccionar modelo" /></Row>
+                <Row label={t('Resúmenes de obras')} hint={t('Redacta resúmenes breves de cada obra para orientar la navegación y la recuperación.')}><ModelWithReasoning allowEmpty={false} settings={settings} value={settings.summaryModel} onChange={(summaryModel) => void patch({ summaryModel })} emptyLabel="Seleccionar modelo" /></Row>
                 <SubscriptionQuotaNotice model={settings.summaryModel} />
                 {activeVault?.type === 'academic' && <>
                   <Row label={t('Comprensión de documentos completos')} hint={t('Analiza todas las secciones y sintetiza la arquitectura global de cada obra.')}><ModelWithReasoning settings={settings} value={settings.documentProfileModel} onChange={(documentProfileModel) => void patch({ documentProfileModel })} emptyLabel="Usar modelo de resúmenes" requireExtraction /></Row>
@@ -2996,10 +3005,10 @@ export function Settings({
                   <Row label={t('Auditor de fichas documentales')} hint={t('Revisa soporte, cobertura y fidelidad antes de publicar una versión nueva.')}><ModelWithReasoning settings={settings} value={settings.documentAuditModel} onChange={(documentAuditModel) => void patch({ documentAuditModel })} emptyLabel="Usar modelo de comprensión documental" requireExtraction /></Row>
                   <SubscriptionQuotaNotice model={settings.documentAuditModel ?? settings.documentProfileModel ?? settings.summaryModel} />
                 </>}
-                <Row label={t('Fusión y deduplicación')}><ModelWithReasoning allowEmpty={false} settings={settings} value={settings.fusionModel} onChange={(fusionModel) => void patch({ fusionModel })} emptyLabel="Seleccionar modelo" requireExtraction /></Row>
+                <Row label={t('Fusión y deduplicación')} hint={t('Combina resultados equivalentes y elimina duplicados sin perder su evidencia.')}><ModelWithReasoning allowEmpty={false} settings={settings} value={settings.fusionModel} onChange={(fusionModel) => void patch({ fusionModel })} emptyLabel="Seleccionar modelo" requireExtraction /></Row>
                 <ExtractionCapabilityNotice model={settings.fusionModel} />
                 <SubscriptionQuotaNotice model={settings.fusionModel} />
-                <Row label={t('Asistente Nodi')}><ModelWithReasoning allowEmpty={false} settings={settings} value={settings.nodiModel} onChange={(nodiModel) => void patch({ nodiModel })} emptyLabel="Seleccionar modelo" /></Row>
+                <Row label={t('Asistente Nodi')} hint={t('Responde en el asistente Nodi y usa el contexto de la vista cuando lo autorizas.')}><ModelWithReasoning allowEmpty={false} settings={settings} value={settings.nodiModel} onChange={(nodiModel) => void patch({ nodiModel })} emptyLabel="Seleccionar modelo" /></Row>
               </div>
               <VaultModelOverrides settings={settings} vaultType={activeVault?.type ?? 'academic'} vaultName={activeVault?.name ?? t('Vault actual')} patch={patch} />
             </>}
@@ -3041,7 +3050,7 @@ export function Settings({
                 </Row>
               </div>
             )}
-            <Row label={t('Indexación de embeddings')}>
+            <Row label={t('Indexación de embeddings')} hint={t('Genera los vectores pendientes para que la búsqueda semántica use el modelo actual.')}>
               <div className="flex gap-2">
                 <button
                   className="btn btn-ghost border border-cyan-800 text-cyan-300"
@@ -3071,7 +3080,7 @@ export function Settings({
                 </button>}
               </div>
             </Row>
-            <Row label={t('Llamadas simultáneas')}>
+            <Row label={t('Llamadas simultáneas')} hint={t('Limita cuántas solicitudes de IA pueden ejecutarse al mismo tiempo.')}>
               <input
                 type="number"
                 min={1}
@@ -3114,10 +3123,10 @@ export function Settings({
                 onChange={(e) => patch({ openRouterThroughput: e.target.checked })}
               />
             </Row>
-            <Row label={t('Email Unpaywall (fallback de texto)')}>
+            <Row label={t('Email Unpaywall (fallback de texto)')} hint={t('Se usa para recuperar texto académico cuando el documento no está disponible por otras vías.')}>
               <input className="input" value={settings.unpaywallEmail} onChange={(e) => patch({ unpaywallEmail: e.target.value })} />
             </Row>
-            <Row label={t('Modo de contexto deep scan')}>
+            <Row label={t('Modo de contexto deep scan')} hint={t('Elige cuánto texto conserva cada análisis profundo antes de dividirlo.')}>
               <select
                 className="input"
                 value={settings.deepContextMode}
@@ -3127,7 +3136,7 @@ export function Settings({
                 <option value="long">{t('Contexto largo')}</option>
               </select>
             </Row>
-            <Row label={t('Palabras por fragmento')}>
+            <Row label={t('Palabras por fragmento')} hint={t('Define el tamaño de cada fragmento según el modo de contexto seleccionado.')}>
               <input
                 type="number"
                 min={settings.deepContextMode === 'long' ? 5000 : 500}
@@ -3726,6 +3735,19 @@ const VAULT_MODEL_FIELDS: Record<VaultModelKey, string> = {
   hypothesisModel: 'Laboratorio de hipótesis',
 };
 
+const VAULT_MODEL_HINTS: Record<VaultModelKey, string> = {
+  chatModel: 'Responde preguntas sobre el corpus y cita la evidencia utilizada.',
+  deepResearchModel: 'Planifica y redacta informes extensos a partir de fuentes y relaciones.',
+  immersionModel: 'Genera sesiones guiadas de lectura y trabajo con las fuentes.',
+  writingModel: 'Revisa, amplía y transforma borradores en el Taller de escritura.',
+  argumentMapModel: 'Construye mapas de tesis, razones, objeciones y evidencias.',
+  authorModel: 'Sintetiza perfiles de autor y redacta biografías basadas en el corpus.',
+  dictionaryModel: 'Genera y actualiza definiciones del Diccionario desde la evidencia.',
+  studyModel: 'Prepara guías y materiales de repaso a partir del contenido del vault.',
+  tutorModel: 'Adapta explicaciones, preguntas y rutas de aprendizaje en el Tutor.',
+  hypothesisModel: 'Propone, contrasta y desarrolla hipótesis de investigación.',
+};
+
 function vaultModelKeys(type: VaultType): VaultModelKey[] {
   if (type === 'genealogy') return ['chatModel', 'deepResearchModel', 'authorModel'];
   if (type === 'databases') return ['chatModel'];
@@ -3744,7 +3766,7 @@ function VaultModelOverrides({ settings, vaultType, vaultName, patch }: {
     <h3 className="text-xs font-semibold uppercase tracking-wide text-neutral-500">{tx('Ajustes avanzados del vault {vault}', { vault: vaultName })}</h3>
     <p className="mb-3 mt-1 text-xs text-neutral-600">{t('Estos cambios no modifican los demás vaults.')}</p>
     {vaultType === 'estudio' ? <StudyVaultModelOverrides settings={settings} patch={patch} /> : <div className="space-y-3">
-      {keys.map((key) => <Row key={key} label={t(VAULT_MODEL_FIELDS[key])}>
+      {keys.map((key) => <Row key={key} label={t(VAULT_MODEL_FIELDS[key])} hint={t(VAULT_MODEL_HINTS[key])}>
         <ModelWithReasoning allowEmpty={false} settings={settings} value={settings[key] ?? null} onChange={(model) => void patch({ [key]: model })} emptyLabel="Seleccionar modelo" />
       </Row>)}
     </div>}
@@ -3752,10 +3774,10 @@ function VaultModelOverrides({ settings, vaultType, vaultName, patch }: {
 }
 
 const STUDY_VAULT_MODEL_FIELDS = [
-  { task: 'chat', label: 'Chat con el corpus', key: 'chatModel' },
-  { task: 'improve', label: 'Mejora de texto', key: 'improveModel' },
-  { task: 'questions', label: 'Generación de preguntas', key: 'questionGenModel' },
-  { task: 'flashcards', label: 'Generación de flashcards', key: 'flashcardModel' },
+  { task: 'chat', label: 'Chat con el corpus', hint: 'Responde preguntas sobre el corpus y cita la evidencia utilizada.', key: 'chatModel' },
+  { task: 'improve', label: 'Mejora de texto', hint: 'Revisa, amplía y transforma borradores en el Taller de escritura.', key: 'improveModel' },
+  { task: 'questions', label: 'Generación de preguntas', hint: 'Adapta explicaciones, preguntas y rutas de aprendizaje en el Tutor.', key: 'questionGenModel' },
+  { task: 'flashcards', label: 'Generación de flashcards', hint: 'Prepara guías y materiales de repaso a partir del contenido del vault.', key: 'flashcardModel' },
 ] as const;
 
 function StudyVaultModelOverrides({ settings, patch }: {
@@ -3767,7 +3789,10 @@ function StudyVaultModelOverrides({ settings, patch }: {
     <b className="text-neutral-600">{t('Principal')}</b>
     <b className="text-neutral-600">{t('Alternativo ante error')}</b>
     {STUDY_VAULT_MODEL_FIELDS.map((item) => <div key={item.task} className="contents">
-      <span className="self-center text-neutral-300">{t(item.label)}</span>
+      <span className="self-center text-neutral-300">
+        {t(item.label)}
+        <span className="mt-0.5 block text-[10px] leading-4 text-neutral-500">{t(item.hint)}</span>
+      </span>
       <ModelWithReasoning compact allowEmpty={false} settings={settings} value={settings[item.key]} onChange={(model) => void patch({ [item.key]: model })} emptyLabel="Seleccionar modelo" />
       <ModelWithReasoning compact settings={settings} value={settings.studyAiFallbackModels[item.task] ?? null} onChange={(model) => void patch({ studyAiFallbackModels: { ...settings.studyAiFallbackModels, [item.task]: model } })} emptyLabel="Sin modelo alternativo" />
     </div>)}

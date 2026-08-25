@@ -25,12 +25,26 @@ try {
 
   const { RELEASE_NOTES, releaseNotesForMajor, compareVersions } = await import(pathToFileURL(bundlePath).href);
   const currentRelease = RELEASE_NOTES[0];
-  assert.equal(currentRelease?.version, '5.0.0');
+  assert.equal(currentRelease?.version, '5.0.1');
   assert.equal(currentRelease?.date, '2026-08-25');
-  assert.equal(currentRelease?.highlights.length, 8);
+  assert.equal(currentRelease?.highlights.length, 7);
   assert.deepEqual(currentRelease?.highlights.map((highlight) => highlight.scope), [
-    'academic', 'academic', 'academic', 'academic', 'browser', 'general', 'general', 'general',
+    'academic', 'academic', 'academic', 'academic', 'academic', 'general', 'general',
   ]);
+  for (const phrase of [
+    /guides each definition more clearly/,
+    /generate several Dictionary entries at once/,
+    /preserve search, filters, position/,
+    /recovers interrupted campaigns/,
+    /one durable queue/,
+    /Opening Settings can no longer freeze/,
+    /without a configured model/,
+  ]) assert.ok(currentRelease?.highlights.some((highlight) => phrase.test(highlight.en)));
+
+  // 5.0.0 keeps the eight highlights it shipped with underneath this repair release.
+  const majorRelease = RELEASE_NOTES.find((note) => note.version === '5.0.0');
+  assert.equal(majorRelease?.date, '2026-08-25');
+  assert.equal(majorRelease?.highlights.length, 8);
   for (const phrase of [
     /gains a Dictionary/,
     /understands each document in layers/,
@@ -40,7 +54,7 @@ try {
     /can no longer block startup/,
     /classic Nodus Server/,
     /public documentation now matches/,
-  ]) assert.ok(currentRelease?.highlights.some((highlight) => phrase.test(highlight.en)));
+  ]) assert.ok(majorRelease?.highlights.some((highlight) => phrase.test(highlight.en)));
 
   // 4.2.5 keeps the highlight it shipped with. It remains available in history.
   const updaterCleanupRelease = RELEASE_NOTES.find((note) => note.version === '4.2.5');

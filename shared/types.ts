@@ -8625,6 +8625,8 @@ export interface NodusApi extends ProsopographyApi, TestimoniesApi, ToolkitApi, 
   nodiEndWindowDrag(): Promise<void>;
   onVaultChanged(cb: (vault: VaultSummary | null) => void): () => void;
   onSettingsChanged(cb: (settings: AppSettings) => void): () => void;
+  /** Fired when a user-started AI task cannot resolve any configured model. */
+  onAiModelRequired(cb: () => void): () => void;
   /** Deeplink received via OS (nodus://...), e.g. OAuth callback from system browser. */
   onDeepLink(cb: (url: string) => void): () => void;
   getActiveVault(): Promise<VaultSummary>;

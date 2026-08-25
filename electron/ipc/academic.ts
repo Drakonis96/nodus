@@ -271,6 +271,7 @@ import * as works from '../db/worksRepo';
 import * as ideas from '../db/ideasRepo';
 import * as themes from '../db/themesRepo';
 import { scanQueue } from '../pipeline/scanQueue';
+import { isAiModelRequiredError } from '@shared/aiModelRequired';
 import { getSyncPassphrase } from '../secrets/secretStore';
 import * as studyMaterials from '../db/studyMaterialsRepo';
 import { getEmbeddingSnapshot } from '../ai/embeddingPipeline';
@@ -357,7 +358,12 @@ function announceDictionary(entryId: string | null): void {
 
 function announceDictionaryProgress(progress: DictionaryProgress): void {
   for (const win of BrowserWindow.getAllWindows()) {
-    if (!win.isDestroyed() && !win.webContents.isDestroyed()) win.webContents.send('dictionary:progress', progress);
+    if (!win.isDestroyed() && !win.webContents.isDestroyed()) {
+      win.webContents.send('dictionary:progress', progress);
+      if (progress.phase === 'failed' && isAiModelRequiredError(progress.error)) {
+        win.webContents.send('ai:modelRequired');
+      }
+    }
   }
 }
 
@@ -446,6 +452,7 @@ export function registerAcademicIpc({ h, getWindow, chatAborters }: IpcContext):
       return { ok: true as const, version };
     } catch (error) {
       const failureDetail = error instanceof Error ? error.message : String(error);
+      if (isAiModelRequiredError(error)) getWindow()?.webContents.send('ai:modelRequired');
       console.error(`[dictionary] generation failed for ${request.entryId}`, error);
       return { ok: false as const, failureDetail };
     }
@@ -1921,14 +1928,26 @@ export function registerAcademicIpc({ h, getWindow, chatAborters }: IpcContext):
 
 
 
-  // Stream queue progress to the renderer.
+  // Stream queue progress to the renderer. A configuration pause happens after
+  // the enqueue call has already returned, so it cannot pass through the common
+  // IPC error wrapper. Emit the same one-shot notice from the progress edge.
+  let scanModelRequiredNotified = false;
   scanQueue.onProgress((p) => {
-    getWindow()?.webContents.send('queue:progress', p);
+    const win = getWindow();
+    win?.webContents.send('queue:progress', p);
+    const modelRequired = isAiModelRequiredError(p.pausedReason);
+    if (modelRequired && !scanModelRequiredNotified) win?.webContents.send('ai:modelRequired');
+    scanModelRequiredNotified = modelRequired;
   });
 
   void documentIndexQueue.initialize();
+  let documentModelRequiredNotified = false;
   documentIndexQueue.onProgress((p) => {
-    getWindow()?.webContents.send('documents:index:progress', localizedForUi(p));
+    const win = getWindow();
+    win?.webContents.send('documents:index:progress', localizedForUi(p));
+    const modelRequired = p.jobs.some((job) => job.status === 'paused' && isAiModelRequiredError(job.error));
+    if (modelRequired && !documentModelRequiredNotified) win?.webContents.send('ai:modelRequired');
+    documentModelRequiredNotified = modelRequired;
   });
 
   // Stream embedding pipeline progress to the renderer.

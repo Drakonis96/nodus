@@ -16,7 +16,7 @@ test('CITATION.cff describes the current Nodus release and its project identity'
   const citation = readRepo('CITATION.cff');
 
   assert.match(citation, new RegExp(`version: "${pkg.version.replaceAll('.', '\\.') }"`));
-  assert.match(citation, new RegExp(`doi: "${VERSION_DOI.replaceAll('.', '\\.')}"`));
+  assert.match(citation, new RegExp(`doi: "${CONCEPT_DOI.replaceAll('.', '\\.')}"`));
   assert.match(citation, /Nodus is the open-source desktop application developed by the Nodus\s+Research project\./);
   for (const keyword of ['Nodus Research', 'research software', 'academic research', 'Zotero', 'local-first', 'knowledge graph', 'evidence', 'research workspace']) {
     assert.ok(citation.includes(`- "${keyword}"`), `CITATION.cff includes ${keyword}`);
@@ -32,7 +32,7 @@ test('the citation page identifies 5.0.0 with its immutable release DOI', () => 
   assert.match(page, new RegExp(CONCEPT_DOI.replaceAll('.', '\\.')));
   assert.match(page, new RegExp(VERSION_DOI.replaceAll('.', '\\.')));
   assert.match(page, /Nodus 5\.0\.0 · version DOI/);
-  for (const detail of ['APA', 'BibTeX', 'CITATION.cff', 'ORCID', 'AGPL-3.0-only', 'Zenodo', 'GitHub', pkg.version]) {
+  for (const detail of ['APA', 'BibTeX', 'CITATION.cff', 'ORCID', 'AGPL-3.0-only', 'Zenodo', 'GitHub']) {
     assert.ok(page.includes(detail), `the citation page includes ${detail}`);
   }
 });

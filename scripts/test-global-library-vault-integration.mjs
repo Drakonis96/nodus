@@ -125,5 +125,8 @@ try {
   closeDb();
   console.log('Global Library → vault reference, clean Markdown resolution and idempotency tests passed!');
 } finally {
-  await rm(scratch, { recursive: true, force: true });
+  // macOS runners can still be flushing the migration marker when Electron
+  // exits. Let fs.rm retry the transient ENOTEMPTY instead of turning a
+  // successful integration run into a cleanup-only failure.
+  await rm(scratch, { recursive: true, force: true, maxRetries: 8, retryDelay: 100 });
 }
