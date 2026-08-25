@@ -15,6 +15,10 @@ change since 4.2.5, including the fixes merged after the first beta tag.
   lexical and vector indexes, freshness tracking and evidence-first drill-down. Background
   indexing asks for explicit one-time consent and provides durable progress with pause,
   resume, stop, retry and crash recovery from Library and Settings.
+- Fixed documentary indexing campaigns pausing again after every Resume when a legacy
+  deep-scan fingerprint differed from the canonical resolved text. Profile publication now
+  guards the resolved corpus atomically, campaign failures stay actionable and localized,
+  and warning and destructive controls remain legible in both light and dark themes.
 - Added Deep Research v2 with idea-and-relationship-first retrieval, selective expansion
   into full documents, version routing and reproducible report metadata. Source and
   proposition coverage now decide when research is complete instead of a requested word
