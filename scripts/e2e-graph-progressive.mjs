@@ -93,6 +93,12 @@ try {
     });
   }, appVersion);
   await page.reload();
+  const nodiStyleModal = page.getByTestId('nodi-style-modal');
+  await nodiStyleModal.waitFor({ state: 'attached', timeout: 1_000 }).catch(() => {});
+  if (await nodiStyleModal.count()) {
+    await page.getByTestId('nodi-style-orb').click();
+    await nodiStyleModal.waitFor({ state: 'detached' });
+  }
   await page.locator('[data-tour="nav-graph"]').click();
   await page.locator('canvas').first().waitFor({ state: 'visible' });
   await page.waitForTimeout(250);
