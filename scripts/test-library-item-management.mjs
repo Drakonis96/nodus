@@ -53,6 +53,8 @@ try {
   assert.equal(managed.attachments[0].fileName, 'García - 1942 - An archival source without a file.pdf', 'the first PDF follows the Zotero-compatible metadata pattern');
   assert.equal(managed.attachments[0].title, 'source.pdf', 'attachment title remains separate from the managed filename');
   assert.equal(managed.attachments[0].autoRenamed, true);
+  assert.match(managed.attachments[0].relativePath, /\.pdf$/i, 'managed storage keeps a literal extension for cloud providers');
+  assert.doesNotMatch(managed.attachments[0].relativePath, /%2Epdf$/i);
   assert.equal(managed.attachments[1].fileName, 'plate 01.png', 'non-default types and supplementary files keep their informative names');
   assert.equal(managed.attachments[1].autoRenamed, false);
   assert.deepEqual(managed.attachments.map((entry) => entry.position), [0, 1]);
@@ -64,7 +66,8 @@ try {
   managed = operations.updateAttachment(reference.id, pdfId, { fileName: 'my archival copy.pdf' });
   assert.equal(managed.attachments.find((entry) => entry.id === pdfId).autoRenamed, false, 'a manual filename opts that attachment out of synchronization');
   managed = operations.updateItemMetadata(reference.id, { title: 'Final archival source' });
-  assert.equal(managed.attachments.find((entry) => entry.id === pdfId).fileName, 'my%20archival%20copy%2Epdf', 'subsequent metadata edits preserve a manual filename');
+  assert.equal(managed.attachments.find((entry) => entry.id === pdfId).fileName, 'my archival copy.pdf', 'subsequent metadata edits preserve a human-readable manual filename');
+  assert.match(managed.attachments.find((entry) => entry.id === pdfId).relativePath, /my%20archival%20copy\.pdf$/i);
 
   const imageId = managed.attachments[1].id;
   managed = operations.updateAttachment(reference.id, imageId, { title: 'Figure 1', role: 'supplement', position: 0 });

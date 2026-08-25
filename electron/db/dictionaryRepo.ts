@@ -566,9 +566,14 @@ export function getDictionaryEntryDetail(id: string): DictionaryEntryDetail | nu
   const proposedVersion = entry.proposedVersionId ? getDictionaryVersion(entry.proposedVersionId) : null;
   const used = new Set((currentVersion?.evidence ?? []).map((ref) => `${ref.kind}:${ref.id}`));
   const cited = new Set((currentVersion?.citations ?? []).map((ref) => `${ref.kind}:${ref.id}`));
-  const coverage = { used: used.size, cited: cited.size, unused: evidence.filter((item) => item.decision === 'unused').length,
+  const unavailable = new Set(evidence.filter((item) => evidenceUnavailable(item)).map((item) => `${item.kind}:${item.ref_id}`));
+  // `included` describes the live selection that the next generation will use.
+  // Counting the current version's snapshot here made every new draft report zero
+  // available evidence even after retrieval had selected twenty usable items.
+  const coverage = { included: evidence.filter((item) => item.decision === 'included' && !unavailable.has(`${item.kind}:${item.ref_id}`)).length,
+    cited: cited.size, unused: evidence.filter((item) => item.decision === 'unused').length,
     excluded: evidence.filter((item) => item.decision === 'excluded').length, newEvidence: evidence.filter((item) => item.is_new).length,
-    unavailable: evidence.filter((item) => evidenceUnavailable(item)).length };
+    unavailable: unavailable.size };
   const authors = buildAuthors(evidence.filter((item) => used.has(`${item.kind}:${item.ref_id}`)), currentVersion?.authorSummaries ?? []);
   const works = buildWorks(evidence.filter((item) => used.has(`${item.kind}:${item.ref_id}`)));
   return { entry, coverage, authors, works, currentVersion, proposedVersion };

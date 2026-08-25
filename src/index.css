@@ -1828,6 +1828,36 @@ body {
   @apply hover:bg-neutral-100 text-neutral-700;
 }
 
+/* Document indexing can pause for a reason that needs action. Keep this warning
+   semantic instead of composing dark-first amber utilities: it appears both in
+   the global progress rail and inside the light/dark manager modal. */
+.document-index-warning {
+  border-color: rgba(217, 119, 6, 0.55);
+  background-color: rgba(69, 26, 3, 0.72);
+  color: #fef3c7;
+}
+.light .document-index-warning {
+  border-color: #f59e0b;
+  background-color: #fffbeb;
+  color: #78350f;
+}
+.document-index-danger {
+  border-color: #991b1b;
+  color: #fca5a5;
+}
+.document-index-danger:hover:not(:disabled) {
+  background-color: rgba(127, 29, 29, 0.35);
+  color: #fecaca;
+}
+.light .document-index-danger {
+  border-color: #fca5a5;
+  color: #b91c1c;
+}
+.light .document-index-danger:hover:not(:disabled) {
+  background-color: #fff1f2;
+  color: #991b1b;
+}
+
 /* Genealogy vault → golden accent instead of the indigo/purple default. Remaps the
    accent utility classes used across the app (the analog of the .light overrides). */
 .genealogy {

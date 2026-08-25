@@ -74,7 +74,7 @@ export function IdeasView({
       ? 'idea'
       : 'catalog'
   ));
-  const [filtersOpen, setFiltersOpen] = useState(() => snapshot?.filtersOpen ?? false);
+  const [filtersOpen, setFiltersOpenState] = useState(() => snapshot?.filtersOpen ?? false);
   // A cached page is useful while the reader changes pages or returns to a previous
   // sort during the same visit. It must not survive leaving and re-entering Ideas,
   // though: deep scans can finish while the view is unmounted, so the queue-idle
@@ -167,6 +167,18 @@ export function IdeasView({
       filtersOpen,
     });
   }, [activeIdeaId, filtersOpen, openIdeas, searchQuery, sortKey, surface, typeFilter]);
+
+  // Do not leave an explicit filter close waiting for a passive effect: the same
+  // click may also dismiss this section. Persist the user's action immediately.
+  const toggleFilterPanel = () => {
+    const nextOpen = !filtersOpen;
+    setFiltersOpenState(nextOpen);
+    report.current?.({ filtersOpen: nextOpen });
+  };
+  const changeTypeFilter = (nextTypeFilter: IdeaType | '') => {
+    setTypeFilter(nextTypeFilter);
+    report.current?.({ typeFilter: nextTypeFilter });
+  };
 
   // Changing the cut throws the place away with it: a row that was at the top of one
   // filter means nothing under another. It must skip its own first run, though, or
@@ -265,7 +277,7 @@ export function IdeasView({
               <button
                 data-testid="ideas-filters-toggle"
                 className={`btn border border-neutral-300 dark:border-neutral-700 ${filtersOpen || typeFilter ? 'bg-indigo-50 text-indigo-700 dark:bg-indigo-500/10 dark:text-indigo-300' : 'btn-ghost'}`}
-                onClick={() => setFiltersOpen((value) => !value)}
+                onClick={toggleFilterPanel}
               >
                 <Icon name="filter" /> {t('Filtros')}{typeFilter ? <span className="rounded bg-indigo-100 px-1.5 py-0.5 text-[10px] dark:bg-indigo-500/20">1</span> : null}
               </button>
@@ -274,7 +286,7 @@ export function IdeasView({
               <div className="mt-2 flex flex-wrap items-center gap-3 rounded-xl bg-neutral-50 p-2 dark:bg-neutral-900/55">
                 <label className="flex items-center gap-2 text-xs text-neutral-500">
                   {t('Tipo')}
-                  <select data-testid="ideas-type-filter" className="input h-8 text-xs" value={typeFilter} onChange={(event) => setTypeFilter(event.target.value as IdeaType | '')}>
+                  <select data-testid="ideas-type-filter" className="input h-8 text-xs" value={typeFilter} onChange={(event) => changeTypeFilter(event.target.value as IdeaType | '')}>
                     <option value="">{t('Todos los tipos')}</option>
                     {(['claim', 'finding', 'construct', 'method', 'framework'] as IdeaType[]).map((type) => <option key={type} value={type}>{t(NODE_LABELS[type])}</option>)}
                   </select>

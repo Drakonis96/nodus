@@ -9,7 +9,7 @@ import type {
   LibraryMigrationStartRequest,
 } from '@shared/libraryTypes';
 import type { VaultSummary } from '@shared/types';
-import { atomicWriteJson, readJsonFile, safeLibraryFolderName } from './libraryPaths';
+import { atomicWriteJson, readJsonFile, resolveLibraryFile, safeLibraryFolderName } from './libraryPaths';
 import { LibraryCatalog } from './libraryCatalog';
 import {
   LibraryMigrationCanceledError,
@@ -213,7 +213,7 @@ export class LibraryMigrationSessionManager {
         ...item.attachments.map((attachment) => attachment.relativePath),
         ...(item.files ? [item.files.reader, item.files.original].filter((file): file is string => Boolean(file)) : []),
       ];
-      return declared.every((file) => fs.existsSync(path.join(folder, file)));
+      return declared.every((file) => resolveLibraryFile(folder, file) !== null);
     });
     const links = this.catalog.listVaultLinks();
     const status = this.catalog.status(this.store.root, this.store.deviceId);

@@ -745,13 +745,11 @@ export async function runDocumentProfileScan(work: Work, options: RunDocumentPro
     throw new Error(document.notes ?? 'No hay texto completo legible.');
   }
   const sourceFingerprint = sha256(document.text);
+  const sourceContentHash = sha1(document.text);
   const sourceMap = Object.fromEntries((document.segments ?? []).map((segment) => [segment.marker, segment.sourceRef]));
-  // `deep_hash` identifies the text representation consumed by the last idea scan;
-  // it is not a revision lock for this independent document profile. In particular,
-  // historical deep hashes predate the durable [[src:sN]] markers now added by the
-  // resolver, so comparing the two made every stable legacy PDF look as if it were
-  // changing forever. The publication-boundary re-resolution below is the real
-  // source-change guard: it compares this exact resolved text before publishing.
+  // deep_hash may come from a pre-inventory deep scan whose corpus did not carry
+  // durable source markers. It is therefore not comparable with this resolved-text
+  // hash. Real races are guarded below by a second read plus the atomic revision check.
   updateDocumentIndexJob(options.jobId, { sourceFingerprint });
   emit(options, 'structuring', 0.04, 'Reconstruyendo la estructura…');
   const sections = deriveDocumentStructure(document.text, work.title, sourceMap);
@@ -973,15 +971,14 @@ export async function runDocumentProfileScan(work: Work, options: RunDocumentPro
       itemType: work.item_type,
       doi: work.doi,
       deepHash: work.deep_hash,
+      resolvedTextHash: sourceContentHash,
     },
     passages: preparedPassages,
   });
   upsertLibraryAnalysisProvenance({
     workId: work.nodus_id,
     component: 'documentProfile',
-    // Provenance follows the exact text this profile analysed, not the possibly
-    // older representation used by the independent idea/deep scan.
-    documentFingerprint: sourceFingerprint,
+    documentFingerprint: sourceContentHash,
     libraryItemId: null,
     libraryRevisionFingerprint: null,
     pipelineVersion: DOCUMENT_PROFILE_PIPELINE_VERSION,

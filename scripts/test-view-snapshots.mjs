@@ -95,6 +95,21 @@ test('sections do not share a snapshot', () => {
   assert.equal(store.readViewSnapshot('vault-a', 'ideas').search, 'mímesis');
 });
 
+test('Dictionary keeps its open concepts and catalogue cut together', () => {
+  store.clearViewSnapshots();
+  const dictionaryCut = {
+    openEntries: [{ id: 'D1', label: 'Hispanofilia' }],
+    activeEntryId: 'D1',
+    detailTabs: { D1: 'evidence' },
+    query: 'propaganda',
+    sortKey: 'authors',
+    sortDir: 'desc',
+    viewMode: 'table',
+  };
+  store.patchViewSnapshot('vault-a', 'dictionary', dictionaryCut);
+  assert.deepEqual(store.readViewSnapshot('vault-a', 'dictionary'), dictionaryCut);
+});
+
 test('a snapshot is closed to the vault it was taken in', () => {
   store.clearViewSnapshots();
   store.patchViewSnapshot('vault-a', 'authors', AUTHORS_CUT);
@@ -288,12 +303,35 @@ test('the snapshot store lives above the single render point and outside React s
   assert.doesNotMatch(app, /useState[^\n]*ViewSnapshots/, 'the snapshots are not shell state');
 });
 
-test('the three opted-in sections receive their snapshot the way they already receive a target', async () => {
+test('the core catalogue sections receive their snapshot the way they already receive a target', async () => {
   const registry = await readSource('src/app/views/corpus.tsx');
-  for (const view of ['library', 'ideas', 'authors']) {
+  for (const view of ['library', 'ideas', 'authors', 'dictionary']) {
     assert.match(registry, new RegExp(`snapshots\\.read\\('${view}'\\)`), `${view} is handed its snapshot`);
     assert.match(registry, new RegExp(`snapshots\\.patch\\('${view}',`), `${view} reports its snapshot back`);
   }
+});
+
+test('Dictionary restores its filters, open entries and selected detail tab', async () => {
+  const view = await readSource('src/views/DictionaryView.tsx');
+  for (const restored of [
+    'query',
+    'letter',
+    'status',
+    'tag',
+    'authorId',
+    'workId',
+    'newOnly',
+    'insufficientOnly',
+    'sortKey',
+    'sortDir',
+    'viewMode',
+  ]) {
+    assert.match(view, new RegExp(`snapshot\\?\\.${restored}`), `${restored} survives leaving Dictionary`);
+  }
+  assert.match(view, /snapshot\?\.openEntries/);
+  assert.match(view, /snapshot\?\.detailTabs/);
+  assert.match(view, /restoredTab=\{detailTabs\[activeId\]\}/);
+  assert.match(view, /report\.current = onSnapshotChange/);
 });
 
 test('a snapshot is an initial value, never a reactive prop', async () => {
@@ -353,6 +391,41 @@ test('Biblioteca keeps a cut per scope, and only what nothing else already persi
   assert.doesNotMatch(types, /visibleColumns|columnWidths/, 'the snapshot does not duplicate what the Library persists itself');
   const librarySnapshot = types.match(/export interface LibrarySnapshot \{[^}]*\}/)?.[0] ?? '';
   assert.doesNotMatch(librarySnapshot, /scope/, 'the scope switch is settings, not a snapshot');
+});
+
+test('explicit filter closes reach the snapshot before a section can unmount', async () => {
+  const [vaultLibrary, globalLibrary, authors, ideas] = await Promise.all([
+    readSource('src/views/Library.tsx'),
+    readSource('src/views/GlobalLibraryView.tsx'),
+    readSource('src/views/AuthorsView.tsx'),
+    readSource('src/views/IdeasView.tsx'),
+  ]);
+
+  // A passive effect is still useful as a catch-all, but it is too late when the
+  // interaction that dismisses a filter also navigates away and unmounts the view.
+  assert.match(vaultLibrary, /const updateFilter =[\s\S]*?reportSnapshot\.current\?\.\(\{ \.\.\.snapshotOf\.current\(\), filter: next \}\);/);
+  assert.match(vaultLibrary, /const toggleFilterPanel =[\s\S]*?filtersOpen: nextOpen,[\s\S]*?advancedFiltersOpen:/);
+  assert.match(globalLibrary, /const toggleFilterPanel =[\s\S]*?reportSnapshotNow\(\{ filtersOpen: nextOpen \}\);/);
+  assert.match(globalLibrary, /const clearCatalogFilters =[\s\S]*?reportSnapshotNow\(\{[\s\S]*?filters:/);
+  assert.match(authors, /const toggleFilterPanel =[\s\S]*?report\.current\?\.\(\{ filtersOpen: nextOpen \}\);/);
+  assert.match(ideas, /const toggleFilterPanel =[\s\S]*?report\.current\?\.\(\{ filtersOpen: nextOpen \}\);/);
+});
+
+test('a contextual Library filter is consumed once and cannot overwrite a later close', async () => {
+  const [registry, wrapper, vaultLibrary, context, app] = await Promise.all([
+    readSource('src/app/views/corpus.tsx'),
+    readSource('src/views/GlobalLibraryView.tsx'),
+    readSource('src/views/Library.tsx'),
+    readSource('src/app/ViewContext.ts'),
+    readSource('src/App.tsx'),
+  ]);
+
+  assert.match(context, /setLibraryTarget: \(target: Nonced<PendingLibraryNavigationTarget> \| null\) => void/);
+  assert.match(app, /^\s*setLibraryTarget,$/m, 'the section can consume the shell-owned command');
+  assert.match(registry, /onTargetConsumed=\{\(\) => setLibraryTarget\(null\)\}/);
+  assert.match(wrapper, /onTargetConsumed=\{onTargetConsumed\}/g);
+  assert.match(vaultLibrary, /setFilter\(target\.healthBucket \? \{ healthBucket: target\.healthBucket \} : \{\}\);\s*onTargetConsumed\?\.\(\);/);
+  assert.match(wrapper, /if \(!requestedScope\) return;\s*setScope\(requestedScope\);/, 'consuming a target does not bounce the Library back to its stored scope');
 });
 
 test('the page and the row are one field, so neither can be restored without the other', async () => {

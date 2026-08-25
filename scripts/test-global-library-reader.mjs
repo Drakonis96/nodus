@@ -121,6 +121,27 @@ try {
   assert.equal(encodedDocument.attachments[0].viewer, 'pdf', 'an encoded PDF extension keeps the native PDF viewer');
   assert.equal(encodedDocument.originalMimeType, 'application/pdf', 'legacy original metadata decodes the extension for MIME detection');
 
+  const cloudFolder = store.itemFolder('CLOUDPDF');
+  const cloudRelativePath = 'attachments/43591cd5-N%C3%BA%C3%B1ez_Florencio%2Epdf';
+  const cloudPdf = Buffer.from('%PDF-1.4 Google Drive appended a literal extension\n');
+  await mkdir(path.dirname(path.join(cloudFolder, cloudRelativePath)), { recursive: true });
+  await writeFile(path.join(cloudFolder, 'reader.md'), '# Cloud PDF\n');
+  await writeFile(`${path.join(cloudFolder, cloudRelativePath)}.pdf`, cloudPdf);
+  store.upsertItem({
+    id: 'nodus:cloud-pdf', storageId: 'CLOUDPDF', source: 'nodus', sourceLibraryId: null, sourceKey: null,
+    metadata: { title: 'Cloud PDF', itemType: 'article-journal', creators: [], isbn: [], issn: [], tags: [] },
+    collectionIds: [], attachments: [{
+      id: 'local:CLOUDPDF', title: 'Cloud PDF', fileName: 'Núñez Florencio.pdf', relativePath: cloudRelativePath,
+      mimeType: 'application/pdf', byteSize: cloudPdf.byteLength,
+      sha256: createHash('sha256').update(cloudPdf).digest('hex'), role: 'original', position: 0,
+    }],
+    files: { reader: 'reader.md', original: cloudRelativePath }, extraction: { status: 'ready' },
+  });
+  const cloudDocument = readerStore.getLibraryReaderDocument('nodus:cloud-pdf');
+  assert.ok(cloudDocument?.originalAvailable, 'a cloud-appended extension remains available as the original');
+  assert.equal(cloudDocument.attachments[0].available, true);
+  assert.equal(readerStore.libraryReaderAttachmentPath('nodus:cloud-pdf', 'local:CLOUDPDF'), `${path.join(cloudFolder, cloudRelativePath)}.pdf`);
+
   const hashFolder = store.itemFolder('HASHPDF');
   const duplicatePdf = Buffer.from('%PDF-1.4 two paths preserving the same immutable bytes\n');
   const duplicateSha = createHash('sha256').update(duplicatePdf).digest('hex');

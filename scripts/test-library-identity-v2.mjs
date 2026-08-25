@@ -31,7 +31,12 @@ try {
   const { LibraryCatalog } = require(path.join(repoRoot, 'electron/library/libraryCatalog.ts'));
   const { importZoteroLibraries } = require(path.join(repoRoot, 'electron/library/zoteroLibraryImport.ts'));
   const { recordContentHash } = require(path.join(repoRoot, 'electron/library/libraryRecord.ts'));
-  const { safeLibraryFolderName } = require(path.join(repoRoot, 'electron/library/libraryPaths.ts'));
+  const {
+    libraryFilePathWithLiteralExtension,
+    resolveLibraryFile,
+    safeLibraryFileName,
+    safeLibraryFolderName,
+  } = require(path.join(repoRoot, 'electron/library/libraryPaths.ts'));
 
   const store = new LibraryDiskStore(root, 'identity-v2-device');
   store.initialize();
@@ -64,6 +69,16 @@ try {
   assert.notEqual(safeLibraryFolderName('NUL.txt').toUpperCase(), 'NUL.TXT');
   assert.match(safeLibraryFolderName('Historia española/研究'), /^Historia%20espa%C3%B1ola%2F/);
   assert.notEqual(safeLibraryFolderName('..'), '..');
+  assert.equal(safeLibraryFileName('Núñez Florencio.pdf'), 'N%C3%BA%C3%B1ez%20Florencio.pdf', 'portable filenames keep a literal extension for cloud providers');
+  assert.doesNotMatch(safeLibraryFileName('Núñez Florencio.pdf'), /%2Epdf$/i);
+  assert.notEqual(safeLibraryFileName('NUL.txt').toUpperCase(), 'NUL.TXT');
+  assert.equal(libraryFilePathWithLiteralExtension('attachments/N%C3%BA%C3%B1ez%2Epdf'), 'attachments/N%C3%BA%C3%B1ez.pdf');
+  const resolverFolder = path.join(scratch, 'cloud-resolver');
+  const legacyRelative = 'attachments/N%C3%BA%C3%B1ez%2Epdf';
+  const cloudRenamed = path.join(resolverFolder, `${legacyRelative}.pdf`);
+  await mkdir(path.dirname(cloudRenamed), { recursive: true });
+  await writeFile(cloudRenamed, '%PDF-1.4 cloud-renamed fixture');
+  assert.equal(resolveLibraryFile(resolverFolder, legacyRelative), cloudRenamed, 'legacy manifests resolve the extension appended by Google Drive');
 
   const personal = { type: 'user', id: '7', name: 'Personal' };
   const group = { type: 'group', id: '7', name: 'Group' };

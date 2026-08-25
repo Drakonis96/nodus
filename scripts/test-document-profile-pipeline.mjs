@@ -3,7 +3,6 @@ import test from 'node:test';
 import { build } from 'esbuild';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { createRequire } from 'node:module';
-import { createHash } from 'node:crypto';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -235,7 +234,7 @@ test('stop during passage embeddings prevents every later write and publication'
   assert.equal(globalThis.__documentPipeline.published, null, 'a cancelled candidate is never published');
 });
 
-test('a legacy deep hash never blocks a stable current document profile', async () => {
+test('a legacy deep hash does not make the current resolved source look unstable', async () => {
   globalThis.__documentPipeline.sourceReads = 0;
   globalThis.__documentPipeline.changedTextAtPublication = null;
   globalThis.__documentPipeline.published = null;
@@ -246,15 +245,15 @@ test('a legacy deep hash never blocks a stable current document profile', async 
     light_at:null,light_hash:null,deep_status:'done',deep_at:null,deep_hash:'hash-anterior',summary_status:'none',summary_at:null,
     summary_hash:null,archived:0,notes:null,
   };
-  const versionId = await pipeline.runDocumentProfileScan(work, {
+  const result = await pipeline.runDocumentProfileScan(work, {
     jobId:'job-legacy-deep-hash',generatorModel:null,auditorModel:null,onProgress() {},
   });
-  assert.equal(versionId, 'published-v1');
-  assert.ok(globalThis.__documentPipeline.published, 'the stable current text is published');
+  assert.equal(result, 'published-v1');
+  assert.match(globalThis.__documentPipeline.published.expectedWorkRevision.resolvedTextHash, /^[a-f0-9]{40}$/);
   assert.equal(
     globalThis.__documentPipeline.provenance.documentFingerprint,
-    createHash('sha256').update(globalThis.__documentPipeline.text).digest('hex'),
-    'profile provenance identifies the exact resolved text instead of the legacy idea-scan representation',
+    globalThis.__documentPipeline.published.expectedWorkRevision.resolvedTextHash,
+    'profile provenance follows the canonical resolved corpus rather than a legacy deep-analysis hash',
   );
 });
 

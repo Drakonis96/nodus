@@ -99,6 +99,15 @@ function normalizeSettingsText(value: string): string {
     .trim();
 }
 
+function settingsTabRequested(tab: SettingsTabId, selected: SettingsTabId, query: string): boolean {
+  const normalizedQuery = normalizeSettingsText(query);
+  if (!normalizedQuery) return selected === tab;
+  const metadata = SETTINGS_TABS.find((item) => item.id === tab);
+  return metadata
+    ? normalizeSettingsText(`${metadata.label} ${t(metadata.label)} ${metadata.keywords}`).includes(normalizedQuery)
+    : false;
+}
+
 function formatBackupBytes(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KiB`;
@@ -156,6 +165,10 @@ export function Settings({
   const [importOpen, setImportOpen] = useState(false);
   const [primarySourcePolicy, setPrimarySourcePolicy] = useState<PrimarySourcePolicySettings | null>(null);
   const hasZoteroLibraryWorkflow = !activeVault || !ZOTERO_FREE_VAULT_TYPES.has(activeVault.type);
+  const dataTabRequested = settingsTabRequested('data', settingsTab, settingsQuery);
+  const integrationsTabRequested = settingsTabRequested('integrations', settingsTab, settingsQuery);
+  const modelsTabRequested = settingsTabRequested('models', settingsTab, settingsQuery);
+  const serverTabRequested = settingsTabRequested('server', settingsTab, settingsQuery);
 
   useEffect(() => {
     if (localStorage.getItem('nodus.settingsTarget') !== 'nodi') return;
@@ -165,7 +178,7 @@ export function Settings({
   }, []);
 
   useEffect(() => {
-    if (activeVault?.type !== 'primary_sources') {
+    if (activeVault?.type !== 'primary_sources' || !modelsTabRequested) {
       setPrimarySourcePolicy(null);
       return;
     }
@@ -174,7 +187,7 @@ export function Settings({
       if (!cancelled) setPrimarySourcePolicy(workspace.policy);
     });
     return () => { cancelled = true; };
-  }, [activeVault?.id, activeVault?.type]);
+  }, [activeVault?.id, activeVault?.type, modelsTabRequested]);
 
   useEffect(() => {
     if (!hasZoteroLibraryWorkflow && settingsTab === 'library') setSettingsTab('providers');
@@ -248,6 +261,7 @@ export function Settings({
   }, []);
 
   useEffect(() => {
+    if (!dataTabRequested) return;
     let active = true;
     void window.nodus.hasBackupPassword().then((has) => {
       if (active) setAutoBackupHasPassword(has);
@@ -255,22 +269,22 @@ export function Settings({
     return () => {
       active = false;
     };
-  }, []);
+  }, [dataTabRequested]);
 
   useEffect(() => {
     let active = true;
     setMigrationRecoverySnapshots([]);
-    if (!activeVault) return () => { active = false; };
+    if (!dataTabRequested || !activeVault) return () => { active = false; };
     void window.nodus.listMigrationRecoverySnapshots()
       .then((snapshots) => { if (active) setMigrationRecoverySnapshots(snapshots); })
       .catch(() => { if (active) setMigrationRecoverySnapshots([]); });
     return () => { active = false; };
-  }, [activeVault?.id]);
+  }, [activeVault?.id, dataTabRequested]);
 
   useEffect(() => {
     let active = true;
     setBackupCleanupPreview(null);
-    if (!settings.autoBackupFolder) {
+    if (!dataTabRequested || !settings.autoBackupFolder) {
       return () => { active = false; };
     }
     void window.nodus.previewBackupCleanup().then((preview) => {
@@ -278,6 +292,7 @@ export function Settings({
     });
     return () => { active = false; };
   }, [
+    dataTabRequested,
     settings.autoBackupFolder,
     settings.backupRetentionUnit,
     settings.backupRetentionValue,
@@ -286,6 +301,7 @@ export function Settings({
   ]);
 
   useEffect(() => {
+    if (!integrationsTabRequested) return;
     let active = true;
     const refresh = async () => {
       const [next, tunnel] = await Promise.all([window.nodus.getMcpStatus(), window.nodus.getMcpTunnelStatus()]);
@@ -300,13 +316,14 @@ export function Settings({
       active = false;
       window.clearInterval(interval);
     };
-  }, [settings.mcpEnabled, settings.mcpPort, settings.mcpToken]);
+  }, [integrationsTabRequested, settings.mcpEnabled, settings.mcpPort, settings.mcpToken]);
 
   useEffect(() => setMcpPortInput(String(settings.mcpPort)), [settings.mcpPort]);
 
   // Basic mode polls on a slow tick, unlike MCP's 1.5s: the answers here involve running the
   // Tailscale CLI, and a status read should not cost a subprocess every second and a half.
   useEffect(() => {
+    if (!serverTabRequested) return;
     let active = true;
     const refresh = async () => {
       try {
@@ -338,11 +355,12 @@ export function Settings({
       active = false;
       window.clearInterval(interval);
     };
-  }, [settings.localServerAccess, settings.localServerPort]);
+  }, [serverTabRequested, settings.localServerAccess, settings.localServerPort]);
 
   useEffect(() => setNodusServerUrlInput(settings.nodusServerUrl), [settings.nodusServerUrl]);
 
   useEffect(() => {
+    if (!serverTabRequested) return;
     let cancelled = false;
     const load = async () => {
       try {
@@ -355,7 +373,7 @@ export function Settings({
     void load();
     const timer = window.setInterval(() => void load(), 5000);
     return () => { cancelled = true; window.clearInterval(timer); };
-  }, []);
+  }, [serverTabRequested]);
 
   const syncReplica = async (vaultId: string) => {
     setReplicaBusy(vaultId);
@@ -373,6 +391,7 @@ export function Settings({
   };
 
   useEffect(() => {
+    if (!serverTabRequested) return;
     let active = true;
     const refresh = async () => {
       const next = await window.nodus.getNodusServerOverview();
@@ -384,9 +403,10 @@ export function Settings({
       active = false;
       window.clearInterval(interval);
     };
-  }, [settings.nodusServerEnabled, settings.nodusServerUrl, settings.nodusServerSpaceId]);
+  }, [serverTabRequested, settings.nodusServerEnabled, settings.nodusServerUrl, settings.nodusServerSpaceId]);
 
   useEffect(() => {
+    if (!integrationsTabRequested) return;
     let active = true;
     const refresh = async () => {
       const next = await window.nodus.getCopilotStatus();
@@ -398,9 +418,10 @@ export function Settings({
       active = false;
       window.clearInterval(interval);
     };
-  }, [settings.copilotEnabled, settings.copilotPort, settings.copilotToken]);
+  }, [integrationsTabRequested, settings.copilotEnabled, settings.copilotPort, settings.copilotToken]);
 
   useEffect(() => {
+    if (!integrationsTabRequested) return;
     let active = true;
     const refresh = async () => {
       const next = await window.nodus.getZoteroPluginStatus();
@@ -412,7 +433,7 @@ export function Settings({
       active = false;
       window.clearInterval(interval);
     };
-  }, [settings.zoteroPluginEnabled, settings.browserConnectorEnabled, settings.zoteroPluginPort, settings.zoteroPluginToken, settings.browserConnectorToken]);
+  }, [integrationsTabRequested, settings.zoteroPluginEnabled, settings.browserConnectorEnabled, settings.zoteroPluginPort, settings.zoteroPluginToken, settings.browserConnectorToken]);
 
   useEffect(() => {
     if (!mcpHelpOpen) return;
@@ -3699,7 +3720,7 @@ const VAULT_MODEL_FIELDS: Record<VaultModelKey, string> = {
   writingModel: 'Taller de escritura',
   argumentMapModel: 'Mapa argumental',
   authorModel: 'Autores y biografías',
-  dictionaryModel: 'Dictionary',
+  dictionaryModel: 'Diccionario',
   studyModel: 'Guías de estudio',
   tutorModel: 'Tutor',
   hypothesisModel: 'Laboratorio de hipótesis',

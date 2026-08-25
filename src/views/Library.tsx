@@ -416,6 +416,7 @@ function SortHeader({
 export function Library({
   vaultId,
   target,
+  onTargetConsumed,
   vaultType,
   snapshot,
   onSnapshotChange,
@@ -430,6 +431,8 @@ export function Library({
   vaultId: string | null;
   /** Incoming navigation that pre-applies a filter (e.g. a corpus-health bucket). */
   target?: LibraryNavigationTarget | null;
+  /** Pending navigation targets are commands: apply once, then discard. */
+  onTargetConsumed?: () => void;
   vaultType?: VaultType;
   /** Where this section was last left. Read once, at mount, and never again. */
   snapshot?: LibraryVaultSnapshot;
@@ -470,8 +473,8 @@ export function Library({
   const [documentStatuses, setDocumentStatuses] = useState<Map<string, DocumentUnderstandingState>>(new Map());
   const [reuseAnalysisFromVaults, setReuseAnalysisFromVaults] = useState(false);
   const [reuseNotice, setReuseNotice] = useState<string | null>(null);
-  const [filtersOpen, setFiltersOpen] = useState(() => snapshot?.filtersOpen ?? false);
-  const [advancedFiltersOpen, setAdvancedFiltersOpen] = useState(() => snapshot?.advancedFiltersOpen ?? false);
+  const [filtersOpen, setFiltersOpenState] = useState(() => snapshot?.filtersOpen ?? false);
+  const [advancedFiltersOpen, setAdvancedFiltersOpenState] = useState(() => snapshot?.advancedFiltersOpen ?? false);
   const [collectionsMenuOpen, setCollectionsMenuOpen] = useState(false);
   const [graphWork, setGraphWork] = useState<{ nodus_id: string; title: string } | null>(null);
   const [ideasWork, setIdeasWork] = useState<{ nodus_id: string; title: string } | null>(null);
@@ -637,7 +640,8 @@ export function Library({
     if (!target) return;
     setSearchDraft('');
     setFilter(target.healthBucket ? { healthBucket: target.healthBucket } : {});
-  }, [target]);
+    onTargetConsumed?.();
+  }, [onTargetConsumed, target]);
 
   // Debounce the free-text search: push the draft into the filter only after the
   // user pauses, so a burst of keystrokes triggers one DB query instead of one
@@ -663,6 +667,21 @@ export function Library({
   const snapshotOf = useRef(currentSnapshot);
   snapshotOf.current = currentSnapshot;
   useEffect(() => { reportSnapshot.current?.(currentSnapshot()); }, [currentSnapshot]);
+
+  // A filter can be changed and the section can be left in the same interaction
+  // (for example, dismissing a filter by clicking another sidebar section). A
+  // passive effect never gets to report that render once this component is
+  // unmounted, so keep the snapshot in step at the moment of the user's action.
+  // The effect above remains the catch-all for non-interactive changes such as the
+  // debounced search and incoming navigation targets.
+  const filterRef = useRef(filter);
+  filterRef.current = filter;
+  const updateFilter = useCallback((updater: WorkFilter | ((current: WorkFilter) => WorkFilter)) => {
+    const next = typeof updater === 'function' ? updater(filterRef.current) : updater;
+    filterRef.current = next;
+    setFilter(next);
+    reportSnapshot.current?.({ ...snapshotOf.current(), filter: next });
+  }, []);
 
   // VirtualList restores the anchor, because only it knows where an unrendered row
   // would be. What to do when the row is gone is this view's call: the first page.
@@ -861,7 +880,7 @@ export function Library({
   }, [availableZoteroTags, tagSearch]);
 
   const toggleZoteroTag = (label: string) => {
-    setFilter((current) => {
+    updateFilter((current) => {
       const selected = current.zoteroTags ?? [];
       const normalized = label.toLocaleLowerCase();
       const exists = selected.some((tag) => tag.toLocaleLowerCase() === normalized);
@@ -873,7 +892,7 @@ export function Library({
   };
 
   const clearZoteroTags = () => {
-    setFilter((current) => ({ ...current, zoteroTags: [], zoteroTagMode: 'any' }));
+    updateFilter((current) => ({ ...current, zoteroTags: [], zoteroTagMode: 'any' }));
     setTagSearch('');
   };
 
@@ -888,7 +907,7 @@ export function Library({
   }, [availableCollections, collectionSearch]);
 
   const toggleCollection = (key: string) => {
-    setFilter((current) => {
+    updateFilter((current) => {
       const selected = current.collections ?? [];
       const exists = selected.includes(key);
       return { ...current, collections: exists ? selected.filter((k) => k !== key) : [...selected, key] };
@@ -896,7 +915,7 @@ export function Library({
   };
 
   const clearCollections = () => {
-    setFilter((current) => ({ ...current, collections: [], collectionMode: 'any' }));
+    updateFilter((current) => ({ ...current, collections: [], collectionMode: 'any' }));
     setCollectionSearch('');
   };
 
@@ -907,7 +926,7 @@ export function Library({
   // letting them stack would mean two answers to the same question.
   const setReadiness = (readiness: Exclude<WorkReadiness, 'running'> | null) => {
     setPageOffset(0);
-    setFilter((current) => ({ ...current, readiness: readiness ?? undefined, healthBucket: undefined }));
+    updateFilter((current) => ({ ...current, readiness: readiness ?? undefined, healthBucket: undefined }));
   };
   const searchValue = searchDraft;
   const hasActiveFilters =
@@ -923,9 +942,9 @@ export function Library({
     selectedCollections.length +
     (selectedReadiness !== null ? 1 : 0) +
     (selectedHealthBucket !== null ? 1 : 0);
-  const clearHealthBucket = () => setFilter((c) => ({ ...c, healthBucket: undefined }));
+  const clearHealthBucket = () => updateFilter((c) => ({ ...c, healthBucket: undefined }));
   const toggleStatusFlag = (f: StatusFlag) =>
-    setFilter((cur) => {
+    updateFilter((cur) => {
       const set = new Set(cur.statusFlags ?? []);
       const opposite = isNegated(f) ? dimensionOf(f) : (`!${dimensionOf(f)}` as StatusFlag);
       set.delete(opposite);
@@ -933,7 +952,7 @@ export function Library({
       return { ...cur, statusFlags: [...set] };
     });
   const setStatusDimension = (dim: StatusDimension, state: 'off' | 'pos' | 'neg') =>
-    setFilter((cur) => {
+    updateFilter((cur) => {
       const set = new Set(cur.statusFlags ?? []);
       set.delete(dim);
       set.delete(`!${dim}` as StatusFlag);
@@ -941,21 +960,31 @@ export function Library({
       else if (state === 'neg') set.add(`!${dim}` as StatusFlag);
       return { ...cur, statusFlags: [...set] };
     });
-  const clearStatusFlags = () => setFilter((c) => ({ ...c, statusFlags: [] }));
+  const clearStatusFlags = () => updateFilter((c) => ({ ...c, statusFlags: [] }));
   const clearAllFilters = () => {
-    setFilter({});
+    updateFilter({});
     setSearchDraft('');
     setTagSearch('');
     setCollectionSearch('');
   };
   const toggleFilterPanel = () => {
     const nextOpen = !filtersOpen;
-    setFiltersOpen(nextOpen);
+    setFiltersOpenState(nextOpen);
     if (!nextOpen) {
       setTagFilterOpen(false);
       setCollectionFilterOpen(false);
-      setAdvancedFiltersOpen(false);
+      setAdvancedFiltersOpenState(false);
     }
+    reportSnapshot.current?.({
+      ...snapshotOf.current(),
+      filtersOpen: nextOpen,
+      advancedFiltersOpen: nextOpen ? advancedFiltersOpen : false,
+    });
+  };
+  const toggleAdvancedFilterPanel = () => {
+    const nextOpen = !advancedFiltersOpen;
+    setAdvancedFiltersOpenState(nextOpen);
+    reportSnapshot.current?.({ ...snapshotOf.current(), advancedFiltersOpen: nextOpen });
   };
 
   // A batch action must only operate on the current result set.  Otherwise a
@@ -1197,7 +1226,7 @@ export function Library({
                     <select
                       className="input py-1 text-xs"
                       value={filter.zoteroTagMode ?? 'any'}
-                      onChange={(e) => setFilter((current) => ({ ...current, zoteroTagMode: e.target.value as 'any' | 'all' }))}
+                      onChange={(e) => updateFilter((current) => ({ ...current, zoteroTagMode: e.target.value as 'any' | 'all' }))}
                     >
                       <option value="any">{t('Cualquiera')}</option>
                       <option value="all">{t('Todas')}</option>
@@ -1286,7 +1315,7 @@ export function Library({
                     <select
                       className="input py-1 text-xs"
                       value={filter.collectionMode ?? 'any'}
-                      onChange={(e) => setFilter((current) => ({ ...current, collectionMode: e.target.value as 'any' | 'all' }))}
+                      onChange={(e) => updateFilter((current) => ({ ...current, collectionMode: e.target.value as 'any' | 'all' }))}
                     >
                       <option value="any">{t('Cualquiera')}</option>
                       <option value="all">{t('Todas')}</option>
@@ -1368,7 +1397,7 @@ export function Library({
                 ? 'is-active border-neutral-600 bg-neutral-800 text-neutral-100'
                 : 'btn-ghost border-neutral-700'
             }`}
-            onClick={() => setAdvancedFiltersOpen((v) => !v)}
+            onClick={toggleAdvancedFilterPanel}
             aria-expanded={advancedFiltersOpen}
           >
             {t('Filtros avanzados')}

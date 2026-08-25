@@ -37,6 +37,7 @@ export const academicApi: AcademicApi = {
     return result.version;
   },
   startDictionaryGeneration: (request) => ipcRenderer.invoke('dictionary:generate:start', request),
+  listDictionaryGenerationJobs: () => ipcRenderer.invoke('dictionary:generate:jobs'),
   onDictionaryProgress: (callback) => {
     const listener = (_event: Electron.IpcRendererEvent, progress: Parameters<typeof callback>[0]) => callback(progress);
     ipcRenderer.on('dictionary:progress', listener);

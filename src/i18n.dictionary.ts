@@ -1,8 +1,8 @@
 /** Dictionary surface translations. Spanish is the source key language. */
 export const DICTIONARY_TRANSLATIONS = {
   en: {
-    Dictionary: "Dictionary",
-    "Nueva entrada de Dictionary": "New Dictionary entry",
+    Diccionario: "Dictionary",
+    "Nueva entrada del Diccionario": "New Dictionary entry",
     "Nodus buscará la evidencia más relevante y generará la definición automáticamente.":
       "Nodus will find the most relevant evidence and generate the definition automatically.",
     "Posibles conceptos duplicados": "Possible duplicate concepts",
@@ -14,6 +14,18 @@ export const DICTIONARY_TRANSLATIONS = {
     Cancelar: "Cancel",
     "Generar de todos modos": "Generate anyway",
     Concepto: "Concept",
+    "Añadir concepto": "Add concept",
+    "Quitar concepto": "Remove concept",
+    "Cada concepto se guardará como una entrada independiente y se procesará en paralelo.":
+      "Each concept will be saved as a separate entry and processed in parallel.",
+    "Hay conceptos repetidos en el lote.":
+      "The batch contains duplicate concepts.",
+    "Preparando {n} definiciones…": "Preparing {n} definitions…",
+    "Generar {n} definiciones": "Generate {n} definitions",
+    "Generar {n} definiciones de todos modos":
+      "Generate {n} definitions anyway",
+    "{n} entradas ya están guardadas; reintentar no creará duplicados.":
+      "{n} entries are already saved; retrying will not create duplicates.",
     "Aliases o términos alternativos": "Aliases or alternative terms",
     "Separados por comas": "Separated by commas",
     "Prompt de enfoque": "Focus prompt",
@@ -39,13 +51,13 @@ export const DICTIONARY_TRANSLATIONS = {
     "Preparando definición…": "Preparing definition…",
     "Reintentar generación": "Retry generation",
     "Generar definición": "Generate definition",
-    "Dictionary ({n})": "Dictionary ({n})",
+    "Diccionario ({n})": "Dictionary ({n})",
     "Eliminar ({n})": "Delete ({n})",
     "Nueva entrada": "New entry",
     "Conceptos sintetizados exclusivamente desde la evidencia de la bóveda.":
       "Concepts synthesized exclusively from vault evidence.",
-    "Eliminar entrada de Dictionary": "Delete Dictionary entry",
-    "Eliminar {n} entradas de Dictionary": "Delete {n} Dictionary entries",
+    "Eliminar entrada del Diccionario": "Delete Dictionary entry",
+    "Eliminar {n} entradas del Diccionario": "Delete {n} Dictionary entries",
     "Se eliminarán también todas sus versiones y relaciones. Esta acción no se puede deshacer.":
       "All versions and relations will also be deleted. This action cannot be undone.",
     "Eliminar entrada": "Delete entry",
@@ -72,12 +84,12 @@ export const DICTIONARY_TRANSLATIONS = {
     "Aún no se ha generado una descripción.":
       "A description has not been generated yet.",
     "{n} nuevas": "{n} new",
-    "Cargando Dictionary…": "Loading Dictionary…",
+    "Cargando Diccionario…": "Loading Dictionary…",
     "No hay entradas con este filtro.": "No entries match this filter.",
     "Abriendo entrada…": "Opening entry…",
     Resumen: "Overview",
     Versiones: "Versions",
-    "Modelo de Dictionary": "Dictionary model",
+    "Modelo del Diccionario": "Dictionary model",
     Insuficiente: "Insufficient",
     "Sin aliases": "No aliases",
     "Sin foco adicional.": "No additional focus.",
@@ -169,8 +181,8 @@ export const DICTIONARY_TRANSLATIONS = {
     Italiano: "Italian",
   },
   fr: {
-    Dictionary: "Dictionnaire",
-    "Nueva entrada de Dictionary": "Nouvelle entrée de dictionnaire",
+    Diccionario: "Dictionnaire",
+    "Nueva entrada del Diccionario": "Nouvelle entrée de dictionnaire",
     "Nodus buscará la evidencia más relevante y generará la definición automáticamente.":
       "Nodus trouvera les éléments les plus pertinents et générera automatiquement la définition.",
     "Posibles conceptos duplicados": "Concepts potentiellement dupliqués",
@@ -182,6 +194,18 @@ export const DICTIONARY_TRANSLATIONS = {
     Cancelar: "Annuler",
     "Generar de todos modos": "Générer quand même",
     Concepto: "Concept",
+    "Añadir concepto": "Ajouter un concept",
+    "Quitar concepto": "Supprimer le concept",
+    "Cada concepto se guardará como una entrada independiente y se procesará en paralelo.":
+      "Chaque concept sera enregistré comme une entrée distincte et traité en parallèle.",
+    "Hay conceptos repetidos en el lote.":
+      "Le lot contient des concepts en double.",
+    "Preparando {n} definiciones…": "Préparation de {n} définitions…",
+    "Generar {n} definiciones": "Générer {n} définitions",
+    "Generar {n} definiciones de todos modos":
+      "Générer quand même {n} définitions",
+    "{n} entradas ya están guardadas; reintentar no creará duplicados.":
+      "{n} entrées sont déjà enregistrées ; réessayer ne créera pas de doublons.",
     "Aliases o términos alternativos": "Alias ou termes alternatifs",
     "Separados por comas": "Séparés par des virgules",
     "Prompt de enfoque": "Question de cadrage",
@@ -207,13 +231,13 @@ export const DICTIONARY_TRANSLATIONS = {
     "Preparando definición…": "Préparation de la définition…",
     "Reintentar generación": "Réessayer la génération",
     "Generar definición": "Générer la définition",
-    "Dictionary ({n})": "Dictionnaire ({n})",
+    "Diccionario ({n})": "Dictionnaire ({n})",
     "Eliminar ({n})": "Supprimer ({n})",
     "Nueva entrada": "Nouvelle entrée",
     "Conceptos sintetizados exclusivamente desde la evidencia de la bóveda.":
       "Concepts synthétisés exclusivement à partir des éléments du coffre.",
-    "Eliminar entrada de Dictionary": "Supprimer l’entrée du dictionnaire",
-    "Eliminar {n} entradas de Dictionary":
+    "Eliminar entrada del Diccionario": "Supprimer l’entrée du dictionnaire",
+    "Eliminar {n} entradas del Diccionario":
       "Supprimer {n} entrées du dictionnaire",
     "Se eliminarán también todas sus versiones y relaciones. Esta acción no se puede deshacer.":
       "Toutes les versions et relations seront également supprimées. Cette action est irréversible.",
@@ -254,13 +278,13 @@ export const DICTIONARY_TRANSLATIONS = {
     "Aún no se ha generado una descripción.":
       "Aucune description n’a encore été générée.",
     "{n} nuevas": "{n} nouveaux",
-    "Cargando Dictionary…": "Chargement du dictionnaire…",
+    "Cargando Diccionario…": "Chargement du dictionnaire…",
     "No hay entradas con este filtro.":
       "Aucune entrée ne correspond à ce filtre.",
     "Abriendo entrada…": "Ouverture de l’entrée…",
     Resumen: "Résumé",
     Versiones: "Versions",
-    "Modelo de Dictionary": "Modèle du dictionnaire",
+    "Modelo del Diccionario": "Modèle du dictionnaire",
     Insuficiente: "Insuffisant",
     "Sin aliases": "Aucun alias",
     "Sin foco adicional.": "Aucun cadrage supplémentaire.",
@@ -1272,3 +1296,263 @@ Object.assign(
     "Nodus Library": "Nodus Library",
   }),
 );
+
+/** Prompt presets are authored as Spanish keys and translated explicitly. */
+Object.assign(DICTIONARY_TRANSLATIONS.en as DictionaryTable, {
+  "Preconfiguración del prompt": "Prompt preset",
+  Personalizado: "Custom",
+  "Escribe o adapta libremente las instrucciones para la síntesis.":
+    "Write or freely adapt the synthesis instructions.",
+  "Básico · definición y autores": "Basic · definition and authors",
+  "Define el concepto e identifica a los autores que lo desarrollan.":
+    "Define the concept and identify the authors who develop it.",
+  "Define el concepto con precisión a partir de la evidencia e identifica a los principales autores que lo desarrollan, explicando brevemente la aportación de cada uno.":
+    "Define the concept precisely from the evidence and identify the main authors who develop it, briefly explaining each author's contribution.",
+  "Evolución histórica": "Historical evolution",
+  "Sigue antecedentes, cambios y puntos de inflexión documentados.":
+    "Trace documented precedents, changes, and turning points.",
+  "Reconstruye la evolución histórica del concepto: antecedentes, primeras formulaciones, cambios de significado y autores u obras que marcan puntos de inflexión.":
+    "Reconstruct the concept's historical evolution: its precedents, early formulations, changes in meaning, and the authors or works that mark turning points.",
+  "Debate entre autores": "Debate among authors",
+  "Compara acuerdos, desacuerdos y matices entre autores.":
+    "Compare agreements, disagreements, and nuances among authors.",
+  "Compara cómo definen y utilizan el concepto los distintos autores. Expón acuerdos, desacuerdos, matices y posiciones intermedias, sin atribuir debates que la evidencia no sostenga.":
+    "Compare how different authors define and use the concept. Present agreements, disagreements, nuances, and intermediate positions without attributing debates that the evidence does not support.",
+  "Genealogía teórica": "Theoretical genealogy",
+  "Reconstruye antecedentes, marcos y conceptos relacionados.":
+    "Reconstruct precedents, frameworks, and related concepts.",
+  "Sitúa el concepto dentro de su genealogía teórica. Explica de qué ideas procede, con qué conceptos se relaciona, qué tradiciones o marcos lo articulan y qué autores realizan esas conexiones.":
+    "Place the concept within its theoretical genealogy. Explain which ideas it stems from, which concepts it relates to, which traditions or frameworks articulate it, and which authors make those connections.",
+  "Usos y aplicaciones": "Uses and applications",
+  "Explica cómo se utiliza el concepto y cuáles son sus límites.":
+    "Explain how the concept is used and what its limits are.",
+  "Explica cómo se aplica u operacionaliza el concepto en las obras del corpus. Distingue ámbitos de uso, problemas que ayuda a analizar, ejemplos documentados y límites de aplicación.":
+    "Explain how the concept is applied or operationalized in the works in the corpus. Distinguish areas of use, problems it helps analyze, documented examples, and limits of application.",
+  "Lectura crítica": "Critical reading",
+  "Examina supuestos, tensiones, críticas y preguntas abiertas.":
+    "Examine assumptions, tensions, criticisms, and open questions.",
+  "Realiza una lectura crítica del concepto: supuestos, tensiones internas, ambigüedades, críticas, límites y cuestiones abiertas señaladas por los autores o visibles en la evidencia.":
+    "Provide a critical reading of the concept: assumptions, internal tensions, ambiguities, criticisms, limits, and open questions identified by the authors or visible in the evidence.",
+});
+
+Object.assign(DICTIONARY_TRANSLATIONS.fr as DictionaryTable, {
+  "Preconfiguración del prompt": "Préconfiguration du prompt",
+  Personalizado: "Personnalisé",
+  "Escribe o adapta libremente las instrucciones para la síntesis.":
+    "Rédigez ou adaptez librement les consignes de synthèse.",
+  "Básico · definición y autores": "Basique · définition et auteurs",
+  "Define el concepto e identifica a los autores que lo desarrollan.":
+    "Définissez le concept et identifiez les auteurs qui le développent.",
+  "Define el concepto con precisión a partir de la evidencia e identifica a los principales autores que lo desarrollan, explicando brevemente la aportación de cada uno.":
+    "Définissez précisément le concept à partir des sources et identifiez les principaux auteurs qui le développent, en expliquant brièvement l'apport de chacun.",
+  "Evolución histórica": "Évolution historique",
+  "Sigue antecedentes, cambios y puntos de inflexión documentados.":
+    "Retracez les antécédents, les changements et les tournants documentés.",
+  "Reconstruye la evolución histórica del concepto: antecedentes, primeras formulaciones, cambios de significado y autores u obras que marcan puntos de inflexión.":
+    "Reconstituez l'évolution historique du concept : antécédents, premières formulations, changements de sens et auteurs ou œuvres marquant des tournants.",
+  "Debate entre autores": "Débat entre auteurs",
+  "Compara acuerdos, desacuerdos y matices entre autores.":
+    "Comparez les accords, les désaccords et les nuances entre auteurs.",
+  "Compara cómo definen y utilizan el concepto los distintos autores. Expón acuerdos, desacuerdos, matices y posiciones intermedias, sin atribuir debates que la evidencia no sostenga.":
+    "Comparez la manière dont les différents auteurs définissent et utilisent le concept. Présentez les accords, les désaccords, les nuances et les positions intermédiaires, sans attribuer de débats que les sources n'étayent pas.",
+  "Genealogía teórica": "Généalogie théorique",
+  "Reconstruye antecedentes, marcos y conceptos relacionados.":
+    "Reconstituez les antécédents, les cadres et les concepts associés.",
+  "Sitúa el concepto dentro de su genealogía teórica. Explica de qué ideas procede, con qué conceptos se relaciona, qué tradiciones o marcos lo articulan y qué autores realizan esas conexiones.":
+    "Situez le concept dans sa généalogie théorique. Expliquez de quelles idées il procède, à quels concepts il se rapporte, quelles traditions ou quels cadres l'articulent et quels auteurs établissent ces liens.",
+  "Usos y aplicaciones": "Usages et applications",
+  "Explica cómo se utiliza el concepto y cuáles son sus límites.":
+    "Expliquez comment le concept est utilisé et quelles sont ses limites.",
+  "Explica cómo se aplica u operacionaliza el concepto en las obras del corpus. Distingue ámbitos de uso, problemas que ayuda a analizar, ejemplos documentados y límites de aplicación.":
+    "Expliquez comment le concept est appliqué ou opérationnalisé dans les œuvres du corpus. Distinguez les domaines d'utilisation, les problèmes qu'il aide à analyser, les exemples documentés et les limites d'application.",
+  "Lectura crítica": "Lecture critique",
+  "Examina supuestos, tensiones, críticas y preguntas abiertas.":
+    "Examinez les présupposés, les tensions, les critiques et les questions ouvertes.",
+  "Realiza una lectura crítica del concepto: supuestos, tensiones internas, ambigüedades, críticas, límites y cuestiones abiertas señaladas por los autores o visibles en la evidencia.":
+    "Proposez une lecture critique du concept : présupposés, tensions internes, ambiguïtés, critiques, limites et questions ouvertes signalées par les auteurs ou visibles dans les sources.",
+});
+
+Object.assign(DICTIONARY_TRANSLATIONS.de as DictionaryTable, {
+  "Preconfiguración del prompt": "Prompt-Voreinstellung",
+  Personalizado: "Benutzerdefiniert",
+  "Escribe o adapta libremente las instrucciones para la síntesis.":
+    "Schreiben oder bearbeiten Sie die Anweisungen für die Synthese frei.",
+  "Básico · definición y autores": "Grundlegend · Definition und Autoren",
+  "Define el concepto e identifica a los autores que lo desarrollan.":
+    "Definieren Sie den Begriff und identifizieren Sie die Autoren, die ihn entwickeln.",
+  "Define el concepto con precisión a partir de la evidencia e identifica a los principales autores que lo desarrollan, explicando brevemente la aportación de cada uno.":
+    "Definieren Sie den Begriff anhand der Belege präzise und identifizieren Sie die wichtigsten Autoren, die ihn entwickeln. Erläutern Sie kurz den Beitrag jedes Autors.",
+  "Evolución histórica": "Historische Entwicklung",
+  "Sigue antecedentes, cambios y puntos de inflexión documentados.":
+    "Verfolgen Sie dokumentierte Vorläufer, Veränderungen und Wendepunkte.",
+  "Reconstruye la evolución histórica del concepto: antecedentes, primeras formulaciones, cambios de significado y autores u obras que marcan puntos de inflexión.":
+    "Rekonstruieren Sie die historische Entwicklung des Begriffs: Vorläufer, frühe Formulierungen, Bedeutungswandel sowie Autoren oder Werke, die Wendepunkte markieren.",
+  "Debate entre autores": "Debatte zwischen Autoren",
+  "Compara acuerdos, desacuerdos y matices entre autores.":
+    "Vergleichen Sie Übereinstimmungen, Meinungsverschiedenheiten und Nuancen zwischen den Autoren.",
+  "Compara cómo definen y utilizan el concepto los distintos autores. Expón acuerdos, desacuerdos, matices y posiciones intermedias, sin atribuir debates que la evidencia no sostenga.":
+    "Vergleichen Sie, wie verschiedene Autoren den Begriff definieren und verwenden. Stellen Sie Übereinstimmungen, Meinungsverschiedenheiten, Nuancen und Zwischenpositionen dar, ohne Debatten zuzuschreiben, die durch die Belege nicht gestützt werden.",
+  "Genealogía teórica": "Theoretische Genealogie",
+  "Reconstruye antecedentes, marcos y conceptos relacionados.":
+    "Rekonstruieren Sie Vorläufer, Rahmen und verwandte Begriffe.",
+  "Sitúa el concepto dentro de su genealogía teórica. Explica de qué ideas procede, con qué conceptos se relaciona, qué tradiciones o marcos lo articulan y qué autores realizan esas conexiones.":
+    "Ordnen Sie den Begriff in seine theoretische Genealogie ein. Erklären Sie, aus welchen Ideen er hervorgeht, mit welchen Begriffen er zusammenhängt, welche Traditionen oder Rahmen ihn ausarbeiten und welche Autoren diese Verbindungen herstellen.",
+  "Usos y aplicaciones": "Verwendung und Anwendungen",
+  "Explica cómo se utiliza el concepto y cuáles son sus límites.":
+    "Erklären Sie, wie der Begriff verwendet wird und wo seine Grenzen liegen.",
+  "Explica cómo se aplica u operacionaliza el concepto en las obras del corpus. Distingue ámbitos de uso, problemas que ayuda a analizar, ejemplos documentados y límites de aplicación.":
+    "Erklären Sie, wie der Begriff in den Werken des Korpus angewendet oder operationalisiert wird. Unterscheiden Sie Anwendungsbereiche, analysierbare Probleme, dokumentierte Beispiele und Anwendungsgrenzen.",
+  "Lectura crítica": "Kritische Lektüre",
+  "Examina supuestos, tensiones, críticas y preguntas abiertas.":
+    "Untersuchen Sie Annahmen, Spannungen, Kritikpunkte und offene Fragen.",
+  "Realiza una lectura crítica del concepto: supuestos, tensiones internas, ambigüedades, críticas, límites y cuestiones abiertas señaladas por los autores o visibles en la evidencia.":
+    "Nehmen Sie eine kritische Lektüre des Begriffs vor: Annahmen, innere Spannungen, Mehrdeutigkeiten, Kritikpunkte, Grenzen und offene Fragen, auf die Autoren hinweisen oder die in den Belegen sichtbar werden.",
+});
+
+Object.assign(DICTIONARY_TRANSLATIONS.pt as DictionaryTable, {
+  "Preconfiguración del prompt": "Predefinição do prompt",
+  Personalizado: "Personalizado",
+  "Escribe o adapta libremente las instrucciones para la síntesis.":
+    "Escreva ou adapte livremente as instruções para a síntese.",
+  "Básico · definición y autores": "Básico · definição e autores",
+  "Define el concepto e identifica a los autores que lo desarrollan.":
+    "Defina o conceito e identifique os autores que o desenvolvem.",
+  "Define el concepto con precisión a partir de la evidencia e identifica a los principales autores que lo desarrollan, explicando brevemente la aportación de cada uno.":
+    "Defina o conceito com precisão a partir das evidências e identifique os principais autores que o desenvolvem, explicando brevemente o contributo de cada um.",
+  "Evolución histórica": "Evolução histórica",
+  "Sigue antecedentes, cambios y puntos de inflexión documentados.":
+    "Acompanhe antecedentes, mudanças e pontos de viragem documentados.",
+  "Reconstruye la evolución histórica del concepto: antecedentes, primeras formulaciones, cambios de significado y autores u obras que marcan puntos de inflexión.":
+    "Reconstrua a evolução histórica do conceito: antecedentes, primeiras formulações, mudanças de significado e autores ou obras que marcam pontos de viragem.",
+  "Debate entre autores": "Debate entre autores",
+  "Compara acuerdos, desacuerdos y matices entre autores.":
+    "Compare acordos, desacordos e nuances entre autores.",
+  "Compara cómo definen y utilizan el concepto los distintos autores. Expón acuerdos, desacuerdos, matices y posiciones intermedias, sin atribuir debates que la evidencia no sostenga.":
+    "Compare a forma como diferentes autores definem e utilizam o conceito. Apresente acordos, desacordos, nuances e posições intermédias, sem atribuir debates que as evidências não sustentem.",
+  "Genealogía teórica": "Genealogia teórica",
+  "Reconstruye antecedentes, marcos y conceptos relacionados.":
+    "Reconstrua antecedentes, quadros e conceitos relacionados.",
+  "Sitúa el concepto dentro de su genealogía teórica. Explica de qué ideas procede, con qué conceptos se relaciona, qué tradiciones o marcos lo articulan y qué autores realizan esas conexiones.":
+    "Situe o conceito na sua genealogia teórica. Explique de que ideias procede, com que conceitos se relaciona, que tradições ou quadros o articulam e que autores estabelecem essas ligações.",
+  "Usos y aplicaciones": "Usos e aplicações",
+  "Explica cómo se utiliza el concepto y cuáles son sus límites.":
+    "Explique como o conceito é utilizado e quais são os seus limites.",
+  "Explica cómo se aplica u operacionaliza el concepto en las obras del corpus. Distingue ámbitos de uso, problemas que ayuda a analizar, ejemplos documentados y límites de aplicación.":
+    "Explique como o conceito é aplicado ou operacionalizado nas obras do corpus. Distinga âmbitos de utilização, problemas que ajuda a analisar, exemplos documentados e limites de aplicação.",
+  "Lectura crítica": "Leitura crítica",
+  "Examina supuestos, tensiones, críticas y preguntas abiertas.":
+    "Examine pressupostos, tensões, críticas e questões em aberto.",
+  "Realiza una lectura crítica del concepto: supuestos, tensiones internas, ambigüedades, críticas, límites y cuestiones abiertas señaladas por los autores o visibles en la evidencia.":
+    "Faça uma leitura crítica do conceito: pressupostos, tensões internas, ambiguidades, críticas, limites e questões em aberto apontadas pelos autores ou visíveis nas evidências.",
+});
+
+Object.assign(DICTIONARY_TRANSLATIONS["pt-BR"] as DictionaryTable, {
+  "Preconfiguración del prompt": "Predefinição do prompt",
+  Personalizado: "Personalizado",
+  "Escribe o adapta libremente las instrucciones para la síntesis.":
+    "Escreva ou adapte livremente as instruções para a síntese.",
+  "Básico · definición y autores": "Básico · definição e autores",
+  "Define el concepto e identifica a los autores que lo desarrollan.":
+    "Defina o conceito e identifique os autores que o desenvolvem.",
+  "Define el concepto con precisión a partir de la evidencia e identifica a los principales autores que lo desarrollan, explicando brevemente la aportación de cada uno.":
+    "Defina o conceito com precisão a partir das evidências e identifique os principais autores que o desenvolvem, explicando brevemente a contribuição de cada um.",
+  "Evolución histórica": "Evolução histórica",
+  "Sigue antecedentes, cambios y puntos de inflexión documentados.":
+    "Acompanhe antecedentes, mudanças e pontos de inflexão documentados.",
+  "Reconstruye la evolución histórica del concepto: antecedentes, primeras formulaciones, cambios de significado y autores u obras que marcan puntos de inflexión.":
+    "Reconstrua a evolução histórica do conceito: antecedentes, primeiras formulações, mudanças de significado e autores ou obras que marcam pontos de inflexão.",
+  "Debate entre autores": "Debate entre autores",
+  "Compara acuerdos, desacuerdos y matices entre autores.":
+    "Compare acordos, desacordos e nuances entre autores.",
+  "Compara cómo definen y utilizan el concepto los distintos autores. Expón acuerdos, desacuerdos, matices y posiciones intermedias, sin atribuir debates que la evidencia no sostenga.":
+    "Compare como diferentes autores definem e utilizam o conceito. Apresente acordos, desacordos, nuances e posições intermediárias, sem atribuir debates que as evidências não sustentem.",
+  "Genealogía teórica": "Genealogia teórica",
+  "Reconstruye antecedentes, marcos y conceptos relacionados.":
+    "Reconstrua antecedentes, referenciais e conceitos relacionados.",
+  "Sitúa el concepto dentro de su genealogía teórica. Explica de qué ideas procede, con qué conceptos se relaciona, qué tradiciones o marcos lo articulan y qué autores realizan esas conexiones.":
+    "Situe o conceito em sua genealogia teórica. Explique de quais ideias ele procede, com quais conceitos se relaciona, quais tradições ou referenciais o articulam e quais autores estabelecem essas conexões.",
+  "Usos y aplicaciones": "Usos e aplicações",
+  "Explica cómo se utiliza el concepto y cuáles son sus límites.":
+    "Explique como o conceito é utilizado e quais são seus limites.",
+  "Explica cómo se aplica u operacionaliza el concepto en las obras del corpus. Distingue ámbitos de uso, problemas que ayuda a analizar, ejemplos documentados y límites de aplicación.":
+    "Explique como o conceito é aplicado ou operacionalizado nas obras do corpus. Distinga áreas de uso, problemas que ele ajuda a analisar, exemplos documentados e limites de aplicação.",
+  "Lectura crítica": "Leitura crítica",
+  "Examina supuestos, tensiones, críticas y preguntas abiertas.":
+    "Examine pressupostos, tensões, críticas e questões em aberto.",
+  "Realiza una lectura crítica del concepto: supuestos, tensiones internas, ambigüedades, críticas, límites y cuestiones abiertas señaladas por los autores o visibles en la evidencia.":
+    "Faça uma leitura crítica do conceito: pressupostos, tensões internas, ambiguidades, críticas, limites e questões em aberto apontadas pelos autores ou visíveis nas evidências.",
+});
+
+Object.assign(DICTIONARY_TRANSLATIONS.it as DictionaryTable, {
+  "Preconfiguración del prompt": "Preconfigurazione del prompt",
+  Personalizado: "Personalizzato",
+  "Escribe o adapta libremente las instrucciones para la síntesis.":
+    "Scrivi o adatta liberamente le istruzioni per la sintesi.",
+  "Básico · definición y autores": "Base · definizione e autori",
+  "Define el concepto e identifica a los autores que lo desarrollan.":
+    "Definisci il concetto e identifica gli autori che lo sviluppano.",
+  "Define el concepto con precisión a partir de la evidencia e identifica a los principales autores que lo desarrollan, explicando brevemente la aportación de cada uno.":
+    "Definisci con precisione il concetto sulla base delle evidenze e identifica i principali autori che lo sviluppano, spiegando brevemente il contributo di ciascuno.",
+  "Evolución histórica": "Evoluzione storica",
+  "Sigue antecedentes, cambios y puntos de inflexión documentados.":
+    "Ripercorri antecedenti, cambiamenti e punti di svolta documentati.",
+  "Reconstruye la evolución histórica del concepto: antecedentes, primeras formulaciones, cambios de significado y autores u obras que marcan puntos de inflexión.":
+    "Ricostruisci l'evoluzione storica del concetto: antecedenti, prime formulazioni, cambiamenti di significato e autori o opere che segnano punti di svolta.",
+  "Debate entre autores": "Dibattito tra autori",
+  "Compara acuerdos, desacuerdos y matices entre autores.":
+    "Confronta accordi, disaccordi e sfumature tra gli autori.",
+  "Compara cómo definen y utilizan el concepto los distintos autores. Expón acuerdos, desacuerdos, matices y posiciones intermedias, sin atribuir debates que la evidencia no sostenga.":
+    "Confronta il modo in cui i diversi autori definiscono e utilizzano il concetto. Presenta accordi, disaccordi, sfumature e posizioni intermedie, senza attribuire dibattiti non sostenuti dalle evidenze.",
+  "Genealogía teórica": "Genealogia teorica",
+  "Reconstruye antecedentes, marcos y conceptos relacionados.":
+    "Ricostruisci antecedenti, quadri teorici e concetti correlati.",
+  "Sitúa el concepto dentro de su genealogía teórica. Explica de qué ideas procede, con qué conceptos se relaciona, qué tradiciones o marcos lo articulan y qué autores realizan esas conexiones.":
+    "Colloca il concetto nella sua genealogia teorica. Spiega da quali idee deriva, a quali concetti è collegato, quali tradizioni o quadri teorici lo articolano e quali autori stabiliscono tali connessioni.",
+  "Usos y aplicaciones": "Usi e applicazioni",
+  "Explica cómo se utiliza el concepto y cuáles son sus límites.":
+    "Spiega come viene utilizzato il concetto e quali sono i suoi limiti.",
+  "Explica cómo se aplica u operacionaliza el concepto en las obras del corpus. Distingue ámbitos de uso, problemas que ayuda a analizar, ejemplos documentados y límites de aplicación.":
+    "Spiega come il concetto viene applicato o operazionalizzato nelle opere del corpus. Distingui gli ambiti d'uso, i problemi che aiuta ad analizzare, gli esempi documentati e i limiti di applicazione.",
+  "Lectura crítica": "Lettura critica",
+  "Examina supuestos, tensiones, críticas y preguntas abiertas.":
+    "Esamina presupposti, tensioni, critiche e questioni aperte.",
+  "Realiza una lectura crítica del concepto: supuestos, tensiones internas, ambigüedades, críticas, límites y cuestiones abiertas señaladas por los autores o visibles en la evidencia.":
+    "Proponi una lettura critica del concetto: presupposti, tensioni interne, ambiguità, critiche, limiti e questioni aperte indicate dagli autori o visibili nelle evidenze.",
+});
+
+Object.assign(DICTIONARY_TRANSLATIONS.tr as DictionaryTable, {
+  "Preconfiguración del prompt": "İstem ön ayarı",
+  Personalizado: "Özel",
+  "Escribe o adapta libremente las instrucciones para la síntesis.":
+    "Sentez yönergelerini serbestçe yazın veya uyarlayın.",
+  "Básico · definición y autores": "Temel · tanım ve yazarlar",
+  "Define el concepto e identifica a los autores que lo desarrollan.":
+    "Kavramı tanımlayın ve onu geliştiren yazarları belirleyin.",
+  "Define el concepto con precisión a partir de la evidencia e identifica a los principales autores que lo desarrollan, explicando brevemente la aportación de cada uno.":
+    "Kavramı kanıtlara dayanarak kesin biçimde tanımlayın ve onu geliştiren başlıca yazarları belirleyerek her birinin katkısını kısaca açıklayın.",
+  "Evolución histórica": "Tarihsel gelişim",
+  "Sigue antecedentes, cambios y puntos de inflexión documentados.":
+    "Belgelenmiş öncülleri, değişimleri ve dönüm noktalarını izleyin.",
+  "Reconstruye la evolución histórica del concepto: antecedentes, primeras formulaciones, cambios de significado y autores u obras que marcan puntos de inflexión.":
+    "Kavramın tarihsel gelişimini yeniden kurun: öncülleri, ilk formülasyonları, anlam değişimleri ve dönüm noktası oluşturan yazar ya da eserleri açıklayın.",
+  "Debate entre autores": "Yazarlar arası tartışma",
+  "Compara acuerdos, desacuerdos y matices entre autores.":
+    "Yazarlar arasındaki uzlaşıları, anlaşmazlıkları ve nüansları karşılaştırın.",
+  "Compara cómo definen y utilizan el concepto los distintos autores. Expón acuerdos, desacuerdos, matices y posiciones intermedias, sin atribuir debates que la evidencia no sostenga.":
+    "Farklı yazarların kavramı nasıl tanımlayıp kullandığını karşılaştırın. Kanıtların desteklemediği tartışmalar atfetmeden uzlaşıları, anlaşmazlıkları, nüansları ve ara konumları ortaya koyun.",
+  "Genealogía teórica": "Kuramsal soykütük",
+  "Reconstruye antecedentes, marcos y conceptos relacionados.":
+    "Öncülleri, çerçeveleri ve ilişkili kavramları yeniden kurun.",
+  "Sitúa el concepto dentro de su genealogía teórica. Explica de qué ideas procede, con qué conceptos se relaciona, qué tradiciones o marcos lo articulan y qué autores realizan esas conexiones.":
+    "Kavramı kuramsal soykütüğü içinde konumlandırın. Hangi fikirlerden doğduğunu, hangi kavramlarla ilişkili olduğunu, hangi gelenek ya da çerçevelerin onu şekillendirdiğini ve hangi yazarların bu bağlantıları kurduğunu açıklayın.",
+  "Usos y aplicaciones": "Kullanımlar ve uygulamalar",
+  "Explica cómo se utiliza el concepto y cuáles son sus límites.":
+    "Kavramın nasıl kullanıldığını ve sınırlarının neler olduğunu açıklayın.",
+  "Explica cómo se aplica u operacionaliza el concepto en las obras del corpus. Distingue ámbitos de uso, problemas que ayuda a analizar, ejemplos documentados y límites de aplicación.":
+    "Kavramın korpustaki eserlerde nasıl uygulandığını veya işlevselleştirildiğini açıklayın. Kullanım alanlarını, analiz etmeye yardımcı olduğu sorunları, belgelenmiş örnekleri ve uygulama sınırlarını ayırt edin.",
+  "Lectura crítica": "Eleştirel okuma",
+  "Examina supuestos, tensiones, críticas y preguntas abiertas.":
+    "Varsayımları, gerilimleri, eleştirileri ve açık soruları inceleyin.",
+  "Realiza una lectura crítica del concepto: supuestos, tensiones internas, ambigüedades, críticas, límites y cuestiones abiertas señaladas por los autores o visibles en la evidencia.":
+    "Kavramı eleştirel biçimde okuyun: yazarların belirttiği veya kanıtlarda görülebilen varsayımları, iç gerilimleri, belirsizlikleri, eleştirileri, sınırları ve açık soruları inceleyin.",
+});

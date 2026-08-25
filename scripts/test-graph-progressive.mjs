@@ -303,16 +303,19 @@ async function bundleGraphService() {
 async function assertRendererContracts() {
   const graphView = await readFile(path.join(repoRoot, 'src/views/GraphView.tsx'), 'utf8');
   const sigmaGraph = await readFile(path.join(repoRoot, 'src/views/graph/SigmaGraph.tsx'), 'utf8');
+  const packageJson = await readFile(path.join(repoRoot, 'package.json'), 'utf8');
+  const packageLock = await readFile(path.join(repoRoot, 'package-lock.json'), 'utf8');
   const preload = await Promise.resolve(readSource('@bridge'));
   const ipc = await Promise.resolve(readSource('@main'));
 
-  assert.match(graphView, /const USE_SIGMA = true;/, 'Sigma is the only selectable graph renderer');
-  assert.doesNotMatch(graphView, /localStorage\.getItem\(['"]nodus\.graph\.engine['"]\)/, 'retired renderer cannot be restored by persisted browser state');
-  assert.match(graphView, /localStorage\.removeItem\(['"]nodus\.graph\.engine['"]\)/, 'stale renderer preferences are removed from upgraded profiles');
-  assert.match(graphView, /if \(USE_SIGMA\) return \[\];/, 'Sigma path skips legacy Cytoscape elements');
+  assert.doesNotMatch(graphView, /USE_SIGMA|cytoscape|nodus\.graph\.engine/i, 'GraphView contains no legacy renderer branch or preference');
+  assert.doesNotMatch(packageJson, /cytoscape/i, 'the legacy renderer is absent from runtime and type dependencies');
+  assert.doesNotMatch(packageLock, /cytoscape/i, 'the legacy renderer is absent from the dependency lockfile');
+  assert.match(graphView, /const focusPendingNavigation = useCallback/, 'cross-view graph targets are focused through the active renderer');
+  assert.match(graphView, /api\.focusNode\(current\.nodeId\)/, 'idea deep-links use the Sigma focus API');
+  assert.match(graphView, /onReady=\{handleGraphReady\}/, 'deep-link focus waits for the requested Sigma scene');
   assert.match(graphView, /getGraphOverview\(\)/, 'initial scene uses the compact overview endpoint');
   assert.match(graphView, /getGraphTheme\(/, 'theme drill-down uses the bounded endpoint');
-  assert.doesNotMatch(graphView, /!USE_SIGMA\s*&&\s*graphLoading/, 'Sigma loading state remains visible');
   assert.match(sigmaGraph, /overrideModel \?\? buildGraphModel/, 'override scenes skip the full model build');
   assert.equal((sigmaGraph.match(/ensureClusters\(\);/g) ?? []).length, 1, 'Louvain only remains on the lazy LOD path');
   assert.match(preload, /graph:overview/, 'overview IPC is exposed by preload');

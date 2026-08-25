@@ -208,7 +208,7 @@ export interface DictionaryVersion {
 export interface DictionaryEntryDetail {
   entry: DictionaryEntry;
   coverage: {
-    used: number;
+    included: number;
     cited: number;
     unused: number;
     excluded: number;
