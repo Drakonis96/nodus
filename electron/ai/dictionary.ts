@@ -598,9 +598,57 @@ function uncitedSubstantiveSentences(markdown: string): string[] {
     .map((part) => part.trim())
     .filter(
       (part) =>
-        part.split(/\s+/).filter(Boolean).length >= 7,
+        part.split(/\s+/).filter(Boolean).length >= 4,
     )
     .filter((part) => !part.includes("CITATION") && !part.includes("nodus://"));
+}
+
+function substantiveWordCount(markdown: string): number {
+  const body = markdown
+    .replace(/^#{1,6} .*$/gm, " ")
+    // Citation labels are bibliography, not synthesis. A citation-only response
+    // must not become an apparently non-empty Dictionary definition.
+    .replace(/\[[^\]\n]*\]\(nodus:\/\/(?:idea|passage)\/[^)\s]+\)/g, " ")
+    .replace(/[^\p{L}\p{M}'’\s-]/gu, " ");
+  return body.match(/\p{L}[\p{L}\p{M}'’-]*/gu)?.length ?? 0;
+}
+
+async function groundGeneratedDescription(
+  generated: GeneratedDictionary,
+  snapshot: WritingWorkshopSnapshot,
+  verifyCitations: typeof aiVerifyCitations,
+  model: ModelRef | null,
+): Promise<{
+  markdown: string;
+  problems: string[];
+  strippedSentences: string[];
+}> {
+  const maps = buildSnapshotMaps(snapshot);
+  for (const id of [...maps.validIds])
+    if (id.startsWith("work:")) maps.validIds.delete(id);
+  let cleaned = applyCitationPolicy(generated.descriptionMarkdown, maps).markdown;
+  const claims = extractCitationClaims(cleaned, maps);
+  let strippedSentences: string[] = [];
+  if (claims.length) {
+    const outcome = applyVerification(
+      cleaned,
+      claims,
+      await verifyCitations(claims, model),
+    );
+    cleaned = outcome.markdown;
+    strippedSentences = outcome.strippedSentences;
+  }
+
+  const survivingClaims = extractCitationClaims(cleaned, maps);
+  const uncited = uncitedSubstantiveSentences(cleaned);
+  const problems: string[] = [];
+  if (substantiveWordCount(cleaned) < 5)
+    problems.push("la definición quedó vacía o era demasiado trivial");
+  if (!survivingClaims.length)
+    problems.push("no sobrevivió ninguna afirmación con una cita válida");
+  if (uncited.length)
+    problems.push(`${uncited.length} afirmaciones quedaron sin cita`);
+  return { markdown: cleaned, problems, strippedSentences };
 }
 
 function decorateIdeaTags(
@@ -632,10 +680,11 @@ async function synthesize(
   evidence: DictionaryEvidenceItem[],
   model: ModelRef | null,
   prior: string,
+  correction = "",
 ): Promise<GeneratedDictionary> {
   const entry = getDictionaryEntry(entryId)!;
-  const system = `Eres el redactor del Dictionary académico de Nodus. Redacta exclusivamente a partir de EVIDENCE. No uses conocimiento externo ni inventes autores, obras, páginas, citas, etiquetas, ideas o pasajes. Cada frase sustantiva debe terminar con una o más citas Markdown exactamente en el formato nodus://idea/ID o nodus://passage/ID ofrecido. Compara autores y obras; identifica acuerdos, desacuerdos, contradicciones y cambios temporales solo cuando EVIDENCE lo sostenga. Di explícitamente qué no permite establecer la evidencia. Devuelve JSON {"descriptionMarkdown":"...","authorSummaries":[{"authorName":"...","summaryMarkdown":"..."}]}. Los resúmenes de autor también deben estar citados.`;
-  const user = `CONCEPTO: ${entry.name}\nALIASES: ${entry.aliases.join(", ")}\nFOCO: ${entry.focusPrompt || "(sin foco adicional)"}\nDETALLE: ${entry.detailLevel}\nIDIOMA DE SALIDA: ${entry.outputLanguage}\n${prior ? `VERSIÓN ACTUAL A ACTUALIZAR SIN COPIAR AFIRMACIONES NO RESPALDADAS:\n${prior}\n` : ""}EVIDENCE:\n${evidencePrompt(evidence)}`;
+  const system = `Eres el redactor del Dictionary académico de Nodus. Redacta exclusivamente a partir de EVIDENCE. No uses conocimiento externo ni inventes autores, obras, páginas, citas, etiquetas, ideas o pasajes. El FOCO es una instrucción editorial: nunca lo copies ni lo presentes como definición. Abre con una definición sustantiva del concepto y desarróllala de acuerdo con DETALLE. Cada frase sustantiva debe terminar con una o más citas Markdown exactamente en el formato nodus://idea/ID o nodus://passage/ID ofrecido. Cada fuente citada debe respaldar la frase completa: si dos fuentes sostienen cláusulas distintas, escribe frases separadas, cada una con su propia cita. Compara autores y obras mediante atribuciones separadas; identifica acuerdos, desacuerdos, contradicciones y cambios temporales solo cuando EVIDENCE lo sostenga. Di explícitamente qué no permite establecer la evidencia. Devuelve JSON {"descriptionMarkdown":"...","authorSummaries":[{"authorName":"...","summaryMarkdown":"..."}]}. Los resúmenes de autor también deben estar citados.`;
+  const user = `CONCEPTO: ${entry.name}\nALIASES: ${entry.aliases.join(", ")}\nFOCO: ${entry.focusPrompt || "(sin foco adicional)"}\nDETALLE: ${entry.detailLevel}\nIDIOMA DE SALIDA: ${entry.outputLanguage}\n${prior ? `VERSIÓN ACTUAL A ACTUALIZAR SIN COPIAR AFIRMACIONES NO RESPALDADAS:\n${prior}\n` : ""}${correction ? `CORRECCIÓN OBLIGATORIA DE LA SALIDA ANTERIOR:\n${correction}\n` : ""}EVIDENCE:\n${evidencePrompt(evidence)}`;
   let generated = await completeJson<GeneratedDictionary>(
     {
       system,
@@ -704,32 +753,44 @@ async function generateDictionaryEntryUsing(
       : "";
     markdown = `## Evidencia insuficiente\n\nLa evidencia seleccionada es insuficiente para ofrecer una síntesis verificable del concepto.${citation}\n\nNo es posible comparar interpretaciones, establecer acuerdos o desacuerdos, ni describir cambios en el tiempo con el material disponible.`;
   } else {
-    const generated = await generator(
-      request.entryId,
-      evidence,
-      request.model ?? null,
-      request.mode === "update" ? entry.contentMarkdown : "",
-    );
     const snapshot = makeSnapshot(request.entryId, evidence);
     const maps = buildSnapshotMaps(snapshot);
     for (const id of [...maps.validIds])
       if (id.startsWith("work:")) maps.validIds.delete(id);
-    let cleaned = applyCitationPolicy(
-      generated.descriptionMarkdown,
-      maps,
-    ).markdown;
-    const claims = extractCitationClaims(cleaned, maps);
-    if (claims.length)
-      cleaned = applyVerification(
-        cleaned,
-        claims,
-        await verifyCitations(claims, request.model ?? null),
-      ).markdown;
-    if (uncitedSubstantiveSentences(cleaned).length)
-      throw new Error(
-        "El proveedor no produjo una síntesis donde cada afirmación estuviera respaldada por una cita válida. La versión anterior se conserva.",
+    let generated!: GeneratedDictionary;
+    let grounded!: Awaited<ReturnType<typeof groundGeneratedDescription>>;
+    let correction = "";
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      generated = await generator(
+        request.entryId,
+        evidence,
+        request.model ?? null,
+        request.mode === "update" ? entry.contentMarkdown : "",
+        correction,
       );
-    markdown = decorateIdeaTags(cleaned, evidence);
+      grounded = await groundGeneratedDescription(
+        generated,
+        snapshot,
+        verifyCitations,
+        request.model ?? null,
+      );
+      if (!grounded.problems.length) break;
+      correction = [
+        `La salida fue rechazada porque ${grounded.problems.join("; ")}.`,
+        "Reescribe desde cero una definición sustantiva. No copies el FOCO.",
+        "Haz afirmaciones atómicas y coloca en cada frase solo citas que respalden la frase completa.",
+        grounded.strippedSentences.length
+          ? `Estas frases no superaron la verificación y no deben repetirse sin estrecharlas: ${grounded.strippedSentences.slice(0, 4).join(" | ")}`
+          : "",
+      ]
+        .filter(Boolean)
+        .join("\n");
+    }
+    if (grounded.problems.length)
+      throw new Error(
+        `El proveedor no produjo una síntesis sustantiva respaldada por citas válidas (${grounded.problems.join("; ")}). La versión anterior se conserva.`,
+      );
+    markdown = decorateIdeaTags(grounded.markdown, evidence);
     const summaries = new Map(
       generated.authorSummaries.map((item) => [
         normalizeDictionaryTerm(item.authorName),
@@ -765,13 +826,19 @@ async function generateDictionaryEntryUsing(
       name: author.name,
       ideaCount: author.ideas.size,
       workCount: author.works.size,
-      summaryMarkdown: decorateIdeaTags(
-        applyCitationPolicy(
+      summaryMarkdown: (() => {
+        const cleaned = applyCitationPolicy(
           summaries.get(normalizeDictionaryTerm(author.name)) ?? "",
           maps,
-        ).markdown,
-        evidence,
-      ),
+        ).markdown;
+        // Author cards must not become a side channel for uncited model prose.
+        if (
+          !extractCitationClaims(cleaned, maps).length ||
+          uncitedSubstantiveSentences(cleaned).length
+        )
+          return "";
+        return decorateIdeaTags(cleaned, evidence);
+      })(),
       attributionBasis: author.basis,
     }));
   }

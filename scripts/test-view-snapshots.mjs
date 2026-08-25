@@ -95,6 +95,21 @@ test('sections do not share a snapshot', () => {
   assert.equal(store.readViewSnapshot('vault-a', 'ideas').search, 'mímesis');
 });
 
+test('Dictionary keeps its open concepts and catalogue cut together', () => {
+  store.clearViewSnapshots();
+  const dictionaryCut = {
+    openEntries: [{ id: 'D1', label: 'Hispanofilia' }],
+    activeEntryId: 'D1',
+    detailTabs: { D1: 'evidence' },
+    query: 'propaganda',
+    sortKey: 'authors',
+    sortDir: 'desc',
+    viewMode: 'table',
+  };
+  store.patchViewSnapshot('vault-a', 'dictionary', dictionaryCut);
+  assert.deepEqual(store.readViewSnapshot('vault-a', 'dictionary'), dictionaryCut);
+});
+
 test('a snapshot is closed to the vault it was taken in', () => {
   store.clearViewSnapshots();
   store.patchViewSnapshot('vault-a', 'authors', AUTHORS_CUT);
@@ -288,12 +303,35 @@ test('the snapshot store lives above the single render point and outside React s
   assert.doesNotMatch(app, /useState[^\n]*ViewSnapshots/, 'the snapshots are not shell state');
 });
 
-test('the three opted-in sections receive their snapshot the way they already receive a target', async () => {
+test('the core catalogue sections receive their snapshot the way they already receive a target', async () => {
   const registry = await readSource('src/app/views/corpus.tsx');
-  for (const view of ['library', 'ideas', 'authors']) {
+  for (const view of ['library', 'ideas', 'authors', 'dictionary']) {
     assert.match(registry, new RegExp(`snapshots\\.read\\('${view}'\\)`), `${view} is handed its snapshot`);
     assert.match(registry, new RegExp(`snapshots\\.patch\\('${view}',`), `${view} reports its snapshot back`);
   }
+});
+
+test('Dictionary restores its filters, open entries and selected detail tab', async () => {
+  const view = await readSource('src/views/DictionaryView.tsx');
+  for (const restored of [
+    'query',
+    'letter',
+    'status',
+    'tag',
+    'authorId',
+    'workId',
+    'newOnly',
+    'insufficientOnly',
+    'sortKey',
+    'sortDir',
+    'viewMode',
+  ]) {
+    assert.match(view, new RegExp(`snapshot\\?\\.${restored}`), `${restored} survives leaving Dictionary`);
+  }
+  assert.match(view, /snapshot\?\.openEntries/);
+  assert.match(view, /snapshot\?\.detailTabs/);
+  assert.match(view, /restoredTab=\{detailTabs\[activeId\]\}/);
+  assert.match(view, /report\.current = onSnapshotChange/);
 });
 
 test('a snapshot is an initial value, never a reactive prop', async () => {

@@ -23,6 +23,11 @@ import type {
   DictionaryProgress,
   DictionaryVersion,
 } from "@shared/dictionary";
+import {
+  DICTIONARY_PROMPT_PRESET_OPTIONS,
+  dictionaryPromptPresetOption,
+  type DictionaryPromptPreset,
+} from "@shared/dictionaryPromptPresets";
 import type {
   AppSettings,
   AuthorSummary,
@@ -45,8 +50,14 @@ import { Icon, Spinner } from "../components/ui";
 import { useFeatureModel } from "../hooks/useFeatureModel";
 import { getActiveLang, pick, t as appT } from "../i18n";
 import { DICTIONARY_TRANSLATIONS } from "../i18n.dictionary";
+import type { DictionarySnapshot } from "../app/viewSnapshots";
 
-type DetailTab = "overview" | "evidence" | "authors" | "works" | "versions";
+export type DictionaryDetailTab =
+  | "overview"
+  | "evidence"
+  | "authors"
+  | "works"
+  | "versions";
 type DictionaryTranslationTable = Record<string, string>;
 const t = (es: string): string => {
   const language = getActiveLang();
@@ -75,10 +86,13 @@ const emptyCatalog: CatalogData = {
   tags: [],
   collections: [],
 };
+const DEFAULT_DICTIONARY_PROMPT_PRESET: DictionaryPromptPreset = "basic";
 const emptyInput = (): DictionaryEntryInput => ({
   name: "",
   aliases: [],
-  focusPrompt: "",
+  focusPrompt: t(
+    dictionaryPromptPresetOption(DEFAULT_DICTIONARY_PROMPT_PRESET).prompt,
+  ),
   scope: { kind: "vault" },
   outputLanguage: "es",
   detailLevel: "standard",
@@ -389,6 +403,9 @@ function CreationDialog({
   onQueued: (id: string, name: string) => void;
 }) {
   const [input, setInput] = useState(emptyInput);
+  const [promptPreset, setPromptPreset] = useState<
+    DictionaryPromptPreset | "custom"
+  >(DEFAULT_DICTIONARY_PROMPT_PRESET);
   const [aliases, setAliases] = useState("");
   const [duplicates, setDuplicates] = useState<
     DictionaryDuplicateMatch[] | null
@@ -398,6 +415,19 @@ function CreationDialog({
   const [relationAdded, setRelationAdded] = useState(false);
   const [phase, setPhase] = useState<"checking" | "creating" | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const interfaceLanguage = getActiveLang();
+
+  useEffect(() => {
+    if (promptPreset === "custom") return;
+    const translatedPrompt = t(
+      dictionaryPromptPresetOption(promptPreset).prompt,
+    );
+    setInput((current) =>
+      current.focusPrompt === translatedPrompt
+        ? current
+        : { ...current, focusPrompt: translatedPrompt },
+    );
+  }, [interfaceLanguage, promptPreset]);
 
   const createAndQueue = async () => {
     setPhase("creating");
@@ -452,7 +482,7 @@ function CreationDialog({
       <div
         role="dialog"
         aria-modal="true"
-        className="max-h-[92vh] w-full max-w-3xl overflow-auto rounded-2xl border border-neutral-200 bg-white p-5 text-neutral-900 shadow-2xl dark:border-neutral-700 dark:bg-neutral-950 dark:text-neutral-100"
+        className="max-h-[92vh] w-full max-w-4xl overflow-auto rounded-2xl border border-neutral-200 bg-white p-5 text-neutral-900 shadow-2xl dark:border-neutral-700 dark:bg-neutral-950 dark:text-neutral-100"
         onClick={(event) => event.stopPropagation()}
       >
         <div className="mb-5 flex items-center gap-3">
@@ -461,7 +491,7 @@ function CreationDialog({
           </span>
           <div>
             <h2 className="font-semibold">
-              {t("Nueva entrada de Dictionary")}
+              {t("Nueva entrada del Diccionario")}
             </h2>
             <p className="text-xs text-neutral-500">
               {t(
@@ -565,18 +595,68 @@ function CreationDialog({
                 />
               </Field>
             </div>
-            <Field label={t("Prompt de enfoque")}>
-              <textarea
-                className="input mt-1 min-h-24 w-full resize-y"
-                value={input.focusPrompt}
-                onChange={(event) =>
-                  setInput({ ...input, focusPrompt: event.target.value })
-                }
-                placeholder={t(
-                  "Qué aspecto del concepto debe priorizar la síntesis",
-                )}
-              />
-            </Field>
+            <div className="grid gap-4 md:grid-cols-[minmax(280px,0.9fr)_minmax(0,1.6fr)]">
+              <label className="rounded-xl border border-neutral-200 bg-neutral-50 p-3 dark:border-neutral-800 dark:bg-neutral-900/50">
+                <span className="flex items-center gap-2 text-sm font-medium">
+                  <Icon name="sparkles" className="text-indigo-500" />
+                  {t("Preconfiguración del prompt")}
+                </span>
+                <select
+                  data-testid="dictionary-prompt-preset"
+                  className="input mt-2 w-full"
+                  value={promptPreset}
+                  onChange={(event) => {
+                    const value = event.target.value as
+                      | DictionaryPromptPreset
+                      | "custom";
+                    setPromptPreset(value);
+                    if (value !== "custom") {
+                      setInput({
+                        ...input,
+                        focusPrompt: t(
+                          dictionaryPromptPresetOption(value).prompt,
+                        ),
+                      });
+                    }
+                  }}
+                >
+                  {DICTIONARY_PROMPT_PRESET_OPTIONS.map((option) => (
+                    <option key={option.id} value={option.id}>
+                      {t(option.label)}
+                    </option>
+                  ))}
+                  <option value="custom">{t("Personalizado")}</option>
+                </select>
+                <p
+                  data-testid="dictionary-prompt-preset-help"
+                  className="mt-2 text-xs leading-relaxed text-neutral-500"
+                >
+                  {promptPreset === "custom"
+                    ? t(
+                        "Escribe o adapta libremente las instrucciones para la síntesis.",
+                      )
+                    : t(dictionaryPromptPresetOption(promptPreset).description)}
+                </p>
+              </label>
+              <Field label={t("Prompt de enfoque")}>
+                <textarea
+                  data-testid="dictionary-focus-prompt"
+                  className="input mt-1 min-h-32 w-full resize-y"
+                  value={input.focusPrompt}
+                  onChange={(event) => {
+                    const focusPrompt = event.target.value;
+                    setInput({ ...input, focusPrompt });
+                    const matching = DICTIONARY_PROMPT_PRESET_OPTIONS.find(
+                      (option) => t(option.prompt) === focusPrompt,
+                    );
+                    setPromptPreset(matching?.id ?? "custom");
+                  }}
+                  placeholder={t(
+                    "Qué aspecto del concepto debe priorizar la síntesis",
+                  )}
+                />
+              </Field>
+            </div>
             <ScopeEditor
               value={input.scope}
               onChange={(scope) => setInput({ ...input, scope })}
@@ -671,11 +751,16 @@ function CreationDialog({
 
 export function DictionaryView({
   settings,
+  snapshot,
+  onSnapshotChange,
   onOpenIdea,
   onOpenAuthor,
   onOpenLibraryWork,
 }: {
   settings: AppSettings;
+  /** Where this section was last left. Read once, at mount, and never again. */
+  snapshot?: DictionarySnapshot;
+  onSnapshotChange?: (patch: Partial<DictionarySnapshot>) => void;
   onOpenIdea: (id: string) => void;
   onOpenAuthor: (id: string, name: string) => void;
   onOpenLibraryWork: (id: string) => void;
@@ -692,19 +777,41 @@ export function DictionaryView({
   const [catalog, setCatalog] = useState<CatalogData>(emptyCatalog);
   const [openEntries, setOpenEntries] = useState<
     Array<{ id: string; title: string }>
-  >([]);
-  const [activeId, setActiveId] = useState<string | null>(null);
-  const [query, setQuery] = useState("");
-  const [letter, setLetter] = useState("");
-  const [status, setStatus] = useState("");
-  const [tag, setTag] = useState("");
-  const [authorId, setAuthorId] = useState("");
-  const [workId, setWorkId] = useState("");
-  const [newOnly, setNewOnly] = useState(false);
-  const [insufficientOnly, setInsufficientOnly] = useState(false);
-  const [sortKey, setSortKey] = useState<DictionarySortKey>("updated");
-  const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
-  const [viewMode, setViewMode] = useState<"list" | "table">("list");
+  >(() =>
+    (snapshot?.openEntries ?? []).map((entry) => ({
+      id: entry.id,
+      title: entry.label,
+    })),
+  );
+  const [activeId, setActiveId] = useState<string | null>(() =>
+    snapshot?.openEntries?.some((entry) => entry.id === snapshot.activeEntryId)
+      ? snapshot.activeEntryId
+      : null,
+  );
+  const [detailTabs, setDetailTabs] = useState<
+    Record<string, DictionaryDetailTab>
+  >(() => snapshot?.detailTabs ?? {});
+  const [query, setQuery] = useState(() => snapshot?.query ?? "");
+  const [letter, setLetter] = useState(() => snapshot?.letter ?? "");
+  const [status, setStatus] = useState<DictionaryEntryStatus | "">(
+    () => snapshot?.status ?? "",
+  );
+  const [tag, setTag] = useState(() => snapshot?.tag ?? "");
+  const [authorId, setAuthorId] = useState(() => snapshot?.authorId ?? "");
+  const [workId, setWorkId] = useState(() => snapshot?.workId ?? "");
+  const [newOnly, setNewOnly] = useState(() => snapshot?.newOnly ?? false);
+  const [insufficientOnly, setInsufficientOnly] = useState(
+    () => snapshot?.insufficientOnly ?? false,
+  );
+  const [sortKey, setSortKey] = useState<DictionarySortKey>(
+    () => snapshot?.sortKey ?? "updated",
+  );
+  const [sortDir, setSortDir] = useState<"asc" | "desc">(
+    () => snapshot?.sortDir ?? "desc",
+  );
+  const [viewMode, setViewMode] = useState<"list" | "table">(
+    () => snapshot?.viewMode ?? "list",
+  );
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [generationJobs, setGenerationJobs] = useState<
     Map<string, DictionaryProgress>
@@ -715,6 +822,41 @@ export function DictionaryView({
   const [creating, setCreating] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const report = useRef(onSnapshotChange);
+  report.current = onSnapshotChange;
+  useEffect(() => {
+    report.current?.({
+      openEntries: openEntries.map(({ id, title }) => ({ id, label: title })),
+      activeEntryId: activeId,
+      detailTabs,
+      query,
+      letter,
+      status,
+      tag,
+      authorId,
+      workId,
+      newOnly,
+      insufficientOnly,
+      sortKey,
+      sortDir,
+      viewMode,
+    });
+  }, [
+    activeId,
+    authorId,
+    detailTabs,
+    insufficientOnly,
+    letter,
+    newOnly,
+    openEntries,
+    query,
+    sortDir,
+    sortKey,
+    status,
+    tag,
+    viewMode,
+    workId,
+  ]);
   const reload = useCallback(
     async (foreground = true) => {
       if (foreground) setLoading(true);
@@ -780,6 +922,27 @@ export function DictionaryView({
       })
       .catch(() => undefined);
   }, []);
+  useEffect(() => {
+    let alive = true;
+    void window.nodus
+      .listDictionaryGenerationJobs()
+      .then((jobs) => {
+        if (!alive) return;
+        setGenerationJobs((current) => {
+          const next = new Map(jobs.map((job) => [job.entryId, job]));
+          // Events received while the IPC round-trip was in flight are newer than
+          // the returned snapshot and must win.
+          for (const [entryId, progress] of current) {
+            next.set(entryId, progress);
+          }
+          return next;
+        });
+      })
+      .catch(() => undefined);
+    return () => {
+      alive = false;
+    };
+  }, []);
   useEffect(
     () =>
       window.nodus.onDictionaryChanged(() => {
@@ -811,6 +974,12 @@ export function DictionaryView({
     const index = openEntries.findIndex((entry) => entry.id === id);
     const next = openEntries.filter((entry) => entry.id !== id);
     setOpenEntries(next);
+    setDetailTabs((current) => {
+      if (!(id in current)) return current;
+      const nextTabs = { ...current };
+      delete nextTabs[id];
+      return nextTabs;
+    });
     if (activeId === id)
       setActiveId(next[Math.min(index, next.length - 1)]?.id ?? null);
   };
@@ -833,6 +1002,11 @@ export function DictionaryView({
       setActiveId((current) =>
         current && deleted.has(current) ? null : current,
       );
+      setDetailTabs((current) =>
+        Object.fromEntries(
+          Object.entries(current).filter(([id]) => !deleted.has(id)),
+        ) as Record<string, DictionaryDetailTab>,
+      );
       setSelected(new Set());
       await reload();
     } catch (reason) {
@@ -851,7 +1025,7 @@ export function DictionaryView({
             <Icon name="thesaurus" size={18} />
           </span>
           <div>
-            <h1 className="text-base font-semibold">{t("Dictionary")}</h1>
+            <h1 className="text-base font-semibold">{t("Diccionario")}</h1>
             <p className="text-[11px] text-neutral-500">
               {t(
                 "Conceptos sintetizados exclusivamente desde la evidencia de la bóveda.",
@@ -886,7 +1060,7 @@ export function DictionaryView({
           </button>
         </div>
         <WorkspaceTabStrip
-          homeLabel={tx("Dictionary ({n})", { n: total })}
+          homeLabel={tx("Diccionario ({n})", { n: total })}
           homeIcon="list"
           homeTestId="dictionary-tab-home"
           tabTestId={(tab) => `dictionary-tab-${tab.key}`}
@@ -906,6 +1080,29 @@ export function DictionaryView({
         <DictionaryEntryView
           key={activeId}
           entryId={activeId}
+          restoredTab={detailTabs[activeId]}
+          onTabChange={(tab) =>
+            setDetailTabs((current) =>
+              current[activeId] === tab
+                ? current
+                : { ...current, [activeId]: tab },
+            )
+          }
+          progress={generationJobs.get(activeId)}
+          onGenerationStarted={(progress) =>
+            setGenerationJobs((current) => {
+              const existing = current.get(progress.entryId);
+              if (
+                existing &&
+                !["done", "failed"].includes(existing.phase)
+              ) {
+                return current;
+              }
+              const next = new Map(current);
+              next.set(progress.entryId, progress);
+              return next;
+            })
+          }
           settings={settings}
           model={model}
           catalog={catalog}
@@ -942,7 +1139,9 @@ export function DictionaryView({
               <select
                 className="input"
                 value={status}
-                onChange={(event) => setStatus(event.target.value)}
+                onChange={(event) =>
+                  setStatus(event.target.value as DictionaryEntryStatus | "")
+                }
               >
                 <option value="">{t("Todos los estados")}</option>
                 <option value="draft">{dictionaryStatusLabel("draft")}</option>
@@ -1061,7 +1260,7 @@ export function DictionaryView({
               <ErrorNotice>{error}</ErrorNotice>
             ) : loading ? (
               <div className="grid h-48 place-items-center">
-                <Spinner label={t("Cargando Dictionary…")} />
+                <Spinner label={t("Cargando Diccionario…")} />
               </div>
             ) : !entries.length ? (
               <div className="rounded-2xl border border-dashed border-neutral-300 p-12 text-center dark:border-neutral-800">
@@ -1126,8 +1325,8 @@ export function DictionaryView({
         <ConfirmModal
           title={
             pendingDeleteIds.length === 1
-              ? t("Eliminar entrada de Dictionary")
-              : tx("Eliminar {n} entradas de Dictionary", {
+              ? t("Eliminar entrada del Diccionario")
+              : tx("Eliminar {n} entradas del Diccionario", {
                   n: pendingDeleteIds.length,
                 })
           }
@@ -1293,6 +1492,10 @@ function DictionaryGenerationState({
 
 function DictionaryEntryView({
   entryId,
+  restoredTab,
+  onTabChange,
+  progress,
+  onGenerationStarted,
   settings,
   model,
   catalog,
@@ -1302,6 +1505,10 @@ function DictionaryEntryView({
   onOpenLibraryWork,
 }: {
   entryId: string;
+  restoredTab?: DictionaryDetailTab;
+  onTabChange: (tab: DictionaryDetailTab) => void;
+  progress?: DictionaryProgress;
+  onGenerationStarted: (progress: DictionaryProgress) => void;
   settings: AppSettings;
   model: ModelRef | null;
   catalog: CatalogData;
@@ -1311,11 +1518,14 @@ function DictionaryEntryView({
   onOpenLibraryWork: (id: string) => void;
 }) {
   const [detail, setDetail] = useState<DictionaryEntryDetail | null>(null);
-  const [tab, setTab] = useState<DetailTab>("overview");
+  const [tab, setTab] = useState<DictionaryDetailTab>(
+    () => restoredTab ?? "overview",
+  );
   const [busy, setBusy] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [citation, setCitation] = useState<CitationTarget>(null);
-  const choseTab = useRef(false);
+  const [hideBackgroundFailure, setHideBackgroundFailure] = useState(false);
+  const choseTab = useRef(restoredTab !== undefined);
   const load = useCallback(
     async () => setDetail(await window.nodus.getDictionaryEntry(entryId)),
     [entryId],
@@ -1331,10 +1541,11 @@ function DictionaryEntryView({
     choseTab.current = true;
     if (!detail.entry.currentVersionId) setTab("evidence");
   }, [detail]);
+  useEffect(() => onTabChange(tab), [onTabChange, tab]);
   const run = async (
     name: string,
     action: () => Promise<unknown>,
-    next?: DetailTab,
+    next?: DictionaryDetailTab,
   ) => {
     setBusy(name);
     setError(null);
@@ -1355,7 +1566,13 @@ function DictionaryEntryView({
       </div>
     );
   const entry = detail.entry;
-  const hasEvidence = detail.coverage.used > 0;
+  const hasEvidence = detail.coverage.included > 0;
+  const backgroundBusy =
+    !!progress && !["done", "failed"].includes(progress.phase);
+  const backgroundFailure =
+    progress?.phase === "failed" && !hideBackgroundFailure
+      ? progress.error || t("La generación no pudo completarse.")
+      : null;
   const mode = entry.currentVersionId ? "regeneration" : "creation";
   const generate = (generation: "creation" | "regeneration" | "update") => {
     if (!hasEvidence) {
@@ -1367,19 +1584,24 @@ function DictionaryEntryView({
       setTab("evidence");
       return;
     }
-    void run(
-      generation,
-      () =>
-        window.nodus.generateDictionaryEntry({
+    setHideBackgroundFailure(true);
+    setBusy(generation);
+    setError(null);
+    void window.nodus
+      .startDictionaryGeneration({
           entryId,
           mode: generation,
           model,
-        }),
-      generation === "creation" ? "overview" : "versions",
-    );
+      })
+      .then((nextProgress) => {
+        onGenerationStarted(nextProgress);
+        setTab(generation === "creation" ? "overview" : "versions");
+      })
+      .catch((reason) => setError(message(reason)))
+      .finally(() => setBusy(""));
   };
   const tabs: Array<{
-    id: DetailTab;
+    id: DictionaryDetailTab;
     label: string;
     icon: string;
     count?: number;
@@ -1453,11 +1675,11 @@ function DictionaryEntryView({
                 onChange={() => undefined}
                 compact
                 disabled
-                ariaLabel={t("Modelo de Dictionary")}
+                ariaLabel={t("Modelo del Diccionario")}
               />
               <button
                 className="btn btn-ghost h-9 w-[220px] shrink-0 justify-center whitespace-nowrap border border-neutral-300 text-xs dark:border-neutral-700"
-                disabled={!!busy}
+                disabled={!!busy || backgroundBusy}
                 onClick={() =>
                   void run(
                     "scan",
@@ -1475,7 +1697,7 @@ function DictionaryEntryView({
               </button>
               <button
                 className="btn btn-primary !text-white disabled:!text-white h-9 w-[112px] shrink-0 justify-center whitespace-nowrap text-xs"
-                disabled={!!busy || !hasEvidence}
+                disabled={!!busy || backgroundBusy || !hasEvidence}
                 onClick={() => generate(mode)}
               >
                 {busy === mode ? (
@@ -1491,6 +1713,7 @@ function DictionaryEntryView({
                 className="btn btn-ghost h-9 w-[112px] shrink-0 justify-center whitespace-nowrap border border-neutral-300 text-xs dark:border-neutral-700"
                 disabled={
                   !!busy ||
+                  backgroundBusy ||
                   !entry.currentVersionId ||
                   entry.newEvidenceCount === 0 ||
                   !hasEvidence
@@ -1503,6 +1726,7 @@ function DictionaryEntryView({
             </div>
           </div>
         </section>
+        {backgroundFailure && <ErrorNotice>{backgroundFailure}</ErrorNotice>}
         {error && <ErrorNotice>{error}</ErrorNotice>}
         {!hasEvidence && (
           <button
@@ -1520,6 +1744,7 @@ function DictionaryEntryView({
           {tabs.map((item) => (
             <button
               key={item.id}
+              data-testid={`dictionary-detail-tab-${item.id}`}
               className={`flex h-10 shrink-0 items-center gap-2 border-b-2 px-3 text-xs ${tab === item.id ? "border-indigo-500 text-indigo-700 dark:text-indigo-300" : "border-transparent text-neutral-500 hover:text-neutral-800 dark:hover:text-neutral-300"}`}
               onClick={() => setTab(item.id)}
             >
@@ -1803,7 +2028,7 @@ function OverviewTab({
           </div>
           <div className="grid grid-cols-2 gap-2 text-xs">
             {[
-              [t("Incluida"), detail.coverage.used],
+              [t("Incluida"), detail.coverage.included],
               [t("Citada"), detail.coverage.cited],
               [t("No usada"), detail.coverage.unused],
               [t("Excluida"), detail.coverage.excluded],

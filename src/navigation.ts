@@ -113,7 +113,7 @@ export const NAV_ITEMS: NavItem[] = [
   { id: 'teachingRubrics', label: 'Rúbricas', icon: 'table', group: 'analyze' },
   { id: 'teachingUnits', label: 'Diseño de unidades', icon: 'compass', group: 'create' },
   // Analizar — superficies derivadas del grafo y síntesis.
-  { id: 'dictionary', label: 'Dictionary', icon: 'thesaurus', group: 'analyze' },
+  { id: 'dictionary', label: 'Diccionario', icon: 'thesaurus', group: 'analyze' },
   { id: 'immersion', label: 'Inmersión', icon: 'target', group: 'analyze' },
   // 'gaps' NO tiene entrada propia: los huecos son una pestaña dentro del Estado de la
   // cuestión, porque solo significan algo mirando qué le falta a una pregunta concreta.

@@ -51,7 +51,9 @@ import type { RouteSortKey as ArgumentRouteSortKey } from '../views/ArgumentMapV
 import type { ReadFilter as ReportReadFilter, SortKey as ReportSortKey } from '../views/DeepResearchView';
 import type { ImmersionSortKey } from '../views/ImmersionView';
 import type { WorkspaceItemKind } from '../views/WorkspaceView';
+import type { DictionaryDetailTab } from '../views/DictionaryView';
 import type { IdeaType, LibraryReaderReference, WorkFilter } from '@shared/types';
+import type { DictionaryEntryStatus, DictionarySortKey } from '@shared/dictionary';
 import type { SortState } from '../views/Library';
 import type { ReadingPlace } from '../readingPlace';
 
@@ -113,6 +115,28 @@ export interface IdeasSnapshot {
   sortKey: IdeasSortKey;
   filtersOpen: boolean;
   placement: ListPlacement | null;
+}
+
+/**
+ * Dictionary: its catalogue cut, all open concepts and the selected inner tab for
+ * each concept. Generation progress is deliberately absent because the main
+ * process owns it and the renderer rehydrates that live state on every mount.
+ */
+export interface DictionarySnapshot {
+  openEntries: OpenEntityTab[];
+  activeEntryId: string | null;
+  detailTabs: Record<string, DictionaryDetailTab>;
+  query: string;
+  letter: string;
+  status: DictionaryEntryStatus | '';
+  tag: string;
+  authorId: string;
+  workId: string;
+  newOnly: boolean;
+  insufficientOnly: boolean;
+  sortKey: DictionarySortKey;
+  sortDir: 'asc' | 'desc';
+  viewMode: 'list' | 'table';
 }
 
 /**
@@ -270,6 +294,7 @@ export interface ImmersionSnapshot {
 export interface ViewSnapshots {
   authors?: AuthorsSnapshot;
   ideas?: IdeasSnapshot;
+  dictionary?: DictionarySnapshot;
   library?: LibrarySnapshot;
   workspace?: WorkspaceSnapshot;
   /**

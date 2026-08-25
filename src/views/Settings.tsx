@@ -3699,7 +3699,7 @@ const VAULT_MODEL_FIELDS: Record<VaultModelKey, string> = {
   writingModel: 'Taller de escritura',
   argumentMapModel: 'Mapa argumental',
   authorModel: 'Autores y biografías',
-  dictionaryModel: 'Dictionary',
+  dictionaryModel: 'Diccionario',
   studyModel: 'Guías de estudio',
   tutorModel: 'Tutor',
   hypothesisModel: 'Laboratorio de hipótesis',

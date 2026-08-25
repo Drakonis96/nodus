@@ -235,6 +235,7 @@ export interface AcademicApi {
   setDictionaryEvidenceDecision(entryId: string, refs: DictionaryEvidenceRef[], decision: DictionaryEvidenceDecision): Promise<void>;
   generateDictionaryEntry(request: DictionaryGenerationRequest): Promise<DictionaryVersion>;
   startDictionaryGeneration(request: DictionaryGenerationRequest): Promise<DictionaryProgress>;
+  listDictionaryGenerationJobs(): Promise<DictionaryProgress[]>;
   onDictionaryProgress(callback: (progress: DictionaryProgress) => void): () => void;
   listDictionaryVersions(entryId: string): Promise<DictionaryVersion[]>;
   acceptDictionaryVersion(entryId: string, versionId: string, expectedCurrentVersionId: string | null): Promise<DictionaryEntryDetail>;

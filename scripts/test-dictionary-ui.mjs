@@ -4,7 +4,18 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const [view, corpus, navigation, authors, ai, academicIpc, preload] =
+const [
+  view,
+  corpus,
+  navigation,
+  authors,
+  ai,
+  academicIpc,
+  preload,
+  promptPresets,
+  dictionaryI18n,
+  viewSnapshots,
+] =
   await Promise.all([
     readFile(path.join(root, "src/views/DictionaryView.tsx"), "utf8"),
     readFile(path.join(root, "src/app/views/corpus.tsx"), "utf8"),
@@ -13,6 +24,9 @@ const [view, corpus, navigation, authors, ai, academicIpc, preload] =
     readFile(path.join(root, "electron/ai/dictionary.ts"), "utf8"),
     readFile(path.join(root, "electron/ipc/academic.ts"), "utf8"),
     readFile(path.join(root, "electron/preload/academic.ts"), "utf8"),
+    readFile(path.join(root, "shared/dictionaryPromptPresets.ts"), "utf8"),
+    readFile(path.join(root, "src/i18n.dictionary.ts"), "utf8"),
+    readFile(path.join(root, "src/app/viewSnapshots.ts"), "utf8"),
   ]);
 
 assert.match(
@@ -24,6 +38,16 @@ assert.match(
   corpus,
   /dictionary:[\s\S]*<DictionaryView/,
   "Dictionary is registered as an internal view",
+);
+assert.match(
+  corpus,
+  /snapshot=\{snapshots\.read\('dictionary'\)\}[\s\S]*onSnapshotChange=\{\(patch\) => snapshots\.patch\('dictionary', patch\)\}/,
+  "Dictionary participates in the shared per-vault view snapshot store",
+);
+assert.match(
+  viewSnapshots,
+  /export interface DictionarySnapshot[\s\S]*openEntries: OpenEntityTab\[\][\s\S]*activeEntryId: string \| null[\s\S]*detailTabs: Record<string, DictionaryDetailTab>/,
+  "Dictionary remembers its open entries, active entry and inner tabs",
 );
 assert.match(
   view,
@@ -70,6 +94,67 @@ assert.match(
   /<ModelPicker/,
   "Dictionary exposes the shared saved-model picker",
 );
+assert.match(
+  view,
+  /data-testid="dictionary-prompt-preset"/,
+  "new entries expose a prompt preset selector",
+);
+assert.match(
+  view,
+  /data-testid="dictionary-focus-prompt"/,
+  "the selected preset remains editable",
+);
+assert.match(
+  view,
+  /setPromptPreset\(matching\?\.id \?\? "custom"\)/,
+  "editing a preset prompt switches the selector to Custom",
+);
+assert.match(
+  view,
+  /focusPrompt: t\([\s\S]*dictionaryPromptPresetOption\(DEFAULT_DICTIONARY_PROMPT_PRESET\)\.prompt/,
+  "the basic definition-and-authors prompt is the translated default",
+);
+assert.match(
+  navigation,
+  /id: 'dictionary', label: 'Diccionario'/,
+  "the sidebar uses the Spanish translation key for the section name",
+);
+assert.match(
+  view,
+  /t\("Diccionario"\)[\s\S]*tx\("Diccionario \(\{n\}\)"/,
+  "the Dictionary header and home tab use the translated section name",
+);
+for (const id of [
+  "basic",
+  "historical",
+  "debate",
+  "genealogy",
+  "applications",
+  "critical",
+]) {
+  assert.match(
+    promptPresets,
+    new RegExp(`id: ["']${id}["']`),
+    `Dictionary includes the ${id} prompt preset`,
+  );
+}
+const translatedPromptKeys = [
+  "Preconfiguración del prompt",
+  "Escribe o adapta libremente las instrucciones para la síntesis.",
+  "Básico · definición y autores",
+  "Evolución histórica",
+  "Debate entre autores",
+  "Genealogía teórica",
+  "Usos y aplicaciones",
+  "Lectura crítica",
+];
+for (const key of translatedPromptKeys) {
+  const occurrences = dictionaryI18n.split(key).length - 1;
+  assert.ok(
+    occurrences >= 7,
+    `${key} is translated for all seven non-Spanish interface languages`,
+  );
+}
 assert.match(
   view,
   /onCitation=\{onCitation\}/,
@@ -136,6 +221,31 @@ assert.match(
   /startDictionaryGeneration\(\{/,
   "creation starts the automatic background pipeline without an evidence-review gate",
 );
+assert.equal(
+  (view.match(/startDictionaryGeneration\(\{/g) ?? []).length,
+  2,
+  "creation, regeneration and update all enter the main-process background pipeline",
+);
+assert.doesNotMatch(
+  view,
+  /window\.nodus\.generateDictionaryEntry/,
+  "no Dictionary generation is owned by a disposable renderer view",
+);
+assert.match(
+  view,
+  /listDictionaryGenerationJobs\(\)/,
+  "Dictionary rehydrates background job progress when the view remounts",
+);
+assert.match(
+  view,
+  /const hasEvidence = detail\.coverage\.included > 0/,
+  "generation eligibility uses the live included selection, not a nonexistent draft version",
+);
+assert.match(
+  view,
+  /backgroundFailure && <ErrorNotice>/,
+  "a failed background generation exposes the backend reason in the entry",
+);
 assert.match(
   view,
   /onDictionaryProgress/,
@@ -150,6 +260,21 @@ assert.match(
   academicIpc,
   /dictionary:generate:start[\s\S]*retrieveDictionaryEvidence[\s\S]*generateDictionaryEntry/,
   "the background IPC automatically retrieves and generates in order",
+);
+assert.match(
+  academicIpc,
+  /needsInitialRetrieval = request\.mode === 'creation' && \(current\?\.coverage\.included \?\? 0\) === 0/,
+  "only a brand-new concept performs initial retrieval before its background generation",
+);
+assert.match(
+  academicIpc,
+  /dictionary:generate:jobs[\s\S]*dictionaryGenerationJobs\.values/,
+  "the main process exposes running and completed jobs for view reconnection",
+);
+assert.match(
+  preload,
+  /listDictionaryGenerationJobs: \(\) => ipcRenderer\.invoke\('dictionary:generate:jobs'\)/,
+  "the renderer can reconnect to Dictionary jobs after changing views",
 );
 assert.match(
   preload,
@@ -176,7 +301,7 @@ assert.match(
   /restoreDictionaryVersion/,
   "version restoration is available",
 );
-const generatedAt = ai.indexOf("const generated = await generator");
+const generatedAt = ai.indexOf("generated = await generator");
 const savedAt = ai.indexOf("return saveDictionaryVersion", generatedAt);
 assert.ok(
   generatedAt >= 0 && savedAt > generatedAt,
@@ -186,6 +311,11 @@ assert.match(
   ai,
   /La versión anterior se conserva/,
   "citation-validation failure reports that the previous version is preserved",
+);
+assert.match(
+  ai,
+  /groundGeneratedDescription[\s\S]*attempt < 2/,
+  "an empty post-verification synthesis gets one bounded grounded rewrite",
 );
 assert.match(
   ai,
