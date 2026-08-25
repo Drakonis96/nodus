@@ -304,11 +304,13 @@ async function assertRendererContracts() {
   const graphView = await readFile(path.join(repoRoot, 'src/views/GraphView.tsx'), 'utf8');
   const sigmaGraph = await readFile(path.join(repoRoot, 'src/views/graph/SigmaGraph.tsx'), 'utf8');
   const packageJson = await readFile(path.join(repoRoot, 'package.json'), 'utf8');
+  const packageLock = await readFile(path.join(repoRoot, 'package-lock.json'), 'utf8');
   const preload = await Promise.resolve(readSource('@bridge'));
   const ipc = await Promise.resolve(readSource('@main'));
 
   assert.doesNotMatch(graphView, /USE_SIGMA|cytoscape|nodus\.graph\.engine/i, 'GraphView contains no legacy renderer branch or preference');
   assert.doesNotMatch(packageJson, /cytoscape/i, 'the legacy renderer is absent from runtime and type dependencies');
+  assert.doesNotMatch(packageLock, /cytoscape/i, 'the legacy renderer is absent from the dependency lockfile');
   assert.match(graphView, /const focusPendingNavigation = useCallback/, 'cross-view graph targets are focused through the active renderer');
   assert.match(graphView, /api\.focusNode\(current\.nodeId\)/, 'idea deep-links use the Sigma focus API');
   assert.match(graphView, /onReady=\{handleGraphReady\}/, 'deep-link focus waits for the requested Sigma scene');
