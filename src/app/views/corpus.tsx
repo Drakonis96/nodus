@@ -60,8 +60,15 @@ export const corpusViews = {
       onOpenAssistant={openAssistant}
     />
   ),
-  dictionary: ({ openAuthor, openIdea, openLibraryItem, settings }) => (
-    <DictionaryView settings={settings} onOpenIdea={openIdea} onOpenAuthor={openAuthor} onOpenLibraryWork={(id) => openLibraryItem(id, 'vault')} />
+  dictionary: ({ openAuthor, openIdea, openLibraryItem, settings, snapshots }) => (
+    <DictionaryView
+      settings={settings}
+      snapshot={snapshots.read('dictionary')}
+      onSnapshotChange={(patch) => snapshots.patch('dictionary', patch)}
+      onOpenIdea={openIdea}
+      onOpenAuthor={openAuthor}
+      onOpenLibraryWork={(id) => openLibraryItem(id, 'vault')}
+    />
   ),
   authors: ({ activeVault, authorTarget, navigate, settings, snapshots }) => (
     <AuthorsView

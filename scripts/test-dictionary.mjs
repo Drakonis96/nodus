@@ -159,12 +159,19 @@ try {
     repo.includedEvidence(automatic.id).length >= 2,
     "automatic retrieval selects relevant ideas/passages before generation",
   );
+  assert.equal(
+    repo.getDictionaryEntryDetail(automatic.id).coverage.included,
+    repo.includedEvidence(automatic.id).filter((item) => !item.unavailable).length,
+    "a draft reports its live included evidence before any version exists",
+  );
   const generated = await ai.__generateDictionaryEntryForTesting(
     { entryId: automatic.id, mode: "creation", model: null },
     async () => ({
-      descriptionMarkdown: "Definición breve.",
+      descriptionMarkdown:
+        "La memoria se construye socialmente mediante prácticas colectivas documentadas [Autora (2020)](nodus://idea/idea-1).",
       authorSummaries: [],
     }),
+    async (claims) => claims.map(() => "supports"),
   );
   assert.equal(
     generated.trigger,
@@ -241,6 +248,47 @@ try {
     citedWithBibliographicLabel.contentMarkdown,
     /nodus:\/\/idea\/idea-1/,
     "bibliographic citation survives validation",
+  );
+
+  // Verification can legitimately remove every sentence from an overbroad first
+  // draft. Never persist the resulting blank version: feed the failure back to the
+  // writer once and save only a substantive, cited correction.
+  let repairAttempts = 0;
+  const repairedAfterVerification = await ai.__generateDictionaryEntryForTesting(
+    { entryId: automatic.id, mode: "regeneration", model: null },
+    async (_entryId, _evidence, _model, _prior, correction) => {
+      repairAttempts += 1;
+      if (repairAttempts === 1) {
+        assert.equal(correction, "");
+        return {
+          descriptionMarkdown:
+            "La memoria demuestra por sí sola todos los cambios históricos posibles [Autora (2020)](nodus://idea/idea-1).",
+          authorSummaries: [],
+        };
+      }
+      assert.match(
+        correction,
+        /no superaron la verificación/,
+        "the retry receives the concrete grounding failure",
+      );
+      return {
+        descriptionMarkdown:
+          "La evidencia presenta la memoria como una construcción social situada [Autora (2020)](nodus://idea/idea-1).",
+        authorSummaries: [],
+      };
+    },
+    async (claims) =>
+      claims.map((claim) =>
+        claim.sentence.includes("todos los cambios")
+          ? "unsupported"
+          : "supports",
+      ),
+  );
+  assert.equal(repairAttempts, 2, "a stripped synthesis gets one bounded retry");
+  assert.match(
+    repairedAfterVerification.contentMarkdown,
+    /construcción social situada/,
+    "only the grounded correction is persisted",
   );
 
   // A provider failure must reject the IPC operation without creating an empty

@@ -397,6 +397,7 @@ export function registerAcademicIpc({ h, getWindow, chatAborters }: IpcContext):
   });
   h('dictionary:delete', async (_e, ids: string[]) => {
     const changed = dictionaryRepo.deleteDictionaryEntries(ids);
+    for (const id of ids) dictionaryGenerationJobs.delete(id);
     if (changed) announceDictionary(null);
     return changed;
   });
@@ -441,11 +442,15 @@ export function registerAcademicIpc({ h, getWindow, chatAborters }: IpcContext):
     setImmediate(() => {
       void (async () => {
         try {
-          const retrieving: DictionaryProgress = { entryId: request.entryId, phase: 'retrieving', message: 'Analizando corpus' };
-          dictionaryGenerationJobs.set(request.entryId, retrieving);
-          announceDictionaryProgress(retrieving);
-          await retrieveDictionaryEvidence(request.entryId, 'initial');
-          announceDictionary(request.entryId);
+          const current = dictionaryRepo.getDictionaryEntryDetail(request.entryId);
+          const needsInitialRetrieval = request.mode === 'creation' && (current?.coverage.included ?? 0) === 0;
+          if (needsInitialRetrieval) {
+            const retrieving: DictionaryProgress = { entryId: request.entryId, phase: 'retrieving', message: 'Analizando corpus' };
+            dictionaryGenerationJobs.set(request.entryId, retrieving);
+            announceDictionaryProgress(retrieving);
+            await retrieveDictionaryEvidence(request.entryId, 'initial');
+            announceDictionary(request.entryId);
+          }
 
           const generating: DictionaryProgress = { entryId: request.entryId, phase: 'generating', message: 'Generando definición' };
           dictionaryGenerationJobs.set(request.entryId, generating);
@@ -467,6 +472,7 @@ export function registerAcademicIpc({ h, getWindow, chatAborters }: IpcContext):
     });
     return queued;
   });
+  h('dictionary:generate:jobs', async () => [...dictionaryGenerationJobs.values()]);
   h('dictionary:versions:list', async (_e, entryId: string) => dictionaryRepo.listDictionaryVersions(entryId));
   h('dictionary:versions:accept', async (_e, entryId: string, versionId: string, expectedCurrentVersionId: string | null) => {
     const detail = dictionaryRepo.acceptDictionaryVersion(entryId, versionId, expectedCurrentVersionId);
