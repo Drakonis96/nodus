@@ -2863,6 +2863,7 @@ export const FR: Record<string, string> = {
   'pág.': 'p.',
   'Pedido desde un cliente MCP': 'Demandé depuis un client MCP',
   'Quitar de la cola': 'Retirer de la file',
+  'No se pudo quitar el informe de la cola.': 'Impossible de retirer le rapport de la file.',
   'Falló': 'Échoué',
   'Abrir a pantalla completa': 'Ouvrir en plein écran',
   'Lectura a pantalla completa': 'Lecture en plein écran',

@@ -15,7 +15,7 @@
 // Requires a build (dist/ + dist-electron/):
 //   npm run build && node scripts/verify-deep-research-mcp-queue.mjs
 import assert from 'node:assert/strict';
-import { mkdtemp, rm } from 'node:fs/promises';
+import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import os from 'node:os';
 import path from 'node:path';
@@ -41,6 +41,36 @@ async function waitFor(label, predicate, timeoutMs = 30_000) {
 let app = null;
 let client = null;
 try {
+  // A restored job bound to another vault remains safely parked, giving the UI a
+  // deterministic queued row on which to exercise the destructive-action modal.
+  const parkedId = 'drj-ui-confirmation-fixture';
+  const queuedAt = new Date().toISOString();
+  await writeFile(path.join(userData, 'deep-research-queue.v1.json'), JSON.stringify([{
+    record: {
+      id: parkedId,
+      origin: 'app',
+      vaultId: 'fixture-foreign-vault',
+      vaultName: 'Corpus temporal',
+      objective: 'Informe temporal para verificar la eliminación de la cola',
+      title: 'Informe temporal para verificar la eliminación de la cola',
+      deepResearchApproach: 'general',
+      deepResearchVersion: 'v2',
+      structure: 'sectioned',
+      model: null,
+      status: 'queued',
+      progress: null,
+      error: null,
+      savedDraftId: null,
+      saveError: null,
+      ahead: null,
+      enqueuedAt: queuedAt,
+      startedAt: null,
+      finishedAt: null,
+    },
+    request: { objective: 'Informe temporal para verificar la eliminación de la cola', language: 'es', deepResearchVersion: 'v2' },
+    save: false,
+    draftTitle: null,
+  }]));
   const childEnv = { ...process.env, NODUS_USERDATA: userData, NODUS_DISABLE_AUTO_UPDATE: '1', NODUS_E2E_UPDATE_STATUS: 'not-available' };
   delete childEnv.ELECTRON_RUN_AS_NODE;
   app = await electron.launch({ executablePath: require('electron'), args: [repoRoot], env: childEnv });
@@ -62,6 +92,7 @@ try {
     localStorage.setItem('nodus.platformHighlightsSeen.2026-07', '1');
     localStorage.setItem('nodus.tutorialVideosAnnouncementSeen.2026-07', '1');
     localStorage.setItem('nodus.toolkitBetaGuideSeen.2.4.0', '1');
+    localStorage.setItem('nodus.documentUnderstandingConsent.2026-08', '1');
     sessionStorage.setItem('nodus.startupUpdateChecked', '1');
   }, appVersion);
   // Past first run: this walk is about the queue, not about onboarding (which
@@ -86,6 +117,23 @@ try {
   // Sit on Deep Research, empty, before a single report exists.
   await page.locator('[data-tour="nav-deepResearch"]').click();
   await waitFor('the empty Deep Research gallery', async () => (await page.locator('.card').count()) === 0);
+
+  // Every active queue row exposes the same trash action. Cancelling the modal keeps
+  // the durable job; confirming it removes the row and cancels the real queue id.
+  const trash = page.getByTestId(`remove-deep-research-${parkedId}`);
+  await trash.waitFor();
+  await trash.click();
+  const confirmation = page.getByRole('dialog', { name: 'Quitar de la cola' });
+  await confirmation.waitFor();
+  await confirmation.getByRole('button', { name: 'Cancelar', exact: true }).click();
+  await trash.waitFor();
+  assert.equal((await page.evaluate((id) => window.nodus.listDeepResearchJobs().then((jobs) => jobs.find((job) => job.id === id)?.status), parkedId)), 'queued');
+  await trash.click();
+  await confirmation.getByRole('button', { name: 'Eliminar', exact: true }).click();
+  await trash.waitFor({ state: 'detached' });
+  assert.equal((await page.evaluate((id) => window.nodus.listDeepResearchJobs().then((jobs) => jobs.find((job) => job.id === id)?.status), parkedId)), 'cancelled');
+  await page.evaluate(() => window.nodus.clearFinishedDeepResearchJobs());
+  console.log('[verify] trash confirmation preserves on cancel and removes on confirm');
 
   // Turn the MCP server on the way a user would: through Settings.
   const token = await page.evaluate(async (mcpPort) => {
@@ -170,18 +218,23 @@ try {
   assert.equal(listed.jobs.length, objectives.length);
   assert.equal(listed.running, false);
 
-  // The app's own path goes through the same lane: the window still gets its report,
-  // and the lane records it as `app` — which is how the strip avoids showing it twice.
-  const appReport = await page.evaluate(() =>
-    window.nodus.generateDeepResearchReport({ objective: 'Informe pedido desde la ventana de Nodus' })
+  // The app's own enqueue API goes through the same durable lane and auto-saves —
+  // exactly the route the New report composer uses.
+  const appJob = await page.evaluate(() =>
+    window.nodus.enqueueDeepResearchJob({ objective: 'Informe pedido desde la ventana de Nodus' })
   );
-  assert.ok(appReport.draft.title, 'a report started in the window still comes back to it');
-  const laneAfter = await call('nodus_list_deep_research_jobs', { status: 'all' });
-  const appJob = laneAfter.jobs.find((job) => job.objective === 'Informe pedido desde la ventana de Nodus');
-  assert.ok(appJob, 'the window report went through the shared lane');
   assert.equal(appJob.origin, 'app');
-  assert.equal(appJob.status, 'completed');
-  console.log('[verify] reports started in the window share the lane and are marked as its own');
+  await waitFor('the app report to finish', async () => {
+    const jobs = await page.evaluate(() => window.nodus.listDeepResearchJobs());
+    return jobs.find((job) => job.id === appJob.id)?.status === 'completed';
+  });
+  const appDetail = await call('nodus_get_deep_research_job', { jobId: appJob.id, includeReport: true });
+  assert.ok(appDetail.report.draft.title, 'a report started in the window still comes back to it');
+  assert.ok(appDetail.job.savedDraftId, 'the app enqueue path auto-saves the report');
+  await waitFor('the app report to appear in the gallery', async () =>
+    page.getByText(appDetail.report.draft.title, { exact: false }).first().isVisible()
+  );
+  console.log('[verify] reports started in the window share the durable lane and land in the gallery');
 
   assert.deepEqual(pageErrors.map((error) => error.message), [], 'no renderer errors');
   console.log('deep research MCP queue verification passed');

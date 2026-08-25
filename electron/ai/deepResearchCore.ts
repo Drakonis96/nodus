@@ -490,11 +490,13 @@ export interface SnapshotMaps {
 export async function orchestrateDeepResearch(
   request: DeepResearchRequest,
   deps: DeepResearchDeps,
-  onProgress?: (p: DeepResearchProgress) => void
+  onProgress?: (p: DeepResearchProgress) => void,
+  signal?: AbortSignal,
 ): Promise<DeepResearchReport> {
   const language = request.language ?? 'es';
   const L = labels(language);
   const emit = (p: DeepResearchProgress) => {
+    signal?.throwIfAborted();
     try {
       onProgress?.(p);
     } catch {

@@ -91,8 +91,10 @@ function sectionClaimsForWriting(section: DeepResearchPlanSection): string[] {
 
 export async function generateDeepResearchReport(
   request: DeepResearchRequest,
-  onProgress?: (p: DeepResearchProgress) => void
+  onProgress?: (p: DeepResearchProgress) => void,
+  signal?: AbortSignal,
 ): Promise<DeepResearchReport> {
+  signal?.throwIfAborted();
   const settings = getSettings();
   const model = request.model ?? settings.deepResearchModel ?? settings.synthesisModel ?? null;
   const approach = normalizeDeepResearchApproach(request.approach);
@@ -104,25 +106,25 @@ export async function generateDeepResearchReport(
   // type sets it for anything that reaches here without the flag (MCP, a stale queue).
   if (request.unitMode || getActiveVault().type === 'docencia') {
     const routedRequest = deepResearchVersion === 'v2'
-      ? await requestWithCoverageQuestions(versionedRequest, model)
+      ? await requestWithCoverageQuestions(versionedRequest, model, signal)
       : versionedRequest;
-    report = await generateStudyDeepResearchReport({ ...routedRequest, unitMode: true }, model, onProgress);
+    report = await generateStudyDeepResearchReport({ ...routedRequest, unitMode: true }, model, onProgress, signal);
     return withGenerationMetadata(report, approach, deepResearchVersion, model);
   }
   if (request.studyMode || getActiveVault().type === 'estudio') {
     const routedRequest = deepResearchVersion === 'v2'
-      ? await requestWithCoverageQuestions(versionedRequest, model)
+      ? await requestWithCoverageQuestions(versionedRequest, model, signal)
       : versionedRequest;
-    report = await generateStudyDeepResearchReport(routedRequest, model, onProgress);
+    report = await generateStudyDeepResearchReport(routedRequest, model, onProgress, signal);
     return withGenerationMetadata(report, approach, deepResearchVersion, model);
   }
   // A genealogy vault has no idea graph; its Deep Research writes a family-history
   // report over the embedding-indexed archive + library instead (own pipeline).
   if (getActiveVault().type === 'genealogy') {
     const routedRequest = deepResearchVersion === 'v2'
-      ? await requestWithCoverageQuestions(versionedRequest, model)
+      ? await requestWithCoverageQuestions(versionedRequest, model, signal)
       : versionedRequest;
-    report = await generateGenealogyDeepResearchReport(routedRequest, onProgress);
+    report = await generateGenealogyDeepResearchReport(routedRequest, onProgress, signal);
     return withGenerationMetadata(report, approach, deepResearchVersion, model);
   }
   // Both academic routes are graph-first. Full-document profiles are prepared and
@@ -132,9 +134,9 @@ export async function generateDeepResearchReport(
     : deepResearchEnginePath(deepResearchVersion, approach) === 'v1-specialized'
       ? legacySpecializedAcademicDeps(model, approach, versionedRequest)
       : deepResearchEnginePath(deepResearchVersion, approach) === 'v2-general'
-      ? realDeps(model)
-      : specializedAcademicDeps(model, approach, versionedRequest);
-  report = await orchestrateDeepResearch({ ...versionedRequest, model }, deps, onProgress);
+      ? realDeps(model, signal)
+      : specializedAcademicDeps(model, approach, versionedRequest, signal);
+  report = await orchestrateDeepResearch({ ...versionedRequest, model }, deps, onProgress, signal);
   return withGenerationMetadata(report, approach, deepResearchVersion, model);
 }
 
@@ -349,13 +351,17 @@ export async function generateDeepResearchPlanPreview(request: DeepResearchReque
 async function requestWithCoverageQuestions(
   request: DeepResearchRequest,
   model: ModelRef | null,
+  signal?: AbortSignal,
 ): Promise<DeepResearchRequest> {
+  signal?.throwIfAborted();
   if (request.coverageQuestions?.length) {
     return { ...request, coverageQuestions: request.coverageQuestions.slice(0, MAX_COVERAGE_QUESTIONS) };
   }
+  const coverageQuestions = await aiDecomposeObjective(request.objective, request.language, model);
+  signal?.throwIfAborted();
   return {
     ...request,
-    coverageQuestions: await aiDecomposeObjective(request.objective, request.language, model),
+    coverageQuestions,
   };
 }
 
@@ -448,7 +454,7 @@ function legacySpecializedAcademicDeps(
   };
 }
 
-function realDeps(model: ModelRef | null): DeepResearchDeps {
+function realDeps(model: ModelRef | null, signal?: AbortSignal): DeepResearchDeps {
   const experimentalProse = process.env.NODUS_EXPERIMENTAL_DEEP_RESEARCH_PROSE === '1';
   let relationships: ReturnType<typeof academicRelationshipContext> = [];
   return {
@@ -467,6 +473,7 @@ function realDeps(model: ModelRef | null): DeepResearchDeps {
       input.candidateWorkIds,
       'deep-research',
       ON_DEMAND_DOCUMENT_PROFILE_LIMIT,
+      signal,
     ),
     retrieveForSection: (input) => retrieveSectionMaterial(input),
     auditSectionClaims: (input) => aiAuditSectionClaims(input, model),
@@ -496,6 +503,7 @@ function specializedAcademicDeps(
   model: ModelRef | null,
   approach: DeepResearchApproach,
   request: DeepResearchRequest,
+  signal?: AbortSignal,
 ): DeepResearchDeps {
   const experimentalProse = process.env.NODUS_EXPERIMENTAL_DEEP_RESEARCH_PROSE === '1';
   let context: AcademicApproachContext = {
@@ -537,6 +545,7 @@ function specializedAcademicDeps(
       input.candidateWorkIds,
       'deep-research',
       ON_DEMAND_DOCUMENT_PROFILE_LIMIT,
+      signal,
     ),
     retrieveForSection: async (input) => {
       const ordinary = await retrieveSectionMaterial(input);

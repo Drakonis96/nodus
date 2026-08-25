@@ -15,7 +15,7 @@ export interface Migration {
 
 // Versioned, append-only migrations. Never edit an existing migration's SQL once
 // shipped — add a new one. The current schema version is the highest applied.
-export const SCHEMA_VERSION = 163;
+export const SCHEMA_VERSION = 164;
 
 export const migrations: Migration[] = [
   {
@@ -8880,6 +8880,38 @@ export const migrations: Migration[] = [
       -- user_version, so an edit there would never reach them (and the CREATE-only
       -- backfill cannot rescue an ALTER).
       ALTER TABLE works ADD COLUMN deep_queued INTEGER NOT NULL DEFAULT 0;
+    `,
+  },
+  {
+    version: 164,
+    up: /* sql */ `
+      -- Document profiles created immediately after the provenance upgrade compared
+      -- the resolver's new source-marked text with legacy deep hashes. Stable PDFs
+      -- consequently exhausted all five retries and remained paused forever. Give
+      -- only those standalone Deep Research jobs one clean retry under the corrected
+      -- comparison; user-paused campaigns and unrelated pauses remain untouched.
+      UPDATE document_profile_state
+         SET status='queued', stale_reason='legacy_text_fingerprint_recovered',
+             error=NULL, updated_at=strftime('%Y-%m-%dT%H:%M:%fZ','now')
+       WHERE status='paused'
+         AND stale_reason='source_changed_during_analysis'
+         AND EXISTS (
+           SELECT 1 FROM document_index_jobs job
+            WHERE job.nodus_id=document_profile_state.nodus_id
+              AND job.campaign_id IS NULL
+              AND job.reason='deep-research'
+              AND job.status='paused'
+              AND job.error LIKE 'La fuente cambió repetidamente durante el análisis.%'
+         );
+
+      UPDATE document_index_jobs
+         SET status='queued', phase='queued', progress=0, attempts=0,
+             source_fingerprint=NULL, error=NULL,
+             updated_at=strftime('%Y-%m-%dT%H:%M:%fZ','now')
+       WHERE campaign_id IS NULL
+         AND reason='deep-research'
+         AND status='paused'
+         AND error LIKE 'La fuente cambió repetidamente durante el análisis.%';
     `,
   },
 ];

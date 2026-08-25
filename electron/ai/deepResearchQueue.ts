@@ -48,7 +48,11 @@ export interface DeepResearchJobInput {
 }
 
 export interface DeepResearchQueueDeps {
-  generate: (request: DeepResearchRequest, onProgress: (progress: DeepResearchProgress) => void) => Promise<DeepResearchReport>;
+  generate: (
+    request: DeepResearchRequest,
+    onProgress: (progress: DeepResearchProgress) => void,
+    signal: AbortSignal,
+  ) => Promise<DeepResearchReport>;
   /** Persists the finished report and returns the saved draft id. */
   saveDraft: (input: { report: DeepResearchReport; request: DeepResearchRequest; title: string | null }) => string;
   activeVault: () => DeepResearchQueueVault;
@@ -79,6 +83,9 @@ interface QueuedJob {
   listener: ((progress: DeepResearchProgress) => void) | null;
   resolve: ((report: DeepResearchReport) => void) | null;
   reject: ((error: Error) => void) | null;
+  /** Stops provider/document waits while the lane remains occupied until the
+   * pipeline has unwound, preserving strict one-at-a-time generation. */
+  controller: AbortController;
 }
 
 /** Finished jobs kept for inspection before the oldest are dropped. */
@@ -146,7 +153,7 @@ export function listDeepResearchJobs(): DeepResearchJobRecord[] {
 
 /** True while a report is being generated — the lane cannot survive its database closing. */
 export function isDeepResearchLaneBusy(): boolean {
-  return jobs.some((job) => job.record.status === 'running');
+  return draining;
 }
 
 export function getDeepResearchJob(id: string): { job: DeepResearchJobRecord; report: DeepResearchReport | null } | null {
@@ -201,6 +208,7 @@ function restorePersistedJobs(persisted: DeepResearchPersistedJob[]): void {
       listener: null,
       resolve: null,
       reject: null,
+      controller: new AbortController(),
     });
   }
   sequence = Math.max(sequence, jobs.length);
@@ -296,6 +304,7 @@ function enqueueJob(input: DeepResearchJobInput, waiter: Pick<QueuedJob, 'listen
     save: input.save,
     draftTitle: input.title ?? null,
     report: null,
+    controller: new AbortController(),
     ...waiter,
   };
   jobs.push(job);
@@ -325,14 +334,24 @@ export function runDeepResearchJob(
   });
 }
 
-/** Drop a report that has not started. A running one is never abandoned mid-flight. */
+/** Remove a queued report or request cancellation of the one currently running. */
 export function cancelDeepResearchJob(id: string): boolean {
   const job = jobs.find((entry) => entry.record.id === id);
-  if (!job || job.record.status !== 'queued') return false;
+  if (!job || (job.record.status !== 'queued' && job.record.status !== 'running')) return false;
+  const wasRunning = job.record.status === 'running';
+  const message = isSpanish(job.request.language)
+    ? (wasRunning ? 'Generación cancelada por el usuario.' : 'Informe cancelado antes de empezar.')
+    : (wasRunning ? 'Generation cancelled by the user.' : 'Report cancelled before it started.');
   job.record.status = 'cancelled';
-  settle(job, {
-    error: isSpanish(job.request.language) ? 'Informe cancelado antes de empezar.' : 'Report cancelled before it started.',
-  });
+  job.record.error = message;
+  if (wasRunning) {
+    // The UI can remove the row now, but `draining` stays true until generate()
+    // acknowledges this signal. A following report can never overlap the unwind.
+    job.controller.abort(new Error(message));
+    notifyChange();
+  } else {
+    settle(job, { error: message });
+  }
   reportQueuePositions();
   notifyChange();
   return true;
@@ -388,7 +407,14 @@ async function drain(): Promise<void> {
         job.record.progress = progress;
         job.listener?.(progress);
         notifyChange();
-      });
+      }, job.controller.signal);
+      if (job.controller.signal.aborted) {
+        settle(job, {
+          error: job.record.error
+            ?? (isSpanish(job.request.language) ? 'Generación cancelada por el usuario.' : 'Generation cancelled by the user.'),
+        });
+        return;
+      }
       job.record.deepResearchApproach = normalizeDeepResearchApproach(report.draft.deepResearchApproach ?? job.request.approach);
       job.record.deepResearchVersion = normalizeDeepResearchMetadataVersion(
         report.draft.deepResearchVersion ?? report.meta?.deepResearchVersion ?? job.request.deepResearchVersion,
@@ -414,7 +440,12 @@ async function drain(): Promise<void> {
       }
       settle(job, { report });
     } catch (error) {
-      settle(job, { error: messageFromError(error) });
+      settle(job, {
+        error: job.controller.signal.aborted
+          ? job.record.error
+            ?? (isSpanish(job.request.language) ? 'Generación cancelada por el usuario.' : 'Generation cancelled by the user.')
+          : messageFromError(error),
+      });
     }
   } finally {
     draining = false;

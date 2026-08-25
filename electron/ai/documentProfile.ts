@@ -745,9 +745,13 @@ export async function runDocumentProfileScan(work: Work, options: RunDocumentPro
     throw new Error(document.notes ?? 'No hay texto completo legible.');
   }
   const sourceFingerprint = sha256(document.text);
-  const sourceContentHash = sha1(document.text);
   const sourceMap = Object.fromEntries((document.segments ?? []).map((segment) => [segment.marker, segment.sourceRef]));
-  if (work.deep_hash && work.deep_hash !== sourceContentHash) throw new Error('DOCUMENT_SOURCE_CHANGED');
+  // `deep_hash` identifies the text representation consumed by the last idea scan;
+  // it is not a revision lock for this independent document profile. In particular,
+  // historical deep hashes predate the durable [[src:sN]] markers now added by the
+  // resolver, so comparing the two made every stable legacy PDF look as if it were
+  // changing forever. The publication-boundary re-resolution below is the real
+  // source-change guard: it compares this exact resolved text before publishing.
   updateDocumentIndexJob(options.jobId, { sourceFingerprint });
   emit(options, 'structuring', 0.04, 'Reconstruyendo la estructura…');
   const sections = deriveDocumentStructure(document.text, work.title, sourceMap);
@@ -975,7 +979,9 @@ export async function runDocumentProfileScan(work: Work, options: RunDocumentPro
   upsertLibraryAnalysisProvenance({
     workId: work.nodus_id,
     component: 'documentProfile',
-    documentFingerprint: work.deep_hash ?? sourceFingerprint,
+    // Provenance follows the exact text this profile analysed, not the possibly
+    // older representation used by the independent idea/deep scan.
+    documentFingerprint: sourceFingerprint,
     libraryItemId: null,
     libraryRevisionFingerprint: null,
     pipelineVersion: DOCUMENT_PROFILE_PIPELINE_VERSION,

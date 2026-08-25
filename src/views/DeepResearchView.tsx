@@ -7,6 +7,7 @@ import type {
   AppSettings,
   DeepResearchArchiveFormat,
   DeepResearchJobRecord,
+  DeepResearchRequest,
   DeepResearchOutlineSection,
   DeepResearchSectionLimit,
   Person,
@@ -59,18 +60,6 @@ import {
   type ReaderSelectionActionsHandle,
 } from '../components/ReaderSelectionActions';
 import { t, tx, getActiveLang } from '../i18n';
-import {
-  DEEP_RESEARCH_MAIN_JOB_KEY,
-  clearFinishedDeepResearch,
-  enqueueDeepResearch,
-  getBackgroundJob,
-  getDeepResearchQueue,
-  removeQueuedDeepResearch,
-  subscribeBackgroundJob,
-  subscribeDeepResearchQueue,
-  type DeepResearchGenerationJob,
-  type DeepResearchQueueItem,
-} from '../backgroundJobs';
 import { useFeatureModel } from '../hooks/useFeatureModel';
 
 const DEEP_SECTION_OPTIONS: { value: DeepResearchSectionLimit; label: string }[] = [
@@ -324,12 +313,9 @@ export function DeepResearchView({
   const [loadingSavedDrafts, setLoadingSavedDrafts] = useState(false);
   /** True once the gallery has been read at least once, empty or not. */
   const [galleryRead, setGalleryRead] = useState(false);
-  const [queue, setQueue] = useState<DeepResearchQueueItem[]>(() => getDeepResearchQueue());
-  // The main-process lane, which also holds reports queued by MCP clients.
+  // The durable main-process lane holds every report, whether it originated in the
+  // app or through MCP. Its ids are also the cancellation ids shown in the strip.
   const [laneJobs, setLaneJobs] = useState<DeepResearchJobRecord[]>([]);
-  const [deepJob, setDeepJob] = useState<DeepResearchGenerationJob | null>(() =>
-    getBackgroundJob(DEEP_RESEARCH_MAIN_JOB_KEY)
-  );
 
   // Gallery controls. Restored as initial values only: a reactive `snapshot` prop
   // would fight the reader for their own filters on every render of the shell.
@@ -359,8 +345,7 @@ export function DeepResearchView({
   const [error, setError] = useState<string | null>(null);
 
   const hasModel = !!selectedModel;
-  const deepRunning = deepJob?.status === 'running';
-  const deepProgress = deepJob?.progress ?? null;
+  const deepRunning = laneJobs.some((job) => job.status === 'running');
 
   /**
    * The report that was open, found again once the gallery has been read.
@@ -420,8 +405,6 @@ export function DeepResearchView({
     report.current?.({ placement: null });
   }, [readFilter, search, sortKey]);
 
-  useEffect(() => subscribeBackgroundJob(DEEP_RESEARCH_MAIN_JOB_KEY, setDeepJob), []);
-  useEffect(() => subscribeDeepResearchQueue(setQueue), []);
   useEffect(() => {
     void window.nodus.listDeepResearchJobs().then(setLaneJobs);
     return window.nodus.onDeepResearchQueue(setLaneJobs);
@@ -503,21 +486,21 @@ export function DeepResearchView({
    */
   const seenUnsavedRef = useRef<Set<string>>(new Set());
   useEffect(() => {
-    const unsaved = queue.find((item) => item.saveError && !seenUnsavedRef.current.has(item.id));
+    const unsaved = laneJobs.find((item) => item.saveError && !seenUnsavedRef.current.has(item.id));
     if (!unsaved?.saveError) return;
     seenUnsavedRef.current.add(unsaved.id);
     setError(unsaved.saveError);
-  }, [queue]);
+  }, [laneJobs]);
 
-  // A report queued over MCP is saved by the main process, so nothing in this window
-  // knows about it until the gallery is re-read.
-  const seenMcpDraftsRef = useRef<Set<string>>(new Set());
+  // Every queued report is saved by the main process, so refresh the gallery once a
+  // durable lane record announces its saved draft.
+  const seenLaneDraftsRef = useRef<Set<string>>(new Set());
   useEffect(() => {
     const landed = laneJobs.filter(
-      (job) => job.origin === 'mcp' && job.savedDraftId && !seenMcpDraftsRef.current.has(job.savedDraftId)
+      (job) => job.savedDraftId && !seenLaneDraftsRef.current.has(job.savedDraftId)
     );
     if (landed.length === 0) return;
-    for (const job of landed) seenMcpDraftsRef.current.add(job.savedDraftId as string);
+    for (const job of landed) seenLaneDraftsRef.current.add(job.savedDraftId as string);
     void refreshSavedDrafts();
   }, [laneJobs, refreshSavedDrafts]);
 
@@ -542,8 +525,10 @@ export function DeepResearchView({
       // Trimmed here rather than in the editor so a slot the teacher is still typing
       // into never loses its whitespace mid-keystroke.
       ...(outline ? { outline: outline.map((slot) => ({ title: slot.title.trim(), focus: slot.focus?.trim() || undefined })) } : {}),
-    } as Parameters<typeof enqueueDeepResearch>[0] & { deepResearchVersion: DeepResearchVersion };
-    enqueueDeepResearch(request);
+    } as DeepResearchRequest & { deepResearchVersion: DeepResearchVersion };
+    void window.nodus.enqueueDeepResearchJob(request).catch((enqueueError) => {
+      setError(enqueueError instanceof Error ? enqueueError.message : String(enqueueError));
+    });
     setComposerOpen(false);
     setObjective('');
     setApproach('general');
@@ -784,46 +769,51 @@ export function DeepResearchView({
     return sorted;
   }, [savedDrafts, search, readFilter, sortKey]);
 
-  // The strip shows one lane, not two. Reports queued from this window come from the
-  // renderer store; reports queued by an MCP client live in the main process and arrive
-  // over `onDeepResearchQueue`. Only MCP ones are taken from there — an app report is
-  // already represented by its renderer entry, and would otherwise appear twice.
-  const stripItems = useMemo<QueueStripItem[]>(() => {
-    const local = queue.map<QueueStripItem>((item) => ({
-      id: item.id,
-      title: item.title,
-      // A report that generated but could not be filed is shown as a failure: the
-      // gallery will never hold it, so quietly completing would lose it in silence.
-      status: item.status === 'completed' && item.saveError ? 'failed' : item.status,
-      progress: item.status === 'running' ? deepProgress : null,
-      error: item.error ?? item.saveError,
-      origin: 'app',
-      enqueuedAt: item.enqueuedAt,
-    }));
-    const remote = laneJobs
-      .filter((job) => job.origin === 'mcp')
-      .map<QueueStripItem>((job) => ({
+  // The strip mirrors the one durable lane. This keeps its visible ids identical to
+  // the ids the main process can cancel, including after an application restart.
+  const stripItems = useMemo<QueueStripItem[]>(() => laneJobs
+    .flatMap<QueueStripItem>((job) => {
+      if (job.status === 'cancelled') return [];
+      return [{
         id: job.id,
         title: job.title,
-        status: job.status === 'cancelled' ? 'failed' : job.status,
+        // A report that generated but could not be filed is shown as a failure: the
+        // gallery will never hold it, so quietly completing would lose it in silence.
+        status: job.status === 'completed' && job.saveError ? 'failed' : job.status,
         progress: job.status === 'running' || job.status === 'queued' ? job.progress : null,
-        error: job.error,
-        origin: 'mcp',
+        error: job.error ?? job.saveError,
+        origin: job.origin,
         enqueuedAt: job.enqueuedAt,
-      }));
-    return [...local, ...remote].sort((a, b) => a.enqueuedAt.localeCompare(b.enqueuedAt));
-  }, [queue, laneJobs, deepProgress]);
+      }];
+    })
+    .sort((a, b) => a.enqueuedAt.localeCompare(b.enqueuedAt)), [laneJobs]);
 
   const activeQueue = stripItems.filter((item) => item.status === 'queued' || item.status === 'running');
   const finishedQueue = stripItems.filter((item) => item.status === 'failed');
 
-  const removeQueued = (item: QueueStripItem) => {
-    if (item.origin === 'mcp') void window.nodus.cancelDeepResearchJob(item.id);
-    else removeQueuedDeepResearch(item.id);
+  const removeQueued = async (item: QueueStripItem) => {
+    const approved = await confirm({
+      title: t('Quitar de la cola'),
+      message: (
+        <>
+          <span>«{item.title}»</span>
+          <br />
+          {t('Esta acción no se puede deshacer.')}
+        </>
+      ),
+      confirmLabel: t('Eliminar'),
+      danger: true,
+    });
+    if (!approved) return;
+    try {
+      const removed = await window.nodus.cancelDeepResearchJob(item.id);
+      if (!removed) setError(t('No se pudo quitar el informe de la cola.'));
+    } catch (removeError) {
+      setError(removeError instanceof Error ? removeError.message : String(removeError));
+    }
   };
 
   const clearFinished = () => {
-    clearFinishedDeepResearch();
     void window.nodus.clearFinishedDeepResearchJobs();
   };
 

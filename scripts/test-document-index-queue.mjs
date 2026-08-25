@@ -97,6 +97,26 @@ test('deliberate research may continue when one optional profile fails',async()=
   assert.equal(globalThis.__documentQueue.data.get('v1').profiles.get('v1-fail'),'failed');
 });
 
+test('a paused profile terminates the research barrier instead of polling forever',async()=>{
+  globalThis.__documentQueue.works.get('v1').push({nodus_id:'v1-paused-barrier',title:'Obra pausada'});
+  globalThis.__documentQueue.blockWorks.add('v1-paused-barrier');
+  const campaign=await documentIndexQueue.startVaultCampaign('v1',{mode:'manual',nodusIds:['v1-paused-barrier']});
+  const deadline=Date.now()+2000;
+  let job;
+  do{await new Promise(r=>setTimeout(r,10));job=globalThis.__documentQueue.data.get('v1').jobs.find(x=>x.nodusId==='v1-paused-barrier')}while(job?.status!=='running'&&Date.now()<deadline);
+  assert.equal(job.status,'running');
+  await documentIndexQueue.setCampaignStatus('v1',campaign.campaignId,'paused');
+  do{await new Promise(r=>setTimeout(r,10));}while(job.status!=='paused'&&Date.now()<deadline);
+  await assert.rejects(
+    Promise.race([
+      documentIndexQueue.ensureProfiles('v1',['v1-paused-barrier'],'research',{allowUnavailable:true,allowFailed:true}),
+      new Promise((_,reject)=>setTimeout(()=>reject(new Error('barrier timed out')),500)),
+    ]),
+    /quedaron en pausa/,
+  );
+  await documentIndexQueue.setCampaignStatus('v1',campaign.campaignId,'cancelled');
+});
+
 test('pause aborts the active provider call, is vault-scoped, and resumes the same persisted job',async()=>{
   globalThis.__documentQueue.works.get('v2').push({nodus_id:'v2-pause',title:'Obra bloqueable'});
   globalThis.__documentQueue.blockWorks.add('v2-pause');

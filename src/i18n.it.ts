@@ -2576,6 +2576,7 @@ export const IT: Record<string, string> = {
   "Limpiar fallidos": "Cancellazione non riuscita",
   "pág.": "pag.",
   "Quitar de la cola": "Rimuovi dalla coda",
+  "No se pudo quitar el informe de la cola.": "Non è stato possibile rimuovere il rapporto dalla coda.",
   "Falló": "Fallito",
   "Abrir a pantalla completa": "Apri a schermo intero",
   "Lectura a pantalla completa": "Lettura a schermo intero",

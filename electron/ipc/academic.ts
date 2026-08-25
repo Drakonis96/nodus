@@ -231,6 +231,7 @@ import { ensureDeepResearchLane } from '../ai/deepResearchLane';
 import {
   cancelDeepResearchJob,
   clearFinishedDeepResearchJobs,
+  enqueueDeepResearchJob,
   listDeepResearchJobs,
   runDeepResearchJob,
 } from '../ai/deepResearchQueue';
@@ -1558,6 +1559,10 @@ export function registerAcademicIpc({ h, getWindow, chatAborters }: IpcContext):
   h('research:deep:queue:list', async () => {
     ensureDeepResearchLane();
     return listDeepResearchJobs();
+  });
+  h('research:deep:queue:enqueue', async (_e, request: DeepResearchRequest) => {
+    ensureDeepResearchLane();
+    return enqueueDeepResearchJob({ request, origin: 'app', save: true });
   });
   h('research:deep:queue:cancel', async (_e, id: string) => {
     ensureDeepResearchLane();

@@ -27,9 +27,15 @@ try {
   const db = new Database(target);
   if (!source) runMigrations(db);
   const before = source ? counts(db) : null;
+  const hasDocumentJobs = !!db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='document_index_jobs'").get();
+  const recoverableLegacyIds = source && hasDocumentJobs
+    ? db.prepare(`SELECT nodus_id FROM document_index_jobs
+        WHERE campaign_id IS NULL AND reason='deep-research' AND status='paused'
+          AND error LIKE 'La fuente cambió repetidamente durante el análisis.%'`).all().map((row) => row.nodus_id)
+    : [];
   runMigrations(db);
   assert.equal(db.pragma('user_version', { simple: true }), SCHEMA_VERSION);
-  assert.equal(SCHEMA_VERSION, 163);
+  assert.equal(SCHEMA_VERSION, 164);
   const workColumns = new Set(db.prepare('PRAGMA table_info(works)').all().map((row) => row.name));
   for (const column of ['resolved_source_type', 'resolved_text_hash', 'text_block_reason', 'resolved_text_notes', 'deep_error', 'deep_queued']) {
     assert.ok(workColumns.has(column), `works.${column} exists`);
@@ -47,6 +53,18 @@ try {
   if (before) assert.deepEqual(counts(db), before, 'additive migration preserves corpus row counts');
   assert.deepEqual(db.pragma('quick_check'), [{ quick_check: 'ok' }]);
   assert.equal(db.pragma('foreign_key_check').length, 0);
+  for (const nodusId of recoverableLegacyIds) {
+    assert.deepEqual(
+      db.prepare('SELECT status, attempts, error FROM document_index_jobs WHERE nodus_id=?').get(nodusId),
+      { status: 'queued', attempts: 0, error: null },
+      `legacy Deep Research profile job ${nodusId} is recovered on the copied vault`
+    );
+    assert.deepEqual(
+      db.prepare('SELECT status, stale_reason, error FROM document_profile_state WHERE nodus_id=?').get(nodusId),
+      { status: 'queued', stale_reason: 'legacy_text_fingerprint_recovered', error: null },
+      `recovered job ${nodusId} has matching profile state`
+    );
+  }
 
   // A database built by a differently-numbered build can sit above the version that
   // introduced the text inventory without ever having created it. That is why the table
@@ -74,6 +92,41 @@ try {
   assert.ok(db.prepare("SELECT 1 FROM sqlite_master WHERE type='index' AND name='idx_work_text_sources_attachment'").get());
   assert.equal(db.pragma('user_version', { simple: true }), SCHEMA_VERSION);
   if (before) assert.deepEqual(counts(db), before, 'the repair pass changes no corpus row');
+
+  // v164 repairs exactly the standalone Deep Research jobs affected by the legacy
+  // text-fingerprint comparison. A different pause — including a user-paused
+  // campaign with the same last error — must remain untouched.
+  for (const suffix of ['recover', 'other', 'campaign']) {
+    db.prepare('INSERT INTO works(nodus_id, title) VALUES(?, ?)').run(`migration-164-${suffix}`, suffix);
+    db.prepare(`INSERT INTO document_profile_state(
+      nodus_id,status,stale_reason,error,updated_at
+    ) VALUES(?, 'paused', 'source_changed_during_analysis', 'old state error', ?)`).run(
+      `migration-164-${suffix}`, new Date().toISOString()
+    );
+  }
+  db.prepare(`INSERT INTO document_index_campaigns(
+    campaign_id,vault_id,mode,status,created_at,updated_at
+  ) VALUES('migration-164-campaign-id','vault','manual','paused',?,?)`).run(
+    new Date().toISOString(), new Date().toISOString()
+  );
+  const insertPausedJob = db.prepare(`INSERT INTO document_index_jobs(
+    job_id,campaign_id,vault_id,nodus_id,reason,status,phase,progress,attempts,max_attempts,error,created_at,updated_at
+  ) VALUES(?,?,?,?,?,'paused','failed',0.7,5,5,?,?,?)`);
+  const sourceChanged = 'La fuente cambió repetidamente durante el análisis. La campaña se ha pausado para evitar reintentos indefinidos.';
+  const now = new Date().toISOString();
+  insertPausedJob.run('migration-164-recover-job', null, 'vault', 'migration-164-recover', 'deep-research', sourceChanged, now, now);
+  insertPausedJob.run('migration-164-other-job', null, 'vault', 'migration-164-other', 'deep-research', 'El proveedor no respondió.', now, now);
+  insertPausedJob.run('migration-164-campaign-job', 'migration-164-campaign-id', 'vault', 'migration-164-campaign', 'deep-research', sourceChanged, now, now);
+  db.pragma('user_version = 163');
+  runMigrations(db);
+  const recoveredJob = db.prepare("SELECT status, phase, progress, attempts, error FROM document_index_jobs WHERE job_id='migration-164-recover-job'").get();
+  assert.deepEqual(recoveredJob, { status: 'queued', phase: 'queued', progress: 0, attempts: 0, error: null });
+  assert.deepEqual(
+    db.prepare("SELECT status, stale_reason, error FROM document_profile_state WHERE nodus_id='migration-164-recover'").get(),
+    { status: 'queued', stale_reason: 'legacy_text_fingerprint_recovered', error: null }
+  );
+  assert.equal(db.prepare("SELECT status FROM document_index_jobs WHERE job_id='migration-164-other-job'").get().status, 'paused');
+  assert.equal(db.prepare("SELECT status FROM document_index_jobs WHERE job_id='migration-164-campaign-job'").get().status, 'paused');
   db.close();
 } finally {
   await rm(root, { recursive: true, force: true });

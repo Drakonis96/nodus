@@ -7,7 +7,7 @@
 // component is bundled and rendered through react-dom/server: no browser, no DOM,
 // no Electron. If the JSX is wrong, this fails.
 import assert from 'node:assert/strict';
-import { mkdtemp, rm } from 'node:fs/promises';
+import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
@@ -97,6 +97,26 @@ test('reports still waiting say how many are ahead of them', () => {
   assert.match(html, /2 por delante/, 'the third behind two');
   // Only the running one has a bar: a queue of five bars at 3% would say nothing.
   assert.equal(html.match(/data-testid="deep-research-progress"/g).length, 1);
+});
+
+test('every active report has a trash action, including the one running', () => {
+  const html = renderStrip([
+    item({ id: 'running', status: 'running', progress: { phase: 'planning', message: 'Planificando…' } }),
+    item({ id: 'waiting', title: 'Segundo informe' }),
+  ]);
+  assert.equal(html.match(/data-testid="remove-deep-research-/g)?.length, 2);
+  assert.equal(html.match(/aria-label="Quitar de la cola"/g)?.length, 2);
+});
+
+test('the trash action asks for confirmation before cancelling the durable job', async () => {
+  const source = await readFile(path.join(repoRoot, 'src/views/DeepResearchView.tsx'), 'utf8');
+  const removal = source.slice(source.indexOf('const removeQueued = async'), source.indexOf('const clearFinished'));
+  assert.match(removal, /await confirm\(/);
+  assert.match(removal, /danger: true/);
+  assert.ok(
+    removal.indexOf('if (!approved) return') < removal.indexOf('cancelDeepResearchJob(item.id)'),
+    'declining the modal must prevent cancellation'
+  );
 });
 
 test('a report asked for over MCP is marked as such, and a failure states it failed', () => {

@@ -268,10 +268,11 @@ class DocumentIndexQueue {
     vaultId: string,
     nodusIds: string[],
     reason = 'research',
-    options: { allowUnavailable?: boolean; allowFailed?: boolean } = {},
+    options: { allowUnavailable?: boolean; allowFailed?: boolean; signal?: AbortSignal } = {},
   ): Promise<void> {
     const ids = [...new Set(nodusIds)].filter(Boolean);
     if (!ids.length) return;
+    options.signal?.throwIfAborted();
     if (this.maintenanceAll || this.maintenanceVaults.has(vaultId)) throw new Error('El vault está en mantenimiento; inténtalo al terminar.');
     await this.initialize();
     await withVaultDatabase(vaultId, () => {
@@ -294,12 +295,22 @@ class DocumentIndexQueue {
       || (options.allowUnavailable && state.status === 'unavailable')
       || (options.allowFailed && state.status === 'failed')
     )) {
+      options.signal?.throwIfAborted();
       const failed = result.filter((state) => state.status === 'failed');
       const unavailable = result.filter((state) => state.status === 'unavailable');
+      const paused = result.filter((state) => state.status === 'paused');
+      // A pause is stable until somebody explicitly resumes the owning campaign.
+      // Polling it as if it were still active leaves Deep Research at 4% forever.
+      if (paused.length) {
+        throw new Error(
+          `${paused.length} obra(s) quedaron en pausa durante la preparación documental. Reanuda su análisis o vuelve a intentarlo cuando la fuente esté estable.`
+        );
+      }
       if ((failed.length && !options.allowFailed) || (unavailable.length && !options.allowUnavailable)) {
         throw new Error(`No se pudieron preparar ${failed.length + unavailable.length} obra(s) necesarias para la investigación.`);
       }
       await new Promise((resolve) => setTimeout(resolve, POLL_MS));
+      options.signal?.throwIfAborted();
       result = await withVaultDatabase(vaultId, () => documentProfileStatuses(ids));
     }
   }
