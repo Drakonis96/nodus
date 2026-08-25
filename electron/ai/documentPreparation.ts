@@ -21,7 +21,9 @@ export async function prepareRelevantDocumentProfiles(
   orderedNodusIds: string[],
   reason: 'deep-research' | 'immersion',
   limit = 32,
+  signal?: AbortSignal,
 ): Promise<DocumentPreparationResult> {
+  signal?.throwIfAborted();
   const vault = getActiveVault();
   const unique = [...new Set(orderedNodusIds)].filter(Boolean);
   if (vault.type !== 'academic' || unique.length === 0) {
@@ -50,7 +52,11 @@ export async function prepareRelevantDocumentProfiles(
   if (!candidates.length) {
     return { considered: unique.length, requested: 0, prepared: 0, unavailable: 0, failed: 0 };
   }
-  await documentIndexQueue.ensureProfiles(vault.id, candidates, reason, { allowUnavailable: true, allowFailed: true });
+  await documentIndexQueue.ensureProfiles(vault.id, candidates, reason, {
+    allowUnavailable: true,
+    allowFailed: true,
+    signal,
+  });
   const statuses = documentProfileStatuses(candidates);
   return {
     considered: unique.length,

@@ -2866,6 +2866,7 @@ export const DE: Record<string, string> = {
   'pág.': 'S.',
   'Pedido desde un cliente MCP': 'Von einem MCP-Client angefordert',
   'Quitar de la cola': 'Aus der Warteschlange entfernen',
+  'No se pudo quitar el informe de la cola.': 'Der Bericht konnte nicht aus der Warteschlange entfernt werden.',
   'Falló': 'Fehlgeschlagen',
   'Abrir a pantalla completa': 'Im Vollbild öffnen',
   'Lectura a pantalla completa': 'Vollbildlesen',

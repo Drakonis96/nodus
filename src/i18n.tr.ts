@@ -2953,6 +2953,7 @@ export const TR: Record<string, string> = {
   "Limpiar fallidos": "Temizleme başarısız oldu",
   "pág.": "s.",
   "Quitar de la cola": "sıradan kaldır",
+  "No se pudo quitar el informe de la cola.": "Rapor sıradan kaldırılamadı.",
   "Falló": "Başarısız",
   "Abrir a pantalla completa": "Tam ekranı aç",
   "Lectura a pantalla completa": "Tam ekran okuma",

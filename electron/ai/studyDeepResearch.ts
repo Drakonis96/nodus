@@ -599,7 +599,12 @@ export async function generateStudyDeepResearchReport(
   request: DeepResearchRequest,
   model: ModelRef | null,
   onProgress?: (progress: DeepResearchProgress) => void,
+  signal?: AbortSignal,
 ): Promise<DeepResearchReport> {
+  const emit = (progress: DeepResearchProgress) => {
+    signal?.throwIfAborted();
+    try { onProgress?.(progress); } catch { /* progress is best-effort */ }
+  };
   const language = request.language ?? 'es';
   const unitMode = Boolean(request.unitMode);
   const approach = normalizeDeepResearchApproach(request.approach);
@@ -611,7 +616,7 @@ export async function generateStudyDeepResearchReport(
   );
   const teacherPlan = unitMode && audience === 'teacher';
   const prompts = studyDeepResearchPromptPack(language, audience, unitMode);
-  onProgress?.({ phase: 'snapshot', message: unitMode ? 'Recuperando materiales, apuntes y transcripciones de clase…' : 'Recuperando apuntes, materiales y transcripciones relevantes…' });
+  emit({ phase: 'snapshot', message: unitMode ? 'Recuperando materiales, apuntes y transcripciones de clase…' : 'Recuperando apuntes, materiales y transcripciones relevantes…' });
   const ordinaryRetrieved = await retrieveStudyAssistantEntries(request.objective, { kinds: ['material', 'document', 'transcript'] }, [], 48);
   let approachContext: StudyApproachContext | null = null;
   let retrieved = ordinaryRetrieved;
@@ -667,7 +672,7 @@ export async function generateStudyDeepResearchReport(
     .filter((edge) => edge.from && edge.to);
   const requestedOutline = normalizeUnitOutline(request.outline);
   const count = sectionCount(request, sources.length, knowledge.ideas.length, request.coverageQuestions?.length ?? 0);
-  onProgress?.({
+  emit({
     phase: 'planning',
     message: requestedOutline.length
       ? `Ajustando el esquema indicado (${count} partes) a los materiales…`
@@ -738,7 +743,7 @@ export async function generateStudyDeepResearchReport(
       ? knowledge.ideas.filter((idea) => section.ideaIds.includes(idea.id))
       : knowledge.ideas.slice(0, 8)
     ).map((idea) => ({ type: idea.type, label: idea.label, statement: idea.statement }));
-    onProgress?.({
+    emit({
       phase: 'section',
       message: `${teacherPlan ? 'Redactando' : 'Explicando'}: ${section.title}`,
       sectionIndex: index + 1,
@@ -826,7 +831,7 @@ export async function generateStudyDeepResearchReport(
     });
   }
 
-  onProgress?.({
+  emit({
     phase: 'assembling',
     message: teacherPlan
       ? 'Preparando síntesis, materiales y propuestas de evaluación…'
@@ -958,7 +963,7 @@ export async function generateStudyDeepResearchReport(
       ? { questions: [...request.coverageQuestions], ratio: qualityAssessment.metrics.objectiveCoverage }
       : null,
   };
-  onProgress?.({
+  emit({
     phase: 'done',
     message: teacherPlan
       ? `Unidad lista: ${singleNarrative ? 'bloque continuo' : `${sections.length} partes`} · ${usedSourceIds.size} materiales`

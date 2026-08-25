@@ -4,6 +4,8 @@ import { app, BrowserWindow } from 'electron';
 import { nodiText } from '@shared/nodiNotifications';
 import { openDbPath } from '../db/database';
 import { saveWritingWorkshopDraft } from '../db/writingDraftsRepo';
+import { applyDecorativeImageOption } from './decorativeImages';
+import { localizedForUi } from '../ipc/context';
 import { addNotification } from '../notifications';
 import { getActiveVault, listVaults } from '../vaults/vaultRegistry';
 import { generateDeepResearchReport } from './deepResearch';
@@ -94,9 +96,23 @@ export function ensureDeepResearchLane(): void {
   if (configured) return;
   configured = true;
   configureDeepResearchQueue({
-    generate: (request, onProgress) => generateDeepResearchReport(request, onProgress),
-    saveDraft: ({ report, request, title }) =>
-      saveWritingWorkshopDraft({ draft: report.draft, model: report.draft.generationModel ?? request.model ?? null, title: title ?? undefined }).id,
+    generate: (request, onProgress, signal) => generateDeepResearchReport(request, onProgress, signal),
+    saveDraft: ({ report, request, title }) => {
+      const saved = saveWritingWorkshopDraft({
+        draft: report.draft,
+        model: report.draft.generationModel ?? request.model ?? null,
+        title: title ?? undefined,
+        decorativeImage: request.decorativeImage,
+      });
+      // The durable report lands before optional image generation starts. Every
+      // window can refresh the gallery immediately and receives the later image.
+      broadcast('writing:saved:changed', null);
+      const image = applyDecorativeImageOption('deep_research', saved.id, request.decorativeImage, (next) => {
+        broadcast('images:changed', localizedForUi(next));
+      });
+      if (image) broadcast('images:changed', localizedForUi(image));
+      return saved.id;
+    },
     activeVault: servingVault,
     load: loadDurableQueue,
     persist: persistDurableQueue,

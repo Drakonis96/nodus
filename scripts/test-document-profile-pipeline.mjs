@@ -236,6 +236,7 @@ test('stop during passage embeddings prevents every later write and publication'
 
 test('a legacy deep hash does not make the current resolved source look unstable', async () => {
   globalThis.__documentPipeline.sourceReads = 0;
+  globalThis.__documentPipeline.changedTextAtPublication = null;
   globalThis.__documentPipeline.published = null;
   globalThis.__documentPipeline.text = `# Texto sustituido\n${'Contenido externo nuevo. '.repeat(100)}`;
   const work = {

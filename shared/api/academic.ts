@@ -709,7 +709,9 @@ export interface AcademicApi {
   generateDeepResearchReport(request: DeepResearchRequest, handlers?: DeepResearchStreamHandlers): Promise<DeepResearchReport>;
   /** Every report in the shared generation lane, including those queued by MCP clients. */
   listDeepResearchJobs(): Promise<DeepResearchJobRecord[]>;
-  /** Drop a report that has not started yet. Returns false for one already running or finished. */
+  /** Add a report from the app to the durable shared lane and return immediately. */
+  enqueueDeepResearchJob(request: DeepResearchRequest): Promise<DeepResearchJobRecord>;
+  /** Remove a queued report or cancel the one currently running. */
   cancelDeepResearchJob(id: string): Promise<boolean>;
   /** Forget the finished tail of the lane; returns how many jobs were dropped. */
   clearFinishedDeepResearchJobs(): Promise<number>;

@@ -123,7 +123,7 @@ test('Academic Deep Research freezes an idea-first argument before document enri
   ]);
   assert.match(source, /deepResearchEnginePath\(deepResearchVersion, approach\) === 'v1-general'[\s\S]*legacyAcademicDeps\(model\)/, 'v1 retains the historical dependency route');
   assert.match(source, /deepResearchEnginePath\(deepResearchVersion, approach\) === 'v2-general'[\s\S]*realDeps\(model\)/, 'v2 retains the idea-first document-enrichment route');
-  assert.match(source, /orchestrateDeepResearch\(\{ \.\.\.versionedRequest, model \}, deps, onProgress\)/, 'both routes share the versioned orchestration boundary');
+  assert.match(source, /orchestrateDeepResearch\(\{ \.\.\.versionedRequest, model \}, deps, onProgress, signal\)/, 'both routes share the versioned cancellable orchestration boundary');
   assert.match(source, /buildIdeaFirstWritingWorkshopSnapshot\(brief, academicObjectiveProbes\(brief\.objective\)\)/, 'General planning uses clause probes over the graph-only snapshot');
   assert.match(source, /function academicObjectiveProbes[\s\S]*split\(\/\[.;\]/, 'graph recall probes are deterministic clauses from the user objective');
   assert.match(source, /planReport: \(input\) => aiPlanReport\(\{ \.\.\.input, relationships \}, model\)/, 'General planning receives explicit graph relationships');

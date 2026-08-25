@@ -10,7 +10,7 @@
 //   • a report whose vault changed *during* generation is never saved as a draft of
 //     the new vault;
 //   • a report that cannot be filed is still returned, not thrown away;
-//   • a queued report can be cancelled, a running one cannot;
+//   • both a queued report and the running one can be cancelled without overlap;
 //   • one failure does not stall the lane.
 import assert from 'node:assert/strict';
 import { build } from 'esbuild';
@@ -220,32 +220,37 @@ try {
     assert.equal(queue.getDeepResearchJob(record.id).report.draft.title, 'A', 'the report stays readable through the job');
   }
 
-  // ── Cancelling: queued yes, running no ─────────────────────────────────────
+  // ── Cancelling queued and running work ──────────────────────────────────────
   {
     queue.__resetDeepResearchQueueForTest();
-    let release;
+    let runningSignal;
     queue.configureDeepResearchQueue({
-      generate: (request) =>
-        new Promise((resolve) => {
-          release = () => resolve(fakeReport(request.objective));
+      generate: (request, _onProgress, signal) =>
+        new Promise((resolve, reject) => {
+          runningSignal = signal;
+          signal.addEventListener('abort', () => reject(signal.reason), { once: true });
         }),
       saveDraft: () => 'draft-1',
       activeVault: () => ({ id: 'v1', name: 'Corpus' }),
     });
 
-    const running = queue.runDeepResearchJob({ request: { objective: 'A' }, origin: 'app', save: false });
+    const running = queue.runDeepResearchJob({ request: { objective: 'A' }, origin: 'app', save: false }).catch((error) => error);
     const waiting = queue.enqueueDeepResearchJob({ request: { objective: 'B' }, origin: 'mcp', save: false });
-    await waitFor(() => typeof release === 'function', 'generation to start');
+    await waitFor(() => runningSignal instanceof AbortSignal, 'generation to start');
 
     const runningId = queue.listDeepResearchJobs().find((job) => job.title === 'A').id;
-    assert.equal(queue.cancelDeepResearchJob(runningId), false, 'a running report is never abandoned mid-flight');
     assert.equal(queue.cancelDeepResearchJob(waiting.id), true);
     assert.equal(queue.getDeepResearchJob(waiting.id).job.status, 'cancelled');
     assert.equal(queue.cancelDeepResearchJob(waiting.id), false, 'cancelling twice is not a second cancellation');
+    assert.equal(queue.cancelDeepResearchJob(runningId), true, 'the visible running report can be removed too');
+    assert.equal(runningSignal.aborted, true, 'cancellation reaches the active pipeline');
+    assert.equal(queue.isDeepResearchLaneBusy(), true, 'the lane stays occupied while the active pipeline unwinds');
 
-    release();
-    await running;
-    assert.equal(queue.listDeepResearchJobs().filter((job) => job.status === 'completed').length, 1);
+    const outcome = await running;
+    assert.ok(outcome instanceof Error);
+    assert.match(outcome.message, /cancelada/);
+    await waitFor(() => queue.isDeepResearchLaneBusy() === false, 'the cancelled pipeline to unwind');
+    assert.equal(queue.listDeepResearchJobs().filter((job) => job.status === 'completed').length, 0);
   }
 
   // ── A failure does not stall the lane ──────────────────────────────────────

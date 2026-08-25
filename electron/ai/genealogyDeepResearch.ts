@@ -281,10 +281,12 @@ export async function orchestrateGenealogyDeepResearch(
   family: FamilyFacts,
   deps: GenDeepDeps,
   onProgress?: (p: DeepResearchProgress) => void,
-  focusPerson: FocusPerson | null = null
+  focusPerson: FocusPerson | null = null,
+  signal?: AbortSignal,
 ): Promise<DeepResearchReport> {
   const language = request.language ?? 'es';
   const emit = (p: DeepResearchProgress) => {
+    signal?.throwIfAborted();
     try {
       onProgress?.(p);
     } catch {
@@ -536,8 +538,10 @@ export async function orchestrateGenealogyDeepResearch(
 /** Production entry point: gather the source pool + family facts, then orchestrate. */
 export async function generateGenealogyDeepResearchReport(
   request: DeepResearchRequest,
-  onProgress?: (p: DeepResearchProgress) => void
+  onProgress?: (p: DeepResearchProgress) => void,
+  signal?: AbortSignal,
 ): Promise<DeepResearchReport> {
+  signal?.throwIfAborted();
   const settings = getSettings();
   const model = request.model ?? settings.deepResearchModel ?? settings.synthesisModel ?? null;
   const approach = normalizeDeepResearchApproach(request.approach);
@@ -548,7 +552,7 @@ export async function generateGenealogyDeepResearchReport(
   const focusPerson = request.focusPersonId ? buildFocusPerson(request.focusPersonId, family) : null;
   // The historical General path remains byte-for-byte the same after source gathering.
   if (approach === 'general') {
-    return orchestrateGenealogyDeepResearch(request, ordinarySources, family, realDeps(model), onProgress, focusPerson);
+    return orchestrateGenealogyDeepResearch(request, ordinarySources, family, realDeps(model), onProgress, focusPerson, signal);
   }
   const retrieval = await planApproachRetrieval({
     approach,
@@ -567,6 +571,7 @@ export async function generateGenealogyDeepResearchReport(
     retrieval.probes.slice(0, 6).map((probe) => buildGenealogySourcePool(probe, request.focusPersonId)),
   );
   const sources = mergeGenealogyApproachSources(ordinarySources, supplementalPools.flat(), approach);
+  signal?.throwIfAborted();
   return orchestrateGenealogyDeepResearch(
     request,
     sources,
@@ -574,6 +579,7 @@ export async function generateGenealogyDeepResearchReport(
     specializedGenealogyDeps(model, approach, retrieval),
     onProgress,
     focusPerson,
+    signal,
   );
 }
 
