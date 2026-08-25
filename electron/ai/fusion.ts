@@ -96,7 +96,12 @@ const STOPWORDS = new Set([
   'y',
 ]);
 
-function tokens(text: string): Set<string> {
+function tokens(text: string | null | undefined): Set<string> {
+  // The column is nullable and the corpus has rows to prove it: six ideas in a real
+  // 14,612-idea vault carry a null statement. This path runs whenever no embedding is
+  // available (no provider configured, missing key, exhausted quota), so a single such
+  // row used to take down fusion — and with it the whole scan — for every work.
+  if (!text) return new Set();
   return new Set(
     text
       .toLowerCase()
@@ -114,7 +119,7 @@ function jaccard(a: Set<string>, b: Set<string>): number {
   return overlap / (a.size + b.size - overlap);
 }
 
-function lexicalSimilarity(a: ExtractedIdea, b: { label: string; statement: string }): number {
+function lexicalSimilarity(a: ExtractedIdea, b: { label: string | null; statement: string | null }): number {
   return 0.65 * jaccard(tokens(a.label), tokens(b.label)) + 0.35 * jaccard(tokens(a.statement), tokens(b.statement));
 }
 

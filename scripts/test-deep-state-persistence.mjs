@@ -217,6 +217,19 @@ try {
   assert.match(uploadBody, /finally\s*\{[^}]*scanQueue\.syncDeepQueued\(nodusId\)/,
     'works:uploadText settles the queued marker through the queue even when its scan throws');
 
+  // Fusion falls back to lexical matching whenever no embedding is available — no
+  // embedding provider configured, no key, exhausted quota. The ideas table allows a
+  // null statement and a real 14,612-idea vault holds six of them, so that fallback used
+  // to throw on the first one and take the whole scan down with it, for every work.
+  const fusion = require(path.join(repoRoot, 'electron/ai/fusion.ts'));
+  db.prepare("INSERT INTO ideas (global_id,type,label,statement,created_at) VALUES ('g-null','claim','idea sin enunciado',NULL,?)")
+    .run(new Date().toISOString());
+  const plan = await fusion.planIdeaFusion(
+    { localId: 'nueva', type: 'claim', label: 'tema completamente distinto', statement: 'Un enunciado sin relación con nada del corpus.' },
+    { embedding: null, model: null },
+  );
+  assert.equal(plan.existingId, null, 'the lexical fallback survives an idea whose statement is null');
+
   // Everything above drives the queue's public surface. The marker is cleared by the
   // JOB's terminal branch inside process(), so run that for real — with the scan itself
   // stubbed, since this is about bookkeeping, not about analysing anything.
