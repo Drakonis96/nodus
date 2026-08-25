@@ -67,6 +67,8 @@ test('Settings requires confirmation and explains every destructive boundary', a
 
 test('cleanup implementation is scoped, verified, quarantined and rollback-aware', async () => {
   const source = await read('electron/export/autoBackup.ts');
+  assert.match(source, /export async function previewBackupCleanup/, 'cloud-backed folder reads do not block Electron');
+  assert.match(source, /await fs\.promises\.readdir\(folder/, 'directory enumeration runs through asynchronous fs');
   assert.match(source, /entry\.isFile\(\)/, 'only direct regular files are considered');
   assert.match(source, /parseBackupFile\(hostname, entry\.name\)/, 'filenames must belong to the current host lineage');
   assert.match(source, /KEEP_ACTIVE_DURING_CLEANUP = 3/);
