@@ -85,6 +85,11 @@ try {
       recoverySetupVersion: 1,
       tourComplete: true,
       advancedTourComplete: true,
+      uiLanguage: 'es',
+      mascotStyle: 'orb',
+      mascotStyleChosen: true,
+      mascotEnabled: false,
+      reduceMotion: true,
     });
   }, appVersion);
   await page.reload();
