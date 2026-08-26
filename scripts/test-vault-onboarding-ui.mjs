@@ -280,6 +280,20 @@ test('the create-vault modal shows an inline accessible name error', async () =>
   assert.match(picker, /aria-invalid=\{Boolean\(addNameError\)\}/);
 });
 
+test('vault deletion names its target in the security-code and final confirmation steps', async () => {
+  const switcher = await read('src/components/VaultSwitcher.tsx');
+  assert.match(
+    switcher,
+    /tx\('Introduce este código manualmente para eliminar la bóveda "\{name\}"\.', \{ name: pendingAction\.vault\.name \}\)/,
+  );
+  assert.match(
+    switcher,
+    /tx\('Código correcto\. Confirma una última vez para eliminar la bóveda "\{name\}"\.', \{ name: pendingAction\.vault\.name \}\)/,
+  );
+  assert.match(switcher, /<p className="mb-4 text-sm text-neutral-400">\{codeMessage\}<\/p>/);
+  assert.match(switcher, /message=\{finalMessage\}/);
+});
+
 test('the create-vault modal asks for a name and a type, never for models', async () => {
   // Model choice belongs to the setup wizard, where Nodus can discover the models
   // from the stored keys. Asking again here is the duplication this replaced.

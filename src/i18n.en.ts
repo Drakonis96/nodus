@@ -1297,6 +1297,7 @@ export const EN: Record<string, string> = {
     'This will erase the contents of "{name}" and recreate its empty database. It does not affect other vaults.',
   Continuar: 'Continue',
   'Introduce este código manualmente': 'Enter this code manually',
+  'Introduce este código manualmente para eliminar la bóveda "{name}".': 'Enter this code manually to delete the vault "{name}".',
   'Código de seguridad': 'Security code',
   'No se puede pegar aquí. Escribe las cuatro cifras manualmente.':
     'You cannot paste here. Type the four digits manually.',
@@ -1304,6 +1305,8 @@ export const EN: Record<string, string> = {
   'Escribe las cuatro cifras para continuar.': 'Type the four digits to continue.',
   'Código correcto. Confirma una última vez para ejecutar la acción.':
     'Code accepted. Confirm one last time to run the action.',
+  'Código correcto. Confirma una última vez para eliminar la bóveda "{name}".':
+    'Code accepted. Confirm one last time to delete the vault "{name}".',
   'Eliminar definitivamente': 'Delete permanently',
   'Reinicializar definitivamente': 'Reset permanently',
   'Bóveda eliminada.': 'Vault deleted.',
