@@ -1352,6 +1352,53 @@ body {
   align-items: center;
 }
 
+/* Immediate, localized labels for every selection-toolbar action. Native `title`
+   tooltips wait for the OS hover delay and Crepe's own buttons have no names at all;
+   this shared treatment appears on hover or keyboard focus without a delay. */
+.study-milkdown .milkdown-toolbar .study-selection-tooltip {
+  position: relative;
+  overflow: visible;
+}
+
+.study-milkdown .milkdown-toolbar .study-selection-tooltip::after {
+  position: absolute;
+  z-index: 40;
+  top: calc(100% + 7px);
+  left: 50%;
+  width: max-content;
+  max-width: min(19rem, calc(100vw - 2rem));
+  padding: 0.35rem 0.5rem;
+  border: 1px solid rgba(82, 82, 82, 0.9);
+  border-radius: 0.4rem;
+  background: rgba(23, 23, 23, 0.98);
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.28);
+  color: #fafafa;
+  content: attr(data-study-tooltip);
+  font-size: 0.7rem;
+  font-weight: 600;
+  line-height: 1.35;
+  text-align: center;
+  white-space: normal;
+  pointer-events: none;
+  opacity: 0;
+  transform: translate(-50%, -3px);
+  transition: opacity 80ms ease, transform 80ms ease;
+}
+
+.study-milkdown .milkdown-toolbar .study-selection-tooltip:hover::after,
+.study-milkdown .milkdown-toolbar .study-selection-tooltip:focus-visible::after,
+.study-milkdown .milkdown-toolbar .study-selection-tooltip:focus-within::after {
+  opacity: 1;
+  transform: translate(-50%, 0);
+}
+
+.light .study-milkdown .milkdown-toolbar .study-selection-tooltip::after {
+  border-color: #d6d3d1;
+  background: rgba(255, 255, 255, 0.99);
+  box-shadow: 0 8px 22px rgba(28, 25, 23, 0.18);
+  color: #292524;
+}
+
 .study-selection-tools-host {
   display: contents;
 }

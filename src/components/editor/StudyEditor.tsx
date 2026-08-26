@@ -35,7 +35,7 @@ import type { TestimonyDeepLink } from '@shared/testimonyDeepLinks';
 import { ModelPicker } from '../ModelPicker';
 import { Icon, ICON_NAMES, Spinner } from '../ui';
 import { TextInputModal } from '../TextInputModal';
-import { t } from '../../i18n';
+import { getActiveLang, t } from '../../i18n';
 import { DocOutline } from './DocOutline';
 import { anchorToolbarToPointer } from './pointerAnchoredToolbar';
 import { StudyDictation } from './StudyDictation';
@@ -81,6 +81,52 @@ const STUDY_KIND_LABEL: Record<StudyDocumentKind, string> = {
   grabacion: 'Grabación', transcripcion: 'Transcripción', banco: 'Banco de preguntas', test: 'Test', examen: 'Examen',
 };
 
+/** Crepe renders these controls without labels or accessible names. Their order is
+ * stable in the toolbar feature; attach Nodus' translated names as soon as the
+ * Vue-owned toolbar appears. */
+const BUILT_IN_SELECTION_TOOLBAR_LABELS = [
+  'Negrita',
+  'Cursiva',
+  'Tachado',
+  'Código en línea',
+  'Fórmula en línea',
+  'Enlace',
+] as const;
+
+const BUILT_IN_STUDY_STYLE_TOOLTIPS: Record<string, string> = {
+  'builtin:academic': 'Académico · Registro académico preciso y argumentación ordenada.',
+  'builtin:formal': 'Formal · Tono formal sin volver el texto artificial.',
+  'builtin:clear': 'Claro · Aclara frases densas y ambigüedades.',
+  'builtin:concise': 'Conciso · Elimina redundancias conservando contenido.',
+  'builtin:developed': 'Desarrollado · Explicita conexiones ya presentes, sin aportar información nueva.',
+  'builtin:outline': 'Esquemático · Convierte el contenido en una estructura jerárquica.',
+  'builtin:proofread': 'Ortografía · Corrige ortografía, gramática y puntuación.',
+  'builtin:cohesion': 'Cohesión · Mejora continuidad y transiciones.',
+  'builtin:neutral': 'Neutralizar · Reduce lenguaje valorativo no sustentado.',
+  'builtin:popular': 'Divulgativo · Hace accesible el texto a público general.',
+  'builtin:adapt-level': 'Adaptar nivel · Ajusta el texto al nivel académico indicado.',
+  'builtin:summary': 'Resumen · Resume sin introducir afirmaciones.',
+  'builtin:notes': 'Apuntes · Convierte prosa en apuntes de estudio.',
+};
+
+function studyStyleTooltip(style: StudyStyle): string {
+  const builtIn = BUILT_IN_STUDY_STYLE_TOOLTIPS[style.id];
+  if (builtIn) return t(builtIn);
+  return [style.name, style.description].filter(Boolean).join(' · ');
+}
+
+function labelBuiltInSelectionToolbar(toolbar: HTMLElement): void {
+  const buttons = toolbar.querySelectorAll<HTMLButtonElement>(':scope > button.toolbar-item');
+  buttons.forEach((button, index) => {
+    const key = BUILT_IN_SELECTION_TOOLBAR_LABELS[index];
+    if (!key) return;
+    const label = t(key);
+    button.classList.add('study-selection-tooltip');
+    button.dataset.studyTooltip = label;
+    button.setAttribute('aria-label', label);
+  });
+}
+
 interface MilkdownCanvasHandle {
   insertText: (text: string, replaceSelection: boolean) => void;
   insertMarkdown: (markdown: string) => void;
@@ -115,6 +161,7 @@ const MilkdownCanvas = forwardRef<MilkdownCanvasHandle, {
   changeRef.current = onChange;
   const historyChangeRef = useRef(onHistoryChange);
   historyChangeRef.current = onHistoryChange;
+  const activeUiLanguage = getActiveLang();
 
   useEffect(() => {
     const root = rootRef.current;
@@ -146,6 +193,7 @@ const MilkdownCanvas = forwardRef<MilkdownCanvasHandle, {
       const findToolbar = () => {
         const toolbar = root.querySelector<HTMLElement>('.milkdown-toolbar') ?? root.parentElement?.querySelector<HTMLElement>('.milkdown-toolbar') ?? null;
         if (!toolbar) return null;
+        labelBuiltInSelectionToolbar(toolbar);
         let host = toolbar.querySelector<HTMLElement>('.study-selection-tools-host');
         if (!host) {
           host = document.createElement('span');
@@ -166,6 +214,14 @@ const MilkdownCanvas = forwardRef<MilkdownCanvasHandle, {
     });
     return () => { disposed = true; toolbarObserver?.disconnect(); detachAnchor?.(); onToolbarElement(null); crepeRef.current = null; void crepe.destroy(); };
   }, [documentId, spellcheck, language]);
+
+  // Changing the interface language should update the labels in place. Recreating
+  // the editor here would risk replacing an unsaved document with its initial value.
+  useEffect(() => {
+    const root = rootRef.current;
+    const toolbar = root?.querySelector<HTMLElement>('.milkdown-toolbar') ?? root?.parentElement?.querySelector<HTMLElement>('.milkdown-toolbar') ?? null;
+    if (toolbar) labelBuiltInSelectionToolbar(toolbar);
+  }, [activeUiLanguage]);
 
   useImperativeHandle(ref, () => ({
     insertText(text, replaceSelection) {
@@ -1075,7 +1131,10 @@ export function StudyEditor({
             )}
           </aside>
         )}
-        {selectionImprove && selectionToolbar && createPortal(<><div className="divider" data-testid="study-selection-tools-divider" />{quickImproveStyles.map((prompt) => <button type="button" key={prompt.id} data-testid={`study-quick-improve-${prompt.id.replace(':', '-')}`} className="toolbar-item study-selection-tool" title={`${prompt.name} · ${prompt.description}`} aria-label={prompt.name} disabled={Boolean(improveStreamingStyleId)} onPointerDown={(event) => { event.preventDefault(); void runQuickImprovement(prompt, selectionImprove.target); }}><ImproveStyleMark style={prompt} /></button>)}<button type="button" data-testid="study-synonyms-toggle" className="toolbar-item study-selection-tool study-synonyms-trigger" title={t('Sinónimos con IA')} aria-label={t('Sinónimos con IA')} disabled={Boolean(improveStreamingStyleId)} onPointerDown={(event) => { event.preventDefault(); event.stopPropagation(); openSynonymPanel(event.currentTarget, selectionImprove.target); }}><Icon name="aiSynonyms" size={16} /></button><label className="toolbar-item study-selection-color" title={t('Color del texto')} aria-label={t('Color del texto')}><Icon name="palette" size={16} /><input data-testid="study-selection-text-color" type="color" defaultValue="#0f766e" onInput={(event) => milkdownRef.current?.setTextColor((event.target as HTMLInputElement).value)} /></label><select data-testid="study-selection-heading" className="study-selection-heading" defaultValue="" title={t('Nivel de título')} aria-label={t('Nivel de título')} onPointerDown={(event) => event.stopPropagation()} onChange={(event) => { milkdownRef.current?.setHeading(Number(event.target.value)); event.target.value = ''; }}><option value="" disabled>H</option><option value="0">{t('Párrafo')}</option>{[1, 2, 3, 4, 5, 6].map((level) => <option key={level} value={level}>H{level}</option>)}</select></>, selectionToolbar)}
+        {selectionImprove && selectionToolbar && createPortal(<><div className="divider" data-testid="study-selection-tools-divider" />{quickImproveStyles.map((prompt) => {
+          const label = studyStyleTooltip(prompt);
+          return <button type="button" key={prompt.id} data-testid={`study-quick-improve-${prompt.id.replace(':', '-')}`} className="toolbar-item study-selection-tool study-selection-tooltip" data-study-tooltip={label} aria-label={label} disabled={Boolean(improveStreamingStyleId)} onPointerDown={(event) => { event.preventDefault(); void runQuickImprovement(prompt, selectionImprove.target); }}><ImproveStyleMark style={prompt} /></button>;
+        })}<button type="button" data-testid="study-synonyms-toggle" className="toolbar-item study-selection-tool study-synonyms-trigger study-selection-tooltip" data-study-tooltip={t('Sinónimos con IA')} aria-label={t('Sinónimos con IA')} disabled={Boolean(improveStreamingStyleId)} onPointerDown={(event) => { event.preventDefault(); event.stopPropagation(); openSynonymPanel(event.currentTarget, selectionImprove.target); }}><Icon name="aiSynonyms" size={16} /></button><label className="toolbar-item study-selection-color study-selection-tooltip" data-study-tooltip={t('Color del texto')} aria-label={t('Color del texto')}><Icon name="palette" size={16} /><input data-testid="study-selection-text-color" aria-label={t('Color del texto')} type="color" defaultValue="#0f766e" onInput={(event) => milkdownRef.current?.setTextColor((event.target as HTMLInputElement).value)} /></label><span className="study-selection-tooltip" data-study-tooltip={t('Nivel de título')}><select data-testid="study-selection-heading" className="study-selection-heading" defaultValue="" aria-label={t('Nivel de título')} onPointerDown={(event) => event.stopPropagation()} onChange={(event) => { milkdownRef.current?.setHeading(Number(event.target.value)); event.target.value = ''; }}><option value="" disabled>H</option><option value="0">{t('Párrafo')}</option>{[1, 2, 3, 4, 5, 6].map((level) => <option key={level} value={level}>H{level}</option>)}</select></span></>, selectionToolbar)}
       </div>
       {synonymPanel && createPortal(
         <div ref={synonymPanelRef} data-testid="study-synonyms-panel" role="dialog" aria-label={t('Alternativas de sinónimos')} className="study-synonyms-panel" style={{ left: synonymPanel.x, top: synonymPanel.y }}>

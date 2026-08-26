@@ -6,6 +6,7 @@ import { CLOUDFLARE_TRANSLATIONS } from './i18n.cloudflare';
 import { TRANSLATE_TRANSLATIONS } from './i18n.translate';
 import { WORLD_CHAT_TRANSLATIONS } from './i18n.worldChat';
 import { STUDY_SYNONYM_TRANSLATIONS } from './i18n.studySynonyms';
+import { STUDY_IMPROVE_TRANSLATIONS } from './i18n.studyImprove';
 import { WORKSPACE_TRANSLATIONS } from './i18n.workspace';
 import { PROSOPOGRAPHY_TRANSLATIONS } from './i18n.prosopography';
 import { DIARIZATION_TRANSLATIONS } from './i18n.diarization';
@@ -90,6 +91,7 @@ export const TR: Record<string, string> = {
   ...ANNOUNCEMENT_TRANSLATIONS['tr'],
   ...WORLD_CHAT_TRANSLATIONS.tr,
   ...STUDY_SYNONYM_TRANSLATIONS.tr,
+  ...STUDY_IMPROVE_TRANSLATIONS.tr,
   ...WORKSPACE_TRANSLATIONS.tr,
   "Lo que cuenta el mapa": "Haritanın anlattıkları",
   "Ver dónde ocurren las escenas ({n})": "Sahnelerin nerede geçtiğini gör ({n})",
