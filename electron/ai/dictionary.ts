@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import type {
   DictionaryAuthorView,
   DictionaryCitationRecord,
+  DictionaryDegradationReason,
   DictionaryDuplicateMatch,
   DictionaryEntryDetail,
   DictionaryEvidenceItem,
@@ -56,18 +57,66 @@ type WorkRow = {
 type GeneratedDictionary = {
   descriptionMarkdown: string;
   authorSummaries: Array<{ authorName: string; summaryMarkdown: string }>;
+  invalidEvidenceRefs?: number;
 };
 
-const isGeneratedDictionary = (
+type GeneratedDictionaryClaims = {
+  paragraphs: Array<{
+    claims: Array<{
+      text: string;
+      evidence: Array<{ kind: "idea" | "passage"; id: string }>;
+    }>;
+  }>;
+};
+
+type GeneratedAuthorSummaries = Pick<GeneratedDictionary, "authorSummaries">;
+
+const isGeneratedDictionaryClaims = (
   value: unknown,
-): value is GeneratedDictionary => {
+): value is GeneratedDictionaryClaims => {
   if (!value || typeof value !== "object") return false;
   const row = value as Record<string, unknown>;
   return (
-    typeof row.descriptionMarkdown === "string" &&
-    row.descriptionMarkdown.trim().length > 0 &&
-    Array.isArray(row.authorSummaries) &&
-    row.authorSummaries.every(
+    Array.isArray(row.paragraphs) &&
+    row.paragraphs.length > 0 &&
+    row.paragraphs.every((paragraph) => {
+      if (!paragraph || typeof paragraph !== "object") return false;
+      const claims = (paragraph as Record<string, unknown>).claims;
+      return (
+        Array.isArray(claims) &&
+        claims.length > 0 &&
+        claims.every((claim) => {
+          if (!claim || typeof claim !== "object") return false;
+          const candidate = claim as Record<string, unknown>;
+          return (
+            typeof candidate.text === "string" &&
+            candidate.text.trim().length > 0 &&
+            Array.isArray(candidate.evidence) &&
+            candidate.evidence.length > 0 &&
+            candidate.evidence.every(
+              (ref) =>
+                !!ref &&
+                typeof ref === "object" &&
+                ["idea", "passage"].includes(
+                  String((ref as Record<string, unknown>).kind),
+                ) &&
+                typeof (ref as Record<string, unknown>).id === "string",
+            )
+          );
+        })
+      );
+    })
+  );
+};
+
+const isGeneratedAuthorSummaries = (
+  value: unknown,
+): value is GeneratedAuthorSummaries => {
+  if (!value || typeof value !== "object") return false;
+  const summaries = (value as Record<string, unknown>).authorSummaries;
+  return (
+    Array.isArray(summaries) &&
+    summaries.every(
       (item) =>
         !!item &&
         typeof item === "object" &&
@@ -584,6 +633,111 @@ function evidencePrompt(evidence: DictionaryEvidenceItem[]): string {
   );
 }
 
+function dictionaryCitationLabel(item: DictionaryEvidenceItem): string {
+  const author = item.authors.find(
+    (candidate) => candidate.attributionBasis !== "editor_only",
+  )?.name ?? item.authors[0]?.name;
+  const year = item.works.find((work) => work.year != null)?.year;
+  if (author) return year ? `${author} (${year})` : author;
+  const work = item.works[0]?.title || item.workTitle || item.label;
+  return year ? `${work} (${year})` : work || "fuente";
+}
+
+function cleanAtomicClaim(value: string): string {
+  return value
+    .replace(/\[[^\]]*\]\(nodus:\/\/[^)]+\)/g, "")
+    .replace(/nodus:\/\/\S+/g, "")
+    .replace(/^\s*(?:#{1,6}|[-*>])\s*/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+/**
+ * The provider chooses and orders atomic claims, but it never writes citation
+ * syntax. Nodus resolves every id against the selected evidence and renders one
+ * independently verifiable sentence per claim. This prevents a malformed link or
+ * a citation attached to the wrong clause from reaching semantic verification.
+ */
+function renderStructuredDictionary(
+  generated: GeneratedDictionaryClaims,
+  evidence: DictionaryEvidenceItem[],
+): { markdown: string; invalidEvidenceRefs: number } {
+  const sources = new Map(
+    evidence.map((item) => [`${item.kind}:${item.id}`, item]),
+  );
+  let invalidEvidenceRefs = 0;
+  const paragraphs = generated.paragraphs.flatMap((paragraph) => {
+    const sentences = paragraph.claims.flatMap((claim) => {
+      const text = cleanAtomicClaim(claim.text);
+      const refs = new Map<string, DictionaryEvidenceItem>();
+      for (const ref of claim.evidence) {
+        const key = `${ref.kind}:${ref.id}`;
+        const source = sources.get(key);
+        if (!source) {
+          invalidEvidenceRefs += 1;
+          continue;
+        }
+        refs.set(key, source);
+      }
+      if (!text || !refs.size) return [];
+      const prose = text.replace(/[.!?]+$/u, "").trim();
+      if (!prose) return [];
+      const citations = [...refs.values()]
+        .map(
+          (item) =>
+            `[${dictionaryCitationLabel(item)}](nodus://${item.kind}/${encodeURIComponent(item.id)})`,
+        )
+        .join(", ");
+      return [`${prose} ${citations}.`];
+    });
+    return sentences.length ? [sentences.join(" ")] : [];
+  });
+  return { markdown: paragraphs.join("\n\n"), invalidEvidenceRefs };
+}
+
+export const __renderStructuredDictionaryForTesting =
+  renderStructuredDictionary;
+
+function citedEvidence(
+  markdown: string,
+  evidence: DictionaryEvidenceItem[],
+): DictionaryEvidenceItem[] {
+  const cited = new Set<string>();
+  for (const match of markdown.matchAll(
+    /nodus:\/\/(idea|passage)\/([^)\s]+)/g,
+  )) {
+    let id = match[2];
+    try {
+      id = decodeURIComponent(id);
+    } catch {
+      /* raw id */
+    }
+    cited.add(`${match[1]}:${id}`);
+  }
+  return evidence.filter((item) => cited.has(`${item.kind}:${item.id}`));
+}
+
+function mainDictionaryAuthors(
+  evidence: DictionaryEvidenceItem[],
+  limit = 6,
+): string[] {
+  const counts = new Map<string, { name: string; count: number }>();
+  for (const item of evidence) {
+    for (const author of item.authors) {
+      if (author.attributionBasis === "editor_only") continue;
+      const key = normalizeDictionaryTerm(author.name);
+      if (!key) continue;
+      const current = counts.get(key) ?? { name: author.name, count: 0 };
+      current.count += 1;
+      counts.set(key, current);
+    }
+  }
+  return [...counts.values()]
+    .sort((left, right) => right.count - left.count || left.name.localeCompare(right.name))
+    .slice(0, limit)
+    .map((item) => item.name);
+}
+
 function uncitedSubstantiveSentences(markdown: string): string[] {
   const body = markdown
     .replace(/^#{1,6} .*$/gm, "")
@@ -664,23 +818,31 @@ function extractiveDictionaryFallback(
   return `## Evidencia verificable\n\n${excerpts.join("\n\n")}`;
 }
 
-function recoverableDictionaryOutputError(error: unknown): boolean {
-  if (!error || typeof error !== "object") return false;
+function dictionaryOutputErrorReason(
+  error: unknown,
+): DictionaryDegradationReason | null {
+  if (!error || typeof error !== "object") return null;
   const candidate = error as { code?: unknown; message?: unknown };
-  if (candidate.code === "output_truncated") return true;
+  if (candidate.code === "output_truncated") return "output_truncated";
   const message =
     typeof candidate.message === "string" ? candidate.message.toLowerCase() : "";
-  return [
+  if (
+    ["esquema", "schema", "structured output", "formato de respuesta"].some(
+      (fragment) => message.includes(fragment),
+    )
+  )
+    return "schema_error";
+  if (
+    [
     "json",
     "parse",
     "parsing",
-    "esquema",
-    "schema",
-    "structured output",
-    "formato de respuesta",
     "respuesta truncada",
     "respuesta se cortó",
-  ].some((fragment) => message.includes(fragment));
+    ].some((fragment) => message.includes(fragment))
+  )
+    return "malformed_output";
+  return null;
 }
 
 async function groundGeneratedDescription(
@@ -692,11 +854,20 @@ async function groundGeneratedDescription(
   markdown: string;
   problems: string[];
   strippedSentences: string[];
+  invalidCitationRefs: number;
 }> {
   const maps = buildSnapshotMaps(snapshot);
   for (const id of [...maps.validIds])
     if (id.startsWith("work:")) maps.validIds.delete(id);
+  const rawCitationCount = [
+    ...generated.descriptionMarkdown.matchAll(
+      /nodus:\/\/(?:idea|passage)\//g,
+    ),
+  ].length;
   let cleaned = applyCitationPolicy(generated.descriptionMarkdown, maps).markdown;
+  const validCitationCount = [
+    ...cleaned.matchAll(/nodus:\/\/(?:idea|passage)\//g),
+  ].length;
   const claims = extractCitationClaims(cleaned, maps);
   let strippedSentences: string[] = [];
   if (claims.length) {
@@ -710,7 +881,12 @@ async function groundGeneratedDescription(
   }
 
   const problems = groundingProblems(cleaned, maps);
-  return { markdown: cleaned, problems, strippedSentences };
+  return {
+    markdown: cleaned,
+    problems,
+    strippedSentences,
+    invalidCitationRefs: Math.max(0, rawCitationCount - validCitationCount),
+  };
 }
 
 function decorateIdeaTags(
@@ -745,56 +921,85 @@ async function synthesize(
   correction = "",
 ): Promise<GeneratedDictionary> {
   const entry = getDictionaryEntry(entryId)!;
-  const system = `Eres el redactor del Dictionary académico de Nodus. Redacta exclusivamente a partir de EVIDENCE. No uses conocimiento externo ni inventes autores, obras, páginas, citas, etiquetas, ideas o pasajes. El FOCO es una instrucción editorial: nunca lo copies ni lo presentes como definición. Abre con una definición sustantiva del concepto y desarróllala de acuerdo con DETALLE. Cada frase sustantiva debe terminar con una o más citas Markdown exactamente en el formato nodus://idea/ID o nodus://passage/ID ofrecido. Cada fuente citada debe respaldar la frase completa: si dos fuentes sostienen cláusulas distintas, escribe frases separadas, cada una con su propia cita. Compara autores y obras mediante atribuciones separadas; identifica acuerdos, desacuerdos, contradicciones y cambios temporales solo cuando EVIDENCE lo sostenga. Di explícitamente qué no permite establecer la evidencia. Devuelve JSON {"descriptionMarkdown":"...","authorSummaries":[{"authorName":"...","summaryMarkdown":"..."}]}. Los resúmenes de autor también deben estar citados.`;
+  const system = `Eres el redactor del Dictionary académico de Nodus. Trabaja exclusivamente a partir de EVIDENCE. No uses conocimiento externo ni inventes autores, obras, páginas, etiquetas, ideas, pasajes o identificadores. El FOCO es una instrucción editorial: nunca lo copies ni lo presentes como definición. Abre con una definición sustantiva del concepto y desarróllala de acuerdo con DETALLE. Devuelve prosa continua organizada en párrafos, pero representa cada frase como una afirmación atómica independiente. Cada afirmación debe expresar una sola relación verificable y llevar los identificadores exactos de la evidencia que la sostiene. Si dos fuentes sostienen cláusulas diferentes, crea afirmaciones separadas. Usa varias evidencias en una misma afirmación solo si CADA una sostiene por sí sola toda la afirmación. Para comparar autores, formula por separado la posición atribuida a cada autor y solo después una afirmación comparativa respaldada plenamente. Identifica acuerdos, desacuerdos, contradicciones y cambios temporales únicamente cuando EVIDENCE los documente. Explicita los límites de la evidencia cuando sean relevantes. No escribas Markdown ni citas dentro de text. Devuelve SOLO JSON válido con esta forma exacta: {"paragraphs":[{"claims":[{"text":"Una afirmación completa","evidence":[{"kind":"idea|passage","id":"ID exacto de EVIDENCE"}]}]}]}.`;
   const user = `CONCEPTO: ${entry.name}\nALIASES: ${entry.aliases.join(", ")}\nFOCO: ${entry.focusPrompt || "(sin foco adicional)"}\nDETALLE: ${entry.detailLevel}\nIDIOMA DE SALIDA: ${entry.outputLanguage}\n${prior ? `VERSIÓN ACTUAL A ACTUALIZAR SIN COPIAR AFIRMACIONES NO RESPALDADAS:\n${prior}\n` : ""}${correction ? `CORRECCIÓN OBLIGATORIA DE LA SALIDA ANTERIOR:\n${correction}\n` : ""}EVIDENCE:\n${evidencePrompt(evidence)}`;
-  let generated = await completeJson<GeneratedDictionary>(
+  const baseMaxTokens =
+    entry.detailLevel === "detailed"
+      ? 4400
+      : entry.detailLevel === "concise"
+        ? 1600
+        : 2800;
+  const structured = await completeJson<GeneratedDictionaryClaims>(
     {
       system,
       user,
-      temperature: 0.1,
-      maxTokens:
-        entry.detailLevel === "detailed"
-          ? 6500
-          : entry.detailLevel === "concise"
-            ? 1800
-            : 3800,
+      temperature: correction ? 0 : 0.1,
+      // The retry gets extra room, while local providers still clamp this to the
+      // space left in their real context window.
+      maxTokens: baseMaxTokens + (correction ? 800 : 0),
     },
-    isGeneratedDictionary,
+    isGeneratedDictionaryClaims,
     model,
   );
-  if (uncitedSubstantiveSentences(generated.descriptionMarkdown).length) {
-    generated = await completeJson<GeneratedDictionary>(
-      {
-        system: `${system}\nLa versión anterior dejó frases sin cita. Reescríbela: divide o elimina esas frases; ninguna afirmación sustantiva puede quedar sin una cita de EVIDENCE.`,
-        user: `${user}\nBORRADOR A REPARAR:\n${JSON.stringify(generated)}`,
-        temperature: 0,
-        maxTokens: entry.detailLevel === "detailed" ? 6500 : 3800,
-      },
-      isGeneratedDictionary,
-      model,
-    );
-  }
-  return generated;
+  const rendered = renderStructuredDictionary(structured, evidence);
+  return {
+    descriptionMarkdown: rendered.markdown,
+    authorSummaries: [],
+    invalidEvidenceRefs: rendered.invalidEvidenceRefs,
+  };
+}
+
+async function synthesizeAuthorSummaries(
+  entryId: string,
+  evidence: DictionaryEvidenceItem[],
+  descriptionMarkdown: string,
+  model: ModelRef | null,
+): Promise<GeneratedAuthorSummaries> {
+  const selectedEvidence = citedEvidence(descriptionMarkdown, evidence);
+  const authors = mainDictionaryAuthors(selectedEvidence);
+  if (!authors.length) return { authorSummaries: [] };
+  const entry = getDictionaryEntry(entryId)!;
+  const system = `Redacta fichas muy breves para los autores principales de una entrada del Dictionary académico de Nodus. Usa exclusivamente EVIDENCE y solo los autores enumerados en AUTHORS. Resume únicamente la aportación documentada de cada autor al concepto; no rellenes lagunas. Cada frase sustantiva debe terminar con una o más citas Markdown nodus:// copiadas exactamente de EVIDENCE. Devuelve SOLO JSON válido {"authorSummaries":[{"authorName":"nombre exacto de AUTHORS","summaryMarkdown":"una o dos frases citadas"}]}.`;
+  const user = `CONCEPTO: ${entry.name}\nIDIOMA DE SALIDA: ${entry.outputLanguage}\nAUTHORS: ${JSON.stringify(authors)}\nDESCRIPCIÓN VERIFICADA:\n${descriptionMarkdown}\nEVIDENCE:\n${evidencePrompt(selectedEvidence)}`;
+  return completeJson<GeneratedAuthorSummaries>(
+    { system, user, temperature: 0, maxTokens: 1800 },
+    isGeneratedAuthorSummaries,
+    model,
+  );
 }
 
 export async function generateDictionaryEntry(
   request: DictionaryGenerationRequest,
 ): Promise<DictionaryVersion> {
-  return generateDictionaryEntryUsing(request, synthesize, aiVerifyCitations);
+  return generateDictionaryEntryUsing(
+    request,
+    synthesize,
+    aiVerifyCitations,
+    synthesizeAuthorSummaries,
+  );
 }
 
 export async function __generateDictionaryEntryForTesting(
   request: DictionaryGenerationRequest,
   generator: typeof synthesize,
   verifyCitations: typeof aiVerifyCitations = aiVerifyCitations,
+  authorGenerator: typeof synthesizeAuthorSummaries = async () => ({
+    authorSummaries: [],
+  }),
 ): Promise<DictionaryVersion> {
-  return generateDictionaryEntryUsing(request, generator, verifyCitations);
+  return generateDictionaryEntryUsing(
+    request,
+    generator,
+    verifyCitations,
+    authorGenerator,
+  );
 }
 
 async function generateDictionaryEntryUsing(
   request: DictionaryGenerationRequest,
   generator: typeof synthesize,
   verifyCitations: typeof aiVerifyCitations,
+  authorGenerator: typeof synthesizeAuthorSummaries,
 ): Promise<DictionaryVersion> {
   const entry = getDictionaryEntry(request.entryId);
   if (!entry) throw new Error("La entrada de Dictionary ya no existe.");
@@ -809,6 +1014,12 @@ async function generateDictionaryEntryUsing(
   const insufficient = evidence.length < 2;
   let markdown: string;
   let authorSummaries: DictionaryAuthorView[] = [];
+  let outcome: DictionaryVersion["outcome"] = insufficient
+    ? "insufficient"
+    : "synthesis";
+  let degradationReason: DictionaryDegradationReason | null = null;
+  let generationAttempts = 1;
+  let generationProblems: string[] = [];
   if (insufficient) {
     const citation = evidence[0]
       ? ` [evidencia disponible](nodus://${evidence[0].kind}/${encodeURIComponent(evidence[0].id)})`
@@ -822,8 +1033,11 @@ async function generateDictionaryEntryUsing(
     let generated!: GeneratedDictionary;
     let grounded!: Awaited<ReturnType<typeof groundGeneratedDescription>>;
     let correction = "";
-    let verificationRemovedClaims = false;
-    for (let attempt = 0; attempt < 2; attempt += 1) {
+    let completed = false;
+    let lastReason: DictionaryDegradationReason = "grounding_failure";
+    const maxAttempts = 3;
+    for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+      generationAttempts = attempt;
       try {
         generated = await generator(
           request.entryId,
@@ -833,21 +1047,18 @@ async function generateDictionaryEntryUsing(
           correction,
         );
       } catch (error) {
-        if (!recoverableDictionaryOutputError(error)) throw error;
-        // completeJson has already exhausted its local JSON repair and structured
-        // retries by this point. Do not multiply those calls at queue level or show
-        // a recurring terminal error: persist a fully traceable extractive result.
-        const extractiveMarkdown = extractiveDictionaryFallback(evidence);
-        generated = {
-          descriptionMarkdown: extractiveMarkdown,
-          authorSummaries: [],
-        };
-        grounded = {
-          markdown: extractiveMarkdown,
-          problems: groundingProblems(extractiveMarkdown, maps),
-          strippedSentences: [],
-        };
-        break;
+        const recoverable = dictionaryOutputErrorReason(error);
+        if (!recoverable) throw error;
+        lastReason = recoverable;
+        generationProblems = [
+          error instanceof Error ? error.message : String(error),
+        ];
+        correction = [
+          `El intento ${attempt} no produjo JSON estructurado utilizable: ${generationProblems[0]}.`,
+          "Devuelve de nuevo el objeto completo con paragraphs, claims, text y evidence.",
+          "Reduce la longitud de cada afirmación y conserva únicamente IDs exactos de EVIDENCE.",
+        ].join("\n");
+        continue;
       }
       grounded = await groundGeneratedDescription(
         generated,
@@ -855,53 +1066,93 @@ async function generateDictionaryEntryUsing(
         verifyCitations,
         request.model ?? null,
       );
-      verificationRemovedClaims ||= grounded.strippedSentences.length > 0;
-      if (!grounded.problems.length) break;
+      const originalGroundingProblems = [...grounded.problems];
+      if (originalGroundingProblems.length) {
+        // A provider used through the testing seam (or a legacy provider adapter)
+        // may still append uncited prose. Keep already verified sentences and retry
+        // the missing material before accepting the locally salvaged definition.
+        const salvagedMarkdown = stripUncitedSubstantiveSentences(
+          grounded.markdown,
+        );
+        grounded = {
+          ...grounded,
+          markdown: salvagedMarkdown,
+          problems: groundingProblems(salvagedMarkdown, maps),
+        };
+      }
+      const needsSemanticRepair = grounded.strippedSentences.length > 0;
+      const needsLocalRepair = originalGroundingProblems.length > 0;
+      if (!grounded.problems.length && !needsSemanticRepair && !needsLocalRepair) {
+        completed = true;
+        break;
+      }
+      lastReason = generated.invalidEvidenceRefs || grounded.invalidCitationRefs
+        ? "invalid_evidence_refs"
+        : needsSemanticRepair
+          ? "semantic_rejection"
+          : /ninguna afirmación con una cita válida/.test(
+                grounded.problems.join(" "),
+              ) &&
+              !/nodus:\/\/(?:idea|passage)\//.test(
+                generated.descriptionMarkdown,
+              )
+            ? "missing_citations"
+            : "grounding_failure";
+      generationProblems = [
+        ...(grounded.problems.length
+          ? grounded.problems
+          : originalGroundingProblems),
+        ...(generated.invalidEvidenceRefs || grounded.invalidCitationRefs
+          ? [`${(generated.invalidEvidenceRefs ?? 0) + grounded.invalidCitationRefs} referencias de evidencia no eran válidas`]
+          : []),
+        ...(needsSemanticRepair
+          ? [`${grounded.strippedSentences.length} afirmaciones no superaron la verificación semántica`]
+          : []),
+      ];
       correction = [
-        `La salida fue rechazada porque ${grounded.problems.join("; ")}.`,
+        `El intento ${attempt} fue rechazado porque ${generationProblems.join("; ")}.`,
         "Reescribe desde cero una definición sustantiva. No copies el FOCO.",
-        "Haz afirmaciones atómicas y coloca en cada frase solo citas que respalden la frase completa.",
+        "Haz afirmaciones atómicas y asigna a cada una solo evidencia que respalde la afirmación completa.",
         grounded.strippedSentences.length
           ? `Estas frases no superaron la verificación y no deben repetirse sin estrecharlas: ${grounded.strippedSentences.slice(0, 4).join(" | ")}`
           : "",
       ]
         .filter(Boolean)
         .join("\n");
+      // On the final attempt, a substantive remainder whose rejected claims were
+      // safely removed is still a genuine synthesis. Empty/invalid output degrades.
+      if (attempt === maxAttempts && !grounded.problems.length) completed = true;
     }
-    if (grounded.problems.length) {
-      // A provider may keep appending a closing sentence without a citation even
-      // after the bounded rewrite attempts. Preserve the verified, cited claims
-      // instead of rejecting the entire generation for that removable tail.
-      const salvagedMarkdown = stripUncitedSubstantiveSentences(
-        grounded.markdown,
+    if (!completed) {
+      outcome = "degraded";
+      degradationReason = lastReason;
+      markdown = decorateIdeaTags(
+        extractiveDictionaryFallback(evidence),
+        evidence,
       );
-      grounded = {
-        ...grounded,
-        markdown: salvagedMarkdown,
-        problems: groundingProblems(salvagedMarkdown, maps),
-      };
+      if (!generationProblems.length)
+        generationProblems = [
+          "No sobrevivió una síntesis sustantiva respaldada por citas válidas.",
+        ];
+      generated = { descriptionMarkdown: markdown, authorSummaries: [] };
+    } else {
+      markdown = decorateIdeaTags(grounded.markdown, evidence);
+      try {
+        generated.authorSummaries = (
+          await authorGenerator(
+            request.entryId,
+            evidence,
+            markdown,
+            request.model ?? null,
+          )
+        ).authorSummaries;
+      } catch {
+        // Author cards are a secondary, separately bounded request. The verified
+        // definition remains valid and the deterministic author counts still load.
+        generated.authorSummaries = [];
+      }
+      generationProblems = [];
     }
-    const providerReturnedNoNodusCitation =
-      !/nodus:\/\/(?:idea|passage)\//.test(generated.descriptionMarkdown);
-    if (
-      grounded.problems.length &&
-      (verificationRemovedClaims || providerReturnedNoNodusCitation)
-    ) {
-      // If semantic verification rejects every generated claim, use the selected
-      // evidence itself as a cited, extractive result. This is deliberately less
-      // polished, but it remains useful and cannot introduce unsupported prose.
-      const extractiveMarkdown = extractiveDictionaryFallback(evidence);
-      grounded = {
-        ...grounded,
-        markdown: extractiveMarkdown,
-        problems: groundingProblems(extractiveMarkdown, maps),
-      };
-    }
-    if (grounded.problems.length)
-      throw new Error(
-        `El proveedor no produjo una síntesis sustantiva respaldada por citas válidas (${grounded.problems.join("; ")}). La versión anterior se conserva.`,
-      );
-    markdown = decorateIdeaTags(grounded.markdown, evidence);
     const summaries = new Map(
       generated.authorSummaries.map((item) => [
         normalizeDictionaryTerm(item.authorName),
@@ -985,7 +1236,16 @@ async function generateDictionaryEntryUsing(
     // Regenerate is an explicit replacement action. The previous version remains
     // immutable in history and can be restored, so making the new definition current
     // immediately matches the button's promise without sacrificing reversibility.
-    state: request.mode === "update" ? "proposed" : "applied",
+    state:
+      outcome === "degraded"
+        ? "degraded"
+        : request.mode === "update"
+          ? "proposed"
+          : "applied",
+    outcome,
+    degradationReason,
+    generationAttempts,
+    generationProblems,
     insufficientEvidence: insufficient,
   });
 }

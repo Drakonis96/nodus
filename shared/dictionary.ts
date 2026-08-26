@@ -6,7 +6,20 @@ export type DictionaryEvidenceKind = "idea" | "passage";
 export type DictionaryEvidenceDecision = "included" | "unused" | "excluded";
 export type DictionaryVersionTrigger =
   "creation" | "update" | "regeneration" | "manual_edit" | "restore";
-export type DictionaryVersionState = "applied" | "proposed";
+export type DictionaryVersionState = "applied" | "proposed" | "degraded";
+export type DictionaryGenerationOutcome =
+  | "synthesis"
+  | "insufficient"
+  | "degraded";
+export type DictionaryDegradationReason =
+  | "output_truncated"
+  | "malformed_output"
+  | "schema_error"
+  | "invalid_evidence_refs"
+  | "missing_citations"
+  | "semantic_rejection"
+  | "grounding_failure"
+  | "legacy_extractive_fallback";
 export type DictionaryRelationType =
   | "related"
   | "broader"
@@ -202,6 +215,10 @@ export interface DictionaryVersion {
   generatedAt: string;
   trigger: DictionaryVersionTrigger;
   state: DictionaryVersionState;
+  outcome: DictionaryGenerationOutcome;
+  degradationReason: DictionaryDegradationReason | null;
+  generationAttempts: number;
+  generationProblems: string[];
   insufficientEvidence: boolean;
 }
 
@@ -219,6 +236,8 @@ export interface DictionaryEntryDetail {
   works: DictionaryWorkView[];
   currentVersion: DictionaryVersion | null;
   proposedVersion: DictionaryVersion | null;
+  /** Present only when the latest generation attempt degraded. It is never current. */
+  latestDegradedVersion: DictionaryVersion | null;
 }
 
 export interface DictionaryDuplicateMatch {
@@ -238,9 +257,12 @@ export interface DictionaryProgress {
     | "validating"
     | "saving"
     | "done"
+    | "degraded"
     | "failed";
   message: string;
   error?: string;
+  degradationReason?: DictionaryDegradationReason;
+  attempts?: number;
 }
 
 export interface DictionaryGenerationRequest {

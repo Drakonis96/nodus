@@ -348,14 +348,14 @@ assert.ok(
   "provider generation completes before any version is saved, so failure preserves current content",
 );
 assert.match(
-  ai,
+  view,
   /La versión anterior se conserva/,
-  "citation-validation failure reports that the previous version is preserved",
+  "a degraded generation reports that the previous version is preserved",
 );
 assert.match(
   ai,
-  /groundGeneratedDescription[\s\S]*attempt < 2/,
-  "an empty post-verification synthesis gets one bounded grounded rewrite",
+  /const maxAttempts = 3/,
+  "generation makes an initial attempt plus two bounded automatic retries",
 );
 assert.match(
   ai,

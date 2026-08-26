@@ -15,7 +15,7 @@ export interface Migration {
 
 // Versioned, append-only migrations. Never edit an existing migration's SQL once
 // shipped — add a new one. The current schema version is the highest applied.
-export const SCHEMA_VERSION = 165;
+export const SCHEMA_VERSION = 166;
 
 export const migrations: Migration[] = [
   {
@@ -8930,6 +8930,119 @@ export const migrations: Migration[] = [
         running_jobs=(SELECT COUNT(*) FROM document_index_jobs j WHERE j.campaign_id=document_index_campaigns.campaign_id AND j.status='running'),
         queued_jobs=(SELECT COUNT(*) FROM document_index_jobs j WHERE j.campaign_id=document_index_campaigns.campaign_id AND j.status='queued'),
         paused_jobs=(SELECT COUNT(*) FROM document_index_jobs j WHERE j.campaign_id=document_index_campaigns.campaign_id AND j.status='paused');
+    `,
+  },
+  {
+    version: 166,
+    up: /* sql */ `
+      -- A traceable extractive fallback is useful diagnostic material, but it is
+      -- not a Dictionary synthesis and must never silently become the current
+      -- definition. Rebuild the versions table so degradation is a first-class
+      -- state with a persisted cause and retry count.
+      ALTER TABLE dictionary_versions RENAME TO dictionary_versions_v165;
+      DROP INDEX dictionary_versions_entry_idx;
+      DROP INDEX dictionary_versions_proposed_idx;
+
+      CREATE TABLE dictionary_versions (
+        id                       TEXT PRIMARY KEY,
+        entry_id                 TEXT NOT NULL,
+        content_markdown         TEXT NOT NULL,
+        evidence_json            TEXT NOT NULL DEFAULT '[]',
+        evidence_snapshot_json   TEXT NOT NULL DEFAULT '[]',
+        citations_json           TEXT NOT NULL DEFAULT '[]',
+        author_summaries_json    TEXT NOT NULL DEFAULT '[]',
+        focus_prompt             TEXT NOT NULL,
+        scope_json               TEXT NOT NULL,
+        output_language          TEXT NOT NULL,
+        detail_level             TEXT NOT NULL,
+        model_json               TEXT,
+        generated_at             TEXT NOT NULL,
+        trigger                  TEXT NOT NULL CHECK (trigger IN ('creation','update','regeneration','manual_edit','restore')),
+        state                    TEXT NOT NULL CHECK (state IN ('applied','proposed','degraded')),
+        outcome                  TEXT NOT NULL DEFAULT 'synthesis' CHECK (outcome IN ('synthesis','insufficient','degraded')),
+        degradation_reason       TEXT CHECK (degradation_reason IN ('output_truncated','malformed_output','schema_error','invalid_evidence_refs','missing_citations','semantic_rejection','grounding_failure','legacy_extractive_fallback')),
+        generation_attempts      INTEGER NOT NULL DEFAULT 1 CHECK (generation_attempts >= 1),
+        generation_problems_json TEXT NOT NULL DEFAULT '[]',
+        insufficient_evidence    INTEGER NOT NULL DEFAULT 0,
+        created_at               TEXT NOT NULL,
+        updated_at               TEXT NOT NULL
+      );
+
+      INSERT INTO dictionary_versions (
+        id,entry_id,content_markdown,evidence_json,evidence_snapshot_json,citations_json,author_summaries_json,
+        focus_prompt,scope_json,output_language,detail_level,model_json,generated_at,trigger,state,outcome,
+        degradation_reason,generation_attempts,generation_problems_json,insufficient_evidence,created_at,updated_at
+      )
+      SELECT
+        id,entry_id,content_markdown,evidence_json,evidence_snapshot_json,citations_json,author_summaries_json,
+        focus_prompt,scope_json,output_language,detail_level,model_json,generated_at,trigger,
+        CASE
+          WHEN content_markdown LIKE '## Evidencia verificable%'
+            AND trigger IN ('creation','update','regeneration') THEN 'degraded'
+          ELSE state
+        END,
+        CASE
+          WHEN content_markdown LIKE '## Evidencia verificable%'
+            AND trigger IN ('creation','update','regeneration') THEN 'degraded'
+          WHEN insufficient_evidence=1 THEN 'insufficient'
+          ELSE 'synthesis'
+        END,
+        CASE
+          WHEN content_markdown LIKE '## Evidencia verificable%'
+            AND trigger IN ('creation','update','regeneration') THEN 'legacy_extractive_fallback'
+          ELSE NULL
+        END,
+        1,
+        CASE
+          WHEN content_markdown LIKE '## Evidencia verificable%'
+            AND trigger IN ('creation','update','regeneration')
+            THEN '["La versión fue creada por el fallback extractivo legado."]'
+          ELSE '[]'
+        END,
+        insufficient_evidence,created_at,updated_at
+      FROM dictionary_versions_v165;
+
+      CREATE INDEX dictionary_versions_entry_idx ON dictionary_versions(entry_id, generated_at DESC);
+      CREATE INDEX dictionary_versions_proposed_idx ON dictionary_versions(entry_id, state, generated_at DESC);
+
+      -- If a degraded fallback had replaced a good definition, restore the latest
+      -- earlier applied synthesis. A first-generation fallback returns the entry to
+      -- draft and leaves its extractive evidence only in Versions/Evidence.
+      UPDATE dictionary_entries
+         SET current_version_id=(
+               SELECT v.id FROM dictionary_versions v
+                WHERE v.entry_id=dictionary_entries.id
+                  AND v.state='applied' AND v.outcome<>'degraded'
+                ORDER BY v.generated_at DESC, v.rowid DESC LIMIT 1
+             ),
+             content_markdown=COALESCE((
+               SELECT v.content_markdown FROM dictionary_versions v
+                WHERE v.entry_id=dictionary_entries.id
+                  AND v.state='applied' AND v.outcome<>'degraded'
+                ORDER BY v.generated_at DESC, v.rowid DESC LIMIT 1
+             ), ''),
+             insufficient_evidence=COALESCE((
+               SELECT v.insufficient_evidence FROM dictionary_versions v
+                WHERE v.entry_id=dictionary_entries.id
+                  AND v.state='applied' AND v.outcome<>'degraded'
+                ORDER BY v.generated_at DESC, v.rowid DESC LIMIT 1
+             ), 0),
+             status=CASE WHEN EXISTS(
+               SELECT 1 FROM dictionary_versions v
+                WHERE v.entry_id=dictionary_entries.id
+                  AND v.state='applied' AND v.outcome<>'degraded'
+             ) THEN status ELSE 'draft' END
+       WHERE current_version_id IN (
+         SELECT id FROM dictionary_versions WHERE outcome='degraded'
+       );
+
+      UPDATE dictionary_entries
+         SET proposed_version_id=NULL
+       WHERE proposed_version_id IN (
+         SELECT id FROM dictionary_versions WHERE outcome='degraded'
+       );
+
+      DROP TABLE dictionary_versions_v165;
     `,
   },
 ];

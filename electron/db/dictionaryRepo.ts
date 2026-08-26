@@ -16,6 +16,8 @@ import type {
   DictionaryEvidenceRequest,
   DictionaryFacets,
   DictionaryGenerationRequest,
+  DictionaryGenerationOutcome,
+  DictionaryDegradationReason,
   DictionaryListRequest,
   DictionaryRelation,
   DictionaryRelationType,
@@ -49,6 +51,8 @@ type VersionRow = {
   citations_json: string; author_summaries_json: string; focus_prompt: string; scope_json: string;
   output_language: PromptLanguage; detail_level: DictionaryEntry['detailLevel']; model_json: string | null;
   generated_at: string; trigger: DictionaryVersionTrigger; state: DictionaryVersionState;
+  outcome: DictionaryGenerationOutcome; degradation_reason: DictionaryDegradationReason | null;
+  generation_attempts: number; generation_problems_json: string;
   insufficient_evidence: number; created_at: string; updated_at: string;
 };
 
@@ -80,6 +84,10 @@ export interface SaveDictionaryVersionInput {
   model: ModelRef | null;
   trigger: DictionaryVersionTrigger;
   state: DictionaryVersionState;
+  outcome: DictionaryGenerationOutcome;
+  degradationReason: DictionaryDegradationReason | null;
+  generationAttempts: number;
+  generationProblems: string[];
   insufficientEvidence: boolean;
 }
 
@@ -311,6 +319,8 @@ export function updateDictionaryEntry(id: string, patch: DictionaryEntryPatch, e
     const citations = citationRecordsForMarkdown(id, content);
     const versionId = insertVersion({ entryId: id, contentMarkdown: content, evidence, citations,
       authorSummaries: currentVersionAuthorSummaries(current.currentVersionId), model: null, trigger: 'manual_edit', state: 'applied',
+      outcome: current.insufficientEvidence ? 'insufficient' : 'synthesis', degradationReason: null,
+      generationAttempts: 1, generationProblems: [],
       insufficientEvidence: current.insufficientEvidence }, stamp);
     db.prepare('UPDATE dictionary_entries SET current_version_id=?, proposed_version_id=NULL WHERE id=?').run(versionId, id);
     if (patch.focusPrompt !== undefined || patch.scope !== undefined) markDictionaryRetrievalStale(id, db);
@@ -463,8 +473,12 @@ export function saveDictionaryVersion(input: SaveDictionaryVersionInput): Dictio
       db.prepare("UPDATE dictionary_versions SET state='applied', updated_at=? WHERE entry_id=? AND id<>? AND state='proposed'").run(stamp, input.entryId, id);
       db.prepare("UPDATE dictionary_evidence SET is_new=0, updated_at=? WHERE entry_id=? AND decision='included'").run(stamp, input.entryId);
       refreshNewEvidenceCount(input.entryId, db);
-    } else {
+    } else if (input.state === 'proposed') {
       db.prepare('UPDATE dictionary_entries SET proposed_version_id=?, updated_at=? WHERE id=?').run(id, stamp, input.entryId);
+    } else {
+      // Degraded attempts remain auditable in Versions, but never replace the
+      // current definition or become an accept-able proposal.
+      db.prepare('UPDATE dictionary_entries SET updated_at=? WHERE id=?').run(stamp, input.entryId);
     }
     return id;
   })();
@@ -473,13 +487,20 @@ export function saveDictionaryVersion(input: SaveDictionaryVersionInput): Dictio
 
 function insertVersion(input: SaveDictionaryVersionInput, stamp: string): string {
   const entry = getDictionaryEntry(input.entryId); if (!entry) throw new Error('La entrada de Dictionary ya no existe.');
+  const outcome = input.outcome ?? (input.insufficientEvidence ? 'insufficient' : 'synthesis');
+  const degradationReason = input.degradationReason ?? null;
+  const generationAttempts = Math.max(1, input.generationAttempts ?? 1);
+  const generationProblems = input.generationProblems ?? [];
   const id = uuid(); const snapshots = includedEvidence(input.entryId).filter((item) => input.evidence.some((ref) => ref.kind === item.kind && ref.id === item.id));
   getDb().prepare(`INSERT INTO dictionary_versions (
     id,entry_id,content_markdown,evidence_json,evidence_snapshot_json,citations_json,author_summaries_json,
-    focus_prompt,scope_json,output_language,detail_level,model_json,generated_at,trigger,state,insufficient_evidence,created_at,updated_at
-  ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).run(id, input.entryId, input.contentMarkdown, JSON.stringify(input.evidence), JSON.stringify(snapshots),
+    focus_prompt,scope_json,output_language,detail_level,model_json,generated_at,trigger,state,outcome,degradation_reason,
+    generation_attempts,generation_problems_json,insufficient_evidence,created_at,updated_at
+  ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).run(id, input.entryId, input.contentMarkdown, JSON.stringify(input.evidence), JSON.stringify(snapshots),
     JSON.stringify(input.citations), JSON.stringify(input.authorSummaries), entry.focusPrompt, JSON.stringify(entry.scope), entry.outputLanguage,
-    entry.detailLevel, input.model ? JSON.stringify(input.model) : null, stamp, input.trigger, input.state, input.insufficientEvidence ? 1 : 0, stamp, stamp);
+    entry.detailLevel, input.model ? JSON.stringify(input.model) : null, stamp, input.trigger, input.state, outcome,
+    degradationReason, generationAttempts, JSON.stringify(generationProblems),
+    input.insufficientEvidence ? 1 : 0, stamp, stamp);
   return id;
 }
 
@@ -488,6 +509,8 @@ function toVersion(row: VersionRow): DictionaryVersion {
     citations: parseJson(row.citations_json, []), authorSummaries: parseJson(row.author_summaries_json, []), focusPrompt: row.focus_prompt,
     scope: parseJson(row.scope_json, { kind: 'vault' }), outputLanguage: row.output_language, detailLevel: row.detail_level,
     model: parseJson<ModelRef | null>(row.model_json, null), generatedAt: row.generated_at, trigger: row.trigger, state: row.state,
+    outcome: row.outcome, degradationReason: row.degradation_reason, generationAttempts: row.generation_attempts,
+    generationProblems: parseJson(row.generation_problems_json, []),
     insufficientEvidence: !!row.insufficient_evidence };
 }
 
@@ -518,13 +541,16 @@ export function acceptDictionaryVersion(entryId: string, versionId: string, expe
 export function restoreDictionaryVersion(entryId: string, versionId: string, expectedCurrentVersionId: string | null): DictionaryEntryDetail {
   const entry = getDictionaryEntry(entryId); const source = getDictionaryVersion(versionId);
   if (!entry || !source || source.entryId !== entryId) throw new Error('No se encontró esa versión.');
+  if (source.outcome === 'degraded') throw new Error('Una generación degradada no puede restaurarse como definición.');
   if (entry.currentVersionId !== expectedCurrentVersionId) throw new Error('La entrada cambió antes de restaurarla.');
   for (const citation of source.citations) if (evidenceReferenceUnavailable(entryId, citation.kind, citation.id)) throw new Error('La versión contiene fuentes que ya no existen y no puede restaurarse de forma verificable.');
   getDb().transaction(() => {
     getDb().prepare('UPDATE dictionary_entries SET focus_prompt=?, scope_kind=?, scope_json=?, output_language=?, detail_level=? WHERE id=?')
       .run(source.focusPrompt, source.scope.kind, JSON.stringify(source.scope), source.outputLanguage, source.detailLevel, entryId);
     const id = insertVersion({ entryId, contentMarkdown: source.contentMarkdown, evidence: source.evidence, citations: source.citations,
-      authorSummaries: source.authorSummaries, model: source.model, trigger: 'restore', state: 'applied', insufficientEvidence: source.insufficientEvidence }, now());
+      authorSummaries: source.authorSummaries, model: source.model, trigger: 'restore', state: 'applied',
+      outcome: source.insufficientEvidence ? 'insufficient' : 'synthesis', degradationReason: null,
+      generationAttempts: 1, generationProblems: [], insufficientEvidence: source.insufficientEvidence }, now());
     getDb().prepare('UPDATE dictionary_entries SET current_version_id=?, proposed_version_id=NULL, content_markdown=?, insufficient_evidence=?, updated_at=? WHERE id=?')
       .run(id, source.contentMarkdown, source.insufficientEvidence ? 1 : 0, now(), entryId);
   })();
@@ -564,6 +590,10 @@ export function getDictionaryEntryDetail(id: string): DictionaryEntryDetail | nu
   const evidence = getDb().prepare('SELECT * FROM dictionary_evidence WHERE entry_id=?').all(id) as EvidenceRow[];
   const currentVersion = entry.currentVersionId ? getDictionaryVersion(entry.currentVersionId) : null;
   const proposedVersion = entry.proposedVersionId ? getDictionaryVersion(entry.proposedVersionId) : null;
+  const latestVersion = (getDb().prepare(
+    'SELECT * FROM dictionary_versions WHERE entry_id=? ORDER BY generated_at DESC, rowid DESC LIMIT 1',
+  ).get(id) as VersionRow | undefined);
+  const latestDegradedVersion = latestVersion?.outcome === 'degraded' ? toVersion(latestVersion) : null;
   const used = new Set((currentVersion?.evidence ?? []).map((ref) => `${ref.kind}:${ref.id}`));
   const cited = new Set((currentVersion?.citations ?? []).map((ref) => `${ref.kind}:${ref.id}`));
   const unavailable = new Set(evidence.filter((item) => evidenceUnavailable(item)).map((item) => `${item.kind}:${item.ref_id}`));
@@ -576,7 +606,7 @@ export function getDictionaryEntryDetail(id: string): DictionaryEntryDetail | nu
     unavailable: unavailable.size };
   const authors = buildAuthors(evidence.filter((item) => used.has(`${item.kind}:${item.ref_id}`)), currentVersion?.authorSummaries ?? []);
   const works = buildWorks(evidence.filter((item) => used.has(`${item.kind}:${item.ref_id}`)));
-  return { entry, coverage, authors, works, currentVersion, proposedVersion };
+  return { entry, coverage, authors, works, currentVersion, proposedVersion, latestDegradedVersion };
 }
 
 function buildAuthors(rows: EvidenceRow[], summaries: DictionaryAuthorView[]): DictionaryAuthorView[] {

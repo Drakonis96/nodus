@@ -236,6 +236,27 @@ function dictionaryVersionText(value: string): string {
   return t(key);
 }
 
+function dictionaryDegradationText(value?: string | null): string {
+  switch (value) {
+    case "output_truncated":
+      return t("La respuesta se truncó antes de completarse.");
+    case "malformed_output":
+      return t("El modelo devolvió una respuesta que no se pudo interpretar.");
+    case "schema_error":
+      return t("La respuesta no respetó la estructura requerida.");
+    case "invalid_evidence_refs":
+      return t("La respuesta utilizó referencias de evidencia no válidas.");
+    case "missing_citations":
+      return t("La síntesis no incluyó citas verificables.");
+    case "semantic_rejection":
+      return t("La verificación rechazó las afirmaciones generadas.");
+    case "legacy_extractive_fallback":
+      return t("Esta versión procedía del fallback extractivo anterior.");
+    default:
+      return t("No se obtuvo una síntesis verificable.");
+  }
+}
+
 function StatusPill({ status }: { status: string }) {
   const classes =
     status === "active"
@@ -1154,7 +1175,7 @@ export function DictionaryView({
           next.set(progress.entryId, progress);
           return next;
         });
-        if (progress.phase === "done") void reload(false);
+        if (["done", "degraded"].includes(progress.phase)) void reload(false);
       }),
     [reload],
   );
@@ -1681,6 +1702,25 @@ function DictionaryGenerationState({
       </span>
     );
   }
+  if (progress.phase === "degraded") {
+    return (
+      <span
+        className="min-w-0 text-xs text-amber-700 dark:text-amber-300"
+        title={progress.error}
+      >
+        <span className="flex items-center gap-1.5 font-medium">
+          <Icon name="warning" size={12} /> {t("Síntesis pendiente")}
+        </span>
+        <span className="mt-0.5 block truncate text-[10px] opacity-80">
+          {progress.attempts
+            ? tx("Se intentó {n} veces. La versión anterior se conserva.", {
+                n: progress.attempts,
+              })
+            : dictionaryDegradationText(progress.degradationReason)}
+        </span>
+      </span>
+    );
+  }
   return (
     <span className="flex items-center gap-1.5 text-xs font-medium text-indigo-600 dark:text-indigo-300">
       <Icon name="refresh" size={13} className="animate-spin" />
@@ -1767,7 +1807,7 @@ function DictionaryEntryView({
   const entry = detail.entry;
   const hasEvidence = detail.coverage.included > 0;
   const backgroundBusy =
-    !!progress && !["done", "failed"].includes(progress.phase);
+    !!progress && !["done", "degraded", "failed"].includes(progress.phase);
   const backgroundFailure =
     progress?.phase === "failed" && !hideBackgroundFailure
       ? progress.error || t("La generación no pudo completarse.")
@@ -1844,6 +1884,11 @@ function DictionaryEntryView({
                 {entry.insufficientEvidence && (
                   <span className="text-[10px] text-amber-600 dark:text-amber-400">
                     {t("Evidencia insuficiente")}
+                  </span>
+                )}
+                {detail.latestDegradedVersion && (
+                  <span className="text-[10px] text-amber-700 dark:text-amber-300">
+                    {t("Último intento degradado")}
                   </span>
                 )}
               </div>
@@ -2210,6 +2255,31 @@ function OverviewTab({
     );
   return (
     <div className="grid items-start gap-4 xl:grid-cols-12">
+      {detail.latestDegradedVersion && (
+        <section className="rounded-xl border border-amber-300 bg-amber-50 p-4 text-amber-900 xl:col-span-12 dark:border-amber-900 dark:bg-amber-950/25 dark:text-amber-200">
+          <div className="flex items-start gap-3">
+            <Icon name="warning" className="mt-0.5 shrink-0" />
+            <div>
+              <h3 className="text-sm font-semibold">
+                {t("El último intento no produjo una síntesis verificable")}
+              </h3>
+              <p className="mt-1 text-xs leading-5 opacity-80">
+                {dictionaryDegradationText(
+                  detail.latestDegradedVersion.degradationReason,
+                )}{" "}
+                {tx("Nodus realizó {n} intentos automáticos.", {
+                  n: detail.latestDegradedVersion.generationAttempts,
+                })}{" "}
+                {entry.currentVersionId
+                  ? t("La versión anterior permanece intacta.")
+                  : t(
+                      "La evidencia extractiva se conserva en Versiones, pero no se ha aplicado como definición.",
+                    )}
+              </p>
+            </div>
+          </div>
+        </section>
+      )}
       <section className={`${panel} p-5 xl:col-span-8`}>
         <div className="mb-4 flex items-start gap-3">
           <div className="min-w-0 flex-1">
@@ -2846,7 +2916,7 @@ function VersionsTab({
       {versions.map((version) => (
         <article
           key={version.id}
-          className={`${panel} p-4 ${version.id === detail.entry.currentVersionId ? "!border-emerald-300 dark:!border-emerald-900" : version.state === "proposed" ? "!border-cyan-300 dark:!border-cyan-900" : ""}`}
+          className={`${panel} p-4 ${version.id === detail.entry.currentVersionId ? "!border-emerald-300 dark:!border-emerald-900" : version.state === "proposed" ? "!border-cyan-300 dark:!border-cyan-900" : version.outcome === "degraded" ? "!border-amber-300 dark:!border-amber-900" : ""}`}
         >
           <button
             className="flex w-full items-center gap-3 text-left"
@@ -2860,7 +2930,9 @@ function VersionsTab({
               <p className="text-[10px] text-neutral-500">
                 {date(version.generatedAt)} ·{" "}
                 {tx("{n} evidencias", { n: version.evidence.length })} ·{" "}
-                {dictionaryVersionText(version.state)}
+                {dictionaryVersionText(
+                  version.outcome === "degraded" ? "degradada" : version.state,
+                )}
               </p>
             </div>
             {version.insufficientEvidence && (
@@ -2875,13 +2947,25 @@ function VersionsTab({
           </button>
           {open === version.id && (
             <div className="mt-4 border-t border-neutral-200 pt-4 dark:border-neutral-800">
+              {version.outcome === "degraded" && (
+                <div className="mb-4 rounded-lg border border-amber-300 bg-amber-50 p-3 text-xs leading-5 text-amber-800 dark:border-amber-900 dark:bg-amber-950/25 dark:text-amber-200">
+                  <p className="font-semibold">{t("Generación degradada")}</p>
+                  <p className="mt-1">
+                    {dictionaryDegradationText(version.degradationReason)}{" "}
+                    {tx("Se realizaron {n} intentos automáticos.", {
+                      n: version.generationAttempts,
+                    })}
+                  </p>
+                </div>
+              )}
               <Markdown
                 content={version.contentMarkdown}
                 onCitation={onCitation}
               />
               <div className="mt-4 flex justify-end">
                 {version.id !== detail.entry.currentVersionId &&
-                  version.state !== "proposed" && (
+                  version.state !== "proposed" &&
+                  version.outcome !== "degraded" && (
                     <button
                       className="btn btn-ghost border border-neutral-300 dark:border-neutral-700"
                       disabled={busy}
