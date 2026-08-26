@@ -318,7 +318,7 @@ export function ResearchMapView({
                   <Icon name="refresh" size={13} /> {t('Re-descomponer')}
                 </button>
                 <button className="btn btn-primary text-xs gap-1.5" onClick={runMap} disabled={busy === 'map' || subDraft.length === 0}>
-                  <Icon name="compass" size={13} /> {t('Mapear cobertura')}
+                  <Icon name="strata" size={13} /> {t('Mapear cobertura')}
                 </button>
                 {detail.rq.status === 'mapped' && (
                   <button className="btn btn-ghost border border-neutral-700 text-xs gap-1.5" onClick={exportMap}>
