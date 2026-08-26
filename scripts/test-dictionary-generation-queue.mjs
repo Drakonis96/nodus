@@ -175,3 +175,41 @@ test("Dictionary retries transient provider failures without exposing a terminal
     await rm(output, { recursive: true, force: true });
   }
 });
+
+test("Dictionary reports degraded attempts without presenting them as generated", async () => {
+  const output = await mkdtemp(path.join(os.tmpdir(), "nodus-dictionary-degraded-"));
+  try {
+    const bundle = path.join(output, "queue.mjs");
+    await build({
+      entryPoints: [path.join(root, "electron/ai/dictionaryGenerationQueue.ts")],
+      outfile: bundle,
+      bundle: true,
+      format: "esm",
+      platform: "node",
+      logLevel: "silent",
+    });
+    const { DictionaryGenerationQueue } = await import(pathToFileURL(bundle));
+    const events = [];
+    const queue = new DictionaryGenerationQueue(
+      async () => ({
+        outcome: "degraded",
+        degradationReason: "semantic_rejection",
+        generationAttempts: 3,
+        generationProblems: ["no valid claims survived"],
+      }),
+      (progress) => events.push(progress),
+    );
+    queue.start({ entryId: "degraded", mode: "creation", model: null });
+    await waitFor(
+      () => queue.list().find((job) => job.entryId === "degraded")?.phase === "degraded",
+      "degraded terminal state",
+    );
+    const terminal = queue.list().find((job) => job.entryId === "degraded");
+    assert.equal(terminal.phase, "degraded");
+    assert.equal(terminal.attempts, 3);
+    assert.equal(terminal.degradationReason, "semantic_rejection");
+    assert.equal(events.some((event) => event.phase === "done"), false);
+  } finally {
+    await rm(output, { recursive: true, force: true });
+  }
+});

@@ -159,6 +159,65 @@ try {
     repo.includedEvidence(automatic.id).length >= 2,
     "automatic retrieval selects relevant ideas/passages before generation",
   );
+  const structuredEvidence = repo.includedEvidence(automatic.id).slice(0, 2);
+  const renderedStructured = ai.__renderStructuredDictionaryForTesting(
+    {
+      paragraphs: [
+        {
+          claims: [
+            {
+              text: "La memoria se configura mediante prácticas colectivas.",
+              evidence: [
+                {
+                  kind: structuredEvidence[0].kind,
+                  id: structuredEvidence[0].id,
+                },
+              ],
+            },
+            {
+              text: "Su transmisión está documentada en procesos sociales.",
+              evidence: [
+                {
+                  kind: structuredEvidence[1].kind,
+                  id: structuredEvidence[1].id,
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    },
+    structuredEvidence,
+  );
+  assert.equal(renderedStructured.invalidEvidenceRefs, 0);
+  assert.doesNotMatch(
+    renderedStructured.markdown,
+    /Evidencia verificable|^\s*[-*>#]/m,
+    "structured claims render as continuous prose rather than an evidence list",
+  );
+  assert.equal(
+    [...renderedStructured.markdown.matchAll(/nodus:\/\/(?:idea|passage)\//g)]
+      .length,
+    2,
+    "Nodus deterministically attaches one validated citation to each atomic claim",
+  );
+  const renderedWithUnknownId = ai.__renderStructuredDictionaryForTesting(
+    {
+      paragraphs: [
+        {
+          claims: [
+            {
+              text: "Esta afirmación no puede publicarse.",
+              evidence: [{ kind: "idea", id: "missing-evidence-id" }],
+            },
+          ],
+        },
+      ],
+    },
+    structuredEvidence,
+  );
+  assert.equal(renderedWithUnknownId.markdown, "");
+  assert.equal(renderedWithUnknownId.invalidEvidenceRefs, 1);
   assert.equal(
     repo.getDictionaryEntryDetail(automatic.id).coverage.included,
     repo.includedEvidence(automatic.id).filter((item) => !item.unavailable).length,
@@ -319,8 +378,8 @@ try {
   );
   assert.equal(
     salvageAttempts,
-    2,
-    "an uncited tail still receives the bounded rewrite before local salvage",
+    3,
+    "an uncited tail receives two automatic rewrites before local salvage",
   );
   assert.match(
     salvagedUncitedTail.contentMarkdown,
@@ -333,6 +392,7 @@ try {
     "only the persistently uncited sentence is removed",
   );
 
+  const currentBeforeDegraded = repo.getDictionaryEntry(automatic.id).currentVersionId;
   let extractiveFallbackAttempts = 0;
   const extractiveFallback = await ai.__generateDictionaryEntryForTesting(
     { entryId: automatic.id, mode: "regeneration", model: null },
@@ -348,8 +408,8 @@ try {
   );
   assert.equal(
     extractiveFallbackAttempts,
-    2,
-    "semantic rejection receives the bounded provider rewrite first",
+    3,
+    "semantic rejection receives two automatic provider rewrites first",
   );
   assert.match(
     extractiveFallback.contentMarkdown,
@@ -365,6 +425,15 @@ try {
     extractiveFallback.contentMarkdown,
     /absolutamente cualquier transformación/,
     "unsupported provider prose is never persisted in the fallback",
+  );
+  assert.equal(extractiveFallback.outcome, "degraded");
+  assert.equal(extractiveFallback.state, "degraded");
+  assert.equal(extractiveFallback.degradationReason, "semantic_rejection");
+  assert.equal(extractiveFallback.generationAttempts, 3);
+  assert.equal(
+    repo.getDictionaryEntry(automatic.id).currentVersionId,
+    currentBeforeDegraded,
+    "a degraded regeneration never replaces the current synthesis",
   );
 
   const missingCitationFallback = await ai.__generateDictionaryEntryForTesting(
@@ -385,6 +454,13 @@ try {
     /conserva información entre generaciones/,
     "uncited provider prose is not persisted",
   );
+  assert.equal(missingCitationFallback.outcome, "degraded");
+  assert.equal(missingCitationFallback.degradationReason, "missing_citations");
+  assert.equal(
+    repo.getDictionaryEntryDetail(automatic.id).latestDegradedVersion.id,
+    missingCitationFallback.id,
+    "the latest degraded attempt remains inspectable without becoming current",
+  );
 
   let malformedOutputCalls = 0;
   const malformedOutputFallback =
@@ -399,18 +475,24 @@ try {
     );
   assert.equal(
     malformedOutputCalls,
-    1,
-    "Dictionary does not multiply completeJson's exhausted repair attempts",
+    3,
+    "a truncated structured output receives two top-level automatic retries",
   );
   assert.match(
     malformedOutputFallback.contentMarkdown,
     /## Evidencia verificable/,
     "malformed or truncated structured output recovers to cited evidence",
   );
+  assert.equal(malformedOutputFallback.state, "degraded");
+  assert.equal(malformedOutputFallback.outcome, "degraded");
   assert.equal(
-    malformedOutputFallback.state,
-    "applied",
-    "structured-output recovery still produces a current Dictionary version",
+    malformedOutputFallback.degradationReason,
+    "output_truncated",
+  );
+  assert.equal(
+    repo.getDictionaryEntry(automatic.id).currentVersionId,
+    currentBeforeDegraded,
+    "structured-output degradation preserves the prior current version",
   );
 
   // A provider failure must reject the IPC operation without creating an empty
@@ -468,20 +550,26 @@ try {
     "provider failure creates no version row",
   );
 
-  // A generated citation to a ref outside the selected evidence is stripped and
-  // then rejected as an uncited substantive claim; the draft remains untouched.
-  await assert.rejects(
-    () =>
-      ai.__generateDictionaryEntryForTesting(
-        { entryId: failed.id, mode: "creation", model: null },
-        async () => ({
+  // A generated citation outside the selected evidence is stripped, retried twice
+  // and retained only as a degraded audit row; the draft remains untouched.
+  let invalidCitationAttempts = 0;
+  const invalidCitationFallback =
+    await ai.__generateDictionaryEntryForTesting(
+      { entryId: failed.id, mode: "creation", model: null },
+      async () => {
+        invalidCitationAttempts += 1;
+        return {
           descriptionMarkdown:
             "Esta afirmación inventada no procede de la evidencia disponible [fuente](nodus://idea/no-existe).",
           authorSummaries: [],
-        }),
-      ),
-    /versión anterior se conserva/,
-    "nonexistent generated citations cannot be persisted",
+        };
+      },
+    );
+  assert.equal(invalidCitationAttempts, 3);
+  assert.equal(invalidCitationFallback.outcome, "degraded");
+  assert.equal(
+    invalidCitationFallback.degradationReason,
+    "invalid_evidence_refs",
   );
   assert.equal(
     repo.getDictionaryEntry(failed.id).currentVersionId,

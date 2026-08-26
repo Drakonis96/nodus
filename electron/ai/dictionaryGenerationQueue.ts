@@ -1,6 +1,7 @@
 import type {
   DictionaryGenerationRequest,
   DictionaryProgress,
+  DictionaryVersion,
 } from "@shared/dictionary";
 
 export type DictionaryGenerationProgressReporter = (
@@ -10,10 +11,10 @@ export type DictionaryGenerationProgressReporter = (
 export type DictionaryGenerationExecutor = (
   request: DictionaryGenerationRequest,
   report: DictionaryGenerationProgressReporter,
-) => Promise<void>;
+) => Promise<DictionaryVersion | void>;
 
 const isRunning = (progress: DictionaryProgress): boolean =>
-  !["done", "failed"].includes(progress.phase);
+  !["done", "degraded", "failed"].includes(progress.phase);
 
 const MAX_TRANSIENT_RETRIES = 2;
 
@@ -77,7 +78,19 @@ export class DictionaryGenerationQueue {
       this.#set({ ...progress, mode: request.mode }, token);
     for (let attempt = 0; ; attempt += 1) {
       try {
-        await this.execute(request, report);
+        const result = await this.execute(request, report);
+        if (result?.outcome === "degraded") {
+          report({
+            entryId: request.entryId,
+            mode: request.mode,
+            phase: "degraded",
+            message: "La síntesis necesita revisión",
+            error: result.generationProblems.join(" · "),
+            degradationReason: result.degradationReason ?? undefined,
+            attempts: result.generationAttempts,
+          });
+          return;
+        }
         report({
           entryId: request.entryId,
           mode: request.mode,

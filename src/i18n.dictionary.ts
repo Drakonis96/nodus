@@ -158,6 +158,38 @@ export const DICTIONARY_TRANSLATIONS = {
     "Error al generar": "Generation error",
     "La generación no pudo completarse.": "Generation could not be completed.",
     Generada: "Generated",
+    "Síntesis pendiente": "Synthesis pending",
+    "Último intento degradado": "Latest attempt degraded",
+    "El último intento no produjo una síntesis verificable":
+      "The latest attempt did not produce a verifiable synthesis",
+    "La respuesta se truncó antes de completarse.":
+      "The response was truncated before it completed.",
+    "El modelo devolvió una respuesta que no se pudo interpretar.":
+      "The model returned a response that could not be interpreted.",
+    "La respuesta no respetó la estructura requerida.":
+      "The response did not follow the required structure.",
+    "La respuesta utilizó referencias de evidencia no válidas.":
+      "The response used invalid evidence references.",
+    "La síntesis no incluyó citas verificables.":
+      "The synthesis did not include verifiable citations.",
+    "La verificación rechazó las afirmaciones generadas.":
+      "Verification rejected the generated claims.",
+    "Esta versión procedía del fallback extractivo anterior.":
+      "This version came from the previous extractive fallback.",
+    "No se obtuvo una síntesis verificable.":
+      "A verifiable synthesis could not be obtained.",
+    "Se intentó {n} veces. La versión anterior se conserva.":
+      "It was attempted {n} times. The previous version is preserved.",
+    "Nodus realizó {n} intentos automáticos.":
+      "Nodus made {n} automatic attempts.",
+    "La versión anterior permanece intacta.":
+      "The previous version remains unchanged.",
+    "La evidencia extractiva se conserva en Versiones, pero no se ha aplicado como definición.":
+      "The extractive evidence is kept in Versions, but it has not been applied as the definition.",
+    "Generación degradada": "Degraded generation",
+    "Se realizaron {n} intentos automáticos.":
+      "{n} automatic attempts were made.",
+    degradada: "degraded",
     "En cola": "Queued",
     "Analizando corpus…": "Analyzing corpus…",
     "Generando definición…": "Generating definition…",
@@ -355,6 +387,38 @@ export const DICTIONARY_TRANSLATIONS = {
     "La generación no pudo completarse.":
       "La génération n’a pas pu être terminée.",
     Generada: "Générée",
+    "Síntesis pendiente": "Synthèse en attente",
+    "Último intento degradado": "Dernière tentative dégradée",
+    "El último intento no produjo una síntesis verificable":
+      "La dernière tentative n’a pas produit de synthèse vérifiable",
+    "La respuesta se truncó antes de completarse.":
+      "La réponse a été tronquée avant d’être terminée.",
+    "El modelo devolvió una respuesta que no se pudo interpretar.":
+      "Le modèle a renvoyé une réponse impossible à interpréter.",
+    "La respuesta no respetó la estructura requerida.":
+      "La réponse n’a pas respecté la structure requise.",
+    "La respuesta utilizó referencias de evidencia no válidas.":
+      "La réponse a utilisé des références de preuve non valides.",
+    "La síntesis no incluyó citas verificables.":
+      "La synthèse ne comportait pas de citations vérifiables.",
+    "La verificación rechazó las afirmaciones generadas.":
+      "La vérification a rejeté les affirmations générées.",
+    "Esta versión procedía del fallback extractivo anterior.":
+      "Cette version provenait de l’ancien repli extractif.",
+    "No se obtuvo una síntesis verificable.":
+      "Aucune synthèse vérifiable n’a pu être obtenue.",
+    "Se intentó {n} veces. La versión anterior se conserva.":
+      "{n} tentatives ont été effectuées. La version précédente est conservée.",
+    "Nodus realizó {n} intentos automáticos.":
+      "Nodus a effectué {n} tentatives automatiques.",
+    "La versión anterior permanece intacta.":
+      "La version précédente reste intacte.",
+    "La evidencia extractiva se conserva en Versiones, pero no se ha aplicado como definición.":
+      "Les extraits sont conservés dans Versions, mais n’ont pas été appliqués comme définition.",
+    "Generación degradada": "Génération dégradée",
+    "Se realizaron {n} intentos automáticos.":
+      "{n} tentatives automatiques ont été effectuées.",
+    degradada: "dégradée",
     "En cola": "En file",
     "Analizando corpus…": "Analyse du corpus…",
     "Generando definición…": "Génération de la définition…",
