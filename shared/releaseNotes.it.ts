@@ -155,6 +155,16 @@ const RELEASE_3_2_4_IT: string[] = [
 ];
 
 export const RELEASE_NOTES_IT: Record<string, string[]> = {
+  "5.0.3": [
+    "Compass non richiede più credenziali per cercare. Interroga direttamente un catalogo molto più ampio di letteratura accademica e fonti primarie aperte, adatta ogni ricerca alla disciplina e combina i risultati con una classificazione più solida. L’interpretazione con IA resta facoltativa e disattivata per impostazione predefinita.",
+    "Compass conserva ricerche e candidati, indica quale fornitore ha restituito ogni risultato e distingue i file aperti verificati dalle semplici pagine di riferimento. L’importazione controlla i duplicati, completa i metadati e può allegare i file disponibili, mentre la coda segnala limiti temporanei, lavoro parziale ed elementi ignorati.",
+    "Deep Research torna a usare la versione 1 per impostazione predefinita, così da ridurre costi e rischi alla prima esecuzione. La versione 2 resta disponibile quando desideri la sua analisi più impegnativa, e le richieste dell’app e dei client MCP rispettano sempre la versione scelta esplicitamente.",
+    "Il Dizionario non sostituisce più una definizione sintetizzata con testo estrattivo degradato. Riprova le risposte troncate, malformate o prive di citazioni verificabili, mantiene intatta la versione precedente e mostra il motivo e il numero di tentativi. Un risultato degradato resta nella cronologia per la diagnosi, ma non viene mai applicato come definizione.",
+    "La barra di scrittura spiega subito le sue tredici trasformazioni del testo. Ogni pulsante mostra un suggerimento localizzato con l’effetto preciso di Accademico, Chiaro, Conciso, Correzione, Coesione, Riassunto e delle altre opzioni. Non devi più provare un’azione per scoprire che cosa farà.",
+    "Le conferme di eliminazione mostrano ora il nome del deposito che stai per rimuovere, sia nella prima domanda sia nella conferma finale. Puoi così verificare l’obiettivo esatto prima di un’azione irreversibile, anche quando gestisci più depositi simili.",
+    "L’interfaccia distingue ora Compass e Stato dell’arte con icone proprie. Le azioni delle schede Deep Research e Immersione restano allineate in basso anche quando il contenuto ha lunghezze diverse, così le gallerie mantengono un ritmo visivo stabile.",
+    "Il sito pubblico acquisisce metadati coerenti per i motori di ricerca, collegamenti canonici, un’immagine sociale ad alta risoluzione e una pagina di citazione generata da un’unica fonte. Pubblica inoltre un confronto più chiaro tra Nodus e NotebookLM e aggiorna il totale pubblico dei download da GitHub.",
+  ],
   "5.0.2": [
     "Deep Research torna a completare i report dall’interfaccia anche quando cambi scheda. Il lavoro pesante esce dal percorso che disegna la finestra, gli errori transitori o di formato vengono riparati e ritentati, e la coda mostra una sola animazione accanto al titolo più numeri aggiornati secondo la posizione reale.",
     "I moduli del Dizionario accettano di nuovo il testo e i pulsanti mostrano subito di aver risposto. Rigenera e Aggiorna restano allineati, riparano le risposte incomplete del modello e riprovano in modo controllato quando un risultato non può essere interpretato, senza riempire l’interfaccia di errori ripetuti.",

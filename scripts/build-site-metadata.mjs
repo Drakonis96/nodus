@@ -85,6 +85,20 @@ replaceBlock('cite/index.html', 'citation-details', `<dl class="citation-meta re
       <div><dt>Licence</dt><dd><a href="${metadata.licenseUrl}" target="_blank" rel="noopener">${metadata.license}</a></dd></div>
     </dl>`);
 
+const versionDoiCard = metadata.versionDoi
+  ? `<article class="card lit doi-card reveal" style="--delay:80ms">
+        <span class="kicker">Nodus ${metadata.version} · version DOI</span>
+        <h3>The exact software release</h3>
+        <p>This immutable DOI resolves only to the archived ${metadata.version} release. Use it when the exact software version matters for reproducibility.</p>
+        <a class="doi-value" href="https://doi.org/${metadata.versionDoi}" target="_blank" rel="noopener">${metadata.versionDoi}</a>
+      </article>`
+  : `<article class="card lit doi-card reveal" style="--delay:80ms">
+        <span class="kicker">Nodus ${metadata.version} · archive pending</span>
+        <h3>Version DOI pending</h3>
+        <p>Zenodo assigns the immutable DOI after this release is archived. Until then, cite the conceptual DOI and the ${metadata.releaseTag} release tag shown here.</p>
+        <a class="doi-value" href="${metadata.repository}/releases/tag/${metadata.releaseTag}" target="_blank" rel="noopener">${metadata.releaseTag}</a>
+      </article>`;
+
 replaceBlock('cite/index.html', 'citation-dois', `<div class="doi-grid">
       <article class="card lit doi-card reveal">
         <span class="kicker">All versions · conceptual DOI</span>
@@ -92,18 +106,13 @@ replaceBlock('cite/index.html', 'citation-dois', `<div class="doi-grid">
         <p>This persistent identifier represents every archived release and resolves through the complete version history.</p>
         <a class="doi-value" href="https://doi.org/${metadata.conceptDoi}" target="_blank" rel="noopener">${metadata.conceptDoi}</a>
       </article>
-      <article class="card lit doi-card reveal" style="--delay:80ms">
-        <span class="kicker">Nodus ${metadata.version} · version DOI</span>
-        <h3>The exact software release</h3>
-        <p>This immutable DOI resolves only to the archived ${metadata.version} release. Use it when the exact software version matters for reproducibility.</p>
-        <a class="doi-value" href="https://doi.org/${metadata.versionDoi}" target="_blank" rel="noopener">${metadata.versionDoi}</a>
-      </article>
+      ${versionDoiCard}
     </div>`);
 
 const citationKey = `perez_burgueno_nodus_${metadata.releaseDate.slice(0, 4)}`;
 replaceBlock('cite/index.html', 'citation-formats', `<div class="citation-block reveal">
       <h3>APA</h3>
-      <p>Pérez Burgueño, J., &amp; Nodus contributors. (${metadata.releaseDate.slice(0, 4)}). <i>Nodus: Open-Source Research Workspace</i> (Version ${metadata.version}) [Computer software]. Zenodo. <a href="https://doi.org/${metadata.versionDoi}" target="_blank" rel="noopener">https://doi.org/${metadata.versionDoi}</a></p>
+      <p>Pérez Burgueño, J., &amp; Nodus contributors. (${metadata.releaseDate.slice(0, 4)}). <i>Nodus: Open-Source Research Workspace</i> (Version ${metadata.version}) [Computer software]. Zenodo. <a href="https://doi.org/${metadata.citationDoi}" target="_blank" rel="noopener">https://doi.org/${metadata.citationDoi}</a></p>
     </div>
 
     <div class="citation-block reveal">
@@ -114,7 +123,7 @@ replaceBlock('cite/index.html', 'citation-formats', `<div class="citation-block 
   version   = {${metadata.version}},
   year      = {${metadata.releaseDate.slice(0, 4)}},
   publisher = {Zenodo},
-  doi       = {${metadata.versionDoi}},
+  doi       = {${metadata.citationDoi}},
   url       = {${metadata.repository}/releases/tag/${metadata.releaseTag}},
   license   = {${metadata.license}}
 }</code></pre>

@@ -73,23 +73,23 @@ test('all JSON-LD parses and the canonical entities stay consistent', () => {
   assert.equal(software.license, metadata.licenseUrl);
   assert.equal(software.codeRepository, metadata.repository);
   assert.equal(software.identifier.find((item) => item.propertyID === 'Concept DOI').value, metadata.conceptDoi);
-  assert.equal(software.identifier.find((item) => item.propertyID === 'Version DOI').value, metadata.versionDoi);
+  assert.equal(software.identifier.find((item) => item.propertyID === 'Version DOI')?.value, metadata.versionDoi ?? undefined);
   assert.equal(author.url, metadata.orcid);
 });
 
 test('release and citation metadata have one generated source of truth', () => {
-  assert.notEqual(metadata.conceptDoi, metadata.versionDoi, 'concept and immutable release DOIs stay distinct');
+  if (metadata.versionDoi) assert.notEqual(metadata.conceptDoi, metadata.versionDoi, 'concept and immutable release DOIs stay distinct');
   const citation = fs.readFileSync(path.join(repoRoot, 'CITATION.cff'), 'utf8');
   assert.match(citation, new RegExp(`^version: "${metadata.version.replaceAll('.', '\\.')}"$`, 'm'));
   assert.match(citation, new RegExp(`^date-released: "${metadata.releaseDate}"$`, 'm'));
-  assert.match(citation, new RegExp(`^doi: "${metadata.versionDoi.replaceAll('.', '\\.')}"$`, 'm'));
+  assert.match(citation, new RegExp(`^doi: "${metadata.citationDoi.replaceAll('.', '\\.')}"$`, 'm'));
 
   for (const relative of ['index.html', 'app/index.html', 'cite/index.html']) {
     assert.ok(read(relative).includes(`"softwareVersion": "${metadata.version}"`), `${relative} has the current softwareVersion`);
     assert.ok(read(relative).includes(`${metadata.repository}/releases/tag/${metadata.releaseTag}`), `${relative} has the current release tag`);
   }
   const cite = read('cite/index.html');
-  for (const value of [metadata.version, metadata.releaseTag, metadata.conceptDoi, metadata.versionDoi]) {
+  for (const value of [metadata.version, metadata.releaseTag, metadata.conceptDoi, metadata.versionDoi].filter(Boolean)) {
     assert.ok(cite.includes(value), `/cite/ includes ${value}`);
   }
   assert.match(cite, /generated:citation-formats:start/);

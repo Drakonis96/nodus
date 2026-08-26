@@ -39,8 +39,8 @@ if (checkOnly) {
   if (releaseDate !== metadata.releaseDate) {
     errors.push(`CITATION.cff release date is ${releaseDate}, but the release metadata is ${metadata.releaseDate}.`);
   }
-  if (citationDoi !== metadata.versionDoi) {
-    errors.push(`CITATION.cff DOI is ${citationDoi}, but the version DOI is ${metadata.versionDoi}.`);
+  if (citationDoi !== metadata.citationDoi) {
+    errors.push(`CITATION.cff DOI is ${citationDoi}, but the current citation DOI is ${metadata.citationDoi}.`);
   }
   if (citationRepository !== metadata.repository) {
     errors.push(`CITATION.cff repository is ${citationRepository}, but the canonical repository is ${metadata.repository}.`);
@@ -66,7 +66,7 @@ if (checkOnly) {
     .replace(/^license:\s*["'][^"']+["']\s*$/m, `license: "${metadata.license}"`)
     .replace(/^repository-code:\s*["'][^"']+["']\s*$/m, `repository-code: "${metadata.repository}"`)
     .replace(/^url:\s*["'][^"']+["']\s*$/m, `url: "${metadata.siteUrl}/"`)
-    .replace(/^doi:\s*["'][^"']+["']\s*$/m, `doi: "${metadata.versionDoi}"`);
+    .replace(/^doi:\s*["'][^"']+["']\s*$/m, `doi: "${metadata.citationDoi}"`);
 
   if (updated === original) {
     console.log(`CITATION.cff is already synchronized for Nodus ${metadata.version}.`);

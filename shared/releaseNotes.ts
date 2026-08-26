@@ -1763,6 +1763,86 @@ const RELEASE_4_2_5_HIGHLIGHTS: RawReleaseHighlight[] = [
 ];
 
 /**
+ * 5.0.3 — every user-visible change merged after 5.0.2. Keep this list aligned
+ * by index with the Italian and Turkish tables so all eight interface languages
+ * receive the same release.
+ */
+const RELEASE_5_0_3_HIGHLIGHTS: RawReleaseHighlight[] = [
+  {
+    scope: 'toolkit',
+    es: 'Compass ya no necesita credenciales para buscar. Consulta directamente un catálogo mucho más amplio de literatura académica y fuentes primarias abiertas, adapta la búsqueda a cada disciplina y combina los resultados con una clasificación más sólida. La interpretación con IA sigue siendo opcional y apagada de forma predeterminada.',
+    en: 'Compass no longer needs credentials to search. It queries a much broader catalogue of scholarly literature and open primary sources directly, adapts each search to its discipline, and combines the results with stronger ranking. AI interpretation remains optional and off by default.',
+    fr: 'Compass n’a plus besoin d’identifiants pour effectuer une recherche. Il interroge directement un catalogue bien plus vaste de littérature scientifique et de sources primaires ouvertes, adapte chaque recherche à sa discipline et combine les résultats avec un classement plus robuste. L’interprétation par IA reste facultative et désactivée par défaut.',
+    de: 'Compass benötigt für die Suche keine Zugangsdaten mehr. Es fragt einen deutlich größeren Katalog wissenschaftlicher Literatur und offener Primärquellen direkt ab, passt jede Suche an das Fachgebiet an und führt die Ergebnisse mit einer robusteren Rangfolge zusammen. Die KI-Interpretation bleibt optional und standardmäßig ausgeschaltet.',
+    pt: 'O Compass já não precisa de credenciais para pesquisar. Consulta diretamente um catálogo muito mais amplo de literatura académica e fontes primárias abertas, adapta cada pesquisa à disciplina e combina os resultados com uma classificação mais robusta. A interpretação por IA continua opcional e desligada por predefinição.',
+    'pt-BR': 'O Compass não precisa mais de credenciais para pesquisar. Ele consulta diretamente um catálogo muito mais amplo de literatura acadêmica e fontes primárias abertas, adapta cada busca à área e combina os resultados com uma classificação mais robusta. A interpretação por IA continua opcional e desativada por padrão.',
+  },
+  {
+    scope: 'toolkit',
+    es: 'Compass conserva búsquedas y candidatos, explica qué proveedor aportó cada resultado y distingue archivos abiertos verificados de simples páginas de referencia. La importación comprueba duplicados, completa metadatos y puede adjuntar archivos disponibles, mientras la cola informa de límites temporales, trabajo parcial y elementos omitidos.',
+    en: 'Compass keeps searches and candidates, explains which provider supplied each result, and distinguishes verified open files from reference pages. Import checks duplicates, completes metadata, and can attach available files, while the queue reports rate limits, partial work, and skipped items.',
+    fr: 'Compass conserve les recherches et les candidats, indique quel fournisseur a fourni chaque résultat et distingue les fichiers ouverts vérifiés des simples pages de référence. L’importation contrôle les doublons, complète les métadonnées et peut joindre les fichiers disponibles, tandis que la file signale les limites temporaires, le travail partiel et les éléments ignorés.',
+    de: 'Compass bewahrt Suchen und Kandidaten auf, nennt den Anbieter jedes Ergebnisses und unterscheidet verifizierte offene Dateien von reinen Referenzseiten. Der Import prüft Dubletten, ergänzt Metadaten und kann verfügbare Dateien anhängen. Die Warteschlange meldet dabei Ratenlimits, Teilergebnisse und übersprungene Elemente.',
+    pt: 'O Compass conserva pesquisas e candidatos, explica que fornecedor trouxe cada resultado e distingue ficheiros abertos verificados de simples páginas de referência. A importação verifica duplicados, completa metadados e pode anexar ficheiros disponíveis, enquanto a fila informa sobre limites temporários, trabalho parcial e elementos omitidos.',
+    'pt-BR': 'O Compass preserva buscas e candidatos, informa qual provedor trouxe cada resultado e diferencia arquivos abertos verificados de simples páginas de referência. A importação verifica duplicatas, completa metadados e pode anexar arquivos disponíveis, enquanto a fila informa limites temporários, trabalho parcial e itens ignorados.',
+  },
+  {
+    scope: 'academic',
+    es: 'Deep Research vuelve a usar la versión 1 de forma predeterminada para reducir coste y riesgo en una primera ejecución. La versión 2 continúa disponible cuando quieras su análisis más exigente, y las solicitudes de la aplicación y de clientes MCP respetan siempre la versión que elijas de forma explícita.',
+    en: 'Deep Research uses version 1 by default again to reduce cost and risk on a first run. Version 2 remains available whenever you want its more demanding analysis, and requests from the app and MCP clients always honour the version you choose explicitly.',
+    fr: 'Deep Research utilise de nouveau la version 1 par défaut afin de réduire le coût et le risque d’une première exécution. La version 2 reste disponible lorsque vous souhaitez son analyse plus exigeante, et les demandes de l’application comme des clients MCP respectent toujours la version choisie explicitement.',
+    de: 'Deep Research verwendet wieder Version 1 als Standard, um Kosten und Risiko beim ersten Lauf zu senken. Version 2 bleibt für die anspruchsvollere Analyse verfügbar. Anfragen aus der App und von MCP-Clients halten sich stets an die ausdrücklich gewählte Version.',
+    pt: 'O Deep Research volta a usar a versão 1 por predefinição para reduzir o custo e o risco numa primeira execução. A versão 2 continua disponível quando quiser a análise mais exigente, e os pedidos da aplicação e dos clientes MCP respeitam sempre a versão escolhida explicitamente.',
+    'pt-BR': 'O Deep Research volta a usar a versão 1 por padrão para reduzir custo e risco em uma primeira execução. A versão 2 continua disponível quando você quiser a análise mais exigente, e as solicitações do aplicativo e de clientes MCP sempre respeitam a versão escolhida explicitamente.',
+  },
+  {
+    scope: 'academic',
+    es: 'El Diccionario ya no sustituye una definición sintetizada por un texto extractivo degradado. Reintenta respuestas truncadas, mal formadas o sin citas verificables, conserva intacta la versión anterior y muestra el motivo y el número de intentos. Un resultado degradado queda en el historial para diagnóstico, pero nunca se aplica como definición.',
+    en: 'The Dictionary no longer replaces a synthesized definition with degraded extractive text. It retries truncated, malformed, or unverifiable responses, keeps the previous version intact, and shows the reason plus attempt count. A degraded result remains in history for diagnosis but is never applied as the definition.',
+    fr: 'Le Dictionnaire ne remplace plus une définition synthétisée par un texte extractif dégradé. Il relance les réponses tronquées, mal formées ou dépourvues de citations vérifiables, conserve la version précédente intacte et affiche la cause ainsi que le nombre de tentatives. Un résultat dégradé reste dans l’historique pour le diagnostic, mais n’est jamais appliqué comme définition.',
+    de: 'Das Wörterbuch ersetzt eine synthetisierte Definition nicht mehr durch minderwertigen extraktiven Text. Abgeschnittene, fehlerhafte oder nicht belegbare Antworten werden erneut versucht, die vorherige Version bleibt unverändert und Grund sowie Anzahl der Versuche werden angezeigt. Ein minderwertiges Ergebnis bleibt zur Diagnose im Verlauf, wird aber nie als Definition angewendet.',
+    pt: 'O Dicionário já não substitui uma definição sintetizada por texto extrativo degradado. Repete respostas truncadas, mal formadas ou sem citações verificáveis, conserva intacta a versão anterior e mostra o motivo e o número de tentativas. Um resultado degradado fica no histórico para diagnóstico, mas nunca é aplicado como definição.',
+    'pt-BR': 'O Dicionário não substitui mais uma definição sintetizada por texto extrativo degradado. Ele repete respostas truncadas, malformadas ou sem citações verificáveis, mantém intacta a versão anterior e mostra o motivo e o número de tentativas. Um resultado degradado fica no histórico para diagnóstico, mas nunca é aplicado como definição.',
+  },
+  {
+    scope: 'estudio',
+    es: 'La barra de escritura explica al instante sus trece transformaciones de texto. Cada botón muestra un tooltip localizado con el efecto concreto de Académico, Claro, Conciso, Ortografía, Cohesión, Resumen y las demás opciones, sin obligarte a probar una acción para descubrir qué hará.',
+    en: 'The writing toolbar now explains its thirteen text transformations immediately. Every button shows a localized tooltip describing the exact effect of Academic, Clear, Concise, Proofread, Cohesion, Summary, and the other options, so you do not have to run an action to discover what it will do.',
+    fr: 'La barre d’écriture explique désormais immédiatement ses treize transformations de texte. Chaque bouton affiche une infobulle localisée qui décrit précisément l’effet d’Académique, Clair, Concis, Correction, Cohésion, Résumé et des autres options. Il n’est plus nécessaire d’essayer une action pour savoir ce qu’elle fera.',
+    de: 'Die Schreibwerkzeugleiste erklärt ihre dreizehn Textumwandlungen jetzt sofort. Jede Schaltfläche zeigt einen übersetzten Hinweis zur genauen Wirkung von Akademisch, Klar, Prägnant, Korrektur, Kohärenz, Zusammenfassung und den übrigen Optionen. Sie müssen eine Aktion nicht mehr ausprobieren, um ihre Wirkung zu kennen.',
+    pt: 'A barra de escrita explica de imediato as suas treze transformações de texto. Cada botão mostra uma dica localizada com o efeito exato de Académico, Claro, Conciso, Revisão, Coesão, Resumo e das restantes opções. Já não precisa de experimentar uma ação para descobrir o que fará.',
+    'pt-BR': 'A barra de escrita agora explica imediatamente suas treze transformações de texto. Cada botão mostra uma dica localizada com o efeito exato de Acadêmico, Claro, Conciso, Revisão, Coesão, Resumo e das demais opções. Você não precisa mais testar uma ação para descobrir o que ela fará.',
+  },
+  {
+    scope: 'general',
+    es: 'Las confirmaciones de borrado muestran el nombre de la bóveda que vas a eliminar, tanto en la primera pregunta como en la confirmación final. Así puedes comprobar el destino exacto antes de una acción irreversible, incluso cuando administras varias bóvedas parecidas.',
+    en: 'Deletion confirmations now show the name of the vault you are about to remove in both the first prompt and the final confirmation. You can therefore verify the exact target before an irreversible action, even when you manage several similar vaults.',
+    fr: 'Les confirmations de suppression affichent désormais le nom du coffre à supprimer dans la première question comme dans la confirmation finale. Vous pouvez ainsi vérifier la cible exacte avant une action irréversible, même lorsque vous gérez plusieurs coffres similaires.',
+    de: 'Löschbestätigungen zeigen jetzt sowohl in der ersten Abfrage als auch in der endgültigen Bestätigung den Namen des zu entfernenden Tresors. So können Sie das genaue Ziel vor einer unumkehrbaren Aktion prüfen, auch wenn Sie mehrere ähnlich benannte Tresore verwalten.',
+    pt: 'As confirmações de eliminação mostram agora o nome do cofre que vai remover, tanto na primeira pergunta como na confirmação final. Assim pode verificar o destino exato antes de uma ação irreversível, mesmo quando gere vários cofres semelhantes.',
+    'pt-BR': 'As confirmações de exclusão agora mostram o nome do cofre que será removido, tanto na primeira pergunta quanto na confirmação final. Assim você pode verificar o destino exato antes de uma ação irreversível, mesmo quando administra vários cofres parecidos.',
+  },
+  {
+    scope: 'general',
+    es: 'La interfaz distingue ahora Compass de Estado del arte con iconos propios. Las acciones de las tarjetas de Deep Research e Inmersión permanecen alineadas en la parte inferior aunque cambie la longitud del contenido, por lo que las galerías mantienen un ritmo visual estable.',
+    en: 'The interface now gives Compass and State of the Art distinct icons. Actions on Deep Research and Immersion cards remain aligned at the bottom even when content lengths differ, so their galleries keep a stable visual rhythm.',
+    fr: 'L’interface distingue désormais Compass et État de l’art avec des icônes propres. Les actions des cartes Deep Research et Immersion restent alignées en bas malgré les différences de longueur du contenu, ce qui conserve un rythme visuel stable dans les galeries.',
+    de: 'Die Oberfläche unterscheidet Compass und Forschungsstand jetzt durch eigene Symbole. Die Aktionen auf Deep-Research- und Immersionskarten bleiben auch bei unterschiedlich langen Inhalten am unteren Rand ausgerichtet. Dadurch behalten die Galerien einen gleichmäßigen visuellen Rhythmus.',
+    pt: 'A interface passa a distinguir o Compass do Estado da arte com ícones próprios. As ações dos cartões de Deep Research e Imersão mantêm-se alinhadas no fundo mesmo quando o conteúdo tem comprimentos diferentes, pelo que as galerias conservam um ritmo visual estável.',
+    'pt-BR': 'A interface agora diferencia o Compass do Estado da arte com ícones próprios. As ações dos cards de Deep Research e Imersão permanecem alinhadas na parte inferior mesmo quando o conteúdo tem tamanhos diferentes, mantendo um ritmo visual estável nas galerias.',
+  },
+  {
+    scope: 'general',
+    es: 'La web pública estrena metadatos coherentes para buscadores, enlaces canónicos, una imagen social de alta resolución y una página de cita generada desde una única fuente. También publica una comparación más legible entre Nodus y NotebookLM y actualiza el total público de descargas de GitHub.',
+    en: 'The public website gains consistent search metadata, canonical links, a high-resolution social image, and a citation page generated from one source of truth. It also publishes a clearer Nodus versus NotebookLM comparison and refreshes the public GitHub download total.',
+    fr: 'Le site public adopte des métadonnées cohérentes pour les moteurs de recherche, des liens canoniques, une image sociale en haute résolution et une page de citation produite depuis une source unique. Il publie aussi une comparaison plus lisible entre Nodus et NotebookLM et actualise le total public des téléchargements GitHub.',
+    de: 'Die öffentliche Website erhält konsistente Suchmetadaten, kanonische Links, ein hochauflösendes Vorschaubild und eine aus einer einzigen Quelle erzeugte Zitierseite. Außerdem veröffentlicht sie einen klareren Vergleich von Nodus und NotebookLM und aktualisiert die öffentliche GitHub-Downloadzahl.',
+    pt: 'O site público passa a ter metadados coerentes para motores de pesquisa, ligações canónicas, uma imagem social de alta resolução e uma página de citação gerada a partir de uma única fonte. Publica também uma comparação mais clara entre Nodus e NotebookLM e atualiza o total público de transferências do GitHub.',
+    'pt-BR': 'O site público ganha metadados consistentes para mecanismos de busca, links canônicos, uma imagem social de alta resolução e uma página de citação gerada a partir de uma única fonte. Ele também publica uma comparação mais clara entre Nodus e NotebookLM e atualiza o total público de downloads do GitHub.',
+  },
+];
+
+/**
  * 5.0.2 — reliability and interface repairs completed after 5.0.1, plus the
  * first release of Compass. Keep this list aligned by index with the Italian
  * and Turkish tables so every highlight is native in all eight languages.
@@ -1975,6 +2055,11 @@ const RELEASE_5_0_0_HIGHLIGHTS: RawReleaseHighlight[] = [
 ];
 
 const RAW_RELEASE_NOTES: RawReleaseNote[] = [
+  {
+    version: '5.0.3',
+    date: '2026-08-26',
+    highlights: RELEASE_5_0_3_HIGHLIGHTS,
+  },
   {
     version: '5.0.2',
     date: '2026-08-26',

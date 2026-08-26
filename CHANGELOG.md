@@ -1,5 +1,32 @@
 # Changelog
 
+## 5.0.3 — 2026-08-26
+
+Nodus 5.0.3 turns Compass into a credential-free discovery engine, protects
+generated Dictionary prose and collects the interface and website improvements
+merged after 5.0.2.
+
+- Rebuilt Compass around direct public APIs for a much broader mix of scholarly
+  literature and open primary sources, with discipline-aware query planning,
+  stronger ranking and deduplication, transparent providers and optional AI
+  interpretation that remains disabled by default.
+- Made Compass searches and candidates durable, distinguished verified open files
+  from landing pages, expanded import with metadata completion and available-file
+  attachment, and surfaced rate limits, partial results and skipped work.
+- Restored Deep Research v1 as the lower-cost default while preserving explicit v2
+  choices in the application and MCP clients.
+- Prevented degraded extractive Dictionary fallbacks from replacing synthesized
+  definitions. Truncated, malformed and unverified results are retried, recorded for
+  diagnosis and shown without changing the last valid version.
+- Added immediate localized tooltips for all thirteen writing transformations.
+- Added the vault name to both stages of deletion confirmation.
+- Gave Compass and State of the Art distinct icons and bottom-aligned the actions in
+  Deep Research and Immersion gallery cards.
+- Rebuilt public-site metadata, canonical links, social previews and citation output
+  from one source of truth, published the Nodus versus NotebookLM article and
+  refreshed the public GitHub download total.
+- Added every 5.0.3 change to the What's New modal in all eight interface languages.
+
 ## 5.0.2 — 2026-08-26
 
 Nodus 5.0.2 repairs the generation and document-analysis workflows reported after

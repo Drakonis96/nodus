@@ -95,6 +95,16 @@ const RELEASE_3_2_4_TR: string[] = [
 ];
 
 export const RELEASE_NOTES_TR: Record<string, string[]> = {
+  "5.0.3": [
+    "Compass artık arama yapmak için kimlik bilgisi istemiyor. Çok daha geniş bir akademik yayın ve açık birincil kaynak kataloğunu doğrudan sorguluyor, her aramayı disipline uyarlıyor ve sonuçları daha güçlü bir sıralamayla birleştiriyor. Yapay zekâ ile yorumlama isteğe bağlı kalıyor ve varsayılan olarak kapalı geliyor.",
+    "Compass aramaları ve adayları saklıyor, her sonucu hangi sağlayıcının getirdiğini açıklıyor ve doğrulanmış açık dosyaları basit başvuru sayfalarından ayırıyor. İçe aktarma yinelenenleri denetliyor, üstveriyi tamamlıyor ve mevcut dosyaları ekleyebiliyor. Kuyruk ise hız sınırlarını, kısmi çalışmayı ve atlanan öğeleri bildiriyor.",
+    "Deep Research ilk çalıştırmada maliyeti ve riski azaltmak için yeniden varsayılan olarak sürüm 1’i kullanıyor. Daha kapsamlı analiz istediğinizde sürüm 2 kullanılabilir durumda kalıyor. Uygulamadan ve MCP istemcilerinden gelen istekler açıkça seçtiğiniz sürüme her zaman uyuyor.",
+    "Sözlük artık sentezlenmiş bir tanımı düşük kaliteli ayıklanmış metinle değiştirmiyor. Kesilmiş, bozuk ya da doğrulanabilir alıntısı olmayan yanıtları yeniden deniyor, önceki sürümü olduğu gibi koruyor ve nedeni ve deneme sayısını gösteriyor. Düşük kaliteli sonuç tanılama için geçmişte kalıyor, ancak hiçbir zaman tanım olarak uygulanmıyor.",
+    "Yazma araç çubuğu on üç metin dönüşümünü artık hemen açıklıyor. Her düğme Akademik, Açık, Öz, Düzeltme, Bağdaşıklık, Özet ve diğer seçeneklerin kesin etkisini anlatan yerelleştirilmiş bir ipucu gösteriyor. Ne yapacağını öğrenmek için bir eylemi denemeniz gerekmiyor.",
+    "Silme onayları artık kaldırmak üzere olduğunuz kasanın adını hem ilk soruda hem de son onayda gösteriyor. Böylece birbirine benzeyen birkaç kasayı yönetirken bile geri alınamaz bir işlemden önce tam hedefi doğrulayabiliyorsunuz.",
+    "Arayüz artık Compass ile Araştırmanın Durumu için ayrı simgeler kullanıyor. Deep Research ve Immersion kartlarındaki eylemler, içerik uzunlukları değişse bile altta hizalı kalıyor. Böylece galeriler tutarlı bir görsel ritmi koruyor.",
+    "Genel web sitesi tutarlı arama üstverileri, kanonik bağlantılar, yüksek çözünürlüklü bir sosyal görsel ve tek kaynaktan üretilen bir atıf sayfası kazanıyor. Ayrıca Nodus ile NotebookLM arasında daha açık bir karşılaştırma yayımlıyor ve GitHub’daki herkese açık indirme toplamını güncelliyor.",
+  ],
   "5.0.2": [
     "Deep Research, sekme değiştirseniz bile raporları yeniden arayüzden tamamlıyor. Ağır işler pencereyi çizen yoldan çıkarılıyor, geçici hatalar ve biçim hataları onarılıp yeniden deneniyor, kuyruk ise başlığın yanında tek bir animasyon ve her raporun gerçek konumuyla güncellenen numaralar gösteriyor.",
     "Sözlük formları yeniden metin kabul ediyor ve düğmeler yanıt verdiklerini hemen gösteriyor. Yeniden Üret ve Güncelle hizalarını koruyor, eksik model yanıtlarını onarıyor ve sonuç yorumlanamadığında denetimli biçimde yeniden deniyor. Böylece arayüz tekrarlanan hatalarla dolmuyor.",

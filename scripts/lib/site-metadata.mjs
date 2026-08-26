@@ -14,6 +14,7 @@ export function loadSiteMetadata(repoRoot) {
     ? { name: packageJson.author, url: '' }
     : packageJson.author || {};
 
+  const versionDoi = release.versionDoi || null;
   const metadata = {
     siteUrl: String(packageJson.homepage || '').replace(/\/+$/, ''),
     websiteId: `${String(packageJson.homepage || '').replace(/\/+$/, '')}/#website`,
@@ -25,7 +26,9 @@ export function loadSiteMetadata(repoRoot) {
     releaseTag: `v${packageJson.version}`,
     releaseDate: release.dateReleased,
     conceptDoi: release.conceptDoi,
-    versionDoi: release.versionDoi,
+    versionDoi,
+    citationDoi: versionDoi || release.conceptDoi,
+    versionDoiPending: !versionDoi,
     license: packageJson.license,
     licenseUrl: `https://spdx.org/licenses/${packageJson.license}.html`,
     repository,
@@ -34,15 +37,15 @@ export function loadSiteMetadata(repoRoot) {
     socialImage: `${String(packageJson.homepage || '').replace(/\/+$/, '')}/assets/social/nodus-research-og.png`,
   };
 
-  for (const [key, value] of Object.entries(metadata)) {
-    if (!value) throw new Error(`package.json is missing site metadata: ${key}`);
+  for (const key of ['siteUrl', 'websiteId', 'softwareId', 'authorId', 'projectName', 'softwareName', 'version', 'releaseTag', 'releaseDate', 'conceptDoi', 'citationDoi', 'license', 'licenseUrl', 'repository', 'authorName', 'orcid', 'socialImage']) {
+    if (!metadata[key]) throw new Error(`package.json is missing site metadata: ${key}`);
   }
   if (!/^\d+\.\d+\.\d+$/.test(metadata.version)) throw new Error(`Invalid release version: ${metadata.version}`);
   if (!/^\d{4}-\d{2}-\d{2}$/.test(metadata.releaseDate)) throw new Error(`Invalid release date: ${metadata.releaseDate}`);
-  for (const doi of [metadata.conceptDoi, metadata.versionDoi]) {
+  for (const doi of [metadata.conceptDoi, metadata.versionDoi].filter(Boolean)) {
     if (!/^10\.5281\/zenodo\.\d+$/.test(doi)) throw new Error(`Invalid Zenodo DOI: ${doi}`);
   }
-  if (metadata.conceptDoi === metadata.versionDoi) {
+  if (metadata.versionDoi && metadata.conceptDoi === metadata.versionDoi) {
     throw new Error('The all-versions concept DOI and immutable version DOI must remain distinct.');
   }
   return Object.freeze(metadata);
@@ -72,6 +75,18 @@ export function websiteEntity(metadata) {
 }
 
 export function softwareEntity(metadata) {
+  const identifiers = [
+    { '@type': 'PropertyValue', propertyID: 'Concept DOI', value: metadata.conceptDoi },
+    ...(metadata.versionDoi
+      ? [{ '@type': 'PropertyValue', propertyID: 'Version DOI', value: metadata.versionDoi }]
+      : []),
+    { '@type': 'PropertyValue', propertyID: 'Release tag', value: metadata.releaseTag },
+  ];
+  const sameAs = [
+    metadata.repository,
+    `https://doi.org/${metadata.conceptDoi}`,
+    ...(metadata.versionDoi ? [`https://doi.org/${metadata.versionDoi}`] : []),
+  ];
   return {
     '@type': 'SoftwareApplication',
     '@id': metadata.softwareId,
@@ -90,16 +105,8 @@ export function softwareEntity(metadata) {
     isAccessibleForFree: true,
     downloadUrl: `${metadata.repository}/releases/latest`,
     softwareHelp: `${metadata.siteUrl}/wiki/`,
-    identifier: [
-      { '@type': 'PropertyValue', propertyID: 'Concept DOI', value: metadata.conceptDoi },
-      { '@type': 'PropertyValue', propertyID: 'Version DOI', value: metadata.versionDoi },
-      { '@type': 'PropertyValue', propertyID: 'Release tag', value: metadata.releaseTag },
-    ],
-    sameAs: [
-      metadata.repository,
-      `https://doi.org/${metadata.conceptDoi}`,
-      `https://doi.org/${metadata.versionDoi}`,
-    ],
+    identifier: identifiers,
+    sameAs,
     author: { '@id': metadata.authorId },
     creator: { '@id': metadata.authorId },
   };

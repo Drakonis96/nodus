@@ -10,13 +10,14 @@ const readSite = (relative) => readRepo(path.join('site', relative));
 const pkg = JSON.parse(readRepo('package.json'));
 
 const CONCEPT_DOI = '10.5281/zenodo.21515531';
-const VERSION_DOI = '10.5281/zenodo.22103353';
+const VERSION_DOI = pkg.releaseMetadata.versionDoi;
+const CITATION_DOI = VERSION_DOI || CONCEPT_DOI;
 
 test('CITATION.cff describes the current Nodus release and its project identity', () => {
   const citation = readRepo('CITATION.cff');
 
   assert.match(citation, new RegExp(`version: "${pkg.version.replaceAll('.', '\\.') }"`));
-  assert.match(citation, new RegExp(`doi: "${VERSION_DOI.replaceAll('.', '\\.')}"`));
+  assert.match(citation, new RegExp(`doi: "${CITATION_DOI.replaceAll('.', '\\.')}"`));
   assert.match(citation, new RegExp(`concept DOI is\\s+#?\\s*${CONCEPT_DOI.replaceAll('.', '\\.')}`));
   assert.match(citation, /Nodus is the open-source desktop application developed by the Nodus\s+Research project\./);
   for (const keyword of ['Nodus Research', 'research software', 'academic research', 'Zotero', 'local-first', 'knowledge graph', 'evidence', 'research workspace']) {
@@ -24,15 +25,20 @@ test('CITATION.cff describes the current Nodus release and its project identity'
   }
 });
 
-test('the citation page identifies the current version with its immutable release DOI', () => {
+test('the citation page identifies the current version and its DOI state', () => {
   const page = readSite('cite/index.html');
 
   assert.match(page, /<title>Cite Nodus Research \| DOI and Software Citation<\/title>/);
   assert.match(page, /<h1[^>]*>Cite Nodus Research<\/h1>/);
   assert.match(page, /rel="canonical" href="https:\/\/nodusresearch\.com\/cite\/"/);
   assert.match(page, new RegExp(CONCEPT_DOI.replaceAll('.', '\\.')));
-  assert.match(page, new RegExp(VERSION_DOI.replaceAll('.', '\\.')));
-  assert.match(page, new RegExp(`Nodus ${pkg.version.replaceAll('.', '\\.')} · version DOI`));
+  if (VERSION_DOI) {
+    assert.match(page, new RegExp(VERSION_DOI.replaceAll('.', '\\.')));
+    assert.match(page, new RegExp(`Nodus ${pkg.version.replaceAll('.', '\\.')} · version DOI`));
+  } else {
+    assert.match(page, new RegExp(`Nodus ${pkg.version.replaceAll('.', '\\.')} · archive pending`));
+    assert.match(page, /Version DOI pending/);
+  }
   assert.match(page, new RegExp(`releases/tag/v${pkg.version.replaceAll('.', '\\.')}`));
   for (const detail of ['APA', 'BibTeX', 'CITATION.cff', 'ORCID', 'AGPL-3.0-only', 'Zenodo', 'GitHub']) {
     assert.ok(page.includes(detail), `the citation page includes ${detail}`);
