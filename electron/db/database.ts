@@ -11,6 +11,7 @@ import { ensureOutboxTriggers } from '../serverSync/outboxTriggers';
 import { activeVaultDbPath, getVault, getVaultByPath } from '../vaults/vaultRegistry';
 import { auditQaDatabaseOpen } from '../qa/databaseAudit';
 import { migrateDatabaseSafely } from './migrationSafety';
+import { scheduleMigrationRecoveryRetention } from './migrationRecoveryUtilityHost';
 import { ensureBackupRevisionTriggers } from '../export/backupVaultRevision';
 
 let db: Database.Database | null = null;
@@ -120,7 +121,9 @@ function openDatabase(file: string): Database.Database {
     next.close();
     throw error;
   }
+  const migrationPending = Number(next.pragma('user_version', { simple: true })) < SCHEMA_VERSION;
   next = migrateDatabaseSafely(next, file, SCHEMA_VERSION, runMigrations);
+  if (migrationPending) scheduleMigrationRecoveryRetention(file);
   ensureWorkspaceDevice(next);
   // Deletion tombstones are written by triggers, which are regenerated here rather than
   // created by a migration: the set of synced tables is decided in code, so a migration

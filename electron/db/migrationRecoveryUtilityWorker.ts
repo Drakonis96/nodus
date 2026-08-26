@@ -1,4 +1,4 @@
-import { listMigrationRecoverySnapshots } from './migrationSafety';
+import { listMigrationRecoverySnapshots, pruneMigrationRecoverySnapshots } from './migrationSafety';
 import type {
   MigrationRecoveryUtilityRequest,
   MigrationRecoveryUtilityResponse,
@@ -7,6 +7,13 @@ import type {
 export function runMigrationRecoveryUtilityRequest(
   request: MigrationRecoveryUtilityRequest,
 ): MigrationRecoveryUtilityResponse {
+  if (request.kind === 'prune') {
+    return {
+      kind: 'prune-done',
+      id: request.id,
+      reports: request.databasePaths.map((databasePath) => pruneMigrationRecoverySnapshots(databasePath)),
+    };
+  }
   return {
     kind: 'list-done',
     id: request.id,

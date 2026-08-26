@@ -8,6 +8,7 @@ import { normalizeVaultType } from '@shared/vaultTypes';
 import { runMigrations, SCHEMA_VERSION } from '../db/migrations';
 import { auditQaDatabaseOpen } from '../qa/databaseAudit';
 import { migrateDatabaseSafely } from '../db/migrationSafety';
+import { scheduleMigrationRecoveryRetention } from '../db/migrationRecoveryUtilityHost';
 
 interface VaultRecord {
   id: string;
@@ -233,7 +234,9 @@ function initializeDatabase(file: string): void {
   let db = new Database(file);
   try {
     auditQaDatabaseOpen(file, 'initialize');
+    const migrationPending = Number(db.pragma('user_version', { simple: true })) < SCHEMA_VERSION;
     db = migrateDatabaseSafely(db, file, SCHEMA_VERSION, runMigrations);
+    if (migrationPending) scheduleMigrationRecoveryRetention(file);
   } finally {
     db.close();
   }

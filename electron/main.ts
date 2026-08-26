@@ -20,7 +20,11 @@ import { getSettings } from './db/settingsRepo';
 import { runDueDatabaseRowTemplates } from './db/databaseTasksRepo';
 import { runDueAutomationRules } from './db/databaseAutomationsRepo';
 import { startDatabaseFormServer, stopDatabaseFormServer } from './automation/formServer';
-import { getActiveVault } from './vaults/vaultRegistry';
+import { getActiveVault, listVaults } from './vaults/vaultRegistry';
+import {
+  cancelScheduledMigrationRecoveryRetention,
+  scheduleMigrationRecoveryRetention,
+} from './db/migrationRecoveryUtilityHost';
 import { generateDemoPortraits, hasDemoPortraitKey, demoPortraitsPending } from './ai/genealogyDemoPortraits';
 import { interruptDecorativeImageGenerations } from './ai/decorativeImages';
 import { startRealtimeSync, stopRealtimeSync } from './sync/syncService';
@@ -963,6 +967,10 @@ app.whenReady().then(async () => {
     (betaUpdates) => configureUpdateChannel(betaUpdates, 'setting changed'),
   );
   createWindow();
+  // Existing installs may have one full database copy per historical schema update.
+  // Queue every registered vault after the window exists; the utility worker applies
+  // retention without delaying startup or opening any vault on the main thread.
+  scheduleMigrationRecoveryRetention(listVaults().map((vault) => vault.path));
   // Deliver any nodus:// deeplink that launched the app (OAuth callback via
   // system browser, e.g. nodus://authorize?code=XYZ).
   if (pendingDeepLink) {
@@ -1118,6 +1126,7 @@ app.on('window-all-closed', () => {
     if (taskTemplateFirstTimer) clearTimeout(taskTemplateFirstTimer);
     if (databaseAutomationTimer) clearInterval(databaseAutomationTimer);
     if (databaseAutomationFirstTimer) clearTimeout(databaseAutomationFirstTimer);
+    cancelScheduledMigrationRecoveryRetention();
     void stopDatabaseFormServer();
     stopRealtimeSync();
     stopNodusServerSync();
@@ -1150,6 +1159,7 @@ app.on('before-quit', () => {
   if (taskTemplateFirstTimer) clearTimeout(taskTemplateFirstTimer);
   if (databaseAutomationTimer) clearInterval(databaseAutomationTimer);
   if (databaseAutomationFirstTimer) clearTimeout(databaseAutomationFirstTimer);
+  cancelScheduledMigrationRecoveryRetention();
   void stopDatabaseFormServer();
   stopRealtimeSync();
   stopNodusServerSync();
@@ -1194,6 +1204,7 @@ updateAwareApp.on('before-quit-for-update', () => {
   if (taskTemplateFirstTimer) clearTimeout(taskTemplateFirstTimer);
   if (databaseAutomationTimer) clearInterval(databaseAutomationTimer);
   if (databaseAutomationFirstTimer) clearTimeout(databaseAutomationFirstTimer);
+  cancelScheduledMigrationRecoveryRetention();
   void stopDatabaseFormServer();
   stopRealtimeSync();
   stopNodusServerSync();

@@ -160,7 +160,10 @@ import { initializeVaultModelSelection, validateVaultModelSelection } from './va
 import { setPersistentDockIcon } from './dockIcon';
 import { closeCrossVaultConnections } from './db/crossVault';
 import { assertNotBrowserIpcSender } from './ipc/trust';
-import { listMigrationRecoverySnapshotsInUtility } from './db/migrationRecoveryUtilityHost';
+import {
+  listMigrationRecoverySnapshotsInUtility,
+  withMigrationRecoverySnapshotsInUtility,
+} from './db/migrationRecoveryUtilityHost';
 import { documentIndexQueue } from './pipeline/documentIndexQueue';
 
 
@@ -648,12 +651,13 @@ export function registerIpc(
   h('migrationRecovery:list', async () => listMigrationRecoverySnapshotsInUtility(getActiveVault().path));
   h('migrationRecovery:open', async (_e, id: string) => {
     const source = getActiveVault();
-    const snapshot = (await listMigrationRecoverySnapshotsInUtility(source.path))
-      .find((candidate) => candidate.id === id);
-    if (!snapshot) throw new Error('La copia previa a la migración no existe o ya no supera la validación.');
-    const name = `${source.name} · antes de v${snapshot.targetVersion}`;
-    const vault = createVaultFromDatabaseFile(snapshot.databasePath, name, source.type);
-    return { vault: withVaultKeyProviders(vault) };
+    return withMigrationRecoverySnapshotsInUtility(source.path, (snapshots) => {
+      const snapshot = snapshots.find((candidate) => candidate.id === id);
+      if (!snapshot) throw new Error('La copia previa a la migración no existe o ya no supera la validación.');
+      const name = `${source.name} · antes de v${snapshot.targetVersion}`;
+      const vault = createVaultFromDatabaseFile(snapshot.databasePath, name, source.type);
+      return { vault: withVaultKeyProviders(vault) };
+    });
   });
   h('vaults:delete', async (_e, id: string, deleteFiles?: boolean) => {
     deleteVault(id, Boolean(deleteFiles));
