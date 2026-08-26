@@ -7,7 +7,19 @@
     <atom:link href="https://nodusresearch.com/blog/feed.xml" rel="self" type="application/rss+xml"/>
     <description>Notes from the Nodus project: comparisons with the tools around it, workflows worth stealing, and what is being built next.</description>
     <language>en</language>
-    <lastBuildDate>Mon, 17 Aug 2026 12:00:00 GMT</lastBuildDate>
+    <lastBuildDate>Wed, 26 Aug 2026 12:00:00 GMT</lastBuildDate>
+    <item>
+      <title>Nodus vs NotebookLM: two different models for AI-assisted research</title>
+      <link>https://nodusresearch.com/blog/nodus-vs-notebooklm/</link>
+      <guid isPermaLink="true">https://nodusresearch.com/blog/nodus-vs-notebooklm/</guid>
+      <pubDate>Wed, 26 Aug 2026 12:00:00 GMT</pubDate>
+      <description>Nodus and NotebookLM both ground AI in the researcher’s own sources, but they organise knowledge very differently. One centres the notebook; the other tries to turn a long-term corpus into persistent evidence, ideas and relationships.</description>
+      <category>Comparisons</category>
+      <category>Research</category>
+      <category>Zotero</category>
+      <category>AI</category>
+      <category>NotebookLM</category>
+    </item>
     <item>
       <title>How Nodus can support research in the humanities</title>
       <link>https://nodusresearch.com/blog/how-nodus-can-support-research-in-the-humanities/</link>

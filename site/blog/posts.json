@@ -2,6 +2,16 @@
   "$comment": "The blog index. Every post listed here must have a matching Markdown file at site/blog/posts/<slug>.md. Fields: slug (kebab-case, becomes /blog/<slug>/), title, date and modified (YYYY-MM-DD publication and substantive-update dates), tags (array, free-form, drives the filter row), summary (one or two sentences shown on the card, in metadata and in the RSS feed), the optional reading (minutes, an integer; omitted means it is estimated from the file), and the optional cover (a path relative to site/blog/, shown on the card and above the post) with its coverAlt. Set draft: true to keep a post out of the index, generated pages and feed while you write it. Newest first is not required — the index sorts by date. Run npm run blog:build after changes. See posts/_template.md.",
   "posts": [
     {
+      "slug": "nodus-vs-notebooklm",
+      "title": "Nodus vs NotebookLM: two different models for AI-assisted research",
+      "date": "2026-08-26",
+      "modified": "2026-08-26",
+      "tags": ["Comparisons", "Research", "Zotero", "AI", "NotebookLM"],
+      "summary": "Nodus and NotebookLM both ground AI in the researcher’s own sources, but they organise knowledge very differently. One centres the notebook; the other tries to turn a long-term corpus into persistent evidence, ideas and relationships.",
+      "cover": "media/gemini-notebook.webp",
+      "coverAlt": "The blue and purple Gemini Notebook mark beside the product name on a white background."
+    },
+    {
       "slug": "how-nodus-can-support-research-in-the-humanities",
       "title": "How Nodus can support research in the humanities",
       "date": "2026-08-17",

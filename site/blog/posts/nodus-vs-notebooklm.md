@@ -1,0 +1,281 @@
+[NotebookLM was renamed Gemini Notebook by Google in 2026](https://blog.google/innovation-and-ai/products/gemini-notebook/notebooklm-gemini-notebook/), although the original name remains much more familiar to many users. It has become one of the most recognisable examples of a new generation of research tools built around source-grounded artificial intelligence. Its appeal is easy to understand. Instead of asking a general-purpose model a question and relying on knowledge whose origin may be difficult to inspect, the user first defines a collection of sources and then works within that boundary. Questions can be answered from those materials, citations point back to the underlying documents, and the same collection can be transformed into summaries, study materials, conceptual maps, reports and increasingly sophisticated audiovisual outputs.
+
+Nodus begins from a very similar concern: AI becomes substantially more useful for serious research when it works with the researcher’s actual sources and when there is a traceable path between a generated statement and the material on which it is based. From that shared starting point, however, the two systems move in different directions.
+
+The difference is not primarily about which model produces better answers, nor about which application contains the longest list of AI features. It is about what each system considers the enduring product of research.
+
+NotebookLM is particularly effective at helping a user interrogate and transform a collection of sources. Nodus is designed around the additional problem of preserving what is learned from those sources as part of a research structure that may continue evolving for months or years.
+
+That distinction may seem subtle when working with ten papers. It becomes much more significant when working with hundreds.
+
+## Two ways of organising research around sources
+
+A feature-by-feature comparison can make Nodus and NotebookLM appear more similar than they really are. Both can work with collections of documents. Both use artificial intelligence to help interpret them. Both attempt to ground generated material in sources. Both can support activities that would traditionally involve reading, note-taking, comparison and synthesis.
+
+The deeper difference appears when we ask what the basic unit of organisation is.
+
+In NotebookLM, the centre of gravity is the notebook and the sources contained within it. The researcher assembles a body of material and then performs operations over that collection: asking questions, generating summaries, comparing positions, identifying themes or transforming the material into different formats. This model is highly effective because the source collection remains understandable. The user knows what is inside the notebook, and the AI interaction is constrained by that material.
+
+Nodus treats the source collection as the beginning rather than the end of the structure.
+
+A research corpus contains documents, but the application can also preserve claims, passages, themes, authors, concepts and relationships derived from those documents. These elements are not intended to exist only inside the answer that originally generated them. They can become persistent parts of the project, remain available to later searches and analyses, and acquire new relationships when additional material enters the corpus.
+
+The conceptual distinction can therefore be expressed quite simply:
+
+**NotebookLM optimises interaction with a collection of sources. Nodus tries to progressively turn those sources into a persistent research structure.**
+
+Neither approach is inherently superior. They are responses to partially different problems.
+
+## NotebookLM is exceptionally effective for rapid understanding
+
+One of NotebookLM’s greatest strengths is the short distance between importing material and beginning to think with it.
+
+A researcher can gather articles, documents, web pages, videos or other sources and begin asking questions almost immediately. Because the conversation is grounded in the selected material and citations can take the user back to relevant passages, the interaction is fundamentally different from asking the same questions of a general-purpose chatbot.
+
+For exploratory research, this is extremely valuable.
+
+Imagine beginning work on an unfamiliar topic with twenty papers. Before reading every article carefully, the researcher may want to understand the vocabulary of the field, identify recurring debates, discover which authors disagree with one another and determine which sources deserve closer attention. NotebookLM is particularly good at this kind of orientation.
+
+Google has also expanded the product far beyond question answering. A source collection can be reused to generate reports, study materials, conceptual representations and audiovisual explanations. This makes the notebook useful not only for understanding material but also for communicating it.
+
+That combination of low friction and flexible transformation is one of NotebookLM’s strongest advantages. It would be misleading to describe it merely as a “chat with PDFs” tool. Its real strength is turning a bounded source collection into an interactive environment for comprehension and synthesis.
+
+The difficulty changes when the research project is no longer bounded or short-lived.
+
+## Long-term research creates a different problem
+
+A doctoral thesis, monograph or multi-year research project rarely develops in a straight line. Sources that initially seem peripheral may become central months later. Arguments that appear unrelated may eventually become part of the same chapter. A new document may contradict an interpretation formed much earlier. A primary source may force the researcher to reconsider several secondary works at once.
+
+The challenge is therefore not simply to understand each document. It is to preserve relationships across time.
+
+Suppose a historian encounters one interpretation of economic modernisation in a book read during the first months of a project. Several months later, another author proposes a partially incompatible explanation. Later still, archival evidence complicates both positions. Eventually, these three pieces of material become relevant to a chapter whose structure did not yet exist when the first book was analysed.
+
+An AI system can rediscover these relationships when the researcher asks the right question. But there is a difference between rediscovering a relationship and having that relationship become part of the intellectual architecture of the project.
+
+Nodus is designed around the latter.
+
+When an idea is identified in a source, it can persist as an object connected to its author, work, supporting passage and page. Later analyses can connect it to other ideas, identify support or contradiction, place it within a broader debate or associate it with themes that were not important when the source first entered the corpus.
+
+The purpose is not to automate interpretation. It is to reduce the amount of potentially important structure that disappears back into individual documents after each reading or AI interaction.
+
+## From documents to evidence, ideas and relationships
+
+The current Nodus academic workflow operates across several levels of representation:
+
+**documents → sections → passages → ideas → relationships**
+
+Each level serves a different research purpose.
+
+A whole-document representation is useful when the researcher wants to know which works are broadly relevant to a question. Section-level information can narrow that search to a particular part of a book or article. Passages provide the textual evidence that can actually support an interpretation. Ideas provide a level at which claims from different sources can be compared. Relationships make it possible to identify patterns that are difficult to see when every document remains isolated.
+
+Earlier versions of Nodus leaned heavily towards the idea level. The application extracted claims and connected them across the corpus, while the original passages remained attached as evidence.
+
+Nodus 5 expands this model by introducing hierarchical document understanding. The system can build document profiles, represent sections, maintain lexical and semantic indexes at the document level and use those representations to decide where a more detailed search should continue.
+
+This creates a retrieval process that can move in both directions. A broad question may begin with documents and descend towards passages and ideas. A conceptual question may begin with an existing network of ideas and then return to the documents that support them.
+
+This is one area where Nodus has moved closer to a major strength of NotebookLM: understanding documents as complete intellectual objects rather than treating them merely as containers of isolated fragments.
+
+The difference is that Nodus still attempts to preserve the lower levels as persistent structure once they have been identified.
+
+## Both systems care about grounding, but they use it differently
+
+Source grounding is one of the most important reasons NotebookLM has attracted researchers.
+
+When the system produces an answer based on the notebook, citations allow the user to inspect the source material behind that answer. This is a substantial improvement over workflows in which an AI-generated statement may sound plausible but its evidential origin is difficult to reconstruct.
+
+Nodus follows the same general principle, but extends it beyond conversational answers.
+
+A stored idea can remain connected to the exact passage that supports it and, where available, the relevant page in the original source. If that idea later participates in a debate, argument map or research report, the connection to the underlying evidence does not need to disappear.
+
+This leads to an important distinction in the way Nodus uses generated document-level representations.
+
+A document profile may help the system decide that a particular book or article deserves closer examination. It may help identify the relevant section or direct retrieval towards a particular part of the work. But the generated profile is not supposed to silently replace the source as evidence.
+
+For claims that matter, the system should eventually return to the underlying passage.
+
+The principle is deliberately conservative:
+
+**summaries can guide retrieval; passages support claims.**
+
+That distinction is especially important in academic work. A generated description of what a book argues may be extremely useful, but the researcher should still be able to determine what the book actually says and where it says it.
+
+## Persistence means something different in each system
+
+NotebookLM does not simply forget everything when a chat ends. Notebooks persist, sources remain available and previous work can be revisited. Describing the system as ephemeral would therefore be inaccurate.
+
+The more interesting distinction is how the knowledge produced from those sources is represented.
+
+In NotebookLM, persistence remains closely associated with the notebook, its source collection and the interactions performed over it.
+
+In Nodus, some of the results of analysis can become first-class research objects.
+
+An interpretation can exist as an idea. A disagreement can exist as a relationship between ideas. Several relationships can contribute to a debate. Repeated absences or weakly supported areas can become candidates for research gaps. A concept can later be synthesised in the Dictionary from evidence distributed across many authors and works.
+
+This creates the possibility of a corpus that becomes intellectually richer as the project progresses.
+
+A source imported during the first year of a thesis can acquire new relevance during the third year without needing to be manually rediscovered from scratch. Its ideas and evidence remain part of the same research environment in which newer material is being analysed.
+
+For long-term work, that kind of continuity may matter more than the quality of any individual generated answer.
+
+## Zotero creates a particularly important distinction
+
+The comparison becomes clearer for researchers whose bibliographic workflow is already organised around Zotero.
+
+Nodus is not intended to replace Zotero. It treats Zotero as a specialised reference manager and attempts to build an analytical layer around the library that already exists.
+
+In practical terms, Zotero can continue managing references, collections, metadata and source files, while Nodus uses those materials as part of a larger research corpus.
+
+The relationship can be summarised as:
+
+**Zotero organises the bibliography. Nodus organises what the bibliography contributes to the research argument.**
+
+A Zotero library can therefore become the foundation for semantic search, author analysis, idea extraction, debates, argument maps, gap analysis, Deep Research and writing workflows without forcing the researcher to abandon the reference manager that already structures the project.
+
+Nodus also includes a standalone Zotero plugin. It can index PDF, EPUB and HTML attachments and provide semantic and keyword search directly inside Zotero, returning passages and page-level citations where possible.
+
+NotebookLM can certainly work with documents that also happen to exist in Zotero, but Zotero is not the structural backbone of the system.
+
+For researchers with large, carefully maintained Zotero libraries, this difference is substantial.
+
+## Discovering new literature: the open web and scholarly infrastructure
+
+Both systems are also moving beyond analysis of an existing source collection.
+
+NotebookLM has introduced research functionality capable of finding material outside the notebook, particularly through the web and the wider Google ecosystem. This fits naturally with the product’s broader model: new information can be discovered, reviewed and then incorporated into the notebook.
+
+Nodus Compass approaches discovery from a more explicitly bibliographic direction.
+
+Compass can federate searches across academic and open-research infrastructures including OpenAlex, Crossref, OpenAIRE, Semantic Scholar, HAL, DOAB, OAPEN, Dialnet, OpenEdition, SciELO, Unpaywall and OpenCitations.
+
+The results are normalised and deduplicated before being presented to the researcher. Metadata such as authorship, identifiers, publication type, provenance, citation information and open-access status can be preserved, and selected works can then be imported into the same Library used by the rest of the research workflow.
+
+The distinction mirrors the broader difference between the products.
+
+A web-oriented search is useful when relevant information may appear almost anywhere: institutional reports, project websites, technical documentation, news archives or specialist pages.
+
+A bibliographic search is more useful when scholarly identity matters: DOI, publication type, authorship, citation relationships, open-access availability or the distinction between books, chapters, articles and theses.
+
+In many research projects there is no reason to choose only one form of discovery.
+
+## Cloud-first and local-first research
+
+The two applications also embody very different assumptions about where the research environment should live.
+
+NotebookLM is a Google service. Its cloud architecture provides obvious advantages: synchronisation, access from multiple devices, integration with other Google products and very little infrastructure for the user to manage.
+
+Nodus is built as a local-first desktop application.
+
+Vault databases, the shared Library and the principal search indexes live on the researcher’s own computer. The desktop application does not require a Nodus account. When an AI operation uses an external provider, the relevant context is sent to the provider selected by the user. Compatible local models can also be used for workflows where external processing is unnecessary.
+
+This does not mean that Nodus is automatically offline or that using an online model somehow avoids transmitting information. If a researcher chooses Gemini, Claude, DeepSeek or another remote model, the necessary context still has to reach that service.
+
+The architectural difference is elsewhere: the research workspace itself is not hosted by Nodus Research.
+
+For many users this may be a minor consideration. For researchers working with unpublished collections, sensitive material, private archives or long-term projects that they want to remain independent of a single hosted platform, it can become much more significant.
+
+## Where NotebookLM is clearly stronger
+
+A useful comparison should also acknowledge where one application solves a problem that the other is not currently trying to solve.
+
+NotebookLM has developed an unusually strong set of tools for transforming sources into different forms of communication.
+
+Audio Overviews are the most recognisable example, but the broader direction is equally important: the same underlying source collection can be repurposed into study materials, visual representations, explanations and other generated artefacts.
+
+This makes NotebookLM especially compelling for teaching, studying, presentation and rapid knowledge transfer.
+
+Nodus is not currently attempting to reproduce this studio-style experience.
+
+Its outputs are more closely connected to the internal development of a research project: Deep Research reports, writing workflows, argument maps, idea graphs, coverage analysis, conceptual dictionaries and related analytical structures.
+
+If the objective is to turn a collection of papers into an accessible audio explanation or a polished presentation with minimal effort, NotebookLM is currently the more natural tool.
+
+That is a genuine advantage, not a missing checkbox.
+
+## Where Nodus is conceptually different
+
+The strongest case for Nodus appears when the central question changes from:
+
+**What can these documents tell me now?**
+
+to:
+
+**How can I preserve and develop what I learn from them over the life of the project?**
+
+Academic research accumulates slowly. Arguments change, chapters are reorganised, sources acquire new meanings and questions emerge that could not have been anticipated when the material was first collected.
+
+In that environment, keeping the documents is only part of the problem.
+
+The researcher must also preserve the intellectual structures gradually built around those documents.
+
+Nodus attempts to make those structures explicit. An idea discovered today can still participate in a relationship discovered next year. A contradiction between two authors can become part of an argument map. A concept may eventually draw evidence from dozens of sources. A research report can return to passages identified much earlier in the project.
+
+The value lies less in producing a single impressive answer than in maintaining continuity between many acts of reading, searching, comparing and writing.
+
+That is probably the clearest conceptual difference between Nodus and NotebookLM.
+
+## Which approach is better for academic research?
+
+There is no useful universal answer because the two tools optimise different stages of research.
+
+NotebookLM is particularly attractive when the researcher wants to understand a bounded collection quickly, ask grounded questions with little configuration, investigate unfamiliar material, discover web sources or transform a corpus into multiple explanatory formats.
+
+Nodus becomes more attractive when the project needs to preserve a large bibliographic corpus over time, maintain Zotero as the reference-management layer, store ideas and evidence as persistent objects, connect claims across authors, construct argument maps and retain a traceable path from synthesis back to the original text.
+
+The distinction can therefore be expressed more precisely than simply calling one an alternative to the other.
+
+**NotebookLM is primarily an environment for interacting with sources. Nodus is primarily an environment for building a research structure from sources.**
+
+Those activities overlap, but they are not identical.
+
+## Using both can make more sense than choosing one
+
+Because the strengths of the two systems are different, they can also coexist within the same research workflow.
+
+NotebookLM can be used for rapid exploration of a temporary body of material, for experimenting with questions, for web-oriented research or for creating alternative explanations and media outputs.
+
+Zotero can remain the bibliographic system of record.
+
+Nodus can serve as the durable analytical layer in which accepted sources, evidence, concepts and relationships accumulate over the longer life of the project.
+
+In that arrangement, each tool has a relatively clear role:
+
+**Zotero manages the bibliography.**
+
+**NotebookLM accelerates exploration and transformation of selected source collections.**
+
+**Nodus preserves the evolving intellectual structure of the research corpus.**
+
+There is little methodological reason to force every stage of academic work into a single application when different tools are genuinely strong at different tasks.
+
+## Two answers to the same underlying problem
+
+NotebookLM helped popularise an important idea: AI-assisted research becomes far more useful when the system is grounded in sources chosen by the researcher and when generated claims can be inspected against those sources.
+
+Nodus shares that premise.
+
+The divergence appears in the question each product asks next.
+
+NotebookLM asks, in effect:
+
+**How can a collection of sources become easier to understand, question and transform?**
+
+Nodus asks:
+
+**How can the knowledge extracted from those sources remain connected and useful as the research project grows?**
+
+The first question naturally leads towards source-grounded conversation, synthesis and multimodal output.
+
+The second leads towards persistent ideas, evidence, relationships, conceptual structures and argument maps.
+
+For quickly exploring a bounded collection, NotebookLM remains exceptionally effective.
+
+For long-running research in which hundreds of sources gradually need to become a coherent network of arguments and evidence, Nodus is designed around a different kind of continuity.
+
+The choice ultimately depends less on which tool has more AI features and more on what the researcher needs the corpus to become.
+
+[Explore how Nodus approaches academic research](/research/)
+
+[See how Nodus works with Zotero](/zotero/)
+
+[Learn more about the open-source project](/open-source/)
