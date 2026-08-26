@@ -21,15 +21,15 @@ await build({
 });
 const versions = await import(`${pathToFileURL(outfile).href}?v=${Date.now()}`);
 
-test('new requests default to v2 and preserve explicit choices', () => {
-  assert.equal(versions.normalizeDeepResearchRequestVersion(undefined), 'v2');
-  assert.equal(versions.normalizeDeepResearchRequestVersion('unknown'), 'v2');
+test('new requests default to lower-cost v1 and preserve explicit choices', () => {
+  assert.equal(versions.normalizeDeepResearchRequestVersion(undefined), 'v1');
+  assert.equal(versions.normalizeDeepResearchRequestVersion('unknown'), 'v1');
   assert.equal(versions.normalizeDeepResearchRequestVersion('v1'), 'v1');
   assert.equal(versions.normalizeDeepResearchRequestVersion('v2'), 'v2');
 });
 
 test('the public request parser defaults omission but rejects an explicit unknown version', () => {
-  assert.equal(versions.parseDeepResearchRequestVersion(undefined), 'v2');
+  assert.equal(versions.parseDeepResearchRequestVersion(undefined), 'v1');
   assert.equal(versions.parseDeepResearchRequestVersion('v1'), 'v1');
   assert.equal(versions.parseDeepResearchRequestVersion('v2'), 'v2');
   assert.throws(() => versions.parseDeepResearchRequestVersion('v3'), /Unsupported Deep Research version/);
@@ -40,7 +40,7 @@ test('v1 and v2 route to distinct valid engines independently of approach', () =
   assert.equal(versions.deepResearchEnginePath('v1', true), 'v1-specialized');
   assert.equal(versions.deepResearchEnginePath('v2', false), 'v2-general');
   assert.equal(versions.deepResearchEnginePath('v2', true), 'v2-specialized');
-  assert.equal(versions.deepResearchEnginePath(undefined, false), 'v2-general');
+  assert.equal(versions.deepResearchEnginePath(undefined, false), 'v1-general');
 });
 
 test('old metadata defaults to v1 and preserves explicit choices', () => {
@@ -53,6 +53,8 @@ test('old metadata defaults to v1 and preserves explicit choices', () => {
 test('the renderer exposes exactly the two compatible engines', () => {
   assert.deepEqual(versions.DEEP_RESEARCH_VERSIONS, ['v1', 'v2']);
   assert.deepEqual(versions.DEEP_RESEARCH_VERSION_OPTIONS.map((option) => option.id), ['v1', 'v2']);
-  assert.match(versions.deepResearchVersionOption('v1').description, /anterior/);
-  assert.match(versions.deepResearchVersionOption('v2').description, /textos completos/);
+  assert.match(versions.deepResearchVersionOption('v1').description, /menos tokens/);
+  assert.match(versions.deepResearchVersionOption('v2').description, /Consume más tokens/);
+  assert.match(versions.deepResearchVersionOption('v2').description, /hasta 8 documentos completos/);
+  assert.match(versions.deepResearchVersionOption('v2').description, /regenera los desactualizados/);
 });

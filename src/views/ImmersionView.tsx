@@ -2266,7 +2266,7 @@ function ExamStep({
     startDeepResearchGeneration(dossierKey, {
       objective: session.plan.topic,
       language: session.plan.language,
-      deepResearchVersion: 'v2',
+      deepResearchVersion: 'v1',
       sectionLimit: 'auto',
       model: session.model,
       decorativeImage: {

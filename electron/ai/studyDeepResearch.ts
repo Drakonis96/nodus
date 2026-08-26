@@ -934,7 +934,7 @@ export async function generateStudyDeepResearchReport(
   });
   const draft: WritingWorkshopDraft = {
     generatedAt: new Date().toISOString(),
-    brief: { kind: 'deep_research', objective: request.objective, audience, tone: 'academic', language, deepResearchVersion: request.deepResearchVersion ?? 'v2' },
+    brief: { kind: 'deep_research', objective: request.objective, audience, tone: 'academic', language, deepResearchVersion: request.deepResearchVersion ?? 'v1' },
     selection: { ideaIds: usedIdeaIds, themeIds: [], gapIds: [], contradictionIds: [], workIds: [], passageIds: [], tutorRouteIds: [] },
     title: final.title?.trim() || plan.title?.trim() || request.objective,
     abstract: final.abstract?.trim() || plan.abstract?.trim() || '',
@@ -949,7 +949,7 @@ export async function generateStudyDeepResearchReport(
     stats: { selectedIdeas: usedIdeaIds.length, selectedThemes: 0, selectedGaps: 0, selectedContradictions: 0, selectedWorks: usedSourceIds.size, selectedPassages: 0, selectedTutorRoutes: 0, contextChars: sources.reduce((sum, source) => sum + source.text.length, 0), truncated: retrieved.length >= 48 },
   };
   const meta = {
-    deepResearchVersion: request.deepResearchVersion ?? 'v2',
+    deepResearchVersion: request.deepResearchVersion ?? 'v1',
     structure: singleNarrative ? 'single' as const : 'sectioned' as const,
     sections: singleNarrative ? 1 : sections.length,
     words,

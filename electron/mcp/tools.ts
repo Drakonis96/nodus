@@ -402,8 +402,8 @@ const promptLanguageSchema = z.enum(PROMPT_LANGUAGES);
 const deepResearchApproachSchema = z.enum(DEEP_RESEARCH_APPROACHES).default('general');
 const deepResearchVersionSchema = z
   .enum(DEEP_RESEARCH_VERSIONS)
-  .default('v2')
-  .describe('Deep Research engine. v2 is the current ideas-first engine; v1 preserves the historical orchestration for reproducible comparisons.');
+  .default('v1')
+  .describe('Deep Research engine. v1 is the lower-token default for simple retrieval. v2 uses more tokens and, in academic vaults, may create or refresh full-document profiles for up to 8 relevant works.');
 
 const writingBriefSchema = z.object({
   kind: z.enum(WRITING_KINDS),

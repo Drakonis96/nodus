@@ -128,7 +128,7 @@ try {
 
   // ── 1a. Version router: independent from approach and strict at the boundary ─
   {
-    assert.equal(deepResearchClientRoute(undefined), 'v2-idea-first', 'new client requests default to v2');
+    assert.equal(deepResearchClientRoute(undefined), 'v1-historical', 'new client requests default to lower-cost v1');
     assert.equal(deepResearchClientRoute('v1'), 'v1-historical');
     assert.equal(deepResearchClientRoute('v2'), 'v2-idea-first');
     assert.throws(() => deepResearchClientRoute('v3'), /Unsupported Deep Research version/);
