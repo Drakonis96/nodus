@@ -1292,7 +1292,7 @@ export async function orchestrateDeepResearch(
   };
 
   const meta: DeepResearchMeta = {
-    deepResearchVersion: request.deepResearchVersion ?? 'v2',
+    deepResearchVersion: request.deepResearchVersion ?? 'v1',
     structure: singleNarrative ? 'single' : 'sectioned',
     sections: singleNarrative ? 1 : written.length,
     words: totalWords,

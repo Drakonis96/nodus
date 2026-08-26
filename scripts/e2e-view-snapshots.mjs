@@ -145,10 +145,17 @@ try {
     assert.match(await page.getByTestId('deep-research-approach-help').innerText(), /líneas de interpretación|métodos/i);
     const versionSelector = page.getByTestId('deep-research-version');
     assert.deepEqual(await versionSelector.locator('option').allTextContents(), [
-      'v1 · Deep Research histórico',
-      'v2 · Ideas primero y documentos completos',
+      'v1 · Recuperación sencilla (por defecto)',
+      'v2 · Análisis ampliado (más tokens)',
     ], 'the real composer exposes both reproducible Deep Research versions');
-    assert.equal(await versionSelector.inputValue(), 'v2', 'new reports default to v2');
+    assert.equal(await versionSelector.inputValue(), 'v1', 'new reports default to lower-cost v1');
+    assert.match(await page.getByTestId('deep-research-version-help').innerText(), /menos tokens/i);
+    await versionSelector.selectOption('v2');
+    const v2Help = page.getByTestId('deep-research-version-help');
+    assert.match(await v2Help.innerText(), /consume más tokens/i);
+    assert.match(await v2Help.innerText(), /hasta 8 documentos completos/i);
+    assert.match(await v2Help.getAttribute('class') ?? '', /text-amber-/, 'v2 cost warning is visually emphasized');
+    await versionSelector.selectOption('v1');
     const sectionSelector = page.getByTestId('deep-research-section-limit');
     assert.deepEqual(await sectionSelector.locator('option').allTextContents(), [
       'Secciones: Auto (IA decide)',
@@ -182,7 +189,7 @@ try {
     await page.setViewportSize({ width: 1400, height: 900 });
     if (process.env.NODUS_E2E_VERSION_V1_SCREENSHOT) {
       await versionSelector.selectOption('v1');
-      assert.match(await page.getByTestId('deep-research-version-help').innerText(), /sistema anterior|compatibilidad/i);
+      assert.match(await page.getByTestId('deep-research-version-help').innerText(), /pasajes ya extraídos|menos tokens/i);
       await page.screenshot({ path: process.env.NODUS_E2E_VERSION_V1_SCREENSHOT });
     }
     await composer.getByRole('button', { name: 'Cerrar' }).click();

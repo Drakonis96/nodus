@@ -291,7 +291,7 @@ export function DeepResearchView({
   const [composerOpen, setComposerOpen] = useState(false);
   const [objective, setObjective] = useState('');
   const [approach, setApproach] = useState<DeepResearchApproach>('general');
-  const [deepResearchVersion, setDeepResearchVersion] = useState<DeepResearchVersion>('v2');
+  const [deepResearchVersion, setDeepResearchVersion] = useState<DeepResearchVersion>('v1');
   const [language, setLanguage] = useState<PromptLanguage>('es');
   const [selectedModel, setSelectedModel] = useFeatureModel(settings, 'deepResearchModel');
   const [deepSectionLimit, setDeepSectionLimit] = useState<DeepResearchSectionLimit>('auto');
@@ -2323,7 +2323,10 @@ function ComposerModal({
                   <option key={option.id} value={option.id}>{t(option.label)}</option>
                 ))}
               </select>
-              <span className="mt-1 block text-[11px] leading-4 text-neutral-500" data-testid="deep-research-version-help">
+              <span
+                className={`mt-1 block text-[11px] leading-4 ${version === 'v2' ? 'text-amber-600 dark:text-amber-400' : 'text-neutral-500'}`}
+                data-testid="deep-research-version-help"
+              >
                 {t(deepResearchVersionOption(version).description)}
               </span>
             </label>

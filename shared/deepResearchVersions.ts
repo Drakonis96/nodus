@@ -13,16 +13,16 @@ export type DeepResearchEnginePath = 'v1-general' | 'v1-specialized' | 'v2-gener
 
 const VERSION_SET = new Set<string>(DEEP_RESEARCH_VERSIONS);
 
-/** New requests use the current engine unless the user explicitly chooses v1. */
+/** New requests use the lower-cost retrieval engine unless the user opts into v2. */
 export function normalizeDeepResearchRequestVersion(value: unknown): DeepResearchVersion {
   return typeof value === 'string' && VERSION_SET.has(value)
     ? value as DeepResearchVersion
-    : 'v2';
+    : 'v1';
 }
 
 /** Public request boundary: omission is backwards-compatible, an explicit typo is not. */
 export function parseDeepResearchRequestVersion(value: unknown): DeepResearchVersion {
-  if (value == null || value === '') return 'v2';
+  if (value == null || value === '') return 'v1';
   if (typeof value === 'string' && VERSION_SET.has(value)) return value as DeepResearchVersion;
   throw new Error(`Unsupported Deep Research version: ${String(value)}`);
 }
@@ -47,7 +47,7 @@ export function deepResearchVersionOption(value: unknown): {
 } {
   const version = normalizeDeepResearchRequestVersion(value);
   return DEEP_RESEARCH_VERSION_OPTIONS.find((option) => option.id === version)
-    ?? DEEP_RESEARCH_VERSION_OPTIONS[1];
+    ?? DEEP_RESEARCH_VERSION_OPTIONS[0];
 }
 
 /** Spanish source strings are translation keys in the renderer. */
@@ -58,12 +58,12 @@ export const DEEP_RESEARCH_VERSION_OPTIONS: ReadonlyArray<{
 }> = [
   {
     id: 'v1',
-    label: 'v1 · Deep Research histórico',
-    description: 'Usa el sistema anterior de Deep Research, conservado para comparar resultados y mantener compatibilidad con el flujo histórico.',
+    label: 'v1 · Recuperación sencilla (por defecto)',
+    description: 'Usa las ideas y los pasajes ya extraídos del corpus y no inicia el análisis de documentos completos. Es la opción recomendada para consultas sencillas y normalmente consume menos tokens.',
   },
   {
     id: 'v2',
-    label: 'v2 · Ideas primero y documentos completos',
-    description: 'Primero reconstruye ideas, relaciones, debates y huecos. Después amplía la recuperación con los textos completos que pueden aportar evidencia relevante.',
+    label: 'v2 · Análisis ampliado (más tokens)',
+    description: 'Consume más tokens. En vaults académicos, parte de ideas y relaciones y puede analizar hasta 8 documentos completos relevantes: analiza los que aún no tienen un perfil completo, regenera los desactualizados y reutiliza los que ya están al día. La primera ejecución puede tener un coste notable.',
   },
 ] as const;

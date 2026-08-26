@@ -486,7 +486,7 @@ export async function orchestrateGenealogyDeepResearch(
 
   const brief: WritingWorkshopBrief = {
     kind: 'deep_research', objective: request.objective, audience: request.audience, tone: 'academic', language,
-    deepResearchVersion: request.deepResearchVersion ?? 'v2',
+    deepResearchVersion: request.deepResearchVersion ?? 'v1',
   };
   const draft: WritingWorkshopDraft = {
     generatedAt: new Date().toISOString(),
@@ -516,7 +516,7 @@ export async function orchestrateGenealogyDeepResearch(
   };
 
   const meta: DeepResearchMeta = {
-    deepResearchVersion: request.deepResearchVersion ?? 'v2',
+    deepResearchVersion: request.deepResearchVersion ?? 'v1',
     structure: singleNarrative ? 'single' : 'sectioned',
     sections: singleNarrative ? 1 : written.length,
     words: totalWords,
