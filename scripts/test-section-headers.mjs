@@ -84,7 +84,7 @@ test('no two sections that can share a sidebar share an icon', async () => {
   assert.equal(byId.deepResearch, 'telescope', 'Deep Research takes the telescope');
   assert.equal(byId.studyGraph, 'network', 'and the study variants follow');
   assert.equal(byId.studyDeepResearch, 'telescope');
-  assert.equal(byId.research, 'compass', 'Estado de la cuestión takes the compass');
+  assert.equal(byId.research, 'strata', 'Estado de la cuestión takes the strata icon');
 
   // Una bóveda genealógica muestra la navegación completa: el grafo y las relaciones
   // sociales conviven en ella, así que no pueden llevar el mismo icono.

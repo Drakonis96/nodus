@@ -103,10 +103,10 @@ test('debate is routable without a sidebar section, and lands on its own tab', (
     'debate must NOT have a NAV_ITEM: it is a tab inside Estado de la cuestión, not a section'
   );
 
-  // The section that holds it keeps its own entry, renamed and with the compass.
+  // The section that holds it keeps its own entry and its dedicated strata icon.
   assert.match(
     navigation,
-    /\{ id: 'research', label: 'Estado de la cuestión', icon: 'compass', group: 'analyze' \}/,
+    /\{ id: 'research', label: 'Estado de la cuestión', icon: 'strata', group: 'analyze' \}/,
     'the three tabs live under one renamed section'
   );
 
