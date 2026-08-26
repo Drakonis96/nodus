@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
+import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
 import { Icon } from '../components/ui';
 import { api, ApiError } from './api';
 import { MarkdownReader } from './readers';

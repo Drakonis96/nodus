@@ -51,7 +51,6 @@ export type LegacyVectorV1Header = {
 };
 
 const FIELD_SET = new Set<string>(EMBEDDING_CONTRACT_FIELDS);
-const IDENTIFIER_FIELDS = new Set(['provider', 'model', 'protocol']);
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
   if (value === null || typeof value !== 'object' || Array.isArray(value)) return false;

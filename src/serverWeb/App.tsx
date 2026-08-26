@@ -1,5 +1,5 @@
 import { lazy, Suspense, type FormEvent, type PointerEvent as ReactPointerEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { normalizeVaultType, VAULT_TYPE_COLORS, VAULT_TYPES, type VaultType } from '@shared/vaultTypes';
+import { normalizeVaultType, VAULT_TYPE_COLORS, type VaultType } from '@shared/vaultTypes';
 import { dedicatedVaultNavIds, groupedNav, NAV_ITEMS, type NavItem, type View } from '../navigation';
 import { Icon } from '../components/ui';
 import { vaultTypeIcon, vaultTypeLabel } from '../components/vaultTypeUi';
