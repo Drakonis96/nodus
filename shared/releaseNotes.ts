@@ -1763,6 +1763,77 @@ const RELEASE_4_2_5_HIGHLIGHTS: RawReleaseHighlight[] = [
 ];
 
 /**
+ * 5.0.4 — every user-visible change merged after 5.0.3. Keep this list aligned
+ * by index with the Italian and Turkish tables so all eight interface languages
+ * receive the same release.
+ */
+const RELEASE_5_0_4_HIGHLIGHTS: RawReleaseHighlight[] = [
+  {
+    scope: 'general',
+    es: 'Nodus Server estrena una interfaz web adaptable para trabajar desde el móvil o cualquier navegador. Reproduce el aspecto de la aplicación y abre los espacios de trabajo compartidos, junto con conversaciones, notas, anotaciones y archivos personales que solo ve su propietario.',
+    en: 'Nodus Server gains a responsive web interface for working from a phone or any browser. It mirrors the desktop experience and opens shared workspaces alongside conversations, notes, annotations, and personal files that only their owner can see.',
+    fr: 'Nodus Server inaugure une interface web adaptative pour travailler depuis un téléphone ou n’importe quel navigateur. Elle reprend l’expérience de l’application et ouvre les espaces de travail partagés avec des conversations, des notes, des annotations et des fichiers personnels que seul leur propriétaire peut voir.',
+    de: 'Nodus Server erhält eine responsive Weboberfläche für die Arbeit vom Smartphone oder jedem Browser aus. Sie übernimmt das Erscheinungsbild der Anwendung und öffnet geteilte Arbeitsbereiche zusammen mit Unterhaltungen, Notizen, Anmerkungen und persönlichen Dateien, die nur ihr Eigentümer sehen kann.',
+    pt: 'O Nodus Server estreia uma interface web adaptável para trabalhar a partir do telemóvel ou de qualquer navegador. Reproduz a experiência da aplicação e abre os espaços de trabalho partilhados, juntamente com conversas, notas, anotações e ficheiros pessoais que só o proprietário pode ver.',
+    'pt-BR': 'O Nodus Server ganha uma interface web responsiva para trabalhar pelo celular ou por qualquer navegador. Ela reproduz a experiência do aplicativo e abre os espaços de trabalho compartilhados, junto com conversas, notas, anotações e arquivos pessoais que só o proprietário pode ver.',
+  },
+  {
+    scope: 'general',
+    es: 'Cada cuenta del servidor puede configurar sus propios proveedores, modelos y credenciales de IA. Las claves se guardan cifradas y nunca vuelven al navegador, los trabajos y resultados permanecen privados y las preferencias te acompañan entre dispositivos sin romper la compatibilidad con Desktop ni con las bóvedas conectadas.',
+    en: 'Each server account can configure its own AI providers, models, and credentials. Keys are stored encrypted and never returned to the browser, jobs and results stay private, and preferences follow you across devices without breaking Desktop or Connected Vault compatibility.',
+    fr: 'Chaque compte du serveur peut configurer ses propres fournisseurs, modèles et identifiants d’IA. Les clés sont conservées sous forme chiffrée et ne reviennent jamais au navigateur, les tâches et leurs résultats restent privés et les préférences vous suivent entre les appareils sans rompre la compatibilité avec Desktop ni les coffres connectés.',
+    de: 'Jedes Serverkonto kann eigene KI-Anbieter, Modelle und Zugangsdaten einrichten. Schlüssel werden verschlüsselt gespeichert und nie an den Browser zurückgegeben, Aufträge und Ergebnisse bleiben privat und Einstellungen folgen Ihnen zwischen Geräten, ohne die Kompatibilität mit Desktop oder verbundenen Tresoren zu beeinträchtigen.',
+    pt: 'Cada conta do servidor pode configurar os seus próprios fornecedores, modelos e credenciais de IA. As chaves ficam cifradas e nunca regressam ao navegador, as tarefas e os resultados permanecem privados e as preferências acompanham-no entre dispositivos sem quebrar a compatibilidade com o Desktop nem com os cofres ligados.',
+    'pt-BR': 'Cada conta do servidor pode configurar seus próprios provedores, modelos e credenciais de IA. As chaves ficam criptografadas e nunca voltam ao navegador, os trabalhos e resultados permanecem privados e as preferências acompanham você entre dispositivos sem quebrar a compatibilidade com o Desktop nem com os cofres conectados.',
+  },
+  {
+    scope: 'general',
+    es: 'El servidor aplica ahora la propiedad y los permisos a cada cambio, archivo y tarea antes de aceptar una operación. También refuerza el inicio de sesión, evita que secretos aparezcan en registros, publicaciones o copias y añade copias de seguridad verificadas con restauración para las instalaciones Docker.',
+    en: 'The server now enforces ownership and permissions for every change, file, and job before accepting an operation. It also hardens sign-in, keeps secrets out of logs, publications, and backups, and adds verified backup and restore tooling for Docker installations.',
+    fr: 'Le serveur vérifie désormais la propriété et les autorisations de chaque modification, fichier et tâche avant d’accepter une opération. Il renforce aussi la connexion, empêche les secrets d’apparaître dans les journaux, les publications ou les sauvegardes et ajoute des outils de sauvegarde vérifiée et de restauration pour les installations Docker.',
+    de: 'Der Server prüft jetzt Eigentum und Berechtigungen für jede Änderung, Datei und Aufgabe, bevor er einen Vorgang annimmt. Außerdem schützt er die Anmeldung stärker, hält Geheimnisse aus Protokollen, Veröffentlichungen und Sicherungen fern und ergänzt geprüfte Sicherungs- und Wiederherstellungswerkzeuge für Docker-Installationen.',
+    pt: 'O servidor aplica agora a propriedade e as permissões a cada alteração, ficheiro e tarefa antes de aceitar uma operação. Também reforça o início de sessão, impede que segredos apareçam em registos, publicações ou cópias e acrescenta ferramentas de cópia verificada e restauro para instalações Docker.',
+    'pt-BR': 'O servidor agora aplica propriedade e permissões a cada alteração, arquivo e tarefa antes de aceitar uma operação. Ele também reforça o login, impede que segredos apareçam em registros, publicações ou backups e adiciona ferramentas de backup verificado e restauração para instalações Docker.',
+  },
+  {
+    scope: 'estudio',
+    es: 'Word Copilot añade una cuarta pestaña para los estilos de escritura guardados en tu espacio. Elige un estilo y un modelo, transforma el texto seleccionado y revisa la propuesta en el panel antes de copiarla o sustituir el fragmento original.',
+    en: 'Word Copilot adds a fourth tab for the writing styles saved in your workspace. Choose a style and model, transform the selected text, and review the proposal in the pane before copying it or replacing the original passage.',
+    fr: 'Word Copilot ajoute un quatrième onglet pour les styles d’écriture enregistrés dans votre espace. Choisissez un style et un modèle, transformez le texte sélectionné et relisez la proposition dans le volet avant de la copier ou de remplacer le passage original.',
+    de: 'Word Copilot ergänzt eine vierte Registerkarte für die in Ihrem Arbeitsbereich gespeicherten Schreibstile. Wählen Sie Stil und Modell, wandeln Sie den markierten Text um und prüfen Sie den Vorschlag im Bereich, bevor Sie ihn kopieren oder die ursprüngliche Passage ersetzen.',
+    pt: 'O Word Copilot acrescenta um quarto separador para os estilos de escrita guardados no seu espaço. Escolha um estilo e um modelo, transforme o texto selecionado e reveja a proposta no painel antes de a copiar ou substituir o excerto original.',
+    'pt-BR': 'O Word Copilot adiciona uma quarta aba para os estilos de escrita salvos no seu espaço. Escolha um estilo e um modelo, transforme o texto selecionado e revise a proposta no painel antes de copiá-la ou substituir o trecho original.',
+  },
+  {
+    scope: 'estudio',
+    es: 'Las cuatro pestañas de Word ocupan menos espacio y solo la activa despliega su nombre. Referencias conserva su anchura compacta, cada solicitud de escritura mantiene aislado su propio resultado y el texto de Word no cambia hasta que pulsas la acción de reemplazo.',
+    en: 'The four Word tabs use less space and only the active one expands its label. References keeps its compact width, each writing request keeps its own result isolated, and the Word text does not change until you choose the replace action.',
+    fr: 'Les quatre onglets de Word prennent moins de place et seul l’onglet actif déploie son nom. Références conserve sa largeur compacte, chaque demande d’écriture garde son propre résultat isolé et le texte de Word ne change que lorsque vous choisissez l’action de remplacement.',
+    de: 'Die vier Word-Registerkarten benötigen weniger Platz und nur die aktive blendet ihren Namen ein. Referenzen behält seine kompakte Breite, jede Schreibanfrage hält ihr eigenes Ergebnis getrennt und der Word-Text ändert sich erst, wenn Sie Ersetzen wählen.',
+    pt: 'Os quatro separadores do Word ocupam menos espaço e só o ativo mostra o nome completo. Referências conserva a largura compacta, cada pedido de escrita mantém o seu próprio resultado isolado e o texto do Word só muda quando escolhe a ação de substituição.',
+    'pt-BR': 'As quatro abas do Word ocupam menos espaço e só a ativa expande o nome. Referências mantém a largura compacta, cada solicitação de escrita preserva seu próprio resultado isolado e o texto do Word só muda quando você escolhe a ação de substituição.',
+  },
+  {
+    scope: 'general',
+    es: 'Nodus conserva solo las dos copias verificadas más recientes que crea antes de migrar cada bóveda. La limpieza se hace en segundo plano y deja intactos informes, archivos desconocidos, pares incompletos, backups y datos especiales de recuperación, evitando que las migraciones antiguas sigan ocupando disco sin límite.',
+    en: 'Nodus keeps only the two most recent verified snapshots it creates before migrating each vault. Cleanup runs in the background and leaves reports, unknown files, incomplete pairs, backups, and special recovery data untouched, preventing old migrations from consuming disk space without limit.',
+    fr: 'Nodus ne conserve que les deux instantanés vérifiés les plus récents créés avant la migration de chaque coffre. Le nettoyage s’exécute en arrière-plan et laisse intacts les rapports, les fichiers inconnus, les paires incomplètes, les sauvegardes et les données de récupération spéciales, afin que les anciennes migrations ne consomment plus le disque sans limite.',
+    de: 'Nodus bewahrt nur die zwei neuesten geprüften Schnappschüsse auf, die vor der Migration jedes Tresors angelegt werden. Die Bereinigung läuft im Hintergrund und lässt Berichte, unbekannte Dateien, unvollständige Paare, Sicherungen und besondere Wiederherstellungsdaten unberührt, damit alte Migrationen nicht unbegrenzt Speicherplatz belegen.',
+    pt: 'O Nodus conserva apenas as duas cópias verificadas mais recentes que cria antes de migrar cada cofre. A limpeza decorre em segundo plano e deixa intactos relatórios, ficheiros desconhecidos, pares incompletos, backups e dados especiais de recuperação, evitando que migrações antigas continuem a ocupar disco sem limite.',
+    'pt-BR': 'O Nodus mantém apenas os dois snapshots verificados mais recentes que cria antes de migrar cada cofre. A limpeza ocorre em segundo plano e deixa intactos relatórios, arquivos desconhecidos, pares incompletos, backups e dados especiais de recuperação, evitando que migrações antigas continuem ocupando disco sem limite.',
+  },
+  {
+    scope: 'general',
+    es: 'El contador público de descargas de la web vuelve a estar al día y su actualización puede lanzarse manualmente cuando haga falta. Así las cifras visibles no dependen únicamente de la ejecución programada.',
+    en: 'The public website download counter is current again and its refresh can now be started manually when needed. Visible totals no longer depend only on the scheduled run.',
+    fr: 'Le compteur public des téléchargements du site est de nouveau à jour et son actualisation peut désormais être lancée manuellement lorsque nécessaire. Les totaux visibles ne dépendent plus uniquement de l’exécution programmée.',
+    de: 'Der öffentliche Downloadzähler der Website ist wieder aktuell und kann bei Bedarf jetzt manuell aufgefrischt werden. Die sichtbaren Summen hängen nicht mehr nur vom geplanten Lauf ab.',
+    pt: 'O contador público de transferências do site está novamente atualizado e a sua atualização pode agora ser iniciada manualmente quando for necessário. Os totais visíveis deixam de depender apenas da execução programada.',
+    'pt-BR': 'O contador público de downloads do site está atualizado novamente e sua atualização agora pode ser iniciada manualmente quando necessário. Os totais visíveis não dependem mais apenas da execução programada.',
+  },
+];
+
+/**
  * 5.0.3 — every user-visible change merged after 5.0.2. Keep this list aligned
  * by index with the Italian and Turkish tables so all eight interface languages
  * receive the same release.
@@ -2055,6 +2126,11 @@ const RELEASE_5_0_0_HIGHLIGHTS: RawReleaseHighlight[] = [
 ];
 
 const RAW_RELEASE_NOTES: RawReleaseNote[] = [
+  {
+    version: '5.0.4',
+    date: '2026-08-27',
+    highlights: RELEASE_5_0_4_HIGHLIGHTS,
+  },
   {
     version: '5.0.3',
     date: '2026-08-26',

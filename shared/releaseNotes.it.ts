@@ -155,6 +155,15 @@ const RELEASE_3_2_4_IT: string[] = [
 ];
 
 export const RELEASE_NOTES_IT: Record<string, string[]> = {
+  "5.0.4": [
+    "Nodus Server introduce un’interfaccia web reattiva per lavorare dal telefono o da qualsiasi browser. Riproduce l’esperienza dell’applicazione e apre gli spazi di lavoro condivisi insieme a conversazioni, note, annotazioni e file personali visibili soltanto al proprietario.",
+    "Ogni account del server può configurare i propri fornitori, modelli e credenziali IA. Le chiavi vengono archiviate in forma cifrata e non tornano mai al browser, le attività e i risultati restano privati e le preferenze ti seguono tra i dispositivi senza compromettere la compatibilità con Desktop o con i depositi connessi.",
+    "Il server applica ora proprietà e autorizzazioni a ogni modifica, file e attività prima di accettare un’operazione. Rafforza inoltre l’accesso, impedisce ai segreti di apparire nei registri, nelle pubblicazioni o nei backup e aggiunge strumenti di backup verificato e ripristino per le installazioni Docker.",
+    "Word Copilot aggiunge una quarta scheda per gli stili di scrittura salvati nel tuo spazio. Scegli uno stile e un modello, trasforma il testo selezionato e controlla la proposta nel riquadro prima di copiarla o sostituire il passaggio originale.",
+    "Le quattro schede di Word occupano meno spazio e soltanto quella attiva espande il proprio nome. Riferimenti mantiene la larghezza compatta, ogni richiesta di scrittura conserva isolato il proprio risultato e il testo di Word non cambia finché non scegli l’azione di sostituzione.",
+    "Nodus conserva soltanto le due istantanee verificate più recenti create prima di migrare ogni deposito. La pulizia avviene in background e lascia intatti rapporti, file sconosciuti, coppie incomplete, backup e dati speciali di recupero, impedendo alle vecchie migrazioni di consumare spazio su disco senza limiti.",
+    "Il contatore pubblico dei download del sito è di nuovo aggiornato e ora può essere ricaricato manualmente quando serve. I totali visibili non dipendono più soltanto dall’esecuzione programmata.",
+  ],
   "5.0.3": [
     "Compass non richiede più credenziali per cercare. Interroga direttamente un catalogo molto più ampio di letteratura accademica e fonti primarie aperte, adatta ogni ricerca alla disciplina e combina i risultati con una classificazione più solida. L’interpretazione con IA resta facoltativa e disattivata per impostazione predefinita.",
     "Compass conserva ricerche e candidati, indica quale fornitore ha restituito ogni risultato e distingue i file aperti verificati dalle semplici pagine di riferimento. L’importazione controlla i duplicati, completa i metadati e può allegare i file disponibili, mentre la coda segnala limiti temporanei, lavoro parziale ed elementi ignorati.",

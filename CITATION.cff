@@ -12,12 +12,12 @@ authors:
     orcid: "https://orcid.org/0000-0002-1150-1930"
   - name: "Nodus contributors"
 type: software
-version: "5.0.3"
-date-released: "2026-08-26"
+version: "5.0.4"
+date-released: "2026-08-27"
 license: "AGPL-3.0-only"
 repository-code: "https://github.com/Drakonis96/nodus"
 url: "https://nodusresearch.com/"
-# Zenodo assigns the immutable v5.0.3 DOI after the GitHub release is archived.
+# Zenodo assigns the immutable v5.0.4 DOI after the GitHub release is archived.
 # Until then the concept DOI is 10.5281/zenodo.21515531 for Nodus over time.
 doi: "10.5281/zenodo.21515531"
 keywords:

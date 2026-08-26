@@ -95,6 +95,15 @@ const RELEASE_3_2_4_TR: string[] = [
 ];
 
 export const RELEASE_NOTES_TR: Record<string, string[]> = {
+  "5.0.4": [
+    "Nodus Server telefondan veya herhangi bir tarayıcıdan çalışmak için uyarlanabilir bir web arayüzü kazanıyor. Uygulama deneyimini yansıtıyor ve paylaşılan çalışma alanlarını yalnızca sahibinin görebildiği konuşmalar, notlar, açıklamalar ve kişisel dosyalarla birlikte açıyor.",
+    "Her sunucu hesabı kendi yapay zekâ sağlayıcılarını, modellerini ve kimlik bilgilerini yapılandırabilir. Anahtarlar şifreli saklanır ve tarayıcıya hiçbir zaman geri dönmez, işler ve sonuçlar özel kalır, tercihler ise Desktop ve bağlı kasalarla uyumluluğu bozmadan cihazlar arasında sizi izler.",
+    "Sunucu artık bir işlemi kabul etmeden önce her değişiklik, dosya ve iş için sahipliği ve izinleri uygular. Ayrıca oturum açmayı güçlendirir, gizli bilgileri günlüklerden, yayınlardan ve yedeklerden uzak tutar ve Docker kurulumları için doğrulanmış yedekleme ve geri yükleme araçları ekler.",
+    "Word Copilot, çalışma alanınızda kayıtlı yazma stilleri için dördüncü bir sekme ekliyor. Bir stil ve model seçin, seçili metni dönüştürün ve özgün parçayı kopyalamadan ya da değiştirmeden önce öneriyi panelde inceleyin.",
+    "Dört Word sekmesi daha az yer kaplıyor ve yalnızca etkin olan adını genişletiyor. Kaynaklar kompakt genişliğini koruyor, her yazma isteği kendi sonucunu ayrı tutuyor ve Word metni siz değiştirme eylemini seçene kadar değişmiyor.",
+    "Nodus her kasayı taşımadan önce oluşturduğu yalnızca en yeni iki doğrulanmış anlık görüntüyü saklıyor. Temizlik arka planda çalışıyor ve raporları, bilinmeyen dosyaları, eksik çiftleri, yedekleri ve özel kurtarma verilerini olduğu gibi bırakıyor. Böylece eski taşımalar disk alanını sınırsız tüketmiyor.",
+    "Web sitesindeki herkese açık indirme sayacı yeniden güncel ve gerektiğinde artık elle yenilenebiliyor. Görünen toplamlar yalnızca zamanlanmış çalışmaya bağlı kalmıyor.",
+  ],
   "5.0.3": [
     "Compass artık arama yapmak için kimlik bilgisi istemiyor. Çok daha geniş bir akademik yayın ve açık birincil kaynak kataloğunu doğrudan sorguluyor, her aramayı disipline uyarlıyor ve sonuçları daha güçlü bir sıralamayla birleştiriyor. Yapay zekâ ile yorumlama isteğe bağlı kalıyor ve varsayılan olarak kapalı geliyor.",
     "Compass aramaları ve adayları saklıyor, her sonucu hangi sağlayıcının getirdiğini açıklıyor ve doğrulanmış açık dosyaları basit başvuru sayfalarından ayırıyor. İçe aktarma yinelenenleri denetliyor, üstveriyi tamamlıyor ve mevcut dosyaları ekleyebiliyor. Kuyruk ise hız sınırlarını, kısmi çalışmayı ve atlanan öğeleri bildiriyor.",
