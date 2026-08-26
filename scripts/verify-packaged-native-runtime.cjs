@@ -1,16 +1,19 @@
 const { execFileSync } = require('node:child_process');
-const { existsSync } = require('node:fs');
+const { existsSync, readdirSync } = require('node:fs');
 const path = require('node:path');
 const asar = require('@electron/asar');
 
 const REQUIRED_ARM64_BINARIES = [
   ['Canvas', '@napi-rs/canvas-darwin-arm64/skia.darwin-arm64.node'],
-  ['Sharp', '@img/sharp-darwin-arm64/lib/sharp-darwin-arm64.node'],
-  ['libvips', '@img/sharp-libvips-darwin-arm64/lib/libvips-cpp.8.17.3.dylib'],
   ['Koffi', '@koromix/koffi-darwin-arm64/darwin_arm64/koffi.node'],
   ['Codex', '@openai/codex-darwin-arm64/vendor/aarch64-apple-darwin/bin/codex'],
   ['Copilot', '@github/copilot-darwin-arm64/copilot'],
   ['Copilot native runtime', '@github/copilot-darwin-arm64/prebuilds/darwin-arm64/runtime.node'],
+];
+
+const REQUIRED_ARM64_BINARY_PATTERNS = [
+  ['Sharp', '@img/sharp-darwin-arm64/lib', /^sharp-darwin-arm64(?:-[0-9.]+)?\.node$/],
+  ['libvips', '@img/sharp-libvips-darwin-arm64/lib', /^libvips-cpp\.[0-9.]+\.dylib$/],
 ];
 
 const INTEL_PACKAGE_MARKERS = [
@@ -35,6 +38,22 @@ function assertArm64Binary(label, filename, architectureReader = getArchitecture
   }
 }
 
+function findUniquePackagedBinary(label, directory, pattern, directoryReader = readdirSync) {
+  let entries;
+  try {
+    entries = directoryReader(directory);
+  } catch {
+    throw new Error(`Missing packaged ARM64 ${label} directory: ${directory}`);
+  }
+  const matches = entries.filter((entry) => pattern.test(entry)).sort();
+  if (matches.length !== 1) {
+    throw new Error(
+      `Expected exactly one packaged ARM64 ${label} binary in ${directory}; found ${matches.length}`,
+    );
+  }
+  return path.join(directory, matches[0]);
+}
+
 function verifyPackagedNativeRuntime(appPath, options = {}) {
   const resourcesPath = path.join(appPath, 'Contents', 'Resources');
   const asarPath = path.join(resourcesPath, 'app.asar');
@@ -56,12 +75,23 @@ function verifyPackagedNativeRuntime(appPath, options = {}) {
   for (const [label, relativePath] of REQUIRED_ARM64_BINARIES) {
     assertArm64Binary(label, path.join(unpackedModules, relativePath), options.getArchitectures);
   }
+  for (const [label, relativeDirectory, pattern] of REQUIRED_ARM64_BINARY_PATTERNS) {
+    const filename = findUniquePackagedBinary(
+      label,
+      path.join(unpackedModules, relativeDirectory),
+      pattern,
+      options.readDirectory,
+    );
+    assertArm64Binary(label, filename, options.getArchitectures);
+  }
   console.log(`[native-runtime] Verified ARM64 Electron, Canvas, Sharp, Koffi, Codex and Copilot in ${appPath}`);
 }
 
 module.exports = {
   REQUIRED_ARM64_BINARIES,
+  REQUIRED_ARM64_BINARY_PATTERNS,
   assertArm64Binary,
+  findUniquePackagedBinary,
   findIntelRuntimePaths,
   verifyPackagedNativeRuntime,
 };
