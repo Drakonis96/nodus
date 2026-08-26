@@ -20,7 +20,7 @@ const root = await mkdtemp(path.join(os.tmpdir(), 'nodus-migration-160-'));
 installTsHook();
 try {
   const Database = require('better-sqlite3');
-  const { runMigrations, SCHEMA_VERSION } = require(path.join(repoRoot, 'electron/db/migrations.ts'));
+  const { migrations, runMigrations, SCHEMA_VERSION } = require(path.join(repoRoot, 'electron/db/migrations.ts'));
   const source = process.env.NODUS_BASELINE_DB;
   const target = path.join(root, 'baseline.sqlite');
   if (source) await copyFile(source, target);
@@ -35,7 +35,7 @@ try {
     : [];
   runMigrations(db);
   assert.equal(db.pragma('user_version', { simple: true }), SCHEMA_VERSION);
-  assert.equal(SCHEMA_VERSION, 165);
+  assert.equal(SCHEMA_VERSION, 166);
   const workColumns = new Set(db.prepare('PRAGMA table_info(works)').all().map((row) => row.name));
   for (const column of ['resolved_source_type', 'resolved_text_hash', 'text_block_reason', 'resolved_text_notes', 'deep_error', 'deep_queued']) {
     assert.ok(workColumns.has(column), `works.${column} exists`);
@@ -50,6 +50,89 @@ try {
     const columns = new Set(db.prepare(`PRAGMA table_info(${table})`).all().map((row) => row.name));
     for (const column of ['source_ref', 'page_start_number', 'page_end_number']) assert.ok(columns.has(column), `${table}.${column} exists`);
   }
+  const dictionaryVersionColumns = new Set(
+    db.prepare('PRAGMA table_info(dictionary_versions)').all().map((row) => row.name)
+  );
+  for (const column of ['outcome', 'degradation_reason', 'generation_attempts', 'generation_problems_json']) {
+    assert.ok(dictionaryVersionColumns.has(column), `dictionary_versions.${column} exists`);
+  }
+  const legacyDictionaryDb = new Database(path.join(root, 'dictionary-v165.sqlite'));
+  legacyDictionaryDb.exec(`
+    CREATE TABLE dictionary_entries (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      normalized_name TEXT NOT NULL,
+      aliases_json TEXT NOT NULL DEFAULT '[]',
+      focus_prompt TEXT NOT NULL DEFAULT '',
+      scope_kind TEXT NOT NULL CHECK (scope_kind IN ('vault','authors','works','tags_collections')),
+      scope_json TEXT NOT NULL,
+      output_language TEXT NOT NULL DEFAULT 'es',
+      detail_level TEXT NOT NULL DEFAULT 'standard' CHECK (detail_level IN ('concise','standard','detailed')),
+      tags_json TEXT NOT NULL DEFAULT '[]',
+      content_markdown TEXT NOT NULL DEFAULT '',
+      notes TEXT NOT NULL DEFAULT '',
+      status TEXT NOT NULL DEFAULT 'draft' CHECK (status IN ('draft','active','archived')),
+      current_version_id TEXT,
+      proposed_version_id TEXT,
+      insufficient_evidence INTEGER NOT NULL DEFAULT 0,
+      new_evidence_count INTEGER NOT NULL DEFAULT 0,
+      last_evidence_scan_at TEXT,
+      last_change_seq INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+    CREATE TABLE dictionary_versions (
+      id TEXT PRIMARY KEY,
+      entry_id TEXT NOT NULL,
+      content_markdown TEXT NOT NULL,
+      evidence_json TEXT NOT NULL DEFAULT '[]',
+      evidence_snapshot_json TEXT NOT NULL DEFAULT '[]',
+      citations_json TEXT NOT NULL DEFAULT '[]',
+      author_summaries_json TEXT NOT NULL DEFAULT '[]',
+      focus_prompt TEXT NOT NULL,
+      scope_json TEXT NOT NULL,
+      output_language TEXT NOT NULL,
+      detail_level TEXT NOT NULL,
+      model_json TEXT,
+      generated_at TEXT NOT NULL,
+      trigger TEXT NOT NULL CHECK (trigger IN ('creation','update','regeneration','manual_edit','restore')),
+      state TEXT NOT NULL CHECK (state IN ('applied','proposed')),
+      insufficient_evidence INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+    CREATE INDEX dictionary_versions_entry_idx ON dictionary_versions(entry_id, generated_at DESC);
+    CREATE INDEX dictionary_versions_proposed_idx ON dictionary_versions(entry_id, state, generated_at DESC);
+  `);
+  const insertLegacyEntry = legacyDictionaryDb.prepare(`INSERT INTO dictionary_entries(
+    id,name,normalized_name,scope_kind,scope_json,content_markdown,status,current_version_id,proposed_version_id,created_at,updated_at
+  ) VALUES(?,?,?,'vault','{}',?,'active',?,?,?,?)`);
+  const legacyFallback = '## Evidencia verificable\n\n> Una retahíla extractiva.';
+  insertLegacyEntry.run('legacy-recover','Legacy recover','legacy recover',legacyFallback,'fallback-recover','fallback-recover','2026-01-01','2026-01-03');
+  insertLegacyEntry.run('legacy-draft','Legacy draft','legacy draft',legacyFallback,'fallback-draft','fallback-draft','2026-01-01','2026-01-03');
+  const insertLegacyVersion = legacyDictionaryDb.prepare(`INSERT INTO dictionary_versions(
+    id,entry_id,content_markdown,focus_prompt,scope_json,output_language,detail_level,model_json,generated_at,trigger,state,created_at,updated_at
+  ) VALUES(?,?,?,'','{}','es','standard',?,?,?,'applied',?,?)`);
+  insertLegacyVersion.run('good-recover','legacy-recover','Una síntesis anterior válida.',null,'2026-01-01','creation','2026-01-01','2026-01-01');
+  insertLegacyVersion.run('fallback-recover','legacy-recover',legacyFallback,null,'2026-01-02','regeneration','2026-01-02','2026-01-02');
+  insertLegacyVersion.run('fallback-draft','legacy-draft',legacyFallback,null,'2026-01-02','creation','2026-01-02','2026-01-02');
+  legacyDictionaryDb.exec(migrations.find((migration) => migration.version === 166).up);
+  assert.deepEqual(
+    legacyDictionaryDb.prepare(`SELECT state,outcome,degradation_reason FROM dictionary_versions WHERE id='fallback-recover'`).get(),
+    { state: 'degraded', outcome: 'degraded', degradation_reason: 'legacy_extractive_fallback' },
+    'v166 identifies the legacy extractive fallback even when no explicit model was persisted'
+  );
+  assert.deepEqual(
+    legacyDictionaryDb.prepare(`SELECT current_version_id,proposed_version_id,content_markdown,status FROM dictionary_entries WHERE id='legacy-recover'`).get(),
+    { current_version_id: 'good-recover', proposed_version_id: null, content_markdown: 'Una síntesis anterior válida.', status: 'active' },
+    'v166 restores the last good synthesis instead of keeping the extractive fallback current'
+  );
+  assert.deepEqual(
+    legacyDictionaryDb.prepare(`SELECT current_version_id,proposed_version_id,content_markdown,status FROM dictionary_entries WHERE id='legacy-draft'`).get(),
+    { current_version_id: null, proposed_version_id: null, content_markdown: '', status: 'draft' },
+    'v166 returns a first-generation legacy fallback to draft without discarding its version record'
+  );
+  legacyDictionaryDb.close();
   if (before) assert.deepEqual(counts(db), before, 'additive migration preserves corpus row counts');
   assert.deepEqual(db.pragma('quick_check'), [{ quick_check: 'ok' }]);
   assert.equal(db.pragma('foreign_key_check').length, 0);

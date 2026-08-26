@@ -378,8 +378,9 @@ const dictionaryGenerationJobs = new DictionaryGenerationQueue(
     }
 
     report({ entryId: request.entryId, phase: 'generating', message: 'Generando definición' });
-    await generateDictionaryEntry(request);
+    const version = await generateDictionaryEntry(request);
     announceDictionary(request.entryId);
+    return version;
   },
   announceDictionaryProgress,
 );
