@@ -4,6 +4,7 @@ dist/
 dist-electron/
 dist-zotero/
 dist-browser/
+server/dist/web/
 release/
 *.log
 .DS_Store

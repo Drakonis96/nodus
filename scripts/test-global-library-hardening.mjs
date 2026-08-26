@@ -50,6 +50,13 @@ try {
     files: { reader: 'reader.md', original: 'attachments/secret.pdf', annotations: 'state/annotations.json', chat: 'state/chat.json' },
     extraction: { status: 'ready' },
   });
+  const malicious = store.upsertItem({
+    id: 'zotero:PATHATTACK', storageId: 'PATHATTACK', source: 'zotero', sourceLibraryId: 'users/0', sourceKey: 'PATHATTACK',
+    metadata: { title: 'Ruta hostil', itemType: 'document', creators: [], isbn: [], issn: [], tags: [] },
+    collectionIds: [], attachments: [], files: { annotations: '../../outside/escaped.json' }, extraction: { status: 'ready' },
+  });
+  assert.equal(await exists(path.join(outside, 'escaped.json')), false, 'remote sidecar paths cannot escape the item folder');
+  assert.equal(await exists(path.join(store.itemFolder(malicious.storageId), 'annotations.json')), true, 'unsafe sidecar paths use the canonical name');
 
   let symlinksAvailable = true;
   try {

@@ -87,9 +87,10 @@ function publishSnapshot(origin, token, spaceId, dbFile, vault) {
 }
 
 test('a corpus travels to two replicas, a writer sends work back, and a reader never can', { timeout: 180_000 }, async () => {
-  await withServer({ label: 'replica-roundtrip' }, async (server) => {
+  await withServer({ label: 'replica-roundtrip', ai: true }, async (server) => {
     // ── The owner ────────────────────────────────────────────────────────────
     const spaceId = await server.createSpace('Corpus compartido');
+    await server.setPublicationPolicy(spaceId, ['allowUserContent']);
     const owner = await server.deviceToken(server.adminEmail, server.adminPassword, spaceId, 'Owner desktop');
     assert.equal(owner.role, 'owner');
 
@@ -128,11 +129,21 @@ test('a corpus travels to two replicas, a writer sends work back, and a reader n
     assert.equal(readerVault.origin, 'connected');
     assert.equal(readerVault.remote.role, 'reader');
     assert.equal(readerVault.type, 'academic', 'the vault type comes from the publication, not from a picker');
+    const readerProfileDevice = await server.deviceToken('lector@example.test', 'lector-account-password', spaceId, 'Reader profile probe');
+    const inheritedProfileResponse = await server.api(readerProfileDevice.deviceToken, 'GET', '/api/v2/me/preferences');
+    assert.equal(inheritedProfileResponse.status, 200, 'Connected Vault uploads the authenticated Desktop profile');
+    const inheritedProfile = await inheritedProfileResponse.json();
+    assert.equal(inheritedProfile.profile.revision, 1);
+    assert.deepEqual(inheritedProfile.profile.source, { kind: 'desktop' });
+    const inheritedText = JSON.stringify(inheritedProfile);
+    for (const forbidden of ['providerKeys', 'lockedProviderKeys', 'embeddingProvider', 'embeddingModel', 'mcpToken', 'autoBackupFolder']) {
+      assert.equal(inheritedText.includes(forbidden), false, `${forbidden} must not cross the Connected Vault profile boundary`);
+    }
 
     const readerDb = new Database(readerVault.path, { fileMustExist: true });
     assert.equal(readerDb.prepare('SELECT COUNT(*) AS n FROM works').get().n, 1);
     assert.equal(readerDb.prepare('SELECT COUNT(*) AS n FROM ideas').get().n, 1);
-    assert.equal(readerDb.prepare("SELECT title FROM notes WHERE id = 'n-owner'").get().title, 'Nota del propietario');
+    assert.equal(readerDb.prepare("SELECT title FROM notes WHERE id = 'n-owner'").get(), undefined, 'the owner note remains private');
     const readerDevice = readerDb.prepare('SELECT id FROM workspace_devices').get().id;
     assert.match(readerDevice, /^device-[0-9a-f-]{36}$/);
     assert.notEqual(readerDevice, 'local-device');
@@ -188,79 +199,23 @@ test('a corpus travels to two replicas, a writer sends work back, and a reader n
     assert.equal(countOutbox(drainedDb).pending, 0, 'the queue empties once the server accepts it');
     drainedDb.close();
 
-    // ── The owner collects and applies ───────────────────────────────────────
-    const ledger = await (await server.api(owner.deviceToken, 'GET', `/api/v1/spaces/${spaceId}/mutations`)).json();
-    assert.equal(ledger.mutations.length, 2);
-    const noteMutation = ledger.mutations.find((mutation) => mutation.table === 'notes');
-    const pageMutation = ledger.mutations.find((mutation) => mutation.table === 'pages');
-    assert.equal(noteMutation.row.content, 'Corregida antes de enviarse.', 'what travels is the live row, not a stale copy');
-    assert.equal(pageMutation.row.note_id, 'n-writer');
-
-    const ownerApply = new Database(ownerFile, { fileMustExist: true });
-    const summary = applyIncomingMutations(ownerApply, ledger.mutations);
-    assert.equal(summary.applied, 1);
-    assert.equal(summary.keptLocal, 1, 'the note trigger already created a newer equivalent page');
-    assert.deepEqual(summary.refused, []);
-    assert.equal(summary.cursor, ledger.cursor);
-    // The detail behind the counters: one entry per decision, carrying enough to tell a
-    // person what arrived without re-reading the row it wrote.
-    assert.equal(summary.entries.length, 2);
-    const noteEntry = summary.entries.find((entry) => entry.table === 'notes');
-    const pageEntry = summary.entries.find((entry) => entry.table === 'pages');
-    assert.equal(noteEntry.outcome, 'applied');
-    assert.equal(noteEntry.id, noteMutation.id);
-    assert.equal(noteEntry.seq, noteMutation.seq);
-    assert.equal(noteEntry.entityKind, 'note');
-    assert.equal(noteEntry.title, 'Aportación del colaborador');
-    assert.deepEqual(noteEntry.key, ['n-writer']);
-    assert.equal(pageEntry.outcome, 'keptLocal');
-    const landed = ownerApply.prepare("SELECT * FROM notes WHERE id = 'n-writer'").get();
-    assert.ok(landed, "the collaborator's note is now in the owner's own vault");
-    assert.equal(landed.updated_at, '2026-03-03T11:00:00.000Z', "the writer's timestamp survives the merge");
-    // The owner's own note is untouched, and the reader's private one never arrived.
-    assert.ok(ownerApply.prepare("SELECT 1 FROM notes WHERE id = 'n-owner'").get());
-    assert.equal(ownerApply.prepare("SELECT 1 FROM notes WHERE id = 'n-reader'").get(), undefined);
-
-    // Replaying the same batch leaves the row exactly as it was. Equal timestamps rewrite
-    // identical bytes, which is what makes a retry after a dropped acknowledgement safe.
-    const replayed = applyIncomingMutations(ownerApply, ledger.mutations);
-    assert.deepEqual(replayed.refused, []);
-    assert.deepEqual(ownerApply.prepare("SELECT * FROM notes WHERE id = 'n-writer'").get(), landed);
-    // The replay describes the same mutation under the same id. That identity is the whole
-    // reason applyIncomingMutations does not write the inbox itself: recording is the
-    // caller's job, and recordServerInbox keeps the FIRST account of what happened.
-    assert.equal(replayed.entries.length, 2);
-    assert.deepEqual(replayed.entries.map((entry) => entry.id), summary.entries.map((entry) => entry.id));
-
-    // And a local edit made after the mutation wins: newest-wins protects the owner's own
-    // later work from a stale batch arriving late.
-    ownerApply.prepare('UPDATE notes SET content = ?, updated_at = ? WHERE id = ?')
-      .run('El propietario lo revisó después.', '2026-03-04T09:00:00.000Z', 'n-writer');
-    const late = applyIncomingMutations(ownerApply, ledger.mutations);
-    assert.equal(late.applied, 0);
-    assert.equal(late.keptLocal, 2);
-    assert.equal(late.entries[0].outcome, 'keptLocal', 'and the inbox can say so, rather than showing it as applied');
-    assert.equal(ownerApply.prepare("SELECT content FROM notes WHERE id = 'n-writer'").get().content, 'El propietario lo revisó después.');
-    ownerApply.close();
-
-    const acked = await server.api(owner.deviceToken, 'POST', `/api/v1/spaces/${spaceId}/mutations/ack`, { json: { cursor: summary.cursor } });
-    assert.equal(acked.status, 200);
-    assert.equal((await (await server.api(owner.deviceToken, 'GET', `/api/v1/spaces/${spaceId}/mutations`)).json()).mutations.length, 0);
-
-    // ── The owner republishes, and only now does everyone see it ─────────────
-    const second = publishSnapshot(server.origin, owner.deviceToken, spaceId, ownerFile, ownerVault);
-    assert.notEqual(second.built.revision, first.built.revision, 'the corpus really changed');
-    const republished = await fetch(`${server.origin}/api/v1/spaces/${spaceId}/snapshot`, {
-      method: 'PUT',
-      headers: { authorization: `Bearer ${owner.deviceToken}`, 'content-encoding': 'gzip', 'x-nodus-revision': second.built.revision },
-      body: second.gzipped,
-    });
-    assert.equal(republished.status, 200);
+    // Private rows use the reliable ledger, but only another device of the same
+    // account may observe them. The note-backed compatibility page shares that scope.
+    const writerProbe = await server.deviceToken('escritor@example.test', 'escritor-account-password', spaceId, 'Writer privacy probe');
+    const writerLedger = await (await server.api(writerProbe.deviceToken, 'GET', `/api/v1/spaces/${spaceId}/mutations?since=0`)).json();
+    assert.equal(writerLedger.mutations.length, 2);
+    assert.equal(writerLedger.mutations.find((mutation) => mutation.table === 'notes').row.content, 'Corregida antes de enviarse.');
+    assert.equal(writerLedger.mutations.find((mutation) => mutation.table === 'pages').row.note_id, 'n-writer');
+    const ownerLedger = await (await server.api(owner.deviceToken, 'GET', `/api/v1/spaces/${spaceId}/mutations?since=0`)).json();
+    assert.equal(ownerLedger.mutations.length, 0, 'the owner cannot observe another user private note or its compatibility page');
+    const ownerInspect = new Database(ownerFile, { fileMustExist: true });
+    assert.equal(ownerInspect.prepare("SELECT 1 FROM notes WHERE id = 'n-writer'").get(), undefined);
+    ownerInspect.close();
 
     await replica.pullReplica(readerVault.id);
     const readerAfter = new Database(readerVault.path, { fileMustExist: true });
-    assert.ok(readerAfter.prepare("SELECT 1 FROM notes WHERE id = 'n-writer'").get(), "the reader now sees the collaborator's work");
-    // And the reader's OWN note survived the publication that overwrote everything else.
+    assert.equal(readerAfter.prepare("SELECT 1 FROM notes WHERE id = 'n-writer'").get(), undefined, "another reader never sees the collaborator's private note");
+    // The reader's OWN note survives every corpus pull.
     assert.equal(readerAfter.prepare("SELECT title FROM notes WHERE id = 'n-reader'").get().title, 'Nota privada del lector');
     assert.equal(readerAfter.prepare('SELECT COUNT(*) AS n FROM works').get().n, 1);
     readerAfter.close();
@@ -416,6 +371,7 @@ test('a revoked replica stops syncing and keeps every byte', { timeout: 180_000 
 test('two offline writers converge Yjs text through binary updates while the owner stays offline', { timeout: 180_000 }, async () => {
   await withServer({ label: 'replica-yjs-convergence' }, async (server) => {
     const spaceId = await server.createSpace('Wiki convergente');
+    await server.setPublicationPolicy(spaceId, ['allowUserContent']);
     const owner = await server.deviceToken(server.adminEmail, server.adminPassword, spaceId, 'Owner offline');
     const ownerFile = path.join(userData, 'yjs-owner.sqlite');
     fs.rmSync(ownerFile, { force: true });

@@ -14,8 +14,9 @@ import { getSettings } from '../db/settingsRepo';
 import { listVaults, getActiveVault, restoreVaultDatabase, setActiveVault } from '../vaults/vaultRegistry';
 import { closeGlobalLibraryRuntime } from '../library/libraryRuntime';
 import { configuredLibraryRoot } from '../library/libraryPaths';
+import { pathStaysInside } from '../library/libraryFileUtils';
 import type { VaultType } from '@shared/types';
-import { getApiKey, getAudioKey, getBackupPassword, setApiKey, setAudioKey } from '../secrets/secretStore';
+import { getBackupPassword, setApiKey, setAudioKey } from '../secrets/secretStore';
 import {
   decryptBackupPayload,
   encryptBackupPayloadFile,
@@ -61,8 +62,8 @@ interface BackupManifest {
   // v3 = secret-free single-vault backup. v4 = multi-vault (every vault of every
   // type). v5 adds granular auxiliary state. v6 encrypts the payload with an
   // independent recovery key and wraps that key with the master password.
-  // `includesSecrets` distinguishes a manual export (keys inside) from an automatic
-  // one. Older app versions reject newer formats cleanly.
+  // `includesSecrets` remains only to read legacy archives that carried keys. New
+  // archives always set it to false. Older app versions reject newer formats cleanly.
   formatVersion: 1 | 2 | 3 | 4 | 5 | 6;
   schemaVersion: number;
   appVersion: string;
@@ -130,9 +131,8 @@ export interface BackupInventory {
 const GLOBAL_AUXILIARY_FILES = ['app-prefs.json', 'browser-bookmarks.json', 'radar-store.json', 'nodi-chat-history.json', 'nodi-notes.json', 'nodi-notifications.json', 'nodi-welcome.seed'] as const;
 const VAULT_HISTORY_FILES = ['study-chat-history.json', 'study-search-index.json'] as const;
 const VAULT_MEDIA_FILES = ['study-audio-meta.json'] as const;
-/** Cloud TTS keys live outside the AI-provider store, encrypted per vault. The blobs
- *  are safeStorage-bound and useless elsewhere, so the archive carries the plaintext
- *  alongside `api-keys.json` and re-encrypts it on the destination machine. */
+/** Cloud TTS keys live outside the AI-provider store. This list is retained only to
+ * restore legacy encrypted backups; new archives never serialize the plaintext keys. */
 const AUDIO_KEY_NAMES = ['hume'] as const;
 /**
  * Settings that describe THIS computer, not the library. They live in the vault's
@@ -178,7 +178,7 @@ function fullBackupSelection(): BackupSelection {
     includePreferences: true,
     includeHistories: true,
     includeGeneratedMedia: true,
-    includeApiKeys: true,
+    includeApiKeys: false,
   };
 }
 
@@ -320,14 +320,10 @@ export async function createBackupArchiveFile(options: {
     date: new Date().toISOString(),
     zoteroUserId: settings.zoteroUserId,
   };
-  // A credential the OS keychain can no longer decrypt must NOT cost the user their
-  // library snapshot: restoreApiKeys is merge-only, so omitting one key never erases
-  // anything on the destination, whereas refusing to run means no backup at all — for
-  // months, since the failure is invisible until someone opens Settings. The caller
-  // surfaces `lockedApiKeyProviders()` as a warning beside the successful result.
-  const includesSecrets = true;
-  const apiKeys = readApiKeys();
-  const audioKeys = readAudioKeys();
+  // New backups never serialize API/audio credentials. They remain in the OS keychain;
+  // legacy archives can still be restored, but no new inner ZIP contains plaintext keys.
+  const includesSecrets = false;
+  const apiKeys: Partial<Record<AiProvider, string>> = {};
 
   // Snapshot EVERY vault (all types), not just the active one, so the archive is an
   // integral copy of the whole app. Each vault's DB carries its own settings row,
@@ -374,12 +370,6 @@ export async function createBackupArchiveFile(options: {
     files['registry.json'] = Buffer.from(JSON.stringify({ activeVaultId, vaults: vaultEntries }, null, 2));
     await addAuxiliaryFiles(files, vaults, selection);
     const globalLibraryFileCount = await addGlobalLibraryFiles(files);
-    if (includesSecrets) {
-      files['api-keys.json'] = Buffer.from(JSON.stringify(apiKeys, null, 2));
-      if (Object.keys(audioKeys).length > 0) {
-        files['audio-keys.json'] = Buffer.from(JSON.stringify(audioKeys, null, 2));
-      }
-    }
     phaseStartedAt = logBackupPerf('collect-auxiliary:complete', phaseStartedAt, { files: Object.keys(files).length });
 
     // Hashing and CRC-ing every entry are both full passes over the whole library.
@@ -736,6 +726,12 @@ function openBackupArchive(archive: Buffer, password: string): OpenedBackup | { 
   if (!payloadManifest) {
     return { ok: false, message: 'Copia inválida: falta el manifiesto interno.' };
   }
+  // Validate vault descriptors before any consumer looks up ZIP entries. In
+  // particular, duplicate IDs or paths make the manifest ambiguous and could
+  // cause one database/inventory to be silently reused for another vault.
+  if (payloadManifest.vaults && !streamedVaultEntries(payloadManifest as StreamedInnerManifest)) {
+    return { ok: false, message: 'Copia inválida: el manifiesto contiene bóvedas o rutas duplicadas.' };
+  }
   if (!verifyPayloadHashes(payload, payloadManifest)) {
     return { ok: false, message: 'Copia inválida: los hashes internos no coinciden.' };
   }
@@ -981,6 +977,9 @@ async function extractAtomicEntry(payload: ZipFileReader, entry: ZipFileEntry, t
 function streamedVaultEntries(manifest: StreamedInnerManifest): BackupVaultEntry[] | null {
   if (!manifest.vaults?.length) return null;
   const vaults: BackupVaultEntry[] = [];
+  const ids = new Set<string>();
+  const dbFiles = new Set<string>();
+  const inventoryFiles = new Set<string>();
   for (const candidate of manifest.vaults) {
     if (
       typeof candidate.id !== 'string' || !candidate.id
@@ -990,7 +989,15 @@ function streamedVaultEntries(manifest: StreamedInnerManifest): BackupVaultEntry
       || !isVaultType(candidate.type)
       || typeof candidate.dbFile !== 'string' || !candidate.dbFile
       || typeof candidate.inventoryFile !== 'string' || !candidate.inventoryFile
+      || !safeArchiveRelative(candidate.dbFile)
+      || !safeArchiveRelative(candidate.inventoryFile)
+      || ids.has(candidate.id)
+      || dbFiles.has(candidate.dbFile)
+      || inventoryFiles.has(candidate.inventoryFile)
     ) return null;
+    ids.add(candidate.id);
+    dbFiles.add(candidate.dbFile);
+    inventoryFiles.add(candidate.inventoryFile);
     vaults.push({
       id: candidate.id,
       name: candidate.name,
@@ -1023,8 +1030,8 @@ async function stageGlobalLibraryRestoreFromFile(
       if (entry.isDirectory || !entry.name.startsWith(prefix)) continue;
       const relative = safeArchiveRelative(entry.name.slice(prefix.length));
       if (!relative) throw new Error(`La copia contiene una ruta de Biblioteca no válida: ${entry.name}`);
-      const target = path.resolve(staging, ...relative.split('/'));
-      if (!target.startsWith(`${path.resolve(staging)}${path.sep}`)) throw new Error('La copia intenta escribir fuera de la Biblioteca.');
+      const target = archiveTargetInside(staging, relative);
+      if (!target) throw new Error('La copia intenta escribir fuera de la Biblioteca.');
       await payload.extract(entry, target, tracker?.advance);
       written += 1;
     }
@@ -1113,7 +1120,9 @@ async function restoreAuxiliaryFilesFromFile(
       for (const entry of payload.entries) {
         if (entry.isDirectory || !entry.name.startsWith(prefix)) continue;
         const relative = safeArchiveRelative(entry.name.slice(prefix.length));
-        if (relative) await extractAtomicEntry(payload, entry, path.join(targetDir, 'audio', ...relative.split('/')), tracker);
+        const target = relative ? archiveTargetInside(path.join(targetDir, 'audio'), relative) : null;
+        if (!target) throw new Error(`La copia contiene una ruta de audio no válida: ${entry.name}`);
+        await extractAtomicEntry(payload, entry, target, tracker);
       }
     }
   }
@@ -1243,8 +1252,8 @@ function stageGlobalLibraryRestore(payload: AdmZip, payloadManifest: PayloadMani
       if (entry.isDirectory || !entry.entryName.startsWith(prefix)) continue;
       const relative = safeArchiveRelative(entry.entryName.slice(prefix.length));
       if (!relative) throw new Error(`La copia contiene una ruta de Biblioteca no válida: ${entry.entryName}`);
-      const target = path.resolve(staging, ...relative.split('/'));
-      if (!target.startsWith(`${path.resolve(staging)}${path.sep}`)) throw new Error('La copia intenta escribir fuera de la Biblioteca.');
+      const target = archiveTargetInside(staging, relative);
+      if (!target) throw new Error('La copia intenta escribir fuera de la Biblioteca.');
       writeAtomicFile(target, entry.getData());
       written += 1;
     }
@@ -1430,10 +1439,27 @@ function restoreGlobalPreferences(data: Buffer): void {
   writeAtomicFile(target, Buffer.from(JSON.stringify(merged, null, 2)));
 }
 
-function safeArchiveRelative(value: string): string | null {
+export function safeArchiveRelative(value: string): string | null {
+  // ZIP names are portable POSIX paths. Reject Windows separators and drive/UNC
+  // spellings even on POSIX, where path.posix would otherwise treat them as a
+  // harmless filename that becomes traversal once consumed on Windows.
+  if (!value || value.includes('\\') || value.includes('\0') || /^[A-Za-z]:/.test(value) || value.startsWith('//')) return null;
+  const parts = value.split('/');
+  if (parts.some((part) => !part || part === '.' || part === '..')) return null;
   const normalized = path.posix.normalize(value);
-  if (!normalized || normalized === '.' || normalized.startsWith('../') || path.posix.isAbsolute(normalized)) return null;
+  if (!normalized || normalized === '.' || normalized === '..' || normalized.startsWith('../') || path.posix.isAbsolute(normalized)) return null;
   return normalized;
+}
+
+function archiveTargetInside(root: string, relative: string): string | null {
+  const safe = safeArchiveRelative(relative);
+  if (!safe) return null;
+  const resolvedRoot = path.resolve(root);
+  const target = path.resolve(resolvedRoot, ...safe.split('/'));
+  if (target !== resolvedRoot && !target.startsWith(`${resolvedRoot}${path.sep}`)) return null;
+  // Textual containment is insufficient when an existing audio/library folder
+  // is a symlink. Check the closest existing ancestor as well.
+  return pathStaysInside(path.dirname(resolvedRoot), target) ? target : null;
 }
 
 function restoreAuxiliaryFiles(payload: AdmZip, payloadManifest: PayloadManifest): void {
@@ -1470,7 +1496,9 @@ function restoreAuxiliaryFiles(payload: AdmZip, payloadManifest: PayloadManifest
       for (const entry of payload.getEntries()) {
         if (entry.isDirectory || !entry.entryName.startsWith(prefix)) continue;
         const relative = safeArchiveRelative(entry.entryName.slice(prefix.length));
-        if (relative) writeAtomicFile(path.join(targetDir, 'audio', ...relative.split('/')), entry.getData());
+        const target = relative ? archiveTargetInside(path.join(targetDir, 'audio'), relative) : null;
+        if (!target) throw new Error(`La copia contiene una ruta de audio no válida: ${entry.entryName}`);
+        writeAtomicFile(target, entry.getData());
       }
     }
   }
@@ -1668,30 +1696,6 @@ function hasTable(db: Database.Database, table: string): boolean {
 
 function quoteIdentifier(value: string): string {
   return `"${value.replace(/"/g, '""')}"`;
-}
-
-function readApiKeys(): Partial<Record<AiProvider, string>> {
-  return Object.fromEntries(
-    SECRET_PROVIDERS.flatMap((provider) => {
-      const key = getApiKey(provider);
-      return key ? [[provider, key]] : [];
-    })
-  ) as Partial<Record<AiProvider, string>>;
-}
-
-function readAudioKeys(): Record<string, string> {
-  return Object.fromEntries(
-    AUDIO_KEY_NAMES.flatMap((name) => {
-      // A key the keychain cannot read is skipped, never fatal — same rule as the AI keys.
-      let key: string | null = null;
-      try {
-        key = getAudioKey(name);
-      } catch {
-        key = null;
-      }
-      return key ? [[name, key]] : [];
-    })
-  );
 }
 
 function restoreAudioKeys(keys: Record<string, string>): void {

@@ -195,7 +195,7 @@ test('an idle desktop drains the ledger on its own and shows what arrived', { ti
   });
 });
 
-test('a refused mutation is recorded once, however often it comes back', { timeout: 120_000 }, async () => {
+test('a permanently refused mutation is recorded once and cannot block later work', { timeout: 120_000 }, async () => {
   await withServer({ label: 'inbox-refusal' }, async (server) => {
     const spaceId = await server.createSpace('Rechazos');
     await server.createUser('telefono2@example.test', 'telefono-account-password', [{ spaceId, role: 'writer' }]);
@@ -211,9 +211,8 @@ test('a refused mutation is recorded once, however often it comes back', { timeo
       nodusServerAutoSync: false,
     });
 
-    // A mutation written against a schema this build does not have. It is refused, the
-    // cursor does not advance, and the server therefore keeps offering it — forever, until
-    // the user updates Nodus. That is the case the DO NOTHING conflict clause is for.
+    // A mutation written against a schema this build does not have is deterministically invalid.
+    // It is recorded for the user and acknowledged so it cannot block every later valid row.
     const sent = await server.api(phone.deviceToken, 'POST', `/api/v1/spaces/${spaceId}/mutations`, {
       json: {
         mutations: [reportMutation('mut-future', reportRow('dr-future', 'Del futuro', 'Un esquema más reciente'), {
@@ -230,7 +229,7 @@ test('a refused mutation is recorded once, however often it comes back', { timeo
     assert.match(first[0].reason, /esquema más reciente/);
     assert.equal(first[0].title, null, 'a refusal names no row, because none was written');
 
-    // The user reads it, and the poller runs again — twice, as it would every 30 seconds.
+    // The user reads it, and later polls do not recreate or unread the durable refusal.
     const { markServerInboxRead } = require(path.join(repoRoot, 'electron/db/serverInboxRepo.ts'));
     markServerInboxRead('mut-future');
     await drainServerInboxNow();
@@ -241,9 +240,9 @@ test('a refused mutation is recorded once, however often it comes back', { timeo
     assert.equal(after[0].read, true, 'and it came back as unread, which the user could never clear');
     assert.equal(after[0].arrivedAt, first[0].arrivedAt, 'a stuck mutation must not keep floating to the top');
 
-    // It is still in the ledger, because refusing does not acknowledge.
+    // It is gone from the ledger: permanent poison rows are safe to acknowledge.
     const remaining = await (await server.api(desktop.accessToken, 'GET', `/api/v1/spaces/${spaceId}/mutations`)).json();
-    assert.equal(remaining.mutations.length, 1, 'a refusal must never be acknowledged away');
+    assert.equal(remaining.mutations.length, 0, 'a permanent refusal must not block the ledger');
   });
 });
 

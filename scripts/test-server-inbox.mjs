@@ -3,9 +3,8 @@
 // Pins serverInboxRepo against a REAL migrated database, because the two decisions that
 // matter here are both about repetition rather than about a single write:
 //
-//   • a REFUSED mutation stops the apply loop without advancing the cursor, so the server
-//     hands back the same mutation every thirty seconds, for as long as the reason stands.
-//     Recording it must be idempotent, and must not resurrect an entry as unread.
+//   • a permanently REFUSED mutation is recorded and acknowledged so it cannot block every
+//     later change. A transient operational failure is retried without advancing the cursor.
 //   • an APPLIED mutation may be replayed after a dropped acknowledgement, carrying the
 //     same id. Same requirement.
 //
@@ -279,4 +278,23 @@ test('global-library annotations can leave the vault database through the extern
       parentEntityId: 'document:with-colon', parentTitle: 'Documento global',
     },
   ]);
+});
+
+test('a transient external write failure is never acknowledged or presented as a permanent refusal', () => {
+  const db = getDb();
+  const summary = applyIncomingMutations(db, [{
+    id: 'mut-library-retry', seq: 41, clientId: 'iphone-de-jorge', kind: 'upsert', table: 'writing_draft_annotations',
+    key: ['library-annotation:retry'], row: { id: 'library-annotation:retry', draft_id: 'nodus-library:retry' },
+    schemaVersion: SCHEMA_VERSION, createdAt: '2026-08-13T12:01:00.000Z',
+  }, {
+    id: 'mut-after-retry', seq: 42, clientId: 'iphone-de-jorge', kind: 'delete', table: 'notes',
+    key: ['must-not-run'], schemaVersion: SCHEMA_VERSION, createdAt: '2026-08-13T12:02:00.000Z',
+  }], {
+    external() { throw new Error('SQLITE_BUSY: sidecar temporarily unavailable'); },
+  });
+  assert.equal(summary.cursor, 0, 'the failed sequence remains owed by the server');
+  assert.equal(summary.entries.length, 0, 'a retryable failure is not a durable refusal notification');
+  assert.deepEqual(summary.refused, []);
+  assert.deepEqual(summary.retryable, [{ id: 'mut-library-retry', reason: 'SQLITE_BUSY: sidecar temporarily unavailable' }]);
+  assert.equal(db.prepare("SELECT 1 FROM notes WHERE id = 'must-not-run'").get(), undefined, 'later mutations wait behind the retry');
 });

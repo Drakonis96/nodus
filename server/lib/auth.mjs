@@ -79,7 +79,8 @@ export function createAuthorizer({ store, resourceFor, publicUrl }) {
   }
 
   function sessionFrom(req, cookieValue) {
-    return store.session(cookieValue);
+    const raw = cookieValue || String(req.headers.cookie || '').split(';').map((part) => part.trim()).find((part) => part.startsWith('nodus_session='))?.slice('nodus_session='.length) || '';
+    try { return store.session(decodeURIComponent(raw)); } catch { return null; }
   }
 
   /**
@@ -96,6 +97,10 @@ export function createAuthorizer({ store, resourceFor, publicUrl }) {
       resource = 'api',
       scope = null,
       sessionCookie = null,
+      // Some device-only control-plane routes are server-wide URLs even though the
+      // credential itself is bound to one space. Resolve that binding here so those
+      // routes do not reimplement expiry, user, membership and role checks by hand.
+      boundSpace = false,
     } = options;
     const now = Date.now();
     const raw = bearer(req);
@@ -129,7 +134,7 @@ export function createAuthorizer({ store, resourceFor, publicUrl }) {
       }
     }
 
-    if (!principal && via.includes('session') && sessionCookie) {
+    if (!principal && via.includes('session')) {
       const current = sessionFrom(req, sessionCookie);
       if (current) {
         user = current.user;
@@ -142,17 +147,18 @@ export function createAuthorizer({ store, resourceFor, publicUrl }) {
       return challenge(res, { resource, scope: scope || 'materials.read' });
     }
 
-    if (!spaceId) {
+    const authorizedSpaceId = spaceId || (boundSpace ? device?.spaceId : null);
+    if (!authorizedSpaceId) {
       if (touched) store.save();
       return { principal, user, device, space: null, role: null };
     }
 
-    const space = store.state.spaces.find((entry) => entry.id === spaceId) ?? null;
+    const space = store.state.spaces.find((entry) => entry.id === authorizedSpaceId) ?? null;
     let role = space ? spaceRole(user.id, space.id) : null;
 
-    // A device paired before roles existed belongs, by construction, to the person who
-    // was publishing that space. Refusing it would break every install on upgrade.
-    if (space && device?.grandfathered && device.kind === 'publisher') role = 'owner';
+    // `grandfathered` is migration metadata, not an authorization bypass. It keeps the
+    // historical token kind, but a live membership role (including a deliberate demotion)
+    // always wins and a revoked membership never comes back through an old token.
 
     if (touched) store.save();
 

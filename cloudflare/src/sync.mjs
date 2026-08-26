@@ -19,8 +19,19 @@ const MAX_LEDGER_BYTES = 50 * 1024 * 1024;
 const MUTATION_BODY_INLINE_BYTES = 96 * 1024;
 const MAX_NODI_NOTES = 500;
 const MAX_NODI_NOTE_BYTES = 64 * 1024;
+const MAX_PRIVATE_OWNERSHIP_ROWS = 250_000;
 const TOMBSTONE_TTL_MS = 90 * 86400_000;
 const ID = /^[A-Za-z0-9_.:-]{1,128}$/;
+
+function isUserScopedMutationEntry(entry) {
+  const table = String(entry?.table || entry?.table_name || '');
+  if (MUTABLE_TABLES[table]?.scope === 'user') return true;
+  if (table === 'pages' && (String(entry?.key?.[0] || '').startsWith('note:')
+      || entry?.row?.note_id !== null && entry?.row?.note_id !== undefined && String(entry.row.note_id) !== '')) return true;
+  const pageColumns = table === 'page_links' ? ['from_page_id', 'to_page_id']
+    : ['page_blocks', 'page_document_updates', 'page_revisions', 'page_comments'].includes(table) ? ['page_id'] : [];
+  return pageColumns.some((column) => String(entry?.row?.[column] || '').startsWith('note:'));
+}
 
 function utf8Bytes(value) {
   return new TextEncoder().encode(value).byteLength;
@@ -28,6 +39,60 @@ function utf8Bytes(value) {
 
 function rowKey(key) {
   return JSON.stringify(key.map((value) => value == null ? null : String(value)));
+}
+
+function privateEntityKey(mutation) {
+  return `${String(mutation.table || '')}:${rowKey(mutation.key)}`;
+}
+
+function pageIdsForMutation(mutation) {
+  const table = String(mutation.table || '');
+  if (table === 'page_links') return [mutation.row?.from_page_id, mutation.row?.to_page_id].filter(Boolean).map(String);
+  if (['page_blocks', 'page_document_updates', 'page_revisions', 'page_comments'].includes(table)) {
+    return [mutation.row?.page_id].filter(Boolean).map(String);
+  }
+  return [];
+}
+
+function ownershipTargets(mutation) {
+  const targets = [{ namespace: 'entity', key: privateEntityKey(mutation) }];
+  if (mutation.table === 'pages') {
+    const key = mutation.row?.id ?? mutation.key?.[0];
+    if (key !== null && key !== undefined && String(key) !== '') targets.push({ namespace: 'page', key: String(key) });
+  }
+  if (mutation.table === 'page_comments') {
+    const key = mutation.row?.id ?? mutation.key?.[0];
+    if (key !== null && key !== undefined && String(key) !== '') targets.push({ namespace: 'comment', key: String(key) });
+  }
+  return targets;
+}
+
+async function ownershipUsers(env, spaceId, namespace, key, cache) {
+  const cacheKey = `${namespace}:${key}`;
+  if (cache.has(cacheKey)) return cache.get(cacheKey);
+  const records = await all(env.DB, `SELECT user_id FROM private_mutation_ownership
+    WHERE space_id = ?1 AND namespace = ?2 AND local_key = ?3`, spaceId, namespace, key);
+  const owners = new Set(records.map((row) => String(row.user_id || '')).filter(Boolean));
+  cache.set(cacheKey, owners);
+  return owners;
+}
+
+async function privateOwnersForMutation(env, auth, mutation, cache, pendingPages, pendingComments) {
+  const owners = new Set();
+  if (isUserScopedMutationEntry(mutation)) owners.add(String(auth.user_id));
+  for (const owner of await ownershipUsers(env, auth.space_id, 'entity', privateEntityKey(mutation), cache)) owners.add(owner);
+  for (const pageId of pageIdsForMutation(mutation)) {
+    for (const owner of await ownershipUsers(env, auth.space_id, 'page', pageId, cache)) owners.add(owner);
+    for (const owner of pendingPages.get(pageId) ?? []) owners.add(owner);
+  }
+  if (['page_comment_reactions', 'page_comment_mentions'].includes(String(mutation.table || ''))) {
+    const commentId = String(mutation.row?.comment_id ?? mutation.key?.[0] ?? '');
+    if (commentId) {
+      for (const owner of await ownershipUsers(env, auth.space_id, 'comment', commentId, cache)) owners.add(owner);
+      for (const owner of pendingComments.get(commentId) ?? []) owners.add(owner);
+    }
+  }
+  return owners;
 }
 
 function validateAnnotation(mutation) {
@@ -137,12 +202,48 @@ export async function postMutations(env, auth, request) {
     valid.push({ mutation, verdict });
   }
   if (missing.size) throw new HttpError(409, 'missing_assets', 'Upload referenced images before their mutations.', { missing: [...missing] });
+  const ownershipCache = new Map();
+  const pendingPages = new Map();
+  const pendingComments = new Map();
+  const addPending = (map, key, userId) => {
+    if (key === null || key === undefined || String(key) === '') return;
+    const normalized = String(key);
+    const owners = map.get(normalized) ?? new Set(); owners.add(String(userId)); map.set(normalized, owners);
+  };
+  for (const { mutation } of valid) {
+    if (mutation.table === 'pages' && isUserScopedMutationEntry(mutation)) {
+      addPending(pendingPages, mutation.row?.id ?? mutation.key?.[0], auth.user_id);
+    }
+  }
+  for (const { mutation } of valid) {
+    if (mutation.table !== 'page_comments') continue;
+    const owners = await privateOwnersForMutation(env, auth, mutation, ownershipCache, pendingPages, pendingComments);
+    if (owners.has(String(auth.user_id))) addPending(pendingComments, mutation.row?.id ?? mutation.key?.[0], auth.user_id);
+  }
+  const ownershipCount = await first(env.DB, 'SELECT COUNT(*) AS count FROM private_mutation_ownership WHERE space_id = ?1', auth.space_id);
+  let privateOwnershipRows = Number(ownershipCount?.count || 0);
   for (const { mutation, verdict } of valid) {
+    const privateOwners = await privateOwnersForMutation(env, auth, mutation, ownershipCache, pendingPages, pendingComments);
+    if (privateOwners.size && !privateOwners.has(String(auth.user_id))) {
+      rejected.push({ id: mutation.id, reason: 'private_parent_forbidden' });
+      continue;
+    }
+    const ownerScope = privateOwners.has(String(auth.user_id)) ? `user:${auth.user_id}` : 'vault';
+    const targets = ownerScope === 'vault' ? [] : ownershipTargets(mutation);
+    const unseen = [];
+    for (const target of targets) {
+      const owners = await ownershipUsers(env, auth.space_id, target.namespace, target.key, ownershipCache);
+      if (!owners.has(String(auth.user_id))) unseen.push(target);
+    }
+    if (privateOwnershipRows + unseen.length > MAX_PRIVATE_OWNERSHIP_ROWS) {
+      rejected.push({ id: mutation.id, reason: 'private_ownership_capacity' });
+      continue;
+    }
     const body = JSON.stringify({
       id: String(mutation.id), clientId: String(mutation.clientId || ''), kind: mutation.kind,
       table: verdict.table, key: mutation.key, row: mutation.kind === 'upsert' ? mutation.row : null,
       assets: Array.isArray(mutation.assets) ? mutation.assets : [], schemaVersion: Number(mutation.schemaVersion) || 0,
-      createdAt: String(mutation.createdAt || nowIso()), userId: auth.user_id,
+      createdAt: String(mutation.createdAt || nowIso()), userId: auth.user_id, ownerScope,
     });
     let bodyJson = body;
     let bodyObjectKey = null;
@@ -156,8 +257,16 @@ export async function postMutations(env, auth, request) {
       VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)`,
     String(mutation.id), auth.space_id, String(mutation.clientId || ''), auth.user_id, mutation.kind, verdict.table,
     rowKey(mutation.key), bodyJson, bodyObjectKey, Number(mutation.schemaVersion) || 0, String(mutation.createdAt || nowIso()));
-    if (Number(result?.meta?.changes || 0)) accepted.push(String(mutation.id));
-    else duplicate.push(String(mutation.id));
+    if (Number(result?.meta?.changes || 0)) {
+      accepted.push(String(mutation.id));
+      for (const target of unseen) {
+        await run(env.DB, `INSERT OR IGNORE INTO private_mutation_ownership
+          (space_id, namespace, local_key, user_id, created_at) VALUES (?1, ?2, ?3, ?4, ?5)`,
+        auth.space_id, target.namespace, target.key, auth.user_id, nowIso());
+        ownershipCache.get(`${target.namespace}:${target.key}`)?.add(String(auth.user_id));
+      }
+      privateOwnershipRows += unseen.length;
+    } else duplicate.push(String(mutation.id));
   }
   const cursor = accepted.length ? await first(env.DB, 'SELECT MAX(sequence) AS value FROM mutations WHERE space_id = ?1', auth.space_id) : null;
   return { accepted, duplicate, rejected, cursor: cursor?.value == null ? null : Number(cursor.value) };
@@ -181,10 +290,17 @@ export async function getMutations(env, auth, request) {
   const mutations = [];
   for (const row of selected) {
     const body = await mutationBody(env, row);
-    if (body) mutations.push({ seq: Number(row.sequence), ...body });
+    if (!body) continue;
+    const explicitlyPrivate = String(body.ownerScope || '').startsWith('user:');
+    const privateEntry = explicitlyPrivate || isUserScopedMutationEntry(body);
+    const owner = explicitlyPrivate ? String(body.ownerScope).slice(5) : String(row.user_id || body.userId || '');
+    // D1 has always stored the authenticated user_id alongside the body. Old private rows
+    // therefore migrate safely; if ownership is ever absent, fail closed rather than share.
+    if (privateEntry && (!owner || owner !== String(auth.user_id))) continue;
+    mutations.push({ seq: Number(row.sequence), ...body });
   }
   const space = await first(env.DB, 'SELECT schema_version FROM spaces WHERE id = ?1', auth.space_id);
-  return { mutations, cursor: mutations.at(-1)?.seq ?? since, hasMore: rows.length > limit, spaceSchemaVersion: Number(space?.schema_version || 0) };
+  return { mutations, cursor: Number(selected.at(-1)?.sequence ?? since), hasMore: rows.length > limit, spaceSchemaVersion: Number(space?.schema_version || 0) };
 }
 
 export async function ackMutations(env, auth, request) {

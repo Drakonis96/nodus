@@ -106,6 +106,7 @@ import {
   stopNodusServerSync,
 } from './serverSync/serverSyncService';
 import { startInboxPolling, stopInboxPolling } from './serverSync/inboxPoller';
+import { syncActiveServerProfilePreferences } from './serverSync/profilePreferencesSync';
 import {
   createConnectedVault,
   detachReplica,
@@ -447,6 +448,9 @@ export function registerIpc(
     for (const win of BrowserWindow.getAllWindows()) {
       if (!win.isDestroyed()) win.webContents.send('settings:changed', next);
     }
+    // Persist portable profile changes without putting an offline Server on the critical
+    // path of the local Settings screen. The replica poller retries after reconnection.
+    void syncActiveServerProfilePreferences(next).catch(() => undefined);
     return next;
   });
 

@@ -192,6 +192,32 @@ If your platform supports secrets mounted as files, you can use `NODUS_ADMIN_EMA
 `NODUS_ADMIN_PASSWORD_FILE` instead of the direct values. Do not simultaneously configure a direct
 variable and its variant `_FILE`. Nodus reads the file when booting and never records the content.
 
+### Per-user AI keys (advanced Server only)
+
+Server AI is disabled unless an external versioned keyring is mounted. Create it outside the
+`nodus_data` volume and start Compose with the optional overlay:
+
+```sh
+mkdir -p -m 700 server/secrets
+node --input-type=module -e "import {createKeyring} from './server/lib/ai/keyring.mjs'; createKeyring('./server/secrets/nodus-ai-keyring.json')"
+chmod 600 server/secrets/nodus-ai-keyring.json
+NODUS_AI_KEYRING_HOST_FILE=./secrets/nodus-ai-keyring.json \
+  docker compose -f server/docker-compose.yml -f server/docker-compose.ai.yml up -d
+```
+
+The user's profile can then store an OpenAI, Anthropic, Gemini, Mistral or Cohere key. The API
+returns only status metadata. Credentials are envelope-encrypted per user with AES-256-GCM; the
+authenticated user and server installation are authenticated associated data, and the data key is
+wrapped by the external KEK. Model-provider calls exist only in the central Provider Gateway.
+Provider work is bounded to four concurrent operations per user and 32 across the process by
+default. Operators may lower or raise those ceilings with `NODUS_AI_MAX_ACTIVE_PER_USER` and
+`NODUS_AI_MAX_ACTIVE_GLOBAL`; the global value must never be lower than the per-user value.
+
+This protects against database/volume theft, accidental exports, normal administrators and
+cross-user API access. It cannot make the secret inaccessible to an attacker with host root access
+who can read the KEK and process memory: the server must decrypt a key briefly in order to use it.
+For that threat, isolate the host/operator role or replace the file keyring with an external KMS/HSM.
+
 ## Connect a Nodus Desktop Vault
 
 1. Enter as administrator in `https://tu-dominio`.
@@ -262,6 +288,13 @@ All three take a whole number of bytes, at least 65536, and refuse to boot on a 
 cannot use. `GET /api/v1/capabilities` publishes the three of them, so a client can measure a change
 before making it rather than discovering the limit by being refused.
 
+Binary collaboration lanes have independent aggregate quotas per space: document updates default
+to 1 GiB (`NODUS_MAX_SPACE_DOCUMENT_UPDATE_BYTES`), completed shared blobs to 2 GiB
+(`NODUS_MAX_SPACE_SHARED_BLOB_BYTES`) and interrupted/partial blob uploads to 512 MiB
+(`NODUS_MAX_SPACE_PARTIAL_BLOB_BYTES`). Stale partial uploads are discarded after 24 hours. These
+limits prevent a writer from filling the server through chunked uploads while preserving the
+existing per-object checks.
+
 ## Access levels
 
 A membership grants one of three levels in one space. An account can hold a different level in each
@@ -298,8 +331,24 @@ the other. An AI client reads; only an application can write.
   token for the chosen one. The pairing code flow stays as it is for publishers.
 - `GET /api/v1/spaces/:id/...` — works, ideas, themes, gaps, authors, debates, notes, Deep Research
   reports, immersion sessions, passages, search.
-- `POST /api/v1/spaces/:id/context` — the retrieval package for a client-side chat. **The server
-  never receives an AI provider key**; the client builds its own prompt and calls its own provider.
+- `POST /api/v1/spaces/:id/context` — the retrieval package for a client-side chat. Desktop keeps
+  using its local credentials. Advanced Server may instead use `/api/v2/vaults/:id/ai/:capability`,
+  which resolves only the authenticated user's encrypted credential through the central gateway.
+- `/api/v2/me/ai/providers`, `/credentials/:provider`, `/preferences` — user-owned AI profile.
+  Saved credentials are never returned and embedding model fields are rejected as preferences.
+- `GET|PUT /api/v2/me/preferences` — versioned portable user profile shared by Desktop and Server
+  Web. Connected Vault uploads it with the authenticated device token when the connection is
+  created, whenever the active connected vault changes Settings, and after reconnecting. The
+  payload is a strict allowlist of appearance/accessibility, preferred task models/favourites and
+  compatible workspace policy. API keys and key-presence metadata, local-provider URLs, bearer
+  tokens, filesystem paths, backup settings and the vault embedding selection have no field in
+  this contract. Unknown, secret-looking and embedding fields are rejected rather than ignored.
+  Server derives ownership and source-device provenance from authentication; it never accepts a
+  client `userId` or device owner. Repeating the same digest from the same Desktop is a no-op, so
+  an unchanged restart cannot overwrite a newer Server/other-device choice.
+- `GET /api/v2/vaults/:id/embedding-contracts` — immutable provider/model/dimension/protocol/task/
+  preprocessing/normalization/quantization contract. Legacy v1 indexes are marked `legacy_locked`;
+  Server refuses to generate new vectors when exact compatibility cannot be proven.
 - `POST /api/v1/spaces/:id/mutations` (writer) and `GET` + `/ack` (owner) — the ledger.
 - `PUT /api/v1/spaces/:id/vectors` (owner) and `POST .../search/semantic` — quantized embeddings for
   semantic search. A client whose embedding provider does not match the published one is told so
@@ -398,10 +447,22 @@ documented here because they change what the server binds and who it will answer
   reader accounts; you cannot view existing passwords.
 - It revokes any lost device from the web. Disconnecting the Vault on Desktop stops submissions, but
   the administrator must remove the retained posting when appropriate.
-- Make periodic copies of the volume `nodus_data` and test its restoration. The status and
-  publications are under `/data` within the container.
-- The backup should be protected as the materials it contains. For institutional data, document
-  accommodation, conservation, accesses, managers and transfers according to your policy and GDPR.
+- Stop the server and create versioned backups with `npm run server:backup -- create --data-dir
+  /path/to/data --output /safe/place/nodus-server.zip --keyring-file /run/secrets/nodus-ai-keyring.json`
+  (the last option defaults to `NODUS_AI_KEYRING_FILE`). The archive hashes every declared file,
+  preserves the installation `instanceId` and explicit ownership, and excludes any misplaced AI
+  keyring even when it has a custom filename. Encrypted credential envelopes may be present, but
+  the external keyring is deliberately a separate backup/escrow responsibility.
+- Inspect with `npm run server:backup -- inspect --archive FILE`. Restore only while the server is
+  stopped, into a path that does not exist, with `npm run server:backup -- restore --archive FILE
+  --target NEW_DIR`. Merge and overwrite restore modes are intentionally refused: they could mix
+  users, vault identities, cursors or newer revisions. Point the next deployment at the restored
+  directory only after inspection, and restore the matching external keyring through the operator's
+  secret-management process.
+- The v1 ZIP has per-file integrity hashes but is not itself encrypted or cryptographically signed.
+  Store it only in authenticated, encrypted backup infrastructure and protect it as the materials it
+  contains. For institutional data, document accommodation, conservation, accesses, managers and
+  transfers according to your policy and GDPR.
 
 Quick check:
 

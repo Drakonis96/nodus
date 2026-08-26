@@ -29,6 +29,7 @@ export interface CompressedServerSnapshot {
   counts: Record<string, number>;
   assets: SnapshotAsset[];
   schemaVersion: number;
+  personal: import('@shared/serverPublication').ServerPersonalImportEnvelope | null;
   vectors: Array<{
     kind: VectorKind;
     revision: string;

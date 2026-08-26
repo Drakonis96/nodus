@@ -405,5 +405,5 @@ test('the vectors switch exists and the privacy notice matches what really trave
   // Off means off.
   assert.match(publisher, /if \(!config\.includeVectors\) return;/);
   // Passage vectors are gated by the passages switch, not by the vectors one alone.
-  assert.match(publisher, /config\.includePassages \? \['ideas', 'documents', 'passages'\] : \['ideas', 'documents'\]/);
+  assert.match(publisher, /(?:config|publicationConfig)\.includePassages \? \['ideas', 'documents', 'passages'\] : \['ideas', 'documents'\]/);
 });

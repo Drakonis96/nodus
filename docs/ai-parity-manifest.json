@@ -1,0 +1,140 @@
+{
+  "schemaVersion": 1,
+  "name": "Nodus AI feature parity (no-tools surfaces)",
+  "description": "Executable inventory of the Desktop, local Server, Server Web and Cloudflare surfaces. Status is evidence, not a product promise.",
+  "roles": ["owner", "writer", "reader", "admin", "device", "oauth"],
+  "viewports": {
+    "desktop": { "kind": "electron", "entry": "src/App.tsx" },
+    "serverWeb": { "kind": "cookie-session-spa", "entry": "src/serverWeb/App.tsx", "base": "/app/" },
+    "serverApi": { "kind": "local-server-api", "entry": "server/server.mjs" },
+    "cloudflareApi": { "kind": "worker-api", "entry": "cloudflare/src/worker.mjs" }
+  },
+  "statusVocabulary": ["implemented", "partial", "missing", "placeholder", "pending"],
+  "features": [
+    {
+      "id": "author-dossier-synthesis",
+      "label": "Author synthesis / dossier",
+      "ownership": { "data": "vault", "generation": "private-user-job", "result": "private-draft-or-published-cache" },
+      "roles": { "owner": ["read", "generate", "publish"], "writer": ["read", "generate", "publish"], "reader": ["read", "generate-private"] },
+      "desktop": { "status": "implemented", "evidence": [
+        { "path": "electron/ai/authorDossier.ts", "line": 557, "symbol": "synthesizeAuthorDossier", "contains": "export async function synthesizeAuthorDossier" }
+      ] },
+      "server": { "status": "partial", "evidence": [
+        { "path": "server/lib/routes/corpus.mjs", "line": 495, "symbol": "author dossier read", "contains": "dossier" },
+        { "path": "electron/serverSync/spaceActionProcessor.ts", "line": 102, "symbol": "author.synthesis.generate", "contains": "case 'author.synthesis.generate'" }
+      ] },
+      "serverWeb": { "status": "implemented", "required": true, "evidence": [
+        { "path": "src/serverWeb/PersonalViews.tsx", "line": 1, "symbol": "private author synthesis", "contains": "export function AuthorSynthesisPanel" }
+      ] }
+    },
+    {
+      "id": "dictionary-entry",
+      "label": "Create and generate a dictionary entry",
+      "ownership": { "data": "private-user-or-published-snapshot", "generation": "desktop-local", "result": "user-owned" },
+      "roles": { "owner": ["read", "write", "generate"], "writer": ["read", "write", "generate"], "reader": ["read", "generate-private"] },
+      "desktop": { "status": "implemented", "evidence": [
+        { "path": "electron/ipc/academic.ts", "line": 409, "symbol": "dictionary:create", "contains": "h('dictionary:create'" },
+        { "path": "electron/ipc/academic.ts", "line": 449, "symbol": "dictionary:generate", "contains": "h('dictionary:generate'" }
+      ] },
+      "server": { "status": "implemented", "evidence": [
+        { "path": "server/lib/routes/corpus.mjs", "line": 129, "symbol": "dictionary corpus", "contains": "dictionary: { table: 'dictionary_entries'" },
+        { "path": "server/lib/routes/artifacts.mjs", "line": 1, "symbol": "private drafts", "contains": "createArtifactRoutes" }
+      ] },
+      "serverWeb": { "status": "implemented", "required": true, "evidence": [
+        { "path": "src/serverWeb/PersonalViews.tsx", "line": 1, "symbol": "dictionary view", "contains": "export function DictionaryServerView" }
+      ] }
+    },
+    {
+      "id": "graph",
+      "label": "Idea graph",
+      "ownership": { "data": "vault", "generation": "desktop-local", "result": "published-or-local-graph" },
+      "roles": { "owner": ["read", "write"], "writer": ["read", "write"], "reader": ["read"] },
+      "desktop": { "status": "implemented", "evidence": [
+        { "path": "electron/ipc/academic.ts", "line": 820, "symbol": "graph:get", "contains": "h('graph:get'" }
+      ] },
+      "server": { "status": "implemented", "evidence": [
+        { "path": "server/lib/routes/corpus.mjs", "line": 300, "symbol": "bounded idea graph", "contains": "rest[1] === 'graph'" }
+      ] },
+      "serverWeb": { "status": "implemented", "required": true, "evidence": [
+        { "path": "src/serverWeb/advanced/AdvancedWorkspace.tsx", "line": 1, "symbol": "Sigma graph view", "contains": "export function GraphServerView" }
+      ] }
+    },
+    {
+      "id": "assistant-chat",
+      "label": "Assistant / research chat",
+      "ownership": { "data": "private-local-conversation", "generation": "desktop-local-provider", "citations": "nodus-uri" },
+      "roles": { "owner": ["read", "chat", "write"], "writer": ["read", "chat", "write"], "reader": ["read", "chat"] },
+      "desktop": { "status": "implemented", "evidence": [
+        { "path": "src/views/ResearchAssistantModal.tsx", "line": 420, "symbol": "researchChatStream", "contains": "window.nodus.researchChatStream" },
+        { "path": "src/views/ResearchAssistantModal.tsx", "line": 534, "symbol": "cancel", "contains": "cancelResearchChat" }
+      ] },
+      "server": { "status": "implemented", "evidence": [
+        { "path": "server/lib/routes/ai.mjs", "line": 200, "symbol": "durable capability job", "contains": "privateData.createJob" },
+        { "path": "server/lib/privateDataStore.mjs", "line": 1, "symbol": "durable private jobs", "contains": "recoverJobs" }
+      ] },
+      "serverWeb": { "status": "implemented", "required": true, "evidence": [
+        { "path": "src/serverWeb/PersonalViews.tsx", "line": 1, "symbol": "assistant conversation", "contains": "export function ConversationServerView" }
+      ] }
+    },
+    {
+      "id": "nodi-chat",
+      "label": "Nodi chat",
+      "ownership": { "data": "private-local-conversation", "generation": "desktop-local-provider", "citations": "validated-nodus-uri" },
+      "roles": { "owner": ["chat", "write"], "writer": ["chat", "write"], "reader": ["chat"] },
+      "desktop": { "status": "implemented", "evidence": [
+        { "path": "electron/ai/nodiChat.ts", "line": 304, "symbol": "streamNodiChat", "contains": "export async function streamNodiChat" }
+      ] },
+      "server": { "status": "implemented", "evidence": [
+        { "path": "server/lib/ai/providerGateway.mjs", "line": 4, "symbol": "Nodi capability", "contains": "'assistant', 'nodi'" }
+      ] },
+      "serverWeb": { "status": "implemented", "required": true, "evidence": [
+        { "path": "src/serverWeb/App.tsx", "line": 1, "symbol": "Nodi header", "contains": "data-testid=\"header-nodi\"" }
+      ] }
+    },
+    {
+      "id": "deep-research",
+      "label": "Generate and read Deep Research",
+      "ownership": { "data": "vault-or-published-draft", "generation": "desktop-durable-job", "result": "draft-with-citations" },
+      "roles": { "owner": ["read", "generate", "write"], "writer": ["read", "generate", "write"], "reader": ["read", "generate-private"] },
+      "desktop": { "status": "implemented", "evidence": [
+        { "path": "electron/ai/deepResearchQueue.ts", "line": 318, "symbol": "enqueueDeepResearchJob", "contains": "export function enqueueDeepResearchJob" },
+        { "path": "src/views/DeepResearchView.tsx", "line": 507, "symbol": "deep research composer", "contains": "enqueueDeepResearchJob" }
+      ] },
+      "server": { "status": "implemented", "evidence": [
+        { "path": "server/lib/routes/corpus.mjs", "line": 569, "symbol": "published report reader", "contains": "deep-research" },
+        { "path": "electron/serverSync/spaceActionProcessor.ts", "line": 115, "symbol": "deepResearch.generate relay", "contains": "case 'deepResearch.generate'" }
+      ] },
+      "serverWeb": { "status": "implemented", "required": true, "evidence": [
+        { "path": "src/serverWeb/PersonalViews.tsx", "line": 1, "symbol": "Deep Research", "contains": "export function DeepResearchServerView" }
+      ] }
+    },
+    {
+      "id": "query-ai-and-notes",
+      "label": "AI query context and note / Workspace creation",
+      "ownership": { "data": "private-user-or-vault", "retrieval": "embedding-contract-plus-lexical", "writes": "desktop-local-or-authorized-mutation" },
+      "roles": { "owner": ["read", "write", "query"], "writer": ["read", "write", "query"], "reader": ["read", "query"] },
+      "desktop": { "status": "implemented", "evidence": [
+        { "path": "electron/ai/researchAssistant.ts", "line": 505, "symbol": "semantic context retrieval", "contains": "embedding" },
+        { "path": "electron/ipc/academic.ts", "line": 1623, "symbol": "notes/workspace IPC", "contains": "notes" }
+      ] },
+      "server": { "status": "implemented", "evidence": [
+        { "path": "server/lib/routes/api.mjs", "line": 981, "symbol": "contextPackage", "contains": "function contextPackage" },
+        { "path": "server/lib/routes/api.mjs", "line": 902, "symbol": "semanticSearch", "contains": "async function semanticSearch" }
+      ] },
+      "serverWeb": { "status": "implemented", "required": true, "evidence": [
+        { "path": "src/serverWeb/PersonalViews.tsx", "line": 1, "symbol": "private notes", "contains": "export function PrivateNotesServerView" }
+      ] }
+    }
+  ],
+  "placeholderRules": [],
+  "cloudflareGate": {
+    "forbiddenPaths": ["/app", "src/serverWeb", "server/dist/web", "vite.server-web.config.ts", "server/web.html"],
+    "forbiddenPatterns": ["serverWeb", "server/dist/web", "vite.server-web", "/app", "href=\"/app", "location: '/app"],
+    "workerFiles": ["cloudflare/src/worker.mjs", "cloudflare/dist/worker.mjs"],
+    "requiredTechnicalPatterns": {
+      "api": ["/api/v1", "/api/v3", "apiPrefix"],
+      "admin": ["/admin", "adminAction", "dashboard"],
+      "oauth": ["/oauth/register", "/oauth/authorize", "/oauth/token", "authorizationServerMetadata"]
+    }
+  }
+}

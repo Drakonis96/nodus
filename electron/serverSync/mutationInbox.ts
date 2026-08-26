@@ -15,8 +15,8 @@ import { immersionSessionIdFromAnnotationDocument } from '@shared/readerAnnotati
  *
  * Conflict policy is the one the rest of Nodus already uses: newest wins by updated_at (or
  * created_at), and a local row that is newer than the incoming one is kept. Nothing here
- * silently drops a change without saying so — a refusal is reported and, crucially, NOT
- * acknowledged, so the ledger keeps it until the reason is fixed.
+ * silently drops a change. Deterministically invalid rows are reported and acknowledged so
+ * they cannot block the stream; operational failures remain unacknowledged and are retried.
  */
 
 const APPLICABLE = new Set<string>(MUTABLE_TABLES);
@@ -70,6 +70,7 @@ export interface InboxSummary {
   deleted: number;
   keptLocal: number;
   refused: { id: string; reason: string }[];
+  retryable: { id: string; reason: string }[];
   /** Highest sequence number safe to acknowledge; everything above it is still owed. */
   cursor: number;
   /** Every decision above, in the order it was made. */
@@ -234,7 +235,7 @@ export function applyIncomingMutations(
   mutations: IncomingMutation[],
   options: { external?: (mutation: IncomingMutation) => ExternalMutationDecision | null } = {},
 ): InboxSummary {
-  const summary: InboxSummary = { applied: 0, deleted: 0, keptLocal: 0, refused: [], cursor: 0, entries: [] };
+  const summary: InboxSummary = { applied: 0, deleted: 0, keptLocal: 0, refused: [], retryable: [], cursor: 0, entries: [] };
   const present = new Set(
     (db.prepare("SELECT name FROM sqlite_master WHERE type = 'table'").all() as { name: string }[]).map((row) => row.name)
   );
@@ -275,6 +276,17 @@ export function applyIncomingMutations(
         ? descriptionOf(db, mutation.table, mutation.row)
         : {}),
     }));
+    // A permanently invalid entry is recorded for the user and acknowledged. Leaving the
+    // cursor before it would make one malformed/too-new row block every valid later change
+    // forever (head-of-line denial of service).
+    summary.cursor = Math.max(summary.cursor, Number(mutation.seq) || 0);
+  };
+
+  const retry = (mutation: IncomingMutation, reason: string): void => {
+    // Do not create a durable "refused" inbox item and, most importantly, do not advance the
+    // cursor. SQLITE_BUSY, a parent row still in flight or an external sidecar failure may be
+    // healthy on the next poll; acknowledging it now would discard valid work permanently.
+    summary.retryable.push({ id: mutation.id, reason });
   };
 
   for (const mutation of mutations.slice().sort((a, b) => Number(a.seq) - Number(b.seq))) {
@@ -284,7 +296,7 @@ export function applyIncomingMutations(
     // refuse a newer package outright.
     if (Number(mutation.schemaVersion) > SCHEMA_VERSION) {
       refuse(mutation, `Procede de un esquema más reciente (v${mutation.schemaVersion} frente a v${SCHEMA_VERSION}). Actualiza Nodus para recibir estos cambios.`);
-      break;
+      continue;
     }
     try {
       const external = options.external?.(mutation) ?? null;
@@ -297,18 +309,18 @@ export function applyIncomingMutations(
         continue;
       }
     } catch (error) {
-      refuse(mutation, error instanceof Error ? error.message : String(error));
+      retry(mutation, error instanceof Error ? error.message : String(error));
       break;
     }
     if (!APPLICABLE.has(mutation.table) || !present.has(mutation.table)) {
       refuse(mutation, `La tabla ${mutation.table} no se acepta desde una réplica.`);
-      break;
+      continue;
     }
 
     const identity = identityColumns(mutation.table, undefined, db);
     if (identity.length !== mutation.key.length) {
       refuse(mutation, 'La clave de fila no coincide con la identidad de esa tabla.');
-      break;
+      continue;
     }
     const where = identity.map((column) => `${quoteIdentifier(column)} IS ?`).join(' AND ');
     const key = mutation.key.map((value) => (value === undefined ? null : value));
@@ -390,7 +402,7 @@ export function applyIncomingMutations(
       summary.entries.push(describe(mutation, outcome, descriptionOf(db, mutation.table, descriptiveRow)));
       summary.cursor = Number(mutation.seq);
     } catch (error) {
-      refuse(mutation, error instanceof Error ? error.message : String(error));
+      retry(mutation, error instanceof Error ? error.message : String(error));
       break;
     }
   }

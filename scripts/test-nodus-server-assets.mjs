@@ -174,6 +174,7 @@ test('the sweeper keeps referenced images and takes orphans once the grace perio
 test('publishing collects the images the new snapshot no longer points at', { timeout: 60_000 }, async () => {
   await withServer({ label: 'assets-gc', env: {} }, async (server) => {
     const spaceId = await server.createSpace('Corpus');
+    await server.setPublicationPolicy(spaceId, ['allowUserContent']);
     const owner = await server.deviceToken(server.adminEmail, server.adminPassword, spaceId);
     const hash = sha256(PNG_BYTES);
     await server.api(owner.deviceToken, 'POST', `/api/v1/spaces/${spaceId}/assets/${hash}`, { body: PNG_BYTES });

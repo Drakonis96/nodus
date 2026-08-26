@@ -45,17 +45,25 @@ export async function jsonBody(req, limit) {
 }
 
 export function contentSecurityPolicy(formActionSources = ["'self'"]) {
-  return `default-src 'none'; style-src 'unsafe-inline'; script-src 'self'; img-src 'self'; form-action ${formActionSources.join(' ')}; frame-ancestors 'none'; base-uri 'none'`;
+  return `default-src 'none'; style-src 'self' 'unsafe-inline'; script-src 'self'; worker-src 'self' blob:; connect-src 'self'; img-src 'self' data: blob:; frame-src 'self' blob:; font-src 'self'; form-action ${formActionSources.join(' ')}; frame-ancestors 'none'; base-uri 'none'; object-src 'none'`;
 }
 
-const SECURITY_HEADERS = {
+export const SECURITY_HEADERS = Object.freeze({
   'content-security-policy': contentSecurityPolicy(),
   'permissions-policy': 'camera=(), microphone=(), geolocation=(), payment=()',
   'referrer-policy': 'no-referrer',
   'strict-transport-security': 'max-age=31536000; includeSubDomains',
   'x-content-type-options': 'nosniff',
   'x-frame-options': 'DENY',
-};
+  'cross-origin-opener-policy': 'same-origin',
+  'cross-origin-resource-policy': 'same-origin',
+  'x-dns-prefetch-control': 'off',
+});
+
+/** Apply the same browser hardening to streamed and binary responses. */
+export function securityHeaders(headers = {}) {
+  return { ...SECURITY_HEADERS, ...headers };
+}
 
 export function json(res, status, value, headers = {}) {
   res.writeHead(status, { ...SECURITY_HEADERS, 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store', ...headers });

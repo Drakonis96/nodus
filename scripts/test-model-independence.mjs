@@ -104,6 +104,9 @@ const allowedLegacyFiles = new Set([
   'shared/types.ts',
   'electron/db/settingsRepo.ts',
   'electron/export/exportImport.ts',
+  // The Word/LibreOffice bridge keeps this response field as a compatibility wire
+  // contract, but derives it from the independent flow models rather than settings.defaultModel.
+  'electron/copilot/server.ts',
 ]);
 const collect = async (directory) => {
   const out = [];

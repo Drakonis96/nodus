@@ -1,7 +1,7 @@
 import Database from 'better-sqlite3';
 import { gzip } from 'node:zlib';
 import { promisify } from 'node:util';
-import { buildServerSnapshot } from './serverSnapshot';
+import { buildServerPersonalImport, buildServerSnapshot } from './serverSnapshot';
 import type { ServerPublishWorkerRequest, ServerPublishWorkerResponse } from './serverPublishWorkerTypes';
 import { publishVaultToCloudflare } from './cloudflarePublisher';
 import { buildVectorSet } from './serverVectors';
@@ -18,6 +18,13 @@ async function build(request: ServerPublishWorkerRequest): Promise<ServerPublish
       return { kind: 'cloudflare-done', id: request.id, result };
     }
     const snapshot = buildServerSnapshot(request.vault, request.settings, db, request.library);
+    const personal = buildServerPersonalImport(
+      request.vault,
+      request.settings,
+      db,
+      request.publisherId,
+      request.libraryAnnotations || [],
+    );
     const compressed = await gzipAsync(snapshot.buffer, { level: 1 });
     const vectors = [];
     for (const kind of request.vectorKinds) {
@@ -39,6 +46,7 @@ async function build(request: ServerPublishWorkerRequest): Promise<ServerPublish
       counts: snapshot.counts,
       assets: snapshot.assets,
       schemaVersion: snapshot.schemaVersion,
+      personal,
       vectors,
     };
   } finally {

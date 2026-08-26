@@ -53,6 +53,10 @@ export interface VaultServerConfig {
   includePassages: boolean;
   includeLibraryDocuments: boolean;
   includeVectors: boolean;
+  /** New projections remain off unless a future settings surface explicitly opts in. */
+  includePrimarySources: boolean;
+  includeTestimonies: boolean;
+  includePersonalImports: boolean;
   hasToken: boolean;
   configured: boolean;
 }
@@ -88,6 +92,7 @@ function readSiblingServerBlob(vaultPath: string): Partial<AppSettings> {
 }
 
 function toConfig(vault: VaultSummary, blob: Partial<AppSettings>): VaultServerConfig {
+  const extended = blob as Partial<AppSettings> & Record<string, unknown>;
   const url = String(blob.nodusServerUrl || '');
   const spaceId = String(blob.nodusServerSpaceId || '');
   const hasToken = hasNodusServerTokenFor(vault.id);
@@ -107,6 +112,9 @@ function toConfig(vault: VaultSummary, blob: Partial<AppSettings>): VaultServerC
     includePassages: Boolean(blob.nodusServerIncludePassages),
     includeLibraryDocuments: Boolean(blob.nodusServerIncludeLibraryDocuments),
     includeVectors: blob.nodusServerIncludeVectors !== false,
+    includePrimarySources: extended.nodusServerIncludePrimarySources === true,
+    includeTestimonies: extended.nodusServerIncludeTestimonies === true,
+    includePersonalImports: extended.nodusServerIncludePersonalImports !== false,
     hasToken,
     configured: Boolean(url && spaceId && hasToken),
   };

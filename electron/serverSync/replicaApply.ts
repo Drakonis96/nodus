@@ -209,13 +209,27 @@ export function applySnapshotToReplica(db: Database.Database, snapshot: { tables
 
       const incoming = Object.entries(snapshot.tables ?? {})
         .filter((entry): entry is [string, Record<string, unknown>[]] => Array.isArray(entry[1]));
+      db.exec(`CREATE TABLE IF NOT EXISTS sync_snapshot_tables (
+        table_name TEXT PRIMARY KEY,
+        projected_at TEXT NOT NULL
+      )`);
+      const incomingNames = new Set(incoming.map(([table]) => table));
+      const previouslyProjected = (db.prepare('SELECT table_name FROM sync_snapshot_tables').all() as { table_name: string }[])
+        .map((entry) => entry.table_name);
+
+      // Omission from a newer authoritative projection is a deletion for corpus tables.
+      // Without this, disabling a publication lane left its old rows readable forever.
+      const removedCorpusTables = previouslyProjected.filter((table) => present.has(table) && !incomingNames.has(table) && !AUTHORED.has(table));
 
       // Every corpus table is emptied BEFORE any of them is refilled, and in dependency
       // order. Doing it table by table meant a later DELETE could cascade into rows an
       // earlier INSERT had just written — `person_portraits` hangs off `persons` with ON
       // DELETE CASCADE, and the publication is ordered alphabetically, so portraits went in
       // before people came out.
-      const replaceable = incoming.map(([table]) => table).filter((table) => present.has(table) && !AUTHORED.has(table));
+      const replaceable = [...new Set([
+        ...incoming.map(([table]) => table).filter((table) => present.has(table) && !AUTHORED.has(table)),
+        ...removedCorpusTables,
+      ])];
       const preserved = new Map<string, ReturnType<typeof captureAssetBlobs>>();
       const preservedLocal = new Map<string, NonNullable<ReturnType<typeof captureLocalOnly>>>();
       for (const table of replaceable) {
@@ -227,6 +241,10 @@ export function applySnapshotToReplica(db: Database.Database, snapshot: { tables
       for (const table of deletionOrder(db, replaceable)) {
         db.prepare(`DELETE FROM ${quoteIdentifier(table)}`).run();
       }
+      db.prepare('DELETE FROM sync_snapshot_tables').run();
+      const rememberProjection = db.prepare('INSERT INTO sync_snapshot_tables (table_name, projected_at) VALUES (?, ?)');
+      const projectedAt = new Date().toISOString();
+      for (const table of incomingNames) rememberProjection.run(table, projectedAt);
 
       for (const [table, value] of incoming) {
         if (!present.has(table)) { summary.skipped.push(table); continue; }
@@ -308,6 +326,13 @@ export function applySnapshotToReplica(db: Database.Database, snapshot: { tables
           }
         }
         summary.merged[table] = counts;
+      }
+      const foreignKeyViolations = db.pragma('foreign_key_check') as Array<{ table: string; rowid: number; parent: string; fkid: number }>;
+      if (foreignKeyViolations.length > 0) {
+        const detail = foreignKeyViolations.slice(0, 8)
+          .map((entry) => `${entry.table}[${entry.rowid}] -> ${entry.parent}#${entry.fkid}`)
+          .join(', ');
+        throw new Error(`La publicación contiene relaciones incompletas: ${detail}`);
       }
     })();
   });

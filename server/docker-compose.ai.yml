@@ -1,0 +1,13 @@
+# Optional advanced Server AI overlay. The KEK stays outside nodus_data so a normal
+# data-volume backup cannot decrypt the per-user credential envelopes it contains.
+services:
+  nodus-server:
+    environment:
+      NODUS_DEPLOYMENT_MODE: advanced
+      NODUS_AI_KEYRING_FILE: /run/secrets/nodus_ai_keyring
+    secrets:
+      - nodus_ai_keyring
+
+secrets:
+  nodus_ai_keyring:
+    file: ${NODUS_AI_KEYRING_HOST_FILE:-./secrets/nodus-ai-keyring.json}

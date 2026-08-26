@@ -138,7 +138,8 @@ try {
   assert.match(secretSource, /path\.basename\(currentRoot\)\.toLowerCase\(\) !== 'nodus'/, 'sibling-root migration stays gated on the default profile');
 
   const exportSource = fs.readFileSync(path.join(repoRoot, 'electron/export/exportImport.ts'), 'utf8');
-  assert.match(exportSource, /lockedApiKeyProviders\(\)/, 'full backup refuses silently locked API keys');
+  assert.match(exportSource, /const includesSecrets = false;/, 'new backups never attempt to serialize API keys');
+  assert.match(exportSource, /includeApiKeys: false/, 'the full-backup manifest also declares the secret-free scope');
   const restoreBody = exportSource.match(/function restoreApiKeys[\s\S]*?\n}/)?.[0] ?? '';
   assert.doesNotMatch(restoreBody, /clearApiKey/, 'restoring an empty snapshot never clears local encrypted keys');
 

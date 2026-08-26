@@ -6,6 +6,8 @@ on:
     paths:
       - 'package.json'
       - 'package-lock.json'
+      - 'vite.server-web.config.ts'
+      - 'src/serverWeb/**'
       - 'server/**'
       - 'scripts/test-nodus-server.mjs'
       - 'scripts/test-nodus-server-deployment.mjs'
@@ -65,7 +67,7 @@ jobs:
           scripts/test-server-vectors.mjs
 
       - name: Build smoke-test image
-        run: docker build --build-arg NODUS_VERSION=4.2.3 --build-arg NODUS_REVISION="$GITHUB_SHA" --tag nodus-server:ci ./server
+        run: docker build -f server/Dockerfile --build-arg NODUS_VERSION=5.0.2 --build-arg NODUS_REVISION="$GITHUB_SHA" --tag nodus-server:ci .
 
       - name: Run image health smoke test
         shell: bash
@@ -122,7 +124,8 @@ jobs:
       - name: Publish experimental multi-platform image
         uses: docker/build-push-action@v7
         with:
-          context: ./server
+          context: .
+          file: server/Dockerfile
           platforms: linux/amd64,linux/arm64
           push: true
           tags: ${{ steps.meta.outputs.tags }}

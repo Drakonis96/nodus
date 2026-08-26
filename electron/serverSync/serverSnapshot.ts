@@ -1,7 +1,9 @@
 import { createHash, type Hash } from 'node:crypto';
 import type Database from 'better-sqlite3';
-import type { AppSettings, VaultSummary } from '@shared/types';
+import type { VaultSummary } from '@shared/types';
 import type { PublishedLibraryManifest } from './serverLibrary';
+import type { ServerPersonalImportEnvelope, ServerPersonalImportBatch, ServerPersonalLibraryAnnotation } from '@shared/serverPublication';
+import { PERMANENT_PUBLICATION_DENYLIST, SERVER_PERSONAL_IMPORT_FORMAT, SERVER_PERSONAL_IMPORT_VERSION } from '@shared/serverPublication';
 
 export const SERVER_SNAPSHOT_FORMAT = 'nodus.server-snapshot';
 export const SERVER_SNAPSHOT_VERSION = 2;
@@ -71,11 +73,11 @@ const CORE_TABLES = [
 // agree. The rows carry no prose beyond an optional note.
 
 const USER_TABLES = [
-  'note_folders', 'notes', 'note_versions', 'note_annotations', 'workspace_library_links',
+  'note_folders', 'notes', 'note_versions', 'workspace_library_links',
   'pages', 'page_blocks', 'page_favorites', 'page_links',
   'page_revisions', 'page_comments', 'page_comment_reactions', 'page_comment_mentions',
   'workspace_actors', 'workspace_groups', 'workspace_group_members', 'acl_entries',
-  'writing_saved_drafts', 'writing_draft_reads', 'writing_draft_annotations', 'projects', 'project_sections',
+  'writing_saved_drafts', 'projects', 'project_sections',
   'project_chapters', 'project_chapter_versions', 'project_chapter_chunks',
   'project_chapter_ideas', 'project_chapter_idea_relations', 'project_links',
   'project_insertion_suggestions', 'saved_searches', 'immersion_sessions',
@@ -137,13 +139,31 @@ export const GENEALOGY_SERVER_TABLES = [
 export const STUDY_SERVER_TABLES = [
   'study_academic_years', 'study_subjects', 'study_courses', 'study_topics', 'study_folders',
   'study_docs', 'study_doc_links', 'study_doc_tags', 'study_tags',
-  'study_materials', 'study_material_annotations', 'study_material_placements', 'study_material_fragment_links',
+  'study_materials', 'study_material_placements', 'study_material_fragment_links',
   'study_schedule_periods', 'study_schedule_cells', 'study_schedule_day_styles',
   'study_calendar_events', 'study_plans', 'study_plan_blocks', 'study_goals', 'study_placements',
   'study_ideas', 'study_idea_edges', 'study_idea_evidence', 'study_idea_occurrences',
   'study_flashcards', 'study_questions', 'study_question_collections', 'study_question_collection_items',
   'study_rubrics', 'study_templates', 'study_styles', 'study_style_associations',
-  'study_annotations', 'study_transcripts', 'study_transcript_segments', 'study_audio_markers',
+  'study_transcripts', 'study_transcript_segments', 'study_audio_markers',
+] as const;
+
+/** Explicit, citable primary-source projection. */
+export const PRIMARY_SOURCES_SERVER_TABLES = [
+  'persons', 'person_names', 'person_places', 'places', 'events', 'event_participants',
+  'record_evidence', 'relationships', 'archive_folders', 'archive_items', 'archive_item_tags',
+  'archive_item_folders', 'archive_item_persons', 'archive_repositories',
+  'archive_description_units', 'archive_item_units', 'archive_item_profiles',
+  'archive_text_versions', 'archive_text_segments', 'archive_excerpts',
+  'archive_person_mentions', 'archive_place_mentions', 'entity_resolutions',
+  'archive_source_analyses', 'primary_source_note_profiles', 'primary_source_citation_settings',
+] as const;
+
+/** Textual testimony projection; media, people, agreements and contacts stay local. */
+export const TESTIMONIES_SERVER_TABLES = [
+  'testimony_interviews', 'testimony_transcripts', 'testimony_transcript_segments',
+  'testimony_annotations', 'testimony_annotation_codes', 'testimony_codes',
+  'testimony_contrasts', 'testimony_contrast_items',
 ] as const;
 
 /**
@@ -172,6 +192,7 @@ const OMIT_COLUMNS = new Set([
   'api_key', 'access_token', 'refresh_token', 'password', 'secret', 'credentials',
   'auth_token_hash',
 ]);
+const DENIED_COLUMN_PATTERN = /(?:^|_)(?:audio|video|contact|phone|email|address|agreement|consent|student|grade|grading|score|attempt|credential|secret|token|password)(?:_|$)/;
 
 // `embedding_dim` and `embedding_text_hash` used to survive while `embedding` itself was
 // stripped, which left a replica holding rows that claimed a 1536-dimension vector they did
@@ -325,13 +346,25 @@ const TABLES_BY_VAULT_TYPE: Partial<Record<VaultSummary['type'], readonly string
   databases: DATABASES_SERVER_TABLES,
 };
 
+const PERSONAL_IMPORT_TABLES = [
+  'writing_draft_annotations', 'writing_draft_reads', 'note_annotations',
+  'study_annotations', 'study_material_annotations',
+] as const;
+const DENIED_TABLES = new Set<string>(PERMANENT_PUBLICATION_DENYLIST);
+
 function tableNames(db: Database.Database): Set<string> {
   return new Set((db.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%'").all() as { name: string }[]).map((row) => row.name));
 }
 
 function safeValue(column: string, value: unknown): unknown {
   const normalized = column.toLowerCase();
+  // `secret_id` is the stable foreign key of a fictional Worldbuilding entity,
+  // not credential material. Its prose/content still passes through the normal
+  // publication policy, but removing the id would break `secret_knowers` and
+  // every reader-side relation to that entity.
+  const fictionalSecretId = normalized === 'secret_id';
   if (
+    (!fictionalSecretId && DENIED_COLUMN_PATTERN.test(normalized)) ||
     OMIT_COLUMNS.has(normalized) ||
     normalized.endsWith('_path') ||
     /(^|_)(api_key|access_token|refresh_token|password|credential|credentials)(_|$)/.test(normalized) ||
@@ -366,6 +399,69 @@ function readTable(db: Database.Database, table: string): Record<string, unknown
       return safe === undefined ? [] : [[column, safe]];
     }))
   );
+}
+
+export interface ServerSnapshotSettings {
+  nodusServerIncludeUserContent: boolean;
+  nodusServerIncludePassages: boolean;
+  nodusServerIncludePrimarySources?: boolean;
+  nodusServerIncludeTestimonies?: boolean;
+  nodusServerIncludePersonalImports?: boolean;
+}
+
+function personalRowKey(table: string, row: Record<string, unknown>): unknown[] {
+  const columns: Record<string, string[]> = {
+    writing_draft_annotations: ['id'],
+    writing_draft_reads: ['draft_id', 'reader_id'],
+    note_annotations: ['id'],
+    study_annotations: ['id'],
+    study_material_annotations: ['id'],
+  };
+  return (columns[table] || ['id']).map((column) => row[column] ?? null);
+}
+
+function readPersonalRows(db: Database.Database, present: Set<string>): ServerPersonalImportBatch['rows'] {
+  const rows: ServerPersonalImportBatch['rows'] = [];
+  for (const table of PERSONAL_IMPORT_TABLES) {
+    if (!present.has(table) || DENIED_TABLES.has(table)) continue;
+    for (const row of readTable(db, table)) rows.push({ table, key: personalRowKey(table, row), row });
+  }
+  return rows;
+}
+
+export function buildServerPersonalImport(
+  vault: VaultSummary,
+  settings: ServerSnapshotSettings,
+  db: Database.Database,
+  publisherId: string,
+  libraryAnnotations: ServerPersonalLibraryAnnotation[] = [],
+  sourceRevision = lightweightVaultRevision(db),
+): ServerPersonalImportEnvelope | null {
+  if (settings.nodusServerIncludePersonalImports === false) return null;
+  const rows = settings.nodusServerIncludeUserContent ? readPersonalRows(db, tableNames(db)) : [];
+  if (!rows.length && !libraryAnnotations.length) return null;
+  const batch: ServerPersonalImportBatch = {
+    id: `${vault.id}:${sourceRevision}:${publisherId}`,
+    publisherId,
+    vaultId: vault.id,
+    vaultType: vault.type,
+    sourceRevision,
+    rows,
+    libraryAnnotations,
+  };
+  const annotations = [
+    ...rows.filter((entry) => entry.table !== 'writing_draft_reads').map((entry) => ({ ...entry.row, table: entry.table })),
+    ...libraryAnnotations.map((entry) => ({ ...entry.annotation, documentId: entry.documentId })),
+  ];
+  return {
+    format: SERVER_PERSONAL_IMPORT_FORMAT,
+    formatVersion: SERVER_PERSONAL_IMPORT_VERSION,
+    publisher: { id: publisherId, kind: 'desktop' },
+    vault: { id: vault.id, name: vault.name, type: vault.type },
+    generatedAt: new Date().toISOString(),
+    batches: [batch],
+    annotations,
+  };
 }
 
 function columnNames(db: Database.Database, table: string): Set<string> {
@@ -446,7 +542,7 @@ export interface BuiltSnapshot {
 
 export function buildServerSnapshot(
   vault: VaultSummary,
-  settings: Pick<AppSettings, 'nodusServerIncludeUserContent' | 'nodusServerIncludePassages'>,
+  settings: ServerSnapshotSettings,
   db: Database.Database,
   library: PublishedLibraryManifest | null = null,
 ): BuiltSnapshot {
@@ -460,16 +556,22 @@ export function buildServerSnapshot(
   for (const table of TABLES_BY_VAULT_TYPE[vault.type] ?? []) {
     if (present.has(table)) selected.add(table);
   }
+  if (settings.nodusServerIncludePrimarySources && vault.type === 'primary_sources') {
+    PRIMARY_SOURCES_SERVER_TABLES.filter((table) => present.has(table)).forEach((table) => selected.add(table));
+  }
+  if (settings.nodusServerIncludeTestimonies && vault.type === 'testimonios') {
+    TESTIMONIES_SERVER_TABLES.filter((table) => present.has(table)).forEach((table) => selected.add(table));
+  }
   if (settings.nodusServerIncludePassages && present.has('passages')) selected.add('passages');
   if (settings.nodusServerIncludeUserContent) {
-    USER_TABLES.filter((table) => present.has(table)).forEach((table) => selected.add(table));
+    USER_TABLES.filter((table) => present.has(table) && !DENIED_TABLES.has(table)).forEach((table) => selected.add(table));
     // Was `table.startsWith('study_')`, which swept in everything the prefix touched:
     // `study_recordings` (what was recorded in a class and when), `study_attempts`,
     // `study_grading_runs` and `study_mastery` (how well somebody performed), and
     // `study_ai_usage` (local telemetry). None of that is shareable material. The explicit
     // list is the point: a table added by a later migration now has to be named to travel.
-    STUDY_SERVER_TABLES.filter((table) => present.has(table)).forEach((table) => selected.add(table));
-    TEACHING_TABLES.filter((table) => present.has(table)).forEach((table) => selected.add(table));
+    STUDY_SERVER_TABLES.filter((table) => present.has(table) && !DENIED_TABLES.has(table)).forEach((table) => selected.add(table));
+    TEACHING_TABLES.filter((table) => present.has(table) && !DENIED_TABLES.has(table)).forEach((table) => selected.add(table));
   }
 
   const tables: Record<string, Record<string, unknown>[]> = {};

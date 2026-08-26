@@ -12,16 +12,21 @@
 services:
   nodus-server:
     build:
-      context: .
-      dockerfile: Dockerfile
+      context: ..
+      dockerfile: server/Dockerfile
     image: nodus-server:source
     restart: unless-stopped
     environment:
       NODUS_PUBLIC_URL: ${NODUS_PUBLIC_URL}
+      NODUS_TRUST_PROXY: "1"
+      NODUS_DEPLOYMENT_MODE: advanced
+      NODUS_AI_KEYRING_FILE: ${NODUS_AI_KEYRING_FILE:-}
+      NODUS_AI_MAX_ACTIVE_PER_USER: ${NODUS_AI_MAX_ACTIVE_PER_USER:-}
+      NODUS_AI_MAX_ACTIVE_GLOBAL: ${NODUS_AI_MAX_ACTIVE_GLOBAL:-}
       NODUS_ADMIN_EMAIL: ${NODUS_ADMIN_EMAIL:-}
       NODUS_ADMIN_PASSWORD: ${NODUS_ADMIN_PASSWORD:-}
       NODUS_SETUP_TOKEN: ${NODUS_SETUP_TOKEN:-}
-      NODUS_SOURCE_URL: ${NODUS_SOURCE_URL:-https://github.com/Drakonis96/nodus/tree/v4.2.3}
+      NODUS_SOURCE_URL: ${NODUS_SOURCE_URL:-https://github.com/Drakonis96/nodus/tree/v5.0.2}
       # Optional ceilings. Left unset they default to 8 MiB per image, 2 GiB of images per
       # space, and the snapshot limits documented in the README.
       NODUS_MAX_ASSET_BYTES: ${NODUS_MAX_ASSET_BYTES:-}
@@ -35,6 +40,9 @@ services:
       NODUS_MAX_MUTATION_BYTES: ${NODUS_MAX_MUTATION_BYTES:-}
       NODUS_MAX_MUTATION_BATCH_BYTES: ${NODUS_MAX_MUTATION_BATCH_BYTES:-}
       NODUS_MAX_LEDGER_BYTES: ${NODUS_MAX_LEDGER_BYTES:-}
+      NODUS_MAX_SPACE_DOCUMENT_UPDATE_BYTES: ${NODUS_MAX_SPACE_DOCUMENT_UPDATE_BYTES:-}
+      NODUS_MAX_SPACE_SHARED_BLOB_BYTES: ${NODUS_MAX_SPACE_SHARED_BLOB_BYTES:-}
+      NODUS_MAX_SPACE_PARTIAL_BLOB_BYTES: ${NODUS_MAX_SPACE_PARTIAL_BLOB_BYTES:-}
       # Threads for semantic search. Unset is one, or two where there are cores spare.
       NODUS_VECTOR_WORKERS: ${NODUS_VECTOR_WORKERS:-}
     volumes:

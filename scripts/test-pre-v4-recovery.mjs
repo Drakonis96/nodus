@@ -126,6 +126,19 @@ try {
   assert.equal(fs.existsSync(path.join(libraryRoot, 'v4-only-record.json')), false, 'rollback restores the exact v3 Library tree');
   assert.equal(fs.existsSync(path.join(created.snapshotPath, 'recovery.json')), true, 'the recovery package remains available after rollback');
 
+  // A signed snapshot must not turn a tampered manifest into an arbitrary write
+  // destination. The profile source path is constrained to this profile before
+  // any replacement is attempted.
+  const manifestFile = path.join(created.snapshotPath, 'recovery.json');
+  const originalManifest = JSON.parse(fs.readFileSync(manifestFile, 'utf8'));
+  const profileEntry = originalManifest.files.find((entry) => entry.archivePath === 'profile/app-prefs.json');
+  if (profileEntry) {
+    profileEntry.sourcePath = path.join(outside, 'should-not-be-overwritten.json');
+    fs.writeFileSync(manifestFile, JSON.stringify(originalManifest));
+    assert.throws(() => restorePreV4Recovery(created.snapshotPath), /profile destination is invalid/);
+    fs.writeFileSync(manifestFile, JSON.stringify({ ...originalManifest, files: originalManifest.files.map((entry) => ({ ...entry, sourcePath: entry.archivePath === 'profile/app-prefs.json' ? path.join(userData, 'app-prefs.json') : entry.sourcePath })) }));
+  }
+
   // Corruption is rejected before any live file changes.
   const protectedEntry = created.manifest.files.find((entry) => entry.archivePath.endsWith('reader.md'));
   const protectedFile = path.join(created.snapshotPath, ...protectedEntry.archivePath.split('/'));

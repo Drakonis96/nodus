@@ -1,7 +1,8 @@
-import type { AppSettings, VaultSummary } from '@shared/types';
+import type { VaultSummary } from '@shared/types';
 import type { PublishedLibraryManifest } from './serverLibrary';
 import type { BuiltServerLibraryPublication } from './serverLibrary';
-import type { SnapshotAsset } from './serverSnapshot';
+import type { SnapshotAsset, ServerSnapshotSettings } from './serverSnapshot';
+import type { ServerPersonalImportEnvelope } from '@shared/serverPublication';
 import type { VaultServerConfig } from './serverSyncShared';
 import type { CloudflarePublishResult } from './cloudflarePublisher';
 import type { VectorKind, VectorSetSummary } from './serverVectors';
@@ -21,9 +22,11 @@ interface BaseWorkerRequest {
 
 export interface ServerSnapshotWorkerRequest extends BaseWorkerRequest {
   kind: 'build';
-  settings: Pick<AppSettings, 'nodusServerIncludeUserContent' | 'nodusServerIncludePassages'>;
+  settings: ServerSnapshotSettings;
   library: PublishedLibraryManifest | null;
+  libraryAnnotations?: import('@shared/serverPublication').ServerPersonalLibraryAnnotation[];
   vectorKinds: VectorKind[];
+  publisherId: string;
 }
 
 export interface CloudflarePublishWorkerRequest extends BaseWorkerRequest {
@@ -44,6 +47,7 @@ export type ServerPublishWorkerResponse = {
   counts: Record<string, number>;
   assets: SnapshotAsset[];
   schemaVersion: number;
+  personal: ServerPersonalImportEnvelope | null;
   vectors: PreparedServerVectorWire[];
 } | {
   kind: 'cloudflare-done';

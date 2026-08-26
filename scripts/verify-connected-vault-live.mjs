@@ -334,10 +334,15 @@ await check('a revoked replica keeps every byte', async () => {
   before.close();
 
   // Revoke through the real administration form.
+  const loginPage = await fetch(`${URL_BASE}/login`);
+  const loginHtml = await loginPage.text();
+  const loginCsrf = loginHtml.match(/name="csrf" value="([^"]+)"/)?.[1];
+  const loginCsrfCookie = loginPage.headers.get('set-cookie')?.split(';', 1)[0];
+  expect(Boolean(loginCsrf && loginCsrfCookie), 'login did not issue its pre-authentication CSRF token');
   const login = await fetch(`${URL_BASE}/login`, {
     method: 'POST', redirect: 'manual',
-    headers: { 'content-type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams({ email: 'audit-admin@local.test', password: 'local-audit-admin-throwaway-2026', next: '/' }),
+    headers: { 'content-type': 'application/x-www-form-urlencoded', cookie: loginCsrfCookie },
+    body: new URLSearchParams({ csrf: loginCsrf, email: 'audit-admin@local.test', password: 'local-audit-admin-throwaway-2026', next: '/' }),
   });
   const cookie = login.headers.get('set-cookie').split(';', 1)[0];
   const page = await (await fetch(`${URL_BASE}/`, { headers: { cookie } })).text();

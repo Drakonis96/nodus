@@ -58,7 +58,13 @@ export function append(store, spaceId, entries) {
   fs.mkdirSync(path.dirname(file), { recursive: true });
   let seq = nextSeq(store, spaceId);
   const stamped = entries.map((entry) => ({ ...entry, seq: seq++ }));
-  fs.appendFileSync(file, `${stamped.map((entry) => JSON.stringify(entry)).join('\n')}\n`, { mode: 0o600 });
+  const descriptor = fs.openSync(file, 'a', 0o600);
+  try {
+    fs.writeFileSync(descriptor, `${stamped.map((entry) => JSON.stringify(entry)).join('\n')}\n`);
+    fs.fsyncSync(descriptor);
+  } finally {
+    fs.closeSync(descriptor);
+  }
   const ids = loadIds(store, spaceId);
   for (const entry of stamped) ids.add(entry.id);
   return stamped;

@@ -208,7 +208,7 @@ try {
   const manifest = JSON.parse(zip.readAsText('manifest.json'));
   assert.equal(manifest.format, 'nodus.encrypted-backup');
   assert.equal(manifest.formatVersion, 6, 'automatic backups are v6 (password + independent recovery key)');
-  assert.equal(manifest.includesSecrets, true);
+  assert.equal(manifest.includesSecrets, false);
   assert.equal(manifest.appVersion, '9.9.9-test');
   assert.ok(manifest.vaultCount >= 1, 'at least one vault backed up');
 
@@ -221,7 +221,7 @@ try {
   assert.equal(recoveredKey, globalThis.__backupTestRecoveryKey, 'master password unwraps the stable recovery key');
   const payload = new AdmZip(crypto.decryptBackupPayload(zip.getEntry('backup.bin').getData(), recoveredKey, manifest.cipher));
   const names = payload.getEntries().map((e) => e.entryName).sort();
-  assert.ok(names.includes('api-keys.json'), 'API keys are protected inside the encrypted full-state payload');
+  assert.ok(!names.includes('api-keys.json'), 'new backups never serialize API keys, even inside the encrypted payload');
   assert.ok(names.includes('registry.json'), 'the vault registry is included');
   const dbEntryName = names.find((n) => /^vaults\/.+\/database\.sqlite$/.test(n));
   const invEntryName = names.find((n) => /^vaults\/.+\/inventory\.json$/.test(n));
@@ -234,8 +234,8 @@ try {
     includePreferences: true,
     includeHistories: true,
     includeGeneratedMedia: true,
-    includeApiKeys: true,
-  }, 'stale granular settings are overridden by the full-state backup invariant');
+    includeApiKeys: false,
+  }, 'stale granular settings cannot reduce data coverage or re-enable secret export');
 
   // The DB snapshot inside is a valid SQLite file with the scrubbed settings row.
   const snapshotFile = path.join(root, 'snapshot-check.sqlite');
@@ -381,11 +381,11 @@ try {
   const manualZip = new AdmZip(manual);
   const manualManifest = JSON.parse(manualZip.readAsText('manifest.json'));
   assert.equal(manualManifest.formatVersion, 6, 'manual export is v6 and supports an independent recovery key');
-  assert.equal(manualManifest.includesSecrets, true, 'manual export includes secrets');
+  assert.equal(manualManifest.includesSecrets, false, 'manual export excludes secrets');
   const manualPayload = new AdmZip(
     crypto.decryptBackupPayload(manualZip.getEntry('backup.bin').getData(), manualRecoveryKey, manualManifest.cipher)
   );
-  assert.ok(manualPayload.getEntry('api-keys.json'), 'manual export still carries keys');
+  assert.equal(manualPayload.getEntry('api-keys.json'), null, 'manual export does not carry keys');
 
   // ── The archive must be built WITHOUT parking the main-process event loop ─────
   // Automatic backups run unattended every 30 minutes on the same single thread
