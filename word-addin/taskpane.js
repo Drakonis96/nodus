@@ -26,6 +26,7 @@
   var promptSourceText = '';
   var promptOutputText = '';
   var promptRequestSeq = 0;
+  var promptGenerating = false;
 
   // The pane follows the Nodus UI language (injected by the copilot server).
   var STR = {
@@ -824,7 +825,22 @@
   }
 
   function updatePromptGenerateState() {
-    els.applyPrompt.disabled = !promptSourceText || !els.promptStyle.value || !selectedPromptModel();
+    els.applyPrompt.disabled = promptGenerating || !promptSourceText || !els.promptStyle.value || !selectedPromptModel();
+  }
+
+  function setPromptGenerating(generating) {
+    promptGenerating = generating;
+    els.applyPrompt.classList.toggle('is-generating', generating);
+    if (generating) {
+      els.applyPrompt.setAttribute('aria-busy', 'true');
+      els.applyPrompt.setAttribute('aria-label', T('promptGenerating'));
+    } else {
+      els.applyPrompt.removeAttribute('aria-busy');
+      els.applyPrompt.setAttribute('aria-label', T('promptGenerate'));
+    }
+    els.promptGenerateLabel.hidden = generating;
+    els.promptTypingIndicator.hidden = !generating;
+    updatePromptGenerateState();
   }
 
   function renderPromptDescription() {
@@ -915,11 +931,9 @@
       });
   }
 
-  function runSavedPrompt(btn) {
-    var original = btn.textContent;
+  function runSavedPrompt() {
     var model = selectedPromptModel();
-    btn.disabled = true;
-    btn.textContent = T('promptGenerating');
+    setPromptGenerating(true);
     clearPromptOutput();
     refreshPromptSelection()
       .then(function (selection) {
@@ -957,8 +971,7 @@
       })
       .catch(function (error) { setStatus((error && error.message) || String(error), 'err'); })
       .finally(function () {
-        btn.textContent = original;
-        updatePromptGenerateState();
+        setPromptGenerating(false);
       });
   }
 
@@ -1100,6 +1113,8 @@
     els.promptSelection = document.getElementById('promptSelection');
     els.refreshPromptSelection = document.getElementById('refreshPromptSelection');
     els.applyPrompt = document.getElementById('applyPrompt');
+    els.promptGenerateLabel = document.getElementById('promptGenerateLabel');
+    els.promptTypingIndicator = document.getElementById('promptTypingIndicator');
     els.promptOutputWrap = document.getElementById('promptOutputWrap');
     els.promptOutput = document.getElementById('promptOutput');
     els.promptOutputMeta = document.getElementById('promptOutputMeta');
@@ -1162,7 +1177,8 @@
     els.promptSelection.textContent = T('promptSelectionEmpty');
     els.refreshPromptSelection.title = T('promptRefresh');
     els.refreshPromptSelection.setAttribute('aria-label', T('promptRefresh'));
-    els.applyPrompt.textContent = T('promptGenerate');
+    els.promptGenerateLabel.textContent = T('promptGenerate');
+    els.applyPrompt.setAttribute('aria-label', T('promptGenerate'));
     els.promptOutput.setAttribute('aria-label', T('promptProposal'));
     els.copyPromptOutput.textContent = T('promptCopy');
     els.pastePromptOutput.textContent = T('promptPaste');
@@ -1221,7 +1237,7 @@
     els.promptStyle.onchange = function () { clearPromptOutput(); renderPromptDescription(); };
     els.promptModel.onchange = function () { clearPromptOutput(); updatePromptGenerateState(); };
     els.refreshPromptSelection.onclick = refreshPromptSelection;
-    els.applyPrompt.onclick = function () { runSavedPrompt(els.applyPrompt); };
+    els.applyPrompt.onclick = runSavedPrompt;
     els.copyPromptOutput.onclick = copyPromptOutput;
     els.pastePromptOutput.onclick = pastePromptOutput;
 

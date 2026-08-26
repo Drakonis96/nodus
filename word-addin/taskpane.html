@@ -117,7 +117,14 @@
             <span class="prompt-block-label">Selected text in Word</span>
             <div id="promptSelection" class="prompt-selection">Select text in Word to transform it.</div>
           </div>
-          <button id="applyPrompt" class="btn primary prompt-generate" type="button" disabled>Generate proposal</button>
+          <button id="applyPrompt" class="btn primary prompt-generate" type="button" disabled>
+            <span id="promptGenerateLabel">Generate proposal</span>
+            <span id="promptTypingIndicator" class="prompt-typing-indicator" aria-hidden="true" hidden>
+              <span class="prompt-typing-dot"></span>
+              <span class="prompt-typing-dot"></span>
+              <span class="prompt-typing-dot"></span>
+            </span>
+          </button>
           <div id="promptOutputWrap" class="prompt-output-wrap" hidden>
             <div class="prompt-output-head"><strong>Proposal</strong><span id="promptOutputMeta"></span></div>
             <textarea id="promptOutput" class="prompt-output" readonly aria-label="Generated proposal"></textarea>

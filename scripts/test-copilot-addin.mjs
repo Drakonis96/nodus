@@ -82,6 +82,7 @@ try {
   for (const id of ['promptControls', 'promptStyle', 'promptModel', 'promptSelection', 'applyPrompt', 'promptOutput', 'copyPromptOutput', 'pastePromptOutput']) {
     assert.match(taskpaneHtml, new RegExp(`id="${id}"`), `Prompt UI must contain ${id}`);
   }
+  assert.equal((taskpaneHtml.match(/class="prompt-typing-dot"/g) || []).length, 3, 'prompt generation must use the Nodi-style three-dot indicator');
   for (const id of ['referenceStyle', 'referenceStyleSearch', 'referenceLocale', 'referencePlacement', 'selectedReferences', 'insertCitation', 'insertBibliography', 'refreshReferences', 'unlinkReferences']) {
     assert.match(taskpaneHtml, new RegExp(`id="${id}"`), `References UI must contain ${id}`);
   }
@@ -111,6 +112,11 @@ try {
   assert.match(taskpaneCss, /\.seg-label\s*\{[^}]*display:\s*none/);
   assert.match(taskpaneCss, /\.seg:not\(\.active\) \.seg-label\s*\{[^}]*display:\s*none !important;[^}]*inline-size:\s*0/);
   assert.match(taskpaneCss, /\.seg\.active \.seg-label\s*\{[^}]*display:\s*inline-block/);
+  assert.match(taskpaneCss, /\.results\[hidden\]\s*\{[^}]*display:\s*none !important/, 'search results must stay hidden in prompt mode');
+  assert.match(taskpaneCss, /\.empty\[hidden\]\s*\{[^}]*display:\s*none !important/, 'empty search messages must stay hidden in prompt mode');
+  assert.match(taskpaneCss, /@keyframes prompt-typing-dot/, 'the prompt loading dots must animate');
+  assert.match(taskpaneJs, /setPromptGenerating\(true\)/);
+  assert.match(taskpaneJs, /setPromptGenerating\(false\)/);
   assert.match(referencesJs, /refTab\.querySelector\('\.seg-label'\)/, 'reference localization must preserve the compact tab icon');
   assert.doesNotMatch(referencesJs, /refTab\.textContent\s*=/, 'reference localization must not replace the complete tab contents');
 

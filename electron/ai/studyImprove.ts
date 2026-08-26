@@ -30,6 +30,9 @@ const LENGTH_RULES = {
 
 export function buildStudyImprovePrompt(request: StudyImproveRequest, style: StudyStyle, protectedText: string) {
   const free = request.mode === 'free';
+  const protectedMarkerRule = protectedText.includes('⟦NODUS_PROTECTED_')
+    ? '- Conserva exactamente una vez y sin alterar cada marcador interno de protección presente en el texto seleccionado.'
+    : '';
   const styleInstruction = renderStudyStylePrompt(style.prompt, {
     ...request.variables,
     language: request.variables?.language ?? style.language,
@@ -41,7 +44,7 @@ export function buildStudyImprovePrompt(request: StudyImproveRequest, style: Stu
 REGLAS INNEGOCIABLES:
 - Devuelve exclusivamente el texto de reemplazo, sin introducciones, explicaciones, etiquetas ni bloques envolventes.
 - Conserva Markdown válido y la estructura que no sea necesario cambiar: títulos, listas, tablas, enlaces, notas, citas, referencias, código y fórmulas.
-- Cada marcador ⟦NODUS_PROTECTED_0000⟧ debe aparecer exactamente una vez y sin ninguna alteración.
+${protectedMarkerRule}
 - No inventes fuentes ni presentes como cierto algo que el original no afirma.
 ${free
     ? '- MODO TRANSFORMACIÓN LIBRE: el usuario ha autorizado cambios creativos, pero debes conservar marcadores protegidos y no inventar citas o datos.'

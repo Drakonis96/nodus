@@ -50,6 +50,10 @@ try {
   assert.ok(protectedValue.spans.length >= 7, 'quotes, citations, numbers, code, math, links and terms are protected');
   assert.equal(shared.restoreProtectedSpans(protectedValue.text, protectedValue.spans), original, 'protected text round-trips losslessly');
   assert.equal(shared.missingProtectedSpans(protectedValue.text.replace(protectedValue.spans[0].placeholder, ''), protectedValue.spans).length, 1);
+  const markerlessPrompt = improve.buildStudyImprovePrompt({
+    mode: 'free', variables: {}, length: 'similar', level: 'minimal', scope: 'selection',
+  }, { prompt: 'Mejora {{selectedText}}.', language: 'es' }, 'Texto sin fragmentos protegidos.');
+  assert.doesNotMatch(markerlessPrompt.system, /NODUS_PROTECTED/, 'a plain selection must not teach the model an internal marker');
   assert.match(shared.renderStudyStylePrompt('Para {{subject}}: {{selectedText}}', { subject: 'Historia', selectedText: 'Texto' }), /Historia: Texto/);
   assert.ok(shared.validateStudyStylePrompt('Inventa nuevas citas y datos para ampliar el texto seleccionado.').length > 0, 'unsafe custom prompt is warned');
   assert.ok(shared.studyImprovementWarnings('Hubo 37 casos.', 'Hubo 41 casos.', [], 'preserve').length >= 2, 'changed and new numbers are warned');

@@ -197,6 +197,7 @@ main {
   flex-direction: column;
   gap: 8px;
 }
+.results[hidden] { display: none !important; }
 
 .reference-controls {
   display: flex;
@@ -408,6 +409,7 @@ main {
   color: var(--muted);
   font-size: 12px;
 }
+.empty[hidden] { display: none !important; }
 
 .card {
   border: 1px solid var(--border);
@@ -658,7 +660,38 @@ main {
   overflow-wrap: anywhere;
 }
 .prompt-selection.placeholder { color: var(--muted); }
-.prompt-generate { width: 100%; }
+.prompt-generate {
+  width: 100%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.prompt-generate.is-generating:disabled { opacity: 1; cursor: progress; }
+.prompt-generate > [hidden] { display: none; }
+.prompt-typing-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 2px;
+  color: currentColor;
+}
+.prompt-typing-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+  opacity: .35;
+  animation: prompt-typing-dot 1.2s infinite ease-in-out;
+}
+.prompt-typing-dot:nth-child(2) { animation-delay: .18s; }
+.prompt-typing-dot:nth-child(3) { animation-delay: .36s; }
+@keyframes prompt-typing-dot {
+  0%, 60%, 100% { opacity: .35; transform: translateY(0); }
+  30% { opacity: 1; transform: translateY(-4px); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .prompt-typing-dot { animation: none; opacity: .75; }
+}
 .prompt-output-wrap {
   display: flex;
   flex-direction: column;

@@ -99,6 +99,12 @@ try {
 
   // --- 3. Model-formatted and ghost markers never leak into the document ---
   {
+    assert.equal(
+      restoreProtectedSpans('Texto limpio\n⟦NODUS_PROTECTED_0000⟧', []),
+      'Texto limpio\n',
+      'ghost markers are removed even when the original text had no protected spans'
+    );
+
     const source = 'Cita [Autor, 2001] y 42 casos.';
     const { text, spans } = protectStudyText(source, []);
     const formatted = text.replace(/⟦NODUS_PROTECTED_(\d+)⟧/g, '[NODUS PROTECTED $1]');

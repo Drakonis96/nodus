@@ -307,7 +307,6 @@ function placeholderLookup(spans: StudyProtectedSpan[]): Map<string, string> {
 }
 
 export function restoreProtectedSpans(text: string, spans: StudyProtectedSpan[]): string {
-  if (spans.length === 0) return text;
   // One pass over the text, not one pass per span.
   //
   // The previous `spans.reduce((acc, span) => acc.split(...).join(...))` walked
