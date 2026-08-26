@@ -7,7 +7,7 @@ function creatorLine(item: CompassResult): string {
   const names = item.authors?.map((author) => author.name).filter(Boolean) ?? [];
   return names.length > 3 ? `${names.slice(0, 3).join(', ')} +${names.length - 3}` : names.join(', ');
 }
-function typeLabel(type: CompassResult['type']): string { return compassT(({ article: 'Artículo', book: 'Libro', chapter: 'Capítulo', thesis: 'Tesis', report: 'Informe', dataset: 'Conjunto de datos', preprint: 'Prepublicación', other: 'Otro' } as const)[type]); }
+function typeLabel(type: CompassResult['type']): string { return compassT(({ article: 'Artículo', book: 'Libro', chapter: 'Capítulo', thesis: 'Tesis', report: 'Informe', dataset: 'Conjunto de datos', preprint: 'Prepublicación', photograph: 'Fotografía', newspaper: 'Prensa', map: 'Mapa', manuscript: 'Manuscrito', audio: 'Audio', video: 'Vídeo', 'archive-item': 'Objeto de archivo', other: 'Otro' } as const)[type]); }
 
 export function CompassResultList({ results, selected, saved, dismissed, onToggle, onOpen, onSave, onDismiss, onSimilar, anchorId, onAnchorChange }: {
   results: CompassResult[]; selected: Set<string>; saved: Set<string>; dismissed: Set<string>; onToggle: (item: CompassResult) => void; onOpen: (item: CompassResult) => void;

@@ -1,21 +1,295 @@
-import { createHash } from 'node:crypto';
-import type { CompassFilters, CompassIdentifier, CompassPublicationType, CompassQueryPlan } from '@shared/compass';
+import { createHash } from "node:crypto";
+import type {
+  CompassFilters,
+  CompassIdentifier,
+  CompassPublicationType,
+  CompassQueryPlan,
+} from "@shared/compass";
+import {
+  conceptsInCompassQuery,
+  detectCompassLanguage,
+  normalizeCompassTerm,
+} from "./compassVocabulary";
 
-const LANGUAGES: Record<string, string> = { english: 'en', inglés: 'en', french: 'fr', francés: 'fr', français: 'fr', german: 'de', alemán: 'de', deutsch: 'de', spanish: 'es', español: 'es', catalan: 'ca', català: 'ca', portuguese: 'pt', português: 'pt', italian: 'it', italiano: 'it', arabic: 'ar', árabe: 'ar' };
-const TYPE_MAP: Record<string, CompassPublicationType> = { article: 'article', articles: 'article', artículo: 'article', artículos: 'article', book: 'book', books: 'book', libro: 'book', libros: 'book', chapter: 'chapter', chapters: 'chapter', capítulo: 'chapter', thesis: 'thesis', theses: 'thesis', tesis: 'thesis', dissertation: 'thesis', report: 'report', reports: 'report', informe: 'report', dataset: 'dataset', datasets: 'dataset', preprint: 'preprint', preprints: 'preprint' };
-function clean(value: unknown, max = 2_000): string { return String(value ?? '').replace(/\s+/g, ' ').trim().slice(0, max); }
-function unique(values: string[]): string[] { return [...new Set(values.map((v) => clean(v, 120).toLowerCase()).filter(Boolean))]; }
-function quoted(query: string): string[] { return [...query.matchAll(/"([^"\n]{2,200})"|'([^'\n]{2,200})'/g)].map((m) => m[1] || m[2]).filter(Boolean); }
-function years(query: string): { fromYear?: number; toYear?: number } { const range = query.match(/\b(19\d{2}|20\d{2})\s*(?:-|–|to|a|hasta)\s*(19\d{2}|20\d{2})\b/i); if (range) return { fromYear: Number(range[1]), toYear: Number(range[2]) }; const since = query.match(/\b(?:since|desde|after|después de)\s+(19\d{2}|20\d{2})\b/i); if (since) return { fromYear: Number(since[1]) }; const only = query.match(/\b(19\d{2}|20\d{2})\b/); return only ? { fromYear: Number(only[1]), toYear: Number(only[1]) } : {}; }
-function identifiers(query: string): CompassIdentifier[] { const out: CompassIdentifier[] = []; for (const m of query.matchAll(/\b(10\.\d{4,9}\/[-._;()/:A-Z0-9]+)\b/ig)) out.push({ scheme: 'doi', value: m[1].replace(/[.,;]+$/, '') }); for (const m of query.matchAll(/\b(?:ISBN(?:-1[03])?[:\s]*)?((?:97[89][ -]?)?\d[\d -]{8,16}\d)\b/ig)) { const value = m[1].replace(/[ -]/g, ''); if (value.length === 10 || value.length === 13) out.push({ scheme: 'isbn', value }); } return out; }
-export function interpretCompassQuery(input: string, filters: CompassFilters = {}): CompassQueryPlan {
-  const source = clean(input); if (!source) return { text: '', exactPhrases: [], excludedTerms: [], authors: [], venues: [], identifiers: [], languages: filters.languages ?? [], types: filters.types ?? [], disciplines: filters.disciplines ?? [], openAccessOnly: filters.openAccessOnly === true, providers: filters.providers ?? [] };
-  const exactPhrases = quoted(source); const excludedTerms = unique([...source.matchAll(/(?:^|\s)-([\p{L}\d][\p{L}\d-]*)/gu)].map((m) => m[1]));
-  const authors = unique([...source.matchAll(/(?:author|autor|auteur|by|por):([^\s,;]+)/gi)].map((m) => m[1])); const venues = unique([...source.matchAll(/(?:venue|journal|revista|journal):([^\s,;]+)/gi)].map((m) => m[1]));
-  const langs = [...source.toLowerCase().matchAll(/(?:language|lang|idioma|langue):?\s*([\p{L}-]+)/gu)].map((m) => LANGUAGES[m[1]] || m[1]).concat((filters.languages ?? []).map((x) => x.toLowerCase()));
-  const types = [...source.toLowerCase().matchAll(/(?:type|tipo):?\s*([\p{L}-]+)/gu)].map((m) => TYPE_MAP[m[1]]).filter(Boolean) as CompassPublicationType[];
-  for (const word of source.toLowerCase().split(/[^\p{L}]+/u)) if (TYPE_MAP[word]) types.push(TYPE_MAP[word]);
-  const range = years(source); const plan: CompassQueryPlan = { text: source, exactPhrases, excludedTerms, authors, venues, identifiers: identifiers(source), fromYear: filters.fromYear ?? range.fromYear, toYear: filters.toYear ?? range.toYear, languages: unique(langs), types: [...new Set([...(filters.types ?? []), ...types])], disciplines: unique(filters.disciplines ?? []), openAccessOnly: filters.openAccessOnly === true || /\b(?:open\s+access|oa|acceso\s+abierto)\b/i.test(source), providers: filters.providers ?? [] };
+const LANGUAGES: Record<string, string> = {
+  english: "en",
+  inglés: "en",
+  anglais: "en",
+  french: "fr",
+  francés: "fr",
+  français: "fr",
+  german: "de",
+  alemán: "de",
+  deutsch: "de",
+  spanish: "es",
+  español: "es",
+  castellano: "es",
+  catalan: "ca",
+  català: "ca",
+  portuguese: "pt",
+  portugués: "pt",
+  português: "pt",
+  italian: "it",
+  italiano: "it",
+};
+const TYPE_MAP: Record<string, CompassPublicationType> = {
+  article: "article",
+  articles: "article",
+  artículo: "article",
+  artículos: "article",
+  book: "book",
+  books: "book",
+  libro: "book",
+  libros: "book",
+  livre: "book",
+  chapter: "chapter",
+  chapters: "chapter",
+  capítulo: "chapter",
+  thesis: "thesis",
+  theses: "thesis",
+  tesis: "thesis",
+  dissertation: "thesis",
+  report: "report",
+  reports: "report",
+  informe: "report",
+  dataset: "dataset",
+  datasets: "dataset",
+  preprint: "preprint",
+  preprints: "preprint",
+  fotografía: "photograph",
+  fotografias: "photograph",
+  photograph: "photograph",
+  photographs: "photograph",
+  photographie: "photograph",
+  newspaper: "newspaper",
+  prensa: "newspaper",
+  journal: "newspaper",
+  map: "map",
+  mapa: "map",
+  carte: "map",
+  manuscript: "manuscript",
+  manuscrito: "manuscript",
+  audio: "audio",
+  video: "video",
+  archive: "archive-item",
+  archivo: "archive-item",
+};
+const PUBLICATION_CUE =
+  /\b(?:publicad[oa]s?|publicaci[oó]n|published|publication|publi[eé]s?|depuis|desde|since|after|antes|before|entre|between|from|hasta|until|von|zwischen|pubblicat[oa]|pubblicazione)\b/i;
+const clean = (value: unknown, max = 2_000) =>
+  String(value ?? "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, max);
+const unique = (values: string[], max = 120) => [
+  ...new Set(
+    values
+      .map((value) => clean(value, max).toLocaleLowerCase())
+      .filter(Boolean),
+  ),
+];
+const quote = (value: string) => `"${value.replaceAll('"', "")}"`;
+
+function quoted(query: string): string[] {
+  return [...query.matchAll(/"([^"\n]{2,200})"|'([^'\n]{2,200})'/g)]
+    .map((match) => match[1] || match[2])
+    .filter(Boolean);
+}
+function publicationYears(query: string): {
+  fromYear?: number;
+  toYear?: number;
+} {
+  if (!PUBLICATION_CUE.test(query)) return {};
+  const range = query.match(
+    /\b(1[0-9]{3}|20\d{2})\s*(?:-|–|—|to|a|y|e|and|et|hasta|until|au|bis|und)\s*(1[0-9]{3}|20\d{2})\b/i,
+  );
+  if (range) return { fromYear: Number(range[1]), toYear: Number(range[2]) };
+  const since = query.match(
+    /\b(?:since|desde|after|después de|depuis|ab|dopo)\s+(1[0-9]{3}|20\d{2})\b/i,
+  );
+  if (since) return { fromYear: Number(since[1]) };
+  const before = query.match(
+    /\b(?:before|antes de|hasta|until|avant|vor)\s+(1[0-9]{3}|20\d{2})\b/i,
+  );
+  if (before) return { toYear: Number(before[1]) };
+  const only = query.match(/\b(1[0-9]{3}|20\d{2})\b/);
+  return only ? { fromYear: Number(only[1]), toYear: Number(only[1]) } : {};
+}
+function identifiers(query: string): CompassIdentifier[] {
+  const out: CompassIdentifier[] = [];
+  for (const match of query.matchAll(/\b(10\.\d{4,9}\/[-._;()/:A-Z0-9]+)\b/gi))
+    out.push({ scheme: "doi", value: match[1].replace(/[.,;]+$/, "") });
+  for (const match of query.matchAll(
+    /\b(?:ISBN(?:-1[03])?[:\s]*)?((?:97[89][ -]?)?\d[\d -]{8,16}[\dX])\b/gi,
+  )) {
+    const value = match[1].replace(/[ -]/g, "").toUpperCase();
+    if (value.length === 10 || value.length === 13)
+      out.push({ scheme: "isbn", value });
+  }
+  for (const [scheme, expression] of [
+    ["pmid", /\bPMID[:\s]*(\d{5,10})\b/gi],
+    ["pmcid", /\b(PMC\d{4,12})\b/gi],
+    ["arxiv", /\b(?:arXiv:)?(\d{4}\.\d{4,5}(?:v\d+)?)\b/gi],
+    ["issn", /\b(?:ISSN[:\s]*)?(\d{4}-\d{3}[\dX])\b/gi],
+  ] as const)
+    for (const match of query.matchAll(expression))
+      out.push({ scheme, value: match[1] });
+  return out.filter(
+    (entry, index, all) =>
+      all.findIndex(
+        (other) =>
+          other.scheme === entry.scheme &&
+          other.value.toLocaleLowerCase() === entry.value.toLocaleLowerCase(),
+      ) === index,
+  );
+}
+function expressions(
+  text: string,
+  exact: string[],
+  excluded: string[],
+  concepts: string[][],
+) {
+  const quotedText = exact.map(quote);
+  const exclusions = excluded.map((term) => `-${quote(term)}`);
+  const conceptTerms = concepts.map(
+    (group) => `(${group.slice(0, 5).map(quote).join(" OR ")})`,
+  );
+  const plain = text
+    .replace(/(?:^|\s)-[\p{L}\d][\p{L}\d-]*/gu, " ")
+    .replace(/["']/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  const balanced = [
+    ...quotedText,
+    ...(conceptTerms.length ? conceptTerms : [plain]),
+    ...exclusions,
+  ]
+    .filter(Boolean)
+    .join(" ");
+  const strict =
+    [...quotedText, ...conceptTerms, ...exclusions]
+      .filter(Boolean)
+      .join(" AND ") || plain;
+  const semantic = [...exact, ...concepts.map((group) => group[0]), plain]
+    .filter(Boolean)
+    .join(" · ");
+  const heads = concepts.map((group) => group.slice(0, 3).join(" OR "));
+  const conceptPairs: string[] = [];
+  for (let left = 0; left < heads.length; left += 1)
+    for (let right = left + 1; right < heads.length; right += 1)
+      conceptPairs.push(`(${heads[left]}) (${heads[right]})`);
+  return {
+    strict,
+    balanced: balanced || plain,
+    semantic,
+    conceptPairs: conceptPairs.slice(0, 8),
+  };
+}
+
+export function interpretCompassQuery(
+  input: string,
+  filters: CompassFilters = {},
+): CompassQueryPlan {
+  const source = clean(input);
+  const exactPhrases = quoted(source);
+  const excludedTerms = unique(
+    [...source.matchAll(/(?:^|\s)-([\p{L}\d][\p{L}\d-]*)/gu)].map(
+      (match) => match[1],
+    ),
+  );
+  const authors = unique(
+    [
+      ...source.matchAll(
+        /(?:author|autor|autora|auteur|by|por):\s*("[^"]+"|[^,;]+)/gi,
+      ),
+    ].map((match) => match[1].replaceAll('"', "").trim()),
+    300,
+  );
+  const venues = unique(
+    [
+      ...source.matchAll(
+        /(?:venue|journal|revista|publication|publicación):\s*("[^"]+"|[^,;]+)/gi,
+      ),
+    ].map((match) => match[1].replaceAll('"', "").trim()),
+    300,
+  );
+  const explicitLanguages = [
+    ...source
+      .toLocaleLowerCase()
+      .matchAll(/(?:language|lang|idioma|langue):?\s*([\p{L}-]+)/gu),
+  ].map((match) => LANGUAGES[match[1]] || match[1]);
+  const detectedLanguage = detectCompassLanguage(source);
+  const types: CompassPublicationType[] = [];
+  for (const word of source.toLocaleLowerCase().split(/[^\p{L}]+/u))
+    if (TYPE_MAP[word]) types.push(TYPE_MAP[word]);
+  const concepts = conceptsInCompassQuery(source);
+  const range = publicationYears(source);
+  const lane =
+    filters.lane ??
+    (types.some((type) =>
+      [
+        "photograph",
+        "newspaper",
+        "map",
+        "manuscript",
+        "audio",
+        "video",
+        "archive-item",
+      ].includes(type),
+    ) ||
+    /\b(?:fuente primaria|primary source|archivo|archive|fotograf|photograph|prensa|newspaper|mapa|map|manuscri|audio|video)\b/i.test(
+      source,
+    )
+      ? "primary"
+      : "scholarly");
+  const languages = unique(
+    [
+      ...(filters.languages ?? []),
+      ...explicitLanguages,
+      ...(explicitLanguages.length
+        ? []
+        : detectedLanguage
+          ? [detectedLanguage]
+          : []),
+    ],
+    20,
+  );
+  const mergedTypes = [...new Set([...(filters.types ?? []), ...types])];
+  const plan: CompassQueryPlan = {
+    text: source,
+    detectedLanguage,
+    exactPhrases,
+    excludedTerms,
+    authors,
+    venues,
+    identifiers: identifiers(source),
+    fromYear: filters.fromYear ?? range.fromYear,
+    toYear: filters.toYear ?? range.toYear,
+    languages,
+    types: mergedTypes,
+    disciplines: unique(filters.disciplines ?? [], 120),
+    concepts,
+    expressions: expressions(source, exactPhrases, excludedTerms, concepts),
+    openAccessOnly:
+      filters.openAccessOnly === true ||
+      /\b(?:open\s+access|oa|acceso\s+abierto|accès\s+ouvert|acesso\s+aberto)\b/i.test(
+        source,
+      ),
+    providers: filters.providers ?? [],
+    lane,
+  };
   return plan;
 }
-export function compassQueryFingerprint(plan: CompassQueryPlan, filters: CompassFilters = {}): string { return createHash('sha256').update(JSON.stringify({ plan, filters })).digest('hex'); }
+
+export function compassQueryFingerprint(
+  plan: CompassQueryPlan,
+  filters: CompassFilters = {},
+): string {
+  return createHash("sha256")
+    .update(JSON.stringify({ plan, filters }))
+    .digest("hex");
+}
+
+export function normalizedCompassConcept(value: string): string {
+  return normalizeCompassTerm(value);
+}

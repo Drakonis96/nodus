@@ -1,17 +1,150 @@
-import type { CompassProviderId, CompassQueryPlan } from '@shared/compass';
-const GENERAL: CompassProviderId[] = ['crossref', 'openaire', 'openalex'];
-export function routeCompassProviders(plan: CompassQueryPlan, configured: Partial<Record<CompassProviderId, boolean>> = {}): CompassProviderId[] {
-  const explicitlyConfigured = Object.keys(configured).length > 0;
-  const enabled = (provider: CompassProviderId) => explicitlyConfigured ? configured[provider] === true : configured[provider] !== false;
-  if (plan.providers.length) return plan.providers.filter((p, i, all) => all.indexOf(p) === i && enabled(p));
-  const text = `${plan.text} ${plan.disciplines.join(' ')}`.toLowerCase(); const out = [...GENERAL];
-  const languages = new Set(plan.languages.map((language) => language.toLowerCase().split('-')[0]));
-  if (plan.identifiers.some((identifier) => identifier.scheme.toLowerCase() === 'doi')) out.unshift('unpaywall', 'opencitations');
-  if (plan.types.some((type) => type === 'book' || type === 'chapter') || /\b(?:book|books|libro|libros|livro|livros|monograph|monografía|chapter|cap[ií]tulo)\b/.test(text)) out.unshift('doab', 'oapen', 'openedition');
-  if (/\b(?:computer science|informatics|artificial intelligence|machine learning|medicine|biomedical|physics|chemistry|neuroscience)\b/.test(text)) out.unshift('semanticscholar');
-  if (languages.has('es') || languages.has('ca') || /\b(?:español|spanish|catal[aá]n|iberoam[eé]rica|hispan)\b/.test(text)) out.unshift('dialnet', 'scielo');
-  if (languages.has('pt') || /\b(?:portugu[eê]s|brazil|brasil|latin america|am[eé]rica latina)\b/.test(text)) out.unshift('scielo');
-  if (languages.has('fr') || /\b(?:fran[cç]ais|french|humanities|humanidades|sciences humaines)\b/.test(text)) out.unshift('hal', 'openedition');
-  if (plan.types.some((x) => ['thesis', 'report', 'dataset', 'preprint'].includes(x)) || /\b(?:thesis|tesis|dissertation|dataset|report|repository|repositorio)\b/.test(text)) out.unshift('hal', 'openaire');
-  return [...new Set(out)].filter(enabled);
+import type {
+  CompassLane,
+  CompassProviderId,
+  CompassQueryPlan,
+  CompassQueryStrategy,
+} from "@shared/compass";
+
+export interface CompassRoute {
+  provider: CompassProviderId;
+  strategy: CompassQueryStrategy;
+  lane: CompassLane;
+}
+const unique = (routes: CompassRoute[]) =>
+  routes.filter(
+    (route, index, all) =>
+      all.findIndex(
+        (other) =>
+          other.provider === route.provider && other.lane === route.lane,
+      ) === index,
+  );
+
+export function routeCompassRequests(plan: CompassQueryPlan): CompassRoute[] {
+  const allowed = new Set(plan.providers);
+  const use = (provider: CompassProviderId) =>
+    allowed.size === 0 || allowed.has(provider);
+  const route = (
+    provider: CompassProviderId,
+    strategy: CompassQueryStrategy = "balanced",
+    lane: CompassLane = plan.lane,
+  ): CompassRoute => ({ provider, strategy, lane });
+  const text = `${plan.text} ${plan.disciplines.join(" ")}`.toLocaleLowerCase();
+  const types = new Set(plan.types);
+  const doi = plan.identifiers.some((entry) => entry.scheme === "doi");
+  const isbn = plan.identifiers.some((entry) => entry.scheme === "isbn");
+  if (plan.mode === "similar")
+    return [
+      route("openalex", "semantic", "scholarly"),
+      route("semanticscholar", "similar", "scholarly"),
+    ];
+  if (allowed.size)
+    return [...allowed].map((provider) =>
+      route(
+        provider,
+        doi || isbn
+          ? "identifier"
+          : provider === "hal" ||
+              provider === "bnf" ||
+              provider === "gallica" ||
+              provider === "arxiv"
+            ? "strict"
+            : "balanced",
+        ["loc", "internetarchive", "gallica"].includes(provider)
+          ? "primary"
+          : "scholarly",
+      ),
+    );
+  let routes: CompassRoute[] = [];
+  if (doi)
+    routes = [
+      route("openalex", "identifier", "scholarly"),
+      route("crossref", "identifier", "scholarly"),
+      route("opencitations", "identifier", "scholarly"),
+    ];
+  else if (isbn)
+    routes = [
+      route("openlibrary", "identifier", "scholarly"),
+      route("doab", "identifier", "scholarly"),
+      route("oapen", "identifier", "scholarly"),
+      route("bnf", "identifier", "scholarly"),
+    ];
+  else if (plan.lane === "primary")
+    routes = [
+      route("loc", "balanced", "primary"),
+      route("internetarchive", "balanced", "primary"),
+      route("gallica", "strict", "primary"),
+    ];
+  else {
+    routes.push(
+      route("openalex"),
+      route(
+        "core",
+        plan.expressions.conceptPairs.length ? "concept-pair" : "balanced",
+      ),
+      route("doaj"),
+      route("openaire"),
+    );
+    if (
+      types.has("book") ||
+      types.has("chapter") ||
+      /\b(?:book|libro|livre|livro|monograph|chapter|cap[ií]tulo|literatura de viajes|travel writing|récits de voyage)\b/i.test(
+        text,
+      )
+    )
+      routes.unshift(
+        route("openlibrary"),
+        route("doab"),
+        route("oapen"),
+        route("bnf", "strict"),
+        route("core", "balanced"),
+      );
+    if (
+      plan.languages.some((language) => language === "fr") ||
+      /\b(?:fran[cç]ais|french|france|humanities|sciences humaines)\b/i.test(
+        text,
+      )
+    )
+      routes.unshift(
+        route("hal", "strict"),
+        route("bnf", "strict"),
+        route("gallica", "strict", "primary"),
+      );
+    if (
+      [...types].some((type) =>
+        ["thesis", "report", "dataset", "preprint"].includes(type),
+      ) ||
+      /\b(?:thesis|tesis|dissertation|dataset|report|informe|preprint)\b/i.test(
+        text,
+      )
+    )
+      routes.unshift(
+        route("datacite"),
+        route("zenodo", "strict"),
+        route("openaire"),
+        route("hal", "strict"),
+      );
+    if (
+      /\b(?:medicine|medical|health|medicina|biomed|salud|médecine|santé)\b/i.test(
+        text,
+      )
+    )
+      routes.unshift(route("europepmc", "strict"));
+    if (
+      /\b(?:computer science|informatics|informática|informatique|software|algorithm|machine learning|artificial intelligence)\b/i.test(
+        text,
+      )
+    )
+      routes.unshift(
+        route("dblp"),
+        route("arxiv", "strict"),
+        route("semanticscholar"),
+      );
+  }
+  return unique(routes).filter((entry) => use(entry.provider));
+}
+
+export function routeCompassProviders(
+  plan: CompassQueryPlan,
+): CompassProviderId[] {
+  return routeCompassRequests(plan).map((route) => route.provider);
 }
