@@ -790,7 +790,7 @@ function SessionGridCard({
       <button className="block w-full text-left" onClick={primary}>
         <DecorativeImageCard entityKind="immersion" entityId={s.id} image={s.image} defaultStyle={settings.imageStyle} thumbnail />
       </button>
-      <div className="flex w-full items-center gap-4">
+      <div className="mt-auto flex w-full items-end gap-4">
         <ProgressRing pct={s.progressPct} finished={s.finished} />
         <button className="min-w-0 flex-1 text-left" onClick={primary}>
           <div className="truncate text-sm font-medium text-neutral-200" title={s.title}>{s.title}</div>
