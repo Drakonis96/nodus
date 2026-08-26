@@ -53,7 +53,7 @@ export function CoverageWorkspace({
       <header className="shrink-0 border-b border-neutral-200 px-5 pt-4 dark:border-neutral-800">
         <div className="mb-3 flex flex-wrap items-center gap-3">
           <span className="grid h-9 w-9 place-items-center rounded-xl bg-indigo-100 text-indigo-600 dark:bg-indigo-500/15 dark:text-indigo-300">
-            <Icon name="compass" size={18} />
+            <Icon name="strata" size={18} />
           </span>
           <div>
             <h1 className="text-base font-semibold">{t('Estado de la cuestión')}</h1>

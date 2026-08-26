@@ -78,6 +78,9 @@ const ICON_PATHS: Record<string, string> = {
   chartBar: '<line x1="12" y1="20" x2="12" y2="10"/><line x1="18" y1="20" x2="18" y2="4"/><line x1="6" y1="20" x2="6" y2="16"/><line x1="3" y1="20" x2="21" y2="20"/>',
   bulb: '<path d="M9 18h6"/><path d="M10 22h4"/><path d="M15.09 14c.18-.98.65-1.74 1.41-2.5A4.65 4.65 0 0 0 18 8 6 6 0 0 0 6 8c0 1 .23 2.23 1.5 3.5A4.61 4.61 0 0 1 8.91 14"/>',
   layers: '<polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/>',
+  // A field seen in section: three uneven strata stand for what the corpus
+  // covers, where its positions diverge and what remains open.
+  strata: '<polyline points="4 5 9 5 11 4 14 6 20 5"/><polyline points="2 12 7 12 10 10 14 11 17 12 22 12"/><polyline points="5 19 9 19 11 18 14 19 17 17 20 18"/>',
   sigma: '<path d="M18 4H6l6 8-6 8h12"/>',
   wand: '<path d="M15 4V2"/><path d="M15 16v-2"/><path d="M8 9h2"/><path d="M20 9h2"/><path d="M17.8 11.8L19 13"/><path d="M15 9h0"/><path d="M17.8 6.2L19 5"/><path d="M3 21l9-9"/><path d="M12.2 6.2L11 5"/>',
   image: '<rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/>',
@@ -169,7 +172,6 @@ const ICON_PATHS: Record<string, string> = {
   archive: '<polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5"/><line x1="10" y1="12" x2="14" y2="12"/>',
   key: '<path d="M21 2l-2 2"/><path d="M17 6l-2 2"/><circle cx="7.5" cy="14.5" r="5.5"/><path d="M12 10l7-7 2 2-7 7"/><path d="M7.5 14.5h.01"/>',
   compass: '<circle cx="12" cy="12" r="10"/><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"/>',
-  compassSearch: '<circle cx="10.5" cy="10.5" r="7.5"/><path d="m16 16 5 5"/><path d="m13.5 7.5-5 6 2-1 1 2 4-5-2 1z"/>',
   chevronLeft: '<polyline points="15 18 9 12 15 6"/>',
   chevronRight: '<polyline points="9 18 15 12 9 6"/>',
   skipBack: '<polygon points="19 20 9 12 19 4 19 20"/><line x1="5" y1="19" x2="5" y2="5"/>',

@@ -123,7 +123,7 @@ export const NAV_ITEMS: NavItem[] = [
   // significa algo junto a lo que el corpus cubre y a lo que le falta. Sigue siendo una
   // vista enrutable —Inicio, Buscar y el tour avanzado navegan a ella— y aterriza en su
   // pestaña; ver src/app/views/corpus.tsx.
-  { id: 'research', label: 'Estado de la cuestión', icon: 'compass', group: 'analyze' },
+  { id: 'research', label: 'Estado de la cuestión', icon: 'strata', group: 'analyze' },
   { id: 'hypothesis', label: 'Hipótesis', icon: 'flask', group: 'analyze' },
   { id: 'reading', label: 'Ruta de lectura', icon: 'route', group: 'analyze' },
   { id: 'deepResearch', label: 'Deep Research', icon: 'telescope', group: 'analyze' },
@@ -138,7 +138,7 @@ export const NAV_ITEMS: NavItem[] = [
   // Vistas universales: disponibles en todos los tipos de vault.
   { id: 'browser', label: 'Nodus Browser', icon: 'globe', group: 'tools' },
   { id: 'radar', label: 'Nodus Radar', icon: 'radar', group: 'tools' },
-  { id: 'compass', label: 'Nodus Compass', icon: 'compassSearch', group: 'tools' },
+  { id: 'compass', label: 'Nodus Compass', icon: 'compass', group: 'tools' },
   { id: 'toolkit', label: 'Nodus Tools', icon: 'tools', group: 'tools' },
   { id: 'settings', label: 'Ajustes', icon: 'settings' },
 ];
