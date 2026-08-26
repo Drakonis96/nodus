@@ -1,4 +1,5 @@
 import os from 'node:os';
+import { createHash } from 'node:crypto';
 import { getDb, withVaultDatabase } from '../db/database';
 import { getActiveVault, getVault } from '../vaults/vaultRegistry';
 import { updateSettings } from '../db/settingsRepo';
@@ -39,6 +40,13 @@ import {
 } from './publishRetryPolicy';
 import { buildServerSnapshotInUtility, publishVaultToCloudflareInUtility } from './serverPublishWorkerHost';
 import { publishSourceRevision } from './publishSourceRevision';
+import {
+  personalImportEndpoint,
+  normalizeServerPublicationPolicy,
+  RESTRICTIVE_SERVER_PUBLICATION_POLICY,
+  type ServerPersonalImportEnvelope,
+  type ServerPublicationPolicy,
+} from '@shared/serverPublication';
 
 // A Nodus Server pairing belongs to ONE vault and one remote space. Unlike the old
 // single-active-vault publisher, every paired vault keeps publishing in the background
@@ -323,6 +331,92 @@ async function uploadLibraryPackages(
 }
 
 /**
+ * Read the owner's publication policy before taking a snapshot. A missing
+ * endpoint is treated as a restrictive policy: old servers continue to work
+ * for the canonical core, while no newly introduced opt-in projection leaks
+ * during an upgrade.
+ */
+async function readPublicationPolicy(
+  config: VaultServerConfig,
+  token: string,
+): Promise<ServerPublicationPolicy> {
+  const endpoint = `${normalizeUrl(config.url)}/api/v1/spaces/${encodeURIComponent(config.spaceId)}/publication-policy`;
+  try {
+    const response = await fetchWithTimeout(endpoint, { headers: { authorization: `Bearer ${token}`, accept: 'application/json' } });
+    if (!response.ok) return RESTRICTIVE_SERVER_PUBLICATION_POLICY;
+    const value = await response.json().catch(() => null);
+    const policy = normalizeServerPublicationPolicy(value);
+    return policy.version === 0 ? RESTRICTIVE_SERVER_PUBLICATION_POLICY : policy;
+  } catch {
+    return RESTRICTIVE_SERVER_PUBLICATION_POLICY;
+  }
+}
+
+function effectivePublicationConfig(config: VaultServerConfig, policy: ServerPublicationPolicy): VaultServerConfig {
+  return {
+    ...config,
+    includeUserContent: config.includeUserContent && policy.allowUserContent,
+    includePassages: config.includePassages && policy.allowPassages,
+    includeLibraryDocuments: config.includeLibraryDocuments && policy.allowLibraryDocuments,
+    includeVectors: config.includeVectors && policy.allowVectors,
+    includePrimarySources: config.includePrimarySources && policy.allowPrimarySources,
+    includeTestimonies: config.includeTestimonies && policy.allowTestimonies,
+    includePersonalImports: config.includePersonalImports && policy.allowPersonalImports,
+  };
+}
+
+function publisherIdForToken(token: string): string {
+  // The classic server identifies a publisher by the SHA-256 digest of its
+  // bearer token. Sending the same opaque digest lets the personal import
+  // endpoint attach rows to the authenticated publisher without exposing it.
+  return createHash('sha256').update(token).digest('hex');
+}
+
+async function uploadPersonalImport(
+  config: VaultServerConfig,
+  token: string,
+  envelope: ServerPersonalImportEnvelope | null,
+): Promise<void> {
+  if (!envelope) return;
+  // The server import endpoint accepts the compact annotation list. Keep the
+  // richer envelope in the wire body as an audit/idempotency envelope, while
+  // also projecting its rows into the endpoint's additive legacy shape.
+  const annotations = envelope.batches.flatMap((batch) => [
+    ...batch.rows
+      .filter((entry) => entry.table !== 'writing_draft_reads')
+      .map((entry) => ({ ...entry.row, table: entry.table })),
+    ...batch.libraryAnnotations.map((entry) => ({ ...entry.annotation, documentId: entry.documentId })),
+  ]);
+  const body = JSON.stringify({ ...envelope, annotations });
+  const base = normalizeUrl(config.url);
+  const endpoint = personalImportEndpoint(base, config.spaceId);
+  const request = {
+    method: 'POST',
+    headers: {
+      authorization: `Bearer ${token}`,
+      accept: 'application/json',
+      'content-type': 'application/vnd.nodus.personal-import+json',
+      'x-nodus-publisher-id': envelope.publisher.id,
+      'x-nodus-import-id': envelope.batches[0]?.id || '',
+    },
+    body,
+  } satisfies RequestInit;
+  let response = await fetchWithTimeout(endpoint, request);
+  // Keep the compact alias as a compatibility retry for the first server-web
+  // builds while the descriptive route remains canonical.
+  if (response.status === 404) {
+    response = await fetchWithTimeout(`${base}/api/v1/spaces/${encodeURIComponent(config.spaceId)}/personal/import`, request);
+  }
+  if (response.status === 404) {
+    throw new Error('Actualiza Nodus Server para poder importar anotaciones personales.');
+  }
+  if (!response.ok) {
+    const result = await response.json().catch(() => ({})) as { error?: string; error_description?: string };
+    throw new Error(result.error_description || result.error || `El servidor rechazó la importación personal (HTTP ${response.status}).`);
+  }
+}
+
+/**
  * Publish the corpus embeddings so the server can answer a semantic query.
  *
  * Separate from the snapshot on purpose: the matrix is binary, it is an order of magnitude
@@ -426,7 +520,9 @@ async function publishVault(vaultId: string): Promise<void> {
     // total_changes + data_version is connection-local but stable for the pooled connection.
     // It cannot miss writes made by this connection or another one. Library packages live
     // outside SQLite, so that opt-in deliberately bypasses this early shortcut.
-    const databaseRevision = publishSourceRevision(lightweightVaultRevision(db), config);
+    const policy = await readPublicationPolicy(config, token);
+    const publicationConfig = effectivePublicationConfig(config, policy);
+    const databaseRevision = publishSourceRevision(lightweightVaultRevision(db), publicationConfig);
     if (databaseRevision && rt.lastPublishedDatabaseRevision === databaseRevision) {
       rt.phase = 'ok';
       rt.pending = false;
@@ -434,18 +530,23 @@ async function publishVault(vaultId: string): Promise<void> {
       clearPublishRetry(rt);
       return;
     }
-    const library = config.includeLibraryDocuments ? buildServerLibraryPublication() : null;
+    const library = publicationConfig.includeLibraryDocuments ? buildServerLibraryPublication() : null;
     let publishPhaseStartedAt = process.hrtime.bigint();
     const snapshot = await buildServerSnapshotInUtility({
       vaultPath: vault.path,
       vault: { ...vault },
       settings: {
-        nodusServerIncludeUserContent: config.includeUserContent,
-        nodusServerIncludePassages: config.includePassages,
+        nodusServerIncludeUserContent: publicationConfig.includeUserContent,
+        nodusServerIncludePassages: publicationConfig.includePassages,
+        nodusServerIncludePrimarySources: publicationConfig.includePrimarySources,
+        nodusServerIncludeTestimonies: publicationConfig.includeTestimonies,
+        nodusServerIncludePersonalImports: publicationConfig.includePersonalImports,
       },
       library: library?.manifest ?? null,
-      vectorKinds: config.includeVectors
-        ? (config.includePassages ? ['ideas', 'documents', 'passages'] : ['ideas', 'documents']) as VectorKind[]
+      libraryAnnotations: library?.personalAnnotations,
+      publisherId: publisherIdForToken(token),
+      vectorKinds: publicationConfig.includeVectors
+        ? (publicationConfig.includePassages ? ['ideas', 'documents', 'passages'] : ['ideas', 'documents']) as VectorKind[]
         : [],
     });
     publishPhaseStartedAt = logPublishPerf('utility-snapshot-gzip:complete', publishPhaseStartedAt, {
@@ -455,7 +556,7 @@ async function publishVault(vaultId: string): Promise<void> {
     // Nothing changed since our last upload this session: keep the server as-is and
     // avoid the round-trip. The very first publish after launch always runs (no cache).
     if (rt.lastRevision && rt.lastRevision === snapshot.revision) {
-      await publishVectors(config, token, snapshot.vectors, rt);
+      await publishVectors(publicationConfig, token, snapshot.vectors, rt);
       rt.phase = 'ok';
       rt.pending = false;
       rt.dirtySince = 0;
@@ -502,6 +603,7 @@ async function publishVault(vaultId: string): Promise<void> {
     }
     if (response.status === 413) throw new Error(tooLargeMessage(config, result.error || '', snapshot.rawBytes));
     if (!response.ok) throw new Error(result.error || `El servidor respondió con HTTP ${response.status}.`);
+    await uploadPersonalImport(publicationConfig, token, snapshot.personal);
     rt.lastRevision = snapshot.revision;
     rt.dirtySince = 0;
     rt.pending = false;
@@ -518,7 +620,7 @@ async function publishVault(vaultId: string): Promise<void> {
     rt.lastBytes = snapshot.compressed.length;
     // After the snapshot, so a client that sees the new revision already has rows for
     // whatever the matrix points at.
-    await publishVectors(config, token, snapshot.vectors, rt);
+    await publishVectors(publicationConfig, token, snapshot.vectors, rt);
     if (vault.active) rt.observed = lightweightVaultRevision(db);
   } catch (error) {
     rt.phase = 'error';

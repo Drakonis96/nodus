@@ -131,6 +131,41 @@ function safeSegment(value: string): string {
   return `${slug}-${createHash('sha256').update(value).digest('hex').slice(0, 10)}`;
 }
 
+function safeRecoveryRelative(value: unknown): value is string {
+  if (typeof value !== 'string' || !value || value.includes('\\') || value.includes('\0')
+    || value.startsWith('/') || /^[A-Za-z]:/.test(value)) return false;
+  const parts = value.split('/');
+  return parts.every((part) => part && part !== '.' && part !== '..');
+}
+
+function snapshotTarget(snapshotRoot: string, archivePath: unknown): string {
+  if (!safeRecoveryRelative(archivePath)) throw new Error('The pre-v4 recovery manifest contains an invalid archive path.');
+  const root = path.resolve(snapshotRoot);
+  const target = path.resolve(root, ...archivePath.split('/'));
+  if (target === root || !target.startsWith(`${root}${path.sep}`)) {
+    throw new Error('The pre-v4 recovery manifest contains an invalid archive target.');
+  }
+  return target;
+}
+
+function absoluteRecoveryDestination(value: unknown, snapshotRoot: string, label: string): string {
+  if (typeof value !== 'string' || !path.isAbsolute(value)) throw new Error(`The pre-v4 recovery ${label} destination is invalid.`);
+  const target = path.resolve(value);
+  const root = path.resolve(snapshotRoot);
+  if (target === root || target.startsWith(`${root}${path.sep}`)) throw new Error(`The pre-v4 recovery ${label} destination is invalid.`);
+  return target;
+}
+
+function samePath(a: string, b: string): boolean {
+  return path.resolve(a) === path.resolve(b);
+}
+
+function pathInside(root: string, target: string): boolean {
+  const resolvedRoot = path.resolve(root);
+  const resolvedTarget = path.resolve(target);
+  return resolvedTarget === resolvedRoot || resolvedTarget.startsWith(`${resolvedRoot}${path.sep}`);
+}
+
 async function defaultCopyFile(source: string, target: string): Promise<void> {
   fs.mkdirSync(path.dirname(target), { recursive: true });
   try {
@@ -310,18 +345,56 @@ export async function ensurePreV4Recovery(options: PreV4RecoveryOptions): Promis
 
 function verifiedManifest(snapshotPath: string): PreV4RecoveryManifest {
   const manifest = readJson(path.join(snapshotPath, 'recovery.json')) as unknown as PreV4RecoveryManifest | null;
-  if (!manifest || manifest.format !== FORMAT || manifest.formatVersion !== FORMAT_VERSION) {
+  if (!manifest || manifest.format !== FORMAT || manifest.formatVersion !== FORMAT_VERSION
+    || !Array.isArray(manifest.files) || !Array.isArray(manifest.vaults)) {
     throw new Error('This is not a valid Nodus pre-v4 recovery copy.');
   }
+  const root = path.resolve(snapshotPath);
+  if (typeof manifest.userDataDirectory !== 'string' || !path.isAbsolute(manifest.userDataDirectory)) {
+    throw new Error('The pre-v4 recovery manifest has an invalid profile destination.');
+  }
+  const userDataRoot = path.resolve(manifest.userDataDirectory);
+  const libraryRoot = manifest.libraryRoot ? path.resolve(manifest.libraryRoot) : null;
+  const vaultBySegment = new Map(manifest.vaults.map((vault) => [vault.archivePath.split('/')[1], vault]));
+  const seenArchivePaths = new Set<string>();
   for (const entry of manifest.files) {
-    const file = path.resolve(snapshotPath, ...entry.archivePath.split('/'));
-    if (!file.startsWith(`${path.resolve(snapshotPath)}${path.sep}`) || !fs.existsSync(file) || sha256File(file) !== entry.sha256) {
+    if (!entry || typeof entry !== 'object' || !safeRecoveryRelative(entry.archivePath) || seenArchivePaths.has(entry.archivePath)) {
+      throw new Error('The pre-v4 recovery manifest contains an invalid or duplicate archive path.');
+    }
+    seenArchivePaths.add(entry.archivePath);
+    const file = snapshotTarget(root, entry.archivePath);
+    const sourcePath = absoluteRecoveryDestination(entry.sourcePath, root, 'file');
+    if (entry.archivePath.startsWith('profile/')) {
+      const name = entry.archivePath.slice('profile/'.length);
+      if (!PROFILE_FILES.includes(name as typeof PROFILE_FILES[number]) || !samePath(sourcePath, path.join(userDataRoot, name))) {
+        throw new Error('The pre-v4 recovery profile destination is invalid.');
+      }
+    } else if (entry.archivePath.startsWith('global-library/')) {
+      if (!libraryRoot || !pathInside(libraryRoot, sourcePath)) throw new Error('The pre-v4 Library manifest contains an invalid target path.');
+    } else {
+      const match = /^vaults\/([^/]+)\/sidecars\/([^/]+)$/.exec(entry.archivePath);
+      const vault = match ? vaultBySegment.get(match[1]) : null;
+      let sidecar: string | null = null;
+      try { sidecar = match ? decodeURIComponent(match[2]) : null; } catch { sidecar = null; }
+      if (!vault || !sidecar || !VAULT_SIDECARS.includes(sidecar as typeof VAULT_SIDECARS[number])
+        || !samePath(sourcePath, path.join(path.dirname(vault.databasePath), sidecar))) {
+        throw new Error('The pre-v4 recovery sidecar destination is invalid.');
+      }
+    }
+    if (!fs.existsSync(file) || !fs.statSync(file).isFile() || sha256File(file) !== entry.sha256) {
       throw new Error(`The pre-v4 recovery file ${entry.archivePath} did not verify.`);
     }
   }
+  const seenVaultIds = new Set<string>();
+  const seenVaultArchives = new Set<string>();
   for (const vault of manifest.vaults) {
-    const file = path.resolve(snapshotPath, ...vault.archivePath.split('/'));
-    if (!file.startsWith(`${path.resolve(snapshotPath)}${path.sep}`) || !fs.existsSync(file) || sha256File(file) !== vault.sha256) {
+    if (!vault || typeof vault !== 'object' || typeof vault.id !== 'string' || !vault.id
+      || seenVaultIds.has(vault.id) || !safeRecoveryRelative(vault.archivePath)
+      || seenVaultArchives.has(vault.archivePath)) throw new Error('The pre-v4 recovery manifest contains duplicate vault entries.');
+    seenVaultIds.add(vault.id); seenVaultArchives.add(vault.archivePath);
+    const file = snapshotTarget(root, vault.archivePath);
+    absoluteRecoveryDestination(vault.databasePath, root, 'database');
+    if (!fs.existsSync(file) || !fs.statSync(file).isFile() || sha256File(file) !== vault.sha256) {
       throw new Error(`The pre-v4 recovery database ${vault.id} did not verify.`);
     }
   }
@@ -353,12 +426,12 @@ function stageRecoveredLibrary(snapshotRoot: string, manifest: PreV4RecoveryMani
   fs.mkdirSync(staging, { recursive: true });
   try {
     for (const entry of entries) {
-      const targetSource = path.resolve(entry.sourcePath);
-      if (!targetSource.startsWith(`${root}${path.sep}`)) throw new Error('The pre-v4 Library manifest contains an invalid target path.');
+      const targetSource = absoluteRecoveryDestination(entry.sourcePath, snapshotRoot, 'Library file');
+      if (targetSource === root || !targetSource.startsWith(`${root}${path.sep}`)) throw new Error('The pre-v4 Library manifest contains an invalid target path.');
       const relative = path.relative(root, targetSource);
       const target = path.join(staging, relative);
       fs.mkdirSync(path.dirname(target), { recursive: true });
-      fs.copyFileSync(path.join(snapshotRoot, ...entry.archivePath.split('/')), target);
+      fs.copyFileSync(snapshotTarget(snapshotRoot, entry.archivePath), target);
     }
     return staging;
   } catch (error) {
@@ -401,12 +474,12 @@ export function restorePreV4Recovery(snapshotPath: string): PreV4RecoveryManifes
   const stagedLibrary = stageRecoveredLibrary(root, manifest);
   try {
     for (const vault of manifest.vaults) {
-      replaceFileRecoverably(path.join(root, ...vault.archivePath.split('/')), vault.databasePath);
+      replaceFileRecoverably(snapshotTarget(root, vault.archivePath), absoluteRecoveryDestination(vault.databasePath, root, 'database'));
       fs.rmSync(`${vault.databasePath}-wal`, { force: true });
       fs.rmSync(`${vault.databasePath}-shm`, { force: true });
     }
     for (const entry of manifest.files.filter((file) => file.archivePath.startsWith('profile/') || file.archivePath.includes('/sidecars/'))) {
-      replaceFileRecoverably(path.join(root, ...entry.archivePath.split('/')), entry.sourcePath);
+      replaceFileRecoverably(snapshotTarget(root, entry.archivePath), absoluteRecoveryDestination(entry.sourcePath, root, 'file'));
     }
     applyRecoveredLibrary(root, manifest, stagedLibrary);
     return manifest;

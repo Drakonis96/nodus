@@ -155,11 +155,20 @@ function hidden(html, name) {
 }
 
 async function postForm(url, fields, options = {}) {
+  let submitted = fields;
+  let headers = { ...(options.headers ?? {}) };
+  if (new URL(url).pathname === '/login' && !Object.hasOwn(fields, 'csrf')) {
+    const page = await fetch(url);
+    const csrf = hidden(await page.text(), 'csrf');
+    const cookie = page.headers.get('set-cookie')?.split(';', 1)[0] || '';
+    submitted = { ...fields, csrf };
+    if (cookie) headers.cookie = cookie;
+  }
   return fetch(url, {
     method: 'POST',
     redirect: 'manual',
-    headers: { 'content-type': 'application/x-www-form-urlencoded', ...(options.headers ?? {}) },
-    body: new URLSearchParams(fields),
+    headers: { 'content-type': 'application/x-www-form-urlencoded', ...headers },
+    body: new URLSearchParams(submitted),
   });
 }
 
@@ -267,6 +276,17 @@ test('environment credentials skip setup, rotate the admin, and rate-limit distr
     });
     assert.equal(initialLogin.status, 303);
     const initialCookie = cookieFrom(initialLogin);
+    for (const unsafeNext of ['/\\evil.example', '/%5cevil.example', '//evil.example', 'https://evil.example/']) {
+      const refusedRedirect = await postForm(`${origin}/login`, {
+        email: 'first-admin@example.test', password: 'first-admin-password-strong', next: unsafeNext,
+      });
+      assert.equal(refusedRedirect.status, 303);
+      assert.equal(refusedRedirect.headers.get('location'), '/admin', `unsafe login destination escaped: ${unsafeNext}`);
+    }
+    const localRedirect = await postForm(`${origin}/login`, {
+      email: 'first-admin@example.test', password: 'first-admin-password-strong', next: '/app/view/settings?section=profile',
+    });
+    assert.equal(localRedirect.headers.get('location'), '/app/view/settings?section=profile');
     await stopServer(child);
 
     await start({
@@ -507,8 +527,8 @@ test('Nodus Server pairs a desktop publisher and protects read-only MCP with OAu
     assert.match(initialSetupHtml, /<script src="\/server-ui\.js\?v=2" defer><\/script>/);
     assert.doesNotMatch(initialSetupHtml, /language-apply/, 'changing the language no longer needs an Apply button');
     assert.ok(
-      [...initialSetupHtml.matchAll(/<script\b([^>]*)>/gi)].every((match) => /\bsrc="\/server-ui\.js\?v=2"/.test(match[1])),
-      'the server UI uses only its external first-party script',
+      [...initialSetupHtml.matchAll(/<script\b([^>]*)>/gi)].every((match) => /\bsrc="\/(?:server-ui\.js\?v=2|organism\.js\?v=1)"/.test(match[1])),
+      'the server UI uses only its two external first-party scripts',
     );
     const setupCsp = initialSetupResponse.headers.get('content-security-policy') || '';
     assert.match(setupCsp, /script-src 'self'/);
@@ -582,6 +602,16 @@ test('Nodus Server pairs a desktop publisher and protects read-only MCP with OAu
     assert.match(dashboard, /data-vault-type="worldbuilding" style="--vault-accent:#7c3aed"/);
     assert.match(dashboard, new RegExp(`data-testid="space-id-copy-${privateSpaceId}"[^>]+data-copy-value="${privateSpaceId}"`));
     assert.match(dashboard, /input\[type="checkbox"\]/, 'the stylesheet explicitly sizes permission checkboxes');
+
+    // This broad integration fixture exercises every legacy publication channel. Production
+    // defaults remain deny-by-default; the fixture opts in explicitly before uploading any
+    // library/corpus material.
+    const enabledPublication = await postForm(`${origin}/admin/spaces/policy`, {
+      csrf, spaceId: sharedSpaceId,
+      allowUserContent: 'on', allowPersonalImports: 'on', allowLibraryDocuments: 'on',
+      allowPassages: 'on', allowVectors: 'on', allowPrimarySources: 'on', allowTestimonies: 'on',
+    }, { headers: { cookie: adminCookie } });
+    assert.equal(enabledPublication.status, 303);
 
     const renamed = await postForm(`${origin}/admin/spaces/name`, {
       csrf, spaceId: privateSpaceId, name: 'Archivo de Orthea',
@@ -884,7 +914,7 @@ test('Nodus Server pairs a desktop publisher and protects read-only MCP with OAu
       next: '/',
     });
     assert.equal(readerLogin.status, 303);
-    assert.equal(readerLogin.headers.get('location'), '/account', 'reader accounts land on their account page');
+    assert.equal(readerLogin.headers.get('location'), '/app', 'reader accounts land in the read-only Server Web app');
     const readerCookie = cookieFrom(readerLogin);
     const secondReaderLogin = await postForm(`${origin}/login`, {
       email: 'student@example.test',

@@ -105,6 +105,7 @@ test('provider, model and dimension must all match before a comparison is allowe
 test('the server searches its own matrix and never lies about an index it does not have', { timeout: 60_000 }, async () => {
   await withServer({ label: 'vectors' }, async (server) => {
     const spaceId = await server.createSpace('Corpus');
+    await server.setPublicationPolicy(spaceId, ['allowVectors']);
     const owner = await server.deviceToken(server.adminEmail, server.adminPassword, spaceId);
     await server.createUser('lector@example.test', 'lector-account-password', [{ spaceId, role: 'reader' }]);
     const reader = await server.deviceToken('lector@example.test', 'lector-account-password', spaceId);
@@ -140,6 +141,12 @@ test('the server searches its own matrix and never lies about an index it does n
     const summary = await uploaded.json();
     assert.equal(summary.count, 3);
     assert.equal(summary.dim, DIM);
+    assert.equal(summary.embeddingContract.contract.protocol, 'legacy_locked');
+
+    const incompatiblePayload = encodeVectorSet({ kind: 'ideas', provider: 'gemini', model: 'gemini-embedding-001', dim: DIM, entries });
+    const incompatible = await server.api(owner.deviceToken, 'PUT', `/api/v1/spaces/${spaceId}/vectors?kind=ideas`, { body: incompatiblePayload });
+    assert.equal(incompatible.status, 409, 'an existing index cannot be silently replaced with another model');
+    assert.equal((await incompatible.json()).error, 'embedding_contract_locked');
 
     // A matching client gets real semantic results, joined back to the snapshot rows.
     const matched = await (await server.api(reader.deviceToken, 'POST', `/api/v1/spaces/${spaceId}/search/semantic`, {

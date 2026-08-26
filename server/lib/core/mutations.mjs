@@ -1,7 +1,7 @@
 import { MUTABLE_TABLES } from './generatedMutableTables.mjs';
 
-// The convergent operation relay. Every authorized replica reads the same ordered stream;
-// the owner is no longer required to be online for two collaborators to converge.
+// The convergent operation relay. Every authorized replica reads the same ordered shared
+// stream; user-scoped operations travel only to other devices owned by their author.
 //
 // Two consequences worth stating plainly:
 //   • the server never interprets a mutation beyond validating its shape, so it never
@@ -46,6 +46,11 @@ export const MAX_MUTATION_BATCH = 200;
 
 export function isMutableTable(table) {
   return Object.prototype.hasOwnProperty.call(MUTABLE_TABLES, String(table ?? ''));
+}
+
+/** User-scoped rows share the reliable ledger transport but never its audience. */
+export function isUserScopedMutation(table) {
+  return MUTABLE_TABLES[String(table ?? '')]?.scope === 'user';
 }
 
 /** Serialized the same way electron/db/tombstones.ts:34 does, byte for byte. */

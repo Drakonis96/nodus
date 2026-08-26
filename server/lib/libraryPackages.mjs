@@ -194,6 +194,57 @@ export function readLibraryPackage(store, spaceId, hash) {
   return looksLikeZip(bytes) && hashLibraryPackage(bytes) === hash ? bytes : null;
 }
 
+/**
+ * Read one already-validated entry without ever extracting the archive to disk.
+ *
+ * The full inspection runs first, so encrypted entries, ZIP64, duplicate/case-folded paths,
+ * traversal and expansion bombs are rejected before this helper considers a payload.
+ */
+export function readLibraryPackageEntry(bytes, wantedName) {
+  const inspection = inspectLibraryPackage(bytes);
+  if (!inspection.ok || typeof wantedName !== 'string' || !wantedName) return null;
+  const end = zipEndOffset(bytes);
+  const entryCount = bytes.readUInt16LE(end + 10);
+  let pointer = bytes.readUInt32LE(end + 16);
+  for (let index = 0; index < entryCount; index += 1) {
+    if (bytes.readUInt32LE(pointer) !== CENTRAL_SIGNATURE) return null;
+    const flags = bytes.readUInt16LE(pointer + 8);
+    const method = bytes.readUInt16LE(pointer + 10);
+    const compressed = bytes.readUInt32LE(pointer + 20);
+    const uncompressed = bytes.readUInt32LE(pointer + 24);
+    const nameBytes = bytes.readUInt16LE(pointer + 28);
+    const extraBytes = bytes.readUInt16LE(pointer + 30);
+    const commentBytes = bytes.readUInt16LE(pointer + 32);
+    const localOffset = bytes.readUInt32LE(pointer + 42);
+    const name = decodeUtf8(bytes.subarray(pointer + 46, pointer + 46 + nameBytes));
+    if (name === wantedName) {
+      if ((flags & 1) !== 0 || (method !== 0 && method !== 8) || bytes.readUInt32LE(localOffset) !== LOCAL_SIGNATURE) return null;
+      const localNameBytes = bytes.readUInt16LE(localOffset + 26);
+      const localExtraBytes = bytes.readUInt16LE(localOffset + 28);
+      const dataOffset = localOffset + 30 + localNameBytes + localExtraBytes;
+      try {
+        const payload = bytes.subarray(dataOffset, dataOffset + compressed);
+        const content = method === 0 ? Buffer.from(payload) : inflateRawSync(payload, { maxOutputLength: uncompressed + 1 });
+        return content.length === uncompressed ? content : null;
+      } catch {
+        return null;
+      }
+    }
+    pointer += 46 + nameBytes + extraBytes + commentBytes;
+  }
+  return null;
+}
+
+export function libraryPackageOriginalEntry(bytes) {
+  const inspection = inspectLibraryPackage(bytes);
+  const entry = inspection.ok && inspection.manifest?.original && typeof inspection.manifest.original === 'object'
+    ? inspection.manifest.original : null;
+  const entryPath = String(entry?.path || '');
+  if (!entryPath.startsWith('original/') || entryPath.includes('..')) return null;
+  const content = readLibraryPackageEntry(bytes, entryPath);
+  return content ? { path: entryPath, content, manifest: entry } : null;
+}
+
 export function writeLibraryPackage(store, spaceId, hash, bytes) {
   const target = store.libraryPackagePath(spaceId, hash);
   fs.mkdirSync(path.dirname(target), { recursive: true });

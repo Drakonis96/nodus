@@ -51,8 +51,12 @@ export function serverEnvironment(overrides = {}) {
   for (const name of [
     'NODUS_ADMIN_EMAIL', 'NODUS_ADMIN_PASSWORD', 'NODUS_ADMIN_EMAIL_FILE', 'NODUS_ADMIN_PASSWORD_FILE',
     'NODUS_SETUP_TOKEN', 'NODUS_PUBLIC_URL', 'NODUS_DATA_DIR', 'NODUS_HOST', 'NODUS_PORT',
+    'NODUS_DEPLOYMENT_MODE', 'NODUS_TRUST_PROXY', 'NODUS_AI_KEYRING_FILE', 'NODUS_AI_CREATE_KEYRING',
+    'NODUS_AI_JOB_RETENTION_MS', 'NODUS_AI_MAX_JOBS', 'NODUS_AI_MAX_ACTIVE_PER_USER', 'NODUS_AI_MAX_ACTIVE_GLOBAL',
+    'NODUS_MAX_PRIVATE_ANNOTATIONS_BYTES',
     'NODUS_MAX_SNAPSHOT_BYTES', 'NODUS_MAX_SNAPSHOT_JSON_BYTES',
     'NODUS_MAX_ASSET_BYTES', 'NODUS_MAX_SPACE_ASSET_BYTES', 'NODUS_MAX_VECTOR_BYTES',
+    'NODUS_MAX_SPACE_DOCUMENT_UPDATE_BYTES', 'NODUS_MAX_SPACE_SHARED_BLOB_BYTES', 'NODUS_MAX_SPACE_PARTIAL_BLOB_BYTES',
     'NODUS_MAX_MUTATION_BYTES', 'NODUS_MAX_MUTATION_BATCH_BYTES', 'NODUS_MAX_LEDGER_BYTES',
     // NODUS_MAX_CACHED_SNAPSHOTS is refused by the server now, so a developer who still has
     // it exported would fail every boot here rather than see one clear message once.
@@ -84,11 +88,22 @@ export function hidden(html, name) {
 }
 
 export async function postForm(url, fields, options = {}) {
+  let submitted = fields;
+  let headers = { ...(options.headers ?? {}) };
+  // Browser login is a real double-submit flow. Keep every integration test on that same
+  // path unless it deliberately supplies a token/cookie to exercise a negative case.
+  if (new URL(url).pathname === '/login' && !Object.hasOwn(fields, 'csrf')) {
+    const page = await fetch(url);
+    const csrf = hidden(await page.text(), 'csrf');
+    const cookie = page.headers.get('set-cookie')?.split(';', 1)[0] || '';
+    submitted = { ...fields, csrf };
+    headers = { ...headers, ...(cookie ? { cookie } : {}) };
+  }
   return fetch(url, {
     method: 'POST',
     redirect: 'manual',
-    headers: { 'content-type': 'application/x-www-form-urlencoded', ...(options.headers ?? {}) },
-    body: new URLSearchParams(fields),
+    headers: { 'content-type': 'application/x-www-form-urlencoded', ...headers },
+    body: new URLSearchParams(submitted),
   });
 }
 
@@ -201,6 +216,11 @@ export async function withServer(options, work) {
       NODUS_PUBLIC_URL: origin,
       NODUS_ADMIN_EMAIL: adminEmail,
       NODUS_ADMIN_PASSWORD: adminPassword,
+      ...(options.ai ? {
+        NODUS_DEPLOYMENT_MODE: 'advanced',
+        NODUS_AI_KEYRING_FILE: path.join(root, 'test-external-ai-keyring.json'),
+        NODUS_AI_CREATE_KEYRING: '1',
+      } : {}),
       ...(options.env ?? {}),
     }),
     stdio: ['ignore', 'pipe', 'pipe'],
@@ -236,6 +256,16 @@ export async function withServer(options, work) {
       return created;
     };
 
+    /** Opt into named publication lanes. New spaces are deliberately restrictive. */
+    context.setPublicationPolicy = async (spaceId, enabled = []) => {
+      const response = await postForm(`${origin}/admin/spaces/policy`, {
+        csrf: await context.csrf(),
+        spaceId,
+        ...Object.fromEntries(enabled.map((field) => [field, 'on'])),
+      }, { headers: { cookie: context.adminCookie } });
+      assert.equal(response.status, 303, `publication policy was not updated for ${spaceId}`);
+    };
+
     context.spaceIds = async () => [...(await context.dashboard()).matchAll(/<code>([0-9a-f-]{36})<\/code>/g)].map((match) => match[1]);
 
     /** Create a member account and grant it one role per space, through the real form. */
@@ -252,6 +282,11 @@ export async function withServer(options, work) {
 
     context.setRole = async (userId, spaceId, role) => {
       const response = await postForm(`${origin}/admin/access/role`, { csrf: await context.csrf(), userId, spaceId, role }, { headers: { cookie: context.adminCookie } });
+      assert.equal(response.status, 303);
+    };
+
+    context.revokeAccess = async (userId, spaceId) => {
+      const response = await postForm(`${origin}/admin/access/revoke`, { csrf: await context.csrf(), userId, spaceId }, { headers: { cookie: context.adminCookie } });
       assert.equal(response.status, 303);
     };
 

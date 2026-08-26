@@ -4,17 +4,20 @@ export const MUTABLE_TABLES = {
   "notes": {
     "key": [
       "id"
-    ]
+    ],
+    "scope": "user"
   },
   "note_folders": {
     "key": [
       "id"
-    ]
+    ],
+    "scope": "user"
   },
   "note_links": {
     "key": [
       "link_id"
-    ]
+    ],
+    "scope": "user"
   },
   "pages": {
     "key": [
@@ -29,7 +32,8 @@ export const MUTABLE_TABLES = {
   "page_favorites": {
     "key": [
       "page_id"
-    ]
+    ],
+    "scope": "user"
   },
   "page_links": {
     "key": [
@@ -193,7 +197,8 @@ export const MUTABLE_TABLES = {
   "automation_notifications": {
     "key": [
       "id"
-    ]
+    ],
+    "scope": "user"
   },
   "database_forms": {
     "key": [
@@ -218,12 +223,14 @@ export const MUTABLE_TABLES = {
   "writing_draft_reads": {
     "key": [
       "draft_id"
-    ]
+    ],
+    "scope": "user"
   },
   "writing_draft_annotations": {
     "key": [
       "id"
-    ]
+    ],
+    "scope": "user"
   },
   "content_translations": {
     "key": [
@@ -247,7 +254,8 @@ export const MUTABLE_TABLES = {
   "saved_searches": {
     "key": [
       "id"
-    ]
+    ],
+    "scope": "user"
   },
   "research_questions": {
     "key": [
@@ -478,7 +486,8 @@ export const MUTABLE_TABLES = {
   "world_notice_mutes": {
     "key": [
       "fingerprint"
-    ]
+    ],
+    "scope": "user"
   },
   "world_scene_text": {
     "key": [
@@ -508,7 +517,8 @@ export const MUTABLE_TABLES = {
   "world_chat_conversations": {
     "key": [
       "id"
-    ]
+    ],
+    "scope": "user"
   }
 };
 export const MUTABLE_TABLE_NAMES = Object.freeze(Object.keys(MUTABLE_TABLES));

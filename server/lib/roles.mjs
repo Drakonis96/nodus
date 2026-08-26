@@ -34,7 +34,7 @@ export function can(role, need) {
   return wanted === undefined ? false : have >= wanted;
 }
 
-export const STATE_VERSION = 2;
+export const STATE_VERSION = 4;
 
 /**
  * Bring a state.json forward in place.
@@ -54,7 +54,12 @@ export function migrateState(state) {
   if (from >= STATE_VERSION) return { migrated: false, from, to: from };
 
   for (const entry of state.memberships ?? []) {
-    entry.role = normalizeSpaceRole(entry.role);
+    // v1 memberships were binary and therefore represented publisher access. Preserve that
+    // capability during migration; an explicitly stored role is a deliberate modern choice.
+    const missingRole = entry.role === undefined || entry.role === null;
+    entry.role = missingRole ? 'owner' : normalizeSpaceRole(entry.role);
+    if (missingRole) entry.legacyRoleAssumed = true;
+    if (!entry.createdAt) entry.createdAt = new Date().toISOString();
   }
   for (const device of state.deviceTokens ?? []) {
     if (device.kind === undefined) device.kind = 'publisher';
@@ -66,7 +71,25 @@ export function migrateState(state) {
     if (space.snapshotFormatVersion === undefined) space.snapshotFormatVersion = 1;
     if (space.mutationCursor === undefined) space.mutationCursor = 0;
     if (space.assetBytes === undefined) space.assetBytes = 0;
+    if (space.receiveSequence === undefined) space.receiveSequence = 0;
+    if (!space.provenance) space.provenance = {
+      schemaVersion: 4,
+      originInstanceId: state.settings?.instanceId || 'legacy-installation',
+      createdAt: space.createdAt || null,
+      migratedFromStateVersion: from,
+    };
   }
+
+  state.quarantine = state.quarantine && typeof state.quarantine === 'object' ? state.quarantine : {};
+  const actions = Array.isArray(state.spaceActions) ? state.spaceActions : [];
+  const unsafeActions = actions.filter((entry) => !entry?.actorUserId);
+  state.spaceActions = actions.filter((entry) => entry?.actorUserId);
+  if (unsafeActions.length) state.quarantine.unownedSpaceActions = unsafeActions;
+  state.securityReview = {
+    ...(state.securityReview ?? {}),
+    legacyMemberships: (state.memberships ?? []).filter((entry) => entry.legacyRoleAssumed).map((entry) => ({ userId: entry.userId, spaceId: entry.spaceId })),
+    required: (state.memberships ?? []).some((entry) => entry.legacyRoleAssumed) || unsafeActions.length > 0,
+  };
 
   state.version = STATE_VERSION;
   state.migratedAt = new Date().toISOString();

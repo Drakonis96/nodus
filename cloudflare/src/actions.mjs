@@ -27,6 +27,18 @@ const ACTION_KINDS = new Set([
   'toolkit.desktopRun',
 ]);
 const TERMINAL = new Set(['applied', 'refused', 'failed', 'cancelled']);
+const SECRET_KEY = /(?:api[-_]?keys?|token|password|passphrase|secret|credential|authorization|cookie|private[-_]?key)/i;
+const SECRET_VALUE = /\b(?:Bearer\s+[A-Za-z0-9._~+\/-]+=*|(?:sk|key|token)[-_][A-Za-z0-9_-]{16,}|AIza[A-Za-z0-9_-]{20,}|sk-ant-[A-Za-z0-9_-]{16,})\b/i;
+
+function containsSensitiveValue(value, depth = 0, seen = new WeakSet()) {
+  if (depth > 20) return true;
+  if (typeof value === 'string') return SECRET_VALUE.test(value);
+  if (!value || typeof value !== 'object') return false;
+  if (seen.has(value)) return true;
+  seen.add(value);
+  if (Array.isArray(value)) return value.some((entry) => containsSensitiveValue(entry, depth + 1, seen));
+  return Object.entries(value).some(([key, entry]) => SECRET_KEY.test(key) || containsSensitiveValue(entry, depth + 1, seen));
+}
 
 function view(row) {
   return {
@@ -53,7 +65,7 @@ function view(row) {
 }
 
 function visible(auth, row) {
-  return auth.space_role === 'owner' || row.actor_user_id === auth.user_id;
+  return row.actor_user_id === auth.user_id;
 }
 
 export async function createSpaceAction(env, auth, request) {
@@ -66,6 +78,7 @@ export async function createSpaceAction(env, auth, request) {
   if (!ACTION_KINDS.has(kind)) throw new HttpError(400, 'unknown_action_kind', 'This action kind is not part of the typed Nodus contract.');
   if (!Number.isSafeInteger(schemaVersion) || schemaVersion < 1) throw new HttpError(400, 'bad_schema_version', 'schemaVersion must be a positive integer.');
   if (!input.payload || typeof input.payload !== 'object' || Array.isArray(input.payload)) throw new HttpError(400, 'bad_payload', 'payload must be an object.');
+  if (containsSensitiveValue(input.payload)) throw new HttpError(400, 'payload_contains_secret', 'Credentials and authorization material are not accepted in vault actions.');
   const fingerprint = input.inputFingerprint == null ? null : String(input.inputFingerprint);
   if (fingerprint && !FINGERPRINT.test(fingerprint)) throw new HttpError(400, 'bad_fingerprint', 'inputFingerprint must be a lowercase SHA-256 value.');
   const now = nowIso();
@@ -90,9 +103,7 @@ export async function listSpaceActions(env, auth, request) {
   const url = new URL(request.url);
   const since = clampInteger(url.searchParams.get('since'), 0, Number.MAX_SAFE_INTEGER, 0);
   const limit = clampInteger(url.searchParams.get('limit'), 1, 100, 50);
-  const rows = auth.space_role === 'owner'
-    ? await all(env.DB, 'SELECT * FROM space_actions WHERE space_id=?1 AND sequence>?2 ORDER BY sequence LIMIT ?3', auth.space_id, since, limit + 1)
-    : await all(env.DB, 'SELECT * FROM space_actions WHERE space_id=?1 AND actor_user_id=?2 AND sequence>?3 ORDER BY sequence LIMIT ?4', auth.space_id, auth.user_id, since, limit + 1);
+  const rows = await all(env.DB, 'SELECT * FROM space_actions WHERE space_id=?1 AND actor_user_id=?2 AND sequence>?3 ORDER BY sequence LIMIT ?4', auth.space_id, auth.user_id, since, limit + 1);
   const page = rows.slice(0, limit);
   return { actions: page.map(view), cursor: Number(page.at(-1)?.sequence || since), hasMore: rows.length > limit };
 }
@@ -119,8 +130,8 @@ export async function claimSpaceAction(env, auth, request) {
   const now = nowIso();
   const requested = input.id == null ? null : String(input.id);
   const candidate = requested
-    ? await first(env.DB, `SELECT * FROM space_actions WHERE space_id=?1 AND id=?2 AND status='queued'`, auth.space_id, requested)
-    : await first(env.DB, `SELECT * FROM space_actions WHERE space_id=?1 AND status='queued' ORDER BY sequence LIMIT 1`, auth.space_id);
+    ? await first(env.DB, `SELECT * FROM space_actions WHERE space_id=?1 AND actor_user_id=?2 AND id=?3 AND status='queued'`, auth.space_id, auth.user_id, requested)
+    : await first(env.DB, `SELECT * FROM space_actions WHERE space_id=?1 AND actor_user_id=?2 AND status='queued' ORDER BY sequence LIMIT 1`, auth.space_id, auth.user_id);
   if (!candidate) return { action: null };
   const claimed = await env.DB.prepare(`UPDATE space_actions SET status='claimed',claimed_by_device=?1,claimed_at=?2,updated_at=?2
     WHERE id=?3 AND status='queued' RETURNING *`).bind(auth.device_id || null, now, candidate.id).first();
@@ -131,8 +142,10 @@ export async function updateSpaceAction(env, auth, id, request) {
   const input = await readJson(request, 512 * 1024);
   const status = String(input.status || '');
   if (!['running', 'applied', 'refused', 'failed'].includes(status)) throw new HttpError(400, 'bad_action_status', 'Desktop may report running, applied, refused or failed.');
+  if (input.result != null && containsSensitiveValue(input.result)) throw new HttpError(400, 'result_contains_secret', 'Credentials and authorization material are not accepted in action results.');
   const current = await first(env.DB, 'SELECT * FROM space_actions WHERE space_id=?1 AND id=?2', auth.space_id, id);
   if (!current) throw new HttpError(404, 'action_not_found', 'The action does not exist.');
+  if (current.actor_user_id !== auth.user_id) throw new HttpError(403, 'wrong_action_owner', 'Only the user who created this action may process it.');
   if (current.claimed_by_device !== auth.device_id) throw new HttpError(403, 'wrong_action_owner', 'Only the Desktop that claimed this action may update it.');
   if (TERMINAL.has(current.status)) return { action: view(current), changed: false };
   const now = nowIso();

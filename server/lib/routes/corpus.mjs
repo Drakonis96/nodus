@@ -1,4 +1,5 @@
 import { deepResearchReportInput, renderProfessionalReportHtml } from '../core/generated/deepResearchReport.mjs';
+import { securityHeaders } from '../http.mjs';
 // The read surface: everything a mobile client or a desktop replica asks the server for.
 //
 // Shape rule: every list answers with the same envelope the desktop MCP `page()` helper
@@ -134,11 +135,23 @@ const COLLECTIONS = {
   gaps: { table: 'gaps', key: 'gaps', id: 'id' },
   authors: { table: 'authors', key: 'authors', id: 'author_id' },
   passages: { table: 'passages', key: 'passages', id: 'passage_id' },
+  // Dictionary is its own authored corpus. Exposing themes here made the Web label a
+  // thematic index as "Dictionary", which was visually plausible but semantically false.
+  dictionary: { table: 'dictionary_entries', key: 'entries', id: 'id' },
   // Genealogy and prosopography
   persons: { table: 'persons', key: 'persons', id: 'person_id' },
   places: { table: 'places', key: 'places', id: 'place_id' },
   events: { table: 'events', key: 'events', id: 'event_id' },
   relationships: { table: 'relationships', key: 'relationships', id: 'id' },
+  // Worldbuilding
+  'world-groups': { table: 'world_groups', key: 'groups', id: 'group_id' },
+  'world-scenes': { table: 'world_scenes', key: 'scenes', id: 'scene_id' },
+  'world-articles': { table: 'world_articles', key: 'articles', id: 'article_id' },
+  'world-maps': { table: 'world_maps', key: 'maps', id: 'map_id' },
+  'world-threads': { table: 'world_threads', key: 'threads', id: 'thread_id' },
+  'world-rules': { table: 'world_rules', key: 'rules', id: 'rule_id' },
+  'world-questions': { table: 'world_questions', key: 'questions', id: 'question_id' },
+  'world-secrets': { table: 'world_secrets', key: 'secrets', id: 'secret_id' },
   // Study.
   //
   // Every one of these is keyed on `id`, not on `<thing>_id`. The study and teaching
@@ -164,8 +177,20 @@ const COLLECTIONS = {
   // deliberately no collection that could ever serve them.
   'teaching-exams': { table: 'teaching_exams', key: 'exams', id: 'id' },
   'teaching-rubrics': { table: 'teaching_rubrics', key: 'rubrics', id: 'id' },
+  // Primary sources (binary originals and local paths are stripped by publication).
+  'archive-items': { table: 'archive_items', key: 'items', id: 'id' },
+  'archive-repositories': { table: 'archive_repositories', key: 'repositories', id: 'id' },
+  'archive-units': { table: 'archive_description_units', key: 'units', id: 'id' },
+  'archive-excerpts': { table: 'archive_excerpts', key: 'excerpts', id: 'id' },
+  'source-analyses': { table: 'archive_source_analyses', key: 'analyses', id: 'id' },
+  // Testimonies: textual research material only; agreements, contacts and media never publish.
+  'testimony-interviews': { table: 'testimony_interviews', key: 'interviews', id: 'id' },
+  'testimony-transcripts': { table: 'testimony_transcripts', key: 'transcripts', id: 'id' },
+  'testimony-codes': { table: 'testimony_codes', key: 'codes', id: 'id' },
+  'testimony-contrasts': { table: 'testimony_contrasts', key: 'contrasts', id: 'id' },
   // Databases
   databases: { table: 'db_databases', key: 'databases', id: 'id' },
+  'database-pages': { table: 'pages', key: 'pages', id: 'id' },
 };
 
 /**
@@ -209,7 +234,7 @@ export function createCorpusRoutes({ readSnapshot, readAssetBytes }) {
   function notModified(req, res, json, space, url, payloadKey) {
     const tag = `W/"${space.revision || space.updatedAt || 'none'}|${payloadKey}"`;
     if (req.headers['if-none-match'] === tag) {
-      res.writeHead(304, { etag: tag, 'cache-control': 'private, max-age=0, must-revalidate' });
+      res.writeHead(304, securityHeaders({ etag: tag, 'cache-control': 'private, max-age=0, must-revalidate' }));
       res.end();
       return true;
     }
@@ -595,12 +620,12 @@ export function createCorpusRoutes({ readSnapshot, readAssetBytes }) {
           return true;
         }
         const bytes = Buffer.from(html, 'utf8');
-        res.writeHead(200, {
+        res.writeHead(200, securityHeaders({
           'content-type': 'text/html; charset=utf-8',
           'content-length': bytes.length,
           'cache-control': 'private, max-age=0, must-revalidate',
           etag: `W/"${space.revision}|${wanted}|document"`,
-        });
+        }));
         if (req.method === 'HEAD') res.end();
         else res.end(bytes);
         return true;

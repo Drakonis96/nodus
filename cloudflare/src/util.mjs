@@ -166,6 +166,7 @@ export function safeJsonParse(value, fallback = null) {
 }
 
 export function clampInteger(value, minimum, maximum, fallback = minimum) {
+  if (value === null || value === undefined || value === '') return fallback;
   const parsed = Number(value);
   if (!Number.isFinite(parsed)) return fallback;
   return Math.max(minimum, Math.min(maximum, Math.trunc(parsed)));

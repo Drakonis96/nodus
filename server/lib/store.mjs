@@ -72,7 +72,7 @@ function validatePassword(value) {
 function initialState() {
   return {
     version: STATE_VERSION,
-    settings: { name: 'Nodus Server', publicUrl: '', language: 'en' },
+    settings: { name: 'Nodus Server', publicUrl: '', language: 'en', instanceId: randomUUID() },
     users: [],
     spaces: [],
     memberships: [],
@@ -129,6 +129,18 @@ export class Store {
     try { fs.chmodSync(this.stateFile, 0o600); } catch { /* Windows */ }
   }
 
+  safePathId(value, label = 'id') {
+    const id = String(value ?? '');
+    if (!/^[A-Za-z0-9_-]{1,128}$/.test(id)) throw new Error(`Invalid ${label}`);
+    return id;
+  }
+
+  safeHash(value) {
+    const hash = String(value ?? '');
+    if (!/^[0-9a-f]{64}$/.test(hash)) throw new Error('Invalid content hash');
+    return hash;
+  }
+
   cleanup(now = Date.now()) {
     const keep = (entry) => !entry.expiresAt || Date.parse(entry.expiresAt) > now;
     this.state.sessions = this.state.sessions.filter(keep);
@@ -175,9 +187,8 @@ export class Store {
     }
     const emailChanged = admin.email !== normalized;
     const passwordChanged = !verifyPassword(cleanPassword, admin.salt, admin.hash);
-    if (emailChanged) admin.email = normalized;
+    if (emailChanged) this.changeEmail(admin.id, normalized);
     if (passwordChanged) this.replacePassword(admin.id, cleanPassword);
-    else if (emailChanged) this.save();
     return { created: false, emailChanged, passwordChanged };
   }
 
@@ -277,7 +288,7 @@ export class Store {
   }
 
   snapshotPath(spaceId) {
-    const dir = path.join(this.spacesDir, spaceId);
+    const dir = path.join(this.spacesDir, this.safePathId(spaceId, 'space id'));
     fs.mkdirSync(dir, { recursive: true });
     return path.join(dir, 'snapshot.json.gz');
   }
@@ -291,12 +302,12 @@ export class Store {
   }
 
   removeSnapshot(spaceId) {
-    const dir = path.join(this.spacesDir, spaceId);
+    const dir = path.join(this.spacesDir, this.safePathId(spaceId, 'space id'));
     fs.rmSync(dir, { recursive: true, force: true });
   }
 
   spaceDir(spaceId) {
-    const dir = path.join(this.spacesDir, spaceId);
+    const dir = path.join(this.spacesDir, this.safePathId(spaceId, 'space id'));
     fs.mkdirSync(dir, { recursive: true });
     return dir;
   }
@@ -320,6 +331,7 @@ export class Store {
   readNodiNotes(userId) {
     try {
       const parsed = JSON.parse(fs.readFileSync(this.nodiNotesPath(userId), 'utf8'));
+      if (parsed?.ownerUserId != null && parsed.ownerUserId !== String(userId)) throw new Error('Nodi notes ownership mismatch');
       return Array.isArray(parsed?.notes) ? parsed.notes : [];
     } catch {
       return [];
@@ -329,7 +341,7 @@ export class Store {
   writeNodiNotes(userId, notes) {
     const target = this.nodiNotesPath(userId);
     const temporary = `${target}.tmp-${process.pid}-${Date.now()}`;
-    fs.writeFileSync(temporary, JSON.stringify({ version: 1, notes }), { mode: 0o600 });
+    fs.writeFileSync(temporary, JSON.stringify({ version: 2, ownerUserId: String(userId), notes }), { mode: 0o600 });
     fs.renameSync(temporary, target);
   }
 
@@ -341,45 +353,63 @@ export class Store {
   // genealogy or Deep Research space can hold tens of thousands of images, and a flat
   // directory degrades badly at that size on every filesystem we ship on.
   assetPath(spaceId, hash) {
-    return path.join(this.spacesDir, spaceId, 'assets', hash.slice(0, 2), hash.slice(2, 4), hash);
+    const safeHash = this.safeHash(hash);
+    return path.join(this.spacesDir, this.safePathId(spaceId, 'space id'), 'assets', safeHash.slice(0, 2), safeHash.slice(2, 4), safeHash);
   }
 
   assetsDir(spaceId) {
-    return path.join(this.spacesDir, spaceId, 'assets');
+    return path.join(this.spacesDir, this.safePathId(spaceId, 'space id'), 'assets');
   }
 
   // Yjs deltas are arbitrary binary, never images. They use their own content-addressed
   // namespace so the image sniffer can remain strict and the JSON relay stays scalar-only.
   documentUpdatePath(spaceId, hash) {
-    return path.join(this.spacesDir, spaceId, 'document-updates', hash.slice(0, 2), hash);
+    const safeHash = this.safeHash(hash);
+    return path.join(this.spacesDir, this.safePathId(spaceId, 'space id'), 'document-updates', safeHash.slice(0, 2), safeHash);
+  }
+
+  documentUpdatesDir(spaceId) {
+    return path.join(this.spacesDir, this.safePathId(spaceId, 'space id'), 'document-updates');
   }
 
   sharedBlobPath(spaceId, hash) {
-    return path.join(this.spacesDir, spaceId, 'blobs', hash.slice(0, 2), hash);
+    const safeHash = this.safeHash(hash);
+    return path.join(this.spacesDir, this.safePathId(spaceId, 'space id'), 'blobs', safeHash.slice(0, 2), safeHash);
+  }
+
+  sharedBlobsDir(spaceId) {
+    return path.join(this.spacesDir, this.safePathId(spaceId, 'space id'), 'blobs');
+  }
+
+  sharedBlobUploadsDir(spaceId) {
+    return path.join(this.spacesDir, this.safePathId(spaceId, 'space id'), 'blob-uploads');
   }
 
   sharedBlobUploadDir(spaceId, hash) {
-    return path.join(this.spacesDir, spaceId, 'blob-uploads', hash);
+    return path.join(this.spacesDir, this.safePathId(spaceId, 'space id'), 'blob-uploads', this.safeHash(hash));
   }
 
   // Clean-Markdown document packages are deliberately separate from the image channel.
   // They are ZIPs addressed by the SHA-256 of their bytes; source PDFs never enter here.
   libraryPackagePath(spaceId, hash) {
-    return path.join(this.spacesDir, spaceId, 'library', hash.slice(0, 2), hash.slice(2, 4), `${hash}.zip`);
+    const safeHash = this.safeHash(hash);
+    return path.join(this.spacesDir, this.safePathId(spaceId, 'space id'), 'library', safeHash.slice(0, 2), safeHash.slice(2, 4), `${safeHash}.zip`);
   }
 
   libraryPackagesDir(spaceId) {
-    return path.join(this.spacesDir, spaceId, 'library');
+    return path.join(this.spacesDir, this.safePathId(spaceId, 'space id'), 'library');
   }
 
   // The mutation ledger is append-only NDJSON rather than a key in state.json, because
   // `save()` rewrites that whole file on every change: a space with fifty thousand pending
   // mutations would rewrite megabytes on each login.
   mutationsPath(spaceId) {
-    return path.join(this.spacesDir, spaceId, 'mutations.ndjson');
+    return path.join(this.spacesDir, this.safePathId(spaceId, 'space id'), 'mutations.ndjson');
   }
 
   vectorsPath(spaceId, kind) {
-    return path.join(this.spacesDir, spaceId, `vectors-${kind}.bin`);
+    const safeKind = String(kind ?? '');
+    if (!/^[A-Za-z0-9_-]{1,64}$/.test(safeKind)) throw new Error('Invalid vector kind');
+    return path.join(this.spacesDir, this.safePathId(spaceId, 'space id'), `vectors-${safeKind}.bin`);
   }
 }

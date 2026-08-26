@@ -21,6 +21,7 @@ async function readJson(response) {
 test('every collection endpoint answers with the MCP page envelope and honours its bounds', { timeout: 60_000 }, async () => {
   await withServer({ label: 'api-read' }, async (server) => {
     const spaceId = await server.createSpace('Corpus');
+    await server.setPublicationPolicy(spaceId, ['allowUserContent', 'allowPassages']);
     const owner = await server.deviceToken(server.adminEmail, server.adminPassword, spaceId);
     await server.createUser('lector@example.test', 'lector-account-password', [{ spaceId, role: 'reader' }]);
     const reader = await server.deviceToken('lector@example.test', 'lector-account-password', spaceId);
@@ -33,7 +34,7 @@ test('every collection endpoint answers with the MCP page envelope and honours i
       ['gaps', 'gaps', 1],
       ['authors', 'authors', 2],
       ['passages', 'passages', 1],
-      ['notes', 'notes', 1],
+      ['notes', 'notes', 0],
       ['deep-research', 'reports', 1],
       ['immersion', 'sessions', 1],
     ]) {
@@ -86,8 +87,7 @@ test('every collection endpoint answers with the MCP page envelope and honours i
 
     const report = await readJson(await server.api(reader.deviceToken, 'GET', `/api/v1/spaces/${spaceId}/deep-research/dr-1`));
     assert.match(report.report.draft.draftMarkdown, /## Resumen/);
-    assert.deepEqual(report.annotations.map((annotation) => annotation.id), ['ann-1']);
-    assert.equal(report.annotations[0].kind, 'highlight');
+    assert.deepEqual(report.annotations, [], 'another reader never receives the publisher\'s private highlights');
 
     const session = await readJson(await server.api(reader.deviceToken, 'GET', `/api/v1/spaces/${spaceId}/immersion/im-1`));
     assert.ok(session.session.plan, 'the immersion plan replays without new AI calls');
@@ -97,9 +97,10 @@ test('every collection endpoint answers with the MCP page envelope and honours i
   });
 });
 
-test('Workspace exposes every note and idea and filters a hierarchical collection recursively', { timeout: 60_000 }, async () => {
+test('published snapshots cannot smuggle personal notes or note folders into the shared Workspace API', { timeout: 60_000 }, async () => {
   await withServer({ label: 'api-workspace' }, async (server) => {
     const spaceId = await server.createSpace('Corpus');
+    await server.setPublicationPolicy(spaceId, ['allowUserContent']);
     const owner = await server.deviceToken(server.adminEmail, server.adminPassword, spaceId);
     const stamp = { created_at: '2026-08-13T10:00:00.000Z', updated_at: '2026-08-13T10:00:00.000Z' };
     await publish(server.origin, owner.deviceToken, spaceId, academicSnapshot({
@@ -119,23 +120,27 @@ test('Workspace exposes every note and idea and filters a hierarchical collectio
     }));
 
     const all = await readJson(await server.api(owner.deviceToken, 'GET', `/api/v1/spaces/${spaceId}/notes`));
-    assert.equal(all.total, 4);
-    assert.deepEqual(all.counts, { notes: 2, ideas: 2 });
-    assert.deepEqual(all.folders.map((folder) => folder.id), ['research', 'chapter', 'personal']);
+    assert.equal(all.total, 0);
+    assert.deepEqual(all.counts, { notes: 0, ideas: 0 });
+    assert.deepEqual(all.folders, []);
 
     const subtree = await readJson(await server.api(owner.deviceToken, 'GET', `/api/v1/spaces/${spaceId}/notes?folderId=research&recursive=1&kind=idea`));
-    assert.deepEqual(subtree.notes.map((note) => note.id), ['i-root', 'i-child']);
-    assert.ok(subtree.notes.every((note) => !Object.hasOwn(note, 'content')), 'the list carries snippets rather than every full body');
+    assert.deepEqual(subtree.notes, []);
 
-    const detail = await readJson(await server.api(owner.deviceToken, 'GET', `/api/v1/spaces/${spaceId}/notes/i-child`));
-    assert.equal(detail.note.content, 'Una idea del capítulo');
-    assert.equal(detail.note.kind, 'idea');
+    assert.equal(
+      (await server.api(owner.deviceToken, 'GET', `/api/v1/spaces/${spaceId}/notes/i-child`)).status,
+      404,
+      'even the publisher cannot read personal note rows back from the shared corpus',
+    );
+    const sharedIdeas = await readJson(await server.api(owner.deviceToken, 'GET', `/api/v1/spaces/${spaceId}/ideas`));
+    assert.equal(sharedIdeas.total, 3, 'vault-owned ideas remain available through their shared table');
   });
 });
 
 test('the styled report document carries its cover image, and says so when it cannot be laid out', { timeout: 60_000 }, async () => {
   await withServer({ label: 'api-report-document' }, async (server) => {
     const spaceId = await server.createSpace('Corpus');
+    await server.setPublicationPolicy(spaceId, ['allowUserContent']);
     const owner = await server.deviceToken(server.adminEmail, server.adminPassword, spaceId);
     const hash = sha256(PNG_BYTES);
 
@@ -371,6 +376,7 @@ test('a database answers in the user’s order, with the page’s files and whic
 test('debates and the idea subgraph both hide what the owner vetoed', { timeout: 60_000 }, async () => {
   await withServer({ label: 'api-debates' }, async (server) => {
     const spaceId = await server.createSpace('Corpus');
+    await server.setPublicationPolicy(spaceId, ['allowPassages']);
     const owner = await server.deviceToken(server.adminEmail, server.adminPassword, spaceId);
     await publish(server.origin, owner.deviceToken, spaceId, academicSnapshot());
 
@@ -421,6 +427,7 @@ test('reads are cached by revision and revalidate with 304', { timeout: 60_000 }
 test('the REST API and the MCP tools answer the same questions the same way', { timeout: 60_000 }, async () => {
   await withServer({ label: 'api-mcp-parity' }, async (server) => {
     const spaceId = await server.createSpace('Corpus');
+    await server.setPublicationPolicy(spaceId, ['allowPassages']);
     const owner = await server.deviceToken(server.adminEmail, server.adminPassword, spaceId);
     await publish(server.origin, owner.deviceToken, spaceId, academicSnapshot());
 

@@ -143,7 +143,11 @@ test('stable and beta publication have isolated entry points and shared build lo
     assert.ok(entry.integrity, `${packageName} has a deterministic integrity hash`);
   }
   assert.equal(lock.packages['node_modules/@koromix/koffi-darwin-arm64'].version, '3.1.1');
-  assert.equal(lock.packages['node_modules/@rollup/rollup-darwin-arm64'].version, '4.62.0');
+  assert.equal(
+    lock.packages['node_modules/@rollup/rollup-darwin-arm64'].version,
+    lock.packages['node_modules/rollup'].version,
+    'the native Rollup binary must exactly match the locked JavaScript package',
+  );
 
   const configPath = require.resolve(path.join(repoRoot, 'build/electron-builder.release.cjs'));
   const previousChannel = process.env.NODUS_RELEASE_CHANNEL;

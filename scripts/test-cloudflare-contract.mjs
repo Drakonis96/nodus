@@ -4,6 +4,7 @@ import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { execFileSync } from 'node:child_process';
 import test from 'node:test';
+import { getMutations } from '../cloudflare/src/sync.mjs';
 
 const root = process.cwd();
 const read = (file) => fs.readFileSync(path.join(root, file), 'utf8');
@@ -19,7 +20,7 @@ test('Cloudflare Worker bundles and every source module parses', () => {
 test('D1 schema covers auth, publication, idempotency, sync and recovery', () => {
   const sql = fs.readdirSync(path.join(root, 'cloudflare', 'migrations')).sort()
     .map((name) => read(`cloudflare/migrations/${name}`)).join('\n');
-  for (const table of ['installation', 'users', 'spaces', 'memberships', 'device_tokens', 'sessions', 'oauth_clients', 'oauth_codes', 'oauth_tokens', 'publications', 'published_rows', 'objects', 'multipart_uploads', 'vector_sets', 'vector_chunks', 'vector_members', 'mutations', 'rate_limits', 'recovery_events', 'space_actions', 'library_record_versions', 'library_records', 'library_objects', 'library_commands']) {
+  for (const table of ['installation', 'users', 'spaces', 'memberships', 'device_tokens', 'sessions', 'oauth_clients', 'oauth_codes', 'oauth_tokens', 'publications', 'published_rows', 'objects', 'multipart_uploads', 'vector_sets', 'vector_chunks', 'vector_members', 'mutations', 'private_mutation_ownership', 'rate_limits', 'recovery_events', 'space_actions', 'library_record_versions', 'library_records', 'library_objects', 'library_commands']) {
     assert.match(sql, new RegExp(`CREATE TABLE IF NOT EXISTS ${table}\\b`));
   }
   assert.match(sql, /CREATE VIRTUAL TABLE IF NOT EXISTS published_search USING fts5/);
@@ -108,7 +109,7 @@ test('release package includes every migration and public deployment configurati
   execFileSync(process.execPath, [path.join(root, 'scripts', 'build-cloudflare-worker.mjs')]);
   const manifest = JSON.parse(read('cloudflare/dist/migrations.json'));
   assert.equal(manifest.schemaVersion, 1);
-  assert.deepEqual(manifest.migrations, ['0001_initial.sql', '0002_mobile_parity.sql', '0003_document_vectors.sql']);
+  assert.deepEqual(manifest.migrations, ['0001_initial.sql', '0002_mobile_parity.sql', '0003_document_vectors.sql', '0004_private_mutation_ownership.sql']);
   for (const name of [...manifest.migrations, 'catalog-config.json', 'pricing.v1.json']) {
     assert.ok(fs.statSync(path.join(root, 'cloudflare', 'dist', name)).size > 0, `${name} is missing from the packaged resources`);
   }
@@ -161,4 +162,42 @@ test('mutation missing assets are rejected before persistence', () => {
   const missing = source.indexOf("if (missing.size) throw new HttpError(409, 'missing_assets'");
   const insert = source.indexOf('for (const { mutation, verdict } of valid)');
   assert.ok(missing > 0 && insert > missing);
+});
+
+test('Cloudflare mutation reads preserve private ownership while advancing the shared cursor', async () => {
+  const body = (value) => JSON.stringify(value);
+  const rows = [
+    { sequence: 1, user_id: 'user-a', body_json: body({ id: 'private-a', table: 'notes', key: ['n-a'], kind: 'upsert', row: { id: 'n-a', content: 'A' }, ownerScope: 'user:user-a', userId: 'user-a' }) },
+    { sequence: 2, user_id: 'user-b', body_json: body({ id: 'private-b', table: 'notes', key: ['n-b'], kind: 'upsert', row: { id: 'n-b', content: 'B' }, ownerScope: 'user:user-b', userId: 'user-b' }) },
+    { sequence: 3, user_id: 'user-a', body_json: body({ id: 'shared', table: 'pages', key: ['shared-page'], kind: 'upsert', row: { id: 'shared-page', title: 'Shared' }, ownerScope: 'vault', userId: 'user-a' }) },
+    { sequence: 4, user_id: 'user-a', body_json: body({ id: 'private-child-a', table: 'page_blocks', key: ['b-a'], kind: 'upsert', row: { id: 'b-a', page_id: 'note:n-a', content: 'A child' }, ownerScope: 'user:user-a', userId: 'user-a' }) },
+  ];
+  const DB = {
+    prepare(sql) {
+      return {
+        bind(...bindings) {
+          return {
+            async all() {
+              if (!sql.includes('FROM mutations')) return { results: [] };
+              const since = Number(bindings[1] || 0); const limit = Number(bindings[2] || 33);
+              return { results: rows.filter((row) => row.sequence > since).slice(0, limit) };
+            },
+            async first() { return sql.includes('FROM spaces') ? { schema_version: 121 } : null; },
+          };
+        },
+      };
+    },
+  };
+  const result = await getMutations({ DB }, { space_id: 'space-a', user_id: 'user-b' }, new Request('https://server.example/api/v1/spaces/space-a/mutations?since=0'));
+  assert.deepEqual(result.mutations.map((entry) => entry.id), ['private-b', 'shared']);
+  assert.equal(result.cursor, 4, 'invisible private rows cannot block the global cursor');
+});
+
+test('Cloudflare actions are private to their actor and reject credential-shaped payloads', () => {
+  const source = read('cloudflare/src/actions.mjs');
+  assert.match(source, /row\.actor_user_id === auth\.user_id/);
+  assert.match(source, /actor_user_id=\?2/);
+  assert.match(source, /payload_contains_secret/);
+  assert.match(source, /result_contains_secret/);
+  assert.doesNotMatch(source, /auth\.space_role === ['"]owner['"] \|\|/);
 });

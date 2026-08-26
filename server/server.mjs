@@ -7,8 +7,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { constants as bufferLimits } from 'node:buffer';
-import { createHash, randomUUID, timingSafeEqual } from 'node:crypto';
-import { gunzipSync } from 'node:zlib';
+import { createHash, randomBytes, randomUUID, timingSafeEqual } from 'node:crypto';
+import { gunzipSync, gzipSync } from 'node:zlib';
 import { fileURLToPath } from 'node:url';
 import { Store, digest, pairingCode, token } from './lib/store.mjs';
 import { DEFAULT_MAX_MUTATION_BYTES } from './lib/core/mutations.mjs';
@@ -24,6 +24,14 @@ import { createCorpusRoutes } from './lib/routes/corpus.mjs';
 import { NODUS_LICENSE, NODUS_SOURCE_URL, NODUS_VERSION } from './lib/version.mjs';
 import { readAsset } from './lib/assets.mjs';
 import { VAULT_TYPE_COLORS } from './lib/core/generated/vaultColors.mjs';
+import { PrivateAnnotationStore } from './lib/privateAnnotations.mjs';
+import { UserAIStore, redactStructured } from './lib/ai/index.mjs';
+import { ProviderGateway } from './lib/ai/providerGateway.mjs';
+import { UserPrivateDataStore } from './lib/privateDataStore.mjs';
+import { createAIRoutes } from './lib/routes/ai.mjs';
+import { UserArtifactStore } from './lib/userArtifacts.mjs';
+import { createArtifactRoutes } from './lib/routes/artifacts.mjs';
+import { acquireDataDirectoryLock } from './lib/dataDirectoryLock.mjs';
 
 // A zero, a `200m`-style unit or a value past what Node can hold in a single buffer
 // would otherwise reach zlib and turn every publication into an opaque rejection, so
@@ -97,6 +105,9 @@ const MAX_SPACE_ASSET_BYTES = byteLimit('NODUS_MAX_SPACE_ASSET_BYTES', 2 * 1024 
 const MAX_LIBRARY_PACKAGE_BYTES = byteLimit('NODUS_MAX_LIBRARY_PACKAGE_BYTES', 128 * 1024 * 1024, bufferLimits.MAX_LENGTH);
 /** Total offline-readable published library budget for one space. */
 const MAX_SPACE_LIBRARY_BYTES = byteLimit('NODUS_MAX_SPACE_LIBRARY_BYTES', 2 * 1024 * 1024 * 1024, bufferLimits.MAX_LENGTH);
+const MAX_SPACE_DOCUMENT_UPDATE_BYTES = byteLimit('NODUS_MAX_SPACE_DOCUMENT_UPDATE_BYTES', 1024 * 1024 * 1024, bufferLimits.MAX_LENGTH);
+const MAX_SPACE_SHARED_BLOB_BYTES = byteLimit('NODUS_MAX_SPACE_SHARED_BLOB_BYTES', 2 * 1024 * 1024 * 1024, bufferLimits.MAX_LENGTH);
+const MAX_SPACE_PARTIAL_BLOB_BYTES = byteLimit('NODUS_MAX_SPACE_PARTIAL_BLOB_BYTES', 512 * 1024 * 1024, bufferLimits.MAX_LENGTH);
 const MAX_VECTOR_BYTES = byteLimit('NODUS_MAX_VECTOR_BYTES', 512 * 1024 * 1024, bufferLimits.MAX_LENGTH);
 /**
  * One row a collaborator may send. See DEFAULT_MAX_MUTATION_BYTES for why 256 KiB and why it
@@ -124,6 +135,8 @@ const MAX_MUTATION_BATCH_BYTES = byteLimit('NODUS_MAX_MUTATION_BATCH_BYTES', 16 
  * itself the moment the owner opens Nodus and drains.
  */
 const MAX_LEDGER_BYTES = byteLimit('NODUS_MAX_LEDGER_BYTES', 256 * 1024 * 1024, bufferLimits.MAX_LENGTH);
+const MAX_PRIVATE_ANNOTATIONS_BYTES = byteLimit('NODUS_MAX_PRIVATE_ANNOTATIONS_BYTES', 8 * 1024 * 1024, bufferLimits.MAX_LENGTH);
+const MAX_PRIVATE_ANNOTATIONS = Number(process.env.NODUS_MAX_PRIVATE_ANNOTATIONS || 10_000);
 /**
  * How long an unreferenced image survives before the sweeper takes it.
  *
@@ -132,7 +145,38 @@ const MAX_LEDGER_BYTES = byteLimit('NODUS_MAX_LEDGER_BYTES', 256 * 1024 * 1024, 
  * hash yet, and an eager sweep would delete bytes still in flight.
  */
 const ASSET_GRACE_MS = 24 * 60 * 60_000;
+const dataDirectoryLock = acquireDataDirectoryLock(DATA_DIR);
 const store = new Store(DATA_DIR);
+const DEPLOYMENT_MODE = String(process.env.NODUS_DEPLOYMENT_MODE || 'basic').toLowerCase();
+const aiJobRetention = Number(process.env.NODUS_AI_JOB_RETENTION_MS || 7 * 24 * 60 * 60_000);
+const aiMaxJobs = Number(process.env.NODUS_AI_MAX_JOBS || 1_000);
+const aiMaxActivePerUser = Number(process.env.NODUS_AI_MAX_ACTIVE_PER_USER || 4);
+const aiMaxActiveGlobal = Number(process.env.NODUS_AI_MAX_ACTIVE_GLOBAL || 32);
+if (!Number.isSafeInteger(aiMaxActivePerUser) || aiMaxActivePerUser < 1 || aiMaxActivePerUser > 100) {
+  throw new Error('NODUS_AI_MAX_ACTIVE_PER_USER must be a whole number between 1 and 100.');
+}
+if (!Number.isSafeInteger(aiMaxActiveGlobal) || aiMaxActiveGlobal < aiMaxActivePerUser || aiMaxActiveGlobal > 1_000) {
+  throw new Error('NODUS_AI_MAX_ACTIVE_GLOBAL must be a whole number between the per-user limit and 1000.');
+}
+const privateData = new UserPrivateDataStore(path.join(DATA_DIR, 'private'), {
+  jobRetentionMs: Number.isFinite(aiJobRetention) && aiJobRetention > 0 ? aiJobRetention : undefined,
+  maxJobs: Number.isSafeInteger(aiMaxJobs) && aiMaxJobs > 0 ? aiMaxJobs : undefined,
+});
+const userArtifacts = new UserArtifactStore(path.join(DATA_DIR, 'private'));
+// Resolve jobs left in queued/running state before opening the listener. A process restart
+// cannot resume an in-memory provider promise, so those records become deterministic failures.
+privateData.recoverJobs();
+const AI_KEYRING_FILE = String(process.env.NODUS_AI_KEYRING_FILE || '').trim();
+const aiStore = AI_KEYRING_FILE ? new UserAIStore(path.join(DATA_DIR, 'private'), {
+  keyringPath: AI_KEYRING_FILE,
+  createKeyring: /^(1|true|yes)$/i.test(String(process.env.NODUS_AI_CREATE_KEYRING || '')),
+  installationId: store.state.settings.instanceId,
+}) : null;
+const providerGateway = aiStore ? new ProviderGateway(aiStore) : null;
+const privateAnnotations = new PrivateAnnotationStore(DATA_DIR, {
+  maxBytes: MAX_PRIVATE_ANNOTATIONS_BYTES,
+  maxAnnotations: Number.isSafeInteger(MAX_PRIVATE_ANNOTATIONS) && MAX_PRIVATE_ANNOTATIONS > 0 ? MAX_PRIVATE_ANNOTATIONS : 10_000,
+});
 /**
  * How much expanded publication the parsed-snapshot cache may hold.
  *
@@ -156,6 +200,7 @@ const MCP_PROTOCOLS = new Set(['2025-11-25', '2025-06-18', '2025-03-26']);
 const AUTH_BODY_BYTES = 32 * 1024;
 const MAX_RATE_BUCKETS = 20_000;
 const languageContext = new AsyncLocalStorage();
+const TRUST_PROXY = /^(1|true|yes)$/i.test(String(process.env.NODUS_TRUST_PROXY || ''));
 
 function environmentCredential(name) {
   const direct = process.env[name] || '';
@@ -236,6 +281,17 @@ function publicUrl() {
   return normalizePublicUrl(process.env.NODUS_PUBLIC_URL || store.state.settings.publicUrl || `${TLS ? 'https' : 'http'}://localhost:${PORT}`);
 }
 
+function safeReturnPath(value) {
+  const candidate = String(value || '/');
+  if (!candidate.startsWith('/') || candidate.startsWith('//') || /\\|%5c|[\u0000-\u001f\u007f]/i.test(candidate)) return '/';
+  try {
+    const base = new URL('https://nodus.invalid/');
+    const parsed = new URL(candidate, base);
+    if (parsed.origin !== base.origin || parsed.username || parsed.password) return '/';
+    return `${parsed.pathname}${parsed.search}${parsed.hash}`;
+  } catch { return '/'; }
+}
+
 /**
  * Two OAuth protected resources over one origin.
  *
@@ -280,20 +336,12 @@ function page(title, content, options = {}) {
   </header>`;
   const main = options.variant === 'auth'
     ? `<main class="auth-main" data-testid="auth-layout">
-        <section class="auth-story">
-          ${nodusMark('nodus-auth-mark', 'auth-mark')}
-          <p class="brand-kicker">Nodus Server</p>
-          <h2>${tr('brandTagline')}</h2>
-          <p>${tr('brandIntro')}</p>
-          <div class="trust-list">
-            <span class="trust-pill">${tr('privateByDesign')}</span>
-            <span class="trust-pill">${tr('oauthProtected')}</span>
-          </div>
-        </section>
-        <section class="auth-card">${content}</section>
+        <canvas id="organism" class="auth-organism" aria-hidden="true"></canvas>
+        <section class="auth-card"><div class="auth-identity">${nodusMark('nodus-auth-mark', 'auth-mark')}<p class="brand-kicker">Nodus Server</p><span>${tr('brandTagline')}</span></div>${content}<div class="trust-list"><span class="trust-pill">${tr('privateByDesign')}</span><span class="trust-pill">${tr('oauthProtected')}</span></div></section>
       </main>`
     : `<main class="app-main">${content}</main>`;
-  return `<!doctype html><html lang="${escapeHtml(language())}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#08080d"><link rel="icon" type="image/svg+xml" href="/favicon.svg"><title>${escapeHtml(title)} · Nodus Server</title><style>${WEB_STYLES}</style><script src="/server-ui.js?v=2" defer></script></head><body>${header}${main}<footer class="site-footer">Nodus Server ${escapeHtml(NODUS_VERSION)} · ${escapeHtml(NODUS_LICENSE)} · <a data-testid="source-code" href="${escapeHtml(NODUS_SOURCE_URL)}" rel="license source">${tr('sourceCode')}</a></footer></body></html>`;
+  const organismScript = options.variant === 'auth' ? '<script src="/organism.js?v=1" defer></script>' : '';
+  return `<!doctype html><html lang="${escapeHtml(language())}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#08080d"><link rel="icon" type="image/svg+xml" href="/favicon.svg"><title>${escapeHtml(title)} · Nodus Server</title><style>${WEB_STYLES}</style><script src="/server-ui.js?v=2" defer></script>${organismScript}</head><body data-formation="off">${header}${main}<footer class="site-footer">Nodus Server ${escapeHtml(NODUS_VERSION)} · ${escapeHtml(NODUS_LICENSE)} · <a data-testid="source-code" href="${escapeHtml(NODUS_SOURCE_URL)}" rel="license source">${tr('sourceCode')}</a></footer></body></html>`;
 }
 
 function sessionFor(req) {
@@ -325,10 +373,11 @@ function bearer(req) {
 }
 
 function clientIp(req) {
+  // Forwarding headers are attacker-controlled unless the operator has explicitly put
+  // this process behind a reverse proxy. Docker/Portainer set this flag and do not expose
+  // the application listener publicly; standalone/basic mode deliberately ignores it.
   const forwarded = String(req.headers['x-forwarded-for'] || '').split(',').map((value) => value.trim()).filter(Boolean);
-  // Nodus Server is bound to loopback by the Docker recipe. The final address is
-  // the one appended by a trusted local reverse proxy, so a client cannot choose it.
-  return forwarded.at(-1) || req.socket.remoteAddress || 'unknown';
+  return (TRUST_PROXY ? forwarded.at(-1) : '') || req.socket.remoteAddress || 'unknown';
 }
 
 function rateLimit(req, res, key, limit, windowMs, identity = clientIp(req)) {
@@ -364,6 +413,16 @@ function validRedirectUri(value) {
   }
 }
 
+function validPkceValue(value) {
+  return /^[A-Za-z0-9._~-]{43,128}$/.test(String(value || ''));
+}
+
+function requestedScopes(value, fallback = 'profile spaces.read materials.read') {
+  const scopes = [...new Set(String(value || fallback).split(/\s+/).filter(Boolean))];
+  if (scopes.length === 0 || scopes.some((scope) => !SCOPES.has(scope))) return null;
+  return scopes;
+}
+
 function oauthRedirectHeaders(redirectUri) {
   // The consent form posts only to this server. Browsers also apply form-action
   // to every redirect in that navigation, so the validated OAuth callback
@@ -390,7 +449,6 @@ function ownerCount(spaceId) {
 
 function effectiveRole(device) {
   const entry = membership(device.userId, device.spaceId);
-  if (device.grandfathered && (device.kind ?? 'publisher') === 'publisher') return 'owner';
   return entry ? normalizeSpaceRole(entry.role) : null;
 }
 
@@ -730,13 +788,33 @@ function setupPage(error = '') {
   </form>`, { variant: 'auth' });
 }
 
-function loginPage(next = '/', error = '') {
+function loginPage(next = '/', error = '', csrf = '') {
   return page(tr('loginTitle'), `<p class="eyebrow">${tr('oauthProtected')}</p><h1>${tr('loginHeading')}</h1><p class="lead">${tr('serverReady')}</p>${error ? `<p class="warn">${escapeHtml(error)}</p>` : ''}<form class="card" method="post" action="/login">
+    <input type="hidden" name="csrf" value="${escapeHtml(csrf)}">
     <input type="hidden" name="next" value="${escapeHtml(next)}">
     <div class="field"><label for="login-email">${tr('email')}</label><input id="login-email" name="email" type="email" autocomplete="username" maxlength="320" required autofocus></div>
     <div class="field"><label for="login-password">${tr('password')}</label><input id="login-password" name="password" type="password" autocomplete="current-password" maxlength="1024" required></div>
     <button type="submit">${tr('signIn')}</button>
   </form>`, { variant: 'auth' });
+}
+
+function loginCsrfCookie(value, { clear = false } = {}) {
+  return `nodus_login_csrf=${encodeURIComponent(value)}; Path=/login; HttpOnly; SameSite=Strict${clear ? '; Max-Age=0' : '; Max-Age=600'}${publicUrl().startsWith('https://') ? '; Secure' : ''}`;
+}
+
+function loginRequestSameOrigin(req) {
+  const fetchSite = String(req.headers['sec-fetch-site'] || '').toLowerCase();
+  if (fetchSite === 'cross-site') return false;
+  let supplied = String(req.headers.origin || '').trim();
+  // Chromium serializes the Origin as `null` for a same-origin form POST when the
+  // response carries Referrer-Policy: no-referrer. Fetch Metadata remains trustworthy
+  // in that case. Sandboxed/cross-site forms have a different Sec-Fetch-Site value.
+  if (supplied === 'null') return fetchSite === 'same-origin';
+  if (!supplied && req.headers.referer) {
+    try { supplied = new URL(String(req.headers.referer)).origin; } catch { return false; }
+  }
+  if (!supplied) return true; // Non-browser clients still need the unguessable form token.
+  try { return new URL(supplied).origin === new URL(publicUrl()).origin; } catch { return false; }
 }
 
 function accountPage(current, notice = '', error = '') {
@@ -888,14 +966,30 @@ function publishedLibraryMeta(space) {
 
 function dashboard(current, notice = '') {
   const emailsUnlocked = store.sensitiveAccessValid(current.session);
-  const spaces = store.state.spaces.map((space) => `<tr>
+  const spaces = store.state.spaces.map((space) => {
+    const policy = space.publicationPolicy && typeof space.publicationPolicy === 'object' ? space.publicationPolicy : {};
+    const checked = (field) => policy[field] === true || (field === 'allowPersonalImports' && policy.allowLegacyPublisherImport === true) ? ' checked' : '';
+    return `<tr>
     <td><div class="space-name"><div class="space-heading">${vaultBadge(space)}<strong>${escapeHtml(space.name)}</strong></div>${space.description ? `<div class="muted">${escapeHtml(space.description)}</div>` : ''}${publishedLibraryMeta(space)}</div>
       <details class="inline-editor"><summary>${escapeHtml(tr('editSpaceName'))}</summary><form method="post" action="/admin/spaces/name"><input type="hidden" name="csrf" value="${current.session.csrf}"><input type="hidden" name="spaceId" value="${space.id}"><input name="name" value="${escapeHtml(space.name)}" maxlength="120" aria-label="${escapeHtml(tr('name'))}" required><button class="secondary" type="submit">${escapeHtml(tr('saveName'))}</button></form></details>
     </td>
     <td><div class="space-id"><code>${space.id}</code>${copyButton(space.id, tr('copySpaceId'), tr('spaceIdCopied'), `space-id-copy-${space.id}`, 'copy-endpoint copy-id')}<span class="copy-feedback" data-copy-feedback aria-live="polite"></span></div></td>
     <td>${escapeHtml(space.updatedAt || tr('unpublished'))}</td>
-    <td><form method="post" action="/admin/pairing"><input type="hidden" name="csrf" value="${current.session.csrf}"><input type="hidden" name="spaceId" value="${space.id}"><button class="secondary" type="submit">${tr('createPairing')}</button></form>${space.updatedAt ? `<form method="post" action="/admin/spaces/clear-request"><input type="hidden" name="csrf" value="${current.session.csrf}"><input type="hidden" name="spaceId" value="${space.id}"><button class="danger" type="submit">${tr('deletePublication')}</button></form>` : ''}</td>
-  </tr>`).join('');
+    <td><form method="post" action="/admin/pairing"><input type="hidden" name="csrf" value="${current.session.csrf}"><input type="hidden" name="spaceId" value="${space.id}"><button class="secondary" type="submit">${tr('createPairing')}</button></form>${space.updatedAt ? `<form method="post" action="/admin/spaces/clear-request"><input type="hidden" name="csrf" value="${current.session.csrf}"><input type="hidden" name="spaceId" value="${space.id}"><button class="danger" type="submit">${tr('deletePublication')}</button></form>` : ''}
+      <details class="inline-editor publication-policy"><summary>Publication policy</summary><form method="post" action="/admin/spaces/policy"><input type="hidden" name="csrf" value="${current.session.csrf}"><input type="hidden" name="spaceId" value="${space.id}">
+        <label><input type="checkbox" name="allowLibraryDocuments" value="on"${checked('allowLibraryDocuments')}> Library documents</label>
+        <label><input type="checkbox" name="allowPassages" value="on"${checked('allowPassages')}> Extracted passages</label>
+        <label><input type="checkbox" name="allowUserContent" value="on"${checked('allowUserContent')}> Authored notes and projects</label>
+        <label><input type="checkbox" name="allowVectors" value="on"${checked('allowVectors')}> Semantic indexes</label>
+        <label><input type="checkbox" name="allowPrimarySources" value="on"${checked('allowPrimarySources')}> Primary-source text</label>
+        <label><input type="checkbox" name="allowTestimonies" value="on"${checked('allowTestimonies')}> Testimony transcripts</label>
+        <label><input type="checkbox" name="allowPersonalImports" value="on"${checked('allowPersonalImports')}> Import publisher's private annotations</label>
+        <small class="muted">Credentials, local paths, media, contacts, agreements, students, grades and attempts are always excluded.</small>
+        <button class="secondary" type="submit">Save policy</button>
+      </form></details>
+    </td>
+  </tr>`;
+  }).join('');
   const users = store.state.users.map((user) => {
     const entries = store.state.memberships.filter((entry) => entry.userId === user.id);
     const reset = user.role === 'member' ? `<a href="/admin/users/password?userId=${encodeURIComponent(user.id)}">${tr('resetPassword')}</a>` : `<a href="/account">${tr('changeMyPassword')}</a>`;
@@ -987,7 +1081,7 @@ function maskEmail(value) {
 function languageReturnPath(req) {
   try {
     const referer = new URL(String(req.headers.referer || ''), publicUrl());
-    if (referer.origin === new URL(publicUrl()).origin) return `${referer.pathname}${referer.search}`;
+    if (referer.origin === new URL(publicUrl()).origin) return safeReturnPath(`${referer.pathname}${referer.search}`);
   } catch {
     // A missing or malformed Referer simply returns to the appropriate home page.
   }
@@ -1003,9 +1097,11 @@ const corpusRoutes = createCorpusRoutes({
 
 const apiRoutes = createApiRoutes({
   store, authorize, json, body, jsonBody, fs, path,
+  privateAnnotations,
   readSnapshot, invalidateSnapshot, expandSnapshot,
   publicUrl, language, rateLimit, clearRateLimit, mib,
   gunzip: (bytes, maxOutputLength) => gunzipSync(bytes, { maxOutputLength }),
+  gzip: (bytes) => gzipSync(bytes),
   // A function, not a snapshot: the public URL is only settled once /setup has run.
   resourceMap,
   corpus: corpusRoutes,
@@ -1016,12 +1112,24 @@ const apiRoutes = createApiRoutes({
     maxSpaceAssetBytes: MAX_SPACE_ASSET_BYTES,
     maxLibraryPackageBytes: MAX_LIBRARY_PACKAGE_BYTES,
     maxSpaceLibraryBytes: MAX_SPACE_LIBRARY_BYTES,
+    maxSpaceDocumentUpdateBytes: MAX_SPACE_DOCUMENT_UPDATE_BYTES,
+    maxSpaceSharedBlobBytes: MAX_SPACE_SHARED_BLOB_BYTES,
+    maxSpacePartialBlobBytes: MAX_SPACE_PARTIAL_BLOB_BYTES,
     maxVectorBytes: MAX_VECTOR_BYTES,
     maxMutationBytes: MAX_MUTATION_BYTES,
     maxMutationBatchBytes: MAX_MUTATION_BATCH_BYTES,
     maxLedgerBytes: MAX_LEDGER_BYTES,
     assetGraceMs: ASSET_GRACE_MS,
   },
+});
+
+const aiRoutes = createAIRoutes({
+  authorize, json, jsonBody, publicUrl, aiStore, privateData, gateway: providerGateway, store, rateLimit,
+  maxActiveJobsPerUser: aiMaxActivePerUser,
+  maxActiveJobsGlobal: aiMaxActiveGlobal,
+});
+const artifactRoutes = createArtifactRoutes({
+  authorize, json, jsonBody, publicUrl, artifacts: userArtifacts, privateData,
 });
 
 /**
@@ -1056,7 +1164,9 @@ async function handleLocalProvision(req, res) {
 
   let space = store.state.spaces.find((entry) => entry.localVaultId === vaultId);
   if (!space) {
-    space = { id: randomUUID(), name: vaultName, description: '', createdAt: new Date().toISOString(), updatedAt: null, revision: '', bytes: 0, localVaultId: vaultId, vaultType };
+    const createdAt = new Date().toISOString();
+    space = { id: randomUUID(), name: vaultName, description: '', createdAt, updatedAt: null, revision: '', bytes: 0, localVaultId: vaultId, vaultType, receiveSequence: 0,
+      provenance: { schemaVersion: 4, originInstanceId: store.state.settings.instanceId, originDeviceId: 'desktop-basic', createdBy: admin.id, createdAt } };
     store.state.spaces.push(space);
     store.state.memberships.push({ userId: admin.id, spaceId: space.id, role: 'owner' });
   } else if (!space.nameEdited && space.name !== vaultName) {
@@ -1066,9 +1176,37 @@ async function handleLocalProvision(req, res) {
   if (vaultType) space.vaultType = vaultType;
 
   const code = pairingCode();
-  store.state.pairingCodes.push({ hash: digest(code), userId: admin.id, spaceId: space.id, expiresAt: new Date(Date.now() + 15 * 60_000).toISOString(), usedAt: null });
+  store.state.pairingCodes.push({ hash: digest(code), userId: admin.id, spaceId: space.id, kind: 'publisher', expiresAt: new Date(Date.now() + 15 * 60_000).toISOString(), usedAt: null });
   store.save();
   return json(res, 200, { spaceId: space.id, spaceName: space.name, code, publicUrl: publicUrl() });
+}
+
+const WEB_DIST = path.join(ROOT, 'dist', 'web');
+const WEB_MIME = {
+  '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.mjs': 'text/javascript; charset=utf-8',
+  '.css': 'text/css; charset=utf-8', '.json': 'application/json; charset=utf-8', '.svg': 'image/svg+xml',
+  '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp', '.ico': 'image/x-icon',
+  '.woff': 'font/woff', '.woff2': 'font/woff2',
+};
+
+function serveWebApp(req, res, pathname) {
+  if (!fs.existsSync(WEB_DIST)) return false;
+  let relative;
+  try { relative = decodeURIComponent(pathname.slice('/app'.length)).replace(/^\/+/, ''); }
+  catch { json(res, 400, { error: 'bad_path' }); return true; }
+  if (!relative || relative.endsWith('/')) relative += 'index.html';
+  const candidate = path.resolve(WEB_DIST, relative);
+  const rootWithSep = `${path.resolve(WEB_DIST)}${path.sep}`;
+  let target = candidate.startsWith(rootWithSep) ? candidate : path.join(WEB_DIST, 'index.html');
+  if (!fs.existsSync(target) || !fs.statSync(target).isFile()) target = path.join(WEB_DIST, 'index.html');
+  if (!fs.existsSync(target)) return false;
+  const ext = path.extname(target).toLowerCase();
+  const bytes = fs.readFileSync(target);
+  const immutable = /[.-][0-9a-f]{8,}[.-]/i.test(path.basename(target));
+  staticAsset(res, 200, bytes, WEB_MIME[ext] || 'application/octet-stream', {
+    'cache-control': ext === '.html' ? 'no-store' : immutable ? 'public, max-age=31536000, immutable' : 'public, max-age=3600',
+  });
+  return true;
 }
 
 async function route(req, res) {
@@ -1078,6 +1216,24 @@ async function route(req, res) {
   }
   if (url.pathname === '/server-ui.js' && req.method === 'GET') {
     return staticAsset(res, 200, WEB_SCRIPT, 'text/javascript; charset=utf-8', { 'cache-control': 'no-cache' });
+  }
+  if (url.pathname === '/organism.js' && req.method === 'GET') {
+    const organism = path.join(WEB_DIST, 'organism.js');
+    if (!fs.existsSync(organism)) return json(res, 404, { error: 'not_found' });
+    return staticAsset(res, 200, fs.readFileSync(organism), 'text/javascript; charset=utf-8', { 'cache-control': 'public, max-age=3600' });
+  }
+  if (url.pathname === '/admin' || url.pathname === '/admin/') {
+    const current = sessionFor(req);
+    if (!current) return redirect(res, `/login?next=${encodeURIComponent('/admin')}`);
+    if (current.user.role !== 'admin') return redirect(res, '/account');
+    return redirect(res, `/${url.search || ''}`);
+  }
+  if (url.pathname === '/app' || url.pathname.startsWith('/app/')) {
+    if (!['GET', 'HEAD'].includes(req.method)) return json(res, 405, { error: 'method_not_allowed' });
+    const current = requireSession(req, res);
+    if (!current) return;
+    if (serveWebApp(req, res, url.pathname)) return;
+    return redirect(res, current.user.role === 'admin' ? '/' : '/account');
   }
   if (url.pathname === '/language' && req.method === 'POST') {
     const values = await form(req, 4 * 1024);
@@ -1095,6 +1251,11 @@ async function route(req, res) {
   if (url.pathname === '/.well-known/oauth-authorization-server' || url.pathname === '/.well-known/openid-configuration') return json(res, 200, { issuer: publicUrl(), authorization_endpoint: `${publicUrl()}/oauth/authorize`, token_endpoint: `${publicUrl()}/oauth/token`, registration_endpoint: `${publicUrl()}/oauth/register`, code_challenge_methods_supported: ['S256'], token_endpoint_auth_methods_supported: ['none'], response_types_supported: ['code'], grant_types_supported: ['authorization_code', 'refresh_token'], scopes_supported: [...SCOPES] });
   if (url.pathname === '/mcp') return handleMcp(req, res);
   if (url.pathname === '/api/v1/local/provision' && req.method === 'POST') return handleLocalProvision(req, res);
+
+  // v2 is the reusable Server/Desktop service boundary. It is enabled only for the
+  // advanced deployment so Desktop's embedded basic server keeps its existing surface.
+  if (DEPLOYMENT_MODE === 'advanced' && await artifactRoutes.handle(req, res, url)) return;
+  if (DEPLOYMENT_MODE === 'advanced' && await aiRoutes.handle(req, res, url)) return;
 
   // The client API answers before the "no users yet" gate below. A machine surface should
   // get a 401 it can act on, not a 303 to an HTML setup page it cannot read. Routes this
@@ -1119,20 +1280,35 @@ async function route(req, res) {
   if (url.pathname === '/setup') return redirect(res, '/login');
 
   if (url.pathname === '/login') {
-    if (req.method === 'GET') return html(res, 200, loginPage(url.searchParams.get('next') || '/'));
+    if (req.method === 'GET') {
+      const csrf = randomBytes(32).toString('base64url');
+      return html(res, 200, loginPage(url.searchParams.get('next') || '/', '', csrf), { 'set-cookie': loginCsrfCookie(csrf) });
+    }
     if (!rateLimit(req, res, 'login-global', 240, 5 * 60_000, 'all')) return;
     if (!rateLimit(req, res, 'login-ip', 60, 15 * 60_000)) return;
     const values = await form(req, AUTH_BODY_BYTES);
+    const csrf = String(cookies(req).nodus_login_csrf || '');
+    if (!csrf || !safeEqual(values.csrf, csrf) || !loginRequestSameOrigin(req)) {
+      const replacement = randomBytes(32).toString('base64url');
+      return html(res, 403, loginPage(safeReturnPath(values.next), tr('sessionExpired'), replacement), { 'set-cookie': loginCsrfCookie(replacement) });
+    }
     const accountIdentity = digest(String(values.email || '').trim().toLowerCase());
     if (!rateLimit(req, res, 'login-account', 10, 10 * 60_000, accountIdentity)) return;
     const user = store.authenticate(values.email, values.password);
-    if (!user) return html(res, 401, loginPage(values.next || '/', tr('invalidLogin')));
+    if (!user) {
+      const replacement = randomBytes(32).toString('base64url');
+      return html(res, 401, loginPage(safeReturnPath(values.next), tr('invalidLogin'), replacement), {
+        'set-cookie': loginCsrfCookie(replacement),
+      });
+    }
     clearRateLimit('login-account', accountIdentity);
     const raw = store.createSession(user.id);
-    const next = String(values.next || '/');
-    const safeNext = next.startsWith('/') && !next.startsWith('//') ? next : '/';
-    const destination = safeNext === '/' && user.role !== 'admin' ? '/account' : safeNext;
-    return redirect(res, destination, { 'set-cookie': `nodus_session=${encodeURIComponent(raw)}; Path=/; HttpOnly; SameSite=Lax${publicUrl().startsWith('https://') ? '; Secure' : ''}` });
+    const safeNext = safeReturnPath(values.next);
+    const destination = safeNext === '/' ? (user.role === 'admin' ? '/admin' : '/app') : safeNext;
+    return redirect(res, destination, { 'set-cookie': [
+      `nodus_session=${encodeURIComponent(raw)}; Path=/; HttpOnly; SameSite=Lax${publicUrl().startsWith('https://') ? '; Secure' : ''}`,
+      loginCsrfCookie('', { clear: true }),
+    ] });
   }
 
   if (url.pathname === '/account' && req.method === 'GET') {
@@ -1224,9 +1400,8 @@ async function route(req, res) {
     const client = store.state.oauthClients.find((entry) => entry.client_id === url.searchParams.get('client_id'));
     const redirectUri = url.searchParams.get('redirect_uri') || '';
     const resource = url.searchParams.get('resource') || mcpResource();
-    if (!client || !client.redirect_uris.includes(redirectUri) || !knownResource(resource) || url.searchParams.get('response_type') !== 'code' || url.searchParams.get('code_challenge_method') !== 'S256') return html(res, 400, page('OAuth', `<h1>${tr('invalidOauth')}</h1>`));
-    const requestedInput = (url.searchParams.get('scope') || 'profile spaces.read materials.read').split(/\s+/).filter((scope) => SCOPES.has(scope));
-    const requested = requestedInput.length > 0 ? requestedInput : ['materials.read'];
+    const requested = requestedScopes(url.searchParams.get('scope'));
+    if (!client || !client.redirect_uris.includes(redirectUri) || !knownResource(resource) || url.searchParams.get('response_type') !== 'code' || url.searchParams.get('code_challenge_method') !== 'S256' || !validPkceValue(url.searchParams.get('code_challenge')) || !requested) return html(res, 400, page('OAuth', `<h1>${tr('invalidOauth')}</h1>`));
     const hidden = [...url.searchParams].map(([key, value]) => `<input type="hidden" name="${escapeHtml(key)}" value="${escapeHtml(value)}">`).join('');
     return html(res, 200, page(tr('authorize'), `<div class="page-heading"><div><p class="eyebrow">${tr('oauthProtected')}</p><h1>${tr('connectClient', { name: escapeHtml(client.client_name) })}</h1><p class="lead">${tr('assignedOnly', { email: escapeHtml(current.user.email) })}</p></div></div><div class="card"><h2>${tr('appCan')}</h2><ul>${requested.map((scope) => `<li>${escapeHtml(scope)}</li>`).join('')}</ul><form method="post" action="/oauth/authorize">${hidden}<input type="hidden" name="csrf" value="${current.session.csrf}"><button type="submit">${tr('authorize')}</button></form></div>`), oauthRedirectHeaders(redirectUri));
   }
@@ -1237,9 +1412,8 @@ async function route(req, res) {
     if (!checkCsrf(current, values.csrf)) return html(res, 403, page(tr('error'), `<h1>${tr('sessionExpired')}</h1>`));
     const client = store.state.oauthClients.find((entry) => entry.client_id === values.client_id);
     const grantedResource = String(values.resource || mcpResource());
-    if (!client || !client.redirect_uris.includes(values.redirect_uri) || values.code_challenge_method !== 'S256' || !knownResource(grantedResource)) return html(res, 400, page('OAuth', `<h1>${tr('invalidOauth')}</h1>`));
-    const scopeInput = String(values.scope || 'profile spaces.read materials.read').split(/\s+/).filter((scope) => SCOPES.has(scope));
-    const scopes = scopeInput.length > 0 ? scopeInput : ['materials.read'];
+    const scopes = requestedScopes(values.scope);
+    if (!client || !client.redirect_uris.includes(values.redirect_uri) || values.code_challenge_method !== 'S256' || !validPkceValue(values.code_challenge) || !knownResource(grantedResource) || !scopes) return html(res, 400, page('OAuth', `<h1>${tr('invalidOauth')}</h1>`));
     const raw = token(24);
     // The code carries the resource it was granted for, and /oauth/token copies it onto the
     // access token, so the surface a client asked for is the only one it can reach.
@@ -1257,6 +1431,7 @@ async function route(req, res) {
       store.cleanup();
       const index = store.state.oauthCodes.findIndex((entry) => entry.hash === digest(values.code));
       const code = store.state.oauthCodes[index];
+      if (!validPkceValue(values.code_verifier)) return json(res, 400, { error: 'invalid_grant' });
       const verifierHash = createHash('sha256').update(String(values.code_verifier || '')).digest('base64url');
       if (!code || code.clientId !== values.client_id || code.redirectUri !== values.redirect_uri || code.codeChallenge !== verifierHash || values.resource !== code.resource) return json(res, 400, { error: 'invalid_grant' });
       store.state.oauthCodes.splice(index, 1);
@@ -1290,25 +1465,22 @@ async function route(req, res) {
     if (!pairing) return json(res, 401, { error: 'Invalid or expired pairing code.' });
     pairing.usedAt = new Date().toISOString();
     const raw = token();
-    store.state.deviceTokens.push({ hash: digest(raw), userId: pairing.userId, spaceId: pairing.spaceId, deviceName: String(input.deviceName || 'Nodus Desktop').slice(0, 120), createdAt: new Date().toISOString(), lastUsedAt: null });
+    store.state.deviceTokens.push({ hash: digest(raw), userId: pairing.userId, spaceId: pairing.spaceId, kind: pairing.kind || 'publisher', grandfathered: false, deviceName: String(input.deviceName || 'Nodus Desktop').slice(0, 120), createdAt: new Date().toISOString(), lastUsedAt: null });
     store.save();
     const space = store.state.spaces.find((entry) => entry.id === pairing.spaceId);
     return json(res, 200, { accessToken: raw, space: { id: space.id, name: space.name }, server: { name: store.state.settings.name, publicUrl: publicUrl(), language: language() } });
   }
 
   if (url.pathname === '/api/v1/settings/language' && req.method === 'PUT') {
-    const raw = bearer(req);
-    const device = store.state.deviceTokens.find((entry) => entry.hash === digest(raw));
     // The web interface language is server-wide, so only a space owner may change it.
-    // A reader's replica must not be able to relabel the administration UI for everyone.
-    const role = device ? effectiveRole(device) : null;
-    if (!device || !role || !canRole(role, 'own')) return json(res, 401, { error: 'Invalid or revoked device token.' });
+    // `boundSpace` keeps even this path-less route inside the central live-membership gate.
+    const auth = authorize(req, res, { need: 'own', via: ['device'], resource: 'api', boundSpace: true });
+    if (!auth) return;
     const input = await jsonBody(req, 4 * 1024);
     if (typeof input.language !== 'string' || normalizeServerLanguage(input.language) !== input.language) {
       return json(res, 400, { error: 'Unsupported server language.' });
     }
     store.state.settings.language = input.language;
-    device.lastUsedAt = new Date().toISOString();
     store.save();
     return json(res, 200, { language: normalizeServerLanguage(store.state.settings.language) });
   }
@@ -1327,7 +1499,9 @@ async function route(req, res) {
   if (url.pathname === '/admin/spaces' && req.method === 'POST') {
     const current = requireSession(req, res, true); if (!current) return;
     const values = await form(req, AUTH_BODY_BYTES); if (!checkCsrf(current, values.csrf)) return html(res, 403, page(tr('error'), `<h1>${tr('sessionExpired')}</h1>`));
-    const space = { id: randomUUID(), name: String(values.name || '').trim().slice(0, 120), description: String(values.description || '').trim().slice(0, 500), vaultType: normalizeVaultType(values.vaultType) || 'academic', nameEdited: true, createdAt: new Date().toISOString(), updatedAt: null, revision: '', bytes: 0 };
+    const createdAt = new Date().toISOString();
+    const space = { id: randomUUID(), name: String(values.name || '').trim().slice(0, 120), description: String(values.description || '').trim().slice(0, 500), vaultType: normalizeVaultType(values.vaultType) || 'academic', nameEdited: true, createdAt, updatedAt: null, revision: '', bytes: 0, receiveSequence: 0,
+      provenance: { schemaVersion: 4, originInstanceId: store.state.settings.instanceId, originDeviceId: 'server-web', createdBy: current.user.id, createdAt } };
     if (!space.name) return html(res, 400, dashboard(current, 'The space needs a name.'));
     store.state.spaces.push(space); store.state.memberships.push({ userId: current.user.id, spaceId: space.id, role: 'owner' }); store.save();
     return redirect(res, '/?notice=' + encodeURIComponent('Space created.'));
@@ -1344,6 +1518,28 @@ async function route(req, res) {
     space.nameEdited = true;
     store.save();
     return redirect(res, '/?notice=' + encodeURIComponent('Space name updated.'));
+  }
+  if (url.pathname === '/admin/spaces/policy' && req.method === 'POST') {
+    const current = requireSession(req, res, true); if (!current) return;
+    const values = await form(req, AUTH_BODY_BYTES); if (!checkCsrf(current, values.csrf)) return html(res, 403, page(tr('error'), `<h1>${tr('sessionExpired')}</h1>`));
+    const space = store.state.spaces.find((entry) => entry.id === values.spaceId);
+    if (!space) return html(res, 404, page(tr('error'), `<h1>${tr('spaceNotFound')}</h1>`));
+    const enabled = (field) => ['on', 'true', '1'].includes(String(values[field] || '').toLowerCase());
+    space.publicationPolicy = {
+      version: 1,
+      allowUserContent: enabled('allowUserContent'),
+      allowPersonalImports: enabled('allowPersonalImports') || enabled('allowLegacyPublisherImport'),
+      allowLibraryDocuments: enabled('allowLibraryDocuments'),
+      allowPassages: enabled('allowPassages'),
+      allowVectors: enabled('allowVectors'),
+      allowPrimarySources: enabled('allowPrimarySources'),
+      allowTestimonies: enabled('allowTestimonies'),
+      publishPersonalAnnotations: false,
+      updatedAt: new Date().toISOString(),
+    };
+    space.publicationPolicy.allowLegacyPublisherImport = space.publicationPolicy.allowPersonalImports;
+    store.save();
+    return redirect(res, '/?notice=' + encodeURIComponent('Publication policy updated.'));
   }
   if (url.pathname === '/admin/spaces/clear-request' && req.method === 'POST') {
     const current = requireSession(req, res, true); if (!current) return;
@@ -1362,6 +1558,9 @@ async function route(req, res) {
     // cannot silently recreate data the administrator has just removed.
     store.state.deviceTokens = store.state.deviceTokens.filter((entry) => entry.spaceId !== space.id);
     store.state.pairingCodes = store.state.pairingCodes.filter((entry) => entry.spaceId !== space.id);
+    // Jobs can contain private prompts and generated output. A publication deletion must
+    // not leave those records orphaned in the server-wide control file.
+    store.state.spaceActions = (store.state.spaceActions ?? []).filter((entry) => entry.spaceId !== space.id);
     space.vaultType = spaceVaultType(space) || space.vaultType || '';
     space.updatedAt = null; space.revision = ''; space.vault = null;
     space.bytes = 0; space.assetBytes = 0; space.libraryPackageBytes = 0; store.save();
@@ -1460,9 +1659,10 @@ async function route(req, res) {
   if (url.pathname === '/admin/pairing' && req.method === 'POST') {
     const current = requireSession(req, res, true); if (!current) return;
     const values = await form(req, AUTH_BODY_BYTES); if (!checkCsrf(current, values.csrf)) return html(res, 403, page(tr('error'), `<h1>${tr('sessionExpired')}</h1>`));
-    if (!membership(current.user.id, values.spaceId)) return html(res, 403, page(tr('error'), '<h1>No access to that space.</h1>'));
+    const access = membership(current.user.id, values.spaceId);
+    if (!access || !canRole(normalizeSpaceRole(access.role), 'own')) return html(res, 403, page(tr('error'), '<h1>Only a space owner can create a publisher pairing.</h1>'));
     const raw = pairingCode();
-    store.state.pairingCodes.push({ hash: digest(raw), userId: current.user.id, spaceId: values.spaceId, expiresAt: new Date(Date.now() + 15 * 60_000).toISOString(), usedAt: null }); store.save();
+    store.state.pairingCodes.push({ hash: digest(raw), userId: current.user.id, spaceId: values.spaceId, kind: 'publisher', expiresAt: new Date(Date.now() + 15 * 60_000).toISOString(), usedAt: null }); store.save();
     return html(res, 200, page(tr('createPairing'), `<div class="page-heading"><div><p class="eyebrow">${tr('publisherDevices')}</p><h1>${tr('connectDesktop')}</h1></div><a class="button-link" href="/">${tr('back')}</a></div><div class="card code-panel"><p>${tr('pairingHelp')}</p><h2><code>${raw}</code></h2><p class="muted">${tr('pairingExpiry')}</p></div>`));
   }
   return json(res, 404, { error: 'not_found' });
@@ -1472,7 +1672,10 @@ const handler = (req, res) => {
   const requestLanguage = normalizeServerLanguage(cookies(req).nodus_language || store.state.settings.language);
   languageContext.run(requestLanguage, () => {
     Promise.resolve(route(req, res)).catch((error) => {
-      console.error('[server]', error);
+      console.error('[server]', redactStructured({
+        name: error?.name || 'Error', code: error?.code || null,
+        message: error?.message || 'Unhandled server error',
+      }));
       if (!res.headersSent) json(res, Number(error?.statusCode) || 500, { error: Number(error?.statusCode) ? error.message : tr('internalError') });
       else res.end();
     });

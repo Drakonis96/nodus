@@ -42,6 +42,29 @@ export interface StreamedInnerManifest {
 type OuterManifest = StreamedOuterManifest;
 type InnerManifest = StreamedInnerManifest;
 
+function safeManifestRelative(value: unknown): value is string {
+  if (typeof value !== 'string' || !value || value.includes('\\') || value.includes('\0')
+    || /^[A-Za-z]:/.test(value) || value.startsWith('/') || value.startsWith('//')) return false;
+  const parts = value.split('/');
+  return parts.every((part) => part && part !== '.' && part !== '..');
+}
+
+/** Reject ambiguous multi-vault manifests before verification or restore. */
+function validVaultManifest(vaults: StreamedVaultEntry[] | undefined): boolean {
+  if (!vaults) return true;
+  const ids = new Set<string>();
+  const dbFiles = new Set<string>();
+  const inventoryFiles = new Set<string>();
+  for (const vault of vaults) {
+    if (!vault || typeof vault.id !== 'string' || !vault.id || typeof vault.dbFile !== 'string'
+      || !safeManifestRelative(vault.dbFile) || typeof vault.inventoryFile !== 'string'
+      || !safeManifestRelative(vault.inventoryFile) || ids.has(vault.id)
+      || dbFiles.has(vault.dbFile) || inventoryFiles.has(vault.inventoryFile)) return false;
+    ids.add(vault.id); dbFiles.add(vault.dbFile); inventoryFiles.add(vault.inventoryFile);
+  }
+  return true;
+}
+
 interface OpenedBackupFile {
   ok: true;
   manifest: StreamedOuterManifest;
@@ -81,6 +104,7 @@ export function verifyBackupBytes(archive: Buffer, password: string, currentSche
     if (!innerEntry) return { ok: false, message: 'Copia inválida: falta el manifiesto interno.' };
     const inner = JSON.parse(payload.readAsText(innerEntry)) as InnerManifest;
     if (inner.schemaVersion > currentSchema) return { ok: false, message: 'La copia usa un esquema más reciente. Actualiza la app.' };
+    if (!validVaultManifest(inner.vaults)) return { ok: false, message: 'Copia inválida: el manifiesto contiene bóvedas o rutas duplicadas.' };
     for (const [name, expected] of Object.entries(inner.files)) {
       const entry = payload.getEntry(name);
       if (!entry) return { ok: false, message: 'Copia inválida: los hashes internos no coinciden.' };
@@ -215,6 +239,10 @@ export async function openVerifiedBackupFile(
   if (!inner || typeof inner !== 'object' || !inner.files || typeof inner.files !== 'object') {
     await cleanup();
     return { ok: false, message: 'Copia inválida: el manifiesto interno no es legible.' };
+  }
+  if (!validVaultManifest(inner.vaults)) {
+    await cleanup();
+    return { ok: false, message: 'Copia inválida: el manifiesto contiene bóvedas o rutas duplicadas.' };
   }
   if (inner.schemaVersion > currentSchema) {
     await cleanup();

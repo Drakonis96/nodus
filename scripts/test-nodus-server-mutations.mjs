@@ -9,6 +9,7 @@
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { mkdtemp, rm } from 'node:fs/promises';
+import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
@@ -29,6 +30,17 @@ function mutation(overrides = {}) {
     id: 'mut-1', clientId: 'client-1', kind: 'upsert', table: 'notes', key: ['n-new'],
     row: NOTE_ROW, schemaVersion: 121, createdAt: '2026-02-02T00:00:00.000Z', ...overrides,
   };
+}
+
+function sharedMutation(overrides = {}) {
+  return mutation({
+    table: 'edge_feedback', key: ['i-a', 'i-b', 'supports'],
+    row: {
+      from_id: 'i-a', to_id: 'i-b', type: 'supports', verdict: 'accepted', note: '',
+      created_at: '2026-02-02T00:00:00.000Z',
+    },
+    ...overrides,
+  });
 }
 
 test('the whitelist covers user-authored tables and nothing derived from the corpus', () => {
@@ -252,7 +264,7 @@ test('a writer sends, the owner drains and acknowledges, and a replay changes no
     const writer = await server.deviceToken('escritor@example.test', 'escritor-account-password', spaceId);
     await publish(server.origin, owner.deviceToken, spaceId, academicSnapshot());
 
-    const sent = await server.api(writer.deviceToken, 'POST', `/api/v1/spaces/${spaceId}/mutations`, { json: { mutations: [mutation()] } });
+    const sent = await server.api(writer.deviceToken, 'POST', `/api/v1/spaces/${spaceId}/mutations`, { json: { mutations: [sharedMutation()] } });
     assert.equal(sent.status, 200);
     const accepted = await sent.json();
     assert.deepEqual(accepted.accepted, ['mut-1']);
@@ -260,13 +272,13 @@ test('a writer sends, the owner drains and acknowledges, and a replay changes no
     assert.equal(accepted.cursor, 1);
 
     // Replay: the same id is recognised, not stored twice.
-    const replayed = await (await server.api(writer.deviceToken, 'POST', `/api/v1/spaces/${spaceId}/mutations`, { json: { mutations: [mutation()] } })).json();
+    const replayed = await (await server.api(writer.deviceToken, 'POST', `/api/v1/spaces/${spaceId}/mutations`, { json: { mutations: [sharedMutation()] } })).json();
     assert.deepEqual(replayed.duplicate, ['mut-1']);
     assert.deepEqual(replayed.accepted, []);
 
     // A rejected mutation reports why, and does not poison its batch-mates.
     const mixed = await (await server.api(writer.deviceToken, 'POST', `/api/v1/spaces/${spaceId}/mutations`, {
-      json: { mutations: [mutation({ id: 'mut-2', table: 'ideas' }), mutation({ id: 'mut-3', key: ['n-other'], row: { ...NOTE_ROW, id: 'n-other' } })] },
+      json: { mutations: [mutation({ id: 'mut-2', table: 'ideas' }), sharedMutation({ id: 'mut-3', key: ['i-b', 'i-c', 'supports'], row: { from_id: 'i-b', to_id: 'i-c', type: 'supports', verdict: 'accepted', note: '', created_at: '2026-02-02T00:00:00.000Z' } })] },
     })).json();
     assert.deepEqual(mixed.accepted, ['mut-3']);
     assert.deepEqual(mixed.rejected, [{ id: 'mut-2', reason: 'table_not_mutable' }]);
@@ -275,7 +287,7 @@ test('a writer sends, the owner drains and acknowledges, and a replay changes no
     const drained = await (await server.api(owner.deviceToken, 'GET', `/api/v1/spaces/${spaceId}/mutations?since=0`)).json();
     assert.deepEqual(drained.mutations.map((entry) => entry.id), ['mut-1', 'mut-3']);
     assert.equal(drained.mutations[0].schemaVersion, 121);
-    assert.equal(drained.mutations[0].row.title, 'Nota del colaborador');
+    assert.equal(drained.mutations[0].row.verdict, 'accepted');
     assert.equal(drained.hasMore, false);
     assert.equal(drained.spaceSchemaVersion, 121, 'the owner can compare its own schema against the space');
 
@@ -298,7 +310,7 @@ test('a writer sends, the owner drains and acknowledges, and a replay changes no
   });
 });
 
-test('reader annotations cross the server in both directions without changing shape', { timeout: 60_000 }, async () => {
+test('reader annotations sync only between devices owned by the same user', { timeout: 60_000 }, async () => {
   await withServer({ label: 'reader-annotation-sync' }, async (server) => {
     const spaceId = await server.createSpace('Corpus');
     const owner = await server.deviceToken(server.adminEmail, server.adminPassword, spaceId);
@@ -307,13 +319,13 @@ test('reader annotations cross the server in both directions without changing sh
     const initial = academicSnapshot();
     await publish(server.origin, owner.deviceToken, spaceId, initial);
 
-    // Desktop → mobile: annotations are part of the report detail, not a device-local sidecar.
+    // Published legacy rows are stripped from the shared corpus view.
     const firstRead = await (await server.api(
       mobile.deviceToken,
       'GET',
       `/api/v1/spaces/${spaceId}/deep-research/dr-1`,
     )).json();
-    assert.deepEqual(firstRead.annotations.map((row) => row.id), ['ann-1']);
+    assert.deepEqual(firstRead.annotations ?? [], []);
 
     const stamp = '2026-08-10T00:00:00.000Z';
     const row = (overrides) => ({
@@ -342,36 +354,187 @@ test('reader annotations cross the server in both directions without changing sh
     )).json();
     assert.deepEqual(receipt.accepted, changes.map((change) => change.id));
 
-    // Mobile → desktop: the owner drains the exact scalar rows the phone wrote.
-    const drained = await (await server.api(
+    // A different account sharing the vault cannot observe a personal row in the ledger.
+    const ownerView = await (await server.api(
       owner.deviceToken,
       'GET',
       `/api/v1/spaces/${spaceId}/mutations?since=0`,
     )).json();
-    assert.deepEqual(drained.mutations.map((change) => change.row), mobileRows);
-    await server.api(owner.deviceToken, 'POST', `/api/v1/spaces/${spaceId}/mutations/ack`, {
-      json: { cursor: drained.cursor },
-    });
+    assert.deepEqual(ownerView.mutations, []);
+    assert.ok(ownerView.cursor >= changes.length, 'the invisible rows still advance the cursor');
 
-    // The owner's ensuing publication is what makes the rows readable everywhere,
-    // including back on their authoring phone.
-    await publish(server.origin, owner.deviceToken, spaceId, academicSnapshot({
-      tables: {
-        writing_draft_annotations: [
-          ...initial.payload.tables.writing_draft_annotations,
-          ...mobileRows,
-        ],
-      },
-    }));
-    const republished = await (await server.api(
-      mobile.deviceToken,
+    // A second paired device belonging to the author receives the exact scalar rows.
+    const sameUser = await server.deviceToken('movil@example.test', 'mobile-account-password', spaceId);
+    const personalView = await (await server.api(
+      sameUser.deviceToken,
       'GET',
-      `/api/v1/spaces/${spaceId}/deep-research/dr-1`,
+      `/api/v1/spaces/${spaceId}/mutations?since=0`,
     )).json();
-    assert.deepEqual(
-      republished.annotations.map((annotation) => annotation.kind).sort(),
-      ['bookmark', 'comment', 'highlight', 'highlight'],
-    );
+    assert.deepEqual(personalView.mutations.map((change) => change.row), mobileRows);
+  });
+});
+
+test('every user-scoped mutation table is invisible to every other account', { timeout: 60_000 }, async () => {
+  await withServer({ label: 'user-scoped-mutation-matrix' }, async (server) => {
+    const spaceId = await server.createSpace('Private transport matrix');
+    const owner = await server.deviceToken(server.adminEmail, server.adminPassword, spaceId);
+    await server.createUser('private-a@example.test', 'private-a-account-password', [{ spaceId, role: 'writer' }]);
+    await server.createUser('private-b@example.test', 'private-b-account-password', [{ spaceId, role: 'writer' }]);
+    const author = await server.deviceToken('private-a@example.test', 'private-a-account-password', spaceId);
+    const stranger = await server.deviceToken('private-b@example.test', 'private-b-account-password', spaceId);
+    await publish(server.origin, owner.deviceToken, spaceId, academicSnapshot());
+
+    const privateTables = Object.entries(MUTABLE_TABLES)
+      .filter(([, definition]) => definition.scope === 'user')
+      .map(([table]) => table);
+    assert.ok(privateTables.length >= 10, 'the matrix must cover the complete personal-data contract');
+    const changes = privateTables.map((table, index) => ({
+      id: `private-matrix-${index}`,
+      clientId: 'private-a-device',
+      kind: 'delete',
+      table,
+      key: MUTABLE_TABLES[table].key.map((column) => `${column}-${index}`),
+      schemaVersion: 121,
+      createdAt: '2026-08-11T00:00:00.000Z',
+    }));
+    const receipt = await (await server.api(author.deviceToken, 'POST', `/api/v1/spaces/${spaceId}/mutations`, {
+      json: { mutations: changes },
+    })).json();
+    assert.deepEqual(receipt.accepted, changes.map((change) => change.id));
+
+    const strangerView = await (await server.api(
+      stranger.deviceToken,
+      'GET',
+      `/api/v1/spaces/${spaceId}/mutations?since=0`,
+    )).json();
+    assert.deepEqual(strangerView.mutations, [], 'another account sees no private table, including deletes/tombstones');
+    assert.ok(strangerView.cursor >= changes.length, 'private rows cannot create head-of-line blocking for another account');
+
+    const sameUserDevice = await server.deviceToken('private-a@example.test', 'private-a-account-password', spaceId);
+    const authorView = await (await server.api(
+      sameUserDevice.deviceToken,
+      'GET',
+      `/api/v1/spaces/${spaceId}/mutations?since=0`,
+    )).json();
+    assert.deepEqual(authorView.mutations.map((change) => change.table), privateTables);
+    assert.ok(authorView.mutations.every((change) => change.actorId === author.user.id));
+    assert.ok(authorView.mutations.every((change) => /^\d{13}-\d{6}-[A-Za-z0-9._:~-]+$/.test(change.hlc)), 'server-stamped HLCs carry deterministic receive order');
+
+    const authorNote = authorView.mutations.find((change) => change.table === 'notes');
+    const sameLocalIdFromAnotherUser = {
+      id: 'private-b-same-note-id', clientId: 'private-b-device', kind: 'delete', table: 'notes',
+      key: authorNote.key, schemaVersion: 121, createdAt: '2026-08-11T00:00:01.000Z',
+    };
+    const secondReceipt = await server.api(stranger.deviceToken, 'POST', `/api/v1/spaces/${spaceId}/mutations`, {
+      json: { mutations: [sameLocalIdFromAnotherUser] },
+    });
+    assert.equal(secondReceipt.status, 200);
+    const strangerOwnView = await (await server.api(
+      stranger.deviceToken,
+      'GET',
+      `/api/v1/spaces/${spaceId}/mutations?since=${strangerView.cursor}`,
+    )).json();
+    assert.deepEqual(strangerOwnView.mutations.map((change) => change.id), ['private-b-same-note-id']);
+    assert.notEqual(strangerOwnView.mutations[0].entityId, authorNote.entityId, 'equal local ids in different accounts never collide in provenance');
+  });
+});
+
+test('note-backed page hierarchies remain private across every member of a shared vault', { timeout: 60_000 }, async () => {
+  await withServer({ label: 'private-note-page-hierarchy' }, async (server) => {
+    const spaceId = await server.createSpace('Private page hierarchy');
+    const owner = await server.deviceToken(server.adminEmail, server.adminPassword, spaceId);
+    await server.createUser('private-page@example.test', 'private-page-account-password', [{ spaceId, role: 'writer' }]);
+    const author = await server.deviceToken('private-page@example.test', 'private-page-account-password', spaceId);
+    await publish(server.origin, owner.deviceToken, spaceId, academicSnapshot());
+
+    const canary = 'PRIVATE-NOTE-BLOCK-MUST-NOT-CROSS-ACCOUNTS';
+    const changes = [
+      mutation({
+        id: 'private-comment-reaction-first', table: 'page_comment_reactions', key: ['private-comment', 'local-actor', 'heart'],
+        row: { comment_id: 'private-comment', actor_id: 'local-actor', emoji: 'heart' },
+      }),
+      mutation({
+        id: 'private-comment-before-page', table: 'page_comments', key: ['private-comment'],
+        row: { id: 'private-comment', page_id: 'opaque-note-page', content: canary },
+      }),
+      mutation({
+        id: 'private-page-child-first', table: 'page_blocks', key: ['private-block'],
+        row: { id: 'private-block', page_id: 'opaque-note-page', type: 'paragraph', content_json: canary },
+      }),
+      mutation({
+        id: 'private-page-parent-second', table: 'pages', key: ['opaque-note-page'],
+        row: { id: 'opaque-note-page', note_id: 'private-note-id', title: 'Private note projection' },
+      }),
+      mutation({
+        id: 'private-page-deterministic-child', table: 'page_revisions', key: ['private-revision'],
+        row: { id: 'private-revision', page_id: 'note:private-note-id', title: canary },
+      }),
+    ];
+    const receipt = await (await server.api(author.deviceToken, 'POST', `/api/v1/spaces/${spaceId}/mutations`, { json: { mutations: changes } })).json();
+    assert.deepEqual(receipt.accepted, changes.map((entry) => entry.id));
+
+    const ownerView = await (await server.api(owner.deviceToken, 'GET', `/api/v1/spaces/${spaceId}/mutations?since=0`)).json();
+    assert.deepEqual(ownerView.mutations, [], 'vault ownership does not reveal a collaborator private page hierarchy');
+    assert.ok(ownerView.cursor >= changes.length);
+
+    const sameUser = await server.deviceToken('private-page@example.test', 'private-page-account-password', spaceId);
+    const authorView = await (await server.api(sameUser.deviceToken, 'GET', `/api/v1/spaces/${spaceId}/mutations?since=0`)).json();
+    assert.deepEqual(authorView.mutations.map((entry) => entry.id), changes.map((entry) => entry.id));
+    assert.ok(authorView.mutations.every((entry) => entry.ownerScope === `user:${author.user.id}`));
+    assert.equal(JSON.stringify(ownerView).includes(canary), false);
+  });
+});
+
+test('private page ownership survives more than 32 users sharing the same local page id', { timeout: 120_000 }, async () => {
+  await withServer({ label: 'private-page-many-owners' }, async (server) => {
+    const spaceId = await server.createSpace('Many private owners');
+    const owner = await server.deviceToken(server.adminEmail, server.adminPassword, spaceId);
+    await publish(server.origin, owner.deviceToken, spaceId, academicSnapshot());
+    const devices = [];
+    for (let index = 0; index < 33; index += 1) {
+      const email = `private-collision-${index}@example.test`;
+      const password = `private-collision-password-${index}`;
+      await server.createUser(email, password, [{ spaceId, role: 'writer' }]);
+      const device = await server.deviceToken(email, password, spaceId);
+      devices.push(device);
+      const parent = mutation({
+        id: `private-collision-parent-${index}`, table: 'pages', key: ['same-local-page-id'],
+        row: { id: 'same-local-page-id', note_id: `private-note-${index}`, title: `Private ${index}` },
+      });
+      const receipt = await server.api(device.deviceToken, 'POST', `/api/v1/spaces/${spaceId}/mutations`, { json: { mutations: [parent] } });
+      assert.equal(receipt.status, 200);
+    }
+    const canary = 'THIRTY-THIRD-OWNER-PRIVATE-CHILD';
+    const child = mutation({
+      id: 'private-collision-child-33', table: 'page_blocks', key: ['last-private-child'],
+      row: { id: 'last-private-child', page_id: 'same-local-page-id', type: 'paragraph', content_json: canary },
+    });
+    const childReceipt = await (await server.api(devices.at(-1).deviceToken, 'POST', `/api/v1/spaces/${spaceId}/mutations`, { json: { mutations: [child] } })).json();
+    assert.deepEqual(childReceipt.accepted, [child.id]);
+    const ownerView = await (await server.api(owner.deviceToken, 'GET', `/api/v1/spaces/${spaceId}/mutations?since=0&limit=200`)).json();
+    assert.equal(JSON.stringify(ownerView).includes(canary), false);
+    const firstUserView = await (await server.api(devices[0].deviceToken, 'GET', `/api/v1/spaces/${spaceId}/mutations?since=0&limit=200`)).json();
+    assert.equal(firstUserView.mutations.some((entry) => entry.id === child.id), false);
+    const lastUserView = await (await server.api(devices.at(-1).deviceToken, 'GET', `/api/v1/spaces/${spaceId}/mutations?since=0&limit=200`)).json();
+    assert.equal(lastUserView.mutations.some((entry) => entry.id === child.id), true);
+  });
+});
+
+test('legacy private ledger rows without provable ownership are quarantined', { timeout: 60_000 }, async () => {
+  await withServer({ label: 'legacy-private-ledger' }, async (server) => {
+    const spaceId = await server.createSpace('Legacy quarantine');
+    const owner = await server.deviceToken(server.adminEmail, server.adminPassword, spaceId);
+    const ledgerFile = path.join(server.root, 'spaces', spaceId, 'mutations.ndjson');
+    fs.mkdirSync(path.dirname(ledgerFile), { recursive: true });
+    fs.writeFileSync(ledgerFile, `${JSON.stringify({
+      seq: 1, id: 'legacy-private-without-owner', kind: 'upsert', table: 'notes', key: ['legacy-note'],
+      row: { id: 'legacy-note', title: 'Must remain quarantined', content: 'PRIVATE LEGACY CANARY' },
+      schemaVersion: 100, createdAt: '2024-01-01T00:00:00.000Z',
+    })}\n`, { mode: 0o600 });
+    const view = await (await server.api(owner.deviceToken, 'GET', `/api/v1/spaces/${spaceId}/mutations?since=0`)).json();
+    assert.deepEqual(view.mutations, []);
+    assert.equal(view.cursor, 1, 'quarantined rows still advance the transport cursor');
+    assert.equal(JSON.stringify(view).includes('PRIVATE LEGACY CANARY'), false);
   });
 });
 
@@ -496,6 +659,8 @@ test('Yjs bytes use a verified binary channel and only metadata enters the relay
     assert.equal(relayed.mutations[0].documentHash, hash);
     assert.equal(Object.prototype.hasOwnProperty.call(relayed.mutations[0].row, 'update_blob'), false, 'binary never enters mutation JSON');
     const downloaded = await server.api(owner.deviceToken, 'GET', `/api/v1/spaces/${spaceId}/document-updates/${hash}`);
+    assert.match(downloaded.headers.get('content-security-policy') || '', /default-src 'none'/);
+    assert.equal(downloaded.headers.get('x-content-type-options'), 'nosniff');
     assert.deepEqual(Buffer.from(await downloaded.arrayBuffer()), bytes);
   });
 });
@@ -530,6 +695,42 @@ test('shared files resume missing chunks and verify chunk plus final checksums',
     const range = await server.api(owner.deviceToken, 'GET', endpoint, { headers: { range: 'bytes=1048576-1048612' } });
     assert.equal(range.status, 206);
     assert.deepEqual(Buffer.from(await range.arrayBuffer()), bytes.subarray(1024 * 1024, 1024 * 1024 + 37));
+  });
+});
+
+test('binary collaboration channels enforce aggregate and partial-upload quotas', { timeout: 60_000 }, async () => {
+  await withServer({
+    label: 'binary-space-quotas',
+    env: {
+      NODUS_MAX_SPACE_DOCUMENT_UPDATE_BYTES: String(64 * 1024),
+      NODUS_MAX_SPACE_SHARED_BLOB_BYTES: String(128 * 1024),
+      NODUS_MAX_SPACE_PARTIAL_BLOB_BYTES: String(64 * 1024),
+    },
+  }, async (server) => {
+    const spaceId = await server.createSpace('Binary quotas');
+    const owner = await server.deviceToken(server.adminEmail, server.adminPassword, spaceId);
+    const first = Buffer.alloc(40 * 1024, 1); const second = Buffer.alloc(40 * 1024, 2);
+    const firstHash = createHash('sha256').update(first).digest('hex');
+    const secondHash = createHash('sha256').update(second).digest('hex');
+    assert.equal((await server.api(owner.deviceToken, 'PUT', `/api/v1/spaces/${spaceId}/document-updates/${firstHash}`, { body: first })).status, 200);
+    const refusedUpdate = await server.api(owner.deviceToken, 'PUT', `/api/v1/spaces/${spaceId}/document-updates/${secondHash}`, { body: second });
+    assert.equal(refusedUpdate.status, 507);
+    assert.equal((await refusedUpdate.json()).error, 'document_update_quota_exceeded');
+
+    const partial = Buffer.alloc(70 * 1024, 3);
+    const blobHash = createHash('sha256').update(partial).digest('hex');
+    const chunkHash = createHash('sha256').update(partial).digest('hex');
+    const refusedPartial = await server.api(owner.deviceToken, 'PUT', `/api/v1/spaces/${spaceId}/blobs/${blobHash}/chunks/0`, {
+      headers: {
+        'x-nodus-total-chunks': '1', 'x-nodus-total-bytes': String(partial.length), 'x-nodus-chunk-sha256': chunkHash,
+      },
+      body: partial,
+    });
+    assert.equal(refusedPartial.status, 507);
+    assert.equal((await refusedPartial.json()).error, 'partial_blob_quota_exceeded');
+    const status = await (await server.api(owner.deviceToken, 'GET', `/api/v1/spaces/${spaceId}/blobs/${blobHash}/status`)).json();
+    assert.equal(status.complete, false);
+    assert.equal(status.totalChunks, null, 'a rejected partial upload leaves no reservation manifest');
   });
 });
 
@@ -569,7 +770,7 @@ test('SSE wakes every authorized replica immediately and polling remains availab
       assert.equal(events.status, 200); assert.match(events.headers.get('content-type'), /text\/event-stream/);
       const reader = events.body.getReader(); const decoder = new TextDecoder();
       const ready = decoder.decode((await reader.read()).value); assert.match(ready, /event: ready/);
-      const sent = await server.api(writer.deviceToken, 'POST', `/api/v1/spaces/${spaceId}/mutations`, { json: { mutations: [mutation({ id: 'sse-mut' })] } });
+      const sent = await server.api(writer.deviceToken, 'POST', `/api/v1/spaces/${spaceId}/mutations`, { json: { mutations: [sharedMutation({ id: 'sse-mut' })] } });
       assert.equal(sent.status, 200);
       let received = '';
       for (let index = 0; index < 4 && !received.includes('event: mutation'); index += 1) {

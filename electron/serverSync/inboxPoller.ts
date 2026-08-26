@@ -152,11 +152,12 @@ async function tick(): Promise<void> {
       });
 
       if (summary.cursor > 0) {
-        await fetchWithTimeout(`${endpoint}/ack`, {
+        const acknowledgement = await fetchWithTimeout(`${endpoint}/ack`, {
           method: 'POST',
           headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' },
           body: JSON.stringify({ cursor: summary.cursor }),
         });
+        if (!acknowledgement.ok) throw new Error(`El servidor no confirmó la recepción (HTTP ${acknowledgement.status}).`);
       }
       // What arrived has to travel back out to everyone else, and only a publication does
       // that. This is what publishVault's own collect step used to guarantee.
@@ -190,8 +191,9 @@ async function tick(): Promise<void> {
         broadcast('writing:annotations:changed', null);
       }
 
-      // A refusal did not advance the cursor, so the very same batch would come back.
-      if (summary.refused.length > 0) break;
+      // Permanent refusals advance past poison rows. Operational failures do not: retry the
+      // first one on a later poll without losing it or processing out of order beyond it.
+      if (summary.retryable.length > 0 || summary.refused.length > 0) break;
       if (!value.hasMore) break;
       // The only real yield in this loop. better-sqlite3 is synchronous, so without an
       // actual await the main process never returns to its event loop and every window

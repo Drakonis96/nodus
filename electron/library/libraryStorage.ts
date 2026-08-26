@@ -8,6 +8,7 @@ import type {
 import {
   atomicWriteJson,
   assertInside,
+  pathStaysInside,
   readJsonFile,
   safeLibraryFolderName,
 } from './libraryFileUtils';
@@ -45,6 +46,30 @@ export interface LibraryReconcileResult {
 }
 
 type RecordKind = 'items' | 'collections';
+
+function materializedSidecarPath(folder: string, declared: unknown, canonicalName: string): string | null {
+  const fallback = path.join(folder, canonicalName);
+  const candidate = typeof declared === 'string' && declared.trim() ? declared.trim() : canonicalName;
+  // Treat synchronized paths as portable POSIX relatives. A backslash is
+  // rejected even on POSIX because the same record may later be materialized on
+  // Windows, where it is a path separator.
+  if (candidate.includes('\\') || candidate.includes('\0') || /^[A-Za-z]:/.test(candidate) || candidate.startsWith('/')) {
+    return pathStaysInside(folder, fallback) ? fallback : null;
+  }
+  const parts = candidate.split('/');
+  if (parts.some((part) => !part || part === '.' || part === '..')) {
+    return pathStaysInside(folder, fallback) ? fallback : null;
+  }
+  let target: string;
+  try {
+    target = assertInside(folder, path.resolve(folder, ...parts));
+  } catch {
+    return pathStaysInside(folder, fallback) ? fallback : null;
+  }
+  return pathStaysInside(folder, target)
+    ? target
+    : (pathStaysInside(folder, fallback) ? fallback : null);
+}
 
 function compareClocks(a: LibraryItemRecord | LibraryCollectionRecord, b: LibraryItemRecord | LibraryCollectionRecord): number {
   return a.clock.updatedAt.localeCompare(b.clock.updatedAt)
@@ -117,10 +142,15 @@ export class LibraryDiskStore {
 
   private materializeItem(record: LibraryItemRecord): void {
     const folder = this.itemFolder(record.storageId);
+    if (!pathStaysInside(this.root, folder)) throw new Error('La carpeta materializada de biblioteca no es válida.');
     fs.mkdirSync(folder, { recursive: true });
     atomicWriteJson(path.join(folder, 'metadata.json'), record);
-    const annotations = path.join(folder, record.files?.annotations ?? 'annotations.json');
-    if (!record.deletedAt && !fs.existsSync(annotations)) atomicWriteJson(annotations, []);
+    // `files` is synchronized metadata and must never be allowed to choose an
+    // arbitrary write target. Keep the historical relative spelling when it is
+    // safe (some old records use a `state/` folder), otherwise use the canonical
+    // sidecar name. Existing symlinked parents are rejected by pathStaysInside.
+    const annotations = materializedSidecarPath(folder, record.files?.annotations, 'annotations.json');
+    if (!record.deletedAt && annotations && !fs.existsSync(annotations)) atomicWriteJson(annotations, []);
   }
 
   private materializeCollection(record: LibraryCollectionRecord): void {

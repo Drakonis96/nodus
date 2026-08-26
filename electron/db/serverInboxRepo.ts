@@ -76,12 +76,9 @@ function storedOutcome(outcome: InboxSummary['entries'][number]['outcome']): str
 /**
  * Write a batch of arrivals, once each.
  *
- * ON CONFLICT DO NOTHING is the whole design, not a detail. A refusal STOPS the apply loop
- * without advancing the cursor, so the server keeps handing back that same mutation every
- * thirty seconds, for as long as the reason stands. INSERT OR REPLACE would reset `read` to
- * 0 on every poll and hand the user an unread badge they can never clear; DO UPDATE on
- * arrived_at would keep a permanently-refused mutation permanently at the top of the list.
- * The first account of what happened is the true one — being refused again is not news.
+ * ON CONFLICT DO NOTHING keeps replay/idempotency honest. Permanent validation refusals are
+ * recorded once and acknowledged; transient operational errors are not inserted here and remain
+ * unacknowledged for retry. The first durable account of what happened is the true one.
  */
 export function recordServerInbox(entries: InboxSummary['entries'], ctx: { spaceId: string }): void {
   if (entries.length === 0) return;

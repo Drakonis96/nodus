@@ -3,7 +3,7 @@ import type { VaultServerConfig } from './serverSyncShared';
 type ProjectionFlags = Pick<
   VaultServerConfig,
   'kind' | 'includeUserContent' | 'includePassages' | 'includeLibraryDocuments' | 'includeVectors'
->;
+> & Partial<Pick<VaultServerConfig, 'includePrimarySources' | 'includeTestimonies' | 'includePersonalImports'>>;
 
 /**
  * Session-local pre-build fingerprint.
@@ -22,5 +22,8 @@ export function publishSourceRevision(databaseRevision: string, config: Projecti
     Number(config.includeUserContent),
     Number(config.includePassages),
     Number(config.includeVectors),
+    Number(config.includePrimarySources ?? false),
+    Number(config.includeTestimonies ?? false),
+    Number(config.includePersonalImports ?? false),
   ].join(':');
 }

@@ -41,14 +41,23 @@ test('large backup manifests and payloads are verified from file streams', async
     const { readZipEntrySync } = require(path.join(repoRoot, 'electron/export/zipFile.ts'));
     const { verifyBackupFile } = require(path.join(repoRoot, 'electron/export/backupVerificationCore.ts'));
 
+    const inventoryBytes = Buffer.from(JSON.stringify({ tableRows: {}, embeddings: {} }));
     const payload = new StreamingZipWriter(payloadPath, 6);
     await payload.addFile('vaults/v1/database.sqlite', sourcePath);
+    await payload.addBuffer('vaults/v1/inventory.json', inventoryBytes);
     await payload.addBuffer('payload-manifest.json', Buffer.from(JSON.stringify({
       schemaVersion: 153,
       files: {
         'vaults/v1/database.sqlite': { sha256: hash.digest('hex'), bytes: sourceBytes },
+        'vaults/v1/inventory.json': {
+          sha256: createHash('sha256').update(inventoryBytes).digest('hex'),
+          bytes: inventoryBytes.byteLength,
+        },
       },
-      vaults: [{ id: 'v1', name: 'Streaming regression vault', dbFile: 'vaults/v1/database.sqlite' }],
+      vaults: [{
+        id: 'v1', name: 'Streaming regression vault',
+        dbFile: 'vaults/v1/database.sqlite', inventoryFile: 'vaults/v1/inventory.json',
+      }],
     })));
     await payload.finalize();
 

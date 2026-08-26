@@ -3,6 +3,7 @@ import os from 'node:os';
 import { gunzipSync } from 'node:zlib';
 import Database from 'better-sqlite3';
 import { ensureWorkspaceDevice, getDb, withDatabaseContext } from '../db/database';
+import { getSettings } from '../db/settingsRepo';
 import * as pages from '../db/pagesRepo';
 import { SCHEMA_VERSION } from '../db/migrations';
 import { quoteIdentifier, identityColumns } from '../db/rowIdentity';
@@ -18,6 +19,7 @@ import {
 } from './outboxTriggers';
 import { applyIncomingMutations, type IncomingMutation } from './mutationInbox';
 import { recordServerInbox } from '../db/serverInboxRepo';
+import { syncServerProfilePreferencesForVault } from './profilePreferencesSync';
 import {
   LEGACY_SERVER_MUTATION_LIMITS,
   negotiateRemoteMutationLimits,
@@ -157,6 +159,10 @@ export async function createConnectedVault(input: {
   serverName: string;
   serverKind?: 'classic' | 'cloudflare';
 }): Promise<VaultSummary> {
+  // Capture the currently configured Desktop profile before creating the new replica.
+  // createVault itself does not switch vaults, but keeping the snapshot explicit makes
+  // the inheritance source unambiguous and protects this flow from future registry changes.
+  const inheritedSettings = getSettings();
   const url = normalizeUrl(input.url);
   const response = await request(`${url}/api/v1/auth/device`, {
     method: 'POST',
@@ -196,6 +202,10 @@ export async function createConnectedVault(input: {
     try { deleteVault(vault.id, true); } catch { /* the registry entry is already gone */ }
     throw error;
   }
+  // Preference inheritance is personal control-plane state, not vault hydration. An
+  // older/basic Server may not support it and must never make an otherwise valid replica
+  // fail or roll back. Advanced Server persists the allowlisted profile synchronously.
+  await syncServerProfilePreferencesForVault(vault, inheritedSettings).catch(() => undefined);
   return getVault(vault.id) ?? vault;
 }
 
@@ -338,9 +348,6 @@ async function pullRelayOperations(vault: VaultSummary, token: string, db: Datab
         return { outcome: 'applied', entityKind: 'page_update', title: applied.document.page.title };
       },
     })));
-    if (summary.refused.length) {
-      throw new Error(`No se pudo aplicar ${summary.refused[0].id}: ${summary.refused[0].reason}`);
-    }
     if (vault.active && summary.entries.length) recordServerInbox(summary.entries, { spaceId: vault.remote!.spaceId });
     if (summary.cursor > 0) {
       const ack = await request(`${endpoint}/ack`, { method: 'POST', headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' }, body: JSON.stringify({ cursor: summary.cursor }) });
@@ -351,7 +358,7 @@ async function pullRelayOperations(vault: VaultSummary, token: string, db: Datab
           updated_at = excluded.updated_at`)
         .run(`server:${vault.remote!.spaceId}`, summary.cursor, snapshotRevision, new Date().toISOString(), new Date().toISOString());
     }
-    if (summary.refused.length || !value.hasMore) return;
+    if (summary.retryable.length || summary.refused.length || !value.hasMore) return;
     await new Promise((resolve) => { setImmediate(resolve); });
   }
 }
@@ -455,6 +462,9 @@ export async function pullReplica(vaultId: string, options: { force?: boolean } 
     // Refresh the role first: a downgrade has to reach ensureOutboxTriggers before anything
     // else runs, or a demoted account keeps queueing until its next restart.
     await refreshRole(vault, token);
+    // Retry a changed/offline profile only for the active replica: that is the vault whose
+    // per-vault model selectors getSettings() currently represents.
+    if (vault.active) await syncServerProfilePreferencesForVault(vault).catch(() => undefined);
 
     const headers: Record<string, string> = { authorization: `Bearer ${token}` };
     if (vault.remote.lastPulledRevision && !options.force) headers['if-none-match'] = `W/"${vault.remote.lastPulledRevision}"`;

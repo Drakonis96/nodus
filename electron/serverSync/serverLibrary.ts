@@ -4,6 +4,7 @@ import { createHash } from 'node:crypto';
 import AdmZip from 'adm-zip';
 import type { LibraryCatalogItem, LibraryCollectionView, LibraryItemRecord } from '@shared/libraryTypes';
 import type { WritingDraftAnnotation } from '@shared/types';
+import type { ServerPersonalLibraryAnnotation } from '@shared/serverPublication';
 import {
   getGlobalLibraryItem,
   listGlobalLibraryCollections,
@@ -87,7 +88,8 @@ export interface PublishedLibraryDocument {
   originalFileName: string | null;
   originalMimeType: string | null;
   originalBytes: number | null;
-  annotations: WritingDraftAnnotation[];
+  /** @deprecated Local compatibility accessor; deliberately non-enumerable. */
+  annotations?: WritingDraftAnnotation[];
 }
 
 export interface PublishedLibraryManifest {
@@ -108,6 +110,8 @@ export interface ServerLibraryPackage {
 export interface BuiltServerLibraryPublication {
   manifest: PublishedLibraryManifest;
   packages: ServerLibraryPackage[];
+  /** Personal reader state; never part of the canonical library manifest. */
+  personalAnnotations: ServerPersonalLibraryAnnotation[];
 }
 
 function creatorName(value: LibraryCatalogItem['creators'][number]): string {
@@ -286,13 +290,18 @@ function packageFor(item: LibraryCatalogItem, record: LibraryItemRecord): {
 export function buildServerLibraryPublication(now = new Date().toISOString()): BuiltServerLibraryPublication {
   const packages: ServerLibraryPackage[] = [];
   const documents: PublishedLibraryDocument[] = [];
+  const personalAnnotations: ServerPersonalLibraryAnnotation[] = [];
   for (const item of allItems()) {
     const record = getGlobalLibraryItem(item.id);
     if (!record || record.deletedAt) continue;
     const built = packageFor(item, record);
     if (built.value) packages.push(built.value);
     const original = originalMetadata(record);
-    documents.push({
+    const annotations = listLibraryReaderAnnotations(item.id);
+    for (const annotation of annotations) {
+      personalAnnotations.push({ documentId: item.id, annotation: annotation as unknown as Record<string, unknown> });
+    }
+    const document: PublishedLibraryDocument = {
       id: item.id,
       title: item.title,
       itemType: item.itemType,
@@ -330,8 +339,11 @@ export function buildServerLibraryPublication(now = new Date().toISOString()): B
       originalFileName: built.originalIncluded ? original.fileName : null,
       originalMimeType: built.originalIncluded ? original.mimeType : null,
       originalBytes: built.originalIncluded ? original.bytes : null,
-      annotations: listLibraryReaderAnnotations(item.id),
-    });
+    };
+    // Existing local callers still read this field, but it must not enter the
+    // canonical manifest, revision hash or wire payload.
+    Object.defineProperty(document, 'annotations', { value: annotations, enumerable: false, writable: false });
+    documents.push(document);
   }
   return {
     manifest: {
@@ -342,5 +354,6 @@ export function buildServerLibraryPublication(now = new Date().toISOString()): B
       documents,
     },
     packages,
+    personalAnnotations,
   };
 }

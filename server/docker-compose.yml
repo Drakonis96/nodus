@@ -5,12 +5,22 @@ services:
     restart: unless-stopped
     environment:
       NODUS_PUBLIC_URL: ${NODUS_PUBLIC_URL}
+      NODUS_TRUST_PROXY: "1"
+      NODUS_DEPLOYMENT_MODE: advanced
+      NODUS_AI_KEYRING_FILE: ${NODUS_AI_KEYRING_FILE:-}
+      NODUS_AI_MAX_ACTIVE_PER_USER: ${NODUS_AI_MAX_ACTIVE_PER_USER:-}
+      NODUS_AI_MAX_ACTIVE_GLOBAL: ${NODUS_AI_MAX_ACTIVE_GLOBAL:-}
+      NODUS_MAX_SPACE_DOCUMENT_UPDATE_BYTES: ${NODUS_MAX_SPACE_DOCUMENT_UPDATE_BYTES:-}
+      NODUS_MAX_SPACE_SHARED_BLOB_BYTES: ${NODUS_MAX_SPACE_SHARED_BLOB_BYTES:-}
+      NODUS_MAX_SPACE_PARTIAL_BLOB_BYTES: ${NODUS_MAX_SPACE_PARTIAL_BLOB_BYTES:-}
       NODUS_ADMIN_EMAIL: ${NODUS_ADMIN_EMAIL:-}
       NODUS_ADMIN_PASSWORD: ${NODUS_ADMIN_PASSWORD:-}
       NODUS_SETUP_TOKEN: ${NODUS_SETUP_TOKEN:-}
-      NODUS_SOURCE_URL: ${NODUS_SOURCE_URL:-https://github.com/Drakonis96/nodus/tree/v4.2.3}
+      NODUS_SOURCE_URL: ${NODUS_SOURCE_URL:-https://github.com/Drakonis96/nodus/tree/v5.0.2}
     volumes:
       - nodus_data:/data
+      # Mount a versioned 0600 keyring outside /data and set NODUS_AI_KEYRING_FILE to
+      # its in-container path to enable per-user Server AI. With no keyring AI stays off.
     ports:
       - "127.0.0.1:7443:7443"
 
