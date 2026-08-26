@@ -17,10 +17,15 @@
   var isWord = false;
   var currentParagraphText = '';
   var currentSelectionText = '';
-  var searchMode = 'ideas'; // 'ideas' | 'passages' | 'references'
+  var searchMode = 'ideas'; // 'ideas' | 'passages' | 'references' | 'prompts'
   var insertTarget = 'body'; // 'body' | 'footnote'
   var footnoteSupported = true;
   var referenceController = null;
+  var promptStyles = [];
+  var promptModels = [];
+  var promptSourceText = '';
+  var promptOutputText = '';
+  var promptRequestSeq = 0;
 
   // The pane follows the Nodus UI language (injected by the copilot server).
   var STR = {
@@ -64,6 +69,7 @@
       modeIdeas: 'Ideas',
       modePassages: 'Pasajes',
       modeReferences: 'Referencias',
+      modePrompts: 'Prompts de IA',
       selectionLabel: 'Selección',
       composeRewrite: 'Reescribir',
       composeExpand: 'Ampliar',
@@ -85,6 +91,27 @@
       noPassages: 'Sin pasajes para esa búsqueda.',
       passagesNotIndexed: 'No hay texto completo indexado. Indexa la biblioteca en Nodus.',
       passageUnreadable: 'Este pasaje no contiene texto Unicode legible. Reconstruye su texto limpio en Nodus.',
+      promptTitle: 'Transformar selección',
+      promptHint: 'Usa un prompt guardado en el workspace y revisa el resultado antes de reemplazar nada.',
+      promptStyle: 'Prompt guardado',
+      promptModel: 'Modelo',
+      promptSelection: 'Texto seleccionado en Word',
+      promptSelectionEmpty: 'Selecciona texto en Word para transformarlo.',
+      promptRefresh: 'Actualizar texto seleccionado',
+      promptGenerate: 'Generar propuesta',
+      promptGenerating: 'Generando…',
+      promptProposal: 'Propuesta',
+      promptCopy: 'Copiar',
+      promptPaste: 'Pegar y reemplazar selección',
+      promptCopied: 'Propuesta copiada',
+      promptPasted: 'Selección reemplazada',
+      promptSelectionChanged: 'La selección de Word ha cambiado. Vuelve a seleccionar el texto original antes de pegar.',
+      promptLoading: 'Cargando prompts del workspace…',
+      promptLoadError: 'No se pudieron cargar los prompts: ',
+      promptNoStyles: 'No hay prompts activos en este workspace.',
+      promptNoModels: 'No hay modelos configurados en Nodus.',
+      promptGeneratedWith: 'Generado con ',
+      promptWarnings: 'Revisa: ',
       quoteOpen: '«',
       quoteClose: '»',
       relation: { supports: 'apoya', contradicts: 'contradice', refines: 'matiza', extends: 'amplía', related: 'relacionada' },
@@ -130,6 +157,7 @@
       modeIdeas: 'Ideas',
       modePassages: 'Passages',
       modeReferences: 'References',
+      modePrompts: 'AI prompts',
       selectionLabel: 'Selection',
       composeRewrite: 'Rewrite',
       composeExpand: 'Expand',
@@ -151,6 +179,27 @@
       noPassages: 'No passages match that search.',
       passagesNotIndexed: 'No full text indexed. Index your library in Nodus.',
       passageUnreadable: 'This passage has no readable Unicode text. Rebuild its clean text in Nodus.',
+      promptTitle: 'Transform selection',
+      promptHint: 'Use a saved workspace prompt, then review the result before replacing anything.',
+      promptStyle: 'Saved prompt',
+      promptModel: 'Model',
+      promptSelection: 'Selected text in Word',
+      promptSelectionEmpty: 'Select text in Word to transform it.',
+      promptRefresh: 'Refresh selected text',
+      promptGenerate: 'Generate proposal',
+      promptGenerating: 'Generating…',
+      promptProposal: 'Proposal',
+      promptCopy: 'Copy',
+      promptPaste: 'Paste and replace selection',
+      promptCopied: 'Proposal copied',
+      promptPasted: 'Selection replaced',
+      promptSelectionChanged: 'The Word selection changed. Select the original text again before pasting.',
+      promptLoading: 'Loading workspace prompts…',
+      promptLoadError: 'Could not load prompts: ',
+      promptNoStyles: 'There are no active prompts in this workspace.',
+      promptNoModels: 'There are no models configured in Nodus.',
+      promptGeneratedWith: 'Generated with ',
+      promptWarnings: 'Review: ',
       quoteOpen: '“',
       quoteClose: '”',
       relation: { supports: 'supports', contradicts: 'contradicts', refines: 'refines', extends: 'extends', related: 'related' },
@@ -508,7 +557,7 @@
   }
 
   function analyze(force) {
-    if (searchMode === 'references') return;
+    if (searchMode === 'references' || searchMode === 'prompts') return;
     if (els.searchBox.value.trim()) return;
     getCurrentParagraph().then(function (text) {
       els.paragraph.textContent = text ? text.slice(0, 360) : '';
@@ -548,6 +597,7 @@
 
   function runSearch() {
     var query = els.searchBox.value.trim();
+    if (searchMode === 'prompts') return;
     if (searchMode === 'references') {
       if (referenceController) referenceController.search(query);
       return;
@@ -746,16 +796,228 @@
     });
   }
 
+  function normalizedSelection(value) {
+    return String(value || '').replace(/\r\n/g, '\n').trim();
+  }
+
+  function promptModelValue(model) {
+    return model ? String(model.provider || '') + '\n' + String(model.model || '') : '';
+  }
+
+  function selectedPromptModel() {
+    var value = els.promptModel.value;
+    for (var i = 0; i < promptModels.length; i++) {
+      if (promptModelValue(promptModels[i]) === value) {
+        return { provider: promptModels[i].provider, model: promptModels[i].model };
+      }
+    }
+    return null;
+  }
+
+  function clearPromptOutput() {
+    promptOutputText = '';
+    els.promptOutput.value = '';
+    els.promptOutputMeta.textContent = '';
+    els.promptWarnings.textContent = '';
+    els.promptWarnings.hidden = true;
+    els.promptOutputWrap.hidden = true;
+  }
+
+  function updatePromptGenerateState() {
+    els.applyPrompt.disabled = !promptSourceText || !els.promptStyle.value || !selectedPromptModel();
+  }
+
+  function renderPromptDescription() {
+    var selectedId = els.promptStyle.value;
+    var style = promptStyles.find(function (entry) { return entry.id === selectedId; });
+    els.promptDescription.textContent = style ? (style.description || '') : '';
+    if (style && style.color) els.promptStyle.style.borderLeftColor = style.color;
+    updatePromptGenerateState();
+  }
+
+  function refreshPromptSelection() {
+    return getSelectionText().then(function (value) {
+      var text = normalizedSelection(value);
+      if (text !== promptSourceText) clearPromptOutput();
+      promptSourceText = text;
+      els.promptSelection.textContent = text || T('promptSelectionEmpty');
+      els.promptSelection.classList.toggle('placeholder', !text);
+      updatePromptGenerateState();
+      return text;
+    });
+  }
+
+  function fillPromptCatalogue(data) {
+    var previousStyle = els.promptStyle.value;
+    var previousModel = els.promptModel.value;
+    promptStyles = Array.isArray(data.styles) ? data.styles : [];
+    promptModels = Array.isArray(data.models) ? data.models : [];
+
+    els.promptStyle.innerHTML = '';
+    if (!promptStyles.length) {
+      var noStyle = document.createElement('option');
+      noStyle.value = '';
+      noStyle.textContent = T('promptNoStyles');
+      els.promptStyle.appendChild(noStyle);
+      els.promptStyle.disabled = true;
+    } else {
+      els.promptStyle.disabled = false;
+      promptStyles.forEach(function (style) {
+        var option = document.createElement('option');
+        option.value = style.id;
+        option.textContent = style.name;
+        els.promptStyle.appendChild(option);
+      });
+      var wantedStyle = promptStyles.some(function (style) { return style.id === previousStyle; })
+        ? previousStyle
+        : data.defaultStyleId;
+      if (wantedStyle) els.promptStyle.value = wantedStyle;
+    }
+
+    els.promptModel.innerHTML = '';
+    if (!promptModels.length) {
+      var noModel = document.createElement('option');
+      noModel.value = '';
+      noModel.textContent = T('promptNoModels');
+      els.promptModel.appendChild(noModel);
+      els.promptModel.disabled = true;
+    } else {
+      els.promptModel.disabled = false;
+      promptModels.forEach(function (model) {
+        var option = document.createElement('option');
+        option.value = promptModelValue(model);
+        option.textContent = model.label || (model.provider + ' · ' + model.model);
+        els.promptModel.appendChild(option);
+      });
+      var wantedModel = promptModels.some(function (model) { return promptModelValue(model) === previousModel; })
+        ? previousModel
+        : promptModelValue(data.defaultModel);
+      if (wantedModel) els.promptModel.value = wantedModel;
+    }
+    renderPromptDescription();
+  }
+
+  function loadPromptCatalogue() {
+    var seq = ++promptRequestSeq;
+    setStatus(T('promptLoading'), '');
+    return api('/api/prompts')
+      .then(function (data) {
+        if (seq !== promptRequestSeq) return;
+        fillPromptCatalogue(data || {});
+        checkHealth();
+      })
+      .catch(function (error) {
+        if (seq !== promptRequestSeq) return;
+        setStatus(T('promptLoadError') + error.message, 'err');
+        promptStyles = [];
+        promptModels = [];
+        fillPromptCatalogue({ styles: [], models: [] });
+      });
+  }
+
+  function runSavedPrompt(btn) {
+    var original = btn.textContent;
+    var model = selectedPromptModel();
+    btn.disabled = true;
+    btn.textContent = T('promptGenerating');
+    clearPromptOutput();
+    refreshPromptSelection()
+      .then(function (selection) {
+        if (!selection) {
+          setStatus(T('promptSelectionEmpty'), 'err');
+          return null;
+        }
+        if (!els.promptStyle.value || !model) {
+          setStatus(!model ? T('promptNoModels') : T('promptNoStyles'), 'err');
+          return null;
+        }
+        return api('/api/prompts/apply', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            styleId: els.promptStyle.value,
+            selectionText: selection,
+            model: model,
+          }),
+        });
+      })
+      .then(function (result) {
+        if (!result) return;
+        promptOutputText = String(result.text || '');
+        if (!promptOutputText) throw new Error(T('composeEmpty'));
+        els.promptOutput.value = promptOutputText;
+        var used = result.model || model;
+        var usedLabel = used && (used.label || (used.provider + ' · ' + used.model));
+        els.promptOutputMeta.textContent = usedLabel ? T('promptGeneratedWith') + usedLabel : '';
+        var warnings = Array.isArray(result.warnings) ? result.warnings : [];
+        els.promptWarnings.textContent = warnings.length ? T('promptWarnings') + warnings.join(' · ') : '';
+        els.promptWarnings.hidden = !warnings.length;
+        els.promptOutputWrap.hidden = false;
+        setStatus(T('promptProposal'), 'ok');
+      })
+      .catch(function (error) { setStatus((error && error.message) || String(error), 'err'); })
+      .finally(function () {
+        btn.textContent = original;
+        updatePromptGenerateState();
+      });
+  }
+
+  function fallbackCopyPromptOutput() {
+    els.promptOutput.focus();
+    els.promptOutput.select();
+    return document.execCommand && document.execCommand('copy');
+  }
+
+  function copyPromptOutput() {
+    if (!promptOutputText) return;
+    var copied = navigator.clipboard && navigator.clipboard.writeText
+      ? navigator.clipboard.writeText(promptOutputText).catch(function () { return fallbackCopyPromptOutput(); })
+      : Promise.resolve(fallbackCopyPromptOutput());
+    Promise.resolve(copied)
+      .then(function () { setStatus(T('promptCopied'), 'ok'); })
+      .catch(function (error) { setStatus((error && error.message) || String(error), 'err'); });
+  }
+
+  function pastePromptOutput() {
+    if (!promptOutputText) return;
+    getSelectionText()
+      .then(function (current) {
+        if (normalizedSelection(current) !== promptSourceText) throw new Error(T('promptSelectionChanged'));
+        return insertAtCursor(promptOutputText, { replace: true });
+      })
+      .then(function () {
+        setStatus(T('promptPasted'), 'ok');
+        promptSourceText = promptOutputText;
+        els.promptSelection.textContent = promptOutputText;
+        clearPromptOutput();
+      })
+      .catch(function (error) { setStatus((error && error.message) || String(error), 'err'); });
+  }
+
   function setSearchMode(mode) {
     if (mode === searchMode) return;
     searchMode = mode;
+    var promptMode = mode === 'prompts';
+    var referenceMode = mode === 'references';
     var buttons = els.searchModeEl ? els.searchModeEl.querySelectorAll('.seg') : [];
     for (var i = 0; i < buttons.length; i++) {
-      buttons[i].classList.toggle('active', buttons[i].getAttribute('data-mode') === mode);
+      var selected = buttons[i].getAttribute('data-mode') === mode;
+      buttons[i].classList.toggle('active', selected);
+      buttons[i].setAttribute('aria-selected', selected ? 'true' : 'false');
     }
-    if (referenceController) referenceController.setActive(mode === 'references');
-    els.paragraph.hidden = mode === 'references';
-    if (mode === 'references') {
+    if (referenceController) referenceController.setActive(referenceMode);
+    els.searchControls.hidden = promptMode;
+    els.analysisControls.hidden = referenceMode || promptMode;
+    els.promptControls.hidden = !promptMode;
+    els.paragraph.hidden = referenceMode || promptMode;
+    els.results.hidden = promptMode;
+    els.empty.hidden = promptMode;
+    if (promptMode) {
+      refreshPromptSelection();
+      loadPromptCatalogue();
+      return;
+    }
+    if (referenceMode) {
       runSearch();
       return;
     }
@@ -765,6 +1027,11 @@
   }
 
   function onSelectionChanged() {
+    if (searchMode === 'prompts') {
+      if (debounceTimer) clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(function () { refreshPromptSelection(); }, 180);
+      return;
+    }
     if (searchMode === 'references') {
       if (referenceController) referenceController.selectionChanged();
       return;
@@ -819,11 +1086,26 @@
     els.autoToggle = document.getElementById('autoToggle');
     els.searchBox = document.getElementById('searchBox');
     els.searchBtn = document.getElementById('searchBtn');
+    els.searchControls = document.getElementById('searchControls');
     els.searchModeEl = document.getElementById('searchMode');
+    els.analysisControls = document.getElementById('analysisControls');
     els.selectionActions = document.getElementById('selectionActions');
     els.insertTargetEl = document.getElementById('insertTarget');
     els.footnoteOption = document.getElementById('footnoteOption');
     els.footnoteRadio = document.getElementById('footnoteRadio');
+    els.promptControls = document.getElementById('promptControls');
+    els.promptStyle = document.getElementById('promptStyle');
+    els.promptModel = document.getElementById('promptModel');
+    els.promptDescription = document.getElementById('promptDescription');
+    els.promptSelection = document.getElementById('promptSelection');
+    els.refreshPromptSelection = document.getElementById('refreshPromptSelection');
+    els.applyPrompt = document.getElementById('applyPrompt');
+    els.promptOutputWrap = document.getElementById('promptOutputWrap');
+    els.promptOutput = document.getElementById('promptOutput');
+    els.promptOutputMeta = document.getElementById('promptOutputMeta');
+    els.promptWarnings = document.getElementById('promptWarnings');
+    els.copyPromptOutput = document.getElementById('copyPromptOutput');
+    els.pastePromptOutput = document.getElementById('pastePromptOutput');
 
     document.documentElement.lang = LANG;
     els.status.textContent = T('connecting');
@@ -832,11 +1114,21 @@
     els.analyzeBtn.textContent = T('analyze');
     els.empty.textContent = T('emptyInitial');
 
-    // Localize the segmented search mode, selection actions and insert target.
+    // Localize the compact tabs without replacing their inline SVG icons.
     var modeButtons = els.searchModeEl.querySelectorAll('.seg');
     for (var mi = 0; mi < modeButtons.length; mi++) {
       var mode = modeButtons[mi].getAttribute('data-mode');
-      modeButtons[mi].textContent = mode === 'passages' ? T('modePassages') : mode === 'references' ? T('modeReferences') : T('modeIdeas');
+      var modeLabel = mode === 'passages'
+        ? T('modePassages')
+        : mode === 'references'
+          ? T('modeReferences')
+          : mode === 'prompts'
+            ? T('modePrompts')
+            : T('modeIdeas');
+      var labelNode = modeButtons[mi].querySelector('.seg-label');
+      if (labelNode) labelNode.textContent = modeLabel;
+      modeButtons[mi].setAttribute('aria-label', modeLabel);
+      modeButtons[mi].title = modeLabel;
     }
     var saLabel = els.selectionActions.querySelector('.sa-label');
     if (saLabel) saLabel.textContent = T('selectionLabel');
@@ -851,6 +1143,29 @@
     var footnoteSpan = els.insertTargetEl.querySelector('[data-it="footnote"]');
     if (bodySpan) bodySpan.textContent = T('targetBody');
     if (footnoteSpan) footnoteSpan.textContent = T('targetFootnote');
+
+    var promptHeading = els.promptControls.querySelector('.prompt-heading div');
+    if (promptHeading) {
+      var promptHeadingTitle = promptHeading.querySelector('strong');
+      var promptHeadingHint = promptHeading.querySelector('small');
+      if (promptHeadingTitle) promptHeadingTitle.textContent = T('promptTitle');
+      if (promptHeadingHint) promptHeadingHint.textContent = T('promptHint');
+    }
+    var promptStyleLabel = els.promptControls.querySelector('[data-prompt-label="style"]');
+    var promptModelLabel = els.promptControls.querySelector('[data-prompt-label="model"]');
+    var promptBlockLabel = els.promptControls.querySelector('.prompt-block-label');
+    var promptProposalLabel = els.promptControls.querySelector('.prompt-output-head strong');
+    if (promptStyleLabel) promptStyleLabel.textContent = T('promptStyle');
+    if (promptModelLabel) promptModelLabel.textContent = T('promptModel');
+    if (promptBlockLabel) promptBlockLabel.textContent = T('promptSelection');
+    if (promptProposalLabel) promptProposalLabel.textContent = T('promptProposal');
+    els.promptSelection.textContent = T('promptSelectionEmpty');
+    els.refreshPromptSelection.title = T('promptRefresh');
+    els.refreshPromptSelection.setAttribute('aria-label', T('promptRefresh'));
+    els.applyPrompt.textContent = T('promptGenerate');
+    els.promptOutput.setAttribute('aria-label', T('promptProposal'));
+    els.copyPromptOutput.textContent = T('promptCopy');
+    els.pastePromptOutput.textContent = T('promptPaste');
 
     // Footnotes need WordApi 1.5. Standalone (LibreOffice) relies on the macro,
     // which falls back to inline if its Writer build cannot place a footnote.
@@ -903,6 +1218,12 @@
       }
     };
     els.autoToggle.onchange = function () { autoAnalyze = els.autoToggle.checked; };
+    els.promptStyle.onchange = function () { clearPromptOutput(); renderPromptDescription(); };
+    els.promptModel.onchange = function () { clearPromptOutput(); updatePromptGenerateState(); };
+    els.refreshPromptSelection.onclick = refreshPromptSelection;
+    els.applyPrompt.onclick = function () { runSavedPrompt(els.applyPrompt); };
+    els.copyPromptOutput.onclick = copyPromptOutput;
+    els.pastePromptOutput.onclick = pastePromptOutput;
 
     for (var mb = 0; mb < modeButtons.length; mb++) {
       (function (btn) {

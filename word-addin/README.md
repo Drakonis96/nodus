@@ -1,10 +1,11 @@
 # Nodus writing integrations for Word and LibreOffice
 
-Nodus provides one writing assistant and reference workflow in Microsoft Word and LibreOffice Writer. The pane exposes three compact views:
+Nodus provides one writing assistant and reference workflow in Microsoft Word and LibreOffice Writer. The pane exposes four compact icon views; the active icon expands to show its label:
 
 - **Ideas** relates the current paragraph to the active Nodus vault.
 - **Passages** searches indexed full text and inserts quotations or AI-assisted prose.
 - **References** searches the Nodus global library and manages live citations and bibliographies.
+- **AI prompts** loads the active workspace writing styles, applies one to the current Word selection with a configured Nodus model, and keeps the proposal in the pane until the user copies it or explicitly replaces the selection.
 
 The pane is a client of the local Nodus HTTPS service (`https://localhost:4320` by default). Library records, document text, and citation requests remain on the user's computer unless the user explicitly invokes a configured remote AI model.
 
@@ -63,7 +64,7 @@ The macro is installed in the current user's LibreOffice Python scripts director
 ## Architecture
 
 - `manifest.xml` defines the persistent Word ribbon and task-pane commands.
-- `taskpane.html`, `taskpane.css`, and `taskpane.js` provide Ideas and Passages.
+- `taskpane.html`, `taskpane.css`, and `taskpane.js` provide Ideas, Passages, and the review-first AI prompt workflow.
 - `references.js` provides the shared reference composer and Word live-field adapter.
 - `scripts/nodus_copilot.py` provides the LibreOffice bridge and Writer live-field adapter.
 - `electron/copilot/server.ts` serves the pane and authenticated local API.

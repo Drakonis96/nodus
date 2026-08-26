@@ -25,7 +25,12 @@ installRuntimeHooks(root);
 
 try {
   const { updateSettings } = require(path.join(repoRoot, 'electron/db/settingsRepo.ts'));
-  updateSettings({ copilotToken: 'test-token', copilotEnabled: true, copilotPort: 4320, uiLanguage: 'en' });
+  updateSettings({
+    copilotToken: 'test-token', copilotEnabled: true, copilotPort: 4320, uiLanguage: 'en',
+    synthesisModel: { provider: 'openai', model: 'gpt-test' },
+    improveModel: { provider: 'ollama', model: 'local-test' },
+    favorites: [{ provider: 'openrouter', model: 'favorite-test' }],
+  });
 
   const server = require(path.join(repoRoot, 'electron/copilot/server.ts'));
 
@@ -42,6 +47,32 @@ try {
     assert.equal(spanishRes.statusCode, 400);
     assert.equal(JSON.parse(spanishRes.getBody()).error, 'Falta ideaId.');
     updateSettings({ uiLanguage: 'en' });
+  }
+
+  // The prompt catalogue is vault-backed and exposes only the model choices
+  // already configured or favorited in Nodus.
+  {
+    const promptRes = mockResponse();
+    await server.handleRequest(mockRequest('GET', '/api/prompts', authHeaders()), promptRes, 4320);
+    const catalogue = JSON.parse(promptRes.getBody());
+    assert.equal(promptRes.statusCode, 200);
+    assert.ok(catalogue.styles.some((style) => style.id === 'builtin:academic'));
+    assert.ok(catalogue.models.some((model) => model.provider === 'ollama' && model.model === 'local-test'));
+    assert.ok(catalogue.models.some((model) => model.provider === 'openrouter' && model.model === 'favorite-test'));
+    assert.deepEqual(catalogue.defaultModel, { provider: 'ollama', model: 'local-test' });
+  }
+
+  // An empty reference search never falls through to the library's default
+  // rows. This endpoint-level guard also protects older cached task panes.
+  {
+    const referenceRes = mockResponse();
+    await server.handleRequest(
+      mockRequest('POST', '/api/references/search', authHeaders(), { query: '   ', limit: 40 }),
+      referenceRes,
+      4320
+    );
+    assert.equal(referenceRes.statusCode, 200);
+    assert.deepEqual(JSON.parse(referenceRes.getBody()), { references: [] });
   }
 
   // Editor state round-trip: update-text → state.
@@ -351,6 +382,10 @@ function installRuntimeHooks(userDataPath) {
   const Database = require('better-sqlite3');
   const testDb = new Database(':memory:');
   testDb.exec('CREATE TABLE settings (key TEXT PRIMARY KEY, value TEXT)');
+  testDb.exec(`CREATE TABLE study_styles (
+    id TEXT PRIMARY KEY, deleted_at TEXT, archived_at TEXT, active INTEGER,
+    favorite INTEGER, position INTEGER, name TEXT
+  )`);
 
   const electronStub = {
     app: {

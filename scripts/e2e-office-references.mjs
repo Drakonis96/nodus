@@ -12,6 +12,8 @@ const screenshotDir = process.env.NODUS_SCREENSHOT_DIR || '';
 const commands = [];
 const nodusOpenRequests = [];
 let styleRequests = 0;
+let referenceSearchRequests = 0;
+let editorSelection = '';
 const styleCatalogue = [
   { id: 'apa-7', title: 'APA 7', availableOffline: true, citationFormat: 'author-date' },
   { id: 'institutional-test', title: 'Institutional test', availableOffline: true, citationFormat: 'note' },
@@ -68,6 +70,7 @@ const server = createServer(async (req, res) => {
     return json(res, { available: true, indexed: true, passages: String(body.query || '').includes('broken') ? [brokenPassage] : [cleanPassage] });
   }
   if (url.pathname === '/api/references/search') {
+    referenceSearchRequests += 1;
     const query = String(body.query || '').toLocaleLowerCase();
     return json(res, { references: references.filter((entry) => !query || `${entry.title} ${entry.author} ${entry.identifiers.join(' ')}`.toLocaleLowerCase().includes(query)) });
   }
@@ -87,7 +90,25 @@ const server = createServer(async (req, res) => {
       bibliography: bibliographyIds.length ? { itemIds: bibliographyIds, text: bibliographyIds.join('\n'), html: bibliographyIds.map((id) => `<div>${id}</div>`).join('') } : null,
     });
   }
-  if (url.pathname === '/api/editor/state') return json(res, { paragraphText: '', selectionText: '', documentId: 'e2e-writer', references: { documentId: 'e2e-writer', preferences: null, citations: [], bibliographyFieldIds: [], bibliographies: [], selectedFieldId: null } });
+  if (url.pathname === '/api/prompts' && req.method === 'GET') return json(res, {
+    styles: [
+      { id: 'builtin:academic', name: 'Academic', description: 'Academic register and explicit transitions.', color: '#0f766e', builtIn: true },
+      { id: 'builtin:clear', name: 'Clear', description: 'Make dense sentences easier to follow.', color: '#0284c7', builtIn: true },
+    ],
+    models: [
+      { provider: 'openai', model: 'gpt-e2e', label: 'OpenAI · gpt-e2e' },
+      { provider: 'ollama', model: 'local-e2e', label: 'Ollama · local-e2e' },
+    ],
+    defaultStyleId: 'builtin:academic',
+    defaultModel: { provider: 'openai', model: 'gpt-e2e' },
+  });
+  if (url.pathname === '/api/prompts/apply' && req.method === 'POST') return json(res, {
+    text: `Clear proposal: ${body.selectionText}`,
+    warnings: [],
+    styleId: body.styleId,
+    model: body.model,
+  });
+  if (url.pathname === '/api/editor/state') return json(res, { paragraphText: editorSelection, selectionText: editorSelection, documentId: 'e2e-writer', references: { documentId: 'e2e-writer', preferences: null, citations: [], bibliographyFieldIds: [], bibliographies: [], selectedFieldId: null } });
   if (url.pathname === '/api/editor/insert') { commands.push(body); return json(res, { ok: true, delivered: true }); }
   if (url.pathname === '/api/nodus/open') { nodusOpenRequests.push(body); return json(res, { ok: true }); }
   res.writeHead(404); res.end();
@@ -110,7 +131,22 @@ try {
   await page.getByRole('tab', { name: 'References' }).waitFor();
   assert.equal(await page.locator('#analysisControls').evaluate((element) => getComputedStyle(element).display), 'none');
   assert.notEqual(await page.locator('#referenceControls').evaluate((element) => getComputedStyle(element).display), 'none');
+  await page.getByText('Search to show references from the global library.').waitFor();
+  assert.equal(await page.locator('.reference-result').count(), 0, 'References starts without default works');
+  assert.equal(referenceSearchRequests, 0, 'opening References with an empty query makes no search request');
+  await page.locator('#searchBox').fill('a');
+  await page.locator('#searchBtn').click();
   await page.getByRole('button', { name: '+ Add' }).first().waitFor();
+  assert.equal(referenceSearchRequests, 1);
+  await page.locator('#searchBox').fill('');
+  await page.locator('#searchBtn').click();
+  await page.getByText('Search to show references from the global library.').waitFor();
+  assert.equal(await page.locator('.reference-result').count(), 0, 'clearing the query removes prior reference results');
+  assert.equal(referenceSearchRequests, 1, 'clearing the query makes no empty search request');
+  await page.locator('#searchBox').fill('a');
+  await page.locator('#searchBtn').click();
+  await page.getByRole('button', { name: '+ Add' }).first().waitFor();
+  assert.equal(referenceSearchRequests, 2);
   const styleSearch = page.locator('#referenceStyleSearch');
   await styleSearch.click();
   await styleSearch.fill('institutional');
@@ -124,6 +160,7 @@ try {
   assert.ok(styleRequests >= 2, 'the installed CSL catalogue refreshes after the pane regains focus');
   await page.keyboard.press('Escape');
   await page.locator('#referenceStyleManager').click();
+  await page.getByText('Style manager opened in Nodus').waitFor();
   assert.deepEqual(nodusOpenRequests.at(-1), { destination: 'citation-styles' });
   await page.getByRole('button', { name: '+ Add' }).first().click();
   await page.getByRole('button', { name: '+ Add' }).nth(1).click();
@@ -147,6 +184,27 @@ try {
   await page.getByText('Live bibliography inserted').waitFor();
   assert.equal(commands[1].command, 'insert-bibliography');
   assert.equal(commands[1].field.uncitedItems.length, 1);
+
+  // Saved workspace prompts generate a reviewable proposal and never mutate the
+  // editor until the explicit Paste action.
+  editorSelection = 'The original Word selection stays untouched during generation.';
+  await page.getByRole('tab', { name: 'AI prompts' }).click();
+  await page.locator('#promptStyle option[value="builtin:academic"]').waitFor({ state: 'attached' });
+  await page.waitForFunction(() => document.querySelector('#promptSelection')?.textContent?.includes('original Word selection'));
+  assert.notEqual(await page.locator('.seg.active .seg-label').evaluate((element) => getComputedStyle(element).display), 'none');
+  assert.equal(await page.locator('.seg:not(.active) .seg-label').first().evaluate((element) => getComputedStyle(element).display), 'none');
+  await page.locator('#promptStyle').selectOption('builtin:clear');
+  await page.locator('#promptModel').selectOption({ label: 'Ollama · local-e2e' });
+  await page.locator('#applyPrompt').click();
+  await page.locator('#promptOutputWrap:not([hidden])').waitFor();
+  assert.equal(await page.locator('#promptOutput').inputValue(), `Clear proposal: ${editorSelection}`);
+  assert.equal(commands.length, 2, 'generation itself must not insert anything into the editor');
+  await page.locator('#pastePromptOutput').click();
+  await page.getByText('Selection replaced').waitFor();
+  assert.equal(commands[2].replace, true);
+  assert.equal(commands[2].text, `Clear proposal: ${editorSelection}`);
+  await page.getByRole('tab', { name: 'References' }).click();
+  await page.getByRole('button', { name: '+ Add' }).first().waitFor();
 
   for (const width of [260, 360, 520]) {
     await page.setViewportSize({ width, height: 840 });

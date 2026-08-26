@@ -23,14 +23,27 @@
 
     <main>
       <section class="controls">
-        <div class="search">
+        <div class="search" id="searchControls">
           <input id="searchBox" type="search" placeholder="Search ideas, authors or works" autocomplete="off" />
           <button id="searchBtn" class="btn icon" type="button" title="Search">⌕</button>
         </div>
         <div class="segmented" id="searchMode" role="tablist">
-          <button class="seg active" data-mode="ideas" type="button" role="tab">Ideas</button>
-          <button class="seg" data-mode="passages" type="button" role="tab">Passages</button>
-          <button class="seg" data-mode="references" type="button" role="tab">References</button>
+          <button class="seg active" data-mode="ideas" type="button" role="tab" aria-selected="true" aria-label="Ideas" title="Ideas">
+            <svg class="seg-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 18h6M10 22h4M8.2 14.5A7 7 0 1 1 15.8 14.5c-.9.7-1.4 1.6-1.5 2.5h-4.6c-.1-.9-.6-1.8-1.5-2.5Z"/></svg>
+            <span class="seg-label">Ideas</span>
+          </button>
+          <button class="seg" data-mode="passages" type="button" role="tab" aria-selected="false" aria-label="Passages" title="Passages">
+            <svg class="seg-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h9l3 3v15H6zM9 9h6M9 13h6M9 17h4M15 3v4h4"/></svg>
+            <span class="seg-label">Passages</span>
+          </button>
+          <button class="seg" data-mode="references" type="button" role="tab" aria-selected="false" aria-label="References" title="References">
+            <svg class="seg-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5h11a3 3 0 0 1 3 3v11H8a3 3 0 0 1-3-3zM8 8h7M8 12h7M8 16h4M5 16a3 3 0 0 1 3-3h11"/></svg>
+            <span class="seg-label">References</span>
+          </button>
+          <button class="seg" data-mode="prompts" type="button" role="tab" aria-selected="false" aria-label="AI prompts" title="AI prompts">
+            <svg class="seg-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m14 4 1-2 1 2 2 1-2 1-1 2-1-2-2-1zM5 17l9-9 3 3-9 9H5zM12.5 9.5l3 3M18 16l.8-1.8.8 1.8 1.8.8-1.8.8-.8 1.8-.8-1.8-1.8-.8z"/></svg>
+            <span class="seg-label">AI prompts</span>
+          </button>
         </div>
         <div id="analysisControls">
           <div class="toolbar">
@@ -89,6 +102,30 @@
           <div class="bibliography-actions">
             <div><strong>Bibliography</strong><small id="bibliographyHint">Uses the sources cited in this document</small></div>
             <button id="insertBibliography" class="btn small" type="button">Insert / update</button>
+          </div>
+        </section>
+
+        <section id="promptControls" class="prompt-controls" hidden aria-label="Saved AI prompts">
+          <div class="prompt-heading">
+            <div><strong>Transform selection</strong><small>Use a saved workspace prompt, then review the result before replacing anything.</small></div>
+            <button id="refreshPromptSelection" class="btn tiny" type="button" title="Refresh selected text" aria-label="Refresh selected text">↻</button>
+          </div>
+          <label class="prompt-field"><span data-prompt-label="style">Saved prompt</span><select id="promptStyle"></select></label>
+          <p id="promptDescription" class="prompt-description"></p>
+          <label class="prompt-field"><span data-prompt-label="model">Model</span><select id="promptModel"></select></label>
+          <div class="prompt-selection-block">
+            <span class="prompt-block-label">Selected text in Word</span>
+            <div id="promptSelection" class="prompt-selection">Select text in Word to transform it.</div>
+          </div>
+          <button id="applyPrompt" class="btn primary prompt-generate" type="button" disabled>Generate proposal</button>
+          <div id="promptOutputWrap" class="prompt-output-wrap" hidden>
+            <div class="prompt-output-head"><strong>Proposal</strong><span id="promptOutputMeta"></span></div>
+            <textarea id="promptOutput" class="prompt-output" readonly aria-label="Generated proposal"></textarea>
+            <div id="promptWarnings" class="prompt-warnings" hidden></div>
+            <div class="prompt-output-actions">
+              <button id="copyPromptOutput" class="btn small" type="button">Copy</button>
+              <button id="pastePromptOutput" class="btn small primary" type="button">Paste and replace selection</button>
+            </div>
           </div>
         </section>
       </section>

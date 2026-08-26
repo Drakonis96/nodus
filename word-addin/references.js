@@ -23,7 +23,7 @@
       add: 'Añadir', onlyBibliography: 'Solo bibliografía', remove: 'Quitar', edit: 'Editar detalles',
       up: 'Mover antes', down: 'Mover después', locator: 'Localizador', value: 'Valor', prefix: 'Prefijo',
       suffix: 'Sufijo / texto posterior', omitAuthor: 'Omitir autor', excludeBibliography: 'Excluir de la bibliografía',
-      noResults: 'No hay referencias que coincidan.', recent: 'Referencias recientes de la biblioteca global',
+      noResults: 'No hay referencias que coincidan.', searchPrompt: 'Haz una búsqueda para mostrar referencias de la biblioteca global.',
       searching: 'Buscando en la biblioteca global…', added: 'Referencia añadida', citationInserted: 'Cita viva insertada',
       citationUpdated: 'Cita actualizada', bibliographyInserted: 'Bibliografía viva insertada', refreshed: 'Citas y bibliografía actualizadas',
       unlinkConfirm: 'Las citas y bibliografías se convertirán en texto normal. Esta acción no se puede deshacer desde Nodus. ¿Continuar?',
@@ -47,7 +47,7 @@
       add: 'Add', onlyBibliography: 'Bibliography only', remove: 'Remove', edit: 'Edit details',
       up: 'Move earlier', down: 'Move later', locator: 'Locator', value: 'Value', prefix: 'Prefix',
       suffix: 'Suffix / text after', omitAuthor: 'Omit author', excludeBibliography: 'Exclude from bibliography',
-      noResults: 'No references match that search.', recent: 'Recent references from the global library',
+      noResults: 'No references match that search.', searchPrompt: 'Search to show references from the global library.',
       searching: 'Searching the global library…', added: 'Reference added', citationInserted: 'Live citation inserted',
       citationUpdated: 'Citation updated', bibliographyInserted: 'Live bibliography inserted', refreshed: 'Citations and bibliography refreshed',
       unlinkConfirm: 'Citations and bibliographies will become plain text. Nodus cannot undo this action. Continue?',
@@ -77,6 +77,7 @@
     var stylePickerOpen = false;
     var activeStyleIndex = 0;
     var styleRequestSeq = 0;
+    var searchRequestSeq = 0;
     var styleRefreshTimer = null;
     var preferences = { formatVersion: 1, style: 'apa-7', locale: lang === 'es' ? 'es-ES' : 'en-US', placement: 'in-text', automaticUpdates: true };
     var el = {
@@ -320,12 +321,23 @@
     }
 
     function search(query) {
+      var normalized = String(query || '').trim();
+      var seq = ++searchRequestSeq;
+      if (!normalized) {
+        refs = [];
+        empty(C.searchPrompt);
+        return Promise.resolve();
+      }
       empty(C.searching);
       return options.api('/api/references/search', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query: query || '', limit: 50 })
-      }).then(function (data) { renderReferenceResults(data.references || []); })
-        .catch(function (error) { empty(error.message); options.setStatus(error.message, 'err'); });
+        body: JSON.stringify({ query: normalized, limit: 50 })
+      }).then(function (data) {
+        if (seq === searchRequestSeq) renderReferenceResults(data.references || []);
+      }).catch(function (error) {
+        if (seq !== searchRequestSeq) return;
+        empty(error.message); options.setStatus(error.message, 'err');
+      });
     }
 
     function optionInput(label, value, onChange, wide) {

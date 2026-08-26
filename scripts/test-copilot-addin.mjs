@@ -77,6 +77,11 @@ try {
   assert.match(taskpaneHtml, /<img class="mark" src="\/addin\/assets\/icon-32\.png"/, 'the pane must use the stylized Nodus mark');
   assert.doesNotMatch(taskpaneHtml, /<div class="mark">N<\/div>/, 'a generic letter N must not be used as the brand');
   assert.match(taskpaneHtml, /data-mode="references"/);
+  assert.match(taskpaneHtml, /data-mode="prompts"/);
+  assert.equal((taskpaneHtml.match(/class="seg-icon"/g) || []).length, 4, 'every pane tab must have an icon');
+  for (const id of ['promptControls', 'promptStyle', 'promptModel', 'promptSelection', 'applyPrompt', 'promptOutput', 'copyPromptOutput', 'pastePromptOutput']) {
+    assert.match(taskpaneHtml, new RegExp(`id="${id}"`), `Prompt UI must contain ${id}`);
+  }
   for (const id of ['referenceStyle', 'referenceStyleSearch', 'referenceLocale', 'referencePlacement', 'selectedReferences', 'insertCitation', 'insertBibliography', 'refreshReferences', 'unlinkReferences']) {
     assert.match(taskpaneHtml, new RegExp(`id="${id}"`), `References UI must contain ${id}`);
   }
@@ -89,6 +94,7 @@ try {
   assert.match(referencesJs, /unlink-references/);
   assert.match(referencesJs, /normalizeStyleSearch/);
   assert.match(referencesJs, /tokens\.every/);
+  assert.match(referencesJs, /if \(!normalized\) \{[\s\S]*refs = \[\];[\s\S]*empty\(C\.searchPrompt\);[\s\S]*return Promise\.resolve\(\);/, 'an empty reference query must render no works and make no request');
   assert.match(taskpaneHtml, /role="combobox"[\s\S]*aria-controls="referenceStyleOptions"/);
   assert.match(taskpaneHtml, /id="referenceStyleOptions"[\s\S]*role="listbox"/);
   assert.match(taskpaneHtml, /id="referenceStyleManager"/);
@@ -100,12 +106,18 @@ try {
   assert.doesNotMatch(taskpaneJs, /style\.setProperty\('--panel', panel\)/, 'Office controlBackgroundColor must not turn dark cards white');
   assert.match(taskpaneJs, /readablePassageText/);
   assert.match(taskpaneJs, /\\uFFFD\\u25A1\\u2610\\u2612/);
+  assert.match(taskpaneJs, /\/api\/prompts\/apply/);
+  assert.match(taskpaneJs, /insertAtCursor\(promptOutputText, \{ replace: true \}\)/, 'pasting a proposal replaces the unchanged Word selection');
+  assert.match(taskpaneCss, /\.seg-label\s*\{[^}]*display:\s*none/);
+  assert.match(taskpaneCss, /\.seg\.active \.seg-label\s*\{[^}]*display:\s*inline/);
 
   // The Word bridge opens the full idea detail in Ideas, not the graph. The
   // nonce makes a second click on the same idea retrigger the selection.
   const appSource = fs.readFileSync(path.join(repoRoot, 'src/App.tsx'), 'utf8');
   const ideasSource = fs.readFileSync(path.join(repoRoot, 'src/views/IdeasView.tsx'), 'utf8');
   const serverSource = fs.readFileSync(path.join(repoRoot, 'electron/copilot/server.ts'), 'utf8');
+  assert.match(serverSource, /urlPath === '\/api\/prompts'/);
+  assert.match(serverSource, /urlPath === '\/api\/prompts\/apply'/);
   assert.match(serverSource, /destination: 'ideas'/);
   assert.match(serverSource, /destination === 'citation-styles'[\s\S]*destination: 'library-citation-styles'/);
   assert.match(appSource, /target\.destination === 'library-citation-styles'[\s\S]*citationStyles: true[\s\S]*setView\('library'\)/);

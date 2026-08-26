@@ -9,9 +9,11 @@ import { randomBytes, timingSafeEqual } from 'node:crypto';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { app, BrowserWindow, shell } from 'electron';
-import type { CopilotServerStatus } from '@shared/types';
+import type { CopilotServerStatus, ModelRef } from '@shared/types';
 import type { OfficeCitationDocumentRequest, OfficeEditorCommand } from '@shared/officeCitationTypes';
 import { localizeRuntimeError } from '@shared/uiLanguage';
+import { GRANULAR_MODEL_KEYS } from '@shared/modelSettings';
+import { PROVIDER_LABELS, sortModelRefs } from '@shared/providers';
 import { getSettings, updateSettings } from '../db/settingsRepo';
 import { loadCopilotCert, loadCopilotCa, certReady, copilotStateDir, renewLeafIfNeeded } from './certs';
 import {
@@ -24,7 +26,9 @@ import {
   type CopilotComposeMode,
 } from '../ai/liveRelations';
 import { embeddedIdeaCount } from '../db/ideasRepo';
+import { getStudyStyle, listStudyStyles } from '../db/studyStylesRepo';
 import { getDb } from '../db/database';
+import { applyCopilotPromptStyle } from '../ai/copilotPromptStyles';
 import {
   formatGlobalLibraryOfficeDocument,
   listGlobalLibraryCitationStyles,
@@ -80,8 +84,66 @@ function copilotError(error: unknown): string {
     'La IA no devolvió texto insertable.': 'The AI did not return any text that could be inserted.',
     'Selecciona (o sitúate en) un fragmento con algo más de texto para trabajarlo.':
       'Select (or place the cursor in) a passage with a little more text to work with.',
+    'Selecciona texto en Word para transformarlo.': 'Select text in Word to transform it.',
+    'El estilo seleccionado no está disponible.': 'The selected style is not available.',
+    'No hay un modelo de IA configurado. Elige uno en Ajustes de Nodus.':
+      'No AI model is configured. Choose one in Nodus Settings.',
   };
   return translated[message] ?? localizeRuntimeError(message, 'en');
+}
+
+function modelRef(value: unknown): ModelRef | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+  const candidate = value as Partial<ModelRef>;
+  if (typeof candidate.provider !== 'string' || typeof candidate.model !== 'string') return null;
+  const provider = candidate.provider.trim() as ModelRef['provider'];
+  const model = candidate.model.trim();
+  return provider && model ? { provider, model } : null;
+}
+
+function copilotPromptCatalogue() {
+  const settings = getSettings();
+  const styles = listStudyStyles().filter((style) => style.active && !style.archivedAt);
+  const models: ModelRef[] = [];
+  const addModel = (candidate: unknown) => {
+    const parsed = modelRef(candidate);
+    if (!parsed || models.some((entry) => entry.provider === parsed.provider && entry.model === parsed.model)) return;
+    models.push(parsed);
+  };
+  addModel(settings.synthesisModel);
+  for (const key of GRANULAR_MODEL_KEYS) addModel(settings[key]);
+  for (const favorite of settings.favorites ?? []) addModel(favorite);
+  for (const style of styles) {
+    if (style.modelProvider && style.modelName) addModel({ provider: style.modelProvider, model: style.modelName });
+  }
+  const defaultModel = settings.improveModel
+    ?? settings.writingModel
+    ?? settings.studyModel
+    ?? settings.synthesisModel
+    ?? models[0]
+    ?? null;
+  const visibleToolbarIds = settings.studyImproveToolbarStyleIds ?? [];
+  const defaultStyleId = visibleToolbarIds.find((id) => styles.some((style) => style.id === id))
+    ?? styles[0]?.id
+    ?? null;
+  return {
+    styles: styles.map((style) => ({
+      id: style.id,
+      name: style.name,
+      icon: style.icon,
+      color: style.color,
+      description: style.description,
+      category: style.category,
+      builtIn: style.builtIn,
+      favorite: style.favorite,
+    })),
+    models: sortModelRefs(models).map((entry) => ({
+      ...entry,
+      label: `${PROVIDER_LABELS[entry.provider] ?? entry.provider} · ${entry.model}`,
+    })),
+    defaultStyleId,
+    defaultModel,
+  };
 }
 
 /**
@@ -277,6 +339,39 @@ export async function handleRequest(req: IncomingMessage, res: ServerResponse, p
       sendJson(res, 200, result);
       return;
     }
+    if (urlPath === '/api/prompts' && req.method === 'GET') {
+      sendJson(res, 200, copilotPromptCatalogue());
+      return;
+    }
+    if (urlPath === '/api/prompts/apply' && req.method === 'POST') {
+      const body = (await readJsonBody(req)) as { styleId?: string; selectionText?: string; model?: unknown };
+      const style = getStudyStyle(String(body.styleId ?? ''));
+      if (!style || !style.active || style.archivedAt) {
+        sendJson(res, 400, { error: copilotText('El estilo seleccionado no está disponible.', 'The selected style is not available.') });
+        return;
+      }
+      const requestedModel = body.model == null ? null : modelRef(body.model);
+      if (body.model != null && !requestedModel) {
+        sendJson(res, 400, { error: copilotText('El modelo seleccionado no es válido.', 'The selected model is invalid.') });
+        return;
+      }
+      if (requestedModel) {
+        const allowed = copilotPromptCatalogue().models.some((entry) => (
+          entry.provider === requestedModel.provider && entry.model === requestedModel.model
+        ));
+        if (!allowed) {
+          sendJson(res, 400, { error: copilotText('El modelo ya no está disponible en Nodus.', 'The model is no longer available in Nodus.') });
+          return;
+        }
+      }
+      const result = await applyCopilotPromptStyle({
+        text: String(body.selectionText ?? ''),
+        styleId: style.id,
+        model: requestedModel,
+      });
+      sendJson(res, 200, result);
+      return;
+    }
     if (urlPath === '/api/idea' && req.method === 'POST') {
       const body = (await readJsonBody(req)) as { ideaId?: string };
       if (!body.ideaId) {
@@ -311,7 +406,10 @@ export async function handleRequest(req: IncomingMessage, res: ServerResponse, p
     }
     if (urlPath === '/api/references/search' && req.method === 'POST') {
       const body = (await readJsonBody(req)) as { query?: string; limit?: number };
-      const references = await searchGlobalLibraryOfficeReferences(String(body.query ?? ''), Number(body.limit ?? 40));
+      const query = String(body.query ?? '').trim();
+      const references = query
+        ? await searchGlobalLibraryOfficeReferences(query, Number(body.limit ?? 40))
+        : [];
       sendJson(res, 200, { references });
       return;
     }

@@ -527,10 +527,10 @@ main {
 .spin { color: var(--muted); font-size: 12px; padding: 4px 0; }
 .copied { color: var(--green); font-size: 11px; align-self: center; }
 
-/* Segmented search mode (Ideas / Passages / References) */
+/* Compact icon tabs. Only the active tab expands to reveal its label. */
 .segmented {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  display: flex;
+  align-items: stretch;
   gap: 4px;
   padding: 3px;
   border: 1px solid var(--border);
@@ -541,6 +541,7 @@ main {
 #analysisControls { display: flex; flex-direction: column; gap: 8px; }
 #analysisControls[hidden] { display: none; }
 .seg {
+  flex: 0 0 34px;
   border: 0;
   background: transparent;
   color: var(--muted);
@@ -550,14 +551,133 @@ main {
   font-size: 12px;
   cursor: pointer;
   min-height: 26px;
+  min-width: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  overflow: hidden;
 }
 .seg:hover { color: var(--text); }
 .seg.active {
+  flex: 1 1 auto;
   background: var(--panel);
   color: var(--text);
   font-weight: 620;
   box-shadow: var(--shadow);
 }
+.seg-icon {
+  width: 15px;
+  height: 15px;
+  flex: 0 0 15px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.seg-label { display: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.seg.active .seg-label { display: inline; }
+
+/* Saved workspace prompts */
+.prompt-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.prompt-controls[hidden] { display: none; }
+.prompt-heading,
+.prompt-output-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+.prompt-heading strong,
+.prompt-output-head strong { display: block; font-size: 12px; }
+.prompt-heading small {
+  display: block;
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 1.35;
+}
+.prompt-field { display: block; min-width: 0; color: var(--muted); font-size: 10px; }
+.prompt-field > span,
+.prompt-block-label { display: block; margin: 0 0 3px 2px; }
+.prompt-field select {
+  width: 100%;
+  min-width: 0;
+  min-height: 32px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 5px 7px;
+  background: var(--panel);
+  color: var(--control-text);
+  font: inherit;
+  font-size: 11px;
+}
+.prompt-field select option { background: var(--panel); color: var(--control-text); }
+.prompt-description {
+  min-height: 0;
+  margin: -2px 2px 0;
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 1.35;
+}
+.prompt-selection-block { min-width: 0; color: var(--muted); font-size: 10px; }
+.prompt-selection {
+  min-height: 48px;
+  max-height: 104px;
+  overflow: auto;
+  border: 1px dashed var(--border);
+  border-radius: 6px;
+  padding: 8px;
+  background: var(--surface);
+  color: var(--text);
+  font-size: 11px;
+  line-height: 1.4;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.prompt-selection.placeholder { color: var(--muted); }
+.prompt-generate { width: 100%; }
+.prompt-output-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  margin-top: 2px;
+  padding-top: 9px;
+  border-top: 1px solid var(--border);
+}
+.prompt-output-wrap[hidden] { display: none; }
+.prompt-output-head { align-items: baseline; }
+.prompt-output-head span { color: var(--muted); font-size: 9px; text-align: right; }
+.prompt-output {
+  width: 100%;
+  min-height: 132px;
+  max-height: 320px;
+  resize: vertical;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  padding: 9px;
+  background: var(--panel);
+  color: var(--control-text);
+  font: inherit;
+  font-size: 12px;
+  line-height: 1.45;
+}
+.prompt-warnings {
+  border: 1px solid color-mix(in srgb, var(--amber) 40%, var(--border));
+  border-radius: 6px;
+  padding: 7px;
+  background: color-mix(in srgb, var(--amber) 9%, var(--panel));
+  color: var(--amber);
+  font-size: 10px;
+  line-height: 1.35;
+}
+.prompt-warnings[hidden] { display: none; }
+.prompt-output-actions { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 6px; }
 
 /* Selection actions (Rewrite / Expand / Counter) and insert target */
 .selection-actions,
