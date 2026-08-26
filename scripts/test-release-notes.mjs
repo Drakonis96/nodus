@@ -25,29 +25,33 @@ try {
 
   const { RELEASE_NOTES, releaseNotesForMajor, compareVersions } = await import(pathToFileURL(bundlePath).href);
   const currentRelease = RELEASE_NOTES[0];
-  assert.equal(currentRelease?.version, '5.0.3');
-  assert.equal(currentRelease?.date, '2026-08-26');
-  assert.equal(currentRelease?.highlights.length, 8);
+  assert.equal(currentRelease?.version, '5.0.4');
+  assert.equal(currentRelease?.date, '2026-08-27');
+  assert.equal(currentRelease?.highlights.length, 7);
   assert.deepEqual(currentRelease?.highlights.map((highlight) => highlight.scope), [
-    'toolkit', 'toolkit', 'academic', 'academic', 'estudio', 'general', 'general', 'general',
+    'general', 'general', 'general', 'estudio', 'estudio', 'general', 'general',
   ]);
   for (const phrase of [
-    /no longer needs credentials/,
-    /distinguishes verified open files/,
-    /uses version 1 by default again/,
-    /never applied as the definition/,
-    /thirteen text transformations/,
-    /name of the vault/,
-    /distinct icons/,
-    /public website gains/,
+    /responsive web interface/,
+    /own AI providers/,
+    /enforces ownership and permissions/,
+    /fourth tab/,
+    /own result isolated/,
+    /two most recent verified snapshots/,
+    /download counter is current again/,
   ]) assert.ok(currentRelease?.highlights.some((highlight) => phrase.test(highlight.en)));
 
-  // 5.0.2 keeps the six highlights it shipped with underneath 5.0.3.
+  // 5.0.3 keeps the eight highlights it shipped with underneath 5.0.4.
+  const previousPatch = RELEASE_NOTES.find((note) => note.version === '5.0.3');
+  assert.equal(previousPatch?.date, '2026-08-26');
+  assert.equal(previousPatch?.highlights.length, 8);
+
+  // 5.0.2 keeps the six highlights it shipped with underneath 5.0.4.
   const compassRelease = RELEASE_NOTES.find((note) => note.version === '5.0.2');
   assert.equal(compassRelease?.date, '2026-08-26');
   assert.equal(compassRelease?.highlights.length, 6);
 
-  // 5.0.1 keeps the seven repair highlights it shipped with underneath 5.0.3.
+  // 5.0.1 keeps the seven repair highlights it shipped with underneath 5.0.4.
   const previousPatchRelease = RELEASE_NOTES.find((note) => note.version === '5.0.1');
   assert.equal(previousPatchRelease?.date, '2026-08-25');
   assert.equal(previousPatchRelease?.highlights.length, 7);

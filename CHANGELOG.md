@@ -1,5 +1,28 @@
 # Changelog
 
+## 5.0.4 — 2026-08-27
+
+Nodus 5.0.4 brings secure multi-user web parity to Nodus Server, extends Word
+Copilot writing workflows and limits accumulated migration recovery snapshots.
+
+- Added a responsive Nodus Server web client that follows the Desktop visual
+  language and opens shared workspace views from phones and browsers.
+- Added private per-user conversations, notes, annotations and artifacts, plus
+  synchronized profile preferences across connected devices.
+- Added per-account AI providers, models and encrypted credentials, with private
+  jobs and results and an immutable embedding compatibility contract.
+- Enforced ownership, membership and provenance across server mutations and
+  hardened login, secret redaction, quotas, backups and Docker deployment.
+- Added a review-first Word Copilot tab for saved workspace writing styles, with
+  model selection and explicit copy or replace actions.
+- Kept Word reference tabs compact, isolated concurrent prompt results and added
+  visible generation feedback without changing the document prematurely.
+- Retained only the two newest managed migration recovery snapshots per vault in
+  a serialized background cleanup that preserves unrelated recovery material.
+- Allowed the public GitHub download total to be refreshed manually and updated
+  the figures displayed by the website.
+- Added every 5.0.4 change to the What's New modal in all eight interface languages.
+
 ## 5.0.3 — 2026-08-26
 
 Nodus 5.0.3 turns Compass into a credential-free discovery engine, protects
