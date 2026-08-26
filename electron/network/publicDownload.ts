@@ -1,10 +1,15 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 // Copyright (C) 2026 Jorge Pérez Burgueño and Nodus contributors
 
-import dns from 'node:dns/promises';
+import dns from 'node:dns';
+import dnsPromises from 'node:dns/promises';
 import fs from 'node:fs';
+import http from 'node:http';
+import https from 'node:https';
+import net from 'node:net';
 import os from 'node:os';
 import path from 'node:path';
+import { Readable } from 'node:stream';
 import { randomUUID } from 'node:crypto';
 
 export const MAX_PUBLIC_DOWNLOAD_BYTES = 64 * 1024 * 1024;
@@ -59,6 +64,7 @@ export interface PublicFetchOptions {
   timeoutMs?: number;
   fetcher?: typeof fetch;
   assertPublic?: (url: string) => Promise<URL>;
+  signal?: AbortSignal;
 }
 
 export interface RemoteFileNameCandidate {
@@ -92,15 +98,99 @@ export function safeRemoteFileName(raw: string | undefined, mimeType: string | u
   return candidate.slice(-220);
 }
 
-function isPrivateAddress(address: string): boolean {
-  const normalized = address.toLowerCase().replace(/^::ffff:/, '');
-  if (normalized === '::1' || normalized === '0.0.0.0' || normalized === '127.0.0.1') return true;
-  if (/^10\./.test(normalized) || /^192\.168\./.test(normalized)) return true;
-  const second = /^172\.(\d+)\./.exec(normalized);
-  if (second && Number(second[1]) >= 16 && Number(second[1]) <= 31) return true;
-  if (/^169\.254\./.test(normalized) || /^100\.(?:6[4-9]|[7-9]\d|1[01]\d|12[0-7])\./.test(normalized)) return true;
-  if (/^(?:fc|fd|fe8|fe9|fea|feb)/.test(normalized)) return true;
+function ipv6Hextets(address: string): number[] | null {
+  let normalized = address.toLowerCase().trim();
+  if (normalized.startsWith('[') && normalized.endsWith(']')) normalized = normalized.slice(1, -1);
+  normalized = normalized.split('%', 1)[0];
+  const dotted = normalized.match(/(?:^|:)(\d{1,3}(?:\.\d{1,3}){3})$/)?.[1];
+  if (dotted) {
+    const octets = dotted.split('.').map(Number);
+    if (octets.some((entry) => !Number.isInteger(entry) || entry < 0 || entry > 255)) return null;
+    normalized = `${normalized.slice(0, -dotted.length)}${((octets[0] << 8) | octets[1]).toString(16)}:${((octets[2] << 8) | octets[3]).toString(16)}`;
+  }
+  const halves = normalized.split('::');
+  if (halves.length > 2) return null;
+  const left = halves[0] ? halves[0].split(':') : [];
+  const right = halves.length === 2 && halves[1] ? halves[1].split(':') : [];
+  const missing = 8 - left.length - right.length;
+  if ((halves.length === 1 && missing !== 0) || (halves.length === 2 && missing < 1)) return null;
+  const parts = halves.length === 2 ? [...left, ...Array(missing).fill('0'), ...right] : left;
+  if (parts.length !== 8 || parts.some((entry) => !/^[0-9a-f]{1,4}$/.test(entry))) return null;
+  return parts.map((entry) => Number.parseInt(entry, 16));
+}
+
+export function isPrivateAddress(address: string): boolean {
+  const literal = address.toLowerCase().trim().replace(/^\[|\]$/g, '').split('%', 1)[0];
+  const normalized = literal.replace(/^::ffff:/, '');
+  if (net.isIPv4(normalized)) {
+    const [a, b, c] = normalized.split('.').map(Number);
+    return (
+      a === 0 || a === 10 || a === 127 || a >= 224 ||
+      (a === 100 && b >= 64 && b <= 127) ||
+      (a === 169 && b === 254) ||
+      (a === 172 && b >= 16 && b <= 31) ||
+      (a === 192 && ((b === 0 && (c === 0 || c === 2)) || b === 168)) ||
+      (a === 198 && (b === 18 || b === 19 || (b === 51 && c === 100))) ||
+      (a === 203 && b === 0 && c === 113)
+    );
+  }
+  if (net.isIPv6(literal)) {
+    const words = ipv6Hextets(literal);
+    if (!words) return true;
+    const mapped = words.slice(0, 5).every((entry) => entry === 0) && words[5] === 0xffff;
+    const compatible = words.slice(0, 6).every((entry) => entry === 0);
+    if (mapped || compatible) {
+      const embedded = `${words[6] >> 8}.${words[6] & 0xff}.${words[7] >> 8}.${words[7] & 0xff}`;
+      if (isPrivateAddress(embedded)) return true;
+    }
+    return words.every((entry) => entry === 0) ||
+      (words.slice(0, 7).every((entry) => entry === 0) && words[7] === 1) ||
+      (words[0] & 0xfe00) === 0xfc00 ||
+      (words[0] & 0xffc0) === 0xfe80 ||
+      (words[0] & 0xff00) === 0xff00 ||
+      (words[0] === 0x2001 && words[1] === 0x0db8);
+  }
   return false;
+}
+
+// The lookup runs inside the actual socket connection. This both validates and
+// pins the chosen public address, closing the DNS-rebinding gap between a
+// preflight lookup and fetch().
+const publicLookup: net.LookupFunction = (hostname, options, callback) => {
+  dns.lookup(hostname, { ...options, all: true, verbatim: true }, (error, addresses) => {
+    if (error) return callback(error, '', 0);
+    const resolved = Array.isArray(addresses) ? addresses : [];
+    if (!resolved.length || resolved.some((entry) => isPrivateAddress(entry.address))) {
+      const rejected = new Error('The resource host resolves to a private or reserved address.') as NodeJS.ErrnoException;
+      rejected.code = 'ENOTFOUND';
+      return callback(rejected, '', 0);
+    }
+    if (options.all) return callback(null, resolved);
+    return callback(null, resolved[0].address, resolved[0].family);
+  });
+};
+
+function fetchWithPinnedPublicDns(url: URL, init: RequestInit): Promise<Response> {
+  return new Promise((resolve, reject) => {
+    const transport = url.protocol === 'https:' ? https : http;
+    const request = transport.request(url, {
+      method: 'GET',
+      headers: init.headers as Record<string, string>,
+      lookup: publicLookup,
+      signal: init.signal ?? undefined,
+    }, (incoming) => {
+      const headers = new Headers();
+      for (let index = 0; index < incoming.rawHeaders.length; index += 2)
+        headers.append(incoming.rawHeaders[index], incoming.rawHeaders[index + 1]);
+      resolve(new Response(Readable.toWeb(incoming) as ReadableStream, {
+        status: incoming.statusCode ?? 500,
+        statusText: incoming.statusMessage,
+        headers,
+      }));
+    });
+    request.once('error', reject);
+    request.end();
+  });
 }
 
 export async function assertPublicUrl(raw: string): Promise<URL> {
@@ -108,29 +198,33 @@ export async function assertPublicUrl(raw: string): Promise<URL> {
   if (!['http:', 'https:'].includes(url.protocol)) throw new Error('Only HTTP(S) resources can be downloaded.');
   if (!url.hostname || url.username || url.password || url.hostname.toLowerCase() === 'localhost') throw new Error('The resource URL is not public.');
   if (isPrivateAddress(url.hostname)) throw new Error('Private-network resource URLs are not accepted.');
-  const addresses = await dns.lookup(url.hostname, { all: true, verbatim: true });
+  const addresses = await dnsPromises.lookup(url.hostname, { all: true, verbatim: true });
   if (!addresses.length || addresses.some((entry) => isPrivateAddress(entry.address))) throw new Error('The resource host resolves to a private address.');
   return url;
 }
 
 export async function fetchPublicResource(raw: string, options: PublicFetchOptions = {}): Promise<PublicFetchResult> {
   const validate = options.assertPublic ?? assertPublicUrl;
-  const fetcher = options.fetcher ?? fetch;
   const maxBytes = options.maxBytes ?? MAX_PUBLIC_DOWNLOAD_BYTES;
   let current = await validate(raw);
   for (let redirect = 0; redirect < 6; redirect += 1) {
-    const response = await fetcher(current, {
+    const timeoutSignal = AbortSignal.timeout(options.timeoutMs ?? 20_000);
+    const init = {
       redirect: 'manual',
-      signal: AbortSignal.timeout(options.timeoutMs ?? 20_000),
+      signal: options.signal ? AbortSignal.any([options.signal, timeoutSignal]) : timeoutSignal,
       headers: {
         Accept: options.accept ?? '*/*',
         'User-Agent': 'Nodus/4 document client',
         ...(options.headers ?? {}),
       },
-    });
+    } as RequestInit;
+    const response = options.fetcher
+      ? await options.fetcher(current, init)
+      : await fetchWithPinnedPublicDns(current, init);
     if (response.status >= 300 && response.status < 400) {
       const location = response.headers.get('location');
       if (!location) throw new Error(`Resource download redirected without a location (${response.status}).`);
+      await response.body?.cancel();
       current = await validate(new URL(location, current).toString());
       continue;
     }

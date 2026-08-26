@@ -46,6 +46,8 @@ export function VirtualList<T>({
   // Reporting the top row while the restore is still pending would overwrite the
   // very placement being restored: the list renders at scroll zero first.
   const anchorSettled = useRef(anchorKey === null);
+  const previousAnchorKey = useRef<React.Key | null>(anchorKey);
+  const previousAnchorIndex = useRef<number>(-1);
   const reportAnchor = useRef(onAnchorChange);
   reportAnchor.current = onAnchorChange;
 
@@ -128,15 +130,22 @@ export function VirtualList<T>({
     onRangeChange?.({ start, end, total: items.length });
   }, [end, items.length, onRangeChange, start]);
 
-  // Put the anchored row back under the top edge, once, as soon as it exists. A row
-  // that never turns up leaves the list where it is and simply releases the hold on
-  // capture: deciding what to do about a vanished anchor belongs to the caller, which
-  // is the only one that knows how to go back to the first page.
+  // Restore a changed anchor and keep it fixed when progressive ranking moves its
+  // row. Tracking the last index avoids snapping during unrelated renders.
   useLayoutEffect(() => {
-    if (anchorSettled.current || anchorKey === null || items.length === 0) return;
+    if (anchorKey === null || items.length === 0) {
+      anchorSettled.current = true;
+      previousAnchorKey.current = anchorKey;
+      previousAnchorIndex.current = -1;
+      return;
+    }
     const index = items.findIndex((item, position) => getKey(item, position) === anchorKey);
     anchorSettled.current = true;
     if (index < 0) return;
+    const changed = previousAnchorKey.current !== anchorKey || previousAnchorIndex.current !== index;
+    previousAnchorKey.current = anchorKey;
+    previousAnchorIndex.current = index;
+    if (!changed) return;
     const element = scrollRef.current;
     if (!element) return;
     const target = variableLayout ? variableLayout.offsets[index] : index * (itemHeight as number);

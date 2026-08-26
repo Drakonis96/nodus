@@ -1,6 +1,7 @@
 import { getDb } from './database';
 import { v4 as uuid } from 'uuid';
 import type { ManagedTheme, Theme } from '@shared/types';
+import { COMPASS_THEME_ALIASES } from '../compass/compassVocabulary';
 
 export const MIN_GRAPH_THEME_WORKS = 2;
 export const MAX_GRAPH_THEMES = 24;
@@ -29,6 +30,7 @@ const THEME_ALIASES: Record<string, string> = {
   colonialism: 'colonialismo',
   'historia contemporánea de españa': 'historia de españa',
   'historia social de españa': 'historia de españa',
+  ...COMPASS_THEME_ALIASES,
 };
 
 export function normalizeThemeLabel(label: string): string {

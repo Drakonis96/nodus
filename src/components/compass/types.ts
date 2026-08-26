@@ -19,16 +19,16 @@ export function getCompassApi(): CompassApi {
 
 export const EMPTY_COMPASS_FILTERS: CompassFilters = {};
 export const EMPTY_COMPASS_SNAPSHOT: CompassSnapshot = {
-  searchId: null, query: '', filters: {}, providerCursors: {}, selectedCanonicalKeys: [], scrollAnchor: undefined,
+  searchId: null, draft: '', lane: 'scholarly', filters: {}, sort: 'relevance', scrollAnchors: {},
 };
 
 export const COMPASS_PROVIDERS: Array<{ id: CompassProviderId; label: string }> = [
-  { id: 'openalex', label: 'OpenAlex' }, { id: 'crossref', label: 'Crossref' },
-  { id: 'openaire', label: 'OpenAIRE' }, { id: 'hal', label: 'HAL' },
-  { id: 'semanticscholar', label: 'Semantic Scholar' }, { id: 'doab', label: 'DOAB' },
-  { id: 'oapen', label: 'OAPEN' }, { id: 'dialnet', label: 'Dialnet' },
-  { id: 'openedition', label: 'OpenEdition' }, { id: 'scielo', label: 'SciELO' },
-  { id: 'unpaywall', label: 'Unpaywall' }, { id: 'opencitations', label: 'OpenCitations' },
+  { id: 'openalex', label: 'OpenAlex' }, { id: 'core', label: 'CORE' }, { id: 'doaj', label: 'DOAJ' }, { id: 'openaire', label: 'OpenAIRE' },
+  { id: 'openlibrary', label: 'Open Library' }, { id: 'doab', label: 'DOAB' }, { id: 'oapen', label: 'OAPEN' }, { id: 'bnf', label: 'BnF' },
+  { id: 'hal', label: 'HAL' }, { id: 'datacite', label: 'DataCite' }, { id: 'zenodo', label: 'Zenodo' }, { id: 'europepmc', label: 'Europe PMC' },
+  { id: 'arxiv', label: 'arXiv' }, { id: 'dblp', label: 'DBLP' }, { id: 'semanticscholar', label: 'Semantic Scholar' },
+  { id: 'internetarchive', label: 'Internet Archive' }, { id: 'loc', label: 'Library of Congress' }, { id: 'gallica', label: 'Gallica' },
+  { id: 'crossref', label: 'Crossref' }, { id: 'opencitations', label: 'OpenCitations' },
 ];
 
 export type CompassResult = CompassResultSummary;
