@@ -16,11 +16,16 @@ SPDX-License-Identifier: AGPL-3.0-only
 <meta property="og:url" content="https://nodusresearch.com/"/>
 <meta property="og:site_name" content="Nodus Research"/>
 <meta property="og:locale" content="en_GB"/>
-<meta property="og:image" content="https://nodusresearch.com/favicon.png"/>
-<meta name="twitter:card" content="summary"/>
+<meta property="og:image" content="https://nodusresearch.com/assets/social/nodus-research-og.png"/>
+<meta property="og:image:type" content="image/png"/>
+<meta property="og:image:width" content="1200"/>
+<meta property="og:image:height" content="630"/>
+<meta property="og:image:alt" content="Nodus Research with a screenshot of the Nodus academic knowledge graph"/>
+<meta name="twitter:card" content="summary_large_image"/>
 <meta name="twitter:title" content="Nodus Research | Open Source Research Workspace"/>
 <meta name="twitter:description" content="The open-source project behind Nodus, a local-first desktop workspace for connecting academic sources, ideas and evidence."/>
-<meta name="twitter:image" content="https://nodusresearch.com/favicon.png"/>
+<meta name="twitter:image" content="https://nodusresearch.com/assets/social/nodus-research-og.png"/>
+<meta name="twitter:image:alt" content="Nodus Research with a screenshot of the Nodus academic knowledge graph"/>
 <link rel="canonical" href="https://nodusresearch.com/"/>
 <link rel="icon" href="favicon.ico" sizes="any"/>
   <link rel="icon" type="image/png" href="favicon.png" sizes="512x512"/>
@@ -52,22 +57,32 @@ SPDX-License-Identifier: AGPL-3.0-only
     }
   } catch (error) {}
 </script>
+<!-- generated:homepage-jsonld:start -->
 <script type="application/ld+json">
 {
   "@context": "https://schema.org",
   "@graph": [
     {
+      "@type": "Person",
+      "@id": "https://nodusresearch.com/#creator",
+      "name": "Jorge Pérez Burgueño",
+      "url": "https://orcid.org/0000-0002-1150-1930",
+      "sameAs": [
+        "https://orcid.org/0000-0002-1150-1930"
+      ]
+    },
+    {
       "@type": "WebSite",
       "@id": "https://nodusresearch.com/#website",
       "url": "https://nodusresearch.com/",
       "name": "Nodus Research",
-      "alternateName": ["nodusresearch.com"],
+      "alternateName": [
+        "nodusresearch.com"
+      ],
       "description": "Nodus Research is the independent open-source project behind the Nodus desktop application.",
       "inLanguage": "en",
       "creator": {
-        "@type": "Person",
-        "name": "Jorge Pérez Burgueño",
-        "sameAs": "https://orcid.org/0000-0002-1150-1930"
+        "@id": "https://nodusresearch.com/#creator"
       }
     },
     {
@@ -75,33 +90,54 @@ SPDX-License-Identifier: AGPL-3.0-only
       "@id": "https://nodusresearch.com/#software",
       "name": "Nodus",
       "url": "https://nodusresearch.com/app/",
-      "isPartOf": { "@id": "https://nodusresearch.com/#website" },
+      "isPartOf": {
+        "@id": "https://nodusresearch.com/#website"
+      },
       "applicationCategory": "EducationalApplication",
-      "applicationSubCategory": "Research workspace",
+      "applicationSubCategory": "Academic research workspace",
       "operatingSystem": "macOS, Windows, Linux",
-      "description": "Nodus is a free, open source, local-first desktop workspace for academic research. It builds a corpus from a Zotero library or your own documents, records ideas with the passage and page that support them, and supports semantic search, research gaps, debates and writing with verifiable citations.",
-      "license": "https://github.com/Drakonis96/nodus/blob/main/LICENSE",
+      "description": "Nodus is a free, open-source, local-first desktop workspace for academic research. It connects sources, ideas and evidence, supports Zotero libraries and semantic search, and keeps the research corpus on the researcher’s own computer.",
+      "softwareVersion": "5.0.2",
+      "datePublished": "2026-08-26",
+      "releaseNotes": "https://github.com/Drakonis96/nodus/releases/tag/v5.0.2",
+      "license": "https://spdx.org/licenses/AGPL-3.0-only.html",
+      "codeRepository": "https://github.com/Drakonis96/nodus",
       "isAccessibleForFree": true,
       "downloadUrl": "https://github.com/Drakonis96/nodus/releases/latest",
       "softwareHelp": "https://nodusresearch.com/wiki/",
-      "identifier": {
-        "@type": "PropertyValue",
-        "propertyID": "DOI",
-        "value": "10.5281/zenodo.21515531"
-      },
+      "identifier": [
+        {
+          "@type": "PropertyValue",
+          "propertyID": "Concept DOI",
+          "value": "10.5281/zenodo.21515531"
+        },
+        {
+          "@type": "PropertyValue",
+          "propertyID": "Version DOI",
+          "value": "10.5281/zenodo.22103353"
+        },
+        {
+          "@type": "PropertyValue",
+          "propertyID": "Release tag",
+          "value": "v5.0.2"
+        }
+      ],
       "sameAs": [
         "https://github.com/Drakonis96/nodus",
-        "https://doi.org/10.5281/zenodo.21515531"
+        "https://doi.org/10.5281/zenodo.21515531",
+        "https://doi.org/10.5281/zenodo.22103353"
       ],
       "author": {
-        "@type": "Person",
-        "name": "Jorge Pérez Burgueño",
-        "sameAs": "https://orcid.org/0000-0002-1150-1930"
+        "@id": "https://nodusresearch.com/#creator"
+      },
+      "creator": {
+        "@id": "https://nodusresearch.com/#creator"
       }
     }
   ]
 }
 </script>
+<!-- generated:homepage-jsonld:end -->
 </head>
 <body data-formation="on">
 
@@ -147,7 +183,7 @@ SPDX-License-Identifier: AGPL-3.0-only
       </button>
     </div>
     <p class="meta"><b>Nodus Research is a personal, independent open-source project developed in Spain.</b> It currently sells no product or service. Nodus is free to download and use, with no accounts, subscriptions or telemetry.</p>
-    <p class="hero-links">Read on: <a href="app/">the Nodus app</a> · <a href="research/">Nodus for academic research</a> · <a href="zotero/">the Zotero integration</a> · <a href="ai-research/">AI for academic research</a> · <a href="open-source/">open source and local-first</a></p>
+    <p class="hero-links">Read on: <a href="app/">the Nodus app</a> · <a href="research/">Nodus for academic research</a> · <a href="zotero/">the Zotero integration</a> · <a href="zotero-plugin/">the Nodus Zotero plugin</a> · <a href="ai-research/">AI for academic research</a> · <a href="open-source/">open source and local-first</a></p>
   </div>
   <div class="scroll-cue" aria-hidden="true"><span class="rail"></span>Scroll</div>
 </header>
@@ -518,7 +554,7 @@ SPDX-License-Identifier: AGPL-3.0-only
     <div class="reveal">
       <span class="kicker" style="justify-content:center">Free and local-first, honestly</span>
       <h2 class="title" data-split>Completely free. Completely yours.</h2>
-      <p class="lead">Nodus 4 is open source under the AGPL-3.0-only licence, with no accounts, no subscriptions and no telemetry. Vaults and the optional cross-vault Library stay on your device and in the backup folder you choose. AI runs with your own key or fully offline through Ollama and LM Studio.</p>
+      <p class="lead">Nodus is open source under the AGPL-3.0-only licence, with no accounts, no subscriptions and no telemetry. Vaults and the optional cross-vault Library stay on your device and in the backup folder you choose. AI runs with your own key or fully offline through Ollama and LM Studio.</p>
       <div class="pills">
         <span class="pill"><svg viewBox="0 0 24 24"><path d="m4 12.5 5 5L20 6.5"/></svg>Free forever (AGPL-3.0-only)</span>
         <span class="pill"><svg viewBox="0 0 24 24"><path d="m4 12.5 5 5L20 6.5"/></svg>100% local storage</span>

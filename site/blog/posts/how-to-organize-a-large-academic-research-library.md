@@ -24,7 +24,7 @@ This does not mean that every research project needs a complex knowledge graph. 
 
 Nodus is designed around this approach. Documents can be stored in a research library alongside bibliographic information, notes and ideas. Ideas extracted from sources can be connected to other elements of the project, allowing the library to become more than a collection of files.
 
-Existing reference managers can remain part of this workflow. Nodus can connect to Zotero, allowing researchers to continue using their existing bibliographic library while adding another layer for documents, ideas and analysis.
+Existing reference managers can remain part of this workflow. Nodus can connect to Zotero, allowing researchers to continue using their existing bibliographic library while adding another layer for documents, ideas and analysis. The [Zotero integration guide](/zotero/) explains the read-only connection and how it differs from the standalone plugin.
 
 ## Using AI to explore your own research sources
 
@@ -52,6 +52,8 @@ A large academic research library will always require some organisation from the
 
 The result is a library that is not simply a place where research material is stored. It becomes part of the research process itself.
 
-[Explore Nodus](https://nodusresearch.com)
+[Explore the Nodus academic research workspace](/research/)
+
+[Read how Nodus uses AI with evidence](/ai-research/)
 
 [View Nodus on GitHub](https://github.com/Drakonis96/nodus)

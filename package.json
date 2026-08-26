@@ -2,8 +2,21 @@
   "name": "nodus",
   "version": "5.0.2",
   "description": "Local-first desktop app that turns a Zotero library into a navigable graph of ideas and authors.",
-  "author": "Nodus",
+  "author": {
+    "name": "Jorge Pérez Burgueño",
+    "url": "https://orcid.org/0000-0002-1150-1930"
+  },
   "license": "AGPL-3.0-only",
+  "homepage": "https://nodusresearch.com/",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Drakonis96/nodus.git"
+  },
+  "releaseMetadata": {
+    "dateReleased": "2026-08-26",
+    "conceptDoi": "10.5281/zenodo.21515531",
+    "versionDoi": "10.5281/zenodo.22103353"
+  },
   "private": true,
   "main": "dist-electron/main.js",
   "type": "module",
@@ -15,7 +28,12 @@
     "test:cloudflare": "node --test scripts/test-cloudflare-contract.mjs",
     "blog:pages": "node scripts/build-blog-pages.mjs",
     "blog:feed": "node scripts/build-blog-feed.mjs",
-    "blog:build": "npm run blog:pages && npm run blog:feed && npm run site:sitemap",
+    "blog:build": "npm run site:metadata && npm run blog:pages && npm run blog:feed && npm run site:sitemap",
+    "site:metadata": "node scripts/build-site-metadata.mjs",
+    "site:social": "node scripts/build-social-image.mjs",
+    "site:artifact": "node scripts/build-pages-artifact.mjs",
+    "site:build": "npm run blog:build && npm run site:artifact",
+    "site:verify": "node --test scripts/test-site-*.mjs",
     "site:sitemap": "node scripts/build-sitemap.mjs",
     "citation:sync": "node scripts/sync-citation.mjs",
     "citation:check": "node scripts/sync-citation.mjs --check",

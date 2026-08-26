@@ -4,10 +4,12 @@ import fs from 'node:fs';
 import path from 'node:path';
 import vm from 'node:vm';
 import { fileURLToPath } from 'node:url';
+import { loadSiteMetadata, personEntity } from './lib/site-metadata.mjs';
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const blogRoot = path.join(repoRoot, 'site', 'blog');
-const SITE = 'https://nodusresearch.com';
+const metadata = loadSiteMetadata(repoRoot);
+const SITE = metadata.siteUrl;
 
 const escapeHtml = (value) => String(value).replace(/[&<>"']/g, (character) => (
   { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[character]
@@ -39,27 +41,52 @@ for (const [position, post] of posts.entries()) {
   const words = source.split(/\s+/).filter(Boolean).length;
   const minutes = post.reading || Math.max(1, Math.round(words / 220));
   const canonical = `${SITE}/blog/${post.slug}/`;
-  const image = post.cover ? new URL(post.cover, `${SITE}/blog/`).href : '';
+  const image = post.cover ? new URL(post.cover, `${SITE}/blog/`).href : metadata.socialImage;
+  const imageAlt = post.coverAlt || 'Nodus Research with a screenshot of the Nodus academic knowledge graph';
+  const modified = post.modified || post.date;
   const next = posts[position + 1];
+  const articleId = `${canonical}#article`;
+  const webpageId = `${canonical}#webpage`;
+  const breadcrumbId = `${canonical}#breadcrumb`;
   const structuredData = JSON.stringify({
     '@context': 'https://schema.org',
-    '@type': 'BlogPosting',
-    headline: post.title,
-    description: post.summary,
-    datePublished: post.date,
-    dateModified: post.date,
-    mainEntityOfPage: canonical,
-    ...(image ? { image } : {}),
-    author: {
-      '@type': 'Person',
-      name: 'Jorge Pérez Burgueño',
-      sameAs: 'https://orcid.org/0000-0002-1150-1930',
-    },
-    publisher: {
-      '@type': 'Person',
-      name: 'Jorge Pérez Burgueño',
-      sameAs: 'https://orcid.org/0000-0002-1150-1930',
-    },
+    '@graph': [
+      personEntity(metadata),
+      {
+        '@type': 'BreadcrumbList',
+        '@id': breadcrumbId,
+        itemListElement: [
+          { '@type': 'ListItem', position: 1, name: metadata.projectName, item: `${SITE}/` },
+          { '@type': 'ListItem', position: 2, name: 'Blog', item: `${SITE}/blog/` },
+          { '@type': 'ListItem', position: 3, name: post.title, item: canonical },
+        ],
+      },
+      {
+        '@type': 'WebPage',
+        '@id': webpageId,
+        url: canonical,
+        name: post.title,
+        isPartOf: { '@id': metadata.websiteId },
+        breadcrumb: { '@id': breadcrumbId },
+        mainEntity: { '@id': articleId },
+      },
+      {
+        '@type': 'BlogPosting',
+        '@id': articleId,
+        url: canonical,
+        headline: post.title,
+        description: post.summary,
+        datePublished: post.date,
+        dateModified: modified,
+        mainEntityOfPage: { '@id': webpageId },
+        isPartOf: { '@id': metadata.websiteId },
+        image: { '@type': 'ImageObject', url: image, caption: imageAlt },
+        keywords: post.tags || [],
+        author: { '@id': metadata.authorId },
+        publisher: { '@id': metadata.authorId },
+        about: { '@id': metadata.softwareId },
+      },
+    ],
   }).replaceAll('<', '\\u003c');
 
   const html = `<!--
@@ -81,11 +108,17 @@ Generated from posts/${post.slug}.md by scripts/build-blog-pages.mjs.
 <meta property="og:title" content="${escapeHtml(post.title)}"/>
 <meta property="og:description" content="${escapeHtml(post.summary)}"/>
 <meta property="og:url" content="${canonical}"/>
-${image ? `<meta property="og:image" content="${escapeHtml(image)}"/>` : ''}
-<meta name="twitter:card" content="${image ? 'summary_large_image' : 'summary'}"/>
+<meta property="og:image" content="${escapeHtml(image)}"/>
+<meta property="og:image:alt" content="${escapeHtml(imageAlt)}"/>
+<meta name="twitter:card" content="summary_large_image"/>
 <meta name="twitter:title" content="${escapeHtml(post.title)}"/>
 <meta name="twitter:description" content="${escapeHtml(post.summary)}"/>
-${image ? `<meta name="twitter:image" content="${escapeHtml(image)}"/>` : ''}
+<meta name="twitter:image" content="${escapeHtml(image)}"/>
+<meta name="twitter:image:alt" content="${escapeHtml(imageAlt)}"/>
+<meta name="author" content="${escapeHtml(metadata.authorName)}"/>
+<meta property="article:published_time" content="${escapeHtml(post.date)}"/>
+<meta property="article:modified_time" content="${escapeHtml(modified)}"/>
+${(post.tags || []).map((tag) => `<meta property="article:tag" content="${escapeHtml(tag)}"/>`).join('\n')}
 <link rel="canonical" href="${canonical}"/>
 <link rel="icon" href="../favicon.ico" sizes="any"/>
 <link rel="icon" type="image/png" href="../favicon.png" sizes="512x512"/>
@@ -117,7 +150,7 @@ ${image ? `<meta name="twitter:image" content="${escapeHtml(image)}"/>` : ''}
         </a>
         <div class="post-tags">${(post.tags || []).map((tag) => `<span>${escapeHtml(tag)}</span>`).join('')}</div>
         <h1 class="display">${escapeHtml(post.title)}</h1>
-        <p class="post-meta"><time datetime="${escapeHtml(post.date)}">${formatDate(post.date)}</time> · ${minutes} min read</p>
+        <p class="post-meta">By ${escapeHtml(metadata.authorName)} · <time datetime="${escapeHtml(post.date)}">${formatDate(post.date)}</time> · ${minutes} min read</p>
       </div>
     </header>
 

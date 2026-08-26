@@ -2,13 +2,13 @@ import fs from 'node:fs';
 import path from 'node:path';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
+import { loadSiteMetadata } from './lib/site-metadata.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const packagePath = path.join(root, 'package.json');
 const citationPath = path.join(root, 'CITATION.cff');
 const checkOnly = process.argv.includes('--check');
 
-const packageJson = JSON.parse(fs.readFileSync(packagePath, 'utf8'));
+const metadata = loadSiteMetadata(root);
 const original = fs.readFileSync(citationPath, 'utf8');
 
 function readQuotedScalar(key) {
@@ -22,22 +22,34 @@ function readQuotedScalar(key) {
 const citationVersion = readQuotedScalar('version');
 const citationLicense = readQuotedScalar('license');
 const releaseDate = readQuotedScalar('date-released');
+const citationDoi = readQuotedScalar('doi');
+const citationRepository = readQuotedScalar('repository-code');
+const citationUrl = readQuotedScalar('url');
 const tagVersion = process.env.GITHUB_REF_NAME?.match(/^v(.+)$/)?.[1];
 
 if (checkOnly) {
   const errors = [];
 
-  if (citationVersion !== packageJson.version) {
-    errors.push(`CITATION.cff is ${citationVersion}, but package.json is ${packageJson.version}.`);
+  if (citationVersion !== metadata.version) {
+    errors.push(`CITATION.cff is ${citationVersion}, but the release metadata is ${metadata.version}.`);
   }
-  if (citationLicense !== packageJson.license) {
-    errors.push(`CITATION.cff license is ${citationLicense}, but package.json is ${packageJson.license}.`);
+  if (citationLicense !== metadata.license) {
+    errors.push(`CITATION.cff license is ${citationLicense}, but package.json is ${metadata.license}.`);
   }
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(releaseDate)) {
-    errors.push(`CITATION.cff has an invalid date-released value: ${releaseDate}.`);
+  if (releaseDate !== metadata.releaseDate) {
+    errors.push(`CITATION.cff release date is ${releaseDate}, but the release metadata is ${metadata.releaseDate}.`);
   }
-  if (tagVersion && tagVersion !== packageJson.version) {
-    errors.push(`Release tag v${tagVersion} does not match package.json ${packageJson.version}.`);
+  if (citationDoi !== metadata.versionDoi) {
+    errors.push(`CITATION.cff DOI is ${citationDoi}, but the version DOI is ${metadata.versionDoi}.`);
+  }
+  if (citationRepository !== metadata.repository) {
+    errors.push(`CITATION.cff repository is ${citationRepository}, but the canonical repository is ${metadata.repository}.`);
+  }
+  if (citationUrl !== `${metadata.siteUrl}/`) {
+    errors.push(`CITATION.cff URL is ${citationUrl}, but the canonical site is ${metadata.siteUrl}/.`);
+  }
+  if (tagVersion && tagVersion !== metadata.version) {
+    errors.push(`Release tag v${tagVersion} does not match package.json ${metadata.version}.`);
   }
 
   if (errors.length > 0) {
@@ -45,16 +57,21 @@ if (checkOnly) {
     console.error('Prepare releases with `npm version <patch|minor|major|version>` before pushing the tag.');
     process.exitCode = 1;
   } else {
-    console.log(`Citation metadata is synchronized for Nodus ${packageJson.version}.`);
+    console.log(`Citation metadata is synchronized for Nodus ${metadata.version}.`);
   }
-} else if (citationVersion === packageJson.version) {
-  console.log(`CITATION.cff is already synchronized for Nodus ${packageJson.version}.`);
 } else {
-  const today = new Date().toISOString().slice(0, 10);
   const updated = original
-    .replace(/^version:\s*["'][^"']+["']\s*$/m, `version: "${packageJson.version}"`)
-    .replace(/^date-released:\s*["'][^"']+["']\s*$/m, `date-released: "${today}"`);
+    .replace(/^version:\s*["'][^"']+["']\s*$/m, `version: "${metadata.version}"`)
+    .replace(/^date-released:\s*["'][^"']+["']\s*$/m, `date-released: "${metadata.releaseDate}"`)
+    .replace(/^license:\s*["'][^"']+["']\s*$/m, `license: "${metadata.license}"`)
+    .replace(/^repository-code:\s*["'][^"']+["']\s*$/m, `repository-code: "${metadata.repository}"`)
+    .replace(/^url:\s*["'][^"']+["']\s*$/m, `url: "${metadata.siteUrl}/"`)
+    .replace(/^doi:\s*["'][^"']+["']\s*$/m, `doi: "${metadata.versionDoi}"`);
 
-  fs.writeFileSync(citationPath, updated);
-  console.log(`Updated CITATION.cff to Nodus ${packageJson.version} (${today}).`);
+  if (updated === original) {
+    console.log(`CITATION.cff is already synchronized for Nodus ${metadata.version}.`);
+  } else {
+    fs.writeFileSync(citationPath, updated);
+    console.log(`Updated CITATION.cff to Nodus ${metadata.version} (${metadata.releaseDate}).`);
+  }
 }

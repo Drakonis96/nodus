@@ -9,11 +9,11 @@ const siteRoot = path.join(repoRoot, 'site');
 const read = (relative) => fs.readFileSync(path.join(siteRoot, relative), 'utf8');
 
 test('the site has every destination the navigation promises', () => {
-  for (const entry of ['index.html', 'about/index.html', 'app/index.html', 'apps/index.html', 'research-atlas/index.html', 'wiki/index.html', 'blog/index.html', 'cite/index.html', 'legal/index.html', 'contribute/index.html', 'faq/index.html']) {
+  for (const entry of ['index.html', 'about/index.html', 'app/index.html', 'apps/index.html', 'research-atlas/index.html', 'zotero-plugin/index.html', 'wiki/index.html', 'blog/index.html', 'cite/index.html', 'legal/index.html', 'contribute/index.html', 'faq/index.html']) {
     assert.ok(fs.existsSync(path.join(siteRoot, entry)), `site/${entry} exists`);
   }
   const home = read('index.html');
-  for (const href of ['about/', 'app/', 'apps/', 'research-atlas/', 'wiki/', 'blog/', 'cite/', 'legal/', 'contribute/', 'faq/']) {
+  for (const href of ['about/', 'app/', 'apps/', 'research-atlas/', 'zotero-plugin/', 'wiki/', 'blog/', 'cite/', 'legal/', 'contribute/', 'faq/']) {
     assert.ok(home.includes(`href="${href}"`), `the home page links to ${href}`);
   }
 });
@@ -300,6 +300,7 @@ const TOPIC_PAGES = [
   ['apps/index.html', 'https://nodusresearch.com/apps/'],
   ['research/index.html', 'https://nodusresearch.com/research/'],
   ['zotero/index.html', 'https://nodusresearch.com/zotero/'],
+  ['zotero-plugin/index.html', 'https://nodusresearch.com/zotero-plugin/'],
   ['ai-research/index.html', 'https://nodusresearch.com/ai-research/'],
   ['open-source/index.html', 'https://nodusresearch.com/open-source/'],
 ];
@@ -335,7 +336,7 @@ test('the topic pages are indexable, canonical and described only once each', ()
 
 test('the topic pages are linked from the home page and to each other', () => {
   const home = read('index.html');
-  for (const href of ['about/', 'app/', 'apps/', 'research/', 'zotero/', 'ai-research/', 'open-source/']) {
+  for (const href of ['about/', 'app/', 'apps/', 'research/', 'zotero/', 'zotero-plugin/', 'ai-research/', 'open-source/']) {
     assert.ok(home.includes(`href="${href}"`), `the home page links to /${href}`);
   }
   // descriptive anchors, not "click here" — the anchor text is the link's whole signal
@@ -343,11 +344,12 @@ test('the topic pages are linked from the home page and to each other', () => {
 
   const links = {
     'about/index.html': ['../app/', '../apps/', '../cite/', '../open-source/'],
-    'app/index.html': ['../about/', '../apps/', '../research/', '../zotero/', '../ai-research/', '../open-source/', '../faq/', '../wiki/'],
+    'app/index.html': ['../about/', '../apps/', '../research/', '../zotero/', '../zotero-plugin/', '../ai-research/', '../open-source/', '../faq/', '../wiki/'],
     'apps/index.html': ['../about/', '../app/#download', '../research/'],
     'research/index.html': ['../about/', '../apps/', '../zotero/', '../ai-research/', '../open-source/'],
-    'zotero/index.html': ['../about/', '../apps/', '../research/', '../open-source/'],
-    'ai-research/index.html': ['../about/', '../apps/', '../research/', '../zotero/', '../open-source/'],
+    'zotero/index.html': ['../about/', '../apps/', '../research/', '../zotero-plugin/', '../open-source/'],
+    'zotero-plugin/index.html': ['../about/', '../app/', '../research/', '../zotero/', '../ai-research/', '../open-source/'],
+    'ai-research/index.html': ['../about/', '../apps/', '../research/', '../zotero/', '../zotero-plugin/#workflows', '../open-source/'],
     'open-source/index.html': ['../about/', '../apps/', '../research/', '../zotero/', '../ai-research/'],
   };
   for (const [page, required] of Object.entries(links)) {
@@ -394,6 +396,7 @@ test('the sitemap lists every static page of the site', () => {
     'https://nodusresearch.com/apps/',
     'https://nodusresearch.com/research/',
     'https://nodusresearch.com/zotero/',
+    'https://nodusresearch.com/zotero-plugin/',
     'https://nodusresearch.com/ai-research/',
     'https://nodusresearch.com/open-source/',
     'https://nodusresearch.com/wiki/',
@@ -429,7 +432,7 @@ test('the app page documents the current desktop builds and available vaults', (
 });
 
 test('every page is reachable by keyboard and readable by a screen reader', () => {
-  for (const page of ['index.html', 'about/index.html', 'app/index.html', 'apps/index.html', 'cite/index.html', 'legal/index.html', 'research-atlas/index.html', 'faq/index.html', 'blog/index.html', 'blog/post.html', 'contribute/index.html', 'research/index.html', 'zotero/index.html', 'ai-research/index.html', 'open-source/index.html']) {
+  for (const page of ['index.html', 'about/index.html', 'app/index.html', 'apps/index.html', 'cite/index.html', 'legal/index.html', 'research-atlas/index.html', 'faq/index.html', 'blog/index.html', 'blog/post.html', 'contribute/index.html', 'research/index.html', 'zotero/index.html', 'zotero-plugin/index.html', 'ai-research/index.html', 'open-source/index.html']) {
     const html = read(page);
     assert.match(html, /class="skip-link" href="#/, `${page} offers a skip link`);
     assert.match(html, /<html lang="en">/, `${page} declares its language`);

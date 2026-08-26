@@ -1,0 +1,255 @@
+<!--
+SPDX-FileCopyrightText: 2026 Jorge Pérez Burgueño and Nodus contributors
+SPDX-License-Identifier: AGPL-3.0-only
+-->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Nodus Zotero Plugin | Local-First Research Assistant</title>
+<meta name="description" content="Install the Nodus Zotero plugin for local-first semantic search, cited answers and evidence audits across PDF, EPUB and HTML attachments inside Zotero."/>
+<meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1"/>
+<meta property="og:title" content="Nodus Zotero Plugin | Local-First Research Assistant"/>
+<meta property="og:description" content="Semantic search, cited answers and evidence-grounded research inside Zotero, with a local index and optional connection to the Nodus desktop app."/>
+<meta property="og:type" content="website"/>
+<meta property="og:url" content="https://nodusresearch.com/zotero-plugin/"/>
+<meta property="og:site_name" content="Nodus Research"/>
+<meta property="og:locale" content="en_GB"/>
+<meta property="og:image" content="https://nodusresearch.com/assets/social/nodus-research-og.png"/>
+<meta property="og:image:type" content="image/png"/>
+<meta property="og:image:width" content="1200"/>
+<meta property="og:image:height" content="630"/>
+<meta property="og:image:alt" content="Nodus Research with a screenshot of the Nodus academic knowledge graph"/>
+<meta name="twitter:card" content="summary_large_image"/>
+<meta name="twitter:title" content="Nodus Zotero Plugin"/>
+<meta name="twitter:description" content="A local-first research assistant for semantic search and cited answers inside Zotero."/>
+<meta name="twitter:image" content="https://nodusresearch.com/assets/social/nodus-research-og.png"/>
+<meta name="twitter:image:alt" content="Nodus Research with a screenshot of the Nodus academic knowledge graph"/>
+<link rel="canonical" href="https://nodusresearch.com/zotero-plugin/"/>
+<link rel="icon" href="../favicon.ico" sizes="any"/>
+<link rel="icon" type="image/png" href="../favicon.png" sizes="512x512"/>
+<link rel="icon" type="image/svg+xml" href="../assets/nodus-logo.svg"/>
+<link rel="apple-touch-icon" href="../apple-touch-icon.png"/>
+<link rel="preload" as="font" type="font/woff2" href="../assets/fonts/inter-latin.woff2" crossorigin/>
+<link rel="preload" as="font" type="font/woff2" href="../assets/fonts/fraunces-latin.woff2" crossorigin/>
+<link rel="stylesheet" href="../assets/css/nodus.css?v=20260823a"/>
+<link rel="stylesheet" href="../assets/css/guide.css?v=20260823a"/>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "BreadcrumbList",
+      "@id": "https://nodusresearch.com/zotero-plugin/#breadcrumb",
+      "itemListElement": [
+        { "@type": "ListItem", "position": 1, "name": "Nodus Research", "item": "https://nodusresearch.com/" },
+        { "@type": "ListItem", "position": 2, "name": "Zotero integration", "item": "https://nodusresearch.com/zotero/" },
+        { "@type": "ListItem", "position": 3, "name": "Nodus Zotero Plugin", "item": "https://nodusresearch.com/zotero-plugin/" }
+      ]
+    },
+    {
+      "@type": "WebPage",
+      "@id": "https://nodusresearch.com/zotero-plugin/#webpage",
+      "url": "https://nodusresearch.com/zotero-plugin/",
+      "name": "Nodus Zotero Plugin",
+      "description": "A local-first Zotero research assistant for semantic search, cited answers and evidence audits.",
+      "isPartOf": { "@id": "https://nodusresearch.com/#website" },
+      "breadcrumb": { "@id": "https://nodusresearch.com/zotero-plugin/#breadcrumb" },
+      "mainEntity": { "@id": "https://nodusresearch.com/zotero-plugin/#software" }
+    },
+    {
+      "@type": "SoftwareApplication",
+      "@id": "https://nodusresearch.com/zotero-plugin/#software",
+      "name": "Nodus Zotero Plugin",
+      "applicationCategory": "EducationalApplication",
+      "applicationSubCategory": "Zotero research assistant",
+      "operatingSystem": "macOS, Windows, Linux",
+      "softwareRequirements": "Zotero 7 or later",
+      "description": "An open-source, local-first Zotero plugin for hybrid semantic search, cited answers, document vision and evidence audits across research attachments.",
+      "isPartOf": { "@id": "https://nodusresearch.com/#software" },
+      "isAccessibleForFree": true,
+      "license": "https://spdx.org/licenses/AGPL-3.0-only.html",
+      "downloadUrl": "https://github.com/Drakonis96/nodus/releases/latest/download/nodus-zotero.xpi",
+      "codeRepository": "https://github.com/Drakonis96/nodus/tree/main/zotero-plugin",
+      "author": { "@id": "https://nodusresearch.com/#creator" }
+    }
+  ]
+}
+</script>
+</head>
+<body data-quiet>
+
+<a class="skip-link" href="#main">Skip to content</a>
+<canvas id="organism" aria-hidden="true"></canvas>
+
+<div data-nodus-site-header data-base="../" data-page="zotero"></div>
+<script defer src="../site-header.js?v=20260823a"></script>
+
+<main id="main">
+
+<header class="page-hero guide-hero" data-accent="#f87171" data-second="#a78bfa" data-energy="0.32">
+  <div class="wrap">
+    <div class="scrim" style="max-width:850px">
+      <nav class="breadcrumb" aria-label="Breadcrumb">
+        <a href="../">Nodus Research</a>
+        <span class="sep" aria-hidden="true">/</span>
+        <a href="../zotero/">Zotero integration</a>
+        <span class="sep" aria-hidden="true">/</span>
+        <span aria-current="page">Plugin</span>
+      </nav>
+      <span class="kicker">Zotero research assistant</span>
+      <h1 class="display" data-split>Nodus Zotero Plugin</h1>
+      <p class="lead">The Nodus Zotero plugin adds semantic search, cited answers and evidence review directly to Zotero. It indexes research attachments inside your Zotero profile, can use local models, and remains useful with or without the Nodus desktop application.</p>
+      <div class="guide-actions">
+        <a class="btn primary" href="https://github.com/Drakonis96/nodus/releases/latest/download/nodus-zotero.xpi" target="_blank" rel="noopener">
+          <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M7 10l5 5 5-5"/><path d="M4 19h16"/></svg>
+          Download the XPI
+        </a>
+        <a class="btn" href="https://github.com/Drakonis96/nodus/tree/main/zotero-plugin" target="_blank" rel="noopener">View plugin source</a>
+      </div>
+      <nav class="guide-jump" aria-label="On this page">
+        <a href="#inside-zotero"><em>01</em> Inside Zotero</a>
+        <a href="#privacy"><em>02</em> Local-first privacy</a>
+        <a href="#install"><em>03</em> Installation</a>
+        <a href="#workflows"><em>04</em> Workflows</a>
+        <a href="#desktop"><em>05</em> Nodus desktop</a>
+      </nav>
+    </div>
+  </div>
+</header>
+
+<section id="inside-zotero" class="section-line" data-accent="#a78bfa" data-second="#f87171" data-energy="0.28">
+  <div class="wrap">
+    <div class="section-head scrim reveal">
+      <span class="kicker">01 · Inside Zotero</span>
+      <h2 class="title" data-split>A research layer over the library you already use.</h2>
+      <p class="lead">The plugin works where reading and reference management already happen. It indexes PDF, EPUB and HTML attachments, then adds a sidebar for exact and semantic retrieval across the indexed library.</p>
+    </div>
+    <div class="guide-body prose reveal" style="margin-top:26px">
+      <p>A cited answer includes the passage it relies on and the page when the source provides one. That makes the result a route back into the document rather than an unsupported summary. Hybrid retrieval combines keywords with semantic similarity and can find related passages across languages even when authors use different terms.</p>
+      <p>The plugin is distinct from the broader <a href="../zotero/">Nodus–Zotero integration</a>. That broader workflow mirrors a Zotero library into the Nodus desktop workspace for ideas, relations, knowledge graphs, research gaps and writing. The plugin focuses on searching and checking the material from inside Zotero.</p>
+    </div>
+  </div>
+</section>
+
+<section id="privacy" class="section-line" data-accent="#34d399" data-second="#22d3ee" data-energy="0.3">
+  <div class="wrap">
+    <div class="section-head scrim reveal">
+      <span class="kicker">02 · Local-first privacy</span>
+      <h2 class="title" data-split>The index belongs to your Zotero profile.</h2>
+      <p class="lead">Attachment text, chunks and the search index are stored locally with the plugin. There is no Nodus account and the plugin does not upload a library to Nodus Research.</p>
+    </div>
+    <div class="guide-grid reveal">
+      <article class="card lit guide-card">
+        <h3>Local retrieval</h3>
+        <p>Keyword search and the stored index run against your own Zotero profile. A managed local embedding model can build the semantic index on the same computer.</p>
+      </article>
+      <article class="card lit guide-card">
+        <h3>Models you choose</h3>
+        <p>Local Ollama or LM Studio endpoints can keep model-assisted work on your hardware. If you configure a cloud provider, only the requested material is sent under that provider's terms.</p>
+      </article>
+      <article class="card lit guide-card">
+        <h3>Open source</h3>
+        <p>The plugin source lives in the canonical Nodus repository under AGPL-3.0-only, beside the desktop application and website.</p>
+      </article>
+    </div>
+    <div class="guide-note reveal">
+      <p>For confidential or restricted material, use local models and review the repository's <a href="https://github.com/Drakonis96/nodus/blob/main/PRIVACY.md" target="_blank" rel="noopener">privacy documentation</a> before enabling an external provider.</p>
+    </div>
+  </div>
+</section>
+
+<section id="install" class="section-line" data-accent="#fbbf24" data-second="#f87171" data-energy="0.3">
+  <div class="wrap">
+    <div class="section-head scrim reveal">
+      <span class="kicker">03 · Installation</span>
+      <h2 class="title" data-split>Install the release file in Zotero.</h2>
+      <p class="lead">The plugin is distributed as <code>nodus-zotero.xpi</code> with each stable Nodus release.</p>
+    </div>
+    <div class="guide-steps reveal">
+      <div class="guide-step"><em>01</em><div><h3>Download the XPI</h3><p>Use the <a href="https://github.com/Drakonis96/nodus/releases/latest/download/nodus-zotero.xpi" target="_blank" rel="noopener">direct latest-release download</a>, or choose the file from a specific tagged release when reproducibility matters.</p></div></div>
+      <div class="guide-step"><em>02</em><div><h3>Open Zotero Add-ons</h3><p>In Zotero 7 or newer, open <b>Tools → Add-ons</b>, then choose <b>Install Add-on From File</b> from the settings menu.</p></div></div>
+      <div class="guide-step"><em>03</em><div><h3>Select and configure</h3><p>Select <code>nodus-zotero.xpi</code>, restart Zotero if requested, then choose a local model or a provider before building the semantic index.</p></div></div>
+    </div>
+  </div>
+</section>
+
+<section id="workflows" class="section-line" data-accent="#818cf8" data-second="#a78bfa" data-energy="0.32">
+  <div class="wrap">
+    <div class="section-head scrim reveal">
+      <span class="kicker">04 · Supported workflows</span>
+      <h2 class="title" data-split>Search, ask, inspect and return to the evidence.</h2>
+      <p class="lead">The plugin is designed for research questions that should end at a source passage, not at an untraceable answer.</p>
+    </div>
+    <div class="guide-grid reveal">
+      <article class="card lit guide-card"><h3>Semantic library search</h3><p>Find related text across indexed PDF, EPUB and HTML attachments, including conceptually similar passages that do not repeat the query wording.</p></article>
+      <article class="card lit guide-card"><h3>Cited answers</h3><p>Ask across the indexed library and receive an answer grounded in exact passages and page references that open the underlying item.</p></article>
+      <article class="card lit guide-card"><h3>Scans and visual pages</h3><p>With a vision-capable model, read scanned text and describe figures, tables or formulas that a plain text layer cannot expose.</p></article>
+      <article class="card lit guide-card"><h3>Evidence audit</h3><p>Compare claims with the indexed library and flag places where support looks thin. The audit is a prompt to inspect sources, not a truth score.</p></article>
+    </div>
+  </div>
+</section>
+
+<section id="desktop" class="section-line" data-accent="#22d3ee" data-second="#34d399" data-energy="0.28">
+  <div class="wrap">
+    <div class="section-head scrim reveal">
+      <span class="kicker">05 · Relation to Nodus desktop</span>
+      <h2 class="title" data-split>Independent when you want it. Connected when you need more.</h2>
+      <p class="lead">The plugin does not require the Nodus desktop app. Its index and research sidebar work inside Zotero on their own.</p>
+    </div>
+    <div class="guide-body prose reveal" style="margin-top:26px">
+      <p>When Nodus desktop is installed, optional actions can check whether a clean reading copy exists, import or refresh the Zotero library in Nodus, and open the current document in the Nodus reader. The original Zotero item and attachment remain read-only.</p>
+      <p>Use the plugin for quick retrieval while collecting and reading. Use the <a href="../app/">Nodus desktop application</a> when the project needs a structured corpus, source-linked ideas, a knowledge graph, research gaps, debates, notes and cited writing. The <a href="../research/">academic research guide</a> explains that wider workflow.</p>
+    </div>
+    <div class="guide-note reveal">
+      <p>Collect and cite in Zotero, search and check inside the plugin, and move into Nodus for corpus-level analysis. Each part has a separate job, and none requires surrendering the local source library.</p>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<footer class="site-foot">
+  <div class="wrap">
+    <div class="foot-grid">
+      <div class="foot-brand">
+        <a class="logo" href="../"><img src="../assets/nodus-logo.svg" alt=""/> Nodus Research</a>
+        <p>A personal, independent open-source project developed in Spain. Nodus is its local-first desktop application.</p>
+      </div>
+      <div class="foot-col">
+        <h3>Research</h3>
+        <a href="../research/">Academic research</a>
+        <a href="../zotero/">Nodus and Zotero</a>
+        <a href="./">Zotero plugin</a>
+        <a href="../ai-research/">AI for research</a>
+        <a href="../open-source/">Open source</a>
+      </div>
+      <div class="foot-col">
+        <h3>Learn</h3>
+        <a href="../wiki/">Wiki</a>
+        <a href="../blog/">Blog</a>
+        <a href="../faq/">FAQ</a>
+      </div>
+      <div class="foot-col">
+        <h3>Project</h3>
+        <a href="../about/">About Nodus Research</a>
+        <a href="../cite/">Cite Nodus</a>
+        <a href="../legal/">Legal notice</a>
+        <a href="../contribute/">Contribute</a>
+        <a href="https://github.com/Drakonis96/nodus" target="_blank" rel="noopener">GitHub</a>
+        <a href="https://github.com/Drakonis96/nodus/releases" target="_blank" rel="noopener">Releases</a>
+      </div>
+    </div>
+    <div class="foot-base">
+      <span>© 2026 Jorge Pérez Burgueño and Nodus contributors.</span>
+      <a href="https://github.com/Drakonis96/nodus/blob/main/LICENSE" target="_blank" rel="noopener">AGPL-3.0-only</a>
+    </div>
+  </div>
+</footer>
+
+<script src="../assets/js/organism.js?v=20260820a"></script>
+<script src="../assets/js/site.js?v=20260815"></script>
+<script src="../assets/js/back-to-top.js?v=20260817b"></script>
+</body>
+</html>

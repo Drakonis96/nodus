@@ -3,10 +3,11 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { loadSiteMetadata } from './lib/site-metadata.mjs';
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const blogRoot = path.join(repoRoot, 'site/blog');
-const SITE = 'https://nodusresearch.com';
+const SITE = loadSiteMetadata(repoRoot).siteUrl;
 
 const escapeXml = (value) => String(value).replace(/[&<>"']/g, (character) => (
   { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&apos;' }[character]

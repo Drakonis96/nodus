@@ -50,6 +50,8 @@ test('every listed post has the fields the blog renders, and a file to render', 
     assert.ok(/^[a-z0-9-]+$/.test(post.slug), `${post.slug} is a kebab-case slug`);
     assert.ok(post.title, `${post.slug} has a title`);
     assert.match(post.date, /^\d{4}-\d{2}-\d{2}$/, `${post.slug} has an ISO date`);
+    assert.match(post.modified, /^\d{4}-\d{2}-\d{2}$/, `${post.slug} has an ISO modified date`);
+    assert.ok(post.modified >= post.date, `${post.slug} is not modified before publication`);
     assert.ok(post.summary, `${post.slug} has a summary for the card and the feed`);
     assert.ok(
       fs.existsSync(path.join(blogRoot, 'posts', `${post.slug}.md`)),
@@ -102,7 +104,13 @@ test('every published post is complete, crawlable HTML at its clean URL', () => 
     assert.ok(html.includes(`content="${post.summary.replaceAll('&', '&amp;').replaceAll('"', '&quot;')}"`), `${post.slug} has its description in source`);
     assert.ok(html.includes(`<link rel="canonical" href="${canonical}"/>`), `${post.slug} has a clean canonical`);
     assert.ok(html.includes(`<meta property="og:url" content="${canonical}"/>`), `${post.slug} shares its clean URL`);
-    assert.match(html, /<script type="application\/ld\+json">.*"@type":"BlogPosting"/, `${post.slug} has BlogPosting structured data`);
+    const structuredData = JSON.parse(html.match(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/)[1]);
+    const article = structuredData['@graph'].find((entry) => entry['@type'] === 'BlogPosting');
+    assert.equal(article.datePublished, post.date, `${post.slug} exposes its publication date`);
+    assert.equal(article.dateModified, post.modified, `${post.slug} exposes its modified date`);
+    assert.ok(structuredData['@graph'].some((entry) => entry['@type'] === 'BreadcrumbList'), `${post.slug} exposes breadcrumbs`);
+    assert.match(html, /<meta name="twitter:card" content="summary_large_image"\/>/, `${post.slug} has a large social card`);
+    assert.match(html, /<meta name="author" content="Jorge Pérez Burgueño"\/>/, `${post.slug} names its author`);
     assert.doesNotMatch(html, /markdown\.js|post\.js|fetch\(/, `${post.slug} does not need JavaScript to load its article`);
   }
 });
@@ -144,7 +152,7 @@ test('regenerating the feed keeps what the published feed says', () => {
   // shipped feed, one `npm run blog:feed` silently undoes the domain move and
   // changes every guid, which shows old posts again in everyone's reader
   const generator = fs.readFileSync(path.join(repoRoot, 'scripts', 'build-blog-feed.mjs'), 'utf8');
-  assert.match(generator, /const SITE = 'https:\/\/nodusresearch\.com'/, 'the generator uses the live domain');
+  assert.match(generator, /loadSiteMetadata\(repoRoot\)\.siteUrl/, 'the generator uses the canonical site metadata');
   assert.match(generator, /xml-stylesheet type="text\/xsl" href="feed\.xsl"/, 'the generator keeps the stylesheet');
   assert.match(generator, /<guid isPermaLink="true">/, 'the generator keeps the guids already published');
 });

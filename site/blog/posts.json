@@ -1,10 +1,11 @@
 {
-  "$comment": "The blog index. Every post listed here must have a matching Markdown file at site/blog/posts/<slug>.md. Fields: slug (kebab-case, becomes /blog/<slug>/), title, date (YYYY-MM-DD), tags (array, free-form, drives the filter row), summary (one or two sentences shown on the card, in metadata and in the RSS feed), the optional reading (minutes, an integer; omitted means it is estimated from the file), and the optional cover (a path relative to site/blog/, shown on the card and above the post) with its coverAlt. Set draft: true to keep a post out of the index, generated pages and feed while you write it. Newest first is not required — the index sorts by date. Run npm run blog:build after changes. See posts/_template.md.",
+  "$comment": "The blog index. Every post listed here must have a matching Markdown file at site/blog/posts/<slug>.md. Fields: slug (kebab-case, becomes /blog/<slug>/), title, date and modified (YYYY-MM-DD publication and substantive-update dates), tags (array, free-form, drives the filter row), summary (one or two sentences shown on the card, in metadata and in the RSS feed), the optional reading (minutes, an integer; omitted means it is estimated from the file), and the optional cover (a path relative to site/blog/, shown on the card and above the post) with its coverAlt. Set draft: true to keep a post out of the index, generated pages and feed while you write it. Newest first is not required — the index sorts by date. Run npm run blog:build after changes. See posts/_template.md.",
   "posts": [
     {
       "slug": "how-nodus-can-support-research-in-the-humanities",
       "title": "How Nodus can support research in the humanities",
       "date": "2026-08-17",
+      "modified": "2026-08-17",
       "tags": ["Humanities", "Digital Humanities", "Archives", "Research", "AI"],
       "summary": "Humanities projects rarely fit one tool: books, archival documents, photographs, interviews and datasets all belong to the same argument. Nodus keeps them in one local-first workspace, with every finding still attached to its source.",
       "cover": "media/nodus-in-humanities.webp",
@@ -14,6 +15,7 @@
       "slug": "how-to-organize-a-large-academic-research-library",
       "title": "How to Organize a Large Academic Research Library",
       "date": "2026-08-16",
+      "modified": "2026-08-16",
       "tags": ["Research", "Workflows", "AI"],
       "summary": "Once a project grows to hundreds of sources, the hard part is no longer storage but context: knowing why a source was collected and how it connects to your ideas.",
       "cover": "media/organize-large-library.webp",
@@ -23,6 +25,7 @@
       "slug": "nodus-open-source-research-workspace",
       "title": "Nodus: an open source research workspace for academic work",
       "date": "2026-08-16",
+      "modified": "2026-08-16",
       "tags": ["Project", "Research", "AI"],
       "summary": "Research is spread across reference managers, PDF folders, note apps and chatbots. Nodus keeps sources, ideas and the evidence behind them in one local-first workspace.",
       "cover": "media/nodus-promo.webp",

@@ -17,6 +17,7 @@ appears on the blog. Copy it to write a real post.
   "slug": "nodus-vs-notebooklm",
   "title": "Nodus and NotebookLM are not the same tool",
   "date": "2026-08-20",
+  "modified": "2026-08-20",
   "tags": ["Comparisons", "AI"],
   "summary": "Both read your sources. Only one of them keeps the evidence, runs offline, and is still yours next year.",
   "reading": 8,
@@ -28,6 +29,10 @@ appears on the blog. Copy it to write a real post.
 `reading` is optional; leave it out and the page estimates it from the file.
 Set `"draft": true` to keep a post out of the index and the RSS feed while you
 are still writing it.
+
+Keep `modified` equal to `date` until a published post receives a substantive
+update. Correcting whitespace or rebuilding the site is not a new modification
+date.
 
 Run `npm run blog:build` after changing the Markdown or its metadata. This
 regenerates the article HTML, RSS feed and sitemap together.

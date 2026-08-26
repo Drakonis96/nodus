@@ -40,10 +40,12 @@ Nodus started as a personal project. It was originally developed to deal with th
 
 That origin still influences how the project develops. Features are tested against real research workflows rather than being designed solely around a list of generic productivity features. The aim is to make it easier to work with large collections of sources and the ideas that emerge from them, while keeping the underlying material accessible to the person doing the research.
 
-Nodus is free and open source under the AGPL-3.0 licence. It is designed as a local-first application and does not require an account to use the desktop application. Researchers can therefore work with their own documents and choose which external services, if any, they want to connect to the application.
+Nodus is free and open source under the AGPL-3.0-only licence. It is designed as a local-first application and does not require an account to use the desktop application. Researchers can therefore work with their own documents and choose which external services, if any, they want to connect to the application. The [open-source and local-first guide](/open-source/) documents the licence, storage model and outgoing requests.
 
 The project is still under active development, and many parts of the research workflow can be improved further. The long-term goal is not to replace every application that researchers already use, but to provide a place where sources, notes, ideas and research activities can remain connected throughout a project.
 
-[Explore Nodus](https://nodusresearch.com)
+[Explore Nodus for academic research](/research/)
+
+[See how Nodus works with Zotero](/zotero/)
 
 [View the source code on GitHub](https://github.com/Drakonis96/nodus)

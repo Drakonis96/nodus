@@ -3,6 +3,9 @@ const INDEX_DOCUMENT = 'index.html';
 
 export function canonicalRequestUrl(requestUrl) {
   const canonical = new URL(requestUrl);
+  if (![CANONICAL_HOST, `www.${CANONICAL_HOST}`].includes(canonical.hostname)) {
+    return null;
+  }
   let changed = false;
 
   if (canonical.protocol !== 'https:') {

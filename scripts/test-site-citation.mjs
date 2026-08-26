@@ -10,20 +10,21 @@ const readSite = (relative) => readRepo(path.join('site', relative));
 const pkg = JSON.parse(readRepo('package.json'));
 
 const CONCEPT_DOI = '10.5281/zenodo.21515531';
-const VERSION_DOI = '10.5281/zenodo.22095050';
+const VERSION_DOI = '10.5281/zenodo.22103353';
 
 test('CITATION.cff describes the current Nodus release and its project identity', () => {
   const citation = readRepo('CITATION.cff');
 
   assert.match(citation, new RegExp(`version: "${pkg.version.replaceAll('.', '\\.') }"`));
-  assert.match(citation, new RegExp(`doi: "${CONCEPT_DOI.replaceAll('.', '\\.')}"`));
+  assert.match(citation, new RegExp(`doi: "${VERSION_DOI.replaceAll('.', '\\.')}"`));
+  assert.match(citation, new RegExp(`concept DOI is\\s+#?\\s*${CONCEPT_DOI.replaceAll('.', '\\.')}`));
   assert.match(citation, /Nodus is the open-source desktop application developed by the Nodus\s+Research project\./);
   for (const keyword of ['Nodus Research', 'research software', 'academic research', 'Zotero', 'local-first', 'knowledge graph', 'evidence', 'research workspace']) {
     assert.ok(citation.includes(`- "${keyword}"`), `CITATION.cff includes ${keyword}`);
   }
 });
 
-test('the citation page identifies 5.0.0 with its immutable release DOI', () => {
+test('the citation page identifies the current version with its immutable release DOI', () => {
   const page = readSite('cite/index.html');
 
   assert.match(page, /<title>Cite Nodus Research \| DOI and Software Citation<\/title>/);
@@ -31,7 +32,8 @@ test('the citation page identifies 5.0.0 with its immutable release DOI', () => 
   assert.match(page, /rel="canonical" href="https:\/\/nodusresearch\.com\/cite\/"/);
   assert.match(page, new RegExp(CONCEPT_DOI.replaceAll('.', '\\.')));
   assert.match(page, new RegExp(VERSION_DOI.replaceAll('.', '\\.')));
-  assert.match(page, /Nodus 5\.0\.0 · version DOI/);
+  assert.match(page, new RegExp(`Nodus ${pkg.version.replaceAll('.', '\\.')} · version DOI`));
+  assert.match(page, new RegExp(`releases/tag/v${pkg.version.replaceAll('.', '\\.')}`));
   for (const detail of ['APA', 'BibTeX', 'CITATION.cff', 'ORCID', 'AGPL-3.0-only', 'Zenodo', 'GitHub']) {
     assert.ok(page.includes(detail), `the citation page includes ${detail}`);
   }
@@ -58,6 +60,7 @@ test('the citation page is linked from each standard project footer', () => {
     'research-atlas/index.html',
     'research/index.html',
     'zotero/index.html',
+    'zotero-plugin/index.html',
     'blog/index.html',
   ];
 

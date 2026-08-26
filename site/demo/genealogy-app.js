@@ -245,7 +245,7 @@
       </div>`,
     system: () => `
       <div class="card"><h3>${ICONS.settings} System</h3>
-        <div class="set-row"><div class="lbl"><b>Version</b><span>Nodus 2.0.3 — up to date</span></div><button class="btn ghost small" onclick="GUI.toast('Checking… you are on the latest release (demo).')">${ICONS.sync} Check for updates</button></div>
+        <div class="set-row"><div class="lbl"><b>Release</b><span>Nodus — up to date</span></div><button class="btn ghost small" onclick="GUI.toast('Checking… you are on the latest release (demo).')">${ICONS.sync} Check for updates</button></div>
         <div class="set-row"><div class="lbl"><b>Pre-release channel</b></div>${sw('prerelease')}</div>
         <div class="set-row"><div class="lbl"><b>Guided tour</b><span>Replay the onboarding walkthrough.</span></div><button class="btn ghost small" onclick="GUI.toast('In the app: replays the interactive tour across every section.')">Replay tour</button></div>
       </div>`,

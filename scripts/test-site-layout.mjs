@@ -78,7 +78,9 @@ test('every static HTML link resolves inside the website tree', () => {
 
       const pathname = reference.split(/[?#]/, 1)[0];
       if (!pathname) continue;
-      const resolved = path.resolve(referenceBase, pathname);
+      const resolved = pathname.startsWith('/')
+        ? path.resolve(siteRoot, `.${pathname}`)
+        : path.resolve(referenceBase, pathname);
       assert.ok(
         resolved === siteRoot || resolved.startsWith(`${siteRoot}${path.sep}`),
         `${path.relative(repoRoot, htmlFile)} keeps ${reference} inside site/`,
@@ -96,7 +98,10 @@ test('the dedicated Pages worker owns the website and its scheduled cache refres
   const pagesWorkflow = read('.github/workflows/pages.yml');
   const releaseWorkflow = read('.github/workflows/release.yml');
 
-  assert.match(pagesWorkflow, /path:\s*site\b/);
+  assert.match(pagesWorkflow, /run:\s*npm run site:artifact/);
+  assert.match(pagesWorkflow, /path:\s*pages-artifact\b/);
+  assert.match(pagesWorkflow, /ref:\s*main\b/, 'every Pages event deploys the canonical branch');
+  assert.doesNotMatch(pagesWorkflow, /ref:\s*\$\{\{.*github\.ref/, 'manual runs cannot publish a legacy branch');
   assert.match(pagesWorkflow, /actions\/deploy-pages@v5/);
   assert.match(pagesWorkflow, /node scripts\/github-release-downloads\.mjs/);
   assert.match(pagesWorkflow, /git add site\/data\/github-release-downloads\.json/);

@@ -16,11 +16,16 @@ SPDX-License-Identifier: AGPL-3.0-only
 <meta property="og:url" content="https://nodusresearch.com/cite/"/>
 <meta property="og:site_name" content="Nodus Research"/>
 <meta property="og:locale" content="en_GB"/>
-<meta property="og:image" content="https://nodusresearch.com/favicon.png"/>
-<meta name="twitter:card" content="summary"/>
+<meta property="og:image" content="https://nodusresearch.com/assets/social/nodus-research-og.png"/>
+<meta property="og:image:type" content="image/png"/>
+<meta property="og:image:width" content="1200"/>
+<meta property="og:image:height" content="630"/>
+<meta property="og:image:alt" content="Nodus Research with a screenshot of the Nodus academic knowledge graph"/>
+<meta name="twitter:card" content="summary_large_image"/>
 <meta name="twitter:title" content="Cite Nodus Research"/>
 <meta name="twitter:description" content="DOI and software citation metadata for Nodus Research."/>
-<meta name="twitter:image" content="https://nodusresearch.com/favicon.png"/>
+<meta name="twitter:image" content="https://nodusresearch.com/assets/social/nodus-research-og.png"/>
+<meta name="twitter:image:alt" content="Nodus Research with a screenshot of the Nodus academic knowledge graph"/>
 <link rel="canonical" href="https://nodusresearch.com/cite/"/>
 <link rel="icon" href="../favicon.ico" sizes="any"/>
 <link rel="icon" type="image/png" href="../favicon.png" sizes="512x512"/>
@@ -31,15 +36,27 @@ SPDX-License-Identifier: AGPL-3.0-only
 <link rel="stylesheet" href="../assets/css/nodus.css?v=20260823a"/>
 <link rel="stylesheet" href="../assets/css/guide.css?v=20260823a"/>
 <link rel="stylesheet" href="../assets/css/cite.css?v=20260822a"/>
+<!-- generated:cite-jsonld:start -->
 <script type="application/ld+json">
 {
   "@context": "https://schema.org",
   "@graph": [
     {
       "@type": "BreadcrumbList",
+      "@id": "https://nodusresearch.com/cite/#breadcrumb",
       "itemListElement": [
-        { "@type": "ListItem", "position": 1, "name": "Nodus Research", "item": "https://nodusresearch.com/" },
-        { "@type": "ListItem", "position": 2, "name": "Cite Nodus Research", "item": "https://nodusresearch.com/cite/" }
+        {
+          "@type": "ListItem",
+          "position": 1,
+          "name": "Nodus Research",
+          "item": "https://nodusresearch.com/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 2,
+          "name": "Cite Nodus Research",
+          "item": "https://nodusresearch.com/cite/"
+        }
       ]
     },
     {
@@ -48,17 +65,36 @@ SPDX-License-Identifier: AGPL-3.0-only
       "url": "https://nodusresearch.com/cite/",
       "name": "Cite Nodus Research",
       "description": "DOI and software citation metadata for Nodus Research and Nodus.",
-      "about": { "@id": "https://nodusresearch.com/#software" }
+      "isPartOf": {
+        "@id": "https://nodusresearch.com/#website"
+      },
+      "breadcrumb": {
+        "@id": "https://nodusresearch.com/cite/#breadcrumb"
+      },
+      "about": {
+        "@id": "https://nodusresearch.com/#software"
+      }
     },
     {
       "@type": "SoftwareApplication",
       "@id": "https://nodusresearch.com/#software",
       "name": "Nodus",
-      "isPartOf": { "@id": "https://nodusresearch.com/#website" },
-      "softwareVersion": "5.0.0",
+      "url": "https://nodusresearch.com/app/",
+      "isPartOf": {
+        "@id": "https://nodusresearch.com/#website"
+      },
       "applicationCategory": "EducationalApplication",
+      "applicationSubCategory": "Academic research workspace",
       "operatingSystem": "macOS, Windows, Linux",
+      "description": "Nodus is a free, open-source, local-first desktop workspace for academic research. It connects sources, ideas and evidence, supports Zotero libraries and semantic search, and keeps the research corpus on the researcher’s own computer.",
+      "softwareVersion": "5.0.2",
+      "datePublished": "2026-08-26",
+      "releaseNotes": "https://github.com/Drakonis96/nodus/releases/tag/v5.0.2",
       "license": "https://spdx.org/licenses/AGPL-3.0-only.html",
+      "codeRepository": "https://github.com/Drakonis96/nodus",
+      "isAccessibleForFree": true,
+      "downloadUrl": "https://github.com/Drakonis96/nodus/releases/latest",
+      "softwareHelp": "https://nodusresearch.com/wiki/",
       "identifier": [
         {
           "@type": "PropertyValue",
@@ -67,23 +103,31 @@ SPDX-License-Identifier: AGPL-3.0-only
         },
         {
           "@type": "PropertyValue",
+          "propertyID": "Version DOI",
+          "value": "10.5281/zenodo.22103353"
+        },
+        {
+          "@type": "PropertyValue",
           "propertyID": "Release tag",
-          "value": "v5.0.0"
+          "value": "v5.0.2"
         }
       ],
       "sameAs": [
         "https://github.com/Drakonis96/nodus",
-        "https://doi.org/10.5281/zenodo.21515531"
+        "https://doi.org/10.5281/zenodo.21515531",
+        "https://doi.org/10.5281/zenodo.22103353"
       ],
       "author": {
-        "@type": "Person",
-        "name": "Jorge Pérez Burgueño",
-        "sameAs": "https://orcid.org/0000-0002-1150-1930"
+        "@id": "https://nodusresearch.com/#creator"
+      },
+      "creator": {
+        "@id": "https://nodusresearch.com/#creator"
       }
     }
   ]
 }
 </script>
+<!-- generated:cite-jsonld:end -->
 </head>
 <body>
 
@@ -128,14 +172,17 @@ SPDX-License-Identifier: AGPL-3.0-only
       <p class="lead">Nodus Research is the project and Nodus is the software. The archived release below is the current desktop version.</p>
     </div>
 
-    <dl class="citation-meta reveal">
+    <!-- generated:citation-details:start -->
+<dl class="citation-meta reveal">
       <div><dt>Project</dt><dd>Nodus Research</dd></div>
       <div><dt>Software</dt><dd>Nodus</dd></div>
-      <div><dt>Version</dt><dd>5.0.0</dd></div>
-      <div><dt>Released</dt><dd>25 August 2026</dd></div>
+      <div><dt>Version</dt><dd>5.0.2</dd></div>
+      <div><dt>Released</dt><dd>26 August 2026</dd></div>
+      <div><dt>Release tag</dt><dd><a href="https://github.com/Drakonis96/nodus/releases/tag/v5.0.2" target="_blank" rel="noopener">v5.0.2</a></dd></div>
       <div><dt>Author</dt><dd><a href="https://orcid.org/0000-0002-1150-1930" target="_blank" rel="noopener">Jorge Pérez Burgueño · ORCID</a></dd></div>
       <div><dt>Licence</dt><dd><a href="https://spdx.org/licenses/AGPL-3.0-only.html" target="_blank" rel="noopener">AGPL-3.0-only</a></dd></div>
     </dl>
+<!-- generated:citation-details:end -->
   </div>
 </section>
 
@@ -147,20 +194,22 @@ SPDX-License-Identifier: AGPL-3.0-only
       <p class="lead">Zenodo keeps the distinction explicit. Cite the version DOI for reproducible research; use the conceptual DOI when discussing Nodus Research as a continuing project.</p>
     </div>
 
-    <div class="doi-grid">
+    <!-- generated:citation-dois:start -->
+<div class="doi-grid">
       <article class="card lit doi-card reveal">
         <span class="kicker">All versions · conceptual DOI</span>
         <h3>Nodus Research over time</h3>
-        <p>This persistent identifier represents every archived release and always resolves through the complete version history.</p>
+        <p>This persistent identifier represents every archived release and resolves through the complete version history.</p>
         <a class="doi-value" href="https://doi.org/10.5281/zenodo.21515531" target="_blank" rel="noopener">10.5281/zenodo.21515531</a>
       </article>
       <article class="card lit doi-card reveal" style="--delay:80ms">
-        <span class="kicker">Nodus 5.0.0 · version DOI</span>
+        <span class="kicker">Nodus 5.0.2 · version DOI</span>
         <h3>The exact software release</h3>
-        <p>This immutable DOI resolves to the archived 5.0.0 release. Use it when the exact software version matters for reproducibility.</p>
-        <a class="doi-value" href="https://doi.org/10.5281/zenodo.22095050" target="_blank" rel="noopener">10.5281/zenodo.22095050</a>
+        <p>This immutable DOI resolves only to the archived 5.0.2 release. Use it when the exact software version matters for reproducibility.</p>
+        <a class="doi-value" href="https://doi.org/10.5281/zenodo.22103353" target="_blank" rel="noopener">10.5281/zenodo.22103353</a>
       </article>
     </div>
+<!-- generated:citation-dois:end -->
   </div>
 </section>
 
@@ -172,9 +221,10 @@ SPDX-License-Identifier: AGPL-3.0-only
       <p class="lead">Adapt punctuation and capitalisation to the style guide used by your journal, institution or repository.</p>
     </div>
 
-    <div class="citation-block reveal">
+    <!-- generated:citation-formats:start -->
+<div class="citation-block reveal">
       <h3>APA</h3>
-      <p>Pérez Burgueño, J., &amp; Nodus contributors. (2026). <i>Nodus: Open-Source Research Workspace</i> (Version 5.0.0) [Computer software]. Zenodo. <a href="https://doi.org/10.5281/zenodo.22095050" target="_blank" rel="noopener">https://doi.org/10.5281/zenodo.22095050</a></p>
+      <p>Pérez Burgueño, J., &amp; Nodus contributors. (2026). <i>Nodus: Open-Source Research Workspace</i> (Version 5.0.2) [Computer software]. Zenodo. <a href="https://doi.org/10.5281/zenodo.22103353" target="_blank" rel="noopener">https://doi.org/10.5281/zenodo.22103353</a></p>
     </div>
 
     <div class="citation-block reveal">
@@ -182,14 +232,15 @@ SPDX-License-Identifier: AGPL-3.0-only
       <pre><code>@software{perez_burgueno_nodus_2026,
   author    = {Pérez Burgueño, Jorge and Nodus contributors},
   title     = {Nodus: Open-Source Research Workspace},
-  version   = {5.0.0},
+  version   = {5.0.2},
   year      = {2026},
   publisher = {Zenodo},
-  doi       = {10.5281/zenodo.22095050},
-  url       = {https://github.com/Drakonis96/nodus/releases/tag/v5.0.0},
+  doi       = {10.5281/zenodo.22103353},
+  url       = {https://github.com/Drakonis96/nodus/releases/tag/v5.0.2},
   license   = {AGPL-3.0-only}
 }</code></pre>
     </div>
+<!-- generated:citation-formats:end -->
 
     <div class="guide-note reveal">
       <p><b>Machine-readable citation.</b> GitHub reads the repository's <a href="https://github.com/Drakonis96/nodus/blob/main/CITATION.cff" target="_blank" rel="noopener"><code>CITATION.cff</code></a>, which carries the same version, release date, DOI, author, ORCID and licence.</p>
@@ -223,7 +274,7 @@ SPDX-License-Identifier: AGPL-3.0-only
       </a>
       <a class="card lit next-card reveal" href="https://github.com/Drakonis96/nodus/blob/main/LICENSE" target="_blank" rel="noopener" style="--delay:210ms">
         <h3>AGPL-3.0-only</h3>
-        <p>The complete licence text that applies to Nodus 4.0.0 and later.</p>
+        <p>The complete AGPL-3.0-only licence text for the current Nodus source and release.</p>
         <span class="arrow-link">Read the licence</span>
       </a>
     </div>

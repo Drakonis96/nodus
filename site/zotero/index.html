@@ -7,20 +7,25 @@ SPDX-License-Identifier: AGPL-3.0-only
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
-<title>Nodus + Zotero | Open Source Research Workspace</title>
-<meta name="description" content="How Nodus connects to Zotero. A read-only link to your local Zotero library turns your references into a research workspace, and a standalone Nodus plugin adds semantic search and cited answers inside Zotero itself."/>
+<title>Zotero Integration with Nodus | Local-First Research Workspace</title>
+<meta name="description" content="Use Zotero with Nodus as a local-first research workspace: mirror a library read-only, search it semantically, connect evidence in a knowledge graph, and get cited answers without replacing Zotero."/>
 <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1"/>
-<meta property="og:title" content="Nodus + Zotero | Open Source Research Workspace"/>
-<meta property="og:description" content="Nodus does not replace Zotero. Connect your Zotero library, keep collecting and citing where you already do, and use Nodus as the research workspace around your sources."/>
+<meta property="og:title" content="Zotero Integration with Nodus | Research Workspace"/>
+<meta property="og:description" content="Keep collecting and citing in Zotero, then use Nodus for semantic search, source-linked ideas, knowledge graphs and evidence-grounded research on your own computer."/>
 <meta property="og:type" content="article"/>
 <meta property="og:url" content="https://nodusresearch.com/zotero/"/>
 <meta property="og:site_name" content="Nodus Research"/>
 <meta property="og:locale" content="en_GB"/>
-<meta property="og:image" content="https://nodusresearch.com/favicon.png"/>
-<meta name="twitter:card" content="summary"/>
-<meta name="twitter:title" content="Nodus and Zotero"/>
-<meta name="twitter:description" content="A read-only connection to your local Zotero library, and a research workspace built around it."/>
-<meta name="twitter:image" content="https://nodusresearch.com/favicon.png"/>
+<meta property="og:image" content="https://nodusresearch.com/assets/social/nodus-research-og.png"/>
+<meta property="og:image:type" content="image/png"/>
+<meta property="og:image:width" content="1200"/>
+<meta property="og:image:height" content="630"/>
+<meta property="og:image:alt" content="Nodus Research with a screenshot of the Nodus academic knowledge graph"/>
+<meta name="twitter:card" content="summary_large_image"/>
+<meta name="twitter:title" content="Zotero Integration with Nodus"/>
+<meta name="twitter:description" content="A local-first Zotero research workspace for semantic search, knowledge graphs and cited, evidence-grounded work."/>
+<meta name="twitter:image" content="https://nodusresearch.com/assets/social/nodus-research-og.png"/>
+<meta name="twitter:image:alt" content="Nodus Research with a screenshot of the Nodus academic knowledge graph"/>
 <link rel="canonical" href="https://nodusresearch.com/zotero/"/>
 <link rel="icon" href="../favicon.ico" sizes="any"/>
   <link rel="icon" type="image/png" href="../favicon.png" sizes="512x512"/>
@@ -33,10 +38,28 @@ SPDX-License-Identifier: AGPL-3.0-only
 <script type="application/ld+json">
 {
   "@context": "https://schema.org",
-  "@type": "BreadcrumbList",
-  "itemListElement": [
-    { "@type": "ListItem", "position": 1, "name": "Nodus Research", "item": "https://nodusresearch.com/" },
-    { "@type": "ListItem", "position": 2, "name": "Zotero integration", "item": "https://nodusresearch.com/zotero/" }
+  "@graph": [
+    {
+      "@type": "BreadcrumbList",
+      "@id": "https://nodusresearch.com/zotero/#breadcrumb",
+      "itemListElement": [
+        { "@type": "ListItem", "position": 1, "name": "Nodus Research", "item": "https://nodusresearch.com/" },
+        { "@type": "ListItem", "position": 2, "name": "Zotero integration", "item": "https://nodusresearch.com/zotero/" }
+      ]
+    },
+    {
+      "@type": "WebPage",
+      "@id": "https://nodusresearch.com/zotero/#webpage",
+      "url": "https://nodusresearch.com/zotero/",
+      "name": "Zotero Integration with Nodus",
+      "description": "A local-first Zotero research workspace for semantic search, knowledge graphs and cited, evidence-grounded academic work.",
+      "isPartOf": { "@id": "https://nodusresearch.com/#website" },
+      "breadcrumb": { "@id": "https://nodusresearch.com/zotero/#breadcrumb" },
+      "about": [
+        { "@id": "https://nodusresearch.com/#software" },
+        { "@id": "https://nodusresearch.com/zotero-plugin/#software" }
+      ]
+    }
   ]
 }
 </script>
@@ -60,14 +83,15 @@ SPDX-License-Identifier: AGPL-3.0-only
         <span aria-current="page">Zotero</span>
       </nav>
       <span class="kicker">Zotero integration</span>
-      <h1 class="display" data-split>Nodus and Zotero</h1>
-      <p class="lead">Zotero is where a great many researchers keep their library, and Nodus is not trying to take that job away from it. Nodus connects to the library you already maintain and becomes the workspace around it, a place where the sources you have collected turn into ideas, relations and evidence you can search, question and cite.</p>
+      <h1 class="display" data-split>Zotero Integration with Nodus</h1>
+      <p class="lead">Zotero remains the reference manager where you collect and cite. Nodus connects read-only to the library you already maintain and becomes the local-first research workspace around it: semantic search across your sources, ideas linked to evidence, a knowledge graph of their relations, and cited research you can trace back to the page.</p>
       <div class="guide-actions">
         <a class="btn primary" href="https://github.com/Drakonis96/nodus/releases/latest" target="_blank" rel="noopener">
           <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M7 10l5 5 5-5"/><path d="M4 19h16"/></svg>
           Download Nodus
         </a>
         <a class="btn" href="../research/">Nodus for academic research</a>
+        <a class="btn" href="../zotero-plugin/">Nodus Zotero plugin</a>
       </div>
       <nav class="guide-jump" aria-label="On this page">
         <a href="#not-a-replacement"><em>01</em> Not a replacement</a>
@@ -208,18 +232,12 @@ SPDX-License-Identifier: AGPL-3.0-only
     <div class="section-head scrim reveal">
       <span class="kicker">04 · The plugin</span>
       <h2 class="title" data-split>Nodus for Zotero, inside Zotero.</h2>
-      <p class="lead">Some work never leaves the reference manager. For that, Nodus ships a separate Zotero plugin. It is a standalone add-on that runs entirely inside Zotero and does not need the Nodus desktop application at all.</p>
+      <p class="lead">Some work never leaves the reference manager. For that, Nodus ships a separate Zotero plugin for semantic search, cited answers and evidence review inside Zotero. It runs independently, while optional desktop actions can refresh the Nodus Library or open the current source in Nodus.</p>
     </div>
 
     <div class="guide-body prose reveal" style="margin-top:26px">
-      <p>The plugin indexes the <b>PDF, EPUB and HTML attachments</b> in your library and adds a research sidebar that answers questions across them. Answers come back with the exact passages they rest on and the pages those passages sit on, so you can check a reply instead of having to take it on trust.</p>
-      <p>Retrieval combines keyword and semantic search and works across languages. The embeddings can be produced by a managed local model that runs on your own machine inside the Zotero profile, or by a provider you configure yourself. Anthropic, OpenAI, OpenRouter, Groq, Cerebras, DeepSeek and Google Gemini are all supported, among others, alongside local <b>Ollama</b> and <b>LM Studio</b> endpoints.</p>
-      <h3>Reading what a scan does not say in text</h3>
-      <p>Vision-capable models can read document pages as images, transcribing scanned text and describing figures, tables and formulas so that material a plain text layer misses still enters the index.</p>
-      <h3>Auditing your own claims</h3>
-      <p>An evidence audit takes claims and checks them against the indexed library, highlighting the ones whose support looks thin. Read it as a nudge to go back to the sources, not as a verdict on whether a claim is true.</p>
-      <h3>Installing it</h3>
-      <p>Download <code>nodus-zotero.xpi</code> from the <a href="https://github.com/Drakonis96/nodus/releases/latest" target="_blank" rel="noopener">latest Nodus release</a>. In Zotero, open <b>Tools → Add-ons</b>, choose <b>Install Add-on From File</b> and select the downloaded file. The index it builds stays in your Zotero profile.</p>
+      <p>The plugin indexes <b>PDF, EPUB and HTML attachments</b> and combines keyword with semantic retrieval across languages. Answers retain the exact passages and page citations they use; the index stays in your Zotero profile, and local model options keep the workflow on your own machine.</p>
+      <p>The dedicated <a href="../zotero-plugin/">Nodus Zotero Plugin guide</a> covers installation, privacy, supported workflows, the direct XPI download, optional desktop connection and source code without repeating the broader library-to-workspace workflow explained here.</p>
     </div>
   </div>
 </section>

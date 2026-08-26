@@ -671,7 +671,7 @@
     }
     if (state.settingsTab === 'system') {
       return '<div class="card"><h3>' + icon('settings', 16) + ' System</h3>' +
-        settingRow('Version', 'Nodus 3.0.1 · up to date', '<button class="btn ghost small" onclick="WB.toast(\'You are on the latest demo version.\')">' + icon('sync', 13) + ' Check for updates</button>') +
+        settingRow('Release', 'Nodus · up to date', '<button class="btn ghost small" onclick="WB.toast(\'You are on the latest demo release.\')">' + icon('sync', 13) + ' Check for updates</button>') +
         settingRow('Pre-release channel', 'Receive preview builds before the stable release.', settingToggle('prerelease')) +
         settingRow('Guided tour', 'Replay the Worldbuilding onboarding walkthrough.', '<button class="btn ghost small" onclick="WB.toast(\'The tour starts in the desktop app.\')">Replay tour</button>') + '</div>';
     }

@@ -17,9 +17,9 @@ date-released: "2026-08-26"
 license: "AGPL-3.0-only"
 repository-code: "https://github.com/Drakonis96/nodus"
 url: "https://nodusresearch.com/"
-# The immutable v5.0.2 DOI is assigned by Zenodo after the GitHub release is
-# published. Until that archive exists, cite the all-versions concept DOI.
-doi: "10.5281/zenodo.21515531"
+# This is the immutable DOI for the software version above. The all-versions concept DOI is
+# 10.5281/zenodo.21515531 and remains the identifier for Nodus over time.
+doi: "10.5281/zenodo.22103353"
 keywords:
   - "Nodus Research"
   - "research software"
