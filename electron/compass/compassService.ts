@@ -283,7 +283,7 @@ export class CompassService {
       (candidate) => candidate.webContents.id === owner,
     );
     if (window && !window.isDestroyed())
-      window.webContents.send("compass:searchProgress", progress);
+      window.webContents.send('compass:searchProgress', progress);
   }
   private emitImport(progress: CompassImportProgress): void {
     for (const listener of this.importListeners) listener(progress);
@@ -292,7 +292,7 @@ export class CompassService {
       (candidate) => candidate.webContents.id === owner,
     );
     if (window && !window.isDestroyed())
-      window.webContents.send("compass:importProgress", progress);
+      window.webContents.send('compass:importProgress', progress);
   }
   claimSearch(searchId: string, webContentsId: number): void {
     const key = clean(searchId, 200);
