@@ -6,7 +6,7 @@ test('Estado de la cuestión is a Library-style workspace with three ordered tab
   const workspace = await readSource('src/views/CoverageWorkspace.tsx');
   assert.match(workspace, /data-testid="coverage-workspace"/);
   assert.match(workspace, /data-testid="coverage-tabs"/);
-  assert.match(workspace, /<Icon name="compass"/);
+  assert.match(workspace, /<Icon name="strata"/);
   assert.match(workspace, /bg-white text-neutral-900 dark:bg-neutral-950 dark:text-neutral-100/);
   assert.match(workspace, /border-neutral-300 bg-white text-neutral-900[^\n]*dark:border-neutral-700 dark:bg-neutral-900/);
   assert.match(
