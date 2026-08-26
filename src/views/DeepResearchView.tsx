@@ -1349,7 +1349,7 @@ function DraftGridCard({
         </div>
         <div className="mt-2"><ReportGenerationTags saved={saved} compact /></div>
         {!selecting && (
-          <div className="mt-3 flex items-center gap-1.5">
+          <div className="mt-auto flex items-center gap-1.5 pt-3">
             <button className="btn btn-primary !py-1 gap-1 text-xs" onClick={onOpen}>
               <Icon name="book" size={12} /> {t('Leer')}
             </button>
