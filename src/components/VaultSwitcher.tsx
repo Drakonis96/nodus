@@ -801,6 +801,14 @@ function renderDestructiveModal({
     pendingAction.kind === 'delete'
       ? tx('Esta acción eliminará la bóveda "{name}" y sus archivos locales. No afecta a otras bóvedas.', { name: pendingAction.vault.name })
       : tx('Esta acción borrará el contenido de "{name}" y recreará su base de datos vacía. No afecta a otras bóvedas.', { name: pendingAction.vault.name });
+  const codeMessage =
+    pendingAction.kind === 'delete'
+      ? tx('Introduce este código manualmente para eliminar la bóveda "{name}".', { name: pendingAction.vault.name })
+      : t('Introduce este código manualmente');
+  const finalMessage =
+    pendingAction.kind === 'delete'
+      ? tx('Código correcto. Confirma una última vez para eliminar la bóveda "{name}".', { name: pendingAction.vault.name })
+      : t('Código correcto. Confirma una última vez para ejecutar la acción.');
   const finalLabel = pendingAction.kind === 'delete' ? t('Eliminar definitivamente') : t('Reinicializar definitivamente');
 
   if (step === 'intro') {
@@ -811,7 +819,7 @@ function renderDestructiveModal({
     return (
       <ConfirmModal
         title={t('Confirmación final')}
-        message={t('Código correcto. Confirma una última vez para ejecutar la acción.')}
+        message={finalMessage}
         confirmLabel={finalLabel}
         danger
         onConfirm={onFinalConfirm}
@@ -824,7 +832,7 @@ function renderDestructiveModal({
     <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 p-6" onClick={onCancel}>
       <div className="card w-full max-w-sm p-5" role="dialog" aria-modal="true" onClick={(event) => event.stopPropagation()}>
         <h2 className="mb-2 font-semibold">{t('Código de seguridad')}</h2>
-        <p className="mb-4 text-sm text-neutral-400">{t('Introduce este código manualmente')}</p>
+        <p className="mb-4 text-sm text-neutral-400">{codeMessage}</p>
         <div className="mb-4 flex select-none justify-center gap-2 text-2xl font-semibold tracking-[0.25em] text-neutral-100" onCopy={(event) => event.preventDefault()}>
           {code.split('').map((digit, index) => (
             <span key={`${digit}-${index}`} className="rounded-md border border-neutral-700 px-3 py-2">
