@@ -26,7 +26,13 @@ const root = await mkdtemp(path.join(os.tmpdir(), 'nodus-major-migration-'));
 installRuntimeHooks();
 const Database = require('better-sqlite3');
 const { migrations, runMigrations, SCHEMA_VERSION } = require(path.join(repoRoot, 'electron/db/migrations.ts'));
-const { migrateDatabaseSafely, listMigrationRecoverySnapshots, MAJOR_SCHEMA_VERSIONS } = require(
+const {
+  migrateDatabaseSafely,
+  listMigrationRecoverySnapshots,
+  pruneMigrationRecoverySnapshots,
+  MAJOR_SCHEMA_VERSIONS,
+  MIGRATION_RECOVERY_RETENTION,
+} = require(
   path.join(repoRoot, 'electron/db/migrationSafety.ts'),
 );
 
@@ -78,6 +84,23 @@ function seedDatabase(db, version = 133) {
   }
 }
 
+function databaseWithSnapshots(name, count) {
+  const directory = path.join(root, name);
+  fs.mkdirSync(directory, { recursive: true });
+  const file = path.join(directory, 'nodus.sqlite');
+  let db = new Database(file);
+  db.exec('CREATE TABLE retained_value (id INTEGER PRIMARY KEY, value TEXT NOT NULL)');
+  db.prepare('INSERT INTO retained_value (value) VALUES (?)').run(name);
+  db.pragma('user_version = 1');
+  for (let targetVersion = 2; targetVersion < count + 2; targetVersion += 1) {
+    db = migrateDatabaseSafely(db, file, targetVersion, (migrating) => {
+      migrating.pragma(`user_version = ${targetVersion}`);
+    });
+  }
+  db.close();
+  return file;
+}
+
 try {
   assert.ok(SCHEMA_VERSION >= 135, 'this test tracks the current Notion-parity major boundary');
   assert.ok(MAJOR_SCHEMA_VERSIONS.includes(134));
@@ -105,6 +128,75 @@ try {
     assert.equal(snapshots[0].immutable, true);
     assert.equal(fs.statSync(snapshots[0].databasePath).mode & 0o222, 0, 'snapshot has no writable bits');
   }
+
+  // Retention is per vault and removes only complete, Nodus-owned snapshot pairs.
+  assert.equal(MIGRATION_RECOVERY_RETENTION, 2);
+  const retainedFile = databaseWithSnapshots('retention-a', 4);
+  const untouchedFile = databaseWithSnapshots('retention-b', 3);
+  const beforeRetention = listMigrationRecoverySnapshots(retainedFile);
+  assert.equal(beforeRetention.length, 4);
+  assert.equal(listMigrationRecoverySnapshots(untouchedFile).length, 3);
+  const retentionDir = path.join(path.dirname(retainedFile), '.nodus', 'migrations');
+  const reportFile = path.join(retentionDir, 'report-keep.json');
+  const unknownFile = path.join(retentionDir, 'unfinished.tmp');
+  const manualFile = path.join(retentionDir, 'manual.sqlite');
+  fs.writeFileSync(reportFile, '{}');
+  fs.writeFileSync(unknownFile, 'partial');
+  fs.writeFileSync(manualFile, 'manual');
+
+  const outsideFile = path.join(root, 'outside.sqlite');
+  fs.writeFileSync(outsideFile, 'outside');
+  const outsideId = 'pre-v99-from-v98-aaaaaaaaaaaaaaaa';
+  fs.writeFileSync(path.join(retentionDir, `${outsideId}.json`), JSON.stringify({
+    format: 'nodus.schema-migration-snapshot', formatVersion: 1,
+    id: outsideId, databasePath: outsideFile, sourceDatabasePath: retainedFile,
+    fromVersion: 98, targetVersion: 99, createdAt: '2026-08-26T00:00:00.000Z',
+    bytes: 7, sha256: 'a'.repeat(64), quickCheck: 'ok', immutable: true, major: false,
+  }));
+  const incompleteId = 'pre-v100-from-v99-bbbbbbbbbbbbbbbb';
+  const incompleteManifest = path.join(retentionDir, `${incompleteId}.json`);
+  fs.writeFileSync(incompleteManifest, JSON.stringify({
+    format: 'nodus.schema-migration-snapshot', formatVersion: 1,
+    id: incompleteId, databasePath: path.join(retentionDir, `${incompleteId}.sqlite`), sourceDatabasePath: retainedFile,
+    fromVersion: 99, targetVersion: 100, createdAt: '2026-08-26T00:01:00.000Z',
+    bytes: 7, sha256: 'b'.repeat(64), quickCheck: 'ok', immutable: true, major: false,
+  }));
+
+  const pruneReport = pruneMigrationRecoverySnapshots(retainedFile);
+  assert.equal(pruneReport.discoveredSnapshots, 4);
+  assert.equal(pruneReport.keptSnapshots, 2);
+  assert.equal(pruneReport.removedSnapshots, 2);
+  assert.equal(pruneReport.removedBytes, beforeRetention.slice(2).reduce((sum, snapshot) => sum + snapshot.bytes, 0));
+  assert.deepEqual(pruneReport.errors, []);
+  assert.deepEqual(listMigrationRecoverySnapshots(retainedFile).map((snapshot) => snapshot.targetVersion), [5, 4]);
+  for (const removed of beforeRetention.slice(2)) {
+    assert.equal(fs.existsSync(removed.databasePath), false, 'old SQLite snapshot is removed');
+    assert.equal(fs.existsSync(removed.manifestPath), false, 'old snapshot manifest is removed after its SQLite file');
+  }
+  for (const preserved of [reportFile, unknownFile, manualFile, outsideFile, path.join(retentionDir, `${outsideId}.json`), incompleteManifest]) {
+    assert.equal(fs.existsSync(preserved), true, `unmanaged path is untouched: ${preserved}`);
+  }
+  assert.equal(listMigrationRecoverySnapshots(untouchedFile).length, 3, 'pruning one vault never changes another vault');
+  assert.equal(pruneMigrationRecoverySnapshots(untouchedFile).removedSnapshots, 1);
+  assert.equal(listMigrationRecoverySnapshots(untouchedFile).length, 2);
+
+  // A failed deletion keeps the snapshot discoverable and immutable so the next launch can retry.
+  const retryFile = databaseWithSnapshots('retention-retry', 3);
+  const retrySnapshots = listMigrationRecoverySnapshots(retryFile);
+  const failedTarget = retrySnapshots.at(-1);
+  const failedPrune = pruneMigrationRecoverySnapshots(retryFile, {
+    removeFile(file) {
+      if (file === failedTarget.databasePath) throw new Error('fallo de borrado simulado');
+      fs.rmSync(file, { force: true });
+    },
+  });
+  assert.equal(failedPrune.removedSnapshots, 0);
+  assert.equal(failedPrune.errors.length, 1);
+  assert.match(failedPrune.errors[0].message, /fallo de borrado simulado/);
+  assert.equal(fs.existsSync(failedTarget.databasePath), true);
+  assert.equal(fs.statSync(failedTarget.databasePath).mode & 0o222, 0, 'a failed deletion restores immutable mode');
+  assert.equal(listMigrationRecoverySnapshots(retryFile).length, 3);
+  assert.equal(pruneMigrationRecoverySnapshots(retryFile).removedSnapshots, 1, 'a later maintenance pass retries safely');
 
   // Failure path: even a deliberately non-transactional partial migration is undone.
   const failure = databaseAt(134, 'failure.sqlite');

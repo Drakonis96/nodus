@@ -7,6 +7,27 @@ import { auditQaDatabaseOpen } from '../qa/databaseAudit';
 import type { MigrationRecoverySnapshot } from '@shared/types';
 
 export const MAJOR_SCHEMA_VERSIONS = Object.freeze([134, 135]);
+export const MIGRATION_RECOVERY_RETENTION = 2;
+
+export interface MigrationRecoveryPruneError {
+  snapshotId: string;
+  file: string;
+  message: string;
+}
+
+export interface MigrationRecoveryPruneReport {
+  databasePath: string;
+  retention: number;
+  discoveredSnapshots: number;
+  keptSnapshots: number;
+  removedSnapshots: number;
+  removedBytes: number;
+  errors: MigrationRecoveryPruneError[];
+}
+
+interface MigrationRecoveryPruneOptions {
+  removeFile?: (file: string) => void;
+}
 
 export interface MigrationSafetyReport {
   format: 'nodus.schema-migration-report';
@@ -96,6 +117,131 @@ function snapshotFromManifest(value: unknown, manifestPath: string): MigrationRe
     immutable: Boolean(record.immutable),
     major: Boolean(record.major),
   };
+}
+
+function managedSnapshotFromManifest(
+  value: unknown,
+  manifestPath: string,
+  sourceDatabasePath: string,
+): MigrationRecoverySnapshot | null {
+  const snapshot = snapshotFromManifest(value, manifestPath);
+  if (!snapshot) return null;
+  const match = /^pre-v(\d+)-from-v(\d+)-[a-f0-9]{16}$/.exec(snapshot.id);
+  if (!match) return null;
+  if (Number(match[1]) !== snapshot.targetVersion || Number(match[2]) !== snapshot.fromVersion) return null;
+  if (!Number.isFinite(Date.parse(snapshot.createdAt))) return null;
+  if (!/^[a-f0-9]{64}$/.test(snapshot.sha256) || snapshot.quickCheck !== 'ok' || !snapshot.immutable) return null;
+
+  const directory = migrationDirectory(sourceDatabasePath);
+  if (path.resolve(snapshot.sourceDatabasePath) !== path.resolve(sourceDatabasePath)) return null;
+  if (path.resolve(manifestPath) !== path.resolve(directory, `${snapshot.id}.json`)) return null;
+  if (path.resolve(snapshot.databasePath) !== path.resolve(directory, `${snapshot.id}.sqlite`)) return null;
+  return snapshot;
+}
+
+function newestSnapshotFirst(a: MigrationRecoverySnapshot, b: MigrationRecoverySnapshot): number {
+  const created = b.createdAt.localeCompare(a.createdAt);
+  if (created !== 0) return created;
+  if (a.targetVersion !== b.targetVersion) return b.targetVersion - a.targetVersion;
+  if (a.fromVersion !== b.fromVersion) return b.fromVersion - a.fromVersion;
+  return b.id.localeCompare(a.id);
+}
+
+/**
+ * Removes only complete snapshot pairs created by this module. Unknown files, reports,
+ * temporary copies and snapshots for a different database are deliberately ignored.
+ * The SQLite file is always removed before its sidecar so an interrupted cleanup cannot
+ * strand a large, undiscoverable copy on disk.
+ */
+export function pruneMigrationRecoverySnapshots(
+  databasePath: string,
+  options: MigrationRecoveryPruneOptions = {},
+): MigrationRecoveryPruneReport {
+  const sourceDatabasePath = path.resolve(databasePath);
+  const directory = migrationDirectory(sourceDatabasePath);
+  const report: MigrationRecoveryPruneReport = {
+    databasePath: sourceDatabasePath,
+    retention: MIGRATION_RECOVERY_RETENTION,
+    discoveredSnapshots: 0,
+    keptSnapshots: 0,
+    removedSnapshots: 0,
+    removedBytes: 0,
+    errors: [],
+  };
+  if (!fs.existsSync(directory)) return report;
+
+  const removeFile = options.removeFile ?? ((file: string) => fs.rmSync(file, { force: true }));
+  const candidates: Array<{ snapshot: MigrationRecoverySnapshot; bytes: number }> = [];
+  let entries: fs.Dirent[];
+  try {
+    entries = fs.readdirSync(directory, { withFileTypes: true });
+  } catch (error) {
+    report.errors.push({
+      snapshotId: 'directory',
+      file: directory,
+      message: error instanceof Error ? error.message : String(error),
+    });
+    return report;
+  }
+  for (const entry of entries) {
+    if (!entry.isFile() || !entry.name.endsWith('.json') || entry.name.startsWith('report-')) continue;
+    const manifestPath = path.join(directory, entry.name);
+    let snapshot: MigrationRecoverySnapshot | null = null;
+    try {
+      snapshot = managedSnapshotFromManifest(JSON.parse(fs.readFileSync(manifestPath, 'utf8')), manifestPath, sourceDatabasePath);
+    } catch {
+      // Malformed or unreadable sidecars are not safe automatic-deletion targets.
+    }
+    if (!snapshot) continue;
+
+    let stat: fs.Stats;
+    try {
+      stat = fs.lstatSync(snapshot.databasePath);
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
+        report.errors.push({
+          snapshotId: snapshot.id,
+          file: snapshot.databasePath,
+          message: error instanceof Error ? error.message : String(error),
+        });
+      }
+      continue;
+    }
+    if (!stat.isFile() || stat.isSymbolicLink()) continue;
+    candidates.push({ snapshot, bytes: stat.size });
+  }
+
+  candidates.sort((a, b) => newestSnapshotFirst(a.snapshot, b.snapshot));
+  report.discoveredSnapshots = candidates.length;
+  report.keptSnapshots = Math.min(candidates.length, MIGRATION_RECOVERY_RETENTION);
+  for (const candidate of candidates.slice(MIGRATION_RECOVERY_RETENTION)) {
+    try {
+      // Snapshots are intentionally mode 0400. Restoring owner write permission makes
+      // removal reliable on Windows without weakening any snapshot that is retained.
+      try { fs.chmodSync(candidate.snapshot.databasePath, 0o600); } catch { /* deletion reports the real failure */ }
+      removeFile(candidate.snapshot.databasePath);
+      report.removedSnapshots += 1;
+      report.removedBytes += candidate.bytes;
+    } catch (error) {
+      try { fs.chmodSync(candidate.snapshot.databasePath, 0o400); } catch { /* the original deletion error remains authoritative */ }
+      report.errors.push({
+        snapshotId: candidate.snapshot.id,
+        file: candidate.snapshot.databasePath,
+        message: error instanceof Error ? error.message : String(error),
+      });
+      continue;
+    }
+    try {
+      removeFile(candidate.snapshot.manifestPath);
+    } catch (error) {
+      report.errors.push({
+        snapshotId: candidate.snapshot.id,
+        file: candidate.snapshot.manifestPath,
+        message: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
+  return report;
 }
 
 function createVerifiedSnapshot(
