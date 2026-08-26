@@ -26,6 +26,10 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v7
+        with:
+          # Sitemap freshness is derived from the latest commit touching each
+          # content source, so the test needs history rather than a shallow tip.
+          fetch-depth: 0
 
       - name: Set up Node
         uses: actions/setup-node@v7

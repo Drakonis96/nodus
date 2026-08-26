@@ -558,7 +558,7 @@ export function CompassView({
         <div className="mx-auto max-w-6xl">
           <div className="flex items-start gap-3">
             <span className="grid h-11 w-11 place-items-center rounded-xl bg-indigo-50 text-indigo-600 dark:bg-indigo-500/10 dark:text-indigo-300">
-              <Icon name="compassSearch" size={22} />
+              <Icon name="compass" size={22} />
             </span>
             <div>
               <h1 className="text-xl font-semibold">
