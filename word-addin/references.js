@@ -151,7 +151,12 @@
 
     function localize() {
       var refTab = document.querySelector('[data-mode="references"]');
-      if (refTab) refTab.textContent = C.references;
+      if (refTab) {
+        var refTabLabel = refTab.querySelector('.seg-label');
+        if (refTabLabel) refTabLabel.textContent = C.references;
+        refTab.setAttribute('aria-label', C.references);
+        refTab.title = C.references;
+      }
       var labels = el.controls.querySelectorAll('[data-ref-label]');
       for (var i = 0; i < labels.length; i++) {
         var key = labels[i].getAttribute('data-ref-label');

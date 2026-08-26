@@ -109,7 +109,10 @@ try {
   assert.match(taskpaneJs, /\/api\/prompts\/apply/);
   assert.match(taskpaneJs, /insertAtCursor\(promptOutputText, \{ replace: true \}\)/, 'pasting a proposal replaces the unchanged Word selection');
   assert.match(taskpaneCss, /\.seg-label\s*\{[^}]*display:\s*none/);
-  assert.match(taskpaneCss, /\.seg\.active \.seg-label\s*\{[^}]*display:\s*inline/);
+  assert.match(taskpaneCss, /\.seg:not\(\.active\) \.seg-label\s*\{[^}]*display:\s*none !important;[^}]*inline-size:\s*0/);
+  assert.match(taskpaneCss, /\.seg\.active \.seg-label\s*\{[^}]*display:\s*inline-block/);
+  assert.match(referencesJs, /refTab\.querySelector\('\.seg-label'\)/, 'reference localization must preserve the compact tab icon');
+  assert.doesNotMatch(referencesJs, /refTab\.textContent\s*=/, 'reference localization must not replace the complete tab contents');
 
   // The Word bridge opens the full idea detail in Ideas, not the graph. The
   // nonce makes a second click on the same idea retrigger the selection.

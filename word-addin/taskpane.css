@@ -531,6 +531,8 @@ main {
 .segmented {
   display: flex;
   align-items: stretch;
+  min-width: 0;
+  overflow: hidden;
   gap: 4px;
   padding: 3px;
   border: 1px solid var(--border);
@@ -561,6 +563,7 @@ main {
 .seg:hover { color: var(--text); }
 .seg.active {
   flex: 1 1 auto;
+  min-width: 0;
   background: var(--panel);
   color: var(--text);
   font-weight: 620;
@@ -576,8 +579,22 @@ main {
   stroke-linecap: round;
   stroke-linejoin: round;
 }
-.seg-label { display: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.seg.active .seg-label { display: inline; }
+.seg-label {
+  display: none;
+  min-width: 0;
+  max-width: 100%;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* A later localization pass must never let an inactive label reclaim space. */
+.seg:not(.active) .seg-label {
+  display: none !important;
+  inline-size: 0;
+  max-inline-size: 0;
+  visibility: hidden;
+}
+.seg.active .seg-label { display: inline-block; visibility: visible; }
 
 /* Saved workspace prompts */
 .prompt-controls {
