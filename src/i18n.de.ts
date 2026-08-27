@@ -8266,4 +8266,13 @@ export const DE: Record<string, string> = {
   "El PDF está escaneado y no tiene capa de texto. Activa OCR y vuelve a analizar.": "Die PDF-Datei ist gescannt und enthält keine Textebene. Aktivieren Sie OCR und analysieren Sie sie erneut.",
   "El adjunto no produjo texto utilizable. Revisa el archivo o activa OCR.": "Der Anhang lieferte keinen verwendbaren Text. Prüfen Sie die Datei oder aktivieren Sie OCR.",
   "El formato del adjunto no es compatible con la extracción de texto.": "Das Anhangsformat wird für die Textextraktion nicht unterstützt.",
+  "Selecciona al menos una referencia.": "Wähle mindestens eine Referenz aus.",
+  "{n} referencias": "{n} Referenzen",
+  "Ya estaba en Nodus": "Bereits in Nodus",
+  "Referencia actualizada": "Referenz aktualisiert",
+  "No se ha creado ningún duplicado.": "Es wurde kein Duplikat erstellt.",
+  "Se han guardado {n} referencias.": "{n} Referenzen wurden gespeichert.",
+  "{n} referencias detectadas": "{n} Referenzen erkannt",
+  "Un autor por línea": "Ein Autor pro Zeile",
+  "Guardar {n} referencias": "{n} Referenzen speichern",
 };

@@ -8016,4 +8016,13 @@ export const TR: Record<string, string> = {
   "El PDF está escaneado y no tiene capa de texto. Activa OCR y vuelve a analizar.": "PDF taranmış ve metin katmanı yok. OCR’yi etkinleştirip yeniden analiz edin.",
   "El adjunto no produjo texto utilizable. Revisa el archivo o activa OCR.": "Ek, kullanılabilir metin üretmedi. Dosyayı kontrol edin veya OCR’yi etkinleştirin.",
   "El formato del adjunto no es compatible con la extracción de texto.": "Ek biçimi metin çıkarma için desteklenmiyor.",
+  "Selecciona al menos una referencia.": "En az bir kaynak seçin.",
+  "{n} referencias": "{n} kaynak",
+  "Ya estaba en Nodus": "Zaten Nodus’taydı",
+  "Referencia actualizada": "Kaynak güncellendi",
+  "No se ha creado ningún duplicado.": "Yinelenen kayıt oluşturulmadı.",
+  "Se han guardado {n} referencias.": "{n} kaynak kaydedildi.",
+  "{n} referencias detectadas": "{n} kaynak algılandı",
+  "Un autor por línea": "Her satıra bir yazar",
+  "Guardar {n} referencias": "{n} kaynağı kaydet",
 };

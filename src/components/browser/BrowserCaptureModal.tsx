@@ -2,9 +2,10 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Icon } from '../ui';
 import { getActiveLang, t } from '../../i18n';
-import type { BrowserConnectorCaptureRequest, BrowserConnectorSaveResult } from '@shared/browserConnector';
+import type { BrowserConnectorCapturePreviewItem, BrowserConnectorCaptureRequest, BrowserConnectorSaveResult } from '@shared/browserConnector';
 import type { LibraryCollectionView, LibraryItemType, LibraryTagRecord } from '@shared/libraryTypes';
 import { filterCollectionRows, normalizeTags } from '../../../browser-extension/lib/collections.js';
+import { applyMetadataEdits, formatCreators } from '../../../browser-extension/lib/metadata-form.js';
 import { ITEM_TYPES, byline, typeGlyph, typeLabel } from '../../../browser-extension/lib/presentation.js';
 import connectorIcon from '../../../browser-extension/icons/icon.svg';
 
@@ -21,6 +22,7 @@ type CapturePreview = BrowserConnectorCaptureRequest & { snapshotAvailable?: boo
 export function BrowserCaptureModal({
   preview,
   warnings,
+  candidates,
   loading = false,
   loadError = null,
   onRetry,
@@ -31,6 +33,7 @@ export function BrowserCaptureModal({
 }: {
   preview: CapturePreview | null;
   warnings: string[];
+  candidates?: BrowserConnectorCapturePreviewItem[];
   loading?: boolean;
   loadError?: string | null;
   onRetry?: () => void;
@@ -40,6 +43,11 @@ export function BrowserCaptureModal({
   onOpenSettings: () => void;
 }) {
   const [title, setTitle] = useState('');
+  const [creators, setCreators] = useState('');
+  const [date, setDate] = useState('');
+  const [publicationTitle, setPublicationTitle] = useState('');
+  const [doi, setDoi] = useState('');
+  const [metadataOpen, setMetadataOpen] = useState(false);
   const [itemType, setItemType] = useState<LibraryItemType>('webpage');
   const [collections, setCollections] = useState<LibraryCollectionView[]>([]);
   const [availableTags, setAvailableTags] = useState<LibraryTagRecord[]>([]);
@@ -54,6 +62,8 @@ export function BrowserCaptureModal({
   const [catalogError, setCatalogError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState<BrowserConnectorSaveResult | null>(null);
+  const [savedCount, setSavedCount] = useState(0);
+  const [selectedCandidates, setSelectedCandidates] = useState<Set<number>>(new Set());
   const collectionWrapRef = useRef<HTMLDivElement | null>(null);
   const tagWrapRef = useRef<HTMLDivElement | null>(null);
   const busyRef = useRef(busy);
@@ -64,13 +74,24 @@ export function BrowserCaptureModal({
   useEffect(() => {
     if (!preview) return;
     setTitle(preview.metadata.title ?? '');
+    setCreators(formatCreators(preview.metadata.creators));
+    setDate(preview.metadata.date ?? (preview.metadata.year ? String(preview.metadata.year) : ''));
+    setPublicationTitle(preview.metadata.publicationTitle ?? '');
+    setDoi(preview.metadata.doi ?? '');
     setItemType(preview.metadata.itemType);
-    setSelectedTags(normalizeTags(preview.tags ?? []));
+    setSelectedTags(candidates?.length
+      ? []
+      : normalizeTags([...(preview.metadata.tags ?? []), ...(preview.tags ?? [])]));
     setSelectedAttachments(new Set((preview.attachments ?? []).map((_entry, index) => index)));
     setIncludeSnapshot(Boolean(preview.snapshotAvailable && !(preview.attachments?.length ?? 0)));
     setSaved(null);
+    setSavedCount(0);
     setError(null);
-  }, [preview]);
+  }, [candidates?.length, preview]);
+
+  useEffect(() => {
+    setSelectedCandidates(new Set((candidates ?? []).map((_entry, index) => index)));
+  }, [candidates]);
 
   useEffect(() => {
     let cancelled = false;
@@ -129,26 +150,54 @@ export function BrowserCaptureModal({
     setTagQuery('');
   };
 
+  const editedMetadata = useMemo(() => applyMetadataEdits(preview?.metadata ?? {
+    title: '', itemType: 'webpage', creators: [], year: null, isbn: [], issn: [], tags: [],
+  }, { title, creators, date, publicationTitle, doi }), [creators, date, doi, preview, publicationTitle, title]);
+
   const save = async () => {
     if (!preview) return;
     setBusy(true);
     setError(null);
     try {
-      const attachments = (preview.attachments ?? []).filter((_entry, index) => selectedAttachments.has(index));
-      const result = await window.nodus.saveBrowserCapture({
-        ...preview,
-        collectionId: selectedCollection,
-        tags: selectedTags,
-        attachments,
-        metadata: {
-          ...preview.metadata,
-          itemType,
-          title: title.trim() || preview.metadata.title,
-        },
-      }, includeSnapshot);
+      const batch = candidates?.length
+        ? candidates.filter((_entry, index) => selectedCandidates.has(index))
+        : [{ request: preview, warnings }];
+      if (!batch.length) throw new Error(t('Selecciona al menos una referencia.'));
+      const results: BrowserConnectorSaveResult[] = [];
+      for (const [index, entry] of batch.entries()) {
+        const request = entry.request;
+        const isPrimaryReview = request === preview || index === 0 && request.pageUrl === preview.pageUrl
+          && request.metadata.title === preview.metadata.title;
+        const requestTags = selectedTags;
+        const attachments = isPrimaryReview
+          ? (preview.attachments ?? []).filter((_entry, attachmentIndex) => selectedAttachments.has(attachmentIndex))
+          : request.attachments ?? [];
+        const result = await window.nodus.saveBrowserCapture({
+          ...request,
+          collectionId: selectedCollection,
+          tags: requestTags,
+          attachments,
+          metadata: isPrimaryReview
+            ? { ...editedMetadata, itemType, tags: requestTags }
+            : { ...request.metadata, tags: requestTags },
+        }, isPrimaryReview && batch.length === 1 && includeSnapshot);
+        results.push({ ...result, warnings: [...entry.warnings, ...result.warnings] });
+        onSaved(result);
+      }
       localStorage.setItem('nodus.connector.lastCollectionId', selectedCollection ?? '');
-      setSaved(result);
-      onSaved(result);
+      const first = results[0];
+      setSaved({
+        ...first,
+        disposition: results.some((result) => result.disposition === 'created')
+          ? 'created'
+          : results.some((result) => result.disposition === 'updated') ? 'updated' : 'existing',
+        deduplicated: results.every((result) => result.deduplicated),
+        title: results.length > 1 ? t('{n} referencias').replace('{n}', String(results.length)) : first.title,
+        attachmentCount: results.reduce((total, result) => total + result.attachmentCount, 0),
+        warnings: results.flatMap((result) => result.warnings),
+        pendingUploads: results.flatMap((result) => result.pendingUploads),
+      });
+      setSavedCount(results.length);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : String(cause));
     } finally {
@@ -159,17 +208,27 @@ export function BrowserCaptureModal({
   const content = saved ? (
     <div className="flex min-h-[300px] flex-col items-center justify-center px-8 py-10 text-center" data-testid="browser-connector-success">
       <span className="mb-4 grid h-14 w-14 place-items-center rounded-2xl bg-emerald-500/15 text-2xl font-bold text-emerald-500">✓</span>
-      <strong className="text-lg text-neutral-900 dark:text-neutral-100">{t('Guardado en Nodus')}</strong>
+      <strong className="text-lg text-neutral-900 dark:text-neutral-100">
+        {saved.disposition === 'existing'
+          ? t('Ya estaba en Nodus')
+          : saved.deduplicated
+            ? t('Referencia actualizada')
+            : t('Guardado en Nodus')}
+      </strong>
       <p className="mt-2 text-sm text-neutral-500 dark:text-neutral-400">
-        {t('Se han guardado {n} archivo(s).').replace('{n}', String(saved.attachmentCount))}
+        {saved.disposition === 'existing' && savedCount <= 1
+          ? t('No se ha creado ningún duplicado.')
+          : savedCount > 1
+          ? t('Se han guardado {n} referencias.').replace('{n}', String(savedCount))
+          : t('Se han guardado {n} archivo(s).').replace('{n}', String(saved.attachmentCount))}
       </p>
-      {[...warnings, ...saved.warnings].length > 0 && (
+      {saved.warnings.length > 0 && (
         <div className="mt-4 max-h-28 w-full overflow-auto rounded-lg bg-amber-500/10 p-3 text-left text-xs text-amber-700 dark:text-amber-300">
-          {[...warnings, ...saved.warnings].map((warning, index) => <p key={`${warning}-${index}`} className="my-1">{warning}</p>)}
+          {saved.warnings.map((warning, index) => <p key={`${warning}-${index}`} className="my-1">{warning}</p>)}
         </div>
       )}
       <div className="mt-5 flex gap-2">
-        <button type="button" className="btn btn-primary" onClick={() => onOpenInNodus(saved.itemId)}>{t('Abrir en Nodus')}</button>
+        {savedCount <= 1 && <button type="button" className="btn btn-primary" onClick={() => onOpenInNodus(saved.itemId)}>{t('Abrir en Nodus')}</button>}
         <button type="button" className="btn btn-ghost border border-neutral-300 dark:border-neutral-700" onClick={onClose}>{t('Listo')}</button>
       </div>
     </div>
@@ -179,6 +238,32 @@ export function BrowserCaptureModal({
     <ConnectorState state="error" title={t('No se ha podido leer esta página')} detail={loadError ?? t('Esta página no ofrece nada que se pueda guardar.')} action={onRetry ? { label: t('Reintentar'), run: onRetry } : undefined} />
   ) : (
     <div className="max-h-[min(690px,calc(100vh-9rem))] overflow-y-auto px-4 py-4" data-testid="browser-connector-capture">
+      {(candidates?.length ?? 0) > 1 && (
+        <section className="mb-3 rounded-xl border border-indigo-200 bg-indigo-500/5 p-2 dark:border-indigo-500/30">
+          <div className="mb-1 flex items-center justify-between px-1 text-xs font-semibold text-indigo-700 dark:text-indigo-300">
+            <span>{t('{n} referencias detectadas').replace('{n}', String(candidates?.length ?? 0))}</span>
+            <span>{selectedCandidates.size}</span>
+          </div>
+          <div className="max-h-36 overflow-y-auto">
+            {candidates?.map((candidate, index) => (
+              <label key={`${candidate.request.metadata.doi ?? candidate.request.metadata.title}-${index}`} className="flex items-start gap-2 rounded-lg px-2 py-1.5 text-xs hover:bg-indigo-500/10">
+                <input
+                  type="checkbox"
+                  className="mt-0.5 accent-indigo-600"
+                  checked={selectedCandidates.has(index)}
+                  disabled={busy}
+                  onChange={(event) => setSelectedCandidates((current) => {
+                    const next = new Set(current);
+                    if (event.target.checked) next.add(index); else next.delete(index);
+                    return next;
+                  })}
+                />
+                <span className="min-w-0"><strong className="block truncate">{candidate.request.metadata.title}</strong><small className="text-neutral-500">{byline(candidate.request.metadata)}</small></span>
+              </label>
+            ))}
+          </div>
+        </section>
+      )}
       <article className="flex gap-3 rounded-xl border border-neutral-200 bg-white p-3 dark:border-neutral-700 dark:bg-neutral-900">
         <div className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-indigo-500/10 text-xs font-extrabold text-indigo-600 dark:bg-indigo-400/15 dark:text-indigo-300">
           {typeGlyph(itemType)}
@@ -203,9 +288,40 @@ export function BrowserCaptureModal({
             onChange={(event) => setTitle(event.target.value)}
             aria-label={t('Título')}
           />
-          <p className="mt-0.5 truncate text-xs text-neutral-500 dark:text-neutral-400">{byline(preview.metadata) || safeHost(preview.pageUrl)}</p>
+          <p className="mt-0.5 truncate text-xs text-neutral-500 dark:text-neutral-400">{byline(editedMetadata) || safeHost(preview.pageUrl)}</p>
         </div>
       </article>
+
+      <button
+        type="button"
+        className="mt-2 flex w-full items-center justify-between rounded-lg px-1 py-1.5 text-left text-xs font-semibold text-indigo-600 hover:bg-indigo-500/5 dark:text-indigo-300"
+        aria-expanded={metadataOpen}
+        disabled={busy}
+        onClick={() => setMetadataOpen((open) => !open)}
+      >
+        <span>{t('Editar metadatos')}</span>
+        <Icon name="chevronDown" size={13} className={metadataOpen ? 'rotate-180' : ''} />
+      </button>
+      {metadataOpen && (
+        <section className="mt-1 grid gap-3 rounded-xl border border-neutral-200 bg-white p-3 dark:border-neutral-700 dark:bg-neutral-900">
+          <label className="grid gap-1 text-[10px] font-bold uppercase tracking-[0.08em] text-neutral-500">
+            {t('Autores')}
+            <textarea
+              value={creators}
+              disabled={busy}
+              rows={Math.min(4, Math.max(2, creators.split(/\r?\n/).length))}
+              onChange={(event) => setCreators(event.target.value)}
+              placeholder={t('Un autor por línea')}
+              className="resize-y rounded-lg border border-neutral-300 bg-transparent px-2 py-1.5 text-xs font-normal normal-case tracking-normal text-neutral-900 outline-none focus:border-indigo-400 dark:border-neutral-700 dark:text-neutral-100"
+            />
+          </label>
+          <div className="grid grid-cols-2 gap-3">
+            <MetadataInput label={t('Fecha')} value={date} disabled={busy} onChange={setDate} />
+            <MetadataInput label="DOI" value={doi} disabled={busy} onChange={setDoi} />
+          </div>
+          <MetadataInput label={t('Publicación')} value={publicationTitle} disabled={busy} onChange={setPublicationTitle} />
+        </section>
+      )}
 
       <div ref={collectionWrapRef} className="relative mt-4">
         <FieldLabel>{t('Guardar en')}</FieldLabel>
@@ -333,10 +449,14 @@ export function BrowserCaptureModal({
         type="button"
         data-testid="browser-capture-save"
         className="mt-4 min-h-10 w-full rounded-lg bg-indigo-600 px-4 font-semibold text-white hover:bg-indigo-500 disabled:cursor-progress disabled:opacity-60"
-        disabled={busy}
+        disabled={busy || Boolean(candidates?.length && !selectedCandidates.size)}
         onClick={() => void save()}
       >
-        {busy ? t('Guardando…') : t('Guardar en Nodus')}
+        {busy
+          ? t('Guardando…')
+          : candidates?.length
+            ? t('Guardar {n} referencias').replace('{n}', String(selectedCandidates.size))
+            : t('Guardar en Nodus')}
       </button>
     </div>
   );
@@ -367,6 +487,24 @@ export function BrowserCaptureModal({
 
 function FieldLabel({ children }: { children: React.ReactNode }) {
   return <span className="mb-1 block text-[10px] font-bold uppercase tracking-[0.08em] text-neutral-500">{children}</span>;
+}
+
+function MetadataInput({
+  label, value, disabled, onChange,
+}: {
+  label: string; value: string; disabled: boolean; onChange: (value: string) => void;
+}) {
+  return (
+    <label className="grid gap-1 text-[10px] font-bold uppercase tracking-[0.08em] text-neutral-500">
+      {label}
+      <input
+        value={value}
+        disabled={disabled}
+        onChange={(event) => onChange(event.target.value)}
+        className="min-h-8 rounded-lg border border-neutral-300 bg-transparent px-2 text-xs font-normal normal-case tracking-normal text-neutral-900 outline-none focus:border-indigo-400 dark:border-neutral-700 dark:text-neutral-100"
+      />
+    </label>
+  );
 }
 
 function CollectionRow({

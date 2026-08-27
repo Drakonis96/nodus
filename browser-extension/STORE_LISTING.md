@@ -19,7 +19,8 @@ and automatic local connection status. Do not use screenshots containing private
 - **storage:** retain the loopback port, pairing token, and last chosen collection on the device.
 - **127.0.0.1 / localhost:** send the reviewed capture to the local Nodus desktop app.
 - **Optional website access:** download only an attachment selected by the user when its site
-  requires the active browser session. Chrome presents this permission request at use time.
+  requires the active browser session and Nodus's public download has failed. Chrome presents this
+  exact-site request at use time, and the connector revokes newly granted access after transfer.
 
 No permission is used for advertising, analytics, browsing profiles, or unrelated functionality.
 

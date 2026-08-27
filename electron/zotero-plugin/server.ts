@@ -14,7 +14,7 @@ import { randomBytes, timingSafeEqual } from 'node:crypto';
 import { mkdir, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import { app, BrowserWindow, shell } from 'electron';
+import { app, BrowserWindow, dialog, shell } from 'electron';
 import type { ModelRef, ReasoningEffort, Work, ZoteroPluginServerStatus } from '@shared/types';
 import { getSettings, updateSettings } from '../db/settingsRepo';
 import { getDb } from '../db/database';
@@ -31,14 +31,17 @@ import {
   getGlobalLibraryStatus,
   startZoteroLibraryImport,
 } from '../library/libraryService';
-import type { BrowserConnectorCaptureRequest } from '@shared/browserConnector';
 import {
   previewBrowserCapture,
   saveBrowserCapture,
   uploadBrowserAttachment,
 } from '../browser-connector/libraryCapture';
+import { sanitizeBrowserCaptureRequest } from '../browser-connector/sanitize';
 
 const MAX_REQUEST_BYTES = 20 * 1024 * 1024; // full text plus several bounded page images
+/** Chrome Web Store id of the signed Nodus Connector extension. */
+export const OFFICIAL_BROWSER_CONNECTOR_EXTENSION_ID = 'ilcclajjhofhieoljdjmikmfopfbamej';
+const OFFICIAL_BROWSER_CONNECTOR_ORIGIN = `chrome-extension://${OFFICIAL_BROWSER_CONNECTOR_EXTENSION_ID}`;
 export const ZOTERO_PLUGIN_PROTOCOL_VERSION = 4;
 export const ZOTERO_PLUGIN_MINIMUM_PROTOCOL = 3;
 export const ZOTERO_PLUGIN_CAPABILITIES = Object.freeze({
@@ -54,6 +57,7 @@ let httpServer: Server | null = null;
 let status: ZoteroPluginServerStatus = { running: false, port: null, url: null, error: null };
 let lastClientProtocol: number | null = null;
 let lifecycle = Promise.resolve();
+let browserPairingLifecycle = Promise.resolve();
 let getMainWindow: (() => BrowserWindow | null) | null = null;
 
 export function setZoteroPluginWindowProvider(provider: () => BrowserWindow | null): void {
@@ -91,12 +95,54 @@ function extensionOrigin(req: IncomingMessage): string | null {
   const validExtensionOrigin = (value: unknown): value is string => (
     typeof value === 'string' && /^(?:chrome|moz)-extension:\/\/[a-z0-9-]{16,80}$/i.test(value)
   );
-  if (validExtensionOrigin(origin)) return origin;
+  if (validExtensionOrigin(origin)) return origin.toLowerCase();
   // A web request always carries its real Origin. Chromium may omit Origin for an extension
   // with host access, so only allow the explicit extension marker when Origin is absent.
   if (origin !== undefined) return null;
   const marker = req.headers['x-nodus-extension-origin'];
-  return validExtensionOrigin(marker) ? marker : null;
+  return validExtensionOrigin(marker) ? marker.toLowerCase() : null;
+}
+
+/** Return the stable extension id encoded by a validated browser extension origin. */
+function extensionId(origin: string): string | null {
+  const match = /^(?:chrome|moz)-extension:\/\/([a-z0-9-]{16,80})$/i.exec(origin);
+  return match?.[1].toLowerCase() ?? null;
+}
+
+function browserOriginIsPaired(req: IncomingMessage): boolean {
+  const origin = extensionOrigin(req);
+  return Boolean(origin && getSettings().browserConnectorOrigin === origin);
+}
+
+async function confirmBrowserPairing(origin: string): Promise<boolean> {
+  const id = extensionId(origin);
+  const official = id === OFFICIAL_BROWSER_CONNECTOR_EXTENSION_ID;
+  const parent = getMainWindow?.() ?? undefined;
+  const options = {
+    type: 'question' as const,
+    buttons: ['Permitir', 'Cancelar'],
+    defaultId: 1,
+    cancelId: 1,
+    title: 'Conectar extensión del navegador',
+    message: '¿Quieres permitir que esta extensión envíe páginas a Nodus?',
+    detail: `Origen: ${origin}${official ? '\nExtensión oficial de Nodus desde Chrome Web Store.' : '\nExtensión de desarrollo (unpacked) u otra instalación local.'}`,
+  };
+  try {
+    const result = parent ? await dialog.showMessageBox(parent, options) : await dialog.showMessageBox(options);
+    return result.response === 0;
+  } catch (error) {
+    console.warn('[zotero-plugin] browser pairing confirmation failed', error);
+    return false;
+  }
+}
+
+/** Serialize pairing so simultaneous requests cannot race the approved origin. */
+async function acquireBrowserPairingLock(): Promise<() => void> {
+  const previous = browserPairingLifecycle;
+  let release!: () => void;
+  browserPairingLifecycle = new Promise<void>((resolve) => { release = resolve; });
+  await previous;
+  return release;
 }
 
 function setCors(req: IncomingMessage, res: ServerResponse): void {
@@ -415,7 +461,7 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse, _port: n
       version: app.getVersion?.() ?? null,
       protocolVersion: 1,
       enabled: settings.browserConnectorEnabled,
-      paired: Boolean(settings.browserConnectorToken),
+      paired: Boolean(settings.browserConnectorToken && settings.browserConnectorOrigin),
       libraryReady: getGlobalLibraryStatus().configured,
       capabilities: { metadata: true, attachments: true, snapshots: true, collections: true, tags: true },
     });
@@ -427,10 +473,43 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse, _port: n
       sendJson(res, 503, { error: 'Enable Nodus Connector in Settings → Integrations first.' });
       return;
     }
-    // Enabling the connector in Nodus is the user's consent. The route is already limited to
-    // installed-extension origins on loopback, so a second native confirmation adds no boundary.
-    await readJsonBody(req);
-    sendJson(res, 200, { ok: true, token: ensureBrowserConnectorToken(), port: _port, protocolVersion: 1 });
+    const origin = extensionOrigin(req);
+    if (!origin) {
+      sendJson(res, 403, { error: 'La extensión no tiene un origen válido.' });
+      return;
+    }
+    const body = await readJsonBody(req);
+    const advertisedId = typeof body.extensionId === 'string' ? body.extensionId.trim().toLowerCase() : null;
+    const actualId = extensionId(origin);
+    if (advertisedId && advertisedId !== actualId) {
+      sendJson(res, 400, { error: 'El identificador de la extensión no coincide con su origen.' });
+      return;
+    }
+    const releasePairingLock = await acquireBrowserPairingLock();
+    try {
+      const settings = getSettings();
+      if (settings.browserConnectorOrigin && settings.browserConnectorOrigin !== origin) {
+        sendJson(res, 403, { error: 'Nodus ya está vinculado a otra extensión. Revoca el acceso antes de emparejar otra.' });
+        return;
+      }
+      // Returning the secret is itself an authorization event. Callers that cannot prove
+      // possession of the existing token must be confirmed again in the native app.
+      const alreadyAuthenticated = settings.browserConnectorOrigin === origin
+        && Boolean(settings.browserConnectorToken)
+        && hasValidToken(req, settings.browserConnectorToken);
+      if (!alreadyAuthenticated && !(await confirmBrowserPairing(origin))) {
+        sendJson(res, 403, { error: 'El emparejamiento fue cancelado por el usuario.' });
+        return;
+      }
+      const token = ensureBrowserConnectorToken();
+      updateSettings({ browserConnectorOrigin: origin });
+      sendJson(res, 200, {
+        ok: true, token, port: _port, protocolVersion: 1,
+        extensionId: actualId, official: origin === OFFICIAL_BROWSER_CONNECTOR_ORIGIN,
+      });
+    } finally {
+      releasePairingLock();
+    }
     return;
   }
 
@@ -445,6 +524,12 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse, _port: n
     sendJson(res, 401, { error: 'Se requiere un bearer token válido.' });
     return;
   }
+  // Health and pairing are intentionally reachable before authentication. Every capability
+  // endpoint requires both the bearer token and the exact origin approved during pairing.
+  if (browserRoute && !browserOriginIsPaired(req)) {
+    sendJson(res, 403, { error: 'Esta extensión no está emparejada con Nodus.' });
+    return;
+  }
 
   try {
     if (urlPath === '/api/browser/catalog' && req.method === 'GET') {
@@ -454,19 +539,26 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse, _port: n
     }
 
     if (urlPath === '/api/browser/preview' && req.method === 'POST') {
-      const body = await readJsonBody(req) as unknown as BrowserConnectorCaptureRequest;
-      sendJson(res, 200, await previewBrowserCapture(body));
+      const body = await readJsonBody(req);
+      const capture = sanitizeBrowserCaptureRequest(body);
+      if (!capture) { sendJson(res, 400, { error: 'La captura contiene una URL inválida o no permitida.' }); return; }
+      sendJson(res, 200, await previewBrowserCapture(capture));
       return;
     }
 
     if (urlPath === '/api/browser/save' && req.method === 'POST') {
-      const body = await readJsonBody(req) as unknown as BrowserConnectorCaptureRequest;
-      sendJson(res, 200, await saveBrowserCapture(body));
+      const body = await readJsonBody(req);
+      const capture = sanitizeBrowserCaptureRequest(body);
+      if (!capture) { sendJson(res, 400, { error: 'La captura contiene una URL inválida o no permitida.' }); return; }
+      sendJson(res, 200, await saveBrowserCapture(capture));
       return;
     }
 
     const attachmentMatch = /^\/api\/browser\/items\/([^/]+)\/attachments$/.exec(urlPath);
     if (attachmentMatch && req.method === 'POST') {
+      let itemId: string;
+      try { itemId = decodeURIComponent(attachmentMatch[1]); }
+      catch { sendJson(res, 400, { error: 'El identificador del elemento no es válido.' }); return; }
       const decodeHeader = (name: string): string => {
         const raw = req.headers[name];
         const value = Array.isArray(raw) ? raw[0] : raw;
@@ -476,7 +568,7 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse, _port: n
       const roleRaw = decodeHeader('x-nodus-attachment-role');
       const roles = new Set(['original', 'supplement', 'snapshot', 'image', 'dataset', 'other']);
       const bytes = await readBinaryBody(req);
-      sendJson(res, 200, await uploadBrowserAttachment(decodeURIComponent(attachmentMatch[1]), bytes, {
+      sendJson(res, 200, await uploadBrowserAttachment(itemId, bytes, {
         title: decodeHeader('x-nodus-file-title') || decodeHeader('x-nodus-file-name') || 'Captured document',
         fileName: decodeHeader('x-nodus-file-name') || undefined,
         mimeType: decodeHeader('x-nodus-mime-type') || undefined,
@@ -1036,7 +1128,6 @@ async function start(): Promise<void> {
   }
   try {
     if (settings.zoteroPluginEnabled) ensureToken();
-    if (settings.browserConnectorEnabled) ensureBrowserConnectorToken();
     const candidate = createServer((req, res) => {
       handleRequest(req, res, port).catch((error) => {
         console.warn('[zotero-plugin] request failed', error);
@@ -1124,7 +1215,8 @@ export async function regenerateZoteroPluginToken(): Promise<string> {
 
 export async function regenerateBrowserConnectorToken(): Promise<string> {
   const token = randomBytes(32).toString('base64url');
-  updateSettings({ browserConnectorToken: token });
+  // Token rotation is a revocation boundary: require an explicit re-pair.
+  updateSettings({ browserConnectorToken: token, browserConnectorOrigin: '' });
   if (getSettings().zoteroPluginEnabled || getSettings().browserConnectorEnabled) await restartZoteroPluginServer();
   return token;
 }

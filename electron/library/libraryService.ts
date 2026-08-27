@@ -590,6 +590,21 @@ export function getGlobalLibraryItem(itemId: string): LibraryItemRecord | null {
   return storageId ? current.store.readMaterializedItem(storageId) : null;
 }
 
+/** Shared duplicate lookup for capture/import entry points. */
+export function findGlobalLibraryItemByMetadata(metadata: LibraryItemMetadata): {
+  item: LibraryItemRecord;
+  matchedBy: 'identifier' | 'bibliography' | 'url';
+} | null {
+  const current = service();
+  if (!current) return null;
+  if (!current.catalog.status(current.root, current.deviceId).lastRebuiltAt) current.catalog.rebuild(current.store);
+  const match = current.catalog.findItemIdByMetadata(metadata);
+  if (!match) return null;
+  const storageId = current.catalog.itemStorageId(match.itemId);
+  const item = storageId ? current.store.readMaterializedItem(storageId) : null;
+  return item ? { item, matchedBy: match.matchedBy } : null;
+}
+
 /** Full immutable records consumed by the account-global sync lane. This deliberately returns
  * no vault links, provider credentials or local paths: those never leave Desktop. */
 export function getGlobalLibrarySyncSnapshot(): {
@@ -784,6 +799,14 @@ function finishItemMutation(current: NonNullable<ReturnType<typeof service>>, re
 export function createGlobalLibraryItem(metadata: LibraryItemMetadata, collectionIds?: string[]): LibraryItemRecord {
   const current = service(); if (!current) throw new Error('Configura primero la carpeta de copias de seguridad de Nodus.');
   return finishItemMutation(current, current.operations.createItem(metadata, collectionIds));
+}
+
+/** Fill absent fields without replacing better values or user overrides. */
+export function mergeGlobalLibraryItemMetadataIfMissing(itemId: string, metadata: LibraryItemMetadata): LibraryItemRecord {
+  const current = service(); if (!current) throw new Error('Configura primero la carpeta de copias de seguridad de Nodus.');
+  const before = getGlobalLibraryItem(itemId);
+  const result = current.operations.mergeItemMetadataIfMissing(itemId, metadata);
+  return before?.clock.revision === result.clock.revision ? result : finishItemMutation(current, result);
 }
 
 export async function duplicateGlobalLibraryItem(itemId: string): Promise<LibraryItemRecord> {

@@ -11,7 +11,7 @@ import type {
   BrowserTabState,
   PendingBrowserPermission,
 } from '@shared/browser';
-import type { BrowserConnectorCaptureRequest } from '@shared/browserConnector';
+import type { BrowserConnectorCapturePreview } from '@shared/browserConnector';
 import type { AppSettings } from '@shared/types';
 import { BrowserCaptureModal } from '../components/browser/BrowserCaptureModal';
 import { BrowserBookmarkModal, type BookmarkEditorTarget } from '../components/browser/BrowserBookmarkModal';
@@ -43,8 +43,7 @@ export function NodusBrowserView() {
   const [omniboxFocused, setOmniboxFocused] = useState(false);
   const [refusal, setRefusal] = useState<string | null>(null);
   const [permission, setPermission] = useState<PendingBrowserPermission | null>(null);
-  const [capture, setCapture] = useState<
-    { request: BrowserConnectorCaptureRequest & { snapshotAvailable?: boolean }; warnings: string[] } | null>(null);
+  const [capture, setCapture] = useState<BrowserConnectorCapturePreview | null>(null);
   const [captureOpen, setCaptureOpen] = useState(false);
   const [captureError, setCaptureError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -638,6 +637,7 @@ export function NodusBrowserView() {
         <BrowserCaptureModal
           preview={capture?.request ?? null}
           warnings={capture?.warnings ?? []}
+          candidates={capture?.candidates}
           loading={busy}
           loadError={captureError}
           onRetry={() => void addToLibrary()}

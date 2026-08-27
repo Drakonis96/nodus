@@ -83,7 +83,7 @@ async function exercise(colorScheme) {
   });
   await page.goto(`http://127.0.0.1:${port}/popup.html`);
   await page.locator('#capture-view:not(.hidden)').waitFor();
-  assert.equal(await page.locator('html').getAttribute('lang'), 'en');
+  assert.equal(await page.locator('html').getAttribute('lang'), 'es');
   assert.equal(await page.locator('#pair-port').inputValue(), '4321');
   assert.equal(await page.evaluate(() => chrome.storage.local.get({ port: 0 }).then((value) => value.port)), 4321);
   assert.equal(await page.locator('#document-title').textContent(), snapshot.title);
@@ -111,6 +111,61 @@ async function exercise(colorScheme) {
   await browser.close();
 }
 
+async function exerciseMultiCapture() {
+  const browser = await chromium.launch({ executablePath: chrome, headless: true });
+  const context = await browser.newContext({ viewport: { width: 420, height: 600 }, colorScheme: 'light' });
+  const page = await context.newPage();
+  const detected = {
+    title: 'Catalogue results', url: 'https://catalog.example/search', lang: 'en', contentType: 'text/html', html: '',
+    jsonLd: [], anchors: [], links: [], metas: [], coins: [
+      'ctx_ver=Z39.88-2004&rft.genre=article&rft.atitle=First+paper&rft.au=Garc%C3%ADa%2C+Mar%C3%ADa&rft_id=info%3Adoi%2F10.1000%2Fone',
+      'ctx_ver=Z39.88-2004&rft.genre=book&rft.btitle=Second+book&rft.au=Lovelace%2C+Ada&rft.isbn=9788400000000',
+    ],
+  };
+  await page.addInitScript(({ messages, snapshot: nextSnapshot }) => {
+    const values = { port: 4321, token: 'visual-test-token', lastCollectionId: null };
+    globalThis.chrome = {
+      i18n: { getUILanguage: () => 'en-US', getMessage: (key, substitutions) => {
+        const entry = messages[key]; if (!entry) return key;
+        let value = entry.message; const args = Array.isArray(substitutions) ? substitutions : substitutions == null ? [] : [substitutions];
+        for (const [name, placeholder] of Object.entries(entry.placeholders || {})) {
+          const index = Number(/^\$(\d+)$/.exec(placeholder.content)?.[1] || 0) - 1;
+          if (index >= 0) value = value.replaceAll(`$${name.toUpperCase()}$`, String(args[index] ?? ''));
+        }
+        return value;
+      } },
+      tabs: { query: async () => [{ id: 9, title: nextSnapshot.title, url: nextSnapshot.url }] },
+      scripting: { executeScript: async () => [{ result: nextSnapshot }] },
+      storage: { local: { get: async (defaults) => ({ ...defaults, ...values }), set: async (input) => Object.assign(values, input), remove: async (keys) => { for (const key of keys) delete values[key]; } } },
+      permissions: { request: async () => true, contains: async () => false, remove: async () => true },
+      runtime: { getManifest: () => ({ version: '5.0.5' }), getURL: (path = '') => `chrome-extension://ilcclajjhofhieoljdjmikmfopfbamej/${path}`, openOptionsPage: async () => undefined },
+    };
+  }, { messages: english, snapshot: detected });
+  let saves = 0;
+  await page.route('http://127.0.0.1:4321/api/browser/**', async (route) => {
+    const url = route.request().url();
+    if (url.endsWith('/health')) return route.fulfill({ json: { ok: true, app: 'nodus', enabled: true, paired: true, libraryReady: true } });
+    if (url.endsWith('/catalog')) return route.fulfill({ json: { collections: [], tags: [] } });
+    if (url.endsWith('/preview')) return route.fulfill({ json: { metadata: JSON.parse(route.request().postData()).metadata, warnings: [] } });
+    if (url.endsWith('/save')) {
+      saves += 1;
+      const body = JSON.parse(route.request().postData());
+      return route.fulfill({ json: { ok: true, itemId: `nodus:batch-${saves}`, disposition: 'created', deduplicated: false, title: body.metadata.title, attachmentCount: 0, extractionStatus: null, warnings: [], pendingUploads: [] } });
+    }
+    return route.fulfill({ status: 404, json: { error: 'not found' } });
+  });
+  await page.goto(`http://127.0.0.1:${port}/popup.html`);
+  await page.locator('#capture-view:not(.hidden)').waitFor();
+  assert.equal(await page.locator('.multi-capture-row').count(), 2);
+  assert.match(await page.locator('#save-button').textContent(), /2 references/);
+  await page.locator('#save-button').click();
+  await page.locator('#success-view:not(.hidden)').waitFor();
+  assert.equal(saves, 2);
+  assert.match(await page.locator('#success-summary').textContent(), /2 references saved/);
+  assert.equal(await page.locator('#open-button').isHidden(), true);
+  await browser.close();
+}
+
 function snapshotMetadata() {
   return {
     title: snapshot.title, itemType: 'journal-article', creators: [{ creatorType: 'author', firstName: 'Alicia', lastName: 'Miranda', fieldMode: 0 }],
@@ -122,6 +177,7 @@ try {
   await mkdir(output, { recursive: true });
   await exercise('light');
   await exercise('dark');
+  await exerciseMultiCapture();
   console.log(`Browser connector popup passed in light and dark mode. Screenshots: ${output}`);
 } finally {
   await new Promise((resolve) => staticServer.close(resolve));

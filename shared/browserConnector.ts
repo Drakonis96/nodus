@@ -23,13 +23,30 @@ export interface BrowserConnectorCaptureRequest {
   snapshotHtml?: string;
 }
 
+export interface BrowserConnectorCapturePreviewItem {
+  request: BrowserConnectorCaptureRequest & { snapshotAvailable?: boolean };
+  warnings: string[];
+}
+
+export interface BrowserConnectorCapturePreview extends BrowserConnectorCapturePreviewItem {
+  /** Independent records advertised by a search/results page. Omitted for a normal page. */
+  candidates?: BrowserConnectorCapturePreviewItem[];
+}
+
 export interface BrowserConnectorPendingUpload extends BrowserConnectorAttachmentCandidate {
   reason: string;
 }
 
+export type BrowserConnectorSaveDisposition = 'created' | 'updated' | 'existing';
+
 export interface BrowserConnectorSaveResult {
   ok: true;
   itemId: string;
+  /** Whether capture created a record, changed an existing one, or was a no-op. */
+  disposition: BrowserConnectorSaveDisposition;
+  /** True when the capture matched an existing record instead of creating one. */
+  deduplicated: boolean;
+  matchedBy?: 'identifier' | 'bibliography' | 'url';
   title: string;
   attachmentCount: number;
   extractionStatus: string | null;

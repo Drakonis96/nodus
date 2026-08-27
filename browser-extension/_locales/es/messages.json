@@ -40,5 +40,20 @@
   "privacy": { "message": "Privacidad" },
   "sourceCode": { "message": "Código fuente" },
   "savedSetting": { "message": "Guardado." },
-  "pairingForgotten": { "message": "Conexión local restablecida. El conector volverá a conectarse automáticamente la próxima vez." }
+  "pairingForgotten": { "message": "Conexión local restablecida. El conector volverá a conectarse automáticamente la próxima vez." },
+  "editMetadata": { "message": "Editar metadatos" },
+  "title": { "message": "Título" },
+  "authors": { "message": "Autores" },
+  "authorsHint": { "message": "Un autor por línea; usa {Organización} para instituciones" },
+  "date": { "message": "Fecha" },
+  "publication": { "message": "Publicación" },
+  "multipleDetected": { "message": "$COUNT$ referencias detectadas", "placeholders": { "count": { "content": "$1" } } },
+  "multipleHint": { "message": "Elige cuáles quieres guardar." },
+  "saveMultiple": { "message": "Guardar $COUNT$ referencias", "placeholders": { "count": { "content": "$1" } } },
+  "selectAtLeastOne": { "message": "Selecciona al menos una referencia." },
+  "savedBatchSummary": { "message": "Se han guardado $COUNT$ referencias con $FILES$ archivo(s) adjunto(s).", "placeholders": { "count": { "content": "$1" }, "files": { "content": "$2" } } },
+  "alreadySaved": { "message": "Ya estaba en Nodus" },
+  "updatedExisting": { "message": "Referencia actualizada" },
+  "duplicateAvoided": { "message": "No se ha creado ningún duplicado." },
+  "permissionDenied": { "message": "No se ha concedido permiso para $ORIGINS$.", "placeholders": { "origins": { "content": "$1" } } }
 }

@@ -18,9 +18,10 @@ import type {
   LibrarySmartSearchCondition,
   LibrarySmartSearchGroup,
   LibrarySortRule,
+  LibraryMetadataIdentifierKind,
 } from '@shared/libraryTypes';
 import { LibraryDiskStore } from './libraryStorage';
-import { libraryCreatorDedupKey, librarySourceIdentityKey, normalizeLibraryDedupTitle } from './libraryRecord';
+import { libraryCreatorDedupKey, librarySourceIdentityKey, normalizeLibraryDedupTitle, normalizeLibraryDedupUrl } from './libraryRecord';
 import { validateLibrarySmartSearchGroup } from './librarySmartCollections';
 import { atomicWriteJson } from './libraryFileUtils';
 
@@ -58,6 +59,19 @@ function isbnForms(value: string): string[] {
     return [clean, `${body}${check === 10 ? 'X' : check}`];
   }
   return clean ? [clean] : [];
+}
+
+function canonicalExternalIdentifier(kind: 'doi' | 'pmid' | 'pmcid' | 'arxiv', value: string | undefined): string {
+  const raw = String(value ?? '').trim();
+  if (!raw) return '';
+  if (kind === 'doi') return raw.replace(/^https?:\/\/(?:dx\.)?doi\.org\//i, '').replace(/^doi:\s*/i, '').trim().toLowerCase();
+  if (kind === 'pmid') return raw.replace(/^pmid:\s*/i, '').trim().toLowerCase();
+  if (kind === 'pmcid') return raw.replace(/^pmcid?:\s*/i, '').trim().toLowerCase();
+  try {
+    const parsed = new URL(raw);
+    if (/arxiv\.org$/i.test(parsed.hostname)) return parsed.pathname.replace(/^\/(?:abs|pdf)\//i, '').replace(/\.pdf$/i, '').toLowerCase();
+  } catch { /* plain arXiv form */ }
+  return raw.replace(/^arxiv:\s*/i, '').replace(/\.pdf$/i, '').trim().toLowerCase();
 }
 
 function emptyFacets(): LibraryCatalogFacets {
@@ -687,13 +701,13 @@ export class LibraryCatalog {
   findItemIdByMetadataIdentifiers(metadata: LibraryItemMetadata): string | null {
     const conditions: string[] = [];
     const params: Record<string, string> = {};
-    const doi = metadata.doi?.replace(/^https?:\/\/(?:dx\.)?doi\.org\//i, '').replace(/^doi:\s*/i, '').trim().toLowerCase();
+    const doi = canonicalExternalIdentifier('doi', metadata.doi);
     if (doi) {
       conditions.push("LOWER(REPLACE(REPLACE(REPLACE(REPLACE(COALESCE(doi, ''), 'https://doi.org/', ''), 'http://doi.org/', ''), 'https://dx.doi.org/', ''), 'http://dx.doi.org/', ''))=@doi");
       params.doi = doi;
     }
     for (const key of ['pmid', 'pmcid', 'arxiv'] as const) {
-      const value = metadata[key]?.trim().toLowerCase();
+      const value = canonicalExternalIdentifier(key, metadata[key]);
       if (!value) continue;
       conditions.push(`LOWER(COALESCE(json_extract(metadata_json, '$.${key}'), ''))=@${key}`);
       params[key] = value;
@@ -710,7 +724,36 @@ export class LibraryCatalog {
       WHERE deleted_at IS NULL AND (${conditions.join(' OR ')})
       ORDER BY updated_at DESC LIMIT 1
     `).get(params) as { id: string } | undefined;
-    return row?.id ?? null;
+    if (row?.id) return row.id;
+
+    // Older/imported records may retain DOI prefixes or arXiv URLs. Keep the
+    // indexed query above as the common path, and use a bounded compatibility
+    // scan only when it misses those legacy spellings.
+    const rows = this.handle.prepare(`
+      SELECT id, doi, isbn_json, metadata_json FROM library_items
+      WHERE deleted_at IS NULL LIMIT 5000
+    `).all() as Array<{ id: string; doi: string | null; isbn_json: string; metadata_json: string }>;
+    const incoming = new Map<LibraryMetadataIdentifierKind, Set<string>>();
+    for (const key of ['doi', 'pmid', 'pmcid', 'arxiv'] as const) {
+      const value = canonicalExternalIdentifier(key, metadata[key]);
+      if (value) incoming.set(key, new Set([value]));
+    }
+    const incomingIsbn = new Set(isbns);
+    for (const candidate of rows) {
+      if (incoming.has('doi') && canonicalExternalIdentifier('doi', candidate.doi ?? undefined) && incoming.get('doi')!.has(canonicalExternalIdentifier('doi', candidate.doi ?? undefined))) return candidate.id;
+      let parsed: Record<string, unknown> = {};
+      try { parsed = JSON.parse(candidate.metadata_json) as Record<string, unknown>; } catch { /* malformed cache row */ }
+      for (const key of ['pmid', 'pmcid', 'arxiv'] as const) {
+        const value = canonicalExternalIdentifier(key, typeof parsed[key] === 'string' ? parsed[key] as string : undefined);
+        if (value && incoming.get(key)?.has(value)) return candidate.id;
+      }
+      if (incomingIsbn.size) {
+        let values: unknown = [];
+        try { values = JSON.parse(candidate.isbn_json); } catch { /* malformed cache row */ }
+        if (Array.isArray(values) && values.flatMap((entry) => isbnForms(String(entry))).some((entry) => incomingIsbn.has(entry))) return candidate.id;
+      }
+    }
+    return null;
   }
 
   /**
@@ -741,6 +784,37 @@ export class LibraryCatalog {
       return row.id;
     }
     return null;
+  }
+
+  /** Exact page identity fallback. URLs are compared after removing only
+   * fragments and known analytics parameters; callers should prefer stable
+   * identifiers and bibliographic identity before reaching this method. */
+  findItemIdByMetadataUrl(metadata: LibraryItemMetadata): string | null {
+    const candidate = normalizeLibraryDedupUrl(metadata.url);
+    const parsed = candidate ? new URL(candidate) : null;
+    if (!parsed || parsed.pathname === '/' || parsed.pathname.length < 4) return null;
+    const rows = this.handle.prepare(`
+      SELECT id, metadata_json FROM library_items
+      WHERE deleted_at IS NULL AND metadata_json LIKE '%"url"%'
+      LIMIT 5000
+    `).all() as Array<{ id: string; metadata_json: string }>;
+    for (const row of rows) {
+      try {
+        const value = JSON.parse(row.metadata_json) as { url?: unknown };
+        if (typeof value.url === 'string' && normalizeLibraryDedupUrl(value.url) === candidate) return row.id;
+      } catch { /* malformed cache row */ }
+    }
+    return null;
+  }
+
+  /** Ordered, explainable duplicate lookup shared by imports and captures. */
+  findItemIdByMetadata(metadata: LibraryItemMetadata): { itemId: string; matchedBy: 'identifier' | 'bibliography' | 'url' } | null {
+    const identifier = this.findItemIdByMetadataIdentifiers(metadata);
+    if (identifier) return { itemId: identifier, matchedBy: 'identifier' };
+    const bibliography = this.findItemIdByNormalizedBibliography(metadata);
+    if (bibliography) return { itemId: bibliography, matchedBy: 'bibliography' };
+    const url = this.findItemIdByMetadataUrl(metadata);
+    return url ? { itemId: url, matchedBy: 'url' } : null;
   }
 
   citationKeys(exceptItemId?: string): string[] {

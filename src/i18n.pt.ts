@@ -8208,4 +8208,13 @@ export const PT: Record<string, string> = {
   "El PDF está escaneado y no tiene capa de texto. Activa OCR y vuelve a analizar.": "O PDF foi digitalizado e não tem camada de texto. Ative o OCR e volte a analisar.",
   "El adjunto no produjo texto utilizable. Revisa el archivo o activa OCR.": "O anexo não produziu texto utilizável. Verifique o ficheiro ou ative o OCR.",
   "El formato del adjunto no es compatible con la extracción de texto.": "O formato do anexo não é compatível com a extração de texto.",
+  "Selecciona al menos una referencia.": "Selecione pelo menos uma referência.",
+  "{n} referencias": "{n} referências",
+  "Ya estaba en Nodus": "Já estava no Nodus",
+  "Referencia actualizada": "Referência atualizada",
+  "No se ha creado ningún duplicado.": "Não foi criado nenhum duplicado.",
+  "Se han guardado {n} referencias.": "Foram guardadas {n} referências.",
+  "{n} referencias detectadas": "{n} referências detetadas",
+  "Un autor por línea": "Um autor por linha",
+  "Guardar {n} referencias": "Guardar {n} referências",
 };
