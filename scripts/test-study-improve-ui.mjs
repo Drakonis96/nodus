@@ -67,5 +67,28 @@ test('the compact prompt manager creates prompts and limits the toolbar to four'
   assert.match(dialog, /selected\.description/);
   assert.match(dialog, /máximo de cuatro prompts/);
   assert.doesNotMatch(dialog, /diffWordsWithSpace/);
-  assert.doesNotMatch(dialog, /updateStudyStyle|duplicateStudyStyle|archiveStudyStyle|importStudyStyles|exportStudyStyles/);
+  assert.doesNotMatch(dialog, /duplicateStudyStyle|archiveStudyStyle|importStudyStyles|exportStudyStyles/);
+});
+
+test('only user prompts can be edited or deleted, and deleting asks first', async () => {
+  const [dialog, repo] = await Promise.all([
+    read('src/components/editor/StudyImproveDialog.tsx'),
+    read('electron/db/studyStylesRepo.ts'),
+  ]);
+  // The edit and delete controls live behind `selected.builtIn`, so the presets stay read-only.
+  assert.match(dialog, /selected\.builtIn\s*\n?\s*\?[^]*Los prompts incluidos no se pueden editar ni eliminar\.[^]*study-prompt-edit/);
+  assert.match(dialog, /data-testid="study-prompt-edit"/);
+  assert.match(dialog, /data-testid="study-prompt-delete"/);
+  assert.match(dialog, /updateStudyStyle\(editing\.id/);
+  // Deleting goes through the confirmation modal, never straight from the button.
+  assert.match(dialog, /setPendingDeletion\(selected\)/);
+  assert.match(dialog, /<ConfirmModal[^]*danger[^]*onConfirm=\{\(\) => void deletePrompt\(pendingDeletion\)\}/);
+  assert.doesNotMatch(dialog, /onClick=\{\(\) => void deletePrompt\(selected\)\}/);
+  // A deleted prompt cannot stay pinned to the writing toolbar.
+  assert.match(dialog, /deleteStudyStyle\(style\.id\)[^]*studyImproveToolbarStyleIds: nextIds/);
+  // The presets are the app's own, so the repository refuses to touch them at all.
+  assert.match(repo, /if \(current\.builtIn\) throw new Error\('Los estilos predefinidos se duplican antes de editarlos\.'\)/);
+  assert.match(repo, /export function deleteStudyStyle[^]*current\.builtIn[^]*Solo se pueden eliminar estilos personalizados/);
+  // Editing must not be a way around the prompt guard that creation enforces.
+  assert.match(repo, /export function updateStudyStyle[^]*validateStudyStylePrompt[^]*sustituir las reglas/);
 });
