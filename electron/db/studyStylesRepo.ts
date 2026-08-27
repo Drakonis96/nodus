@@ -166,6 +166,9 @@ export function updateStudyStyle(id: string, patch: Partial<StudyStyleInput>): S
     throw new Error('Desbloquea el estilo antes de editar su configuración.');
   }
   const config = normalizeConfig({ ...current, ...patch, name: patch.name ?? current.name, prompt: patch.prompt ?? current.prompt }, current);
+  // La misma puerta que en la creación: editar no puede colar un prompt que anule las reglas.
+  const warnings = validateStudyStylePrompt(`${config.prompt}\n${config.systemPrompt}`);
+  if (warnings.some((warning) => warning.includes('sustituir las reglas'))) throw new Error(warnings[0]);
   const timestamp = now();
   getDb().prepare(`UPDATE study_styles SET name = ?, icon = ?, color = ?, description = ?, prompt = ?, system_prompt = ?,
     category = ?, language = ?, level = ?, length_mode = ?, model_provider = ?, model_name = ?, temperature = ?,
