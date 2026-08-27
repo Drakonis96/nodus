@@ -13,7 +13,10 @@ const commands = [];
 const nodusOpenRequests = [];
 let styleRequests = 0;
 let referenceSearchRequests = 0;
+const synonymRequests = [];
+const chatRequests = [];
 let editorSelection = '';
+let editorParagraph = '';
 const styleCatalogue = [
   { id: 'apa-7', title: 'APA 7', availableOffline: true, citationFormat: 'author-date' },
   { id: 'institutional-test', title: 'Institutional test', availableOffline: true, citationFormat: 'note' },
@@ -108,7 +111,36 @@ const server = createServer(async (req, res) => {
     styleId: body.styleId,
     model: body.model,
   });
-  if (url.pathname === '/api/editor/state') return json(res, { paragraphText: editorSelection, selectionText: editorSelection, documentId: 'e2e-writer', references: { documentId: 'e2e-writer', preferences: null, citations: [], bibliographyFieldIds: [], bibliographies: [], selectedFieldId: null } });
+  if (url.pathname === '/api/synonyms' && req.method === 'POST') {
+    synonymRequests.push(body);
+    const round = synonymRequests.length;
+    return json(res, {
+      alternatives: Array.from({ length: 5 }, (_, index) => ({
+        target: body.selectedText,
+        replacement: `${round === 1 ? 'Alternative' : 'Fresh'} ${index + 1}`,
+        from: body.selectionFrom,
+        to: body.selectionTo,
+      })),
+      modelProvider: 'openai',
+      modelName: 'gpt-e2e',
+    });
+  }
+  if (url.pathname === '/api/chat/catalogue' && req.method === 'GET') return json(res, {
+    models: [
+      { provider: 'openai', model: 'gpt-e2e', label: 'OpenAI · gpt-e2e' },
+      { provider: 'ollama', model: 'local-e2e', label: 'Ollama · local-e2e' },
+    ],
+    defaultModel: { provider: 'openai', model: 'gpt-e2e' },
+  });
+  if (url.pathname === '/api/chat/stream' && req.method === 'POST') {
+    chatRequests.push(body);
+    res.writeHead(200, { 'Content-Type': 'application/x-ndjson; charset=utf-8', 'Cache-Control': 'no-store' });
+    res.write(`${JSON.stringify({ type: 'delta', text: 'Grounded answer ' })}\n`);
+    res.write(`${JSON.stringify({ type: 'delta', text: '**from Word**.' })}\n`);
+    res.end(`${JSON.stringify({ type: 'done' })}\n`);
+    return;
+  }
+  if (url.pathname === '/api/editor/state') return json(res, { paragraphText: editorParagraph || editorSelection, selectionText: editorSelection, documentId: 'e2e-writer', references: { documentId: 'e2e-writer', preferences: null, citations: [], bibliographyFieldIds: [], bibliographies: [], selectedFieldId: null } });
   if (url.pathname === '/api/editor/insert') { commands.push(body); return json(res, { ok: true, delivered: true }); }
   if (url.pathname === '/api/nodus/open') { nodusOpenRequests.push(body); return json(res, { ok: true }); }
   res.writeHead(404); res.end();
@@ -170,6 +202,9 @@ try {
   await firstOptions.getByLabel('Value').fill('401');
   await firstOptions.getByLabel('Prefix').fill('see ');
   await firstOptions.getByLabel('Suffix / text after').fill('; compare with ');
+  await page.waitForTimeout(1700);
+  assert.equal(await firstOptions.getByLabel('Value').inputValue(), '401', 'Writer polling must not rebuild a citation while its details are being edited');
+  assert.equal(await firstOptions.getByLabel('Prefix').inputValue(), 'see ');
   await page.getByRole('button', { name: 'Insert citation' }).click();
   await page.getByText('Live citation inserted').waitFor();
   assert.equal(commands[0].command, 'insert-citation');
@@ -188,11 +223,11 @@ try {
   // Saved workspace prompts generate a reviewable proposal and never mutate the
   // editor until the explicit Paste action.
   editorSelection = 'The original Word selection stays untouched during generation.';
-  await page.getByRole('tab', { name: 'AI prompts' }).click();
+  await page.getByRole('tab', { name: 'AI Edition' }).click();
   await page.locator('#promptStyle option[value="builtin:academic"]').waitFor({ state: 'attached' });
   await page.waitForFunction(() => document.querySelector('#promptSelection')?.textContent?.includes('original Word selection'));
   assert.notEqual(await page.locator('.seg.active .seg-label').evaluate((element) => getComputedStyle(element).display), 'none');
-  assert.equal(await page.locator('.seg:not(.active) .seg-label').first().evaluate((element) => getComputedStyle(element).display), 'none');
+  assert.notEqual(await page.locator('.seg:not(.active) .seg-label').first().evaluate((element) => getComputedStyle(element).display), 'none');
   await page.locator('#promptStyle').selectOption('builtin:clear');
   await page.locator('#promptModel').selectOption({ label: 'Ollama · local-e2e' });
   await page.locator('#applyPrompt').click();
@@ -203,6 +238,157 @@ try {
   await page.getByText('Selection replaced').waitFor();
   assert.equal(commands[2].replace, true);
   assert.equal(commands[2].text, `Clear proposal: ${editorSelection}`);
+
+  // The contextual thesaurus sends the whole sentence even when one word is
+  // selected, presents five choices, excludes them on regeneration, and only
+  // replaces text after the user chooses an alternative.
+  editorParagraph = 'The central argument is solid and convincing.';
+  editorSelection = 'solid';
+  await page.waitForTimeout(1700);
+  await page.getByRole('tab', { name: 'Synonyms' }).click();
+  await page.getByRole('button', { name: 'Apply: Alternative 1' }).waitFor();
+  assert.equal(await page.locator('#synonymRounds .synonym-option').count(), 5);
+  assert.equal(await page.locator('#synonymContext').textContent(), editorParagraph);
+  assert.equal(await page.locator('#synonymContext mark').textContent(), editorSelection);
+  assert.equal(synonymRequests[0].sentence, editorParagraph);
+  assert.equal(synonymRequests[0].selectedText, editorSelection);
+  assert.equal(editorParagraph.slice(synonymRequests[0].selectionFrom, synonymRequests[0].selectionTo), editorSelection);
+  await page.locator('#generateSynonyms').click();
+  await page.getByRole('button', { name: 'Apply: Fresh 1' }).waitFor();
+  assert.equal(synonymRequests[1].previousAlternatives.length, 5);
+  assert.equal(await page.locator('#synonymRounds .synonym-option').count(), 10);
+  await page.getByRole('button', { name: 'Apply: Fresh 1' }).click();
+  await page.getByText('Alternative applied').waitFor();
+  assert.equal(commands.at(-1).replace, true);
+  assert.equal(commands.at(-1).text, 'Fresh 1');
+
+  // Chat mirrors the Zotero conversation flow, but grounds every turn in the
+  // fresh Word scope and always carries the currently selected passage too.
+  editorParagraph = 'The complete editor document explains workers’ autonomy and clandestine organization.';
+  editorSelection = 'workers’ autonomy';
+  await page.waitForTimeout(1700);
+  await page.getByRole('tab', { name: 'Chat' }).click();
+  await page.locator('#chatSelection:not([hidden])').waitFor();
+  assert.equal(await page.locator('#chatSelectionText').textContent(), editorSelection);
+  await page.locator('#chatScopeDocument').check();
+  await page.locator('#chatInput').fill('What does the selection mean?');
+  await page.locator('#chatInput').press('Enter');
+  await page.locator('.word-chat-message--assistant strong').getByText('from Word').waitFor();
+  assert.equal(chatRequests.length, 1);
+  assert.equal(chatRequests[0].context.scope, 'document');
+  assert.equal(chatRequests[0].context.text, editorParagraph);
+  assert.equal(chatRequests[0].context.selectionText, editorSelection);
+  assert.deepEqual(chatRequests[0].messages, [{ role: 'user', content: 'What does the selection mean?' }]);
+
+  await page.locator('#chatInput').fill('Summarize it.');
+  await page.locator('#chatSend').click();
+  await page.locator('.word-chat-message--assistant').last().locator('strong').getByText('from Word').waitFor();
+  assert.equal(chatRequests[1].messages.length, 3, 'the second request carries the preceding conversation');
+  assert.deepEqual(chatRequests[1].messages.map((message) => message.role), ['user', 'assistant', 'user']);
+  const regenerated = page.waitForResponse((response) => response.url().endsWith('/api/chat/stream'));
+  await page.locator('.word-chat-message--assistant').last().getByRole('button', { name: 'Regenerate' }).click();
+  await regenerated;
+  await page.locator('.word-chat-message--assistant').last().locator('strong').getByText('from Word').waitFor();
+  assert.equal(chatRequests.length, 3);
+  assert.equal(chatRequests[2].messages.at(-1).content, 'Summarize it.');
+  await page.getByRole('button', { name: 'Conversations' }).click();
+  await page.locator('.word-chat-conversation').first().waitFor();
+  assert.match(await page.locator('.word-chat-conversation-title').first().textContent(), /What does the selection mean/);
+  await page.locator('#chatHistoryClose').click();
+  const chatStorageKeys = await page.evaluate(() => Object.keys(localStorage).filter((key) => key.startsWith('nodus.word-chat.conversations.')));
+  assert.equal(chatStorageKeys.some((key) => key === 'nodus.word-chat.conversations.v1'), false, 'unscoped legacy history must not remain readable');
+  assert.equal(chatStorageKeys.filter((key) => key.startsWith('nodus.word-chat.conversations.v2.')).length, 1, 'history must use a document-scoped namespace');
+
+  await page.evaluate(() => {
+    Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText: () => Promise.reject(new Error('denied')) } });
+    document.execCommand = () => true;
+  });
+  await page.locator('.word-chat-message--assistant').last().getByRole('button', { name: 'Copy' }).click();
+  await page.locator('.word-chat-message--assistant').last().getByRole('button', { name: 'Copied' }).waitFor();
+
+  editorSelection = 'x'.repeat(40_500);
+  editorParagraph = 'A short editor context for the oversized selection test.';
+  await page.waitForTimeout(1700);
+  await page.getByRole('button', { name: 'New conversation' }).click();
+  await page.locator('#chatInput').fill('Use this long selection.');
+  await page.locator('#chatSend').click();
+  await page.locator('.word-chat-message--assistant strong').getByText('from Word').waitFor();
+  assert.equal(chatRequests.at(-1).context.selectionText.length, 40_000);
+  assert.equal(chatRequests.at(-1).context.selectionTruncated, true);
+  await page.getByText(/selection is too long/i).waitFor();
+
+  // Exercise the actual Office.js branch too. This mock follows Microsoft's
+  // WordApiDesktop 1.2 PageCollection/Page.getRange contract, so both scope
+  // choices are verified independently from the standalone Writer bridge.
+  const wordContext = await browser.newContext({ viewport: { width: 360, height: 840 }, colorScheme: 'light' });
+  const wordPage = await wordContext.newPage();
+  await wordPage.route('https://appsforoffice.microsoft.com/**', (route) => route.fulfill({
+    contentType: 'text/javascript',
+    body: `
+      (function () {
+        var pageRange = { text: 'Only the seventh Word page is used here.', load: function () {} };
+        var page = { index: 7, load: function () {}, getRange: function () { return pageRange; } };
+        window.__failWordPages = false;
+        function selection() { return {
+          text: 'seventh Word page', load: function () {},
+          pages: { items: window.__failWordPages ? [] : [page], load: function () {} },
+          paragraphs: { getFirst: function () { return { text: 'A paragraph long enough for startup analysis.', load: function () {} }; } }
+        }; }
+        window.Word = {
+          FieldType: { addin: 'addin' }, InsertLocation: { replace: 'replace' },
+          run: function (callback) {
+            var context = {
+              document: { body: { text: 'The complete Word document includes every section.', load: function () {} }, getSelection: selection },
+              sync: function () { return Promise.resolve(); }
+            };
+            return Promise.resolve(callback(context));
+          }
+        };
+        window.Office = {
+          HostType: { Word: 'Word' }, EventType: { OfficeThemeChanged: 'theme', DocumentSelectionChanged: 'selection' }, AsyncResultStatus: { Failed: 'failed' },
+          context: {
+            officeTheme: { bodyBackgroundColor: '#ffffff', bodyForegroundColor: '#111111', controlBackgroundColor: '#ffffff', controlForegroundColor: '#111111', addHandlerAsync: function () {} },
+            requirements: { isSetSupported: function () { return true; } },
+            document: { addHandlerAsync: function () {}, settings: { get: function () { return null; }, set: function () {}, saveAsync: function (callback) { callback({ status: 'ok' }); } } }
+          },
+          onReady: function (callback) { setTimeout(function () { callback({ host: 'Word' }); }, 0); }
+        };
+      })();
+    `,
+  }));
+  await wordPage.goto(`http://127.0.0.1:${port}/addin/taskpane.html`);
+  await wordPage.getByRole('tab', { name: 'Chat' }).click();
+  await wordPage.locator('#chatModel option[value="openai::gpt-e2e"]').waitFor({ state: 'attached' });
+  const wordChatStart = chatRequests.length;
+  await wordPage.locator('#chatInput').fill('Use the current page.');
+  await wordPage.locator('#chatSend').click();
+  await wordPage.locator('.word-chat-message--assistant strong').getByText('from Word').waitFor();
+  assert.equal(chatRequests[wordChatStart].context.scope, 'page');
+  assert.equal(chatRequests[wordChatStart].context.label, 'Page 7');
+  assert.equal(chatRequests[wordChatStart].context.text, 'Only the seventh Word page is used here.');
+  assert.equal(chatRequests[wordChatStart].context.selectionText, 'seventh Word page');
+  await wordPage.locator('#chatScopeDocument').check();
+  await wordPage.locator('#chatInput').fill('Now use the whole document.');
+  await wordPage.locator('#chatSend').click();
+  await wordPage.locator('.word-chat-message--assistant').last().locator('strong').getByText('from Word').waitFor();
+  assert.equal(chatRequests[wordChatStart + 1].context.scope, 'document');
+  assert.equal(chatRequests[wordChatStart + 1].context.text, 'The complete Word document includes every section.');
+  await wordPage.evaluate(() => { window.__failWordPages = true; });
+  await wordPage.locator('#chatScopePage').check();
+  await wordPage.locator('#chatInput').fill('Fall back safely.');
+  await wordPage.locator('#chatSend').click();
+  await wordPage.locator('.word-chat-message--assistant').last().locator('strong').getByText('from Word').waitFor();
+  assert.equal(chatRequests[wordChatStart + 2].context.scope, 'document');
+  assert.equal(chatRequests[wordChatStart + 2].context.pageFallback, true);
+  await wordPage.getByText(/current page could not be read/i).waitFor();
+  if (screenshotDir) {
+    await mkdir(screenshotDir, { recursive: true });
+    await wordPage.evaluate(() => document.body.classList.add('dark'));
+    await wordPage.waitForTimeout(250);
+    await wordPage.screenshot({ path: path.join(screenshotDir, 'copilot-chat-dark.png'), fullPage: true });
+  }
+  await wordContext.close();
+
   await page.getByRole('tab', { name: 'References' }).click();
   await page.getByRole('button', { name: '+ Add' }).first().waitFor();
 
@@ -216,7 +402,7 @@ try {
     }));
     assert.ok(geometry.body <= geometry.viewport, `no horizontal clipping at ${width}px`);
     assert.ok(geometry.search > width - 35, `search stays full width at ${width}px`);
-    assert.ok(geometry.tabs > width - 35, `three tabs stay balanced at ${width}px`);
+    assert.ok(geometry.tabs > width - 35, `tabs stay balanced at ${width}px`);
     assert.equal(geometry.icon, 28, 'the stylized Nodus mark has the intended visual size');
   }
 
@@ -229,7 +415,7 @@ try {
     const card = getComputedStyle(document.querySelector('.card'));
     return { background: body.getPropertyValue('--bg').trim(), panel: body.getPropertyValue('--panel').trim(), text: body.getPropertyValue('--text').trim(), activeBackground: activeTab.backgroundColor, activeText: activeTab.color, cardBackground: card.backgroundColor };
   });
-  assert.deepEqual({ background: colors.background, panel: colors.panel, text: colors.text }, { background: '#1f1f1f', panel: '#2b2b2b', text: '#f3f3f3' });
+  assert.deepEqual({ background: colors.background, panel: colors.panel, text: colors.text }, { background: '#1c1c22', panel: '#2b2b2b', text: '#e7e6ee' });
   assert.notEqual(colors.activeBackground, 'rgb(255, 255, 255)', 'the selected tab is never white in dark mode');
   assert.notEqual(colors.cardBackground, 'rgb(255, 255, 255)', 'result cards are never white in dark mode');
   assert.notEqual(colors.activeText, colors.activeBackground, 'the selected tab keeps readable contrast');
@@ -264,7 +450,7 @@ try {
     await visual.screenshot({ path: path.join(screenshotDir, 'copilot-references-dark.png'), fullPage: true });
     await visual.close();
   }
-  console.log('Office references frontend E2E passed: live searchable styles, Nodus manager link, readable passages, dark mode, and 260/360/520px layouts.');
+  console.log('Office add-in frontend E2E passed: references, prompts, synonyms, grounded streaming chat, dark mode, and responsive layouts.');
 } finally {
   await browser.close();
   await new Promise((resolve) => server.close(resolve));

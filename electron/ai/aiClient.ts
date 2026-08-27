@@ -939,6 +939,25 @@ export async function completeTextStream(
   return rawCompleteStream(resolved, withPromptContext(opts), onDelta, reasoning, signal, codexReasoning);
 }
 
+/**
+ * Streaming completion that leaves the output language entirely to the caller.
+ * Conversational surfaces whose language follows the latest user turn use this
+ * instead of inheriting the vault-wide promptLanguage override.
+ */
+export async function completeTextStreamNeutral(
+  opts: CallOpts,
+  onDelta: TextDeltaHandler,
+  model?: ModelRef | null,
+  signal?: AbortSignal
+): Promise<string> {
+  const resolved = resolveModel(model);
+  const reasoning = opts.reasoning ?? getSettings().chatReasoning ?? 'off';
+  const codexReasoning = opts.reasoning === undefined || opts.useConfiguredCodexReasoning
+    ? configuredCodexReasoning(resolved)
+    : undefined;
+  return rawCompleteStream(resolved, opts, onDelta, reasoning, signal, codexReasoning);
+}
+
 async function rawCompleteStream(
   model: ModelRef,
   opts: CallOpts,
