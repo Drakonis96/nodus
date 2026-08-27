@@ -700,6 +700,30 @@ try {
     path: path.join(captures, "02-compass-500-candidates.png"),
   });
 
+  // Clearing affects only the active renderer session: it removes every mounted
+  // result and selection while keeping the query and searchable history intact.
+  await page.getByTestId("compass-clear-results").click();
+  assert.equal(
+    await page.getByTestId("compass-view").getAttribute("data-loaded-results"),
+    "0",
+    "the clear-results control empties the rendered result set",
+  );
+  assert.equal(
+    await page.getByTestId("compass-query").inputValue(),
+    stressQuery,
+    "clearing results keeps the current query available",
+  );
+  assert.equal(
+    await page.getByText(stressQuery, { exact: true }).isVisible(),
+    true,
+    "clearing results does not delete the search from history",
+  );
+  assert.equal(
+    await page.getByTestId("compass-clear-results").count(),
+    0,
+    "the clear-results control disappears once there is no active result session",
+  );
+
   const stressImport = await page.evaluate(
     async ({ searchId, revision }) => {
       await window.nodus.selectCompassRange({

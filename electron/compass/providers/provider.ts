@@ -67,7 +67,14 @@ export function author(value: unknown): CompassAuthor | null {
     300,
   );
   return name
-    ? { name, given, family, orcid: text(record.orcid, 120) || undefined }
+    ? {
+        name,
+        given,
+        family,
+        orcid:
+          normalizeIdentifier("orcid", text(record.orcid ?? record.ORCID, 120)) ||
+          undefined,
+      }
     : null;
 }
 function isbn13From10(value: string): string | undefined {
@@ -99,6 +106,11 @@ export function normalizeIdentifier(scheme: string, raw: string): string {
       .replace(/^arxiv:\s*/i, "")
       .replace(/v\d+$/i, "")
       .toLocaleLowerCase();
+  if (key === "orcid")
+    value = value
+      .replace(/^https?:\/\/(?:www\.)?orcid\.org\//i, "")
+      .replace(/^orcid:\s*/i, "")
+      .toUpperCase();
   return text(value, 300);
 }
 export function canonicalKey(

@@ -441,6 +441,41 @@ export function CompassView({
         .setCompassSelection(searchId, [], ++selectionVersion.current)
         .catch(() => undefined);
   };
+  const clearResults = useCallback(() => {
+    const currentSearchId = activeSearchId.current ?? searchId;
+    const currentRequestId = requestId.current;
+
+    // Invalidate the renderer request before canceling so a progress event that
+    // was already queued cannot repopulate the list after it has been cleared.
+    generation.current += 1;
+    queryRevision.current += 1;
+    viewRevision.current = 0;
+    requestId.current = "";
+    if (
+      currentSearchId &&
+      ["interpreting", "queued", "searching", "partial"].includes(status)
+    )
+      void api
+        .cancelCompassSearch(currentSearchId, currentRequestId)
+        .catch(() => undefined);
+    activeSearchId.current = null;
+    hydratedSearchId.current = currentSearchId;
+    selectionVersion.current += 1;
+
+    setSearchId(null);
+    setSession(null);
+    setResults([]);
+    setProviders([]);
+    setStatus("complete");
+    setSelected(new Set());
+    setDismissed(new Set());
+    setSelectedItem(null);
+    setHasMore(false);
+    setLastPage({ offset: 0, length: 0 });
+    setScrollAnchors({});
+    setLaneTotals({ scholarly: 0, primary: 0 });
+    patchSnapshot({ searchId: null, scrollAnchors: {} });
+  }, [api, patchSnapshot, searchId, status]);
   const saveCandidate = async (item: CompassResult) => {
     if (!searchId) return;
     await api.saveCompassCandidate(searchId, item.canonicalKey);
@@ -523,8 +558,9 @@ export function CompassView({
       provider.lane === lane &&
       ["error", "offline", "rate-limited", "budget-exhausted", "temporarily-disabled", "canceled"].includes(provider.state),
   );
-  const statusText =
-    !online || status === "offline"
+  const statusText = !session
+    ? ""
+    : !online || status === "offline"
       ? "Sin conexión"
       : ((
           {
@@ -575,6 +611,7 @@ export function CompassView({
             <CompassSearchBar
               value={query}
               busy={["interpreting", "queued", "searching"].includes(status)}
+              canClear={Boolean(searchId || session || results.length)}
               onSearch={(value) => {
                 setQuery(value);
                 patchSnapshot({ draft: value });
@@ -587,6 +624,7 @@ export function CompassView({
                 );
                 setStatus("canceled");
               }}
+              onClear={clearResults}
               ai={aiInterpret}
               onAiChange={setAiInterpret}
             />

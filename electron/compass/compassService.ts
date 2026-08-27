@@ -34,6 +34,7 @@ import { COMPASS_MAX_QUERY_LENGTH, COMPASS_PROVIDERS } from "@shared/compass";
 import { CompassStore, compassDatabasePath } from "./compassStore";
 import { interpretCompassQuery } from "./compassQueryInterpreter";
 import { routeCompassRequests, type CompassRoute } from "./compassRouter";
+import { compassAuthorNameScore } from "./authorNames";
 import {
   CompassRequestScheduler,
   CompassScheduleError,
@@ -365,7 +366,10 @@ export class CompassService {
     }));
     let vectors: Array<number[] | null> = [];
     const already = this.embeddedBySearch.get(session.searchId) ?? 0;
-    if (!fixture && already < 200 && rankedInput.length) {
+    const authorSearch =
+      session.plan.authors.length > 0 ||
+      session.plan.identifiers.some((entry) => entry.scheme === "orcid");
+    if (!fixture && !authorSearch && already < 200 && rankedInput.length) {
       let release!: () => void;
       const previous = this.embeddingLock;
       this.embeddingLock = new Promise<void>((resolve) => {
@@ -875,8 +879,10 @@ export class CompassService {
         normalize(left.title) === normalize(right.title) &&
         (!left.authors[0]?.name ||
           !right.authors[0]?.name ||
-          normalize(left.authors[0].name) ===
-            normalize(right.authors[0].name)) &&
+          compassAuthorNameScore(
+            left.authors[0].name,
+            right.authors[0].name,
+          ) >= 0.9) &&
         (!left.issuedYear ||
           !right.issuedYear ||
           Math.abs(left.issuedYear - right.issuedYear) <= 1) &&
@@ -929,6 +935,22 @@ export class CompassService {
           all.findIndex((other) => other.url === entry.url) === index,
       ),
       providerRanks: { ...existing.providerRanks, ...candidate.providerRanks },
+      nativeScore: Math.max(
+        existing.nativeScore ?? 0,
+        candidate.nativeScore ?? 0,
+      ) || undefined,
+      lexicalScore: Math.max(existing.lexicalScore, candidate.lexicalScore),
+      semanticScore:
+        Math.max(
+          existing.semanticScore ?? 0,
+          candidate.semanticScore ?? 0,
+        ) || undefined,
+      rrfScore:
+        Math.max(existing.rrfScore ?? 0, candidate.rrfScore ?? 0) || undefined,
+      exactScore:
+        Math.max(existing.exactScore ?? 0, candidate.exactScore ?? 0) ||
+        undefined,
+      finalScore: Math.max(existing.finalScore, candidate.finalScore),
       reasons: [...existing.reasons, ...candidate.reasons].filter(
         (entry, index, all) =>
           all.findIndex(

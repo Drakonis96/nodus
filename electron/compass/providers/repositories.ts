@@ -15,6 +15,7 @@ import {
   result,
   text,
 } from "./provider";
+import { compassAuthorQueryVariants } from "../authorNames";
 
 const authors = (values: unknown[]) =>
   values
@@ -137,13 +138,30 @@ function datacite(): CompassProviderAdapter {
         : "https://api.datacite.org/dois",
     );
     if (!doi) {
-      url.searchParams.set("query", queryFor(context));
+      const orcid = context.query.identifiers.find(
+        (entry) => entry.scheme === "orcid",
+      )?.value;
+      const requestedAuthor = context.query.authors[0];
+      const authorQuery = requestedAuthor
+        ? compassAuthorQueryVariants(requestedAuthor)
+            .map(
+              (variant) =>
+                `creators.name:"${variant.replaceAll('"', "")}"`,
+            )
+            .join(" OR ")
+        : "";
+      url.searchParams.set(
+        "query",
+        orcid
+          ? `creators.nameIdentifiers.nameIdentifier:"https://orcid.org/${orcid}" OR creators.nameIdentifiers.nameIdentifier:"${orcid}"`
+          : authorQuery || queryFor(context),
+      );
       url.searchParams.set("page[size]", "25");
       url.searchParams.set("page[number]", String(pageNumber));
       if (context.query.fromYear || context.query.toYear)
         url.searchParams.set(
           "query",
-          `${queryFor(context)} AND published:[${context.query.fromYear ?? "*"} TO ${context.query.toYear ?? "*"}]`,
+          `${url.searchParams.get("query")} AND published:[${context.query.fromYear ?? "*"} TO ${context.query.toYear ?? "*"}]`,
         );
     }
     const { data } = await requestJson(url.toString(), context.signal);
@@ -167,6 +185,11 @@ function datacite(): CompassProviderAdapter {
             name: creator?.name,
             given: creator?.givenName,
             family: creator?.familyName,
+            orcid: creator?.nameIdentifiers?.find(
+              (entry: any) =>
+                String(entry?.nameIdentifierScheme).toLocaleLowerCase() ===
+                "orcid",
+            )?.nameIdentifier,
           })),
         ),
         year: Number(attrs?.publicationYear) || undefined,
@@ -211,14 +234,22 @@ function zenodo(): CompassProviderAdapter {
   return adapter(providerDescriptor("zenodo"), async (context) => {
     const pageNumber = Math.max(1, Number(context.cursor ?? 1));
     const url = new URL("https://zenodo.org/api/records");
-    url.searchParams.set("q", queryFor(context));
+    const requestedAuthor = context.query.authors[0];
+    const authorQuery = requestedAuthor
+      ? compassAuthorQueryVariants(requestedAuthor)
+          .map(
+            (variant) => `creators.name:"${variant.replaceAll('"', "")}"`,
+          )
+          .join(" OR ")
+      : "";
+    url.searchParams.set("q", authorQuery || queryFor(context));
     url.searchParams.set("size", "25");
     url.searchParams.set("page", String(pageNumber));
     url.searchParams.set("sort", "bestmatch");
     if (context.query.fromYear || context.query.toYear)
       url.searchParams.set(
         "q",
-        `${queryFor(context)} AND publication_date:[${context.query.fromYear ?? "*"} TO ${context.query.toYear ?? "*"}]`,
+        `${url.searchParams.get("q")} AND publication_date:[${context.query.fromYear ?? "*"} TO ${context.query.toYear ?? "*"}]`,
       );
     const { data } = await requestJson(url.toString(), context.signal);
     const hits = data?.hits?.hits ?? [];

@@ -2,8 +2,8 @@ import { useEffect, useState } from 'react';
 import { Icon } from '../ui';
 import { compassT } from '../../i18n.compass';
 
-export function CompassSearchBar({ value, busy, onSearch, onCancel, ai, onAiChange }: {
-  value: string; busy: boolean; onSearch: (value: string) => void; onCancel: () => void; ai: boolean; onAiChange: (value: boolean) => void;
+export function CompassSearchBar({ value, busy, canClear, onSearch, onCancel, onClear, ai, onAiChange }: {
+  value: string; busy: boolean; canClear: boolean; onSearch: (value: string) => void; onCancel: () => void; onClear: () => void; ai: boolean; onAiChange: (value: boolean) => void;
 }) {
   const [draft, setDraft] = useState(value);
   useEffect(() => setDraft(value), [value]);
@@ -20,6 +20,7 @@ export function CompassSearchBar({ value, busy, onSearch, onCancel, ai, onAiChan
       </label>
       {busy ? <button type="button" className="btn btn-ghost h-10" onClick={onCancel}><Icon name="stop" size={14} /> {compassT('Cancelar')}</button>
         : <button type="submit" data-testid="compass-search" className="btn btn-primary h-10 gap-1.5 bg-indigo-600 px-4 text-white hover:bg-indigo-500"><Icon name="search" size={14} /> {compassT('Buscar')}</button>}
+      {canClear && <button type="button" data-testid="compass-clear-results" className="btn btn-ghost h-10 gap-1.5" onClick={onClear}><Icon name="x" size={14} /> {compassT('Limpiar resultados')}</button>}
     </form>
   );
 }
