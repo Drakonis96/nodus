@@ -72,6 +72,7 @@
     var extras = [];
     var editingCitationId = null;
     var externalState = null;
+    var externalStateFingerprint = '';
     var active = false;
     var fieldsSupported = true;
     var stylePickerOpen = false;
@@ -594,7 +595,15 @@
     }
 
     function setExternalState(state) {
-      externalState = state || externalState;
+      var nextState = state || externalState;
+      var fingerprint = '';
+      try { fingerprint = JSON.stringify(nextState || null); } catch (_) { fingerprint = String(Date.now()); }
+      // LibreOffice polls the same document state repeatedly. Reapplying an
+      // identical snapshot rebuilt the citation composer under the user's
+      // pointer and could detach inputs while they were being edited.
+      if (fingerprint === externalStateFingerprint) return;
+      externalStateFingerprint = fingerprint;
+      externalState = nextState;
       if (externalState && externalState.preferences && !options.isWord) { preferences = Object.assign({}, preferences, externalState.preferences); loadPreferences(); }
       if (externalState && !options.isWord) hydrateExtras(externalState.bibliographies || []);
       if (!active || !externalState || !externalState.selectedFieldId) return;

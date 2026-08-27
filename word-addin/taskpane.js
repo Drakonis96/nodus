@@ -7,6 +7,7 @@
   var DEBOUNCE_MS = 700;
   var PROMPT_POLL_MS = 700;
   var MIN_CHARS = 12;
+  var CHAT_DOCUMENT_KEY_SETTING = 'nodusWordChatDocumentKeyV1';
 
   var els = {};
   var lastHash = '';
@@ -18,7 +19,7 @@
   var isWord = false;
   var currentParagraphText = '';
   var currentSelectionText = '';
-  var searchMode = 'ideas'; // 'ideas' | 'passages' | 'references' | 'prompts'
+  var searchMode = 'ideas'; // 'ideas' | 'passages' | 'references' | 'synonyms' | 'prompts' | 'chat'
   var insertTarget = 'body'; // 'body' | 'footnote'
   var footnoteSupported = true;
   var referenceController = null;
@@ -32,6 +33,17 @@
   var promptSelectionPainted = false;
   var promptPollTimer = null;
   var promptPollBusy = false;
+  var synonymLiveContext = null;
+  var synonymRequestContext = null;
+  var synonymRounds = [];
+  var synonymModelLabel = '';
+  var synonymRequestSeq = 0;
+  var synonymGenerating = false;
+  var synonymRangeSupported = true;
+  var chatController = null;
+  var chatPageSupported = true;
+  var CHAT_CONTEXT_CHAR_LIMIT = 260000;
+  var CHAT_SELECTION_CHAR_LIMIT = 40000;
 
   // The pane follows the Nodus UI language (injected by the copilot server).
   var STR = {
@@ -75,7 +87,9 @@
       modeIdeas: 'Ideas',
       modePassages: 'Pasajes',
       modeReferences: 'Referencias',
-      modePrompts: 'Prompts de IA',
+      modeSynonyms: 'Sinónimos',
+      modePrompts: 'AI Edition',
+      modeChat: 'Chat',
       selectionLabel: 'Selección',
       composeRewrite: 'Reescribir',
       composeExpand: 'Ampliar',
@@ -119,6 +133,23 @@
       promptNoModels: 'No hay modelos configurados en Nodus.',
       promptGeneratedWith: 'Generado con ',
       promptWarnings: 'Revisa: ',
+      synonymTitle: 'Sinónimos y reformulaciones',
+      synonymHint: 'Selecciona una o varias palabras. Nodus usa la frase completa para conservar el sentido y la gramática.',
+      synonymContextLabel: 'Contexto de la frase',
+      synonymSelectionEmpty: 'Selecciona una o varias palabras en Word.',
+      synonymRefresh: 'Actualizar selección',
+      synonymGenerate: 'Generar 5 alternativas',
+      synonymRegenerate: 'Regenerar alternativas',
+      synonymGenerating: 'Buscando alternativas…',
+      synonymLatest: 'Alternativas',
+      synonymPrevious: 'Alternativas anteriores',
+      synonymApply: 'Aplicar',
+      synonymApplied: 'Alternativa aplicada',
+      synonymOriginal: 'Sustituye «{text}»',
+      synonymStale: 'La selección de Word ha cambiado. Vuelve a seleccionar el texto original para aplicar o regenerar estas alternativas.',
+      synonymSelectionChanged: 'La selección de Word ha cambiado. Vuelve a seleccionar el texto original.',
+      synonymRangeUnsupported: 'Esta alternativa necesita ampliar la selección. Actualiza Word para habilitar rangos contextuales.',
+      synonymGeneratedWith: 'Generado con ',
       quoteOpen: '«',
       quoteClose: '»',
       relation: { supports: 'apoya', contradicts: 'contradice', refines: 'matiza', extends: 'amplía', related: 'relacionada' },
@@ -164,7 +195,9 @@
       modeIdeas: 'Ideas',
       modePassages: 'Passages',
       modeReferences: 'References',
-      modePrompts: 'AI prompts',
+      modeSynonyms: 'Synonyms',
+      modePrompts: 'AI Edition',
+      modeChat: 'Chat',
       selectionLabel: 'Selection',
       composeRewrite: 'Rewrite',
       composeExpand: 'Expand',
@@ -208,6 +241,23 @@
       promptNoModels: 'There are no models configured in Nodus.',
       promptGeneratedWith: 'Generated with ',
       promptWarnings: 'Review: ',
+      synonymTitle: 'Synonyms and rephrasings',
+      synonymHint: 'Select one or more words. Nodus uses the complete sentence to preserve meaning and grammar.',
+      synonymContextLabel: 'Sentence context',
+      synonymSelectionEmpty: 'Select one or more words in Word.',
+      synonymRefresh: 'Refresh selection',
+      synonymGenerate: 'Generate 5 alternatives',
+      synonymRegenerate: 'Regenerate alternatives',
+      synonymGenerating: 'Finding alternatives…',
+      synonymLatest: 'Alternatives',
+      synonymPrevious: 'Previous alternatives',
+      synonymApply: 'Apply',
+      synonymApplied: 'Alternative applied',
+      synonymOriginal: 'Replaces “{text}”',
+      synonymStale: 'The Word selection changed. Select the original text again to apply or regenerate these alternatives.',
+      synonymSelectionChanged: 'The Word selection changed. Select the original text again.',
+      synonymRangeUnsupported: 'This alternative needs a wider selection. Update Word to enable contextual ranges.',
+      synonymGeneratedWith: 'Generated with ',
       quoteOpen: '“',
       quoteClose: '”',
       relation: { supports: 'supports', contradicts: 'contradicts', refines: 'refines', extends: 'extends', related: 'related' },
@@ -312,6 +362,232 @@
       });
     }).catch(function () {
       return '';
+    });
+  }
+
+  function sampleChatText(value) {
+    var text = String(value || '').replace(/\r\n/g, '\n');
+    if (text.length <= CHAT_CONTEXT_CHAR_LIMIT) {
+      return { text: text, truncated: false, totalChars: text.length };
+    }
+    var marker = LANG === 'es'
+      ? '\n\n[… contenido intermedio omitido por longitud …]\n\n'
+      : '\n\n[… middle content omitted because of length …]\n\n';
+    var available = CHAT_CONTEXT_CHAR_LIMIT - marker.length;
+    var head = Math.floor(available * 0.65);
+    return {
+      text: text.slice(0, head) + marker + text.slice(text.length - (available - head)),
+      truncated: true,
+      totalChars: text.length,
+    };
+  }
+
+  function packagedChatContext(scope, label, text, selectionText) {
+    var sampled = sampleChatText(text);
+    var rawSelection = String(selectionText || '').trim();
+    return {
+      scope: scope,
+      label: label,
+      text: sampled.text,
+      selectionText: rawSelection.slice(0, CHAT_SELECTION_CHAR_LIMIT),
+      selectionTruncated: rawSelection.length > CHAT_SELECTION_CHAR_LIMIT,
+      selectionTotalChars: rawSelection.length,
+      truncated: sampled.truncated,
+      totalChars: sampled.totalChars,
+    };
+  }
+
+  function randomChatDocumentKey() {
+    try {
+      var bytes = new Uint32Array(4);
+      window.crypto.getRandomValues(bytes);
+      return 'doc-' + Array.prototype.map.call(bytes, function (value) { return value.toString(36); }).join('-');
+    } catch (error) {
+      return 'doc-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2);
+    }
+  }
+
+  function resolveChatDocumentKey() {
+    if (!isWord) {
+      var sessionKey = '';
+      try {
+        sessionKey = sessionStorage.getItem(CHAT_DOCUMENT_KEY_SETTING) || '';
+        if (!sessionKey) {
+          sessionKey = randomChatDocumentKey();
+          sessionStorage.setItem(CHAT_DOCUMENT_KEY_SETTING, sessionKey);
+        }
+      } catch (error) {
+        sessionKey = randomChatDocumentKey();
+      }
+      return 'editor-' + sessionKey;
+    }
+    try {
+      var settings = Office.context && Office.context.document && Office.context.document.settings;
+      var stored = settings && settings.get(CHAT_DOCUMENT_KEY_SETTING);
+      if (typeof stored === 'string' && stored) return stored;
+      var created = randomChatDocumentKey();
+      if (settings) {
+        settings.set(CHAT_DOCUMENT_KEY_SETTING, created);
+        settings.saveAsync(function () {});
+      }
+      return created;
+    } catch (error) {
+      var identity = Office.context && Office.context.document
+        ? String(Office.context.document.url || Office.context.document.name || '')
+        : '';
+      return identity ? 'word-' + hash(identity) : randomChatDocumentKey();
+    }
+  }
+
+  function readWordDocumentChatContext() {
+    return Word.run(function (context) {
+      var body = context.document.body;
+      var selection = context.document.getSelection();
+      body.load('text');
+      selection.load('text');
+      return context.sync().then(function () {
+        return packagedChatContext(
+          'document',
+          LANG === 'es' ? 'Documento completo' : 'Full document',
+          body.text || '',
+          selection.text || ''
+        );
+      });
+    });
+  }
+
+  function readWordPageChatContext() {
+    return Word.run(function (context) {
+      var selection = context.document.getSelection();
+      var pages = selection.pages;
+      selection.load('text');
+      pages.load('items');
+      return context.sync().then(function () {
+        if (!pages.items.length) throw new Error(LANG === 'es' ? 'No se pudo identificar la página actual.' : 'The current page could not be identified.');
+        // A selection can cross a page boundary. "Current page" means the page
+        // where that selection begins, which is also the sole page for a caret.
+        var page = pages.items[0];
+        var pageRange = page.getRange();
+        page.load('index');
+        pageRange.load('text');
+        return context.sync().then(function () {
+          return packagedChatContext(
+            'page',
+            (LANG === 'es' ? 'Página ' : 'Page ') + page.index,
+            pageRange.text || '',
+            selection.text || ''
+          );
+        });
+      });
+    });
+  }
+
+  function readChatContext(scope) {
+    if (!isWord) {
+      return Promise.resolve(packagedChatContext(
+        scope === 'document' ? 'document' : 'page',
+        LANG === 'es' ? 'Contexto del editor' : 'Editor context',
+        currentParagraphText,
+        currentSelectionText
+      ));
+    }
+    if (scope === 'page' && chatPageSupported) {
+      return readWordPageChatContext().catch(function (pageError) {
+        return readWordDocumentChatContext().then(function (context) {
+          context.pageFallback = true;
+          context.pageFallbackReason = String((pageError && pageError.message) || pageError || '');
+          return context;
+        });
+      });
+    }
+    return readWordDocumentChatContext();
+  }
+
+  function synonymSentenceContext(source, from, to) {
+    var safeFrom = Math.max(0, Math.min(source.length, Math.trunc(from)));
+    var safeTo = Math.max(safeFrom, Math.min(source.length, Math.trunc(to)));
+    var sentenceFrom = 0;
+    var index;
+    for (index = safeFrom - 1; index >= 0; index--) {
+      var before = source.charAt(index);
+      if (before === '\n' || (/[.!?…。！？]/u.test(before) && /\s/u.test(source.charAt(index + 1)))) {
+        sentenceFrom = index + 1;
+        break;
+      }
+    }
+    while (sentenceFrom < safeFrom && /\s/u.test(source.charAt(sentenceFrom))) sentenceFrom++;
+
+    var sentenceTo = source.length;
+    for (index = safeTo; index < source.length; index++) {
+      var after = source.charAt(index);
+      if (after === '\n') { sentenceTo = index; break; }
+      if (/[.!?…。！？]/u.test(after)) { sentenceTo = index + 1; break; }
+    }
+    while (sentenceTo > safeTo && /\s/u.test(source.charAt(sentenceTo - 1))) sentenceTo--;
+    return {
+      sentence: source.slice(sentenceFrom, sentenceTo),
+      sentenceFrom: sentenceFrom,
+      sentenceTo: sentenceTo,
+      selectionFrom: safeFrom - sentenceFrom,
+      selectionTo: safeTo - sentenceFrom,
+    };
+  }
+
+  function locateUniqueSelection(paragraphText, selectedText) {
+    var first = paragraphText.indexOf(selectedText);
+    if (first < 0 || paragraphText.indexOf(selectedText, first + 1) >= 0) return -1;
+    return first;
+  }
+
+  function buildSynonymContext(paragraphText, selectedText, paragraphSelectionFrom) {
+    if (!selectedText || !selectedText.trim()) return null;
+    var paragraphSelectionTo = paragraphSelectionFrom + selectedText.length;
+    if (paragraphSelectionFrom < 0 || paragraphText.slice(paragraphSelectionFrom, paragraphSelectionTo) !== selectedText) return null;
+    var sentence = synonymSentenceContext(paragraphText, paragraphSelectionFrom, paragraphSelectionTo);
+    return {
+      paragraphText: paragraphText,
+      paragraphSelectionFrom: paragraphSelectionFrom,
+      selectedText: selectedText,
+      sentence: sentence.sentence,
+      sentenceFrom: sentence.sentenceFrom,
+      selectionFrom: sentence.selectionFrom,
+      selectionTo: sentence.selectionTo,
+    };
+  }
+
+  function readSynonymSelectionContext() {
+    if (!isWord) {
+      var externalSelection = String(currentSelectionText || '');
+      var externalParagraph = String(currentParagraphText || '');
+      return Promise.resolve(buildSynonymContext(
+        externalParagraph,
+        externalSelection,
+        locateUniqueSelection(externalParagraph, externalSelection)
+      ));
+    }
+    return Word.run(async function (context) {
+      var selection = context.document.getSelection();
+      var paragraph = selection.paragraphs.getFirst();
+      var paragraphRange = paragraph.getRange();
+      var prefix = null;
+      selection.load('text');
+      paragraph.load('text');
+      if (synonymRangeSupported) {
+        prefix = paragraphRange.getRange(Word.RangeLocation.start)
+          .expandTo(selection.getRange(Word.RangeLocation.start));
+        prefix.load('text');
+      }
+      await context.sync();
+      var selectedText = String(selection.text || '');
+      var paragraphText = String(paragraph.text || '');
+      var from = prefix ? String(prefix.text || '').length : locateUniqueSelection(paragraphText, selectedText);
+      var result = buildSynonymContext(paragraphText, selectedText, from);
+      // Some Word builds count an adjacent control character in the expanded
+      // prefix. A unique literal occurrence is a safe compatibility fallback.
+      if (!result) result = buildSynonymContext(paragraphText, selectedText, locateUniqueSelection(paragraphText, selectedText));
+      return result;
+    }).catch(function () {
+      return null;
     });
   }
 
@@ -565,7 +841,7 @@
   }
 
   function analyze(force) {
-    if (searchMode === 'references' || searchMode === 'prompts') return;
+    if (searchMode === 'references' || searchMode === 'prompts' || searchMode === 'synonyms' || searchMode === 'chat') return;
     if (els.searchBox.value.trim()) return;
     getCurrentParagraph().then(function (text) {
       els.paragraph.textContent = text ? text.slice(0, 360) : '';
@@ -604,8 +880,12 @@
   }
 
   function runSearch() {
+    if (searchTimer) {
+      clearTimeout(searchTimer);
+      searchTimer = null;
+    }
     var query = els.searchBox.value.trim();
-    if (searchMode === 'prompts') return;
+    if (searchMode === 'prompts' || searchMode === 'synonyms' || searchMode === 'chat') return;
     if (searchMode === 'references') {
       if (referenceController) referenceController.search(query);
       return;
@@ -911,7 +1191,12 @@
       if (promptPollBusy) return;
       promptPollBusy = true;
       var done = function () { promptPollBusy = false; };
-      refreshPromptSelection().then(done, done);
+      var refresh = searchMode === 'chat' && chatController
+        ? chatController.selectionChanged
+        : searchMode === 'synonyms'
+          ? refreshSynonymSelection
+          : refreshPromptSelection;
+      refresh().then(done, done);
     }, PROMPT_POLL_MS);
   }
 
@@ -1070,10 +1355,234 @@
       .catch(function (error) { setStatus((error && error.message) || String(error), 'err'); });
   }
 
+  function sameSynonymContext(left, right) {
+    return !!left && !!right
+      && left.paragraphText === right.paragraphText
+      && left.paragraphSelectionFrom === right.paragraphSelectionFrom
+      && left.selectedText === right.selectedText
+      && left.sentence === right.sentence
+      && left.selectionFrom === right.selectionFrom
+      && left.selectionTo === right.selectionTo;
+  }
+
+  function paintSynonymContext(value) {
+    els.synonymContext.innerHTML = '';
+    if (!value) {
+      els.synonymContext.textContent = T('synonymSelectionEmpty');
+      els.synonymContext.classList.add('placeholder');
+      return;
+    }
+    els.synonymContext.classList.remove('placeholder');
+    els.synonymContext.appendChild(document.createTextNode(value.sentence.slice(0, value.selectionFrom)));
+    var selected = document.createElement('mark');
+    selected.textContent = value.selectedText;
+    els.synonymContext.appendChild(selected);
+    els.synonymContext.appendChild(document.createTextNode(value.sentence.slice(value.selectionTo)));
+  }
+
+  function synonymStateIsStale() {
+    return !!synonymRequestContext && !sameSynonymContext(synonymLiveContext, synonymRequestContext);
+  }
+
+  function updateSynonymState() {
+    var stale = synonymStateIsStale();
+    els.synonymStale.textContent = stale ? T('synonymStale') : '';
+    els.synonymStale.hidden = !stale;
+    els.generateSynonyms.disabled = synonymGenerating || !synonymLiveContext;
+    els.synonymGenerateLabel.textContent = synonymRounds.length && !stale
+      ? T('synonymRegenerate')
+      : T('synonymGenerate');
+    var options = els.synonymRounds.querySelectorAll('.synonym-option');
+    for (var i = 0; i < options.length; i++) options[i].disabled = synonymGenerating || stale;
+  }
+
+  function setSynonymGenerating(generating) {
+    synonymGenerating = generating;
+    els.generateSynonyms.classList.toggle('is-generating', generating);
+    if (els.synonymTab) els.synonymTab.classList.toggle('is-busy', generating);
+    if (generating) {
+      els.generateSynonyms.setAttribute('aria-busy', 'true');
+      els.generateSynonyms.setAttribute('aria-label', T('synonymGenerating'));
+    } else {
+      els.generateSynonyms.removeAttribute('aria-busy');
+      els.generateSynonyms.setAttribute('aria-label', synonymRounds.length ? T('synonymRegenerate') : T('synonymGenerate'));
+    }
+    els.synonymGenerateLabel.hidden = generating;
+    els.synonymTypingIndicator.hidden = !generating;
+    updateSynonymState();
+  }
+
+  function refreshSynonymSelection() {
+    return readSynonymSelectionContext().then(function (value) {
+      synonymLiveContext = value;
+      paintSynonymContext(value);
+      updateSynonymState();
+      return value;
+    });
+  }
+
+  function appendSynonymOptions(container, alternatives) {
+    alternatives.forEach(function (alternative) {
+      var option = document.createElement('button');
+      option.type = 'button';
+      option.className = 'synonym-option';
+      option.setAttribute('aria-label', T('synonymApply') + ': ' + alternative.replacement);
+      var copy = textEl('span', 'synonym-option-copy', '');
+      copy.appendChild(textEl('strong', '', alternative.replacement));
+      if (alternative.target !== synonymRequestContext.selectedText) {
+        copy.appendChild(textEl('small', '', T('synonymOriginal').replace('{text}', alternative.target)));
+      }
+      option.appendChild(copy);
+      option.appendChild(textEl('span', 'synonym-option-arrow', '→'));
+      option.onclick = function () { applySynonymAlternative(alternative); };
+      container.appendChild(option);
+    });
+  }
+
+  function renderSynonymRounds() {
+    els.synonymRounds.innerHTML = '';
+    if (!synonymRounds.length || !synonymRequestContext) {
+      els.synonymRounds.hidden = true;
+      updateSynonymState();
+      return;
+    }
+    els.synonymRounds.hidden = false;
+    var title = textEl('div', 'synonym-round-title', '');
+    title.appendChild(textEl('strong', '', T('synonymLatest')));
+    title.appendChild(textEl('span', '', synonymModelLabel ? T('synonymGeneratedWith') + synonymModelLabel : ''));
+    els.synonymRounds.appendChild(title);
+    var latest = textEl('div', 'synonym-list', '');
+    appendSynonymOptions(latest, synonymRounds[synonymRounds.length - 1]);
+    els.synonymRounds.appendChild(latest);
+
+    if (synonymRounds.length > 1) {
+      var history = document.createElement('details');
+      history.className = 'synonym-history';
+      var summary = document.createElement('summary');
+      summary.textContent = T('synonymPrevious') + ' (' + ((synonymRounds.length - 1) * 5) + ')';
+      history.appendChild(summary);
+      var previous = textEl('div', 'synonym-list', '');
+      synonymRounds.slice(0, -1).reverse().forEach(function (round) { appendSynonymOptions(previous, round); });
+      history.appendChild(previous);
+      els.synonymRounds.appendChild(history);
+    }
+    updateSynonymState();
+  }
+
+  function generateSynonymRound() {
+    var requested = null;
+    var seq = ++synonymRequestSeq;
+    setSynonymGenerating(true);
+    refreshSynonymSelection()
+      .then(function (context) {
+        requested = context;
+        if (!context) throw new Error(T('synonymSelectionEmpty'));
+        var continuing = sameSynonymContext(context, synonymRequestContext);
+        var previous = continuing
+          ? synonymRounds.reduce(function (all, round) {
+            return all.concat(round.map(function (alternative) { return alternative.replacement; }));
+          }, [])
+          : [];
+        if (!continuing) {
+          synonymRounds = [];
+          synonymRequestContext = null;
+          synonymModelLabel = '';
+          renderSynonymRounds();
+        }
+        return api('/api/synonyms', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            sentence: context.sentence,
+            selectedText: context.selectedText,
+            selectionFrom: context.selectionFrom,
+            selectionTo: context.selectionTo,
+            previousAlternatives: previous,
+          }),
+        });
+      })
+      .then(function (result) {
+        if (!result || seq !== synonymRequestSeq) return;
+        var alternatives = Array.isArray(result.alternatives) ? result.alternatives : [];
+        if (alternatives.length !== 5) throw new Error(T('composeEmpty'));
+        synonymRequestContext = requested;
+        synonymRounds.push(alternatives);
+        synonymModelLabel = [result.modelProvider, result.modelName].filter(Boolean).join(' · ');
+        renderSynonymRounds();
+        setStatus(T('synonymLatest'), 'ok');
+      })
+      .catch(function (error) {
+        if (seq === synonymRequestSeq) setStatus((error && error.message) || String(error), 'err');
+      })
+      .finally(function () {
+        if (seq === synonymRequestSeq) setSynonymGenerating(false);
+      });
+  }
+
+  function replaceSynonymInWord(alternative, sourceContext) {
+    if (!isWord) {
+      if (alternative.target !== sourceContext.selectedText) return Promise.reject(new Error(T('synonymRangeUnsupported')));
+      return insertAtCursor(alternative.replacement, { replace: true });
+    }
+    return Word.run(async function (context) {
+      var selection = context.document.getSelection();
+      selection.load('text');
+      await context.sync();
+      if (String(selection.text || '') !== sourceContext.selectedText) throw new Error(T('synonymSelectionChanged'));
+      if (alternative.target === sourceContext.selectedText) {
+        selection.insertText(alternative.replacement, Word.InsertLocation.replace);
+        await context.sync();
+        return;
+      }
+      if (!synonymRangeSupported) throw new Error(T('synonymRangeUnsupported'));
+      var paragraphRange = selection.paragraphs.getFirst().getRange();
+      var matches = paragraphRange.search(alternative.target, { matchCase: true, matchWildcards: false });
+      matches.load('items');
+      await context.sync();
+      matches.items.forEach(function (match) { match.load('text'); });
+      await context.sync();
+      var candidates = [];
+      for (var i = 0; i < matches.items.length; i++) {
+        if (matches.items[i].text === alternative.target) {
+          candidates.push({ range: matches.items[i], relation: matches.items[i].compareLocationWith(selection) });
+        }
+      }
+      await context.sync();
+      var matched = candidates.find(function (candidate) {
+        var relation = String(candidate.relation.value || '').toLowerCase();
+        return relation === 'contains' || relation === 'equal';
+      });
+      if (!matched) throw new Error(T('synonymSelectionChanged'));
+      matched.range.insertText(alternative.replacement, Word.InsertLocation.replace);
+      await context.sync();
+    });
+  }
+
+  function applySynonymAlternative(alternative) {
+    if (!synonymRequestContext || synonymGenerating) return;
+    var sourceContext = synonymRequestContext;
+    readSynonymSelectionContext()
+      .then(function (current) {
+        if (!sameSynonymContext(current, sourceContext)) throw new Error(T('synonymSelectionChanged'));
+        return replaceSynonymInWord(alternative, sourceContext);
+      })
+      .then(function () {
+        synonymRounds = [];
+        synonymRequestContext = null;
+        synonymModelLabel = '';
+        renderSynonymRounds();
+        setStatus(T('synonymApplied'), 'ok');
+        return refreshSynonymSelection();
+      })
+      .catch(function (error) { setStatus((error && error.message) || String(error), 'err'); });
+  }
+
   function setSearchMode(mode) {
     if (mode === searchMode) return;
     searchMode = mode;
     var promptMode = mode === 'prompts';
+    var synonymMode = mode === 'synonyms';
+    var chatMode = mode === 'chat';
     var referenceMode = mode === 'references';
     var buttons = els.searchModeEl ? els.searchModeEl.querySelectorAll('.seg') : [];
     for (var i = 0; i < buttons.length; i++) {
@@ -1082,15 +1591,30 @@
       buttons[i].setAttribute('aria-selected', selected ? 'true' : 'false');
     }
     if (referenceController) referenceController.setActive(referenceMode);
-    els.searchControls.hidden = promptMode;
-    els.analysisControls.hidden = referenceMode || promptMode;
+    if (chatController) chatController.setActive(chatMode);
+    els.searchControls.hidden = promptMode || synonymMode || chatMode;
+    els.analysisControls.hidden = referenceMode || promptMode || synonymMode || chatMode;
     els.promptControls.hidden = !promptMode;
-    els.paragraph.hidden = referenceMode || promptMode;
-    els.results.hidden = promptMode;
-    els.empty.hidden = promptMode;
+    els.synonymControls.hidden = !synonymMode;
+    els.chatControls.hidden = !chatMode;
+    els.paragraph.hidden = referenceMode || promptMode || synonymMode || chatMode;
+    els.results.hidden = promptMode || synonymMode || chatMode;
+    els.empty.hidden = promptMode || synonymMode || chatMode;
     if (promptMode) {
       refreshPromptSelection();
       loadPromptCatalogue();
+      startPromptSelectionPolling();
+      return;
+    }
+    if (synonymMode) {
+      refreshSynonymSelection().then(function (context) {
+        if (context && !synonymRequestContext && !synonymGenerating) generateSynonymRound();
+      });
+      startPromptSelectionPolling();
+      return;
+    }
+    if (chatMode) {
+      if (chatController) chatController.selectionChanged();
       startPromptSelectionPolling();
       return;
     }
@@ -1105,9 +1629,13 @@
   }
 
   function onSelectionChanged() {
-    if (searchMode === 'prompts') {
+    if (searchMode === 'prompts' || searchMode === 'synonyms' || searchMode === 'chat') {
       if (debounceTimer) clearTimeout(debounceTimer);
-      debounceTimer = setTimeout(function () { refreshPromptSelection(); }, 180);
+      debounceTimer = setTimeout(function () {
+        if (searchMode === 'chat' && chatController) chatController.selectionChanged();
+        else if (searchMode === 'synonyms') refreshSynonymSelection();
+        else refreshPromptSelection();
+      }, 180);
       return;
     }
     if (searchMode === 'references') {
@@ -1188,6 +1716,16 @@
     els.promptTab = document.querySelector('.seg[data-mode="prompts"]');
     els.copyPromptOutput = document.getElementById('copyPromptOutput');
     els.pastePromptOutput = document.getElementById('pastePromptOutput');
+    els.synonymControls = document.getElementById('synonymControls');
+    els.synonymContext = document.getElementById('synonymContext');
+    els.refreshSynonymSelection = document.getElementById('refreshSynonymSelection');
+    els.generateSynonyms = document.getElementById('generateSynonyms');
+    els.synonymGenerateLabel = document.getElementById('synonymGenerateLabel');
+    els.synonymTypingIndicator = document.getElementById('synonymTypingIndicator');
+    els.synonymStale = document.getElementById('synonymStale');
+    els.synonymRounds = document.getElementById('synonymRounds');
+    els.synonymTab = document.querySelector('.seg[data-mode="synonyms"]');
+    els.chatControls = document.getElementById('chatControls');
 
     document.documentElement.lang = LANG;
     els.status.textContent = T('connecting');
@@ -1204,9 +1742,13 @@
         ? T('modePassages')
         : mode === 'references'
           ? T('modeReferences')
-          : mode === 'prompts'
-            ? T('modePrompts')
-            : T('modeIdeas');
+          : mode === 'synonyms'
+            ? T('modeSynonyms')
+            : mode === 'prompts'
+              ? T('modePrompts')
+              : mode === 'chat'
+                ? T('modeChat')
+                : T('modeIdeas');
       var labelNode = modeButtons[mi].querySelector('.seg-label');
       if (labelNode) labelNode.textContent = modeLabel;
       modeButtons[mi].setAttribute('aria-label', modeLabel);
@@ -1251,13 +1793,33 @@
     els.pastePromptOutput.textContent = T('promptPaste');
     updatePromptOutputState();
 
+    var synonymHeading = els.synonymControls.querySelector('.synonym-heading div');
+    if (synonymHeading) {
+      var synonymHeadingTitle = synonymHeading.querySelector('strong');
+      var synonymHeadingHint = synonymHeading.querySelector('small');
+      if (synonymHeadingTitle) synonymHeadingTitle.textContent = T('synonymTitle');
+      if (synonymHeadingHint) synonymHeadingHint.textContent = T('synonymHint');
+    }
+    var synonymBlockLabel = els.synonymControls.querySelector('.synonym-block-label');
+    if (synonymBlockLabel) synonymBlockLabel.textContent = T('synonymContextLabel');
+    els.synonymContext.textContent = T('synonymSelectionEmpty');
+    els.refreshSynonymSelection.title = T('synonymRefresh');
+    els.refreshSynonymSelection.setAttribute('aria-label', T('synonymRefresh'));
+    els.synonymGenerateLabel.textContent = T('synonymGenerate');
+    els.generateSynonyms.setAttribute('aria-label', T('synonymGenerate'));
+    updateSynonymState();
+
     // Footnotes need WordApi 1.5. Standalone (LibreOffice) relies on the macro,
     // which falls back to inline if its Writer build cannot place a footnote.
     if (isWord) {
       try {
         footnoteSupported = !!(Office.context.requirements && Office.context.requirements.isSetSupported('WordApi', '1.5'));
+        synonymRangeSupported = !!(Office.context.requirements && Office.context.requirements.isSetSupported('WordApi', '1.3'));
+        chatPageSupported = !!(Office.context.requirements && Office.context.requirements.isSetSupported('WordApiDesktop', '1.2'));
       } catch (e) {
         footnoteSupported = false;
+        synonymRangeSupported = false;
+        chatPageSupported = false;
       }
     }
     if (!footnoteSupported) {
@@ -1308,6 +1870,8 @@
     els.applyPrompt.onclick = runSavedPrompt;
     els.copyPromptOutput.onclick = copyPromptOutput;
     els.pastePromptOutput.onclick = pastePromptOutput;
+    els.refreshSynonymSelection.onclick = refreshSynonymSelection;
+    els.generateSynonyms.onclick = generateSynonymRound;
 
     for (var mb = 0; mb < modeButtons.length; mb++) {
       (function (btn) {
@@ -1340,6 +1904,17 @@
       setStatus: setStatus,
     });
     if (referenceController) referenceController.init();
+    chatController = window.NodusWordChat && window.NodusWordChat.create({
+      api: api,
+      isWord: isWord,
+      lang: LANG,
+      pageSupported: !isWord || chatPageSupported,
+      documentKey: resolveChatDocumentKey(),
+      readContext: readChatContext,
+      getSelectionText: getSelectionText,
+      setStatus: setStatus,
+    });
+    if (chatController) chatController.init();
 
     checkHealth();
     var requestedMode = window.location.hash.indexOf('references') >= 0 ? 'references' : 'ideas';

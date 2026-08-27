@@ -69,6 +69,7 @@ try {
   const taskpaneHtml = fs.readFileSync(path.join(repoRoot, 'word-addin/taskpane.html'), 'utf8');
   const taskpaneJs = fs.readFileSync(path.join(repoRoot, 'word-addin/taskpane.js'), 'utf8');
   const referencesJs = fs.readFileSync(path.join(repoRoot, 'word-addin/references.js'), 'utf8');
+  const chatJs = fs.readFileSync(path.join(repoRoot, 'word-addin/chat.js'), 'utf8');
   const taskpaneCss = fs.readFileSync(path.join(repoRoot, 'word-addin/taskpane.css'), 'utf8');
   assert.match(taskpaneHtml, /<html lang="en">/);
   assert.match(taskpaneHtml, />Analyze paragraph</);
@@ -93,12 +94,22 @@ try {
     'the tab strip must come before the search box',
   );
   assert.match(taskpaneHtml, /data-mode="references"/);
+  assert.match(taskpaneHtml, /data-mode="synonyms"/);
   assert.match(taskpaneHtml, /data-mode="prompts"/);
-  assert.equal((taskpaneHtml.match(/class="seg-icon"/g) || []).length, 4, 'every pane tab must have an icon');
+  assert.match(taskpaneHtml, /data-mode="chat"/);
+  assert.match(taskpaneHtml, /data-mode="prompts"[\s\S]*?<span class="seg-label">AI Edition<\/span>/);
+  assert.equal((taskpaneHtml.match(/class="seg-icon"/g) || []).length, 6, 'every pane tab must have an icon');
+  for (const id of ['synonymControls', 'synonymContext', 'generateSynonyms', 'synonymStale', 'synonymRounds']) {
+    assert.match(taskpaneHtml, new RegExp(`id="${id}"`), `Synonyms UI must contain ${id}`);
+  }
   for (const id of ['promptControls', 'promptStyle', 'promptModel', 'promptSelection', 'applyPrompt', 'promptOutput', 'promptOutputStale', 'copyPromptOutput', 'pastePromptOutput']) {
     assert.match(taskpaneHtml, new RegExp(`id="${id}"`), `Prompt UI must contain ${id}`);
   }
-  assert.equal((taskpaneHtml.match(/class="prompt-typing-dot"/g) || []).length, 3, 'prompt generation must use the Nodi-style three-dot indicator');
+  for (const id of ['chatControls', 'chatModel', 'chatScopePage', 'chatScopeDocument', 'chatSelection', 'chatMessages', 'chatInput', 'chatSend', 'chatStop', 'chatHistory', 'chatHistoryList']) {
+    assert.match(taskpaneHtml, new RegExp(`id="${id}"`), `Chat UI must contain ${id}`);
+  }
+  assert.match(taskpaneHtml, /<script src="\/addin\/chat\.js"><\/script>/);
+  assert.equal((taskpaneHtml.match(/class="prompt-typing-dot"/g) || []).length, 6, 'both writing generators must use the Nodi-style three-dot indicator');
   for (const id of ['referenceStyle', 'referenceStyleSearch', 'referenceLocale', 'referencePlacement', 'selectedReferences', 'insertCitation', 'insertBibliography', 'refreshReferences', 'unlinkReferences']) {
     assert.match(taskpaneHtml, new RegExp(`id="${id}"`), `References UI must contain ${id}`);
   }
@@ -124,6 +135,29 @@ try {
   assert.match(taskpaneJs, /readablePassageText/);
   assert.match(taskpaneJs, /\\uFFFD\\u25A1\\u2610\\u2612/);
   assert.match(taskpaneJs, /\/api\/prompts\/apply/);
+  assert.match(taskpaneJs, /\/api\/synonyms/);
+  assert.match(taskpaneJs, /WordApiDesktop', '1\.2'/, 'current-page chat must be capability-gated');
+  assert.match(taskpaneJs, /var pages = selection\.pages;/, 'current-page chat must read the page containing the Word selection');
+  assert.match(taskpaneJs, /var pageRange = page\.getRange\(\);/, 'current-page chat must send the complete page range');
+  assert.match(taskpaneJs, /body\.load\('text'\)/, 'full-document chat must load the Word body text');
+  assert.match(taskpaneJs, /selectionText: rawSelection\.slice\(0, CHAT_SELECTION_CHAR_LIMIT\)/, 'selected Word text must accompany either chat scope with an explicit bound');
+  assert.match(taskpaneJs, /selectionTruncated: rawSelection\.length > CHAT_SELECTION_CHAR_LIMIT/, 'selection truncation must be disclosed');
+  assert.match(taskpaneJs, /readWordPageChatContext\(\)\.catch[\s\S]*readWordDocumentChatContext/, 'a runtime page API failure must fall back to the full document');
+  assert.match(taskpaneJs, /documentKey: resolveChatDocumentKey\(\)/, 'chat history must be scoped to the current document');
+  assert.match(chatJs, /\/api\/chat\/catalogue/);
+  assert.match(chatJs, /\/api\/chat\/stream/);
+  assert.match(chatJs, /new AbortController\(\)/, 'chat replies must be stoppable');
+  assert.match(chatJs, /event\.key === 'Enter' && !event\.altKey/, 'Enter sends and Alt+Enter inserts a newline like the Zotero chat');
+  assert.match(chatJs, /regenerateFrom\(messageIndex\)/, 'assistant messages must support regeneration');
+  assert.match(chatJs, /editUserMessage\(messageIndex\)/, 'user messages must support editing');
+  assert.match(chatJs, /localStorage\.setItem\(storageKey/, 'Word chat history must persist locally');
+  assert.match(chatJs, /STORAGE_PREFIX \+ \(safe \|\| 'session'\)/, 'each document must have an isolated history namespace');
+  assert.match(chatJs, /navigator\.clipboard\.writeText\(value\)\.catch[\s\S]*legacyCopyText/, 'clipboard permission failures must use the fallback');
+  assert.doesNotMatch(chatJs, /innerHTML\s*=\s*(answer|content|source)/, 'model output must never be injected as HTML');
+  assert.match(taskpaneJs, /previousAlternatives: previous/, 'regeneration must exclude every earlier replacement');
+  assert.match(taskpaneJs, /alternatives\.length !== 5/, 'the pane only accepts complete five-item rounds');
+  assert.match(taskpaneJs, /compareLocationWith\(selection\)/, 'expanded reformulations must resolve the target containing the live selection');
+  assert.match(taskpaneJs, /matched\.range\.insertText\(alternative\.replacement, Word\.InsertLocation\.replace\)/, 'choosing an expanded alternative replaces its exact contextual target');
   assert.match(taskpaneJs, /insertAtCursor\(promptOutputText, \{ replace: true \}\)/, 'pasting a proposal replaces the unchanged Word selection');
 
   // A proposal costs tokens, so moving the Word selection must never discard
@@ -168,6 +202,7 @@ try {
   );
   assert.match(taskpaneCss, /\.seg\.is-busy::after \{/, 'the busy tab needs its marker');
   assert.match(taskpaneCss, /\.prompt-stale\[hidden\] \{ display: none; \}/);
+  assert.match(taskpaneCss, /@media \(hover: none\), \(pointer: coarse\)[\s\S]*\.word-chat-message-actions \{ opacity: \.82;/, 'chat actions must stay visible on touch devices');
 
   // The pane and the Zotero sidebar are one product: they must not drift into
   // two different accents. Both read their violet from their own stylesheet.
@@ -193,14 +228,11 @@ try {
   // an unrelated control to force a refresh.
   assert.match(
     taskpaneJs,
-    /function startPromptSelectionPolling\(\)[\s\S]*setInterval\([\s\S]*refreshPromptSelection\(\)/,
-    'the prompts tab must poll the Word selection',
+    /function startPromptSelectionPolling\(\)[\s\S]*setInterval\([\s\S]*refreshPromptSelection/,
+    'the writing and chat tabs must poll the Word selection',
   );
-  assert.match(
-    taskpaneJs,
-    /if \(promptMode\) \{[\s\S]*startPromptSelectionPolling\(\);[\s\S]*\}\s*\n\s*stopPromptSelectionPolling\(\);/,
-    'the selection poll must stop when the prompts tab is left',
-  );
+  assert.match(taskpaneJs, /if \(synonymMode\) \{[\s\S]*startPromptSelectionPolling\(\);/, 'the synonyms tab must poll the Word selection');
+  assert.match(taskpaneJs, /if \(chatMode\) \{[\s\S]*startPromptSelectionPolling\(\);[\s\S]*return;[\s\S]*\}\s*\n\s*stopPromptSelectionPolling\(\);/, 'the selection poll must remain active for Chat and stop after leaving contextual tabs');
   // The tab strip must not reflow when the selection moves: every tab owns an
   // equal slot and the active one may not grow into its neighbours' space.
   assert.match(taskpaneCss, /\.seg \{[^}]*flex: 1 1 0;/, 'every tab must take an equal slot');
@@ -221,8 +253,30 @@ try {
   const appSource = fs.readFileSync(path.join(repoRoot, 'src/App.tsx'), 'utf8');
   const ideasSource = fs.readFileSync(path.join(repoRoot, 'src/views/IdeasView.tsx'), 'utf8');
   const serverSource = fs.readFileSync(path.join(repoRoot, 'electron/copilot/server.ts'), 'utf8');
+  const copilotChatSource = fs.readFileSync(path.join(repoRoot, 'electron/ai/copilotChat.ts'), 'utf8');
+  const { isAllowedCopilotOrigin } = require(path.join(repoRoot, 'electron/copilot/originPolicy.ts'));
+  assert.equal(isAllowedCopilotOrigin(undefined, 4320), true, 'native clients without Origin remain supported');
+  assert.equal(isAllowedCopilotOrigin('https://localhost:4320', 4320), true);
+  assert.equal(isAllowedCopilotOrigin('http://127.0.0.1:4320', 4320), true);
+  assert.equal(isAllowedCopilotOrigin('https://attacker.example', 4320), false, 'remote websites cannot read the token-bearing add-in page');
+  assert.equal(isAllowedCopilotOrigin('https://localhost:9999', 4320), false, 'another local port is not the add-in origin');
   assert.match(serverSource, /urlPath === '\/api\/prompts'/);
   assert.match(serverSource, /urlPath === '\/api\/prompts\/apply'/);
+  assert.match(serverSource, /urlPath === '\/api\/synonyms'/);
+  assert.match(serverSource, /urlPath === '\/api\/chat\/catalogue'/);
+  assert.match(serverSource, /urlPath === '\/api\/chat\/stream'/);
+  assert.match(serverSource, /isAllowedCopilotOrigin\(origin, port\)/, 'the local API must reject non-local browser origins');
+  assert.doesNotMatch(serverSource, /Access-Control-Allow-Origin', origin \?\? '\*'/, 'the bearer-token page must never enable wildcard/reflected CORS');
+  assert.match(serverSource, /error instanceof CopilotRequestError \? error\.statusCode : 500/, 'malformed and oversized input must keep its 4xx status');
+  assert.match(serverSource, /normalizeOfficeChatRequest\([\s\S]*sendJson\(res, 400/, 'chat validation must happen before streaming headers');
+  assert.match(serverSource, /COPILOT_MODEL_PROVIDERS\.has\(provider\)/, 'unknown providers must be rejected before reaching the AI client');
+  assert.match(serverSource, /streamOfficeChat\(normalizedChat/);
+  assert.match(copilotChatSource, /untrustedSelectedPassage/);
+  assert.match(copilotChatSource, /Solo authorizedQuestion contiene la instrucción actual autorizada/, 'only the latest question may direct the model');
+  assert.match(copilotChatSource, /completeTextStreamNeutral/, 'global promptLanguage must not override the question language');
+  assert.match(copilotChatSource, /No inventes contenido ausente del contexto/, 'chat must stay grounded in the selected Word context');
+  assert.match(referencesJs, /fingerprint === externalStateFingerprint/, 'identical Writer polling snapshots must not rebuild the citation composer');
+  assert.match(serverSource, /suggestStudySynonyms\(\{/, 'the Word endpoint must reuse the workspace synonym engine');
   assert.match(serverSource, /destination: 'ideas'/);
   assert.match(serverSource, /destination === 'citation-styles'[\s\S]*destination: 'library-citation-styles'/);
   assert.match(appSource, /target\.destination === 'library-citation-styles'[\s\S]*citationStyles: true[\s\S]*setView\('library'\)/);

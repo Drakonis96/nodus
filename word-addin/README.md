@@ -1,13 +1,15 @@
 # Nodus writing integrations for Word and LibreOffice
 
-Nodus provides one writing assistant and reference workflow in Microsoft Word and LibreOffice Writer. The pane exposes four compact icon views; the active icon expands to show its label:
+Nodus provides one writing assistant and reference workflow in Microsoft Word and LibreOffice Writer. The pane exposes six compact icon views:
 
 - **Ideas** relates the current paragraph to the active Nodus vault.
 - **Passages** searches indexed full text and inserts quotations or AI-assisted prose.
 - **References** searches the Nodus global library and manages live citations and bibliographies.
-- **AI prompts** loads the active workspace writing styles, applies one to the current Word selection with a configured Nodus model, and keeps the proposal in the pane until the user copies it or explicitly replaces the selection.
+- **Synonyms** reads the complete sentence around the Word selection, proposes five contextual alternatives, applies the chosen replacement, and can regenerate without repeating earlier suggestions.
+- **AI Edition** loads the active workspace writing styles, applies one to the current Word selection with a configured Nodus model, and keeps the proposal in the pane until the user copies it or explicitly replaces the selection.
+- **Chat** mirrors the Nodus for Zotero conversation design. Each question uses either the current Word page or the full document as context, prioritizes any selected text, streams the answer, and supports per-document history, editing, copying, stopping, and regenerating replies.
 
-The pane is a client of the local Nodus HTTPS service (`https://localhost:4320` by default). Library records, document text, and citation requests remain on the user's computer unless the user explicitly invokes a configured remote AI model.
+The pane is a same-origin client of the local Nodus HTTPS service (`https://localhost:4320` by default); browser requests from any other origin are rejected before the token-bearing add-in page is served. Library records, document text, and citation requests remain on the user's computer unless the user explicitly invokes a configured remote AI model. Chat sends the chosen page/document context and selected passage to that configured model for each answer; conversation history is isolated by Word document and never includes a copy of the document context.
 
 ## Reference workflow
 
@@ -64,10 +66,12 @@ The macro is installed in the current user's LibreOffice Python scripts director
 ## Architecture
 
 - `manifest.xml` defines the persistent Word ribbon and task-pane commands.
-- `taskpane.html`, `taskpane.css`, and `taskpane.js` provide Ideas, Passages, and the review-first AI prompt workflow.
+- `taskpane.html`, `taskpane.css`, `taskpane.js`, and `chat.js` provide Ideas, Passages, contextual synonyms, AI Edition, and the grounded document chat.
 - `references.js` provides the shared reference composer and Word live-field adapter.
 - `scripts/nodus_copilot.py` provides the LibreOffice bridge and Writer live-field adapter.
 - `electron/copilot/server.ts` serves the pane and authenticated local API.
+- `electron/copilot/originPolicy.ts` restricts browser access to the exact loopback origin used by the add-in.
+- `electron/ai/copilotChat.ts` validates chat requests, isolates document content from instructions, and streams grounded answers through the selected Nodus model.
 - `electron/library/libraryCslStyles.ts` formats whole-document citations and bibliographies.
 
 ## Verification

@@ -10,12 +10,14 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { app, BrowserWindow, shell } from 'electron';
 import type { CopilotServerStatus, ModelRef } from '@shared/types';
+import type { StudySynonymRequest } from '@shared/studySynonyms';
 import type { OfficeCitationDocumentRequest, OfficeEditorCommand } from '@shared/officeCitationTypes';
 import { localizeRuntimeError } from '@shared/uiLanguage';
 import { GRANULAR_MODEL_KEYS } from '@shared/modelSettings';
-import { PROVIDER_LABELS, sortModelRefs } from '@shared/providers';
+import { AI_PROVIDERS, PROVIDER_LABELS, sortModelRefs } from '@shared/providers';
 import { getSettings, updateSettings } from '../db/settingsRepo';
 import { loadCopilotCert, loadCopilotCa, certReady, copilotStateDir, renewLeafIfNeeded } from './certs';
+import { isAllowedCopilotOrigin } from './originPolicy';
 import {
   analyzeText,
   composeCopilotIdeaInsertion,
@@ -29,6 +31,13 @@ import { embeddedIdeaCount } from '../db/ideasRepo';
 import { getStudyStyle, listStudyStyles } from '../db/studyStylesRepo';
 import { getDb } from '../db/database';
 import { applyCopilotPromptStyle } from '../ai/copilotPromptStyles';
+import { suggestStudySynonyms } from '../ai/studySynonyms';
+import {
+  normalizeOfficeChatRequest,
+  streamOfficeChat,
+  type OfficeChatContext,
+  type OfficeChatMessage,
+} from '../ai/copilotChat';
 import {
   formatGlobalLibraryOfficeDocument,
   listGlobalLibraryCitationStyles,
@@ -39,6 +48,13 @@ import {
 // offline-safe citation snapshots. The bridge is loopback-only and token
 // authenticated, so keep a bounded but realistic document payload ceiling.
 const MAX_REQUEST_BYTES = 16 * 1024 * 1024;
+const COPILOT_MODEL_PROVIDERS = new Set<string>([...AI_PROVIDERS, 'nodus']);
+
+class CopilotRequestError extends Error {
+  constructor(message: string, readonly statusCode: 400 | 413 = 400) {
+    super(message);
+  }
+}
 
 let httpServer: Server | null = null;
 let status: CopilotServerStatus = { running: false, port: null, addinUrl: null, certReady: false, error: null };
@@ -88,8 +104,19 @@ function copilotError(error: unknown): string {
     'El estilo seleccionado no está disponible.': 'The selected style is not available.',
     'No hay un modelo de IA configurado. Elige uno en Ajustes de Nodus.':
       'No AI model is configured. Choose one in Nodus Settings.',
+    'Selecciona una o varias palabras.': 'Select one or more words.',
+    'La selección ya no coincide con la frase. Vuelve a seleccionar el texto.':
+      'The selection no longer matches the sentence. Select the text again.',
+    'La IA no pudo proponer cinco alternativas distintas. Regenera para intentarlo de nuevo.':
+      'The AI could not suggest five distinct alternatives. Regenerate to try again.',
+    'La IA no devolvió alternativas válidas.': 'The AI did not return valid alternatives.',
+    'El chat necesita una pregunta del usuario.': 'Chat needs a user question.',
+    'No hay texto del documento disponible para responder.': 'There is no document text available to answer from.',
   };
-  return translated[message] ?? localizeRuntimeError(message, 'en');
+  if (translated[message]) return translated[message];
+  const synonymLimit = /^La frase supera el límite de ([\d.,]+) caracteres\.$/.exec(message);
+  if (synonymLimit) return `The sentence exceeds the ${synonymLimit[1]} character limit.`;
+  return localizeRuntimeError(message, 'en');
 }
 
 function modelRef(value: unknown): ModelRef | null {
@@ -98,7 +125,12 @@ function modelRef(value: unknown): ModelRef | null {
   if (typeof candidate.provider !== 'string' || typeof candidate.model !== 'string') return null;
   const provider = candidate.provider.trim() as ModelRef['provider'];
   const model = candidate.model.trim();
-  return provider && model ? { provider, model } : null;
+  const hasControlCharacter = Array.from(model).some((character) => {
+    const codePoint = character.codePointAt(0) ?? 0;
+    return codePoint <= 31 || codePoint === 127;
+  });
+  if (!COPILOT_MODEL_PROVIDERS.has(provider) || !model || model.length > 200 || hasControlCharacter) return null;
+  return { provider, model };
 }
 
 function copilotPromptCatalogue() {
@@ -142,6 +174,28 @@ function copilotPromptCatalogue() {
       label: `${PROVIDER_LABELS[entry.provider] ?? entry.provider} · ${entry.model}`,
     })),
     defaultStyleId,
+    defaultModel,
+  };
+}
+
+function copilotChatCatalogue() {
+  const settings = getSettings();
+  const promptCatalogue = copilotPromptCatalogue();
+  const defaultModel = settings.chatModel
+    ?? settings.synthesisModel
+    ?? settings.writingModel
+    ?? settings.studyModel
+    ?? promptCatalogue.defaultModel
+    ?? null;
+  const refs: ModelRef[] = promptCatalogue.models.map((entry) => ({ provider: entry.provider, model: entry.model }));
+  if (defaultModel && !refs.some((entry) => entry.provider === defaultModel.provider && entry.model === defaultModel.model)) {
+    refs.push(defaultModel);
+  }
+  return {
+    models: sortModelRefs(refs).map((entry) => ({
+      ...entry,
+      label: `${PROVIDER_LABELS[entry.provider] ?? entry.provider} · ${entry.model}`,
+    })),
     defaultModel,
   };
 }
@@ -192,12 +246,16 @@ function hasValidToken(req: IncomingMessage, expected: string): boolean {
   return actual.length === wanted.length && timingSafeEqual(actual, wanted);
 }
 
-function setCors(req: IncomingMessage, res: ServerResponse): void {
+function setCors(req: IncomingMessage, res: ServerResponse, port: number): boolean {
   const origin = req.headers.origin;
-  res.setHeader('Access-Control-Allow-Origin', origin ?? '*');
-  res.setHeader('Vary', 'Origin');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Authorization, Content-Type');
+  if (!isAllowedCopilotOrigin(origin, port)) return false;
+  if (origin) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+    res.setHeader('Vary', 'Origin');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Authorization, Content-Type');
+  }
+  return true;
 }
 
 export function setCopilotWindowProvider(provider: () => BrowserWindow | null): void {
@@ -216,13 +274,17 @@ async function readJsonBody(req: IncomingMessage): Promise<unknown> {
     const data = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
     size += data.length;
     if (size > MAX_REQUEST_BYTES) {
-      throw new Error(copilotText('La solicitud supera el tamaño máximo.', 'The request exceeds the maximum size.'));
+      throw new CopilotRequestError(copilotText('La solicitud supera el tamaño máximo.', 'The request exceeds the maximum size.'), 413);
     }
     chunks.push(data);
   }
   const raw = Buffer.concat(chunks).toString('utf8').trim();
   if (!raw) return {};
-  return JSON.parse(raw);
+  try {
+    return JSON.parse(raw);
+  } catch {
+    throw new CopilotRequestError(copilotText('La solicitud contiene JSON no válido.', 'The request contains invalid JSON.'));
+  }
 }
 
 const STATIC_TYPES: Record<string, string> = {
@@ -270,7 +332,10 @@ async function serveAddin(req: IncomingMessage, res: ServerResponse, urlPath: st
 }
 
 export async function handleRequest(req: IncomingMessage, res: ServerResponse, port: number): Promise<void> {
-  setCors(req, res);
+  if (!setCors(req, res, port)) {
+    sendJson(res, 403, { error: copilotText('Origen no permitido.', 'Origin not allowed.') });
+    return;
+  }
   if (req.method === 'OPTIONS') {
     res.writeHead(204);
     res.end();
@@ -337,6 +402,73 @@ export async function handleRequest(req: IncomingMessage, res: ServerResponse, p
         paragraphText: String(body.paragraphText ?? ''),
       });
       sendJson(res, 200, result);
+      return;
+    }
+    if (urlPath === '/api/synonyms' && req.method === 'POST') {
+      const body = (await readJsonBody(req)) as Partial<StudySynonymRequest>;
+      const result = await suggestStudySynonyms({
+        documentId: 'office-addin',
+        sentence: String(body.sentence ?? ''),
+        selectedText: String(body.selectedText ?? ''),
+        selectionFrom: Number(body.selectionFrom),
+        selectionTo: Number(body.selectionTo),
+        previousAlternatives: Array.isArray(body.previousAlternatives)
+          ? body.previousAlternatives.map(String).slice(-50)
+          : [],
+      });
+      sendJson(res, 200, result);
+      return;
+    }
+    if (urlPath === '/api/chat/catalogue' && req.method === 'GET') {
+      sendJson(res, 200, copilotChatCatalogue());
+      return;
+    }
+    if (urlPath === '/api/chat/stream' && req.method === 'POST') {
+      const parsedBody = await readJsonBody(req);
+      const body = parsedBody && typeof parsedBody === 'object' && !Array.isArray(parsedBody)
+        ? parsedBody as { messages?: unknown; context?: unknown; model?: unknown }
+        : {};
+      const requestedModel = modelRef(body.model);
+      const catalogue = copilotChatCatalogue();
+      if (!requestedModel || !catalogue.models.some((entry) => (
+        entry.provider === requestedModel.provider && entry.model === requestedModel.model
+      ))) {
+        sendJson(res, 400, { error: copilotText('El modelo seleccionado no está disponible.', 'The selected model is not available.') });
+        return;
+      }
+      const messages = Array.isArray(body.messages) ? body.messages as OfficeChatMessage[] : [];
+      const context = body.context && typeof body.context === 'object' && !Array.isArray(body.context)
+        ? body.context as OfficeChatContext
+        : { scope: 'document' as const, label: '', text: '' };
+      let normalizedChat;
+      try {
+        normalizedChat = normalizeOfficeChatRequest({ messages, context, model: requestedModel });
+      } catch (error) {
+        sendJson(res, 400, { error: copilotError(error) });
+        return;
+      }
+      const abortController = new AbortController();
+      res.writeHead(200, {
+        'Content-Type': 'application/x-ndjson; charset=utf-8',
+        'Cache-Control': 'no-store',
+        'X-Content-Type-Options': 'nosniff',
+      });
+      const writeEvent = (event: unknown) => {
+        if (!res.writableEnded && !res.destroyed) res.write(`${JSON.stringify(event)}\n`);
+      };
+      res.on('close', () => {
+        if (!res.writableEnded) abortController.abort();
+      });
+      try {
+        await streamOfficeChat(normalizedChat, (delta) => {
+          writeEvent({ type: 'delta', text: delta });
+        }, abortController.signal);
+        writeEvent({ type: 'done' });
+      } catch (error) {
+        if (!abortController.signal.aborted) writeEvent({ type: 'error', error: copilotError(error) });
+      } finally {
+        if (!res.writableEnded && !res.destroyed) res.end();
+      }
       return;
     }
     if (urlPath === '/api/prompts' && req.method === 'GET') {
@@ -553,7 +685,7 @@ export async function handleRequest(req: IncomingMessage, res: ServerResponse, p
     sendJson(res, 404, { error: copilotText('Ruta no encontrada.', 'Route not found.') });
   } catch (error) {
     if (res.headersSent) return;
-    sendJson(res, 500, { error: copilotError(error) });
+    sendJson(res, error instanceof CopilotRequestError ? error.statusCode : 500, { error: copilotError(error) });
   }
 }
 
