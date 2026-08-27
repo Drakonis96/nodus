@@ -97,6 +97,12 @@
 .nodus-start-page .atlas-card-actions { display:flex; flex-wrap:wrap; gap:7px; margin-top:17px; }
 .nodus-start-page .atlas-card-actions .atlas-open { margin-top:0; cursor:pointer; }
 .nodus-start-page .atlas-card-actions .is-saved { color:#fbbf24; border-color:rgba(251,191,36,.3); }
+.nodus-start-page.bookmarks-main .atlas-grid { align-items:start; }
+.nodus-start-page.bookmarks-main .atlas-card { min-height:0; padding:20px; }
+.nodus-start-page.bookmarks-main .bookmark-card { cursor:pointer; }
+.nodus-start-page.bookmarks-main .atlas-card-actions { margin-top:14px; }
+.nodus-start-page.bookmarks-main .bookmark-delete { color:#fca5a5; border-color:rgba(248,113,113,.2); }
+.nodus-start-page.bookmarks-main .bookmark-delete:hover { color:#fecaca; border-color:rgba(248,113,113,.45); background:rgba(127,29,29,.2); }
 .nodus-start-page .bookmark-favicon { width:22px; height:22px; object-fit:contain; border-radius:5px; }
 .nodus-start-page .bookmark-folder-icon { display:grid; place-items:center; width:36px; height:36px; border:1px solid rgba(167,139,250,.25); border-radius:11px; background:rgba(139,92,246,.12); color:var(--violet-3); }
 .nodus-start-page .bookmark-heading { display:flex; align-items:center; gap:11px; min-width:0; }

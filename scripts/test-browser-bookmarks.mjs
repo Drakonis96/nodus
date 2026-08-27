@@ -164,6 +164,19 @@ test('trusted Bookmarks UI reuses Atlas styling and avoids native prompt dialogs
   assert.match(pages, /page !== 'bookmarks' && <[\s\S]*atlas-engine-wrap/,
     'Bookmarks must omit the Atlas engine selector so the full control is search');
   assert.match(styles, /\.atlas-searchbar\.is-bookmarks\s*\{\s*grid-template-columns:minmax\(0,1fr\) 52px/);
+  assert.match(styles, /\.bookmarks-main \.atlas-grid\s*\{\s*align-items:start/,
+    'bookmark rows must not stretch short cards to match taller neighbours');
+  assert.match(styles, /\.bookmarks-main \.atlas-card\s*\{\s*min-height:0;\s*padding:20px/,
+    'bookmark cards must override the Atlas minimum height and excess padding');
+  assert.match(pages, /className="card lit atlas-card bookmark-card"[\s\S]{0,260}openBrowserTab\(entry\.url\)/,
+    'clicking a website card must open its bookmark');
+  assert.match(pages, /className=\{`card lit atlas-card bookmark-card[\s\S]{0,300}setFolderId\(entry\.id\)/,
+    'clicking a folder card must open that folder');
+  assert.equal((pages.match(/data-testid="browser-bookmark-card-delete"/g) ?? []).length, 2,
+    'folder and website cards must each expose their own delete button');
+  assert.match(pages, /deleteBrowserBookmarkNode\(deleteConfirmation\.ref\)/);
+  assert.match(pages, /<ConfirmModal[\s\S]{0,700}danger[\s\S]{0,700}onConfirm=\{\(\) => void remove\(\)\}/,
+    'card deletion must use a destructive confirmation modal');
   const siteHeader = pages.indexOf('<NodusSiteHeader page={page} />');
   const atlasGrid = pages.indexOf('<div className="atlas-grid">{children}</div>', siteHeader);
   const siteFooter = pages.indexOf('<NodusSiteFooter />', atlasGrid);
