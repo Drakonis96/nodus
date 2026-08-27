@@ -89,6 +89,7 @@ const NODUS_PRIVACY_URL = `${NODUS_REPOSITORY_URL}/blob/main/PRIVACY.md`;
 const NODUS_VERSION_SOURCE_URL = `${NODUS_REPOSITORY_URL}/tree/v${__APP_VERSION__}`;
 const NODUS_LICENSE_URL = `${NODUS_REPOSITORY_URL}/blob/v${__APP_VERSION__}/LICENSE`;
 const NODUS_SECURITY_REPORT_URL = `${NODUS_REPOSITORY_URL}/security/advisories/new`;
+const NODUS_ZOTERO_INSTALL_URL = 'https://nodusresearch.com/zotero-plugin/';
 const CHROME_WEB_STORE_URL = 'https://chromewebstore.google.com/detail/ilcclajjhofhieoljdjmikmfopfbamej?utm_source=item-share-cb';
 
 function normalizeSettingsText(value: string): string {
@@ -2292,38 +2293,24 @@ export function Settings({
                 className="btn btn-primary"
                 disabled={zoteroInstallBusy}
                 onClick={async () => {
-                  const info = await window.nodus.getZoteroInstallInfo();
-                  if (!info.profileFound) { flash(t('No se encontró Zotero en este equipo. Instala el plugin manualmente.')); return; }
-                  if (info.running) {
-                    const ok = await confirm({
-                      title: t('Instalar el plugin en Zotero'),
-                      message: t('Zotero está abierto y se cerrará para instalar el plugin; se reabrirá al terminar. ¿Continuar?'),
-                      confirmLabel: t('Continuar'),
-                    });
-                    if (!ok) return;
-                  }
                   setZoteroInstallBusy(true);
                   try {
-                    const r = await window.nodus.installZoteroPlugin();
-                    if (r.ok) flash(r.reopened ? t('Plugin instalado. Zotero se ha reabierto.') : t('Plugin instalado. Se cargará al abrir Zotero.'));
-                    else flash(r.message);
+                    const r = await window.nodus.downloadZoteroPluginXpi();
+                    if (r.ok && r.path) flash(`${t('XPI verificado guardado en:')} ${r.path}. ${t('En Zotero: Herramientas → Complementos → ⚙ → Instalar complemento desde archivo.')}`);
+                    else if (r.message) flash(r.message);
                   } finally {
                     setZoteroInstallBusy(false);
                   }
                 }}
               >
                 <Icon name={zoteroInstallBusy ? 'sync' : 'download'} className={zoteroInstallBusy ? 'animate-spin' : ''} />
-                {zoteroInstallBusy ? t('Instalando…') : t('Instalar/actualizar en Zotero')}
+                {zoteroInstallBusy ? t('Guardando…') : t('Guardar .xpi para Zotero')}
               </button>
               <button
                 className="btn btn-ghost border border-neutral-700"
-                onClick={async () => {
-                  const r = await window.nodus.downloadZoteroPluginXpi();
-                  if (r.ok && r.path) flash(`${t('Plugin guardado en:')} ${r.path}`);
-                  else if (r.message) flash(r.message);
-                }}
+                onClick={() => void window.nodus.openExternal(NODUS_ZOTERO_INSTALL_URL)}
               >
-                <Icon name="download" /> {t('Descargar .xpi')}
+                <Icon name="external" /> {t('Ver instrucciones de instalación')}
               </button>
               <button
                 className="btn btn-ghost border border-neutral-700"

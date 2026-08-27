@@ -56,6 +56,8 @@ function makeEl(tag, doc) {
     classList: { add() {} },
     appendChild(c) { this.children.push(c); return c; },
     setAttribute(k, v) { this.attrs[k] = v; },
+    getAttribute(k) { return k in this.attrs ? this.attrs[k] : null; },
+    removeAttribute(k) { delete this.attrs[k]; },
     addEventListener() {},
     get textContent() { return serializeText(this); },
     set textContent(v) { this.children = []; if (v) this.children.push({ nodeType: 3, _text: String(v) }); },
@@ -263,13 +265,16 @@ const FAKE_STORE = {
   getCustomPrompts: () => [], addCustomPrompt: () => [], removeCustomPrompt() {},
   getAutoUpdate: () => false, setAutoUpdate() {}, getAgent: () => false, setAgent() {},
   getAgentAuto: () => false, setAgentAuto() {},
-  getManual: () => ({ port: 0, token: '' }), setManual() {},
+  SOURCE_SCOPES: ['current', 'selection', 'collection', 'library'], getSourceScope: () => 'current', setSourceScope() {},
+  getHistoryEnabled: () => true, setHistoryEnabled() {}, getHistoryRetention: () => 365, setHistoryRetention() {},
+  getManual: () => ({ port: 0, token: '' }), setManual() { return true; }, deleteConversationHistory: async () => true,
   loadConversations: async () => [], saveConversations: async () => {},
-  saveEvidenceIndex: async () => {}, loadEvidenceIndex: async () => null,
-  newId: () => 'conv-1', compactAudit: (a) => a,
+  saveEvidenceIndex: async () => {}, loadEvidenceIndex: async () => null, loadEvidenceIndexes: async () => [],
+  evidenceCacheStats: async () => ({ documents: 0, pages: 0, bytes: 0 }), pruneEvidenceIndexes: async () => 0, clearEvidenceIndexes: async () => 0,
+  newId: () => 'conv-1', compactAudit: (a) => a, compactConversations: (a) => a,
 };
-// A stand-in for electron/zotero-plugin/server.ts with the property that
-// matters here: /health is tokenless, everything else demands the bearer token.
+// A stand-in for electron/zotero-plugin/server.ts: every Zotero route,
+// including health, requires the bridge bearer token.
 const openServers = new Set();
 function fakeNodus(token) {
   const hits = { total: 0 };
@@ -277,8 +282,8 @@ function fakeNodus(token) {
     hits.total++;
     const send = (code, body) => { res.writeHead(code, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(body)); };
     const url = (req.url || '/').split('?')[0];
-    if (url === '/api/z/health') return send(200, { ok: true, app: 'nodus', vault: 'Test', corpusSize: 3 });
     if (req.headers.authorization !== `Bearer ${token}`) return send(401, { error: 'bad token' });
+    if (url === '/api/z/health') return send(200, { ok: true, app: 'nodus', vault: 'Test', corpusSize: 3 });
     if (url === '/api/z/models') return send(200, { models: [{ provider: 'openai', model: 'gpt-test' }], default: null });
     return send(404, {});
   });
@@ -322,7 +327,7 @@ test('sidebar: connects to Nodus by itself, follows a restart, and refuses a sta
   vm.createContext(sandbox);
   const run = (code) => vm.runInContext(code, sandbox);
   t.after(async () => {
-    try { run('stopConnectionWatch(); clearInterval(state.pollTimer);'); } catch (e) {}
+    try { run('stopConnectionWatch(); clearInterval(state.pollTimer);'); } catch {}
     await closeServers();
     rmSync(home, { recursive: true, force: true });
   });
@@ -366,13 +371,17 @@ test('sidebar: connects to Nodus by itself, follows a restart, and refuses a sta
 });
 
 // ─────────────────────────────────────────── evidence retrieval
-test('evidence: page-aware chunking preserves exact passages and stable ids', () => {
+test('evidence: page-aware chunking preserves exact passages, group provenance and stable ids', () => {
   const { NodusEvidence: E } = loadModule('evidence.js');
   const text = 'INTRODUCTION\n' + 'First page evidence. '.repeat(80) + '\fRESULTS\n' + 'Second page finding. '.repeat(80);
-  const idx = E.buildIndex({ libraryID: 1, itemKey: 'PARENT', attachmentKey: 'ATT', title: 'Paper', pageLabels: ['i', '7'] }, text, { targetChars: 500, minChars: 150, overlapChars: 50 });
+  const idx = E.buildIndex({ libraryID: 1, groupID: 42, itemKey: 'PARENT', attachmentKey: 'ATT', title: 'Paper', pageLabels: ['i', '7'] }, text, { targetChars: 500, minChars: 150, overlapChars: 50 });
   assert.equal(idx.pages.length, 2);
+  assert.equal(idx.groupID, 42);
   assert.ok(idx.chunks.length >= 4);
+  assert.ok(idx.chunks.every((chunk) => chunk.groupID === 42));
   assert.ok(idx.chunks.some((c) => c.pageLabel === '7' && c.section === 'RESULTS'));
+  assert.equal(E.resolvePageIndex(idx, 'i'), 0, 'roman front matter resolves by its visible Zotero label');
+  assert.equal(E.resolvePageIndex(idx, '7'), 1, 'printed numeric labels resolve before physical positions');
   for (const chunk of idx.chunks) {
     const page = idx.pages[chunk.pageIndex];
     const combined = [page.text, page.visualText].filter(Boolean).join('\n\n[VISUAL/OCR]\n');
@@ -408,6 +417,23 @@ test('evidence: full text remains citable and citation validation rejects invent
   assert.equal(checked.invalid.length, 1);
   assert.ok(!checked.text.includes('[[e:nope]]'));
   assert.ok(checked.text.includes('[[p:2]]'), 'unspecified legacy citation kinds remain untouched');
+});
+
+test('evidence: every rendered citation kind is constrained by an explicit allow-list', () => {
+  const { NodusEvidence: E } = loadModule('evidence.js');
+  const checked = E.validateCitations(
+    'Page [[p:i]] [[p:999]], idea [[idea:ok]] [[idea:fake]], gap [[gap:g1]] [[gap:g2]], item [[zotero:groups:42:GOOD]] [[zotero:BAD]].',
+    {
+      evidence: [], pages: ['i'], ideas: ['ok'], gaps: ['g1'],
+      zotero: ['groups:42:GOOD'],
+    },
+  );
+  assert.match(checked.text, /\[\[p:i\]\]/);
+  assert.match(checked.text, /\[\[idea:ok\]\]/);
+  assert.match(checked.text, /\[\[gap:g1\]\]/);
+  assert.match(checked.text, /\[\[zotero:groups:42:GOOD\]\]/);
+  for (const invented of ['[[p:999]]', '[[idea:fake]]', '[[gap:g2]]', '[[zotero:BAD]]']) assert.ok(!checked.text.includes(invented));
+  assert.equal(checked.invalid.length, 4);
 });
 
 test('evidence: malformed evidence brackets are normalized only for allowed ids', () => {
@@ -450,6 +476,7 @@ test('store: conversation audits are compacted without persisting embeddings', (
     messages: [{
       role: 'assistant',
       content: 'Supported answer.',
+      evidence: [{ id: 'good', libraryID: 8, groupID: 42, itemKey: 'ITEM', attachmentKey: 'ATT', text: 'Exact passage' }],
       audit: {
         total: 1, covered: 1, weak: 0, missing: 0, coverage: 1,
         invalidCitations: [{ id: 'bad', token: '[[e:bad]]', embedding: [9, 9] }],
@@ -464,6 +491,7 @@ test('store: conversation audits are compacted without persisting embeddings', (
   assert.equal(compact[0].messages[0].audit.claims[0].support, 0.91);
   assert.equal(compact[0].messages[0].audit.claims[0].evidence, undefined);
   assert.equal(compact[0].messages[0].audit.invalidCitations[0].embedding, undefined);
+  assert.equal(compact[0].messages[0].evidence[0].groupID, 42, 'history retains group provenance for PDF fallbacks');
   assert.ok(!JSON.stringify(compact).includes('embedding'));
 });
 
@@ -951,7 +979,207 @@ test('providers: chatBase builds per-provider URLs', () => {
   const { NodusProviders } = loadModule('providers.js');
   assert.equal(NodusProviders.chatBase('openai'), 'https://api.openai.com/v1');
   assert.equal(NodusProviders.chatBase('ollama'), 'http://localhost:11434/v1');
-  assert.equal(NodusProviders.chatBase('ollama', 'http://box:1234/'), 'http://box:1234/v1');
+  assert.equal(NodusProviders.chatBase('ollama', 'http://127.0.0.1:1234/'), 'http://127.0.0.1:1234/v1');
+  assert.throws(() => NodusProviders.chatBase('ollama', 'http://box:1234/'), /localhost/);
+});
+
+test('security: model-authored links require HTTPS', () => {
+  const { NodusMarkdown } = loadModule('markdown.js');
+  assert.equal(NodusMarkdown.safeExternalUrl('https://example.org/paper'), 'https://example.org/paper');
+  for (const value of ['http://127.0.0.1:4321', 'http://example.org', 'javascript:alert(1)', 'data:text/html,x', 'file:///etc/passwd', 'chrome://zotero/content']) {
+    assert.equal(NodusMarkdown.safeExternalUrl(value), '', `${value} is not clickable`);
+  }
+});
+
+test('security: agent actions are bounded and note HTML is sanitized', () => {
+  const { NodusAgent } = loadModule('agent.js');
+  const raw = '<script>alert(1)</script><p onclick="steal()">Safe <strong>text</strong><img src=x onerror=x></p><iframe src=x>bad</iframe>';
+  const safe = NodusAgent.sanitizeNoteHtml(raw);
+  assert.equal(safe, '<p>Safe <strong>text</strong></p>');
+  assert.doesNotMatch(safe, /script|onclick|onerror|iframe|img/i);
+  const blocks = Array.from({ length: 9 }, (_, i) => '```nodus:action\n' + JSON.stringify({ tool: 'add_tags', tags: [`tag-${i}`] }) + '\n```').join('\n');
+  assert.equal(NodusAgent.parseActions(blocks).actions.length, NodusAgent.MAX_ACTIONS);
+  const tags = NodusAgent.validateAction({ tool: 'add_tags', tags: Array.from({ length: 40 }, (_, i) => `t${i}`) });
+  assert.equal(tags.tags.length, NodusAgent.LIMITS.tags);
+  assert.equal(NodusAgent.validateAction({ tool: 'set_field', field: 'itemType', value: 'book' }), null);
+  assert.equal(NodusAgent.isUserRequested({ tool: 'create_note' }, 'Summarize this paper'), false, 'a normal research question cannot authorize a document-injected action');
+  assert.equal(NodusAgent.isUserRequested({ tool: 'create_note' }, 'Create a note with this summary'), true);
+  assert.equal(NodusAgent.isUserRequested({ tool: 'add_tags' }, 'Añade las etiquetas historia y viajes'), true);
+  assert.equal(NodusAgent.isUserRequested({ tool: 'set_field', field: 'DOI' }, 'Cambia el DOI a 10.1/test'), true);
+});
+
+test('security: Gemini model discovery keeps the API key out of the URL', async () => {
+  let seen = null;
+  const { NodusProviders } = loadModule('providers.js', {
+    fetch: async (url, opts) => {
+      seen = { url, opts };
+      return { ok: true, json: async () => ({ models: [{ name: 'models/gemini-test', supportedGenerationMethods: ['generateContent'] }] }) };
+    },
+  });
+  assert.deepEqual(await NodusProviders.listModels('gemini', { key: 'secret-key' }), ['gemini-test']);
+  assert.doesNotMatch(seen.url, /secret-key|\?key=/);
+  assert.equal(seen.opts.headers['x-goog-api-key'], 'secret-key');
+});
+
+test('evidence: attachment signature detects same-size middle edits and forced rebuild preserves unchanged OCR', async () => {
+  const { NodusEvidence: E } = loadModule('evidence.js');
+  const att = {
+    id: 7, libraryID: 1, key: 'ATT', attachmentContentType: 'text/plain',
+    parentItem: { key: 'ITEM', getDisplayTitle: () => 'Source' },
+    getFilePathAsync: async () => null,
+    attachmentText: 'first page\fsecond page',
+  };
+  const a = await E.attachmentSignature(att, 'A'.repeat(5000) + 'X' + 'B'.repeat(5000));
+  const b = await E.attachmentSignature(att, 'A'.repeat(5000) + 'Y' + 'B'.repeat(5000));
+  assert.notEqual(a, b);
+  const first = E.buildIndex({ libraryID: 1, itemKey: 'ITEM', attachmentKey: 'ATT', title: 'Source', contentType: 'text/plain' }, att.attachmentText);
+  E.addVisualText(first, 0, 'OCR diagram label');
+  let saved = null;
+  const store = { loadEvidenceIndex: async () => first, saveEvidenceIndex: async (index) => { saved = index; } };
+  const rebuilt = await E.ensureIndex(att, store, { force: true });
+  assert.equal(rebuilt.rebuilt, true);
+  assert.equal(rebuilt.index.pages[0].visualText, 'OCR diagram label');
+  assert.equal(saved.pages[0].visualText, 'OCR diagram label');
+});
+
+test('security: provider credentials use Zotero Login Manager and migrate plaintext prefs', () => {
+  const prefs = new Map([['nodus.key.openai', 'legacy-secret']]);
+  const logins = [];
+  const manager = {
+    findLogins: () => logins,
+    addLogin: (login) => logins.push(login),
+    modifyLogin: (oldLogin, next) => Object.assign(oldLogin, next),
+    removeLogin: (login) => logins.splice(logins.indexOf(login), 1),
+  };
+  const Zotero = { Prefs: { get: (key) => prefs.get(key), set: (key, value) => prefs.set(key, value) }, logError() {} };
+  const LoginInfo = function () { this.init = (origin, form, realm, username, password) => Object.assign(this, { origin, realm, username, password }); };
+  const { NodusStore } = loadModule('store.js', {
+    ChromeUtils: { importESModule: () => ({ Zotero }) },
+    Services: { logins: manager, dirsvc: { get: () => ({ path: '/tmp' }) } },
+    Components: { classes: { '@mozilla.org/login-manager/loginInfo;1': { createInstance: () => new LoginInfo() } }, interfaces: { nsILoginInfo: {}, nsIFile: {} } },
+    PathUtils: { join: (...parts) => parts.join('/') }, IOUtils: {},
+  });
+  assert.equal(NodusStore.getSecretStorageStatus(), 'encrypted');
+  assert.equal(NodusStore.getKey('openai'), 'legacy-secret');
+  assert.equal(logins[0].password, 'legacy-secret');
+  assert.equal(prefs.get('nodus.key.openai'), '');
+  NodusStore.setKey('openai', 'new-secret');
+  assert.equal(NodusStore.getKey('openai'), 'new-secret');
+});
+
+test('security: legacy plaintext credentials fail closed without Login Manager', () => {
+  const prefs = new Map([['nodus.key.openai', 'must-not-leak'], ['nodus.token', 'bridge-secret'], ['nodus.port', 4321]]);
+  const Zotero = { Prefs: { get: (key) => prefs.get(key), set: (key, value) => prefs.set(key, value) }, logError() {} };
+  const { NodusStore } = loadModule('store.js', {
+    ChromeUtils: { importESModule: () => ({ Zotero }) },
+    Services: { dirsvc: { get: () => ({ path: '/tmp' }) } },
+    Components: { classes: {}, interfaces: { nsIFile: {} } },
+    PathUtils: { join: (...parts) => parts.join('/') }, IOUtils: {},
+  });
+  assert.equal(NodusStore.getSecretStorageStatus(), 'unavailable');
+  assert.equal(NodusStore.getKey('openai'), '');
+  assert.equal(NodusStore.getManual().token, '');
+});
+
+test('security: Zotero bridge is authenticated, non-reflective, owner-only and removed on stop', () => {
+  const server = readSource('electron/zotero-plugin/server.ts');
+  assert.ok(server.indexOf("urlPath === '/api/z/health'") > server.indexOf('hasValidToken(req, token)'), 'health route is after bearer validation');
+  assert.doesNotMatch(server.slice(server.indexOf('function setCors'), server.indexOf('function describeError')), /allowedOrigin\s*=.*:\s*origin/, 'Zotero CORS never reflects a request origin');
+  assert.match(server, /chmod\(bridgePath, 0o600\)/);
+  assert.match(server, /chmod\(dir, 0o700\)/);
+  assert.match(server, /messages\.length > 60/);
+  assert.match(server, /model requested|modelo solicitado|modelos configurados/);
+  assert.match(server, /rm\(path\.join\(bridgeDir\(\), 'zotero-bridge\.json'\)/);
+  assert.match(server, /UNTRUSTED SOURCE DATA/);
+  const installer = readSource('electron/zotero-plugin/install.ts');
+  assert.doesNotMatch(installer, /user_pref\("extensions\.(?:startupScanScopes|autoDisableScopes)"/, 'installer does not weaken global add-on policy');
+  assert.doesNotMatch(installer, /path\.join\(profile, 'extensions'\)/, 'installer never sideloads into a Zotero profile');
+  assert.match(installer, /official Add-ons flow|official Add-ons UI/);
+});
+
+test('scope: group and personal Zotero keys cannot collide at the server boundary', () => {
+  const sidebar = readSource('zotero-plugin/content/sidebar.js');
+  const server = readSource('electron/zotero-plugin/server.ts');
+  const liveRelations = readSource('electron/ai/liveRelations.ts');
+  const sourceKeys = sidebar.slice(sidebar.indexOf('async function scopedSourceKeys'), sidebar.indexOf('async function refreshScopeStatus'));
+  assert.match(sourceKeys, /add\(index\.libraryID, index\.itemKey\)/);
+  assert.match(sourceKeys, /add\(index\.libraryID, index\.attachmentKey\)/);
+  assert.match(sourceKeys, /canonicalZoteroKey\(libraryID, key\)/);
+  assert.match(sourceKeys, /NS\.listEvidenceRecords/);
+  assert.match(sourceKeys, /await scopedAttachments\(\)/);
+  assert.match(sourceKeys, /getSelectedItemInfos\(\)/);
+  assert.doesNotMatch(sourceKeys, /state\.items/, 'selection keys are read live rather than from the polling snapshot');
+  assert.match(sidebar, /const sourceKeys = await scopedSourceKeys\(\)/, 'scope identity does not depend on full-text indexing');
+  const send = sidebar.slice(sidebar.indexOf('async function send(text)'), sidebar.indexOf('// Streams an assistant reply'));
+  assert.match(send, /await refreshItem\(false\)/, 'send synchronizes a just-changed selection before appending the message');
+  const connected = sidebar.slice(sidebar.indexOf('async function sendConnected'), sidebar.indexOf('async function sendStandalone'));
+  assert.match(connected, /const liveCurrent = getCurrentItem\(\)/);
+  assert.match(server, /export function canonicalZoteroSourceKey/);
+  assert.match(server, /const currentKey = canonicalLibraryItemKey\(context\)/);
+  assert.match(server, /sourceKeys\.has\(passage\.zoteroKey\)/);
+  assert.match(sidebar, /attachmentKey: liveCurrent\.attachment \? String\(liveCurrent\.attachment\.key/, 'the exact open attachment is sent to Nodus');
+  assert.match(liveRelations, /attachmentKey: source\?\.attachment_key \|\| null/, 'retrieved passages retain their exact attachment provenance');
+  assert.match(server, /p\.zoteroKey === currentKey && p\.attachmentKey === currentAttachmentKey/, 'bare page chips are emitted only for the exact open attachment');
+  assert.match(server, /navigablePage \? `\[\[p:\$\{pageLabel\}\]\] ` : pageLabel \? `\(p\. \$\{pageLabel\}\) `/, 'other-source page labels remain non-actionable text');
+  assert.match(server, /citations:\s*\{[\s\S]*gaps:[\s\S]*zotero:/, 'server returns exact citation allow-lists with its stream metadata');
+  const select = sidebar.slice(sidebar.indexOf('async function selectInZotero'), sidebar.indexOf('// ─────────────────────────────────────────── conversations'));
+  assert.match(select, /if \(!item && !group\)/, 'a group key is never searched across unrelated libraries');
+  assert.match(sidebar, /hit\.groupID[\s\S]*"groups\/" \+ groupID/, 'PDF fallback retains persisted group provenance');
+});
+
+test('scope: a source change aborts and generation-guards the foreground response', () => {
+  const sidebar = readSource('zotero-plugin/content/sidebar.js');
+  const reset = sidebar.slice(sidebar.indexOf('async function resetSourceContext'), sidebar.indexOf('async function refreshItem'));
+  const generate = sidebar.slice(sidebar.indexOf('async function generateAssistant'), sidebar.indexOf('async function sendConnected'));
+  assert.match(reset, /state\.sourceGeneration \+= 1/);
+  assert.match(reset, /foreground\.abort\(\)/);
+  assert.match(generate, /const conversation = state\.conv/);
+  assert.match(generate, /isCurrentRun/);
+  assert.match(generate, /if \(!isCurrentRun\(\)\) return/);
+  assert.match(generate, /conversation\.messages\.push/);
+  assert.doesNotMatch(generate, /state\.conv\.messages\.push/);
+});
+
+test('privacy: disabled history and deleted Zotero items are purged automatically', () => {
+  const sidebar = readSource('zotero-plugin/content/sidebar.js');
+  const boot = sidebar.slice(sidebar.indexOf('async function boot()'));
+  assert.match(boot, /!state\.historyEnabled[\s\S]*deleteConversationHistory\(\)/);
+  assert.match(boot, /await NS\.pruneEvidenceIndexes\(\)/);
+  const notifier = sidebar.slice(sidebar.indexOf('function registerNotifier'), sidebar.indexOf('async function boot'));
+  assert.match(notifier, /event === "delete"[\s\S]*scheduleEvidencePrune\(\)/);
+  assert.match(sidebar, /history\.deleteFailed/);
+});
+
+test('agent: approval revalidates the exact PDF selection', () => {
+  const sidebar = readSource('zotero-plugin/content/sidebar.js');
+  const cards = sidebar.slice(sidebar.indexOf('function selectionFingerprint'), sidebar.indexOf('function okMsg'));
+  assert.match(cards, /selectionFingerprint: selectionFingerprint\(state\.selection, state\.selectionDraft\)/);
+  assert.match(cards, /action\.tool === "highlight"/);
+  assert.match(cards, /selectionFingerprint\(state\.selection, state\.selectionDraft\) !== target\.selectionFingerprint/);
+});
+
+test('scope: indexed-library identity includes validated signatures and collection scope is recursive', () => {
+  const sidebar = readSource('zotero-plugin/content/sidebar.js');
+  assert.match(sidebar, /async function librarySourceIdentity\(records\)/);
+  assert.match(sidebar, /String\(record\.signature \|\| ""\)/);
+  assert.match(sidebar, /syncLibraryIdentityBeforeSend/);
+  assert.match(sidebar, /getChildCollections \? collection\.getChildCollections\(false, false\)/);
+});
+
+test('accessibility and i18n: tabs are related, keyboard-operable and citation fallbacks are localized', () => {
+  const html = readSource('zotero-plugin/content/sidebar.html');
+  const sidebar = readSource('zotero-plugin/content/sidebar.js');
+  assert.match(html, /id="nd-tab-chat"[^>]+aria-controls="nd-panel-chat"/);
+  assert.match(html, /id="nd-panel-chat"[^>]+aria-labelledby="nd-tab-chat"/);
+  assert.match(html, /id="nd-history-close"[^>]+data-i18n-title="modal.close"/);
+  assert.match(sidebar, /function handleTabKey/);
+  assert.match(sidebar, /"ArrowLeft", "ArrowRight", "Home", "End"/);
+  const makeCite = sidebar.slice(sidebar.indexOf('function makeCite'), sidebar.indexOf('async function goToEvidence'));
+  assert.doesNotMatch(makeCite, /"Evidence unavailable"|\|\| "source"|\|\| "evidence"/);
+  assert.match(makeCite, /t\("citation\.unavailable"\)/);
+  const audit = sidebar.slice(sidebar.indexOf('function validateAnswerCitations'), sidebar.indexOf('async function buildSelectedIndexes'));
+  assert.match(audit, /pages,/);
+  for (const kind of ['ideas', 'gaps', 'zotero']) assert.match(audit, new RegExp(kind + ':'));
 });
 
 test('providers: reasoning maps to the right per-provider body', () => {
@@ -989,35 +1217,22 @@ test('#reasoning: sidebar + server wire the selector through', () => {
   assert.ok(/reasoning/.test(server) && server.includes('ReasoningEffort'), 'connected server honors reasoning');
 });
 
-test('self-update: default-on preference, AddonManager wiring and a guarded disable toggle', () => {
-  // Store defaults ON and round-trips the preference.
-  const { NodusStore: S } = loadModule('store.js');
-  assert.equal(S.getAutoUpdate(), true, 'auto-update defaults to enabled');
-  assert.equal(typeof S.setAutoUpdate, 'function', 'store exposes setAutoUpdate');
-
-  // updater.js drives Zotero's own AddonManager (per-add-on background updates +
-  // an immediate check), rather than reinventing download/verify.
-  const updater = readSource('zotero-plugin/content/updater.js');
-  assert.ok(updater.includes('AddonManager.sys.mjs'), 'imports the AddonManager');
-  assert.ok(updater.includes('applyBackgroundUpdates'), 'sets per-add-on auto-update');
-  assert.ok(updater.includes('AUTOUPDATE_ENABLE') && updater.includes('AUTOUPDATE_DISABLE'), 'enables/disables explicitly');
-  assert.ok(updater.includes('findUpdates'), 'can check for an update immediately');
-  assert.ok(updater.includes('window.NodusUpdater'), 'exposes NodusUpdater');
-
-  // bootstrap applies the preference at startup, defaulting to enabled.
+test('security: Zotero-required update feed is HTTPS while background updates stay disabled per add-on', () => {
+  const manifest = JSON.parse(readSource('zotero-plugin/manifest.json'));
   const bootstrap = readSource('zotero-plugin/bootstrap.js');
-  assert.ok(bootstrap.includes('configureAutoUpdate'), 'startup configures auto-update');
-  assert.ok(/nodus\.autoUpdate/.test(bootstrap), 'reads the auto-update preference');
-  assert.ok(/updater\.js/.test(bootstrap), 'startup loads the shared updater module');
-
-  // sidebar exposes the toggle, confirms before turning it OFF, and reverts on cancel.
   const sidebar = readSource('zotero-plugin/content/sidebar.js');
   const html = readSource('zotero-plugin/content/sidebar.html');
-  assert.ok(html.includes('id="nd-autoupdate"'), 'settings expose the toggle');
-  assert.ok(html.includes('chrome://nodus/content/updater.js'), 'sidebar loads the updater');
-  assert.ok(sidebar.includes('NS.setAutoUpdate'), 'persists the choice');
-  assert.ok(/showConfirm\(t\("update\.disableConfirm"\)/.test(sidebar), 'disabling asks for confirmation');
-  assert.ok(/e\.target\.checked = true;\s*return;/.test(sidebar), 'cancelling reverts the toggle to on');
+  assert.equal(
+    manifest.applications.zotero.update_url,
+    'https://github.com/Drakonis96/nodus/releases/latest/download/updates.json',
+    'Zotero 9 rejects extensions without applications.zotero.update_url',
+  );
+  assert.match(bootstrap, /applyBackgroundUpdates\s*=\s*AddonManager\.AUTOUPDATE_DISABLE/);
+  assert.doesNotMatch(bootstrap, /updater\.js|configureAutoUpdate|findUpdates/);
+  assert.doesNotMatch(html, /nd-autoupdate|updater\.js/);
+  assert.doesNotMatch(sidebar, /NodusUpdater|\.configure\(state\.autoUpdate/);
+  assert.match(html, /Tools → Plugins → ⚙ → Install Add-on From File/);
+  assert.doesNotMatch(`${html}\n${sidebar}`, /installs? the packaged XPI|instala el XPI empaquetado/i);
 });
 
 test('local retrieval: E5 is pinned, isolated in a worker and requires no embedding setting or API', () => {
@@ -1131,6 +1346,97 @@ test('#10: message-action buttons live-render via the real fake-DOM path', () =>
   assert.ok(src.includes('nsIClipboardHelper'), 'copy uses the clipboard helper XPCOM');
 });
 
+test('streaming UX: Markdown and safe citation chips render progressively in one frame', () => {
+  const sidebar = readSource('zotero-plugin/content/sidebar.js');
+  const start = sidebar.indexOf('function renderCitations');
+  const end = sidebar.indexOf('async function goToEvidence');
+  assert.ok(start >= 0 && end > start, 'streaming renderer source is available');
+
+  const { NodusMarkdown } = loadModule('markdown.js');
+  const doc = makeDoc();
+  const body = makeEl('div', doc);
+  const frames = [];
+  const cancelled = new Set();
+  const testState = {
+    evidence: new Map(), ideaLabels: {},
+    citationAllow: { pages: new Set(), ideas: new Set(), gaps: new Set(), zotero: new Set() },
+  };
+  const testCurrent = { reader: { itemID: 9 }, attachment: { key: 'PDF', libraryID: 1, attachmentContentType: 'application/pdf' } };
+  const testLog = makeEl('div', doc);
+  const sandbox = {
+    window: {
+      requestAnimationFrame(fn) { frames.push(fn); return frames.length; },
+      cancelAnimationFrame(id) { cancelled.add(id); },
+    },
+    document: doc,
+    testState, testCurrent, testLog,
+    testMarkdown: NodusMarkdown,
+    Zotero: { logError() {} },
+    setTimeout, clearTimeout,
+  };
+  vm.createContext(sandbox);
+  vm.runInContext(`
+    const state = testState;
+    const NM = testMarkdown;
+    const getCurrentItem = () => testCurrent;
+    const messagesEl = () => testLog;
+    const emptyCitationAllow = () => ({ pages: new Set(), ideas: new Set(), gaps: new Set(), zotero: new Set() });
+    const labels = { "citation.page": "p. {page}", "citation.source": "source", "citation.evidence": "evidence", "citation.idea": "idea", "citation.gap": "gap", "citation.pending": "Validating citation…", "citation.unavailable": "Evidence unavailable", "evidence.noLocator": "No locator" };
+    const t = (key) => labels[key] || key;
+    const tf = (key, params) => t(key).replace(/\\{(\\w+)\\}/g, (m, p) => params[p] == null ? m : String(params[p]));
+    const el = (tag, cls, txt) => { const node = document.createElement(tag); if (cls) node.className = cls; if (txt != null) node.textContent = txt; return node; };
+    ${sidebar.slice(start, end)}
+    window.streaming = { renderStreamingRich, cancelStreamingRich, setStreamingAccessibility };
+  `, sandbox);
+
+  sandbox.window.streaming.renderStreamingRich(body, '**First');
+  sandbox.window.streaming.renderStreamingRich(body, '**First** and [[p:7]]');
+  assert.equal(frames.length, 1, 'multiple provider deltas are coalesced into one paint');
+  frames.shift()();
+  assert.ok(serializeHtml(body).includes('<strong>First</strong>'), 'completed Markdown is formatted before the stream ends');
+  let button = body.children.flatMap(function walk(node) { return [node, ...(node.children || []).flatMap(walk)]; }).find((node) => node.tagName === 'BUTTON');
+  assert.ok(button && button.disabled, 'an unverified streaming citation is visible but cannot be clicked');
+  assert.equal(button.title, 'Validating citation…');
+
+  testState.citationAllow.pages.add('7');
+  sandbox.window.streaming.renderStreamingRich(body, '**First** and [[p:7]] plus text');
+  assert.equal(frames.length, 1);
+  frames.shift()();
+  button = body.children.flatMap(function walk(node) { return [node, ...(node.children || []).flatMap(walk)]; }).find((node) => node.tagName === 'BUTTON');
+  assert.ok(button && !button.disabled, 'the chip becomes actionable as soon as server metadata allows it');
+  assert.equal(serializeText(body), 'First and p. 7 plus text');
+
+  testCurrent.attachment.attachmentContentType = 'application/epub+zip';
+  sandbox.window.streaming.renderStreamingRich(body, 'EPUB [[p:7]]');
+  frames.shift()();
+  button = body.children.flatMap(function walk(node) { return [node, ...(node.children || []).flatMap(walk)]; }).find((node) => node.tagName === 'BUTTON');
+  assert.ok(button && button.disabled, 'EPUB logical pages never become misleading PDF navigation buttons');
+
+  sandbox.window.streaming.setStreamingAccessibility(body, true);
+  assert.equal(testLog.getAttribute('aria-busy'), 'true');
+  assert.equal(body.getAttribute('aria-live'), 'off');
+  sandbox.window.streaming.setStreamingAccessibility(body, false);
+  assert.equal(testLog.getAttribute('aria-busy'), 'false');
+  assert.equal(body.getAttribute('aria-live'), null, 'the final validated response is announced once');
+
+  sandbox.window.streaming.renderStreamingRich(body, 'will be cancelled');
+  sandbox.window.streaming.cancelStreamingRich(body);
+  assert.ok(cancelled.size > 0, 'a pending paint is cancelled before final validated rendering');
+});
+
+test('streaming UX: response growth never forces the reading position downward', () => {
+  const sidebar = readSource('zotero-plugin/content/sidebar.js');
+  const connected = sidebar.slice(sidebar.indexOf('async function sendConnected'), sidebar.indexOf('async function sendStandalone'));
+  const standalone = sidebar.slice(sidebar.indexOf('async function sendStandalone'), sidebar.indexOf('// ─────────────────────────────────────────── providers tab'));
+  const cards = sidebar.slice(sidebar.indexOf('function renderActionCards'), sidebar.indexOf('async function runAction'));
+  for (const [name, source] of [['connected stream', connected], ['standalone stream', standalone], ['action cards', cards]]) {
+    assert.doesNotMatch(source, /scrollTop\s*=\s*[^;]*scrollHeight/, `${name} does not auto-scroll as content grows`);
+  }
+  assert.match(connected, /renderStreamingRich\(bodyEl, acc\)/);
+  assert.match(standalone, /renderStreamingRich\(bodyEl, acc\)/);
+  assert.match(readSource('zotero-plugin/content/sidebar.css'), /#nd-messages[^}]*overflow-anchor:\s*none/);
+});
+
 test('composer: Enter sends and Alt+Enter keeps the textarea newline', () => {
   const src = readSource('zotero-plugin/content/sidebar.js');
   assert.match(
@@ -1224,21 +1530,19 @@ test('highlighter: sortIndexStr matches Zotero page|offset|top format', () => {
 // ─────────────────────────────────────────── #9 packaging
 test('#9: build-zotero-xpi produces a valid xpi + updates.json', () => {
   const r = buildXpi();
+  const firstBytes = readFileSync(r.xpiPath);
+  const second = buildXpi();
+  assert.deepEqual(readFileSync(second.xpiPath), firstBytes, 'identical source builds produce byte-identical XPIs');
   const manifest = JSON.parse(readSource('zotero-plugin/manifest.json'));
   assert.equal(r.version, manifest.version);
   assert.equal(r.xpiName, 'nodus-zotero.xpi', 'release asset name stays stable across versions');
-  assert.equal(
-    manifest.applications.zotero.update_url,
-    'https://github.com/Drakonis96/nodus/releases/latest/download/updates.json',
-    'installed plugins always poll the latest Nodus release',
-  );
+  assert.match(manifest.applications.zotero.update_url, /^https:\/\//, 'Zotero 9 requires an HTTPS update_url to install');
 
   const zip = new AdmZip(r.xpiPath);
   const names = zip.getEntries().map((e) => e.entryName);
   assert.ok(names.includes('manifest.json'), 'manifest.json at zip ROOT (Zotero rejects it otherwise)');
   for (const need of [
     'content/sidebar.js',
-    'content/updater.js',
     'content/local-embeddings.js',
     'content/runtime/local-embedding-worker.js',
     'content/runtime/ort-wasm-simd-threaded.jsep.mjs',
@@ -1273,7 +1577,7 @@ test('#9: build-zotero-xpi produces a valid xpi + updates.json', () => {
   assert.equal(entry.applications.zotero.strict_min_version, manifest.applications.zotero.strict_min_version);
 });
 
-test('#9: desktop installer copies the canonical release XPI', () => {
+test('#9: desktop exports the canonical release XPI and leaves installation to Zotero', () => {
   const install = readSource('electron/zotero-plugin/install.ts');
   const beforePack = readSource('build/beforePack.cjs');
   const pkg = JSON.parse(readSource('package.json'));
@@ -1282,11 +1586,27 @@ test('#9: desktop installer copies the canonical release XPI', () => {
   assert.match(install, /ort-wasm-simd-threaded\.jsep\.wasm/);
   assert.match(install, /icons\/nodus\.svg/);
   assert.doesNotMatch(install, /addLocalFolder/);
+  assert.doesNotMatch(install, /path\.join\(profile, 'extensions'\)/);
+  assert.match(install, /ok: false[\s\S]*Herramientas → Complementos/);
   assert.match(beforePack, /build-zotero-xpi\.mjs/);
   assert.ok(pkg.build.extraResources.some((entry) => (
     entry.from === 'dist-zotero/nodus-zotero.xpi'
     && entry.to === 'zotero/nodus-zotero.xpi'
   )));
+});
+
+test('#9: opt-in live smoke uses an isolated Zotero profile and verifies active bootstrap startup', () => {
+  const smoke = readSource('scripts/smoke-zotero-xpi.mjs');
+  assert.match(smoke, /mkdtempSync\(path\.join\(os\.tmpdir\(\), 'nodus-zotero-live-smoke-'\)\)/);
+  assert.match(smoke, /extensions\.startupScanScopes/);
+  assert.match(smoke, /extensions\.autoDisableScopes/);
+  assert.match(smoke, /extensions\.zotero\.dataDir/);
+  assert.match(smoke, /state\.active === true/);
+  assert.match(smoke, /state\.appDisabled === false/);
+  assert.match(smoke, /state\.userDisabled === false/);
+  assert.match(smoke, /state\.applyBackgroundUpdates === 0/);
+  assert.match(smoke, /\[Nodus\] startup complete/);
+  assert.doesNotMatch(smoke, /Library\/Application Support\/Zotero|AppData|profiles\.ini/);
 });
 
 test('#9: stable release blocks publication until the Zotero assets exist', () => {

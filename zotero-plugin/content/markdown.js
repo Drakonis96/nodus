@@ -44,6 +44,11 @@
     return out;
   }
 
+  function safeExternalUrl(value) {
+    const href = String(value || "").trim();
+    return /^https:\/\/[^\s]+$/i.test(href) ? href : "";
+  }
+
   function isBlockStart(line) {
     return (
       /^\s*```/.test(line) ||
@@ -110,11 +115,13 @@
       }
       if (sp.type === "code") { const c = doc.createElement("code"); c.className = "nd-md-code"; c.textContent = sp.value; parent.appendChild(c); continue; }
       if (sp.type === "link") {
+        const href = safeExternalUrl(sp.href);
+        if (!href) { renderInline(doc, sp.children, parent, citeFn); continue; }
         const a = doc.createElement("a");
         a.className = "nd-md-link";
-        a.setAttribute("href", sp.href);
+        a.setAttribute("href", href);
         // Open externally: chrome:// docs can't navigate to http in place.
-        a.addEventListener("click", (e) => { e.preventDefault(); try { Zotero.launchURL(sp.href); } catch (x) {} });
+        a.addEventListener("click", (e) => { e.preventDefault(); try { Zotero.launchURL(href); } catch (x) {} });
         renderInline(doc, sp.children, a, citeFn);
         parent.appendChild(a);
         continue;
@@ -151,5 +158,5 @@
     for (const b of parse(text)) container.appendChild(renderBlock(doc, b, citeFn));
   }
 
-  window.NodusMarkdown = { parse, parseInline, render };
+  window.NodusMarkdown = { parse, parseInline, safeExternalUrl, render };
 })();

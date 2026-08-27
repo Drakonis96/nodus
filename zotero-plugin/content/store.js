@@ -1,9 +1,6 @@
-/* Nodus for Zotero — persistence. Small settings/keys in Zotero prefs; the
- * conversation history in a JSON file in the Zotero profile. window.NodusStore.
- *
- * Note: API keys are stored in Zotero's prefs (plain text in the profile), the
- * same trade-off other Zotero AI plugins make. They never leave this machine
- * except in the request to the provider you configured.
+/* Nodus for Zotero — persistence. Small settings in Zotero prefs, provider
+ * credentials in Zotero's encrypted Login Manager, and conversation/evidence
+ * data in the Zotero profile. window.NodusStore.
  */
 /* eslint-disable no-undef */
 (function () {
@@ -57,9 +54,78 @@
     const threshold = Number(c.fullTextThreshold);
     S("ctx.fullTextThreshold", String(Number.isFinite(threshold) && threshold > 0 ? threshold : 48000));
   }
+  const SOURCE_SCOPES = ["current", "selection", "collection", "library"];
+  function getSourceScope() {
+    const value = P("sourceScope", "current");
+    return SOURCE_SCOPES.includes(value) ? value : "current";
+  }
+  function setSourceScope(value) { S("sourceScope", SOURCE_SCOPES.includes(value) ? value : "current"); }
+  function getOnboarded() { return P("onboarded", "0") === "1"; }
+  function setOnboarded(value) { S("onboarded", value ? "1" : "0"); }
   // ---- providers ----
-  function getKey(provider) { return P("key." + provider, "") || ""; }
-  function setKey(provider, v) { S("key." + provider, v || ""); }
+  // Zotero's Login Manager encrypts passwords in logins.json/key4.db instead of
+  // leaving provider keys readable in prefs.js. Existing plaintext values are
+  // migrated lazily and then removed. New secrets fail closed if Login Manager
+  // is unavailable; they are never written back to prefs.js.
+  const SECRET_ORIGIN = "chrome://nodus";
+  const SECRET_REALM = "Nodus Zotero provider credentials";
+  let secretStorage = null;
+  function loginManager() {
+    if (secretStorage) return secretStorage;
+    try {
+      if (!Services || !Services.logins) throw new Error("login-manager-unavailable");
+      secretStorage = { kind: "encrypted", manager: Services.logins };
+    } catch (e) {
+      secretStorage = { kind: "unavailable", manager: null };
+    }
+    return secretStorage;
+  }
+  function providerLogin(provider) {
+    const storage = loginManager();
+    if (!storage.manager) return null;
+    try {
+      return (storage.manager.findLogins(SECRET_ORIGIN, null, SECRET_REALM) || [])
+        .find((login) => login.username === String(provider || "")) || null;
+    } catch (e) { return null; }
+  }
+  function newProviderLogin(provider, password) {
+    try {
+      const login = Components.classes["@mozilla.org/login-manager/loginInfo;1"]
+        .createInstance(Components.interfaces.nsILoginInfo);
+      login.init(SECRET_ORIGIN, null, SECRET_REALM, String(provider || ""), String(password || ""), "", "");
+      return login;
+    } catch (e) { return null; }
+  }
+  function writeSecureKey(provider, value) {
+    const storage = loginManager();
+    if (!storage.manager) return false;
+    try {
+      const existing = providerLogin(provider);
+      if (!value) {
+        if (existing) storage.manager.removeLogin(existing);
+        return true;
+      }
+      const next = newProviderLogin(provider, value);
+      if (!next) return false;
+      if (existing) storage.manager.modifyLogin(existing, next);
+      else storage.manager.addLogin(next);
+      return true;
+    } catch (e) { return false; }
+  }
+  function getKey(provider) {
+    const login = providerLogin(provider);
+    if (login && login.password) return String(login.password);
+    const legacy = P("key." + provider, "") || "";
+    if (legacy && writeSecureKey(provider, legacy)) { S("key." + provider, ""); return legacy; }
+    return "";
+  }
+  function setKey(provider, value) {
+    const clean = String(value || "");
+    if (!clean) { writeSecureKey(provider, ""); S("key." + provider, ""); return true; }
+    if (writeSecureKey(provider, clean)) { S("key." + provider, ""); return true; }
+    return false;
+  }
+  function getSecretStorageStatus() { return loginManager().kind; }
   function getLocalBase(provider) { return P("localbase." + provider, "") || ""; }
   function setLocalBase(provider, v) { S("localbase." + provider, v || ""); }
   function getPinned() { const a = PJSON("pinned", []); return Array.isArray(a) ? a : []; }
@@ -83,8 +149,8 @@
   }
   function removeCustomPrompt(id) { setCustomPrompts(getCustomPrompts().filter((p) => p.id !== id)); }
 
-  // ---- self-update (default ON; the plugin keeps itself current via Zotero) ----
-  function getAutoUpdate() { return P("autoUpdate", "1") !== "0"; }
+  // ---- self-update (explicit opt-in; privileged code never updates silently by default) ----
+  function getAutoUpdate() { return P("autoUpdate", "0") === "1"; }
   function setAutoUpdate(v) { S("autoUpdate", v ? "1" : "0"); }
 
   // ---- agent mode ----
@@ -93,9 +159,36 @@
   function getAgentAuto() { return P("agentAuto", "0") === "1"; }
   function setAgentAuto(v) { S("agentAuto", v ? "1" : "0"); }
 
+  // ---- local history privacy/retention ----
+  // History is private-by-default. Users can explicitly opt in from Settings;
+  // disabling it also removes the already persisted conversation file.
+  function getHistoryEnabled() { return P("history.enabled", "0") === "1"; }
+  function setHistoryEnabled(v) { S("history.enabled", v ? "1" : "0"); }
+  function getHistoryRetention() {
+    const value = Number(P("history.retentionDays", 365));
+    return [30, 90, 365, 0].includes(value) ? value : 365;
+  }
+  function setHistoryRetention(value) {
+    const days = Number(value);
+    S("history.retentionDays", String([30, 90, 365, 0].includes(days) ? days : 365));
+  }
+
   // ---- conversation manual (nodus) connection override (advanced) ----
-  function getManual() { return { port: Number(P("port", 0)) || 0, token: P("token", "") || "" }; }
-  function setManual(port, token) { S("port", Number(port) || 0); S("token", token || ""); }
+  const MANUAL_TOKEN_LOGIN = "__nodus_bridge_manual__";
+  function getManual() {
+    const login = providerLogin(MANUAL_TOKEN_LOGIN);
+    if (login && login.password) return { port: Number(P("port", 0)) || 0, token: String(login.password) };
+    const legacy = P("token", "") || "";
+    if (legacy && writeSecureKey(MANUAL_TOKEN_LOGIN, legacy)) { S("token", ""); return { port: Number(P("port", 0)) || 0, token: legacy }; }
+    return { port: Number(P("port", 0)) || 0, token: "" };
+  }
+  function setManual(port, token) {
+    const clean = String(token || "");
+    if (clean && !writeSecureKey(MANUAL_TOKEN_LOGIN, clean)) return false;
+    if (!clean) writeSecureKey(MANUAL_TOKEN_LOGIN, "");
+    S("port", Number(port) || 0); S("token", "");
+    return true;
+  }
 
   // ---- conversations (file) ----
   function convPath() {
@@ -110,6 +203,9 @@
       weak: Number(audit.weak) || 0,
       missing: Number(audit.missing) || 0,
       coverage: Number(audit.coverage) || 0,
+      citationCoverage: Number(audit.citationCoverage == null ? audit.coverage : audit.citationCoverage) || 0,
+      matchCoverage: Number(audit.matchCoverage == null ? audit.coverage : audit.matchCoverage) || 0,
+      method: String(audit.method || "citation-presence+lexical-screen"),
       repairAttempted: !!audit.repairAttempted,
       invalidCitations: Array.isArray(audit.invalidCitations)
         ? audit.invalidCitations.map((citation) => ({
@@ -129,22 +225,81 @@
   }
   function compactConversations(list) {
     if (!Array.isArray(list)) return [];
-    return list.map((conversation) => ({
-      ...conversation,
-      messages: Array.isArray(conversation && conversation.messages)
-        ? conversation.messages.map((message) => ({
-          ...message,
+    const now = Date.now();
+    const retention = getHistoryRetention();
+    const earliest = retention ? now - retention * 86400000 : 0;
+    const normalized = list
+      .filter((conversation) => conversation && typeof conversation === "object")
+      .map((conversation) => ({
+        id: String(conversation.id || newId()).slice(0, 160),
+        title: String(conversation.title || "").slice(0, 300),
+        mode: conversation.mode === "standalone" ? "standalone" : "connected",
+        sourceScope: SOURCE_SCOPES.includes(conversation.sourceScope) ? conversation.sourceScope : "current",
+        sourceIdentity: String(conversation.sourceIdentity || "").slice(0, 20000),
+        model: conversation.model && typeof conversation.model === "object" ? {
+          provider: String(conversation.model.provider || "").slice(0, 80),
+          model: String(conversation.model.model || "").slice(0, 240),
+        } : null,
+        createdAt: Number(conversation.createdAt) || now,
+        updatedAt: Number(conversation.updatedAt) || now,
+        messages: (Array.isArray(conversation.messages) ? conversation.messages : []).slice(-60).map((message) => ({
+          role: message && message.role === "assistant" ? "assistant" : "user",
+          content: String(message && message.content || "").slice(0, 50000),
+          evidence: (Array.isArray(message && message.evidence) ? message.evidence : []).slice(0, 12).map((hit) => ({
+            id: String(hit && hit.id || "").slice(0, 180),
+            libraryID: Number(hit && hit.libraryID) || 0,
+            groupID: hit && hit.groupID != null && Number.isFinite(Number(hit.groupID)) ? Number(hit.groupID) : null,
+            itemKey: String(hit && hit.itemKey || "").slice(0, 80),
+            attachmentKey: String(hit && hit.attachmentKey || "").slice(0, 80),
+            title: String(hit && hit.title || "").slice(0, 500),
+            contentType: String(hit && hit.contentType || "").slice(0, 120),
+            pageIndex: Number(hit && hit.pageIndex) || 0,
+            pageLabel: String(hit && hit.pageLabel || "").slice(0, 80),
+            section: String(hit && hit.section || "").slice(0, 500),
+            text: String(hit && hit.text || "").slice(0, 2000),
+          })),
           audit: message && message.audit ? compactAudit(message.audit) : null,
-        }))
-        : [],
-    }));
+        })),
+      }))
+      .filter((conversation) => !earliest || conversation.updatedAt >= earliest)
+      .sort((a, b) => b.updatedAt - a.updatedAt)
+      .slice(0, 100);
+    const out = [];
+    let bytes = 2;
+    for (const conversation of normalized) {
+      const serialized = JSON.stringify(conversation);
+      if (bytes + serialized.length > 50 * 1024 * 1024) break;
+      bytes += serialized.length + 1; out.push(conversation);
+    }
+    return out;
   }
   async function loadConversations() {
-    try { const raw = await IOUtils.readUTF8(convPath()); return compactConversations(JSON.parse(raw)); }
+    try {
+      const stat = await IOUtils.stat(convPath());
+      if (Number(stat && stat.size) > 50 * 1024 * 1024) throw new Error("conversation-history-too-large");
+      const raw = await IOUtils.readUTF8(convPath());
+      const parsed = JSON.parse(raw);
+      const compacted = compactConversations(parsed);
+      if (JSON.stringify(parsed) !== JSON.stringify(compacted)) await saveConversations(compacted);
+      return compacted;
+    }
     catch (e) { return []; }
   }
   async function saveConversations(list) {
-    try { await IOUtils.writeUTF8(convPath(), JSON.stringify(compactConversations(list))); } catch (e) { try { Zotero.logError(e); } catch (x) {} }
+    try {
+      const target = convPath();
+      const temp = target + ".tmp";
+      await IOUtils.writeUTF8(temp, JSON.stringify(compactConversations(list)));
+      await IOUtils.move(temp, target, { noOverwrite: false });
+      if (IOUtils.setPermissions) await IOUtils.setPermissions(target, 0o600);
+    } catch (e) { try { Zotero.logError(e); } catch (x) {} }
+  }
+  async function deleteConversationHistory() {
+    try {
+      await IOUtils.remove(convPath(), { ignoreAbsent: true });
+      await IOUtils.remove(convPath() + ".tmp", { ignoreAbsent: true });
+      return true;
+    } catch (e) { try { Zotero.logError(e); } catch (x) {} return false; }
   }
   const EVIDENCE_CACHE_VERSION = 1;
   let evidenceDbPromise = null;
@@ -279,7 +434,9 @@
     // place until the new cache has been written successfully.
     try {
       const legacy = JSON.parse(await IOUtils.readUTF8(legacyIndexPath(libraryID, attachmentKey)));
-      if (legacy) await saveEvidenceIndex(legacy);
+      if (legacy && await saveEvidenceIndex(legacy)) {
+        await IOUtils.remove(legacyIndexPath(libraryID, attachmentKey), { ignoreAbsent: true });
+      }
       return legacy;
     } catch (e) { return null; }
   }
@@ -296,6 +453,10 @@
       await IOUtils.write(vectorsTmp, packed.bytes);
       await IOUtils.move(dataTmp, target, { noOverwrite: false });
       await IOUtils.move(vectorsTmp, vectorsTarget, { noOverwrite: false });
+      if (IOUtils.setPermissions) {
+        await IOUtils.setPermissions(target, 0o600);
+        await IOUtils.setPermissions(vectorsTarget, 0o600);
+      }
       const db = await evidenceDb();
       await db.queryAsync(
         "INSERT INTO evidence_indexes " +
@@ -324,33 +485,116 @@
       return true;
     } catch (e) { return false; }
   }
+  async function listEvidenceRecords() {
+    try {
+      const db = await evidenceDb();
+      const rows = await db.queryAsync(
+        "SELECT library_id AS libraryID, attachment_key AS attachmentKey, item_key AS itemKey, " +
+        "signature, index_version AS indexVersion, embedding_model AS embeddingModel, " +
+        "total_pages AS totalPages, total_chars AS totalChars, data_path AS dataPath, " +
+        "vector_path AS vectorPath, updated_at AS updatedAt FROM evidence_indexes ORDER BY updated_at DESC"
+      );
+      return (rows || []).map((row) => ({
+        libraryID: Number(row.libraryID), attachmentKey: String(row.attachmentKey || ""),
+        itemKey: String(row.itemKey || ""), signature: String(row.signature || ""),
+        indexVersion: Number(row.indexVersion) || 0, embeddingModel: String(row.embeddingModel || ""),
+        totalPages: Number(row.totalPages) || 0, totalChars: Number(row.totalChars) || 0,
+        dataPath: String(row.dataPath || ""), vectorPath: String(row.vectorPath || ""),
+        updatedAt: Number(row.updatedAt) || 0,
+      }));
+    } catch (e) { return []; }
+  }
+  async function loadEvidenceIndexes(filter) {
+    const records = await listEvidenceRecords();
+    const indexes = [];
+    for (const record of records) {
+      if (typeof filter === "function" && !filter(record)) continue;
+      const index = await loadEvidenceIndex(record.libraryID, record.attachmentKey);
+      if (index) indexes.push(index);
+    }
+    return indexes;
+  }
+  async function pruneEvidenceIndexes() {
+    const records = await listEvidenceRecords();
+    let removed = 0;
+    for (const record of records) {
+      let exists = false;
+      try { exists = !!(Zotero.Items && Zotero.Items.getByLibraryAndKey && Zotero.Items.getByLibraryAndKey(record.libraryID, record.attachmentKey)); }
+      catch (e) {}
+      let sidecars = true;
+      try { await IOUtils.stat(record.dataPath); await IOUtils.stat(record.vectorPath); } catch (e) { sidecars = false; }
+      if ((!exists || !sidecars) && await deleteEvidenceIndex(record.libraryID, record.attachmentKey)) removed++;
+    }
+    const referenced = new Set((await listEvidenceRecords()).flatMap((record) => [record.dataPath, record.vectorPath]));
+    try {
+      for (const filePath of await IOUtils.getChildren(evidenceDir())) {
+        if ((/\.(?:json\.gz|f32|tmp)$/.test(filePath)) && !referenced.has(filePath)) await IOUtils.remove(filePath, { ignoreAbsent: true });
+      }
+    } catch (e) {}
+    // A v0.1 JSON that points to a deleted Zotero attachment must not be able
+    // to reappear through the lazy migration path after pruning.
+    try {
+      for (const filePath of await IOUtils.getChildren(legacyIndexDir())) {
+        if (/\.json$/.test(filePath)) await IOUtils.remove(filePath, { ignoreAbsent: true });
+      }
+    } catch (e) {}
+    return removed;
+  }
+  async function clearEvidenceIndexes() {
+    const records = await listEvidenceRecords();
+    let removed = 0;
+    for (const record of records) if (await deleteEvidenceIndex(record.libraryID, record.attachmentKey)) removed++;
+    try {
+      for (const filePath of await IOUtils.getChildren(evidenceDir())) {
+        if (/\.(?:json\.gz|f32|tmp)$/.test(filePath)) await IOUtils.remove(filePath, { ignoreAbsent: true });
+      }
+      const db = await evidenceDb(); await db.queryAsync("DELETE FROM evidence_indexes");
+    } catch (e) {}
+    try {
+      for (const filePath of await IOUtils.getChildren(legacyIndexDir())) {
+        if (/\.json$/.test(filePath)) await IOUtils.remove(filePath, { ignoreAbsent: true });
+      }
+    } catch (e) {}
+    return removed;
+  }
   async function evidenceCacheStats() {
     try {
       const db = await evidenceDb();
       const row = await db.rowQueryAsync(
         "SELECT COUNT(*) AS documents, COALESCE(SUM(total_pages),0) AS pages, COALESCE(SUM(total_chars),0) AS chars FROM evidence_indexes"
       );
+      const records = await listEvidenceRecords();
+      let bytes = 0;
+      for (const record of records) {
+        for (const filePath of [record.dataPath, record.vectorPath]) {
+          try { const stat = await IOUtils.stat(filePath); bytes += Number(stat && stat.size) || 0; } catch (e) {}
+        }
+      }
       return {
         path: evidenceDir(),
         database: evidenceDbPath(),
         documents: Number(row && row.documents) || 0,
         pages: Number(row && row.pages) || 0,
         chars: Number(row && row.chars) || 0,
+        bytes,
       };
     } catch (e) {
-      return { path: evidenceDir(), database: evidenceDbPath(), documents: 0, pages: 0, chars: 0 };
+      return { path: evidenceDir(), database: evidenceDbPath(), documents: 0, pages: 0, chars: 0, bytes: 0 };
     }
   }
   function newId() { return "c_" + Date.now() + "_" + Math.random().toString(36).slice(2, 8); }
 
   window.NodusStore = {
     getMode, setMode, getLang, setLang, getModel, setModel, getMaxTokens, setMaxTokens, getReasoning, setReasoning, getHlColors, setHlColors, getContext, setContext,
-    getKey, setKey, getLocalBase, setLocalBase, getPinned, setPinned, isPinned, togglePinned,
+    SOURCE_SCOPES, getSourceScope, setSourceScope, getOnboarded, setOnboarded,
+    getKey, setKey, getSecretStorageStatus, getLocalBase, setLocalBase, getPinned, setPinned, isPinned, togglePinned,
     getCustomPrompts, setCustomPrompts, addCustomPrompt, removeCustomPrompt,
     getAutoUpdate, setAutoUpdate,
     getAgent, setAgent, getAgentAuto, setAgentAuto,
-    getManual, setManual, loadConversations, saveConversations, compactAudit, compactConversations,
+    getHistoryEnabled, setHistoryEnabled, getHistoryRetention, setHistoryRetention,
+    getManual, setManual, loadConversations, saveConversations, deleteConversationHistory, compactAudit, compactConversations,
     EVIDENCE_CACHE_VERSION, gzipText, gunzipText, detachEmbeddings, attachEmbeddings,
-    loadEvidenceIndex, saveEvidenceIndex, deleteEvidenceIndex, evidenceCacheStats, newId,
+    loadEvidenceIndex, saveEvidenceIndex, deleteEvidenceIndex, listEvidenceRecords, loadEvidenceIndexes,
+    pruneEvidenceIndexes, clearEvidenceIndexes, evidenceCacheStats, newId,
   };
 })();

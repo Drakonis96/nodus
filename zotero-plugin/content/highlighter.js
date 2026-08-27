@@ -95,14 +95,19 @@
     if (a < 0 || b <= a) return [];
     let arr; try { arr = JSON.parse(s.slice(a, b + 1)); } catch (e) { return []; }
     if (!Array.isArray(arr)) return [];
-    const out = [];
+    const out = [], seen = new Set();
     for (const it of arr) {
       if (!it) continue;
       const t = typeof it === "string" ? it : it.text;
       if (typeof t !== "string" || !t.trim()) continue;
+      const clean = t.trim().replace(/\s+/g, " ").slice(0, 500);
+      const dedupe = normalizeText(clean);
+      if (!dedupe || seen.has(dedupe)) continue;
+      seen.add(dedupe);
       const raw = String((typeof it === "object" && (it.level || it.importance)) || "medium").toLowerCase();
       const level = /(high|very|muy|crit|red|rojo|1)/.test(raw) ? "high" : "medium";
-      out.push({ text: t.trim(), level });
+      out.push({ text: clean, level });
+      if (out.length >= 25) break;
     }
     return out;
   }

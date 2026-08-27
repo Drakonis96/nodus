@@ -32,7 +32,7 @@ Download the installer for your computer and open it. There is no server to conf
 | Ubuntu and Debian | [Download DEB](https://github.com/Drakonis96/nodus/releases/latest/download/Nodus-linux-amd64.deb) |
 | Other Linux distributions | [Download AppImage](https://github.com/Drakonis96/nodus/releases/latest/download/Nodus-linux-x86_64.AppImage) |
 
-The standalone Zotero plugin is available from the same release as [nodus-zotero.xpi](https://github.com/Drakonis96/nodus/releases/latest/download/nodus-zotero.xpi). In Zotero, open **Tools → Add-ons**, choose **Install Add-on From File**, and select the downloaded file.
+The standalone Zotero plugin is available from the same release as [nodus-zotero.xpi](https://github.com/Drakonis96/nodus/releases/latest/download/nodus-zotero.xpi). In Zotero 9, open **Tools → Plugins**, choose **Install Add-on From File** from the gear menu, and select the downloaded file.
 
 The optional [Nodus Connector for Chrome](browser-extension/README.md) captures the open academic
 page or document into the local Library. It detects embedded bibliographic metadata, DOI/ISBN and
@@ -93,7 +93,7 @@ You can open material from disk or from compatible vault sources, then save the 
 
 ## Zotero plugin
 
-The standalone Zotero plugin brings Nodus search into your reference manager. It indexes PDF, EPUB and HTML attachments so you can search across them and receive answers with exact passages and page citations.
+The standalone Zotero plugin supports Zotero 9. It brings Nodus search into your reference manager and indexes PDF, EPUB and HTML attachments so you can search across them and receive answers grounded in exact passages. PDF citations can jump to their page; EPUB and HTML citations remain clearly marked as non-navigable until Zotero exposes a stable chapter or anchor locator.
 
 Semantic search works across languages and combines with keyword search. The index stays in your Zotero profile, Vision can read scanned pages, figures, tables and formulas, and an evidence audit highlights claims that need stronger support.
 
