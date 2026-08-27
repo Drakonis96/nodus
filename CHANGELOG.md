@@ -1,5 +1,25 @@
 # Changelog
 
+## 5.0.5 — 2026-08-27
+
+Nodus 5.0.5 refines the Word and LibreOffice copilot pane: it stops discarding
+generated proposals, keeps up with the selection on its own and adopts the
+visual language the Zotero sidebar already used.
+
+- Kept a generated proposal on screen until the next generation instead of
+  discarding it whenever the Word selection moved.
+- Made the prompts tab poll the Word selection while it is open, so selecting
+  text updates the pane without touching an unrelated control.
+- Froze the selected-text box while a proposal is generating, so moving the
+  cursor never looks like it redirected the running request.
+- Marked the prompts tab while a generation is running, which continues and is
+  delivered even from another tab.
+- Redesigned the task pane around the Nodus accent, rounded cards and pill
+  badges shared with the Zotero sidebar, in light and dark.
+- Fixed every tab of the strip in place, moved the search box below the tabs and
+  adopted the desktop Nodus mark.
+- Added the 5.0.5 change to the What's New modal in all eight interface languages.
+
 ## 5.0.4 — 2026-08-27
 
 Nodus 5.0.4 brings secure multi-user web parity to Nodus Server, extends Word

@@ -1763,6 +1763,25 @@ const RELEASE_4_2_5_HIGHLIGHTS: RawReleaseHighlight[] = [
 ];
 
 /**
+ * v5.0.5 — the Word and LibreOffice copilot, tidied.
+ *
+ * One highlight, because from the outside this is one thing: the pane keeps the
+ * proposals you paid for, follows the selection without being nudged, and now
+ * looks like the rest of Nodus.
+ */
+const RELEASE_5_0_5_HIGHLIGHTS: RawReleaseHighlight[] = [
+  {
+    scope: 'plugin',
+    es: 'Mejoras generales en Nodus Copilot para Word y LibreOffice. El panel conserva la propuesta que ha generado, sigue tu selección por su cuenta y estrena el aspecto de Nodus.',
+    en: 'General improvements to Nodus Copilot for Word and LibreOffice. The pane keeps the proposal it generated, follows your selection on its own and adopts the Nodus look.',
+    fr: 'Améliorations générales de Nodus Copilot pour Word et LibreOffice. Le volet conserve la proposition générée, suit votre sélection de lui-même et adopte l’apparence de Nodus.',
+    de: 'Allgemeine Verbesserungen an Nodus Copilot für Word und LibreOffice. Der Bereich behält den erzeugten Vorschlag, folgt Ihrer Auswahl von selbst und übernimmt das Erscheinungsbild von Nodus.',
+    pt: 'Melhorias gerais no Nodus Copilot para o Word e o LibreOffice. O painel mantém a proposta que gerou, acompanha a sua seleção sozinho e adota o aspeto do Nodus.',
+    'pt-BR': 'Melhorias gerais no Nodus Copilot para Word e LibreOffice. O painel mantém a proposta que gerou, acompanha sua seleção sozinho e adota a aparência do Nodus.',
+  },
+];
+
+/**
  * 5.0.4 — every user-visible change merged after 5.0.3. Keep this list aligned
  * by index with the Italian and Turkish tables so all eight interface languages
  * receive the same release.
@@ -2126,6 +2145,11 @@ const RELEASE_5_0_0_HIGHLIGHTS: RawReleaseHighlight[] = [
 ];
 
 const RAW_RELEASE_NOTES: RawReleaseNote[] = [
+  {
+    version: '5.0.5',
+    date: '2026-08-27',
+    highlights: RELEASE_5_0_5_HIGHLIGHTS,
+  },
   {
     version: '5.0.4',
     date: '2026-08-27',

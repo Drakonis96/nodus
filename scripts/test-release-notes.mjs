@@ -24,11 +24,19 @@ try {
   );
 
   const { RELEASE_NOTES, releaseNotesForMajor, compareVersions } = await import(pathToFileURL(bundlePath).href);
+  // 5.0.5 ships a single highlight: from the outside, the copilot work is one thing.
   const currentRelease = RELEASE_NOTES[0];
-  assert.equal(currentRelease?.version, '5.0.4');
+  assert.equal(currentRelease?.version, '5.0.5');
   assert.equal(currentRelease?.date, '2026-08-27');
-  assert.equal(currentRelease?.highlights.length, 7);
-  assert.deepEqual(currentRelease?.highlights.map((highlight) => highlight.scope), [
+  assert.equal(currentRelease?.highlights.length, 1);
+  assert.deepEqual(currentRelease?.highlights.map((highlight) => highlight.scope), ['plugin']);
+  assert.match(currentRelease?.highlights[0]?.en ?? '', /Nodus Copilot for Word and LibreOffice/);
+
+  // 5.0.4 keeps the seven highlights it shipped with underneath 5.0.5.
+  const serverWebRelease = RELEASE_NOTES.find((note) => note.version === '5.0.4');
+  assert.equal(serverWebRelease?.date, '2026-08-27');
+  assert.equal(serverWebRelease?.highlights.length, 7);
+  assert.deepEqual(serverWebRelease?.highlights.map((highlight) => highlight.scope), [
     'general', 'general', 'general', 'estudio', 'estudio', 'general', 'general',
   ]);
   for (const phrase of [
@@ -39,9 +47,9 @@ try {
     /own result isolated/,
     /two most recent verified snapshots/,
     /download counter is current again/,
-  ]) assert.ok(currentRelease?.highlights.some((highlight) => phrase.test(highlight.en)));
+  ]) assert.ok(serverWebRelease?.highlights.some((highlight) => phrase.test(highlight.en)));
 
-  // 5.0.3 keeps the eight highlights it shipped with underneath 5.0.4.
+  // 5.0.3 keeps the eight highlights it shipped with underneath 5.0.5.
   const previousPatch = RELEASE_NOTES.find((note) => note.version === '5.0.3');
   assert.equal(previousPatch?.date, '2026-08-26');
   assert.equal(previousPatch?.highlights.length, 8);

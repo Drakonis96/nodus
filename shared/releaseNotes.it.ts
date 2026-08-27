@@ -155,6 +155,9 @@ const RELEASE_3_2_4_IT: string[] = [
 ];
 
 export const RELEASE_NOTES_IT: Record<string, string[]> = {
+  "5.0.5": [
+    "Miglioramenti generali in Nodus Copilot per Word e LibreOffice. Il riquadro conserva la proposta generata, segue la tua selezione da solo e adotta l’aspetto di Nodus.",
+  ],
   "5.0.4": [
     "Nodus Server introduce un’interfaccia web reattiva per lavorare dal telefono o da qualsiasi browser. Riproduce l’esperienza dell’applicazione e apre gli spazi di lavoro condivisi insieme a conversazioni, note, annotazioni e file personali visibili soltanto al proprietario.",
     "Ogni account del server può configurare i propri fornitori, modelli e credenziali IA. Le chiavi vengono archiviate in forma cifrata e non tornano mai al browser, le attività e i risultati restano privati e le preferenze ti seguono tra i dispositivi senza compromettere la compatibilità con Desktop o con i depositi connessi.",
