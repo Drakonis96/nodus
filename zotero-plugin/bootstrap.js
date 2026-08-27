@@ -35,6 +35,21 @@ function log(m) { try { Zotero.debug("[Nodus] " + m); } catch (e) {} }
 function install() {}
 function uninstall() {}
 
+async function disableBackgroundUpdates() {
+  try {
+    const { AddonManager } = ChromeUtils.importESModule("resource://gre/modules/AddonManager.sys.mjs");
+    const addon = await AddonManager.getAddonByID(PLUGIN_ID);
+    if (addon && addon.applyBackgroundUpdates !== AddonManager.AUTOUPDATE_DISABLE) {
+      // Zotero 9 rejects a plugin whose manifest omits update_url. Keep the
+      // mandatory feed, but opt only Nodus out of background updates so the
+      // documented manual install/update flow remains truthful.
+      addon.applyBackgroundUpdates = AddonManager.AUTOUPDATE_DISABLE;
+    }
+  } catch (e) {
+    log("could not disable background updates: " + e);
+  }
+}
+
 async function startup({ id, version, rootURI, resourceURI }) {
   await Zotero.initializationPromise;
   if (!rootURI) rootURI = resourceURI.spec;
@@ -47,27 +62,12 @@ async function startup({ id, version, rootURI, resourceURI }) {
   const manifestURI = Services.io.newURI(rootURI + "manifest.json");
   chromeHandle = aomStartup.registerChrome(manifestURI, [["content", "nodus", rootURI + "content/"]]);
 
+  await disableBackgroundUpdates();
+
   registerReaderToolbarButton();
   registerSelectionPopup();
   eachMainWindow((w) => { injectSidebar(w); addLibraryButton(w); });
-  configureAutoUpdate();
   log("startup complete v" + version);
-}
-
-// Self-update: on by default. Reads the user's preference (Settings toggle) and
-// tells Zotero's AddonManager whether to keep this add-on current, checking for
-// a new release immediately when enabled. Shares content/updater.js with the
-// sidebar so both apply the same behaviour.
-function autoUpdateEnabled() {
-  try { return Zotero.Prefs.get("nodus.autoUpdate") !== "0"; } catch (e) { return true; }
-}
-function configureAutoUpdate() {
-  try {
-    const scope = { window: {}, ChromeUtils: ChromeUtils };
-    Services.scriptloader.loadSubScript("chrome://nodus/content/updater.js", scope);
-    const NU = scope.window.NodusUpdater;
-    if (NU && NU.configure) NU.configure(autoUpdateEnabled());
-  } catch (e) { log("auto-update config failed: " + (e && e.message ? e.message : e)); }
 }
 
 function onMainWindowLoad({ window }) {
@@ -180,8 +180,8 @@ function addLibraryButton(window) {
   if (!toolbar) { log("library toolbar not found"); return; }
   const btn = doc.createXULElement("toolbarbutton");
   btn.id = BTN_ID;
-  btn.setAttribute("tabindex", "-1");
   btn.setAttribute("tooltiptext", "Nodus");
+  btn.setAttribute("aria-label", "Nodus");
   btn.classList.add("zotero-tb-button");
   btn.style.setProperty("list-style-image", 'url("' + Nodus.rootURI + 'icons/nodus.svg")');
   // Only WIDEN the button so it isn't a tall/narrow vertical rectangle. Do NOT
@@ -211,7 +211,7 @@ function registerReaderToolbarButton() {
       const btn = doc.createElement("button");
       btn.id = READER_BTN_ID;
       btn.title = "Nodus";
-      btn.setAttribute("tabindex", "-1");
+      btn.setAttribute("aria-label", "Nodus");
       btn.style.cssText =
         "display:inline-flex;align-items:center;justify-content:center;" +
         "height:100%;min-width:28px;padding:0 6px;margin:0;background:transparent;border:none;border-radius:5px;cursor:pointer;";
@@ -299,6 +299,7 @@ function buildTranslateUI(doc, area, text, L) {
   input.placeholder = L.searchLang;
   input.style.cssText = "width:100%;box-sizing:border-box;padding:5px 7px;border:1px solid rgba(124,58,237,.3);border-radius:6px;font-size:11px;outline:none;";
   const list = doc.createElement("div");
+  list.setAttribute("role", "listbox");
   list.style.cssText = "width:100%;box-sizing:border-box;max-height:132px;overflow-y:auto;border:1px solid rgba(0,0,0,.12);border-radius:6px;";
   const result = doc.createElement("div");
   result.style.cssText = "display:none;box-sizing:border-box;width:100%;font-size:12px;line-height:1.45;white-space:pre-wrap;overflow-wrap:anywhere;word-break:break-word;max-height:190px;overflow-y:auto;padding:6px 8px;border-radius:6px;background:rgba(124,58,237,.07);color:#1f2430;";
@@ -307,9 +308,10 @@ function buildTranslateUI(doc, area, text, L) {
     const q = (filter || "").toLowerCase();
     for (const name of POPUP_LANGS) {
       if (q && name.toLowerCase().indexOf(q) < 0) continue;
-      const it = doc.createElement("div");
+      const it = doc.createElement("button");
+      it.type = "button"; it.setAttribute("role", "option");
       it.textContent = name;
-      it.style.cssText = "box-sizing:border-box;width:100%;padding:5px 9px;cursor:pointer;font-size:11px;color:#1f2430;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;";
+      it.style.cssText = "box-sizing:border-box;width:100%;padding:5px 9px;cursor:pointer;font-size:11px;color:#1f2430;background:transparent;border:0;text-align:left;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;";
       it.addEventListener("mouseenter", () => { it.style.background = "rgba(124,58,237,.1)"; });
       it.addEventListener("mouseleave", () => { it.style.background = ""; });
       it.addEventListener("click", () => {

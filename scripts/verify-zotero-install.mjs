@@ -1,7 +1,6 @@
-// Headless verification of the "Install/update in Zotero" flow. Runs the real
-// install module under Electron-as-Node (electron stubbed; app.getAppPath →
-// repo root so it copies the canonical dist-zotero XPI). It WILL close +
-// reopen a running Zotero.
+// Headless verification of an installation completed through Zotero's official
+// Add-ons UI. This script is read-only: it never sideloads an XPI, edits prefs,
+// or mutates extensions.json.
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import { createRequire } from 'node:module';
@@ -26,20 +25,39 @@ const install = require(path.join(repoRoot, 'electron/zotero-plugin/install.ts')
 
 const info = await install.getZoteroInstallInfo();
 console.log('installInfo:', JSON.stringify(info));
-const res = await install.installZoteroPlugin();
-console.log('installResult:', JSON.stringify(res));
-
-// Give Zotero a moment to relaunch + register, then check.
-await new Promise((r) => setTimeout(r, 11000));
 const prof = info.profilePath;
-try {
-  const d = JSON.parse(fs.readFileSync(path.join(prof, 'extensions.json'), 'utf8'));
-  const a = d.addons.find((x) => x.id === 'nodus-zotero@nodus.app');
-  console.log('extensions.json →', a ? `v${a.version} active=${a.active}` : 'NOT REGISTERED');
-} catch (e) { console.log('could not read extensions.json:', e.message); }
-const reRunning = await install.isZoteroRunning();
-console.log('zotero running after:', reRunning);
-process.exit(res.ok ? 0 : 1);
+if (!prof) { console.error('No Zotero profile found.'); process.exit(1); }
+const AdmZip = require('adm-zip');
+const packaged = path.join(repoRoot, 'dist-zotero', 'nodus-zotero.xpi');
+const manifest = JSON.parse(new AdmZip(packaged).readAsText('manifest.json'));
+const deadline = Date.now() + 30_000;
+let failure = 'NOT REGISTERED';
+while (Date.now() < deadline) {
+  try {
+    const d = JSON.parse(fs.readFileSync(path.join(prof, 'extensions.json'), 'utf8'));
+    const addon = d.addons.find((entry) => entry.id === 'nodus-zotero@nodus.app');
+    if (!addon) { failure = 'NOT REGISTERED'; }
+    else {
+      const addonPath = String(addon.path || '');
+      const checks = {
+        version: addon.version === manifest.version,
+        active: addon.active === true,
+        appEnabled: addon.appDisabled === false,
+        userEnabled: addon.userDisabled === false,
+        xpiPath: addonPath.endsWith('.xpi') && fs.existsSync(addonPath),
+      };
+      const failed = Object.entries(checks).filter(([, ok]) => !ok).map(([name]) => name);
+      if (!failed.length && await install.isZoteroRunning()) {
+        console.log(`extensions.json → v${addon.version} active=true path=${addonPath}`);
+        process.exit(0);
+      }
+      failure = `registered but invalid: ${failed.join(', ') || 'Zotero not running'}`;
+    }
+  } catch (error) { failure = `could not read extensions.json: ${error.message}`; }
+  await new Promise((resolve) => setTimeout(resolve, 500));
+}
+console.error(`Zotero plugin verification failed: ${failure}`);
+process.exit(1);
 
 function installRuntimeHooks() {
   const ts = require('typescript');

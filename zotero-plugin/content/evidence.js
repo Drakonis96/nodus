@@ -2,7 +2,7 @@
  * citation auditing. Pure helpers are deliberately kept in this chrome script
  * so the exact production logic can be exercised by Node's vm tests.
  *
- * Index schema v3:
+ * Index schema v4:
  *   page/layout-aware extraction with repeated-margin removal, paragraph
  *   reconstruction and source-position maps; sentence-aligned overlapping
  *   chunks; managed local embeddings; visual/OCR text merged into its page.
@@ -14,7 +14,7 @@
   let ZoteroRef = null;
   try { ZoteroRef = ChromeUtils.importESModule("chrome://zotero/content/zotero.mjs").Zotero; } catch (e) {}
 
-  const INDEX_VERSION = 3;
+  const INDEX_VERSION = 4;
   const EXTRACTION_VERSION = "layout-v3";
   const DEFAULTS = {
     targetChars: 1200,
@@ -64,6 +64,19 @@
       h = Math.imul(h, 16777619);
     }
     return (h >>> 0).toString(36);
+  }
+  async function contentDigest(value) {
+    const text = String(value == null ? "" : value);
+    try {
+      if (globalThis.crypto && globalThis.crypto.subtle && typeof TextEncoder !== "undefined") {
+        const bytes = await globalThis.crypto.subtle.digest("SHA-256", new TextEncoder().encode(text));
+        return Array.from(new Uint8Array(bytes), (byte) => byte.toString(16).padStart(2, "0")).join("");
+      }
+    } catch (e) {}
+    // Privileged legacy builds without WebCrypto still hash every character;
+    // two independent seeded passes substantially reduce accidental collision
+    // risk compared with the former 4 KiB edge sample.
+    return hashText(text) + hashText("\u241f" + text + "\u241e" + text.length);
   }
   function safeId(value) {
     return String(value || "source").replace(/[^A-Za-z0-9_-]+/g, "_").slice(0, 80);
@@ -537,6 +550,7 @@
         chunks.push({
           id: "ev_" + safeId(idCore),
           libraryID: meta.libraryID,
+          groupID: meta.groupID == null ? null : meta.groupID,
           itemKey: meta.itemKey,
           attachmentKey: meta.attachmentKey,
           title: meta.title || "",
@@ -576,6 +590,7 @@
       version: INDEX_VERSION,
       extractionVersion: EXTRACTION_VERSION,
       libraryID: meta.libraryID == null ? 1 : meta.libraryID,
+      groupID: meta.groupID == null ? null : Number(meta.groupID),
       itemKey: String(meta.itemKey || ""),
       attachmentKey: String(meta.attachmentKey || ""),
       title: String(meta.title || ""),
@@ -846,8 +861,15 @@
     opts = { maxRequests: 4, maxPagesPerRequest: 6, maxHits: 24, ...(opts || {}) };
     const indexByKey = new Map();
     for (const index of indexes || []) {
-      indexByKey.set(String(index.attachmentKey || ""), index);
-      indexByKey.set(String(index.itemKey || ""), index);
+      indexByKey.set(String(index.libraryID) + ":" + String(index.attachmentKey || ""), index);
+      indexByKey.set(String(index.libraryID) + ":" + String(index.itemKey || ""), index);
+      // Retain the short form only while it is unambiguous within this exact
+      // index set; Zotero keys are not globally unique across group libraries.
+      for (const short of [String(index.attachmentKey || ""), String(index.itemKey || "")]) {
+        if (!short) continue;
+        if (!indexByKey.has(short)) indexByKey.set(short, index);
+        else if (indexByKey.get(short) !== index) indexByKey.set(short, null);
+      }
     }
     const out = [], seen = new Set();
     for (const raw of (requests || []).slice(0, opts.maxRequests)) {
@@ -880,7 +902,8 @@
       "Never invent an id or page. Put citations immediately after the supported sentence.",
     ];
     for (const h of hits || []) {
-      const where = [h.title || h.itemKey, h.section ? "§ " + h.section : "", h.pageLabel ? "p. " + h.pageLabel : ""].filter(Boolean).join(" · ");
+      const isPdf = String(h.contentType || "").toLowerCase() === "application/pdf";
+      const where = ["source " + h.libraryID + ":" + h.attachmentKey, h.title || h.itemKey, h.section ? "§ " + h.section : "", isPdf && h.pageLabel ? "p. " + h.pageLabel : ""].filter(Boolean).join(" · ");
       lines.push(`- [[e:${h.id}]] ${where}\n  EXACT PASSAGE: """${String(h.text || "").trim()}"""`);
     }
     return lines.join("\n");
@@ -914,7 +937,8 @@
       "Cite factual claims with its exact [[e:...]] token. Never invent evidence ids.",
     ];
     for (const h of chunks) {
-      const where = [h.title || h.itemKey, h.section ? "§ " + h.section : "", h.pageLabel ? "p. " + h.pageLabel : ""].filter(Boolean).join(" · ");
+      const isPdf = String(h.contentType || "").toLowerCase() === "application/pdf";
+      const where = [h.title || h.itemKey, h.section ? "§ " + h.section : "", isPdf && h.pageLabel ? "p. " + h.pageLabel : ""].filter(Boolean).join(" · ");
       const block = `\n[[e:${h.id}]] ${where}\n"""${String(h.text || "").trim()}"""\n`;
       const blockTokens = estimateTokens(block);
       if (used + block.length > cap || tokens + blockTokens > tokenCap) { truncated = true; break; }
@@ -941,18 +965,24 @@
     }
     return String(want + 1);
   }
-  // Resolve a page number the user typed (usually the printed label) to the
-  // matching 0-based pageIndex — matching labels first, then falling back to
-  // treating the number as a physical position.
+  // Resolve the page label the user/model supplied to the matching 0-based
+  // pageIndex. Zotero labels may be numeric or roman front matter; match the
+  // exact visible label first, then treat a numeric value as physical position.
   function resolvePageIndex(index, requested) {
-    const n = Math.floor(Number(requested));
-    if (!Number.isFinite(n)) return -1;
+    const label = String(requested == null ? "" : requested).trim();
+    if (!label) return -1;
     const pages = (index && index.pages) || [];
-    for (const p of pages) if (Number(p.pageLabel) === n) return Number(p.pageIndex);
+    const folded = label.toLocaleLowerCase();
+    for (const p of pages) {
+      if (String(p.pageLabel == null ? "" : p.pageLabel).trim().toLocaleLowerCase() === folded) return Number(p.pageIndex);
+    }
+    const n = Math.floor(Number(label));
+    if (!Number.isFinite(n)) return -1;
     for (const p of pages) if (Number(p.pageIndex) + 1 === n) return Number(p.pageIndex);
     return -1;
   }
-  // opts.current = { attachmentKey, pageIndex }; opts.coverage[attachmentKey] =
+  // opts.current = { libraryID, attachmentKey, pageIndex };
+  // opts.coverage["libraryID:attachmentKey"] =
   // { fromLabel, toLabel } marks the page span actually present in the evidence
   // text (used to warn honestly about truncation in full-text mode).
   function buildDocumentMap(indexes, opts) {
@@ -966,6 +996,8 @@
       const firstLabel = pages.length ? pageLabelForIndex(index, pages[0].pageIndex) : "1";
       const lastLabel = pages.length ? pageLabelForIndex(index, pages[pages.length - 1].pageIndex) : String(total);
       const src = {
+        libraryID: Number(index.libraryID) || 0,
+        sourceId: (Number(index.libraryID) || 0) + ":" + String(index.attachmentKey || ""),
         attachmentKey: String(index.attachmentKey || ""),
         title: String(index.title || index.itemKey || index.attachmentKey || "document"),
         totalPages: total,
@@ -975,11 +1007,11 @@
         // print pages, etc.) — worth telling the model so it quotes the label.
         labelsDiffer: firstLabel !== "1" || (total > 0 && lastLabel !== String(total)),
       };
-      if (current && String(current.attachmentKey || "") === src.attachmentKey && current.pageIndex != null && Number(current.pageIndex) >= 0) {
+      if (current && (current.libraryID == null || Number(current.libraryID) === src.libraryID) && String(current.attachmentKey || "") === src.attachmentKey && current.pageIndex != null && Number(current.pageIndex) >= 0) {
         src.currentPageIndex = Number(current.pageIndex);
         src.currentLabel = pageLabelForIndex(index, Number(current.pageIndex));
       }
-      if (coverage[src.attachmentKey]) src.coverage = coverage[src.attachmentKey];
+      if (coverage[src.sourceId]) src.coverage = coverage[src.sourceId];
       sources.push(src);
     }
     return { sources };
@@ -994,7 +1026,7 @@
       ? "MAPA DEL DOCUMENTO — datos estructurales AUTORITATIVOS. Úsalo como ÚNICA fuente para responder cualquier pregunta sobre el número de páginas, la extensión, la página actual o «la última/primera página». NUNCA deduzcas esos datos de los pasajes de EVIDENCIA de más abajo: son una selección parcial y sus números de página NO indican la longitud del documento. El mapa NO es una fuente citable: no lo cites nunca ni inventes un token [[e:...]] a partir de él."
       : "DOCUMENT MAP — AUTHORITATIVE structural facts. Use this as the ONLY source for any question about the page count, length, the current page, or \"the last/first page\". NEVER infer those from the EVIDENCE passages below: they are a partial selection and their page numbers do NOT indicate the document's length. The map is NOT a citable source: never cite it and never fabricate an [[e:...]] token from it.");
     for (const s of sources) {
-      const bits = ["\"" + s.title + "\"", es ? s.totalPages + " páginas" : s.totalPages + " pages"];
+      const bits = ["[" + s.sourceId + "]", "\"" + s.title + "\"", es ? s.totalPages + " páginas" : s.totalPages + " pages"];
       if (s.labelsDiffer) bits.push(es ? "etiquetas de página «" + s.firstLabel + "»–«" + s.lastLabel + "»" : "page labels \"" + s.firstLabel + "\"–\"" + s.lastLabel + "\"");
       let line = "• " + bits.join(" · ") + ".";
       if (s.currentLabel != null) line += es ? " El lector está abierto ahora en la página " + s.currentLabel + "." : " The reader is currently open at page " + s.currentLabel + ".";
@@ -1183,9 +1215,15 @@
     const a = new Set(auditTokens(claim));
     const b = new Set(auditTokens(evidence));
     if (!a.size || !b.size) return 0;
+    // A mismatched number is a strong signal that the citation does not support
+    // the claim, even when surrounding topic words overlap.
+    const claimNumbers = [...new Set(fold(claim).match(/\b\d+(?:[.,]\d+)?%?\b/g) || [])];
+    const evidenceNumbers = new Set(fold(evidence).match(/\b\d+(?:[.,]\d+)?%?\b/g) || []);
+    if (claimNumbers.some((number) => !evidenceNumbers.has(number))) return 0;
     let shared = 0;
     for (const token of a) if (b.has(token)) shared++;
-    return shared / Math.max(1, Math.min(a.size, 18));
+    if (shared < Math.min(2, a.size)) return 0;
+    return shared / Math.max(1, a.size);
   }
   function auditClaims(text, evidence) {
     const map = evidence instanceof Map ? evidence : evidenceMap(evidence || []);
@@ -1193,18 +1231,26 @@
       const refs = claim.citationIds.map((id) => map.get(id)).filter(Boolean);
       if (!refs.length) return { ...claim, status: "missing", support: 0, evidence: [] };
       const support = Math.max(...refs.map((r) => supportScore(claim.text, r.text)));
-      return { ...claim, status: support >= 0.08 ? "covered" : "weak", support, evidence: refs };
+      return { ...claim, status: support >= 0.22 ? "covered" : "weak", support, evidence: refs };
     });
     const covered = claims.filter((c) => c.status === "covered").length;
     const weak = claims.filter((c) => c.status === "weak").length;
     const missing = claims.filter((c) => c.status === "missing").length;
+    const citationCoverage = claims.length ? (covered + weak) / claims.length : 1;
+    const matchCoverage = claims.length ? covered / claims.length : 1;
     return {
       claims,
       total: claims.length,
       covered,
       weak,
       missing,
-      coverage: claims.length ? covered / claims.length : 1,
+      // `coverage` remains for conversation-schema compatibility and now means
+      // exactly what the UI says: claims carrying an allowed citation. It is
+      // not an entailment or truth score.
+      coverage: citationCoverage,
+      citationCoverage,
+      matchCoverage,
+      method: "citation-presence+lexical-screen",
     };
   }
 
@@ -1218,7 +1264,9 @@
         size = Number(stat && stat.size) || 0;
       }
     } catch (e) {}
-    return [att.libraryID, att.key, mtime, size, String(text || "").length, hashText(String(text || "").slice(0, 4096) + String(text || "").slice(-4096))].join(":");
+    // Hash the complete extracted text. Sampling only the ends allowed an
+    // in-place edit in the middle of a same-size file to reuse stale evidence.
+    return [att.libraryID, att.key, mtime, size, String(text || "").length, await contentDigest(String(text || ""))].join(":");
   }
 
   function readerPageLabels(att) {
@@ -1240,6 +1288,13 @@
     })();
     let text = "", totalPages = 1;
     const contentType = String(att.attachmentContentType || "");
+    let groupID = null;
+    try {
+      const library = ZoteroRef && ZoteroRef.Libraries && ZoteroRef.Libraries.get
+        ? ZoteroRef.Libraries.get(Number(att.libraryID))
+        : null;
+      if (library && library.libraryType === "group") groupID = Number(library.groupID);
+    } catch (e) {}
     if (contentType === "application/pdf" && ZoteroRef && ZoteroRef.PDFWorker && att.id) {
       try {
         const full = await ZoteroRef.PDFWorker.getFullText(att.id, null, true);
@@ -1260,6 +1315,7 @@
     const signature = await attachmentSignature(att, text);
     return {
       libraryID: att.libraryID,
+      groupID,
       itemKey: parent ? parent.key : att.key,
       attachmentKey: att.key,
       title: title || att.key,
@@ -1275,9 +1331,10 @@
     opts = opts || {};
     const extracted = await extractAttachment(att);
     let existing = null;
-    if (!opts.force && store && store.loadEvidenceIndex) existing = await store.loadEvidenceIndex(extracted.libraryID, extracted.attachmentKey);
+    if (store && store.loadEvidenceIndex) existing = await store.loadEvidenceIndex(extracted.libraryID, extracted.attachmentKey);
     if (
-      existing
+      !opts.force
+      && existing
       && existing.version === INDEX_VERSION
       && existing.extractionVersion === EXTRACTION_VERSION
       && existing.signature === extracted.signature
@@ -1294,13 +1351,28 @@
       } catch (e) { try { if (ZoteroRef) ZoteroRef.logError(e); } catch (x) {} }
     }
     const index = buildIndex(extracted, extracted.text, opts);
+    // A forced text/layout refresh must not silently erase valid OCR/vision
+    // enrichments. Preserve them only for pages whose extracted text still
+    // matches exactly; changed pages are intentionally re-analysed.
+    if (existing && Array.isArray(existing.pages) && Array.isArray(index.pages)) {
+      const oldByPage = new Map(existing.pages.map((page) => [Number(page.pageIndex), page]));
+      for (const page of index.pages) {
+        const previous = oldByPage.get(Number(page.pageIndex));
+        if (previous && String(previous.text || "") === String(page.text || "") && previous.visualText) {
+          page.visualText = String(previous.visualText);
+          page.needsOcr = false;
+        }
+      }
+      index.chunks = [];
+      for (const page of index.pages) index.chunks.push(...chunkPage(page, extracted, opts));
+    }
     if (store && store.saveEvidenceIndex) await store.saveEvidenceIndex(index);
     return { index, rebuilt: true, extracted };
   }
 
   window.NodusEvidence = {
     INDEX_VERSION, EXTRACTION_VERSION, DEFAULTS,
-    cleanText, fold, tokenize, hashText, estimateTokens, looksLikeHeading, detectHeadings,
+    cleanText, fold, tokenize, hashText, contentDigest, estimateTokens, looksLikeHeading, detectHeadings,
     marginSignature, pageLines, repeatedMarginSignatures, paragraphText, structurePlainPages,
     lineFromItems, splitColumnLines, orderLayoutLines, layoutLineText, structureLayoutPage, structureLayoutPages,
     splitLogicalPages, chunkPage, buildIndex, addVisualText,

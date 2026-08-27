@@ -25,10 +25,18 @@
   ];
   const byId = (id) => PROVIDERS.find((p) => p.id === id);
 
+  function localServerBase(value, fallback) {
+    const base = String(value || fallback || "").replace(/\/+$/, "");
+    if (!/^https?:\/\/(?:localhost|127\.0\.0\.1|\[::1\])(?::\d+)?(?:\/|$)/i.test(base)) {
+      throw new Error("Local model servers must use localhost, 127.0.0.1 or [::1].");
+    }
+    return base;
+  }
+
   function chatBase(provider, localBase) {
     const p = byId(provider);
     if (!p) throw new Error("Unknown provider " + provider);
-    if (p.local) return (localBase || p.defaultBase).replace(/\/+$/, "") + "/v1";
+    if (p.local) return localServerBase(localBase, p.defaultBase) + "/v1";
     return p.base;
   }
 
@@ -46,7 +54,7 @@
       return (d.data || []).map((m) => m.id).filter(Boolean).sort();
     }
     if (provider === "gemini") {
-      const res = await fetch("https://generativelanguage.googleapis.com/v1beta/models?key=" + encodeURIComponent(key) + "&pageSize=1000");
+      const res = await fetch("https://generativelanguage.googleapis.com/v1beta/models?pageSize=1000", { headers: { "x-goog-api-key": key } });
       if (!res.ok) throw new Error("Gemini /models HTTP " + res.status);
       const d = await res.json();
       return (d.models || [])
@@ -55,7 +63,7 @@
         .filter(Boolean).sort();
     }
     if (provider === "ollama") {
-      const base = (opts.localBase || p.defaultBase).replace(/\/+$/, "");
+      const base = localServerBase(opts.localBase, p.defaultBase);
       const res = await fetch(base + "/api/tags");
       if (!res.ok) throw new Error("Ollama /api/tags HTTP " + res.status);
       const d = await res.json();
@@ -287,7 +295,7 @@
   }
 
   window.NodusProviders = {
-    PROVIDERS, byId, chatBase, listModels, chatStream, embed,
+    PROVIDERS, byId, chatBase, localServerBase, listModels, chatStream, embed,
     buildAnthropicBody, withOpenAiImages, withAnthropicImages, imageParts,
     clampMaxTokens, DEFAULT_MAX_TOKENS, reasoningBody, REASONING_LEVELS, isProbablyTruncated,
   };

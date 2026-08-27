@@ -44,8 +44,10 @@ context so scanned text, figures, tables, equations and diagrams can be read.
 - Only ids in the catalogue sent for the current answer are accepted.
 - Page, idea, gap and Zotero tokens are also checked against their respective
   allow-lists. Invalid tokens are removed before rendering.
-- Every accepted evidence citation resolves to the exact stored passage and
-  opens its Zotero source/page.
+- Every accepted evidence citation resolves to the exact stored passage. PDF
+  citations open the supporting page (including roman page labels); EPUB/HTML
+  chips are explicitly non-navigable until Zotero exposes a stable chapter,
+  CFI or DOM-anchor locator.
 - The client segments the answer into factual claims, measures citation
   coverage and flags missing or weakly related support.
 - Each answer exposes an expandable evidence audit containing claims, exact
@@ -89,7 +91,10 @@ context so scanned text, figures, tables, equations and diagrams can be read.
 - Packaging tests for the worker, pinned model metadata, WASM runtime and icon.
 - Connected-server tests for evidence catalogues and images.
 - Syntax, lint, typecheck, build and the complete repository test suite.
-- Live Zotero 9 install/update smoke test:
+- Automated live Zotero 9 XPI smoke (`npm run zotero:smoke:live`) uses a
+  disposable profile and two launches to verify registration, compatibility,
+  active state, scoped background-update opt-out and real bootstrap startup.
+- Manual Zotero 9 reader smoke before a release:
   - index a normal PDF and a multi-document selection;
   - retrieve a passage from the middle/end and open its citation;
   - reject a fabricated citation;

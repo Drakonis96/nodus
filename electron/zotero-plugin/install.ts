@@ -1,13 +1,11 @@
-// One-click install/update of the "Nodus for Zotero" plugin into the user's
-// Zotero profile. Zotero ignores an .xpi merely dropped into extensions/ UNLESS
-// a full extension rescan is forced, so we: (Zotero closed) copy the same
-// prebuilt .xpi that ships on GitHub Releases, force a rescan via prefs, clear
-// the startup caches, and relaunch.
-// Verified against Zotero 9: a VALID .xpi (with update_url) is auto-registered
-// by the startup scan — no need to hand-edit extensions.json.
+// Export and validate the exact "Nodus for Zotero" XPI shipped with Nodus.
+// Zotero 9 deliberately disables foreign profile sideloads unless broad global
+// preferences are weakened. We never change those preferences or hand-edit the
+// add-on database: installation goes through Zotero's official Add-ons UI.
 import AdmZip from 'adm-zip';
 import { promises as fs } from 'node:fs';
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
 import { homedir } from 'node:os';
 import path from 'node:path';
 import { execFile } from 'node:child_process';
@@ -98,31 +96,6 @@ export async function isZoteroRunning(): Promise<boolean> {
   }
 }
 
-async function quitZotero(): Promise<void> {
-  if (process.platform === 'darwin') {
-    await execFileAsync('osascript', ['-e', 'tell application "Zotero" to quit']).catch(() => {});
-  } else if (process.platform === 'win32') {
-    await execFileAsync('taskkill', ['/IM', 'zotero.exe']).catch(() => {});
-  } else {
-    await execFileAsync('pkill', ['-x', 'zotero']).catch(() => {});
-  }
-  for (let i = 0; i < 40; i += 1) {
-    if (!(await isZoteroRunning())) return;
-    await new Promise((r) => setTimeout(r, 500));
-  }
-}
-
-async function launchZotero(): Promise<boolean> {
-  try {
-    if (process.platform === 'darwin') { await execFileAsync('open', ['-a', 'Zotero']); return true; }
-    if (process.platform === 'win32') { await execFileAsync('cmd', ['/c', 'start', '', 'zotero']); return true; }
-    await execFileAsync('sh', ['-c', 'zotero >/dev/null 2>&1 &']);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
 function packagedXpiCandidates(): string[] {
   const candidates = [
     path.join(process.resourcesPath || '', 'zotero', PLUGIN_XPI_NAME),
@@ -133,7 +106,11 @@ function packagedXpiCandidates(): string[] {
 
 function validatePackagedXpi(xpiPath: string): void {
   const zip = new AdmZip(xpiPath);
-  const names = new Set(zip.getEntries().map((entry) => entry.entryName));
+  const entries = zip.getEntries();
+  // Reading every entry makes AdmZip validate its CRC instead of accepting a
+  // central directory whose required filenames merely look plausible.
+  for (const entry of entries) if (!entry.isDirectory) entry.getData();
+  const names = new Set(entries.map((entry) => entry.entryName));
   for (const required of REQUIRED_XPI_ENTRIES) {
     if (!names.has(required)) throw new Error(`El XPI integrado no contiene ${required}.`);
   }
@@ -147,6 +124,16 @@ function validatePackagedXpi(xpiPath: string): void {
     throw new Error('El XPI integrado tiene un identificador de plugin inesperado.');
   }
   if (!manifest.version) throw new Error('El XPI integrado no declara una versión.');
+  const updatesPath = path.join(path.dirname(xpiPath), 'updates.json');
+  if (!existsSync(updatesPath)) throw new Error('Falta el manifiesto de integridad del XPI integrado.');
+  const updates = JSON.parse(readFileSync(updatesPath, 'utf8')) as {
+    addons?: Record<string, { updates?: Array<{ version?: string; update_hash?: string }> }>;
+  };
+  const release = updates.addons?.[PLUGIN_ID]?.updates?.find((entry) => entry.version === manifest.version);
+  if (!release) throw new Error('La versión del XPI no coincide con su manifiesto de integridad.');
+  const expectedHash = /^sha256:([0-9a-f]{64})$/i.exec(release.update_hash ?? '')?.[1]?.toLowerCase();
+  const actualHash = createHash('sha256').update(readFileSync(xpiPath)).digest('hex');
+  if (!expectedHash || actualHash !== expectedHash) throw new Error('El hash del XPI integrado no coincide.');
 }
 
 function packagedXpiPath(): string {
@@ -162,26 +149,6 @@ function packagedXpiPath(): string {
 
 async function copyPackagedXpi(destXpi: string): Promise<void> {
   await fs.copyFile(packagedXpiPath(), destXpi);
-}
-
-async function ensurePrefs(profile: string): Promise<void> {
-  const prefsPath = path.join(profile, 'prefs.js');
-  let prefs: string;
-  try {
-    prefs = await fs.readFile(prefsPath, 'utf8');
-  } catch {
-    return; // no prefs.js yet; the rescan defaults still apply on first run
-  }
-  // Drop cache-pinning lines so Zotero does a full extension rescan next start.
-  prefs = prefs
-    .split('\n')
-    .filter((l) => !/extensions\.(lastAppBuildId|lastAppVersion|lastPlatformVersion)/.test(l))
-    .join('\n');
-  const add: string[] = [];
-  if (!/extensions\.startupScanScopes/.test(prefs)) add.push('user_pref("extensions.startupScanScopes", 15);');
-  if (!/extensions\.autoDisableScopes/.test(prefs)) add.push('user_pref("extensions.autoDisableScopes", 0);');
-  if (add.length) prefs = prefs.replace(/\s*$/, '') + '\n' + add.join('\n') + '\n';
-  await fs.writeFile(prefsPath, prefs, 'utf8');
 }
 
 export async function getZoteroInstallInfo(): Promise<ZoteroInstallInfo> {
@@ -204,31 +171,17 @@ export async function exportZoteroPluginXpi(): Promise<ZoteroExportResult> {
   }
 }
 
-/** Install or update the plugin. Closes Zotero if running and reopens it after. */
+/**
+ * Legacy API kept for older renderers. Direct profile sideloading cannot be
+ * made both reliable and scoped on Zotero 9, so fail closed and direct the user
+ * to the official Add-ons flow. New UI calls exportZoteroPluginXpi() directly.
+ */
 export async function installZoteroPlugin(): Promise<ZoteroInstallResult> {
-  const profile = await findProfileDir();
-  if (!profile) return { ok: false, message: 'No se encontró el perfil de Zotero en este equipo.', running: false, reopened: false };
   const running = await isZoteroRunning();
-  try {
-    if (running) await quitZotero();
-    if (await isZoteroRunning()) {
-      return { ok: false, message: 'No se pudo cerrar Zotero. Ciérralo manualmente e inténtalo de nuevo.', running, reopened: false };
-    }
-    const extDir = path.join(profile, 'extensions');
-    await fs.mkdir(extDir, { recursive: true });
-    await copyPackagedXpi(path.join(extDir, `${PLUGIN_ID}.xpi`));
-    await ensurePrefs(profile);
-    await fs.rm(path.join(profile, 'addonStartup.json.lz4'), { force: true }).catch(() => {});
-    await fs.rm(path.join(profile, 'startupCache'), { recursive: true, force: true }).catch(() => {});
-    let reopened = false;
-    if (running) reopened = await launchZotero();
-    return {
-      ok: true,
-      message: running ? 'Plugin instalado en Zotero. Zotero se ha reabierto.' : 'Plugin instalado. Se cargará la próxima vez que abras Zotero.',
-      running,
-      reopened,
-    };
-  } catch (error) {
-    return { ok: false, message: error instanceof Error ? error.message : String(error), running, reopened: false };
-  }
+  return {
+    ok: false,
+    message: 'Guarda el archivo .xpi y, en Zotero, abre Herramientas → Complementos → ⚙ → Instalar complemento desde archivo.',
+    running,
+    reopened: false,
+  };
 }

@@ -15,14 +15,14 @@
     </header>
 
     <div id="nd-body">
-    <nav id="nd-tabs">
-      <button class="nd-tab nd-tab--active" data-tab="chat" data-i18n="tab.chat">Chat</button>
-      <button class="nd-tab" data-tab="providers" data-i18n="tab.providers">Providers</button>
-      <button class="nd-tab" data-tab="settings" data-i18n="tab.settings">Settings</button>
+    <nav id="nd-tabs" role="tablist" aria-label="Nodus">
+      <button id="nd-tab-chat" class="nd-tab nd-tab--active" role="tab" aria-selected="true" aria-controls="nd-panel-chat" tabindex="0" data-tab="chat" data-i18n="tab.chat">Chat</button>
+      <button id="nd-tab-providers" class="nd-tab" role="tab" aria-selected="false" aria-controls="nd-panel-providers" tabindex="-1" data-tab="providers" data-i18n="tab.providers">Providers</button>
+      <button id="nd-tab-settings" class="nd-tab" role="tab" aria-selected="false" aria-controls="nd-panel-settings" tabindex="-1" data-tab="settings" data-i18n="tab.settings">Settings</button>
     </nav>
 
     <!-- CHAT -->
-    <section class="nd-panel nd-panel--active" data-panel="chat">
+    <section id="nd-panel-chat" class="nd-panel nd-panel--active" role="tabpanel" aria-labelledby="nd-tab-chat" aria-hidden="false" data-panel="chat">
       <div id="nd-chatbar">
         <button id="nd-new" class="nd-iconbtn" data-i18n-title="chat.new" title="New conversation">＋</button>
         <button id="nd-history-btn" class="nd-iconbtn" data-i18n-title="chat.history" title="Conversations">🕑</button>
@@ -30,32 +30,48 @@
         <button id="nd-highlight-btn" class="nd-iconbtn" data-i18n-title="hl.btn" title="Auto-highlight document">🖍️</button>
         <button id="nd-agent-btn" class="nd-iconbtn" data-i18n-title="agent.mode" title="Agent mode">🛠</button>
         <div id="nd-model-dd" class="nd-dd">
-          <button id="nd-model-btn" class="nd-dd-btn" title="Model"><span id="nd-model-label">—</span></button>
-          <div id="nd-model-menu" class="nd-dd-menu" hidden>
+          <button id="nd-model-btn" class="nd-dd-btn" title="Model" aria-haspopup="listbox" aria-expanded="false"><span id="nd-model-label">—</span></button>
+          <div id="nd-model-menu" class="nd-dd-menu" role="listbox" hidden>
             <div class="nd-dd-search"><input id="nd-model-search" data-i18n-ph="model.search" placeholder="Search models…" /></div>
             <div id="nd-model-list" class="nd-dd-list"></div>
           </div>
         </div>
         <div id="nd-think-dd" class="nd-dd nd-dd--think">
-          <button id="nd-reasoning-btn" class="nd-iconbtn nd-think-btn" data-i18n-title="reasoning.title" title="Thinking"><span class="nd-think-ico" aria-hidden="true"></span><span id="nd-think-lvl" class="nd-think-lvl"></span></button>
-          <div id="nd-think-menu" class="nd-dd-menu nd-dd-menu--think" hidden>
+          <button id="nd-reasoning-btn" class="nd-iconbtn nd-think-btn" data-i18n-title="reasoning.title" title="Thinking" aria-haspopup="listbox" aria-expanded="false"><span class="nd-think-ico" aria-hidden="true"></span><span id="nd-think-lvl" class="nd-think-lvl"></span></button>
+          <div id="nd-think-menu" class="nd-dd-menu nd-dd-menu--think" role="listbox" hidden>
             <div id="nd-think-list" class="nd-dd-list"></div>
           </div>
         </div>
       </div>
       <div id="nd-item"></div>
+      <aside id="nd-onboarding" class="nd-onboarding" hidden>
+        <strong data-i18n="onboarding.title">Start with trustworthy sources</strong>
+        <ul>
+          <li data-i18n="onboarding.scope">Choose the exact document, selection, collection or indexed library Chat may use.</li>
+          <li data-i18n="onboarding.prepare">Prepare extracts local evidence; visual OCR needs the PDF open in Zotero.</li>
+          <li data-i18n="onboarding.model">Link mode uses Nodus; Standalone requires a model and your own encrypted API key.</li>
+          <li data-i18n="onboarding.privacy">Evidence stays in this Zotero profile. Document text is sent only to the model you choose when you ask.</li>
+        </ul>
+        <button id="nd-onboarding-done" class="nd-btn-primary" data-i18n="onboarding.done">Got it</button>
+      </aside>
       <div id="nd-evidencebar" class="nd-evidencebar">
-        <span id="nd-index-status" data-i18n="evidence.idle">Evidence index idle</span>
-        <button id="nd-index-quick-btn" class="nd-btn-ghost" data-i18n="evidence.indexQuick" data-i18n-title="evidence.indexQuickTitle" title="Quick index (text only)">Quick index</button>
-        <button id="nd-index-full-btn" class="nd-btn-ghost" data-i18n="evidence.indexFull" data-i18n-title="evidence.indexFullTitle" title="Full index (OCR + embeddings)">Full index</button>
+        <label class="nd-sr-only" for="nd-source-scope" data-i18n="source.label">Sources</label>
+        <select id="nd-source-scope" data-i18n-title="source.title" title="Choose the sources used by chat">
+          <option value="current" data-i18n="source.current">Current document</option>
+          <option value="selection" data-i18n="source.selection">Selected items</option>
+          <option value="collection" data-i18n="source.collection">Current collection</option>
+          <option value="library" data-i18n="source.library">Indexed library</option>
+        </select>
+        <span id="nd-index-status" role="status" aria-live="polite" data-i18n="evidence.idle">Evidence index idle</span>
+        <button id="nd-index-btn" class="nd-btn-ghost" data-i18n="evidence.prepare" data-i18n-title="evidence.prepareTitle" title="Prepare this source scope">Prepare</button>
         <button id="nd-visual-btn" class="nd-btn-ghost" data-i18n="evidence.vision" data-i18n-title="evidence.visionTitle" title="Analyze current page image">Vision</button>
       </div>
       <div id="nd-embed-progress" class="nd-embed-progress" hidden><div id="nd-embed-progress-bar" class="nd-embed-progress-bar"></div></div>
       <div id="nd-selection" hidden></div>
-      <div id="nd-messages"></div>
+      <div id="nd-messages" role="log" aria-live="polite" aria-relevant="additions text"></div>
       <div id="nd-prompt-menu" class="nd-menu" hidden></div>
       <div id="nd-composer">
-        <button id="nd-prompt-btn" class="nd-iconbtn" title="Prompts" data-i18n-title="chat.prompts">✦</button>
+        <button id="nd-prompt-btn" class="nd-iconbtn" title="Prompts" data-i18n-title="chat.prompts" aria-haspopup="menu" aria-expanded="false">✦</button>
         <textarea id="nd-input" rows="2" data-i18n-ph="composer.placeholder" placeholder="Ask about this document…"></textarea>
         <button id="nd-stop" class="nd-sendbtn nd-stopbtn" title="Stop" data-i18n-title="chat.stop" hidden>■</button>
         <button id="nd-send" class="nd-sendbtn" title="Send" data-i18n-title="composer.send">➤</button>
@@ -63,13 +79,13 @@
     </section>
 
     <!-- PROVIDERS -->
-    <section class="nd-panel" data-panel="providers">
+    <section id="nd-panel-providers" class="nd-panel" role="tabpanel" aria-labelledby="nd-tab-providers" aria-hidden="true" data-panel="providers" hidden>
       <p class="nd-muted" data-i18n="providers.intro">Add API keys per provider, load their models, and pin the ones you want in the model menu. Used in Standalone mode.</p>
       <div id="nd-providers"></div>
     </section>
 
     <!-- SETTINGS -->
-    <section class="nd-panel" data-panel="settings">
+    <section id="nd-panel-settings" class="nd-panel" role="tabpanel" aria-labelledby="nd-tab-settings" aria-hidden="true" data-panel="settings" hidden>
       <div class="nd-field">
         <label data-i18n="settings.mode">Mode</label>
         <div id="nd-mode-seg" class="nd-seg">
@@ -100,8 +116,25 @@
       <div class="nd-field">
         <label data-i18n="agent.mode">Agent mode</label>
         <label class="nd-check"><input type="checkbox" id="nd-agent" /> <span data-i18n="agent.modeDesc">Let Nodus act on your Zotero library (create notes, highlight, tag) — with your approval.</span></label>
-        <label class="nd-check"><input type="checkbox" id="nd-agent-auto" /> <span data-i18n="agent.auto">Auto-approve actions (no confirmation each time)</span></label>
-        <div class="nd-muted" data-i18n="agent.hint">Each action asks for permission unless auto-approve is on.</div>
+        <div class="nd-muted" data-i18n="agent.hint">Each action shows its exact target and preview and requires approval.</div>
+      </div>
+      <div class="nd-field">
+        <label data-i18n="history.privacy">Conversation history</label>
+        <label class="nd-check"><input type="checkbox" id="nd-history-enabled" /> <span data-i18n="history.saveLocal">Save conversations locally in this Zotero profile</span></label>
+        <select id="nd-history-retention">
+          <option value="30" data-i18n="history.days30">Keep 30 days</option>
+          <option value="90" data-i18n="history.days90">Keep 90 days</option>
+          <option value="365" data-i18n="history.days365">Keep 1 year</option>
+          <option value="0" data-i18n="history.forever">Keep until I delete them</option>
+        </select>
+      </div>
+      <div class="nd-field">
+        <label data-i18n="evidence.storage">Evidence index</label>
+        <div id="nd-index-stats" class="nd-muted" aria-live="polite"></div>
+        <div class="nd-row">
+          <button id="nd-index-prune" class="nd-btn-ghost" data-i18n="evidence.prune">Remove obsolete</button>
+          <button id="nd-index-clear" class="nd-danger" data-i18n="evidence.clear">Clear index</button>
+        </div>
       </div>
       <div class="nd-field">
         <label data-i18n="hl.title">Auto-highlight colors</label>
@@ -122,8 +155,8 @@
       </div>
       <div class="nd-field">
         <label data-i18n="update.title">Updates</label>
-        <label class="nd-check"><input type="checkbox" id="nd-autoupdate" /> <span data-i18n="update.autoDesc">Keep the plugin up to date automatically</span></label>
-        <div class="nd-muted" data-i18n="update.hint">Nodus installs each new plugin release automatically when Zotero checks for add-on updates. Updates are downloaded from GitHub and verified before installing.</div>
+        <div data-i18n="update.manualDesc">Install updates with Zotero's official plugin manager.</div>
+        <div class="nd-muted" data-i18n="update.hint">Save the verified XPI from Nodus, then open Tools → Plugins → ⚙ → Install Add-on From File in Zotero. Zotero 9 requires an update feed, but background updates are disabled for Nodus.</div>
       </div>
       <div class="nd-field" data-nodus-only>
         <label data-i18n="settings.connection">Nodus connection</label>
@@ -131,17 +164,17 @@
         <button id="nd-test" data-i18n="settings.test">Test connection</button>
         <div class="nd-row" style="margin-top:6px">
           <input id="nd-port" type="number" placeholder="4321" />
-          <input id="nd-token" type="text" data-i18n-ph="settings.token" placeholder="token" />
+          <input id="nd-token" type="password" autocomplete="off" data-i18n-ph="settings.token" placeholder="token" />
         </div>
         <div class="nd-muted" data-i18n="settings.manualHint">Leave empty to auto-detect from Nodus.</div>
       </div>
     </section>
 
     <!-- HISTORY OVERLAY -->
-    <div id="nd-history" class="nd-overlay" hidden>
+    <div id="nd-history" class="nd-overlay" role="dialog" aria-modal="true" aria-label="Conversations" hidden>
       <div class="nd-overlay-head">
         <input id="nd-history-search" data-i18n-ph="history.search" placeholder="Search conversations…" />
-        <button id="nd-history-close" class="nd-iconbtn" title="Close">✕</button>
+        <button id="nd-history-close" class="nd-iconbtn" title="Close" aria-label="Close" data-i18n-title="modal.close">✕</button>
       </div>
       <div id="nd-history-list"></div>
       <button id="nd-history-clear" class="nd-danger" data-i18n="history.clearAll">Delete all conversations</button>
@@ -149,9 +182,9 @@
     </div><!-- /#nd-body -->
 
     <!-- ADD PROMPT MODAL -->
-    <div id="nd-prompt-modal" class="nd-modal" hidden>
+    <div id="nd-prompt-modal" class="nd-modal" role="dialog" aria-modal="true" aria-labelledby="nd-prompt-modal-title" hidden>
       <div class="nd-modal-box">
-        <div class="nd-modal-title" data-i18n="prompt.newTitle">New prompt</div>
+        <div id="nd-prompt-modal-title" class="nd-modal-title" data-i18n="prompt.newTitle">New prompt</div>
         <input id="nd-prompt-title" class="nd-modal-input" data-i18n-ph="prompt.titlePh" placeholder="Title" />
         <textarea id="nd-prompt-text" class="nd-modal-input" rows="4" data-i18n-ph="prompt.textPh" placeholder="Prompt text…"></textarea>
         <div class="nd-modal-actions">
@@ -162,7 +195,7 @@
     </div>
 
     <!-- CONFIRM MODAL -->
-    <div id="nd-modal" class="nd-modal" hidden>
+    <div id="nd-modal" class="nd-modal" role="dialog" aria-modal="true" aria-labelledby="nd-modal-msg" hidden>
       <div class="nd-modal-box">
         <div id="nd-modal-msg"></div>
         <div class="nd-modal-actions">
@@ -175,7 +208,6 @@
   <script src="chrome://nodus/content/icons.js"></script>
   <script src="chrome://nodus/content/providers.js"></script>
   <script src="chrome://nodus/content/store.js"></script>
-  <script src="chrome://nodus/content/updater.js"></script>
   <script src="chrome://nodus/content/local-embeddings.js"></script>
   <script src="chrome://nodus/content/evidence.js"></script>
   <script src="chrome://nodus/content/multimodal.js"></script>

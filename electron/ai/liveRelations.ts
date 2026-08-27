@@ -847,6 +847,7 @@ export interface CopilotPassageSearchResult {
   year: number | null;
   authorYear: string | null;
   zoteroKey: string | null;
+  attachmentKey: string | null;
   searchString: string | null;
 }
 
@@ -886,10 +887,16 @@ export async function searchCopilotPassages(query: string, limit = 20): Promise<
   if (!indexed) return { available: true, indexed: false, passages: [] };
 
   const hits = findSimilarPassages(vector, LIVE_PASSAGE_MIN_SIMILARITY, cleanLimit);
+  const attachmentForSource = getDb().prepare(
+    'SELECT attachment_key FROM work_text_sources WHERE nodus_id = ? AND source_ref = ? AND active = 1 LIMIT 1',
+  );
   const passages = hits.flatMap((hit) => {
     const text = readableCopilotPassageText(hit.text);
     if (!text) return [];
     const authors = parseAuthorsJson(hit.authors_json);
+    const source = hit.source_ref
+      ? attachmentForSource.get(hit.nodus_id, hit.source_ref) as { attachment_key: string | null } | undefined
+      : undefined;
     return [{
       passageId: hit.passage_id,
       nodusId: hit.nodus_id,
@@ -902,6 +909,7 @@ export async function searchCopilotPassages(query: string, limit = 20): Promise<
       year: hit.year,
       authorYear: authorYearLabel(authors, hit.year),
       zoteroKey: hit.zotero_key || null,
+      attachmentKey: source?.attachment_key || null,
       searchString: searchString(authors, hit.year, hit.title),
     }];
   });

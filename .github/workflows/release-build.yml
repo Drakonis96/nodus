@@ -224,6 +224,28 @@ jobs:
             done
           fi
 
+      - name: Verify published Zotero integrity chain
+        if: env.RELEASE_CHANNEL == 'latest'
+        run: |
+          verify_dir="$(mktemp -d)"
+          gh release download "$RELEASE_TAG" \
+            --repo "$GITHUB_REPOSITORY" \
+            --pattern nodus-zotero.xpi \
+            --pattern updates.json \
+            --dir "$verify_dir"
+          expected="$(jq -r '.addons["nodus-zotero@nodus.app"].updates[0].update_hash' "$verify_dir/updates.json")"
+          link="$(jq -r '.addons["nodus-zotero@nodus.app"].updates[0].update_link' "$verify_dir/updates.json")"
+          actual="sha256:$(sha256sum "$verify_dir/nodus-zotero.xpi" | awk '{print $1}')"
+          if [[ "$expected" != "$actual" ]]; then
+            echo "::error::Downloaded Zotero XPI hash does not match updates.json"
+            exit 1
+          fi
+          if [[ "$link" != "https://github.com/$GITHUB_REPOSITORY/releases/download/$RELEASE_TAG/nodus-zotero.xpi" ]]; then
+            echo "::error::updates.json does not point at this immutable release tag"
+            exit 1
+          fi
+          unzip -t "$verify_dir/nodus-zotero.xpi" >/dev/null
+
       - name: Publish stable release
         if: inputs.channel == 'latest'
         run: gh release edit "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --draft=false --prerelease=false --latest

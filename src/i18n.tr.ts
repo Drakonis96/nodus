@@ -8025,4 +8025,8 @@ export const TR: Record<string, string> = {
   "{n} referencias detectadas": "{n} kaynak algılandı",
   "Un autor por línea": "Her satıra bir yazar",
   "Guardar {n} referencias": "{n} kaynağı kaydet",
+  "XPI verificado guardado en:": "Doğrulanmış XPI şuraya kaydedildi:",
+  "En Zotero: Herramientas → Complementos → ⚙ → Instalar complemento desde archivo.": "Zotero’da: Araçlar → Eklentiler → ⚙ → Eklentiyi Dosyadan Kur.",
+  "Guardar .xpi para Zotero": "Zotero için .xpi kaydet",
+  "Ver instrucciones de instalación": "Kurulum talimatlarını görüntüle",
 };

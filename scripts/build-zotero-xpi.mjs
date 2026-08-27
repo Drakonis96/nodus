@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 
 // Package zotero-plugin/ into an installable .xpi and generate the matching
-// Zotero auto-update manifest (updates.json). Single source of truth = the
+// release integrity manifest (updates.json). Single source of truth = the
 // plugin's manifest.json (id, version, strict versions).
 //
 //   node scripts/build-zotero-xpi.mjs [--base <url>]
@@ -13,8 +13,9 @@
 //
 // Outputs to dist-zotero/:
 //   nodus-zotero.xpi   — fixed-name packaged add-on (manifest.json at root)
-//   updates.json       — served at manifest.update_url; points Zotero at the
-//                        tagged .xpi with a sha256 integrity hash.
+//   updates.json       — release metadata pointing at the tagged XPI with a
+//                        SHA-256 integrity hash. Zotero 9 requires update_url
+//                        even when background updates are disabled per add-on.
 import { createHash } from 'node:crypto';
 import { cpSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
@@ -57,6 +58,9 @@ export function buildXpi() {
   const id = app.id;
   const version = manifest.version;
   if (!id || !version) throw new Error('manifest.json missing applications.zotero.id or version');
+  if (!/^https:\/\//.test(app.update_url ?? '')) {
+    throw new Error('manifest.json missing the HTTPS applications.zotero.update_url required by Zotero 9');
+  }
 
   const staging = mkdtempSync(path.join(os.tmpdir(), 'nodus-zotero-xpi-'));
   let files;
@@ -101,7 +105,12 @@ export function buildXpi() {
     }
 
     const zip = new AdmZip();
-    for (const file of files) zip.addFile(file.relPath, readFileSync(file.abs));
+    const deterministicTime = new Date("1980-01-01T00:00:00.000Z");
+    for (const file of files) {
+      zip.addFile(file.relPath, readFileSync(file.abs));
+      const entry = zip.getEntry(file.relPath);
+      if (entry) entry.header.time = deterministicTime;
+    }
     mkdirSync(outDir, { recursive: true });
     zip.writeZip(xpiPath);
   } finally {
@@ -143,8 +152,9 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
   console.log(`  sha256: ${r.sha256}`);
   console.log(`✔ Wrote updates.json → ${r.updatesPath}`);
   console.log('');
-  console.log('Publish the XPI at the update_link base and updates.json at the manifest update_url:');
-  console.log(`  update_url in manifest : ${r.updateUrl || '(none)'}`);
-  console.log(`  XPI update_link base   : ${r.base}`);
-  console.log('Zotero polls updates.json and offers the new version to installed users.');
+  console.log('Release integrity metadata:');
+  console.log(`  required Zotero feed  : ${r.updateUrl}`);
+  console.log('  background updates    : disabled per add-on; installation remains manual');
+  console.log(`  published XPI base    : ${r.base}`);
+  console.log('Install or update this XPI through Zotero: Tools → Plugins → ⚙ → Install Add-on From File.');
 }

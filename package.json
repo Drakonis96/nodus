@@ -102,6 +102,7 @@
     "licenses:verify": "npm run licenses:generate && node scripts/verify-license-compliance.mjs",
     "privacy:verify": "node --test scripts/test-privacy-compliance.mjs",
     "zotero:xpi": "node scripts/build-zotero-xpi.mjs",
+    "zotero:smoke:live": "node scripts/smoke-zotero-xpi.mjs",
     "browser:zip": "node scripts/build-browser-extension.mjs",
     "word:addin-icons": "node scripts/build-word-addin-icons.mjs",
     "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p electron/tsconfig.json",
@@ -252,6 +253,10 @@
       {
         "from": "dist-zotero/nodus-zotero.xpi",
         "to": "zotero/nodus-zotero.xpi"
+      },
+      {
+        "from": "dist-zotero/updates.json",
+        "to": "zotero/updates.json"
       },
       {
         "from": "dist-browser/nodus-connector-chrome.zip",

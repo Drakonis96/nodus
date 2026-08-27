@@ -7680,4 +7680,8 @@ export const IT: Record<string, string> = {
   "{n} referencias detectadas": "{n} riferimenti rilevati",
   "Un autor por línea": "Un autore per riga",
   "Guardar {n} referencias": "Salva {n} riferimenti",
+  "XPI verificado guardado en:": "XPI verificato salvato in:",
+  "En Zotero: Herramientas → Complementos → ⚙ → Instalar complemento desde archivo.": "In Zotero: Strumenti → Plugin → ⚙ → Installa componente aggiuntivo da file.",
+  "Guardar .xpi para Zotero": "Salva .xpi per Zotero",
+  "Ver instrucciones de instalación": "Visualizza le istruzioni di installazione",
 };
