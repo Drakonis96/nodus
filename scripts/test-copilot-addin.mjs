@@ -74,12 +74,28 @@ try {
   assert.match(taskpaneHtml, />Analyze paragraph</);
   assert.doesNotMatch(taskpaneHtml, /Conectando|Buscar ideas|Analizar párrafo|Selección|Insertar en|Nota al pie|Pasajes/);
   assert.match(taskpaneJs, /table\[key\] !== undefined \? table\[key\] : STR\.en\[key\]/);
-  assert.match(taskpaneHtml, /<img class="mark" src="\/addin\/assets\/icon-32\.png"/, 'the pane must use the stylized Nodus mark');
+  // The pane wears the desktop app's own mark, inlined: its geometry is checked
+  // against src/assets/nodus-logo.svg so the two can never drift into two logos.
+  const desktopLogo = fs.readFileSync(path.join(repoRoot, 'src/assets/nodus-logo.svg'), 'utf8');
+  const markPath = (desktopLogo.match(/<path d="([^"]+)"/) || [])[1];
+  assert.equal(typeof markPath, 'string', 'the desktop logo must declare its mark path');
+  assert.match(taskpaneHtml, /<svg class="mark"/, 'the pane must use the stylized Nodus mark');
+  assert.ok(taskpaneHtml.includes(`d="${markPath}"`), 'the pane mark must be the desktop mark, stroke for stroke');
+  for (const node of desktopLogo.match(/<circle[^>]*\/>/g) || []) {
+    assert.ok(taskpaneHtml.includes(node.trim()), `the pane mark is missing a node of the desktop logo: ${node.trim()}`);
+  }
   assert.doesNotMatch(taskpaneHtml, /<div class="mark">N<\/div>/, 'a generic letter N must not be used as the brand');
+
+  // The tab strip stays above the search box: the tabs are the pane's spine and
+  // the search box only belongs to the section it filters.
+  assert.ok(
+    taskpaneHtml.indexOf('id="searchMode"') < taskpaneHtml.indexOf('id="searchControls"'),
+    'the tab strip must come before the search box',
+  );
   assert.match(taskpaneHtml, /data-mode="references"/);
   assert.match(taskpaneHtml, /data-mode="prompts"/);
   assert.equal((taskpaneHtml.match(/class="seg-icon"/g) || []).length, 4, 'every pane tab must have an icon');
-  for (const id of ['promptControls', 'promptStyle', 'promptModel', 'promptSelection', 'applyPrompt', 'promptOutput', 'copyPromptOutput', 'pastePromptOutput']) {
+  for (const id of ['promptControls', 'promptStyle', 'promptModel', 'promptSelection', 'applyPrompt', 'promptOutput', 'promptOutputStale', 'copyPromptOutput', 'pastePromptOutput']) {
     assert.match(taskpaneHtml, new RegExp(`id="${id}"`), `Prompt UI must contain ${id}`);
   }
   assert.equal((taskpaneHtml.match(/class="prompt-typing-dot"/g) || []).length, 3, 'prompt generation must use the Nodi-style three-dot indicator');
@@ -109,9 +125,89 @@ try {
   assert.match(taskpaneJs, /\\uFFFD\\u25A1\\u2610\\u2612/);
   assert.match(taskpaneJs, /\/api\/prompts\/apply/);
   assert.match(taskpaneJs, /insertAtCursor\(promptOutputText, \{ replace: true \}\)/, 'pasting a proposal replaces the unchanged Word selection');
-  assert.match(taskpaneCss, /\.seg-label\s*\{[^}]*display:\s*none/);
-  assert.match(taskpaneCss, /\.seg:not\(\.active\) \.seg-label\s*\{[^}]*display:\s*none !important;[^}]*inline-size:\s*0/);
-  assert.match(taskpaneCss, /\.seg\.active \.seg-label\s*\{[^}]*display:\s*inline-block/);
+
+  // A proposal costs tokens, so moving the Word selection must never discard
+  // it: only the next generation (or pasting it) clears the box. While the
+  // selection differs from the one that produced it, the proposal stays on
+  // screen but cannot be pasted over the wrong text.
+  assert.doesNotMatch(
+    taskpaneJs,
+    /if \(text !== promptSourceText\) clearPromptOutput\(\);/,
+    'changing the Word selection must not discard a generated proposal',
+  );
+  assert.match(
+    taskpaneJs,
+    /normalizedSelection\(current\) !== promptOutputSourceText/,
+    'pasting must compare against the selection the proposal was generated from',
+  );
+  assert.match(
+    taskpaneJs,
+    /var stale = !!promptOutputText && promptSourceText !== promptOutputSourceText;[\s\S]*els\.pastePromptOutput\.disabled = !promptOutputText \|\| stale;/,
+    'a proposal from another selection must stay visible with pasting disabled',
+  );
+
+  // Moving the Word selection while a proposal is generating must not look
+  // like it redirected the generation: the box keeps showing the text that was
+  // sent and only goes live again once the generation settles.
+  assert.match(
+    taskpaneJs,
+    /if \(!promptGenerating && \(changed \|\| !promptSelectionPainted\)\) paintPromptSelection\(text\);/,
+    'the selection box must freeze while a proposal is generating',
+  );
+  assert.match(
+    taskpaneJs,
+    /var settled = promptGenerating && !generating;[\s\S]*if \(settled\) paintPromptSelection\(promptSourceText\);/,
+    'the selection box must go live again when the generation settles',
+  );
+
+  // A generation survives leaving its tab, so the tab has to say so.
+  assert.match(
+    taskpaneJs,
+    /els\.promptTab\.classList\.toggle\('is-busy', generating\)/,
+    'the prompts tab must be marked while a proposal is generating',
+  );
+  assert.match(taskpaneCss, /\.seg\.is-busy::after \{/, 'the busy tab needs its marker');
+  assert.match(taskpaneCss, /\.prompt-stale\[hidden\] \{ display: none; \}/);
+
+  // The pane and the Zotero sidebar are one product: they must not drift into
+  // two different accents. Both read their violet from their own stylesheet.
+  const zoteroCss = fs.readFileSync(path.join(repoRoot, 'zotero-plugin/content/sidebar.css'), 'utf8');
+  const zoteroAccent = (zoteroCss.match(/--nd-accent:\s*(#[0-9a-f]{6})/i) || [])[1];
+  assert.equal(typeof zoteroAccent, 'string', 'the Zotero sidebar must declare its accent');
+  assert.match(
+    taskpaneCss,
+    new RegExp(`--primary: ${zoteroAccent}`, 'i'),
+    'the Word pane must use the same accent as the Zotero sidebar',
+  );
+
+  // An explicit display on a class beats the UA [hidden] rule, which is why the
+  // search box used to stay on screen in the prompts tab.
+  assert.match(
+    taskpaneCss,
+    /\[hidden\] \{ display: none !important; \}/,
+    'panels the script hides must actually disappear',
+  );
+
+  // Word does not raise DocumentSelectionChanged for every way of selecting
+  // text, so the open prompts tab polls the selection instead of waiting for
+  // an unrelated control to force a refresh.
+  assert.match(
+    taskpaneJs,
+    /function startPromptSelectionPolling\(\)[\s\S]*setInterval\([\s\S]*refreshPromptSelection\(\)/,
+    'the prompts tab must poll the Word selection',
+  );
+  assert.match(
+    taskpaneJs,
+    /if \(promptMode\) \{[\s\S]*startPromptSelectionPolling\(\);[\s\S]*\}\s*\n\s*stopPromptSelectionPolling\(\);/,
+    'the selection poll must stop when the prompts tab is left',
+  );
+  // The tab strip must not reflow when the selection moves: every tab owns an
+  // equal slot and the active one may not grow into its neighbours' space.
+  assert.match(taskpaneCss, /\.seg \{[^}]*flex: 1 1 0;/, 'every tab must take an equal slot');
+  const segActiveRule = (taskpaneCss.match(/\.seg\.active \{([^}]*)\}/) || [])[1] || '';
+  assert.doesNotMatch(segActiveRule, /flex:/, 'the active tab must not resize its slot');
+  assert.match(taskpaneCss, /\.seg-label \{[^}]*display: block;/, 'every tab keeps its label, not just the active one');
+  assert.match(taskpaneCss, /@media \(max-width: 310px\)[\s\S]*\.seg-label \{ display: none; \}/, 'a very narrow pane falls back to icons');
   assert.match(taskpaneCss, /\.results\[hidden\]\s*\{[^}]*display:\s*none !important/, 'search results must stay hidden in prompt mode');
   assert.match(taskpaneCss, /\.empty\[hidden\]\s*\{[^}]*display:\s*none !important/, 'empty search messages must stay hidden in prompt mode');
   assert.match(taskpaneCss, /@keyframes prompt-typing-dot/, 'the prompt loading dots must animate');

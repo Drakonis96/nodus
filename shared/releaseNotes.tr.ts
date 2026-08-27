@@ -95,6 +95,9 @@ const RELEASE_3_2_4_TR: string[] = [
 ];
 
 export const RELEASE_NOTES_TR: Record<string, string[]> = {
+  "5.0.5": [
+    "Word ve LibreOffice için Nodus Copilot'ta genel iyileştirmeler. Panel ürettiği öneriyi saklıyor, seçiminizi kendiliğinden izliyor ve Nodus'un görünümünü benimsiyor.",
+  ],
   "5.0.4": [
     "Nodus Server telefondan veya herhangi bir tarayıcıdan çalışmak için uyarlanabilir bir web arayüzü kazanıyor. Uygulama deneyimini yansıtıyor ve paylaşılan çalışma alanlarını yalnızca sahibinin görebildiği konuşmalar, notlar, açıklamalar ve kişisel dosyalarla birlikte açıyor.",
     "Her sunucu hesabı kendi yapay zekâ sağlayıcılarını, modellerini ve kimlik bilgilerini yapılandırabilir. Anahtarlar şifreli saklanır ve tarayıcıya hiçbir zaman geri dönmez, işler ve sonuçlar özel kalır, tercihler ise Desktop ve bağlı kasalarla uyumluluğu bozmadan cihazlar arasında sizi izler.",
