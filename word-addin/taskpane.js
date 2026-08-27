@@ -5,6 +5,7 @@
   var TOKEN = (window.NODUS && window.NODUS.token) || '';
   var LANG = (window.NODUS && window.NODUS.lang) === 'en' ? 'en' : 'es';
   var DEBOUNCE_MS = 700;
+  var PROMPT_POLL_MS = 700;
   var MIN_CHARS = 12;
 
   var els = {};
@@ -25,8 +26,12 @@
   var promptModels = [];
   var promptSourceText = '';
   var promptOutputText = '';
+  var promptOutputSourceText = '';
   var promptRequestSeq = 0;
   var promptGenerating = false;
+  var promptSelectionPainted = false;
+  var promptPollTimer = null;
+  var promptPollBusy = false;
 
   // The pane follows the Nodus UI language (injected by the copilot server).
   var STR = {
@@ -107,6 +112,7 @@
       promptCopied: 'Propuesta copiada',
       promptPasted: 'Selección reemplazada',
       promptSelectionChanged: 'La selección de Word ha cambiado. Vuelve a seleccionar el texto original antes de pegar.',
+      promptOutputStale: 'Esta propuesta se generó con otra selección. Vuelve a seleccionar ese texto para poder pegarla.',
       promptLoading: 'Cargando prompts del workspace…',
       promptLoadError: 'No se pudieron cargar los prompts: ',
       promptNoStyles: 'No hay prompts activos en este workspace.',
@@ -195,6 +201,7 @@
       promptCopied: 'Proposal copied',
       promptPasted: 'Selection replaced',
       promptSelectionChanged: 'The Word selection changed. Select the original text again before pasting.',
+      promptOutputStale: 'This proposal came from a different selection. Select that text again to paste it.',
       promptLoading: 'Loading workspace prompts…',
       promptLoadError: 'Could not load prompts: ',
       promptNoStyles: 'There are no active prompts in this workspace.',
@@ -817,11 +824,25 @@
 
   function clearPromptOutput() {
     promptOutputText = '';
+    promptOutputSourceText = '';
     els.promptOutput.value = '';
     els.promptOutputMeta.textContent = '';
     els.promptWarnings.textContent = '';
     els.promptWarnings.hidden = true;
     els.promptOutputWrap.hidden = true;
+    updatePromptOutputState();
+  }
+
+  // A generated proposal only disappears on the next generation: moving the
+  // Word selection re-reads the source text but never throws away tokens that
+  // were already paid for. While the selection differs from the one that
+  // produced the proposal, the proposal stays readable but cannot be pasted
+  // over the wrong text.
+  function updatePromptOutputState() {
+    var stale = !!promptOutputText && promptSourceText !== promptOutputSourceText;
+    els.promptOutputStale.textContent = stale ? T('promptOutputStale') : '';
+    els.promptOutputStale.hidden = !stale;
+    els.pastePromptOutput.disabled = !promptOutputText || stale;
   }
 
   function updatePromptGenerateState() {
@@ -829,8 +850,11 @@
   }
 
   function setPromptGenerating(generating) {
+    var settled = promptGenerating && !generating;
     promptGenerating = generating;
     els.applyPrompt.classList.toggle('is-generating', generating);
+    if (els.promptTab) els.promptTab.classList.toggle('is-busy', generating);
+    if (settled) paintPromptSelection(promptSourceText);
     if (generating) {
       els.applyPrompt.setAttribute('aria-busy', 'true');
       els.applyPrompt.setAttribute('aria-label', T('promptGenerating'));
@@ -851,16 +875,51 @@
     updatePromptGenerateState();
   }
 
+  function paintPromptSelection(text) {
+    promptSelectionPainted = true;
+    els.promptSelection.textContent = text || T('promptSelectionEmpty');
+    els.promptSelection.classList.toggle('placeholder', !text);
+  }
+
   function refreshPromptSelection() {
     return getSelectionText().then(function (value) {
       var text = normalizedSelection(value);
-      if (text !== promptSourceText) clearPromptOutput();
+      var changed = text !== promptSourceText;
       promptSourceText = text;
-      els.promptSelection.textContent = text || T('promptSelectionEmpty');
-      els.promptSelection.classList.toggle('placeholder', !text);
+      // While a proposal is generating the box keeps showing the text that was
+      // actually sent: moving the cursor in Word must never look like it
+      // redirected the generation. Only pressing Generate again does that. The
+      // live selection returns the moment the generation settles.
+      // Repainting an unchanged box would also drop any in-pane text selection.
+      if (!promptGenerating && (changed || !promptSelectionPainted)) paintPromptSelection(text);
       updatePromptGenerateState();
+      updatePromptOutputState();
       return text;
     });
+  }
+
+  // Word's DocumentSelectionChanged does not fire for every way of selecting
+  // text (dragging inside a paragraph is the usual miss), which used to leave
+  // the box stale until an unrelated control forced a refresh. While the
+  // prompts tab is open the pane also polls the selection itself.
+  function startPromptSelectionPolling() {
+    if (promptPollTimer) return;
+    promptPollTimer = setInterval(function () {
+      // Deliberately no document.hidden guard: an embedded webview can report
+      // itself hidden while its pane is perfectly visible, and a poll that
+      // stops without saying so is the very bug this exists to fix.
+      if (promptPollBusy) return;
+      promptPollBusy = true;
+      var done = function () { promptPollBusy = false; };
+      refreshPromptSelection().then(done, done);
+    }, PROMPT_POLL_MS);
+  }
+
+  function stopPromptSelectionPolling() {
+    if (!promptPollTimer) return;
+    clearInterval(promptPollTimer);
+    promptPollTimer = null;
+    promptPollBusy = false;
   }
 
   function fillPromptCatalogue(data) {
@@ -933,10 +992,12 @@
 
   function runSavedPrompt() {
     var model = selectedPromptModel();
+    var requestedSource = '';
     setPromptGenerating(true);
     clearPromptOutput();
     refreshPromptSelection()
       .then(function (selection) {
+        requestedSource = selection;
         if (!selection) {
           setStatus(T('promptSelectionEmpty'), 'err');
           return null;
@@ -959,6 +1020,7 @@
         if (!result) return;
         promptOutputText = String(result.text || '');
         if (!promptOutputText) throw new Error(T('composeEmpty'));
+        promptOutputSourceText = requestedSource;
         els.promptOutput.value = promptOutputText;
         var used = result.model || model;
         var usedLabel = used && (used.label || (used.provider + ' · ' + used.model));
@@ -967,6 +1029,7 @@
         els.promptWarnings.textContent = warnings.length ? T('promptWarnings') + warnings.join(' · ') : '';
         els.promptWarnings.hidden = !warnings.length;
         els.promptOutputWrap.hidden = false;
+        updatePromptOutputState();
         setStatus(T('promptProposal'), 'ok');
       })
       .catch(function (error) { setStatus((error && error.message) || String(error), 'err'); })
@@ -995,7 +1058,7 @@
     if (!promptOutputText) return;
     getSelectionText()
       .then(function (current) {
-        if (normalizedSelection(current) !== promptSourceText) throw new Error(T('promptSelectionChanged'));
+        if (normalizedSelection(current) !== promptOutputSourceText) throw new Error(T('promptSelectionChanged'));
         return insertAtCursor(promptOutputText, { replace: true });
       })
       .then(function () {
@@ -1028,8 +1091,10 @@
     if (promptMode) {
       refreshPromptSelection();
       loadPromptCatalogue();
+      startPromptSelectionPolling();
       return;
     }
+    stopPromptSelectionPolling();
     if (referenceMode) {
       runSearch();
       return;
@@ -1119,6 +1184,8 @@
     els.promptOutput = document.getElementById('promptOutput');
     els.promptOutputMeta = document.getElementById('promptOutputMeta');
     els.promptWarnings = document.getElementById('promptWarnings');
+    els.promptOutputStale = document.getElementById('promptOutputStale');
+    els.promptTab = document.querySelector('.seg[data-mode="prompts"]');
     els.copyPromptOutput = document.getElementById('copyPromptOutput');
     els.pastePromptOutput = document.getElementById('pastePromptOutput');
 
@@ -1182,6 +1249,7 @@
     els.promptOutput.setAttribute('aria-label', T('promptProposal'));
     els.copyPromptOutput.textContent = T('promptCopy');
     els.pastePromptOutput.textContent = T('promptPaste');
+    updatePromptOutputState();
 
     // Footnotes need WordApi 1.5. Standalone (LibreOffice) relies on the macro,
     // which falls back to inline if its Writer build cannot place a footnote.
