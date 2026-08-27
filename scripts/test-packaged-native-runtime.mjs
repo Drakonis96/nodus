@@ -10,6 +10,7 @@ const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..'
 const {
   assertArm64Binary,
   findIntelRuntimePaths,
+  findUniquePackagedBinary,
 } = require(path.join(repoRoot, 'scripts/verify-packaged-native-runtime.cjs'));
 
 test('packaged runtime audit detects Intel-only optional dependencies', () => {
@@ -26,6 +27,26 @@ test('packaged runtime audit requires an ARM64 slice', () => {
   assert.throws(
     () => assertArm64Binary('fixture', import.meta.filename, () => ['x86_64']),
     /is not ARM64/,
+  );
+});
+
+test('packaged runtime audit accepts versioned Sharp and libvips binary names', () => {
+  const readDirectory = () => [
+    'index.js',
+    'libvips-cpp.8.18.6.dylib',
+    'sharp-darwin-arm64-0.35.4.node',
+  ];
+  assert.equal(
+    findUniquePackagedBinary('Sharp', '/sharp/lib', /^sharp-darwin-arm64(?:-[0-9.]+)?\.node$/, readDirectory),
+    path.join('/sharp/lib', 'sharp-darwin-arm64-0.35.4.node'),
+  );
+  assert.equal(
+    findUniquePackagedBinary('libvips', '/libvips/lib', /^libvips-cpp\.[0-9.]+\.dylib$/, readDirectory),
+    path.join('/libvips/lib', 'libvips-cpp.8.18.6.dylib'),
+  );
+  assert.throws(
+    () => findUniquePackagedBinary('Sharp', '/sharp/lib', /^sharp-.*\.node$/, () => []),
+    /found 0/,
   );
 });
 
