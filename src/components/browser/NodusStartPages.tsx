@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { ConfirmModal } from '../ConfirmModal';
 import { Icon } from '../ui';
 import atlasCatalogue from '../../../site/data/research-atlas.json';
 import type {
@@ -180,7 +181,7 @@ function StartShell({ title, copy, query, onQuery, status, children, toolbar }: 
 }) {
   const page = title === 'Nodus Bookmarks' ? 'bookmarks' : 'atlas';
   return (
-    <main className="nodus-start-page atlas-main">
+    <main className={`nodus-start-page atlas-main ${page === 'bookmarks' ? 'bookmarks-main' : 'research-atlas-main'}`}>
       <NodusSiteBackdrop />
       <NodusSiteHeader page={page} />
       <div className="nodus-site-content atlas-shell">
@@ -218,16 +219,19 @@ function StartShell({ title, copy, query, onQuery, status, children, toolbar }: 
   );
 }
 
-export function NodusBookmarksPage({ store, onEditBookmark, onNewBookmark, onNewFolder }: {
+export function NodusBookmarksPage({ store, onEditBookmark, onNewBookmark, onNewFolder, onNotice }: {
   store: BrowserBookmarkStore;
   onEditBookmark: (bookmark: BrowserBookmark) => void;
   onNewBookmark: (parentId: string | null) => void;
   onNewFolder: (parentId: string | null) => void;
+  onNotice: (message: string) => void;
 }) {
   const [query, setQuery] = useState('');
   const [folderId, setFolderId] = useState<string | null>(null);
   const [dragging, setDragging] = useState<BrowserBookmarkNodeRef | null>(null);
   const [dropId, setDropId] = useState<string | null>(null);
+  const [deleteConfirmation, setDeleteConfirmation] = useState<{ ref: BrowserBookmarkNodeRef; label: string } | null>(null);
+  const [deleting, setDeleting] = useState(false);
   const folder = store.folders.find((entry) => entry.id === folderId) ?? null;
   useEffect(() => { if (folderId && !folder) setFolderId(null); }, [folder, folderId]);
   useEffect(() => {
@@ -258,6 +262,19 @@ export function NodusBookmarksPage({ store, onEditBookmark, onNewBookmark, onNew
     } finally { setDragging(null); setDropId(null); }
   };
 
+  const remove = async () => {
+    if (!deleteConfirmation || deleting) return;
+    setDeleting(true);
+    try {
+      await window.nodus.deleteBrowserBookmarkNode(deleteConfirmation.ref);
+      setDeleteConfirmation(null);
+    } catch (cause) {
+      onNotice(cause instanceof Error ? cause.message : String(cause));
+    } finally {
+      setDeleting(false);
+    }
+  };
+
   return (
     <StartShell
       title="Nodus Bookmarks"
@@ -277,8 +294,9 @@ export function NodusBookmarksPage({ store, onEditBookmark, onNewBookmark, onNew
       {folders.map((entry) => (
         <article
           key={entry.id}
-          className={`card lit atlas-card${dropId === entry.id ? ' bookmark-drop' : ''}`}
+          className={`card lit atlas-card bookmark-card${dropId === entry.id ? ' bookmark-drop' : ''}`}
           draggable
+          onClick={(event) => { if (!(event.target as Element).closest('button')) setFolderId(entry.id); }}
           onDragStart={() => setDragging({ kind: 'folder', id: entry.id })}
           onDragOver={(event) => { event.preventDefault(); setDropId(entry.id); }}
           onDragLeave={() => setDropId(null)}
@@ -287,13 +305,13 @@ export function NodusBookmarksPage({ store, onEditBookmark, onNewBookmark, onNew
           <div className="bookmark-heading"><span className="bookmark-folder-icon"><Icon name="folder" size={19} /></span><h2><button type="button" onClick={() => setFolderId(entry.id)}>{entry.name}</button></h2></div>
           <div className="atlas-geo">Folder · {browserBookmarkChildren(store, entry.id).length} items</div>
           <p className="atlas-description">Open this folder to browse its saved research resources and nested folders.</p>
-          <div className="atlas-card-actions"><button className="atlas-open" type="button" onClick={() => setFolderId(entry.id)}>Open folder <Icon name="chevronRight" size={13} /></button></div>
+          <div className="atlas-card-actions"><button className="atlas-open" type="button" onClick={() => setFolderId(entry.id)}>Open folder <Icon name="chevronRight" size={13} /></button><button className="atlas-open bookmark-delete" type="button" data-testid="browser-bookmark-card-delete" onClick={() => setDeleteConfirmation({ ref: { kind: 'folder', id: entry.id }, label: entry.name })}><Icon name="trash" size={13} /> Delete</button></div>
         </article>
       ))}
       {bookmarks.map((entry) => {
         const location = browserBookmarkFolderPath(store, entry.parentId);
         return (
-          <article key={entry.id} className="card lit atlas-card" draggable onDragStart={() => setDragging({ kind: 'bookmark', id: entry.id })}>
+          <article key={entry.id} className="card lit atlas-card bookmark-card" draggable onClick={(event) => { if (!(event.target as Element).closest('button')) void window.nodus.openBrowserTab(entry.url); }} onDragStart={() => setDragging({ kind: 'bookmark', id: entry.id })}>
             <div className="atlas-card-top"><div className="bookmark-heading">{entry.faviconDataUrl ? <img className="bookmark-favicon" src={entry.faviconDataUrl} alt="" /> : <Icon name="globe" size={22} />}<h2><button type="button" onClick={() => void window.nodus.openBrowserTab(entry.url)}>{entry.title}</button></h2></div><span className="atlas-access">Saved</span></div>
             <div className="atlas-geo">{new URL(entry.url).hostname}{location.length ? ` · ${location.join(' › ')}` : ''}</div>
             <p className="atlas-description">{entry.description || 'A website saved privately in Nodus Bookmarks.'}</p>
@@ -301,6 +319,7 @@ export function NodusBookmarksPage({ store, onEditBookmark, onNewBookmark, onNew
               <button className="atlas-open" type="button" onClick={() => void window.nodus.openBrowserTab(entry.url)}>Open <Icon name="external" size={13} /></button>
               <button className="atlas-open" type="button" onClick={() => onEditBookmark(entry)}>Edit</button>
               <button className="atlas-open" type="button" onClick={() => void navigator.clipboard.writeText(entry.url)}>Copy URL</button>
+              <button className="atlas-open bookmark-delete" type="button" data-testid="browser-bookmark-card-delete" onClick={() => setDeleteConfirmation({ ref: { kind: 'bookmark', id: entry.id }, label: entry.title })}><Icon name="trash" size={13} /> Delete</button>
             </div>
           </article>
         );
@@ -308,6 +327,17 @@ export function NodusBookmarksPage({ store, onEditBookmark, onNewBookmark, onNew
       {!folders.length && !bookmarks.length && (
         <div className="atlas-empty"><h2>{query ? 'No matching bookmarks' : folder ? 'This folder is empty' : 'No bookmarks yet'}</h2><p>{query ? 'Search includes titles, URLs, descriptions and folder names.' : 'Save websites from Nodus Browser or Research Atlas to build your personal research start page.'}</p><div className="flex justify-center gap-2"><button className="atlas-open" onClick={() => onNewBookmark(folderId)}>Add a bookmark</button><button className="atlas-open" onClick={() => void window.nodus.openBrowserTab(NODUS_RESEARCH_ATLAS_URL)}>Open Research Atlas</button></div></div>
       )}
+      {deleteConfirmation && <ConfirmModal
+        title={`Delete “${deleteConfirmation.label}”?`}
+        message={deleteConfirmation.ref.kind === 'folder'
+          ? 'The folder and everything inside it will be deleted.'
+          : 'This bookmark will be removed from Nodus Bookmarks.'}
+        confirmLabel={deleting ? 'Deleting…' : 'Delete'}
+        danger
+        zIndex={160}
+        onCancel={() => { if (!deleting) setDeleteConfirmation(null); }}
+        onConfirm={() => void remove()}
+      />}
     </StartShell>
   );
 }

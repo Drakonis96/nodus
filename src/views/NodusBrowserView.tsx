@@ -621,6 +621,7 @@ export function NodusBrowserView() {
             onEditBookmark={(bookmark) => { setReturnToBookmarksManager(false); setBookmarkEditor({ mode: 'edit', bookmark }); }}
             onNewBookmark={createManualBookmark}
             onNewFolder={() => setBookmarksManager(true)}
+            onNotice={setNotice}
           />
         )}
         {active?.kind === 'atlas' && (
