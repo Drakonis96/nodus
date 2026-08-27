@@ -10,6 +10,7 @@ import {
   detectCompassLanguage,
   normalizeCompassTerm,
 } from "./compassVocabulary";
+import { probableCompassAuthorName } from "./authorNames";
 
 const LANGUAGES: Record<string, string> = {
   english: "en",
@@ -127,6 +128,7 @@ function identifiers(query: string): CompassIdentifier[] {
       out.push({ scheme: "isbn", value });
   }
   for (const [scheme, expression] of [
+    ["orcid", /\b(?:ORCID[:\s]*)?(\d{4}-\d{4}-\d{4}-\d{3}[\dX])\b/gi],
     ["pmid", /\bPMID[:\s]*(\d{5,10})\b/gi],
     ["pmcid", /\b(PMC\d{4,12})\b/gi],
     ["arxiv", /\b(?:arXiv:)?(\d{4}\.\d{4,5}(?:v\d+)?)\b/gi],
@@ -134,8 +136,15 @@ function identifiers(query: string): CompassIdentifier[] {
   ] as const)
     for (const match of query.matchAll(expression))
       out.push({ scheme, value: match[1] });
+  const orcids = out
+    .filter((entry) => entry.scheme === "orcid")
+    .map((entry) => entry.value);
   return out.filter(
     (entry, index, all) =>
+      !(
+        entry.scheme === "issn" &&
+        orcids.some((orcid) => orcid.includes(entry.value))
+      ) &&
       all.findIndex(
         (other) =>
           other.scheme === entry.scheme &&
@@ -197,14 +206,18 @@ export function interpretCompassQuery(
       (match) => match[1],
     ),
   );
-  const authors = unique(
+  const explicitAuthors = unique(
     [
       ...source.matchAll(
-        /(?:author|autor|autora|auteur|by|por):\s*("[^"]+"|[^,;]+)/gi,
+        /(?:author|autor|autora|auteur|by|por):\s*(?:"([^"]+)"|([^,;]+?))(?=\s+(?:type|tipo|language|lang|idioma|langue|venue|journal|revista|publication|publicación):|[,;]|$)/gi,
       ),
-    ].map((match) => match[1].replaceAll('"', "").trim()),
+    ].map((match) => (match[1] || match[2]).trim()),
     300,
   );
+  const bareAuthor = explicitAuthors.length
+    ? null
+    : probableCompassAuthorName(source);
+  const authors = bareAuthor ? unique([bareAuthor], 300) : explicitAuthors;
   const venues = unique(
     [
       ...source.matchAll(

@@ -8,6 +8,7 @@ const EN: Record<string, string> = {
     "Discover academic literature across open sources.",
   "Buscar literatura": "Search literature",
   Buscar: "Search",
+  "Limpiar resultados": "Clear results",
   "Interpretar con IA": "Interpret with AI",
   Filtros: "Filters",
   "Limpiar filtros": "Clear filters",
@@ -158,6 +159,7 @@ const FR: Record<string, string> = {
     "Découvrez la littérature académique dans des sources ouvertes.",
   "Buscar literatura": "Rechercher dans la littérature",
   Buscar: "Rechercher",
+  "Limpiar resultados": "Effacer les résultats",
   Filtros: "Filtres",
   "Limpiar filtros": "Effacer les filtres",
   Desde: "De",
@@ -219,6 +221,7 @@ const FR: Record<string, string> = {
 const DE: Record<string, string> = {
   ...EN,
   Buscar: "Suchen",
+  "Limpiar resultados": "Ergebnisse löschen",
   Filtros: "Filter",
   "Cargar más": "Mehr laden",
   Guardar: "Speichern",
@@ -255,6 +258,7 @@ const DE: Record<string, string> = {
 const PT: Record<string, string> = {
   ...EN,
   Buscar: "Pesquisar",
+  "Limpiar resultados": "Limpar resultados",
   Filtros: "Filtros",
   "Cargar más": "Carregar mais",
   Guardar: "Guardar",
@@ -292,6 +296,7 @@ const PT_BR: Record<string, string> = { ...PT, "Cargar más": "Carregar mais" };
 const IT: Record<string, string> = {
   ...EN,
   Buscar: "Cerca",
+  "Limpiar resultados": "Cancella risultati",
   Filtros: "Filtri",
   "Cargar más": "Carica altro",
   Guardar: "Salva",
@@ -328,6 +333,7 @@ const IT: Record<string, string> = {
 const TR: Record<string, string> = {
   ...EN,
   Buscar: "Ara",
+  "Limpiar resultados": "Sonuçları temizle",
   Filtros: "Filtreler",
   "Cargar más": "Daha fazla yükle",
   Guardar: "Kaydet",

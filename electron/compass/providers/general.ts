@@ -16,6 +16,7 @@ import {
   text,
   xmlValues,
 } from "./provider";
+import { compassAuthorNameScore } from "../authorNames";
 
 const authors = (values: unknown[]) =>
   values
@@ -54,16 +55,53 @@ function openAlex(): CompassProviderAdapter {
       );
       return page([mapOpenAlex(data)], "openalex", undefined, "OpenAlex");
     }
+    const orcid = context.query.identifiers.find(
+      (entry) => entry.scheme === "orcid",
+    )?.value;
+    const requestedAuthor = context.query.authors[0];
+    let resolvedAuthorIds: string[] = [];
+    if (orcid) {
+      const { data } = await requestJson(
+        `https://api.openalex.org/authors/https://orcid.org/${encodeURIComponent(orcid)}`,
+        context.signal,
+      );
+      if (data?.id) resolvedAuthorIds = [text(data.id).split("/").pop()!];
+    } else if (requestedAuthor) {
+      const authorUrl = new URL("https://api.openalex.org/authors");
+      authorUrl.searchParams.set("search", requestedAuthor);
+      authorUrl.searchParams.set("per-page", "10");
+      const { data } = await requestJson(authorUrl.toString(), context.signal);
+      const matchingAuthors = (Array.isArray(data?.results) ? data.results : [])
+        .filter(
+          (entry: any) =>
+            compassAuthorNameScore(requestedAuthor, text(entry?.display_name)) >=
+            0.9,
+        )
+        .sort(
+          (left: any, right: any) =>
+            Number(Boolean(right?.orcid)) - Number(Boolean(left?.orcid)) ||
+            Number(right?.works_count ?? 0) - Number(left?.works_count ?? 0),
+        )
+        .slice(0, 3);
+      resolvedAuthorIds = matchingAuthors
+        .slice(0, matchingAuthors[0]?.orcid ? 1 : 3)
+        .map((entry: any) => text(entry?.id).split("/").pop())
+        .filter(Boolean);
+    }
     const url = new URL("https://api.openalex.org/works");
     const expression = queryFor(context);
-    // Anonymous calls choose one paid search operation: semantic OR lexical.
-    url.searchParams.set(
-      context.strategy === "semantic" ? "search.semantic" : "search",
-      expression,
-    );
+    if (!resolvedAuthorIds.length)
+      // Anonymous calls choose one paid search operation: semantic OR lexical.
+      url.searchParams.set(
+        context.strategy === "semantic" ? "search.semantic" : "search",
+        expression,
+      );
     url.searchParams.set("per-page", "25");
     url.searchParams.set("cursor", context.cursor ?? "*");
     const filters = [
+      resolvedAuthorIds.length
+        ? `author.id:${resolvedAuthorIds.join("|")}`
+        : "",
       context.query.fromYear
         ? `from_publication_date:${context.query.fromYear}-01-01`
         : "",
@@ -140,8 +178,14 @@ function mapOpenAlex(work: any) {
 function core(): CompassProviderAdapter {
   return adapter(providerDescriptor("core"), async (context) => {
     const url = new URL("https://api.core.ac.uk/v3/search/works");
-    url.searchParams.set("q", queryFor(context));
-    url.searchParams.set("limit", "1");
+    const requestedAuthor = context.query.authors[0];
+    url.searchParams.set(
+      "q",
+      requestedAuthor
+        ? `authors:"${requestedAuthor.replaceAll('"', "")}"`
+        : queryFor(context),
+    );
+    url.searchParams.set("limit", requestedAuthor ? "25" : "1");
     url.searchParams.set("offset", context.cursor ?? "0");
     const { data } = await requestJson(url.toString(), context.signal);
     const items = Array.isArray(data?.results) ? data.results : [];
@@ -179,7 +223,7 @@ function core(): CompassProviderAdapter {
     return page(
       records,
       "core",
-      records.length === 1 &&
+      records.length === (requestedAuthor ? 25 : 1) &&
         offset + records.length < Number(data?.totalHits ?? Infinity)
         ? String(offset + records.length)
         : undefined,
@@ -255,7 +299,13 @@ function openAire(): CompassProviderAdapter {
   return adapter(providerDescriptor("openaire"), async (context) => {
     const pageNumber = Math.max(1, Number(context.cursor ?? 1));
     const url = new URL("https://api.openaire.eu/search/publications");
-    url.searchParams.set("keywords", queryFor(context));
+    const orcid = context.query.identifiers.find(
+      (entry) => entry.scheme === "orcid",
+    )?.value;
+    if (orcid) url.searchParams.set("orcid", orcid);
+    else if (context.query.authors[0])
+      url.searchParams.set("author", context.query.authors[0]);
+    else url.searchParams.set("keywords", queryFor(context));
     url.searchParams.set("size", "25");
     url.searchParams.set("page", String(pageNumber));
     if (context.query.fromYear)

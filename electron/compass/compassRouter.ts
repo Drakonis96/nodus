@@ -32,6 +32,7 @@ export function routeCompassRequests(plan: CompassQueryPlan): CompassRoute[] {
   const types = new Set(plan.types);
   const doi = plan.identifiers.some((entry) => entry.scheme === "doi");
   const isbn = plan.identifiers.some((entry) => entry.scheme === "isbn");
+  const orcid = plan.identifiers.some((entry) => entry.scheme === "orcid");
   if (plan.mode === "similar")
     return [
       route("openalex", "semantic", "scholarly"),
@@ -75,6 +76,22 @@ export function routeCompassRequests(plan: CompassQueryPlan): CompassRoute[] {
       route("gallica", "strict", "primary"),
     ];
   else {
+    if (orcid)
+      return unique([
+        route("openalex", "identifier"),
+        route("crossref", "identifier"),
+        route("datacite", "identifier"),
+        route("openaire", "identifier"),
+      ]).filter((entry) => use(entry.provider));
+    if (plan.authors.length)
+      return unique([
+        route("openalex", "strict"),
+        route("crossref", "strict"),
+        route("datacite", "strict"),
+        route("zenodo", "strict"),
+        route("core", "strict"),
+        route("openaire", "strict"),
+      ]).filter((entry) => use(entry.provider));
     routes.push(
       route("openalex"),
       route(

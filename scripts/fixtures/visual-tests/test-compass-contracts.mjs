@@ -99,6 +99,64 @@ test("natural-language interpretation extracts phrases, exclusions, years, langu
   );
 });
 
+test("author queries are detected without turning thematic searches into people", async () => {
+  const { interpretCompassQuery } = await load(
+    "electron/compass/compassQueryInterpreter.ts",
+    "query-authors",
+  );
+  assert.deepEqual(
+    interpretCompassQuery("Jorge Pérez Burgueño").authors,
+    ["jorge pérez burgueño"],
+  );
+  assert.deepEqual(
+    interpretCompassQuery("Pérez Burgueño, Jorge").authors,
+    ["pérez burgueño, jorge"],
+  );
+  assert.deepEqual(
+    interpretCompassQuery('autor:"Jorge Pérez Burgueño" type:article').authors,
+    ["jorge pérez burgueño"],
+  );
+  assert.deepEqual(interpretCompassQuery("Open Science").authors, []);
+  assert.deepEqual(interpretCompassQuery("Historia Digital").authors, []);
+  assert.deepEqual(interpretCompassQuery("Machine Learning").authors, []);
+  assert.deepEqual(interpretCompassQuery("Computer Vision").authors, []);
+  assert.deepEqual(
+    interpretCompassQuery("ORCID: 0000-0002-1150-1930").identifiers,
+    [{ scheme: "orcid", value: "0000-0002-1150-1930" }],
+  );
+});
+
+test("author matching tolerates diacritics, display order and initials but requires the surnames", async () => {
+  const { compassAuthorNameScore, compassAuthorQueryVariants } = await load(
+    "electron/compass/authorNames.ts",
+    "author-names",
+  );
+  assert.equal(
+    compassAuthorNameScore("Jorge Pérez Burgueño", "Pérez Burgueño, Jorge"),
+    1,
+  );
+  assert.equal(
+    compassAuthorNameScore("Jorge Pérez Burgueño", "Jorge Perez Burgueno"),
+    1,
+  );
+  assert.ok(
+    compassAuthorNameScore("Jorge Pérez Burgueño", "J. Pérez Burgueño") >= 0.9,
+  );
+  assert.ok(
+    compassAuthorNameScore("Jorge Pérez Burgueño", "Jorge Pérez") < 0.84,
+  );
+  assert.ok(
+    compassAuthorQueryVariants("Jorge Pérez Burgueño").includes(
+      "Pérez Burgueño, Jorge",
+    ),
+  );
+  assert.ok(
+    compassAuthorQueryVariants("Pérez Burgueño, Jorge").includes(
+      "Pérez Burgueño, Jorge",
+    ),
+  );
+});
+
 test("provider routing respects explicit selection and routes repository/type searches", async () => {
   const { routeCompassProviders } = await load(
     "electron/compass/compassRouter.ts",
@@ -132,6 +190,70 @@ test("provider routing respects explicit selection and routes repository/type se
     "openalex",
     "semanticscholar",
   ]);
+  const authorRoutes = routeCompassProviders(
+    interpretCompassQuery("Jorge Pérez Burgueño"),
+  );
+  assert.deepEqual(authorRoutes, [
+    "openalex",
+    "crossref",
+    "datacite",
+    "zenodo",
+    "core",
+    "openaire",
+  ]);
+  assert.deepEqual(
+    routeCompassProviders(
+      interpretCompassQuery("ORCID: 0000-0002-1150-1930"),
+    ),
+    ["openalex", "crossref", "datacite", "openaire"],
+  );
+});
+
+test("author ranking keeps genuine authors and rejects title-only name mentions", async () => {
+  const { interpretCompassQuery } = await load(
+    "electron/compass/compassQueryInterpreter.ts",
+    "query-author-ranking",
+  );
+  const { rankCompassResults } = await load(
+    "electron/workers/compassWorker.ts",
+    "worker-author-ranking",
+  );
+  const { author, result } = await load(
+    "electron/compass/providers/provider.ts",
+    "provider-author-ranking",
+  );
+  const make = (providerId, title, names, nativeRank) => {
+    const record = result({
+      provider: "openalex",
+      providerId,
+      title,
+      authors: names.map((name) => author(name)).filter(Boolean),
+      year: 2024,
+    });
+    record.nativeRank = nativeRank;
+    record.providerRanks.openalex = nativeRank;
+    return record;
+  };
+  const records = [
+    make("W1", "Análisis cuantitativo", ["Pérez Burgueño, Jorge"], 1),
+    make("W2", "Alfonso X", ["J. Pérez Burgueño", "Ada Lovelace"], 2),
+    make("W3", "Jorge Pérez Burgueño: perfil bibliográfico", ["Otra Persona"], 3),
+    make("W4", "Publicación homónima", ["Jorge Pérez García"], 4),
+  ];
+  const ranked = rankCompassResults(
+    interpretCompassQuery("Jorge Pérez Burgueño"),
+    records,
+    {},
+  );
+  assert.deepEqual(ranked.map((entry) => entry.provenance[0].providerId), [
+    "W1",
+    "W2",
+  ]);
+  assert.ok(
+    ranked.every((entry) =>
+      entry.reasons.some((reason) => reason.code === "author-match"),
+    ),
+  );
 });
 
 test("provider helpers normalize compact metadata, cap pages and create stable identifiers", async () => {
@@ -320,6 +442,118 @@ test("adapter pagination and transient provider failures are cancellable and ret
     );
     controller.abort();
     await assert.rejects(pending, /Abort|aborted/i);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("OpenAlex resolves an exact author profile before requesting works", async () => {
+  const { createCompassAdapters } = await load(
+    "electron/compass/providers/adapters.ts",
+    "author-adapters",
+  );
+  const { interpretCompassQuery } = await load(
+    "electron/compass/compassQueryInterpreter.ts",
+    "query-author-adapter",
+  );
+  const originalFetch = globalThis.fetch;
+  const requested = [];
+  try {
+    globalThis.fetch = async (input) => {
+      const url = String(input);
+      requested.push(url);
+      if (url.includes("/authors?"))
+        return Response.json({
+          results: [
+            {
+              id: "https://openalex.org/A5044132486",
+              display_name: "Jorge Pérez Burgueño",
+              orcid: "https://orcid.org/0000-0002-1150-1930",
+              works_count: 44,
+            },
+            {
+              id: "https://openalex.org/A-HOMONYM",
+              display_name: "Jorge Pérez Burgueño",
+              works_count: 2,
+            },
+          ],
+        });
+      return Response.json({
+        results: [
+          {
+            id: "https://openalex.org/W1",
+            title: "Análisis cuantitativo",
+            publication_year: 2023,
+            authorships: [
+              {
+                author: {
+                  display_name: "Jorge Pérez Burgueño",
+                  orcid: "https://orcid.org/0000-0002-1150-1930",
+                },
+              },
+            ],
+          },
+        ],
+        meta: {},
+      });
+    };
+    const pageResult = await createCompassAdapters().get("openalex").search({
+      query: interpretCompassQuery("Jorge Pérez Burgueño"),
+      filters: {},
+      strategy: "strict",
+      lane: "scholarly",
+      signal: new AbortController().signal,
+    });
+    assert.equal(pageResult.records.length, 1);
+    assert.equal(pageResult.records[0].authors[0].orcid, "0000-0002-1150-1930");
+    const worksUrl = new URL(requested.find((url) => url.includes("/works?")));
+    assert.equal(worksUrl.searchParams.get("filter"), "author.id:A5044132486");
+    assert.equal(worksUrl.searchParams.has("search"), false);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("Crossref author searches preserve relevance ordering on the first page", async () => {
+  const { createCompassAdapters } = await load(
+    "electron/compass/providers/adapters.ts",
+    "crossref-author-adapter",
+  );
+  const { interpretCompassQuery } = await load(
+    "electron/compass/compassQueryInterpreter.ts",
+    "query-crossref-author-adapter",
+  );
+  const originalFetch = globalThis.fetch;
+  let requested;
+  try {
+    globalThis.fetch = async (input) => {
+      requested = new URL(String(input));
+      return Response.json({
+        message: {
+          items: [
+            {
+              DOI: "10.18239/vdh_2023.12.21",
+              title: ["Análisis cuantitativo"],
+              author: [
+                { given: "Jorge", family: "Pérez Burgueño" },
+              ],
+            },
+          ],
+          "total-results": 1,
+        },
+      });
+    };
+    const pageResult = await createCompassAdapters().get("crossref").search({
+      query: interpretCompassQuery("Jorge Pérez Burgueño"),
+      filters: {},
+      strategy: "strict",
+      lane: "scholarly",
+      signal: new AbortController().signal,
+    });
+    assert.equal(requested.searchParams.get("query.author"), "jorge pérez burgueño");
+    assert.equal(requested.searchParams.get("offset"), "0");
+    assert.equal(requested.searchParams.has("cursor"), false);
+    assert.equal(pageResult.records[0].authors[0].name, "Jorge Pérez Burgueño");
   } finally {
     globalThis.fetch = originalFetch;
   }
