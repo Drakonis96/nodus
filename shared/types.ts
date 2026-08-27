@@ -2042,6 +2042,8 @@ export interface AppSettings {
   browserConnectorEnabled: boolean;
   /** Separate bearer token issued only after the user approves the browser extension pairing. */
   browserConnectorToken: string;
+  /** Canonical extension origin approved for the browser connector. Empty until pairing. */
+  browserConnectorOrigin: string;
   /**
    * User-defined order of the sidebar sections, as stable view/action ids. Excludes
    * 'home' (always pinned first) and 'settings' (always pinned last). Empty means
@@ -8521,10 +8523,7 @@ export interface BrowserApi {
   getBrowserDeviceVolume(): Promise<number>;
   setBrowserDeviceVolume(volume: number): Promise<void>;
   onBrowserMediaChanged(cb: (states: import('./browser').BrowserMediaState[]) => void): () => void;
-  captureBrowserPage(): Promise<{
-    request: import('./browserConnector').BrowserConnectorCaptureRequest & { snapshotAvailable?: boolean };
-    warnings: string[];
-  } | null>;
+  captureBrowserPage(): Promise<import('./browserConnector').BrowserConnectorCapturePreview | null>;
   saveBrowserCapture(
     request: import('./browserConnector').BrowserConnectorCaptureRequest,
     includeSnapshot: boolean,

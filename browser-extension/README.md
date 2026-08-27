@@ -15,9 +15,10 @@ The connector combines the same categories of evidence used by modern bibliograp
 - linked files advertised by the page.
 
 Nodus then enriches DOI, ISBN, PMID/PMCID and arXiv records through the desktop application's
-existing metadata resolvers. The user sees and may change the detected Zotero-compatible item type,
-select a nested editable Nodus collection, search existing tags, add more than one tag, choose files,
-and decide whether to retain a sanitized readable page snapshot.
+existing metadata resolvers. The user sees and may correct title, authors, date, publication, DOI and
+the detected Zotero-compatible item type; select a nested editable Nodus collection; review tags;
+choose files; and decide whether to retain a bounded readable page snapshot. Search/result pages
+that expose independent COinS or Schema.org records can be saved as a reviewed batch.
 
 Imported Zotero collections remain read-only. They can be synchronized by the Zotero workflow,
 while the browser connector writes to the Library root or to Nodus-owned collections. Saving an
@@ -45,15 +46,17 @@ Settings can rotate connector access for every installed browser.
 The extension uses `activeTab`, not permanent browsing-history access. It runs the detector only
 after a toolbar click. Its only mandatory origins are `127.0.0.1` and `localhost`, where Nodus
 exposes a token-authenticated, extension-origin-only API. Cross-site attachment access is optional
-and requested at save time for the exact site involved. The package contains no analytics,
-advertising, remotely hosted code, `eval`, or background worker.
+and requested for the exact site only after Nodus cannot retrieve the selected public URL itself;
+newly granted access is revoked after transfer. The package contains no analytics, advertising,
+remotely hosted code, or `eval`. Its Manifest V3 service worker runs only while a user-confirmed
+attachment transfer is active, so closing the popup does not interrupt a large file.
 
 Requests to the local Nodus API use extension-page `fetch()` with both the standard installed
 extension origin and a dedicated request marker. Current Chromium versions allow extensions with
 explicit loopback host access to set `Origin`; updated Nodus builds accept the marker only when an
 older Chromium build omits that header. Any request carrying an ordinary web origin is rejected.
-Enabling the connector in Nodus is the authorization step; token delivery is automatic and remains
-limited to installed-extension origins on the loopback-only API.
+Initial pairing requires confirmation in Nodus. The resulting token is bound to that exact
+extension origin and remains limited to the loopback-only API.
 
 See [PRIVACY.md](PRIVACY.md) for the Chrome Web Store disclosure and
 [STORE_LISTING.md](STORE_LISTING.md) for release instructions and permission justifications.

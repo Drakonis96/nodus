@@ -211,6 +211,7 @@ const DEFAULTS: Omit<AppSettings, 'providerKeys' | 'lockedProviderKeys'> = {
   zoteroPluginToken: '',
   browserConnectorEnabled: false,
   browserConnectorToken: '',
+  browserConnectorOrigin: '',
   sidebarOrder: [],
   sidebarHidden: [],
   sidebarCustomized: false,
@@ -283,6 +284,14 @@ export function getSettings(): AppSettings {
     }
   }
   const merged = { ...DEFAULTS, ...parsed };
+  // The browser connector stores one canonical extension origin. Treat malformed or
+  // hand-edited values as unpaired so they can never authorize a capability endpoint.
+  const browserOrigin = typeof merged.browserConnectorOrigin === 'string'
+    ? merged.browserConnectorOrigin.trim().toLowerCase()
+    : '';
+  merged.browserConnectorOrigin = /^(?:chrome|moz)-extension:\/\/[a-z0-9-]{16,80}$/.test(browserOrigin)
+    ? browserOrigin
+    : '';
   if (merged.libraryScope !== 'global' && merged.libraryScope !== 'vault') merged.libraryScope = 'vault';
   if (typeof merged.libraryGlobalEnabled !== 'boolean') merged.libraryGlobalEnabled = false;
   if (!Number.isInteger(merged.libraryScopeOnboardingVersion) || merged.libraryScopeOnboardingVersion < 0) {
@@ -444,6 +453,15 @@ export function getSettings(): AppSettings {
 }
 
 export function updateSettings(patch: Partial<AppSettings>): AppSettings {
+  if (patch.browserConnectorOrigin !== undefined) {
+    const value = typeof patch.browserConnectorOrigin === 'string'
+      ? patch.browserConnectorOrigin.trim().toLowerCase()
+      : '';
+    patch = {
+      ...patch,
+      browserConnectorOrigin: /^(?:chrome|moz)-extension:\/\/[a-z0-9-]{16,80}$/.test(value) ? value : '',
+    };
+  }
   if (patch.mascotScale !== undefined) {
     patch = { ...patch, mascotScale: normalizeNodiScale(patch.mascotScale) };
   }

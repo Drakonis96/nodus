@@ -7671,4 +7671,13 @@ export const IT: Record<string, string> = {
   "El PDF está escaneado y no tiene capa de texto. Activa OCR y vuelve a analizar.": "Il PDF è scansionato e non contiene un livello di testo. Attiva l’OCR e analizzalo di nuovo.",
   "El adjunto no produjo texto utilizable. Revisa el archivo o activa OCR.": "L’allegato non ha prodotto testo utilizzabile. Controlla il file o attiva l’OCR.",
   "El formato del adjunto no es compatible con la extracción de texto.": "Il formato dell’allegato non è supportato per l’estrazione del testo.",
+  "Selecciona al menos una referencia.": "Seleziona almeno un riferimento.",
+  "{n} referencias": "{n} riferimenti",
+  "Ya estaba en Nodus": "Era già in Nodus",
+  "Referencia actualizada": "Riferimento aggiornato",
+  "No se ha creado ningún duplicado.": "Non è stato creato alcun duplicato.",
+  "Se han guardado {n} referencias.": "Sono stati salvati {n} riferimenti.",
+  "{n} referencias detectadas": "{n} riferimenti rilevati",
+  "Un autor por línea": "Un autore per riga",
+  "Guardar {n} referencias": "Salva {n} riferimenti",
 };

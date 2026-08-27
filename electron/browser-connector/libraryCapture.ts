@@ -16,8 +16,11 @@ import { normalizeLibraryMetadata } from '../library/libraryRecord';
 import {
   addGlobalLibraryAttachments,
   createGlobalLibraryItem,
+  findGlobalLibraryItemByMetadata,
   getGlobalLibraryItem,
   listGlobalLibraryCollections,
+  mergeGlobalLibraryItemMetadataIfMissing,
+  patchGlobalLibraryItemCollections,
   resolveGlobalLibraryMetadata,
   updateGlobalLibraryAttachment,
 } from '../library/libraryService';
@@ -31,6 +34,20 @@ import {
 
 const MAX_REMOTE_BYTES = MAX_PUBLIC_DOWNLOAD_BYTES;
 const MAX_SNAPSHOT_CHARS = 6 * 1024 * 1024;
+
+// Keep the lookup/merge/create section atomic within the Electron process.
+// Attachment downloads happen after this short critical section, so a slow
+// publisher never blocks unrelated captures while still preventing two
+// simultaneous captures from both creating the same record.
+let captureMutationTail: Promise<void> = Promise.resolve();
+
+async function serializeCaptureMutation<T>(operation: () => T | Promise<T>): Promise<T> {
+  const previous = captureMutationTail;
+  let release!: () => void;
+  captureMutationTail = new Promise<void>((resolve) => { release = resolve; });
+  await previous;
+  try { return await operation(); } finally { release(); }
+}
 
 function cleanText(value: unknown, limit = 10_000): string {
   return typeof value === 'string' ? value.replace(/\s+/g, ' ').trim().slice(0, limit) : '';
@@ -128,7 +145,25 @@ export async function saveBrowserCapture(request: BrowserConnectorCaptureRequest
   const preview = await previewBrowserCapture(request);
   const tags = [...new Set([...(preview.metadata.tags ?? []), ...(request.tags ?? [])].map((entry) => cleanText(entry, 200)).filter(Boolean))].slice(0, 256);
   const collectionId = editableCollectionId(request.collectionId);
-  let record = createGlobalLibraryItem({ ...preview.metadata, tags }, collectionId ? [collectionId] : []);
+  const incomingMetadata = { ...preview.metadata, tags };
+  const resolution = await serializeCaptureMutation(async () => {
+    const match = findGlobalLibraryItemByMetadata(incomingMetadata);
+    const initialRevision = match?.item.clock.revision ?? null;
+    let record = match
+      ? mergeGlobalLibraryItemMetadataIfMissing(match.item.id, incomingMetadata)
+      : createGlobalLibraryItem(incomingMetadata, collectionId ? [collectionId] : []);
+    let changed = !match;
+    if (match && collectionId && !record.collectionIds.includes(collectionId)) {
+      await patchGlobalLibraryItemCollections([record.id], { add: [collectionId] });
+      record = getGlobalLibraryItem(record.id) ?? record;
+      changed = true;
+    }
+    changed ||= initialRevision !== record.clock.revision;
+    return { match, record, changed };
+  });
+  const { match } = resolution;
+  let record = resolution.record;
+  let changed = resolution.changed;
   const warnings = [...preview.warnings];
   const pendingUploads: BrowserConnectorPendingUpload[] = [];
   const attachments = [...new Map((request.attachments ?? []).slice(0, 8).flatMap((entry) => {
@@ -152,7 +187,9 @@ export async function saveBrowserCapture(request: BrowserConnectorCaptureRequest
         const response = await fetchPublicAttachment(candidate.url);
         temporary = await responseToTemporaryFile(response, candidate);
       }
+      const beforeAttachmentRevision = record.clock.revision;
       record = await attachFile(record.id, temporary.file, candidate, index === 0 && candidate.role === 'original');
+      changed ||= record.clock.revision !== beforeAttachmentRevision;
     } catch (error) {
       const reason = error instanceof Error ? error.message : String(error);
       warnings.push(`${candidate.title || candidate.url}: ${reason}`);
@@ -167,7 +204,9 @@ export async function saveBrowserCapture(request: BrowserConnectorCaptureRequest
     const file = path.join(dir, 'webpage.html');
     try {
       await fs.promises.writeFile(file, request.snapshotHtml, { encoding: 'utf8', mode: 0o600 });
+      const beforeSnapshotRevision = record.clock.revision;
       record = await attachFile(record.id, file, { url: request.pageUrl, title: 'Web page snapshot', mimeType: 'text/html', role: 'snapshot' });
+      changed ||= record.clock.revision !== beforeSnapshotRevision;
     } finally {
       await fs.promises.rm(dir, { recursive: true, force: true });
     }
@@ -178,6 +217,9 @@ export async function saveBrowserCapture(request: BrowserConnectorCaptureRequest
   return {
     ok: true,
     itemId: record.id,
+    disposition: !match ? 'created' : changed ? 'updated' : 'existing',
+    deduplicated: !!match,
+    ...(match ? { matchedBy: match.matchedBy } : {}),
     title: record.metadata.title,
     attachmentCount: record.attachments.length,
     extractionStatus: record.extraction?.status ?? null,
@@ -202,6 +244,8 @@ export async function uploadBrowserAttachment(itemId: string, bytes: Uint8Array,
     return {
       ok: true,
       itemId: saved.id,
+      disposition: saved.clock.revision === current.clock.revision ? 'existing' : 'updated',
+      deduplicated: false,
       title: saved.metadata.title,
       attachmentCount: saved.attachments.length,
       extractionStatus: saved.extraction?.status ?? null,

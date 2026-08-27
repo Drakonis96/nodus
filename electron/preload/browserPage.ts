@@ -31,7 +31,7 @@ import { isNodusResearchSiteUrl } from '../../shared/browser';
 // loads. It is pure ESM with no Chrome API and no DOM access, so both consumers
 // share the Highwire / JSON-LD / COinS / Dublin Core / OpenGraph parsing rather
 // than maintaining two implementations that must agree.
-import { detectCapture } from '../../browser-extension/lib/detector.js';
+import { detectCaptureCandidates } from '../../browser-extension/lib/multi-capture.js';
 import { collectPageSnapshot } from './browserPageSnapshot';
 import {
   anyPlaying,
@@ -263,7 +263,10 @@ ipcRenderer.on('nodus-browser:page:collect', (_event, requestId: string, what: s
       const snapshot = collectPageSnapshot();
       // detectCapture throws on a page with no usable URL; a null payload is the
       // honest answer, and main reports it rather than inventing metadata.
-      payload = snapshot ? detectCapture(snapshot as never) : null;
+      if (snapshot) {
+        const candidates = detectCaptureCandidates(snapshot as never);
+        payload = candidates.length > 1 ? candidates : candidates[0] ?? null;
+      }
     } else if (what === 'pdf') {
       const contentType = String(textPage.document?.contentType ?? '');
       payload = { isPdf: contentType === 'application/pdf', url: clip(textPage.location?.href, 2048) };

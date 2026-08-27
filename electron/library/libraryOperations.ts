@@ -933,6 +933,55 @@ export class LibraryOperations {
     return desired;
   }
 
+  /**
+   * Fill only genuinely absent metadata on an existing record. This is used
+   * by browser capture and deliberately differs from a user metadata edit:
+   * existing values and explicit overrides always win. Arrays of identifiers
+   * and tags are additive, while `extra` is merged by missing key only.
+   */
+  mergeItemMetadataIfMissing(itemId: string, incoming: LibraryItemMetadata): LibraryItemRecord {
+    const current = this.item(itemId);
+    const source = normalizeLibraryMetadata(incoming, current.metadata.title);
+    const overrides = new Set(Object.keys(current.metadataOverrides ?? {}));
+    const merged = { ...current.metadata } as LibraryItemMetadata;
+    let changed = false;
+    const isBlank = (value: unknown): boolean => value == null || value === '' || (Array.isArray(value) && value.length === 0);
+    const scalarKeys: Array<keyof LibraryItemMetadata> = [
+      'abstract', 'date', 'language', 'publisher', 'publicationTitle', 'volume', 'issue', 'pages',
+      'edition', 'place', 'rights', 'url', 'doi', 'pmid', 'pmcid', 'arxiv',
+    ];
+    if ((!current.metadata.title || current.metadata.title === 'Documento sin título') && source.title && !overrides.has('title')) {
+      merged.title = source.title; changed = true;
+    }
+    if ((current.metadata.itemType === 'document' && source.itemType !== 'document') && !overrides.has('itemType')) {
+      merged.itemType = source.itemType; changed = true;
+    }
+    if (!current.metadata.creators.length && source.creators.length && !overrides.has('creators')) {
+      merged.creators = source.creators; changed = true;
+    }
+    if (current.metadata.year == null && source.year != null && !overrides.has('year')) {
+      merged.year = source.year; changed = true;
+    }
+    for (const key of scalarKeys) {
+      if (overrides.has(key) || !isBlank(merged[key]) || isBlank(source[key])) continue;
+      (merged as any)[key] = source[key]; changed = true;
+    }
+    for (const key of ['isbn', 'issn', 'tags'] as const) {
+      if (overrides.has(key)) continue;
+      const values = [...new Set([...(merged[key] ?? []), ...(source[key] ?? [])])];
+      if (values.length !== (merged[key] ?? []).length) { (merged as any)[key] = values; changed = true; }
+    }
+    if (!overrides.has('extra')) {
+      const extra = { ...(merged.extra ?? {}) };
+      for (const [key, value] of Object.entries(source.extra ?? {})) if (extra[key] == null || extra[key] === '') { extra[key] = value; changed = true; }
+      if (Object.keys(extra).length) merged.extra = extra;
+    }
+    if (!changed) return current;
+    const result = this.store.upsertItem({ ...current, metadata: normalizeLibraryMetadata(merged) }, current.clock.revision);
+    this.catalog.indexItem(result, this.store);
+    return result;
+  }
+
   updateCitationKey(itemId: string, preferred: string): LibraryItemRecord {
     const current = this.item(itemId);
     const used = this.catalog.citationKeys(current.id);

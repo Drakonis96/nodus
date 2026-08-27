@@ -79,6 +79,33 @@ export function normalizeLibraryDedupTitle(value: string | undefined): string {
     .replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
 }
 
+/**
+ * Canonical URL used only as a conservative duplicate hint.  Tracking
+ * parameters and fragments are not part of a page identity, while meaningful
+ * query parameters are retained.  Root/home-page URLs are intentionally
+ * rejected by callers because they are too broad to identify a work.
+ */
+export function normalizeLibraryDedupUrl(value: string | undefined): string {
+  if (!value) return '';
+  try {
+    const url = new URL(value.trim());
+    if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password) return '';
+    url.hash = '';
+    url.hostname = url.hostname.toLocaleLowerCase();
+    if ((url.protocol === 'http:' && url.port === '80') || (url.protocol === 'https:' && url.port === '443')) url.port = '';
+    const tracking = /^(?:utm_[^=]+|fbclid|gclid|mc_cid|mc_eid)$/i;
+    const kept = [...url.searchParams.entries()]
+      .filter(([key]) => !tracking.test(key))
+      .sort(([leftKey, leftValue], [rightKey, rightValue]) => leftKey.localeCompare(rightKey) || leftValue.localeCompare(rightValue));
+    url.search = '';
+    for (const [key, entry] of kept) url.searchParams.append(key, entry);
+    if (url.pathname.length > 1) url.pathname = url.pathname.replace(/\/+$/, '');
+    return url.toString();
+  } catch {
+    return '';
+  }
+}
+
 export function libraryCreatorDedupKey(creators: LibraryCreator[] | undefined): string {
   const first = creators?.find((creator) => creator.creatorType === 'author' || creator.creatorType === 'bookAuthor') ?? creators?.[0];
   return normalizeLibraryDedupTitle(first?.name || [first?.firstName, first?.lastName].filter(Boolean).join(' '));

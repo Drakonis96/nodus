@@ -39,6 +39,11 @@
     </section>
 
     <section id="capture-view" class="capture hidden">
+      <section id="multi-capture-block" class="multi-capture hidden">
+        <div class="multi-capture-heading"><strong id="multi-capture-title"></strong><small data-i18n="multipleHint">Choose the references to save together.</small></div>
+        <div id="multi-capture-list" class="multi-capture-list"></div>
+      </section>
+
       <article class="document-card">
         <div id="type-icon" class="type-icon" aria-hidden="true">Aa</div>
         <div class="document-copy">
@@ -48,6 +53,14 @@
           <p id="document-byline"></p>
         </div>
       </article>
+
+      <button id="metadata-toggle" class="metadata-toggle" type="button" aria-expanded="false"><span data-i18n="editMetadata">Edit metadata</span><span aria-hidden="true">⌄</span></button>
+      <section id="metadata-panel" class="metadata-panel hidden">
+        <label><span data-i18n="title">Title</span><input id="metadata-title" type="text"></label>
+        <label><span data-i18n="authors">Authors</span><textarea id="metadata-creators" rows="3" data-i18n-placeholder="authorsHint" placeholder="One author per line"></textarea></label>
+        <div class="metadata-grid"><label><span data-i18n="date">Date</span><input id="metadata-date" type="text"></label><label><span>DOI</span><input id="metadata-doi" type="text"></label></div>
+        <label><span data-i18n="publication">Publication</span><input id="metadata-publication" type="text"></label>
+      </section>
 
       <div id="enrichment-status" class="inline-status hidden"><span class="mini-spinner"></span><span data-i18n="enriching">Checking bibliographic metadata…</span></div>
 
@@ -81,7 +94,7 @@
 
     <section id="success-view" class="center-state hidden">
       <span class="success-icon">✓</span>
-      <strong data-i18n="saved">Saved to Nodus</strong>
+      <strong id="success-title" data-i18n="saved">Saved to Nodus</strong>
       <p id="success-summary"></p>
       <div id="success-warnings" class="warning-list hidden"></div>
       <div class="success-actions"><button id="open-button" class="primary-button" type="button" data-i18n="openInNodus">Open in Nodus</button><button id="done-button" class="secondary-button" type="button" data-i18n="done">Done</button></div>

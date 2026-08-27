@@ -17,10 +17,11 @@ const scratch = await mkdtemp(path.join(os.tmpdir(), 'nodus-browser-connector-')
 const userData = path.join(scratch, 'profile');
 const backups = path.join(scratch, 'backups');
 const port = 4500 + (process.pid % 1000);
-const origin = 'chrome-extension://aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
+const origin = 'chrome-extension://ilcclajjhofhieoljdjmikmfopfbamej';
+const developmentOrigin = 'chrome-extension://aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
 let nativePromptCalls = 0;
 const electron = installRuntimeHooks(userData, {
-  dialog: { showMessageBox: async () => { nativePromptCalls += 1; return { response: 1 }; } },
+  dialog: { showMessageBox: async () => { nativePromptCalls += 1; return { response: 0 }; } },
   shell: { openExternal: async () => undefined },
 });
 electron.BrowserWindow.getFocusedWindow = () => null;
@@ -58,7 +59,9 @@ try {
   assert.equal(markerHealthResponse.status, 200, 'an extension marker works when Chromium omits Origin');
   assert.equal(markerHealthResponse.headers.get('access-control-allow-origin'), origin);
 
-  assert.equal((await fetch(`${base}/api/browser/health`, { headers: { Origin: 'https://malicious.example' } })).status, 403);
+  const maliciousHealth = await fetch(`${base}/api/browser/health`, { headers: { Origin: 'https://malicious.example' } });
+  assert.equal(maliciousHealth.status, 403);
+  assert.equal(maliciousHealth.headers.get('access-control-allow-origin'), null, 'web origins never receive reflected CORS');
   assert.equal((await fetch(`${base}/api/browser/health`, {
     headers: { Origin: 'https://malicious.example', 'X-Nodus-Extension-Origin': origin },
   })).status, 403, 'a web origin cannot override its identity with the extension marker');
@@ -77,13 +80,32 @@ try {
 
   const pair = await (await fetch(`${base}/api/browser/pair`, {
     method: 'POST', headers: { ...extensionHeaders, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ extensionVersion: '4.1.3', pageUrl: 'https://journal.example/article' }),
+    body: JSON.stringify({ extensionVersion: '4.1.3', extensionId: 'ilcclajjhofhieoljdjmikmfopfbamej', pageUrl: 'https://journal.example/article' }),
   })).json();
   assert.equal(pair.token, 'browser-test-token');
-  assert.equal(nativePromptCalls, 0, 'enabling the connector is sufficient; pairing never opens a native prompt');
+  assert.equal(pair.official, true);
+  assert.equal(nativePromptCalls, 2, 'every unauthenticated token delivery requires native user confirmation');
+
+  const wrongExtensionPair = await fetch(`${base}/api/browser/pair`, {
+    method: 'POST', headers: { Origin: developmentOrigin, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ extensionId: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' }),
+  });
+  assert.equal(wrongExtensionPair.status, 403, 'a second extension cannot take over the pairing');
+  assert.equal(nativePromptCalls, 2, 'a rejected second origin must not open a misleading prompt');
+  const wrongOriginCapability = await fetch(`${base}/api/browser/catalog`, {
+    headers: { Origin: developmentOrigin, Authorization: 'Bearer browser-test-token' },
+  });
+  assert.equal(wrongOriginCapability.status, 403, 'the bearer token is bound to the approved origin');
+  assert.equal(wrongOriginCapability.headers.get('access-control-allow-origin'), developmentOrigin, 'extension callers need CORS to receive the pairing rejection');
 
   const catalog = await (await fetch(`${base}/api/browser/catalog`, { headers: authHeaders })).json();
   assert.deepEqual(catalog.collections.map((entry) => entry.name), ['History', 'Women']);
+
+  const invalidCapture = await fetch(`${base}/api/browser/preview`, {
+    method: 'POST', headers: authHeaders,
+    body: JSON.stringify({ pageUrl: 'file:///etc/passwd', metadataSource: 'generic', metadata: { title: 'Blocked' } }),
+  });
+  assert.equal(invalidCapture.status, 400, 'extension captures are sanitized at the server boundary');
 
   const capture = {
     pageUrl: 'https://journal.example/article', metadataSource: 'highwire', collectionId: women.id,
@@ -103,6 +125,18 @@ try {
   assert.deepEqual(stored.collectionIds, [women.id]);
   assert.deepEqual(stored.metadata.tags.sort(), ['migration', 'women']);
 
+  const unsafeSnapshotResponse = await fetch(`${base}/api/browser/save`, {
+    method: 'POST', headers: authHeaders,
+    body: JSON.stringify({
+      ...capture,
+      metadata: { ...capture.metadata, title: 'Passive snapshot boundary check' },
+      snapshotHtml: '<main><a href="java&#x73;cript:alert(1)">unsafe</a><img/src="https://tracker.example/pixel"></main>',
+    }),
+  });
+  assert.equal(unsafeSnapshotResponse.status, 200);
+  const unsafeSnapshot = library.getGlobalLibraryItem((await unsafeSnapshotResponse.json()).itemId);
+  assert.equal(unsafeSnapshot.attachments.length, 0, 'active links and remote media are discarded before snapshot storage');
+
   const upload = await fetch(`${base}/api/browser/items/${encodeURIComponent(saved.itemId)}/attachments`, {
     method: 'POST',
     headers: {
@@ -121,6 +155,13 @@ try {
   assert.ok(libraryRoot);
   const storageFolder = encodeURIComponent(attached.storageId).replace(/\./g, '%2E');
   assert.ok(existsSync(path.join(libraryRoot, storageFolder, attached.attachments[0].relativePath)));
+
+  const malformedItemPath = await fetch(`${base}/api/browser/items/%ZZ/attachments`, {
+    method: 'POST',
+    headers: { Origin: origin, Authorization: 'Bearer browser-test-token', 'Content-Type': 'application/octet-stream' },
+    body: 'ignored',
+  });
+  assert.equal(malformedItemPath.status, 400, 'malformed binary route ids are rejected cleanly');
 
   const fakePdfUpload = await fetch(`${base}/api/browser/items/${encodeURIComponent(saved.itemId)}/attachments`, {
     method: 'POST',

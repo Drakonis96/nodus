@@ -19,7 +19,7 @@ The extension does not send captured content, browsing activity, credentials, or
 - `activeTab` and `scripting`: inspect only the tab on which the user clicked the extension.
 - `storage`: retain the local pairing token, port, and last collection.
 - `http://127.0.0.1/*` and `http://localhost/*`: communicate with the local Nodus desktop application.
-- Optional per-site HTTP/HTTPS access: retrieve a user-selected attachment when its website requires the browser session. Chrome asks for this access at capture time.
+- Optional per-site HTTP/HTTPS access: retrieve a user-selected attachment only when Nodus first fails to download it without the browser session. Chrome asks for the exact site at that point; newly granted access is revoked after the transfer. An on-demand Manifest V3 service worker lets that user-confirmed transfer finish if the popup closes.
 
 Users can revoke site permissions in Chrome, forget the pairing from the extension settings, disable the connector in Nodus, or delete captured records from the Nodus Library.
 

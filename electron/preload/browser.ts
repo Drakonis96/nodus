@@ -19,7 +19,7 @@ import type {
   BrowserDataCategory, BrowserDownloadView, BrowserMediaState,
   BrowserStorageReport, PendingBrowserPermission,
 } from '@shared/browser';
-import type { BrowserConnectorCaptureRequest, BrowserConnectorSaveResult } from '@shared/browserConnector';
+import type { BrowserConnectorCapturePreview, BrowserConnectorCaptureRequest, BrowserConnectorSaveResult } from '@shared/browserConnector';
 import type {
   BrowserBookmarkDraft,
   BrowserBookmarkFolderDraft,
@@ -34,10 +34,7 @@ import type {
 } from '@shared/browserBookmarks';
 import type { BrowserHistoryStore } from '@shared/browserHistory';
 
-export interface BrowserCapturePreview {
-  request: BrowserConnectorCaptureRequest & { snapshotAvailable?: boolean };
-  warnings: string[];
-}
+export type BrowserCapturePreview = BrowserConnectorCapturePreview;
 
 /** What `browser:submitOmnibox` answers: the resolution, plus whether it landed. */
 export type BrowserOmniboxResult =

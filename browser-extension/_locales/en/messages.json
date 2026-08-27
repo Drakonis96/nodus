@@ -40,5 +40,20 @@
   "privacy": { "message": "Privacy" },
   "sourceCode": { "message": "Source code" },
   "savedSetting": { "message": "Saved." },
-  "pairingForgotten": { "message": "Local connection reset. The connector will reconnect automatically next time." }
+  "pairingForgotten": { "message": "Local connection reset. The connector will reconnect automatically next time." },
+  "editMetadata": { "message": "Edit metadata" },
+  "title": { "message": "Title" },
+  "authors": { "message": "Authors" },
+  "authorsHint": { "message": "One author per line; use {Organization} for institutions" },
+  "date": { "message": "Date" },
+  "publication": { "message": "Publication" },
+  "multipleDetected": { "message": "$COUNT$ references detected", "placeholders": { "count": { "content": "$1" } } },
+  "multipleHint": { "message": "Choose which ones to save." },
+  "saveMultiple": { "message": "Save $COUNT$ references", "placeholders": { "count": { "content": "$1" } } },
+  "selectAtLeastOne": { "message": "Select at least one reference." },
+  "savedBatchSummary": { "message": "$COUNT$ references saved with $FILES$ attached file(s).", "placeholders": { "count": { "content": "$1" }, "files": { "content": "$2" } } },
+  "alreadySaved": { "message": "Already in Nodus" },
+  "updatedExisting": { "message": "Reference updated" },
+  "duplicateAvoided": { "message": "No duplicate was created." },
+  "permissionDenied": { "message": "Permission was not granted for $ORIGINS$.", "placeholders": { "origins": { "content": "$1" } } }
 }

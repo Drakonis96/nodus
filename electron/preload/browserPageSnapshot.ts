@@ -19,23 +19,19 @@
  * querySelectorAll on a hostile document sizes our IPC payload for us.
  */
 
-interface Attr { name: string; value: string }
 interface El {
   getAttribute(name: string): string | null;
   textContent?: unknown;
+  innerText?: unknown;
   href?: unknown;
-  attributes?: ArrayLike<Attr>;
-  querySelectorAll(selector: string): ArrayLike<El>;
-  removeAttribute(name: string): void;
-  remove(): void;
-  cloneNode(deep: boolean): El;
-  outerHTML?: unknown;
   lang?: unknown;
 }
 interface Doc {
   title?: unknown;
   contentType?: unknown;
   documentElement?: El;
+  body?: El;
+  querySelector(selector: string): El | null;
   querySelectorAll(selector: string): ArrayLike<El>;
 }
 
@@ -45,8 +41,8 @@ const page = globalThis as unknown as {
   navigator?: { language?: unknown };
 };
 
-const list = (nodes: ArrayLike<El> | undefined): El[] =>
-  nodes ? (Array.prototype.slice.call(nodes) as El[]) : [];
+const list = (nodes: ArrayLike<El> | undefined, limit = Number.POSITIVE_INFINITY): El[] =>
+  nodes ? (Array.prototype.slice.call(nodes, 0, limit) as El[]) : [];
 
 const text = (value: unknown, limit: number): string =>
   String(value ?? '').replace(/\s+/g, ' ').trim().slice(0, limit);
@@ -59,37 +55,34 @@ const FILE_PATTERN =
 const FULL_TEXT_PATTERN =
   /(?:\bpdf\b|full\s*text|texto\s+completo|texte\s+int[ée]gral|volltext|testo\s+completo|texto\s+integral|tam\s+metin|descargar\s+(?:art[ií]culo|pdf)|download\s+(?:article|paper|pdf))/i;
 
-const MAX_SNAPSHOT_BYTES = 6 * 1024 * 1024;
+// Escaping can expand a character to five bytes (`&amp;`), so one MiB of
+// source text remains below the six MiB server-side HTML ceiling.
+const MAX_SNAPSHOT_CHARS = 1 * 1024 * 1024;
+const MAX_METADATA_CHARS = 2 * 1024 * 1024;
+
+function escapeHtml(value: string): string {
+  return value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
 
 /**
- * A sanitised copy of the document, for the optional stored snapshot.
+ * A bounded reader-style copy of the document, for the optional snapshot.
  *
- * Scripts, frames, embedded objects, forms, every `on*` handler and `srcdoc` are
- * stripped: what gets attached to a Library item is a record of what the page
- * said, and it must not be able to execute anything if it is ever opened again.
+ * It serializes text rather than cloning hostile DOM. Besides producing a much
+ * more useful reading copy, that means a huge page cannot make us clone and
+ * walk millions of nodes before discovering that the result exceeds the cap.
  */
-function sanitizedHtml(doc: Doc): string {
+function readableHtml(doc: Doc): string {
   const contentType = String(doc.contentType ?? '');
   if (contentType !== 'text/html' && contentType !== 'application/xhtml+xml') return '';
-  const root = doc.documentElement;
+  const root = doc.querySelector('article,main,[role="main"]') ?? doc.body ?? doc.documentElement;
   if (!root) return '';
   try {
-    const clone = root.cloneNode(true);
-    for (const element of list(clone.querySelectorAll('script,noscript,iframe,object,embed,form,base,style,link[rel="stylesheet"]'))) element.remove();
-    for (const element of list(clone.querySelectorAll('*'))) {
-      for (const attribute of list(element.attributes as unknown as ArrayLike<El>) as unknown as Attr[]) {
-        const name = attribute.name.toLowerCase();
-        if (/^on/i.test(name) || ['srcdoc', 'style', 'src', 'srcset', 'poster'].includes(name)) {
-          element.removeAttribute(attribute.name);
-          continue;
-        }
-        if ((name === 'href' || name === 'xlink:href') && /^(?:\s*javascript:|\s*file:|\s*nodus-)/i.test(attribute.value)) {
-          element.removeAttribute(attribute.name);
-        }
-      }
-    }
-    const html = `<!doctype html>\n${String(clone.outerHTML ?? '')}`;
-    return html.length <= MAX_SNAPSHOT_BYTES ? html : '';
+    const plain = String(root.innerText ?? root.textContent ?? '').split('\u0000').join('').slice(0, MAX_SNAPSHOT_CHARS);
+    if (!plain.trim()) return '';
+    const paragraphs = plain.split(/\n\s*\n|\r?\n/).map((entry) => entry.replace(/\s+/g, ' ').trim()).filter(Boolean);
+    const title = escapeHtml(text(doc.title, 1_000));
+    const body = paragraphs.map((entry) => `<p>${escapeHtml(entry)}</p>`).join('\n');
+    return `<!doctype html>\n<html><head><meta charset="utf-8"><title>${title}</title></head><body><article><h1>${title}</h1>${body}</article></body></html>`;
   } catch {
     return '';
   }
@@ -100,29 +93,37 @@ export function collectPageSnapshot(): Record<string, unknown> | null {
   const doc = page.document;
   if (!doc) return null;
 
-  const metas = list(doc.querySelectorAll('meta')).slice(0, 800).map((el) => ({
+  let remaining = MAX_METADATA_CHARS;
+  const bounded = (value: unknown, perField: number): string => {
+    if (remaining <= 0) return '';
+    const result = String(value ?? '').slice(0, Math.min(perField, remaining));
+    remaining -= result.length;
+    return result;
+  };
+
+  const metas = list(doc.querySelectorAll('meta'), 800).map((el) => ({
     name: el.getAttribute('name') || '',
     property: el.getAttribute('property') || '',
     httpEquiv: el.getAttribute('http-equiv') || '',
-    content: el.getAttribute('content') || '',
+    content: bounded(el.getAttribute('content'), 100_000),
   }));
 
-  const links = list(doc.querySelectorAll('link[href]')).slice(0, 400).map((el) => ({
+  const links = list(doc.querySelectorAll('link[href]'), 400).map((el) => ({
     rel: el.getAttribute('rel') || '',
     type: el.getAttribute('type') || '',
-    href: String(el.href ?? ''),
-    title: el.getAttribute('title') || '',
+    href: bounded(el.href, 4_096),
+    title: bounded(el.getAttribute('title'), 500),
   }));
 
   const jsonLd = list(doc.querySelectorAll('script[type="application/ld+json"]'))
     .slice(0, 80)
-    .map((el) => String(el.textContent ?? '').slice(0, 1_000_000));
+    .map((el) => bounded(el.textContent, 256_000)).filter(Boolean);
 
   const coins = list(doc.querySelectorAll('.Z3988[title], span[title^="ctx_ver="]'))
     .slice(0, 100)
-    .map((el) => el.getAttribute('title') || '');
+    .map((el) => bounded(el.getAttribute('title'), 8_192)).filter(Boolean);
 
-  const anchors = list(doc.querySelectorAll('a[href]'))
+  const anchors = list(doc.querySelectorAll('a[href]'), 5_000)
     .filter((el) => {
       const label = `${String(el.textContent ?? '')} ${el.getAttribute('title') || ''}`;
       const href = String(el.href ?? '');
@@ -130,7 +131,7 @@ export function collectPageSnapshot(): Record<string, unknown> | null {
     })
     .slice(0, 80)
     .map((el) => ({
-      href: String(el.href ?? ''),
+      href: bounded(el.href, 4_096),
       text: text(el.textContent, 300),
       title: (el.getAttribute('title') || '').slice(0, 500),
       type: el.getAttribute('type') || '',
@@ -146,6 +147,6 @@ export function collectPageSnapshot(): Record<string, unknown> | null {
     jsonLd,
     coins,
     anchors,
-    html: sanitizedHtml(doc),
+    html: readableHtml(doc),
   };
 }
