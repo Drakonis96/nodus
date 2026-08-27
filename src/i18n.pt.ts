@@ -8217,4 +8217,8 @@ export const PT: Record<string, string> = {
   "{n} referencias detectadas": "{n} referências detetadas",
   "Un autor por línea": "Um autor por linha",
   "Guardar {n} referencias": "Guardar {n} referências",
+  "XPI verificado guardado en:": "XPI verificado guardado em:",
+  "En Zotero: Herramientas → Complementos → ⚙ → Instalar complemento desde archivo.": "No Zotero: Ferramentas → Plugins → ⚙ → Instalar suplemento a partir de ficheiro.",
+  "Guardar .xpi para Zotero": "Guardar .xpi para o Zotero",
+  "Ver instrucciones de instalación": "Ver instruções de instalação",
 };

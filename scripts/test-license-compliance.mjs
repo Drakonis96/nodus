@@ -18,6 +18,7 @@ test('packaging generates and exposes the legal bundle', () => {
       ['PRIVACY.md', 'legal/PRIVACY.md'],
       ['legal', 'legal'],
       ['dist-zotero/nodus-zotero.xpi', 'zotero/nodus-zotero.xpi'],
+      ['dist-zotero/updates.json', 'zotero/updates.json'],
       ['dist-browser/nodus-connector-chrome.zip', 'browser/nodus-connector-chrome.zip'],
       // Nodus Server itself, so the basic mode can run it as a child process. Outside the asar
       // because it is executed as ESM from disk rather than read as an asset.
