@@ -1225,8 +1225,10 @@ test('security: Zotero-required update feed is HTTPS while background updates st
   assert.equal(
     manifest.applications.zotero.update_url,
     'https://github.com/Drakonis96/nodus/releases/latest/download/updates.json',
-    'Zotero 9 rejects extensions without applications.zotero.update_url',
+    'Zotero 9 and 10 reject extensions without applications.zotero.update_url',
   );
+  assert.equal(manifest.applications.zotero.strict_min_version, '9.0');
+  assert.equal(manifest.applications.zotero.strict_max_version, '10.*');
   assert.match(bootstrap, /applyBackgroundUpdates\s*=\s*AddonManager\.AUTOUPDATE_DISABLE/);
   assert.doesNotMatch(bootstrap, /updater\.js|configureAutoUpdate|findUpdates/);
   assert.doesNotMatch(html, /nd-autoupdate|updater\.js/);
@@ -1536,7 +1538,7 @@ test('#9: build-zotero-xpi produces a valid xpi + updates.json', () => {
   const manifest = JSON.parse(readSource('zotero-plugin/manifest.json'));
   assert.equal(r.version, manifest.version);
   assert.equal(r.xpiName, 'nodus-zotero.xpi', 'release asset name stays stable across versions');
-  assert.match(manifest.applications.zotero.update_url, /^https:\/\//, 'Zotero 9 requires an HTTPS update_url to install');
+  assert.match(manifest.applications.zotero.update_url, /^https:\/\//, 'Zotero 9 and 10 require an HTTPS update_url to install');
 
   const zip = new AdmZip(r.xpiPath);
   const names = zip.getEntries().map((e) => e.entryName);
@@ -1575,6 +1577,7 @@ test('#9: build-zotero-xpi produces a valid xpi + updates.json', () => {
   assert.ok(entry.update_link.endsWith(r.xpiName), 'update_link points at the built xpi');
   assert.match(entry.update_hash, /^sha256:[0-9a-f]{64}$/);
   assert.equal(entry.applications.zotero.strict_min_version, manifest.applications.zotero.strict_min_version);
+  assert.equal(entry.applications.zotero.strict_max_version, manifest.applications.zotero.strict_max_version);
 });
 
 test('#9: desktop exports the canonical release XPI and leaves installation to Zotero', () => {

@@ -91,10 +91,10 @@ context so scanned text, figures, tables, equations and diagrams can be read.
 - Packaging tests for the worker, pinned model metadata, WASM runtime and icon.
 - Connected-server tests for evidence catalogues and images.
 - Syntax, lint, typecheck, build and the complete repository test suite.
-- Automated live Zotero 9 XPI smoke (`npm run zotero:smoke:live`) uses a
+- Automated live Zotero 9/10 XPI smoke (`npm run zotero:smoke:live`) uses a
   disposable profile and two launches to verify registration, compatibility,
   active state, scoped background-update opt-out and real bootstrap startup.
-- Manual Zotero 9 reader smoke before a release:
+- Manual Zotero 9/10 reader smoke before a release:
   - index a normal PDF and a multi-document selection;
   - retrieve a passage from the middle/end and open its citation;
   - reject a fabricated citation;

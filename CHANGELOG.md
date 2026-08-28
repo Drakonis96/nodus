@@ -10,6 +10,8 @@ research workflow across Word, Zotero, Chrome, Compass and Nodus Browser.
 - Added contextual synonyms and a grounded per-document chat to Nodus Copilot.
 - Made Nodus for Zotero retrieve across complete selected attachments, audit
   exact citations, interpret visual pages and stream persistent conversations.
+- Restored installation and startup compatibility for the standalone plugin on
+  Zotero 10 while retaining Zotero 9 support.
 - Expanded the Chrome connector with reviewed metadata, batch capture,
   background transfers and duplicate-safe Library ingestion.
 - Improved Compass author matching across diacritics, initials and name order,
