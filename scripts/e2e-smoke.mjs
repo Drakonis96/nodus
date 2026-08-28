@@ -1887,9 +1887,22 @@ try {
   await page.getByTestId('app-shell').waitFor();
   await page.locator('[data-tour="nav-dbDeepResearch"]').click();
   await page.getByTestId('database-deep-research').waitFor({ timeout: 30_000 });
-  assert.equal(await page.getByTestId('database-deep-research-composer').count(), 1, 'database Deep Research composer renders in the real app');
-  assert.equal(await page.getByTestId('database-deep-research-preview').count(), 1, 'database Deep Research editable preview renders in the real app');
-  assert.equal(await page.getByTestId('database-deep-research-gallery').count(), 1, 'database Deep Research report gallery renders in the real app');
+  // The library is what the view opens on; the composer is now a dialog behind
+  // "Nuevo informe", and the editable outline lives inside its advanced options.
+  assert.equal(await page.getByTestId('database-deep-research-library').count(), 1, 'database Deep Research report library renders in the real app');
+  assert.equal(await page.getByTestId('database-deep-research-composer').count(), 0, 'the composer stays closed until it is asked for');
+  await page.getByTestId('database-deep-research-new').click();
+  await page.getByTestId('database-deep-research-composer').waitFor({ timeout: 30_000 });
+  await page.getByTestId('database-deep-research-objective').fill('Verificar diferencias y anomalías sin inventar cifras.');
+  const composer = page.getByTestId('database-deep-research-composer');
+  await composer.getByRole('checkbox', { name: 'Research evidence' }).check();
+  await composer.getByRole('button', { name: 'Opciones avanzadas' }).click();
+  await composer.getByTestId('database-deep-research-advanced').waitFor({ timeout: 30_000 });
+  await composer.getByRole('button', { name: 'Preparar automáticamente' }).click();
+  await composer.getByTestId('database-deep-research-preview').waitFor({ timeout: 30_000 });
+  assert.ok(await composer.getByTestId('database-deep-research-preview').locator('input').count() >= 6, 'the editable outline renders a title and focus field per section');
+  await composer.getByRole('button', { name: 'Cancelar' }).click();
+  await page.getByTestId('database-deep-research-composer').waitFor({ state: 'detached', timeout: 30_000 });
   await page.evaluate(async ({ originalVaultId, temporaryVaultId }) => {
     const switched = await window.nodus.switchVault(originalVaultId);
     if (!switched.ok) throw new Error(switched.message);
@@ -1897,7 +1910,7 @@ try {
   }, databaseResearchSetup);
   await page.reload();
   await page.getByTestId('app-shell').waitFor();
-  console.log('[e2e] database Deep Research composer + preview + gallery ok over real IPC');
+  console.log('[e2e] database Deep Research library + composer dialog + editable outline ok over real IPC');
 
   // ── Study vault: real UI creation flow + visual/structural regressions ─────
   await page.evaluate(async () => {
