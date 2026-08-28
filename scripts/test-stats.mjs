@@ -178,3 +178,126 @@ test('boxplot: whiskers clamp to non-outlier extremes', () => {
   near(b.whiskerHigh, 9);
   near(b.median, 5.5);
 });
+
+test('robust statistics: MAD and trimmed mean', () => {
+  near(S.medianAbsoluteDeviation([1, 2, 3, 4, 100]), 1);
+  near(S.medianAbsoluteDeviation([1, 2, 3, 4, 100], 1.4826), 1.4826, 1e-6);
+  near(S.trimmedMean([1, 2, 3, 4, 100], 0.2), 3, 1e-6);
+});
+
+test('seeded bootstrap and permutation are reproducible', () => {
+  const a = S.bootstrap([1, 2, 3, 4], S.mean, { iterations: 100, seed: 'demo', confidence: 0.9 });
+  const b = S.bootstrap([1, 2, 3, 4], S.mean, { iterations: 100, seed: 'demo', confidence: 0.9 });
+  assert.deepEqual(a.samples, b.samples);
+  assert.deepEqual(S.permutationTest([1, 2], [4, 5], undefined, { iterations: 100, seed: 42 }), S.permutationTest([1, 2], [4, 5], undefined, { iterations: 100, seed: 42 }));
+});
+
+test('multiple-testing corrections preserve input order', () => {
+  const bh = S.benjaminiHochberg([0.001, 0.04, 0.2, 0.01]);
+  assert.deepEqual(bh.rejected, [true, false, false, true]);
+  const holm = S.holmCorrection([0.001, 0.04, 0.2, 0.01]);
+  assert.deepEqual(holm.rejected, [true, false, false, true]);
+});
+
+test('effect sizes and diagnostics', () => {
+  near(S.cohensD([2, 3, 4], [1, 2, 3]), 1, 1e-6);
+  near(S.cliffsDelta([3, 4], [1, 2]), 1, 1e-6);
+  assert.deepEqual(S.missingness([1, null, '', NaN]), { total: 4, missing: 3, observed: 1, rate: 0.75 });
+  near(S.autocorrelation([1, 2, 3], 1)[0], 1, 1e-6);
+});
+
+test('linear/logistic regression and PCA are deterministic', () => {
+  const lr = S.logisticRegression([[ -2, 0 ], [ -1, 0 ], [ 1, 1 ], [ 2, 1 ]]);
+  assert.ok(lr.coefficient > 0);
+  assert.equal(lr.n, 4);
+  const p = S.pca([[1, 0], [2, 0], [3, 0]]);
+  near(p.explainedVariance[0], 1, 1e-6);
+  assert.equal(S.hashSnapshot({ b: 2, a: 1 }), S.hashSnapshot({ a: 1, b: 2 }));
+});
+
+test('change-point scan finds a clear level shift', () => {
+  const cp = S.detectChangePoints([1, 1, 1, 1, 1, 10, 10, 10, 10, 10], { minSegmentLength: 2, threshold: 3 });
+  assert.equal(cp[0].index, 5);
+});
+
+test('BCa, Welch, Mann–Whitney and Kruskal–Wallis are deterministic', () => {
+  const first = S.bcaBootstrap([1, 2, 3, 4, 5], S.mean, { iterations: 200, seed: 7 });
+  const second = S.bcaBootstrap([1, 2, 3, 4, 5], S.mean, { iterations: 200, seed: 7 });
+  assert.deepEqual(first, second);
+  const welch = S.welchTTest([1, 2, 3], [4, 5, 6]);
+  near(welch.statistic, -3.674234614, 1e-6);
+  const mw = S.mannWhitneyU([1, 2, 3], [4, 5, 6]);
+  assert.equal(mw.statistic, 0);
+  near(S.kruskalWallis([[1, 2, 3], [4, 5, 6]]).statistic, 3.857142857, 1e-6);
+});
+
+test('Kaplan–Meier and log-rank use event/censor ordering', () => {
+  const km = S.kaplanMeier([1, 2, 3, 4], [1, 0, 1, 1]);
+  assert.equal(km.n, 4);
+  assert.equal(km.events, 3);
+  near(km.points.at(-1).survival, 0, 1e-6);
+  near(km.median, 3, 1e-6);
+  const lr = S.logRank([1, 2, 3, 4, 1, 2, 3, 4], [1, 1, 1, 1, 1, 0, 1, 0], ['a', 'a', 'a', 'a', 'b', 'b', 'b', 'b']);
+  assert.ok(Number.isFinite(lr.statistic));
+  assert.equal(lr.groups[0], 4);
+});
+
+test('Cox PH and IPW expose assumptions and diagnostics', () => {
+  const cox = S.coxPH([1, 2, 3, 4, 5, 6], [1, 1, 1, 1, 1, 1], [[0], [0], [1], [1], [2], [2]]);
+  assert.equal(cox.n, 6);
+  assert.equal(cox.coefficients.length, 1);
+  assert.ok(Array.isArray(cox.pValues));
+  const ipw = S.inverseProbabilityWeighting([0, 0, 1, 1], [1, 2, 4, 5], [[0], [1], [0], [1]], { stabilized: true });
+  assert.equal(ipw.metadata.estimand, 'ATE');
+  assert.equal(ipw.assumptions.length, 4);
+  assert.equal(ipw.propensity.length, 4);
+  const extreme = S.inverseProbabilityWeighting(
+    [0, 0, 0, 0, 1, 1, 1, 1],
+    [1, 2, 1, 2, 8, 9, 8, 9],
+    [[-100], [-80], [-60], [-40], [40], [60], [80], [100]],
+  );
+  assert.ok(extreme.warnings.some((warning) => /Extreme propensity scores/.test(warning)));
+});
+
+test('Simpson and graph diagnostics are deterministic', () => {
+  const simpson = S.detectSimpsonParadox(
+    ['A', 'A', 'A', 'A', 'B', 'B', 'B', 'B'],
+    [90, 80, 20, 10, 95, 85, 25, 15],
+    ['easy', 'easy', 'hard', 'hard', 'easy', 'easy', 'hard', 'hard'],
+  );
+  assert.equal(simpson.detected, false); // same within-stratum direction
+  const graph = S.relationGraphDiagnostics([{ source: 'a', target: 'b' }, { source: 'b', target: 'c' }, { source: 'd', target: 'e' }]);
+  assert.deepEqual(graph.components, [['a', 'b', 'c'], ['d', 'e']]);
+  assert.equal(graph.degree.b, 2);
+  assert.ok(graph.betweenness.b > graph.betweenness.a);
+});
+
+test('cohort comparison is label/metric aligned and FDR-corrected', () => {
+  const result = S.cohortComparison(
+    ['control', 'treated', 'control', 'treated', 'control', 'treated', null],
+    [1, 5, 2, 6, 3, 7, 999],
+  );
+  assert.deepEqual(result.groups.map((group) => group.count), [3, 3]);
+  assert.equal(result.pairwise.length, 1);
+  assert.equal(result.pairwise[0].n1, 3);
+  assert.equal(result.pairwise[0].n2, 3);
+  assert.equal(result.correction.adjusted.length, 2);
+});
+
+test('sparse temporal change points retain source indices', () => {
+  const points = S.detectIndexedChangePoints([1, null, 1, 1, 10, null, 10, 10], { minSegmentLength: 2, threshold: 3 });
+  assert.equal(points[0].sourceIndex, 4);
+});
+
+test('text and geographic audits never expose source values', () => {
+  const text = S.auditText(['Madrid', 'Madrid', '東京', null]);
+  assert.equal(text.duplicateValues, 1);
+  assert.ok(Array.isArray(text.tfidfTopTerms));
+  assert.ok(Array.isArray(text.topCooccurrences));
+  assert.equal(typeof text.nearDuplicatePairs, 'number');
+  assert.equal(Object.prototype.hasOwnProperty.call(text, 'values'), false);
+  const geo = S.auditGeo(['40.4,-3.7', { latitude: 41, longitude: -3 }, 'bad']);
+  assert.equal(geo.observed, 2);
+  assert.equal(geo.invalid, 1);
+  assert.ok(geo.centroid);
+});

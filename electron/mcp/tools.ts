@@ -47,6 +47,23 @@ import * as pageComments from '../db/pageCommentsRepo';
 import * as pageAcl from '../db/aclRepo';
 import * as databaseTasks from '../db/databaseTasksRepo';
 import * as databaseAutomations from '../db/databaseAutomationsRepo';
+import * as databaseResearch from '../db/databaseDeepResearchRepo';
+import {
+  DATABASE_DEEP_RESEARCH_REPORT_TYPES,
+  DATABASE_DEEP_RESEARCH_PROMPT_LANGUAGES,
+  DATABASE_RESEARCH_BUDGETS,
+  estimateDatabaseDeepResearchCost,
+  getDatabaseDeepResearchAnalysisRequirements,
+  getDatabaseDeepResearchEligibility,
+  normalizeDatabaseDeepResearchJobInput,
+  redactDatabaseResearchMarkdown,
+  sanitizeDatabaseResearchExternal,
+  type DatabaseDeepResearchJobInput,
+  type DatabaseDeepResearchReportType,
+  type DatabaseResearchRunStatus,
+} from '@shared/databaseDeepResearch';
+import { buildDatabaseDeepResearchPreviewSections } from '@shared/databaseDeepResearchPrompts';
+import { enqueueDatabaseDeepResearch, ensureDatabaseDeepResearchLane } from '../ai/databaseDeepResearchLane';
 import {
   decodeCheckbox,
   decodeMultiSelect,
@@ -66,6 +83,7 @@ import {
   type FilterOp,
 } from '@shared/databaseFilters';
 import { STUDY_QUESTION_TYPES, type StudyQuestionType } from '@shared/studyQuestions';
+
 import type { ArchiveItem, DatabaseColumn, DatabaseRow, HistoricalEventType } from '@shared/types';
 import { kinOf } from '../db/relationshipsRepo';
 import { listOpenSuggestions, listSuggestionsForPerson } from '../db/kinshipSuggestionsRepo';
@@ -530,6 +548,104 @@ function canMcpView(resourceType: 'page' | 'database' | 'view' | 'row', resource
   } catch {
     return false;
   }
+}
+
+function databaseResearchRunDatabaseIds(run: ReturnType<typeof databaseResearch.getDatabaseResearchRun>): string[] {
+  if (!run) return [];
+  const requested = Array.isArray(run.options?.databaseIds)
+    ? run.options.databaseIds.filter((value): value is string => typeof value === 'string' && value.trim().length > 0)
+    : [];
+  return [...new Set([run.databaseId, ...requested])];
+}
+
+/** A multi-source research run is visible only when the MCP principal can
+ * view every participating database. This prevents aggregate information from
+ * a secondary database leaking through an otherwise-authorized anchor. */
+function canMcpViewDatabaseResearchRun(run: ReturnType<typeof databaseResearch.getDatabaseResearchRun>): boolean {
+  const databaseIds = databaseResearchRunDatabaseIds(run);
+  return databaseIds.length > 0 && databaseIds.every((databaseId) => canMcpView('database', databaseId));
+}
+
+function safeMcpDatabaseResearchJob(run: NonNullable<ReturnType<typeof databaseResearch.getDatabaseResearchRun>>) {
+  const job = databaseResearch.databaseResearchJob(run);
+  return {
+    ...job,
+    title: redactDatabaseResearchMarkdown(job.title),
+    error: job.error == null ? null : redactDatabaseResearchMarkdown(job.error),
+  };
+}
+
+function visibleDatabaseResearchRuns(status: DatabaseResearchRunStatus | 'all', offset: number, limit: number) {
+  const visible: ReturnType<typeof databaseResearch.listDatabaseResearchRuns> = []; let skipped = 0; let sourceOffset = 0;
+  while (visible.length <= limit) {
+    const batch = databaseResearch.listDatabaseResearchRuns({ status, limit: 200, offset: sourceOffset });
+    sourceOffset += batch.length;
+    for (const run of batch) {
+      if (!canMcpViewDatabaseResearchRun(run)) continue;
+      if (skipped++ < offset) continue;
+      visible.push(run);
+      if (visible.length > limit) break;
+    }
+    if (batch.length < 200) break;
+  }
+  return { items: visible.slice(0, limit), hasMore: visible.length > limit };
+}
+
+function visibleDatabaseResearchReports(query: string | undefined, offset: number, limit: number, reportType?: DatabaseDeepResearchReportType) {
+  const visible: ReturnType<typeof databaseResearch.listDatabaseResearchReports> = []; let skipped = 0; let sourceOffset = 0;
+  while (visible.length <= limit) {
+    const batch = databaseResearch.listDatabaseResearchReports({ query, reportType, limit: 200, offset: sourceOffset });
+    sourceOffset += batch.length;
+    for (const report of batch) {
+      const run = databaseResearch.getDatabaseResearchRun(report.runId);
+      if (!canMcpViewDatabaseResearchRun(run)) continue;
+      if (skipped++ < offset) continue;
+      visible.push(report);
+      if (visible.length > limit) break;
+    }
+    if (batch.length < 200) break;
+  }
+  return { items: visible.slice(0, limit).map((report) => safeMcpDatabaseResearchReport(report)), hasMore: visible.length > limit };
+}
+
+/** MCP is an external boundary: never return the persisted evidence graph or
+ * model echoes verbatim. Keep report prose useful while recursively removing
+ * cell-derived strings from structured payloads. */
+function safeMcpDatabaseResearchReport(report: ReturnType<typeof databaseResearch.getDatabaseResearchReport>) {
+  if (!report) return null;
+  return {
+    id: report.id,
+    runId: report.runId,
+    title: redactDatabaseResearchMarkdown(report.title),
+    reportType: report.reportType ?? 'general',
+    markdown: redactDatabaseResearchMarkdown(report.markdown),
+    summary: report.summary == null ? null : redactDatabaseResearchMarkdown(report.summary),
+    bibliography: sanitizeDatabaseResearchExternal(report.bibliography),
+    metadata: sanitizeDatabaseResearchExternal(report.metadata),
+    structured: sanitizeDatabaseResearchExternal(report.structured),
+    quality: sanitizeDatabaseResearchExternal(report.quality),
+    provenance: sanitizeDatabaseResearchExternal(report.provenance),
+    createdAt: report.createdAt,
+    updatedAt: report.updatedAt,
+  };
+}
+
+function safeMcpDatabaseResearchJobDetail(detail: ReturnType<typeof databaseResearch.getDatabaseResearchRunDetail>) {
+  if (!detail) return null;
+  return {
+    run: {
+      ...safeMcpDatabaseResearchJob(detail.run),
+      databaseId: detail.run.databaseId,
+      reportType: detail.run.reportType ?? 'general',
+      model: sanitizeDatabaseResearchExternal(detail.run.model),
+      snapshotFingerprint: detail.run.snapshotFingerprint,
+      snapshotManifest: sanitizeDatabaseResearchExternal(detail.run.snapshotManifest),
+      updatedAt: detail.run.updatedAt,
+    },
+    steps: sanitizeDatabaseResearchExternal(detail.steps),
+    claims: sanitizeDatabaseResearchExternal(detail.claims),
+    report: safeMcpDatabaseResearchReport(detail.report),
+  };
 }
 
 function json(value: unknown) {
@@ -1048,6 +1164,13 @@ const TOOL_VAULT_SCOPE: Record<string, VaultType[]> = {
   nodus_list_database_templates: DATABASE_VAULTS,
   nodus_list_database_automations: DATABASE_VAULTS,
   nodus_list_database_forms: DATABASE_VAULTS,
+  nodus_preview_database_deep_research: DATABASE_VAULTS,
+  nodus_enqueue_database_deep_research: DATABASE_VAULTS,
+  nodus_list_database_deep_research_jobs: DATABASE_VAULTS,
+  nodus_get_database_deep_research_job: DATABASE_VAULTS,
+  nodus_cancel_database_deep_research_job: DATABASE_VAULTS,
+  nodus_list_database_deep_research_reports: DATABASE_VAULTS,
+  nodus_get_database_deep_research_reports: DATABASE_VAULTS,
   nodus_create_database_row: DATABASE_VAULTS,
   nodus_set_database_cell: DATABASE_VAULTS,
   nodus_list_pages: DATABASE_VAULTS,
@@ -1112,10 +1235,11 @@ export function registerToolsForVault(server: McpServer, vaultType: VaultType | 
     get(target, prop, receiver) {
       if (prop !== 'registerTool') return Reflect.get(target, prop, receiver);
       const original = Reflect.get(target, prop, receiver) as (name: string, ...rest: unknown[]) => unknown;
-      return (name: string, ...rest: unknown[]) =>
-        isReadOnlyToolMeta(rest[0]) || isToolAllowedForVaultType(name, vaultType)
+      return (name: string, ...rest: unknown[]) => {
+        return isReadOnlyToolMeta(rest[0]) || isToolAllowedForVaultType(name, vaultType)
           ? original.call(target, name, ...rest)
           : undefined;
+      };
     },
   });
   registerTools(gated);
@@ -2838,6 +2962,147 @@ export function registerTools(server: McpServer): void {
         .filter((database) => canMcpView('database', database.id))
         .map((d) => ({ id: d.id, shortId: d.shortId, name: d.name, rows: d.rowCount })),
     }))
+  );
+
+  server.registerTool(
+    'nodus_enqueue_database_deep_research',
+    {
+      title: 'Queue database Deep Research',
+      description:
+        'Queues a durable Deep Research run for one structured database and returns immediately. The run is persisted in the active databases vault and remains discoverable after restart. This endpoint only schedules orchestration; it never changes database rows.',
+      inputSchema: {
+        databaseIds: z.array(z.string().trim().min(1)).min(1).max(100),
+        objective: z.string().trim().min(1).max(20_000),
+        reportType: z.enum(DATABASE_DEEP_RESEARCH_REPORT_TYPES).default('general'),
+        language: z.enum(DATABASE_DEEP_RESEARCH_PROMPT_LANGUAGES).optional(),
+        audience: z.string().trim().max(200).optional(),
+        viewIds: z.array(z.string().trim().min(1)).max(100).default([]),
+        filters: z.object({ query: z.string().max(2_000).default(''), columnIds: z.array(z.string()).max(500).default([]) }).default({ query: '', columnIds: [] }),
+        roles: z.record(z.union([z.string(), z.array(z.string())])).default({}),
+        model: modelSchema.nullable().optional(),
+        depth: z.enum(['focused', 'deep', 'exhaustive']).default('deep'),
+        maxRows: z.number().int().min(1).max(500_000).default(500_000),
+        maxCostUsd: z.number().min(0).max(100_000).optional(),
+        seed: z.union([z.number().int(), z.string().max(200)]).optional(),
+        includedCellTypes: z.array(z.string()).max(100).default([]),
+        includeAttachmentContent: z.boolean().default(false),
+      },
+      annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
+    },
+    ({ databaseIds, objective, reportType, language, audience, viewIds, filters, roles, model, depth, maxRows, maxCostUsd, seed, includedCellTypes, includeAttachmentContent }) =>
+      tool(async () => {
+        for (const databaseId of databaseIds) if (!canMcpView('database', databaseId)) throw notFound('database', databaseId);
+        const preset = DATABASE_RESEARCH_BUDGETS[depth];
+        const input: DatabaseDeepResearchJobInput & { reportType: string } = {
+          databaseIds, objective, reportType, language, audience, viewIds, filters,
+          roles, model: asModel(model ?? undefined) ?? null, depth,
+          budget: { ...preset, depth, maxRows, seed, ...(maxCostUsd == null ? {} : { maxCostUsd }) },
+          includedCellTypes, includeAttachmentContent,
+        };
+        return { job: await enqueueDatabaseDeepResearch(getActiveVault().id, input), queued: true };
+      })()
+  );
+
+  server.registerTool(
+    'nodus_preview_database_deep_research',
+    {
+      title: 'Preview database Deep Research',
+      description: 'Previews bounded row evidence and an estimated cost before queueing a database Deep Research run.',
+      inputSchema: {
+        databaseIds: z.array(z.string().trim().min(1)).min(1).max(100),
+        objective: z.string().trim().min(1).max(20_000),
+        reportType: z.enum(DATABASE_DEEP_RESEARCH_REPORT_TYPES).default('general'),
+        language: z.enum(DATABASE_DEEP_RESEARCH_PROMPT_LANGUAGES).optional(),
+        viewIds: z.array(z.string().trim().min(1)).max(100).default([]),
+        filters: z.object({ query: z.string().max(2_000).default(''), columnIds: z.array(z.string()).default([]) }).default({ query: '', columnIds: [] }),
+        roles: z.record(z.union([z.string(), z.array(z.string())])).default({}),
+        model: modelSchema.nullable().optional(),
+        depth: z.enum(['focused', 'deep', 'exhaustive']).default('deep'),
+        maxRows: z.number().int().min(1).max(500_000).default(500_000),
+      },
+      annotations: { readOnlyHint: true, openWorldHint: false },
+    },
+    ({ databaseIds, objective, reportType, language, viewIds, filters, roles, model, depth, maxRows }) =>
+      tool(() => {
+        for (const databaseId of databaseIds) if (!canMcpView('database', databaseId)) throw notFound('database', databaseId);
+        const normalized = normalizeDatabaseDeepResearchJobInput({ databaseIds, objective, reportType, language, viewIds, filters, roles, model: asModel(model ?? undefined) ?? null, depth, budget: { maxRows } } as DatabaseDeepResearchJobInput);
+        const rows = databaseIds.reduce((n, databaseId) => n + (dbMode.getDatabase(databaseId)?.rowCount ?? 0), 0);
+        const estimate = estimateDatabaseDeepResearchCost(rows, databaseIds.length, depth);
+        const columns = databaseIds.flatMap((databaseId) => dbMode.getColumns(databaseId).map((column) => ({ id: column.id, type: column.type })));
+        const availableReportTypes = DATABASE_DEEP_RESEARCH_REPORT_TYPES.map((type) => getDatabaseDeepResearchEligibility(type, { columns, roles: normalized.roles, databaseCount: databaseIds.length }));
+        const effectiveReportType = normalized.reportType ?? 'general';
+        const analyses = getDatabaseDeepResearchAnalysisRequirements(effectiveReportType);
+        return {
+          rowCount: rows,
+          sourceCount: databaseIds.length,
+          reportType: effectiveReportType,
+          eligibility: availableReportTypes.find((item) => item.reportType === effectiveReportType),
+          availableReportTypes,
+          ...estimate,
+          requiredAnalyses: analyses.required,
+          optionalAnalyses: analyses.optional,
+          sections: buildDatabaseDeepResearchPreviewSections(
+            normalized.language ?? 'en',
+            effectiveReportType,
+            normalized.objective,
+            0,
+          ),
+          evidence: [],
+          request: normalized,
+        };
+      })()
+  );
+
+  server.registerTool(
+    'nodus_list_database_deep_research_jobs',
+    { title: 'List database Deep Research jobs', description: 'Lists the durable asynchronous database Deep Research queue with pagination.', inputSchema: { limit: compactLimitSchema, offset: z.number().int().min(0).default(0), status: z.enum(['all', 'queued', 'running', 'completed', 'partial', 'failed', 'stale', 'cancelling', 'cancelled']).default('all') }, annotations: { readOnlyHint: true, openWorldHint: false } },
+    ({ limit, offset, status }) => tool(() => {
+      ensureDatabaseDeepResearchLane(getActiveVault().id);
+      const visible = visibleDatabaseResearchRuns(status, offset, limit);
+      return { jobs: visible.items.map(safeMcpDatabaseResearchJob), limit, offset, hasMore: visible.hasMore };
+    })()
+  );
+
+  server.registerTool(
+    'nodus_get_database_deep_research_job',
+    { title: 'Get database Deep Research job', description: 'Returns one database Deep Research queue job and its durable detail.', inputSchema: { jobId: z.string().trim().min(1) }, annotations: { readOnlyHint: true, openWorldHint: false } },
+    ({ jobId }) => tool(() => {
+      const detail = databaseResearch.getDatabaseResearchRunDetail(jobId);
+      if (!detail || !canMcpViewDatabaseResearchRun(detail.run)) throw notFound('database research job', jobId);
+      return { job: safeMcpDatabaseResearchJob(detail.run), detail: safeMcpDatabaseResearchJobDetail(detail) };
+    })()
+  );
+
+  server.registerTool(
+    'nodus_cancel_database_deep_research_job',
+    { title: 'Cancel database Deep Research job', description: 'Cancels a queued or running database Deep Research job.', inputSchema: { jobId: z.string().trim().min(1) }, annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false } },
+    ({ jobId }) => tool(() => {
+      const detail = databaseResearch.getDatabaseResearchRunDetail(jobId);
+      if (!detail || !canMcpViewDatabaseResearchRun(detail.run)) throw notFound('database research job', jobId);
+      const cancelled = databaseResearch.cancelDatabaseResearchRun(jobId);
+      const updated = databaseResearch.getDatabaseResearchRun(jobId);
+      return { cancelled, job: updated ? safeMcpDatabaseResearchJob(updated) : null };
+    })()
+  );
+
+  server.registerTool(
+    'nodus_list_database_deep_research_reports',
+    { title: 'List database Deep Research reports', description: 'Lists saved database Deep Research reports with pagination, optional title search, and report type.', inputSchema: { query: querySchema, reportType: z.enum(DATABASE_DEEP_RESEARCH_REPORT_TYPES).optional(), limit: compactLimitSchema, offset: z.number().int().min(0).default(0) }, annotations: { readOnlyHint: true, openWorldHint: false } },
+    ({ query, reportType, limit, offset }) => tool(() => {
+      const visible = visibleDatabaseResearchReports(query, offset, limit, reportType);
+      return { reports: visible.items, limit, offset, hasMore: visible.hasMore };
+    })()
+  );
+
+  server.registerTool(
+    'nodus_get_database_deep_research_reports',
+    { title: 'Get database Deep Research report', description: 'Returns one saved database Deep Research report.', inputSchema: { reportId: z.string().trim().min(1) }, annotations: { readOnlyHint: true, openWorldHint: false } },
+    ({ reportId }) => tool(() => {
+      const report = databaseResearch.getDatabaseResearchReport(reportId);
+      const run = report ? databaseResearch.getDatabaseResearchRun(report.runId) : null;
+      if (!report || !canMcpViewDatabaseResearchRun(run)) throw notFound('database research report', reportId);
+      return { report: safeMcpDatabaseResearchReport(report) };
+    })()
   );
 
   server.registerTool(

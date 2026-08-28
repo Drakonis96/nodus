@@ -1196,6 +1196,7 @@ export function DatabasesHome({
   onImportNotion,
   onOpenAnalysis,
   onOpenChat,
+  onOpenDeepResearch,
   demoBusy = false,
   onLoadDatabasesDemo,
 }: {
@@ -1206,6 +1207,7 @@ export function DatabasesHome({
   onImportNotion?: () => void;
   onOpenAnalysis: () => void;
   onOpenChat: () => void;
+  onOpenDeepResearch: () => void;
   demoBusy?: boolean;
   onLoadDatabasesDemo?: () => Promise<void>;
 }) {
@@ -1280,7 +1282,7 @@ export function DatabasesHome({
         )}
       </section>
 
-      <section className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+      <section className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         <button className="card p-4 text-left hover:border-indigo-600/70 transition-colors" onClick={onOpenAnalysis}>
           <div className="flex items-center gap-2 font-medium">
             <Icon name="chartBar" className="text-indigo-400" /> {t('Análisis')}
@@ -1295,6 +1297,14 @@ export function DatabasesHome({
           </div>
           <p className="text-xs text-neutral-500 mt-1">
             {tx('Pregunta a tus datos ({n} entradas en total).', { n: totalRows.toLocaleString() })}
+          </p>
+        </button>
+        <button data-testid="open-database-deep-research" className="card p-4 text-left hover:border-cyan-600/70 transition-colors" onClick={onOpenDeepResearch}>
+          <div className="flex items-center gap-2 font-medium">
+            <Icon name="telescope" className="text-cyan-500" /> {t('Deep Research de datos')}
+          </div>
+          <p className="text-xs text-neutral-500 mt-1">
+            {t('Investiga patrones y contrastes en tus tablas con evidencia trazable.')}
           </p>
         </button>
       </section>

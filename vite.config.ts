@@ -152,6 +152,23 @@ const databaseAggregateWorkerBuild = {
   },
 };
 
+const databaseDeepResearchWorkerBuild = {
+  onstart: (args: { reload: () => void }) => args.reload(),
+  vite: {
+    plugins: [databaseComputeWorkerAliases()],
+    resolve: { alias: { '@shared': path.resolve(__dirname, 'shared') } },
+    build: {
+      outDir: 'dist-electron',
+      emptyOutDir: false,
+      rollupOptions: {
+        input: path.join(__dirname, 'electron/workers/databaseDeepResearchWorker.ts'),
+        external: mainExternals,
+        output: { format: 'cjs' as const, entryFileNames: 'databaseDeepResearchWorker.cjs', inlineDynamicImports: true },
+      },
+    },
+  },
+};
+
 const vectorScanWorkerBuild = {
   onstart: (args: { reload: () => void }) => args.reload(),
   vite: {
@@ -314,6 +331,7 @@ export default defineConfig({
       databaseComputeWorkerBuild,
       databaseScaleFixtureWorkerBuild,
       databaseAggregateWorkerBuild,
+      databaseDeepResearchWorkerBuild,
       vectorScanWorkerBuild,
       utilityBuild('backupUtilityWorker', 'electron/export/backupUtilityWorker.ts'),
       utilityBuild('recoveryProbeUtilityWorker', 'electron/recovery/recoveryProbeUtilityWorker.ts'),

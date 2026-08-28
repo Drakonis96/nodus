@@ -53,7 +53,7 @@ test('dedicated vaults expose only their own fixed navigation', () => {
   assert.ok(!teaching.includes('studyDeepResearch'));
   assert.ok(!teaching.includes('persons'));
 
-  assert.deepEqual(databases.filter((id) => id.startsWith('db')), ['dbSearch', 'dbAnalysis', 'dbChat']);
+  assert.deepEqual(databases.filter((id) => id.startsWith('db')), ['dbSearch', 'dbAnalysis', 'dbChat', 'dbDeepResearch']);
   assert.ok(!databases.includes('studyCourses'));
 
   assert.ok(worldbuilding.includes('characters'));

@@ -31,3 +31,13 @@ export function getDb(): Database.Database {
   database.pragma('cache_size = -32768');
   return database;
 }
+
+/** Compatibility shim for worker bundles that import read-only helpers from
+ * the main database module. The compute worker already owns its isolated
+ * connection, so there is no global context to swap. */
+export function withDatabaseContext<T>(
+  _database: Database.Database,
+  work: () => T,
+): T {
+  return work();
+}

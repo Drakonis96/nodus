@@ -186,6 +186,21 @@ export const databasesApi: DatabasesApi = {
   suggestDatabaseAnalyses: (databaseId) => ipcRenderer.invoke('db:suggestAnalyses', databaseId),
   runDatabaseAnalysis: (databaseId, request) => ipcRenderer.invoke('db:runAnalysis', databaseId, request),
   narrateDatabaseAnalysis: (result) => ipcRenderer.invoke('db:narrateAnalysis', result),
+  previewDatabaseDeepResearch: (input) => ipcRenderer.invoke('db:deepResearch:preview', input),
+  enqueueDatabaseDeepResearch: (input) => ipcRenderer.invoke('db:deepResearch:enqueue', input),
+  getDatabaseDeepResearchJob: (id) => ipcRenderer.invoke('db:deepResearch:job:get', id),
+  clearFinishedDatabaseDeepResearchJobs: () => ipcRenderer.invoke('db:deepResearch:jobs:clear'),
+  deleteDatabaseDeepResearchReport: (id) => ipcRenderer.invoke('db:deepResearch:report:delete', id),
+  exportDatabaseDeepResearchReport: (id, options) => ipcRenderer.invoke('db:deepResearch:report:export', id, options),
+  onDatabaseDeepResearchProgress: (cb) => {
+    const listener = (_e: unknown, progress: import('@shared/databaseDeepResearch').DatabaseResearchProgress) => cb(progress);
+    ipcRenderer.on('db:deepResearch:progress', listener);
+    return () => ipcRenderer.removeListener('db:deepResearch:progress', listener);
+  },
+  listDatabaseDeepResearchJobs: () => ipcRenderer.invoke('db:deepResearch:jobs:list'),
+  listDatabaseDeepResearchReports: (query) => ipcRenderer.invoke('db:deepResearch:reports:list', query),
+  getDatabaseDeepResearchReport: (id) => ipcRenderer.invoke('db:deepResearch:report:get', id),
+  cancelDatabaseDeepResearchJob: (id) => ipcRenderer.invoke('db:deepResearch:job:cancel', id),
   dbChatStream: async (request, handlers) => {
     const requestId = `db-${Date.now()}-${Math.random().toString(36).slice(2)}`;
     const onDelta = (_e: unknown, id: string, delta: string) => {

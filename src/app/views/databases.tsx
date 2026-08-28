@@ -6,6 +6,7 @@ const DatabasesView = lazy(() => import('../../views/DatabasesView').then((modul
 const DatabasesSearchView = lazy(() => import('../../views/DatabasesSearchView').then((module) => ({ default: module.DatabasesSearchView })));
 const DatabasesAnalysisView = lazy(() => import('../../views/DatabasesAnalysisView').then((module) => ({ default: module.DatabasesAnalysisView })));
 const DatabasesChatView = lazy(() => import('../../views/DatabasesChatView').then((module) => ({ default: module.DatabasesChatView })));
+const DatabaseDeepResearchView = lazy(() => import('../../views/DatabaseDeepResearchView').then((module) => ({ default: module.DatabaseDeepResearchView })));
 const PageWikiView = lazy(() => import('../../views/PageWikiView').then((module) => ({ default: module.PageWikiView })));
 
 export const databasesViews = {
@@ -30,4 +31,5 @@ export const databasesViews = {
   ),
   dbAnalysis: ({ activeDatabaseId }) => <DatabasesAnalysisView initialDatabaseId={activeDatabaseId} />,
   dbChat: ({ activeDatabaseId }) => <DatabasesChatView initialDatabaseId={activeDatabaseId} />,
+  dbDeepResearch: ({ settings, snapshots }) => <DatabaseDeepResearchView settings={settings} snapshot={snapshots.read('dbDeepResearch')} onSnapshotChange={(patch) => snapshots.patch('dbDeepResearch', patch)} />,
 } satisfies Record<string, ViewRenderer>;

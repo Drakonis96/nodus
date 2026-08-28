@@ -43,6 +43,20 @@ import { isVisionMime } from '@shared/imageAnalysis';
 import { importNotionZip } from '../import/notionZipImport';
 import { getQaDatabaseScaleFixtureStatus, startQaDatabaseScaleFixture } from '../qa/databaseScaleFixtureHost';
 import type { QaDatabaseScaleFixtureInput } from '@shared/databaseScaleQa';
+import * as databaseResearch from '../db/databaseDeepResearchRepo';
+import {
+  estimateDatabaseDeepResearchCost,
+  DATABASE_DEEP_RESEARCH_REPORT_TYPES,
+  getDatabaseDeepResearchAnalysisRequirements,
+  getDatabaseDeepResearchEligibility,
+  normalizeDatabaseDeepResearchJobInput,
+  type DatabaseDeepResearchExportOptions,
+  type DatabaseDeepResearchJobInput,
+  type DatabaseDeepResearchReportType,
+} from '@shared/databaseDeepResearch';
+import { enqueueDatabaseDeepResearch, ensureDatabaseDeepResearchLane } from '../ai/databaseDeepResearchLane';
+import { buildDatabaseDeepResearchExport } from '../export/databaseDeepResearchExport';
+import { buildDatabaseDeepResearchPreviewSections } from '@shared/databaseDeepResearchPrompts';
 
 /**
  * Rows of the CSV the import modal is currently showing, kept out of the renderer: a real
@@ -518,6 +532,111 @@ export function registerDatabasesIpc({ h, getWindow, chatAborters }: IpcContext)
   h('db:narrateAnalysis', async (_e, result: AnalysisResult) => {
     const vaultId = getActiveVault().id;
     return withVaultDatabase(vaultId, () => narrateAnalysisResult(result));
+  });
+  // Database Deep Research is a durable, asynchronous orchestration lane. The
+  // statistical/AI worker consumes these records separately; IPC only validates,
+  // persists and reports lifecycle changes.
+  const databaseResearchVault = () => {
+    const vault = getActiveVault();
+    if (vault.type !== 'databases') throw new Error('La investigación de bases sólo está disponible en un vault de bases de datos.');
+    return vault;
+  };
+  h('db:deepResearch:preview', async (_e, input: DatabaseDeepResearchJobInput) => {
+    const vault = databaseResearchVault();
+    return withVaultDatabase(vault.id, () => {
+      const normalized = normalizeDatabaseDeepResearchJobInput(input);
+      const evidence: Array<{ id: string; label: string; excerpt: string; databaseName?: string; rowId?: string }> = [];
+      let rowCount = 0;
+      const availableViews = new Set<string>();
+      const availableColumns = new Set<string>();
+      const schemaColumns: Array<{ id: string; type: string }> = [];
+      for (const databaseId of normalized.databaseIds) {
+        const database = dbMode.getDatabase(databaseId);
+        if (!database) throw new Error('Base de datos no encontrada.');
+        for (const view of dbMode.listViews(databaseId)) availableViews.add(view.id);
+        for (const column of dbMode.getColumns(databaseId)) {
+          availableColumns.add(column.id);
+          schemaColumns.push({ id: column.id, type: column.type });
+        }
+        const rows = dbMode.listRows(databaseId, { limit: 200 });
+        rowCount += database.rowCount;
+        for (const [index] of rows.slice(0, 8).entries()) {
+          // Preview is metadata-only. Never echo cell values, row IDs, free text,
+          // PII or prompt-injection payloads across the IPC boundary.
+          const excerpt = 'Valores de celdas omitidos por privacidad; solo se muestra evidencia agregada tras ejecutar la investigación.';
+          evidence.push({ id: `${databaseId}:sample:${index}`, label: 'Muestra redactada', excerpt, databaseName: database.name });
+        }
+      }
+      for (const viewId of normalized.viewIds) if (!availableViews.has(viewId)) throw new Error(`Vista no válida: ${viewId}`);
+      for (const columnId of normalized.filters.columnIds) if (!availableColumns.has(columnId)) throw new Error(`Columna de filtro no válida: ${columnId}`);
+      const { estimatedTokens, estimatedCostUsd } = estimateDatabaseDeepResearchCost(rowCount, normalized.databaseIds.length, normalized.depth);
+      const availableReportTypes = DATABASE_DEEP_RESEARCH_REPORT_TYPES.map((type) =>
+        getDatabaseDeepResearchEligibility(type, {
+          columns: schemaColumns,
+          roles: normalized.roles,
+          databaseCount: normalized.databaseIds.length,
+        }),
+      );
+      const eligibility = availableReportTypes.find((item) => item.reportType === normalized.reportType);
+      const analyses = getDatabaseDeepResearchAnalysisRequirements(normalized.reportType);
+      return {
+        reportType: normalized.reportType,
+        eligibility,
+        availableReportTypes,
+        rowCount, sourceCount: normalized.databaseIds.length, estimatedTokens, estimatedCostUsd,
+        requiredAnalyses: analyses.required,
+        optionalAnalyses: analyses.optional,
+        sections: buildDatabaseDeepResearchPreviewSections(
+          normalized.language ?? 'en',
+          normalized.reportType ?? 'general',
+          normalized.objective,
+          evidence.length,
+        ),
+        evidence,
+      };
+    });
+  });
+  h('db:deepResearch:enqueue', async (e, input: DatabaseDeepResearchJobInput) => {
+    const vault = databaseResearchVault();
+    const job = await enqueueDatabaseDeepResearch(vault.id, input);
+    if (!e.sender.isDestroyed()) e.sender.send('db:deepResearch:progress', {
+      runId: job.id, status: job.status, progress: job.progress / 100, step: null, phase: job.phase, message: 'Añadida a la cola.',
+    });
+    return job;
+  });
+  h('db:deepResearch:job:get', async (_e, id: string) => {
+    const vault = databaseResearchVault(); ensureDatabaseDeepResearchLane(vault.id); return withVaultDatabase(vault.id, () => databaseResearch.getDatabaseResearchJob(id));
+  });
+  h('db:deepResearch:jobs:list', async () => {
+    const vault = databaseResearchVault(); ensureDatabaseDeepResearchLane(vault.id); return withVaultDatabase(vault.id, () => databaseResearch.listDatabaseResearchJobs());
+  });
+  h('db:deepResearch:job:cancel', async (_e, id: string) => {
+    const vault = databaseResearchVault(); return withVaultDatabase(vault.id, () => databaseResearch.cancelDatabaseResearchRun(id));
+  });
+  h('db:deepResearch:jobs:clear', async () => {
+    const vault = databaseResearchVault(); return withVaultDatabase(vault.id, () => databaseResearch.clearFinishedDatabaseResearchJobs());
+  });
+  h('db:deepResearch:reports:list', async (_e, query?: { limit?: number; offset?: number; query?: string; reportType?: DatabaseDeepResearchReportType }) => {
+    const vault = databaseResearchVault(); return withVaultDatabase(vault.id, () => databaseResearch.listDatabaseResearchReports(query));
+  });
+  h('db:deepResearch:report:get', async (_e, id: string) => {
+    const vault = databaseResearchVault(); return withVaultDatabase(vault.id, () => databaseResearch.getDatabaseResearchReport(id));
+  });
+  h('db:deepResearch:report:delete', async (_e, id: string) => {
+    const vault = databaseResearchVault(); return withVaultDatabase(vault.id, () => databaseResearch.deleteDatabaseResearchReport(id));
+  });
+  h('db:deepResearch:report:export', async (_e, id: string, options: DatabaseDeepResearchExportOptions) => {
+    const vault = databaseResearchVault();
+    if (!options || !['markdown', 'pdf', 'zip'].includes(options.format)) throw new Error('Formato de exportación no válido.');
+    if (options.includeSnapshot && options.format !== 'zip') throw new Error('El snapshot bruto sólo puede incluirse en el ZIP reproducible.');
+    const report = await withVaultDatabase(vault.id, () => databaseResearch.getDatabaseResearchReport(id));
+    if (!report) return { canceled: true, path: null };
+    const extension = options.format === 'markdown' ? 'md' : options.format;
+    const picked = await dialog.showSaveDialog(getWindow() ?? undefined!, { title: 'Exportar informe de Deep Research', defaultPath: `${report.title.replace(/[^\w\-. ]+/g, '').trim() || 'database-research'}.${extension}` });
+    if (picked.canceled || !picked.filePath) return { canceled: true, path: null };
+    const exported = await withVaultDatabase(vault.id, () => buildDatabaseDeepResearchExport(id, options));
+    fs.writeFileSync(picked.filePath, exported.bytes);
+    return { canceled: false, path: picked.filePath };
   });
   h('db:chatStream', async (e, requestId: string, request: DatabaseChatRequest) => {
     const controller = new AbortController();

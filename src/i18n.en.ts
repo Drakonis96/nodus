@@ -44,6 +44,7 @@ import { DOCUMENT_UNDERSTANDING_TRANSLATIONS } from './i18n.documentUnderstandin
 import { DEEP_RESEARCH_QUALITY_TRANSLATIONS } from './i18n.deepResearchQuality';
 import { DOCUMENT_UNDERSTANDING_CONSENT_TRANSLATIONS } from './i18n.documentUnderstandingConsent';
 import { MODEL_SETTINGS_TRANSLATIONS } from './i18n.modelSettings';
+import { DATABASE_DEEP_RESEARCH_TRANSLATIONS } from './i18n.databaseDeepResearch';
 
 /**
  * English translations keyed by the Spanish source string (see {@link ../i18n}).
@@ -51,6 +52,7 @@ import { MODEL_SETTINGS_TRANSLATIONS } from './i18n.modelSettings';
  * every non-Spanish interface language.
  */
 export const EN: Record<string, string> = {
+  ...DATABASE_DEEP_RESEARCH_TRANSLATIONS.en,
   ...MODEL_SETTINGS_TRANSLATIONS.en,
   ...DICTIONARY_TRANSLATIONS.en,
   'Tamaño de Nodi': 'Nodi size',

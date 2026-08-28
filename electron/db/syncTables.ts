@@ -314,6 +314,15 @@ const NOT_SYNCED_TABLES = new Set([
   'db_search_fts_content',
   'db_search_fts_docsize',
   'db_search_fts_config',
+  // Database Deep Research is deliberately desktop-local in schema v167. Runs and
+  // steps describe a machine-local queue; claims and reports are bound to an immutable
+  // local SQLite fingerprint. Syncing any subset would detach evidence from the exact
+  // snapshot that was verified. A future remote format needs an atomic provenance
+  // contract rather than inheriting generic row sync accidentally.
+  'database_research_runs',
+  'database_research_steps',
+  'database_research_claims',
+  'database_research_reports',
   // TESTIMONIOS NO SE SINCRONIZA, y es una decision, no una omision (decision 18 del
   // plan). Antes de activarlo hay que demostrar que TODAS estas tablas viajan, que los
   // blobs de los maestros tienen una politica explicita, y sobre todo que las

@@ -123,13 +123,14 @@ function makeMcpServer(): McpServer {
       'All data remains on this machine. Do not claim a relation, evidence or source that is not returned by a Nodus tool.',
     ].join('\n'),
   });
-  // Scope the surface to the active vault type. If resolution ever fails, fall back to
-  // the full surface (null) rather than letting a gating hiccup break session creation.
-  let vaultType: VaultType | null = null;
+  // Resolving the serving vault is an authorization boundary. Fail closed if
+  // resolution fails instead of exposing the full cross-vault surface.
+  let vaultType: VaultType;
   try {
     vaultType = resolveServingVaultType();
   } catch (error) {
-    console.warn('[mcp] could not resolve active vault type; serving full surface', error);
+    console.error('[mcp] could not resolve active vault type; refusing session', error);
+    throw new Error('Could not resolve the active vault for this MCP session.');
   }
   registerToolsForVault(server, vaultType);
   return server;
