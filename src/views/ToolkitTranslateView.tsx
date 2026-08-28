@@ -17,6 +17,7 @@ import { ModelPicker, SubscriptionQuotaNotice } from '../components/ModelPicker'
 import { ToolkitAppHero } from '../components/ToolkitAppHero';
 import { Icon, Spinner } from '../components/ui';
 import { errorText, t, tr, tx } from '../i18n';
+import { zoteroConnectionHint, zoteroPingErrorText } from '../lib/zoteroConnection';
 import {
   TRANSLATE_JOB_KEY,
   clearBackgroundJob,
@@ -76,6 +77,7 @@ export function ToolkitTranslateView({ onBack, settings }: { onBack: () => void;
   const [zoteroConnecting, setZoteroConnecting] = useState(false);
   const [zoteroSearching, setZoteroSearching] = useState(false);
   const [zoteroError, setZoteroError] = useState<string | null>(null);
+  const [zoteroHint, setZoteroHint] = useState<string | null>(null);
   const [zoteroConnectAttempt, setZoteroConnectAttempt] = useState(0);
 
   const [history, setHistory] = useState<TranslateHistoryEntry[]>([]);
@@ -91,8 +93,13 @@ export function ToolkitTranslateView({ onBack, settings }: { onBack: () => void;
     let disposed = false;
     setZoteroConnecting(true);
     setZoteroError(null);
+    setZoteroHint(null);
     void window.nodus.zoteroPing().then(async (status) => {
-      if (!status.ok) throw new Error(status.message || t('Zotero no está disponible.'));
+      if (!status.ok) {
+        // The hint survives the throw below: the catch only knows the message.
+        setZoteroHint(zoteroConnectionHint(status));
+        throw new Error(zoteroPingErrorText(status));
+      }
       const next = await window.nodus.zoteroLibraries();
       if (disposed) return;
       setLibraries(next);
@@ -255,7 +262,10 @@ export function ToolkitTranslateView({ onBack, settings }: { onBack: () => void;
     {tab === 'zotero' && <section className="space-y-3">
       <div className={`flex flex-wrap items-center gap-2 rounded-lg border px-3 py-2 text-xs ${zoteroError ? 'border-red-300 bg-red-50 text-red-700 dark:border-red-900/60 dark:bg-red-950/20 dark:text-red-300' : 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900/50 dark:bg-emerald-950/20 dark:text-emerald-300'}`}>
         <Icon name={zoteroError ? 'alert' : zoteroConnecting ? 'sync' : 'check'} size={14} className={zoteroConnecting ? 'animate-spin' : ''} />
-        <span className="min-w-0 flex-1">{zoteroConnecting ? t('Conectando con Zotero…') : zoteroError || tx(libraries.length === 1 ? 'Conectado a Zotero · {count} biblioteca' : 'Conectado a Zotero · {count} bibliotecas', { count: libraries.length })}</span>
+        <span className="min-w-0 flex-1">
+          {zoteroConnecting ? t('Conectando con Zotero…') : zoteroError || tx(libraries.length === 1 ? 'Conectado a Zotero · {count} biblioteca' : 'Conectado a Zotero · {count} bibliotecas', { count: libraries.length })}
+          {!zoteroConnecting && zoteroError && zoteroHint && <span className="mt-1 block font-normal leading-5 opacity-90">{zoteroHint}</span>}
+        </span>
         <button data-testid="translate-zotero-reconnect" type="button" className="btn btn-ghost !px-2 !py-1" disabled={zoteroConnecting} onClick={() => setZoteroConnectAttempt((value) => value + 1)}>{t('Reconectar')}</button>
       </div>
       <div className="grid gap-4 lg:grid-cols-2">

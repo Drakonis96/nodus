@@ -2215,6 +2215,8 @@ export const TR: Record<string, string> = {
   "Conectado (userID {id})": "Bağlandı (kullanıcı kimliği {id})",
   "No disponible: {msg}": "Mevcut değil: {msg}",
   "sin respuesta": "yanıt yok",
+  "Comprueba que Zotero esté abierto y que «Permitir que otras aplicaciones de este ordenador se comuniquen con Zotero» esté activado en los ajustes Avanzados de Zotero.":
+    "Zotero’nun açık olduğundan ve Zotero’nun Gelişmiş ayarlarında “Bu bilgisayardaki diğer uygulamaların Zotero ile iletişim kurmasına izin ver” seçeneğinin etkin olduğundan emin olun.",
   "Elige las colecciones a monitorizar. Se incorporan metadatos; los análisis se lanzan manualmente salvo que actives automatización en Ajustes.": "İzlenecek koleksiyonları seçin. Meta veriler dahil edilmiştir; Ayarlar'da otomasyonu etkinleştirmediğiniz sürece analizler manuel olarak başlatılır.",
   "ítems": "öğeler",
   "subcol.": "alt sütun",

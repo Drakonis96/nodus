@@ -58,6 +58,7 @@ import type {
   ZoteroInstallResult,
   ZoteroItem,
   ZoteroLibrary,
+  ZoteroPingResult,
   ZoteroPluginServerStatus,
   ZoteroPluginOpenTarget,
 } from '../types';
@@ -254,7 +255,7 @@ export interface PlatformApi {
   humeSynthesize(voiceId: string, provider: 'HUME_AI' | 'CUSTOM_VOICE', text: string): Promise<Uint8Array>;
 
   // zotero
-  zoteroPing(): Promise<{ ok: boolean; userId?: string; message?: string }>;
+  zoteroPing(): Promise<ZoteroPingResult>;
   zoteroLibraries(): Promise<ZoteroLibrary[]>;
   zoteroCollections(library?: ZoteroLibrary): Promise<ZoteroCollection[]>;
   zoteroChildCollections(parentKey: string, library?: ZoteroLibrary): Promise<ZoteroCollection[]>;

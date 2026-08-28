@@ -1,12 +1,13 @@
 import { useRef, useState } from 'react';
 import { motion } from 'framer-motion';
-import type { AiProvider, AppSettings, ZoteroCollection, ModelRef, VaultSummary } from '@shared/types';
+import type { AiProvider, AppSettings, ZoteroCollection, ModelRef, VaultSummary, ZoteroPingResult } from '@shared/types';
 import { normalizeEmbeddingModel, normalizeEmbeddingProvider } from '@shared/providers';
 import { getNodusLocalModel } from '@shared/localAiModels';
 import { Spinner, Icon } from '../components/ui';
 import { ConfirmModal } from '../components/ConfirmModal';
 import { OnboardingModelStep } from '../components/OnboardingModelStep';
 import { t, tx } from '../i18n';
+import { zoteroConnectionHint, zoteroPingErrorText } from '../lib/zoteroConnection';
 
 type OnboardingExit = 'home' | 'library' | 'settings';
 
@@ -28,7 +29,7 @@ export function Onboarding({
   discardsVault?: boolean;
 }) {
   const [step, setStep] = useState(0);
-  const [ping, setPing] = useState<{ ok: boolean; userId?: string; message?: string } | null>(null);
+  const [ping, setPing] = useState<ZoteroPingResult | null>(null);
   const [collections, setCollections] = useState<ZoteroCollection[]>([]);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [librarySetup, setLibrarySetup] = useState<'nodus' | 'zotero'>('nodus');
@@ -224,6 +225,9 @@ export function Onboarding({
     }
   };
 
+  // A failed check names the setting that fixes it; an HTTP failure from a Zotero that
+  // did answer gets no hint (zoteroConnectionHint decides).
+  const pingHint = ping && !ping.ok ? zoteroConnectionHint(ping) : null;
   const steps = simple
     ? [t('Introducción'), t('Proveedor de IA'), t('Listo')]
     : [t('Biblioteca'), connectsZotero ? t('Colecciones de Zotero') : t('Añadir contenido'), connectsZotero ? t('Lecturas de Zotero') : t('Cómo funciona'), t('Proveedor de IA'), t('Primer resultado')];
@@ -348,7 +352,14 @@ export function Onboarding({
             {connectsZotero && <div className="rounded-xl border border-neutral-800 p-3">
               <p className="text-xs text-neutral-400">{t('Nodus usa la API local de Zotero en modo solo lectura (requiere Zotero 7 o posterior). Abre Zotero y verifica la conexión.')}</p>
               <button className="btn btn-secondary mt-3" onClick={checkZotero}>{t('Verificar conexión')}</button>
-              {ping && <div className={`mt-2 text-sm ${ping.ok ? 'text-emerald-400' : 'text-red-400'}`}>{ping.ok ? tx('Conectado (userID {id})', { id: ping.userId ?? '' }) : tx('No disponible: {msg}', { msg: ping.message ?? t('sin respuesta') })}</div>}
+              {ping && (ping.ok ? (
+                <div className="mt-2 text-sm text-emerald-400">{tx('Conectado (userID {id})', { id: ping.userId ?? '' })}</div>
+              ) : (
+                <div role="alert" data-testid="onboarding-zotero-error" className="mt-2 text-sm text-red-400">
+                  {zoteroPingErrorText(ping)}
+                  {pingHint && <p className="mt-1 text-xs leading-5 text-amber-300">{pingHint}</p>}
+                </div>
+              ))}
             </div>}
             {librarySetup === 'nodus' && (
               <div className="rounded-xl border border-emerald-700/30 bg-emerald-500/5 p-3 text-xs leading-5 text-emerald-300">

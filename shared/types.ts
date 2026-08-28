@@ -4740,6 +4740,21 @@ export interface ZoteroLibrary {
   name: string;
 }
 
+/**
+ * Outcome of checking Zotero's local API. On failure `message` carries the technical
+ * detail (a transport error such as "The operation could not be completed.", or the
+ * HTTP status) and `reason` says what the user has to do about it, which the renderer
+ * turns into a localized hint. 'forbidden' and 'unreachable' come down to the same
+ * fix: Zotero open, and its local API allowed in Advanced settings.
+ */
+export interface ZoteroPingResult {
+  ok: boolean;
+  userId?: string;
+  version?: number;
+  message?: string;
+  reason?: 'forbidden' | 'unreachable' | 'http';
+}
+
 export interface ZoteroAttachmentInfo {
   key: string;
   itemKey: string;
