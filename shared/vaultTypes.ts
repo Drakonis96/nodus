@@ -351,6 +351,7 @@ export const VAULT_TYPE_SCOPED_VIEWS: Record<string, VaultType[]> = {
   dbSearch: ['databases'],
   dbAnalysis: ['databases'],
   dbChat: ['databases'],
+  dbDeepResearch: ['databases'],
   // Worldbuilding mode: characters are the first section to ship. Their storage is the
   // shared person ontology plus the `character_profiles` overlay, but the view itself is
   // its own (a card grid, not the genealogy list + dossier split).

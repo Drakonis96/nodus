@@ -649,6 +649,9 @@ test('the three sections added here receive their snapshot the way the others do
   // The same surface under the three names the app gives it, each with its own cut.
   assert.match(study, /snapshots\.read\('studyDeepResearch'\)/);
   assert.match(teaching, /snapshots\.read\('teachingUnits'\)/);
+  const databases = await readSource('src/app/views/databases.tsx');
+  assert.match(databases, /snapshots\.read\('dbDeepResearch'\)/);
+  assert.match(databases, /snapshots\.patch\('dbDeepResearch',/);
 });
 
 // ── Phase four: the half of the cut that outlives the run ─────────────────────
@@ -661,6 +664,17 @@ const forgetPreferences = () => {
   globalThis.localStorage.writes = 0;
   store.clearViewSnapshots();
 };
+
+test('database Deep Research restores its selected sources and open report within a vault', () => {
+  forgetPreferences();
+  store.patchViewSnapshot('vault-a', 'dbDeepResearch', {
+    selectedDatabaseIds: ['DB1', 'DB2'], selectedViewIds: ['VIEW1'], openReportId: 'REPORT1',
+  });
+  assert.deepEqual(store.readViewSnapshot('vault-a', 'dbDeepResearch'), {
+    selectedDatabaseIds: ['DB1', 'DB2'], selectedViewIds: ['VIEW1'], openReportId: 'REPORT1',
+  });
+  assert.equal(store.readViewSnapshot('vault-b', 'dbDeepResearch'), undefined);
+});
 
 test('the galleries reopen on the ordering and the layout the reader chose, run after run', () => {
   forgetPreferences();

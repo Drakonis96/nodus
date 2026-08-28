@@ -275,6 +275,14 @@ export interface DeepResearchSnapshot {
   reading: ReadingPlace | null;
 }
 
+/** Database Deep Research keeps the selected table set and open result, not the
+ * composer (an objective is a draft and should never reappear unexpectedly). */
+export interface DatabaseDeepResearchSnapshot {
+  selectedDatabaseIds: string[];
+  selectedViewIds: string[];
+  openReportId: string | null;
+}
+
 /**
  * Inmersión: the gallery's cut and the session left open.
  *
@@ -319,6 +327,7 @@ export interface ViewSnapshots {
   deepResearch?: DeepResearchSnapshot;
   studyDeepResearch?: DeepResearchSnapshot;
   teachingUnits?: DeepResearchSnapshot;
+  dbDeepResearch?: DatabaseDeepResearchSnapshot;
   compass?: CompassSnapshot;
 }
 

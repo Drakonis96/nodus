@@ -35,7 +35,7 @@ try {
     : [];
   runMigrations(db);
   assert.equal(db.pragma('user_version', { simple: true }), SCHEMA_VERSION);
-  assert.equal(SCHEMA_VERSION, 166);
+  assert.ok(SCHEMA_VERSION >= 166, `expected schema v166 or later, got v${SCHEMA_VERSION}`);
   const workColumns = new Set(db.prepare('PRAGMA table_info(works)').all().map((row) => row.name));
   for (const column of ['resolved_source_type', 'resolved_text_hash', 'text_block_reason', 'resolved_text_notes', 'deep_error', 'deep_queued']) {
     assert.ok(workColumns.has(column), `works.${column} exists`);

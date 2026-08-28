@@ -816,7 +816,8 @@ async function parseOrRepair<T>(
   text: string,
   guard: (v: unknown) => v is T,
   perf?: PerfContext,
-  maxTokens?: number
+  maxTokens?: number,
+  allowRemoteRepair = true,
 ): Promise<T> {
   if (endsMidJson(text)) {
     throw new AiError(truncatedJsonMessage(model, maxTokens ?? 0), true, false, 'output_truncated');
@@ -828,6 +829,7 @@ async function parseOrRepair<T>(
     // Genuinely unparseable output — extractJson already recovers code fences, prose
     // wrappers and truncation locally via jsonrepair, so reaching here means only a
     // repair round-trip can still salvage the text (e.g. two objects run together).
+    if (!allowRemoteRepair) throw parseError;
     const repaired = await repairJson(model, text, parseError, guard, perf);
     if (repaired) return repaired;
     throw parseError;
@@ -866,7 +868,9 @@ export async function completeJson<T>(
   // provider that honours neither (the subscription runtimes) would send the exact
   // same request three times and bill three turns for it, so it gets one retry —
   // the only lever left there is a fresh sample — instead of two identical ones.
-  const attempts = supportsSamplingControls(resolved.provider)
+  const attempts = langOpts.noRetry
+    ? [{ temperature: langOpts.temperature ?? 0.15, jsonMode: true }]
+    : supportsSamplingControls(resolved.provider)
     ? [
         { temperature: langOpts.temperature ?? 0.15, jsonMode: true },
         { temperature: 0, jsonMode: true },
@@ -892,7 +896,7 @@ export async function completeJson<T>(
       throw e;
     }
     try {
-      const parsed = await parseOrRepair(resolved, text, guard, langOpts.perf, langOpts.maxTokens);
+      const parsed = await parseOrRepair(resolved, text, guard, langOpts.perf, langOpts.maxTokens, !langOpts.noRetry);
       if (i > 0) retryDone({ status: 'ok' });
       return deanonymizeResult(parsed);
     } catch (e) {

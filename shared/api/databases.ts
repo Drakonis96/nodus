@@ -16,6 +16,15 @@ import type { NotionImportReport } from '../notionImport';
 import type { DbChatTurn } from '../databaseChat';
 import type { AnalysisRequest, AnalysisResult, AnalysisSuggestion } from '../analysisSpec';
 import type { QaDatabaseScaleFixtureInput, QaDatabaseScaleFixtureStatus } from '../databaseScaleQa';
+import type {
+  DatabaseResearchProgress,
+  DatabaseResearchReport,
+  DatabaseDeepResearchJob,
+  DatabaseDeepResearchJobInput,
+  DatabaseDeepResearchPreview,
+  DatabaseDeepResearchReportType,
+  DatabaseResearchReportQuery,
+} from '../databaseDeepResearch';
 // Declared in shared/types.ts itself; the resulting cycle is types-only and erased at build time.
 import type {
   DatabaseChatConversation,
@@ -195,6 +204,20 @@ export interface DatabasesApi {
   suggestDatabaseAnalyses(databaseId: string): Promise<{ databaseName: string; suggestions: AnalysisSuggestion[] }>;
   runDatabaseAnalysis(databaseId: string, request: AnalysisRequest): Promise<{ databaseName: string; request: AnalysisRequest; result: AnalysisResult }>;
   narrateDatabaseAnalysis(result: AnalysisResult): Promise<string>;
+  previewDatabaseDeepResearch(input: DatabaseDeepResearchJobInput): Promise<DatabaseDeepResearchPreview>;
+  enqueueDatabaseDeepResearch(input: DatabaseDeepResearchJobInput): Promise<DatabaseDeepResearchJob>;
+  listDatabaseDeepResearchJobs(): Promise<DatabaseDeepResearchJob[]>;
+  getDatabaseDeepResearchJob(id: string): Promise<DatabaseDeepResearchJob | null>;
+  cancelDatabaseDeepResearchJob(id: string): Promise<boolean>;
+  clearFinishedDatabaseDeepResearchJobs(): Promise<number>;
+  listDatabaseDeepResearchReports(query?: DatabaseResearchReportQuery & { reportType?: DatabaseDeepResearchReportType }): Promise<DatabaseResearchReport[]>;
+  getDatabaseDeepResearchReport(id: string): Promise<DatabaseResearchReport | null>;
+  deleteDatabaseDeepResearchReport(id: string): Promise<boolean>;
+  exportDatabaseDeepResearchReport(
+    id: string,
+    options: import('../databaseDeepResearch').DatabaseDeepResearchExportOptions,
+  ): Promise<{ canceled: boolean; path: string | null }>;
+  onDatabaseDeepResearchProgress(cb: (progress: DatabaseResearchProgress) => void): () => void;
   dbChatStream(request: DatabaseChatRequest, handlers: { onDelta: (delta: string) => void }): Promise<{ text: string }>;
   cancelDbChat(): Promise<void>;
   listDatabaseChatConversations(): Promise<DatabaseChatConversationSummary[]>;

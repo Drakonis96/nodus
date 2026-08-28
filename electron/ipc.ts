@@ -166,6 +166,7 @@ import {
   withMigrationRecoverySnapshotsInUtility,
 } from './db/migrationRecoveryUtilityHost';
 import { documentIndexQueue } from './pipeline/documentIndexQueue';
+import { ensureDatabaseDeepResearchLane } from './ai/databaseDeepResearchLane';
 
 
 function withVaultKeyProviders(vault: VaultSummary): VaultSummary {
@@ -311,6 +312,7 @@ export function registerIpc(
     closeDb();
     setActiveVault(id);
     getDb();
+    if (target.type === 'databases') ensureDatabaseDeepResearchLane(target.id);
     // Wake the durable lane for this vault. Work belonging to another vault remains
     // queued against that corpus and resumes when its owner returns to it.
     cancelDeepResearchJobsForOtherVaults(id);
@@ -870,4 +872,6 @@ export function registerIpc(
   h('dock:setIcon', async (_e, pngDataUrl: string) => {
     setPersistentDockIcon(pngDataUrl);
   });
+  const activeVault = getActiveVault();
+  if (activeVault.type === 'databases') ensureDatabaseDeepResearchLane(activeVault.id);
 }

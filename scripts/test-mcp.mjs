@@ -107,6 +107,13 @@ try {
     'nodus_get_archive_item',
     'nodus_search_archive',
     'nodus_list_databases',
+    'nodus_enqueue_database_deep_research',
+    'nodus_preview_database_deep_research',
+    'nodus_list_database_deep_research_jobs',
+    'nodus_get_database_deep_research_job',
+    'nodus_cancel_database_deep_research_job',
+    'nodus_list_database_deep_research_reports',
+    'nodus_get_database_deep_research_reports',
     'nodus_get_database_schema',
     'nodus_query_database',
     'nodus_get_database_row',
@@ -559,7 +566,7 @@ try {
   const mDoble = dbmode.createColumn(mdb.id, 'Doble', 'formula', {
     formula: { kind: 'arithmetic', op: 'multiply', operands: [{ kind: 'column', columnId: mNum.id }, { kind: 'number', value: 2 }] },
   });
-  const mVerdict = dbmode.createColumn(mdb.id, 'Veredicto', 'formula', {
+  const _mVerdict = dbmode.createColumn(mdb.id, 'Veredicto', 'formula', {
     formula: { kind: 'ifThen', rules: [{ id: 'r', conjunction: 'and', conditions: [{ id: 'c', columnId: mNum.id, op: 'gt', value: '3' }], output: { kind: 'text', value: 'Pesado' } }], otherwise: { kind: 'text', value: 'Ligero' } },
   });
   // A rollup over a relation from another database back to this row.
@@ -569,7 +576,7 @@ try {
   dbmode.setCell(mOtherRow.id, mOtherName.id, 'Enlazado');
   const mRel = dbmode.createColumn(mdb.id, 'Vínculo', 'relation', { relationTargetKind: 'db_row', relationTargetDatabaseId: mOther.id });
   dbmode.addRelation(mRow.id, mRel.id, 'db_row', mOtherRow.id);
-  const mRollup = dbmode.createColumn(mdb.id, 'Enlaces', 'rollup', { rollupRelationColumnId: mRel.id, rollupTargetColumnId: '__title__', rollupFunction: 'count' });
+  const _mRollup = dbmode.createColumn(mdb.id, 'Enlaces', 'rollup', { rollupRelationColumnId: mRel.id, rollupTargetColumnId: '__title__', rollupFunction: 'count' });
 
   const schema2 = await callTool(server, 'nodus_get_database_schema', { databaseId: mdb.id });
   const doble = schema2.columns.find((c) => c.name === 'Doble');

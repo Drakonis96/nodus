@@ -13,9 +13,46 @@ export interface Migration {
   after?: (db: Database.Database) => void;
 }
 
+const DATABASE_RESEARCH_REPORT_TYPES_SQL = "'general', 'data_quality', 'cohort_comparison', 'temporal_anomalies', 'relationships_integrity', 'causal_impact', 'survival_retention', 'privacy_attachments', 'formulas_reconciliation'";
+
+/** v168 is deliberately idempotent: recovery tests and older prerelease builds may
+ * have the column while their user_version still points before this migration. */
+function ensureDatabaseResearchReportTypeColumns(db: Database.Database): void {
+  const hasColumn = (table: string, column: string) =>
+    (db.prepare(`PRAGMA table_info(${table})`).all() as Array<{ name: string }>).some((row) => row.name === column);
+  if (!hasColumn('database_research_runs', 'report_type')) {
+    db.exec(`ALTER TABLE database_research_runs ADD COLUMN report_type TEXT NOT NULL DEFAULT 'general' CHECK (report_type IN (${DATABASE_RESEARCH_REPORT_TYPES_SQL}))`);
+  }
+  if (!hasColumn('database_research_reports', 'report_type')) {
+    db.exec(`ALTER TABLE database_research_reports ADD COLUMN report_type TEXT NOT NULL DEFAULT 'general' CHECK (report_type IN (${DATABASE_RESEARCH_REPORT_TYPES_SQL}))`);
+  }
+  db.exec(`CREATE INDEX IF NOT EXISTS database_research_runs_report_type_idx ON database_research_runs(report_type, updated_at DESC)`);
+  db.exec(`CREATE INDEX IF NOT EXISTS database_research_reports_report_type_idx ON database_research_reports(report_type, updated_at DESC)`);
+}
+
+/** v169 adds nullable statistical provenance fields to claims. The helper is
+ * idempotent because prerelease builds may have applied part of this additive
+ * migration before user_version was advanced. */
+function ensureDatabaseResearchClaimMetricColumns(db: Database.Database): void {
+  const hasColumn = (column: string) =>
+    (db.prepare('PRAGMA table_info(database_research_claims)').all() as Array<{ name: string }>)
+      .some((row) => row.name === column);
+  const additions: Array<[string, string]> = [
+    ['effect', 'REAL'],
+    ['interval_json', 'TEXT'],
+    ['p_value', 'REAL'],
+    ['q_value', 'REAL'],
+    ['sensitivity_json', "TEXT NOT NULL DEFAULT '{}'"],
+    ['limitations_json', "TEXT NOT NULL DEFAULT '[]'"],
+  ];
+  for (const [column, definition] of additions) {
+    if (!hasColumn(column)) db.exec(`ALTER TABLE database_research_claims ADD COLUMN ${column} ${definition}`);
+  }
+}
+
 // Versioned, append-only migrations. Never edit an existing migration's SQL once
 // shipped — add a new one. The current schema version is the highest applied.
-export const SCHEMA_VERSION = 166;
+export const SCHEMA_VERSION = 169;
 
 export const migrations: Migration[] = [
   {
@@ -9044,6 +9081,126 @@ export const migrations: Migration[] = [
 
       DROP TABLE dictionary_versions_v165;
     `,
+  },
+  {
+    version: 167,
+    up: /* sql */ `
+      -- Durable Deep Research for structured databases. Runs are scoped to one
+      -- database; all subordinate material is disposable with its run.
+      CREATE TABLE IF NOT EXISTS database_research_runs (
+        id            TEXT PRIMARY KEY,
+        database_id   TEXT NOT NULL REFERENCES db_databases(id) ON DELETE CASCADE,
+        objective     TEXT NOT NULL,
+        title         TEXT,
+        language      TEXT,
+        model_json    TEXT,
+        options_json  TEXT NOT NULL DEFAULT '{}',
+        request_json  TEXT NOT NULL DEFAULT '{}',
+        plan_json     TEXT NOT NULL DEFAULT '{}',
+        snapshot_manifest_json TEXT NOT NULL DEFAULT '{}',
+        snapshot_fingerprint TEXT,
+        provider      TEXT,
+        budget_json   TEXT NOT NULL DEFAULT '{}',
+        revisions_json TEXT NOT NULL DEFAULT '[]',
+        phase         TEXT CHECK (phase IS NULL OR phase IN ('snapshot','semantic_profile','planning','calculations','sensitivity','adversarial_review','verification','assembly','done')),
+        progress_json TEXT NOT NULL DEFAULT '{}',
+        revision      INTEGER NOT NULL DEFAULT 1 CHECK (revision >= 1),
+        status        TEXT NOT NULL DEFAULT 'queued'
+                      CHECK (status IN ('queued','running','completed','partial','failed','stale','cancelling','cancelled')),
+        progress      REAL NOT NULL DEFAULT 0 CHECK (progress >= 0 AND progress <= 1),
+        current_step  TEXT CHECK (current_step IS NULL OR current_step IN ('snapshot','semantic_profile','planning','calculations','sensitivity','adversarial_review','verification','assembly')),
+        error         TEXT,
+        report_id     TEXT,
+        created_at    TEXT NOT NULL,
+        started_at    TEXT,
+        completed_at  TEXT,
+        updated_at    TEXT NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS database_research_runs_database_idx
+        ON database_research_runs(database_id, updated_at DESC);
+      CREATE INDEX IF NOT EXISTS database_research_runs_status_idx
+        ON database_research_runs(status, created_at ASC);
+      CREATE INDEX IF NOT EXISTS database_research_runs_phase_idx
+        ON database_research_runs(current_step, updated_at DESC);
+
+      CREATE TABLE IF NOT EXISTS database_research_steps (
+        id            TEXT PRIMARY KEY,
+        run_id        TEXT NOT NULL REFERENCES database_research_runs(id) ON DELETE CASCADE,
+        kind          TEXT NOT NULL CHECK (kind IN ('snapshot','semantic_profile','planning','calculations','sensitivity','adversarial_review','verification','assembly')),
+        ordinal       INTEGER NOT NULL CHECK (ordinal >= 0),
+        task          TEXT,
+        agent         TEXT,
+        params_json   TEXT NOT NULL DEFAULT '{}',
+        result_json   TEXT NOT NULL DEFAULT '{}',
+        result_hash   TEXT,
+        seed          INTEGER,
+        duration_ms   INTEGER,
+        status        TEXT NOT NULL DEFAULT 'queued'
+                      CHECK (status IN ('queued','running','completed','failed','cancelled')),
+        progress      REAL NOT NULL DEFAULT 0 CHECK (progress >= 0 AND progress <= 1),
+        message       TEXT,
+        input_json    TEXT NOT NULL DEFAULT '{}',
+        output_json   TEXT NOT NULL DEFAULT '{}',
+        error         TEXT,
+        started_at    TEXT,
+        completed_at  TEXT,
+        created_at    TEXT NOT NULL,
+        updated_at    TEXT NOT NULL,
+        UNIQUE(run_id, ordinal)
+      );
+      CREATE INDEX IF NOT EXISTS database_research_steps_run_idx
+        ON database_research_steps(run_id, ordinal ASC);
+      CREATE INDEX IF NOT EXISTS database_research_steps_status_idx
+        ON database_research_steps(status, updated_at DESC);
+
+      CREATE TABLE IF NOT EXISTS database_research_claims (
+        id              TEXT PRIMARY KEY,
+        run_id          TEXT NOT NULL REFERENCES database_research_runs(id) ON DELETE CASCADE,
+        text            TEXT NOT NULL,
+        claim_type      TEXT,
+        claim_status    TEXT NOT NULL DEFAULT 'exploratory'
+                      CHECK (claim_status IN ('verified','sensitive','exploratory','unverifiable')),
+        confidence      REAL CHECK (confidence IS NULL OR (confidence >= 0 AND confidence <= 1)),
+        source_row_ids_json TEXT NOT NULL DEFAULT '[]',
+        evidence_json   TEXT NOT NULL DEFAULT '{}',
+        artifact_refs_json TEXT NOT NULL DEFAULT '[]',
+        ordinal         INTEGER NOT NULL DEFAULT 0 CHECK (ordinal >= 0),
+        created_at      TEXT NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS database_research_claims_run_idx
+        ON database_research_claims(run_id, ordinal ASC);
+      CREATE INDEX IF NOT EXISTS database_research_claims_status_idx
+        ON database_research_claims(run_id, claim_status);
+
+      CREATE TABLE IF NOT EXISTS database_research_reports (
+        id              TEXT PRIMARY KEY,
+        run_id          TEXT NOT NULL UNIQUE REFERENCES database_research_runs(id) ON DELETE CASCADE,
+        title           TEXT NOT NULL,
+        markdown        TEXT NOT NULL,
+        summary         TEXT,
+        bibliography_json TEXT NOT NULL DEFAULT '[]',
+        metadata_json   TEXT NOT NULL DEFAULT '{}',
+        structured_json TEXT NOT NULL DEFAULT '{}',
+        quality_json   TEXT NOT NULL DEFAULT '{}',
+        provenance_json TEXT NOT NULL DEFAULT '{}',
+        created_at      TEXT NOT NULL,
+        updated_at      TEXT NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS database_research_reports_updated_idx
+        ON database_research_reports(updated_at DESC);
+    `,
+  },
+  {
+    version: 168,
+    // The body is a harmless marker; after performs conditional ALTERs so replaying
+    // v168 after a user_version repair cannot produce duplicate-column errors.
+    up: /* sql */ `SELECT 1;`,
+    after: ensureDatabaseResearchReportTypeColumns,
+  },
+  {
+    version: 169,
+    up: /* sql */ `SELECT 1;`,
+    after: ensureDatabaseResearchClaimMetricColumns,
   },
 ];
 

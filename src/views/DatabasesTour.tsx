@@ -5,7 +5,7 @@ import { TourOverlay, type TourStep } from './tourEngine';
  * The databases-mode guided tour, shown in the databases demo. It walks a first-time
  * user through the seeded sample databases: the sidebar list, the typed table with
  * inline editing, coloured select options, adding rows/columns, and the Analysis +
- * Chat sections (arriving in later phases). Relaunchable from Settings.
+ * Chat sections, plus the evidence-led Deep Research workspace. Relaunchable from Settings.
  */
 const STEPS: TourStep[] = [
   {
@@ -46,6 +46,12 @@ const STEPS: TourStep[] = [
     view: 'dbChat',
     title: 'Chat de datos (próximamente)',
     body: 'Un chat adaptado para conversar con una o varias de tus bases de datos, capaz de generar gráficos y consultas reproducibles. También llega en una próxima fase.',
+  },
+  {
+    target: 'nav-dbDeepResearch',
+    view: 'dbDeepResearch',
+    title: 'Deep Research de datos',
+    body: 'Formula una pregunta sobre tus tablas, elige bases, vistas, roles y profundidad, y revisa el preview y el coste antes de encolar una investigación con evidencia trazable.',
   },
   {
     title: 'Listo para tus datos',

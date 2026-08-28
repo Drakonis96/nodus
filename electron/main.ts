@@ -52,6 +52,7 @@ import type { UpdateCheckResponse, UpdateProgressEvent } from '@shared/types';
 import { TUTORIAL_VIDEO_EMBED_ORIGIN } from '@shared/tutorialVideos';
 import { killChatGptSubscriptionServer } from './ai/codexSubscription';
 import { killGitHubCopilotSubscriptionServer } from './ai/githubCopilotSubscription';
+import { ensureDatabaseDeepResearchLane } from './ai/databaseDeepResearchLane';
 import { installProcessSafetyNet } from './util/processSafety';
 import { restoreAppWindows } from './windowLifecycle';
 import { registerImageProtocol, registerImageSchemePrivileges } from './imageProtocol';
@@ -940,6 +941,8 @@ app.whenReady().then(async () => {
   });
   if (preV4.snapshotPath) console.log(`[recovery] pre-v4 snapshot: ${preV4.snapshotPath}`);
   getDb(); // open + migrate before anything touches data
+  const startupVault = getActiveVault();
+  if (startupVault.type === 'databases') ensureDatabaseDeepResearchLane(startupVault.id);
   // Do this before creating either the main window or a browser tab: Chromium
   // then exposes the same effective preference to pages from their first frame.
   setBrowserTheme(getSettings().theme);

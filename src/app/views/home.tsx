@@ -66,6 +66,7 @@ export const renderHome: ViewRenderer = (ctx) => {
         onImportNotion={() => void importNotion()}
         onOpenAnalysis={() => setView('dbAnalysis')}
         onOpenChat={() => setView('dbChat')}
+        onOpenDeepResearch={() => setView('dbDeepResearch')}
         demoBusy={demoBusy}
         onLoadDatabasesDemo={ctx.loadDatabasesDemo}
       />

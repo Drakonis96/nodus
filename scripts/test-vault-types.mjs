@@ -220,7 +220,7 @@ test('the header vault entry point uses a stable localized label', async () => {
 });
 
 test('databases mode: table/analysis/chat views scoped to it + data-analyst prompt pack', () => {
-  for (const v of ['databases', 'dbAnalysis', 'dbChat']) {
+  for (const v of ['databases', 'dbAnalysis', 'dbChat', 'dbDeepResearch']) {
     assert.equal(vt.isViewAllowedForVaultType(v, 'databases'), true, `${v} allowed for databases`);
     assert.equal(vt.isViewAllowedForVaultType(v, 'academic'), false, `${v} hidden for academic`);
     assert.equal(vt.isViewAllowedForVaultType(v, 'genealogy'), false, `${v} hidden for genealogy`);

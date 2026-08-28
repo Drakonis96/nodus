@@ -50,8 +50,10 @@ import { DOCUMENT_UNDERSTANDING_TRANSLATIONS } from './i18n.documentUnderstandin
 import { DEEP_RESEARCH_QUALITY_TRANSLATIONS } from './i18n.deepResearchQuality';
 import { DOCUMENT_UNDERSTANDING_CONSENT_TRANSLATIONS } from './i18n.documentUnderstandingConsent';
 import { MODEL_SETTINGS_TRANSLATIONS } from './i18n.modelSettings';
+import { DATABASE_DEEP_RESEARCH_TRANSLATIONS } from './i18n.databaseDeepResearch';
 
 export const PT: Record<string, string> = {
+  ...DATABASE_DEEP_RESEARCH_TRANSLATIONS.pt,
   ...MODEL_SETTINGS_TRANSLATIONS.pt,
   ...DICTIONARY_TRANSLATIONS.pt,
   'Tamaño de Nodi': 'Tamanho do Nodi',

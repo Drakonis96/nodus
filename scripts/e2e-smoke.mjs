@@ -200,6 +200,12 @@ try {
     hasGitHubCopilotSubscription: typeof window.nodus?.getGitHubCopilotSubscriptionStatus === 'function' && typeof window.nodus?.startGitHubCopilotSubscriptionLogin === 'function' && typeof window.nodus?.logoutGitHubCopilotSubscription === 'function',
     hasOpenCodeGoUsage: typeof window.nodus?.getOpenCodeGoUsageStatus === 'function' && typeof window.nodus?.onOpenCodeGoUsageStatusChanged === 'function',
     hasProtect: typeof window.nodus?.pickProtectFiles === 'function' && typeof window.nodus?.readProtectSource === 'function' && typeof window.nodus?.saveProtectArtifactToVault === 'function' && typeof window.nodus?.downloadProtectCopy === 'function',
+    hasDatabaseDeepResearch: [
+      'previewDatabaseDeepResearch', 'enqueueDatabaseDeepResearch', 'listDatabaseDeepResearchJobs',
+      'getDatabaseDeepResearchJob', 'cancelDatabaseDeepResearchJob', 'clearFinishedDatabaseDeepResearchJobs',
+      'listDatabaseDeepResearchReports', 'getDatabaseDeepResearchReport', 'deleteDatabaseDeepResearchReport',
+      'exportDatabaseDeepResearchReport', 'onDatabaseDeepResearchProgress',
+    ].every((name) => typeof window.nodus?.[name] === 'function'),
   }));
   assert.equal(bridge.hasNodus, true, 'window.nodus bridge exposed');
   assert.equal(bridge.hasGetGraph, true, 'getGraph available');
@@ -222,6 +228,7 @@ try {
   assert.equal(bridge.hasGitHubCopilotSubscription, true, 'managed GitHub Copilot subscription bridge available');
   assert.equal(bridge.hasOpenCodeGoUsage, true, 'OpenCode Go usage bridge available');
   assert.equal(bridge.hasProtect, true, 'Nodus Protect secure bridge available');
+  assert.equal(bridge.hasDatabaseDeepResearch, true, 'database Deep Research bridge is complete');
   const signedOutChatGpt = await page.evaluate(() => window.nodus.getChatGptSubscriptionStatus());
   assert.equal(signedOutChatGpt.available, true, `official Codex runtime is available: ${signedOutChatGpt.error ?? 'ok'}`);
   assert.equal(signedOutChatGpt.connected, false, 'throwaway profile starts without a ChatGPT account');
@@ -1845,6 +1852,52 @@ try {
   assert.equal(dbmode.profileRows, 2, 'analysis profile counts rows over IPC');
   assert.equal(dbmode.profileNumberMean, 5.75, 'analysis profile computes numeric mean over IPC');
   console.log('[e2e] databases mode (CSV import + relations + views + analysis) ok over IPC');
+
+  // ── Database Deep Research: production renderer → preload → IPC preview ─────
+  const databaseResearchSetup = await page.evaluate(async () => {
+    const originalVaultId = (await window.nodus.getActiveVault()).id;
+    const created = await window.nodus.createVault({ name: 'Database research smoke', type: 'databases' });
+    const switched = await window.nodus.switchVault(created.vault.id);
+    if (!switched.ok) throw new Error(switched.message);
+    await window.nodus.updateSettings({
+      onboardingComplete: true, basicsTutorialVersion: 5, recoverySetupVersion: 1,
+      tourComplete: true, advancedTourComplete: true, databasesTourComplete: true, theme: 'light',
+    });
+    const database = await window.nodus.createDatabase('Research evidence', null);
+    const title = await window.nodus.createDatabaseColumn(database.id, 'Cohorte', 'title');
+    const value = await window.nodus.createDatabaseColumn(database.id, 'Resultado', 'number');
+    for (const [label, numeric] of [['A', '10'], ['B', '18'], ['C', '31']]) {
+      const row = await window.nodus.createDatabaseRow(database.id);
+      await window.nodus.setDatabaseCell(row.id, title.id, label);
+      await window.nodus.setDatabaseCell(row.id, value.id, numeric);
+    }
+    const preview = await window.nodus.previewDatabaseDeepResearch({
+      objective: 'Verificar diferencias y anomalías sin inventar cifras.',
+      databaseIds: [database.id], viewIds: [], filters: { query: '', columnIds: [] }, roles: { outcome: value.id },
+      model: { provider: 'codex', model: 'gpt-5.6-luna' }, depth: 'deep',
+      budget: { depth: 'deep', rounds: 4, maxTasks: 60, resamples: 5000, maxRows: 500000 },
+      includeAttachmentContent: false,
+    });
+    return { originalVaultId, temporaryVaultId: created.vault.id, preview };
+  });
+  assert.equal(databaseResearchSetup.preview.rowCount, 3, 'database Deep Research preview reads the selected rows over IPC');
+  assert.equal(databaseResearchSetup.preview.sourceCount, 1, 'database Deep Research preview preserves source scope');
+  assert.ok(databaseResearchSetup.preview.sections.length >= 3, 'database Deep Research preview returns an editable research outline');
+  await page.reload();
+  await page.getByTestId('app-shell').waitFor();
+  await page.locator('[data-tour="nav-dbDeepResearch"]').click();
+  await page.getByTestId('database-deep-research').waitFor({ timeout: 30_000 });
+  assert.equal(await page.getByTestId('database-deep-research-composer').count(), 1, 'database Deep Research composer renders in the real app');
+  assert.equal(await page.getByTestId('database-deep-research-preview').count(), 1, 'database Deep Research editable preview renders in the real app');
+  assert.equal(await page.getByTestId('database-deep-research-gallery').count(), 1, 'database Deep Research report gallery renders in the real app');
+  await page.evaluate(async ({ originalVaultId, temporaryVaultId }) => {
+    const switched = await window.nodus.switchVault(originalVaultId);
+    if (!switched.ok) throw new Error(switched.message);
+    await window.nodus.deleteVault(temporaryVaultId, true);
+  }, databaseResearchSetup);
+  await page.reload();
+  await page.getByTestId('app-shell').waitFor();
+  console.log('[e2e] database Deep Research composer + preview + gallery ok over real IPC');
 
   // ── Study vault: real UI creation flow + visual/structural regressions ─────
   await page.evaluate(async () => {
