@@ -1,8 +1,9 @@
-import { useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react';
+import { cloneElement, isValidElement, useEffect, useMemo, useRef, useState, type ChangeEvent, type ReactElement, type ReactNode } from 'react';
 import { normalizeVaultType, type VaultType } from '@shared/vaultTypes';
 import { VaultTypePicker, vaultTypeIcon, vaultTypeLabel, VAULT_TYPE_COLOR } from '../../components/vaultTypeUi';
 import { Icon } from '../../components/ui';
 import { api, ApiError } from '../api';
+import { t } from '../i18nShim';
 import type { Space } from '../types';
 
 type ManagedSpace = Space & { vaultType?: string; createdAt?: string | null };
@@ -21,6 +22,19 @@ function spaceType(space: ManagedSpace): VaultType {
 
 function isNative(space: ManagedSpace): boolean {
   return space.storageKind === 'server_native' || space.authorityMode === 'server';
+}
+
+function translateVaultNode(node: ReactNode): ReactNode {
+  if (typeof node === 'string') return t(node);
+  if (Array.isArray(node)) return node.map(translateVaultNode);
+  if (!isValidElement(node)) return node;
+  const element = node as ReactElement<Record<string, unknown>>;
+  const translated: Record<string, unknown> = {};
+  for (const key of ['placeholder', 'title', 'aria-label']) {
+    if (typeof element.props[key] === 'string') translated[key] = t(element.props[key] as string);
+  }
+  if ('children' in element.props) translated.children = translateVaultNode(element.props.children as ReactNode);
+  return cloneElement(element, translated);
 }
 
 function errorMessage(error: unknown): string {
@@ -161,7 +175,7 @@ export function ServerVaultManager({ spaces, active, isAdmin, csrfToken, onSelec
     finally { setBusy(false); setImportTarget(null); }
   };
 
-  return <>
+  return <>{translateVaultNode(<>
     <div ref={panelRef} className="server-vault-popover" role="dialog" aria-label="Gestionar vaults" data-testid="vault-manager" tabIndex={-1}>
       <header className="flex items-center gap-2 border-b border-neutral-800 p-3"><div className="min-w-0 flex-1"><strong className="block text-sm text-neutral-200">Vaults ({spaces.length})</strong><small className="text-[10px] text-neutral-600">Selector y gestor de vaults del servidor</small></div>{isAdmin && <button type="button" className="btn btn-primary gap-1 px-2 py-1 text-xs" onClick={() => { setError(''); setAddOpen(true); }} data-testid="vault-add"><Icon name="plus" size={14} />Añadir</button>}<button type="button" className="btn btn-ghost px-2" onClick={onClose} aria-label="Cerrar"><Icon name="x" /></button></header>
       <div className="server-vault-filters flex flex-wrap gap-2 border-b border-neutral-800 p-3"><label className="relative min-w-0 flex-1"><Icon name="search" size={13} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-neutral-500" /><input className="input input-with-leading-icon h-8 w-full text-xs" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Buscar vaults…" aria-label="Buscar vaults" data-testid="vault-search" /></label><select className="input h-8 text-xs" value={typeFilter} onChange={(event) => setTypeFilter(event.target.value as VaultType | 'all')} aria-label="Filtrar por tipo" data-testid="vault-filter"><option value="all">Todos los tipos</option>{(['academic', 'primary_sources', 'testimonios', 'databases', 'docencia', 'estudio', 'genealogy', 'prosopography', 'worldbuilding'] as VaultType[]).map((type) => <option value={type} key={type}>{vaultTypeLabel(type)}</option>)}</select><select className="input h-8 text-xs" value={sortKey} onChange={(event) => setSortKey(event.target.value as SortKey)} aria-label="Ordenar vaults" data-testid="vault-sort"><option value="recent">Último uso</option><option value="created">Fecha de creación</option><option value="name">Nombre</option></select></div>
@@ -176,5 +190,5 @@ export function ServerVaultManager({ spaces, active, isAdmin, csrfToken, onSelec
       {destructiveStep === 'final' && <><p className="text-sm leading-6 text-red-300">{confirmAction.action === 'delete' ? 'Esta acción no se puede deshacer. Se eliminarán el vault y sus datos nativos.' : 'Esta acción vaciará todos los datos del vault nativo.'}</p><div className="mt-5 flex justify-end gap-2"><button type="button" className="btn btn-ghost" onClick={() => setConfirmAction(null)}>Cancelar</button><button type="button" className="btn border border-red-700 text-red-300" onClick={() => void destructive()} disabled={busy}>{confirmAction.action === 'delete' ? 'Eliminar definitivamente' : 'Reinicializar definitivamente'}</button></div></>}
     </Modal>}
     {importTarget && <Modal title="Importar vault" onClose={() => setImportTarget(null)}><p className="text-sm leading-6 text-neutral-300">Selecciona una copia SQLite compatible para «{importTarget.name}». La importación sustituye solo el vault nativo del servidor.</p><input className="mt-4 block w-full text-xs" type="file" accept=".sqlite,.db,application/vnd.sqlite3,application/x-sqlite3" onChange={(event) => void importSpace(event)} disabled={busy} data-testid="vault-import-file" /></Modal>}
-  </>;
+  </>)}</>;
 }

@@ -12,10 +12,11 @@ import type { AIConversation, AIJob, AIMessage, AIPreferences, JsonRecord, PageR
 import type { WritingDraftAnnotation, WritingDraftAnnotationColor } from '@shared/types';
 import { SERVER_DEFAULT_MODELS, serverModelsFor } from './modelCatalog';
 import { AI_PROVIDERS, PROVIDER_LABELS } from '@shared/providers';
+import { getActiveLang, t } from './i18nShim';
 
 function valueText(value: unknown, fallback = ''): string {
   const result = typeof value === 'string' ? value : value == null ? '' : JSON.stringify(value);
-  return result || fallback;
+  return result || t(fallback);
 }
 
 function plainReading(markdown: string): string {
@@ -29,14 +30,14 @@ function formatReportDate(value: unknown): string {
   if (!raw) return '';
   const date = new Date(raw);
   if (Number.isNaN(date.getTime())) return raw;
-  return date.toLocaleDateString('es', { year: 'numeric', month: 'short', day: 'numeric' });
+  return date.toLocaleDateString(getActiveLang(), { year: 'numeric', month: 'short', day: 'numeric' });
 }
 
 function formatPublicationStatus(value: unknown): string {
   const status = valueText(value, 'published').toLocaleLowerCase();
-  if (status === 'active' || status === 'published' || status === 'ready') return 'Publicado';
-  if (status === 'draft') return 'Borrador';
-  if (status === 'archived') return 'Archivado';
+  if (status === 'active' || status === 'published' || status === 'ready') return t('Publicado');
+  if (status === 'draft') return t('Borrador');
+  if (status === 'archived') return t('Archivado');
   return valueText(value, 'Publicado');
 }
 
@@ -92,7 +93,7 @@ export function extractAIText(result: unknown): string {
   if (gemini) return gemini;
   const cohere = root.message as Record<string, unknown> | undefined;
   const cohereText = (Array.isArray(cohere?.content) ? cohere.content as Array<Record<string, unknown>> : []).map((entry) => valueText(entry.text)).filter(Boolean).join('\n');
-  return cohereText || 'El proveedor completó el trabajo, pero su respuesta no contiene texto compatible.';
+  return cohereText || t('El proveedor completó el trabajo, pero su respuesta no contiene texto compatible.');
 }
 
 async function awaitJob(id: string, signal: AbortSignal): Promise<AIJob> {

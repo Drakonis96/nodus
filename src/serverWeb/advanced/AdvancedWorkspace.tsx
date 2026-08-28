@@ -7,6 +7,7 @@ import { advancedRest, type AuthorsQuery, type IdeasQuery } from './api';
 import { toGraphData, type AdvancedAuthor, type AdvancedAuthorDossier, type AdvancedIdea, type AdvancedIdeaDetail, type AdvancedPage } from './types';
 import { AcademicDetailExplorer } from '../academic/AcademicDetailExplorer';
 import type { GraphPresetId } from '../../navigation';
+import { t } from '../i18nShim';
 
 type Surface = 'ideas' | 'authors' | 'graph';
 
@@ -17,7 +18,7 @@ const IDEA_SORTS = ['label', 'type', 'works', 'connections', 'confidence'] as co
 const AUTHOR_SORTS = ['surname', 'name', 'works', 'ideas', 'connections'] as const;
 
 function stringValue(value: unknown, fallback = '—'): string {
-  if (value === null || value === undefined || value === '') return fallback;
+  if (value === null || value === undefined || value === '') return t(fallback);
   return typeof value === 'string' ? value : String(value);
 }
 
@@ -32,23 +33,23 @@ function formatNumber(value: unknown): string {
 
 function ErrorMessage({ error, onRetry }: { error: unknown; onRetry?: () => void }) {
   return <div className="rounded-xl border border-red-800/70 bg-red-950/30 p-4 text-sm text-red-300" role="alert">
-    <strong>No se ha podido cargar el contenido publicado.</strong>
+    <strong>{t('No se ha podido cargar el contenido publicado.')}</strong>
     <p className="mt-1 text-xs opacity-80">{error instanceof Error ? error.message : String(error)}</p>
-    {onRetry && <button className="btn btn-ghost mt-3 text-xs" onClick={onRetry}>Reintentar</button>}
+    {onRetry && <button className="btn btn-ghost mt-3 text-xs" onClick={onRetry}>{t('Reintentar')}</button>}
   </div>;
 }
 
 function Loading() {
-  return <div className="grid min-h-40 place-items-center text-sm text-neutral-500" role="status">Cargando…</div>;
+  return <div className="grid min-h-40 place-items-center text-sm text-neutral-500" role="status">{t('Cargando…')}</div>;
 }
 
 function ReadOnlyBadge() {
-  return <span className="inline-flex items-center gap-1 rounded-full border border-teal-800/70 bg-teal-950/35 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-teal-300"><Icon name="lock" size={11} /> Solo lectura</span>;
+  return <span className="inline-flex items-center gap-1 rounded-full border border-teal-800/70 bg-teal-950/35 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-teal-300"><Icon name="lock" size={11} /> {t('Solo lectura')}</span>;
 }
 
 function Section({ title, icon, children, testId }: { title: string; icon?: string; children: ReactNode; testId?: string }) {
   return <section data-testid={testId} className="rounded-xl border border-neutral-800 bg-neutral-950/45 p-4">
-    <div className="mb-3 flex items-center gap-2"><Icon name={icon ?? 'layers'} size={15} className="text-indigo-300" /><h3 className="text-sm font-semibold text-neutral-100">{title}</h3></div>
+    <div className="mb-3 flex items-center gap-2"><Icon name={icon ?? 'layers'} size={15} className="text-indigo-300" /><h3 className="text-sm font-semibold text-neutral-100">{t(title)}</h3></div>
     {children}
   </section>;
 }

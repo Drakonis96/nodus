@@ -229,8 +229,8 @@ test('compiled Server Web badge closes on second click and activates a native va
     await page.getByTestId('overview-metrics').getByRole('button').first().click();
     await page.getByTestId('native-content-surface').waitFor();
     await page.getByTestId('native-content-create').click();
-    await page.getByRole('dialog', { name: 'Nuevo personaje' }).waitFor();
-    await page.getByRole('button', { name: 'Cerrar' }).click();
+    await page.getByRole('dialog', { name: 'New character' }).waitFor();
+    await page.getByRole('button', { name: 'Close' }).click();
     assert.doesNotMatch(await page.locator('body').innerText(), /No se ha podido cargar esta vista|Internal Server Error/i);
     assert.deepEqual(errors, [], 'activating a native vault must not produce browser errors');
     await context.close();

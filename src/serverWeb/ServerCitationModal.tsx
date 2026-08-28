@@ -3,6 +3,7 @@ import { Icon } from '../components/ui';
 import { AcademicDetailExplorer, type AcademicTarget } from './academic/AcademicDetailExplorer';
 import { api } from './api';
 import type { JsonRecord } from './types';
+import { t } from './i18nShim';
 
 export type ServerCitationTarget = AcademicTarget | { kind: 'gap' | 'passage' | 'theme' | 'contradiction'; id: string; label: string };
 type NonAcademicCitationTarget = Extract<ServerCitationTarget, { kind: 'gap' | 'passage' | 'theme' | 'contradiction' }>;
@@ -25,7 +26,7 @@ export function parseServerCitation(href: string): ServerCitationTarget | null {
 }
 
 function text(value: unknown, fallback = '—'): string {
-  if (value === null || value === undefined || value === '') return fallback;
+  if (value === null || value === undefined || value === '') return t(fallback);
   return typeof value === 'string' ? value : String(value);
 }
 

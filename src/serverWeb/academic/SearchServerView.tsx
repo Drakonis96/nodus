@@ -4,6 +4,7 @@ import { Icon } from '../../components/ui';
 import { api } from '../api';
 import type { JsonRecord } from '../types';
 import { AcademicDetailExplorer, type AcademicTarget } from './AcademicDetailExplorer';
+import { t } from '../i18nShim';
 
 type SearchMode = 'text' | 'semantic';
 type SearchKind = 'note' | 'idea' | 'work' | 'passage' | 'gap' | 'theme' | 'author'
@@ -12,7 +13,7 @@ type SearchKind = 'note' | 'idea' | 'work' | 'passage' | 'gap' | 'theme' | 'auth
   | 'interview' | 'transcript' | 'code' | 'contrast' | 'database' | 'page' | 'document'
   | 'prosopStudy' | 'prosopVariable' | 'prosopSource' | 'other';
 
-const KIND_META: Record<SearchKind, { label: string; icon: string }> = {
+const KIND_META_SOURCE: Record<SearchKind, { label: string; icon: string }> = {
   note: { label: 'Notas', icon: 'notebook' }, idea: { label: 'Ideas', icon: 'bulb' }, work: { label: 'Obras', icon: 'book' },
   passage: { label: 'Pasajes', icon: 'quote' }, gap: { label: 'Huecos', icon: 'gap' }, theme: { label: 'Temas', icon: 'tag' },
   author: { label: 'Autores', icon: 'graduation' }, other: { label: 'Otros', icon: 'search' },
@@ -25,6 +26,12 @@ const KIND_META: Record<SearchKind, { label: string; icon: string }> = {
   database: { label: 'Bases de datos', icon: 'table' }, page: { label: 'Páginas', icon: 'notebook' }, document: { label: 'Documentos', icon: 'book' },
   prosopStudy: { label: 'Estudios', icon: 'compass' }, prosopVariable: { label: 'Variables agregadas', icon: 'chartBar' }, prosopSource: { label: 'Tipos de fuente', icon: 'archive' },
 };
+// Resolve labels at render/access time so changing the server language updates
+// existing search filters without rebuilding this module.
+const KIND_META = new Proxy(KIND_META_SOURCE, { get(target, property: string) {
+  const meta = target[property as SearchKind];
+  return meta ? { ...meta, label: t(meta.label) } : undefined;
+} });
 const ACADEMIC_TEXT_KINDS: SearchKind[] = ['note', 'idea', 'work', 'gap', 'theme', 'author', 'passage'];
 function textKinds(vaultType: VaultType | undefined): SearchKind[] {
   if (vaultType === 'genealogy') return ['person', 'event', 'archive', 'place', 'work', 'note'];

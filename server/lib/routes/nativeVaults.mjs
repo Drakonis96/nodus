@@ -247,7 +247,10 @@ export function createNativeVaultRoutes({ store, authorize, json, jsonBody, body
       if (!SAFE_LEGACY_READ_HEADS.has(head)) return false;
       if (head === 'search' && segments[2] === 'semantic') return false;
       if (head === 'library' && segments.length > 2) return false;
-      if (head === 'databases' && !(segments[2] && segments[3] === 'analysis' && segments.length === 4)) return false;
+      // Keep the normal database catalogue and single-record dossier on the
+      // native read-through. Only deeper database subroutes are delegated,
+      // except for the explicit safe analysis projection below.
+      if (head === 'databases' && segments.length > 3 && !(segments[2] && segments[3] === 'analysis' && segments.length === 4)) return false;
     }
     const metadata = await native.get(segments[0]).catch(() => null);
     if (!metadata) return false;

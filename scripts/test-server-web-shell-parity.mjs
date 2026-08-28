@@ -30,7 +30,7 @@ test('Server header mirrors Desktop measured geometry and action semantics', () 
   assert.match(app, /data-testid="sidebar-header-brand"/);
   assert.match(app, /text-lg font-semibold tracking-tight/);
   assert.match(app, /data-vault-trigger data-tour="vault-badge"/);
-  assert.match(app, /title="Bóveda activa"/);
+  assert.match(app, /title=\{t\('Bóveda activa'\)\}/);
   assert.match(app, /visibility: vaultBadgePlacement\?\.fits \? 'visible' : 'hidden'/);
   assert.doesNotMatch(app, /transform: vaultBadgePlacement \? 'translateY/);
   assert.doesNotMatch(app, /header-vault-badge[^>]*-translate-x-1\/2/);

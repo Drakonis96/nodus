@@ -20,6 +20,11 @@ test('Server Web defaults to English and reuses every Desktop language catalogue
   assert.match(app, /useState<AppLanguage>\('en'\)/);
   assert.match(app, /setLanguage\(response\.profile\.values\.appearance\.uiLanguage \|\| 'en'\)/);
   assert.match(app, /setActiveLang\(language\)/);
+  assert.match(app, /t\(vaultTypeLabel\(type\)\)/, 'server shell must localize vault type labels');
+  assert.match(app, /Metric label=\{t\('Personajes'\)\}/, 'worldbuilding overview must localize metrics');
+  assert.match(app, /t\('Personajes recientes'\)/, 'worldbuilding overview must localize headings');
+  assert.match(app, /t\('Explorar la bóveda'\)/, 'shared overview must localize native vault copy');
+  assert.match(app, /\{t\(column\.label\)\}/, 'shared collection tables must localize column labels');
 });
 
 test('Server is the first and default Settings tab', () => {

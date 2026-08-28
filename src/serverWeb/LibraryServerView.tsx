@@ -10,6 +10,7 @@ import { Icon } from "../components/ui";
 import { MarkdownReader } from "./readers";
 import { api } from "./api";
 import type { AIJob, Annotation, JsonRecord, LibraryDocument } from "./types";
+import { t } from "./i18nShim";
 
 type LibraryProps = { spaceId: string; onOpen: (id: string) => void };
 
@@ -37,7 +38,7 @@ function writeOpeningFormatPreference(value: ReaderOpeningFormat | null): void {
 }
 
 function display(value: unknown, fallback = "—"): string {
-  if (value == null || value === "") return fallback;
+  if (value == null || value === "") return t(fallback);
   if (Array.isArray(value))
     return (
       value
@@ -50,7 +51,7 @@ function display(value: unknown, fallback = "—"): string {
 }
 
 function titleFor(document: LibraryDocument): string {
-  return document.title || document.originalFileName || "Documento sin título";
+  return document.title || document.originalFileName || t("Documento sin título");
 }
 
 function extractJobText(result: unknown): string {
@@ -132,22 +133,22 @@ function ReaderOpeningFormatDialog({
     <div className="fixed inset-0 z-[150] grid place-items-center bg-black/60 p-4" role="presentation" onMouseDown={onCancel}>
       <section className="w-full max-w-xl overflow-hidden rounded-2xl border border-neutral-200 bg-white text-neutral-900 shadow-2xl dark:border-neutral-700 dark:bg-neutral-950 dark:text-neutral-100" role="dialog" aria-modal="true" aria-labelledby="library-reader-format-title" onMouseDown={(event) => event.stopPropagation()} data-testid="library-reader-format-dialog">
         <header className="border-b border-neutral-200 px-5 py-4 dark:border-neutral-800">
-          <h2 id="library-reader-format-title" className="text-base font-semibold">¿Cómo quieres leer este documento?</h2>
-          <p className="mt-1 text-xs leading-5 text-neutral-500">Puedes cambiar de versión desde el selector del lector.</p>
+          <h2 id="library-reader-format-title" className="text-base font-semibold">{t("¿Cómo quieres leer este documento?")}</h2>
+          <p className="mt-1 text-xs leading-5 text-neutral-500">{t("Puedes cambiar de versión desde el selector del lector.")}</p>
         </header>
         <div className="grid gap-3 p-5 sm:grid-cols-2">
           <button data-testid="library-reader-format-clean" className="min-h-32 rounded-xl border border-neutral-200 bg-neutral-50 p-4 text-left hover:border-indigo-400 dark:border-neutral-800 dark:bg-neutral-900" disabled={!document.cleanAvailable} onClick={() => onChoose("clean")}>
-            <strong className="block text-sm">Markdown limpio</strong>
-            <span className="mt-1 block text-xs leading-5 text-neutral-500">Lectura adaptable con índice e imágenes extraídas.</span>
+            <strong className="block text-sm">{t("Markdown limpio")}</strong>
+            <span className="mt-1 block text-xs leading-5 text-neutral-500">{t("Lectura adaptable con índice e imágenes extraídas.")}</span>
           </button>
           <button data-testid="library-reader-format-original" className="min-h-32 rounded-xl border border-neutral-200 bg-neutral-50 p-4 text-left hover:border-indigo-400 dark:border-neutral-800 dark:bg-neutral-900" disabled={!document.originalAvailable} onClick={() => onChoose("original")}>
-            <strong className="block text-sm">Archivo original</strong>
-            <span className="mt-1 block text-xs leading-5 text-neutral-500">Abre directamente el archivo conservado y su diseño original.</span>
+            <strong className="block text-sm">{t("Archivo original")}</strong>
+            <span className="mt-1 block text-xs leading-5 text-neutral-500">{t("Abre directamente el archivo conservado y su diseño original.")}</span>
             {document.originalFileName && <span className="mt-2 block truncate text-[10px] text-neutral-400">{document.originalFileName}</span>}
           </button>
         </div>
         <footer className="border-t border-neutral-200 px-5 py-4 dark:border-neutral-800">
-          <label className="flex cursor-pointer items-start gap-2.5 text-xs text-neutral-700 dark:text-neutral-300"><input data-testid="library-reader-format-remember" className="mt-0.5" type="checkbox" checked={remember} onChange={(event) => onRememberChange(event.target.checked)} /><span><b className="font-medium">No volver a preguntar</b><small className="mt-0.5 block text-[10px] text-neutral-500">La próxima vez se abrirá el formato elegido.</small></span></label>
+          <label className="flex cursor-pointer items-start gap-2.5 text-xs text-neutral-700 dark:text-neutral-300"><input data-testid="library-reader-format-remember" className="mt-0.5" type="checkbox" checked={remember} onChange={(event) => onRememberChange(event.target.checked)} /><span><b className="font-medium">{t("No volver a preguntar")}</b><small className="mt-0.5 block text-[10px] text-neutral-500">{t("La próxima vez se abrirá el formato elegido.")}</small></span></label>
         </footer>
       </section>
     </div>
@@ -250,9 +251,9 @@ export function PublishedLibraryView({ spaceId, onOpen }: LibraryProps) {
             <Icon name="book" size={18} />
           </span>
           <div>
-            <h1 className="text-base font-semibold">Biblioteca</h1>
+            <h1 className="text-base font-semibold">{t("Biblioteca")}</h1>
             <p className="text-[11px] text-neutral-500">
-              {total} documentos publicados
+              {total} {t("documentos publicados")}
             </p>
           </div>
           <button
@@ -266,14 +267,14 @@ export function PublishedLibraryView({ spaceId, onOpen }: LibraryProps) {
               size={13}
               className={loading ? "animate-spin" : ""}
             />
-            Actualizar
+            {t("Actualizar")}
           </button>
         </div>
         <div
           className="flex h-9 w-fit items-center gap-2 rounded-t-lg border border-b-0 border-neutral-300 bg-white px-3 text-xs dark:border-neutral-700 dark:bg-neutral-900"
           data-testid="library-tabs"
         >
-          <Icon name="table" size={13} /> Biblioteca
+          <Icon name="table" size={13} /> {t("Biblioteca")}
         </div>
       </header>
       <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-neutral-200 p-3 dark:border-neutral-800">
@@ -290,7 +291,7 @@ export function PublishedLibraryView({ spaceId, onOpen }: LibraryProps) {
               setQuery(event.target.value);
               setOffset(0);
             }}
-            placeholder="Buscar título, autor, etiqueta…"
+            placeholder={t("Buscar título, autor, etiqueta…")}
             data-testid="library-search"
           />
         </div>
@@ -303,7 +304,7 @@ export function PublishedLibraryView({ spaceId, onOpen }: LibraryProps) {
           }}
           data-testid="library-collection-filter"
         >
-          <option value="">Todas las colecciones</option>
+          <option value="">{t("Todas las colecciones")}</option>
           {collections.map((collection) => (
             <option key={String(collection.id)} value={String(collection.id)}>
               {display(collection.name || collection.title || collection.id)}
@@ -320,28 +321,28 @@ export function PublishedLibraryView({ spaceId, onOpen }: LibraryProps) {
                 "minmax(320px,1.7fr) minmax(220px,1.2fr) 7rem 8rem 8rem 5.5rem",
             }}
           >
-            <span>Título</span>
-            <span>Autoría</span>
-            <span>Año</span>
-            <span>Tipo</span>
-            <span>Lectura</span>
+            <span>{t("Título")}</span>
+            <span>{t("Autoría")}</span>
+            <span>{t("Año")}</span>
+            <span>{t("Tipo")}</span>
+            <span>{t("Lectura")}</span>
             <span />
           </div>
           {error ? (
             <div className="p-4">
               <p className="text-sm text-red-400">
-                No se ha podido cargar la biblioteca.
+                {t("No se ha podido cargar la biblioteca.")}
               </p>
               <button
                 className="btn btn-ghost mt-2"
                 onClick={() => void load()}
               >
-                Reintentar
+                {t("Reintentar")}
               </button>
             </div>
           ) : loading ? (
             <div className="p-6">
-              <span className="text-sm text-neutral-500">Cargando…</span>
+              <span className="text-sm text-neutral-500">{t("Cargando…")}</span>
             </div>
           ) : items.length === 0 ? (
             <LibraryEmpty
@@ -374,7 +375,7 @@ export function PublishedLibraryView({ spaceId, onOpen }: LibraryProps) {
                       {item.abstract ||
                         item.originalFileName ||
                         item.tags?.join(" · ") ||
-                        "Documento publicado"}
+                        t("Documento publicado")}
                     </small>
                   </button>
                   <span className="truncate pr-4 text-neutral-500">
@@ -390,20 +391,20 @@ export function PublishedLibraryView({ spaceId, onOpen }: LibraryProps) {
                   </span>
                   <span className="text-neutral-500">
                     {item.cleanAvailable
-                      ? "Texto limpio"
+                      ? t("Texto limpio")
                       : item.originalAvailable
-                        ? "Original"
-                        : "Metadatos"}
+                        ? t("Original")
+                        : t("Metadatos")}
                   </span>
                   <a
                     className="btn btn-ghost h-7 justify-self-end px-2 text-[10px]"
                     href={href}
                     target="_blank"
                     rel="noreferrer"
-                    aria-label={`Abrir ${titleFor(item)} en otra pestaña`}
+                    aria-label={`${t("Abrir")} ${titleFor(item)} en otra pestaña`}
                   >
                     <Icon name="external" size={12} />
-                    Abrir
+                    {t("Abrir")}
                   </a>
                 </div>
               );
@@ -420,18 +421,18 @@ export function PublishedLibraryView({ spaceId, onOpen }: LibraryProps) {
             className="btn btn-ghost h-7 px-2 text-xs"
             onClick={() => setOffset((value) => Math.max(0, value - PAGE_SIZE))}
             disabled={offset === 0 || loading}
-            aria-label="Página anterior"
+            aria-label={t("Página anterior")}
           >
             <Icon name="chevronLeft" size={13} />
-            Anterior
+            {t("Anterior")}
           </button>
           <button
             className="btn btn-ghost h-7 px-2 text-xs"
             onClick={() => setOffset((value) => value + PAGE_SIZE)}
             disabled={!hasMore || loading}
-            aria-label="Página siguiente"
+            aria-label={t("Página siguiente")}
           >
-            Siguiente
+            {t("Siguiente")}
             <Icon name="chevronRight" size={13} />
           </button>
         </div>
