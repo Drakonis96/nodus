@@ -23,6 +23,8 @@ import type {
   DatabaseDeepResearchJobInput,
   DatabaseDeepResearchPreview,
   DatabaseDeepResearchReportType,
+  DatabaseDeepResearchReportAnnotation,
+  DatabaseDeepResearchReportAnnotationInput,
   DatabaseResearchReportQuery,
 } from '../databaseDeepResearch';
 // Declared in shared/types.ts itself; the resulting cycle is types-only and erased at build time.
@@ -212,6 +214,12 @@ export interface DatabasesApi {
   clearFinishedDatabaseDeepResearchJobs(): Promise<number>;
   listDatabaseDeepResearchReports(query?: DatabaseResearchReportQuery & { reportType?: DatabaseDeepResearchReportType }): Promise<DatabaseResearchReport[]>;
   getDatabaseDeepResearchReport(id: string): Promise<DatabaseResearchReport | null>;
+  setDatabaseDeepResearchReportRead(id: string, read: boolean): Promise<DatabaseResearchReport | null>;
+  listDatabaseDeepResearchReportAnnotations(reportId: string): Promise<DatabaseDeepResearchReportAnnotation[]>;
+  createDatabaseDeepResearchReportAnnotation(input: DatabaseDeepResearchReportAnnotationInput): Promise<DatabaseDeepResearchReportAnnotation>;
+  updateDatabaseDeepResearchReportComment(id: string, comment: string): Promise<DatabaseDeepResearchReportAnnotation | null>;
+  deleteDatabaseDeepResearchReportAnnotation(id: string): Promise<void>;
+  onDatabaseDeepResearchReportAnnotationsChanged(cb: (reportId: string | null) => void): () => void;
   deleteDatabaseDeepResearchReport(id: string): Promise<boolean>;
   exportDatabaseDeepResearchReport(
     id: string,

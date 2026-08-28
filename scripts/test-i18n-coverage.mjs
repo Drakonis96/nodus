@@ -228,6 +228,10 @@ const INDIRECT_KEY_SOURCES = [
   // Map kind names, rendered as t(kind.label) in the map cards, the side panel and the
   // creation modal. They never appear literally inside a t() call.
   { file: 'src/views/WorldMapsView.tsx', pattern: /\blabel:\s*(["'])((?:\\.|(?!\1).)*?)\1/g },
+  // Database Deep Research report modes are defined in shared code and rendered as
+  // t(option.label)/t(option.description) by the database research view. Keep this
+  // indirect source explicit so adding a mode cannot silently ship Spanish copy.
+  { file: 'shared/databaseDeepResearch.ts', pattern: /\b(?:label|description):\s*(["'])((?:\\.|(?!\1).)*?)\1/g },
   // El vocabulario visible de Testimonios: estados del flujo, del acuerdo y del acceso,
   // usos documentados, papeles, tipos de transcripción y motivos de denegación. TODO
   // llega a la interfaz como t(LABEL[x]) — nunca como literal dentro de un t() — así que

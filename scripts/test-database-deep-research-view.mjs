@@ -32,7 +32,7 @@ test("database Deep Research renderer uses the canonical typed surface", () => {
   );
 });
 
-test("composer carries canonical depths, budget preset, roles and editable plan sections", () => {
+test("composer keeps the simple flow visible and moves roles plus preview into advanced options", () => {
   for (const depth of ["focused", "deep", "exhaustive"])
     assert.match(view, new RegExp(`['"]${depth}['"]`));
   for (const role of [
@@ -50,10 +50,26 @@ test("composer carries canonical depths, budget preset, roles and editable plan 
   assert.match(view, /DATABASE_RESEARCH_BUDGETS\[depth\]/);
   assert.match(view, /budget:\s*\{\s*\.\.\.preset/);
   assert.match(view, /planSections: previewSections/);
-  assert.match(view, /database-deep-research-analysis-requirements/);
-  assert.match(view, /preview\.requiredAnalyses/);
-  assert.match(view, /preview\.optionalAnalyses/);
-  assert.match(view, /allowEmpty=\{false\}/);
+  assert.match(view, /database-deep-research-composer/);
+  assert.match(view, /database-deep-research-advanced/);
+  assert.match(view, /Preparar automáticamente/);
+  assert.match(view, /Usar automático/);
+  assert.match(view, /reportType: autoReportType \? "auto" : reportType/);
+  assert.doesNotMatch(view, /maxCostUsd|setMaxCostUsd/);
+});
+
+test("library and reader expose the same durable reading workflow as academic Deep Research", () => {
+  for (const marker of [
+    "database-deep-research-library",
+    "database-deep-research-toolbar",
+    "ReaderSelectionActions",
+    "ReaderHighlighterControl",
+    "FindInPage",
+    "SaveToNotesModal",
+    "useReadingPlace",
+    "setDatabaseDeepResearchReportRead",
+    "listDatabaseDeepResearchReportAnnotations",
+  ]) assert.match(view, new RegExp(marker));
 });
 
 test("renderer preserves stale/partial status, shows all eight phases and evidence metrics", () => {
@@ -69,7 +85,8 @@ test("renderer preserves stale/partial status, shows all eight phases and eviden
   ])
     assert.match(view, new RegExp(`\\b${phase}\\b`));
   assert.match(view, /status: progress\.status/);
-  assert.match(view, /job\.status === ["']stale["']/);
+  assert.match(view, /\["failed", "cancelled", "stale", "partial"\]\.includes\(job\.status\)/);
+  assert.match(view, /report\.qualityStatus === ["']partial["']/);
   for (const metric of [
     "method",
     "n",
@@ -96,7 +113,7 @@ test("reader offers all exports and confirms raw snapshot inclusion", () => {
   assert.match(view, /getDatabaseDeepResearchReport/);
 });
 
-test("shared job input carries the editable preview outline and budget cap", () => {
+test("shared job input retains the editable preview outline and internal budget cap", () => {
   assert.match(contract, /planSections\?: Array/);
   assert.match(contract, /maxCostUsd\?: number/);
 });

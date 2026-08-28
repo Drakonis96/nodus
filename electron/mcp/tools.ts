@@ -56,6 +56,7 @@ import {
   getDatabaseDeepResearchAnalysisRequirements,
   getDatabaseDeepResearchEligibility,
   normalizeDatabaseDeepResearchJobInput,
+  normalizeDatabaseDeepResearchReportType,
   redactDatabaseResearchMarkdown,
   sanitizeDatabaseResearchExternal,
   type DatabaseDeepResearchJobInput,
@@ -3030,7 +3031,7 @@ export function registerTools(server: McpServer): void {
         const estimate = estimateDatabaseDeepResearchCost(rows, databaseIds.length, depth);
         const columns = databaseIds.flatMap((databaseId) => dbMode.getColumns(databaseId).map((column) => ({ id: column.id, type: column.type })));
         const availableReportTypes = DATABASE_DEEP_RESEARCH_REPORT_TYPES.map((type) => getDatabaseDeepResearchEligibility(type, { columns, roles: normalized.roles, databaseCount: databaseIds.length }));
-        const effectiveReportType = normalized.reportType ?? 'general';
+        const effectiveReportType = normalizeDatabaseDeepResearchReportType(normalized.reportType);
         const analyses = getDatabaseDeepResearchAnalysisRequirements(effectiveReportType);
         return {
           rowCount: rows,

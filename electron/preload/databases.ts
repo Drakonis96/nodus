@@ -200,6 +200,16 @@ export const databasesApi: DatabasesApi = {
   listDatabaseDeepResearchJobs: () => ipcRenderer.invoke('db:deepResearch:jobs:list'),
   listDatabaseDeepResearchReports: (query) => ipcRenderer.invoke('db:deepResearch:reports:list', query),
   getDatabaseDeepResearchReport: (id) => ipcRenderer.invoke('db:deepResearch:report:get', id),
+  setDatabaseDeepResearchReportRead: (id, read) => ipcRenderer.invoke('db:deepResearch:report:read', id, read),
+  listDatabaseDeepResearchReportAnnotations: (reportId) => ipcRenderer.invoke('db:deepResearch:report:annotations:list', reportId),
+  createDatabaseDeepResearchReportAnnotation: (input) => ipcRenderer.invoke('db:deepResearch:report:annotations:create', input),
+  updateDatabaseDeepResearchReportComment: (id, comment) => ipcRenderer.invoke('db:deepResearch:report:annotations:updateComment', id, comment),
+  deleteDatabaseDeepResearchReportAnnotation: (id) => ipcRenderer.invoke('db:deepResearch:report:annotations:delete', id).then(() => undefined),
+  onDatabaseDeepResearchReportAnnotationsChanged: (cb) => {
+    const listener = (_e: unknown, reportId: string | null) => cb(reportId);
+    ipcRenderer.on('db:deepResearch:report:annotations:changed', listener);
+    return () => ipcRenderer.removeListener('db:deepResearch:report:annotations:changed', listener);
+  },
   cancelDatabaseDeepResearchJob: (id) => ipcRenderer.invoke('db:deepResearch:job:cancel', id),
   dbChatStream: async (request, handlers) => {
     const requestId = `db-${Date.now()}-${Math.random().toString(36).slice(2)}`;
