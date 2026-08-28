@@ -239,11 +239,6 @@ function formatDate(iso: string): string {
     return iso;
   }
 }
-function phaseLabel(phase: string | null | undefined): string {
-  return phase && phase in PHASE_LABELS
-    ? t(PHASE_LABELS[phase as DatabaseResearchStepKind])
-    : phase || t("En cola");
-}
 function progressPercent(value: number): number {
   const n = Number(value) || 0;
   return Math.round(Math.min(100, Math.max(0, n <= 1 ? n * 100 : n)));
@@ -674,9 +669,6 @@ export function DatabaseDeepResearchView({
   const [selectedReports, setSelectedReports] = useState<Set<string>>(new Set());
   const [reader, setReader] = useState<ReaderReport | null>(null);
   const [evidenceOpen, setEvidenceOpen] = useState(false);
-  const [selectedEvidence, setSelectedEvidence] = useState<EvidenceItem | null>(
-    null,
-  );
   const [busy, setBusy] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const [includeSnapshot, setIncludeSnapshot] = useState(false);
@@ -975,7 +967,6 @@ export function DatabaseDeepResearchView({
         loaded ? normalizeReport(loaded as DatabaseDeepResearchReport) : report,
       );
       setEvidenceOpen(false);
-      setSelectedEvidence(null);
       onSnapshotChange?.({
         openReportId: report.id,
         reading: snapshot?.openReportId === report.id ? snapshot.reading ?? null : null,

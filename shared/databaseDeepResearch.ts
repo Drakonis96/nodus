@@ -84,7 +84,6 @@ export interface DatabaseDeepResearchAutoConfiguration {
   partial: boolean;
 }
 
-const AUTO_ROLE_KEYS = ['outcome', 'treatment', 'time', 'duration', 'event', 'group', 'entity', 'location', 'text', 'metrics', 'confounders', 'sensitive'] as const;
 const AUTO_NUMERIC = new Set(['number', 'formula', 'rollup']);
 const AUTO_TEMPORAL = new Set(['date', 'time', 'created_time', 'last_edited_time']);
 const AUTO_BINARY = new Set(['number', 'formula', 'rollup', 'checkbox']);
