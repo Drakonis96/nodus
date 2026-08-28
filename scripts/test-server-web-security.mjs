@@ -86,14 +86,50 @@ test('Server web sessions are read-only while personal annotations stay private 
       assert.equal(canonical.tables[table], undefined, `${table} must not be canonical under the restrictive policy`);
     }
 
-    const app = await sessionFetch(server.origin, cookieA, '/app');
-    assert.equal(app.status, 200);
-    assert.match(app.headers.get('content-security-policy') || '', /connect-src 'self'/);
-    assert.match(app.headers.get('content-security-policy') || '', /worker-src 'self' blob:/);
-    assert.match(app.headers.get('content-security-policy') || '', /frame-ancestors 'none'/);
-    assert.equal(app.headers.get('x-frame-options'), 'DENY');
-    assert.equal(app.headers.get('access-control-allow-origin'), null);
-    assert.doesNotMatch(await app.text(), /private-a|My note/);
+    const rootApp = await sessionFetch(server.origin, cookieA, '/', { headers: { 'sec-fetch-dest': 'document' } });
+    assert.equal(rootApp.status, 200, 'the authenticated browser app is canonical at the web root');
+    assert.match(rootApp.headers.get('content-security-policy') || '', /connect-src 'self'/);
+    assert.match(rootApp.headers.get('content-security-policy') || '', /worker-src 'self' blob:/);
+    assert.match(rootApp.headers.get('content-security-policy') || '', /font-src 'self' data:/);
+    assert.match(rootApp.headers.get('content-security-policy') || '', /img-src 'self' data: blob: https:\/\/\*\.tile\.openstreetmap\.org/);
+    assert.match(rootApp.headers.get('content-security-policy') || '', /frame-ancestors 'none'/);
+    assert.equal(rootApp.headers.get('x-frame-options'), 'DENY');
+    assert.equal(rootApp.headers.get('access-control-allow-origin'), null);
+    assert.doesNotMatch(await rootApp.text(), /private-a|My note/);
+
+    // Browser-side navigation can open a published map without touching the
+    // network again, but a hard reload starts at the detail URL.  The server
+    // must return the authenticated SPA shell for that route so React can
+    // resolve the published record; API/static paths must still be handled by
+    // their own dispatchers below.
+    const mapDeepLink = await sessionFetch(server.origin, cookieA, '/detail/map/world-maps/w-map-1', {
+      headers: { 'sec-fetch-dest': 'document' },
+    });
+    assert.equal(mapDeepLink.status, 200, 'published map deep-links must survive a hard reload');
+    assert.match(mapDeepLink.headers.get('content-type') || '', /text\/html/i);
+    assert.doesNotMatch(await mapDeepLink.text(), /private-a|My note/);
+
+    const legacyApp = await sessionFetch(server.origin, cookieA, '/app');
+    assert.equal(legacyApp.status, 200, 'legacy /app links remain backwards compatible');
+
+    const adminRedirect = await sessionFetch(server.origin, server.adminCookie, '/admin', { redirect: 'manual' });
+    assert.equal(adminRedirect.status, 303);
+    assert.equal(adminRedirect.headers.get('location'), '/view/settings?tab=server');
+
+    const embeddedAdmin = await sessionFetch(server.origin, server.adminCookie, '/admin/settings?embedded=1&theme=light');
+    assert.equal(embeddedAdmin.status, 200);
+    assert.equal(embeddedAdmin.headers.get('x-frame-options'), 'SAMEORIGIN');
+    assert.match(embeddedAdmin.headers.get('content-security-policy') || '', /frame-ancestors 'self'/);
+    assert.doesNotMatch(await embeddedAdmin.text(), /class="site-header"/);
+
+    const embeddedValidationError = await postForm(`${server.origin}/admin/spaces/name`, {
+      csrf: await server.csrf(), spaceId, name: '',
+    }, { headers: { cookie: server.adminCookie, referer: `${server.origin}/admin/settings?embedded=1&theme=light` } });
+    assert.equal(embeddedValidationError.status, 400);
+    assert.equal(embeddedValidationError.headers.get('x-frame-options'), 'SAMEORIGIN');
+    const embeddedErrorHtml = await embeddedValidationError.text();
+    assert.match(embeddedErrorHtml, /<html class="light"/);
+    assert.doesNotMatch(embeddedErrorHtml, /class="site-header"/);
 
     const state = await server.readState();
     const readerA = state.users.find((entry) => entry.email === 'reader-a@example.test');
@@ -103,5 +139,88 @@ test('Server web sessions are read-only while personal annotations stay private 
     assert.equal((await sessionFetch(server.origin, cookieA, `/api/v1/spaces/${spaceId}/context`, {
       method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ query: 'memoria', budget: 32_000 }),
     })).status, 403, 'revocation also closes the AI retrieval context route');
+  });
+});
+
+test('integrated Server settings use a native JSON control plane with admin, owner and CSRF gates', { timeout: 60_000 }, async () => {
+  await withServer({ label: 'server-web-admin-json' }, async (server) => {
+    const headers = (csrf) => ({
+      cookie: server.adminCookie,
+      'content-type': 'application/json',
+      'x-csrf-token': csrf,
+      origin: server.origin,
+      'sec-fetch-site': 'same-origin',
+    });
+    const initial = await json(await sessionFetch(server.origin, server.adminCookie, '/api/v1/web/admin'));
+    assert.equal(initial.response.status, 200);
+    assert.equal(initial.value.server.publicUrl, server.origin);
+    assert.equal(initial.value.spaces.length, 0);
+    assert.ok(initial.value.csrfToken);
+
+    const refused = await sessionFetch(server.origin, server.adminCookie, '/api/v1/web/admin/spaces', {
+      method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ name: 'No CSRF' }),
+    });
+    assert.equal(refused.status, 403);
+
+    const created = await json(await sessionFetch(server.origin, server.adminCookie, '/api/v1/web/admin/spaces', {
+      method: 'POST', headers: headers(initial.value.csrfToken), body: JSON.stringify({ name: 'Corpus JSON', description: 'Integrado', vaultType: 'academic' }),
+    }));
+    assert.equal(created.response.status, 201);
+    const spaceId = created.value.space.id;
+    assert.equal(created.value.space.name, 'Corpus JSON');
+
+    const patched = await json(await sessionFetch(server.origin, server.adminCookie, `/api/v1/web/admin/spaces/${spaceId}`, {
+      method: 'PATCH', headers: headers(initial.value.csrfToken), body: JSON.stringify({
+        name: 'Corpus nativo',
+        publicationPolicy: { allowUserContent: true, allowLibraryDocuments: true, allowPassages: true },
+      }),
+    }));
+    assert.equal(patched.response.status, 200);
+    assert.equal(patched.value.space.name, 'Corpus nativo');
+    assert.equal(patched.value.space.publicationPolicy.allowUserContent, true);
+    assert.equal(patched.value.space.publicationPolicy.allowVectors, false, 'an omitted lane retains its restrictive value');
+
+    const pairing = await json(await sessionFetch(server.origin, server.adminCookie, `/api/v1/web/admin/spaces/${spaceId}/pairing`, {
+      method: 'POST', headers: headers(initial.value.csrfToken), body: '{}',
+    }));
+    assert.equal(pairing.response.status, 201);
+    assert.match(pairing.value.code, /^[A-HJ-NP-Z2-9]{4}-[A-HJ-NP-Z2-9]{4}$/);
+    const paired = await server.pair(pairing.value.code, 'Native settings device');
+
+    const userCreated = await json(await sessionFetch(server.origin, server.adminCookie, '/api/v1/web/admin/users', {
+      method: 'POST', headers: headers(initial.value.csrfToken), body: JSON.stringify({
+        email: 'native-reader@example.test', password: 'native-reader-password', memberships: [{ spaceId, role: 'reader' }],
+      }),
+    }));
+    assert.equal(userCreated.response.status, 201);
+    const userId = userCreated.value.user.id;
+    assert.deepEqual(userCreated.value.user.memberships, [{ spaceId, role: 'reader' }]);
+
+    const access = await json(await sessionFetch(server.origin, server.adminCookie, `/api/v1/web/admin/users/${userId}/access`, {
+      method: 'PATCH', headers: headers(initial.value.csrfToken), body: JSON.stringify({ memberships: [{ spaceId, role: 'writer' }] }),
+    }));
+    assert.equal(access.response.status, 200);
+    assert.deepEqual(access.value.user.memberships, [{ spaceId, role: 'writer' }]);
+
+    const refreshed = await json(await sessionFetch(server.origin, server.adminCookie, '/api/v1/web/admin'));
+    const device = refreshed.value.devices.find((entry) => entry.deviceName === 'Native settings device');
+    assert.ok(device);
+    assert.notEqual(device.id, paired.accessToken, 'the raw bearer token is never returned');
+    const revoked = await json(await sessionFetch(server.origin, server.adminCookie, `/api/v1/web/admin/devices/${encodeURIComponent(device.id)}`, {
+      method: 'DELETE', headers: headers(initial.value.csrfToken),
+    }));
+    assert.equal(revoked.response.status, 200);
+    assert.equal((await json(await sessionFetch(server.origin, server.adminCookie, '/api/v1/web/admin'))).value.devices.length, 0);
+
+    const readerCookie = await server.signIn('native-reader@example.test', 'native-reader-password');
+    const me = await json(await sessionFetch(server.origin, readerCookie, '/api/v1/web/me'));
+    const changed = await json(await sessionFetch(server.origin, readerCookie, '/api/v1/web/account/password', {
+      method: 'PUT', headers: {
+        cookie: readerCookie, 'content-type': 'application/json', 'x-csrf-token': me.value.csrfToken,
+        origin: server.origin, 'sec-fetch-site': 'same-origin',
+      }, body: JSON.stringify({ currentPassword: 'native-reader-password', newPassword: 'native-reader-password-2', confirmPassword: 'native-reader-password-2' }),
+    }));
+    assert.equal(changed.response.status, 200);
+    assert.equal((await server.signIn('native-reader@example.test', 'native-reader-password-2')).startsWith('nodus_session='), true);
   });
 });

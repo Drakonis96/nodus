@@ -51,14 +51,20 @@ export interface PrimarySourceOpenTarget {
   endOffset?: number | null;
 }
 
+export type PrimarySourcesSearchLoader = {
+  searchPrimarySourceCorpus: (request: import('@shared/primarySourcesTypes').PrimarySourceSearchRequest) => Promise<PrimarySourceSearchResponse>;
+};
+
 export function PrimarySourcesSearchView({
   onOpenSource,
   onOpenNote,
   onNavigate,
+  loader,
 }: {
   onOpenSource: (target: PrimarySourceOpenTarget) => void;
   onOpenNote: (noteId: string) => void;
   onNavigate: (view: View) => void;
+  loader?: PrimarySourcesSearchLoader;
 }) {
   const [query, setQuery] = useState('');
   const [filters, setFilters] = useState<PrimarySourceSearchFilters>({});
@@ -78,7 +84,7 @@ export function PrimarySourcesSearchView({
         return;
       }
       setLoading(true);
-      void window.nodus.searchPrimarySourceCorpus({
+      void (loader?.searchPrimarySourceCorpus ?? window.nodus.searchPrimarySourceCorpus)({
         query,
         filters,
         allowPrivateContent: allowPrivate,
@@ -87,7 +93,7 @@ export function PrimarySourcesSearchView({
       }).then(setResponse).finally(() => setLoading(false));
     }, 180);
     return () => window.clearTimeout(timer);
-  }, [allowPrivate, allowRestricted, allowUnknownRights, filters, query]);
+  }, [allowPrivate, allowRestricted, allowUnknownRights, filters, query, loader]);
 
   const groups = useMemo(() => {
     const result = new Map<PrimarySourceSearchLayer, PrimarySourceSearchResult[]>();

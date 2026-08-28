@@ -49,10 +49,24 @@ test('the Server web asset handler stops routing after writing its response', ()
 
 test('Server settings use the native app navigation and visual surface', () => {
   const app = read('src/serverWeb/App.tsx');
-  assert.match(app, /data-testid="header-settings"/);
+  const settings = read('src/serverWeb/settings/ServerSettingsView.tsx');
+  assert.match(app, /dataTestId="header-settings"/);
+  assert.match(app, /dataTestId="header-account"/);
+  assert.match(app, /key={settingsTab}/, 'settings must remount when the URL tab changes');
+  assert.match(app, /data-theme={theme}/, 'the shell must expose the resolved theme to its token scope');
   assert.match(app, /onClick=\{\(\) => openView\('settings'\)\}/);
-  assert.match(app, /data-testid="settings-view"/);
-  assert.match(app, /data-testid=\{`settings-tab-\$\{id\}`\}/);
+  assert.match(app, /<ServerSettingsView/);
+  assert.match(settings, /data-testid="settings-view"/);
+  assert.match(settings, /data-testid=\{`settings-tab-\$\{entry\.id\}`\}/);
+  assert.doesNotMatch(settings, /<iframe|\/admin\/settings/);
   assert.doesNotMatch(app, />Nodus Research<\/span>/);
   assert.match(app, />Nodus<\/span>/);
+});
+
+test('Server vault creation uses canonical vault type ids', () => {
+  const settings = read('src/serverWeb/settings/ServerSettingsView.tsx');
+  for (const type of ['estudio', 'docencia', 'databases']) {
+    assert.match(settings, new RegExp(`option value="${type}"`), `${type} must be accepted by normalizeVaultType`);
+  }
+  assert.doesNotMatch(settings, /option value="(?:study|teaching|database)"/, 'legacy aliases would silently create academic vaults');
 });

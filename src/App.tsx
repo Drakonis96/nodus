@@ -219,6 +219,12 @@ export function App() {
   const viewRef = useRef<View>('home');
   useEffect(() => { viewRef.current = view; }, [view]);
   const setView = useCallback((next: View) => {
+    // Escritura and Proyectos were consolidated into one workspace. Keep their
+    // historical ids as input aliases only so old deep links and notifications do
+    // not resurrect removed sections in the shell.
+    const canonicalNext: View = next === 'writing' || next === 'projects'
+      ? (normalizeVaultType(activeVault?.type) === 'academic' ? 'workspace' : 'notes')
+      : next;
     const cur = viewRef.current;
     // Leaving Browser: hide the native WebContentsView BEFORE mounting the next
     // section. The previous `invoke` left one frame where Settings header was
@@ -226,12 +232,12 @@ export function App() {
     // (see screenshot). Awaiting the hide ensures no overlap; the extra ~5ms
     // keeps Browser visible a fraction longer instead of flashing atlas over
     // Settings. Entering Browser is handled by NodusBrowserView's mount effect.
-    if (cur === 'browser' && next !== 'browser') {
-      void window.nodus.setBrowserSectionVisible(false).then(() => setViewRaw(next)).catch(() => setViewRaw(next));
+    if (cur === 'browser' && canonicalNext !== 'browser') {
+      void window.nodus.setBrowserSectionVisible(false).then(() => setViewRaw(canonicalNext)).catch(() => setViewRaw(canonicalNext));
       return;
     }
-    setViewRaw(next);
-  }, []);
+    setViewRaw(canonicalNext);
+  }, [activeVault?.type]);
   useBrowserNativeOverlayGuard(view === 'browser');
   useEffect(() => window.nodus.onAiModelRequired(() => setAiModelRequiredOpen(true)), []);
   // Página activa dentro de Herramientas. Vive aquí (y no en ToolkitView) porque

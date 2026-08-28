@@ -37,6 +37,28 @@ test('primary-source/testimony projections and permanent denylist are explicit',
   assert.match(snapshot, /DENIED_COLUMN_PATTERN/);
 });
 
+test('primary-source and testimony opt-ins travel from Desktop settings to both publishers', () => {
+  const types = read('shared/types.ts');
+  const defaults = read('electron/db/settingsRepo.ts');
+  const shared = read('electron/serverSync/serverSyncShared.ts');
+  const cloudflare = read('electron/serverSync/cloudflarePublisher.ts');
+  const settings = read('src/views/Settings.tsx');
+  for (const field of ['nodusServerIncludePrimarySources', 'nodusServerIncludeTestimonies']) {
+    assert.match(types, new RegExp(field));
+    assert.match(defaults, new RegExp(`${field}: false`));
+    assert.match(shared, new RegExp(field));
+    assert.match(settings, new RegExp(field));
+  }
+  assert.match(cloudflare, /nodusServerIncludePrimarySources: config\.includePrimarySources/);
+  assert.match(cloudflare, /nodusServerIncludeTestimonies: config\.includeTestimonies/);
+});
+
+test('prosopography remains a private identity-resolution surface', () => {
+  assert.doesNotMatch(snapshot, /prosopography:\s*GENEALOGY_SERVER_TABLES/);
+  assert.match(read('src/serverWeb/vaults/index.tsx'), /prosopography-persons[^\n]+published: false/);
+  assert.match(read('src/serverWeb/vaults/index.tsx'), /testimony-participants[^\n]+published: false/);
+});
+
 test('classic publisher consults policy before snapshot and posts a publisher envelope', () => {
   const policyAt = service.indexOf('readPublicationPolicy(config, token)');
   const snapshotAt = service.indexOf('buildServerSnapshotInUtility({');

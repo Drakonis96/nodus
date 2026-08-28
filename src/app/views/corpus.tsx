@@ -12,9 +12,7 @@ const AuthorsView = lazy(() => import('../../views/AuthorsView').then((module) =
 const CoverageWorkspace = lazy(() => import('../../views/CoverageWorkspace').then((module) => ({ default: module.CoverageWorkspace })));
 const HypothesisLabView = lazy(() => import('../../views/HypothesisLabView').then((module) => ({ default: module.HypothesisLabView })));
 const ReadingPathView = lazy(() => import('../../views/ReadingPathView').then((module) => ({ default: module.ReadingPathView })));
-const WritingWorkshopView = lazy(() => import('../../views/WritingWorkshopView').then((module) => ({ default: module.WritingWorkshopView })));
 const DeepResearchView = lazy(() => import('../../views/DeepResearchView').then((module) => ({ default: module.DeepResearchView })));
-const ProjectsView = lazy(() => import('../../views/ProjectsView').then((module) => ({ default: module.ProjectsView })));
 const ImmersionView = lazy(() => import('../../views/ImmersionView').then((module) => ({ default: module.ImmersionView })));
 const WorkspaceView = lazy(() => import('../../views/WorkspaceView').then((module) => ({ default: module.WorkspaceView })));
 const SearchView = lazy(() => import('../../views/SearchView').then((module) => ({ default: module.SearchView })));
@@ -126,7 +124,18 @@ export const corpusViews = {
   reading: ({ navigate, openAssistant }) => (
     <ReadingPathView onOpenGraph={(target) => navigate('graph', target)} onOpenAssistant={openAssistant} />
   ),
-  writing: ({ settings }) => <WritingWorkshopView settings={settings} />,
+  // Compatibility aliases for bookmarks and commands created before Escritura and
+  // Proyectos were folded into the single Workspace. They deliberately render the
+  // exact same component instead of keeping two hidden product surfaces alive.
+  writing: ({ navigate, noteTarget, settings, snapshots }) => (
+    <WorkspaceView
+      settings={settings}
+      focusNote={noteTarget}
+      snapshot={snapshots.read('workspace')}
+      onSnapshotChange={(patch) => snapshots.patch('workspace', patch)}
+      onOpenGraph={(target) => navigate('graph', target)}
+    />
+  ),
   deepResearch: ({ isGenealogy, openLibraryItem, settings, snapshots }) => (
     <DeepResearchView
       settings={settings}
@@ -136,7 +145,15 @@ export const corpusViews = {
       onOpenLibraryWork={openLibraryItem}
     />
   ),
-  projects: ({ settings }) => <ProjectsView settings={settings} />,
+  projects: ({ navigate, noteTarget, settings, snapshots }) => (
+    <WorkspaceView
+      settings={settings}
+      focusNote={noteTarget}
+      snapshot={snapshots.read('workspace')}
+      onSnapshotChange={(patch) => snapshots.patch('workspace', patch)}
+      onOpenGraph={(target) => navigate('graph', target)}
+    />
+  ),
 
   // Searching a testimonies vault is NOT searching a Zotero corpus: what has to be
   // found are passages with their speaker, their minute and their access condition.

@@ -106,6 +106,13 @@ test('Markdown rendering preserves the start of separated ordered-list items', (
   assert.match(html, /<ol start="3"><li>Third<\/li><\/ol>/);
 });
 
+test('Markdown rendering rejects executable and opaque link schemes', () => {
+  const html = markdownModule.markdownToHtml('[bad](javascript:alert(1)) [data](data:text/html,x) [safe](https://example.com) [section](#report)');
+  assert.doesNotMatch(html, /href="(?:javascript:|data:)/i);
+  assert.match(html, /href="https:\/\/example\.com"/);
+  assert.match(html, /href="#report"/);
+});
+
 test('DOCX translation keeps styles, bold runs, media, headers, footers and footnotes', async () => {
   const source = await buildDocx(fixtureDir, 'structured.docx');
   const zip = new AdmZip(source);

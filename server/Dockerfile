@@ -27,8 +27,13 @@ LABEL org.opencontainers.image.title="Nodus Server" \
 
 WORKDIR /app
 COPY server/package.json ./
+RUN npm install --omit=dev
 COPY server/server.mjs ./
 COPY server/lib ./lib
+# Native vaults compile the canonical desktop migration source once at first use. Keep the
+# source and its shared dependencies in the image so the server never forks a second schema.
+COPY electron/db ./electron/db
+COPY shared ./shared
 # Server's per-user preference store and routes deliberately reuse the same portable
 # contract as Desktop. Their relative imports resolve to /shared in the runtime image.
 COPY shared/serverProfilePreferences.mjs /shared/serverProfilePreferences.mjs

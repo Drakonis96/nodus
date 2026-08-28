@@ -464,7 +464,7 @@ export async function pullReplica(vaultId: string, options: { force?: boolean } 
     await refreshRole(vault, token);
     // Retry a changed/offline profile only for the active replica: that is the vault whose
     // per-vault model selectors getSettings() currently represents.
-    if (vault.active) await syncServerProfilePreferencesForVault(vault).catch(() => undefined);
+    if (vault.active) await syncServerProfilePreferencesForVault(vault, undefined, { pull: true }).catch(() => undefined);
 
     const headers: Record<string, string> = { authorization: `Bearer ${token}` };
     if (vault.remote.lastPulledRevision && !options.force) headers['if-none-match'] = `W/"${vault.remote.lastPulledRevision}"`;

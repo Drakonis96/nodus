@@ -1969,6 +1969,7 @@ body {
 .genealogy .border-indigo-800\/70 { border-color: rgba(133, 77, 14, 0.7); }
 .genealogy .border-indigo-900\/70 { border-color: rgba(120, 53, 15, 0.7); }
 .genealogy .hover\:border-indigo-700\/60:hover { border-color: rgba(161, 98, 7, 0.6); }
+.genealogy.dark .dark\:hover\:border-indigo-700\/60:hover { border-color: rgba(161, 98, 7, 0.6); }
 .genealogy .ring-indigo-500 { --tw-ring-color: #d4a017; }
 .genealogy .ring-indigo-500\/40 { --tw-ring-color: rgba(212, 160, 23, 0.4); }
 .genealogy .ring-indigo-600\/40 { --tw-ring-color: rgba(202, 138, 4, 0.4); }
@@ -2098,6 +2099,7 @@ body {
 .estudio .border-indigo-900\/70 { border-color: rgba(19, 78, 74, 0.7); }
 .estudio .ring-indigo-600\/40 { --tw-ring-color: rgba(15, 118, 110, 0.4); }
 .estudio .hover\:border-indigo-700\/60:hover { border-color: rgba(15, 118, 110, 0.6); }
+.estudio.dark .dark\:hover\:border-indigo-700\/60:hover { border-color: rgba(15, 118, 110, 0.6); }
 .estudio .ring-indigo-500 { --tw-ring-color: #14b8a6; }
 .estudio .ring-indigo-500\/40 { --tw-ring-color: rgba(20, 184, 166, 0.4); }
 
@@ -2166,6 +2168,7 @@ body {
 .docencia .border-indigo-900\/70 { border-color: rgba(124, 45, 18, 0.7); }
 .docencia .ring-indigo-600\/40 { --tw-ring-color: rgba(234, 88, 12, 0.4); }
 .docencia .hover\:border-indigo-700\/60:hover { border-color: rgba(194, 65, 12, 0.6); }
+.docencia.dark .dark\:hover\:border-indigo-700\/60:hover { border-color: rgba(194, 65, 12, 0.6); }
 .docencia .hover\:bg-indigo-600\/20:hover { background-color: rgba(234, 88, 12, 0.20); }
 .docencia .ring-indigo-500 { --tw-ring-color: #f97316; }
 /* Reached only through the Analizar group: the Ideas list's drag handle and open-card
@@ -2242,6 +2245,7 @@ body {
 .worldbuilding .ring-indigo-500\/40 { --tw-ring-color: rgba(139, 92, 246, 0.4); }
 .worldbuilding .ring-indigo-600\/40 { --tw-ring-color: rgba(124, 58, 237, 0.4); }
 .worldbuilding .hover\:border-indigo-700\/60:hover { border-color: rgba(109, 40, 217, 0.6); }
+.worldbuilding.dark .dark\:hover\:border-indigo-700\/60:hover { border-color: rgba(109, 40, 217, 0.6); }
 .worldbuilding .hover\:bg-indigo-600\/20:hover { background-color: rgba(124, 58, 237, 0.2); }
 .worldbuilding .hover\:bg-indigo-700:hover { background-color: #6d28d9; }
 
@@ -2407,6 +2411,7 @@ body {
 .docencia .bg-teal-950 { background-color: #431407; }
 .docencia .bg-teal-600\/15 { background-color: rgba(234, 88, 12, 0.15); }
 .docencia .bg-teal-900\/30 { background-color: rgba(124, 45, 18, 0.3); }
+.docencia.dark .dark\:bg-teal-900\/30 { background-color: rgba(124, 45, 18, 0.3); }
 .docencia .bg-teal-50\/95 { background-color: rgba(255, 247, 237, 0.95); }
 .docencia .hover\:bg-teal-50:hover { background-color: #fff7ed; }
 .docencia .hover\:bg-teal-100:hover { background-color: #ffedd5; }
@@ -2495,6 +2500,7 @@ body {
 .databases .border-indigo-800\/70 { border-color: rgba(107, 1, 30, 0.7); }
 .databases .border-indigo-900\/70 { border-color: rgba(77, 1, 22, 0.7); }
 .databases .hover\:border-indigo-700\/60:hover { border-color: rgba(138, 2, 39, 0.6); }
+.databases.dark .dark\:hover\:border-indigo-700\/60:hover { border-color: rgba(138, 2, 39, 0.6); }
 .databases .ring-indigo-500 { --tw-ring-color: #cc0a3a; }
 .databases .ring-indigo-500\/30 { --tw-ring-color: rgba(204, 10, 58, 0.3); }
 .databases .ring-indigo-500\/40 { --tw-ring-color: rgba(204, 10, 58, 0.4); }
