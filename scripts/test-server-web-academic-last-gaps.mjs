@@ -5,16 +5,13 @@ import { readFile } from 'node:fs/promises';
 const root = new URL('..', import.meta.url);
 const source = async (name) => readFile(new URL(name, root), 'utf8');
 
-test('Ideas, authors and graph expose private account-scoped research panels', async () => {
+test('Ideas, authors and graph do not invent private research panels absent from Desktop', async () => {
   const code = await source('src/serverWeb/advanced/AdvancedWorkspace.tsx');
-  assert.match(code, /api\.artifacts\(spaceId, 'workspace-note'\)/);
-  assert.match(code, /entry\.metadata\?\.surface === surface/);
-  assert.match(code, /api\.createArtifact\(\{ vaultId: spaceId, kind: 'workspace-note'/);
-  assert.match(code, /api\.updateArtifact\(active\.id/);
-  assert.match(code, /api\.deleteArtifact\(active\.id/);
-  assert.match(code, /surface="graph"/);
-  assert.match(code, /surface="idea"/);
-  assert.match(code, /surface="author"/);
+  assert.doesNotMatch(code, /PrivateResearchPanel/);
+  assert.doesNotMatch(code, /api\.artifacts\(spaceId, 'workspace-note'\)/);
+  assert.doesNotMatch(code, /Notas privadas del autor|Notas privadas de Ideas|Notas privadas del grafo/);
+  assert.match(code, /AcademicDetailExplorer/);
+  assert.match(code, /GraphServerView/);
 });
 
 test('Reading path has private read-state and assistant affordances', async () => {
@@ -28,7 +25,7 @@ test('Reading path has private read-state and assistant affordances', async () =
 
 test('Parity matrix records the safe boundary instead of claiming unsupported writes', async () => {
   const docs = await source('docs/server-web-academic-parity.md');
-  assert.match(docs, /notas\/auditoría privado/);
+  assert.match(docs, /sin paneles privados inventados/i);
   assert.match(docs, /estado personal puede superponerse/);
   assert.match(docs, /Markdown.*vista previa/);
   assert.match(docs, /las publicaciones nunca se mutan/i);

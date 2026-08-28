@@ -505,6 +505,12 @@ html.light .server-vault-popover .text-neutral-600,
 html[data-theme='light'] .server-vault-popover .text-neutral-600 { color: #64748b; }
 html.light .server-vault-popover button:hover,
 html[data-theme='light'] .server-vault-popover button:hover { background: #f1f5f9; color: #171717; }
+html.light .server-vault-modal > section,
+html[data-theme='light'] .server-vault-modal > section { border-color: #d4d4d8; background: #fff; color: #171717; box-shadow: 0 24px 70px rgb(15 23 42 / .18); }
+html.light .server-vault-modal .text-neutral-300,
+html[data-theme='light'] .server-vault-modal .text-neutral-300,
+html.light .server-vault-modal .text-neutral-400,
+html[data-theme='light'] .server-vault-modal .text-neutral-400 { color: #475569; }
 html.light .server-record-card,
 html[data-theme='light'] .server-record-card { border-color: #e5e7eb; background: #fff; color: #171717; }
 html.light .server-record-card:hover,
@@ -616,6 +622,23 @@ html[data-theme='light'] [class~='to-neutral-900'] {
   .server-ai-controls label { min-width: 0; flex: 1; }
   .server-ai-controls .input { width: 100%; min-width: 0; max-width: none; }
   .server-chat-message { max-width: 100%; }
+  /* The reader's notes/info/chat rail is a desktop column. On a phone it must
+     become an overlay, otherwise its fixed 21rem width pushes the document
+     outside the viewport and makes the close/back controls unreachable. */
+  .library-document-reader > .relative > .library-reader-notes {
+    position: absolute;
+    z-index: 30;
+    inset: 0 0 0 auto;
+    width: min(21rem, calc(100vw - 1rem));
+    max-width: 100%;
+    border-left: 1px solid #262626;
+    box-shadow: -18px 0 50px rgb(0 0 0 / .45);
+  }
+  html.light .library-document-reader > .relative > .library-reader-notes,
+  html[data-theme='light'] .library-document-reader > .relative > .library-reader-notes {
+    border-left-color: #e5e7eb;
+    box-shadow: -18px 0 50px rgb(15 23 42 / .18);
+  }
 }
 
 @media (max-height: 480px) and (orientation: landscape) {

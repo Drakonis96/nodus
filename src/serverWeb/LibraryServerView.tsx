@@ -181,7 +181,7 @@ function ReaderFilesMenu({
         onClick={() => setOpen((value) => !value)}
       >
         <Icon name="folder" size={13} className="text-neutral-400" />
-        <span className="min-w-0 flex-1"><b className="block text-[11px] font-medium text-neutral-300">Versiones y archivos</b><small className="block truncate text-[9px] text-neutral-600">{document.originalFileName || "Documento"} · 2</small></span>
+        <span className="min-w-0 flex-1"><b className="block text-[11px] font-medium text-neutral-300">Versiones y archivos</b><small className="block truncate text-[9px] text-neutral-600">{document.originalFileName || "Documento"} · {Number(document.cleanAvailable) + Number(document.originalAvailable)} disponibles</small></span>
         <Icon name={open ? "chevronUp" : "chevronDown"} size={12} className="text-neutral-600" />
       </button>
       {open && <div id="library-reader-files" data-testid="library-reader-files" className="mt-2 space-y-0.5">
@@ -446,6 +446,7 @@ function ReaderNotes({
   notes,
   selectedQuote,
   onRefresh,
+  onClose,
   csrfToken,
 }: {
   spaceId: string;
@@ -453,6 +454,7 @@ function ReaderNotes({
   notes: Annotation[];
   selectedQuote: string;
   onRefresh: () => Promise<void>;
+  onClose: () => void;
   csrfToken?: string;
 }) {
   const [open, setOpen] = useState(false);
@@ -513,13 +515,16 @@ function ReaderNotes({
     >
       <div className="flex items-center justify-between border-b border-neutral-800 px-3 py-2">
         <h2 className="text-xs font-semibold text-neutral-200">Documento</h2>
-        <button
-          className="btn btn-ghost h-7 px-2 text-[10px]"
-          onClick={() => setOpen((value) => !value)}
-          data-testid="library-reader-add-note"
-        >
-          {open ? "Cerrar" : "Añadir nota"}
-        </button>
+        <div className="flex items-center gap-1">
+          <button
+            className="btn btn-ghost h-7 px-2 text-[10px]"
+            onClick={() => setOpen((value) => !value)}
+            data-testid="library-reader-add-note"
+          >
+            {open ? "Cerrar" : "Añadir nota"}
+          </button>
+          <button type="button" className="btn btn-ghost h-7 w-7 p-0 text-[10px]" onClick={onClose} aria-label="Cerrar panel" title="Cerrar panel">×</button>
+        </div>
       </div>
       {open && (
         <form
@@ -615,7 +620,7 @@ export function LibraryDetail({
   const [source, setSource] = useState<"clean" | "original">("clean");
   const [openingFormatPrompt, setOpeningFormatPrompt] = useState(false);
   const [rememberOpeningFormat, setRememberOpeningFormat] = useState(false);
-  const [sidebarTab, setSidebarTab] = useState<"notes" | "metadata" | "chat">(
+  const [sidebarTab, setSidebarTab] = useState<"notes" | "metadata" | "chat" | null>(
     "notes",
   );
   const [progress, setProgress] = useState(0);
@@ -674,22 +679,22 @@ export function LibraryDetail({
         setIsRead(state ? state.content === "read" : localStorage.getItem(`nodus.server.library.read.${id}`) === "1");
         const hasClean = Boolean(nextDocument.cleanAvailable);
         const hasOriginal = Boolean(nextDocument.originalAvailable);
-        // Preserve the historical fallback for older publication manifests;
-        // the preference-aware selection below supersedes it when applicable.
-        if (!preference) setSource(response.document?.cleanAvailable ? "clean" : response.document?.originalAvailable ? "original" : "clean");
         const preferred = preference === "original" && hasOriginal
           ? "original"
           : preference === "clean" && hasClean
             ? "clean"
-            : hasClean
-              ? "clean"
-              : "original";
+            : hasOriginal
+              ? "original"
+              : "clean";
         setSource(preferred);
-        // When both variants exist, ask once before downloading the Markdown.
-        // Choosing the original therefore opens it immediately without a clean
-        // content request, matching Desktop's reader contract.
-        if (!preference && hasClean && hasOriginal) setOpeningFormatPrompt(true);
-        if (preferred === "clean" && (!hasClean || preference || !hasOriginal)) setReadable(await api.libraryContent(spaceId, id));
+        // The catalogue row must open without an interstitial: Desktop opens the
+        // preserved original immediately when one is available, while the clean
+        // copy remains a reader option. Server cannot run Desktop's foreground
+        // extraction queue, so a remembered clean preference is still honored;
+        // otherwise the original iframe is the first rendered source.
+        // Never leave a blocking format prompt over the reader on a deep link.
+        setOpeningFormatPrompt(false);
+        if (preferred === "clean" && hasClean) setReadable(await api.libraryContent(spaceId, id));
       })
       .catch((cause) => {
         if (alive) setError(cause);
@@ -950,7 +955,7 @@ export function LibraryDetail({
         )}
         <button
           className={`btn btn-ghost h-9 px-2 text-xs ${sidebarTab === "notes" ? "text-indigo-300" : ""}`}
-          onClick={() => setSidebarTab("notes")}
+          onClick={() => setSidebarTab((value) => value === "notes" ? null : "notes")}
           data-testid="library-reader-notes"
         >
           <Icon name="notebook" size={13} />
@@ -958,7 +963,7 @@ export function LibraryDetail({
         </button>
         <button
           className="btn btn-ghost h-9 px-2 text-xs"
-          onClick={() => setSidebarTab("metadata")}
+          onClick={() => setSidebarTab((value) => value === "metadata" ? null : "metadata")}
           data-testid="library-reader-info"
         >
           <Icon name="info" size={13} />
@@ -966,7 +971,7 @@ export function LibraryDetail({
         </button>
         <button
           className="btn btn-primary h-9 px-2 text-xs"
-          onClick={() => setSidebarTab("chat")}
+          onClick={() => setSidebarTab((value) => value === "chat" ? null : "chat")}
           data-testid="library-reader-open-chat"
         >
           <Icon name="chat" size={13} />
@@ -1093,6 +1098,7 @@ export function LibraryDetail({
             notes={notes}
             selectedQuote={selectedQuote}
             onRefresh={refreshNotes}
+            onClose={() => setSidebarTab(null)}
             csrfToken={csrfToken}
           />
         )}
@@ -1101,7 +1107,7 @@ export function LibraryDetail({
             className="library-reader-notes w-[21rem] shrink-0 overflow-y-auto border-l border-neutral-800 bg-neutral-950/25 p-4"
             data-testid="library-reader-metadata"
           >
-            <h2 className="text-sm font-semibold">Información</h2>
+            <div className="flex items-center justify-between gap-2"><h2 className="text-sm font-semibold">Información</h2><button type="button" className="btn btn-ghost h-7 w-7 p-0 text-[10px]" onClick={() => setSidebarTab(null)} aria-label="Cerrar panel" title="Cerrar panel">×</button></div>
             <dl className="mt-4 space-y-3 text-xs">
               {[
                 ["Título", titleFor(document)],
@@ -1129,7 +1135,7 @@ export function LibraryDetail({
             data-testid="library-reader-chat"
           >
             <div className="border-b border-neutral-800 px-3 py-3">
-              <h2 className="text-sm font-semibold">Chat del documento</h2>
+              <div className="flex items-center justify-between gap-2"><h2 className="text-sm font-semibold">Chat del documento</h2><button type="button" className="btn btn-ghost h-7 w-7 p-0 text-[10px]" onClick={() => setSidebarTab(null)} aria-label="Cerrar panel" title="Cerrar panel">×</button></div>
               <p className="mt-1 text-[10px] text-neutral-600">
                 La consulta y sus respuestas son privadas.
               </p>

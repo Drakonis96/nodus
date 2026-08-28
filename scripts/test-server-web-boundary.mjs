@@ -54,7 +54,7 @@ test('Server settings use the native app navigation and visual surface', () => {
   assert.match(app, /dataTestId="header-account"/);
   assert.match(app, /key={settingsTab}/, 'settings must remount when the URL tab changes');
   assert.match(app, /data-theme={theme}/, 'the shell must expose the resolved theme to its token scope');
-  assert.match(app, /onClick=\{\(\) => openView\('settings'\)\}/);
+  assert.match(app, /icon="settings"[\s\S]*?onClick=\{\(\) => navigate\('\/view\/settings\?tab=server'\)\}/);
   assert.match(app, /<ServerSettingsView/);
   assert.match(settings, /data-testid="settings-view"/);
   assert.match(settings, /data-testid=\{`settings-tab-\$\{entry\.id\}`\}/);
@@ -69,4 +69,11 @@ test('Server vault creation uses canonical vault type ids', () => {
     assert.match(settings, new RegExp(`option value="${type}"`), `${type} must be accepted by normalizeVaultType`);
   }
   assert.doesNotMatch(settings, /option value="(?:study|teaching|database)"/, 'legacy aliases would silently create academic vaults');
+  assert.match(settings, /api\.createVault\(\{ \.\.\.newSpace, storageKind: 'server_native', authority: 'server' \}/,
+    'Settings must create an autonomous Server-native vault, not a Desktop publication target');
+  assert.match(settings, /data-testid="server-native-vault-create"/);
+  assert.match(settings, /Nativo del servidor/);
+  assert.match(settings, /isAdmin && !native && <div className="ss-policy-grid">/,
+    'publication policy switches only apply to Desktop-published spaces');
+  assert.doesNotMatch(settings, /api\.createAdminSpace\(newSpace/);
 });

@@ -113,7 +113,22 @@ function restCollection(type: string): string {
 
 function storageKey(spaceId: string) { return `nodus.server.savedSearches.${spaceId}`; }
 function readSaved(spaceId: string): SavedSearch[] {
-  try { const value = JSON.parse(localStorage.getItem(storageKey(spaceId)) ?? '[]'); return Array.isArray(value) ? value : []; } catch { return []; }
+  try {
+    const value = JSON.parse(localStorage.getItem(storageKey(spaceId)) ?? '[]');
+    if (!Array.isArray(value)) return [];
+    return value.flatMap((entry): SavedSearch[] => {
+      if (!entry || typeof entry !== 'object') return [];
+      const candidate = entry as Partial<SavedSearch>;
+      if (typeof candidate.id !== 'string' || typeof candidate.name !== 'string' || typeof candidate.query !== 'string') return [];
+      const mode: SearchMode = candidate.mode === 'semantic' ? 'semantic' : 'text';
+      const kinds = Array.isArray(candidate.kinds) ? candidate.kinds.filter((kind): kind is SearchKind => typeof kind === 'string' && kind in KIND_META) : [];
+      return [{ id: candidate.id, name: candidate.name, query: candidate.query, mode, kinds }];
+    });
+  } catch { return []; }
+}
+
+function writeSaved(spaceId: string, value: SavedSearch[]): void {
+  try { localStorage.setItem(storageKey(spaceId), JSON.stringify(value)); } catch { /* A blocked quota must not break global search. */ }
 }
 
 function PublishedAcademicDetail({ spaceId, target, onBack }: { spaceId: string; target: PublishedAcademicTarget; onBack: () => void }) {
@@ -172,7 +187,7 @@ export function SearchServerView({ spaceId, vaultType, onNavigate }: { spaceId: 
   const availableKinds = mode === 'semantic' ? SEMANTIC_KINDS : textKinds(vaultType);
   const visible = useMemo(() => results.filter((result) => activeKinds.has(result.kind)), [activeKinds, results]);
   const grouped = useMemo(() => availableKinds.map((kind) => ({ kind, items: visible.filter((item) => item.kind === kind) })).filter((group) => group.items.length > 0), [availableKinds, visible]);
-  const persist = (next: SavedSearch[]) => { setSaved(next); localStorage.setItem(storageKey(spaceId), JSON.stringify(next)); };
+  const persist = (next: SavedSearch[]) => { setSaved(next); writeSaved(spaceId, next); };
   const switchMode = (next: SearchMode) => { setMode(next); setActiveKinds(new Set(next === 'semantic' ? SEMANTIC_KINDS : textKinds(vaultType))); };
   const toggleKind = (kind: SearchKind) => setActiveKinds((current) => { const next = new Set(current); if (next.has(kind)) next.delete(kind); else next.add(kind); return next.size ? next : new Set(availableKinds); });
   const open = (hit: SearchHit) => {

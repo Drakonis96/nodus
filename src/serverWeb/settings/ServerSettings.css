@@ -7,8 +7,8 @@
   --ss-text: #f5f5f5;
   --ss-muted: #858585;
   --ss-faint: #5b5b5b;
-  --ss-accent: #6366f1;
-  --ss-accent-soft: rgb(79 70 229 / .18);
+  --ss-accent: var(--vault-accent, #6366f1);
+  --ss-accent-soft: color-mix(in srgb, var(--ss-accent) 18%, transparent);
   --ss-good: #2dd4bf;
   min-height: 100%;
   overflow-y: auto;
@@ -30,8 +30,8 @@ html[data-theme='light'] .server-settings-native {
   --ss-text: #171717;
   --ss-muted: #64748b;
   --ss-faint: #94a3b8;
-  --ss-accent: #4f46e5;
-  --ss-accent-soft: #eef2ff;
+  --ss-accent: var(--vault-accent, #4f46e5);
+  --ss-accent-soft: color-mix(in srgb, var(--ss-accent) 12%, white);
   --ss-good: #0f766e;
   color-scheme: light;
 }
@@ -54,6 +54,7 @@ html[data-theme='light'] .server-settings-native {
 .ss-tabs { display: flex; max-width: 1180px; margin: 0 auto 20px; flex-wrap: wrap; gap: 7px; }
 .ss-tabs button { display: inline-flex; min-height: 31px; align-items: center; gap: 6px; border: 1px solid var(--ss-border); border-radius: 7px; padding: 5px 10px; background: var(--ss-panel); color: var(--ss-muted); font: inherit; font-size: 12px; cursor: pointer; }
 .ss-tabs button:hover { border-color: color-mix(in srgb, var(--ss-accent) 55%, var(--ss-border)); color: var(--ss-text); }
+.ss-tabs button.server-priority { border-color: color-mix(in srgb, var(--ss-accent) 68%, var(--ss-border)); color: var(--ss-accent); }
 .ss-tabs button.active { border-color: var(--ss-accent); background: var(--ss-accent); color: #fff; box-shadow: 0 3px 12px rgb(67 56 202 / .18); }
 
 .ss-error, .ss-notice, .ss-warning, .ss-info, .ss-empty { max-width: 1180px; border: 1px solid; border-radius: 8px; padding: 10px 12px; font-size: 12px; line-height: 1.6; }
@@ -145,6 +146,7 @@ html[data-theme='light'] .server-settings-native .ss-warning { background: #fffb
 .ss-actions { display: flex; justify-content: flex-end; gap: 7px; padding: 13px 16px; }
 
 .ss-model-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; padding: 15px 16px; }
+.ss-model-mode-help { margin: 0; padding: 0 16px; color: var(--ss-muted); font-size: 11px; line-height: 1.5; }
 .ss-model-field { display: grid; min-width: 0; gap: 5px; color: var(--ss-muted); font-size: 11px; }
 .ss-model-field .ss-select { width: 100%; max-width: none; }
 .ss-metrics { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; padding: 15px 16px; border-bottom: 1px solid var(--ss-border-soft); }

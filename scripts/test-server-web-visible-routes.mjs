@@ -13,18 +13,18 @@ test('every visible dedicated-vault route has a Server Web renderer', () => {
     prosopography: ['prosopSearch', 'prosopPopulation', 'prosopPersons', 'prosopSources', 'prosopAnalysis', 'prosopNetworks'],
     estudio: ['studyCourses', 'studySchedule', 'studyCalendar', 'studySearch', 'studyLibrary', 'studyRecordings', 'studyChat', 'studyIdeas', 'studyGraph', 'studyQuestions', 'studyReview', 'studyDeepResearch'],
     docencia: ['studyCourses', 'teachingGroups', 'studySchedule', 'studyCalendar', 'studySearch', 'studyLibrary', 'studyRecordings', 'studyChat', 'studyIdeas', 'studyGraph', 'studyQuestions', 'teachingRubrics', 'teachingExams', 'teachingGrades', 'teachingUnits'],
-    databases: ['pages', 'dbSearch', 'dbAnalysis', 'dbChat'],
+    databases: ['pages', 'dbSearch', 'dbAnalysis', 'dbChat', 'dbDeepResearch'],
     worldbuilding: ['encyclopedia', 'characters', 'places', 'factions', 'cultures', 'timeline', 'map', 'relations', 'tree', 'dynasties', 'worldChat', 'rules', 'conflicts', 'arcs', 'continuity', 'questions', 'scenes', 'manuscript'],
   };
-  const explicit = new Set(['prosopSearch', 'prosopPopulation', 'studySearch', 'studyChat', 'studyDeepResearch', 'dbSearch', 'dbChat', 'worldChat']);
+  const explicit = new Set(['prosopSearch', 'prosopPopulation', 'studySearch', 'studyChat', 'studyDeepResearch', 'dbSearch', 'dbChat', 'dbDeepResearch', 'worldChat']);
   for (const [vaultType, routes] of Object.entries(visibleRoutes)) {
     for (const view of routes) {
-      const renderedBySurface = new RegExp(`${view}\\s*:\\s*['\"]`, 'm').test(surfaces);
-      const renderedExplicitly = explicit.has(view) && new RegExp(`route\\.view === ['\"]${view}['\"]`).test(app);
+      const renderedBySurface = new RegExp(`${view}\\s*:\\s*['"]`, 'm').test(surfaces);
+      const renderedExplicitly = explicit.has(view) && new RegExp(`route\\.view === ['"]${view}['"]`).test(app);
       assert.ok(renderedBySurface || renderedExplicitly, `${vaultType}/${view} must not fall through UnavailableView`);
     }
   }
-  for (const view of explicit) assert.doesNotMatch(app, new RegExp(`route\\.view === ['\"]${view}['\"][\\s\\S]{0,500}UnavailableView`), `${view} must dispatch to a real surface`);
+  for (const view of explicit) assert.doesNotMatch(app, new RegExp(`route\\.view === ['"]${view}['"][\\s\\S]{0,500}UnavailableView`), `${view} must dispatch to a real surface`);
 });
 
 test('special Server Web routes reuse the publication-safe adapters', () => {
@@ -36,6 +36,7 @@ test('special Server Web routes reuse the publication-safe adapters', () => {
   assert.match(app, /route\.view === 'dbChat'[\s\S]*?<ConversationServerView[\s\S]*?mode="database"/);
   assert.match(app, /route\.view === 'worldChat'[\s\S]*?<ConversationServerView[\s\S]*?mode="world"/);
   assert.match(app, /route\.view === 'studyDeepResearch'[\s\S]*?<DeepResearchServerView/);
+  assert.match(app, /route\.view === 'dbDeepResearch'[\s\S]*?<DatabaseDeepResearchServerView/);
 });
 
 test('structured immersion plans are rendered as sections rather than stringified objects', () => {
@@ -53,7 +54,7 @@ test('switching vaults dismisses the selector before navigating to the new home'
   // assert the semantic hook and its action instead of coupling this contract to
   // the presentational Icon wrapper.
   assert.match(app, /<HoverLabelButton[\s\S]*?data-testid=\{dataTestId\}/);
-  assert.match(app, /<ServerHeaderAction[\s\S]*?icon="user"[\s\S]*?label="Mi cuenta"[\s\S]*?dataTestId="header-account"/);
+  assert.match(app, /<ServerHeaderAction[\s\S]*?icon="user"[\s\S]*?label=\{t\('Mi cuenta'\)\}[\s\S]*?dataTestId="header-account"/);
   assert.match(app, /onClick=\{\(\) => \{ setDrawer\(false\); navigate\('\/view\/settings\?tab=server'\); \}\} dataTestId="header-account"/);
   assert.match(app, /navigate\('\/view\/settings\?tab=server'\)/);
 });

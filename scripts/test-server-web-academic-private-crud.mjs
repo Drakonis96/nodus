@@ -6,34 +6,23 @@ const root = new URL('..', import.meta.url).pathname;
 const academic = fs.readFileSync(`${root}/src/serverWeb/AcademicToolsServerView.tsx`, 'utf8');
 const state = fs.readFileSync(`${root}/src/serverWeb/StateOfArtServerView.tsx`, 'utf8');
 const api = fs.readFileSync(`${root}/src/serverWeb/api.ts`, 'utf8');
+const app = fs.readFileSync(`${root}/src/serverWeb/App.tsx`, 'utf8');
+const navigation = fs.readFileSync(`${root}/src/navigation.ts`, 'utf8');
 
-test('writing and projects expose private artifact CRUD without public writes', () => {
-  assert.match(academic, /data-testid=\{`private-\$\{surface\}-workspace`\}/);
-  assert.match(academic, /api\.createArtifact\(\{ vaultId: spaceId, kind: 'workspace-note'/);
-  assert.match(academic, /api\.updateArtifact\(active\.id/);
-  assert.match(academic, /api\.deleteArtifact\(active\.id/);
-  assert.match(academic, /metadata: \{ surface, private: true \}/);
-  assert.match(academic, /filter\(\(entry\) => entry\.metadata\?\.surface === 'writing'\)/);
-  assert.match(academic, /filter\(\(entry\) => entry\.metadata\?\.surface === 'project'\)/);
+test('the visible writing group contains only Workspace and legacy URLs canonicalize there', () => {
+  assert.match(navigation, /\{ id: 'workspace', label: 'Espacio de trabajo'/);
+  assert.doesNotMatch(navigation, /\{ id: 'writing', label:/);
+  assert.doesNotMatch(navigation, /\{ id: 'projects', label:/);
+  assert.match(app, /requested === 'writing' \|\| requested === 'projects' \? 'workspace'/);
+  assert.match(app, /view === 'writing' \|\| view === 'projects' \? 'workspace'/);
+  assert.doesNotMatch(app, /tool=\{route\.view as 'writing' \| 'projects'/);
   assert.doesNotMatch(academic, /window\.nodus\.(createProject|updateProject|deleteProject)/);
 });
 
-test('writing and projects offer an account-private Markdown preview', () => {
-  assert.match(academic, /private-\$\{surface\}-preview-tab/);
-  assert.match(academic, /private-\$\{surface\}-preview/);
-  assert.match(academic, /<MarkdownReader value=\{content \|\|/);
-});
-
-test('state of the question keeps the published triple view and private overlay', () => {
+test('state of the question keeps the published triple view without invented private overlays', () => {
   assert.match(state, /data-testid="coverage-tabs"/);
-  assert.match(state, /data-testid="state-private-questions"/);
-  assert.match(state, /data-testid="state-private-analysis"/);
-  assert.match(state, /metadata: \{ surface: 'state-of-art', entity: 'question', private: true/);
-  assert.match(state, /metadata: \{ surface: 'state-of-art', entity: 'analysis', private: true/);
-  assert.match(state, /api\.runAI\(spaceId, 'content-query'/);
-  assert.match(state, /api\.contextPackage\(spaceId, title\(question\)/);
-  assert.match(state, /api\.updateArtifact\(own\.id/);
-  assert.match(state, /api\.deleteArtifact\(active\.id/);
+  assert.doesNotMatch(state, /state-private-questions|state-private-analysis/);
+  assert.doesNotMatch(state, /api\.(createArtifact|updateArtifact|deleteArtifact|runAI|contextPackage)/);
   assert.match(state, /tab === 'map' \? <CoverageView/);
 });
 

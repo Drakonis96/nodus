@@ -303,7 +303,7 @@ function stringArray(value: unknown): string[] {
 
 function readerAnnotations(items: JsonRecord[]): WritingDraftAnnotation[] {
   return items.filter((entry) => ['highlight', 'comment', 'bookmark'].includes(valueText(entry.kind))).map((entry) => ({
-    id: valueText(entry.id), draftId: valueText(entry.documentId), scope: 'source',
+    id: valueText(entry.id), draftId: valueText(entry.documentId), scope: valueText(entry.scope, 'source'),
     kind: (['highlight', 'comment', 'bookmark'].includes(valueText(entry.kind)) ? valueText(entry.kind) : 'highlight') as WritingDraftAnnotation['kind'],
     color: (entry.color === null || typeof entry.color === 'string' ? entry.color : null) as WritingDraftAnnotationColor | null,
     startOffset: Number((entry.anchor as JsonRecord | undefined)?.startOffset ?? entry.startOffset) || 0,
@@ -513,6 +513,7 @@ export function DeepResearchServerView({ spaceId, csrfToken, initialReportId }: 
   const markActionsRef = useRef<ReaderSelectionActionsHandle | null>(null);
   const initialReportApplied = useRef(false);
   const generationAbort = useRef<AbortController | null>(null);
+  const annotationScope = activeTranslation ? `translation:${valueText(activeTranslation.id)}` : 'source';
 
   const refreshPrivateJobs = useCallback(async () => {
     const response = await api.aiJobs().catch(() => ({ jobs: [] as AIJob[] }));
@@ -574,8 +575,9 @@ export function DeepResearchServerView({ spaceId, csrfToken, initialReportId }: 
         const allTranslations = [...nextTranslations, ...ownTranslations];
         setActiveTranslation(requestedTranslation ? allTranslations.find((entry) => valueText(entry.id) === requestedTranslation) || null : null);
         setAnnotationVersion(personal.version);
-        setReaderAnnotationsState(readerAnnotations(personal.annotations as unknown as JsonRecord[]));
-        setNotes(personal.annotations
+        const scopedAnnotations = personal.annotations.filter((entry) => valueText(entry.scope, 'source') === (requestedTranslation ? `translation:${requestedTranslation}` : 'source'));
+        setReaderAnnotationsState(readerAnnotations(scopedAnnotations as unknown as JsonRecord[]));
+        setNotes(scopedAnnotations
           .filter((entry) => !entry.deletedAt && ['highlight', 'comment', 'bookmark'].includes(valueText(entry.kind)))
           .map((entry) => ({ id: entry.id, quote: entry.quote, content: entry.content })));
       }).catch(setError).finally(() => { if (alive) setReaderLoading(false); });
@@ -648,11 +650,12 @@ export function DeepResearchServerView({ spaceId, csrfToken, initialReportId }: 
       startOffset: Number(patch.startOffset) || 0, endOffset: Number(patch.endOffset) || 0,
       selectedText: valueText(patch.selectedText || patch.quote), prefix: valueText(patch.prefix), suffix: valueText(patch.suffix),
     } : existing ? { startOffset: existing.startOffset, endOffset: existing.endOffset, selectedText: existing.selectedText, prefix: existing.prefix, suffix: existing.suffix } : null);
-    const response = await api.addAnnotation(spaceId, { ...(existing ? { kind: existing.kind, color: existing.color, content: existing.comment || '', quote: existing.selectedText, anchor } : {}), ...patch, id, resource: 'deep-research', documentId: valueText(open.id), quote: valueText(patch.quote || patch.selectedText || existing?.selectedText), anchor, baseVersion: annotationVersion, createdAt: valueText(patch.createdAt, now), updatedAt: now }, csrfToken);
+    const response = await api.addAnnotation(spaceId, { ...(existing ? { kind: existing.kind, color: existing.color, content: existing.comment || '', quote: existing.selectedText, anchor } : {}), ...patch, id, resource: 'deep-research', documentId: valueText(open.id), scope: annotationScope, quote: valueText(patch.quote || patch.selectedText || existing?.selectedText), anchor, baseVersion: annotationVersion, createdAt: valueText(patch.createdAt, now), updatedAt: now }, csrfToken);
     setAnnotationVersion(response.version);
     const openAnnotations = response.annotations.filter((entry) => entry.resource === 'deep-research' && entry.documentId === valueText(open.id));
-    setReaderAnnotationsState(readerAnnotations(openAnnotations as unknown as JsonRecord[]));
-    setNotes(openAnnotations.filter((entry) => !entry.deletedAt && ['highlight', 'comment', 'bookmark'].includes(valueText(entry.kind))).map((entry) => ({ id: entry.id, quote: entry.quote, content: entry.content })));
+    const scopedAnnotations = openAnnotations.filter((entry) => valueText(entry.scope, 'source') === annotationScope);
+    setReaderAnnotationsState(readerAnnotations(scopedAnnotations as unknown as JsonRecord[]));
+    setNotes(scopedAnnotations.filter((entry) => !entry.deletedAt && ['highlight', 'comment', 'bookmark'].includes(valueText(entry.kind))).map((entry) => ({ id: entry.id, quote: entry.quote, content: entry.content })));
   };
 
   const toggleRead = async (entry: JsonRecord) => {
@@ -681,7 +684,7 @@ export function DeepResearchServerView({ spaceId, csrfToken, initialReportId }: 
         // The POST returns the authoritative version and complete private set.
         // Refreshing the open reader here prevents the next highlight from using
         // the stale version that existed before the read toggle.
-        const openAnnotations = response.annotations.filter((item) => item.resource === 'deep-research' && item.documentId === id);
+        const openAnnotations = response.annotations.filter((item) => item.resource === 'deep-research' && item.documentId === id && valueText(item.scope, 'source') === annotationScope);
         setReaderAnnotationsState(readerAnnotations(openAnnotations as unknown as JsonRecord[]));
         setNotes(openAnnotations
           .filter((item) => !item.deletedAt && ['highlight', 'comment', 'bookmark'].includes(valueText(item.kind)) && item.documentId === id)

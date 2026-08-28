@@ -63,9 +63,15 @@ test("reader persists read state in the account-scoped annotation overlay and se
   assert.match(view, /id: `reading-state-\$\{id\}`/);
   assert.match(view, /content: next \? "read" : "unread"/);
   assert.match(view, /setIsRead\(state \? state\.content === "read"/);
-  assert.match(view, /setSource\(response\.document\?\.cleanAvailable \? "clean" : response\.document\?\.originalAvailable \? "original"/);
+  assert.match(view, /const preferred = preference === "original"[\s\S]{0,220}: hasOriginal\s*\n\s*\? "original"\s*\n\s*: "clean"/);
   assert.match(view, /note\.kind === "note" && note\.title === "Estado de lectura"/);
   assert.match(view, /bookmarkFill/);
+});
+
+test("reader opens a published original first while keeping Markdown as an explicit option", () => {
+  assert.match(view, /: hasOriginal\s*\n\s*\? "original"\s*\n\s*: "clean"/);
+  assert.match(view, /data-testid="library-reader-original-frame"/);
+  assert.match(view, /setOpeningFormatPrompt\(false\)/);
 });
 
 test("parity matrix records the safe Server boundary", () => {

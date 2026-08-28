@@ -20,13 +20,13 @@ test('Academic parity matrix names every Desktop surface and its Server renderer
   ].map(read).join('\n');
   const academicViews = [
     'search', 'library', 'graph', 'argument', 'ideas', 'authors', 'dictionary', 'immersion',
-    'research', 'hypothesis', 'reading', 'deepResearch', 'workspace', 'writing', 'projects',
+    'research', 'hypothesis', 'reading', 'deepResearch', 'workspace',
   ];
   for (const view of academicViews) {
     assert.match(desktop, new RegExp(`['"]${view}['"]`), `Desktop navigation must keep ${view}`);
     assert.match(matrix, new RegExp(`\|[^\\n]*${view === 'deepResearch' ? 'Deep Research' : view === 'research' ? 'Estado triple' : view}[^\\n]*\\|`), `${view} must be audited in the matrix`);
   }
-  for (const marker of ['SearchServerView', 'LibraryView', 'GraphServerView', 'ArgumentView', 'IdeasServerView', 'AuthorsServerView', 'DictionaryServerView', 'ImmersionView', 'StateOfArtServerView', 'HypothesisView', 'ReadingView', 'DeepResearchServerView', 'PrivateNotesServerView', 'WritingView', 'ProjectsView', 'ServerSettingsView']) {
+  for (const marker of ['SearchServerView', 'LibraryView', 'GraphServerView', 'ArgumentView', 'IdeasServerView', 'AuthorsServerView', 'DictionaryServerView', 'ImmersionView', 'StateOfArtServerView', 'HypothesisView', 'ReadingView', 'DeepResearchServerView', 'PrivateNotesServerView', 'ServerSettingsView']) {
     assert.match(serverFiles + app, new RegExp(marker), `Server renderer ${marker} must exist`);
   }
 });
@@ -91,8 +91,7 @@ test('Academic mutability audit separates private actions from snapshot mutation
   assert.match(audit, /Deep Research · generación/);
   assert.match(audit, /Estado de la cuestión · triple vista/);
   assert.match(audit, /Workspace/);
-  assert.match(audit, /Escritura/);
-  assert.match(audit, /Proyectos/);
+  assert.doesNotMatch(audit, /^\| (?:Escritura|Proyectos) \|/m);
   assert.match(audit, /PDF binario.*pdf-lib/);
 });
 
@@ -168,18 +167,19 @@ test('Graph parity keeps Desktop lenses, presets and safe audit filters visible'
   assert.match(graph, /onDrillDown=/);
 });
 
-test('Academic tools render published contracts without invented private composers', () => {
+test('Academic tools render current Desktop contracts and legacy removed routes stay hidden', () => {
   const tools = read('src/serverWeb/AcademicToolsServerView.tsx');
+  const app = read('src/serverWeb/App.tsx');
+  const navigation = read('src/navigation.ts');
   assert.match(tools, /ideas\/routes/);
   assert.match(tools, /ideas\/\$\{encodeURIComponent\(String\(active\.ideaId\)\)\}\/graph/);
   assert.match(tools, /api\.detail\(spaceId, 'gaps'/);
-  assert.match(tools, /data-testid="writing-published-document"/);
-  assert.match(tools, /api\.writingDraft\(spaceId/);
-  assert.match(tools, /data-testid="projects-published-detail"/);
+  assert.match(app, /requested === 'writing' \|\| requested === 'projects' \? 'workspace'/);
+  assert.doesNotMatch(navigation, /\{ id: 'writing', label:/);
+  assert.doesNotMatch(navigation, /\{ id: 'projects', label:/);
   assert.doesNotMatch(tools, /chapter\.original_text/);
   assert.doesNotMatch(tools, /private-\$\{surface\}-ai-workbench|private-\$\{surface\}-ai-generate|PrivateAiWorkbench/);
   for (const surface of ['argument', 'hypothesis', 'immersion']) assert.doesNotMatch(tools, new RegExp(`surface="${surface}"`), `${surface} must not mount an invented private composer`);
-  assert.match(tools, /kind: 'workspace-note'/);
 });
 
 test('Reading path preserves Desktop controls, card metadata and published navigation', () => {

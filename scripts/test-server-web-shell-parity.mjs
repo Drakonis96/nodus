@@ -20,7 +20,7 @@ test('Server shell preserves Desktop sidebar state and compact threshold', () =>
 test('Server shell keeps tools out of navigation and routes the account glyph to settings', () => {
   assert.match(app, /const SERVER_TOOL_VIEWS = new Set<View>\(\['browser', 'radar', 'compass', 'toolkit'\]\)/);
   assert.match(app, /!SERVER_TOOL_VIEWS\.has\(item\.id\)/);
-  assert.match(app, /label="Mi cuenta"[\s\S]*?dataTestId="header-account"/);
+  assert.match(app, /label=\{t\('Mi cuenta'\)\}[\s\S]*?dataTestId="header-account"/);
   assert.match(app, /navigate\('\/view\/settings\?tab=server'\)/);
 });
 

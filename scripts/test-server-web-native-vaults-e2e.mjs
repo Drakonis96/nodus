@@ -213,7 +213,7 @@ test('compiled Server Web badge closes on second click and activates a native va
     await page.locator('#login-email').fill('native-e2e-admin@example.test');
     await page.locator('#login-password').fill('native-e2e-administrator-password');
     await Promise.all([page.waitForURL(new RegExp(`${server.origin.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}/?$`)), page.locator('button[type="submit"]').click()]);
-    await page.getByTestId('overview-view').waitFor();
+    await page.getByTestId('worldbuilding-overview').waitFor();
     const badge = page.getByTestId('header-vault-badge');
     await badge.waitFor();
     await badge.click();
@@ -224,8 +224,13 @@ test('compiled Server Web badge closes on second click and activates a native va
     assert.equal(await badge.getAttribute('aria-expanded'), 'false', 'second badge click must close the manager');
     await badge.click();
     await page.getByTestId(`vault-option-${native.id}`).click();
-    await page.getByTestId('overview-view').waitFor();
+    await page.getByTestId('worldbuilding-overview').waitFor();
     assert.match(await page.locator('body').innerText(), /UI native world/);
+    await page.getByTestId('overview-metrics').getByRole('button').first().click();
+    await page.getByTestId('native-content-surface').waitFor();
+    await page.getByTestId('native-content-create').click();
+    await page.getByRole('dialog', { name: 'Nuevo personaje' }).waitFor();
+    await page.getByRole('button', { name: 'Cerrar' }).click();
     assert.doesNotMatch(await page.locator('body').innerText(), /No se ha podido cargar esta vista|Internal Server Error/i);
     assert.deepEqual(errors, [], 'activating a native vault must not produce browser errors');
     await context.close();

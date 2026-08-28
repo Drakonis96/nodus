@@ -9,9 +9,10 @@ test('private annotations are isolated, sanitised and versioned atomically', () 
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'nodus-private-annotations-'));
   try {
     const store = new PrivateAnnotationStore(root, { maxBytes: 64 * 1024 });
-    const first = store.replace('user-a', 'space-a', [{ id: 'note-1', text: '<script>alert(1)</script>Hello', documentId: 'doc' }]);
+    const first = store.replace('user-a', 'space-a', [{ id: 'note-1', text: '<script>alert(1)</script>Hello', documentId: 'doc', scope: 'translation:t-1' }]);
     assert.equal(first.version, 1);
     assert.equal(first.annotations[0].content, 'Hello');
+    assert.equal(first.annotations[0].scope, 'translation:t-1');
     assert.deepEqual(store.read('user-b', 'space-a').annotations, []);
     assert.throws(() => store.replace('user-a', 'space-a', [], 0), (error) => error instanceof AnnotationVersionConflict && error.statusCode === 409);
     assert.equal(store.read('user-a', 'space-a').annotations.length, 1);

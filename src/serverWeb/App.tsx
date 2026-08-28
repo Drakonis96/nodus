@@ -1,5 +1,6 @@
-import { lazy, Suspense, type PointerEvent as ReactPointerEvent, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { lazy, Suspense, type PointerEvent as ReactPointerEvent, type ReactNode, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { normalizeVaultType, VAULT_TYPE_COLORS, type VaultType } from '@shared/vaultTypes';
+import type { AppLanguage } from '@shared/types';
 import { dedicatedVaultNavIds, groupedNav, NAV_ITEMS, type NavItem, type View } from '../navigation';
 import { HoverLabelButton, Icon } from '../components/ui';
 import { vaultTypeIcon, vaultTypeLabel } from '../components/vaultTypeUi';
@@ -20,10 +21,12 @@ import { api, ApiError } from './api';
 import { ConversationServerView, DeepResearchServerView, DictionaryServerView, PrivateNotesServerView } from './PersonalViews';
 import { StateOfArtServerView } from './StateOfArtServerView';
 import { DatabaseAnalysisServerView } from './DatabaseAnalysisServerView';
+import { DatabaseDeepResearchServerView } from './DatabaseDeepResearchServerView';
 import { SearchServerView } from './academic/SearchServerView';
 import { AcademicDetailExplorer, type AcademicTarget } from './academic/AcademicDetailExplorer';
 import { ServerSettingsView, type TabId } from './settings';
 import { ServerVaultManager, surfaceForView, VaultSurfaceView } from './vaults';
+import { NativeContentAuthoring } from './vaults/NativeContentAuthoring';
 import { AcademicToolsServerView } from './AcademicToolsServerView';
 import { LibraryDetail as ServerLibraryDetail, PublishedLibraryView as ServerPublishedLibraryView } from './LibraryServerView';
 import { PrimarySourcesMapView } from '../views/PrimarySourcesMapView';
@@ -35,6 +38,7 @@ import { PrimarySourcesArchiveServerView } from './PrimarySourcesArchiveServerVi
 import type { PrimarySourceMapWorkspace, PrimarySourceRelationsWorkspace, PrimarySourceSearchRequest, PrimarySourceSearchResponse, PrimarySourceTimelineWorkspace, PrimarySourcePersonDossier, PrimarySourcePersonFilter, PrimarySourcePersonSummary } from '@shared/primarySourcesTypes';
 import type { JsonRecord, MeResponse, PageResponse, PortableProfileValues, Space, SpaceSummary } from './types';
 import { placeHeaderBadge, type HeaderBadgePlacement } from '../headerLayout';
+import { setActiveLang, t } from './i18nShim';
 
 type ServerView = View | 'assistant' | 'nodi';
 type Route =
@@ -228,7 +232,7 @@ function searchDetailView(collection: string, type: VaultType): View | null {
 }
 
 function Loading() {
-  return <div className="flex h-full items-center justify-center gap-2 text-sm text-neutral-500" role="status" data-testid="loading"><span className="h-4 w-4 animate-spin rounded-full border-2 border-neutral-700 border-t-indigo-400" />Cargando…</div>;
+  return <div className="flex h-full items-center justify-center gap-2 text-sm text-neutral-500" role="status" data-testid="loading"><span className="h-4 w-4 animate-spin rounded-full border-2 border-neutral-700 border-t-indigo-400" />{t('Cargando…')}</div>;
 }
 
 /** Keep the Server action rail identical to Desktop: an icon by default, with a
@@ -253,19 +257,31 @@ function ErrorState({ error, onRetry }: { error: unknown; onRetry?: () => void }
 }
 
 function PublishedWorldHome({ active, summary: _summary, onOpen }: { active: Space; summary: SpaceSummary; onOpen: (view: View) => void }) {
+  const native = active.storageKind === 'server_native' || active.authorityMode === 'server';
   const [entries, setEntries] = useState<JsonRecord[]>([]); const [people, setPeople] = useState<JsonRecord[]>([]);
-  useEffect(() => { let alive = true; Promise.all([api.collection(active.id, 'world-entries', { limit: '200' }), api.collection(active.id, 'persons', { limit: '200' })]).then(([entryPage, peoplePage]) => { if (!alive) return; setEntries(pageItems(entryPage)); setPeople(pageItems(peoplePage)); }).catch(() => undefined); return () => { alive = false; }; }, [active.id]);
+  useEffect(() => {
+    let mounted = true;
+    const load = (active.storageKind === 'server_native' || active.authorityMode === 'server')
+      ? Promise.all([
+        api.nativeContentList(active.id, 'world_articles', { limit: '200' }),
+        api.nativeContentList(active.id, 'persons', { limit: '200' }),
+      ]).then(([entryPage, peoplePage]) => [entryPage.rows, peoplePage.rows] as const)
+      : Promise.all([api.collection(active.id, 'world-entries', { limit: '200' }), api.collection(active.id, 'persons', { limit: '200' })]).then(([entryPage, peoplePage]) => [pageItems(entryPage), pageItems(peoplePage)] as const);
+    void load.then(([nextEntries, nextPeople]) => { if (!mounted) return; setEntries(nextEntries); setPeople(nextPeople); }).catch(() => undefined);
+    return () => { mounted = false; };
+  }, [active.authorityMode, active.id, active.storageKind]);
   const profiles = new Map(people.map((person) => [String(person.person_id), person]));
   const protagonists = people.filter((person) => String(profiles.get(String(person.person_id))?.narrative_role ?? person.narrative_role ?? '') === 'protagonist').length;
   const alive = people.filter((person) => String(person.life_status ?? person.status ?? '') === 'alive').length;
   const recent = [...people].sort((a, b) => String(b.updated_at ?? '').localeCompare(String(a.updated_at ?? ''))).slice(0, 6);
-  return <div className="h-full overflow-y-auto p-6 server-view-padding" data-testid="worldbuilding-overview"><div className="mx-auto max-w-5xl"><HomeIntroCard eyebrow="Vault de worldbuilding · Publicado" title={active.name} description={active.description || 'Personajes, lugares y lore del mundo publicados para consulta.'} icon="globe" /><div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4" data-testid="overview-metrics"><Metric label="Personajes" value={people.length} onClick={() => onOpen('characters')} /><Metric label="Protagonistas" value={protagonists} onClick={() => onOpen('characters')} /><Metric label="Con vida" value={alive} onClick={() => onOpen('characters')} /><Metric label="En la enciclopedia" value={entries.length} onClick={() => onOpen('encyclopedia')} /></div><section className="mt-6 rounded-xl border border-neutral-200 bg-white dark:border-neutral-800 dark:bg-neutral-900/40"><div className="flex items-center justify-between border-b border-neutral-200 px-4 py-3 dark:border-neutral-800"><h2 className="text-sm font-semibold">Personajes recientes</h2><button className="text-xs text-indigo-400" onClick={() => onOpen('characters')}>Ver todos</button></div>{recent.length ? <div className="grid gap-2 p-4 sm:grid-cols-2">{recent.map((person) => <button key={String(person.person_id)} className="rounded-lg border border-neutral-200 p-3 text-left hover:border-indigo-300 dark:border-neutral-800" onClick={() => onOpen('characters')}><strong className="block truncate text-sm">{text(person.display_name ?? person.name, 'Personaje')}</strong><span className="mt-1 block line-clamp-2 text-xs text-neutral-500">{text(person.biography ?? person.notes, 'Personaje publicado')}</span></button>)}</div> : <p className="p-6 text-center text-xs text-neutral-500">Todavía no hay personajes publicados.</p>}</section></div></div>;
+  return <div className="h-full overflow-y-auto p-6 server-view-padding" data-testid="worldbuilding-overview"><div className="mx-auto max-w-5xl"><HomeIntroCard eyebrow={`Vault de worldbuilding · ${native ? 'Nativo del servidor' : 'Publicado'}`} title={active.name} description={active.description || (native ? 'Crea y organiza personajes, lugares y lore directamente en Nodus Server.' : 'Personajes, lugares y lore del mundo publicados para consulta.')} icon="globe" /><div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4" data-testid="overview-metrics"><Metric label="Personajes" value={people.length} onClick={() => onOpen('characters')} /><Metric label="Protagonistas" value={protagonists} onClick={() => onOpen('characters')} /><Metric label="Con vida" value={alive} onClick={() => onOpen('characters')} /><Metric label="En la enciclopedia" value={entries.length} onClick={() => onOpen('encyclopedia')} /></div><section className="mt-6 rounded-xl border border-neutral-200 bg-white dark:border-neutral-800 dark:bg-neutral-900/40"><div className="flex items-center justify-between border-b border-neutral-200 px-4 py-3 dark:border-neutral-800"><h2 className="text-sm font-semibold">Personajes recientes</h2><button className="text-xs text-indigo-400" onClick={() => onOpen('characters')}>Ver todos</button></div>{recent.length ? <div className="grid gap-2 p-4 sm:grid-cols-2">{recent.map((person) => <button key={String(person.person_id)} className="rounded-lg border border-neutral-200 p-3 text-left hover:border-indigo-300 dark:border-neutral-800" onClick={() => onOpen('characters')}><strong className="block truncate text-sm">{text(person.display_name ?? person.name, 'Personaje')}</strong><span className="mt-1 block line-clamp-2 text-xs text-neutral-500">{text(person.biography ?? person.notes, native ? 'Personaje del servidor' : 'Personaje publicado')}</span></button>)}</div> : <p className="p-6 text-center text-xs text-neutral-500">Todavía no hay personajes.{native ? ' Crea el primero desde Personajes.' : ''}</p>}</section></div></div>;
 }
 
 function PublishedGenealogyHome({ active, summary, onOpen }: { active: Space; summary: SpaceSummary; onOpen: (view: View) => void }) {
+  const native = active.storageKind === 'server_native' || active.authorityMode === 'server';
   const counts = summary.counts || active.counts || {};
   const tile = (label: string, value: unknown, view: View, icon: string) => <button className="server-record-card flex items-center gap-3" onClick={() => onOpen(view)}><span className="server-record-icon"><Icon name={icon} /></span><span><strong className="block text-lg">{Number(value || 0).toLocaleString('es')}</strong><small className="text-xs text-neutral-500">{label}</small></span></button>;
-  return <div className="h-full overflow-y-auto p-6 server-view-padding" data-testid="genealogy-overview"><div className="mx-auto max-w-5xl"><HomeIntroCard eyebrow="Vault de genealogía · Publicado" title={active.name} description={active.description || 'Personas, parentescos, acontecimientos y lugares publicados para consulta.'} icon="tree" /><div className="mt-5 grid gap-3 sm:grid-cols-4" data-testid="overview-metrics">{tile('Personas', counts.persons, 'persons', 'users')}{tile('Vínculos de parentesco', counts.relationships, 'tree', 'tree')}{tile('Eventos', counts.events, 'timeline', 'clock')}{tile('Lugares', counts.places, 'map', 'map')}</div><section className="mt-6 grid gap-3 sm:grid-cols-2">{tile('Documentos publicados', summary.assets, 'archive', 'archive')}<article className="server-record-card flex items-center gap-3"><span className="server-record-icon"><Icon name="lock" /></span><span><strong className="block text-sm">Sugerencias de parentesco</strong><small className="text-xs text-neutral-500">Privadas y no publicadas</small></span></article></section></div></div>;
+  return <div className="h-full overflow-y-auto p-6 server-view-padding" data-testid="genealogy-overview"><div className="mx-auto max-w-5xl"><HomeIntroCard eyebrow={`Vault de genealogía · ${native ? 'Nativo del servidor' : 'Publicado'}`} title={active.name} description={active.description || (native ? 'Construye personas, parentescos, acontecimientos y lugares directamente en Server.' : 'Personas, parentescos, acontecimientos y lugares publicados para consulta.')} icon="tree" /><div className="mt-5 grid gap-3 sm:grid-cols-4" data-testid="overview-metrics">{tile('Personas', counts.persons, 'persons', 'users')}{tile('Vínculos de parentesco', counts.relationships, 'tree', 'tree')}{tile('Eventos', counts.events, 'timeline', 'clock')}{tile('Lugares', counts.places, 'map', 'map')}</div><section className="mt-6 grid gap-3 sm:grid-cols-2">{tile(native ? 'Documentos' : 'Documentos publicados', summary.assets, 'archive', 'archive')}<article className="server-record-card flex items-center gap-3"><span className="server-record-icon"><Icon name="lock" /></span><span><strong className="block text-sm">Sugerencias de parentesco</strong><small className="text-xs text-neutral-500">Privadas de la cuenta</small></span></article></section></div></div>;
 }
 
 function Metric({ label, value, onClick }: { label: string; value: number; onClick: () => void }) {
@@ -280,13 +296,14 @@ function Sidebar({ type, activeView, compact, collapsedGroups, sidebarOrder, sid
   const groups = groupedNav(sidebarOrder, ['library', ...sidebarHidden, ...NAV_ITEMS.filter((item) => !allowed.has(item.id)).map((item) => item.id), ...SERVER_TOOL_VIEWS]);
   const button = (item: NavItem) => {
     const active = activeView === item.id;
-    return <button key={item.id} data-tour={`nav-${item.id}`} data-testid={`nav-${item.id}`} onClick={() => onNavigate(item.id)} aria-current={active ? 'page' : undefined} aria-label={compact ? item.label : undefined} title={compact ? item.label : undefined} className={`server-sidebar-nav-item flex items-center rounded-lg py-2 text-left text-sm transition-colors ${compact ? 'justify-center px-2' : 'gap-2 px-3'} ${active ? 'is-active bg-indigo-600 text-white' : 'text-neutral-400 hover:bg-neutral-900'}`}><Icon name={item.icon} className="shrink-0 opacity-70" /><span className={compact ? 'sr-only' : undefined}>{item.label}</span></button>;
+    const label = t(item.label);
+    return <button key={item.id} data-tour={`nav-${item.id}`} data-testid={`nav-${item.id}`} onClick={() => onNavigate(item.id)} aria-current={active ? 'page' : undefined} aria-label={compact ? label : undefined} title={compact ? label : undefined} className={`server-sidebar-nav-item flex items-center rounded-lg py-2 text-left text-sm transition-colors ${compact ? 'justify-center px-2' : 'gap-2 px-3'} ${active ? 'is-active bg-indigo-600 text-white' : 'text-neutral-400 hover:bg-neutral-900'}`}><Icon name={item.icon} className="shrink-0 opacity-70" /><span className={compact ? 'sr-only' : undefined}>{label}</span></button>;
   };
   const canonicalHome = NAV_ITEMS.find((item) => item.id === 'home')!;
   const canonicalLibrary = NAV_ITEMS.find((item) => item.id === 'library')!;
   const canonicalSettings = NAV_ITEMS.find((item) => item.id === 'settings')!;
   const renderGroups = (selected: typeof groups) => selected.map((group) => { const collapsed = !compact && collapsedGroups.has(group.id); const active = group.items.some((item) => item.id === activeView); return <div key={group.id} className={`${compact ? 'mt-1 border-t border-neutral-800/70 pt-1' : 'mt-2'} flex flex-col gap-1`}>
-    {!compact && <button className={`server-sidebar-nav-group flex items-center gap-1 px-3 pt-1 pb-0.5 text-left text-[10px] font-semibold uppercase tracking-wider ${active && collapsed ? 'text-indigo-400' : 'text-neutral-600 hover:text-neutral-400'}`} aria-expanded={!collapsed} aria-label={`${collapsed ? 'Mostrar' : 'Ocultar'} grupo ${group.label}`} onClick={() => onToggleGroup(group.id)}><Icon name="chevronRight" size={11} className={`transition-transform ${collapsed ? '' : 'rotate-90'}`} />{group.label}</button>}
+    {!compact && <button className={`server-sidebar-nav-group flex items-center gap-1 px-3 pt-1 pb-0.5 text-left text-[10px] font-semibold uppercase tracking-wider ${active && collapsed ? 'text-indigo-400' : 'text-neutral-600 hover:text-neutral-400'}`} aria-expanded={!collapsed} aria-label={`${t(collapsed ? 'Mostrar' : 'Ocultar')} ${t('grupo')} ${t(group.label)}`} onClick={() => onToggleGroup(group.id)}><Icon name="chevronRight" size={11} className={`transition-transform ${collapsed ? '' : 'rotate-90'}`} />{t(group.label)}</button>}
     {!collapsed && group.items.map(button)}
   </div>; });
   const specialized = type === 'worldbuilding'
@@ -327,6 +344,7 @@ const VAULT_HOME_METRICS: Record<string, Array<[string, string]>> = {
 
 function Home({ active, summary, onOpen, onRefresh }: { active: Space; summary: SpaceSummary; onOpen: (view: View) => void; onRefresh?: () => Promise<void> }) {
   const type = normalizeVaultType(active.vaultType || active.vault?.type);
+  const native = active.storageKind === 'server_native' || active.authorityMode === 'server';
   if (type === 'worldbuilding') return <PublishedWorldHome active={active} summary={summary} onOpen={onOpen} />;
   if (type === 'genealogy') return <PublishedGenealogyHome active={active} summary={summary} onOpen={onOpen} />;
   const counts = summary.counts || active.counts || {};
@@ -334,9 +352,9 @@ function Home({ active, summary, onOpen, onRefresh }: { active: Space; summary: 
   const configured = type === 'academic' ? [['works', 'Obras'], ['authors', 'Autores'], ['ideas', 'Ideas'], ['themes', 'Temas']] : VAULT_HOME_METRICS[type] || [];
   const metrics = configured.filter(([key]) => counts[key] !== undefined).map(([key, label]) => [label, counts[key]] as const);
   return <div className="h-full overflow-y-auto p-6 server-view-padding" data-testid="overview-view"><div className="mx-auto max-w-5xl">
-    <div className="relative"><HomeIntroCard eyebrow={`${vaultTypeLabel(type)} · Publicado`} title={active.name} description={active.description || 'Consulta el conocimiento publicado con el mismo espacio de trabajo de Nodus Desktop.'} icon={vaultTypeIcon(type)} />{onRefresh && <button className="btn btn-ghost absolute right-4 top-4 gap-1.5 text-xs" onClick={() => void onRefresh()} data-testid="overview-refresh"><Icon name="sync" size={13} />Actualizar</button>}</div>
+    <div className="relative"><HomeIntroCard eyebrow={`${vaultTypeLabel(type)} · ${native ? 'Nativo del servidor' : 'Publicado'}`} title={active.name} description={active.description || (native ? 'Trabaja directamente en esta bóveda sin depender de Nodus Desktop.' : 'Consulta el conocimiento publicado con el mismo espacio de trabajo de Nodus Desktop.')} icon={vaultTypeIcon(type)} />{onRefresh && <button className="btn btn-ghost absolute right-4 top-4 gap-1.5 text-xs" onClick={() => void onRefresh()} data-testid="overview-refresh"><Icon name="sync" size={13} />Actualizar</button>}</div>
     <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4" data-testid="overview-metrics">{metrics.map(([label, value]) => <div key={label} className="rounded-lg border border-neutral-800 px-3 py-2"><div className="truncate text-xs text-neutral-500">{label}</div><div className="text-lg font-semibold tabular-nums">{Number(value).toLocaleString('es')}</div></div>)}{metrics.length === 0 && <div className="rounded-lg border border-neutral-800 px-3 py-2"><div className="text-xs text-neutral-500">{type === 'prosopography' ? 'Datos privados' : 'Recursos'}</div><div className="text-lg font-semibold">{type === 'prosopography' ? '—' : (summary.assets || 0)}</div></div>}</div>
-    <section className="mt-6"><div className="mb-3 flex items-center justify-between"><div><div className="text-xs font-semibold text-neutral-300">Explorar la bóveda</div><p className="mt-1 text-xs text-neutral-600">Las mismas secciones y jerarquía que en Desktop.</p></div><span className="rounded-full border border-teal-800/60 bg-teal-950/30 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-teal-300">Solo lectura</span></div><div className="server-record-grid">{cards.map((item) => <button key={item.id} className="server-record-card flex items-center gap-3" onClick={() => onOpen(item.id)} data-testid={`overview-card-${item.id}`}><span className="server-record-icon"><Icon name={item.icon} /></span><span className="min-w-0 flex-1"><strong className="block truncate text-sm text-neutral-200">{item.label}</strong><small className="block truncate text-xs text-neutral-600">Abrir sección publicada</small></span><Icon name="chevronRight" size={14} className="text-neutral-700" /></button>)}</div></section>
+    <section className="mt-6"><div className="mb-3 flex items-center justify-between"><div><div className="text-xs font-semibold text-neutral-300">Explorar la bóveda</div><p className="mt-1 text-xs text-neutral-600">Las mismas secciones y jerarquía que en Desktop.</p></div><span className="rounded-full border border-teal-800/60 bg-teal-950/30 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-teal-300">{native ? 'Editable' : 'Solo lectura'}</span></div><div className="server-record-grid">{cards.map((item) => <button key={item.id} className="server-record-card flex items-center gap-3" onClick={() => onOpen(item.id)} data-testid={`overview-card-${item.id}`}><span className="server-record-icon"><Icon name={item.icon} /></span><span className="min-w-0 flex-1"><strong className="block truncate text-sm text-neutral-200">{item.label}</strong><small className="block truncate text-xs text-neutral-600">{native ? 'Abrir sección' : 'Abrir sección publicada'}</small></span><Icon name="chevronRight" size={14} className="text-neutral-700" /></button>)}</div></section>
   </div></div>;
 }
 
@@ -408,7 +426,8 @@ function UnavailableView({ view }: { view: View }) {
 
 
 export default function App() {
-  const [route, setRoute] = useState<Route>(routeFromLocation); const [me, setMe] = useState<MeResponse>(); const [profile, setProfile] = useState<PortableProfileValues>(); const [activeId, setActiveId] = useState(''); const [summary, setSummary] = useState<SpaceSummary>(); const [error, setError] = useState<unknown>(); const [theme, setTheme] = useState<'dark' | 'light'>(() => localStorage.getItem('nodus-web-theme') === 'light' ? 'light' : 'dark'); const [sidebarWidth, setSidebarWidth] = useState(() => Math.max(SERVER_SIDEBAR_MIN_WIDTH, Math.min(SERVER_SIDEBAR_MAX_WIDTH, Number(localStorage.getItem('nodus-server-sidebar-width')) || SERVER_SIDEBAR_DEFAULT_WIDTH))); const [navCollapsed, setNavCollapsed] = useState(() => localStorage.getItem(SERVER_NAV_COLLAPSED_STORAGE_KEY) === '1'); const [drawer, setDrawer] = useState(false); const [vaultsOpen, setVaultsOpen] = useState(false); const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(() => { try { const value = JSON.parse(localStorage.getItem(SERVER_COLLAPSED_GROUPS_STORAGE_KEY) || '[]'); return new Set(Array.isArray(value) ? value.filter((entry): entry is string => typeof entry === 'string') : []); } catch { return new Set(); } });
+  const [route, setRoute] = useState<Route>(routeFromLocation); const [me, setMe] = useState<MeResponse>(); const [profile, setProfile] = useState<PortableProfileValues>(); const [language, setLanguage] = useState<AppLanguage>('en'); const [activeId, setActiveId] = useState(''); const [summary, setSummary] = useState<SpaceSummary>(); const [error, setError] = useState<unknown>(); const [theme, setTheme] = useState<'dark' | 'light'>(() => localStorage.getItem('nodus-web-theme') === 'light' ? 'light' : 'dark'); const [sidebarWidth, setSidebarWidth] = useState(() => Math.max(SERVER_SIDEBAR_MIN_WIDTH, Math.min(SERVER_SIDEBAR_MAX_WIDTH, Number(localStorage.getItem('nodus-server-sidebar-width')) || SERVER_SIDEBAR_DEFAULT_WIDTH))); const [navCollapsed, setNavCollapsed] = useState(() => localStorage.getItem(SERVER_NAV_COLLAPSED_STORAGE_KEY) === '1'); const [drawer, setDrawer] = useState(false); const [vaultsOpen, setVaultsOpen] = useState(false); const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(() => { try { const value = JSON.parse(localStorage.getItem(SERVER_COLLAPSED_GROUPS_STORAGE_KEY) || '[]'); return new Set(Array.isArray(value) ? value.filter((entry): entry is string => typeof entry === 'string') : []); } catch { return new Set(); } });
+  setActiveLang(language);
   const [headerEl, setHeaderEl] = useState<HTMLElement | null>(null);
   const [headerLogoEl, setHeaderLogoEl] = useState<HTMLElement | null>(null);
   const [headerActionsEl, setHeaderActionsEl] = useState<HTMLElement | null>(null);
@@ -428,12 +447,26 @@ export default function App() {
   }, []);
   useEffect(() => { refreshSpaces().catch(setError); }, [refreshSpaces]);
   useEffect(() => {
+    const listener = (event: Event) => {
+      const requested = (event as CustomEvent<{ activeId?: string }>).detail?.activeId;
+      void refreshSpaces().then(() => {
+        if (requested) {
+          localStorage.setItem(ACTIVE_VAULT_STORAGE_KEY, requested);
+          setActiveId(requested);
+        }
+      }).catch(setError);
+    };
+    addEventListener('nodus-vaults-updated', listener);
+    return () => removeEventListener('nodus-vaults-updated', listener);
+  }, [refreshSpaces]);
+  useEffect(() => {
     const resolveTheme = (preferred: PortableProfileValues['appearance']['theme']) => preferred === 'system'
       ? (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
       : preferred;
     api.profilePreferences().then((response) => {
       if (!response.profile.values) return;
       setProfile(response.profile.values);
+      setLanguage(response.profile.values.appearance.uiLanguage || 'en');
       profileThemeRef.current = response.profile.values.appearance.theme;
       setTheme(resolveTheme(response.profile.values.appearance.theme));
     }).catch(() => undefined);
@@ -441,6 +474,7 @@ export default function App() {
       const next = (event as CustomEvent<PortableProfileValues>).detail;
       if (next) {
         setProfile(next);
+        setLanguage(next.appearance.uiLanguage || 'en');
         profileThemeRef.current = next.appearance.theme;
         setTheme(resolveTheme(next.appearance.theme));
       }
@@ -504,13 +538,18 @@ export default function App() {
   // frame: besides visibly flashing wrong metrics, fast consumers could mistake it for
   // the new vault's published state.
   if (!active || !summary || summary.space?.id !== active.id) return <Loading />;
+  const isNativeVault = active.storageKind === 'server_native' || active.authorityMode === 'server';
+  const canAuthorNative = isNativeVault && (active.role === 'owner' || active.role === 'writer');
+  const wrapNativeSurface = (surface: string, child: ReactNode) => isNativeVault
+    ? <NativeContentAuthoring spaceId={active.id} surface={surface} revision={Number(summary.space?.revision ?? active.revision ?? 0)} csrfToken={me.csrfToken} canWrite={canAuthorNative} onChanged={() => { void refreshSpaces(); void api.space(active.id).then(setSummary); }}>{child}</NativeContentAuthoring>
+    : child;
   const content = (() => {
     if (route.kind === 'library-detail') return <ServerLibraryDetail spaceId={active.id} id={route.id} csrfToken={me.csrfToken} onBack={() => history.length > 1 ? history.back() : openView('library')} />;
     if (route.kind === 'detail' && ['ideas', 'works', 'authors'].includes(route.collection)) {
       const kind = route.collection === 'ideas' ? 'idea' : route.collection === 'works' ? 'work' : 'author';
       return <AcademicDetailExplorer key={`${kind}:${route.id}`} spaceId={active.id} origin={route.view === 'search' ? 'Buscar' : 'Inicio'} initialTarget={{ kind, id: route.id, label: route.id } as AcademicTarget} onOrigin={() => history.back()} />;
     }
-    if (route.kind === 'detail' && surfaceForView(type, route.view)) return <VaultSurfaceView key={`${active.id}:${route.view}:${route.collection}:${route.id}`} spaceId={active.id} surface={surfaceForView(type, route.view)!} vaultType={type} view={route.view} initialId={route.id} initialCollection={route.collection} onOrigin={() => openView(route.view)} onOpenRecord={(collection, id) => navigate(`/detail/${route.view}/${encodeURIComponent(collection)}/${encodeURIComponent(id)}`)} />;
+    if (route.kind === 'detail' && surfaceForView(type, route.view)) { const surface = surfaceForView(type, route.view)!; return wrapNativeSurface(surface, <VaultSurfaceView key={`${active.id}:${route.view}:${route.collection}:${route.id}`} spaceId={active.id} surface={surface} vaultType={type} view={route.view} initialId={route.id} initialCollection={route.collection} onOrigin={() => openView(route.view)} onOpenRecord={(collection, id) => navigate(`/detail/${route.view}/${encodeURIComponent(collection)}/${encodeURIComponent(id)}`)} />); }
     if (route.kind === 'detail') return <DetailView spaceId={active.id} route={route} />;
     if (route.view === 'home') return <Home active={active} summary={summary} onOpen={openView} onRefresh={async () => { const next = await api.space(active.id); setSummary(next); }} />;
     if (route.view === 'search' && type === 'primary_sources') return <><span className="hidden" data-testid="academic-search-view" /><PrimarySourcesSearchView loader={primarySourcesLoader} onOpenSource={(target) => navigate(`/detail/archive/archive-items/${encodeURIComponent(target.itemId)}`)} onOpenNote={() => undefined} onNavigate={openView} /></>;
@@ -521,20 +560,21 @@ export default function App() {
     if (route.view === 'studyChat') return <ConversationServerView key={active.id} spaceId={active.id} csrfToken={me.csrfToken} mode="study" />;
     if (route.view === 'studyIdeas' || route.view === 'studyGraph' || route.view === 'studyQuestions' || route.view === 'studyReview') {
       const surface = surfaceForView(type, route.view);
-      return surface ? <VaultSurfaceView key={`${active.id}:${route.view}`} spaceId={active.id} surface={surface} vaultType={type} view={route.view} onOrigin={() => openView('home')} onOpenRecord={(collection, id) => navigate(`/detail/${route.view}/${encodeURIComponent(collection)}/${encodeURIComponent(id)}`)} /> : <UnavailableView view={route.view} />;
+      return surface ? wrapNativeSurface(surface, <VaultSurfaceView key={`${active.id}:${route.view}`} spaceId={active.id} surface={surface} vaultType={type} view={route.view} onOrigin={() => openView('home')} onOpenRecord={(collection, id) => navigate(`/detail/${route.view}/${encodeURIComponent(collection)}/${encodeURIComponent(id)}`)} />) : <UnavailableView view={route.view} />;
     }
     if (route.view === 'dbChat') return <ConversationServerView key={active.id} spaceId={active.id} csrfToken={me.csrfToken} mode="database" />;
     if (route.view === 'dbAnalysis') return <DatabaseAnalysisServerView key={active.id} spaceId={active.id} />;
+    if (route.view === 'dbDeepResearch') return <DatabaseDeepResearchServerView key={active.id} spaceId={active.id} csrfToken={me.csrfToken} />;
     if (route.view === 'worldChat') return <ConversationServerView key={active.id} spaceId={active.id} csrfToken={me.csrfToken} mode="world" />;
     if (route.view === 'studyDeepResearch') return <DeepResearchServerView key={active.id} spaceId={active.id} csrfToken={me.csrfToken} initialReportId={new URLSearchParams(location.search).get('report') || undefined} />;
     if (route.view === 'library') return <ServerPublishedLibraryView spaceId={active.id} onOpen={(id) => navigate(`/library/${encodeURIComponent(id)}`)} />;
-    if (route.view === 'ideas') return <IdeasServerView key={active.id} spaceId={active.id} />;
-    if (route.view === 'authors') return <AuthorsServerView key={active.id} spaceId={active.id} />;
+    if (route.view === 'ideas') return wrapNativeSurface('academic-ideas', <IdeasServerView key={active.id} spaceId={active.id} />);
+    if (route.view === 'authors') return wrapNativeSurface('academic-authors', <AuthorsServerView key={active.id} spaceId={active.id} />);
     if (route.view === 'graph') return <GraphServerView key={active.id} spaceId={active.id} csrfToken={me.csrfToken} initialSeedId={new URLSearchParams(location.search).get('seed') || undefined} onOpenIdea={(id) => navigate(`/detail/ideas/ideas/${encodeURIComponent(id)}`)} />;
     if (['argument', 'hypothesis', 'reading', 'immersion'].includes(route.view)) return <AcademicToolsServerView key={active.id} spaceId={active.id} csrfToken={me.csrfToken} tool={route.view as 'argument' | 'hypothesis' | 'reading' | 'immersion'} />;
     if (route.view === 'dictionary') return <DictionaryServerView key={active.id} spaceId={active.id} csrfToken={me.csrfToken} />;
     if (route.view === 'deepResearch') return <DeepResearchServerView key={active.id} spaceId={active.id} csrfToken={me.csrfToken} initialReportId={new URLSearchParams(location.search).get('report') || undefined} />;
-    if (route.view === 'research' || route.view === 'debate' || route.view === 'gaps') return <StateOfArtServerView key={`${active.id}:${route.view}`} spaceId={active.id} csrfToken={me.csrfToken} initialTab={route.view === 'debate' ? 'debate' : route.view === 'gaps' ? 'gaps' : 'map'} />;
+    if (route.view === 'research' || route.view === 'debate' || route.view === 'gaps') return wrapNativeSurface(route.view === 'gaps' ? 'academic-gaps' : 'academic-themes', <StateOfArtServerView key={`${active.id}:${route.view}`} spaceId={active.id} csrfToken={me.csrfToken} initialTab={route.view === 'debate' ? 'debate' : route.view === 'gaps' ? 'gaps' : 'map'} />);
     if (route.view === 'workspace' || route.view === 'notes') return <PrivateNotesServerView key={active.id} spaceId={active.id} csrfToken={me.csrfToken} />;
     if (route.view === 'assistant') return <ConversationServerView key={active.id} spaceId={active.id} csrfToken={me.csrfToken} mode="assistant" />;
     if (route.view === 'nodi') return <ConversationServerView key={active.id} spaceId={active.id} csrfToken={me.csrfToken} mode="nodi" />;
@@ -542,15 +582,15 @@ export default function App() {
       // Keep the tab in the URL authoritative even when Settings is already
       // mounted.  Without a key, clicking the account glyph while viewing (for
       // example) Providers changed the URL but left the old tab on screen.
-      const settingsTab = new URLSearchParams(location.search).get('tab') || 'providers';
-      return <ServerSettingsView key={settingsTab} csrfToken={me.csrfToken} isAdmin={me.user?.role === 'admin'} theme={theme} initialTab={settingsTab as TabId} onThemeChange={setTheme} />;
+      const settingsTab = new URLSearchParams(location.search).get('tab') || 'server';
+      return <ServerSettingsView key={settingsTab} csrfToken={me.csrfToken} isAdmin={me.user?.role === 'admin'} theme={theme} initialTab={settingsTab as TabId} onThemeChange={setTheme} onLanguageChange={setLanguage} />;
     }
     if (type === 'primary_sources' && route.view === 'timeline') return <><span className="hidden" data-testid="vault-surface-genealogy-timeline" /><PrimarySourcesTimelineView loader={primarySourcesLoader} /></>;
     if (type === 'primary_sources' && route.view === 'archive') return <div data-testid="vault-surface-archive-items" className="h-full"><PrimarySourcesArchiveServerView spaceId={active.id} onOpen={(id) => navigate(`/detail/archive/archive-items/${encodeURIComponent(id)}`)} /></div>;
     if (type === 'primary_sources' && route.view === 'map') return <><span className="hidden" data-testid="vault-surface-genealogy-map" /><PrimarySourcesMapView loader={primarySourcesLoader} /></>;
     if (type === 'primary_sources' && route.view === 'relations') return <><span className="hidden" data-testid="vault-surface-relationships" /><PrimarySourcesRelationsView loader={primarySourcesLoader} /></>;
     if (type === 'primary_sources' && route.view === 'persons') return <><span className="hidden" data-testid="vault-surface-persons" /><PrimarySourcesPersonsView loader={primarySourcesLoader} readOnly onOpenExcerpt={(itemId) => navigate(`/detail/archive/archive-items/${encodeURIComponent(itemId)}`)} /></>;
-    if (surfaceForView(type, route.view as View)) return <VaultSurfaceView key={`${active.id}:${route.view}`} spaceId={active.id} surface={surfaceForView(type, route.view as View)!} vaultType={type} view={route.view as View} onOpenRecord={(collection, id) => navigate(`/detail/${route.view}/${encodeURIComponent(collection)}/${encodeURIComponent(id)}`)} />;
+    if (surfaceForView(type, route.view as View)) { const surface = surfaceForView(type, route.view as View)!; return wrapNativeSurface(surface, <VaultSurfaceView key={`${active.id}:${route.view}`} spaceId={active.id} surface={surface} vaultType={type} view={route.view as View} onOpenRecord={(collection, id) => navigate(`/detail/${route.view}/${encodeURIComponent(collection)}/${encodeURIComponent(id)}`)} />); }
     if (VIEW_COLLECTIONS[route.view as View]) return <CollectionView spaceId={active.id} view={route.view as View} />;
     return <UnavailableView view={route.view as View} />;
   })();
@@ -558,7 +598,7 @@ export default function App() {
     <header ref={setHeaderEl} className="app-titlebar relative flex h-11 shrink-0 items-center border-b border-neutral-800" data-platform="web">
       <button ref={setHeaderLogoEl} data-testid="sidebar-header-toggle" className="server-header-logo relative flex h-full shrink-0 items-center justify-center px-2 text-lg font-semibold tracking-tight transition-colors hover:bg-neutral-900/70 focus-visible:bg-neutral-900/70" style={{ width: sidebarWidth }} onClick={() => { if (matchMedia('(max-width: 760px)').matches) setDrawer((value) => !value); else setNavCollapsed((value) => !value); }} title={matchMedia('(max-width: 760px)').matches ? (drawer ? 'Cerrar navegación' : 'Abrir navegación') : (navCollapsed ? 'Mostrar el menú lateral' : 'Ocultar el menú lateral')} aria-label="Alternar navegación" aria-controls="server-sidebar-navigation" aria-expanded={matchMedia('(max-width: 760px)').matches ? drawer : !navCollapsed}><span data-testid="sidebar-header-brand" className="flex items-center justify-center gap-2 whitespace-nowrap"><img src={logoFor(type)} alt="" className={sidebarWidth <= SERVER_SIDEBAR_COMPACT_THRESHOLD ? 'h-6 w-6' : 'h-7 w-7'} data-testid="nodus-logo" data-vault-logo={type} /><span className={`server-header-brand-text ${sidebarWidth <= SERVER_SIDEBAR_COMPACT_THRESHOLD ? 'sr-only' : ''}`}>Nodus</span></span>{sidebarWidth > SERVER_SIDEBAR_COMPACT_THRESHOLD && <Icon name={navCollapsed ? 'chevronRight' : 'chevronLeft'} size={14} className="server-header-chevron absolute right-2 text-neutral-600" />}</button>
       <button ref={setVaultBadgeEl} data-vault-trigger data-tour="vault-badge" data-testid="header-vault-badge" data-badge-fits={vaultBadgePlacement ? String(vaultBadgePlacement.fits) : undefined} aria-label="Bóveda activa" aria-expanded={vaultsOpen} onClick={() => setVaultsOpen((value) => !value)} title="Bóveda activa" style={{ left: vaultBadgePlacement ? `${vaultBadgePlacement.left}px` : '50%', visibility: vaultBadgePlacement?.fits ? 'visible' : 'hidden' }} className="header-vault-badge absolute top-1/2 inline-flex -translate-y-1/2 items-center gap-1.5 rounded-full border border-indigo-700/60 bg-indigo-950/30 px-3 py-0.5 text-xs font-semibold uppercase tracking-wide text-indigo-200 transition-colors hover:border-indigo-500 hover:bg-indigo-900/40"><Icon name={vaultTypeIcon(type)} size={13} /><span className="hidden xl:inline">{vaultTypeLabel(type)}</span><Icon name="chevronDown" size={12} className={vaultsOpen ? 'rotate-180' : ''} /></button>
-      <div className="flex-1" /><div ref={setHeaderActionsEl} className="header-action-rail flex min-w-0 items-center justify-end gap-0.5 overflow-hidden pr-4" data-testid="header-actions"><button className="server-mobile-menu rounded-lg p-2 text-neutral-400 hover:bg-neutral-900" onClick={() => setDrawer(true)} aria-label="Abrir navegación"><Icon name="menu" /></button><ServerHeaderAction icon="search" label="Comandos" title="Paleta de comandos" onClick={() => openView('search')} dataTestId="header-search" className={activeView === 'search' ? 'bg-indigo-600 text-white' : ''} /><ServerHeaderAction icon="sparkles" label="Nodi" title="Abrir Nodi" onClick={() => navigate('/view/nodi')} dataTestId="header-nodi" className={activeView === 'nodi' ? 'bg-indigo-600 text-white' : ''} /><ServerHeaderAction icon="chat" label="Asistente" title="Abrir asistente de investigación" onClick={() => navigate('/view/assistant')} dataTestId="header-assistant" className={activeView === 'assistant' ? 'bg-indigo-600 text-white' : ''} /><ServerHeaderAction icon="settings" label="Ajustes" title="Ajustes" onClick={() => openView('settings')} dataTestId="header-settings" className={activeView === 'settings' ? 'bg-indigo-600 text-white' : ''} /><ServerHeaderAction icon={theme === 'dark' ? 'sun' : 'moon'} label={theme === 'dark' ? 'Usar tema claro' : 'Usar tema oscuro'} title={theme === 'dark' ? 'Usar tema claro' : 'Usar tema oscuro'} onClick={() => setTheme((value) => value === 'dark' ? 'light' : 'dark')} dataTestId="theme-toggle" /><ServerHeaderAction icon="user" label="Mi cuenta" title="Mi cuenta" onClick={() => { setDrawer(false); navigate('/view/settings?tab=server'); }} dataTestId="header-account" /></div>
+      <div className="flex-1" /><div ref={setHeaderActionsEl} className="header-action-rail flex min-w-0 items-center justify-end gap-0.5 overflow-hidden pr-4" data-testid="header-actions"><button className="server-mobile-menu rounded-lg p-2 text-neutral-400 hover:bg-neutral-900" onClick={() => setDrawer(true)} aria-label={t('Abrir navegación')}><Icon name="menu" /></button><ServerHeaderAction icon="search" label={t('Comandos')} title={t('Paleta de comandos')} onClick={() => openView('search')} dataTestId="header-search" className={activeView === 'search' ? 'bg-indigo-600 text-white' : ''} /><ServerHeaderAction icon="sparkles" label="Nodi" title={t('Abrir Nodi')} onClick={() => navigate('/view/nodi')} dataTestId="header-nodi" className={activeView === 'nodi' ? 'bg-indigo-600 text-white' : ''} /><ServerHeaderAction icon="chat" label={t('Asistente')} title={t('Abrir asistente de investigación')} onClick={() => navigate('/view/assistant')} dataTestId="header-assistant" className={activeView === 'assistant' ? 'bg-indigo-600 text-white' : ''} /><ServerHeaderAction icon="settings" label={t('Ajustes')} title={t('Ajustes')} onClick={() => navigate('/view/settings?tab=server')} dataTestId="header-settings" className={activeView === 'settings' ? 'bg-indigo-600 text-white' : ''} /><ServerHeaderAction icon={theme === 'dark' ? 'sun' : 'moon'} label={t(theme === 'dark' ? 'Usar tema claro' : 'Usar tema oscuro')} title={t(theme === 'dark' ? 'Usar tema claro' : 'Usar tema oscuro')} onClick={() => setTheme((value) => value === 'dark' ? 'light' : 'dark')} dataTestId="theme-toggle" /><ServerHeaderAction icon="user" label={t('Mi cuenta')} title={t('Mi cuenta')} onClick={() => { setDrawer(false); navigate('/view/settings?tab=server'); }} dataTestId="header-account" /></div>
       {vaultsOpen && active && <ServerVaultManager spaces={spaces} active={active} isAdmin={me.user?.role === 'admin'} csrfToken={me.csrfToken} onSelect={(id) => { localStorage.setItem(ACTIVE_VAULT_STORAGE_KEY, id); setActiveId(id); setVaultsOpen(false); navigate('/'); }} onChanged={refreshSpaces} onClose={() => setVaultsOpen(false)} />}
     </header>
     <div className="flex min-h-0 flex-1"><nav id="server-sidebar-navigation" className={`server-desktop-nav relative shrink-0 overflow-hidden border-r border-neutral-800 ${navCollapsed ? 'hidden' : ''}`} data-testid="resizable-sidebar" data-sidebar-compact={sidebarWidth <= SERVER_SIDEBAR_COMPACT_THRESHOLD ? 'true' : 'false'} data-drawer={drawer ? 'true' : 'false'}><Sidebar type={type} activeView={(activeView === 'debate' || activeView === 'gaps' ? 'research' : activeView) as View} compact={sidebarWidth <= SERVER_SIDEBAR_COMPACT_THRESHOLD} collapsedGroups={collapsedGroups} sidebarOrder={profile?.workspace.sidebarOrder || []} sidebarHidden={profile?.workspace.sidebarHidden || []} onToggleGroup={(id) => setCollapsedGroups((current) => { const next = new Set(current); if (next.has(id)) next.delete(id); else next.add(id); return next; })} onNavigate={openView} /><button data-testid="sidebar-resize-handle" type="button" className="server-sidebar-resizer" onPointerDown={resize} onKeyDown={resizeWithKeyboard} onDoubleClick={() => setSidebarWidth(SERVER_SIDEBAR_DEFAULT_WIDTH)} aria-label="Cambiar el ancho del menú lateral" title="Arrastra para cambiar el ancho. Usa las flechas o doble clic para restablecerlo." /></nav><main className="server-main min-w-0 flex-1" id="main-content"><Suspense fallback={<Loading />}>{content}</Suspense></main></div>

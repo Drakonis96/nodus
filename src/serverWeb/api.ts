@@ -52,6 +52,18 @@ export const api = {
   },
   detail: (spaceId: string, collection: string, id: string) =>
     request<JsonRecord>(`/api/v1/spaces/${encoded(spaceId)}/${encoded(collection)}/${encoded(id)}`),
+  nativeContentContract: (spaceId: string) => request<{ schemaVersion: number; revision: number; tables: Record<string, { key: string[]; columns: string[] }> }>(`/api/v2/vaults/${encoded(spaceId)}/content-contract`),
+  nativeContentList: (spaceId: string, table: string, params: Record<string, string> = {}) => request<{ table: string; rows: JsonRecord[]; items: JsonRecord[]; total: number; limit: number; offset: number; hasMore: boolean; revision: number }>(`/api/v2/vaults/${encoded(spaceId)}/content/${encoded(table)}?${new URLSearchParams(params).toString()}`),
+  nativeContentGet: (spaceId: string, table: string, key: Record<string, unknown>) => request<{ table: string; row: JsonRecord; revision: number }>(`/api/v2/vaults/${encoded(spaceId)}/content/${encoded(table)}/${encoded(String(Object.values(key)[0] ?? ''))}?key=${encodeURIComponent(JSON.stringify(key))}`),
+  nativeContentCreate: (spaceId: string, table: string, row: JsonRecord, expectedRevision: number, idempotencyKey: string, csrfToken?: string) => request<{ row: JsonRecord | null; revision: number }>(`/api/v2/vaults/${encoded(spaceId)}/content/${encoded(table)}`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json', ...(csrfToken ? { 'X-CSRF-Token': csrfToken } : {}) }, body: JSON.stringify({ row, expectedRevision, idempotencyKey }),
+  }),
+  nativeContentUpdate: (spaceId: string, table: string, key: Record<string, unknown>, row: JsonRecord, expectedRevision: number, idempotencyKey: string, csrfToken?: string) => request<{ row: JsonRecord | null; revision: number }>(`/api/v2/vaults/${encoded(spaceId)}/content/${encoded(table)}/${encoded(String(Object.values(key)[0] ?? ''))}`, {
+    method: 'PATCH', headers: { 'Content-Type': 'application/json', ...(csrfToken ? { 'X-CSRF-Token': csrfToken } : {}) }, body: JSON.stringify({ key, row, expectedRevision, idempotencyKey }),
+  }),
+  nativeContentDelete: (spaceId: string, table: string, key: Record<string, unknown>, expectedRevision: number, idempotencyKey: string, csrfToken?: string) => request<{ row: null; revision: number }>(`/api/v2/vaults/${encoded(spaceId)}/content/${encoded(table)}/${encoded(String(Object.values(key)[0] ?? ''))}`, {
+    method: 'DELETE', headers: { 'Content-Type': 'application/json', ...(csrfToken ? { 'X-CSRF-Token': csrfToken } : {}) }, body: JSON.stringify({ key, expectedRevision, idempotencyKey }),
+  }),
   /** Complete published database projection used by the read-only Analysis workbench. */
   databaseAnalysis: (spaceId: string, id: string) =>
     request<JsonRecord>(`/api/v1/spaces/${encoded(spaceId)}/databases/${encoded(id)}/analysis`),
@@ -175,6 +187,7 @@ export const api = {
   }),
   aiJob: (jobId: string) => request<{ job: AIJob }>(`/api/v2/me/jobs/${encoded(jobId)}`),
   aiJobs: () => request<{ jobs: AIJob[] }>('/api/v2/me/jobs'),
+  deleteAIJob: (jobId: string, csrfToken?: string) => request<{ ok: boolean }>(`/api/v2/me/jobs/${encoded(jobId)}`, { method: 'DELETE', headers: csrfToken ? { 'X-CSRF-Token': csrfToken } : {} }),
   cancelAIJob: (jobId: string, csrfToken?: string) => request<{ job: AIJob }>(`/api/v2/me/jobs/${encoded(jobId)}/cancel`, { method: 'POST', headers: csrfToken ? { 'X-CSRF-Token': csrfToken } : {} }),
   retryAIJob: (jobId: string, csrfToken?: string) => request<{ job: AIJob }>(`/api/v2/me/jobs/${encoded(jobId)}/retry`, { method: 'POST', headers: csrfToken ? { 'X-CSRF-Token': csrfToken } : {} }),
   contextPackage: (spaceId: string, query: string, csrfToken?: string) => request<{ sections?: JsonRecord[]; citationScheme?: JsonRecord }>(`/api/v1/spaces/${encoded(spaceId)}/context`, {

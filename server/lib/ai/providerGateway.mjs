@@ -1,7 +1,7 @@
 import { redactStructured, redactText } from './redact.mjs';
 
 const CAPABILITIES = new Set([
-  'assistant', 'nodi', 'content-query', 'deep-research', 'dictionary', 'idea-analysis',
+  'assistant', 'nodi', 'content-query', 'deep-research', 'database-deep-research', 'dictionary', 'idea-analysis',
   'relation-generation', 'author-tools', 'argument-map', 'academic', 'database', 'teaching', 'study',
 ]);
 

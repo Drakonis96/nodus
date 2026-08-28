@@ -31,11 +31,12 @@ test('primary-source dossier exposes normalized text/evidence while excluding lo
   assert.match(corpus, /profile: rows\(snapshot, 'archive_item_profiles'\)/);
   assert.match(corpus, /file_id: _fileId/);
   assert.match(surfaces, /function ArchiveItemDetailRich/);
-  assert.match(surfaces, /labels:.*Fuente.*Descripción.*Texto.*Evidencias.*Análisis.*Notas.*Historial/);
+  assert.match(surfaces, /labels:.*Fuente.*Descripción.*Texto.*Evidencias.*Análisis.*Historial/);
+  assert.doesNotMatch(surfaces, /labels:.*Notas/);
   assert.match(surfaces, /data-testid="archive-item-dossier-rich"/);
   assert.match(surfaces, /Versiones de texto/);
   assert.match(surfaces, /Evidencias vinculadas/);
-  assert.match(surfaces, /onOpenRecord\?\.\('persons'/);
+  assert.doesNotMatch(surfaces, /Notas privadas/);
 });
 
 test('editing vault surfaces remain publication-safe and never claim server mutation', async () => {
@@ -43,7 +44,7 @@ test('editing vault surfaces remain publication-safe and never claim server muta
   const surfaces = await read('src/serverWeb/vaults/index.tsx');
   assert.match(snapshot, /'archive_text_versions', 'archive_text_segments'/);
   assert.doesNotMatch(snapshot, /'archive_item_files'/);
-  assert.match(surfaces, /Notas privadas/);
+  assert.doesNotMatch(surfaces, /Notas privadas/);
   assert.match(surfaces, /El historial local.*permanecen privados/);
   assert.match(surfaces, /function DatabaseDetail/);
   assert.match(surfaces, /attachments/);

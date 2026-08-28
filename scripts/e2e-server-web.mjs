@@ -142,6 +142,7 @@ await withServer({ label: 'server-web-e2e', ai: true }, async (server) => {
     await page.waitForTimeout(250);
     await page.screenshot({ path: path.join(output, '02b-vault-switcher-desktop.png') });
     await page.getByTestId('header-vault-badge').click();
+    await page.getByTestId('vault-switcher').waitFor({ state: 'hidden' });
 
     // The Server uses the canonical Desktop navigation ids, not a parallel
     // collection menu invented for the web surface.
@@ -267,6 +268,9 @@ await withServer({ label: 'server-web-e2e', ai: true }, async (server) => {
     assert.ok(await page.getByTestId('library-document-row').count() > 0, 'Library must paint published rows before capture');
     await page.locator('[data-testid="library-list"] button').first().click();
     await waitForSettled(page, 'library-reader');
+    await page.getByTestId('library-reader-original-frame').waitFor();
+    assert.equal(await page.getByTestId('library-reader-original-frame').isVisible(), true, 'published original opens immediately');
+    await page.getByTestId('library-reader-source-picker').selectOption('clean');
     await page.getByTestId('library-reader-document').waitFor();
     await page.screenshot({ path: path.join(output, '10-library-reader-desktop.png'), fullPage: true });
     await page.getByTestId('library-reader-document').locator('p').first().evaluate((paragraph) => {
