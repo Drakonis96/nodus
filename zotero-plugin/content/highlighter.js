@@ -4,7 +4,7 @@
  * getSortIndex) and creating them through the reader's annotationManager (the
  * only path that both persists AND renders). window.NodusHighlighter.
  *
- * The reader recipe (verified in Zotero 9):
+ * The reader recipe (verified in Zotero 9 and 10):
  *  - reader._internalReader._primaryView._pdfPages is a DICT keyed by pageIndex
  *    (NOT an array); each page has `.chars` (structured chars) + `.viewBox`.
  *  - each char: {c, u, rect:[x1,y1,x2,y2], inlineRect, rotation, lineBreakAfter}.

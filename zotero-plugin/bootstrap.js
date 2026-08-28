@@ -40,7 +40,7 @@ async function disableBackgroundUpdates() {
     const { AddonManager } = ChromeUtils.importESModule("resource://gre/modules/AddonManager.sys.mjs");
     const addon = await AddonManager.getAddonByID(PLUGIN_ID);
     if (addon && addon.applyBackgroundUpdates !== AddonManager.AUTOUPDATE_DISABLE) {
-      // Zotero 9 rejects a plugin whose manifest omits update_url. Keep the
+      // Zotero 9 and 10 reject a plugin whose manifest omits update_url. Keep the
       // mandatory feed, but opt only Nodus out of background updates so the
       // documented manual install/update flow remains truthful.
       addon.applyBackgroundUpdates = AddonManager.AUTOUPDATE_DISABLE;

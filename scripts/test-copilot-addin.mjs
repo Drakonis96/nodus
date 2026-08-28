@@ -99,7 +99,7 @@ try {
   assert.match(taskpaneHtml, /data-mode="chat"/);
   assert.match(taskpaneHtml, /data-mode="prompts"[\s\S]*?<span class="seg-label">AI Edition<\/span>/);
   assert.equal((taskpaneHtml.match(/class="seg-icon"/g) || []).length, 6, 'every pane tab must have an icon');
-  for (const id of ['synonymControls', 'synonymContext', 'generateSynonyms', 'synonymStale', 'synonymRounds']) {
+  for (const id of ['searchModel', 'synonymControls', 'synonymModel', 'synonymContext', 'generateSynonyms', 'synonymStale', 'synonymRounds']) {
     assert.match(taskpaneHtml, new RegExp(`id="${id}"`), `Synonyms UI must contain ${id}`);
   }
   for (const id of ['promptControls', 'promptStyle', 'promptModel', 'promptSelection', 'applyPrompt', 'promptOutput', 'promptOutputStale', 'copyPromptOutput', 'pastePromptOutput']) {
@@ -136,6 +136,10 @@ try {
   assert.match(taskpaneJs, /\\uFFFD\\u25A1\\u2610\\u2612/);
   assert.match(taskpaneJs, /\/api\/prompts\/apply/);
   assert.match(taskpaneJs, /\/api\/synonyms/);
+  assert.match(taskpaneJs, /text: text, model: selectedModelFrom\(els\.searchModel\)/, 'Ideas sends the selected model');
+  assert.match(taskpaneJs, /ideaId: ideaId,[\s\S]*?model: selectedModelFrom\(els\.searchModel\)/, 'Insert with AI uses the Ideas model selector');
+  assert.match(taskpaneJs, /var selectedModel = selectedModelFrom\(els\.synonymModel\);[\s\S]*?model: selectedModel/, 'Synonyms sends the selected model');
+  assert.match(taskpaneJs, /\[els\.promptModel, els\.searchModel, els\.synonymModel\]\.forEach\(fillModelSelect\)/, 'the writing surfaces share the configured model catalogue');
   assert.match(taskpaneJs, /WordApiDesktop', '1\.2'/, 'current-page chat must be capability-gated');
   assert.match(taskpaneJs, /var pages = selection\.pages;/, 'current-page chat must read the page containing the Word selection');
   assert.match(taskpaneJs, /var pageRange = page\.getRange\(\);/, 'current-page chat must send the complete page range');
@@ -277,6 +281,9 @@ try {
   assert.match(copilotChatSource, /No inventes contenido ausente del contexto/, 'chat must stay grounded in the selected Word context');
   assert.match(referencesJs, /fingerprint === externalStateFingerprint/, 'identical Writer polling snapshots must not rebuild the citation composer');
   assert.match(serverSource, /suggestStudySynonyms\(\{/, 'the Word endpoint must reuse the workspace synonym engine');
+  assert.match(serverSource, /composeFromSelection\(\{[\s\S]*?model: modelRef\(body\.model\)/, 'selection actions must honor the Ideas/Passages model selector');
+  assert.match(serverSource, /composeCopilotIdeaInsertion\(\{[\s\S]*?model: modelRef\(body\.model\)/, 'Insert with AI must honor the Ideas model selector');
+  assert.match(serverSource, /suggestStudySynonyms\(\{[\s\S]*?model: modelRef\(body\.model\)/, 'synonyms must honor their model selector');
   assert.match(serverSource, /destination: 'ideas'/);
   assert.match(serverSource, /destination === 'citation-styles'[\s\S]*destination: 'library-citation-styles'/);
   assert.match(appSource, /target\.destination === 'library-citation-styles'[\s\S]*citationStyles: true[\s\S]*setView\('library'\)/);

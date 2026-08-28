@@ -1,7 +1,7 @@
 {
   "manifest_version": 2,
   "name": "Nodus for Zotero",
-  "version": "5.0.5",
+  "version": "5.0.6",
   "license": "AGPL-3.0-only",
   "description": "Evidence-grounded research assistant for Zotero with full-text semantic retrieval, audited citations, OCR and visual document understanding.",
   "author": "Nodus",
@@ -17,7 +17,7 @@
       "id": "nodus-zotero@nodus.app",
       "update_url": "https://github.com/Drakonis96/nodus/releases/latest/download/updates.json",
       "strict_min_version": "9.0",
-      "strict_max_version": "9.*"
+      "strict_max_version": "10.*"
     }
   }
 }

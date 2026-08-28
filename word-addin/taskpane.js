@@ -774,7 +774,12 @@
         return api('/api/insert', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ ideaId: ideaId, paragraphText: values[0], selectionText: values[1] }),
+          body: JSON.stringify({
+            ideaId: ideaId,
+            paragraphText: values[0],
+            selectionText: values[1],
+            model: selectedModelFrom(els.searchModel),
+          }),
         });
       })
       .then(function (result) {
@@ -862,7 +867,7 @@
       api('/api/relations', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text: text }),
+        body: JSON.stringify({ text: text, model: selectedModelFrom(els.searchModel) }),
       })
         .then(function (data) {
           if (seq !== requestSeq) return;
@@ -1036,7 +1041,12 @@
         return api('/api/compose', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ mode: mode, selectionText: selectionText, paragraphText: paragraphText }),
+          body: JSON.stringify({
+            mode: mode,
+            selectionText: selectionText,
+            paragraphText: paragraphText,
+            model: selectedModelFrom(els.searchModel),
+          }),
         });
       })
       .then(function (result) {
@@ -1093,7 +1103,11 @@
   }
 
   function selectedPromptModel() {
-    var value = els.promptModel.value;
+    return selectedModelFrom(els.promptModel);
+  }
+
+  function selectedModelFrom(select) {
+    var value = select && select.value;
     for (var i = 0; i < promptModels.length; i++) {
       if (promptModelValue(promptModels[i]) === value) {
         return { provider: promptModels[i].provider, model: promptModels[i].model };
@@ -1209,7 +1223,6 @@
 
   function fillPromptCatalogue(data) {
     var previousStyle = els.promptStyle.value;
-    var previousModel = els.promptModel.value;
     promptStyles = Array.isArray(data.styles) ? data.styles : [];
     promptModels = Array.isArray(data.models) ? data.models : [];
 
@@ -1234,41 +1247,46 @@
       if (wantedStyle) els.promptStyle.value = wantedStyle;
     }
 
-    els.promptModel.innerHTML = '';
-    if (!promptModels.length) {
-      var noModel = document.createElement('option');
-      noModel.value = '';
-      noModel.textContent = T('promptNoModels');
-      els.promptModel.appendChild(noModel);
-      els.promptModel.disabled = true;
-    } else {
-      els.promptModel.disabled = false;
+    function fillModelSelect(select) {
+      var previousModel = select.value;
+      select.innerHTML = '';
+      if (!promptModels.length) {
+        var noModel = document.createElement('option');
+        noModel.value = '';
+        noModel.textContent = T('promptNoModels');
+        select.appendChild(noModel);
+        select.disabled = true;
+        return;
+      }
+      select.disabled = false;
       promptModels.forEach(function (model) {
         var option = document.createElement('option');
         option.value = promptModelValue(model);
         option.textContent = model.label || (model.provider + ' · ' + model.model);
-        els.promptModel.appendChild(option);
+        select.appendChild(option);
       });
       var wantedModel = promptModels.some(function (model) { return promptModelValue(model) === previousModel; })
         ? previousModel
         : promptModelValue(data.defaultModel);
-      if (wantedModel) els.promptModel.value = wantedModel;
+      if (wantedModel) select.value = wantedModel;
     }
+    [els.promptModel, els.searchModel, els.synonymModel].forEach(fillModelSelect);
     renderPromptDescription();
+    updateSynonymState();
   }
 
-  function loadPromptCatalogue() {
+  function loadPromptCatalogue(silent) {
     var seq = ++promptRequestSeq;
-    setStatus(T('promptLoading'), '');
+    if (!silent) setStatus(T('promptLoading'), '');
     return api('/api/prompts')
       .then(function (data) {
         if (seq !== promptRequestSeq) return;
         fillPromptCatalogue(data || {});
-        checkHealth();
+        if (!silent) checkHealth();
       })
       .catch(function (error) {
         if (seq !== promptRequestSeq) return;
-        setStatus(T('promptLoadError') + error.message, 'err');
+        if (!silent) setStatus(T('promptLoadError') + error.message, 'err');
         promptStyles = [];
         promptModels = [];
         fillPromptCatalogue({ styles: [], models: [] });
@@ -1388,7 +1406,7 @@
     var stale = synonymStateIsStale();
     els.synonymStale.textContent = stale ? T('synonymStale') : '';
     els.synonymStale.hidden = !stale;
-    els.generateSynonyms.disabled = synonymGenerating || !synonymLiveContext;
+    els.generateSynonyms.disabled = synonymGenerating || !synonymLiveContext || !selectedModelFrom(els.synonymModel);
     els.synonymGenerateLabel.textContent = synonymRounds.length && !stale
       ? T('synonymRegenerate')
       : T('synonymGenerate');
@@ -1470,6 +1488,11 @@
   }
 
   function generateSynonymRound() {
+    var selectedModel = selectedModelFrom(els.synonymModel);
+    if (!selectedModel) {
+      setStatus(T('promptNoModels'), 'err');
+      return;
+    }
     var requested = null;
     var seq = ++synonymRequestSeq;
     setSynonymGenerating(true);
@@ -1498,6 +1521,7 @@
             selectionFrom: context.selectionFrom,
             selectionTo: context.selectionTo,
             previousAlternatives: previous,
+            model: selectedModel,
           }),
         });
       })
@@ -1608,7 +1632,7 @@
     }
     if (synonymMode) {
       refreshSynonymSelection().then(function (context) {
-        if (context && !synonymRequestContext && !synonymGenerating) generateSynonymRound();
+        if (context && selectedModelFrom(els.synonymModel) && !synonymRequestContext && !synonymGenerating) generateSynonymRound();
       });
       startPromptSelectionPolling();
       return;
@@ -1692,6 +1716,7 @@
     els.autoToggle = document.getElementById('autoToggle');
     els.searchBox = document.getElementById('searchBox');
     els.searchBtn = document.getElementById('searchBtn');
+    els.searchModel = document.getElementById('searchModel');
     els.searchControls = document.getElementById('searchControls');
     els.searchModeEl = document.getElementById('searchMode');
     els.analysisControls = document.getElementById('analysisControls');
@@ -1717,6 +1742,7 @@
     els.copyPromptOutput = document.getElementById('copyPromptOutput');
     els.pastePromptOutput = document.getElementById('pastePromptOutput');
     els.synonymControls = document.getElementById('synonymControls');
+    els.synonymModel = document.getElementById('synonymModel');
     els.synonymContext = document.getElementById('synonymContext');
     els.refreshSynonymSelection = document.getElementById('refreshSynonymSelection');
     els.generateSynonyms = document.getElementById('generateSynonyms');
@@ -1781,6 +1807,8 @@
     var promptProposalLabel = els.promptControls.querySelector('.prompt-output-head strong');
     if (promptStyleLabel) promptStyleLabel.textContent = T('promptStyle');
     if (promptModelLabel) promptModelLabel.textContent = T('promptModel');
+    var contextualModelLabels = document.querySelectorAll('[data-model-label]');
+    for (var mli = 0; mli < contextualModelLabels.length; mli++) contextualModelLabels[mli].textContent = T('promptModel');
     if (promptBlockLabel) promptBlockLabel.textContent = T('promptSelection');
     if (promptProposalLabel) promptProposalLabel.textContent = T('promptProposal');
     els.promptSelection.textContent = T('promptSelectionEmpty');
@@ -1866,6 +1894,16 @@
     els.autoToggle.onchange = function () { autoAnalyze = els.autoToggle.checked; };
     els.promptStyle.onchange = function () { clearPromptOutput(); renderPromptDescription(); };
     els.promptModel.onchange = function () { clearPromptOutput(); updatePromptGenerateState(); };
+    els.searchModel.onchange = function () {
+      lastHash = '';
+      if (searchMode === 'ideas' && !els.searchBox.value.trim()) analyze(true);
+    };
+    els.synonymModel.onchange = function () {
+      synonymRounds = [];
+      synonymRequestContext = null;
+      synonymModelLabel = '';
+      renderSynonymRounds();
+    };
     els.refreshPromptSelection.onclick = refreshPromptSelection;
     els.applyPrompt.onclick = runSavedPrompt;
     els.copyPromptOutput.onclick = copyPromptOutput;
@@ -1916,6 +1954,7 @@
     });
     if (chatController) chatController.init();
 
+    loadPromptCatalogue(true);
     checkHealth();
     var requestedMode = window.location.hash.indexOf('references') >= 0 ? 'references' : 'ideas';
     if (requestedMode === 'references') {

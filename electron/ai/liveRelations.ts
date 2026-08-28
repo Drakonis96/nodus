@@ -717,11 +717,12 @@ export async function composeCopilotIdeaInsertion(input: {
   ideaId: string;
   paragraphText: string;
   selectionText?: string;
+  model?: ModelRef | null;
 }): Promise<CopilotInsertionResult> {
   const detail = getCopilotIdeaDetail(input.ideaId);
   if (!detail) throw new Error('No se encontró la idea en Nodus.');
   const settings = getSettings();
-  const model = settings.synthesisModel;
+  const model = input.model ?? settings.synthesisModel;
   const authorYear = detail.authorYear ?? detail.occurrences[0]?.authorYear ?? null;
   const source = detail.occurrences[0] ?? null;
   const text = await completeText(

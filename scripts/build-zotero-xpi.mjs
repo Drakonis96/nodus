@@ -14,7 +14,7 @@
 // Outputs to dist-zotero/:
 //   nodus-zotero.xpi   — fixed-name packaged add-on (manifest.json at root)
 //   updates.json       — release metadata pointing at the tagged XPI with a
-//                        SHA-256 integrity hash. Zotero 9 requires update_url
+//                        SHA-256 integrity hash. Zotero 9 and 10 require update_url
 //                        even when background updates are disabled per add-on.
 import { createHash } from 'node:crypto';
 import { cpSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
@@ -59,7 +59,7 @@ export function buildXpi() {
   const version = manifest.version;
   if (!id || !version) throw new Error('manifest.json missing applications.zotero.id or version');
   if (!/^https:\/\//.test(app.update_url ?? '')) {
-    throw new Error('manifest.json missing the HTTPS applications.zotero.update_url required by Zotero 9');
+    throw new Error('manifest.json missing the HTTPS applications.zotero.update_url required by Zotero 9 and 10');
   }
 
   const staging = mkdtempSync(path.join(os.tmpdir(), 'nodus-zotero-xpi-'));

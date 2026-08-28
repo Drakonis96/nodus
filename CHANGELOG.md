@@ -1,5 +1,27 @@
 # Changelog
 
+## 5.0.6 — 2026-08-28
+
+Nodus 5.0.6 brings verifiable Deep Research to database vaults and extends the
+research workflow across Word, Zotero, Chrome, Compass and Nodus Browser.
+
+- Added Data Deep Research with editable previews, reproducible snapshots,
+  traceable evidence, explicit limitations and Markdown, PDF and ZIP exports.
+- Added contextual synonyms and a grounded per-document chat to Nodus Copilot.
+- Made Nodus for Zotero retrieve across complete selected attachments, audit
+  exact citations, interpret visual pages and stream persistent conversations.
+- Restored installation and startup compatibility for the standalone plugin on
+  Zotero 10 while retaining Zotero 9 support.
+- Expanded the Chrome connector with reviewed metadata, batch capture,
+  background transfers and duplicate-safe Library ingestion.
+- Improved Compass author matching across diacritics, initials and name order,
+  and added a one-click action to clear a completed search.
+- Made Nodus Bookmarks cards compact, directly clickable and safely deletable.
+- Added edit and delete actions for custom writing-improvement prompts while
+  preserving their model settings and protecting built-in prompts.
+- Added the 5.0.6 changes to the What's New modal in all eight interface
+  languages.
+
 ## 5.0.5 — 2026-08-27
 
 Nodus 5.0.5 refines the Word and LibreOffice copilot pane: it stops discarding

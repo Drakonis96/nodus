@@ -377,7 +377,7 @@ export async function handleRequest(req: IncomingMessage, res: ServerResponse, p
   try {
     if (urlPath === '/api/relations' && req.method === 'POST') {
       const body = (await readJsonBody(req)) as { text?: string; model?: unknown };
-      const result = await analyzeText(String(body.text ?? ''), (body.model ?? null) as never);
+      const result = await analyzeText(String(body.text ?? ''), modelRef(body.model));
       sendJson(res, 200, result);
       return;
     }
@@ -394,12 +394,13 @@ export async function handleRequest(req: IncomingMessage, res: ServerResponse, p
       return;
     }
     if (urlPath === '/api/compose' && req.method === 'POST') {
-      const body = (await readJsonBody(req)) as { mode?: string; selectionText?: string; paragraphText?: string };
+      const body = (await readJsonBody(req)) as { mode?: string; selectionText?: string; paragraphText?: string; model?: unknown };
       const mode: CopilotComposeMode = body.mode === 'rewrite' || body.mode === 'counter' ? body.mode : 'expand';
       const result = await composeFromSelection({
         mode,
         selectionText: String(body.selectionText ?? ''),
         paragraphText: String(body.paragraphText ?? ''),
+        model: modelRef(body.model),
       });
       sendJson(res, 200, result);
       return;
@@ -415,6 +416,7 @@ export async function handleRequest(req: IncomingMessage, res: ServerResponse, p
         previousAlternatives: Array.isArray(body.previousAlternatives)
           ? body.previousAlternatives.map(String).slice(-50)
           : [],
+        model: modelRef(body.model),
       });
       sendJson(res, 200, result);
       return;
@@ -519,7 +521,7 @@ export async function handleRequest(req: IncomingMessage, res: ServerResponse, p
       return;
     }
     if (urlPath === '/api/insert' && req.method === 'POST') {
-      const body = (await readJsonBody(req)) as { ideaId?: string; paragraphText?: string; selectionText?: string };
+      const body = (await readJsonBody(req)) as { ideaId?: string; paragraphText?: string; selectionText?: string; model?: unknown };
       if (!body.ideaId) {
         sendJson(res, 400, { error: copilotText('Falta ideaId.', 'Missing ideaId.') });
         return;
@@ -528,6 +530,7 @@ export async function handleRequest(req: IncomingMessage, res: ServerResponse, p
         ideaId: body.ideaId,
         paragraphText: String(body.paragraphText ?? ''),
         selectionText: String(body.selectionText ?? ''),
+        model: modelRef(body.model),
       });
       sendJson(res, 200, insertion);
       return;

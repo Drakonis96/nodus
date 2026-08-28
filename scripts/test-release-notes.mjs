@@ -24,15 +24,33 @@ try {
   );
 
   const { RELEASE_NOTES, releaseNotesForMajor, compareVersions } = await import(pathToFileURL(bundlePath).href);
-  // 5.0.5 ships a single highlight: from the outside, the copilot work is one thing.
+  // 5.0.6 covers every user-visible change merged after 5.0.5, with the
+  // independent server-web parity branch deliberately absent.
   const currentRelease = RELEASE_NOTES[0];
-  assert.equal(currentRelease?.version, '5.0.5');
-  assert.equal(currentRelease?.date, '2026-08-27');
-  assert.equal(currentRelease?.highlights.length, 1);
-  assert.deepEqual(currentRelease?.highlights.map((highlight) => highlight.scope), ['plugin']);
-  assert.match(currentRelease?.highlights[0]?.en ?? '', /Nodus Copilot for Word and LibreOffice/);
+  assert.equal(currentRelease?.version, '5.0.6');
+  assert.equal(currentRelease?.date, '2026-08-28');
+  assert.equal(currentRelease?.highlights.length, 7);
+  assert.deepEqual(currentRelease?.highlights.map((highlight) => highlight.scope), [
+    'plugin', 'plugin', 'plugin', 'browser', 'databases', 'toolkit', 'estudio',
+  ]);
+  for (const phrase of [
+    /gains Synonyms and Chat/,
+    /complete content of every selected attachment/,
+    /review and correct the title/,
+    /more compact cards/,
+    /Data Deep Research/,
+    /recognizes author searches more accurately/,
+    /prompts can now be edited and deleted/,
+  ]) assert.ok(currentRelease?.highlights.some((highlight) => phrase.test(highlight.en)));
 
-  // 5.0.4 keeps the seven highlights it shipped with underneath 5.0.5.
+  // 5.0.5 keeps the single copilot-pane highlight it shipped with.
+  const copilotRelease = RELEASE_NOTES.find((note) => note.version === '5.0.5');
+  assert.equal(copilotRelease?.date, '2026-08-27');
+  assert.equal(copilotRelease?.highlights.length, 1);
+  assert.deepEqual(copilotRelease?.highlights.map((highlight) => highlight.scope), ['plugin']);
+  assert.match(copilotRelease?.highlights[0]?.en ?? '', /Nodus Copilot for Word and LibreOffice/);
+
+  // 5.0.4 keeps the seven highlights it shipped with underneath 5.0.6.
   const serverWebRelease = RELEASE_NOTES.find((note) => note.version === '5.0.4');
   assert.equal(serverWebRelease?.date, '2026-08-27');
   assert.equal(serverWebRelease?.highlights.length, 7);

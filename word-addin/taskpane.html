@@ -72,6 +72,7 @@
           <button id="searchBtn" class="btn icon" type="button" title="Search">⌕</button>
         </div>
         <div id="analysisControls">
+          <label class="prompt-field mode-model-field"><span data-model-label>Model</span><select id="searchModel"></select></label>
           <div class="toolbar">
             <label class="auto"><input type="checkbox" id="autoToggle" checked /> Auto</label>
             <button id="analyzeBtn" class="btn primary" type="button">Analyze paragraph</button>
@@ -168,6 +169,7 @@
             <div><strong>Synonyms and rephrasings</strong><small>Select one or more words. Nodus uses the complete sentence to preserve meaning and grammar.</small></div>
             <button id="refreshSynonymSelection" class="btn tiny" type="button" title="Refresh selected text" aria-label="Refresh selected text">↻</button>
           </div>
+          <label class="prompt-field"><span data-model-label>Model</span><select id="synonymModel"></select></label>
           <div class="synonym-selection-block">
             <span class="synonym-block-label">Sentence context</span>
             <div id="synonymContext" class="synonym-context placeholder">Select one or more words in Word.</div>
