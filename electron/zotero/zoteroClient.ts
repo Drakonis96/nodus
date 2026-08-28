@@ -1,5 +1,5 @@
 import { fileURLToPath } from 'node:url';
-import type { ZoteroAttachmentInfo, ZoteroCollection, ZoteroItem, ZoteroLibrary, WorkMeta } from '@shared/types';
+import type { ZoteroAttachmentInfo, ZoteroCollection, ZoteroItem, ZoteroLibrary, ZoteroPingResult, WorkMeta } from '@shared/types';
 
 // Read-only client for Zotero's local API: the desktop app's local implementation
 // of Web API v3, served from port 23119 since Zotero 7. There is no "Zotero 7 API" —
@@ -103,21 +103,19 @@ export async function libraries(): Promise<ZoteroLibrary[]> {
 /**
  * Verify the local API is reachable. The local API has no auth and uses users/0,
  * so we just confirm a 200 and read the library version header.
+ *
+ * `message` stays technical (the transport error, or the HTTP status): the renderer
+ * localizes the actionable part from `reason`, so no Spanish is written here.
  */
-export async function ping(): Promise<{ ok: boolean; userId?: string; version?: number; message?: string }> {
+export async function ping(): Promise<ZoteroPingResult> {
   try {
     const res = await zfetch(`${BASE}/users/${LOCAL_USER_ID}/items?limit=1`);
-    if (!res.ok) {
-      const hint =
-        res.status === 403
-          ? 'Habilita "Permitir que otras aplicaciones se comuniquen con Zotero" en Ajustes › Avanzado.'
-          : `HTTP ${res.status}`;
-      return { ok: false, message: hint };
-    }
+    if (!res.ok) return { ok: false, message: `HTTP ${res.status}`, reason: res.status === 403 ? 'forbidden' : 'http' };
     const v = res.headers.get('Last-Modified-Version');
     return { ok: true, userId: LOCAL_USER_ID, version: v ? parseInt(v, 10) : 0 };
   } catch (e) {
-    return { ok: false, message: (e as Error).message };
+    // Nothing answered on the local port: Zotero is closed, or its local API is off.
+    return { ok: false, message: (e as Error).message, reason: 'unreachable' };
   }
 }
 

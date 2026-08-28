@@ -2028,6 +2028,8 @@ export const PT: Record<string, string> = {
   'Conectado (userID {id})': 'Ligado (userID {id})',
   'No disponible: {msg}': 'Não disponível: {msg}',
   'sin respuesta': 'sem resposta',
+  'Comprueba que Zotero esté abierto y que «Permitir que otras aplicaciones de este ordenador se comuniquen con Zotero» esté activado en los ajustes Avanzados de Zotero.':
+    'Verifique se o Zotero está aberto e se «Permitir que outras aplicações deste computador comuniquem com o Zotero» está ativado nas definições Avançadas do Zotero.',
   'Elige las colecciones a monitorizar. Se incorporan metadatos; los análisis se lanzan manualmente salvo que actives automatización en Ajustes.':
     'Escolha as coleções a monitorizar. Os metadados são incorporados; as análises são iniciadas manualmente, exceto se ativar a automatização nas Definições.',
   'ítems': 'itens',
