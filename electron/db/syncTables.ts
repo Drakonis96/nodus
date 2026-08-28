@@ -323,6 +323,7 @@ const NOT_SYNCED_TABLES = new Set([
   'database_research_steps',
   'database_research_claims',
   'database_research_reports',
+  'database_research_report_annotations',
   // TESTIMONIOS NO SE SINCRONIZA, y es una decision, no una omision (decision 18 del
   // plan). Antes de activarlo hay que demostrar que TODAS estas tablas viajan, que los
   // blobs de los maestros tienen una politica explicita, y sobre todo que las

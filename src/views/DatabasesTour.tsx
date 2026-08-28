@@ -50,8 +50,8 @@ const STEPS: TourStep[] = [
   {
     target: 'nav-dbDeepResearch',
     view: 'dbDeepResearch',
-    title: 'Deep Research de datos',
-    body: 'Formula una pregunta sobre tus tablas, elige bases, vistas, roles y profundidad, y revisa el preview y el coste antes de encolar una investigación con evidencia trazable.',
+    title: 'Deep Research',
+    body: 'Formula una pregunta sobre tus tablas y crea un informe con configuración automática; si lo necesitas, ajusta roles y estructura desde Opciones avanzadas.',
   },
   {
     title: 'Listo para tus datos',

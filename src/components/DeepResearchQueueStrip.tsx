@@ -15,6 +15,9 @@ export interface QueueStripItem {
   status: 'queued' | 'running' | 'completed' | 'failed';
   /** The live progress of this report, already attributed to the right lane. */
   progress: DeepResearchProgress | null;
+  /** Optional adapter fields for other durable research lanes. */
+  percent?: number | null;
+  detail?: string | null;
   error: string | null;
   origin: 'app' | 'mcp';
   enqueuedAt: string;
@@ -65,8 +68,8 @@ export function progressDetail(progress: DeepResearchProgress | null): string | 
  * it. The percentage comes from the phases the pipeline already reports (see
  * shared/deepResearchProgress.ts), so it is measured work, not a timer.
  */
-function QueueProgressBar({ progress }: { progress: DeepResearchProgress | null }) {
-  const percent = deepResearchProgressPercent(progress);
+function QueueProgressBar({ progress, explicitPercent }: { progress: DeepResearchProgress | null; explicitPercent?: number | null }) {
+  const percent = explicitPercent ?? deepResearchProgressPercent(progress);
   return (
     <div
       className="mt-1.5 h-1.5 overflow-hidden rounded bg-neutral-800"
@@ -114,7 +117,7 @@ export function DeepResearchQueueStrip({
       <div className="flex flex-col gap-1.5">
         {active.map((item, index) => {
           const queuePosition = index + 1;
-          const percent = item.status === 'running' ? deepResearchProgressPercent(item.progress) : null;
+          const percent = item.status === 'running' ? item.percent ?? deepResearchProgressPercent(item.progress) : null;
           return (
             <div key={item.id} className="rounded-md border border-neutral-800 bg-neutral-950/40 px-2.5 py-1.5 text-xs">
               <div className="flex items-center gap-2">
@@ -129,7 +132,7 @@ export function DeepResearchQueueStrip({
                 {item.origin === 'mcp' && <OriginBadge />}
                 {item.status === 'running' ? (
                   <>
-                    <span className="shrink-0 text-[11px] text-indigo-300">{progressDetail(item.progress) ?? t('Generando…')}</span>
+                    <span className="shrink-0 text-[11px] text-indigo-300">{item.detail ?? progressDetail(item.progress) ?? t('Generando…')}</span>
                     {percent !== null && (
                       <span className="w-9 shrink-0 text-right text-[11px] tabular-nums text-indigo-400">{percent}%</span>
                     )}
@@ -147,7 +150,7 @@ export function DeepResearchQueueStrip({
                   <Icon name="trash" size={13} />
                 </button>
               </div>
-              {item.status === 'running' && <QueueProgressBar progress={item.progress} />}
+              {item.status === 'running' && <QueueProgressBar progress={item.progress} explicitPercent={item.percent} />}
             </div>
           );
         })}

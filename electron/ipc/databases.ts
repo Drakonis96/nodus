@@ -31,7 +31,7 @@ import type { CreateAutomationRuleInput, CreateFormDefinitionInput } from '@shar
 import { databaseFormPublicUrl, databaseFormServerStatus } from '../automation/formServer';
 import path from 'node:path';
 import fs from 'node:fs';
-import { dialog } from 'electron';
+import { BrowserWindow, dialog } from 'electron';
 import { showImportOpenDialog } from '../privacy';
 import { getSettings } from '../db/settingsRepo';
 import { cancelDatabaseCalculation, getDatabaseCalculationStatus, startDatabaseCalculation } from '../db/databaseComputeHost';
@@ -50,6 +50,8 @@ import {
   getDatabaseDeepResearchAnalysisRequirements,
   getDatabaseDeepResearchEligibility,
   normalizeDatabaseDeepResearchJobInput,
+  normalizeDatabaseDeepResearchReportType,
+  autoConfigureDatabaseDeepResearch,
   type DatabaseDeepResearchExportOptions,
   type DatabaseDeepResearchJobInput,
   type DatabaseDeepResearchReportType,
@@ -549,14 +551,15 @@ export function registerDatabasesIpc({ h, getWindow, chatAborters }: IpcContext)
       let rowCount = 0;
       const availableViews = new Set<string>();
       const availableColumns = new Set<string>();
-      const schemaColumns: Array<{ id: string; type: string }> = [];
+      const schemaColumns: Array<{ databaseId: string; id: string; type: string; name: string; config: Record<string, unknown>; profile?: { filled?: number; fillRate?: number; distinct?: number; valueType?: string } }> = [];
       for (const databaseId of normalized.databaseIds) {
         const database = dbMode.getDatabase(databaseId);
         if (!database) throw new Error('Base de datos no encontrada.');
         for (const view of dbMode.listViews(databaseId)) availableViews.add(view.id);
         for (const column of dbMode.getColumns(databaseId)) {
           availableColumns.add(column.id);
-          schemaColumns.push({ id: column.id, type: column.type });
+          const profile = getDatabaseProfile(databaseId)?.profile.columns.find((item) => item.columnId === column.id);
+          schemaColumns.push({ databaseId, id: column.id, type: column.type, name: column.name, config: column.config as Record<string, unknown>, profile });
         }
         const rows = dbMode.listRows(databaseId, { limit: 200 });
         rowCount += database.rowCount;
@@ -570,17 +573,30 @@ export function registerDatabasesIpc({ h, getWindow, chatAborters }: IpcContext)
       for (const viewId of normalized.viewIds) if (!availableViews.has(viewId)) throw new Error(`Vista no válida: ${viewId}`);
       for (const columnId of normalized.filters.columnIds) if (!availableColumns.has(columnId)) throw new Error(`Columna de filtro no válida: ${columnId}`);
       const { estimatedTokens, estimatedCostUsd } = estimateDatabaseDeepResearchCost(rowCount, normalized.databaseIds.length, normalized.depth);
+      const requestedReportType = normalized.requestedReportType ?? normalized.reportType ?? 'general';
+      const autoConfiguration = normalized.autoConfigure
+        ? autoConfigureDatabaseDeepResearch(requestedReportType, { columns: schemaColumns, roles: normalized.roles, databaseCount: normalized.databaseIds.length, objective: normalized.objective }, normalized.roles)
+        : { requestedReportType, reportType: normalizeDatabaseDeepResearchReportType(normalized.reportType), roles: normalized.roles, confidence: 1, warnings: [], limitations: [], partial: false };
+      const effectiveRoles = autoConfiguration.roles;
+      const effectiveReportType = autoConfiguration.reportType;
       const availableReportTypes = DATABASE_DEEP_RESEARCH_REPORT_TYPES.map((type) =>
         getDatabaseDeepResearchEligibility(type, {
           columns: schemaColumns,
-          roles: normalized.roles,
+          roles: effectiveRoles,
           databaseCount: normalized.databaseIds.length,
         }),
       );
-      const eligibility = availableReportTypes.find((item) => item.reportType === normalized.reportType);
-      const analyses = getDatabaseDeepResearchAnalysisRequirements(normalized.reportType);
+      const eligibility = availableReportTypes.find((item) => item.reportType === effectiveReportType);
+      const analyses = getDatabaseDeepResearchAnalysisRequirements(effectiveReportType);
       return {
-        reportType: normalized.reportType,
+        requestedReportType,
+        reportType: effectiveReportType,
+        resolvedReportType: effectiveReportType,
+        suggestedRoles: effectiveRoles,
+        confidence: autoConfiguration.confidence,
+        warnings: autoConfiguration.warnings,
+        limitations: autoConfiguration.limitations,
+        preflight: { ok: Boolean(eligibility?.applicable), partial: autoConfiguration.partial, warnings: autoConfiguration.warnings },
         eligibility,
         availableReportTypes,
         rowCount, sourceCount: normalized.databaseIds.length, estimatedTokens, estimatedCostUsd,
@@ -588,7 +604,7 @@ export function registerDatabasesIpc({ h, getWindow, chatAborters }: IpcContext)
         optionalAnalyses: analyses.optional,
         sections: buildDatabaseDeepResearchPreviewSections(
           normalized.language ?? 'en',
-          normalized.reportType ?? 'general',
+          effectiveReportType,
           normalized.objective,
           evidence.length,
         ),
@@ -621,6 +637,37 @@ export function registerDatabasesIpc({ h, getWindow, chatAborters }: IpcContext)
   });
   h('db:deepResearch:report:get', async (_e, id: string) => {
     const vault = databaseResearchVault(); return withVaultDatabase(vault.id, () => databaseResearch.getDatabaseResearchReport(id));
+  });
+  h('db:deepResearch:report:read', async (_e, id: string, read: boolean) => {
+    const vault = databaseResearchVault();
+    return withVaultDatabase(vault.id, () => databaseResearch.setDatabaseDeepResearchReportRead(id, read === true));
+  });
+  const announceDatabaseResearchAnnotations = (reportId: string | null): void => {
+    for (const win of BrowserWindow.getAllWindows()) {
+      if (!win.isDestroyed() && !win.webContents.isDestroyed()) win.webContents.send('db:deepResearch:report:annotations:changed', reportId);
+    }
+  };
+  h('db:deepResearch:report:annotations:list', async (_e, reportId: string) => {
+    const vault = databaseResearchVault();
+    return withVaultDatabase(vault.id, () => databaseResearch.listDatabaseDeepResearchReportAnnotations(reportId));
+  });
+  h('db:deepResearch:report:annotations:create', async (_e, input) => {
+    const vault = databaseResearchVault();
+    const annotation = await withVaultDatabase(vault.id, () => databaseResearch.createDatabaseDeepResearchReportAnnotation(input));
+    announceDatabaseResearchAnnotations(annotation.reportId);
+    return annotation;
+  });
+  h('db:deepResearch:report:annotations:updateComment', async (_e, id: string, comment: string) => {
+    const vault = databaseResearchVault();
+    const annotation = await withVaultDatabase(vault.id, () => databaseResearch.updateDatabaseDeepResearchReportComment(id, comment));
+    if (annotation) announceDatabaseResearchAnnotations(annotation.reportId);
+    return annotation;
+  });
+  h('db:deepResearch:report:annotations:delete', async (_e, id: string) => {
+    const vault = databaseResearchVault();
+    const reportId = await withVaultDatabase(vault.id, () => databaseResearch.deleteDatabaseDeepResearchReportAnnotation(id));
+    if (reportId) announceDatabaseResearchAnnotations(reportId);
+    return !!reportId;
   });
   h('db:deepResearch:report:delete', async (_e, id: string) => {
     const vault = databaseResearchVault(); return withVaultDatabase(vault.id, () => databaseResearch.deleteDatabaseResearchReport(id));

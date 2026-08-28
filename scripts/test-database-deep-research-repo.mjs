@@ -76,6 +76,18 @@ try {
   research.startDatabaseResearchRun(completed.id); research.saveDatabaseResearchReport(report(completed.id));
   assert.throws(() => research.saveDatabaseResearchReport(report(completed.id, 'partial')), /degradar/);
   assert.equal(research.getDatabaseResearchRun(completed.id).status, 'completed');
+  const savedReport = research.getDatabaseResearchReport(`report-${completed.id}`);
+  assert.equal(savedReport.readAt, null);
+  assert.ok(research.setDatabaseDeepResearchReportRead(savedReport.id, true).readAt);
+  assert.equal(research.setDatabaseDeepResearchReportRead(savedReport.id, false).readAt, null);
+  const annotation = research.createDatabaseDeepResearchReportAnnotation({
+    reportId: savedReport.id, scope: 'source', kind: 'comment', startOffset: 0, endOffset: 6,
+    selectedText: 'Report', prefix: '', suffix: '', comment: 'Review this',
+  });
+  assert.equal(research.listDatabaseDeepResearchReportAnnotations(savedReport.id).length, 1);
+  assert.equal(research.updateDatabaseDeepResearchReportComment(annotation.id, 'Updated').comment, 'Updated');
+  assert.equal(research.deleteDatabaseDeepResearchReportAnnotation(annotation.id), savedReport.id);
+  assert.deepEqual(research.listDatabaseDeepResearchReportAnnotations(savedReport.id), []);
 
   const bounded = research.createDatabaseResearchRun(input('Payload bounds'));
   assert.throws(() => research.upsertDatabaseResearchStep({ runId: bounded.id, kind: 'snapshot', ordinal: 0, output: { huge: 'x'.repeat(1_000_001) } }), /límite/);

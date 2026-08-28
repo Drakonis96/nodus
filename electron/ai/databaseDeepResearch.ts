@@ -3982,11 +3982,15 @@ export async function processDatabaseResearchRun(
     const reviewBlocksCompletion = reviewWarnings.some((warning) =>
       /(?:reject|high_risk|invalid_output)/i.test(warning),
     );
+    const autoConfiguration = options.autoConfiguration && typeof options.autoConfiguration === "object"
+      ? options.autoConfiguration as { partial?: boolean; warnings?: unknown; limitations?: unknown; requestedReportType?: unknown }
+      : null;
     const discrepancy =
       snapshot.truncated ||
       verifierBlocksClaims ||
       claims.some((claim) => !claim.verified) ||
-      reviewBlocksCompletion;
+      reviewBlocksCompletion ||
+      autoConfiguration?.partial === true;
     const finalStatus = discrepancy ? "partial" : "completed";
     // Record the fully gated assembly before publishing the report. If the
     // process dies between these operations, resume can reuse the persisted
@@ -4011,6 +4015,9 @@ export async function processDatabaseResearchRun(
       metadata: {
         deterministic: true,
         language: run.language ?? "es",
+        requestedReportType: autoConfiguration?.requestedReportType ?? reportType,
+        autoConfigurationWarnings: Array.isArray(autoConfiguration?.warnings) ? autoConfiguration.warnings : [],
+        autoConfigurationLimitations: Array.isArray(autoConfiguration?.limitations) ? autoConfiguration.limitations : [],
         estimatedCostUsd: Number(
           (budget as Record<string, unknown>).estimatedCostUsd ?? 0,
         ),

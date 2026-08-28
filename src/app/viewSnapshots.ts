@@ -57,6 +57,7 @@ import type { DictionaryEntryStatus, DictionarySortKey } from '@shared/dictionar
 import type { SortState } from '../views/Library';
 import type { ReadingPlace } from '../readingPlace';
 import type { CompassSnapshot } from '@shared/compass';
+import type { DatabaseDeepResearchReportType } from '@shared/databaseDeepResearch';
 
 /** An open inner tab: enough to redraw the tab strip and refetch its contents. */
 export interface OpenEntityTab {
@@ -281,6 +282,12 @@ export interface DatabaseDeepResearchSnapshot {
   selectedDatabaseIds: string[];
   selectedViewIds: string[];
   openReportId: string | null;
+  search?: string;
+  readFilter?: 'all' | 'read' | 'unread';
+  reportFilter?: DatabaseDeepResearchReportType | 'all';
+  sortKey?: 'recent' | 'oldest' | 'title';
+  viewMode?: 'grid' | 'list';
+  reading?: ReadingPlace | null;
 }
 
 /**

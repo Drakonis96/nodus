@@ -87,7 +87,7 @@ export const NAV_ITEMS: NavItem[] = [
   { id: 'dbSearch', label: 'Buscar', icon: 'search', group: 'explore' },
   { id: 'dbAnalysis', label: 'Análisis', icon: 'chartBar', group: 'analyze' },
   { id: 'dbChat', label: 'Chat de datos', icon: 'chat', group: 'analyze' },
-  { id: 'dbDeepResearch', label: 'Deep Research de datos', icon: 'telescope', group: 'analyze' },
+  { id: 'dbDeepResearch', label: 'Deep Research', icon: 'telescope', group: 'analyze' },
   // Testimonios — historia oral. Solo tres secciones propias: lo demás que un archivo
   // de entrevistas necesita (grabaciones, transcripciones, códigos, acuerdos) vive
   // dentro del dossier de cada entrevista, no en el menú.

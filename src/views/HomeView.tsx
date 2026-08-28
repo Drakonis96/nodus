@@ -1301,7 +1301,7 @@ export function DatabasesHome({
         </button>
         <button data-testid="open-database-deep-research" className="card p-4 text-left hover:border-cyan-600/70 transition-colors" onClick={onOpenDeepResearch}>
           <div className="flex items-center gap-2 font-medium">
-            <Icon name="telescope" className="text-cyan-500" /> {t('Deep Research de datos')}
+            <Icon name="telescope" className="text-cyan-500" /> {t('Deep Research')}
           </div>
           <p className="text-xs text-neutral-500 mt-1">
             {t('Investiga patrones y contrastes en tus tablas con evidencia trazable.')}
