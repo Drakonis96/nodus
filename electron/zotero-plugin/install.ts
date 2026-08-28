@@ -1,5 +1,5 @@
 // Export and validate the exact "Nodus for Zotero" XPI shipped with Nodus.
-// Zotero 9 deliberately disables foreign profile sideloads unless broad global
+// Zotero 9 and 10 deliberately disable foreign profile sideloads unless broad global
 // preferences are weakened. We never change those preferences or hand-edit the
 // add-on database: installation goes through Zotero's official Add-ons UI.
 import AdmZip from 'adm-zip';
@@ -173,7 +173,7 @@ export async function exportZoteroPluginXpi(): Promise<ZoteroExportResult> {
 
 /**
  * Legacy API kept for older renderers. Direct profile sideloading cannot be
- * made both reliable and scoped on Zotero 9, so fail closed and direct the user
+ * made both reliable and scoped on Zotero 9/10, so fail closed and direct the user
  * to the official Add-ons flow. New UI calls exportZoteroPluginXpi() directly.
  */
 export async function installZoteroPlugin(): Promise<ZoteroInstallResult> {
