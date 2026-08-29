@@ -404,13 +404,19 @@ export interface ZoteroImportSelection {
   collectionIds?: string[];
   includeUnfiled?: boolean;
   copyAttachments?: boolean;
+  /**
+   * Import parentless files — a PDF dropped into Zotero with no bibliographic entry
+   * above it — as works of their own. Off by default: they arrive with no author,
+   * year or title beyond a filename, so they change what counts as a work.
+   */
+  includeStandaloneFiles?: boolean;
   /** Ignore the saved Zotero version and create a new full snapshot. */
   fullRefresh?: boolean;
 }
 
 export interface ZoteroImportProgress {
   requestId: string;
-  phase: 'connecting' | 'collections' | 'catalog' | 'attachments' | 'rebuild' | 'complete' | 'canceled' | 'failed';
+  phase: 'connecting' | 'collections' | 'catalog' | 'notes' | 'attachments' | 'rebuild' | 'complete' | 'canceled' | 'failed';
   libraryId: string | null;
   libraryName: string | null;
   processedItems: number;
@@ -430,12 +436,17 @@ export interface ZoteroImportReport {
   itemsUnchanged: number;
   itemsDeleted: number;
   itemsSourceMissing: number;
+  /** Parentless files left out because `includeStandaloneFiles` was off. */
+  itemsStandaloneSkipped: number;
   collectionsCreated: number;
   collectionsUpdated: number;
   collectionsUnchanged: number;
   attachmentsCopied: number;
   attachmentsUnchanged: number;
   attachmentsUnavailable: number;
+  /** Attachments with no file behind them — Zotero bookmarks (`linked_url`) and
+   *  filename-less entries. Not a failure: there was never a file to copy. */
+  attachmentsLinkOnly: number;
   attachmentsChanged: number;
   conflicts: number;
   librariesMissing: string[];

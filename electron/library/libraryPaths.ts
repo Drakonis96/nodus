@@ -7,6 +7,7 @@ export {
   assertInside,
   atomicWriteFile,
   atomicWriteJson,
+  fitLibraryFileName,
   libraryFilePathWithLiteralExtension,
   pathStaysInside,
   readJsonFile,

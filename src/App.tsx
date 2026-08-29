@@ -9,6 +9,7 @@ import { RoadmapModal } from './views/RoadmapModal';
 import { QueueBar } from './components/QueueBar';
 import { EmbeddingProgressBar } from './components/EmbeddingProgressBar';
 import { PassageProgressBar } from './components/PassageProgressBar';
+import { ZoteroImportProgressBar } from './components/ZoteroImportProgressBar';
 import { DocumentIndexProgressBar } from './components/DocumentIndexProgressBar';
 import { VaultSwitcher, vaultTypeIcon, vaultTypeLabel } from './components/VaultSwitcher';
 import { ServerInbox } from './components/ServerInbox';
@@ -1852,6 +1853,7 @@ export function App() {
 
       <div data-tour="queue">
         <QueueBar />
+        <ZoteroImportProgressBar />
         <DocumentIndexProgressBar />
         <EmbeddingProgressBar />
         <PassageProgressBar />
