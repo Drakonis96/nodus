@@ -168,7 +168,12 @@ export async function publishVaultToCloudflare(
   const base = normalizeServerUrl(config.url); const spaceId = config.spaceId;
   const availableVectorizeDimensions = await vectorizeDimensions(base);
   const library = preparedLibrary;
-  const snapshot = buildServerSnapshot(vault, { nodusServerIncludeUserContent: config.includeUserContent, nodusServerIncludePassages: config.includePassages }, db, library?.manifest || null);
+  const snapshot = buildServerSnapshot(vault, {
+    nodusServerIncludeUserContent: config.includeUserContent,
+    nodusServerIncludePassages: config.includePassages,
+    nodusServerIncludePrimarySources: config.includePrimarySources,
+    nodusServerIncludeTestimonies: config.includeTestimonies,
+  }, db, library?.manifest || null);
   const payload = JSON.parse(snapshot.buffer.toString('utf8')) as SnapshotPayload;
   const preparedRows = stableRows(db, payload);
   const compressed = await gzipAsync(snapshot.buffer, { level: 1 });

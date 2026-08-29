@@ -178,6 +178,20 @@ test('private store rejects symlinks and cross-owner records instead of launderi
   } finally { await rm(root, { recursive: true, force: true }); }
 });
 
+test('private data files enforce a bounded per-user quota', async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), 'nodus-private-quota-'));
+  try {
+    const store = new UserPrivateDataStore(root, { maxBytes: 1 * 1024 * 1024 });
+    const conversation = store.createConversation('alpha', { vaultId: 'vault-1', title: 'bounded' });
+    store.appendMessage('alpha', conversation.id, { content: 'x'.repeat(1_000_000) });
+    assert.throws(
+      () => store.appendMessage('alpha', conversation.id, { content: 'y'.repeat(1_000_000) }),
+      /storage quota exceeded/,
+    );
+    assert.equal(store.conversation('alpha', conversation.id).messages.length, 1, 'a rejected write leaves the prior state intact');
+  } finally { await rm(root, { recursive: true, force: true }); }
+});
+
 test('revoking vault membership aborts an in-flight provider job and discards its result', async () => {
   const membershipStore = { state: { memberships: [{ userId: 'alpha', spaceId: 'vault-1', role: 'reader' }] } };
   const gateway = { chat: ({ signal }) => new Promise((resolve, reject) => {
@@ -197,5 +211,41 @@ test('revoking vault membership aborts an in-flight provider job and discards it
     const job = fx.privateData.job('alpha', id);
     assert.equal(job.status, 'cancelled');
     assert.equal(job.result, null);
+  } finally { await fx.close(); }
+});
+
+test('owned jobs can be cancelled and retried with their durable original request', async () => {
+  let calls = 0;
+  let release;
+  const gateway = {
+    chat: ({ signal }) => {
+      calls += 1;
+      if (calls === 1) return new Promise((resolve, reject) => {
+        release = () => reject(new Error('temporary provider failure'));
+        signal.addEventListener('abort', () => reject(signal.reason || new Error('aborted')), { once: true });
+      });
+      return Promise.resolve({ answer: 'retry works' });
+    },
+  };
+  const fx = await fixture({ gateway });
+  try {
+    const created = await api(fx.origin, '/api/v2/vaults/vault-1/ai/deep-research', {
+      method: 'POST', headers: { 'x-test-user': 'alpha' },
+      json: { provider: 'openai', model: 'test-model', messages: [{ role: 'user', content: 'original brief' }] },
+    });
+    const id = (await created.json()).job.id;
+    for (let attempt = 0; attempt < 40 && fx.privateData.job('alpha', id)?.status !== 'running'; attempt += 1) await new Promise((resolve) => setTimeout(resolve, 10));
+    const cancelled = await api(fx.origin, `/api/v2/me/jobs/${id}/cancel`, { method: 'POST', headers: { 'x-test-user': 'alpha' } });
+    assert.equal(cancelled.status, 200);
+    assert.equal((await cancelled.json()).job.status, 'cancelled');
+    const retry = await api(fx.origin, `/api/v2/me/jobs/${id}/retry`, { method: 'POST', headers: { 'x-test-user': 'alpha' } });
+    assert.equal(retry.status, 202);
+    assert.equal((await retry.json()).job.attempt, 2);
+    // Let the first provider promise unwind; retry still uses the stored brief.
+    release?.();
+    for (let attempt = 0; attempt < 40 && fx.privateData.job('alpha', id)?.status !== 'completed'; attempt += 1) await new Promise((resolve) => setTimeout(resolve, 10));
+    assert.equal(fx.privateData.job('alpha', id)?.status, 'completed');
+    assert.equal(fx.privateData.job('alpha', id)?.request.messages[0].content, 'original brief');
+    assert.equal(calls, 2);
   } finally { await fx.close(); }
 });

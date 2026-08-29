@@ -2,11 +2,90 @@
    file is imported by the Electron entry. */
 .server-desktop-surface {
   --server-sidebar-width: 176px;
+  /* Keep server-only surfaces on the same semantic palette as Desktop.  The
+     utility remap in index.css cannot reach declarations made in this file,
+     so every custom component uses these tokens instead of inheriting the
+     dark baseline when the document is switched to light mode. */
+  --server-shell-bg: #0a0a0a;
+  --server-shell-panel: #111111;
+  --server-shell-panel-soft: #171717;
+  --server-shell-border: #262626;
+  --server-shell-text: #f5f5f5;
+  --server-shell-muted: #a3a3a3;
+  background: var(--server-shell-bg);
+  color: var(--server-shell-text);
   isolation: isolate;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.server-desktop-surface .app-titlebar {
+  background: var(--server-shell-bg);
+  border-color: var(--server-shell-border);
+}
+
+.server-desktop-surface .server-header-action {
+  color: var(--server-shell-muted);
+}
+
+.server-desktop-surface .server-header-action:not(.bg-indigo-600):hover,
+.server-desktop-surface .server-header-action:not(.bg-indigo-600):focus-visible {
+  background: color-mix(in srgb, var(--server-shell-panel-soft) 92%, transparent);
+  color: var(--server-shell-text);
+}
+
+.server-desktop-surface .server-header-action.bg-indigo-600 {
+  color: #fff;
+}
+
+.server-home-intro .text-indigo-300 {
+  color: #a5b4fc;
+}
+
+.server-home-intro h1 {
+  color: var(--server-shell-text);
+}
+
+.server-home-intro p {
+  color: var(--server-shell-muted);
+}
+
+html.light .server-desktop-surface,
+.server-desktop-surface[data-theme='light'] {
+  --server-shell-bg: #f8fafc;
+  --server-shell-panel: #ffffff;
+  --server-shell-panel-soft: #f8fafc;
+  --server-shell-border: #e5e7eb;
+  --server-shell-text: #171717;
+  --server-shell-muted: #525252;
+}
+
+html.light .server-desktop-surface .server-home-intro,
+.server-desktop-surface[data-theme='light'] .server-home-intro {
+  border-color: #c7d2fe;
+  background: #eef2ff;
+}
+
+html.light .server-desktop-surface .server-home-intro .text-indigo-300,
+.server-desktop-surface[data-theme='light'] .server-home-intro .text-indigo-300 {
+  color: #4338ca;
 }
 
 .server-desktop-surface .server-main {
   min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* Views own their scrolling region. Constrain this host so the shell never
+   grows a second page-level scrollbar around a reader, table or chat. */
+.server-view-host {
+  min-width: 0;
+  min-height: 0;
   overflow: hidden;
 }
 
@@ -18,26 +97,211 @@
   scrollbar-gutter: stable;
 }
 
-.server-readonly-banner {
-  display: flex;
-  min-height: 30px;
-  flex: 0 0 auto;
-  align-items: center;
-  gap: 8px;
-  border-bottom: 1px solid rgb(39 39 42 / .85);
-  padding: 5px 16px;
-  background: rgb(24 24 27 / .78);
-  color: #a3a3a3;
-  font-size: 11px;
-}
-
-.server-readonly-banner strong { color: #d4d4d8; }
-.server-readonly-dot { width: 7px; height: 7px; flex: 0 0 auto; border-radius: 999px; background: #2dd4bf; box-shadow: 0 0 0 3px rgb(45 212 191 / .1); }
-
 .server-desktop-nav {
   width: var(--server-sidebar-width);
   min-width: var(--server-sidebar-width);
 }
+
+/* The Server sidebar can be resized independently from Desktop. Keep labels
+   inside their flex item while resizing so a light-theme transition (or a
+   narrow persisted width) cannot paint only a middle slice of the active label. */
+.server-sidebar-nav-item {
+  min-width: 0;
+  color: var(--server-shell-muted);
+}
+.server-sidebar-nav-item > span:not(.sr-only) {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.server-sidebar-nav-item.is-active,
+.server-desktop-surface[data-theme='light'] .server-sidebar-nav-item.is-active,
+html.light .server-desktop-surface .server-sidebar-nav-item.is-active {
+  color: #fff;
+  background: #4f46e5;
+}
+.server-sidebar-nav-item:focus-visible,
+.server-sidebar-nav-group:focus-visible { outline: 2px solid #818cf8; outline-offset: -2px; }
+
+/* The shared Desktop nav uses utility classes whose dark hover colours are
+   intentionally global. Scope the web overrides to the shell so switching to
+   light mode cannot leave a charcoal hover tile or unreadable header control. */
+html.light .server-desktop-surface .server-sidebar-nav-item:not(.is-active):hover,
+html[data-theme='light'] .server-desktop-surface .server-sidebar-nav-item:not(.is-active):hover { background: #f1f5f9; color: #171717; }
+html.light .server-desktop-surface .server-header-logo:hover,
+html[data-theme='light'] .server-desktop-surface .server-header-logo:hover,
+html.light .server-desktop-surface .server-mobile-menu:hover,
+html[data-theme='light'] .server-desktop-surface .server-mobile-menu:hover { background: #f1f5f9; color: #334155; }
+html.light .server-desktop-surface .server-desktop-nav,
+html[data-theme='light'] .server-desktop-surface .server-desktop-nav { border-color: #e5e7eb; }
+
+/* Advanced and collection views contain a few Desktop utility classes in
+   JSX whose declarations are intentionally dark (for example, the evidence
+   panel and the read-only dossier).  The normal utility remap is keyed off
+   `html.light`; the Server shell also carries the authoritative data-theme
+   attribute, so mirror the semantic palette here as a last-mile guard.  This
+   keeps a profile/theme update repainting the complete shell in one frame,
+   including empty/error states, tables, badges, and interactive controls. */
+html.light .server-desktop-surface .text-neutral-100,
+html[data-theme='light'] .server-desktop-surface .text-neutral-100,
+.server-desktop-surface[data-theme='light'] .text-neutral-100 { color: #171717; }
+html.light .server-desktop-surface .text-neutral-200,
+html[data-theme='light'] .server-desktop-surface .text-neutral-200,
+.server-desktop-surface[data-theme='light'] .text-neutral-200 { color: #1f2937; }
+html.light .server-desktop-surface .text-neutral-300,
+html[data-theme='light'] .server-desktop-surface .text-neutral-300,
+.server-desktop-surface[data-theme='light'] .text-neutral-300 { color: #334155; }
+html.light .server-desktop-surface .text-neutral-400,
+html[data-theme='light'] .server-desktop-surface .text-neutral-400,
+.server-desktop-surface[data-theme='light'] .text-neutral-400 { color: #475569; }
+html.light .server-desktop-surface .text-neutral-500,
+html[data-theme='light'] .server-desktop-surface .text-neutral-500,
+.server-desktop-surface[data-theme='light'] .text-neutral-500 { color: #64748b; }
+html.light .server-desktop-surface .text-neutral-600,
+html[data-theme='light'] .server-desktop-surface .text-neutral-600,
+.server-desktop-surface[data-theme='light'] .text-neutral-600 { color: #64748b; }
+html.light .server-desktop-surface .text-neutral-700,
+html[data-theme='light'] .server-desktop-surface .text-neutral-700,
+.server-desktop-surface[data-theme='light'] .text-neutral-700 { color: #94a3b8; }
+
+html.light .server-desktop-surface [class~='border-neutral-700'],
+html.light .server-desktop-surface [class~='border-neutral-800'],
+html.light .server-desktop-surface [class~='border-neutral-800/60'],
+html.light .server-desktop-surface [class~='border-neutral-800/70'],
+html.light .server-desktop-surface [class~='border-neutral-900'],
+html[data-theme='light'] .server-desktop-surface [class~='border-neutral-700'],
+html[data-theme='light'] .server-desktop-surface [class~='border-neutral-800'],
+html[data-theme='light'] .server-desktop-surface [class~='border-neutral-800/60'],
+html[data-theme='light'] .server-desktop-surface [class~='border-neutral-800/70'],
+html[data-theme='light'] .server-desktop-surface [class~='border-neutral-900'],
+.server-desktop-surface[data-theme='light'] [class~='border-neutral-700'],
+.server-desktop-surface[data-theme='light'] [class~='border-neutral-800'],
+.server-desktop-surface[data-theme='light'] [class~='border-neutral-800/60'],
+.server-desktop-surface[data-theme='light'] [class~='border-neutral-800/70'],
+.server-desktop-surface[data-theme='light'] [class~='border-neutral-900'] { border-color: #e5e7eb; }
+html.light .server-desktop-surface [class*='border-neutral-700/'],
+html.light .server-desktop-surface [class*='border-neutral-800/'],
+html.light .server-desktop-surface [class*='border-neutral-900/'],
+html[data-theme='light'] .server-desktop-surface [class*='border-neutral-700/'],
+html[data-theme='light'] .server-desktop-surface [class*='border-neutral-800/'],
+html[data-theme='light'] .server-desktop-surface [class*='border-neutral-900/'],
+.server-desktop-surface[data-theme='light'] [class*='border-neutral-700/'],
+.server-desktop-surface[data-theme='light'] [class*='border-neutral-800/'],
+.server-desktop-surface[data-theme='light'] [class*='border-neutral-900/'] { border-color: #e5e7eb; }
+
+html.light .server-desktop-surface [class~='bg-neutral-950'],
+html.light .server-desktop-surface [class~='bg-neutral-950/25'],
+html.light .server-desktop-surface [class~='bg-neutral-950/30'],
+html.light .server-desktop-surface [class~='bg-neutral-950/35'],
+html.light .server-desktop-surface [class~='bg-neutral-950/40'],
+html.light .server-desktop-surface [class~='bg-neutral-950/45'],
+html.light .server-desktop-surface [class~='bg-neutral-950/55'],
+html.light .server-desktop-surface [class~='bg-neutral-950/60'],
+html[data-theme='light'] .server-desktop-surface [class~='bg-neutral-950'],
+html[data-theme='light'] .server-desktop-surface [class~='bg-neutral-950/25'],
+html[data-theme='light'] .server-desktop-surface [class~='bg-neutral-950/30'],
+html[data-theme='light'] .server-desktop-surface [class~='bg-neutral-950/35'],
+html[data-theme='light'] .server-desktop-surface [class~='bg-neutral-950/40'],
+html[data-theme='light'] .server-desktop-surface [class~='bg-neutral-950/45'],
+html[data-theme='light'] .server-desktop-surface [class~='bg-neutral-950/55'],
+html[data-theme='light'] .server-desktop-surface [class~='bg-neutral-950/60'],
+.server-desktop-surface[data-theme='light'] [class~='bg-neutral-950'],
+.server-desktop-surface[data-theme='light'] [class~='bg-neutral-950/25'],
+.server-desktop-surface[data-theme='light'] [class~='bg-neutral-950/30'],
+.server-desktop-surface[data-theme='light'] [class~='bg-neutral-950/35'],
+.server-desktop-surface[data-theme='light'] [class~='bg-neutral-950/40'],
+.server-desktop-surface[data-theme='light'] [class~='bg-neutral-950/45'],
+.server-desktop-surface[data-theme='light'] [class~='bg-neutral-950/55'],
+.server-desktop-surface[data-theme='light'] [class~='bg-neutral-950/60'] { background-color: #ffffff; }
+html.light .server-desktop-surface [class*='bg-neutral-950/'],
+html[data-theme='light'] .server-desktop-surface [class*='bg-neutral-950/'],
+.server-desktop-surface[data-theme='light'] [class*='bg-neutral-950/'] { background-color: #ffffff; }
+html.light .server-desktop-surface [class~='bg-neutral-900'],
+html.light .server-desktop-surface [class~='bg-neutral-900/55'],
+html.light .server-desktop-surface [class~='bg-neutral-900/60'],
+html.light .server-desktop-surface [class~='bg-neutral-900/70'],
+html[data-theme='light'] .server-desktop-surface [class~='bg-neutral-900'],
+html[data-theme='light'] .server-desktop-surface [class~='bg-neutral-900/55'],
+html[data-theme='light'] .server-desktop-surface [class~='bg-neutral-900/60'],
+html[data-theme='light'] .server-desktop-surface [class~='bg-neutral-900/70'],
+.server-desktop-surface[data-theme='light'] [class~='bg-neutral-900'],
+.server-desktop-surface[data-theme='light'] [class~='bg-neutral-900/55'],
+.server-desktop-surface[data-theme='light'] [class~='bg-neutral-900/60'],
+.server-desktop-surface[data-theme='light'] [class~='bg-neutral-900/70'] { background-color: #f8fafc; }
+html.light .server-desktop-surface [class*='bg-neutral-900/'],
+html[data-theme='light'] .server-desktop-surface [class*='bg-neutral-900/'],
+.server-desktop-surface[data-theme='light'] [class*='bg-neutral-900/'] { background-color: #f8fafc; }
+html.light .server-desktop-surface [class~='bg-neutral-800'],
+html[data-theme='light'] .server-desktop-surface [class~='bg-neutral-800'],
+.server-desktop-surface[data-theme='light'] [class~='bg-neutral-800'] { background-color: #e5e7eb; }
+
+html.light .server-desktop-surface [class~='hover:bg-neutral-900']:hover,
+html.light .server-desktop-surface [class~='hover:bg-neutral-900/70']:hover,
+html[data-theme='light'] .server-desktop-surface [class~='hover:bg-neutral-900']:hover,
+html[data-theme='light'] .server-desktop-surface [class~='hover:bg-neutral-900/70']:hover,
+.server-desktop-surface[data-theme='light'] [class~='hover:bg-neutral-900']:hover,
+.server-desktop-surface[data-theme='light'] [class~='hover:bg-neutral-900/70']:hover { background-color: #f1f5f9; }
+html.light .server-desktop-surface [class~='hover:bg-neutral-800']:hover,
+html[data-theme='light'] .server-desktop-surface [class~='hover:bg-neutral-800']:hover,
+.server-desktop-surface[data-theme='light'] [class~='hover:bg-neutral-800']:hover { background-color: #e5e7eb; }
+html.light .server-desktop-surface [class~='hover:text-neutral-200']:hover,
+html[data-theme='light'] .server-desktop-surface [class~='hover:text-neutral-200']:hover,
+.server-desktop-surface[data-theme='light'] [class~='hover:text-neutral-200']:hover { color: #171717; }
+
+/* Read-only controls still need the same affordances as Desktop: disabled
+   controls are visibly inactive while keyboard focus remains obvious. */
+html.light .server-desktop-surface button:disabled,
+html[data-theme='light'] .server-desktop-surface button:disabled,
+.server-desktop-surface[data-theme='light'] button:disabled,
+html.light .server-desktop-surface input:disabled,
+html[data-theme='light'] .server-desktop-surface input:disabled,
+.server-desktop-surface[data-theme='light'] input:disabled { cursor: not-allowed; opacity: .52; }
+html.light .server-desktop-surface :is(button, input, select, textarea):focus-visible,
+html[data-theme='light'] .server-desktop-surface :is(button, input, select, textarea):focus-visible,
+.server-desktop-surface[data-theme='light'] :is(button, input, select, textarea):focus-visible { outline: 2px solid #6366f1; outline-offset: 2px; }
+html.light .server-desktop-surface :is(input, select, textarea),
+html[data-theme='light'] .server-desktop-surface :is(input, select, textarea),
+.server-desktop-surface[data-theme='light'] :is(input, select, textarea) { color-scheme: light; }
+
+/* The data-theme branch also covers the first paint before App's document
+   class effect runs.  Keep the semantic accent colours readable for the
+   dossier, evidence and read-only badges in that short window as well. */
+.server-desktop-surface[data-theme='light'] .text-indigo-200,
+.server-desktop-surface[data-theme='light'] .text-indigo-300,
+.server-desktop-surface[data-theme='light'] .text-indigo-400 { color: #4338ca; }
+.server-desktop-surface[data-theme='light'] .text-teal-200,
+.server-desktop-surface[data-theme='light'] .text-teal-300,
+.server-desktop-surface[data-theme='light'] .text-teal-400 { color: #0f766e; }
+.server-desktop-surface[data-theme='light'] .text-amber-200,
+.server-desktop-surface[data-theme='light'] .text-amber-300,
+.server-desktop-surface[data-theme='light'] .text-amber-400 { color: #b45309; }
+.server-desktop-surface[data-theme='light'] .text-red-200,
+.server-desktop-surface[data-theme='light'] .text-red-300,
+.server-desktop-surface[data-theme='light'] .text-red-400 { color: #dc2626; }
+.server-desktop-surface[data-theme='light'] [class*='border-indigo-700/'],
+.server-desktop-surface[data-theme='light'] [class*='border-indigo-800/'],
+.server-desktop-surface[data-theme='light'] [class*='border-teal-800/'] { border-color: #c7d2fe; }
+.server-desktop-surface[data-theme='light'] [class*='border-amber-700/'],
+.server-desktop-surface[data-theme='light'] [class*='border-amber-800/'] { border-color: #fcd34d; }
+.server-desktop-surface[data-theme='light'] [class*='bg-indigo-950/'] { background-color: #eef2ff; }
+.server-desktop-surface[data-theme='light'] [class*='bg-teal-950/'] { background-color: #ecfdf5; }
+.server-desktop-surface[data-theme='light'] [class*='bg-red-950/'] { background-color: #fef2f2; }
+.server-desktop-surface[data-theme='light'] [class*='bg-amber-950/'] { background-color: #fffbeb; }
+.server-desktop-surface[data-theme='light'] .server-vault-popover { border-color: #d4d4d8; background: #fff; box-shadow: 0 24px 70px rgb(15 23 42 / .16); }
+.server-desktop-surface[data-theme='light'] .server-record-card { border-color: #e5e7eb; background: #fff; color: #171717; }
+.server-desktop-surface[data-theme='light'] .server-record-card:hover { border-color: #818cf8; background: #f8fafc; }
+.server-desktop-surface[data-theme='light'] .server-record-card .server-record-icon { background: #eef2ff; color: #4f46e5; }
+.server-desktop-surface[data-theme='light'] .server-detail-list dt,
+.server-desktop-surface[data-theme='light'] .server-detail-list dd { border-color: #e5e7eb; }
+.server-desktop-surface[data-theme='light'] .server-detail-list dt { color: #64748b; }
+.server-desktop-surface[data-theme='light'] .server-detail-list dd { color: #334155; }
+.server-desktop-surface[data-theme='light'] .server-saved-highlight { color: #334155; }
+.server-desktop-surface[data-theme='light'] .server-desktop-record { border-color: #e5e7eb; }
+.server-desktop-surface[data-theme='light'] .server-desktop-record dt,
+.server-desktop-surface[data-theme='light'] .server-desktop-record dd { border-color: #e5e7eb; }
+.server-desktop-surface[data-theme='light'] .server-desktop-record dt { background: #f8fafc; color: #64748b; }
+.server-desktop-surface[data-theme='light'] .server-desktop-record dd { background: #fff; color: #334155; }
 
 .server-sidebar-resizer {
   position: absolute;
@@ -46,41 +310,52 @@
   right: 0;
   width: 7px;
   height: 100%;
+  border: 0;
+  padding: 0;
   cursor: col-resize;
   touch-action: none;
+  background: transparent;
 }
 .server-sidebar-resizer::after { position: absolute; top: 0; right: 2px; width: 1px; height: 100%; content: ''; background: transparent; }
 .server-sidebar-resizer:hover::after, body.is-resizing-sidebar .server-sidebar-resizer::after { background: #6366f1; }
+.server-sidebar-resizer:focus-visible { outline: 2px solid #818cf8; outline-offset: -2px; }
 .server-settings-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(220px, 320px); gap: 1rem; }
 
 .server-vault-popover {
   position: fixed;
   z-index: 80;
+  display: flex;
+  flex-direction: column;
   top: 52px;
   left: 50%;
   width: min(520px, calc(100vw - 32px));
+  max-height: calc(100vh - 60px);
   overflow: hidden;
-  border: 1px solid #262626;
+  border: 1px solid var(--server-shell-border);
   border-radius: 9px;
-  background: #0a0a0a;
+  background: var(--server-shell-bg);
   box-shadow: 0 24px 80px rgb(0 0 0 / .58);
   transform: translateX(-50%);
   transform-origin: center top;
   animation: server-vault-open .16s ease-out;
 }
+.server-vault-list {
+  min-height: 0;
+  flex: 1 1 auto;
+}
 @keyframes server-vault-open { from { opacity: 0; transform: translateX(-50%) translateY(-8px) scaleY(.84); } }
 
 .server-record-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 12px; }
-.server-record-card { min-width: 0; border: 1px solid #262626; border-radius: 12px; background: rgb(23 23 23 / .48); padding: 14px; text-align: left; transition: border-color .16s, background .16s; }
+.server-record-card { min-width: 0; border: 1px solid var(--server-shell-border); border-radius: 12px; background: color-mix(in srgb, var(--server-shell-panel-soft) 86%, transparent); padding: 14px; text-align: left; transition: border-color .16s, background .16s; color: var(--server-shell-text); }
 .server-record-card:hover { border-color: rgb(79 70 229 / .75); background: rgb(30 27 75 / .18); }
 .server-record-card .server-record-icon { display: grid; width: 36px; height: 36px; place-items: center; flex: 0 0 auto; border-radius: 10px; background: rgb(79 70 229 / .16); color: #a5b4fc; }
 
 .server-detail-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(250px, 320px); gap: 16px; align-items: start; }
 .server-detail-list { display: grid; grid-template-columns: minmax(120px, .36fr) minmax(0, .64fr); }
 .server-detail-list > div { display: contents; }
-.server-detail-list dt, .server-detail-list dd { min-width: 0; margin: 0; border-bottom: 1px solid rgb(38 38 38 / .8); padding: 9px 10px; overflow-wrap: anywhere; }
-.server-detail-list dt { color: #737373; font-size: 10px; font-weight: 650; text-transform: uppercase; letter-spacing: .08em; }
-.server-detail-list dd { color: #d4d4d8; font-size: 12px; }
+.server-detail-list dt, .server-detail-list dd { min-width: 0; margin: 0; border-bottom: 1px solid color-mix(in srgb, var(--server-shell-border) 80%, transparent); padding: 9px 10px; overflow-wrap: anywhere; }
+.server-detail-list dt { color: var(--server-shell-muted); font-size: 10px; font-weight: 650; text-transform: uppercase; letter-spacing: .08em; }
+.server-detail-list dd { color: var(--server-shell-text); font-size: 12px; }
 
 .server-annotation-card textarea { resize: vertical; }
 .server-saved-highlight { border-left: 3px solid #a78bfa; padding-left: 10px; color: #d4d4d8; font-style: italic; }
@@ -99,40 +374,242 @@
 .server-mobile-menu { display: none; }
 
 .server-personal-layout { display: grid; grid-template-columns: minmax(210px, 280px) minmax(0, 1fr); height: 100%; min-height: 0; }
-.server-personal-list { min-width: 0; overflow-y: auto; border-right: 1px solid #262626; background: rgb(10 10 10 / .55); }
+.server-personal-list { min-width: 0; overflow-y: auto; border-right: 1px solid var(--server-shell-border); background: color-mix(in srgb, var(--server-shell-bg) 82%, transparent); }
 .server-personal-main { display: flex; min-width: 0; min-height: 0; flex-direction: column; }
 .server-chat-scroll { min-height: 0; flex: 1; overflow-y: auto; padding: 16px; }
-.server-chat-empty { display: grid; min-height: 280px; place-items: center; align-content: center; gap: 8px; color: #525252; text-align: center; }
-.server-chat-empty h2 { color: #d4d4d8; font-size: 15px; font-weight: 600; }
+.server-chat-empty { display: grid; min-height: 280px; place-items: center; align-content: center; gap: 8px; color: var(--server-shell-muted); text-align: center; }
+.server-chat-empty h2 { color: var(--server-shell-text); font-size: 15px; font-weight: 600; }
 .server-chat-empty p { max-width: 420px; font-size: 12px; }
-.server-chat-message { max-width: min(820px, 92%); margin: 0 auto 12px; border: 1px solid #262626; border-radius: 12px; padding: 12px 14px; background: rgb(23 23 23 / .52); }
+.server-chat-message { max-width: min(820px, 92%); margin: 0 auto 12px; border: 1px solid var(--server-shell-border); border-radius: 12px; padding: 12px 14px; background: color-mix(in srgb, var(--server-shell-panel-soft) 84%, transparent); }
 .server-chat-message.user { margin-right: 0; border-color: rgb(67 56 202 / .55); background: rgb(49 46 129 / .18); }
 .server-chat-message > span { display: block; margin-bottom: 6px; color: #818cf8; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; }
-.server-chat-message .markdown-reader { color: #d4d4d8; font-size: 13px; line-height: 1.65; }
+.server-chat-message .markdown-reader { color: var(--server-shell-text); font-size: 13px; line-height: 1.65; }
 .server-chat-message .markdown-reader p { margin: .5em 0; }
-.server-chat-composer { flex: 0 0 auto; border-top: 1px solid #262626; padding: 12px 16px; background: rgb(10 10 10 / .82); }
-.server-chat-composer textarea { width: 100%; resize: vertical; border: 1px solid #303030; border-radius: 10px; padding: 10px 12px; background: #111; color: #e5e5e5; font-size: 13px; outline: none; }
+.server-chat-composer { flex: 0 0 auto; border-top: 1px solid var(--server-shell-border); padding: 12px 16px; background: color-mix(in srgb, var(--server-shell-bg) 90%, transparent); }
+.server-chat-composer textarea { width: 100%; resize: vertical; border: 1px solid var(--server-shell-border); border-radius: 10px; padding: 10px 12px; background: var(--server-shell-panel); color: var(--server-shell-text); font-size: 13px; outline: none; }
 .server-chat-composer textarea:focus { border-color: #6366f1; }
 .server-ai-controls { display: flex; min-width: 0; flex-wrap: wrap; gap: 8px; }
 .server-ai-controls label { display: grid; gap: 3px; color: #737373; font-size: 9px; font-weight: 650; text-transform: uppercase; letter-spacing: .07em; }
 .server-ai-controls .input { min-width: 145px; max-width: 220px; }
-.server-note-title { width: 100%; border: 0; border-bottom: 1px solid #262626; padding: 10px 2px; background: transparent; color: #f5f5f5; font-size: clamp(20px, 3vw, 30px); font-weight: 650; outline: none; }
-.server-note-editor { min-height: 52vh; flex: 1; resize: vertical; border: 0; padding: 20px 2px; background: transparent; color: #d4d4d8; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 13px; line-height: 1.75; outline: none; }
-.server-authors-composite { display: grid; grid-template-columns: minmax(0, 1fr) 340px; height: 100%; min-height: 0; }
-.server-author-ai-panel { min-width: 0; overflow-y: auto; border-left: 1px solid #262626; background: rgb(10 10 10 / .72); }
-.server-author-ai-toggle { display: none; width: 100%; align-items: center; justify-content: center; gap: 6px; border: 0; border-bottom: 1px solid #262626; padding: 9px; background: #111; color: #a5b4fc; font-size: 11px; }
-.server-author-ai-content { padding: 14px; }
-.server-desktop-surface [data-tour='nav-browser'],
-.server-desktop-surface [data-tour='nav-radar'],
-.server-desktop-surface [data-tour='nav-compass'],
-.server-desktop-surface [data-tour='nav-toolkit'] { pointer-events: none; opacity: .32; }
+.server-note-title { width: 100%; border: 0; border-bottom: 1px solid var(--server-shell-border); padding: 10px 2px; background: transparent; color: var(--server-shell-text); font-size: clamp(20px, 3vw, 30px); font-weight: 650; outline: none; }
+.server-note-editor { min-height: 52vh; flex: 1; resize: vertical; border: 0; padding: 20px 2px; background: transparent; color: var(--server-shell-text); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 13px; line-height: 1.75; outline: none; }
+.deep-research-reader-toolbar { background: var(--server-shell-bg); }
+.deep-research-reader-rail { background: var(--server-shell-panel-soft); }
+.deep-research-server-view,
+.deep-research-server-reader { min-width: 0; }
+.deep-research-readonly-pill,
+.deep-research-published-pill,
+.deep-research-vault-tag {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid rgb(99 102 241 / .38);
+  border-radius: 999px;
+  background: rgb(49 46 129 / .2);
+  color: #a5b4fc;
+  font-size: 10px;
+  font-weight: 650;
+  letter-spacing: .04em;
+  line-height: 1.2;
+  padding: 4px 9px;
+  white-space: nowrap;
+}
+.deep-research-published-pill { padding: 2px 7px; }
+.deep-research-vault-tag { color: var(--server-shell-muted); border-color: var(--server-shell-border); background: transparent; font-weight: 500; }
+.deep-research-gallery { overscroll-behavior: contain; scrollbar-gutter: stable; }
+.deep-research-gallery-card { min-width: 0; }
+.deep-research-server-tags { display: flex; min-width: 0; flex-wrap: wrap; align-items: center; gap: 5px; margin-top: 7px; color: var(--server-shell-muted); font-size: 10px; line-height: 1.2; }
+.deep-research-server-tags > span { max-width: 14rem; overflow: hidden; border: 1px solid var(--server-shell-border); border-radius: 999px; padding: 3px 7px; text-overflow: ellipsis; white-space: nowrap; }
+.deep-research-server-tags .deep-research-server-tag-indigo { border-color: rgb(99 102 241 / .42); background: rgb(49 46 129 / .18); color: #a5b4fc; }
+.deep-research-server-tags .deep-research-server-tag-cyan { border-color: rgb(6 182 212 / .42); background: rgb(8 51 68 / .2); color: #67e8f9; }
+.deep-research-server-tutorial { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; flex: 0 0 auto; border-bottom: 1px solid var(--server-shell-border); padding: 14px 16px; background: color-mix(in srgb, var(--server-shell-panel-soft) 70%, transparent); }
+.deep-research-server-tutorial article { display: flex; min-width: 0; gap: 9px; border: 1px solid var(--server-shell-border); border-radius: 10px; padding: 11px; background: var(--server-shell-panel); }
+.deep-research-server-tutorial h2 { margin: 0; color: var(--server-shell-text); font-size: 12px; font-weight: 650; }
+.deep-research-server-tutorial p { margin: 4px 0 0; color: var(--server-shell-muted); font-size: 11px; line-height: 1.45; }
+.deep-research-report-cover { box-shadow: 0 12px 30px rgb(15 23 42 / .08); }
+.deep-research-report-cover img { display: block; min-height: 9rem; background: var(--server-shell-panel-soft); }
+.deep-research-brief-editor { box-shadow: 0 4px 14px rgb(79 70 229 / .08); }
+.deep-research-reader-actions { max-width: 100%; }
+.deep-research-reader-scroll { overscroll-behavior: contain; scrollbar-gutter: stable; }
+.deep-research-support-rail { width: 20rem; flex: 0 0 20rem; overflow-y: auto; border-left: 1px solid var(--server-shell-border); padding: 1rem; background: var(--server-shell-panel); }
+.deep-research-support-rail h2 { margin: 0 0 .75rem; color: var(--server-shell-text); font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
+.deep-research-support-matrix { display: grid; gap: .65rem; }
+.deep-research-support-metrics { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .4rem; margin-bottom: .2rem; }
+.deep-research-support-metric { display: flex; align-items: baseline; justify-content: space-between; gap: .4rem; border: 1px solid var(--server-shell-border); border-radius: .55rem; padding: .45rem .55rem; background: color-mix(in srgb, var(--server-shell-panel-soft) 82%, transparent); font-size: 10px; color: var(--server-shell-muted); }
+.deep-research-support-metric strong { color: var(--server-shell-text); font-size: 12px; }
+.deep-research-support-card { border: 1px solid var(--server-shell-border); border-radius: .65rem; padding: .7rem; background: color-mix(in srgb, var(--server-shell-panel-soft) 88%, transparent); }
+.deep-research-support-role { border-radius: 999px; padding: 2px 7px; background: rgb(99 102 241 / .14); color: #a5b4fc; font-size: 10px; font-weight: 700; white-space: nowrap; }
+.deep-research-support-list { border-top: 1px solid var(--server-shell-border); padding-top: .65rem; }
+.deep-research-support-list h3 { margin: 0 0 .35rem; color: var(--server-shell-text); font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; }
+.deep-research-support-list ul { display: grid; gap: .25rem; margin: 0; padding-left: 1rem; color: var(--server-shell-muted); font-size: 11px; line-height: 1.45; }
+.deep-research-reader-feedback { flex: 0 0 auto; border-bottom: 1px solid var(--server-shell-border); background: rgb(79 70 229 / .12); padding: .45rem 1rem; color: #a5b4fc; font-size: 11px; }
+.deep-research-reader-state { display: inline-flex; align-items: center; gap: 4px; border: 1px solid var(--server-shell-border); border-radius: 999px; padding: 5px 8px; color: var(--server-shell-muted); font-size: 10px; white-space: nowrap; }
+.deep-research-reader-progress-track { height: 4px; margin-bottom: 5px; overflow: hidden; border-radius: 999px; background: var(--server-shell-border); }
+.deep-research-reader-progress-track span { display: block; height: 100%; border-radius: inherit; background: #6366f1; transition: width .2s ease; }
+.deep-research-reader-fullscreen { position: fixed; z-index: 60; inset: 0; }
+.deep-research-reader-fullscreen .deep-research-reader-toolbar { padding-left: 18px; padding-right: 18px; }
+@media (max-width: 1100px) {
+  .deep-research-reader-actions { width: 100%; }
+  .deep-research-reader-actions > * { flex-shrink: 0; }
+}
+@media (max-width: 760px) {
+  .deep-research-readonly-pill { display: none; }
+  .deep-research-reader-actions { overflow-x: auto; flex-wrap: nowrap; padding-bottom: 2px; }
+  .deep-research-reader-actions .deep-research-draft-actions { flex-shrink: 0; }
+  .deep-research-support-rail { display: none; }
+}
+html.light .deep-research-readonly-pill,
+html[data-theme='light'] .deep-research-readonly-pill,
+html.light .deep-research-published-pill,
+html[data-theme='light'] .deep-research-published-pill { border-color: #c7d2fe; background: #eef2ff; color: #4338ca; }
+html.light .deep-research-vault-tag,
+html[data-theme='light'] .deep-research-vault-tag { border-color: #d4d4d8; color: #64748b; }
+.deep-research-document { color: var(--server-shell-text); }
+.deep-research-document-section { scroll-margin-top: 28px; }
+.deep-research-document-section > h2 { margin: .35rem 0 1rem; color: var(--server-shell-text); font-size: 1.25rem; font-weight: 650; }
+.deep-research-eyebrow { margin: 0; color: #6366f1; font-size: 10px; font-weight: 750; letter-spacing: .16em; text-transform: uppercase; }
+.deep-research-outline-list { display: grid; gap: 8px; margin: 0; padding-left: 1.3rem; color: var(--server-shell-muted); font-size: 13px; line-height: 1.55; }
+.deep-research-outline-list li { padding-left: 4px; }
+.deep-research-outline-list span { display: block; margin-top: 2px; color: var(--server-shell-muted); font-size: 12px; }
+.deep-research-document .markdown-reader { color: var(--server-shell-text); font-size: inherit; line-height: 1.8; }
+.deep-research-document .markdown-reader :is(h1,h2,h3,h4) { color: var(--server-shell-text); scroll-margin-top: 28px; }
+.deep-research-document .markdown-reader a { color: #818cf8; text-decoration: underline; text-underline-offset: 2px; }
+.deep-research-document .markdown-reader img { display: block; max-width: 100%; height: auto; margin: 1.5rem auto; border-radius: 12px; }
+.deep-research-document-section > ul { margin: 0; padding-left: 1.3rem; color: var(--server-shell-text); font-size: 13px; line-height: 1.7; }
+.deep-research-matrix-wrap { overflow-x: auto; border: 1px solid var(--server-shell-border); border-radius: 10px; }
+.deep-research-matrix { width: 100%; min-width: 720px; border-collapse: collapse; font-size: 11px; line-height: 1.5; }
+.deep-research-matrix th { background: var(--server-shell-panel-soft); color: var(--server-shell-muted); font-size: 10px; font-weight: 700; letter-spacing: .06em; text-align: left; text-transform: uppercase; }
+.deep-research-matrix :is(th, td) { border-bottom: 1px solid var(--server-shell-border); padding: 9px 10px; vertical-align: top; }
+.deep-research-matrix tr:last-child td { border-bottom: 0; }
+.light .deep-research-reader-toolbar { background: #fff; }
+.light .deep-research-reader-rail { background: #f8fafc; }
+.light .deep-research-document { color: #334155; }
+.light .deep-research-document-section > h2 { color: #0f172a; }
+.light .deep-research-document .markdown-reader { color: #334155; }
+.light .deep-research-document .markdown-reader :is(h1,h2,h3,h4) { color: #0f172a; }
+.light .deep-research-matrix th { background: #f8fafc; color: #64748b; }
+html.light .deep-research-server-tags .deep-research-server-tag-indigo,
+html[data-theme='light'] .deep-research-server-tags .deep-research-server-tag-indigo { border-color: #c7d2fe; background: #eef2ff; color: #4338ca; }
+html.light .deep-research-server-tags .deep-research-server-tag-cyan,
+html[data-theme='light'] .deep-research-server-tags .deep-research-server-tag-cyan { border-color: #a5f3fc; background: #ecfeff; color: #0e7490; }
+html.light .deep-research-report-cover,
+html[data-theme='light'] .deep-research-report-cover { box-shadow: 0 12px 30px rgb(15 23 42 / .09); }
+@media (max-width: 900px) {
+  .deep-research-server-tutorial { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 560px) {
+  .deep-research-server-tutorial { grid-template-columns: 1fr; }
+  .deep-research-server-tags > span { max-width: 10rem; }
+}
+.server-desktop-record { display: grid; grid-template-columns: minmax(150px,.34fr) minmax(0,.66fr); border: 1px solid var(--server-shell-border); border-radius: 12px; overflow: hidden; }
+.server-desktop-record > div { display: contents; }
+.server-desktop-record dt,
+.server-desktop-record dd { min-width: 0; margin: 0; border-bottom: 1px solid var(--server-shell-border); padding: 11px 13px; overflow-wrap: anywhere; }
+.server-desktop-record dt { background: color-mix(in srgb, var(--server-shell-panel-soft) 88%, transparent); color: var(--server-shell-muted); font-size: 10px; font-weight: 650; letter-spacing: .08em; text-transform: uppercase; }
+.server-desktop-record dd { color: var(--server-shell-text); font-size: 12px; line-height: 1.6; }
+.server-desktop-record pre { max-width: 100%; margin: 0; overflow: auto; white-space: pre-wrap; }
+
+/* Server-only custom classes used to hard-code charcoal surfaces. Desktop's
+   utility remap cannot see those declarations, so they need the same explicit
+   light palette as the canonical workspaces. */
+html.light .server-vault-popover,
+html[data-theme='light'] .server-vault-popover { border-color: #d4d4d8; background: #fff; box-shadow: 0 24px 70px rgb(15 23 42 / .16); }
+html.light .server-vault-popover .border-neutral-800,
+html[data-theme='light'] .server-vault-popover .border-neutral-800 { border-color: #e5e7eb; }
+html.light .server-vault-popover .bg-neutral-950,
+html[data-theme='light'] .server-vault-popover .bg-neutral-950 { background: #f8fafc; }
+html.light .server-vault-popover .text-neutral-200,
+html[data-theme='light'] .server-vault-popover .text-neutral-200,
+html.light .server-vault-popover .text-neutral-300,
+html[data-theme='light'] .server-vault-popover .text-neutral-300 { color: #334155; }
+html.light .server-vault-popover .text-neutral-500,
+html[data-theme='light'] .server-vault-popover .text-neutral-500,
+html.light .server-vault-popover .text-neutral-600,
+html[data-theme='light'] .server-vault-popover .text-neutral-600 { color: #64748b; }
+html.light .server-vault-popover button:hover,
+html[data-theme='light'] .server-vault-popover button:hover { background: #f1f5f9; color: #171717; }
+html.light .server-vault-modal > section,
+html[data-theme='light'] .server-vault-modal > section { border-color: #d4d4d8; background: #fff; color: #171717; box-shadow: 0 24px 70px rgb(15 23 42 / .18); }
+html.light .server-vault-modal .text-neutral-300,
+html[data-theme='light'] .server-vault-modal .text-neutral-300,
+html.light .server-vault-modal .text-neutral-400,
+html[data-theme='light'] .server-vault-modal .text-neutral-400 { color: #475569; }
+html.light .server-record-card,
+html[data-theme='light'] .server-record-card { border-color: #e5e7eb; background: #fff; color: #171717; }
+html.light .server-record-card:hover,
+html[data-theme='light'] .server-record-card:hover { border-color: #818cf8; background: #f8fafc; }
+html.light .server-record-card .server-record-icon,
+html[data-theme='light'] .server-record-card .server-record-icon { background: #eef2ff; color: #4f46e5; }
+html.light .server-detail-list dt,
+html.light .server-detail-list dd,
+html[data-theme='light'] .server-detail-list dt,
+html[data-theme='light'] .server-detail-list dd { border-color: #e5e7eb; }
+html.light .server-detail-list dt,
+html[data-theme='light'] .server-detail-list dt { color: #64748b; }
+html.light .server-detail-list dd,
+html[data-theme='light'] .server-detail-list dd { color: #334155; }
+html.light .server-saved-highlight,
+html[data-theme='light'] .server-saved-highlight { color: #334155; }
+html.light .server-personal-list,
+html.light .server-chat-empty,
+html[data-theme='light'] .server-personal-list,
+html[data-theme='light'] .server-chat-empty { color: #64748b; }
+html.light .server-chat-empty h2,
+html[data-theme='light'] .server-chat-empty h2 { color: #334155; }
+html.light .server-chat-message,
+html[data-theme='light'] .server-chat-message { border-color: #e5e7eb; background: #fff; }
+html.light .server-chat-message.user,
+html[data-theme='light'] .server-chat-message.user { border-color: #a5b4fc; background: #eef2ff; }
+html.light .server-chat-message .markdown-reader,
+html[data-theme='light'] .server-chat-message .markdown-reader { color: #334155; }
+html.light .server-chat-composer,
+html[data-theme='light'] .server-chat-composer { border-color: #e5e7eb; background: rgba(255,255,255,.96); }
+html.light .server-chat-composer textarea,
+html[data-theme='light'] .server-chat-composer textarea { border-color: #d4d4d8; background: #fff; color: #171717; }
+html.light .server-note-title,
+html[data-theme='light'] .server-note-title { border-color: #e5e7eb; color: #0f172a; }
+html.light .server-note-editor,
+html[data-theme='light'] .server-note-editor { color: #334155; }
+html.light .server-desktop-record,
+html[data-theme='light'] .server-desktop-record { border-color: #e5e7eb; }
+html.light .server-desktop-record dt,
+html.light .server-desktop-record dd,
+html[data-theme='light'] .server-desktop-record dt,
+html[data-theme='light'] .server-desktop-record dd { border-color: #e5e7eb; }
+html.light .server-desktop-record dt,
+html[data-theme='light'] .server-desktop-record dt { background: #f8fafc; color: #64748b; }
+html.light .server-desktop-record dd,
+html[data-theme='light'] .server-desktop-record dd { background: #fff; color: #334155; }
+
+/* Tailwind's gradient stop utilities are emitted as CSS variables and have no
+   light-mode counterpart. Deep Research uses these stops for report covers;
+   without an explicit remap they remain an opaque indigo/charcoal strip in
+   an otherwise light reader. Attribute selectors avoid coupling this rule to
+   Tailwind's escaped slash syntax. */
+html.light [class~='from-indigo-950/30'] [class~='to-neutral-900'],
+html[data-theme='light'] [class~='from-indigo-950/30'] [class~='to-neutral-900'],
+html.light [class~='from-indigo-950/30'],
+html[data-theme='light'] [class~='from-indigo-950/30'] {
+  --tw-gradient-from: rgb(238 242 255 / .3) var(--tw-gradient-from-position);
+  --tw-gradient-to: rgb(248 250 252 / 0) var(--tw-gradient-to-position);
+  --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to);
+}
+html.light [class~='to-neutral-900'],
+html[data-theme='light'] [class~='to-neutral-900'] {
+  --tw-gradient-to: #f8fafc var(--tw-gradient-to-position);
+}
 
 @media (max-width: 760px) {
   .server-settings-grid { grid-template-columns: minmax(0, 1fr); }
+  .server-settings-native { min-height: 0; overflow-x: hidden; }
   .server-desktop-surface { --server-sidebar-width: min(86vw, 310px) !important; }
   .server-mobile-menu { display: inline-flex; }
   .server-header-secondary { display: none !important; }
-  .header-action-rail > :nth-last-child(-n+2) { display: none !important; }
+  /* Keep the controls that remain actionable on a narrow viewport (search,
+     settings, theme and account). Nodi and the assistant are optional
+     destinations and yield first, instead of hiding the account control as
+     the old positional selector did. */
+  .header-action-rail > [data-testid='header-nodi'],
+  .header-action-rail > [data-testid='header-assistant'] { display: none !important; }
   .header-vault-badge { max-width: 132px; }
   .header-vault-badge span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .server-header-brand-text, .server-header-chevron { display: none !important; }
@@ -150,10 +627,11 @@
     transform: translateX(-105%);
     transition: transform .18s ease;
   }
+  .server-desktop-nav .server-sidebar-resizer { display: none; }
   .server-desktop-nav[data-drawer='true'] { transform: translateX(0); }
-  .server-sidebar-resizer { display: none; }
+  html.light .server-desktop-nav,
+  html[data-theme='light'] .server-desktop-nav { border-color: #e5e7eb; background: #fff; box-shadow: 18px 0 50px rgb(15 23 42 / .18); }
   .server-drawer-scrim { position: fixed; z-index: 65; inset: 44px 0 0; border: 0; background: rgb(0 0 0 / .62); }
-  .server-readonly-banner { padding-inline: 10px; }
   .server-detail-grid { grid-template-columns: 1fr; }
   .server-record-grid { grid-template-columns: 1fr; }
   .server-view-padding { padding: 16px !important; }
@@ -167,16 +645,26 @@
   .server-ai-controls label { min-width: 0; flex: 1; }
   .server-ai-controls .input { width: 100%; min-width: 0; max-width: none; }
   .server-chat-message { max-width: 100%; }
-  .server-authors-composite { grid-template-columns: 1fr; grid-template-rows: minmax(0, 1fr) auto; }
-  .server-author-ai-panel { max-height: 42px; border-top: 1px solid #262626; border-left: 0; transition: max-height .18s ease; }
-  .server-author-ai-panel.is-open { max-height: min(60vh, 520px); }
-  .server-author-ai-toggle { display: flex; }
-  .server-author-ai-content { display: none; }
-  .server-author-ai-panel.is-open .server-author-ai-content { display: block; }
+  /* The reader's notes/info/chat rail is a desktop column. On a phone it must
+     become an overlay, otherwise its fixed 21rem width pushes the document
+     outside the viewport and makes the close/back controls unreachable. */
+  .library-document-reader > .relative > .library-reader-notes {
+    position: absolute;
+    z-index: 30;
+    inset: 0 0 0 auto;
+    width: min(21rem, calc(100vw - 1rem));
+    max-width: 100%;
+    border-left: 1px solid #262626;
+    box-shadow: -18px 0 50px rgb(0 0 0 / .45);
+  }
+  html.light .library-document-reader > .relative > .library-reader-notes,
+  html[data-theme='light'] .library-document-reader > .relative > .library-reader-notes {
+    border-left-color: #e5e7eb;
+    box-shadow: -18px 0 50px rgb(15 23 42 / .18);
+  }
 }
 
 @media (max-height: 480px) and (orientation: landscape) {
-  .server-readonly-banner { display: none; }
   .server-desktop-nav { top: 44px; }
   .server-view-padding { padding: 12px 16px !important; }
   .server-vault-popover { max-height: calc(100vh - 58px); overflow-y: auto; }

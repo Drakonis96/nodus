@@ -30,10 +30,29 @@ interface ProvisionResult {
 async function provision(loopbackUrl: string, vaultId: string, vaultName: string, vaultType: VaultType): Promise<ProvisionResult> {
   const secret = readProvisionSecret();
   if (!secret) throw new Error('El servidor local todavía no ha escrito su secreto de aprovisionamiento.');
+  const settings = getSettings() as unknown as Record<string, unknown>;
   const response = await fetch(`${loopbackUrl}/api/v1/local/provision`, {
     method: 'POST',
     headers: { 'content-type': 'application/json', authorization: `Bearer ${secret}` },
-    body: JSON.stringify({ vaultId, vaultName, vaultType }),
+    // The local server is provisioned by the same process that owns these settings. Carry
+    // the explicit publication choices with the one-shot, loopback-only request so the
+    // very first snapshot is evaluated against the policy the user selected. Previously a
+    // fresh local space started with the restrictive server default and silently removed
+    // Deep Research, Library and passages before the first publication.
+    body: JSON.stringify({
+      vaultId,
+      vaultName,
+      vaultType,
+      publicationPolicy: {
+        allowUserContent: settings.nodusServerIncludeUserContent === true,
+        allowLibraryDocuments: settings.nodusServerIncludeLibraryDocuments === true,
+        allowPassages: settings.nodusServerIncludePassages === true,
+        allowVectors: settings.nodusServerIncludeVectors !== false,
+        allowPrimarySources: settings.nodusServerIncludePrimarySources === true,
+        allowTestimonies: settings.nodusServerIncludeTestimonies === true,
+        allowPersonalImports: settings.nodusServerIncludePersonalImports !== false,
+      },
+    }),
     signal: AbortSignal.timeout(15_000),
   });
   const result = await response.json().catch(() => ({})) as Partial<ProvisionResult> & { error_description?: string; error?: string };

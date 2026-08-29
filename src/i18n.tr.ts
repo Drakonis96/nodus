@@ -36,13 +36,13 @@ import { DATABASE_TASK_TRANSLATIONS } from './i18n.databaseTasks';
 import { DATABASE_AUTOMATION_TRANSLATIONS } from './i18n.databaseAutomations';
 import { NOTION_IMPORT_TRANSLATIONS } from './i18n.notionImport';
 import { LIBRARY_ONBOARDING_TRANSLATIONS } from './i18n.libraryOnboarding';
-import { LIBRARY_TUTORIAL_TRANSLATIONS } from './i18n.libraryTutorial';
 import { SOURCE_CITATION_TRANSLATIONS } from './i18n.sourceCitation';
 import { DEEP_RESEARCH_APPROACH_TRANSLATIONS } from './i18n.deepResearchApproaches';
 import { DICTIONARY_TRANSLATIONS } from './i18n.dictionary';
 import { DEEP_RESEARCH_VERSION_TRANSLATIONS } from './i18n.deepResearchVersions';
 import { DOCUMENT_UNDERSTANDING_TRANSLATIONS } from './i18n.documentUnderstanding';
 import { DEEP_RESEARCH_QUALITY_TRANSLATIONS } from './i18n.deepResearchQuality';
+import { DOCUMENT_UNDERSTANDING_CONSENT_TRANSLATIONS } from './i18n.documentUnderstandingConsent';
 import { MODEL_SETTINGS_TRANSLATIONS } from './i18n.modelSettings';
 import { DATABASE_DEEP_RESEARCH_TRANSLATIONS } from './i18n.databaseDeepResearch';
 
@@ -70,9 +70,9 @@ export const TR: Record<string, string> = {
   ...DEEP_RESEARCH_VERSION_TRANSLATIONS.tr,
   ...DOCUMENT_UNDERSTANDING_TRANSLATIONS.tr,
   ...DEEP_RESEARCH_QUALITY_TRANSLATIONS.tr,
+  ...DOCUMENT_UNDERSTANDING_CONSENT_TRANSLATIONS.tr,
   ...LIBRARY_BIBLIOGRAPHY_TRANSLATIONS.tr,
   ...LIBRARY_ONBOARDING_TRANSLATIONS.tr,
-  ...LIBRARY_TUTORIAL_TRANSLATIONS.tr,
   ...LIBRARY_RECOVERY_TRANSLATIONS.tr,
   ...DIARIZATION_TRANSLATIONS.tr,
   ...PROSOPOGRAPHY_TRANSLATIONS.tr,
@@ -2215,8 +2215,6 @@ export const TR: Record<string, string> = {
   "Conectado (userID {id})": "Bağlandı (kullanıcı kimliği {id})",
   "No disponible: {msg}": "Mevcut değil: {msg}",
   "sin respuesta": "yanıt yok",
-  "Comprueba que Zotero esté abierto y que «Permitir que otras aplicaciones de este ordenador se comuniquen con Zotero» esté activado en los ajustes Avanzados de Zotero.":
-    "Zotero’nun açık olduğundan ve Zotero’nun Gelişmiş ayarlarında “Bu bilgisayardaki diğer uygulamaların Zotero ile iletişim kurmasına izin ver” seçeneğinin etkin olduğundan emin olun.",
   "Elige las colecciones a monitorizar. Se incorporan metadatos; los análisis se lanzan manualmente salvo que actives automatización en Ajustes.": "İzlenecek koleksiyonları seçin. Meta veriler dahil edilmiştir; Ayarlar'da otomasyonu etkinleştirmediğiniz sürece analizler manuel olarak başlatılır.",
   "ítems": "öğeler",
   "subcol.": "alt sütun",
@@ -8033,18 +8031,17 @@ export const TR: Record<string, string> = {
   "En Zotero: Herramientas → Complementos → ⚙ → Instalar complemento desde archivo.": "Zotero’da: Araçlar → Eklentiler → ⚙ → Eklentiyi Dosyadan Kur.",
   "Guardar .xpi para Zotero": "Zotero için .xpi kaydet",
   "Ver instrucciones de instalación": "Kurulum talimatlarını görüntüle",
-  "Leyendo colecciones…": "Koleksiyonlar okunuyor…",
-  "Catalogando…": "Kataloglanıyor…",
-  "Leyendo notas…": "Notlar okunuyor…",
-  "Copiando archivos…": "Dosyalar kopyalanıyor…",
-  "Verificando el índice local…": "Yerel dizin doğrulanıyor…",
-  "Importación completada": "İçe aktarma tamamlandı",
-  "Importación cancelada": "İçe aktarma iptal edildi",
-  "No se pudo completar la importación": "İçe aktarma tamamlanamadı",
-  "Cancelar importación": "İçe aktarmayı iptal et",
-  "Ocultar la importación terminada": "Tamamlanan içe aktarmayı gizle",
-  "Importar archivos sueltos (sin ficha bibliográfica)": "Bağımsız dosyaları içe aktar (kaynakça kaydı olmayan)",
-  "PDFs y EPUBs añadidos a Zotero sin una entrada encima. Llegan sin autor ni año.": "Zotero’ya üstlerinde bir kayıt olmadan eklenen PDF ve EPUB’lar. Yazar ve yıl bilgisi olmadan gelirler.",
-  "Archivos sueltos no importados": "Bağımsız dosyalar içe aktarılmadı",
-  "Tu biblioteca tiene {n} archivo(s) sin ficha bibliográfica. Marca la casilla de arriba y vuelve a importar si los quieres.": "Kitaplığınızda kaynakça kaydı olmayan {n} dosya var. Bunları istiyorsanız yukarıdaki kutuyu işaretleyip yeniden içe aktarın.",
+  "Publicar fuentes primarias revisadas": "İncelenmiş birincil kaynakları yayımla",
+  "Incluye metadatos, extractos y análisis; nunca archivos originales, rutas locales ni datos privados.": "Meta verileri, alıntıları ve analizleri içerir; özgün dosyaları, yerel yolları veya özel verileri asla içermez.",
+  "Publicar testimonios textuales": "Metinsel tanıklıkları yayımla",
+  "Incluye entrevistas, transcripciones y análisis; participantes, acuerdos y archivos multimedia permanecen privados.": "Görüşmeleri, dökümleri ve analizleri içerir; katılımcılar, anlaşmalar ve medya dosyaları gizli kalır.",
+  "Espacio de trabajo": "Çalışma alanı",
+  "notas, borradores y organización": "notlar, taslaklar ve düzenleme",
+  "Organiza notas, borradores y materiales en un único espacio con citas verificables.": "Notları, taslakları ve materyalleri doğrulanabilir alıntılarla tek bir alanda düzenleyin.",
+  "Organiza el trabajo del corpus": "Derlem çalışmasını düzenleyin",
+  "Ya hay suficientes ideas y fuentes para organizar notas y borradores con citas verificables en un único espacio de trabajo.": "Notları ve taslakları doğrulanabilir alıntılarla tek bir çalışma alanında düzenlemek için yeterli fikir ve kaynak var.",
+  "Abrir espacio de trabajo": "Çalışma alanını aç",
+  "Espacio de trabajo: notas y borradores con fuentes verificables": "Çalışma alanı: doğrulanabilir kaynaklarla notlar ve taslaklar",
+  "El Espacio de trabajo reúne notas, borradores y organización en una única superficie. Conserva las citas clicables y permite estructurar el manuscrito sin separar artificialmente Escritura y Proyectos.": "Çalışma alanı notları, taslakları ve düzenlemeyi tek bir yüzeyde birleştirir. Alıntıları tıklanabilir tutar ve Yazım ile Projeleri yapay biçimde ayırmadan metni yapılandırmanızı sağlar.",
+  "Revisa, amplía y transforma borradores en el Espacio de trabajo.": "Çalışma alanında taslakları gözden geçirin, genişletin ve dönüştürün.",
 };
