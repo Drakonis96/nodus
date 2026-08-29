@@ -315,7 +315,10 @@ const SERVER_TOOL_VIEWS = new Set<View>([
 const ACTIVE_VAULT_STORAGE_KEY = "nodus-server-active-vault";
 const SERVER_NAV_COLLAPSED_STORAGE_KEY = "nodus-server-nav-collapsed";
 const SERVER_COLLAPSED_GROUPS_STORAGE_KEY = "nodus-server-collapsed-groups";
-const SERVER_SIDEBAR_DEFAULT_WIDTH = 176;
+// The header brand row -- logo, "Nodus Server" and the BETA tag -- measures 138px,
+// and the pinned chevron reserves 24px more on the right. At the old 176px default
+// that left 6px of slack and the row read as flush against both edges.
+const SERVER_SIDEBAR_DEFAULT_WIDTH = 200;
 const SERVER_SIDEBAR_MIN_WIDTH = 64;
 const SERVER_SIDEBAR_MAX_WIDTH = 360;
 // Desktop switches to icon-only navigation at this width. Keep the same
@@ -2492,7 +2495,7 @@ export default function App() {
         <button
           ref={setHeaderLogoEl}
           data-testid="sidebar-header-toggle"
-          className="server-header-logo relative flex h-full shrink-0 items-center justify-center px-2 text-lg font-semibold tracking-tight transition-colors hover:bg-neutral-900/70 focus-visible:bg-neutral-900/70"
+          className={`server-header-logo relative flex h-full shrink-0 items-center justify-center text-lg font-semibold tracking-tight transition-colors hover:bg-neutral-900/70 focus-visible:bg-neutral-900/70 ${sidebarWidth > SERVER_SIDEBAR_COMPACT_THRESHOLD ? "pl-2 pr-6" : "px-2"}`}
           style={{ width: sidebarWidth }}
           onClick={() => {
             if (matchMedia("(max-width: 760px)").matches)
@@ -2516,24 +2519,23 @@ export default function App() {
         >
           <span
             data-testid="sidebar-header-brand"
-            className="flex items-center justify-center gap-2 whitespace-nowrap"
+            className="flex min-w-0 items-center justify-center gap-1.5 whitespace-nowrap"
           >
             <img
               src={logoFor(type)}
               alt=""
-              className={
-                sidebarWidth <= SERVER_SIDEBAR_COMPACT_THRESHOLD
-                  ? "h-6 w-6"
-                  : "h-7 w-7"
-              }
+              className="h-6 w-6"
               data-testid="nodus-logo"
               data-vault-logo={type}
             />
             <span
               className={`server-header-brand-text ${sidebarWidth <= SERVER_SIDEBAR_COMPACT_THRESHOLD ? "sr-only" : ""}`}
             >
-              Nodus
+              Nodus Server
             </span>
+            {sidebarWidth > SERVER_SIDEBAR_COMPACT_THRESHOLD && (
+              <span className="server-header-beta">BETA</span>
+            )}
           </span>
           {sidebarWidth > SERVER_SIDEBAR_COMPACT_THRESHOLD && (
             <Icon

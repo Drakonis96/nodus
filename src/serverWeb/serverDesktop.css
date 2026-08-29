@@ -671,3 +671,26 @@ html[data-theme='light'] [class~='to-neutral-900'] {
 }
 
 @media (prefers-reduced-motion: reduce) { .server-vault-popover { animation: none; } }
+
+/* Sidebar header brand.  The row has to hold the logo, "Nodus Server" and the
+   BETA tag inside a sidebar the reader can drag down to 64px, so the text is
+   sized well below the header's own scale and the row reserves the space the
+   pinned chevron occupies on the right.  BETA takes the colour of the open
+   vault through --vault-accent, set on .server-desktop-surface. */
+.server-header-brand-text {
+  font-size: 0.6875rem;
+  line-height: 1;
+  letter-spacing: -0.01em;
+}
+.server-header-beta {
+  flex: 0 0 auto;
+  padding: 0.0625rem 0.1875rem;
+  border: 1px solid color-mix(in srgb, var(--vault-accent) 45%, transparent);
+  border-radius: 0.25rem;
+  background: color-mix(in srgb, var(--vault-accent) 16%, transparent);
+  color: var(--vault-accent);
+  font-size: 0.5rem;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: 0.06em;
+}
