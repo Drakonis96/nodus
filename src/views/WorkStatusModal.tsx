@@ -8,7 +8,8 @@ import type { WorkView } from '@shared/types';
 import { Icon } from '../components/ui';
 import { notifyDataChanged } from '../hooks';
 import { STEP_ORDER, type StepId, type StepState, type WorkStatus } from '../libraryStatus';
-import { t, tx } from '../i18n';
+import { localizeRuntimeError } from '@shared/uiLanguage';
+import { getActiveLang, t, tx } from '../i18n';
 
 /**
  * The five steps, in pipeline order. Kept in this file with display-shaped values
@@ -147,13 +148,24 @@ export function WorkStatusModal({
     if (step.state === 'blocked') return t('Necesita el texto completo de la obra.');
     switch (id) {
       case 'themes':
+        // The light scan persists its own failure into `notes` (worksRepo.setLightResult),
+        // so this step can name a cause instead of showing the same dash it shows for
+        // "not run yet" — which read as "no information exists" when there always was some.
+        if (step.state === 'failed') return work.notes ? localizeRuntimeError(work.notes, getActiveLang()) : t('El paso falló sin dejar un motivo. Reintenta; si vuelve a fallar, revisa el modelo en Ajustes → Modelos de IA.');
         return work.themes.length > 0 ? work.themes.join(', ') : '—';
       case 'ideas':
-        if (step.state === 'failed' && work.deep_error) return work.deep_error;
+        // Stored in Spanish by the main process, and `deep_error` is not one of the
+        // `message`/`error` field names `localizeIpcPayload` sweeps — so it arrived here
+        // untouched while every neighbouring line went through t(). It read as Spanish
+        // prose in the other seven interface languages, which is what the reader sees
+        // most often, because a failed analysis repeats its sentence until it is retried.
+        if (step.state === 'failed' && work.deep_error) return localizeRuntimeError(work.deep_error, getActiveLang());
         if (step.reason === 'analysis_text_changed') return t('Las ideas pertenecen a la versión anterior del texto. Vuelve a analizarlas para usar el texto actual.');
         if (step.state === 'partial') return t('El análisis solo pudo usar el abstract.');
         return work.ideaCount > 0 ? tx('{n} ideas extraídas', { n: work.ideaCount }) : '—';
       case 'summary':
+        // No column stores a summary failure, so say that plainly rather than nothing.
+        if (step.state === 'failed') return t('El paso falló sin dejar un motivo. Reintenta; si vuelve a fallar, revisa el modelo en Ajustes → Modelos de IA.');
         return step.state === 'done' ? t('Disponible en la obra.') : '—';
       case 'semantic':
         return step.total ? tx('{a}/{b} ideas indexadas', { a: step.done ?? 0, b: step.total }) : '—';

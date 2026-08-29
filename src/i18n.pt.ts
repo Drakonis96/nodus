@@ -5567,6 +5567,10 @@ export const PT: Record<string, string> = {
     'Este modelo consome a quota da sua subscrição, não crédito de API. Uma análise completa do corpus pode esgotar o limite semanal ou mensal do seu plano.',
   'Este modelo local es de visión y no extrae ideas de forma fiable (tiende a divagar y no cerrar el JSON). Para extracción, elige Gemma 4 E2B u otro modelo mayor.':
     'Este modelo local é orientado a visão e não extrai ideias de forma fiável (tende a divagar e a não fechar o JSON). Para extração, escolha o Gemma 4 E2B ou um modelo maior.',
+  "Estos pesos son los mismos que Nodus descarta entre sus modelos integrados: al extraer ideas divagan y no cierran el JSON. Puedes usarlos igualmente, pero para extracción conviene un modelo mayor.": "Estes são os mesmos pesos que o Nodus descarta entre os seus modelos integrados: ao extrair ideias divagam e nunca fecham o JSON. Pode usá-los à mesma, mas a extração fica melhor servida por um modelo maior.",
+  "El paso falló sin dejar un motivo. Reintenta; si vuelve a fallar, revisa el modelo en Ajustes → Modelos de IA.": "O passo falhou sem registar um motivo. Tente novamente; se voltar a falhar, verifique o modelo em Definições → Modelos de IA.",
+  "Todavía no hay ningún modelo entre los que elegir. Pulsa «Cargar modelos» para ver los de tus proveedores, o marca los que quieras como favoritos en Ajustes → Proveedores de IA y modelos.": "Ainda não há nenhum modelo por onde escolher. Carregue em «Carregar modelos» para ver os dos seus fornecedores, ou marque os que quiser como favoritos em Definições → Fornecedores de IA e modelos.",
+  "Sin respuesta de {list}. Revisa su clave o que el servidor local esté abierto.": "Sem resposta de {list}. Verifique a chave, ou que o servidor local está aberto.",
   'solo visión':
     'apenas visão',
   'Este modelo no puede usarse para extracción de ideas.':

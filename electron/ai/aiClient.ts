@@ -51,7 +51,7 @@ export class AiError extends Error {
     message: string,
     public retriable = false,
     public config = false,
-    public code: 'output_truncated' | typeof AI_MODEL_REQUIRED_ERROR_CODE | null = null,
+    public code: 'output_truncated' | 'timeout' | typeof AI_MODEL_REQUIRED_ERROR_CODE | null = null,
   ) {
     super(message);
   }
@@ -158,6 +158,32 @@ function truncatedJsonMessage(model: ModelRef, maxTokens: number): string {
     return `${cut} El espacio de salida es lo que queda de la ventana de contexto tras el prompt: amplíala en ${label} (${knob}), elige un modelo local con más contexto o usa un proveedor en la nube para esta tarea.`;
   }
   return `${cut} Usa un modelo con mayor límite de salida o reduce el tamaño de la tarea.`;
+}
+
+/**
+ * How long one non-streaming completion may take before the transport gives up.
+ *
+ * A cloud provider that has said nothing for three minutes is stuck: it runs the model
+ * on hardware sized for it, and the request is billed whether or not we keep waiting.
+ * A model on the user's own laptop is a different animal — the wait IS the work. Idea
+ * extraction asks for up to 8.000 JSON tokens per chunk, which at the 15-40 tokens/s a
+ * quantized 7B reaches on an M-series is 200-530 seconds of perfectly healthy
+ * generation. Under one shared 180s ceiling that arrived as "timed out waiting for the
+ * AI provider" on every chunk, which is why local models could produce Themes (1.500
+ * tokens, one call) and never Ideas. Nothing is billed by the second here and the deep
+ * scan ticks a heartbeat while it waits, so the local budget is generous; it stays
+ * finite because a wedged local server must not hold the scan queue open forever.
+ */
+const CLOUD_COMPLETION_TIMEOUT_MS = 180_000;
+const ON_DEVICE_COMPLETION_TIMEOUT_MS = 900_000;
+
+/** True when the model runs on this machine: the built-in runtime, or a local server. */
+function runsOnDevice(provider: AiProvider): boolean {
+  return provider === 'nodus' || isLocalProvider(provider);
+}
+
+export function completionTimeoutMs(model: ModelRef): number {
+  return runsOnDevice(model.provider) ? ON_DEVICE_COMPLETION_TIMEOUT_MS : CLOUD_COMPLETION_TIMEOUT_MS;
 }
 
 /**
@@ -632,7 +658,7 @@ async function rawCompleteTransport(
   const client = new OpenAI({
     apiKey: key,
     baseURL: baseURL ?? undefined,
-    timeout: opts.timeoutMs ?? 180_000,
+    timeout: opts.timeoutMs ?? completionTimeoutMs(model),
     maxRetries: 0,
     defaultHeaders: openAiClientHeaders(model),
   });
@@ -695,8 +721,10 @@ function wrapProviderError(e: any): AiError {
   if (isContextOverflow(e?.error?.message ?? e?.message)) {
     return new AiError(genericContextOverflowMessage(), false, true);
   }
+  // Tagged, not merely worded: the deep scan answers a timeout by splitting the chunk
+  // (less to generate → it fits), which it must not do for an unrelated failure.
   if (e?.name?.includes('Timeout') || /timeout|timed out/i.test(e?.message ?? '')) {
-    return new AiError('Tiempo agotado esperando al proveedor de IA. Prueba con un modelo más rápido o un fragmento menor.', false);
+    return new AiError('Tiempo agotado esperando al proveedor de IA. Prueba con un modelo más rápido o un fragmento menor.', false, false, 'timeout');
   }
   if (status === 429 || status === 529) return new AiError('Límite de tasa del proveedor de IA', true);
   if (status >= 500) return new AiError(`Error del proveedor (${status})`, true);
@@ -1143,7 +1171,7 @@ async function rawCompleteStreamTransport(
   const client = new OpenAI({
     apiKey: key,
     baseURL: baseURL ?? undefined,
-    timeout: 180_000,
+    timeout: completionTimeoutMs(model),
     maxRetries: 0,
     defaultHeaders: openAiClientHeaders(model),
   });
