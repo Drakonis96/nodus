@@ -130,6 +130,13 @@ test('academic onboarding offers Nodus Library or optional Zotero while dedicate
   assert.match(onboarding, /useState<'nodus' \| 'zotero'>\('nodus'\)/);
   assert.match(onboarding, /data-testid="onboarding-library-nodus"/);
   assert.match(onboarding, /data-testid="onboarding-library-zotero"/);
+  // The two sources are shown as brands, not as generic glyphs: the Nodus node mark
+  // and the same mark drawn as a red Z, with Zotero carrying the recommendation.
+  assert.match(onboarding, /import nodusLogo from '\.\.\/assets\/nodus-logo\.svg';/);
+  assert.match(onboarding, /import zoteroLogo from '\.\.\/assets\/nodus-logo-zotero\.svg';/);
+  assert.match(onboarding, /data-testid="onboarding-library-nodus"[\s\S]*?<img src=\{nodusLogo\}/);
+  assert.match(onboarding, /data-testid="onboarding-library-zotero"[\s\S]*?<img src=\{zoteroLogo\}/);
+  assert.match(onboarding, /data-testid="onboarding-library-zotero-recommended"[^>]*>\{t\('Recomendado'\)\}/);
   assert.match(onboarding, /if \(connectsZotero\) \{[\s\S]*syncNow/);
   assert.match(onboarding, /No necesitas Zotero/);
   assert.match(onboarding, /Organiza cursos, apuntes, materiales y repasos en un espacio de aprendizaje local/);
