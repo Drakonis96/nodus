@@ -36,13 +36,13 @@ import { DATABASE_TASK_TRANSLATIONS } from './i18n.databaseTasks';
 import { DATABASE_AUTOMATION_TRANSLATIONS } from './i18n.databaseAutomations';
 import { NOTION_IMPORT_TRANSLATIONS } from './i18n.notionImport';
 import { LIBRARY_ONBOARDING_TRANSLATIONS } from './i18n.libraryOnboarding';
+import { LIBRARY_TUTORIAL_TRANSLATIONS } from './i18n.libraryTutorial';
 import { SOURCE_CITATION_TRANSLATIONS } from './i18n.sourceCitation';
 import { DEEP_RESEARCH_APPROACH_TRANSLATIONS } from './i18n.deepResearchApproaches';
 import { DICTIONARY_TRANSLATIONS } from './i18n.dictionary';
 import { DEEP_RESEARCH_VERSION_TRANSLATIONS } from './i18n.deepResearchVersions';
 import { DOCUMENT_UNDERSTANDING_TRANSLATIONS } from './i18n.documentUnderstanding';
 import { DEEP_RESEARCH_QUALITY_TRANSLATIONS } from './i18n.deepResearchQuality';
-import { DOCUMENT_UNDERSTANDING_CONSENT_TRANSLATIONS } from './i18n.documentUnderstandingConsent';
 import { MODEL_SETTINGS_TRANSLATIONS } from './i18n.modelSettings';
 import { DATABASE_DEEP_RESEARCH_TRANSLATIONS } from './i18n.databaseDeepResearch';
 
@@ -70,9 +70,9 @@ export const IT: Record<string, string> = {
   ...DEEP_RESEARCH_VERSION_TRANSLATIONS.it,
   ...DOCUMENT_UNDERSTANDING_TRANSLATIONS.it,
   ...DEEP_RESEARCH_QUALITY_TRANSLATIONS.it,
-  ...DOCUMENT_UNDERSTANDING_CONSENT_TRANSLATIONS.it,
   ...LIBRARY_BIBLIOGRAPHY_TRANSLATIONS.it,
   ...LIBRARY_ONBOARDING_TRANSLATIONS.it,
+  ...LIBRARY_TUTORIAL_TRANSLATIONS.it,
   ...LIBRARY_RECOVERY_TRANSLATIONS.it,
   ...DIARIZATION_TRANSLATIONS.it,
   ...PROSOPOGRAPHY_TRANSLATIONS.it,

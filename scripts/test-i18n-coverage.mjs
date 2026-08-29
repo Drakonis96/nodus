@@ -634,6 +634,64 @@ test('legacy Spanish Electron errors cannot leak into a non-Spanish interface', 
   );
 });
 
+/**
+ * A closed Zotero is the commonest failure the global library has, and its sentence
+ * is born in the main process in Spanish. Unlisted here it was not translated but
+ * erased: every one of these collapsed into "The operation could not be completed.",
+ * which is what the Zotero import dialog showed instead of naming the cause.
+ */
+test('Zotero and global library failures name their cause in every language', () => {
+  const { localizeRuntimeError } = loadModule('shared/uiLanguage.ts');
+  const generic = 'The operation could not be completed.';
+  const failures = [
+    'No se pudo conectar con Zotero: fetch failed',
+    'No se pudo conectar con Zotero.',
+    'Las credenciales de Zotero han caducado.',
+    'Zotero rechazó el acceso a esta biblioteca.',
+    'Zotero mantiene temporalmente limitado el acceso.',
+    'Zotero respondió HTTP 503.',
+    'La biblioteca de Zotero ya no existe: Colecciones de Zotero.',
+    'Configura primero la carpeta de copias de seguridad de Nodus.',
+  ];
+  for (const failure of failures) {
+    assert.equal(localizeRuntimeError(failure, 'es'), failure, `Spanish must keep ${failure} verbatim`);
+    for (const language of ['en', 'fr', 'de', 'pt', 'pt-BR', 'it', 'tr', 'unknown']) {
+      const localized = localizeRuntimeError(failure, language);
+      assert.notEqual(localized, generic, `${language} erased "${failure}" into the generic error`);
+      assert.notEqual(localized, failure, `${language} leaked Spanish for "${failure}"`);
+    }
+  }
+  // The transport detail is not prose: it survives the translation untouched.
+  assert.equal(localizeRuntimeError('No se pudo conectar con Zotero: fetch failed', 'en'), 'Could not connect to Zotero: fetch failed');
+  assert.equal(localizeRuntimeError('Zotero respondió HTTP 503.', 'en'), 'Zotero responded with HTTP 503.');
+
+  // Every Zotero surface reports the cause through one helper, which drops what
+  // Electron prefixes onto a rejected invoke: the channel name, and the error class
+  // that comes with it when the message needed no translation and was rethrown as is.
+  const { zoteroFailureText } = loadModule('src/lib/zoteroConnection.ts');
+  assert.equal(
+    zoteroFailureText(new Error("Error invoking remote method 'library:zoteroLibraries': Error: Could not connect to Zotero: fetch failed")),
+    'Could not connect to Zotero: fetch failed',
+  );
+  assert.equal(
+    zoteroFailureText(new Error("Error invoking remote method 'zotero:libraries': ZoteroRequestError: No se pudo conectar con Zotero: fetch failed")),
+    'No se pudo conectar con Zotero: fetch failed',
+  );
+  assert.equal(zoteroFailureText(new Error('Could not connect to Zotero: fetch failed')), 'Could not connect to Zotero: fetch failed');
+
+  // The import dialog names the cause and, when Zotero itself is silent, the fix.
+  const dialog = fs.readFileSync(path.join(repoRoot, 'src/views/GlobalLibraryView.tsx'), 'utf8');
+  assert.match(dialog, /setError\(zoteroFailureText\(libraryResult\.reason\)\)/);
+  assert.match(dialog, /zoteroConnectionHint\(status\)/);
+
+  // Onboarding: a reachable Zotero that cannot be read is a failure, not a green tick.
+  const onboarding = fs.readFileSync(path.join(repoRoot, 'src/views/Onboarding.tsx'), 'utf8');
+  assert.doesNotMatch(onboarding, /zoteroLibraries\(\)\.catch/, 'a failed library listing must not be swallowed');
+  assert.doesNotMatch(onboarding, /zoteroCollections\(library\)\.catch/, 'a failed collection listing must not be swallowed');
+  assert.match(onboarding, /setLibraryError\(zoteroFailureText\(error\)\)/);
+  assert.match(onboarding, /ping\.ok && !libraryError/, 'the green "connected" line waits for the collections to load');
+});
+
 test('issue #12 queue payloads translate at runtime', () => {
   const runtime = loadModule('src/i18n.ts');
   for (const language of ['en', 'fr', 'de', 'pt', 'pt-BR', 'it', 'tr']) {

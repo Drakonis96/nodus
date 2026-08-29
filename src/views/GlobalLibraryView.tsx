@@ -36,11 +36,13 @@ import { LibraryDocumentReader } from './LibraryDocumentReader';
 import { VirtualList } from '../components/VirtualList';
 import { confirm, promptText, toast } from '../components/feedback';
 import { t, tx } from '../i18n';
+import { zoteroConnectionHint, zoteroFailureText } from '../lib/zoteroConnection';
 import type { PendingAssistantNavigationTarget } from '../navigation';
 import type { PendingLibraryNavigationTarget } from '../navigation';
 import type { LibraryGlobalSnapshot, LibrarySnapshot, ListPlacement } from '../app/viewSnapshots';
 import type { PendingGraphNavigationTarget } from '../navigation';
 import { Library } from './Library';
+import { LibraryTutorialModal, libraryTutorialSeen, markLibraryTutorialSeen, type LibraryTutorialTab } from '../components/LibraryTutorialModal';
 import { LIBRARY_COLUMN_BY_ID, libraryItemTypeLabel } from '@shared/libraryBibliography';
 import { DEFAULT_GLOBAL_LIBRARY_SETTINGS } from '@shared/libraryAttachmentNaming';
 
@@ -403,6 +405,21 @@ function CollectionBranch({
   );
 }
 
+/**
+ * The failure text names the cause; this names the fix. Asking Zotero itself is what
+ * separates a closed Zotero from a Nodus-side precondition such as an unconfigured
+ * library folder: pointing at Zotero's Advanced settings would be a wrong turn for
+ * the second, so a Zotero that answers gets no hint.
+ */
+async function diagnoseZotero(): Promise<string | null> {
+  try {
+    const status = await window.nodus.zoteroPing();
+    return status.ok ? null : zoteroConnectionHint(status);
+  } catch {
+    return null;
+  }
+}
+
 function ZoteroImportDialog({ onClose, onFinished }: { onClose: () => void; onFinished: () => void }) {
   const [libraries, setLibraries] = useState<ZoteroLibraryPreview[]>([]);
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -415,6 +432,7 @@ function ZoteroImportDialog({ onClose, onFinished }: { onClose: () => void; onFi
   const [includeStandaloneFiles, setIncludeStandaloneFiles] = useState(false);
   const [sessions, setSessions] = useState<ZoteroSyncSession[]>([]);
   const [lastReport, setLastReport] = useState<ZoteroSyncSession['report']>(null);
+  const [hint, setHint] = useState<string | null>(null);
 
   useEffect(() => {
     let alive = true;
@@ -426,7 +444,10 @@ function ZoteroImportDialog({ onClose, onFinished }: { onClose: () => void; onFi
       if (libraryResult.status === 'fulfilled') {
         setLibraries(libraryResult.value);
         setSelected(new Set(libraryResult.value.map((entry) => entry.id)));
-      } else setError(libraryResult.reason instanceof Error ? libraryResult.reason.message : String(libraryResult.reason));
+      } else {
+        setError(zoteroFailureText(libraryResult.reason));
+        void diagnoseZotero().then((next) => { if (alive) setHint(next); });
+      }
       if (sessionResult.status === 'fulfilled') setSessions(sessionResult.value);
     }).finally(() => alive && setLoading(false));
     const off = window.nodus.onZoteroImportProgress((value) => {
@@ -438,6 +459,7 @@ function ZoteroImportDialog({ onClose, onFinished }: { onClose: () => void; onFi
   const run = async (id: string, selection?: ZoteroImportSelection) => {
     setRequestId(id);
     setError(null);
+    setHint(null);
     setLastReport(null);
     try {
       const report = selection
@@ -450,7 +472,8 @@ function ZoteroImportDialog({ onClose, onFinished }: { onClose: () => void; onFi
       onFinished();
       if (!report.canceled && !report.partial) onClose();
     } catch (nextError) {
-      setError(nextError instanceof Error ? nextError.message : String(nextError));
+      setError(zoteroFailureText(nextError));
+      void diagnoseZotero().then(setHint);
     } finally {
       setRequestId(null);
       void window.nodus.listZoteroSyncSessions().then(setSessions).catch(() => undefined);
@@ -522,7 +545,12 @@ function ZoteroImportDialog({ onClose, onFinished }: { onClose: () => void; onFi
               <p className="mt-2 text-[10px] text-neutral-500">{progress.processedItems}/{progress.totalItems || '—'} {t('documentos')} · {progress.processedAttachments}/{progress.totalAttachments || '—'} {t('adjuntos')}</p>
             </div>
           )}
-          {error && <p role="alert" className="mt-4 rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-xs text-red-300">{error}</p>}
+          {error && (
+            <div role="alert" data-testid="zotero-global-import-error" className="mt-4 rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-xs text-red-300">
+              <p>{error}</p>
+              {hint && <p data-testid="zotero-global-import-hint" className="mt-2 opacity-80">{hint}</p>}
+            </div>
+          )}
           {!!lastReport?.itemsStandaloneSkipped && !includeStandaloneFiles && (
             <div role="status" className="mt-4 rounded-lg border border-sky-500/30 bg-sky-500/10 p-3 text-xs text-sky-950 dark:text-sky-100">
               <b>{t('Archivos sueltos no importados')}</b>
@@ -1724,6 +1752,22 @@ export function GlobalLibraryView({
   const preferredScope = requestedScope ?? (settings.libraryGlobalEnabled ? settings.libraryScope : 'vault');
   const [scope, setScope] = useState<LibraryScope>(preferredScope);
   const [switching, setSwitching] = useState(false);
+  // Everyone meets the Library guide once, on their first visit to the section. The
+  // flag is written as soon as it is presented — not when it is dismissed — so a
+  // closed window or a switched vault does not queue the same greeting again. The
+  // header's «?» reopens it afterwards, and that route ignores the flag entirely.
+  const [tutorialOpen, setTutorialOpen] = useState(() => !libraryTutorialSeen());
+  const [tutorialTab, setTutorialTab] = useState<LibraryTutorialTab>('analysis');
+  // The flag records that the guide WAS presented, not that it was dismissed, so it
+  // is written on the visit that opened it: closing the window cannot queue it again.
+  const autoPresented = useRef(tutorialOpen);
+  useEffect(() => {
+    if (autoPresented.current) markLibraryTutorialSeen();
+  }, []);
+  const openTutorial = useCallback((tab: LibraryTutorialTab = 'analysis') => {
+    setTutorialTab(tab);
+    setTutorialOpen(true);
+  }, []);
   // The documents left open, restored as initial values. Reopening one is the same
   // read as opening it was, and the page the reader had reached inside it comes back
   // with it: the reader writes its own position per document and restores it on mount.
@@ -1831,6 +1875,7 @@ export function GlobalLibraryView({
             onSnapshotChange={(vault) => onSnapshotChange?.({ vault })}
             onOpenCollections={onOpenCollections}
             onOpenNodusCollections={() => void chooseScope('global')}
+            onOpenTutorial={() => openTutorial('analysis')}
             onOpenGraph={onOpenGraph}
             onOpenAssistant={onOpenAssistant}
             onOpenArchive={onOpenArchive}
@@ -1862,6 +1907,12 @@ export function GlobalLibraryView({
           />
         </div>
       )}
+      <LibraryTutorialModal
+        open={tutorialOpen}
+        tab={tutorialTab}
+        onTabChange={setTutorialTab}
+        onClose={() => setTutorialOpen(false)}
+      />
     </div>
   );
 }

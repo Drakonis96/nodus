@@ -1,5 +1,5 @@
 import type { ZoteroPingResult } from '@shared/types';
-import { t, tx } from '../i18n';
+import { t, tr, tx } from '../i18n';
 
 /**
  * The line every Zotero connection check shows when it fails, plus what to do about it.
@@ -22,4 +22,23 @@ export function zoteroPingErrorText(status: Pick<ZoteroPingResult, 'message'> | 
 export function zoteroConnectionHint(status: Pick<ZoteroPingResult, 'reason'> | null | undefined): string | null {
   if (status?.reason === 'http') return null;
   return t('Comprueba que Zotero esté abierto y que «Permitir que otras aplicaciones de este ordenador se comuniquen con Zotero» esté activado en los ajustes Avanzados de Zotero.');
+}
+
+/**
+ * A Zotero failure as the user should read it, wherever it surfaced.
+ *
+ * Electron prefixes a rejected `invoke` with its own channel name ("Error invoking
+ * remote method 'library:zoteroLibraries': Error: …"), which puts an IPC channel
+ * where the cause belongs and pushes the sentence that matters off the end of the
+ * line. The class name goes with it: the localized path rethrows a plain `Error`,
+ * but a message already in the interface's language is rethrown as itself, and
+ * Electron serializes that one as `ZoteroRequestError: …`. What remains is
+ * translated — these sentences are written in Spanish in the main process, and `tr`
+ * is what carries them into the interface's language.
+ */
+export function zoteroFailureText(cause: unknown): string {
+  const message = (cause instanceof Error ? cause.message : String(cause))
+    .replace(/^Error invoking remote method '[^']+':\s*/, '')
+    .replace(/^\w*Error:\s*/, '');
+  return tr(message);
 }
