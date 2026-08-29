@@ -183,7 +183,7 @@ test('Server reuses the Desktop action rail and measured vault badge geometry', 
   assert.match(serverSource, /HoverLabelButton/);
   assert.match(serverSource, /ref=\{setHeaderEl\}/);
   assert.match(serverSource, /ref=\{setHeaderActionsEl\}/);
-  assert.match(serverSource, /data-badge-fits=\{vaultBadgePlacement/);
+  assert.match(serverSource, /data-badge-fits=\{\s*vaultBadgePlacement/);
   assert.match(serverStyles, /\.server-header-action:not\(\.bg-indigo-600\):hover/);
 });
 

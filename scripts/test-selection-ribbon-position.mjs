@@ -101,10 +101,12 @@ test('the offset moves a floating element by the drift of its own answer', () =>
 
 test('the ribbon is anchored to the pointer in the reader and in the editor', () => {
   const reader = fs.readFileSync(path.join(repoRoot, 'src/components/ReaderSelectionActions.tsx'), 'utf8');
-  assert.match(reader, /pointer \? pointerAnchor\(pointer\.x, pointer\.y\) : focusAnchor\(/);
+  // Matched across line breaks: the formatter may wrap the ternary, but the rule
+  // it encodes -- the pointer wins over the selection box -- must stay.
+  assert.match(reader, /pointer\s*\?\s*pointerAnchor\(pointer\.x, pointer\.y\)\s*:\s*focusAnchor\(/);
   assert.match(reader, /const onPointerUp = \(event: PointerEvent\)/);
-  assert.match(reader, /document\.addEventListener\('pointerup', onPointerUp, true\)/);
-  assert.match(reader, /target\.closest\('\[data-reader-selection-actions\]'\)/);
+  assert.match(reader, /document\.addEventListener\(['"]pointerup['"], onPointerUp, true\)/);
+  assert.match(reader, /target\.closest\(['"]\[data-reader-selection-actions\]['"]\)/);
   const editor = fs.readFileSync(path.join(repoRoot, 'src/components/editor/StudyEditor.tsx'), 'utf8');
   assert.match(editor, /anchorToolbarToPointer\(root\.parentElement \?\? root, toolbar\)/);
 });
@@ -113,7 +115,7 @@ test('a highlight the reader clicks offers the whole ribbon, plus the trash', ()
   const reader = fs.readFileSync(path.join(repoRoot, 'src/components/ReaderSelectionActions.tsx'), 'utf8');
   // One target covers both a loose selection and a stored highlight, so copy,
   // comment, bookmark and quote reach a painted passage too.
-  assert.match(reader, /const target: \{ anchor: ReaderAnchor; highlight: WritingDraftAnnotation \| null/);
+  assert.match(reader, /const target: \{\s*anchor: ReaderAnchor;\s*highlight: WritingDraftAnnotation \| null/);
   assert.match(reader, /target\.highlight\s*\n\s*\? recolorHighlight\(target\.highlight, item\.id\)/);
   assert.match(reader, /\{target\.highlight && \(/);
   // Recolouring writes the new highlight before dropping the old one.

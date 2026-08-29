@@ -89,7 +89,7 @@ test('report selection offers icon-only copy, margin bookmark and Nodi quote act
     read('src/views/ImmersionView.tsx'),
   ]);
   assert.match(actions, /name="copy"/);
-  assert.match(actions, /name=\{mark \? 'bookmarkFill' : 'bookmark'\}/);
+  assert.match(actions, /name=\{mark \? ['"]bookmarkFill['"] : ['"]bookmark['"]\}/);
   assert.match(actions, /name="quote"/);
   assert.match(actions, /role="toolbar"/);
   assert.match(actions, /contextmenu/);
@@ -98,7 +98,9 @@ test('report selection offers icon-only copy, margin bookmark and Nodi quote act
   assert.match(actions, /localStorage\.setItem\(storageKey\(contextId\)/);
   assert.match(actions, /localStorage\.removeItem\(storageKey\(contextId\)/);
   assert.match(actions, /range\.getClientRects\(\)/, 'the margin markers stay aligned with their text ranges');
-  assert.match(actions, /useImperativeHandle\(ref, \(\) => \(\{ goToMark \}\)/);
+  // goToMark must stay on the imperative handle; the ribbon may expose more
+  // besides it, so the members after it are not pinned.
+  assert.match(actions, /useImperativeHandle\(ref, \(\) => \(\{[^}]*\bgoToMark\b/);
   assert.match(actions, /updateSettings\(\{ mascotEnabled: true \}\)/);
   assert.match(actions, /quoteNodiSelection\(text\)/);
   assert.match(css, /\.reader-margin-marker-bookmark/);
