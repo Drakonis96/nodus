@@ -555,7 +555,7 @@ const DEEP_RESEARCH_LOCALE_OVERRIDES: Partial<
     "Nueva traducción privada": "Nova tradução privada",
     "Nueva pestaña": "Nova aba",
     Contenido: "Conteúdo",
-    "Matriz de trazabilidade": "Matriz de rastreabilidade",
+    "Matriz de trazabilidad": "Matriz de rastreabilidade",
     "Marcadores y subrayados": "Marcadores e destaques",
     "Eliminar anotación": "Excluir anotação",
     "No hay informes publicados.": "Não há relatórios publicados.",
@@ -1639,7 +1639,10 @@ const completeWith = (
 });
 
 export const SERVER_TRANSLATIONS = {
-  en: EN,
+  // Every other locale receives SERVER_READER_EN through complete(); English is
+  // the base of that catalogue, so without it here English is the one language
+  // where the server reader chrome falls back to Spanish.
+  en: { ...EN, ...SERVER_READER_EN },
   fr: completeWith("fr", {
     Bandeja: "Boîte de réception",
     "1 cambio": "1 modification",
