@@ -35,6 +35,7 @@ import {
 } from '../navigation';
 import { t, tx } from '../i18n';
 import { getVaultQueryCache, setVaultQueryCache } from '../vaultQueryCache';
+import { vaultTypeColor } from '@shared/vaultTypes';
 import type { LibraryVaultSnapshot, ListPlacement } from '../app/viewSnapshots';
 
 const LIBRARY_ROW_HEIGHT = 64;
@@ -427,6 +428,7 @@ export function Library({
   onOpenArchive,
   scopeControls,
   onOpenReader,
+  onOpenTutorial,
 }: {
   vaultId: string | null;
   /** Incoming navigation that pre-applies a filter (e.g. a corpus-health bucket). */
@@ -444,6 +446,8 @@ export function Library({
   onOpenArchive?: () => void;
   scopeControls?: ReactNode;
   onOpenReader: (reference: LibraryReaderReference) => void;
+  /** Reopens the Library guide. The header's «?» is the only way back to it. */
+  onOpenTutorial: () => void;
 }) {
   // In records vaults the Library holds SECONDARY / published sources (books,
   // published genealogies, transcribed record collections) that can also be mined
@@ -1091,7 +1095,10 @@ export function Library({
             onClick={() => setDocumentManagerOpen(true)}
             title={t('Gestionar la comprensión jerárquica de documentos completos')}
           >
+            {/* Whole-document understanding is still beta: slow on long texts, and
+                not always right about the structure. The badge says so up front. */}
             <Icon name="layers" /> {t('Índice documental')}
+            <em data-testid="document-index-beta" className="library-action-menu-badge is-beta">BETA</em>
           </button>}
           <div className="relative z-40" ref={collectionsMenuRef}>
             <button
@@ -1120,7 +1127,9 @@ export function Library({
                   }}
                 >
                   <Icon name="library" />
-                  <span><b>{t('Colecciones de Nodus')}</b><small>{t('Global')}</small></span>
+                  {/* The two sources carry the same badges the guide and the setup
+                      wizard use, so "choose Nodus or Zotero" reads the same everywhere. */}
+                  <span><span className="library-action-menu-heading"><b>{t('Colecciones de Nodus')}</b><em data-testid="nodus-collections-beta" className="library-action-menu-badge is-beta">BETA</em></span><small>{t('Global')}</small></span>
                 </button>
                 <button
                   data-testid="open-zotero-collections"
@@ -1132,11 +1141,25 @@ export function Library({
                   }}
                 >
                   <Icon name="folder" />
-                  <span><b>{t('Colecciones de Zotero')}</b><small>{t('Este vault')}</small></span>
+                  <span><span className="library-action-menu-heading"><b>{t('Colecciones de Zotero')}</b><em data-testid="zotero-collections-recommended" className="library-action-menu-badge is-recommended">{t('Recomendado')}</em></span><small>{t('Este vault')}</small></span>
                 </button>
               </div>
             )}
           </div>
+          {/* The only unlabelled button in the row, so it wears the vault's own accent
+              rather than the neutral outline the others share: a help affordance
+              nobody can find is the same as no help at all. */}
+          <button
+            data-testid="library-open-tutorial"
+            type="button"
+            className="library-help-button"
+            style={{ ['--library-help-accent' as string]: vaultTypeColor(vaultType) }}
+            onClick={onOpenTutorial}
+            aria-label={t('Cómo funciona la Biblioteca')}
+            title={t('Cómo funciona la Biblioteca')}
+          >
+            <Icon name="help" size={17} />
+          </button>
         </div>
       </header>
 

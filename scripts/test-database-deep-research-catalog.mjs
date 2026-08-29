@@ -89,6 +89,36 @@ test('unknown modes normalize to general and request normalization preserves exp
   assert.equal(normalized.reportType, 'privacy_attachments');
 });
 
+test('local automatic configuration uses the objective and falls back safely', () => {
+  const columns = [
+    { id: 'date', name: 'Fecha', type: 'date' },
+    { id: 'revenue', name: 'Ingresos', type: 'number' },
+  ];
+  const generic = contract.autoConfigureDatabaseDeepResearch('auto', { columns, objective: 'Resume los principales hallazgos', databaseCount: 1 });
+  assert.equal(generic.reportType, 'general');
+  const temporal = contract.autoConfigureDatabaseDeepResearch('auto', { columns, objective: 'Detecta tendencias y anomalías temporales', databaseCount: 1 });
+  assert.equal(temporal.reportType, 'temporal_anomalies');
+  assert.equal(temporal.roles.time, 'date');
+  assert.deepEqual(temporal.roles.metrics, ['revenue']);
+  const unsupportedExplicit = contract.autoConfigureDatabaseDeepResearch('causal_impact', { columns, objective: 'Impacto causal', databaseCount: 1 });
+  assert.equal(unsupportedExplicit.reportType, 'general');
+  assert.equal(unsupportedExplicit.partial, true);
+  assert.ok(unsupportedExplicit.limitations.length > 0);
+
+  const splitSources = contract.autoConfigureDatabaseDeepResearch('auto', {
+    columns: [
+      { databaseId: 'experiment', id: 'treatment', name: 'Tratamiento', type: 'checkbox' },
+      { databaseId: 'results', id: 'outcome', name: 'Resultado', type: 'number' },
+      { databaseId: 'experiment', id: 'confounder', name: 'Edad baseline', type: 'number' },
+    ],
+    objective: 'Estima el impacto causal del tratamiento',
+    databaseCount: 2,
+  });
+  assert.equal(splitSources.reportType, 'general');
+  assert.equal(splitSources.partial, false);
+  assert.ok(splitSources.limitations.some((item) => item.includes('bases de datos distintas')));
+});
+
 test('depth presets change the bounded model-cost envelope', () => {
   const focused = contract.estimateDatabaseDeepResearchCost(1_000, 2, 'focused');
   const deep = contract.estimateDatabaseDeepResearchCost(1_000, 2, 'deep');

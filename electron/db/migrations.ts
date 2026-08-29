@@ -50,9 +50,24 @@ function ensureDatabaseResearchClaimMetricColumns(db: Database.Database): void {
   }
 }
 
+function ensureDatabaseResearchReaderColumns(db: Database.Database): void {
+  const hasColumn = (table: string, column: string) =>
+    (db.prepare(`PRAGMA table_info(${table})`).all() as Array<{ name: string }>).some((row) => row.name === column);
+  if (!hasColumn('database_research_reports', 'read_at')) db.exec('ALTER TABLE database_research_reports ADD COLUMN read_at TEXT');
+  db.exec(`CREATE TABLE IF NOT EXISTS database_research_report_annotations (
+    id TEXT PRIMARY KEY, report_id TEXT NOT NULL REFERENCES database_research_reports(id) ON DELETE CASCADE,
+    scope TEXT NOT NULL DEFAULT 'source', kind TEXT NOT NULL CHECK (kind IN ('highlight','comment','bookmark')),
+    color TEXT CHECK (color IS NULL OR color IN ('yellow','rose','blue','mint','lavender','peach')),
+    start_offset INTEGER NOT NULL CHECK (start_offset >= 0), end_offset INTEGER NOT NULL CHECK (end_offset > start_offset),
+    selected_text TEXT NOT NULL, prefix TEXT NOT NULL DEFAULT '', suffix TEXT NOT NULL DEFAULT '', comment_text TEXT,
+    created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+  )`);
+  db.exec('CREATE INDEX IF NOT EXISTS idx_database_research_report_annotations_report ON database_research_report_annotations(report_id, scope, start_offset, created_at)');
+}
+
 // Versioned, append-only migrations. Never edit an existing migration's SQL once
 // shipped — add a new one. The current schema version is the highest applied.
-export const SCHEMA_VERSION = 169;
+export const SCHEMA_VERSION = 170;
 
 export const migrations: Migration[] = [
   {
@@ -9201,6 +9216,11 @@ export const migrations: Migration[] = [
     version: 169,
     up: /* sql */ `SELECT 1;`,
     after: ensureDatabaseResearchClaimMetricColumns,
+  },
+  {
+    version: 170,
+    up: /* sql */ `SELECT 1;`,
+    after: ensureDatabaseResearchReaderColumns,
   },
 ];
 

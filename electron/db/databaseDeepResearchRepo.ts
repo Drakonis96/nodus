@@ -18,6 +18,9 @@ import {
   type DatabaseResearchReportQuery,
   normalizeDatabaseDeepResearchReportType,
   isDatabaseDeepResearchReportType,
+  type DatabaseDeepResearchReportAnnotation,
+  type DatabaseDeepResearchReportAnnotationInput,
+  type DatabaseDeepResearchReportAnnotationColor,
 } from '@shared/databaseDeepResearch';
 
 type Row = Record<string, unknown>;
@@ -155,8 +158,72 @@ function reportFromRow(row: Row): DatabaseResearchReport {
     reportType: normalizeDatabaseDeepResearchReportType(row.report_type ?? json<Record<string, unknown>>(row.metadata_json, {}).reportType),
     summary: row.summary == null ? null : String(row.summary), bibliography: json(row.bibliography_json, []),
     metadata: json(row.metadata_json, {}), createdAt: String(row.created_at), updatedAt: String(row.updated_at),
+    readAt: row.read_at == null ? null : String(row.read_at),
     structured: json(row.structured_json, {}), quality: json(row.quality_json, {}), provenance: json(row.provenance_json, {}),
   };
+}
+
+interface DatabaseResearchReportAnnotationRow {
+  id: string; report_id: string; scope: string; kind: string; color: string | null;
+  start_offset: number; end_offset: number; selected_text: string; prefix: string; suffix: string;
+  comment_text: string | null; created_at: string; updated_at: string;
+}
+const ANNOTATION_COLORS = new Set<DatabaseDeepResearchReportAnnotationColor>(['yellow', 'rose', 'blue', 'mint', 'lavender', 'peach']);
+function annotationFromRow(row: DatabaseResearchReportAnnotationRow): DatabaseDeepResearchReportAnnotation | null {
+  if (!['highlight', 'comment', 'bookmark'].includes(row.kind)) return null;
+  if (row.color !== null && !ANNOTATION_COLORS.has(row.color as DatabaseDeepResearchReportAnnotationColor)) return null;
+  if (!Number.isInteger(row.start_offset) || !Number.isInteger(row.end_offset) || row.start_offset < 0 || row.end_offset <= row.start_offset) return null;
+  return { id: row.id, reportId: row.report_id, scope: row.scope, kind: row.kind as DatabaseDeepResearchReportAnnotation['kind'], color: row.color as DatabaseDeepResearchReportAnnotationColor | null,
+    startOffset: row.start_offset, endOffset: row.end_offset, selectedText: row.selected_text, prefix: row.prefix, suffix: row.suffix,
+    comment: row.comment_text, createdAt: row.created_at, updatedAt: row.updated_at };
+}
+function resolveReportId(reportId: string): string | null {
+  const value = String(reportId ?? '').trim();
+  if (!value) return null;
+  const row = getDb().prepare('SELECT id FROM database_research_reports WHERE id = ? OR run_id = ?').get(value, value) as { id: string } | undefined;
+  return row?.id ?? null;
+}
+export function setDatabaseDeepResearchReportRead(id: string, read: boolean): DatabaseResearchReport | null {
+  const reportId = resolveReportId(id); if (!reportId) return null;
+  getDb().prepare('UPDATE database_research_reports SET read_at = ?, updated_at = ? WHERE id = ?').run(read ? now() : null, now(), reportId);
+  const row = getDb().prepare('SELECT * FROM database_research_reports WHERE id = ?').get(reportId) as Row | undefined;
+  return row ? reportFromRow(row) : null;
+}
+export function listDatabaseDeepResearchReportAnnotations(reportId: string): DatabaseDeepResearchReportAnnotation[] {
+  const id = resolveReportId(reportId); if (!id) return [];
+  const rows = getDb().prepare('SELECT * FROM database_research_report_annotations WHERE report_id = ? ORDER BY scope, start_offset, created_at').all(id) as DatabaseResearchReportAnnotationRow[];
+  return rows.map(annotationFromRow).filter((item): item is DatabaseDeepResearchReportAnnotation => item !== null);
+}
+function normalizeReportAnnotation(input: DatabaseDeepResearchReportAnnotationInput) {
+  const reportId = resolveReportId(input.reportId); if (!reportId) throw new Error('El informe anotado ya no existe.');
+  const scope = String(input.scope ?? 'source').trim() || 'source';
+  const selectedText = String(input.selectedText ?? '');
+  const startOffset = Math.trunc(Number(input.startOffset)); const endOffset = Math.trunc(Number(input.endOffset));
+  if (scope.length > 180 || startOffset < 0 || endOffset <= startOffset || !Number.isInteger(startOffset) || !Number.isInteger(endOffset)) throw new Error('El fragmento seleccionado no es válido.');
+  if (!selectedText.trim() || selectedText.length !== endOffset - startOffset) throw new Error('El texto seleccionado no coincide con su posición.');
+  if (!['highlight', 'comment', 'bookmark'].includes(input.kind)) throw new Error('El tipo de anotación no es válido.');
+  if (input.kind === 'highlight' && (!input.color || !ANNOTATION_COLORS.has(input.color))) throw new Error('El color del subrayado no es válido.');
+  const comment = input.kind === 'comment' ? String(input.comment ?? '').trim() : null;
+  if (input.kind === 'comment' && !comment) throw new Error('Escribe el comentario antes de guardarlo.');
+  return { reportId, scope, kind: input.kind, color: input.kind === 'highlight' ? input.color! : null, startOffset, endOffset, selectedText,
+    prefix: String(input.prefix ?? '').slice(-64), suffix: String(input.suffix ?? '').slice(0, 64), comment };
+}
+export function createDatabaseDeepResearchReportAnnotation(input: DatabaseDeepResearchReportAnnotationInput): DatabaseDeepResearchReportAnnotation {
+  const value = normalizeReportAnnotation(input); const id = value.kind === 'bookmark' ? `database-research-bookmark:${value.reportId}:${value.scope}` : randomUUID(); const timestamp = now(); const db = getDb();
+  db.prepare(`INSERT INTO database_research_report_annotations (id, report_id, scope, kind, color, start_offset, end_offset, selected_text, prefix, suffix, comment_text, created_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(id) DO UPDATE SET scope=excluded.scope, kind=excluded.kind, color=excluded.color, start_offset=excluded.start_offset, end_offset=excluded.end_offset, selected_text=excluded.selected_text, prefix=excluded.prefix, suffix=excluded.suffix, comment_text=excluded.comment_text, updated_at=excluded.updated_at`)
+    .run(id, value.reportId, value.scope, value.kind, value.color, value.startOffset, value.endOffset, value.selectedText, value.prefix, value.suffix, value.comment, timestamp, timestamp);
+  const row = db.prepare('SELECT * FROM database_research_report_annotations WHERE id = ?').get(id) as DatabaseResearchReportAnnotationRow;
+  const annotation = annotationFromRow(row); if (!annotation) throw new Error('No se pudo guardar la anotación.'); return annotation;
+}
+export function updateDatabaseDeepResearchReportComment(id: string, comment: string): DatabaseDeepResearchReportAnnotation | null {
+  const value = String(comment ?? '').trim(); if (!value) throw new Error('Escribe el comentario antes de guardarlo.'); const db = getDb();
+  const changed = db.prepare("UPDATE database_research_report_annotations SET comment_text = ?, updated_at = ? WHERE id = ? AND kind = 'comment'").run(value, now(), id);
+  if (!changed.changes) return null; return annotationFromRow(db.prepare('SELECT * FROM database_research_report_annotations WHERE id = ?').get(id) as DatabaseResearchReportAnnotationRow);
+}
+export function deleteDatabaseDeepResearchReportAnnotation(id: string): string | null {
+  const db = getDb(); const row = db.prepare('SELECT report_id FROM database_research_report_annotations WHERE id = ?').get(id) as { report_id: string } | undefined; if (!row) return null;
+  db.prepare('DELETE FROM database_research_report_annotations WHERE id = ?').run(id); return row.report_id;
 }
 
 function assertRun(runId: string): Row {
@@ -436,7 +503,7 @@ export function upsertDatabaseResearchStep(input: {
 export const createDatabaseResearchStep = upsertDatabaseResearchStep;
 
 export type DatabaseResearchFinalStatus = 'completed' | 'partial';
-export type DatabaseResearchReportInput = Omit<DatabaseResearchReport, 'createdAt' | 'updatedAt'> & { finalStatus?: DatabaseResearchFinalStatus };
+export type DatabaseResearchReportInput = Omit<DatabaseResearchReport, 'createdAt' | 'updatedAt' | 'readAt'> & { finalStatus?: DatabaseResearchFinalStatus };
 
 export function saveDatabaseResearchReport(input: DatabaseResearchReportInput): DatabaseResearchReport {
   const row = assertRun(input.runId); const currentStatus = String(row.status);

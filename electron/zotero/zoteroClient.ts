@@ -1,5 +1,5 @@
 import { fileURLToPath } from 'node:url';
-import type { ZoteroAttachmentInfo, ZoteroCollection, ZoteroItem, ZoteroLibrary, WorkMeta } from '@shared/types';
+import type { ZoteroAttachmentInfo, ZoteroCollection, ZoteroItem, ZoteroLibrary, ZoteroPingResult, WorkMeta } from '@shared/types';
 
 // Read-only client for Zotero's local API: the desktop app's local implementation
 // of Web API v3, served from port 23119 since Zotero 7. There is no "Zotero 7 API" —
@@ -103,21 +103,19 @@ export async function libraries(): Promise<ZoteroLibrary[]> {
 /**
  * Verify the local API is reachable. The local API has no auth and uses users/0,
  * so we just confirm a 200 and read the library version header.
+ *
+ * `message` stays technical (the transport error, or the HTTP status): the renderer
+ * localizes the actionable part from `reason`, so no Spanish is written here.
  */
-export async function ping(): Promise<{ ok: boolean; userId?: string; version?: number; message?: string }> {
+export async function ping(): Promise<ZoteroPingResult> {
   try {
     const res = await zfetch(`${BASE}/users/${LOCAL_USER_ID}/items?limit=1`);
-    if (!res.ok) {
-      const hint =
-        res.status === 403
-          ? 'Habilita "Permitir que otras aplicaciones se comuniquen con Zotero" en Ajustes › Avanzado.'
-          : `HTTP ${res.status}`;
-      return { ok: false, message: hint };
-    }
+    if (!res.ok) return { ok: false, message: `HTTP ${res.status}`, reason: res.status === 403 ? 'forbidden' : 'http' };
     const v = res.headers.get('Last-Modified-Version');
     return { ok: true, userId: LOCAL_USER_ID, version: v ? parseInt(v, 10) : 0 };
   } catch (e) {
-    return { ok: false, message: (e as Error).message };
+    // Nothing answered on the local port: Zotero is closed, or its local API is off.
+    return { ok: false, message: (e as Error).message, reason: 'unreachable' };
   }
 }
 
@@ -219,17 +217,40 @@ export interface ZoteroLibraryItemsPage {
   items: ZoteroItem[];
   version: number;
   total: number;
+  /**
+   * Parentless files left out because `includeStandaloneFiles` was off — a PDF added
+   * straight to Zotero with no bibliographic entry above it. They are reported rather
+   * than silently dropped: in a real library they can be a quarter of the shelf (603
+   * of 2.155 in the one this was measured against), and a user who never sees the
+   * number cannot know an option would bring them in.
+   */
+  standaloneSkipped: number;
 }
+
+/**
+ * A parentless attachment is only worth importing when a file actually sits behind it.
+ * A top-level `linked_url` is a bookmark: importing it would create a work with
+ * nothing to read.
+ */
+const STANDALONE_FILE_MODES = new Set(['imported_file', 'imported_url', 'linked_file']);
 
 /** All top-level bibliographic items in a library, or its incremental changes. */
 export async function libraryItems(
   library: ZoteroLibrary,
-  opts: { since?: number; signal?: AbortSignal; onProgress?: (loaded: number, total: number) => void } = {},
+  opts: {
+    since?: number;
+    signal?: AbortSignal;
+    onProgress?: (loaded: number, total: number) => void;
+    /** Import parentless files as works of their own. Off by default: they carry no
+     *  bibliographic metadata, so they change what counts as a work. */
+    includeStandaloneFiles?: boolean;
+  } = {},
 ): Promise<ZoteroLibraryItemsPage> {
   const items: ZoteroItem[] = [];
   let start = 0;
   let version = 0;
   let total = 0;
+  let standaloneSkipped = 0;
   const limit = 100;
   for (;;) {
     const params = new URLSearchParams({ limit: String(limit), start: String(start), sort: 'dateModified', direction: 'asc' });
@@ -239,14 +260,20 @@ export async function libraryItems(
     const data = (await res.json()) as any[];
     version = Number(res.headers.get('Last-Modified-Version')) || version;
     total = Number(res.headers.get('Total-Results')) || data.length;
-    items.push(...data
-      .filter((raw) => !['attachment', 'note', 'annotation'].includes(raw.data?.itemType))
-      .map((raw) => mapItem(raw, library)));
+    for (const raw of data) {
+      const itemType = raw.data?.itemType;
+      if (itemType === 'note' || itemType === 'annotation') continue;
+      if (itemType === 'attachment') {
+        if (!STANDALONE_FILE_MODES.has(String(raw.data?.linkMode))) continue;
+        if (!opts.includeStandaloneFiles) { standaloneSkipped += 1; continue; }
+      }
+      items.push(mapItem(raw, library));
+    }
     start += data.length;
     opts.onProgress?.(Math.min(start, total), total);
     if (data.length < limit || start >= total) break;
   }
-  return { items, version, total };
+  return { items, version, total, standaloneSkipped };
 }
 
 export interface ZoteroDeletedObjects {

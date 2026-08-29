@@ -15,6 +15,8 @@ export const DATABASE_DEEP_RESEARCH_REPORT_TYPES = [
 ] as const;
 export type DatabaseDeepResearchReportType =
   (typeof DATABASE_DEEP_RESEARCH_REPORT_TYPES)[number];
+/** A user may ask the local semantic profiler to choose a specialised mode. */
+export type DatabaseDeepResearchRequestedReportType = DatabaseDeepResearchReportType | 'auto';
 
 export const DATABASE_DEEP_RESEARCH_PROMPT_LANGUAGES = [
   'es', 'en', 'fr', 'de', 'pt', 'pt-BR', 'it', 'tr',
@@ -65,6 +67,161 @@ export const DATABASE_DEEP_RESEARCH_REPORT_TYPE_OPTIONS: readonly DatabaseDeepRe
 export interface DatabaseResearchSchemaColumn {
   id: string;
   type: DatabaseColumnType | string;
+  /** Local-only metadata used for deterministic semantic matching. Never sent to providers. */
+  databaseId?: string;
+  name?: string;
+  config?: Record<string, unknown>;
+  profile?: { filled?: number; fillRate?: number; distinct?: number; valueType?: string };
+}
+
+export interface DatabaseDeepResearchAutoConfiguration {
+  requestedReportType: DatabaseDeepResearchRequestedReportType;
+  reportType: DatabaseDeepResearchReportType;
+  roles: DatabaseResearchSemanticRoles;
+  confidence: number;
+  warnings: string[];
+  limitations: string[];
+  partial: boolean;
+}
+
+const AUTO_NUMERIC = new Set(['number', 'formula', 'rollup']);
+const AUTO_TEMPORAL = new Set(['date', 'time', 'created_time', 'last_edited_time']);
+const AUTO_BINARY = new Set(['number', 'formula', 'rollup', 'checkbox']);
+const AUTO_GROUP = new Set(['select', 'status', 'checkbox']);
+const AUTO_SENSITIVE = new Set(['person', 'created_by', 'last_edited_by', 'email', 'phone', 'location', 'files', 'attachment', 'ai_image']);
+const AUTO_KEYWORDS: Record<string, string[]> = {
+  outcome: ['outcome', 'result', 'resultado', 'metric', 'measure', 'score', 'target', 'valor', 'amount', 'revenue', 'impact'],
+  treatment: ['treatment', 'tratamiento', 'variant', 'variante', 'intervention', 'exposure', 'exposicion', 'experiment', 'arm'],
+  time: ['time', 'date', 'fecha', 'hora', 'timestamp', 'created', 'updated', 'month', 'day', 'year'],
+  duration: ['duration', 'duracion', 'tenure', 'lifetime', 'survival', 'days', 'dias', 'age', 'edad'],
+  event: ['event', 'evento', 'churn', 'retained', 'retencion', 'converted', 'conversion', 'failure', 'failed', 'status'],
+  group: ['group', 'grupo', 'cohort', 'cohorte', 'segment', 'segmento', 'category', 'categoria', 'variant', 'region', 'country', 'pais'],
+  entity: ['id', 'identifier', 'identificador', 'name', 'nombre', 'title', 'titulo', 'entity', 'cliente', 'customer', 'user'],
+  location: ['location', 'ubicacion', 'lat', 'lon', 'longitude', 'latitude', 'address', 'direccion', 'country', 'pais'],
+  metrics: ['metric', 'metrica', 'measure', 'medida', 'score', 'valor', 'value', 'amount', 'revenue', 'ingreso', 'total', 'count', 'rate'],
+  confounders: ['confound', 'confus', 'covariate', 'covariable', 'control', 'age', 'edad', 'baseline', 'income', 'ingreso'],
+  text: ['text', 'texto', 'description', 'descripcion', 'notes', 'notas', 'comment', 'comentario', 'summary', 'resumen'],
+  sensitive: ['email', 'correo', 'phone', 'telefono', 'person', 'persona', 'address', 'direccion', 'location', 'ubicacion', 'attachment', 'adjunto', 'file', 'archivo'],
+};
+
+const AUTO_REPORT_KEYWORDS: Partial<Record<DatabaseDeepResearchReportType, string[]>> = {
+  data_quality: ['calidad', 'quality', 'missing', 'faltante', 'duplicad', 'validez', 'integridad de datos', 'nettoyage', 'datenqualitat', 'qualidade', 'qualita', 'veri kalitesi'],
+  cohort_comparison: ['cohorte', 'cohort', 'grupo', 'group', 'segment', 'comparar', 'compare', 'comparaison', 'vergleich', 'confronta', 'karsilastir'],
+  temporal_anomalies: ['anomalia', 'anomaly', 'tendencia', 'trend', 'estacional', 'season', 'tiempo', 'temporal', 'serie', 'drift', 'zeitreihe', 'tendance'],
+  relationships_integrity: ['relacion', 'relationship', 'join', 'huerfan', 'orphan', 'cardinalidad', 'network', 'red', 'integrite referentielle', 'beziehung'],
+  causal_impact: ['causal', 'causa', 'impacto', 'impact', 'tratamiento', 'treatment', 'intervencion', 'intervention', 'effet causal', 'kausal'],
+  survival_retention: ['supervivencia', 'survival', 'retencion', 'retention', 'churn', 'abandono', 'censura', 'hazard', 'risque', 'bindung'],
+  privacy_attachments: ['privacidad', 'privacy', 'pii', 'personal', 'sensible', 'sensitive', 'adjunto', 'attachment', 'datenschutz', 'confidentialite'],
+  formulas_reconciliation: ['formula', 'reconcili', 'lineage', 'dependenc', 'total', 'divergenc', 'abgleich', 'riconciliazione'],
+};
+
+function normalizedSemanticText(value: string): string {
+  return value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase();
+}
+
+function autoScore(column: DatabaseResearchSchemaColumn, role: string): number {
+  const type = String(column.type);
+  const valueType = String(column.profile?.valueType ?? type);
+  const text = `${column.name ?? ''} ${Object.keys(column.config ?? {}).join(' ')}`.toLocaleLowerCase();
+  const keywords = AUTO_KEYWORDS[role] ?? [];
+  const keywordHit = keywords.some((word) => text.includes(word));
+  let score = keywordHit ? 0.72 : 0.1;
+  if (role === 'outcome' || role === 'metrics' || role === 'confounders') score += AUTO_NUMERIC.has(valueType) ? 0.2 : -0.4;
+  if (role === 'treatment' || role === 'event') score += AUTO_BINARY.has(valueType) ? 0.18 : -0.3;
+  if (role === 'group') score += AUTO_GROUP.has(type) ? 0.2 : -0.25;
+  if (role === 'time') score += AUTO_TEMPORAL.has(type) ? 0.25 : -0.3;
+  if (role === 'duration') score += (AUTO_TEMPORAL.has(type) || AUTO_NUMERIC.has(valueType)) ? 0.16 : -0.25;
+  if (role === 'sensitive') score += AUTO_SENSITIVE.has(type) ? 0.35 : -0.25;
+  if (role === 'location') score += (type === 'location' || type === 'text') ? 0.12 : -0.15;
+  if (role === 'entity') score += (type === 'title' || type === 'text') ? 0.08 : 0;
+  if (column.profile?.fillRate != null && column.profile.fillRate < 0.1) score -= 0.15;
+  return Math.max(0, Math.min(1, score));
+}
+
+/** Deterministic local-first mode/role selection. It receives only schema and aggregate profiles. */
+export function autoConfigureDatabaseDeepResearch(
+  requested: DatabaseDeepResearchRequestedReportType = 'auto',
+  input: DatabaseDeepResearchEligibilityInput & { columns: readonly DatabaseResearchSchemaColumn[]; objective?: string },
+  overrides: DatabaseResearchSemanticRoles = {},
+): DatabaseDeepResearchAutoConfiguration {
+  const columns = input.columns ?? [];
+  const warnings: string[] = [];
+  const limitations: string[] = [];
+  const roles: DatabaseResearchSemanticRoles = structuredClone(overrides ?? {});
+  const ranked = (role: string, allowed?: ReadonlySet<string>) => columns
+    .map((column) => ({ column, score: autoScore(column, role) }))
+    .filter((item) => !allowed || allowed.has(String(item.column.type)) || (role === 'outcome' && allowed.has(String(item.column.profile?.valueType ?? item.column.type))))
+    .sort((a, b) => b.score - a.score || String(a.column.id).localeCompare(String(b.column.id)));
+  const choose = (role: keyof DatabaseResearchSemanticRoles, allowed?: ReadonlySet<string>) => {
+    if (roles[role] != null && (!Array.isArray(roles[role]) || roles[role].length)) return 0.9;
+    const best = ranked(String(role), allowed)[0];
+    if (!best || best.score < 0.55) return 0;
+    roles[role] = best.column.id;
+    return best.score;
+  };
+  const chooseArray = (role: 'metrics' | 'confounders' | 'text' | 'sensitive', allowed?: ReadonlySet<string>) => {
+    if (Array.isArray(roles[role]) && roles[role]!.length) return 0.9;
+    const picks = ranked(role, allowed).filter((item) => item.score >= 0.55).slice(0, role === 'metrics' ? 8 : 4).map((item) => item.column.id);
+    if (picks.length) roles[role] = picks;
+    return picks.length ? Math.max(...ranked(role, allowed).slice(0, picks.length).map((item) => item.score)) : 0;
+  };
+  const scores: number[] = [];
+  scores.push(choose('outcome', AUTO_NUMERIC));
+  scores.push(choose('treatment', AUTO_BINARY));
+  scores.push(choose('time', AUTO_TEMPORAL));
+  scores.push(choose('duration', new Set([...AUTO_TEMPORAL, ...AUTO_NUMERIC])));
+  scores.push(choose('event', AUTO_BINARY));
+  scores.push(choose('group', AUTO_GROUP));
+  scores.push(choose('entity'));
+  scores.push(chooseArray('metrics', AUTO_NUMERIC));
+  scores.push(chooseArray('confounders', AUTO_NUMERIC));
+  scores.push(chooseArray('text', new Set(['text', 'title', 'ai'])));
+  scores.push(chooseArray('sensitive', AUTO_SENSITIVE));
+  const average = scores.filter((score) => score > 0).length ? scores.filter((score) => score > 0).reduce((a, b) => a + b, 0) / scores.filter((score) => score > 0).length : 0;
+
+  let reportType: DatabaseDeepResearchReportType = requested === 'auto' ? 'general' : requested;
+  let partial = false;
+  if (requested === 'auto') {
+    const objective = normalizedSemanticText(String(input.objective ?? ''));
+    const candidates = Object.entries(AUTO_REPORT_KEYWORDS)
+      .map(([type, keywords]) => ({
+        type: type as DatabaseDeepResearchReportType,
+        score: (keywords ?? []).reduce((total, keyword) => total + (objective.includes(normalizedSemanticText(keyword)) ? 1 : 0), 0),
+      }))
+      .filter(({ type, score }) => score > 0 && getDatabaseDeepResearchEligibility(type, { ...input, roles }).applicable)
+      .sort((a, b) => b.score - a.score || a.type.localeCompare(b.type));
+    reportType = candidates[0]?.type ?? 'general';
+    if (reportType === 'general' && objective) warnings.push('No se encontró un contrato especializado con confianza suficiente; se usará investigación general.');
+  } else {
+    const eligibility = getDatabaseDeepResearchEligibility(requested, { ...input, roles });
+    if (!eligibility.applicable) {
+      warnings.push(`El tipo solicitado puede no ser aplicable: ${eligibility.reasons.join(' ')}`);
+      limitations.push(...eligibility.reasons);
+      reportType = 'general';
+      partial = true;
+    }
+  }
+  const sourceSensitiveRoleIds = reportType === 'causal_impact'
+    ? [roles.outcome, roles.treatment, ...(roles.confounders ?? [])]
+    : reportType === 'survival_retention'
+      ? [roles.duration, roles.event, roles.group, ...(roles.confounders ?? [])]
+      : reportType === 'temporal_anomalies'
+        ? [roles.time, roles.outcome]
+        : [];
+  const columnSources = new Map(columns.map((column) => [column.id, column.databaseId]));
+  const roleSources = new Set(sourceSensitiveRoleIds
+    .filter((id): id is string => typeof id === 'string' && id.length > 0)
+    .map((id) => columnSources.get(id))
+    .filter((databaseId): databaseId is string => typeof databaseId === 'string' && databaseId.length > 0));
+  if (roleSources.size > 1) {
+    const reason = 'Los roles detectados pertenecen a bases de datos distintas y no pueden formar un único contrato especializado.';
+    warnings.push(`${reason} Se usará investigación general.`);
+    limitations.push(reason);
+    reportType = 'general';
+    partial = requested !== 'auto';
+  }
+  if (average < 0.55) warnings.push('La confianza semántica local es baja; revisa los roles en Opciones avanzadas.');
+  return { requestedReportType: requested, reportType, roles, confidence: Number(average.toFixed(3)), warnings, limitations, partial };
 }
 
 export interface DatabaseDeepResearchEligibilityInput {
@@ -394,7 +551,11 @@ export interface DatabaseResearchRequest {
 /** Renderer/MCP queue input. Multiple databases and view selections are kept in
  * `options` while the durable foreign key anchors the run to the first source. */
 export interface DatabaseDeepResearchJobInput {
-  reportType?: DatabaseDeepResearchReportType;
+  reportType?: DatabaseDeepResearchRequestedReportType;
+  /** Enables deterministic schema/profile based local configuration. */
+  autoConfigure?: boolean;
+  requestedReportType?: DatabaseDeepResearchRequestedReportType;
+  autoConfiguration?: DatabaseDeepResearchAutoConfiguration;
   objective: string;
   databaseIds: string[];
   viewIds: string[];
@@ -426,8 +587,44 @@ export interface DatabaseDeepResearchJob {
   error: string | null;
 }
 
+export type DatabaseDeepResearchReportAnnotationColor = 'yellow' | 'rose' | 'blue' | 'mint' | 'lavender' | 'peach';
+export interface DatabaseDeepResearchReportAnnotation {
+  id: string;
+  reportId: string;
+  scope: string;
+  kind: 'highlight' | 'comment' | 'bookmark';
+  color: DatabaseDeepResearchReportAnnotationColor | null;
+  startOffset: number;
+  endOffset: number;
+  selectedText: string;
+  prefix: string;
+  suffix: string;
+  comment: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+export interface DatabaseDeepResearchReportAnnotationInput {
+  reportId: string;
+  scope?: string;
+  kind: DatabaseDeepResearchReportAnnotation['kind'];
+  color?: DatabaseDeepResearchReportAnnotationColor | null;
+  startOffset: number;
+  endOffset: number;
+  selectedText: string;
+  prefix?: string;
+  suffix?: string;
+  comment?: string | null;
+}
+
 export interface DatabaseDeepResearchPreview {
+  requestedReportType?: DatabaseDeepResearchRequestedReportType;
   reportType?: DatabaseDeepResearchReportType;
+  resolvedReportType?: DatabaseDeepResearchReportType;
+  suggestedRoles?: DatabaseResearchSemanticRoles;
+  confidence?: number;
+  warnings?: string[];
+  limitations?: string[];
+  preflight?: { ok: boolean; partial: boolean; warnings: string[] };
   eligibility?: DatabaseDeepResearchEligibility;
   availableReportTypes?: DatabaseDeepResearchEligibility[];
   rowCount: number;
@@ -529,6 +726,7 @@ export interface DatabaseResearchReport {
   structured: Record<string, unknown>;
   quality: Record<string, unknown>;
   provenance: Record<string, unknown>;
+  readAt: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -772,7 +970,10 @@ export function normalizeDatabaseDeepResearchJobInput(
   const depth = DATABASE_RESEARCH_DEPTHS.includes(input.depth)
     ? input.depth
     : "deep";
-  const reportType = normalizeDatabaseDeepResearchReportType(input.reportType);
+  const requestedReportType: DatabaseDeepResearchRequestedReportType = input.requestedReportType === 'auto' || input.reportType === 'auto'
+    ? 'auto'
+    : normalizeDatabaseDeepResearchReportType(input.requestedReportType ?? input.reportType);
+  const reportType = requestedReportType === 'auto' ? 'general' : requestedReportType;
   const preset = DATABASE_RESEARCH_BUDGETS[depth];
   const model =
     input.model == null
@@ -817,6 +1018,9 @@ export function normalizeDatabaseDeepResearchJobInput(
     .filter((section) => section.title && section.focus);
   return {
     reportType,
+    requestedReportType,
+    autoConfigure: input.autoConfigure === true || requestedReportType === 'auto',
+    autoConfiguration: input.autoConfiguration,
     objective,
     databaseIds,
     viewIds,

@@ -36,11 +36,13 @@ import { LibraryDocumentReader } from './LibraryDocumentReader';
 import { VirtualList } from '../components/VirtualList';
 import { confirm, promptText, toast } from '../components/feedback';
 import { t, tx } from '../i18n';
+import { zoteroConnectionHint, zoteroFailureText } from '../lib/zoteroConnection';
 import type { PendingAssistantNavigationTarget } from '../navigation';
 import type { PendingLibraryNavigationTarget } from '../navigation';
 import type { LibraryGlobalSnapshot, LibrarySnapshot, ListPlacement } from '../app/viewSnapshots';
 import type { PendingGraphNavigationTarget } from '../navigation';
 import { Library } from './Library';
+import { LibraryTutorialModal, libraryTutorialSeen, markLibraryTutorialSeen, type LibraryTutorialTab } from '../components/LibraryTutorialModal';
 import { LIBRARY_COLUMN_BY_ID, libraryItemTypeLabel } from '@shared/libraryBibliography';
 import { DEFAULT_GLOBAL_LIBRARY_SETTINGS } from '@shared/libraryAttachmentNaming';
 
@@ -403,6 +405,21 @@ function CollectionBranch({
   );
 }
 
+/**
+ * The failure text names the cause; this names the fix. Asking Zotero itself is what
+ * separates a closed Zotero from a Nodus-side precondition such as an unconfigured
+ * library folder: pointing at Zotero's Advanced settings would be a wrong turn for
+ * the second, so a Zotero that answers gets no hint.
+ */
+async function diagnoseZotero(): Promise<string | null> {
+  try {
+    const status = await window.nodus.zoteroPing();
+    return status.ok ? null : zoteroConnectionHint(status);
+  } catch {
+    return null;
+  }
+}
+
 function ZoteroImportDialog({ onClose, onFinished }: { onClose: () => void; onFinished: () => void }) {
   const [libraries, setLibraries] = useState<ZoteroLibraryPreview[]>([]);
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -412,8 +429,10 @@ function ZoteroImportDialog({ onClose, onFinished }: { onClose: () => void; onFi
   const [progress, setProgress] = useState<ZoteroImportProgress | null>(null);
   const [copyAttachments, setCopyAttachments] = useState(true);
   const [includeUnfiled, setIncludeUnfiled] = useState(true);
+  const [includeStandaloneFiles, setIncludeStandaloneFiles] = useState(false);
   const [sessions, setSessions] = useState<ZoteroSyncSession[]>([]);
   const [lastReport, setLastReport] = useState<ZoteroSyncSession['report']>(null);
+  const [hint, setHint] = useState<string | null>(null);
 
   useEffect(() => {
     let alive = true;
@@ -425,7 +444,10 @@ function ZoteroImportDialog({ onClose, onFinished }: { onClose: () => void; onFi
       if (libraryResult.status === 'fulfilled') {
         setLibraries(libraryResult.value);
         setSelected(new Set(libraryResult.value.map((entry) => entry.id)));
-      } else setError(libraryResult.reason instanceof Error ? libraryResult.reason.message : String(libraryResult.reason));
+      } else {
+        setError(zoteroFailureText(libraryResult.reason));
+        void diagnoseZotero().then((next) => { if (alive) setHint(next); });
+      }
       if (sessionResult.status === 'fulfilled') setSessions(sessionResult.value);
     }).finally(() => alive && setLoading(false));
     const off = window.nodus.onZoteroImportProgress((value) => {
@@ -437,6 +459,7 @@ function ZoteroImportDialog({ onClose, onFinished }: { onClose: () => void; onFi
   const run = async (id: string, selection?: ZoteroImportSelection) => {
     setRequestId(id);
     setError(null);
+    setHint(null);
     setLastReport(null);
     try {
       const report = selection
@@ -449,13 +472,14 @@ function ZoteroImportDialog({ onClose, onFinished }: { onClose: () => void; onFi
       onFinished();
       if (!report.canceled && !report.partial) onClose();
     } catch (nextError) {
-      setError(nextError instanceof Error ? nextError.message : String(nextError));
+      setError(zoteroFailureText(nextError));
+      void diagnoseZotero().then(setHint);
     } finally {
       setRequestId(null);
       void window.nodus.listZoteroSyncSessions().then(setSessions).catch(() => undefined);
     }
   };
-  const start = () => run(crypto.randomUUID(), { libraryIds: [...selected], copyAttachments, includeUnfiled });
+  const start = () => run(crypto.randomUUID(), { libraryIds: [...selected], copyAttachments, includeUnfiled, includeStandaloneFiles });
   // Only the newest session can be resumed. Searching the whole history instead meant
   // that one old failure kept the "interrupted sync" banner up forever: a later run
   // that completed cleanly still found the stale entry and reported itself as
@@ -508,6 +532,11 @@ function ZoteroImportDialog({ onClose, onFinished }: { onClose: () => void; onFi
           <div className="mt-4 grid gap-2 text-xs text-neutral-400 sm:grid-cols-2">
             <label className="flex items-center gap-2 rounded-lg bg-neutral-900/60 p-2.5"><input type="checkbox" checked={copyAttachments} disabled={!!requestId} onChange={(event) => setCopyAttachments(event.target.checked)} />{t('Copiar todos los adjuntos')}</label>
             <label className="flex items-center gap-2 rounded-lg bg-neutral-900/60 p-2.5"><input type="checkbox" checked={includeUnfiled} disabled={!!requestId} onChange={(event) => setIncludeUnfiled(event.target.checked)} />{t('Incluir documentos sin colección')}</label>
+            {/* A parentless file is a first-class entry in Zotero but arrives with no
+                author, year or title beyond a filename, so it stays opt-in. The count
+                the last import skipped is reported below, because the option is
+                useless to someone who does not know it applies to them. */}
+            <label className="flex items-start gap-2 rounded-lg bg-neutral-900/60 p-2.5"><input type="checkbox" className="mt-0.5" checked={includeStandaloneFiles} disabled={!!requestId} onChange={(event) => setIncludeStandaloneFiles(event.target.checked)} /><span>{t('Importar archivos sueltos (sin ficha bibliográfica)')}<span className="mt-0.5 block text-[10px] text-neutral-500">{t('PDFs y EPUBs añadidos a Zotero sin una entrada encima. Llegan sin autor ni año.')}</span></span></label>
           </div>
           {progress && (
             <div className="mt-5 rounded-xl border border-indigo-500/20 bg-indigo-500/5 p-3">
@@ -516,7 +545,18 @@ function ZoteroImportDialog({ onClose, onFinished }: { onClose: () => void; onFi
               <p className="mt-2 text-[10px] text-neutral-500">{progress.processedItems}/{progress.totalItems || '—'} {t('documentos')} · {progress.processedAttachments}/{progress.totalAttachments || '—'} {t('adjuntos')}</p>
             </div>
           )}
-          {error && <p role="alert" className="mt-4 rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-xs text-red-300">{error}</p>}
+          {error && (
+            <div role="alert" data-testid="zotero-global-import-error" className="mt-4 rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-xs text-red-300">
+              <p>{error}</p>
+              {hint && <p data-testid="zotero-global-import-hint" className="mt-2 opacity-80">{hint}</p>}
+            </div>
+          )}
+          {!!lastReport?.itemsStandaloneSkipped && !includeStandaloneFiles && (
+            <div role="status" className="mt-4 rounded-lg border border-sky-500/30 bg-sky-500/10 p-3 text-xs text-sky-950 dark:text-sky-100">
+              <b>{t('Archivos sueltos no importados')}</b>
+              <p className="mt-1">{tx('Tu biblioteca tiene {n} archivo(s) sin ficha bibliográfica. Marca la casilla de arriba y vuelve a importar si los quieres.', { n: lastReport.itemsStandaloneSkipped })}</p>
+            </div>
+          )}
           {lastReport?.partial && (
             <div role="status" className="mt-4 rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-950 dark:text-amber-100">
               <b>{t('Sincronización parcial')}</b>
@@ -1712,6 +1752,22 @@ export function GlobalLibraryView({
   const preferredScope = requestedScope ?? (settings.libraryGlobalEnabled ? settings.libraryScope : 'vault');
   const [scope, setScope] = useState<LibraryScope>(preferredScope);
   const [switching, setSwitching] = useState(false);
+  // Everyone meets the Library guide once, on their first visit to the section. The
+  // flag is written as soon as it is presented — not when it is dismissed — so a
+  // closed window or a switched vault does not queue the same greeting again. The
+  // header's «?» reopens it afterwards, and that route ignores the flag entirely.
+  const [tutorialOpen, setTutorialOpen] = useState(() => !libraryTutorialSeen());
+  const [tutorialTab, setTutorialTab] = useState<LibraryTutorialTab>('analysis');
+  // The flag records that the guide WAS presented, not that it was dismissed, so it
+  // is written on the visit that opened it: closing the window cannot queue it again.
+  const autoPresented = useRef(tutorialOpen);
+  useEffect(() => {
+    if (autoPresented.current) markLibraryTutorialSeen();
+  }, []);
+  const openTutorial = useCallback((tab: LibraryTutorialTab = 'analysis') => {
+    setTutorialTab(tab);
+    setTutorialOpen(true);
+  }, []);
   // The documents left open, restored as initial values. Reopening one is the same
   // read as opening it was, and the page the reader had reached inside it comes back
   // with it: the reader writes its own position per document and restores it on mount.
@@ -1819,6 +1875,7 @@ export function GlobalLibraryView({
             onSnapshotChange={(vault) => onSnapshotChange?.({ vault })}
             onOpenCollections={onOpenCollections}
             onOpenNodusCollections={() => void chooseScope('global')}
+            onOpenTutorial={() => openTutorial('analysis')}
             onOpenGraph={onOpenGraph}
             onOpenAssistant={onOpenAssistant}
             onOpenArchive={onOpenArchive}
@@ -1850,6 +1907,12 @@ export function GlobalLibraryView({
           />
         </div>
       )}
+      <LibraryTutorialModal
+        open={tutorialOpen}
+        tab={tutorialTab}
+        onTabChange={setTutorialTab}
+        onClose={() => setTutorialOpen(false)}
+      />
     </div>
   );
 }

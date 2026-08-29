@@ -76,7 +76,6 @@ try {
   await page.evaluate((nextSettings) => {
     localStorage.setItem("nodus.lastSeenVersion", "9999.0.0");
     localStorage.setItem("nodus.mobileTeaserSeen.3.2.4", "1");
-    localStorage.setItem("nodus.documentUnderstandingConsent.2026-08", "1");
     localStorage.setItem("nodus.platformHighlightsSeen.2026-07", "1");
     localStorage.setItem("nodus.toolkitBetaGuideSeen.2.4.0", "1");
     localStorage.setItem(

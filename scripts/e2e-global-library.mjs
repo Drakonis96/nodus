@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
+import net from 'node:net';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -16,8 +17,17 @@ const itemId = 'zotero:E7FGXJFE';
 const storageId = 'E7FGXJFE';
 const pendingItemId = 'nodus:E2E-PENDING-READING';
 const pendingStorageId = 'E2E-PENDING-READING';
+// A port with nothing listening on it is a closed Zotero, which is both the
+// commonest way this dialog fails and the one thing the run cannot control: without
+// this, the test passed or skipped its Zotero assertions depending on whether the
+// developer happened to have Zotero open.
+const deadZoteroPort = await new Promise((resolve) => {
+  const probe = net.createServer();
+  probe.listen(0, '127.0.0.1', () => { const { port } = probe.address(); probe.close(() => resolve(port)); });
+});
 const childEnv = {
   ...process.env,
+  NODUS_ZOTERO_API_BASE: `http://127.0.0.1:${deadZoteroPort}/api`,
   NODUS_USERDATA: userData,
   NODUS_DISABLE_AUTO_UPDATE: '1',
   NODUS_E2E_UPDATE_STATUS: 'not-available',
@@ -34,6 +44,24 @@ async function closeElectronApp(instance) {
   const clean = await Promise.race([closed, new Promise((resolve) => { timer = setTimeout(() => resolve(false), 5_000); })]);
   clearTimeout(timer);
   if (!clean && child.exitCode === null && !child.killed) child.kill('SIGKILL');
+}
+
+async function hoverUntilTooltip(page, buttonTestId, tooltip) {
+  // These tooltips are pure CSS `:hover`, and Chromium only recomputes the hover
+  // chain when the pointer moves. A re-render of the scope switcher right after
+  // the pointer lands leaves the element unhovered with no event to fix it, so
+  // move the pointer away and back instead of waiting the state out.
+  for (let attempt = 0; attempt < 4; attempt += 1) {
+    await page.getByTestId(buttonTestId).hover();
+    try {
+      await tooltip.waitFor({ state: 'visible', timeout: 2_000 });
+      return;
+    } catch {
+      await page.mouse.move(4, 4);
+    }
+  }
+  await page.getByTestId(buttonTestId).hover();
+  await tooltip.waitFor({ state: 'visible' });
 }
 
 async function writePendingReadingFixture(collectionId, now) {
@@ -153,14 +181,13 @@ try {
     await updateModal.getByRole('button', { name: 'Entendido', exact: false }).click();
     await updateModal.waitFor({ state: 'detached' });
   }
-  const documentConsent = page.getByTestId('document-understanding-consent');
-  await documentConsent.waitFor({ state: 'attached', timeout: 1_000 }).catch(() => {});
-  if (await documentConsent.count()) {
-    await documentConsent.getByRole('button', { name: 'Ahora no', exact: true }).click();
-    await documentConsent.waitFor({ state: 'detached' });
-  }
-
   await page.locator('[data-tour="nav-library"]').click();
+  // Everyone meets the Library guide the first time they open Library, and its
+  // backdrop swallows every pointer event aimed at the view behind it.
+  const libraryTutorial = page.getByTestId('library-tutorial-modal');
+  await libraryTutorial.waitFor({ state: 'visible' });
+  await page.getByTestId('library-tutorial-close').click();
+  await libraryTutorial.waitFor({ state: 'detached' });
   const scopeSwitcher = page.getByTestId('library-scope-switcher');
   await scopeSwitcher.waitFor({ state: 'visible' });
   assert.equal(await scopeSwitcher.getAttribute('data-scope-placement'), 'content-header');
@@ -189,8 +216,7 @@ try {
   assert.ok(vaultScopeLayout.switcherWidth < Math.min(300, vaultScopeLayout.shellWidth * 0.4), `scope controls remain compact (${JSON.stringify(vaultScopeLayout)})`);
   const vaultScopeTooltip = page.getByTestId('library-scope-vault-tooltip');
   assert.equal(await vaultScopeTooltip.isVisible(), false, 'scope help is not persistent');
-  await page.getByTestId('library-scope-vault').hover();
-  await vaultScopeTooltip.waitFor({ state: 'visible' });
+  await hoverUntilTooltip(page, 'library-scope-vault', vaultScopeTooltip);
   assert.match(await vaultScopeTooltip.innerText(), /colecciones|collections/i, 'This vault explanation appears on hover');
   assert.equal(await page.getByTestId('library-scope-vault').getAttribute('aria-pressed'), 'true', 'a v3-style profile starts in the unchanged vault corpus');
   const vaultSearch = page.getByTestId('library-vault-search');
@@ -265,8 +291,7 @@ try {
   assert.ok(globalScopeLayout.switcherWidth < Math.min(300, globalScopeLayout.shellWidth * 0.4), `Global scope controls remain compact (${JSON.stringify(globalScopeLayout)})`);
   const globalScopeTooltip = page.getByTestId('library-scope-global-tooltip');
   assert.equal(await globalScopeTooltip.isVisible(), false, 'Global help is not persistent');
-  await page.getByTestId('library-scope-global').hover();
-  await globalScopeTooltip.waitFor({ state: 'visible' });
+  await hoverUntilTooltip(page, 'library-scope-global', globalScopeTooltip);
   assert.match(await globalScopeTooltip.innerText(), /Markdown/i, 'Global explanation appears on hover');
   const scopeSettings = await page.evaluate(() => window.nodus.getSettings());
   assert.equal(scopeSettings.libraryGlobalEnabled, true, 'global activation is opt-in');
@@ -642,6 +667,7 @@ try {
   await row.getByRole('button').click();
   const detail = page.getByTestId('global-library-detail');
   await detail.waitFor({ state: 'visible' });
+  await detail.getByText('10.0000/nodus.fixture').waitFor();
   console.log('[global-library-e2e] metadata detail visible');
   assert.match(await detail.innerText(), /10\.0000\/nodus\.fixture/);
   assert.match(await detail.innerText(), /1134-6396/);
@@ -657,6 +683,7 @@ try {
   await pendingRow.waitFor({ state: 'visible' });
   await pendingRow.getByRole('button').click();
   const pendingDetail = page.getByTestId('global-library-detail');
+  await pendingDetail.getByTestId('library-reading-status').getByText('Preparación pendiente').waitFor();
   assert.match(await pendingDetail.getByTestId('library-reading-status').innerText(), /Preparación pendiente/);
   const pendingEnqueue = await page.evaluate((id) => window.nodus.enqueueLibraryExtraction([id]), pendingItemId);
   assert.equal(pendingEnqueue.queued, 1, 'the pending reading enters the extraction queue');
@@ -665,6 +692,7 @@ try {
   await pendingDetail.getByTestId('library-reading-status').getByText('Lista para leer', { exact: true }).waitFor();
   assert.match(await pendingDetail.getByTestId('library-detail-primary-action').innerText(), /Leer/, 'the selected detail refreshes without leaving Library');
   await row.getByRole('button').click();
+  await detail.getByText('10.0000/nodus.fixture').waitFor();
   const toastDismissButtons = page.getByTestId('app-toast-stack').getByRole('button', { name: 'Cerrar' });
   while (await toastDismissButtons.count()) {
     await toastDismissButtons.first().evaluate((button) => (button instanceof HTMLButtonElement ? button.click() : undefined)).catch(() => undefined);
@@ -707,11 +735,14 @@ try {
   await page.locator('[data-testid^="library-workspace-tab-document-"]').first().waitFor({ state: 'visible' });
   assert.equal(await page.getByTestId('work-ideas-modal').count(), 0, 'the reader action does not reopen the analysis modal');
   const readerFormatDialog = page.getByTestId('library-reader-format-dialog');
-  if (await readerFormatDialog.count()) await page.getByTestId('library-reader-format-clean').click();
+  await readerFormatDialog.waitFor({ state: 'visible' });
+  await page.getByTestId('library-reader-format-clean').click();
+  await readerFormatDialog.waitFor({ state: 'detached' });
   await page.getByTestId('library-workspace-tab-library').click();
   await page.getByTestId('library-scope-global').click();
   await row.getByRole('button').click();
   await detail.waitFor({ state: 'visible' });
+  await detail.getByText('10.0000/nodus.fixture').waitFor();
 
   const editorToastDismissButtons = page.getByTestId('app-toast-stack').getByRole('button', { name: 'Cerrar' });
   while (await editorToastDismissButtons.count()) {
@@ -826,6 +857,22 @@ try {
   assert.match(await zoteroDialog.innerText(), /solo lectura/);
   await page.getByTestId('zotero-sync-resume').waitFor({ state: 'visible' });
   await page.getByTestId('resume-zotero-sync').waitFor({ state: 'visible' });
+
+  // A failure here used to reach the user as "Error invoking remote method
+  // 'library:zoteroLibraries': Error: The operation could not be completed." — an IPC
+  // channel and a sentence that named neither the cause nor the fix. It must now name
+  // both: Zotero did not answer, and the setting that makes it answer.
+  const zoteroFailure = page.getByTestId('zotero-global-import-error');
+  await zoteroFailure.waitFor({ state: 'visible' });
+  const failureText = await zoteroFailure.innerText();
+  assert.doesNotMatch(failureText, /invoking remote method/, 'the IPC channel name is not an error message');
+  assert.match(failureText, /No se pudo conectar con Zotero/, 'the dialog names why the import failed');
+  await page.getByTestId('zotero-global-import-hint').waitFor({ state: 'visible' });
+  assert.match(
+    await page.getByTestId('zotero-global-import-hint').innerText(),
+    /Comprueba que Zotero esté abierto/,
+    'the dialog names the setting that fixes it',
+  );
   await page.screenshot({ path: path.join(os.tmpdir(), 'nodus-library-zotero-resume-dark-wide.png'), fullPage: true });
   await page.evaluate(() => { document.documentElement.classList.add('light'); document.documentElement.classList.remove('dark'); });
   await page.setViewportSize({ width: 760, height: 900 });

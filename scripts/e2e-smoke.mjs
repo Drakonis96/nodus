@@ -458,21 +458,15 @@ try {
   await startupUpdateModal.waitFor({ state: 'detached' });
   console.log('[e2e] essential tutorial language preferences + persistent seen-once gate ok');
 
-  // Existing users receive the document-understanding choice exactly once, after
-  // updates and release notes have settled and before Nodi returns. Decline in the
-  // broad smoke test so it stays provider-free; the dedicated document-index E2E
-  // covers accept, progress, pause, resume and stop with durable checkpoints.
-  const documentUnderstandingConsent = page.getByTestId('document-understanding-consent');
-  await documentUnderstandingConsent.waitFor({ timeout: 30_000 });
-  await documentUnderstandingConsent.getByRole('heading', { name: 'Comprender tus obras completas', exact: true }).waitFor();
-  await documentUnderstandingConsent.getByRole('button', { name: 'Ahora no', exact: true }).click();
-  await documentUnderstandingConsent.waitFor({ state: 'detached' });
+  // No startup dialog offers document understanding any more: it is opted into from
+  // Library -> Document index or Settings -> Library. Nothing may queue between the
+  // update check and Nodi.
   assert.equal(
-    await page.evaluate(() => localStorage.getItem('nodus.documentUnderstandingConsent.2026-08')),
-    '1',
-    'document-understanding consent is persisted only after the user chooses',
+    await page.getByTestId('document-understanding-consent').count(),
+    0,
+    'no document-understanding consent modal is shown at startup',
   );
-  console.log('[e2e] document-understanding consent follows updates once and settles before Nodi');
+  console.log('[e2e] startup shows no document-understanding consent modal');
 
   // File imports open the OS picker directly — there is no in-app privacy modal.
   // Stub the native dialog so automation never opens a real picker, then assert
@@ -1887,9 +1881,22 @@ try {
   await page.getByTestId('app-shell').waitFor();
   await page.locator('[data-tour="nav-dbDeepResearch"]').click();
   await page.getByTestId('database-deep-research').waitFor({ timeout: 30_000 });
-  assert.equal(await page.getByTestId('database-deep-research-composer').count(), 1, 'database Deep Research composer renders in the real app');
-  assert.equal(await page.getByTestId('database-deep-research-preview').count(), 1, 'database Deep Research editable preview renders in the real app');
-  assert.equal(await page.getByTestId('database-deep-research-gallery').count(), 1, 'database Deep Research report gallery renders in the real app');
+  // The library is what the view opens on; the composer is now a dialog behind
+  // "Nuevo informe", and the editable outline lives inside its advanced options.
+  assert.equal(await page.getByTestId('database-deep-research-library').count(), 1, 'database Deep Research report library renders in the real app');
+  assert.equal(await page.getByTestId('database-deep-research-composer').count(), 0, 'the composer stays closed until it is asked for');
+  await page.getByTestId('database-deep-research-new').click();
+  await page.getByTestId('database-deep-research-composer').waitFor({ timeout: 30_000 });
+  await page.getByTestId('database-deep-research-objective').fill('Verificar diferencias y anomalías sin inventar cifras.');
+  const composer = page.getByTestId('database-deep-research-composer');
+  await composer.getByRole('checkbox', { name: 'Research evidence' }).check();
+  await composer.getByRole('button', { name: 'Opciones avanzadas' }).click();
+  await composer.getByTestId('database-deep-research-advanced').waitFor({ timeout: 30_000 });
+  await composer.getByRole('button', { name: 'Preparar automáticamente' }).click();
+  await composer.getByTestId('database-deep-research-preview').waitFor({ timeout: 30_000 });
+  assert.ok(await composer.getByTestId('database-deep-research-preview').locator('input').count() >= 6, 'the editable outline renders a title and focus field per section');
+  await composer.getByRole('button', { name: 'Cancelar' }).click();
+  await page.getByTestId('database-deep-research-composer').waitFor({ state: 'detached', timeout: 30_000 });
   await page.evaluate(async ({ originalVaultId, temporaryVaultId }) => {
     const switched = await window.nodus.switchVault(originalVaultId);
     if (!switched.ok) throw new Error(switched.message);
@@ -1897,7 +1904,7 @@ try {
   }, databaseResearchSetup);
   await page.reload();
   await page.getByTestId('app-shell').waitFor();
-  console.log('[e2e] database Deep Research composer + preview + gallery ok over real IPC');
+  console.log('[e2e] database Deep Research library + composer dialog + editable outline ok over real IPC');
 
   // ── Study vault: real UI creation flow + visual/structural regressions ─────
   await page.evaluate(async () => {

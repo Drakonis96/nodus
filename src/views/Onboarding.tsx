@@ -1,12 +1,17 @@
 import { useRef, useState } from 'react';
 import { motion } from 'framer-motion';
-import type { AiProvider, AppSettings, ZoteroCollection, ModelRef, VaultSummary } from '@shared/types';
+import type { AiProvider, AppSettings, ZoteroCollection, ModelRef, VaultSummary, ZoteroPingResult } from '@shared/types';
 import { normalizeEmbeddingModel, normalizeEmbeddingProvider } from '@shared/providers';
 import { getNodusLocalModel } from '@shared/localAiModels';
 import { Spinner, Icon } from '../components/ui';
 import { ConfirmModal } from '../components/ConfirmModal';
 import { OnboardingModelStep } from '../components/OnboardingModelStep';
 import { t, tx } from '../i18n';
+import { zoteroConnectionHint, zoteroFailureText, zoteroPingErrorText } from '../lib/zoteroConnection';
+// The two library sources are brands, not generic actions: the Nodus node mark and
+// the same node mark drawn as a red Z stand in for the app itself and for Zotero.
+import nodusLogo from '../assets/nodus-logo.svg';
+import zoteroLogo from '../assets/nodus-logo-zotero.svg';
 
 type OnboardingExit = 'home' | 'library' | 'settings';
 
@@ -28,8 +33,9 @@ export function Onboarding({
   discardsVault?: boolean;
 }) {
   const [step, setStep] = useState(0);
-  const [ping, setPing] = useState<{ ok: boolean; userId?: string; message?: string } | null>(null);
+  const [ping, setPing] = useState<ZoteroPingResult | null>(null);
   const [collections, setCollections] = useState<ZoteroCollection[]>([]);
+  const [libraryError, setLibraryError] = useState<string | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [librarySetup, setLibrarySetup] = useState<'nodus' | 'zotero'>('nodus');
   const [readTag, setReadTag] = useState('leído');
@@ -79,13 +85,24 @@ export function Onboarding({
     }
   };
 
+  /**
+   * A reachable Zotero is not yet a readable one: a group library can refuse access,
+   * and the local API can rate-limit. Swallowing those with `catch(() => [])` turned
+   * a real failure into a green "Connected" followed by an empty collection list, so
+   * the only symptom the user got was a step that looked finished and did nothing.
+   */
   const checkZotero = async () => {
+    setLibraryError(null);
     const res = await window.nodus.zoteroPing();
     setPing(res);
-    if (res.ok) {
-      const libs = await window.nodus.zoteroLibraries().catch(() => []);
-      const groups = await Promise.all(libs.map((library) => window.nodus.zoteroCollections(library).catch(() => [])));
+    if (!res.ok) return;
+    try {
+      const libs = await window.nodus.zoteroLibraries();
+      const groups = await Promise.all(libs.map((library) => window.nodus.zoteroCollections(library)));
       setCollections(groups.flat());
+    } catch (error) {
+      setCollections([]);
+      setLibraryError(zoteroFailureText(error));
     }
   };
 
@@ -224,6 +241,9 @@ export function Onboarding({
     }
   };
 
+  // A failed check names the setting that fixes it; an HTTP failure from a Zotero that
+  // did answer gets no hint (zoteroConnectionHint decides).
+  const pingHint = ping && !ping.ok ? zoteroConnectionHint(ping) : null;
   const steps = simple
     ? [t('Introducción'), t('Proveedor de IA'), t('Listo')]
     : [t('Biblioteca'), connectsZotero ? t('Colecciones de Zotero') : t('Añadir contenido'), connectsZotero ? t('Lecturas de Zotero') : t('Cómo funciona'), t('Proveedor de IA'), t('Primer resultado')];
@@ -337,18 +357,33 @@ export function Onboarding({
             </p>
             <div className="grid gap-3 sm:grid-cols-2">
               <button type="button" data-testid="onboarding-library-nodus" aria-pressed={librarySetup === 'nodus'} className={`rounded-xl border p-4 text-left ${librarySetup === 'nodus' ? 'border-indigo-500 bg-indigo-500/10' : 'border-neutral-700 hover:border-neutral-500'}`} onClick={() => setLibrarySetup('nodus')}>
-                <span className="flex items-center gap-2 font-semibold"><Icon name="library" /> {t('Biblioteca de Nodus')}</span>
+                <span className="flex items-center gap-2 font-semibold">
+                  <img src={nodusLogo} alt="" aria-hidden="true" className="h-5 w-5 shrink-0" /> {t('Biblioteca de Nodus')}
+                  {/* The standalone reference manager is still in beta; the badge says so
+                      here, exactly as the Library guide does at the same fork. */}
+                  <span data-testid="onboarding-library-nodus-beta" className="rounded-full border border-amber-500/40 bg-amber-500/15 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-amber-300">BETA</span>
+                </span>
                 <span className="mt-2 block text-xs leading-5 text-neutral-400">{t('Añade archivos, DOI, ISBN o referencias manuales y organiza tus propias colecciones. No necesitas Zotero.')}</span>
               </button>
               <button type="button" data-testid="onboarding-library-zotero" aria-pressed={librarySetup === 'zotero'} className={`rounded-xl border p-4 text-left ${librarySetup === 'zotero' ? 'border-indigo-500 bg-indigo-500/10' : 'border-neutral-700 hover:border-neutral-500'}`} onClick={() => { setLibrarySetup('zotero'); void checkZotero(); }}>
-                <span className="flex items-center gap-2 font-semibold"><Icon name="sync" /> Zotero</span>
+                <span className="flex items-center gap-2 font-semibold">
+                  <img src={zoteroLogo} alt="" aria-hidden="true" className="h-5 w-5 shrink-0" /> Zotero
+                  <span data-testid="onboarding-library-zotero-recommended" className="rounded-full border border-indigo-500/40 bg-indigo-500/15 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-indigo-300">{t('Recomendado')}</span>
+                </span>
                 <span className="mt-2 block text-xs leading-5 text-neutral-400">{t('Conecta tu biblioteca existente en modo solo lectura y elige qué colecciones monitorizar.')}</span>
               </button>
             </div>
             {connectsZotero && <div className="rounded-xl border border-neutral-800 p-3">
               <p className="text-xs text-neutral-400">{t('Nodus usa la API local de Zotero en modo solo lectura (requiere Zotero 7 o posterior). Abre Zotero y verifica la conexión.')}</p>
               <button className="btn btn-secondary mt-3" onClick={checkZotero}>{t('Verificar conexión')}</button>
-              {ping && <div className={`mt-2 text-sm ${ping.ok ? 'text-emerald-400' : 'text-red-400'}`}>{ping.ok ? tx('Conectado (userID {id})', { id: ping.userId ?? '' }) : tx('No disponible: {msg}', { msg: ping.message ?? t('sin respuesta') })}</div>}
+              {ping && (ping.ok && !libraryError ? (
+                <div className="mt-2 text-sm text-emerald-400">{tx('Conectado (userID {id})', { id: ping.userId ?? '' })}</div>
+              ) : (
+                <div role="alert" data-testid="onboarding-zotero-error" className="mt-2 text-sm text-red-400">
+                  {libraryError ?? zoteroPingErrorText(ping)}
+                  {pingHint && <p className="mt-1 text-xs leading-5 text-amber-300">{pingHint}</p>}
+                </div>
+              ))}
             </div>}
             {librarySetup === 'nodus' && (
               <div className="rounded-xl border border-emerald-700/30 bg-emerald-500/5 p-3 text-xs leading-5 text-emerald-300">

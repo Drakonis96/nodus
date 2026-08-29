@@ -130,6 +130,16 @@ test('academic onboarding offers Nodus Library or optional Zotero while dedicate
   assert.match(onboarding, /useState<'nodus' \| 'zotero'>\('nodus'\)/);
   assert.match(onboarding, /data-testid="onboarding-library-nodus"/);
   assert.match(onboarding, /data-testid="onboarding-library-zotero"/);
+  // The two sources are shown as brands, not as generic glyphs: the Nodus node mark
+  // and the same mark drawn as a red Z, with Zotero carrying the recommendation.
+  assert.match(onboarding, /import nodusLogo from '\.\.\/assets\/nodus-logo\.svg';/);
+  assert.match(onboarding, /import zoteroLogo from '\.\.\/assets\/nodus-logo-zotero\.svg';/);
+  assert.match(onboarding, /data-testid="onboarding-library-nodus"[\s\S]*?<img src=\{nodusLogo\}/);
+  assert.match(onboarding, /data-testid="onboarding-library-zotero"[\s\S]*?<img src=\{zoteroLogo\}/);
+  assert.match(onboarding, /data-testid="onboarding-library-zotero-recommended"[^>]*>\{t\('Recomendado'\)\}/);
+  // Nodus Library is the standalone reference manager, still in beta; the pair of
+  // badges is what tells the two options apart at a glance.
+  assert.match(onboarding, /data-testid="onboarding-library-nodus-beta"[^>]*>BETA</);
   assert.match(onboarding, /if \(connectsZotero\) \{[\s\S]*syncNow/);
   assert.match(onboarding, /No necesitas Zotero/);
   assert.match(onboarding, /Organiza cursos, apuntes, materiales y repasos en un espacio de aprendizaje local/);
@@ -137,6 +147,31 @@ test('academic onboarding offers Nodus Library or optional Zotero while dedicate
   assert.match(onboarding, /Conserva entrevistas, participantes y transcripciones en un archivo de historia oral local y privado/);
   assert.match(onboarding, /Estudia una población histórica desde sus fuentes, observaciones y criterios explícitos/);
   assert.match(onboarding, /Construye un mundo de ficción coherente a partir de tu propio canon/);
+});
+
+test('a failed Zotero check names the setting that fixes it', async () => {
+  const [client, helper, onboarding, translate, en] = await Promise.all([
+    read('electron/zotero/zoteroClient.ts'),
+    read('src/lib/zoteroConnection.ts'),
+    read('src/views/Onboarding.tsx'),
+    read('src/views/ToolkitTranslateView.tsx'),
+    read('src/i18n.en.ts'),
+  ]);
+  // A closed Zotero answers with a bare transport error ("The operation could not be
+  // completed."), so the cause has to travel as a reason the renderer can localize.
+  assert.match(client, /reason: res\.status === 403 \? 'forbidden' : 'http'/);
+  assert.match(client, /reason: 'unreachable'/);
+  assert.doesNotMatch(client, /Habilita "Permitir/);
+  // …and a Zotero that DID answer, with some other status, must not be blamed on it.
+  assert.match(helper, /if \(status\?\.reason === 'http'\) return null;/);
+  const hint = /Comprueba que Zotero esté abierto y que «Permitir que otras aplicaciones de este ordenador se comuniquen con Zotero» esté activado en los ajustes Avanzados de Zotero\./;
+  assert.match(helper, hint);
+  assert.match(en, hint);
+  // Both surfaces that check the connection show it: the academic wizard and Translate.
+  for (const view of [onboarding, translate]) {
+    assert.match(view, /zoteroConnectionHint/);
+    assert.match(view, /zoteroPingErrorText/);
+  }
 });
 
 test('Zotero controls stay out of testimonies, prosopography and worldbuilding', async () => {

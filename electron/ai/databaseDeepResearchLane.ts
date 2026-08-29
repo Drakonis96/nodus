@@ -9,11 +9,15 @@ import {
   estimateDatabaseDeepResearchCost,
   getDatabaseDeepResearchEligibility,
   normalizeDatabaseDeepResearchJobInput,
+  normalizeDatabaseDeepResearchReportType,
+  autoConfigureDatabaseDeepResearch,
+  type DatabaseDeepResearchAutoConfiguration,
 } from '@shared/databaseDeepResearch';
 import { withVaultDatabase } from '../db/database';
 import { getSettings } from '../db/settingsRepo';
 import * as dbMode from '../db/databasesRepo';
 import * as repo from '../db/databaseDeepResearchRepo';
+import { getDatabaseProfile } from './databaseAnalysis';
 import { getVault } from '../vaults/vaultRegistry';
 import { assertChatGptSubscriptionConnected } from './codexSubscription';
 import { completeJson } from './aiClient';
@@ -193,9 +197,12 @@ function validateSources(input: DatabaseDeepResearchJobInput): void {
     const sources = new Set(ids.filter((id): id is string => Boolean(id)).map((id) => columnSources.get(id)));
     if (sources.size > 1) throw new Error(`Los roles de ${label} deben pertenecer a la misma base de datos.`);
   };
-  sameSource('supervivencia', [input.roles.duration, input.roles.event, input.roles.group, ...(input.roles.confounders ?? [])]);
-  sameSource('causalidad', [input.roles.treatment, input.roles.outcome, ...(input.roles.confounders ?? [])]);
-  sameSource('tiempo', [input.roles.time, input.roles.outcome]);
+  if (input.reportType === 'survival_retention')
+    sameSource('supervivencia', [input.roles.duration, input.roles.event, input.roles.group, ...(input.roles.confounders ?? [])]);
+  if (input.reportType === 'causal_impact')
+    sameSource('causalidad', [input.roles.treatment, input.roles.outcome, ...(input.roles.confounders ?? [])]);
+  if (input.reportType === 'temporal_anomalies')
+    sameSource('tiempo', [input.roles.time, input.roles.outcome]);
 
   const eligibility = getDatabaseDeepResearchEligibility(input.reportType, {
     columns: [...columnTypes.entries()].map(([id, type]) => ({ id, type })),
@@ -293,10 +300,20 @@ export async function enqueueDatabaseDeepResearch(
   if (!vault || vault.type !== 'databases') throw new Error('Deep Research de datos sólo está disponible en un vault de bases de datos.');
   const run = await withVaultDatabase(vaultId, () => {
     const normalized = normalizeDatabaseDeepResearchJobInput(rawInput);
-    validateSources(normalized);
-    const selectedModel = normalized.model ?? getSettings().deepResearchModel ?? null;
+    const schemaColumns = normalized.databaseIds.flatMap((databaseId) => {
+      const profile = getDatabaseProfile(databaseId)?.profile;
+      const profiles = new Map((profile?.columns ?? []).map((item) => [item.columnId, item]));
+      return dbMode.getColumns(databaseId).map((column) => ({ databaseId, id: column.id, type: column.type, name: column.name, config: column.config, profile: profiles.get(column.id) }));
+    });
+    const requested = normalized.requestedReportType ?? normalized.reportType ?? 'general';
+    const autoConfiguration: DatabaseDeepResearchAutoConfiguration = normalized.autoConfigure
+      ? autoConfigureDatabaseDeepResearch(requested, { columns: schemaColumns, roles: normalized.roles, databaseCount: normalized.databaseIds.length, objective: normalized.objective }, normalized.roles)
+      : { requestedReportType: requested, reportType: normalizeDatabaseDeepResearchReportType(normalized.reportType), roles: normalized.roles, confidence: 1, warnings: [], limitations: [], partial: false };
+    const configured = { ...normalized, reportType: autoConfiguration.reportType, roles: autoConfiguration.roles, autoConfiguration };
+    validateSources(configured);
+    const selectedModel = configured.model ?? getSettings().deepResearchModel ?? null;
     if (!selectedModel) throw new Error('Selecciona un modelo para Deep Research antes de iniciar la investigación.');
-    const input = { ...normalized, model: selectedModel };
+    const input = { ...configured, model: selectedModel };
     const rowCount = input.databaseIds.reduce((sum, databaseId) => sum + (dbMode.getDatabase(databaseId)?.rowCount ?? 0), 0);
     const estimate = estimateDatabaseDeepResearchCost(rowCount, input.databaseIds.length, input.depth);
     const maxCostUsd = input.budget?.maxCostUsd;
