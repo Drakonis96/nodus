@@ -163,7 +163,6 @@ try {
   await page.waitForFunction(() => typeof window.nodus === "object");
   await page.evaluate(
     async ({ appVersion, backupRoot }) => {
-      localStorage.setItem("nodus.documentUnderstandingConsent.2026-08", "1");
       localStorage.setItem("nodus.lastSeenVersion", appVersion);
       localStorage.setItem(`nodus.mobileTeaserSeen.${appVersion}`, "1");
       localStorage.setItem("nodus.platformHighlightsSeen.2026-07", "1");

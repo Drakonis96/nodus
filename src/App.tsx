@@ -45,10 +45,6 @@ import { PlatformHighlightsUpdateTour } from './components/PlatformHighlightsGui
 import { ToolkitBetaUpdateTour } from './components/ToolkitBetaGuide';
 import { StartupUpdateModal } from './components/StartupUpdateModal';
 import { AiModelRequiredModal } from './components/AiModelRequiredModal';
-import {
-  DocumentUnderstandingConsentModal,
-  hasSeenDocumentUnderstandingConsent,
-} from './components/DocumentUnderstandingConsentModal';
 import { MobileTeaserGuide } from './components/MobileTeaserGuide';
 import { recoveryHealthAdvice, recoveryHealthHeadline } from './recoveryHealth';
 import { NodiMascot } from './components/nodi/NodiMascot';
@@ -193,11 +189,6 @@ export function App() {
   // Set once the startup update check is done with the screen, so the one-time Nodi
   // choice can queue up behind it instead of fighting it for the foreground.
   const [updateSettled, setUpdateSettled] = useState(false);
-  // New document understanding is an opt-in, potentially long/API-consuming pass.
-  // It queues once behind release notes and the startup update check.
-  const [documentUnderstandingConsentSettled, setDocumentUnderstandingConsentSettled] = useState(
-    () => hasSeenDocumentUnderstandingConsent(),
-  );
   // Whether this RUN began before the essential guide had ever been completed — i.e.
   // whether the person at the keyboard is meeting Nodus for the first time. Captured
   // from the first settings read and never recomputed, because both flags the
@@ -2093,22 +2084,10 @@ export function App() {
         />
       )}
 
-      {updateSettled && !documentUnderstandingConsentSettled && !manualWhatsNewOpen && isAcademic &&
-        (!activeVault?.remote || (activeVault.remote.state === 'active' && activeVault.remote.role !== 'reader')) &&
-        settings.onboardingComplete && settings.basicsTutorialVersion > 0 && !recoveryStatus?.needsSetup && (
-          <DocumentUnderstandingConsentModal
-            settings={settings}
-            onSettled={async () => {
-              setDocumentUnderstandingConsentSettled(true);
-              await reloadSettings();
-            }}
-          />
-        )}
-
       {/* Users who already saw the cinematic tutorial were never offered the choice of
           Nodi, so it is made here instead — once, behind the update check. New users
           pick inside the tutorial and reach this already chosen. */}
-      {updateSettled && documentUnderstandingConsentSettled && !manualWhatsNewOpen && !isPreviewVault &&
+      {updateSettled && !manualWhatsNewOpen && !isPreviewVault &&
         settings.onboardingComplete &&
         settings.basicsTutorialVersion > 0 &&
         !recoveryStatus?.needsSetup &&
@@ -2117,7 +2096,7 @@ export function App() {
           <NodiStyleModal onChosen={async () => { await reloadSettings(); }} />
         )}
 
-      {!manualWhatsNewOpen && updateSettled && documentUnderstandingConsentSettled && <NodiMascot settings={settings} />}
+      {!manualWhatsNewOpen && updateSettled && <NodiMascot settings={settings} />}
     </div>
   );
 }

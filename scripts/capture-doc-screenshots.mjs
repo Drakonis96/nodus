@@ -19,7 +19,6 @@ import { _electron as electron } from 'playwright-core';
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const screenshotsDir = path.join(repoRoot, 'docs', 'screenshots');
 const require = createRequire(import.meta.url);
-const documentUnderstandingConsentKey = 'nodus.documentUnderstandingConsent.2026-08';
 const tutorialVideosAnnouncementKey = 'nodus.tutorialVideosAnnouncementSeen.2026-07';
 const startupUpdateSessionKey = 'nodus.startupUpdateChecked';
 
@@ -73,7 +72,6 @@ try {
 
   async function prepareCurrentVault() {
     await page.evaluate((version) => localStorage.setItem('nodus.lastSeenVersion', version), appVersion);
-    await page.evaluate((key) => localStorage.setItem(key, '1'), documentUnderstandingConsentKey);
     await page.evaluate((key) => localStorage.setItem(key, '1'), tutorialVideosAnnouncementKey);
     await page.evaluate((key) => sessionStorage.setItem(key, '1'), startupUpdateSessionKey);
     await page.evaluate((settings) => window.nodus.updateSettings(settings), publicSettings);

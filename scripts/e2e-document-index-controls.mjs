@@ -33,7 +33,6 @@ try {
     localStorage.setItem('nodus.platformHighlightsSeen.2026-07', '1');
     localStorage.setItem('nodus.tutorialVideosAnnouncementSeen.2026-07', '1');
     localStorage.setItem('nodus.toolkitBetaGuideSeen.2.4.0', '1');
-    localStorage.removeItem('nodus.documentUnderstandingConsent.2026-08');
     await window.nodus.updateSettings({
       onboardingComplete: true,
       basicsTutorialVersion: 999,
@@ -57,10 +56,14 @@ try {
     await update.waitFor({ state: 'detached' });
   }
 
-  const consent = page.getByTestId('document-understanding-consent');
-  await consent.waitFor({ state: 'visible' });
-  await consent.getByRole('button', { name: 'Analizar mi vault ahora', exact: true }).click();
-  await consent.waitFor({ state: 'detached' });
+  // Document understanding is started explicitly from the app, never by a startup
+  // dialog, so the campaign is launched the same way the Library control does.
+  assert.equal(
+    await page.getByTestId('document-understanding-consent').count(),
+    0,
+    'no startup consent modal precedes the document index',
+  );
+  await page.evaluate(() => window.nodus.startDocumentIndexCampaign({ includeArchived: false }));
 
   const bar = page.getByTestId('document-index-progress-bar');
   await bar.waitFor({ state: 'visible' });
@@ -90,7 +93,7 @@ try {
   });
   await bar.waitFor({ state: 'detached' });
 
-  console.log('Document consent and real renderer pause/resume/stop E2E passed!');
+  console.log('Document index real renderer pause/resume/stop E2E passed!');
 } finally {
   if (app) await app.close().catch(() => undefined);
   await rm(userData, { recursive: true, force: true });

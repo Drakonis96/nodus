@@ -458,21 +458,15 @@ try {
   await startupUpdateModal.waitFor({ state: 'detached' });
   console.log('[e2e] essential tutorial language preferences + persistent seen-once gate ok');
 
-  // Existing users receive the document-understanding choice exactly once, after
-  // updates and release notes have settled and before Nodi returns. Decline in the
-  // broad smoke test so it stays provider-free; the dedicated document-index E2E
-  // covers accept, progress, pause, resume and stop with durable checkpoints.
-  const documentUnderstandingConsent = page.getByTestId('document-understanding-consent');
-  await documentUnderstandingConsent.waitFor({ timeout: 30_000 });
-  await documentUnderstandingConsent.getByRole('heading', { name: 'Comprender tus obras completas', exact: true }).waitFor();
-  await documentUnderstandingConsent.getByRole('button', { name: 'Ahora no', exact: true }).click();
-  await documentUnderstandingConsent.waitFor({ state: 'detached' });
+  // No startup dialog offers document understanding any more: it is opted into from
+  // Library -> Document index or Settings -> Library. Nothing may queue between the
+  // update check and Nodi.
   assert.equal(
-    await page.evaluate(() => localStorage.getItem('nodus.documentUnderstandingConsent.2026-08')),
-    '1',
-    'document-understanding consent is persisted only after the user chooses',
+    await page.getByTestId('document-understanding-consent').count(),
+    0,
+    'no document-understanding consent modal is shown at startup',
   );
-  console.log('[e2e] document-understanding consent follows updates once and settles before Nodi');
+  console.log('[e2e] startup shows no document-understanding consent modal');
 
   // File imports open the OS picker directly — there is no in-app privacy modal.
   // Stub the native dialog so automation never opens a real picker, then assert
