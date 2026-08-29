@@ -61,7 +61,7 @@ test('Server settings use the native app navigation and visual surface', () => {
   assert.match(settings, /data-testid=\{`settings-tab-\$\{entry\.id\}`\}/);
   assert.doesNotMatch(settings, /<iframe|\/admin\/settings/);
   assert.doesNotMatch(app, />Nodus Research<\/span>/);
-  assert.match(app, />\s*Nodus\s*<\/span>/);
+  assert.match(app, />\s*Nodus Server\s*<\/span>/);
 });
 
 test('Server vault creation uses canonical vault type ids', () => {
