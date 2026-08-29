@@ -52,6 +52,7 @@
     "test:e2e:office-references": "node scripts/e2e-office-references.mjs",
     "test:e2e:local-server": "node scripts/e2e-local-server.mjs",
     "test:e2e:server-web": "npm run build:server-web && node scripts/e2e-server-web.mjs",
+    "test:e2e:server-web-specialized-matrix": "npm run build:server-web && node scripts/e2e-server-web-specialized-matrix.mjs",
     "test:server-web-security": "npm run build:server-web && node --test scripts/test-server-web-security.mjs scripts/test-server-web-publication.mjs scripts/test-server-web-boundary.mjs server/test/privateAnnotations.test.mjs",
     "server:backup": "node scripts/nodus-server-backup.mjs",
     "smoke:author-roles": "node scripts/run-smoke.mjs smoke-author-roles",

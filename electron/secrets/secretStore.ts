@@ -92,6 +92,14 @@ function readKeyFile(file: string): string | null {
   }
 }
 
+// Legacy `b64:` blobs are readable only while Safe Storage is available so
+// they can be migrated immediately to encryption. They are never usable as a
+// plaintext-at-rest fallback when the OS credential store is unavailable.
+function readApiKeyFile(file: string): string | null {
+  if (!fs.existsSync(file) || !safeStorage.isEncryptionAvailable()) return null;
+  return readKeyFile(file);
+}
+
 export function setApiKey(provider: AiProvider, key: string): void {
   if (provider === 'codex') throw new Error('ChatGPT usa acceso gestionado; Nodus no almacena una clave para este proveedor.');
   if (provider === 'github-copilot') throw new Error('GitHub Copilot usa el acceso oficial de GitHub; Nodus no almacena una clave para este proveedor.');
@@ -99,32 +107,31 @@ export function setApiKey(provider: AiProvider, key: string): void {
     clearApiKey(provider);
     return;
   }
+  if (!safeStorage.isEncryptionAvailable()) {
+    throw new Error('El almacén seguro del sistema no está disponible; la clave no se ha guardado.');
+  }
   const file = keyFile(provider);
   const historicalFiles = apiKeyCandidateFiles(provider).filter((candidate) => !sameFile(candidate, file));
   fs.mkdirSync(path.dirname(file), { recursive: true });
   preserveLockedFile(file);
   const write = (data: Buffer) => writeSecretAtomically(file, data);
-  if (!safeStorage.isEncryptionAvailable()) {
-    write(Buffer.from(`b64:${Buffer.from(key).toString('base64')}`));
-  } else {
-    write(safeStorage.encryptString(key));
-  }
+  write(safeStorage.encryptString(key));
   // Once the canonical write is verified, retire exact-name copies from older
   // roots/vaults so a future recovery can never resurrect a stale credential.
-  if (readKeyFile(file) === key) historicalFiles.forEach(retireHistoricalFile);
+  if (readApiKeyFile(file) === key) historicalFiles.forEach(retireHistoricalFile);
 }
 
 export function getApiKey(provider: AiProvider): string | null {
   if (provider === 'codex' || provider === 'github-copilot') return null;
   const canonical = keyFile(provider);
-  const fromGlobal = readKeyFile(canonical);
+  const fromGlobal = readApiKeyFile(canonical);
   if (fromGlobal !== null) return fromGlobal;
   // One-time migration: any readable key from a released root/vault location
   // is promoted to the current global store. This also covers Windows/Linux
   // userData casing changes, where the OS credential itself remains readable.
   for (const candidate of apiKeyCandidateFiles(provider)) {
     if (sameFile(candidate, canonical)) continue;
-    const legacy = readKeyFile(candidate);
+    const legacy = readApiKeyFile(candidate);
     if (legacy !== null) {
       setApiKey(provider, legacy);
       return legacy;
@@ -133,7 +140,7 @@ export function getApiKey(provider: AiProvider): string | null {
   // Last resort: the emergency archive. Nothing used to read it, so a key that
   // only survived there was lost in practice.
   for (const archived of archivedApiKeyFiles(provider)) {
-    const rescued = readKeyFile(archived);
+    const rescued = readApiKeyFile(archived);
     if (rescued !== null) {
       setApiKey(provider, rescued);
       return rescued;

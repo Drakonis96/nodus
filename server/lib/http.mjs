@@ -45,7 +45,7 @@ export async function jsonBody(req, limit) {
 }
 
 export function contentSecurityPolicy(formActionSources = ["'self'"]) {
-  return `default-src 'none'; style-src 'self' 'unsafe-inline'; script-src 'self'; worker-src 'self' blob:; connect-src 'self'; img-src 'self' data: blob:; frame-src 'self' blob:; font-src 'self'; form-action ${formActionSources.join(' ')}; frame-ancestors 'none'; base-uri 'none'; object-src 'none'`;
+  return `default-src 'none'; style-src 'self' 'unsafe-inline'; script-src 'self'; worker-src 'self' blob:; connect-src 'self'; img-src 'self' data: blob: https://*.tile.openstreetmap.org; frame-src 'self' blob:; font-src 'self' data:; form-action ${formActionSources.join(' ')}; frame-ancestors 'none'; base-uri 'none'; object-src 'none'`;
 }
 
 export const SECURITY_HEADERS = Object.freeze({

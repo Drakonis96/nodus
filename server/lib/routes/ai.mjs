@@ -20,6 +20,7 @@ export function createAIRoutes({
 }) {
   const cancelled = new Set();
   const activeControllers = new Map();
+  const activeRunTokens = new Map();
   const scheduled = new Set();
   const activeEmbeddings = new Map();
 
@@ -62,7 +63,8 @@ export function createAIRoutes({
     scheduled.add(scheduledKey);
     queueMicrotask(async () => {
       const initial = ownedJob(userId, id);
-      if (!initial || initial.status !== 'queued' || cancelled.has(`${userId}:${id}`)) {
+      const runToken = initial ? `${userId}:${id}:${initial.attempt}` : '';
+      if (!initial || initial.status !== 'queued' || cancelled.has(`${userId}:${id}`) || cancelled.has(runToken)) {
         scheduled.delete(scheduledKey); return;
       }
       if (!canStillReadVault(userId, initial.vaultId)) {
@@ -73,10 +75,11 @@ export function createAIRoutes({
       if (!started || started.status !== 'running') { scheduled.delete(scheduledKey); return; }
       const controller = new AbortController();
       const key = `${userId}:${id}`;
+      activeRunTokens.set(key, runToken);
       activeControllers.set(key, controller);
       const membershipMonitor = setInterval(() => {
         if (!canStillReadVault(userId, initial.vaultId)) {
-          cancelled.add(key);
+          cancelled.add(runToken);
           controller.abort(new Error('Vault access was revoked.'));
         }
       }, 250);
@@ -90,14 +93,14 @@ export function createAIRoutes({
         // A cancellation may have arrived while the provider request was in flight. Never let
         // its late response resurrect a cancelled or deleted job.
         const current = ownedJob(userId, id);
-        if (current?.status === 'running' && canStillReadVault(userId, initial.vaultId) && !cancelled.has(key)) {
+        if (current?.status === 'running' && current.attempt === initial.attempt && canStillReadVault(userId, initial.vaultId) && !cancelled.has(runToken)) {
           privateData.updateJob(userId, id, { status: 'completed', result: redactStructured(result), error: null });
         }
       } catch (error) {
         const current = ownedJob(userId, id);
-        if (current?.status === 'running' && (controller.signal.aborted || !canStillReadVault(userId, initial.vaultId))) {
+        if (current?.status === 'running' && current.attempt === initial.attempt && (controller.signal.aborted || !canStillReadVault(userId, initial.vaultId))) {
           privateData.updateJob(userId, id, { status: 'cancelled', result: null, error: null });
-        } else if (current?.status === 'running' && !cancelled.has(key)) {
+        } else if (current?.status === 'running' && current.attempt === initial.attempt && !cancelled.has(runToken)) {
           privateData.updateJob(userId, id, {
             status: 'failed', result: null,
             error: { code: 'provider_error', message: redactText(String(error?.message || 'Provider request failed.')).slice(0, 500) },
@@ -105,9 +108,13 @@ export function createAIRoutes({
         }
       } finally {
         clearInterval(membershipMonitor);
-        activeControllers.delete(key);
-        cancelled.delete(key);
+        if (activeRunTokens.get(key) === runToken) {
+          activeRunTokens.delete(key);
+          activeControllers.delete(key);
+        }
+        cancelled.delete(runToken);
         scheduled.delete(scheduledKey);
+        if (ownedJob(userId, id)?.status === 'queued') queueMicrotask(() => enqueue(userId, id));
       }
     });
   }
@@ -185,6 +192,21 @@ export function createAIRoutes({
       const auth = me(req, res); if (!auth) return true;
       if (req.method !== 'GET') { json(res, 405, { error: 'method_not_allowed' }); return true; }
       json(res, 200, { providers: providerMetadata(auth.user.id), credentialsAvailable: Boolean(aiStore) }); return true;
+    }
+
+    if (segments[1] === 'v2' && segments[2] === 'me' && segments[3] === 'ai' && segments[4] === 'providers' && segments[5] && segments[6] === 'models' && !segments[7]) {
+      const auth = me(req, res); if (!auth) return true;
+      if (req.method !== 'GET') { json(res, 405, { error: 'method_not_allowed' }); return true; }
+      const provider = providerId(segments[5]);
+      if (!supportedProvider(provider)) { json(res, 404, { error: 'unsupported_provider' }); return true; }
+      try {
+        const models = await gateway.listModels({ userId: auth.user.id, provider });
+        json(res, 200, { provider, models, source: 'live' });
+      } catch (error) {
+        const status = Number(error?.statusCode) || (String(error?.message || '').includes('No credential') ? 409 : 502);
+        json(res, status, { error: status === 409 ? 'credential_required' : 'provider_catalog_error', error_description: redactText(String(error?.message || 'The provider model catalogue is unavailable.')).slice(0, 500) });
+      }
+      return true;
     }
 
     if (segments[1] === 'v2' && segments[2] === 'me' && segments[3] === 'ai' && segments[4] === 'credentials' && segments[5]) {
@@ -287,6 +309,8 @@ export function createAIRoutes({
         const job = ownedJob(auth.user.id, id);
         if (!job || !principalCanReadVault(auth, job.vaultId) || !privateData.deleteJob(auth.user.id, id)) { json(res, 404, { error: 'job_not_found' }); return true; }
         cancelled.add(`${auth.user.id}:${id}`);
+        const activeToken = activeRunTokens.get(`${auth.user.id}:${id}`);
+        if (activeToken) cancelled.add(activeToken);
         activeControllers.get(`${auth.user.id}:${id}`)?.abort(new Error('Job deleted.'));
         json(res, 200, { ok: true }); return true;
       }
@@ -295,6 +319,8 @@ export function createAIRoutes({
         if (!job || !principalCanReadVault(auth, job.vaultId)) { json(res, 404, { error: 'job_not_found' }); return true; }
         if (!['queued', 'running'].includes(job.status)) { json(res, 409, { error: 'job_not_active' }); return true; }
         cancelled.add(`${auth.user.id}:${id}`);
+        const activeToken = activeRunTokens.get(`${auth.user.id}:${id}`);
+        if (activeToken) cancelled.add(activeToken);
         activeControllers.get(`${auth.user.id}:${id}`)?.abort(new Error('Job cancelled.'));
         const updated = privateData.updateJob(auth.user.id, id, { status: 'cancelled', result: null });
         json(res, 200, { job: publicJob(updated) }); return true;
@@ -303,6 +329,8 @@ export function createAIRoutes({
         const job = ownedJob(auth.user.id, id);
         if (!job || !principalCanReadVault(auth, job.vaultId)) { json(res, 404, { error: 'job_not_found' }); return true; }
         if (!['failed', 'cancelled'].includes(job.status)) { json(res, 409, { error: 'job_not_retryable' }); return true; }
+        // Older attempts retain their token until their provider promise unwinds. The new
+        // attempt has a distinct token, so a late response can never settle the retry.
         cancelled.delete(`${auth.user.id}:${id}`);
         const updated = privateData.updateJob(auth.user.id, id, { status: 'queued', result: null, error: null, attempt: (job.attempt || 1) + 1 });
         enqueue(auth.user.id, id);

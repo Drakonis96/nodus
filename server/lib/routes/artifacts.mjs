@@ -1,7 +1,7 @@
 const JSON_LIMIT = 2 * 1024 * 1024;
 
-/** Private notes and AI drafts. The URL deliberately contains no user id. */
-export function createArtifactRoutes({ authorize, json, jsonBody, publicUrl, artifacts, privateData }) {
+/** Private notes, collections and AI drafts. The URL deliberately contains no user id. */
+export function createArtifactRoutes({ authorize, json, jsonBody, publicUrl, artifacts, privateData, renderPdf }) {
   function sameOrigin(req, res, auth) {
     if (auth.principal.kind !== 'session') return true;
     let origin = String(req.headers.origin || '');
@@ -80,6 +80,27 @@ export function createArtifactRoutes({ authorize, json, jsonBody, publicUrl, art
       scope: mutation ? 'materials.write' : 'materials.read',
     });
     if (!artifactVaultAuth) return true;
+    if (req.method === 'GET' && segments[5] === 'document.pdf') {
+      if (artifact.kind !== 'deep-research' || typeof renderPdf !== 'function') { json(res, 404, { error: 'artifact_not_found' }); return true; }
+      let bytes;
+      try {
+        bytes = await renderPdf({
+          title: artifact.title,
+          draftMarkdown: artifact.content,
+          abstract: artifact.metadata?.objective || '',
+        }, { subject: 'Deep Research · privado' });
+      } catch (error) {
+        json(res, 422, { error: 'unrenderable_artifact', error_description: String(error?.message || error) }); return true;
+      }
+      const filename = String(artifact.title || 'deep-research').replace(/[^A-Za-z0-9._-]+/g, '-').slice(0, 80) || 'deep-research';
+      res.writeHead(200, {
+        'content-type': 'application/pdf', 'content-length': bytes.length,
+        'content-disposition': `inline; filename="${filename}.pdf"`,
+        'cache-control': 'private, max-age=0, must-revalidate', 'x-content-type-options': 'nosniff',
+      });
+      if (req.method === 'HEAD') res.end(); else res.end(bytes);
+      return true;
+    }
     if (req.method === 'GET') { json(res, 200, { artifact }); return true; }
     if (req.method === 'PATCH') {
       const input = await jsonBody(req, JSON_LIMIT);

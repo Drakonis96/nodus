@@ -85,10 +85,8 @@ export const VAULT_TYPES: VaultTypeDef[] = [
     // Genealogy is record- and kinship-focused; hide the argumentative surfaces, the
     // idea graph and the coverage/gaps analysis. Deep Research STAYS: it has its own
     // genealogy pipeline that writes a family-history report over the embedding-indexed
-    // archive + library. The Writing workshop and Projects remain hidden by default —
-    // they are idea-graph + Zotero-citation authoring tools with no genealogy data
-    // source — but stay re-enableable from the sidebar for mixed corpora. The
-    // tree/persons/timeline/archive/map come in via scoping.
+    // archive + library. The unified Workspace is an academic surface; genealogy
+    // keeps Notes as its corresponding authoring surface.
     defaultHiddenViews: [
       'argument',
       'debate',
@@ -154,7 +152,7 @@ Este vault se usa para APRENDER y ESTUDIAR, no para investigación original. Pri
   {
     id: 'primary_sources',
     available: PRIMARY_SOURCES_RELEASE_ENABLED,
-    // A dedicated documentary workspace. Library, Writing and Deep Research may be
+    // A dedicated documentary workspace. Library, the legacy Writing route and Deep Research may be
     // offered later as optional views, but never enter the default ten-section shell.
     defaultHiddenViews: ['library', 'writing', 'deepResearch'],
     promptPack: `

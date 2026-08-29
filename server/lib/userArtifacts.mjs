@@ -7,7 +7,7 @@ const VERSION = 1;
 const MAX_ITEMS = 10_000;
 const MAX_USER_BYTES = 64 * 1024 * 1024;
 const KINDS = new Set([
-  'workspace-note', 'nodi-note', 'author-synthesis', 'dictionary-entry', 'deep-research',
+  'workspace-note', 'workspace-collection', 'nodi-note', 'author-synthesis', 'dictionary-entry', 'deep-research',
 ]);
 
 function safeId(value, label = 'id') {

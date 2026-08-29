@@ -7,6 +7,7 @@ import { SERVER_PROFILE_PREFERENCES_VERSION, sanitizeServerProfilePreferences } 
 const PRIVATE_DATA_VERSION = 1;
 const DEFAULT_JOB_RETENTION_MS = 7 * 24 * 60 * 60_000;
 const DEFAULT_MAX_JOBS = 1_000;
+const DEFAULT_MAX_USER_BYTES = 64 * 1024 * 1024;
 const TERMINAL_JOB_STATUSES = new Set(['completed', 'failed', 'cancelled']);
 const JOB_STATUSES = new Set(['queued', 'running', 'completed', 'failed', 'cancelled']);
 const JOB_TRANSITIONS = Object.freeze({
@@ -97,8 +98,10 @@ export class UserPrivateDataStore {
     this.root = path.resolve(root, 'users');
     const configuredRetention = Number(options.jobRetentionMs ?? options.retentionMs ?? DEFAULT_JOB_RETENTION_MS);
     const configuredMaxJobs = Number(options.maxJobs ?? options.maxJobCount ?? DEFAULT_MAX_JOBS);
+    const configuredMaxBytes = Number(options.maxBytes ?? DEFAULT_MAX_USER_BYTES);
     this.jobRetentionMs = Number.isFinite(configuredRetention) && configuredRetention > 0 ? configuredRetention : DEFAULT_JOB_RETENTION_MS;
     this.maxJobs = Number.isSafeInteger(configuredMaxJobs) && configuredMaxJobs > 0 ? configuredMaxJobs : DEFAULT_MAX_JOBS;
+    this.maxBytes = Number.isSafeInteger(configuredMaxBytes) && configuredMaxBytes >= 1 * 1024 * 1024 ? configuredMaxBytes : DEFAULT_MAX_USER_BYTES;
     privateDirectory(this.root, 'Private-data root');
   }
 
@@ -164,6 +167,8 @@ export class UserPrivateDataStore {
     const userId = safeId(userIdValue, 'user id');
     if (value?.ownerUserId !== userId) throw new Error('Private-data ownership mismatch');
     const file = this.userFile(userId);
+    const serialized = JSON.stringify(value);
+    if (Buffer.byteLength(serialized, 'utf8') > this.maxBytes) throw new Error('Private data storage quota exceeded');
     const temporary = `${file}.tmp-${process.pid}-${randomUUID()}`;
     fs.writeFileSync(temporary, JSON.stringify(value, null, 2), { mode: 0o600, flag: 'wx' });
     fs.renameSync(temporary, file);

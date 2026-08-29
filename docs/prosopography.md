@@ -28,7 +28,15 @@ La bóveda de Prosopografía construye una biografía colectiva sin separar los 
 
 `exportProsopLongRows` genera una fila por statement con sujeto, valor, literal, fuente, localizador y certezas. `exportProsopIpif` genera el borrador IPIF separando persona, fuente, factoid y statement. El auditor verifica invariantes, `PRAGMA quick_check`, checksum canónico y cobertura de sincronización.
 
-Todas las tablas `prosop_*` viajan en el grupo de sincronización `prosopography`; `note_links` viaja con Notas. El backup normal de la bóveda contiene el SQLite completo y sus adjuntos.
+Todas las tablas `prosop_*` viajan en el grupo de sincronización local `prosopography`;
+eso no implica publicación en Server. Una bóveda `server_native` autenticada puede
+gestionar sólo su allowlist explícita de personas, perfiles, fuentes/segmentos,
+organizaciones y vínculos de red. Una bóveda `desktop_published` nunca copia esas
+filas: sólo publica agregados `prosopography-public-*`, sin nombres, citas, nodos,
+aristas ni resolución de identidad. Factoids, statements, pertenencias, hipótesis,
+capturas y propuestas siguen siendo locales hasta disponer de contratos de dominio
+con sus invariantes. `note_links` viaja con Notas. El backup normal de la bóveda
+contiene el SQLite completo y sus adjuntos.
 
 ## Privacidad y accesibilidad
 

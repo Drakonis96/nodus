@@ -141,7 +141,9 @@ function EventCard({
   );
 }
 
-export function PrimarySourcesTimelineView() {
+export type PrimarySourcesTimelineLoader = { getPrimarySourceTimelineWorkspace: () => Promise<PrimarySourceTimelineWorkspace> };
+
+export function PrimarySourcesTimelineView({ loader }: { loader?: PrimarySourcesTimelineLoader } = {}) {
   const [attention, setAttention] = useState(() => consumePrimarySourceAttention(['event_evidence']));
   const [workspace, setWorkspace] = useState<PrimarySourceTimelineWorkspace | null>(null);
   const [mode, setMode] = useState<TimelineMode>('timeline');
@@ -161,7 +163,7 @@ export function PrimarySourcesTimelineView() {
 
   useEffect(() => {
     let cancelled = false;
-    window.nodus.getPrimarySourceTimelineWorkspace()
+    (loader?.getPrimarySourceTimelineWorkspace ?? window.nodus.getPrimarySourceTimelineWorkspace)()
       .then((data) => {
         if (cancelled) return;
         setWorkspace(data);
@@ -171,7 +173,7 @@ export function PrimarySourcesTimelineView() {
         if (!cancelled) setError(cause instanceof Error ? cause.message : String(cause));
       });
     return () => { cancelled = true; };
-  }, []);
+  }, [loader]);
 
   const filtered = useMemo(() => {
     const query = search.trim().toLocaleLowerCase();
@@ -221,7 +223,7 @@ export function PrimarySourcesTimelineView() {
   ];
 
   return (
-    <div className="flex h-full min-h-0 flex-col bg-neutral-50 text-neutral-900 dark:bg-neutral-950 dark:text-neutral-100">
+    <div className="flex h-full min-h-0 flex-col bg-neutral-50 text-neutral-900 dark:bg-neutral-950 dark:text-neutral-100" data-testid="primary-sources-timeline-view">
       <header className="shrink-0 border-b border-neutral-200 bg-white px-5 py-4 dark:border-neutral-800 dark:bg-neutral-950">
         {attention && (
           <div className="mb-3 flex items-center gap-2 rounded-lg bg-indigo-50 px-3 py-2 text-[10px] text-indigo-800 dark:bg-indigo-950/40 dark:text-indigo-200">

@@ -20,7 +20,7 @@ type HomeTarget =
   | 'ideas'
   | 'gaps'
   | 'reading'
-  | 'writing'
+  | 'workspace'
   | 'settings'
   | 'persons'
   | 'tree'
@@ -309,19 +309,19 @@ export function HomeView({
         </StatusCard>
 
         <StatusCard
-          title={t('Escritura')}
-          icon="edit"
+          title={t('Espacio de trabajo')}
+          icon="notebook"
           tone="indigo"
           metric={stats.ideaNodes > 0 ? t('lista') : t('pendiente')}
-          metricLabel={t('taller académico')}
-          action={<button className="btn btn-ghost border border-neutral-700" onClick={() => onNavigate('writing')}>{t('Abrir')}</button>}
+          metricLabel={t('notas, borradores y organización')}
+          action={<button className="btn btn-ghost border border-neutral-700" onClick={() => onNavigate('workspace')}>{t('Abrir')}</button>}
         >
           <div className="grid grid-cols-2 gap-2">
             <MiniMetric label={t('ideas')} value={stats.ideaNodes} />
             <MiniMetric label={t('huecos')} value={stats.gaps} />
           </div>
           <p className="text-xs text-neutral-500 mt-3">
-            {t('Convierte ideas, contradicciones, huecos y rutas del Tutor en un borrador con citas verificables.')}
+            {t('Organiza notas, borradores y materiales en un único espacio con citas verificables.')}
           </p>
         </StatusCard>
 
@@ -491,9 +491,9 @@ function getRecommendation(settings: AppSettings, stats: AcademicHomeStats): Rec
   }
   if (stats.ideaNodes >= 12 && stats.deepDone > 0) {
     return {
-      title: t('Convierte el grafo en escritura'),
-      body: t('Ya hay suficientes ideas y fuentes para montar un estado de la cuestión, un marco teórico o una justificación de hueco con citas verificables.'),
-      action: { kind: 'view', target: 'writing', icon: 'edit', label: t('Abrir taller') },
+      title: t('Organiza el trabajo del corpus'),
+      body: t('Ya hay suficientes ideas y fuentes para organizar notas y borradores con citas verificables en un único espacio de trabajo.'),
+      action: { kind: 'view', target: 'workspace', icon: 'notebook', label: t('Abrir espacio de trabajo') },
       secondary: { target: stats.gaps > 0 || stats.contradictions > 0 ? 'gaps' : 'ideas', icon: stats.gaps > 0 ? 'gap' : 'bulb', label: stats.gaps > 0 ? t('Ver huecos') : t('Ver ideas') },
     };
   }

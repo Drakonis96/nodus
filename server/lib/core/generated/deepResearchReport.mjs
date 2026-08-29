@@ -41,7 +41,13 @@ function renderInline(text) {
   return parts.join("");
 }
 function inlineEmphasis(escaped) {
-  return escaped.replace(/\[([^\]]+)\]\(([^)\s]+)\)/g, (_m, label, url) => `<a href="${url}">${label}</a>`).replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>").replace(/__([^_]+)__/g, "<strong>$1</strong>").replace(/(^|[^*])\*([^*\n]+)\*/g, "$1<em>$2</em>").replace(/(^|[^_])_([^_\n]+)_/g, "$1<em>$2</em>");
+  return escaped.replace(/\[([^\]]+)\]\(([^)\s]+)\)/g, (_m, label, url) => `<a href="${safeHref(url)}">${label}</a>`).replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>").replace(/__([^_]+)__/g, "<strong>$1</strong>").replace(/(^|[^*])\*([^*\n]+)\*/g, "$1<em>$2</em>").replace(/(^|[^_])_([^_\n]+)_/g, "$1<em>$2</em>");
+}
+function safeHref(value) {
+  const href = String(value ?? "").trim();
+  if (/^(?:https?:\/\/|mailto:|#)/i.test(href)) return href;
+  if (/^[a-z][a-z0-9+.-]*:/i.test(href) || href.startsWith("//")) return "#";
+  return href;
 }
 function isTableSeparator(line) {
   return /^\s*\|?\s*:?-{1,}:?\s*(\|\s*:?-{1,}:?\s*)+\|?\s*$/.test(line);
@@ -171,8 +177,8 @@ function anchoredMarkdown(markdown, prefix) {
   return { html, headings };
 }
 function reportLink(href, label, className = "") {
-  const safeHref = /^(?:https?:\/\/|nodus:\/\/|zotero:\/\/|#)/.test(href) ? href : "#";
-  return `<a${className ? ` class="${escapeHtml(className)}"` : ""} href="${escapeHtml(safeHref)}">${escapeHtml(label)}</a>`;
+  const safeHref2 = /^(?:https?:\/\/|nodus:\/\/|zotero:\/\/|#)/.test(href) ? href : "#";
+  return `<a${className ? ` class="${escapeHtml(className)}"` : ""} href="${escapeHtml(safeHref2)}">${escapeHtml(label)}</a>`;
 }
 function imageIsSafe(dataUrl) {
   return !!dataUrl && /^data:image\/(?:png|jpe?g|webp);base64,[a-z0-9+/=\s]+$/i.test(dataUrl);
