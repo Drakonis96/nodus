@@ -41,6 +41,7 @@ import type { PendingLibraryNavigationTarget } from '../navigation';
 import type { LibraryGlobalSnapshot, LibrarySnapshot, ListPlacement } from '../app/viewSnapshots';
 import type { PendingGraphNavigationTarget } from '../navigation';
 import { Library } from './Library';
+import { LibraryTutorialModal, libraryTutorialSeen, markLibraryTutorialSeen, type LibraryTutorialTab } from '../components/LibraryTutorialModal';
 import { LIBRARY_COLUMN_BY_ID, libraryItemTypeLabel } from '@shared/libraryBibliography';
 import { DEFAULT_GLOBAL_LIBRARY_SETTINGS } from '@shared/libraryAttachmentNaming';
 
@@ -1724,6 +1725,22 @@ export function GlobalLibraryView({
   const preferredScope = requestedScope ?? (settings.libraryGlobalEnabled ? settings.libraryScope : 'vault');
   const [scope, setScope] = useState<LibraryScope>(preferredScope);
   const [switching, setSwitching] = useState(false);
+  // Everyone meets the Library guide once, on their first visit to the section. The
+  // flag is written as soon as it is presented — not when it is dismissed — so a
+  // closed window or a switched vault does not queue the same greeting again. The
+  // header's «?» reopens it afterwards, and that route ignores the flag entirely.
+  const [tutorialOpen, setTutorialOpen] = useState(() => !libraryTutorialSeen());
+  const [tutorialTab, setTutorialTab] = useState<LibraryTutorialTab>('analysis');
+  // The flag records that the guide WAS presented, not that it was dismissed, so it
+  // is written on the visit that opened it: closing the window cannot queue it again.
+  const autoPresented = useRef(tutorialOpen);
+  useEffect(() => {
+    if (autoPresented.current) markLibraryTutorialSeen();
+  }, []);
+  const openTutorial = useCallback((tab: LibraryTutorialTab = 'analysis') => {
+    setTutorialTab(tab);
+    setTutorialOpen(true);
+  }, []);
   // The documents left open, restored as initial values. Reopening one is the same
   // read as opening it was, and the page the reader had reached inside it comes back
   // with it: the reader writes its own position per document and restores it on mount.
@@ -1831,6 +1848,7 @@ export function GlobalLibraryView({
             onSnapshotChange={(vault) => onSnapshotChange?.({ vault })}
             onOpenCollections={onOpenCollections}
             onOpenNodusCollections={() => void chooseScope('global')}
+            onOpenTutorial={() => openTutorial('analysis')}
             onOpenGraph={onOpenGraph}
             onOpenAssistant={onOpenAssistant}
             onOpenArchive={onOpenArchive}
@@ -1862,6 +1880,12 @@ export function GlobalLibraryView({
           />
         </div>
       )}
+      <LibraryTutorialModal
+        open={tutorialOpen}
+        tab={tutorialTab}
+        onTabChange={setTutorialTab}
+        onClose={() => setTutorialOpen(false)}
+      />
     </div>
   );
 }

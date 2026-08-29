@@ -137,6 +137,9 @@ test('academic onboarding offers Nodus Library or optional Zotero while dedicate
   assert.match(onboarding, /data-testid="onboarding-library-nodus"[\s\S]*?<img src=\{nodusLogo\}/);
   assert.match(onboarding, /data-testid="onboarding-library-zotero"[\s\S]*?<img src=\{zoteroLogo\}/);
   assert.match(onboarding, /data-testid="onboarding-library-zotero-recommended"[^>]*>\{t\('Recomendado'\)\}/);
+  // Nodus Library is the standalone reference manager, still in beta; the pair of
+  // badges is what tells the two options apart at a glance.
+  assert.match(onboarding, /data-testid="onboarding-library-nodus-beta"[^>]*>BETA</);
   assert.match(onboarding, /if \(connectsZotero\) \{[\s\S]*syncNow/);
   assert.match(onboarding, /No necesitas Zotero/);
   assert.match(onboarding, /Organiza cursos, apuntes, materiales y repasos en un espacio de aprendizaje local/);
