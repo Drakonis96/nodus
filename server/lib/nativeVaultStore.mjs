@@ -183,8 +183,12 @@ function bindSql(sql, values) {
 }
 
 // The desktop dependency is compiled for Electron's Node ABI in development distributions.
-// A server started with the system Node can still provide real SQLite files through the
-// sqlite3 utility (available in the server image), instead of silently falling back to JSON.
+// A server started with a Node that cannot load it can still provide real SQLite files
+// through the sqlite3 utility, where one is installed. The published image is not that
+// case: server/Dockerfile is node:22-alpine and never installs the CLI, so there the
+// driver is better-sqlite3 from server/package.json and this class stays unused.
+// cliSqliteCapability() below refuses to hand out a CliDatabase unless the binary is
+// really there and really has FTS5, because the schema creates FTS5 virtual tables.
 class CliDatabase {
   constructor(file, options = {}) { this.file = file; this.readonly = Boolean(options.readonly); }
   exec(sql) {
@@ -262,6 +266,43 @@ function safeRevision(value) {
   return revision;
 }
 
+let cliSqliteProbe;
+/**
+ * Whether the sqlite3 CLI can stand in for better-sqlite3. Two things have to hold: the
+ * binary exists, and its build carries FTS5. Neither is guaranteed -- GitHub's macOS
+ * runner ships a sqlite3 without FTS5, and the server image ships no sqlite3 at all --
+ * and without the check the schema half-applies and a vault is created broken instead of
+ * failing. Probed once and cached.
+ */
+function cliSqliteCapability() {
+  if (cliSqliteProbe !== undefined) return cliSqliteProbe;
+  try {
+    execFileSync('sqlite3', [':memory:'], {
+      input: 'CREATE VIRTUAL TABLE nodus_fts_probe USING fts5(x);\n',
+      stdio: ['pipe', 'pipe', 'pipe'],
+    });
+    cliSqliteProbe = { usable: true };
+  } catch (error) {
+    cliSqliteProbe = {
+      usable: false,
+      reason: error?.code === 'ENOENT'
+        ? 'the sqlite3 command is not installed'
+        : 'the installed sqlite3 command was built without the FTS5 module',
+    };
+  }
+  return cliSqliteProbe;
+}
+
+/** A CliDatabase, or a diagnosis naming both halves of why there is no SQLite driver. */
+function cliDatabase(file, mode = {}) {
+  const capability = cliSqliteCapability();
+  if (capability.usable) return new CliDatabase(file, mode);
+  throw new NativeVaultError(
+    'sqlite_unavailable',
+    `Server-native vaults need SQLite with FTS5. better-sqlite3 could not be loaded in this runtime, and ${capability.reason}.`
+  );
+}
+
 export class NativeVaultError extends Error {
   constructor(code, message, details = {}) {
     super(message); this.name = 'NativeVaultError'; this.code = code; this.details = details;
@@ -303,13 +344,13 @@ export class NativeVaultStore {
 
   async _createDb(file, mode = {}) {
     const DatabaseClass = await this._database();
-    if (!DatabaseClass) return new CliDatabase(file, mode);
+    if (!DatabaseClass) return cliDatabase(file, mode);
     try { return new DatabaseClass(file, mode); }
     catch (error) {
       // Electron's native module may be present but built for another Node ABI. Treat that
       // exactly like an unavailable optional driver and keep the canonical SQLite fallback.
       if (error?.code !== 'ERR_DLOPEN_FAILED') throw error;
-      this.Database = null; return new CliDatabase(file, mode);
+      this.Database = null; return cliDatabase(file, mode);
     }
   }
 
@@ -358,7 +399,7 @@ export class NativeVaultStore {
   async _migrate(file) {
     const { runMigrations, SCHEMA_VERSION } = await this.canonical();
     const DatabaseClass = await this._database();
-    if (!DatabaseClass) { migrateWithCli(file, this.migrations.migrations); return { db: new CliDatabase(file), schemaVersion: Number(SCHEMA_VERSION) }; }
+    if (!DatabaseClass) { cliSqliteCapability().usable || cliDatabase(file); migrateWithCli(file, this.migrations.migrations); return { db: new CliDatabase(file), schemaVersion: Number(SCHEMA_VERSION) }; }
     const db = await this._createDb(file);
     if (db instanceof CliDatabase) { migrateWithCli(file, this.migrations.migrations); return { db, schemaVersion: Number(SCHEMA_VERSION) }; }
     try { runMigrations(db); return { db, schemaVersion: Number(SCHEMA_VERSION) }; }

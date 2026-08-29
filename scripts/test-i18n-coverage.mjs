@@ -567,11 +567,12 @@ for (const { name, lang, file, table } of TRANSLATIONS) {
   });
 }
 
-// Server Web strings only English can answer: every other locale falls through
-// to the English safety net, so a French reader sees English there. That is a
-// gap, not a break, and this is its ceiling — it may shrink, never grow.
-// Translate the string in src/i18n.server.ts and lower the number.
-const SERVER_WEB_ENGLISH_ONLY_CEILING = 181;
+// Server Web strings only English can answer. Every other locale would fall
+// through to the English safety net there, so a French reader would see English
+// on a published surface. The catalogue now covers all seven languages, and this
+// ceiling holds it at zero: a new string has to be translated, not left to the
+// fallback. Raise it only to record a gap you mean to keep.
+const SERVER_WEB_ENGLISH_ONLY_CEILING = 0;
 
 test('Server Web strings left to the English safety net stay a bounded set', () => {
   const strings = collectTranslatableStrings();
