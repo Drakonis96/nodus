@@ -6,7 +6,10 @@ import type { ZoteroAttachmentInfo, ZoteroCollection, ZoteroItem, ZoteroLibrary,
 // the API version is 3, and Zotero supports exactly one version at a time. Requires
 // Zotero 7 or newer. Never writes to Zotero, never touches zotero.sqlite directly.
 
-const BASE = process.env.NODUS_ZOTERO_API_BASE?.trim() || 'http://localhost:23119/api';
+// Zotero's HTTP server binds specifically to IPv4 loopback. Using the literal address
+// avoids depending on how a user's `localhost` resolves (or whether a proxy intercepts
+// it), while still sending a Host value accepted by Zotero's DNS-rebinding guard.
+export const ZOTERO_API_BASE = process.env.NODUS_ZOTERO_API_BASE?.trim() || 'http://127.0.0.1:23119/api';
 
 // The local API accepts `0` as the user ID (the real numeric userID works too;
 // anything else answers 400), so we always address the local library as `users/0`.
@@ -18,8 +21,12 @@ const HEADERS: Record<string, string> = {
   // Mozilla/* User-Agent (Electron's) without this header, Zotero closes the TCP
   // connection outright — not a 403, so callers see a socket error rather than an
   // HTTP status. Verified against Zotero 9.0.6.
-  // https://www.zotero.org/support/dev/web_api/v3/basics
+  // https://www.zotero.org/support/dev/web_api/v3/local_api
   'Zotero-Allowed-Request': '1',
+  // Zotero currently supports exactly API v3 locally. Sending the version explicitly
+  // follows the production-client recommendation and prevents a future default from
+  // silently changing the response contract beneath the importer.
+  'Zotero-API-Version': '3',
 };
 
 export class ZoteroRequestError extends Error {
@@ -90,7 +97,7 @@ function parseCanonicalKey(key: string, fallback: ZoteroLibrary = PERSONAL_LIBRA
 }
 
 export async function libraries(): Promise<ZoteroLibrary[]> {
-  const res = await zfetch(`${BASE}/users/${LOCAL_USER_ID}/groups?limit=100`);
+  const res = await zfetch(`${ZOTERO_API_BASE}/users/${LOCAL_USER_ID}/groups?limit=100`);
   if (!res.ok) return [PERSONAL_LIBRARY];
   const groups = (await res.json().catch(() => [])) as any[];
   return [PERSONAL_LIBRARY, ...groups.map((raw) => ({
@@ -109,7 +116,7 @@ export async function libraries(): Promise<ZoteroLibrary[]> {
  */
 export async function ping(): Promise<ZoteroPingResult> {
   try {
-    const res = await zfetch(`${BASE}/users/${LOCAL_USER_ID}/items?limit=1`);
+    const res = await zfetch(`${ZOTERO_API_BASE}/users/${LOCAL_USER_ID}/items?limit=1`);
     if (!res.ok) return { ok: false, message: `HTTP ${res.status}`, reason: res.status === 403 ? 'forbidden' : 'http' };
     const v = res.headers.get('Last-Modified-Version');
     return { ok: true, userId: LOCAL_USER_ID, version: v ? parseInt(v, 10) : 0 };
@@ -121,7 +128,7 @@ export async function ping(): Promise<ZoteroPingResult> {
 
 /** Library version is returned in the Last-Modified-Version response header. */
 export async function libraryVersion(userId: string, library: ZoteroLibrary = { ...PERSONAL_LIBRARY, id: userId }): Promise<number> {
-  const res = await zfetch(`${BASE}/${libraryPrefix(library)}/items?limit=1`);
+  const res = await zfetch(`${ZOTERO_API_BASE}/${libraryPrefix(library)}/items?limit=1`);
   const v = res.headers.get('Last-Modified-Version');
   return v ? parseInt(v, 10) : 0;
 }
@@ -142,7 +149,7 @@ function mapCollection(raw: any, library: ZoteroLibrary): ZoteroCollection {
 
 export async function topCollections(userId: string, requestedLibrary?: ZoteroLibrary): Promise<ZoteroCollection[]> {
   const library = requestedLibrary ?? { ...PERSONAL_LIBRARY, id: userId };
-  const res = await zfetch(`${BASE}/${libraryPrefix(library)}/collections/top?limit=100`);
+  const res = await zfetch(`${ZOTERO_API_BASE}/${libraryPrefix(library)}/collections/top?limit=100`);
   if (!res.ok) throw endpointError('Colecciones de Zotero', res);
   const data = (await res.json()) as any[];
   return data.map((raw) => mapCollection(raw, library)).sort((a, b) => a.name.localeCompare(b.name));
@@ -150,7 +157,7 @@ export async function topCollections(userId: string, requestedLibrary?: ZoteroLi
 
 export async function childCollections(userId: string, parentKey: string, requestedLibrary?: ZoteroLibrary): Promise<ZoteroCollection[]> {
   const parsed = parseCanonicalKey(parentKey, requestedLibrary ?? { ...PERSONAL_LIBRARY, id: userId });
-  const res = await zfetch(`${BASE}/${libraryPrefix(parsed.library)}/collections/${encodeURIComponent(parsed.rawKey)}/collections?limit=100`);
+  const res = await zfetch(`${ZOTERO_API_BASE}/${libraryPrefix(parsed.library)}/collections/${encodeURIComponent(parsed.rawKey)}/collections?limit=100`);
   if (!res.ok) throw endpointError('Subcolecciones de Zotero', res);
   const data = (await res.json()) as any[];
   return data.map((raw) => mapCollection(raw, parsed.library)).sort((a, b) => a.name.localeCompare(b.name));
@@ -255,7 +262,7 @@ export async function libraryItems(
   for (;;) {
     const params = new URLSearchParams({ limit: String(limit), start: String(start), sort: 'dateModified', direction: 'asc' });
     if (opts.since && opts.since > 0) params.set('since', String(opts.since));
-    const res = await zfetch(`${BASE}/${libraryPrefix(library)}/items/top?${params}`, opts.signal);
+    const res = await zfetch(`${ZOTERO_API_BASE}/${libraryPrefix(library)}/items/top?${params}`, opts.signal);
     if (!res.ok) throw endpointError('Elementos de Zotero', res);
     const data = (await res.json()) as any[];
     version = Number(res.headers.get('Last-Modified-Version')) || version;
@@ -289,7 +296,7 @@ export async function deletedSince(
   signal?: AbortSignal,
 ): Promise<ZoteroDeletedObjects> {
   if (since <= 0) return { version: 0, items: [], collections: [] };
-  const res = await zfetch(`${BASE}/${libraryPrefix(library)}/deleted?since=${encodeURIComponent(String(since))}`, signal);
+  const res = await zfetch(`${ZOTERO_API_BASE}/${libraryPrefix(library)}/deleted?since=${encodeURIComponent(String(since))}`, signal);
   // The local API does not implement /deleted: it answers 404 "No endpoint found" for
   // every library, user id and `since` — unlike the Web API this endpoint only exists in.
   // Read as a missing library that aborted the entire import on the *second* run, once a
@@ -317,7 +324,7 @@ export async function allCollections(library: ZoteroLibrary, signal?: AbortSigna
   let start = 0;
   const limit = 100;
   for (;;) {
-    const res = await zfetch(`${BASE}/${libraryPrefix(library)}/collections?limit=${limit}&start=${start}&sort=title`, signal);
+    const res = await zfetch(`${ZOTERO_API_BASE}/${libraryPrefix(library)}/collections?limit=${limit}&start=${start}&sort=title`, signal);
     if (!res.ok) throw endpointError('Colecciones de Zotero', res);
     const data = (await res.json()) as any[];
     out.push(...data.map((raw) => mapCollection(raw, library)));
@@ -340,7 +347,7 @@ export async function collectionItems(
   const limit = 100;
   for (;;) {
     const q = opts.query ? `&q=${encodeURIComponent(opts.query)}&qmode=titleCreatorYear` : '';
-    const url = `${BASE}/${libraryPrefix(parsed.library)}/collections/${encodeURIComponent(parsed.rawKey)}/items/top?limit=${limit}&start=${start}${q}`;
+    const url = `${ZOTERO_API_BASE}/${libraryPrefix(parsed.library)}/collections/${encodeURIComponent(parsed.rawKey)}/items/top?limit=${limit}&start=${start}${q}`;
     const res = await zfetch(url);
     if (!res.ok) throw new Error(`Zotero items HTTP ${res.status}`);
     const data = (await res.json()) as any[];
@@ -378,7 +385,7 @@ export async function collectionItemsRecursive(
 
 export async function getItem(userId: string, itemKey: string, requestedLibrary?: ZoteroLibrary): Promise<ZoteroItem | null> {
   const parsed = parseCanonicalKey(itemKey, requestedLibrary ?? { ...PERSONAL_LIBRARY, id: userId });
-  const res = await zfetch(`${BASE}/${libraryPrefix(parsed.library)}/items/${encodeURIComponent(parsed.rawKey)}`);
+  const res = await zfetch(`${ZOTERO_API_BASE}/${libraryPrefix(parsed.library)}/items/${encodeURIComponent(parsed.rawKey)}`);
   if (!res.ok) return null;
   return mapItem(await res.json(), parsed.library);
 }
@@ -387,7 +394,7 @@ export async function searchItems(library: ZoteroLibrary, query: string): Promis
   const q = query.trim();
   const params = new URLSearchParams({ limit: '50', sort: 'dateModified', direction: 'desc' });
   if (q) { params.set('q', q); params.set('qmode', 'titleCreatorYear'); }
-  const res = await zfetch(`${BASE}/${libraryPrefix(library)}/items/top?${params}`);
+  const res = await zfetch(`${ZOTERO_API_BASE}/${libraryPrefix(library)}/items/top?${params}`);
   if (!res.ok) throw new Error(`Zotero search HTTP ${res.status}`);
   return ((await res.json()) as any[])
     .filter((raw) => !['note', 'annotation'].includes(raw.data?.itemType))
@@ -402,7 +409,7 @@ function creatorName(c: any): string {
 /** Full bibliographic metadata for one item — used by the graph detail panel. */
 export async function getItemMeta(userId: string, itemKey: string): Promise<WorkMeta | null> {
   const parsed = parseCanonicalKey(itemKey, { ...PERSONAL_LIBRARY, id: userId });
-  const res = await zfetch(`${BASE}/${libraryPrefix(parsed.library)}/items/${encodeURIComponent(parsed.rawKey)}`);
+  const res = await zfetch(`${ZOTERO_API_BASE}/${libraryPrefix(parsed.library)}/items/${encodeURIComponent(parsed.rawKey)}`);
   if (!res.ok) return null;
   const d = ((await res.json()) as any).data ?? {};
   const authors = (d.creators ?? [])
@@ -446,7 +453,7 @@ export interface ZoteroFulltext {
  */
 export async function getFulltext(userId: string, attachmentKey: string): Promise<ZoteroFulltext | null> {
   const parsed = parseCanonicalKey(attachmentKey, { ...PERSONAL_LIBRARY, id: userId });
-  const res = await zfetch(`${BASE}/${libraryPrefix(parsed.library)}/items/${encodeURIComponent(parsed.rawKey)}/fulltext`);
+  const res = await zfetch(`${ZOTERO_API_BASE}/${libraryPrefix(parsed.library)}/items/${encodeURIComponent(parsed.rawKey)}/fulltext`);
   if (!res.ok) return null;
   const data = (await res.json().catch(() => null)) as ZoteroFulltext | null;
   if (!data || !data.content || !data.content.trim()) return null;
@@ -455,7 +462,7 @@ export async function getFulltext(userId: string, attachmentKey: string): Promis
 
 export async function itemChildren(userId: string, itemKey: string): Promise<ZoteroAttachment[]> {
   const parsed = parseCanonicalKey(itemKey, { ...PERSONAL_LIBRARY, id: userId });
-  const res = await zfetch(`${BASE}/${libraryPrefix(parsed.library)}/items/${encodeURIComponent(parsed.rawKey)}/children`);
+  const res = await zfetch(`${ZOTERO_API_BASE}/${libraryPrefix(parsed.library)}/items/${encodeURIComponent(parsed.rawKey)}/children`);
   if (!res.ok) return [];
   const data = (await res.json()) as any[];
   return data
@@ -489,7 +496,7 @@ export interface ZoteroChildNote {
 /** Child notes remain a read-only mirror in Nodus. */
 export async function itemNotes(userId: string, itemKey: string, library?: ZoteroLibrary): Promise<ZoteroChildNote[]> {
   const parsed = parseCanonicalKey(itemKey, library ?? { ...PERSONAL_LIBRARY, id: userId });
-  const res = await zfetch(`${BASE}/${libraryPrefix(parsed.library)}/items/${encodeURIComponent(parsed.rawKey)}/children`);
+  const res = await zfetch(`${ZOTERO_API_BASE}/${libraryPrefix(parsed.library)}/items/${encodeURIComponent(parsed.rawKey)}/children`);
   if (!res.ok) return [];
   const data = (await res.json()) as any[];
   return data.filter((child) => child.data?.itemType === 'note' && child.data?.parentItem === parsed.rawKey).map((child) => ({
@@ -511,7 +518,7 @@ export async function itemAttachments(userId: string, itemKey: string, library?:
 
 export async function attachmentFilePath(userId: string, attachmentKey: string): Promise<string | null> {
   const parsed = parseCanonicalKey(attachmentKey, { ...PERSONAL_LIBRARY, id: userId });
-  const res = await zfetch(`${BASE}/${libraryPrefix(parsed.library)}/items/${encodeURIComponent(parsed.rawKey)}/file`, undefined, { redirect: 'manual' });
+  const res = await zfetch(`${ZOTERO_API_BASE}/${libraryPrefix(parsed.library)}/items/${encodeURIComponent(parsed.rawKey)}/file`, undefined, { redirect: 'manual' });
   const location = res.headers.get('location');
   if (!location?.startsWith('file:')) return null;
   try { return fileURLToPath(location); } catch { return null; }
@@ -553,7 +560,7 @@ export async function resolvePdfAttachmentKey(userId: string, itemKey: string): 
  */
 export async function itemAsAttachment(userId: string, itemKey: string): Promise<ZoteroAttachment | null> {
   const parsed = parseCanonicalKey(itemKey, { ...PERSONAL_LIBRARY, id: userId });
-  const res = await zfetch(`${BASE}/${libraryPrefix(parsed.library)}/items/${encodeURIComponent(parsed.rawKey)}`);
+  const res = await zfetch(`${ZOTERO_API_BASE}/${libraryPrefix(parsed.library)}/items/${encodeURIComponent(parsed.rawKey)}`);
   if (!res.ok) return null;
   const raw = (await res.json().catch(() => null)) as any;
   const d = raw?.data;

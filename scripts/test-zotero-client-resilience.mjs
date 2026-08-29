@@ -11,6 +11,8 @@ let mode = 'retry';
 let requests = 0;
 const server = createServer((request, response) => {
   requests += 1;
+  assert.equal(request.headers['zotero-allowed-request'], '1', 'the browser-safety opt-in reaches Zotero');
+  assert.equal(request.headers['zotero-api-version'], '3', 'the local API response contract is explicit');
   if (mode === 'closed') {
     request.socket.destroy();
     return;
@@ -35,6 +37,16 @@ await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
 try {
   const output = path.join(scratch, 'zotero-client.mjs');
   await build({ entryPoints: [path.resolve('electron/zotero/zoteroClient.ts')], outfile: output, bundle: true, platform: 'node', format: 'esm' });
+
+  const originalBase = process.env.NODUS_ZOTERO_API_BASE;
+  delete process.env.NODUS_ZOTERO_API_BASE;
+  const defaultClient = await import(`${pathToFileURL(output).href}?default=${Date.now()}`);
+  assert.equal(
+    defaultClient.ZOTERO_API_BASE,
+    'http://127.0.0.1:23119/api',
+    'the default matches the IPv4 loopback address Zotero actually binds',
+  );
+
   process.env.NODUS_ZOTERO_API_BASE = `http://127.0.0.1:${server.address().port}/api`;
   const client = await import(`${pathToFileURL(output).href}?resilience=${Date.now()}`);
 
@@ -48,6 +60,8 @@ try {
   mode = 'closed'; requests = 0;
   await assert.rejects(client.libraryVersion('0'), (error) => error.code === 'zotero-closed' && error.retryable === true);
   assert.equal(requests, 3, 'a temporarily closed Zotero receives bounded retries');
+  if (originalBase === undefined) delete process.env.NODUS_ZOTERO_API_BASE;
+  else process.env.NODUS_ZOTERO_API_BASE = originalBase;
   console.log('Zotero retry and structured failure tests passed!');
 } finally {
   await new Promise((resolve) => server.close(resolve));
