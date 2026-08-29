@@ -3488,6 +3488,43 @@ select.input optgroup {
 .library-action-menu-item > span { display: grid; min-width: 0; flex: 1; gap: 0.15rem; }
 .library-action-menu-item b { overflow: hidden; font-size: 0.75rem; font-weight: 500; text-overflow: ellipsis; white-space: nowrap; }
 .library-action-menu-item small { overflow: hidden; color: #737373; font-size: 0.625rem; line-height: 0.9rem; text-overflow: ellipsis; white-space: nowrap; }
+.library-action-menu-heading { display: flex; min-width: 0; align-items: center; gap: 0.4rem; }
+.library-action-menu-heading b { min-width: 0; }
+.library-action-menu-badge { flex: 0 0 auto; border-radius: 999px; padding: 0.1rem 0.35rem; font-size: 0.5rem; font-style: normal; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; }
+.library-action-menu-badge.is-beta { color: #fcd34d; background: rgb(245 158 11 / 0.16); }
+.library-action-menu-badge.is-recommended { color: #6ee7b7; background: rgb(16 185 129 / 0.14); }
+/* The way back into the Library guide. It is the one glyph-only button in a row of
+   labelled ones, so it takes the active vault's accent (handed in as
+   --library-help-accent) instead of the shared neutral outline. */
+.library-help-button {
+  --library-help-glyph: color-mix(in srgb, var(--library-help-accent) 62%, #ffffff);
+  display: inline-flex;
+  min-width: 2.25rem;
+  min-height: 2.25rem;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid color-mix(in srgb, var(--library-help-accent) 68%, transparent);
+  border-radius: 0.625rem;
+  color: var(--library-help-glyph);
+  background: color-mix(in srgb, var(--library-help-accent) 24%, transparent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--library-help-accent) 13%, transparent);
+  transition: background 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
+}
+.library-help-button:hover,
+.library-help-button:focus-visible {
+  color: #ffffff;
+  background: color-mix(in srgb, var(--library-help-accent) 44%, transparent);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--library-help-accent) 20%, transparent);
+  outline: none;
+}
+.light .library-help-button {
+  --library-help-glyph: color-mix(in srgb, var(--library-help-accent) 88%, #000000);
+  background: color-mix(in srgb, var(--library-help-accent) 14%, #ffffff);
+}
+.light .library-help-button:hover,
+.light .library-help-button:focus-visible { color: #ffffff; background: var(--library-help-accent); }
+.light .library-action-menu-badge.is-beta { color: #b45309; }
+.light .library-action-menu-badge.is-recommended { color: #047857; }
 .light .library-action-menu {
   border-color: #d4d4d4;
   background: #ffffff;
@@ -4711,6 +4748,80 @@ body:has(.library-document-reader [data-testid="library-reader-sidebar"]) .app-t
 .toolkit-guide-footer button:not(:disabled):hover { transform: translateY(-1px); filter: brightness(1.04); }
 @media (max-width: 660px) { .toolkit-guide-backdrop { padding: 10px; } .toolkit-guide-cinema { max-height: 95vh; border-radius: 20px; } .toolkit-guide-hero { min-height: 170px; grid-template-columns: 1fr 120px; padding: 24px 20px; } .toolkit-guide-nodi svg { height: 130px !important; } .toolkit-guide-stage { padding: 19px; } .toolkit-guide-tools, .toolkit-guide-models, .toolkit-guide-remote-models, .toolkit-guide-subscriptions, .platform-guide-pair, .platform-guide-feature-list, .platform-guide-feature-list.compact, .platform-guide-tool-grid { grid-template-columns: 1fr; } .toolkit-guide-subscription { grid-template-columns: 38px minmax(0, 1fr); } .toolkit-guide-subscription em { display: none; } }
 @media (prefers-reduced-motion: reduce) { .toolkit-guide-aurora { animation: none; } }
+
+/* The Library greeting. It borrows the cinema shell, the hero and the footer from the
+   Toolkit guide — same --tg-* tokens, so light mode is already handled — and adds what
+   a two-tab guide needs that a linear tour did not: the tab strip, numbered steps and
+   the two brand rows (library sources, and the Word/Chrome integrations). */
+.library-tutorial-cinema { width: min(880px, 100%); }
+.library-tutorial-hero { min-height: 150px; padding: 20px 32px; background: radial-gradient(circle at 84% 30%, rgb(99 102 241 / .26), transparent 32%), radial-gradient(circle at 16% 8%, rgb(45 212 191 / .2), transparent 36%), linear-gradient(124deg, #0f172a, #0b1522 56%, #141026); }
+.library-tutorial-hero .toolkit-guide-kicker { color: #a5b4fc; }
+/* A guide is read, not admired: the hero gives back the vertical room the
+   announcement tours spend on their headline so a whole step fits on screen. */
+.library-tutorial-hero h2 { max-width: 560px; margin-top: 7px; font-size: clamp(23px, 2.6vw, 32px); }
+.library-tutorial-hero p { max-width: 560px; margin-top: 9px; }
+.library-tutorial-cinema .toolkit-guide-nodi { margin-bottom: -18px; }
+.library-tutorial-close { position: absolute; top: 14px; right: 14px; z-index: 3; display: grid; width: 30px; height: 30px; place-items: center; border: 1px solid rgb(255 255 255 / .16); border-radius: 9px; color: #e2e8f0; background: rgb(2 6 23 / .38); }
+.library-tutorial-close:hover { border-color: rgb(255 255 255 / .34); background: rgb(2 6 23 / .62); }
+.library-tutorial-tabs { display: flex; flex: 0 0 auto; gap: 6px; border-bottom: 1px solid var(--tg-border); padding: 11px 24px 0; background: var(--tg-surface); }
+.library-tutorial-tabs button { display: inline-flex; min-height: 38px; align-items: center; gap: 7px; border-bottom: 2px solid transparent; padding: 8px 13px; color: var(--tg-muted); font-size: 12px; font-weight: 700; }
+.library-tutorial-tabs button:hover { color: var(--tg-text); }
+.library-tutorial-tabs button.is-active { border-bottom-color: #818cf8; color: var(--tg-text); }
+.library-tutorial-tabs svg { flex: 0 0 auto; }
+.library-tutorial-panel { display: grid; gap: 15px; margin-top: 4px; color: var(--tg-muted); font-size: 13px; line-height: 1.6; }
+.library-tutorial-panel .toolkit-guide-summary { margin-top: 6px; }
+.library-tutorial-step { display: grid; grid-template-columns: 28px minmax(0, 1fr); gap: 12px; }
+.library-tutorial-step > div { display: grid; gap: 9px; }
+.library-tutorial-step h4 { color: var(--tg-text); font-size: 14px; font-weight: 720; letter-spacing: -.01em; }
+.library-tutorial-step h4 { display: flex; flex-wrap: wrap; align-items: center; gap: 7px; }
+.library-tutorial-step-badge { border-radius: 999px; padding: 3px 7px; color: #b45309; background: rgb(245 158 11 / .16); font-size: 8px; font-style: normal; font-weight: 850; letter-spacing: .09em; text-transform: uppercase; }
+.dark .library-tutorial-step-badge, .tutorial-cinema .library-tutorial-step-badge { color: #fcd34d; }
+.library-tutorial-step p { color: var(--tg-muted); font-size: 12.5px; line-height: 1.6; }
+.library-tutorial-step-number { display: grid; width: 28px; height: 28px; place-items: center; border: 1px solid rgb(129 140 248 / .34); border-radius: 999px; color: #4f46e5; background: rgb(99 102 241 / .12); font-size: 12px; font-weight: 850; }
+.dark .library-tutorial-step-number, .tutorial-cinema .library-tutorial-step-number { color: #a5b4fc; }
+.library-tutorial-sources { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 9px; }
+.library-tutorial-source { display: grid; grid-template-columns: 40px minmax(0, 1fr); align-items: start; gap: 9px 11px; border: 1px solid var(--tg-border); border-radius: 13px; padding: 11px 12px; background: var(--tg-card); }
+.library-tutorial-brand { display: grid; width: 38px; height: 38px; place-items: center; border-radius: 11px; background: #fff; box-shadow: 0 5px 18px rgb(0 0 0 / .12); }
+.library-tutorial-brand img { display: block; width: 22px; height: 22px; object-fit: contain; }
+.library-tutorial-source > div { display: grid; gap: 3px; }
+.library-tutorial-source-heading { display: flex; min-width: 0; flex-wrap: wrap; align-items: center; gap: 7px; }
+.library-tutorial-source b { color: var(--tg-text); font-size: 12px; }
+.library-tutorial-source small { color: var(--tg-muted); font-size: 10.5px; line-height: 1.5; }
+.library-tutorial-source em { flex: 0 0 auto; border-radius: 999px; padding: 3px 7px; font-size: 8px; font-style: normal; font-weight: 850; letter-spacing: .09em; text-transform: uppercase; }
+.library-tutorial-source em.is-beta { color: #b45309; background: rgb(245 158 11 / .16); }
+.dark .library-tutorial-source em.is-beta, .tutorial-cinema .library-tutorial-source em.is-beta { color: #fcd34d; }
+.library-tutorial-source em.is-recommended { color: #047857; background: rgb(16 185 129 / .14); }
+.dark .library-tutorial-source em.is-recommended, .tutorial-cinema .library-tutorial-source em.is-recommended { color: #6ee7b7; }
+.library-tutorial-chips { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.library-tutorial-chips span { display: inline-flex; align-items: center; gap: 7px; border: 1px solid var(--tg-border); border-radius: 999px; padding: 6px 11px; color: var(--tg-text); background: var(--tg-card); font-size: 10.5px; font-weight: 700; }
+.library-tutorial-chips svg { color: #818cf8; }
+.library-tutorial-arrow { color: var(--tg-muted); }
+.library-tutorial-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 9px; }
+.library-tutorial-actions > div { display: grid; gap: 5px; border: 1px solid rgb(129 140 248 / .3); border-radius: 13px; padding: 11px 12px; background: linear-gradient(125deg, rgb(99 102 241 / .1), var(--tg-card)); }
+.library-tutorial-actions b { display: inline-flex; align-items: center; gap: 7px; color: var(--tg-text); font-size: 11.5px; }
+.library-tutorial-actions b svg { color: #818cf8; }
+.library-tutorial-actions small { color: var(--tg-muted); font-size: 10.5px; line-height: 1.5; }
+.library-tutorial-cards { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 9px; }
+.library-tutorial-cards > div { display: flex; min-width: 0; align-items: flex-start; gap: 10px; border: 1px solid var(--tg-border); border-radius: 13px; padding: 12px; background: var(--tg-card); }
+.library-tutorial-cards > div > span { display: grid; width: 34px; height: 34px; flex: 0 0 auto; place-items: center; border-radius: 10px; color: #6366f1; background: rgb(99 102 241 / .13); }
+.dark .library-tutorial-cards > div > span, .tutorial-cinema .library-tutorial-cards > div > span { color: #a5b4fc; }
+.library-tutorial-cards > div > div { display: grid; gap: 3px; }
+.library-tutorial-cards b { color: var(--tg-text); font-size: 11.5px; }
+.library-tutorial-cards small { color: var(--tg-muted); font-size: 10.5px; line-height: 1.5; }
+.library-tutorial-subheading { color: var(--tg-text); font-size: 12px; font-weight: 800; letter-spacing: .01em; }
+.library-tutorial-integrations { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 9px; }
+.library-tutorial-integrations > div { display: grid; grid-template-columns: 40px minmax(0, 1fr); align-items: start; gap: 9px 11px; border: 1px solid var(--tg-border); border-radius: 13px; padding: 11px 12px; background: var(--tg-card); }
+.library-tutorial-integrations > div > div { display: grid; gap: 3px; }
+.library-tutorial-integrations b { color: var(--tg-text); font-size: 11.5px; }
+.library-tutorial-integrations small { color: var(--tg-muted); font-size: 10.5px; line-height: 1.5; }
+.library-tutorial-hint { display: inline-flex; min-width: 0; align-items: center; gap: 7px; color: var(--tg-muted); font-size: 10.5px; }
+.library-tutorial-hint svg { flex: 0 0 auto; }
+@media (max-width: 760px) {
+  .library-tutorial-sources, .library-tutorial-actions, .library-tutorial-cards, .library-tutorial-integrations { grid-template-columns: 1fr; }
+  .library-tutorial-tabs { padding: 10px 14px 0; }
+  .library-tutorial-tabs button { padding: 8px 9px; font-size: 11px; }
+  .library-tutorial-hint { display: none; }
+}
 
 /* "A tease of what's coming" — the App Store screenshots beside the copy that explains
    them. The shots are portrait (1320 x 2868), so they get their own narrow column and

@@ -42,6 +42,7 @@ import { DATABASE_TASK_TRANSLATIONS } from './i18n.databaseTasks';
 import { DATABASE_AUTOMATION_TRANSLATIONS } from './i18n.databaseAutomations';
 import { NOTION_IMPORT_TRANSLATIONS } from './i18n.notionImport';
 import { LIBRARY_ONBOARDING_TRANSLATIONS } from './i18n.libraryOnboarding';
+import { LIBRARY_TUTORIAL_TRANSLATIONS } from './i18n.libraryTutorial';
 import { SOURCE_CITATION_TRANSLATIONS } from './i18n.sourceCitation';
 import { DEEP_RESEARCH_APPROACH_TRANSLATIONS } from './i18n.deepResearchApproaches';
 import { DICTIONARY_TRANSLATIONS } from './i18n.dictionary';
@@ -75,6 +76,7 @@ export const PT_BR: Record<string, string> = {
   ...DOCUMENT_UNDERSTANDING_CONSENT_TRANSLATIONS['pt-BR'],
   ...LIBRARY_BIBLIOGRAPHY_TRANSLATIONS['pt-BR'],
   ...LIBRARY_ONBOARDING_TRANSLATIONS['pt-BR'],
+  ...LIBRARY_TUTORIAL_TRANSLATIONS['pt-BR'],
   ...LIBRARY_RECOVERY_TRANSLATIONS['pt-BR'],
   ...DIARIZATION_TRANSLATIONS['pt-BR'],
   ...PROSOPOGRAPHY_TRANSLATIONS['pt-BR'],
