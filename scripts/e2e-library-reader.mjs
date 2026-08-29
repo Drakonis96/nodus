@@ -82,7 +82,6 @@ try {
 
   const work = await page.evaluate(async ({ version, backup }) => {
     localStorage.setItem('nodus.lastSeenVersion', version);
-    localStorage.setItem('nodus.documentUnderstandingConsent.2026-08', '1');
     localStorage.setItem('nodus.mobileTeaserSeen.3.2.4', '1');
     localStorage.setItem('nodus.platformHighlightsSeen.2026-07', '1');
     localStorage.setItem('nodus.tutorialVideosAnnouncementSeen.2026-07', '1');

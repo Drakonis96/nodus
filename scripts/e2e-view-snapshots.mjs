@@ -97,12 +97,6 @@ try {
     await updateModal.waitFor({ state: 'detached' });
   };
   await dismissUpdateModal();
-  const documentConsent = page.getByTestId('document-understanding-consent');
-  if (await documentConsent.count()) {
-    await documentConsent.getByRole('button', { name: 'Ahora no', exact: true }).click();
-    await documentConsent.waitFor({ state: 'detached' });
-  }
-
   // The demo's report is one screen long, and a place only means something in a
   // document that does not fit on one. This is the demo report with a long body: same
   // brief, same shape, enough of it to scroll.
