@@ -3291,6 +3291,44 @@ export function resolveTranslation(
     source
   );
 }
+/**
+ * The catalogues resolveTranslation() consults for the requested locale, in the
+ * same order. Kept beside it so the two cannot drift: anything added to the
+ * chain above belongs here too.
+ */
+const LOCALE_CATALOGUES: Partial<Record<string, Record<string, string>>>[] = [
+  SERVER_WEB_FINAL_CHROME_TRANSLATIONS,
+  SERVER_WEB_PERSONAL_STATUS_TRANSLATIONS,
+  SERVER_WEB_ADVANCED_TRANSLATIONS,
+  SERVER_WEB_CONVERSATION_TRANSLATIONS,
+  SERVER_WEB_PERSONAL_EXTRA,
+  SERVER_WEB_PERSONAL_TRANSLATIONS,
+  SERVER_WEB_SETTINGS_ACTION_TRANSLATIONS,
+  SERVER_WEB_TRANSLATIONS,
+  SERVER_WEB_VAULT_TRANSLATIONS,
+  SERVER_WEB_ACADEMIC_SHELL_TRANSLATIONS,
+  SERVER_WEB_ACADEMIC_TRANSLATIONS,
+  DESKTOP_TABLES,
+  SERVER_TRANSLATIONS,
+];
+
+/**
+ * Whether `language` can translate `source` from its own catalogues, i.e.
+ * without falling through to the English safety net or, past that, to the
+ * Spanish source itself. The i18n coverage gate reads this to check the
+ * strings that live in src/serverWeb, which the desktop tables never hold.
+ */
+export function hasServerTranslation(
+  language: AppLanguage,
+  source: string,
+): boolean {
+  const normalized = normalizeUiLanguage(language);
+  if (normalized === "es") return true;
+  return LOCALE_CATALOGUES.some(
+    (catalogue) => catalogue[normalized]?.[source] !== undefined,
+  );
+}
+
 export function t(source: string): string {
   return resolveTranslation(active, source);
 }
