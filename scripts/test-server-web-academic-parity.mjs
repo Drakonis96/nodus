@@ -23,9 +23,12 @@ test('Academic parity matrix names every Desktop surface and its Server renderer
     'search', 'library', 'graph', 'argument', 'ideas', 'authors', 'dictionary', 'immersion',
     'research', 'hypothesis', 'reading', 'deepResearch', 'workspace',
   ];
+  // The matrix is written in Spanish, so some surfaces are audited under their
+  // label rather than their view id.
+  const matrixLabels = { deepResearch: 'Deep Research', research: 'Estado triple', hypothesis: 'Hipótesis' };
   for (const view of academicViews) {
     assert.match(desktop, new RegExp(`['"]${view}['"]`), `Desktop navigation must keep ${view}`);
-    assert.match(matrix, new RegExp(`\\|[^\\n]*${view === 'deepResearch' ? 'Deep Research' : view === 'research' ? 'Estado triple' : view}[^\\n]*\\|`), `${view} must be audited in the matrix`);
+    assert.match(matrix, new RegExp(`\\|[^\\n]*${matrixLabels[view] ?? view}[^\\n]*\\|`), `${view} must be audited in the matrix`);
   }
   for (const marker of ['SearchServerView', 'LibraryView', 'GraphServerView', 'ArgumentView', 'IdeasServerView', 'AuthorsServerView', 'DictionaryServerView', 'ImmersionView', 'StateOfArtServerView', 'HypothesisView', 'ReadingView', 'DeepResearchServerView', 'PrivateNotesServerView', 'ServerSettingsView']) {
     assert.match(serverFiles + app, new RegExp(marker), `Server renderer ${marker} must exist`);

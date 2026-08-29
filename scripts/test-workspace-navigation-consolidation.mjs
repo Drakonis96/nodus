@@ -6,6 +6,17 @@ import { fileURLToPath } from 'node:url';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const source = (file) => readFile(path.join(root, file), 'utf8');
+// src/serverWeb/App.tsx is formatted with double quotes and wraps its lists one
+// entry per line, so match against those shapes too: the navigation contract
+// below is about which ids exist and how legacy ones are canonicalized, never
+// about how the file happens to be laid out. Same helper as the sibling
+// scripts/test-server-web-academic-parity.mjs.
+const variants = (text) => [
+  text,
+  text.replaceAll('"', "'"),
+  text.replace(/\s+/g, ' '),
+  text.replaceAll('"', "'").replace(/\s+/g, ' '),
+].join('\n');
 
 test('Desktop exposes one authoring section and keeps old ids as aliases only', async () => {
   const [navigation, app, corpus, home, tour] = await Promise.all([
@@ -25,7 +36,7 @@ test('Desktop exposes one authoring section and keeps old ids as aliases only', 
 });
 
 test('Server exposes the same single authoring section and canonicalizes legacy URLs', async () => {
-  const app = await source('src/serverWeb/App.tsx');
+  const app = variants(await source('src/serverWeb/App.tsx'));
   assert.match(app, /'deepResearch', 'workspace',/);
   assert.doesNotMatch(app, /'deepResearch', 'workspace', 'writing', 'projects'/);
   assert.match(app, /requested === 'writing' \|\| requested === 'projects' \? 'workspace'/);
