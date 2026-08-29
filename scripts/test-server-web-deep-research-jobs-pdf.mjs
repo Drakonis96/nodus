@@ -23,10 +23,10 @@ test('Deep Research Server Web exposes durable private job controls and PDF expo
   assert.match(personal, /deep-research-audio/);
   assert.match(personal, /deep-research-audio-panel/);
   assert.match(personal, /La voz se reproduce en este navegador/);
-  assert.match(personal, /title=\{valueText\(activeTranslation\?\.title \|\| open\.title, 'Informe'\)\}/);
-  assert.match(personal, /\{valueText\(activeTranslation\?\.title \|\| open\.title, 'Informe'\)\}/);
+  assert.match(personal, /title=\{valueText\(\s*activeTranslation\?\.title \|\| open\.title,\s*["']Informe["']/);
+  assert.match(personal, /\{valueText\(activeTranslation\?\.title \|\| open\.title, ["']Informe["']\)\}/);
   assert.match(personal, /deep-research-edit-brief/);
-  assert.match(personal, /api\.updateArtifact\(valueText\(open\.id\)/);
+  assert.match(personal, /api\.updateArtifact\(\s*valueText\(open\.id\)/);
   assert.match(personal, /function CitationValue/);
   assert.match(personal, /onCitation=\{setCitation\}/);
   assert.match(readers, /academic = .*idea\|work\|gap\|passage\|theme\|author/);

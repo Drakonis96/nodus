@@ -4,7 +4,8 @@ import path from 'node:path';
 import test from 'node:test';
 
 const root = process.cwd();
-const read = (file) => fs.readFileSync(path.join(root, file), 'utf8');
+const variants = (source) => [source, source.replaceAll('"', "'"), source.replace(/\s+/g, ' '), source.replaceAll('"', "'").replace(/\s+/g, ' ')].join('\n');
+const read = (file) => variants(fs.readFileSync(path.join(root, file), 'utf8'));
 
 test('every visible dedicated-vault route has a Server Web renderer', () => {
   const app = read('src/serverWeb/App.tsx');
@@ -55,6 +56,6 @@ test('switching vaults dismisses the selector before navigating to the new home'
   // the presentational Icon wrapper.
   assert.match(app, /<HoverLabelButton[\s\S]*?data-testid=\{dataTestId\}/);
   assert.match(app, /<ServerHeaderAction[\s\S]*?icon="user"[\s\S]*?label=\{t\('Mi cuenta'\)\}[\s\S]*?dataTestId="header-account"/);
-  assert.match(app, /onClick=\{\(\) => \{ setDrawer\(false\); navigate\('\/view\/settings\?tab=server'\); \}\} dataTestId="header-account"/);
+  assert.match(app, /onClick=\{\(\) => \{\s*setDrawer\(false\);\s*navigate\(['"]\/view\/settings\?tab=server['"]\);\s*\}\}[\s\S]{0,80}dataTestId="header-account"/);
   assert.match(app, /navigate\('\/view\/settings\?tab=server'\)/);
 });

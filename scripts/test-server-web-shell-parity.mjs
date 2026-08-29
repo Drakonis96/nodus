@@ -3,7 +3,8 @@ import fs from 'node:fs';
 import test from 'node:test';
 
 const root = process.cwd();
-const read = (file) => fs.readFileSync(`${root}/${file}`, 'utf8');
+const variants = (source) => [source, source.replaceAll('"', "'"), source.replace(/\s+/g, ' '), source.replaceAll('"', "'").replace(/\s+/g, ' ')].join('\n');
+const read = (file) => variants(fs.readFileSync(`${root}/${file}`, 'utf8'));
 const app = read('src/serverWeb/App.tsx');
 const css = read('src/serverWeb/serverDesktop.css');
 const settingsCss = read('src/serverWeb/settings/ServerSettings.css');
@@ -18,7 +19,7 @@ test('Server shell preserves Desktop sidebar state and compact threshold', () =>
 });
 
 test('Server shell keeps tools out of navigation and routes the account glyph to settings', () => {
-  assert.match(app, /const SERVER_TOOL_VIEWS = new Set<View>\(\['browser', 'radar', 'compass', 'toolkit'\]\)/);
+  assert.match(app, /const SERVER_TOOL_VIEWS = new Set<View>\(\[\s*'browser',\s*'radar',\s*'compass',\s*'toolkit',?\s*\]\)/);
   assert.match(app, /!SERVER_TOOL_VIEWS\.has\(item\.id\)/);
   assert.match(app, /label=\{t\('Mi cuenta'\)\}[\s\S]*?dataTestId="header-account"/);
   assert.match(app, /navigate\('\/view\/settings\?tab=server'\)/);
@@ -55,8 +56,8 @@ test('Server light mode remaps shell hovers, nav, switcher and settings controls
 });
 
 test('account settings expose CSRF-protected web sign-out', () => {
-  const settings = fs.readFileSync(`${root}/src/serverWeb/settings/ServerSettingsView.tsx`, 'utf8');
-  assert.match(settings, /method="post" action="\/logout"/);
-  assert.match(settings, /name="csrf" value=\{csrfToken \|\| ''\}/);
+  const settings = variants(fs.readFileSync(`${root}/src/serverWeb/settings/ServerSettingsView.tsx`, 'utf8'));
+  assert.match(settings, /method="post"[\s\S]*?action="\/logout"/);
+  assert.match(settings, /name=["']csrf["'] value=\{csrfToken \|\| ["']{2}\}/);
   assert.match(settings, /data-testid="account-signout"/);
 });

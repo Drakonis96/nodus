@@ -6,15 +6,17 @@ import { academicSnapshot, publish } from './lib/nodusServerFixtures.mjs';
 import { withServer } from './lib/nodusServerHarness.mjs';
 
 const root = path.resolve(new URL('..', import.meta.url).pathname);
-const surface = fs.readFileSync(path.join(root, 'src/serverWeb/vaults/index.tsx'), 'utf8');
+const variants = (source) => [source, source.replaceAll('"', "'"), source.replace(/\s+/g, ' '), source.replaceAll('"', "'").replace(/\s+/g, ' ')].join('\n');
+const surface = variants(fs.readFileSync(path.join(root, 'src/serverWeb/vaults/index.tsx'), 'utf8'));
 
 test('Study Web surfaces retain Desktop calendar, schedule, review and graph controls', () => {
   for (const marker of [
     'study-calendar-view-',
-    'study-calendar-agenda', 'study-agenda', 'api.studyAgenda',
+    'study-calendar-agenda', 'study-agenda',
     'data-testid="vault-schedule"', 'study-review-catalog', 'study-review-session',
     'study-review-rate-', 'study-graph-svg', 'study-graph-search', 'study-graph-edge-type',
   ]) assert.match(surface, new RegExp(marker.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')), marker);
+  assert.match(surface, /api\s*\.studyAgenda/, 'api.studyAgenda');
   assert.match(surface, /SRS.*privad|historial SRS/i, 'the UI must not imply that private SRS data was published');
 });
 

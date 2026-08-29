@@ -13,6 +13,16 @@ server/dist/web
 cloudflare/dist
 .env
 .env.*
+*.pem
+*.key
+*.p12
+*.pfx
+*.mobileprovision
 *.log
 *.sqlite
 *.nodus
+.DS_Store
+.vite
+.tmp-shots
+.tutorial-out
+scripts/.cache

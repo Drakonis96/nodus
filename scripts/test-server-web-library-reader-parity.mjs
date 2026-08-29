@@ -3,11 +3,12 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 
 const root = new URL("..", import.meta.url).pathname;
-const app = fs.readFileSync(`${root}/src/serverWeb/App.tsx`, "utf8");
-const view = fs.readFileSync(
+const variants = (source) => [source, source.replaceAll('"', "'"), source.replace(/\s+/g, ' '), source.replaceAll('"', "'").replace(/\s+/g, ' ')].join('\n');
+const app = variants(fs.readFileSync(`${root}/src/serverWeb/App.tsx`, "utf8"));
+const view = variants(fs.readFileSync(
   `${root}/src/serverWeb/LibraryServerView.tsx`,
   "utf8",
-);
+));
 const docs = fs.readFileSync(
   `${root}/docs/server-web-academic-parity.md`,
   "utf8",
@@ -62,8 +63,8 @@ test("reader persists read state in the account-scoped annotation overlay and se
   assert.match(view, /title: "Estado de lectura"/);
   assert.match(view, /id: `reading-state-\$\{id\}`/);
   assert.match(view, /content: next \? "read" : "unread"/);
-  assert.match(view, /setIsRead\(state \? state\.content === "read"/);
-  assert.match(view, /const preferred = preference === "original"[\s\S]{0,220}: hasOriginal\s*\n\s*\? "original"\s*\n\s*: "clean"/);
+  assert.match(view, /if \(state\) setIsRead\(state\.content === ["']read["']\)/);
+  assert.match(view, /const preferred =\s*preference === ["']original["'] && hasOriginal[\s\S]{0,260}: hasOriginal\s*\? ["']original["']\s*: ["']clean["']/);
   assert.match(view, /note\.kind === "note" && note\.title === "Estado de lectura"/);
   assert.match(view, /bookmarkFill/);
 });

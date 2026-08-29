@@ -4,7 +4,8 @@ import path from 'node:path';
 import test from 'node:test';
 
 const root = process.cwd();
-const read = (file) => fs.readFileSync(path.join(root, file), 'utf8');
+const variants = (source) => [source, source.replaceAll('"', "'"), source.replace(/\s+/g, ' '), source.replaceAll('"', "'").replace(/\s+/g, ' ')].join('\n');
+const read = (file) => variants(fs.readFileSync(path.join(root, file), 'utf8'));
 
 test('Academic parity matrix names every Desktop surface and its Server renderer', () => {
   const matrix = read('docs/server-web-academic-parity.md');
@@ -24,7 +25,7 @@ test('Academic parity matrix names every Desktop surface and its Server renderer
   ];
   for (const view of academicViews) {
     assert.match(desktop, new RegExp(`['"]${view}['"]`), `Desktop navigation must keep ${view}`);
-    assert.match(matrix, new RegExp(`\|[^\\n]*${view === 'deepResearch' ? 'Deep Research' : view === 'research' ? 'Estado triple' : view}[^\\n]*\\|`), `${view} must be audited in the matrix`);
+    assert.match(matrix, new RegExp(`\\|[^\\n]*${view === 'deepResearch' ? 'Deep Research' : view === 'research' ? 'Estado triple' : view}[^\\n]*\\|`), `${view} must be audited in the matrix`);
   }
   for (const marker of ['SearchServerView', 'LibraryView', 'GraphServerView', 'ArgumentView', 'IdeasServerView', 'AuthorsServerView', 'DictionaryServerView', 'ImmersionView', 'StateOfArtServerView', 'HypothesisView', 'ReadingView', 'DeepResearchServerView', 'PrivateNotesServerView', 'ServerSettingsView']) {
     assert.match(serverFiles + app, new RegExp(marker), `Server renderer ${marker} must exist`);
@@ -43,7 +44,8 @@ test('Server Academic search is explicitly truthful about lexical fallback', () 
   const search = read('src/serverWeb/academic/SearchServerView.tsx');
   assert.match(search, /response\.mode/);
   assert.match(search, /mode === 'semantic' && serverMode !== 'semantic'/);
-  assert.match(search, /embeddings publicados/);
+  assert.match(search, /búsqueda por significado necesita embeddings/);
+  assert.match(search, /Configura el proveedor y la clave de embeddings/);
 });
 
 test('Search opens published academic details instead of the generic record card', () => {
@@ -80,8 +82,8 @@ test('Library and Deep Research expose the published projection with stable DOM 
   assert.match(personal, /deepResearchDocumentUrl/);
   assert.match(personal, /deepResearchPdfUrl/);
   assert.match(personal, /deep-research-private-composer/);
-  assert.match(personal, /api\.runAI\(spaceId, 'deep-research'/);
-  assert.match(personal, /kind: 'deep-research'/);
+  assert.match(personal, /api\.runAI\(\s*spaceId,\s*["']deep-research["']/);
+  assert.match(personal, /kind: ["']deep-research["']/);
   assert.match(personal, /deep-research-private-delete/);
   assert.match(personal, /ErrorNotice error=\{error\}/);
 });
@@ -100,11 +102,11 @@ test('Dictionary keeps Desktop table/dossier semantics and private CRUD isolated
   const corpus = read('server/lib/routes/corpus.mjs');
   assert.match(personal, /data-testid="dictionary-view"/);
   assert.match(personal, /data-testid="dictionary-new"/);
-  assert.match(personal, /api\.createArtifact\(\{ vaultId: spaceId, kind: 'dictionary-entry'/);
-  assert.match(personal, /api\.updateArtifact\(activeId/);
-  assert.match(personal, /api\.deleteArtifact\(activeId/);
-  assert.match(personal, /api\.detail\(spaceId, 'dictionary'/);
-  assert.match(personal, /metadata: \{ private: true, surface: 'dictionary'/);
+  assert.match(personal, /api\.createArtifact\(\s*\{\s*vaultId: spaceId,\s*kind: ["']dictionary-entry["']/);
+  assert.match(personal, /api\.updateArtifact\(\s*activeId/);
+  assert.match(personal, /api\.deleteArtifact\(\s*activeId/);
+  assert.match(personal, /api\.detail\(\s*spaceId,\s*["']dictionary["']/);
+  assert.match(personal, /metadata: \{ private: true, surface: ["']dictionary["']/);
   assert.match(corpus, /head === 'dictionary'/);
   assert.match(corpus, /dictionary_evidence/);
   assert.match(corpus, /dictionary_relations/);
@@ -113,11 +115,11 @@ test('Dictionary keeps Desktop table/dossier semantics and private CRUD isolated
 
 test('Deep Research can generate account-private translations beside published ones', () => {
   const personal = read('src/serverWeb/PersonalViews.tsx');
-  assert.match(personal, /surface === 'translation'/);
+  assert.match(personal, /surface === ["']translation["']/);
   assert.match(personal, /reportId/);
   assert.match(personal, /deep-research-private-translation-composer/);
   assert.match(personal, /Nueva traducción privada/);
-  assert.match(personal, /kind: 'deep-research'/);
+  assert.match(personal, /kind: ["']deep-research["']/);
   assert.match(personal, /entry\.privateArtifact === true/);
   assert.match(personal, /modifica el vault/i);
 });
@@ -161,9 +163,9 @@ test('Graph parity keeps Desktop lenses, presets and safe audit filters visible'
   }
   assert.match(graph, /data-testid=\{`graph-preset-\$\{id\}`\}/, 'all graph presets are testable');
   assert.match(graph, /buildPresetAtlas\(graph, filters, lens, preset\)/);
-  assert.match(graph, /next === 'reading'.*readState: 'read'/s);
-  assert.match(graph, /next === 'unread'.*readState: 'unread'/s);
-  assert.match(graph, /contradicts', 'refutes', 'contains'/);
+  assert.match(graph, /next === ["']reading["'].*readState: ["']read["']/s);
+  assert.match(graph, /next === ["']unread["'].*readState: ["']unread["']/s);
+  assert.match(graph, /["']contradicts["'], ["']refutes["'], ["']contains["']/);
   assert.match(graph, /onDrillDown=/);
 });
 
@@ -173,8 +175,8 @@ test('Academic tools render current Desktop contracts and legacy removed routes 
   const navigation = read('src/navigation.ts');
   assert.match(tools, /ideas\/routes/);
   assert.match(tools, /ideas\/\$\{encodeURIComponent\(String\(active\.ideaId\)\)\}\/graph/);
-  assert.match(tools, /api\.detail\(spaceId, 'gaps'/);
-  assert.match(app, /requested === 'writing' \|\| requested === 'projects' \? 'workspace'/);
+  assert.match(tools, /api\s*\.detail\(spaceId, ["']gaps["']/);
+  assert.match(app, /requested === ["']writing["'] \|\| requested === ["']projects["'] \? ["']workspace["']/);
   assert.doesNotMatch(navigation, /\{ id: 'writing', label:/);
   assert.doesNotMatch(navigation, /\{ id: 'projects', label:/);
   assert.doesNotMatch(tools, /chapter\.original_text/);

@@ -16,10 +16,10 @@ test('Ideas, authors and graph do not invent private research panels absent from
 
 test('Reading path has private read-state and assistant affordances', async () => {
   const code = await source('src/serverWeb/AcademicToolsServerView.tsx');
-  assert.match(code, /api\.annotations\(spaceId, 'reading-path'/);
-  assert.match(code, /api\.addAnnotation\(spaceId/);
-  assert.match(code, /content: read \? 'read' : 'unread'/);
-  assert.match(code, /window\.location\.assign\(`\/view\/assistant/);
+  assert.match(code, /\.annotations\(spaceId, ["']reading-path["']/);
+  assert.match(code, /api\.addAnnotation\(\s*spaceId/);
+  assert.match(code, /content: read \? ["']read["'] : ["']unread["']/);
+  assert.match(code, /window\.location\.assign\(\s*`\/view\/assistant/);
   assert.match(code, /onToggleRead=\{toggleRead\}/);
 });
 

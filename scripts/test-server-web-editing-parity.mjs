@@ -4,7 +4,8 @@ import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 
 const root = path.resolve(import.meta.dirname, '..');
-const read = (file) => readFile(path.join(root, file), 'utf8');
+const variants = (source) => [source, source.replaceAll('"', "'"), source.replace(/\s+/g, ' '), source.replaceAll('"', "'").replace(/\s+/g, ' ')].join('\n');
+const read = async (file) => variants(await readFile(path.join(root, file), 'utf8'));
 
 test('published manuscript rows preserve the Desktop spine without shipping prose in the catalogue', async () => {
   const corpus = await read('server/lib/routes/corpus.mjs');

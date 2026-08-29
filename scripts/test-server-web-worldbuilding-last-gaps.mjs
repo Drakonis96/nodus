@@ -4,10 +4,12 @@ import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 
 const root = path.resolve(import.meta.dirname, '..');
+const variants = (source) => [source, source.replaceAll('"', "'"), source.replace(/\s+/g, ' '), source.replaceAll('"', "'").replace(/\s+/g, ' ')].join('\n');
+const readSource = (file) => readFile(path.join(root, file), 'utf8').then(variants);
 
 test('worldbuilding workbenches keep distinct server projections', async () => {
-  const client = await readFile(path.join(root, 'src/serverWeb/vaults/index.tsx'), 'utf8');
-  const server = await readFile(path.join(root, 'server/lib/routes/corpus.mjs'), 'utf8');
+  const client = await readSource('src/serverWeb/vaults/index.tsx');
+  const server = await readSource('server/lib/routes/corpus.mjs');
 
   assert.match(client, /variant: 'conflict-board'/);
   assert.match(client, /data-testid="conflicts-tab-board"/);
@@ -33,8 +35,8 @@ test('worldbuilding workbenches keep distinct server projections', async () => {
 });
 
 test('continuity and manuscript remain honest read-only projections', async () => {
-  const client = await readFile(path.join(root, 'src/serverWeb/vaults/index.tsx'), 'utf8');
-  const server = await readFile(path.join(root, 'server/lib/routes/corpus.mjs'), 'utf8');
+  const client = await readSource('src/serverWeb/vaults/index.tsx');
+  const server = await readSource('server/lib/routes/corpus.mjs');
 
   assert.match(client, /variant: 'continuity'/);
   assert.match(client, /Avisos derivados del snapshot publicado/);

@@ -119,9 +119,13 @@ await withServer({ label: 'server-web-e2e', ai: true }, async (server) => {
   try {
     const context = await browser.newContext({ viewport: { width: 1440, height: 1000 }, deviceScaleFactor: 1 });
     const page = await context.newPage();
+    const personalAnnotationTraffic = [];
     page.on('console', (message) => { if (message.type() === 'error') consoleErrors.push(`${message.text()} @ ${message.location().url || 'unknown'}`); });
     page.on('pageerror', (error) => consoleErrors.push(error.message));
     page.on('response', (response) => { if (response.status() >= 400) consoleErrors.push(`HTTP ${response.status()} ${response.url()}`); });
+    page.on('response', (response) => {
+      if (response.url().includes('/personal-annotations')) personalAnnotationTraffic.push(`${response.request().method()} ${response.status()}`);
+    });
 
     await page.goto(`${server.origin}/login?next=/`, { waitUntil: 'networkidle' });
     await page.locator('#organism').waitFor();
@@ -138,11 +142,11 @@ await withServer({ label: 'server-web-e2e', ai: true }, async (server) => {
     await waitForView(page, 'overview-view', consoleErrors, server.logs);
     await page.screenshot({ path: path.join(output, '02-academic-overview-desktop.png'), fullPage: true });
     await page.getByTestId('header-vault-badge').click();
-    await page.getByTestId('vault-switcher').waitFor();
+    await page.getByTestId('vault-manager').waitFor();
     await page.waitForTimeout(250);
     await page.screenshot({ path: path.join(output, '02b-vault-switcher-desktop.png') });
     await page.getByTestId('header-vault-badge').click();
-    await page.getByTestId('vault-switcher').waitFor({ state: 'hidden' });
+    await page.getByTestId('vault-manager').waitFor({ state: 'hidden' });
 
     // The Server uses the canonical Desktop navigation ids, not a parallel
     // collection menu invented for the web surface.
@@ -173,10 +177,10 @@ await withServer({ label: 'server-web-e2e', ai: true }, async (server) => {
 
     await page.goto(`${server.origin}/view/workspace`, { waitUntil: 'networkidle' });
     await waitForSettled(page, 'private-notes-view');
-    await page.getByRole('button', { name: 'Nueva nota' }).click();
+    await page.getByRole('button', { name: /New note|Nueva nota/ }).click();
     await page.locator('.server-note-title').fill('Nota privada E2E');
     await page.locator('.server-note-editor').fill('# Apunte\n\nEste contenido pertenece únicamente al lector.');
-    await page.getByRole('button', { name: 'Guardar' }).click();
+    await page.getByRole('button', { name: /Save|Guardar/, exact: true }).click();
     await page.screenshot({ path: path.join(output, '07-private-workspace-desktop.png'), fullPage: true });
 
     await page.getByTestId('header-assistant').click();
@@ -217,16 +221,16 @@ await withServer({ label: 'server-web-e2e', ai: true }, async (server) => {
       range.selectNodeContents(paragraph); selection?.removeAllRanges(); selection?.addRange(range);
       paragraph.dispatchEvent(new KeyboardEvent('keyup', { key: 'Shift', bubbles: true }));
     });
-    const selectionToolbar = page.getByRole('toolbar', { name: 'Acciones de selección' });
+    const selectionToolbar = page.getByRole('toolbar', { name: /Selection actions|Acciones de selección/ });
     await selectionToolbar.waitFor();
-    await selectionToolbar.getByRole('button', { name: 'Añadir marcador de lectura' }).click();
+    await selectionToolbar.getByRole('button', { name: /Add reading bookmark|Añadir marcador de lectura/ }).click();
     const bookmark = page.getByTestId('deep-research-bookmark');
     await page.waitForFunction(() => document.querySelector('[data-testid="deep-research-bookmark"]')?.getAttribute('aria-pressed') === 'true');
     assert.equal(await bookmark.getAttribute('aria-pressed'), 'true', 'selection ribbon saves a private bookmark');
     await page.getByTestId('deep-research-copy-reading').click();
     await page.getByTestId('deep-research-save-note').click();
-    await page.waitForFunction(() => document.querySelector('[data-testid="deep-research-reader-feedback"]')?.textContent?.includes('Notas privadas'));
-    assert.match(await page.getByTestId('deep-research-reader-feedback').innerText(), /Notas privadas/);
+    await page.waitForFunction(() => /Saved to private notes|Guardado en notas privadas/.test(document.querySelector('[data-testid="deep-research-reader-feedback"]')?.textContent || ''));
+    assert.match(await page.getByTestId('deep-research-reader-feedback').innerText(), /Saved to private notes|Guardado en notas privadas/);
     const readState = page.getByTestId('deep-research-read-state');
     const readBefore = await readState.getAttribute('aria-pressed');
     await readState.click();
@@ -249,18 +253,32 @@ await withServer({ label: 'server-web-e2e', ai: true }, async (server) => {
       range.selectNodeContents(paragraph); selection?.removeAllRanges(); selection?.addRange(range);
       paragraph.dispatchEvent(new KeyboardEvent('keyup', { key: 'Shift', bubbles: true }));
     });
-    await page.getByRole('toolbar', { name: 'Acciones de selección' }).waitFor();
-    const highlightSaved = page.waitForResponse((response) => response.url().includes('/personal-annotations') && response.request().method() === 'POST' && response.status() === 200);
-    await page.getByRole('toolbar', { name: 'Acciones de selección' }).getByRole('button', { name: /Subrayar 1/ }).click();
-    await highlightSaved;
+    await page.getByRole('toolbar', { name: /Selection actions|Acciones de selección/ }).waitFor();
+    const highlightSaved = page.waitForResponse((response) => response.url().includes('/personal-annotations') && response.request().method() === 'POST', { timeout: 5_000 }).catch(() => null);
+    await page.getByRole('toolbar', { name: /Selection actions|Acciones de selección/ }).getByRole('button', { name: /Underline 1|Subrayar 1/ }).click();
+    const highlightResponse = await highlightSaved;
+    assert.ok(highlightResponse, `highlight did not issue a POST; traffic=${personalAnnotationTraffic.join(',')}; alerts=${(await page.getByRole('alert').allTextContents()).join(' | ')}`);
+    assert.equal(highlightResponse.status(), 200, `highlight save failed: ${await highlightResponse.text()}`);
     await page.getByTestId('deep-research-read-state').click();
     await page.waitForFunction((before) => document.querySelector('[data-testid="deep-research-read-state"]')?.getAttribute('aria-pressed') === before, readBefore);
     await page.reload({ waitUntil: 'networkidle' });
     await page.getByTestId('deep-research-reader').waitFor();
     assert.equal(await page.getByTestId('deep-research-read-state').getAttribute('aria-pressed'), readBefore, 'explicit unread override survives reopening the report');
-    await page.getByTestId('deep-research-reader').getByRole('button', { name: 'Volver a la galería' }).click();
+    const savedHighlight = page.locator('[data-annotation-kind="highlight"]');
+    await savedHighlight.waitFor();
+    const highlightDelete = savedHighlight.getByRole('button', { name: /Eliminar anotación|Delete annotation/ });
+    const highlightDeleted = page.waitForResponse((response) => response.url().includes('/personal-annotations') && response.request().method() === 'DELETE' && response.status() === 200);
+    page.once('dialog', (dialog) => void dialog.accept());
+    await highlightDelete.click();
+    await highlightDeleted;
+    await savedHighlight.waitFor({ state: 'detached' });
+    await page.reload({ waitUntil: 'networkidle' });
+    await page.getByTestId('deep-research-reader').waitFor();
+    assert.equal(await page.locator('[data-annotation-kind="highlight"]').count(), 0, 'deleted highlight does not reappear after reopening the report');
+    assert.equal(await page.getByTestId('deep-research-bookmark').getAttribute('aria-pressed'), 'true', 'deleting a highlight preserves the independent reading bookmark');
+    await page.getByTestId('deep-research-reader').getByRole('button', { name: /Back to gallery|Volver a la galería/ }).click();
     await waitForSettled(page, 'deep-research-view');
-    await page.getByLabel('Filtrar por estado').selectOption(readBefore === 'true' ? 'read' : 'unread');
+    await page.getByLabel(/Filter by status|Filtrar por estado/).selectOption(readBefore === 'true' ? 'read' : 'unread');
     assert.ok(await page.getByTestId('deep-research-gallery-card').count() > 0, 'gallery filter reflects private read overlay');
 
     await page.getByTestId('nav-library').click();
@@ -279,11 +297,12 @@ await withServer({ label: 'server-web-e2e', ai: true }, async (server) => {
     await page.getByTestId('library-reader-add-note').click();
     await page.getByTestId('library-reader-sidebar').locator('input').fill('Lectura clave');
     await page.getByTestId('library-reader-sidebar').locator('textarea').fill('Conservar esta idea para la próxima sesión.');
-    await page.getByTestId('library-reader-sidebar').getByRole('button', { name: 'Guardar anotación', exact: true }).click();
+    await page.getByTestId('library-reader-sidebar').getByRole('button', { name: /Save annotation|Guardar anotación/, exact: true }).click();
     await page.getByTestId('library-reader-sidebar').getByText('Lectura clave', { exact: true }).waitFor();
     await page.screenshot({ path: path.join(output, '11-private-highlight-desktop.png'), fullPage: true });
 
     await page.getByTestId('nav-settings').click();
+    await page.getByTestId('settings-tab-providers').click();
     await waitForSettled(page, 'server-native-providers');
     assert.equal(await page.locator('iframe').count(), 0, 'Settings must be native and never embed the legacy admin page');
     assert.equal(new URL(page.url()).pathname.startsWith('/app'), false, 'canonical Server navigation must not use /app');
@@ -299,7 +318,7 @@ await withServer({ label: 'server-web-e2e', ai: true }, async (server) => {
     }
     await page.getByTestId('server-native-providers').locator('input[type="password"]').first().waitFor();
     assert.equal(await page.getByTestId('server-native-providers').locator('input[type="password"]').first().inputValue(), '', 'saved secrets are never prefilled');
-    await page.getByRole('button', { name: 'Modelos IA', exact: true }).click();
+    await page.getByRole('button', { name: /AI models|Modelos IA/, exact: true }).click();
     await waitForSettled(page, 'server-native-models');
     assert.equal(await page.getByTestId('settings-model-assistant').evaluate((element) => element.tagName), 'SELECT');
     await page.screenshot({ path: path.join(output, '12-ai-settings-desktop.png'), fullPage: true });
@@ -314,6 +333,7 @@ await withServer({ label: 'server-web-e2e', ai: true }, async (server) => {
     await page.getByTestId(`vault-option-${worldId}`).click();
     await page.getByRole('heading', { name: 'Crónicas de Asteria', exact: true }).waitFor();
     await page.getByTestId('header-settings').click();
+    await page.getByTestId('settings-tab-providers').click();
     await page.getByTestId('server-native-providers').waitFor();
     assert.deepEqual(
       await page.locator('.ss-favorites .ss-chip').allTextContents(),
@@ -328,7 +348,7 @@ await withServer({ label: 'server-web-e2e', ai: true }, async (server) => {
     await page.goto(`${server.origin}/`, { waitUntil: 'networkidle' });
     await page.getByRole('heading', { name: 'Crónicas de Asteria', exact: true }).waitFor();
     assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1), 'mobile app must not overflow horizontally');
-    await page.getByRole('button', { name: 'Abrir navegación' }).click();
+    await page.getByRole('button', { name: /Open navigation|Abrir navegación/ }).click();
     await page.waitForTimeout(250);
     assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1), 'mobile drawer must stay within the viewport');
     await page.screenshot({ path: path.join(output, '15-mobile-portrait-navigation.png') });
@@ -346,7 +366,7 @@ await withServer({ label: 'server-web-e2e', ai: true }, async (server) => {
     await Promise.all([adminPage.waitForURL(/\/$/), adminPage.locator('button[type="submit"]').click()]);
     await adminPage.getByTestId('app-shell').waitFor();
     await adminPage.getByTestId('header-settings').click();
-    await adminPage.getByRole('button', { name: 'Servidor', exact: true }).click();
+    await adminPage.getByRole('button', { name: /Server|Servidor/, exact: true }).click();
     await adminPage.getByTestId('server-native-admin').waitFor();
     assert.equal(await adminPage.locator('iframe').count(), 0, 'Server administration must stay inside the native settings surface');
     assert.equal(new URL(adminPage.url()).pathname, '/view/settings');

@@ -4,9 +4,10 @@ import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 
 const root = path.resolve(import.meta.dirname, '..');
+const variants = (source) => [source, source.replaceAll('"', "'"), source.replace(/\s+/g, ' '), source.replaceAll('"', "'").replace(/\s+/g, ' ')].join('\n');
 
 test('published genealogy tree uses the canonical Desktop geometry and relation semantics', async () => {
-  const source = await readFile(path.join(root, 'src/serverWeb/vaults/index.tsx'), 'utf8');
+  const source = variants(await readFile(path.join(root, 'src/serverWeb/vaults/index.tsx'), 'utf8'));
   assert.match(source, /computeTreeLayout\(/, 'Web tree must share the Desktop layout algorithm');
   assert.match(source, /buildTreeFamilies\(/, 'parent edges must be grouped into the same family trunks');
   assert.match(source, /row\.type === 'parent'/, 'parent direction is preserved');
@@ -17,7 +18,7 @@ test('published genealogy tree uses the canonical Desktop geometry and relation 
 });
 
 test('published genealogy tree keeps Desktop reader interactions and safe navigation', async () => {
-  const source = await readFile(path.join(root, 'src/serverWeb/vaults/index.tsx'), 'utf8');
+  const source = variants(await readFile(path.join(root, 'src/serverWeb/vaults/index.tsx'), 'utf8'));
   assert.match(source, /data-testid="tree-focus-person"/);
   assert.match(source, /data-testid="tree-search-input"/);
   assert.match(source, /data-testid="tree-pan-viewport"/);
@@ -38,8 +39,8 @@ test('published genealogy tree keeps Desktop reader interactions and safe naviga
 
 test('published genealogy timeline keeps Desktop person and event-type filters', async () => {
   const [web, api] = await Promise.all([
-    readFile(path.join(root, 'src/serverWeb/vaults/index.tsx'), 'utf8'),
-    readFile(path.join(root, 'server/lib/routes/corpus.mjs'), 'utf8'),
+    readFile(path.join(root, 'src/serverWeb/vaults/index.tsx'), 'utf8').then(variants),
+    readFile(path.join(root, 'server/lib/routes/corpus.mjs'), 'utf8').then(variants),
   ]);
   assert.match(web, /testId="timeline-person-filter"/);
   assert.match(web, /testId="timeline-type-filter"/);

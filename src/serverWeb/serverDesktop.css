@@ -15,6 +15,9 @@
   background: var(--server-shell-bg);
   color: var(--server-shell-text);
   isolation: isolate;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
 }
 
 .server-desktop-surface .app-titlebar {
@@ -71,6 +74,18 @@ html.light .server-desktop-surface .server-home-intro .text-indigo-300,
 
 .server-desktop-surface .server-main {
   min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* Views own their scrolling region. Constrain this host so the shell never
+   grows a second page-level scrollbar around a reader, table or chat. */
+.server-view-host {
+  min-width: 0;
+  min-height: 0;
   overflow: hidden;
 }
 
@@ -309,9 +324,12 @@ html[data-theme='light'] .server-desktop-surface :is(input, select, textarea),
 .server-vault-popover {
   position: fixed;
   z-index: 80;
+  display: flex;
+  flex-direction: column;
   top: 52px;
   left: 50%;
   width: min(520px, calc(100vw - 32px));
+  max-height: calc(100vh - 60px);
   overflow: hidden;
   border: 1px solid var(--server-shell-border);
   border-radius: 9px;
@@ -320,6 +338,10 @@ html[data-theme='light'] .server-desktop-surface :is(input, select, textarea),
   transform: translateX(-50%);
   transform-origin: center top;
   animation: server-vault-open .16s ease-out;
+}
+.server-vault-list {
+  min-height: 0;
+  flex: 1 1 auto;
 }
 @keyframes server-vault-open { from { opacity: 0; transform: translateX(-50%) translateY(-8px) scaleY(.84); } }
 
@@ -578,6 +600,7 @@ html[data-theme='light'] [class~='to-neutral-900'] {
 
 @media (max-width: 760px) {
   .server-settings-grid { grid-template-columns: minmax(0, 1fr); }
+  .server-settings-native { min-height: 0; overflow-x: hidden; }
   .server-desktop-surface { --server-sidebar-width: min(86vw, 310px) !important; }
   .server-mobile-menu { display: inline-flex; }
   .server-header-secondary { display: none !important; }

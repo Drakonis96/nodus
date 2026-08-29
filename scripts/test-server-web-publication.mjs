@@ -4,7 +4,8 @@ import path from 'node:path';
 import test from 'node:test';
 
 const root = path.resolve(import.meta.dirname, '..');
-const read = (file) => fs.readFileSync(path.join(root, file), 'utf8');
+const variants = (source) => [source, source.replaceAll('"', "'"), source.replace(/\s+/g, ' '), source.replaceAll('"', "'").replace(/\s+/g, ' ')].join('\n');
+const read = (file) => variants(fs.readFileSync(path.join(root, file), 'utf8'));
 const snapshot = read('electron/serverSync/serverSnapshot.ts');
 const library = read('electron/serverSync/serverLibrary.ts');
 const service = read('electron/serverSync/serverSyncService.ts');

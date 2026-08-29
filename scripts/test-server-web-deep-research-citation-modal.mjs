@@ -19,13 +19,13 @@ test('Deep Research citations open a safe embedded workspace with tabs', () => {
   assert.match(modal, /data-testid="server-citation-tabs"/);
   assert.match(modal, /data-testid=\{`server-citation-tab-/);
   assert.match(modal, /data-testid="server-citation-close"/);
-  assert.match(modal, /event\.key === 'Escape'/);
+  assert.match(modal, /event\.key === ["']Escape["']/);
   assert.match(modal, /onClick=\{onClose\}/);
   assert.match(modal, /onOpenTarget=\{onOpen\}/);
   assert.match(explorer, /onOpenTarget\?:/);
-  assert.match(explorer, /if \(onOpenTarget\) \{ onOpenTarget\(next\); return; \}/);
+  assert.match(explorer, /if \(onOpenTarget\) \{\s*onOpenTarget\(next\);\s*return;\s*\}/);
   assert.match(readers, /onNodusLink\?: \(href: string\) => boolean \| void/);
   assert.match(readers, /onNodusLink\(href\) === false && internalHref/);
   assert.match(personal, /parseServerCitation\(href\)/);
-  assert.match(personal, /<ServerCitationModal spaceId=\{spaceId\} target=\{citation\}/);
+  assert.match(personal, /<ServerCitationModal\s+spaceId=\{spaceId\}\s+target=\{citation\}/);
 });

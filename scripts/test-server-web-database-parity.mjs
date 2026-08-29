@@ -6,12 +6,14 @@ import { createCorpusRoutes } from '../server/lib/routes/corpus.mjs';
 import { lexicalSearch } from '../server/lib/core/search.mjs';
 
 const root = path.resolve(import.meta.dirname, '..');
+const variants = (source) => [source, source.replaceAll('"', "'"), source.replace(/\s+/g, ' '), source.replaceAll('"', "'").replace(/\s+/g, ' ')].join('\n');
+const readSource = (file) => readFile(path.join(root, file), 'utf8').then(variants);
 
 test('published database analysis has a complete immutable projection and Web adapter', async () => {
-  const corpus = await readFile(path.join(root, 'server/lib/routes/corpus.mjs'), 'utf8');
-  const snapshot = await readFile(path.join(root, 'electron/serverSync/serverSnapshot.ts'), 'utf8');
-  const view = await readFile(path.join(root, 'src/serverWeb/DatabaseAnalysisServerView.tsx'), 'utf8');
-  const app = await readFile(path.join(root, 'src/serverWeb/App.tsx'), 'utf8');
+  const corpus = await readSource('server/lib/routes/corpus.mjs');
+  const snapshot = await readSource('electron/serverSync/serverSnapshot.ts');
+  const view = await readSource('src/serverWeb/DatabaseAnalysisServerView.tsx');
+  const app = await readSource('src/serverWeb/App.tsx');
   assert.match(corpus, /head === 'databases' && rest\[1\] === 'analysis'/);
   assert.match(corpus, /db_computed_cells/);
   assert.match(corpus, /cellsByRow/);
@@ -30,7 +32,7 @@ test('published database analysis has a complete immutable projection and Web ad
 });
 
 test('database search searches db_rows content in the published lexical contract', async () => {
-  const search = await readFile(path.join(root, 'server/lib/core/search.mjs'), 'utf8');
+  const search = await readSource('server/lib/core/search.mjs');
   assert.match(search, /'db_databases'/);
   assert.match(search, /'pages'/);
   assert.match(search, /db_rows/);

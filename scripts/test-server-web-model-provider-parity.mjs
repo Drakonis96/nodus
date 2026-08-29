@@ -6,7 +6,8 @@ import { fileURLToPath } from 'node:url';
 import { desktopSettingsPatchFromServerProfile, sanitizeServerProfilePreferences } from '../shared/serverProfilePreferences.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const view = await readFile(path.join(root, 'src/serverWeb/settings/ServerSettingsView.tsx'), 'utf8');
+const variants = (source) => [source, source.replaceAll('"', "'"), source.replace(/\s+/g, ' '), source.replaceAll('"', "'").replace(/\s+/g, ' ')].join('\n');
+const view = variants(await readFile(path.join(root, 'src/serverWeb/settings/ServerSettingsView.tsx'), 'utf8'));
 const css = await readFile(path.join(root, 'src/serverWeb/settings/ServerSettings.css'), 'utf8');
 const profileSync = await readFile(path.join(root, 'electron/serverSync/profilePreferencesSync.ts'), 'utf8');
 const replicaSync = await readFile(path.join(root, 'electron/serverSync/replicaService.ts'), 'utf8');
@@ -62,7 +63,7 @@ test('Server provider settings use Desktop provider identity and star-list inter
 
 test('feature model controls are real dropdowns backed only by portable favorites', () => {
   assert.match(view, /function ModelSelect/);
-  assert.match(view, /return <select className="ss-select"/);
+  assert.match(view, /return \(\s*<select className="ss-select"/);
   assert.match(view, /\.\.\.favorites/);
   assert.doesNotMatch(view, /<input[^>]+settings-model-/, 'model task controls are not free-text forms');
 });
@@ -116,6 +117,6 @@ test('configured Server providers expose the same live model-catalog flow as Des
   assert.match(aiRoutes, /segments\[6\] === 'models'/);
   assert.match(aiRoutes, /gateway\.listModels/);
   assert.match(serverApi, /aiProviderModels/);
-  assert.match(view, /api\.aiProviderModels\(provider\)/);
+  assert.match(view, /api\s*\.aiProviderModels\(provider\)/);
   assert.match(view, /Catálogo en vivo del proveedor/);
 });

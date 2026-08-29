@@ -51,7 +51,9 @@ function display(value: unknown, fallback = "—"): string {
 }
 
 function titleFor(document: LibraryDocument): string {
-  return document.title || document.originalFileName || t("Documento sin título");
+  return (
+    document.title || document.originalFileName || t("Documento sin título")
+  );
 }
 
 function extractJobText(result: unknown): string {
@@ -130,25 +132,77 @@ function ReaderOpeningFormatDialog({
   onCancel: () => void;
 }) {
   return (
-    <div className="fixed inset-0 z-[150] grid place-items-center bg-black/60 p-4" role="presentation" onMouseDown={onCancel}>
-      <section className="w-full max-w-xl overflow-hidden rounded-2xl border border-neutral-200 bg-white text-neutral-900 shadow-2xl dark:border-neutral-700 dark:bg-neutral-950 dark:text-neutral-100" role="dialog" aria-modal="true" aria-labelledby="library-reader-format-title" onMouseDown={(event) => event.stopPropagation()} data-testid="library-reader-format-dialog">
+    <div
+      className="fixed inset-0 z-[150] grid place-items-center bg-black/60 p-4"
+      role="presentation"
+      onMouseDown={onCancel}
+    >
+      <section
+        className="w-full max-w-xl overflow-hidden rounded-2xl border border-neutral-200 bg-white text-neutral-900 shadow-2xl dark:border-neutral-700 dark:bg-neutral-950 dark:text-neutral-100"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="library-reader-format-title"
+        onMouseDown={(event) => event.stopPropagation()}
+        data-testid="library-reader-format-dialog"
+      >
         <header className="border-b border-neutral-200 px-5 py-4 dark:border-neutral-800">
-          <h2 id="library-reader-format-title" className="text-base font-semibold">{t("¿Cómo quieres leer este documento?")}</h2>
-          <p className="mt-1 text-xs leading-5 text-neutral-500">{t("Puedes cambiar de versión desde el selector del lector.")}</p>
+          <h2
+            id="library-reader-format-title"
+            className="text-base font-semibold"
+          >
+            {t("¿Cómo quieres leer este documento?")}
+          </h2>
+          <p className="mt-1 text-xs leading-5 text-neutral-500">
+            {t("Puedes cambiar de versión desde el selector del lector.")}
+          </p>
         </header>
         <div className="grid gap-3 p-5 sm:grid-cols-2">
-          <button data-testid="library-reader-format-clean" className="min-h-32 rounded-xl border border-neutral-200 bg-neutral-50 p-4 text-left hover:border-indigo-400 dark:border-neutral-800 dark:bg-neutral-900" disabled={!document.cleanAvailable} onClick={() => onChoose("clean")}>
+          <button
+            data-testid="library-reader-format-clean"
+            className="min-h-32 rounded-xl border border-neutral-200 bg-neutral-50 p-4 text-left hover:border-indigo-400 dark:border-neutral-800 dark:bg-neutral-900"
+            disabled={!document.cleanAvailable}
+            onClick={() => onChoose("clean")}
+          >
             <strong className="block text-sm">{t("Markdown limpio")}</strong>
-            <span className="mt-1 block text-xs leading-5 text-neutral-500">{t("Lectura adaptable con índice e imágenes extraídas.")}</span>
+            <span className="mt-1 block text-xs leading-5 text-neutral-500">
+              {t("Lectura adaptable con índice e imágenes extraídas.")}
+            </span>
           </button>
-          <button data-testid="library-reader-format-original" className="min-h-32 rounded-xl border border-neutral-200 bg-neutral-50 p-4 text-left hover:border-indigo-400 dark:border-neutral-800 dark:bg-neutral-900" disabled={!document.originalAvailable} onClick={() => onChoose("original")}>
+          <button
+            data-testid="library-reader-format-original"
+            className="min-h-32 rounded-xl border border-neutral-200 bg-neutral-50 p-4 text-left hover:border-indigo-400 dark:border-neutral-800 dark:bg-neutral-900"
+            disabled={!document.originalAvailable}
+            onClick={() => onChoose("original")}
+          >
             <strong className="block text-sm">{t("Archivo original")}</strong>
-            <span className="mt-1 block text-xs leading-5 text-neutral-500">{t("Abre directamente el archivo conservado y su diseño original.")}</span>
-            {document.originalFileName && <span className="mt-2 block truncate text-[10px] text-neutral-400">{document.originalFileName}</span>}
+            <span className="mt-1 block text-xs leading-5 text-neutral-500">
+              {t(
+                "Abre directamente el archivo conservado y su diseño original.",
+              )}
+            </span>
+            {document.originalFileName && (
+              <span className="mt-2 block truncate text-[10px] text-neutral-400">
+                {document.originalFileName}
+              </span>
+            )}
           </button>
         </div>
         <footer className="border-t border-neutral-200 px-5 py-4 dark:border-neutral-800">
-          <label className="flex cursor-pointer items-start gap-2.5 text-xs text-neutral-700 dark:text-neutral-300"><input data-testid="library-reader-format-remember" className="mt-0.5" type="checkbox" checked={remember} onChange={(event) => onRememberChange(event.target.checked)} /><span><b className="font-medium">{t("No volver a preguntar")}</b><small className="mt-0.5 block text-[10px] text-neutral-500">{t("La próxima vez se abrirá el formato elegido.")}</small></span></label>
+          <label className="flex cursor-pointer items-start gap-2.5 text-xs text-neutral-700 dark:text-neutral-300">
+            <input
+              data-testid="library-reader-format-remember"
+              className="mt-0.5"
+              type="checkbox"
+              checked={remember}
+              onChange={(event) => onRememberChange(event.target.checked)}
+            />
+            <span>
+              <b className="font-medium">{t("No volver a preguntar")}</b>
+              <small className="mt-0.5 block text-[10px] text-neutral-500">
+                {t("La próxima vez se abrirá el formato elegido.")}
+              </small>
+            </span>
+          </label>
         </footer>
       </section>
     </div>
@@ -182,14 +236,69 @@ function ReaderFilesMenu({
         onClick={() => setOpen((value) => !value)}
       >
         <Icon name="folder" size={13} className="text-neutral-400" />
-        <span className="min-w-0 flex-1"><b className="block text-[11px] font-medium text-neutral-300">Versiones y archivos</b><small className="block truncate text-[9px] text-neutral-600">{document.originalFileName || "Documento"} · {Number(document.cleanAvailable) + Number(document.originalAvailable)} disponibles</small></span>
-        <Icon name={open ? "chevronUp" : "chevronDown"} size={12} className="text-neutral-600" />
+        <span className="min-w-0 flex-1">
+          <b className="block text-[11px] font-medium text-neutral-300">
+            Versiones y archivos
+          </b>
+          <small className="block truncate text-[9px] text-neutral-600">
+            {document.originalFileName || "Documento"} ·{" "}
+            {Number(document.cleanAvailable) +
+              Number(document.originalAvailable)}{" "}
+            disponibles
+          </small>
+        </span>
+        <Icon
+          name={open ? "chevronUp" : "chevronDown"}
+          size={12}
+          className="text-neutral-600"
+        />
       </button>
-      {open && <div id="library-reader-files" data-testid="library-reader-files" className="mt-2 space-y-0.5">
-        <button type="button" data-testid="library-reader-file-clean" className={`flex w-full items-center gap-2 rounded-lg px-2 py-2 text-left text-xs ${source === "clean" ? "bg-indigo-500/10 text-indigo-300" : "text-neutral-400"}`} disabled={!document.cleanAvailable} onClick={() => choose("clean")}><Icon name="book" size={12} /><span className="truncate">Markdown limpio</span></button>
-        <button type="button" data-testid="library-reader-file-original" className={`flex w-full items-center gap-2 rounded-lg px-2 py-2 text-left text-xs ${source === "original" ? "bg-indigo-500/10 text-indigo-300" : "text-neutral-400"}`} disabled={!document.originalAvailable} onClick={() => choose("original")}><Icon name="file" size={12} /><span className="min-w-0 flex-1 truncate">{document.originalFileName || "Archivo original"}</span><span className="text-[9px] uppercase text-neutral-600">{document.originalMimeType || "archivo"}</span></button>
-        {readOpeningFormatPreference() && <button type="button" data-testid="library-reader-reset-format-preference" className="mt-1 flex w-full items-center gap-2 border-t border-neutral-800 px-2 py-2.5 text-left text-[10px] text-neutral-500 hover:text-indigo-300" onClick={() => { onResetPreference(); setOpen(false); }}><Icon name="refresh" size={11} /> Preguntar de nuevo al abrir</button>}
-      </div>}
+      {open && (
+        <div
+          id="library-reader-files"
+          data-testid="library-reader-files"
+          className="mt-2 space-y-0.5"
+        >
+          <button
+            type="button"
+            data-testid="library-reader-file-clean"
+            className={`flex w-full items-center gap-2 rounded-lg px-2 py-2 text-left text-xs ${source === "clean" ? "bg-indigo-500/10 text-indigo-300" : "text-neutral-400"}`}
+            disabled={!document.cleanAvailable}
+            onClick={() => choose("clean")}
+          >
+            <Icon name="book" size={12} />
+            <span className="truncate">Markdown limpio</span>
+          </button>
+          <button
+            type="button"
+            data-testid="library-reader-file-original"
+            className={`flex w-full items-center gap-2 rounded-lg px-2 py-2 text-left text-xs ${source === "original" ? "bg-indigo-500/10 text-indigo-300" : "text-neutral-400"}`}
+            disabled={!document.originalAvailable}
+            onClick={() => choose("original")}
+          >
+            <Icon name="file" size={12} />
+            <span className="min-w-0 flex-1 truncate">
+              {document.originalFileName || "Archivo original"}
+            </span>
+            <span className="text-[9px] uppercase text-neutral-600">
+              {document.originalMimeType || "archivo"}
+            </span>
+          </button>
+          {readOpeningFormatPreference() && (
+            <button
+              type="button"
+              data-testid="library-reader-reset-format-preference"
+              className="mt-1 flex w-full items-center gap-2 border-t border-neutral-800 px-2 py-2.5 text-left text-[10px] text-neutral-500 hover:text-indigo-300"
+              onClick={() => {
+                onResetPreference();
+                setOpen(false);
+              }}
+            >
+              <Icon name="refresh" size={11} /> Preguntar de nuevo al abrir
+            </button>
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -524,7 +633,15 @@ function ReaderNotes({
           >
             {open ? "Cerrar" : "Añadir nota"}
           </button>
-          <button type="button" className="btn btn-ghost h-7 w-7 p-0 text-[10px]" onClick={onClose} aria-label="Cerrar panel" title="Cerrar panel">×</button>
+          <button
+            type="button"
+            className="btn btn-ghost h-7 w-7 p-0 text-[10px]"
+            onClick={onClose}
+            aria-label={t("Cerrar panel")}
+            title={t("Cerrar panel")}
+          >
+            ×
+          </button>
         </div>
       </div>
       {open && (
@@ -541,7 +658,7 @@ function ReaderNotes({
             className="input text-xs"
             value={title}
             onChange={(event) => setTitle(event.target.value)}
-            placeholder="Título"
+            placeholder={t("Título")}
           />
           <textarea
             className="input min-h-20 text-xs"
@@ -576,7 +693,7 @@ function ReaderNotes({
                 </strong>
                 <button
                   className="rounded p-1 text-neutral-600 hover:text-red-400"
-                  aria-label="Eliminar anotación"
+                  aria-label={t("Eliminar anotación")}
                   onClick={() => void remove(note)}
                 >
                   <Icon name="trash" size={12} />
@@ -621,9 +738,9 @@ export function LibraryDetail({
   const [source, setSource] = useState<"clean" | "original">("clean");
   const [openingFormatPrompt, setOpeningFormatPrompt] = useState(false);
   const [rememberOpeningFormat, setRememberOpeningFormat] = useState(false);
-  const [sidebarTab, setSidebarTab] = useState<"notes" | "metadata" | "chat" | null>(
-    "notes",
-  );
+  const [sidebarTab, setSidebarTab] = useState<
+    "notes" | "metadata" | "chat" | null
+  >("notes");
   const [progress, setProgress] = useState(0);
   const [chat, setChat] = useState<
     Array<{ role: "user" | "assistant"; content: string }>
@@ -641,8 +758,12 @@ export function LibraryDetail({
     setAnnotationVersion(result.version);
     setNotes(nextNotes);
     const state = nextNotes
-      .filter((note) => note.kind === "note" && note.title === "Estado de lectura")
-      .sort((a, b) => String(a.updatedAt || "").localeCompare(String(b.updatedAt || "")))
+      .filter(
+        (note) => note.kind === "note" && note.title === "Estado de lectura",
+      )
+      .sort((a, b) =>
+        String(a.updatedAt || "").localeCompare(String(b.updatedAt || "")),
+      )
       .at(-1);
     if (state) setIsRead(state.content === "read");
   }, [id, spaceId]);
@@ -670,23 +791,35 @@ export function LibraryDetail({
         if (!alive || !response.document) return;
         const nextDocument = response.document;
         setDocument(nextDocument);
-        const nextNotes = annotationResponse.annotations.filter((note) => !note.deletedAt);
+        const nextNotes = annotationResponse.annotations.filter(
+          (note) => !note.deletedAt,
+        );
         setAnnotationVersion(annotationResponse.version);
         setNotes(nextNotes);
         const state = nextNotes
-          .filter((note) => note.kind === "note" && note.title === "Estado de lectura")
-          .sort((a, b) => String(a.updatedAt || "").localeCompare(String(b.updatedAt || "")))
+          .filter(
+            (note) =>
+              note.kind === "note" && note.title === "Estado de lectura",
+          )
+          .sort((a, b) =>
+            String(a.updatedAt || "").localeCompare(String(b.updatedAt || "")),
+          )
           .at(-1);
-        setIsRead(state ? state.content === "read" : localStorage.getItem(`nodus.server.library.read.${id}`) === "1");
+        setIsRead(
+          state
+            ? state.content === "read"
+            : localStorage.getItem(`nodus.server.library.read.${id}`) === "1",
+        );
         const hasClean = Boolean(nextDocument.cleanAvailable);
         const hasOriginal = Boolean(nextDocument.originalAvailable);
-        const preferred = preference === "original" && hasOriginal
-          ? "original"
-          : preference === "clean" && hasClean
-            ? "clean"
-            : hasOriginal
-              ? "original"
-              : "clean";
+        const preferred =
+          preference === "original" && hasOriginal
+            ? "original"
+            : preference === "clean" && hasClean
+              ? "clean"
+              : hasOriginal
+                ? "original"
+                : "clean";
         setSource(preferred);
         // The catalogue row must open without an interstitial: Desktop opens the
         // preserved original immediately when one is available, while the clean
@@ -695,7 +828,8 @@ export function LibraryDetail({
         // otherwise the original iframe is the first rendered source.
         // Never leave a blocking format prompt over the reader on a deep link.
         setOpeningFormatPrompt(false);
-        if (preferred === "clean" && hasClean) setReadable(await api.libraryContent(spaceId, id));
+        if (preferred === "clean" && hasClean)
+          setReadable(await api.libraryContent(spaceId, id));
       })
       .catch((cause) => {
         if (alive) setError(cause);
@@ -906,11 +1040,11 @@ export function LibraryDetail({
               .getElementById("library-reader-outline")
               ?.classList.toggle("hidden")
           }
-          aria-label="Índice"
+          aria-label={t("Índice")}
         >
           <Icon name="list" />
         </button>
-        <div className="min-w-[12rem] flex-1">
+        <div className="min-w-0 flex-[1_1_12rem]">
           <h1 className="truncate text-sm font-semibold text-neutral-100">
             {titleFor(document)}
           </h1>
@@ -922,8 +1056,10 @@ export function LibraryDetail({
         <select
           className="input h-9 max-w-64 text-xs"
           value={source}
-          onChange={(event) => chooseSource(event.target.value as ReaderOpeningFormat)}
-          aria-label="Versión o archivo"
+          onChange={(event) =>
+            chooseSource(event.target.value as ReaderOpeningFormat)
+          }
+          aria-label={t("Versión o archivo")}
           data-testid="library-reader-source-picker"
         >
           <option value="clean" disabled={!document.cleanAvailable}>
@@ -948,15 +1084,17 @@ export function LibraryDetail({
             className="btn btn-ghost h-9 w-9 p-0"
             onClick={() => void markBookmark()}
             data-testid="library-reader-bookmark"
-            aria-label="Marcar esta sección"
-            title="Marcar esta sección"
+            aria-label={t("Marcar esta sección")}
+            title={t("Marcar esta sección")}
           >
             <Icon name={hasBookmark ? "bookmarkFill" : "bookmark"} size={14} />
           </button>
         )}
         <button
           className={`btn btn-ghost h-9 px-2 text-xs ${sidebarTab === "notes" ? "text-indigo-300" : ""}`}
-          onClick={() => setSidebarTab((value) => value === "notes" ? null : "notes")}
+          onClick={() =>
+            setSidebarTab((value) => (value === "notes" ? null : "notes"))
+          }
           data-testid="library-reader-notes"
         >
           <Icon name="notebook" size={13} />
@@ -964,7 +1102,9 @@ export function LibraryDetail({
         </button>
         <button
           className="btn btn-ghost h-9 px-2 text-xs"
-          onClick={() => setSidebarTab((value) => value === "metadata" ? null : "metadata")}
+          onClick={() =>
+            setSidebarTab((value) => (value === "metadata" ? null : "metadata"))
+          }
           data-testid="library-reader-info"
         >
           <Icon name="info" size={13} />
@@ -972,7 +1112,9 @@ export function LibraryDetail({
         </button>
         <button
           className="btn btn-primary h-9 px-2 text-xs"
-          onClick={() => setSidebarTab((value) => value === "chat" ? null : "chat")}
+          onClick={() =>
+            setSidebarTab((value) => (value === "chat" ? null : "chat"))
+          }
           data-testid="library-reader-open-chat"
         >
           <Icon name="chat" size={13} />
@@ -1046,14 +1188,19 @@ export function LibraryDetail({
               <span className="text-[10px] uppercase tracking-wider text-neutral-600">
                 Versión
               </span>
-                  <p className="mt-1 text-xs text-neutral-400">
-                    {source === "clean"
-                      ? "Markdown limpio"
-                      : document.originalFileName || "Archivo original"}
-                  </p>
-                </div>
-                <ReaderFilesMenu document={document} source={source} onSelect={chooseSource} onResetPreference={resetOpeningFormatPreference} />
-              </nav>
+              <p className="mt-1 text-xs text-neutral-400">
+                {source === "clean"
+                  ? "Markdown limpio"
+                  : document.originalFileName || "Archivo original"}
+              </p>
+            </div>
+            <ReaderFilesMenu
+              document={document}
+              source={source}
+              onSelect={chooseSource}
+              onResetPreference={resetOpeningFormatPreference}
+            />
+          </nav>
         </aside>
         {source === "clean" ? (
           <main
@@ -1108,7 +1255,18 @@ export function LibraryDetail({
             className="library-reader-notes w-[21rem] shrink-0 overflow-y-auto border-l border-neutral-800 bg-neutral-950/25 p-4"
             data-testid="library-reader-metadata"
           >
-            <div className="flex items-center justify-between gap-2"><h2 className="text-sm font-semibold">Información</h2><button type="button" className="btn btn-ghost h-7 w-7 p-0 text-[10px]" onClick={() => setSidebarTab(null)} aria-label="Cerrar panel" title="Cerrar panel">×</button></div>
+            <div className="flex items-center justify-between gap-2">
+              <h2 className="text-sm font-semibold">{t("Información")}</h2>
+              <button
+                type="button"
+                className="btn btn-ghost h-7 w-7 p-0 text-[10px]"
+                onClick={() => setSidebarTab(null)}
+                aria-label={t("Cerrar panel")}
+                title={t("Cerrar panel")}
+              >
+                ×
+              </button>
+            </div>
             <dl className="mt-4 space-y-3 text-xs">
               {[
                 ["Título", titleFor(document)],
@@ -1136,7 +1294,20 @@ export function LibraryDetail({
             data-testid="library-reader-chat"
           >
             <div className="border-b border-neutral-800 px-3 py-3">
-              <div className="flex items-center justify-between gap-2"><h2 className="text-sm font-semibold">Chat del documento</h2><button type="button" className="btn btn-ghost h-7 w-7 p-0 text-[10px]" onClick={() => setSidebarTab(null)} aria-label="Cerrar panel" title="Cerrar panel">×</button></div>
+              <div className="flex items-center justify-between gap-2">
+                <h2 className="text-sm font-semibold">
+                  {t("Chat del documento")}
+                </h2>
+                <button
+                  type="button"
+                  className="btn btn-ghost h-7 w-7 p-0 text-[10px]"
+                  onClick={() => setSidebarTab(null)}
+                  aria-label={t("Cerrar panel")}
+                  title={t("Cerrar panel")}
+                >
+                  ×
+                </button>
+              </div>
               <p className="mt-1 text-[10px] text-neutral-600">
                 La consulta y sus respuestas son privadas.
               </p>

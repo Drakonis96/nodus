@@ -4,10 +4,12 @@ import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 
 const root = path.resolve(import.meta.dirname, '..');
+const variants = (source) => [source, source.replaceAll('"', "'"), source.replace(/\s+/g, ' '), source.replaceAll('"', "'").replace(/\s+/g, ' ')].join('\n');
+const readSource = (file) => readFile(path.join(root, file), 'utf8').then(variants);
 
 test('server web keeps non-academic views on their Desktop presentation contracts', async () => {
-  const source = await readFile(path.join(root, 'src/serverWeb/vaults/index.tsx'), 'utf8');
-  const corpus = await readFile(path.join(root, 'server/lib/routes/corpus.mjs'), 'utf8');
+  const source = await readSource('src/serverWeb/vaults/index.tsx');
+  const corpus = await readSource('server/lib/routes/corpus.mjs');
   for (const [id, marker] of [
     ['genealogy-timeline', 'vault-timeline'],
     ['genealogy-tree', 'vault-tree'],
@@ -33,7 +35,7 @@ test('server web keeps non-academic views on their Desktop presentation contract
 });
 
 test('server web preserves published collection keys and never fabricates map data', async () => {
-  const source = await readFile(path.join(root, 'src/serverWeb/vaults/index.tsx'), 'utf8');
+  const source = await readSource('src/serverWeb/vaults/index.tsx');
   assert.match(source, /['"]study-calendar['"]:\s*['"]events['"]/,
     'the study calendar reads the published events key');
   assert.doesNotMatch(source, /index \* 37|index \* 71|\?\? \(index \*/,
@@ -43,7 +45,7 @@ test('server web preserves published collection keys and never fabricates map da
 });
 
 test('teaching privacy surfaces remain empty and do not alias public collections', async () => {
-  const source = await readFile(path.join(root, 'src/serverWeb/vaults/index.tsx'), 'utf8');
+  const source = await readSource('src/serverWeb/vaults/index.tsx');
   for (const surface of ['teaching-groups', 'teaching-grades', 'teaching-units']) {
     const descriptor = source.slice(source.indexOf(`'${surface}':`), source.indexOf(`'${surface}':`) + 520);
     assert.match(descriptor, /published:\s*false/, `${surface} is explicitly private`);
@@ -55,7 +57,7 @@ test('teaching privacy surfaces remain empty and do not alias public collections
 });
 
 test('factions, cultures and dynasties keep Desktop labels and kind facets', async () => {
-  const source = await readFile(path.join(root, 'src/serverWeb/vaults/index.tsx'), 'utf8');
+  const source = await readSource('src/serverWeb/vaults/index.tsx');
   assert.match(source, /factions:\s*\{[^}]*label:\s*'Facciones'[^}]*kinds:\s*\['faction',\s*'order',\s*'religion'\]/s);
   assert.match(source, /cultures:\s*\{[^}]*label:\s*'Culturas'[^}]*kinds:\s*\['culture',\s*'species',\s*'language'\]/s);
   assert.match(source, /dynasties:\s*\{[^}]*label:\s*'Dinastías'[^}]*kinds:\s*\['house'\]/s);
@@ -64,8 +66,8 @@ test('factions, cultures and dynasties keep Desktop labels and kind facets', asy
 });
 
 test('world maps and nonstandard record keys keep reloadable Web details', async () => {
-  const source = await readFile(path.join(root, 'src/serverWeb/vaults/index.tsx'), 'utf8');
-  const corpus = await readFile(path.join(root, 'server/lib/routes/corpus.mjs'), 'utf8');
+  const source = await readSource('src/serverWeb/vaults/index.tsx');
+  const corpus = await readSource('server/lib/routes/corpus.mjs');
   assert.match(source, /row\.map_id/, 'map rows use their real primary key when opening a tab');
   assert.match(source, /row\.rel_id/, 'relationship rows use their real primary key when opening a tab');
   assert.match(source, /data-testid="vault-world-maps"/, 'world maps have a dedicated atlas catalogue');
@@ -77,9 +79,9 @@ test('world maps and nonstandard record keys keep reloadable Web details', async
 });
 
 test('worldbuilding and genealogy home surfaces keep domain metrics and social privacy exact', async () => {
-  const source = await readFile(path.join(root, 'src/serverWeb/App.tsx'), 'utf8');
-  const vaults = await readFile(path.join(root, 'src/serverWeb/vaults/index.tsx'), 'utf8');
-  const corpus = await readFile(path.join(root, 'server/lib/routes/corpus.mjs'), 'utf8');
+  const source = await readSource('src/serverWeb/App.tsx');
+  const vaults = await readSource('src/serverWeb/vaults/index.tsx');
+  const corpus = await readSource('server/lib/routes/corpus.mjs');
   assert.match(source, /data-testid="worldbuilding-overview"/, 'worldbuilding home has its own metrics surface');
   assert.match(source, /data-testid="genealogy-overview"/, 'genealogy home has its own metrics surface');
   assert.match(source, /Protagonistas/, 'worldbuilding home preserves character-role metric');
@@ -95,8 +97,8 @@ test('worldbuilding and genealogy home surfaces keep domain metrics and social p
 });
 
 test('worldbuilding catalogues and dossiers preserve the Desktop domain presentations', async () => {
-  const source = await readFile(path.join(root, 'src/serverWeb/vaults/index.tsx'), 'utf8');
-  const corpus = await readFile(path.join(root, 'server/lib/routes/corpus.mjs'), 'utf8');
+  const source = await readSource('src/serverWeb/vaults/index.tsx');
+  const corpus = await readSource('server/lib/routes/corpus.mjs');
   for (const marker of ['characters-grid', 'character-card', 'places-tree', 'world-groups-grid', 'encyclopedia-grid']) {
     assert.match(source, new RegExp(`data-testid=["']${marker}["']`), `${marker} is a dedicated worldbuilding presentation`);
   }
@@ -118,8 +120,8 @@ test('worldbuilding catalogues and dossiers preserve the Desktop domain presenta
 });
 
 test('shared world surfaces keep the exact Desktop route labels', async () => {
-  const source = await readFile(path.join(root, 'src/serverWeb/vaults/index.tsx'), 'utf8');
-  const app = await readFile(path.join(root, 'src/serverWeb/App.tsx'), 'utf8');
+  const source = await readSource('src/serverWeb/vaults/index.tsx');
+  const app = await readSource('src/serverWeb/App.tsx');
   assert.match(source, /view === 'timeline'[^\n]*vaultType === 'worldbuilding' \? 'Cronología' : 'Línea temporal'/);
   assert.match(source, /view === 'map'[^\n]*label: 'Mapa'/);
   assert.match(source, /view === 'relations'[^\n]*vaultType === 'worldbuilding' \? 'Relaciones' : 'Relaciones sociales'/);
@@ -130,8 +132,8 @@ test('shared world surfaces keep the exact Desktop route labels', async () => {
 });
 
 test('study schedule, archive dossiers and testimony dossiers use canonical nested contracts', async () => {
-  const source = await readFile(path.join(root, 'src/serverWeb/vaults/index.tsx'), 'utf8');
-  const corpus = await readFile(path.join(root, 'server/lib/routes/corpus.mjs'), 'utf8');
+  const source = await readSource('src/serverWeb/vaults/index.tsx');
+  const corpus = await readSource('server/lib/routes/corpus.mjs');
   assert.match(corpus, /'study-schedule':\s*\{\s*table:\s*'study_schedule_periods'/);
   assert.match(corpus, /head === 'study-schedule'/);
   assert.match(corpus, /head === 'archive-items'/);
@@ -143,8 +145,8 @@ test('study schedule, archive dossiers and testimony dossiers use canonical nest
 });
 
 test('genealogy person details resolve human-readable family dossiers', async () => {
-  const source = await readFile(path.join(root, 'src/serverWeb/vaults/index.tsx'), 'utf8');
-  const corpus = await readFile(path.join(root, 'server/lib/routes/corpus.mjs'), 'utf8');
+  const source = await readSource('src/serverWeb/vaults/index.tsx');
+  const corpus = await readSource('server/lib/routes/corpus.mjs');
   assert.match(source, /data-testid="person-dossier"/);
   assert.match(source, /Relaciones familiares/);
   assert.match(corpus, /relatedPersons: publishedPersons\(snapshot\)/);
@@ -152,7 +154,7 @@ test('genealogy person details resolve human-readable family dossiers', async ()
 });
 
 test('Markdown keeps only the internal Nodus protocol available to navigation handlers', async () => {
-  const reader = await readFile(path.join(root, 'src/serverWeb/readers.tsx'), 'utf8');
+  const reader = await readSource('src/serverWeb/readers.tsx');
   assert.match(reader, /defaultUrlTransform/);
   assert.match(reader, /url\.startsWith\('nodus:\/\/'\) \? url : defaultUrlTransform\(url\)/);
   assert.match(reader, /serverHrefForNodus/);
@@ -168,8 +170,8 @@ test('Markdown keeps only the internal Nodus protocol available to navigation ha
 });
 
 test('teaching catalogues never expose implementation JSON and retain Desktop document shapes', async () => {
-  const source = await readFile(path.join(root, 'src/serverWeb/vaults/index.tsx'), 'utf8');
-  const corpus = await readFile(path.join(root, 'server/lib/routes/corpus.mjs'), 'utf8');
+  const source = await readSource('src/serverWeb/vaults/index.tsx');
+  const corpus = await readSource('server/lib/routes/corpus.mjs');
   assert.match(source, /'teaching-exams':[^\n]*variant:\s*'exam'/);
   assert.match(source, /data-testid="vault-exams"/);
   assert.match(source, /data-testid="exam-card"/);
@@ -183,8 +185,8 @@ test('teaching catalogues never expose implementation JSON and retain Desktop do
 });
 
 test('specialized published dossiers keep their Desktop reading hierarchy', async () => {
-  const source = await readFile(path.join(root, 'src/serverWeb/vaults/index.tsx'), 'utf8');
-  const corpus = await readFile(path.join(root, 'server/lib/routes/corpus.mjs'), 'utf8');
+  const source = await readSource('src/serverWeb/vaults/index.tsx');
+  const corpus = await readSource('server/lib/routes/corpus.mjs');
   assert.match(source, /function StudyMaterialDetail/);
   assert.match(source, /data-testid="study-material-detail"/);
   assert.match(source, /function ArchiveItemDetail/);
@@ -204,7 +206,7 @@ test('specialized published dossiers keep their Desktop reading hierarchy', asyn
 });
 
 test('study question bank keeps answers in the opened sheet, not in the catalogue', async () => {
-  const source = await readFile(path.join(root, 'src/serverWeb/vaults/index.tsx'), 'utf8');
+  const source = await readSource('src/serverWeb/vaults/index.tsx');
   assert.match(source, /variant: 'question-bank'/);
   assert.match(source, /data-testid="study-question-bank-catalog"/);
   assert.match(source, /data-testid="study-question-detail"/);

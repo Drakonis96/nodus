@@ -74,6 +74,19 @@ test('Server web sessions are read-only while personal annotations stay private 
     assert.deepEqual(theirs.value.annotations, []);
     assert.deepEqual(adminView.value.annotations, []);
 
+    // The reader's delete action uses the same revisioned overlay contract and
+    // must remove the row immediately, rather than leaving a painted tombstone
+    // that reappears after the next reload.
+    const deleted = await json(await sessionFetch(server.origin, cookieA, endpoint, {
+      method: 'DELETE', headers: { 'content-type': 'application/json', 'x-csrf-token': meA.value.csrfToken, origin: server.origin },
+      body: JSON.stringify({ id: 'private-a', baseVersion: created.value.version }),
+    }));
+    assert.equal(deleted.response.status, 200);
+    assert.equal(deleted.value.version, 2);
+    assert.deepEqual(deleted.value.annotations, []);
+    const afterDelete = await json(await sessionFetch(server.origin, cookieA, `${endpoint}?resource=works&documentId=w-1`));
+    assert.deepEqual(afterDelete.value.annotations, []);
+
     const deviceCannotReadOverlay = await server.api(owner.deviceToken, 'GET', endpoint);
     assert.ok([401, 403].includes(deviceCannotReadOverlay.status));
     const sessionCannotPublish = await sessionFetch(server.origin, cookieA, `/api/v1/spaces/${spaceId}/snapshot`, { method: 'PUT', body: Buffer.from('not a snapshot') });
