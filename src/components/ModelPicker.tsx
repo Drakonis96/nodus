@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { AppSettings, CodexReasoningEffort, ModelRef } from '@shared/types';
 import { isSubscriptionProvider } from '@shared/providers';
-import { modelRefSupportsExtraction } from '@shared/localAiModels';
+import { localModelRefLikelyWeakAtExtraction, modelRefSupportsExtraction } from '@shared/localAiModels';
 import {
   codexReasoningCatalog,
   modelRefWithReasoning,
@@ -37,16 +37,24 @@ export function SubscriptionQuotaNotice({ model }: { model: ModelRef | null | un
  * dedicated extraction model) when the chosen model can't be trusted to extract — today the small
  * built-in vision models (Qwen3.5-0.8B, LFM2.5-VL), which loop inside the JSON and return no ideas.
  * They stay valid for chat/vision, so this warns rather than silently dropping the selection.
+ *
+ * The same weights reach Nodus through Ollama and LM Studio as well, where the built-in verdict
+ * cannot apply (the id is a label the user chose, not a build we ship). Those get the warning
+ * without the block: the picker still offers them, and the scan pipeline still runs them.
  */
 export function ExtractionCapabilityNotice({ model }: { model: ModelRef | null | undefined }) {
-  if (modelRefSupportsExtraction(model)) return null;
+  const unsupported = !modelRefSupportsExtraction(model);
+  const weak = !unsupported && localModelRefLikelyWeakAtExtraction(model);
+  if (!unsupported && !weak) return null;
   return (
     <p
       role="note"
       data-testid="extraction-capability-notice"
       className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-800 dark:border-amber-900/60 dark:bg-amber-950/20 dark:text-amber-200"
     >
-      {t('Este modelo local es de visión y no extrae ideas de forma fiable (tiende a divagar y no cerrar el JSON). Para extracción, elige Gemma 4 E2B u otro modelo mayor.')}
+      {unsupported
+        ? t('Este modelo local es de visión y no extrae ideas de forma fiable (tiende a divagar y no cerrar el JSON). Para extracción, elige Gemma 4 E2B u otro modelo mayor.')
+        : t('Estos pesos son los mismos que Nodus descarta entre sus modelos integrados: al extraer ideas divagan y no cierran el JSON. Puedes usarlos igualmente, pero para extracción conviene un modelo mayor.')}
     </p>
   );
 }

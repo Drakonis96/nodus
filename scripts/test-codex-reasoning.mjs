@@ -116,14 +116,19 @@ test('the level a call runs at: the role first, then the model, then the provide
 });
 
 test('every model picker that drives a role carries its reasoning level', async () => {
-  const [settings, providers, picker] = await Promise.all([
+  const [settings, providers, picker, generalModel] = await Promise.all([
     readFile(path.join(repoRoot, 'src/views/Settings.tsx'), 'utf8'),
     readFile(path.join(repoRoot, 'src/views/ProvidersSettings.tsx'), 'utf8'),
     readFile(path.join(repoRoot, 'src/components/ModelPicker.tsx'), 'utf8'),
+    readFile(path.join(repoRoot, 'src/components/GeneralTextModelControl.tsx'), 'utf8'),
   ]);
 
+  // The basic-mode general model moved into its own control when that row gained a
+  // provider catalogue of its own. What this guards is that a role's level sits beside
+  // that role's model — not which file the row happens to live in.
+  const roleRows = `${settings}\n${generalModel}`;
   for (const role of ['synthesisModel', 'extractionModel', 'visionModel', 'summaryModel', 'fusionModel', 'nodiModel']) {
-    const row = settings.match(new RegExp(`<ModelWithReasoning[^>]*settings\\.${role}[^>]*>`));
+    const row = roleRows.match(new RegExp(`<ModelWithReasoning[^>]*settings\\.${role}[^>]*>`, 's'));
     assert.ok(row, `the ${role} picker must offer the reasoning level next to it`);
   }
   assert.match(settings, /<ModelWithReasoning[^>]*settings\[key\]/, 'per-vault overrides carry it too');

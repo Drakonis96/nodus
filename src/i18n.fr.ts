@@ -5611,6 +5611,10 @@ export const FR: Record<string, string> = {
     "Ce modèle consomme le quota de votre abonnement, et non du crédit d'API. Une analyse complète du corpus peut épuiser la limite hebdomadaire ou mensuelle de votre offre.",
   'Este modelo local es de visión y no extrae ideas de forma fiable (tiende a divagar y no cerrar el JSON). Para extracción, elige Gemma 4 E2B u otro modelo mayor.':
     'Ce modèle local est orienté vision et n\'extrait pas les idées de façon fiable (il a tendance à divaguer et à ne pas fermer le JSON). Pour l\'extraction, choisissez Gemma 4 E2B ou un modèle plus grand.',
+  "Estos pesos son los mismos que Nodus descarta entre sus modelos integrados: al extraer ideas divagan y no cierran el JSON. Puedes usarlos igualmente, pero para extracción conviene un modelo mayor.": "Ce sont les mêmes poids que Nodus écarte parmi ses modèles intégrés : lors de l’extraction d’idées, ils divaguent et ne ferment jamais le JSON. Vous pouvez tout de même les utiliser, mais l’extraction gagne à passer par un modèle plus grand.",
+  "El paso falló sin dejar un motivo. Reintenta; si vuelve a fallar, revisa el modelo en Ajustes → Modelos de IA.": "L’étape a échoué sans enregistrer de motif. Réessayez ; si elle échoue encore, vérifiez le modèle dans Réglages → Modèles d’IA.",
+  "Todavía no hay ningún modelo entre los que elegir. Pulsa «Cargar modelos» para ver los de tus proveedores, o marca los que quieras como favoritos en Ajustes → Proveedores de IA y modelos.": "Aucun modèle n’est encore proposé ici. Appuyez sur « Charger les modèles » pour voir ceux de vos fournisseurs, ou marquez ceux que vous voulez comme favoris dans Réglages → Fournisseurs d’IA et modèles.",
+  "Sin respuesta de {list}. Revisa su clave o que el servidor local esté abierto.": "Aucune réponse de {list}. Vérifiez sa clé, ou que le serveur local est bien lancé.",
   'solo visión':
     'vision uniquement',
   'Este modelo no puede usarse para extracción de ideas.':

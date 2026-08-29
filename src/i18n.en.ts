@@ -5856,6 +5856,10 @@ export const EN: Record<string, string> = {
     'This model draws on your subscription quota, not on API credit. A full corpus analysis can exhaust your plan\'s weekly or monthly limit.',
   'Este modelo local es de visión y no extrae ideas de forma fiable (tiende a divagar y no cerrar el JSON). Para extracción, elige Gemma 4 E2B u otro modelo mayor.':
     'This local model is vision-oriented and does not extract ideas reliably (it tends to ramble and never close the JSON). For extraction, choose Gemma 4 E2B or a larger model.',
+  "Estos pesos son los mismos que Nodus descarta entre sus modelos integrados: al extraer ideas divagan y no cierran el JSON. Puedes usarlos igualmente, pero para extracción conviene un modelo mayor.": "These are the same weights Nodus rules out among its built-in models: when extracting ideas they ramble and never close the JSON. You can still use them, but extraction is better served by a larger model.",
+  "El paso falló sin dejar un motivo. Reintenta; si vuelve a fallar, revisa el modelo en Ajustes → Modelos de IA.": "The step failed without recording a reason. Retry it; if it fails again, check the model in Settings → AI models.",
+  "Todavía no hay ningún modelo entre los que elegir. Pulsa «Cargar modelos» para ver los de tus proveedores, o marca los que quieras como favoritos en Ajustes → Proveedores de IA y modelos.": "There is no model to choose from yet. Press “Load models” to see the ones your providers offer, or star the ones you want in Settings → AI providers and models.",
+  "Sin respuesta de {list}. Revisa su clave o que el servidor local esté abierto.": "No response from {list}. Check its key, or that the local server is running.",
   'solo visión':
     'vision only',
   'Este modelo no puede usarse para extracción de ideas.':

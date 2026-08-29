@@ -5617,6 +5617,10 @@ export const DE: Record<string, string> = {
     'Dieses Modell verbraucht das Kontingent Ihres Abonnements, kein API-Guthaben. Eine vollständige Korpusanalyse kann das Wochen- oder Monatslimit Ihres Tarifs aufbrauchen.',
   'Este modelo local es de visión y no extrae ideas de forma fiable (tiende a divagar y no cerrar el JSON). Para extracción, elige Gemma 4 E2B u otro modelo mayor.':
     'Dieses lokale Modell ist auf Vision ausgelegt und extrahiert Ideen nicht zuverlässig (es neigt dazu, abzuschweifen und das JSON nicht zu schließen). Wählen Sie zur Extraktion Gemma 4 E2B oder ein größeres Modell.',
+  "Estos pesos son los mismos que Nodus descarta entre sus modelos integrados: al extraer ideas divagan y no cierran el JSON. Puedes usarlos igualmente, pero para extracción conviene un modelo mayor.": "Das sind dieselben Gewichte, die Nodus unter seinen integrierten Modellen ausschließt: Beim Extrahieren von Ideen schweifen sie ab und schließen das JSON nie. Sie können sie trotzdem verwenden, für die Extraktion eignet sich jedoch ein größeres Modell besser.",
+  "El paso falló sin dejar un motivo. Reintenta; si vuelve a fallar, revisa el modelo en Ajustes → Modelos de IA.": "Der Schritt ist fehlgeschlagen, ohne einen Grund festzuhalten. Versuchen Sie es erneut; scheitert er wieder, prüfen Sie das Modell unter Einstellungen → KI-Modelle.",
+  "Todavía no hay ningún modelo entre los que elegir. Pulsa «Cargar modelos» para ver los de tus proveedores, o marca los que quieras como favoritos en Ajustes → Proveedores de IA y modelos.": "Hier steht noch kein Modell zur Auswahl. Klicken Sie auf „Modelle laden“, um die Modelle Ihrer Anbieter zu sehen, oder markieren Sie die gewünschten als Favoriten unter Einstellungen → KI-Anbieter und Modelle.",
+  "Sin respuesta de {list}. Revisa su clave o que el servidor local esté abierto.": "Keine Antwort von {list}. Prüfen Sie den Schlüssel oder ob der lokale Server läuft.",
   'solo visión':
     'nur Vision',
   'Este modelo no puede usarse para extracción de ideas.':

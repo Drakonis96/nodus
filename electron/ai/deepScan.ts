@@ -586,12 +586,22 @@ export async function runDeepScan(
           } catch (error) {
             const aiError = error instanceof AiError ? error : null;
             const recoverableJson = aiError?.code === 'output_truncated' || /json|esquema|truncad|límite de salida/i.test(error instanceof Error ? error.message : String(error));
+            // A chunk that ran out of time is recoverable the same way a clipped one is —
+            // by asking for less — and until now it wasn't: the whole deep pass died on the
+            // first slow chunk, which is what a local model did to every long work. It gets
+            // ONE split rather than four, because each failed attempt here costs the full
+            // transport budget on the user's own machine, and a halved chunk that still
+            // times out is telling us the model is too slow for this work, not this chunk.
+            const timedOut = aiError?.code === 'timeout';
+            const maxDepth = timedOut ? 1 : 4;
             const words = chunkText.split(/\s+/).filter(Boolean).length;
-            if (!recoverableJson || depth >= 4 || words < 400 || adaptive.leaves >= 16) throw error;
+            if ((!recoverableJson && !timedOut) || depth >= maxDepth || words < 400 || adaptive.leaves >= 16) throw error;
 
             // First use any output headroom. If the provider still clips the object,
             // split on the marker-aware chunker and merge only strict child results.
-            if (depth === 0 && maxTokens < 16000) {
+            // Headroom is the answer to truncation only: raising the ceiling after a
+            // timeout just buys a slow model more rope to run out of time with.
+            if (!timedOut && depth === 0 && maxTokens < 16000) {
               try {
                 return await completeAdaptive(chunkText, depth + 1, Math.min(16000, maxTokens * 2));
               } catch (expandedError) {

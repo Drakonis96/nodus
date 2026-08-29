@@ -308,3 +308,38 @@ export function modelRefSupportsExtraction(ref: { provider: string; model: strin
   if (ref.provider !== 'nodus') return true;
   return nodusLocalModelSupportsExtraction(ref.model);
 }
+
+/**
+ * The same benchmarked verdict, for a model served by somebody else's local server.
+ *
+ * `modelRefSupportsExtraction` is deliberately narrow: it is a HARD gate (the picker
+ * disables the option, the scan pipeline refuses the job), so it may only speak about
+ * ids we ship and have measured. But the models it blocks are downloadable by anyone,
+ * and running Qwen3.5-0.8B through LM Studio produced exactly the same result as
+ * running it through ours: it wanders inside the JSON and returns no ideas — silently,
+ * because a third-party provider id told the guard nothing.
+ *
+ * So the knowledge is separated from the enforcement. This recognises the same weights
+ * behind any local server and returns true so the UI can WARN; it never blocks, because
+ * on a third-party server the id is a label the user chose, not a build we control.
+ */
+const WEAK_LOCAL_EXTRACTION_MODELS = NODUS_LOCAL_MODELS
+  .filter((model) => model.kind === 'chat' && model.supportsExtraction === false)
+  // 'qwen3.5-0.8b-q4' → 'qwen3508b': the family, without our quantization suffix, so
+  // 'Qwen/Qwen3.5-0.8B-Instruct-GGUF' and 'qwen3.5-0.8b@q8_0' both match it.
+  .map((model) => normalizeLocalModelId(model.id.replace(/-q\d.*$/i, '')));
+
+function normalizeLocalModelId(id: string): string {
+  return id.toLowerCase().replace(/[^a-z0-9]+/g, '');
+}
+
+/** True when a third-party local server is serving weights we benchmarked as unable to
+ *  extract ideas. False for our own `nodus` provider, which `modelRefSupportsExtraction`
+ *  already blocks outright, so a caller never shows two warnings for one model. */
+export function localModelRefLikelyWeakAtExtraction(
+  ref: { provider: string; model: string } | null | undefined
+): boolean {
+  if (!ref || (ref.provider !== 'ollama' && ref.provider !== 'lmstudio')) return false;
+  const normalized = normalizeLocalModelId(ref.model);
+  return WEAK_LOCAL_EXTRACTION_MODELS.some((family) => normalized.includes(family));
+}
