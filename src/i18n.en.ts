@@ -36,13 +36,13 @@ import { DATABASE_TASK_TRANSLATIONS } from './i18n.databaseTasks';
 import { DATABASE_AUTOMATION_TRANSLATIONS } from './i18n.databaseAutomations';
 import { NOTION_IMPORT_TRANSLATIONS } from './i18n.notionImport';
 import { LIBRARY_ONBOARDING_TRANSLATIONS } from './i18n.libraryOnboarding';
+import { LIBRARY_TUTORIAL_TRANSLATIONS } from './i18n.libraryTutorial';
 import { SOURCE_CITATION_TRANSLATIONS } from './i18n.sourceCitation';
 import { DEEP_RESEARCH_APPROACH_TRANSLATIONS } from './i18n.deepResearchApproaches';
 import { DICTIONARY_TRANSLATIONS } from './i18n.dictionary';
 import { DEEP_RESEARCH_VERSION_TRANSLATIONS } from './i18n.deepResearchVersions';
 import { DOCUMENT_UNDERSTANDING_TRANSLATIONS } from './i18n.documentUnderstanding';
 import { DEEP_RESEARCH_QUALITY_TRANSLATIONS } from './i18n.deepResearchQuality';
-import { DOCUMENT_UNDERSTANDING_CONSENT_TRANSLATIONS } from './i18n.documentUnderstandingConsent';
 import { MODEL_SETTINGS_TRANSLATIONS } from './i18n.modelSettings';
 import { DATABASE_DEEP_RESEARCH_TRANSLATIONS } from './i18n.databaseDeepResearch';
 
@@ -71,9 +71,9 @@ export const EN: Record<string, string> = {
   ...DEEP_RESEARCH_VERSION_TRANSLATIONS.en,
   ...DOCUMENT_UNDERSTANDING_TRANSLATIONS.en,
   ...DEEP_RESEARCH_QUALITY_TRANSLATIONS.en,
-  ...DOCUMENT_UNDERSTANDING_CONSENT_TRANSLATIONS.en,
   ...LIBRARY_BIBLIOGRAPHY_TRANSLATIONS.en,
   ...LIBRARY_ONBOARDING_TRANSLATIONS.en,
+  ...LIBRARY_TUTORIAL_TRANSLATIONS.en,
   ...LIBRARY_RECOVERY_TRANSLATIONS.en,
   ...DIARIZATION_TRANSLATIONS.en,
   ...PROSOPOGRAPHY_TRANSLATIONS.en,
@@ -2072,6 +2072,8 @@ export const EN: Record<string, string> = {
   'Conectado (userID {id})': 'Connected (userID {id})',
   'No disponible: {msg}': 'Unavailable: {msg}',
   'sin respuesta': 'no response',
+  'Comprueba que Zotero esté abierto y que «Permitir que otras aplicaciones de este ordenador se comuniquen con Zotero» esté activado en los ajustes Avanzados de Zotero.':
+    'Make sure Zotero is open and that “Allow other applications on this computer to communicate with Zotero” is enabled in Zotero’s Advanced settings.',
   'Elige las colecciones a monitorizar. Se incorporan metadatos; los análisis se lanzan manualmente salvo que actives automatización en Ajustes.':
     'Choose the collections to monitor. Metadata is ingested; analyses run manually unless you enable automation in Settings.',
   ítems: 'items',
@@ -8522,4 +8524,18 @@ export const EN: Record<string, string> = {
   "Espacio de trabajo: notas y borradores con fuentes verificables": "Workspace: notes and drafts with verifiable sources",
   "El Espacio de trabajo reúne notas, borradores y organización en una única superficie. Conserva las citas clicables y permite estructurar el manuscrito sin separar artificialmente Escritura y Proyectos.": "The Workspace brings notes, drafts, and organization together in one surface. It keeps citations clickable and lets you structure the manuscript without artificially separating Writing and Projects.",
   "Revisa, amplía y transforma borradores en el Espacio de trabajo.": "Review, expand, and transform drafts in the Workspace.",
+  "Leyendo colecciones…": "Reading collections…",
+  "Catalogando…": "Cataloguing…",
+  "Leyendo notas…": "Reading notes…",
+  "Copiando archivos…": "Copying files…",
+  "Verificando el índice local…": "Verifying the local index…",
+  "Importación completada": "Import complete",
+  "Importación cancelada": "Import canceled",
+  "No se pudo completar la importación": "The import could not be completed",
+  "Cancelar importación": "Cancel import",
+  "Ocultar la importación terminada": "Hide the finished import",
+  "Importar archivos sueltos (sin ficha bibliográfica)": "Import standalone files (no bibliographic entry)",
+  "PDFs y EPUBs añadidos a Zotero sin una entrada encima. Llegan sin autor ni año.": "PDFs and EPUBs added to Zotero with no entry above them. They arrive with no author or year.",
+  "Archivos sueltos no importados": "Standalone files not imported",
+  "Tu biblioteca tiene {n} archivo(s) sin ficha bibliográfica. Marca la casilla de arriba y vuelve a importar si los quieres.": "Your library has {n} file(s) with no bibliographic entry. Tick the box above and import again if you want them.",
 };
