@@ -40,6 +40,7 @@ import { LEGAL_DOCS, type LegalDocId } from '../legalDocs';
 import { confirm } from '../components/feedback';
 import { Icon, PROVIDER_LABELS } from '../components/ui';
 import { ModelPicker, ModelWithReasoning, SubscriptionQuotaNotice, ExtractionCapabilityNotice } from '../components/ModelPicker';
+import { GeneralTextModelControl } from '../components/GeneralTextModelControl';
 import { NodiStylePicker } from '../components/nodi/NodiStylePicker';
 import { TutorialVideoGrid } from '../components/TutorialVideos';
 import { vaultTypeLabel } from '../components/VaultSwitcher';
@@ -2941,7 +2942,7 @@ export function Settings({
             </p>
             {settings.modelSettingsMode === 'basic' && <>
               <Row label={t('Modelo general de texto')} hint={t('Conversación, análisis, resúmenes y demás tareas de texto.')}>
-                <ModelWithReasoning settings={settings} value={settings.synthesisModel} onChange={(m) => patch({ synthesisModel: m })} requireExtraction />
+                <GeneralTextModelControl settings={settings} patch={patch} />
               </Row>
               {/* In basic mode this one model runs the scans too, so it is the single
                   most expensive place to pick a subscription-billed provider — and it must be able

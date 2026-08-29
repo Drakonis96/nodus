@@ -100,6 +100,41 @@ assert.ok(!settingsView.includes('onClick={() => void patch({ modelSettingsMode:
 assert.ok(!settingsView.includes('Heredar modelo general'), 'advanced model selectors must contain concrete choices, not inheritance options');
 assert.ok(settingsView.includes('gap-x-4 gap-y-3'), 'study model dropdowns must have horizontal and vertical separation');
 
+// The general text model must be reachable from its own row.
+//
+// ModelPicker offers favourites plus whatever is currently selected and nothing else,
+// and nothing in this screen could create the first favourite: the only place that read
+// a provider's catalogue was the setup wizard. A vault that finished setup without a
+// model — or whose one selection stopped being a favourite, which is what deleting a
+// downloaded built-in model does — reached a picker whose only entry was "no model
+// selected", with the fix two sections away in Providers and nothing on screen saying
+// so. Reinstalling was a rational thing to try, and users did.
+assert.ok(settingsView.includes('<GeneralTextModelControl settings={settings} patch={patch} />'),
+  'the basic-mode general model row must carry its own catalogue, not a favourites-only picker');
+const generalModel = await source('src/components/GeneralTextModelControl.tsx');
+assert.ok(generalModel.includes('autoDiscoverableAiProviders'),
+  'loading models must ask every provider that already answers, exactly as the wizard does');
+assert.ok(generalModel.includes('general-text-model-load') && generalModel.includes('general-text-model-catalog'),
+  'the load action and the catalogue need stable test hooks');
+assert.ok(/favorites: \[\.\.\.favorites, model\]/.test(generalModel),
+  'choosing from the catalogue must also star the model, or the picker above stays empty afterwards');
+assert.ok(generalModel.includes('modelRefSupportsExtraction'),
+  'the catalogue must apply the same extraction rule as the picker it feeds');
+assert.ok(generalModel.includes('general-text-model-empty'),
+  'an empty picker must say where models come from instead of looking broken');
+
+// A failed step has to say why. `deep_error` is stored in Spanish by the main process and
+// is not one of the `message`/`error` field names localizeIpcPayload sweeps, so it used to
+// reach the reader untouched while every neighbouring line went through t().
+const workStatus = await source('src/views/WorkStatusModal.tsx');
+assert.ok(workStatus.includes('localizeRuntimeError(work.deep_error, getActiveLang())'),
+  'the ideas failure reason must be localized, not rendered raw');
+assert.ok(!/return work\.deep_error;/.test(workStatus), 'no raw Spanish may reach a non-Spanish interface');
+assert.ok(workStatus.includes('localizeRuntimeError(work.notes, getActiveLang())'),
+  'a failed light scan already persists its reason into notes — show it instead of a dash');
+assert.ok((workStatus.match(/El paso falló sin dejar un motivo\./g) ?? []).length === 2,
+  'themes and summary both explain a failure that stored no reason');
+
 const allowedLegacyFiles = new Set([
   'shared/types.ts',
   'electron/db/settingsRepo.ts',
