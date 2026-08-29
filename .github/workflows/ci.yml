@@ -56,6 +56,14 @@ jobs:
           NODE_OPTIONS: --max-old-space-size=4096
         run: npm run build
 
+      # The Server Web suites drive the compiled app and ask the server for its SPA
+      # shell, so without this the published-record routes answer 404 and the
+      # Chromium checks have nothing to open.
+      - name: Build the Server Web bundle
+        env:
+          NODE_OPTIONS: --max-old-space-size=4096
+        run: npm run build:server-web
+
       - name: Unit and integration tests
         run: npm test
 

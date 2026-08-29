@@ -3,8 +3,17 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
+import { requireElectronRuntime } from './lib/tsRuntimeHooks.mjs';
 
 const root = path.resolve(import.meta.dirname, '..');
+
+// NativeVaultStore opens a real database through better-sqlite3, which CI builds against
+// Electron's ABI. Under the system Node the import throws, the store falls back to the
+// sqlite3 CLI, and that binary has no FTS5 on the runner, so creating a vault fails.
+// Re-exec under Electron-as-Node like every other suite that opens a database.
+if (!requireElectronRuntime(path.join(root, 'scripts/test-server-web-native-authoring-boundary.mjs'), '--electron-native-authoring-test')) {
+  process.exit(0);
+}
 const read = (file) => fs.readFileSync(path.join(root, file), 'utf8');
 const authoring = read('src/serverWeb/vaults/NativeContentAuthoring.tsx');
 const snapshot = read('electron/serverSync/serverSnapshot.ts');

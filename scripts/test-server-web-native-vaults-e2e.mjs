@@ -22,6 +22,16 @@ import { chromium } from 'playwright-core';
 import {
   cookieFrom, hidden, postForm, repoRoot, serverEnvironment, stopServer, waitForHealth,
 } from './lib/nodusServerHarness.mjs';
+import { requireElectronRuntime } from './lib/tsRuntimeHooks.mjs';
+
+// The server this suite spawns creates native vaults through better-sqlite3, which CI
+// builds against Electron's ABI. Started from the system Node it falls back to the sqlite3
+// CLI, whose build on the runner has no FTS5, and creation answers 500 instead of 201.
+// Re-exec here so process.execPath -- the binary the server is spawned with below -- is
+// Electron's Node, the same runtime the published image resolves better-sqlite3 under.
+if (!requireElectronRuntime(path.join(repoRoot, 'scripts/test-server-web-native-vaults-e2e.mjs'), '--electron-native-vaults-test')) {
+  process.exit(0);
+}
 
 const TYPES = [
   'academic', 'estudio', 'primary_sources', 'genealogy', 'prosopography',
