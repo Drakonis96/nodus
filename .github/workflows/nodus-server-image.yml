@@ -19,6 +19,17 @@ on:
       - 'scripts/lib/nodusServerHarness.mjs'
       - 'scripts/lib/nodusServerFixtures.mjs'
       - '.github/workflows/nodus-server-image.yml'
+  # The image only ever built after a merge, so a server change that stops the
+  # container booting reached main before anyone saw it. Pull requests now build
+  # and smoke the same image; they never publish it.
+  pull_request:
+    paths:
+      - 'package.json'
+      - 'package-lock.json'
+      - 'vite.server-web.config.ts'
+      - 'src/serverWeb/**'
+      - 'server/**'
+      - '.github/workflows/nodus-server-image.yml'
   workflow_dispatch:
 
 permissions:
@@ -33,6 +44,42 @@ env:
   IMAGE: ghcr.io/drakonis96/nodus-server
 
 jobs:
+  # Build and boot the image without publishing it. The image's dependencies are
+  # server/package.json alone, so a module the server imports at startup but does
+  # not declare there only shows up here, never in the main CI workflow.
+  smoke-pull-request:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Build smoke-test image
+        run: docker build -f server/Dockerfile --build-arg NODUS_VERSION=5.0.6 --build-arg NODUS_REVISION="$GITHUB_SHA" --tag nodus-server:ci .
+
+      - name: Run image health smoke test
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker run -d --name nodus-server-ci \
+            -p 127.0.0.1:17443:7443 \
+            -e NODUS_PUBLIC_URL=http://localhost:17443 \
+            -e NODUS_ADMIN_EMAIL=ci-admin@example.test \
+            -e NODUS_ADMIN_PASSWORD=ci-only-admin-password-123456 \
+            nodus-server:ci
+          for _ in {1..30}; do
+            if curl --fail --silent http://127.0.0.1:17443/healthz | grep --quiet '"ok":true'; then
+              curl --silent --head http://127.0.0.1:17443/ | grep --ignore-case --quiet '^location: /login'
+              docker rm -f nodus-server-ci >/dev/null
+              exit 0
+            fi
+            sleep 1
+          done
+          docker logs nodus-server-ci
+          docker rm -f nodus-server-ci >/dev/null
+          exit 1
+
   publish-main:
     # A manual run from another branch must never replace the image consumed by
     # production-like Portainer tests.

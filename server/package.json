@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "better-sqlite3": "^12.11.1",
-    "esbuild": "^0.28.2"
+    "esbuild": "^0.28.2",
+    "pdf-lib": "^1.17.1"
   }
 }
