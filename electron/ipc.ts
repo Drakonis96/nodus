@@ -106,7 +106,7 @@ import {
   stopNodusServerSync,
 } from './serverSync/serverSyncService';
 import { startInboxPolling, stopInboxPolling } from './serverSync/inboxPoller';
-import { setServerProfilePreferencesAppliedHandler, syncActiveServerProfilePreferences } from './serverSync/profilePreferencesSync';
+import { syncActiveServerProfilePreferences } from './serverSync/profilePreferencesSync';
 import {
   createConnectedVault,
   detachReplica,
@@ -250,14 +250,6 @@ export function registerIpc(
   onOpenCodeGoUsageStatusChanged((status) => {
     for (const win of BrowserWindow.getAllWindows()) {
       if (!win.isDestroyed()) win.webContents.send('ai:openCodeGo:usageChanged', status);
-    }
-  });
-
-  setServerProfilePreferencesAppliedHandler((next) => {
-    setBrowserTheme(next.theme);
-    getWindow()?.setBackgroundColor(nativeTheme.shouldUseDarkColors ? '#0a0a0a' : '#ffffff');
-    for (const win of BrowserWindow.getAllWindows()) {
-      if (!win.isDestroyed()) win.webContents.send('settings:changed', next);
     }
   });
 
@@ -411,8 +403,6 @@ export function registerIpc(
       patch.nodusServerSpaceId !== undefined ||
       patch.nodusServerIncludeUserContent !== undefined ||
       patch.nodusServerIncludePassages !== undefined ||
-      patch.nodusServerIncludePrimarySources !== undefined ||
-      patch.nodusServerIncludeTestimonies !== undefined ||
       patch.nodusServerIncludeLibraryDocuments !== undefined ||
       patch.nodusServerIncludeVectors !== undefined
     ) {

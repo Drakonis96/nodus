@@ -163,10 +163,10 @@ test('the provisioning secret is written 0600, and guards the endpoint', async (
     const secret = fs.readFileSync(secretFile, 'utf8').trim();
     assert.ok(secret.length >= 32);
 
-    const call = (headers, publicationPolicy = undefined) => fetch(`${server.base}/api/v1/local/provision`, {
+    const call = (headers) => fetch(`${server.base}/api/v1/local/provision`, {
       method: 'POST',
       headers: { 'content-type': 'application/json', ...headers },
-      body: JSON.stringify({ vaultId: 'vault-1', vaultName: 'Tesis', vaultType: 'academic', publicationPolicy }),
+      body: JSON.stringify({ vaultId: 'vault-1', vaultName: 'Tesis', vaultType: 'academic' }),
     });
 
     assert.equal((await call({})).status, 401, 'no secret must be refused');
@@ -174,13 +174,7 @@ test('the provisioning secret is written 0600, and guards the endpoint', async (
     // A shorter wrong secret must fail on comparison, not on a length crash.
     assert.equal((await call({ authorization: 'Bearer x' })).status, 401);
 
-    const granted = await call({ authorization: `Bearer ${secret}` }, {
-      allowUserContent: true,
-      allowLibraryDocuments: true,
-      allowPassages: true,
-      allowVectors: false,
-      allowPersonalImports: false,
-    });
+    const granted = await call({ authorization: `Bearer ${secret}` });
     assert.equal(granted.status, 200);
     const first = await granted.json();
     assert.ok(first.spaceId);
@@ -188,12 +182,6 @@ test('the provisioning secret is written 0600, and guards the endpoint', async (
     assert.equal(first.spaceName, 'Tesis');
     let state = JSON.parse(fs.readFileSync(path.join(dir, 'data', 'state.json'), 'utf8'));
     assert.equal(state.spaces[0].vaultType, 'academic', 'local provisioning records the vault type before its first publication');
-    assert.deepEqual(
-      Object.fromEntries(['allowUserContent', 'allowLibraryDocuments', 'allowPassages', 'allowVectors', 'allowPersonalImports']
-        .map((field) => [field, state.spaces[0].publicationPolicy[field]])),
-      { allowUserContent: true, allowLibraryDocuments: true, allowPassages: true, allowVectors: false, allowPersonalImports: false },
-      'the first publication uses the explicit Desktop policy instead of a restrictive transient default',
-    );
 
     // Same vault, second call: the space is reused rather than duplicated.
     const again = await (await call({ authorization: `Bearer ${secret}` })).json();

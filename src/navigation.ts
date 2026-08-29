@@ -132,6 +132,8 @@ export const NAV_ITEMS: NavItem[] = [
   // La bóveda académica llama Espacio de trabajo a su sección unificada. Los demás
   // vaults conservan la entrada Notas, pero comparten su catálogo, pestañas y editor.
   { id: 'workspace', label: 'Espacio de trabajo', icon: 'notebook', group: 'create' },
+  { id: 'writing', label: 'Escritura', icon: 'edit', group: 'create' },
+  { id: 'projects', label: 'Proyectos', icon: 'folder', group: 'create' },
   { id: 'notes', label: 'Notas', icon: 'notebook', group: 'create' },
   // Herramientas — consultar la web, seguir novedades y procesar archivos.
   // Vistas universales: disponibles en todos los tipos de vault.

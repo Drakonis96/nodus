@@ -133,8 +133,6 @@ export function readVaultConfig(vault: VaultSummary): VaultServerConfig {
       nodusServerAutoSync: s.nodusServerAutoSync,
       nodusServerIncludeUserContent: s.nodusServerIncludeUserContent,
       nodusServerIncludePassages: s.nodusServerIncludePassages,
-      nodusServerIncludePrimarySources: s.nodusServerIncludePrimarySources,
-      nodusServerIncludeTestimonies: s.nodusServerIncludeTestimonies,
       nodusServerIncludeLibraryDocuments: s.nodusServerIncludeLibraryDocuments,
       nodusServerIncludeVectors: s.nodusServerIncludeVectors,
     });

@@ -205,8 +205,6 @@ function connectionFrom(config: VaultServerConfig): NodusServerConnection {
     includePassages: config.includePassages,
     includeLibraryDocuments: config.includeLibraryDocuments,
     includeVectors: config.includeVectors,
-    includePrimarySources: config.includePrimarySources,
-    includeTestimonies: config.includeTestimonies,
     phase,
     lastSyncAt: rt?.lastSyncAt ?? null,
     lastError: rt?.lastError ?? null,

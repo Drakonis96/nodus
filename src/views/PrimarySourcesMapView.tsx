@@ -26,9 +26,7 @@ function authorityLabel(point: PrimarySourceMapPoint): string {
   );
 }
 
-export type PrimarySourcesMapLoader = { getPrimarySourceMapWorkspace: () => Promise<PrimarySourceMapWorkspace> };
-
-export function PrimarySourcesMapView({ loader }: { loader?: PrimarySourcesMapLoader } = {}) {
+export function PrimarySourcesMapView() {
   const [workspace, setWorkspace] = useState<PrimarySourceMapWorkspace | null>(null);
   const [mode, setMode] = useState<'map' | 'table'>('map');
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -40,7 +38,7 @@ export function PrimarySourcesMapView({ loader }: { loader?: PrimarySourcesMapLo
 
   useEffect(() => {
     let cancelled = false;
-    (loader?.getPrimarySourceMapWorkspace ?? window.nodus.getPrimarySourceMapWorkspace)()
+    window.nodus.getPrimarySourceMapWorkspace()
       .then((data) => {
         if (cancelled) return;
         setWorkspace(data);
@@ -50,7 +48,7 @@ export function PrimarySourcesMapView({ loader }: { loader?: PrimarySourcesMapLo
         if (!cancelled) setError(cause instanceof Error ? cause.message : String(cause));
       });
     return () => { cancelled = true; };
-  }, [loader]);
+  }, []);
 
   const filtered = useMemo(() => {
     const query = search.trim().toLocaleLowerCase();

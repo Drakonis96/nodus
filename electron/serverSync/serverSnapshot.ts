@@ -176,7 +176,7 @@ export const TESTIMONIES_SERVER_TABLES = [
  * and nothing anywhere else.
  */
 export const DATABASES_SERVER_TABLES = [
-  'db_databases', 'db_data_sources', 'db_columns', 'db_rows', 'db_cells', 'db_computed_cells', 'db_views', 'db_view_sources', 'db_view_revisions', 'db_select_options', 'db_relations',
+  'db_databases', 'db_data_sources', 'db_columns', 'db_rows', 'db_cells', 'db_views', 'db_view_sources', 'db_view_revisions', 'db_select_options', 'db_relations',
   'db_attachments', 'db_row_templates', 'db_template_runs', 'db_row_hierarchy', 'db_row_dependencies', 'db_task_configs',
   'db_sprints', 'db_sprint_rows', 'pages', 'page_blocks', 'page_favorites', 'page_links',
   'page_revisions', 'page_comments', 'page_comment_reactions', 'page_comment_mentions',
@@ -338,10 +338,7 @@ export interface SnapshotAsset extends SnapshotAssetRef {
 const TABLES_BY_VAULT_TYPE: Partial<Record<VaultSummary['type'], readonly string[]>> = {
   worldbuilding: WORLDBUILDING_SERVER_TABLES,
   genealogy: GENEALOGY_SERVER_TABLES,
-  // Prosopography is an internal identity-resolution workspace. Its Desktop
-  // surfaces remain available locally, but there is no public projection for
-  // the person/source/network tables; publishing the genealogy set here would
-  // expose names and relationship assertions without an explicit consent model.
+  prosopography: GENEALOGY_SERVER_TABLES,
   estudio: STUDY_SERVER_TABLES,
   // Teaching reuses the study views, so a shared teaching vault carries both its own
   // materials and the study structure they hang from. Rosters and grades are in neither.
@@ -402,73 +399,6 @@ function readTable(db: Database.Database, table: string): Record<string, unknown
       return safe === undefined ? [] : [[column, safe]];
     }))
   );
-}
-
-/**
- * Build the only prosopography representation allowed to cross the publication
- * boundary.  Identity rows, literals, source quotations and person foreign keys
- * stay local; the Server receives study-level counts and public methodology
- * metadata.  Keeping this as generated tables (rather than adding a second API
- * or copying the prosop_* tables) also makes old servers fail closed naturally.
- */
-function buildProsopographyPublicProjection(db: Database.Database, present: Set<string>): Record<string, Record<string, unknown>[]> {
-  const table = (name: string): Record<string, unknown>[] => present.has(name) ? readTable(db, name) : [];
-  const studies = table('prosop_studies');
-  if (!studies.length) return {};
-  const profiles = table('prosop_person_profiles');
-  const memberships = table('prosop_population_memberships');
-  const revisions = table('prosop_variable_revisions');
-  const questionnaires = table('prosop_questionnaire_versions');
-  const sources = table('prosop_sources');
-  const factoids = table('prosop_factoids');
-  const statements = table('prosop_statements');
-  const analyses = table('prosop_analysis_definitions');
-  const runs = table('prosop_analysis_runs');
-  const layers = table('prosop_network_layers');
-  const edges = table('prosop_network_edges');
-  const publishedQuestionnaireIds = new Set(questionnaires.filter((row) => row.status === 'published').map((row) => String(row.questionnaire_version_id)));
-  const ordinaryRevisionIds = new Set(revisions.filter((row) => row.sensitivity === 'ordinary' && (publishedQuestionnaireIds.size === 0 || publishedQuestionnaireIds.has(String(row.questionnaire_version_id)))).map((row) => String(row.revision_id)));
-  // Only evidence backed by openly accessible sources is publishable. Restricted and
-  // embargoed source rows still count locally, but neither their records nor aggregates
-  // derived from their factoids should become a side channel in the public projection.
-  const publicSources = sources.filter((row) => row.access_status === 'open');
-  const publicSourceIds = new Set(publicSources.map((row) => String(row.source_id)));
-  const reviewedFactoidIds = new Set(factoids.filter((row) => row.status === 'reviewed').map((row) => String(row.factoid_id)));
-  const publicFactoids = factoids.filter((row) => reviewedFactoidIds.has(String(row.factoid_id)) && row.source_id != null && publicSourceIds.has(String(row.source_id)) && row.source_segment_id != null);
-  const publicFactoidIds = new Set(publicFactoids.map((row) => String(row.factoid_id)));
-  const publicStatements = statements.filter((row) => row.status === 'reviewed' && publicFactoidIds.has(String(row.factoid_id)) && (row.variable_revision_id == null || ordinaryRevisionIds.has(String(row.variable_revision_id))));
-  const publicProfiles = profiles.filter((row) => row.privacy_status !== 'restricted');
-  const countBy = (rows: Record<string, unknown>[], key: string): Record<string, number> => rows.reduce<Record<string, number>>((result, row) => { const value = String(row[key] ?? 'unknown'); result[value] = (result[value] ?? 0) + 1; return result; }, {});
-  const populationRows = studies.map((study) => {
-    const studyId = String(study.study_id);
-    const currentMethodology = table('prosop_methodology_versions').find((row) => String(row.version_id) === String(study.current_methodology_version_id));
-    const currentQuestionnaire = table('prosop_questionnaire_versions').find((row) => String(row.questionnaire_version_id) === String(study.current_questionnaire_version_id));
-    const studyMemberships = memberships.filter((row) => String(row.methodology_version_id) === String(study.current_methodology_version_id));
-    return {
-      id: `population:${studyId}`, study_id: studyId, title: study.title, research_question: study.research_question,
-      unit_of_analysis: study.unit_of_analysis, temporal_scope: study.temporal_scope, geographic_scope: study.geographic_scope,
-      expected_population: study.expected_population ?? null, visible_population_count: publicProfiles.length,
-      included_count: studyMemberships.filter((row) => row.status === 'included').length,
-      excluded_count: studyMemberships.filter((row) => row.status === 'excluded').length,
-      uncertain_count: studyMemberships.filter((row) => row.status === 'uncertain').length,
-      candidate_count: studyMemberships.filter((row) => row.status === 'candidate').length,
-      source_count: publicSources.length, reviewed_factoid_count: publicFactoids.length,
-      reviewed_statement_count: publicStatements.length,
-      methodology_status: currentMethodology?.status ?? 'unpublished', questionnaire_status: currentQuestionnaire?.status ?? 'unpublished',
-      publication_state: 'aggregate_only', updated_at: study.updated_at,
-    };
-  });
-  const variableRows = revisions.filter((row) => ordinaryRevisionIds.has(String(row.revision_id))).map((revision) => {
-    const variableId = String(revision.variable_id);
-    const variableStatements = publicStatements.filter((row) => String(row.variable_revision_id ?? row.variable_id) === String(revision.revision_id) || String(row.variable_id) === variableId);
-    return { id: `variable:${variableId}`, variable_id: variableId, label: revision.label, value_type: revision.value_type, cardinality: revision.cardinality, statement_count: variableStatements.length, known_count: variableStatements.filter((row) => String(row.literal_value ?? '').trim()).length, publication_state: 'aggregate_only' };
-  });
-  const sourceKinds = [...new Set(publicSources.map((row) => `${String(row.source_kind ?? 'other')}\u0000${String(row.access_status ?? 'unknown')}`))];
-  const sourceRows = sourceKinds.map((key) => { const [source_kind, access_status] = key.split('\u0000'); const group = publicSources.filter((row) => String(row.source_kind ?? 'other') === source_kind && String(row.access_status ?? 'unknown') === access_status); return { id: `source:${source_kind}:${access_status}`, source_kind, access_status, source_count: group.length, segment_count: table('prosop_source_segments').filter((segment) => group.some((source) => String(source.source_id) === String(segment.source_id))).length, publication_state: 'aggregate_only' }; });
-  const analysisRows = analyses.flatMap((definition) => { const definitionRuns = runs.filter((run) => String(run.analysis_id) === String(definition.analysis_id)); const latest = definitionRuns[0]; return [{ id: `analysis:${String(definition.analysis_id)}`, analysis_id: definition.analysis_id, title: definition.title, analysis_kind: definition.analysis_kind, run_count: definitionRuns.length, latest_population_count: latest?.population_count ?? 0, latest_included_count: latest?.included_count ?? 0, latest_fingerprint: latest?.input_fingerprint ?? null, publication_state: 'aggregate_only', updated_at: definition.updated_at }]; });
-  const networkRows = layers.map((layer) => { const layerEdges = edges.filter((edge) => String(edge.layer_id) === String(layer.layer_id) && edge.status === 'active'); const origins = countBy(layerEdges, 'origin'); const anonymizedNodeCount = new Set(layerEdges.flatMap((edge) => [edge.source_person_id, edge.target_person_id]).filter(Boolean)).size; return { id: `network:${String(layer.layer_id)}`, layer_id: layer.layer_id, name: layer.name, kind: layer.kind, directionality: layer.directionality, edge_count: layerEdges.length, node_count: anonymizedNodeCount, density: anonymizedNodeCount > 1 ? layerEdges.length / (anonymizedNodeCount * (anonymizedNodeCount - 1) / 2) : 0, explicit_count: origins.explicit ?? 0, derived_count: origins.derived ?? 0, hypothesis_count: origins.hypothesis ?? 0, publication_state: 'aggregate_only', updated_at: layer.updated_at }; });
-  const searchRows = [...populationRows.map((row) => ({ id: row.id, type: 'prosopography-public-population', kind: 'prosopStudy', title: row.title, snippet: row.research_question })), ...variableRows.map((row) => ({ id: row.id, type: 'prosopography-public-variables', kind: 'prosopVariable', title: row.label, snippet: `${row.value_type} · ${row.statement_count} observaciones` })), ...sourceRows.map((row) => ({ id: row.id, type: 'prosopography-public-sources', kind: 'prosopSource', title: row.source_kind, snippet: `${row.source_count} fuentes · ${row.access_status}` }))];
-  return { prosopography_public_population: populationRows, prosopography_public_variables: variableRows, prosopography_public_sources: sourceRows, prosopography_public_analysis: analysisRows, prosopography_public_networks: networkRows, prosopography_public_search: searchRows };
 }
 
 export interface ServerSnapshotSettings {
@@ -646,40 +576,6 @@ export function buildServerSnapshot(
 
   const tables: Record<string, Record<string, unknown>[]> = {};
   for (const table of [...selected].sort()) tables[table] = readTable(db, table);
-  // Prosopography is not a raw publication family.  Add only the generated,
-  // identity-free aggregates after normal table selection; no prosop_* source
-  // table is ever copied into the snapshot.
-  if (vault.type === 'prosopography') Object.assign(tables, buildProsopographyPublicProjection(db, present));
-
-  // Testimony sessions/media are private and therefore never enter `tables`, but
-  // a published transcript still needs to be grouped under its interview in the
-  // Desktop dossier. Add only the stable interview id to the already-sanitized
-  // transcript row; no media path, filename, participant or agreement field can
-  // cross this boundary.
-  if (tables.testimony_transcripts?.length && present.has('testimony_media') && present.has('testimony_sessions')) {
-    const transcriptInterview = new Map<string, string>((db.prepare(`
-      SELECT t.id AS transcript_id, s.interview_id
-      FROM testimony_transcripts t
-      JOIN testimony_media m ON m.id = t.media_id
-      JOIN testimony_sessions s ON s.id = m.session_id
-    `).all() as Array<{ transcript_id: string; interview_id: string }>).map((entry) => [String(entry.transcript_id), String(entry.interview_id)]));
-    tables.testimony_transcripts = tables.testimony_transcripts.map((row) => {
-      const interviewId = transcriptInterview.get(String(row.id));
-      return interviewId ? { ...row, interview_id: interviewId } : row;
-    });
-  }
-  // A testimony row may carry a foreign key that is not named `person_id`
-  // (participant_id, narrator_id, speaker_id, etc.).  The textual projection
-  // needs stable interview/transcript ids for grouping, but none of those
-  // identity-bearing columns.  Apply this after the generic column denylist so
-  // future testimony migrations cannot accidentally widen the contract.
-  for (const table of ['testimony_interviews', 'testimony_transcripts', 'testimony_annotations', 'testimony_annotation_codes', 'testimony_contrasts', 'testimony_contrast_items']) {
-    if (!tables[table]) continue;
-    tables[table] = tables[table].map((row) => Object.fromEntries(Object.entries(row).filter(([column]) => {
-      if (column === 'interview_id' || column === 'transcript_id' || column === 'annotation_id' || column === 'contrast_id' || column === 'code_id') return true;
-      return !/(?:participant|speaker|narrator|informant|respondent|person|identity|contact)/i.test(column);
-    })));
-  }
   phaseStartedAt = logPublishPerf('select-tables:complete', phaseStartedAt, {
     tables: Object.keys(tables).length,
     rows: Object.values(tables).reduce((total, rows) => total + rows.length, 0),

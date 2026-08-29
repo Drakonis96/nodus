@@ -45,9 +45,8 @@ function sourceMentionCounts(sources: number, mentions: number): string {
   return `${countLabel(sources, '{n} fuente', '{n} fuentes')} · ${countLabel(mentions, '{n} mención', '{n} menciones')}`;
 }
 
-function openExcerpt(itemId: string, excerptId: string | null, onOpenExcerpt?: (itemId: string, excerptId: string) => void): void {
+function openExcerpt(itemId: string, excerptId: string | null): void {
   if (!excerptId) return;
-  if (onOpenExcerpt) { onOpenExcerpt(itemId, excerptId); return; }
   window.dispatchEvent(new CustomEvent('nodus:navigate-primary-source', {
     detail: { itemId, excerptId },
   }));
@@ -119,12 +118,7 @@ function PersonListCard({
   );
 }
 
-export type PrimarySourcesPersonsLoader = {
-  listPrimarySourcePersons: (search: string, filter: PrimarySourcePersonFilter) => Promise<PrimarySourcePersonSummary[]>;
-  getPrimarySourcePersonDossier: (personId: string) => Promise<PrimarySourcePersonDossier | null>;
-};
-
-export function PrimarySourcesPersonsView({ loader, readOnly = false, onOpenExcerpt }: { loader?: PrimarySourcesPersonsLoader; readOnly?: boolean; onOpenExcerpt?: (itemId: string, excerptId: string) => void } = {}) {
+export function PrimarySourcesPersonsView() {
   const [attention, setAttention] = useState(() => consumePrimarySourceAttention(['provisional_identities']));
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState<PrimarySourcePersonFilter>(attention ? 'provisional' : 'all');
@@ -137,7 +131,7 @@ export function PrimarySourcesPersonsView({ loader, readOnly = false, onOpenExce
   const [variant, setVariant] = useState('');
 
   const reloadList = async (preferId?: string | null) => {
-    const fetched = await (loader?.listPrimarySourcePersons ?? window.nodus.listPrimarySourcePersons)(search, filter);
+    const fetched = await window.nodus.listPrimarySourcePersons(search, filter);
     const rows = attention?.targetIds.length
       ? fetched.filter((person) => attention.targetIds.includes(person.personId))
       : fetched;
@@ -155,7 +149,7 @@ export function PrimarySourcesPersonsView({ loader, readOnly = false, onOpenExce
     const timeout = window.setTimeout(() => {
       setLoading(true);
       setError(null);
-      (loader?.listPrimarySourcePersons ?? window.nodus.listPrimarySourcePersons)(search, filter)
+      window.nodus.listPrimarySourcePersons(search, filter)
         .then((fetched) => {
           if (cancelled) return;
           const rows = attention?.targetIds.length
@@ -179,7 +173,7 @@ export function PrimarySourcesPersonsView({ loader, readOnly = false, onOpenExce
       cancelled = true;
       window.clearTimeout(timeout);
     };
-  }, [search, filter, attention, loader]);
+  }, [search, filter, attention]);
 
   useEffect(() => {
     let cancelled = false;
@@ -188,7 +182,7 @@ export function PrimarySourcesPersonsView({ loader, readOnly = false, onOpenExce
       return;
     }
     setError(null);
-    (loader?.getPrimarySourcePersonDossier ?? window.nodus.getPrimarySourcePersonDossier)(selectedId)
+    window.nodus.getPrimarySourcePersonDossier(selectedId)
       .then((next) => {
         if (!cancelled) setDossier(next);
       })
@@ -196,7 +190,7 @@ export function PrimarySourcesPersonsView({ loader, readOnly = false, onOpenExce
         if (!cancelled) setError(cause instanceof Error ? cause.message : String(cause));
       });
     return () => { cancelled = true; };
-  }, [selectedId, loader]);
+  }, [selectedId]);
 
   const assertionsByField = useMemo(() => {
     const groups = new Map<PrimarySourcePersonAssertionField, PrimarySourcePersonDossier['assertions']>();
@@ -212,7 +206,6 @@ export function PrimarySourcesPersonsView({ loader, readOnly = false, onOpenExce
     operation: () => Promise<PrimarySourcePersonDossier | null>,
     successMessage: string
   ) => {
-    if (readOnly) return;
     setBusy(true);
     setError(null);
     try {
@@ -354,7 +347,7 @@ export function PrimarySourcesPersonsView({ loader, readOnly = false, onOpenExce
                   </span>
                 ))}
               </div>
-              {!readOnly && <form
+              <form
                 className="mt-4 flex max-w-xl gap-2"
                 onSubmit={(event) => {
                   event.preventDefault();
@@ -374,7 +367,7 @@ export function PrimarySourcesPersonsView({ loader, readOnly = false, onOpenExce
                 <button className="btn btn-secondary h-9" disabled={!variant.trim() || busy}>
                   <Icon name="plus" size={13} /> {t('Añadir variante')}
                 </button>
-              </form>}
+              </form>
             </header>
 
             {error && (
@@ -411,7 +404,7 @@ export function PrimarySourcesPersonsView({ loader, readOnly = false, onOpenExce
                       <button
                         type="button"
                         disabled={!mention.excerptId}
-                        onClick={() => openExcerpt(mention.itemId, mention.excerptId, onOpenExcerpt)}
+                        onClick={() => openExcerpt(mention.itemId, mention.excerptId)}
                         className="btn btn-ghost h-7 shrink-0 px-2 text-[10px]"
                       >
                         <Icon name="external" size={12} /> {t('Abrir fragmento')}
@@ -434,7 +427,7 @@ export function PrimarySourcesPersonsView({ loader, readOnly = false, onOpenExce
                         <button
                           type="button"
                           key={assertion.assertionId}
-                          onClick={() => openExcerpt(assertion.itemId, assertion.excerptId, onOpenExcerpt)}
+                          onClick={() => openExcerpt(assertion.itemId, assertion.excerptId)}
                           className="flex items-start justify-between gap-3 rounded-lg border border-neutral-200 p-3 text-left hover:border-indigo-300 hover:bg-indigo-50/50 dark:border-neutral-700 dark:hover:border-indigo-700 dark:hover:bg-indigo-950/20"
                         >
                           <div>
@@ -479,7 +472,7 @@ export function PrimarySourcesPersonsView({ loader, readOnly = false, onOpenExce
                                 <button
                                   type="button"
                                   key={assertion.assertionId}
-                                  onClick={() => openExcerpt(assertion.itemId, assertion.excerptId, onOpenExcerpt)}
+                                  onClick={() => openExcerpt(assertion.itemId, assertion.excerptId)}
                                   className="block w-full truncate text-left text-[10px] text-indigo-600 hover:underline dark:text-indigo-300"
                                 >
                                   {assertion.sourceTitle} · {assertion.excerptLocator}
@@ -524,7 +517,7 @@ export function PrimarySourcesPersonsView({ loader, readOnly = false, onOpenExce
                       </div>
                       <button
                         type="button"
-                        disabled={readOnly || busy}
+                        disabled={busy}
                         onClick={() => void runMutation(
                           () => window.nodus.revertPrimarySourcePersonMerge(resolution.resolutionId),
                           t('Fusión revertida: las identidades vuelven a estar separadas sin pérdida de datos.')
@@ -561,7 +554,7 @@ export function PrimarySourcesPersonsView({ loader, readOnly = false, onOpenExce
                       <div className="mt-3 text-[10px] text-neutral-500">{candidate.reasons.map((reason) => t(reasonLabel(reason))).join(' · ')}</div>
                       <button
                         type="button"
-                        disabled={readOnly || busy}
+                        disabled={busy}
                         onClick={() => void runMutation(
                           () => window.nodus.mergePrimarySourcePersons({
                             sourcePersonId: candidate.personId,

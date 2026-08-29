@@ -96,12 +96,7 @@ export function academicSnapshot(overrides = {}) {
         brief_json: JSON.stringify({ kind: 'deep_research', objective: 'Estado de la cuestión', language: 'es' }),
         selection_json: '{}',
         model_json: '{}',
-        draft_json: JSON.stringify({
-          title: 'Informe sobre el archivo',
-          draftMarkdown: '## Resumen\nTexto.',
-          bibliography: [],
-          matrix: [{ role: 'support', claim: 'El archivo conserva memoria.', sourceLabel: 'Fuente publicada', evidence: 'Texto.', notes: '' }],
-        }),
+        draft_json: JSON.stringify({ title: 'Informe sobre el archivo', draftMarkdown: '## Resumen\nTexto.', bibliography: [] }),
         created_at: '2026-01-01T00:00:00.000Z',
         updated_at: '2026-01-01T00:00:00.000Z',
       },
@@ -125,15 +120,7 @@ export function academicSnapshot(overrides = {}) {
       { id: 'im-1', topic: 'Archivo', title: 'Inmersión en el archivo', language: 'es', minutes: 20, model_json: '{}', plan_json: JSON.stringify({ stations: [] }), progress_json: '{}', stats_json: JSON.stringify({ stations: 3 }), created_at: '2026-01-01T00:00:00.000Z', updated_at: '2026-01-01T00:00:00.000Z' },
     ],
     saved_searches: [],
-    research_questions: [
-      { id: 'rq-1', question: '¿Cómo configura el archivo la memoria?', notes: 'Pregunta marco', model_json: JSON.stringify({ provider: 'openai', model: 'gpt-test' }), status: 'mapped', corpus_ideas: 2, corpus_works: 1, created_at: '2026-01-01T00:00:00.000Z', updated_at: '2026-01-02T00:00:00.000Z', mapped_at: '2026-01-02T00:00:00.000Z' },
-    ],
-    research_subquestions: [
-      { id: 'rqs-1', rq_id: 'rq-1', text: '¿Qué fuentes sostienen esa relación?', rationale: 'Trazabilidad', order_idx: 0, coverage_status: 'partial', justification: 'Una obra principal', created_at: '2026-01-01T00:00:00.000Z' },
-    ],
-    research_coverage_links: [
-      { id: 'rql-1', subq_id: 'rqs-1', kind: 'idea', ref_id: 'i-a', label: 'Tesis A', score: 0.9, read_state: 'read', created_at: '2026-01-01T00:00:00.000Z' },
-    ],
+    research_questions: [],
     ...(overrides.tables ?? {}),
   };
 
@@ -147,9 +134,8 @@ export function academicSnapshot(overrides = {}) {
     capabilities: { includesUserContent: true, includesPassages: true, hasAssets: assets.length > 0 },
     assets,
     tables,
-    ...(overrides.library ? { library: overrides.library } : {}),
   };
-  const revision = createHash('sha256').update(JSON.stringify({ vault: payload.vault, assets, tables, library: payload.library })).digest('base64url');
+  const revision = createHash('sha256').update(JSON.stringify({ vault: payload.vault, assets, tables })).digest('base64url');
   return { payload, revision, gzipped: gzipSync(Buffer.from(JSON.stringify(payload))) };
 }
 

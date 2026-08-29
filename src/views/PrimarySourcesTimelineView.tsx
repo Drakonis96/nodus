@@ -141,9 +141,7 @@ function EventCard({
   );
 }
 
-export type PrimarySourcesTimelineLoader = { getPrimarySourceTimelineWorkspace: () => Promise<PrimarySourceTimelineWorkspace> };
-
-export function PrimarySourcesTimelineView({ loader }: { loader?: PrimarySourcesTimelineLoader } = {}) {
+export function PrimarySourcesTimelineView() {
   const [attention, setAttention] = useState(() => consumePrimarySourceAttention(['event_evidence']));
   const [workspace, setWorkspace] = useState<PrimarySourceTimelineWorkspace | null>(null);
   const [mode, setMode] = useState<TimelineMode>('timeline');
@@ -163,7 +161,7 @@ export function PrimarySourcesTimelineView({ loader }: { loader?: PrimarySources
 
   useEffect(() => {
     let cancelled = false;
-    (loader?.getPrimarySourceTimelineWorkspace ?? window.nodus.getPrimarySourceTimelineWorkspace)()
+    window.nodus.getPrimarySourceTimelineWorkspace()
       .then((data) => {
         if (cancelled) return;
         setWorkspace(data);
@@ -173,7 +171,7 @@ export function PrimarySourcesTimelineView({ loader }: { loader?: PrimarySources
         if (!cancelled) setError(cause instanceof Error ? cause.message : String(cause));
       });
     return () => { cancelled = true; };
-  }, [loader]);
+  }, []);
 
   const filtered = useMemo(() => {
     const query = search.trim().toLocaleLowerCase();
@@ -223,7 +221,7 @@ export function PrimarySourcesTimelineView({ loader }: { loader?: PrimarySources
   ];
 
   return (
-    <div className="flex h-full min-h-0 flex-col bg-neutral-50 text-neutral-900 dark:bg-neutral-950 dark:text-neutral-100" data-testid="primary-sources-timeline-view">
+    <div className="flex h-full min-h-0 flex-col bg-neutral-50 text-neutral-900 dark:bg-neutral-950 dark:text-neutral-100">
       <header className="shrink-0 border-b border-neutral-200 bg-white px-5 py-4 dark:border-neutral-800 dark:bg-neutral-950">
         {attention && (
           <div className="mb-3 flex items-center gap-2 rounded-lg bg-indigo-50 px-3 py-2 text-[10px] text-indigo-800 dark:bg-indigo-950/40 dark:text-indigo-200">

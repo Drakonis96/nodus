@@ -28,21 +28,11 @@ export function renderInline(text: string): string {
 
 function inlineEmphasis(escaped: string): string {
   return escaped
-    .replace(/\[([^\]]+)\]\(([^)\s]+)\)/g, (_m, label, url) => `<a href="${safeHref(url)}">${label}</a>`)
+    .replace(/\[([^\]]+)\]\(([^)\s]+)\)/g, (_m, label, url) => `<a href="${url}">${label}</a>`)
     .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
     .replace(/__([^_]+)__/g, '<strong>$1</strong>')
     .replace(/(^|[^*])\*([^*\n]+)\*/g, '$1<em>$2</em>')
     .replace(/(^|[^_])_([^_\n]+)_/g, '$1<em>$2</em>');
-}
-
-// Markdown may arrive from a published snapshot or a private draft. Keep useful web and
-// in-document links, but never let a document turn into a javascript/data URL when this
-// converter is used to produce HTML for a browser or an export.
-function safeHref(value: string): string {
-  const href = String(value ?? '').trim();
-  if (/^(?:https?:\/\/|mailto:|#)/i.test(href)) return href;
-  if (/^[a-z][a-z0-9+.-]*:/i.test(href) || href.startsWith('//')) return '#';
-  return href;
 }
 
 function isTableSeparator(line: string): boolean {

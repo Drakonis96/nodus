@@ -1468,10 +1468,6 @@ export type PromptLanguage = (typeof PROMPT_LANGUAGES)[number];
 export interface ModelRef {
   provider: AiProvider;
   model: string;
-  /** Set only at a portable-profile boundary when a local/downloadable model
-   * cannot be executed by Server. It is an assignment marker, never a model
-   * fallback; Desktop may resolve it locally. */
-  pending?: boolean;
   /**
    * The reasoning level chosen for THIS assignment. It rides on the selection rather
    * than living in a map keyed by model id, which is what keeps two roles running the
@@ -1994,10 +1990,6 @@ export interface AppSettings {
   nodusServerIncludeUserContent: boolean;
   /** Include citable extracted passages. Off by default because full text may be licensed. */
   nodusServerIncludePassages: boolean;
-  /** Publish the reviewed primary-source projection for a primary_sources vault. */
-  nodusServerIncludePrimarySources: boolean;
-  /** Publish textual testimony projection; participant/media/agreement rows remain private. */
-  nodusServerIncludeTestimonies: boolean;
   /**
    * Publish the global library catalogue plus Clean Markdown/figure packages.
    * Independent from passages and authored vault content, and off by default because it may
@@ -4512,8 +4504,6 @@ export interface NodusServerConnection {
   includePassages: boolean;
   includeLibraryDocuments: boolean;
   includeVectors: boolean;
-  includePrimarySources: boolean;
-  includeTestimonies: boolean;
   phase: NodusServerSyncPhase;
   lastSyncAt: string | null;
   lastError: string | null;

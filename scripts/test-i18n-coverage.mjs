@@ -446,20 +446,6 @@ function isNotTranslatable(v) {
  * the literal scan can't see the string because it lives in a const, not in the call.
  */
 function collectMapLabels(src, file, record, unescape) {
-  const translatedObjectIteration = (name) => {
-    const uses = src.matchAll(new RegExp(`\\bObject\\.(?:entries|values)\\(\\s*${name}\\s*\\)`, 'g'));
-    for (const use of uses) {
-      const start = (use.index ?? 0) + use[0].length;
-      const statementEnd = src.indexOf(';', start);
-      const end = statementEnd < 0 ? src.length : statementEnd;
-      const chain = src.slice(start, end);
-      const iteration = /\.(?:map|flatMap|forEach)\s*\(/g.exec(chain);
-      if (!iteration) continue;
-      const openParen = start + iteration.index + iteration[0].lastIndexOf('(');
-      if (/\bt[x]?\s*\(/.test(sliceBalanced(src, openParen))) return true;
-    }
-    return false;
-  };
   const defRe = /\b(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*(?::[^=\n]*)?=\s*([[{])/g;
   let m;
   while ((m = defRe.exec(src))) {
@@ -469,7 +455,7 @@ function collectMapLabels(src, file, record, unescape) {
     const consumed =
       new RegExp(`\\bt[x]?\\([^)]*\\b${name}\\s*\\[`).test(src) ||           // t(NAME[..]) incl. ternaries
       new RegExp(`\\bt[x]?\\(\\s*${name}\\s*\\)`).test(src) ||               // t(NAME)
-      translatedObjectIteration(name) ||
+      new RegExp(`\\bObject\\.(?:entries|values)\\(\\s*${name}\\s*\\)`).test(src) ||
       // array of primitive strings mapped with a t() in the file: t(element). An array
       // of OBJECTS (contains `{`) is mapped by its fields, not its elements → skip.
       (isArray && !body.includes('{') && new RegExp(`\\b${name}\\.(?:map|flatMap|forEach)\\(`).test(src) && /\bt[x]?\(/.test(src));

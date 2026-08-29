@@ -75,18 +75,12 @@ test('every collection endpoint answers with the MCP page envelope and honours i
     assert.equal(idea.idea.global_id, 'i-a');
     assert.deepEqual(idea.themes, ['Memoria']);
     assert.equal(idea.evidence.length, 1);
-    assert.equal(idea.occurrences[0].workTitle, 'Memoria y archivo');
-    assert.equal(idea.occurrences[0].work.nodus_id, 'w-1');
     // e-hidden is vetoed in edge_feedback, stored in the reverse direction.
     assert.deepEqual(idea.relations.map((edge) => edge.id).sort(), ['e-ab', 'e-sup']);
-    assert.ok(idea.relations.every((edge) => edge.other_id && edge.other_label));
 
     const work = await readJson(await server.api(reader.deviceToken, 'GET', `/api/v1/spaces/${spaceId}/works/w-1`));
     assert.deepEqual(work.work.authors, ['Alba, Rosa'], 'authors_json is parsed, as toView() does');
     assert.equal(work.passages, 1);
-    assert.equal(work.occurrences[0].idea.global_id, 'i-a');
-    assert.equal(work.evidence[0].id, 'ev-1');
-    assert.ok(work.relations.some((edge) => edge.from_label === 'Tesis A'));
 
     const author = await readJson(await server.api(reader.deviceToken, 'GET', `/api/v1/spaces/${spaceId}/authors/a-1`));
     assert.deepEqual(author.works.map((entry) => entry.nodus_id), ['w-1']);
@@ -98,24 +92,6 @@ test('every collection endpoint answers with the MCP page envelope and honours i
     const session = await readJson(await server.api(reader.deviceToken, 'GET', `/api/v1/spaces/${spaceId}/immersion/im-1`));
     assert.ok(session.session.plan, 'the immersion plan replays without new AI calls');
     assert.equal('progress' in session.session, false, "another device's progress is not served");
-
-    const stateOfArt = await readJson(await server.api(reader.deviceToken, 'GET', `/api/v1/spaces/${spaceId}/state-of-art`));
-    assert.equal(stateOfArt.questions.length, 1);
-    assert.equal(stateOfArt.questions[0].subQuestions[0].links[0].refId, 'i-a');
-    assert.deepEqual(stateOfArt.questions[0].summary, { covered: 0, partial: 1, uncovered: 0, disputed: 0, unmapped: 0 });
-    assert.equal(stateOfArt.questions[0].stale, true, 'the published corpus has grown beyond the mapped baseline');
-    assert.equal(stateOfArt.debates.length, 2);
-    assert.equal(stateOfArt.gaps[0].work.title, 'Memoria y archivo');
-    assert.equal(stateOfArt.gaps[0].idea.global_id, 'i-a');
-
-    const reading = await readJson(await server.api(reader.deviceToken, 'GET', `/api/v1/spaces/${spaceId}/reading-path?strategy=connected_authors&limit=36&includeRead=1`));
-    assert.equal(reading.strategy, 'connected_authors');
-    assert.equal(reading.totalWorks, 2);
-    assert.equal(reading.readCount, 0);
-    assert.equal(reading.unreadCount, 2);
-    assert.ok(reading.phases.every((phase) => phase.entries.every((entry) => entry.analysis && 'deepStatus' in entry.analysis)), 'reading cards receive Desktop analysis metadata');
-    const withoutRead = await readJson(await server.api(reader.deviceToken, 'GET', `/api/v1/spaces/${spaceId}/reading-path?limit=36&includeRead=0`));
-    assert.equal(withoutRead.shownWorks, 2);
 
     assert.equal((await server.api(reader.deviceToken, 'GET', `/api/v1/spaces/${spaceId}/ideas/does-not-exist`)).status, 404);
   });
@@ -217,8 +193,6 @@ test('the styled report document carries its cover image, and says so when it ca
     const document = await server.api(owner.deviceToken, 'GET', `/api/v1/spaces/${spaceId}/deep-research/dr-3/document.html`);
     assert.equal(document.status, 200);
     assert.equal(document.headers.get('content-type'), 'text/html; charset=utf-8');
-    assert.equal(document.headers.get('x-frame-options'), 'SAMEORIGIN');
-    assert.match(document.headers.get('content-security-policy') || '', /frame-ancestors 'self'/);
     const html = await document.text();
     assert.match(html, /^<!doctype html>/);
     // The cover image reaches the page as bytes, not as a link: whatever prints this document
@@ -472,8 +446,6 @@ test('the REST API and the MCP tools answer the same questions the same way', { 
       mcpSearch.result.structuredContent.results.map((hit) => `${hit.type}:${hit.id}`),
       'both surfaces share one lexical search implementation',
     );
-    const authorSearch = await readJson(await server.api(owner.deviceToken, 'GET', `/api/v1/spaces/${spaceId}/search?q=Alba`));
-    assert.ok(authorSearch.results.some((entry) => entry.type === 'authors' && entry.id === 'a-1'), 'Desktop Search includes author rows');
 
     // Every hit must be nameable, on both surfaces. This is not decoration: the mobile
     // client types `id` as a plain string, so ONE hit without it fails the decode and the
@@ -671,9 +643,6 @@ test('a person dossier returns the relationships that name them', { timeout: 60_
         { rel_id: 'r-2', from_person: 'per-2', to_person: 'per-3', type: 'parent', created_at: '2026-01-01T00:00:00.000Z' },
         { rel_id: 'r-3', from_person: 'per-1', to_person: 'per-2', type: 'spouse', created_at: '2026-01-01T00:00:00.000Z' },
       ],
-      places: [{ place_id: 'place-1', name: 'Madrid', kind: 'city' }],
-      events: [{ event_id: 'event-1', type: 'birth', label: 'Nacimiento de Marta', date: '1975', date_sort: '1975-01-01', place_id: 'place-1' }],
-      event_participants: [{ event_id: 'event-1', person_id: 'per-3', role: 'principal' }],
     };
     const payload = {
       format: 'nodus.server-snapshot',
@@ -700,67 +669,5 @@ test('a person dossier returns the relationships that name them', { timeout: 60_
 
     const marta = await (await server.api(owner.deviceToken, 'GET', `/api/v1/spaces/${spaceId}/persons/per-3`)).json();
     assert.equal(marta.relationships.length, 2, 'Marta is named by both parent edges');
-    const timeline = await (await server.api(owner.deviceToken, 'GET', `/api/v1/spaces/${spaceId}/events`)).json();
-    assert.equal(timeline.events[0].place_name, 'Madrid');
-    assert.deepEqual(timeline.events[0].participants, [{ personId: 'per-3', displayName: 'Marta Ruiz', role: 'principal' }]);
-  });
-});
-
-test('world map publication keeps canvas assets and map workbench data in Web details', { timeout: 60_000 }, async () => {
-  await withServer({ label: 'world-map-detail' }, async (server) => {
-    const spaceId = await server.createSpace('World');
-    const owner = await server.deviceToken(server.adminEmail, server.adminPassword, spaceId);
-    const hash = sha256(PNG_BYTES);
-    await server.api(owner.deviceToken, 'POST', `/api/v1/spaces/${spaceId}/assets/${hash}`, {
-      body: PNG_BYTES, headers: { 'content-type': 'image/png' },
-    });
-    await publish(server.origin, owner.deviceToken, spaceId, academicSnapshot({
-      vault: { id: 'vault-world', name: 'World', type: 'worldbuilding' },
-      assets: [{ hash, thumbHash: null, mime: 'image/png', thumbMime: null, bytes: PNG_BYTES.length, thumbBytes: null, kind: 'world_map_image', table: 'map_images', key: ['mi-1'] }],
-      tables: {
-        world_maps: [
-          { map_id: 'm-root', name: 'Atlas', kind: 'world', parent_map_id: null, place_id: null, image_id: null, width_px: 1000, height_px: 500, notes: 'Mapa raíz', updated_at: '2026-01-01T00:00:00.000Z' },
-          { map_id: 'm-1', name: 'Costa', kind: 'region', parent_map_id: 'm-root', place_id: 'p-1', image_id: 'mi-1', width_px: 1000, height_px: 500, notes: 'Costa oriental', updated_at: '2026-01-02T00:00:00.000Z' },
-        ],
-        places: [{ place_id: 'p-1', name: 'Puerto', kind: 'city' }],
-        map_layers: [{ layer_id: 'l-1', map_id: 'm-1', name: 'Política', sort_order: 0 }],
-        map_markers: [{ marker_id: 'mk-1', map_id: 'm-1', layer_id: 'l-1', place_id: 'p-1', child_map_id: null, label: 'Puerto', geometry_kind: 'point', x: 0.4, y: 0.5, sort_order: 0 }],
-        map_travel_modes: [{ mode_id: 'walk', name: 'A pie', distance_per_day: 20, unit: 'km', sort_order: 0 }],
-      },
-    }));
-    const maps = await readJson(await server.api(owner.deviceToken, 'GET', `/api/v1/spaces/${spaceId}/world-maps`));
-    assert.equal(maps.total, 2);
-    assert.equal(maps.maps.find((map) => map.map_id === 'm-1').image.hash, hash);
-    const detail = await readJson(await server.api(owner.deviceToken, 'GET', `/api/v1/spaces/${spaceId}/world-maps/m-1`));
-    assert.equal(detail.map.map_id, 'm-1');
-    assert.deepEqual(detail.ancestry.map((map) => map.map_id), ['m-root', 'm-1']);
-    assert.equal(detail.layers[0].layer_id, 'l-1');
-    assert.equal(detail.markers[0].place_name, 'Puerto');
-    assert.equal(detail.travelModes[0].mode_id, 'walk');
-  });
-});
-
-test('world encyclopedia publication aggregates entities without inventing rows', { timeout: 60_000 }, async () => {
-  await withServer({ label: 'world-entries' }, async (server) => {
-    const spaceId = await server.createSpace('Mundo');
-    const owner = await server.deviceToken(server.adminEmail, server.adminPassword, spaceId);
-    const payload = academicSnapshot({ vault: { id: 'vault-world', name: 'Mundo', type: 'worldbuilding' }, tables: {
-      world_articles: [{ article_id: 'a-1', title: 'La magia', body: 'Una ley antigua.', aka: 'Arcanos', category: 'magic', updated_at: '2026-01-01' }],
-      persons: [{ person_id: 'p-1', display_name: 'Iria', biography: 'Guardiana del umbral.', updated_at: '2026-01-02' }],
-      person_names: [{ person_id: 'p-1', name: 'Iria la Roja' }],
-      character_profiles: [{ person_id: 'p-1', species: 'humana', narrative_role: 'protagonist' }],
-      world_groups: [{ group_id: 'g-1', name: 'La Guardia', kind: 'faction', description: 'Protege la frontera.', updated_at: '2026-01-03' }],
-      world_scenes: [{ scene_id: 's-1', title: 'El umbral', summary: 'Una llegada.', status: 'draft', updated_at: '2026-01-04' }],
-      world_rules: [{ rule_id: 'r-1', title: 'Toda magia deja huella', statement: 'La magia tiene un coste.', hardness: 'hard', updated_at: '2026-01-05' }],
-      world_threads: [{ thread_id: 't-1', title: 'La guerra', kind: 'conflict', pitch: 'Dos reinos chocan.', status: 'open', updated_at: '2026-01-06' }],
-      world_maps: [{ map_id: 'm-1', name: 'El continente', kind: 'world', notes: 'Costa y montañas.', updated_at: '2026-01-07' }],
-    }});
-    await publish(server.origin, owner.deviceToken, spaceId, payload);
-    const list = await readJson(await server.api(owner.deviceToken, 'GET', `/api/v1/spaces/${spaceId}/world-entries`));
-    assert.equal(list.total, 7);
-    assert.ok(list.entries.some((entry) => entry.key === 'character:p-1' && entry.aliases.includes('Iria la Roja')));
-    const detail = await readJson(await server.api(owner.deviceToken, 'GET', `/api/v1/spaces/${spaceId}/world-entries/character:p-1`));
-    assert.equal(detail.entry.title, 'Iria');
-    assert.match(detail.body, /Guardiana/);
   });
 });

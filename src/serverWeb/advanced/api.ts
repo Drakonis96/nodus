@@ -6,7 +6,6 @@ import type {
   AdvancedGraphResponse,
   AdvancedIdea,
   AdvancedIdeaDetail,
-  AdvancedWorkDetail,
   AdvancedPage,
 } from './types';
 
@@ -62,9 +61,7 @@ export const advancedRest = {
     surface: 'workspace', offset: query.offset ?? 0, limit: query.limit ?? 80, q: query.q, type: query.type, sort: query.sort ?? 'label',
   })).then((response) => page<AdvancedIdea>(response, 'ideas')),
   idea: (spaceId: string, ideaId: string) => api.detail(spaceId, 'ideas', ideaId).then((response) => response as AdvancedIdeaDetail),
-  work: (spaceId: string, workId: string) => api.detail(spaceId, 'works', workId).then((response) => response as AdvancedWorkDetail),
   ideaGraph: (spaceId: string, ideaId: string, depth = 2, limit = 200) => getJson<AdvancedGraphResponse>(`/api/v1/spaces/${encoded(spaceId)}/ideas/${encoded(ideaId)}/graph?depth=${Math.max(1, Math.min(3, depth))}&limit=${Math.max(1, Math.min(200, limit))}`),
-  graph: (spaceId: string, limit = 2_000) => getJson<AdvancedGraphResponse>(`/api/v1/spaces/${encoded(spaceId)}/graph?limit=${Math.max(1, Math.min(2_000, limit))}`),
   authors: (spaceId: string, query: AuthorsQuery = {}) => api.collection(spaceId, 'authors', queryParams({
     surface: 'workspace', offset: query.offset ?? 0, limit: query.limit ?? 80, q: query.q, synthesis: query.synthesis ?? 'all', sort: query.sort ?? 'surname',
   })).then((response) => page<AdvancedAuthor>(response, 'authors')),

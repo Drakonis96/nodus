@@ -30,23 +30,6 @@ export type AdvancedIdeaDetail = {
   revision?: string;
 };
 
-export type AdvancedWorkDetail = {
-  work: Record<string, unknown> & { nodus_id?: string; title?: string; abstract?: string; citation?: string };
-  ideas: Array<Record<string, unknown> & { global_id?: string; label?: string; type?: string; statement?: string }>;
-  summary: Record<string, unknown> | null;
-  passages: number;
-  documentProfile: null | {
-    state?: Record<string, unknown>;
-    version?: Record<string, unknown>;
-    fields?: Array<Record<string, unknown>>;
-    sections?: Array<Record<string, unknown>>;
-    supports?: Array<Record<string, unknown>>;
-    ideaLinks?: Array<Record<string, unknown>>;
-    citationPolicy?: string;
-  };
-  revision?: string;
-};
-
 export type AdvancedAuthor = {
   author_id: string;
   name: string;
@@ -136,7 +119,7 @@ export type AdvancedGraphResponse = {
 
 /** Convert the intentionally loose REST graph rows to the shared Sigma input. */
 export function toGraphData(payload: AdvancedGraphResponse): GraphData {
-  const ideaNodes: GraphNode[] = payload.ideas.map((row, index) => {
+  const nodes: GraphNode[] = payload.ideas.map((row, index) => {
     const id = String(row.global_id ?? row.id ?? index);
     const rawType = String(row.type ?? 'claim');
     const type = (['claim', 'finding', 'construct', 'method', 'framework', 'theme'].includes(rawType)
@@ -157,29 +140,8 @@ export function toGraphData(payload: AdvancedGraphResponse): GraphData {
       createdAt: row.createdAt == null ? null : String(row.createdAt),
     };
   });
-  // The published REST projection is intentionally idea-centric. Sigma's
-  // progressive Desktop atlas, however, requires explicit theme nodes and
-  // membership edges. Reconstruct those losslessly from each idea's published
-  // theme labels so the first scene is the same constellation as Desktop.
-  const themeLabels = [...new Set(ideaNodes.flatMap((node) => node.themes).map((label) => label.trim()).filter(Boolean))];
-  const themeId = (label: string) => `theme:${encodeURIComponent(label.trim().toLocaleLowerCase())}`;
-  const themeNodes: GraphNode[] = themeLabels.map((label) => ({
-    id: themeId(label),
-    label,
-    type: 'theme',
-    statement: '',
-    workCount: ideaNodes.filter((node) => node.themes.includes(label)).length,
-    workIds: [],
-    read: true,
-    themes: [label],
-    years: [],
-    authors: [],
-    maxConfidence: 1,
-    createdAt: null,
-  }));
-  const nodes = [...themeNodes, ...ideaNodes];
   const nodeIds = new Set(nodes.map((node) => node.id));
-  const semanticEdges: GraphEdge[] = payload.edges.flatMap((row, index) => {
+  const edges: GraphEdge[] = payload.edges.flatMap((row, index) => {
     const source = String(row.source ?? row.from_id ?? '');
     const target = String(row.target ?? row.to_id ?? '');
     if (!source || !target || !nodeIds.has(source) || !nodeIds.has(target)) return [];
@@ -192,14 +154,5 @@ export function toGraphData(payload: AdvancedGraphResponse): GraphData {
       confidence: Number(row.confidence ?? 0) || 0,
     }];
   });
-  const membershipEdges: GraphEdge[] = ideaNodes.flatMap((node) => node.themes.map((label, index) => ({
-    id: `contains:${themeId(label)}:${node.id}:${index}`,
-    source: themeId(label),
-    target: node.id,
-    type: 'contains',
-    basis: 'inferred',
-    confidence: 1,
-  })));
-  const edges = [...semanticEdges, ...membershipEdges];
   return { nodes, edges };
 }

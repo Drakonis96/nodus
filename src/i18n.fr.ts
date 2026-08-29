@@ -42,13 +42,13 @@ import { DATABASE_TASK_TRANSLATIONS } from './i18n.databaseTasks';
 import { DATABASE_AUTOMATION_TRANSLATIONS } from './i18n.databaseAutomations';
 import { NOTION_IMPORT_TRANSLATIONS } from './i18n.notionImport';
 import { LIBRARY_ONBOARDING_TRANSLATIONS } from './i18n.libraryOnboarding';
+import { LIBRARY_TUTORIAL_TRANSLATIONS } from './i18n.libraryTutorial';
 import { SOURCE_CITATION_TRANSLATIONS } from './i18n.sourceCitation';
 import { DEEP_RESEARCH_APPROACH_TRANSLATIONS } from './i18n.deepResearchApproaches';
 import { DICTIONARY_TRANSLATIONS } from './i18n.dictionary';
 import { DEEP_RESEARCH_VERSION_TRANSLATIONS } from './i18n.deepResearchVersions';
 import { DOCUMENT_UNDERSTANDING_TRANSLATIONS } from './i18n.documentUnderstanding';
 import { DEEP_RESEARCH_QUALITY_TRANSLATIONS } from './i18n.deepResearchQuality';
-import { DOCUMENT_UNDERSTANDING_CONSENT_TRANSLATIONS } from './i18n.documentUnderstandingConsent';
 import { MODEL_SETTINGS_TRANSLATIONS } from './i18n.modelSettings';
 import { DATABASE_DEEP_RESEARCH_TRANSLATIONS } from './i18n.databaseDeepResearch';
 
@@ -72,9 +72,9 @@ export const FR: Record<string, string> = {
   ...DEEP_RESEARCH_VERSION_TRANSLATIONS.fr,
   ...DOCUMENT_UNDERSTANDING_TRANSLATIONS.fr,
   ...DEEP_RESEARCH_QUALITY_TRANSLATIONS.fr,
-  ...DOCUMENT_UNDERSTANDING_CONSENT_TRANSLATIONS.fr,
   ...LIBRARY_BIBLIOGRAPHY_TRANSLATIONS.fr,
   ...LIBRARY_ONBOARDING_TRANSLATIONS.fr,
+  ...LIBRARY_TUTORIAL_TRANSLATIONS.fr,
   ...LIBRARY_RECOVERY_TRANSLATIONS.fr,
   ...DIARIZATION_TRANSLATIONS.fr,
   ...PROSOPOGRAPHY_TRANSLATIONS.fr,
@@ -2045,6 +2045,8 @@ export const FR: Record<string, string> = {
   'Conectado (userID {id})': 'Connecté (userID {id})',
   'No disponible: {msg}': 'Indisponible : {msg}',
   'sin respuesta': 'aucune réponse',
+  'Comprueba que Zotero esté abierto y que «Permitir que otras aplicaciones de este ordenador se comuniquen con Zotero» esté activado en los ajustes Avanzados de Zotero.':
+    'Vérifiez que Zotero est ouvert et que « Autoriser les autres applications de cet ordinateur à communiquer avec Zotero » est activé dans les réglages Avancés de Zotero.',
   'Elige las colecciones a monitorizar. Se incorporan metadatos; los análisis se lanzan manualmente salvo que actives automatización en Ajustes.':
     'Choisissez les collections à surveiller. Les métadonnées sont importées ; les analyses sont lancées manuellement, sauf si vous activez l\'automatisation dans les paramètres.',
   'ítems': 'éléments',
@@ -8272,17 +8274,18 @@ export const FR: Record<string, string> = {
   "En Zotero: Herramientas → Complementos → ⚙ → Instalar complemento desde archivo.": "Dans Zotero : Outils → Extensions → ⚙ → Installer un module depuis un fichier.",
   "Guardar .xpi para Zotero": "Enregistrer le .xpi pour Zotero",
   "Ver instrucciones de instalación": "Voir les instructions d’installation",
-  "Publicar fuentes primarias revisadas": "Publier les sources primaires vérifiées",
-  "Incluye metadatos, extractos y análisis; nunca archivos originales, rutas locales ni datos privados.": "Inclut les métadonnées, les extraits et les analyses ; jamais les fichiers originaux, les chemins locaux ni les données privées.",
-  "Publicar testimonios textuales": "Publier les témoignages textuels",
-  "Incluye entrevistas, transcripciones y análisis; participantes, acuerdos y archivos multimedia permanecen privados.": "Inclut les entretiens, les transcriptions et les analyses ; les participants, les accords et les fichiers multimédias restent privés.",
-  "Espacio de trabajo": "Espace de travail",
-  "notas, borradores y organización": "notes, brouillons et organisation",
-  "Organiza notas, borradores y materiales en un único espacio con citas verificables.": "Organisez notes, brouillons et documents dans un espace unique avec des citations vérifiables.",
-  "Organiza el trabajo del corpus": "Organisez le travail du corpus",
-  "Ya hay suficientes ideas y fuentes para organizar notas y borradores con citas verificables en un único espacio de trabajo.": "Il y a assez d’idées et de sources pour organiser notes et brouillons avec des citations vérifiables dans un espace unique.",
-  "Abrir espacio de trabajo": "Ouvrir l’espace de travail",
-  "Espacio de trabajo: notas y borradores con fuentes verificables": "Espace de travail : notes et brouillons avec sources vérifiables",
-  "El Espacio de trabajo reúne notas, borradores y organización en una única superficie. Conserva las citas clicables y permite estructurar el manuscrito sin separar artificialmente Escritura y Proyectos.": "L’Espace de travail réunit notes, brouillons et organisation dans une seule surface. Il conserve les citations cliquables et permet de structurer le manuscrit sans séparer artificiellement Écriture et Projets.",
-  "Revisa, amplía y transforma borradores en el Espacio de trabajo.": "Révisez, développez et transformez les brouillons dans l’Espace de travail.",
+  "Leyendo colecciones…": "Lecture des collections…",
+  "Catalogando…": "Catalogage…",
+  "Leyendo notas…": "Lecture des notes…",
+  "Copiando archivos…": "Copie des fichiers…",
+  "Verificando el índice local…": "Vérification de l’index local…",
+  "Importación completada": "Importation terminée",
+  "Importación cancelada": "Importation annulée",
+  "No se pudo completar la importación": "L’importation n’a pas pu être terminée",
+  "Cancelar importación": "Annuler l’importation",
+  "Ocultar la importación terminada": "Masquer l’importation terminée",
+  "Importar archivos sueltos (sin ficha bibliográfica)": "Importer les fichiers isolés (sans notice bibliographique)",
+  "PDFs y EPUBs añadidos a Zotero sin una entrada encima. Llegan sin autor ni año.": "PDF et EPUB ajoutés à Zotero sans notice au-dessus. Ils arrivent sans auteur ni année.",
+  "Archivos sueltos no importados": "Fichiers isolés non importés",
+  "Tu biblioteca tiene {n} archivo(s) sin ficha bibliográfica. Marca la casilla de arriba y vuelve a importar si los quieres.": "Votre bibliothèque contient {n} fichier(s) sans notice bibliographique. Cochez la case ci-dessus et relancez l’importation si vous les voulez.",
 };

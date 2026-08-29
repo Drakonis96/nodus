@@ -2102,24 +2102,6 @@ export function Settings({
                         </div>
                         <input type="checkbox" checked={settings.nodusServerIncludeUserContent} onChange={(event) => void patch({ nodusServerIncludeUserContent: event.target.checked })} />
                       </div>
-                      {conn.vaultType === 'primary_sources' && (
-                        <div className="flex items-center justify-between gap-4">
-                          <div>
-                            <label className="text-sm text-neutral-700 dark:text-neutral-300">{t('Publicar fuentes primarias revisadas')}</label>
-                            <p className="mt-0.5 text-xs text-amber-700 dark:text-amber-400">{t('Incluye metadatos, extractos y análisis; nunca archivos originales, rutas locales ni datos privados.')}</p>
-                          </div>
-                          <input type="checkbox" checked={settings.nodusServerIncludePrimarySources} onChange={(event) => void patch({ nodusServerIncludePrimarySources: event.target.checked })} />
-                        </div>
-                      )}
-                      {conn.vaultType === 'testimonios' && (
-                        <div className="flex items-center justify-between gap-4">
-                          <div>
-                            <label className="text-sm text-neutral-700 dark:text-neutral-300">{t('Publicar testimonios textuales')}</label>
-                            <p className="mt-0.5 text-xs text-amber-700 dark:text-amber-400">{t('Incluye entrevistas, transcripciones y análisis; participantes, acuerdos y archivos multimedia permanecen privados.')}</p>
-                          </div>
-                          <input type="checkbox" checked={settings.nodusServerIncludeTestimonies} onChange={(event) => void patch({ nodusServerIncludeTestimonies: event.target.checked })} />
-                        </div>
-                      )}
                       <div className="flex items-center justify-between gap-4">
                         <div>
                           <label className="text-sm text-neutral-700 dark:text-neutral-300">{t('Incluir pasajes extraídos')}</label>
@@ -3731,7 +3713,7 @@ const VAULT_MODEL_FIELDS: Record<VaultModelKey, string> = {
   chatModel: 'Chat con el corpus',
   deepResearchModel: 'Deep Research',
   immersionModel: 'Inmersión',
-  writingModel: 'Espacio de trabajo',
+  writingModel: 'Taller de escritura',
   argumentMapModel: 'Mapa argumental',
   authorModel: 'Autores y biografías',
   dictionaryModel: 'Diccionario',
@@ -3744,7 +3726,7 @@ const VAULT_MODEL_HINTS: Record<VaultModelKey, string> = {
   chatModel: 'Responde preguntas sobre el corpus y cita la evidencia utilizada.',
   deepResearchModel: 'Planifica y redacta informes extensos a partir de fuentes y relaciones.',
   immersionModel: 'Genera sesiones guiadas de lectura y trabajo con las fuentes.',
-  writingModel: 'Revisa, amplía y transforma borradores en el Espacio de trabajo.',
+  writingModel: 'Revisa, amplía y transforma borradores en el Taller de escritura.',
   argumentMapModel: 'Construye mapas de tesis, razones, objeciones y evidencias.',
   authorModel: 'Sintetiza perfiles de autor y redacta biografías basadas en el corpus.',
   dictionaryModel: 'Genera y actualiza definiciones del Diccionario desde la evidencia.',

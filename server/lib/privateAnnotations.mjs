@@ -51,10 +51,6 @@ export function sanitizeAnnotation(input, now = new Date().toISOString()) {
     id,
     resource: plainText(input.resource ?? input.resourceType ?? input.table ?? 'record', 128) || 'record',
     documentId: plainText(input.documentId ?? input.document_id ?? input.draftId ?? '', 512) || null,
-    // Reader renderings (for example a report and one of its translations) share
-    // a document id but need independent anchors. Preserve the optional scope in
-    // the account-private sidecar; older rows remain source-scoped.
-    scope: plainText(input.scope ?? 'source', 256) || 'source',
     kind: ANNOTATION_KINDS.has(requestedKind) ? requestedKind : 'comment',
     title: plainText(input.title ?? input.label ?? '', 160),
     quote: plainText(input.quote ?? input.selectedText ?? input.quoteSnapshot ?? '', 20_000),

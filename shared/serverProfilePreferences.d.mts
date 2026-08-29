@@ -16,18 +16,14 @@ export type ServerProfilePreferences = {
     models: Record<string, ModelRef | null>; chatReasoning: AppSettings['chatReasoning'];
     codexReasoningEfforts: Record<string, string>; preferFastOpenRouter: boolean;
     providerFreeTier: Record<string, boolean>;
-    /** Role names whose Desktop assignment requires a local/downloadable runtime. */
-    pendingAssignments: string[];
-    image: { provider: string; model: string; quality: string; style: string; pending?: boolean };
-    audio: { provider: string; voice: string; speed: number; pending?: boolean };
+    image: { provider: string; model: string; quality: string; style: string };
+    audio: { provider: string; voice: string; speed: number };
     studyPolicy: { enabled: boolean; privacyMode: AppSettings['studyAiPrivacyMode']; confirmExternal: boolean; monthlyBudgetUsd: number; budgetWarningPercent: number; maxInputChars: number; maxOutputTokens: number; temperature: number; retryCount: number; studentPseudonyms: boolean };
   };
   workspace: { sidebarOrder: string[]; sidebarHidden: string[]; sidebarCustomized: boolean; concurrency: number; deepContextMode: AppSettings['deepContextMode']; standardChunkWords: number; longChunkWords: number };
 };
 
 export class ServerProfilePreferenceError extends Error { code: string }
-export function isLocalServerModel(provider: unknown, model?: unknown): boolean;
 export function extractServerProfilePreferences(settings: AppSettings): ServerProfilePreferences;
-export function desktopSettingsPatchFromServerProfile(profile: ServerProfilePreferences): Partial<AppSettings>;
 export function sanitizeServerProfilePreferences(value: unknown): ServerProfilePreferences;
 export function aiPreferencesFromServerProfile(profile: ServerProfilePreferences, supportedProviders?: readonly string[]): Record<string, unknown>;

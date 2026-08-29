@@ -37,7 +37,7 @@ if (!process.argv.includes('--electron-vaults-test')) {
         '--format=cjs',
         '--target=es2022',
         `--outfile=${bundle}`,
-        `--alias:electron=${path.join(repoRoot, 'scripts/stub-electron-safe-storage.mjs')}`,
+        `--alias:electron=${path.join(repoRoot, 'scripts/stub-electron.mjs')}`,
         '--external:better-sqlite3',
       ],
       { cwd: repoRoot, stdio: 'inherit' }

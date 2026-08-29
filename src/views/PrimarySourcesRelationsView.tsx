@@ -23,9 +23,7 @@ function dateInterval(edge: PrimarySourceRelationEdge): string {
   return edge.dateDisplay;
 }
 
-export type PrimarySourcesRelationsLoader = { getPrimarySourceRelationsWorkspace: () => Promise<PrimarySourceRelationsWorkspace> };
-
-export function PrimarySourcesRelationsView({ loader }: { loader?: PrimarySourcesRelationsLoader } = {}) {
+export function PrimarySourcesRelationsView() {
   const [attention, setAttention] = useState(() => consumePrimarySourceAttention(['relation_evidence']));
   const [workspace, setWorkspace] = useState<PrimarySourceRelationsWorkspace | null>(null);
   const [mode, setMode] = useState<'graph' | 'table'>('graph');
@@ -41,7 +39,7 @@ export function PrimarySourcesRelationsView({ loader }: { loader?: PrimarySource
 
   useEffect(() => {
     let cancelled = false;
-    (loader?.getPrimarySourceRelationsWorkspace ?? window.nodus.getPrimarySourceRelationsWorkspace)()
+    window.nodus.getPrimarySourceRelationsWorkspace()
       .then((data) => {
         if (cancelled) return;
         setWorkspace(data);
@@ -51,7 +49,7 @@ export function PrimarySourcesRelationsView({ loader }: { loader?: PrimarySource
         if (!cancelled) setError(cause instanceof Error ? cause.message : String(cause));
       });
     return () => { cancelled = true; };
-  }, [loader]);
+  }, []);
 
   const filteredEdges = useMemo(() => {
     const query = search.trim().toLocaleLowerCase();
@@ -86,7 +84,7 @@ export function PrimarySourcesRelationsView({ loader }: { loader?: PrimarySource
   const selectEdge = useCallback((edgeId: string) => setSelectedId(edgeId), []);
 
   return (
-    <div className="flex h-full min-h-0 flex-col bg-neutral-50 text-neutral-900 dark:bg-neutral-950 dark:text-neutral-100" data-testid="primary-sources-relations-view">
+    <div className="flex h-full min-h-0 flex-col bg-neutral-50 text-neutral-900 dark:bg-neutral-950 dark:text-neutral-100">
       <header className="shrink-0 border-b border-neutral-200 bg-white px-5 py-4 dark:border-neutral-800 dark:bg-neutral-950">
         {attention && (
           <div className="mb-3 flex items-center gap-2 rounded-lg bg-indigo-50 px-3 py-2 text-[10px] text-indigo-800 dark:bg-indigo-950/40 dark:text-indigo-200">

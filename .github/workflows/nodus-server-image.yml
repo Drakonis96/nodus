@@ -67,7 +67,7 @@ jobs:
           scripts/test-server-vectors.mjs
 
       - name: Build smoke-test image
-        run: docker build -f server/Dockerfile --build-arg NODUS_VERSION=5.0.6 --build-arg NODUS_REVISION="$GITHUB_SHA" --tag nodus-server:ci .
+        run: docker build -f server/Dockerfile --build-arg NODUS_VERSION=5.0.2 --build-arg NODUS_REVISION="$GITHUB_SHA" --tag nodus-server:ci .
 
       - name: Run image health smoke test
         shell: bash

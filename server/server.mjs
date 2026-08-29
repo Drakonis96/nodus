@@ -31,8 +31,6 @@ import { UserPrivateDataStore } from './lib/privateDataStore.mjs';
 import { createAIRoutes } from './lib/routes/ai.mjs';
 import { UserArtifactStore } from './lib/userArtifacts.mjs';
 import { createArtifactRoutes } from './lib/routes/artifacts.mjs';
-import { createNativeVaultRoutes } from './lib/routes/nativeVaults.mjs';
-import { deepResearchPdfBytes } from './lib/core/deepResearchPdf.mjs';
 import { acquireDataDirectoryLock } from './lib/dataDirectoryLock.mjs';
 
 // A zero, a `200m`-style unit or a value past what Node can hold in a single buffer
@@ -328,10 +326,6 @@ const { authorize, challenge: authChallenge } = createAuthorizer({
 });
 
 function page(title, content, options = {}) {
-  if (options.variant === 'embedded') {
-    const themeClass = options.theme === 'light' ? 'light' : 'dark';
-    return `<!doctype html><html class="${themeClass}" lang="${escapeHtml(language())}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="${themeClass === 'light' ? '#f8fafc' : '#08080d'}"><link rel="icon" type="image/svg+xml" href="/favicon.svg"><title>${escapeHtml(title)} · Nodus Server</title><style>${WEB_STYLES}\nhtml,body{min-height:100%}.app-main{width:100%;max-width:none;margin:0;padding:20px 24px 48px}.site-header,.site-footer{display:none!important}</style><script src="/server-ui.js?v=2" defer></script></head><body data-formation="off" data-embedded="true"><main class="app-main">${content}</main></body></html>`;
-  }
   const picker = languagePicker(language(), { language: tr('language') });
   const header = `<header class="site-header">
     <a class="site-brand" href="/" data-testid="nodus-brand">
@@ -970,7 +964,7 @@ function publishedLibraryMeta(space) {
   return `<span class="publication-meta" data-testid="published-library-${escapeHtml(space.id)}">${icon}${escapeHtml(label)}</span>`;
 }
 
-function dashboard(current, notice = '', options = {}) {
+function dashboard(current, notice = '') {
   const emailsUnlocked = store.sensitiveAccessValid(current.session);
   const spaces = store.state.spaces.map((space) => {
     const policy = space.publicationPolicy && typeof space.publicationPolicy === 'object' ? space.publicationPolicy : {};
@@ -1072,7 +1066,7 @@ function dashboard(current, notice = '', options = {}) {
   <section class="section">
     <div class="section-header"><div><div class="section-title"><h2>${tr('publisherDevices')}</h2>${helpTip(tr('devicesHelp'), tr('moreInformation'))}</div></div></div>
     <div class="table-shell"><table><thead><tr><th>${tr('device')}</th><th>${tr('space')}</th><th>${tr('lastUsed')}</th><th>${tr('actions')}</th></tr></thead><tbody>${devices || `<tr><td class="empty" colspan="4">${tr('noDevices')}</td></tr>`}</tbody></table></div>
-  </section>`, options);
+  </section>`);
 }
 
 function maskEmail(value) {
@@ -1099,7 +1093,6 @@ function languageReturnPath(req) {
 const corpusRoutes = createCorpusRoutes({
   readSnapshot,
   readAssetBytes: (spaceId, hash) => readAsset(store, spaceId, hash),
-  renderPdf: deepResearchPdfBytes,
 });
 
 const apiRoutes = createApiRoutes({
@@ -1130,28 +1123,13 @@ const apiRoutes = createApiRoutes({
   },
 });
 
-// Server-native vaults use the canonical Electron schema in one SQLite file per vault. The
-// legacy `spaces/` publication tree remains untouched and is exposed as desktop_published.
-const nativeVaultRoutes = createNativeVaultRoutes({
-  store, authorize, json, jsonBody, body, root: DATA_DIR,
-  checkCsrf: (session, supplied) => safeEqual(supplied, session?.csrf),
-  sameOrigin: (req) => {
-    let origin = String(req.headers.origin || '').trim();
-    if (!origin) { try { origin = new URL(String(req.headers.referer || '')).origin; } catch { origin = ''; } }
-    let expected = ''; try { expected = new URL(publicUrl()).origin; } catch {}
-    const fetchSite = String(req.headers['sec-fetch-site'] || '').toLowerCase();
-    const validSite = !fetchSite || fetchSite === 'same-origin' || fetchSite === 'same-site';
-    try { return Boolean(origin) && new URL(origin).origin === expected && validSite; } catch { return false; }
-  },
-});
-
 const aiRoutes = createAIRoutes({
   authorize, json, jsonBody, publicUrl, aiStore, privateData, gateway: providerGateway, store, rateLimit,
   maxActiveJobsPerUser: aiMaxActivePerUser,
   maxActiveJobsGlobal: aiMaxActiveGlobal,
 });
 const artifactRoutes = createArtifactRoutes({
-  authorize, json, jsonBody, publicUrl, artifacts: userArtifacts, privateData, renderPdf: deepResearchPdfBytes,
+  authorize, json, jsonBody, publicUrl, artifacts: userArtifacts, privateData,
 });
 
 /**
@@ -1197,28 +1175,6 @@ async function handleLocalProvision(req, res) {
   }
   if (vaultType) space.vaultType = vaultType;
 
-  // Local provisioning is authenticated by a fresh 0600 secret and accepted only over
-  // loopback. It may therefore carry the Desktop's explicit publication switches. This is
-  // intentionally unavailable to remote/advanced publishers, whose policy remains an
-  // administrator decision made through the normal session + CSRF control plane.
-  if (input.publicationPolicy && typeof input.publicationPolicy === 'object' && !Array.isArray(input.publicationPolicy)) {
-    const requested = input.publicationPolicy;
-    const bool = (field) => requested[field] === true;
-    space.publicationPolicy = {
-      version: 1,
-      allowUserContent: bool('allowUserContent'),
-      allowPersonalImports: bool('allowPersonalImports'),
-      allowLibraryDocuments: bool('allowLibraryDocuments'),
-      allowPassages: bool('allowPassages'),
-      allowVectors: bool('allowVectors'),
-      allowPrimarySources: bool('allowPrimarySources'),
-      allowTestimonies: bool('allowTestimonies'),
-      publishPersonalAnnotations: false,
-      updatedAt: new Date().toISOString(),
-    };
-    space.publicationPolicy.allowLegacyPublisherImport = space.publicationPolicy.allowPersonalImports;
-  }
-
   const code = pairingCode();
   store.state.pairingCodes.push({ hash: digest(code), userId: admin.id, spaceId: space.id, kind: 'publisher', expiresAt: new Date(Date.now() + 15 * 60_000).toISOString(), usedAt: null });
   store.save();
@@ -1236,10 +1192,7 @@ const WEB_MIME = {
 function serveWebApp(req, res, pathname) {
   if (!fs.existsSync(WEB_DIST)) return false;
   let relative;
-  try {
-    const appPath = pathname === '/app' || pathname.startsWith('/app/') ? pathname.slice('/app'.length) : pathname;
-    relative = decodeURIComponent(appPath).replace(/^\/+/, '');
-  }
+  try { relative = decodeURIComponent(pathname.slice('/app'.length)).replace(/^\/+/, ''); }
   catch { json(res, 400, { error: 'bad_path' }); return true; }
   if (!relative || relative.endsWith('/')) relative += 'index.html';
   const candidate = path.resolve(WEB_DIST, relative);
@@ -1254,265 +1207,6 @@ function serveWebApp(req, res, pathname) {
     'cache-control': ext === '.html' ? 'no-store' : immutable ? 'public, max-age=31536000, immutable' : 'public, max-age=3600',
   });
   return true;
-}
-
-function browserDocumentRequest(req) {
-  return String(req.headers['sec-fetch-dest'] || '').toLowerCase() === 'document';
-}
-
-function canonicalWebPath(pathname) {
-  return pathname === '/' || pathname === '/view' || pathname.startsWith('/view/')
-    || pathname === '/detail' || pathname.startsWith('/detail/')
-    || pathname === '/library' || pathname.startsWith('/library/');
-}
-
-function embeddedAdminRequest(req) {
-  try {
-    const referer = new URL(String(req.headers.referer || ''), publicUrl());
-    return referer.origin === new URL(publicUrl()).origin && referer.pathname === '/admin/settings' && referer.searchParams.get('embedded') === '1';
-  } catch { return false; }
-}
-
-function adminRedirect(req, notice = '') {
-  let embeddedTheme = 'dark';
-  try { embeddedTheme = new URL(String(req.headers.referer || ''), publicUrl()).searchParams.get('theme') === 'light' ? 'light' : 'dark'; } catch { /* default */ }
-  const base = embeddedAdminRequest(req) ? `/admin/settings?embedded=1&theme=${embeddedTheme}` : '/?legacy-admin=1';
-  return `${base}${notice ? `${base.includes('?') ? '&' : '?'}notice=${encodeURIComponent(notice)}` : ''}`;
-}
-
-const EMBEDDED_ADMIN_HEADERS = Object.freeze({
-  'x-frame-options': 'SAMEORIGIN',
-  'content-security-policy': contentSecurityPolicy().replace("frame-ancestors 'none'", "frame-ancestors 'self'"),
-});
-
-function adminDashboardResponse(req, res, current, status, notice) {
-  const embedded = embeddedAdminRequest(req);
-  let theme = 'dark';
-  try { theme = new URL(String(req.headers.referer || ''), publicUrl()).searchParams.get('theme') === 'light' ? 'light' : 'dark'; } catch { /* default */ }
-  return html(
-    res,
-    status,
-    dashboard(current, notice, embedded ? { variant: 'embedded', theme } : {}),
-    embedded ? EMBEDDED_ADMIN_HEADERS : {},
-  );
-}
-
-function publishedPolicy(space) {
-  const input = space?.publicationPolicy && typeof space.publicationPolicy === 'object' ? space.publicationPolicy : {};
-  return {
-    version: 1,
-    allowUserContent: input.allowUserContent === true,
-    allowPersonalImports: input.allowPersonalImports === true || input.allowLegacyPublisherImport === true,
-    allowLibraryDocuments: input.allowLibraryDocuments === true,
-    allowPassages: input.allowPassages === true,
-    allowVectors: input.allowVectors === true,
-    allowPrimarySources: input.allowPrimarySources === true,
-    allowTestimonies: input.allowTestimonies === true,
-    publishPersonalAnnotations: false,
-    updatedAt: typeof input.updatedAt === 'string' ? input.updatedAt : null,
-  };
-}
-
-function webAdminState(current) {
-  const emailsUnlocked = store.sensitiveAccessValid(current.session);
-  return {
-    server: {
-      name: store.state.settings.name,
-      publicUrl: publicUrl(),
-      mcpUrl: mcpResource(),
-      version: NODUS_VERSION,
-      language: normalizeServerLanguage(store.state.settings.language),
-      deploymentMode: DEPLOYMENT_MODE,
-    },
-    spaces: store.state.spaces.map((space) => {
-      const snapshot = readSnapshot(space.id);
-      return {
-        id: space.id,
-        name: space.name,
-        description: space.description || '',
-        vaultType: spaceVaultType(space) || space.vaultType || '',
-        storageKind: space.storageKind || 'desktop_published',
-        authorityMode: space.authorityMode || 'desktop',
-        initializationState: space.initializationState || (space.storageKind === 'server_native' ? 'ready' : 'published'),
-        updatedAt: space.updatedAt || null,
-        revision: space.revision || '',
-        bytes: Number(space.bytes) || 0,
-        counts: snapshot ? Object.fromEntries(Object.entries(snapshot.tables ?? {}).map(([table, values]) => [table, Array.isArray(values) ? values.length : 0])) : {},
-        libraryDocuments: Array.isArray(snapshot?.library?.documents) ? snapshot.library.documents.length : 0,
-        publicationPolicy: publishedPolicy(space),
-      };
-    }),
-    users: store.state.users.map((user) => ({
-      id: user.id,
-      email: user.id === current.user.id || emailsUnlocked ? user.email : maskEmail(user.email),
-      emailMasked: user.id !== current.user.id && !emailsUnlocked,
-      role: user.role,
-      memberships: store.state.memberships.filter((entry) => entry.userId === user.id)
-        .map((entry) => ({ spaceId: entry.spaceId, role: normalizeSpaceRole(entry.role) })),
-    })),
-    devices: store.state.deviceTokens.map((device) => ({
-      id: device.hash,
-      deviceName: device.deviceName,
-      userId: device.userId,
-      spaceId: device.spaceId,
-      createdAt: device.createdAt || null,
-      lastUsedAt: device.lastUsedAt || null,
-      kind: device.kind || 'publisher',
-    })),
-    sensitiveAccessUnlocked: emailsUnlocked,
-    csrfToken: current.session.csrf,
-  };
-}
-
-function webJsonSession(req, res, { admin = false, mutate = false } = {}) {
-  const current = sessionFor(req);
-  if (!current) { json(res, 401, { error: 'authentication_required' }); return null; }
-  if (admin && current.user.role !== 'admin') { json(res, 403, { error: 'admin_required' }); return null; }
-  if (!mutate) return current;
-  let origin = String(req.headers.origin || '').trim();
-  if (!origin) {
-    try { origin = new URL(String(req.headers.referer || '')).origin; } catch { origin = ''; }
-  }
-  let expected = '';
-  try { expected = new URL(publicUrl()).origin; } catch { expected = ''; }
-  const fetchSite = String(req.headers['sec-fetch-site'] || '').toLowerCase();
-  const validSite = !fetchSite || fetchSite === 'same-origin' || fetchSite === 'same-site';
-  if (!origin || origin !== expected || !validSite || !checkCsrf(current, req.headers['x-csrf-token'] || req.headers['x-csrf'])) {
-    json(res, 403, { error: 'csrf_failed', error_description: 'A same-origin request and a valid CSRF token are required.' });
-    return null;
-  }
-  return current;
-}
-
-function requestedMemberships(input) {
-  const values = Array.isArray(input?.memberships) ? input.memberships : [];
-  const result = new Map();
-  for (const entry of values) {
-    const spaceId = String(entry?.spaceId || '');
-    if (!store.state.spaces.some((space) => space.id === spaceId)) continue;
-    result.set(spaceId, normalizeSpaceRole(entry?.role));
-  }
-  return result;
-}
-
-async function handleWebControlApi(req, res, url) {
-  if (!url.pathname.startsWith('/api/v1/web/')) return false;
-  let segments;
-  try { segments = url.pathname.slice('/api/v1/web/'.length).split('/').filter(Boolean).map(decodeURIComponent); }
-  catch { json(res, 400, { error: 'bad_path' }); return true; }
-  const adminRoute = segments[0] === 'admin';
-
-  if (adminRoute && segments.length === 1 && req.method === 'GET') {
-    const current = webJsonSession(req, res, { admin: true });
-    if (current) json(res, 200, webAdminState(current));
-    return true;
-  }
-
-  if (adminRoute && segments[1] === 'spaces' && segments.length === 2 && req.method === 'POST') {
-    const current = webJsonSession(req, res, { admin: true, mutate: true }); if (!current) return true;
-    const input = await jsonBody(req, AUTH_BODY_BYTES);
-    const name = String(input.name || '').trim().slice(0, 120);
-    if (!name) { json(res, 400, { error: 'invalid_space', error_description: 'The space needs a name.' }); return true; }
-    const createdAt = new Date().toISOString();
-    const space = {
-      id: randomUUID(), name, description: String(input.description || '').trim().slice(0, 500),
-      vaultType: normalizeVaultType(input.vaultType) || 'academic', nameEdited: true,
-      createdAt, updatedAt: null, revision: '', bytes: 0, receiveSequence: 0,
-      provenance: { schemaVersion: 4, originInstanceId: store.state.settings.instanceId, originDeviceId: 'server-web', createdBy: current.user.id, createdAt },
-    };
-    store.state.spaces.push(space);
-    store.state.memberships.push({ userId: current.user.id, spaceId: space.id, role: 'owner' });
-    store.save(); json(res, 201, { space: webAdminState(current).spaces.find((entry) => entry.id === space.id) }); return true;
-  }
-
-  if (adminRoute && segments[1] === 'spaces' && segments[2] && segments.length === 3 && req.method === 'PATCH') {
-    const current = webJsonSession(req, res, { admin: true, mutate: true }); if (!current) return true;
-    const space = store.state.spaces.find((entry) => entry.id === segments[2]);
-    if (!space) { json(res, 404, { error: 'space_not_found' }); return true; }
-    const input = await jsonBody(req, AUTH_BODY_BYTES);
-    if (input.name !== undefined) {
-      const name = String(input.name || '').trim().slice(0, 120);
-      if (!name) { json(res, 400, { error: 'invalid_space', error_description: 'The space needs a name.' }); return true; }
-      space.name = name; space.nameEdited = true;
-    }
-    if (input.description !== undefined) space.description = String(input.description || '').trim().slice(0, 500);
-    if (input.publicationPolicy !== undefined) {
-      if (!input.publicationPolicy || typeof input.publicationPolicy !== 'object' || Array.isArray(input.publicationPolicy)) {
-        json(res, 400, { error: 'invalid_policy' }); return true;
-      }
-      const policy = input.publicationPolicy;
-      const fields = ['allowUserContent', 'allowPersonalImports', 'allowLibraryDocuments', 'allowPassages', 'allowVectors', 'allowPrimarySources', 'allowTestimonies'];
-      for (const field of fields) if (policy[field] !== undefined && typeof policy[field] !== 'boolean') {
-        json(res, 400, { error: 'invalid_policy', field }); return true;
-      }
-      const previous = publishedPolicy(space);
-      space.publicationPolicy = { version: 1, publishPersonalAnnotations: false, updatedAt: new Date().toISOString() };
-      for (const field of fields) space.publicationPolicy[field] = policy[field] === undefined ? previous[field] : policy[field];
-      space.publicationPolicy.allowLegacyPublisherImport = space.publicationPolicy.allowPersonalImports;
-    }
-    store.save(); json(res, 200, { space: webAdminState(current).spaces.find((entry) => entry.id === space.id) }); return true;
-  }
-
-  if (adminRoute && segments[1] === 'spaces' && segments[2] && segments[3] === 'pairing' && segments.length === 4 && req.method === 'POST') {
-    const current = webJsonSession(req, res, { admin: true, mutate: true }); if (!current) return true;
-    const access = membership(current.user.id, segments[2]);
-    if (!access || !canRole(normalizeSpaceRole(access.role), 'own')) { json(res, 403, { error: 'owner_required' }); return true; }
-    const code = pairingCode(); const expiresAt = new Date(Date.now() + 15 * 60_000).toISOString();
-    store.state.pairingCodes.push({ hash: digest(code), userId: current.user.id, spaceId: segments[2], kind: 'publisher', expiresAt, usedAt: null });
-    store.save(); json(res, 201, { code, expiresAt }); return true;
-  }
-
-  if (adminRoute && segments[1] === 'users' && segments.length === 2 && req.method === 'POST') {
-    const current = webJsonSession(req, res, { admin: true, mutate: true }); if (!current) return true;
-    const input = await jsonBody(req, AUTH_BODY_BYTES);
-    try {
-      const user = store.createUser(input.email, input.password, 'member');
-      for (const [spaceId, role] of requestedMemberships(input)) store.state.memberships.push({ userId: user.id, spaceId, role });
-      store.save(); json(res, 201, { user: webAdminState(current).users.find((entry) => entry.id === user.id) });
-    } catch (error) { json(res, 400, { error: 'invalid_user', error_description: error instanceof Error ? error.message : String(error) }); }
-    return true;
-  }
-
-  if (adminRoute && segments[1] === 'users' && segments[2] && segments[3] === 'access' && segments.length === 4 && req.method === 'PATCH') {
-    const current = webJsonSession(req, res, { admin: true, mutate: true }); if (!current) return true;
-    const user = store.state.users.find((entry) => entry.id === segments[2]);
-    if (!user) { json(res, 404, { error: 'user_not_found' }); return true; }
-    const input = await jsonBody(req, AUTH_BODY_BYTES); const desired = requestedMemberships(input);
-    const existing = store.state.memberships.filter((entry) => entry.userId === user.id);
-    for (const entry of existing) if (entry.role === 'owner' && desired.get(entry.spaceId) !== 'owner' && ownerCount(entry.spaceId) <= 1) {
-      json(res, 409, { error: 'last_owner', error_description: 'A space needs at least one owner.' }); return true;
-    }
-    const removed = new Set(existing.filter((entry) => !desired.has(entry.spaceId)).map((entry) => entry.spaceId));
-    store.state.memberships = store.state.memberships.filter((entry) => entry.userId !== user.id || desired.has(entry.spaceId));
-    for (const [spaceId, role] of desired) { const entry = membership(user.id, spaceId); if (entry) entry.role = role; else store.state.memberships.push({ userId: user.id, spaceId, role }); }
-    if (removed.size) {
-      store.state.deviceTokens = store.state.deviceTokens.filter((entry) => entry.userId !== user.id || !removed.has(entry.spaceId));
-      store.state.pairingCodes = store.state.pairingCodes.filter((entry) => entry.userId !== user.id || !removed.has(entry.spaceId));
-    }
-    store.save(); json(res, 200, { user: webAdminState(current).users.find((entry) => entry.id === user.id) }); return true;
-  }
-
-  if (adminRoute && segments[1] === 'devices' && segments[2] && segments.length === 3 && req.method === 'DELETE') {
-    const current = webJsonSession(req, res, { admin: true, mutate: true }); if (!current) return true;
-    const before = store.state.deviceTokens.length;
-    store.state.deviceTokens = store.state.deviceTokens.filter((entry) => entry.hash !== segments[2]);
-    if (store.state.deviceTokens.length === before) { json(res, 404, { error: 'device_not_found' }); return true; }
-    store.save(); json(res, 200, { ok: true }); return true;
-  }
-
-  if (segments[0] === 'account' && segments[1] === 'password' && segments.length === 2 && req.method === 'PUT') {
-    const current = webJsonSession(req, res, { mutate: true }); if (!current) return true;
-    if (!rateLimit(req, res, 'password-change', 10, 15 * 60_000)) return true;
-    const input = await jsonBody(req, AUTH_BODY_BYTES);
-    if (input.newPassword !== input.confirmPassword) { json(res, 400, { error: 'password_mismatch' }); return true; }
-    try {
-      store.changePassword(current.user.id, input.currentPassword, input.newPassword, current.session.hash);
-      json(res, 200, { ok: true, signedOutOtherSessions: true });
-    } catch (error) { json(res, 400, { error: 'invalid_password', error_description: error instanceof Error ? error.message : String(error) }); }
-    return true;
-  }
-
-  return false;
 }
 
 async function route(req, res) {
@@ -1532,17 +1226,7 @@ async function route(req, res) {
     const current = sessionFor(req);
     if (!current) return redirect(res, `/login?next=${encodeURIComponent('/admin')}`);
     if (current.user.role !== 'admin') return redirect(res, '/account');
-    return redirect(res, `/view/settings?tab=server`);
-  }
-  if (url.pathname === '/admin/settings' && req.method === 'GET') {
-    const current = requireSession(req, res, true); if (!current) return;
-    const embedded = url.searchParams.get('embedded') === '1';
-    return html(
-      res,
-      200,
-      dashboard(current, url.searchParams.get('notice') || '', embedded ? { variant: 'embedded', theme: url.searchParams.get('theme') === 'light' ? 'light' : 'dark' } : {}),
-      embedded ? EMBEDDED_ADMIN_HEADERS : {},
-    );
+    return redirect(res, `/${url.search || ''}`);
   }
   if (url.pathname === '/app' || url.pathname.startsWith('/app/')) {
     if (!['GET', 'HEAD'].includes(req.method)) return json(res, 405, { error: 'method_not_allowed' });
@@ -1550,11 +1234,6 @@ async function route(req, res) {
     if (!current) return;
     if (serveWebApp(req, res, url.pathname)) return;
     return redirect(res, current.user.role === 'admin' ? '/' : '/account');
-  }
-  if (canonicalWebPath(url.pathname) && (url.pathname !== '/' || browserDocumentRequest(req)) && ['GET', 'HEAD'].includes(req.method)) {
-    const current = requireSession(req, res);
-    if (!current) return;
-    if (serveWebApp(req, res, url.pathname)) return;
   }
   if (url.pathname === '/language' && req.method === 'POST') {
     const values = await form(req, 4 * 1024);
@@ -1573,14 +1252,8 @@ async function route(req, res) {
   if (url.pathname === '/mcp') return handleMcp(req, res);
   if (url.pathname === '/api/v1/local/provision' && req.method === 'POST') return handleLocalProvision(req, res);
 
-  // Native JSON control plane used by the integrated Server settings tab. It deliberately
-  // runs before the general API dispatcher and never renders or embeds the legacy admin UI.
-  if (await handleWebControlApi(req, res, url)) return;
-
-  // v2 is the reusable Server/Desktop service boundary. Native vault lifecycle is available
-  // in both deployments; the existing advanced-only AI/artifact surfaces retain their gate.
-  if (await nativeVaultRoutes.handle(req, res, url)) return;
-  if (await nativeVaultRoutes.handleLegacyRead(req, res, url)) return;
+  // v2 is the reusable Server/Desktop service boundary. It is enabled only for the
+  // advanced deployment so Desktop's embedded basic server keeps its existing surface.
   if (DEPLOYMENT_MODE === 'advanced' && await artifactRoutes.handle(req, res, url)) return;
   if (DEPLOYMENT_MODE === 'advanced' && await aiRoutes.handle(req, res, url)) return;
 
@@ -1631,7 +1304,7 @@ async function route(req, res) {
     clearRateLimit('login-account', accountIdentity);
     const raw = store.createSession(user.id);
     const safeNext = safeReturnPath(values.next);
-    const destination = safeNext === '/' ? (browserDocumentRequest(req) ? '/' : user.role === 'admin' ? '/admin' : '/app') : safeNext;
+    const destination = safeNext === '/' ? (user.role === 'admin' ? '/admin' : '/app') : safeNext;
     return redirect(res, destination, { 'set-cookie': [
       `nodus_session=${encodeURIComponent(raw)}; Path=/; HttpOnly; SameSite=Lax${publicUrl().startsWith('https://') ? '; Secure' : ''}`,
       loginCsrfCookie('', { clear: true }),
@@ -1686,7 +1359,7 @@ async function route(req, res) {
       store.unlockSensitiveAccess(current.session.hash, values.password);
       return redirect(res, '/?notice=' + encodeURIComponent(tr('emailAccessUnlocked')));
     } catch {
-      return adminDashboardResponse(req, res, current, 401, tr('emailUnlockFailed'));
+      return html(res, 401, dashboard(current, tr('emailUnlockFailed')));
     }
   }
   if (url.pathname === '/admin/users/email' && req.method === 'POST') {
@@ -1694,10 +1367,10 @@ async function route(req, res) {
     if (!rateLimit(req, res, 'email-change', 20, 15 * 60_000)) return;
     const values = await form(req, AUTH_BODY_BYTES);
     if (!checkCsrf(current, values.csrf)) return html(res, 403, page(tr('error'), `<h1>${tr('sessionExpired')}</h1>`));
-    if (!store.sensitiveAccessValid(current.session)) return adminDashboardResponse(req, res, current, 403, tr('emailAccessExpired'));
+    if (!store.sensitiveAccessValid(current.session)) return html(res, 403, dashboard(current, tr('emailAccessExpired')));
     const target = store.state.users.find((entry) => entry.id === values.userId);
-    if (!target) return adminDashboardResponse(req, res, current, 404, tr('readerNotFound'));
-    if (ENVIRONMENT_ADMIN_CONFIGURED && target.role === 'admin') return adminDashboardResponse(req, res, current, 403, tr('environmentEmailReadonly'));
+    if (!target) return html(res, 404, dashboard(current, tr('readerNotFound')));
+    if (ENVIRONMENT_ADMIN_CONFIGURED && target.role === 'admin') return html(res, 403, dashboard(current, tr('environmentEmailReadonly')));
     try {
       const result = store.changeEmail(target.id, values.email);
       if (result.changed && target.id === current.user.id) {
@@ -1705,7 +1378,7 @@ async function route(req, res) {
       }
       return redirect(res, '/?notice=' + encodeURIComponent(result.changed ? tr('emailUpdated') : tr('emailUnchanged')));
     } catch (error) {
-      return adminDashboardResponse(req, res, current, 400, error instanceof Error ? error.message : String(error));
+      return html(res, 400, dashboard(current, error instanceof Error ? error.message : String(error)));
     }
   }
 
@@ -1829,9 +1502,9 @@ async function route(req, res) {
     const createdAt = new Date().toISOString();
     const space = { id: randomUUID(), name: String(values.name || '').trim().slice(0, 120), description: String(values.description || '').trim().slice(0, 500), vaultType: normalizeVaultType(values.vaultType) || 'academic', nameEdited: true, createdAt, updatedAt: null, revision: '', bytes: 0, receiveSequence: 0,
       provenance: { schemaVersion: 4, originInstanceId: store.state.settings.instanceId, originDeviceId: 'server-web', createdBy: current.user.id, createdAt } };
-    if (!space.name) return adminDashboardResponse(req, res, current, 400, 'The space needs a name.');
+    if (!space.name) return html(res, 400, dashboard(current, 'The space needs a name.'));
     store.state.spaces.push(space); store.state.memberships.push({ userId: current.user.id, spaceId: space.id, role: 'owner' }); store.save();
-    return redirect(res, adminRedirect(req, 'Space created.'));
+    return redirect(res, '/?notice=' + encodeURIComponent('Space created.'));
   }
   if (url.pathname === '/admin/spaces/name' && req.method === 'POST') {
     const current = requireSession(req, res, true); if (!current) return;
@@ -1839,12 +1512,12 @@ async function route(req, res) {
     const space = store.state.spaces.find((entry) => entry.id === values.spaceId);
     if (!space) return html(res, 404, page(tr('error'), `<h1>${tr('spaceNotFound')}</h1>`));
     const name = String(values.name || '').trim().slice(0, 120);
-    if (!name) return adminDashboardResponse(req, res, current, 400, 'The space needs a name.');
+    if (!name) return html(res, 400, dashboard(current, 'The space needs a name.'));
     space.name = name;
     // A deliberate administration name wins over later local reprovisioning of the vault.
     space.nameEdited = true;
     store.save();
-    return redirect(res, adminRedirect(req, 'Space name updated.'));
+    return redirect(res, '/?notice=' + encodeURIComponent('Space name updated.'));
   }
   if (url.pathname === '/admin/spaces/policy' && req.method === 'POST') {
     const current = requireSession(req, res, true); if (!current) return;
@@ -1866,7 +1539,7 @@ async function route(req, res) {
     };
     space.publicationPolicy.allowLegacyPublisherImport = space.publicationPolicy.allowPersonalImports;
     store.save();
-    return redirect(res, adminRedirect(req, 'Publication policy updated.'));
+    return redirect(res, '/?notice=' + encodeURIComponent('Publication policy updated.'));
   }
   if (url.pathname === '/admin/spaces/clear-request' && req.method === 'POST') {
     const current = requireSession(req, res, true); if (!current) return;
@@ -1891,7 +1564,7 @@ async function route(req, res) {
     space.vaultType = spaceVaultType(space) || space.vaultType || '';
     space.updatedAt = null; space.revision = ''; space.vault = null;
     space.bytes = 0; space.assetBytes = 0; space.libraryPackageBytes = 0; store.save();
-    return redirect(res, adminRedirect(req, 'Publication deleted from the server.'));
+    return redirect(res, '/?notice=' + encodeURIComponent('Publication deleted from the server.'));
   }
   if (url.pathname === '/admin/users' && req.method === 'POST') {
     const current = requireSession(req, res, true); if (!current) return;
@@ -1903,14 +1576,14 @@ async function route(req, res) {
       const grants = readSpaceGrants(values);
       for (const grant of grants) store.state.memberships.push({ userId: user.id, spaceId: grant.spaceId, role: grant.role });
       if (grants.length) store.save();
-      return redirect(res, adminRedirect(req, `User created with access to ${grants.length} space(s).`));
-    } catch (error) { return adminDashboardResponse(req, res, current, 400, error instanceof Error ? error.message : String(error)); }
+      return redirect(res, '/?notice=' + encodeURIComponent(`User created with access to ${grants.length} space(s).`));
+    } catch (error) { return html(res, 400, dashboard(current, error instanceof Error ? error.message : String(error))); }
   }
   if (url.pathname === '/admin/users/access' && req.method === 'POST') {
     const current = requireSession(req, res, true); if (!current) return;
     const values = await form(req, AUTH_BODY_BYTES); if (!checkCsrf(current, values.csrf)) return html(res, 403, page(tr('error'), `<h1>${tr('sessionExpired')}</h1>`));
     const user = store.state.users.find((entry) => entry.id === values.userId);
-    if (!user) return adminDashboardResponse(req, res, current, 400, 'Invalid user.');
+    if (!user) return html(res, 400, dashboard(current, 'Invalid user.'));
     const desired = new Map(readSpaceGrants(values).map((grant) => [grant.spaceId, grant.role]));
     const existing = store.state.memberships.filter((entry) => entry.userId === user.id);
 
@@ -1919,7 +1592,7 @@ async function route(req, res) {
     for (const entry of existing) {
       const nextRole = desired.get(entry.spaceId);
       if (entry.role === 'owner' && nextRole !== 'owner' && ownerCount(entry.spaceId) <= 1) {
-        return adminDashboardResponse(req, res, current, 400, 'A space needs at least one owner. Grant owner access to another account before changing this one.');
+        return html(res, 400, dashboard(current, 'A space needs at least one owner. Grant owner access to another account before changing this one.'));
       }
     }
 
@@ -1935,53 +1608,53 @@ async function route(req, res) {
       store.state.pairingCodes = store.state.pairingCodes.filter((pairing) => pairing.userId !== user.id || !removedSpaceIds.has(pairing.spaceId));
     }
     store.save();
-    return redirect(res, adminRedirect(req, 'User access updated.'));
+    return redirect(res, '/?notice=' + encodeURIComponent('User access updated.'));
   }
   if (url.pathname === '/admin/access/role' && req.method === 'POST') {
     const current = requireSession(req, res, true); if (!current) return;
     const values = await form(req, AUTH_BODY_BYTES); if (!checkCsrf(current, values.csrf)) return html(res, 403, page(tr('error'), `<h1>${tr('sessionExpired')}</h1>`));
     const entry = membership(values.userId, values.spaceId);
-    if (!entry) return adminDashboardResponse(req, res, current, 400, 'That access cannot be changed here.');
-    if (!isSpaceRole(values.role)) return adminDashboardResponse(req, res, current, 400, 'Unknown access level.');
+    if (!entry) return html(res, 400, dashboard(current, 'That access cannot be changed here.'));
+    if (!isSpaceRole(values.role)) return html(res, 400, dashboard(current, 'Unknown access level.'));
     // A space with no owner can never be published to again, and nothing in the interface
     // can undo that. Demoting the last one is refused; demoting one of several is fine.
     if (entry.role === 'owner' && values.role !== 'owner' && ownerCount(values.spaceId) <= 1) {
-      return adminDashboardResponse(req, res, current, 400, 'A space needs at least one owner. Grant owner access to another account before changing this one.');
+      return html(res, 400, dashboard(current, 'A space needs at least one owner. Grant owner access to another account before changing this one.'));
     }
     entry.role = values.role;
     // Nothing else to revoke: authorize() reads the role live on every request, so an
     // already-issued device or OAuth token drops to the new level on its very next call.
     store.save();
-    return redirect(res, adminRedirect(req, 'Access level updated.'));
+    return redirect(res, '/?notice=' + encodeURIComponent('Access level updated.'));
   }
   if (url.pathname === '/admin/access/grant' && req.method === 'POST') {
     const current = requireSession(req, res, true); if (!current) return;
     const values = await form(req, AUTH_BODY_BYTES); if (!checkCsrf(current, values.csrf)) return html(res, 403, page(tr('error'), `<h1>${tr('sessionExpired')}</h1>`));
     const user = store.state.users.find((entry) => entry.id === values.userId);
     const space = store.state.spaces.find((entry) => entry.id === values.spaceId);
-    if (!user || !space) return adminDashboardResponse(req, res, current, 400, 'Invalid user or space.');
+    if (!user || !space) return html(res, 400, dashboard(current, 'Invalid user or space.'));
     const role = isSpaceRole(values.role) ? values.role : 'reader';
     if (!membership(user.id, space.id)) { store.state.memberships.push({ userId: user.id, spaceId: space.id, role }); store.save(); }
-    return redirect(res, adminRedirect(req, `Access granted (${role}).`));
+    return redirect(res, '/?notice=' + encodeURIComponent(`Access granted (${role}).`));
   }
   if (url.pathname === '/admin/access/revoke' && req.method === 'POST') {
     const current = requireSession(req, res, true); if (!current) return;
     const values = await form(req, AUTH_BODY_BYTES); if (!checkCsrf(current, values.csrf)) return html(res, 403, page(tr('error'), `<h1>${tr('sessionExpired')}</h1>`));
     const entry = membership(values.userId, values.spaceId);
-    if (!entry) return adminDashboardResponse(req, res, current, 400, 'That access cannot be revoked here.');
+    if (!entry) return html(res, 400, dashboard(current, 'That access cannot be revoked here.'));
     if (entry.role === 'owner' && ownerCount(values.spaceId) <= 1) {
-      return adminDashboardResponse(req, res, current, 400, 'A space needs at least one owner. Grant owner access to another account before revoking this one.');
+      return html(res, 400, dashboard(current, 'A space needs at least one owner. Grant owner access to another account before revoking this one.'));
     }
     store.state.memberships = store.state.memberships.filter((candidate) => candidate !== entry);
     store.state.deviceTokens = store.state.deviceTokens.filter((device) => device.userId !== values.userId || device.spaceId !== values.spaceId);
     store.save();
-    return redirect(res, adminRedirect(req, 'Access revoked.'));
+    return redirect(res, '/?notice=' + encodeURIComponent('Access revoked.'));
   }
   if (url.pathname === '/admin/devices/revoke' && req.method === 'POST') {
     const current = requireSession(req, res, true); if (!current) return;
     const values = await form(req, AUTH_BODY_BYTES); if (!checkCsrf(current, values.csrf)) return html(res, 403, page(tr('error'), `<h1>${tr('sessionExpired')}</h1>`));
     store.state.deviceTokens = store.state.deviceTokens.filter((entry) => entry.hash !== values.tokenHash); store.save();
-    return redirect(res, adminRedirect(req, 'Device revoked.'));
+    return redirect(res, '/?notice=' + encodeURIComponent('Device revoked.'));
   }
   if (url.pathname === '/admin/pairing' && req.method === 'POST') {
     const current = requireSession(req, res, true); if (!current) return;

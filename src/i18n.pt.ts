@@ -42,13 +42,13 @@ import { DATABASE_TASK_TRANSLATIONS } from './i18n.databaseTasks';
 import { DATABASE_AUTOMATION_TRANSLATIONS } from './i18n.databaseAutomations';
 import { NOTION_IMPORT_TRANSLATIONS } from './i18n.notionImport';
 import { LIBRARY_ONBOARDING_TRANSLATIONS } from './i18n.libraryOnboarding';
+import { LIBRARY_TUTORIAL_TRANSLATIONS } from './i18n.libraryTutorial';
 import { SOURCE_CITATION_TRANSLATIONS } from './i18n.sourceCitation';
 import { DEEP_RESEARCH_APPROACH_TRANSLATIONS } from './i18n.deepResearchApproaches';
 import { DICTIONARY_TRANSLATIONS } from './i18n.dictionary';
 import { DEEP_RESEARCH_VERSION_TRANSLATIONS } from './i18n.deepResearchVersions';
 import { DOCUMENT_UNDERSTANDING_TRANSLATIONS } from './i18n.documentUnderstanding';
 import { DEEP_RESEARCH_QUALITY_TRANSLATIONS } from './i18n.deepResearchQuality';
-import { DOCUMENT_UNDERSTANDING_CONSENT_TRANSLATIONS } from './i18n.documentUnderstandingConsent';
 import { MODEL_SETTINGS_TRANSLATIONS } from './i18n.modelSettings';
 import { DATABASE_DEEP_RESEARCH_TRANSLATIONS } from './i18n.databaseDeepResearch';
 
@@ -72,9 +72,9 @@ export const PT: Record<string, string> = {
   ...DEEP_RESEARCH_VERSION_TRANSLATIONS.pt,
   ...DOCUMENT_UNDERSTANDING_TRANSLATIONS.pt,
   ...DEEP_RESEARCH_QUALITY_TRANSLATIONS.pt,
-  ...DOCUMENT_UNDERSTANDING_CONSENT_TRANSLATIONS.pt,
   ...LIBRARY_BIBLIOGRAPHY_TRANSLATIONS.pt,
   ...LIBRARY_ONBOARDING_TRANSLATIONS.pt,
+  ...LIBRARY_TUTORIAL_TRANSLATIONS.pt,
   ...LIBRARY_RECOVERY_TRANSLATIONS.pt,
   ...DIARIZATION_TRANSLATIONS.pt,
   ...PROSOPOGRAPHY_TRANSLATIONS.pt,
@@ -2028,6 +2028,8 @@ export const PT: Record<string, string> = {
   'Conectado (userID {id})': 'Ligado (userID {id})',
   'No disponible: {msg}': 'Não disponível: {msg}',
   'sin respuesta': 'sem resposta',
+  'Comprueba que Zotero esté abierto y que «Permitir que otras aplicaciones de este ordenador se comuniquen con Zotero» esté activado en los ajustes Avanzados de Zotero.':
+    'Verifique se o Zotero está aberto e se «Permitir que outras aplicações deste computador comuniquem com o Zotero» está ativado nas definições Avançadas do Zotero.',
   'Elige las colecciones a monitorizar. Se incorporan metadatos; los análisis se lanzan manualmente salvo que actives automatización en Ajustes.':
     'Escolha as coleções a monitorizar. Os metadados são incorporados; as análises são iniciadas manualmente, exceto se ativar a automatização nas Definições.',
   'ítems': 'itens',
@@ -8223,17 +8225,18 @@ export const PT: Record<string, string> = {
   "En Zotero: Herramientas → Complementos → ⚙ → Instalar complemento desde archivo.": "No Zotero: Ferramentas → Plugins → ⚙ → Instalar suplemento a partir de ficheiro.",
   "Guardar .xpi para Zotero": "Guardar .xpi para o Zotero",
   "Ver instrucciones de instalación": "Ver instruções de instalação",
-  "Publicar fuentes primarias revisadas": "Publicar fontes primárias revistas",
-  "Incluye metadatos, extractos y análisis; nunca archivos originales, rutas locales ni datos privados.": "Inclui metadados, excertos e análises; nunca ficheiros originais, caminhos locais ou dados privados.",
-  "Publicar testimonios textuales": "Publicar testemunhos textuais",
-  "Incluye entrevistas, transcripciones y análisis; participantes, acuerdos y archivos multimedia permanecen privados.": "Inclui entrevistas, transcrições e análises; participantes, acordos e ficheiros multimédia permanecem privados.",
-  "Espacio de trabajo": "Espaço de trabalho",
-  "notas, borradores y organización": "notas, rascunhos e organização",
-  "Organiza notas, borradores y materiales en un único espacio con citas verificables.": "Organize notas, rascunhos e materiais num único espaço com citações verificáveis.",
-  "Organiza el trabajo del corpus": "Organize o trabalho do corpus",
-  "Ya hay suficientes ideas y fuentes para organizar notas y borradores con citas verificables en un único espacio de trabajo.": "Já existem ideias e fontes suficientes para organizar notas e rascunhos com citações verificáveis num único espaço de trabalho.",
-  "Abrir espacio de trabajo": "Abrir espaço de trabalho",
-  "Espacio de trabajo: notas y borradores con fuentes verificables": "Espaço de trabalho: notas e rascunhos com fontes verificáveis",
-  "El Espacio de trabajo reúne notas, borradores y organización en una única superficie. Conserva las citas clicables y permite estructurar el manuscrito sin separar artificialmente Escritura y Proyectos.": "O Espaço de trabalho reúne notas, rascunhos e organização numa única superfície. Mantém as citações clicáveis e permite estruturar o manuscrito sem separar artificialmente Escrita e Projetos.",
-  "Revisa, amplía y transforma borradores en el Espacio de trabajo.": "Reveja, amplie e transforme rascunhos no Espaço de trabalho.",
+  "Leyendo colecciones…": "A ler coleções…",
+  "Catalogando…": "A catalogar…",
+  "Leyendo notas…": "A ler notas…",
+  "Copiando archivos…": "A copiar ficheiros…",
+  "Verificando el índice local…": "A verificar o índice local…",
+  "Importación completada": "Importação concluída",
+  "Importación cancelada": "Importação cancelada",
+  "No se pudo completar la importación": "Não foi possível concluir a importação",
+  "Cancelar importación": "Cancelar importação",
+  "Ocultar la importación terminada": "Ocultar a importação terminada",
+  "Importar archivos sueltos (sin ficha bibliográfica)": "Importar ficheiros soltos (sem ficha bibliográfica)",
+  "PDFs y EPUBs añadidos a Zotero sin una entrada encima. Llegan sin autor ni año.": "PDFs e EPUBs adicionados ao Zotero sem uma entrada por cima. Chegam sem autor nem ano.",
+  "Archivos sueltos no importados": "Ficheiros soltos não importados",
+  "Tu biblioteca tiene {n} archivo(s) sin ficha bibliográfica. Marca la casilla de arriba y vuelve a importar si los quieres.": "A sua biblioteca tem {n} ficheiro(s) sem ficha bibliográfica. Marque a caixa acima e importe de novo se os quiser.",
 };
