@@ -43,6 +43,120 @@ export function looksLikeSpanishUiText(value: string): boolean {
 }
 
 /**
+ * Every failure the global library can hit while talking to Zotero, translated.
+ *
+ * These sentences are born in the main process (`electron/zotero/zoteroClient.ts`
+ * and `electron/library/libraryService.ts`) and reach the renderer as a rejected
+ * `ipcRenderer.invoke`, which is the one path that never gets a second chance:
+ * `localizeIpcPayload` lets a renderer-translated field through untouched, but a
+ * thrown error is localized here or not at all. Unlisted, they read as Spanish
+ * prose and collapsed into the generic "the operation could not be completed" —
+ * so the commonest failure of all, a closed Zotero, named neither its cause nor
+ * its fix. The technical detail (`fetch failed`, an HTTP status) is transport
+ * output and stays verbatim in every language.
+ */
+const ZOTERO_LIBRARY_ERRORS: Record<string, UiTranslations> = {
+  'No se pudo conectar con Zotero.': {
+    es: 'No se pudo conectar con Zotero.',
+    en: 'Could not connect to Zotero.',
+    fr: 'Impossible de se connecter à Zotero.',
+    de: 'Verbindung zu Zotero nicht möglich.',
+    pt: 'Não foi possível ligar ao Zotero.',
+    'pt-BR': 'Não foi possível conectar ao Zotero.',
+    it: 'Impossibile connettersi a Zotero.',
+    tr: 'Zotero’ya bağlanılamadı.',
+  },
+  'Las credenciales de Zotero han caducado.': {
+    es: 'Las credenciales de Zotero han caducado.',
+    en: 'The Zotero credentials have expired.',
+    fr: 'Les identifiants Zotero ont expiré.',
+    de: 'Die Zotero-Anmeldedaten sind abgelaufen.',
+    pt: 'As credenciais do Zotero expiraram.',
+    'pt-BR': 'As credenciais do Zotero expiraram.',
+    it: 'Le credenziali di Zotero sono scadute.',
+    tr: 'Zotero kimlik bilgilerinin süresi doldu.',
+  },
+  'Zotero rechazó el acceso a esta biblioteca.': {
+    es: 'Zotero rechazó el acceso a esta biblioteca.',
+    en: 'Zotero refused access to this library.',
+    fr: 'Zotero a refusé l’accès à cette bibliothèque.',
+    de: 'Zotero hat den Zugriff auf diese Bibliothek verweigert.',
+    pt: 'O Zotero recusou o acesso a esta biblioteca.',
+    'pt-BR': 'O Zotero recusou o acesso a esta biblioteca.',
+    it: 'Zotero ha rifiutato l’accesso a questa libreria.',
+    tr: 'Zotero bu kitaplığa erişimi reddetti.',
+  },
+  'Zotero mantiene temporalmente limitado el acceso.': {
+    es: 'Zotero mantiene temporalmente limitado el acceso.',
+    en: 'Zotero is temporarily limiting access.',
+    fr: 'Zotero limite temporairement les accès.',
+    de: 'Zotero begrenzt den Zugriff vorübergehend.',
+    pt: 'O Zotero está a limitar temporariamente o acesso.',
+    'pt-BR': 'O Zotero está limitando temporariamente o acesso.',
+    it: 'Zotero sta limitando temporaneamente l’accesso.',
+    tr: 'Zotero erişimi geçici olarak sınırlıyor.',
+  },
+  'Configura primero la carpeta de copias de seguridad de Nodus.': {
+    es: 'Configura primero la carpeta de copias de seguridad de Nodus.',
+    en: 'Set up the Nodus backup folder first.',
+    fr: 'Configurez d’abord le dossier de sauvegarde de Nodus.',
+    de: 'Richten Sie zuerst den Nodus-Sicherungsordner ein.',
+    pt: 'Configure primeiro a pasta de cópias de segurança do Nodus.',
+    'pt-BR': 'Configure primeiro a pasta de backups do Nodus.',
+    it: 'Configura prima la cartella dei backup di Nodus.',
+    tr: 'Önce Nodus yedekleme klasörünü yapılandırın.',
+  },
+};
+
+/** The same failures whose text carries a transport detail or an HTTP status. */
+function zoteroRuntimeError(message: string, language: unknown): string | null {
+  const known = ZOTERO_LIBRARY_ERRORS[message];
+  if (known) return uiText(language, known);
+  const unreachable = /^No se pudo conectar con Zotero: (.+)$/.exec(message);
+  if (unreachable) {
+    const detail = unreachable[1];
+    return uiText(language, {
+      es: message,
+      en: `Could not connect to Zotero: ${detail}`,
+      fr: `Impossible de se connecter à Zotero : ${detail}`,
+      de: `Verbindung zu Zotero nicht möglich: ${detail}`,
+      pt: `Não foi possível ligar ao Zotero: ${detail}`,
+      'pt-BR': `Não foi possível conectar ao Zotero: ${detail}`,
+      it: `Impossibile connettersi a Zotero: ${detail}`,
+      tr: `Zotero’ya bağlanılamadı: ${detail}`,
+    });
+  }
+  const responded = /^Zotero respondió HTTP (\d+)\.$/.exec(message);
+  if (responded) {
+    const status = responded[1];
+    return uiText(language, {
+      es: message,
+      en: `Zotero responded with HTTP ${status}.`,
+      fr: `Zotero a répondu HTTP ${status}.`,
+      de: `Zotero hat mit HTTP ${status} geantwortet.`,
+      pt: `O Zotero respondeu HTTP ${status}.`,
+      'pt-BR': `O Zotero respondeu HTTP ${status}.`,
+      it: `Zotero ha risposto HTTP ${status}.`,
+      tr: `Zotero HTTP ${status} yanıtı verdi.`,
+    });
+  }
+  const missing = /^La biblioteca de Zotero ya no existe: .+\.$/.test(message);
+  if (missing) {
+    return uiText(language, {
+      es: message,
+      en: 'That Zotero library no longer exists.',
+      fr: 'Cette bibliothèque Zotero n’existe plus.',
+      de: 'Diese Zotero-Bibliothek existiert nicht mehr.',
+      pt: 'Essa biblioteca do Zotero já não existe.',
+      'pt-BR': 'Essa biblioteca do Zotero não existe mais.',
+      it: 'Quella libreria Zotero non esiste più.',
+      tr: 'Bu Zotero kitaplığı artık mevcut değil.',
+    });
+  }
+  return null;
+}
+
+/**
  * Last-resort protection for legacy Electron errors that still contain prose rather
  * than a stable error code. Specific messages should be translated by the caller;
  * unknown Spanish prose becomes a localized generic error instead of leaking Spanish.
@@ -110,6 +224,8 @@ export function localizeRuntimeError(message: string, language: unknown): string
       tr: 'Kaynak değişmeye devam ediyor. Eşitleme tamamlandıktan sonra devam edin.',
     });
   }
+  const zoteroFailure = zoteroRuntimeError(message, language);
+  if (zoteroFailure) return zoteroFailure;
   if (!looksLikeSpanishUiText(message)) return message;
   return uiText(language, {
     es: message,

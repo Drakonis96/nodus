@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
+import net from 'node:net';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -16,8 +17,17 @@ const itemId = 'zotero:E7FGXJFE';
 const storageId = 'E7FGXJFE';
 const pendingItemId = 'nodus:E2E-PENDING-READING';
 const pendingStorageId = 'E2E-PENDING-READING';
+// A port with nothing listening on it is a closed Zotero, which is both the
+// commonest way this dialog fails and the one thing the run cannot control: without
+// this, the test passed or skipped its Zotero assertions depending on whether the
+// developer happened to have Zotero open.
+const deadZoteroPort = await new Promise((resolve) => {
+  const probe = net.createServer();
+  probe.listen(0, '127.0.0.1', () => { const { port } = probe.address(); probe.close(() => resolve(port)); });
+});
 const childEnv = {
   ...process.env,
+  NODUS_ZOTERO_API_BASE: `http://127.0.0.1:${deadZoteroPort}/api`,
   NODUS_USERDATA: userData,
   NODUS_DISABLE_AUTO_UPDATE: '1',
   NODUS_E2E_UPDATE_STATUS: 'not-available',
@@ -819,6 +829,22 @@ try {
   assert.match(await zoteroDialog.innerText(), /solo lectura/);
   await page.getByTestId('zotero-sync-resume').waitFor({ state: 'visible' });
   await page.getByTestId('resume-zotero-sync').waitFor({ state: 'visible' });
+
+  // A failure here used to reach the user as "Error invoking remote method
+  // 'library:zoteroLibraries': Error: The operation could not be completed." — an IPC
+  // channel and a sentence that named neither the cause nor the fix. It must now name
+  // both: Zotero did not answer, and the setting that makes it answer.
+  const zoteroFailure = page.getByTestId('zotero-global-import-error');
+  await zoteroFailure.waitFor({ state: 'visible' });
+  const failureText = await zoteroFailure.innerText();
+  assert.doesNotMatch(failureText, /invoking remote method/, 'the IPC channel name is not an error message');
+  assert.match(failureText, /No se pudo conectar con Zotero/, 'the dialog names why the import failed');
+  await page.getByTestId('zotero-global-import-hint').waitFor({ state: 'visible' });
+  assert.match(
+    await page.getByTestId('zotero-global-import-hint').innerText(),
+    /Comprueba que Zotero esté abierto/,
+    'the dialog names the setting that fixes it',
+  );
   await page.screenshot({ path: path.join(os.tmpdir(), 'nodus-library-zotero-resume-dark-wide.png'), fullPage: true });
   await page.evaluate(() => { document.documentElement.classList.add('light'); document.documentElement.classList.remove('dark'); });
   await page.setViewportSize({ width: 760, height: 900 });
