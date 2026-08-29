@@ -46,6 +46,24 @@ async function closeElectronApp(instance) {
   if (!clean && child.exitCode === null && !child.killed) child.kill('SIGKILL');
 }
 
+async function hoverUntilTooltip(page, buttonTestId, tooltip) {
+  // These tooltips are pure CSS `:hover`, and Chromium only recomputes the hover
+  // chain when the pointer moves. A re-render of the scope switcher right after
+  // the pointer lands leaves the element unhovered with no event to fix it, so
+  // move the pointer away and back instead of waiting the state out.
+  for (let attempt = 0; attempt < 4; attempt += 1) {
+    await page.getByTestId(buttonTestId).hover();
+    try {
+      await tooltip.waitFor({ state: 'visible', timeout: 2_000 });
+      return;
+    } catch {
+      await page.mouse.move(4, 4);
+    }
+  }
+  await page.getByTestId(buttonTestId).hover();
+  await tooltip.waitFor({ state: 'visible' });
+}
+
 async function writePendingReadingFixture(collectionId, now) {
   const pendingItemFolder = path.join(backupRoot, 'nodus-library', pendingStorageId);
   const pendingMarkdown = [
@@ -164,6 +182,12 @@ try {
     await updateModal.waitFor({ state: 'detached' });
   }
   await page.locator('[data-tour="nav-library"]').click();
+  // Everyone meets the Library guide the first time they open Library, and its
+  // backdrop swallows every pointer event aimed at the view behind it.
+  const libraryTutorial = page.getByTestId('library-tutorial-modal');
+  await libraryTutorial.waitFor({ state: 'visible' });
+  await page.getByTestId('library-tutorial-close').click();
+  await libraryTutorial.waitFor({ state: 'detached' });
   const scopeSwitcher = page.getByTestId('library-scope-switcher');
   await scopeSwitcher.waitFor({ state: 'visible' });
   assert.equal(await scopeSwitcher.getAttribute('data-scope-placement'), 'content-header');
@@ -192,8 +216,7 @@ try {
   assert.ok(vaultScopeLayout.switcherWidth < Math.min(300, vaultScopeLayout.shellWidth * 0.4), `scope controls remain compact (${JSON.stringify(vaultScopeLayout)})`);
   const vaultScopeTooltip = page.getByTestId('library-scope-vault-tooltip');
   assert.equal(await vaultScopeTooltip.isVisible(), false, 'scope help is not persistent');
-  await page.getByTestId('library-scope-vault').hover();
-  await vaultScopeTooltip.waitFor({ state: 'visible' });
+  await hoverUntilTooltip(page, 'library-scope-vault', vaultScopeTooltip);
   assert.match(await vaultScopeTooltip.innerText(), /colecciones|collections/i, 'This vault explanation appears on hover');
   assert.equal(await page.getByTestId('library-scope-vault').getAttribute('aria-pressed'), 'true', 'a v3-style profile starts in the unchanged vault corpus');
   const vaultSearch = page.getByTestId('library-vault-search');
@@ -268,8 +291,7 @@ try {
   assert.ok(globalScopeLayout.switcherWidth < Math.min(300, globalScopeLayout.shellWidth * 0.4), `Global scope controls remain compact (${JSON.stringify(globalScopeLayout)})`);
   const globalScopeTooltip = page.getByTestId('library-scope-global-tooltip');
   assert.equal(await globalScopeTooltip.isVisible(), false, 'Global help is not persistent');
-  await page.getByTestId('library-scope-global').hover();
-  await globalScopeTooltip.waitFor({ state: 'visible' });
+  await hoverUntilTooltip(page, 'library-scope-global', globalScopeTooltip);
   assert.match(await globalScopeTooltip.innerText(), /Markdown/i, 'Global explanation appears on hover');
   const scopeSettings = await page.evaluate(() => window.nodus.getSettings());
   assert.equal(scopeSettings.libraryGlobalEnabled, true, 'global activation is opt-in');
@@ -645,6 +667,7 @@ try {
   await row.getByRole('button').click();
   const detail = page.getByTestId('global-library-detail');
   await detail.waitFor({ state: 'visible' });
+  await detail.getByText('10.0000/nodus.fixture').waitFor();
   console.log('[global-library-e2e] metadata detail visible');
   assert.match(await detail.innerText(), /10\.0000\/nodus\.fixture/);
   assert.match(await detail.innerText(), /1134-6396/);
@@ -660,6 +683,7 @@ try {
   await pendingRow.waitFor({ state: 'visible' });
   await pendingRow.getByRole('button').click();
   const pendingDetail = page.getByTestId('global-library-detail');
+  await pendingDetail.getByTestId('library-reading-status').getByText('Preparación pendiente').waitFor();
   assert.match(await pendingDetail.getByTestId('library-reading-status').innerText(), /Preparación pendiente/);
   const pendingEnqueue = await page.evaluate((id) => window.nodus.enqueueLibraryExtraction([id]), pendingItemId);
   assert.equal(pendingEnqueue.queued, 1, 'the pending reading enters the extraction queue');
@@ -668,6 +692,7 @@ try {
   await pendingDetail.getByTestId('library-reading-status').getByText('Lista para leer', { exact: true }).waitFor();
   assert.match(await pendingDetail.getByTestId('library-detail-primary-action').innerText(), /Leer/, 'the selected detail refreshes without leaving Library');
   await row.getByRole('button').click();
+  await detail.getByText('10.0000/nodus.fixture').waitFor();
   const toastDismissButtons = page.getByTestId('app-toast-stack').getByRole('button', { name: 'Cerrar' });
   while (await toastDismissButtons.count()) {
     await toastDismissButtons.first().evaluate((button) => (button instanceof HTMLButtonElement ? button.click() : undefined)).catch(() => undefined);
@@ -710,11 +735,14 @@ try {
   await page.locator('[data-testid^="library-workspace-tab-document-"]').first().waitFor({ state: 'visible' });
   assert.equal(await page.getByTestId('work-ideas-modal').count(), 0, 'the reader action does not reopen the analysis modal');
   const readerFormatDialog = page.getByTestId('library-reader-format-dialog');
-  if (await readerFormatDialog.count()) await page.getByTestId('library-reader-format-clean').click();
+  await readerFormatDialog.waitFor({ state: 'visible' });
+  await page.getByTestId('library-reader-format-clean').click();
+  await readerFormatDialog.waitFor({ state: 'detached' });
   await page.getByTestId('library-workspace-tab-library').click();
   await page.getByTestId('library-scope-global').click();
   await row.getByRole('button').click();
   await detail.waitFor({ state: 'visible' });
+  await detail.getByText('10.0000/nodus.fixture').waitFor();
 
   const editorToastDismissButtons = page.getByTestId('app-toast-stack').getByRole('button', { name: 'Cerrar' });
   while (await editorToastDismissButtons.count()) {
