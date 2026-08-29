@@ -36,13 +36,13 @@ import { DATABASE_TASK_TRANSLATIONS } from './i18n.databaseTasks';
 import { DATABASE_AUTOMATION_TRANSLATIONS } from './i18n.databaseAutomations';
 import { NOTION_IMPORT_TRANSLATIONS } from './i18n.notionImport';
 import { LIBRARY_ONBOARDING_TRANSLATIONS } from './i18n.libraryOnboarding';
+import { LIBRARY_TUTORIAL_TRANSLATIONS } from './i18n.libraryTutorial';
 import { SOURCE_CITATION_TRANSLATIONS } from './i18n.sourceCitation';
 import { DEEP_RESEARCH_APPROACH_TRANSLATIONS } from './i18n.deepResearchApproaches';
 import { DICTIONARY_TRANSLATIONS } from './i18n.dictionary';
 import { DEEP_RESEARCH_VERSION_TRANSLATIONS } from './i18n.deepResearchVersions';
 import { DOCUMENT_UNDERSTANDING_TRANSLATIONS } from './i18n.documentUnderstanding';
 import { DEEP_RESEARCH_QUALITY_TRANSLATIONS } from './i18n.deepResearchQuality';
-import { DOCUMENT_UNDERSTANDING_CONSENT_TRANSLATIONS } from './i18n.documentUnderstandingConsent';
 import { MODEL_SETTINGS_TRANSLATIONS } from './i18n.modelSettings';
 import { DATABASE_DEEP_RESEARCH_TRANSLATIONS } from './i18n.databaseDeepResearch';
 
@@ -70,9 +70,9 @@ export const TR: Record<string, string> = {
   ...DEEP_RESEARCH_VERSION_TRANSLATIONS.tr,
   ...DOCUMENT_UNDERSTANDING_TRANSLATIONS.tr,
   ...DEEP_RESEARCH_QUALITY_TRANSLATIONS.tr,
-  ...DOCUMENT_UNDERSTANDING_CONSENT_TRANSLATIONS.tr,
   ...LIBRARY_BIBLIOGRAPHY_TRANSLATIONS.tr,
   ...LIBRARY_ONBOARDING_TRANSLATIONS.tr,
+  ...LIBRARY_TUTORIAL_TRANSLATIONS.tr,
   ...LIBRARY_RECOVERY_TRANSLATIONS.tr,
   ...DIARIZATION_TRANSLATIONS.tr,
   ...PROSOPOGRAPHY_TRANSLATIONS.tr,
@@ -8033,4 +8033,18 @@ export const TR: Record<string, string> = {
   "En Zotero: Herramientas → Complementos → ⚙ → Instalar complemento desde archivo.": "Zotero’da: Araçlar → Eklentiler → ⚙ → Eklentiyi Dosyadan Kur.",
   "Guardar .xpi para Zotero": "Zotero için .xpi kaydet",
   "Ver instrucciones de instalación": "Kurulum talimatlarını görüntüle",
+  "Leyendo colecciones…": "Koleksiyonlar okunuyor…",
+  "Catalogando…": "Kataloglanıyor…",
+  "Leyendo notas…": "Notlar okunuyor…",
+  "Copiando archivos…": "Dosyalar kopyalanıyor…",
+  "Verificando el índice local…": "Yerel dizin doğrulanıyor…",
+  "Importación completada": "İçe aktarma tamamlandı",
+  "Importación cancelada": "İçe aktarma iptal edildi",
+  "No se pudo completar la importación": "İçe aktarma tamamlanamadı",
+  "Cancelar importación": "İçe aktarmayı iptal et",
+  "Ocultar la importación terminada": "Tamamlanan içe aktarmayı gizle",
+  "Importar archivos sueltos (sin ficha bibliográfica)": "Bağımsız dosyaları içe aktar (kaynakça kaydı olmayan)",
+  "PDFs y EPUBs añadidos a Zotero sin una entrada encima. Llegan sin autor ni año.": "Zotero’ya üstlerinde bir kayıt olmadan eklenen PDF ve EPUB’lar. Yazar ve yıl bilgisi olmadan gelirler.",
+  "Archivos sueltos no importados": "Bağımsız dosyalar içe aktarılmadı",
+  "Tu biblioteca tiene {n} archivo(s) sin ficha bibliográfica. Marca la casilla de arriba y vuelve a importar si los quieres.": "Kitaplığınızda kaynakça kaydı olmayan {n} dosya var. Bunları istiyorsanız yukarıdaki kutuyu işaretleyip yeniden içe aktarın.",
 };

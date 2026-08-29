@@ -357,7 +357,12 @@ export function Onboarding({
             </p>
             <div className="grid gap-3 sm:grid-cols-2">
               <button type="button" data-testid="onboarding-library-nodus" aria-pressed={librarySetup === 'nodus'} className={`rounded-xl border p-4 text-left ${librarySetup === 'nodus' ? 'border-indigo-500 bg-indigo-500/10' : 'border-neutral-700 hover:border-neutral-500'}`} onClick={() => setLibrarySetup('nodus')}>
-                <span className="flex items-center gap-2 font-semibold"><img src={nodusLogo} alt="" aria-hidden="true" className="h-5 w-5 shrink-0" /> {t('Biblioteca de Nodus')}</span>
+                <span className="flex items-center gap-2 font-semibold">
+                  <img src={nodusLogo} alt="" aria-hidden="true" className="h-5 w-5 shrink-0" /> {t('Biblioteca de Nodus')}
+                  {/* The standalone reference manager is still in beta; the badge says so
+                      here, exactly as the Library guide does at the same fork. */}
+                  <span data-testid="onboarding-library-nodus-beta" className="rounded-full border border-amber-500/40 bg-amber-500/15 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-amber-300">BETA</span>
+                </span>
                 <span className="mt-2 block text-xs leading-5 text-neutral-400">{t('Añade archivos, DOI, ISBN o referencias manuales y organiza tus propias colecciones. No necesitas Zotero.')}</span>
               </button>
               <button type="button" data-testid="onboarding-library-zotero" aria-pressed={librarySetup === 'zotero'} className={`rounded-xl border p-4 text-left ${librarySetup === 'zotero' ? 'border-indigo-500 bg-indigo-500/10' : 'border-neutral-700 hover:border-neutral-500'}`} onClick={() => { setLibrarySetup('zotero'); void checkZotero(); }}>

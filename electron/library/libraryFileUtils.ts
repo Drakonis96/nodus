@@ -32,6 +32,47 @@ export function safeLibraryFileName(value: string): string {
   return `${safeLibraryFolderName(clean.slice(0, -extension.length))}${extension}`;
 }
 
+/**
+ * Longest single path component every filesystem Nodus targets accepts, in bytes.
+ * It is a limit on the NAME, not on the path.
+ */
+const MAX_NAME_BYTES = 255;
+
+/**
+ * `atomicWriteFile` and `copyImmutable` both write `<name>.tmp-<pid>-<uuid>` before
+ * renaming into place, so the visible name has to leave room for that suffix. Without
+ * the reserve the failure is baffling: the destination fits, the temporary file is the
+ * thing that blows the limit, and the user is told a plainly short filename is too
+ * long. A pid can reach 7 digits and the UUID is fixed at 36, so 56 covers it.
+ */
+const TEMP_SUFFIX_BYTES = 56;
+
+/**
+ * Trim a already-sanitised name to something the filesystem will actually take.
+ *
+ * Sanitising percent-encodes anything outside `[A-Za-z0-9._-]`, which is nearly every
+ * real Zotero filename: a space costs 3 bytes, an en dash 9. A 154-character
+ * "Author - Year - Title - Supplementary Information.pdf" came out at 215 bytes and
+ * its temporary file at 262, past the limit — so the copy failed on a name whose
+ * owner could see perfectly well that it was not too long. The extension is kept (the
+ * reader dispatches on it) and a hash of the full name preserves uniqueness between
+ * two attachments that share a long prefix.
+ */
+export function fitLibraryFileName(name: string, reserveBytes = TEMP_SUFFIX_BYTES): string {
+  const budget = MAX_NAME_BYTES - reserveBytes;
+  if (Buffer.byteLength(name) <= budget) return name;
+  const extension = /\.[A-Za-z0-9]{1,16}$/.exec(name)?.[0] ?? '';
+  const marker = `-${createHash('sha256').update(name).digest('hex').slice(0, 12)}`;
+  const stemBudget = budget - Buffer.byteLength(extension) - marker.length;
+  const stem = name.slice(0, name.length - extension.length);
+  let kept = '';
+  for (const character of stem) {
+    if (Buffer.byteLength(kept + character) > stemBudget) break;
+    kept += character;
+  }
+  return `${kept}${marker}${extension}`;
+}
+
 export function assertInside(root: string, target: string): string {
   const resolvedRoot = path.resolve(root);
   const resolved = path.resolve(target);

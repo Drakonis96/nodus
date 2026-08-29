@@ -163,13 +163,6 @@ try {
     await updateModal.getByRole('button', { name: 'Entendido', exact: false }).click();
     await updateModal.waitFor({ state: 'detached' });
   }
-  const documentConsent = page.getByTestId('document-understanding-consent');
-  await documentConsent.waitFor({ state: 'attached', timeout: 1_000 }).catch(() => {});
-  if (await documentConsent.count()) {
-    await documentConsent.getByRole('button', { name: 'Ahora no', exact: true }).click();
-    await documentConsent.waitFor({ state: 'detached' });
-  }
-
   await page.locator('[data-tour="nav-library"]').click();
   const scopeSwitcher = page.getByTestId('library-scope-switcher');
   await scopeSwitcher.waitFor({ state: 'visible' });

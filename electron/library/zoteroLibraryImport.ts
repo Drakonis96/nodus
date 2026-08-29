@@ -17,7 +17,7 @@ import type {
 import type { ZoteroAttachmentInfo, ZoteroCollection, ZoteroItem, ZoteroLibrary } from '@shared/types';
 import * as zotero from '../zotero/zoteroClient';
 import { LibraryCatalog } from './libraryCatalog';
-import { assertInside, resolveLibraryFile, safeLibraryFileName, safeLibraryFolderName } from './libraryPaths';
+import { assertInside, fitLibraryFileName, resolveLibraryFile, safeLibraryFileName, safeLibraryFolderName } from './libraryPaths';
 import {
   canonicalJson,
   librarySourceIdentityKey,
@@ -35,7 +35,8 @@ export interface ZoteroImportClient {
     since?: number;
     signal?: AbortSignal;
     onProgress?: (loaded: number, total: number) => void;
-  }): Promise<{ items: ZoteroItem[]; version: number; total: number }>;
+    includeStandaloneFiles?: boolean;
+  }): Promise<{ items: ZoteroItem[]; version: number; total: number; standaloneSkipped?: number }>;
   deletedSince(library: ZoteroLibrary, since: number, signal?: AbortSignal): Promise<{
     version: number;
     items: string[];
@@ -176,18 +177,38 @@ function comparableCollection(record: LibraryCollectionRecord): string {
   return canonicalJson(rest);
 }
 
+/**
+ * Zotero has no "this one is the article" flag. An entry routinely carries a full-text
+ * PDF *and* a supplementary PDF, and to the API both are plain `application/pdf`: the
+ * format tiers below tied them, and the tie fell through to `key.localeCompare`, the
+ * alphabetical order of an opaque Zotero key. So an entry whose supplement happened to
+ * key as "AA…" and whose article keyed as "ZZ…" had Nodus read, extract and analyse
+ * the supplementary information as if it were the paper — a coin flip, silently.
+ *
+ * The attachment titles Zotero's own translators write are the only signal available,
+ * and they are fairly consistent ("Full Text PDF", "Supplementary Information"). A
+ * supplementary-looking attachment is ranked just below others of its own format, so
+ * it still wins against an image or a spreadsheet and never against the article.
+ */
+const SUPPLEMENTARY = /supplement|supporting[\s_-]+information|appendix|annex/i;
+
+function isSupplementary(attachment: ZoteroAttachmentInfo): boolean {
+  return SUPPLEMENTARY.test(`${attachment.title ?? ''} ${attachment.filename ?? ''}`);
+}
+
 function priority(attachment: ZoteroAttachmentInfo): number {
   const mime = String(attachment.contentType ?? '').toLowerCase();
   const extension = path.extname(attachment.filename ?? '').toLowerCase();
-  if (mime === 'application/pdf' || extension === '.pdf') return 0;
-  if (mime.includes('epub') || extension === '.epub') return 1;
-  if (['.md', '.markdown', '.jats', '.xml', '.html', '.htm'].includes(extension)) return 2;
-  if (['.docx', '.odt', '.rtf'].includes(extension)) return 3;
-  if (mime.startsWith('text/plain') || extension === '.txt') return 4;
-  if (['.csv', '.tsv', '.xlsx', '.xls', '.ods'].includes(extension)) return 5;
-  if (String(attachment.linkMode).toLowerCase().includes('snapshot')) return 6;
-  if (mime.startsWith('image/')) return 7;
-  return 8;
+  const format = mime === 'application/pdf' || extension === '.pdf' ? 0
+    : mime.includes('epub') || extension === '.epub' ? 1
+      : ['.md', '.markdown', '.jats', '.xml', '.html', '.htm'].includes(extension) ? 2
+        : ['.docx', '.odt', '.rtf'].includes(extension) ? 3
+          : mime.startsWith('text/plain') || extension === '.txt' ? 4
+            : ['.csv', '.tsv', '.xlsx', '.xls', '.ods'].includes(extension) ? 5
+              : String(attachment.linkMode).toLowerCase().includes('snapshot') ? 6
+                : mime.startsWith('image/') ? 7
+                  : 8;
+  return format + (isSupplementary(attachment) ? 0.5 : 0);
 }
 
 function attachmentRole(attachment: ZoteroAttachmentInfo, index: number): LibraryAttachmentRecord['role'] {
@@ -241,11 +262,18 @@ function progress(
   processedAttachments: number,
   totalAttachments: number,
   message: string,
+  // Fraction of the *items* walked by the notes and attachments passes. Those two
+  // phases cannot be measured against `totalAttachments`: that total is discovered
+  // one item at a time, so processed/total sat at ~1 from the first file onwards and
+  // pinned the bar at 93% for the entire copy. Items are known up front, so they are
+  // the only honest denominator once the catalogue is committed.
+  itemRatio = 0,
 ): ZoteroImportProgress {
-  const phaseBase = { connecting: 0, collections: 5, catalog: 15, attachments: 45, rebuild: 95, complete: 100, canceled: 100, failed: 100 }[phase];
+  const phaseBase = { connecting: 0, collections: 5, catalog: 15, notes: 45, attachments: 58, rebuild: 95, complete: 100, canceled: 100, failed: 100 }[phase];
   const portion = phase === 'catalog' && totalItems ? Math.round((processedItems / totalItems) * 28)
-    : phase === 'attachments' && totalAttachments ? Math.round((processedAttachments / totalAttachments) * 48)
-      : 0;
+    : phase === 'notes' ? Math.round(Math.min(1, Math.max(0, itemRatio)) * 12)
+      : phase === 'attachments' ? Math.round(Math.min(1, Math.max(0, itemRatio)) * 37)
+        : 0;
   return {
     requestId, phase, libraryId: library ? libraryId(library) : null, libraryName: library?.name ?? null,
     processedItems, totalItems, processedAttachments, totalAttachments,
@@ -282,9 +310,9 @@ export async function importZoteroLibraries(options: {
   const selection = options.selection ?? {};
   const report: ZoteroImportReport = {
     requestId, libraries: 0, itemsDiscovered: 0, itemsCreated: 0, itemsUpdated: 0,
-    itemsUnchanged: 0, itemsDeleted: 0, itemsSourceMissing: 0, collectionsCreated: 0, collectionsUpdated: 0,
+    itemsUnchanged: 0, itemsDeleted: 0, itemsSourceMissing: 0, itemsStandaloneSkipped: 0, collectionsCreated: 0, collectionsUpdated: 0,
     collectionsUnchanged: 0, attachmentsCopied: 0, attachmentsUnchanged: 0,
-    attachmentsUnavailable: 0, attachmentsChanged: 0, conflicts: 0, librariesMissing: [], failures: [], partial: false,
+    attachmentsUnavailable: 0, attachmentsLinkOnly: 0, attachmentsChanged: 0, conflicts: 0, librariesMissing: [], failures: [], partial: false,
     warnings: [], canceled: false, durationMs: 0,
   };
   const sessions = new ZoteroSyncSessionStore(store.root);
@@ -420,6 +448,7 @@ export async function importZoteroLibraries(options: {
 
       const page = await client.libraryItems(library, {
         since: since || undefined, signal,
+        includeStandaloneFiles: selection.includeStandaloneFiles === true,
         onProgress: (loaded, total) => emit(progress(
           requestId, 'catalog', library, processedItems + loaded, totalItems + total,
           processedAttachments, totalAttachments, `Catalogando ${library.name}…`,
@@ -429,6 +458,7 @@ export async function importZoteroLibraries(options: {
         if (subset) return item.collections.some((key) => selectedKeys.has(key));
         return selection.includeUnfiled === false ? item.collections.length > 0 : true;
       });
+      report.itemsStandaloneSkipped += page.standaloneSkipped ?? 0;
       report.itemsDiscovered += changedItems.length;
       totalItems += changedItems.length;
       const desiredByKey = new Map<string, LibraryItemRecord>();
@@ -524,12 +554,20 @@ export async function importZoteroLibraries(options: {
 
       // Deliberate checkpoint: every changed record is already visible through
       // incremental indexing before any file copy begins.
-      emit(progress(requestId, 'attachments', library, processedItems, totalItems, processedAttachments, totalAttachments, 'Catálogo listo; copiando adjuntos…'));
+      emit(progress(requestId, 'notes', library, processedItems, totalItems, processedAttachments, totalAttachments, 'Catálogo listo; leyendo notas…'));
       if (client.itemNotes) {
         const { default: TurndownService } = await import('turndown');
         const turndown = new TurndownService({ headingStyle: 'atx', bulletListMarker: '-' });
-        for (const item of changedItems) {
+        // One request per item, and every one of them has to land before the first
+        // file is copied. On a 14.000-item library that is minutes of silence, so the
+        // pass reports itself rather than leaving the bar parked on the last catalogue
+        // message with nothing to show for it.
+        for (const [noteIndex, item] of changedItems.entries()) {
           abortIfNeeded(signal);
+          emit(progress(
+            requestId, 'notes', library, processedItems, totalItems, processedAttachments, totalAttachments,
+            `Leyendo notas: ${item.title}`, changedItems.length ? noteIndex / changedItems.length : 0,
+          ));
           const current = desiredByKey.get(item.key) ?? catalogItem(zoteroSourceIdentity(sourceLibraryId, item.itemKey));
           if (!current) continue;
           try {
@@ -554,8 +592,13 @@ export async function importZoteroLibraries(options: {
         }
       }
       if (selection.copyAttachments !== false) {
-        for (const item of changedItems) {
+        emit(progress(requestId, 'attachments', library, processedItems, totalItems, processedAttachments, totalAttachments, 'Copiando adjuntos…'));
+        for (const [fileIndex, item] of changedItems.entries()) {
           abortIfNeeded(signal);
+          emit(progress(
+            requestId, 'attachments', library, processedItems, totalItems, processedAttachments, totalAttachments,
+            `Adjuntos: ${item.title}`, changedItems.length ? fileIndex / changedItems.length : 0,
+          ));
           let attachments: ZoteroAttachmentInfo[];
           try {
             attachments = (await client.itemAttachments(library.id, item.key, library)).sort((a, b) => priority(a) - priority(b) || a.key.localeCompare(b.key));
@@ -577,6 +620,15 @@ export async function importZoteroLibraries(options: {
           for (let index = 0; index < attachments.length; index += 1) {
             abortIfNeeded(signal);
             const attachment = attachments[index];
+            // A `linked_url` attachment is a bookmark: a URL with no file behind it,
+            // which Zotero answers with `400 Not a file attachment`. Asking for its
+            // path and then filing the refusal under "unavailable" turned every saved
+            // link into a warning and flagged the whole sync as partial — roughly 7% of
+            // a typical library. It is not a missing file, so it is not counted as one.
+            if (attachment.linkMode === 'linked_url' || attachment.available === false) {
+              report.attachmentsLinkOnly += 1;
+              continue;
+            }
             seenSourceKeys.add(attachment.itemKey);
             const previousBySource = current.attachments.find((entry) => entry.sourceKey === attachment.itemKey);
             let sourcePath: string | null = null;
@@ -604,13 +656,31 @@ export async function importZoteroLibraries(options: {
               continue;
             }
             const fileName = path.basename(attachment.filename || path.basename(sourcePath) || 'adjunto');
-            const baseName = `${safeLibraryFolderName(attachment.itemKey)}-${safeLibraryFileName(fileName)}`;
+            const baseName = fitLibraryFileName(`${safeLibraryFolderName(attachment.itemKey)}-${safeLibraryFileName(fileName)}`);
             const attachmentDirectory = assertInside(store.itemFolder(current.storageId), path.join(store.itemFolder(current.storageId), 'attachments'));
             let destination = assertInside(attachmentDirectory, path.join(attachmentDirectory, baseName));
             if (fs.existsSync(destination)) destination = assertInside(attachmentDirectory, path.join(
-              attachmentDirectory, `${safeLibraryFolderName(attachment.itemKey)}-${sourceHash.slice(0, 12)}-${safeLibraryFileName(fileName)}`,
+              attachmentDirectory, fitLibraryFileName(`${safeLibraryFolderName(attachment.itemKey)}-${sourceHash.slice(0, 12)}-${safeLibraryFileName(fileName)}`),
             ));
-            if (!fs.existsSync(destination)) await copyImmutable(sourcePath, destination);
+            // One unwritable file used to abort the whole library. The copy sits at the
+            // end of a loop whose only try/catch covers the Zotero request, so an
+            // ENAMETOOLONG — or a full disk, or a permission — threw past every
+            // remaining item straight to the per-library handler, and an import of
+            // 14.000 works stopped copying at whichever file happened to be awkward
+            // while the catalogue kept claiming everything was imported. A file that
+            // cannot be copied is now one skipped attachment, reported and survived.
+            try {
+              if (!fs.existsSync(destination)) await copyImmutable(sourcePath, destination);
+            } catch (error) {
+              const failure = syncFailure(error, sourceLibraryId);
+              report.failures.push(failure);
+              report.warnings.push(`No se pudo copiar el adjunto de ${item.title} — ${attachment.title}: ${failure.message}`);
+              report.attachmentsUnavailable += 1;
+              report.partial = true;
+              if (previousBySource) copied.push({ ...previousBySource, sourceState: 'not-downloaded' });
+              processedAttachments += 1;
+              continue;
+            }
             const stat = fs.statSync(destination);
             copied.push({
               id: attachment.key, title: attachment.title, fileName,
@@ -622,7 +692,10 @@ export async function importZoteroLibraries(options: {
             report.attachmentsCopied += 1;
             if (previousBySource) report.attachmentsChanged += 1;
             processedAttachments += 1;
-            emit(progress(requestId, 'attachments', library, processedItems, totalItems, processedAttachments, totalAttachments, `Copiado: ${fileName}`));
+            emit(progress(
+              requestId, 'attachments', library, processedItems, totalItems, processedAttachments, totalAttachments,
+              `Copiado: ${fileName}`, changedItems.length ? fileIndex / changedItems.length : 0,
+            ));
           }
           copied.push(...current.attachments
             .filter((entry) => entry.sourceKey && !seenSourceKeys.has(entry.sourceKey))

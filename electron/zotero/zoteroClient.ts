@@ -217,17 +217,40 @@ export interface ZoteroLibraryItemsPage {
   items: ZoteroItem[];
   version: number;
   total: number;
+  /**
+   * Parentless files left out because `includeStandaloneFiles` was off — a PDF added
+   * straight to Zotero with no bibliographic entry above it. They are reported rather
+   * than silently dropped: in a real library they can be a quarter of the shelf (603
+   * of 2.155 in the one this was measured against), and a user who never sees the
+   * number cannot know an option would bring them in.
+   */
+  standaloneSkipped: number;
 }
+
+/**
+ * A parentless attachment is only worth importing when a file actually sits behind it.
+ * A top-level `linked_url` is a bookmark: importing it would create a work with
+ * nothing to read.
+ */
+const STANDALONE_FILE_MODES = new Set(['imported_file', 'imported_url', 'linked_file']);
 
 /** All top-level bibliographic items in a library, or its incremental changes. */
 export async function libraryItems(
   library: ZoteroLibrary,
-  opts: { since?: number; signal?: AbortSignal; onProgress?: (loaded: number, total: number) => void } = {},
+  opts: {
+    since?: number;
+    signal?: AbortSignal;
+    onProgress?: (loaded: number, total: number) => void;
+    /** Import parentless files as works of their own. Off by default: they carry no
+     *  bibliographic metadata, so they change what counts as a work. */
+    includeStandaloneFiles?: boolean;
+  } = {},
 ): Promise<ZoteroLibraryItemsPage> {
   const items: ZoteroItem[] = [];
   let start = 0;
   let version = 0;
   let total = 0;
+  let standaloneSkipped = 0;
   const limit = 100;
   for (;;) {
     const params = new URLSearchParams({ limit: String(limit), start: String(start), sort: 'dateModified', direction: 'asc' });
@@ -237,14 +260,20 @@ export async function libraryItems(
     const data = (await res.json()) as any[];
     version = Number(res.headers.get('Last-Modified-Version')) || version;
     total = Number(res.headers.get('Total-Results')) || data.length;
-    items.push(...data
-      .filter((raw) => !['attachment', 'note', 'annotation'].includes(raw.data?.itemType))
-      .map((raw) => mapItem(raw, library)));
+    for (const raw of data) {
+      const itemType = raw.data?.itemType;
+      if (itemType === 'note' || itemType === 'annotation') continue;
+      if (itemType === 'attachment') {
+        if (!STANDALONE_FILE_MODES.has(String(raw.data?.linkMode))) continue;
+        if (!opts.includeStandaloneFiles) { standaloneSkipped += 1; continue; }
+      }
+      items.push(mapItem(raw, library));
+    }
     start += data.length;
     opts.onProgress?.(Math.min(start, total), total);
     if (data.length < limit || start >= total) break;
   }
-  return { items, version, total };
+  return { items, version, total, standaloneSkipped };
 }
 
 export interface ZoteroDeletedObjects {

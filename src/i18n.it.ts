@@ -36,13 +36,13 @@ import { DATABASE_TASK_TRANSLATIONS } from './i18n.databaseTasks';
 import { DATABASE_AUTOMATION_TRANSLATIONS } from './i18n.databaseAutomations';
 import { NOTION_IMPORT_TRANSLATIONS } from './i18n.notionImport';
 import { LIBRARY_ONBOARDING_TRANSLATIONS } from './i18n.libraryOnboarding';
+import { LIBRARY_TUTORIAL_TRANSLATIONS } from './i18n.libraryTutorial';
 import { SOURCE_CITATION_TRANSLATIONS } from './i18n.sourceCitation';
 import { DEEP_RESEARCH_APPROACH_TRANSLATIONS } from './i18n.deepResearchApproaches';
 import { DICTIONARY_TRANSLATIONS } from './i18n.dictionary';
 import { DEEP_RESEARCH_VERSION_TRANSLATIONS } from './i18n.deepResearchVersions';
 import { DOCUMENT_UNDERSTANDING_TRANSLATIONS } from './i18n.documentUnderstanding';
 import { DEEP_RESEARCH_QUALITY_TRANSLATIONS } from './i18n.deepResearchQuality';
-import { DOCUMENT_UNDERSTANDING_CONSENT_TRANSLATIONS } from './i18n.documentUnderstandingConsent';
 import { MODEL_SETTINGS_TRANSLATIONS } from './i18n.modelSettings';
 import { DATABASE_DEEP_RESEARCH_TRANSLATIONS } from './i18n.databaseDeepResearch';
 
@@ -70,9 +70,9 @@ export const IT: Record<string, string> = {
   ...DEEP_RESEARCH_VERSION_TRANSLATIONS.it,
   ...DOCUMENT_UNDERSTANDING_TRANSLATIONS.it,
   ...DEEP_RESEARCH_QUALITY_TRANSLATIONS.it,
-  ...DOCUMENT_UNDERSTANDING_CONSENT_TRANSLATIONS.it,
   ...LIBRARY_BIBLIOGRAPHY_TRANSLATIONS.it,
   ...LIBRARY_ONBOARDING_TRANSLATIONS.it,
+  ...LIBRARY_TUTORIAL_TRANSLATIONS.it,
   ...LIBRARY_RECOVERY_TRANSLATIONS.it,
   ...DIARIZATION_TRANSLATIONS.it,
   ...PROSOPOGRAPHY_TRANSLATIONS.it,
@@ -7688,4 +7688,18 @@ export const IT: Record<string, string> = {
   "En Zotero: Herramientas → Complementos → ⚙ → Instalar complemento desde archivo.": "In Zotero: Strumenti → Plugin → ⚙ → Installa componente aggiuntivo da file.",
   "Guardar .xpi para Zotero": "Salva .xpi per Zotero",
   "Ver instrucciones de instalación": "Visualizza le istruzioni di installazione",
+  "Leyendo colecciones…": "Lettura delle raccolte…",
+  "Catalogando…": "Catalogazione…",
+  "Leyendo notas…": "Lettura delle note…",
+  "Copiando archivos…": "Copia dei file…",
+  "Verificando el índice local…": "Verifica dell’indice locale…",
+  "Importación completada": "Importazione completata",
+  "Importación cancelada": "Importazione annullata",
+  "No se pudo completar la importación": "Non è stato possibile completare l’importazione",
+  "Cancelar importación": "Annulla importazione",
+  "Ocultar la importación terminada": "Nascondi l’importazione completata",
+  "Importar archivos sueltos (sin ficha bibliográfica)": "Importa i file singoli (senza scheda bibliografica)",
+  "PDFs y EPUBs añadidos a Zotero sin una entrada encima. Llegan sin autor ni año.": "PDF ed EPUB aggiunti a Zotero senza una voce sopra di essi. Arrivano senza autore né anno.",
+  "Archivos sueltos no importados": "File singoli non importati",
+  "Tu biblioteca tiene {n} archivo(s) sin ficha bibliográfica. Marca la casilla de arriba y vuelve a importar si los quieres.": "La tua biblioteca contiene {n} file senza scheda bibliografica. Spunta la casella qui sopra e reimporta se li vuoi.",
 };
