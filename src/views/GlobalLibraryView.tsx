@@ -412,6 +412,7 @@ function ZoteroImportDialog({ onClose, onFinished }: { onClose: () => void; onFi
   const [progress, setProgress] = useState<ZoteroImportProgress | null>(null);
   const [copyAttachments, setCopyAttachments] = useState(true);
   const [includeUnfiled, setIncludeUnfiled] = useState(true);
+  const [includeStandaloneFiles, setIncludeStandaloneFiles] = useState(false);
   const [sessions, setSessions] = useState<ZoteroSyncSession[]>([]);
   const [lastReport, setLastReport] = useState<ZoteroSyncSession['report']>(null);
 
@@ -455,7 +456,7 @@ function ZoteroImportDialog({ onClose, onFinished }: { onClose: () => void; onFi
       void window.nodus.listZoteroSyncSessions().then(setSessions).catch(() => undefined);
     }
   };
-  const start = () => run(crypto.randomUUID(), { libraryIds: [...selected], copyAttachments, includeUnfiled });
+  const start = () => run(crypto.randomUUID(), { libraryIds: [...selected], copyAttachments, includeUnfiled, includeStandaloneFiles });
   // Only the newest session can be resumed. Searching the whole history instead meant
   // that one old failure kept the "interrupted sync" banner up forever: a later run
   // that completed cleanly still found the stale entry and reported itself as
@@ -508,6 +509,11 @@ function ZoteroImportDialog({ onClose, onFinished }: { onClose: () => void; onFi
           <div className="mt-4 grid gap-2 text-xs text-neutral-400 sm:grid-cols-2">
             <label className="flex items-center gap-2 rounded-lg bg-neutral-900/60 p-2.5"><input type="checkbox" checked={copyAttachments} disabled={!!requestId} onChange={(event) => setCopyAttachments(event.target.checked)} />{t('Copiar todos los adjuntos')}</label>
             <label className="flex items-center gap-2 rounded-lg bg-neutral-900/60 p-2.5"><input type="checkbox" checked={includeUnfiled} disabled={!!requestId} onChange={(event) => setIncludeUnfiled(event.target.checked)} />{t('Incluir documentos sin colección')}</label>
+            {/* A parentless file is a first-class entry in Zotero but arrives with no
+                author, year or title beyond a filename, so it stays opt-in. The count
+                the last import skipped is reported below, because the option is
+                useless to someone who does not know it applies to them. */}
+            <label className="flex items-start gap-2 rounded-lg bg-neutral-900/60 p-2.5"><input type="checkbox" className="mt-0.5" checked={includeStandaloneFiles} disabled={!!requestId} onChange={(event) => setIncludeStandaloneFiles(event.target.checked)} /><span>{t('Importar archivos sueltos (sin ficha bibliográfica)')}<span className="mt-0.5 block text-[10px] text-neutral-500">{t('PDFs y EPUBs añadidos a Zotero sin una entrada encima. Llegan sin autor ni año.')}</span></span></label>
           </div>
           {progress && (
             <div className="mt-5 rounded-xl border border-indigo-500/20 bg-indigo-500/5 p-3">
@@ -517,6 +523,12 @@ function ZoteroImportDialog({ onClose, onFinished }: { onClose: () => void; onFi
             </div>
           )}
           {error && <p role="alert" className="mt-4 rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-xs text-red-300">{error}</p>}
+          {!!lastReport?.itemsStandaloneSkipped && !includeStandaloneFiles && (
+            <div role="status" className="mt-4 rounded-lg border border-sky-500/30 bg-sky-500/10 p-3 text-xs text-sky-950 dark:text-sky-100">
+              <b>{t('Archivos sueltos no importados')}</b>
+              <p className="mt-1">{tx('Tu biblioteca tiene {n} archivo(s) sin ficha bibliográfica. Marca la casilla de arriba y vuelve a importar si los quieres.', { n: lastReport.itemsStandaloneSkipped })}</p>
+            </div>
+          )}
           {lastReport?.partial && (
             <div role="status" className="mt-4 rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-950 dark:text-amber-100">
               <b>{t('Sincronización parcial')}</b>
