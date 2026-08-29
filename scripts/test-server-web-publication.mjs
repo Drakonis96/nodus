@@ -4,7 +4,8 @@ import path from 'node:path';
 import test from 'node:test';
 
 const root = path.resolve(import.meta.dirname, '..');
-const read = (file) => fs.readFileSync(path.join(root, file), 'utf8');
+const variants = (source) => [source, source.replaceAll('"', "'"), source.replace(/\s+/g, ' '), source.replaceAll('"', "'").replace(/\s+/g, ' ')].join('\n');
+const read = (file) => variants(fs.readFileSync(path.join(root, file), 'utf8'));
 const snapshot = read('electron/serverSync/serverSnapshot.ts');
 const library = read('electron/serverSync/serverLibrary.ts');
 const service = read('electron/serverSync/serverSyncService.ts');
@@ -35,6 +36,28 @@ test('primary-source/testimony projections and permanent denylist are explicit',
     assert.match(contract, new RegExp(`['"]${table}['"]`));
   }
   assert.match(snapshot, /DENIED_COLUMN_PATTERN/);
+});
+
+test('primary-source and testimony opt-ins travel from Desktop settings to both publishers', () => {
+  const types = read('shared/types.ts');
+  const defaults = read('electron/db/settingsRepo.ts');
+  const shared = read('electron/serverSync/serverSyncShared.ts');
+  const cloudflare = read('electron/serverSync/cloudflarePublisher.ts');
+  const settings = read('src/views/Settings.tsx');
+  for (const field of ['nodusServerIncludePrimarySources', 'nodusServerIncludeTestimonies']) {
+    assert.match(types, new RegExp(field));
+    assert.match(defaults, new RegExp(`${field}: false`));
+    assert.match(shared, new RegExp(field));
+    assert.match(settings, new RegExp(field));
+  }
+  assert.match(cloudflare, /nodusServerIncludePrimarySources: config\.includePrimarySources/);
+  assert.match(cloudflare, /nodusServerIncludeTestimonies: config\.includeTestimonies/);
+});
+
+test('prosopography remains a private identity-resolution surface', () => {
+  assert.doesNotMatch(snapshot, /prosopography:\s*GENEALOGY_SERVER_TABLES/);
+  assert.match(read('src/serverWeb/vaults/index.tsx'), /prosopography-persons[^\n]+published: false/);
+  assert.match(read('src/serverWeb/vaults/index.tsx'), /testimony-participants[^\n]+published: false/);
 });
 
 test('classic publisher consults policy before snapshot and posts a publisher envelope', () => {

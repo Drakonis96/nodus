@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import test from 'node:test';
-import { extractServerProfilePreferences } from '../../shared/serverProfilePreferences.mjs';
+import { desktopSettingsPatchFromServerProfile, extractServerProfilePreferences } from '../../shared/serverProfilePreferences.mjs';
 import { withServer } from '../../scripts/lib/nodusServerHarness.mjs';
 
 function desktopSettings(overrides = {}) {
@@ -80,6 +80,11 @@ test('Desktop profile preferences persist per user without secrets or embedding 
     assert.equal(alphaAI.preferences.defaultProvider, 'openai');
     assert.equal(alphaAI.preferences.chatModels.openai, 'gpt-5.4');
     assert.equal(alphaAI.preferences.featureModels.deepResearch.model, 'gpt-5.4');
+    const catalogWithoutCredential = await ctx.api(alphaDevice.deviceToken, 'GET', '/api/v2/me/ai/providers/openai/models');
+    assert.equal(catalogWithoutCredential.status, 409);
+    assert.equal((await catalogWithoutCredential.json()).error, 'credential_required');
+    const unsupportedCatalog = await ctx.api(alphaDevice.deviceToken, 'GET', '/api/v2/me/ai/providers/not-a-provider/models');
+    assert.equal(unsupportedCatalog.status, 404);
 
     const betaProfile = await (await ctx.api(betaDevice.deviceToken, 'GET', '/api/v2/me/preferences')).json();
     assert.equal(betaProfile.profile.revision, 0, 'another user cannot inherit or observe Alpha preferences');
@@ -134,4 +139,34 @@ test('Desktop profile preferences persist per user without secrets or embedding 
     assert.equal(privateFile.includes('private-lan.invalid'), false);
     assert.equal(privateFile.includes('gpt-5.6'), true, 'portable preferences are durable per user');
   });
+});
+
+test('portable profiles exclude local runtimes without erasing their Desktop assignments', () => {
+  const portable = extractServerProfilePreferences(desktopSettings({
+    favorites: [
+      { provider: 'openai', model: 'gpt-5.4' },
+      { provider: 'ollama', model: 'qwen-local' },
+    ],
+    synthesisModel: { provider: 'lmstudio', model: 'local-synthesis' },
+    imageProvider: 'nodus',
+    imageModel: 'local-sdxl',
+    audioProvider: 'piper',
+    audioVoice: 'es_ES-sharvard-medium',
+  }));
+
+  const serialized = JSON.stringify(portable);
+  for (const localIdentifier of ['ollama', 'qwen-local', 'lmstudio', 'local-synthesis', 'local-sdxl', 'es_ES-sharvard-medium']) {
+    assert.equal(serialized.includes(localIdentifier), false, `${localIdentifier} crossed the portable profile boundary`);
+  }
+  assert.deepEqual(portable.ai.favorites, [{ provider: 'openai', model: 'gpt-5.4' }]);
+  assert.equal(portable.ai.models.synthesis, null);
+  assert.ok(portable.ai.pendingAssignments.includes('synthesis'));
+  assert.ok(portable.ai.pendingAssignments.includes('favorites'));
+  assert.equal(portable.ai.image.pending, true);
+  assert.equal(portable.ai.audio.pending, true);
+
+  const patch = desktopSettingsPatchFromServerProfile(portable);
+  assert.equal(Object.hasOwn(patch, 'synthesisModel'), false, 'a local task assignment must remain untouched on Desktop');
+  assert.equal(Object.hasOwn(patch, 'imageProvider'), false, 'a local image runtime must remain untouched on Desktop');
+  assert.equal(Object.hasOwn(patch, 'audioProvider'), false, 'a local audio runtime must remain untouched on Desktop');
 });

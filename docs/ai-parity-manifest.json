@@ -5,7 +5,7 @@
   "roles": ["owner", "writer", "reader", "admin", "device", "oauth"],
   "viewports": {
     "desktop": { "kind": "electron", "entry": "src/App.tsx" },
-    "serverWeb": { "kind": "cookie-session-spa", "entry": "src/serverWeb/App.tsx", "base": "/app/" },
+    "serverWeb": { "kind": "cookie-session-spa", "entry": "src/serverWeb/App.tsx", "base": "/" },
     "serverApi": { "kind": "local-server-api", "entry": "server/server.mjs" },
     "cloudflareApi": { "kind": "worker-api", "entry": "cloudflare/src/worker.mjs" }
   },
@@ -24,7 +24,7 @@
         { "path": "electron/serverSync/spaceActionProcessor.ts", "line": 102, "symbol": "author.synthesis.generate", "contains": "case 'author.synthesis.generate'" }
       ] },
       "serverWeb": { "status": "implemented", "required": true, "evidence": [
-        { "path": "src/serverWeb/PersonalViews.tsx", "line": 1, "symbol": "private author synthesis", "contains": "export function AuthorSynthesisPanel" }
+        { "path": "src/serverWeb/advanced/AdvancedWorkspace.tsx", "line": 1, "symbol": "published author dossier", "contains": "export function AuthorsServerView" }
       ] }
     },
     {
@@ -88,7 +88,7 @@
         { "path": "server/lib/ai/providerGateway.mjs", "line": 4, "symbol": "Nodi capability", "contains": "'assistant', 'nodi'" }
       ] },
       "serverWeb": { "status": "implemented", "required": true, "evidence": [
-        { "path": "src/serverWeb/App.tsx", "line": 1, "symbol": "Nodi header", "contains": "data-testid=\"header-nodi\"" }
+        { "path": "src/serverWeb/App.tsx", "line": 1, "symbol": "Nodi header", "contains": "dataTestId=\"header-nodi\"" }
       ] }
     },
     {

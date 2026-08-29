@@ -19,6 +19,8 @@ const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..'
 const require = createRequire(import.meta.url);
 const appSource = await readFile(path.join(repoRoot, 'src/App.tsx'), 'utf8');
 const styles = await readFile(path.join(repoRoot, 'src/index.css'), 'utf8');
+const serverSource = await readFile(path.join(repoRoot, 'src/serverWeb/App.tsx'), 'utf8');
+const serverStyles = await readFile(path.join(repoRoot, 'src/serverWeb/serverDesktop.css'), 'utf8');
 
 const outDir = await mkdtemp(path.join(os.tmpdir(), 'nodus-header-layout-'));
 const bundle = path.join(outDir, 'headerLayout.cjs');
@@ -175,4 +177,18 @@ test('notification badges stay fully inside the clipped action rail', () => {
   assert.match(badgeRules, /top:\s*2px/);
   assert.doesNotMatch(badgeRules, /top:\s*-/);
   assert.match(badgeRules, /box-shadow:\s*0 0 0 2px/);
+});
+
+test('Server reuses the Desktop action rail and measured vault badge geometry', () => {
+  assert.match(serverSource, /HoverLabelButton/);
+  assert.match(serverSource, /ref=\{setHeaderEl\}/);
+  assert.match(serverSource, /ref=\{setHeaderActionsEl\}/);
+  assert.match(serverSource, /data-badge-fits=\{\s*vaultBadgePlacement/);
+  assert.match(serverStyles, /\.server-header-action:not\(\.bg-indigo-600\):hover/);
+});
+
+test('Server intro card has a readable light-theme counterpart', () => {
+  assert.match(serverSource, /server-home-intro/);
+  assert.match(serverStyles, /html\.light \.server-desktop-surface \.server-home-intro/);
+  assert.match(serverStyles, /background:\s*#eef2ff/);
 });

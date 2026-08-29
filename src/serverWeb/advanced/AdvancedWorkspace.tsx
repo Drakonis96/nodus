@@ -1,163 +1,1750 @@
-import { lazy, useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from 'react';
-import type { GraphData } from '@shared/types';
-import { Icon } from '../../components/ui';
-import { GraphErrorBoundary } from '../../views/graph/GraphErrorBoundary';
-import { buildGraphModel } from '../../views/graph/model';
-import { advancedRest, type AuthorsQuery, type IdeasQuery } from './api';
-import { toGraphData, type AdvancedAuthor, type AdvancedAuthorDossier, type AdvancedIdea, type AdvancedIdeaDetail, type AdvancedPage } from './types';
+import {
+  lazy,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type FormEvent,
+  type ReactNode,
+} from "react";
+import type { GraphData } from "@shared/types";
+import { Icon } from "../../components/ui";
+import { GraphErrorBoundary } from "../../views/graph/GraphErrorBoundary";
+import {
+  buildGraphModel,
+  buildPresetAtlas,
+  buildThemeBackbone,
+  buildThemeConstellation,
+  type GraphFilters,
+  type GraphLens,
+} from "../../views/graph/model";
+import { advancedRest, type AuthorsQuery, type IdeasQuery } from "./api";
+import {
+  toGraphData,
+  type AdvancedAuthor,
+  type AdvancedAuthorDossier,
+  type AdvancedIdea,
+  type AdvancedIdeaDetail,
+  type AdvancedPage,
+} from "./types";
+import { AcademicDetailExplorer } from "../academic/AcademicDetailExplorer";
+import type { GraphPresetId } from "../../navigation";
+import { getActiveLang, t, tx } from "../i18nShim";
 
-type Surface = 'ideas' | 'authors' | 'graph';
+type Surface = "ideas" | "authors" | "graph";
 
-const SigmaGraph = lazy(() => import('../../views/graph/SigmaGraph').then((module) => ({ default: module.SigmaGraph })));
+const SigmaGraph = lazy(() =>
+  import("../../views/graph/SigmaGraph").then((module) => ({
+    default: module.SigmaGraph,
+  })),
+);
 
-const IDEA_TYPES = ['', 'claim', 'finding', 'construct', 'method', 'framework'] as const;
-const IDEA_SORTS = ['label', 'type', 'works', 'connections', 'confidence'] as const;
-const AUTHOR_SORTS = ['surname', 'name', 'works', 'ideas', 'connections'] as const;
+const IDEA_TYPES = [
+  "",
+  "claim",
+  "finding",
+  "construct",
+  "method",
+  "framework",
+] as const;
+const IDEA_SORTS = [
+  "label",
+  "type",
+  "works",
+  "connections",
+  "confidence",
+] as const;
+const AUTHOR_SORTS = [
+  "surname",
+  "name",
+  "works",
+  "ideas",
+  "connections",
+] as const;
 
-function stringValue(value: unknown, fallback = '—'): string {
-  if (value === null || value === undefined || value === '') return fallback;
-  return typeof value === 'string' ? value : String(value);
+function stringValue(value: unknown, fallback = "—"): string {
+  if (value === null || value === undefined || value === "") return t(fallback);
+  return typeof value === "string" ? value : String(value);
 }
 
 function authorHeading(dossier: AdvancedAuthorDossier): string {
-  return stringValue(dossier.fullName || dossier.author.name, 'Autor sin nombre');
+  return stringValue(
+    dossier.fullName || dossier.author.name,
+    "Autor sin nombre",
+  );
 }
 
 function formatNumber(value: unknown): string {
   const number = Number(value);
-  return Number.isFinite(number) ? number.toLocaleString('es') : '0';
+  return Number.isFinite(number) ? number.toLocaleString(getActiveLang()) : "0";
 }
 
-function ErrorMessage({ error, onRetry }: { error: unknown; onRetry?: () => void }) {
-  return <div className="rounded-xl border border-red-800/70 bg-red-950/30 p-4 text-sm text-red-300" role="alert">
-    <strong>No se ha podido cargar el contenido publicado.</strong>
-    <p className="mt-1 text-xs opacity-80">{error instanceof Error ? error.message : String(error)}</p>
-    {onRetry && <button className="btn btn-ghost mt-3 text-xs" onClick={onRetry}>Reintentar</button>}
-  </div>;
+function ErrorMessage({
+  error,
+  onRetry,
+}: {
+  error: unknown;
+  onRetry?: () => void;
+}) {
+  return (
+    <div
+      className="rounded-xl border border-red-800/70 bg-red-950/30 p-4 text-sm text-red-300"
+      role="alert"
+    >
+      <strong>{t("No se ha podido cargar el contenido publicado.")}</strong>
+      <p className="mt-1 text-xs opacity-80">
+        {error instanceof Error ? error.message : String(error)}
+      </p>
+      {onRetry && (
+        <button className="btn btn-ghost mt-3 text-xs" onClick={onRetry}>
+          {t("Reintentar")}
+        </button>
+      )}
+    </div>
+  );
 }
 
 function Loading() {
-  return <div className="grid min-h-40 place-items-center text-sm text-neutral-500" role="status">Cargando…</div>;
+  return (
+    <div
+      className="grid min-h-40 place-items-center text-sm text-neutral-500"
+      role="status"
+    >
+      {t("Cargando…")}
+    </div>
+  );
 }
 
 function ReadOnlyBadge() {
-  return <span className="inline-flex items-center gap-1 rounded-full border border-teal-800/70 bg-teal-950/35 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-teal-300"><Icon name="lock" size={11} /> Solo lectura</span>;
+  return (
+    <span className="inline-flex items-center gap-1 rounded-full border border-teal-800/70 bg-teal-950/35 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-teal-300">
+      <Icon name="lock" size={11} /> {t("Solo lectura")}
+    </span>
+  );
 }
 
-function Section({ title, icon, children, testId }: { title: string; icon?: string; children: ReactNode; testId?: string }) {
-  return <section data-testid={testId} className="rounded-xl border border-neutral-800 bg-neutral-950/45 p-4">
-    <div className="mb-3 flex items-center gap-2"><Icon name={icon ?? 'layers'} size={15} className="text-indigo-300" /><h3 className="text-sm font-semibold text-neutral-100">{title}</h3></div>
-    {children}
-  </section>;
+function Section({
+  title,
+  icon,
+  children,
+  testId,
+}: {
+  title: string;
+  icon?: string;
+  children: ReactNode;
+  testId?: string;
+}) {
+  const translatedTitle = title.replace(
+    /\((\d+)\)$/,
+    (_match, count: string) => `(${count})`,
+  );
+  const titleKey = title.replace(/\(\d+\)$/, "({n})");
+  return (
+    <section
+      data-testid={testId}
+      className="rounded-xl border border-neutral-800 bg-neutral-950/45 p-4"
+    >
+      <div className="mb-3 flex items-center gap-2">
+        <Icon name={icon ?? "layers"} size={15} className="text-indigo-300" />
+        <h3 className="text-sm font-semibold text-neutral-100">
+          {titleKey !== title
+            ? tx(titleKey, { n: title.match(/\((\d+)\)$/)?.[1] ?? "" })
+            : t(translatedTitle)}
+        </h3>
+      </div>
+      {children}
+    </section>
+  );
 }
 
-function PageControls({ page, onPage }: { page: AdvancedPage<unknown>; onPage: (offset: number) => void }) {
+function _PageControls({
+  page,
+  onPage,
+}: {
+  page: AdvancedPage<unknown>;
+  onPage: (offset: number) => void;
+}) {
   const current = page.limit ? Math.floor(page.offset / page.limit) + 1 : 1;
-  const totalPages = page.limit ? Math.max(1, Math.ceil(page.total / page.limit)) : 1;
-  return <div className="mt-4 flex flex-wrap items-center justify-between gap-2 text-xs text-neutral-500" data-testid="advanced-pagination">
-    <span>{page.total ? `${page.offset + 1}–${Math.min(page.total, page.offset + page.items.length)} de ${page.total}` : 'Sin resultados'}</span>
-    <div className="flex items-center gap-2"><button className="btn btn-ghost text-xs" disabled={page.offset <= 0} onClick={() => onPage(Math.max(0, page.offset - page.limit))} aria-label="Página anterior">‹</button><span>Página {current} / {totalPages}</span><button className="btn btn-ghost text-xs" disabled={!page.hasMore} onClick={() => onPage(page.offset + page.limit)} aria-label="Página siguiente">›</button></div>
-  </div>;
-}
-
-function IdeaCard({ idea, onOpen }: { idea: AdvancedIdea; onOpen: () => void }) {
-  return <button className="server-record-card flex items-start gap-3" onClick={onOpen} data-testid="advanced-idea-card">
-    <span className="server-record-icon"><Icon name="bulb" /></span>
-    <span className="min-w-0 flex-1"><strong className="block truncate text-sm text-neutral-200">{idea.label}</strong><span className="mt-1 block text-[11px] uppercase tracking-wide text-indigo-300">{idea.type}</span><small className="mt-1 line-clamp-2 block text-xs leading-5 text-neutral-500">{idea.statement || 'Sin enunciado publicado'}</small><span className="mt-2 block text-[11px] text-neutral-600">{formatNumber(idea.workCount)} obras · {formatNumber(idea.connectionCount)} conexiones</span></span><Icon name="chevronRight" size={14} className="mt-2 text-neutral-700" />
-  </button>;
-}
-
-function IdeaDetail({ detail, onBack }: { detail: AdvancedIdeaDetail; onBack: () => void }) {
-  const idea = detail.idea;
-  return <div className="space-y-4" data-testid="advanced-idea-detail">
-    <button className="flex items-center gap-1 text-xs text-neutral-500 hover:text-neutral-200" onClick={onBack}><Icon name="chevronLeft" size={13} />Volver a Ideas</button>
-    <header className="rounded-2xl border border-indigo-800/60 bg-indigo-950/25 p-5"><div className="flex flex-wrap items-start gap-3"><span className="server-record-icon"><Icon name="bulb" /></span><div className="min-w-0 flex-1"><div className="text-[10px] font-semibold uppercase tracking-[.18em] text-indigo-300">{stringValue(idea.type, 'claim')}</div><h2 className="mt-1 text-xl font-semibold text-neutral-100">{stringValue(idea.label, 'Idea sin título')}</h2><p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-neutral-400">{stringValue(idea.statement, 'Sin enunciado publicado')}</p><div className="mt-3 flex flex-wrap gap-2">{detail.themes.map((theme) => <span key={theme} className="rounded-full border border-amber-800/60 px-2 py-1 text-[11px] text-amber-300">{theme}</span>)}</div></div><ReadOnlyBadge /></div></header>
-    <div className="grid items-start gap-4 xl:grid-cols-2">
-      <Section title={`Obras y ocurrencias (${detail.occurrences.length})`} icon="book"><div className="space-y-2">{detail.occurrences.length ? detail.occurrences.map((entry, index) => <article key={`${stringValue(entry.nodus_id, String(index))}-${index}`} className="rounded-lg border border-neutral-800 p-3"><strong className="text-sm text-neutral-200">{stringValue(entry.workTitle ?? entry.nodus_id, 'Obra publicada')}</strong><p className="mt-1 whitespace-pre-wrap text-xs leading-5 text-neutral-500">{stringValue(entry.development ?? entry.context, 'Sin desarrollo publicado')}</p><span className="mt-1 block text-[11px] text-neutral-600">{stringValue(entry.role, 'secondary')} · confianza {stringValue(entry.confidence, '—')}</span></article>) : <p className="text-xs text-neutral-600">No hay ocurrencias publicadas.</p>}</div></Section>
-      <Section title={`Evidencia (${detail.evidence.length})`} icon="quote"><div className="space-y-2">{detail.evidence.length ? detail.evidence.map((entry, index) => <blockquote key={`${index}-${stringValue(entry.id)}`} className="rounded-r-lg border-l-2 border-indigo-500 bg-neutral-900/55 px-3 py-2 text-sm italic leading-6 text-neutral-300">“{stringValue(entry.quote ?? entry.text, 'Evidencia sin texto')}”<span className="mt-1 block text-[11px] not-italic text-neutral-600">{stringValue(entry.location ?? entry.source_ref, '')}</span></blockquote>) : <p className="text-xs text-neutral-600">No hay evidencia anclada publicada.</p>}</div></Section>
-      <Section title={`Relaciones (${detail.relations.length})`} icon="share"><div className="space-y-2">{detail.relations.length ? detail.relations.map((entry, index) => <div key={`${stringValue(entry.id, String(index))}`} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-neutral-800 px-3 py-2 text-xs"><span className="text-neutral-300">{stringValue(entry.type, 'relación')}</span><span className="text-neutral-500">{stringValue(entry.from_id)} → {stringValue(entry.to_id)}</span></div>) : <p className="text-xs text-neutral-600">No hay relaciones visibles.</p>}</div></Section>
-      <Section title="Metadatos publicados" icon="info"><dl className="server-detail-list">{Object.entries(idea).filter(([, value]) => value !== null && value !== undefined && typeof value !== 'object').slice(0, 20).map(([key, value]) => <div key={key}><dt>{key.replace(/_/g, ' ')}</dt><dd>{stringValue(value)}</dd></div>)}</dl></Section>
+  const totalPages = page.limit
+    ? Math.max(1, Math.ceil(page.total / page.limit))
+    : 1;
+  return (
+    <div
+      className="mt-4 flex flex-wrap items-center justify-between gap-2 text-xs text-neutral-500"
+      data-testid="advanced-pagination"
+    >
+      <span>
+        {page.total
+          ? `${page.offset + 1}–${Math.min(page.total, page.offset + page.items.length)} de ${page.total}`
+          : t("Sin resultados")}
+      </span>
+      <div className="flex items-center gap-2">
+        <button
+          className="btn btn-ghost text-xs"
+          disabled={page.offset <= 0}
+          onClick={() => onPage(Math.max(0, page.offset - page.limit))}
+          aria-label={t("Página anterior")}
+        >
+          ‹
+        </button>
+        <span>
+          {t("Página")} {current} / {totalPages}
+        </span>
+        <button
+          className="btn btn-ghost text-xs"
+          disabled={!page.hasMore}
+          onClick={() => onPage(page.offset + page.limit)}
+          aria-label={t("Página siguiente")}
+        >
+          ›
+        </button>
+      </div>
     </div>
-  </div>;
+  );
 }
 
-export function IdeasServerView({ spaceId }: { spaceId: string }) {
-  const [query, setQuery] = useState('');
-  const [filters, setFilters] = useState<IdeasQuery>({ offset: 0, limit: 80, sort: 'label' });
-  const [page, setPage] = useState<AdvancedPage<AdvancedIdea>>({ items: [], total: 0, offset: 0, limit: 80, hasMore: false });
+function _IdeaCard({
+  idea,
+  onOpen,
+}: {
+  idea: AdvancedIdea;
+  onOpen: () => void;
+}) {
+  return (
+    <button
+      className="server-record-card flex items-start gap-3"
+      onClick={onOpen}
+      data-testid="advanced-idea-card"
+    >
+      <span className="server-record-icon">
+        <Icon name="bulb" />
+      </span>
+      <span className="min-w-0 flex-1">
+        <strong className="block truncate text-sm text-neutral-200">
+          {idea.label}
+        </strong>
+        <span className="mt-1 block text-[11px] uppercase tracking-wide text-indigo-300">
+          {idea.type}
+        </span>
+        <small className="mt-1 line-clamp-2 block text-xs leading-5 text-neutral-500">
+          {idea.statement || t("Sin enunciado publicado")}
+        </small>
+        <span className="mt-2 block text-[11px] text-neutral-600">
+          {formatNumber(idea.workCount)} {t("obras")} ·{" "}
+          {formatNumber(idea.connectionCount)} {t("conexiones")}
+        </span>
+      </span>
+      <Icon name="chevronRight" size={14} className="mt-2 text-neutral-700" />
+    </button>
+  );
+}
+
+function _IdeaDetail({
+  detail,
+  onBack,
+}: {
+  detail: AdvancedIdeaDetail;
+  onBack: () => void;
+}) {
+  const idea = detail.idea;
+  return (
+    <div className="space-y-4" data-testid="advanced-idea-detail">
+      <button
+        className="flex items-center gap-1 text-xs text-neutral-500 hover:text-neutral-200"
+        onClick={onBack}
+      >
+        <Icon name="chevronLeft" size={13} />
+        {t("Volver a Ideas")}
+      </button>
+      <header className="rounded-2xl border border-indigo-800/60 bg-indigo-950/25 p-5">
+        <div className="flex flex-wrap items-start gap-3">
+          <span className="server-record-icon">
+            <Icon name="bulb" />
+          </span>
+          <div className="min-w-0 flex-1">
+            <div className="text-[10px] font-semibold uppercase tracking-[.18em] text-indigo-300">
+              {stringValue(idea.type, "claim")}
+            </div>
+            <h2 className="mt-1 text-xl font-semibold text-neutral-100">
+              {stringValue(idea.label, "Idea sin título")}
+            </h2>
+            <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-neutral-400">
+              {stringValue(idea.statement, "Sin enunciado publicado")}
+            </p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {detail.themes.map((theme) => (
+                <span
+                  key={theme}
+                  className="rounded-full border border-amber-800/60 px-2 py-1 text-[11px] text-amber-300"
+                >
+                  {theme}
+                </span>
+              ))}
+            </div>
+          </div>
+          <ReadOnlyBadge />
+        </div>
+      </header>
+      <div className="grid items-start gap-4 xl:grid-cols-2">
+        <Section
+          title={`Obras y ocurrencias (${detail.occurrences.length})`}
+          icon="book"
+        >
+          <div className="space-y-2">
+            {detail.occurrences.length ? (
+              detail.occurrences.map((entry, index) => (
+                <article
+                  key={`${stringValue(entry.nodus_id, String(index))}-${index}`}
+                  className="rounded-lg border border-neutral-800 p-3"
+                >
+                  <strong className="text-sm text-neutral-200">
+                    {stringValue(
+                      entry.workTitle ?? entry.nodus_id,
+                      "Obra publicada",
+                    )}
+                  </strong>
+                  <p className="mt-1 whitespace-pre-wrap text-xs leading-5 text-neutral-500">
+                    {stringValue(
+                      entry.development ?? entry.context,
+                      "Sin desarrollo publicado",
+                    )}
+                  </p>
+                  <span className="mt-1 block text-[11px] text-neutral-600">
+                    {stringValue(entry.role, "secondary")} · {t("confianza")}{" "}
+                    {stringValue(entry.confidence, "—")}
+                  </span>
+                </article>
+              ))
+            ) : (
+              <p className="text-xs text-neutral-600">
+                {t("No hay ocurrencias publicadas.")}
+              </p>
+            )}
+          </div>
+        </Section>
+        <Section title={`Evidencia (${detail.evidence.length})`} icon="quote">
+          <div className="space-y-2">
+            {detail.evidence.length ? (
+              detail.evidence.map((entry, index) => (
+                <blockquote
+                  key={`${index}-${stringValue(entry.id)}`}
+                  className="rounded-r-lg border-l-2 border-indigo-500 bg-neutral-900/55 px-3 py-2 text-sm italic leading-6 text-neutral-300"
+                >
+                  “
+                  {stringValue(
+                    entry.quote ?? entry.text,
+                    "Evidencia sin texto",
+                  )}
+                  ”
+                  <span className="mt-1 block text-[11px] not-italic text-neutral-600">
+                    {stringValue(entry.location ?? entry.source_ref, "")}
+                  </span>
+                </blockquote>
+              ))
+            ) : (
+              <p className="text-xs text-neutral-600">
+                {t("No hay evidencia anclada publicada.")}
+              </p>
+            )}
+          </div>
+        </Section>
+        <Section title={`Relaciones (${detail.relations.length})`} icon="share">
+          <div className="space-y-2">
+            {detail.relations.length ? (
+              detail.relations.map((entry, index) => (
+                <div
+                  key={`${stringValue(entry.id, String(index))}`}
+                  className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-neutral-800 px-3 py-2 text-xs"
+                >
+                  <span className="text-neutral-300">
+                    {stringValue(entry.type, "relación")}
+                  </span>
+                  <span className="text-neutral-500">
+                    {stringValue(entry.from_id)} → {stringValue(entry.to_id)}
+                  </span>
+                </div>
+              ))
+            ) : (
+              <p className="text-xs text-neutral-600">
+                {t("No hay relaciones visibles.")}
+              </p>
+            )}
+          </div>
+        </Section>
+        <Section title="Metadatos publicados" icon="info">
+          <dl className="server-detail-list">
+            {Object.entries(idea)
+              .filter(
+                ([, value]) =>
+                  value !== null &&
+                  value !== undefined &&
+                  typeof value !== "object",
+              )
+              .slice(0, 20)
+              .map(([key, value]) => (
+                <div key={key}>
+                  <dt>{key.replace(/_/g, " ")}</dt>
+                  <dd>{stringValue(value)}</dd>
+                </div>
+              ))}
+          </dl>
+        </Section>
+      </div>
+    </div>
+  );
+}
+
+export function IdeasServerView({
+  spaceId,
+  csrfToken: _csrfToken,
+}: {
+  spaceId: string;
+  csrfToken?: string;
+}) {
+  const [query, setQuery] = useState("");
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const [filters, setFilters] = useState<IdeasQuery>({
+    offset: 0,
+    limit: 80,
+    sort: "label",
+  });
+  const [page, setPage] = useState<AdvancedPage<AdvancedIdea>>({
+    items: [],
+    total: 0,
+    offset: 0,
+    limit: 80,
+    hasMore: false,
+  });
   const [detail, setDetail] = useState<AdvancedIdeaDetail | null>(null);
-  const [openTabs, setOpenTabs] = useState<Array<{ id: string; label: string }>>([]);
+  const [openTabs, setOpenTabs] = useState<
+    Array<{ id: string; label: string }>
+  >([]);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<unknown>();
   const listRequest = useRef(0);
   const detailRequest = useRef(0);
 
-  const load = useCallback(async () => { const request = ++listRequest.current; setLoading(true); setError(undefined); try { const next = await advancedRest.ideas(spaceId, filters); if (request === listRequest.current) setPage(next); } catch (cause) { if (request === listRequest.current) setError(cause); } finally { if (request === listRequest.current) setLoading(false); } }, [filters, spaceId]);
-  useEffect(() => { void load(); }, [load]);
-  const open = useCallback(async (idea: Pick<AdvancedIdea, 'id' | 'label'>) => { const request = ++detailRequest.current; setOpenTabs((tabs) => tabs.some((tab) => tab.id === idea.id) ? tabs : [...tabs, { id: idea.id, label: idea.label }]); setActiveId(idea.id); setError(undefined); try { const next = await advancedRest.idea(spaceId, idea.id); if (request === detailRequest.current) setDetail(next); } catch (cause) { if (request === detailRequest.current) setError(cause); } }, [spaceId]);
-  const showCatalog = () => { detailRequest.current += 1; setActiveId(null); setDetail(null); };
-  const closeTab = (id: string) => { setOpenTabs((tabs) => tabs.filter((tab) => tab.id !== id)); if (activeId === id) showCatalog(); };
-  const submit = (event: FormEvent) => { event.preventDefault(); setFilters((current) => ({ ...current, offset: 0, q: query.trim() || undefined })); };
+  const load = useCallback(async () => {
+    const request = ++listRequest.current;
+    setLoading(true);
+    setError(undefined);
+    try {
+      const next = await advancedRest.ideas(spaceId, filters);
+      if (request === listRequest.current) setPage(next);
+    } catch (cause) {
+      if (request === listRequest.current) setError(cause);
+    } finally {
+      if (request === listRequest.current) setLoading(false);
+    }
+  }, [filters, spaceId]);
+  useEffect(() => {
+    void load();
+  }, [load]);
+  const open = useCallback(
+    async (idea: Pick<AdvancedIdea, "id" | "label">) => {
+      const request = ++detailRequest.current;
+      setOpenTabs((tabs) =>
+        tabs.some((tab) => tab.id === idea.id)
+          ? tabs
+          : [...tabs, { id: idea.id, label: idea.label }],
+      );
+      setActiveId(idea.id);
+      setError(undefined);
+      try {
+        const next = await advancedRest.idea(spaceId, idea.id);
+        if (request === detailRequest.current) setDetail(next);
+      } catch (cause) {
+        if (request === detailRequest.current) setError(cause);
+      }
+    },
+    [spaceId],
+  );
+  const showCatalog = () => {
+    detailRequest.current += 1;
+    setActiveId(null);
+    setDetail(null);
+  };
+  const closeTab = (id: string) => {
+    setOpenTabs((tabs) => tabs.filter((tab) => tab.id !== id));
+    if (activeId === id) showCatalog();
+  };
+  const submit = (event: FormEvent) => {
+    event.preventDefault();
+    setFilters((current) => ({
+      ...current,
+      offset: 0,
+      q: query.trim() || undefined,
+    }));
+  };
 
-  return <div className="flex h-full min-h-0 flex-col" data-testid="advanced-ideas-view">
-    <header className="shrink-0 border-b border-neutral-800 p-4"><div className="flex flex-wrap items-center gap-3"><div><h1 className="text-base font-semibold text-neutral-100">Ideas</h1><p className="text-xs text-neutral-500">{formatNumber(page.total)} ideas publicadas</p></div><ReadOnlyBadge /></div><div data-testid="advanced-ideas-tabs" className="mt-4 flex min-w-0 items-end gap-1 overflow-x-auto"><button className={`flex h-8 shrink-0 items-center gap-2 rounded-t-lg px-3 text-xs ${!activeId ? 'bg-neutral-900 text-neutral-100' : 'text-neutral-500'}`} onClick={showCatalog}>Catálogo</button>{openTabs.map((tab) => <div key={tab.id} className={`flex h-8 shrink-0 items-center rounded-t-lg ${activeId === tab.id ? 'bg-neutral-900 text-neutral-100' : 'text-neutral-500'}`}><button className="max-w-48 truncate px-3 text-xs" onClick={() => { setActiveId(tab.id); const found = page.items.find((idea) => idea.id === tab.id); if (found) void open(found); }}>{tab.label}</button><button className="mr-1 rounded px-1 text-neutral-600 hover:text-neutral-200" aria-label={`Cerrar ${tab.label}`} onClick={() => closeTab(tab.id)}>×</button></div>)}</div></header>
-    <div className="min-h-0 flex-1 overflow-auto p-4">{activeId && detail ? <IdeaDetail detail={detail} onBack={showCatalog} /> : <>{activeId && <Loading />}{!activeId && <><form className="mb-4 flex flex-wrap gap-2" onSubmit={submit}><input data-testid="advanced-ideas-search" className="input min-w-[180px] flex-1 text-xs" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Buscar ideas publicadas…" /><select className="input text-xs" value={filters.type ?? ''} onChange={(event) => setFilters((current) => ({ ...current, offset: 0, type: event.target.value || undefined }))}>{IDEA_TYPES.map((type) => <option key={type} value={type}>{type || 'Todos los tipos'}</option>)}</select><select className="input text-xs" value={filters.sort ?? 'label'} onChange={(event) => setFilters((current) => ({ ...current, offset: 0, sort: event.target.value as IdeasQuery['sort'] }))}>{IDEA_SORTS.map((sort) => <option key={sort} value={sort}>{sort === 'label' ? 'Etiqueta' : sort}</option>)}</select><button className="btn text-xs">Buscar</button></form>{error ? <ErrorMessage error={error} onRetry={() => void load()} /> : loading ? <Loading /> : page.items.length === 0 ? <div className="grid min-h-40 place-items-center text-sm text-neutral-600">No hay ideas publicadas con estos filtros.</div> : <><div className="server-record-grid">{page.items.map((idea) => <IdeaCard key={idea.id} idea={idea} onOpen={() => void open(idea)} />)}</div><PageControls page={page} onPage={(offset) => setFilters((current) => ({ ...current, offset }))} /></>}</>}</>}</div>
-  </div>;
+  const activeSort = filters.sort ?? "label";
+  return (
+    <div
+      className="flex h-full min-h-0 flex-col bg-white text-neutral-900 dark:bg-neutral-950 dark:text-neutral-100"
+      data-testid="advanced-ideas-view"
+    >
+      <header className="shrink-0 border-b border-neutral-200 px-5 pt-4 dark:border-neutral-800">
+        <div className="mb-3 flex flex-wrap items-center gap-3">
+          <span className="grid h-9 w-9 place-items-center rounded-xl bg-indigo-100 text-indigo-600 dark:bg-indigo-500/15 dark:text-indigo-300">
+            <Icon name="bulb" size={18} />
+          </span>
+          <div>
+            <h1 className="text-base font-semibold">{t("Ideas")}</h1>
+            <p className="text-[11px] text-neutral-500">
+              {formatNumber(page.total)} {t("ideas extraídas")}
+            </p>
+          </div>
+          <div className="flex-1" />
+          <ReadOnlyBadge />
+        </div>
+        <div
+          data-testid="advanced-ideas-tabs"
+          className="flex min-w-0 items-end gap-1 overflow-x-auto"
+        >
+          <button
+            className={`flex h-9 shrink-0 items-center gap-2 rounded-t-lg border border-b-0 px-3 text-xs ${!activeId ? "border-neutral-300 bg-white text-neutral-900 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-100" : "border-transparent text-neutral-500 hover:bg-neutral-100 dark:hover:bg-neutral-900/60"}`}
+            onClick={showCatalog}
+          >
+            <Icon name="list" size={13} /> {t("Ideas")}
+          </button>
+          {openTabs.map((tab) => (
+            <div
+              key={tab.id}
+              className={`flex h-9 min-w-0 shrink-0 items-center rounded-t-lg border border-b-0 ${activeId === tab.id ? "border-neutral-300 bg-white text-neutral-900 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-100" : "border-transparent text-neutral-500 hover:bg-neutral-100 dark:hover:bg-neutral-900/60"}`}
+            >
+              <button
+                className="flex h-full max-w-80 min-w-0 items-center gap-2 px-3 text-xs"
+                onClick={() => void open(tab)}
+              >
+                <Icon name="bulb" size={13} />
+                <span className="truncate">{tab.label}</span>
+              </button>
+              <button
+                className="mr-1 grid h-6 w-6 place-items-center rounded hover:bg-neutral-200 dark:hover:bg-neutral-800"
+                aria-label={`${t("Cerrar")} ${tab.label}`}
+                onClick={() => closeTab(tab.id)}
+              >
+                <Icon name="x" size={11} />
+              </button>
+            </div>
+          ))}
+        </div>
+      </header>
+      <main className="min-h-0 flex-1">
+        {activeId ? (
+          <div className="h-full overflow-auto p-4">
+            <AcademicDetailExplorer
+              key={activeId}
+              spaceId={spaceId}
+              origin={t("Ideas")}
+              initialTarget={{
+                kind: "idea",
+                id: activeId,
+                label:
+                  openTabs.find((tab) => tab.id === activeId)?.label ??
+                  String(detail?.idea.label ?? activeId),
+              }}
+              onOrigin={showCatalog}
+            />
+          </div>
+        ) : (
+          <div className="flex h-full min-h-0 flex-col">
+            <form
+              className="shrink-0 border-b border-neutral-200 p-3 dark:border-neutral-800"
+              onSubmit={submit}
+            >
+              <div className="flex flex-wrap items-center gap-2">
+                <div className="relative min-w-[240px] flex-1">
+                  <Icon
+                    name="search"
+                    size={15}
+                    className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-neutral-500"
+                  />
+                  <input
+                    data-testid="advanced-ideas-search"
+                    className="input input-with-leading-icon w-full"
+                    value={query}
+                    onChange={(event) => setQuery(event.target.value)}
+                    placeholder={t("Buscar ideas…")}
+                  />
+                </div>
+                <button
+                  type="button"
+                  className={`btn border border-neutral-300 dark:border-neutral-700 ${filtersOpen || filters.type ? "bg-indigo-50 text-indigo-700 dark:bg-indigo-500/10 dark:text-indigo-300" : "btn-ghost"}`}
+                  onClick={() => setFiltersOpen((value) => !value)}
+                >
+                  <Icon name="filter" /> {t("Filtros")}
+                </button>
+              </div>
+              {filtersOpen && (
+                <div className="mt-2 flex flex-wrap items-center gap-3 rounded-xl bg-neutral-50 p-2 dark:bg-neutral-900/55">
+                  <label className="flex items-center gap-2 text-xs text-neutral-500">
+                    {t("Tipo")}
+                    <select
+                      className="input h-8 text-xs"
+                      value={filters.type ?? ""}
+                      onChange={(event) =>
+                        setFilters((current) => ({
+                          ...current,
+                          offset: 0,
+                          type: event.target.value || undefined,
+                        }))
+                      }
+                    >
+                      {IDEA_TYPES.map((type) => (
+                        <option key={type} value={type}>
+                          {type || t("Todos los tipos")}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="flex items-center gap-2 text-xs text-neutral-500">
+                    {t("Ordenar")}
+                    <select
+                      className="input h-8 text-xs"
+                      value={activeSort}
+                      onChange={(event) =>
+                        setFilters((current) => ({
+                          ...current,
+                          offset: 0,
+                          sort: event.target.value as IdeasQuery["sort"],
+                        }))
+                      }
+                    >
+                      {IDEA_SORTS.map((sort) => (
+                        <option key={sort} value={sort}>
+                          {sort === "label" ? t("Nombre") : t(sort)}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                </div>
+              )}
+            </form>
+            <div
+              className="min-h-0 flex-1 overflow-auto"
+              data-testid="ideas-table-scroll"
+            >
+              <div className="min-w-[1080px]" data-testid="ideas-catalog-table">
+                <div
+                  className="grid h-11 items-center border-b border-neutral-200 px-4 text-[10px] font-semibold uppercase tracking-wider text-neutral-500 dark:border-neutral-800 dark:text-neutral-600"
+                  style={{
+                    gridTemplateColumns:
+                      "minmax(360px,2.4fr) 8rem 6.5rem 7.5rem 7rem minmax(220px,1.35fr) 2rem",
+                  }}
+                >
+                  <span>{t("Idea")}</span>
+                  <span>{t("Tipo")}</span>
+                  <span>{t("Nº de obras")}</span>
+                  <span>{t("Nº de conexiones")}</span>
+                  <span>{t("Confianza")}</span>
+                  <span>{t("Temas")}</span>
+                  <span />
+                </div>
+                {error ? (
+                  <ErrorMessage error={error} onRetry={() => void load()} />
+                ) : loading ? (
+                  <Loading />
+                ) : page.items.length === 0 ? (
+                  <div className="grid h-48 place-items-center text-sm text-neutral-500">
+                    {t("No hay ideas publicadas con estos filtros.")}
+                  </div>
+                ) : (
+                  page.items.map((idea) => (
+                    <button
+                      key={idea.id}
+                      data-testid="advanced-idea-card"
+                      className="grid min-h-[88px] w-full items-center border-b border-neutral-100 px-4 py-3 text-left text-xs transition-colors hover:bg-neutral-50 dark:border-neutral-900 dark:hover:bg-neutral-900/55"
+                      style={{
+                        gridTemplateColumns:
+                          "minmax(360px,2.4fr) 8rem 6.5rem 7.5rem 7rem minmax(220px,1.35fr) 2rem",
+                      }}
+                      onClick={() => void open(idea)}
+                    >
+                      <div className="flex min-w-0 items-center gap-2 pr-5">
+                        <span className="h-2.5 w-2.5 shrink-0 rounded-full bg-indigo-500" />
+                        <div className="min-w-0">
+                          <span className="block truncate font-medium text-neutral-900 dark:text-neutral-200">
+                            {idea.label}
+                          </span>
+                          <span className="mt-1 block line-clamp-2 text-[11px] leading-relaxed text-neutral-500">
+                            {idea.statement}
+                          </span>
+                        </div>
+                      </div>
+                      <span className="text-neutral-600 dark:text-neutral-400">
+                        {idea.type}
+                      </span>
+                      <span className="tabular-nums text-neutral-600 dark:text-neutral-400">
+                        {idea.workCount}
+                      </span>
+                      <span className="tabular-nums text-neutral-600 dark:text-neutral-400">
+                        {idea.connectionCount}
+                      </span>
+                      <span className="tabular-nums text-neutral-600 dark:text-neutral-400">
+                        {idea.maxConfidence.toFixed(2)}
+                      </span>
+                      <span className="flex min-w-0 flex-wrap gap-1 pr-3">
+                        {idea.themes.slice(0, 3).map((theme) => (
+                          <span
+                            key={theme}
+                            className="max-w-36 truncate rounded-full bg-neutral-100 px-2 py-1 text-[10px] text-neutral-600 dark:bg-neutral-900 dark:text-neutral-500"
+                          >
+                            {theme}
+                          </span>
+                        ))}
+                      </span>
+                      <Icon
+                        name="chevronRight"
+                        size={14}
+                        className="text-neutral-400 dark:text-neutral-600"
+                      />
+                    </button>
+                  ))
+                )}
+              </div>
+            </div>
+            <footer className="flex h-10 shrink-0 items-center border-t border-neutral-200 px-3 text-xs text-neutral-500 dark:border-neutral-800">
+              <span>
+                {page.total
+                  ? `${page.offset + 1}–${Math.min(page.total, page.offset + page.items.length)} / ${page.total}`
+                  : "0"}
+              </span>
+              <div className="flex-1" />
+              <button
+                className="btn btn-ghost h-7"
+                disabled={page.offset <= 0}
+                onClick={() =>
+                  setFilters((current) => ({
+                    ...current,
+                    offset: Math.max(0, page.offset - page.limit),
+                  }))
+                }
+              >
+                <Icon name="chevronLeft" size={13} />
+              </button>
+              <button
+                className="btn btn-ghost h-7"
+                disabled={!page.hasMore}
+                onClick={() =>
+                  setFilters((current) => ({
+                    ...current,
+                    offset: page.offset + page.limit,
+                  }))
+                }
+              >
+                <Icon name="chevronRight" size={13} />
+              </button>
+            </footer>
+          </div>
+        )}
+      </main>
+    </div>
+  );
 }
 
-function AuthorCard({ author, onOpen }: { author: AdvancedAuthor; onOpen: () => void }) {
-  return <button className="server-record-card flex items-start gap-3" onClick={onOpen} data-testid="advanced-author-card"><span className="server-record-icon"><Icon name="graduation" /></span><span className="min-w-0 flex-1"><strong className="block truncate text-sm text-neutral-200">{author.fullName || author.name}</strong><small className="mt-1 block truncate text-xs text-neutral-500">{author.affiliation || 'Afiliación no publicada'}</small><span className="mt-2 block text-[11px] text-neutral-600">{formatNumber(author.workCount)} obras · {formatNumber(author.ideaCount)} ideas · {formatNumber(author.relationCount)} conexiones</span><span className="mt-2 flex flex-wrap gap-1">{author.topThemes.slice(0, 3).map((theme) => <span key={theme} className="rounded border border-neutral-700 px-1.5 py-0.5 text-[10px] text-amber-300">{theme}</span>)}</span></span><Icon name="chevronRight" size={14} className="mt-2 text-neutral-700" /></button>;
+function _AuthorCard({
+  author,
+  onOpen,
+}: {
+  author: AdvancedAuthor;
+  onOpen: () => void;
+}) {
+  return (
+    <button
+      className="server-record-card flex items-start gap-3"
+      onClick={onOpen}
+      data-testid="advanced-author-card"
+    >
+      <span className="server-record-icon">
+        <Icon name="graduation" />
+      </span>
+      <span className="min-w-0 flex-1">
+        <strong className="block truncate text-sm text-neutral-200">
+          {author.fullName || author.name}
+        </strong>
+        <small className="mt-1 block truncate text-xs text-neutral-500">
+          {author.affiliation || t("Afiliación no publicada")}
+        </small>
+        <span className="mt-2 block text-[11px] text-neutral-600">
+          {formatNumber(author.workCount)} {t("obras")} ·{" "}
+          {formatNumber(author.ideaCount)} {t("ideas")} ·{" "}
+          {formatNumber(author.relationCount)} {t("conexiones")}
+        </span>
+        <span className="mt-2 flex flex-wrap gap-1">
+          {author.topThemes.slice(0, 3).map((theme) => (
+            <span
+              key={theme}
+              className="rounded border border-neutral-700 px-1.5 py-0.5 text-[10px] text-amber-300"
+            >
+              {theme}
+            </span>
+          ))}
+        </span>
+      </span>
+      <Icon name="chevronRight" size={14} className="mt-2 text-neutral-700" />
+    </button>
+  );
 }
 
-function Synthesis({ synthesis }: { synthesis: AdvancedAuthorDossier['synthesis'] }) {
-  if (!synthesis) return <p className="text-xs text-neutral-600">No hay síntesis publicada para este autor.</p>;
-  return <div data-testid="advanced-author-synthesis" className="space-y-3"><div className="flex flex-wrap items-center gap-2"><span className="rounded-full border border-teal-800/60 px-2 py-1 text-[10px] uppercase tracking-wide text-teal-300">Síntesis publicada</span>{synthesis.stale && <span className="rounded-full border border-amber-800/60 px-2 py-1 text-[10px] text-amber-300">Puede estar desactualizada</span>}</div><p className="text-sm leading-6 text-neutral-300">{synthesis.thesis || 'Sin tesis publicada.'}</p>{synthesis.remember.length > 0 && <ul className="list-disc space-y-1 pl-5 text-xs leading-5 text-neutral-400">{synthesis.remember.map((entry, index) => <li key={`${index}-${entry}`}>{entry}</li>)}</ul>}{synthesis.positioning && <p className="border-t border-neutral-800 pt-3 text-xs leading-5 text-neutral-500">{synthesis.positioning}</p>}<p className="text-[10px] text-neutral-600">Generada: {stringValue(synthesis.generatedAt)}</p></div>;
+function Synthesis({
+  synthesis,
+}: {
+  synthesis: AdvancedAuthorDossier["synthesis"];
+}) {
+  if (!synthesis)
+    return (
+      <p className="text-xs text-neutral-600">
+        {t("No hay síntesis publicada para este autor.")}
+      </p>
+    );
+  return (
+    <div data-testid="advanced-author-synthesis" className="space-y-3">
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="rounded-full border border-teal-800/60 px-2 py-1 text-[10px] uppercase tracking-wide text-teal-300">
+          {t("Síntesis publicada")}
+        </span>
+        {synthesis.stale && (
+          <span className="rounded-full border border-amber-800/60 px-2 py-1 text-[10px] text-amber-300">
+            {t("Puede estar desactualizada")}
+          </span>
+        )}
+      </div>
+      <p className="text-sm leading-6 text-neutral-300">
+        {synthesis.thesis || t("Sin tesis publicada.")}
+      </p>
+      {synthesis.remember.length > 0 && (
+        <ul className="list-disc space-y-1 pl-5 text-xs leading-5 text-neutral-400">
+          {synthesis.remember.map((entry, index) => (
+            <li key={`${index}-${entry}`}>{entry}</li>
+          ))}
+        </ul>
+      )}
+      {synthesis.positioning && (
+        <p className="border-t border-neutral-800 pt-3 text-xs leading-5 text-neutral-500">
+          {synthesis.positioning}
+        </p>
+      )}
+      <p className="text-[10px] text-neutral-600">
+        {t("Generada:")} {stringValue(synthesis.generatedAt)}
+      </p>
+    </div>
+  );
 }
 
-function AuthorDossier({ dossier, onBack, privateSynthesis: _privateSynthesis }: { dossier: AdvancedAuthorDossier; onBack: () => void; privateSynthesis?: ReactNode }) {
-  return <div className="space-y-4" data-testid="advanced-author-dossier"><button className="flex items-center gap-1 text-xs text-neutral-500 hover:text-neutral-200" onClick={onBack}><Icon name="chevronLeft" size={13} />Volver a Autores</button><header className="rounded-2xl border border-indigo-800/60 bg-indigo-950/25 p-5"><div className="flex flex-wrap items-start gap-3"><span className="server-record-icon"><Icon name="graduation" /></span><div className="min-w-0 flex-1"><h2 className="text-xl font-semibold text-neutral-100">{authorHeading(dossier)}</h2><p className="mt-1 text-xs text-neutral-500">{stringValue(dossier.author.affiliation, 'Afiliación no publicada')}</p><div className="mt-3 flex flex-wrap gap-2">{dossier.themes.map((theme) => <span key={theme} className="rounded-full border border-amber-800/60 px-2 py-1 text-[11px] text-amber-300">{theme}</span>)}</div></div><ReadOnlyBadge /></div></header><Section title="Síntesis publicada" icon="sparkles"><Synthesis synthesis={dossier.synthesis} /></Section><div className="grid items-start gap-4 xl:grid-cols-2"><Section title={`Obras (${dossier.works.length})`} icon="book">{dossier.works.length ? <div className="space-y-2">{dossier.works.map((work) => <article key={work.nodus_id} className="rounded-lg border border-neutral-800 p-3"><strong className="text-sm text-neutral-200">{work.title}</strong><p className="mt-1 text-xs text-neutral-500">{stringValue(work.year, 'Año desconocido')} · {work.itemType || 'obra'} · {work.read ? 'Leída' : 'No marcada como leída'}</p></article>)}</div> : <p className="text-xs text-neutral-600">No hay obras de autoría publicadas.</p>}</Section><Section title={`Ideas (${dossier.ideas.length})`} icon="bulb">{dossier.ideas.length ? <div className="space-y-2">{dossier.ideas.map((idea) => <article key={`${idea.global_id}-${idea.workId}`} className="rounded-lg border border-neutral-800 p-3"><strong className="text-sm text-neutral-200">{idea.label}</strong><p className="mt-1 line-clamp-3 text-xs leading-5 text-neutral-500">{idea.statement || idea.development}</p><span className="mt-1 block text-[11px] text-neutral-600">{idea.workTitle} · {idea.role} · confianza {idea.confidence.toFixed(2)}</span></article>)}</div> : <p className="text-xs text-neutral-600">No hay ideas publicadas.</p>}</Section><Section title={`Relaciones autorales (${dossier.relations.length})`} icon="share">{dossier.relations.length ? <div className="space-y-2">{dossier.relations.map((relation) => <div key={`${relation.author_id}-${relation.type}`} className="flex flex-wrap justify-between gap-2 rounded-lg border border-neutral-800 px-3 py-2 text-xs"><span className="text-neutral-300">{relation.name}</span><span className="text-neutral-500">{relation.type} · peso {relation.weight}</span></div>)}</div> : <p className="text-xs text-neutral-600">No hay relaciones visibles.</p>}</Section></div>{dossier.editedWorks.length > 0 && <Section title={`Obras editadas (${dossier.editedWorks.length})`} icon="book"><div className="space-y-1 text-xs text-neutral-500">{dossier.editedWorks.map((work) => <div key={work.nodus_id}>{work.title} <span className="text-neutral-700">· edición</span></div>)}</div></Section>}</div>;
+function _AuthorDossier({
+  dossier,
+  onBack,
+  privateSynthesis: _privateSynthesis,
+}: {
+  dossier: AdvancedAuthorDossier;
+  onBack: () => void;
+  privateSynthesis?: ReactNode;
+}) {
+  return (
+    <div className="space-y-4" data-testid="advanced-author-dossier">
+      <button
+        className="flex items-center gap-1 text-xs text-neutral-500 hover:text-neutral-200"
+        onClick={onBack}
+      >
+        <Icon name="chevronLeft" size={13} />
+        {t("Volver a Autores")}
+      </button>
+      <header className="rounded-2xl border border-indigo-800/60 bg-indigo-950/25 p-5">
+        <div className="flex flex-wrap items-start gap-3">
+          <span className="server-record-icon">
+            <Icon name="graduation" />
+          </span>
+          <div className="min-w-0 flex-1">
+            <h2 className="text-xl font-semibold text-neutral-100">
+              {authorHeading(dossier)}
+            </h2>
+            <p className="mt-1 text-xs text-neutral-500">
+              {stringValue(
+                dossier.author.affiliation,
+                "Afiliación no publicada",
+              )}
+            </p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {dossier.themes.map((theme) => (
+                <span
+                  key={theme}
+                  className="rounded-full border border-amber-800/60 px-2 py-1 text-[11px] text-amber-300"
+                >
+                  {theme}
+                </span>
+              ))}
+            </div>
+          </div>
+          <ReadOnlyBadge />
+        </div>
+      </header>
+      <Section title="Síntesis publicada" icon="sparkles">
+        <Synthesis synthesis={dossier.synthesis} />
+      </Section>
+      <div className="grid items-start gap-4 xl:grid-cols-2">
+        <Section title={`Obras (${dossier.works.length})`} icon="book">
+          {dossier.works.length ? (
+            <div className="space-y-2">
+              {dossier.works.map((work) => (
+                <article
+                  key={work.nodus_id}
+                  className="rounded-lg border border-neutral-800 p-3"
+                >
+                  <strong className="text-sm text-neutral-200">
+                    {work.title}
+                  </strong>
+                  <p className="mt-1 text-xs text-neutral-500">
+                    {stringValue(work.year, "Año desconocido")} ·{" "}
+                    {work.itemType || t("obra")} ·{" "}
+                    {work.read ? t("Leída") : t("No marcada como leída")}
+                  </p>
+                </article>
+              ))}
+            </div>
+          ) : (
+            <p className="text-xs text-neutral-600">
+              {t("No hay obras de autoría publicadas.")}
+            </p>
+          )}
+        </Section>
+        <Section title={`Ideas (${dossier.ideas.length})`} icon="bulb">
+          {dossier.ideas.length ? (
+            <div className="space-y-2">
+              {dossier.ideas.map((idea) => (
+                <article
+                  key={`${idea.global_id}-${idea.workId}`}
+                  className="rounded-lg border border-neutral-800 p-3"
+                >
+                  <strong className="text-sm text-neutral-200">
+                    {idea.label}
+                  </strong>
+                  <p className="mt-1 line-clamp-3 text-xs leading-5 text-neutral-500">
+                    {idea.statement || idea.development}
+                  </p>
+                  <span className="mt-1 block text-[11px] text-neutral-600">
+                    {idea.workTitle} · {idea.role} · {t("confianza")}{" "}
+                    {idea.confidence.toFixed(2)}
+                  </span>
+                </article>
+              ))}
+            </div>
+          ) : (
+            <p className="text-xs text-neutral-600">
+              {t("No hay ideas publicadas.")}
+            </p>
+          )}
+        </Section>
+        <Section
+          title={`Relaciones autorales (${dossier.relations.length})`}
+          icon="share"
+        >
+          {dossier.relations.length ? (
+            <div className="space-y-2">
+              {dossier.relations.map((relation) => (
+                <div
+                  key={`${relation.author_id}-${relation.type}`}
+                  className="flex flex-wrap justify-between gap-2 rounded-lg border border-neutral-800 px-3 py-2 text-xs"
+                >
+                  <span className="text-neutral-300">{relation.name}</span>
+                  <span className="text-neutral-500">
+                    {relation.type} · {t("peso")} {relation.weight}
+                  </span>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-xs text-neutral-600">
+              {t("No hay relaciones visibles.")}
+            </p>
+          )}
+        </Section>
+      </div>
+      {dossier.editedWorks.length > 0 && (
+        <Section
+          title={`Obras editadas (${dossier.editedWorks.length})`}
+          icon="book"
+        >
+          <div className="space-y-1 text-xs text-neutral-500">
+            {dossier.editedWorks.map((work) => (
+              <div key={work.nodus_id}>
+                {work.title}{" "}
+                <span className="text-neutral-700">· {t("edición")}</span>
+              </div>
+            ))}
+          </div>
+        </Section>
+      )}
+    </div>
+  );
 }
 
-export function AuthorsServerView({ spaceId, renderPrivateSynthesis: _renderPrivateSynthesis }: { spaceId: string; renderPrivateSynthesis?: (dossier: AdvancedAuthorDossier) => ReactNode }) {
-  const [query, setQuery] = useState('');
-  const [filters, setFilters] = useState<AuthorsQuery>({ offset: 0, limit: 80, sort: 'surname', synthesis: 'all' });
-  const [page, setPage] = useState<AdvancedPage<AdvancedAuthor>>({ items: [], total: 0, offset: 0, limit: 80, hasMore: false });
+export function AuthorsServerView({
+  spaceId,
+  csrfToken: _csrfToken,
+  renderPrivateSynthesis: _renderPrivateSynthesis,
+}: {
+  spaceId: string;
+  csrfToken?: string;
+  renderPrivateSynthesis?: (dossier: AdvancedAuthorDossier) => ReactNode;
+}) {
+  const [query, setQuery] = useState("");
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const [filters, setFilters] = useState<AuthorsQuery>({
+    offset: 0,
+    limit: 80,
+    sort: "surname",
+    synthesis: "all",
+  });
+  const [page, setPage] = useState<AdvancedPage<AdvancedAuthor>>({
+    items: [],
+    total: 0,
+    offset: 0,
+    limit: 80,
+    hasMore: false,
+  });
   const [dossier, setDossier] = useState<AdvancedAuthorDossier | null>(null);
-  const [openTabs, setOpenTabs] = useState<Array<{ id: string; label: string }>>([]);
+  const [openTabs, setOpenTabs] = useState<
+    Array<{ id: string; label: string }>
+  >([]);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<unknown>();
   const listRequest = useRef(0);
   const detailRequest = useRef(0);
-  const load = useCallback(async () => { const request = ++listRequest.current; setLoading(true); setError(undefined); try { const next = await advancedRest.authors(spaceId, filters); if (request === listRequest.current) setPage(next); } catch (cause) { if (request === listRequest.current) setError(cause); } finally { if (request === listRequest.current) setLoading(false); } }, [filters, spaceId]);
-  useEffect(() => { void load(); }, [load]);
-  const open = useCallback(async (author: Pick<AdvancedAuthor, 'author_id' | 'name' | 'fullName'>) => { const request = ++detailRequest.current; setOpenTabs((tabs) => tabs.some((tab) => tab.id === author.author_id) ? tabs : [...tabs, { id: author.author_id, label: author.fullName || author.name }]); setActiveId(author.author_id); setError(undefined); try { const next = await advancedRest.authorDossier(spaceId, author.author_id); if (request === detailRequest.current) setDossier(next); } catch (cause) { if (request === detailRequest.current) setError(cause); } }, [spaceId]);
-  const submit = (event: FormEvent) => { event.preventDefault(); setFilters((current) => ({ ...current, offset: 0, q: query.trim() || undefined })); };
-  const showCatalog = () => { detailRequest.current += 1; setActiveId(null); setDossier(null); };
-  const closeTab = (id: string) => { setOpenTabs((tabs) => tabs.filter((tab) => tab.id !== id)); if (activeId === id) showCatalog(); };
-  return <div className="flex h-full min-h-0 flex-col" data-testid="advanced-authors-view"><header className="shrink-0 border-b border-neutral-800 p-4"><div className="flex flex-wrap items-center gap-3"><div><h1 className="text-base font-semibold text-neutral-100">Autores</h1><p className="text-xs text-neutral-500">{formatNumber(page.total)} autores publicados</p></div><ReadOnlyBadge /></div><div data-testid="advanced-authors-tabs" className="mt-4 flex min-w-0 items-end gap-1 overflow-x-auto"><button className={`flex h-8 shrink-0 items-center rounded-t-lg px-3 text-xs ${!activeId ? 'bg-neutral-900 text-neutral-100' : 'text-neutral-500'}`} onClick={showCatalog}>Catálogo</button>{openTabs.map((tab) => <div key={tab.id} className={`flex h-8 shrink-0 items-center rounded-t-lg ${activeId === tab.id ? 'bg-neutral-900 text-neutral-100' : 'text-neutral-500'}`}><button className="max-w-48 truncate px-3 text-xs" onClick={() => void open({ author_id: tab.id, name: tab.label, fullName: tab.label })}>{tab.label}</button><button className="mr-1 rounded px-1 text-neutral-600 hover:text-neutral-200" aria-label={`Cerrar ${tab.label}`} onClick={() => closeTab(tab.id)}>×</button></div>)}</div></header><div className="min-h-0 flex-1 overflow-auto p-4">{activeId && dossier ? <AuthorDossier dossier={dossier} onBack={showCatalog} /> : <><form className="mb-4 flex flex-wrap gap-2" onSubmit={submit}><input data-testid="advanced-authors-search" className="input min-w-[180px] flex-1 text-xs" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Buscar autores publicados…" /><select className="input text-xs" value={filters.synthesis ?? 'all'} onChange={(event) => setFilters((current) => ({ ...current, offset: 0, synthesis: event.target.value as AuthorsQuery['synthesis'] }))}><option value="all">Todas las síntesis</option><option value="with">Con síntesis</option><option value="without">Sin síntesis</option></select><select className="input text-xs" value={filters.sort ?? 'surname'} onChange={(event) => setFilters((current) => ({ ...current, offset: 0, sort: event.target.value as AuthorsQuery['sort'] }))}>{AUTHOR_SORTS.map((sort) => <option key={sort} value={sort}>{sort}</option>)}</select><button className="btn text-xs">Buscar</button></form>{error ? <ErrorMessage error={error} onRetry={() => void load()} /> : loading ? <Loading /> : page.items.length === 0 ? <div className="grid min-h-40 place-items-center text-sm text-neutral-600">No hay autores publicados con estos filtros.</div> : <><div className="server-record-grid">{page.items.map((author) => <AuthorCard key={author.author_id} author={author} onOpen={() => void open(author)} />)}</div><PageControls page={page} onPage={(offset) => setFilters((current) => ({ ...current, offset }))} /></>}</>}</div></div>;
+  const load = useCallback(async () => {
+    const request = ++listRequest.current;
+    setLoading(true);
+    setError(undefined);
+    try {
+      const next = await advancedRest.authors(spaceId, filters);
+      if (request === listRequest.current) setPage(next);
+    } catch (cause) {
+      if (request === listRequest.current) setError(cause);
+    } finally {
+      if (request === listRequest.current) setLoading(false);
+    }
+  }, [filters, spaceId]);
+  useEffect(() => {
+    void load();
+  }, [load]);
+  const open = useCallback(
+    async (author: Pick<AdvancedAuthor, "author_id" | "name" | "fullName">) => {
+      const request = ++detailRequest.current;
+      setOpenTabs((tabs) =>
+        tabs.some((tab) => tab.id === author.author_id)
+          ? tabs
+          : [
+              ...tabs,
+              { id: author.author_id, label: author.fullName || author.name },
+            ],
+      );
+      setActiveId(author.author_id);
+      setError(undefined);
+      try {
+        const next = await advancedRest.authorDossier(
+          spaceId,
+          author.author_id,
+        );
+        if (request === detailRequest.current) setDossier(next);
+      } catch (cause) {
+        if (request === detailRequest.current) setError(cause);
+      }
+    },
+    [spaceId],
+  );
+  const submit = (event: FormEvent) => {
+    event.preventDefault();
+    setFilters((current) => ({
+      ...current,
+      offset: 0,
+      q: query.trim() || undefined,
+    }));
+  };
+  const showCatalog = () => {
+    detailRequest.current += 1;
+    setActiveId(null);
+    setDossier(null);
+  };
+  const closeTab = (id: string) => {
+    setOpenTabs((tabs) => tabs.filter((tab) => tab.id !== id));
+    if (activeId === id) showCatalog();
+  };
+  return (
+    <div
+      className="flex h-full min-h-0 flex-col bg-white text-neutral-900 dark:bg-neutral-950 dark:text-neutral-100"
+      data-testid="advanced-authors-view"
+    >
+      <header className="shrink-0 border-b border-neutral-200 px-5 pt-4 dark:border-neutral-800">
+        <div className="mb-3 flex flex-wrap items-center gap-3">
+          <span className="grid h-9 w-9 place-items-center rounded-xl bg-indigo-100 text-indigo-600 dark:bg-indigo-500/15 dark:text-indigo-300">
+            <Icon name="graduation" size={18} />
+          </span>
+          <div>
+            <h1 className="text-base font-semibold">{t("Autores")}</h1>
+            <p className="text-[11px] text-neutral-500">
+              {t("Autores, documentos y red autoral.")}
+            </p>
+          </div>
+          <div className="flex-1" />
+          <ReadOnlyBadge />
+        </div>
+        <div
+          data-testid="advanced-authors-tabs"
+          className="flex min-w-0 items-end gap-1 overflow-x-auto"
+        >
+          <button
+            className={`flex h-9 shrink-0 items-center gap-2 rounded-t-lg border border-b-0 px-3 text-xs ${!activeId ? "border-neutral-300 bg-white text-neutral-900 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-100" : "border-transparent text-neutral-500 hover:bg-neutral-100 dark:hover:bg-neutral-900/60"}`}
+            onClick={showCatalog}
+          >
+            <Icon name="list" size={13} /> {t("Autores")}
+          </button>
+          {openTabs.map((tab) => (
+            <div
+              key={tab.id}
+              className={`flex h-9 shrink-0 items-center rounded-t-lg border border-b-0 ${activeId === tab.id ? "border-neutral-300 bg-white text-neutral-900 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-100" : "border-transparent text-neutral-500 hover:bg-neutral-100 dark:hover:bg-neutral-900/60"}`}
+            >
+              <button
+                className="flex h-full max-w-64 items-center gap-2 px-3 text-xs"
+                onClick={() =>
+                  void open({
+                    author_id: tab.id,
+                    name: tab.label,
+                    fullName: tab.label,
+                  })
+                }
+              >
+                <Icon name="user" size={13} />
+                <span className="truncate">{tab.label}</span>
+              </button>
+              <button
+                className="mr-1 grid h-6 w-6 place-items-center rounded hover:bg-neutral-200 dark:hover:bg-neutral-800"
+                aria-label={`${t("Cerrar")} ${tab.label}`}
+                onClick={() => closeTab(tab.id)}
+              >
+                <Icon name="x" size={11} />
+              </button>
+            </div>
+          ))}
+        </div>
+      </header>
+      {activeId ? (
+        <div className="min-h-0 flex-1 overflow-auto p-4">
+          <AcademicDetailExplorer
+            key={activeId}
+            spaceId={spaceId}
+            origin={t("Autores")}
+            initialTarget={{
+              kind: "author",
+              id: activeId,
+              label:
+                openTabs.find((tab) => tab.id === activeId)?.label ??
+                dossier?.fullName ??
+                activeId,
+            }}
+            onOrigin={showCatalog}
+          />
+        </div>
+      ) : (
+        <div className="flex min-h-0 flex-1 flex-col">
+          <form
+            className="shrink-0 border-b border-neutral-200 p-3 dark:border-neutral-800"
+            onSubmit={submit}
+          >
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="relative min-w-[240px] flex-1">
+                <Icon
+                  name="search"
+                  size={15}
+                  className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-neutral-500"
+                />
+                <input
+                  data-testid="advanced-authors-search"
+                  className="input input-with-leading-icon w-full"
+                  value={query}
+                  onChange={(event) => setQuery(event.target.value)}
+                  placeholder={t("Buscar autor…")}
+                />
+              </div>
+              <button
+                type="button"
+                className={`btn border border-neutral-300 dark:border-neutral-700 ${filtersOpen || filters.synthesis !== "all" ? "bg-indigo-50 text-indigo-700 dark:bg-indigo-500/10 dark:text-indigo-300" : "btn-ghost"}`}
+                onClick={() => setFiltersOpen((value) => !value)}
+              >
+                <Icon name="filter" /> {t("Filtros")}
+              </button>
+            </div>
+            {filtersOpen && (
+              <div className="mt-2 flex flex-wrap items-center gap-2 rounded-xl bg-neutral-50 p-2 dark:bg-neutral-900/55">
+                <label className="flex items-center gap-2 text-xs text-neutral-500">
+                  {t("Síntesis")}
+                  <select
+                    className="input h-8 text-xs"
+                    value={filters.synthesis ?? "all"}
+                    onChange={(event) =>
+                      setFilters((current) => ({
+                        ...current,
+                        offset: 0,
+                        synthesis: event.target
+                          .value as AuthorsQuery["synthesis"],
+                      }))
+                    }
+                  >
+                    <option value="all">{t("Todas")}</option>
+                    <option value="with">{t("Con síntesis")}</option>
+                    <option value="without">{t("Sin síntesis")}</option>
+                  </select>
+                </label>
+                <label className="flex items-center gap-2 text-xs text-neutral-500">
+                  {t("Ordenar")}
+                  <select
+                    className="input h-8 text-xs"
+                    value={filters.sort ?? "surname"}
+                    onChange={(event) =>
+                      setFilters((current) => ({
+                        ...current,
+                        offset: 0,
+                        sort: event.target.value as AuthorsQuery["sort"],
+                      }))
+                    }
+                  >
+                    {AUTHOR_SORTS.map((sort) => (
+                      <option key={sort} value={sort}>
+                        {t(sort)}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+            )}
+          </form>
+          <div
+            className="min-h-0 flex-1 overflow-auto"
+            data-testid="authors-table-scroll"
+          >
+            <div className="min-w-[1050px]">
+              <div
+                className="grid h-10 items-center border-b border-neutral-200 px-3 text-[10px] font-semibold uppercase tracking-wider text-neutral-500 dark:border-neutral-800 dark:text-neutral-600"
+                style={{
+                  gridTemplateColumns:
+                    "2.25rem minmax(130px,1fr) minmax(150px,1.15fr) 5.5rem 5.5rem 7rem minmax(220px,1.6fr) 6rem 2.5rem",
+                }}
+              >
+                <span />
+                <span>{t("Nombre")}</span>
+                <span>{t("Apellidos")}</span>
+                <span>{t("Nº de obras")}</span>
+                <span>{t("Nº de ideas")}</span>
+                <span>{t("Nº de conexiones")}</span>
+                <span>{t("Etiquetas")}</span>
+                <span>{t("Síntesis")}</span>
+                <span />
+              </div>
+              {error ? (
+                <ErrorMessage error={error} onRetry={() => void load()} />
+              ) : loading ? (
+                <Loading />
+              ) : page.items.length === 0 ? (
+                <div className="grid h-48 place-items-center text-sm text-neutral-500">
+                  {t("No hay autores todavía.")}
+                </div>
+              ) : (
+                page.items.map((author) => (
+                  <div
+                    key={author.author_id}
+                    data-testid="advanced-author-card"
+                    className="grid min-h-[64px] items-center border-b border-neutral-100 px-3 text-xs hover:bg-neutral-50 dark:border-neutral-900 dark:hover:bg-neutral-900/55"
+                    style={{
+                      gridTemplateColumns:
+                        "2.25rem minmax(130px,1fr) minmax(150px,1.15fr) 5.5rem 5.5rem 7rem minmax(220px,1.6fr) 6rem 2.5rem",
+                    }}
+                  >
+                    <input
+                      type="checkbox"
+                      disabled
+                      aria-label={t(
+                        "Selección no disponible en modo solo lectura",
+                      )}
+                    />
+                    <button
+                      className="min-w-0 pr-3 text-left font-medium text-neutral-900 hover:text-indigo-600 dark:text-neutral-200 dark:hover:text-indigo-300"
+                      onClick={() => void open(author)}
+                    >
+                      <span className="block truncate">
+                        {author.firstName || author.fullName || author.name}
+                      </span>
+                      {author.affiliation && (
+                        <span className="mt-1 block truncate text-[10px] font-normal text-neutral-500">
+                          {author.affiliation}
+                        </span>
+                      )}
+                    </button>
+                    <button
+                      className="min-w-0 truncate pr-3 text-left text-neutral-500 hover:text-indigo-600 dark:hover:text-indigo-300"
+                      onClick={() => void open(author)}
+                    >
+                      {author.lastName || author.name}
+                    </button>
+                    <span className="tabular-nums text-neutral-500">
+                      {author.workCount}
+                    </span>
+                    <span className="tabular-nums text-neutral-500">
+                      {author.ideaCount}
+                    </span>
+                    <span className="tabular-nums text-neutral-500">
+                      {author.relationCount}
+                    </span>
+                    <div className="flex min-w-0 flex-wrap gap-1 pr-3">
+                      {(author.topTags.length
+                        ? author.topTags
+                        : author.topThemes
+                      )
+                        .slice(0, 4)
+                        .map((tag) => (
+                          <span
+                            key={tag}
+                            className="max-w-32 truncate rounded-full bg-neutral-100 px-2 py-1 text-[10px] text-neutral-500 dark:bg-neutral-900"
+                          >
+                            {tag}
+                          </span>
+                        ))}
+                    </div>
+                    <span
+                      className={`flex items-center gap-1 text-[10px] ${author.hasSynthesis ? "text-indigo-600 dark:text-indigo-300" : "text-neutral-500"}`}
+                    >
+                      {author.hasSynthesis ? (
+                        <>
+                          <Icon name="wand" size={11} /> {t("Síntesis")}
+                        </>
+                      ) : (
+                        "—"
+                      )}
+                    </span>
+                    <Icon
+                      name="chevronRight"
+                      size={14}
+                      className="text-neutral-400"
+                    />
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+          <footer className="flex h-10 shrink-0 items-center border-t border-neutral-200 px-3 text-xs text-neutral-500 dark:border-neutral-800">
+            <span>
+              {page.total
+                ? `${page.offset + 1}–${Math.min(page.total, page.offset + page.items.length)} / ${page.total}`
+                : "0"}
+            </span>
+            <div className="flex-1" />
+            <button
+              className="btn btn-ghost h-7"
+              disabled={page.offset <= 0}
+              onClick={() =>
+                setFilters((current) => ({
+                  ...current,
+                  offset: Math.max(0, page.offset - page.limit),
+                }))
+              }
+            >
+              <Icon name="chevronLeft" size={13} />
+            </button>
+            <button
+              className="btn btn-ghost h-7"
+              disabled={!page.hasMore}
+              onClick={() =>
+                setFilters((current) => ({
+                  ...current,
+                  offset: page.offset + page.limit,
+                }))
+              }
+            >
+              <Icon name="chevronRight" size={13} />
+            </button>
+          </footer>
+        </div>
+      )}
+    </div>
+  );
 }
 
-const GRAPH_FILTERS = { search: '', nodeTypes: ['theme', 'claim', 'finding', 'construct', 'method', 'framework'], edgeTypes: ['supports', 'refutes', 'contradicts', 'extends', 'refines', 'applies_to', 'shares_method', 'precondition_of', 'measures_same', 'variant_of', 'contains'], theme: '', workIds: [], authors: [], yearMin: null, yearMax: null, readState: 'all' as const, minConfidence: 0, basis: 'all' as const };
+const GRAPH_FILTERS: GraphFilters = {
+  search: "",
+  nodeTypes: ["theme", "claim", "finding", "construct", "method", "framework"],
+  edgeTypes: [
+    "supports",
+    "refutes",
+    "contradicts",
+    "extends",
+    "refines",
+    "applies_to",
+    "shares_method",
+    "precondition_of",
+    "measures_same",
+    "variant_of",
+    "contains",
+  ],
+  theme: "",
+  workIds: [],
+  authors: [],
+  yearMin: null,
+  yearMax: null,
+  readState: "all",
+  minConfidence: 0,
+  basis: "all",
+};
 
-export function GraphServerView({ spaceId, initialSeedId, onOpenIdea }: { spaceId: string; initialSeedId?: string; onOpenIdea?: (id: string) => void }) {
+export function GraphServerView({
+  spaceId,
+  csrfToken: _csrfToken,
+  initialSeedId,
+  onOpenIdea,
+}: {
+  spaceId: string;
+  csrfToken?: string;
+  initialSeedId?: string;
+  onOpenIdea?: (id: string) => void;
+}) {
   const [seeds, setSeeds] = useState<AdvancedIdea[]>([]);
-  const [seedId, setSeedId] = useState(initialSeedId ?? '');
+  const [seedId, setSeedId] = useState(initialSeedId ?? "");
+  const [themeLabel, setThemeLabel] = useState("");
+  const [lens, setLens] = useState<GraphLens>("ideas");
+  const [preset, setPreset] = useState<GraphPresetId>("overview");
+  const [filters, setFilters] = useState<GraphFilters>(GRAPH_FILTERS);
   const [graph, setGraph] = useState<GraphData | null>(null);
   const [error, setError] = useState<unknown>();
   const [loading, setLoading] = useState(false);
   const graphRequest = useRef(0);
-  useEffect(() => { advancedRest.ideas(spaceId, { offset: 0, limit: 80, sort: 'connections' }).then((page) => { setSeeds(page.items); setSeedId((current) => current || page.items[0]?.id || ''); }).catch(setError); }, [spaceId]);
-  const load = useCallback(async () => { if (!seedId) return; const request = ++graphRequest.current; setLoading(true); setError(undefined); try { const next = toGraphData(await advancedRest.ideaGraph(spaceId, seedId)); if (request === graphRequest.current) setGraph(next); } catch (cause) { if (request === graphRequest.current) setError(cause); } finally { if (request === graphRequest.current) setLoading(false); } }, [seedId, spaceId]);
-  useEffect(() => { void load(); }, [load]);
-  const selectedLabel = useMemo(() => seeds.find((idea) => idea.id === seedId)?.label, [seedId, seeds]);
-  const graphModel = useMemo(() => graph ? buildGraphModel(graph, GRAPH_FILTERS, 'ideas', 'overview') : null, [graph]);
-  return <div className="flex h-full min-h-0 flex-col" data-testid="advanced-graph-view"><header className="shrink-0 border-b border-neutral-800 p-4"><div className="flex flex-wrap items-center gap-3"><div><h1 className="text-base font-semibold text-neutral-100">Grafo</h1><p className="text-xs text-neutral-500">Vecindad publicada alrededor de una idea{selectedLabel ? ` · ${selectedLabel}` : ''}</p></div><ReadOnlyBadge /><label className="ml-auto flex items-center gap-2 text-xs text-neutral-500">Semilla<select data-testid="advanced-graph-seed" className="input max-w-64 text-xs" value={seedId} onChange={(event) => setSeedId(event.target.value)}><option value="">Selecciona una idea</option>{seeds.map((idea) => <option key={idea.id} value={idea.id}>{idea.label}</option>)}</select></label></div></header><div className="relative min-h-0 flex-1 overflow-hidden p-3">{error ? <ErrorMessage error={error} onRetry={() => void load()} /> : loading && !graph ? <Loading /> : graph && graphModel ? <GraphErrorBoundary><SigmaGraph data={graph} filters={GRAPH_FILTERS} lens="ideas" preset="overview" highlightDepth={2} lightTheme={typeof document !== 'undefined' && document.documentElement.classList.contains('light')} overrideModel={graphModel} viewLevel="atlas" showMinimap={false} onOpenNode={(id) => onOpenIdea?.(id)} onOpenEdge={() => undefined} onClearFocus={() => undefined} /></GraphErrorBoundary> : <div className="grid h-full min-h-60 place-items-center text-sm text-neutral-600">Publica ideas para explorar su grafo.</div>}</div></div>;
+  useEffect(() => {
+    advancedRest
+      .ideas(spaceId, { offset: 0, limit: 200, sort: "connections" })
+      .then((page) => setSeeds(page.items))
+      .catch(setError);
+  }, [spaceId]);
+  const load = useCallback(async () => {
+    const request = ++graphRequest.current;
+    setLoading(true);
+    setError(undefined);
+    try {
+      const payload = seedId
+        ? await advancedRest.ideaGraph(spaceId, seedId, 3, 200)
+        : await advancedRest.graph(spaceId);
+      const next = toGraphData(payload);
+      if (request === graphRequest.current) setGraph(next);
+    } catch (cause) {
+      if (request === graphRequest.current) setError(cause);
+    } finally {
+      if (request === graphRequest.current) setLoading(false);
+    }
+  }, [seedId, spaceId]);
+  useEffect(() => {
+    void load();
+  }, [load]);
+  const selectedLabel = useMemo(
+    () => seeds.find((idea) => idea.id === seedId)?.label,
+    [seedId, seeds],
+  );
+  const graphModel = useMemo(() => {
+    if (!graph) return null;
+    if (seedId || lens === "authors" || preset !== "overview")
+      return (
+        buildPresetAtlas(graph, filters, lens, preset) ||
+        buildGraphModel(graph, filters, lens, preset)
+      );
+    if (themeLabel) return buildThemeBackbone(graph, themeLabel);
+    return buildThemeConstellation(graph);
+  }, [filters, graph, lens, preset, seedId, themeLabel]);
+  const resetAtlas = () => {
+    setSeedId("");
+    setThemeLabel("");
+    setLens("ideas");
+    setPreset("overview");
+    setFilters(GRAPH_FILTERS);
+  };
+  const applyPreset = (next: GraphPresetId) => {
+    setSeedId("");
+    setPreset(next);
+    setThemeLabel("");
+    setLens(next === "authors" ? "authors" : "ideas");
+    setFilters(() => {
+      if (next === "contradictions")
+        return {
+          ...GRAPH_FILTERS,
+          edgeTypes: ["contradicts", "refutes", "contains"],
+          minConfidence: 0.1,
+        };
+      if (next === "gaps")
+        return {
+          ...GRAPH_FILTERS,
+          nodeTypes: ["theme", "finding", "claim", "construct", "framework"],
+          edgeTypes: [
+            "extends",
+            "refines",
+            "applies_to",
+            "shares_method",
+            "measures_same",
+            "variant_of",
+            "contains",
+          ],
+        };
+      if (next === "reading") return { ...GRAPH_FILTERS, readState: "read" };
+      if (next === "unread") return { ...GRAPH_FILTERS, readState: "unread" };
+      if (next === "authors") return { ...GRAPH_FILTERS };
+      return { ...GRAPH_FILTERS };
+    });
+  };
+  return (
+    <div
+      className="nodus-graph-workspace flex h-full min-h-0 flex-col bg-white text-neutral-900 dark:bg-neutral-950 dark:text-neutral-100"
+      data-testid="advanced-graph-view"
+    >
+      <header className="nodus-graph-toolbar shrink-0 border-b border-neutral-200 px-4 py-3 dark:border-neutral-800">
+        <div className="flex flex-wrap items-center gap-3">
+          <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-indigo-100 text-indigo-600 dark:bg-indigo-500/15 dark:text-indigo-300">
+            <Icon name="network" size={18} />
+          </span>
+          <div>
+            <h1 className="text-base font-semibold">{t("Grafo")}</h1>
+            <p className="text-[11px] text-neutral-500">
+              {seedId
+                ? tx("Vecindad · {label}", { label: selectedLabel || seedId })
+                : themeLabel
+                  ? tx("Tema · {label}", { label: themeLabel })
+                  : t("Atlas completo organizado primero por temas")}
+            </p>
+          </div>
+          <ReadOnlyBadge />
+          <button
+            className={`btn ml-auto text-xs ${seedId || themeLabel ? "btn-ghost" : ""}`}
+            onClick={resetAtlas}
+            data-testid="graph-atlas-home"
+          >
+            <Icon name="layers" size={13} /> {t("Temas")}
+          </button>
+          <label className="flex items-center gap-2 text-xs text-neutral-500">
+            {t("Ir a idea")}
+            <select
+              data-testid="advanced-graph-seed"
+              className="input max-w-72 text-xs"
+              value={seedId}
+              onChange={(event) => {
+                setThemeLabel("");
+                setPreset("overview");
+                setSeedId(event.target.value);
+              }}
+            >
+              <option value="">{t("Atlas de temas")}</option>
+              {seeds.map((idea) => (
+                <option key={idea.id} value={idea.id}>
+                  {idea.label}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+        <div
+          className="mt-3 flex flex-wrap items-center gap-2 border-t border-neutral-200 pt-3 dark:border-neutral-800"
+          data-testid="graph-controls"
+        >
+          <div className="flex overflow-hidden rounded-md border border-neutral-300 text-xs dark:border-neutral-700">
+            <button
+              className={`px-2.5 py-1.5 ${lens === "ideas" ? "bg-indigo-600 text-white" : "text-neutral-500"}`}
+              onClick={() => applyPreset("overview")}
+            >
+              {t("Ideas")}
+            </button>
+            <button
+              className={`px-2.5 py-1.5 ${lens === "authors" ? "bg-indigo-600 text-white" : "text-neutral-500"}`}
+              onClick={() => applyPreset("authors")}
+            >
+              {t("Autores")}
+            </button>
+          </div>
+          <div className="flex overflow-hidden rounded-md border border-neutral-300 text-xs dark:border-neutral-700">
+            {(
+              [
+                ["overview", "Atlas"],
+                ["reading", "Lecturas"],
+                ["unread", "No leídas"],
+                ["gaps", "Huecos"],
+                ["contradictions", "Contradicciones"],
+              ] as [GraphPresetId, string][]
+            ).map(([id, label]) => (
+              <button
+                key={id}
+                data-testid={`graph-preset-${id}`}
+                className={`px-2.5 py-1.5 ${preset === id ? "bg-indigo-600 text-white" : "text-neutral-500"}`}
+                onClick={() => applyPreset(id)}
+              >
+                {t(label)}
+              </button>
+            ))}
+          </div>
+          <div className="relative min-w-[12rem] flex-1">
+            <Icon
+              name="search"
+              size={13}
+              className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-neutral-500"
+            />
+            <input
+              data-testid="graph-search"
+              className="input input-with-leading-icon h-8 w-full text-xs"
+              value={filters.search}
+              onChange={(event) => {
+                setFilters((current) => ({
+                  ...current,
+                  search: event.target.value,
+                }));
+                setThemeLabel("");
+              }}
+              placeholder={t("Buscar en el grafo…")}
+            />
+          </div>
+          <label className="flex items-center gap-1.5 text-xs text-neutral-500">
+            {t("Lectura")}
+            <select
+              data-testid="graph-read-filter"
+              className="input h-8 text-xs"
+              value={filters.readState}
+              onChange={(event) =>
+                setFilters((current) => ({
+                  ...current,
+                  readState: event.target.value as GraphFilters["readState"],
+                }))
+              }
+            >
+              <option value="all">{t("Todas")}</option>
+              <option value="read">{t("Leídas")}</option>
+              <option value="unread">{t("No leídas")}</option>
+            </select>
+          </label>
+          <label className="flex items-center gap-1.5 text-xs text-neutral-500">
+            {t("Conf.")} ≥{" "}
+            <input
+              data-testid="graph-confidence-filter"
+              className="w-20"
+              type="range"
+              min="0"
+              max="1"
+              step=".1"
+              value={filters.minConfidence}
+              onChange={(event) =>
+                setFilters((current) => ({
+                  ...current,
+                  minConfidence: Number(event.target.value),
+                }))
+              }
+            />
+            <span className="tabular-nums">
+              {filters.minConfidence.toFixed(1)}
+            </span>
+          </label>
+        </div>
+      </header>
+      <div className="nodus-graph-stage relative min-h-0 flex-1 overflow-hidden">
+        {error ? (
+          <div className="p-4">
+            <ErrorMessage error={error} onRetry={() => void load()} />
+          </div>
+        ) : loading && !graph ? (
+          <Loading />
+        ) : graph && graphModel ? (
+          <GraphErrorBoundary>
+            <SigmaGraph
+              data={graph}
+              filters={filters}
+              lens={lens}
+              preset={preset}
+              highlightDepth={2}
+              lightTheme={
+                typeof document !== "undefined" &&
+                document.documentElement.classList.contains("light")
+              }
+              overrideModel={graphModel}
+              viewLevel={seedId ? "full" : themeLabel ? "theme" : "corpus"}
+              showMinimap
+              onDrillDown={(_id, label) => {
+                setSeedId("");
+                setThemeLabel(label);
+              }}
+              onOpenNode={(id, _label, type) => {
+                if (type === "theme") setThemeLabel(_label);
+                else onOpenIdea?.(id);
+              }}
+              onOpenEdge={() => undefined}
+              onClearFocus={resetAtlas}
+            />
+          </GraphErrorBoundary>
+        ) : (
+          <div className="grid h-full min-h-60 place-items-center text-sm text-neutral-600">
+            {t("Publica ideas para explorar su grafo.")}
+          </div>
+        )}
+        <div className="shrink-0 overflow-auto px-4 pb-4"></div>
+      </div>
+    </div>
+  );
 }
 
 /** Opt-in composition used by the Server Advanced shell; it performs no writes. */
-export function AdvancedServerWorkspace({ spaceId, initialSurface = 'ideas', initialGraphSeedId, onOpenIdea }: { spaceId: string; initialSurface?: Surface; initialGraphSeedId?: string; onOpenIdea?: (id: string) => void }) {
+export function AdvancedServerWorkspace({
+  spaceId,
+  csrfToken,
+  initialSurface = "ideas",
+  initialGraphSeedId,
+  onOpenIdea,
+}: {
+  spaceId: string;
+  csrfToken?: string;
+  initialSurface?: Surface;
+  initialGraphSeedId?: string;
+  onOpenIdea?: (id: string) => void;
+}) {
   const [surface, setSurface] = useState<Surface>(initialSurface);
-  return <div className="server-desktop-surface flex h-full min-h-0 flex-col bg-neutral-950 text-neutral-100" data-testid="advanced-server-workspace"><nav className="flex shrink-0 gap-1 border-b border-neutral-800 p-2" aria-label="Superficies académicas"><button className={`btn text-xs ${surface === 'ideas' ? '' : 'btn-ghost'}`} onClick={() => setSurface('ideas')}><Icon name="bulb" size={13} /> Ideas</button><button className={`btn text-xs ${surface === 'authors' ? '' : 'btn-ghost'}`} onClick={() => setSurface('authors')}><Icon name="graduation" size={13} /> Autores</button><button className={`btn text-xs ${surface === 'graph' ? '' : 'btn-ghost'}`} onClick={() => setSurface('graph')}><Icon name="network" size={13} /> Grafo</button></nav><div className="min-h-0 flex-1">{surface === 'ideas' ? <IdeasServerView spaceId={spaceId} /> : surface === 'authors' ? <AuthorsServerView spaceId={spaceId} /> : <GraphServerView spaceId={spaceId} initialSeedId={initialGraphSeedId} onOpenIdea={onOpenIdea} />}</div></div>;
+  return (
+    <div
+      className="server-desktop-surface flex h-full min-h-0 flex-col bg-neutral-950 text-neutral-100"
+      data-testid="advanced-server-workspace"
+    >
+      <nav
+        className="flex shrink-0 gap-1 border-b border-neutral-800 p-2"
+        aria-label={t("Superficies académicas")}
+      >
+        <button
+          className={`btn text-xs ${surface === "ideas" ? "" : "btn-ghost"}`}
+          onClick={() => setSurface("ideas")}
+        >
+          <Icon name="bulb" size={13} /> {t("Ideas")}
+        </button>
+        <button
+          className={`btn text-xs ${surface === "authors" ? "" : "btn-ghost"}`}
+          onClick={() => setSurface("authors")}
+        >
+          <Icon name="graduation" size={13} /> {t("Autores")}
+        </button>
+        <button
+          className={`btn text-xs ${surface === "graph" ? "" : "btn-ghost"}`}
+          onClick={() => setSurface("graph")}
+        >
+          <Icon name="network" size={13} /> {t("Grafo")}
+        </button>
+      </nav>
+      <div className="min-h-0 flex-1">
+        {surface === "ideas" ? (
+          <IdeasServerView spaceId={spaceId} csrfToken={csrfToken} />
+        ) : surface === "authors" ? (
+          <AuthorsServerView spaceId={spaceId} csrfToken={csrfToken} />
+        ) : (
+          <GraphServerView
+            spaceId={spaceId}
+            csrfToken={csrfToken}
+            initialSeedId={initialGraphSeedId}
+            onOpenIdea={onOpenIdea}
+          />
+        )}
+      </div>
+    </div>
+  );
 }

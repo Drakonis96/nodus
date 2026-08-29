@@ -63,6 +63,8 @@ export async function inspectActiveVaultForCloudflare(activity: Partial<Cloudfla
   const snapshot = buildServerSnapshot(vault, {
     nodusServerIncludeUserContent: config.includeUserContent,
     nodusServerIncludePassages: config.includePassages,
+    nodusServerIncludePrimarySources: config.includePrimarySources,
+    nodusServerIncludeTestimonies: config.includeTestimonies,
   }, db, library?.manifest || null);
   const payload = JSON.parse(snapshot.buffer.toString('utf8')) as { tables?: Record<string, Record<string, unknown>[]> };
   const structured = structuredSize(payload);

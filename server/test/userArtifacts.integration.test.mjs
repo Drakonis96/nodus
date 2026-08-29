@@ -64,3 +64,50 @@ test('private artifacts are vault-authorized, user-isolated and secret-redacted'
     assert.equal(artifactFiles.join('\n').includes(secret), false);
   });
 });
+
+test('deep-research artifacts export as a private binary PDF', async () => {
+  await withServer({ label: 'user-artifacts-pdf', ai: true }, async (ctx) => {
+    const vaultId = await ctx.createSpace('PDF vault');
+    const alpha = await ctx.createUser('artifact-pdf@example.test', 'artifact-pdf-password-long', [{ spaceId: vaultId, role: 'reader' }]);
+    const cookie = await ctx.signIn(alpha.email, alpha.password);
+    const csrf = await ctx.csrf(cookie);
+    const created = await api(ctx.origin, cookie, csrf, '/api/v2/me/artifacts', 'POST', {
+      vaultId, kind: 'deep-research', title: 'Informe seguro', content: '# Hallazgo\n\nTexto privado.',
+    });
+    assert.equal(created.status, 201);
+    const artifact = (await created.json()).artifact;
+    const pdf = await api(ctx.origin, cookie, null, `/api/v2/me/artifacts/${artifact.id}/document.pdf`);
+    assert.equal(pdf.status, 200);
+    assert.equal(pdf.headers.get('content-type'), 'application/pdf');
+    assert.match(Buffer.from(await pdf.arrayBuffer()).subarray(0, 5).toString('ascii'), /^%PDF-/);
+  });
+});
+
+test('workspace collections and note lifecycle stay private and metadata-driven', async () => {
+  await withServer({ label: 'workspace-artifacts', ai: true }, async (ctx) => {
+    const vaultId = await ctx.createSpace('Workspace vault');
+    const user = await ctx.createUser('workspace@example.test', 'workspace-password-long', [{ spaceId: vaultId, role: 'reader' }]);
+    const cookie = await ctx.signIn(user.email, user.password);
+    const csrf = await ctx.csrf(cookie);
+    const collectionResponse = await api(ctx.origin, cookie, csrf, '/api/v2/me/artifacts', 'POST', {
+      vaultId, kind: 'workspace-collection', title: 'Investigación', content: '',
+      metadata: { surface: 'workspace', entity: 'collection', private: true, parentId: null },
+    });
+    assert.equal(collectionResponse.status, 201);
+    const collection = (await collectionResponse.json()).artifact;
+    const noteResponse = await api(ctx.origin, cookie, csrf, '/api/v2/me/artifacts', 'POST', {
+      vaultId, kind: 'workspace-note', title: 'Apunte', content: '# Markdown',
+      metadata: { surface: 'workspace', private: true, folderId: collection.id, tags: ['tesis'] },
+    });
+    assert.equal(noteResponse.status, 201);
+    const note = (await noteResponse.json()).artifact;
+    assert.equal(note.metadata.folderId, collection.id);
+    const moved = await api(ctx.origin, cookie, csrf, `/api/v2/me/artifacts/${note.id}`, 'PATCH', { metadata: { ...note.metadata, trashedAt: '2026-08-28T00:00:00.000Z' } });
+    assert.equal(moved.status, 200);
+    assert.equal((await moved.json()).artifact.metadata.trashedAt, '2026-08-28T00:00:00.000Z');
+    const listed = await api(ctx.origin, cookie, null, `/api/v2/me/artifacts?vaultId=${vaultId}&kind=workspace-note`);
+    assert.deepEqual((await listed.json()).artifacts.map((entry) => entry.id), [note.id]);
+    assert.equal((await api(ctx.origin, cookie, csrf, `/api/v2/me/artifacts/${note.id}`, 'DELETE')).status, 200);
+    assert.equal((await api(ctx.origin, cookie, null, `/api/v2/me/artifacts/${note.id}`)).status, 404);
+  });
+});

@@ -4,6 +4,7 @@ import path from 'node:path';
 import test from 'node:test';
 
 const root = process.cwd();
+const variants = (source) => [source, source.replaceAll('"', "'"), source.replace(/\s+/g, ' '), source.replaceAll('"', "'").replace(/\s+/g, ' ')].join('\n');
 const read = (file) => fs.readFileSync(path.join(root, file), 'utf8');
 
 function filesBelow(directory) {
@@ -48,11 +49,32 @@ test('the Server web asset handler stops routing after writing its response', ()
 });
 
 test('Server settings use the native app navigation and visual surface', () => {
-  const app = read('src/serverWeb/App.tsx');
-  assert.match(app, /data-testid="header-settings"/);
-  assert.match(app, /onClick=\{\(\) => openView\('settings'\)\}/);
-  assert.match(app, /data-testid="settings-view"/);
-  assert.match(app, /data-testid=\{`settings-tab-\$\{id\}`\}/);
+  const app = variants(read('src/serverWeb/App.tsx'));
+  const settings = variants(read('src/serverWeb/settings/ServerSettingsView.tsx'));
+  assert.match(app, /dataTestId="header-settings"/);
+  assert.match(app, /dataTestId="header-account"/);
+  assert.match(app, /key={settingsTab}/, 'settings must remount when the URL tab changes');
+  assert.match(app, /data-theme={theme}/, 'the shell must expose the resolved theme to its token scope');
+  assert.match(app, /icon="settings"[\s\S]*?onClick=\{\(\) => navigate\('\/view\/settings\?tab=server'\)\}/);
+  assert.match(app, /<ServerSettingsView/);
+  assert.match(settings, /data-testid="settings-view"/);
+  assert.match(settings, /data-testid=\{`settings-tab-\$\{entry\.id\}`\}/);
+  assert.doesNotMatch(settings, /<iframe|\/admin\/settings/);
   assert.doesNotMatch(app, />Nodus Research<\/span>/);
-  assert.match(app, />Nodus<\/span>/);
+  assert.match(app, />\s*Nodus Server\s*<\/span>/);
+});
+
+test('Server vault creation uses canonical vault type ids', () => {
+  const settings = variants(read('src/serverWeb/settings/ServerSettingsView.tsx'));
+  for (const type of ['estudio', 'docencia', 'databases']) {
+    assert.match(settings, new RegExp(`option value="${type}"`), `${type} must be accepted by normalizeVaultType`);
+  }
+  assert.doesNotMatch(settings, /option value="(?:study|teaching|database)"/, 'legacy aliases would silently create academic vaults');
+  assert.match(settings, /api\.createVault\(\s*\{ \.\.\.newSpace, storageKind: 'server_native', authority: 'server' \}/,
+    'Settings must create an autonomous Server-native vault, not a Desktop publication target');
+  assert.match(settings, /data-testid="server-native-vault-create"/);
+  assert.match(settings, /Nativo del servidor/);
+  assert.match(settings, /isAdmin && !native && \(\s*<div className="ss-policy-grid">/,
+    'publication policy switches only apply to Desktop-published spaces');
+  assert.doesNotMatch(settings, /api\.createAdminSpace\(newSpace/);
 });

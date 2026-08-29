@@ -43,14 +43,22 @@ function loadModule(file) {
  * no table. Add a language here and it inherits every check below.
  */
 const TRANSLATIONS = [
-  { name: 'English', file: 'src/i18n.en.ts', export: 'EN' },
-  { name: 'French', file: 'src/i18n.fr.ts', export: 'FR' },
-  { name: 'German', file: 'src/i18n.de.ts', export: 'DE' },
-  { name: 'European Portuguese', file: 'src/i18n.pt.ts', export: 'PT' },
-  { name: 'Brazilian Portuguese', file: 'src/i18n.pt-BR.ts', export: 'PT_BR' },
-  { name: 'Italian', file: 'src/i18n.it.ts', export: 'IT' },
-  { name: 'Turkish', file: 'src/i18n.tr.ts', export: 'TR' },
+  { name: 'English', lang: 'en', file: 'src/i18n.en.ts', export: 'EN' },
+  { name: 'French', lang: 'fr', file: 'src/i18n.fr.ts', export: 'FR' },
+  { name: 'German', lang: 'de', file: 'src/i18n.de.ts', export: 'DE' },
+  { name: 'European Portuguese', lang: 'pt', file: 'src/i18n.pt.ts', export: 'PT' },
+  { name: 'Brazilian Portuguese', lang: 'pt-BR', file: 'src/i18n.pt-BR.ts', export: 'PT_BR' },
+  { name: 'Italian', lang: 'it', file: 'src/i18n.it.ts', export: 'IT' },
+  { name: 'Turkish', lang: 'tr', file: 'src/i18n.tr.ts', export: 'TR' },
 ].map((entry) => ({ ...entry, table: loadModule(entry.file)[entry.export] }));
+
+// Server Web renders through its own adapter: t() there walks the server
+// catalogues in src/serverWeb/i18nShim.ts before the desktop tables, so its
+// strings legitimately live outside src/i18n.<lang>.ts. hasServerTranslation
+// answers, for one locale, whether those catalogues hold a key at all.
+const { hasServerTranslation } = loadModule('src/serverWeb/i18nShim.ts');
+const SERVER_WEB_DIR = 'src/serverWeb/';
+const isServerWebFile = (file) => file.split(path.sep).join('/').startsWith(SERVER_WEB_DIR);
 
 const EN = TRANSLATIONS[0].table;
 const enKeys = new Set(Object.keys(EN));
@@ -399,7 +407,11 @@ function stripNonKeyLiterals(arg) {
     .replace(/(?:===|!==|==|!=)\s*(["'])(?:\\.|(?!\1).)*?\1/g, '')
     .replace(/(["'])(?:\\.|(?!\1).)*?\1\s*(?:===|!==|==|!=)/g, '')
     .replace(/\.(?:includes|startsWith|endsWith|split|join|has|get)\(\s*(["'])(?:\\.|(?!\1).)*?\1\s*\)/g, '')
-    .replace(/\[[^\]]*(["'])(?:\\.|(?!\1).)*?\1\s*\]/g, '');
+    .replace(/\[[^\]]*(["'])(?:\\.|(?!\1).)*?\1\s*\]/g, '')
+    // A media query steering which label t() returns, e.g.
+    // t(matchMedia('(max-width: 760px)').matches ? 'Cerrar' : 'Abrir'). The
+    // breakpoint is never UI text; only the labels around it are.
+    .replace(/\bmatchMedia\(\s*(["'])(?:\\.|(?!\1).)*?\1\s*\)/g, '');
 }
 
 /** Slice the balanced {...} or [...] literal that starts at `openIdx`. */
@@ -446,6 +458,20 @@ function isNotTranslatable(v) {
  * the literal scan can't see the string because it lives in a const, not in the call.
  */
 function collectMapLabels(src, file, record, unescape) {
+  const translatedObjectIteration = (name) => {
+    const uses = src.matchAll(new RegExp(`\\bObject\\.(?:entries|values)\\(\\s*${name}\\s*\\)`, 'g'));
+    for (const use of uses) {
+      const start = (use.index ?? 0) + use[0].length;
+      const statementEnd = src.indexOf(';', start);
+      const end = statementEnd < 0 ? src.length : statementEnd;
+      const chain = src.slice(start, end);
+      const iteration = /\.(?:map|flatMap|forEach)\s*\(/g.exec(chain);
+      if (!iteration) continue;
+      const openParen = start + iteration.index + iteration[0].lastIndexOf('(');
+      if (/\bt[x]?\s*\(/.test(sliceBalanced(src, openParen))) return true;
+    }
+    return false;
+  };
   const defRe = /\b(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*(?::[^=\n]*)?=\s*([[{])/g;
   let m;
   while ((m = defRe.exec(src))) {
@@ -455,7 +481,7 @@ function collectMapLabels(src, file, record, unescape) {
     const consumed =
       new RegExp(`\\bt[x]?\\([^)]*\\b${name}\\s*\\[`).test(src) ||           // t(NAME[..]) incl. ternaries
       new RegExp(`\\bt[x]?\\(\\s*${name}\\s*\\)`).test(src) ||               // t(NAME)
-      new RegExp(`\\bObject\\.(?:entries|values)\\(\\s*${name}\\s*\\)`).test(src) ||
+      translatedObjectIteration(name) ||
       // array of primitive strings mapped with a t() in the file: t(element). An array
       // of OBJECTS (contains `{`) is mapped by its fields, not its elements → skip.
       (isArray && !body.includes('{') && new RegExp(`\\b${name}\\.(?:map|flatMap|forEach)\\(`).test(src) && /\bt[x]?\(/.test(src));
@@ -483,7 +509,14 @@ function collectTranslatableStrings() {
   const found = new Map(); // string -> file
   const record = (val, file) => {
     if (!val || NOT_KEYS.has(val) || !/[a-zA-Z]/.test(val)) return;
-    if (!found.has(val)) found.set(val, path.relative(repoRoot, file));
+    const rel = path.relative(repoRoot, file);
+    const seen = found.get(val);
+    // A string used by Desktop and by Server Web belongs to the desktop
+    // catalogue, so a desktop file always wins the attribution and the string
+    // keeps being held to the full per-language requirement below.
+    if (seen === undefined || (!isServerWebFile(rel) && isServerWebFile(seen))) {
+      found.set(val, rel);
+    }
   };
   const unescape = (s) => s
     .replace(/\\n/g, '\n')
@@ -512,14 +545,49 @@ function collectTranslatableStrings() {
   return found;
 }
 
-for (const { name, file, table } of TRANSLATIONS) {
+for (const { name, lang, file, table } of TRANSLATIONS) {
   test(`every t()/tx() string and tour step has a ${name} translation`, () => {
     const strings = collectTranslatableStrings();
-    const missing = [...strings].filter(([s]) => !(s in table));
+    const missing = [...strings].filter(([s, f]) => {
+      if (s in table) return false;
+      // A Server Web string is answered by the server catalogues instead. It
+      // still must never reach the renderer untranslated: either this locale
+      // or English has to hold it, or the screen shows the Spanish source.
+      if (isServerWebFile(f)) {
+        return !(hasServerTranslation(lang, s) || hasServerTranslation('en', s));
+      }
+      return true;
+    });
     const report = missing.map(([s, f]) => `  ${f}: ${JSON.stringify(s)}`).join('\n');
-    assert.equal(missing.length, 0, `Untranslated strings (add to ${file}):\n${report}`);
+    assert.equal(
+      missing.length,
+      0,
+      `Untranslated strings (add to ${file}, or to src/i18n.server.ts for src/serverWeb):\n${report}`
+    );
   });
 }
+
+// Server Web strings only English can answer. Every other locale would fall
+// through to the English safety net there, so a French reader would see English
+// on a published surface. The catalogue now covers all seven languages, and this
+// ceiling holds it at zero: a new string has to be translated, not left to the
+// fallback. Raise it only to record a gap you mean to keep.
+const SERVER_WEB_ENGLISH_ONLY_CEILING = 0;
+
+test('Server Web strings left to the English safety net stay a bounded set', () => {
+  const strings = collectTranslatableStrings();
+  const englishOnly = [...strings].filter(
+    ([s, f]) =>
+      isServerWebFile(f) &&
+      TRANSLATIONS.some(
+        ({ lang, table }) => lang !== 'en' && !(s in table) && !hasServerTranslation(lang, s)
+      )
+  );
+  assert.ok(
+    englishOnly.length <= SERVER_WEB_ENGLISH_ONLY_CEILING,
+    `${englishOnly.length} Server Web strings reach non-English readers in English, above the ${SERVER_WEB_ENGLISH_ONLY_CEILING} recorded here`
+  );
+});
 
 test('every language table covers exactly the same keys', () => {
   // A key in one table but not another means one language silently falls back.
