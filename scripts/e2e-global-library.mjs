@@ -182,6 +182,12 @@ try {
     await updateModal.waitFor({ state: 'detached' });
   }
   await page.locator('[data-tour="nav-library"]').click();
+  // Everyone meets the Library guide the first time they open Library, and its
+  // backdrop swallows every pointer event aimed at the view behind it.
+  const libraryTutorial = page.getByTestId('library-tutorial-modal');
+  await libraryTutorial.waitFor({ state: 'visible' });
+  await page.getByTestId('library-tutorial-close').click();
+  await libraryTutorial.waitFor({ state: 'detached' });
   const scopeSwitcher = page.getByTestId('library-scope-switcher');
   await scopeSwitcher.waitFor({ state: 'visible' });
   assert.equal(await scopeSwitcher.getAttribute('data-scope-placement'), 'content-header');
