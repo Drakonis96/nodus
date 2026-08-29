@@ -8,6 +8,10 @@ import { ConfirmModal } from '../components/ConfirmModal';
 import { OnboardingModelStep } from '../components/OnboardingModelStep';
 import { t, tx } from '../i18n';
 import { zoteroConnectionHint, zoteroPingErrorText } from '../lib/zoteroConnection';
+// The two library sources are brands, not generic actions: the Nodus node mark and
+// the same node mark drawn as a red Z stand in for the app itself and for Zotero.
+import nodusLogo from '../assets/nodus-logo.svg';
+import zoteroLogo from '../assets/nodus-logo-zotero.svg';
 
 type OnboardingExit = 'home' | 'library' | 'settings';
 
@@ -341,11 +345,14 @@ export function Onboarding({
             </p>
             <div className="grid gap-3 sm:grid-cols-2">
               <button type="button" data-testid="onboarding-library-nodus" aria-pressed={librarySetup === 'nodus'} className={`rounded-xl border p-4 text-left ${librarySetup === 'nodus' ? 'border-indigo-500 bg-indigo-500/10' : 'border-neutral-700 hover:border-neutral-500'}`} onClick={() => setLibrarySetup('nodus')}>
-                <span className="flex items-center gap-2 font-semibold"><Icon name="library" /> {t('Biblioteca de Nodus')}</span>
+                <span className="flex items-center gap-2 font-semibold"><img src={nodusLogo} alt="" aria-hidden="true" className="h-5 w-5 shrink-0" /> {t('Biblioteca de Nodus')}</span>
                 <span className="mt-2 block text-xs leading-5 text-neutral-400">{t('Añade archivos, DOI, ISBN o referencias manuales y organiza tus propias colecciones. No necesitas Zotero.')}</span>
               </button>
               <button type="button" data-testid="onboarding-library-zotero" aria-pressed={librarySetup === 'zotero'} className={`rounded-xl border p-4 text-left ${librarySetup === 'zotero' ? 'border-indigo-500 bg-indigo-500/10' : 'border-neutral-700 hover:border-neutral-500'}`} onClick={() => { setLibrarySetup('zotero'); void checkZotero(); }}>
-                <span className="flex items-center gap-2 font-semibold"><Icon name="sync" /> Zotero</span>
+                <span className="flex items-center gap-2 font-semibold">
+                  <img src={zoteroLogo} alt="" aria-hidden="true" className="h-5 w-5 shrink-0" /> Zotero
+                  <span data-testid="onboarding-library-zotero-recommended" className="rounded-full border border-indigo-500/40 bg-indigo-500/15 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-indigo-300">{t('Recomendado')}</span>
+                </span>
                 <span className="mt-2 block text-xs leading-5 text-neutral-400">{t('Conecta tu biblioteca existente en modo solo lectura y elige qué colecciones monitorizar.')}</span>
               </button>
             </div>
