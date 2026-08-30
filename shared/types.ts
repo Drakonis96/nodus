@@ -693,6 +693,8 @@ export interface Work {
   nodus_id: string;
   zotero_key: string;
   zotero_version: number | null;
+  /** Stable metadata revision used when Zotero's local API reports item version 0. */
+  zotero_fingerprint: string | null;
   title: string;
   authors_json: string; // JSON-encoded string[]
   year: number | null;
@@ -4925,6 +4927,11 @@ export interface SyncLogEntry {
   summary: string;
 }
 
+export interface ZoteroSyncOptions {
+  /** Update monitored catalog metadata and membership without starting analysis. */
+  catalogOnly?: boolean;
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Graph payloads (renderer consumes these directly)
 // ─────────────────────────────────────────────────────────────────────────────
@@ -8725,7 +8732,7 @@ export interface NodusApi extends ProsopographyApi, TestimoniesApi, ToolkitApi, 
 
   // core: sync, backups, recovery. Regrouped here so the academic and study
   // declarations above form one range — they used to sit inside it.
-  syncNow(): Promise<SyncLogEntry>;
+  syncNow(options?: ZoteroSyncOptions): Promise<SyncLogEntry>;
   getSyncLog(): Promise<SyncLogEntry[]>;
   /** Sync packages are encrypted with a passphrase the user sets on both machines. */
   hasSyncPassphrase(): Promise<boolean>;

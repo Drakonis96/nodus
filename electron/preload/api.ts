@@ -224,7 +224,7 @@ export const nodusApi: NodusApi = {
 
   // Core: sync, backups, recovery. Regrouped here so the academic and study
   // bindings above form one range — they used to sit inside it.
-  syncNow: () => ipcRenderer.invoke('sync:now'),
+  syncNow: (options) => ipcRenderer.invoke('sync:now', options),
   getSyncLog: () => ipcRenderer.invoke('sync:log'),
   hasSyncPassphrase: () => ipcRenderer.invoke('sync:hasPassphrase'),
   setSyncPassphrase: (passphrase: string) => ipcRenderer.invoke('sync:setPassphrase', passphrase),

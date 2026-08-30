@@ -67,7 +67,7 @@ function ensureDatabaseResearchReaderColumns(db: Database.Database): void {
 
 // Versioned, append-only migrations. Never edit an existing migration's SQL once
 // shipped — add a new one. The current schema version is the highest applied.
-export const SCHEMA_VERSION = 170;
+export const SCHEMA_VERSION = 171;
 
 export const migrations: Migration[] = [
   {
@@ -9221,6 +9221,24 @@ export const migrations: Migration[] = [
     version: 170,
     up: /* sql */ `SELECT 1;`,
     after: ensureDatabaseResearchReaderColumns,
+  },
+  {
+    version: 171,
+    up: /* sql */ `
+      ALTER TABLE works ADD COLUMN zotero_fingerprint TEXT;
+      DROP TRIGGER IF EXISTS works_document_profile_stale_deep;
+      CREATE TRIGGER works_document_profile_stale_deep
+      AFTER UPDATE OF deep_hash, zotero_version, zotero_fingerprint ON works
+      WHEN OLD.deep_hash IS NOT NEW.deep_hash
+        OR OLD.zotero_version IS NOT NEW.zotero_version
+        OR (OLD.zotero_fingerprint IS NOT NULL AND OLD.zotero_fingerprint IS NOT NEW.zotero_fingerprint)
+      BEGIN
+        UPDATE document_profile_state
+           SET status='stale', stale_reason='source_changed', error=NULL,
+               updated_at=strftime('%Y-%m-%dT%H:%M:%fZ','now')
+         WHERE nodus_id=NEW.nodus_id AND current_version_id IS NOT NULL;
+      END;
+    `,
   },
 ];
 

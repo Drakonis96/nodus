@@ -452,6 +452,7 @@ export interface UpsertWorkInput {
   nodus_id: string;
   zotero_key: string;
   zotero_version: number | null;
+  zotero_fingerprint?: string | null;
   title: string;
   authors: string[];
   creators?: WorkCreator[];
@@ -468,22 +469,24 @@ export function upsertWork(input: UpsertWorkInput): void {
   const existing = getWorkByZoteroKey(input.zotero_key);
   if (!existing) {
     db.prepare(
-      `INSERT INTO works (nodus_id, zotero_key, zotero_version, title, authors_json, creators_json, year, item_type, doi, read_tag, light_status)
-       VALUES (@nodus_id, @zotero_key, @zotero_version, @title, @authors_json, @creators_json, @year, @item_type, @doi, @read_tag, 'none')`
+      `INSERT INTO works (nodus_id, zotero_key, zotero_version, zotero_fingerprint, title, authors_json, creators_json, year, item_type, doi, read_tag, light_status)
+       VALUES (@nodus_id, @zotero_key, @zotero_version, @zotero_fingerprint, @title, @authors_json, @creators_json, @year, @item_type, @doi, @read_tag, 'none')`
     ).run({
       ...input,
+      zotero_fingerprint: input.zotero_fingerprint ?? null,
       authors_json: JSON.stringify(input.authors),
       creators_json: input.creators ? JSON.stringify(input.creators) : null,
       read_tag: input.read_tag ? 1 : 0,
     });
   } else {
     db.prepare(
-      `UPDATE works SET zotero_version=@zotero_version, title=@title, authors_json=@authors_json,
+      `UPDATE works SET zotero_version=@zotero_version, zotero_fingerprint=COALESCE(@zotero_fingerprint, zotero_fingerprint), title=@title, authors_json=@authors_json,
        creators_json=COALESCE(@creators_json, creators_json),
        year=@year, item_type=@item_type, doi=@doi, read_tag=@read_tag, archived=0 WHERE zotero_key=@zotero_key`
     ).run({
       zotero_key: input.zotero_key,
       zotero_version: input.zotero_version,
+      zotero_fingerprint: input.zotero_fingerprint ?? null,
       title: input.title,
       authors_json: JSON.stringify(input.authors),
       creators_json: input.creators ? JSON.stringify(input.creators) : null,

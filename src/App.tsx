@@ -1033,7 +1033,7 @@ export function App() {
   const onSync = async () => {
     setSyncing(true);
     try {
-      const result = await window.nodus.syncNow();
+      const result = await window.nodus.syncNow({ catalogOnly: true });
       setLastSync(result);
       notifyDataChanged();
     } finally {
@@ -1465,7 +1465,7 @@ export function App() {
             <HeaderAction
               dataTour="sync"
               icon="refresh"
-              label={syncing ? t('Actualizando…') : t('Actualizar')}
+              label={syncing ? t('Actualizando…') : t('Actualizar (sincronizar Zotero)')}
               spinning={syncing}
               showLabel={syncing}
               disabled={syncing}
