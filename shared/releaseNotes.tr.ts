@@ -94,8 +94,7 @@ const RELEASE_3_2_4_TR: string[] = [
   "Akademik bir kasa daha az bölümle açılıyor. Boşluklar, Kapsam içinde bir sekmeye dönüşüyor, çünkü bir boşluk ancak kendi sorunuza neyin eksik olduğuna bakarken anlam taşır. Hipotez ve Okuma yolu başlangıçta gizli geliyor, çünkü yeni eşitlenmiş bir külliyatta gürültüyle yanıt veriyorlardı. İkisi de Ayarlar üzerinden geri gelir.",
 ];
 
-export const RELEASE_NOTES_TR: Record<string, string[]> = {
-  "5.1.0": [
+const RELEASE_5_1_0_TR = [
     "Otomatik mod artık yapay zeka işlerini paralel yürütüyor ve hızını her sağlayıcıya, modele ve kimlik bilgisine göre ayarlıyor. Sertifikalı testlerde dizinleme, alıntıları, sıralamayı veya bütünlük kontrollerini kaybetmeden iki kattan daha hızlı tamamlandı. İşlem çubukları artık toplam süreyi ve öğe başına süreyi gösteriyor. Yükü sınırlamanız gerekirse aynı anda 1 ile 8 görev arasında seçim yapabilirsiniz.",
     "LM Studio, Ollama ve Nodus modellerinin zorlu analizleri tamamlamak için artık yeterli süresi var. Bir bölüm fazla ağırsa Nodus tüm belgeyi bırakmak yerine bölümü parçalayıp devam ediyor. Hatalar nedenlerini arayüz dilinde açıklıyor ve genel seçici ilk kurulum sihirbazına dönmeden model yükleyip kaydetmenizi sağlıyor.",
     "İçe aktarma artık ekler, notlar, koleksiyonlar, bağımsız belgeler ve bibliyografik üst veriler dahil olmak üzere kişisel ve grup kitaplıklarının tamamını tarıyor. Nodus her kopyayı doğruluyor, eksik dosyaları onarıyor ve iptal edilen bir içe aktarmayı kusurlu işi tamamlanmış saymadan sürdürmenizi sağlıyor. Uzun dosya adları işlemi durdurmuyor ve bağlantı hataları çözümü açıklıyor. Kurulum sihirbazı Nodus Library ile Zotero’yu görsel olarak ayırıyor ve doğrudan doğru yerel API’ye bağlanıyor.",
@@ -104,7 +103,14 @@ export const RELEASE_NOTES_TR: Record<string, string[]> = {
     "Veritabanı kasalarındaki Deep Research artık akademik moddaki açık kitaplık, oluşturma, kuyruk ve okuma akışını kullanıyor. Otomatik yerel kurulum, birden fazla veritabanıyla çalışma, kalıcı okuma durumu, ek açıklamalar ve dışa aktarmalar içeriyor. Rol seçenekleri ve rapor önizleme düzenlemesi gelişmiş ayarlar olarak kullanılmaya devam ediyor.",
     "Fikirler, Pasajlar ve Eş Anlamlılar artık kendi modellerini seçebiliyor. Eş anlamlı üretimi tüm cümleyi daha iyi anlıyor ve sağlayıcı yanıt biçimini değiştirse bile geçerli alternatifler döndürüyor. Word şeridine Yapay Zeka ile Düzenleme, Eş Anlamlılar ve Sohbet kısayolları eklendi, stil seçici de eklenti açıldığında artık genişletilmiş görünmüyor.",
     "Chrome uzantısının adı artık Nodus Research Connector ve doğrudan proje sitesine bağlantı veriyor. Uygulamayla eşleştirme, iptal seçeneğini ilk sıraya koyan açık ve çevrilmiş bir iletişim kutusu kullanıyor ve artık yerel sistem uyarısına bağlı değil.",
+];
+
+export const RELEASE_NOTES_TR: Record<string, string[]> = {
+  "5.1.1": [
+    ...RELEASE_5_1_0_TR,
+    "Başlıktaki Güncelle düğmesi artık yalnızca izlediğiniz Zotero koleksiyonlarının kataloğunu yeniliyor. Yeni öğeler analiz başlatılmadan veya kuyruğa eklenmeden Kitaplıkta görünüyor. Bu sürüm ayrıca Zotero 10’un döndürdüğü sıfır öğe sürümünü düzeltiyor. Bu değer daha önce tüm kitaplığı bir anda değişmiş gibi gösterebiliyordu.",
   ],
+  "5.1.0": RELEASE_5_1_0_TR,
   "5.0.6": [
     "Nodus Copilot Eş Anlamlılar ve Sohbet özelliklerini kazanıyor. Eş Anlamlılar, seçiminizin çevresindeki cümlenin tamamını okuyor, bağlama uygun beş alternatif öneriyor ve yalnızca seçtiğiniz terimi değiştiriyor. Sohbet geçerli sayfayı veya belgenin tamamını kullanarak yanıt veriyor, seçili metne öncelik tanıyor ve yanıtları durdurmanıza, yeniden üretmenize, düzenlemenize ve kopyalamanıza izin veriyor. Her belge kendi geçmişini koruyor.",
     "Zotero için Nodus, seçilen tüm eklerin eksiksiz içeriğiyle çalışıyor ve yerel bir dizin üzerinden hem sözcüklere hem de anlama göre kanıt buluyor. Yanıtlar kesin pasajlara, sayfalara ve bölümlere bağlanıyor, daha fazla desteğe ihtiyaç duyan iddiaları belirtiyor ve konuşma yeniden açıldığında incelenebilir bir denetim kaydını koruyor. Ayrıca yakalamalar ve OCR aracılığıyla sayfaları, tabloları, şekilleri ve taranmış belgeleri yorumlayabiliyor, sohbet ise yanıtı üretilirken gösteriyor. Eklentinin kurulumu ve güncellemeleri artık her resmi sürüm paketine entegre ediliyor.",
