@@ -8,7 +8,7 @@ import {
 } from "react";
 import { Icon } from "../components/ui";
 import { MarkdownReader } from "./readers";
-import { api } from "./api";
+import { api, ApiError } from "./api";
 import type { AIJob, Annotation, JsonRecord, LibraryDocument } from "./types";
 import { t } from "./i18nShim";
 
@@ -18,6 +18,14 @@ const PAGE_SIZE = 50;
 const annotationResource = "library";
 type ReaderOpeningFormat = "clean" | "original";
 const READER_OPENING_FORMAT_KEY = "nodus.libraryReader.openingFormat";
+
+function isUnpublishedLibrary(error: unknown): boolean {
+  return (
+    error instanceof ApiError &&
+    error.status === 409 &&
+    error.code === "library_not_published"
+  );
+}
 
 function readOpeningFormatPreference(): ReaderOpeningFormat | null {
   try {
@@ -107,12 +115,33 @@ async function waitForJob(id: string, signal: AbortSignal): Promise<AIJob> {
   );
 }
 
-function LibraryEmpty({ title }: { title: string }) {
+function LibraryEmpty({
+  title,
+  detail,
+  settingsLink = false,
+}: {
+  title: string;
+  detail?: string;
+  settingsLink?: boolean;
+}) {
   return (
     <div className="server-unavailable" data-testid="library-empty">
       <div>
         <Icon name="inbox" size={32} className="mx-auto text-neutral-500" />
         <h2 className="mt-3 text-lg font-semibold">{title}</h2>
+        {detail && (
+          <p className="mt-2 max-w-md text-sm leading-6 text-neutral-500">
+            {detail}
+          </p>
+        )}
+        {settingsLink && (
+          <a
+            className="btn btn-primary mt-4"
+            href="/view/settings?tab=server&focus=connected-vault"
+          >
+            {t("Abrir Ajustes de Server")}
+          </a>
+        )}
       </div>
     </div>
   );
@@ -313,13 +342,20 @@ export function PublishedLibraryView({ spaceId, onOpen }: LibraryProps) {
   const [offset, setOffset] = useState(0);
   const [total, setTotal] = useState(0);
   const [hasMore, setHasMore] = useState(false);
+  const [published, setPublished] = useState<boolean | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<unknown>();
   const loadCollections = useCallback(async () => {
     try {
       setCollections((await api.libraryCollections(spaceId)).collections || []);
     } catch (cause) {
-      setError(cause);
+      // Collections are an optional facet. Older Server releases answer 409
+      // before the first library publication; keep the document table usable
+      // and render that state as an empty catalogue instead of a fatal error.
+      setCollections([]);
+      if (!isUnpublishedLibrary(cause)) {
+        console.warn("[nodus-server] library collections unavailable", cause);
+      }
     }
   }, [spaceId]);
   const load = useCallback(async () => {
@@ -335,8 +371,16 @@ export function PublishedLibraryView({ spaceId, onOpen }: LibraryProps) {
       setItems(page.items || []);
       setTotal(page.total || 0);
       setHasMore(Boolean(page.hasMore));
+      setPublished(page.published !== false);
     } catch (cause) {
-      setError(cause);
+      if (isUnpublishedLibrary(cause)) {
+        setItems([]);
+        setTotal(0);
+        setHasMore(false);
+        setPublished(false);
+      } else {
+        setError(cause);
+      }
     } finally {
       setLoading(false);
     }
@@ -456,8 +500,20 @@ export function PublishedLibraryView({ spaceId, onOpen }: LibraryProps) {
           ) : items.length === 0 ? (
             <LibraryEmpty
               title={
-                total ? "No hay coincidencias" : "La biblioteca está vacía"
+                total
+                  ? t("No hay coincidencias")
+                  : published === false
+                    ? t("La biblioteca aún no se ha publicado")
+                    : t("La biblioteca está vacía")
               }
+              detail={
+                published === false
+                  ? t(
+                      "Activa Biblioteca en Ajustes → Server y vuelve a publicar desde Desktop.",
+                    )
+                  : undefined
+              }
+              settingsLink={published === false}
             />
           ) : (
             items.map((item) => {

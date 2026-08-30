@@ -11,7 +11,6 @@ import {
 } from "react";
 import { normalizeVaultType, type VaultType } from "@shared/vaultTypes";
 import {
-  VaultTypePicker,
   vaultTypeIcon,
   vaultTypeLabel,
   VAULT_TYPE_COLOR,
@@ -117,6 +116,7 @@ export function ServerVaultManager({
   csrfToken,
   onSelect,
   onChanged,
+  onAddVault,
   onClose,
 }: {
   spaces: Space[];
@@ -125,6 +125,7 @@ export function ServerVaultManager({
   csrfToken?: string;
   onSelect: (id: string) => void;
   onChanged: () => Promise<void>;
+  onAddVault: (kind: "native" | "connected") => void;
   onClose: () => void;
 }) {
   const [query, setQuery] = useState("");
@@ -133,10 +134,7 @@ export function ServerVaultManager({
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
-  const [addOpen, setAddOpen] = useState(false);
-  const [name, setName] = useState("");
-  const [description, setDescription] = useState("");
-  const [vaultType, setVaultType] = useState<VaultType>("academic");
+  const [addMenuOpen, setAddMenuOpen] = useState(false);
   const [renameTarget, setRenameTarget] = useState<ManagedSpace | null>(null);
   const [renameValue, setRenameValue] = useState("");
   const [duplicateTarget, setDuplicateTarget] = useState<ManagedSpace | null>(
@@ -220,25 +218,6 @@ export function ServerVaultManager({
     } finally {
       setBusy(false);
     }
-  };
-
-  const add = async () => {
-    if (!name.trim()) {
-      setError(t("Escribe un nombre para el vault."));
-      return;
-    }
-    await run(
-      () =>
-        api.createVault(
-          { name: name.trim(), description: description.trim(), vaultType },
-          csrfToken,
-        ),
-      t("Vault creado."),
-    );
-    setAddOpen(false);
-    setName("");
-    setDescription("");
-    setVaultType("academic");
   };
 
   const rename = async () => {
@@ -367,18 +346,60 @@ export function ServerVaultManager({
                 </small>
               </div>
               {isAdmin && (
-                <button
-                  type="button"
-                  className="btn btn-primary gap-1 px-2 py-1 text-xs"
-                  onClick={() => {
-                    setError("");
-                    setAddOpen(true);
-                  }}
-                  data-testid="vault-add"
-                >
-                  <Icon name="plus" size={14} />
-                  {t("Añadir")}
-                </button>
+                <div className="server-vault-add-menu">
+                  <button
+                    type="button"
+                    className="btn btn-primary gap-1 px-2 py-1 text-xs"
+                    onClick={() => {
+                      setError("");
+                      setAddMenuOpen((open) => !open);
+                    }}
+                    aria-haspopup="menu"
+                    aria-expanded={addMenuOpen}
+                    data-testid="vault-add"
+                  >
+                    <Icon name="plus" size={14} />
+                    {t("Añadir")}
+                    <Icon name="chevronDown" size={12} />
+                  </button>
+                  {addMenuOpen && (
+                    <div
+                      className="server-vault-add-options"
+                      role="menu"
+                      aria-label={t("Añadir vault")}
+                      data-testid="vault-add-options"
+                    >
+                      <button
+                        type="button"
+                        role="menuitem"
+                        onClick={() => onAddVault("native")}
+                        data-testid="vault-add-native"
+                      >
+                        <Icon name="vault" size={16} />
+                        <span>
+                          <strong>{t("Nuevo vault")}</strong>
+                          <small>
+                            {t("Crear un vault editable directamente en Server.")}
+                          </small>
+                        </span>
+                      </button>
+                      <button
+                        type="button"
+                        role="menuitem"
+                        onClick={() => onAddVault("connected")}
+                        data-testid="vault-add-connected"
+                      >
+                        <Icon name="link" size={16} />
+                        <span>
+                          <strong>{t("Connected Vault")}</strong>
+                          <small>
+                            {t("Conectar un vault de Desktop para publicarlo y sincronizarlo.")}
+                          </small>
+                        </span>
+                      </button>
+                    </div>
+                  )}
+                </div>
               )}
               <button
                 type="button"
@@ -612,52 +633,6 @@ export function ServerVaultManager({
               )}
             </div>
           </div>
-          {addOpen && (
-            <Modal title="Añadir vault" onClose={() => setAddOpen(false)}>
-              <label className="block text-sm">
-                Nombre
-                <input
-                  className="input mt-1 w-full"
-                  autoFocus
-                  value={name}
-                  onChange={(event) => setName(event.target.value)}
-                />
-              </label>
-              <label className="mt-3 block text-sm">
-                Descripción
-                <input
-                  className="input mt-1 w-full"
-                  value={description}
-                  onChange={(event) => setDescription(event.target.value)}
-                />
-              </label>
-              <div className="mt-4">
-                <p className="mb-2 text-xs text-neutral-500">Tipo de vault</p>
-                <VaultTypePicker
-                  value={vaultType}
-                  onChange={setVaultType}
-                  disabled={busy}
-                />
-              </div>
-              <div className="mt-5 flex justify-end gap-2">
-                <button
-                  type="button"
-                  className="btn btn-ghost"
-                  onClick={() => setAddOpen(false)}
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="button"
-                  className="btn btn-primary"
-                  onClick={() => void add()}
-                  disabled={busy}
-                >
-                  Crear vault
-                </button>
-              </div>
-            </Modal>
-          )}
           {renameTarget && (
             <Modal
               title="Renombrar vault"

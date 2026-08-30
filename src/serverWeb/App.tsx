@@ -1770,6 +1770,7 @@ export default function App() {
     () => localStorage.getItem(SERVER_NAV_COLLAPSED_STORAGE_KEY) === "1",
   );
   const [drawer, setDrawer] = useState(false);
+  const [pendingView, setPendingView] = useState<View | null>(null);
   const [vaultsOpen, setVaultsOpen] = useState(false);
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(() => {
     try {
@@ -1796,6 +1797,7 @@ export default function App() {
     useState<HeaderBadgePlacement | null>(null);
   const profileThemeRef =
     useRef<PortableProfileValues["appearance"]["theme"]>("system");
+  const viewHostRef = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
     const listener = () => setRoute(routeFromLocation());
     addEventListener("popstate", listener);
@@ -1947,9 +1949,36 @@ export default function App() {
   }, [active?.id]);
   const openView = (view: View) => {
     if (SERVER_TOOL_VIEWS.has(view)) return;
+    if (view === activeView) {
+      setDrawer(false);
+      return;
+    }
+    setPendingView(view);
     navigate(viewPath(view));
     setDrawer(false);
   };
+  useEffect(() => {
+    if (!pendingView || pendingView !== activeView) return undefined;
+    const host = viewHostRef.current;
+    if (!host) return undefined;
+    let observer: MutationObserver | undefined;
+    const finishWhenContentIsReady = () => {
+      if (host.querySelector('[data-testid="loading"]')) return;
+      setPendingView((current) =>
+        current === pendingView ? null : current,
+      );
+      observer?.disconnect();
+    };
+    const frame = requestAnimationFrame(() => {
+      observer = new MutationObserver(finishWhenContentIsReady);
+      observer.observe(host, { childList: true, subtree: true });
+      finishWhenContentIsReady();
+    });
+    return () => {
+      cancelAnimationFrame(frame);
+      observer?.disconnect();
+    };
+  }, [activeView, pendingView]);
   const resize = (event: ReactPointerEvent) => {
     const start = event.clientX;
     const initial = sidebarWidth;
@@ -2388,9 +2417,11 @@ export default function App() {
       // example) Providers changed the URL but left the old tab on screen.
       const settingsTab =
         new URLSearchParams(location.search).get("tab") || "server";
+      const settingsFocus =
+        new URLSearchParams(location.search).get("focus") || "";
       return (
         <ServerSettingsView
-          key={settingsTab}
+          key={`${settingsTab}:${settingsFocus}`}
           csrfToken={me.csrfToken}
           isAdmin={me.user?.role === "admin"}
           theme={theme}
@@ -2595,14 +2626,6 @@ export default function App() {
             }
           />
           <ServerHeaderAction
-            icon="sparkles"
-            label="Nodi"
-            title={t("Abrir Nodi")}
-            onClick={() => navigate("/view/nodi")}
-            dataTestId="header-nodi"
-            className={activeView === "nodi" ? "bg-indigo-600 text-white" : ""}
-          />
-          <ServerHeaderAction
             icon="chat"
             label={t("Asistente")}
             title={t("Abrir asistente de investigación")}
@@ -2613,14 +2636,14 @@ export default function App() {
             }
           />
           <ServerHeaderAction
-            icon="settings"
-            label={t("Ajustes")}
-            title={t("Ajustes")}
-            onClick={() => navigate("/view/settings?tab=server")}
-            dataTestId="header-settings"
-            className={
-              activeView === "settings" ? "bg-indigo-600 text-white" : ""
-            }
+            icon="user"
+            label={t("Mi cuenta")}
+            title={t("Mi cuenta")}
+            onClick={() => {
+              setDrawer(false);
+              navigate("/view/settings?tab=server");
+            }}
+            dataTestId="header-account"
           />
           <ServerHeaderAction
             icon={theme === "dark" ? "sun" : "moon"}
@@ -2632,14 +2655,14 @@ export default function App() {
             dataTestId="theme-toggle"
           />
           <ServerHeaderAction
-            icon="user"
-            label={t("Mi cuenta")}
-            title={t("Mi cuenta")}
-            onClick={() => {
-              setDrawer(false);
-              navigate("/view/settings?tab=server");
-            }}
-            dataTestId="header-account"
+            icon="settings"
+            label={t("Ajustes")}
+            title={t("Ajustes")}
+            onClick={() => navigate("/view/settings?tab=server")}
+            dataTestId="header-settings"
+            className={
+              activeView === "settings" ? "bg-indigo-600 text-white" : ""
+            }
           />
         </div>
         {vaultsOpen && active && (
@@ -2655,6 +2678,14 @@ export default function App() {
               navigate("/");
             }}
             onChanged={refreshSpaces}
+            onAddVault={(kind) => {
+              setVaultsOpen(false);
+              navigate(
+                `/view/settings?tab=server&focus=${
+                  kind === "native" ? "new-vault" : "connected-vault"
+                }`,
+              );
+            }}
             onClose={() => setVaultsOpen(false)}
           />
         )}
@@ -2704,8 +2735,26 @@ export default function App() {
           />
         </nav>
         <main className="server-main min-h-0 min-w-0 flex-1" id="main-content">
-          <div className="server-view-host min-h-0 flex-1 overflow-hidden">
+          <div
+            ref={viewHostRef}
+            className="server-view-host relative min-h-0 flex-1 overflow-hidden"
+            data-loading-view={
+              pendingView === activeView ? pendingView : undefined
+            }
+            aria-busy={pendingView === activeView ? true : undefined}
+          >
             <Suspense fallback={<Loading />}>{content}</Suspense>
+            {pendingView === activeView && (
+              <div
+                className="server-view-loading-overlay"
+                role="status"
+                aria-label={t("Cargando…")}
+                data-testid="view-loading-spinner"
+              >
+                <span className="server-view-loading-spinner" aria-hidden="true" />
+                <span className="sr-only">{t("Cargando…")}</span>
+              </div>
+            )}
           </div>
         </main>
       </div>

@@ -10,6 +10,7 @@ const shim = read("src/serverWeb/i18nShim.ts");
 const app = read("src/serverWeb/App.tsx");
 const settings = read("src/serverWeb/settings/ServerSettingsView.tsx");
 const css = read("src/serverWeb/settings/ServerSettings.css");
+const settingsTranslations = read("src/serverWeb/i18nServerSettings.ts");
 
 test("Server Web defaults to English and reuses every Desktop language catalogue", () => {
   assert.match(shim, /let active: AppLanguage = ["']en["']/);
@@ -103,6 +104,40 @@ test("Server Settings accent follows the active vault in dark and light themes",
   assert.match(settings, /data-testid="interface-language"/);
 });
 
+test("Server Settings owns a height-constrained vertical scroll viewport", () => {
+  assert.match(
+    css,
+    /\.server-settings-native\s*\{[\s\S]*?height:\s*100%;[\s\S]*?min-height:\s*0;[\s\S]*?max-height:\s*100%;[\s\S]*?overflow-y:\s*auto;/,
+  );
+  assert.match(css, /scrollbar-gutter:\s*stable/);
+});
+
+test("every Server administration block exposes translated contextual help", () => {
+  assert.match(settings, /help\?: string/);
+  assert.match(settings, /className=["']ss-help-button["']/);
+  assert.match(settings, /aria-expanded=\{helpOpen\}/);
+  assert.match(settings, /aria-controls=\{helpId\}/);
+  assert.match(settings, /tx\(["']Ayuda sobre \{section\}["']/);
+  assert.match(settings, /className=["']ss-section-help["']/);
+  for (const title of [
+    "Nodus Server",
+    "Nuevo vault",
+    "Vaults del servidor",
+    "Usuarios y acceso",
+    "Dispositivos publicadores",
+    "Mi cuenta",
+  ]) {
+    const escaped = title.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    assert.match(
+      settings,
+      new RegExp(`title=["']${escaped}["'][\\s\\S]{0,420}?help=["']`),
+      `${title} must include contextual help`,
+    );
+  }
+  assert.match(css, /\.ss-help-button/);
+  assert.match(css, /\.ss-section-help/);
+});
+
 test("Server Settings translates mixed chrome without translating published values", () => {
   assert.match(settings, /setActiveLang, t, tx/);
   for (const source of [
@@ -157,6 +192,12 @@ test("requested locale catalogues win before the English safety fallback", () =>
   );
   for (const source of [
     "Abrir navegación",
+    "Connected Vault",
+    "Crear un vault editable directamente en Server.",
+    "Conectar un vault de Desktop para publicarlo y sincronizarlo.",
+    "La biblioteca aún no se ha publicado",
+    "Activa Biblioteca en Ajustes → Server y vuelve a publicar desde Desktop.",
+    "Abrir Ajustes de Server",
     "Introducir una clave nueva para sustituirla",
     "Esta superficie es privada y no contiene datos publicados.",
     "Árbol genealógico publicado",
@@ -167,5 +208,47 @@ test("requested locale catalogues win before the English safety fallback", () =>
         .length >= 7,
       `${source} must have complete non-Spanish locale coverage`,
     );
+  }
+});
+
+test("Server Settings prose is translated in every supported non-Spanish locale", () => {
+  assert.match(
+    shim,
+    /SERVER_SETTINGS_TRANSLATIONS\[normalized\]\?\.\[source\]/,
+  );
+  const localeOrder = ["en", "fr", "de", "pt", "pt-BR", "it", "tr"];
+  const localeBlocks = new Map();
+  for (let index = 0; index < localeOrder.length; index += 1) {
+    const locale = localeOrder[index];
+    const next = localeOrder[index + 1];
+    const startToken = locale === "pt-BR" ? '"pt-BR": {' : `${locale}: {`;
+    const start = settingsTranslations.indexOf(startToken);
+    const end = next
+      ? settingsTranslations.indexOf(
+          next === "pt-BR" ? '"pt-BR": {' : `${next}: {`,
+          start + startToken.length,
+        )
+      : settingsTranslations.lastIndexOf("};");
+    assert.ok(
+      start >= 0 && end > start,
+      `${locale} Settings catalogue exists`,
+    );
+    localeBlocks.set(locale, settingsTranslations.slice(start, end));
+  }
+  const englishKeys = [
+    ...localeBlocks.get("en").matchAll(/^\s{4}"([^"]+)":/gm),
+  ].map((match) => match[1]);
+  assert.ok(
+    englishKeys.length >= 35,
+    "the complete Settings prose catalogue is covered",
+  );
+  for (const locale of localeOrder) {
+    const block = localeBlocks.get(locale);
+    for (const source of englishKeys) {
+      assert.ok(
+        block.includes(`${JSON.stringify(source)}:`),
+        `${locale} must translate Settings copy: ${source}`,
+      );
+    }
   }
 });

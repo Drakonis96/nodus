@@ -772,18 +772,27 @@ export function createApiRoutes(ctx) {
 
   function libraryCollections(req, res, space) {
     const library = libraryManifest(space.id);
-    if (!library) return libraryUnavailable(res);
+    // An authorised space without a library publication is a valid empty
+    // catalogue, not a failed request. This distinction lets Server Web render
+    // its normal empty state while the owner has not published any documents.
+    if (!library) {
+      json(res, 200, { collections: [], published: false, generatedAt: null });
+      return true;
+    }
     json(res, 200, { collections: Array.isArray(library.collections) ? library.collections : [], generatedAt: library.generatedAt });
     return true;
   }
 
   function libraryDocuments(req, res, space, url) {
     const library = libraryManifest(space.id);
-    if (!library) return libraryUnavailable(res);
-    const query = String(url.searchParams.get('q') || '').trim().toLocaleLowerCase();
-    const collectionId = String(url.searchParams.get('collectionId') || '');
     const limit = Math.max(1, Math.min(200, Number(url.searchParams.get('limit')) || 50));
     const offset = Math.max(0, Number(url.searchParams.get('offset')) || 0);
+    if (!library) {
+      json(res, 200, { items: [], total: 0, limit, offset, hasMore: false, published: false, generatedAt: null });
+      return true;
+    }
+    const query = String(url.searchParams.get('q') || '').trim().toLocaleLowerCase();
+    const collectionId = String(url.searchParams.get('collectionId') || '');
     const all = (Array.isArray(library.documents) ? library.documents : []).filter((document) => {
       if (collectionId && !(Array.isArray(document?.collectionIds) && document.collectionIds.includes(collectionId))) return false;
       if (!query) return true;

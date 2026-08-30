@@ -3,6 +3,7 @@ import {
   isValidElement,
   useCallback,
   useEffect,
+  useId,
   useMemo,
   useState,
   type FormEvent,
@@ -346,19 +347,51 @@ function translateSettingsNode(node: ReactNode): ReactNode {
 function Section({
   title,
   description,
+  help,
   children,
   testId,
+  focusId,
 }: {
   title: string;
   description?: string;
+  help?: string;
   children: React.ReactNode;
   testId?: string;
+  focusId?: string;
 }) {
+  const [helpOpen, setHelpOpen] = useState(false);
+  const helpId = useId();
+  const helpLabel = tx("Ayuda sobre {section}", { section: t(title) });
   return (
-    <section className="ss-card" data-testid={testId}>
+    <section
+      className="ss-card"
+      data-testid={testId}
+      id={focusId}
+      tabIndex={focusId ? -1 : undefined}
+    >
       <header className="ss-section-head">
-        <h2>{t(title)}</h2>
+        <div className="ss-section-title-line">
+          <h2>{t(title)}</h2>
+          {help && (
+            <button
+              type="button"
+              className="ss-help-button"
+              aria-label={helpLabel}
+              title={helpLabel}
+              aria-expanded={helpOpen}
+              aria-controls={helpId}
+              onClick={() => setHelpOpen((current) => !current)}
+            >
+              <Icon name="help" size={12} />
+            </button>
+          )}
+        </div>
         {description && <p>{t(description)}</p>}
+        {helpOpen && help && (
+          <p className="ss-section-help" id={helpId} role="status">
+            {t(help)}
+          </p>
+        )}
       </header>
       {translateSettingsNode(children)}
     </section>
@@ -488,6 +521,7 @@ export function ServerSettingsView({
 }: ServerSettingsViewProps) {
   const requested =
     initialTab || new URLSearchParams(location.search).get("tab") || "server";
+  const requestedFocus = new URLSearchParams(location.search).get("focus");
   const [tab, setTab] = useState<TabId>(
     TABS.some((entry) => entry.id === requested)
       ? (requested as TabId)
@@ -574,6 +608,21 @@ export function ServerSettingsView({
     addEventListener("popstate", onPopState);
     return () => removeEventListener("popstate", onPopState);
   }, []);
+
+  useEffect(() => {
+    if (tab !== "server" || !requestedFocus || !profile) return undefined;
+    const frame = requestAnimationFrame(() => {
+      const section = document.getElementById(`server-${requestedFocus}`);
+      if (!section) return;
+      const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
+      section.scrollIntoView({
+        behavior: reduceMotion ? "auto" : "smooth",
+        block: "start",
+      });
+      section.focus({ preventScroll: true });
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [profile, requestedFocus, tab]);
 
   const selectTab = (next: TabId) => {
     setTab(next);
@@ -1067,10 +1116,10 @@ export function ServerSettingsView({
     >
       {profile.ai.pendingAssignments.length > 0 && (
         <div className="ss-warning" data-testid="server-pending-models">
-          Hay asignaciones heredadas pendientes (
-          {profile.ai.pendingAssignments.join(", ")}). Los modelos locales
-          descargables no se ejecutan en Server ni se sustituyen por un modelo
-          de pago.
+          {tx(
+            "Hay asignaciones heredadas pendientes ({assignments}). Los modelos locales descargables no se ejecutan en Server ni se sustituyen por un modelo de pago.",
+            { assignments: profile.ai.pendingAssignments.join(", ") },
+          )}
         </div>
       )}
       <Row label="Configuración">
@@ -1363,6 +1412,7 @@ export function ServerSettingsView({
       <Section
         title="Nodus Server"
         description="Administración integrada, sin iframe ni rutas a puertos auxiliares."
+        help="Resume este servidor y muestra cuántos vaults, usuarios y dispositivos administra, junto con sus direcciones de acceso."
         testId="server-native-admin"
       >
         <div className="ss-metrics">
@@ -1399,6 +1449,8 @@ export function ServerSettingsView({
         <Section
           title="Nuevo vault"
           description="Crea una bóveda nativa administrada íntegramente por Server, sin depender de Nodus Desktop."
+          help="Crea un vault editable que vive directamente en Server. Elige su nombre, tipo y descripción inicial."
+          focusId="server-new-vault"
         >
           <form
             className="ss-inline-form"
@@ -1459,7 +1511,11 @@ export function ServerSettingsView({
           </form>
         </Section>
       )}
-      <Section title="Vaults del servidor">
+      <Section
+        title="Vaults del servidor"
+        help="Muestra los vaults nativos y los publicados desde Desktop. Aquí puedes revisar su estado, ajustar qué se publica y generar códigos de conexión."
+        focusId="server-connected-vault"
+      >
         <div className="ss-admin-list">
           {(admin?.spaces || me?.spaces || []).map((space) => {
             const policy = (
@@ -1575,7 +1631,10 @@ export function ServerSettingsView({
         )}
       </Section>
       {isAdmin && (
-        <Section title="Usuarios y acceso">
+        <Section
+          title="Usuarios y acceso"
+          help="Crea cuentas y decide qué puede hacer cada usuario en cada vault: leer, escribir o administrarlo como propietario."
+        >
           <form
             className="ss-inline-form"
             onSubmit={(event) => void createUser(event)}
@@ -1708,7 +1767,10 @@ export function ServerSettingsView({
         </Section>
       )}
       {isAdmin && (
-        <Section title="Dispositivos publicadores">
+        <Section
+          title="Dispositivos publicadores"
+          help="Enumera los dispositivos Desktop autorizados para publicar vaults en este servidor. Puedes revocar un dispositivo que ya no deba sincronizar."
+        >
           <div className="ss-table">
             <div className="ss-table-head">
               <span>Dispositivo</span>
@@ -1750,6 +1812,7 @@ export function ServerSettingsView({
       <Section
         title="Mi cuenta"
         description="La cuenta se administra dentro de Ajustes; nunca se abre un puerto ni una página externa."
+        help="Muestra la cuenta y el rol con los que has iniciado sesión. También permite cambiar la contraseña o cerrar la sesión actual."
       >
         <Row label="Cuenta activa">
           <span className="ss-value">{me?.user?.email || "—"}</span>
