@@ -10,6 +10,7 @@ import {
   mergeGlobalLibraryItems,
   mergeGlobalLibrarySyncRecord,
   mergeGlobalLibrarySyncTombstone,
+  normalizeZoteroImportSelection,
   startZoteroLibraryImport,
 } from '../library/libraryService';
 import { getNodusServerTokenFor } from '../secrets/secretStore';
@@ -199,7 +200,11 @@ async function executeCommand(base: string, token: string, command: { id: string
     return mergeGlobalLibraryItems(itemIds[0], itemIds.slice(1));
   }
   if (command.kind === 'zoteroSync') {
-    return startZoteroLibraryImport(command.id, (payload.selection ?? {}) as never, () => undefined);
+    const report = await startZoteroLibraryImport(command.id, normalizeZoteroImportSelection(payload.selection), () => undefined);
+    if (report.partial || report.verification?.status === 'blocked' || report.canceled) {
+      throw new Error('zotero_import_verification_failed');
+    }
+    return report;
   }
   if (command.kind === 'import') {
     const objects = Array.isArray(payload.objects) ? payload.objects : [];

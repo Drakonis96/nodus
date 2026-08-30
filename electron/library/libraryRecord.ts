@@ -38,6 +38,20 @@ function stringValue(value: unknown, max = 10_000): string | undefined {
   return clean ? clean.slice(0, max) : undefined;
 }
 
+// Bibliographic strings are source data, not UI labels. Internal whitespace can be
+// meaningful (paragraphs, initials, catalogue punctuation) and must round-trip from
+// Zotero exactly. Structural identifiers continue to use stringValue above.
+function metadataStringValue(value: unknown, max = 10_000): string | undefined {
+  if (typeof value !== 'string') return undefined;
+  const clean = value.trim();
+  return clean ? clean.slice(0, max) : undefined;
+}
+
+function metadataStringArray(value: unknown, maxItems = 256): string[] {
+  if (!Array.isArray(value)) return [];
+  return [...new Set(value.map((item) => metadataStringValue(item, 1_000)).filter((item): item is string => !!item))].slice(0, maxItems);
+}
+
 function stringArray(value: unknown, maxItems = 256): string[] {
   if (!Array.isArray(value)) return [];
   return [...new Set(value.map((item) => stringValue(item, 1_000)).filter((item): item is string => !!item))].slice(0, maxItems);
@@ -157,15 +171,15 @@ function normalizeCreators(value: unknown): LibraryCreator[] {
   if (!Array.isArray(value)) return [];
   return value.slice(0, 512).flatMap<LibraryCreator>((entry) => {
     if (typeof entry === 'string') {
-      const name = stringValue(entry, 1_000);
+      const name = metadataStringValue(entry, 1_000);
       return name ? [{ creatorType: 'author', name }] : [];
     }
     if (!entry || typeof entry !== 'object') return [];
     const source = entry as Record<string, unknown>;
-    const creatorType = stringValue(source.creatorType, 80) ?? 'author';
-    const firstName = stringValue(source.firstName, 500);
-    const lastName = stringValue(source.lastName, 500);
-    const name = stringValue(source.name, 1_000);
+    const creatorType = metadataStringValue(source.creatorType, 80) ?? 'author';
+    const firstName = metadataStringValue(source.firstName, 500);
+    const lastName = metadataStringValue(source.lastName, 500);
+    const name = metadataStringValue(source.name, 1_000);
     if (!firstName && !lastName && !name) return [];
     const fieldMode = source.fieldMode === 1 || name && !firstName && !lastName ? 1 as const : 0 as const;
     return [{ creatorType, ...(firstName ? { firstName } : {}), ...(lastName ? { lastName } : {}), ...(name ? { name } : {}), fieldMode }];
@@ -179,34 +193,35 @@ export function normalizeLibraryMetadata(value: unknown, fallbackTitle = 'Docume
   const extra = input.extra && typeof input.extra === 'object' && !Array.isArray(input.extra)
     ? Object.fromEntries(Object.entries(input.extra as Record<string, unknown>)
       .flatMap(([key, entry]) => {
-        const normalized = stringValue(entry, 10_000);
+        const normalized = metadataStringValue(entry, 10_000);
         return normalized ? [[key.slice(0, 200), normalized]] : [];
       }))
     : undefined;
+  const abstract = metadataStringValue(input.abstract, 500_000);
   return {
-    title: stringValue(input.title, 10_000) ?? fallbackTitle,
+    title: metadataStringValue(input.title, 10_000) ?? fallbackTitle,
     itemType,
     creators: normalizeCreators(input.creators ?? input.authors),
-    ...(stringValue(input.abstract, 500_000) ? { abstract: stringValue(input.abstract, 500_000) } : {}),
-    ...(stringValue(input.date, 200) ? { date: stringValue(input.date, 200) } : {}),
+    ...(abstract ? { abstract } : {}),
+    ...(metadataStringValue(input.date, 200) ? { date: metadataStringValue(input.date, 200) } : {}),
     year: Number.isInteger(rawYear) && rawYear > -10_000 && rawYear < 10_000 ? rawYear : null,
-    ...(stringValue(input.language, 100) ? { language: stringValue(input.language, 100) } : {}),
-    ...(stringValue(input.publisher, 2_000) ? { publisher: stringValue(input.publisher, 2_000) } : {}),
-    ...(stringValue(input.publicationTitle, 2_000) ? { publicationTitle: stringValue(input.publicationTitle, 2_000) } : {}),
-    ...(stringValue(input.volume, 200) ? { volume: stringValue(input.volume, 200) } : {}),
-    ...(stringValue(input.issue, 200) ? { issue: stringValue(input.issue, 200) } : {}),
-    ...(stringValue(input.pages, 200) ? { pages: stringValue(input.pages, 200) } : {}),
-    ...(stringValue(input.edition, 200) ? { edition: stringValue(input.edition, 200) } : {}),
-    ...(stringValue(input.place, 1_000) ? { place: stringValue(input.place, 1_000) } : {}),
-    ...(stringValue(input.rights, 4_000) ? { rights: stringValue(input.rights, 4_000) } : {}),
-    ...(stringValue(input.url, 10_000) ? { url: stringValue(input.url, 10_000) } : {}),
-    ...(stringValue(input.doi, 1_000) ? { doi: stringValue(input.doi, 1_000) } : {}),
-    ...(stringValue(input.pmid, 100) ? { pmid: stringValue(input.pmid, 100) } : {}),
-    ...(stringValue(input.pmcid, 100) ? { pmcid: stringValue(input.pmcid, 100) } : {}),
-    ...(stringValue(input.arxiv, 100) ? { arxiv: stringValue(input.arxiv, 100) } : {}),
-    isbn: stringArray(input.isbn),
-    issn: stringArray(input.issn),
-    tags: stringArray(input.tags),
+    ...(metadataStringValue(input.language, 100) ? { language: metadataStringValue(input.language, 100) } : {}),
+    ...(metadataStringValue(input.publisher, 2_000) ? { publisher: metadataStringValue(input.publisher, 2_000) } : {}),
+    ...(metadataStringValue(input.publicationTitle, 2_000) ? { publicationTitle: metadataStringValue(input.publicationTitle, 2_000) } : {}),
+    ...(metadataStringValue(input.volume, 200) ? { volume: metadataStringValue(input.volume, 200) } : {}),
+    ...(metadataStringValue(input.issue, 200) ? { issue: metadataStringValue(input.issue, 200) } : {}),
+    ...(metadataStringValue(input.pages, 200) ? { pages: metadataStringValue(input.pages, 200) } : {}),
+    ...(metadataStringValue(input.edition, 200) ? { edition: metadataStringValue(input.edition, 200) } : {}),
+    ...(metadataStringValue(input.place, 1_000) ? { place: metadataStringValue(input.place, 1_000) } : {}),
+    ...(metadataStringValue(input.rights, 4_000) ? { rights: metadataStringValue(input.rights, 4_000) } : {}),
+    ...(metadataStringValue(input.url, 10_000) ? { url: metadataStringValue(input.url, 10_000) } : {}),
+    ...(metadataStringValue(input.doi, 1_000) ? { doi: metadataStringValue(input.doi, 1_000) } : {}),
+    ...(metadataStringValue(input.pmid, 100) ? { pmid: metadataStringValue(input.pmid, 100) } : {}),
+    ...(metadataStringValue(input.pmcid, 100) ? { pmcid: metadataStringValue(input.pmcid, 100) } : {}),
+    ...(metadataStringValue(input.arxiv, 100) ? { arxiv: metadataStringValue(input.arxiv, 100) } : {}),
+    isbn: metadataStringArray(input.isbn),
+    issn: metadataStringArray(input.issn),
+    tags: metadataStringArray(input.tags),
     ...(extra && Object.keys(extra).length ? { extra } : {}),
   };
 }

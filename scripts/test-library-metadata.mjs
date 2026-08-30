@@ -45,6 +45,17 @@ try {
   const { normalizeLibraryMetadata } = require(path.join(repoRoot, 'electron/library/libraryRecord.ts'));
 
   assert.equal(normalizeLibraryMetadata({ title: 'Undated', itemType: 'document', creators: [], year: null }).year, null, 'an empty year never becomes year zero');
+  const exactMetadata = normalizeLibraryMetadata({
+    title: 'Title   with\ttab', itemType: 'document',
+    creators: [{ creatorType: 'author', firstName: 'J.   Enrique', lastName: 'Nueda Lozano' }],
+    year: null, publisher: 'Publisher  ;', tags: ['tag  exact'], extra: { source: 'Vol.  2' },
+  });
+  assert.equal(exactMetadata.title, 'Title   with\ttab');
+  assert.equal(exactMetadata.creators[0].firstName, 'J.   Enrique');
+  assert.equal(exactMetadata.creators[0].lastName, 'Nueda Lozano');
+  assert.equal(exactMetadata.publisher, 'Publisher  ;');
+  assert.deepEqual(exactMetadata.tags, ['tag  exact']);
+  assert.equal(exactMetadata.extra.source, 'Vol.  2');
 
   const zoteroTypes = LIBRARY_ITEM_TYPES.filter((entry) => entry.zoteroType);
   assert.equal(zoteroTypes.length, 37, 'every current citeable Zotero type is available');

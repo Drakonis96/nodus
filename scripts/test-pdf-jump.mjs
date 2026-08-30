@@ -62,8 +62,9 @@ try {
   globalThis.fetch = async (url) => {
     fetchCalls += 1;
     const u = String(url);
+    const pathname = new URL(u).pathname;
     for (const [suffix, body] of routes) {
-      if (u.endsWith(suffix)) return new Response(JSON.stringify(body), { status: 200 });
+      if (pathname.endsWith(suffix)) return new Response(JSON.stringify(body), { status: 200 });
     }
     return new Response('not found', { status: 404 });
   };
@@ -109,7 +110,7 @@ try {
     assert.equal(await zotero.resolvePdfAttachmentKey('0', 'LATER1'), null, 'offline → graceful null');
     globalThis.fetch = async (url) => {
       const u = String(url);
-      if (u.endsWith('/items/LATER1/children')) {
+      if (new URL(u).pathname.endsWith('/items/LATER1/children')) {
         return new Response(
           JSON.stringify([{ data: { itemType: 'attachment', key: 'PDF9', contentType: 'application/pdf', parentItem: 'LATER1' } }]),
           { status: 200 }

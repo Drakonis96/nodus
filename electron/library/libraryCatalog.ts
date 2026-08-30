@@ -976,6 +976,22 @@ export class LibraryCatalog {
     };
   }
 
+  listImportSources(source?: LibraryImportSourceState['source']): LibraryImportSourceState[] {
+    const rows = (source
+      ? this.handle.prepare('SELECT * FROM library_import_sources WHERE source=? ORDER BY source_id').all(source)
+      : this.handle.prepare('SELECT * FROM library_import_sources ORDER BY source_id').all()
+    ) as Record<string, unknown>[];
+    return rows.map((row) => ({
+      sourceId: String(row.source_id),
+      source: row.source as LibraryImportSourceState['source'],
+      libraryId: String(row.library_id),
+      libraryName: String(row.library_name),
+      version: Number(row.version),
+      importedAt: String(row.imported_at),
+      configuration: json(row.configuration_json, {}),
+    }));
+  }
+
   putImportSource(state: LibraryImportSourceState): void {
     this.handle.prepare(`
       INSERT INTO library_import_sources (source_id, source, library_id, library_name, version, imported_at, configuration_json)

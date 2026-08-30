@@ -168,6 +168,10 @@ export interface LibraryAttachmentRecord {
   position?: number;
   addedAt?: string;
   sourceKey?: string;
+  /** Zotero library version that supplied this attachment, when known. */
+  sourceVersion?: number;
+  /** Provider modification timestamp retained for audit/reconciliation. */
+  sourceModifiedAt?: string;
   sourceState?: 'available' | 'not-downloaded' | 'source-missing' | 'corrupt';
   /** True while Nodus owns the filename and may keep it aligned with item metadata. */
   autoRenamed?: boolean;
@@ -187,6 +191,8 @@ export interface LibraryNoteRecord {
   markdown: string;
   source: 'nodus' | 'zotero';
   sourceKey?: string;
+  /** Zotero library version that supplied this mirrored note, when known. */
+  sourceVersion?: number;
   readOnly: boolean;
   createdAt: string;
   updatedAt: string;
@@ -406,8 +412,8 @@ export interface ZoteroImportSelection {
   copyAttachments?: boolean;
   /**
    * Import parentless files — a PDF dropped into Zotero with no bibliographic entry
-   * above it — as works of their own. Off by default: they arrive with no author,
-   * year or title beyond a filename, so they change what counts as a work.
+   * above it — as works of their own. Enabled by default; callers that need the
+   * historical BETA behavior must disable it explicitly.
    */
   includeStandaloneFiles?: boolean;
   /** Ignore the saved Zotero version and create a new full snapshot. */
@@ -416,7 +422,7 @@ export interface ZoteroImportSelection {
 
 export interface ZoteroImportProgress {
   requestId: string;
-  phase: 'connecting' | 'collections' | 'catalog' | 'notes' | 'attachments' | 'rebuild' | 'complete' | 'canceled' | 'failed';
+  phase: 'inventory' | 'connecting' | 'collections' | 'catalog' | 'notes' | 'attachments' | 'rebuild' | 'verification' | 'complete' | 'canceled' | 'failed';
   libraryId: string | null;
   libraryName: string | null;
   processedItems: number;
@@ -425,6 +431,32 @@ export interface ZoteroImportProgress {
   totalAttachments: number;
   percent: number;
   message: string;
+}
+
+export interface ZoteroImportVerificationCounts {
+  items: number;
+  attachments: number;
+  libraries?: number;
+  collections?: number;
+  notes?: number;
+}
+
+export interface ZoteroImportVerificationMismatch {
+  kind: 'libraries' | 'collections' | 'items' | 'attachments' | 'notes' | 'unknown';
+  expected: number;
+  imported: number;
+  message?: string;
+}
+
+/**
+ * Post-import completeness check. Optional on the report for compatibility with
+ * pre-verification BETA sessions; new importers should always populate it.
+ */
+export interface ZoteroImportVerification {
+  status: 'passed' | 'blocked';
+  expected: ZoteroImportVerificationCounts;
+  imported: ZoteroImportVerificationCounts;
+  mismatches: ZoteroImportVerificationMismatch[];
 }
 
 export interface ZoteroImportReport {
@@ -451,6 +483,8 @@ export interface ZoteroImportReport {
   conflicts: number;
   librariesMissing: string[];
   failures: ZoteroSyncFailure[];
+  /** Absent only for reports produced by older/BETA importers. */
+  verification?: ZoteroImportVerification;
   partial: boolean;
   warnings: string[];
   canceled: boolean;
@@ -459,7 +493,7 @@ export interface ZoteroImportReport {
 
 export interface ZoteroSyncFailure {
   libraryId: string | null;
-  code: 'zotero-closed' | 'credentials-expired' | 'rate-limited' | 'library-missing' | 'permission' | 'network' | 'invalid-response' | 'unknown';
+  code: 'zotero-closed' | 'credentials-expired' | 'rate-limited' | 'library-missing' | 'permission' | 'network' | 'invalid-response' | 'attachment-unavailable' | 'attachment-corrupt' | 'verification-mismatch' | 'concurrent-source-change' | 'storage' | 'unknown';
   message: string;
   retryable: boolean;
 }
