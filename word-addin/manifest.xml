@@ -60,6 +60,24 @@
                     <SourceLocation resid="Nodus.Taskpane.Url" />
                   </Action>
                 </Control>
+                <Control xsi:type="Button" id="Nodus.AiEditButton">
+                  <Label resid="Nodus.AiEdit.Label" />
+                  <Supertip><Title resid="Nodus.AiEdit.Label" /><Description resid="Nodus.AiEdit.Tooltip" /></Supertip>
+                  <Icon><bt:Image size="16" resid="Icon.AiEdit.16" /><bt:Image size="32" resid="Icon.AiEdit.32" /><bt:Image size="80" resid="Icon.AiEdit.80" /></Icon>
+                  <Action xsi:type="ShowTaskpane"><TaskpaneId>NodusTaskpane</TaskpaneId><SourceLocation resid="Nodus.AiEdit.Url" /></Action>
+                </Control>
+                <Control xsi:type="Button" id="Nodus.SynonymsButton">
+                  <Label resid="Nodus.Synonyms.Label" />
+                  <Supertip><Title resid="Nodus.Synonyms.Label" /><Description resid="Nodus.Synonyms.Tooltip" /></Supertip>
+                  <Icon><bt:Image size="16" resid="Icon.Synonyms.16" /><bt:Image size="32" resid="Icon.Synonyms.32" /><bt:Image size="80" resid="Icon.Synonyms.80" /></Icon>
+                  <Action xsi:type="ShowTaskpane"><TaskpaneId>NodusTaskpane</TaskpaneId><SourceLocation resid="Nodus.Synonyms.Url" /></Action>
+                </Control>
+                <Control xsi:type="Button" id="Nodus.ChatButton">
+                  <Label resid="Nodus.Chat.Label" />
+                  <Supertip><Title resid="Nodus.Chat.Label" /><Description resid="Nodus.Chat.Tooltip" /></Supertip>
+                  <Icon><bt:Image size="16" resid="Icon.Chat.16" /><bt:Image size="32" resid="Icon.Chat.32" /><bt:Image size="80" resid="Icon.Chat.80" /></Icon>
+                  <Action xsi:type="ShowTaskpane"><TaskpaneId>NodusTaskpane</TaskpaneId><SourceLocation resid="Nodus.Chat.Url" /></Action>
+                </Control>
                 <Control xsi:type="Button" id="Nodus.CitationButton">
                   <Label resid="Nodus.Citation.Label" />
                   <Supertip><Title resid="Nodus.Citation.Label" /><Description resid="Nodus.Citation.Tooltip" /></Supertip>
@@ -120,9 +138,21 @@
         <bt:Image id="Icon.Unlink.16" DefaultValue="https://localhost:4320/addin/assets/icon-unlink-16.png" />
         <bt:Image id="Icon.Unlink.32" DefaultValue="https://localhost:4320/addin/assets/icon-unlink-32.png" />
         <bt:Image id="Icon.Unlink.80" DefaultValue="https://localhost:4320/addin/assets/icon-unlink-80.png" />
+        <bt:Image id="Icon.AiEdit.16" DefaultValue="https://localhost:4320/addin/assets/icon-ai-edit-16.png" />
+        <bt:Image id="Icon.AiEdit.32" DefaultValue="https://localhost:4320/addin/assets/icon-ai-edit-32.png" />
+        <bt:Image id="Icon.AiEdit.80" DefaultValue="https://localhost:4320/addin/assets/icon-ai-edit-80.png" />
+        <bt:Image id="Icon.Synonyms.16" DefaultValue="https://localhost:4320/addin/assets/icon-synonyms-16.png" />
+        <bt:Image id="Icon.Synonyms.32" DefaultValue="https://localhost:4320/addin/assets/icon-synonyms-32.png" />
+        <bt:Image id="Icon.Synonyms.80" DefaultValue="https://localhost:4320/addin/assets/icon-synonyms-80.png" />
+        <bt:Image id="Icon.Chat.16" DefaultValue="https://localhost:4320/addin/assets/icon-chat-16.png" />
+        <bt:Image id="Icon.Chat.32" DefaultValue="https://localhost:4320/addin/assets/icon-chat-32.png" />
+        <bt:Image id="Icon.Chat.80" DefaultValue="https://localhost:4320/addin/assets/icon-chat-80.png" />
       </bt:Images>
       <bt:Urls>
         <bt:Url id="Nodus.Taskpane.Url" DefaultValue="https://localhost:4320/addin/taskpane.html" />
+        <bt:Url id="Nodus.AiEdit.Url" DefaultValue="https://localhost:4320/addin/taskpane.html#prompts" />
+        <bt:Url id="Nodus.Synonyms.Url" DefaultValue="https://localhost:4320/addin/taskpane.html#synonyms" />
+        <bt:Url id="Nodus.Chat.Url" DefaultValue="https://localhost:4320/addin/taskpane.html#chat" />
         <bt:Url id="Nodus.Citation.Url" DefaultValue="https://localhost:4320/addin/taskpane.html#references-citation" />
         <bt:Url id="Nodus.Bibliography.Url" DefaultValue="https://localhost:4320/addin/taskpane.html#references-bibliography" />
         <bt:Url id="Nodus.Refresh.Url" DefaultValue="https://localhost:4320/addin/taskpane.html#references-refresh" />
@@ -135,6 +165,9 @@
         <bt:String id="Nodus.Tab.Label" DefaultValue="Nodus" />
         <bt:String id="Nodus.Group.Label" DefaultValue="Nodus" />
         <bt:String id="Nodus.Taskpane.Label" DefaultValue="Nodus Copilot" />
+        <bt:String id="Nodus.AiEdit.Label" DefaultValue="AI Edit"><bt:Override Locale="es-ES" Value="AI Edit" /></bt:String>
+        <bt:String id="Nodus.Synonyms.Label" DefaultValue="Synonyms"><bt:Override Locale="es-ES" Value="Sinónimos" /></bt:String>
+        <bt:String id="Nodus.Chat.Label" DefaultValue="Chat"><bt:Override Locale="es-ES" Value="Chat" /></bt:String>
         <bt:String id="Nodus.Citation.Label" DefaultValue="Add/Edit Citation"><bt:Override Locale="es-ES" Value="Añadir/editar cita" /></bt:String>
         <bt:String id="Nodus.Bibliography.Label" DefaultValue="Add/Edit Bibliography"><bt:Override Locale="es-ES" Value="Añadir/editar bibliografía" /></bt:String>
         <bt:String id="Nodus.Refresh.Label" DefaultValue="Refresh"><bt:Override Locale="es-ES" Value="Actualizar" /></bt:String>
@@ -148,6 +181,9 @@
         <bt:String id="Nodus.Taskpane.Tooltip" DefaultValue="Relate the current paragraph to your Nodus library and insert cited ideas.">
           <bt:Override Locale="es-ES" Value="Relaciona el párrafo actual con tu biblioteca de Nodus e inserta ideas citadas." />
         </bt:String>
+        <bt:String id="Nodus.AiEdit.Tooltip" DefaultValue="Transform the current selection with a saved Nodus writing prompt."><bt:Override Locale="es-ES" Value="Transforma la selección actual con un prompt de escritura guardado en Nodus." /></bt:String>
+        <bt:String id="Nodus.Synonyms.Tooltip" DefaultValue="Suggest contextual synonyms and rephrasings for the current selection."><bt:Override Locale="es-ES" Value="Sugiere sinónimos y reformulaciones contextuales para la selección actual." /></bt:String>
+        <bt:String id="Nodus.Chat.Tooltip" DefaultValue="Chat with the current page or the complete Word document."><bt:Override Locale="es-ES" Value="Chatea con la página actual o con todo el documento de Word." /></bt:String>
         <bt:String id="Nodus.Citation.Tooltip" DefaultValue="Search the Nodus global library and add or edit a live citation."><bt:Override Locale="es-ES" Value="Busca en la biblioteca global de Nodus y añade o edita una cita viva." /></bt:String>
         <bt:String id="Nodus.Bibliography.Tooltip" DefaultValue="Insert or update the live bibliography for this document."><bt:Override Locale="es-ES" Value="Inserta o actualiza la bibliografía viva de este documento." /></bt:String>
         <bt:String id="Nodus.Refresh.Tooltip" DefaultValue="Refresh every live Nodus citation and bibliography."><bt:Override Locale="es-ES" Value="Actualiza todas las citas y bibliografías vivas de Nodus." /></bt:String>

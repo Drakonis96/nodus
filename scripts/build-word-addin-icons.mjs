@@ -18,6 +18,20 @@ function svg(content) {
   </svg>`);
 }
 
+// These three glyphs deliberately reuse the exact paths from the corresponding
+// task-pane tabs. Office requires raster ribbon assets, so only their rendering
+// (black ink with the existing Nodus red accent) differs from the currentColor
+// SVGs in taskpane.html. The complete original path stays intact; accentPath is
+// only an optional colour overlay.
+function sidebarIcon(pathData, accentPath = '') {
+  return Buffer.from(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+    <g fill="none" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7">
+      <path stroke="${INK}" d="${pathData}"/>
+      ${accentPath ? `<path stroke="${RED}" d="${accentPath}"/>` : ''}
+    </g>
+  </svg>`);
+}
+
 const icons = {
   copilot: svg(`
     <path stroke="${INK}" stroke-width="6" d="M17 21h38a9 9 0 0 1 9 9v20a9 9 0 0 1-9 9H35L23 68v-9h-6a9 9 0 0 1-9-9V30a9 9 0 0 1 9-9Z"/>
@@ -47,6 +61,15 @@ const icons = {
     <path stroke="${INK}" stroke-width="6" d="m29 51 22-22"/>
     <path stroke="${RED}" stroke-width="7" d="M16 13l48 54"/>
   `),
+  'ai-edit': sidebarIcon(
+    'm14 4 1-2 1 2 2 1-2 1-1 2-1-2-2-1zM5 17l9-9 3 3-9 9H5zM12.5 9.5l3 3M18 16l.8-1.8.8 1.8 1.8.8-1.8.8-.8 1.8-.8-1.8-1.8-.8z',
+    'm14 4 1-2 1 2 2 1-2 1-1 2-1-2-2-1zM18 16l.8-1.8.8 1.8 1.8.8-1.8.8-.8 1.8-.8-1.8-1.8-.8z',
+  ),
+  synonyms: sidebarIcon(
+    'M4 5.5A2.5 2.5 0 0 1 6.5 3H11a2 2 0 0 1 2 2v16a2.5 2.5 0 0 0-2-2H6.5A2.5 2.5 0 0 0 4 21.5zM13 5a2 2 0 0 1 2-2h2M7 8h3M7 12h3M16 12h3M19 2l.5 1.5L21 4l-1.5.5L19 6l-.5-1.5L17 4l1.5-.5zM13 21a2.5 2.5 0 0 1 2-2h4a2 2 0 0 1 2 2v-9',
+    'M19 2l.5 1.5L21 4l-1.5.5L19 6l-.5-1.5L17 4l1.5-.5z',
+  ),
+  chat: sidebarIcon('M20 15a4 4 0 0 1-4 4H8l-5 3V7a4 4 0 0 1 4-4h9a4 4 0 0 1 4 4zM8 9h8M8 13h5'),
 };
 
 await mkdir(output, { recursive: true });

@@ -631,7 +631,14 @@
       if (action === 'bibliography') { insertBibliography(); return; }
       if (action === 'refresh') { refresh(); return; }
       if (action === 'unlink') { unlink(); return; }
-      if (action === 'preferences') { el.styleSearch.focus(); setStylePickerOpen(true); return; }
+      if (action === 'preferences') {
+        // Word gives the first useful control focus when a ribbon shortcut opens
+        // the pane. Focus alone must not look like an explicit request to expand
+        // the style catalogue.
+        setStylePickerOpen(false);
+        el.styleSearch.focus();
+        return;
+      }
       el.search.focus();
     }
 
@@ -646,7 +653,6 @@
       loadStyles().then(function () { loadPreferences(); renderStyleOptions(''); syncStyleSearchDisplay(); })
         .catch(function (error) { options.setStatus(error.message, 'err'); });
       el.styleSearch.placeholder = C.styleSearch; el.styleSearch.setAttribute('aria-label', C.styleSearch);
-      el.styleSearch.onfocus = function () { if (!stylePickerOpen) setStylePickerOpen(true); };
       el.styleSearch.onclick = function () { if (!stylePickerOpen) setStylePickerOpen(true); };
       el.styleSearch.oninput = function () { if (!stylePickerOpen) setStylePickerOpen(true); activeStyleIndex = 0; renderStyleOptions(el.styleSearch.value); };
       el.styleSearch.onkeydown = function (event) {

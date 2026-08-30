@@ -166,6 +166,16 @@ try {
   await page.getByText('Search to show references from the global library.').waitFor();
   assert.equal(await page.locator('.reference-result').count(), 0, 'References starts without default works');
   assert.equal(referenceSearchRequests, 0, 'opening References with an empty query makes no search request');
+  assert.equal(await page.locator('#referenceStyleOptions').isHidden(), true, 'opening the add-in keeps the style picker collapsed');
+  const preferencesPage = await browser.newPage({ viewport: { width: 360, height: 840 }, colorScheme: 'light' });
+  await preferencesPage.route('https://appsforoffice.microsoft.com/**', (route) => route.fulfill({
+    contentType: 'text/javascript',
+    body: "window.Office={HostType:{Word:'Word'},AsyncResultStatus:{Failed:'failed'},onReady:function(cb){setTimeout(function(){cb({host:null});},0);}};",
+  }));
+  await preferencesPage.goto(`http://127.0.0.1:${port}/addin/taskpane.html#references-preferences`);
+  await preferencesPage.getByRole('tab', { name: 'References' }).waitFor();
+  assert.equal(await preferencesPage.locator('#referenceStyleOptions').isHidden(), true, 'the Preferences shortcut focuses the style field without expanding it');
+  await preferencesPage.close();
   await page.locator('#searchBox').fill('a');
   await page.locator('#searchBtn').click();
   await page.getByRole('button', { name: '+ Add' }).first().waitFor();

@@ -35,12 +35,13 @@ try {
   assert.match(rendered, /<CustomTab id="Nodus\.Tab">/);
   assert.match(rendered, /<Label resid="Nodus\.Tab\.Label" \/>/);
   assert.doesNotMatch(rendered, /<OfficeTab id="TabHome">/);
-  for (const control of ['Nodus.CitationButton', 'Nodus.BibliographyButton', 'Nodus.RefreshButton', 'Nodus.PreferencesButton', 'Nodus.UnlinkButton']) {
+  for (const control of ['Nodus.AiEditButton', 'Nodus.SynonymsButton', 'Nodus.ChatButton', 'Nodus.CitationButton', 'Nodus.BibliographyButton', 'Nodus.RefreshButton', 'Nodus.PreferencesButton', 'Nodus.UnlinkButton']) {
     assert.match(rendered, new RegExp(`<Control xsi:type="Button" id="${control}">`), `${control} must stay on the persistent Nodus tab`);
   }
   const actionIcons = {
     Taskpane: 'Copilot', Citation: 'Citation', Bibliography: 'Bibliography',
     Refresh: 'Refresh', Preferences: 'Preferences', Unlink: 'Unlink',
+    AiEdit: 'AiEdit', Synonyms: 'Synonyms', Chat: 'Chat',
   };
   for (const [control, icon] of Object.entries(actionIcons)) {
     assert.match(
@@ -49,7 +50,8 @@ try {
       `${control} must use its own action icon`,
     );
     for (const size of [16, 32, 80]) {
-      const iconPath = path.join(repoRoot, `word-addin/assets/icon-${icon.toLowerCase()}-${size}.png`);
+      const iconFile = icon === 'AiEdit' ? 'ai-edit' : icon.toLowerCase();
+      const iconPath = path.join(repoRoot, `word-addin/assets/icon-${iconFile}-${size}.png`);
       assert.equal(fs.existsSync(iconPath), true, `${icon} ${size}px icon must exist`);
       const png = fs.readFileSync(iconPath);
       assert.equal(png.readUInt32BE(16), size, `${icon} icon width must be ${size}px`);
@@ -59,6 +61,9 @@ try {
   assert.match(rendered, /taskpane\.html#references-citation/);
   assert.match(rendered, /taskpane\.html#references-bibliography/);
   assert.match(rendered, /taskpane\.html#references-unlink/);
+  assert.match(rendered, /taskpane\.html#prompts/);
+  assert.match(rendered, /taskpane\.html#synonyms/);
+  assert.match(rendered, /taskpane\.html#chat/);
   assert.match(rendered, /<DefaultLocale>en-US<\/DefaultLocale>/);
   assert.match(rendered, /DefaultValue="Open the pane to see how your text relates to your library\."/);
   assert.match(rendered, /<bt:Override Locale="es-ES" Value="Abre el panel/);
@@ -71,6 +76,7 @@ try {
   const referencesJs = fs.readFileSync(path.join(repoRoot, 'word-addin/references.js'), 'utf8');
   const chatJs = fs.readFileSync(path.join(repoRoot, 'word-addin/chat.js'), 'utf8');
   const taskpaneCss = fs.readFileSync(path.join(repoRoot, 'word-addin/taskpane.css'), 'utf8');
+  const wordIconBuilder = fs.readFileSync(path.join(repoRoot, 'scripts/build-word-addin-icons.mjs'), 'utf8');
   assert.match(taskpaneHtml, /<html lang="en">/);
   assert.match(taskpaneHtml, />Analyze paragraph</);
   assert.doesNotMatch(taskpaneHtml, /Conectando|Buscar ideas|Analizar párrafo|Selección|Insertar en|Nota al pie|Pasajes/);
@@ -99,6 +105,11 @@ try {
   assert.match(taskpaneHtml, /data-mode="chat"/);
   assert.match(taskpaneHtml, /data-mode="prompts"[\s\S]*?<span class="seg-label">AI Edition<\/span>/);
   assert.equal((taskpaneHtml.match(/class="seg-icon"/g) || []).length, 6, 'every pane tab must have an icon');
+  for (const mode of ['prompts', 'synonyms', 'chat']) {
+    const tabMarkup = (taskpaneHtml.match(new RegExp(`data-mode="${mode}"[\\s\\S]*?<svg class="seg-icon"[\\s\\S]*?<path d="([^"]+)"`)) || [])[1];
+    assert.equal(typeof tabMarkup, 'string', `${mode} must expose its sidebar icon path`);
+    assert.ok(wordIconBuilder.includes(tabMarkup), `${mode} ribbon icon must come from the sidebar-tab geometry`);
+  }
   for (const id of ['searchModel', 'synonymControls', 'synonymModel', 'synonymContext', 'generateSynonyms', 'synonymStale', 'synonymRounds']) {
     assert.match(taskpaneHtml, new RegExp(`id="${id}"`), `Synonyms UI must contain ${id}`);
   }
@@ -129,6 +140,7 @@ try {
   assert.match(referencesJs, /\/api\/references\/styles\?fresh=/, 'installed CSL styles must bypass caches');
   assert.match(referencesJs, /setInterval[\s\S]*loadStyles/, 'the open References pane keeps its installed styles live');
   assert.match(referencesJs, /destination: 'citation-styles'/, 'the style link opens Nodus at its CSL manager');
+  assert.doesNotMatch(referencesJs, /styleSearch\.onfocus\s*=/, 'focus alone must not expand the style picker');
   assert.match(taskpaneCss, /body\.dark[\s\S]*--panel: #2b2b2b/);
   assert.match(taskpaneCss, /\.reference-style-options[\s\S]*background: var\(--panel\)/);
   assert.doesNotMatch(taskpaneJs, /style\.setProperty\('--panel', panel\)/, 'Office controlBackgroundColor must not turn dark cards white');
