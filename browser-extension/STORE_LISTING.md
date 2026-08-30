@@ -2,7 +2,7 @@
 
 ## Suggested listing
 
-- **Name:** Nodus Connector
+- **Name:** Nodus Research Connector
 - **Summary:** Save academic pages, documents, metadata, collections, and tags to your local Nodus Library.
 - **Category:** Productivity
 - **Language:** English and Spanish
@@ -30,7 +30,7 @@ No permission is used for advertising, analytics, browsing profiles, or unrelate
    one-time registration fee.
 2. Run the full verification commands, then `npm run browser:zip`.
 3. In the Chrome Web Store Developer Dashboard, create a new item and upload
-   `dist-browser/nodus-connector-chrome.zip`.
+   `dist-browser/nodus-research-connector-chrome.zip`.
 4. Complete the store listing, distribution regions, privacy practices, permission justifications,
    support URL, and the public privacy-policy URL. Declare that authentication information and page
    content are handled only for the user-facing feature and are not sold or used for advertising.

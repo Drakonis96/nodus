@@ -4,6 +4,7 @@ import { TOOLKIT_APPS_TRANSLATIONS } from './i18n.toolkitApps';
 import { SERVER_TRANSLATIONS } from './i18n.server';
 import { CLOUDFLARE_TRANSLATIONS } from './i18n.cloudflare';
 import { TRANSLATE_TRANSLATIONS } from './i18n.translate';
+import { BROWSER_CONNECTOR_TRANSLATIONS } from './i18n.browserConnector';
 import { WORLD_CHAT_TRANSLATIONS } from './i18n.worldChat';
 import { STUDY_SYNONYM_TRANSLATIONS } from './i18n.studySynonyms';
 import { STUDY_IMPROVE_TRANSLATIONS } from './i18n.studyImprove';
@@ -232,6 +233,7 @@ export const TR: Record<string, string> = {
   ...SERVER_TRANSLATIONS.tr,
   ...CLOUDFLARE_TRANSLATIONS.tr,
   ...TRANSLATE_TRANSLATIONS.tr,
+  ...BROWSER_CONNECTOR_TRANSLATIONS.tr,
   "Nuevo OCR": "Yeni OCR",
   "Biblioteca": "Kütüphane",
   "Reprocesar página {n}": "{n} sayfasını yeniden işle",

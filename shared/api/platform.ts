@@ -3,6 +3,7 @@
 import type { NodusLocalAiStatus } from '../localAiModels';
 import type { NodusLocalImageStatus } from '../localImageModels';
 import type { CloudflareCompleteDirectDeployInput, CloudflareDeployState, CloudflareDirectDeployPreparation, CloudflareVaultInventory } from '../cloudflare';
+import type { BrowserConnectorPairingPrompt } from '../browserConnector';
 // Declared in shared/types.ts itself; the resulting cycle is types-only and erased at build time.
 import type {
   AcademicHomeSnapshot,
@@ -132,6 +133,9 @@ export interface PlatformApi {
   downloadBrowserConnectorZip(): Promise<BrowserConnectorExportResult>;
   /** Revoke every browser pairing without exposing the replacement secret. */
   regenerateBrowserConnectorToken(): Promise<void>;
+  /** Present and resolve the just-in-time desktop confirmation for a browser origin. */
+  onBrowserConnectorPairingRequest(cb: (request: BrowserConnectorPairingPrompt) => void): () => void;
+  resolveBrowserConnectorPairingRequest(requestId: string, allow: boolean): Promise<void>;
   /** Generate + trust a localhost TLS cert for the copilot server (idempotent). */
   ensureCopilotCert(): Promise<{ ok: boolean; message: string }>;
   /** Copy a port-aware Nodus Copilot manifest into Word's local add-in catalog. */

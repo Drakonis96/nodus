@@ -798,7 +798,7 @@ export function Settings({
     visibleSettingsSection('integrations', 'Copiloto de escritura Word', 'word copilot addin certificado token localhost'),
     visibleSettingsSection('integrations', 'Copiloto de escritura LibreOffice', 'libreoffice copilot macro python install instalacion instalando'),
     visibleSettingsSection('integrations', 'Nodus para Zotero', 'zotero plugin sidebar chat servidor puerto token pagina citas conexiones'),
-    visibleSettingsSection('integrations', 'Nodus Connector para Chrome', 'chrome navegador browser extension conector captura metadatos colecciones etiquetas pdf doi isbn'),
+    visibleSettingsSection('integrations', 'Nodus Research Connector', 'chrome navegador browser extension conector captura metadatos colecciones etiquetas pdf doi isbn'),
     visibleSettingsSection('data', 'Backup / copia de seguridad', 'datos demo exportar importar copia backup cifrada contraseña'),
     visibleSettingsSection('models', 'Modelos de IA', 'basico avanzado modelo general extraccion sintesis tutor resumen fusion embeddings transcripcion voz imagen'),
     visibleSettingsSection('extraction', 'Extracción de texto PDFs grandes', 'pdf texto zotero ocr tesseract paginas idiomas'),
@@ -2347,13 +2347,13 @@ export function Settings({
           </Section>
       )}
 
-      {visibleSettingsSection('integrations', 'Nodus Connector para Chrome', 'chrome navegador browser extension conector captura metadatos colecciones etiquetas pdf doi isbn') && (
-          <Section title={t('Nodus Connector para Chrome')}>
+      {visibleSettingsSection('integrations', 'Nodus Research Connector', 'chrome navegador browser extension conector captura metadatos colecciones etiquetas pdf doi isbn') && (
+          <Section title={t('Nodus Research Connector')}>
             <p className="text-xs leading-5 text-neutral-600 dark:text-neutral-400">
               {t('Guarda la página o documento abierto en la Biblioteca de Nodus con metadatos, archivos, colección y etiquetas. Solo lee la pestaña cuando pulsas el icono.')}
             </p>
             <div className="flex items-center justify-between gap-4">
-              <label className="text-sm text-neutral-700 dark:text-neutral-300">{t('Activar Nodus Connector para Chrome')}</label>
+              <label className="text-sm text-neutral-700 dark:text-neutral-300">{t('Activar Nodus Research Connector')}</label>
               <input type="checkbox" checked={settings.browserConnectorEnabled} onChange={(event) => void patch({ browserConnectorEnabled: event.target.checked })} />
             </div>
             <div className="rounded-lg border border-neutral-200 bg-neutral-50 px-3 py-2 text-xs dark:border-neutral-800 dark:bg-neutral-950/50">

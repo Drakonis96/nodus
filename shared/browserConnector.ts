@@ -3,6 +3,13 @@
 
 import type { LibraryItemMetadata } from './libraryTypes';
 
+/** A desktop confirmation requested before a browser origin receives its local token. */
+export interface BrowserConnectorPairingPrompt {
+  requestId: string;
+  origin: string;
+  official: boolean;
+}
+
 export interface BrowserConnectorAttachmentCandidate {
   url: string;
   title: string;

@@ -1,8 +1,8 @@
-# Nodus Connector privacy policy
+# Nodus Research Connector privacy policy
 
 Last updated: 11 August 2026
 
-Nodus Connector has one purpose: capture a document or web reference chosen by the user and save it in the user's local Nodus Library.
+Nodus Research Connector has one purpose: capture a document or web reference chosen by the user and save it in the user's local Nodus Library.
 
 ## Data handled
 
@@ -23,4 +23,4 @@ The extension does not send captured content, browsing activity, credentials, or
 
 Users can revoke site permissions in Chrome, forget the pairing from the extension settings, disable the connector in Nodus, or delete captured records from the Nodus Library.
 
-Nodus Connector's use of information received from Chrome APIs complies with the Chrome Web Store User Data Policy, including its Limited Use requirements. Data is used only to provide the user-facing save-to-Nodus feature, is not transferred for advertising or profiling, and is not made available for human review except when the user explicitly supplies it for support or law requires it.
+Nodus Research Connector's use of information received from Chrome APIs complies with the Chrome Web Store User Data Policy, including its Limited Use requirements. Data is used only to provide the user-facing save-to-Nodus feature, is not transferred for advertising or profiling, and is not made available for human review except when the user explicitly supplies it for support or law requires it.

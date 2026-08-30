@@ -260,8 +260,8 @@
         "to": "zotero/updates.json"
       },
       {
-        "from": "dist-browser/nodus-connector-chrome.zip",
-        "to": "browser/nodus-connector-chrome.zip"
+        "from": "dist-browser/nodus-research-connector-chrome.zip",
+        "to": "browser/nodus-research-connector-chrome.zip"
       },
       {
         "from": "server",

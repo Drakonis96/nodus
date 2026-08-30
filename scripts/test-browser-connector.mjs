@@ -205,7 +205,12 @@ test('preserves the installed extension origin on local connector requests', asy
 
 test('Manifest V3 package minimizes permission and contains no remote executable code', () => {
   const manifest = JSON.parse(readFileSync(path.join(root, 'browser-extension/manifest.json'), 'utf8'));
+  const englishMessages = JSON.parse(readFileSync(path.join(root, 'browser-extension/_locales/en/messages.json'), 'utf8'));
+  const spanishMessages = JSON.parse(readFileSync(path.join(root, 'browser-extension/_locales/es/messages.json'), 'utf8'));
+  const options = readFileSync(path.join(root, 'browser-extension/options.html'), 'utf8');
   assert.equal(manifest.manifest_version, 3);
+  assert.equal(englishMessages.extensionName.message, 'Nodus Research Connector');
+  assert.equal(spanishMessages.extensionName.message, 'Nodus Research Connector');
   assert.deepEqual(manifest.permissions, ['activeTab', 'scripting', 'storage']);
   assert.equal(manifest.host_permissions.includes('<all_urls>'), false);
   assert.deepEqual(manifest.optional_host_permissions, ['https://*/*', 'http://*/*']);
@@ -220,6 +225,7 @@ test('Manifest V3 package minimizes permission and contains no remote executable
   assert.match(popupScript, /ITEM_TYPE_LABELS_ES|spanishUi/);
   assert.match(popupScript, /snapshotAvailable && !state\.capture\.attachments\.length/, 'a detected full text keeps the HTML snapshot off by default');
   assert.match(popupScript, /if \(!state\.token\) await pair\(\)/, 'opening the popup establishes the local token automatically');
+  assert.match(options, /href="https:\/\/nodusresearch\.com"/);
 });
 
 test('Settings recommends the Chrome Web Store while preserving the manual ZIP download', () => {
@@ -240,5 +246,20 @@ test('Settings recommends the Chrome Web Store while preserving the manual ZIP d
     const translations = readFileSync(path.join(root, `src/i18n.${locale}.ts`), 'utf8');
     assert.match(translations, /"Instalar desde Chrome Web Store":/);
     assert.match(translations, /"Recomendado":/);
+  }
+});
+
+test('browser pairing is a cancel-first translated renderer modal', () => {
+  const server = readFileSync(path.join(root, 'electron/zotero-plugin/server.ts'), 'utf8');
+  const host = readFileSync(path.join(root, 'src/components/BrowserConnectorPairingRequestHost.tsx'), 'utf8');
+  const translations = readFileSync(path.join(root, 'src/i18n.browserConnector.ts'), 'utf8');
+
+  assert.doesNotMatch(server, /dialog\.showMessageBox/);
+  assert.match(server, /webContents\.send\('browserConnector:pairing:request'/);
+  assert.match(host, /data-testid="browser-connector-pairing-modal"/);
+  assert.match(host, /autoFocusConfirm=\{false\}/);
+  assert.match(host, /resolveBrowserConnectorPairingRequest\(requestId, allow\)/);
+  for (const locale of ['en', 'fr', 'de', 'pt', "'pt-BR'", 'it', 'tr']) {
+    assert.match(translations, new RegExp(`(?:^|\\n)  ${locale.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\$&')}: table\\(`));
   }
 });
