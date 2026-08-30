@@ -41,10 +41,45 @@ test('Server header mirrors Desktop measured geometry and action semantics', () 
   assert.match(app, /dataTestId="header-account"/);
 });
 
-test('Server responsive header preserves account/settings/theme and yields optional actions first', () => {
-  assert.match(css, /header-action-rail > \[data-testid='header-nodi'\]/);
+test('Server header orders commands, assistant, account, theme and settings', () => {
+  const orderedActions = [
+    'header-search',
+    'header-assistant',
+    'header-account',
+    'theme-toggle',
+    'header-settings',
+  ].map((testId) => app.indexOf(`dataTestId="${testId}"`));
+  assert.ok(orderedActions.every((position) => position >= 0));
+  assert.deepEqual(orderedActions, [...orderedActions].sort((a, b) => a - b));
+  assert.doesNotMatch(app, /dataTestId="header-nodi"/);
   assert.match(css, /header-action-rail > \[data-testid='header-assistant'\]/);
+  assert.doesNotMatch(css, /header-action-rail > \[data-testid='header-nodi'\]/);
   assert.doesNotMatch(css, /header-action-rail > :nth-last-child\(-n\+2\)/);
+});
+
+test('active Server header actions retain contrast in light mode and on hover', () => {
+  assert.match(
+    css,
+    /\.server-desktop-surface \.server-header-action\.bg-indigo-600:hover[\s\S]*?background:\s*var\(--vault-accent,\s*#4f46e5\);[\s\S]*?color:\s*#fff;/,
+  );
+  assert.match(
+    css,
+    /\.server-desktop-surface \.server-header-action\.bg-indigo-600:focus-visible/,
+  );
+});
+
+test('central view shows a circular loader while sidebar navigation resolves', () => {
+  assert.match(app, /const \[pendingView, setPendingView\] = useState<View \| null>\(null\)/);
+  assert.match(app, /setPendingView\(view\)[\s\S]*?navigate\(viewPath\(view\)\)/);
+  assert.match(app, /className=["']server-view-host relative[\s\S]*?data-loading-view=/);
+  assert.match(app, /aria-busy=\{pendingView === activeView \? true : undefined\}/);
+  assert.match(app, /data-testid=["']view-loading-spinner["']/);
+  assert.match(app, /querySelector\('\[data-testid="loading"\]'\)/);
+  assert.doesNotMatch(app, /<nav[\s\S]{0,400}?data-loading-view=/);
+  assert.match(css, /\.server-view-loading-overlay[\s\S]*?place-items:\s*center/);
+  assert.match(css, /\.server-view-loading-spinner[\s\S]*?border-radius:\s*50%/);
+  assert.match(css, /@keyframes server-view-loading-spin/);
+  assert.doesNotMatch(css, /server-sidebar-loading-dots|content:\s*"•••"/);
 });
 
 test('Server light mode remaps shell hovers, nav, switcher and settings controls', () => {

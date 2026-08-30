@@ -14,6 +14,7 @@ import { PT_BR } from "../i18n.pt-BR";
 import { IT } from "../i18n.it";
 import { TR } from "../i18n.tr";
 import { SERVER_TRANSLATIONS } from "../i18n.server";
+import { SERVER_SETTINGS_TRANSLATIONS } from "./i18nServerSettings";
 
 /**
  * Server Web uses the same translation tables as Desktop.  This used to be a
@@ -29,6 +30,11 @@ const SERVER_WEB_TRANSLATIONS: Partial<
   Record<AppLanguage, Record<string, string>>
 > = {
   en: {
+    "La biblioteca aún no se ha publicado":
+      "The library has not been published yet",
+    "Activa Biblioteca en Ajustes → Server y vuelve a publicar desde Desktop.":
+      "Enable Library in Settings → Server and publish again from Desktop.",
+    "Abrir Ajustes de Server": "Open Server Settings",
     // Non-academic vault chrome and renderer-owned fallbacks. Published record
     // values never use these entries; only labels/status placeholders do.
     "Bases de datos": "Databases",
@@ -710,6 +716,11 @@ const SERVER_WEB_TRANSLATIONS: Partial<
     "Obras y ocurrencias ({n})": "Works and occurrences ({n})",
   },
   fr: {
+    "La biblioteca aún no se ha publicado":
+      "La bibliothèque n’a pas encore été publiée",
+    "Activa Biblioteca en Ajustes → Server y vuelve a publicar desde Desktop.":
+      "Activez Bibliothèque dans Paramètres → Server, puis republiez depuis Desktop.",
+    "Abrir Ajustes de Server": "Ouvrir les paramètres Server",
     Ajustes: "Paramètres",
     Servidor: "Serveur",
     Proveedores: "Fournisseurs",
@@ -755,6 +766,11 @@ const SERVER_WEB_TRANSLATIONS: Partial<
     "No hay coincidencias.": "Aucun résultat.",
   },
   de: {
+    "La biblioteca aún no se ha publicado":
+      "Die Bibliothek wurde noch nicht veröffentlicht",
+    "Activa Biblioteca en Ajustes → Server y vuelve a publicar desde Desktop.":
+      "Aktivieren Sie Bibliothek unter Einstellungen → Server und veröffentlichen Sie erneut aus Desktop.",
+    "Abrir Ajustes de Server": "Server-Einstellungen öffnen",
     Ajustes: "Einstellungen",
     Servidor: "Server",
     Proveedores: "Anbieter",
@@ -802,6 +818,11 @@ const SERVER_WEB_TRANSLATIONS: Partial<
     "No hay coincidencias.": "Keine Treffer.",
   },
   pt: {
+    "La biblioteca aún no se ha publicado":
+      "A biblioteca ainda não foi publicada",
+    "Activa Biblioteca en Ajustes → Server y vuelve a publicar desde Desktop.":
+      "Ative Biblioteca em Definições → Server e volte a publicar a partir do Desktop.",
+    "Abrir Ajustes de Server": "Abrir definições do Server",
     Ajustes: "Definições",
     Servidor: "Servidor",
     Proveedores: "Provedores",
@@ -847,6 +868,11 @@ const SERVER_WEB_TRANSLATIONS: Partial<
     "No hay coincidencias.": "Sem correspondências.",
   },
   "pt-BR": {
+    "La biblioteca aún no se ha publicado":
+      "A biblioteca ainda não foi publicada",
+    "Activa Biblioteca en Ajustes → Server y vuelve a publicar desde Desktop.":
+      "Ative Biblioteca em Configurações → Server e publique novamente pelo Desktop.",
+    "Abrir Ajustes de Server": "Abrir configurações do Server",
     Ajustes: "Configurações",
     Servidor: "Servidor",
     Proveedores: "Provedores",
@@ -892,6 +918,11 @@ const SERVER_WEB_TRANSLATIONS: Partial<
     "No hay coincidencias.": "Nenhuma correspondência.",
   },
   it: {
+    "La biblioteca aún no se ha publicado":
+      "La biblioteca non è ancora stata pubblicata",
+    "Activa Biblioteca en Ajustes → Server y vuelve a publicar desde Desktop.":
+      "Attiva Biblioteca in Impostazioni → Server e pubblica di nuovo da Desktop.",
+    "Abrir Ajustes de Server": "Apri impostazioni Server",
     Ajustes: "Impostazioni",
     Servidor: "Server",
     Proveedores: "Provider",
@@ -937,6 +968,11 @@ const SERVER_WEB_TRANSLATIONS: Partial<
     "No hay coincidencias.": "Nessuna corrispondenza.",
   },
   tr: {
+    "La biblioteca aún no se ha publicado":
+      "Kütüphane henüz yayımlanmadı",
+    "Activa Biblioteca en Ajustes → Server y vuelve a publicar desde Desktop.":
+      "Ayarlar → Server bölümünde Kütüphane’yi etkinleştirin ve Desktop’tan yeniden yayımlayın.",
+    "Abrir Ajustes de Server": "Server ayarlarını aç",
     Ajustes: "Ayarlar",
     Servidor: "Sunucu",
     Proveedores: "Sağlayıcılar",
@@ -2932,6 +2968,15 @@ type TranslationTables = Partial<
 >;
 const SERVER_WEB_FINAL_CHROME_TRANSLATIONS: TranslationTables = {
   en: {
+    "Nuevo vault": "New vault",
+    "Connected Vault": "Connected Vault",
+    "Añadir vault": "Add vault",
+    "No hay coincidencias": "No matches",
+    "La biblioteca está vacía": "The library is empty",
+    "Crear un vault editable directamente en Server.":
+      "Create an editable vault directly on Server.",
+    "Conectar un vault de Desktop para publicarlo y sincronizarlo.":
+      "Connect a Desktop vault to publish and synchronise it.",
     "Abrir navegación": "Open navigation",
     "Abrir Nodi": "Open Nodi",
     "Cerrar navegación": "Close navigation",
@@ -2975,6 +3020,15 @@ const SERVER_WEB_FINAL_CHROME_TRANSLATIONS: TranslationTables = {
     "No se ha podido cargar el registro.": "The record could not be loaded.",
   },
   fr: {
+    "Nuevo vault": "Nouveau coffre",
+    "Connected Vault": "Coffre connecté",
+    "Añadir vault": "Ajouter un coffre",
+    "No hay coincidencias": "Aucun résultat",
+    "La biblioteca está vacía": "La bibliothèque est vide",
+    "Crear un vault editable directamente en Server.":
+      "Créer un coffre modifiable directement sur Server.",
+    "Conectar un vault de Desktop para publicarlo y sincronizarlo.":
+      "Connecter un coffre Desktop pour le publier et le synchroniser.",
     "Abrir navegación": "Ouvrir la navigation",
     "Abrir Nodi": "Ouvrir Nodi",
     "Cerrar navegación": "Fermer la navigation",
@@ -3011,6 +3065,15 @@ const SERVER_WEB_FINAL_CHROME_TRANSLATIONS: TranslationTables = {
       "L’enregistrement n’a pas pu être chargé.",
   },
   de: {
+    "Nuevo vault": "Neuer Tresor",
+    "Connected Vault": "Verbundener Tresor",
+    "Añadir vault": "Tresor hinzufügen",
+    "No hay coincidencias": "Keine Treffer",
+    "La biblioteca está vacía": "Die Bibliothek ist leer",
+    "Crear un vault editable directamente en Server.":
+      "Einen bearbeitbaren Tresor direkt auf Server erstellen.",
+    "Conectar un vault de Desktop para publicarlo y sincronizarlo.":
+      "Einen Desktop-Tresor verbinden, um ihn zu veröffentlichen und zu synchronisieren.",
     "Abrir navegación": "Navigation öffnen",
     "Abrir Nodi": "Nodi öffnen",
     "Cerrar navegación": "Navigation schließen",
@@ -3047,6 +3110,15 @@ const SERVER_WEB_FINAL_CHROME_TRANSLATIONS: TranslationTables = {
       "Der Datensatz konnte nicht geladen werden.",
   },
   pt: {
+    "Nuevo vault": "Novo cofre",
+    "Connected Vault": "Cofre ligado",
+    "Añadir vault": "Adicionar cofre",
+    "No hay coincidencias": "Sem resultados",
+    "La biblioteca está vacía": "A biblioteca está vazia",
+    "Crear un vault editable directamente en Server.":
+      "Criar um cofre editável diretamente no Server.",
+    "Conectar un vault de Desktop para publicarlo y sincronizarlo.":
+      "Ligar um cofre do Desktop para o publicar e sincronizar.",
     "Vault de worldbuilding": "Vault de construção de mundos",
     "Abrir navegación": "Abrir navegação",
     "Abrir Nodi": "Abrir o Nodi",
@@ -3105,6 +3177,15 @@ const SERVER_WEB_FINAL_CHROME_TRANSLATIONS: TranslationTables = {
       "Não foi possível carregar o registo.",
   },
   "pt-BR": {
+    "Nuevo vault": "Novo cofre",
+    "Connected Vault": "Cofre conectado",
+    "Añadir vault": "Adicionar cofre",
+    "No hay coincidencias": "Nenhum resultado",
+    "La biblioteca está vacía": "A biblioteca está vazia",
+    "Crear un vault editable directamente en Server.":
+      "Criar um cofre editável diretamente no Server.",
+    "Conectar un vault de Desktop para publicarlo y sincronizarlo.":
+      "Conectar um cofre do Desktop para publicá-lo e sincronizá-lo.",
     "Vault de worldbuilding": "Vault de construção de mundos",
     "Registro publicado": "Registro publicado",
     "Abrir navegación": "Abrir navegação",
@@ -3162,6 +3243,15 @@ const SERVER_WEB_FINAL_CHROME_TRANSLATIONS: TranslationTables = {
       "Não foi possível carregar o registro.",
   },
   it: {
+    "Nuevo vault": "Nuovo vault",
+    "Connected Vault": "Vault connesso",
+    "Añadir vault": "Aggiungi vault",
+    "No hay coincidencias": "Nessun risultato",
+    "La biblioteca está vacía": "La biblioteca è vuota",
+    "Crear un vault editable directamente en Server.":
+      "Crea un vault modificabile direttamente su Server.",
+    "Conectar un vault de Desktop para publicarlo y sincronizarlo.":
+      "Connetti un vault Desktop per pubblicarlo e sincronizzarlo.",
     "Abrir navegación": "Apri navigazione",
     "Abrir Nodi": "Apri Nodi",
     "Cerrar navegación": "Chiudi navigazione",
@@ -3200,6 +3290,15 @@ const SERVER_WEB_FINAL_CHROME_TRANSLATIONS: TranslationTables = {
       "Non è stato possibile caricare il record.",
   },
   tr: {
+    "Nuevo vault": "Yeni kasa",
+    "Connected Vault": "Bağlı kasa",
+    "Añadir vault": "Kasa ekle",
+    "No hay coincidencias": "Eşleşme yok",
+    "La biblioteca está vacía": "Kütüphane boş",
+    "Crear un vault editable directamente en Server.":
+      "Doğrudan Server üzerinde düzenlenebilir bir kasa oluşturun.",
+    "Conectar un vault de Desktop para publicarlo y sincronizarlo.":
+      "Yayımlamak ve eşitlemek için bir Desktop kasasını bağlayın.",
     "Abrir navegación": "Gezinmeyi aç",
     "Abrir Nodi": "Nodi’yi aç",
     "Cerrar navegación": "Gezinmeyi kapat",
@@ -3258,6 +3357,7 @@ export function resolveTranslation(
   const normalized = normalizeUiLanguage(language);
   if (normalized === "es") return source;
   return (
+    SERVER_SETTINGS_TRANSLATIONS[normalized]?.[source] ??
     SERVER_WEB_FINAL_CHROME_TRANSLATIONS[normalized]?.[source] ??
     SERVER_WEB_PERSONAL_STATUS_TRANSLATIONS[normalized]?.[source] ??
     SERVER_WEB_ADVANCED_TRANSLATIONS[normalized]?.[source] ??
@@ -3276,6 +3376,7 @@ export function resolveTranslation(
     // English is the final safety net only after every catalogue for the
     // requested locale has had an opportunity to resolve the key. An English
     // table earlier in the chain masked valid translations from later tables.
+    SERVER_SETTINGS_TRANSLATIONS.en?.[source] ??
     SERVER_WEB_PERSONAL_STATUS_TRANSLATIONS.en?.[source] ??
     SERVER_WEB_ADVANCED_TRANSLATIONS.en?.[source] ??
     SERVER_WEB_CONVERSATION_TRANSLATIONS.en?.[source] ??
@@ -3297,6 +3398,7 @@ export function resolveTranslation(
  * chain above belongs here too.
  */
 const LOCALE_CATALOGUES: Partial<Record<string, Record<string, string>>>[] = [
+  SERVER_SETTINGS_TRANSLATIONS,
   SERVER_WEB_FINAL_CHROME_TRANSLATIONS,
   SERVER_WEB_PERSONAL_STATUS_TRANSLATIONS,
   SERVER_WEB_ADVANCED_TRANSLATIONS,

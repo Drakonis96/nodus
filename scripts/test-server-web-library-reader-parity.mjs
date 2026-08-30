@@ -9,6 +9,10 @@ const view = variants(fs.readFileSync(
   `${root}/src/serverWeb/LibraryServerView.tsx`,
   "utf8",
 ));
+const routes = variants(fs.readFileSync(
+  `${root}/server/lib/routes/api.mjs`,
+  "utf8",
+));
 const docs = fs.readFileSync(
   `${root}/docs/server-web-academic-parity.md`,
   "utf8",
@@ -35,6 +39,24 @@ test("library catalogue preserves Desktop table affordances and tab-safe opening
   assert.match(view, /target="_blank"/);
   assert.match(view, /api\.libraryCollections/);
   assert.match(view, /api\.library\(spaceId/);
+});
+
+test("an unpublished library is an empty catalogue rather than a permanent error", () => {
+  assert.match(view, /error instanceof ApiError/);
+  assert.match(view, /error\.code === ["']library_not_published["']/);
+  assert.match(view, /setItems\(\[\]\)[\s\S]{0,120}setTotal\(0\)[\s\S]{0,120}setHasMore\(false\)/);
+  assert.match(view, /setCollections\(\[\]\)/);
+  assert.match(view, /setPublished\(false\)/);
+  assert.match(view, /La biblioteca aún no se ha publicado/);
+  assert.match(view, /\/view\/settings\?tab=server&focus=connected-vault/);
+  assert.match(
+    routes,
+    /function libraryCollections[\s\S]*?if \(!library\)[\s\S]*?collections:\s*\[\][\s\S]*?published:\s*false/,
+  );
+  assert.match(
+    routes,
+    /function libraryDocuments[\s\S]*?if \(!library\)[\s\S]*?items:\s*\[\][\s\S]*?total:\s*0[\s\S]*?hasMore:\s*false/,
+  );
 });
 
 test("reader preserves safe published reading and private overlay capabilities", () => {

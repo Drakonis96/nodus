@@ -35,7 +35,10 @@
   color: var(--server-shell-text);
 }
 
-.server-desktop-surface .server-header-action.bg-indigo-600 {
+.server-desktop-surface .server-header-action.bg-indigo-600,
+.server-desktop-surface .server-header-action.bg-indigo-600:hover,
+.server-desktop-surface .server-header-action.bg-indigo-600:focus-visible {
+  background: var(--vault-accent, #4f46e5);
   color: #fff;
 }
 
@@ -123,6 +126,34 @@ html.light .server-desktop-surface .server-sidebar-nav-item.is-active {
 }
 .server-sidebar-nav-item:focus-visible,
 .server-sidebar-nav-group:focus-visible { outline: 2px solid #818cf8; outline-offset: -2px; }
+
+/* Route latency belongs to the view being opened. Cover only the central pane
+   while its lazy bundle or request resolves, leaving the navigation stable. */
+.server-view-loading-overlay {
+  position: absolute;
+  z-index: 10;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: color-mix(in srgb, var(--server-shell-bg) 88%, transparent);
+  cursor: progress;
+}
+.server-view-loading-spinner {
+  width: 30px;
+  height: 30px;
+  border: 3px solid color-mix(in srgb, var(--server-shell-muted) 32%, transparent);
+  border-top-color: var(--vault-accent, #6366f1);
+  border-radius: 50%;
+  animation: server-view-loading-spin 700ms linear infinite;
+}
+@keyframes server-view-loading-spin {
+  to { transform: rotate(360deg); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .server-view-loading-spinner {
+    animation: none;
+  }
+}
 
 /* The shared Desktop nav uses utility classes whose dark hover colours are
    intentionally global. Scope the web overrides to the shell so switching to
@@ -343,6 +374,40 @@ html[data-theme='light'] .server-desktop-surface :is(input, select, textarea),
   min-height: 0;
   flex: 1 1 auto;
 }
+.server-vault-add-menu { position: relative; flex: 0 0 auto; }
+.server-vault-add-options {
+  position: absolute;
+  z-index: 4;
+  top: calc(100% + 7px);
+  right: 0;
+  display: grid;
+  width: min(270px, calc(100vw - 48px));
+  overflow: hidden;
+  border: 1px solid var(--server-shell-border);
+  border-radius: 10px;
+  padding: 5px;
+  background: var(--server-shell-panel);
+  box-shadow: 0 14px 36px rgb(0 0 0 / .38);
+}
+.server-vault-add-options button {
+  display: flex;
+  min-width: 0;
+  align-items: flex-start;
+  gap: 10px;
+  border: 0;
+  border-radius: 7px;
+  padding: 10px;
+  background: transparent;
+  color: var(--server-shell-muted);
+  text-align: left;
+  cursor: pointer;
+}
+.server-vault-add-options button:hover,
+.server-vault-add-options button:focus-visible { background: var(--server-shell-panel-soft); color: var(--server-shell-text); outline: none; }
+.server-vault-add-options button > svg { flex: 0 0 auto; margin-top: 2px; color: var(--vault-accent, #6366f1); }
+.server-vault-add-options button span { min-width: 0; }
+.server-vault-add-options strong { display: block; color: var(--server-shell-text); font-size: 12px; font-weight: 650; }
+.server-vault-add-options small { display: block; margin-top: 3px; color: var(--server-shell-muted); font-size: 10px; line-height: 1.4; }
 @keyframes server-vault-open { from { opacity: 0; transform: translateX(-50%) translateY(-8px) scaleY(.84); } }
 
 .server-record-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 12px; }
@@ -605,10 +670,8 @@ html[data-theme='light'] [class~='to-neutral-900'] {
   .server-mobile-menu { display: inline-flex; }
   .server-header-secondary { display: none !important; }
   /* Keep the controls that remain actionable on a narrow viewport (search,
-     settings, theme and account). Nodi and the assistant are optional
-     destinations and yield first, instead of hiding the account control as
-     the old positional selector did. */
-  .header-action-rail > [data-testid='header-nodi'],
+     account, theme and settings). The assistant yields first, instead of
+     hiding one of those core controls. */
   .header-action-rail > [data-testid='header-assistant'] { display: none !important; }
   .header-vault-badge { max-width: 132px; }
   .header-vault-badge span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

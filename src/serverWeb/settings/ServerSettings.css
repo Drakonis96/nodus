@@ -10,8 +10,13 @@
   --ss-accent: var(--vault-accent, #6366f1);
   --ss-accent-soft: color-mix(in srgb, var(--ss-accent) 18%, transparent);
   --ss-good: #2dd4bf;
-  min-height: 100%;
+  box-sizing: border-box;
+  height: 100%;
+  min-height: 0;
+  max-height: 100%;
   overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
   padding: 24px;
   background: var(--ss-bg);
   color: var(--ss-text);
@@ -73,9 +78,15 @@ html[data-theme='light'] .server-settings-native .ss-warning { background: #fffb
 .ss-panels { max-width: 1180px; margin: 0 auto; }
 .ss-result-title { margin: 24px 0 9px; color: var(--ss-muted); font-size: 12px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
 .ss-card { overflow: hidden; margin-bottom: 16px; border: 1px solid var(--ss-border); border-radius: 11px; background: var(--ss-panel); box-shadow: 0 1px 2px rgb(0 0 0 / .08); }
+.ss-card[id] { scroll-margin-top: 18px; }
+.ss-card[id]:focus { border-color: var(--ss-accent); outline: 2px solid var(--ss-accent-soft); outline-offset: 2px; }
 .ss-section-head { padding: 15px 16px 13px; border-bottom: 1px solid var(--ss-border-soft); }
+.ss-section-title-line { display: flex; align-items: center; gap: 7px; }
 .ss-section-head h2 { margin: 0; color: var(--ss-muted); font-size: 12px; font-weight: 700; letter-spacing: .075em; text-transform: uppercase; }
 .ss-section-head p { max-width: 820px; margin: 7px 0 0; color: var(--ss-muted); font-size: 12px; font-weight: 400; letter-spacing: 0; line-height: 1.55; text-transform: none; }
+.ss-help-button { display: grid; width: 20px; height: 20px; flex: 0 0 auto; place-items: center; border: 1px solid var(--ss-border); border-radius: 50%; padding: 0; background: var(--ss-panel-soft); color: var(--ss-muted); cursor: pointer; }
+.ss-help-button:hover, .ss-help-button:focus-visible, .ss-help-button[aria-expanded='true'] { border-color: var(--ss-accent); background: var(--ss-accent-soft); color: var(--ss-accent); outline: none; }
+.ss-section-head .ss-section-help { max-width: 900px; margin-top: 10px; border-left: 3px solid var(--ss-accent); border-radius: 0 7px 7px 0; padding: 8px 10px; background: var(--ss-accent-soft); color: var(--ss-text); }
 .ss-row { display: grid; grid-template-columns: minmax(180px, .78fr) minmax(220px, 1.22fr); align-items: center; gap: 22px; min-height: 57px; padding: 10px 16px; border-bottom: 1px solid var(--ss-border-soft); }
 .ss-row:last-child { border-bottom: 0; }
 .ss-row strong { display: block; font-size: 12px; font-weight: 550; }

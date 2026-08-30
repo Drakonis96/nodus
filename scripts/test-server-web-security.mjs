@@ -36,6 +36,15 @@ test('Server web sessions are read-only while personal annotations stay private 
     assert.equal(meA.value.spaces[0].role, 'reader');
     assert.equal(meA.response.headers.get('access-control-allow-origin'), null);
 
+    const emptyLibrary = await json(await sessionFetch(server.origin, cookieA, `/api/v1/spaces/${spaceId}/library/documents`));
+    assert.equal(emptyLibrary.response.status, 200, 'a library that has not been published is a valid empty catalogue');
+    assert.deepEqual(emptyLibrary.value.items, []);
+    assert.equal(emptyLibrary.value.total, 0);
+    assert.equal(emptyLibrary.value.published, false);
+    const emptyCollections = await json(await sessionFetch(server.origin, cookieA, `/api/v1/spaces/${spaceId}/library/collections`));
+    assert.equal(emptyCollections.response.status, 200);
+    assert.deepEqual(emptyCollections.value.collections, []);
+
     const context = await json(await sessionFetch(server.origin, cookieA, `/api/v1/spaces/${spaceId}/context`, {
       method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ query: 'memoria', budget: 32_000 }),
     }));

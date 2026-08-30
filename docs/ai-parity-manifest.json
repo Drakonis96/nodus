@@ -88,7 +88,7 @@
         { "path": "server/lib/ai/providerGateway.mjs", "line": 4, "symbol": "Nodi capability", "contains": "'assistant', 'nodi'" }
       ] },
       "serverWeb": { "status": "implemented", "required": true, "evidence": [
-        { "path": "src/serverWeb/App.tsx", "line": 1, "symbol": "Nodi header", "contains": "dataTestId=\"header-nodi\"" }
+        { "path": "src/serverWeb/App.tsx", "line": 1, "symbol": "Assistant header", "contains": "dataTestId=\"header-assistant\"" }
       ] }
     },
     {

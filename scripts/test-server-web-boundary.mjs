@@ -53,7 +53,11 @@ test('Server settings use the native app navigation and visual surface', () => {
   const settings = variants(read('src/serverWeb/settings/ServerSettingsView.tsx'));
   assert.match(app, /dataTestId="header-settings"/);
   assert.match(app, /dataTestId="header-account"/);
-  assert.match(app, /key={settingsTab}/, 'settings must remount when the URL tab changes');
+  assert.match(
+    app,
+    /key={`\$\{settingsTab\}:\$\{settingsFocus\}`}/,
+    'settings must remount when the URL tab or focused section changes',
+  );
   assert.match(app, /data-theme={theme}/, 'the shell must expose the resolved theme to its token scope');
   assert.match(app, /icon="settings"[\s\S]*?onClick=\{\(\) => navigate\('\/view\/settings\?tab=server'\)\}/);
   assert.match(app, /<ServerSettingsView/);
