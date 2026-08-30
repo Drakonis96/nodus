@@ -91,6 +91,7 @@
     "verify:library-metadata-live": "node scripts/verify-library-metadata-live.mjs",
     "verify:zotero:live": "node scripts/audit-zotero-live-import.mjs --all",
     "verify:zotero:ping": "node scripts/audit-zotero-live-import.mjs",
+    "verify:zotero:manual-sync-live": "node scripts/verify-zotero-manual-sync-live.mjs",
     "verify:browser-connector": "node scripts/verify-browser-connector-server.mjs",
     "verify:browser-connector-live": "node scripts/verify-browser-connector-live.mjs",
     "verify:study-whisper": "node scripts/verify-study-whisper.mjs",

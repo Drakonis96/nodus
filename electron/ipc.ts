@@ -776,7 +776,9 @@ export function registerIpc(
   // ── Core: sync, backups, recovery, updates ─────────────────────────────────
   // Regrouped here so the academic and study channels above form one range. They
   // used to sit inside it, which is why extracting that range needed this first.
-  h('sync:now', async () => fullSync('manual'));
+  h('sync:now', async (_e, options?: { catalogOnly?: boolean }) => fullSync('manual', {
+    catalogOnly: options?.catalogOnly === true,
+  }));
   h('sync:log', async () => getSyncLog());
   // automatic encrypted backups (master password lives in the OS keychain)
   h('sync:hasPassphrase', async () => hasSyncPassphrase());

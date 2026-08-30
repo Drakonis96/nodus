@@ -1,6 +1,6 @@
 import { v4 as uuid } from 'uuid';
 import { getSettings } from '../db/settingsRepo';
-import { addSyncLog } from '../db/syncRepo';
+import { addSyncLog, getSyncLog } from '../db/syncRepo';
 import {
   upsertWork,
   getWorkByZoteroKey,
@@ -23,6 +23,15 @@ import { probeWorkTextAvailability } from '../extraction/textExtractor';
 import { getActiveVault } from '../vaults/vaultRegistry';
 import { documentIndexQueue } from '../pipeline/documentIndexQueue';
 import { DOCUMENT_INDEX_CONTINUOUS_AVAILABLE } from '@shared/documentIndexPolicy';
+import type { ZoteroSyncOptions } from '@shared/types';
+import {
+  classifyZoteroItemChange,
+  persistedZoteroVersion,
+  shouldAutomateAnalysisAfterSync,
+  zoteroItemFingerprint,
+  zoteroLibraryVersionsChanged,
+  type ZoteroSyncMode,
+} from './zoteroSyncPolicy';
 
 
 /** Structured creators kept for building canonical author identity. Only authors
@@ -76,7 +85,8 @@ export function ingestZoteroItem(item: ZoteroItem, readTagName: string): { nodus
   upsertWork({
     nodus_id: nodusId,
     zotero_key: item.key,
-    zotero_version: item.version,
+    zotero_version: persistedZoteroVersion(existing, item.version),
+    zotero_fingerprint: zoteroItemFingerprint(item),
     title: item.title,
     // Byline and structured creators are derived from the same filtered list, so
     // the display string can never disagree with the roles stored beside it.
@@ -268,11 +278,15 @@ function reconcileMonitoredCollectionMemberships(
 }
 
 /** Full sync over all monitored collections. */
-export async function fullSync(mode: 'manual' | 'realtime'): Promise<SyncLogEntry> {
+export async function fullSync(mode: ZoteroSyncMode, options: ZoteroSyncOptions = {}): Promise<SyncLogEntry> {
   const settings = getSettings();
   const userId = settings.zoteroUserId;
+  const catalogOnly = options.catalogOnly === true;
+  const automateAnalysis = shouldAutomateAnalysisAfterSync(mode, options);
+  const lastSuccessfulSyncAt = getSyncLog(1)[0]?.at ?? null;
   let added = 0;
   let changed = 0;
+  let baselined = 0;
   let lightQueued = 0;
   let deepQueued = 0;
   const collectionFailures: string[] = [];
@@ -302,52 +316,73 @@ export async function fullSync(mode: 'manual' | 'realtime'): Promise<SyncLogEntr
     const items = await collectionItemsRecursiveObserved(userId, collectionKey, collectionFailures);
     for (const item of items) {
       observedMemberships.set(item.key, new Set(item.collections));
-      const before = getWorkByZoteroKey(item.key);
+      const directBefore = getWorkByZoteroKey(item.key);
+      const before = directBefore
+        ?? getWorkByAliasKey(item.key)
+        ?? (item.doi ? getWorkByDoi(item.doi) : null);
+      const incomingAuthors = bylineFromCreators(creatorsOf(item));
+      const incomingHasReadTag = item.tags.some((tag) => tag.toLowerCase() === settings.readTag.toLowerCase());
+      // Alias/DOI matches describe a second Zotero record attached to one canonical
+      // work. Its metadata must not invalidate or reanalyse that canonical record.
+      const changeState = directBefore
+        ? classifyZoteroItemChange(directBefore, item, {
+          authors: incomingAuthors,
+          hasReadTag: incomingHasReadTag,
+          lastSuccessfulSyncAt,
+        })
+        : before ? 'unchanged' : 'new';
       const { nodusId, isNew, hasReadTag } = ingestZoteroItem(item, settings.readTag);
       const workMemberships = observedWorkMemberships.get(nodusId) ?? new Set<string>();
       for (const collectionKey of item.collections) workMemberships.add(collectionKey);
       observedWorkMemberships.set(nodusId, workMemberships);
-      const didChange = !!before && before.zotero_version !== item.version;
+      const didChange = !isNew && changeState === 'changed';
       if (isNew) {
         added++;
       } else if (didChange) {
         changed++;
+      } else if (changeState === 'baseline') {
+        baselined++;
       }
-      if (settings.autoLightScan && (isNew || didChange)) {
+      // A user-initiated refresh is deliberately catalog-only: it updates monitored
+      // Zotero membership and metadata, and leaves every AI queue untouched. Automatic
+      // analysis belongs exclusively to the opt-in realtime background path.
+      if (automateAnalysis && settings.autoLightScan && (isNew || didChange)) {
         setLightPending(nodusId);
         scanQueue.enqueue(nodusId, item.title, 'light');
         lightQueued++;
       }
-      const after = getWorkByZoteroKey(item.key);
-      let recoverableText = false;
-      if (after?.deep_status === 'skipped_no_text' && !probeRequeuedThisSession.has(item.key)) {
-        const probe = await probeWorkTextAvailability(settings.zoteroUserId, item.key, settings.zoteroStoragePath, {
-          preferZoteroFulltext: settings.preferZoteroFulltext,
-          itemType: after.item_type,
-        });
-        recoverableText = probe.available;
-        // A present-but-unextractable file (e.g. a scanned PDF with OCR off) keeps
-        // probing as available while every retry ends in skipped_no_text again. Cap
-        // probe-driven requeues at one per work per session so each sync doesn't
-        // re-parse the same stuck attachments. Real changes (new tag, new file
-        // version) still requeue via isNew/didChange.
-        if (recoverableText) probeRequeuedThisSession.add(item.key);
-      }
-      const needsDeep =
-        !!after &&
-        shouldQueueDeepAfterSync({
-          autoDeepScanOnReadTag: settings.autoDeepScanOnReadTag,
-          hasReadTag,
-          manualDeep: after.manual_deep === 1,
-          isNew,
-          didChange,
-          deepStatus: after.deep_status,
-          recoverableText,
-        });
-      if (needsDeep) {
-        setDeepPending(nodusId);
-        scanQueue.enqueue(nodusId, item.title, 'deep');
-        deepQueued++;
+      if (automateAnalysis) {
+        const after = getWorkByZoteroKey(item.key);
+        let recoverableText = false;
+        if (after?.deep_status === 'skipped_no_text' && !probeRequeuedThisSession.has(item.key)) {
+          const probe = await probeWorkTextAvailability(settings.zoteroUserId, item.key, settings.zoteroStoragePath, {
+            preferZoteroFulltext: settings.preferZoteroFulltext,
+            itemType: after.item_type,
+          });
+          recoverableText = probe.available;
+          // A present-but-unextractable file (e.g. a scanned PDF with OCR off) keeps
+          // probing as available while every retry ends in skipped_no_text again. Cap
+          // probe-driven requeues at one per work per session so each sync doesn't
+          // re-parse the same stuck attachments. Real changes (new tag, new file
+          // version) still requeue via isNew/didChange.
+          if (recoverableText) probeRequeuedThisSession.add(item.key);
+        }
+        const needsDeep =
+          !!after &&
+          shouldQueueDeepAfterSync({
+            autoDeepScanOnReadTag: settings.autoDeepScanOnReadTag,
+            hasReadTag,
+            manualDeep: after.manual_deep === 1,
+            isNew,
+            didChange,
+            deepStatus: after.deep_status,
+            recoverableText,
+          });
+        if (needsDeep) {
+          setDeepPending(nodusId);
+          scanQueue.enqueue(nodusId, item.title, 'deep');
+          deepQueued++;
+        }
       }
     }
   }
@@ -378,7 +413,7 @@ export async function fullSync(mode: 'manual' | 'realtime'): Promise<SyncLogEntr
 
   // Continuous document understanding is opt-in. When enabled, reconcile now so
   // newly synced or changed works do not have to wait for the periodic safety poll.
-  if (DOCUMENT_INDEX_CONTINUOUS_AVAILABLE && settings.documentIndexingEnabled && (added > 0 || changed > 0)) {
+  if (automateAnalysis && DOCUMENT_INDEX_CONTINUOUS_AVAILABLE && settings.documentIndexingEnabled && (added > 0 || changed > 0)) {
     await documentIndexQueue.refreshVault(getActiveVault().id).catch((error) => {
       console.error('[document-index] post-sync refresh failed', error);
     });
@@ -386,7 +421,10 @@ export async function fullSync(mode: 'manual' | 'realtime'): Promise<SyncLogEntr
 
   for (const failure of collectionFailures) console.warn(`[zotero-sync] collection traversal failed: ${failure}`);
   const failureSummary = collectionFailures.length ? `, ${collectionFailures.length} fallos de colección` : '';
-  const summary = `${added} altas, ${changed} cambios, ${lightQueued} temas encolados, ${deepQueued} profundos encolados${failureSummary}`;
+  const baselineSummary = baselined > 0 ? `, ${baselined} revisiones locales adoptadas` : '';
+  const summary = catalogOnly
+    ? `${added} altas, ${changed} cambios${baselineSummary}; catálogo actualizado sin iniciar análisis${failureSummary}`
+    : `${added} altas, ${changed} cambios${baselineSummary}, ${lightQueued} temas encolados, ${deepQueued} profundos encolados${failureSummary}`;
   const log = addSyncLog(mode, summary);
   if (collectionFailures.length) {
     throw new Error(`La sincronización de Zotero quedó incompleta: ${collectionFailures.length} lectura(s) fallaron. No se avanzó el checkpoint.`);
@@ -438,7 +476,7 @@ export function startRealtimeSync(): void {
     try {
       const versions = await fetchLibraryVersions(settings.zoteroUserId, settings.monitoredCollections);
       const previous = getLibraryVersions();
-      if (Object.entries(versions).some(([key, version]) => version > (previous[key] ?? 0))) {
+      if (zoteroLibraryVersionsChanged(previous, versions)) {
         await fullSync('realtime');
       }
     } catch {

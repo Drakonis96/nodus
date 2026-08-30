@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+- Made the header's Zotero refresh strictly catalog-only: it updates monitored
+  collections and shows new or changed items without starting theme, deep,
+  summary, embedding, passage, graph or documentary-index work.
+- Added a stable metadata fingerprint for Zotero 10 local APIs that report every
+  item as version zero, preventing both whole-library false changes and missed
+  edits after the compatibility transition.
+
 ## 5.1.0 — 2026-08-30
 
 Nodus 5.1.0 is a repair-focused release that makes AI processing faster and
