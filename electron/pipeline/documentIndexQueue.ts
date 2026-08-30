@@ -27,6 +27,7 @@ import { AiError } from '../ai/aiClient';
 import { coalesce } from '../util/coalesce';
 import { registerDocumentIndexMaintenanceController } from './documentIndexMaintenance';
 import { compareDocumentIndexJobsForDisplay } from '@shared/documentIndexProgress';
+import { DOCUMENT_INDEX_CONTINUOUS_AVAILABLE } from '@shared/documentIndexPolicy';
 
 type Listener = (progress: DocumentIndexProgress) => void;
 const POLL_MS = 350;
@@ -113,15 +114,21 @@ class DocumentIndexQueue {
       await withVaultDatabase(vault.id, async () => {
         recoverInterruptedDocumentJobs();
         const settings = getSettings();
-        if (settings.documentIndexingEnabled) {
+        if (DOCUMENT_INDEX_CONTINUOUS_AVAILABLE && settings.documentIndexingEnabled) {
           await this.ensureContinuousCampaignInside(vault.id, settings.documentIndexIncludeArchived);
+        } else {
+          for (const campaign of listDocumentIndexCampaigns().filter((item) =>
+            item.mode === 'continuous' && ['queued', 'running'].includes(item.status)
+          )) setDocumentCampaignStatus(campaign.campaignId, 'paused');
         }
       }).catch((error) => console.error('[document-index] resume failed', vault.id, error));
     }
-    this.continuousTimer = setInterval(() => {
-      void this.refreshContinuousCampaigns();
-    }, 30_000);
-    this.continuousTimer.unref?.();
+    if (DOCUMENT_INDEX_CONTINUOUS_AVAILABLE) {
+      this.continuousTimer = setInterval(() => {
+        void this.refreshContinuousCampaigns();
+      }, 30_000);
+      this.continuousTimer.unref?.();
+    }
     this.schedule();
   }
 
@@ -130,7 +137,7 @@ class DocumentIndexQueue {
     for (const vault of listVaults().filter((item) => writable(item) && !this.maintenanceVaults.has(item.id))) {
       await withVaultDatabase(vault.id, async () => {
         const settings = getSettings();
-        if (settings.documentIndexingEnabled) {
+        if (DOCUMENT_INDEX_CONTINUOUS_AVAILABLE && settings.documentIndexingEnabled) {
           await this.ensureContinuousCampaignInside(vault.id, settings.documentIndexIncludeArchived);
         }
       }).catch((error) => console.error('[document-index] continuous refresh failed', vault.id, error));
@@ -146,7 +153,7 @@ class DocumentIndexQueue {
     if (!vault || !writable(vault) || this.stopping || this.maintenanceAll || this.maintenanceVaults.has(vaultId)) return;
     await withVaultDatabase(vault.id, async () => {
       const settings = getSettings();
-      if (settings.documentIndexingEnabled) {
+      if (DOCUMENT_INDEX_CONTINUOUS_AVAILABLE && settings.documentIndexingEnabled) {
         await this.ensureContinuousCampaignInside(vault.id, settings.documentIndexIncludeArchived);
       }
     });
@@ -163,7 +170,7 @@ class DocumentIndexQueue {
       const campaigns = listDocumentIndexCampaigns().filter((campaign) =>
         campaign.mode === 'continuous' && ['queued', 'running', 'paused'].includes(campaign.status)
       );
-      if (!enabled) {
+      if (!DOCUMENT_INDEX_CONTINUOUS_AVAILABLE || !enabled) {
         for (const campaign of campaigns) setDocumentCampaignStatus(campaign.campaignId, 'paused');
         return;
       }

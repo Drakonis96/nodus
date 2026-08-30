@@ -893,6 +893,7 @@ export async function resolveWorkText(
   // so deep scans can still find local PDFs instead of degrading to abstract-only.
   const effectiveStorage = storagePath || defaultZoteroStorage();
   const isAttachmentItem = (itemType ?? '').toLowerCase() === 'attachment';
+  const isNodusLibraryItem = zoteroKey.startsWith('nodus-library:');
 
   // (1+2) Resolve text from the Zotero attachments. A scan can race a just-attached
   // file — the attachment child, its filename, or the on-disk copy may surface a
@@ -901,7 +902,11 @@ export async function resolveWorkText(
   let hadTextAttachment = false;
   let scanNote: string | null = null;
   let blockReason: TextBlockReason | null = null;
-  for (let attempt = 0; attempt < ATTACHMENT_READ_ATTEMPTS; attempt++) {
+  // A `nodus-library:` key is not a Zotero item key. Its canonical clean copy is
+  // resolved by the Library fallback immediately below, so do not spend retries
+  // querying Zotero before reading the source Nodus already owns locally.
+  const attachmentReadAttempts = isNodusLibraryItem ? 0 : ATTACHMENT_READ_ATTEMPTS;
+  for (let attempt = 0; attempt < attachmentReadAttempts; attempt++) {
     opts.signal?.throwIfAborted();
     if (attempt > 0) await abortableDelay(ATTACHMENT_RETRY_DELAYS_MS[attempt] ?? 1500, opts.signal);
     let textAttachments: ZoteroAttachment[] = [];

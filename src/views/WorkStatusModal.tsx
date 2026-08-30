@@ -4,7 +4,7 @@
 // is done, what is missing, and how do I fix just that". Each step can be retried
 // on its own so a reader never has to re-run a whole analysis to repair one index.
 import { useEffect, useState } from 'react';
-import type { WorkView } from '@shared/types';
+import type { DocumentUnderstandingState, WorkView } from '@shared/types';
 import { Icon } from '../components/ui';
 import { notifyDataChanged } from '../hooks';
 import { STEP_ORDER, type StepId, type StepState, type WorkStatus } from '../libraryStatus';
@@ -46,20 +46,74 @@ const STATE_TONE: Record<StepState, string> = {
 /** States a reader can act on. `blocked` and `na` are terminal by definition. */
 const RETRYABLE: StepState[] = ['partial', 'missing', 'failed'];
 
+const DOCUMENT_STATUS_LABEL: Record<DocumentUnderstandingState, string> = {
+  missing: 'Sin preparar',
+  queued: 'En cola',
+  waiting_source: 'Resolviendo texto completo',
+  paused: 'En pausa',
+  structuring: 'Reconstruyendo estructura',
+  analyzing: 'Analizando secciones',
+  synthesizing: 'Sintetizando la obra',
+  auditing: 'Auditando',
+  embedding: 'Creando vectores',
+  aligning: 'Enlazando ideas',
+  current: 'Actual',
+  stale: 'Obsoleta',
+  failed: 'Falló',
+  unavailable: 'Sin texto completo',
+};
+
+const DOCUMENT_STATUS_TONE: Record<DocumentUnderstandingState, string> = {
+  current: STATE_TONE.done,
+  failed: STATE_TONE.failed,
+  unavailable: STATE_TONE.blocked,
+  stale: STATE_TONE.partial,
+  missing: STATE_TONE.missing,
+  queued: STATE_TONE.running,
+  waiting_source: STATE_TONE.running,
+  paused: STATE_TONE.partial,
+  structuring: STATE_TONE.running,
+  analyzing: STATE_TONE.running,
+  synthesizing: STATE_TONE.running,
+  auditing: STATE_TONE.running,
+  embedding: STATE_TONE.running,
+  aligning: STATE_TONE.running,
+};
+
+const DOCUMENT_ACTIVE = new Set<DocumentUnderstandingState>([
+  'queued',
+  'waiting_source',
+  'structuring',
+  'analyzing',
+  'synthesizing',
+  'auditing',
+  'embedding',
+  'aligning',
+]);
+
 export function WorkStatusModal({
   work,
   status,
+  documentStatus,
   onClose,
   onChanged,
+  onOpenDocument,
 }: {
   work: WorkView;
   status: WorkStatus;
+  documentStatus: DocumentUnderstandingState;
   onClose: () => void;
   onChanged: () => void | Promise<void>;
+  onOpenDocument: () => void;
 }) {
-  const [busy, setBusy] = useState<StepId | 'all' | null>(null);
+  const [busy, setBusy] = useState<StepId | 'all' | 'documentary' | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [citableQueued, setCitableQueued] = useState(false);
+  const [documentQueued, setDocumentQueued] = useState(false);
+
+  const displayedDocumentStatus = documentQueued && !DOCUMENT_ACTIVE.has(documentStatus) && documentStatus !== 'current'
+    ? 'queued'
+    : documentStatus;
 
   const retryable = STEP_ORDER.filter((id) => RETRYABLE.includes(status.steps[id].state) && !(id === 'citable' && citableQueued));
 
@@ -72,6 +126,12 @@ export function WorkStatusModal({
       else void onChanged();
     });
   }, [citableQueued, onChanged]);
+
+  useEffect(() => {
+    if (documentStatus === 'current' || documentStatus === 'failed' || documentStatus === 'unavailable') {
+      setDocumentQueued(false);
+    }
+  }, [documentStatus]);
 
   const runStep = async (id: StepId) => {
     switch (id) {
@@ -106,6 +166,21 @@ export function WorkStatusModal({
     setActionError(null);
     try {
       await runStep(id);
+      notifyDataChanged();
+      await onChanged();
+    } catch (error) {
+      setActionError(error instanceof Error ? error.message : String(error));
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const runDocumentaryIndex = async () => {
+    setBusy('documentary');
+    setActionError(null);
+    try {
+      await window.nodus.enqueueDocumentProfile(work.nodus_id);
+      setDocumentQueued(true);
       notifyDataChanged();
       await onChanged();
     } catch (error) {
@@ -248,6 +323,43 @@ export function WorkStatusModal({
                 </section>
               );
             })}
+
+            <section
+              className="mt-3 flex items-start gap-3 rounded-lg border border-cyan-200 bg-cyan-50/60 p-3 dark:border-cyan-900/70 dark:bg-cyan-950/15"
+              data-testid="work-status-documentary-index"
+            >
+              <Icon name="layers" size={16} className="mt-0.5 shrink-0 text-cyan-600 dark:text-cyan-300" />
+              <div className="min-w-0 flex-1">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-sm font-medium text-neutral-900 dark:text-neutral-200">{t('Índice documental')}</span>
+                  <em data-testid="work-status-documentary-beta" className="library-action-menu-badge is-beta">BETA</em>
+                  <span className={`work-step-state inline-flex items-center rounded-md border px-1.5 py-0.5 text-[11px] ${DOCUMENT_STATUS_TONE[displayedDocumentStatus]}`}>
+                    {t(DOCUMENT_STATUS_LABEL[displayedDocumentStatus])}
+                  </span>
+                </div>
+                <p className="mt-1 text-xs leading-5 text-neutral-600 dark:text-neutral-500">
+                  {t('Es opcional y no afecta al estado general de la obra. Deep Research lo prepara cuando lo necesita; también puedes iniciarlo manualmente.')}
+                </p>
+              </div>
+              {!DOCUMENT_ACTIVE.has(displayedDocumentStatus) && (
+                <button
+                  className="btn btn-ghost shrink-0 border border-cyan-300 px-2 py-1 text-xs disabled:opacity-40 dark:border-cyan-800"
+                  disabled={busy != null}
+                  onClick={() => displayedDocumentStatus === 'current' || displayedDocumentStatus === 'paused'
+                    ? onOpenDocument()
+                    : void runDocumentaryIndex()}
+                  data-testid="work-status-documentary-action"
+                >
+                  {busy === 'documentary'
+                    ? t('Enviando…')
+                    : displayedDocumentStatus === 'current' || displayedDocumentStatus === 'paused'
+                      ? t('Abrir la ficha documental completa')
+                      : displayedDocumentStatus === 'missing'
+                        ? t('Escanear obra completa')
+                        : t('Volver a escanear')}
+                </button>
+              )}
+            </section>
           </div>
         </div>
 

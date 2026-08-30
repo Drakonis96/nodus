@@ -745,7 +745,13 @@ export async function runDocumentProfileScan(work: Work, options: RunDocumentPro
   const settings = getSettings();
   const userId = settings.zoteroUserId || LOCAL_USER_ID;
   emit(options, 'waiting_source', 0.01, 'Resolviendo el texto completo…');
-  const item = await getItem(userId, work.zotero_key).catch(() => null);
+  // Nodus-owned Library references already point at a materialized, clean local
+  // document. Asking Zotero about that synthetic key first is both unnecessary
+  // and harmful when Zotero's local server accepts the connection but never
+  // answers: a manual Documentary Index then appears frozen at waiting_source.
+  const item = work.zotero_key.startsWith('nodus-library:')
+    ? null
+    : await getItem(userId, work.zotero_key).catch(() => null);
   const document = await resolveWorkText(
     userId, work.zotero_key, settings.zoteroStoragePath, item?.abstract ?? null, work.doi,
     {
