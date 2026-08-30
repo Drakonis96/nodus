@@ -1,7 +1,9 @@
 # SPDX-FileCopyrightText: 2026 Jorge Pérez Burgueño and Nodus contributors
 # SPDX-License-Identifier: AGPL-3.0-only
 
-FROM node:22-alpine AS web-build
+# The renderer output is architecture-independent. Build it on the runner's native
+# platform so multi-platform releases do not execute npm/Vite through QEMU.
+FROM --platform=$BUILDPLATFORM node:22-alpine AS web-build
 
 WORKDIR /src
 COPY package.json package-lock.json ./
