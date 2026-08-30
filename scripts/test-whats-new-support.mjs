@@ -79,10 +79,18 @@ assert.match(modal, /mcp: \{ icon: 'plug', color: '#1e3a8a', label: 'Servidor MC
 assert.match(modal, /nodi: \{ icon: 'nodi', color: '#d4af37', label: 'Mascota Nodi' \}/);
 assert.match(modal, /toolkit: \{ icon: 'tools', color: '#059669', label: 'Herramientas' \}/);
 assert.match(modal, /plugin: \{ icon: 'puzzle', color: '#0ea5e9', label: 'Plugins' \}/);
+assert.match(modal, /ai: \{ icon: 'sparkles', color: '#7c3aed', label: 'IA' \}/);
+assert.match(modal, /library: \{ icon: 'library', color: '#0f766e', label: 'Biblioteca' \}/);
+assert.match(modal, /server: \{ icon: 'building', color: '#334155', label: 'Nodus Server' \}/);
+assert.match(modal, /word: \{ icon: 'fileText', color: '#2563eb', label: 'Word' \}/);
+assert.match(modal, /zotero: \{ icon: 'puzzle', color: '#cc2936', label: 'Zotero' \}/);
+assert.match(modal, /connector: \{ icon: 'external', color: '#0891b2', label: 'Nodus Research Connector' \}/);
 assert.match(modal, /languages: \{ icon: 'languages', color: '#db2777', label: 'Idiomas' \}/);
 assert.match(modal, /browser: \{ icon: 'globe', color: '#2563eb', label: 'Nodus Browser' \}/);
 assert.match(modal, /radar: \{ icon: 'radar', color: '#f97316', label: 'Nodus Radar' \}/);
-assert.match(releaseNotes, /export type ReleaseNoteScope = 'general' \| VaultType \| 'mcp' \| 'nodi' \| 'toolkit' \| 'plugin' \| 'languages' \| 'browser' \| 'radar';/);
+for (const scope of ['ai', 'library', 'server', 'word', 'zotero', 'connector']) {
+  assert.match(releaseNotes, new RegExp(`\\| '${scope}'`));
+}
 assert.match(releaseNotes, /RELEASE_4_2_0_HIGHLIGHTS[\s\S]*scope: 'browser'[\s\S]*scope: 'radar'/);
 assert.match(releaseNotes, /version: '4\.2\.0'[\s\S]*highlights: RELEASE_4_2_0_HIGHLIGHTS/);
 assert.match(releaseNotes, /version: '2\.2\.0'[\s\S]*scope: 'nodi'/);

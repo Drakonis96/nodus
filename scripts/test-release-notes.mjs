@@ -24,24 +24,30 @@ try {
   );
 
   const { RELEASE_NOTES, releaseNotesForMajor, compareVersions } = await import(pathToFileURL(bundlePath).href);
-  // 5.0.6 covers every user-visible change merged after 5.0.5, with the
-  // independent server-web parity branch deliberately absent.
+  // 5.1.0 groups the user-visible result of PRs #599 through #623 by product
+  // surface so fixes from the same workflow read as one coherent announcement.
   const currentRelease = RELEASE_NOTES[0];
-  assert.equal(currentRelease?.version, '5.0.6');
-  assert.equal(currentRelease?.date, '2026-08-28');
-  assert.equal(currentRelease?.highlights.length, 7);
+  assert.equal(currentRelease?.version, '5.1.0');
+  assert.equal(currentRelease?.date, '2026-08-30');
+  assert.equal(currentRelease?.highlights.length, 8);
   assert.deepEqual(currentRelease?.highlights.map((highlight) => highlight.scope), [
-    'plugin', 'plugin', 'plugin', 'browser', 'databases', 'toolkit', 'estudio',
+    'ai', 'ai', 'zotero', 'server', 'library', 'databases', 'word', 'connector',
   ]);
   for (const phrase of [
-    /gains Synonyms and Chat/,
-    /complete content of every selected attachment/,
-    /review and correct the title/,
-    /more compact cards/,
-    /Data Deep Research/,
-    /recognizes author searches more accurately/,
-    /prompts can now be edited and deleted/,
+    /more than twice as fast/,
+    /LM Studio, Ollama, and Nodus/,
+    /complete personal and group libraries/,
+    /web interface now matches the desktop app/,
+    /Documentary Index/,
+    /same clear library, composer, queue, and reading flow/,
+    /Word ribbon adds shortcuts/,
+    /Nodus Research Connector/,
   ]) assert.ok(currentRelease?.highlights.some((highlight) => phrase.test(highlight.en)));
+
+  // 5.0.6 remains intact beneath the new minor release.
+  const previousStableRelease = RELEASE_NOTES.find((note) => note.version === '5.0.6');
+  assert.equal(previousStableRelease?.date, '2026-08-28');
+  assert.equal(previousStableRelease?.highlights.length, 7);
 
   // 5.0.5 keeps the single copilot-pane highlight it shipped with.
   const copilotRelease = RELEASE_NOTES.find((note) => note.version === '5.0.5');
@@ -319,7 +325,7 @@ try {
   const whatsNew = fs.readFileSync(path.join(root, 'src/components/WhatsNewModal.tsx'), 'utf8');
   assert.match(whatsNew, /function ZoteroReleaseIcon/);
   assert.match(whatsNew, /M16 18H48L16 46H48/);
-  assert.match(whatsNew, /scope === 'plugin'/);
+  assert.match(whatsNew, /scope === 'zotero'/);
   const currentMajorNotes = releaseNotesForMajor('2.3.8');
 
   assert.equal(currentMajorNotes[0]?.version, '2.3.8');
@@ -330,6 +336,12 @@ try {
 
   const validScopes = new Set([
     'general',
+    'ai',
+    'library',
+    'server',
+    'word',
+    'zotero',
+    'connector',
     'academic',
     'estudio',
     'primary_sources',
