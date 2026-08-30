@@ -15,7 +15,22 @@ import { RELEASE_NOTES_TR } from './releaseNotes.tr';
 // identity of its own: the MCP server, the Nodi mascot, the tools hub or a new
 // interface language. They get their own icon and colour instead of dissolving
 // into 'general'.
-export type ReleaseNoteScope = 'general' | VaultType | 'mcp' | 'nodi' | 'toolkit' | 'plugin' | 'languages' | 'browser' | 'radar';
+export type ReleaseNoteScope =
+  | 'general'
+  | VaultType
+  | 'ai'
+  | 'library'
+  | 'server'
+  | 'word'
+  | 'zotero'
+  | 'connector'
+  | 'mcp'
+  | 'nodi'
+  | 'toolkit'
+  | 'plugin'
+  | 'languages'
+  | 'browser'
+  | 'radar';
 
 interface RawReleaseHighlight {
   es: string;
@@ -1763,6 +1778,87 @@ const RELEASE_4_2_5_HIGHLIGHTS: RawReleaseHighlight[] = [
 ];
 
 /**
+ * v5.1.0 groups the user-visible result of every merged pull request from #599
+ * through #623 by product surface. Infrastructure-only work stays inside the
+ * surface it repaired instead of becoming a separate, repetitive announcement.
+ * Keep this list aligned by index with the Italian and Turkish tables.
+ */
+const RELEASE_5_1_0_HIGHLIGHTS: RawReleaseHighlight[] = [
+  {
+    scope: 'ai',
+    es: 'El modo Automático reparte el trabajo de IA en paralelo y ajusta el ritmo según cada proveedor, modelo y credencial. En las pruebas certificadas, la indexación terminó más del doble de rápido sin perder citas, orden ni controles de integridad. Las barras de proceso muestran ahora el tiempo total y el de cada elemento. Si necesitas limitar la carga, puedes elegir entre 1 y 8 tareas simultáneas.',
+    en: 'Automatic mode now runs AI work in parallel and adjusts its pace for each provider, model, and credential. In certified tests, indexing finished more than twice as fast without losing citations, ordering, or integrity checks. Processing bars now show both total time and time per item. If you need to limit the load, you can choose between 1 and 8 simultaneous tasks.',
+    fr: 'Le mode Automatique répartit désormais le travail de l’IA en parallèle et adapte son rythme à chaque fournisseur, modèle et identifiant. Lors des tests certifiés, l’indexation s’est terminée plus de deux fois plus vite sans perdre de citations, d’ordre ni de contrôles d’intégrité. Les barres de traitement affichent maintenant la durée totale et celle de chaque élément. Pour limiter la charge, vous pouvez choisir entre 1 et 8 tâches simultanées.',
+    de: 'Der automatische Modus verteilt KI-Arbeit nun parallel und passt das Tempo an Anbieter, Modell und Zugangsdaten an. In zertifizierten Tests war die Indexierung mehr als doppelt so schnell, ohne Zitate, Reihenfolge oder Integritätsprüfungen zu verlieren. Fortschrittsleisten zeigen jetzt die Gesamtzeit und die Zeit pro Element. Bei Bedarf lässt sich die Last auf 1 bis 8 gleichzeitige Aufgaben begrenzen.',
+    pt: 'O modo Automático distribui agora o trabalho de IA em paralelo e ajusta o ritmo a cada fornecedor, modelo e credencial. Nos testes certificados, a indexação terminou mais de duas vezes mais depressa sem perder citações, ordem nem controlos de integridade. As barras de processamento mostram agora o tempo total e o de cada elemento. Se precisar de limitar a carga, pode escolher entre 1 e 8 tarefas simultâneas.',
+    'pt-BR': 'O modo Automático agora distribui o trabalho de IA em paralelo e ajusta o ritmo para cada provedor, modelo e credencial. Nos testes certificados, a indexação terminou mais de duas vezes mais rápido sem perder citações, ordem ou verificações de integridade. As barras de processamento mostram o tempo total e o de cada item. Se precisar limitar a carga, você pode escolher entre 1 e 8 tarefas simultâneas.',
+  },
+  {
+    scope: 'ai',
+    es: 'Los modelos de LM Studio, Ollama y Nodus tienen ahora tiempo suficiente para completar análisis exigentes. Si un fragmento resulta demasiado pesado, Nodus lo divide y continúa en lugar de abandonar todo el documento. Los errores explican su causa en el idioma de la interfaz y el selector general permite cargar y guardar modelos sin volver al asistente inicial.',
+    en: 'Models from LM Studio, Ollama, and Nodus now have enough time to complete demanding analyses. If a passage is too heavy, Nodus splits it and continues instead of abandoning the whole document. Errors explain their cause in the interface language, and the general selector can load and save models without returning to the initial setup wizard.',
+    fr: 'Les modèles de LM Studio, Ollama et Nodus disposent désormais d’assez de temps pour terminer les analyses exigeantes. Si un passage est trop lourd, Nodus le divise et continue au lieu d’abandonner tout le document. Les erreurs expliquent leur cause dans la langue de l’interface et le sélecteur général permet de charger et d’enregistrer des modèles sans revenir à l’assistant initial.',
+    de: 'Modelle aus LM Studio, Ollama und Nodus haben jetzt genügend Zeit für anspruchsvolle Analysen. Ist ein Abschnitt zu aufwendig, teilt Nodus ihn und arbeitet weiter, statt das gesamte Dokument abzubrechen. Fehlermeldungen erklären die Ursache in der Sprache der Oberfläche, und über die allgemeine Auswahl lassen sich Modelle laden und speichern, ohne zum Einrichtungsassistenten zurückzukehren.',
+    pt: 'Os modelos do LM Studio, Ollama e Nodus têm agora tempo suficiente para concluir análises exigentes. Se um excerto for demasiado pesado, o Nodus divide-o e continua em vez de abandonar todo o documento. Os erros explicam a causa no idioma da interface e o seletor geral permite carregar e guardar modelos sem voltar ao assistente inicial.',
+    'pt-BR': 'Os modelos do LM Studio, Ollama e Nodus agora têm tempo suficiente para concluir análises exigentes. Se um trecho for pesado demais, o Nodus o divide e continua em vez de abandonar o documento inteiro. Os erros explicam a causa no idioma da interface, e o seletor geral permite carregar e salvar modelos sem voltar ao assistente inicial.',
+  },
+  {
+    scope: 'zotero',
+    es: 'La importación recorre completas las bibliotecas personales y de grupo, incluidos adjuntos, notas, colecciones, documentos independientes y metadatos bibliográficos. Nodus verifica cada copia, repara archivos incompletos y permite reanudar una importación cancelada sin dar por terminado un trabajo defectuoso. Los nombres de archivo largos ya no detienen el proceso y los errores de conexión indican cómo resolverlos. El asistente distingue visualmente Nodus Library y Zotero, y conecta directamente con la API local correcta.',
+    en: 'Import now traverses complete personal and group libraries, including attachments, notes, collections, standalone documents, and bibliographic metadata. Nodus verifies every copy, repairs incomplete files, and lets a cancelled import resume without marking faulty work as complete. Long filenames no longer stop the process, and connection errors explain how to fix them. The setup wizard visually distinguishes Nodus Library from Zotero and connects directly to the correct local API.',
+    fr: 'L’importation parcourt désormais intégralement les bibliothèques personnelles et de groupe, y compris les pièces jointes, notes, collections, documents autonomes et métadonnées bibliographiques. Nodus vérifie chaque copie, répare les fichiers incomplets et permet de reprendre une importation annulée sans considérer un travail défectueux comme terminé. Les noms de fichier longs n’interrompent plus le processus et les erreurs de connexion indiquent comment les résoudre. L’assistant distingue visuellement Nodus Library de Zotero et se connecte directement à la bonne API locale.',
+    de: 'Der Import durchläuft jetzt vollständige persönliche und Gruppenbibliotheken einschließlich Anhängen, Notizen, Sammlungen, eigenständigen Dokumenten und bibliografischen Metadaten. Nodus prüft jede Kopie, repariert unvollständige Dateien und setzt abgebrochene Importe fort, ohne fehlerhafte Arbeit als abgeschlossen zu markieren. Lange Dateinamen stoppen den Vorgang nicht mehr, und Verbindungsfehler erklären die Lösung. Der Assistent unterscheidet Nodus Library und Zotero visuell und verbindet sich direkt mit der richtigen lokalen API.',
+    pt: 'A importação percorre agora bibliotecas pessoais e de grupo completas, incluindo anexos, notas, coleções, documentos independentes e metadados bibliográficos. O Nodus verifica cada cópia, repara ficheiros incompletos e permite retomar uma importação cancelada sem dar por concluído um trabalho defeituoso. Os nomes de ficheiro longos já não interrompem o processo e os erros de ligação explicam como resolvê-los. O assistente distingue visualmente Nodus Library e Zotero e liga-se diretamente à API local correta.',
+    'pt-BR': 'A importação agora percorre bibliotecas pessoais e de grupo completas, incluindo anexos, notas, coleções, documentos independentes e metadados bibliográficos. O Nodus verifica cada cópia, repara arquivos incompletos e permite retomar uma importação cancelada sem marcar um trabalho defeituoso como concluído. Nomes de arquivo longos não interrompem mais o processo, e os erros de conexão explicam como resolvê-los. O assistente diferencia visualmente Nodus Library e Zotero e se conecta diretamente à API local correta.',
+  },
+  {
+    scope: 'server',
+    es: 'La interfaz web se acerca mucho más a la aplicación de escritorio en navegación, edición, búsqueda, Deep Research y compatibilidad con los distintos tipos de bóveda. También se han corregido los ajustes, los indicadores de carga, el acceso a bibliotecas sin publicar y varios textos que aparecían sin traducir. Las imágenes de servidor vuelven a arrancar correctamente y mantienen soporte para AMD64 y ARM64.',
+    en: 'The web interface now matches the desktop app much more closely in navigation, editing, search, Deep Research, and support for the different vault types. Settings, loading feedback, access to unpublished libraries, and several untranslated labels have also been fixed. Server images start correctly again and continue to support both AMD64 and ARM64.',
+    fr: 'L’interface web se rapproche beaucoup plus de l’application de bureau pour la navigation, l’édition, la recherche, Deep Research et la prise en charge des différents types de coffre. Les paramètres, les indicateurs de chargement, l’accès aux bibliothèques non publiées et plusieurs textes non traduits ont également été corrigés. Les images du serveur démarrent de nouveau correctement et restent compatibles avec AMD64 et ARM64.',
+    de: 'Die Weboberfläche entspricht der Desktop-App nun deutlich besser bei Navigation, Bearbeitung, Suche, Deep Research und der Unterstützung verschiedener Tresortypen. Auch Einstellungen, Ladeanzeigen, der Zugriff auf unveröffentlichte Bibliotheken und mehrere unübersetzte Texte wurden korrigiert. Die Server-Images starten wieder zuverlässig und unterstützen weiterhin AMD64 und ARM64.',
+    pt: 'A interface web aproxima-se muito mais da aplicação de desktop na navegação, edição, pesquisa, Deep Research e compatibilidade com os diferentes tipos de cofre. Também foram corrigidas as definições, os indicadores de carregamento, o acesso a bibliotecas não publicadas e vários textos que apareciam sem tradução. As imagens do servidor voltam a arrancar corretamente e mantêm suporte para AMD64 e ARM64.',
+    'pt-BR': 'A interface web agora se aproxima muito mais do aplicativo para desktop em navegação, edição, busca, Deep Research e compatibilidade com os diferentes tipos de cofre. Também foram corrigidas as configurações, os indicadores de carregamento, o acesso a bibliotecas não publicadas e vários textos que apareciam sem tradução. As imagens do servidor voltam a iniciar corretamente e mantêm suporte para AMD64 e ARM64.',
+  },
+  {
+    scope: 'library',
+    es: 'Una guía breve explica la diferencia entre «Este vault» y «Global», cómo importar, monitorizar y procesar colecciones, y dónde encontrar el índice documental. Ese índice pasa a ser opcional para cada obra y su ausencia ya no reduce el estado de finalización. También desaparece la pregunta sobre comprensión documental que interrumpía el inicio de la aplicación.',
+    en: 'A short guide explains the difference between “This vault” and “Global”, how to import, monitor, and process collections, and where to find the Documentary Index. That index is now optional for each work, and its absence no longer lowers completion status. The document-understanding question that interrupted application startup has also been removed.',
+    fr: 'Un guide court explique la différence entre « Ce coffre » et « Global », comment importer, surveiller et traiter des collections, et où trouver l’Index documentaire. Cet index devient facultatif pour chaque œuvre et son absence ne réduit plus l’état d’achèvement. La question sur la compréhension des documents qui interrompait le démarrage de l’application a également disparu.',
+    de: 'Eine kurze Anleitung erklärt den Unterschied zwischen „Dieser Tresor“ und „Global“, wie Sammlungen importiert, überwacht und verarbeitet werden und wo der Dokumentindex zu finden ist. Dieser Index ist nun für jedes Werk optional, und sein Fehlen senkt den Abschlussstatus nicht mehr. Die Frage zum Dokumentverständnis, die den App-Start unterbrach, wurde ebenfalls entfernt.',
+    pt: 'Um guia breve explica a diferença entre «Este cofre» e «Global», como importar, monitorizar e processar coleções e onde encontrar o Índice documental. Esse índice passa a ser opcional para cada obra e a sua ausência já não reduz o estado de conclusão. Também desaparece a pergunta sobre compreensão documental que interrompia o arranque da aplicação.',
+    'pt-BR': 'Um guia breve explica a diferença entre “Este cofre” e “Global”, como importar, monitorar e processar coleções e onde encontrar o Índice documental. Esse índice agora é opcional para cada obra, e sua ausência não reduz mais o estado de conclusão. Também foi removida a pergunta sobre compreensão documental que interrompia a inicialização do aplicativo.',
+  },
+  {
+    scope: 'databases',
+    es: 'Deep Research adopta en las bóvedas de Bases de datos el mismo flujo claro de biblioteca, composición, cola y lectura que ya tenía el modo académico. Incluye configuración local automática, trabajo con varias bases, estado de lectura persistente, anotaciones y exportaciones. Las opciones de roles y edición previa del informe siguen disponibles como ajustes avanzados.',
+    en: 'Deep Research in Database vaults now uses the same clear library, composer, queue, and reading flow as the academic mode. It includes automatic local setup, work across multiple databases, persistent reading state, annotations, and exports. Role options and report preview editing remain available as advanced settings.',
+    fr: 'Deep Research adopte dans les coffres Bases de données le même parcours clair de bibliothèque, composition, file d’attente et lecture que le mode académique. Il comprend une configuration locale automatique, le travail sur plusieurs bases, un état de lecture persistant, des annotations et des exportations. Les options de rôles et la modification préalable du rapport restent disponibles dans les paramètres avancés.',
+    de: 'Deep Research verwendet in Datenbanktresoren jetzt denselben klaren Ablauf für Bibliothek, Erstellung, Warteschlange und Lesen wie im akademischen Modus. Dazu gehören automatische lokale Einrichtung, Arbeit mit mehreren Datenbanken, ein dauerhafter Lesestatus, Anmerkungen und Exporte. Rollenoptionen und die Bearbeitung der Berichtsvorschau bleiben als erweiterte Einstellungen verfügbar.',
+    pt: 'O Deep Research adota nos cofres de Bases de dados o mesmo fluxo claro de biblioteca, composição, fila e leitura do modo académico. Inclui configuração local automática, trabalho com várias bases, estado de leitura persistente, anotações e exportações. As opções de funções e a edição prévia do relatório continuam disponíveis como definições avançadas.',
+    'pt-BR': 'O Deep Research agora usa nos cofres de Bancos de dados o mesmo fluxo claro de biblioteca, composição, fila e leitura do modo acadêmico. Ele inclui configuração local automática, trabalho com vários bancos, estado de leitura persistente, anotações e exportações. As opções de funções e a edição prévia do relatório continuam disponíveis como configurações avançadas.',
+  },
+  {
+    scope: 'word',
+    es: 'Ideas, Pasajes y Sinónimos permiten elegir su propio modelo. La generación de sinónimos entiende mejor la frase completa y devuelve alternativas válidas incluso cuando el proveedor cambia el formato de la respuesta. La cinta de Word incorpora accesos directos a Edición con IA, Sinónimos y Chat, y el selector de estilos ya no aparece desplegado al abrir el complemento.',
+    en: 'Ideas, Passages, and Synonyms can each use their own selected model. Synonym generation understands the full sentence better and returns valid alternatives even when the provider changes its response format. The Word ribbon adds shortcuts to AI Edit, Synonyms, and Chat, and the style picker no longer opens expanded when the add-in starts.',
+    fr: 'Idées, Passages et Synonymes permettent chacun de choisir leur propre modèle. La génération de synonymes comprend mieux la phrase entière et renvoie des alternatives valides même lorsque le fournisseur modifie le format de sa réponse. Le ruban Word ajoute des raccourcis vers Édition par IA, Synonymes et Chat, et le sélecteur de styles ne s’ouvre plus déplié au démarrage du complément.',
+    de: 'Ideen, Passagen und Synonyme können jeweils ein eigenes Modell verwenden. Die Synonymerzeugung versteht den vollständigen Satz besser und liefert gültige Alternativen, selbst wenn der Anbieter das Antwortformat ändert. Das Word-Menüband erhält Verknüpfungen zu KI-Bearbeitung, Synonymen und Chat, und die Stilauswahl wird beim Start des Add-ins nicht mehr aufgeklappt.',
+    pt: 'Ideias, Passagens e Sinónimos permitem escolher o seu próprio modelo. A geração de sinónimos compreende melhor a frase completa e devolve alternativas válidas mesmo quando o fornecedor altera o formato da resposta. O friso do Word incorpora atalhos para Edição com IA, Sinónimos e Chat, e o seletor de estilos já não aparece expandido ao abrir o suplemento.',
+    'pt-BR': 'Ideias, Passagens e Sinônimos permitem escolher seu próprio modelo. A geração de sinônimos entende melhor a frase completa e retorna alternativas válidas mesmo quando o provedor muda o formato da resposta. A faixa de opções do Word ganha atalhos para Edição com IA, Sinônimos e Chat, e o seletor de estilos não aparece mais expandido ao abrir o suplemento.',
+  },
+  {
+    scope: 'connector',
+    es: 'La extensión de Chrome pasa a llamarse Nodus Research Connector y enlaza directamente con la web del proyecto. La vinculación con la aplicación utiliza ahora un diálogo claro y traducido, con la opción de cancelar en primer lugar y sin depender de una alerta nativa del sistema.',
+    en: 'The Chrome extension is now called Nodus Research Connector and links directly to the project website. Pairing with the application now uses a clear, translated dialog that puts the cancel option first and no longer depends on a native system alert.',
+    fr: 'L’extension Chrome s’appelle désormais Nodus Research Connector et renvoie directement vers le site du projet. L’association avec l’application utilise maintenant une boîte de dialogue claire et traduite, qui place l’option d’annulation en premier et ne dépend plus d’une alerte native du système.',
+    de: 'Die Chrome-Erweiterung heißt jetzt Nodus Research Connector und führt direkt zur Projektwebsite. Die Kopplung mit der Anwendung verwendet nun einen klaren, übersetzten Dialog, der die Abbrechen-Option an erster Stelle zeigt und nicht mehr von einer nativen Systemmeldung abhängt.',
+    pt: 'A extensão do Chrome passa a chamar-se Nodus Research Connector e liga diretamente ao site do projeto. O emparelhamento com a aplicação utiliza agora um diálogo claro e traduzido, com a opção de cancelar em primeiro lugar e sem depender de um alerta nativo do sistema.',
+    'pt-BR': 'A extensão do Chrome agora se chama Nodus Research Connector e leva diretamente ao site do projeto. O pareamento com o aplicativo usa um diálogo claro e traduzido, com a opção de cancelar em primeiro lugar e sem depender de um alerta nativo do sistema.',
+  },
+];
+
+/**
  * v5.0.6 — every user-visible change merged after v5.0.5, excluding the
  * independent server-web parity branch. Keep this list aligned by index with
  * the Italian and Turkish tables so all eight interface languages receive the
@@ -2217,6 +2313,11 @@ const RELEASE_5_0_0_HIGHLIGHTS: RawReleaseHighlight[] = [
 ];
 
 const RAW_RELEASE_NOTES: RawReleaseNote[] = [
+  {
+    version: '5.1.0',
+    date: '2026-08-30',
+    highlights: RELEASE_5_1_0_HIGHLIGHTS,
+  },
   {
     version: '5.0.6',
     date: '2026-08-28',

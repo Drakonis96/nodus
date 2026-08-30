@@ -1,5 +1,30 @@
 # Changelog
 
+## 5.1.0 — 2026-08-30
+
+Nodus 5.1.0 is a repair-focused release that makes AI processing faster and
+more transparent while hardening Zotero, Server Web, Library, Word and the
+Chrome connector.
+
+- Added adaptive AI concurrency with automatic provider-aware pacing, manual
+  limits from 1 to 8 and total plus per-item elapsed time in processing rails.
+- Let local models finish demanding analyses, split oversized passages after a
+  timeout and restore model discovery directly from the general selector.
+- Made Zotero imports exhaustive, resumable and hash-verified across personal
+  and group libraries, with actionable connection errors and safer filenames.
+- Brought Server Web closer to desktop parity across navigation, editing,
+  search, Deep Research and all supported vault types.
+- Added the first-use Library guide, made Documentary Index opt-in per work and
+  removed the document-understanding prompt from startup.
+- Unified Database Deep Research with the academic library, composer, queue and
+  reader flow while retaining advanced role and preview controls.
+- Added Word ribbon shortcuts and per-task model selectors, and hardened
+  contextual synonym generation and the citation-style picker.
+- Renamed the Chrome extension to Nodus Research Connector and replaced native
+  pairing alerts with a clear, translated, cancel-first dialog.
+- Added the 5.1.0 changes to the What's New modal in all eight interface
+  languages, grouped by product surface.
+
 ## 5.0.6 — 2026-08-28
 
 Nodus 5.0.6 brings verifiable Deep Research to database vaults and extends the

@@ -36,6 +36,12 @@ const RELEASE_SCOPE_META: Record<ReleaseNoteScope, { icon: string; color: string
   testimonios: { ...vaultScope('testimonios'), label: 'Testimonios' },
   worldbuilding: { ...vaultScope('worldbuilding'), label: 'Worldbuilding' },
   docencia: { ...vaultScope('docencia'), label: 'Docencia' },
+  ai: { icon: 'sparkles', color: '#7c3aed', label: 'IA' },
+  library: { icon: 'library', color: '#0f766e', label: 'Biblioteca' },
+  server: { icon: 'building', color: '#334155', label: 'Nodus Server' },
+  word: { icon: 'fileText', color: '#2563eb', label: 'Word' },
+  zotero: { icon: 'puzzle', color: '#cc2936', label: 'Zotero' },
+  connector: { icon: 'external', color: '#0891b2', label: 'Nodus Research Connector' },
   // Navy rather than the blue-600 it used to be: that shade now belongs to the
   // prosopography vault, and the two scopes appear side by side from v3.0.0 on.
   mcp: { icon: 'plug', color: '#1e3a8a', label: 'Servidor MCP' },
@@ -363,7 +369,7 @@ export function WhatsNewModal({
                       aria-label={scopeLabel}
                       aria-describedby={tooltipId}
                     >
-                      {scope === 'plugin'
+                      {scope === 'zotero'
                         ? <ZoteroReleaseIcon size={13} />
                         : <Icon name={scopeMeta.icon} size={13} />}
                       <span id={tooltipId} role="tooltip" className="whats-new-scope-tooltip">{scopeLabel}</span>
