@@ -65,6 +65,28 @@ function ensureDatabaseResearchReaderColumns(db: Database.Database): void {
   db.exec('CREATE INDEX IF NOT EXISTS idx_database_research_report_annotations_report ON database_research_report_annotations(report_id, scope, start_offset, created_at)');
 }
 
+/** v171 is idempotent because recovery can replay additive migrations after a
+ * user_version rollback while the physical column is already present. */
+function ensureZoteroFingerprintColumn(db: Database.Database): void {
+  const hasFingerprint = (db.prepare('PRAGMA table_info(works)').all() as Array<{ name: string }>)
+    .some((row) => row.name === 'zotero_fingerprint');
+  if (!hasFingerprint) db.exec('ALTER TABLE works ADD COLUMN zotero_fingerprint TEXT');
+  db.exec(`
+    DROP TRIGGER IF EXISTS works_document_profile_stale_deep;
+    CREATE TRIGGER works_document_profile_stale_deep
+    AFTER UPDATE OF deep_hash, zotero_version, zotero_fingerprint ON works
+    WHEN OLD.deep_hash IS NOT NEW.deep_hash
+      OR OLD.zotero_version IS NOT NEW.zotero_version
+      OR (OLD.zotero_fingerprint IS NOT NULL AND OLD.zotero_fingerprint IS NOT NEW.zotero_fingerprint)
+    BEGIN
+      UPDATE document_profile_state
+         SET status='stale', stale_reason='source_changed', error=NULL,
+             updated_at=strftime('%Y-%m-%dT%H:%M:%fZ','now')
+       WHERE nodus_id=NEW.nodus_id AND current_version_id IS NOT NULL;
+    END;
+  `);
+}
+
 // Versioned, append-only migrations. Never edit an existing migration's SQL once
 // shipped — add a new one. The current schema version is the highest applied.
 export const SCHEMA_VERSION = 171;
@@ -9224,21 +9246,8 @@ export const migrations: Migration[] = [
   },
   {
     version: 171,
-    up: /* sql */ `
-      ALTER TABLE works ADD COLUMN zotero_fingerprint TEXT;
-      DROP TRIGGER IF EXISTS works_document_profile_stale_deep;
-      CREATE TRIGGER works_document_profile_stale_deep
-      AFTER UPDATE OF deep_hash, zotero_version, zotero_fingerprint ON works
-      WHEN OLD.deep_hash IS NOT NEW.deep_hash
-        OR OLD.zotero_version IS NOT NEW.zotero_version
-        OR (OLD.zotero_fingerprint IS NOT NULL AND OLD.zotero_fingerprint IS NOT NEW.zotero_fingerprint)
-      BEGIN
-        UPDATE document_profile_state
-           SET status='stale', stale_reason='source_changed', error=NULL,
-               updated_at=strftime('%Y-%m-%dT%H:%M:%fZ','now')
-         WHERE nodus_id=NEW.nodus_id AND current_version_id IS NOT NULL;
-      END;
-    `,
+    up: /* sql */ `SELECT 1;`,
+    after: ensureZoteroFingerprintColumn,
   },
 ];
 
