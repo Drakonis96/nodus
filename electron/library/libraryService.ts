@@ -119,11 +119,46 @@ let live: {
   operations: LibraryOperations;
   migrations: LibraryMigrationSessionManager;
 } | null = null;
-const zoteroImports = new Map<string, AbortController>();
+const zoteroImports = new Map<string, { controller: AbortController; cancelable: boolean }>();
+// Zotero is a single local API/database surface.  Serialize every global import
+// (UI, plugin and account-sync) even when callers use different request IDs.
+let zoteroImportTail: Promise<void> = Promise.resolve();
 const compassImports = new Map<string, AbortController>();
 const metadataBatches = new Map<string, { controller: AbortController; result: LibraryMetadataBatchResult | null }>();
 const SHORT_READING_PAGE_LIMIT = 50;
 const LONG_REFLOWABLE_BYTE_THRESHOLD = 8 * 1024 * 1024;
+
+/** Validate the untrusted selection received from account-sync/plugin callers. */
+export function normalizeZoteroImportSelection(input: unknown): ZoteroImportSelection {
+  if (input === undefined || input === null) return {};
+  if (typeof input !== 'object' || Array.isArray(input)) throw new Error('La selección de Zotero no es válida.');
+  const value = input as Record<string, unknown>;
+  const list = (name: string): string[] | undefined => {
+    const raw = value[name];
+    if (raw === undefined) return undefined;
+    if (!Array.isArray(raw)) throw new Error(`La selección de Zotero contiene ${name} no válido.`);
+    if (raw.length > 10_000) throw new Error(`La selección de Zotero contiene demasiados valores en ${name}.`);
+    const out = raw.map((entry) => {
+      if (typeof entry !== 'string' || !entry.trim()) throw new Error(`La selección de Zotero contiene ${name} no válido.`);
+      return entry.trim();
+    });
+    return [...new Set(out)];
+  };
+  const boolean = (name: keyof ZoteroImportSelection): boolean | undefined => {
+    const raw = value[name];
+    if (raw === undefined) return undefined;
+    if (typeof raw !== 'boolean') throw new Error(`La selección de Zotero contiene ${String(name)} no válido.`);
+    return raw;
+  };
+  const result: ZoteroImportSelection = {};
+  const libraryIds = list('libraryIds'); if (libraryIds) result.libraryIds = libraryIds;
+  const collectionIds = list('collectionIds'); if (collectionIds) result.collectionIds = collectionIds;
+  const includeUnfiled = boolean('includeUnfiled'); if (includeUnfiled !== undefined) result.includeUnfiled = includeUnfiled;
+  const copyAttachments = boolean('copyAttachments'); if (copyAttachments !== undefined) result.copyAttachments = copyAttachments;
+  const includeStandaloneFiles = boolean('includeStandaloneFiles'); if (includeStandaloneFiles !== undefined) result.includeStandaloneFiles = includeStandaloneFiles;
+  const fullRefresh = boolean('fullRefresh'); if (fullRefresh !== undefined) result.fullRefresh = fullRefresh;
+  return result;
+}
 
 function bibliographicPageCount(pages?: string): number | null {
   if (!pages) return null;
@@ -351,35 +386,146 @@ export async function startZoteroLibraryImport(
 ): Promise<ZoteroImportReport> {
   if (!requestId?.trim()) throw new Error('La importación necesita un identificador de solicitud.');
   if (zoteroImports.has(requestId)) throw new Error('Esa importación de Zotero ya está en curso.');
-  const current = service();
-  if (!current) throw new Error('Configura primero la carpeta de copias de seguridad de Nodus.');
-  if (!current.catalog.status(current.root, current.deviceId).lastRebuiltAt) {
-    await runLibraryOperationInWorker(
-      workerContext(current), 'rebuild', [], () => current.catalog.rebuild(current.store),
-    );
-  }
+  const normalizedSelection = normalizeZoteroImportSelection(selection);
   const controller = new AbortController();
-  zoteroImports.set(requestId, controller);
+  const activeImport = { controller, cancelable: true };
+  zoteroImports.set(requestId, activeImport);
+  const previous = zoteroImportTail;
+  let release!: () => void;
+  zoteroImportTail = new Promise<void>((resolve) => { release = resolve; });
   try {
-    const report = await importZoteroLibraries({
-      requestId, selection, store: current.store, catalog: current.catalog,
-      signal: controller.signal, onProgress,
+    await previous;
+    const current = service();
+    if (!current) throw new Error('Configura primero la carpeta de copias de seguridad de Nodus.');
+    if (!current.catalog.status(current.root, current.deviceId).lastRebuiltAt) {
+      await runLibraryOperationInWorker(
+        workerContext(current), 'rebuild', [], () => current.catalog.rebuild(current.store),
+      );
+    }
+    const sessions = new ZoteroSyncSessionStore(current.root);
+    let latestProgress: ZoteroImportProgress | null = null;
+    const importerProgress = (value: ZoteroImportProgress): void => {
+      latestProgress = value;
+      if (value.phase === 'failed' || value.phase === 'canceled') activeImport.cancelable = false;
+      onProgress(value);
+    };
+    let report = await importZoteroLibraries({
+      requestId, selection: normalizedSelection, store: current.store, catalog: current.catalog,
+      signal: controller.signal, onProgress: importerProgress, deferSessionCompletion: true,
     });
-    await runLibraryOperationInWorker(
-      workerContext(current), 'ensure-citation-keys', [], () => current.operations.ensureCitationKeys(),
-    );
-    const readyToExtract = current.catalog.pendingExtractionItemIds('zotero');
-    if (readyToExtract.length) current.extraction.enqueue(readyToExtract);
+    const finishCanceled = (): ZoteroImportReport => {
+      const canceledReport: ZoteroImportReport = {
+        ...report,
+        canceled: true,
+        partial: true,
+        verification: report.verification ? { ...report.verification, status: 'blocked' } : report.verification,
+      };
+      const prior = latestProgress ?? {
+        requestId, phase: 'rebuild' as const, libraryId: null, libraryName: null,
+        processedItems: report.itemsDiscovered, totalItems: report.itemsDiscovered,
+        processedAttachments: report.attachmentsCopied + report.attachmentsUnchanged,
+        totalAttachments: report.attachmentsCopied + report.attachmentsUnchanged,
+        percent: 99, message: 'Finalizando importación…',
+      };
+      const canceledProgress: ZoteroImportProgress = {
+        ...prior, phase: 'canceled', percent: 100,
+        message: 'Importación cancelada; el catálogo ya importado se conserva.',
+      };
+      activeImport.cancelable = false;
+      sessions.progress(requestId, canceledProgress);
+      sessions.finish(requestId, 'canceled', canceledReport);
+      latestProgress = canceledProgress;
+      onProgress(canceledProgress);
+      return canceledReport;
+    };
+    if (controller.signal.aborted && !report.canceled) report = finishCanceled();
+    if (!report.partial && !report.canceled && report.verification?.status !== 'blocked') {
+      try {
+        await runLibraryOperationInWorker(
+          workerContext(current), 'ensure-citation-keys', [], () => current.operations.ensureCitationKeys(),
+        );
+        if (controller.signal.aborted) {
+          report = finishCanceled();
+          broadcast(current.catalog.status(current.root, current.deviceId));
+          return report;
+        }
+        const readyToExtract = current.catalog.pendingExtractionItemIds('zotero');
+        if (readyToExtract.length) current.extraction.enqueue(readyToExtract);
+        const prior = latestProgress!;
+        const completeProgress: ZoteroImportProgress = {
+          ...prior, phase: 'complete', percent: 100,
+          message: 'Importación de Zotero completada, verificada y preparada para extracción.',
+        };
+        activeImport.cancelable = false;
+        sessions.progress(requestId, completeProgress);
+        sessions.finish(requestId, 'completed', report);
+        latestProgress = completeProgress;
+        onProgress(completeProgress);
+      } catch (error) {
+        if (controller.signal.aborted) {
+          report = finishCanceled();
+          broadcast(current.catalog.status(current.root, current.deviceId));
+          return report;
+        }
+        const message = error instanceof Error ? error.message : String(error);
+        const verification = report.verification ?? {
+          status: 'blocked' as const,
+          expected: { libraries: report.libraries, items: report.itemsDiscovered, attachments: report.attachmentsCopied + report.attachmentsUnchanged },
+          imported: { libraries: 0, items: report.itemsCreated + report.itemsUpdated + report.itemsUnchanged, attachments: report.attachmentsCopied + report.attachmentsUnchanged },
+          mismatches: [],
+        };
+        const failedReport: ZoteroImportReport = {
+          ...report,
+          partial: true,
+          warnings: [...report.warnings, `Falló el postproceso obligatorio de la importación: ${message}`],
+          failures: [...report.failures, {
+            libraryId: null, code: 'storage', retryable: true,
+            message: `Falló el postproceso obligatorio de la importación: ${message}`,
+          }],
+          verification: {
+            ...verification,
+            status: 'blocked',
+            mismatches: [...verification.mismatches, {
+              kind: 'unknown', expected: 1, imported: 0,
+              message: 'No se completaron la normalización de claves de cita y el encolado de extracción.',
+            }],
+          },
+        };
+        const session = sessions.get(requestId);
+        if (session) {
+          const failedProgress: ZoteroImportProgress = {
+            ...session.progress,
+            phase: 'failed',
+            message: `Falló el postproceso obligatorio de la importación: ${message}`,
+          };
+          sessions.progress(requestId, failedProgress);
+          activeImport.cancelable = false;
+          onProgress(failedProgress);
+        }
+        sessions.finish(requestId, 'failed', failedReport, message);
+        throw error;
+      }
+    }
     broadcast(current.catalog.status(current.root, current.deviceId));
     return report;
   } finally {
     zoteroImports.delete(requestId);
+    release();
   }
 }
 
 export function listZoteroSyncSessions(): ZoteroSyncSession[] {
   const current = service();
-  return current ? new ZoteroSyncSessionStore(current.root).list() : [];
+  if (!current) return [];
+  return new ZoteroSyncSessionStore(current.root).list().map((session) => (
+    session.status === 'running' && !zoteroImports.has(session.id)
+      ? {
+        ...session,
+        status: 'failed' as const,
+        error: session.error ?? 'La aplicación se cerró durante esta importación; puede reanudarse de forma segura.',
+      }
+      : session
+  ));
 }
 
 export function resumeZoteroLibraryImport(
@@ -390,15 +536,19 @@ export function resumeZoteroLibraryImport(
   if (!current) return Promise.reject(new Error('Configura primero la carpeta de copias de seguridad de Nodus.'));
   const session = new ZoteroSyncSessionStore(current.root).get(requestId);
   if (!session) return Promise.reject(new Error('No se encontró esa sesión de sincronización.'));
-  if (session.status === 'running') return Promise.reject(new Error('Esa sincronización todavía está en curso.'));
-  if (session.status === 'completed') return Promise.reject(new Error('Esa sincronización ya se completó.'));
+  if (session.status === 'running' && zoteroImports.has(requestId)) {
+    return Promise.reject(new Error('Esa sincronización todavía está en curso.'));
+  }
+  if (session.status === 'completed' && !session.report?.partial && session.report?.verification?.status !== 'blocked') {
+    return Promise.reject(new Error('Esa sincronización ya se completó.'));
+  }
   return startZoteroLibraryImport(requestId, session.selection, onProgress);
 }
 
 export function cancelZoteroLibraryImport(requestId: string): boolean {
-  const controller = zoteroImports.get(requestId);
-  if (!controller) return false;
-  controller.abort();
+  const active = zoteroImports.get(requestId);
+  if (!active?.cancelable || active.controller.signal.aborted) return false;
+  active.controller.abort();
   return true;
 }
 
@@ -1321,7 +1471,7 @@ export async function linkGlobalLibraryItemsToVault(itemIds: string[], vaultId: 
 }
 
 export function closeGlobalLibrary(): void {
-  for (const controller of zoteroImports.values()) controller.abort();
+  for (const active of zoteroImports.values()) active.controller.abort();
   zoteroImports.clear();
   live?.extraction.dispose();
   disposeLibraryOperationWorkers();

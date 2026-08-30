@@ -56,6 +56,9 @@ try {
   mode = 'unauthorized'; requests = 0;
   await assert.rejects(client.libraryVersion('0'), (error) => error.code === 'credentials-expired' && error.retryable === false);
   assert.equal(requests, 1, 'expired credentials are not retried');
+  requests = 0;
+  await assert.rejects(client.libraries(), (error) => error.code === 'credentials-expired' && error.retryable === false);
+  assert.equal(requests, 1, 'a failed group-library inventory never degrades to a falsely complete personal-only list');
 
   mode = 'closed'; requests = 0;
   await assert.rejects(client.libraryVersion('0'), (error) => error.code === 'zotero-closed' && error.retryable === true);

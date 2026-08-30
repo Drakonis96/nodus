@@ -712,8 +712,12 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse, _port: n
       const libraryId = typeof body.libraryId === 'string' && body.libraryId.trim() ? body.libraryId.trim() : 'users/0';
       const requestId = `zotero-plugin-${Date.now()}-${randomBytes(5).toString('hex')}`;
       const report = await startZoteroLibraryImport(requestId, {
-        libraryIds: [libraryId], includeUnfiled: true, copyAttachments: true,
+        libraryIds: [libraryId], includeUnfiled: true, copyAttachments: true, includeStandaloneFiles: true,
       }, () => undefined);
+      if (report.partial || report.verification?.status === 'blocked' || report.canceled) {
+        sendJson(res, 409, { ok: false, error: 'zotero_import_verification_failed', report });
+        return;
+      }
       sendJson(res, 200, { ...globalLibraryItemStatus(body), report });
       return;
     }

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
-import { existsSync } from 'node:fs';
-import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { existsSync, writeFileSync } from 'node:fs';
+import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import os from 'node:os';
 import path from 'node:path';
@@ -21,7 +21,7 @@ function item(overrides) {
   return {
     key: 'A', itemKey: 'A', library: { type: 'user', id: '0', name: 'Mi biblioteca' }, version: 10,
     title: 'Norma y deseo', creators: [{ creatorType: 'author', firstName: 'Ana', lastName: 'García' }],
-    year: 2020, itemType: 'journalArticle', doi: '10.1234/norma', abstract: 'Un resumen limpio.',
+    year: 2020, itemType: 'journalArticle', doi: '10.1234/norma', abstract: 'Un resumen  fiel.\nSegundo párrafo.',
     tags: ['historia'], collections: ['ROOT'], publisher: 'Editorial', publicationTitle: 'Revista',
     isbn: '978-84-0000-000-0', issn: '1234-5678', url: 'https://example.test/a', date: '2020-05-10',
     language: 'es', volume: '4', issue: '2', pages: '10-30', edition: null, place: 'Madrid', rights: 'CC BY',
@@ -35,10 +35,12 @@ try {
   const pdf = path.join(sourceFiles, 'norma.pdf');
   const image = path.join(sourceFiles, 'figura.png');
   const epub = path.join(sourceFiles, 'grupo.epub');
+  const secondPdf = path.join(sourceFiles, 'missing.pdf');
   const localNote = path.join(sourceFiles, 'local.txt');
   await writeFile(pdf, '%PDF-1.4\nfixture-pdf\n');
   await writeFile(image, 'fixture-image');
   await writeFile(epub, 'fixture-epub');
+  await writeFile(secondPdf, '%PDF-1.4\nsecond-fixture-pdf\n');
   await writeFile(localNote, 'local attachment retained by Nodus');
   const sourceBefore = await Promise.all([pdf, image, epub].map((file) => readFile(file, 'utf8')));
 
@@ -69,7 +71,7 @@ try {
     ['B', [{ key: 'MISS', itemKey: 'MISS', library: personal, title: 'Perdido', contentType: 'application/pdf', linkMode: 'imported_file', filename: 'missing.pdf', available: true }]],
     ['groups:42:G1', [{ key: 'groups:42:EPUB', itemKey: 'EPUB', library: group, title: 'EPUB', contentType: 'application/epub+zip', linkMode: 'imported_file', filename: 'grupo.epub', available: true }]],
   ]);
-  const fileMap = new Map([['PDF', pdf], ['IMG', image], ['groups:42:EPUB', epub]]);
+  const fileMap = new Map([['PDF', pdf], ['IMG', image], ['MISS', secondPdf], ['groups:42:EPUB', epub]]);
   const client = {
     async libraries() { state.calls.push('libraries'); return state.availableLibraries ?? [personal, group]; },
     async libraryVersion(_userId, library) { return library.type === 'group' ? state.groupVersion : state.personalVersion; },
@@ -119,8 +121,8 @@ try {
     },
   });
   assert.equal(first.itemsCreated, 3);
-  assert.equal(first.attachmentsCopied, 3);
-  assert.equal(first.attachmentsUnavailable, 1);
+  assert.equal(first.attachmentsCopied, 4);
+  assert.equal(first.attachmentsUnavailable, 0);
   assert.equal(first.attachmentsLinkOnly, 1, 'a Zotero bookmark is counted as link-only, never as a missing file');
   assert.equal(first.failures.length, 0, 'a bookmark with no file is not a sync failure');
   assert.ok(!first.warnings.some((entry) => entry.includes('Enlace')), 'a bookmark produces no "unavailable attachment" warning');
@@ -133,10 +135,12 @@ try {
   // of the import. Items are the denominator now, and the band starts where it should.
   assert.equal(events.at(-1).phase, 'complete');
   assert.equal(events.at(-1).percent, 100);
-  assert.equal(first.partial, true, 'an unavailable Zotero file produces an explicit partial result');
+  assert.equal(first.partial, false);
+  assert.equal(first.verification.status, 'passed');
+  assert.deepEqual(first.verification.expected, first.verification.imported);
   const sessionStore = new ZoteroSyncSessionStore(root);
   assert.equal(sessionStore.get('first').status, 'completed');
-  assert.equal(sessionStore.get('first').report.attachmentsUnavailable, 1);
+  assert.equal(sessionStore.get('first').report.attachmentsUnavailable, 0);
   const canonicalAId = catalog.resolveItemId('zotero:A');
   assert.ok(canonicalAId?.startsWith('nodus:'), 'a manager key is an alias, never the canonical Nodus ID');
   assert.deepEqual(catalog.list({ collectionId: 'zotero:ROOT' }).items.map((entry) => entry.id), [canonicalAId]);
@@ -145,7 +149,9 @@ try {
   assert.equal(storedA.id, canonicalAId);
   assert.equal(storedA.sourceLibraryId, 'users/0');
   assert.equal(storedA.metadata.issn[0], '1234-5678');
+  assert.equal(storedA.metadata.abstract, 'Un resumen  fiel.\nSegundo párrafo.', 'Zotero abstract paragraph and spacing fidelity is exact');
   assert.equal(storedA.metadata.extra['Citation Key'], 'garciafernandezEntreNormaDeseo2020');
+  assert.equal(storedA.citationKey, 'garciafernandezEntreNormaDeseo2020', 'the Zotero citation key is preferred over a generated replacement');
   assert.equal(storedA.metadata.extra['Zotero field: series'], 'Historia contemporánea');
   assert.equal(storedA.metadata.extra['Zotero field: numPages'], '312');
   assert.equal(storedA.attachments[0].sourceKey, 'PDF', 'PDF wins original-format priority even if Zotero returned an image first');
@@ -163,6 +169,13 @@ try {
   operations.updateItemMetadata('zotero:A', { publisher: 'Corrección local de Nodus', language: 'ca', rights: undefined });
   operations.addAttachments('zotero:A', [localNote]);
   operations.patchItemTags(['zotero:A'], { add: ['revisión Nodus'], remove: ['historia'] });
+  const enrichedA = store.findItemByIdOrAlias(canonicalAId);
+  store.upsertItem({
+    ...enrichedA,
+    provenance: [{ provider: 'Crossref', providerId: '10.1234/norma' }],
+    relations: [{ id: 'rel-1', targetItemId: storedGroup.id, relationType: 'cites', createdAt: '2026-01-01T00:00:00.000Z' }],
+    vaultWorkIds: { 'vault-test': 'legacy-work-a' },
+  }, enrichedA.clock.revision);
   assert.equal(store.findItemByIdOrAlias(canonicalAId).metadataOverrides.publisher, 'Corrección local de Nodus');
   assert.equal(store.findItemByIdOrAlias(canonicalAId).metadataOverrides.rights, null, 'cleared manager fields use an explicit durable tombstone');
 
@@ -177,7 +190,7 @@ try {
   assert.equal(second.itemsSourceMissing, 1);
   assert.equal(second.conflicts, 1, 'a changed source version reports preserved Nodus corrections as a conflict');
   assert.equal(second.attachmentsCopied, 0);
-  assert.equal(second.attachmentsUnchanged, 2);
+  assert.equal(second.attachmentsUnchanged, 3, 'a correctness-first refresh verifies unchanged group files too');
   assert.equal(store.findItemByIdOrAlias(canonicalAId).metadata.title, 'Norma y deseo — revisado');
   assert.equal(store.findItemByIdOrAlias(canonicalAId).metadata.publisher, 'Corrección local de Nodus', 'a Zotero refresh preserves local metadata corrections');
   assert.equal(store.findItemByIdOrAlias(canonicalAId).metadata.language, 'ca');
@@ -191,9 +204,20 @@ try {
   assert.equal(catalog.list().items.find((entry) => entry.id === missingB.id).sourceState, 'source-missing');
   const refreshedA = store.findItemByIdOrAlias(canonicalAId);
   assert.ok(refreshedA.attachments.some((entry) => entry.sourceKey === undefined && entry.fileName === 'local.txt'), 'Zotero refresh retains local Nodus attachments');
+  assert.equal(refreshedA.provenance[0].provider, 'Crossref', 'provider provenance survives a Zotero refresh');
+  assert.equal(refreshedA.relations[0].targetItemId, storedGroup.id, 'local relations survive a Zotero refresh');
+  assert.equal(refreshedA.vaultWorkIds['vault-test'], 'legacy-work-a', 'vault relinking identities survive a Zotero refresh');
   assert.equal(store.findItemByIdOrAlias(storedGroup.id).clock.revision, groupRevision, 'an unchanged group item receives no phantom revision');
   assert.equal(catalog.list().total, 3, 'source-missing items remain visible and recoverable');
   assert.equal(catalog.getImportSource('zotero:users/0').version, 12);
+
+  const groupCollectionId = catalog.resolveCollectionId('zotero:groups:42:GC');
+  const groupSubset = await importZoteroLibraries({
+    requestId: 'group-subset', selection: { libraryIds: ['groups/42'], collectionIds: [groupCollectionId] },
+    store, catalog, client,
+  });
+  assert.equal(groupSubset.itemsDiscovered, 1, 'a Nodus collection id resolves to the canonical group transport key');
+  assert.equal(groupSubset.verification.status, 'passed');
 
   const currentA = store.findItemByIdOrAlias(canonicalAId);
   const currentComponents = Object.fromEntries(Object.entries(currentA.contentRevision.components).map(([name, component]) => [name, {
@@ -220,9 +244,25 @@ try {
   state.personalItems = [item({ version: 14, title: 'Norma y deseo — revisado', dateModified: '2026-03-03' })];
   const unavailableRefresh = await importZoteroLibraries({ requestId: 'attachment-unavailable', selection: { libraryIds: ['users/0'] }, store, catalog, client });
   assert.equal(unavailableRefresh.attachmentsUnavailable, 1);
+  assert.equal(unavailableRefresh.partial, true);
+  assert.equal(unavailableRefresh.verification.status, 'blocked');
+  assert.equal(sessionStore.get('attachment-unavailable').status, 'failed');
+  assert.equal(catalog.getImportSource('zotero:users/0').version, 13, 'a blocked file never advances the source checkpoint');
   const unavailableA = store.findItemByIdOrAlias(canonicalAId);
   assert.equal(unavailableA.attachments.find((entry) => entry.sourceKey === 'PDF').sourceState, 'not-downloaded');
   assert.ok(unavailableA.attachments.some((entry) => entry.fileName === 'local.txt'));
+
+  // A blocked snapshot must be retryable without an artificial Zotero version bump.
+  // Restoring the file at the exact same source version completes the pending import.
+  fileMap.set('PDF', pdf);
+  const unavailableRetry = await importZoteroLibraries({
+    requestId: 'attachment-unavailable-retry', selection: { libraryIds: ['users/0'] }, store, catalog, client,
+  });
+  assert.equal(unavailableRetry.partial, false);
+  assert.equal(unavailableRetry.verification.status, 'passed');
+  assert.equal(sessionStore.get('attachment-unavailable-retry').status, 'completed');
+  assert.equal(catalog.getImportSource('zotero:users/0').version, 14, 'the same-version retry advances only after every file verifies');
+  assert.equal(store.findItemByIdOrAlias(canonicalAId).attachments.find((entry) => entry.sourceKey === 'PDF').sourceState, 'available');
 
   const controller = new AbortController();
   let canceledCatalogCount = 0;
@@ -251,6 +291,10 @@ try {
   assert.equal(sessionStore.get('missing-library').status, 'failed');
   assert.equal(sessionStore.list()[0].id, 'missing-library');
 
+  const missingLibraryDefault = await importZoteroLibraries({ requestId: 'missing-library-default', store, catalog, client });
+  assert.deepEqual(missingLibraryDefault.librariesMissing, ['groups/42'], 'a previously imported group cannot disappear from an unfiltered sync silently');
+  assert.equal(missingLibraryDefault.verification.status, 'blocked');
+
   // The attachment band used to be measured as processedAttachments/totalAttachments,
   // but that total is discovered one item at a time: after the first item it always
   // read "all of them", so every emit reported 100% of the band and the bar sat pinned
@@ -268,6 +312,7 @@ try {
     client: {
       ...client,
       async libraries() { return [personal]; },
+      async libraryVersion() { return 1; },
       async allCollections() { return []; },
       async libraryItems() { return { items: manyItems, version: 1, total: manyItems.length }; },
       async itemAttachments(_userId, key) {
@@ -287,8 +332,8 @@ try {
   // treats it as a first-class top-level item; `/items/top` returns it alongside real
   // references. It used to be filtered out unconditionally — 603 of 2.155 entries in
   // the library this was measured against — so those files simply never arrived and
-  // nothing said so. It is opt-in (no author, no year, only a filename) but the count
-  // is always reported, because an option nobody knows applies to them is no option.
+  // nothing said so. It is on by default (no author, no year, only a filename), while
+  // callers can still disable it explicitly for compatibility.
   const looseFile = path.join(sourceFiles, 'suelto.pdf');
   await writeFile(looseFile, '%PDF-1.4\nstandalone\n');
   const loose = {
@@ -300,6 +345,7 @@ try {
   const looseClient = (rawItems) => ({
     ...client,
     async libraries() { return [personal]; },
+    async libraryVersion() { return 1; },
     async allCollections() { return []; },
     async libraryItems(_library, options = {}) {
       // Mirror what zoteroClient does with the raw page, which is where the filter lives.
@@ -326,19 +372,20 @@ try {
   const offStore = new LibraryDiskStore(path.join(scratch, 'backups', 'nodus-loose-off'), 'zotero-import-device-0005');
   const offCatalog = new LibraryCatalog(path.join(userData, 'library', 'catalog-loose-off.sqlite'));
   const off = await importZoteroLibraries({
-    requestId: 'loose-off', store: offStore, catalog: offCatalog, client: looseClient([paper, loose, bookmark]),
+    requestId: 'loose-off', selection: { includeStandaloneFiles: false },
+    store: offStore, catalog: offCatalog, client: looseClient([paper, loose, bookmark]),
   });
-  assert.equal(off.itemsCreated, 1, 'by default only the bibliographic entry arrives');
+  assert.equal(off.itemsCreated, 1, 'an explicit compatibility opt-out keeps only the bibliographic entry');
   assert.equal(off.itemsStandaloneSkipped, 1, 'the skipped file is counted so the dialog can offer the option');
   offCatalog.close();
 
   const onStore = new LibraryDiskStore(path.join(scratch, 'backups', 'nodus-loose-on'), 'zotero-import-device-0006');
   const onCatalog = new LibraryCatalog(path.join(userData, 'library', 'catalog-loose-on.sqlite'));
   const on = await importZoteroLibraries({
-    requestId: 'loose-on', selection: { includeStandaloneFiles: true }, store: onStore, catalog: onCatalog,
+    requestId: 'loose-on', store: onStore, catalog: onCatalog,
     client: looseClient([paper, loose, bookmark]),
   });
-  assert.equal(on.itemsCreated, 2, 'with the option on, the parentless file becomes a work of its own');
+  assert.equal(on.itemsCreated, 2, 'by default, the parentless file becomes a work of its own');
   assert.equal(on.itemsStandaloneSkipped, 0);
   const stored = onStore.findItemBySourceIdentity({ source: 'zotero', libraryType: 'user', libraryId: '0', itemKey: 'S1' });
   assert.equal(stored.attachments.length, 1, 'and its file is copied, resolved from the item itself');
@@ -375,6 +422,7 @@ try {
     client: {
       ...client,
       async libraries() { return [personal]; },
+      async libraryVersion() { return 1; },
       async allCollections() { return []; },
       async libraryItems() { return { items: [item({ key: 'P1', itemKey: 'P1', title: 'The paper', collections: [], version: 1 })], version: 1, total: 1 }; },
       async itemAttachments() { return children; },
@@ -403,7 +451,7 @@ try {
   // still queued behind it: an import of 14.000 works silently stopped copying at the
   // first awkward name while the catalogue went on reporting success.
   const longName = 'Uddin et al. - 2013 - Design, Synthesis, and Structure–Activity Relationship Studies of Fluorescent Inhibitors of Cycloxyg - Supplementary Information.pdf';
-  const longFile = path.join(sourceFiles, 'supplementary.pdf');
+  const longFile = path.join(sourceFiles, longName);
   await writeFile(longFile, '%PDF-1.4\nsupplementary\n');
   const longStore = new LibraryDiskStore(path.join(scratch, 'backups', 'nodus-long'), 'zotero-import-device-0003');
   const longCatalog = new LibraryCatalog(path.join(userData, 'library', 'catalog-long.sqlite'));
@@ -416,6 +464,7 @@ try {
     client: {
       ...client,
       async libraries() { return [personal]; },
+      async libraryVersion() { return 1; },
       async allCollections() { return []; },
       async libraryItems() { return { items: longItems, version: 1, total: longItems.length }; },
       async itemAttachments(_userId, key) {
@@ -438,6 +487,324 @@ try {
   assert.equal(behind.attachments.length, 1, 'an awkward filename does not abandon the attachments queued behind it');
   assert.equal(longReport.attachmentsCopied, 2);
   longCatalog.close();
+
+  // Child objects have their own Zotero versions. Adding, changing or deleting an
+  // attachment must be observed even when the bibliographic parent's version remains
+  // unchanged. This exercises the bulk inventory path used by the real client.
+  const childOne = path.join(sourceFiles, 'child-one.pdf');
+  const childTwo = path.join(sourceFiles, 'child-two.pdf');
+  await writeFile(childOne, '%PDF-1.4\nchild-one-v1\n');
+  await writeFile(childTwo, '%PDF-1.4\nchild-two\n');
+  const childState = { version: 1, attachments: [
+    { key: 'C1', itemKey: 'C1', library: personal, title: 'Child one', contentType: 'application/pdf', linkMode: 'imported_file', filename: 'child-one.pdf', available: true, version: 1, parentItem: 'PARENT', dateModified: '2026-01-01' },
+  ] };
+  const parent = item({ key: 'PARENT', itemKey: 'PARENT', title: 'Stable parent', collections: [], version: 1 });
+  const childPaths = new Map([['C1', childOne], ['C2', childTwo]]);
+  const childClient = {
+    ...client,
+    async libraries() { return [personal]; },
+    async libraryVersion() { return childState.version; },
+    async libraryInventory(library) {
+      return {
+        library, items: [parent], collections: [], attachments: childState.attachments,
+        notes: [], version: childState.version, total: 1, standaloneSkipped: 0, attempts: 1,
+      };
+    },
+    async attachmentFilePath(_userId, key) { return childPaths.get(key) ?? null; },
+  };
+  const childStore = new LibraryDiskStore(path.join(scratch, 'backups', 'nodus-child-inventory'), 'zotero-import-device-0007');
+  const childCatalog = new LibraryCatalog(path.join(userData, 'library', 'catalog-child-inventory.sqlite'));
+  const childFirst = await importZoteroLibraries({ requestId: 'child-first', store: childStore, catalog: childCatalog, client: childClient });
+  assert.equal(childFirst.verification.status, 'passed');
+  assert.equal(childFirst.attachmentsCopied, 1);
+
+  await writeFile(childOne, '%PDF-1.4\nchild-one-v2\n');
+  childState.version = 2;
+  childState.attachments = [
+    { ...childState.attachments[0], version: 2, dateModified: '2026-02-01' },
+    { key: 'C2', itemKey: 'C2', library: personal, title: 'Child two', contentType: 'application/pdf', linkMode: 'imported_file', filename: 'child-two.pdf', available: true, version: 2, parentItem: 'PARENT', dateModified: '2026-02-01' },
+  ];
+  const childSecond = await importZoteroLibraries({ requestId: 'child-second', store: childStore, catalog: childCatalog, client: childClient });
+  assert.equal(childSecond.verification.status, 'passed');
+  assert.equal(childSecond.verification.expected.attachments, 2);
+  assert.equal(childSecond.verification.imported.attachments, 2);
+  assert.equal(childSecond.attachmentsChanged, 1, 'child content changed without a parent version bump');
+  assert.equal(childSecond.attachmentsCopied, 2, 'the changed child and newly-added second child are both copied');
+  let childStored = childStore.findItemBySourceIdentity({ source: 'zotero', libraryType: 'user', libraryId: '0', itemKey: 'PARENT' });
+  assert.equal(childStored.attachments.filter((entry) => entry.sourceState === 'available').length, 2);
+
+  childState.version = 3;
+  childState.attachments = [childState.attachments[1]];
+  const childThird = await importZoteroLibraries({ requestId: 'child-third', store: childStore, catalog: childCatalog, client: childClient });
+  assert.equal(childThird.verification.status, 'passed');
+  childStored = childStore.findItemBySourceIdentity({ source: 'zotero', libraryType: 'user', libraryId: '0', itemKey: 'PARENT' });
+  assert.equal(childStored.attachments.find((entry) => entry.sourceKey === 'C1').sourceState, 'source-missing');
+  assert.equal(childStored.attachments.find((entry) => entry.sourceKey === 'C2').sourceState, 'available');
+
+  // A destination that exists is never trusted by filename or saved metadata alone.
+  // Corrupt it, re-run at the same source version, and require a repaired, re-hashed copy.
+  const currentChildTwo = childStored.attachments.find((entry) => entry.sourceKey === 'C2');
+  await writeFile(path.join(childStore.itemFolder(childStored.storageId), currentChildTwo.relativePath), 'corrupt destination');
+  const repaired = await importZoteroLibraries({ requestId: 'child-corrupt-repair', store: childStore, catalog: childCatalog, client: childClient });
+  assert.equal(repaired.verification.status, 'passed');
+  assert.equal(repaired.attachmentsCopied, 1);
+  childStored = childStore.findItemBySourceIdentity({ source: 'zotero', libraryType: 'user', libraryId: '0', itemKey: 'PARENT' });
+  const repairedChildTwo = childStored.attachments.find((entry) => entry.sourceKey === 'C2');
+  assert.equal(
+    await readFile(path.join(childStore.itemFolder(childStored.storageId), repairedChildTwo.relativePath), 'utf8'),
+    await readFile(childTwo, 'utf8'),
+  );
+
+  // Zotero can rename/retype an attachment without changing its bytes. A hash-only
+  // fast path used to retain the old filename, extension and MIME while verification
+  // still reported PASS, which could send the file to the wrong extractor.
+  const renamedChildTwo = path.join(sourceFiles, 'child-two-renamed.epub');
+  await writeFile(renamedChildTwo, await readFile(childTwo));
+  childPaths.set('C2', renamedChildTwo);
+  childState.version = 4;
+  childState.attachments = [{
+    ...childState.attachments[0], version: 4, filename: 'child-two-renamed.epub',
+    contentType: 'application/epub+zip', dateModified: '2026-03-01',
+  }];
+  const descriptorRefresh = await importZoteroLibraries({
+    requestId: 'child-descriptor-refresh', store: childStore, catalog: childCatalog, client: childClient,
+  });
+  assert.equal(descriptorRefresh.verification.status, 'passed');
+  assert.equal(descriptorRefresh.attachmentsChanged, 1);
+  childStored = childStore.findItemBySourceIdentity({ source: 'zotero', libraryType: 'user', libraryId: '0', itemKey: 'PARENT' });
+  const renamedChildRecord = childStored.attachments.find((entry) => entry.sourceKey === 'C2');
+  assert.equal(renamedChildRecord.fileName, 'child-two-renamed.epub');
+  assert.equal(renamedChildRecord.mimeType, 'application/epub+zip');
+  assert.match(renamedChildRecord.relativePath, /\.epub$/);
+  assert.ok(existsSync(path.join(childStore.itemFolder(childStored.storageId), renamedChildRecord.relativePath)));
+  childCatalog.close();
+
+  // Changing the standalone-file option after a successful checkpoint must still
+  // discover old files at the same Zotero version; a `since`-only importer misses it.
+  const transitionStore = new LibraryDiskStore(path.join(scratch, 'backups', 'nodus-standalone-transition'), 'zotero-import-device-0008');
+  const transitionCatalog = new LibraryCatalog(path.join(userData, 'library', 'catalog-standalone-transition.sqlite'));
+  const transitionPaper = item({ key: 'TRANSITION-PAPER', itemKey: 'TRANSITION-PAPER', title: 'Paper', collections: [], version: 5 });
+  const transitionLoose = { ...loose, key: 'TRANSITION-FILE', itemKey: 'TRANSITION-FILE', version: 5 };
+  const transitionAttachment = {
+    key: 'TRANSITION-FILE', itemKey: 'TRANSITION-FILE', library: personal, title: 'Un PDF suelto',
+    contentType: 'application/pdf', linkMode: 'imported_file', filename: 'suelto.pdf', available: true,
+    version: 5, parentItem: null, dateModified: '2026-03-01',
+  };
+  const transitionClient = {
+    ...client,
+    async libraries() { return [personal]; },
+    async libraryVersion() { return 5; },
+    async libraryInventory(library, options = {}) {
+      const enabled = options.includeStandaloneFiles !== false;
+      return {
+        library, items: enabled ? [transitionPaper, transitionLoose] : [transitionPaper], collections: [],
+        attachments: [transitionAttachment], notes: [], version: 5, total: 2,
+        standaloneSkipped: enabled ? 0 : 1, attempts: 1,
+      };
+    },
+    async attachmentFilePath() { return looseFile; },
+  };
+  const transitionOff = await importZoteroLibraries({
+    requestId: 'transition-off', selection: { includeStandaloneFiles: false },
+    store: transitionStore, catalog: transitionCatalog, client: transitionClient,
+  });
+  assert.equal(transitionOff.itemsCreated, 1);
+  assert.equal(transitionOff.verification.status, 'passed');
+  assert.equal(transitionCatalog.getImportSource('zotero:users/0').version, 5);
+  const transitionOn = await importZoteroLibraries({
+    requestId: 'transition-on', store: transitionStore, catalog: transitionCatalog, client: transitionClient,
+  });
+  assert.equal(transitionOn.itemsCreated, 1, 'the old standalone file is found despite an unchanged library checkpoint');
+  assert.equal(transitionOn.verification.status, 'passed');
+  assert.ok(transitionStore.findItemBySourceIdentity({ source: 'zotero', libraryType: 'user', libraryId: '0', itemKey: 'TRANSITION-FILE' }));
+  transitionCatalog.close();
+
+  // A "filed only" refresh must consume the full inventory to reconcile items
+  // that were moved out of their last Zotero collection or deleted altogether.
+  const filedState = {
+    version: 1,
+    items: [item({ key: 'FILED', itemKey: 'FILED', title: 'Filed item', collections: ['FILED-C'], version: 1 })],
+  };
+  const filedCollection = {
+    key: 'FILED-C', itemKey: 'FILED-C', library: personal, name: 'Filed',
+    parentCollection: false, itemCount: 1, subCount: 0,
+  };
+  const filedClient = {
+    ...client,
+    async libraries() { return [personal]; },
+    async libraryVersion() { return filedState.version; },
+    async libraryInventory(library) {
+      return {
+        library, items: filedState.items, collections: [filedCollection], attachments: [], notes: [],
+        version: filedState.version, total: filedState.items.length, standaloneSkipped: 0, attempts: 1,
+      };
+    },
+  };
+  const filedStore = new LibraryDiskStore(path.join(scratch, 'backups', 'nodus-filed-only'), 'zotero-import-device-0010');
+  const filedCatalog = new LibraryCatalog(path.join(userData, 'library', 'catalog-filed-only.sqlite'));
+  assert.equal((await importZoteroLibraries({
+    requestId: 'filed-first', selection: { copyAttachments: false },
+    store: filedStore, catalog: filedCatalog, client: filedClient,
+  })).verification.status, 'passed');
+  filedState.version = 2;
+  filedState.items = [{ ...filedState.items[0], version: 2, collections: [] }];
+  const becameUnfiled = await importZoteroLibraries({
+    requestId: 'filed-moved-out', selection: { includeUnfiled: false, copyAttachments: false },
+    store: filedStore, catalog: filedCatalog, client: filedClient,
+  });
+  assert.equal(becameUnfiled.itemsDiscovered, 0);
+  assert.equal(becameUnfiled.verification.status, 'passed');
+  const filedStored = filedStore.findItemBySourceIdentity({ source: 'zotero', libraryType: 'user', libraryId: '0', itemKey: 'FILED' });
+  assert.deepEqual(filedStored.collectionIds, [], 'filed-only refresh removes a stale Zotero membership');
+  assert.equal(filedStored.sourceState, 'current');
+  filedState.version = 3;
+  filedState.items = [];
+  await importZoteroLibraries({
+    requestId: 'filed-deleted', selection: { includeUnfiled: false, copyAttachments: false },
+    store: filedStore, catalog: filedCatalog, client: filedClient,
+  });
+  assert.equal(
+    filedStore.findItemBySourceIdentity({ source: 'zotero', libraryType: 'user', libraryId: '0', itemKey: 'FILED' }).sourceState,
+    'source-missing',
+  );
+  filedCatalog.close();
+
+  // Linked files can change without a Zotero version increment. Mutate the source
+  // after the copy and require the final source+destination hash barrier to block.
+  const raceFile = path.join(sourceFiles, 'linked-race.pdf');
+  await writeFile(raceFile, '%PDF-1.4\nlinked-before\n');
+  const raceItem = item({ key: 'RACE', itemKey: 'RACE', title: 'Linked race', collections: [], version: 1 });
+  const raceAttachment = {
+    key: 'RACE-FILE', itemKey: 'RACE-FILE', library: personal, title: 'Linked PDF',
+    contentType: 'application/pdf', linkMode: 'linked_file', filename: 'linked-race.pdf', available: true,
+    version: 1, parentItem: 'RACE', dateModified: '2026-03-01',
+  };
+  const raceClient = {
+    ...client,
+    async libraries() { return [personal]; },
+    async libraryVersion() { return 1; },
+    async libraryInventory(library) {
+      return {
+        library, items: [raceItem], collections: [], attachments: [raceAttachment], notes: [],
+        version: 1, total: 1, standaloneSkipped: 0, attempts: 1,
+      };
+    },
+    async attachmentFilePath() { return raceFile; },
+  };
+  const raceStore = new LibraryDiskStore(path.join(scratch, 'backups', 'nodus-linked-race'), 'zotero-import-device-0011');
+  const raceCatalog = new LibraryCatalog(path.join(userData, 'library', 'catalog-linked-race.sqlite'));
+  let sourceMutated = false;
+  const raceReport = await importZoteroLibraries({
+    requestId: 'linked-race', store: raceStore, catalog: raceCatalog, client: raceClient,
+    onProgress(value) {
+      if (value.phase === 'verification' && !sourceMutated) {
+        sourceMutated = true;
+        writeFileSync(raceFile, '%PDF-1.4\nlinked-after\n');
+      }
+    },
+  });
+  assert.equal(raceReport.verification.status, 'blocked');
+  assert.equal(raceReport.partial, true);
+  assert.equal(raceCatalog.getImportSource('zotero:users/0'), null, 'a source hash race never advances the checkpoint');
+  raceCatalog.close();
+
+  // Hashing and copying large files must remain cancellable and must not leave a
+  // temporary partial copy behind in the item folder.
+  const cancelFile = path.join(sourceFiles, 'cancel-large.pdf');
+  await writeFile(cancelFile, Buffer.alloc(32 * 1024 * 1024, 0x5a));
+  const cancelItem = item({ key: 'CANCEL-LARGE', itemKey: 'CANCEL-LARGE', title: 'Large cancel', collections: [], version: 1 });
+  const cancelAttachment = {
+    key: 'CANCEL-FILE', itemKey: 'CANCEL-FILE', library: personal, title: 'Large PDF',
+    contentType: 'application/pdf', linkMode: 'linked_file', filename: 'cancel-large.pdf', available: true,
+    version: 1, parentItem: 'CANCEL-LARGE', dateModified: '2026-03-01',
+  };
+  const cancelLargeClient = {
+    ...client,
+    async libraries() { return [personal]; },
+    async libraryVersion() { return 1; },
+    async libraryInventory(library) {
+      return { library, items: [cancelItem], collections: [], attachments: [cancelAttachment], notes: [], version: 1, total: 1, standaloneSkipped: 0, attempts: 1 };
+    },
+    async attachmentFilePath() { return cancelFile; },
+  };
+  const cancelStore = new LibraryDiskStore(path.join(scratch, 'backups', 'nodus-cancel-large'), 'zotero-import-device-0012');
+  const cancelCatalog = new LibraryCatalog(path.join(userData, 'library', 'catalog-cancel-large.sqlite'));
+  const alreadyCanceledController = new AbortController();
+  alreadyCanceledController.abort();
+  const alreadyCanceled = await importZoteroLibraries({
+    requestId: 'already-canceled', store: cancelStore, catalog: cancelCatalog, client: cancelLargeClient,
+    signal: alreadyCanceledController.signal,
+  });
+  assert.equal(alreadyCanceled.canceled, true, 'a pre-aborted import settles cleanly instead of leaving a rejected file stream');
+  const cancelController = new AbortController();
+  let cancelScheduled = false;
+  const canceledLarge = await importZoteroLibraries({
+    requestId: 'cancel-large', store: cancelStore, catalog: cancelCatalog, client: cancelLargeClient,
+    signal: cancelController.signal,
+    onProgress(value) {
+      if (value.phase === 'attachments' && !cancelScheduled) {
+        cancelScheduled = true;
+        setTimeout(() => cancelController.abort(), 0);
+      }
+    },
+  });
+  assert.equal(canceledLarge.canceled, true, 'the event loop remains responsive enough to cancel a large-file hash/copy');
+  const canceledStored = cancelStore.findItemBySourceIdentity({ source: 'zotero', libraryType: 'user', libraryId: '0', itemKey: 'CANCEL-LARGE' });
+  const cancelAttachmentFolder = path.join(cancelStore.itemFolder(canceledStored.storageId), 'attachments');
+  if (existsSync(cancelAttachmentFolder)) {
+    assert.ok(!(await readdir(cancelAttachmentFolder)).some((name) => name.includes('.tmp-')), 'cancellation cleans temporary copies');
+  }
+  cancelCatalog.close();
+
+  // A subset sync also reconciles objects leaving the selected subtree. Otherwise a
+  // 0/0 verification advances the checkpoint while stale memberships remain forever.
+  const subsetState = {
+    version: 1,
+    collections: [{ key: 'SUBSET', itemKey: 'SUBSET', library: personal, name: 'Subset', parentCollection: false, itemCount: 1, subCount: 0 }],
+    items: [item({ key: 'SUBSET-ITEM', itemKey: 'SUBSET-ITEM', title: 'Moves out', collections: ['SUBSET'], version: 1 })],
+  };
+  const subsetClient = {
+    ...client,
+    async libraries() { return [personal]; },
+    async libraryVersion() { return subsetState.version; },
+    async libraryInventory(library) {
+      return {
+        library, items: subsetState.items, collections: subsetState.collections,
+        attachments: [], notes: [], version: subsetState.version,
+        total: subsetState.items.length, standaloneSkipped: 0, attempts: 1,
+      };
+    },
+  };
+  const subsetStore = new LibraryDiskStore(path.join(scratch, 'backups', 'nodus-subset-reconcile'), 'zotero-import-device-0009');
+  const subsetCatalog = new LibraryCatalog(path.join(userData, 'library', 'catalog-subset-reconcile.sqlite'));
+  const subsetFirst = await importZoteroLibraries({
+    requestId: 'subset-first', selection: { copyAttachments: false },
+    store: subsetStore, catalog: subsetCatalog, client: subsetClient,
+  });
+  assert.equal(subsetFirst.verification.status, 'passed');
+  const subsetCollectionId = subsetCatalog.findCollectionIdBySource('zotero', 'users/0', 'SUBSET');
+  subsetState.version = 2;
+  subsetState.items = [{ ...subsetState.items[0], version: 2, collections: [] }];
+  const subsetMoved = await importZoteroLibraries({
+    requestId: 'subset-moved', selection: { collectionIds: [subsetCollectionId], copyAttachments: false },
+    store: subsetStore, catalog: subsetCatalog, client: subsetClient,
+  });
+  assert.equal(subsetMoved.itemsDiscovered, 0);
+  assert.equal(subsetMoved.verification.status, 'passed');
+  assert.deepEqual(
+    subsetStore.findItemBySourceIdentity({ source: 'zotero', libraryType: 'user', libraryId: '0', itemKey: 'SUBSET-ITEM' }).collectionIds,
+    [],
+    'moving an item outside a selected collection removes the stale membership',
+  );
+  subsetState.version = 3;
+  subsetState.collections = [];
+  const subsetDeletedCollection = await importZoteroLibraries({
+    requestId: 'subset-collection-deleted', selection: { collectionIds: [subsetCollectionId], copyAttachments: false },
+    store: subsetStore, catalog: subsetCatalog, client: subsetClient,
+  });
+  assert.equal(subsetDeletedCollection.verification.status, 'passed');
+  assert.equal(subsetStore.readMaterializedCollection(subsetCollectionId).sourceState, 'source-missing');
+  subsetCatalog.close();
 
   const sourceAfter = await Promise.all([pdf, image, epub].map((file) => readFile(file, 'utf8')));
   assert.equal(sourceAfter[1], sourceBefore[1]);

@@ -23,6 +23,7 @@ import type {
   ZoteroImportSelection,
   ZoteroLibraryPreview,
   ZoteroSyncSession,
+  ZoteroImportVerificationMismatch,
 } from '@shared/libraryTypes';
 import type { AppSettings, LibraryReaderReference, VaultSummary, VaultType } from '@shared/types';
 import { Icon, Spinner } from '../components/ui';
@@ -429,7 +430,9 @@ function ZoteroImportDialog({ onClose, onFinished }: { onClose: () => void; onFi
   const [progress, setProgress] = useState<ZoteroImportProgress | null>(null);
   const [copyAttachments, setCopyAttachments] = useState(true);
   const [includeUnfiled, setIncludeUnfiled] = useState(true);
-  const [includeStandaloneFiles, setIncludeStandaloneFiles] = useState(false);
+  // Standalone Zotero files are real source entries. Keep them enabled for new
+  // imports; an older/BETA session can still be resumed with its saved selection.
+  const [includeStandaloneFiles, setIncludeStandaloneFiles] = useState(true);
   const [sessions, setSessions] = useState<ZoteroSyncSession[]>([]);
   const [lastReport, setLastReport] = useState<ZoteroSyncSession['report']>(null);
   const [hint, setHint] = useState<string | null>(null);
@@ -466,11 +469,15 @@ function ZoteroImportDialog({ onClose, onFinished }: { onClose: () => void; onFi
         ? await window.nodus.importZoteroLibrary(id, selection)
         : await window.nodus.resumeZoteroLibraryImport(id);
       setLastReport(report);
+      const verificationBlocked = report.verification?.status === 'blocked';
       toast(report.canceled ? t('La importación se canceló; el catálogo ya recuperado se conserva.')
-        : report.partial ? t('La sincronización terminó parcialmente; los datos locales se conservan.')
+        : report.partial || verificationBlocked ? t('La sincronización necesita revisión; los datos locales se conservan.')
           : tx('Importación terminada: {n} documentos.', { n: report.itemsDiscovered }));
       onFinished();
-      if (!report.canceled && !report.partial) onClose();
+      // A partial or blocked verification is never presented as a successful
+      // completion. Keep the dialog open so the mismatch and retry action remain
+      // visible, including for a report whose legacy importer forgot `partial`.
+      if (!report.canceled && !report.partial && !verificationBlocked) onClose();
     } catch (nextError) {
       setError(zoteroFailureText(nextError));
       void diagnoseZotero().then(setHint);
@@ -479,7 +486,14 @@ function ZoteroImportDialog({ onClose, onFinished }: { onClose: () => void; onFi
       void window.nodus.listZoteroSyncSessions().then(setSessions).catch(() => undefined);
     }
   };
-  const start = () => run(crypto.randomUUID(), { libraryIds: [...selected], copyAttachments, includeUnfiled, includeStandaloneFiles });
+  const start = () => {
+    const availableIds = libraries.map((entry) => entry.id);
+    const allAvailableSelected = availableIds.length === selected.size && availableIds.every((id) => selected.has(id));
+    return run(crypto.randomUUID(), {
+      ...(allAvailableSelected ? {} : { libraryIds: [...selected] }),
+      copyAttachments, includeUnfiled, includeStandaloneFiles,
+    });
+  };
   // Only the newest session can be resumed. Searching the whole history instead meant
   // that one old failure kept the "interrupted sync" banner up forever: a later run
   // that completed cleanly still found the stale entry and reported itself as
@@ -490,9 +504,11 @@ function ZoteroImportDialog({ onClose, onFinished }: { onClose: () => void; onFi
     (newest, session) => (!newest || session.updatedAt > newest.updatedAt ? session : newest),
     null,
   );
-  const resumable = latestSession && (latestSession.status === 'canceled' || latestSession.status === 'failed')
+  const resumable = latestSession && (latestSession.status === 'canceled' || latestSession.status === 'failed'
+    || (latestSession.status === 'completed' && (latestSession.report?.partial || latestSession.report?.verification?.status === 'blocked')))
     ? latestSession
     : null;
+  const resumableIsPartial = Boolean(resumable?.report?.partial || resumable?.report?.verification?.status === 'blocked');
 
   return (
     <div className="fixed inset-0 z-[80] grid place-items-center bg-black/65 p-6" onMouseDown={(event) => { if (event.target === event.currentTarget && !requestId) onClose(); }}>
@@ -509,8 +525,8 @@ function ZoteroImportDialog({ onClose, onFinished }: { onClose: () => void; onFi
           {resumable && !requestId && (
             <div data-testid="zotero-sync-resume" className="mb-4 flex items-center gap-3 rounded-xl border border-amber-500/35 bg-amber-500/10 p-3">
               <Icon name="refresh" className="shrink-0 text-amber-700 dark:text-amber-300" />
-              <div className="min-w-0 flex-1 text-xs"><b className="block text-amber-950 dark:text-amber-100">{t('Sincronización interrumpida')}</b><span className="text-amber-800 dark:text-amber-200/80">{resumable.progress.message}</span></div>
-              <button data-testid="resume-zotero-sync" className="btn btn-ghost border border-amber-500/25" onClick={() => void run(resumable.id)}>{t('Reanudar')}</button>
+              <div className="min-w-0 flex-1 text-xs"><b className="block text-amber-950 dark:text-amber-100">{resumableIsPartial ? t('Sincronización requiere revisión') : t('Sincronización interrumpida')}</b><span className="text-amber-800 dark:text-amber-200/80">{resumable.progress.message}</span></div>
+              <button data-testid="resume-zotero-sync" className="btn btn-ghost border border-amber-500/25" onClick={() => void run(resumable.id)}>{resumableIsPartial ? t('Reintentar') : t('Reanudar')}</button>
             </div>
           )}
           {loading ? <div className="flex items-center gap-2 py-8 text-sm text-neutral-500"><Spinner /> {t('Buscando bibliotecas…')}</div> : (
@@ -532,10 +548,8 @@ function ZoteroImportDialog({ onClose, onFinished }: { onClose: () => void; onFi
           <div className="mt-4 grid gap-2 text-xs text-neutral-400 sm:grid-cols-2">
             <label className="flex items-center gap-2 rounded-lg bg-neutral-900/60 p-2.5"><input type="checkbox" checked={copyAttachments} disabled={!!requestId} onChange={(event) => setCopyAttachments(event.target.checked)} />{t('Copiar todos los adjuntos')}</label>
             <label className="flex items-center gap-2 rounded-lg bg-neutral-900/60 p-2.5"><input type="checkbox" checked={includeUnfiled} disabled={!!requestId} onChange={(event) => setIncludeUnfiled(event.target.checked)} />{t('Incluir documentos sin colección')}</label>
-            {/* A parentless file is a first-class entry in Zotero but arrives with no
-                author, year or title beyond a filename, so it stays opt-in. The count
-                the last import skipped is reported below, because the option is
-                useless to someone who does not know it applies to them. */}
+            {/* A parentless file is a first-class entry in Zotero. It is enabled for
+                new imports, while the checkbox remains available for compatibility. */}
             <label className="flex items-start gap-2 rounded-lg bg-neutral-900/60 p-2.5"><input type="checkbox" className="mt-0.5" checked={includeStandaloneFiles} disabled={!!requestId} onChange={(event) => setIncludeStandaloneFiles(event.target.checked)} /><span>{t('Importar archivos sueltos (sin ficha bibliográfica)')}<span className="mt-0.5 block text-[10px] text-neutral-500">{t('PDFs y EPUBs añadidos a Zotero sin una entrada encima. Llegan sin autor ni año.')}</span></span></label>
           </div>
           {progress && (
@@ -557,6 +571,18 @@ function ZoteroImportDialog({ onClose, onFinished }: { onClose: () => void; onFi
               <p className="mt-1">{tx('Tu biblioteca tiene {n} archivo(s) sin ficha bibliográfica. Marca la casilla de arriba y vuelve a importar si los quieres.', { n: lastReport.itemsStandaloneSkipped })}</p>
             </div>
           )}
+          {lastReport?.verification?.status === 'blocked' && (
+            <div role="alert" data-testid="zotero-import-verification-blocked" className="mt-4 rounded-lg border border-red-500/40 bg-red-500/10 p-3 text-xs text-red-950 dark:text-red-100">
+              <b>{t('Verificación bloqueada')}</b>
+              <p className="mt-1">{t('La importación no se ha cerrado como correcta porque el inventario no coincide con lo guardado.')}</p>
+              <div className="mt-2 grid grid-cols-2 gap-1 tabular-nums text-[10px]">
+                <span>{tx('Documentos: {imported}/{expected}', { imported: lastReport.verification.imported.items, expected: lastReport.verification.expected.items })}</span>
+                <span>{tx('Adjuntos: {imported}/{expected}', { imported: lastReport.verification.imported.attachments, expected: lastReport.verification.expected.attachments })}</span>
+              </div>
+              {!!lastReport.verification.mismatches.length && <ul className="mt-2 list-disc space-y-0.5 pl-4">{lastReport.verification.mismatches.map((mismatch: ZoteroImportVerificationMismatch, index) => <li key={`${mismatch.kind}-${index}`}>{mismatch.message || tx('{kind}: se esperaban {expected} y se importaron {imported}.', { kind: mismatch.kind, expected: mismatch.expected, imported: mismatch.imported })}</li>)}</ul>}
+              <p className="mt-2 font-medium">{t('Puedes reintentar esta sesión cuando se resuelva la incidencia.')}</p>
+            </div>
+          )}
           {lastReport?.partial && (
             <div role="status" className="mt-4 rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-950 dark:text-amber-100">
               <b>{t('Sincronización parcial')}</b>
@@ -567,7 +593,7 @@ function ZoteroImportDialog({ onClose, onFinished }: { onClose: () => void; onFi
           )}
         </div>
         <footer className="flex justify-end gap-2 border-t border-neutral-800 px-5 py-4">
-          {requestId ? <button className="btn btn-ghost border border-neutral-700" onClick={() => void window.nodus.cancelZoteroLibraryImport(requestId)}><Icon name="x" /> {t('Cancelar')}</button> : (
+          {requestId && !progress?.phase.match(/^(complete|canceled|failed)$/) ? <button className="btn btn-ghost border border-neutral-700" onClick={() => void window.nodus.cancelZoteroLibraryImport(requestId)}><Icon name="x" /> {t('Cancelar')}</button> : (
             <><button className="btn btn-ghost" onClick={onClose}>{t('Cerrar')}</button><button data-testid="start-zotero-global-import" className="btn btn-primary" disabled={loading || selected.size === 0} onClick={() => void start()}><Icon name="download" /> {t('Importar / actualizar')}</button></>
           )}
         </footer>

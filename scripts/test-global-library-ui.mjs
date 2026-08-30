@@ -15,9 +15,11 @@ test('the unified Library keeps the global catalogue independent and the vault c
 
 test('the Library UI exposes hierarchy, search, bulk operations, imports and background state', async () => {
   const workspaceTabs = await readSource('src/components/library/LibraryWorkspaceTabs.tsx');
+  const zoteroProgress = await readSource('src/components/ZoteroImportProgressBar.tsx');
   const itemManager = await readSource('src/components/library/LibraryItemManager.tsx');
   const librarySettings = await readSource('src/components/library/LibrarySettingsDialog.tsx');
-  const view = `${await readSource('src/views/GlobalLibraryView.tsx')}\n${workspaceTabs}\n${itemManager}\n${librarySettings}\n${await readSource('src/components/library/LibrarySmartSearchDialog.tsx')}\n${await readSource('src/components/library/LibraryMetadataDialogs.tsx')}\n${await readSource('src/components/library/LibraryRecoveryDialogs.tsx')}`;
+  const libraryTypes = await readSource('shared/libraryTypes.ts');
+  const view = `${await readSource('src/views/GlobalLibraryView.tsx')}\n${zoteroProgress}\n${workspaceTabs}\n${itemManager}\n${librarySettings}\n${await readSource('src/components/library/LibrarySmartSearchDialog.tsx')}\n${await readSource('src/components/library/LibraryMetadataDialogs.tsx')}\n${await readSource('src/components/library/LibraryRecoveryDialogs.tsx')}`;
   const vaultLibrary = await readSource('src/views/Library.tsx');
   const libraryService = await readSource('electron/library/libraryService.ts');
   const appCss = await readSource('src/index.css');
@@ -120,6 +122,18 @@ test('the Library UI exposes hierarchy, search, bulk operations, imports and bac
   assert.match(view, /className="library-catalog-list[^"]*overflow-x-hidden"/, 'the virtualized rows cannot render a second horizontal scrollbar');
   assert.match(view, /La importación se canceló; el catálogo ya recuperado se conserva/);
   assert.match(view, /Copia de solo lectura: Nodus nunca modifica Zotero/);
+  assert.match(view, /includeStandaloneFiles, setIncludeStandaloneFiles\] = useState\(true\)/, 'standalone Zotero files are enabled by default for new imports');
+  assert.match(view, /allAvailableSelected[\s\S]*allAvailableSelected \? \{\} : \{ libraryIds:/, 'the default all-libraries UI leaves discovery open so disappeared groups are detected');
+  assert.match(view, /inventory:\s*'Inventariando Zotero/, 'Zotero progress exposes the inventory phase');
+  assert.match(view, /verification:\s*'Comprobando integridad/, 'Zotero progress exposes the verification phase');
+  assert.match(view, /verification\?\.status === 'blocked'/, 'a blocked verification is visible and prevents a success close');
+  assert.match(view, /report\?\.partial[\s\S]*report\?\.verification\?\.status === 'blocked'/, 'partial and blocked sessions remain retryable');
+  assert.match(view, /zotero-import-verification-blocked/, 'verification mismatches have a strict visible blocking panel');
+  assert.match(libraryTypes, /interface ZoteroImportVerification[\s\S]*status: 'passed' \| 'blocked'[\s\S]*expected: ZoteroImportVerificationCounts[\s\S]*imported: ZoteroImportVerificationCounts[\s\S]*mismatches: ZoteroImportVerificationMismatch\[\]/, 'Zotero reports expose a serializable verification contract');
+  assert.match(libraryTypes, /verification\?: ZoteroImportVerification/, 'verification remains optional for pre-verification BETA sessions');
+  assert.match(libraryTypes, /sourceVersion\?: number[\s\S]*sourceModifiedAt\?: string/, 'attachment provenance retains source version and modification time');
+  assert.match(libraryTypes, /interface LibraryNoteRecord[\s\S]*sourceVersion\?: number/, 'mirrored Zotero notes retain source version');
+  assert.match(libraryTypes, /attachment-unavailable.*attachment-corrupt.*verification-mismatch.*concurrent-source-change.*storage/, 'Zotero reports support typed integrity and coordination failures');
   assert.match(view, /status\.conflicts > 0 \|\| status\.invalidRecords > 0/);
   assert.match(view, /LibraryDocumentReader/);
   assert.match(view, /onDoubleClick=\{\(event\) => \{ if \(\(event\.target as HTMLElement\)\.closest\('button, input, select, a'\)\) return; if \(item\.readerAvailable \|\| item\.attachmentCount\) void openReader/, 'global rows open the reader on a non-interactive double-click');

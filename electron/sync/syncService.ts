@@ -12,8 +12,8 @@ import {
   setLightPending,
   setDeepPending,
 } from '../db/worksRepo';
-import { setWorkCollections, addWorkCollections, upsertCollections } from '../db/collectionsRepo';
-import { collectionItemsRecursive, libraries as zoteroLibraries, libraryVersion, topCollections, childCollections } from '../zotero/zoteroClient';
+import { setWorkCollections, addWorkCollections, upsertCollections, expandCollectionKeys } from '../db/collectionsRepo';
+import { collectionItems, libraries as zoteroLibraries, libraryVersion, topCollections, childCollections } from '../zotero/zoteroClient';
 import type { ZoteroCollection, ZoteroLibrary } from '@shared/types';
 import { scanQueue } from '../pipeline/scanQueue';
 import type { SyncLogEntry, WorkCreator, ZoteroItem } from '@shared/types';
@@ -100,14 +100,21 @@ export function ingestZoteroItem(item: ZoteroItem, readTagName: string): { nodus
 
 /** Refresh the stored collection tree (key → name, parent) for every monitored
  *  collection and its descendants, so the Library collection filter shows names. */
-async function refreshCollectionTree(userId: string, monitored: string[]): Promise<void> {
+async function refreshCollectionTree(userId: string, monitored: string[], failures: string[]): Promise<void> {
   if (monitored.length === 0) return;
   const all = new Map<string, ZoteroCollection>();
   let top: ZoteroCollection[] = [];
   try {
     const libs = await zoteroLibraries();
-    top = (await Promise.all(libs.map((library) => topCollections(userId, library).catch(() => [])))).flat();
-  } catch {
+    top = (await Promise.all(libs.map(async (library) => {
+      try { return await topCollections(userId, library); }
+      catch (error) {
+        failures.push(`${library.type}:${library.id}:top:${error instanceof Error ? error.message : 'unknown'}`);
+        return [];
+      }
+    }))).flat();
+  } catch (error) {
+    failures.push(`libraries:${error instanceof Error ? error.message : 'unknown'}`);
     return;
   }
   for (const c of top) all.set(c.key, c);
@@ -118,7 +125,8 @@ async function refreshCollectionTree(userId: string, monitored: string[]): Promi
     let children: ZoteroCollection[] = [];
     try {
       children = await childCollections(userId, key);
-    } catch {
+    } catch (error) {
+      failures.push(`${key}:tree-children:${error instanceof Error ? error.message : 'unknown'}`);
       return;
     }
     for (const c of children) {
@@ -160,6 +168,105 @@ export function shouldQueueDeepAfterSync(input: {
  *  (mirrors scanQueue.degradedRetryScheduled: at most one retry per session). */
 const probeRequeuedThisSession = new Set<string>();
 
+/** Traverse monitored collections while retaining diagnostics for a failed page or
+ * child lookup.  The client helper intentionally degrades to an empty result for
+ * compatibility; the legacy sync must not make that look like a clean collection. */
+async function collectionItemsRecursiveObserved(
+  userId: string,
+  collectionKey: string,
+  failures: string[],
+): Promise<ZoteroItem[]> {
+  const seen = new Map<string, ZoteroItem>();
+  const visited = new Set<string>();
+  const visit = async (key: string): Promise<void> => {
+    if (visited.has(key)) return;
+    visited.add(key);
+    let items: ZoteroItem[] = [];
+    try {
+      items = await collectionItems(userId, key);
+    } catch (error) {
+      failures.push(`${key}:items:${error instanceof Error ? error.message : 'unknown'}`);
+    }
+    for (const item of items) if (!seen.has(item.key)) seen.set(item.key, item);
+    let children: ZoteroCollection[] = [];
+    try {
+      children = await childCollections(userId, key);
+    } catch (error) {
+      failures.push(`${key}:children:${error instanceof Error ? error.message : 'unknown'}`);
+    }
+    for (const child of children) await visit(child.key);
+  };
+  await visit(collectionKey);
+  return [...seen.values()];
+}
+
+/**
+ * Reconcile only the legacy Zotero memberships observed by this complete pass.
+ * A work row (and therefore its notes, analysis and local files) is never deleted:
+ * when Zotero removes or moves an item out of every monitored collection, only the
+ * stale membership edge is dropped. This must run only after every collection page
+ * was observed successfully; an empty result caused by a failed request is not an
+ * authoritative deletion.
+ */
+function reconcileMonitoredCollectionMemberships(
+  observedMemberships: Map<string, Set<string>>,
+  monitored: string[],
+  previousScope: string[] = [],
+): void {
+  // Membership rows carry the direct child collection key, not necessarily the
+  // monitored root. Expand the persisted hierarchy so a deletion/move from any
+  // descendant is reconciled as well. Stale collection rows are intentionally
+  // useful here: they let us remove the last edge after Zotero deletes that child.
+  const keys = [...new Set([
+    ...previousScope,
+    ...expandCollectionKeys([...new Set(monitored.filter((key) => typeof key === 'string' && key))]),
+  ])];
+  if (keys.length === 0) return;
+  const db = getDb();
+  const placeholders = keys.map(() => '?').join(',');
+  const rows = db.prepare(`
+    SELECT wc.nodus_id, wc.collection_key, w.zotero_key
+      FROM work_collections wc
+      JOIN works w ON w.nodus_id = wc.nodus_id
+     WHERE wc.collection_key IN (${placeholders})
+  `).all(...keys) as { nodus_id: string; collection_key: string; zotero_key: string | null }[];
+  const nodusIds = [...new Set(rows.map((row) => row.nodus_id))];
+  const identitiesByWork = new Map<string, Set<string>>();
+  for (const row of rows) {
+    const identities = identitiesByWork.get(row.nodus_id) ?? new Set<string>();
+    if (row.zotero_key) identities.add(row.zotero_key);
+    identitiesByWork.set(row.nodus_id, identities);
+  }
+  if (nodusIds.length) {
+    const aliases = db.prepare(`
+      SELECT nodus_id, zotero_key
+        FROM work_aliases
+       WHERE nodus_id IN (${nodusIds.map(() => '?').join(',')})
+    `).all(...nodusIds) as { nodus_id: string; zotero_key: string }[];
+    for (const alias of aliases) {
+      const identities = identitiesByWork.get(alias.nodus_id) ?? new Set<string>();
+      identities.add(alias.zotero_key);
+      identitiesByWork.set(alias.nodus_id, identities);
+    }
+  }
+  // A DOI/explicit merge can put several Zotero identities behind one work. Keep
+  // an edge iff at least one identity observed in this complete pass still claims
+  // that exact direct collection; comparing only works.zotero_key either deletes a
+  // valid alias edge or leaves an edge that an item has moved away from.
+  const stale = rows.filter((row) => {
+    const identities = [...(identitiesByWork.get(row.nodus_id) ?? [])];
+    // A manual/non-Zotero work can legitimately use the same collection. Only a
+    // canonical Zotero identity or alias authorizes this pass to prune its edge.
+    return identities.length > 0
+      && !identities.some((key) => observedMemberships.get(key)?.has(row.collection_key));
+  });
+  if (stale.length === 0) return;
+  const remove = db.prepare('DELETE FROM work_collections WHERE nodus_id = ? AND collection_key = ?');
+  db.transaction(() => {
+    for (const row of stale) remove.run(row.nodus_id, row.collection_key);
+  })();
+}
+
 /** Full sync over all monitored collections. */
 export async function fullSync(mode: 'manual' | 'realtime'): Promise<SyncLogEntry> {
   const settings = getSettings();
@@ -168,25 +275,38 @@ export async function fullSync(mode: 'manual' | 'realtime'): Promise<SyncLogEntr
   let changed = 0;
   let lightQueued = 0;
   let deepQueued = 0;
+  const collectionFailures: string[] = [];
+  let startingVersions: Record<string, number> | null = null;
 
-  const seen = new Set<string>();
+  try {
+    startingVersions = await fetchLibraryVersions(userId, settings.monitoredCollections);
+  } catch (error) {
+    collectionFailures.push(`versions:start:${error instanceof Error ? error.message : 'unknown'}`);
+  }
+
+  const observedMemberships = new Map<string, Set<string>>();
+  const observedWorkMemberships = new Map<string, Set<string>>();
+  // Capture the old subtree before refreshing parent links. If Zotero moves an
+  // entire child collection outside a monitored root, that child is no longer a
+  // descendant afterwards, but its historical membership edge is still in scope
+  // for this reconciliation pass.
+  const previousMonitoredScope = expandCollectionKeys(settings.monitoredCollections);
 
   // Keep the collection tree current so the Library collection filter shows names
   // and can expand a parent to its subcollections.
-  await refreshCollectionTree(userId, settings.monitoredCollections);
+  await refreshCollectionTree(userId, settings.monitoredCollections, collectionFailures);
 
   for (const collectionKey of settings.monitoredCollections) {
-    let items: ZoteroItem[] = [];
-    try {
-      // Recurse into subcollections so monitoring a parent captures everything under it.
-      items = await collectionItemsRecursive(userId, collectionKey);
-    } catch {
-      continue; // collection unavailable; skip without aborting the whole sync
-    }
+    // Recurse into subcollections so monitoring a parent captures everything under it.
+    // A failed child is recorded and skipped, instead of being silently treated as empty.
+    const items = await collectionItemsRecursiveObserved(userId, collectionKey, collectionFailures);
     for (const item of items) {
-      seen.add(item.key);
+      observedMemberships.set(item.key, new Set(item.collections));
       const before = getWorkByZoteroKey(item.key);
       const { nodusId, isNew, hasReadTag } = ingestZoteroItem(item, settings.readTag);
+      const workMemberships = observedWorkMemberships.get(nodusId) ?? new Set<string>();
+      for (const collectionKey of item.collections) workMemberships.add(collectionKey);
+      observedWorkMemberships.set(nodusId, workMemberships);
       const didChange = !!before && before.zotero_version !== item.version;
       if (isNew) {
         added++;
@@ -233,10 +353,27 @@ export async function fullSync(mode: 'manual' | 'realtime'): Promise<SyncLogEntr
   }
 
   // Persist every monitored library version so group-library edits also trigger realtime sync.
-  try {
-    setLibraryVersions(await fetchLibraryVersions(userId, settings.monitoredCollections));
-  } catch {
-    /* ignore */
+  if (collectionFailures.length === 0) {
+    try {
+      const endingVersions = await fetchLibraryVersions(userId, settings.monitoredCollections);
+      const changedDuringRead = !startingVersions
+        || [...new Set([...Object.keys(startingVersions), ...Object.keys(endingVersions)])]
+          .some((key) => startingVersions?.[key] !== endingVersions[key]);
+      if (changedDuringRead) {
+        collectionFailures.push('versions: Zotero cambió durante el recorrido de colecciones');
+      } else {
+        // `ingestZoteroItem` replaces memberships for a canonical key and adds them
+        // for an alias. Their traversal order is not stable, so restore the complete
+        // observed union once per merged work before pruning stale in-scope edges.
+        for (const [nodusId, memberships] of observedWorkMemberships) {
+          addWorkCollections(nodusId, [...memberships]);
+        }
+        reconcileMonitoredCollectionMemberships(observedMemberships, settings.monitoredCollections, previousMonitoredScope);
+        setLibraryVersions(endingVersions);
+      }
+    } catch (error) {
+      collectionFailures.push(`versions:${error instanceof Error ? error.message : 'unknown'}`);
+    }
   }
 
   // Continuous document understanding is opt-in. When enabled, reconcile now so
@@ -247,8 +384,14 @@ export async function fullSync(mode: 'manual' | 'realtime'): Promise<SyncLogEntr
     });
   }
 
-  const summary = `${added} altas, ${changed} cambios, ${lightQueued} temas encolados, ${deepQueued} profundos encolados`;
-  return addSyncLog(mode, summary);
+  for (const failure of collectionFailures) console.warn(`[zotero-sync] collection traversal failed: ${failure}`);
+  const failureSummary = collectionFailures.length ? `, ${collectionFailures.length} fallos de colección` : '';
+  const summary = `${added} altas, ${changed} cambios, ${lightQueued} temas encolados, ${deepQueued} profundos encolados${failureSummary}`;
+  const log = addSyncLog(mode, summary);
+  if (collectionFailures.length) {
+    throw new Error(`La sincronización de Zotero quedó incompleta: ${collectionFailures.length} lectura(s) fallaron. No se avanzó el checkpoint.`);
+  }
+  return log;
 }
 
 function monitoredLibraries(collections: string[]): ZoteroLibrary[] {

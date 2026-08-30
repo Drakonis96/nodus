@@ -5,12 +5,14 @@ import { Icon } from './ui';
 import { t } from '../i18n';
 
 const PHASE_LABEL: Record<ZoteroImportProgress['phase'], string> = {
+  inventory: 'Inventariando Zotero…',
   connecting: 'Conectando con Zotero…',
   collections: 'Leyendo colecciones…',
   catalog: 'Catalogando…',
   notes: 'Leyendo notas…',
   attachments: 'Copiando archivos…',
   rebuild: 'Verificando el índice local…',
+  verification: 'Comprobando integridad de la importación…',
   complete: 'Importación completada',
   canceled: 'Importación cancelada',
   failed: 'No se pudo completar la importación',

@@ -1,4 +1,6 @@
 import { fileURLToPath } from 'node:url';
+import fs from 'node:fs';
+import path from 'node:path';
 import type { ZoteroAttachmentInfo, ZoteroCollection, ZoteroItem, ZoteroLibrary, ZoteroPingResult, WorkMeta } from '@shared/types';
 
 // Read-only client for Zotero's local API: the desktop app's local implementation
@@ -96,15 +98,61 @@ function parseCanonicalKey(key: string, fallback: ZoteroLibrary = PERSONAL_LIBRA
   return { library: { type: 'group', id: match[1], name: fallback.type === 'group' && fallback.id === match[1] ? fallback.name : `Grupo ${match[1]}` }, rawKey: match[2] };
 }
 
-export async function libraries(): Promise<ZoteroLibrary[]> {
-  const res = await zfetch(`${ZOTERO_API_BASE}/users/${LOCAL_USER_ID}/groups?limit=100`);
-  if (!res.ok) return [PERSONAL_LIBRARY];
-  const groups = (await res.json().catch(() => [])) as any[];
-  return [PERSONAL_LIBRARY, ...groups.map((raw) => ({
-    type: 'group' as const,
-    id: String(raw.id ?? raw.data?.id ?? raw.library?.id ?? ''),
-    name: String(raw.data?.name ?? raw.name ?? raw.library?.name ?? 'Grupo de Zotero'),
-  })).filter((group) => group.id)];
+export async function libraries(signal?: AbortSignal): Promise<ZoteroLibrary[]> {
+  const limit = 100;
+  let previousSignature: string | null = null;
+  let previousGroups: ZoteroLibrary[] = [];
+
+  // The groups endpoint has no library-version barrier. Offset pagination can shift
+  // while a group is added/removed, producing one duplicate and silently omitting a
+  // library. Require two identical, complete traversals before exposing the snapshot.
+  for (let attempt = 1; attempt <= 4; attempt += 1) {
+    const byId = new Map<string, ZoteroLibrary>();
+    let start = 0;
+    let declaredTotal: number | null = null;
+    let complete = true;
+    for (;;) {
+      const res = await zfetch(`${ZOTERO_API_BASE}/users/${LOCAL_USER_ID}/groups?limit=${limit}&start=${start}`, signal);
+      if (!res.ok) throw endpointError('Bibliotecas de grupo de Zotero', res);
+      const page = (await res.json().catch(() => [])) as any[];
+      if (!Array.isArray(page)) {
+        throw new ZoteroRequestError('Zotero devolvió un inventario de grupos inválido.', 'invalid-response', res.status, true);
+      }
+      const header = res.headers.get('Total-Results');
+      if (header !== null) {
+        const total = Number(header);
+        if (!Number.isFinite(total) || total < 0 || (declaredTotal !== null && declaredTotal !== total)) complete = false;
+        else declaredTotal = total;
+      }
+      for (const raw of page) {
+        const id = String(raw.id ?? raw.data?.id ?? raw.library?.id ?? '');
+        if (!id || byId.has(id)) { complete = false; continue; }
+        byId.set(id, {
+          type: 'group', id,
+          name: String(raw.data?.name ?? raw.name ?? raw.library?.name ?? 'Grupo de Zotero'),
+        });
+      }
+      start += page.length;
+      if (page.length === 0 || page.length < limit || (declaredTotal !== null && start >= declaredTotal)) break;
+    }
+    if (declaredTotal !== null && byId.size !== declaredTotal) complete = false;
+    const groups = [...byId.values()];
+    const signature = JSON.stringify(groups
+      .map((group) => [group.id, group.name])
+      .sort(([left], [right]) => left.localeCompare(right)));
+    if (complete && signature === previousSignature) return [PERSONAL_LIBRARY, ...groups];
+    if (complete) {
+      previousSignature = signature;
+      previousGroups = groups;
+    } else {
+      previousSignature = null;
+      previousGroups = [];
+    }
+  }
+  throw new ZoteroRequestError(
+    `El inventario de bibliotecas de Zotero cambió durante el recorrido${previousGroups.length ? ` (${previousGroups.length} grupos observados)` : ''}; vuelve a intentarlo.`,
+    'invalid-response', null, true,
+  );
 }
 
 /**
@@ -127,8 +175,12 @@ export async function ping(): Promise<ZoteroPingResult> {
 }
 
 /** Library version is returned in the Last-Modified-Version response header. */
-export async function libraryVersion(userId: string, library: ZoteroLibrary = { ...PERSONAL_LIBRARY, id: userId }): Promise<number> {
-  const res = await zfetch(`${ZOTERO_API_BASE}/${libraryPrefix(library)}/items?limit=1`);
+export async function libraryVersion(
+  userId: string,
+  library: ZoteroLibrary = { ...PERSONAL_LIBRARY, id: userId },
+  signal?: AbortSignal,
+): Promise<number> {
+  const res = await zfetch(`${ZOTERO_API_BASE}/${libraryPrefix(library)}/items?limit=1`, signal);
   const v = res.headers.get('Last-Modified-Version');
   return v ? parseInt(v, 10) : 0;
 }
@@ -149,18 +201,38 @@ function mapCollection(raw: any, library: ZoteroLibrary): ZoteroCollection {
 
 export async function topCollections(userId: string, requestedLibrary?: ZoteroLibrary): Promise<ZoteroCollection[]> {
   const library = requestedLibrary ?? { ...PERSONAL_LIBRARY, id: userId };
-  const res = await zfetch(`${ZOTERO_API_BASE}/${libraryPrefix(library)}/collections/top?limit=100`);
-  if (!res.ok) throw endpointError('Colecciones de Zotero', res);
-  const data = (await res.json()) as any[];
-  return data.map((raw) => mapCollection(raw, library)).sort((a, b) => a.name.localeCompare(b.name));
+  const out: ZoteroCollection[] = [];
+  let start = 0;
+  const limit = 100;
+  for (;;) {
+    const res = await zfetch(`${ZOTERO_API_BASE}/${libraryPrefix(library)}/collections/top?limit=${limit}&start=${start}`);
+    if (!res.ok) throw endpointError('Colecciones de Zotero', res);
+    const data = (await res.json()) as any[];
+    out.push(...data.map((raw) => mapCollection(raw, library)));
+    start += data.length;
+    const totalHeader = res.headers.get('Total-Results');
+    const total = totalHeader === null ? null : Number(totalHeader);
+    if (data.length === 0 || data.length < limit || (Number.isFinite(total) && start >= (total as number))) break;
+  }
+  return out.sort((a, b) => a.name.localeCompare(b.name));
 }
 
 export async function childCollections(userId: string, parentKey: string, requestedLibrary?: ZoteroLibrary): Promise<ZoteroCollection[]> {
   const parsed = parseCanonicalKey(parentKey, requestedLibrary ?? { ...PERSONAL_LIBRARY, id: userId });
-  const res = await zfetch(`${ZOTERO_API_BASE}/${libraryPrefix(parsed.library)}/collections/${encodeURIComponent(parsed.rawKey)}/collections?limit=100`);
-  if (!res.ok) throw endpointError('Subcolecciones de Zotero', res);
-  const data = (await res.json()) as any[];
-  return data.map((raw) => mapCollection(raw, parsed.library)).sort((a, b) => a.name.localeCompare(b.name));
+  const out: ZoteroCollection[] = [];
+  let start = 0;
+  const limit = 100;
+  for (;;) {
+    const res = await zfetch(`${ZOTERO_API_BASE}/${libraryPrefix(parsed.library)}/collections/${encodeURIComponent(parsed.rawKey)}/collections?limit=${limit}&start=${start}`);
+    if (!res.ok) throw endpointError('Subcolecciones de Zotero', res);
+    const data = (await res.json()) as any[];
+    out.push(...data.map((raw) => mapCollection(raw, parsed.library)));
+    start += data.length;
+    const totalHeader = res.headers.get('Total-Results');
+    const total = totalHeader === null ? null : Number(totalHeader);
+    if (data.length === 0 || data.length < limit || (Number.isFinite(total) && start >= (total as number))) break;
+  }
+  return out.sort((a, b) => a.name.localeCompare(b.name));
 }
 
 function yearFromDate(date?: string): number | null {
@@ -183,10 +255,23 @@ function mapItem(raw: any, library: ZoteroLibrary): ZoteroItem {
     'publisher', 'publicationTitle', 'bookTitle', 'proceedingsTitle', 'ISBN', 'ISSN', 'url', 'language', 'volume', 'issue',
     'pages', 'edition', 'place', 'rights', 'extra', 'dateAdded', 'dateModified', 'relations',
   ]);
-  const fields = Object.fromEntries(Object.entries(d as Record<string, unknown>).flatMap(([name, value]) => {
+  const fields: Record<string, string> = Object.fromEntries(Object.entries(d as Record<string, unknown>).flatMap(([name, value]) => {
     if (represented.has(name) || !['string', 'number', 'boolean'].includes(typeof value)) return [];
     const clean = String(value).trim(); return clean ? [[name, clean]] : [];
   }));
+  // Keep Zotero distinctions that do not have a first-class Nodus field. They remain
+  // searchable/exportable through metadata.extra instead of being silently collapsed
+  // (for example bookTitle/proceedingsTitle both map to publicationTitle).
+  for (const name of ['shortTitle', 'bookTitle', 'proceedingsTitle'] as const) {
+    const clean = typeof d[name] === 'string' ? d[name].trim() : '';
+    if (clean) fields[name] = clean;
+  }
+  if (d.relations && typeof d.relations === 'object' && Object.keys(d.relations).length) {
+    fields.relations = JSON.stringify(d.relations);
+  }
+  if (Array.isArray(d.tags) && d.tags.some((tag: any) => tag && typeof tag === 'object' && 'type' in tag)) {
+    fields.tags = JSON.stringify(d.tags);
+  }
   return {
     key: canonicalKey(library, itemKey),
     itemKey,
@@ -318,9 +403,14 @@ export async function deletedSince(
   };
 }
 
-/** Complete collection tree. Pagination is explicit so libraries over 100 nodes are never truncated. */
-export async function allCollections(library: ZoteroLibrary, signal?: AbortSignal): Promise<ZoteroCollection[]> {
+interface PagedCollections {
+  collections: ZoteroCollection[];
+  versions: number[];
+}
+
+async function readAllCollections(library: ZoteroLibrary, signal?: AbortSignal): Promise<PagedCollections> {
   const out: ZoteroCollection[] = [];
+  const versions: number[] = [];
   let start = 0;
   const limit = 100;
   for (;;) {
@@ -328,11 +418,19 @@ export async function allCollections(library: ZoteroLibrary, signal?: AbortSigna
     if (!res.ok) throw endpointError('Colecciones de Zotero', res);
     const data = (await res.json()) as any[];
     out.push(...data.map((raw) => mapCollection(raw, library)));
-    const total = Number(res.headers.get('Total-Results')) || data.length;
+    const pageVersion = Number(res.headers.get('Last-Modified-Version'));
+    if (Number.isFinite(pageVersion) && pageVersion > 0) versions.push(pageVersion);
+    const totalHeader = res.headers.get('Total-Results');
+    const total = totalHeader === null ? null : Number(totalHeader);
     start += data.length;
-    if (data.length < limit || start >= total) break;
+    if (data.length === 0 || data.length < limit || (Number.isFinite(total) && start >= (total as number))) break;
   }
-  return out.sort((a, b) => a.name.localeCompare(b.name));
+  return { collections: out.sort((a, b) => a.name.localeCompare(b.name)), versions };
+}
+
+/** Complete collection tree. Pagination is explicit so libraries over 100 nodes are never truncated. */
+export async function allCollections(library: ZoteroLibrary, signal?: AbortSignal): Promise<ZoteroCollection[]> {
+  return (await readAllCollections(library, signal)).collections;
 }
 
 /** Page through a collection's items (limit=100), skipping attachments/notes. */
@@ -460,68 +558,294 @@ export async function getFulltext(userId: string, attachmentKey: string): Promis
   return data;
 }
 
-export async function itemChildren(userId: string, itemKey: string): Promise<ZoteroAttachment[]> {
-  const parsed = parseCanonicalKey(itemKey, { ...PERSONAL_LIBRARY, id: userId });
-  const res = await zfetch(`${ZOTERO_API_BASE}/${libraryPrefix(parsed.library)}/items/${encodeURIComponent(parsed.rawKey)}/children`);
-  if (!res.ok) return [];
-  const data = (await res.json()) as any[];
-  return data
+function mapAttachment(raw: any, library: ZoteroLibrary): ZoteroAttachment {
+  const data = raw.data ?? {};
+  const itemKey = String(data.key ?? raw.key ?? '');
+  return {
+    key: canonicalKey(library, itemKey),
+    itemKey,
+    library,
+    title: data.title || data.filename || 'Adjunto',
+    contentType: data.contentType ?? null,
+    linkMode: data.linkMode ?? null,
+    filename: data.filename ?? null,
+    available: Boolean(data.filename),
+    version: data.version ?? raw.version ?? 0,
+    parentItem: data.parentItem ?? null,
+    dateModified: data.dateModified ?? null,
+  };
+}
+
+async function rawItemChildren(
+  userId: string,
+  itemKey: string,
+  requestedLibrary?: ZoteroLibrary,
+  signal?: AbortSignal,
+): Promise<{ parsed: { library: ZoteroLibrary; rawKey: string }; children: any[] }> {
+  const parsed = parseCanonicalKey(itemKey, requestedLibrary ?? { ...PERSONAL_LIBRARY, id: userId });
+  const children: any[] = [];
+  let start = 0;
+  const limit = 100;
+  for (;;) {
+    const params = new URLSearchParams({ limit: String(limit), start: String(start) });
+    const res = await zfetch(`${ZOTERO_API_BASE}/${libraryPrefix(parsed.library)}/items/${encodeURIComponent(parsed.rawKey)}/children?${params}`, signal);
+    if (!res.ok) return { parsed, children: [] };
+    const page = (await res.json()) as any[];
+    children.push(...page);
+    start += page.length;
+    const totalHeader = res.headers.get('Total-Results');
+    const total = totalHeader === null ? null : Number(totalHeader);
+    if (page.length === 0 || page.length < limit || (Number.isFinite(total) && start >= (total as number))) break;
+  }
+  return { parsed, children };
+}
+
+export async function itemChildren(userId: string, itemKey: string, signal?: AbortSignal): Promise<ZoteroAttachment[]> {
+  const { parsed, children } = await rawItemChildren(userId, itemKey, undefined, signal);
+  return children
     // Defensive: older Zotero builds answered /items/<unknown>/children with a 200
     // listing of UNRELATED library items instead of a 404 (9.0.6 returns an empty
     // array). Requiring parentItem to match keeps a stale/foreign key from ever
     // resolving to someone else's file, whichever behaviour the client has.
     .filter((c) => c.data?.itemType === 'attachment' && c.data?.parentItem === parsed.rawKey)
-    .map((c) => ({
-      key: canonicalKey(parsed.library, c.data.key),
-      itemKey: c.data.key,
-      library: parsed.library,
-      title: c.data.title || c.data.filename || 'Adjunto',
-      contentType: c.data.contentType ?? null,
-      linkMode: c.data.linkMode ?? null,
-      filename: c.data.filename ?? null,
-      available: Boolean(c.data.filename),
-      version: c.data.version ?? c.version ?? 0,
-      parentItem: c.data.parentItem ?? null,
-      dateModified: c.data.dateModified ?? null,
-    }));
+    .map((child) => mapAttachment(child, parsed.library));
 }
 
 export interface ZoteroChildNote {
   key: string;
+  itemKey: string;
+  library: ZoteroLibrary;
   title: string;
   html: string;
   version: number;
+  parentItem: string;
+  dateModified: string | null;
+}
+
+function mapChildNote(raw: any, library: ZoteroLibrary): ZoteroChildNote {
+  const data = raw.data ?? {};
+  const itemKey = String(data.key ?? raw.key ?? '');
+  return {
+    key: canonicalKey(library, itemKey),
+    itemKey,
+    library,
+    title: String(data.title || 'Zotero note'),
+    html: String(data.note || ''),
+    version: Number(data.version ?? raw.version ?? 0),
+    parentItem: String(data.parentItem ?? ''),
+    dateModified: data.dateModified ?? null,
+  };
 }
 
 /** Child notes remain a read-only mirror in Nodus. */
-export async function itemNotes(userId: string, itemKey: string, library?: ZoteroLibrary): Promise<ZoteroChildNote[]> {
-  const parsed = parseCanonicalKey(itemKey, library ?? { ...PERSONAL_LIBRARY, id: userId });
-  const res = await zfetch(`${ZOTERO_API_BASE}/${libraryPrefix(parsed.library)}/items/${encodeURIComponent(parsed.rawKey)}/children`);
-  if (!res.ok) return [];
-  const data = (await res.json()) as any[];
-  return data.filter((child) => child.data?.itemType === 'note' && child.data?.parentItem === parsed.rawKey).map((child) => ({
-    key: canonicalKey(parsed.library, child.data.key),
-    title: String(child.data.title || 'Zotero note'),
-    html: String(child.data.note || ''),
-    version: Number(child.data.version ?? child.version ?? 0),
-  }));
+export async function itemNotes(
+  userId: string,
+  itemKey: string,
+  library?: ZoteroLibrary,
+  signal?: AbortSignal,
+): Promise<ZoteroChildNote[]> {
+  const { parsed, children } = await rawItemChildren(userId, itemKey, library, signal);
+  return children
+    .filter((child) => child.data?.itemType === 'note' && child.data?.parentItem === parsed.rawKey)
+    .map((child) => mapChildNote(child, parsed.library));
 }
 
-export async function itemAttachments(userId: string, itemKey: string, library?: ZoteroLibrary): Promise<ZoteroAttachment[]> {
+export async function itemAttachments(
+  userId: string,
+  itemKey: string,
+  library?: ZoteroLibrary,
+  signal?: AbortSignal,
+): Promise<ZoteroAttachment[]> {
   const parsed = parseCanonicalKey(itemKey, library ?? { ...PERSONAL_LIBRARY, id: userId });
   const canonical = canonicalKey(parsed.library, parsed.rawKey);
-  const children = await itemChildren(userId, canonical);
+  const children = await itemChildren(userId, canonical, signal);
   if (children.length) return children;
-  const self = await itemAsAttachment(userId, canonical);
+  const self = await itemAsAttachment(userId, canonical, signal);
   return self ? [self] : [];
 }
 
-export async function attachmentFilePath(userId: string, attachmentKey: string): Promise<string | null> {
-  const parsed = parseCanonicalKey(attachmentKey, { ...PERSONAL_LIBRARY, id: userId });
-  const res = await zfetch(`${ZOTERO_API_BASE}/${libraryPrefix(parsed.library)}/items/${encodeURIComponent(parsed.rawKey)}/file`, undefined, { redirect: 'manual' });
+export interface ZoteroLibraryInventory {
+  library: ZoteroLibrary;
+  /** Bibliographic top-level items plus standalone files when enabled. */
+  items: ZoteroItem[];
+  collections: ZoteroCollection[];
+  /** Every attachment object, including linked URLs and standalone files. */
+  attachments: ZoteroAttachment[];
+  /** Notes with a parent item. Standalone notes are not importable works. */
+  notes: ZoteroChildNote[];
+  /** Stable Zotero library version represented by this snapshot. */
+  version: number;
+  /** Number of importable top-level works before applying the standalone-file option. */
+  total: number;
+  standaloneSkipped: number;
+  attempts: number;
+}
+
+export interface ZoteroLibraryInventoryOptions {
+  signal?: AbortSignal;
+  onProgress?: (loaded: number, total: number) => void;
+  /** A complete inventory includes standalone files unless explicitly disabled. */
+  includeStandaloneFiles?: boolean;
+  /** Primarily useful for deterministic verification; defaults to three. */
+  maxAttempts?: number;
+}
+
+export class ZoteroInventoryChangedError extends ZoteroRequestError {
+  constructor(
+    readonly library: ZoteroLibrary,
+    readonly startVersion: number,
+    readonly endVersion: number,
+    readonly attempts: number,
+  ) {
+    super(
+      `Zotero cambió la biblioteca "${library.name}" durante el inventario (${startVersion} → ${endVersion}).`,
+      'invalid-response',
+      null,
+      true,
+    );
+    this.name = 'ZoteroInventoryChangedError';
+  }
+}
+
+interface PagedRawItems {
+  items: any[];
+  versions: number[];
+}
+
+async function readAllRawItems(
+  library: ZoteroLibrary,
+  signal?: AbortSignal,
+  onProgress?: (loaded: number, total: number) => void,
+): Promise<PagedRawItems> {
+  const items: any[] = [];
+  const versions: number[] = [];
+  let start = 0;
+  const limit = 100;
+  for (;;) {
+    const params = new URLSearchParams({ limit: String(limit), start: String(start), sort: 'dateModified', direction: 'asc' });
+    const res = await zfetch(`${ZOTERO_API_BASE}/${libraryPrefix(library)}/items?${params}`, signal);
+    if (!res.ok) throw endpointError('Inventario de Zotero', res);
+    const page = (await res.json()) as any[];
+    items.push(...page);
+    const pageVersion = Number(res.headers.get('Last-Modified-Version'));
+    if (Number.isFinite(pageVersion) && pageVersion > 0) versions.push(pageVersion);
+    start += page.length;
+    const totalHeader = res.headers.get('Total-Results');
+    const total = totalHeader === null ? null : Number(totalHeader);
+    onProgress?.(start, Number.isFinite(total) ? (total as number) : start);
+    if (page.length === 0 || page.length < limit || (Number.isFinite(total) && start >= (total as number))) break;
+  }
+  return { items, versions };
+}
+
+/**
+ * Build an exhaustive, coherent snapshot of one Zotero library.
+ *
+ * Reading `/items` rather than requesting children once per parent both avoids the
+ * local API's default page limit and makes child-only changes visible. The library
+ * version is sampled around all item and collection pages; if any page belongs to a
+ * different version, the entire read is discarded and retried a bounded number of
+ * times so callers never import a page-shifted mixture of two Zotero states.
+ */
+export async function libraryInventory(
+  library: ZoteroLibrary,
+  opts: ZoteroLibraryInventoryOptions = {},
+): Promise<ZoteroLibraryInventory> {
+  const configuredAttempts = Number.isFinite(opts.maxAttempts) ? Math.trunc(opts.maxAttempts as number) : 3;
+  const maxAttempts = Math.max(1, Math.min(10, configuredAttempts));
+  let lastStartVersion = 0;
+  let lastEndVersion = 0;
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    if (opts.signal?.aborted) throw new DOMException('Solicitud cancelada', 'AbortError');
+    const startVersion = await libraryVersion(library.id, library, opts.signal);
+    const raw = await readAllRawItems(library, opts.signal, opts.onProgress);
+    const collectionPage = await readAllCollections(library, opts.signal);
+    const endVersion = await libraryVersion(library.id, library, opts.signal);
+    lastStartVersion = startVersion;
+    lastEndVersion = endVersion;
+
+    const observedVersions = [...raw.versions, ...collectionPage.versions];
+    const stable = startVersion === endVersion && observedVersions.every((version) => version === startVersion);
+    if (!stable) {
+      if (attempt < maxAttempts) await waitForRetry(Math.min(250, attempt * 50), opts.signal);
+      continue;
+    }
+
+    const items: ZoteroItem[] = [];
+    const attachments: ZoteroAttachment[] = [];
+    const notes: ZoteroChildNote[] = [];
+    let standaloneSkipped = 0;
+    const includeStandaloneFiles = opts.includeStandaloneFiles !== false;
+
+    for (const entry of raw.items) {
+      const data = entry.data ?? {};
+      const itemType = String(data.itemType ?? '');
+      const parentItem = data.parentItem ? String(data.parentItem) : null;
+      if (itemType === 'attachment') {
+        attachments.push(mapAttachment(entry, library));
+        if (parentItem || !STANDALONE_FILE_MODES.has(String(data.linkMode))) continue;
+        if (!includeStandaloneFiles) { standaloneSkipped += 1; continue; }
+        items.push(mapItem(entry, library));
+        continue;
+      }
+      if (itemType === 'note') {
+        if (parentItem) notes.push(mapChildNote(entry, library));
+        continue;
+      }
+      if (itemType === 'annotation' || parentItem) continue;
+      items.push(mapItem(entry, library));
+    }
+
+    return {
+      library,
+      items,
+      collections: collectionPage.collections,
+      attachments,
+      notes,
+      version: endVersion,
+      total: items.length + standaloneSkipped,
+      standaloneSkipped,
+      attempts: attempt,
+    };
+  }
+
+  throw new ZoteroInventoryChangedError(library, lastStartVersion, lastEndVersion, maxAttempts);
+}
+
+export async function attachmentFilePath(
+  userId: string,
+  attachmentKey: string,
+  library?: ZoteroLibrary,
+  signal?: AbortSignal,
+): Promise<string | null> {
+  const parsed = parseCanonicalKey(attachmentKey, library ?? { ...PERSONAL_LIBRARY, id: userId });
+  const res = await zfetch(`${ZOTERO_API_BASE}/${libraryPrefix(parsed.library)}/items/${encodeURIComponent(parsed.rawKey)}/file`, signal, { redirect: 'manual' });
   const location = res.headers.get('location');
   if (!location?.startsWith('file:')) return null;
-  try { return fileURLToPath(location); } catch { return null; }
+  try {
+    const declaredPath = fileURLToPath(location);
+    if (fs.existsSync(declaredPath) && fs.statSync(declaredPath).isFile()) return declaredPath;
+
+    // Zotero can retain an obsolete filename in its attachment row after its own
+    // storage renames the physical file. A storage directory belongs to one
+    // attachment key, so a unique non-hidden file (or unique same-extension file)
+    // is the safe materialized target. Never guess when several candidates remain.
+    const directory = path.dirname(declaredPath);
+    if (!fs.existsSync(directory) || !fs.statSync(directory).isDirectory()) return null;
+    const candidates = fs.readdirSync(directory, { withFileTypes: true })
+      .filter((entry) => entry.isFile() && !entry.name.startsWith('.'))
+      .map((entry) => path.join(directory, entry.name));
+    const extension = path.extname(declaredPath).toLocaleLowerCase();
+    if (candidates.length === 1
+      && (!extension || path.extname(candidates[0]).toLocaleLowerCase() === extension)) return candidates[0];
+    const sameExtension = extension
+      ? candidates.filter((candidate) => path.extname(candidate).toLocaleLowerCase() === extension)
+      : [];
+    return sameExtension.length === 1 ? sameExtension[0] : null;
+  } catch {
+    return null;
+  }
 }
 
 // Attachment key per parent item, resolved once per session. Used by the
@@ -558,26 +882,14 @@ export async function resolvePdfAttachmentKey(userId: string, itemKey: string): 
  * children, so its text must be read from the item itself. Returns the item as a
  * ZoteroAttachment, or null when it is not an attachment.
  */
-export async function itemAsAttachment(userId: string, itemKey: string): Promise<ZoteroAttachment | null> {
+export async function itemAsAttachment(userId: string, itemKey: string, signal?: AbortSignal): Promise<ZoteroAttachment | null> {
   const parsed = parseCanonicalKey(itemKey, { ...PERSONAL_LIBRARY, id: userId });
-  const res = await zfetch(`${ZOTERO_API_BASE}/${libraryPrefix(parsed.library)}/items/${encodeURIComponent(parsed.rawKey)}`);
+  const res = await zfetch(`${ZOTERO_API_BASE}/${libraryPrefix(parsed.library)}/items/${encodeURIComponent(parsed.rawKey)}`, signal);
   if (!res.ok) return null;
   const raw = (await res.json().catch(() => null)) as any;
   const d = raw?.data;
   if (!d || d.itemType !== 'attachment') return null;
-  return {
-    key: canonicalKey(parsed.library, d.key ?? parsed.rawKey),
-    itemKey: d.key ?? parsed.rawKey,
-    library: parsed.library,
-    title: d.title || d.filename || 'Adjunto',
-    contentType: d.contentType ?? null,
-    linkMode: d.linkMode ?? null,
-    filename: d.filename ?? null,
-    available: Boolean(d.filename),
-    version: d.version ?? raw.version ?? 0,
-    parentItem: d.parentItem ?? null,
-    dateModified: d.dateModified ?? null,
-  };
+  return mapAttachment(raw, parsed.library);
 }
 
 // An `itemsSince()` incremental diff used to live here, unreferenced by any caller.

@@ -84,6 +84,8 @@
     "verify:deep-research-approaches-live": "node scripts/verify-deep-research-approaches-live.mjs",
     "verify:vector-scan": "ELECTRON_RUN_AS_NODE=1 ./node_modules/.bin/electron scripts/verify-vector-scan.mjs",
     "verify:library-metadata-live": "node scripts/verify-library-metadata-live.mjs",
+    "verify:zotero:live": "node scripts/audit-zotero-live-import.mjs --all",
+    "verify:zotero:ping": "node scripts/audit-zotero-live-import.mjs",
     "verify:browser-connector": "node scripts/verify-browser-connector-server.mjs",
     "verify:browser-connector-live": "node scripts/verify-browser-connector-live.mjs",
     "verify:study-whisper": "node scripts/verify-study-whisper.mjs",
