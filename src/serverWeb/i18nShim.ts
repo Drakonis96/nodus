@@ -2970,6 +2970,9 @@ const SERVER_WEB_FINAL_CHROME_TRANSLATIONS: TranslationTables = {
   en: {
     "Nuevo vault": "New vault",
     "Connected Vault": "Connected Vault",
+    "Añadir vault": "Add vault",
+    "No hay coincidencias": "No matches",
+    "La biblioteca está vacía": "The library is empty",
     "Crear un vault editable directamente en Server.":
       "Create an editable vault directly on Server.",
     "Conectar un vault de Desktop para publicarlo y sincronizarlo.":
@@ -3019,6 +3022,9 @@ const SERVER_WEB_FINAL_CHROME_TRANSLATIONS: TranslationTables = {
   fr: {
     "Nuevo vault": "Nouveau coffre",
     "Connected Vault": "Coffre connecté",
+    "Añadir vault": "Ajouter un coffre",
+    "No hay coincidencias": "Aucun résultat",
+    "La biblioteca está vacía": "La bibliothèque est vide",
     "Crear un vault editable directamente en Server.":
       "Créer un coffre modifiable directement sur Server.",
     "Conectar un vault de Desktop para publicarlo y sincronizarlo.":
@@ -3061,6 +3067,9 @@ const SERVER_WEB_FINAL_CHROME_TRANSLATIONS: TranslationTables = {
   de: {
     "Nuevo vault": "Neuer Tresor",
     "Connected Vault": "Verbundener Tresor",
+    "Añadir vault": "Tresor hinzufügen",
+    "No hay coincidencias": "Keine Treffer",
+    "La biblioteca está vacía": "Die Bibliothek ist leer",
     "Crear un vault editable directamente en Server.":
       "Einen bearbeitbaren Tresor direkt auf Server erstellen.",
     "Conectar un vault de Desktop para publicarlo y sincronizarlo.":
@@ -3103,6 +3112,9 @@ const SERVER_WEB_FINAL_CHROME_TRANSLATIONS: TranslationTables = {
   pt: {
     "Nuevo vault": "Novo cofre",
     "Connected Vault": "Cofre ligado",
+    "Añadir vault": "Adicionar cofre",
+    "No hay coincidencias": "Sem resultados",
+    "La biblioteca está vacía": "A biblioteca está vazia",
     "Crear un vault editable directamente en Server.":
       "Criar um cofre editável diretamente no Server.",
     "Conectar un vault de Desktop para publicarlo y sincronizarlo.":
@@ -3167,6 +3179,9 @@ const SERVER_WEB_FINAL_CHROME_TRANSLATIONS: TranslationTables = {
   "pt-BR": {
     "Nuevo vault": "Novo cofre",
     "Connected Vault": "Cofre conectado",
+    "Añadir vault": "Adicionar cofre",
+    "No hay coincidencias": "Nenhum resultado",
+    "La biblioteca está vacía": "A biblioteca está vazia",
     "Crear un vault editable directamente en Server.":
       "Criar um cofre editável diretamente no Server.",
     "Conectar un vault de Desktop para publicarlo y sincronizarlo.":
@@ -3230,6 +3245,9 @@ const SERVER_WEB_FINAL_CHROME_TRANSLATIONS: TranslationTables = {
   it: {
     "Nuevo vault": "Nuovo vault",
     "Connected Vault": "Vault connesso",
+    "Añadir vault": "Aggiungi vault",
+    "No hay coincidencias": "Nessun risultato",
+    "La biblioteca está vacía": "La biblioteca è vuota",
     "Crear un vault editable directamente en Server.":
       "Crea un vault modificabile direttamente su Server.",
     "Conectar un vault de Desktop para publicarlo y sincronizarlo.":
@@ -3274,6 +3292,9 @@ const SERVER_WEB_FINAL_CHROME_TRANSLATIONS: TranslationTables = {
   tr: {
     "Nuevo vault": "Yeni kasa",
     "Connected Vault": "Bağlı kasa",
+    "Añadir vault": "Kasa ekle",
+    "No hay coincidencias": "Eşleşme yok",
+    "La biblioteca está vacía": "Kütüphane boş",
     "Crear un vault editable directamente en Server.":
       "Doğrudan Server üzerinde düzenlenebilir bir kasa oluşturun.",
     "Conectar un vault de Desktop para publicarlo y sincronizarlo.":
