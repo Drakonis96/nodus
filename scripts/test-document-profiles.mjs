@@ -53,6 +53,19 @@ try {
   ) VALUES('w1','Z1','Modernización española','["Autora Uno"]',2024,'book','pdf',0,'done','done','none')`).run();
 
   const repo = require(path.join(repoRoot, 'electron/db/documentProfilesRepo.ts'));
+  const profileAi = require(path.join(repoRoot, 'electron/ai/documentProfile.ts'));
+  assert.deepEqual(profileAi.normalizeSectionAnalysis({
+    section_analysis: {
+      title: 'Método', summary: 'Describe el entrenamiento.', role: 'method',
+      claims: [{ text: 'Usa descenso de gradiente.', support_quote: 'gradient descent', confidence: '0.9' }],
+    },
+  }, 'Fallback'), {
+    title: 'Método', summary: 'Describe el entrenamiento.', role: 'method', concepts: [],
+    claims: [{ text: 'Usa descenso de gradiente.', support_quote: 'gradient descent', page: null, confidence: 0.9 }],
+  }, 'provider wrappers and omitted empty arrays normalize without discarding supported claims');
+  assert.deepEqual(profileAi.normalizeSectionAnalysis({ title: 'Vacía' }, 'Fallback'), {
+    title: 'Vacía', summary: '', role: '', concepts: [], claims: [],
+  }, 'an incomplete object cannot manufacture claims during normalization');
   const campaign = repo.createDocumentIndexCampaign({
     vaultId: 'vault-a', mode: 'continuous', includeArchived: false,
     generatorModel: { provider: 'openai', model: 'generator' },
@@ -298,6 +311,40 @@ try {
     'starting again after stop copies compatible checkpoints without racing the cancelled worker',
   );
   repo.cancelDocumentIndexJob(restartedAfterStop.jobId);
+
+  sqlite.prepare(`INSERT INTO works(
+    nodus_id,zotero_key,title,authors_json,year,item_type,source_type,archived,
+    light_status,deep_status,summary_status
+  ) VALUES
+    ('w-retry-1','ZR1','Trabajo recuperable','[]',2024,'journalArticle','pdf',0,'done','done','none'),
+    ('w-retry-2','ZR2','Trabajo que mantiene la campaña activa','[]',2024,'journalArticle','pdf',0,'done','done','none')`).run();
+  const retryCampaign = repo.createDocumentIndexCampaign({
+    vaultId: 'vault-a', mode: 'manual', includeArchived: false,
+    generatorModel: null, auditorModel: null,
+  });
+  const failedInActiveCampaign = repo.enqueueDocumentIndexJob({
+    vaultId: 'vault-a', nodusId: 'w-retry-1', campaignId: retryCampaign.campaignId,
+    priority: 1, reason: 'manual', generatorModel: null, auditorModel: null,
+  });
+  repo.enqueueDocumentIndexJob({
+    vaultId: 'vault-a', nodusId: 'w-retry-2', campaignId: retryCampaign.campaignId,
+    priority: 0, reason: 'manual', generatorModel: null, auditorModel: null,
+  });
+  assert.equal(repo.claimNextDocumentIndexJob().jobId, failedInActiveCampaign.jobId);
+  repo.saveDocumentCheckpoint(failedInActiveCampaign.jobId, 'section:retry', 'same-source', { kept: true });
+  repo.updateDocumentIndexJob(failedInActiveCampaign.jobId, { status: 'failed', phase: 'done', error: 'invalid JSON' });
+  const retriedInSameCampaign = repo.enqueueDocumentIndexJob({
+    vaultId: 'vault-a', nodusId: 'w-retry-1', campaignId: retryCampaign.campaignId,
+    priority: 2, reason: 'manual', generatorModel: null, auditorModel: null,
+  });
+  assert.equal(retriedInSameCampaign.jobId, failedInActiveCampaign.jobId,
+    'retrying a failed item in an active campaign reuses its row instead of counting a duplicate failure');
+  assert.equal(retriedInSameCampaign.attempts, 0);
+  assert.deepEqual(repo.readDocumentCheckpoint(retriedInSameCampaign.jobId, 'section:retry', 'same-source'), { kept: true });
+  assert.equal(sqlite.prepare(
+    'SELECT COUNT(*) n FROM document_index_jobs WHERE campaign_id=? AND nodus_id=?'
+  ).get(retryCampaign.campaignId, 'w-retry-1').n, 1);
+  repo.setDocumentCampaignStatus(retryCampaign.campaignId, 'cancelled');
 
   const replayInput = {
     nodusId: 'w3', sourceFingerprint: 'stable-source', pipelineVersion: 'document-profile/4', schemaVersion: 1,

@@ -15,11 +15,10 @@
  * An explicit parameter is normally the right default, and this file is the one place
  * in the repo that argues otherwise, so the reasoning is worth writing down.
  *
- * `CallOpts` is not reliably propagated. `repairJson` (aiClient.ts) builds a BRAND-NEW
- * options literal — `{ system, user, temperature, maxTokens }` — and calls the
- * transport with it; anything else on the original object is dropped. `completeJson`
- * rebuilds its options per retry attempt, and `runStudyAiTask` re-invokes the whole
- * operation for retries and for the fallback model.
+ * `CallOpts` is not a safe carrier across every nested AI path: intermediary features
+ * legitimately construct fresh option literals and can drop a privacy-only field.
+ * AsyncLocalStorage follows the asynchronous call chain, including frozen JSON retries,
+ * without requiring every abstraction between the feature and transport to forward it.
  *
  * So the choice is between two failure modes, not between two aesthetics:
  *

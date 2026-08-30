@@ -23,7 +23,15 @@ import { resolveWorkText } from '../extraction/textExtractor';
 import { completeText, completeTextStream, resolveModelRef, localModelContextWindow } from './aiClient';
 import { embed } from './aiClient';
 import { enforceContextBudget, humanizeCitationLabels } from './researchContextFit';
-import { canonicalizeCitationLinks, extractCitationRefs, stripDisallowedCitations, supportedCitationKeys } from './citationSanitize';
+import {
+  alignCitationKindsToAllowed,
+  buildCitationOutputContract,
+  canonicalizeCitationLinks,
+  extractCitationRefs,
+  stripDisallowedCitations,
+  supportedCitationKeys,
+} from './citationSanitize';
+import { repairLooseCitations } from './deepResearchCore';
 import { verifyCitations } from '../citations/verifyCitations';
 import { findSimilarWorksPaged } from '../db/workSummariesRepo';
 import {
@@ -155,21 +163,21 @@ interface PromptBuild {
   maxTokens: number;
   /** Whether the effective model is a local server (enables citation-label repair). */
   local: boolean;
+  /** Academic corpus answers must contain at least one verifiable source link. */
+  citationRequired: boolean;
 }
 
-export async function answerResearchChat(request: ResearchChatRequest): Promise<ResearchChatResponse> {
-  const { system, user, stats, maxTokens, local } = await buildResearchChatPrompt(request);
-  const answer = await completeText(
-    {
-      system,
-      user,
-      temperature: 0.2,
-      maxTokens,
-    },
-    request.model
-  );
+const CHAT_CITATION_ATTEMPTS = 3;
 
-  return { answer: finalizeAnswer(answer, local, user), stats };
+export async function answerResearchChat(request: ResearchChatRequest): Promise<ResearchChatResponse> {
+  const { system, user, stats, maxTokens, local, citationRequired } = await buildResearchChatPrompt(request);
+  const opts = { system, user, temperature: 0.2, maxTokens };
+  let answer = '';
+  for (let attempt = 0; attempt < CHAT_CITATION_ATTEMPTS; attempt += 1) {
+    answer = finalizeAnswer(await completeText(opts, request.model), local, user);
+    if (!citationRequired || extractCitationRefs(answer).length > 0) return { answer, stats };
+  }
+  throw new Error('El modelo no devolvió ninguna cita verificable del contexto tras tres intentos idénticos.');
 }
 
 export async function streamResearchChat(
@@ -177,20 +185,25 @@ export async function streamResearchChat(
   onDelta: (delta: string, kind?: 'content' | 'reasoning') => void,
   signal?: AbortSignal
 ): Promise<ResearchChatResponse> {
-  const { system, user, stats, maxTokens, local } = await buildResearchChatPrompt(request);
-  const answer = await completeTextStream(
-    {
-      system,
-      user,
-      temperature: 0.2,
-      maxTokens,
-    },
+  const { system, user, stats, maxTokens, local, citationRequired } = await buildResearchChatPrompt(request);
+  const opts = { system, user, temperature: 0.2, maxTokens, signal };
+  let answer = finalizeAnswer(await completeTextStream(
+    opts,
     onDelta,
     request.model,
     signal
-  );
-
-  return { answer: finalizeAnswer(answer, local, user), stats };
+  ), local, user);
+  for (let attempt = 1; citationRequired && extractCitationRefs(answer).length === 0 && attempt < CHAT_CITATION_ATTEMPTS; attempt += 1) {
+    signal?.throwIfAborted();
+    // Streamed deltas are provisional and the renderer replaces them with the
+    // returned answer. Recovery repeats the frozen request without changing any
+    // model, prompt, temperature or output-budget parameter.
+    answer = finalizeAnswer(await completeText(opts, request.model), local, user);
+  }
+  if (citationRequired && extractCitationRefs(answer).length === 0) {
+    throw new Error('El modelo no devolvió ninguna cita verificable del contexto tras tres intentos idénticos.');
+  }
+  return { answer, stats };
 }
 
 /**
@@ -370,21 +383,24 @@ async function buildResearchChatPrompt(request: ResearchChatRequest): Promise<Pr
       contextChars: JSON.stringify(context).length,
       truncated: false,
     };
-    return { system, user, stats, maxTokens, local };
+    return { system, user, stats, maxTokens, local, citationRequired: false };
   }
 
   const { context, stats } = await buildResearchContext(request.selection, question, contextBudget);
 
+  const contextJson = JSON.stringify(context);
+  const citationContract = buildCitationOutputContract(contextJson);
   const user = JSON.stringify(
     {
       contexto_modular_seleccionado: context,
       conversacion: messages,
+      ...(citationContract ? { contrato_de_salida_obligatorio: citationContract } : {}),
     },
     null,
     2
   );
 
-  return { system, user, stats, maxTokens, local };
+  return { system, user, stats, maxTokens, local, citationRequired: citationContract != null };
 }
 
 /** System prompt for the genealogy-mode assistant: an evidence-first family historian. */
@@ -462,9 +478,11 @@ export function humanizeResearchCitations(answer: string): string {
 
 /** Remove model-invented/dead citations before the final answer replaces streamed deltas. */
 export function sanitizeResearchCitations(answer: string, sourceContext: string): string {
-  const labelled = canonicalizeCitationLinks(humanizeResearchCitations(answer.trim()));
+  const sourceRefs = extractCitationRefs(sourceContext);
+  const repaired = alignCitationKindsToAllowed(repairLooseCitations(answer.trim()), sourceRefs);
+  const labelled = canonicalizeCitationLinks(humanizeResearchCitations(repaired));
   const refs = extractCitationRefs(labelled);
-  if (!refs.length) return labelled;
+  if (!refs.length) return stripDisallowedCitations(labelled, new Set());
   const allowed = supportedCitationKeys(refs, verifyCitations(refs), sourceContext);
   return stripDisallowedCitations(labelled, allowed);
 }

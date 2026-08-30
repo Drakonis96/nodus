@@ -279,16 +279,13 @@ async function validateCandidates(
       })),
     };
 
-    let result: LlmValidationResult;
-    try {
-      result = await completeJson<LlmValidationResult>(
-        { system: VALIDATION_SYSTEM, user: JSON.stringify(input), temperature: 0.1 },
-        isLlmValidationResult,
-        model
-      );
-    } catch {
-      continue;
-    }
+    // A missing validation batch is not equivalent to "no bridges". The rejection
+    // propagates while earlier checkpoints remain available for a fail-closed resume.
+    const result = await completeJson<LlmValidationResult>(
+      { system: VALIDATION_SYSTEM, user: JSON.stringify(input), temperature: 0.1 },
+      isLlmValidationResult,
+      model
+    );
 
     saveCheckpoint('bridges', contentHash, CHECKPOINT_KIND, bi, result);
 

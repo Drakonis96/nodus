@@ -86,6 +86,12 @@ export const nodusApi: NodusApi = {
   ...testimoniesApi,
   getSettings: () => ipcRenderer.invoke('settings:get'),
   updateSettings: (patch) => ipcRenderer.invoke('settings:update', patch),
+  getAiConcurrencySnapshot: () => ipcRenderer.invoke('ai:concurrency:get'),
+  onAiConcurrencySnapshot: (cb) => {
+    const listener = (_e: unknown, snapshot: Parameters<typeof cb>[0]) => cb(snapshot);
+    ipcRenderer.on('ai:concurrency:changed', listener);
+    return () => ipcRenderer.removeListener('ai:concurrency:changed', listener);
+  },
   listVaults: () => ipcRenderer.invoke('vaults:list'),
   // Nodi companion: notifications
   listNotifications: () => ipcRenderer.invoke('nodi:notifications:list'),

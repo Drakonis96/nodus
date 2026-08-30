@@ -93,6 +93,9 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Verify adaptive concurrency contracts
+        run: npm run test:adaptive-concurrency
+
       # Electron 43 exposes its runtime downloader as a CLI instead of running
       # it during npm install. beforePack inventories LICENSES.chromium.html
       # from that verified distribution on every packaging platform.

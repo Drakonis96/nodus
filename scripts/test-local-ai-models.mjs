@@ -32,15 +32,19 @@ try {
   assert.ok(chat.every((model) => (model.vision ? Boolean(model.projectorFile) : !model.projectorFile)),
     'vision models download a projector; text models do not');
   // The extraction gate that guards the scan roles: only Gemma and Granite are trusted to extract.
-  assert.deepEqual(chat.filter((model) => model.supportsExtraction).map((model) => model.label),
+  assert.deepEqual(chat.filter((model) => model.capabilities.extraction).map((model) => model.label),
     ['Gemma 4 E2B Q4', 'Granite 4.0 Micro Q4']);
   assert.ok(catalog.NODUS_LOCAL_MODELS.every((model) => model.assets.every((asset) => asset.bytes > 0)), 'every asset has an expected byte size');
-  assert.ok(catalog.NODUS_LOCAL_MODELS.every((model) => model.assets.filter((asset) => asset.bytes > 1_000_000).every((asset) => /^[a-f0-9]{64}$/.test(asset.sha256))), 'large assets are pinned by SHA-256');
+  assert.ok(catalog.NODUS_LOCAL_MODELS.every((model) => model.assets.every((asset) => /^[a-f0-9]{64}$/.test(asset.sha256))), 'every asset is pinned by SHA-256');
+  assert.deepEqual(chat.find((model) => model.id === 'qwen3.5-0.8b-q4').capabilities,
+    { chat: true, vision: true, summary: false, extraction: false, fusion: false, documentProfile: false });
+  assert.equal(chat.find((model) => model.id === 'granite-4.0-micro-q4').vision, undefined, 'Granite is text-only');
 
-  const [manager, aiClient, ipc, preload, settings, ui, onboarding, providers, studyPolicy] = await Promise.all([
+  const [manager, aiClient, ipc, mainProcess, preload, settings, ui, onboarding, providers, studyPolicy] = await Promise.all([
     Promise.resolve(readSource('electron/ai/nodusLocalAi.ts')),
     Promise.resolve(readSource('electron/ai/aiClient.ts')),
     Promise.resolve(readSource('@main')),
+    Promise.resolve(readSource('electron/main.ts')),
     Promise.resolve(readSource('@bridge')),
     Promise.resolve(readSource('src/views/Settings.tsx')),
     Promise.resolve(readSource('src/components/LocalAiModelsSettings.tsx')),
@@ -60,11 +64,35 @@ try {
   assert.match(manager, /activeDownloads\.get\(model\.id\)/, 'model status reconnects to a main-process download job');
   assert.match(manager, /return followDownload\(running, onProgress\)/, 'duplicate requests follow the existing download');
   assert.match(manager, /controller: AbortController/, 'every main-process transfer owns an abort controller');
-  assert.match(manager, /fetch\(url, \{ redirect: 'follow', signal \}\)/, 'cancelling aborts the network request itself');
+  assert.match(manager, /Range: `bytes=\$\{resumedBytes\}-`/, 'interrupted downloads resume with HTTP Range');
   assert.match(manager, /export async function cancelNodusLocalDownloads/, 'the main process exposes a real cancellation operation');
   assert.match(manager, /Promise\.allSettled\(/, 'cancellation waits until active jobs have stopped');
-  assert.match(manager, /fsp\.rm\(modelDirectory\(modelId\), \{ recursive: true, force: true \}\)/, 'cancellation removes an incomplete model directory');
-  assert.match(manager, /fsp\.rm\(`\$\{archive\}\.download`/, 'cancellation removes runtime partials');
+  assert.match(manager, /withNodusLocalServerLease/, 'model switches cannot stop a runtime with in-flight requests');
+  assert.match(manager, /'--parallel', String\(slots\)/, 'llama.cpp slots are explicit');
+  assert.match(manager, /String\(contextPerSlot \* slots\)/, 'every slot retains its complete context budget');
+  assert.match(manager, /'--metrics'/, 'llama.cpp metrics are enabled');
+  assert.match(manager, /for \(const slots of \[2, 4\] as const\)/, 'local calibration tests two slots before four');
+  assert.match(manager, /gain < 0\.15 \|\| p95Change > 0\.1/, 'extra slots require the throughput and p95 gates');
+  assert.match(manager, /minimumFree >= os\.totalmem\(\) \* 0\.05/, 'local calibration rejects critical memory pressure');
+  assert.match(manager, /ensureNodusLocalServerUnlocked\(model\.id, mode, slots\)/, 'calibration starts the full-context runtime at each candidate slot count');
+  assert.match(manager, /calibrationTail/, 'normal requests cannot race a runtime calibration');
+  assert.doesNotMatch(manager, /model\.runtime !== 'llama_cpp' \|\| !await verifyNodusLocalModel/,
+    'the downloaded-model wrapper registers calibration before any asynchronous checksum yield');
+  assert.match(manager, /export function killNodusLocalServerSync/, 'process shutdown has a forceful local-runtime backstop');
+  assert.match(manager, /await stopNodusLocalServerAndWait\(acquired\.server\)/,
+    'slot benchmarks wait for the previous runtime to exit before testing the next configuration');
+  assert.match(manager, /child\.kill\('SIGKILL'\)/, 'a runtime that ignores graceful shutdown cannot remain orphaned');
+  assert.match(manager, /const safe = input\.memorySafe/,
+    'a failed one-slot baseline is persisted as unsafe rather than a successful calibration');
+  assert.match(manager, /runtime-start-or-transport/,
+    'calibration failures persist a content-free diagnostic reason while retaining one safe slot');
+  assert.match(manager, /!selectedMemorySafe \? 'memory-gate-failed'/,
+    'a failed memory gate is never mislabeled as a successful single-slot calibration');
+  assert.match(manager, /max_tokens: 512/,
+    'reasoning-capable local models have enough probe budget to emit calibration content');
+  assert.match(mainProcess, /killNodusLocalServerSync\(\)/, 'main-process shutdown cannot orphan the integrated llama server');
+  assert.match(ipc, /patch\.aiConcurrencyMode === 'automatic' \|\| patchSelectsLocalModel/,
+    'automatic profiles calibrate even when automatic was already the default, and recalibrate selected local models');
   assert.match(aiClient, /ensureNodusLocalServer\(model\.model, 'chat'\)/, 'chat completions start the managed local server');
   assert.match(aiClient, /embedWithNodusLocal/, 'embedding calls route to the integrated runtime');
   assert.match(ipc, /ai:nodusLocal:downloadModel/, 'main IPC exposes model downloads');
@@ -85,7 +113,7 @@ try {
   assert.match(ui, /nodus-local-download-progress/, 'rehydrated progress has a stable UI hook');
   assert.match(onboarding, /data-testid="onboarding-stop-model-download"/, 'the setup wizard exposes a stop-download action');
   assert.match(onboarding, /await window\.nodus\.cancelNodusLocalDownloads\(\)/, 'the stop action reaches the main-process transfer');
-  assert.match(onboarding, /Descarga detenida\. Los archivos temporales se han eliminado\./, 'the wizard confirms cleanup after cancellation');
+  assert.match(onboarding, /Descarga detenida\. El progreso verificado se conserva para reanudar\./, 'the wizard explains resumable cancellation');
   assert.match(ui, /exposeDownloadedChatModels/, 'downloaded local chat models are exposed to the shared dropdowns');
   assert.doesNotMatch(ui, /SettingsModelDot|selectedEmbedding|selectedGeneral|selectedVision/, 'the download catalog must not present models as active selections');
   assert.doesNotMatch(ui, /onSelectEmbedding|selectChat|Usar para embeddings|Usar como general|Usar para visión|Modelo general|Modelo de visión/, 'model assignment belongs exclusively to the shared dropdowns');

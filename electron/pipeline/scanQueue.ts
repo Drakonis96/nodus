@@ -3,7 +3,11 @@ import type { QueueItem, QueueKind, QueueProgress, Work, ModelRef } from '@share
 import { getDb } from '../db/database';
 import { getSettings } from '../db/settingsRepo';
 import { runLightScan } from '../ai/lightScan';
-import { runDeepScan } from '../ai/deepScan';
+import {
+  finishDeepScanPublicationOrdinal,
+  issueDeepScanPublicationOrdinal,
+  runDeepScan,
+} from '../ai/deepScan';
 import { runSummaryScan } from '../ai/summaryScan';
 import { reprocessConnections } from '../ai/reprocessConnections';
 import { listThemeLabels } from '../db/themesRepo';
@@ -13,8 +17,8 @@ import { clearDeepQueued, setDeepPending, setDeepResult, setResolvedTextState, s
 import { failedSummaryWorks, pendingSummaryWorks } from '../db/workSummariesRepo';
 import { AiError } from '../ai/aiClient';
 import { discoverSemanticBridges } from '../ai/semanticBridges';
-import { startEmbedding, getEmbeddingSnapshot } from '../ai/embeddingPipeline';
-import { startPassageEmbedding, getPassageSnapshot } from '../ai/passageEmbeddingPipeline';
+import { startEmbedding } from '../ai/embeddingPipeline';
+import { startPassageEmbedding } from '../ai/passageEmbeddingPipeline';
 import { startPerf } from '../perf';
 import { addNotification } from '../notifications';
 import { coalesce } from '../util/coalesce';
@@ -41,6 +45,18 @@ class ScanQueue {
   private deepSinceReprocess = false;
   /** Guards against concurrent reprocess runs. */
   private reprocessing = false;
+  /** Required post-batch work stays visible; the queue is not complete until this clears. */
+  private maintenanceRunning = false;
+  private maintenanceDetail: string | null = null;
+  /** Visible, resumable failure from global relation/bridge preparation. */
+  private maintenanceError: string | null = null;
+  /** Wall-clock bounds for the queue session, including required maintenance. */
+  private taskStartedAt: string | null = null;
+  private taskFinishedAt: string | null = null;
+  /** Running providers cannot always abort an accepted request. Keep those items visible
+   * until the current operation really settles instead of creating hidden work. */
+  private cancelAfterCurrent = new Set<string>();
+  private removeAfterSettle = new Set<string>();
   /** Works whose deep scan completed this cycle, awaiting (re-)indexing on drain. */
   private pendingIndexWorks = new Set<string>();
   /** Works already given a delayed re-scan after degrading to abstract-only, so a
@@ -93,6 +109,11 @@ class ScanQueue {
     return {
       paused: this.paused,
       pausedReason: this.pausedReason,
+      maintenanceError: this.maintenanceError,
+      maintenanceRunning: this.maintenanceRunning,
+      maintenanceDetail: this.maintenanceDetail,
+      startedAt: this.taskStartedAt,
+      finishedAt: this.taskFinishedAt,
       total: this.items.length,
       done,
       failed,
@@ -102,7 +123,20 @@ class ScanQueue {
   }
 
   isBusy(): boolean {
-    return this.running || this.items.some((item) => item.state === 'queued' || item.state === 'running');
+    return this.running || this.maintenanceRunning
+      || this.items.some((item) => item.state === 'queued' || item.state === 'running');
+  }
+
+  private beginTask(): void {
+    if (!this.taskStartedAt) this.taskStartedAt = new Date().toISOString();
+    this.taskFinishedAt = null;
+  }
+
+  private resetTaskTimingIfIdle(): void {
+    if (this.items.length === 0 && !this.maintenanceRunning) {
+      this.taskStartedAt = null;
+      this.taskFinishedAt = null;
+    }
   }
 
   /** Keep active/pending work at the top and completed history at the bottom. */
@@ -138,6 +172,7 @@ class ScanQueue {
       if (opts?.chain) existing.chain = true;
       return;
     }
+    this.beginTask();
     if (kind === 'deep') setDeepPending(nodusId);
     this.insertPending({
       id: uuid(),
@@ -147,6 +182,8 @@ class ScanQueue {
       state: 'queued',
       error: null,
       enqueued_at: new Date().toISOString(),
+      started_at: null,
+      finished_at: null,
       model: model ?? null,
       chain: opts?.chain ?? false,
     });
@@ -161,6 +198,7 @@ class ScanQueue {
       else if (existing.scopeNodusIds) existing.scopeNodusIds = [...new Set([...existing.scopeNodusIds, ...scopeNodusIds])];
       return;
     }
+    this.beginTask();
     this.insertPending({
       id: uuid(),
       nodus_id: '',
@@ -169,6 +207,8 @@ class ScanQueue {
       state: 'queued',
       error: null,
       enqueued_at: new Date().toISOString(),
+      started_at: null,
+      finished_at: null,
       model: model ?? null,
       scopeNodusIds,
     });
@@ -184,6 +224,7 @@ class ScanQueue {
   resume(): void {
     this.paused = false;
     this.pausedReason = null;
+    if (this.maintenanceError || this.items.some((item) => item.state === 'queued')) this.beginTask();
     this.emit();
     void this.run();
   }
@@ -192,6 +233,7 @@ class ScanQueue {
     const item = this.items.find((i) => i.id === id);
     if (item && (item.state === 'queued' || item.state === 'paused')) {
       item.state = 'cancelled';
+      item.finished_at = new Date().toISOString();
       this.resetPendingStatus(item);
       this.moveTerminalToEnd(item);
       // A cancelled deep item stays in the list as history, so only the marker records
@@ -200,6 +242,7 @@ class ScanQueue {
       if (item.kind === 'deep') this.syncDeepQueued(item.nodus_id);
     }
     this.emit();
+    this.notifyDrain();
   }
 
   moveToTop(id: string): void {
@@ -226,42 +269,65 @@ class ScanQueue {
     }
     this.items = this.items.filter((i) => i.state === 'running');
     for (const item of dropped) if (item.kind === 'deep') this.syncDeepQueued(item.nodus_id);
+    this.resetTaskTimingIfIdle();
     this.emit();
   }
 
   /**
-   * Stop and remove a single item — including one that's currently running. The
-   * in-flight scan can't be truly aborted, so it's abandoned: we detach the item
-   * from the list and reset its pending status so it isn't resumed on restart.
+   * Remove a pending item immediately. An already accepted provider request remains
+   * visible until it settles; only then is the row removed. This prevents the UI from
+   * claiming the task stopped while an unabortable network operation is still alive.
    */
   removeItem(id: string): void {
     const item = this.items.find((i) => i.id === id);
     if (!item) return;
+    if (item.state === 'running') {
+      this.cancelAfterCurrent.add(item.id);
+      this.removeAfterSettle.add(item.id);
+      item.detail = 'Deteniendo al terminar la operación actual…';
+      item.subPct = null;
+      this.emit();
+      return;
+    }
     this.resetPendingStatus(item);
     this.retries.delete(item.id);
     this.items = this.items.filter((i) => i.id !== id);
     if (item.kind === 'deep') this.syncDeepQueued(item.nodus_id);
+    this.resetTaskTimingIfIdle();
     this.emit();
   }
 
   /**
-   * Stop everything and empty the queue, including the running job. Resets the
-   * paused state so future enqueues run, and clears pending DB statuses so the
-   * abandoned work isn't auto-resumed.
+   * Drop pending work and ask running items to settle after their current operation.
+   * Running rows stay visible until that happens, and any already-published deep scan
+   * is allowed to complete its integrity maintenance.
    */
   stopAll(): void {
-    const dropped = [...this.items];
-    for (const item of this.items) this.resetPendingStatus(item);
-    this.items = [];
+    const dropped = this.items.filter((item) => item.state !== 'running');
+    const retained = this.items.filter((item) => item.state === 'running');
+    for (const item of dropped) this.resetPendingStatus(item);
+    for (const item of retained) {
+      this.cancelAfterCurrent.add(item.id);
+      this.removeAfterSettle.add(item.id);
+      item.detail = 'Deteniendo al terminar la operación actual…';
+      item.subPct = null;
+    }
+    this.items = retained;
     for (const item of dropped) if (item.kind === 'deep') this.syncDeepQueued(item.nodus_id);
     this.retries.clear();
     this.lastKind = null;
-    this.pendingIndexWorks.clear();
-    this.bridgeAfterDrain = false;
-    this.deepSinceReprocess = false;
+    // A running deep scan may already have published data. Its required integrity
+    // work is allowed to finish and remains visible instead of being abandoned.
+    if (retained.length === 0 && !this.maintenanceRunning) {
+      this.pendingIndexWorks.clear();
+      this.bridgeAfterDrain = false;
+      this.deepSinceReprocess = false;
+      this.maintenanceError = null;
+    }
     this.notifiedTerminalIds.clear();
     this.paused = false;
     this.pausedReason = null;
+    this.resetTaskTimingIfIdle();
     this.emit();
   }
 
@@ -274,10 +340,9 @@ class ScanQueue {
   /**
    * Make works.deep_queued say what this queue says. A rescan of an already-analysed
    * work keeps deep_status='done', so the marker is the only trace a restart can find —
-   * and it belongs to the WORK, not to the item. Stopping a running job detaches it
-   * while its scan keeps going, so the same work can hold an abandoned scan and a fresh
-   * queued job at once: clearing on either one's outcome would strand the other. Ask the
-   * list instead, always after it has been mutated. Public because the upload path runs a
+   * and it belongs to the WORK, not to the item. A running job remains visible while its
+   * accepted provider operation settles, so its marker must remain live during that
+   * interval. Ask the list after every mutation. Public because the upload path runs a
    * deep scan without a queue item and must answer the same question when it ends.
    */
   syncDeepQueued(nodusId: string): void {
@@ -305,8 +370,12 @@ class ScanQueue {
     if (this.running || this.paused) return;
     this.running = true;
     try {
-      const concurrency = Math.max(1, getSettings().concurrency || 1);
-      // Sequential by default (concurrency=1); honour the configured limit.
+      const scheduling = getSettings();
+      const concurrency = scheduling.aiConcurrencyMode === 'automatic'
+        ? 4
+        : Math.max(1, Math.min(8, scheduling.concurrency || 1));
+      // Automatic mode keeps several documents ready while the transport scheduler
+      // applies the stricter account/model limits and reserves interactive capacity.
       const inFlight: Promise<void>[] = [];
       let next: QueueItem | undefined;
       while (!this.paused && (next = this.nextQueued())) {
@@ -324,7 +393,7 @@ class ScanQueue {
     }
     if (!this.paused && this.nextQueued()) {
       void this.run();
-    } else if (!this.paused && this.deepSinceReprocess && !this.reprocessing) {
+    } else if (!this.paused && this.deepSinceReprocess && !this.reprocessing && !this.maintenanceRunning) {
       // Queue drained after deep scans → re-trace relations, (re-)index and
       // discover semantic bridges so the global graph stays connected.
       void this.runPostBatch();
@@ -334,6 +403,12 @@ class ScanQueue {
   }
 
   private notifyDrain(): void {
+    const live = this.items.some((item) => item.state === 'queued' || item.state === 'running' || item.state === 'paused');
+    if (live || this.maintenanceRunning) return;
+    if (this.taskStartedAt && !this.taskFinishedAt) {
+      this.taskFinishedAt = new Date().toISOString();
+      this.emit();
+    }
     const terminal = this.items.filter((item) =>
       (item.state === 'done' || item.state === 'failed') && !this.notifiedTerminalIds.has(item.id)
     );
@@ -353,21 +428,46 @@ class ScanQueue {
 
   /**
    * Post-batch chain that runs once the queue drains after deep scans: re-trace
-   * inter-work relations + theme memberships, (re-)index the just-scanned works
-   * (idea embeddings + full-text passages), then discover semantic bridges. Each
-   * step is best-effort; failures are logged and never block the queue.
+   * inter-work relations + theme memberships, then discover semantic bridges. Per-work
+   * embeddings/passages have already completed before its queue item becomes done.
+   * A failure remains visible and resumable; it is never reduced to a console message.
    */
   private async runPostBatch(): Promise<void> {
+    if (this.maintenanceRunning) return;
+    this.maintenanceRunning = true;
+    this.maintenanceDetail = 'Postprocesando relaciones del grafo…';
+    this.taskFinishedAt = null;
+    this.emit();
     const ids = Array.from(this.pendingIndexWorks);
     this.pendingIndexWorks.clear();
-    await this.autoIndex(ids);
-    if (ids.length > 0) await this.autoReprocessConnections(ids);
-    if (this.bridgeAfterDrain) {
-      this.bridgeAfterDrain = false;
-      if (ids.length > 0) this.maybeEnqueueBridge(ids);
-      else this.notifyDrain();
-    } else {
-      this.notifyDrain();
+    let settledSuccessfully = false;
+    try {
+      if (ids.length > 0) await this.autoReprocessConnections(ids);
+      else this.deepSinceReprocess = false;
+      this.maintenanceError = null;
+      if (this.bridgeAfterDrain) {
+        this.bridgeAfterDrain = false;
+        this.maintenanceDetail = 'Preparando descubrimiento de puentes…';
+        this.emit();
+        if (ids.length > 0) this.maybeEnqueueBridge(ids);
+      }
+      settledSuccessfully = true;
+    } catch (error) {
+      for (const id of ids) this.pendingIndexWorks.add(id);
+      this.deepSinceReprocess = true;
+      this.maintenanceError = error instanceof Error ? error.message : String(error);
+      addNotification({
+        title: nodiText('graphMaintenanceFailedTitle'),
+        body: nodiText('graphMaintenanceFailedBody', { error: this.maintenanceError }),
+        kind: 'warning',
+        dedupeKey: 'knowledge-connections:error',
+      });
+      this.taskFinishedAt = new Date().toISOString();
+    } finally {
+      this.maintenanceRunning = false;
+      this.maintenanceDetail = null;
+      this.emit();
+      if (settledSuccessfully) this.notifyDrain();
     }
   }
 
@@ -377,30 +477,44 @@ class ScanQueue {
    * re-indexing, and arm bridge discovery for the next drain. `item.chain` forces
    * the chain even when the auto-* settings are off (used by "Procesar todo").
    */
-  private chainAfterDeep(work: Work, item: QueueItem): void {
-    try {
-      const settings = getSettings();
-      this.pendingIndexWorks.add(work.nodus_id);
-      if (item.chain || settings.autoBridgeAfterQueue) this.bridgeAfterDrain = true;
-      if (item.chain || settings.autoSummaryAfterDeep) {
-        setSummaryPending(work.nodus_id);
-        this.enqueue(work.nodus_id, work.title, 'summary', item.model ?? null);
-      }
-    } catch (e) {
-      console.error('[scanQueue] encadenado tras profundo falló:', e instanceof Error ? e.message : String(e));
+  private async chainAfterDeep(work: Work, item: QueueItem): Promise<void> {
+    const settings = getSettings();
+    this.pendingIndexWorks.add(work.nodus_id);
+    if (this.cancelAfterCurrent.has(item.id)) return;
+    if (item.chain || settings.autoSummaryAfterDeep) {
+      item.detail = 'Generando el resumen requerido…';
+      this.emit();
+      setSummaryPending(work.nodus_id);
+      await runSummaryScan(work, item.model ?? null);
+    }
+    if (this.cancelAfterCurrent.has(item.id)) return;
+    if (this.embeddingConfigured()) {
+      item.detail = 'Indexando ideas y pasajes requeridos…';
+      this.emit();
+      await startEmbedding([work.nodus_id]);
+      if (this.cancelAfterCurrent.has(item.id)) return;
+      await startPassageEmbedding([work.nodus_id]);
+    } else {
+      item.detail = 'Modo léxico: no hay proveedor de embeddings configurado.';
+      this.emit();
+    }
+    if (!this.cancelAfterCurrent.has(item.id) && (item.chain || settings.autoBridgeAfterQueue)) {
+      this.bridgeAfterDrain = true;
     }
   }
 
   /**
    * Automatically re-run connection reprocessing (themes + inter-work idea
-   * relations) after a batch of deep scans completes. Runs once per drain cycle;
-   * failures are logged but never block the queue.
+   * relations) after a batch of deep scans completes. Runs once per drain cycle.
    */
   private async autoReprocessConnections(nodusIds: string[]): Promise<void> {
     if (this.reprocessing) return;
     this.reprocessing = true;
     try {
-      const result = await reprocessConnections({ relations: true, nodusIds });
+      const result = await reprocessConnections({ relations: true, nodusIds }, null, (progress) => {
+        this.maintenanceDetail = `${progress.label} (${progress.current}/${progress.total})`;
+        this.emit();
+      });
       if (result.relationsAdded > 0 || result.newThemes > 0) {
         addNotification({
           title: nodiText('connectionsTitle'),
@@ -409,10 +523,8 @@ class ScanQueue {
           dedupeKey: 'knowledge-connections',
         });
       }
-    } catch (e) {
-      console.error('[scanQueue] reprocess automático falló:', e instanceof Error ? e.message : String(e));
-    } finally {
       this.deepSinceReprocess = false;
+    } finally {
       this.reprocessing = false;
     }
   }
@@ -420,50 +532,40 @@ class ScanQueue {
   /** True when an embedding provider + model are configured for indexing. */
   private embeddingConfigured(): boolean {
     const settings = getSettings();
-    return Boolean(settings.embeddingProvider || settings.embeddingModel);
-  }
-
-  /**
-   * Index the given works after their deep scan: idea embeddings first (needed by
-   * bridge discovery), then full-text passages. Awaits completion so a subsequent
-   * bridge job runs against fresh embeddings. Skips when there is nothing to index
-   * or no embedding model is configured; each pipeline is best-effort.
-   */
-  private async autoIndex(nodusIds: string[]): Promise<void> {
-    if (nodusIds.length === 0 || !this.embeddingConfigured()) return;
-    try {
-      if (!getEmbeddingSnapshot().running) await startEmbedding(nodusIds);
-    } catch (e) {
-      console.error('[scanQueue] auto-indexación de ideas falló:', e instanceof Error ? e.message : String(e));
-    }
-    try {
-      if (!getPassageSnapshot().running) await startPassageEmbedding(nodusIds);
-    } catch (e) {
-      console.error('[scanQueue] auto-indexación de pasajes falló:', e instanceof Error ? e.message : String(e));
-    }
+    return settings.embeddingProvider === 'nodus'
+      || settings.embeddingProvider === 'ollama'
+      || settings.embeddingProvider === 'lmstudio'
+      || settings.providerKeys[settings.embeddingProvider] === true;
   }
 
   /** Enqueue semantic bridge discovery once indexing is done, if configured. */
-  private maybeEnqueueBridge(nodusIds: string[]): void {
-    if (!this.embeddingConfigured()) return;
+  private maybeEnqueueBridge(nodusIds: string[]): boolean {
+    if (!this.embeddingConfigured()) return false;
     const settings = getSettings();
     this.enqueueBridge(settings.synthesisModel ?? null, nodusIds);
+    return true;
   }
 
   private async process(item: QueueItem): Promise<void> {
     item.state = 'running';
+    item.started_at ??= new Date().toISOString();
+    item.finished_at = null;
     this.moveRunningToFront(item);
     this.emit();
     if (item.kind === 'bridge') {
       try {
         await this.doBridge(item);
-        item.state = 'done';
+        item.state = this.cancelAfterCurrent.has(item.id) ? 'cancelled' : 'done';
         item.error = null;
       } catch (e) {
         item.state = 'failed';
         item.error = (e as Error).message;
       }
-      this.moveTerminalToEnd(item);
+      item.finished_at = new Date().toISOString();
+      if (this.removeAfterSettle.has(item.id)) this.items = this.items.filter((candidate) => candidate.id !== item.id);
+      else this.moveTerminalToEnd(item);
+      this.cancelAfterCurrent.delete(item.id);
+      this.removeAfterSettle.delete(item.id);
       this.emit();
       return;
     }
@@ -471,8 +573,12 @@ class ScanQueue {
     if (!work) {
       item.state = 'failed';
       item.error = 'Obra no encontrada';
+      item.finished_at = new Date().toISOString();
       // No marker to settle: the row this item names is gone from works entirely.
-      this.moveTerminalToEnd(item);
+      if (this.removeAfterSettle.has(item.id)) this.items = this.items.filter((candidate) => candidate.id !== item.id);
+      else this.moveTerminalToEnd(item);
+      this.cancelAfterCurrent.delete(item.id);
+      this.removeAfterSettle.delete(item.id);
       this.emit();
       return;
     }
@@ -481,52 +587,61 @@ class ScanQueue {
         await this.doLight(work, item.model ?? null);
       } else if (item.kind === 'deep') {
         await this.doDeep(work, item);
+        await this.chainAfterDeep(work, item);
         this.deepSinceReprocess = true;
       } else {
         await this.doSummary(work, item);
       }
-      item.state = 'done';
+      item.state = this.cancelAfterCurrent.has(item.id) ? 'cancelled' : 'done';
       item.error = null;
       item.detail = null;
       item.subPct = null;
     } catch (e) {
+      if (this.cancelAfterCurrent.has(item.id)) {
+        item.state = 'cancelled';
+        item.error = null;
       // A misconfiguration (no model / no key / invalid key) fails identically for
       // every job, so pause the queue once and surface it instead of marking the
       // entire library as failed. The job stays queued and resumes after the fix.
-      if (e instanceof AiError && e.config) {
+      } else if (e instanceof AiError && e.config) {
         item.state = 'queued';
         item.error = null;
         this.pausedReason = (e as Error).message;
         console.error(`[scanQueue] configuración: ${this.pausedReason} — cola en pausa`);
         this.pause();
         return;
-      }
-      const retriable = e instanceof AiError && e.retriable;
-      const attempts = (this.retries.get(item.id) ?? 0) + 1;
-      this.retries.set(item.id, attempts);
-      if (retriable && attempts <= MAX_RETRIES) {
-        const backoff = 2000 * 2 ** (attempts - 1);
-        item.state = 'queued';
-        item.error = `Reintentando (${attempts}/${MAX_RETRIES})…`;
-        this.emit();
-        await delay(backoff);
       } else {
-        item.state = 'failed';
-        item.error = (e as Error).message;
-        console.error(`[scanQueue] ${item.kind} falló: ${item.title} -> ${(e as Error).message}`);
-        // Persist deep-scan failure so it's visible in the library and not
-        // re-enqueued forever by resumePending(). (Light scans already persist.)
-        if (item.kind === 'deep') setDeepResult(work.nodus_id, 'failed', null, null, (e as Error).message);
+        const retriable = e instanceof AiError && e.retriable;
+        const attempts = (this.retries.get(item.id) ?? 0) + 1;
+        this.retries.set(item.id, attempts);
+        if (retriable && attempts <= MAX_RETRIES) {
+          const backoff = 2000 * 2 ** (attempts - 1);
+          item.state = 'queued';
+          item.finished_at = null;
+          item.error = `Reintentando (${attempts}/${MAX_RETRIES})…`;
+          this.emit();
+          await delay(backoff);
+        } else {
+          item.state = 'failed';
+          item.error = (e as Error).message;
+          console.error(`[scanQueue] ${item.kind} falló: ${item.title} -> ${(e as Error).message}`);
+          // Persist deep-scan failure so it's visible in the library and not
+          // re-enqueued forever by resumePending(). (Light scans already persist.)
+          if (item.kind === 'deep') setDeepResult(work.nodus_id, 'failed', null, null, (e as Error).message);
+        }
       }
     }
-    // After a successful deep scan, chain the rest of the pipeline (summary now;
-    // index + bridge on drain). Kept outside the try/catch so a chaining hiccup
-    // can never re-mark the completed deep scan as failed.
-    if (item.kind === 'deep' && item.state === 'done') this.chainAfterDeep(work, item);
     // The marker follows the job's outcome, never the database write: an abandoned scan
     // writes its result too, and by then the work may already hold a queued replacement.
     if (item.kind === 'deep' && (item.state === 'done' || item.state === 'failed')) this.syncDeepQueued(work.nodus_id);
-    if (item.state === 'done' || item.state === 'failed') this.moveTerminalToEnd(item);
+    if (item.state === 'done' || item.state === 'failed' || item.state === 'cancelled') {
+      item.finished_at = new Date().toISOString();
+      if (item.kind === 'deep') this.syncDeepQueued(work.nodus_id);
+      if (this.removeAfterSettle.has(item.id)) this.items = this.items.filter((candidate) => candidate.id !== item.id);
+      else this.moveTerminalToEnd(item);
+      this.cancelAfterCurrent.delete(item.id);
+      this.removeAfterSettle.delete(item.id);
+    }
     this.emit();
   }
 
@@ -548,46 +663,58 @@ class ScanQueue {
     work: Work,
     queueItem: QueueItem
   ): Promise<void> {
+    // Reserve before any asynchronous metadata/PDF work. Faster extraction of a later
+    // paper therefore cannot overtake an earlier queue item when the graph is committed.
+    const publicationOrdinal = issueDeepScanPublicationOrdinal();
     const settings = getSettings();
     const perf = { nodusId: work.nodus_id, title: work.title };
-    let abstract: string | null = null;
-    const metadataDone = startPerf('abstract/Zotero metadata', perf);
     try {
-      const item = await getItem(settings.zoteroUserId, work.zotero_key);
-      abstract = item?.abstract ?? null;
-      metadataDone({ abstract: Boolean(abstract) });
-    } catch (e) {
-      metadataDone({ status: 'error', error: e instanceof Error ? e.message : String(e) });
-      /* offline: rely on stored attachments */
-    }
-    const doc = await resolveWorkText(
-      settings.zoteroUserId,
-      work.zotero_key,
-      settings.zoteroStoragePath,
-      abstract,
-      work.doi,
-      {
-        unpaywallEmail: settings.unpaywallEmail,
-        preferZoteroFulltext: settings.preferZoteroFulltext,
-        ocr: { enabled: settings.ocrEnabled, languages: settings.ocrLanguages, maxPages: settings.ocrMaxPages },
-        perf,
-        onProgress: (p) => {
-          queueItem.detail = p.detail;
-          queueItem.subPct = p.pct;
-          this.emit();
+      let abstract: string | null = null;
+      const metadataDone = startPerf('abstract/Zotero metadata', perf);
+      try {
+        const item = await getItem(settings.zoteroUserId, work.zotero_key);
+        abstract = item?.abstract ?? null;
+        metadataDone({ abstract: Boolean(abstract) });
+      } catch (e) {
+        metadataDone({ status: 'error', error: e instanceof Error ? e.message : String(e) });
+        /* offline: rely on stored attachments */
+      }
+      const doc = await resolveWorkText(
+        settings.zoteroUserId,
+        work.zotero_key,
+        settings.zoteroStoragePath,
+        abstract,
+        work.doi,
+        {
+          unpaywallEmail: settings.unpaywallEmail,
+          preferZoteroFulltext: settings.preferZoteroFulltext,
+          ocr: { enabled: settings.ocrEnabled, languages: settings.ocrLanguages, maxPages: settings.ocrMaxPages },
+          perf,
+          onProgress: (p) => {
+            if (this.cancelAfterCurrent.has(queueItem.id)) return;
+            queueItem.detail = p.detail;
+            queueItem.subPct = p.pct;
+            this.emit();
+          },
         },
-      },
-      work.item_type
-    );
-    setResolvedTextState(work.nodus_id, resolvedTextStateFromDoc(doc));
-    queueItem.detail = 'Analizando con IA…';
-    queueItem.subPct = null;
-    this.emit();
-    await runDeepScan(work, doc, queueItem.model ?? null, (p) => {
-      queueItem.detail = p.detail;
-      queueItem.subPct = p.pct;
-      this.emit();
-    });
+        work.item_type
+      );
+      setResolvedTextState(work.nodus_id, resolvedTextStateFromDoc(doc));
+      if (!this.cancelAfterCurrent.has(queueItem.id)) {
+        queueItem.detail = 'Analizando con IA…';
+        queueItem.subPct = null;
+        this.emit();
+      }
+      await runDeepScan(work, doc, queueItem.model ?? null, (p) => {
+        if (this.cancelAfterCurrent.has(queueItem.id)) return;
+        queueItem.detail = p.detail;
+        queueItem.subPct = p.pct;
+        this.emit();
+      }, publicationOrdinal);
+    } finally {
+      // `runDeepScan` normally advances it; this also covers extraction failures.
+      finishDeepScanPublicationOrdinal(publicationOrdinal);
+    }
   }
 
   private async doSummary(work: Work, item: QueueItem): Promise<void> {
@@ -602,6 +729,7 @@ class ScanQueue {
     item.subPct = null;
     this.emit();
     const result = await discoverSemanticBridges(item.model ?? null, (p) => {
+      if (this.cancelAfterCurrent.has(item.id)) return;
       if (p.phase === 'validation') {
         item.detail = `${p.label} (${p.current}/${p.total})`;
         item.subPct = p.total > 0 ? p.current / p.total : null;
@@ -614,9 +742,11 @@ class ScanQueue {
       }
       this.emit();
     }, item.scopeNodusIds);
-    item.detail = `${result.added} nuevas · ${result.validated} validados · ${result.candidatesScanned} escaneados`;
-    item.subPct = 1;
-    this.emit();
+    if (!this.cancelAfterCurrent.has(item.id)) {
+      item.detail = `${result.added} nuevas · ${result.validated} validados · ${result.candidatesScanned} escaneados`;
+      item.subPct = 1;
+      this.emit();
+    }
     if (result.added > 0) {
       addNotification({
         title: nodiText('bridgesTitle'),
@@ -633,6 +763,13 @@ class ScanQueue {
    */
   retryFailed(): void {
     const db = getDb();
+    for (const item of this.items) {
+      if (item.kind === 'bridge' && item.state === 'failed') {
+        item.state = 'queued';
+        item.error = null;
+        item.finished_at = null;
+      }
+    }
     const failedLight = db
       .prepare("SELECT nodus_id, title FROM works WHERE light_status = 'failed' AND archived = 0")
       .all() as { nodus_id: string; title: string }[];
@@ -660,6 +797,7 @@ class ScanQueue {
     for (const w of failedDeep) this.enqueue(w.nodus_id, w.title, 'deep');
     for (const w of failedLight) this.enqueue(w.nodus_id, w.title, 'light');
     for (const w of failedSummary) this.enqueue(w.nodus_id, w.title, 'summary');
+    if (this.maintenanceError) this.maintenanceError = null;
     this.resume();
   }
 

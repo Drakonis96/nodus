@@ -1,4 +1,4 @@
-import { completeJson, embed } from './aiClient';
+import { AiError, completeJson, embed } from './aiClient';
 import { PROMPT_FUSION } from './prompts';
 import {
   createIdea,
@@ -12,6 +12,7 @@ import {
 import { getSettings } from '../db/settingsRepo';
 import type { IdeaType, EdgeType, EdgeBasis, ModelRef } from '@shared/types';
 import { perfLog, startPerf, type PerfContext } from '../perf';
+import { modelRefSupportsCapability } from '@shared/localAiModels';
 
 export interface ExtractedIdea {
   localId: string;
@@ -143,6 +144,9 @@ export async function planIdeaFusion(
   const opts: FuseIdeaOptions = optionsOrModel && 'provider' in optionsOrModel ? { model: optionsOrModel } : optionsOrModel ?? {};
   const settings = getSettings();
   const fusionModel = opts.model ?? settings.fusionModel ?? settings.synthesisModel ?? null;
+  if (!modelRefSupportsCapability(fusionModel, 'fusion')) {
+    throw new AiError(`El modelo local «${fusionModel?.model}» no está certificado para fusionar ideas; no se modificó el grafo.`, false, true);
+  }
   const embeddingText = opts.embeddingText ?? embeddingTextForIdea({ ...idea, themes: opts.themes });
   const embeddingDone = opts.embedding === undefined ? startPerf('embedding', opts.perf, { idea: idea.label }) : null;
   const embedding = opts.embedding === undefined ? await embed(embeddingText) : opts.embedding;
@@ -192,45 +196,52 @@ export async function planIdeaFusion(
     })),
   };
 
-  let result: FusionResult;
   const fusionDone = startPerf('LLM fusion', opts.perf, { idea: idea.label, candidates: candidates.length });
   try {
-    result = await completeJson<FusionResult>(
-      { system: PROMPT_FUSION, user: JSON.stringify(input), temperature: 0.1, maxTokens: 800, perf: opts.perf },
+    const result = await completeJson<FusionResult>(
+      {
+        system: PROMPT_FUSION,
+        user: JSON.stringify(input),
+        temperature: 0.1,
+        maxTokens: 800,
+        perf: opts.perf,
+        requestClass: 'fusion',
+        jobId: `fusion:${idea.localId}`,
+      },
       isFusionResult,
       fusionModel
     );
     fusionDone({ resolution: result.resolution, matched: Boolean(result.matched_id) });
-  } catch {
-    // On fusion failure, be conservative: treat as new (avoid wrong merges).
+    if (result.resolution === 'same_as' && result.matched_id && getIdea(result.matched_id)) {
+      return { idea, embedding, embeddingText, themes: opts.themes ?? [], model: fusionModel, existingId: result.matched_id, label: idea.label, edge: null };
+    }
+
+    const matched = result.matched_id && result.edge_to_existing && getIdea(result.matched_id)
+      ? candidates.find((candidate) => candidate.global_id === result.matched_id)
+      : null;
+    return {
+      idea,
+      embedding,
+      embeddingText,
+      themes: opts.themes ?? [],
+      model: fusionModel,
+      existingId: null,
+      label: result.merged_label || idea.label,
+      edge: matched && result.edge_to_existing ? {
+        to: matched.global_id,
+        type: result.edge_to_existing.type,
+        basis: result.edge_to_existing.basis,
+        confidence: result.edge_to_existing.confidence,
+        similarity: matched.similarity,
+        rationale: result.rationale,
+      } : null,
+    };
+  } catch (error) {
+    // A failed semantic decision cannot be represented as "new": doing so mutates
+    // the graph with a lower-quality answer. Leave the enclosing work checkpointed.
     fusionDone({ status: 'error' });
-    return { idea, embedding, embeddingText, themes: opts.themes ?? [], model: fusionModel, existingId: null, label: idea.label, edge: null };
+    throw error;
   }
-
-  if (result.resolution === 'same_as' && result.matched_id && getIdea(result.matched_id)) {
-    return { idea, embedding, embeddingText, themes: opts.themes ?? [], model: fusionModel, existingId: result.matched_id, label: idea.label, edge: null };
-  }
-
-  const matched = result.matched_id && result.edge_to_existing && getIdea(result.matched_id)
-    ? candidates.find((candidate) => candidate.global_id === result.matched_id)
-    : null;
-  return {
-    idea,
-    embedding,
-    embeddingText,
-    themes: opts.themes ?? [],
-    model: fusionModel,
-    existingId: null,
-    label: result.merged_label || idea.label,
-    edge: matched && result.edge_to_existing ? {
-      to: matched.global_id,
-      type: result.edge_to_existing.type,
-      basis: result.edge_to_existing.basis,
-      confidence: result.edge_to_existing.confidence,
-      similarity: matched.similarity,
-      rationale: result.rationale,
-    } : null,
-  };
 }
 
 /** Apply a previously planned decision. Callers may compose this inside a transaction. */

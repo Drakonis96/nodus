@@ -52,6 +52,7 @@ import type { UpdateCheckResponse, UpdateProgressEvent } from '@shared/types';
 import { TUTORIAL_VIDEO_EMBED_ORIGIN } from '@shared/tutorialVideos';
 import { killChatGptSubscriptionServer } from './ai/codexSubscription';
 import { killGitHubCopilotSubscriptionServer } from './ai/githubCopilotSubscription';
+import { killNodusLocalServerSync } from './ai/nodusLocalAi';
 import { ensureDatabaseDeepResearchLane } from './ai/databaseDeepResearchLane';
 import { installProcessSafetyNet } from './util/processSafety';
 import { restoreAppWindows } from './windowLifecycle';
@@ -1141,6 +1142,7 @@ app.on('window-all-closed', () => {
     stopAllWhisperCpp();
     destroyBrowserSubsystem();
     closeGlobalLibraryRuntime();
+    killNodusLocalServerSync();
     documentIndexQueue.stop();
     closeDb();
     app.quit();
@@ -1183,6 +1185,7 @@ app.on('before-quit', () => {
   // be abandoned mid-drain and leave the vendor runtimes running as orphans.
   killChatGptSubscriptionServer();
   killGitHubCopilotSubscriptionServer();
+  killNodusLocalServerSync();
   destroyBrowserSubsystem();
   closeGlobalLibraryRuntime();
   documentIndexQueue.stop();
@@ -1199,6 +1202,7 @@ app.on('will-quit', () => {
 const updateAwareApp = app as typeof app & { on(event: 'before-quit-for-update', listener: () => void): typeof app };
 updateAwareApp.on('before-quit-for-update', () => {
   quitting = true;
+  killNodusLocalServerSync();
   if (updateCheckTimer) clearInterval(updateCheckTimer);
   if (announcementsFirstTimer) clearTimeout(announcementsFirstTimer);
   if (autoBackupTimer) clearInterval(autoBackupTimer);

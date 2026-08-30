@@ -196,6 +196,7 @@ try {
     hasStudyAiPolicy: typeof window.nodus?.getStudyAiUsageSummary === 'function' && typeof window.nodus?.clearStudyAiUsage === 'function',
     hasStudyDemo: typeof window.nodus?.seedStudyDemoData === 'function',
     hasNodusLocalAi: typeof window.nodus?.getNodusLocalAiStatus === 'function' && typeof window.nodus?.downloadNodusLocalModel === 'function' && typeof window.nodus?.deleteNodusLocalModel === 'function',
+    hasAiConcurrency: typeof window.nodus?.getAiConcurrencySnapshot === 'function' && typeof window.nodus?.onAiConcurrencySnapshot === 'function',
     hasChatGptSubscription: typeof window.nodus?.getChatGptSubscriptionStatus === 'function' && typeof window.nodus?.startChatGptSubscriptionLogin === 'function' && typeof window.nodus?.logoutChatGptSubscription === 'function',
     hasGitHubCopilotSubscription: typeof window.nodus?.getGitHubCopilotSubscriptionStatus === 'function' && typeof window.nodus?.startGitHubCopilotSubscriptionLogin === 'function' && typeof window.nodus?.logoutGitHubCopilotSubscription === 'function',
     hasOpenCodeGoUsage: typeof window.nodus?.getOpenCodeGoUsageStatus === 'function' && typeof window.nodus?.onOpenCodeGoUsageStatusChanged === 'function',
@@ -224,6 +225,8 @@ try {
   assert.equal(bridge.hasStudyAiPolicy, true, 'study AI policy and usage bridge available');
   assert.equal(bridge.hasStudyDemo, true, 'study sample-data bridge available');
   assert.equal(bridge.hasNodusLocalAi, true, 'integrated local AI model manager bridge available');
+  assert.equal(bridge.hasAiConcurrency, true, 'adaptive AI concurrency snapshot bridge available');
+  assert.deepEqual(await page.evaluate(() => window.nodus.getAiConcurrencySnapshot()), [], 'fresh profile has no leaked provider/model state');
   assert.equal(bridge.hasChatGptSubscription, true, 'managed ChatGPT subscription bridge available');
   assert.equal(bridge.hasGitHubCopilotSubscription, true, 'managed GitHub Copilot subscription bridge available');
   assert.equal(bridge.hasOpenCodeGoUsage, true, 'OpenCode Go usage bridge available');

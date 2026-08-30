@@ -35,6 +35,8 @@ export const NODI_NOTIFICATION_TEXT = {
   scanQueueDoneBody: '{done} tareas completadas. El conocimiento de la bóveda está actualizado.',
   scanQueueFailedTitle: 'La cola de análisis ha terminado con incidencias',
   scanQueueFailedBody: '{done} tareas completadas y {failed} con errores.',
+  graphMaintenanceFailedTitle: 'El postprocesado del grafo está pendiente',
+  graphMaintenanceFailedBody: 'Error: {error}',
   connectionsTitle: 'Nuevas conexiones en tu bóveda',
   connectionsBody: '{relations} relaciones y {themes} temas nuevos detectados.',
   radarUpdatesTitle: 'Nodus Radar ha encontrado novedades',

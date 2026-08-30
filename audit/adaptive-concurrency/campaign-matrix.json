@@ -1,0 +1,13 @@
+{
+  "schema": "nodus-adaptive-matrix/1",
+  "cloud": [
+    { "provider": "gemini", "model": "gemini-2.5-flash-lite", "embeddingProvider": "gemini", "embeddingModel": "gemini-embedding-001", "routingModes": ["direct"] },
+    { "provider": "deepseek", "model": "deepseek-v4-flash", "embeddingProvider": "gemini", "embeddingModel": "gemini-embedding-001", "routingModes": ["direct"] }
+  ],
+  "finalPaperCount": 3,
+  "campaignsPerMode": 1,
+  "order": ["gemini/manual", "gemini/automatic", "deepseek/automatic", "deepseek/manual"],
+  "defaultMode": "automatic",
+  "rollbackMode": { "mode": "manual", "concurrency": 1 },
+  "releasePolicy": "blocked-until-final-evaluator-passes-and-owner-consents"
+}

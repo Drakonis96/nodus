@@ -59,7 +59,7 @@ const STUDY_KEYS = new Set([
   'maxInputChars', 'maxOutputTokens', 'temperature', 'retryCount', 'studentPseudonyms',
 ]);
 const WORKSPACE_KEYS = new Set([
-  'sidebarOrder', 'sidebarHidden', 'sidebarCustomized', 'concurrency', 'deepContextMode',
+  'sidebarOrder', 'sidebarHidden', 'sidebarCustomized', 'aiConcurrencyMode', 'aiConcurrencyVersion', 'concurrency', 'deepContextMode',
   'standardChunkWords', 'longChunkWords',
 ]);
 const PROVIDER_PATTERN = /^[a-z][a-z0-9-]{0,47}$/;
@@ -232,6 +232,8 @@ export function extractServerProfilePreferences(settings) {
       sidebarOrder: Array.isArray(settings.sidebarOrder) ? settings.sidebarOrder : [],
       sidebarHidden: Array.isArray(settings.sidebarHidden) ? settings.sidebarHidden : [],
       sidebarCustomized: settings.sidebarCustomized,
+      aiConcurrencyMode: settings.aiConcurrencyMode,
+      aiConcurrencyVersion: settings.aiConcurrencyVersion,
       concurrency: settings.concurrency,
       deepContextMode: settings.deepContextMode,
       standardChunkWords: settings.deepStandardChunkWords,
@@ -303,6 +305,8 @@ export function desktopSettingsPatchFromServerProfile(value) {
     sidebarOrder: [...profile.workspace.sidebarOrder],
     sidebarHidden: [...profile.workspace.sidebarHidden],
     sidebarCustomized: profile.workspace.sidebarCustomized,
+    aiConcurrencyMode: profile.workspace.aiConcurrencyMode,
+    aiConcurrencyVersion: profile.workspace.aiConcurrencyVersion,
     concurrency: profile.workspace.concurrency,
     deepContextMode: profile.workspace.deepContextMode,
     deepStandardChunkWords: profile.workspace.standardChunkWords,
@@ -409,7 +413,18 @@ export function sanitizeServerProfilePreferences(value) {
     },
     workspace: {
       sidebarOrder: strings(workspace.sidebarOrder), sidebarHidden: strings(workspace.sidebarHidden),
-      sidebarCustomized: bool(workspace.sidebarCustomized), concurrency: number(workspace.concurrency, 1, 32, true),
+      sidebarCustomized: bool(workspace.sidebarCustomized),
+      // Version 1 records an explicit selector choice. Older/missing values are
+      // the pre-release opt-in default and graduate once to production automatic.
+      aiConcurrencyMode: workspace.aiConcurrencyVersion !== undefined
+        && number(workspace.aiConcurrencyVersion, 0, 100, true) >= 1
+        ? enumValue(workspace.aiConcurrencyMode, ['automatic', 'manual'])
+        : 'automatic',
+      aiConcurrencyVersion: workspace.aiConcurrencyVersion !== undefined
+        && number(workspace.aiConcurrencyVersion, 0, 100, true) >= 1
+        ? number(workspace.aiConcurrencyVersion, 1, 100, true)
+        : 1,
+      concurrency: number(workspace.concurrency, 1, 8, true),
       deepContextMode: enumValue(workspace.deepContextMode, ['standard', 'long']),
       standardChunkWords: number(workspace.standardChunkWords, 100, 100_000, true),
       longChunkWords: number(workspace.longChunkWords, 1_000, 1_000_000, true),

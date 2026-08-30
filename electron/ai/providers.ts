@@ -95,6 +95,15 @@ function isGemini3Model(modelId: string | undefined): boolean {
   return Boolean(modelId && /^gemini-3(?:[.-]|$)/i.test(modelId));
 }
 
+/** OpenRouter models whose endpoint requires reasoning and rejects
+ * `reasoning.enabled=false`. Their minimum supported effort is the only safe mapping
+ * for Nodus' `off`: omitting the field can select a `max` default that spends the
+ * complete output budget on reasoning and returns no answer. Keep this allow-list
+ * narrow and evidence-backed: a future model must fail closed before it is added. */
+function isOpenRouterMandatoryReasoningModel(modelId: string | undefined): boolean {
+  return Boolean(modelId && /^z-ai\/glm-5\.3-flash(?::|$)/i.test(modelId));
+}
+
 /**
  * Sampling controls are deliberately absent for Gemini 3.x. Google recommends the
  * model defaults for the whole family and, starting with 3.5 Flash-Lite / 3.6,
@@ -116,8 +125,14 @@ export function reasoningBody(
 ): Record<string, unknown> {
   switch (provider) {
     case 'openrouter':
-      // OpenRouter's unified `reasoning` param: disable entirely, or pick an effort.
-      return effort === 'off' ? { reasoning: { enabled: false } } : { reasoning: { effort } };
+      // OpenRouter's unified `reasoning` param normally disables thinking explicitly.
+      // GLM 5.3 Flash rejects that control because reasoning is mandatory and publishes
+      // `low` as its minimum supported effort (`max` is the default). Map the impossible
+      // opt-out to that minimum so reasoning cannot consume the entire completion budget.
+      // Explicit user-selected efforts are still forwarded unchanged.
+      return effort === 'off' && isOpenRouterMandatoryReasoningModel(modelId)
+        ? { reasoning: { effort: 'low' } }
+        : effort === 'off' ? { reasoning: { enabled: false } } : { reasoning: { effort } };
     case 'gemini':
       // Gemini 3 models cannot disable thinking. Omitting the field selects the
       // model's own lowest/default level (minimal for Flash-Lite); sending "none"
@@ -269,6 +284,8 @@ export async function listModels(provider: AiProvider, key: string | null): Prom
 
 const OPENCODE_GO_MODEL_NAMES: Record<string, string> = {
   'grok-4.5': 'Grok 4.5',
+  'grok-4.6': 'Grok 4.6',
+  'gpt-5.6-luna': 'GPT 5.6 Luna',
   'glm-5.2': 'GLM-5.2',
   'glm-5.1': 'GLM-5.1',
   'glm-5': 'GLM-5',
@@ -278,6 +295,8 @@ const OPENCODE_GO_MODEL_NAMES: Record<string, string> = {
   'kimi-k2.5': 'Kimi K2.5',
   'deepseek-v4-pro': 'DeepSeek V4 Pro',
   'deepseek-v4-flash': 'DeepSeek V4 Flash',
+  'deepseek-v4-flash-vision-exp': 'DeepSeek V4 Flash Vision Exp',
+  'muse-spark-1.2-contributor': 'Muse Spark 1.2 Contributor',
   'mimo-v2.5': 'MiMo-V2.5',
   'mimo-v2.5-pro': 'MiMo-V2.5-Pro',
   'mimo-v2-pro': 'MiMo-V2-Pro',
@@ -286,6 +305,8 @@ const OPENCODE_GO_MODEL_NAMES: Record<string, string> = {
   'minimax-m2.7': 'MiniMax M2.7',
   'minimax-m2.5': 'MiniMax M2.5',
   'qwen3.7-max': 'Qwen3.7 Max',
+  'qwen3.8-max': 'Qwen3.8 Max',
+  'qwen3.8-flash': 'Qwen3.8 Flash',
   'qwen3.7-plus': 'Qwen3.7 Plus',
   'qwen3.6-plus': 'Qwen3.6 Plus',
   'qwen3.5-plus': 'Qwen3.5 Plus',

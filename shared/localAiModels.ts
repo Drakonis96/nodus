@@ -1,5 +1,7 @@
 export type NodusLocalModelKind = 'embedding' | 'chat';
 export type NodusLocalModelRuntime = 'llama_cpp' | 'transformers';
+export type NodusLocalCapability = 'chat' | 'vision' | 'summary' | 'extraction' | 'fusion' | 'documentProfile';
+export type NodusLocalCapabilities = Readonly<Record<NodusLocalCapability, boolean>>;
 
 export interface NodusLocalModelAsset {
   file: string;
@@ -22,15 +24,8 @@ export interface NodusLocalModelDefinition {
   contextLength?: number;
   dimensions?: number;
   vision?: boolean;
-  /**
-   * Whether this model is fit to drive idea EXTRACTION (deep/light scans) and, by extension, to be
-   * the single generic model in "basic" mode. Small vision models (Qwen3.5-0.8B, LFM2.5-VL-1.6B)
-   * are left `false`: benchmarked against a real 7000-word paper they produced 0 valid extractions —
-   * they loop/ramble inside the JSON and never close it, and no server flag, grammar, concision
-   * suffix or repetition penalty rescues them (see design/local-extraction-and-free-tier-plan.md).
-   * They stay usable for chat / vision / image. Only Gemma 4 E2B extracts reliably (20/20, 0 fails).
-   */
-  supportsExtraction?: boolean;
+  /** Benchmarked role contract. Unsupported roles are blocked before inference. */
+  capabilities: NodusLocalCapabilities;
   modelFile: string;
   projectorFile?: string;
   assets: readonly NodusLocalModelAsset[];
@@ -60,7 +55,20 @@ export interface NodusLocalAiStatus {
   runtime: NodusLocalRuntimeStatus;
   models: NodusLocalModelStatus[];
   activeModelId: string | null;
+  activeSlots: number;
+  activeLeases: number;
 }
+
+const EMBEDDING_CAPABILITIES: NodusLocalCapabilities = {
+  chat: false, vision: false, summary: false, extraction: false, fusion: false, documentProfile: false,
+};
+const FULL_TEXT_CAPABILITIES: NodusLocalCapabilities = {
+  chat: true, vision: false, summary: true, extraction: true, fusion: true, documentProfile: true,
+};
+const FULL_VISION_CAPABILITIES: NodusLocalCapabilities = { ...FULL_TEXT_CAPABILITIES, vision: true };
+const RESTRICTED_VISION_CAPABILITIES: NodusLocalCapabilities = {
+  chat: true, vision: true, summary: false, extraction: false, fusion: false, documentProfile: false,
+};
 
 const HF_REVISIONS: Record<string, string> = {
   'ggml-org/bge-m3-Q8_0-GGUF': '9eba04c5d75ba5a1595e45de734d36bef4e5cb98',
@@ -88,6 +96,7 @@ export const NODUS_LOCAL_MODELS: readonly NodusLocalModelDefinition[] = [
     licenseUrl: 'https://huggingface.co/BAAI/bge-m3',
     contextLength: 8192,
     dimensions: 1024,
+    capabilities: EMBEDDING_CAPABILITIES,
     modelFile: 'bge-m3-q8_0.gguf',
     assets: [
       {
@@ -110,11 +119,12 @@ export const NODUS_LOCAL_MODELS: readonly NodusLocalModelDefinition[] = [
     licenseUrl: 'https://huggingface.co/Alibaba-NLP/gte-multilingual-base',
     contextLength: 8192,
     dimensions: 768,
+    capabilities: EMBEDDING_CAPABILITIES,
     modelFile: 'onnx/model_int8.onnx',
     assets: [
-      { file: 'config.json', url: hf('onnx-community/gte-multilingual-base', 'config.json'), bytes: 1_648 },
-      { file: 'special_tokens_map.json', url: hf('onnx-community/gte-multilingual-base', 'special_tokens_map.json'), bytes: 964 },
-      { file: 'tokenizer_config.json', url: hf('onnx-community/gte-multilingual-base', 'tokenizer_config.json'), bytes: 1_149 },
+      { file: 'config.json', url: hf('onnx-community/gte-multilingual-base', 'config.json'), bytes: 1_648, sha256: '6ef2538d4286a7cd18d05225f659d8a1bceca7adb01c186868e53dbd4f822e17' },
+      { file: 'special_tokens_map.json', url: hf('onnx-community/gte-multilingual-base', 'special_tokens_map.json'), bytes: 964, sha256: '8c785abebea9ae3257b61681b4e6fd8365ceafde980c21970d001e834cf10835' },
+      { file: 'tokenizer_config.json', url: hf('onnx-community/gte-multilingual-base', 'tokenizer_config.json'), bytes: 1_149, sha256: '24cebbf2ef20fc317256e03e52ac7b2ca326586f946a8427ecac036332bf0933' },
       {
         file: 'tokenizer.json',
         url: hf('onnx-community/gte-multilingual-base', 'tokenizer.json'),
@@ -141,11 +151,12 @@ export const NODUS_LOCAL_MODELS: readonly NodusLocalModelDefinition[] = [
     licenseUrl: 'https://huggingface.co/intfloat/multilingual-e5-small',
     contextLength: 512,
     dimensions: 384,
+    capabilities: EMBEDDING_CAPABILITIES,
     modelFile: 'onnx/model_int8.onnx',
     assets: [
-      { file: 'config.json', url: hf('Xenova/multilingual-e5-small', 'config.json'), bytes: 658 },
-      { file: 'special_tokens_map.json', url: hf('Xenova/multilingual-e5-small', 'special_tokens_map.json'), bytes: 167 },
-      { file: 'tokenizer_config.json', url: hf('Xenova/multilingual-e5-small', 'tokenizer_config.json'), bytes: 443 },
+      { file: 'config.json', url: hf('Xenova/multilingual-e5-small', 'config.json'), bytes: 658, sha256: 'cb99455288675345e1a4f411438d5d0adbba5fbd3a67ea4fb03c015433b996c1' },
+      { file: 'special_tokens_map.json', url: hf('Xenova/multilingual-e5-small', 'special_tokens_map.json'), bytes: 167, sha256: 'd05497f1da52c5e09554c0cd874037a083e1dc1b9cfd48034d1c717f1afc07a7' },
+      { file: 'tokenizer_config.json', url: hf('Xenova/multilingual-e5-small', 'tokenizer_config.json'), bytes: 443, sha256: 'a1d6bc8734a6f635dc158508bef000f8e2e5a759c7d92f984b2c86e5ff53425b' },
       {
         file: 'tokenizer.json',
         url: hf('Xenova/multilingual-e5-small', 'tokenizer.json'),
@@ -166,13 +177,13 @@ export const NODUS_LOCAL_MODELS: readonly NodusLocalModelDefinition[] = [
     kind: 'chat',
     runtime: 'llama_cpp',
     quantization: 'Q4_K_M',
-    description: 'Modelo visual muy ligero para conversación, resúmenes e ideas.',
+    description: 'Modelo visual muy ligero para conversación e imagen. La extracción, fusión, perfiles y resúmenes están bloqueados por fiabilidad.',
     sourceUrl: 'https://huggingface.co/unsloth/Qwen3.5-0.8B-GGUF',
     licenseLabel: 'Apache-2.0',
     licenseUrl: 'https://huggingface.co/Qwen/Qwen3.5-0.8B/blob/main/LICENSE',
     contextLength: 32_768,
     vision: true,
-    supportsExtraction: false,
+    capabilities: RESTRICTED_VISION_CAPABILITIES,
     modelFile: 'Qwen3.5-0.8B-Q4_K_M.gguf',
     projectorFile: 'mmproj-F16.gguf',
     assets: [
@@ -202,7 +213,7 @@ export const NODUS_LOCAL_MODELS: readonly NodusLocalModelDefinition[] = [
     licenseUrl: 'https://huggingface.co/google/gemma-4-E2B-it-qat-q4_0-gguf',
     contextLength: 32_768,
     vision: true,
-    supportsExtraction: true,
+    capabilities: FULL_VISION_CAPABILITIES,
     modelFile: 'gemma-4-E2B_q4_0-it.gguf',
     projectorFile: 'gemma-4-E2B-it-mmproj.gguf',
     assets: [
@@ -231,7 +242,7 @@ export const NODUS_LOCAL_MODELS: readonly NodusLocalModelDefinition[] = [
     licenseLabel: 'Apache-2.0',
     licenseUrl: 'https://huggingface.co/ibm-granite/granite-4.0-micro-GGUF',
     contextLength: 32_768,
-    supportsExtraction: true,
+    capabilities: FULL_TEXT_CAPABILITIES,
     modelFile: 'granite-4.0-micro-Q4_K_M.gguf',
     assets: [
       {
@@ -248,13 +259,13 @@ export const NODUS_LOCAL_MODELS: readonly NodusLocalModelDefinition[] = [
     kind: 'chat',
     runtime: 'llama_cpp',
     quantization: 'Q4_0',
-    description: 'Modelo visual compacto orientado a documentos e imágenes.',
+    description: 'Modelo visual compacto para conversación e imagen. La extracción, fusión, perfiles y resúmenes están bloqueados por fiabilidad.',
     sourceUrl: 'https://huggingface.co/LiquidAI/LFM2.5-VL-1.6B-GGUF',
     licenseLabel: 'LFM Open License 1.0 · condición comercial ≥ USD 10M',
     licenseUrl: 'https://huggingface.co/LiquidAI/LFM2.5-VL-1.6B-GGUF/blob/48c6a306939241d1ddc99b090df552cb47a066c6/LICENSE',
     contextLength: 32_768,
     vision: true,
-    supportsExtraction: false,
+    capabilities: RESTRICTED_VISION_CAPABILITIES,
     modelFile: 'LFM2.5-VL-1.6B-Q4_0.gguf',
     projectorFile: 'mmproj-LFM2.5-VL-1.6b-Q8_0.gguf',
     assets: [
@@ -283,16 +294,26 @@ export function nodusLocalModelBytes(model: NodusLocalModelDefinition): number {
 }
 
 /**
- * True when a built-in chat model can be trusted to drive idea extraction (and thus be the single
- * model in basic mode). Unknown ids default to `true` — only models we have explicitly benchmarked
- * as unfit are blocked, so a future model isn't accidentally locked out. Embedding models are `false`
- * (they can't chat at all). See `supportsExtraction` on the definition for the why.
+ * Backwards-compatible extraction-role helper over the explicit capability matrix.
+ * Unknown ids and embedding models fail closed: a newly added built-in model must be
+ * certified for this role before it can mutate the graph.
  */
 export function nodusLocalModelSupportsExtraction(id: string): boolean {
   const model = getNodusLocalModel(id);
-  if (!model) return true;
-  if (model.kind !== 'chat') return false;
-  return model.supportsExtraction !== false;
+  if (!model || model.kind !== 'chat') return false;
+  return model.capabilities.extraction;
+}
+
+export function nodusLocalModelSupports(id: string, capability: NodusLocalCapability): boolean {
+  return getNodusLocalModel(id)?.capabilities[capability] === true;
+}
+
+export function modelRefSupportsCapability(
+  ref: { provider: string; model: string } | null | undefined,
+  capability: NodusLocalCapability,
+): boolean {
+  if (!ref || ref.provider !== 'nodus') return true;
+  return nodusLocalModelSupports(ref.model, capability);
 }
 
 /** The built-in chat model recommended as the default local extractor (basic mode / scans). */
@@ -304,9 +325,7 @@ export const NODUS_DEFAULT_EXTRACTION_MODEL_ID = 'gemma-4-e2b-q4';
  * gate the extraction / basic-mode-generic roles, and by the scan pipeline to warn on a bad choice.
  */
 export function modelRefSupportsExtraction(ref: { provider: string; model: string } | null | undefined): boolean {
-  if (!ref) return true;
-  if (ref.provider !== 'nodus') return true;
-  return nodusLocalModelSupportsExtraction(ref.model);
+  return modelRefSupportsCapability(ref, 'extraction');
 }
 
 /**
@@ -324,7 +343,7 @@ export function modelRefSupportsExtraction(ref: { provider: string; model: strin
  * on a third-party server the id is a label the user chose, not a build we control.
  */
 const WEAK_LOCAL_EXTRACTION_MODELS = NODUS_LOCAL_MODELS
-  .filter((model) => model.kind === 'chat' && model.supportsExtraction === false)
+  .filter((model) => model.kind === 'chat' && !model.capabilities.extraction)
   // 'qwen3.5-0.8b-q4' → 'qwen3508b': the family, without our quantization suffix, so
   // 'Qwen/Qwen3.5-0.8B-Instruct-GGUF' and 'qwen3.5-0.8b@q8_0' both match it.
   .map((model) => normalizeLocalModelId(model.id.replace(/-q\d.*$/i, '')));

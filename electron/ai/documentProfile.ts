@@ -26,6 +26,9 @@ import { setResolvedTextState } from '../db/worksRepo';
 import { analysisFingerprint, analysisModelFingerprint, upsertLibraryAnalysisProvenance } from '../db/libraryAnalysisProvenance';
 import { getItem, LOCAL_USER_ID } from '../zotero/zoteroClient';
 import { AiError, completeJson, embedMany } from './aiClient';
+import { mapOrderedPool } from './orderedPool';
+import { modelRefSupportsCapability } from '@shared/localAiModels';
+import type { PerfContext } from '../perf';
 
 export const DOCUMENT_PROFILE_PIPELINE_VERSION = 'document-profile/4';
 export const DOCUMENT_PROFILE_SCHEMA_VERSION = 1;
@@ -104,6 +107,8 @@ export interface RunDocumentProfileOptions {
   auditorModel: ModelRef | null;
   signal?: AbortSignal;
   onProgress?: (progress: DocumentProfileScanProgress) => void;
+  /** Audit-only timing context; never contains document text. */
+  perf?: PerfContext;
 }
 
 const clean = (value: unknown, max = 20_000): string => typeof value === 'string'
@@ -119,18 +124,26 @@ const sha256 = (value: string): string => createHash('sha256').update(value).dig
 const sha1 = (value: string): string => createHash('sha1').update(value).digest('hex');
 
 function isSectionAnalysis(value: unknown): value is SectionAnalysis {
-  if (!value || typeof value !== 'object') return false;
-  const item = value as Record<string, unknown>;
-  return typeof item.summary === 'string' && Array.isArray(item.concepts) && Array.isArray(item.claims);
+  // Providers commonly omit optional empty arrays or wrap the requested object.
+  // Accept only an object here and let the conservative normalizer plus literal
+  // quote matching and the independent audit reject unsupported content.
+  return Boolean(value && typeof value === 'object' && !Array.isArray(value));
 }
 
-function normalizeSectionAnalysis(value: SectionAnalysis, fallbackTitle: string): SectionAnalysis {
+export function normalizeSectionAnalysis(value: unknown, fallbackTitle: string): SectionAnalysis {
+  const root = value && typeof value === 'object' && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : {};
+  const nested = [root.section_analysis, root.analysis].find(
+    (candidate) => candidate && typeof candidate === 'object' && !Array.isArray(candidate),
+  ) as Record<string, unknown> | undefined;
+  const item = nested ?? root;
   return {
-    title: clean(value.title, 300) || fallbackTitle,
-    summary: clean(value.summary, 4_000),
-    role: clean(value.role, 300),
-    concepts: strings(value.concepts),
-    claims: (Array.isArray(value.claims) ? value.claims : []).flatMap((entry) => {
+    title: clean(item.title, 300) || fallbackTitle,
+    summary: clean(item.summary, 4_000),
+    role: clean(item.role, 300),
+    concepts: strings(item.concepts),
+    claims: (Array.isArray(item.claims) ? item.claims : []).flatMap((entry) => {
       if (!entry || typeof entry !== 'object') return [];
       const claim = entry as unknown as Record<string, unknown>;
       const text = clean(claim.text, 1_500);
@@ -364,8 +377,29 @@ function splitAnalysisParts(body: string): string[] {
 }
 
 function providerShapeFailure(error: unknown): boolean {
-  return (error instanceof AiError && !error.retriable && !error.config && /json|esquema/i.test(error.message))
+  return (error instanceof AiError && !error.retriable && !error.config
+      && (error.code === 'invalid_json' || /json|esquema/i.test(error.message)))
     || error instanceof SyntaxError;
+}
+
+function structuredOutputFailure(error: unknown): boolean {
+  return providerShapeFailure(error)
+    || (error instanceof AiError && error.code === 'output_truncated');
+}
+
+function mergeSectionAnalyses(values: SectionAnalysis[], fallbackTitle: string): SectionAnalysis {
+  const claims = new Map<string, RawClaim>();
+  for (const claim of values.flatMap((value) => value.claims)) {
+    const existing = claims.get(claim.support_quote);
+    if (!existing || existing.confidence < claim.confidence) claims.set(claim.support_quote, claim);
+  }
+  return {
+    title: values.find((value) => value.title.trim())?.title ?? fallbackTitle,
+    summary: clean(values.map((value) => value.summary).filter(Boolean).join(' '), 4_000),
+    role: clean(values.map((value) => value.role).find(Boolean), 300),
+    concepts: [...new Set(values.flatMap((value) => value.concepts).filter(Boolean))].slice(0, 24),
+    claims: [...claims.values()].slice(0, 16),
+  };
 }
 
 function literalSectionFallback(evidence: string, title: string): SectionAnalysis {
@@ -384,6 +418,7 @@ async function auditSectionAnalysis(
   candidate: SectionAnalysis,
   fallbackTitle: string,
   options: RunDocumentProfileOptions,
+  splitDepth = 0,
 ): Promise<SectionAnalysis> {
   let current = { ...candidate, claims: candidate.claims.filter((claim) => quoteOffset(evidence, claim.support_quote) >= 0) };
   const literalClaims = new Map(current.claims.map((claim) => [claim.support_quote, claim]));
@@ -395,9 +430,27 @@ async function auditSectionAnalysis(
         system: SECTION_AUDIT_SYSTEM,
         user: JSON.stringify({ fragment: evidence, analysis: current, prior_issues: issues }),
         temperature: 0, maxTokens: 5_000, signal: options.signal,
+        requestClass: 'background', jobId: `${options.jobId}:section-audit`,
+        perf: options.perf,
       }, isSectionAuditResponse, options.auditorModel), fallbackTitle);
     } catch (error) {
-      if (!providerShapeFailure(error)) throw error;
+      if (structuredOutputFailure(error) && current.claims.length > 1 && splitDepth < 4) {
+        const middle = Math.ceil(current.claims.length / 2);
+        const audited = await mapOrderedPool(
+          [current.claims.slice(0, middle), current.claims.slice(middle)],
+          2,
+          (claims, _index, poolSignal) => auditSectionAnalysis(
+            evidence,
+            { ...current, claims },
+            fallbackTitle,
+            { ...options, signal: poolSignal },
+            splitDepth + 1,
+          ),
+          options.signal,
+        );
+        return mergeSectionAnalyses(audited, fallbackTitle);
+      }
+      if (!structuredOutputFailure(error)) throw error;
       break;
     }
     issues = response.issues;
@@ -431,31 +484,67 @@ async function auditSectionAnalysis(
   };
 }
 
-async function analyzeSection(section: DerivedDocumentSection, options: RunDocumentProfileOptions): Promise<SectionAnalysis> {
-  const parts = splitAnalysisParts(section.body);
-  const analyses: SectionAnalysis[] = [];
-  for (let index = 0; index < parts.length; index += 1) {
-    const key = `section:${section.sectionId}:part:${index}`;
-    const hash = sha256(parts[index]);
-    const cached = readDocumentCheckpoint<SectionAnalysis>(options.jobId, key, hash);
-    let candidate = cached;
-    if (!candidate) {
-      try {
-        candidate = normalizeSectionAnalysis(await completeJson<SectionAnalysis>({
-          system: SECTION_SYSTEM,
-          user: JSON.stringify({ section_title: section.title, page_start: section.pageStart, fragment: parts[index] }),
-          temperature: 0, maxTokens: 4_000, signal: options.signal,
-        }, isSectionAnalysis, options.generatorModel), section.title);
-      } catch (error) {
-        if (!providerShapeFailure(error)) throw error;
-        candidate = literalSectionFallback(parts[index], section.title);
+async function analyzeSectionPart(
+  evidence: string,
+  key: string,
+  title: string,
+  pageStart: string | null,
+  options: RunDocumentProfileOptions,
+  depth = 0,
+): Promise<SectionAnalysis> {
+  const hash = sha256(evidence);
+  const cached = readDocumentCheckpoint<SectionAnalysis>(options.jobId, key, hash);
+  if (cached) return cached;
+  let candidate: SectionAnalysis;
+  try {
+    candidate = normalizeSectionAnalysis(await completeJson<SectionAnalysis>({
+      system: SECTION_SYSTEM,
+      user: JSON.stringify({ section_title: title, page_start: pageStart, fragment: evidence }),
+      temperature: 0, maxTokens: 4_000, signal: options.signal,
+      requestClass: 'background', jobId: `${options.jobId}:${key}`,
+      perf: options.perf,
+    }, isSectionAnalysis, options.generatorModel), title);
+  } catch (error) {
+    const words = evidence.split(/\s+/).filter(Boolean).length;
+    if (structuredOutputFailure(error) && words >= 400 && depth < 4) {
+      const childWords = Math.max(250, Math.ceil(words / 2));
+      const children = chunksWithOffsets(evidence, childWords).map((chunk) => chunk.body);
+      if (children.length >= 2) {
+        const values = await mapOrderedPool(
+          children,
+          Math.min(2, children.length),
+          (child, index, poolSignal) => analyzeSectionPart(
+            child,
+            `${key}:split:${depth}:${index}`,
+            title,
+            pageStart,
+            { ...options, signal: poolSignal },
+            depth + 1,
+          ),
+          options.signal,
+        );
+        const merged = mergeSectionAnalyses(values, title);
+        saveDocumentCheckpoint(options.jobId, key, hash, merged);
+        return merged;
       }
     }
-    const literal = { ...candidate, claims: candidate.claims.filter((claim) => quoteOffset(parts[index], claim.support_quote) >= 0) };
-    const value = await auditSectionAnalysis(parts[index], literal, section.title, options);
-    if (!cached) saveDocumentCheckpoint(options.jobId, key, hash, value);
-    analyses.push(value);
+    if (!structuredOutputFailure(error)) throw error;
+    candidate = literalSectionFallback(evidence, title);
   }
+  const literal = { ...candidate, claims: candidate.claims.filter((claim) => quoteOffset(evidence, claim.support_quote) >= 0) };
+  const value = await auditSectionAnalysis(evidence, literal, title, options);
+  saveDocumentCheckpoint(options.jobId, key, hash, value);
+  return value;
+}
+
+async function analyzeSection(section: DerivedDocumentSection, options: RunDocumentProfileOptions): Promise<SectionAnalysis> {
+  const parts = splitAnalysisParts(section.body);
+  const settings = getSettings();
+  const poolSize = settings.aiConcurrencyMode === 'automatic' ? 8 : Math.max(1, Math.min(8, settings.concurrency));
+  const analyses = await mapOrderedPool(parts, poolSize, async (part, index, poolSignal) => {
+    const key = `section:${section.sectionId}:part:${index}`;
+    return analyzeSectionPart(part, key, section.title, section.pageStart, { ...options, signal: poolSignal });
+  }, options.signal);
   if (analyses.length === 1) return analyses[0];
   const reduceHash = sha256(JSON.stringify(analyses));
   const cached = readDocumentCheckpoint<SectionAnalysis>(options.jobId, `section:${section.sectionId}:reduced`, reduceHash);
@@ -465,10 +554,12 @@ async function analyzeSection(section: DerivedDocumentSection, options: RunDocum
     candidate = normalizeSectionAnalysis(await completeJson<SectionAnalysis>({
       system: SECTION_REDUCE_SYSTEM, user: JSON.stringify({ title: section.title, analyses }),
       temperature: 0, maxTokens: 5_000, signal: options.signal,
+      requestClass: 'background', jobId: `${options.jobId}:section:${section.sectionId}:reduce`,
+      perf: options.perf,
     }, isSectionAnalysis, options.generatorModel), section.title);
   } catch (error) {
-    if (!providerShapeFailure(error)) throw error;
-    candidate = literalSectionFallback(section.body, section.title);
+    if (!structuredOutputFailure(error)) throw error;
+    candidate = mergeSectionAnalyses(analyses, section.title);
   }
   const literal = { ...candidate, claims: candidate.claims.filter((claim) => quoteOffset(section.body, claim.support_quote) >= 0) };
   const reduced = await auditSectionAnalysis(section.body, literal, section.title, options);
@@ -560,7 +651,10 @@ async function preparePassages(
   if (current.count > 0 && current.hash === contentHash) return null;
   const chunks = planRetrievalChunks(text, { sourceMap });
   const embeddingConfig = currentEmbeddingConfig();
-  const embeddings = await embedMany(chunks.map((chunk) => chunk.text), options.signal);
+  const embeddings = await embedMany(chunks.map((chunk) => chunk.text), options.signal, {
+    perf: options.perf,
+    jobId: `${options.jobId}:structure-embeddings`,
+  });
   options.signal?.throwIfAborted();
   return {
     contentHash,
@@ -590,6 +684,65 @@ function synthesisPayload(
       page_start: section.pageStart, page_end: section.pageEnd,
     })),
   };
+}
+
+function mergeProfileSyntheses(profiles: ProfileSynthesis[]): ProfileSynthesis {
+  const fields = new Map<string, RawProfileField>();
+  for (const field of profiles.flatMap((profile) => profile.fields)) {
+    const key = `${field.kind}\0${field.support_quote}`;
+    const existing = fields.get(key);
+    if (!existing || existing.confidence < field.confidence) fields.set(key, field);
+  }
+  return {
+    source_language: profiles.find((profile) => profile.source_language !== 'und')?.source_language ?? 'und',
+    overview: clean(profiles.map((profile) => profile.overview).filter(Boolean).join(' '), 5_000),
+    fields: [...fields.values()].slice(0, 80),
+  };
+}
+
+async function synthesizeProfileAdaptive(
+  input: Record<string, unknown>,
+  options: RunDocumentProfileOptions,
+  splitPath = 'root',
+  splitDepth = 0,
+): Promise<ProfileSynthesis> {
+  const inputHash = sha256(JSON.stringify(input));
+  const checkpointType = splitPath === 'root' ? 'profile:synthesis' : `profile:synthesis:${splitPath}`;
+  const checkpoint = readDocumentCheckpoint<ProfileSynthesis>(options.jobId, checkpointType, inputHash);
+  if (checkpoint) return checkpoint;
+  try {
+    const profile = normalizeProfile(await completeJson<ProfileSynthesis>({
+      system: PROFILE_SYSTEM,
+      user: JSON.stringify(input),
+      temperature: 0,
+      maxTokens: 8_000,
+      signal: options.signal,
+      requestClass: 'background',
+      jobId: `${options.jobId}:profile:synthesis:${splitPath}`,
+      perf: options.perf,
+    }, isProfileSynthesis, options.generatorModel));
+    saveDocumentCheckpoint(options.jobId, checkpointType, inputHash, profile);
+    return profile;
+  } catch (error) {
+    const inputSections = Array.isArray(input.sections) ? input.sections : [];
+    if (!structuredOutputFailure(error) || inputSections.length < 2 || splitDepth >= 6) throw error;
+    const middle = Math.ceil(inputSections.length / 2);
+    const halves = [inputSections.slice(0, middle), inputSections.slice(middle)];
+    const profiles = await mapOrderedPool(
+      halves,
+      2,
+      (sections, index, poolSignal) => synthesizeProfileAdaptive(
+        { ...input, sections },
+        { ...options, signal: poolSignal },
+        `${splitPath}.${index}`,
+        splitDepth + 1,
+      ),
+      options.signal,
+    );
+    const merged = mergeProfileSyntheses(profiles);
+    saveDocumentCheckpoint(options.jobId, checkpointType, inputHash, merged);
+    return merged;
+  }
 }
 
 function deterministicAudit(text: string, sections: DerivedDocumentSection[], profile: ProfileSynthesis): {
@@ -741,7 +894,12 @@ function emit(
 
 /** Full-text, hierarchical, audited document scan. */
 export async function runDocumentProfileScan(work: Work, options: RunDocumentProfileOptions): Promise<string> {
+  options = { ...options, perf: options.perf ?? { nodusId: work.nodus_id, title: work.title } };
   options.signal?.throwIfAborted();
+  if (!modelRefSupportsCapability(options.generatorModel, 'documentProfile')
+    || !modelRefSupportsCapability(options.auditorModel, 'documentProfile')) {
+    throw new AiError('El modelo local seleccionado no está certificado para perfiles documentales; no se inició la inferencia.', false, true);
+  }
   const settings = getSettings();
   const userId = settings.zoteroUserId || LOCAL_USER_ID;
   emit(options, 'waiting_source', 0.01, 'Resolviendo el texto completo…');
@@ -786,8 +944,8 @@ export async function runDocumentProfileScan(work: Work, options: RunDocumentPro
     options,
     sourceMap,
   );
-  const sectionAnalyses = new Map<string, SectionAnalysis>();
-  for (let index = 0; index < sections.length; index += 1) {
+  const sectionPool = settings.aiConcurrencyMode === 'automatic' ? 8 : Math.max(1, Math.min(8, settings.concurrency));
+  const orderedAnalyses = await mapOrderedPool(sections, sectionPool, async (section, index, poolSignal) => {
     emit(
       options,
       'analyzing_sections',
@@ -795,7 +953,11 @@ export async function runDocumentProfileScan(work: Work, options: RunDocumentPro
       `Analizando sección ${index + 1} de ${sections.length}…`,
       { current: index + 1, total: sections.length },
     );
-    const analysis = await analyzeSection(sections[index], options);
+    return analyzeSection(section, { ...options, signal: poolSignal });
+  }, options.signal);
+  const sectionAnalyses = new Map<string, SectionAnalysis>();
+  for (let index = 0; index < sections.length; index += 1) {
+    const analysis = orderedAnalyses[index];
     sectionAnalyses.set(sections[index].sectionId, analysis);
     sections[index] = {
       ...sections[index], title: sections[index].title.startsWith('Sección ') ? analysis.title : sections[index].title,
@@ -805,23 +967,17 @@ export async function runDocumentProfileScan(work: Work, options: RunDocumentPro
   }
 
   const synthesisInput = synthesisPayload(work, sections, sectionAnalyses, item?.abstract ?? null);
-  const synthesisHash = sha256(JSON.stringify(synthesisInput));
   emit(options, 'synthesizing', 0.64, 'Sintetizando la obra completa…');
-  let profile = readDocumentCheckpoint<ProfileSynthesis>(options.jobId, 'profile:synthesis', synthesisHash);
+  let profile: ProfileSynthesis;
   let extractiveFallback = false;
   let repaired = false;
-  if (!profile) {
-    try {
-      profile = normalizeProfile(await completeJson<ProfileSynthesis>({
-        system: PROFILE_SYSTEM, user: JSON.stringify(synthesisInput), temperature: 0, maxTokens: 8_000, signal: options.signal,
-      }, isProfileSynthesis, options.generatorModel));
-    } catch (error) {
-      if (!providerShapeFailure(error)) throw error;
-      profile = buildExtractiveProfileFallback(work, sections, sectionAnalyses, 'und');
-      extractiveFallback = true;
-      repaired = true;
-    }
-    saveDocumentCheckpoint(options.jobId, 'profile:synthesis', synthesisHash, profile);
+  try {
+    profile = await synthesizeProfileAdaptive(synthesisInput, options);
+  } catch (error) {
+    if (!structuredOutputFailure(error)) throw error;
+    profile = buildExtractiveProfileFallback(work, sections, sectionAnalyses, 'und');
+    extractiveFallback = true;
+    repaired = true;
   }
   if (!profile.overview || !profile.fields.length) {
     profile = buildExtractiveProfileFallback(work, sections, sectionAnalyses, profile.source_language);
@@ -849,9 +1005,11 @@ export async function runDocumentProfileScan(work: Work, options: RunDocumentPro
           support_coverage: deterministic.supportCoverage, structure_coverage: deterministic.structureCoverage,
         } }),
         temperature: 0, maxTokens: 5_000, signal: options.signal,
+        requestClass: 'background', jobId: `${options.jobId}:profile:audit:${attempt}`,
+        perf: options.perf,
       }, isAuditResponse, options.auditorModel));
     } catch (error) {
-      if (!providerShapeFailure(error)) throw error;
+      if (!structuredOutputFailure(error)) throw error;
       break;
     }
     if (auditor.passed && auditor.field_fixes?.length) {
@@ -879,9 +1037,11 @@ export async function runDocumentProfileScan(work: Work, options: RunDocumentPro
         system: REPAIR_SYSTEM,
         user: JSON.stringify({ profile, audit: auditor, sections: synthesisInput.sections }),
         temperature: 0, maxTokens: 8_000, signal: options.signal,
+        requestClass: 'background', jobId: `${options.jobId}:profile:repair:${attempt}`,
+        perf: options.perf,
       }, isProfileSynthesis, options.generatorModel));
     } catch (error) {
-      if (!providerShapeFailure(error)) throw error;
+      if (!structuredOutputFailure(error)) throw error;
       break;
     }
     const repairedFieldCount = profile.fields.length;
@@ -951,7 +1111,10 @@ export async function runDocumentProfileScan(work: Work, options: RunDocumentPro
     ...sections.map((section) => ({ kind: 'section', sourceId: section.sectionId, text: `${section.title}\n${section.summary}`, weight: 0.75 })),
   ].filter((source) => source.text.trim());
   const vectorEmbeddingConfig = currentEmbeddingConfig();
-  const embeddings = await embedMany(vectorSources.map((source) => source.text), options.signal);
+  const embeddings = await embedMany(vectorSources.map((source) => source.text), options.signal, {
+    perf: options.perf,
+    jobId: `${options.jobId}:profile-embeddings`,
+  });
   options.signal?.throwIfAborted();
   const vectors = vectorSources.map((source, index) => ({
     ...source,

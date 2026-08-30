@@ -10,6 +10,7 @@ import { embedMany } from './aiClient';
 import { addNotification } from '../notifications';
 import { nodiText } from '@shared/nodiNotifications';
 import { recordLinkedLibraryAnalysis } from '../library/libraryVaultProvenance';
+import { coalesce } from '../util/coalesce';
 
 type ProgressListener = (progress: PassageEmbeddingProgress) => void;
 
@@ -25,6 +26,10 @@ const state = {
   running: false,
   paused: false,
   stopRequested: false,
+  startedAt: null as string | null,
+  finishedAt: null as string | null,
+  currentWorkStartedAt: null as string | null,
+  currentWorkFinishedAt: null as string | null,
   works: [] as PassageWork[],
   currentWorkIndex: 0,
   passagesEmbedded: 0,
@@ -40,6 +45,11 @@ function snapshot(): PassageEmbeddingProgress {
   return {
     running: state.running,
     paused: state.paused,
+    cancelled: state.stopRequested,
+    startedAt: state.startedAt,
+    finishedAt: state.finishedAt,
+    currentWorkStartedAt: state.currentWorkStartedAt,
+    currentWorkFinishedAt: state.currentWorkFinishedAt,
     currentWorkIndex: state.currentWorkIndex,
     totalWorks: state.works.length,
     currentWorkTitle: current?.title ?? null,
@@ -51,9 +61,13 @@ function snapshot(): PassageEmbeddingProgress {
   };
 }
 
-function emit(): void {
+const emitter = coalesce(() => {
   const progress = snapshot();
   for (const listener of state.listeners) listener(progress);
+}, 150);
+
+function emit(): void {
+  emitter.schedule();
 }
 
 export function onPassageProgress(listener: ProgressListener): () => void {
@@ -85,6 +99,10 @@ export function clearPassageProgress(): void {
   if (state.running) return;
   state.paused = false;
   state.stopRequested = false;
+  state.startedAt = null;
+  state.finishedAt = null;
+  state.currentWorkStartedAt = null;
+  state.currentWorkFinishedAt = null;
   state.works = [];
   state.currentWorkIndex = 0;
   state.passagesEmbedded = 0;
@@ -127,11 +145,17 @@ export async function startPassageEmbedding(nodusIds?: string[]): Promise<void> 
       }
       emit();
     }
+    while (state.running) await new Promise((resolve) => setTimeout(resolve, 100));
+    if (state.error && !state.stopRequested) throw new Error(state.error);
     return;
   }
   state.running = true;
   state.paused = false;
   state.stopRequested = false;
+  state.startedAt = new Date().toISOString();
+  state.finishedAt = null;
+  state.currentWorkStartedAt = null;
+  state.currentWorkFinishedAt = null;
   state.works = [];
   state.currentWorkIndex = 0;
   state.passagesEmbedded = 0;
@@ -141,6 +165,7 @@ export async function startPassageEmbedding(nodusIds?: string[]): Promise<void> 
   state.error = null;
   emit();
 
+  let terminalError: Error | null = null;
   try {
     const db = getDb();
     const ids = requestedIds;
@@ -168,6 +193,8 @@ export async function startPassageEmbedding(nodusIds?: string[]): Promise<void> 
       state.currentWorkIndex = workIndex;
       state.currentPassageIndex = 0;
       state.currentWorkPassages = 0;
+      state.currentWorkStartedAt = new Date().toISOString();
+      state.currentWorkFinishedAt = null;
       emit();
 
       const entry = state.works[workIndex];
@@ -199,9 +226,16 @@ export async function startPassageEmbedding(nodusIds?: string[]): Promise<void> 
       state.currentWorkPassages = chunks.length;
       state.totalPassages += chunks.length;
       emit();
-      if (chunks.length === 0) continue;
+      if (chunks.length === 0) {
+        state.currentWorkFinishedAt = new Date().toISOString();
+        emit();
+        continue;
+      }
 
-      const embeddings = await embedMany(chunks.map((chunk) => chunk.text));
+      const embeddings = await embedMany(chunks.map((chunk) => chunk.text), undefined, {
+        perf: { nodusId: entry.work.nodus_id, title: entry.title },
+        jobId: `${entry.work.nodus_id}:passage-embeddings`,
+      });
       const missing = embeddings.findIndex((embedding) => !embedding?.length);
       if (missing >= 0) {
         throw new Error(
@@ -227,12 +261,17 @@ export async function startPassageEmbedding(nodusIds?: string[]): Promise<void> 
         components: ['passages', 'embeddings'],
         documentFingerprint: contentHash,
       });
+      state.currentWorkFinishedAt = new Date().toISOString();
       emit();
     }
   } catch (error) {
-    state.error = error instanceof Error ? error.message : String(error);
+    terminalError = error instanceof Error ? error : new Error(String(error));
+    state.error = terminalError.message;
     console.error('[passageEmbeddingPipeline] fatal error:', state.error);
   } finally {
+    const finishedAt = new Date().toISOString();
+    if (state.currentWorkStartedAt && !state.currentWorkFinishedAt) state.currentWorkFinishedAt = finishedAt;
+    state.finishedAt = finishedAt;
     state.running = false;
     emit();
     if (!state.stopRequested && state.totalPassages > 0) {
@@ -248,6 +287,7 @@ export async function startPassageEmbedding(nodusIds?: string[]): Promise<void> 
       });
     }
   }
+  if (terminalError && !state.stopRequested) throw terminalError;
 }
 
 export { clearAllPassages, workPassageStatuses as getWorkPassageStatuses };

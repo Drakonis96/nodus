@@ -429,6 +429,7 @@ export async function startZoteroLibraryImport(
       };
       const canceledProgress: ZoteroImportProgress = {
         ...prior, phase: 'canceled', percent: 100,
+        finishedAt: new Date().toISOString(), currentItem: null, currentItemStartedAt: null,
         message: 'Importación cancelada; el catálogo ya importado se conserva.',
       };
       activeImport.cancelable = false;
@@ -454,6 +455,7 @@ export async function startZoteroLibraryImport(
         const prior = latestProgress!;
         const completeProgress: ZoteroImportProgress = {
           ...prior, phase: 'complete', percent: 100,
+          finishedAt: new Date().toISOString(), currentItem: null, currentItemStartedAt: null,
           message: 'Importación de Zotero completada, verificada y preparada para extracción.',
         };
         activeImport.cancelable = false;
@@ -496,6 +498,7 @@ export async function startZoteroLibraryImport(
           const failedProgress: ZoteroImportProgress = {
             ...session.progress,
             phase: 'failed',
+            finishedAt: new Date().toISOString(), currentItem: null, currentItemStartedAt: null,
             message: `Falló el postproceso obligatorio de la importación: ${message}`,
           };
           sessions.progress(requestId, failedProgress);

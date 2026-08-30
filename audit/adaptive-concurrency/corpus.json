@@ -1,0 +1,15 @@
+{
+  "schema": "nodus-adaptive-corpus/1",
+  "papers": [
+    { "key": "LORA0001", "attachmentKey": "LORAATT1", "title": "LoRA: Low-Rank Adaptation of Large Language Models", "year": 2021, "arxiv": "2106.09685v2", "pages": 26, "sha256": "e9a0d3128767db616085dc0f4e6e455e672e89af823e8ed1282793682787395a", "url": "https://arxiv.org/pdf/2106.09685v2" },
+    { "key": "SELF0001", "attachmentKey": "SELFATT1", "title": "Self-Instruct: Aligning Language Models with Self-Generated Instructions", "year": 2022, "arxiv": "2212.10560v2", "pages": 23, "sha256": "1f14747af9bb8faee2221965449d7685174da18f3421efd4f38ef9bc57d6944e", "url": "https://arxiv.org/pdf/2212.10560v2" },
+    { "key": "LLAMA001", "attachmentKey": "LLAMAAT1", "title": "LLaMA: Open and Efficient Foundation Language Models", "year": 2023, "arxiv": "2302.13971v1", "pages": 27, "sha256": "2e663675ae36ad12adb2f5a05281bac2747ecf8d23d92bedd9f937a89fee7136", "url": "https://arxiv.org/pdf/2302.13971v1" },
+    { "key": "SAM00001", "attachmentKey": "SAM0ATT1", "title": "Segment Anything", "year": 2023, "arxiv": "2304.02643v1", "pages": 30, "sha256": "c6ca524e47200c3e542587ca76ac1dbc89cc67340f948c819250d16fdbd90cfb", "url": "https://arxiv.org/pdf/2304.02643v1" },
+    { "key": "RWKV0001", "attachmentKey": "RWKVATT1", "title": "RWKV: Reinventing RNNs for the Transformer Era", "year": 2023, "arxiv": "2305.13048v2", "pages": 30, "sha256": "57d18c40bdbb4bc1ab69c078a304f97e31657b4f543c408d8a5520e672a3fab0", "url": "https://arxiv.org/pdf/2305.13048v2" },
+    { "key": "QLORA001", "attachmentKey": "QLORAAT1", "title": "QLoRA: Efficient Finetuning of Quantized LLMs", "year": 2023, "arxiv": "2305.14314v1", "pages": 26, "sha256": "33a4e757c19d6ea8d3cca8958fce8fe405e290272e135c99ee66065c775d5bd1", "url": "https://arxiv.org/pdf/2305.14314v1" },
+    { "key": "DPO00001", "attachmentKey": "DPO0ATT1", "title": "Direct Preference Optimization: Your Language Model is Secretly a Reward Model", "year": 2023, "arxiv": "2305.18290v3", "pages": 27, "sha256": "92cb3a2b71362acda98a789b03d88688fd33cf5fcf13f81d2b1de30ee7d3b67a", "url": "https://arxiv.org/pdf/2305.18290v3" },
+    { "key": "ARENA001", "attachmentKey": "ARENAAT1", "title": "Chatbot Arena: An Open Platform for Evaluating LLMs by Human Preference", "year": 2024, "arxiv": "2403.04132v1", "pages": 29, "sha256": "039bccd60a7d49bfda80ce17ea627654736928eee9a7ee75767a38d04a01562f", "url": "https://arxiv.org/pdf/2403.04132v1" },
+    { "key": "AGENT001", "attachmentKey": "AGENTAT1", "title": "Generative Agents: Interactive Simulacra of Human Behavior", "year": 2023, "arxiv": "2304.03442v2", "pages": 22, "sha256": "1b31e77fb24d25d7598f2c49e955d12a28b95a6dabad34acdac40f44bfb7a139", "url": "https://arxiv.org/pdf/2304.03442v2" },
+    { "key": "HUGGPT01", "attachmentKey": "HUGGPTA1", "title": "HuggingGPT: Solving AI Tasks with ChatGPT and its Friends in Hugging Face", "year": 2023, "arxiv": "2303.17580v4", "pages": 27, "sha256": "5add5f7ff9041299c305769d49615e1ac2de2229e17c46e0811d1a60f94d6e3b", "url": "https://arxiv.org/pdf/2303.17580v4" }
+  ]
+}

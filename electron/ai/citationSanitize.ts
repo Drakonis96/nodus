@@ -25,6 +25,29 @@ export function citationUrl(ref: CitationRef): string {
   return `nodus://${ref.kind}/${encodeURIComponent(ref.id)}`;
 }
 
+/**
+ * Keep the citation contract close to the end of very large chat prompts. Some
+ * providers follow the system rule in short contexts but omit every link once
+ * tens of thousands of source tokens sit between that rule and the answer.
+ * These are not new or inferred sources: every target is copied from the exact
+ * context and the normal existence + in-context allow-list still runs after
+ * generation.
+ */
+export function buildCitationOutputContract(sourceContext: string): {
+  requirement: string;
+  exactTargets: string[];
+} | null {
+  const refs = extractCitationRefs(sourceContext);
+  if (!refs.length) return null;
+  return {
+    requirement:
+      'La respuesta es inválida si usa el corpus sin incluir citas Markdown verificables. ' +
+      'Después de cada afirmación sustantiva, copia el destino exacto de una fuente pertinente de esta lista; ' +
+      'no inventes ids, no cites orientación documental y no agrupes todas las citas solo al final.',
+    exactTargets: refs.slice(0, 40).map((ref) => `[fuente](${citationUrl(ref)})`),
+  };
+}
+
 export function dedupeRefs(refs: CitationRef[]): CitationRef[] {
   const seen = new Set<string>();
   const out: CitationRef[] = [];
@@ -113,6 +136,29 @@ export function canonicalizeCitationLinks(text: string): string {
       let id = rawId;
       try { id = decodeURIComponent(rawId); } catch { /* retain the provider text for deterministic encoding */ }
       return `[${label}](nodus://${kind}/${encodeURIComponent(id)})`;
+    },
+  );
+}
+
+/**
+ * A provider can copy the exact id from its source menu while putting it under
+ * the wrong Nodus kind (for example, `idea/<work uuid>`). Correct that typo only
+ * when the id identifies exactly one allowed source. Ambiguous or invented ids
+ * are deliberately left untouched so the normal allow-list pass removes them.
+ */
+export function alignCitationKindsToAllowed(text: string, allowedRefs: CitationRef[]): string {
+  const allowed = dedupeRefs(allowedRefs);
+  const allowedKeys = new Set(allowed.map((ref) => `${ref.kind}:${ref.id}`));
+  const byId = new Map<string, CitationRef[]>();
+  for (const ref of allowed) byId.set(ref.id, [...(byId.get(ref.id) ?? []), ref]);
+
+  return text.replace(
+    new RegExp(`\\[([^\\]]*)\\]\\(nodus:\\/\\/${ALL_LINK_KINDS}\\/([^\\s)]+)\\)`, 'g'),
+    (whole, label: string, kind: CitationRef['kind'], rawId: string) => {
+      const id = safeDecodeCitationId(rawId);
+      if (allowedKeys.has(`${kind}:${id}`)) return `[${label}](${citationUrl({ kind, id })})`;
+      const candidates = byId.get(id) ?? [];
+      return candidates.length === 1 ? `[${label}](${citationUrl(candidates[0])})` : whole;
     },
   );
 }

@@ -30,7 +30,7 @@ import { connectActiveVaultToLocalServer } from '../localServer/connect';
 import { startTailscaleServe, stopTailscaleServe } from '../localServer/tailscale';
 import { holdAwake, holdLid, powerStatus, recordPowerError, releaseAwake, releaseLid } from '../localServer/power';
 import { getAcademicHomeStats } from '../db/homeRepo';
-import { cancelNodusLocalDownloads, deleteNodusLocalModel, downloadNodusLocalModel, getNodusLocalAiStatus, installNodusLocalRuntime } from '../ai/nodusLocalAi';
+import { calibrateNodusLocalModelConcurrency, cancelNodusLocalDownloads, deleteNodusLocalModel, downloadNodusLocalModel, getNodusLocalAiStatus, installNodusLocalRuntime } from '../ai/nodusLocalAi';
 import { deleteNodusLocalImageModel, downloadNodusLocalImageModel, getNodusLocalImageStatus, installNodusLocalImageRuntime } from '../ai/nodusLocalImages';
 import { TRANSLATION_LANGUAGES } from '@shared/types';
 import { translateMarkdown, titleFromMarkdown } from '../ai/translate';
@@ -237,10 +237,15 @@ export function registerPlatformIpc({ h, getWindow }: IpcContext): void {
     installNodusLocalRuntime((fraction) => {
       if (!event.sender.isDestroyed()) event.sender.send('ai:nodusLocal:progress', requestId, fraction);
     }));
-  h('ai:nodusLocal:downloadModel', async (event, requestId: string, model: string) =>
-    downloadNodusLocalModel(model, (fraction) => {
+  h('ai:nodusLocal:downloadModel', async (event, requestId: string, model: string) => {
+    const status = await downloadNodusLocalModel(model, (fraction) => {
       if (!event.sender.isDestroyed()) event.sender.send('ai:nodusLocal:progress', requestId, fraction);
-    }));
+    });
+    if (getSettings().aiConcurrencyMode === 'automatic') {
+      void calibrateNodusLocalModelConcurrency(model).catch(() => undefined);
+    }
+    return status;
+  });
   h('ai:nodusLocal:cancelDownloads', async () => cancelNodusLocalDownloads());
   h('ai:nodusLocal:deleteModel', async (_event, model: string) => deleteNodusLocalModel(model));
   h('ai:nodusLocalImage:status', async () => getNodusLocalImageStatus());

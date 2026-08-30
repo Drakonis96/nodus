@@ -27,6 +27,14 @@ import { findSimilarIdeasPaged } from '../db/ideasRepo';
 import { findSimilarWorksPaged } from '../db/workSummariesRepo';
 import { findSimilarPassagesPaged, type SimilarPassage } from '../db/passagesRepo';
 import { retrieveHierarchical, selectPassageEvidence } from './hierarchicalRetrieval';
+import {
+  alignCitationKindsToAllowed,
+  canonicalizeCitationLinks,
+  citationUrl,
+  extractCitationRefs,
+  stripDisallowedCitations,
+} from './citationSanitize';
+import { repairLooseCitations } from './deepResearchCore';
 
 const MAX_IDEAS = 120;
 const MAX_THEMES = 30;
@@ -249,6 +257,7 @@ export async function generateWritingWorkshopDraft(request: WritingWorkshopDraft
     'Usa SOLO los materiales recibidos. No inventes obras, autores, citas, paginas ni relaciones.',
     'Los campos resumen_orientacion son solo para ubicar una obra: NUNCA son evidencia ni una fuente citable. Para afirmaciones sustantivas usa ideas, evidencias, huecos o contradicciones anclados.',
     'Cada afirmacion sustantiva del borrador debe ir ligada a una fuente mediante enlaces Markdown nodus://.',
+    'Una cita SIEMPRE tiene la forma [etiqueta](nodus://tipo/id). Nunca escribas [nodus://tipo/id] ni una URL nodus:// suelta.',
     'El objetivo NO es una respuesta breve: entrega un borrador desarrollado, pegable en un capitulo o articulo.',
     'Integra de forma explicita todas las ideas seleccionadas que puedas sostener con el contexto. Si hay muchas, agrupalas en lineas argumentales, pero no las reduzcas a una lista.',
     'Relaciona las ideas entre si: muestra continuidad, diferencias, niveles de abstraccion, consecuencias metodologicas, contradicciones y huecos.',
@@ -1494,27 +1503,50 @@ function sanitizeDraft(
   selection: WritingWorkshopSelection,
   context: WorkshopContext
 ): WritingWorkshopDraft {
-  const draftMarkdown = normalizeCitationLabels(ensureSubstantialMarkdown(cleanString(ai.draftMarkdown, ''), brief, context));
+  const citationPolicy = workshopCitationPolicy(context);
+  const substantial = ensureSubstantialMarkdown(cleanString(ai.draftMarkdown, ''), brief, context);
+  const primary = sanitizeWorkshopCitationText(substantial, citationPolicy);
+  // An invented or ambiguous target means the sentence that contains it is not
+  // demonstrably grounded. The deterministic fallback is preferable to keeping
+  // polished prose whose evidence boundary the provider crossed.
+  if (primary.unsupported > 0 || (citationPolicy.keys.size > 0 && primary.refs === 0)) {
+    return structuralFallback(brief, selection, context);
+  }
+  const draftMarkdown = primary.text;
   const outline = sanitizeOutline(ai.outline).map((section) => ({
     ...section,
-    sources: section.sources.map(normalizeCitationLabels),
+    purpose: sanitizeWorkshopCitationText(section.purpose, citationPolicy).text,
+    keyClaims: section.keyClaims.map((claim) => sanitizeWorkshopCitationText(claim, citationPolicy).text),
+    sources: section.sources
+      .map((source) => sanitizeWorkshopCitationText(source, citationPolicy).text)
+      .filter(Boolean),
   }));
-  const matrix = sanitizeMatrix(ai.matrix).map((row) => ({
-    ...row,
-    sourceLabel: citationLabelForUrl(row.citation) ?? row.sourceLabel,
-  }));
+  const matrix = sanitizeMatrix(ai.matrix)
+    .map((row) => {
+      const citation = canonicalWorkshopCitation(row.citation, citationPolicy);
+      if (!citation) return null;
+      return {
+        ...row,
+        claim: sanitizeWorkshopCitationText(row.claim, citationPolicy).text,
+        sourceLabel: citationLabelForUrl(citation) ?? row.sourceLabel,
+        citation,
+        evidence: sanitizeWorkshopCitationText(row.evidence, citationPolicy).text,
+        notes: sanitizeWorkshopCitationText(row.notes, citationPolicy).text,
+      };
+    })
+    .filter((row): row is WritingWorkshopMatrixRow => row !== null);
   return {
     generatedAt: new Date().toISOString(),
     brief,
     selection,
     title: cleanString(ai.title, 'Borrador de escritura'),
-    abstract: cleanString(ai.abstract, ''),
+    abstract: sanitizeWorkshopCitationText(cleanString(ai.abstract, ''), citationPolicy).text,
     outline,
     draftMarkdown,
     matrix,
     bibliography: stringList(ai.bibliography),
-    nextSteps: stringList(ai.nextSteps),
-    limitations: stringList(ai.limitations),
+    nextSteps: stringList(ai.nextSteps).map((item) => sanitizeWorkshopCitationText(item, citationPolicy).text),
+    limitations: stringList(ai.limitations).map((item) => sanitizeWorkshopCitationText(item, citationPolicy).text),
     stats: context.stats,
   };
 }
@@ -1807,6 +1839,35 @@ type CitationWork = { autores?: string[]; authors?: string[]; ano?: number | nul
 
 const citationLabelCache = new Map<string, string | null>();
 
+interface WorkshopCitationPolicy {
+  refs: ReturnType<typeof extractCitationRefs>;
+  keys: Set<string>;
+}
+
+function workshopCitationPolicy(context: WorkshopContext): WorkshopCitationPolicy {
+  const refs = extractCitationRefs(JSON.stringify(context.payload));
+  return { refs, keys: new Set(refs.map((ref) => `${ref.kind}:${ref.id}`)) };
+}
+
+function sanitizeWorkshopCitationText(
+  text: string,
+  policy: WorkshopCitationPolicy,
+): { text: string; refs: number; unsupported: number } {
+  const repaired = alignCitationKindsToAllowed(repairLooseCitations(text ?? ''), policy.refs);
+  const canonical = canonicalizeCitationLinks(repaired);
+  const refs = extractCitationRefs(canonical);
+  const unsupported = refs.filter((ref) => !policy.keys.has(`${ref.kind}:${ref.id}`)).length;
+  const sanitized = normalizeCitationLabels(stripDisallowedCitations(canonical, policy.keys));
+  return { text: sanitized, refs: extractCitationRefs(sanitized).length, unsupported };
+}
+
+function canonicalWorkshopCitation(citation: string, policy: WorkshopCitationPolicy): string | null {
+  const repaired = alignCitationKindsToAllowed(repairLooseCitations(citation ?? ''), policy.refs);
+  const ref = extractCitationRefs(canonicalizeCitationLinks(repaired))
+    .find((candidate) => policy.keys.has(`${candidate.kind}:${candidate.id}`));
+  return ref ? citationUrl(ref) : null;
+}
+
 function sourceLabel(work: CitationWork | undefined): string {
   if (!work) return 'Fuente del corpus';
   const authors = 'autores' in work ? work.autores : work.authors;
@@ -1832,13 +1893,19 @@ function citationLabelForUrl(citation: string): string | null {
   const cached = citationLabelCache.get(citation);
   if (cached !== undefined) return cached;
 
-  const match = citation.match(/^nodus:\/\/(idea|work|passage)\/(.+)$/);
+  const match = citation.match(/^nodus:\/\/(idea|work|passage|gap|contradiction)\/(.+)$/);
   if (!match) return null;
   let id: string;
   try {
     id = decodeURIComponent(match[2]);
   } catch {
     return null;
+  }
+
+  if (match[1] === 'gap' || match[1] === 'contradiction') {
+    const label = match[1] === 'gap' ? 'hueco' : 'contradicción';
+    citationLabelCache.set(citation, label);
+    return label;
   }
 
   const db = getDb();
@@ -1880,7 +1947,7 @@ function citationLabelForUrl(citation: string): string | null {
 
 /** Never display a model-invented or abbreviated label when its nodus target is known. */
 function normalizeCitationLabels(markdown: string): string {
-  return markdown.replace(/\[([^\]]*)\]\((nodus:\/\/(?:idea|work|passage)\/[^)]+)\)/g, (full, _label: string, citation: string) => {
+  return markdown.replace(/\[([^\]]*)\]\((nodus:\/\/(?:idea|work|passage|gap|contradiction)\/[^)]+)\)/g, (full, _label: string, citation: string) => {
     const label = citationLabelForUrl(citation);
     return label ? `[${label}](${citation})` : full;
   });

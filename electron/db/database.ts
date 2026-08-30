@@ -189,6 +189,15 @@ export function withDatabaseContext<T>(database: Database.Database, work: () => 
 }
 
 /**
+ * Run UI/global work without inheriting a completed background job's vault.
+ * Timers and event listeners created inside AsyncLocalStorage retain its store
+ * even after withVaultDatabase has closed that dedicated connection.
+ */
+export function withoutDatabaseContext<T>(work: () => T): T {
+  return jobDatabase.exit(work);
+}
+
+/**
  * Run a long-lived task against its originating vault, independently of the live UI
  * connection. AsyncLocalStorage keeps every repository call on this dedicated connection
  * across provider awaits, while the user remains free to close/switch the active vault.

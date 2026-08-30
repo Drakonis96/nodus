@@ -7,7 +7,7 @@ interface PricingUsdPerMillion {
   cachedWrite?: number;
 }
 
-/** Prices published in the OpenCode Go documentation on 2026-07-17. Unknown
+/** Prices published in the OpenCode Go documentation on 2026-08-30. Unknown
  * catalogue entries remain unpriced instead of receiving a guess. */
 const PRICING: Record<string, PricingUsdPerMillion> = {
   'grok-4.5': { input: 2, output: 6, cachedRead: 0.5 },
@@ -18,12 +18,15 @@ const PRICING: Record<string, PricingUsdPerMillion> = {
   'kimi-k2.6': { input: 0.95, output: 4, cachedRead: 0.16 },
   'deepseek-v4-pro': { input: 0.435, output: 0.87, cachedRead: 0.003625 },
   'deepseek-v4-flash': { input: 0.14, output: 0.28, cachedRead: 0.0028 },
+  'muse-spark-1.2-contributor': { input: 0.1, output: 0.2, cachedRead: 0.002 },
   'mimo-v2.5': { input: 0.14, output: 0.28, cachedRead: 0.0028 },
   'mimo-v2.5-pro': { input: 0.435, output: 0.87, cachedRead: 0.003625 },
   'minimax-m3': { input: 0.3, output: 1.2, cachedRead: 0.06 },
   'minimax-m2.7': { input: 0.3, output: 1.2, cachedRead: 0.06, cachedWrite: 0.375 },
   'minimax-m2.5': { input: 0.3, output: 1.2, cachedRead: 0.06, cachedWrite: 0.375 },
   'qwen3.7-max': { input: 2.5, output: 7.5, cachedRead: 0.5, cachedWrite: 3.125 },
+  'qwen3.8-max': { input: 2, output: 6, cachedRead: 0.25, cachedWrite: 2.5 },
+  'qwen3.8-flash': { input: 0.15, output: 0.47, cachedRead: 0.016, cachedWrite: 0.2 },
   'qwen3.7-plus': { input: 0.4, output: 1.6, cachedRead: 0.04, cachedWrite: 0.5 },
   'qwen3.6-plus': { input: 0.5, output: 3, cachedRead: 0.05, cachedWrite: 0.625 },
 };

@@ -99,6 +99,22 @@ async function fakeOpenCodeGo() {
       response.end(`event: message_delta\ndata: ${JSON.stringify({ type: 'message_delta', delta: { stop_reason: 'end_turn' }, usage: { output_tokens: 3 } })}\n\n`);
       return;
     }
+    if (request.url === '/v1/responses') {
+      if (!payload.stream) {
+        response.writeHead(200, { 'content-type': 'application/json' });
+        response.end(JSON.stringify({
+          status: 'completed', output_text: 'respuesta responses',
+          usage: { input_tokens: 9, output_tokens: 6, input_tokens_details: { cached_tokens: 4 } },
+        }));
+        return;
+      }
+      response.writeHead(200, { 'content-type': 'text/event-stream' });
+      response.write(`event: response.reasoning_summary_text.delta\ndata: ${JSON.stringify({ type: 'response.reasoning_summary_text.delta', delta: 'razona' })}\n\n`);
+      response.write(`event: response.output_text.delta\ndata: ${JSON.stringify({ type: 'response.output_text.delta', delta: 'hola ' })}\n\n`);
+      response.write(`event: response.output_text.delta\ndata: ${JSON.stringify({ type: 'response.output_text.delta', delta: 'muse' })}\n\n`);
+      response.end(`event: response.completed\ndata: ${JSON.stringify({ type: 'response.completed', response: { usage: { input_tokens: 5, output_tokens: 2 } } })}\n\n`);
+      return;
+    }
     response.writeHead(404).end();
   });
   await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
@@ -110,12 +126,14 @@ async function fakeOpenCodeGo() {
   };
 }
 
-test('OpenCode Go selects its two documented protocols and normalizes usage', async () => {
+test('OpenCode Go selects its three documented protocols and normalizes usage', async () => {
   const fake = await fakeOpenCodeGo();
   try {
     assert.equal(openCodeGoProtocol('kimi-k3'), 'openai');
     assert.equal(openCodeGoProtocol('minimax-m3'), 'anthropic');
     assert.equal(openCodeGoProtocol('qwen3.7-plus'), 'anthropic');
+    assert.equal(openCodeGoProtocol('qwen3.8-flash'), 'anthropic');
+    assert.equal(openCodeGoProtocol('muse-spark-1.2-contributor'), 'responses');
 
     const openai = await completeWithOpenCodeGo({
       apiKey: 'go-key', model: 'kimi-k3', system: 'system', user: 'user', jsonMode: true, baseUrl: fake.baseUrl,
@@ -128,7 +146,7 @@ test('OpenCode Go selects its two documented protocols and normalizes usage', as
     assert.deepEqual(openaiCall.payload.response_format, { type: 'json_object' });
 
     const anthropic = await completeWithOpenCodeGo({
-      apiKey: 'go-key', model: 'minimax-m3', system: 'system', user: 'user', jsonMode: true, baseUrl: fake.baseUrl,
+      apiKey: 'go-key', model: 'qwen3.8-flash', system: 'system', user: 'user', jsonMode: true, reasoning: 'off', baseUrl: fake.baseUrl,
     });
     assert.equal(anthropic.text, 'respuesta anthropic');
     assert.deepEqual(anthropic.usage, { uncachedInputTokens: 7, outputTokens: 5, cachedReadTokens: 2, cachedWriteTokens: 1 });
@@ -136,6 +154,17 @@ test('OpenCode Go selects its two documented protocols and normalizes usage', as
     assert.equal(anthropicCall.url, '/v1/messages');
     assert.equal(anthropicCall.headers['x-api-key'], 'go-key');
     assert.equal(anthropicCall.headers['anthropic-version'], '2023-06-01');
+    assert.deepEqual(anthropicCall.payload.thinking, { type: 'disabled' });
+
+    const responses = await completeWithOpenCodeGo({
+      apiKey: 'go-key', model: 'muse-spark-1.2-contributor', system: 'system', user: 'user', jsonMode: true, baseUrl: fake.baseUrl,
+    });
+    assert.equal(responses.text, 'respuesta responses');
+    assert.deepEqual(responses.usage, { uncachedInputTokens: 5, outputTokens: 6, cachedReadTokens: 4, cachedWriteTokens: 0 });
+    const responsesCall = fake.calls[2];
+    assert.equal(responsesCall.url, '/v1/responses');
+    assert.equal(responsesCall.headers.authorization, 'Bearer go-key');
+    assert.match(responsesCall.payload.instructions, /valid JSON/);
   } finally {
     await fake.close();
   }
@@ -153,7 +182,7 @@ test('OpenCode Go local metering uses official cache and long-context prices wit
   }), null);
 });
 
-test('OpenCode Go streams both protocols, separates reasoning, and surfaces auth errors', async () => {
+test('OpenCode Go streams all protocols, separates reasoning, and surfaces auth errors', async () => {
   const fake = await fakeOpenCodeGo();
   try {
     const text = [];
@@ -174,6 +203,17 @@ test('OpenCode Go streams both protocols, separates reasoning, and surfaces auth
     assert.equal(anthropic.text, 'hola mini');
     assert.deepEqual(mini, ['hola mini']);
     assert.deepEqual(anthropic.usage, { uncachedInputTokens: 6, outputTokens: 3, cachedReadTokens: 2, cachedWriteTokens: 0 });
+
+    const museText = [];
+    const museReasoning = [];
+    const muse = await completeWithOpenCodeGo({
+      apiKey: 'go-key', model: 'muse-spark-1.2-contributor', system: 's', user: 'u', baseUrl: fake.baseUrl,
+      onDelta: (delta) => museText.push(delta), onReasoningDelta: (delta) => museReasoning.push(delta),
+    });
+    assert.equal(muse.text, 'hola muse');
+    assert.deepEqual(museText, ['hola ', 'muse']);
+    assert.deepEqual(museReasoning, ['razona']);
+    assert.deepEqual(muse.usage, { uncachedInputTokens: 5, outputTokens: 2, cachedReadTokens: 0, cachedWriteTokens: 0 });
 
     await assert.rejects(() => completeWithOpenCodeGo({
       apiKey: 'rejected', model: 'kimi-k3', system: 's', user: 'u', baseUrl: fake.baseUrl,

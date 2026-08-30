@@ -150,6 +150,8 @@ const DEFAULTS: Omit<AppSettings, 'providerKeys' | 'lockedProviderKeys'> = {
   mascotStyleChosen: false,
   mascotOrbColorMode: 'auto',
   mascotOrbColor: NODI_ORB_DEFAULT_COLOR,
+  aiConcurrencyMode: 'automatic',
+  aiConcurrencyVersion: 1,
   concurrency: 1,
   chatReasoning: 'off',
   codexReasoningEfforts: {},
@@ -286,6 +288,24 @@ export function getSettings(): AppSettings {
     }
   }
   const merged = { ...DEFAULTS, ...parsed };
+  const storedConcurrencyVersion = Number.isInteger(parsed.aiConcurrencyVersion)
+    ? Number(parsed.aiConcurrencyVersion)
+    : 0;
+  const storedConcurrencyMode = parsed.aiConcurrencyMode === 'automatic' || parsed.aiConcurrencyMode === 'manual'
+    ? parsed.aiConcurrencyMode
+    : null;
+  // Automatic is the production default. Version 1 is written whenever the user
+  // touches the selector, so an explicit manual choice survives every migration.
+  // Profiles from the opt-in implementation (or profiles with neither key) remain
+  // version 0 and graduate once to automatic.
+  if (storedConcurrencyVersion >= 1 && storedConcurrencyMode) {
+    merged.aiConcurrencyMode = storedConcurrencyMode;
+    merged.aiConcurrencyVersion = storedConcurrencyVersion;
+  } else {
+    merged.aiConcurrencyMode = 'automatic';
+    merged.aiConcurrencyVersion = 1;
+  }
+  merged.concurrency = Math.max(1, Math.min(8, Math.trunc(Number(merged.concurrency) || 1)));
   // The browser connector stores one canonical extension origin. Treat malformed or
   // hand-edited values as unpaired so they can never authorize a capability endpoint.
   const browserOrigin = typeof merged.browserConnectorOrigin === 'string'

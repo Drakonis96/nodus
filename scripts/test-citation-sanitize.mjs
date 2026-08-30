@@ -26,7 +26,7 @@ try {
     logLevel: 'silent',
   });
   const mod = await import(pathToFileURL(outfile).href);
-  const { CITATION_KINDS, citationUrl, dedupeRefs, normalizeRefs, extractCitationRefs, stripDisallowedCitations, supportedCitationKeys, canonicalizeCitationLinks } = mod;
+  const { CITATION_KINDS, citationUrl, buildCitationOutputContract, dedupeRefs, normalizeRefs, extractCitationRefs, stripDisallowedCitations, supportedCitationKeys, canonicalizeCitationLinks, alignCitationKindsToAllowed } = mod;
 
   // ── citationUrl / extractCitationRefs round-trip ────────────────────────────
   assert.equal(citationUrl({ kind: 'idea', id: 'g-0001' }), 'nodus://idea/g-0001');
@@ -40,6 +40,12 @@ try {
   );
   // Encoded ids are decoded back.
   assert.deepEqual(extractCitationRefs('[a](nodus://work/a%20b)'), [{ kind: 'work', id: 'a b' }]);
+  assert.equal(buildCitationOutputContract('sin fuentes'), null);
+  assert.deepEqual(
+    buildCitationOutputContract('{"citation":"nodus://passage/work-1%237","again":"nodus://passage/work-1%237"}').exactTargets,
+    ['[fuente](nodus://passage/work-1%237)'],
+    'the tail contract exposes only canonical, de-duplicated targets copied from context',
+  );
   assert.deepEqual(
     extractCitationRefs('[cortada](nodus://work/a%2)'),
     [{ kind: 'work', id: 'a%2' }],
@@ -155,6 +161,22 @@ try {
     stripDisallowedCitations('Afirmación ([Autor](nodus://passage/uuid-truncado', new Set()),
     'Afirmación',
     'an answer cut off in the middle of a citation leaves no broken link or punctuation',
+  );
+  assert.equal(
+    alignCitationKindsToAllowed(
+      'Una obra [Fuente](nodus://idea/04702974-89d6-4f41-9d3c-76e46f364073).',
+      [{ kind: 'work', id: '04702974-89d6-4f41-9d3c-76e46f364073' }],
+    ),
+    'Una obra [Fuente](nodus://work/04702974-89d6-4f41-9d3c-76e46f364073).',
+    'a wrong kind is corrected only when the exact id has one unambiguous allowed source',
+  );
+  assert.equal(
+    alignCitationKindsToAllowed(
+      '[Fuente](nodus://idea/shared)',
+      [{ kind: 'idea', id: 'shared' }, { kind: 'work', id: 'shared' }],
+    ),
+    '[Fuente](nodus://idea/shared)',
+    'an ambiguous id is never rewritten to a different kind',
   );
 
   console.log('citation sanitiser test passed');

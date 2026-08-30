@@ -100,6 +100,10 @@ type RuntimePattern = {
 
 const RUNTIME_PATTERNS: RuntimePattern[] = [
   {
+    pattern: /^(Agrupando ideas en temas|Validando pares semánticos entre ideas) \((\d+)\/(\d+)\)$/,
+    render: (m) => `${t(m[1])} (${m[2]}/${m[3]})`,
+  },
+  {
     pattern: /^(Esta bóveda ya está cargada\.|Bóveda cargada\.) Claves API copiadas: (\d+)\.$/,
     render: (m) => `${t(m[1])} ${tx('Claves API copiadas: {n}.', { n: m[2] })}`,
   },

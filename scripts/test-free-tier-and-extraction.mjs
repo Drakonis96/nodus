@@ -43,13 +43,16 @@ test('extraction gate: Gemma passes, the small vision models are blocked, cloud 
   assert.equal(m.nodusLocalModelSupportsExtraction('lfm2.5-vl-1.6b-q4'), false);
   // embedding models can't chat → not extraction-capable
   assert.equal(m.nodusLocalModelSupportsExtraction('bge-m3-q8_0'), false);
-  // unknown ids default permissive (don't lock out a future model)
-  assert.equal(m.nodusLocalModelSupportsExtraction('some-future-model'), true);
+  // Unknown built-in ids fail closed until their role matrix is certified.
+  assert.equal(m.nodusLocalModelSupportsExtraction('some-future-model'), false);
 
   assert.equal(m.modelRefSupportsExtraction({ provider: 'nodus', model: 'qwen3.5-0.8b-q4' }), false);
   assert.equal(m.modelRefSupportsExtraction({ provider: 'nodus', model: 'gemma-4-e2b-q4' }), true);
   assert.equal(m.modelRefSupportsExtraction({ provider: 'openai', model: 'gpt-4o' }), true);
   assert.equal(m.modelRefSupportsExtraction(null), true);
+  assert.equal(m.modelRefSupportsCapability({ provider: 'nodus', model: 'qwen3.5-0.8b-q4' }, 'chat'), true);
+  assert.equal(m.modelRefSupportsCapability({ provider: 'nodus', model: 'qwen3.5-0.8b-q4' }, 'fusion'), false);
+  assert.equal(m.modelRefSupportsCapability({ provider: 'nodus', model: 'granite-4.0-micro-q4' }, 'vision'), false);
   assert.equal(m.NODUS_DEFAULT_EXTRACTION_MODEL_ID, 'gemma-4-e2b-q4');
 });
 
@@ -100,5 +103,24 @@ test('Gemini 3 transport omits rejected sampling and impossible thinking-off con
     m.reasoningBody('gemini', 'high', 'gemini-3.5-flash-lite'),
     { reasoning_effort: 'high' },
     'explicit supported Gemini 3 thinking levels remain available',
+  );
+});
+
+test('OpenRouter omits thinking-off only for endpoints with mandatory reasoning', async () => {
+  const m = await load('electron/ai/providers.ts');
+  assert.deepEqual(
+    m.reasoningBody('openrouter', 'off', 'z-ai/glm-5.3-flash'),
+    { reasoning: { effort: 'low' } },
+    'GLM 5.3 Flash rejects reasoning.enabled=false and must receive its minimum supported effort',
+  );
+  assert.deepEqual(
+    m.reasoningBody('openrouter', 'high', 'z-ai/glm-5.3-flash'),
+    { reasoning: { effort: 'high' } },
+    'an explicit supported effort is not discarded',
+  );
+  assert.deepEqual(
+    m.reasoningBody('openrouter', 'off', 'deepseek/deepseek-v4-flash'),
+    { reasoning: { enabled: false } },
+    'other OpenRouter models retain the fast explicit opt-out',
   );
 });

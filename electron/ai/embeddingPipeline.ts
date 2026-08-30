@@ -9,10 +9,11 @@ import {
   updateIdeaEmbedding,
 } from '../db/ideasRepo';
 import { allWorkSummaryRows, clearAllWorkSummaryEmbeddings, summaryNeedsEmbedding, updateWorkSummaryEmbedding } from '../db/workSummariesRepo';
-import { embed } from './aiClient';
+import { embedManyStrict } from './aiClient';
 import { clearAllPassages } from '../db/passagesRepo';
 import { addNotification } from '../notifications';
 import { nodiText } from '@shared/nodiNotifications';
+import { coalesce } from '../util/coalesce';
 
 type ProgressListener = (p: EmbeddingPipelineProgress) => void;
 
@@ -28,6 +29,10 @@ const state = {
   running: false,
   paused: false,
   stopRequested: false,
+  startedAt: null as string | null,
+  finishedAt: null as string | null,
+  currentWorkStartedAt: null as string | null,
+  currentWorkFinishedAt: null as string | null,
   works: [] as WorkIdeas[],
   currentWorkIndex: 0,
   ideasEmbedded: 0,
@@ -37,9 +42,13 @@ const state = {
   listeners: new Set<ProgressListener>(),
 };
 
-function emit(): void {
+const emitter = coalesce(() => {
   const p = snapshot();
   for (const l of state.listeners) l(p);
+}, 150);
+
+function emit(): void {
+  emitter.schedule();
 }
 
 function snapshot(): EmbeddingPipelineProgress {
@@ -47,6 +56,11 @@ function snapshot(): EmbeddingPipelineProgress {
   return {
     running: state.running,
     paused: state.paused,
+    cancelled: state.stopRequested,
+    startedAt: state.startedAt,
+    finishedAt: state.finishedAt,
+    currentWorkStartedAt: state.currentWorkStartedAt,
+    currentWorkFinishedAt: state.currentWorkFinishedAt,
     currentWorkIndex: state.currentWorkIndex,
     totalWorks: state.works.length,
     currentWorkTitle: currentWork?.title ?? null,
@@ -92,6 +106,10 @@ export function clearEmbeddingProgress(): void {
   if (state.running) return;
   state.paused = false;
   state.stopRequested = false;
+  state.startedAt = null;
+  state.finishedAt = null;
+  state.currentWorkStartedAt = null;
+  state.currentWorkFinishedAt = null;
   state.works = [];
   state.currentWorkIndex = 0;
   state.ideasEmbedded = 0;
@@ -113,11 +131,20 @@ async function waitIfPaused(): Promise<boolean> {
  * If nodusIds is empty, processes all deep-scanned works.
  */
 export async function startEmbedding(nodusIds?: string[]): Promise<void> {
-  if (state.running) return;
+  if (state.running) {
+    // A caller awaiting required post-processing must not receive a false success.
+    // Let the active batch finish, then run its requested scope explicitly.
+    while (state.running) await new Promise((resolve) => setTimeout(resolve, 100));
+    return startEmbedding(nodusIds);
+  }
 
   state.running = true;
   state.paused = false;
   state.stopRequested = false;
+  state.startedAt = new Date().toISOString();
+  state.finishedAt = null;
+  state.currentWorkStartedAt = null;
+  state.currentWorkFinishedAt = null;
   state.error = null;
   state.works = [];
   state.currentWorkIndex = 0;
@@ -126,6 +153,7 @@ export async function startEmbedding(nodusIds?: string[]): Promise<void> {
   state.currentIdeaIndex = 0;
   emit();
 
+  let terminalError: Error | null = null;
   try {
     const db = getDb();
 
@@ -234,41 +262,35 @@ export async function startEmbedding(nodusIds?: string[]): Promise<void> {
 
       state.currentWorkIndex = wi;
       const work = state.works[wi];
+      state.currentWorkStartedAt = new Date().toISOString();
+      state.currentWorkFinishedAt = null;
+      emit();
 
-      for (let ii = 0; ii < work.ideas.length; ii++) {
-        if (await waitIfPaused()) break;
-
-        state.currentIdeaIndex = ii;
-        emit();
-
-        const idea = work.ideas[ii];
-        try {
-          const text = embeddingTextForIdea(idea);
-          const embedding = await embed(text);
-
-          if (!embedding?.length) {
-            throw new Error('El proveedor no devolvió un embedding utilizable.');
-          }
-          updateIdeaEmbedding(idea.globalId, text, embedding);
-
-          state.ideasEmbedded++;
-
-        } catch (e) {
-          const message = e instanceof Error ? e.message : String(e);
-          state.error ??= message;
-          console.error(
-            `[embeddingPipeline] error embedding idea ${idea.globalId}:`,
-            message
-          );
+      if (await waitIfPaused()) break;
+      const texts = work.ideas.map((idea) => embeddingTextForIdea(idea));
+      const embeddings = await embedManyStrict(texts, undefined, {
+        perf: { nodusId: work.nodusId, title: work.title },
+        jobId: `${work.nodusId}:idea-embeddings`,
+      });
+      if (state.stopRequested || await waitIfPaused()) break;
+      getDb().transaction(() => {
+        for (let ii = 0; ii < work.ideas.length; ii++) {
+          state.currentIdeaIndex = ii;
+          updateIdeaEmbedding(work.ideas[ii].globalId, texts[ii], embeddings[ii]);
+          state.ideasEmbedded += 1;
         }
-
-        emit();
-      }
+      })();
+      state.currentWorkFinishedAt = new Date().toISOString();
+      emit();
     }
   } catch (e) {
-    state.error = e instanceof Error ? e.message : String(e);
+    terminalError = e instanceof Error ? e : new Error(String(e));
+    state.error = terminalError.message;
     console.error('[embeddingPipeline] fatal error:', state.error);
   } finally {
+    const finishedAt = new Date().toISOString();
+    if (state.currentWorkStartedAt && !state.currentWorkFinishedAt) state.currentWorkFinishedAt = finishedAt;
+    state.finishedAt = finishedAt;
     state.running = false;
     emit();
     if (!state.stopRequested && state.totalIdeas > 0) {
@@ -284,6 +306,7 @@ export async function startEmbedding(nodusIds?: string[]): Promise<void> {
       });
     }
   }
+  if (terminalError && !state.stopRequested) throw terminalError;
 }
 
 /**
@@ -300,19 +323,12 @@ export async function reindexAll(): Promise<void> {
 
 /** Rebuild orientation-summary vectors without coupling them to the idea-progress UI. */
 async function reembedAllSummaries(): Promise<void> {
-  for (const row of allWorkSummaryRows()) {
-    if (!summaryNeedsEmbedding(row, row.summary)) continue;
-    try {
-      const embedding = await embed(row.summary);
-      if (!embedding?.length) throw new Error('El proveedor no devolvió un embedding utilizable.');
-      updateWorkSummaryEmbedding(row.nodus_id, row.summary, embedding);
-    } catch (error) {
-      console.error(
-        `[embeddingPipeline] error embedding work summary ${row.nodus_id}:`,
-        error instanceof Error ? error.message : String(error)
-      );
-    }
-  }
+  const rows = allWorkSummaryRows().filter((row) => summaryNeedsEmbedding(row, row.summary));
+  if (!rows.length) return;
+  const embeddings = await embedManyStrict(rows.map((row) => row.summary));
+  getDb().transaction(() => {
+    rows.forEach((row, index) => updateWorkSummaryEmbedding(row.nodus_id, row.summary, embeddings[index]));
+  })();
 }
 
 /** Get per-work embedding status for the library table. */

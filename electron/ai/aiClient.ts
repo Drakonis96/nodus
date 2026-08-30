@@ -14,15 +14,20 @@ import {
   groqFreeTpm,
   isGroqReasoningModel,
 } from './providers';
-import { DEFAULT_EMBEDDING_MODELS, normalizeEmbeddingModel, PROVIDER_LABELS, supportsSamplingControls } from '@shared/providers';
+import { DEFAULT_EMBEDDING_MODELS, normalizeEmbeddingModel, PROVIDER_LABELS } from '@shared/providers';
 import type { AiProvider, CodexReasoningEffort, EmbeddingProvider, LocalProvider, ModelRef, PromptLanguage, ReasoningEffort } from '@shared/types';
 import { vaultTypePromptPack } from '@shared/vaultTypes';
 import { codexReasoningFor } from '@shared/codexReasoning';
 import { anthropicVisionContent, openAiVisionContent, type VisionImagePart } from '@shared/imageAnalysis';
 import { getActiveVault } from '../vaults/vaultRegistry';
 import { jsonrepair } from 'jsonrepair';
-import { startPerf, type PerfContext } from '../perf';
-import { embedWithNodusLocal, ensureNodusLocalServer } from './nodusLocalAi';
+import { perfLogNs, startPerf, type PerfContext } from '../perf';
+import {
+  embedWithNodusLocal,
+  ensureNodusLocalServer,
+  getNodusLocalSafeSlots,
+  withNodusLocalServerLease,
+} from './nodusLocalAi';
 import { getNodusLocalModel } from '@shared/localAiModels';
 import { currentPrivacyScope, type ActivePrivacyScope } from './studentPrivacyContext';
 import {
@@ -37,9 +42,167 @@ import { completeWithGitHubCopilotSubscription } from './githubCopilotSubscripti
 import { completeWithOpenCodeGo, OUTPUT_TRUNCATED_MARKER } from './openCodeGoCompletion';
 import { recordOpenCodeGoUsage } from './openCodeGoUsage';
 import { AI_MODEL_REQUIRED_ERROR_CODE } from '@shared/aiModelRequired';
-import { AiRequestGate } from './aiRequestGate';
+import { createHash } from 'node:crypto';
+import {
+  AiRequestScheduler,
+  type AiRequestClass,
+  type AiRequestDescriptor,
+} from './aiRequestGate';
+import type { AiConcurrencySnapshot } from '@shared/types';
+import { orderedEmbeddingEntries, requestEmbeddingBatchWithBisection, validateEmbeddingVectors } from './strictEmbeddings';
+import {
+  geminiBatchEmbeddingEndpoint,
+  geminiBatchEmbeddingRequest,
+  parseGeminiBatchEmbeddingResponse,
+} from './geminiEmbeddings';
+import { completeGeminiDeterministicJson } from './geminiDeterministicCompletion';
+import { withTransportDeadline } from './transportDeadline';
 
-const textRequestGate = new AiRequestGate(() => getSettings().concurrency);
+const concurrencyListeners = new Set<(snapshots: AiConcurrencySnapshot[]) => void>();
+const concurrencyTelemetry = new Map<string, string>();
+
+function concurrencyPolicy(descriptor: AiRequestDescriptor) {
+  const settings = getSettings();
+  const manualLimit = Math.max(1, Math.min(8, Math.trunc(settings.concurrency || 1)));
+  if (settings.aiConcurrencyMode !== 'automatic') {
+    return { mode: 'manual' as const, initial: manualLimit, maximum: manualLimit, manualLimit };
+  }
+  if (settings.providerFreeTier?.[descriptor.provider as AiProvider]) {
+    return { mode: 'automatic' as const, initial: 1, maximum: 1, manualLimit };
+  }
+  // Only providers that pass the release campaign receive the accelerated 4→8
+  // policy. Every other remote surface remains serial even though the UI default
+  // is Automatic; certification can widen this allowlist in a later release.
+  if (descriptor.provider === 'gemini' || descriptor.provider === 'deepseek') {
+    return { mode: 'automatic' as const, initial: 4, maximum: 8, manualLimit };
+  }
+  if (descriptor.provider === 'nodus') {
+    return { mode: 'automatic' as const, initial: 1, maximum: getNodusLocalSafeSlots(descriptor.model), manualLimit };
+  }
+  if (descriptor.provider === 'ollama' || descriptor.provider === 'lmstudio') {
+    return { mode: 'automatic' as const, initial: 1, maximum: 1, manualLimit };
+  }
+  return { mode: 'automatic' as const, initial: 1, maximum: 1, manualLimit };
+}
+
+const aiRequestScheduler = new AiRequestScheduler({
+  globalLimit: 12,
+  policyFor: concurrencyPolicy,
+  onSnapshot: (snapshots) => {
+    for (const snapshot of snapshots) {
+      const key = `${snapshot.provider}\u0000${snapshot.model}`;
+      const fingerprint = JSON.stringify({
+        currentLimit: snapshot.currentLimit,
+        maximumLimit: snapshot.maximumLimit,
+        cooldownUntil: snapshot.cooldownUntil,
+        lastChangeReason: snapshot.lastChangeReason,
+      });
+      if (concurrencyTelemetry.get(key) === fingerprint) continue;
+      concurrencyTelemetry.set(key, fingerprint);
+      perfLogNs('AI concurrency change', 0n, {}, {
+        provider: snapshot.provider,
+        model: snapshot.model,
+        active: snapshot.active,
+        queued: snapshot.queued,
+        currentLimit: snapshot.currentLimit,
+        maximumLimit: snapshot.maximumLimit,
+        cooldownUntil: snapshot.cooldownUntil,
+        reason: snapshot.lastChangeReason,
+      });
+    }
+    for (const listener of concurrencyListeners) listener(snapshots);
+  },
+});
+
+export function getAiConcurrencySnapshot(): AiConcurrencySnapshot[] {
+  return aiRequestScheduler.snapshots();
+}
+
+export function refreshAiConcurrencyPolicy(): void {
+  aiRequestScheduler.reconfigure();
+}
+
+export function onAiConcurrencySnapshot(listener: (snapshots: AiConcurrencySnapshot[]) => void): () => void {
+  concurrencyListeners.add(listener);
+  return () => concurrencyListeners.delete(listener);
+}
+
+function credentialScope(provider: string, key: string | null, endpoint?: string | null): string {
+  return createHash('sha256').update(`${provider}\u0000${key ?? 'subscription'}\u0000${endpoint ?? ''}`).digest('hex').slice(0, 16);
+}
+
+function providerRequestDescriptor(
+  model: ModelRef,
+  opts: CallOpts,
+  key: string | null,
+  endpoint: string | null | undefined,
+): AiRequestDescriptor {
+  return {
+    provider: model.provider,
+    model: model.model,
+    credentialScope: credentialScope(model.provider, key, endpoint),
+    endpoint,
+    requestClass: opts.requestClass ?? 'interactive',
+    estimatedInputTokens: estimateTokens(opts.system) + estimateTokens(opts.user),
+    estimatedOutputTokens: opts.maxTokens,
+    signal: opts.signal,
+    jobId: opts.jobId,
+  };
+}
+
+function observeProviderQuota(
+  model: ModelRef,
+  opts: CallOpts,
+  key: string | null,
+  endpoint: string | null | undefined,
+  headers: Headers,
+): void {
+  aiRequestScheduler.observeQuota(providerRequestDescriptor(model, opts, key, endpoint), headers);
+}
+
+function scheduleProviderRequest<T>(
+  model: ModelRef,
+  opts: CallOpts,
+  key: string | null,
+  endpoint: string | null | undefined,
+  task: () => Promise<T>,
+): Promise<T> {
+  const queuedAt = process.hrtime.bigint();
+  const requestHash = providerRequestHash(model, opts);
+  return aiRequestScheduler.run(providerRequestDescriptor(model, opts, key, endpoint), async () => {
+    const startedAt = process.hrtime.bigint();
+    const meta = {
+      provider: model.provider,
+      model: model.model,
+      class: opts.requestClass ?? 'interactive',
+      jobId: opts.jobId ?? null,
+      requestHash,
+    };
+    perfLogNs('AI queue wait', startedAt - queuedAt, opts.perf, meta);
+    try {
+      return await task();
+    } finally {
+      perfLogNs('AI inference', process.hrtime.bigint() - startedAt, opts.perf, meta);
+    }
+  });
+}
+
+function providerRequestHash(model: ModelRef, opts: CallOpts): string {
+  return createHash('sha256').update(JSON.stringify({
+    provider: model.provider,
+    model: model.model,
+    system: opts.system,
+    user: opts.user,
+    temperature: opts.temperature ?? null,
+    maxTokens: opts.maxTokens ?? null,
+    reasoning: opts.reasoning ?? null,
+    deterministic: opts.deterministic ?? false,
+    images: opts.images?.map((part) => ({
+      mediaType: part.mediaType,
+      sha256: createHash('sha256').update(part.base64).digest('hex'),
+    })) ?? [],
+  })).digest('hex');
+}
 
 export class AiError extends Error {
   /**
@@ -51,7 +214,7 @@ export class AiError extends Error {
     message: string,
     public retriable = false,
     public config = false,
-    public code: 'output_truncated' | 'timeout' | typeof AI_MODEL_REQUIRED_ERROR_CODE | null = null,
+    public code: 'output_truncated' | 'invalid_json' | 'timeout' | 'provider_empty_error' | typeof AI_MODEL_REQUIRED_ERROR_CODE | null = null,
   ) {
     super(message);
   }
@@ -242,6 +405,16 @@ interface CallOpts {
   /** Opt out of student pseudonymisation for a call that provably carries no roster
    *  data. Deliberately explicit: see electron/ai/studentPrivacyContext.ts. */
   skipStudentPseudonyms?: true;
+  /** Scheduler priority. Background pipelines must opt in explicitly. */
+  requestClass?: AiRequestClass;
+  /** Stable, content-free identifier used only for diagnostics/checkpoints. */
+  jobId?: string;
+  /**
+   * Ask a provider with a native seed contract to make a best effort at producing
+   * the same structured result for the same frozen request. Extraction uses this;
+   * creative and conversational calls deliberately do not.
+   */
+  deterministic?: boolean;
 }
 
 /** Streaming delta. `kind` distinguishes the final answer (`content`, default) from
@@ -356,6 +529,7 @@ export async function localModelContextWindow(model: ModelRef): Promise<number |
  * be rejected by some models, so callers retry once without them on a 400.
  */
 function optionalBody(model: ModelRef, jsonMode: boolean, reasoning: ReasoningEffort): Record<string, unknown> {
+  const auditedOpenRouterProvider = process.env.NODUS_AUDIT_OPENROUTER_PROVIDER?.trim();
   return {
     ...(jsonMode && supportsJsonMode(model.provider) ? { response_format: { type: 'json_object' as const } } : {}),
     ...reasoningBody(model.provider, reasoning, model.model),
@@ -365,7 +539,11 @@ function optionalBody(model: ModelRef, jsonMode: boolean, reasoning: ReasoningEf
     ...(model.provider === 'groq' && reasoning === 'off' && isGroqReasoningModel(model.model)
       ? { reasoning_effort: 'low' as const }
       : {}),
-    ...(model.provider === 'openrouter' ? openRouterRoutingBody(getSettings().openRouterThroughput) : {}),
+    ...(model.provider === 'openrouter'
+      ? auditedOpenRouterProvider
+        ? { provider: { only: [auditedOpenRouterProvider], allow_fallbacks: false } }
+        : openRouterRoutingBody(getSettings().openRouterThroughput)
+      : {}),
   };
 }
 
@@ -405,26 +583,56 @@ function completionTokensBody(model: ModelRef, maxTokens: number): Record<string
     : { max_tokens: maxTokens };
 }
 
-/** True for a provider 400 (bad request) — used to retry without the optional params. */
-function isBadRequest(e: any): boolean {
-  return (e?.status ?? e?.response?.status) === 400;
+/**
+ * Only retry a 400 when the provider explicitly names an unsupported optional
+ * transport field. A generic 400 can be an ambiguous timeout or rejected payload;
+ * replaying it would violate the no-blind-retry contract and may double-charge.
+ */
+function rejectsOptionalTransportField(e: any): boolean {
+  if ((e?.status ?? e?.response?.status) !== 400) return false;
+  const message = String(e?.error?.message ?? e?.message ?? '');
+  return /(?:unknown|unrecognized|unsupported|not supported|extra|invalid)\s+(?:field|parameter|argument)|response_format|reasoning_effort|include_reasoning|provider\.only|allow_fallbacks/i.test(message);
 }
 
-/** True for a provider 429 (rate limit) — worth waiting out on a free tier instead of failing. */
+/** True for provider throttling. OpenRouter also uses 529 when the selected
+ * upstream is temporarily over capacity and can attach the same retry hints. */
 function isRateLimited(e: any): boolean {
-  return (e?.status ?? e?.response?.status) === 429;
+  const status = e?.status ?? e?.response?.status;
+  return status === 429 || status === 529;
 }
 
-/** How long to wait after a 429, from the provider's Retry-After header (seconds), clamped to 60s. */
+/** How long to wait after a 429, from Retry-After/reset headers, bounded to 15 minutes. */
 function retryAfterMs(e: any): number {
   const h = e?.headers;
-  const raw = typeof h?.get === 'function' ? h.get('retry-after') : h?.['retry-after'];
+  const raw = typeof h?.get === 'function'
+    ? h.get('retry-after') ?? h.get('x-ratelimit-reset')
+    : h?.['retry-after'] ?? h?.['x-ratelimit-reset'];
   const secs = Number(raw);
-  if (Number.isFinite(secs) && secs > 0) return Math.min(60_000, Math.ceil(secs * 1000));
+  if (Number.isFinite(secs) && secs > 0) {
+    const duration = secs > 1_000_000_000 ? secs * 1000 - Date.now() : secs * 1000;
+    return Math.max(0, Math.min(15 * 60_000, Math.ceil(duration)));
+  }
+  const parsed = Date.parse(String(raw ?? ''));
+  if (Number.isFinite(parsed)) return Math.max(0, Math.min(15 * 60_000, parsed - Date.now()));
   return 3_000; // provider gave no usable hint — a short, bounded pause
 }
 
-const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+function sleep(ms: number, signal?: AbortSignal): Promise<void> {
+  signal?.throwIfAborted();
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(finish, ms);
+    const onAbort = () => {
+      clearTimeout(timer);
+      signal?.removeEventListener('abort', onAbort);
+      reject(signal?.reason ?? new DOMException('The operation was aborted.', 'AbortError'));
+    };
+    function finish() {
+      signal?.removeEventListener('abort', onAbort);
+      resolve();
+    }
+    signal?.addEventListener('abort', onAbort, { once: true });
+  });
+}
 
 /** True for a provider 5xx: the request did not run, so repeating it is not a double charge. */
 function isTransientServerError(e: any): boolean {
@@ -442,20 +650,28 @@ function isTransientServerError(e: any): boolean {
  *   tramos, indexar un corpus— cuando la petición ni siquiera llegó a ejecutarse. Y por eso
  *   mismo no es doble facturación: no hubo primera.
  */
-async function withProviderRetries<T>(freeTier: boolean, make: () => Promise<T>): Promise<T> {
-  const maxRateWaits = freeTier ? 4 : 0;
-  const maxServerRetries = 2;
+async function withProviderRetries<T>(
+  freeTier: boolean,
+  make: () => Promise<T>,
+  signal?: AbortSignal,
+  allowRetries = true,
+): Promise<T> {
+  // Automatic mode owns rate recovery for paid providers too. Each `make` call
+  // reacquires the scheduler, so these waits never consume useful capacity.
+  const maxRateWaits = allowRetries && (freeTier || getSettings().aiConcurrencyMode === 'automatic') ? 4 : 0;
+  const maxServerRetries = allowRetries ? 2 : 0;
   let serverRetries = 0;
   for (let attempt = 0; ; attempt++) {
+    signal?.throwIfAborted();
     try {
       return await make();
     } catch (e) {
       if (attempt < maxRateWaits && isRateLimited(e)) {
-        await sleep(retryAfterMs(e));
+        await sleep(retryAfterMs(e), signal);
         continue;
       }
       if (serverRetries < maxServerRetries && isTransientServerError(e)) {
-        await sleep(500 * (serverRetries + 1) ** 2);
+        await sleep(500 * (serverRetries + 1) ** 2, signal);
         serverRetries += 1;
         continue;
       }
@@ -540,10 +756,7 @@ async function rawComplete(
   reasoning: ReasoningEffort = 'off',
   codexReasoning?: CodexReasoningEffort | null
 ): Promise<string> {
-  return textRequestGate.run(
-    () => rawCompleteTransport(model, opts, jsonMode, reasoning, codexReasoning),
-    opts.signal,
-  );
+  return rawCompleteTransport(model, opts, jsonMode, reasoning, codexReasoning);
 }
 
 async function rawCompleteTransport(
@@ -560,7 +773,7 @@ async function rawCompleteTransport(
 
   if (model.provider === 'codex') {
     try {
-      return await completeWithChatGptSubscription({
+      return await scheduleProviderRequest(model, opts, null, 'codex-subscription', () => completeWithChatGptSubscription({
         model: model.model,
         system: withJsonModeDirective(opts.system, jsonMode),
         user: opts.user,
@@ -568,14 +781,14 @@ async function rawCompleteTransport(
         timeoutMs: opts.timeoutMs,
         images: opts.images,
         signal: opts.signal,
-      });
+      }));
     } catch (error) {
       throw subscriptionError(error);
     }
   }
   if (model.provider === 'github-copilot') {
     try {
-      return await completeWithGitHubCopilotSubscription({
+      return await scheduleProviderRequest(model, opts, null, 'github-copilot-subscription', () => completeWithGitHubCopilotSubscription({
         model: model.model,
         system: withJsonModeDirective(opts.system, jsonMode),
         user: opts.user,
@@ -583,7 +796,7 @@ async function rawCompleteTransport(
         timeoutMs: opts.timeoutMs,
         images: opts.images,
         signal: opts.signal,
-      });
+      }));
     } catch (error) {
       throw subscriptionError(error);
     }
@@ -593,7 +806,7 @@ async function rawCompleteTransport(
 
   if (model.provider === 'opencode-go') {
     try {
-      const result = await completeWithOpenCodeGo({
+      const result = await scheduleProviderRequest(model, opts, key, 'opencode-go', () => completeWithOpenCodeGo({
         apiKey: key,
         model: model.model,
         system: opts.system,
@@ -605,7 +818,7 @@ async function rawCompleteTransport(
         timeoutMs: opts.timeoutMs,
         images: opts.images,
         signal: opts.signal,
-      });
+      }));
       await recordOpenCodeGoUsage(model.model, result.usage);
       return result.text;
     } catch (error: any) {
@@ -621,7 +834,7 @@ async function rawCompleteTransport(
       ...(opts.timeoutMs ? { timeout: opts.timeoutMs } : {}),
     });
     try {
-      const res = await client.messages.create({
+      const res = await scheduleProviderRequest(model, opts, key, 'anthropic', () => client.messages.create({
         model: model.model,
         max_tokens: opts.maxTokens ?? 8000,
         temperature: opts.temperature ?? 0.15,
@@ -629,7 +842,7 @@ async function rawCompleteTransport(
         messages: [
           { role: 'user', content: opts.images?.length ? (anthropicVisionContent(opts.user, opts.images) as any) : opts.user },
         ],
-      }, { signal: opts.signal });
+      }, { signal: opts.signal }));
       const block = res.content.find((b: any) => b.type === 'text');
       if (jsonMode && (res as any).stop_reason === 'max_tokens') {
         throw new AiError(truncatedJsonMessage(model, opts.maxTokens ?? 8000), true, false, 'output_truncated');
@@ -654,6 +867,55 @@ async function rawCompleteTransport(
   // token budget (Groq) — otherwise the request 400s with "Request too large". No-op off free tier.
   const freeTier = isProviderFreeTier(model.provider);
   const maxTokens = freeTier ? freeTierBudget(model, opts, localMax) : localMax;
+  const schedulerEndpoint = model.provider === 'nodus' ? 'nodus-local-runtime' : baseURL;
+
+  // Google's OpenAI compatibility layer does not expose GenerationConfig.seed. For
+  // extraction, use the native endpoint so identical manual/automatic requests do not
+  // receive a fresh random seed merely because they were dispatched at a different
+  // time. Seed is documented as best-effort, so schema validation and fail-closed
+  // chunk recovery remain mandatory.
+  if (model.provider === 'gemini' && jsonMode && opts.deterministic) {
+    const requestHash = providerRequestHash(model, opts);
+    const seed = Number.parseInt(requestHash.slice(0, 8), 16) & 0x7fffffff;
+    const endpoint = 'https://generativelanguage.googleapis.com/v1beta/native';
+    try {
+      const result = await scheduleProviderRequest(model, opts, key, endpoint, () =>
+        completeGeminiDeterministicJson({
+          apiKey: key,
+          model: model.model,
+          system: opts.system,
+          user: opts.user,
+          temperature: opts.temperature ?? 0.15,
+          maxTokens,
+          seed,
+          timeoutMs: opts.timeoutMs ?? completionTimeoutMs(model),
+          signal: opts.signal,
+          images: opts.images,
+        }));
+      if (result.headers) observeProviderQuota(model, opts, key, endpoint, result.headers);
+      perfLogNs('AI response metadata', 0n, opts.perf, {
+        provider: model.provider,
+        model: model.model,
+        class: opts.requestClass ?? 'interactive',
+        jobId: opts.jobId ?? null,
+        requestHash,
+        inputTokens: result.inputTokens,
+        outputTokens: result.outputTokens,
+        deterministicSeed: seed,
+      });
+      if (result.finishReason === 'MAX_TOKENS') {
+        throw new AiError(truncatedJsonMessage(model, maxTokens), true, false, 'output_truncated');
+      }
+      if (!result.text.trim()) {
+        throw new AiError(`Respuesta vacía del proveedor de IA (${result.finishReason ?? 'sin finish_reason'}).`, false);
+      }
+      return result.text;
+    } catch (error: any) {
+      if (error instanceof AiError) throw error;
+      throw wrapProviderError(error);
+    }
+  }
+
   const OpenAI = (await import('openai')).default;
   const client = new OpenAI({
     apiKey: key,
@@ -662,6 +924,23 @@ async function rawCompleteTransport(
     maxRetries: 0,
     defaultHeaders: openAiClientHeaders(model),
   });
+  const createCompletion = (body: any) => model.provider === 'nodus'
+    ? withNodusLocalServerLease(model.model, 'chat', async (apiUrl) => {
+      const timeoutMs = opts.timeoutMs ?? completionTimeoutMs(model);
+      const result = await withTransportDeadline(timeoutMs, opts.signal, (signal) => new OpenAI({
+          apiKey: key,
+          baseURL: apiUrl,
+          timeout: timeoutMs,
+          maxRetries: 0,
+        }).chat.completions.create(body, { signal }).withResponse());
+      observeProviderQuota(model, opts, key, schedulerEndpoint, result.response.headers);
+      return result.data;
+    })
+    : withTransportDeadline(opts.timeoutMs ?? completionTimeoutMs(model), opts.signal, (signal) =>
+      client.chat.completions.create(body, { signal }).withResponse()).then((result) => {
+      observeProviderQuota(model, opts, key, schedulerEndpoint, result.response.headers);
+      return result.data;
+    });
   const baseBody = {
     model: model.model,
     ...samplingTemperatureBody(model.provider, model.model, opts.temperature ?? 0.15),
@@ -675,21 +954,37 @@ async function rawCompleteTransport(
   try {
     let res;
     try {
-      res = await withProviderRetries(freeTier, () => client.chat.completions.create({ ...baseBody, ...extras } as any, { signal: opts.signal }));
+      res = await withProviderRetries(freeTier, () => scheduleProviderRequest(
+        model, opts, key, schedulerEndpoint, () => createCompletion({ ...baseBody, ...extras } as any),
+      ), opts.signal, !opts.noRetry);
     } catch (e: any) {
       // The optional reasoning/JSON/routing params may be unsupported by this model.
       // Retry once as a plain request before surfacing the error.
-      if (!opts.noRetry && isBadRequest(e) && Object.keys(extras).length > 0) {
-        res = await withProviderRetries(freeTier, () => client.chat.completions.create(baseBody as any, { signal: opts.signal }));
+      if (!opts.noRetry && rejectsOptionalTransportField(e) && Object.keys(extras).length > 0) {
+        res = await withProviderRetries(freeTier, () => scheduleProviderRequest(
+          model, opts, key, schedulerEndpoint, () => createCompletion({
+            ...baseBody,
+            ...(model.provider === 'openrouter' && process.env.NODUS_AUDIT_OPENROUTER_PROVIDER?.trim()
+              ? { provider: (extras as any).provider }
+              : {}),
+          } as any),
+        ), opts.signal, !opts.noRetry);
       } else {
         throw e;
       }
     }
     const choice = res.choices[0];
+    perfLogNs('AI response metadata', 0n, opts.perf, {
+      provider: model.provider,
+      model: model.model,
+      class: opts.requestClass ?? 'interactive',
+      jobId: opts.jobId ?? null,
+      requestHash: providerRequestHash(model, opts),
+      backend: typeof (res as any).provider === 'string' ? (res as any).provider : null,
+      inputTokens: Number((res as any).usage?.prompt_tokens) || null,
+      outputTokens: Number((res as any).usage?.completion_tokens) || null,
+    });
     const content = choice?.message?.content ?? '';
-    if (!content.trim()) {
-      throw new AiError(`Respuesta vacía del proveedor de IA (${choice?.finish_reason ?? 'sin finish_reason'}).`, false);
-    }
     // A structured response cut off at the output ceiling is not partial data, it is
     // broken data: extractJson's jsonrepair pass closes the dangling braces without a
     // word, so the caller silently stores a fraction of the ideas — or trips the schema
@@ -698,6 +993,20 @@ async function rawCompleteTransport(
     // stays untouched: a clipped sentence is still usable, an unterminated object is not.
     if (jsonMode && choice?.finish_reason === 'length') {
       throw new AiError(truncatedJsonMessage(model, maxTokens), true, false, 'output_truncated');
+    }
+    // Some mandatory-reasoning models can spend the complete output allowance before
+    // emitting the first JSON character. Test `finish_reason` before the generic empty
+    // response guard so chunk-aware callers can recover by bisecting the input instead
+    // of treating a recoverable truncation as a terminal provider failure.
+    if (!content.trim()) {
+      if ((choice as any)?.finish_reason === 'error') {
+        // OpenRouter can surface an upstream failure as a syntactically successful
+        // HTTP response with an empty choice. Unlike an ambiguous timeout, the server
+        // has explicitly said that no completion was produced, so an exact bounded
+        // replay is safe and cannot duplicate a usable result.
+        throw new AiError('El backend de IA terminó la solicitud sin producir respuesta.', true, false, 'provider_empty_error');
+      }
+      throw new AiError(`Respuesta vacía del proveedor de IA (${choice?.finish_reason ?? 'sin finish_reason'}).`, false);
     }
     return content;
   } catch (e: any) {
@@ -803,49 +1112,11 @@ function extractJson(text: string): unknown {
   }
 }
 
-async function repairJson<T>(
-  model: ModelRef,
-  rawText: string,
-  parseError: unknown,
-  guard: (v: unknown) => v is T,
-  perf?: PerfContext
-): Promise<T | null> {
-  const repairDone = startPerf('JSON repair', perf, { rawChars: rawText.length });
-  const clipped = rawText.length > 60_000 ? rawText.slice(0, 60_000) : rawText;
-  const system =
-    'Eres un reparador estricto de JSON. Recibes una salida JSON mal formada. Devuelve únicamente el mismo objeto como JSON válido, sin añadir campos, sin inventar datos y sin vallas de código.';
-  const user = JSON.stringify({
-    parse_error: errorMessage(parseError),
-    invalid_json: clipped,
-  });
-  try {
-    const repaired = await rawComplete(
-      model,
-      {
-        system,
-        user,
-        temperature: 0,
-        maxTokens: Math.max(2000, Math.min(8000, Math.ceil(clipped.length / 3))),
-      },
-      false
-    );
-    const parsed = extractJson(repaired);
-    const ok = guard(parsed);
-    repairDone({ status: ok ? 'ok' : 'schema_mismatch' });
-    return ok ? parsed : null;
-  } catch (e) {
-    repairDone({ status: 'error', error: errorMessage(e) });
-    return null;
-  }
-}
-
 async function parseOrRepair<T>(
   model: ModelRef,
   text: string,
   guard: (v: unknown) => v is T,
-  perf?: PerfContext,
   maxTokens?: number,
-  allowRemoteRepair = true,
 ): Promise<T> {
   if (endsMidJson(text)) {
     throw new AiError(truncatedJsonMessage(model, maxTokens ?? 0), true, false, 'output_truncated');
@@ -854,27 +1125,23 @@ async function parseOrRepair<T>(
   try {
     parsed = extractJson(text);
   } catch (parseError) {
-    // Genuinely unparseable output — extractJson already recovers code fences, prose
-    // wrappers and truncation locally via jsonrepair, so reaching here means only a
-    // repair round-trip can still salvage the text (e.g. two objects run together).
-    if (!allowRemoteRepair) throw parseError;
-    const repaired = await repairJson(model, text, parseError, guard, perf);
-    if (repaired) return repaired;
-    throw parseError;
+    // extractJson already attempts deterministic local repair. Anything still invalid
+    // must be resampled from the frozen request; a remote repair prompt could invent
+    // fields and would invalidate manual-versus-automatic comparisons.
+    throw new AiError(`JSON inválido: ${errorMessage(parseError)}`, false, false, 'invalid_json');
   }
   if (guard(parsed)) return parsed;
-  // Well-formed JSON that misses the schema. repairJson asks the model for "the same
-  // object as valid JSON, sin añadir campos, sin inventar datos" — instructions it
-  // cannot follow and also fix a missing field, so it can only echo the mismatch back
-  // and fail this same guard. Skip the billed call and let completeJson retry the real
-  // prompt at a lower temperature, which is what actually recovers.
+  // Well-formed JSON that misses the schema is also resampled without changing the
+  // prompt, model, temperature, context or output budget.
   throw new AiError('El JSON no cumple el esquema esperado');
 }
 
 /**
- * JSON completion that retries (lower temperature, then no JSON mode) only when text
- * came back but failed to parse. A provider/transport failure (timeout, empty, etc.)
- * aborts on the first attempt so a hung provider can't stall for minutes.
+ * JSON completion retries the exact same request only when text came back but failed
+ * validation. It never changes prompt, temperature, JSON mode, context, output budget,
+ * model or provider as a hidden recovery strategy. Provider/transport failures
+ * (timeout, empty, etc.) abort on the first attempt so an ambiguous request is not
+ * blindly replayed.
  * Uses the given model override or the configured synthesis model.
  */
 export async function completeJson<T>(
@@ -892,30 +1159,20 @@ export async function completeJson<T>(
   // the fast default for a corpus-wide run is unchanged.
   const codexReasoning = configuredCodexReasoning(resolved) ?? undefined;
   let lastErr: unknown;
-  // Each rung escalates by lowering temperature, then by dropping JSON mode. A
-  // provider that honours neither (the subscription runtimes) would send the exact
-  // same request three times and bill three turns for it, so it gets one retry —
-  // the only lever left there is a fresh sample — instead of two identical ones.
-  const attempts = langOpts.noRetry
-    ? [{ temperature: langOpts.temperature ?? 0.15, jsonMode: true }]
-    : supportsSamplingControls(resolved.provider)
-    ? [
-        { temperature: langOpts.temperature ?? 0.15, jsonMode: true },
-        { temperature: 0, jsonMode: true },
-        { temperature: 0, jsonMode: false },
-      ]
-    : [
-        { temperature: langOpts.temperature ?? 0.15, jsonMode: true },
-        { temperature: langOpts.temperature ?? 0.15, jsonMode: true },
-      ];
-  for (let i = 0; i < attempts.length; i++) {
+  const attempts = langOpts.noRetry ? 1 : 3;
+  for (let i = 0; i < attempts; i++) {
     langOpts.signal?.throwIfAborted();
-    const attempt = attempts[i];
-    const retryDone = startPerf('JSON retry', langOpts.perf, { attempt: i + 1, jsonMode: attempt.jsonMode });
+    const retryDone = startPerf('JSON retry', langOpts.perf, { attempt: i + 1, jsonMode: true, invariantRequest: true });
     let text: string;
     try {
-      text = await rawComplete(resolved, { ...langOpts, temperature: attempt.temperature }, attempt.jsonMode, reasoning, codexReasoning);
+      text = await rawComplete(resolved, langOpts, true, reasoning, codexReasoning);
     } catch (e) {
+      const explicitEmptyProviderFailure = e instanceof AiError && e.code === 'provider_empty_error';
+      if (explicitEmptyProviderFailure && i < attempts - 1) {
+        retryDone({ status: 'error', error: errorMessage(e), retry: true });
+        lastErr = e;
+        continue;
+      }
       // Provider/transport failure (timeout, empty response, rate limit, 5xx, bad key).
       // Each call can burn the full 180s timeout, so looping here would let a hung
       // provider stall for minutes. The JSON retries below only help when text DID come
@@ -924,11 +1181,18 @@ export async function completeJson<T>(
       throw e;
     }
     try {
-      const parsed = await parseOrRepair(resolved, text, guard, langOpts.perf, langOpts.maxTokens, !langOpts.noRetry);
+      // A different repair prompt would violate the invariant request contract and
+      // could invent data. Reject and resample the frozen request instead.
+      const parsed = await parseOrRepair(resolved, text, guard, langOpts.maxTokens);
       if (i > 0) retryDone({ status: 'ok' });
       return deanonymizeResult(parsed);
     } catch (e) {
-      retryDone({ status: 'error', error: errorMessage(e), retry: i < attempts.length - 1 });
+      // Replaying a response that already consumed the full output budget cannot
+      // make it fit. Surface it immediately so chunk-aware callers can bisect the
+      // input; invariant resampling remains useful only for malformed/schema JSON.
+      const outputTruncated = e instanceof AiError && e.code === 'output_truncated';
+      retryDone({ status: 'error', error: errorMessage(e), retry: !outputTruncated && i < attempts - 1 });
+      if (outputTruncated) throw e;
       lastErr = e;
     }
   }
@@ -998,10 +1262,7 @@ async function rawCompleteStream(
   signal?: AbortSignal,
   codexReasoning?: CodexReasoningEffort | null
 ): Promise<string> {
-  return textRequestGate.run(
-    () => rawCompleteStreamTransport(model, opts, onDelta, reasoning, signal, codexReasoning),
-    signal ?? opts.signal,
-  );
+  return rawCompleteStreamTransport(model, opts, onDelta, reasoning, signal, codexReasoning);
 }
 
 async function rawCompleteStreamTransport(
@@ -1014,6 +1275,7 @@ async function rawCompleteStreamTransport(
 ): Promise<string> {
   const { sent, privacy } = anonymizeCallOpts(opts);
   opts = sent;
+  const scheduleOpts = { ...opts, signal: signal ?? opts.signal };
 
   let full = '';
   // Placeholders arrive split across chunk boundaries ("STU_" + "7K3Q"), so the reverse
@@ -1057,7 +1319,7 @@ async function rawCompleteStreamTransport(
 
   if (model.provider === 'codex') {
     try {
-      const answer = await completeWithChatGptSubscription({
+      const answer = await scheduleProviderRequest(model, scheduleOpts, null, 'codex-subscription', () => completeWithChatGptSubscription({
         model: model.model,
         system: opts.system,
         user: opts.user,
@@ -1066,7 +1328,7 @@ async function rawCompleteStreamTransport(
         images: opts.images,
         signal,
         onDelta: emitContent,
-      });
+      }));
       if (!full && answer) emitContent(answer);
       return finish();
     } catch (error) {
@@ -1077,7 +1339,7 @@ async function rawCompleteStreamTransport(
 
   if (model.provider === 'github-copilot') {
     try {
-      const answer = await completeWithGitHubCopilotSubscription({
+      const answer = await scheduleProviderRequest(model, scheduleOpts, null, 'github-copilot-subscription', () => completeWithGitHubCopilotSubscription({
         model: model.model,
         system: opts.system,
         user: opts.user,
@@ -1087,7 +1349,7 @@ async function rawCompleteStreamTransport(
         signal,
         onDelta: emitContent,
         onReasoningDelta: emitReasoning,
-      });
+      }));
       if (!full && answer) emitContent(answer);
       return finish();
     } catch (error) {
@@ -1101,7 +1363,7 @@ async function rawCompleteStreamTransport(
 
   if (model.provider === 'opencode-go') {
     try {
-      const result = await completeWithOpenCodeGo({
+      const result = await scheduleProviderRequest(model, scheduleOpts, key, 'opencode-go', () => completeWithOpenCodeGo({
         apiKey: key,
         model: model.model,
         system: opts.system,
@@ -1115,7 +1377,7 @@ async function rawCompleteStreamTransport(
         signal,
         onDelta: emitContent,
         onReasoningDelta: emitReasoning,
-      });
+      }));
       await recordOpenCodeGoUsage(model.model, result.usage);
       if (!full && result.text) emitContent(result.text);
       return finish();
@@ -1129,22 +1391,21 @@ async function rawCompleteStreamTransport(
     const Anthropic = (await import('@anthropic-ai/sdk')).default;
     const client = new Anthropic({ apiKey: key });
     try {
-      const stream = await (client.messages.create as any)(
-        {
+      await scheduleProviderRequest(model, scheduleOpts, key, 'anthropic', async () => {
+        const stream = await (client.messages.create as any)({
           model: model.model,
           max_tokens: opts.maxTokens ?? 8000,
           temperature: opts.temperature ?? 0.15,
           system: opts.system,
           stream: true,
           messages: [{ role: 'user', content: opts.user }],
-        },
-        { signal }
-      );
-      for await (const event of stream as AsyncIterable<any>) {
-        if (event?.type === 'content_block_delta' && event.delta?.type === 'text_delta') emitContent(event.delta.text);
-        else if (event?.type === 'content_block_delta' && event.delta?.type === 'thinking_delta') emitReasoning(event.delta.thinking);
-        else if (event?.type === 'text') emitContent(event.text);
-      }
+        }, { signal });
+        for await (const event of stream as AsyncIterable<any>) {
+          if (event?.type === 'content_block_delta' && event.delta?.type === 'text_delta') emitContent(event.delta.text);
+          else if (event?.type === 'content_block_delta' && event.delta?.type === 'thinking_delta') emitReasoning(event.delta.thinking);
+          else if (event?.type === 'text') emitContent(event.text);
+        }
+      });
     } catch (e: any) {
       // A user-triggered stop surfaces as an abort here — keep the partial answer
       // that already streamed instead of failing the whole turn.
@@ -1167,11 +1428,12 @@ async function rawCompleteStreamTransport(
     : isLocalProvider(model.provider) ? await localMaxTokens(model, opts, requestedMax) : requestedMax;
   const freeTier = isProviderFreeTier(model.provider);
   const maxTokens = freeTier ? freeTierBudget(model, opts, localMax) : localMax;
+  const streamTimeoutMs = opts.timeoutMs ?? completionTimeoutMs(model);
   const OpenAI = (await import('openai')).default;
   const client = new OpenAI({
     apiKey: key,
     baseURL: baseURL ?? undefined,
-    timeout: completionTimeoutMs(model),
+    timeout: streamTimeoutMs,
     maxRetries: 0,
     defaultHeaders: openAiClientHeaders(model),
   });
@@ -1187,30 +1449,65 @@ async function rawCompleteStreamTransport(
   };
   // Streaming is plain text (no JSON mode); only reasoning + routing apply.
   const extras = optionalBody(model, false, reasoning);
-  try {
-    let stream;
+  const schedulerEndpoint = model.provider === 'nodus' ? 'nodus-local-runtime' : baseURL;
+  const consumeStream = async (
+    streamClient: InstanceType<typeof OpenAI>,
+    body: any,
+    transportSignal: AbortSignal,
+  ): Promise<void> => {
+    const contentBefore = full.length;
     try {
-      stream = await withProviderRetries(freeTier, () => client.chat.completions.create({ ...baseBody, ...extras } as any, { signal }));
+      const result = await streamClient.chat.completions.create(body, { signal: transportSignal }).withResponse();
+      observeProviderQuota(model, scheduleOpts, key, schedulerEndpoint, result.response.headers);
+      const stream = result.data;
+      for await (const chunk of stream as any) {
+        if (chunk?.error) {
+          const msg = chunk.error.message ?? 'Error del proveedor durante el streaming.';
+          if (isLocalProvider(model.provider) && isContextOverflow(msg)) {
+            throw new AiError(contextOverflowMessage(model.provider, model.model, null, null), false, true);
+          }
+          throw new AiError(msg, false);
+        }
+        const delta = chunk?.choices?.[0]?.delta;
+        emitReasoning(delta?.reasoning ?? delta?.reasoning_content);
+        emitContent(delta?.content);
+      }
+    } catch (error) {
+      // A timeout after deltas is ambiguous: retrying would duplicate already emitted
+      // content. Re-type it without raw status so the retry layer cannot repeat it.
+      if (full.length > contentBefore && !(error instanceof AiError)) throw wrapProviderError(error);
+      throw error;
+    }
+  };
+  const executeStream = (body: any) => withTransportDeadline(
+    streamTimeoutMs,
+    signal ?? opts.signal,
+    (transportSignal) => model.provider === 'nodus'
+      ? withNodusLocalServerLease(model.model, 'chat', (apiUrl) => consumeStream(new OpenAI({
+          apiKey: key, baseURL: apiUrl, timeout: streamTimeoutMs, maxRetries: 0,
+        }), body, transportSignal))
+      : consumeStream(client, body, transportSignal),
+  );
+  try {
+    try {
+      await withProviderRetries(freeTier, () => scheduleProviderRequest(
+        model, scheduleOpts, key, schedulerEndpoint,
+        () => executeStream({ ...baseBody, ...extras } as any),
+      ), signal, !opts.noRetry);
     } catch (e: any) {
-      if (isBadRequest(e) && Object.keys(extras).length > 0) {
-        stream = await withProviderRetries(freeTier, () => client.chat.completions.create(baseBody as any, { signal }));
+      if (rejectsOptionalTransportField(e) && Object.keys(extras).length > 0) {
+        await withProviderRetries(freeTier, () => scheduleProviderRequest(
+          model, scheduleOpts, key, schedulerEndpoint,
+          () => executeStream({
+            ...baseBody,
+            ...(model.provider === 'openrouter' && process.env.NODUS_AUDIT_OPENROUTER_PROVIDER?.trim()
+              ? { provider: (extras as any).provider }
+              : {}),
+          } as any),
+        ), signal, !opts.noRetry);
       } else {
         throw e;
       }
-    }
-    for await (const chunk of stream as any) {
-      if (chunk?.error) {
-        const msg = chunk.error.message ?? 'Error del proveedor durante el streaming.';
-        // LM Studio/llama.cpp report a too-large prompt mid-stream; reword it actionably.
-        if (isLocalProvider(model.provider) && isContextOverflow(msg)) {
-          throw new AiError(contextOverflowMessage(model.provider, model.model, null, null), false, true);
-        }
-        throw new AiError(msg, false);
-      }
-      const delta = chunk?.choices?.[0]?.delta;
-      // Reasoning trace: OpenRouter exposes `reasoning`, DeepSeek `reasoning_content`.
-      emitReasoning(delta?.reasoning ?? delta?.reasoning_content);
-      emitContent(delta?.content);
     }
   } catch (e: any) {
     // A user-triggered stop surfaces as an abort here — keep the partial answer.
@@ -1233,32 +1530,114 @@ function embeddingConfig(): { provider: EmbeddingProvider; modelId: string } {
   };
 }
 
-async function requestEmbeddings(provider: EmbeddingProvider, key: string, modelId: string, input: string | string[], signal?: AbortSignal): Promise<number[][]> {
+interface EmbeddingRequestOptions {
+  perf?: PerfContext;
+  jobId?: string;
+}
+
+async function requestEmbeddings(
+  provider: EmbeddingProvider,
+  key: string,
+  modelId: string,
+  input: string | string[],
+  signal?: AbortSignal,
+  options: EmbeddingRequestOptions = {},
+): Promise<number[][]> {
+  const expected = Array.isArray(input) ? input.length : 1;
   const validate = (vectors: number[][]): number[][] => {
-    const dimension = vectors[0]?.length ?? 0;
-    for (const vector of vectors) {
-      if (
-        !Array.isArray(vector) ||
-        vector.length === 0 ||
-        vector.length !== dimension ||
-        !vector.every(Number.isFinite) ||
-        !vector.some((value) => value !== 0)
-      ) {
-        throw new AiError(
-          `El modelo de embeddings ${modelId} devolvió vectores vacíos, inválidos o con dimensiones incompatibles.`,
-          false
-        );
-      }
-    }
-    return vectors;
+    try { return validateEmbeddingVectors(vectors, expected, modelId); }
+    catch (error) { throw new AiError(error instanceof Error ? error.message : String(error), false); }
   };
   signal?.throwIfAborted();
-  if (provider === 'nodus') return validate(await embedWithNodusLocal(modelId, input, signal));
-  const baseURL = openAiCompatBase(provider) ?? undefined;
+  const endpoint = provider === 'nodus'
+    ? 'nodus-local-runtime'
+    : provider === 'gemini'
+      ? geminiBatchEmbeddingEndpoint(modelId)
+      : openAiCompatBase(provider) ?? undefined;
+  const descriptor: AiRequestDescriptor = {
+    provider,
+    model: modelId,
+    credentialScope: credentialScope(provider, key, endpoint),
+    endpoint,
+    requestClass: 'embedding',
+    estimatedInputTokens: (Array.isArray(input) ? input : [input]).reduce((sum, value) => sum + estimateTokens(value), 0),
+    signal,
+    jobId: options.jobId,
+  };
+  const runEmbeddingRequest = <T>(task: () => Promise<T>): Promise<T> => {
+    const queuedAt = process.hrtime.bigint();
+    const requestHash = createHash('sha256').update(JSON.stringify({
+      provider,
+      model: modelId,
+      input: Array.isArray(input) ? input : [input],
+    })).digest('hex');
+    return aiRequestScheduler.run(descriptor, async () => {
+      const startedAt = process.hrtime.bigint();
+      const meta = { provider, model: modelId, class: 'embedding', inputs: expected, jobId: options.jobId ?? null, requestHash };
+      perfLogNs('AI queue wait', startedAt - queuedAt, options.perf, meta);
+      try { return await task(); }
+      finally { perfLogNs('AI inference', process.hrtime.bigint() - startedAt, options.perf, meta); }
+    });
+  };
+  if (provider === 'nodus') {
+    return validate(await runEmbeddingRequest(() => embedWithNodusLocal(modelId, input, signal)));
+  }
+  const freeTier = isProviderFreeTier(provider);
+  if (provider === 'gemini') {
+    const texts = Array.isArray(input) ? input : [input];
+    const nativeEndpoint = endpoint!;
+    try {
+      const vectors = await withProviderRetries(freeTier, () => runEmbeddingRequest(async () => {
+        const timeoutController = new AbortController();
+        const timeout = setTimeout(
+          () => timeoutController.abort(new DOMException('Gemini embedding request timed out.', 'TimeoutError')),
+          completionTimeoutMs({ provider, model: modelId }),
+        );
+        const abortFromCaller = () => timeoutController.abort(signal?.reason);
+        signal?.addEventListener('abort', abortFromCaller, { once: true });
+        try {
+          const response = await fetch(nativeEndpoint, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'x-goog-api-key': key,
+            },
+            body: JSON.stringify(geminiBatchEmbeddingRequest(modelId, texts)),
+            signal: timeoutController.signal,
+          });
+          aiRequestScheduler.observeQuota(descriptor, response.headers);
+          const body = await response.json().catch(() => null);
+          if (!response.ok) {
+            const detail = body && typeof body === 'object'
+              ? (body as any).error?.message ?? JSON.stringify(body)
+              : `HTTP ${response.status}`;
+            const error = new Error(String(detail || `HTTP ${response.status}`)) as Error & {
+              status: number;
+              headers: Headers;
+              error?: { message: string };
+            };
+            error.status = response.status;
+            error.headers = response.headers;
+            error.error = { message: String(detail || '') };
+            throw error;
+          }
+          return parseGeminiBatchEmbeddingResponse(body);
+        } finally {
+          clearTimeout(timeout);
+          signal?.removeEventListener('abort', abortFromCaller);
+        }
+      }), signal);
+      return validate(vectors);
+    } catch (error) {
+      if (signal?.aborted) throw signal.reason;
+      if (error instanceof AiError) throw error;
+      throw wrapProviderError(error);
+    }
+  }
   const OpenAI = (await import('openai')).default;
   const client = new OpenAI({
     apiKey: key,
-    baseURL,
+    baseURL: endpoint,
     defaultHeaders:
       provider === 'openrouter'
         ? {
@@ -1267,51 +1646,89 @@ async function requestEmbeddings(provider: EmbeddingProvider, key: string, model
           }
         : undefined,
   });
-  const res = await client.embeddings.create({ model: modelId, input }, { signal });
-  return validate([...res.data]
-    .sort((a, b) => (a.index ?? 0) - (b.index ?? 0))
-    .map((d) => d.embedding));
+  try {
+    const res = await withProviderRetries(freeTier, () => runEmbeddingRequest(async () => {
+      const result = await client.embeddings.create({ model: modelId, input }, { signal }).withResponse();
+      aiRequestScheduler.observeQuota(descriptor, result.response.headers);
+      return result.data;
+    }), signal);
+    return orderedEmbeddingEntries(res.data.map((entry) => ({ index: entry.index, embedding: entry.embedding })), expected, modelId);
+  } catch (error) {
+    if (signal?.aborted) throw signal.reason;
+    if (error instanceof AiError) throw error;
+    const wrapped = wrapProviderError(error);
+    if (wrapped.config || wrapped.retriable || wrapped.code === 'timeout') throw wrapped;
+    throw new AiError(error instanceof Error ? error.message : String(error), false);
+  }
 }
 
 /**
  * Embeddings for idea fusion. Uses the embedding provider selected in Settings.
- * Returns null when unavailable — fusion then stays conservative (treats ideas
- * as new).
+ * Returns null only when no embedding credential exists. Once configured, errors
+ * are explicit: callers must checkpoint/retry rather than degrade silently.
  */
-export async function embed(text: string, signal?: AbortSignal): Promise<number[] | null> {
+export async function embed(text: string, signal?: AbortSignal, options: EmbeddingRequestOptions = {}): Promise<number[] | null> {
   signal?.throwIfAborted();
   const { provider, modelId } = embeddingConfig();
   const key = resolveProviderKey(provider);
   if (!key) return null;
-  try {
-    const vectors = await requestEmbeddings(provider, key, modelId, text.slice(0, 8000), signal);
-    return vectors[0] ?? null;
-  } catch (error) {
-    if (signal?.aborted) throw error;
-    return null;
-  }
+  const vectors = await requestEmbeddings(provider, key, modelId, text.slice(0, 8000), signal, options);
+  return vectors[0] ?? null;
 }
 
-export async function embedMany(texts: string[], signal?: AbortSignal): Promise<(number[] | null)[]> {
+function embeddingBatchSize(provider: EmbeddingProvider, modelId: string): number {
+  if (provider === 'nodus') return 64;
+  if (provider === 'gemini' && /embedding-2/i.test(modelId)) return 1;
+  if (provider === 'gemini') return 32;
+  return 64;
+}
+
+async function embedBatchBisect(
+  provider: EmbeddingProvider,
+  key: string,
+  modelId: string,
+  texts: string[],
+  signal?: AbortSignal,
+  options: EmbeddingRequestOptions = {},
+): Promise<number[][]> {
+  return requestEmbeddingBatchWithBisection(
+    texts,
+    (batch) => requestEmbeddings(provider, key, modelId, batch, signal, options),
+    signal,
+    (error) => !(error instanceof AiError && (error.config || error.retriable)),
+  );
+}
+
+/** Strict, ordered embedding batches. No configured input may disappear. */
+export async function embedManyStrict(texts: string[], signal?: AbortSignal, options: EmbeddingRequestOptions = {}): Promise<number[][]> {
   signal?.throwIfAborted();
   if (texts.length === 0) return [];
   const clipped = texts.map((t) => t.slice(0, 8000));
   const { provider, modelId } = embeddingConfig();
   const key = resolveProviderKey(provider);
-  if (!key) return texts.map(() => null);
+  if (!key) throw new AiError(`Falta la clave de IA para embeddings (${provider}). Configúrala en Ajustes o usa el modo léxico.`, false, true);
 
-  // Gemini Embedding 2's native API aggregates multiple inputs; the OpenAI
-  // compatibility endpoint can evolve, so keep this path one-text-per-call.
-  if (provider === 'gemini' && /embedding-2/i.test(modelId)) {
-    return Promise.all(clipped.map((text) => embed(text, signal)));
+  const size = embeddingBatchSize(provider, modelId);
+  const batches: string[][] = [];
+  for (let index = 0; index < clipped.length; index += size) batches.push(clipped.slice(index, index + size));
+  const vectors = (await Promise.all(batches.map((batch, index) => embedBatchBisect(
+    provider,
+    key,
+    modelId,
+    batch,
+    signal,
+    { ...options, jobId: options.jobId ? `${options.jobId}:batch:${index}` : undefined },
+  )))).flat();
+  if (vectors.length !== texts.length) {
+    throw new AiError(`La indexación produjo ${vectors.length} embeddings para ${texts.length} entradas; no se publicará un índice incompleto.`, false);
   }
+  return vectors;
+}
 
-  try {
-    const vectors = await requestEmbeddings(provider, key, modelId, clipped, signal);
-    if (vectors.length === clipped.length) return vectors;
-  } catch (error) {
-    if (signal?.aborted) throw error;
-    /* fall back below */
-  }
-  return Promise.all(clipped.map((text) => embed(text, signal)));
+export async function embedMany(texts: string[], signal?: AbortSignal, options: EmbeddingRequestOptions = {}): Promise<(number[] | null)[]> {
+  signal?.throwIfAborted();
+  if (texts.length === 0) return [];
+  const { provider } = embeddingConfig();
+  if (!resolveProviderKey(provider)) return texts.map(() => null);
+  return embedManyStrict(texts, signal, options);
 }

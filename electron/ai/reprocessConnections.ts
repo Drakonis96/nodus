@@ -480,17 +480,13 @@ async function reprocessRelations(
         similarity: Number(candidate.similarity.toFixed(3)),
       })),
     };
-    let result: RelationExtractionResult;
-    try {
-      result = await completeJson<RelationExtractionResult>(
-        { system: RELATION_SYSTEM, user: JSON.stringify(input), temperature: 0.1, maxTokens: 4000 },
-        isRelationExtractionResult,
-        model
-      );
-    } catch {
-      // If a single batch fails (e.g. output too large), skip it and continue.
-      continue;
-    }
+    // A rejected validation call propagates directly: completed checkpoints remain
+    // resumable, and silently skipping a batch would publish an incomplete graph.
+    const result = await completeJson<RelationExtractionResult>(
+      { system: RELATION_SYSTEM, user: JSON.stringify(input), temperature: 0.1, maxTokens: 4000 },
+      isRelationExtractionResult,
+      model
+    );
     saveCheckpoint('reprocess', relationHash, 'reproc_relation_batch', bi, result);
     for (const relation of result.relations) acceptRelation(relation);
   }
