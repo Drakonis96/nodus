@@ -46,6 +46,8 @@ test('the main workflow tests then publishes amd64 and arm64 images', () => {
 
 test('the image is non-root, health-checked and visibly experimental', () => {
   const dockerfile = read('server/Dockerfile');
+  assert.match(dockerfile, /FROM --platform=\$BUILDPLATFORM node:22-alpine AS web-build/,
+    'architecture-independent web assets must build natively instead of through QEMU');
   assert.match(dockerfile, /USER node/);
   assert.match(dockerfile, /HEALTHCHECK/);
   assert.match(dockerfile, /app\.nodus\.stability="experimental"/);
