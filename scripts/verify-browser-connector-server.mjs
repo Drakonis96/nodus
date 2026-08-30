@@ -19,9 +19,9 @@ const backups = path.join(scratch, 'backups');
 const port = 4500 + (process.pid % 1000);
 const origin = 'chrome-extension://ilcclajjhofhieoljdjmikmfopfbamej';
 const developmentOrigin = 'chrome-extension://aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
-let nativePromptCalls = 0;
+let modalPromptCalls = 0;
 const electron = installRuntimeHooks(userData, {
-  dialog: { showMessageBox: async () => { nativePromptCalls += 1; return { response: 0 }; } },
+  dialog: {},
   shell: { openExternal: async () => undefined },
 });
 electron.BrowserWindow.getFocusedWindow = () => null;
@@ -30,6 +30,27 @@ const require = createRequire(import.meta.url);
 const settingsRepo = require(path.join(repoRoot, 'electron/db/settingsRepo.ts'));
 const library = require(path.join(repoRoot, 'electron/library/libraryService.ts'));
 const server = require(path.join(repoRoot, 'electron/zotero-plugin/server.ts'));
+const closedListeners = new Set();
+const pairingWindow = {
+  isDestroyed: () => false,
+  isMinimized: () => false,
+  isVisible: () => true,
+  restore: () => undefined,
+  show: () => undefined,
+  focus: () => undefined,
+  once: (event, listener) => { if (event === 'closed') closedListeners.add(listener); },
+  removeListener: (event, listener) => { if (event === 'closed') closedListeners.delete(listener); },
+  webContents: {
+    id: 91,
+    isDestroyed: () => false,
+    send: (channel, prompt) => {
+      assert.equal(channel, 'browserConnector:pairing:request');
+      modalPromptCalls += 1;
+      setImmediate(() => server.resolveBrowserConnectorPairingRequest(91, prompt.requestId, true));
+    },
+  },
+};
+server.setZoteroPluginWindowProvider(() => pairingWindow);
 
 try {
   settingsRepo.updateSettings({
@@ -84,14 +105,14 @@ try {
   })).json();
   assert.equal(pair.token, 'browser-test-token');
   assert.equal(pair.official, true);
-  assert.equal(nativePromptCalls, 2, 'every unauthenticated token delivery requires native user confirmation');
+  assert.equal(modalPromptCalls, 2, 'every unauthenticated token delivery requires renderer-modal confirmation');
 
   const wrongExtensionPair = await fetch(`${base}/api/browser/pair`, {
     method: 'POST', headers: { Origin: developmentOrigin, 'Content-Type': 'application/json' },
     body: JSON.stringify({ extensionId: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' }),
   });
   assert.equal(wrongExtensionPair.status, 403, 'a second extension cannot take over the pairing');
-  assert.equal(nativePromptCalls, 2, 'a rejected second origin must not open a misleading prompt');
+  assert.equal(modalPromptCalls, 2, 'a rejected second origin must not open a misleading prompt');
   const wrongOriginCapability = await fetch(`${base}/api/browser/catalog`, {
     headers: { Origin: developmentOrigin, Authorization: 'Bearer browser-test-token' },
   });

@@ -10,6 +10,7 @@ import { TOOLKIT_APPS_TRANSLATIONS } from './i18n.toolkitApps';
 import { SERVER_TRANSLATIONS } from './i18n.server';
 import { CLOUDFLARE_TRANSLATIONS } from './i18n.cloudflare';
 import { TRANSLATE_TRANSLATIONS } from './i18n.translate';
+import { BROWSER_CONNECTOR_TRANSLATIONS } from './i18n.browserConnector';
 import { WORLD_CHAT_TRANSLATIONS } from './i18n.worldChat';
 import { STUDY_SYNONYM_TRANSLATIONS } from './i18n.studySynonyms';
 import { STUDY_IMPROVE_TRANSLATIONS } from './i18n.studyImprove';
@@ -235,6 +236,7 @@ export const FR: Record<string, string> = {
   ...SERVER_TRANSLATIONS.fr,
   ...CLOUDFLARE_TRANSLATIONS.fr,
   ...TRANSLATE_TRANSLATIONS.fr,
+  ...BROWSER_CONNECTOR_TRANSLATIONS.fr,
   'Traduce texto, documentos y adjuntos de Zotero con el modelo que elijas, incluido un modo PDF facsímil.': 'Traduisez du texte, des documents et des pièces jointes Zotero avec le modèle de votre choix, y compris un mode fac-similé PDF.',
   'Traducir texto, documentos y adjuntos de Zotero con el modelo elegido, conservando la estructura de DOCX y EPUB y la apariencia de los PDF mediante un modo facsímil.': 'Traduire du texte, des documents et des pièces jointes Zotero avec le modèle choisi, tout en conservant la structure des DOCX et EPUB et l’apparence des PDF grâce au mode fac-similé.',
   'Mover documento a la papelera': 'Mettre le document à la corbeille',

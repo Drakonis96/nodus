@@ -14,8 +14,9 @@ import { randomBytes, timingSafeEqual } from 'node:crypto';
 import { chmod, mkdir, rename, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import { app, BrowserWindow, dialog, shell } from 'electron';
+import { app, BrowserWindow, shell } from 'electron';
 import type { ModelRef, ReasoningEffort, Work, ZoteroPluginServerStatus } from '@shared/types';
+import type { BrowserConnectorPairingPrompt } from '@shared/browserConnector';
 import { getSettings, updateSettings } from '../db/settingsRepo';
 import { getDb } from '../db/database';
 import { embeddedIdeaCount, getIdeasByWork, getIdeaDetail } from '../db/ideasRepo';
@@ -59,6 +60,13 @@ let lastClientProtocol: number | null = null;
 let lifecycle = Promise.resolve();
 let browserPairingLifecycle = Promise.resolve();
 let getMainWindow: (() => BrowserWindow | null) | null = null;
+
+type PendingBrowserPairingRequest = {
+  senderId: number;
+  settle: (allow: boolean) => void;
+};
+
+const pendingBrowserPairingRequests = new Map<string, PendingBrowserPairingRequest>();
 
 export function setZoteroPluginWindowProvider(provider: () => BrowserWindow | null): void {
   getMainWindow = provider;
@@ -117,23 +125,43 @@ function browserOriginIsPaired(req: IncomingMessage): boolean {
 async function confirmBrowserPairing(origin: string): Promise<boolean> {
   const id = extensionId(origin);
   const official = id === OFFICIAL_BROWSER_CONNECTOR_EXTENSION_ID;
-  const parent = getMainWindow?.() ?? undefined;
-  const options = {
-    type: 'question' as const,
-    buttons: ['Permitir', 'Cancelar'],
-    defaultId: 1,
-    cancelId: 1,
-    title: 'Conectar extensión del navegador',
-    message: '¿Quieres permitir que esta extensión envíe páginas a Nodus?',
-    detail: `Origen: ${origin}${official ? '\nExtensión oficial de Nodus desde Chrome Web Store.' : '\nExtensión de desarrollo (unpacked) u otra instalación local.'}`,
-  };
-  try {
-    const result = parent ? await dialog.showMessageBox(parent, options) : await dialog.showMessageBox(options);
-    return result.response === 0;
-  } catch (error) {
-    console.warn('[zotero-plugin] browser pairing confirmation failed', error);
-    return false;
-  }
+  const win = getMainWindow?.() ?? null;
+  if (!win || win.isDestroyed() || win.webContents.isDestroyed()) return false;
+  const requestId = randomBytes(18).toString('base64url');
+  const prompt: BrowserConnectorPairingPrompt = { requestId, origin, official };
+  return new Promise((resolve) => {
+    let settled = false;
+    let timeout: NodeJS.Timeout | null = null;
+    const onClosed = () => settle(false);
+    const settle = (allow: boolean) => {
+      if (settled) return;
+      settled = true;
+      if (timeout) clearTimeout(timeout);
+      win.removeListener('closed', onClosed);
+      pendingBrowserPairingRequests.delete(requestId);
+      resolve(allow);
+    };
+    timeout = setTimeout(() => settle(false), 10 * 60 * 1000);
+    win.once('closed', onClosed);
+    pendingBrowserPairingRequests.set(requestId, { senderId: win.webContents.id, settle });
+    try {
+      if (win.isMinimized()) win.restore();
+      if (!win.isVisible()) win.show();
+      win.focus();
+      win.webContents.send('browserConnector:pairing:request', prompt);
+    } catch (error) {
+      console.warn('[zotero-plugin] browser pairing modal failed', error);
+      settle(false);
+    }
+  });
+}
+
+/** Settle one renderer-hosted pairing modal, bound to the exact window that received it. */
+export function resolveBrowserConnectorPairingRequest(senderId: number, requestId: string, allow: boolean): void {
+  if (typeof requestId !== 'string' || typeof allow !== 'boolean') return;
+  const pending = pendingBrowserPairingRequests.get(requestId);
+  if (!pending || pending.senderId !== senderId) return;
+  pending.settle(allow);
 }
 
 /** Serialize pairing so simultaneous requests cannot race the approved origin. */

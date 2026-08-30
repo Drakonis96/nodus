@@ -1,6 +1,6 @@
-# Nodus Connector for Chrome
+# Nodus Research Connector for Chrome
 
-Nodus Connector captures the page or document that the user has deliberately opened and saves it
+Nodus Research Connector captures the page or document that the user has deliberately opened and saves it
 to the local Nodus Library. It is a separate Manifest V3 extension and does not require a Nodus
 account or a hosted service.
 
@@ -26,10 +26,10 @@ attachment queues the usual clean-reading extraction in the desktop application.
 
 ## Install locally in Chrome
 
-1. In Nodus, open **Settings → Integrations → Nodus Connector for Chrome**, enable the connector,
+1. In Nodus, open **Settings → Integrations → Nodus Research Connector**, enable the connector,
    and choose **Download Chrome extension**. Alternatively run `npm run browser:zip` from this
    repository.
-2. Extract `nodus-connector-chrome.zip` to a permanent folder. Chrome cannot load an unpacked
+2. Extract `nodus-research-connector-chrome.zip` to a permanent folder. Chrome cannot load an unpacked
    extension directly from a ZIP archive.
 3. Open `chrome://extensions`, enable **Developer mode**, choose **Load unpacked**, and select the
    extracted folder containing `manifest.json`.

@@ -28,6 +28,7 @@ import type { DossierTab } from './components/testimonies/InterviewDossier';
 import type { TestimonyDeepLink } from '@shared/testimonyDeepLinks';
 import { FeedbackHost } from './components/feedback';
 import { PrivacyRequestHost } from './privacyNotices';
+import { BrowserConnectorPairingRequestHost } from './components/BrowserConnectorPairingRequestHost';
 import { Tour } from './views/Tour';
 import { AdvancedTour } from './views/AdvancedTour';
 import { GenealogyTour } from './views/GenealogyTour';
@@ -1858,6 +1859,7 @@ export function App() {
 
       <FeedbackHost />
       <PrivacyRequestHost />
+      <BrowserConnectorPairingRequestHost />
 
       {paletteOpen && <CommandPalette commands={paletteCommands} onClose={() => setPaletteOpen(false)} />}
 

@@ -7,7 +7,7 @@ import path from 'node:path';
 
 import type { BrowserConnectorExportResult } from '@shared/types';
 
-const ARCHIVE_NAME = 'nodus-connector-chrome.zip';
+const ARCHIVE_NAME = 'nodus-research-connector-chrome.zip';
 
 function packagedArchivePath(): string {
   const candidates = [

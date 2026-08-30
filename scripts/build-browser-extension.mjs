@@ -9,7 +9,7 @@ import { fileURLToPath } from 'node:url';
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const source = path.join(root, 'browser-extension');
 const outputDir = path.join(root, 'dist-browser');
-const output = path.join(outputDir, 'nodus-connector-chrome.zip');
+const output = path.join(outputDir, 'nodus-research-connector-chrome.zip');
 
 const manifest = JSON.parse(await readFile(path.join(source, 'manifest.json'), 'utf8'));
 const pkg = JSON.parse(await readFile(path.join(root, 'package.json'), 'utf8'));

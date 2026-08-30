@@ -7,7 +7,7 @@ import { openPrivacyPolicy } from '../privacy';
 import type { AudioEntityKind, AudioProvider, AudioSegmentRequest, AiProvider, LocalProvider, ZoteroLibrary, EmbeddingProvider, TranslationEntityKind, GenerateTranslationRequest, DecorativeImageActionRequest, DecorativeImageEntityKind, DecorativeImageStyle, StudyPronunciationEntry } from '@shared/types';
 import { connectMcpTunnel, disconnectMcpTunnel, forgetMcpTunnel, getMcpStatus, getMcpTunnelStatus, regenerateMcpToken, restartMcpTunnelIfConfigured } from '../mcp';
 import { getCopilotStatus, regenerateCopilotToken } from '../copilot/server';
-import { getZoteroPluginStatus, regenerateBrowserConnectorToken, regenerateZoteroPluginToken } from '../zotero-plugin/server';
+import { getZoteroPluginStatus, regenerateBrowserConnectorToken, regenerateZoteroPluginToken, resolveBrowserConnectorPairingRequest } from '../zotero-plugin/server';
 import { exportZoteroPluginXpi, getZoteroInstallInfo, installZoteroPlugin } from '../zotero-plugin/install';
 import { exportBrowserConnectorZip } from '../browser-connector/install';
 import { ensureCopilotCert } from '../copilot/certs';
@@ -182,6 +182,9 @@ export function registerPlatformIpc({ h, getWindow }: IpcContext): void {
   h('zoteroPlugin:downloadXpi', async () => exportZoteroPluginXpi());
   h('browserConnector:downloadZip', async () => exportBrowserConnectorZip());
   h('browserConnector:regenerateToken', async () => { await regenerateBrowserConnectorToken(); });
+  h('browserConnector:pairing:resolve', async (event, requestId: string, allow: boolean) => {
+    resolveBrowserConnectorPairingRequest(event.sender.id, requestId, allow);
+  });
   h('app:info', async () => {
     const osName =
       process.platform === 'darwin' ? 'macOS' : process.platform === 'win32' ? 'Windows' : process.platform === 'linux' ? 'Linux' : process.platform;

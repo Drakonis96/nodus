@@ -51,6 +51,13 @@ export const platformApi: PlatformApi = {
   downloadZoteroPluginXpi: () => ipcRenderer.invoke('zoteroPlugin:downloadXpi'),
   downloadBrowserConnectorZip: () => ipcRenderer.invoke('browserConnector:downloadZip'),
   regenerateBrowserConnectorToken: () => ipcRenderer.invoke('browserConnector:regenerateToken'),
+  onBrowserConnectorPairingRequest: (cb) => {
+    const listener = (_event: unknown, request: Parameters<typeof cb>[0]) => cb(request);
+    ipcRenderer.on('browserConnector:pairing:request', listener);
+    return () => ipcRenderer.removeListener('browserConnector:pairing:request', listener);
+  },
+  resolveBrowserConnectorPairingRequest: (requestId, allow) =>
+    ipcRenderer.invoke('browserConnector:pairing:resolve', requestId, allow).then(() => undefined),
   ensureCopilotCert: () => ipcRenderer.invoke('copilot:ensureCert'),
   installCopilotAddin: () => ipcRenderer.invoke('copilot:installAddin'),
   installLibreOfficeCopilot: () => ipcRenderer.invoke('copilot:installLibreOffice'),

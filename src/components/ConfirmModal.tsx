@@ -17,6 +17,7 @@ export function ConfirmModal({
   cancelLabel,
   rememberLabel,
   danger = false,
+  autoFocusConfirm = true,
   zIndex = 120,
   onConfirm,
   onCancel,
@@ -28,6 +29,8 @@ export function ConfirmModal({
   cancelLabel?: string;
   rememberLabel?: string;
   danger?: boolean;
+  /** Keep security-sensitive dialogs cancel-first while retaining confirm-first elsewhere. */
+  autoFocusConfirm?: boolean;
   zIndex?: number;
   onConfirm: () => void;
   onCancel: () => void;
@@ -55,7 +58,7 @@ export function ConfirmModal({
         <h2 className="font-semibold mb-2">{title}</h2>
         <div className="text-sm text-neutral-400 mb-5">{message}</div>
         <div className="flex flex-wrap justify-end gap-2">
-          <button className="btn btn-ghost" onClick={onCancel}>
+          <button className="btn btn-ghost" onClick={onCancel} autoFocus={!autoFocusConfirm}>
             {cancelLabel ?? t('Cancelar')}
           </button>
           {rememberLabel && onRemember && (
@@ -69,7 +72,7 @@ export function ConfirmModal({
           <button
             className={`btn ${danger ? 'bg-red-600 hover:bg-red-500 text-white' : 'btn-primary'}`}
             onClick={onConfirm}
-            autoFocus
+            autoFocus={autoFocusConfirm}
           >
             {confirmLabel ?? t('Confirmar')}
           </button>

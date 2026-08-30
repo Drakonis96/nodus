@@ -27,7 +27,7 @@ export async function discoverNodus(preferredPort, probe) {
 export function extensionOrigin(getUrl) {
   const url = new URL(getUrl(''));
   if (!/^(?:chrome|moz)-extension:$/.test(url.protocol) || !url.hostname) {
-    throw new TypeError('Nodus Connector must run from an installed browser extension.');
+    throw new TypeError('Nodus Research Connector must run from an installed browser extension.');
   }
   return `${url.protocol}//${url.hostname}`;
 }
