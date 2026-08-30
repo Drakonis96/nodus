@@ -165,6 +165,7 @@ export async function startPassageEmbedding(nodusIds?: string[]): Promise<void> 
   state.error = null;
   emit();
 
+  let terminalError: Error | null = null;
   try {
     const db = getDb();
     const ids = requestedIds;
@@ -264,7 +265,8 @@ export async function startPassageEmbedding(nodusIds?: string[]): Promise<void> 
       emit();
     }
   } catch (error) {
-    state.error = error instanceof Error ? error.message : String(error);
+    terminalError = error instanceof Error ? error : new Error(String(error));
+    state.error = terminalError.message;
     console.error('[passageEmbeddingPipeline] fatal error:', state.error);
   } finally {
     const finishedAt = new Date().toISOString();
@@ -284,8 +286,8 @@ export async function startPassageEmbedding(nodusIds?: string[]): Promise<void> 
         dedupeKey: `passage-embeddings:${state.error ? 'error' : 'complete'}`,
       });
     }
-    if (state.error && !state.stopRequested) throw new Error(state.error);
   }
+  if (terminalError && !state.stopRequested) throw terminalError;
 }
 
 export { clearAllPassages, workPassageStatuses as getWorkPassageStatuses };

@@ -2,7 +2,7 @@ import crypto from 'node:crypto';
 import { completeJson, embedMany, AiError } from './aiClient';
 import { modelRefSupportsExtraction } from '@shared/localAiModels';
 import { PROMPT_DEEP } from './prompts';
-import { planIdeaFusion, applyFusionPlan, ExtractedIdea, type FusionPlan } from './fusion';
+import { planIdeaFusion, applyFusionPlan, ExtractedIdea } from './fusion';
 import {
   upsertOccurrence,
   addEvidence,

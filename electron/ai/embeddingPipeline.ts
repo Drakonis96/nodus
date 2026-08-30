@@ -153,6 +153,7 @@ export async function startEmbedding(nodusIds?: string[]): Promise<void> {
   state.currentIdeaIndex = 0;
   emit();
 
+  let terminalError: Error | null = null;
   try {
     const db = getDb();
 
@@ -283,7 +284,8 @@ export async function startEmbedding(nodusIds?: string[]): Promise<void> {
       emit();
     }
   } catch (e) {
-    state.error = e instanceof Error ? e.message : String(e);
+    terminalError = e instanceof Error ? e : new Error(String(e));
+    state.error = terminalError.message;
     console.error('[embeddingPipeline] fatal error:', state.error);
   } finally {
     const finishedAt = new Date().toISOString();
@@ -303,8 +305,8 @@ export async function startEmbedding(nodusIds?: string[]): Promise<void> {
         dedupeKey: `idea-embeddings:${state.error ? 'error' : 'complete'}`,
       });
     }
-    if (state.error && !state.stopRequested) throw new Error(state.error);
   }
+  if (terminalError && !state.stopRequested) throw terminalError;
 }
 
 /**
