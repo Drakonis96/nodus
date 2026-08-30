@@ -3,6 +3,8 @@ import { motion } from 'framer-motion';
 import type { ZoteroImportProgress } from '@shared/libraryTypes';
 import { Icon } from './ui';
 import { t } from '../i18n';
+import { elapsedTimeLabel } from '@shared/elapsedTime';
+import { useElapsedClock } from '../useElapsedClock';
 
 const PHASE_LABEL: Record<ZoteroImportProgress['phase'], string> = {
   inventory: 'Inventariando Zotero…',
@@ -44,11 +46,16 @@ export function ZoteroImportProgressBar() {
     return window.nodus.onZoteroImportProgress(setProgress);
   }, []);
 
+  const live = Boolean(progress && !FINISHED.includes(progress.phase));
+  const now = useElapsedClock(live);
   if (!progress || dismissed === progress.requestId) return null;
 
   const { phase, percent, libraryName, message, processedItems, totalItems, processedAttachments, totalAttachments } = progress;
   const done = FINISHED.includes(phase);
   const failed = phase === 'failed';
+  const cancelled = phase === 'canceled';
+  const totalElapsed = elapsedTimeLabel(progress.startedAt, progress.finishedAt, now);
+  const itemElapsed = elapsedTimeLabel(progress.currentItemStartedAt, null, now);
 
   return (
     <div className="border-t border-neutral-200 bg-neutral-100/80 px-4 py-2 text-sm backdrop-blur dark:border-neutral-800 dark:bg-neutral-900/80">
@@ -65,10 +72,16 @@ export function ZoteroImportProgressBar() {
               {/* Both counters, always: the catalogue finishing is not the import
                   finishing, and the file count is the half users were missing. */}
               <span>{t('Documentos')} {processedItems.toLocaleString()}/{totalItems.toLocaleString()}</span>
+              {!done && progress.currentItem && itemElapsed && (
+                <span className="max-w-52 truncate" title={progress.currentItem}>
+                  {t('Elemento')} {itemElapsed}
+                </span>
+              )}
               <span className={phase === 'attachments' ? 'text-amber-400' : ''}>
                 {t('Archivos')} {processedAttachments.toLocaleString()}
                 {totalAttachments > processedAttachments ? `/${totalAttachments.toLocaleString()}` : ''}
               </span>
+              {totalElapsed && <span>{t('Total')} {totalElapsed}</span>}
               <span>{percent}%</span>
             </span>
           </div>
@@ -92,12 +105,12 @@ export function ZoteroImportProgressBar() {
         )}
         {done && (
           <button
-            className="btn btn-ghost"
+            className={`btn btn-ghost ${failed ? 'text-amber-400' : cancelled ? 'text-neutral-400' : 'text-emerald-400'}`}
             title={t('Ocultar la importación terminada')}
             aria-label={t('Ocultar la importación terminada')}
             onClick={() => setDismissed(progress.requestId)}
           >
-            <Icon name="trash" size={16} />
+            <Icon name={failed ? 'warning' : cancelled ? 'x' : 'check'} size={17} />
           </button>
         )}
       </div>

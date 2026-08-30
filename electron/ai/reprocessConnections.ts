@@ -487,9 +487,10 @@ async function reprocessRelations(
         isRelationExtractionResult,
         model
       );
-    } catch {
-      // If a single batch fails (e.g. output too large), skip it and continue.
-      continue;
+    } catch (error) {
+      // Preserve every completed checkpoint and leave maintenance visibly
+      // resumable. Silently skipping a batch would publish an incomplete graph.
+      throw error;
     }
     saveCheckpoint('reprocess', relationHash, 'reproc_relation_batch', bi, result);
     for (const relation of result.relations) acceptRelation(relation);

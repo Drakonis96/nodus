@@ -437,6 +437,7 @@ export async function importZoteroLibraries(options: {
   deferSessionCompletion?: boolean;
 }): Promise<ZoteroImportReport> {
   const started = Date.now();
+  const startedAt = new Date(started).toISOString();
   const { requestId, store, catalog, signal, onProgress } = options;
   const client = options.client ?? defaultClient;
   const selection: ZoteroImportSelection = {
@@ -476,14 +477,20 @@ export async function importZoteroLibraries(options: {
     return id ? store.readMaterializedCollection(id) : null;
   };
   const emit = (value: ZoteroImportProgress): void => {
-    value.percent = Math.max(lastPercent, value.percent);
-    lastPercent = value.percent;
-    onProgress?.(value);
+    const terminal = ['complete', 'canceled', 'failed'].includes(value.phase);
+    const timedValue: ZoteroImportProgress = {
+      ...value,
+      percent: Math.max(lastPercent, value.percent),
+      startedAt,
+      finishedAt: terminal ? new Date().toISOString() : null,
+    };
+    lastPercent = timedValue.percent;
+    onProgress?.(timedValue);
     const now = Date.now();
-    if (value.phase !== lastCheckpointPhase || now - lastCheckpointAt >= 500 || ['complete', 'canceled', 'failed'].includes(value.phase)) {
-      sessions.progress(requestId, value);
+    if (timedValue.phase !== lastCheckpointPhase || now - lastCheckpointAt >= 500 || terminal) {
+      sessions.progress(requestId, timedValue);
       lastCheckpointAt = now;
-      lastCheckpointPhase = value.phase;
+      lastCheckpointPhase = timedValue.phase;
     }
   };
   const mismatch = (
@@ -495,7 +502,11 @@ export async function importZoteroLibraries(options: {
     verification.mismatches.push({ kind, expected, imported, message });
     verification.status = 'blocked';
   };
-  const initialProgress = progress(requestId, 'connecting', null, 0, 0, 0, 0, 'Conectando con Zotero…');
+  const initialProgress = {
+    ...progress(requestId, 'connecting', null, 0, 0, 0, 0, 'Conectando con Zotero…'),
+    startedAt,
+    finishedAt: null,
+  };
   sessions.begin(requestId, selection, initialProgress);
   emit(initialProgress);
 
@@ -681,6 +692,7 @@ export async function importZoteroLibraries(options: {
         const desiredByKey = new Map<string, LibraryItemRecord>();
 
         for (const item of visibleItems) {
+          const itemStartedAt = new Date().toISOString();
           abortIfNeeded(signal);
           const identity = zoteroSourceIdentity(sourceLibraryId, item.itemKey);
           const legacyAtTransportKey = store.readMaterializedItem(item.key);
@@ -745,7 +757,11 @@ export async function importZoteroLibraries(options: {
           desiredByKey.set(item.itemKey, stored);
           catalog.indexItem(stored, store);
           processedItems += 1;
-          emit(progress(requestId, 'catalog', library, processedItems, totalItems, processedAttachments, totalAttachments, `Catálogo disponible: ${item.title}`));
+          emit({
+            ...progress(requestId, 'catalog', library, processedItems, totalItems, processedAttachments, totalAttachments, `Catálogo disponible: ${item.title}`),
+            currentItem: item.title,
+            currentItemStartedAt: itemStartedAt,
+          });
           if (processedItems % 25 === 0) await new Promise<void>((resolve) => setImmediate(resolve));
         }
 
@@ -847,9 +863,14 @@ export async function importZoteroLibraries(options: {
         const { default: TurndownService } = await import('turndown');
         const turndown = new TurndownService({ headingStyle: 'atx', bulletListMarker: '-' });
         for (const [noteIndex, item] of visibleItems.entries()) {
+          const itemStartedAt = new Date().toISOString();
           abortIfNeeded(signal);
-          emit(progress(requestId, 'notes', library, processedItems, totalItems, processedAttachments, totalAttachments,
-            `Notas: ${item.title}`, visibleItems.length ? noteIndex / visibleItems.length : 0));
+          emit({
+            ...progress(requestId, 'notes', library, processedItems, totalItems, processedAttachments, totalAttachments,
+              `Notas: ${item.title}`, visibleItems.length ? noteIndex / visibleItems.length : 0),
+            currentItem: item.title,
+            currentItemStartedAt: itemStartedAt,
+          });
           let current = desiredByKey.get(item.itemKey) ?? catalogItem(zoteroSourceIdentity(sourceLibraryId, item.itemKey));
           if (!current) { libraryBlocked = true; continue; }
           try {
@@ -903,9 +924,14 @@ export async function importZoteroLibraries(options: {
         if (selection.copyAttachments !== false) {
           emit(progress(requestId, 'attachments', library, processedItems, totalItems, processedAttachments, totalAttachments, 'Copiando y verificando adjuntos…'));
           for (const [fileIndex, item] of visibleItems.entries()) {
+            const itemStartedAt = new Date().toISOString();
             abortIfNeeded(signal);
-            emit(progress(requestId, 'attachments', library, processedItems, totalItems, processedAttachments, totalAttachments,
-              `Adjuntos: ${item.title}`, visibleItems.length ? fileIndex / visibleItems.length : 0));
+            emit({
+              ...progress(requestId, 'attachments', library, processedItems, totalItems, processedAttachments, totalAttachments,
+                `Adjuntos: ${item.title}`, visibleItems.length ? fileIndex / visibleItems.length : 0),
+              currentItem: item.title,
+              currentItemStartedAt: itemStartedAt,
+            });
             const attachments = (attachmentsByParent.get(item.itemKey) ?? [])
               .filter((entry) => entry.linkMode !== 'linked_url')
               .sort((a, b) => priority(a) - priority(b) || a.key.localeCompare(b.key));

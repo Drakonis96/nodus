@@ -51,9 +51,11 @@ import { DEEP_RESEARCH_VERSION_TRANSLATIONS } from './i18n.deepResearchVersions'
 import { DOCUMENT_UNDERSTANDING_TRANSLATIONS } from './i18n.documentUnderstanding';
 import { DEEP_RESEARCH_QUALITY_TRANSLATIONS } from './i18n.deepResearchQuality';
 import { MODEL_SETTINGS_TRANSLATIONS } from './i18n.modelSettings';
+import { ADAPTIVE_CONCURRENCY_TRANSLATIONS } from './i18n.adaptiveConcurrency';
 import { DATABASE_DEEP_RESEARCH_TRANSLATIONS } from './i18n.databaseDeepResearch';
 
 export const PT_BR: Record<string, string> = {
+  ...ADAPTIVE_CONCURRENCY_TRANSLATIONS['pt-BR'],
   ...DATABASE_DEEP_RESEARCH_TRANSLATIONS['pt-BR'],
   ...MODEL_SETTINGS_TRANSLATIONS['pt-BR'],
   ...DICTIONARY_TRANSLATIONS['pt-BR'],

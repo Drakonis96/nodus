@@ -28,6 +28,7 @@ import { coalesce } from '../util/coalesce';
 import { registerDocumentIndexMaintenanceController } from './documentIndexMaintenance';
 import { compareDocumentIndexJobsForDisplay } from '@shared/documentIndexProgress';
 import { DOCUMENT_INDEX_CONTINUOUS_AVAILABLE } from '@shared/documentIndexPolicy';
+import { measurePerf } from '../perf';
 
 type Listener = (progress: DocumentIndexProgress) => void;
 const POLL_MS = 350;
@@ -492,17 +493,20 @@ class DocumentIndexQueue {
         return;
       }
       try {
-        await runDocumentProfileScan(work, {
-          jobId: job.jobId, generatorModel: job.generatorModel, auditorModel: job.auditorModel,
-          signal,
-          onProgress: () => {
-            const live = listDocumentIndexJobs().find((item) => item.jobId === job.jobId);
-            if (live?.status === 'cancelled') throw new Error('DOCUMENT_INDEX_CANCELLED');
-            if (live?.status === 'paused') throw new Error('DOCUMENT_INDEX_PAUSED');
-            if (signal.aborted) throw new Error('DOCUMENT_INDEX_CANCELLED');
-            this.emit();
-          },
-        });
+        await measurePerf('document profile', { nodusId: work.nodus_id, title: work.title }, () =>
+          runDocumentProfileScan(work, {
+            jobId: job.jobId, generatorModel: job.generatorModel, auditorModel: job.auditorModel,
+            signal,
+            onProgress: () => {
+              const live = listDocumentIndexJobs().find((item) => item.jobId === job.jobId);
+              if (live?.status === 'cancelled') throw new Error('DOCUMENT_INDEX_CANCELLED');
+              if (live?.status === 'paused') throw new Error('DOCUMENT_INDEX_PAUSED');
+              if (signal.aborted) throw new Error('DOCUMENT_INDEX_CANCELLED');
+              this.emit();
+            },
+          }),
+          { jobId: job.jobId },
+        );
         const live = listDocumentIndexJobs().find((item) => item.jobId === job.jobId);
         if (live?.status === 'cancelled') return;
         updateDocumentIndexJob(job.jobId, {
@@ -510,6 +514,12 @@ class DocumentIndexQueue {
           progressMessage: null, currentUnit: null, totalUnits: null,
         });
       } catch (error) {
+        console.error('[document-index] job failed', {
+          vaultId: vault.id,
+          jobId: job.jobId,
+          nodusId: job.nodusId,
+          error,
+        });
         const message = error instanceof Error ? error.message : String(error);
         const current = listDocumentIndexJobs().find((item) => item.jobId === job.jobId) ?? job;
         if (current.status === 'cancelled' || message === 'DOCUMENT_INDEX_CANCELLED') return;

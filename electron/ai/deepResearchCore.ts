@@ -1530,6 +1530,13 @@ export interface SectionPlan {
   mode: 'auto' | 'user';
 }
 
+/** The planner may use one extra broad movement only when an explicit coverage
+ * contract exists. This is an architectural safety bound, not a content cutoff:
+ * normalizePlan folds every discarded assignment into a retained section. */
+export function sectionPlanMaximum(sectionPlan: SectionPlan, coverageQuestions: string[]): number {
+  return sectionPlan.target + (coverageQuestions.length > 0 ? 1 : 0);
+}
+
 /**
  * Decide how many broad argumentative movements the retrieved evidence warrants.
  * A numeric preference controls organization only; coverage questions and distinct
@@ -1610,7 +1617,12 @@ async function planWithFallback(
   try {
     // The grace slot is reserved for a genuine coverage expansion. A planner
     // cannot spend it merely by returning one more short heading.
-    plan = normalizePlan(await deps.planReport(input), snapshot, Number.MAX_SAFE_INTEGER, input.coverageQuestions);
+    plan = normalizePlan(
+      await deps.planReport(input),
+      snapshot,
+      sectionPlanMaximum(sectionPlan, input.coverageQuestions),
+      input.coverageQuestions,
+    );
     enforcePlanObjectiveExclusions(plan, snapshot, request.objective);
   } catch {
     plan = null;
@@ -1851,7 +1863,7 @@ export function normalizePlan(
   const passageIds = new Set(snapshot.passages.map((p) => p.id));
 
   const validCoverageQuestions = new Set(coverageQuestions);
-  const sections = (plan.sections ?? []).slice(0, maxSections).map((s, index) => ({
+  const sections = (plan.sections ?? []).map((s, index) => ({
     id: cleanStr(s.id, `s${index + 1}`),
     title: normalizeSectionTitle(cleanStr(s.title, `Sección ${index + 1}`)),
     purpose: cleanStr(s.purpose, ''),
@@ -1869,11 +1881,65 @@ export function normalizePlan(
   }));
 
   assignMissingCoverageQuestions(sections, coverageQuestions);
+  const compacted = compactPlanSections(orderSections(sections), maxSections, snapshot);
+  // Compaction preserves explicit assignments, then this deterministic pass gives
+  // every coverage question exactly one surviving primary home.
+  assignMissingCoverageQuestions(compacted, coverageQuestions);
   return {
     title: cleanStr(plan.title, ''),
     abstract: cleanStr(plan.abstract, ''),
-    sections: ensureIdeaAssignment(orderSections(sections), snapshot),
+    sections: ensureIdeaAssignment(compacted, snapshot),
   };
+}
+
+/** Bound a hallucinated/fragmented plan without dropping its evidence mandate.
+ * Introduction and closing synthesis survive; surplus movements are merged into
+ * the most relevant retained body section and dependencies are remapped. */
+function compactPlanSections(
+  ordered: DeepResearchPlanSection[],
+  maxSections: number,
+  snapshot: WritingWorkshopSnapshot,
+): DeepResearchPlanSection[] {
+  const cap = Number.isFinite(maxSections)
+    ? Math.max(1, Math.trunc(maxSections))
+    : Number.MAX_SAFE_INTEGER;
+  if (ordered.length <= cap) return ordered;
+
+  const synthesis = [...ordered].reverse().find((section) => section.role === 'synthesis') ?? ordered.at(-1)!;
+  const beforeSynthesis = ordered.filter((section) => section !== synthesis);
+  const retained = cap === 1 ? [synthesis] : [...beforeSynthesis.slice(0, cap - 1), synthesis];
+  const retainedIds = new Set(retained.map((section) => section.id));
+  const dropped = ordered.filter((section) => !retainedIds.has(section.id));
+  const replacement = new Map<string, string>();
+
+  for (const section of dropped) {
+    const candidates = retained.filter((candidate) => candidate.role === 'body');
+    const targets = candidates.length > 0 ? candidates : retained.filter((candidate) => candidate !== synthesis);
+    const pool = targets.length > 0 ? targets : retained;
+    const text = [section.title, section.purpose, ...section.keyClaims].join(' ');
+    let target = pool[0];
+    let bestScore = -Infinity;
+    for (const candidate of pool) {
+      const score = relevanceScore(sectionProfile(candidate, snapshot), text)
+        - candidate.keyClaims.length * 0.01
+        - candidate.ideaIds.length * 0.001;
+      if (score > bestScore) {
+        target = candidate;
+        bestScore = score;
+      }
+    }
+    const at = retained.indexOf(target);
+    retained[at] = mergePlanSections(target, section);
+    replacement.set(section.id, target.id);
+  }
+
+  const finalIds = new Set(retained.map((section) => section.id));
+  return orderSections(retained.map((section) => ({
+    ...section,
+    dependsOn: [...new Set((section.dependsOn ?? [])
+      .map((id) => replacement.get(id) ?? id)
+      .filter((id) => id !== section.id && finalIds.has(id)))],
+  })));
 }
 
 /** Remove excluded axes at the plan boundary, before their ids can drive document
@@ -2187,11 +2253,15 @@ function mergePlanSections(a: DeepResearchPlanSection, b: DeepResearchPlanSectio
     ...a,
     purpose: [a.purpose, b.purpose].filter(Boolean).join(' '),
     keyClaims: unique([...a.keyClaims, ...b.keyClaims]).slice(0, 8),
-    ideaIds: unique([...a.ideaIds, ...b.ideaIds]),
+    ideaIds: unique([...a.ideaIds, ...b.ideaIds]).slice(0, MAX_SECTION_IDEAS),
     workIds: unique([...a.workIds, ...b.workIds]),
     gapIds: unique([...a.gapIds, ...b.gapIds]),
     contradictionIds: unique([...a.contradictionIds, ...b.contradictionIds]),
     passageIds: unique([...a.passageIds, ...b.passageIds]),
+    coverageQuestions: unique([...(a.coverageQuestions ?? []), ...(b.coverageQuestions ?? [])]),
+    coverageClaims: unique([...(a.coverageClaims ?? []), ...(b.coverageClaims ?? [])]),
+    retrievalEvidencePacks: [...(a.retrievalEvidencePacks ?? []), ...(b.retrievalEvidencePacks ?? [])],
+    dependsOn: unique([...(a.dependsOn ?? []), ...(b.dependsOn ?? [])]),
   };
 }
 

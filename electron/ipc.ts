@@ -18,6 +18,8 @@ import type {
 } from '@shared/types';
 
 import { getSettings, updateSettings } from './db/settingsRepo';
+import { getAiConcurrencySnapshot, onAiConcurrencySnapshot, refreshAiConcurrencyPolicy } from './ai/aiClient';
+import { calibrateDownloadedNodusLocalModels } from './ai/nodusLocalAi';
 import * as protect from './protect/protectService';
 import { createIpcContext } from './ipc/context';
 import { registerProsopographyIpc } from './ipc/prosopography';
@@ -252,6 +254,11 @@ export function registerIpc(
       if (!win.isDestroyed()) win.webContents.send('ai:openCodeGo:usageChanged', status);
     }
   });
+  onAiConcurrencySnapshot((snapshot) => {
+    for (const win of BrowserWindow.getAllWindows()) {
+      if (!win.isDestroyed()) win.webContents.send('ai:concurrency:changed', snapshot);
+    }
+  });
 
   setServerProfilePreferencesAppliedHandler((next) => {
     setBrowserTheme(next.theme);
@@ -354,6 +361,7 @@ export function registerIpc(
 
   // settings + secrets
   h('settings:get', async () => getSettings());
+  h('ai:concurrency:get', async () => getAiConcurrencySnapshot());
   h('settings:update', async (_e, patch: Partial<AppSettings>) => {
     const previous = getSettings();
     if (
@@ -380,6 +388,27 @@ export function registerIpc(
       }
     }
     const next = updateSettings(patch);
+    if (patch.aiConcurrencyMode !== undefined || patch.concurrency !== undefined) {
+      refreshAiConcurrencyPolicy();
+    }
+    const patchSelectsLocalModel = Object.values(patch).some((value) => Boolean(
+      value && typeof value === 'object'
+      && (value as any).provider === 'nodus'
+      && typeof (value as any).model === 'string',
+    )) || patch.embeddingProvider === 'nodus'
+      || (patch.embeddingModel !== undefined && next.embeddingProvider === 'nodus');
+    if (next.aiConcurrencyMode === 'automatic'
+      && (patch.aiConcurrencyMode === 'automatic' || patchSelectsLocalModel)) {
+      const selectedLocalModels = Object.values(next)
+        .filter((value): value is { provider: 'nodus'; model: string } => Boolean(
+          value && typeof value === 'object' && (value as any).provider === 'nodus' && typeof (value as any).model === 'string',
+        ))
+        .map((value) => value.model);
+      if (next.embeddingProvider === 'nodus' && next.embeddingModel) selectedLocalModels.push(next.embeddingModel);
+      // Calibration is offline and isolated from user requests by the runtime lease.
+      // Settings persistence must stay responsive while the benchmark runs.
+      void calibrateDownloadedNodusLocalModels(selectedLocalModels).catch(() => undefined);
+    }
     if (patch.documentIndexingEnabled !== undefined || patch.documentIndexIncludeArchived !== undefined) {
       await documentIndexQueue.configureContinuous(getActiveVault().id, next.documentIndexingEnabled);
     }

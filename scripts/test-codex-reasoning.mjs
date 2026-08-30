@@ -159,7 +159,7 @@ test('the level a role chose is the one the completion call sends', async () => 
   const completeJson = client.slice(client.indexOf('export async function completeJson'));
   const body = completeJson.slice(0, completeJson.indexOf('\n}\n'));
   assert.match(body, /const codexReasoning = configuredCodexReasoning\(resolved\) \?\? undefined/);
-  assert.match(body, /rawComplete\(resolved, \{ \.\.\.langOpts[^)]*\}, attempt\.jsonMode, reasoning, codexReasoning\)/);
+  assert.match(body, /rawComplete\(resolved, langOpts, true, reasoning, codexReasoning\)/);
 });
 
 test('two roles on one model render their own levels, not a shared one', async () => {

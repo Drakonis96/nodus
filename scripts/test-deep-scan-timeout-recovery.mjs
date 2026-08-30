@@ -109,6 +109,8 @@ try {
   const chunkCalls = hits.filter((hit) => hit.words > 0);
   console.log('[deep-timeout] chunk requests the provider saw:', JSON.stringify(chunkCalls.map((h) => h.words)));
   assert.equal(chunkCalls[0].words, words, 'the first attempt carried the whole chunk');
+  assert.equal(chunkCalls.filter((hit) => hit.words === words).length, 1,
+    'an ambiguous timeout must never replay the same full request');
   const smaller = chunkCalls.filter((hit) => hit.words < words);
   assert.ok(smaller.length >= 2, `the timed-out chunk must come back as smaller pieces, saw ${JSON.stringify(chunkCalls.map((h) => h.words))}`);
   assert.ok(smaller.every((hit) => hit.words <= TOO_BIG_WORDS), 'and the pieces must be small enough to finish');
@@ -139,6 +141,7 @@ try {
   );
   const rejectedChunkCalls = hits.filter((hit) => hit.words > 0);
   console.log('[deep-timeout] chunk requests for the unrecoverable case:', JSON.stringify(rejectedChunkCalls.map((h) => h.words)));
+  assert.equal(rejectedChunkCalls.length, 1, 'a rejected credential must fail on its first request');
   assert.ok(rejectedChunkCalls.every((hit) => hit.words === words),
     'a rejected key must never be answered by splitting the text: nothing smaller would help');
 

@@ -105,12 +105,14 @@ try {
   );
   assert.ok(seen.length >= 1, 'the request actually reached the wire');
 
-  // --- 3. Both completion transports use the same budget ----------------------
+  // --- 3. Both completion transports use the same budget and full-body deadline
   const client = read('electron/ai/aiClient.ts');
-  assert.equal(
-    (client.match(/timeout: (?:opts\.timeoutMs \?\? )?completionTimeoutMs\(model\)/g) ?? []).length, 2,
-    'the buffered and the streaming OpenAI clients both size their timeout by provider',
-  );
+  assert.match(client, /const timeoutMs = opts\.timeoutMs \?\? completionTimeoutMs\(model\)/,
+    'buffered leased Nodus-local clients size their timeout by provider');
+  assert.match(client, /const streamTimeoutMs = opts\.timeoutMs \?\? completionTimeoutMs\(model\)/,
+    'streaming clients size their timeout by provider');
+  assert.ok((client.match(/withTransportDeadline\(/g) ?? []).length >= 3,
+    'buffered and streaming OpenAI-compatible clients keep the deadline until the complete body settles');
   assert.doesNotMatch(client, /timeout: opts\.timeoutMs \?\? 180_000/, 'no hard-coded ceiling survives');
   assert.match(client, /'Tiempo agotado esperando al proveedor de IA[^']*',\s*false,\s*false,\s*'timeout'/,
     'the timeout error carries its code');

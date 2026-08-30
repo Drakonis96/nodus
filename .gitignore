@@ -52,6 +52,17 @@ __pycache__/
 # Locally generated analysis reports
 reports/
 
+# Adaptive-concurrency audit runtime data. The manifests and harness under
+# audit/adaptive-concurrency remain versioned; downloaded PDFs, isolated profiles
+# and raw provider results do not.
+audit/adaptive-concurrency/.cache/
+audit/adaptive-concurrency/.runs/
+audit/adaptive-concurrency/.results/
+audit/adaptive-concurrency/**/*.pdf
+audit/adaptive-concurrency/**/raw-campaign*.json
+audit/adaptive-concurrency/**/gate-report*.json
+audit/adaptive-concurrency/**/final-verification*.json
+
 # Reproducible throwaway profile retained by `npm run qa:notion-parity -- --retain`.
 .qa/notion-parity-userdata/
 

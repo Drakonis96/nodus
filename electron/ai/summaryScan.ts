@@ -9,6 +9,8 @@ import { getItem } from '../zotero/zoteroClient';
 import { resolveWorkText } from '../extraction/textExtractor';
 import { updateWorkSummaryEmbedding, upsertWorkSummary } from '../db/workSummariesRepo';
 import { recordLinkedLibraryAnalysis } from '../library/libraryVaultProvenance';
+import { modelRefSupportsCapability } from '@shared/localAiModels';
+import { startPerf } from '../perf';
 
 function parseAuthors(authorsJson: string): string[] {
   try {
@@ -34,6 +36,9 @@ export function summaryContentHash(
 ): string {
   const settings = getSettings();
   const scanModel = model ?? settings.summaryModel ?? settings.synthesisModel ?? null;
+  if (!modelRefSupportsCapability(scanModel, 'summary')) {
+    throw new AiError('El modelo local seleccionado no está certificado para resumir; no se inició la inferencia.', false, true);
+  }
   return crypto
     .createHash('sha1')
     .update(`${work.deep_hash ?? ''}|${work.light_hash ?? ''}|${modelId(scanModel)}|summary-v1`)
@@ -45,6 +50,8 @@ export function summaryContentHash(
  * Nodus. Full text is only used when neither ideas nor an abstract is available.
  */
 export async function runSummaryScan(work: Work, model?: ModelRef | null): Promise<void> {
+  const perf = { nodusId: work.nodus_id, title: work.title };
+  const summaryDone = startPerf('summary pipeline', perf);
   const settings = getSettings();
   const scanModel = model ?? settings.summaryModel ?? settings.synthesisModel ?? null;
   const hash = summaryContentHash(work, model);
@@ -151,7 +158,15 @@ export async function runSummaryScan(work: Work, model?: ModelRef | null): Promi
   };
 
   try {
-    const summary = (await completeText({ system: PROMPT_SUMMARY, user: JSON.stringify(input), temperature: 0.2, maxTokens: 800 }, scanModel)).trim();
+    const summary = (await completeText({
+      system: PROMPT_SUMMARY,
+      user: JSON.stringify(input),
+      temperature: 0.2,
+      maxTokens: 800,
+      requestClass: 'background',
+      jobId: `${work.nodus_id}:summary`,
+      perf,
+    }, scanModel)).trim();
     if (!summary) throw new Error('El modelo no devolvió un resumen utilizable.');
 
     upsertWorkSummary({
@@ -164,9 +179,11 @@ export async function runSummaryScan(work: Work, model?: ModelRef | null): Promi
     setSummaryResult(work.nodus_id, 'done', hash);
     recordLinkedLibraryAnalysis({ workId: work.nodus_id, components: ['summary'], documentFingerprint: hash });
 
-    const embedding = await embed(summary);
+    const embedding = await embed(summary, undefined, { perf, jobId: `${work.nodus_id}:summary-embedding` });
     if (embedding) updateWorkSummaryEmbedding(work.nodus_id, summary, embedding);
+    summaryDone({ status: 'ok' });
   } catch (error) {
+    summaryDone({ status: 'error', error: error instanceof Error ? error.message : String(error) });
     if (error instanceof AiError && error.config) throw error;
     setSummaryResult(work.nodus_id, 'failed', hash);
     throw error;

@@ -2,7 +2,7 @@
 //
 // scripts/test-student-pseudonyms.mjs proves the string logic. This file proves the
 // plumbing: that opening a scope actually rewrites what reaches the wire, that the
-// AsyncLocalStorage context survives the retry/repair paths inside completeJson, and
+// AsyncLocalStorage context survives exact retries inside completeJson, and
 // that a placeholder split across streaming chunks still reaches the UI intact.
 //
 // It drives aiClient against a fake OpenAI-compatible server and asserts on the
@@ -102,7 +102,7 @@ try {
   assert.ok(wire().includes('Juan'), 'two Juanes: the model is asked the question as written');
   assert.ok(!wire().includes('STU_MMMM'), 'and neither of them is guessed at');
 
-  // ── completeJson: deep mapping, and the repair path stays in code space ────
+  // ── completeJson: deep mapping, and exact retries stay in code space ───────
   const guard = (v) => !!v && typeof v === 'object' && Array.isArray(v.rows);
   run(['{"rows":[{"who":"STU_MMMM","nota":"bien"}]}']);
   const parsed = await privacyCtx.withStudentPseudonyms(roster, () =>
@@ -110,17 +110,18 @@ try {
   assert.deepEqual(parsed.rows, [{ who: 'Juan García Ruiz', nota: 'bien' }], 'nested JSON strings are mapped back');
   assert.ok(!/García/.test(wire()), 'the JSON prompt carried no real name either');
 
-  // Two objects run together is the one shape jsonrepair cannot fix locally, so it is
-  // what actually forces the repair round-trip. That round-trip re-sends the model's
-  // own bad output through a BRAND-NEW options object built inside repairJson — the
-  // exact propagation hole that made us choose AsyncLocalStorage over a CallOpts field.
+  // Two objects run together is a shape jsonrepair cannot fix locally. A remote repair
+  // prompt could invent data and would destroy request identity, so completeJson must
+  // resample the same pseudonymised request byte-for-byte.
   run(['{"rows":[]}{"rows":[{"who":"STU_MMMM"}]}', '{"rows":[{"who":"STU_MMMM"}]}']);
   const repaired = await privacyCtx.withStudentPseudonyms(roster, () =>
     aiClient.completeJson({ system: 's', user: 'Evalúa a Juan García Ruiz' }, guard, model));
-  assert.ok(seen.some((h) => JSON.stringify(h.body).includes('invalid_json')),
-    'the unparseable reply really did trigger a repair round-trip');
-  assert.ok(!/García|Ana|Peña/.test(wire()), 'no retry or repair call leaks a real name');
-  assert.deepEqual(repaired.rows, [{ who: 'Juan García Ruiz' }], 'and the repaired result still maps back');
+  assert.equal(seen.length, 2, 'the unparseable reply triggers exactly one retry');
+  assert.ok(seen.every((h) => !JSON.stringify(h.body).includes('invalid_json')),
+    'no alternate repair prompt is sent');
+  assert.deepEqual(seen[1].body, seen[0].body, 'the retry is the identical pseudonymised request');
+  assert.ok(!/García|Ana|Peña/.test(wire()), 'no retry call leaks a real name');
+  assert.deepEqual(repaired.rows, [{ who: 'Juan García Ruiz' }], 'and the retried result still maps back');
 
   // Schema mismatch takes the retry path instead — the scope must survive that too.
   run(['{"wrong":true}', '{"rows":[{"who":"STU_MMMM"}]}']);

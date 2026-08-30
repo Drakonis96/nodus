@@ -4,6 +4,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type {
   AppSettings,
+  AiConcurrencySnapshot,
   BackupCleanupPreview,
   BackupRetentionUnit,
   CopilotServerStatus,
@@ -122,6 +123,15 @@ function backupRetentionLimit(unit: BackupRetentionUnit): number {
   return unit === 'days' ? 3650 : unit === 'weeks' ? 520 : unit === 'months' ? 120 : 10;
 }
 
+function aiConcurrencyReason(entry: AiConcurrencySnapshot): string | null {
+  if (entry.cooldownUntil || /quota-reserved/.test(entry.lastChangeReason)) return 'espera por cuota';
+  if (/rate-limited|overloaded|repeated-/.test(entry.lastChangeReason)) return 'reducción temporal';
+  if (entry.lastChangeReason === 'healthy-saturated-queue') return 'capacidad ampliada';
+  if (entry.lastChangeReason === 'quota-window-reset') return 'cuota restablecida';
+  if (entry.provider === 'nodus') return 'límite local seguro';
+  return null;
+}
+
 export function Settings({
   settings,
   vaults: _vaults,
@@ -144,6 +154,7 @@ export function Settings({
   onOpenRoadmap: () => void;
 }) {
   const [saved, setSaved] = useState<string | null>(null);
+  const [aiConcurrency, setAiConcurrency] = useState<AiConcurrencySnapshot[]>([]);
   const [supersededReloadKey, setSupersededReloadKey] = useState(0);
   const [syncHasPassphrase, setSyncHasPassphrase] = useState(true);
   const [importSyncPassphrase, setImportSyncPassphrase] = useState('');
@@ -172,6 +183,11 @@ export function Settings({
   const integrationsTabRequested = settingsTabRequested('integrations', settingsTab, settingsQuery);
   const modelsTabRequested = settingsTabRequested('models', settingsTab, settingsQuery);
   const serverTabRequested = settingsTabRequested('server', settingsTab, settingsQuery);
+
+  useEffect(() => {
+    void window.nodus.getAiConcurrencySnapshot().then(setAiConcurrency);
+    return window.nodus.onAiConcurrencySnapshot(setAiConcurrency);
+  }, []);
 
   useEffect(() => {
     const target = localStorage.getItem('nodus.settingsTarget');
@@ -3005,16 +3021,16 @@ export function Settings({
                 <SubscriptionQuotaNotice model={settings.extractionModel} />
                 <Row label={t('Visión y OCR de imágenes')} hint={t('Interpreta imágenes y páginas escaneadas y obtiene su texto cuando hace falta.')}><ModelWithReasoning allowEmpty={false} settings={settings} value={settings.visionModel} onChange={(visionModel) => void patch({ visionModel })} emptyLabel="Seleccionar modelo" /></Row>
                 <SubscriptionQuotaNotice model={settings.visionModel} />
-                <Row label={t('Resúmenes de obras')} hint={t('Redacta resúmenes breves de cada obra para orientar la navegación y la recuperación.')}><ModelWithReasoning allowEmpty={false} settings={settings} value={settings.summaryModel} onChange={(summaryModel) => void patch({ summaryModel })} emptyLabel="Seleccionar modelo" /></Row>
+                <Row label={t('Resúmenes de obras')} hint={t('Redacta resúmenes breves de cada obra para orientar la navegación y la recuperación.')}><ModelWithReasoning allowEmpty={false} settings={settings} value={settings.summaryModel} onChange={(summaryModel) => void patch({ summaryModel })} emptyLabel="Seleccionar modelo" requiredCapability="summary" /></Row>
                 <SubscriptionQuotaNotice model={settings.summaryModel} />
                 {activeVault?.type === 'academic' && <>
-                  <Row label={t('Comprensión de documentos completos')} hint={t('Analiza todas las secciones y sintetiza la arquitectura global de cada obra.')}><ModelWithReasoning settings={settings} value={settings.documentProfileModel} onChange={(documentProfileModel) => void patch({ documentProfileModel })} emptyLabel="Usar modelo de resúmenes" requireExtraction /></Row>
+                  <Row label={t('Comprensión de documentos completos')} hint={t('Analiza todas las secciones y sintetiza la arquitectura global de cada obra.')}><ModelWithReasoning settings={settings} value={settings.documentProfileModel} onChange={(documentProfileModel) => void patch({ documentProfileModel })} emptyLabel="Usar modelo de resúmenes" requiredCapability="documentProfile" /></Row>
                   <ExtractionCapabilityNotice model={settings.documentProfileModel ?? settings.summaryModel} />
                   <SubscriptionQuotaNotice model={settings.documentProfileModel ?? settings.summaryModel} />
-                  <Row label={t('Auditor de fichas documentales')} hint={t('Revisa soporte, cobertura y fidelidad antes de publicar una versión nueva.')}><ModelWithReasoning settings={settings} value={settings.documentAuditModel} onChange={(documentAuditModel) => void patch({ documentAuditModel })} emptyLabel="Usar modelo de comprensión documental" requireExtraction /></Row>
+                  <Row label={t('Auditor de fichas documentales')} hint={t('Revisa soporte, cobertura y fidelidad antes de publicar una versión nueva.')}><ModelWithReasoning settings={settings} value={settings.documentAuditModel} onChange={(documentAuditModel) => void patch({ documentAuditModel })} emptyLabel="Usar modelo de comprensión documental" requiredCapability="documentProfile" /></Row>
                   <SubscriptionQuotaNotice model={settings.documentAuditModel ?? settings.documentProfileModel ?? settings.summaryModel} />
                 </>}
-                <Row label={t('Fusión y deduplicación')} hint={t('Combina resultados equivalentes y elimina duplicados sin perder su evidencia.')}><ModelWithReasoning allowEmpty={false} settings={settings} value={settings.fusionModel} onChange={(fusionModel) => void patch({ fusionModel })} emptyLabel="Seleccionar modelo" requireExtraction /></Row>
+                <Row label={t('Fusión y deduplicación')} hint={t('Combina resultados equivalentes y elimina duplicados sin perder su evidencia.')}><ModelWithReasoning allowEmpty={false} settings={settings} value={settings.fusionModel} onChange={(fusionModel) => void patch({ fusionModel })} emptyLabel="Seleccionar modelo" requiredCapability="fusion" /></Row>
                 <ExtractionCapabilityNotice model={settings.fusionModel} />
                 <SubscriptionQuotaNotice model={settings.fusionModel} />
                 <Row label={t('Asistente Nodi')} hint={t('Responde en el asistente Nodi y usa el contexto de la vista cuando lo autorizas.')}><ModelWithReasoning allowEmpty={false} settings={settings} value={settings.nodiModel} onChange={(nodiModel) => void patch({ nodiModel })} emptyLabel="Seleccionar modelo" /></Row>
@@ -3089,16 +3105,40 @@ export function Settings({
                 </button>}
               </div>
             </Row>
-            <Row label={t('Llamadas simultáneas')} hint={t('Limita cuántas solicitudes de IA pueden ejecutarse al mismo tiempo.')}>
-              <input
-                type="number"
-                min={1}
-                max={5}
-                className="input w-20"
-                value={settings.concurrency}
-                onChange={(e) => patch({ concurrency: parseInt(e.target.value) || 1 })}
-              />
+            <Row label={t('Llamadas simultáneas')} hint={t('Automático se adapta por proveedor y modelo; Manual conserva un límite fijo entre 1 y 8.')}>
+              <div className="flex items-center gap-2">
+                <select
+                  className="input"
+                  value={settings.aiConcurrencyMode}
+                  onChange={(e) => patch({
+                    aiConcurrencyMode: e.target.value as AppSettings['aiConcurrencyMode'],
+                    aiConcurrencyVersion: 1,
+                  })}
+                >
+                  <option value="automatic">{t('Automático')}</option>
+                  <option value="manual">{t('Manual')}</option>
+                </select>
+                {settings.aiConcurrencyMode === 'manual' && <input
+                  type="number"
+                  min={1}
+                  max={8}
+                  className="input w-20"
+                  value={settings.concurrency}
+                  onChange={(e) => patch({ concurrency: Math.max(1, Math.min(8, parseInt(e.target.value) || 1)) })}
+                />}
+              </div>
             </Row>
+            {settings.aiConcurrencyMode === 'automatic' && aiConcurrency.length > 0 && (
+              <div className="-mt-2 rounded-lg border border-neutral-800 px-3 py-2 text-xs text-neutral-400">
+                {aiConcurrency.map((entry) => {
+                  const reason = aiConcurrencyReason(entry);
+                  return <div key={`${entry.provider}:${entry.model}`}>
+                    {entry.provider} · {entry.model}: {t('Automático')} · {entry.currentLimit}/{entry.maximumLimit} {t('ahora')}
+                    {reason ? ` · ${t(reason)}` : ''}
+                  </div>;
+                })}
+              </div>
+            )}
             <Row
               label={t('Razonamiento (chat/tutor/escritura)')}
               hint={t('Los escaneos van sin razonamiento para ir más rápido; esto solo afecta a las respuestas conversacionales. En Codex, el nivel que fijes a cada tarea en Modelos manda también en sus escaneos.')}

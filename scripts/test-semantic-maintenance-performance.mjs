@@ -20,7 +20,7 @@ for (const [name, source] of [['semantic bridges', bridges], ['connection reproc
 }
 assert.match(bridges, /MAX_MANUAL_QUERY_IDEAS = 400/, 'manual maintenance must be bounded');
 assert.match(reprocess, /options\.nodusIds/, 'automatic reprocessing must accept changed-work scope');
-assert.match(queue, /reprocessConnections\(\{ relations: true, nodusIds \}\)/, 'queue must pass only changed works');
+assert.match(queue, /reprocessConnections\(\{ relations: true, nodusIds \}, null,/, 'queue must pass only changed works');
 assert.match(queue, /discoverSemanticBridges[\s\S]*?item\.scopeNodusIds/, 'automatic bridges must retain changed-work scope');
 
 const postBatch = queue.slice(queue.indexOf('private async runPostBatch'), queue.indexOf('private chainAfterDeep'));

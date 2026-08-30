@@ -4,6 +4,8 @@ import type { QueueProgress, QueueKind } from '@shared/types';
 import { Icon } from './ui';
 import { ConfirmModal } from './ConfirmModal';
 import { t, tr, tx } from '../i18n';
+import { elapsedTimeLabel } from '@shared/elapsedTime';
+import { useElapsedClock } from '../useElapsedClock';
 
 const KIND_LABELS: Record<QueueKind, string> = {
   light: 'LIGERO',
@@ -35,20 +37,41 @@ export function QueueBar() {
     return window.nodus.onQueueProgress(setProgress);
   }, []);
 
-  if (!progress || progress.total === 0) return null;
-  const { done, failed, total, current, paused, pausedReason, items } = progress;
-  const pct = total ? Math.round(((done + failed) / total) * 100) : 0;
-  const active = done + failed < total;
+  const ticking = Boolean(progress && (
+    progress.maintenanceRunning
+    || progress.items.some((item) => item.state === 'queued' || item.state === 'running' || item.state === 'paused')
+  ));
+  const now = useElapsedClock(ticking);
+
+  if (!progress || (progress.total === 0 && !progress.maintenanceError && !progress.maintenanceRunning)) return null;
+  const {
+    done, failed, total, current, paused, pausedReason, maintenanceError,
+    maintenanceRunning, maintenanceDetail, startedAt, finishedAt, items,
+  } = progress;
+  const terminalItems = items.filter((item) => item.state === 'done' || item.state === 'failed' || item.state === 'cancelled').length;
+  const pct = total ? Math.round((terminalItems / total) * 100) : maintenanceRunning ? 99 : 0;
+  const workActive = items.some((item) => item.state === 'queued' || item.state === 'running' || item.state === 'paused');
+  const active = workActive || maintenanceRunning;
+  const terminal = !active && !maintenanceError;
   const running = items.find((i) => i.state === 'running');
+  const totalElapsed = elapsedTimeLabel(startedAt, finishedAt, now);
+  const itemElapsed = elapsedTimeLabel(running?.started_at, running?.finished_at, now);
 
   return (
     <div className="border-t border-neutral-200 bg-neutral-100/80 backdrop-blur px-4 py-2 text-sm dark:border-neutral-800 dark:bg-neutral-900/80">
       {pausedReason && (
         <div className="mb-2 flex items-center gap-2 rounded-lg bg-amber-50 border border-amber-200 px-3 py-1.5 text-amber-700 text-xs dark:bg-amber-950/60 dark:border-amber-800/60 dark:text-amber-300">
-          <span>⚠</span>
+          <Icon name="warning" size={14} className="shrink-0" />
           <span className="flex-1">
             {t('Escaneo en pausa:')} {tr(pausedReason)} {t('Corrígelo en Ajustes y pulsa')} <b>{t('Reanudar')}</b>.
           </span>
+        </div>
+      )}
+      {maintenanceError && (
+        <div className="mb-2 flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs text-amber-700 dark:border-amber-800/60 dark:bg-amber-950/60 dark:text-amber-300">
+          <Icon name="warning" size={14} className="shrink-0" />
+          <span className="flex-1">{t('Postprocesado del grafo pendiente:')} {tr(maintenanceError)}</span>
+          <button className="btn btn-ghost h-7 px-2" onClick={() => window.nodus.resumeQueue()}>{t('Reintentar')}</button>
         </div>
       )}
       <div className="flex items-center gap-3">
@@ -68,7 +91,10 @@ export function QueueBar() {
                       {running.subPct != null ? ` (${Math.round(running.subPct * 100)}%)` : ''}
                     </span>
                   )}
+                  {itemElapsed && <span className="ml-1 tabular-nums text-neutral-500">· {t('Obra')} {itemElapsed}</span>}
                 </>
+              ) : maintenanceRunning ? (
+                <>{tr(maintenanceDetail ?? 'Postprocesando relaciones del grafo…')}</>
               ) : paused ? (
                 t('Cola en pausa')
               ) : active ? (
@@ -77,7 +103,10 @@ export function QueueBar() {
                 `${done} ${t('completados')}${failed ? `, ${failed} ${t('fallidos')}` : ''}`
               )}
             </span>
-            <span>{pct}%</span>
+            <span className="shrink-0 tabular-nums">
+              {totalElapsed && <span className="mr-3">{t('Total')} {totalElapsed}</span>}
+              {pct}%
+            </span>
           </div>
           <div className="h-1.5 bg-neutral-800 rounded-full overflow-hidden">
             <motion.div
@@ -87,7 +116,7 @@ export function QueueBar() {
             />
           </div>
         </div>
-        {active &&
+        {workActive &&
           (paused ? (
             <button
               className="btn btn-ghost"
@@ -117,15 +146,27 @@ export function QueueBar() {
             <Icon name="refresh" size={15} /> {failed}
           </button>
         )}
-        <button
-          className="btn btn-ghost"
-          title={t('Limpiar la cola (quita los elementos pendientes y terminados)')}
-          aria-label={t('Limpiar la cola')}
-          onClick={() => setConfirm('clear')}
-        >
-          <Icon name="trash" size={16} />
-        </button>
-        {active && (
+        {workActive && (
+          <button
+            className="btn btn-ghost"
+            title={t('Limpiar la cola (quita los elementos pendientes y terminados)')}
+            aria-label={t('Limpiar la cola')}
+            onClick={() => setConfirm('clear')}
+          >
+            <Icon name="trash" size={16} />
+          </button>
+        )}
+        {terminal && (
+          <button
+            className={`btn btn-ghost ${failed > 0 ? 'text-amber-400' : 'text-emerald-400'}`}
+            title={failed > 0 ? t('Finalizado con fallos · ocultar') : t('Completado · ocultar')}
+            aria-label={failed > 0 ? t('Finalizado con fallos · ocultar') : t('Completado · ocultar')}
+            onClick={() => void window.nodus.clearQueue()}
+          >
+            <Icon name={failed > 0 ? 'warning' : 'check'} size={17} />
+          </button>
+        )}
+        {workActive && (
           <button
             className="btn btn-ghost text-red-400 hover:text-red-300"
             title={t('Detener y eliminar todos los elementos de la cola')}
@@ -165,8 +206,16 @@ export function QueueBar() {
                             : 'text-neutral-500'
                     }
                   >
-                    {t(STATE_LABELS[it.state])}
+                    <span className="inline-flex items-center gap-1">
+                      {it.state === 'done' && <Icon name="check" size={12} />}
+                      {t(STATE_LABELS[it.state])}
+                    </span>
                   </span>
+                  {elapsedTimeLabel(it.started_at, it.finished_at, now) && (
+                    <span className="ml-2 min-w-[5.5rem] text-right tabular-nums text-neutral-500">
+                      {elapsedTimeLabel(it.started_at, it.finished_at, now)}
+                    </span>
+                  )}
                   {it.state === 'queued' && (
                     <button
                       className="ml-2 inline-flex h-6 w-6 items-center justify-center rounded-md text-neutral-500 hover:bg-neutral-800 hover:text-indigo-300"

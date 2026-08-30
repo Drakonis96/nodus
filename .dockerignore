@@ -9,6 +9,10 @@ release
 output
 artifacts
 reports
+audit
+tmp
+.qa
+pages-artifact
 server/data
 server/dist/web
 cloudflare/dist
@@ -27,3 +31,9 @@ cloudflare/dist
 .tmp-shots
 .tutorial-out
 scripts/.cache
+.claude
+__pycache__
+*.heic
+*.HEIC
+*.heif
+*.HEIF

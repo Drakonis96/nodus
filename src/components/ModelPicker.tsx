@@ -1,7 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
 import type { AppSettings, CodexReasoningEffort, ModelRef } from '@shared/types';
 import { isSubscriptionProvider } from '@shared/providers';
-import { localModelRefLikelyWeakAtExtraction, modelRefSupportsExtraction } from '@shared/localAiModels';
+import {
+  localModelRefLikelyWeakAtExtraction,
+  modelRefSupportsCapability,
+  modelRefSupportsExtraction,
+  type NodusLocalCapability,
+} from '@shared/localAiModels';
 import {
   codexReasoningCatalog,
   modelRefWithReasoning,
@@ -188,6 +193,7 @@ export function ModelWithReasoning({
   allowEmpty = true,
   emptyLabel,
   requireExtraction = false,
+  requiredCapability,
 }: {
   settings: AppSettings;
   value: ModelRef | null;
@@ -196,6 +202,7 @@ export function ModelWithReasoning({
   allowEmpty?: boolean;
   emptyLabel?: string;
   requireExtraction?: boolean;
+  requiredCapability?: NodusLocalCapability;
 }) {
   return (
     <div className="flex w-full min-w-0 flex-wrap items-center gap-2">
@@ -208,6 +215,7 @@ export function ModelWithReasoning({
         allowEmpty={allowEmpty}
         emptyLabel={emptyLabel}
         requireExtraction={requireExtraction}
+        requiredCapability={requiredCapability}
       />
       <ReasoningPicker settings={settings} model={value} onChange={onChange} compact={compact} />
     </div>
@@ -230,6 +238,7 @@ export function ModelPicker({
   allowEmpty = true,
   menu = false,
   requireExtraction = false,
+  requiredCapability,
   triggerModelOnly = false,
   ariaLabel,
   className = '',
@@ -243,6 +252,7 @@ export function ModelPicker({
   allowEmpty?: boolean;
   menu?: boolean;
   requireExtraction?: boolean;
+  requiredCapability?: NodusLocalCapability;
   /** Keep compact, in-context pickers readable while the options retain provider names. */
   triggerModelOnly?: boolean;
   /** Accessible control name; the current provider and model are appended as its value. */
@@ -250,8 +260,9 @@ export function ModelPicker({
   className?: string;
 }) {
   const favorites = sortModelRefs(settings.favorites ?? []);
-  const blocked = (m: ModelRef) => requireExtraction && !modelRefSupportsExtraction(m);
-  const optionText = (m: ModelRef) => (blocked(m) ? `${modelLabel(m)} — ${t('solo visión')}` : modelLabel(m));
+  const capability = requiredCapability ?? (requireExtraction ? 'extraction' : null);
+  const blocked = (m: ModelRef) => capability ? !modelRefSupportsCapability(m, capability) : false;
+  const optionText = (m: ModelRef) => (blocked(m) ? `${modelLabel(m)} — ${t('rol no certificado')}` : modelLabel(m));
   const serialize = (m: ModelRef) => `${m.provider}::${m.model}`;
   const valueIsFavorite = value ? favorites.some((model) => sameModel(model, value)) : false;
   const [open, setOpen] = useState(false);

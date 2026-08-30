@@ -1692,6 +1692,17 @@ export type NodiOrbColorMode = 'auto' | 'manual';
 
 export type BackupRetentionUnit = 'days' | 'weeks' | 'months' | 'years';
 
+export interface AiConcurrencySnapshot {
+  provider: string;
+  model: string;
+  active: number;
+  queued: number;
+  currentLimit: number;
+  maximumLimit: number;
+  cooldownUntil: number | null;
+  lastChangeReason: string;
+}
+
 export interface AppSettings {
   /** Whether the user explicitly enabled the cross-vault catalogue. */
   libraryGlobalEnabled: boolean;
@@ -1894,6 +1905,11 @@ export interface AppSettings {
   // Orb only: the accent (hex) used when mascotOrbColorMode is 'manual'. Every other
   // colour in the orb is derived from this one's hue.
   mascotOrbColor: string;
+  /** Provider-aware adaptive scheduling, or the explicitly selected fixed limit. */
+  aiConcurrencyMode: 'automatic' | 'manual';
+  /** Migration/rollout marker. Version 0 keeps existing installs in beta-safe manual mode. */
+  aiConcurrencyVersion: number;
+  /** Manual request limit (1..8); retained even while automatic mode is active. */
   concurrency: number;
   // Reasoning effort for interactive long-form calls (chat, tutor, debate, writing).
   // Scans always run with reasoning off for speed, regardless of this value.
@@ -4864,6 +4880,10 @@ export interface QueueItem {
   state: QueueState;
   error: string | null;
   enqueued_at: string;
+  /** First dispatch time. Retries keep the original timestamp so this is total wall time. */
+  started_at: string | null;
+  /** Terminal time; null while queued/running or while a retry is pending. */
+  finished_at: string | null;
   /** Sub-step detail for the running item, e.g. "OCR p. 12/340" or "Extrayendo p. 8/22". */
   detail?: string | null;
   /** 0..1 progress within the current item (extraction/OCR), when known. */
@@ -4883,6 +4903,14 @@ export interface QueueProgress {
   paused: boolean;
   /** When the queue auto-paused on a misconfiguration (no model / invalid key), why. */
   pausedReason: string | null;
+  /** Reanudable global graph post-processing failure; never hidden as a completed queue. */
+  maintenanceError?: string | null;
+  /** Global relation maintenance remains visible until it has really settled. */
+  maintenanceRunning: boolean;
+  maintenanceDetail: string | null;
+  /** Wall time for the whole queue task, including required post-processing. */
+  startedAt: string | null;
+  finishedAt: string | null;
   total: number;
   done: number;
   failed: number;
@@ -8608,6 +8636,8 @@ export interface NodusApi extends ProsopographyApi, TestimoniesApi, ToolkitApi, 
   // settings + secrets
   getSettings(): Promise<AppSettings>;
   updateSettings(patch: Partial<AppSettings>): Promise<AppSettings>;
+  getAiConcurrencySnapshot(): Promise<AiConcurrencySnapshot[]>;
+  onAiConcurrencySnapshot(cb: (snapshot: AiConcurrencySnapshot[]) => void): () => void;
   listVaults(): Promise<VaultSummary[]>;
   // Nodi companion
   listNotifications(): Promise<NodiNotification[]>;
@@ -8822,6 +8852,11 @@ export interface CollectionFacet {
 export interface EmbeddingPipelineProgress {
   running: boolean;
   paused: boolean;
+  cancelled: boolean;
+  startedAt: string | null;
+  finishedAt: string | null;
+  currentWorkStartedAt: string | null;
+  currentWorkFinishedAt: string | null;
   /** Index of the work currently being processed (0-based). */
   currentWorkIndex: number;
   /** Total works queued for embedding. */
@@ -8853,6 +8888,11 @@ export interface WorkEmbeddingStatus {
 export interface PassageEmbeddingProgress {
   running: boolean;
   paused: boolean;
+  cancelled: boolean;
+  startedAt: string | null;
+  finishedAt: string | null;
+  currentWorkStartedAt: string | null;
+  currentWorkFinishedAt: string | null;
   currentWorkIndex: number;
   totalWorks: number;
   currentWorkTitle: string | null;

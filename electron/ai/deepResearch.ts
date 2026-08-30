@@ -43,6 +43,7 @@ import {
   normalizePlan,
   fallbackPlan,
   resolveSectionPlan,
+  sectionPlanMaximum,
   assignMissingCoverageQuestions,
   reconcileCoverageAudit,
   plannedCandidateWorkIds,
@@ -214,7 +215,7 @@ export async function generateDeepResearchPlanPreview(request: DeepResearchReque
     plan = normalizePlan(
       options.planOverride ?? await deps.planReport(input),
       snapshot,
-      Number.MAX_SAFE_INTEGER,
+      sectionPlanMaximum(sectionPlan, coverageQuestions),
       coverageQuestions,
     );
     if (!plan.sections.length) throw new Error('empty plan');
@@ -768,11 +769,48 @@ const VERIFY_BATCH = 12;
  */
 export const __verifyCitationsForTesting = aiVerifyCitations;
 
-interface AiVerdicts {
-  veredictos?: { i?: number; veredicto?: string }[];
+interface AiVerdictEntry {
+  i?: number;
+  index?: number;
+  veredicto?: string;
+  verdict?: string;
 }
-function isAiVerdicts(v: unknown): v is AiVerdicts {
-  return typeof v === 'object' && v !== null && Array.isArray((v as AiVerdicts).veredictos);
+interface AiVerdicts {
+  veredictos?: AiVerdictEntry[];
+  /** Gemini 2.5 Flash Lite has emitted this hybrid spelling under JSON mode. */
+  veredicts?: AiVerdictEntry[];
+  /** Gemini can also translate only the middle of the Spanish container key. */
+  verdictos?: AiVerdictEntry[];
+  verdicts?: AiVerdictEntry[];
+  results?: AiVerdictEntry[];
+}
+type AiVerdictsResponse = AiVerdicts;
+
+function verdictEntries(v: AiVerdictsResponse): AiVerdictEntry[] {
+  if (Array.isArray(v.veredictos)) return v.veredictos;
+  if (Array.isArray(v.veredicts)) return v.veredicts;
+  if (Array.isArray(v.verdictos)) return v.verdictos;
+  if (Array.isArray(v.verdicts)) return v.verdicts;
+  if (Array.isArray(v.results)) return v.results;
+  return [];
+}
+
+function isAiVerdicts(v: unknown): v is AiVerdictsResponse {
+  if (typeof v !== 'object' || v === null) return false;
+  const candidate = v as AiVerdicts;
+  return Array.isArray(candidate.veredictos)
+    || Array.isArray(candidate.veredicts)
+    || Array.isArray(candidate.verdictos)
+    || Array.isArray(candidate.verdicts)
+    || Array.isArray(candidate.results);
+}
+
+function normalizeCitationVerdict(value: unknown): CitationVerdict | null {
+  const raw = String(value ?? '').trim().toLocaleLowerCase().replace(/[\s-]+/gu, '_');
+  if (raw === 'sostiene' || raw === 'supports' || raw === 'supported') return 'supports';
+  if (raw === 'parcial' || raw === 'partial' || raw === 'partially_supported') return 'partial';
+  if (raw === 'no_sostiene' || raw === 'unsupported' || raw === 'does_not_support') return 'unsupported';
+  return null;
 }
 
 /**
@@ -821,12 +859,20 @@ export async function aiVerifyCitations(claims: CitationClaim[], model: ModelRef
     let lastError: unknown = null;
     for (let attempt = 0; attempt < 3; attempt += 1) {
       try {
-        const ai = await completeJson<AiVerdicts>({ system, user, temperature: 0, maxTokens: 1800 }, isAiVerdicts, model);
-        for (const entry of ai.veredictos ?? []) {
-          const at = start + (typeof entry.i === 'number' ? entry.i : -1);
+        // This verifier owns the complete three-attempt budget. Letting completeJson
+        // retry internally as well multiplies a persistent schema mismatch into nine
+        // identical billed calls before the batch can fail closed.
+        const ai = await completeJson<AiVerdictsResponse>(
+          { system, user, temperature: 0, maxTokens: 1800, noRetry: true },
+          isAiVerdicts,
+          model,
+        );
+        for (const entry of verdictEntries(ai)) {
+          const index = typeof entry.i === 'number' ? entry.i : entry.index;
+          const at = start + (typeof index === 'number' ? index : -1);
           if (at < start || at >= start + batch.length) continue;
-          const raw = String(entry.veredicto ?? '').toLowerCase();
-          verdicts[at] = raw.includes('no_sostiene') ? 'unsupported' : raw.includes('parcial') ? 'partial' : 'supports';
+          const verdict = normalizeCitationVerdict(entry.veredicto ?? entry.verdict);
+          if (verdict) verdicts[at] = verdict;
         }
         if (verdicts.slice(start, start + batch.length).every((verdict) => verdict != null)) break;
         lastError = new Error('El verificador omitió uno o más veredictos.');

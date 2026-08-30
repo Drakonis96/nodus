@@ -1,0 +1,69 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "One isolated Nodus adaptive-concurrency campaign",
+  "type": "object",
+  "required": [
+    "schema", "id", "pairId", "build", "provider", "model", "routingMode", "mode", "campaignIndex",
+    "totalMs", "papers", "plannedChunks", "completedChunks", "checkpointedChunks",
+    "invalidAcceptedJson", "invalidEmbeddings", "sqliteIntegrity", "requestHashes",
+    "quality", "profileHashes"
+  ],
+  "properties": {
+    "schema": { "const": "nodus-adaptive-campaign/1" },
+    "id": { "type": "string", "minLength": 1 },
+    "pairId": { "type": "string", "minLength": 1 },
+    "provider": { "type": "string", "minLength": 1 },
+    "model": { "type": "string", "minLength": 1 },
+    "build": { "enum": ["historical", "candidate"] },
+    "routingMode": { "enum": ["direct", "controlled", "throughput", "local"] },
+    "mode": { "enum": ["historical", "manual", "automatic"] },
+    "campaignIndex": { "type": "integer", "minimum": 1 },
+    "cold": { "type": "boolean" },
+    "totalMs": { "type": "number", "exclusiveMinimum": 0 },
+    "papers": {
+      "type": "array", "minItems": 3, "maxItems": 10,
+      "items": {
+        "type": "object", "required": ["key", "totalMs", "ideaRecall", "evidencePrecision", "citationPrecision"],
+        "properties": {
+          "key": { "type": "string" },
+          "totalMs": { "type": "number", "minimum": 0 },
+          "ideaRecall": { "type": "number", "minimum": 0, "maximum": 1 },
+          "evidencePrecision": { "type": "number", "minimum": 0, "maximum": 1 },
+          "citationPrecision": { "type": "number", "minimum": 0, "maximum": 1 }
+        }
+      }
+    },
+    "plannedChunks": { "type": "integer", "minimum": 0 },
+    "completedChunks": { "type": "integer", "minimum": 0 },
+    "checkpointedChunks": { "type": "integer", "minimum": 0 },
+    "invalidAcceptedJson": { "type": "integer", "minimum": 0 },
+    "invalidEmbeddings": { "type": "integer", "minimum": 0 },
+    "sqliteIntegrity": { "const": "ok" },
+    "requestHashes": { "type": "array", "items": { "type": "string", "pattern": "^[a-f0-9]{64}$" } },
+    "backendEffective": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+    "terminalFailures": { "type": "integer", "minimum": 0 },
+    "quality": {
+      "type": "object",
+      "required": ["ndcg10", "recall20", "falseDistinctMerges", "equivalentFusionRecall"],
+      "properties": {
+        "ndcg10": { "type": "number", "minimum": 0, "maximum": 1 },
+        "recall20": { "type": "number", "minimum": 0, "maximum": 1 },
+        "falseDistinctMerges": { "type": "integer", "minimum": 0 },
+        "equivalentFusionRecall": { "type": "number", "minimum": 0, "maximum": 1 }
+      }
+    },
+    "embeddings": {
+      "type": "object",
+      "properties": {
+        "validVectors": { "type": "integer", "minimum": 0 },
+        "expectedVectors": { "type": "integer", "minimum": 0 },
+        "minimumScalarBatchCosine": { "type": "number", "minimum": -1, "maximum": 1 },
+        "retrievalMetricRegression": { "type": "number" }
+      }
+    },
+    "profileHashes": {
+      "type": "object", "required": ["before", "after"],
+      "properties": { "before": { "type": "string" }, "after": { "type": "string" } }
+    }
+  }
+}

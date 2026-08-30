@@ -27,21 +27,26 @@ import { planTextChunks, ExtractedDoc } from '../extraction/textExtractor';
 import { perfLog, startPerf } from '../perf';
 import { recordLinkedLibraryAnalysis } from '../library/libraryVaultProvenance';
 import { getDb } from '../db/database';
+import { mapOrderedPool } from './orderedPool';
+import { OrderedPublicationBarrier } from './orderedPublicationBarrier';
 
 // Fusion decisions depend on the current global graph. Serialize only that phase so
 // concurrent scans can still extract chunks in parallel without planning against a
 // graph that changes before their atomic commit.
-let fusionTail: Promise<void> = Promise.resolve();
-async function withFusionLock<T>(fn: () => Promise<T>): Promise<T> {
-  let release!: () => void;
-  const previous = fusionTail;
-  fusionTail = new Promise<void>((resolve) => { release = resolve; });
-  await previous;
-  try {
-    return await fn();
-  } finally {
-    release();
-  }
+const publicationBarrier = new OrderedPublicationBarrier();
+
+/** Reserve publication order before a queued paper starts metadata/PDF extraction. */
+export function issueDeepScanPublicationOrdinal(): number {
+  return publicationBarrier.issue();
+}
+
+/** Mark a paper terminal when it fails before `runDeepScan` can reach the barrier. */
+export function finishDeepScanPublicationOrdinal(ticket: number): void {
+  publicationBarrier.finish(ticket);
+}
+
+async function withFusionLock<T>(ticket: number, fn: () => Promise<T>, signal?: AbortSignal): Promise<T> {
+  return publicationBarrier.publish(ticket, fn, signal);
 }
 
 // ── Prompt 1 output shapes ────────────────────────────────────────────────────
@@ -441,8 +446,13 @@ export async function runDeepScan(
   work: Work,
   doc: ExtractedDoc,
   model?: ModelRef | null,
-  onProgress?: (p: DeepScanProgress) => void
+  onProgress?: (p: DeepScanProgress) => void,
+  publicationOrdinal?: number,
 ): Promise<void> {
+  // Queue callers reserve this before PDF extraction. Direct scans still receive a
+  // safe ordinal here, preserving a single ordering domain for graph publication.
+  const publishOrdinal = publicationOrdinal ?? publicationBarrier.issue();
+  let publicationAdvanced = false;
   const perf = { nodusId: work.nodus_id, title: work.title };
   const totalDone = startPerf('deep pipeline', perf, { sourceType: doc.sourceType, chars: doc.text.length });
   const text = doc.text;
@@ -495,7 +505,6 @@ export async function runDeepScan(
     });
     const authors: string[] = JSON.parse(work.authors_json || '[]');
     const existingThemeLabels = getWorkThemeLabels(work.nodus_id);
-    const results: DeepResult[] = [];
     const sourceMap = new Map((doc.segments ?? []).map((segment) => [segment.marker, segment.sourceRef]));
     const citationCorpus = citationCorpusFor(doc);
 
@@ -503,15 +512,17 @@ export async function runDeepScan(
     const checkpoints = loadCheckpoints(work.nodus_id, hash, 'deep_chunk');
 
     const llmDone = startPerf('deep LLM extraction', perf, { chunks: chunks.length, mode: chunkPlan.mode });
-    for (let i = 0; i < chunks.length; i++) {
+    const extractionPool = settings.aiConcurrencyMode === 'automatic'
+      ? 8
+      : Math.max(1, Math.min(8, settings.concurrency));
+    const results = await mapOrderedPool(chunks, extractionPool, async (_chunk, i, poolSignal) => {
       // Resume from checkpoint if available.
       const defaultSourceAlias = chunks[i].match(/\[\[src:([^\]\s]+)/i)?.[1] ?? null;
       const reusable = usableCheckpoint(checkpoints.get(i), sourceMap, defaultSourceAlias, citationCorpus);
       if (reusable) {
-        results.push(reusable);
         // Upgrade legacy checkpoints in place so every later resume is strict.
         saveCheckpoint(work.nodus_id, hash, 'deep_chunk', i, reusable);
-        continue;
+        return reusable;
       }
       onProgress?.({ detail: `Analizando fragmento ${i + 1}/${chunks.length} con IA…`, pct: i / chunks.length });
       const chunkWordCount = chunks[i].split(/\s+/).filter(Boolean).length;
@@ -574,6 +585,10 @@ export async function runDeepScan(
                 temperature: 0.15,
                 maxTokens,
                 perf,
+                signal: poolSignal,
+                requestClass: 'background',
+                deterministic: true,
+                jobId: `${work.nodus_id}:deep:${i}:${depth}:${crypto.createHash('sha1').update(chunkText).digest('hex').slice(0, 12)}`,
               },
               isRawDeepResult,
               extractionModel
@@ -612,16 +627,20 @@ export async function runDeepScan(
             const childWords = Math.max(500, Math.min(5000, Math.ceil(words / 2)));
             const children = planTextChunks(chunkText, { mode: 'standard', standardChunkWords: childWords }).chunks;
             if (children.length < 2 || adaptive.leaves + children.length > 16) throw error;
-            const childResults: DeepResult[] = [];
-            for (const child of children) childResults.push(await completeAdaptive(child, depth + 1, baseMaxTokens));
+            const childResults = await mapOrderedPool(
+              children,
+              Math.min(children.length, extractionPool),
+              (child) => completeAdaptive(child, depth + 1, baseMaxTokens),
+              poolSignal,
+            );
             return combineDeepResults(childResults);
           }
         };
         const result = await completeAdaptive(chunks[i], 0, baseMaxTokens);
         chunkDone({ ideas: result.ideas.length, themes: result.theme_nodes?.length ?? 0 });
-        results.push(result);
         // Checkpoint this chunk so a later failure doesn't lose the work.
         saveCheckpoint(work.nodus_id, hash, 'deep_chunk', i, result);
+        return result;
       } catch (e) {
         chunkDone({ status: 'error', error: e instanceof Error ? e.message : String(e) });
         llmDone({ status: 'error', chunk: i + 1 });
@@ -629,7 +648,7 @@ export async function runDeepScan(
       } finally {
         clearInterval(heartbeat);
       }
-    }
+    });
     llmDone({ results: results.length });
 
     const merged = mergeByLabel(results);
@@ -678,12 +697,16 @@ export async function runDeepScan(
     const fusionDone = startPerf('embeddings/fusion', perf, { ideas: ideaEntries.length });
     const embeddingDone = startPerf('embedding', perf, { mode: 'batch', ideas: ideaEntries.length });
     try {
-      const embeddings = await embedMany(preparedIdeas.map((entry) => entry.embeddingText));
+      const embeddings = await embedMany(
+        preparedIdeas.map((entry) => entry.embeddingText),
+        undefined,
+        { perf, jobId: `${work.nodus_id}:fusion-embeddings` },
+      );
       embeddingDone({ available: embeddings.filter(Boolean).length });
-      await withFusionLock(async () => {
-        const plans: FusionPlan[] = [];
-        for (let i = 0; i < preparedIdeas.length; i++) {
-          const { labelKey, idea, ideaThemeLabels, embeddingText } = preparedIdeas[i];
+      await withFusionLock(publishOrdinal, async () => {
+        publicationAdvanced = true;
+        const plans = await mapOrderedPool(preparedIdeas, extractionPool, async (prepared, i) => {
+          const { labelKey, idea, ideaThemeLabels, embeddingText } = prepared;
           onProgress?.({
             detail: `Fusionando idea ${i + 1}/${ideaEntries.length}…`,
             pct: ideaEntries.length ? i / ideaEntries.length : null,
@@ -694,14 +717,14 @@ export async function runDeepScan(
             label: idea.label,
             statement: idea.statement,
           };
-          plans.push(await planIdeaFusion(ext, {
+          return planIdeaFusion(ext, {
             model: fusionModel,
             perf,
             embedding: embeddings[i] ?? null,
             embeddingText,
             themes: ideaThemeLabels,
-          }));
-        }
+          });
+        });
 
         // No user-visible deep row is changed until every model/embedding decision is
         // ready. A write error rolls the whole replacement back to the previous result.
@@ -782,5 +805,9 @@ export async function runDeepScan(
   } catch (e) {
     totalDone({ status: 'error', error: e instanceof Error ? e.message : String(e) });
     throw e;
+  } finally {
+    // A skipped/failed work is terminal for ordering purposes and cannot strand every
+    // later publication behind an ordinal that will never reach the fusion barrier.
+    if (!publicationAdvanced) publicationBarrier.finish(publishOrdinal);
   }
 }

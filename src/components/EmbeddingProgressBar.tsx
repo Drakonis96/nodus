@@ -3,6 +3,8 @@ import { motion } from 'framer-motion';
 import type { EmbeddingPipelineProgress } from '@shared/types';
 import { Icon } from './ui';
 import { t, tx } from '../i18n';
+import { elapsedTimeLabel } from '@shared/elapsedTime';
+import { useElapsedClock } from '../useElapsedClock';
 
 export function EmbeddingProgressBar() {
   const [progress, setProgress] = useState<EmbeddingPipelineProgress | null>(null);
@@ -12,11 +14,18 @@ export function EmbeddingProgressBar() {
     return window.nodus.onEmbeddingProgress(setProgress);
   }, []);
 
+  const now = useElapsedClock(Boolean(progress && (progress.running || progress.paused)));
   if (!progress || (!progress.running && progress.totalIdeas === 0 && !progress.error)) return null;
 
-  const { running, paused, totalWorks, currentWorkTitle, ideasEmbedded, totalIdeas, currentWorkIndex, currentIdeaIndex, currentWorkIdeas, error } = progress;
+  const {
+    running, paused, cancelled, startedAt, finishedAt, currentWorkStartedAt, currentWorkFinishedAt,
+    totalWorks, currentWorkTitle, ideasEmbedded, totalIdeas, currentWorkIndex,
+    currentIdeaIndex, currentWorkIdeas, error,
+  } = progress;
   const pct = totalIdeas > 0 ? Math.round((ideasEmbedded / totalIdeas) * 100) : 0;
   const active = running || paused;
+  const totalElapsed = elapsedTimeLabel(startedAt, finishedAt, now);
+  const workElapsed = elapsedTimeLabel(currentWorkStartedAt, currentWorkFinishedAt, now);
 
   return (
     <div className="border-t border-neutral-200 bg-neutral-100/80 backdrop-blur px-4 py-2 text-sm dark:border-neutral-800 dark:bg-neutral-900/80">
@@ -39,6 +48,7 @@ export function EmbeddingProgressBar() {
                       <span className="text-cyan-300 ml-1">
                         · {t('idea')} {currentIdeaIndex + 1}/{currentWorkIdeas}
                       </span>
+                      {workElapsed && <span className="ml-1 tabular-nums text-neutral-500">· {t('Obra')} {workElapsed}</span>}
                     </>
                   ) : (
                     t('Preparando…')
@@ -46,11 +56,16 @@ export function EmbeddingProgressBar() {
                 </>
               ) : error ? (
                 t('Indexación detenida por error')
+              ) : cancelled ? (
+                t('Indexación cancelada')
               ) : (
                 tx('{n} ideas indexadas', { n: ideasEmbedded })
               )}
             </span>
-            <span>{pct}%</span>
+            <span className="shrink-0 tabular-nums">
+              {totalElapsed && <span className="mr-3">{t('Total')} {totalElapsed}</span>}
+              {pct}%
+            </span>
           </div>
           <div className="h-1.5 bg-neutral-800 rounded-full overflow-hidden">
             <motion.div
@@ -92,12 +107,12 @@ export function EmbeddingProgressBar() {
         )}
         {!active && (
           <button
-            className="btn btn-ghost"
+            className={`btn btn-ghost ${error ? 'text-amber-400' : cancelled ? 'text-neutral-400' : 'text-emerald-400'}`}
             title={t('Ocultar cola de embeddings terminada')}
             aria-label={t('Ocultar cola de embeddings terminada')}
             onClick={() => void window.nodus.clearEmbeddingProgress()}
           >
-            <Icon name="trash" size={16} />
+            <Icon name={error ? 'warning' : cancelled ? 'x' : 'check'} size={17} />
           </button>
         )}
       </div>

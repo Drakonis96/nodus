@@ -286,8 +286,10 @@ async function validateCandidates(
         isLlmValidationResult,
         model
       );
-    } catch {
-      continue;
+    } catch (error) {
+      // A missing validation batch is not equivalent to "no bridges". Keep the
+      // earlier checkpoints and fail closed so the queue can resume it.
+      throw error;
     }
 
     saveCheckpoint('bridges', contentHash, CHECKPOINT_KIND, bi, result);

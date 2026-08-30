@@ -13,6 +13,7 @@
 import { ipcMain, type BrowserWindow } from 'electron';
 import { localizeIpcPayload, localizeRuntimeError } from '@shared/uiLanguage';
 import { getSettings } from '../db/settingsRepo';
+import { withoutDatabaseContext } from '../db/database';
 import { assertNotBrowserIpcSender } from './trust';
 import { isAiModelRequiredError } from '@shared/aiModelRequired';
 
@@ -48,7 +49,7 @@ export interface IpcContext {
  * invoke, and so could show two different texts for one failure.
  */
 export function localizedForUi<T>(payload: T): T {
-  return localizeIpcPayload(payload, getSettings().uiLanguage);
+  return withoutDatabaseContext(() => localizeIpcPayload(payload, getSettings().uiLanguage));
 }
 
 /** Build the context handed to every `register*Ipc` function. */

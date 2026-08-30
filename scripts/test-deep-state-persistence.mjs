@@ -150,21 +150,28 @@ try {
   queue.resumePending();
   assert.equal(deepItemsFor('degraded').length, 0, 'a cancelled rescan is not resurrected');
 
-  // Stopping a running job detaches it while its scan keeps going. If the user queues the
-  // work again, the abandoned scan's own result must not clear the replacement's marker.
+  // Stopping a running job must keep it visible until its already-accepted provider
+  // operation settles. This prevents hidden work and also prevents a duplicate scan of
+  // the same paper from starting while the original is still alive.
   queue.enqueue('degraded', 'Degradada', 'deep');
-  const abandoned = queue.snapshot().items.find((item) => item.nodus_id === 'degraded' && item.kind === 'deep');
-  queue.items.find((item) => item.id === abandoned.id).state = 'running';
-  queue.removeItem(abandoned.id);
-  assert.equal(db.prepare("SELECT deep_queued FROM works WHERE nodus_id='degraded'").get().deep_queued, 0,
-    'stopping the only job drops the marker: deep_status stayed done, so nothing else records it');
-  queue.enqueue('degraded', 'Degradada', 'deep');
-  works.setDeepResult('degraded', 'done', 'deg-hash-3', 'pdf', null); // the abandoned scan lands
+  const stopping = queue.snapshot().items.find((item) => item.nodus_id === 'degraded' && item.kind === 'deep');
+  queue.items.find((item) => item.id === stopping.id).state = 'running';
+  queue.removeItem(stopping.id);
   assert.equal(db.prepare("SELECT deep_queued FROM works WHERE nodus_id='degraded'").get().deep_queued, 1,
-    'an abandoned scan writing its result cannot strand the replacement job already queued');
+    'the marker remains while the accepted operation remains visible');
+  queue.enqueue('degraded', 'Degradada', 'deep');
+  assert.equal(deepItemsFor('degraded').length, 1, 'a stopping operation blocks a duplicate for the same paper');
+  works.setDeepResult('degraded', 'done', 'deg-hash-3', 'pdf', null); // the accepted scan lands
+  assert.equal(db.prepare("SELECT deep_queued FROM works WHERE nodus_id='degraded'").get().deep_queued, 1,
+    'publishing the result cannot hide the still-settling operation');
+  queue.items = queue.items.filter((item) => item.id !== stopping.id); // process() removes it after settlement
+  queue.syncDeepQueued('degraded');
+  assert.equal(db.prepare("SELECT deep_queued FROM works WHERE nodus_id='degraded'").get().deep_queued, 0,
+    'the marker drops only after the accepted operation really settles');
+  queue.enqueue('degraded', 'Degradada', 'deep');
   queue.items.length = 0;
   queue.resumePending();
-  assert.equal(deepItemsFor('degraded').length, 1, 'the replacement rescan still survives a restart');
+  assert.equal(deepItemsFor('degraded').length, 1, 'a later replacement rescan still survives a restart');
   queue.stopAll();
 
   // A failed replacement keeps deep_status='done' so the old graph stays readable; the

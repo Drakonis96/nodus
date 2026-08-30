@@ -769,11 +769,32 @@ export function enqueueDocumentIndexJob(input: {
     return jobRow({ ...active, priority: Math.max(Number(active.priority), input.priority ?? 0) });
   }
   const resumable = getDb().prepare(
-    `SELECT job_id FROM document_index_jobs
-      WHERE vault_id=? AND nodus_id=? AND status='cancelled'
+    `SELECT job_id,campaign_id FROM document_index_jobs
+      WHERE vault_id=? AND nodus_id=? AND status IN ('cancelled','failed')
       ORDER BY updated_at DESC LIMIT 1`
-  ).get(input.vaultId, input.nodusId) as { job_id: string } | undefined;
+  ).get(input.vaultId, input.nodusId) as { job_id: string; campaign_id: string | null } | undefined;
   ensureDocumentProfileState(input.nodusId);
+  if (resumable && resumable.campaign_id && resumable.campaign_id === (input.campaignId ?? null)) {
+    const now = new Date().toISOString();
+    getDb().transaction(() => {
+      getDb().prepare(
+        `UPDATE document_index_jobs SET status='queued',phase='queued',error=NULL,attempts=0,
+           priority=?,reason=?,generator_model_json=?,auditor_model_json=?,updated_at=? WHERE job_id=?`
+      ).run(
+        input.priority ?? 0,
+        input.reason,
+        input.generatorModel ? JSON.stringify(input.generatorModel) : null,
+        input.auditorModel ? JSON.stringify(input.auditorModel) : null,
+        now,
+        resumable.job_id,
+      );
+      setDocumentProfileState(input.nodusId, 'queued');
+    })();
+    refreshCampaign(input.campaignId ?? null);
+    return jobRow(getDb().prepare(
+      `SELECT j.*,w.title FROM document_index_jobs j JOIN works w ON w.nodus_id=j.nodus_id WHERE j.job_id=?`
+    ).get(resumable.job_id) as Record<string, unknown>);
+  }
   const jobId = randomUUID();
   const now = new Date().toISOString();
   getDb().transaction(() => {

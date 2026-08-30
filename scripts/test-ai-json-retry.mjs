@@ -43,7 +43,15 @@ const server = createServer((req, res) => {
     const next = queue.shift() ?? '{}';
     const reply = typeof next === 'string' ? { content: next, finish_reason: 'stop' } : next;
     res.writeHead(200, { 'content-type': 'application/json' });
-    res.end(JSON.stringify({ choices: [{ message: { role: 'assistant', content: reply.content }, finish_reason: reply.finish_reason }] }));
+    const payload = JSON.stringify({ choices: [{ message: { role: 'assistant', content: reply.content }, finish_reason: reply.finish_reason }] });
+    if (reply.bodyDelayMs) {
+      // Reproduce the SDK edge case: headers arrive within its timeout, while the
+      // response body remains pending beyond the complete-operation deadline.
+      res.flushHeaders();
+      setTimeout(() => res.end(payload), reply.bodyDelayMs);
+    } else {
+      res.end(payload);
+    }
   });
 });
 await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
@@ -53,6 +61,7 @@ let closeDb = () => undefined;
 try {
   const settingsRepo = require(path.join(repoRoot, 'electron/db/settingsRepo.ts'));
   const aiClient = require(path.join(repoRoot, 'electron/ai/aiClient.ts'));
+  const geminiNative = require(path.join(repoRoot, 'electron/ai/geminiDeterministicCompletion.ts'));
   ({ closeDb } = require(path.join(repoRoot, 'electron/db/database.ts')));
 
   settingsRepo.updateSettings({ localProviders: { lmstudio: { baseUrl } } });
@@ -67,27 +76,28 @@ try {
   assert.deepEqual((await aiClient.completeJson(opts, guard, model)).ideas, ['a']);
   assert.equal(seen.length, 1, 'a valid first response costs a single provider call');
 
-  /** The repair prompt ships the bad text back under this key; a plain retry never does. */
+  /** A repair prompt would ship the bad text back under this key. It is forbidden here. */
   const isRepairCall = (hit) => JSON.stringify(hit.body).includes('invalid_json');
 
   // 2. Schema mismatch: the response parses cleanly but misses `ideas`. The repair prompt
   //    is explicitly forbidden from adding fields or inventing data, so it can only echo
-  //    the same object back and fail the guard again. Retrying the ORIGINAL prompt at a
-  //    lower temperature is the only thing that recovers, so the second call must be that
-  //    retry — never a repair round-trip that cannot succeed by construction.
+  //    the same object back and fail the guard again. Retrying the frozen ORIGINAL request
+  //    may recover from a stochastic sample, but changing temperature or any other input
+  //    would invalidate manual-versus-automatic quality comparisons.
   run(['{"wrong":true}', '{"ideas":["b"]}']);
   assert.deepEqual((await aiClient.completeJson(opts, guard, model)).ideas, ['b']);
   assert.equal(seen.length, 2, 'well-formed JSON that misses the schema costs attempt + retry only');
   assert.ok(!isRepairCall(seen[1]), 'no futile repair call for a schema mismatch');
-  assert.equal(seen[1].body.temperature, 0, 'the retry drops temperature to 0');
+  assert.deepEqual(seen[1].body, seen[0].body, 'the retry preserves every request field exactly');
 
   // 3. Genuinely unparseable output (two objects run together — jsonrepair bails on this
-  //    where it recovers truncation and fences locally). A repair pass CAN pick the right
-  //    object here, so it must still run.
+  //    where it recovers truncation and fences locally). A remote repair pass would use a
+  //    different prompt and could invent fields, so recovery is another exact request.
   run(['uno {"ideas":["a"]} dos {"ideas":["b"]}', '{"ideas":["c"]}']);
   assert.deepEqual((await aiClient.completeJson(opts, guard, model)).ideas, ['c']);
-  assert.equal(seen.length, 2, 'unparseable JSON still gets exactly one repair call');
-  assert.ok(isRepairCall(seen[1]), 'the second call is the repair prompt, not a blind retry');
+  assert.equal(seen.length, 2, 'unparseable JSON gets exactly one frozen retry');
+  assert.ok(!isRepairCall(seen[1]), 'the second call never substitutes a repair prompt');
+  assert.deepEqual(seen[1].body, seen[0].body, 'unparseable output also preserves request identity');
 
   // 4. Exhaustion: three schema-mismatched replies burn the three attempts and no more.
   run(['{"wrong":1}', '{"wrong":2}', '{"wrong":3}']);
@@ -112,6 +122,25 @@ try {
   });
   assert.equal(seen.length, 1, 'a truncated response fails fast instead of burning all three attempts');
 
+  // 5b. Mandatory reasoning can consume the whole output allowance before the first
+  // JSON token. This is still truncation and must carry the same bisection signal; the
+  // generic "empty response" branch used to swallow that signal and fail the paper.
+  run([{ content: '', finish_reason: 'length' }, '{"ideas":["never reached"]}']);
+  await assert.rejects(() => aiClient.completeJson(opts, guard, model), (e) => {
+    assert.equal(e.code, 'output_truncated');
+    assert.match(e.message, /se cortó/i);
+    return true;
+  });
+  assert.equal(seen.length, 1, 'empty-at-length also delegates recovery to chunk bisection');
+
+  // 5c. OpenRouter may encode an explicit upstream failure as HTTP 200 plus an empty
+  // choice with finish_reason=error. No answer exists to duplicate, so one invariant
+  // replay is safe (and lets throughput routing select a healthy backend).
+  run([{ content: '', finish_reason: 'error' }, '{"ideas":["recovered"]}']);
+  assert.deepEqual((await aiClient.completeJson(opts, guard, model)).ideas, ['recovered']);
+  assert.equal(seen.length, 2, 'an explicit empty backend failure is retried once');
+  assert.deepEqual(seen[1].body, seen[0].body, 'the provider-error retry preserves request identity');
+
   // 6. Prose is not JSON: a clipped sentence is still usable, so plain text must survive
   //    truncation untouched rather than inheriting the JSON guard.
   run([{ content: 'una frase cortada por la mitad', finish_reason: 'length' }]);
@@ -121,12 +150,15 @@ try {
   //    github-copilot) hand back a bare string with no finish_reason at all, and any
   //    provider can simply be wrong. jsonrepair closes the dangling braces, the shard
   //    passes the guard, and half a chunk's ideas disappear with no error anywhere — so
-  //    the shape of the text has to be read on its own: it ends inside an unclosed
-  //    object, therefore it was cut. A fresh sample may well complete, so this one does
-  //    retry, unlike case 5 where the provider itself said a repeat is pointless.
-  run([{ content: '{"ideas":[{"a":1},{"b":', finish_reason: 'stop' }, '{"ideas":["recovered"]}']);
-  assert.deepEqual((await aiClient.completeJson(opts, guard, model)).ideas, ['recovered'],
-    'a silently truncated response is refused, not repaired into a plausible shard');
+  //    the shape of the text has to be read on its own. The frozen request must not be
+  //    replayed blindly: chunk-aware callers bisect it, while callers without a safe
+  //    subdivision fail closed.
+  run([{ content: '{"ideas":[{"a":1},{"b":', finish_reason: 'stop' }, '{"ideas":["never reached"]}']);
+  await assert.rejects(() => aiClient.completeJson(opts, guard, model), (e) => {
+    assert.equal(e.code, 'output_truncated');
+    return true;
+  });
+  assert.equal(seen.length, 1, 'silent truncation is surfaced immediately for caller-controlled bisection');
 
   run([
     { content: '{"ideas":[{"a":1},{"b":', finish_reason: 'stop' },
@@ -138,6 +170,69 @@ try {
     assert.equal(e.code, 'output_truncated', 'and carries the code the deep scan splits on');
     return true;
   });
+  assert.equal(seen.length, 1, 'repeated silent truncation also fails after one request');
+
+  // 8. A caller that owns a semantic retry budget must disable completeJson's
+  // internal retry budget. The citation verifier used to turn three outer attempts
+  // into nine identical provider calls. It also treated every unknown label as
+  // "supports", which could silently certify a malformed verdict.
+  const deepResearch = require(path.join(repoRoot, 'electron/ai/deepResearch.ts'));
+  const verifyCitations = deepResearch.__verifyCitationsForTesting;
+  const claim = { sentence: 'A is supported by B.', kind: 'idea', content: 'B supports A.' };
+
+  run(['{"wrong":1}', '{"wrong":2}', '{"wrong":3}', '{"veredictos":[{"i":0,"veredicto":"sostiene"}]}']);
+  await assert.rejects(() => verifyCitations([claim], model), /No se pudo verificar/);
+  assert.equal(seen.length, 3, 'citation verification has one bounded budget of three calls, not 3 x 3');
+
+  run(['{"verdicts":[{"index":0,"verdict":"supported"}]}']);
+  assert.deepEqual(await verifyCitations([claim], model), ['supports']);
+  assert.equal(seen.length, 1, 'safe English field aliases are accepted without a retry');
+
+  run(['{"veredicts":[{"i":0,"veredicto":"parcial"}]}']);
+  assert.deepEqual(await verifyCitations([claim], model), ['partial']);
+  assert.equal(seen.length, 1, 'Gemini hybrid container spelling is accepted without weakening entry validation');
+
+  run(['{"verdictos":[{"i":0,"veredicto":"no_sostiene"}]}']);
+  assert.deepEqual(await verifyCitations([claim], model), ['unsupported']);
+  assert.equal(seen.length, 1, 'Gemini translated-middle container spelling is accepted without changing verdict semantics');
+
+  run([
+    '{"veredictos":[{"i":0,"veredicto":"quizas"}]}',
+    '{"veredictos":[{"i":0,"veredicto":"quizas"}]}',
+    '{"veredictos":[{"i":0,"veredicto":"quizas"}]}',
+  ]);
+  await assert.rejects(() => verifyCitations([claim], model), /No se pudo verificar/);
+  assert.equal(seen.length, 3, 'an unknown verdict fails closed after the same bounded budget');
+
+  // 9. The complete-operation deadline must remain armed after HTTP headers. OpenAI's
+  // SDK timeout stops at that boundary, which allowed a 180s request to occupy a Nodus
+  // slot for 267s when DeepSeek stalled while delivering the body.
+  run([{ content: '{"ideas":["late"]}', finish_reason: 'stop', bodyDelayMs: 200 }]);
+  const timeoutStarted = Date.now();
+  await assert.rejects(() => aiClient.completeJson({ ...opts, timeoutMs: 40 }, guard, model), (e) => {
+    assert.equal(e.code, 'timeout');
+    return true;
+  });
+  assert.ok(Date.now() - timeoutStarted < 180, 'body delivery is bounded by the caller deadline');
+  assert.equal(seen.length, 1, 'an ambiguous body timeout is not replayed blindly');
+
+  // 10. Deterministic Gemini extraction uses the native GenerationConfig contract:
+  // the stable seed, JSON MIME type and output budget are explicit, and Gemini 2.5's
+  // native thinking toggle matches the previous compatibility request.
+  const native = geminiNative.buildGeminiDeterministicRequest({
+    model: 'gemini-2.5-flash-lite', system: 's', user: 'u', temperature: 0.15,
+    maxTokens: 8000, seed: 123456, images: [],
+  });
+  assert.equal(native.config.seed, 123456);
+  assert.equal(native.config.responseMimeType, 'application/json');
+  assert.equal(native.config.maxOutputTokens, 8000);
+  assert.equal(native.config.temperature, 0.15);
+  assert.deepEqual(native.config.thinkingConfig, { thinkingBudget: 0 });
+  const gemini3 = geminiNative.buildGeminiDeterministicRequest({
+    model: 'gemini-3.5-flash-lite', system: 's', user: 'u', temperature: 0.15,
+    maxTokens: 8000, seed: 123456, images: [],
+  });
+  assert.equal(gemini3.config.temperature, undefined, 'Gemini 3 keeps provider sampling defaults');
 
   console.log('AI JSON retry budget verified.');
 } finally {

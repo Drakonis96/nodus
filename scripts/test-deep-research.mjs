@@ -462,6 +462,83 @@ try {
     assert.ok(preferred.target >= 4, 'the preference is honored without becoming an evidence cutoff');
   }
 
+  // ── 9b. A fragmented provider plan is compacted without losing mandates ───
+  {
+    const snapshot = makeSnapshot(12);
+    const coverageQuestions = ['¿Qué mecanismo explica el cambio?', '¿Qué límites conserva la evidencia?'];
+    const sections = Array.from({ length: 22 }, (_, index) => ({
+      id: `over-${index + 1}`,
+      title: index === 0 ? 'Introducción' : index === 21 ? 'Síntesis' : `Fragmento ${index}`,
+      purpose: `Desarrollar el mandato ${index + 1}`,
+      keyClaims: [`Afirmación ${index + 1}`],
+      ideaIds: [`g-${index % snapshot.ideas.length}`],
+      workIds: [],
+      gapIds: index === 15 ? ['gap-1'] : [],
+      contradictionIds: index === 16 ? ['edge-1'] : [],
+      passageIds: [],
+      coverageQuestions: index === 0 ? [coverageQuestions[0]] : index === 18 ? [coverageQuestions[1]] : [],
+      role: index === 0 ? 'intro' : index === 21 ? 'synthesis' : 'body',
+      dependsOn: index > 0 ? [`over-${index}`] : [],
+    }));
+    const normalized = normalizePlan(
+      { title: 'Plan sobredimensionado', abstract: '', sections },
+      snapshot,
+      4,
+      coverageQuestions,
+    );
+    assert.equal(normalized.sections.length, 4, 'the hard architectural bound is enforced');
+    assert.equal(normalized.sections[0].role, 'intro', 'the introduction survives compaction');
+    assert.equal(normalized.sections.at(-1).role, 'synthesis', 'the closing synthesis survives compaction');
+    assert.deepEqual(
+      [...new Set(normalized.sections.flatMap((section) => section.coverageQuestions))].sort(),
+      [...coverageQuestions].sort(),
+      'all explicit coverage questions retain exactly one primary home',
+    );
+    assert.deepEqual(
+      [...new Set(normalized.sections.flatMap((section) => section.ideaIds))].sort(),
+      snapshot.ideas.map((idea) => idea.id).sort(),
+      'all evidence assignments survive or are deterministically reassigned',
+    );
+    assert.ok(normalized.sections.some((section) => section.gapIds.includes('gap-1')), 'a gap assigned to a dropped fragment survives');
+    assert.ok(normalized.sections.some((section) => section.contradictionIds.includes('edge-1')), 'a contradiction assigned to a dropped fragment survives');
+    const retainedIds = new Set(normalized.sections.map((section) => section.id));
+    assert.ok(normalized.sections.every((section) => section.dependsOn.every((id) => id !== section.id && retainedIds.has(id))),
+      'dependencies are remapped to retained sections only');
+  }
+
+  // ── 9c. The orchestrator never pays for every heading a model invents ──────
+  {
+    const snapshot = makeSnapshot(6);
+    const deps = baseDeps(snapshot);
+    let writes = 0;
+    deps.planReport = async (input) => ({
+      title: 'Plan sobredimensionado',
+      abstract: '',
+      sections: Array.from({ length: 22 }, (_, index) => ({
+        id: `provider-${index + 1}`,
+        title: index === 0 ? 'Introducción' : index === 21 ? 'Síntesis' : `Fragmento ${index}`,
+        purpose: `Mandato ${index + 1}`,
+        keyClaims: [`Clave ${index + 1}`],
+        ideaIds: [input.ideas[index % input.ideas.length].id],
+        workIds: [],
+        gapIds: [],
+        contradictionIds: [],
+        passageIds: [],
+        role: index === 0 ? 'intro' : index === 21 ? 'synthesis' : 'body',
+        dependsOn: [],
+      })),
+    });
+    deps.writeSection = async (input) => {
+      writes += 1;
+      return fakeWriteSection(input);
+    };
+    const request = { objective: 'X', language: 'es', sectionLimit: 3 };
+    const expected = resolveSectionPlan(snapshot, request.sectionLimit, request.objective).target;
+    const report = await orchestrateDeepResearch(request, deps);
+    assert.equal(writes, expected, 'only the computed number of sections reaches generation');
+    assert.equal(report.meta.sections, expected, 'only bounded sections are published');
+  }
+
   // ── 10. A user section preference remains organizational end-to-end ─────────
   {
     const snapshot = makeSnapshot(60);

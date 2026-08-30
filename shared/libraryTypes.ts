@@ -422,6 +422,12 @@ export interface ZoteroImportSelection {
 
 export interface ZoteroImportProgress {
   requestId: string;
+  /** Stable task timing supplied by the main process, including restored sessions. */
+  startedAt?: string;
+  finishedAt?: string | null;
+  /** Current record within a multi-item phase and when that record started. */
+  currentItem?: string | null;
+  currentItemStartedAt?: string | null;
   phase: 'inventory' | 'connecting' | 'collections' | 'catalog' | 'notes' | 'attachments' | 'rebuild' | 'verification' | 'complete' | 'canceled' | 'failed';
   libraryId: string | null;
   libraryName: string | null;

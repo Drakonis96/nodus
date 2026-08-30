@@ -79,6 +79,13 @@ test('portable favorites are canonical across vaults and devices', () => {
     { provider: 'gemini', model: 'gemini-test' },
   ]);
   assert.equal(Object.hasOwn(canonical, 'providerKeys'), false, 'the portable profile cannot carry credentials');
+  assert.equal(canonical.workspace.aiConcurrencyMode, 'automatic', 'legacy profiles graduate to automatic');
+  assert.equal(canonical.workspace.aiConcurrencyVersion, 1);
+
+  const explicitManual = profileWithFavorites([]);
+  explicitManual.workspace.aiConcurrencyMode = 'manual';
+  explicitManual.workspace.aiConcurrencyVersion = 1;
+  assert.equal(sanitizeServerProfilePreferences(explicitManual).workspace.aiConcurrencyMode, 'manual', 'explicit manual survives profile sync');
 });
 
 test('a new Server profile does not invent a model selection', () => {

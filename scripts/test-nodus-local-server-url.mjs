@@ -19,7 +19,8 @@
 // alone would not catch that, so the vectors are exercised too.
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { chmod, mkdir, mkdtemp, open, rm, writeFile } from 'node:fs/promises';
+import { chmod, mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import crypto from 'node:crypto';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -44,16 +45,22 @@ const model = getNodusLocalModel(MODEL_ID);
 assert.ok(model, `the catalogue still ships ${MODEL_ID}`);
 assert.equal(model.runtime, 'llama_cpp', `${MODEL_ID} still runs through the managed server`);
 
+// Keep checksum verification real without manufacturing a 600 MB fixture. The
+// bundled manager sees an otherwise identical catalogue entry whose asset is small
+// and has a pinned digest known by this test.
+const verifiedAssets = model.assets.map((asset, index) => {
+  const content = Buffer.from(`verified-${MODEL_ID}-${index}`);
+  return { asset: { ...asset, bytes: content.length, sha256: crypto.createHash('sha256').update(content).digest('hex') }, content };
+});
+const verifiedModel = { ...model, assets: verifiedAssets.map((entry) => entry.asset) };
+
 // ── A downloaded model, without downloading 600 MB ───────────────────────────
-// modelStatus only stats each asset and compares its size, so sparse files of the
-// exact expected length are indistinguishable from the real download to it.
+// The manager validates both size and SHA-256 before starting the runtime.
 const modelDir = path.join(tmp, 'local-ai', 'models', MODEL_ID);
 await mkdir(modelDir, { recursive: true });
-for (const asset of model.assets) {
+for (const { asset, content } of verifiedAssets) {
   await mkdir(path.dirname(path.join(modelDir, asset.file)), { recursive: true });
-  const handle = await open(path.join(modelDir, asset.file), 'w');
-  await handle.truncate(asset.bytes);
-  await handle.close();
+  await writeFile(path.join(modelDir, asset.file), content);
 }
 
 // ── A stand-in for llama-server ──────────────────────────────────────────────
@@ -106,10 +113,17 @@ let manager;
 try {
   // ── Bundle the real manager, stubbing only Electron's app ──────────────────
   const electronStub = path.join(tmp, 'electron-stub.mjs');
+  const catalogueStub = path.join(tmp, 'local-models-stub.mjs');
   await writeFile(
     electronStub,
     `export const app = { getPath: () => ${JSON.stringify(tmp)}, once: () => {} };\nexport default { app };\n`
   );
+  await writeFile(catalogueStub, `
+    const model = ${JSON.stringify(verifiedModel)};
+    export const NODUS_LOCAL_MODELS = [model];
+    export const getNodusLocalModel = (id) => id === model.id ? model : undefined;
+    export const nodusLocalModelBytes = (entry) => entry.assets.reduce((sum, asset) => sum + asset.bytes, 0);
+  `);
   const outfile = path.join(tmp, 'nodusLocalAi.mjs');
   await build({
     entryPoints: [path.join(repoRoot, 'electron/ai/nodusLocalAi.ts')],
@@ -127,7 +141,10 @@ try {
     banner: { js: "import { createRequire as __createRequire } from 'node:module';\nconst require = __createRequire(import.meta.url);" },
     plugins: [{
       name: 'stub-electron',
-      setup(b) { b.onResolve({ filter: /^electron$/ }, () => ({ path: electronStub })); },
+      setup(b) {
+        b.onResolve({ filter: /^electron$/ }, () => ({ path: electronStub }));
+        b.onResolve({ filter: /^@shared\/localAiModels$/ }, () => ({ path: catalogueStub }));
+      },
     }],
   });
   manager = await import(pathToFileURL(outfile).href);

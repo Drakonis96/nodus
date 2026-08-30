@@ -244,6 +244,8 @@ function blankProfile(
       sidebarOrder: [],
       sidebarHidden: [],
       sidebarCustomized: false,
+      aiConcurrencyMode: "automatic",
+      aiConcurrencyVersion: 1,
       concurrency: 2,
       deepContextMode: "standard",
       standardChunkWords: 1800,
@@ -1145,6 +1147,46 @@ export function ServerSettingsView({
           ? "Un modelo general atiende las tareas de texto compatibles."
           : "Cada tarea usa su modelo seleccionado de forma independiente."}
       </p>
+      <Row
+        label="Llamadas simultáneas"
+        hint="Automático se adapta en los proveedores certificados; Manual conserva un límite fijo entre 1 y 8."
+      >
+        <div className="ss-actions">
+          <select
+            className="ss-select"
+            value={profile.workspace.aiConcurrencyMode}
+            onChange={(event) =>
+              changeProfile((next) => {
+                next.workspace.aiConcurrencyMode = event.target.value as "automatic" | "manual";
+                next.workspace.aiConcurrencyVersion = 1;
+              })
+            }
+            data-testid="ai-concurrency-mode"
+          >
+            <option value="automatic">Automático</option>
+            <option value="manual">Manual</option>
+          </select>
+          {profile.workspace.aiConcurrencyMode === "manual" && (
+            <input
+              className="ss-input"
+              type="number"
+              min={1}
+              max={8}
+              value={profile.workspace.concurrency}
+              onChange={(event) =>
+                changeProfile((next) => {
+                  next.workspace.concurrency = Math.max(
+                    1,
+                    Math.min(8, Number.parseInt(event.target.value, 10) || 1),
+                  );
+                  next.workspace.aiConcurrencyVersion = 1;
+                })
+              }
+              data-testid="ai-concurrency-manual-limit"
+            />
+          )}
+        </div>
+      </Row>
       <div className="ss-model-grid">
         {MODEL_TASKS.filter(
           ({ id }) =>

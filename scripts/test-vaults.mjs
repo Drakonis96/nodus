@@ -70,6 +70,13 @@ assert.equal(registry.getActiveVault().type, 'academic', 'pre-existing/legacy va
 assert.equal(database.dbPath(), path.join(userData, 'nodus.sqlite'));
 
 let db = database.getDb();
+db.prepare("INSERT INTO settings (key, value) VALUES ('app', ?) ON CONFLICT(key) DO UPDATE SET value=excluded.value")
+  .run(JSON.stringify({ aiConcurrencyMode: 'manual', aiConcurrencyVersion: 0, concurrency: 1 }));
+assert.equal(settingsRepo.getSettings().aiConcurrencyMode, 'automatic', 'an unchosen opt-in default graduates to automatic');
+assert.equal(settingsRepo.getSettings().aiConcurrencyVersion, 1, 'the production concurrency migration is current');
+settingsRepo.updateSettings({ aiConcurrencyMode: 'manual', aiConcurrencyVersion: 1, concurrency: 1 });
+assert.equal(settingsRepo.getSettings().aiConcurrencyMode, 'manual', 'an explicit manual choice is never overwritten');
+settingsRepo.updateSettings({ aiConcurrencyMode: 'automatic', aiConcurrencyVersion: 1 });
 seedAnalyzedWork(db);
 db.prepare('INSERT INTO settings (key, value) VALUES (?, ?)').run('vault-import-test', 'source-only-setting');
 secrets.setApiKey('openai', 'sk-default');
@@ -94,6 +101,23 @@ assert.equal(
   undefined,
   'a background write never leaks into the newly active vault'
 );
+let resolveLateUiRead;
+let rejectLateUiRead;
+const lateUiRead = new Promise((resolve, reject) => {
+  resolveLateUiRead = resolve;
+  rejectLateUiRead = reject;
+});
+await database.withVaultDatabase('default', () => {
+  setTimeout(() => {
+    try {
+      resolveLateUiRead(database.withoutDatabaseContext(() => settingsRepo.getSettings().uiLanguage));
+    } catch (error) {
+      rejectLateUiRead(error);
+    }
+  }, 10);
+});
+assert.equal(typeof await lateUiRead, 'string',
+  'a delayed UI event escapes the closed background connection and reads the active vault safely');
 database.closeDb();
 registry.setActiveVault('default');
 db = database.getDb();

@@ -16,15 +16,21 @@ const server = createServer((req, res) => {
   req.on('end', () => {
     const body = JSON.parse(raw || '{}');
     const anthropic = req.url?.endsWith('/v1/messages');
+    const responses = req.url?.endsWith('/v1/responses');
     if (!body.stream) {
       res.writeHead(200, { 'content-type': 'application/json' });
-      res.end(JSON.stringify(anthropic
+      res.end(JSON.stringify(responses
+        ? { status: 'incomplete', output_text: '{"ideas":[', incomplete_details: { reason: 'max_output_tokens' } }
+        : anthropic
         ? { content: [{ type: 'text', text: '{"ideas":[' }], stop_reason: 'max_tokens' }
         : { choices: [{ message: { content: '{"ideas":[' }, finish_reason: 'length' }] }));
       return;
     }
     res.writeHead(200, { 'content-type': 'text/event-stream' });
-    if (anthropic) {
+    if (responses) {
+      res.write('event: response.output_text.delta\ndata: {"type":"response.output_text.delta","delta":"{\\"ideas\\":["}\n\n');
+      res.write('event: response.incomplete\ndata: {"type":"response.incomplete","response":{"status":"incomplete","incomplete_details":{"reason":"max_output_tokens"}}}\n\n');
+    } else if (anthropic) {
       res.write('data: {"type":"content_block_delta","delta":{"type":"text_delta","text":"{\\"ideas\\":["}}\n\n');
       res.write('data: {"type":"message_delta","delta":{"stop_reason":"max_tokens"},"usage":{"output_tokens":2}}\n\n');
     } else {
@@ -44,6 +50,8 @@ try {
     { model: 'gpt-test', streaming: true },
     { model: 'qwen-test', streaming: false },
     { model: 'qwen-test', streaming: true },
+    { model: 'muse-spark-test', streaming: false },
+    { model: 'muse-spark-test', streaming: true },
   ]) {
     await assert.rejects(
       () => completeWithOpenCodeGo({ ...base, model: spec.model, ...(spec.streaming ? { onDelta: () => undefined } : {}) }),

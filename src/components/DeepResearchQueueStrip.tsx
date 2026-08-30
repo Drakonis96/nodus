@@ -7,6 +7,8 @@ import type { DeepResearchProgress } from '@shared/types';
 import { deepResearchProgressPercent } from '@shared/deepResearchProgress';
 import { Icon } from './ui';
 import { t, tx } from '../i18n';
+import { elapsedTimeLabel } from '@shared/elapsedTime';
+import { useElapsedClock } from '../useElapsedClock';
 
 /** One row of the strip, whichever lane it came from. */
 export interface QueueStripItem {
@@ -103,11 +105,18 @@ export function DeepResearchQueueStrip({
   onRemove: (item: QueueStripItem) => void;
   onClearFinished: () => void;
 }) {
+  const now = useElapsedClock(active.length > 0);
+  const queueStartedAt = active.reduce<string | null>(
+    (earliest, item) => !earliest || item.enqueuedAt < earliest ? item.enqueuedAt : earliest,
+    null,
+  );
+  const totalElapsed = elapsedTimeLabel(queueStartedAt, null, now);
   return (
     <div className="border-b border-neutral-800 bg-indigo-950/15 px-4 py-2.5">
       <div className="mb-1.5 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-indigo-300">
         <Icon name={running ? 'sync' : 'layers'} size={12} className={running ? 'animate-spin' : ''} />
         {tx('Cola de generación · {n} en curso', { n: active.length })}
+        {totalElapsed && <span className="font-medium normal-case tabular-nums text-neutral-500">· {t('Total')} {totalElapsed}</span>}
         {failed.length > 0 && (
           <button className="ml-auto text-[11px] font-medium text-neutral-500 hover:text-neutral-300" onClick={onClearFinished}>
             {t('Limpiar fallidos')}
@@ -130,6 +139,9 @@ export function DeepResearchQueueStrip({
                 </span>
                 <span className="min-w-0 flex-1 truncate text-neutral-300" title={item.title}>{item.title}</span>
                 {item.origin === 'mcp' && <OriginBadge />}
+                <span className="shrink-0 text-[11px] tabular-nums text-neutral-500">
+                  {elapsedTimeLabel(item.enqueuedAt, null, now)}
+                </span>
                 {item.status === 'running' ? (
                   <>
                     <span className="shrink-0 text-[11px] text-indigo-300">{item.detail ?? progressDetail(item.progress) ?? t('Generando…')}</span>

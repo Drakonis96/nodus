@@ -5,6 +5,8 @@ import { ConfirmModal } from './ConfirmModal';
 import { Icon } from './ui';
 import { t, tx } from '../i18n';
 import { compareDocumentIndexJobsForDisplay, documentIndexPercentLabel } from '@shared/documentIndexProgress';
+import { elapsedTimeLabel } from '@shared/elapsedTime';
+import { useElapsedClock } from '../useElapsedClock';
 
 const LIVE = new Set<DocumentIndexCampaign['status']>(['queued', 'running', 'paused']);
 const TERMINAL = new Set<DocumentIndexJob['status']>(['completed', 'failed', 'unavailable', 'cancelled']);
@@ -47,6 +49,7 @@ export function DocumentIndexProgressBar() {
       .sort(compareDocumentIndexJobsForDisplay),
     [progress, campaignIds],
   );
+  const now = useElapsedClock(liveCampaigns.length > 0);
 
   if (!progress || liveCampaigns.length === 0) return null;
 
@@ -64,6 +67,12 @@ export function DocumentIndexProgressBar() {
     ?? null;
   const allPaused = liveCampaigns.every((campaign) => campaign.status === 'paused');
   const error = jobs.find((job) => job.error && ['paused', 'failed', 'unavailable'].includes(job.status))?.error ?? null;
+  const campaignStartedAt = liveCampaigns.reduce<string | null>(
+    (earliest, campaign) => !earliest || campaign.createdAt < earliest ? campaign.createdAt : earliest,
+    null,
+  );
+  const totalElapsed = elapsedTimeLabel(campaignStartedAt, null, now);
+  const itemElapsed = elapsedTimeLabel(current?.createdAt, null, now);
 
   const applyStatus = async (status: 'running' | 'paused' | 'cancelled') => {
     setBusy(true);
@@ -98,10 +107,10 @@ export function DocumentIndexProgressBar() {
           <div className="mb-1 flex justify-between gap-3 text-xs text-neutral-500 dark:text-neutral-400">
             <span className="min-w-0 truncate">
               {allPaused ? t('Análisis documental en pausa') : current ? (
-                <>{tx('{done} de {total} obras', { done: completed + failed, total })} — <span className="text-neutral-800 dark:text-neutral-200">{current.title ?? current.nodusId}</span> · <span className="text-cyan-800 dark:text-cyan-300">{jobPhaseDetail(current)} ({Math.round(current.progress * 100)}%)</span></>
+                <>{tx('{done} de {total} obras', { done: completed + failed, total })} — <span className="text-neutral-800 dark:text-neutral-200">{current.title ?? current.nodusId}</span> · <span className="text-cyan-800 dark:text-cyan-300">{jobPhaseDetail(current)} ({Math.round(current.progress * 100)}%)</span>{itemElapsed && <span className="ml-1 tabular-nums text-neutral-500">· {t('Obra')} {itemElapsed}</span>}</>
               ) : tx('{done} de {total} obras', { done: completed + failed, total })}
             </span>
-            <span className="shrink-0 tabular-nums" data-testid="document-index-progress-percent">{pct}</span>
+            <span className="shrink-0 tabular-nums" data-testid="document-index-progress-percent">{totalElapsed && <span className="mr-3">{t('Total')} {totalElapsed}</span>}{pct}</span>
           </div>
           <div
             className="h-1.5 overflow-hidden rounded-full bg-neutral-300 dark:bg-neutral-800"
@@ -141,6 +150,7 @@ export function DocumentIndexProgressBar() {
                   </span>
                   <span className="min-w-0 flex-1 truncate">{job.title ?? job.nodusId}</span>
                   <span className={job.status === 'running' ? 'text-cyan-300' : 'text-neutral-500'}>{jobPhaseDetail(job)}</span>
+                  <span className="min-w-[5.5rem] text-right tabular-nums text-neutral-500">{elapsedTimeLabel(job.createdAt, null, now)}</span>
                   <span className="w-10 text-right tabular-nums text-neutral-500">{Math.round(job.progress * 100)}%</span>
                 </div>
               ))}

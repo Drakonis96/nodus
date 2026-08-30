@@ -9,7 +9,7 @@ import type { VisionImagePart } from '@shared/imageAnalysis';
  */
 export const OUTPUT_TRUNCATED_MARKER = 'NODUS_OUTPUT_TRUNCATED';
 
-export type OpenCodeGoProtocol = 'openai' | 'anthropic';
+export type OpenCodeGoProtocol = 'openai' | 'anthropic' | 'responses';
 
 export interface OpenCodeGoNormalizedUsage {
   uncachedInputTokens: number;
@@ -42,12 +42,15 @@ export interface OpenCodeGoCompletionResult {
 }
 
 const ANTHROPIC_MODEL_PREFIXES = ['minimax-', 'qwen'];
+const RESPONSES_MODEL_PREFIXES = ['grok-4.6', 'gpt-5.6-', 'muse-spark-'];
 
 /** The official Go catalogue documents MiniMax/Qwen on Messages and the rest on
  * Chat Completions. Unknown future models use the OpenAI-compatible route unless
  * their family is explicitly one of the Messages families. */
 export function openCodeGoProtocol(model: string): OpenCodeGoProtocol {
-  return ANTHROPIC_MODEL_PREFIXES.some((prefix) => model.toLowerCase().startsWith(prefix))
+  const normalized = model.toLowerCase();
+  if (RESPONSES_MODEL_PREFIXES.some((prefix) => normalized.startsWith(prefix))) return 'responses';
+  return ANTHROPIC_MODEL_PREFIXES.some((prefix) => normalized.startsWith(prefix))
     ? 'anthropic'
     : 'openai';
 }
@@ -199,6 +202,89 @@ function anthropicUsage(usage: any): OpenCodeGoNormalizedUsage | null {
   };
 }
 
+function responseText(body: any): string {
+  if (typeof body?.output_text === 'string') return body.output_text;
+  return (body?.output ?? [])
+    .flatMap((item: any) => item?.content ?? [])
+    .filter((content: any) => content?.type === 'output_text' || content?.type === 'text')
+    .map((content: any) => content?.text ?? '')
+    .join('');
+}
+
+function responsesInstructions(options: OpenCodeGoCompletionOptions): string {
+  return options.jsonMode
+    ? `${options.system}\n\nReturn only a single valid JSON value. No prose, no explanation, no Markdown code fences.`
+    : options.system;
+}
+
+function responsesTruncated(body: any): boolean {
+  const reason = String(body?.incomplete_details?.reason ?? body?.response?.incomplete_details?.reason ?? '').toLowerCase();
+  return body?.status === 'incomplete' || body?.response?.status === 'incomplete'
+    ? reason.includes('max_output') || reason.includes('max_token') || !reason
+    : false;
+}
+
+/** OpenCode documents Muse Spark (plus its GPT/Grok catalogue entries) on the
+ * OpenAI Responses surface, not Chat Completions. Keep this transport distinct:
+ * silently sending those models to /chat/completions produces misleading 404/400
+ * failures and prevents a fair provider benchmark. */
+async function completeResponses(options: OpenCodeGoCompletionOptions, url: string, signal: AbortSignal): Promise<OpenCodeGoCompletionResult> {
+  const streaming = Boolean(options.onDelta);
+  const response = await postWithOptionalExtras(
+    `${url}/v1/responses`,
+    { Authorization: `Bearer ${options.apiKey}`, 'Content-Type': 'application/json' },
+    signal,
+    {
+      model: options.model,
+      instructions: responsesInstructions(options),
+      input: options.user,
+      max_output_tokens: options.maxTokens ?? 8_000,
+      stream: streaming,
+    },
+    {
+      ...(options.temperature == null ? {} : { temperature: options.temperature }),
+      ...(!options.reasoning || options.reasoning === 'off'
+        ? {}
+        : { reasoning: { effort: options.reasoning } }),
+    },
+  );
+  if (!response.ok) return readError(response);
+
+  if (!streaming) {
+    const body = await response.json() as any;
+    if (body?.error || body?.status === 'failed') throw apiError(response.status, body);
+    if (options.jsonMode && responsesTruncated(body)) {
+      throw new Error(`${OUTPUT_TRUNCATED_MARKER}: OpenCode Go cortó la respuesta al alcanzar el límite de salida y el JSON quedó incompleto.`);
+    }
+    return { text: assertText(responseText(body)), usage: openAiUsage(body?.usage) };
+  }
+
+  let text = '';
+  let usage: OpenCodeGoNormalizedUsage | null = null;
+  let incomplete = false;
+  for await (const event of sseEvents(response)) {
+    let chunk: any;
+    try { chunk = JSON.parse(event.data); } catch { continue; }
+    const kind = String(chunk?.type ?? event.event ?? '');
+    if (kind === 'error' || kind === 'response.failed' || chunk?.error) {
+      throw apiError(streamErrorStatus(chunk), chunk);
+    }
+    if (kind === 'response.output_text.delta' && typeof chunk?.delta === 'string') {
+      text += chunk.delta;
+      options.onDelta?.(chunk.delta);
+    } else if ((kind === 'response.reasoning_text.delta' || kind === 'response.reasoning_summary_text.delta')
+      && typeof chunk?.delta === 'string') {
+      options.onReasoningDelta?.(chunk.delta);
+    }
+    if (kind === 'response.incomplete' || responsesTruncated(chunk)) incomplete = true;
+    usage = openAiUsage(chunk?.response?.usage ?? chunk?.usage) ?? usage;
+  }
+  if (options.jsonMode && incomplete) {
+    throw new Error(`${OUTPUT_TRUNCATED_MARKER}: OpenCode Go cortó la respuesta al alcanzar el límite de salida y el JSON quedó incompleto.`);
+  }
+  return { text: assertText(text), usage };
+}
+
 async function completeOpenAi(options: OpenCodeGoCompletionOptions, url: string, signal: AbortSignal): Promise<OpenCodeGoCompletionResult> {
   const streaming = Boolean(options.onDelta);
   const response = await postWithOptionalExtras(
@@ -259,6 +345,7 @@ async function completeOpenAi(options: OpenCodeGoCompletionOptions, url: string,
 
 async function completeAnthropic(options: OpenCodeGoCompletionOptions, url: string, signal: AbortSignal): Promise<OpenCodeGoCompletionResult> {
   const streaming = Boolean(options.onDelta);
+  const isQwen = options.model.toLowerCase().startsWith('qwen');
   const response = await fetch(`${url}/v1/messages`, {
     method: 'POST',
     headers: {
@@ -279,6 +366,13 @@ async function completeAnthropic(options: OpenCodeGoCompletionOptions, url: stri
       temperature: options.temperature ?? 0.15,
       max_tokens: options.maxTokens ?? 8_000,
       stream: streaming,
+      // Qwen's hybrid-thinking mode is enabled by default on OpenCode Go. If the
+      // caller selected "off", make that intent explicit on the Messages surface:
+      // otherwise hidden thinking consumes the shared max_tokens budget and can
+      // truncate an otherwise valid structured response. OpenCode accepts the
+      // Anthropic-compatible disabled form for Qwen; do not send it to unrelated
+      // Messages models whose gateways may reject the extension.
+      ...(isQwen && options.reasoning === 'off' ? { thinking: { type: 'disabled' } } : {}),
       messages: [{ role: 'user', content: options.user }],
     }),
   });
@@ -330,9 +424,10 @@ export async function completeWithOpenCodeGo(options: OpenCodeGoCompletionOption
   const linked = linkedSignal(options.signal, options.timeoutMs ?? 180_000);
   const baseUrl = (options.baseUrl ?? 'https://opencode.ai/zen/go').replace(/\/+$/, '');
   try {
-    return openCodeGoProtocol(options.model) === 'anthropic'
-      ? await completeAnthropic(options, baseUrl, linked.signal)
-      : await completeOpenAi(options, baseUrl, linked.signal);
+    const protocol = openCodeGoProtocol(options.model);
+    if (protocol === 'anthropic') return await completeAnthropic(options, baseUrl, linked.signal);
+    if (protocol === 'responses') return await completeResponses(options, baseUrl, linked.signal);
+    return await completeOpenAi(options, baseUrl, linked.signal);
   } catch (error) {
     if (linked.signal.aborted && !options.signal?.aborted) {
       throw new Error('OpenCode Go no completó la petición dentro del tiempo esperado.');

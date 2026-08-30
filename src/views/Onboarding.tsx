@@ -162,7 +162,7 @@ export function Onboarding({
     setDownloadNotice(null);
     try {
       await window.nodus.cancelNodusLocalDownloads();
-      setDownloadNotice(t('Descarga detenida. Los archivos temporales se han eliminado.'));
+      setDownloadNotice(t('Descarga detenida. El progreso verificado se conserva para reanudar.'));
     } catch (error) {
       setModelError(error instanceof Error ? error.message : String(error));
     } finally {
@@ -211,7 +211,7 @@ export function Onboarding({
       if (downloadCancellationRequested.current) {
         setDownloadLabel('');
         setDownloadProgress(0);
-        setDownloadNotice(t('Descarga detenida. Los archivos temporales se han eliminado.'));
+        setDownloadNotice(t('Descarga detenida. El progreso verificado se conserva para reanudar.'));
       } else {
         setStep(doneStep);
         setFinishError(e instanceof Error ? e.message : String(e));
