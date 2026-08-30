@@ -1956,12 +1956,21 @@
 
     loadPromptCatalogue(true);
     checkHealth();
-    var requestedMode = window.location.hash.indexOf('references') >= 0 ? 'references' : 'ideas';
+    var requestedMode = window.location.hash.indexOf('references') >= 0
+      ? 'references'
+      : window.location.hash === '#prompts'
+        ? 'prompts'
+        : window.location.hash === '#synonyms'
+          ? 'synonyms'
+          : window.location.hash === '#chat'
+            ? 'chat'
+            : 'ideas';
     if (requestedMode === 'references') {
       setSearchMode('references');
       var referenceAction = window.location.hash.replace(/^#references-?/, '') || 'citation';
       referenceController.performAction(referenceAction);
     }
+    else if (requestedMode !== 'ideas') setSearchMode(requestedMode);
     else analyze(true);
   }
 
