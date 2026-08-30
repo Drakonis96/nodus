@@ -19,7 +19,6 @@ import { getApiKey } from '../secrets/secretStore';
 import { buildIdeaGraph, getContradictions } from '../graph/graphService';
 import { getImmersionSession, recordImmersionAnswer, saveImmersionSession } from '../db/immersionRepo';
 import { buildWritingWorkshopSnapshot } from './writingWorkshop';
-import { prepareRelevantDocumentProfiles } from './documentPreparation';
 import { completeJson, embed } from './aiClient';
 import {
   IMMERSION_LIMITS,
@@ -439,22 +438,14 @@ export async function generateImmersionSession(
     try { onProgress?.(progress); } catch { /* progress cannot abort generation */ }
   };
   emit({ phase: 'discovery', message: 'Cartografiando ideas, obras y pasajes relevantes…' });
-  const preliminary = await buildImmersionMaterial(request.topic);
-  const candidates = preliminary.works.map((work) => work.nodusId);
+  const material = await buildImmersionMaterial(request.topic);
   emit({
     phase: 'document_preparation',
-    message: `Preparando la comprensión integral de hasta ${Math.min(32, candidates.length)} obras para la ruta…`,
+    message: 'Usando las fichas documentales ya disponibles junto con ideas y evidencia literal…',
   });
-  const prepared = await prepareRelevantDocumentProfiles(candidates, 'immersion', 32);
-  emit({
-    phase: 'document_preparation',
-    message: prepared.requested
-      ? `${prepared.prepared} fichas documentales auditadas listas para estructurar la inmersión; ${prepared.unavailable + prepared.failed} obras continúan mediante ideas y pasajes.`
-      : 'El material ya estaba preparado; continuando con ideas y evidencia literal.',
-  });
-  // Rebuild once: new profiles can change which works and sections route the topic.
-  const refreshed = prepared.requested ? await buildImmersionMaterial(request.topic) : preliminary;
-  const plan = await orchestrateImmersion({ ...request, model }, realDeps(model, refreshed), onProgress);
+  // Immersion may consume profiles already prepared by Deep Research or a manual
+  // reader action, but it never creates new Documentary Index work itself.
+  const plan = await orchestrateImmersion({ ...request, model }, realDeps(model, material), onProgress);
   return saveImmersionSession(plan, model);
 }
 

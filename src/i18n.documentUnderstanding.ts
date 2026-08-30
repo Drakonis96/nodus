@@ -62,6 +62,7 @@ const KEYS = [
   'Análisis documental en pausa',
   '{done} de {total} obras',
   'Se detendrá el análisis documental pendiente. Las fichas ya publicadas, las correcciones del usuario y las obras completadas se conservarán.',
+  'Es opcional y no afecta al estado general de la obra. Deep Research lo prepara cuando lo necesita; también puedes iniciarlo manualmente.',
 ] as const;
 
 function table(values: readonly string[]): Record<string, string> {
@@ -91,6 +92,7 @@ const en = table([
   'Analyzes every section and synthesizes the global architecture of each work.', 'Document-profile auditor',
   'Checks support, coverage and fidelity before publishing a new version.', 'With issues', 'Document analysis paused', '{done} of {total} works',
   'Pending document analysis will stop. Published profiles, user corrections, and completed works will be preserved.',
+  'It is optional and does not affect the work’s overall status. Deep Research prepares it when needed; you can also start it manually.',
 ]);
 
 const fr = table([
@@ -115,6 +117,7 @@ const fr = table([
   'Analyse toutes les sections et synthétise l’architecture globale de chaque œuvre.', 'Auditeur des fiches documentaires',
   'Vérifie les preuves, la couverture et la fidélité avant de publier une nouvelle version.', 'Avec incidents', 'Analyse documentaire en pause', '{done} œuvres sur {total}',
   'L’analyse documentaire en attente sera arrêtée. Les fiches publiées, les corrections de l’utilisateur et les œuvres terminées seront conservées.',
+  'Il est facultatif et n’affecte pas l’état général de l’œuvre. Deep Research le prépare si nécessaire ; vous pouvez aussi le lancer manuellement.',
 ]);
 
 const de = table([
@@ -139,6 +142,7 @@ const de = table([
   'Analysiert alle Abschnitte und synthetisiert die Gesamtarchitektur jedes Werks.', 'Prüfer für Dokumentprofile',
   'Prüft Belege, Abdeckung und Treue vor der Veröffentlichung einer neuen Version.', 'Mit Problemen', 'Dokumentanalyse pausiert', '{done} von {total} Werken',
   'Die ausstehende Dokumentanalyse wird beendet. Veröffentlichte Profile, Benutzerkorrekturen und abgeschlossene Werke bleiben erhalten.',
+  'Er ist optional und hat keinen Einfluss auf den Gesamtstatus des Werks. Deep Research bereitet ihn bei Bedarf vor; du kannst ihn auch manuell starten.',
 ]);
 
 const pt = table([
@@ -163,6 +167,7 @@ const pt = table([
   'Analisa todas as secções e sintetiza a arquitetura global de cada obra.', 'Auditor de fichas documentais',
   'Verifica o suporte, a cobertura e a fidelidade antes de publicar uma nova versão.', 'Com problemas', 'Análise documental em pausa', '{done} de {total} obras',
   'A análise documental pendente será interrompida. As fichas publicadas, as correções do utilizador e as obras concluídas serão preservadas.',
+  'É opcional e não afeta o estado geral da obra. O Deep Research prepara-o quando necessário; também pode iniciá-lo manualmente.',
 ]);
 
 const ptBR = table([
@@ -187,6 +192,7 @@ const ptBR = table([
   'Analisa todas as seções e sintetiza a arquitetura global de cada obra.', 'Auditor de fichas documentais',
   'Verifica o suporte, a cobertura e a fidelidade antes de publicar uma nova versão.', 'Com problemas', 'Análise documental pausada', '{done} de {total} obras',
   'A análise documental pendente será interrompida. As fichas publicadas, as correções do usuário e as obras concluídas serão preservadas.',
+  'É opcional e não afeta o status geral da obra. O Deep Research o prepara quando necessário; você também pode iniciá-lo manualmente.',
 ]);
 
 const it = table([
@@ -211,6 +217,7 @@ const it = table([
   'Analizza tutte le sezioni e sintetizza l’architettura globale di ogni opera.', 'Revisore delle schede documentali',
   'Verifica prove, copertura e fedeltà prima di pubblicare una nuova versione.', 'Con problemi', 'Analisi documentale in pausa', '{done} opere su {total}',
   'L’analisi documentale in sospeso verrà interrotta. Le schede pubblicate, le correzioni dell’utente e le opere completate saranno conservate.',
+  'È facoltativo e non influisce sullo stato generale dell’opera. Deep Research lo prepara quando serve; puoi anche avviarlo manualmente.',
 ]);
 
 const tr = table([
@@ -235,6 +242,7 @@ const tr = table([
   'Tüm bölümleri analiz eder ve her eserin genel mimarisini sentezler.', 'Belge profili denetçisi',
   'Yeni bir sürüm yayımlamadan önce dayanak, kapsam ve sadakati denetler.', 'Sorunlu', 'Belge analizi duraklatıldı', '{total} eserden {done} tanesi',
   'Bekleyen belge analizi durdurulacak. Yayımlanmış profiller, kullanıcı düzeltmeleri ve tamamlanan eserler korunacaktır.',
+  'İsteğe bağlıdır ve eserin genel durumunu etkilemez. Deep Research gerektiğinde hazırlar; siz de elle başlatabilirsiniz.',
 ]);
 
 export const DOCUMENT_UNDERSTANDING_TRANSLATIONS = { en, fr, de, pt, 'pt-BR': ptBR, it, tr } as const;

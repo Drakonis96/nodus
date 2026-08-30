@@ -58,6 +58,7 @@ reports/
 # Local artifact previews (published website manuals live in site/manuals/)
 output/
 pages-artifact/
+artifacts/
 
 # Locally generated legal texts (rebuilt from node_modules on every build).
 legal/generated/*

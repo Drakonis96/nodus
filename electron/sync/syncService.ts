@@ -22,6 +22,7 @@ import { getDb } from '../db/database';
 import { probeWorkTextAvailability } from '../extraction/textExtractor';
 import { getActiveVault } from '../vaults/vaultRegistry';
 import { documentIndexQueue } from '../pipeline/documentIndexQueue';
+import { DOCUMENT_INDEX_CONTINUOUS_AVAILABLE } from '@shared/documentIndexPolicy';
 
 
 /** Structured creators kept for building canonical author identity. Only authors
@@ -240,7 +241,7 @@ export async function fullSync(mode: 'manual' | 'realtime'): Promise<SyncLogEntr
 
   // Continuous document understanding is opt-in. When enabled, reconcile now so
   // newly synced or changed works do not have to wait for the periodic safety poll.
-  if (settings.documentIndexingEnabled && (added > 0 || changed > 0)) {
+  if (DOCUMENT_INDEX_CONTINUOUS_AVAILABLE && settings.documentIndexingEnabled && (added > 0 || changed > 0)) {
     await documentIndexQueue.refreshVault(getActiveVault().id).catch((error) => {
       console.error('[document-index] post-sync refresh failed', error);
     });

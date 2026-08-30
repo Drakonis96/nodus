@@ -78,15 +78,14 @@ test('persistent scheduler processes two vaults without using an active-vault si
   assert.equal(snapshot.campaigns.filter(c=>c.status==='completed').length,2);
 });
 
-test('continuous mode discovers newly imported works immediately and remains vault-scoped',async()=>{
+test('continuous mode stays disabled until the beta policy is reopened',async()=>{
   globalThis.__documentQueue.continuousEnabled=true;
   await documentIndexQueue.configureContinuous('v1',true);
   globalThis.__documentQueue.works.get('v1').push({nodus_id:'v1-new',title:'Obra recién importada'});
   await documentIndexQueue.refreshVault('v1');
-  const deadline=Date.now()+2000;
-  do{await new Promise(r=>setTimeout(r,20));}while(globalThis.__documentQueue.data.get('v1').profiles.get('v1-new')!=='current'&&Date.now()<deadline);
-  assert.equal(globalThis.__documentQueue.data.get('v1').profiles.get('v1-new'),'current');
-  assert.ok(globalThis.__documentQueue.runs.some(run=>run.vault==='v1'&&run.work==='v1-new'));
+  await new Promise(r=>setTimeout(r,60));
+  assert.equal(globalThis.__documentQueue.data.get('v1').profiles.get('v1-new'),undefined);
+  assert.ok(!globalThis.__documentQueue.runs.some(run=>run.vault==='v1'&&run.work==='v1-new'));
   assert.ok(!globalThis.__documentQueue.runs.some(run=>run.vault==='v2'&&run.work==='v1-new'));
 });
 

@@ -19,7 +19,7 @@ export interface DocumentPreparationResult {
  */
 export async function prepareRelevantDocumentProfiles(
   orderedNodusIds: string[],
-  reason: 'deep-research' | 'immersion',
+  reason: 'deep-research',
   limit = 32,
   signal?: AbortSignal,
 ): Promise<DocumentPreparationResult> {

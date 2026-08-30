@@ -41,7 +41,9 @@ const work = (over = {}) => ({
 const embedded = (over = {}) => ({ nodus_id: 'w1', totalIdeas: 10, embeddedIdeas: 10, complete: true, ...over });
 const indexed = (over = {}) => ({ nodus_id: 'w1', totalPassages: 40, status: 'complete', outdatedReason: null, ...over });
 
-test('a fully processed work is ready, and the summary does not gate it', () => {
+test('a fully processed work is ready without a documentary index, and the summary does not gate it', () => {
+  // deriveWorkStatus deliberately has no document-profile input: an absent beta
+  // index cannot turn a completed work amber.
   assert.equal(deriveWorkStatus(work(), embedded(), indexed()).readiness, 'ready');
   // Summary is an orientation aid, not citable evidence: missing it stays green.
   const noSummary = deriveWorkStatus(work({ summary_status: 'none' }), embedded(), indexed());
@@ -213,16 +215,43 @@ test('the status modal repairs missing steps without wasting work', async () => 
   // Blocked and not-applicable steps are terminal: offering a retry there spends
   // tokens on something that cannot succeed.
   assert.match(source, /const RETRYABLE: StepState\[\] = \['partial', 'missing', 'failed'\]/);
+  assert.match(source, /data-testid="work-status-documentary-index"/);
+  assert.match(source, /data-testid="work-status-documentary-beta"[^>]*>BETA</);
+  assert.match(source, /enqueueDocumentProfile\(work\.nodus_id\)/, 'the documentary index remains an explicit per-work action');
+  assert.match(source, /no afecta al estado general de la obra/, 'the optional index is explained next to its action');
   assert.match(source, /role="dialog"[\s\S]{0,120}aria-modal="true"/);
 });
 
 test('the library row renders the derived status instead of the five pipeline columns', async () => {
   const source = await readFile(path.join(root, 'src/views/Library.tsx'), 'utf8');
   assert.match(source, /deriveWorkStatus/);
+  assert.match(source, /DOCUMENT_INDEX_MANAGER_VISIBLE && vaultType === 'academic'/, 'the global documentary-index button remains implemented but hidden');
   // The tour and the tutorial video both anchor on this.
   assert.match(source, /data-tour="library-actions"/);
   // The pipeline columns and the per-row icon toolbar are gone.
   assert.doesNotMatch(source, /sortKey="embeddings"/);
   assert.doesNotMatch(source, /sortKey="passages"/);
   assert.doesNotMatch(source, /nodus_id\.slice\(0, 8\)/);
+});
+
+test('documentary indexing is limited to Deep Research and explicit reader actions', async () => {
+  const [policy, queue, immersion, deepResearch, modal, profile, extractor] = await Promise.all([
+    readFile(path.join(root, 'shared/documentIndexPolicy.ts'), 'utf8'),
+    readFile(path.join(root, 'electron/pipeline/documentIndexQueue.ts'), 'utf8'),
+    readFile(path.join(root, 'electron/ai/immersion.ts'), 'utf8'),
+    readFile(path.join(root, 'electron/ai/deepResearch.ts'), 'utf8'),
+    readFile(path.join(root, 'src/views/WorkStatusModal.tsx'), 'utf8'),
+    readFile(path.join(root, 'electron/ai/documentProfile.ts'), 'utf8'),
+    readFile(path.join(root, 'electron/extraction/textExtractor.ts'), 'utf8'),
+  ]);
+  assert.match(policy, /DOCUMENT_INDEX_CONTINUOUS_AVAILABLE = false/);
+  assert.match(policy, /DOCUMENT_INDEX_MANAGER_VISIBLE = false/);
+  assert.match(queue, /DOCUMENT_INDEX_CONTINUOUS_AVAILABLE && settings\.documentIndexingEnabled/);
+  assert.doesNotMatch(immersion, /prepareRelevantDocumentProfiles/, 'Immersion may reuse profiles but never creates them');
+  assert.match(deepResearch, /prepareRelevantDocumentProfiles\([\s\S]{0,180}'deep-research'/);
+  assert.match(modal, /enqueueDocumentProfile\(work\.nodus_id\)/);
+  assert.match(profile, /work\.zotero_key\.startsWith\('nodus-library:'\)[\s\S]{0,120}\? null[\s\S]{0,80}getItem/,
+    'Nodus-owned Library works bypass the Zotero metadata request');
+  assert.match(extractor, /attachmentReadAttempts = isNodusLibraryItem \? 0 : ATTACHMENT_READ_ATTEMPTS/,
+    'Nodus-owned Library works resolve their clean local copy without Zotero attachment retries');
 });

@@ -36,6 +36,7 @@ import {
 import { t, tx } from '../i18n';
 import { getVaultQueryCache, setVaultQueryCache } from '../vaultQueryCache';
 import { vaultTypeColor } from '@shared/vaultTypes';
+import { DOCUMENT_INDEX_MANAGER_VISIBLE } from '@shared/documentIndexPolicy';
 import type { LibraryVaultSnapshot, ListPlacement } from '../app/viewSnapshots';
 
 const LIBRARY_ROW_HEIGHT = 64;
@@ -1090,7 +1091,8 @@ export function Library({
         </div>
         {scopeControls}
         <div className="library-header-actions">
-          {vaultType === 'academic' && <button
+          {DOCUMENT_INDEX_MANAGER_VISIBLE && vaultType === 'academic' && <button
+            data-testid="document-index-manager-button"
             className="btn btn-ghost border border-neutral-700 gap-1.5"
             onClick={() => setDocumentManagerOpen(true)}
             title={t('Gestionar la comprensión jerárquica de documentos completos')}
@@ -1874,8 +1876,13 @@ export function Library({
         <WorkStatusModal
           work={currentWork}
           status={currentStatus}
+          documentStatus={documentStatuses.get(currentWork.nodus_id) ?? 'missing'}
           onClose={() => setStatusWork(null)}
           onChanged={() => load()}
+          onOpenDocument={() => {
+            setStatusWork(null);
+            setDocumentWork(currentWork);
+          }}
         />
         ) : null;
       })()}

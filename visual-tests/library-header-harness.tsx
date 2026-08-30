@@ -1,6 +1,7 @@
 import ReactDOM from 'react-dom/client';
 import type { AppSettings } from '@shared/types';
 import { GlobalLibraryView } from '../src/views/GlobalLibraryView';
+import '../src/index.css';
 
 /**
  * The Library shell (scope switcher, header actions, the guide's «?») rendered with a

@@ -61,6 +61,7 @@ import { DEFAULT_EMBEDDING_MODELS, EMBEDDING_PROVIDERS } from '@shared/providers
 import { ORB_COLOR_CHOICES, orbHue } from '@shared/nodiOrb';
 import { NODI_DEFAULT_SCALE, NODI_SIZE_SCALES } from '@shared/nodiSize';
 import { effectiveSidebarHidden, isViewAllowedForVaultType } from '@shared/vaultTypes';
+import { DOCUMENT_INDEX_CONTINUOUS_AVAILABLE } from '@shared/documentIndexPolicy';
 import chromeWebStoreLogo from '../assets/brands/chrome-web-store.svg';
 
 type SettingsTabId = 'providers' | 'models' | 'library' | 'extraction' | 'interface' | 'integrations' | 'browser' | 'server' | 'system' | 'data' | 'about' | 'updates';
@@ -917,15 +918,17 @@ export function Settings({
                 <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-neutral-500">{t('Comprensión documental')}</h3>
                 <p className="mb-3 text-xs leading-5 text-neutral-500">{t('Crea una ficha jerárquica auditada de cada obra completa para orientar chat, Nodi, Deep Research e Immersion. Las citas siguen apuntando al texto original.')}</p>
               </div>
-              <Row label={t('Indexar obras nuevas automáticamente')} hint={t('Continúa en segundo plano y entre vaults. Las obras actuales no se vuelven a procesar.') }>
-                <input type="checkbox" checked={settings.documentIndexingEnabled} onChange={async (event) => {
-                  const enabled = event.target.checked;
-                  await patch({ documentIndexingEnabled: enabled });
-                }} />
-              </Row>
-              <Row label={t('Incluir obras archivadas')}>
-                <input type="checkbox" checked={settings.documentIndexIncludeArchived} onChange={(event) => void patch({ documentIndexIncludeArchived: event.target.checked })} />
-              </Row>
+              {DOCUMENT_INDEX_CONTINUOUS_AVAILABLE && <>
+                <Row label={t('Indexar obras nuevas automáticamente')} hint={t('Continúa en segundo plano y entre vaults. Las obras actuales no se vuelven a procesar.') }>
+                  <input type="checkbox" checked={settings.documentIndexingEnabled} onChange={async (event) => {
+                    const enabled = event.target.checked;
+                    await patch({ documentIndexingEnabled: enabled });
+                  }} />
+                </Row>
+                <Row label={t('Incluir obras archivadas')}>
+                  <input type="checkbox" checked={settings.documentIndexIncludeArchived} onChange={(event) => void patch({ documentIndexIncludeArchived: event.target.checked })} />
+                </Row>
+              </>}
               <Row label={t('Concurrencia documental')} hint={t('Automático usa dos trabajadores; reduce el valor si el proveedor limita las solicitudes.') }>
                 <select className="input" value={settings.documentIndexConcurrency} onChange={(event) => void patch({ documentIndexConcurrency: Number(event.target.value) })}>
                   <option value={0}>{t('Automática')}</option>
