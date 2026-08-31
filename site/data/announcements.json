@@ -2,6 +2,54 @@
   "version": 1,
   "notices": [
     {
+      "id": "2026-08-31-language-survey",
+      "date": "2026-08-31",
+      "severity": "info",
+      "url": "https://docs.google.com/forms/d/e/1FAIpQLSfcHOtLxVYO2kzz0GTTuW04tYAEOHKfC5hhLstjMJ7JQdQuYQ/viewform?usp=dialog",
+      "copy": {
+        "es": {
+          "title": "¿Qué idioma te gustaría ver en Nodus?",
+          "body": "Ayúdanos a decidir qué idioma añadir próximamente a Nodus respondiendo a una breve encuesta.",
+          "linkLabel": "Responder la encuesta"
+        },
+        "en": {
+          "title": "Which language would you like to see in Nodus?",
+          "body": "Help us decide which language to add to Nodus next by taking a short survey.",
+          "linkLabel": "Take the survey"
+        },
+        "fr": {
+          "title": "Quelle langue aimeriez-vous voir dans Nodus ?",
+          "body": "Aidez-nous à décider quelle langue ajouter prochainement à Nodus en répondant à un court sondage.",
+          "linkLabel": "Répondre au sondage"
+        },
+        "de": {
+          "title": "Welche Sprache wünschst du dir für Nodus?",
+          "body": "Hilf uns mit einer kurzen Umfrage zu entscheiden, welche Sprache als Nächstes zu Nodus hinzugefügt werden soll.",
+          "linkLabel": "An der Umfrage teilnehmen"
+        },
+        "pt": {
+          "title": "Que idioma gostarias de ver no Nodus?",
+          "body": "Ajuda-nos a decidir que idioma adicionar a seguir ao Nodus, respondendo a um breve inquérito.",
+          "linkLabel": "Responder ao inquérito"
+        },
+        "pt-BR": {
+          "title": "Qual idioma você gostaria de ver no Nodus?",
+          "body": "Ajude-nos a decidir qual idioma adicionar ao Nodus em seguida, respondendo a uma breve pesquisa.",
+          "linkLabel": "Responder à pesquisa"
+        },
+        "it": {
+          "title": "Quale lingua vorresti vedere in Nodus?",
+          "body": "Aiutaci a decidere quale lingua aggiungere prossimamente a Nodus rispondendo a un breve sondaggio.",
+          "linkLabel": "Rispondi al sondaggio"
+        },
+        "tr": {
+          "title": "Nodus'u hangi dilde görmek istersiniz?",
+          "body": "Kısa bir ankete katılarak Nodus'a bir sonraki adımda hangi dili ekleyeceğimize karar vermemize yardımcı olun.",
+          "linkLabel": "Ankete katılın"
+        }
+      }
+    },
+    {
       "id": "2026-08-21-github-star",
       "date": "2026-08-21",
       "severity": "info",

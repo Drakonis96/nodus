@@ -66,6 +66,17 @@ test('the new website is published through the remote feed', () => {
   assert.ok(!fs.existsSync(path.join(repoRoot, 'src/components/WebsiteLaunchGuide.tsx')), 'the announcement must not depend on a new app release');
 });
 
+test('the language survey is published with its response button', () => {
+  const notice = published.notices.find((entry) => entry.id === '2026-08-31-language-survey');
+  assert.ok(notice, 'the language survey must be in the remotely deployed feed');
+  assert.equal(
+    notice.url,
+    'https://docs.google.com/forms/d/e/1FAIpQLSfcHOtLxVYO2kzz0GTTuW04tYAEOHKfC5hhLstjMJ7JQdQuYQ/viewform?usp=dialog',
+  );
+  assert.equal(notice.copy.es.title, '¿Qué idioma te gustaría ver en Nodus?');
+  assert.equal(notice.copy.es.linkLabel, 'Responder la encuesta');
+});
+
 test('every published notice is written in all eight languages', () => {
   for (const notice of published.notices) {
     const missing = ANNOUNCEMENT_LANGUAGES.filter((language) => {
