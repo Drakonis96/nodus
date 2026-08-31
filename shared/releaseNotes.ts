@@ -1877,6 +1877,51 @@ const RELEASE_5_1_1_HIGHLIGHTS: RawReleaseHighlight[] = [
 ];
 
 /**
+ * v5.1.2 keeps the complete v5.1.1 announcement and appends the fixes merged
+ * afterwards. The patch remains self-contained for anyone updating from an
+ * earlier 5.1 release.
+ */
+const RELEASE_5_1_2_HIGHLIGHTS: RawReleaseHighlight[] = [
+  ...RELEASE_5_1_1_HIGHLIGHTS,
+  {
+    scope: 'word',
+    es: 'Nodus Copilot para Word cambia Sinónimos por Alternativas para trabajar también con expresiones y frases completas. La pestaña espera a que pulses Generar y respeta el modelo elegido. Ideas, Pasajes, Edición con IA, Alternativas y Chat comparten ahora un selector de modelos con búsqueda y control por teclado.',
+    en: 'Nodus Copilot for Word replaces Synonyms with Alternatives so it can also work with expressions and complete phrases. The tab waits for you to press Generate and respects the model you choose. Ideas, Passages, AI Edit, Alternatives, and Chat now share a searchable model picker with keyboard control.',
+    fr: 'Nodus Copilot pour Word remplace Synonymes par Alternatives afin de traiter aussi les expressions et les phrases complètes. L’onglet attend que vous appuyiez sur Générer et respecte le modèle choisi. Idées, Passages, Édition par IA, Alternatives et Chat partagent désormais un sélecteur de modèles avec recherche et contrôle au clavier.',
+    de: 'Nodus Copilot für Word ersetzt Synonyme durch Alternativen, damit auch Ausdrücke und vollständige Sätze bearbeitet werden können. Die Registerkarte wartet auf einen Klick auf Erzeugen und verwendet das gewählte Modell. Ideen, Passagen, KI-Bearbeitung, Alternativen und Chat teilen sich jetzt eine durchsuchbare Modellauswahl mit Tastatursteuerung.',
+    pt: 'O Nodus Copilot para Word substitui Sinónimos por Alternativas para trabalhar também com expressões e frases completas. O separador espera que carregue em Gerar e respeita o modelo escolhido. Ideias, Passagens, Edição com IA, Alternativas e Chat partilham agora um seletor de modelos com pesquisa e controlo por teclado.',
+    'pt-BR': 'O Nodus Copilot para Word substitui Sinônimos por Alternativas para trabalhar também com expressões e frases completas. A aba espera você clicar em Gerar e respeita o modelo escolhido. Ideias, Passagens, Edição com IA, Alternativas e Chat agora compartilham um seletor de modelos com busca e controle pelo teclado.',
+  },
+  {
+    scope: 'ai',
+    es: 'Los modelos locales ya pueden vectorizar pasajes largos dentro de su límite de contexto sin fallar al superar 512 tokens. Los resúmenes terminados siguen disponibles si falla una tarea opcional posterior. Cuando el propio resumen falla, Nodus guarda y muestra el motivo para que puedas corregirlo y reintentar.',
+    en: 'Local models can now embed long passages within their context limit without failing above 512 tokens. Completed summaries remain available if an optional follow-up task fails. When the summary itself fails, Nodus saves and shows the reason so you can correct it and try again.',
+    fr: 'Les modèles locaux peuvent désormais vectoriser de longs passages dans leur limite de contexte sans échouer au-delà de 512 jetons. Les résumés terminés restent disponibles si une tâche facultative ultérieure échoue. Lorsque le résumé lui-même échoue, Nodus enregistre et affiche la raison afin de pouvoir la corriger et réessayer.',
+    de: 'Lokale Modelle können jetzt lange Passagen innerhalb ihres Kontextlimits einbetten, ohne oberhalb von 512 Token fehlzuschlagen. Fertige Zusammenfassungen bleiben verfügbar, wenn eine optionale Folgeaufgabe scheitert. Schlägt die Zusammenfassung selbst fehl, speichert und zeigt Nodus den Grund, damit Sie ihn beheben und es erneut versuchen können.',
+    pt: 'Os modelos locais já podem criar embeddings de passagens longas dentro do respetivo limite de contexto sem falhar acima de 512 tokens. Os resumos concluídos continuam disponíveis se uma tarefa opcional posterior falhar. Quando o próprio resumo falha, o Nodus guarda e mostra o motivo para que possa corrigi-lo e tentar novamente.',
+    'pt-BR': 'Os modelos locais agora podem criar embeddings de passagens longas dentro do limite de contexto sem falhar acima de 512 tokens. Os resumos concluídos continuam disponíveis se uma tarefa opcional posterior falhar. Quando o próprio resumo falha, o Nodus salva e mostra o motivo para você corrigi-lo e tentar novamente.',
+  },
+  {
+    scope: 'zotero',
+    es: 'Los títulos de Zotero con cursivas, superíndices, subíndices u otro formato enriquecido vuelven a mostrarse como texto limpio en la Biblioteca, la búsqueda y los mensajes de progreso. Nodus conserva el marcado original para reconocer cambios reales y evita que un título formateado desestabilice la sincronización.',
+    en: 'Zotero titles with italics, superscripts, subscripts, or other rich formatting now appear as clean text in the Library, search, and progress messages. Nodus preserves the original markup when checking for real changes so a formatted title no longer destabilizes synchronization.',
+    fr: 'Les titres Zotero contenant de l’italique, des exposants, des indices ou d’autres mises en forme enrichies s’affichent désormais comme du texte propre dans la Bibliothèque, la recherche et les messages de progression. Nodus conserve le balisage d’origine pour détecter les changements réels et empêcher un titre formaté de déstabiliser la synchronisation.',
+    de: 'Zotero-Titel mit Kursivschrift, Hochstellung, Tiefstellung oder anderer Rich-Text-Formatierung erscheinen jetzt als sauberer Text in Bibliothek, Suche und Fortschrittsmeldungen. Nodus bewahrt die ursprüngliche Auszeichnung zur Erkennung echter Änderungen, damit ein formatierter Titel die Synchronisierung nicht mehr destabilisiert.',
+    pt: 'Os títulos do Zotero com itálico, sobrescrito, subscrito ou outra formatação enriquecida passam a aparecer como texto limpo na Biblioteca, na pesquisa e nas mensagens de progresso. O Nodus conserva a marcação original ao verificar alterações reais para que um título formatado deixe de desestabilizar a sincronização.',
+    'pt-BR': 'Os títulos do Zotero com itálico, sobrescrito, subscrito ou outra formatação enriquecida agora aparecem como texto limpo na Biblioteca, na busca e nas mensagens de progresso. O Nodus preserva a marcação original ao verificar mudanças reais para que um título formatado não desestabilize mais a sincronização.',
+  },
+  {
+    scope: 'general',
+    es: 'La primera bóveda y los Ajustes explican ahora la misma regla para la contraseña maestra. Debe tener al menos ocho caracteres y puede ser una frase larga sin números ni símbolos obligatorios. La validación señala enseguida si falta longitud o si la confirmación no coincide, y la misma regla se aplica al crear la copia protegida.',
+    en: 'Your first vault and Settings now explain the same master-password rule. It must contain at least eight characters and can be a long passphrase without mandatory numbers or symbols. Validation immediately identifies a short or mismatched confirmation, and the same rule is enforced when the protected copy is created.',
+    fr: 'Le premier coffre et les Paramètres expliquent désormais la même règle pour le mot de passe principal. Il doit comporter au moins huit caractères et peut être une longue phrase sans chiffres ni symboles obligatoires. La validation signale immédiatement une longueur insuffisante ou une confirmation différente, et la même règle est appliquée lors de la création de la copie protégée.',
+    de: 'Der erste Tresor und die Einstellungen erklären jetzt dieselbe Regel für das Masterpasswort. Es muss mindestens acht Zeichen enthalten und darf eine lange Passphrase ohne vorgeschriebene Zahlen oder Symbole sein. Die Prüfung zeigt eine zu kurze oder abweichende Bestätigung sofort an, und beim Erstellen der geschützten Kopie gilt dieselbe Regel.',
+    pt: 'O primeiro cofre e as Definições passam a explicar a mesma regra para a palavra-passe mestra. Deve ter pelo menos oito caracteres e pode ser uma frase longa sem números nem símbolos obrigatórios. A validação identifica de imediato uma confirmação curta ou diferente, e a mesma regra é aplicada ao criar a cópia protegida.',
+    'pt-BR': 'O primeiro cofre e as Configurações agora explicam a mesma regra para a senha mestra. Ela deve ter pelo menos oito caracteres e pode ser uma frase longa sem números nem símbolos obrigatórios. A validação identifica imediatamente uma confirmação curta ou diferente, e a mesma regra é aplicada ao criar a cópia protegida.',
+  },
+];
+
+/**
  * v5.0.6 — every user-visible change merged after v5.0.5, excluding the
  * independent server-web parity branch. Keep this list aligned by index with
  * the Italian and Turkish tables so all eight interface languages receive the
@@ -2331,6 +2376,11 @@ const RELEASE_5_0_0_HIGHLIGHTS: RawReleaseHighlight[] = [
 ];
 
 const RAW_RELEASE_NOTES: RawReleaseNote[] = [
+  {
+    version: '5.1.2',
+    date: '2026-08-31',
+    highlights: RELEASE_5_1_2_HIGHLIGHTS,
+  },
   {
     version: '5.1.1',
     date: '2026-08-31',
