@@ -40,7 +40,7 @@ export function loadSiteMetadata(repoRoot) {
   for (const key of ['siteUrl', 'websiteId', 'softwareId', 'authorId', 'projectName', 'softwareName', 'version', 'releaseTag', 'releaseDate', 'conceptDoi', 'citationDoi', 'license', 'licenseUrl', 'repository', 'authorName', 'orcid', 'socialImage']) {
     if (!metadata[key]) throw new Error(`package.json is missing site metadata: ${key}`);
   }
-  if (!/^\d+\.\d+\.\d+$/.test(metadata.version)) throw new Error(`Invalid release version: ${metadata.version}`);
+  if (!/^\d+\.\d+\.\d+(?:-beta\.\d+)?$/.test(metadata.version)) throw new Error(`Invalid release version: ${metadata.version}`);
   if (!/^\d{4}-\d{2}-\d{2}$/.test(metadata.releaseDate)) throw new Error(`Invalid release date: ${metadata.releaseDate}`);
   for (const doi of [metadata.conceptDoi, metadata.versionDoi].filter(Boolean)) {
     if (!/^10\.5281\/zenodo\.\d+$/.test(doi)) throw new Error(`Invalid Zenodo DOI: ${doi}`);

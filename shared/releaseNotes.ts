@@ -30,7 +30,8 @@ export type ReleaseNoteScope =
   | 'plugin'
   | 'languages'
   | 'browser'
-  | 'radar';
+  | 'radar'
+  | 'apple';
 
 interface RawReleaseHighlight {
   es: string;
@@ -1876,6 +1877,27 @@ const RELEASE_5_1_1_HIGHLIGHTS: RawReleaseHighlight[] = [
   },
 ];
 
+const RELEASE_5_1_3_HIGHLIGHTS: RawReleaseHighlight[] = [
+  {
+    scope: 'apple',
+    es: 'Nodus para macOS se distribuye ahora firmado con Developer ID y notarizado por Apple. Hardened Runtime protege la aplicación y Gatekeeper verifica la firma y el ticket antes de abrirla. Todos los helpers, frameworks, módulos nativos y binarios incluidos se firman con los permisos mínimos que necesitan.',
+    en: 'Nodus for macOS is now distributed with a Developer ID signature and Apple notarization. Hardened Runtime protects the application, and Gatekeeper verifies its signature and ticket before opening it. Every bundled helper, framework, native module, and executable is signed with only the permissions it needs.',
+    fr: 'Nodus pour macOS est désormais distribué avec une signature Developer ID et une notarisation Apple. Hardened Runtime protège l’application et Gatekeeper vérifie la signature et le ticket avant son ouverture. Tous les assistants, frameworks, modules natifs et exécutables inclus sont signés avec uniquement les autorisations nécessaires.',
+    de: 'Nodus für macOS wird jetzt mit einer Developer-ID-Signatur und Apple-Notarisierung ausgeliefert. Hardened Runtime schützt die Anwendung, und Gatekeeper prüft vor dem Öffnen Signatur und Ticket. Alle enthaltenen Hilfsprogramme, Frameworks, nativen Module und ausführbaren Dateien werden nur mit den benötigten Berechtigungen signiert.',
+    pt: 'O Nodus para macOS passa a ser distribuído com assinatura Developer ID e notarização da Apple. O Hardened Runtime protege a aplicação e o Gatekeeper verifica a assinatura e o comprovativo antes de a abrir. Todos os auxiliares, frameworks, módulos nativos e executáveis incluídos são assinados apenas com as permissões necessárias.',
+    'pt-BR': 'O Nodus para macOS agora é distribuído com assinatura Developer ID e notarização da Apple. O Hardened Runtime protege o aplicativo e o Gatekeeper verifica a assinatura e o tíquete antes de abri-lo. Todos os auxiliares, frameworks, módulos nativos e executáveis incluídos são assinados apenas com as permissões necessárias.',
+  },
+  {
+    scope: 'academic',
+    es: 'El Diccionario reparte ahora las fuentes entre distintas obras y autorías en vez de dejar que una sola domine la selección. Combina búsqueda semántica y léxica, identifica el origen de ideas, citas y relaciones, y avisa si una definición no cubre suficientes fuentes o autores.',
+    en: 'The Dictionary now spreads evidence across different works and authors instead of letting one source dominate the selection. It combines semantic and lexical search, identifies the origin of ideas, quotations, and relationships, and warns when a definition does not cover enough sources or authors.',
+    fr: 'Le Dictionnaire répartit désormais les preuves entre plusieurs œuvres et auteurs au lieu de laisser une seule source dominer la sélection. Il combine recherche sémantique et lexicale, identifie l’origine des idées, citations et relations, et avertit lorsqu’une définition ne couvre pas assez de sources ou d’auteurs.',
+    de: 'Das Wörterbuch verteilt Belege jetzt auf verschiedene Werke und Autorinnen oder Autoren, statt eine einzige Quelle die Auswahl bestimmen zu lassen. Es kombiniert semantische und lexikalische Suche, kennzeichnet die Herkunft von Ideen, Zitaten und Beziehungen und warnt, wenn eine Definition nicht genügend Quellen oder Urheber abdeckt.',
+    pt: 'O Dicionário distribui agora as provas por diferentes obras e autorias em vez de deixar uma única fonte dominar a seleção. Combina pesquisa semântica e lexical, identifica a origem de ideias, citações e relações e avisa quando uma definição não cobre fontes ou autores suficientes.',
+    'pt-BR': 'O Dicionário agora distribui as evidências entre diferentes obras e autorias em vez de deixar uma única fonte dominar a seleção. Ele combina busca semântica e lexical, identifica a origem de ideias, citações e relações e avisa quando uma definição não cobre fontes ou autores suficientes.',
+  },
+];
+
 /**
  * v5.1.2 keeps the complete v5.1.1 announcement and appends the fixes merged
  * afterwards. The patch remains self-contained for anyone updating from an
@@ -2376,6 +2398,11 @@ const RELEASE_5_0_0_HIGHLIGHTS: RawReleaseHighlight[] = [
 ];
 
 const RAW_RELEASE_NOTES: RawReleaseNote[] = [
+  {
+    version: '5.1.3',
+    date: '2026-08-31',
+    highlights: RELEASE_5_1_3_HIGHLIGHTS,
+  },
   {
     version: '5.1.2',
     date: '2026-08-31',

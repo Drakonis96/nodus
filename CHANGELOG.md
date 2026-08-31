@@ -2,6 +2,21 @@
 
 ## Unreleased
 
+## 5.1.3-beta.1 — 2026-08-31
+
+This beta validates the complete Developer ID signing and Apple notarization
+pipeline before Nodus 5.1.3 is promoted to the stable channel.
+
+- Signed the macOS application and every nested executable component with the
+  minimum required entitlements and Hardened Runtime enabled.
+- Submitted the signed application to Apple, stapled the accepted ticket and
+  made publication fail closed unless `codesign`, `spctl` and `stapler` all
+  verify the result.
+- Balanced Dictionary evidence across works and authors, combined semantic and
+  lexical retrieval, exposed source provenance and added coverage warnings.
+- Added a focused two-item What's New modal in all eight interface languages,
+  led by the Apple notarization milestone and its dedicated SVG icon.
+
 ## 5.1.2 — 2026-08-31
 
 Nodus 5.1.2 improves Word model selection and fixes local analysis, Zotero

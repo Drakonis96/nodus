@@ -27,19 +27,25 @@ test('CITATION.cff describes the current Nodus release and its project identity'
 
 test('the citation page identifies the current version and its DOI state', () => {
   const page = readSite('cite/index.html');
+  const prerelease = pkg.version.includes('-');
+  const publicVersion = prerelease
+    ? page.match(/Nodus (\d+\.\d+\.\d+) · archive pending/)?.[1]
+    : pkg.version;
 
   assert.match(page, /<title>Cite Nodus Research \| DOI and Software Citation<\/title>/);
   assert.match(page, /<h1[^>]*>Cite Nodus Research<\/h1>/);
   assert.match(page, /rel="canonical" href="https:\/\/nodusresearch\.com\/cite\/"/);
   assert.match(page, new RegExp(CONCEPT_DOI.replaceAll('.', '\\.')));
-  if (VERSION_DOI) {
+  assert.ok(publicVersion, 'the citation page identifies its stable public version');
+  if (VERSION_DOI && !prerelease) {
     assert.match(page, new RegExp(VERSION_DOI.replaceAll('.', '\\.')));
-    assert.match(page, new RegExp(`Nodus ${pkg.version.replaceAll('.', '\\.')} · version DOI`));
+    assert.match(page, new RegExp(`Nodus ${publicVersion.replaceAll('.', '\\.')} · version DOI`));
   } else {
-    assert.match(page, new RegExp(`Nodus ${pkg.version.replaceAll('.', '\\.')} · archive pending`));
+    assert.match(page, new RegExp(`Nodus ${publicVersion.replaceAll('.', '\\.')} · archive pending`));
     assert.match(page, /Version DOI pending/);
   }
-  assert.match(page, new RegExp(`releases/tag/v${pkg.version.replaceAll('.', '\\.')}`));
+  assert.match(page, new RegExp(`releases/tag/v${publicVersion.replaceAll('.', '\\.')}`));
+  if (prerelease) assert.ok(!page.includes(pkg.version), 'a desktop beta does not replace the stable citation page');
   for (const detail of ['APA', 'BibTeX', 'CITATION.cff', 'ORCID', 'AGPL-3.0-only', 'Zenodo', 'GitHub']) {
     assert.ok(page.includes(detail), `the citation page includes ${detail}`);
   }
