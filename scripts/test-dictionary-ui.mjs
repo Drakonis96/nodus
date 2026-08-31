@@ -364,7 +364,7 @@ assert.match(
 );
 assert.match(
   ai,
-  /findSimilarPassagesPaged\(vector,[\s\S]*nodusIds: scope\.ids/,
+  /findSimilarPassagesPaged\([\s\S]*?vector,[\s\S]*?nodusIds: scope\.ids/,
   "retrieval reuses scoped Deep Research passage embeddings",
 );
 assert.match(
@@ -379,8 +379,18 @@ assert.match(
 );
 assert.match(
   ai,
-  /selectedIdeas < 12[\s\S]*selectedPassages < 8/,
-  "initial retrieval automatically selects the strongest ideas and passages",
+  /selectedIdeas < DICTIONARY_SELECTION_LIMITS\.ideas[\s\S]*selectedPassages < DICTIONARY_SELECTION_LIMITS\.passages/,
+  "initial retrieval automatically selects a bounded, source-balanced set of ideas and passages",
+);
+assert.match(
+  ai,
+  /cantidad de pasajes recuperados[\s\S]*no mide por sí sola la importancia/,
+  "Dictionary synthesis does not treat repeated passages as author importance",
+);
+assert.match(
+  ai,
+  /structuredDictionaryCoverageProblems/,
+  "Dictionary synthesis validates multi-source coverage before persistence",
 );
 assert.match(
   ai,

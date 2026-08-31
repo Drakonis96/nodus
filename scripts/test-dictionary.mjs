@@ -102,6 +102,102 @@ try {
   );
 
   seedCorpus(db);
+  const sourceCandidate = (refId, score, workId, authorName) => ({
+    kind: "passage",
+    refId,
+    decision: "unused",
+    score,
+    reason: "test",
+    label: refId,
+    text: `Aportación de ${authorName}`,
+    workId,
+    workTitle: `Obra ${workId}`,
+    zoteroKey: null,
+    works: [
+      {
+        id: workId,
+        title: `Obra ${workId}`,
+        zoteroKey: null,
+        authors: [authorName],
+        year: 2020,
+      },
+    ],
+    pageLabel: null,
+    authors: [{ id: authorName, name: authorName, attributionBasis: "author" }],
+    tags: [],
+    sourceRevision: refId,
+  });
+  const repeatedSourceCandidates = [
+    sourceCandidate("galant-1", 0.95, "galant-work", "Galant"),
+    sourceCandidate("galant-2", 0.94, "galant-work", "Galant"),
+    sourceCandidate("galant-3", 0.93, "galant-work", "Galant"),
+    sourceCandidate("fuentes-1", 0.82, "fuentes-work", "Fuentes Vega"),
+    sourceCandidate("tercera-1", 0.8, "tercera-work", "Tercera Autora"),
+  ];
+  const balancedCandidates = ai.__balanceDictionaryCandidatesForTesting(
+    repeatedSourceCandidates,
+  );
+  assert.deepEqual(
+    balancedCandidates.slice(0, 3).map((item) => item.workId),
+    ["galant-work", "fuentes-work", "tercera-work"],
+    "automatic ranking retains the strongest hit but surfaces distinct works before repeated neighboring passages",
+  );
+  const coverageEvidence = repeatedSourceCandidates
+    .filter((item) => !item.refId.endsWith("-2") && !item.refId.endsWith("-3"))
+    .map((item) => ({
+      ...item,
+      id: item.refId,
+      entryId: "coverage-test",
+      isNew: false,
+      usedInCurrentVersion: false,
+      citedInCurrentVersion: false,
+      unavailable: false,
+    }));
+  const coverageIndex = ai.__dictionaryCoveragePromptForTesting(
+    coverageEvidence,
+    "standard",
+  );
+  assert.match(coverageIndex, /Fuentes Vega/);
+  assert.match(coverageIndex, /Tercera Autora/);
+  const skewedCoverageProblems =
+    ai.__structuredDictionaryCoverageProblemsForTesting(
+      {
+        paragraphs: [
+          {
+            claims: [
+              {
+                text: "Solo se usa la primera aportación.",
+                evidence: [{ kind: "passage", id: "galant-1" }],
+              },
+            ],
+          },
+        ],
+      },
+      coverageEvidence,
+      "standard",
+    );
+  assert.ok(
+    skewedCoverageProblems.some((problem) => /obras disponibles/.test(problem)),
+    "a synthesis dominated by one work is rejected when other direct sources are available",
+  );
+  assert.deepEqual(
+    ai.__structuredDictionaryCoverageProblemsForTesting(
+      {
+        paragraphs: [
+          {
+            claims: coverageEvidence.map((item) => ({
+              text: `Aportación documentada por ${item.authors[0].name}.`,
+              evidence: [{ kind: "passage", id: item.id }],
+            })),
+          },
+        ],
+      },
+      coverageEvidence,
+      "standard",
+    ),
+    [],
+    "coverage validation accepts a synthesis that integrates the available authors and works",
+  );
   const ideaColumns = db
     .prepare("SELECT name FROM pragma_table_info('ideas')")
     .all()

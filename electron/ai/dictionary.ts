@@ -26,6 +26,7 @@ import {
 import { findSimilarIdeasPaged } from "../db/ideasRepo";
 import {
   findSimilarPassagesPaged,
+  lexicalPassageSearch,
   type SimilarPassage,
 } from "../db/passagesRepo";
 import { expandCollectionKeys } from "../db/collectionsRepo";
@@ -58,6 +59,7 @@ type GeneratedDictionary = {
   descriptionMarkdown: string;
   authorSummaries: Array<{ authorName: string; summaryMarkdown: string }>;
   invalidEvidenceRefs?: number;
+  coverageProblems?: string[];
 };
 
 type GeneratedDictionaryClaims = {
@@ -137,6 +139,93 @@ function json<T>(value: unknown, fallback: T): T {
 function placeholders(values: unknown[]): string {
   return values.map(() => "?").join(",");
 }
+
+const DICTIONARY_RETRIEVAL_LIMITS = { ideas: 36, passages: 48 } as const;
+const DICTIONARY_SELECTION_LIMITS = { ideas: 12, passages: 8 } as const;
+
+type DictionarySourceCandidate = Pick<
+  DictionaryEvidenceUpsert,
+  "kind" | "score" | "workId" | "works" | "authors"
+>;
+
+function candidateSourceKeys(candidate: DictionarySourceCandidate): {
+  works: string[];
+  authors: string[];
+} {
+  const primaryWork = candidate.works.find(
+    (work) => work.id === candidate.workId,
+  );
+  const works = candidate.workId
+    ? [candidate.workId]
+    : candidate.works.map((work) => work.id).filter(Boolean);
+  const primaryAuthors = primaryWork?.authors.length
+    ? primaryWork.authors
+    : candidate.authors
+        .filter((author) => author.attributionBasis !== "editor_only")
+        .map((author) => author.name);
+  return {
+    works: [...new Set(works)],
+    authors: [
+      ...new Set(primaryAuthors.map(normalizeDictionaryTerm).filter(Boolean)),
+    ],
+  };
+}
+
+/**
+ * Keep semantic relevance as the base rank while discounting repeated chunks from
+ * a source already represented in the prefix. A prolific work can still contribute
+ * several strong passages, but it no longer occupies every automatic-selection slot
+ * before a close result from another author is considered.
+ */
+function balanceDictionarySources<T extends DictionarySourceCandidate>(
+  candidates: T[],
+): T[] {
+  const remaining = [...candidates];
+  const ordered: T[] = [];
+  const workCounts = new Map<string, number>();
+  const authorCounts = new Map<string, number>();
+  while (remaining.length) {
+    let bestIndex = 0;
+    let bestUtility = Number.NEGATIVE_INFINITY;
+    for (let index = 0; index < remaining.length; index += 1) {
+      const candidate = remaining[index];
+      const keys = candidateSourceKeys(candidate);
+      const repeatedWork = keys.works.length
+        ? Math.min(...keys.works.map((key) => workCounts.get(key) ?? 0))
+        : 0;
+      const repeatedAuthor = keys.authors.length
+        ? Math.min(...keys.authors.map((key) => authorCounts.get(key) ?? 0))
+        : 0;
+      const utility =
+        candidate.score - repeatedWork * 0.14 - repeatedAuthor * 0.08;
+      if (
+        utility > bestUtility ||
+        (utility === bestUtility &&
+          candidate.score > remaining[bestIndex].score)
+      ) {
+        bestIndex = index;
+        bestUtility = utility;
+      }
+    }
+    const [selected] = remaining.splice(bestIndex, 1);
+    ordered.push(selected);
+    const keys = candidateSourceKeys(selected);
+    for (const key of keys.works)
+      workCounts.set(key, (workCounts.get(key) ?? 0) + 1);
+    for (const key of keys.authors)
+      authorCounts.set(key, (authorCounts.get(key) ?? 0) + 1);
+  }
+  return ordered;
+}
+
+function balanceDictionaryCandidates(
+  candidates: DictionaryEvidenceUpsert[],
+): DictionaryEvidenceUpsert[] {
+  return balanceDictionarySources(candidates);
+}
+
+export const __balanceDictionaryCandidatesForTesting =
+  balanceDictionaryCandidates;
 
 function resolveScopeWorkIds(scope: DictionaryScope): {
   ids: string[];
@@ -258,36 +347,6 @@ function lexicalIdeaIds(
     }));
 }
 
-function lexicalPassages(
-  query: string,
-  workIds: string[],
-  limit: number,
-): SimilarPassage[] {
-  if (!workIds.length) return [];
-  const terms = normalizeDictionaryTerm(query)
-    .split(" ")
-    .filter((term) => term.length >= 3)
-    .slice(0, 8);
-  if (!terms.length) return [];
-  const clauses = terms.map(() => "lower(p.text) LIKE ?").join(" OR ");
-  const rows = getDb()
-    .prepare(
-      `SELECT p.passage_id,p.nodus_id,p.text,p.page_label,w.title,w.authors_json,w.year,w.zotero_key
-    FROM passages p JOIN works w ON w.nodus_id=p.nodus_id
-    WHERE p.nodus_id IN (${placeholders(workIds)}) AND (${clauses})
-      AND ((w.resolved_text_hash IS NOT NULL AND p.content_hash = w.resolved_text_hash)
-        OR (w.resolved_text_hash IS NULL AND (w.deep_hash IS NULL OR p.content_hash = w.deep_hash)))
-    ORDER BY p.chunk_index LIMIT ?`,
-    )
-    .all(...workIds, ...terms.map((term) => `%${term}%`), limit) as Array<
-    Omit<SimilarPassage, "similarity">
-  >;
-  return rows.map((row, index) => ({
-    ...row,
-    similarity: Math.max(0.2, 0.65 - index * 0.01),
-  }));
-}
-
 function ideaEvidence(
   ids: Array<{ global_id: string; similarity: number }>,
   workIds: string[],
@@ -318,23 +377,46 @@ function ideaEvidence(
     if (!idea) continue;
     const occurrences = db
       .prepare(
-        `SELECT nodus_id,development FROM idea_occurrences WHERE global_id=? AND nodus_id IN (${placeholders(workIds)})`,
+        `SELECT nodus_id,development,confidence FROM idea_occurrences
+         WHERE global_id=? AND nodus_id IN (${placeholders(workIds)})
+         ORDER BY confidence DESC LIMIT 20`,
       )
       .all(hit.global_id, ...workIds) as Array<{
       nodus_id: string;
       development: string;
+      confidence: number;
     }>;
     if (!occurrences.length) continue;
     const scopedWorks = [...new Set(occurrences.map((row) => row.nodus_id))];
-    const quotes = db
+    const quoteRows = db
       .prepare(
-        `SELECT quote,location,nodus_id FROM evidence WHERE global_id=? AND nodus_id IN (${placeholders(scopedWorks)}) ORDER BY rowid LIMIT 10`,
+        `SELECT quote,location,nodus_id FROM evidence
+         WHERE global_id=? AND nodus_id IN (${placeholders(scopedWorks)})
+         ORDER BY rowid LIMIT 40`,
       )
       .all(hit.global_id, ...scopedWorks) as Array<{
       quote: string;
       location: string | null;
       nodus_id: string;
     }>;
+    const quoteBuckets = new Map<string, typeof quoteRows>();
+    for (const quote of quoteRows)
+      quoteBuckets.set(quote.nodus_id, [
+        ...(quoteBuckets.get(quote.nodus_id) ?? []),
+        quote,
+      ]);
+    const quotes: typeof quoteRows = [];
+    while (quotes.length < 12) {
+      let added = false;
+      for (const bucket of quoteBuckets.values()) {
+        const quote = bucket.shift();
+        if (!quote) continue;
+        quotes.push(quote);
+        added = true;
+        if (quotes.length >= 12) break;
+      }
+      if (!added) break;
+    }
     const themeRows = db
       .prepare(
         `SELECT DISTINCT t.label FROM idea_theme_links l JOIN themes t ON t.theme_id=l.theme_id
@@ -366,29 +448,41 @@ function ideaEvidence(
       .filter(
         (row) => !row.source_work || scopedWorks.includes(row.source_work),
       );
+    const sourceHeading = (workId: string): string => {
+      const work = workMap.get(workId);
+      const names = (authorMap.get(workId) ?? [])
+        .filter((author) => author.attributionBasis !== "editor_only")
+        .map((author) => author.name);
+      return `Obra: ${work?.title ?? workId}${names.length ? ` | Autoría: ${names.join(", ")}` : ""}`;
+    };
     const relationParts = relationRows.map((row) => {
       const currentIsSource = row.from_id === hit.global_id;
       const from = currentIsSource ? idea.label : row.related_label;
       const to = currentIsSource ? row.related_label : idea.label;
-      return `Relación almacenada en el grafo: «${from}» ${row.type.replaceAll("_", " ")} «${to}» (${row.basis}, confianza ${row.confidence.toFixed(2)}).`;
+      const source = row.source_work
+        ? `${sourceHeading(row.source_work)} | `
+        : "";
+      return `${source}Relación almacenada en el grafo: «${from}» ${row.type.replaceAll("_", " ")} «${to}» (${row.basis}, confianza ${row.confidence.toFixed(2)}).`;
     });
+    const occurrenceParts = occurrences.map(
+      (row) =>
+        `${sourceHeading(row.nodus_id)}\nAportación documentada: ${row.development}`,
+    );
+    const quoteParts = quotes.map(
+      (row) =>
+        `${sourceHeading(row.nodus_id)}\nCita textual: “${row.quote}”${row.location ? ` (${row.location})` : ""}`,
+    );
     const textParts = restricted
       ? [
-          idea.label,
-          ...occurrences.map((row) => row.development),
-          ...quotes.map(
-            (row) =>
-              `“${row.quote}”${row.location ? ` (${row.location})` : ""}`,
-          ),
+          `Idea localizada: ${idea.label}`,
+          ...occurrenceParts,
+          ...quoteParts,
           ...relationParts,
         ]
       : [
-          idea.statement,
-          ...occurrences.map((row) => row.development),
-          ...quotes.map(
-            (row) =>
-              `“${row.quote}”${row.location ? ` (${row.location})` : ""}`,
-          ),
+          `Síntesis global de la idea: ${idea.statement}`,
+          ...occurrenceParts,
+          ...quoteParts,
           ...relationParts,
         ];
     const works = scopedWorks.map((id) => {
@@ -485,36 +579,60 @@ export async function retrieveDictionaryEvidence(
     markDictionaryEvidenceScanned(entryId, currentDictionaryChangeSequence());
     return getDictionaryEntryDetail(entryId)!;
   }
-  const query = [entry.name, ...entry.aliases, entry.focusPrompt]
-    .filter(Boolean)
-    .join(". ");
+  // The focus is an editorial instruction, not part of the concept's vocabulary.
+  // Mixing a long preset such as "compare authors" into the embedding diluted rare
+  // terms and favored generic passages. Retrieval therefore searches only the name
+  // and aliases; the focus is applied later by the writer.
+  const query = [entry.name, ...entry.aliases].filter(Boolean).join(". ");
   let ideaHits: Array<{ global_id: string; similarity: number }> = [];
   let passageHits: SimilarPassage[] = [];
   try {
     const vector = await embed(query);
     if (!vector) throw new Error("No hay un modelo de embeddings disponible.");
     [ideaHits, passageHits] = await Promise.all([
-      findSimilarIdeasPaged(vector, -1, 36, { nodusIds: scope.ids }),
-      findSimilarPassagesPaged(vector, -1, 30, { nodusIds: scope.ids }),
+      findSimilarIdeasPaged(vector, -1, DICTIONARY_RETRIEVAL_LIMITS.ideas, {
+        nodusIds: scope.ids,
+      }),
+      findSimilarPassagesPaged(
+        vector,
+        -1,
+        DICTIONARY_RETRIEVAL_LIMITS.passages,
+        { nodusIds: scope.ids },
+      ),
     ]);
   } catch {
-    ideaHits = lexicalIdeaIds(query, scope.ids, 36);
-    passageHits = lexicalPassages(query, scope.ids, 30);
+    ideaHits = lexicalIdeaIds(
+      query,
+      scope.ids,
+      DICTIONARY_RETRIEVAL_LIMITS.ideas,
+    );
+    passageHits = lexicalPassageSearch(
+      query,
+      DICTIONARY_RETRIEVAL_LIMITS.passages,
+      { nodusIds: scope.ids },
+    );
   }
-  const existing = new Map(
+  const existing = new Map<string, string>(
     getDb()
       .prepare(
         "SELECT kind,ref_id,decision FROM dictionary_evidence WHERE entry_id=?",
       )
       .all(entryId)
-      .map((row: any) => [`${row.kind}:${row.ref_id}`, String(row.decision)]),
+      .map(
+        (row: any) =>
+          [`${row.kind}:${row.ref_id}`, String(row.decision)] as const,
+      ),
   );
-  const candidates = [
+  const candidates = balanceDictionaryCandidates([
     ...ideaEvidence(ideaHits, scope.ids, scope.restricted),
     ...passageEvidence(passageHits),
-  ].sort((a, b) => b.score - a.score);
-  let selectedIdeas = 0;
-  let selectedPassages = 0;
+  ]);
+  let selectedIdeas = [...existing].filter(
+    ([key, decision]) => key.startsWith("idea:") && decision === "included",
+  ).length;
+  let selectedPassages = [...existing].filter(
+    ([key, decision]) => key.startsWith("passage:") && decision === "included",
+  ).length;
   for (const candidate of candidates) {
     const key = `${candidate.kind}:${candidate.refId}`;
     const oldDecision = existing.get(key);
@@ -523,8 +641,10 @@ export async function retrieveDictionaryEvidence(
       candidate.decision = oldDecision as DictionaryEvidenceUpsert["decision"];
     else if (
       mode === "initial" &&
-      ((candidate.kind === "idea" && selectedIdeas < 12) ||
-        (candidate.kind === "passage" && selectedPassages < 8))
+      ((candidate.kind === "idea" &&
+        selectedIdeas < DICTIONARY_SELECTION_LIMITS.ideas) ||
+        (candidate.kind === "passage" &&
+          selectedPassages < DICTIONARY_SELECTION_LIMITS.passages))
     ) {
       candidate.decision = "included";
       if (candidate.kind === "idea") selectedIdeas += 1;
@@ -612,13 +732,24 @@ function makeSnapshot(
   };
 }
 
+function evidenceRef(item: DictionaryEvidenceItem): string {
+  return `${item.kind}:${item.id}`;
+}
+
+function orderedDictionaryEvidence(
+  evidence: DictionaryEvidenceItem[],
+): DictionaryEvidenceItem[] {
+  return balanceDictionarySources(evidence);
+}
+
 function evidencePrompt(evidence: DictionaryEvidenceItem[]): string {
   return JSON.stringify(
-    evidence.map((item) => ({
+    orderedDictionaryEvidence(evidence).map((item) => ({
       type: item.kind,
       id: item.id,
       label: item.label,
       text: item.text,
+      relevance: Number(item.score.toFixed(4)),
       authors: item.authors.map((author) => author.name),
       works: item.works.map((work) => ({
         title: work.title,
@@ -633,7 +764,159 @@ function evidencePrompt(evidence: DictionaryEvidenceItem[]): string {
   );
 }
 
+function dictionaryCoveragePrompt(
+  evidence: DictionaryEvidenceItem[],
+  detailLevel: DictionaryEntryDetail["entry"]["detailLevel"],
+): string {
+  const authorLimit =
+    detailLevel === "detailed" ? 10 : detailLevel === "concise" ? 3 : 6;
+  const workLimit =
+    detailLevel === "detailed" ? 12 : detailLevel === "concise" ? 4 : 8;
+  const authors = new Map<
+    string,
+    { name: string; score: number; works: Set<string>; refs: Set<string> }
+  >();
+  const works = new Map<
+    string,
+    { title: string; score: number; authors: Set<string>; refs: Set<string> }
+  >();
+  for (const item of evidence) {
+    const ref = evidenceRef(item);
+    for (const author of item.authors) {
+      if (author.attributionBasis === "editor_only") continue;
+      const key = normalizeDictionaryTerm(author.name);
+      if (!key) continue;
+      const current = authors.get(key) ?? {
+        name: author.name,
+        score: Number.NEGATIVE_INFINITY,
+        works: new Set<string>(),
+        refs: new Set<string>(),
+      };
+      current.score = Math.max(current.score, item.score);
+      current.refs.add(ref);
+      for (const work of item.works) current.works.add(work.title);
+      authors.set(key, current);
+    }
+    for (const work of item.works) {
+      const current = works.get(work.id) ?? {
+        title: work.title,
+        score: Number.NEGATIVE_INFINITY,
+        authors: new Set<string>(),
+        refs: new Set<string>(),
+      };
+      current.score = Math.max(current.score, item.score);
+      current.refs.add(ref);
+      for (const author of work.authors) current.authors.add(author);
+      works.set(work.id, current);
+    }
+  }
+  const authorRows = [...authors.values()]
+    .sort(
+      (left, right) =>
+        right.score - left.score ||
+        right.works.size - left.works.size ||
+        left.name.localeCompare(right.name),
+    )
+    .slice(0, authorLimit)
+    .map(
+      (author) =>
+        `- ${author.name} | obras: ${[...author.works].join("; ") || "sin obra identificada"} | evidencia: ${[...author.refs].join(", ")}`,
+    );
+  const workRows = [...works.values()]
+    .sort(
+      (left, right) =>
+        right.score - left.score || left.title.localeCompare(right.title),
+    )
+    .slice(0, workLimit)
+    .map(
+      (work) =>
+        `- ${work.title} | autoría: ${[...work.authors].join(", ") || "sin autoría identificada"} | evidencia: ${[...work.refs].join(", ")}`,
+    );
+  return [
+    "ÍNDICE DE COBERTURA (metadatos para recorrer EVIDENCE; no añade afirmaciones):",
+    "AUTORES CON EVIDENCIA DIRECTA:",
+    ...(authorRows.length ? authorRows : ["- Ninguno identificado"]),
+    "OBRAS CON EVIDENCIA DIRECTA:",
+    ...(workRows.length ? workRows : ["- Ninguna identificada"]),
+  ].join("\n");
+}
+
+export const __dictionaryCoveragePromptForTesting = dictionaryCoveragePrompt;
+
+function dictionarySourceCoverageProblems(
+  evidence: DictionaryEvidenceItem[],
+  usedEvidence: DictionaryEvidenceItem[],
+  detailLevel: DictionaryEntryDetail["entry"]["detailLevel"],
+): string[] {
+  const strongestScore = Math.max(...evidence.map((item) => item.score));
+  // Diversity is a constraint among credible alternatives, never a reason to force
+  // a tangential low-score tail into the definition. The generous relative window
+  // still keeps a rare, less repetitive formulation in play.
+  const relevanceFloor = Math.max(0.2, strongestScore - 0.35);
+  const eligibleEvidence = evidence.filter(
+    (item) => item.score >= relevanceFloor,
+  );
+  const availableWorks = new Set<string>();
+  const availableAuthors = new Set<string>();
+  for (const item of eligibleEvidence) {
+    const keys = candidateSourceKeys(item);
+    for (const key of keys.works) availableWorks.add(key);
+    for (const key of keys.authors) availableAuthors.add(key);
+  }
+  const citedWorks = new Set<string>();
+  const citedAuthors = new Set<string>();
+  for (const item of usedEvidence) {
+    const keys = candidateSourceKeys(item);
+    for (const key of keys.works) citedWorks.add(key);
+    for (const key of keys.authors) citedAuthors.add(key);
+  }
+  const target = (available: number): number => {
+    if (available < 2) return available;
+    if (detailLevel === "concise") return Math.min(2, available);
+    if (detailLevel === "detailed") return Math.min(5, available);
+    return Math.min(3, available);
+  };
+  const problems: string[] = [];
+  const workTarget = target(availableWorks.size);
+  const authorTarget = target(availableAuthors.size);
+  if (citedWorks.size < workTarget)
+    problems.push(
+      `la síntesis solo utilizó ${citedWorks.size} de ${availableWorks.size} obras disponibles; debe integrar al menos ${workTarget}`,
+    );
+  if (citedAuthors.size < authorTarget)
+    problems.push(
+      `la síntesis solo utilizó evidencia atribuida a ${citedAuthors.size} de ${availableAuthors.size} autores disponibles; debe integrar al menos ${authorTarget}`,
+    );
+  return problems;
+}
+
+function structuredDictionaryCoverageProblems(
+  generated: GeneratedDictionaryClaims,
+  evidence: DictionaryEvidenceItem[],
+  detailLevel: DictionaryEntryDetail["entry"]["detailLevel"],
+): string[] {
+  const byRef = new Map(evidence.map((item) => [evidenceRef(item), item]));
+  const used = new Map<string, DictionaryEvidenceItem>();
+  for (const paragraph of generated.paragraphs)
+    for (const claim of paragraph.claims)
+      for (const ref of claim.evidence) {
+        const item = byRef.get(`${ref.kind}:${ref.id}`);
+        if (!item) continue;
+        used.set(evidenceRef(item), item);
+      }
+  return dictionarySourceCoverageProblems(
+    evidence,
+    [...used.values()],
+    detailLevel,
+  );
+}
+
+export const __structuredDictionaryCoverageProblemsForTesting =
+  structuredDictionaryCoverageProblems;
+
 function dictionaryCitationLabel(item: DictionaryEvidenceItem): string {
+  if (item.kind === "idea" && item.works.length > 1)
+    return `Idea «${item.label}»`;
   const author = item.authors.find(
     (candidate) => candidate.attributionBasis !== "editor_only",
   )?.name ?? item.authors[0]?.name;
@@ -715,6 +998,18 @@ function citedEvidence(
     cited.add(`${match[1]}:${id}`);
   }
   return evidence.filter((item) => cited.has(`${item.kind}:${item.id}`));
+}
+
+function markdownDictionaryCoverageProblems(
+  markdown: string,
+  evidence: DictionaryEvidenceItem[],
+  detailLevel: DictionaryEntryDetail["entry"]["detailLevel"],
+): string[] {
+  return dictionarySourceCoverageProblems(
+    evidence,
+    citedEvidence(markdown, evidence),
+    detailLevel,
+  );
 }
 
 function mainDictionaryAuthors(
@@ -803,18 +1098,20 @@ function stripUncitedSubstantiveSentences(markdown: string): string {
 function extractiveDictionaryFallback(
   evidence: DictionaryEvidenceItem[],
 ): string {
-  const excerpts = evidence.slice(0, 4).flatMap((item, index) => {
-    const normalized = item.text.replace(/\s+/g, " ").trim();
-    const citation = `[evidencia ${index + 1}](nodus://${item.kind}/${encodeURIComponent(item.id)})`;
-    const sentences = normalized.split(/(?<=[.!?])\s+/u).slice(0, 2);
-    return sentences.map((sentence) => {
-      const shortened =
-        sentence.length > 600
-          ? `${sentence.slice(0, 597).replace(/\s+\S*$/, "").trim()}…`
-          : sentence.replace(/[.!?]+$/u, "").trim();
-      return `> ${shortened} ${citation}.`;
+  const excerpts = orderedDictionaryEvidence(evidence)
+    .slice(0, 4)
+    .flatMap((item, index) => {
+      const normalized = item.text.replace(/\s+/g, " ").trim();
+      const citation = `[evidencia ${index + 1}](nodus://${item.kind}/${encodeURIComponent(item.id)})`;
+      const sentences = normalized.split(/(?<=[.!?])\s+/u).slice(0, 2);
+      return sentences.map((sentence) => {
+        const shortened =
+          sentence.length > 600
+            ? `${sentence.slice(0, 597).replace(/\s+\S*$/, "").trim()}…`
+            : sentence.replace(/[.!?]+$/u, "").trim();
+        return `> ${shortened} ${citation}.`;
+      });
     });
-  });
   return `## Evidencia verificable\n\n${excerpts.join("\n\n")}`;
 }
 
@@ -921,8 +1218,8 @@ async function synthesize(
   correction = "",
 ): Promise<GeneratedDictionary> {
   const entry = getDictionaryEntry(entryId)!;
-  const system = `Eres el redactor del Dictionary académico de Nodus. Trabaja exclusivamente a partir de EVIDENCE. No uses conocimiento externo ni inventes autores, obras, páginas, etiquetas, ideas, pasajes o identificadores. El FOCO es una instrucción editorial: nunca lo copies ni lo presentes como definición. Abre con una definición sustantiva del concepto y desarróllala de acuerdo con DETALLE. Devuelve prosa continua organizada en párrafos, pero representa cada frase como una afirmación atómica independiente. Cada afirmación debe expresar una sola relación verificable y llevar los identificadores exactos de la evidencia que la sostiene. Si dos fuentes sostienen cláusulas diferentes, crea afirmaciones separadas. Usa varias evidencias en una misma afirmación solo si CADA una sostiene por sí sola toda la afirmación. Para comparar autores, formula por separado la posición atribuida a cada autor y solo después una afirmación comparativa respaldada plenamente. Identifica acuerdos, desacuerdos, contradicciones y cambios temporales únicamente cuando EVIDENCE los documente. Explicita los límites de la evidencia cuando sean relevantes. No escribas Markdown ni citas dentro de text. Devuelve SOLO JSON válido con esta forma exacta: {"paragraphs":[{"claims":[{"text":"Una afirmación completa","evidence":[{"kind":"idea|passage","id":"ID exacto de EVIDENCE"}]}]}]}.`;
-  const user = `CONCEPTO: ${entry.name}\nALIASES: ${entry.aliases.join(", ")}\nFOCO: ${entry.focusPrompt || "(sin foco adicional)"}\nDETALLE: ${entry.detailLevel}\nIDIOMA DE SALIDA: ${entry.outputLanguage}\n${prior ? `VERSIÓN ACTUAL A ACTUALIZAR SIN COPIAR AFIRMACIONES NO RESPALDADAS:\n${prior}\n` : ""}${correction ? `CORRECCIÓN OBLIGATORIA DE LA SALIDA ANTERIOR:\n${correction}\n` : ""}EVIDENCE:\n${evidencePrompt(evidence)}`;
+  const system = `Eres el redactor del Dictionary académico de Nodus. Trabaja exclusivamente a partir de EVIDENCE. No uses conocimiento externo ni inventes autores, obras, páginas, etiquetas, ideas, pasajes o identificadores. El FOCO es una instrucción editorial: nunca lo copies ni lo presentes como definición. Antes de redactar, recorre por completo el ÍNDICE DE COBERTURA y toda EVIDENCE. La cantidad de pasajes recuperados de un autor u obra no mide por sí sola la importancia de su aportación: varios fragmentos contiguos o repetitivos de una misma fuente no deben desplazar una contribución definitoria y pertinente documentada por otra. Cuando haya evidencia directa de varios autores u obras, integra el mayor número de aportaciones sustantivas que permita DETALLE y evita que una sola fuente monopolice la explicación. No fuerces una simetría artificial: pondera la relevancia y la sustancia de cada aportación, no la mera frecuencia de recuperación. Nombra al autor al atribuirle una definición, uso, matiz o crítica y cita la evidencia específica asociada a esa aportación. Abre con una definición sustantiva del concepto y desarróllala de acuerdo con DETALLE. Devuelve prosa continua organizada en párrafos, pero representa cada frase como una afirmación atómica independiente. Cada afirmación debe expresar una sola relación verificable y llevar los identificadores exactos de la evidencia que la sostiene. Si dos fuentes sostienen cláusulas diferentes, crea afirmaciones separadas. Usa varias evidencias en una misma afirmación solo si CADA una sostiene por sí sola toda la afirmación. Para comparar autores, formula por separado la posición atribuida a cada autor y solo después una afirmación comparativa respaldada plenamente. Identifica acuerdos, desacuerdos, contradicciones y cambios temporales únicamente cuando EVIDENCE los documente. Explicita los límites de la evidencia cuando sean relevantes. No escribas Markdown ni citas dentro de text. Devuelve SOLO JSON válido con esta forma exacta: {"paragraphs":[{"claims":[{"text":"Una afirmación completa","evidence":[{"kind":"idea|passage","id":"ID exacto de EVIDENCE"}]}]}]}.`;
+  const user = `CONCEPTO: ${entry.name}\nALIASES: ${entry.aliases.join(", ")}\nFOCO: ${entry.focusPrompt || "(sin foco adicional)"}\nDETALLE: ${entry.detailLevel}\nIDIOMA DE SALIDA: ${entry.outputLanguage}\n${dictionaryCoveragePrompt(evidence, entry.detailLevel)}\n${prior ? `VERSIÓN ACTUAL A ACTUALIZAR SIN COPIAR AFIRMACIONES NO RESPALDADAS:\n${prior}\n` : ""}${correction ? `CORRECCIÓN OBLIGATORIA DE LA SALIDA ANTERIOR:\n${correction}\n` : ""}EVIDENCE:\n${evidencePrompt(evidence)}`;
   const baseMaxTokens =
     entry.detailLevel === "detailed"
       ? 4400
@@ -946,6 +1243,11 @@ async function synthesize(
     descriptionMarkdown: rendered.markdown,
     authorSummaries: [],
     invalidEvidenceRefs: rendered.invalidEvidenceRefs,
+    coverageProblems: structuredDictionaryCoverageProblems(
+      structured,
+      evidence,
+      entry.detailLevel,
+    ),
   };
 }
 
@@ -1066,7 +1368,21 @@ async function generateDictionaryEntryUsing(
         verifyCitations,
         request.model ?? null,
       );
-      const originalGroundingProblems = [...grounded.problems];
+      const originalGroundingProblems = [
+        ...new Set([
+          ...grounded.problems,
+          ...(generated.coverageProblems ?? []),
+          ...markdownDictionaryCoverageProblems(
+            grounded.markdown,
+            evidence,
+            entry.detailLevel,
+          ),
+        ]),
+      ];
+      grounded = {
+        ...grounded,
+        problems: originalGroundingProblems,
+      };
       if (originalGroundingProblems.length) {
         // A provider used through the testing seam (or a legacy provider adapter)
         // may still append uncited prose. Keep already verified sentences and retry
@@ -1077,7 +1393,17 @@ async function generateDictionaryEntryUsing(
         grounded = {
           ...grounded,
           markdown: salvagedMarkdown,
-          problems: groundingProblems(salvagedMarkdown, maps),
+          problems: [
+            ...new Set([
+              ...groundingProblems(salvagedMarkdown, maps),
+              ...(generated.coverageProblems ?? []),
+              ...markdownDictionaryCoverageProblems(
+                salvagedMarkdown,
+                evidence,
+                entry.detailLevel,
+              ),
+            ]),
+          ],
         };
       }
       const needsSemanticRepair = grounded.strippedSentences.length > 0;
@@ -1113,6 +1439,7 @@ async function generateDictionaryEntryUsing(
         `El intento ${attempt} fue rechazado porque ${generationProblems.join("; ")}.`,
         "Reescribe desde cero una definición sustantiva. No copies el FOCO.",
         "Haz afirmaciones atómicas y asigna a cada una solo evidencia que respalde la afirmación completa.",
+        "Revisa de nuevo el índice completo: no midas la importancia de un autor por la cantidad de fragmentos recuperados y conserva las aportaciones pertinentes de fuentes distintas.",
         grounded.strippedSentences.length
           ? `Estas frases no superaron la verificación y no deben repetirse sin estrecharlas: ${grounded.strippedSentences.slice(0, 4).join(" | ")}`
           : "",
