@@ -156,11 +156,36 @@ jobs:
             -k "$keychain_password" \
             "$keychain_path" >/dev/null
 
+          # codesign only resolves identities from the user's keychain search
+          # list, even when --keychain is also supplied. Preserve the runner's
+          # existing keychains while making this isolated one discoverable.
+          search_keychains=("$keychain_path")
+          while IFS= read -r existing_keychain; do
+            if [[ -n "$existing_keychain" && "$existing_keychain" != "$keychain_path" ]]; then
+              search_keychains+=("$existing_keychain")
+            fi
+          done < <(security list-keychains -d user | sed -E 's/^[[:space:]]*"([^"]+)".*/\1/')
+          security list-keychains -d user -s "${search_keychains[@]}"
+
           signing_identities="$(security find-identity -v -p codesigning "$keychain_path")"
           if [[ "$signing_identities" != *'"Developer ID Application:'* ]]; then
             echo "::error::The imported .p12 does not contain a valid Developer ID Application identity and private key"
             exit 1
           fi
+
+          # Fail before the expensive app build if codesign cannot use the
+          # imported private key in this non-interactive runner session.
+          identity_hash="$(awk '/"Developer ID Application:/ { print $2; exit }' <<< "$signing_identities")"
+          signing_probe="$RUNNER_TEMP/nodus-codesign-probe"
+          cp /usr/bin/true "$signing_probe"
+          codesign --force \
+            --sign "$identity_hash" \
+            --keychain "$keychain_path" \
+            --timestamp \
+            --options runtime \
+            "$signing_probe"
+          codesign --verify --strict "$signing_probe"
+          rm -f "$signing_probe"
 
           {
             echo "CSC_KEYCHAIN=$keychain_path"
@@ -198,9 +223,10 @@ jobs:
           keychain_path="${CSC_KEYCHAIN:-$RUNNER_TEMP/nodus-signing.keychain-db}"
           certificate_path="${NODUS_MACOS_CERTIFICATE_PATH:-$RUNNER_TEMP/nodus-signing-certificate.p12}"
           api_key_path="${NODUS_NOTARY_KEY_PATH:-$RUNNER_TEMP/nodus-notary-api-key.p8}"
+          signing_probe="$RUNNER_TEMP/nodus-codesign-probe"
           security lock-keychain "$keychain_path" >/dev/null 2>&1
           security delete-keychain "$keychain_path" >/dev/null 2>&1
-          rm -f "$certificate_path" "$api_key_path" "$keychain_path"
+          rm -f "$certificate_path" "$api_key_path" "$keychain_path" "$signing_probe"
 
       - name: Upload platform assets to the single draft
         env:

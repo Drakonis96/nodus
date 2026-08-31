@@ -123,6 +123,9 @@ test('GitHub release workflow requires API-key notarization and verifies before 
   assert.match(workflow, /RUNNER_TEMP\/nodus-notary-api-key\.p8/);
   assert.match(workflow, /security create-keychain/);
   assert.match(workflow, /security set-key-partition-list/);
+  assert.match(workflow, /security list-keychains -d user -s/);
+  assert.match(workflow, /nodus-codesign-probe/);
+  assert.match(workflow, /codesign --verify --strict "\$signing_probe"/);
   assert.match(workflow, /security delete-keychain/);
   assert.match(workflow, /rm -f "\$certificate_path" "\$api_key_path" "\$keychain_path"/);
   assert.match(workflow, /NODUS_REQUIRE_MACOS_SIGNING: true/);
