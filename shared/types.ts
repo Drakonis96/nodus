@@ -696,6 +696,8 @@ export interface Work {
   /** Stable metadata revision used when Zotero's local API reports item version 0. */
   zotero_fingerprint: string | null;
   title: string;
+  /** Original Zotero rich-text title when it differs from the plain display title. */
+  zotero_title_markup: string | null;
   authors_json: string; // JSON-encoded string[]
   year: number | null;
   item_type: string;
@@ -724,6 +726,7 @@ export interface Work {
   summary_status: SummaryStatus;
   summary_at: string | null;
   summary_hash: string | null;
+  summary_error: string | null;
   archived: number; // 0|1
   notes: string | null;
 }
@@ -4822,6 +4825,8 @@ export interface ZoteroItem {
   library: ZoteroLibrary;
   version: number;
   title: string;
+  /** Original Zotero rich-text title; `title` is always safe plain text. */
+  titleMarkup?: string | null;
   creators: ZoteroCreator[];
   year: number | null;
   itemType: string;

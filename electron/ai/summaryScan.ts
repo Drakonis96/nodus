@@ -157,8 +157,9 @@ export async function runSummaryScan(work: Work, model?: ModelRef | null): Promi
     fallback_text: fallbackText,
   };
 
+  let summary: string;
   try {
-    const summary = (await completeText({
+    summary = (await completeText({
       system: PROMPT_SUMMARY,
       user: JSON.stringify(input),
       temperature: 0.2,
@@ -169,23 +170,42 @@ export async function runSummaryScan(work: Work, model?: ModelRef | null): Promi
     }, scanModel)).trim();
     if (!summary) throw new Error('El modelo no devolvió un resumen utilizable.');
 
-    upsertWorkSummary({
-      nodusId: work.nodus_id,
-      summary,
-      sourceLevel: work.deep_status === 'done' ? 'deep' : 'light',
-      model: scanModel,
-      contentHash: hash,
-    });
-    setSummaryResult(work.nodus_id, 'done', hash);
-    recordLinkedLibraryAnalysis({ workId: work.nodus_id, components: ['summary'], documentFingerprint: hash });
-
-    const embedding = await embed(summary, undefined, { perf, jobId: `${work.nodus_id}:summary-embedding` });
-    if (embedding) updateWorkSummaryEmbedding(work.nodus_id, summary, embedding);
-    summaryDone({ status: 'ok' });
+    // Publish the readable summary and its status atomically. A crash cannot leave
+    // a new row hidden behind an old failed status (or vice versa).
+    db.transaction(() => {
+      upsertWorkSummary({
+        nodusId: work.nodus_id,
+        summary,
+        sourceLevel: work.deep_status === 'done' ? 'deep' : 'light',
+        model: scanModel,
+        contentHash: hash,
+      });
+      setSummaryResult(work.nodus_id, 'done', hash);
+    })();
   } catch (error) {
     summaryDone({ status: 'error', error: error instanceof Error ? error.message : String(error) });
     if (error instanceof AiError && error.config) throw error;
-    setSummaryResult(work.nodus_id, 'failed', hash);
+    setSummaryResult(work.nodus_id, 'failed', hash, error instanceof Error ? error.message : String(error));
     throw error;
+  }
+
+  // Library provenance is useful for cross-vault reuse, but it must not revoke a
+  // summary that has already been generated and committed successfully.
+  try {
+    recordLinkedLibraryAnalysis({ workId: work.nodus_id, components: ['summary'], documentFingerprint: hash });
+  } catch (error) {
+    console.warn(`[summaryScan] resumen guardado; procedencia diferida para ${work.nodus_id}: ${error instanceof Error ? error.message : String(error)}`);
+  }
+
+  // A readable summary does not depend on its optional retrieval vector. If the
+  // embedding provider is temporarily unavailable, keep the committed summary
+  // successful and let the reindex flow fill this derived field later.
+  try {
+    const embedding = await embed(summary, undefined, { perf, jobId: `${work.nodus_id}:summary-embedding` });
+    if (embedding) updateWorkSummaryEmbedding(work.nodus_id, summary, embedding);
+    summaryDone({ status: 'ok', embedding: embedding ? 'done' : 'not-configured' });
+  } catch (error) {
+    console.warn(`[summaryScan] resumen guardado; embedding diferido para ${work.nodus_id}: ${error instanceof Error ? error.message : String(error)}`);
+    summaryDone({ status: 'ok', embedding: 'deferred' });
   }
 }

@@ -454,6 +454,7 @@ export interface UpsertWorkInput {
   zotero_version: number | null;
   zotero_fingerprint?: string | null;
   title: string;
+  zotero_title_markup?: string | null;
   authors: string[];
   creators?: WorkCreator[];
   year: number | null;
@@ -469,18 +470,19 @@ export function upsertWork(input: UpsertWorkInput): void {
   const existing = getWorkByZoteroKey(input.zotero_key);
   if (!existing) {
     db.prepare(
-      `INSERT INTO works (nodus_id, zotero_key, zotero_version, zotero_fingerprint, title, authors_json, creators_json, year, item_type, doi, read_tag, light_status)
-       VALUES (@nodus_id, @zotero_key, @zotero_version, @zotero_fingerprint, @title, @authors_json, @creators_json, @year, @item_type, @doi, @read_tag, 'none')`
+      `INSERT INTO works (nodus_id, zotero_key, zotero_version, zotero_fingerprint, title, zotero_title_markup, authors_json, creators_json, year, item_type, doi, read_tag, light_status)
+       VALUES (@nodus_id, @zotero_key, @zotero_version, @zotero_fingerprint, @title, @zotero_title_markup, @authors_json, @creators_json, @year, @item_type, @doi, @read_tag, 'none')`
     ).run({
       ...input,
       zotero_fingerprint: input.zotero_fingerprint ?? null,
+      zotero_title_markup: input.zotero_title_markup ?? null,
       authors_json: JSON.stringify(input.authors),
       creators_json: input.creators ? JSON.stringify(input.creators) : null,
       read_tag: input.read_tag ? 1 : 0,
     });
   } else {
     db.prepare(
-      `UPDATE works SET zotero_version=@zotero_version, zotero_fingerprint=COALESCE(@zotero_fingerprint, zotero_fingerprint), title=@title, authors_json=@authors_json,
+      `UPDATE works SET zotero_version=@zotero_version, zotero_fingerprint=COALESCE(@zotero_fingerprint, zotero_fingerprint), title=@title, zotero_title_markup=@zotero_title_markup, authors_json=@authors_json,
        creators_json=COALESCE(@creators_json, creators_json),
        year=@year, item_type=@item_type, doi=@doi, read_tag=@read_tag, archived=0 WHERE zotero_key=@zotero_key`
     ).run({
@@ -488,6 +490,7 @@ export function upsertWork(input: UpsertWorkInput): void {
       zotero_version: input.zotero_version,
       zotero_fingerprint: input.zotero_fingerprint ?? null,
       title: input.title,
+      zotero_title_markup: input.zotero_title_markup ?? null,
       authors_json: JSON.stringify(input.authors),
       creators_json: input.creators ? JSON.stringify(input.creators) : null,
       year: input.year,
@@ -594,7 +597,7 @@ export function clearDeepQueued(nodusId: string): void {
 }
 
 export function setSummaryPending(nodusId: string): void {
-  getDb().prepare("UPDATE works SET summary_status = 'pending' WHERE nodus_id = ?").run(nodusId);
+  getDb().prepare("UPDATE works SET summary_status = 'pending', summary_error = NULL WHERE nodus_id = ?").run(nodusId);
 }
 
 export function setLightResult(nodusId: string, status: string, hash: string | null, notes?: string | null): void {
@@ -698,11 +701,16 @@ export function listWorkTextSources(nodusId: string): WorkTextSource[] {
   ).all(nodusId) as WorkTextSource[];
 }
 
-export function setSummaryResult(nodusId: string, status: SummaryStatus, hash: string | null): void {
+export function setSummaryResult(
+  nodusId: string,
+  status: SummaryStatus,
+  hash: string | null,
+  error?: string | null,
+): void {
   const db = getDb();
   db
-    .prepare('UPDATE works SET summary_status = ?, summary_at = ?, summary_hash = ? WHERE nodus_id = ?')
-    .run(status, new Date().toISOString(), hash, nodusId);
+    .prepare('UPDATE works SET summary_status = ?, summary_at = ?, summary_hash = ?, summary_error = ? WHERE nodus_id = ?')
+    .run(status, new Date().toISOString(), hash, status === 'failed' ? error ?? 'La generación del resumen ha fallado.' : null, nodusId);
   markLibraryAnalysisFreshness(db, nodusId, 'summary', status === 'done' ? 'current' : status === 'failed' ? 'failed' : status === 'skipped_no_text' ? 'unavailable' : 'queued', hash);
 }
 
@@ -724,7 +732,7 @@ function markLibraryAnalysisFreshness(
 /** Underlying light/deep material changed, so its orientation summary is no longer current. */
 export function invalidateSummary(nodusId: string): void {
   getDb()
-    .prepare("UPDATE works SET summary_status = 'none', summary_at = NULL, summary_hash = NULL WHERE nodus_id = ?")
+    .prepare("UPDATE works SET summary_status = 'none', summary_at = NULL, summary_hash = NULL, summary_error = NULL WHERE nodus_id = ?")
     .run(nodusId);
 }
 

@@ -2,6 +2,7 @@ import { fileURLToPath } from 'node:url';
 import fs from 'node:fs';
 import path from 'node:path';
 import type { ZoteroAttachmentInfo, ZoteroCollection, ZoteroItem, ZoteroLibrary, ZoteroPingResult, WorkMeta } from '@shared/types';
+import { bibliographicPlainText } from '@shared/bibliographicText';
 
 // Read-only client for Zotero's local API: the desktop app's local implementation
 // of Web API v3, served from port 23119 since Zotero 7. There is no "Zotero 7 API" —
@@ -243,6 +244,8 @@ function yearFromDate(date?: string): number | null {
 
 function mapItem(raw: any, library: ZoteroLibrary): ZoteroItem {
   const d = raw.data ?? {};
+  const rawTitle = String(d.title ?? d.shortTitle ?? '(sin título)');
+  const plainTitle = bibliographicPlainText(rawTitle) || '(sin título)';
   const creators = (d.creators ?? []).map((c: any) => ({
     lastName: c.lastName ?? '',
     firstName: c.firstName ?? '',
@@ -277,7 +280,8 @@ function mapItem(raw: any, library: ZoteroLibrary): ZoteroItem {
     itemKey,
     library,
     version: d.version ?? raw.version ?? 0,
-    title: d.title ?? d.shortTitle ?? '(sin título)',
+    title: plainTitle,
+    titleMarkup: rawTitle !== plainTitle ? rawTitle : null,
     creators,
     year: yearFromDate(d.date),
     itemType: d.itemType ?? 'other',

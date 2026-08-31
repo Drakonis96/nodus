@@ -42,6 +42,12 @@ try {
   assert.match(recovery.inspectRecoveryFolder(recoveryRoot, 'tr').message, /Boş klasör/, 'Turkish recovery never falls back to English');
   assert.equal(recovery.inspectRecoveryFolder(invalidRoot).kind, 'invalid', 'non-empty unrelated folder rejected');
 
+  const shortPassword = await recovery.initializeRecoveryFolder(recoveryRoot, 'short', '9.9.9-test', 'en');
+  assert.equal(shortPassword.ok, false, 'a short master password is rejected by the authoritative backend');
+  assert.match(shortPassword.message, /at least 8 characters/i);
+  assert.equal(recovery.inspectRecoveryFolder(recoveryRoot).kind, 'empty',
+    'invalid credentials cannot write a manifest or partially initialize recovery');
+
   const active = vaults.getActiveVault();
   const alice = entities.createPerson({ displayName: 'Alice protegida' });
   const vaultDir = path.dirname(active.path);

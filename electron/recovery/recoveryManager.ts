@@ -40,6 +40,7 @@ import {
   STARTUP_RECOVERY_PROBE_TIMEOUT_MS,
   probeRecoveryFolderInUtility,
 } from './recoveryProbeUtilityHost';
+import { validateBackupPassword } from '@shared/backupPasswordPolicy';
 
 export const RECOVERY_SETUP_VERSION = 1;
 
@@ -229,8 +230,9 @@ export async function initializeRecoveryFolder(
   appVersion: string,
   language: AppLanguage = 'es'
 ): Promise<RecoverySetupResult> {
-  const cleanPassword = password.trim();
-  if (cleanPassword.length < 8) return { ok: false, message: tr(language, { es: 'La contraseña debe tener al menos 8 caracteres.', en: 'The password must be at least 8 characters long.', fr: 'Le mot de passe doit contenir au moins 8 caractères.', de: 'Das Passwort muss mindestens 8 Zeichen lang sein.', pt: 'A palavra-passe deve ter pelo menos 8 caracteres.', 'pt-BR': 'A senha deve ter pelo menos 8 caracteres.', it: 'La password deve contenere almeno 8 caratteri.', tr: 'Parola en az 8 karakter uzunluğunda olmalıdır.' }) };
+  const passwordValidation = validateBackupPassword(password);
+  const cleanPassword = passwordValidation.normalized;
+  if (!passwordValidation.valid) return { ok: false, message: tr(language, { es: 'La contraseña debe tener al menos 8 caracteres.', en: 'The password must be at least 8 characters long.', fr: 'Le mot de passe doit contenir au moins 8 caractères.', de: 'Das Passwort muss mindestens 8 Zeichen lang sein.', pt: 'A palavra-passe deve ter pelo menos 8 caracteres.', 'pt-BR': 'A senha deve ter pelo menos 8 caracteres.', it: 'La password deve contenere almeno 8 caratteri.', tr: 'Parola en az 8 karakter uzunluğunda olmalıdır.' }) };
   let inspection: RecoveryFolderInspection;
   try {
     inspection = await inspectRecoveryFolderSafely(folder, language, 'deep');

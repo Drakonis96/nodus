@@ -15,7 +15,8 @@ const policy = require(path.join(repoRoot, 'electron/sync/zoteroSyncPolicy.ts'))
 function item(overrides = {}) {
   return {
     key: 'ITEM0001', itemKey: 'ITEM0001', library: { type: 'user', id: '0', name: 'Mi biblioteca' },
-    version: 0, title: 'A stable title', creators: [{ firstName: 'Ada', lastName: 'Lovelace', creatorType: 'author' }],
+    version: 0, title: 'A stable title', titleMarkup: null,
+    creators: [{ firstName: 'Ada', lastName: 'Lovelace', creatorType: 'author' }],
     year: 1843, itemType: 'journalArticle', doi: '10.1000/example', abstract: 'An abstract',
     tags: ['/read', 'history'], collections: ['ROOT', 'CHILD'], publisher: 'Publisher', publicationTitle: 'Journal',
     isbn: null, issn: '0000-0000', url: 'https://example.test', date: '1843', language: 'en', volume: '1', issue: '2',
@@ -28,13 +29,13 @@ function item(overrides = {}) {
 function work(overrides = {}) {
   return {
     nodus_id: 'work-1', zotero_key: 'ITEM0001', zotero_version: 5131, zotero_fingerprint: null,
-    title: 'A stable title', authors_json: JSON.stringify(['Ada Lovelace']), year: 1843,
+    title: 'A stable title', zotero_title_markup: null, authors_json: JSON.stringify(['Ada Lovelace']), year: 1843,
     item_type: 'journalArticle', doi: '10.1000/example', read_tag: 1, manual_deep: 1, deep_trigger: 'both',
     source_type: 'full_text', light_status: 'done', light_at: null, light_hash: 'light', deep_status: 'done', deep_at: null,
     deep_hash: 'deep', resolved_source_type: 'pdf', resolved_text_hash: 'deep', resolved_text_chars: 100,
     resolved_text_source_count: 1, resolved_has_page_markers: 1, text_block_reason: null, text_resolved_at: null,
     resolved_text_notes: null, deep_error: null, deep_queued: 0, summary_status: 'done', summary_at: null,
-    summary_hash: 'summary', archived: 0, notes: null,
+    summary_hash: 'summary', summary_error: null, archived: 0, notes: null,
     ...overrides,
   };
 }
@@ -79,6 +80,21 @@ test('fingerprints detect later zero-version edits and ignore unordered metadata
   const persisted = work({ zotero_version: 0, zotero_fingerprint: fingerprint });
   assert.equal(policy.classifyZoteroItemChange(persisted, reordered, context), 'unchanged');
   assert.equal(policy.classifyZoteroItemChange(persisted, item({ abstract: 'A revised abstract' }), context), 'changed');
+});
+
+test('normalizing Zotero rich-text titles does not create a false metadata change', () => {
+  const rawTitle = '<span style="font-variant:small-caps;">CLE</span> peptides in plant-biotic interactions';
+  const plainTitle = 'CLE peptides in plant-biotic interactions';
+  const previousFingerprint = policy.zoteroItemFingerprint(item({ title: rawTitle }));
+  const normalized = item({ title: plainTitle, titleMarkup: rawTitle });
+  const persisted = work({
+    title: plainTitle,
+    zotero_title_markup: rawTitle,
+    zotero_version: 0,
+    zotero_fingerprint: previousFingerprint,
+  });
+  assert.equal(policy.zoteroItemFingerprint(normalized), previousFingerprint);
+  assert.equal(policy.classifyZoteroItemChange(persisted, normalized, context), 'unchanged');
 });
 
 test('positive Zotero revisions remain authoritative', () => {

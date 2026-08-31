@@ -25,7 +25,9 @@ function sortedRecord(values: Record<string, string>): Record<string, string> {
  */
 export function zoteroItemFingerprint(item: ZoteroItem): string {
   const payload = {
-    title: item.title,
+    // Old fingerprints used Zotero's original rich-text value. Continue hashing
+    // that value while exposing a plain title to the rest of the app.
+    title: item.titleMarkup ?? item.title,
     creators: item.creators.map((creator) => ({
       creatorType: creator.creatorType ?? 'author',
       firstName: creator.firstName ?? '',
@@ -73,7 +75,7 @@ function modifiedAfter(item: ZoteroItem, timestamp: string | null): boolean {
 function coreMetadataChanged(previous: Work, item: ZoteroItem, context: ZoteroChangeContext): boolean {
   let previousAuthors: string[] = [];
   try { previousAuthors = JSON.parse(previous.authors_json || '[]') as string[]; } catch { previousAuthors = []; }
-  return previous.title !== item.title
+  return (previous.zotero_title_markup ?? previous.title) !== (item.titleMarkup ?? item.title)
     || JSON.stringify(previousAuthors) !== JSON.stringify(context.authors)
     || previous.year !== item.year
     || previous.item_type !== item.itemType

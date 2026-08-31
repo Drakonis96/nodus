@@ -22,6 +22,19 @@ const server = createServer((request, response) => {
     response.end('{}');
     return;
   }
+  if (mode === 'rich-title') {
+    response.statusCode = 200;
+    response.setHeader('Content-Type', 'application/json');
+    response.end(JSON.stringify({
+      key: 'RICH',
+      data: {
+        key: 'RICH', version: 7, itemType: 'journalArticle',
+        title: '<span style="font-variant:small-caps;">CLE</span> peptides &amp; plant-biotic interactions',
+        creators: [], tags: [], collections: [],
+      },
+    }));
+    return;
+  }
   if (requests < 3) {
     response.statusCode = 429;
     response.setHeader('Retry-After', '0');
@@ -52,6 +65,12 @@ try {
 
   assert.equal(await client.libraryVersion('0'), 91);
   assert.equal(requests, 3, 'rate limits are retried before the sync is reported as partial');
+
+  mode = 'rich-title'; requests = 0;
+  const richTitle = await client.getItem('0', 'RICH');
+  assert.equal(richTitle.title, 'CLE peptides & plant-biotic interactions');
+  assert.equal(richTitle.titleMarkup, '<span style="font-variant:small-caps;">CLE</span> peptides &amp; plant-biotic interactions');
+  assert.equal(requests, 1, 'title normalization adds no extra Zotero request');
 
   mode = 'unauthorized'; requests = 0;
   await assert.rejects(client.libraryVersion('0'), (error) => error.code === 'credentials-expired' && error.retryable === false);

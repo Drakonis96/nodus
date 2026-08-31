@@ -5,6 +5,7 @@ import { backfillUniversalPageDocuments, migrateUniversalPages } from './pageMig
 import { databaseCellStorage } from '@shared/databaseCellStorage';
 import { columnTypeDef } from '@shared/databases';
 import { normalizeDatabaseViewConfig } from '@shared/databaseViewConfig';
+import { bibliographicPlainText } from '@shared/bibliographicText';
 
 export interface Migration {
   version: number;
@@ -87,9 +88,38 @@ function ensureZoteroFingerprintColumn(db: Database.Database): void {
   `);
 }
 
+/** Persist summary failures so a restart does not erase the actionable cause. */
+function ensureSummaryErrorColumn(db: Database.Database): void {
+  const hasColumn = (db.prepare('PRAGMA table_info(works)').all() as Array<{ name: string }>)
+    .some((row) => row.name === 'summary_error');
+  if (!hasColumn) db.exec('ALTER TABLE works ADD COLUMN summary_error TEXT');
+}
+
+/**
+ * Move Zotero's rich title markup out of the plain title used by every UI,
+ * search, prompt, and progress surface. The source value remains available for
+ * future rich citation rendering, and the Zotero fingerprint is left untouched.
+ */
+function ensureZoteroTitleMarkupColumn(db: Database.Database): void {
+  const hasColumn = (db.prepare('PRAGMA table_info(works)').all() as Array<{ name: string }>)
+    .some((row) => row.name === 'zotero_title_markup');
+  if (!hasColumn) db.exec('ALTER TABLE works ADD COLUMN zotero_title_markup TEXT');
+  const rows = db.prepare('SELECT nodus_id, title, zotero_title_markup FROM works').all() as Array<{
+    nodus_id: string;
+    title: string | null;
+    zotero_title_markup: string | null;
+  }>;
+  const update = db.prepare('UPDATE works SET title=?, zotero_title_markup=? WHERE nodus_id=?');
+  for (const row of rows) {
+    if (row.zotero_title_markup || !row.title) continue;
+    const plain = bibliographicPlainText(row.title);
+    if (plain !== row.title) update.run(plain || '(sin título)', row.title, row.nodus_id);
+  }
+}
+
 // Versioned, append-only migrations. Never edit an existing migration's SQL once
 // shipped — add a new one. The current schema version is the highest applied.
-export const SCHEMA_VERSION = 171;
+export const SCHEMA_VERSION = 173;
 
 export const migrations: Migration[] = [
   {
@@ -9248,6 +9278,16 @@ export const migrations: Migration[] = [
     version: 171,
     up: /* sql */ `SELECT 1;`,
     after: ensureZoteroFingerprintColumn,
+  },
+  {
+    version: 172,
+    up: /* sql */ `SELECT 1;`,
+    after: ensureSummaryErrorColumn,
+  },
+  {
+    version: 173,
+    up: /* sql */ `SELECT 1;`,
+    after: ensureZoteroTitleMarkupColumn,
   },
 ];
 
