@@ -199,6 +199,8 @@ ${next ? `        <a class="btn" href="${encodeURIComponent(next.slug)}/">${esca
     </div>
     <div class="foot-base">
       <span>© 2026 Jorge Pérez Burgueño and Nodus contributors.</span>
+      <a href="../privacy/">Website privacy</a>
+      <a href="../cookies/">Cookies</a>
       <a href="https://github.com/Drakonis96/nodus/blob/main/LICENSE" target="_blank" rel="noopener">AGPL-3.0-only</a>
     </div>
   </div>

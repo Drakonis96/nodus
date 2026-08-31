@@ -1,0 +1,124 @@
+<!--
+SPDX-FileCopyrightText: 2026 Jorge Pérez Burgueño and Nodus contributors
+SPDX-License-Identifier: AGPL-3.0-only
+-->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Cookies and Local Storage | Nodus Research</title>
+<meta name="description" content="Cookies and local browser storage used by the Nodus Research website, with purposes, durations and deletion controls."/>
+<meta name="robots" content="noindex, follow, noarchive"/>
+<meta property="og:title" content="Cookies and Local Storage | Nodus Research"/>
+<meta property="og:description" content="A precise inventory of the local storage used by nodusresearch.com and its external media and map resources."/>
+<meta property="og:type" content="website"/>
+<meta property="og:url" content="https://nodusresearch.com/cookies/"/>
+<meta property="og:site_name" content="Nodus Research"/>
+<meta property="og:locale" content="en_GB"/>
+<meta property="og:image" content="https://nodusresearch.com/favicon.png"/>
+<link rel="canonical" href="https://nodusresearch.com/cookies/"/>
+<link rel="icon" href="../favicon.ico" sizes="any"/>
+<link rel="icon" type="image/png" href="../favicon.png" sizes="512x512"/>
+<link rel="icon" type="image/svg+xml" href="../assets/nodus-logo.svg"/>
+<link rel="apple-touch-icon" href="../apple-touch-icon.png"/>
+<link rel="preload" as="font" type="font/woff2" href="../assets/fonts/inter-latin.woff2" crossorigin/>
+<link rel="preload" as="font" type="font/woff2" href="../assets/fonts/fraunces-latin.woff2" crossorigin/>
+<link rel="stylesheet" href="../assets/css/nodus.css?v=20260823a"/>
+<link rel="stylesheet" href="../assets/css/guide.css?v=20260823a"/>
+<link rel="stylesheet" href="../assets/css/legal.css?v=20260831"/>
+</head>
+<body class="legal-page">
+
+<a class="skip-link" href="#main">Skip to content</a>
+
+<div data-nodus-site-header data-base="../"></div>
+<script defer src="../site-header.js?v=20260823a"></script>
+
+<main id="main">
+
+<header class="page-hero guide-hero">
+  <div class="wrap">
+    <div class="scrim" style="max-width:850px">
+      <nav class="breadcrumb" aria-label="Breadcrumb">
+        <a href="../">Nodus Research</a>
+        <span class="sep" aria-hidden="true">/</span>
+        <span aria-current="page">Cookies and local storage</span>
+      </nav>
+      <h1 class="display">Cookies and local storage notice</h1>
+      <p class="lead">This notice identifies the cookies and equivalent browser-storage technologies used by nodusresearch.com, their purposes and duration, and the means available to remove them.</p>
+      <p class="meta">Effective date: 31 August 2026.</p>
+    </div>
+  </div>
+</header>
+
+<section>
+  <div class="wrap">
+    <div class="section-head reveal"><h2 class="title">1. Use of cookies and equivalent technologies</h2></div>
+    <div class="guide-body prose reveal">
+      <p>The project does not deliberately set HTTP cookies on <b>nodusresearch.com</b>. It has no Google Analytics, analytics container, advertising pixel, fingerprinting code or cross-site visitor identifier. Google Search Console ownership verification is not a visitor-tracking script and does not create a Search Console cookie on this website.</p>
+      <p>The website does use the browser's <code>localStorage</code> for limited functional purposes. Spanish and EU rules cover this type of terminal storage as well as conventional cookies, so it is documented here even when the stored value contains no personal visitor identifier.</p>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <div class="section-head reveal"><h2 class="title">2. First-party browser storage</h2></div>
+    <div class="guide-body prose reveal">
+      <div class="legal-table-scroll">
+      <table>
+        <thead><tr><th>Key</th><th>Purpose</th><th>Duration</th></tr></thead>
+        <tbody>
+          <tr><td><code>nodus-contributors</code></td><td>Caches public GitHub contributor data so the contribution wall remains available if an anonymous API request is rate-limited.</td><td>Used for up to 24 hours; an older value may remain inert until browser storage is cleared.</td></tr>
+          <tr><td><code>nodus.web.nodi.notes</code></td><td>Stores notes the visitor expressly creates in the website's local Nodi helper. The contents are not sent to Nodus Research.</td><td>Until the visitor deletes the notes or clears site data.</td></tr>
+          <tr><td><code>nodus.web.nodi.notifications.read</code></td><td>Remembers that the visitor opened the local website notification panel.</td><td>Until site data is cleared.</td></tr>
+          <tr><td><code>nodus.web.nodi.notifications.cleared</code></td><td>Remembers that the visitor cleared the local website notices.</td><td>Until site data is cleared.</td></tr>
+          <tr><td><code>nodus.lang</code></td><td>Legacy language preference that the current helper may read if it already exists from an earlier visit.</td><td>Until site data is cleared.</td></tr>
+        </tbody>
+      </table>
+      </div>
+      <p>These values support a feature used or selected by the visitor, store public cache data, or remember a local interface choice. They are not combined into a visitor profile, used for advertising or sent to the project.</p>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <div class="section-head reveal"><h2 class="title">3. Third-party content and storage</h2></div>
+    <div class="guide-body prose reveal">
+      <p>Public GitHub counters and contributor data, YouTube thumbnails, the Leaflet library supplied through unpkg, and CARTO map tiles can be requested as described in the <a href="../privacy/">website privacy notice</a>. Those network requests are not used by Nodus Research to track visitors.</p>
+      <p>A YouTube player is created only after the visitor chooses a video. It uses the <code>youtube-nocookie.com</code> privacy-enhanced domain. YouTube may then use storage needed to operate the requested player under Google's rules; leaving the embedded player or opening YouTube directly subjects the visit to Google's own settings and policies.</p>
+      <p>GitHub, Google, unpkg and CARTO control any storage used on their own domains. Their practices can change independently, so their current notices and the browser's storage panel are the authoritative sources for third-party items.</p>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <div class="section-head reveal"><h2 class="title">4. Management, refusal and deletion</h2></div>
+    <div class="guide-body prose reveal">
+      <p>Local Nodi notes can be deleted inside the notes panel. All first-party items can also be removed using the browser's “site data”, “cookies and site data” or equivalent privacy settings for <b>nodusresearch.com</b>. Blocking local storage may prevent notes and read-state preferences from persisting, but the public content remains available.</p>
+      <p>Because the website currently has no non-essential analytics or advertising storage, it does not display a general consent banner. If a future version introduces non-essential storage, it must remain disabled until the visitor has received the required information and made a choice; this notice and the interface will be updated at that time.</p>
+      <p>Questions can be sent to <a href="mailto:contact@nodusresearch.com">contact@nodusresearch.com</a>.</p>
+    </div>
+    <div class="guide-body prose reveal"><p><b>Related documents:</b> <a href="../privacy/">website privacy notice</a>, <a href="../legal/">legal notice</a>, and <a href="https://github.com/Drakonis96/nodus/blob/main/PRIVACY.md" target="_blank" rel="noopener">Nodus application privacy policy</a>.</p></div>
+  </div>
+</section>
+
+</main>
+
+<footer class="site-foot">
+  <div class="wrap">
+    <div class="foot-grid">
+      <div class="foot-brand"><a class="logo" href="../"><img src="../assets/nodus-logo.svg" alt=""/> Nodus Research</a><p>A personal, independent open-source project developed in Spain. Nodus is its local-first desktop application.</p></div>
+      <div class="foot-col"><h3>Research</h3><a href="../research/">Academic research</a><a href="../zotero/">Nodus and Zotero</a><a href="../apps/">Nodus Apps</a></div>
+      <div class="foot-col"><h3>Learn</h3><a href="../wiki/">Wiki</a><a href="../blog/">Blog</a><a href="../faq/">FAQ</a></div>
+      <div class="foot-col"><h3>Project</h3><a href="../about/">About</a><a href="../legal/">Legal notice</a><a href="../privacy/">Website privacy</a><a href="./" aria-current="page">Cookies</a><a href="https://github.com/Drakonis96/nodus" target="_blank" rel="noopener">GitHub</a></div>
+    </div>
+    <div class="foot-base"><span>© 2026 Jorge Pérez Burgueño and Nodus contributors.</span><a href="../privacy/">Website privacy</a><a href="./" aria-current="page">Cookies</a><a href="https://github.com/Drakonis96/nodus/blob/main/PRIVACY.md" target="_blank" rel="noopener">App privacy</a><a href="https://github.com/Drakonis96/nodus/blob/main/LICENSE" target="_blank" rel="noopener">AGPL-3.0-only</a></div>
+  </div>
+</footer>
+
+</body>
+</html>
