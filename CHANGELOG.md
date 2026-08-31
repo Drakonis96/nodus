@@ -2,10 +2,10 @@
 
 ## Unreleased
 
-## 5.1.3-beta.4 — 2026-08-31
+## 5.1.3 — 2026-08-31
 
-This beta validates the complete Developer ID signing and Apple notarization
-pipeline before Nodus 5.1.3 is promoted to the stable channel.
+Nodus 5.1.3 introduces the complete Developer ID signing and Apple notarization
+pipeline and improves the quality and transparency of Dictionary evidence.
 
 - Signed the macOS application and every nested executable component with the
   minimum required entitlements and Hardened Runtime enabled.
@@ -16,6 +16,8 @@ pipeline before Nodus 5.1.3 is promoted to the stable channel.
   lexical retrieval, exposed source provenance and added coverage warnings.
 - Added a focused two-item What's New modal in all eight interface languages,
   led by the Apple notarization milestone and its dedicated SVG icon.
+- Prevented beta installations from presenting an older stable release as an
+  available update after `electron-updater` had correctly rejected the downgrade.
 
 ## 5.1.2 — 2026-08-31
 
