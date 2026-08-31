@@ -166,3 +166,14 @@ test('release version validation cannot cross channels', () => {
   assert.throws(() => validateReleaseChannel('beta', 'v3.3.0', '3.3.0'));
   assert.throws(() => validateReleaseChannel('beta', 'v3.3.0-beta.3', '3.3.0-beta.2'));
 });
+
+test('desktop betas keep the Chrome connector on its Manifest V3 base version', async () => {
+  const [pkg, manifest, builder] = await Promise.all([
+    read('package.json').then(JSON.parse),
+    read('browser-extension/manifest.json').then(JSON.parse),
+    read('scripts/build-browser-extension.mjs'),
+  ]);
+  assert.equal(manifest.version, pkg.version.replace(/-beta\.\d+$/, ''));
+  assert.match(builder, /const connectorVersion = pkg\.version\.replace\(\/-beta\\\.\\d\+\$\/, ''\)/);
+  assert.match(builder, /manifest\.version !== connectorVersion/);
+});

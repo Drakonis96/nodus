@@ -56,7 +56,7 @@ try {
 
   assert.match(serverVersion, /export const NODUS_VERSION = '5\.1\.2'/);
   assert.match(serverVersion, /tree\/v\$\{NODUS_VERSION\}/);
-  assert.match(sourceOffer, /archive\/refs\/tags\/v5\.1\.3-beta\.1\.tar\.gz/);
+  assert.match(sourceOffer, /archive\/refs\/tags\/v5\.1\.3-beta\.2\.tar\.gz/);
   assert.match(citation, /^date-released: "2026-08-31"$/m);
   for (const phrase of ['pre-v4', '3.2.7', 'may not open', '50,000', '10,000']) {
     assert.match(`${guide}\n${acceptance}`, new RegExp(phrase.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i'), `release documentation is missing ${phrase}`);
