@@ -24,14 +24,14 @@ try {
   );
 
   const { RELEASE_NOTES, releaseNotesForMajor, compareVersions } = await import(pathToFileURL(bundlePath).href);
-  // 5.1.0 groups the user-visible result of PRs #599 through #623 by product
-  // surface so fixes from the same workflow read as one coherent announcement.
+  // 5.1.1 preserves the complete 5.1.0 announcement and adds the catalog-only
+  // Zotero header refresh hotfix in every interface language.
   const currentRelease = RELEASE_NOTES[0];
-  assert.equal(currentRelease?.version, '5.1.0');
-  assert.equal(currentRelease?.date, '2026-08-30');
-  assert.equal(currentRelease?.highlights.length, 8);
+  assert.equal(currentRelease?.version, '5.1.1');
+  assert.equal(currentRelease?.date, '2026-08-31');
+  assert.equal(currentRelease?.highlights.length, 9);
   assert.deepEqual(currentRelease?.highlights.map((highlight) => highlight.scope), [
-    'ai', 'ai', 'zotero', 'server', 'library', 'databases', 'word', 'connector',
+    'ai', 'ai', 'zotero', 'server', 'library', 'databases', 'word', 'connector', 'zotero',
   ]);
   for (const phrase of [
     /more than twice as fast/,
@@ -42,9 +42,16 @@ try {
     /same clear library, composer, queue, and reading flow/,
     /Word ribbon adds shortcuts/,
     /Nodus Research Connector/,
+    /without starting or queuing analysis/,
+    /entire library appear to have changed at once/,
   ]) assert.ok(currentRelease?.highlights.some((highlight) => phrase.test(highlight.en)));
 
-  // 5.0.6 remains intact beneath the new minor release.
+  const minorRelease = RELEASE_NOTES.find((note) => note.version === '5.1.0');
+  assert.equal(minorRelease?.date, '2026-08-30');
+  assert.equal(minorRelease?.highlights.length, 8);
+  assert.deepEqual(currentRelease?.highlights.slice(0, 8), minorRelease?.highlights);
+
+  // 5.0.6 remains intact beneath the new hotfix and minor release.
   const previousStableRelease = RELEASE_NOTES.find((note) => note.version === '5.0.6');
   assert.equal(previousStableRelease?.date, '2026-08-28');
   assert.equal(previousStableRelease?.highlights.length, 7);

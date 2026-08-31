@@ -1859,6 +1859,24 @@ const RELEASE_5_1_0_HIGHLIGHTS: RawReleaseHighlight[] = [
 ];
 
 /**
+ * v5.1.1 deliberately keeps the complete v5.1.0 announcement and appends the
+ * Zotero catalog-only hotfix. This makes the patch modal self-contained without
+ * rewriting or dropping anything that shipped in the minor release.
+ */
+const RELEASE_5_1_1_HIGHLIGHTS: RawReleaseHighlight[] = [
+  ...RELEASE_5_1_0_HIGHLIGHTS,
+  {
+    scope: 'zotero',
+    es: 'El botón Actualizar del encabezado ahora solo sincroniza el catálogo de las colecciones de Zotero que monitorizas. Los artículos nuevos aparecen en la Biblioteca sin iniciar ni encolar análisis. También se corrige la versión cero que devolvía Zotero 10 y que podía hacer que toda la biblioteca pareciera modificada de golpe.',
+    en: 'The Update button in the header now only refreshes the catalog for the Zotero collections you monitor. New items appear in the Library without starting or queuing analysis. This also fixes Zotero 10 returning item version zero, which could make the entire library appear to have changed at once.',
+    fr: 'Le bouton Actualiser de l’en-tête met désormais à jour uniquement le catalogue des collections Zotero que vous surveillez. Les nouveaux éléments apparaissent dans la Bibliothèque sans lancer ni mettre d’analyse en file d’attente. Cette version corrige aussi la valeur zéro renvoyée par Zotero 10, qui pouvait faire croire que toute la bibliothèque avait changé d’un coup.',
+    de: 'Die Schaltfläche Aktualisieren in der Kopfzeile aktualisiert jetzt nur den Katalog der überwachten Zotero-Sammlungen. Neue Einträge erscheinen in der Bibliothek, ohne Analysen zu starten oder einzureihen. Außerdem wird die von Zotero 10 gemeldete Elementversion null korrekt behandelt, durch die zuvor die gesamte Bibliothek auf einmal als geändert erscheinen konnte.',
+    pt: 'O botão Atualizar do cabeçalho passa a atualizar apenas o catálogo das coleções do Zotero que monitoriza. Os novos elementos aparecem na Biblioteca sem iniciar nem colocar análises em fila. Esta versão também corrige o valor zero devolvido pelo Zotero 10, que podia fazer parecer que toda a biblioteca tinha mudado de uma só vez.',
+    'pt-BR': 'O botão Atualizar do cabeçalho agora atualiza apenas o catálogo das coleções do Zotero que você monitora. Os novos itens aparecem na Biblioteca sem iniciar nem colocar análises na fila. Esta versão também corrige o valor zero retornado pelo Zotero 10, que podia fazer parecer que toda a biblioteca havia mudado de uma só vez.',
+  },
+];
+
+/**
  * v5.0.6 — every user-visible change merged after v5.0.5, excluding the
  * independent server-web parity branch. Keep this list aligned by index with
  * the Italian and Turkish tables so all eight interface languages receive the
@@ -2313,6 +2331,11 @@ const RELEASE_5_0_0_HIGHLIGHTS: RawReleaseHighlight[] = [
 ];
 
 const RAW_RELEASE_NOTES: RawReleaseNote[] = [
+  {
+    version: '5.1.1',
+    date: '2026-08-31',
+    highlights: RELEASE_5_1_1_HIGHLIGHTS,
+  },
   {
     version: '5.1.0',
     date: '2026-08-30',
