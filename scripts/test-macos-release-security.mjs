@@ -81,12 +81,28 @@ test('the custom signer covers the DockTile and every enclosed native code bundl
   assert.match(signer, /signAsync/);
   assert.match(signer, /entitlements\.mac\.empty\.plist/);
   assert.match(signer, /isElectronHelperRuntime/);
+  assert.match(signer, /security.*find-identity/s);
+  assert.match(signer, /identity: signingIdentity/);
   assert.doesNotMatch(signer, /optionsForFile:\s*async/, 'osx-sign silently ignores async per-file options');
   assert.doesNotMatch(signer, /--deep/);
 
   const afterPack = read('build/afterPack.cjs');
   assert.match(afterPack, /NODUS_REQUIRE_MACOS_SIGNING === 'true'/);
   assert.match(afterPack, /Deferred .* mandatory Developer ID signer/);
+});
+
+test('the custom signer resolves electron-builder certificate hashes to full Developer ID names', () => {
+  const signer = require(path.join(repoRoot, 'build/macSign.cjs'));
+  const identities = signer.parseDeveloperIdIdentities([
+    '  1) AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA "Developer ID Application: Release Owner (TEAMID1234)"',
+    '  2) ABCDEF0123456789ABCDEF0123456789ABCDEF01 "Apple Development: Local Developer (TEAMID1234)"',
+    '     2 valid identities found',
+  ].join('\n'));
+
+  assert.deepEqual(identities, [{
+    hash: 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA',
+    name: 'Developer ID Application: Release Owner (TEAMID1234)',
+  }]);
 });
 
 test('GitHub release workflow requires API-key notarization and verifies before upload', () => {

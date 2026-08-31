@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-## 5.1.3-beta.2 — 2026-08-31
+## 5.1.3-beta.3 — 2026-08-31
 
 This beta validates the complete Developer ID signing and Apple notarization
 pipeline before Nodus 5.1.3 is promoted to the stable channel.
