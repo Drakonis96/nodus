@@ -106,6 +106,14 @@ const RELEASE_5_1_0_TR = [
 ];
 
 export const RELEASE_NOTES_TR: Record<string, string[]> = {
+  "5.1.2": [
+    ...RELEASE_5_1_0_TR,
+    "Başlıktaki Güncelle düğmesi artık yalnızca izlediğiniz Zotero koleksiyonlarının kataloğunu yeniliyor. Yeni öğeler analiz başlatılmadan veya kuyruğa eklenmeden Kitaplıkta görünüyor. Bu sürüm ayrıca Zotero 10’un döndürdüğü sıfır öğe sürümünü düzeltiyor. Bu değer daha önce tüm kitaplığı bir anda değişmiş gibi gösterebiliyordu.",
+    "Word için Nodus Copilot, ifadeler ve tam cümlelerle de çalışabilmek için Eş Anlamlılar özelliğini Alternatifler olarak değiştiriyor. Sekme siz Oluştur düğmesine basana kadar bekliyor ve seçtiğiniz modeli kullanıyor. Fikirler, Pasajlar, Yapay Zeka ile Düzenleme, Alternatifler ve Sohbet artık aranabilen ve klavyeyle kullanılabilen ortak bir model seçiciye sahip.",
+    "Yerel modeller artık bağlam sınırları içindeki uzun pasajların embeddinglerini 512 token üzerinde hata vermeden oluşturabiliyor. Tamamlanmış özetler, isteğe bağlı sonraki bir görev başarısız olsa bile kullanılabilir kalıyor. Özetin kendisi başarısız olduğunda Nodus nedeni kaydedip gösteriyor, böylece sorunu düzeltip yeniden deneyebiliyorsunuz.",
+    "İtalik, üst simge, alt simge veya başka zengin biçimlendirme içeren Zotero başlıkları artık Kitaplıkta, aramada ve ilerleme iletilerinde temiz metin olarak görünüyor. Nodus gerçek değişiklikleri denetlerken özgün işaretlemeyi koruyor, böylece biçimlendirilmiş bir başlık eşitlemeyi artık kararsız hâle getirmiyor.",
+    "İlk kasa ve Ayarlar artık ana parola için aynı kuralı açıklıyor. Parola en az sekiz karakter içermeli ve zorunlu sayı ya da simge olmadan uzun bir parola ifadesi olabilir. Doğrulama kısa veya eşleşmeyen onayı hemen gösteriyor ve korumalı kopya oluşturulurken de aynı kural uygulanıyor.",
+  ],
   "5.1.1": [
     ...RELEASE_5_1_0_TR,
     "Başlıktaki Güncelle düğmesi artık yalnızca izlediğiniz Zotero koleksiyonlarının kataloğunu yeniliyor. Yeni öğeler analiz başlatılmadan veya kuyruğa eklenmeden Kitaplıkta görünüyor. Bu sürüm ayrıca Zotero 10’un döndürdüğü sıfır öğe sürümünü düzeltiyor. Bu değer daha önce tüm kitaplığı bir anda değişmiş gibi gösterebiliyordu.",

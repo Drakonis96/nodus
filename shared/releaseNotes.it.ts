@@ -166,6 +166,14 @@ const RELEASE_5_1_0_IT = [
 ];
 
 export const RELEASE_NOTES_IT: Record<string, string[]> = {
+  "5.1.2": [
+    ...RELEASE_5_1_0_IT,
+    "Il pulsante Aggiorna nell’intestazione ora aggiorna soltanto il catalogo delle collezioni Zotero monitorate. I nuovi elementi compaiono nella Libreria senza avviare né accodare analisi. Questa versione gestisce anche il valore zero restituito da Zotero 10, che poteva far apparire modificata tutta la libreria in una sola volta.",
+    "Nodus Copilot per Word sostituisce Sinonimi con Alternative per lavorare anche con espressioni e frasi complete. La scheda attende che tu prema Genera e rispetta il modello scelto. Idee, Passaggi, Modifica con IA, Alternative e Chat condividono ora un selettore di modelli ricercabile e controllabile da tastiera.",
+    "I modelli locali possono ora creare embedding di passaggi lunghi entro il proprio limite di contesto senza fallire oltre 512 token. I riassunti completati restano disponibili se un’attività facoltativa successiva fallisce. Quando fallisce il riassunto stesso, Nodus salva e mostra il motivo per permetterti di correggerlo e riprovare.",
+    "I titoli Zotero con corsivo, apici, pedici o altra formattazione avanzata appaiono ora come testo pulito nella Libreria, nella ricerca e nei messaggi di avanzamento. Nodus conserva il markup originale quando verifica le modifiche reali, così un titolo formattato non destabilizza più la sincronizzazione.",
+    "Il primo deposito e le Impostazioni spiegano ora la stessa regola per la password principale. Deve contenere almeno otto caratteri e può essere una passphrase lunga senza numeri o simboli obbligatori. La convalida segnala subito una conferma troppo corta o diversa, e la stessa regola viene applicata quando si crea la copia protetta.",
+  ],
   "5.1.1": [
     ...RELEASE_5_1_0_IT,
     "Il pulsante Aggiorna nell’intestazione ora aggiorna soltanto il catalogo delle collezioni Zotero monitorate. I nuovi elementi compaiono nella Libreria senza avviare né accodare analisi. Questa versione gestisce anche il valore zero restituito da Zotero 10, che poteva far apparire modificata tutta la libreria in una sola volta.",

@@ -2,6 +2,26 @@
 
 ## Unreleased
 
+## 5.1.2 — 2026-08-31
+
+Nodus 5.1.2 improves Word model selection and fixes local analysis, Zotero
+titles, summary diagnostics and the first-vault password flow.
+
+- Replaced Synonyms with explicit, phrase-aware Alternatives in the Word add-in,
+  stopped automatic generation on tab entry and added one searchable,
+  keyboard-accessible model picker across all five Copilot tasks.
+- Let local embedding models process inputs beyond the previous 512-token
+  physical batch limit while remaining inside the configured context window.
+- Preserved completed summaries when optional provenance or embedding work
+  fails, and persisted actionable errors when summary generation itself fails.
+- Rendered Zotero rich-text titles as clean text throughout the interface while
+  retaining their original markup for stable change detection.
+- Unified the master-password policy across first-vault setup, Settings, IPC and
+  recovery creation, with immediate translated feedback for short or mismatched
+  passwords.
+- Kept every 5.1.1 entry in the What's New modal and added these corrections in
+  all eight interface languages.
+
 ## 5.1.1 — 2026-08-31
 
 Nodus 5.1.1 is a Zotero hotfix that keeps the header refresh limited to the

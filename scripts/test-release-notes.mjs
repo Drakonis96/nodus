@@ -24,14 +24,15 @@ try {
   );
 
   const { RELEASE_NOTES, releaseNotesForMajor, compareVersions } = await import(pathToFileURL(bundlePath).href);
-  // 5.1.1 preserves the complete 5.1.0 announcement and adds the catalog-only
-  // Zotero header refresh hotfix in every interface language.
+  // 5.1.2 preserves the complete 5.1.1 announcement and adds every repair
+  // merged afterwards in all eight interface languages.
   const currentRelease = RELEASE_NOTES[0];
-  assert.equal(currentRelease?.version, '5.1.1');
+  assert.equal(currentRelease?.version, '5.1.2');
   assert.equal(currentRelease?.date, '2026-08-31');
-  assert.equal(currentRelease?.highlights.length, 9);
+  assert.equal(currentRelease?.highlights.length, 13);
   assert.deepEqual(currentRelease?.highlights.map((highlight) => highlight.scope), [
     'ai', 'ai', 'zotero', 'server', 'library', 'databases', 'word', 'connector', 'zotero',
+    'word', 'ai', 'zotero', 'general',
   ]);
   for (const phrase of [
     /more than twice as fast/,
@@ -44,12 +45,22 @@ try {
     /Nodus Research Connector/,
     /without starting or queuing analysis/,
     /entire library appear to have changed at once/,
+    /replaces Synonyms with Alternatives/,
+    /without failing above 512 tokens/,
+    /saves and shows the reason/,
+    /appear as clean text/,
+    /at least eight characters/,
   ]) assert.ok(currentRelease?.highlights.some((highlight) => phrase.test(highlight.en)));
+
+  const previousPatchRelease = RELEASE_NOTES.find((note) => note.version === '5.1.1');
+  assert.equal(previousPatchRelease?.date, '2026-08-31');
+  assert.equal(previousPatchRelease?.highlights.length, 9);
+  assert.deepEqual(currentRelease?.highlights.slice(0, 9), previousPatchRelease?.highlights);
 
   const minorRelease = RELEASE_NOTES.find((note) => note.version === '5.1.0');
   assert.equal(minorRelease?.date, '2026-08-30');
   assert.equal(minorRelease?.highlights.length, 8);
-  assert.deepEqual(currentRelease?.highlights.slice(0, 8), minorRelease?.highlights);
+  assert.deepEqual(previousPatchRelease?.highlights.slice(0, 8), minorRelease?.highlights);
 
   // 5.0.6 remains intact beneath the new hotfix and minor release.
   const previousStableRelease = RELEASE_NOTES.find((note) => note.version === '5.0.6');
@@ -91,9 +102,9 @@ try {
   assert.equal(compassRelease?.highlights.length, 6);
 
   // 5.0.1 keeps the seven repair highlights it shipped with underneath 5.0.4.
-  const previousPatchRelease = RELEASE_NOTES.find((note) => note.version === '5.0.1');
-  assert.equal(previousPatchRelease?.date, '2026-08-25');
-  assert.equal(previousPatchRelease?.highlights.length, 7);
+  const previousMajorPatchRelease = RELEASE_NOTES.find((note) => note.version === '5.0.1');
+  assert.equal(previousMajorPatchRelease?.date, '2026-08-25');
+  assert.equal(previousMajorPatchRelease?.highlights.length, 7);
 
   // 5.0.0 keeps the eight highlights it shipped with underneath this repair release.
   const majorRelease = RELEASE_NOTES.find((note) => note.version === '5.0.0');
