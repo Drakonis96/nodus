@@ -75,6 +75,7 @@ try {
   const taskpaneJs = fs.readFileSync(path.join(repoRoot, 'word-addin/taskpane.js'), 'utf8');
   const referencesJs = fs.readFileSync(path.join(repoRoot, 'word-addin/references.js'), 'utf8');
   const chatJs = fs.readFileSync(path.join(repoRoot, 'word-addin/chat.js'), 'utf8');
+  const modelPickerJs = fs.readFileSync(path.join(repoRoot, 'word-addin/model-picker.js'), 'utf8');
   const taskpaneCss = fs.readFileSync(path.join(repoRoot, 'word-addin/taskpane.css'), 'utf8');
   const wordIconBuilder = fs.readFileSync(path.join(repoRoot, 'scripts/build-word-addin-icons.mjs'), 'utf8');
   assert.match(taskpaneHtml, /<html lang="en">/);
@@ -120,6 +121,15 @@ try {
     assert.match(taskpaneHtml, new RegExp(`id="${id}"`), `Chat UI must contain ${id}`);
   }
   assert.match(taskpaneHtml, /<script src="\/addin\/chat\.js"><\/script>/);
+  assert.match(taskpaneHtml, /<script src="\/addin\/model-picker\.js"><\/script>/);
+  for (const selectId of ['searchModel', 'promptModel', 'synonymModel']) {
+    assert.match(taskpaneJs, new RegExp(`NodusModelPicker\\.enhance\\([\\s\\S]*${selectId}|\\[els\\.searchModel, els\\.promptModel, els\\.synonymModel\\]`), `${selectId} must use the searchable model picker`);
+  }
+  assert.match(chatJs, /NodusModelPicker\.enhance\(els\.model/);
+  assert.match(modelPickerJs, /input\.type = 'search'/);
+  assert.match(modelPickerJs, /setAttribute\('role', 'combobox'\)/);
+  assert.match(modelPickerJs, /normalizeSearch\(label\)\.indexOf\(normalized\)/, 'model options must be filtered by the search box');
+  assert.match(modelPickerJs, /event\.key === 'ArrowDown'/, 'the searchable picker must remain keyboard accessible');
   assert.equal((taskpaneHtml.match(/class="prompt-typing-dot"/g) || []).length, 6, 'both writing generators must use the Nodi-style three-dot indicator');
   for (const id of ['referenceStyle', 'referenceStyleSearch', 'referenceLocale', 'referencePlacement', 'selectedReferences', 'insertCitation', 'insertBibliography', 'refreshReferences', 'unlinkReferences']) {
     assert.match(taskpaneHtml, new RegExp(`id="${id}"`), `References UI must contain ${id}`);
@@ -292,10 +302,12 @@ try {
   assert.match(copilotChatSource, /completeTextStreamNeutral/, 'global promptLanguage must not override the question language');
   assert.match(copilotChatSource, /No inventes contenido ausente del contexto/, 'chat must stay grounded in the selected Word context');
   assert.match(referencesJs, /fingerprint === externalStateFingerprint/, 'identical Writer polling snapshots must not rebuild the citation composer');
-  assert.match(serverSource, /suggestStudySynonyms\(\{/, 'the Word endpoint must reuse the workspace synonym engine');
+  assert.match(serverSource, /suggestCopilotAlternatives\(\{/, 'the Word endpoint must use the direct AI Edition-style alternatives engine');
   assert.match(serverSource, /composeFromSelection\(\{[\s\S]*?model: modelRef\(body\.model\)/, 'selection actions must honor the Ideas/Passages model selector');
   assert.match(serverSource, /composeCopilotIdeaInsertion\(\{[\s\S]*?model: modelRef\(body\.model\)/, 'Insert with AI must honor the Ideas model selector');
-  assert.match(serverSource, /suggestStudySynonyms\(\{[\s\S]*?model: modelRef\(body\.model\)/, 'synonyms must honor their model selector');
+  assert.match(serverSource, /var requestedModel|const requestedModel = modelRef\(body\.model\)/, 'alternatives must validate their model selector');
+  assert.match(serverSource, /suggestCopilotAlternatives\(\{[\s\S]*?model: requestedModel/, 'alternatives must honor their validated model selector');
+  assert.doesNotMatch(taskpaneJs, /if \(synonymMode\) \{[\s\S]*?generateSynonymRound\(\);[\s\S]*?startPromptSelectionPolling\(\);/, 'opening Alternatives must never spend tokens automatically');
   assert.match(serverSource, /destination: 'ideas'/);
   assert.match(serverSource, /destination === 'citation-styles'[\s\S]*destination: 'library-citation-styles'/);
   assert.match(appSource, /target\.destination === 'library-citation-styles'[\s\S]*citationStyles: true[\s\S]*setView\('library'\)/);

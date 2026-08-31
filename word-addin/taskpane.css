@@ -864,6 +864,88 @@ input[type="radio"] { accent-color: var(--primary); }
   box-shadow: 0 0 0 3px var(--primary-soft);
 }
 .prompt-field select option { background: var(--panel); color: var(--control-text); }
+
+/* Searchable model dropdown shared by Ideas, Alternatives, AI Edition and Chat. */
+.model-picker { position: relative; width: 100%; min-width: 0; color: var(--control-text); }
+.model-picker-search {
+  width: 100%;
+  min-width: 0;
+  min-height: 34px;
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--primary-line);
+  border-radius: 9px;
+  padding: 6px 32px 6px 9px;
+  background: var(--panel);
+  color: var(--control-text);
+  font: inherit;
+  font-size: 11.5px;
+  text-overflow: ellipsis;
+  transition: border-color .16s ease, box-shadow .16s ease;
+}
+.model-picker-search:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px var(--primary-soft);
+}
+.model-picker-search:disabled { cursor: not-allowed; opacity: .65; }
+.model-picker-toggle {
+  position: absolute;
+  top: 1px;
+  right: 1px;
+  width: 30px;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-left: 1px solid var(--border);
+  border-radius: 0 8px 8px 0;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+.model-picker-toggle span {
+  width: 7px;
+  height: 7px;
+  margin-top: -3px;
+  border-right: 1.5px solid currentColor;
+  border-bottom: 1.5px solid currentColor;
+  transform: rotate(45deg);
+}
+.model-picker.open .model-picker-toggle span { margin-top: 3px; transform: rotate(225deg); }
+.model-picker-options {
+  position: absolute;
+  z-index: 30;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  max-height: 210px;
+  overflow-y: auto;
+  border: 1px solid var(--border-strong);
+  border-radius: 9px;
+  padding: 4px;
+  background: var(--panel);
+  box-shadow: var(--shadow-lg);
+}
+.model-picker-option {
+  width: 100%;
+  display: block;
+  border: 0;
+  border-radius: 6px;
+  padding: 7px 8px;
+  background: transparent;
+  color: var(--control-text);
+  font: inherit;
+  font-size: 10.5px;
+  line-height: 1.35;
+  text-align: left;
+  overflow-wrap: anywhere;
+  cursor: pointer;
+}
+.model-picker-option:hover,
+.model-picker-option.active { background: var(--primary-soft); color: var(--primary); }
+.model-picker-option[aria-selected="true"] { color: var(--primary); font-weight: 650; }
+.model-picker-empty { padding: 10px 8px; color: var(--muted); font-size: 10.5px; text-align: center; }
 .prompt-description {
   min-height: 0;
   margin: -3px 2px 0;
@@ -1138,18 +1220,19 @@ input[type="radio"] { accent-color: var(--primary); }
 .word-chat-icon-btn:hover { border-color: var(--primary-line); background: var(--primary-soft); color: var(--primary); }
 .word-chat-model { min-width: 0; flex: 1 1 auto; display: flex; align-items: center; gap: 6px; }
 .word-chat-model > span { color: var(--muted); font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; }
-.word-chat-model select {
+.word-chat-model .model-picker {
   flex: 1 1 auto;
   min-width: 0;
+}
+.word-chat-model .model-picker-search {
   height: 28px;
+  min-height: 28px;
   border: 1px solid var(--border);
   border-radius: 7px;
-  padding: 3px 7px;
-  background: var(--panel);
-  color: var(--control-text);
-  font: inherit;
+  padding: 3px 29px 3px 7px;
   font-size: 10.5px;
 }
+.word-chat-model .model-picker-toggle { width: 27px; height: 26px; border-radius: 0 6px 6px 0; }
 .word-chat-scope {
   display: flex;
   align-items: center;

@@ -31,7 +31,7 @@ import { embeddedIdeaCount } from '../db/ideasRepo';
 import { getStudyStyle, listStudyStyles } from '../db/studyStylesRepo';
 import { getDb } from '../db/database';
 import { applyCopilotPromptStyle } from '../ai/copilotPromptStyles';
-import { suggestStudySynonyms } from '../ai/studySynonyms';
+import { suggestCopilotAlternatives } from '../ai/studySynonyms';
 import {
   normalizeOfficeChatRequest,
   streamOfficeChat,
@@ -104,7 +104,7 @@ function copilotError(error: unknown): string {
     'El estilo seleccionado no está disponible.': 'The selected style is not available.',
     'No hay un modelo de IA configurado. Elige uno en Ajustes de Nodus.':
       'No AI model is configured. Choose one in Nodus Settings.',
-    'Selecciona una o varias palabras.': 'Select one or more words.',
+    'Selecciona una palabra, expresión o frase.': 'Select a word, expression, or phrase.',
     'La selección ya no coincide con la frase. Vuelve a seleccionar el texto.':
       'The selection no longer matches the sentence. Select the text again.',
     'La IA no pudo proponer cinco alternativas distintas. Regenera para intentarlo de nuevo.':
@@ -407,7 +407,19 @@ export async function handleRequest(req: IncomingMessage, res: ServerResponse, p
     }
     if (urlPath === '/api/synonyms' && req.method === 'POST') {
       const body = (await readJsonBody(req)) as Partial<StudySynonymRequest>;
-      const result = await suggestStudySynonyms({
+      const requestedModel = modelRef(body.model);
+      if (!requestedModel) {
+        sendJson(res, 400, { error: copilotText('El modelo seleccionado no es válido.', 'The selected model is invalid.') });
+        return;
+      }
+      const allowed = copilotPromptCatalogue().models.some((entry) => (
+        entry.provider === requestedModel.provider && entry.model === requestedModel.model
+      ));
+      if (!allowed) {
+        sendJson(res, 400, { error: copilotText('El modelo ya no está disponible en Nodus.', 'The model is no longer available in Nodus.') });
+        return;
+      }
+      const result = await suggestCopilotAlternatives({
         documentId: 'office-addin',
         sentence: String(body.sentence ?? ''),
         selectedText: String(body.selectedText ?? ''),
@@ -416,7 +428,7 @@ export async function handleRequest(req: IncomingMessage, res: ServerResponse, p
         previousAlternatives: Array.isArray(body.previousAlternatives)
           ? body.previousAlternatives.map(String).slice(-50)
           : [],
-        model: modelRef(body.model),
+        model: requestedModel,
       });
       sendJson(res, 200, result);
       return;

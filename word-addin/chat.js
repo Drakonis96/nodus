@@ -22,6 +22,7 @@
       copy: 'Copiar', edit: 'Editar', regenerate: 'Regenerar', remove: 'Eliminar',
       copied: 'Copiado', copyError: 'No se pudo copiar la respuesta.',
       noModels: 'No hay modelos configurados en Nodus.', loadingModels: 'Cargando modelos…',
+      modelSearch: 'Buscar modelos', noModelMatches: 'No hay modelos que coincidan.',
       modelError: 'No se pudieron cargar los modelos: ', responseEmpty: 'Nodus no devolvió una respuesta.',
       stopped: 'Respuesta detenida.', contextReading: 'Leyendo el contexto del documento…',
       contextReady: '{label} · {chars} caracteres enviados',
@@ -41,6 +42,7 @@
       copy: 'Copy', edit: 'Edit', regenerate: 'Regenerate', remove: 'Delete',
       copied: 'Copied', copyError: 'The response could not be copied.',
       noModels: 'There are no models configured in Nodus.', loadingModels: 'Loading models…',
+      modelSearch: 'Search models', noModelMatches: 'No matching models.',
       modelError: 'Could not load models: ', responseEmpty: 'Nodus returned no response.',
       stopped: 'Response stopped.', contextReading: 'Reading document context…',
       contextReady: '{label} · {chars} characters sent',
@@ -628,6 +630,7 @@
         var wanted = modelKey((conversation && conversation.model) || defaultModel);
         if (wanted && models.some(function (model) { return modelKey(model) === wanted; })) els.model.value = wanted;
       }
+      if (window.NodusModelPicker) window.NodusModelPicker.refresh(els.model);
       setBusy(false);
     }
 
@@ -671,6 +674,13 @@
       els.history = document.getElementById('chatHistory');
       els.historyList = document.getElementById('chatHistoryList');
       els.historyClose = document.getElementById('chatHistoryClose');
+      if (window.NodusModelPicker) {
+        window.NodusModelPicker.enhance(els.model, {
+          searchPlaceholder: t('modelSearch'),
+          showOptionsLabel: t('modelSearch'),
+          noResults: t('noModelMatches'),
+        });
+      }
       applyLabels();
       if (!options.pageSupported) {
         els.scopePage.disabled = true;

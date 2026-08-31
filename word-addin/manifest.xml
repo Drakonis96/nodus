@@ -166,7 +166,7 @@
         <bt:String id="Nodus.Group.Label" DefaultValue="Nodus" />
         <bt:String id="Nodus.Taskpane.Label" DefaultValue="Nodus Copilot" />
         <bt:String id="Nodus.AiEdit.Label" DefaultValue="AI Edit"><bt:Override Locale="es-ES" Value="AI Edit" /></bt:String>
-        <bt:String id="Nodus.Synonyms.Label" DefaultValue="Synonyms"><bt:Override Locale="es-ES" Value="Sinónimos" /></bt:String>
+        <bt:String id="Nodus.Synonyms.Label" DefaultValue="Alternatives"><bt:Override Locale="es-ES" Value="Alternativas" /></bt:String>
         <bt:String id="Nodus.Chat.Label" DefaultValue="Chat"><bt:Override Locale="es-ES" Value="Chat" /></bt:String>
         <bt:String id="Nodus.Citation.Label" DefaultValue="Add/Edit Citation"><bt:Override Locale="es-ES" Value="Añadir/editar cita" /></bt:String>
         <bt:String id="Nodus.Bibliography.Label" DefaultValue="Add/Edit Bibliography"><bt:Override Locale="es-ES" Value="Añadir/editar bibliografía" /></bt:String>
@@ -182,7 +182,7 @@
           <bt:Override Locale="es-ES" Value="Relaciona el párrafo actual con tu biblioteca de Nodus e inserta ideas citadas." />
         </bt:String>
         <bt:String id="Nodus.AiEdit.Tooltip" DefaultValue="Transform the current selection with a saved Nodus writing prompt."><bt:Override Locale="es-ES" Value="Transforma la selección actual con un prompt de escritura guardado en Nodus." /></bt:String>
-        <bt:String id="Nodus.Synonyms.Tooltip" DefaultValue="Suggest contextual synonyms and rephrasings for the current selection."><bt:Override Locale="es-ES" Value="Sugiere sinónimos y reformulaciones contextuales para la selección actual." /></bt:String>
+        <bt:String id="Nodus.Synonyms.Tooltip" DefaultValue="Suggest different contextual ways to express the current selection."><bt:Override Locale="es-ES" Value="Sugiere distintas alternativas contextuales para expresar la selección actual." /></bt:String>
         <bt:String id="Nodus.Chat.Tooltip" DefaultValue="Chat with the current page or the complete Word document."><bt:Override Locale="es-ES" Value="Chatea con la página actual o con todo el documento de Word." /></bt:String>
         <bt:String id="Nodus.Citation.Tooltip" DefaultValue="Search the Nodus global library and add or edit a live citation."><bt:Override Locale="es-ES" Value="Busca en la biblioteca global de Nodus y añade o edita una cita viva." /></bt:String>
         <bt:String id="Nodus.Bibliography.Tooltip" DefaultValue="Insert or update the live bibliography for this document."><bt:Override Locale="es-ES" Value="Inserta o actualiza la bibliografía viva de este documento." /></bt:String>
