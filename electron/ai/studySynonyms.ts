@@ -72,13 +72,13 @@ export function buildStudySynonymPrompt(request: StudySynonymRequest): { system:
   const markedSentence = `${request.sentence.slice(0, request.selectionFrom)}<<<SELECCIÓN>>>${request.selectedText}<<<FIN_SELECCIÓN>>>${request.sentence.slice(request.selectionTo)}`;
   const excluded = (request.previousAlternatives ?? []).slice(-50);
   return {
-    system: `Actúas como tesauro contextual y asistente de redacción de Nodus.
+    system: `Actúas como asistente de redacción contextual de Nodus. Propones alternativas: distintas formas naturales de expresar lo mismo. No te limites a sinónimos palabra por palabra; la selección puede ser una palabra, una expresión o una frase completa.
 
 Devuelve exclusivamente JSON válido con esta forma exacta:
 {"alternatives":[{"target":"fragmento original exacto","replacement":"alternativa"}]}
 
 REGLAS:
-- Devuelve ${CANDIDATE_COUNT} alternativas naturales, distintas entre sí y distintas del original. El servidor seleccionará las cinco primeras válidas.
+- Devuelve ${CANDIDATE_COUNT} alternativas de redacción naturales, distintas entre sí y distintas del original. El servidor seleccionará las cinco primeras válidas.
 - Detecta el idioma de la frase y escribe TODAS las alternativas en ese mismo idioma. Nunca traduzcas.
 - Conserva significado, registro, género, número, tiempo verbal, datos, citas y fuerza de la afirmación.
 - "target" debe ser una subcadena literal y contigua de la frase original que contenga toda la selección.
@@ -94,16 +94,37 @@ REGLAS:
   };
 }
 
-export async function suggestStudySynonyms(request: StudySynonymRequest): Promise<StudySynonymResult> {
+function normalizedSynonymRequest(request: StudySynonymRequest): StudySynonymRequest {
   const sentence = request.sentence.replace(/\r\n/g, '\n');
   const selectedText = request.selectedText;
-  if (!selectedText.trim()) throw new Error('Selecciona una o varias palabras.');
+  if (!selectedText.trim()) throw new Error('Selecciona una palabra, expresión o frase.');
   if (sentence.length > MAX_SENTENCE_CHARS) throw new Error(`La frase supera el límite de ${MAX_SENTENCE_CHARS.toLocaleString('es-ES')} caracteres.`);
   if (request.selectionFrom < 0 || request.selectionTo > sentence.length || request.selectionFrom >= request.selectionTo
     || sentence.slice(request.selectionFrom, request.selectionTo) !== selectedText) {
     throw new Error('La selección ya no coincide con la frase. Vuelve a seleccionar el texto.');
   }
-  const normalizedRequest = { ...request, sentence };
+  return { ...request, sentence };
+}
+
+async function generateAlternatives(request: StudySynonymRequest, model: ModelRef): Promise<StudySynonymAlternative[]> {
+  const prompt = buildStudySynonymPrompt(request);
+  const raw = await completeTextNeutral({
+    system: prompt.system,
+    user: prompt.user,
+    temperature: 0.65,
+    maxTokens: 1_200,
+    reasoning: 'off',
+    plainContext: true,
+  }, model);
+  const alternatives = normalizeAlternatives(request, parsePayload(raw));
+  if (alternatives.length !== ALTERNATIVE_COUNT) {
+    throw new Error('La IA no pudo proponer cinco alternativas distintas. Regenera para intentarlo de nuevo.');
+  }
+  return alternatives;
+}
+
+export async function suggestStudySynonyms(request: StudySynonymRequest): Promise<StudySynonymResult> {
+  const normalizedRequest = normalizedSynonymRequest(request);
   const initialPrompt = buildStudySynonymPrompt(normalizedRequest);
   const completed = await runStudyAiTask({
     task: 'improve',
@@ -112,24 +133,31 @@ export async function suggestStudySynonyms(request: StudySynonymRequest): Promis
     inputChars: initialPrompt.system.length + initialPrompt.user.length,
     outputChars: (value: StudySynonymAlternative[]) => JSON.stringify(value).length,
     externalConsentModelKey: '*',
-  }, async (model) => {
-    const raw = await completeTextNeutral({
-      system: initialPrompt.system,
-      user: initialPrompt.user,
-      temperature: 0.65,
-      maxTokens: 1_200,
-      reasoning: 'off',
-      plainContext: true,
-    }, model);
-    const alternatives = normalizeAlternatives(normalizedRequest, parsePayload(raw));
-    if (alternatives.length !== ALTERNATIVE_COUNT) {
-      throw new Error('La IA no pudo proponer cinco alternativas distintas. Regenera para intentarlo de nuevo.');
-    }
-    return alternatives;
-  });
+  }, (model) => generateAlternatives(normalizedRequest, model));
   return {
     alternatives: completed.value,
     modelProvider: completed.model.provider,
     modelName: completed.model.model,
+  };
+}
+
+/**
+ * Word's AI Edition is an explicit, user-triggered writing action and talks to
+ * its selected model directly. Alternatives follow that same contract instead
+ * of being blocked by the separate Study-AI enablement, budget and subject
+ * policy; only their structured five-option output differs.
+ */
+export async function suggestCopilotAlternatives(
+  request: StudySynonymRequest & { model: ModelRef },
+): Promise<StudySynonymResult> {
+  const normalizedRequest = normalizedSynonymRequest(request);
+  if (!request.model?.provider || !request.model.model) {
+    throw new Error('No hay un modelo de IA configurado. Elige uno en Ajustes de Nodus.');
+  }
+  const alternatives = await generateAlternatives(normalizedRequest, request.model);
+  return {
+    alternatives,
+    modelProvider: request.model.provider,
+    modelName: request.model.model,
   };
 }

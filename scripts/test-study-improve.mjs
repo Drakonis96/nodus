@@ -163,12 +163,29 @@ try {
     previousAlternatives: [],
     model: { provider: 'ollama', model: 'controlled-local-verifier' },
   });
-  assert.equal(synonymResult.alternatives.length, 5, 'the contextual thesaurus always returns five alternatives');
+  assert.equal(synonymResult.alternatives.length, 5, 'the contextual writing assistant always returns five alternatives');
   assert.deepEqual(synonymResult.alternatives.at(-1), { target: 'es sólido', replacement: 'está bien fundamentado', from: 13, to: 22 }, 'an alternative may expand the exact replacement target');
   assert.equal(synonymGenerationCalls, 1, 'over-generation fills five alternatives without an extra provider call');
   const synonymPrompt = synonyms.buildStudySynonymPrompt({ sentence: sentenceContext.sentence, selectedText: 'sólido', selectionFrom: sentenceContext.selectionFrom, selectionTo: sentenceContext.selectionTo });
+  assert.match(synonymPrompt.system, /No te limites a sinónimos palabra por palabra/);
+  assert.match(synonymPrompt.system, /una palabra, una expresión o una frase completa/);
   assert.match(synonymPrompt.user, /<<<SELECCIÓN>>>sólido<<<FIN_SELECCIÓN>>>/);
   assert.equal(JSON.parse(synonymPrompt.user).originalSentence, sentenceContext.sentence, 'the model can copy an exact target from an unmarked sentence');
+
+  settingsRepo.updateSettings({ studyAiEnabled: false });
+  const wordAlternatives = await synonyms.suggestCopilotAlternatives({
+    documentId: 'office-addin',
+    sentence: sentenceContext.sentence,
+    selectedText: 'sólido',
+    selectionFrom: sentenceContext.selectionFrom,
+    selectionTo: sentenceContext.selectionTo,
+    previousAlternatives: [],
+    model: { provider: 'ollama', model: 'controlled-local-verifier' },
+  });
+  assert.equal(wordAlternatives.alternatives.length, 5, 'Word alternatives use the explicit AI Edition model directly');
+  assert.equal(wordAlternatives.modelName, 'controlled-local-verifier');
+  assert.equal(synonymGenerationCalls, 2, 'the Word path reaches the selected model even when Study AI is disabled');
+  settingsRepo.updateSettings({ studyAiEnabled: true });
 
   const exported = styles.exportStudyStyles([custom.id]);
   assert.equal(exported.format, 'nodus-study-styles');

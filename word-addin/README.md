@@ -5,7 +5,7 @@ Nodus provides one writing assistant and reference workflow in Microsoft Word an
 - **Ideas** relates the current paragraph to the active Nodus vault.
 - **Passages** searches indexed full text and inserts quotations or AI-assisted prose.
 - **References** searches the Nodus global library and manages live citations and bibliographies.
-- **Synonyms** reads the complete sentence around the Word selection, proposes five contextual alternatives, applies the chosen replacement, and can regenerate without repeating earlier suggestions.
+- **Alternatives** reads the complete sentence around a selected word, expression, or phrase, proposes five contextual ways to express the same meaning, applies the chosen replacement, and can regenerate without repeating earlier suggestions.
 - **AI Edition** loads the active workspace writing styles, applies one to the current Word selection with a configured Nodus model, and keeps the proposal in the pane until the user copies it or explicitly replaces the selection.
 - **Chat** mirrors the Nodus for Zotero conversation design. Each question uses either the current Word page or the full document as context, prioritizes any selected text, streams the answer, and supports per-document history, editing, copying, stopping, and regenerating replies.
 
@@ -66,7 +66,7 @@ The macro is installed in the current user's LibreOffice Python scripts director
 ## Architecture
 
 - `manifest.xml` defines the persistent Word ribbon and task-pane commands.
-- `taskpane.html`, `taskpane.css`, `taskpane.js`, and `chat.js` provide Ideas, Passages, contextual synonyms, AI Edition, and the grounded document chat.
+- `taskpane.html`, `taskpane.css`, `model-picker.js`, `taskpane.js`, and `chat.js` provide Ideas, Passages, contextual writing alternatives, searchable model selectors, AI Edition, and the grounded document chat.
 - `references.js` provides the shared reference composer and Word live-field adapter.
 - `scripts/nodus_copilot.py` provides the LibreOffice bridge and Writer live-field adapter.
 - `electron/copilot/server.ts` serves the pane and authenticated local API.

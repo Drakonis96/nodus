@@ -87,7 +87,7 @@
       modeIdeas: 'Ideas',
       modePassages: 'Pasajes',
       modeReferences: 'Referencias',
-      modeSynonyms: 'Sinónimos',
+      modeSynonyms: 'Alternativas',
       modePrompts: 'AI Edition',
       modeChat: 'Chat',
       selectionLabel: 'Selección',
@@ -131,12 +131,14 @@
       promptLoadError: 'No se pudieron cargar los prompts: ',
       promptNoStyles: 'No hay prompts activos en este workspace.',
       promptNoModels: 'No hay modelos configurados en Nodus.',
+      modelSearch: 'Buscar modelos',
+      modelNoMatches: 'No hay modelos que coincidan.',
       promptGeneratedWith: 'Generado con ',
       promptWarnings: 'Revisa: ',
-      synonymTitle: 'Sinónimos y reformulaciones',
-      synonymHint: 'Selecciona una o varias palabras. Nodus usa la frase completa para conservar el sentido y la gramática.',
+      synonymTitle: 'Alternativas de redacción',
+      synonymHint: 'Selecciona una palabra, expresión o frase. Nodus propone distintas formas de expresar lo mismo respetando el contexto.',
       synonymContextLabel: 'Contexto de la frase',
-      synonymSelectionEmpty: 'Selecciona una o varias palabras en Word.',
+      synonymSelectionEmpty: 'Selecciona una palabra, expresión o frase en Word.',
       synonymRefresh: 'Actualizar selección',
       synonymGenerate: 'Generar 5 alternativas',
       synonymRegenerate: 'Regenerar alternativas',
@@ -195,7 +197,7 @@
       modeIdeas: 'Ideas',
       modePassages: 'Passages',
       modeReferences: 'References',
-      modeSynonyms: 'Synonyms',
+      modeSynonyms: 'Alternatives',
       modePrompts: 'AI Edition',
       modeChat: 'Chat',
       selectionLabel: 'Selection',
@@ -239,12 +241,14 @@
       promptLoadError: 'Could not load prompts: ',
       promptNoStyles: 'There are no active prompts in this workspace.',
       promptNoModels: 'There are no models configured in Nodus.',
+      modelSearch: 'Search models',
+      modelNoMatches: 'No matching models.',
       promptGeneratedWith: 'Generated with ',
       promptWarnings: 'Review: ',
-      synonymTitle: 'Synonyms and rephrasings',
-      synonymHint: 'Select one or more words. Nodus uses the complete sentence to preserve meaning and grammar.',
+      synonymTitle: 'Writing alternatives',
+      synonymHint: 'Select a word, expression, or phrase. Nodus suggests different ways to express the same meaning in context.',
       synonymContextLabel: 'Sentence context',
-      synonymSelectionEmpty: 'Select one or more words in Word.',
+      synonymSelectionEmpty: 'Select a word, expression, or phrase in Word.',
       synonymRefresh: 'Refresh selection',
       synonymGenerate: 'Generate 5 alternatives',
       synonymRegenerate: 'Regenerate alternatives',
@@ -1256,6 +1260,7 @@
         noModel.textContent = T('promptNoModels');
         select.appendChild(noModel);
         select.disabled = true;
+        if (window.NodusModelPicker) window.NodusModelPicker.refresh(select);
         return;
       }
       select.disabled = false;
@@ -1269,6 +1274,7 @@
         ? previousModel
         : promptModelValue(data.defaultModel);
       if (wantedModel) select.value = wantedModel;
+      if (window.NodusModelPicker) window.NodusModelPicker.refresh(select);
     }
     [els.promptModel, els.searchModel, els.synonymModel].forEach(fillModelSelect);
     renderPromptDescription();
@@ -1631,9 +1637,9 @@
       return;
     }
     if (synonymMode) {
-      refreshSynonymSelection().then(function (context) {
-        if (context && selectedModelFrom(els.synonymModel) && !synonymRequestContext && !synonymGenerating) generateSynonymRound();
-      });
+      // Reading and showing the selection is free. Alternatives are generated
+      // only after the user explicitly presses the button.
+      refreshSynonymSelection();
       startPromptSelectionPolling();
       return;
     }
@@ -1752,6 +1758,16 @@
     els.synonymRounds = document.getElementById('synonymRounds');
     els.synonymTab = document.querySelector('.seg[data-mode="synonyms"]');
     els.chatControls = document.getElementById('chatControls');
+
+    if (window.NodusModelPicker) {
+      [els.searchModel, els.promptModel, els.synonymModel].forEach(function (select) {
+        window.NodusModelPicker.enhance(select, {
+          searchPlaceholder: T('modelSearch'),
+          showOptionsLabel: T('modelSearch'),
+          noResults: T('modelNoMatches'),
+        });
+      });
+    }
 
     document.documentElement.lang = LANG;
     els.status.textContent = T('connecting');

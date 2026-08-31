@@ -54,9 +54,9 @@
             <svg class="seg-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5h11a3 3 0 0 1 3 3v11H8a3 3 0 0 1-3-3zM8 8h7M8 12h7M8 16h4M5 16a3 3 0 0 1 3-3h11"/></svg>
             <span class="seg-label">References</span>
           </button>
-          <button class="seg" data-mode="synonyms" type="button" role="tab" aria-selected="false" aria-label="Synonyms" title="Synonyms">
+          <button class="seg" data-mode="synonyms" type="button" role="tab" aria-selected="false" aria-label="Alternatives" title="Alternatives">
             <svg class="seg-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H11a2 2 0 0 1 2 2v16a2.5 2.5 0 0 0-2-2H6.5A2.5 2.5 0 0 0 4 21.5zM13 5a2 2 0 0 1 2-2h2M7 8h3M7 12h3M16 12h3M19 2l.5 1.5L21 4l-1.5.5L19 6l-.5-1.5L17 4l1.5-.5zM13 21a2.5 2.5 0 0 1 2-2h4a2 2 0 0 1 2 2v-9"/></svg>
-            <span class="seg-label">Synonyms</span>
+            <span class="seg-label">Alternatives</span>
           </button>
           <button class="seg" data-mode="prompts" type="button" role="tab" aria-selected="false" aria-label="AI Edition" title="AI Edition">
             <svg class="seg-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m14 4 1-2 1 2 2 1-2 1-1 2-1-2-2-1zM5 17l9-9 3 3-9 9H5zM12.5 9.5l3 3M18 16l.8-1.8.8 1.8 1.8.8-1.8.8-.8 1.8-.8-1.8-1.8-.8z"/></svg>
@@ -72,7 +72,7 @@
           <button id="searchBtn" class="btn icon" type="button" title="Search">⌕</button>
         </div>
         <div id="analysisControls">
-          <label class="prompt-field mode-model-field"><span data-model-label>Model</span><select id="searchModel"></select></label>
+          <div class="prompt-field mode-model-field"><span data-model-label>Model</span><select id="searchModel"></select></div>
           <div class="toolbar">
             <label class="auto"><input type="checkbox" id="autoToggle" checked /> Auto</label>
             <button id="analyzeBtn" class="btn primary" type="button">Analyze paragraph</button>
@@ -139,7 +139,7 @@
           </div>
           <label class="prompt-field"><span data-prompt-label="style">Saved prompt</span><select id="promptStyle"></select></label>
           <p id="promptDescription" class="prompt-description"></p>
-          <label class="prompt-field"><span data-prompt-label="model">Model</span><select id="promptModel"></select></label>
+          <div class="prompt-field"><span data-prompt-label="model">Model</span><select id="promptModel"></select></div>
           <div class="prompt-selection-block">
             <span class="prompt-block-label">Selected text in Word</span>
             <div id="promptSelection" class="prompt-selection">Select text in Word to transform it.</div>
@@ -164,15 +164,15 @@
           </div>
         </section>
 
-        <section id="synonymControls" class="synonym-controls" hidden aria-label="Contextual synonyms">
+        <section id="synonymControls" class="synonym-controls" hidden aria-label="Contextual alternatives">
           <div class="synonym-heading">
-            <div><strong>Synonyms and rephrasings</strong><small>Select one or more words. Nodus uses the complete sentence to preserve meaning and grammar.</small></div>
+            <div><strong>Writing alternatives</strong><small>Select a word, expression, or phrase. Nodus suggests different ways to express the same meaning in context.</small></div>
             <button id="refreshSynonymSelection" class="btn tiny" type="button" title="Refresh selected text" aria-label="Refresh selected text">↻</button>
           </div>
-          <label class="prompt-field"><span data-model-label>Model</span><select id="synonymModel"></select></label>
+          <div class="prompt-field"><span data-model-label>Model</span><select id="synonymModel"></select></div>
           <div class="synonym-selection-block">
             <span class="synonym-block-label">Sentence context</span>
-            <div id="synonymContext" class="synonym-context placeholder">Select one or more words in Word.</div>
+            <div id="synonymContext" class="synonym-context placeholder">Select a word, expression, or phrase in Word.</div>
           </div>
           <button id="generateSynonyms" class="btn primary synonym-generate" type="button" disabled>
             <span id="synonymGenerateLabel">Generate 5 alternatives</span>
@@ -192,7 +192,7 @@
               <button id="chatNew" class="word-chat-icon-btn" type="button" title="New conversation" aria-label="New conversation">＋</button>
               <button id="chatHistoryButton" class="word-chat-icon-btn" type="button" title="Conversations" aria-label="Conversations">↶</button>
             </div>
-            <label class="word-chat-model"><span>Model</span><select id="chatModel"></select></label>
+            <div class="word-chat-model"><span>Model</span><select id="chatModel"></select></div>
           </div>
           <div id="chatScope" class="word-chat-scope" role="radiogroup" aria-label="Context">
             <span class="word-chat-scope-label">Context</span>
@@ -224,6 +224,7 @@
       <div id="empty" class="empty">Place the cursor in a paragraph to see related ideas.</div>
     </main>
 
+    <script src="/addin/model-picker.js"></script>
     <script src="/addin/references.js"></script>
     <script src="/addin/chat.js"></script>
     <script src="/addin/taskpane.js"></script>
