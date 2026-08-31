@@ -88,6 +88,7 @@ export function ingestZoteroItem(item: ZoteroItem, readTagName: string): { nodus
     zotero_version: persistedZoteroVersion(existing, item.version),
     zotero_fingerprint: zoteroItemFingerprint(item),
     title: item.title,
+    zotero_title_markup: item.titleMarkup ?? null,
     // Byline and structured creators are derived from the same filtered list, so
     // the display string can never disagree with the roles stored beside it.
     authors: bylineFromCreators(creatorsOf(item)),

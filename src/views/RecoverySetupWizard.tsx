@@ -10,6 +10,7 @@ import type {
 } from '@shared/types';
 import { Icon } from '../components/ui';
 import { NodiAvatar } from '../components/nodi/NodiAvatar';
+import { backupPasswordsMatch, validateBackupPassword } from '@shared/backupPasswordPolicy';
 
 type Mode = 'create' | 'restore';
 
@@ -32,12 +33,24 @@ export function RecoverySetupWizard({
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<RecoverySetupResult | null>(null);
   const [restoreProgress, setRestoreProgress] = useState<RecoveryRestoreProgress | null>(null);
+  const [validationAttempted, setValidationAttempted] = useState(false);
 
   const snapshots = folder?.snapshots ?? [];
   const effectiveSnapshot = selectedSnapshot || snapshots[0]?.fileName || '';
+  const passwordValidation = validateBackupPassword(password);
+  const confirmationProvided = confirmPassword.trim().length > 0;
+  const passwordsMatch = confirmationProvided && backupPasswordsMatch(password, confirmPassword);
   const canSubmit = mode === 'create'
-    ? folder?.kind === 'empty' && password.trim().length >= 8 && password === confirmPassword
-    : folder?.kind === 'recovery' && Boolean(effectiveSnapshot) && password.trim().length >= 8;
+    ? folder?.kind === 'empty' && passwordValidation.valid && passwordsMatch
+    : folder?.kind === 'recovery' && Boolean(effectiveSnapshot) && passwordValidation.valid;
+  const canAttemptSubmit = mode === 'create'
+    ? folder?.kind === 'empty'
+    : folder?.kind === 'recovery' && Boolean(effectiveSnapshot);
+  const showPasswordError = !passwordValidation.valid && (validationAttempted || password.length > 0);
+  const showConfirmationError = mode === 'create' && (
+    (validationAttempted && !confirmationProvided)
+    || (confirmationProvided && !passwordsMatch)
+  );
 
   const chooseFolder = async () => {
     const picked = await window.nodus.chooseRecoveryFolder(mode, language);
@@ -46,9 +59,11 @@ export function RecoverySetupWizard({
     setSelectedSnapshot(picked.snapshots[0]?.fileName ?? '');
     setResult(null);
     setRestoreProgress(null);
+    setValidationAttempted(false);
   };
 
   const submit = async () => {
+    setValidationAttempted(true);
     if (!folder || !canSubmit) return;
     setBusy(true);
     setResult(null);
@@ -59,6 +74,9 @@ export function RecoverySetupWizard({
         : await window.nodus.restoreRecoverySnapshot(folder.path, effectiveSnapshot, password, language, setRestoreProgress);
       setResult(next);
       if (!next.ok) setRestoreProgress(null);
+    } catch (error) {
+      setResult({ ok: false, message: error instanceof Error ? error.message : String(error) });
+      setRestoreProgress(null);
     } finally {
       setBusy(false);
     }
@@ -112,8 +130,8 @@ export function RecoverySetupWizard({
 
         <section className="recovery-form">
           <div className="recovery-mode-tabs">
-            <button className={mode === 'create' ? 'active' : ''} onClick={() => { setMode('create'); setFolder(null); setResult(null); setRestoreProgress(null); }}><Icon name="lock" />{status.previousInstallation ? (t('Migrar y proteger este equipo')) : (t('Crear carpeta segura'))}</button>
-            <button className={mode === 'restore' ? 'active' : ''} onClick={() => { setMode('restore'); setFolder(null); setResult(null); setRestoreProgress(null); }}><Icon name="upload" />{t('Recuperar otro equipo')}</button>
+            <button className={mode === 'create' ? 'active' : ''} onClick={() => { setMode('create'); setFolder(null); setResult(null); setRestoreProgress(null); setValidationAttempted(false); }}><Icon name="lock" />{status.previousInstallation ? (t('Migrar y proteger este equipo')) : (t('Crear carpeta segura'))}</button>
+            <button className={mode === 'restore' ? 'active' : ''} onClick={() => { setMode('restore'); setFolder(null); setResult(null); setRestoreProgress(null); setValidationAttempted(false); }}><Icon name="upload" />{t('Recuperar otro equipo')}</button>
           </div>
 
           <div className="recovery-block">
@@ -144,9 +162,27 @@ export function RecoverySetupWizard({
               onToggle={() => setShowPassword((value) => !value)}
               placeholder={mode === 'restore' ? (t('Contraseña o clave de recuperación')) : (t('Contraseña maestra'))}
               language={language}
+              invalid={showPasswordError}
+              describedBy="recovery-password-requirement"
+              testId="recovery-password"
             />
-            {mode === 'create' && <PasswordField value={confirmPassword} onChange={setConfirmPassword} visible={showPassword} onToggle={() => setShowPassword((value) => !value)} placeholder={t('Repite la contraseña')} language={language} />}
-            {mode === 'create' && confirmPassword && password !== confirmPassword && <small className="text-red-400">{t('Las contraseñas no coinciden.')}</small>}
+            <small
+              id="recovery-password-requirement"
+              data-testid="recovery-password-requirement"
+              className={passwordValidation.valid ? 'text-emerald-400' : showPasswordError ? 'text-red-400' : 'text-neutral-500'}
+              role={showPasswordError ? 'alert' : undefined}
+              aria-live="polite"
+            >
+              {passwordValidation.valid
+                ? t('La contraseña cumple el mínimo de 8 caracteres.')
+                : t('La contraseña debe tener al menos 8 caracteres. Los números y símbolos son opcionales.')}
+            </small>
+            {mode === 'create' && <PasswordField value={confirmPassword} onChange={setConfirmPassword} visible={showPassword} onToggle={() => setShowPassword((value) => !value)} placeholder={t('Repite la contraseña')} language={language} invalid={showConfirmationError} describedBy={showConfirmationError ? 'recovery-password-confirmation-error' : undefined} testId="recovery-password-confirmation" />}
+            {showConfirmationError && (
+              <small id="recovery-password-confirmation-error" className="text-red-400" role="alert" aria-live="polite">
+                {confirmationProvided ? t('Las contraseñas no coinciden.') : t('Repite la contraseña para confirmar.')}
+              </small>
+            )}
           </div>
 
           {result && !result.ok && <div className="recovery-error"><Icon name="alert" />{result.message}</div>}
@@ -174,7 +210,7 @@ export function RecoverySetupWizard({
               )}
             </div>
           )}
-          <footer className="recovery-footer"><span><Icon name="lock" />{t('AES-256-GCM · instantáneas SQLite consistentes · hashes de integridad')}</span><button className="btn btn-primary" disabled={!canSubmit || busy} onClick={() => void submit()}>{busy ? (mode === 'restore' && restoreProgress ? restoreProgressLabel(restoreProgress.phase) : t('Verificando y guardando…')) : mode === 'create' ? (t('Crear primera copia segura')) : (t('Verificar y recuperar'))}<Icon name={busy ? 'sync' : 'chevronRight'} className={busy ? 'animate-spin' : ''} /></button></footer>
+          <footer className="recovery-footer"><span><Icon name="lock" />{t('AES-256-GCM · instantáneas SQLite consistentes · hashes de integridad')}</span><button className="btn btn-primary" disabled={!canAttemptSubmit || busy} onClick={() => void submit()}>{busy ? (mode === 'restore' && restoreProgress ? restoreProgressLabel(restoreProgress.phase) : t('Verificando y guardando…')) : mode === 'create' ? (t('Crear primera copia segura')) : (t('Verificar y recuperar'))}<Icon name={busy ? 'sync' : 'chevronRight'} className={busy ? 'animate-spin' : ''} /></button></footer>
         </section>
       </motion.main>
     </div>
@@ -190,15 +226,18 @@ function restoreProgressLabel(phase: RecoveryRestoreProgress['phase']): string {
   return t('Restaurando…');
 }
 
-function PasswordField({ value, onChange, visible, onToggle, placeholder, language }: {
+function PasswordField({ value, onChange, visible, onToggle, placeholder, language, invalid = false, describedBy, testId }: {
   value: string;
   onChange: (value: string) => void;
   visible: boolean;
   onToggle: () => void;
   placeholder: string;
   language: AppLanguage;
+  invalid?: boolean;
+  describedBy?: string;
+  testId?: string;
 }) {
-  return <div className="recovery-password-field"><input className="input w-full" type={visible ? 'text' : 'password'} value={value} onChange={(event) => onChange(event.target.value)} placeholder={placeholder} /><button type="button" onClick={onToggle} aria-label={visible ? (language === 'en' ? 'Hide password' : 'Ocultar contraseña') : (language === 'en' ? 'Show password' : 'Mostrar contraseña')} title={visible ? (language === 'en' ? 'Hide password' : 'Ocultar contraseña') : (language === 'en' ? 'Show password' : 'Mostrar contraseña')}><Icon name={visible ? 'eyeOff' : 'eye'} /></button></div>;
+  return <div className="recovery-password-field"><input className="input w-full" type={visible ? 'text' : 'password'} value={value} onChange={(event) => onChange(event.target.value)} placeholder={placeholder} aria-invalid={invalid} aria-describedby={describedBy} data-testid={testId} /><button type="button" onClick={onToggle} aria-label={visible ? (language === 'en' ? 'Hide password' : 'Ocultar contraseña') : (language === 'en' ? 'Show password' : 'Mostrar contraseña')} title={visible ? (language === 'en' ? 'Hide password' : 'Ocultar contraseña') : (language === 'en' ? 'Show password' : 'Mostrar contraseña')}><Icon name={visible ? 'eyeOff' : 'eye'} /></button></div>;
 }
 
 function formatBytes(bytes: number): string {

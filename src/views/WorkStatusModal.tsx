@@ -239,8 +239,9 @@ export function WorkStatusModal({
         if (step.state === 'partial') return t('El análisis solo pudo usar el abstract.');
         return work.ideaCount > 0 ? tx('{n} ideas extraídas', { n: work.ideaCount }) : '—';
       case 'summary':
-        // No column stores a summary failure, so say that plainly rather than nothing.
-        if (step.state === 'failed') return t('El paso falló sin dejar un motivo. Reintenta; si vuelve a fallar, revisa el modelo en Ajustes → Modelos de IA.');
+        if (step.state === 'failed') return work.summary_error
+          ? localizeRuntimeError(work.summary_error, getActiveLang())
+          : t('El paso falló sin dejar un motivo. Reintenta; si vuelve a fallar, revisa el modelo en Ajustes → Modelos de IA.');
         return step.state === 'done' ? t('Disponible en la obra.') : '—';
       case 'semantic':
         return step.total ? tx('{a}/{b} ideas indexadas', { a: step.done ?? 0, b: step.total }) : '—';

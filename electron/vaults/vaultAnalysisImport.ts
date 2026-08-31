@@ -639,6 +639,7 @@ function updateWorkStatus(
              summary_status = CASE WHEN @summaryImported THEN @summaryStatus ELSE summary_status END,
              summary_at     = CASE WHEN @summaryImported THEN @summaryAt     ELSE summary_at     END,
              summary_hash   = CASE WHEN @summaryImported THEN @summaryHash   ELSE summary_hash   END,
+             summary_error  = CASE WHEN @summaryImported THEN NULL           ELSE summary_error  END,
              source_type    = COALESCE(source_type, @sourceType),
              creators_json  = COALESCE(creators_json, @creatorsJson)
        WHERE nodus_id = @targetId

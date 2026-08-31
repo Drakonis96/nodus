@@ -63,6 +63,7 @@ import { ORB_COLOR_CHOICES, orbHue } from '@shared/nodiOrb';
 import { NODI_DEFAULT_SCALE, NODI_SIZE_SCALES } from '@shared/nodiSize';
 import { effectiveSidebarHidden, isViewAllowedForVaultType } from '@shared/vaultTypes';
 import { DOCUMENT_INDEX_CONTINUOUS_AVAILABLE } from '@shared/documentIndexPolicy';
+import { validateBackupPassword } from '@shared/backupPasswordPolicy';
 import chromeWebStoreLogo from '../assets/brands/chrome-web-store.svg';
 
 type SettingsTabId = 'providers' | 'models' | 'library' | 'extraction' | 'interface' | 'integrations' | 'browser' | 'server' | 'system' | 'data' | 'about' | 'updates';
@@ -2714,19 +2715,27 @@ export function Settings({
                     </div>
                   ) : (
                     <div className="flex flex-wrap items-center gap-2">
-                      <div className="relative w-64">
-                        <input
-                          type={showAutoBackupPassword ? 'text' : 'password'}
-                          className="input w-full pr-10"
-                          placeholder={t('Contraseña maestra (mín. 8 caracteres)')}
-                          value={autoBackupPasswordInput}
-                          onChange={(e) => setAutoBackupPasswordInput(e.target.value)}
-                        />
-                        <button type="button" className="absolute right-2 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-neutral-100" onClick={() => setShowAutoBackupPassword((value) => !value)} aria-label={t(showAutoBackupPassword ? 'Ocultar contraseña' : 'Mostrar contraseña')} title={t(showAutoBackupPassword ? 'Ocultar contraseña' : 'Mostrar contraseña')}><Icon name={showAutoBackupPassword ? 'eyeOff' : 'eye'} size={17} /></button>
+                      <div className="flex w-64 flex-col gap-1">
+                        <div className="relative">
+                          <input
+                            type={showAutoBackupPassword ? 'text' : 'password'}
+                            className="input w-full pr-10"
+                            placeholder={t('Contraseña maestra (mín. 8 caracteres)')}
+                            value={autoBackupPasswordInput}
+                            onChange={(e) => setAutoBackupPasswordInput(e.target.value)}
+                            aria-describedby="settings-backup-password-requirement"
+                            aria-invalid={autoBackupPasswordInput.length > 0 && !validateBackupPassword(autoBackupPasswordInput).valid}
+                          />
+                          <button type="button" className="absolute right-2 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-neutral-100" onClick={() => setShowAutoBackupPassword((value) => !value)} aria-label={t(showAutoBackupPassword ? 'Ocultar contraseña' : 'Mostrar contraseña')} title={t(showAutoBackupPassword ? 'Ocultar contraseña' : 'Mostrar contraseña')}><Icon name={showAutoBackupPassword ? 'eyeOff' : 'eye'} size={17} /></button>
+                        </div>
+                        <small id="settings-backup-password-requirement" className={validateBackupPassword(autoBackupPasswordInput).valid ? 'text-emerald-400' : autoBackupPasswordInput.length > 0 ? 'text-red-400' : 'text-neutral-500'}>
+                          {validateBackupPassword(autoBackupPasswordInput).valid
+                            ? t('La contraseña cumple el mínimo de 8 caracteres.')
+                            : t('La contraseña debe tener al menos 8 caracteres. Los números y símbolos son opcionales.')}
+                        </small>
                       </div>
                       <button
                         className="btn btn-ghost border border-neutral-700"
-                        disabled={autoBackupPasswordInput.trim().length < 8}
                         onClick={async () => {
                           try {
                             await window.nodus.setBackupPassword(autoBackupPasswordInput);

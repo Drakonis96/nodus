@@ -57,6 +57,15 @@ try {
   assert.match(manager, /createHash\('sha256'\)/, 'downloads verify SHA-256');
   assert.match(manager, /'--mmproj'/, 'llama-server receives the multimodal projector');
   assert.match(manager, /'--embedding', '--pooling', 'mean'/, 'BGE runs through llama.cpp embedding mode');
+  const embeddingArgs = manager.match(/if \(mode === 'embedding'\) \{([\s\S]*?)\n  \}/)?.[1] ?? '';
+  assert.match(embeddingArgs, /'--batch-size', String\(contextPerSlot\)/,
+    'the logical embedding batch accepts one complete model-context input');
+  assert.match(embeddingArgs, /'--ubatch-size', String\(contextPerSlot\)/,
+    'the physical embedding batch accepts inputs above llama.cpp\'s 512-token default');
+  assert.doesNotMatch(embeddingArgs, /contextPerSlot \* slots/,
+    'the per-input batch limit is not inflated by concurrent slots');
+  assert.ok(embeddings.find((model) => model.id === 'bge-m3-q8_0').contextLength > 512,
+    'the regression fixture exercises a context larger than the old physical batch');
   assert.match(manager, /pipeline\('feature-extraction'/, 'INT8 ONNX models run through Transformers.js');
   assert.match(manager, /model\.runtime === 'llama_cpp'.*llamaServerPath/s, 'llama.cpp is installed automatically before a dependent model download');
   assert.match(manager, /installNodusLocalRuntime.*downloadModelAssets/s, 'runtime installation continues immediately into the requested model download');

@@ -37,7 +37,7 @@ try {
   assert.equal(db.pragma('user_version', { simple: true }), SCHEMA_VERSION);
   assert.ok(SCHEMA_VERSION >= 166, `expected schema v166 or later, got v${SCHEMA_VERSION}`);
   const workColumns = new Set(db.prepare('PRAGMA table_info(works)').all().map((row) => row.name));
-  for (const column of ['resolved_source_type', 'resolved_text_hash', 'text_block_reason', 'resolved_text_notes', 'deep_error', 'deep_queued']) {
+  for (const column of ['resolved_source_type', 'resolved_text_hash', 'text_block_reason', 'resolved_text_notes', 'deep_error', 'deep_queued', 'summary_error', 'zotero_title_markup']) {
     assert.ok(workColumns.has(column), `works.${column} exists`);
   }
   assert.ok(db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='work_text_sources'").get());
@@ -133,6 +133,39 @@ try {
     'v166 returns a first-generation legacy fallback to draft without discarding its version record'
   );
   legacyDictionaryDb.close();
+
+  // v172-v173 upgrade a real v171 vault in place: preserve its sync fingerprint,
+  // expose the failure-reason column, and move Zotero markup away from UI text.
+  db.exec('ALTER TABLE works DROP COLUMN summary_error; ALTER TABLE works DROP COLUMN zotero_title_markup;');
+  const rawRichTitle = '<span style="font-variant:small-caps;">CLE</span> peptides &amp; plant-biotic interactions';
+  db.prepare(`INSERT INTO works(nodus_id,zotero_key,zotero_version,zotero_fingerprint,title,summary_status)
+    VALUES('migration-173-rich','RICH',0,'stable-fingerprint',?,'failed')`).run(rawRichTitle);
+  db.prepare(`INSERT INTO works(nodus_id,title) VALUES('migration-173-empty','<i></i>')`).run();
+  db.pragma('user_version = 171');
+  runMigrations(db);
+  assert.deepEqual(
+    db.prepare(`SELECT title,zotero_title_markup,zotero_fingerprint,summary_error
+      FROM works WHERE nodus_id='migration-173-rich'`).get(),
+    {
+      title: 'CLE peptides & plant-biotic interactions',
+      zotero_title_markup: rawRichTitle,
+      zotero_fingerprint: 'stable-fingerprint',
+      summary_error: null,
+    },
+    'the title migration is display-safe without causing a false Zotero revision',
+  );
+  assert.deepEqual(
+    db.prepare(`SELECT title,zotero_title_markup FROM works WHERE nodus_id='migration-173-empty'`).get(),
+    { title: '(sin título)', zotero_title_markup: '<i></i>' },
+    'markup-only legacy titles receive a safe fallback while retaining the original value',
+  );
+  runMigrations(db);
+  assert.equal(
+    db.prepare(`SELECT zotero_title_markup FROM works WHERE nodus_id='migration-173-rich'`).get().zotero_title_markup,
+    rawRichTitle,
+    'the data migration is idempotent',
+  );
+  db.prepare(`DELETE FROM works WHERE nodus_id IN ('migration-173-rich','migration-173-empty')`).run();
   if (before) assert.deepEqual(counts(db), before, 'additive migration preserves corpus row counts');
   assert.deepEqual(db.pragma('quick_check'), [{ quick_check: 'ok' }]);
   assert.equal(db.pragma('foreign_key_check').length, 0);

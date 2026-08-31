@@ -37,7 +37,9 @@ function applyToWork(
     if (components.some((component) => ['deep', 'passages', 'ideas', 'embeddings'].includes(component))) {
       db.prepare("UPDATE works SET deep_status='pending' WHERE nodus_id=?").run(link.workId);
     }
-    if (components.includes('summary')) db.prepare("UPDATE works SET summary_status='pending' WHERE nodus_id=?").run(link.workId);
+    if (components.includes('summary')) {
+      db.prepare("UPDATE works SET summary_status='pending', summary_error=NULL WHERE nodus_id=?").run(link.workId);
+    }
     const statement = db.prepare(`
       INSERT INTO library_analysis_freshness (work_id, component, freshness, fingerprint, reason, updated_at)
       VALUES (?, ?, 'stale', ?, ?, ?)

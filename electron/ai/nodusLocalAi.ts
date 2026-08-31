@@ -925,7 +925,20 @@ async function ensureNodusLocalServerUnlocked(
     '--no-webui',
   ];
   if (model.projectorFile) args.push('--mmproj', path.join(modelDirectory(model.id), model.projectorFile));
-  if (mode === 'embedding') args.push('--embedding', '--pooling', 'mean');
+  if (mode === 'embedding') {
+    // llama.cpp's non-causal embedding path cannot split one input across
+    // micro-batches. Its defaults (n_batch=2048, n_ubatch=512) are collapsed to
+    // 512 by llama-server in embedding mode, which made BGE-M3 reject ordinary
+    // 513-token passages despite its advertised 8k context.
+    //
+    // This is a per-input limit, so it is deliberately not multiplied by slots.
+    // Keep logical and physical sizes equal, as encoder models require.
+    args.push(
+      '--batch-size', String(contextPerSlot),
+      '--ubatch-size', String(contextPerSlot),
+      '--embedding', '--pooling', 'mean',
+    );
+  }
   const child = spawn(executable, args, { cwd: path.dirname(executable), stdio: ['ignore', 'pipe', 'pipe'] });
   let output = '';
   const capture = (chunk: unknown) => { output = `${output}${String(chunk)}`.slice(-12_000); };

@@ -43,6 +43,17 @@ try {
   assert.equal(row.deep_hash, 'old-hash');
   assert.equal(row.resolved_source_type, 'epub');
 
+  works.setSummaryResult('w1', 'failed', 'summary-hash', 'provider exploded');
+  row = db.prepare('SELECT summary_status, summary_error FROM works WHERE nodus_id=?').get('w1');
+  assert.equal(row.summary_status, 'failed');
+  assert.equal(row.summary_error, 'provider exploded', 'summary failures retain the actionable provider reason');
+  works.setSummaryPending('w1');
+  row = db.prepare('SELECT summary_status, summary_error FROM works WHERE nodus_id=?').get('w1');
+  assert.equal(row.summary_status, 'pending');
+  assert.equal(row.summary_error, null, 'retrying clears the obsolete failure reason');
+  works.setSummaryResult('w1', 'done', 'summary-hash');
+  assert.equal(db.prepare('SELECT summary_error FROM works WHERE nodus_id=?').get('w1').summary_error, null);
+
   passages.replaceWorkPassages('w1', 'old-hash', [{ text: 'pasaje de la versión anterior', pageLabel: 'p. 1', sourceRef: 'zotero:user:0:A', pageNumber: 1, embedding: [1, 0] }]);
   assert.equal(passages.embeddedPassageCount(), 0, 'retrieval excludes passages whose hash differs from resolved text');
   assert.equal(passages.getPassageDetail('w1#0'), null, 'a stale passage cannot be recovered directly');

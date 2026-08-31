@@ -88,7 +88,7 @@ import {
   runAutoBackupNow,
   runBackupCleanupNow,
 } from './export/autoBackup';
-import { MIN_BACKUP_PASSWORD_LENGTH } from './export/backupCrypto';
+import { validateBackupPassword } from '@shared/backupPasswordPolicy';
 import {
   onChatGptSubscriptionStatusChanged,
 } from './ai/codexSubscription';
@@ -783,19 +783,19 @@ export function registerIpc(
   // automatic encrypted backups (master password lives in the OS keychain)
   h('sync:hasPassphrase', async () => hasSyncPassphrase());
   h('sync:setPassphrase', async (_e, passphrase: string) => {
-    const clean = passphrase.trim();
-    if (clean.length < MIN_BACKUP_PASSWORD_LENGTH) {
-      throw new Error(`La frase de sincronización debe tener al menos ${MIN_BACKUP_PASSWORD_LENGTH} caracteres.`);
+    const validation = validateBackupPassword(passphrase);
+    if (!validation.valid) {
+      throw new Error('La frase de sincronización debe tener al menos 8 caracteres.');
     }
-    setSyncPassphrase(clean);
+    setSyncPassphrase(validation.normalized);
   });
   h('sync:clearPassphrase', async () => clearSyncPassphrase());
   h('backup:setPassword', async (_e, password: string) => {
-    const clean = password.trim();
-    if (clean.length < MIN_BACKUP_PASSWORD_LENGTH) {
-      throw new Error(`La contraseña maestra debe tener al menos ${MIN_BACKUP_PASSWORD_LENGTH} caracteres.`);
+    const validation = validateBackupPassword(password);
+    if (!validation.valid) {
+      throw new Error('La contraseña maestra debe tener al menos 8 caracteres.');
     }
-    setBackupPassword(clean);
+    setBackupPassword(validation.normalized);
   });
   h('backup:clearPassword', async () => clearBackupPassword());
   h('backup:hasPassword', async () => hasBackupPassword());
